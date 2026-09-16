@@ -144,7 +144,11 @@ class MechanicalSystem(DynamicSystem):
         C = self.C(q, v, params)
         g = self.g(q, params)
         d = self.d(q, v, u, t, params)
-        return H @ acceleration + C @ v + g + d
+
+        # τ = H v̇ + C v + g + d
+        tau = H @ acceleration + C @ v + g + d
+
+        return tau
 
     def forward_dynamics(self, q, v, u, t=0.0, params=None):
         """Forward dynamics: generalized acceleration given ``u``."""
@@ -158,20 +162,30 @@ class MechanicalSystem(DynamicSystem):
 
         # H v̇ = τ − C v − g − d
         vdot = xp.linalg.solve(H, tau - C @ v - g - d)
+
         return vdot
 
     def f(self, x, u, t=0.0, params=None):
         params = self.params if params is None else params
         q, v = self.x2q(x)
         vdot = self.forward_dynamics(q, v, u, t, params)
-        return self.q2x(v, vdot)
+
+        # dx = [v; v̇]
+        dx = self.q2x(v, vdot)
+
+        return dx
 
     def h(self, x, u, t=0.0, params=None):
         return x
 
     def kinetic_energy(self, q, v, params=None):
         params = self.params if params is None else params
-        return 0.5 * (v @ (self.H(q, params) @ v))
+        H = self.H(q, params)
+
+        # T = ½ vᵀ H v
+        T = 0.5 * (v @ (H @ v))
+
+        return T
 
 
 class JaxMechanicalSystem(MechanicalSystem):
@@ -236,6 +250,7 @@ class JaxMechanicalSystem(MechanicalSystem):
 
         # H v̇ = τ − C v − g − d
         vdot = jnp.linalg.solve(H, tau - C @ v - g - d)
+
         return vdot
 
     def f(self, x, u, t=0.0, params=None):
@@ -244,4 +259,8 @@ class JaxMechanicalSystem(MechanicalSystem):
         u = jnp.asarray(u)
         q, v = self.x2q(x)
         vdot = self.forward_dynamics(q, v, u, t, params)
-        return self.q2x(v, vdot)
+
+        # dx = [v; v̇]
+        dx = self.q2x(v, vdot)
+
+        return dx

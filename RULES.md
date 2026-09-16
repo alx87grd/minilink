@@ -203,17 +203,34 @@ Systems-as-descriptions: CONSTITUTION.md §4.*
   ```
   Write the subsequent mathematical algebra using `xp` so the exact same equation path executes
   on both NumPy and JAX arrays without branching.
-- **5.3 Unpack parameters before equations; no `self.` in math lines:** Bind parameters to local
-  variables first. Use named temporaries in equation paths so the algebra stays readable.
-  Core equations must read as pure mathematics:
+- **5.3 Three beats in an equation path; no `self.` in math lines:** Every native-array
+  equation method (`f`, `h`, `g`, `margin`, `value`, `sdf`, `forward_dynamics`, …) is
+  three beats, with a blank line between them so the core equation is the thing the
+  eye lands on:
+
+  1. **Unpack.** Bind `params`, split `x`, and copy `self.` fields into short textbook
+     names. No `self.` remains in the algebra.
+  2. **Core math.** A short comment in textbook notation (rule 5.22), then the equation
+     as a **named assignment**. The equation is never on the `return` line.
+  3. **Output machinery.** Stack, wrap, or `return` the named result. This beat is
+     plumbing, not the lesson.
+
   ```python
   # Good:
+  params = self.params if params is None else params
   m, l, g, d = params["m"], params["l"], params["g"], params["d"]
+  xp = array_module(x)
+  theta, omega = x
+  tau = u[0]
+
+  # (m l²) ω̇ = τ − m g l sin(θ) − d ω
   dtheta = omega
-  domega = (u - m * g * l * xp.sin(theta) - d * omega) / (m * l**2)
-  
-  # Bad:
-  domega = (u - self.m * self.g * self.l * xp.sin(x[0])) / (self.m * self.l**2)
+  domega = (tau - m * g * l * xp.sin(theta) - d * omega) / (m * l**2)
+
+  return xp.array([dtheta, domega])
+
+  # Bad — self. in the algebra, and the equation lives on the return line:
+  return (u - self.m * self.g * self.l * xp.sin(x[0])) / (self.m * self.l**2)
   ```
 - **5.4 Mathematical naming conventions:**
   - Matrices: uppercase (`A`, `B`, `C`, `D`, `H`, `M`, `K`).
@@ -299,16 +316,17 @@ Systems-as-descriptions: CONSTITUTION.md §4.*
   for value objects — a `Trajectory`, a set, a shape, a certificate, a solver record; plain
   classes with `params` for parametric equation objects — systems, costs. Never dataclasses as
   input/output wrappers around arrays (rule 2.5). Use `ABC` only when enforcement helps.
-- **5.22 Comment the steps, not the file.** Core math (`f`, `h`, costs, maps) is ventilated:
-  blank lines between the main steps. A short comment sits on its own line above each step
-  that the symbols do not already make obvious. Skip the comment when the line reads like
-  the textbook (`dx = A @ x + B @ u`). Comments name the step; they do not restate the
-  algebra in prose. When the code cannot use the textbook's symbols (dictionary lookups,
-  library calls, vectorization), the step comment gives the equation in textbook notation,
-  `# TD error: delta_k = r_k + gamma V(x_k+1) - V(x_k)`, and names the locals after those
-  symbols (`sigma`, `eps`, `advantage`). That comment is the one place an equation lives: never
-  a module or method docstring. Apply this to new math; do not restyle an existing dense
-  equation path unless the maintainer asks.
+- **5.22 Comment the core math, not the file.** Beat 2 of rule 5.3 is the highlighted
+  equation: a blank line, a short comment on its own line, then a named assignment.
+  The comment is textbook notation (`# (m l²) ω̇ = τ − m g l sin(θ) − d ω`,
+  `# g = dxᵀ Q dx + duᵀ R du`, `# dx = A x + B u`). It names the step; it does not
+  restate the Python in prose. Skip the comment only when the assignment *is* the
+  textbook (`dx = A @ x + B @ u`) — the name and the blank lines still highlight it.
+  When the code cannot use the textbook's symbols (dictionary lookups, library calls,
+  `solve`), the comment is the one place the equation lives, and the locals take those
+  symbols (`vdot`, `sigma`, `eps`, `advantage`). Never put that equation on `return`;
+  never put it in a module or method docstring. Apply this to new math; when restyling
+  an existing path (only if the maintainer asks), use the three beats of rule 5.3.
 - **5.23 No preamble walls.** A module or demo opens with a one-line title docstring. Do not
   add a long introduction, section map, run recipe, or flag explanation at the top — the
   code plus inline comments must tell the story. Notebooks are course material: do not

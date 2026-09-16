@@ -41,7 +41,10 @@ class MassSpringDamper(DynamicSystem):
         params = self.params if params is None else params
         m, k, c = params["m"], params["k"], params["c"]
         p, v = x
+
+        # m p̈ + c ṗ + k p = u
         a = (u[0] - c * v - k * p) / m
+
         return np.array([v, a])
 
     def tf(self, x, u, t=0, params=None):

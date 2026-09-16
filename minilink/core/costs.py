@@ -227,13 +227,21 @@ class QuadraticCost(CostFunction):
         xbar, ubar = self.xbar, self.ubar
         dx = x - xbar
         du = u - ubar
-        return dx.T @ Q @ dx + du.T @ R @ du
+
+        # g = dxᵀ Q dx + duᵀ R du
+        g = dx.T @ Q @ dx + du.T @ R @ du
+
+        return g
 
     def h(self, x, t=0.0, params=None):
         """Return the quadratic terminal cost."""
         S, xbar = self.S, self.xbar
         dx = x - xbar
-        return dx.T @ S @ dx
+
+        # h = dxᵀ S dx
+        h = dx.T @ S @ dx
+
+        return h
 
 
 @dataclass(frozen=True)
@@ -267,7 +275,11 @@ class TimeCost(CostFunction):
         xbar = xp.asarray(self.xbar)
         eps = self.eps
         on_target = xp.linalg.norm(x - xbar) < eps
-        return xp.where(on_target, xp.asarray(0.0), xp.asarray(1.0))
+
+        # g = 0 on the target, 1 elsewhere
+        g = xp.where(on_target, xp.asarray(0.0), xp.asarray(1.0))
+
+        return g
 
     def h(self, x, t=0.0, params=None):
         """Return zero terminal cost."""
