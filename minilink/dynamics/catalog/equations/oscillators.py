@@ -27,7 +27,9 @@ class VanderPol(DynamicSystem):
 
         # Van der Pol oscillator: damping is negative (pumps energy) for |y| < 1
         ddy = -y + mu * dy * (1.0 - y**2)
-        return xp.array([dy, ddy])
+        dx = xp.array([dy, ddy])
+
+        return dx
 
     def h(self, x, u, t=0.0, params=None):
         return x
@@ -65,7 +67,9 @@ class Lorenz(DynamicSystem):
         dx = sigma * (y - x_val)
         dy = x_val * (rho - z) - y
         dz = x_val * y - beta * z
-        return xp.array([dx, dy, dz])
+        dx_dt = xp.array([dx, dy, dz])
+
+        return dx_dt
 
     def h(self, x, u, t=0.0, params=None):
         return x

@@ -203,17 +203,40 @@ Systems-as-descriptions: CONSTITUTION.md §4.*
   ```
   Write the subsequent mathematical algebra using `xp` so the exact same equation path executes
   on both NumPy and JAX arrays without branching.
-- **5.3 Unpack parameters before equations; no `self.` in math lines:** Bind parameters to local
-  variables first. Use named temporaries in equation paths so the algebra stays readable.
-  Core equations must read as pure mathematics:
+- **5.3 Three beats in an equation path; no `self.` in math lines:** Every native-array
+  equation method (`f`, `h`, `g`, `margin`, `value`, `sdf`, `forward_dynamics`, …) is
+  three beats, with a blank line between them so the core equation is the thing the
+  eye lands on:
+
+  1. **Unpack.** Bind `params`, split `x`, and copy `self.` fields into short textbook
+     names. No `self.` remains in the algebra.
+  2. **Core math.** The equation as a **named assignment**. A short textbook
+     comment belongs here only when it is not a copy of the code (rule 5.22).
+     The equation is never on the `return` line.
+  3. **Output machinery.** Stack, wrap, or `return` the named result. This beat is
+     plumbing, not the lesson.
+
   ```python
-  # Good:
+  # Good — the comment is the implicit form; the code is the solved assignment:
+  params = self.params if params is None else params
   m, l, g, d = params["m"], params["l"], params["g"], params["d"]
+  xp = array_module(x)
+  theta, omega = x
+  tau = u[0]
+
+  # (m l²) ω̇ = τ − m g l sin(θ) − d ω
   dtheta = omega
-  domega = (u - m * g * l * xp.sin(theta) - d * omega) / (m * l**2)
-  
-  # Bad:
-  domega = (u - self.m * self.g * self.l * xp.sin(x[0])) / (self.m * self.l**2)
+  domega = (tau - m * g * l * xp.sin(theta) - d * omega) / (m * l**2)
+
+  return xp.array([dtheta, domega])
+
+  # Good — the assignment is already the textbook; no copy-comment:
+  dx = A @ x + B @ u
+
+  return dx
+
+  # Bad — self. in the algebra, and the equation lives on the return line:
+  return (u - self.m * self.g * self.l * xp.sin(x[0])) / (self.m * self.l**2)
   ```
 - **5.4 Mathematical naming conventions:**
   - Matrices: uppercase (`A`, `B`, `C`, `D`, `H`, `M`, `K`).
@@ -299,16 +322,18 @@ Systems-as-descriptions: CONSTITUTION.md §4.*
   for value objects — a `Trajectory`, a set, a shape, a certificate, a solver record; plain
   classes with `params` for parametric equation objects — systems, costs. Never dataclasses as
   input/output wrappers around arrays (rule 2.5). Use `ABC` only when enforcement helps.
-- **5.22 Comment the steps, not the file.** Core math (`f`, `h`, costs, maps) is ventilated:
-  blank lines between the main steps. A short comment sits on its own line above each step
-  that the symbols do not already make obvious. Skip the comment when the line reads like
-  the textbook (`dx = A @ x + B @ u`). Comments name the step; they do not restate the
-  algebra in prose. When the code cannot use the textbook's symbols (dictionary lookups,
-  library calls, vectorization), the step comment gives the equation in textbook notation,
-  `# TD error: delta_k = r_k + gamma V(x_k+1) - V(x_k)`, and names the locals after those
-  symbols (`sigma`, `eps`, `advantage`). That comment is the one place an equation lives: never
-  a module or method docstring. Apply this to new math; do not restyle an existing dense
-  equation path unless the maintainer asks.
+- **5.22 Comment only when it is not a copy of the code.** Beat 2 of rule 5.3 is
+  the highlighted equation: a blank line, then a named assignment. Add a short
+  textbook comment on its own line only when that comment is *not* a copy of the
+  assignment — when the code cannot write the textbook form (`# (m l²) ω̇ = τ − …`
+  above a solved `domega = (tau - …) / (m * l**2)`; `# H v̇ = τ − C v − g − d`
+  above `solve`; `# dx = [v; v̇]` above `q2x`; `# g = 0 on the target, 1 elsewhere`
+  above `xp.where`). Skip the comment when the assignment is already ~90% the
+  textbook (`dx = A @ x + B @ u`, `g = dx.T @ Q @ dx + du.T @ R @ du`,
+  `H = xp.array([[m * l**2 + I]])`) — the name and the blank lines still highlight
+  it. Never put the equation on `return`; never put it in a module or method
+  docstring. Apply this to new math; when restyling an existing path (only if the
+  maintainer asks), use the three beats of rule 5.3.
 - **5.23 No preamble walls.** A module or demo opens with a one-line title docstring. Do not
   add a long introduction, section map, run recipe, or flag explanation at the top — the
   code plus inline comments must tell the story. Notebooks are course material: do not
@@ -353,13 +378,13 @@ Systems-as-descriptions: CONSTITUTION.md §4.*
 - **6.8 Demo-gate maturity.** Nothing enters the teaching surface without a demo or notebook,
   a both-backends test where it defines dynamics, and a docstring (ROADMAP.md §2).
 - **6.9 Public-facing prose is foundational, not a bake-off.** README, the three showcases,
-  `docs/pitch/`, and the docs landing page stay positive about minilink and never name
+  and the docs landing page stay positive about minilink and never name
   other tools. Framing: minilink bridges capabilities that usually live in separate tools.
   No superlatives; quote measured notebook batches, never a per-call speedup. The main
   line is readable by an undergraduate; expert depth sits in short "under the hood"
-  asides. The README does not link the pitch deck for now. GIF assets stay under 1 MB
+  asides. GIF assets stay under 1 MB
   and use catalog plant framing (the MPC clip may follow the car). Before pushing those
-  files, `grep -rniE "simulink|matlab|drake|casadi|mujoco"` over README, the slides, and the
+  files, `grep -rniE "simulink|matlab|drake|casadi|mujoco"` over README and the
   showcase notebook markdown must be empty (the `-E` matters: without it the alternation is
   literal and the gate passes on anything). `test_repo_contract.py` runs the same check.
 - **6.10 Flat demos.** No functions or classes in a demo or a teaching notebook except the

@@ -26,7 +26,7 @@ jobs:
     - name: Install dependencies (full optional stack)
       run: |
         python -m pip install --upgrade pip
-        pip install -e ".[dev,jax,visualization,plotting,rl,ipopt]"
+        pip install -e ".[dev,jax,visualization,plotting,rl,ipopt,diagrams]"
 
     - name: All example scripts under examples/demos
       env:

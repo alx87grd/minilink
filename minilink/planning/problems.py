@@ -317,17 +317,21 @@ class StochasticPlanningProblem(PlanningProblem):
         Law of the initial state ``x(0) ~ p(x0)``. Its mean is the default
         ``x_start`` and its support (when it has one) the default ``X0``.
     params_distribution : mapping, optional
-        ``{name: Distribution}`` over entries of ``sys.params`` (domain
-        randomization, robustness sweeps); each sample overrides those entries.
-        A dotted name reaches into a diagram's subsystem params
-        (``"sys.mass"`` for the plant inside a closed loop).
+        Mapping of parameter names to :class:`~minilink.core.distributions.Distribution`
+        over entries of ``sys.params`` (domain randomization, robustness
+        sweeps); each sample overrides those entries. A dotted name reaches
+        into a diagram's subsystem params (``sys.mass`` for the plant inside
+        a closed loop).
     disturbances : mapping, optional
-        ``{port_id: Distribution}`` over input ports of ``sys``: a fresh draw
-        per step held on that port (a seeded disturbance signal).
+        Mapping of input port ids to :class:`~minilink.core.distributions.Distribution`
+        on ``sys``: a fresh draw per step held on that port (a seeded
+        disturbance signal).
     criterion : {"expectation", "worst_case"}
         What "optimal" means over the draws. Reinforcement learning optimizes
         the expectation; Monte Carlo evaluation reports both.
 
+    Notes
+    -----
     Solve verbs (RL, gain search) and the evaluate verb (Monte Carlo) both
     read this description; :meth:`nominal` returns the certainty-equivalent
     :class:`PlanningProblem` for trajectory optimization and LQR.

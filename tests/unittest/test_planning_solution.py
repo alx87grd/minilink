@@ -212,7 +212,10 @@ def test_grid_policies_roll_out_as_held_input_closed_loops(make):
         solution = planner.solve(episodes=300, evaluate=True)
     assert not solution.open_loop and solution.evaluation.n_trials == 1
     planned = solution.trajectory
-    law = lambda x, t: solution.policy.action(x)  # noqa: E731
+
+    def law(x, t):
+        return solution.policy.action(x)
+
     x_hand = held_input_rollout(problem.sys, law, planned.t, problem.x_start)
     np.testing.assert_allclose(planned.x, x_hand, atol=1e-10)
     # the same rollout is what plot_solution draws, and the cost-to-go is the planner's table

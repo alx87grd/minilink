@@ -41,7 +41,5 @@ def _resolve_topology_exporter(backend):
 
         return MermaidTopologyExporter()
     raise ValueError(
-        "Unknown topology backend {!r}. Expected 'graphviz' or 'mermaid'.".format(
-            backend
-        )
+        f"Unknown topology backend {backend!r}. Expected 'graphviz' or 'mermaid'."
     )

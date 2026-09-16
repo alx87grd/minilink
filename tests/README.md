@@ -67,6 +67,7 @@ Workflow: [`.github/workflows/test.yml`](../.github/workflows/test.yml).
 | Job | Steps |
 | --- | --- |
 | **`test`** | ruff + `pytest` (py 3.10–3.13; demo-check bridge; JAX demos may skip) |
+| **`packaging`** | `python -m build` + wheel/sdist check (no `experimental/`) + `twine check` + install the wheel and `import minilink` |
 | **`regression`** | regression gates `--suite all --tiny …` + **flagship demos** + **notebook smoke** (py 3.12 + JAX + viz) |
 
 ### At a glance
@@ -81,6 +82,7 @@ Workflow: [`.github/workflows/test.yml`](../.github/workflows/test.yml).
 | **Demo checks** | `run_demo_checks.py` | `tests/demo_checks/run_*.py` | `test` + `regression` |
 | **Notebook smoke** | `run_notebook_checks.py` | `tests/demo_checks/run_notebook_checks.py` | `regression` |
 | **Pre-push** | `run_pre_push.py` | ruff + pytest | `test` |
+| **Packaging** | — | `python -m build` + `check_wheel.py` | `packaging` |
 
 ### Performance — regression gates vs benchmark study vs host context
 
@@ -113,6 +115,7 @@ Detail: [benchmarks/README.md](../benchmarks/README.md).
 | **Demo checks** | Catalog + flagship demos must not throw | `run_catalog_checks.py`, `run_flagship_demos.py` | `test` (pytest bridge) + `regression` (full flagships w/ JAX) |
 | **Notebook smoke** | Teaching notebooks' code cells must not throw | `run_notebook_checks.py` | `regression` |
 | **Repo contract** | Doc links resolve, public prose names no other tool, no pseudo-private methods | `test_repo_contract.py` (in `pytest`) | `test` |
+| **Packaging** | Wheel/sdist ship the teaching surface, not `experimental/` | `python -m build` + `tests/demo_checks/check_wheel.py` | `packaging` |
 
 ## Local environment
 
@@ -198,7 +201,7 @@ Or install library extras in another Python 3.10+ environment (this is not the
 Full teaching stack — no Jupyter / SB3; see [install.md](../install.md)):
 
 ```bash
-pip install -e ".[dev,symbolic,jax,visualization,plotting,ipopt,rl]"
+pip install -e ".[dev,full,ipopt]"
 SDL_VIDEODRIVER=dummy pytest
 ```
 

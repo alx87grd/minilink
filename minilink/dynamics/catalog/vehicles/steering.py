@@ -45,13 +45,15 @@ class KinematicBicycle(DynamicSystem):
         xp = array_module(x, u)
 
         # kinematic bicycle: heading turns at speed * tan(steering) / wheelbase
-        return xp.array(
+        dx = xp.array(
             [
                 speed * xp.cos(theta),
                 speed * xp.sin(theta),
                 speed * xp.tan(steering) / length,
             ]
         )
+
+        return dx
 
     def h(self, x, u, t=0.0, params=None):
         return x
@@ -147,7 +149,9 @@ class HolonomicMobileRobot(DynamicSystem):
 
     def f(self, x, u, t=0.0, params=None):
         # holonomic point: velocity command integrates straight to position
-        return array_module(u).asarray(u)
+        dx = array_module(u).asarray(u)
+
+        return dx
 
     def h(self, x, u, t=0.0, params=None):
         return x

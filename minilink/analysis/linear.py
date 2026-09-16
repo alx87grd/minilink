@@ -234,7 +234,9 @@ def _bracket_unit_gain(A, B, C, D, w_min, w_max, *, decades=8):
     plateau and stops the walk), upward while it is above one. At most
     ``decades`` steps each way.
     """
-    magnitude = lambda w: abs(frequency_response(A, B, C, D, [w])[0])  # noqa: E731
+
+    def magnitude(w):
+        return abs(frequency_response(A, B, C, D, [w])[0])
 
     low = magnitude(w_min)
     for _ in range(decades):

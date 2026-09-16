@@ -115,7 +115,10 @@ class GeneralizedMechanicalSystem(DynamicSystem):
     def qdot(self, q, v, params=None):
         """Configuration derivative ``qdot = N(q) @ v``."""
         params = self.params if params is None else params
-        return self.N(q, params) @ v
+
+        qdot = self.N(q, params) @ v
+
+        return qdot
 
     def inverse_dynamics(self, q, v, acceleration, u=None, t=0.0, params=None):
         """Generalized RHS force required by a trajectory."""
@@ -124,7 +127,10 @@ class GeneralizedMechanicalSystem(DynamicSystem):
         C = self.C(q, v, params)
         g = self.g(q, params)
         d = self.d(q, v, u, t, params)
-        return M @ acceleration + C @ v + g + d
+
+        tau = M @ acceleration + C @ v + g + d
+
+        return tau
 
     def forward_dynamics(self, q, v, u, t=0.0, params=None):
         """Velocity derivative from forward dynamics."""
@@ -136,19 +142,30 @@ class GeneralizedMechanicalSystem(DynamicSystem):
         tau = self.generalized_force(q, v, u, t, params)
         rhs = tau - C @ v - g - d
         xp = array_module(rhs)
-        return xp.linalg.solve(M, rhs)
+
+        # M v̇ = τ − C v − g − d
+        vdot = xp.linalg.solve(M, rhs)
+
+        return vdot
 
     def f(self, x, u, t=0.0, params=None):
         params = self.params if params is None else params
         q, v = self.x2qv(x)
-        return self.qv2x(
-            self.qdot(q, v, params),
-            self.forward_dynamics(q, v, u, t, params),
-        )
+        qdot = self.qdot(q, v, params)
+        vdot = self.forward_dynamics(q, v, u, t, params)
+
+        # dx = [q̇; v̇]
+        dx = self.qv2x(qdot, vdot)
+
+        return dx
 
     def h(self, x, u, t=0.0, params=None):
         return x
 
     def kinetic_energy(self, q, v, params=None):
         params = self.params if params is None else params
-        return 0.5 * (v @ (self.M(q, params) @ v))
+        M = self.M(q, params)
+
+        T = 0.5 * (v @ (M @ v))
+
+        return T

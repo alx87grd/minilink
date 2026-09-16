@@ -93,8 +93,9 @@ class Sphere(Shape):
         center = self.center
         radius = self.radius
 
-        # signed distance to the sphere surface
-        return xp.linalg.norm(p - center) - radius
+        sdf = xp.linalg.norm(p - center) - radius
+
+        return sdf
 
 
 @dataclass(frozen=True)
@@ -132,7 +133,9 @@ class Box(Shape):
 
         # per-axis signed gap, then split exterior distance and interior depth
         d = xp.maximum(lower - p, p - upper)
-        return xp.linalg.norm(xp.maximum(d, 0.0)) + xp.minimum(xp.max(d), 0.0)
+        sdf = xp.linalg.norm(xp.maximum(d, 0.0)) + xp.minimum(xp.max(d), 0.0)
+
+        return sdf
 
 
 @dataclass(frozen=True)
@@ -161,9 +164,11 @@ class Union(Shape):
 
         # nearest surface among members; reduce with xp.minimum so it traces
         # under JAX (Python min() would compare traced values and break jit)
-        return functools.reduce(
+        sdf = functools.reduce(
             xp.minimum, (shape.sdf(p, t, params) for shape in self.shapes)
         )
+
+        return sdf
 
 
 @dataclass(frozen=True)
@@ -187,7 +192,9 @@ class Inflated(Shape):
         radius = self.radius
 
         # grow the solid by radius: every surface moves outward
-        return base.sdf(p, t, params) - radius
+        sdf = base.sdf(p, t, params) - radius
+
+        return sdf
 
 
 if __name__ == "__main__":

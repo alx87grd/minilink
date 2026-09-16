@@ -60,27 +60,33 @@ class SingleMass(StateSpaceSystem):
 
         # mass * x'' + b * x' + k * x = u, state = [position, velocity]
         # fmt: off
-        return np.array([
+        A = np.array([
             [      0.0,       1.0],
             [-k / mass, -b / mass],
         ])
         # fmt: on
+
+        return A
 
     def B(self, t=0.0, params=None):
         params = self.params if params is None else params
         mass = params["mass"]
 
         # the force enters through the acceleration row
-        return np.array(
+        B = np.array(
             [
                 [0.0],
                 [1.0 / mass],
             ]
         )
 
+        return B
+
     def C(self, t=0.0, params=None):
         # measure the position of the mass
-        return np.array([[1.0, 0.0]])
+        C = np.array([[1.0, 0.0]])
+
+        return C
 
     def D(self, t=0.0, params=None):
         return np.array([[0.0]])
@@ -136,7 +142,7 @@ class TwoMass(StateSpaceSystem):
 
         # m1 x1'' = -(k1 + k2) x1 + k2 x2 - b1 x1';  m2 x2'' = k2 (x1 - x2) - b2 x2'
         # fmt: off
-        return np.array([
+        A = np.array([
             [            0.0,      0.0,      1.0,      0.0],
             [            0.0,      0.0,      0.0,      1.0],
             [-(k1 + k2) / m1,  k2 / m1, -b1 / m1,      0.0],
@@ -144,12 +150,14 @@ class TwoMass(StateSpaceSystem):
         ])
         # fmt: on
 
+        return A
+
     def B(self, t=0.0, params=None):
         params = self.params if params is None else params
         m2 = params["m2"]
 
         # the force enters on the second mass
-        return np.array(
+        B = np.array(
             [
                 [0.0],
                 [0.0],
@@ -157,6 +165,8 @@ class TwoMass(StateSpaceSystem):
                 [1.0 / m2],
             ]
         )
+
+        return B
 
     def C(self, t=0.0, params=None):
         C, _ = _mass_output_matrix(2, self.output_mass)
@@ -224,7 +234,7 @@ class ThreeMass(StateSpaceSystem):
 
         # nearest-neighbour spring/damper coupling along the chain
         # fmt: off
-        return np.array([
+        A = np.array([
             [            0.0,             0.0,      0.0,      1.0,      0.0,      0.0],
             [            0.0,             0.0,      0.0,      0.0,      1.0,      0.0],
             [            0.0,             0.0,      0.0,      0.0,      0.0,      1.0],
@@ -234,12 +244,14 @@ class ThreeMass(StateSpaceSystem):
         ])
         # fmt: on
 
+        return A
+
     def B(self, t=0.0, params=None):
         params = self.params if params is None else params
         m3 = params["m3"]
 
         # the force enters on the third mass
-        return np.array(
+        B = np.array(
             [
                 [0.0],
                 [0.0],
@@ -249,6 +261,8 @@ class ThreeMass(StateSpaceSystem):
                 [1.0 / m3],
             ]
         )
+
+        return B
 
     def C(self, t=0.0, params=None):
         C, _ = _mass_output_matrix(3, self.output_mass)

@@ -223,14 +223,23 @@ class QuadraticCost(CostFunction):
 
     def g(self, x, u, t=0.0, params=None):
         """Return the quadratic running cost."""
-        dx = x - self.xbar
-        du = u - self.ubar
-        return dx.T @ self.Q @ dx + du.T @ self.R @ du
+        Q, R = self.Q, self.R
+        xbar, ubar = self.xbar, self.ubar
+        dx = x - xbar
+        du = u - ubar
+
+        g = dx.T @ Q @ dx + du.T @ R @ du
+
+        return g
 
     def h(self, x, t=0.0, params=None):
         """Return the quadratic terminal cost."""
-        dx = x - self.xbar
-        return dx.T @ self.S @ dx
+        S, xbar = self.S, self.xbar
+        dx = x - xbar
+
+        h = dx.T @ S @ dx
+
+        return h
 
 
 @dataclass(frozen=True)
@@ -262,8 +271,13 @@ class TimeCost(CostFunction):
         """Return unit running cost away from the target, zero on it."""
         xp = array_module(x)
         xbar = xp.asarray(self.xbar)
-        on_target = xp.linalg.norm(x - xbar) < self.eps
-        return xp.where(on_target, xp.asarray(0.0), xp.asarray(1.0))
+        eps = self.eps
+        on_target = xp.linalg.norm(x - xbar) < eps
+
+        # g = 0 on the target, 1 elsewhere
+        g = xp.where(on_target, xp.asarray(0.0), xp.asarray(1.0))
+
+        return g
 
     def h(self, x, t=0.0, params=None):
         """Return zero terminal cost."""
@@ -316,9 +330,15 @@ class ScaledCost(CostFunction):
     def g(self, x, u, t=0.0, params=None):
         """Return the weighted running cost."""
         weight = self.weight
-        return weight * self.cost.g(x, u, t, params)
+
+        g = weight * self.cost.g(x, u, t, params)
+
+        return g
 
     def h(self, x, t=0.0, params=None):
         """Return the weighted terminal cost."""
         weight = self.weight
-        return weight * self.cost.h(x, t, params)
+
+        h = weight * self.cost.h(x, t, params)
+
+        return h

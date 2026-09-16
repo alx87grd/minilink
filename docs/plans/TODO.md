@@ -15,7 +15,7 @@ updates only where a public contract changes.
 
 | Section | Phase |
 | --- | --- |
-| [§1](#1-phase-d--docs-as-plan-of-record) | D — docs (in progress) |
+| [§1](#1-phase-d--docs-as-plan-of-record) | D — docs (complete) |
 | [§2](#2-phase-0--first-hour-safety) | 0 — first-hour safety |
 | [§3](#3-phase-1--teaching-contract-and-the-gro860-path) | 1 — teaching contract + GRO860 path |
 | [§4](#4-phase-2--the-jax-claim-and-the-research-facade) | 2 — JAX claim + research facade |
@@ -71,7 +71,7 @@ updates only where a public contract changes.
 - [ ] ~~**S16 Delete the `_jit` aliases**~~ — **kept** (ruled 2026-09-06). Original note: `register_jit_aliases`, `_TRACE_TIER_SUFFIXES`, six call sites, `test_f_jit_alias_identity`, DESIGN §5 sentence. 24 alias methods, zero call sites.
 - [ ] ~~**S17 Delete the 28 unreferenced evaluator methods**~~ — **kept** (ruled 2026-09-06). Original list: `euler_integrate_ivp_p`, `euler_integrate_ivp_trace`, `euler_integrate_ivp_trace_p`, `euler_integrate_zoh_p`, `euler_integrate_zoh_trace_p`, `euler_step_ivp_p`, `euler_step_ivp_trace`, `euler_step_ivp_trace_p`, `euler_step_trace`, `euler_step_trace_p`, `f_ivp_scipy`, `f_scipy`, `integrate_zoh_p`, `outputs_trace_p`, `rk4_integrate_ivp_p`, `rk4_integrate_ivp_trace`, `rk4_integrate_ivp_trace_p`, `rk4_integrate_linear_trace`, `rk4_integrate_linear_trace_p`, `rk4_integrate_zoh_trace_p`, `rk4_step_ivp`, `rk4_step_ivp_p`, `rk4_step_ivp_trace`, `rk4_step_ivp_trace_p`, `rk4_step_trace_p`, `rollout_p`, `step_block`, `step_trace_p`. Keep the frozen subset DESIGN §5 names.
 - [x] **S18 Wheel excludes the research lane** (approved). `pyproject.toml` `[tool.hatch.build.targets.wheel]` excludes `minilink/experimental/symbolic/**`, `minilink/experimental/engines/**`, `minilink/experimental/c_export.py`; `examples/` were never shipped. Done when `python -m build` produces a wheel without those paths and the suite (run from the repo) stays green.
-- [x] **S19 `c_export` in the nightly sweep**. Add both `examples/experimental/c_export/` scripts to the nightly manifest with `requires: ["jax"]` (TRL row already in ROADMAP).
+- [x] **S19 `c_export` flagship smoke** (not nightly). Both `examples/experimental/c_export/` scripts are in `tests/demo_checks/flagship_manifest.json` (`requires: ["jax"]`); the regression job runs them. Nightly only sweeps `examples/demos/`. TRL 1 (2026-09-16): Agent MVP, no user-check; keep isolated, not autodoc.
 - [x] **S20 Nightly full demo sweep**. `.github/workflows/nightly.yml` running `run_all_demos.py --timeout 120 --continue-on-error` and `run_notebook_checks.py` on a schedule + `workflow_dispatch`.
 - [x] **S21 Branch hygiene** — script listed local branches merged into `main` and the `cursor/*` remotes (session log retired 2026-09-16).
 - [x] **S41 Consolidation inventory** (report only) — [../reviews/2026-09-05-consolidation-inventory.md](../reviews/2026-09-05-consolidation-inventory.md). Ranked table of maintenance-cost items — text edited twice, dead API, boilerplate classes, twin plants, plotting homes, research code in the teaching tree — each with lines, blast radius, and what it does *not* remove. Maintainer picks; picked items become steps in §4/§5.
@@ -114,16 +114,17 @@ After the term, in the order the cohort's questions suggest:
 - [ ] **S31** `HybridDiagram` → `HybridLoop`, `%` → `on_schedule()` — or promotion to a `System` (ROADMAP §6, v1.0). **[ask — core]**
 - [ ] **S32** Unify `MechanicalSystem` / `GeneralizedMechanicalSystem` (`N = I` special case); `Boat2D` / `Plane3D` gain `q` / `dq` ports. **[ask — core]**
 - [x] Frequency analysis — NumPy-only on the state-space channel: `pzmap`, `nyquist`, `margins`, `root_locus`, `step_response` and their plots (2026-09-07).
-- [x] **Pitch-driven (2026-09-09)** — auto-fit camera (`camera_scale=None` default, `bounding_points`, `camera_fit` flag; pendulum follows `params["l"]`, cart-pole ground via `ground_line`); `RRTPlanner(problem)` default bang-bang `KinodynamicExtender` (0.3 s edges) and `RRTOptions` / extenders on the planning band and root prelude; DESIGN §5 speed note; ROADMAP §1 north star = the pitch.
+- [x] **Pitch-driven (2026-09-09)** — auto-fit camera (`camera_scale=None` default, `bounding_points`, `camera_fit` flag; pendulum follows `params["l"]`, cart-pole ground via `ground_line`); `RRTPlanner(problem)` default bang-bang `KinodynamicExtender` (0.3 s edges) and `RRTOptions` / extenders on the planning band and root prelude; DESIGN §5 speed note. (The five-slide docs landing was removed 2026-09-16; the user guide is `examples/tutorial/`.)
 - [x] **RL as primary planner (2026-09-10)** — `ReinforcementLearningPlanner` with pure-JAX PPO/SAC, `StochasticPlanningProblem`, `NeuralPolicyController`, `MonteCarloEvaluator`; verified on UR5 showcase; canonical demos in `examples/demos/rl/` and intro chapter `11_reinforcement_learning.ipynb`.
 - [x] **Lyapunov certificates (2026-09-11)** — `region_of_attraction()` returning `LyapunovCertificate` with `verify()`, `contains()`, `plot()`, and system shortcuts; verified on UR5 impedance loop in `showcase_from_rl_to_bode.ipynb`.
 - [x] **CBF design doc (2026-09-11)** — [docs/plans/cbf-safety-filter.md](cbf-safety-filter.md): $C^1$ bicubic SDF interpolation in JAX, DCBF with slacks, HOCBF relative degree, and `CBFSafetyFilter` block.
-- [ ] PyPI publication as a third install option (conda stays recommended). **[ask]**
-- [ ] **S41** Profile `rollout_batch` with a `params` family: 278 ms vs 27 ms for the plain batch (pendulum, 1000 × 1000 RK4 steps, 2026-09-09). Done when the family path is within 2× of the plain batch.
-- [ ] **S42** `plot_cost2go` colour scale clipped at `out_of_bound_cost` by default (the showcase passes `jmax` by hand); review the DP `out_of_bound_cost` default.
+- [x] **v0.1 pip packaging (2026-09-16)** — hatch-vcs `__version__`, Graphviz as the `[diagrams]` extra, CI installs that extra. Same day: `[full]` extra, sdist excludes `experimental/`, CI `packaging` job, Trusted Publishing workflow. `pip install minilink` is a v0.1 goal; conda from `environment.yml` stays the Full local stack.
+- [x] **v0.1 docs freeze (2026-09-16)** — Sphinx autodoc of the teaching-lane API only (`docs/api/experimental.rst` dropped); user guide is `examples/tutorial/`; README API + PyPI badges; C export TRL 1. Install: PyPI one-liner after the `0.1.0` tag, plus conda Full local (install.md).
+- [x] **PyPI publication (v0.1, 2026-09-16)** — repo ready: `.github/workflows/publish.yml` uploads from a `0.*` tag via Trusted Publishing. First upload is the maintainer `0.1.0` tag after GitHub Environment `pypi` and the PyPI pending publisher (`alx87grd` / `minilink` / `publish.yml` / env `pypi`). **[ask remaining]** register those, then `git tag 0.1.0 && git push origin 0.1.0`.
+- [ ] **S53** Profile `rollout_batch` with a `params` family: 278 ms vs 27 ms for the plain batch (pendulum, 1000 × 1000 RK4 steps, 2026-09-09). Done when the family path is within 2× of the plain batch.
+- [ ] **S54** `plot_cost2go` colour scale clipped at `out_of_bound_cost` by default (the showcase passes `jmax` by hand); review the DP `out_of_bound_cost` default.
 - [ ] **S43** Constructor-derived `camera_scale` hints (boat, steering, propulsion, plane, arms, rotating cart-poles) → auto-fit or params-derived; convert raw ground `CustomLine`s in catalog skins to `ground_line()` so the `camera_fit` flag applies.
 - [ ] **S44** A single posed-geometry hook so "two functions" (`f` + drawing) is literal; today `tf` + skin. **[ask — core]**
-- [ ] **S45** `c_export` in the nightly sweep (on the pitch deck as experimental).
 - [ ] **S36** iLQR planner from parts (`jacfwd` of `f_trace`; idea, research lane).
 - [ ] **S27** Diffrax as an optional JAX solver backend (later; not short-term).
 - [ ] **S37** Evaluator / solver re-layering (v1.0; after S27).

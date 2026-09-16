@@ -12,8 +12,8 @@ Identity: [CONSTITUTION.md](CONSTITUTION.md).
 
 | Release | Milestone | When |
 | --- | --- | --- |
-| **v0.1** | **GRO860 end to end.** Every topic of the running optimal-control & RL course runs on the teaching surface, in Colab (git-clone cell) and in the conda env: value iteration / DP on a grid · LQR + linearization · trajectory optimization · RL via native `ReinforcementLearningPlanner` (with `Sys2Gym` + SB3 as an optional bridge). See §4.1. | Fall 2026 — term in progress; hardening lands during the term without breaking names the course notebooks already use |
-| **v0.2** | **GRO501 end to end** (the classical-control course: multi-physics modelling · root locus / Bode / margins · PID to spec · digital implementation · state feedback, pole placement, LQR, observers — see §4.2), **pyro parity + the GMC714 modelling ladder** (manipulators, four-rung vehicle ladder, robotic controllers), the deferred v0.1 items in §5 Phase 2, and a `pip install minilink` option (conda stays the recommended local install). | Winter 2027 |
+| **v0.1** | **GRO860 end to end**, plus a working **`pip install minilink` on PyPI**. Every topic of the running optimal-control & RL course runs on the teaching surface, in Colab (git-clone cell) and in the conda env: value iteration / DP on a grid · LQR + linearization · trajectory optimization · RL via native `ReinforcementLearningPlanner` (with `Sys2Gym` + SB3 as an optional bridge). See §4.1. | Fall 2026 — **0.1.0 cut**; the `0.1.0` tag publishes the wheel from GitHub. Conda from `environment.yml` stays the Full local stack. Names the course notebooks already use stay frozen. |
+| **v0.2** | **GRO501 end to end** (the classical-control course: multi-physics modelling · root locus / Bode / margins · PID to spec · digital implementation · state feedback, pole placement, LQR, observers — see §4.2), **pyro parity + the GMC714 modelling ladder** (manipulators, four-rung vehicle ladder, robotic controllers), and the deferred v0.1 items in §5 Phase 2. Conda stays the recommended Full local install. | Winter 2027 |
 | **v1.0** | The foundation questions deferred in §6 (hybrid as a `System`, evaluator/solver layering, geometry unification), after two cohorts. | 2027 |
 
 ## 2. Two lanes
@@ -68,15 +68,15 @@ a release process by themselves.
 
 | Area | Lane | TRL | Rationale | Next |
 | --- | --- | --- | --- | --- |
-| Core + diagrams | teaching | 7 | Public API and diagram API stable; compile-vs-reference parity tested. | Shape validation at compile; derived `x0` (v1.0). |
-| Compile (`core/compile/`) | teaching (frozen subset) | 4 | Integrated; ~30 unreferenced integration helpers and `_jit` aliases still on the surface. Speed lives in batches: 1000 rollouts × 1000 RK4 steps in 27 ms; a single jitted `f` call is no faster than NumPy. | Delete the unused grid; float64 policy; profile `rollout_batch` with a `params` family (10× slower than the plain batch, 2026-09-09); re-layering deferred to v1.0. |
-| Simulation | teaching | 7 | Mature workflow; stable solvers/forcing. | Fixed output count by default; unify `verbose` flag names. |
-| Dynamics (abstraction + catalog) | teaching | 7 | Plants QA'd; `MechanicalSystem` / `Manipulator`; UR5 ABA/RNEA. **Every catalog plant compiles on both backends** (`xp` sweep 2026-09-06, contract test `test_catalog_backends.py`); `JaxCartPole` retired. | Four-rung vehicle teaching ladder, research rungs → projects. |
-| Control | teaching | 6 | Linear, LQR, `P` / `PI` / `PD` / `PID`; model-based SMC; robotic impedance/kinematic. **Each compensator form carries only the states its terms need** (landed 2026-09-07), so pole and zero counts match the hand calculation. | `place()` for GRO501 (v0.2); robotic PID wrappers; traj LQR (v0.2). |
+| Core + diagrams | teaching | 7 | Public API and diagram API stable; compile-vs-reference parity tested. Shape validation at compile landed (S02). | Derived `x0` (v1.0). |
+| Compile (`core/compile/`) | teaching (frozen subset) | 4 | Integrated; ~30 unreferenced integration helpers and `_jit` aliases still on the surface (S16/S17 kept). Speed lives in batches: 1000 rollouts × 1000 RK4 steps in 27 ms; a single jitted `f` call is no faster than NumPy. Float64 on JAX evaluators landed (S05). | Profile `rollout_batch` with a `params` family (S53); re-layering deferred to v1.0. |
+| Simulation | teaching | 7 | Mature workflow; stable solvers/forcing. Fixed output count and `verbose` names landed (S01, S07). | — |
+| Dynamics (abstraction + catalog) | teaching | 7 | Plants QA'd; `MechanicalSystem` / `Manipulator`; UR5 ABA/RNEA. **Every catalog plant compiles on both backends** (`xp` sweep 2026-09-06, contract test `test_catalog_backends.py`); `JaxCartPole` retired. Four-rung vehicle teaching ladder landed (S25). | — |
+| Control | teaching | 6 | Linear, LQR, `P` / `PI` / `PD` / `PID`; model-based SMC; robotic impedance/kinematic. **Each compensator form carries only the states its terms need** (landed 2026-09-07), so pole and zero counts match the hand calculation. `trajectory_lqr` landed 2026-09-15. | `place()` for GRO501 (v0.2); robotic PID wrappers. |
 | Analysis | teaching | 6 | Jacobians, linearize, structural, equilibria, modal; one-channel Bode with margins, pole-zero, root locus, Nyquist, step response — matplotlib and plotly. **The automatic frequency band brackets the 0 dB crossing** (landed 2026-09-07), so integrator and high-gain loops no longer report infinite margins. | `minreal`; named `S`/`T`/`PS`/`CS`; Nichols chart; multi-system overlays. Discrete-time (z) plots held. |
 | Blocks | teaching | 5 | Routing, nonlinear, filters, sources, TF, 1-layer NN. | `Sine`/`Ramp`/`Chirp`/`Delay`/`Switch` (v0.2). |
-| Planning / policy synthesis (DP) | teaching (GRO860) | 6 | Grid + value iteration, `loop`/`numpy`/`jax` backends, lookup controller, `PolicyEvaluator`; returns a `PlanningSolution` (lookup policy, `ValueIterationRecord`, `cost_to_go`; 2026-09-15). | `vi_ctl @ plant` in notebooks; `plot_cost2go` colour scale clipped at the out-of-bound cost by default. |
-| Planning / trajopt | teaching (GRO860) | 5 | Collocation, shooting, multiple shooting; live plot; returns a `PlanningSolution` with a linear `TrajectorySource` policy and a `TrajectoryOptimizationRecord` (`success` = defects satisfied to `feasibility_tol`). **float32 by default on JAX.** | float64 policy; multiple-shooting parametric guard. |
+| Planning / policy synthesis (DP) | teaching (GRO860) | 6 | Grid + value iteration, `loop`/`numpy`/`jax` backends, lookup controller, `PolicyEvaluator`; returns a `PlanningSolution` (lookup policy, `ValueIterationRecord`, `cost_to_go`; 2026-09-15). Notebooks wire with `vi_ctl @ plant`. | `plot_cost2go` colour scale clipped at the out-of-bound cost by default (S54). |
+| Planning / trajopt | teaching (GRO860) | 5 | Collocation, shooting, multiple shooting; live plot; returns a `PlanningSolution` with a linear `TrajectorySource` policy and a `TrajectoryOptimizationRecord` (`success` = defects satisfied to `feasibility_tol`). JAX evaluators enable float64 on construction (`MINILINK_JAX_X64=0` opts out). | Harden SciPy/Ipopt before TRL 6; multiple-shooting parametric guard landed. |
 | Optimization | teaching (via trajopt) | 5 | `MathematicalProgram` + `Optimizer`, SciPy/Ipopt. | Harden SciPy/Ipopt before TRL 6. |
 | Interfaces / RL bridge | research lane (bridge) | 4 | `Sys2Gym` + `SB3Controller`; the env step is one compiled RK4 call (jitted under JAX when the plant traces, NumPy otherwise; Euler kept as an option). Kept as an optional external bridge; not the primary course path. | Keep module for external interop; course material uses native RL. |
 | Analysis / Lyapunov certificates | provisional (research) | 4 | Landed 2026-09-11 from [lyapunov-certificates.md](docs/plans/lyapunov-certificates.md): `region_of_attraction` + `LyapunovCertificate` (`verify`, `plot`, `contains`), two `System` shortcuts, demo `analysis_region_of_attraction.py` and showcase §11 of `showcase_from_rl_to_bode.ipynb`. Quadratic `V` only; the level is a sampled estimate and the search reports `sample_limited` when halves disagree. | Student cohort validation; SOS and discrete-time later. |
@@ -84,12 +84,12 @@ a release process by themselves.
 | Planning / search (RRT) | provisional | 5 | RRT/RRT*; spatial `Scene`. **`RRTPlanner(problem)` works from the input bounds alone** (bang-bang `KinodynamicExtender` default, 0.3 s edges; extenders and `RRTOptions` on the planning band, landed 2026-09-09). Returns a `PlanningSolution` with a held `TrajectorySource` policy and a `TreeSearchRecord` (2026-09-15). | RRT-Connect later. |
 | Geometry / spatial | provisional | 4 | SDF + `Scene` / fields / bodies; JAX twins tested. | Bicubic SDF and CBF filter (`docs/plans/cbf-safety-filter.md`); glyph/solid naming split (v1.0). |
 | Graphics / animation | teaching | 5 | Frame-keyed `tf` / geometry / overlays; four renderers. **Auto-fit camera** (`camera_scale=None`, the `System` default, landed 2026-09-09): hint-less plants frame the drawn geometry over the whole animation; backdrops (`ground_line`, `Plane`) and force glyphs excluded. | Renderer polish; matplotlib renderer coverage; constructor-derived `camera_scale` hints → auto or params-derived so `params` changes keep the framing. |
-| Hybrid / step / MPC | provisional (research) | 4 | `StepSystem`, `Computer`, `HybridDiagram`, `HybridSimulator`, MPC with parametric JAX. Research scaffold to exercise MPC; not the library core narrative. Pitch-visible seam: the sampled loop is the one thing that is not a `System`. | Keep names through the term; full promotion to official `HybridLoop` deferred to v1.0+. |
+| Hybrid / step / MPC | provisional (research) | 4 | `StepSystem`, `Computer`, `HybridDiagram`, `HybridSimulator`, MPC with parametric JAX. Research scaffold to exercise MPC; not the library core narrative. The sampled loop is the one thing that is not a `System`. | Keep names through the term; full promotion to official `HybridLoop` deferred to v1.0+. |
 | Realtime simulation | provisional | 2 | `RealtimeSimulator` + pygame I/O. | Architectural review. |
 | Estimation | planned (GRO501) | 1 | Placeholder. **The largest single GRO501 gap** (§4.2). | Luenberger, then Kalman, as diagram blocks (v0.2). |
 | Identification | planned | 2 | Parametric-tier prototype only. | `fitting.py` (v0.2); batched `rollout_batch` facade first. |
-| C export (`experimental/c_export`) | research | 2 | Experimental JAX→C transpiler; two demos pass locally; not in CI. On the pitch deck as *experimental* since 2026-09-09. | Repo-only; add to the nightly sweep (pitch-visible). |
-| Experimental tier (`experimental/symbolic`, `experimental/engines`) | research | 1 | Experimental; not teaching path. | Keep isolated; repo-only. |
+| C export (`experimental/c_export`) | research | 1 | Agent MVP: JAX→C transpiler; two demos; flagship smoke in the JAX regression job. Not a user-check, not autodoc, not the nightly demo sweep. | Keep isolated; repo-only. |
+| Experimental tier (`experimental/symbolic`, `experimental/engines`) | research | 1 | Experimental; not teaching path; not on the Sphinx API site. | Keep isolated; repo-only. |
 | External multibody leaf (MJX) | research | 0 | Not started. | Spike later (`interfaces/mjx.py`). |
 | Pyro 2.0 overall | v0.2 | 3 | Catalog + core + search/DP/trajopt done; many demos unported. | Remaining rows in [pyro-port-remaining.md](docs/plans/pyro-port-remaining.md). |
 
@@ -125,11 +125,14 @@ GRO501 (§4.2, v0.2, parallel objective adopted 2026-09-07). A course is
    `environment.yml` both run every GRO860 notebook top to bottom.
 6. `ruff` + `pytest` + notebook smoke green; nightly full demo sweep green.
 7. No name a GRO860 notebook imports today changes during the term.
+8. Tagging `0.1.0` publishes `minilink` to PyPI from GitHub (Trusted Publishing
+   in `.github/workflows/publish.yml`). `pip install minilink` installs the
+   teaching surface; extras (`[jax]`, `[visualization]`, …) match
+   `pyproject.toml`. Conda remains the Full local stack (JAX, Ipopt, notebooks).
 
 Out of the v0.1 checklist by decision: MPC/hybrid (provisional, lesson keeps
 shipping), estimation, identification, frequency-domain tools (landed
-2026-09-07 but gated by §4.2, not by v0.1), PyPI publication (later; conda
-remains the local path).
+2026-09-07 but gated by §4.2, not by v0.1).
 
 ### 4.2 v0.2 — GRO501 end to end
 
@@ -184,15 +187,24 @@ Step-level specs, files, and "done when" criteria live in
 
 **Status 2026-09-09:** pitch material landed (README, five-slide deck as the
 docs landing page, both showcases rebuilt); from the pitch: auto-fit camera,
-`RRTPlanner` default extender; open items listed in TODO §5 (S41–S45).
+`RRTPlanner` default extender; open items then listed in TODO §5 (later
+renumbered; `c_export` nightly duplicate retired).
+
+**Status 2026-09-16:** Sphinx site is autodoc of the teaching-lane API only
+(`docs/api/`; experimental page dropped); the five-slide deck and
+`docs/roadmap.rst` are gone. The user guide is `examples/tutorial/`. C export
+is TRL 1. **PyPI is a v0.1 goal:** hatch-vcs versions the wheel, the wheel
+excludes `experimental/`, and `.github/workflows/publish.yml` publishes from a
+`0.*` tag via Trusted Publishing. Conda from `environment.yml` stays the Full
+local stack.
 
 | Phase | Scope | When |
 | --- | --- | --- |
 | **D — docs as plan of record** | ROADMAP, README, DESIGN, AGENTS, TODO, plans index, install/examples READMEs aligned to §1–§4. No Python changes. | now, 1–2 days |
 | **0 — first-hour safety** | Default grid · shape validation · README example + `@` message · float64 policy · `super().__init__` guard · `verbose` flag names · nbstripout · trajopt `success` semantics. | immediately after D, ~1 agent-day |
-| **1 — teaching contract + the GRO860 path** | Teaching-surface registry + Basic-tier clean-env test · import-layer CI check · `simulation`/`planning`/`core` band facades · rewrite imports in `learn/` then `demos/` · compiled `Sys2Gym.step` · DP metadata honesty · delete `_jit` aliases and unreferenced evaluator methods · wheel excludes research lane · `c_export` in nightly · nightly demo sweep · branch hygiene · **consolidation inventory** (duplicated code and parallel implementations, ranked; no feature removal — see below). | weeks 2–4 of the term |
+| **1 — teaching contract + the GRO860 path** | Teaching-surface registry + Basic-tier clean-env test · import-layer CI check · `simulation`/`planning`/`core` band facades · rewrite imports in `learn/` then `demos/` · compiled `Sys2Gym.step` · DP metadata honesty · delete `_jit` aliases and unreferenced evaluator methods · wheel excludes research lane · `c_export` flagship smoke · nightly demo sweep · branch hygiene · **consolidation inventory** (duplicated code and parallel implementations, ranked; no feature removal — see below). | weeks 2–4 of the term |
 | **2 — the JAX claim, and the research facade** | `xp` sweep of the NumPy-only catalog · both-backends contract test · retire `JaxCartPole` · four-rung vehicle ladder, `named_ports=` flag, research rungs → projects · `rollout_batch` for parameter-family sweeps · consolidation passes picked from the inventory. | rest of the term (v0.1.x) → v0.2 |
-| **3 — foundations** | Derived `x0` · geometry glyph/solid rename · `HybridLoop` or promotion · mechanical-base unification · frequency tools (native or bridge, per §6) · PyPI option · iLQR from parts (idea) · Diffrax as optional JAX solver (later) · evaluator/solver re-layering · **RL as a planner** landed (2026-09-10; R7 retired the prototype 2026-09-15 — DESIGN / this TRL table). | after the term (v0.2 → v1.0) |
+| **3 — foundations** | Derived `x0` · geometry glyph/solid rename · `HybridLoop` or promotion · mechanical-base unification · frequency tools (native or bridge, per §6) · iLQR from parts (idea) · Diffrax as optional JAX solver (later) · evaluator/solver re-layering · **RL as a planner** landed (2026-09-10; R7 retired the prototype 2026-09-15 — DESIGN / this TRL table). | after the term (v0.2 → v1.0) |
 
 **Simplify and consolidate — a standing principle, not a phase.** The repo
 must stay manageable by one maintainer, so every phase carries consolidation
@@ -224,10 +236,10 @@ Decisions that block or shape a milestone (maintainer sign-off). Settled
 - ~~`PID` spurious modes~~ — settled 2026-09-07: dedicated `PI` and `PD` classes carry only the states their terms need (`ProportionalController` already covered P); `PID` keeps its fixed `2n` layout so its gains stay tunable from zero. `minreal` still wanted for the general case (P2).
 - **Held (v0.2):** discrete-domain scope for GRO501 — a z-domain tier in `analysis/` (ZOH/Tustin, z-plane `pzmap`, discrete Bode) vs teaching the Arduino law with `discretize` + simulation only. Maintainer paused this 2026-09-07; default is simulation only.
 - **Open (v0.2):** the `estimation/` band (Luenberger observer, steady-state Kalman filter) — scheduled as the primary gap for the GRO501 wave (§4.2).
-- **Open (v0.2):** PyPI publication — wanted eventually as a third install option; conda stays recommended.
+- ~~**v0.1:** PyPI publication~~ — settled 2026-09-16: `pip install minilink` is a v0.1 goal. The wheel is hatch-vcs versioned, excludes the research lane, and `.github/workflows/publish.yml` uploads from a `0.*` GitHub tag (Trusted Publishing). Conda stays the recommended Full local stack. First upload is the `0.1.0` tag after a PyPI trusted publisher is registered for `alx87grd/minilink` / `publish.yml` / environment `pypi`.
 - **Open (after v0.2):** Zenodo archive and a citable DOI — tag a release, deposit it, add `CITATION.cff`. Sequenced after PyPI so a citation points at a release rather than a branch. This is also the JOSS entry ticket if that route is wanted: JOSS reviews the software against a checklist (install, docs, tests, license, contributing and issue guidelines) and requires a state-of-the-field section naming related tools — the one text that may, as a paper and not as repo prose, carry the landscape table from the 2026-09-12 editorial review. Decide the RULES 6.9 carve-out then, not before.
-- **Open (v1.0):** `HybridDiagram` as a `System` (state `[plant; computer]`, periodic discrete update) vs an honest `HybridLoop` rename. Pitch-visible since 2026-09-09; kept as research scaffold through v0.1.
-- **Open (v1.0):** a single posed-geometry hook so the pitch's "two functions" (`f` and a drawing function) is literal; today animation is `tf` plus skin geometry.
+- **Open (v1.0):** `HybridDiagram` as a `System` (state `[plant; computer]`, periodic discrete update) vs an honest `HybridLoop` rename. Kept as research scaffold through v0.1.
+- **Open (v1.0):** a single posed-geometry hook so "two functions" (`f` and a drawing function) is literal; today animation is `tf` plus skin geometry.
 - **Open (v1.0):** evaluator/solver layering — evaluators keep pure maps and one scannable step; integrators move to `simulation/solvers/`; Diffrax as an optional JAX solve (later).
 - **Open (v0.2 → v1.0):** a differentiable closed-loop cost, `J = F(problem params)` as one traced scalar — simulate the closed loop and integrate the plant's cost with every parameter an input, so `jax.grad` and `vmap` reach plant, controller, cost, sets and `x0` alike (today tutorial 11 and `pid_autotuning_jax` write that scan by hand). Needs first one parameter dictionary for a `PlanningProblem` — `system` nested by subsystem id, `cost`, `sets`, `x0` — with one owner per value; today `ProblemParameters` covers `system` / `cost` / `sets` and `x0` lives on the problem. The post-hoc path it extends landed 2026-09-13: `cost.total_cost(loop.trajectory_of(plant))`. First step, the cost dictionary nested like diagram params: design in docs/plans/cost-params.md.
 - **Open (v0.2):** what the terminal cost `h(x_f, t_f)` means, one rule for every tool. Today each decides on its own: `CostFunction.total_cost` and `sys.compute_cost` always add `h` at the last sample; the Monte Carlo score and the RL environment add it only when a finite horizon is reached; trajectory optimization adds it at `tf`; value iteration starts from it (the terminal value for a finite horizon, an initial guess for an infinite one); `Sys2Gym` charges it when a task-defined termination is reached. So a cost with a nonzero `h` on an infinite-horizon task scores differently per tool (the rocket landing's constant `h = 100`, labeled "crash", is an exit penalty written as a terminal cost). To settle: whether `h` exists only for a finite horizon (and an infinite-horizon cost with nonzero `h` warns or raises), whether `total_cost` follows `horizon_kind`, and that exits are priced only by the problem's `exit_cost`.

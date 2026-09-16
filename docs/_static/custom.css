@@ -14,26 +14,6 @@ html[data-theme="dark"] {
     --color-brand-content: #93c5fd;
 }
 
-/* Landing intro */
-.minilink-lead {
-    font-size: 1.05rem;
-    line-height: 1.65;
-    max-width: 42rem;
-}
-
-.minilink-links {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 0.75rem 1.25rem;
-    margin: 1.25rem 0 2rem;
-    padding: 0;
-    list-style: none;
-}
-
-.minilink-links a {
-    font-weight: 500;
-}
-
 /* API pages: breathe room for long signatures */
 dl.class > dt,
 dl.function > dt {
@@ -43,11 +23,3 @@ dl.function > dt {
 .highlight pre {
     border-radius: 0.35rem;
 }
-
-/* Landing page: the pitch slides stack as a one-pager and use the full column */
-.content:has(.ml-pitch) { max-width: 68rem; }
-article:has(.ml-pitch) { max-width: none; }
-.ml-pitch { margin-top: -1.5rem; }
-.ml-pitch h1, .ml-pitch h2 { border: 0; }
-.ml-deck-link { color: var(--color-foreground-secondary); font-size: .9rem; margin: 1rem 0 2rem; }
-section#minilink > h1:first-child { display: none; }

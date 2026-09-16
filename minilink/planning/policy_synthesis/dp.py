@@ -224,9 +224,12 @@ class DynamicProgrammingPlanner(Planner):
         Discretization of ``problem``'s state and input spaces.
     options : DynamicProgrammingOptions, optional
         Tier-2 workflow bag. Flat kwargs below overlay matching fields.
-    backend, alpha, tol, max_iterations, interpolation, out_of_bound_cost,
-    final_time, record_history, verbose
-        Tier-1 flat mirrors of :class:`DynamicProgrammingOptions`.
+
+    Notes
+    -----
+    Flat keyword arguments overlay :class:`DynamicProgrammingOptions`:
+    ``backend``, ``alpha``, ``tol``, ``max_iterations``, ``interpolation``,
+    ``out_of_bound_cost``, ``final_time``, ``record_history``, ``verbose``.
     """
 
     def __init__(

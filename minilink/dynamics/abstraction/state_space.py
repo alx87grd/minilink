@@ -93,16 +93,18 @@ class StateSpaceSystem(DynamicSystem):
         A = self.A(t, params)
         B = self.B(t, params)
 
-        # dx = A x + B u
-        return A @ x + B @ u
+        dx = A @ x + B @ u
+
+        return dx
 
     def h(self, x, u, t=0.0, params=None):
         params = self.params if params is None else params
         C = self.C(t, params)
         D = self.D(t, params)
 
-        # y = C x + D u
-        return C @ x + D @ u
+        y = C @ x + D @ u
+
+        return y
 
 
 class LTISystem(StateSpaceSystem):

@@ -27,38 +27,36 @@ if TYPE_CHECKING:
 
 
 class System(SharedSystemFacades):
-    """
-      Static input-output shell: ports, parameters, metadata, and facades.
+    """Static input-output shell: ports, parameters, metadata, and facades.
 
-          y  = h(x, u, t; p)   (via port ``compute`` / :meth:`h`)
+    ``y = h(x, u, t; p)`` (via port ``compute`` / :meth:`h`).
 
-      Default ``n = 0`` (no states). State dimension :attr:`n` is the number of
-      state slots this block contributes when stacked in a diagram (zero for
+    Default ``n = 0`` (no states). State dimension :attr:`n` is the number of
+    state slots this block contributes when stacked in a diagram (zero for
     static blocks). Continuous evolution ``dx = f(x, u, t; p)`` is defined on
-      :class:`DynamicSystem` only.
+    :class:`DynamicSystem` only.
 
-      A :class:`System` serves several roles at once:
+    A :class:`System` serves several roles at once:
 
-      - **IO contract**: output ports (and optional :meth:`h`) as functions of
-        ``(x, u, t, params)``.
-      - **Structural model description**: dimensions, ports, state metadata,
-        labels, units, bounds, and nominal values.
-      - **Model defaults and metadata**: default parameters (:attr:`params`),
-        default initial condition (:attr:`x0`), and solver hints (:attr:`solver_info`).
-      - **Visualization contract**: forward-kinematic geometry for rendering
-        and animation.
-      - **User shortcut façade**: :meth:`compile`, :meth:`compute_trajectory`,
-        :meth:`render`, :meth:`animate` on
-        :class:`~minilink.core.facades.SharedSystemFacades` (continuous analysis
-        and :meth:`game` on :class:`~minilink.core.facades.DynamicSystemFacades`).
+    - **IO contract**: output ports (and optional :meth:`h`) as functions of
+      ``(x, u, t, params)``.
+    - **Structural model description**: dimensions, ports, state metadata,
+      labels, units, bounds, and nominal values.
+    - **Model defaults and metadata**: default parameters (:attr:`params`),
+      default initial condition (:attr:`x0`), and solver hints
+      (:attr:`solver_info`).
+    - **Visualization contract**: forward-kinematic geometry for rendering
+      and animation.
+    - **User shortcut façade**: :meth:`compile`, :meth:`compute_trajectory`,
+      :meth:`render`, :meth:`animate` on
+      :class:`~minilink.core.facades.SharedSystemFacades` (continuous analysis
+      and :meth:`game` on :class:`~minilink.core.facades.DynamicSystemFacades`).
 
-      Notes on purity
-      ---------------
-      Overridden :meth:`h` and port ``compute`` functions are functions of
-      ``(x, u, t, params)`` alone: no memory between calls, no cached side
-      effects. This is the first invariant of CONSTITUTION.md, and it is what
-      lets diagrams nest, solvers step, and JAX trace. Python cannot check it,
-      so the burden sits with whoever writes the equation.
+    Overridden :meth:`h` and port ``compute`` functions are functions of
+    ``(x, u, t, params)`` alone: no memory between calls, no cached side
+    effects. This is the first invariant of CONSTITUTION.md, and it is what
+    lets diagrams nest, solvers step, and JAX trace. Python cannot check it,
+    so the burden sits with whoever writes the equation.
     """
 
     #: Opt-in swappable look: a callable ``(plant) -> dict[str, list[prim]]`` or
@@ -625,7 +623,9 @@ if __name__ == "__main__":
             super().__init__(n=2, input_dim=1, output_dim=2)
 
         def f(self, x, u, t=0, params=None):
-            return np.array([x[1], u[0]])
+            dx = np.array([x[1], u[0]])
+
+            return dx
 
     sys = DoubleIntegrator()
     print(sys.f(x=np.array([0.0, 1.0]), u=np.array([2.0])))

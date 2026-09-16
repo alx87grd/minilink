@@ -1,7 +1,9 @@
 """
 Pyro-ported double pendulum (2 actuators, 2 links).
 
-This matches SherbyRobotics/pyro ``DoublePendulum`` in ``pyro/dynamic/vi_pendulum.py``:
+This matches SherbyRobotics/pyro ``DoublePendulum`` in
+``pyro/dynamic/vi_pendulum.py``:
+
 * ``q = [theta1, theta2]`` where ``theta1`` is the first joint and ``theta2`` is
   measured relative to the first link
 * the same ``H``, ``C``, ``B``, ``g``, and linear joint damping in ``d``
@@ -90,11 +92,13 @@ class DoublePendulum(MechanicalSystem):
         h01 = m2 * lc2**2 + m2 * l1 * lc2 * c2 + I2
         h11 = m2 * lc2**2 + I2
         # fmt: off
-        return xp.array([
+        H = xp.array([
             [h00, h01],
             [h01, h11],
         ])
         # fmt: on
+
+        return H
 
     def C(self, q, dq, params=None):
         params = self.params if params is None else params
@@ -108,11 +112,13 @@ class DoublePendulum(MechanicalSystem):
         # Coriolis/centrifugal coupling driven by the elbow rate
         h = m2 * l1 * lc2 * s2
         # fmt: off
-        return xp.array([
+        C = xp.array([
             [-h * dq[1], -h * (dq[0] + dq[1])],
             [ h * dq[0],                  0.0],
         ])
         # fmt: on
+
+        return C
 
     def B(self, q, params=None):
         xp = array_module(q)
@@ -133,7 +139,9 @@ class DoublePendulum(MechanicalSystem):
         # gravity restoring torque on each joint (sign matches the +y-down screen)
         g1 = (m1 * lc1 + m2 * l1) * gravity
         g2 = m2 * lc2 * gravity
-        return xp.array([-g1 * s1 - g2 * s12, -g2 * s12])
+        g = xp.array([-g1 * s1 - g2 * s12, -g2 * s12])
+
+        return g
 
     def d(self, q, dq, u=None, t=0.0, params=None):
         params = self.params if params is None else params
@@ -141,7 +149,9 @@ class DoublePendulum(MechanicalSystem):
         d2 = params["d2"]
         xp = array_module(dq)
         D = xp.diag(xp.array([d1, d2]))
-        return D @ dq
+        tau_d = D @ dq
+
+        return tau_d
 
     def get_kinematic_geometry(self):
         l1 = self.params["l1"]

@@ -38,10 +38,14 @@ class MassSpringDamper(DynamicSystem):
         self.camera_scale = 4.0
 
     def f(self, x, u, t=0, params=None):
-        p = self.params if params is None else params
-        pos, vel = x
-        acc = (u[0] - p["c"] * vel - p["k"] * pos) / p["m"]
-        return np.array([vel, acc])
+        params = self.params if params is None else params
+        m, k, c = params["m"], params["k"], params["c"]
+        p, v = x
+
+        # m p̈ + c ṗ + k p = u
+        a = (u[0] - c * v - k * p) / m
+
+        return np.array([v, a])
 
     def tf(self, x, u, t=0, params=None):
         return {"body": translation(x[0], 0.0, 0.0)}

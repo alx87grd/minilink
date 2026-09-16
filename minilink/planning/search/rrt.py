@@ -131,11 +131,14 @@ class RRTPlanner(Planner):
         Pairwise nearest-neighbour distance ``metric(a, b) -> float``.
     options : RRTOptions
         Tier-2 workflow bag. Flat kwargs below overlay matching fields.
-    max_nodes, goal_bias, goal_tolerance, seed, edge_resolution,
-    max_sample_attempts, return_best_effort, callback, live_plot,
-    live_plot_every, live_plot_pause, live_plot_after_goal_only,
-    live_plot_ax, nearest_backend
-        Tier-1 flat mirrors of :class:`RRTOptions`.
+
+    Notes
+    -----
+    Flat keyword arguments overlay :class:`RRTOptions`: ``max_nodes``,
+    ``goal_bias``, ``goal_tolerance``, ``seed``, ``edge_resolution``,
+    ``max_sample_attempts``, ``return_best_effort``, ``callback``,
+    ``live_plot``, ``live_plot_every``, ``live_plot_pause``,
+    ``live_plot_after_goal_only``, ``live_plot_ax``, ``nearest_backend``.
 
     Attributes
     ----------
