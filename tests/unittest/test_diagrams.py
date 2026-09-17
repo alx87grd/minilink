@@ -82,6 +82,24 @@ class TestDiagrams(unittest.TestCase):
         self.assertIsNotNone(graph)
         self.assertIn("Integrator", graph.source)
 
+    def test_inline_plot_diagram_does_not_call_ipython_display(self):
+        """Notebook cells auto-display the returned graph; display() would draw twice."""
+        from unittest import mock
+
+        pytest.importorskip("graphviz")
+        try:
+            import IPython.display  # noqa: F401
+        except ImportError:
+            self.skipTest("IPython not installed")
+
+        with mock.patch("IPython.display.display") as display:
+            graph = plot_diagram(
+                Integrator(), show=True, show_inline=True, show_pdf=False
+            )
+        display.assert_not_called()
+        self.assertIsNotNone(graph)
+        self.assertIn("Integrator", graph.source)
+
     def test_topology_builder_contains_ports_and_edges(self):
         topology = build_diagram_topology(self._make_diagram())
         node_ids = [node.id for node in topology.nodes]
@@ -506,17 +524,13 @@ class TestDiagramRenderWithoutDot(unittest.TestCase):
         from minilink.dynamics.catalog.pendulum.pendulum import Pendulum
         from minilink.graphical.diagrams import dot as dot_module
 
-        try:
-            import IPython.display  # noqa: F401
-        except ImportError:
-            self.skipTest("IPython not installed")
-
         graph = (ImpedanceController() @ Pendulum()).get_diagram()
         if graph is None:
             self.skipTest("graphviz Python package not installed")
 
-        with mock.patch(
-            "IPython.display.display",
+        with mock.patch.object(
+            graph,
+            "pipe",
             side_effect=RuntimeError("failed to execute PosixPath('dot')"),
         ):
             with warnings.catch_warnings(record=True) as caught:

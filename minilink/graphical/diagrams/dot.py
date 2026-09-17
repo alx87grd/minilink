@@ -129,12 +129,13 @@ def _render_diagram_graph(
         show_pdf = False
 
     if show and show_inline:
+        # Probe Graphviz here so a missing ``dot`` binary warns instead of
+        # raising. Do not IPython.display the graph: plot_diagram returns it,
+        # and the notebook auto-displays that last expression. Calling
+        # display() *and* returning the object renders the figure twice
+        # (same rule as SharedSystemFacades.animate).
         try:
-            import IPython.display as display
-
-            display.display(graph)
-        except ImportError:
-            warnings.warn("IPython is not available for inline display", stacklevel=2)
+            graph.pipe(format="svg")
         except Exception as exc:
             # graphviz raises ExecutableNotFound when the ``dot`` binary is
             # missing (a bare Colab runtime, or a pip install without the

@@ -351,7 +351,8 @@ class HybridDiagram:
         """Render Plant + Computer clusters with boundary ZOH/sample edges.
 
         Display policy matches :meth:`minilink.core.facades.SharedSystemFacades.plot_diagram`
-        (notebook SVG; script Matplotlib window; ``show_pdf`` / ``filename`` /
+        (notebook SVG as the returned cell output, without a second
+        ``display()``; script Matplotlib window; ``show_pdf`` / ``filename`` /
         ``show=False`` overrides). ``abstract_boundary=True`` (default) omits
         external Inputs/Outputs routing nodes and anchors hybrid edges on the
         wired subsystem ports.

@@ -33,7 +33,7 @@ from minilink.dynamics.catalog.mass_spring_damper.linear import (
     ThreeMass,
     TwoMass,
 )
-from minilink.dynamics.catalog.pendulum.cartpole import CartPole
+from minilink.dynamics.catalog.pendulum.cartpole import CartPole, CartPoleWithNoisePort
 from minilink.dynamics.catalog.pendulum.double_pendulum import Acrobot
 from minilink.dynamics.catalog.pendulum.pendulum import (
     Pendulum,
@@ -197,7 +197,7 @@ class TestCatalogSmoke(unittest.TestCase):
 from minilink.dynamics.catalog.pendulum.double_pendulum import DoublePendulum
 from minilink.dynamics.catalog.vehicles.dynamic_bicycle import DynamicBicycle
 from minilink.graphical.animation.camera import resolve_camera_from_hints
-from minilink.graphical.animation.primitives import Arrow, Box, Rod
+from minilink.graphical.animation.primitives import Arrow, Box, Circle, Rod
 from tests.unittest.graphics_contract_helpers import geometry_smoke, resolve_draw_frame
 
 
@@ -237,8 +237,34 @@ class TestCartPole(unittest.TestCase):
         ]
         self.assertEqual(len(cart_boxes), 1)
         self.assertEqual(cart_boxes[0].length_z, sys.cart_depth)
+        self.assertEqual(sys.camera_scale, 5.0)
+        wheels = [
+            primitive
+            for primitive in frame["primitives"]
+            if isinstance(primitive, Circle) and primitive.color == "black"
+        ]
+        self.assertEqual(len(wheels), 2)
+        self.assertAlmostEqual(wheels[0].radius, sys.wheel_radius)
+        pole = next(p for p in frame["primitives"] if isinstance(p, Rod))
+        self.assertAlmostEqual(pole.linewidth, sys.line_width)
         self.assertTrue(any((isinstance(p, Rod) for p in frame["primitives"])))
         geometry_smoke(sys)
+
+    def test_noise_ports_add_disturbance_and_sensor_noise(self):
+        sys = CartPoleWithNoisePort()
+        self.assertEqual(sys.inputs["w"].dim, 1)
+        self.assertEqual(sys.inputs["v"].dim, 4)
+        x = np.array([0.1, 0.2, 0.3, 0.4])
+        F = np.array([1.0])
+        w = np.array([0.5])
+        v = np.array([0.01, 0.02, 0.03, 0.04])
+        u = np.concatenate([F, w, v])
+        np.testing.assert_allclose(sys.h(x, u), x + v)
+        q, dq = x[:2], x[2:]
+        np.testing.assert_allclose(
+            sys.generalized_force(q, dq, u),
+            sys.B(q) @ (F + w),
+        )
 
 
 class TestDoublePendulum(unittest.TestCase):
@@ -271,6 +297,8 @@ class TestDynamicBicycle(unittest.TestCase):
         sys = DynamicBicycle()
         self.assertEqual(sys.n, 6)
         self.assertEqual(sys.m, 2)
+        self.assertEqual(sys.camera_follow_frame, "body")
+        self.assertEqual(sys.camera_scale, 10.0)
         x = np.array([10.0, 3.0, 0.25, 4.0, 0.0, 0.0])
         u = np.zeros(sys.m)
         sys.camera_target[:] = (1.0, -2.0, 0.5)

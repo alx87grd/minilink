@@ -15,6 +15,10 @@ _EXPORTS: dict[str, tuple[str, str]] = {
     # pendulum
     "Acrobot": ("minilink.dynamics.catalog.pendulum", "Acrobot"),
     "CartPole": ("minilink.dynamics.catalog.pendulum", "CartPole"),
+    "CartPoleWithNoisePort": (
+        "minilink.dynamics.catalog.pendulum",
+        "CartPoleWithNoisePort",
+    ),
     "DoublePendulum": ("minilink.dynamics.catalog.pendulum", "DoublePendulum"),
     "InvertedPendulum": ("minilink.dynamics.catalog.pendulum", "InvertedPendulum"),
     "Pendulum": ("minilink.dynamics.catalog.pendulum", "Pendulum"),

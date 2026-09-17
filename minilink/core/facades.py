@@ -325,11 +325,13 @@ class SharedSystemFacades:
         """
         Convenience shortcut to render the system diagram.
 
-        Jupyter / Colab get inline SVG by default. Bare scripts and IPython
-        REPLs open a Matplotlib window with the Graphviz PNG (same blocking
-        policy as trajectory plots). Pass ``show_pdf=True`` for the legacy
-        OS PDF viewer; pass ``filename`` to write Graphviz output to disk;
-        pass ``show=False`` to build the Digraph only.
+        Jupyter / Colab get inline SVG by default (the returned Graphviz
+        object is the cell output; this method does not also call
+        ``display()``, which would draw the figure twice). Bare scripts
+        and IPython REPLs open a Matplotlib window with the Graphviz PNG
+        (same blocking policy as trajectory plots). Pass ``show_pdf=True``
+        for the legacy OS PDF viewer; pass ``filename`` to write Graphviz
+        output to disk; pass ``show=False`` to build the Digraph only.
         """
         from minilink.graphical.diagrams import plot_diagram
 

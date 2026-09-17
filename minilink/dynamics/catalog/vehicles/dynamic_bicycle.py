@@ -146,9 +146,11 @@ class DynamicBicycle(DynamicSystem):
         self._visual_tire_radius_ratio = 0.58
 
         # Default 2-D skin (black centerline chassis) and a camera that tracks
-        # the body frame.
+        # the body frame. A numeric scale keeps auto-fit from taking over
+        # (``camera_scale=None`` would frame the whole trail / overlays).
         self.skin = partial(car_skin_2d, color="#1a1a1a")
         self.camera_follow_frame = "body"
+        self.camera_scale = 10.0
 
     def M(self, q, params=None):
         params = self.params if params is None else params

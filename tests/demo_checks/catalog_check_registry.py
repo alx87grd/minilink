@@ -53,6 +53,7 @@ from minilink.dynamics.catalog.mass_spring_damper.linear import (
 )
 from minilink.dynamics.catalog.pendulum.cartpole import (
     CartPole,
+    CartPoleWithNoisePort,
     RotatingCartPole,
     UnderactuatedRotatingCartPole,
 )
@@ -121,6 +122,7 @@ CATALOG_CHECK_ENTRIES: tuple[CatalogCheckEntry, ...] = (
     CatalogCheckEntry("RotatingCartPole", RotatingCartPole),
     CatalogCheckEntry("UnderactuatedRotatingCartPole", UnderactuatedRotatingCartPole),
     CatalogCheckEntry("CartPole", CartPole),
+    CatalogCheckEntry("CartPoleWithNoisePort", CartPoleWithNoisePort),
     CatalogCheckEntry("KinematicBicycle", KinematicBicycle),
     CatalogCheckEntry("KinematicCar", KinematicCar),
     CatalogCheckEntry("HolonomicMobileRobot", HolonomicMobileRobot),

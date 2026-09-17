@@ -20,8 +20,8 @@ from minilink.dynamics.abstraction.mechanical import MechanicalSystem
 from minilink.graphical.animation.primitives import (
     Arrow,
     Box,
+    Circle,
     CustomLine,
-    Point,
     Rod,
     Sphere,
     ground_line,
@@ -195,12 +195,16 @@ def _configure_cartpole(sys, *, name):
         "gravity": 9.81,
     }
 
-    # Graphic parameters (not part of the EoM)
+    # Graphic parameters (not part of the EoM). Camera ±5 matches pyro's
+    # ``forward_kinematic_domain``.
     sys.pole_length = 3.0
     sys.cart_length = 2.5
     sys.cart_height = 1.5
     sys.cart_depth = 0.8
     sys.ground_half_width = 10.0
+    sys.wheel_radius = 0.15
+    sys.line_width = 1.5
+    sys.camera_scale = 10.0
 
     sys.state.labels = ["x", "theta", "dx", "dtheta"]
     sys.state.units = ["m", "rad", "m/s", "rad/s"]
@@ -285,6 +289,8 @@ class CartPole(MechanicalSystem):
         cart_length = self.cart_length
         cart_height = self.cart_height
         cart_depth = self.cart_depth
+        wheel_r = self.wheel_radius
+        lw = self.line_width
         wheel_y = -cart_height / 2.0
         wheel_dx = cart_length / 4.0
         return {
@@ -297,16 +303,33 @@ class CartPole(MechanicalSystem):
                     color="black",
                     opacity=0.85,
                 ),
-                Point([-wheel_dx, wheel_y, 0.0], color="black", marker="o", size=6),
-                Point([wheel_dx, wheel_y, 0.0], color="black", marker="o", size=6),
+                Circle(
+                    radius=wheel_r,
+                    center=[-wheel_dx, wheel_y, 0.0],
+                    color="black",
+                    fill=True,
+                ),
+                Circle(
+                    radius=wheel_r,
+                    center=[wheel_dx, wheel_y, 0.0],
+                    color="black",
+                    fill=True,
+                ),
             ],
             "pole": [
+                Circle(radius=wheel_r, center=[0.0, 0.0], color="blue", fill=True),
                 Rod(
                     length=pole_length,
                     radius=0.03 * pole_length,
                     color="blue",
-                    linewidth=2,
-                )
+                    linewidth=lw,
+                ),
+                Circle(
+                    radius=wheel_r,
+                    center=[0.0, -pole_length],
+                    color="blue",
+                    fill=True,
+                ),
             ],
         }
 
@@ -341,10 +364,40 @@ class CartPole(MechanicalSystem):
                     scale=force_len,
                     head_ratio=0.15,
                     color="red",
-                    linewidth=2,
+                    linewidth=self.line_width,
                 )
             ]
         }
+
+
+class CartPoleWithNoisePort(CartPole):
+    """Linear cart-pole with process and measurement noise ports.
+
+    ``w`` injects a disturbance force into the cart; ``v`` corrupts the
+    measured state in ``y``.
+    """
+
+    def __init__(self):
+        super().__init__()
+        self.name = "Cart Pole"
+
+        self.add_input_port("w", dim=1, nominal_value=np.array([0.0]))
+        self.add_input_port("v", dim=4, nominal_value=np.zeros(4))
+        self.inputs["w"].labels = ["disturbance"]
+        self.inputs["w"].units = ["N"]
+        self.inputs["v"].labels = list(self.state.labels)
+        self.inputs["v"].units = list(self.state.units)
+
+        self.outputs["y"].dependencies = ("v",)
+
+    def generalized_force(self, q, v, u, t=0.0, params=None):
+        F, w = self.get_port_values_from_u(u, "u", "w")
+        return self.B(q, params) @ (F + w)
+
+    def h(self, x, u, t=0.0, params=None):
+        v_noise = self.get_port_values_from_u(u, "v")
+        xp = array_module(x, u)
+        return xp.asarray(x) + xp.asarray(v_noise)
 
 
 if __name__ == "__main__":

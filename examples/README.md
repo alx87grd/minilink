@@ -15,7 +15,7 @@ examples/
   tutorial/                    # Numbered minilink API walk: 00_core … 11_reinforcement_learning + showcases
   teaching/
     topics/<domain>/           # Textbook pages — refactorable (classical_control, optimal_control, …)
-    courses/<id>/              # Live course pins (udes_gro860, later udes_gmc714) — frozen paths
+    courses/<id>/              # Live course pins (udes_gro860, udes_gro501, later udes_gmc714) — frozen paths
   demos/<chapter>/             # Canonical single-file textbook scripts (1:1 with tutorial chapters)
 
   # --- Research Lane (Repo-only, unconstrained, exploratory) ---
@@ -136,6 +136,16 @@ Pinned by the course notes. Rename or move only with the notes and webpage in th
 | [pendulum_value_iteration_vs_lqr_vs_rl](teaching/courses/udes_gro860/pendulum_value_iteration_vs_lqr_vs_rl.ipynb) (native JAX) | [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/alx87grd/minilink/blob/main/examples/teaching/courses/udes_gro860/pendulum_value_iteration_vs_lqr_vs_rl.ipynb) |
 | [drone_ppo_sb3](teaching/courses/udes_gro860/drone_ppo_sb3.ipynb) (Stable-Baselines3) | [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/alx87grd/minilink/blob/main/examples/teaching/courses/udes_gro860/drone_ppo_sb3.ipynb) |
 | [pendulum_value_iteration_vs_lqr_vs_ppo_sb3](teaching/courses/udes_gro860/pendulum_value_iteration_vs_lqr_vs_ppo_sb3.ipynb) (Stable-Baselines3) | [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/alx87grd/minilink/blob/main/examples/teaching/courses/udes_gro860/pendulum_value_iteration_vs_lqr_vs_ppo_sb3.ipynb) |
+
+### Teaching — UdeS GRO501
+
+Pinned by the course notes (C5.1, C5.3, C5.4). Rename or move only with the notes and webpage in the same change.
+
+| Notebook | Colab |
+| --- | --- |
+| [numpy_state_space](teaching/courses/udes_gro501/numpy_state_space.ipynb) (C5.1: NumPy / SciPy, python-control, minilink) | [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/alx87grd/minilink/blob/main/examples/teaching/courses/udes_gro501/numpy_state_space.ipynb) |
+| [cartpole_static_controller](teaching/courses/udes_gro501/cartpole_static_controller.ipynb) (C5.3) | [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/alx87grd/minilink/blob/main/examples/teaching/courses/udes_gro501/cartpole_static_controller.ipynb) |
+| [cartpole_dynamic_controller](teaching/courses/udes_gro501/cartpole_dynamic_controller.ipynb) (C5.4) | [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/alx87grd/minilink/blob/main/examples/teaching/courses/udes_gro501/cartpole_dynamic_controller.ipynb) |
 
 **Colab tip:** open a badge → **File → Save a copy in Drive** → run from the top.
 The first code cell clones the repo and installs `meshcat` when needed. Locally,
