@@ -104,7 +104,7 @@ Fix with `ruff check --fix .` and `ruff format .` when either fails. CI runs the
 | Docs/markdown only | skip pytest |
 | Narrow module + tests already updated | `pytest tests/unittest/test_<domain>.py` |
 | Cross-cutting or before handoff/push | `pytest` |
-| Compile backend, simulator, or trajopt changes (big review pass) | Regression gates: `PYTHONPATH=. python benchmarks/run_regression_check.py --suite all --tiny --factor 10 --speed-gate-suffixes solve_s,nlp_s,speedup` |
+| Compile backend, simulator, trajopt, or value-iteration changes (big review pass) | Regression gates: `PYTHONPATH=. python benchmarks/run_regression_check.py --suite all --tiny --factor 10 --speed-gate-suffixes solve_s,nlp_s,speedup` |
 | Teaching notebooks | `MPLBACKEND=Agg python tests/demo_checks/run_notebook_checks.py` |
 
 Regression gates full command and CI `regression` job flags: tests/README.md (entry points).

@@ -35,7 +35,7 @@ Demos stay in `examples/demos/` for teaching; **demo-check runners** that execut
 | --- | --- |
 | **Daily** | [`tests/run/run_contract_tests.py`](run/run_contract_tests.py) |
 | **Before push** | [`tests/run/run_pre_push.py`](run/run_pre_push.py) |
-| **After sim/trajopt/MPC work** | [`tests/run/run_regression_gates.py`](run/run_regression_gates.py) |
+| **After sim/trajopt/MPC/value-iteration work** | [`tests/run/run_regression_gates.py`](run/run_regression_gates.py) |
 | **Demo/catalog sanity** | [`tests/run/run_demo_checks.py`](run/run_demo_checks.py) |
 | **Notebook smoke** | [`tests/run/run_notebook_checks.py`](run/run_notebook_checks.py) |
 | **Backend perf tables** | [`tests/run/run_benchmark_study.py`](run/run_benchmark_study.py) |
@@ -53,7 +53,7 @@ Optional toggles: constants at the top of each `tests/run/*.py` file.
 | Docs/markdown only | skip pytest |
 | Narrow module change | `pytest tests/unittest/test_<domain>.py` |
 | Cross-cutting or handoff | `pytest` |
-| Compile / `Simulator` / trajopt / MPC | `PYTHONPATH=. python benchmarks/run_regression_check.py --suite all --tiny --factor 10 --speed-gate-suffixes solve_s,nlp_s,speedup` |
+| Compile / `Simulator` / trajopt / MPC / value iteration | `PYTHONPATH=. python benchmarks/run_regression_check.py --suite all --tiny --factor 10 --speed-gate-suffixes solve_s,nlp_s,speedup` |
 | Backend perf exploration | `python benchmarks/run_study.py --list` |
 | Demo-check change | `python tests/demo_checks/run_catalog_checks.py --fast` and/or `run_flagship_demos.py` |
 | Notebook change | `MPLBACKEND=Agg python tests/demo_checks/run_notebook_checks.py` |
