@@ -269,7 +269,9 @@ class RRTPlanner(Planner):
                 policy, dt=dt, n_trials=n_trials, tf=float(trajectory.tf)
             )
         return self.store_solution(
-            PlanningSolution(policy, self.search_record(), trajectory, evaluation)
+            PlanningSolution(
+                self.problem, policy, self.search_record(), trajectory, evaluation
+            )
         )
 
     def search_record(self) -> "TreeSearchRecord":

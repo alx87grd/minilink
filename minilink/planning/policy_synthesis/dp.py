@@ -481,7 +481,9 @@ class DynamicProgrammingPlanner(Planner):
             trajectory = nominal_trajectory(self.problem, policy, dt=self.grid.dt)
             evaluation = self.evaluate(policy, dt=self.grid.dt, n_trials=n_trials)
         return self.store_solution(
-            PlanningSolution(policy, record, trajectory, evaluation, result.value_at)
+            PlanningSolution(
+                self.problem, policy, record, trajectory, evaluation, result.value_at
+            )
         )
 
     def _vectorized_step(self, J, t):

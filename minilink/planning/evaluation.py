@@ -194,7 +194,8 @@ class MonteCarloEvaluator:
         return 10.0 if self.episode_length is None else float(self.episode_length)
 
     def evaluate(self, controller) -> Evaluation:
-        """Return the :class:`Evaluation` of a policy block on the problem."""
+        """Return the :class:`Evaluation` of a policy block (or of a solution's policy) on the problem."""
+        controller = policy_of(controller)
         if self.backend == "jax":
             return self.evaluate_jax(controller)
         if self.backend == "numpy":
@@ -330,6 +331,15 @@ class MonteCarloEvaluator:
         finally:
             sys.x0 = x0_saved
         return Evaluation(J, failed, x0s, trajectories)
+
+
+def policy_of(controller):
+    """The block itself, or the policy of a :class:`~minilink.planning.results.PlanningSolution`."""
+    from minilink.planning.results import PlanningSolution
+
+    if isinstance(controller, PlanningSolution):
+        return controller.policy
+    return controller
 
 
 def nominal_trajectory(problem, policy, *, dt, tf=None) -> Trajectory:

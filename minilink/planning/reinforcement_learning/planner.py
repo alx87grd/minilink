@@ -299,6 +299,7 @@ class ReinforcementLearningPlanner(Planner):
             Evaluation.of_trajectory(self.problem, trajectory) if evaluate else None
         )
         return PlanningSolution(
+            problem=self.problem,
             policy=self.controller,
             solver=self.training_record(),
             trajectory=trajectory,
@@ -477,6 +478,7 @@ class ReinforcementLearningPlanner(Planner):
                 backend="jax",
             )
         return PlanningSolution(
+            problem=self.problem,
             policy=self.controller,
             solver=self.training_record(),
             trajectory=trajectory,

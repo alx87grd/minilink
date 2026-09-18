@@ -484,6 +484,8 @@ deliberate: subsystem operands are always shared references (never copied), so a
 `sys` (stateful plants), with numeric suffix on collision (`sys2`, …). Override
 with ``System.id`` before wiring or explicit ``add_subsystem(..., "plant")``.
 Block titles in ``plot_diagram()`` still show ``sys.name`` (human type).
+``print(sys)`` is a short text summary: name, class, ``n``, ports with
+dimensions; a diagram adds its keys.
 :func:`~minilink.graphical.diagrams.build_diagram_topology` accepts
 ``abstract_boundary=True`` to omit external Inputs/Outputs routing nodes and record
 ``boundary_inputs`` / ``boundary_outputs`` port anchors (used by hybrid export).
@@ -597,6 +599,7 @@ deliberately not provided in v0.1.
 ### `Trajectory`, sets, costs, geometry
 
 - `Trajectory`: `t (N,)`, `x (n,N)`, `u (m,N)`, optional `signals`; NumPy reporting object.
+  `print(traj)` is `N`, the time span, and the array shapes, not the sample dump.
 - Sets: `margin ≥ 0` feasible; `contains` is a NumPy boundary utility; `sample(key, n=None)`
   follows the distributions' draw convention below (`BoxSet.sample` traces);
   `bounding_box()` is the tightest box containing the set, or `None` — tools that need a
@@ -830,15 +833,38 @@ kind is class-type routing only — ``solver_info["continuous_time_equation"]`` 
 require finite `tf` via `require_finite_tf()`). `X0`/`Xf` authoritative;
 `x_start`/`x_goal` are shortcuts/representative points. Offline entry is
 `Planner.solve()` → `PlanningSolution`, one result for every planner: the
-`policy` (a controller block `u = pi(x)`, or a `TrajectorySource` `u = pi(t)`
-for the trajectory family — `solution.open_loop`), the `solver` record (one
-frozen dataclass per planner with `success` and a one-line `str`), the
+`problem` it solved (a frozen reference), the
+`policy` (a controller block `u = pi(x)`, a `TrajectorySource` `u = pi(t)`
+for the trajectory family — `solution.open_loop` — or a time-varying feedback
+`u = pi(x, t)` for a finite-horizon LQR), the `solver` record (one
+frozen dataclass per planner with `success` and a one-line `str`; `method`
+names it), the
 `trajectory` (native for open-loop planners; the feedback law's nominal
 rollout on the planner's grid otherwise), the Monte Carlo `evaluation`, and
-`cost_to_go` where the method produces one (the DP and tabular tables; the RL
-critic when the training discount equals the cost's). A planner computes only
-what its solve computes natively; `solve(evaluate=True, n_trials=)` fills the
-rest through the evaluator. `get_controller()` returns the policy.
+`cost_to_go` where the method produces one (the DP and tabular tables; the
+Riccati form of `LQRPlanner`; the RL critic when the training discount equals
+the cost's). Everything on the solution is the solver's own claim under its
+own model — `cost_to_go` is the method's estimate, never a measurement; a
+measurement comes back from the evaluators as its own object. A planner
+computes only what its solve computes natively; `solve(evaluate=True,
+n_trials=)` fills the rest through the evaluator. `get_controller()` returns
+the policy. **The planner's output is a controller or a trajectory, and the
+script closes the loop itself** (`solution.policy @ plant`): the solution's
+verbs draw what the planner produced — `plot_control_law` (the law over the
+problem's box, one colour scale from its inputs), `plot_cost_to_go` (the
+field over the box, anchored at the goal), `plot_trajectory` (the plan or the
+nominal rollout, titled as such), `plot_cost` — never a closed-loop
+simulation; the planner keeps one-line shortcuts to its latest solution.
+`compare(VI=..., LQR=..., PPO=...)` → `Comparison` reads named solutions
+side by side: `print` is the table of records and evaluations,
+`plot_control_law` / `plot_cost_to_go` / `plot_trajectory` the overlays on
+one scale, `evaluate(evaluator)` the same table with every policy scored on one evaluator's draws. `LQRPlanner
+(problem)` is the linear-quadratic method on a `QuadraticCost` problem: `A`,
+`B` at the cost's `(xbar, ubar)`, the algebraic Riccati equation for an
+infinite `tf`, the differential one swept from `S` for a finite `tf`; its
+`RiccatiRecord` holds `K`, `P`, the closed-loop poles (success = Hurwitz) and
+the finite-horizon schedule. `control.lqr` stays the array-in / block-out
+factory the planner calls.
 
 **Cost horizon (landed 2026-09-10) and the constraint set (ruled 2026-09-15):** a
 `CostFunction` states its `horizon` (`"finite"` with `h` at `tf`, `"infinite"`
@@ -1111,7 +1137,11 @@ post-goal tree scans dominate.
 
 Facades delegate to `graphical/`. Time plots: `signals=("x", "u", "block:port")`.
 Phase plane: matplotlib default. Diagrams: Graphviz layout (notebook SVG;
-script Matplotlib window), Mermaid export;
+script Matplotlib window), Mermaid export. `print(sys)` is a short text
+summary: name, class, `n`, ports with dimensions; a diagram adds its keys.
+The same inspect print lives on `Trajectory`, sets, distributions, costs,
+`PlanningProblem`, `StateField`, and `MathematicalProgram` (a notebook
+last-expression on a `System` is still the Graphviz block).
 Plotly under `plotting` extra.
 
 **Camera:** plain `camera_*` hints on `System` resolve to a 4×4 matrix

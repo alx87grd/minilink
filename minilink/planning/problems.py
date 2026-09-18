@@ -15,6 +15,7 @@ import numpy as np
 
 from minilink.core.costs import CostFunction
 from minilink.core.distributions import Distribution, Particles, split_keys
+from minilink.core.inspect import inspect_text, repr_pretty
 from minilink.core.sets import BoxInputSet, BoxSet, InputSet, Set, SingletonSet
 from minilink.core.system import System
 
@@ -111,6 +112,12 @@ class PlanningProblem:
     params: ProblemParameters | None = None
     metadata: Mapping[str, object] | None = None
     infeasible_cost: object = None
+
+    def __str__(self):
+        return inspect_text(self)
+
+    def _repr_pretty_(self, p, cycle):
+        repr_pretty(self, p, cycle)
 
     def __post_init__(self) -> None:
         n = int(self.sys.n)

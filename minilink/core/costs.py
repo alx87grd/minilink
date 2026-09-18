@@ -32,6 +32,7 @@ from dataclasses import dataclass
 import numpy as np
 
 from minilink.core.backends import array_module
+from minilink.core.inspect import inspect_text, repr_pretty
 from minilink.core.trajectory import Trajectory
 
 
@@ -64,6 +65,12 @@ class CostFunction(ABC):
     def h(self, x, t=0.0, params=None):
         """Return the native scalar terminal cost ``h(x, t)``."""
         ...
+
+    def __str__(self):
+        return inspect_text(self)
+
+    def _repr_pretty_(self, p, cycle):
+        repr_pretty(self, p, cycle)
 
     def horizon_kind(self, tf=None) -> str:
         """Return ``"finite"`` or ``"infinite"``, resolving ``None`` from ``tf``."""

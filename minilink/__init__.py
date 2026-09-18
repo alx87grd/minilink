@@ -102,6 +102,8 @@ _EXPORTS: dict[str, tuple[str, str]] = {
     # planning
     "PlanningProblem": ("minilink.planning.problems", "PlanningProblem"),
     "PlanningSolution": ("minilink.planning.results", "PlanningSolution"),
+    "LQRPlanner": ("minilink.planning.policy_synthesis.lqr", "LQRPlanner"),
+    "compare": ("minilink.planning.comparison", "compare"),
     "TrajectoryOptimizationPlanner": (
         "minilink.planning.trajectory_optimization.planner",
         "TrajectoryOptimizationPlanner",

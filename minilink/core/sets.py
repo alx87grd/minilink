@@ -17,6 +17,7 @@ from minilink.core.backends import (
     numpy_generator,
     require_jax,
 )
+from minilink.core.inspect import inspect_text, repr_pretty
 
 
 class Set(ABC):
@@ -32,6 +33,12 @@ class Set(ABC):
     def margin(self, z, t=0.0, params=None):
         """Return nonnegative feasibility margins for ``z``, shape ``(k,)``."""
         ...
+
+    def __str__(self):
+        return inspect_text(self)
+
+    def _repr_pretty_(self, p, cycle):
+        repr_pretty(self, p, cycle)
 
     def contains(
         self,
@@ -78,6 +85,12 @@ class InputSet(ABC):
     def margin(self, u, x=None, t=0.0, params=None):
         """Return nonnegative feasibility margins for ``u``, shape ``(k,)``."""
         ...
+
+    def __str__(self):
+        return inspect_text(self)
+
+    def _repr_pretty_(self, p, cycle):
+        repr_pretty(self, p, cycle)
 
     def contains(
         self,

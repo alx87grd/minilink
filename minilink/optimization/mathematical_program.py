@@ -18,6 +18,7 @@ from typing import Any, TypeAlias
 import numpy as np
 
 from minilink.core.backends import BACKEND_NUMPY
+from minilink.core.inspect import inspect_text, repr_pretty
 
 # These stay loose on purpose: the runtime contract is native-backend behavior
 # plus shape checks in evaluators, without making JAX a core dependency.
@@ -108,6 +109,12 @@ class MathematicalProgram:
         object.__setattr__(self, "lower", lower)
         object.__setattr__(self, "upper", upper)
         object.__setattr__(self, "metadata", dict(self.metadata))
+
+    def __str__(self):
+        return inspect_text(self)
+
+    def _repr_pretty_(self, p, cycle):
+        repr_pretty(self, p, cycle)
 
 
 def _as_vector_or_none(name: str, value, n_z: int) -> np.ndarray | None:

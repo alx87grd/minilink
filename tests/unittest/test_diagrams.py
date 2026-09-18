@@ -140,6 +140,22 @@ class TestDiagrams(unittest.TestCase):
         self.assertIn('input -- "r -> r" --> ctl', source)
         self.assertIn('plant -- "y -> y_meas" --> output', source)
 
+    def test_print_system_is_a_short_summary(self):
+        from minilink.dynamics.catalog.pendulum.pendulum import Pendulum
+
+        text = str(Pendulum())
+        self.assertIn("Pendulum, n=2", text)
+        self.assertIn("inputs: u (1)", text)
+        self.assertIn("outputs: y (", text)
+        self.assertNotIn("0x", text)
+
+    def test_print_diagram_lists_block_keys(self):
+        text = str(self._make_diagram())
+        self.assertIn("n=1", text)
+        self.assertIn("inputs: r (1)", text)
+        self.assertIn("outputs: y_meas (1)", text)
+        self.assertIn("blocks: ctl, plant", text)
+
     @staticmethod
     def _make_diagram():
         diagram = DiagramSystem()

@@ -12,6 +12,8 @@ from types import MappingProxyType
 
 import numpy as np
 
+from minilink.core.inspect import inspect_text, repr_pretty
+
 
 @dataclass(frozen=True)
 class Trajectory:
@@ -78,6 +80,12 @@ class Trajectory:
         object.__setattr__(self, "x", x)
         object.__setattr__(self, "u", u)
         object.__setattr__(self, "signals", MappingProxyType(signals))
+
+    def __str__(self):
+        return inspect_text(self)
+
+    def _repr_pretty_(self, p, cycle):
+        repr_pretty(self, p, cycle)
 
     @property
     def n(self) -> int:

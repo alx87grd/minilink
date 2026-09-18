@@ -4,13 +4,13 @@ import numpy as np
 
 from minilink import (
     DynamicProgrammingPlanner,
+    LQRPlanner,
     Pendulum,
     PlanningProblem,
     PolicyEvaluator,
     QuadraticCost,
-    lqr_at_operating_point,
+    compare,
 )
-from minilink.planning.policy_synthesis import plotting
 
 INF = 500.0
 UPRIGHT = np.array([-np.pi, 0.0])
@@ -27,54 +27,35 @@ plant.inputs["u"].lower_bound = np.array([-TORQUE])
 plant.inputs["u"].upper_bound = np.array([TORQUE])
 
 cost = QuadraticCost.from_system(plant, xbar=UPRIGHT, Q=Q, R=R)
-problem = PlanningProblem(plant, x_goal=UPRIGHT, cost=cost)
+problem = PlanningProblem(plant, x_start=X0, x_goal=UPRIGHT, cost=cost)
 
+# Two planners on one problem
 planner = DynamicProgrammingPlanner(
     problem, x_grid=(101, 101), u_grid=(11,), dt=0.05, tol=0.1, max_iterations=2000
 )
 grid = planner.grid  # shared with the LQR policy evaluation below
-planner.solve()
+sol_vi = planner.solve()
+sol_lqr = LQRPlanner(problem).solve()
 
-lqr_plant = Pendulum()
-lqr_plant.state.lower_bound = np.array([LO, LO])
-lqr_plant.state.upper_bound = np.array([HI, HI])
-lqr_plant.inputs["u"].lower_bound = np.array([-TORQUE])
-lqr_plant.inputs["u"].upper_bound = np.array([TORQUE])
-lqr = lqr_at_operating_point(lqr_plant, UPRIGHT, Q, R)
-
-# The LQR block is the policy and the law: no params unpacking needed.
-J_lqr = PolicyEvaluator(problem, grid=grid, policy=lqr, options=planner.options).solve()
-
+# What each method claims: its law and its own cost-to-go, on one scale
+race = compare(VI=sol_vi, LQR=sol_lqr)
+print(race)
+race.plot_control_law()
+race.plot_cost_to_go(jmax=INF)
 planner.plot_cost2go(jmax=INF, show_3d=True)
-plotting.plot_value(grid, J_lqr, vmax=INF, title="LQR cost-to-go")
 
-planner.plot_policy()
-lqr.plot_control_law(
-    bounds=((LO, HI), (LO, HI)),
-    vmin=-TORQUE,
-    vmax=TORQUE,
-    title="LQR control law",
-)
-planner.get_controller().plot_control_law(title="VI control law (interpolated)")
+# The LQR law measured on the nonlinear plant: the Bellman expectation equation on VI's grid
+J_lqr = PolicyEvaluator(
+    problem, grid=grid, policy=sol_lqr, options=planner.options
+).solve()
+grid.plot_value(J_lqr, vmax=INF, title="LQR cost-to-go, measured")
 
-sim_vi = Pendulum()
-sim_vi.state.lower_bound = np.array([LO, LO])
-sim_vi.state.upper_bound = np.array([HI, HI])
-sim_vi.inputs["u"].lower_bound = np.array([-TORQUE])
-sim_vi.inputs["u"].upper_bound = np.array([TORQUE])
-sim_lqr = Pendulum()
-sim_lqr.state.lower_bound = np.array([LO, LO])
-sim_lqr.state.upper_bound = np.array([HI, HI])
-sim_lqr.inputs["u"].lower_bound = np.array([-TORQUE])
-sim_lqr.inputs["u"].upper_bound = np.array([TORQUE])
-
-vi_diagram = planner.get_controller() @ sim_vi
-lqr_diagram = lqr @ sim_lqr
+# Close the loops, explicitly, and simulate each from the same start
+plant.x0 = X0
+vi_diagram = sol_vi.policy @ plant
+lqr_diagram = sol_lqr.policy @ plant
 vi_diagram.name = "Pendulum swing-up (value iteration)"
 lqr_diagram.name = "Pendulum swing-up (LQR)"
-
-sim_vi.x0 = X0
-sim_lqr.x0 = X0
 vi_diagram.plot_diagram()
 lqr_diagram.plot_diagram()
 vi_traj = vi_diagram.compute_trajectory(tf=10.0)

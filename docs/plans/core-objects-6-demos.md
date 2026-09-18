@@ -5,7 +5,8 @@ every file of the sweep is a maintainer review. Runs alongside phases 2–4 once
 The census behind the rule: docs/reviews/2026-09-15-foundations-review.md, comment C14.
 
 - [ ] **6.1 Native reporting the demos hand-roll** (agent lane: plotting interfaces; land only
-  what two or more demos need). `print(sys)` (naming quick win 5); `Optimizer` convergence plot
+  what two or more demos need). ~~`print(sys)` (naming quick win 5)~~ landed 2026-09-17;
+  remaining: `Optimizer` convergence plot
   (`optim_plot.py` draws it by hand); two planners' trees or solutions side by side
   (`rrt_car_parking.py`, `rrt_holonomic_obstacles.py`); learning curves of several learners on
   one axis (`double_integrator_sarsa_vs_q_learning_rl.py`); a `rollout_batch` family plot

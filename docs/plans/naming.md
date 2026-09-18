@@ -1,7 +1,7 @@
 # Names of blocks and signals: one rule
 
-Status: core contract, audit done 2026-09-13, nothing applied. The maintainer chose to record
-the findings and the quick wins before changing code.
+Status: core contract, audit done 2026-09-13. Quick win 5 (`print(sys)`) landed
+2026-09-17; wins 1–4 and 6 are still unapplied.
 
 ## Problem
 
@@ -52,8 +52,8 @@ anything.
    name is replaced.
 4. The sampled loop's plant wrapper honors `plant.id`, keeping `plant` as its default so the
    tested key stays; the override rule then holds for every loop kind.
-5. `print(sys)` gives a short text summary: name, class, `n`, and the ports with their
-   dimensions; a diagram adds its keys. This adds a method to `System` (core API).
+5. ~~`print(sys)` gives a short text summary: name, class, `n`, and the ports with their
+   dimensions; a diagram adds its keys.~~ Landed 2026-09-17 (`System.__str__`).
 6. The `System` docstring documents `id` as the key override.
 
 ## Not quick

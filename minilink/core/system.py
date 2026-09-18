@@ -20,6 +20,7 @@ from minilink.core.facades import (
     SharedSystemFacades,
     StepSystemFacades,
 )
+from minilink.core.inspect import inspect_text, repr_pretty
 from minilink.core.signals import InputPort, OutputPort, VectorSignal
 
 if TYPE_CHECKING:
@@ -51,6 +52,9 @@ class System(SharedSystemFacades):
       :meth:`render`, :meth:`animate` on
       :class:`~minilink.core.facades.SharedSystemFacades` (continuous analysis
       and :meth:`game` on :class:`~minilink.core.facades.DynamicSystemFacades`).
+    - **Inspect**: :meth:`__str__` is a short summary (name, class, ``n``,
+      ports with dimensions; a diagram adds its keys). A notebook last
+      expression still draws the Graphviz block.
 
     Overridden :meth:`h` and port ``compute`` functions are functions of
     ``(x, u, t, params)`` alone: no memory between calls, no cached side
@@ -122,6 +126,12 @@ class System(SharedSystemFacades):
         # drawables exist.
         self.camera_follow_frame = None
         self.camera_priority = 0.0
+
+    def __str__(self):
+        return inspect_text(self)
+
+    def _repr_pretty_(self, p, cycle):
+        repr_pretty(self, p, cycle)
 
     # Core output contract (static IO)
 

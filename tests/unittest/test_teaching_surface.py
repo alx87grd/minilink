@@ -32,6 +32,7 @@ TEACHING_SURFACE: dict[str, tuple[str, ...]] = {
         "Step",
         "feedback",
         "StochasticPlanningProblem",
+        "LQRPlanner",
         "ReinforcementLearningPlanner",
         "TabularLearningPlanner",
         "NeuralPolicyController",
@@ -117,6 +118,8 @@ TEACHING_SURFACE: dict[str, tuple[str, ...]] = {
     "minilink.planning": (
         "PlanningProblem",
         "PlanningSolution",
+        "compare",
+        "LQRPlanner",
         "TrajectoryOptimizationPlanner",
         "StateSpaceGrid",
         "DynamicProgrammingPlanner",
