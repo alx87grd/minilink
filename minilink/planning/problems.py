@@ -258,12 +258,8 @@ class PlanningProblem:
         return price(x, t) if callable(price) else price
 
     def horizon_kind(self) -> str:
-        """``"finite"`` or ``"infinite"``: the cost's declaration, else from ``tf``."""
-        if self.cost is None:
-            return (
-                "infinite" if self.tf is None or not np.isfinite(self.tf) else "finite"
-            )
-        return self.cost.horizon_kind(self.tf)
+        """``"finite"`` when ``tf`` is a finite length (``h`` is charged there), ``"infinite"`` for ``+inf`` or unset."""
+        return "infinite" if self.tf is None or not np.isfinite(self.tf) else "finite"
 
     @property
     def has_cost(self) -> bool:

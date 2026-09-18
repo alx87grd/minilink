@@ -29,14 +29,15 @@ def quadratic(plant):
 # --- R1: cost horizon and discount, problem exit rule ---
 
 
-def test_cost_horizon_follows_tf_unless_declared():
-    cost = quadratic(pendulum())
-    assert cost.horizon_kind(tf=5.0) == "finite"
-    assert cost.horizon_kind(tf=np.inf) == "infinite"
-    assert cost.horizon_kind(tf=None) == "infinite"
+def test_horizon_is_the_problem_tf_and_the_cost_only_discounts():
+    plant = pendulum()
+    cost = quadratic(plant)
+    assert PlanningProblem(plant, cost=cost, tf=5.0).horizon_kind() == "finite"
+    assert PlanningProblem(plant, cost=cost, tf=np.inf).horizon_kind() == "infinite"
+    assert PlanningProblem(plant, cost=cost).horizon_kind() == "infinite"
+    assert not hasattr(CostFunction, "horizon")  # one owner: the problem's tf
 
-    class Infinite(CostFunction):
-        horizon = "infinite"
+    class Discounted(CostFunction):
         discount_rate = 0.5
 
         def g(self, x, u, t=0.0, params=None):
@@ -45,9 +46,7 @@ def test_cost_horizon_follows_tf_unless_declared():
         def h(self, x, t=0.0, params=None):
             return 0.0
 
-    inf = Infinite()
-    assert inf.horizon_kind(tf=5.0) == "infinite"
-    np.testing.assert_allclose(inf.discount_factor(0.1), np.exp(-0.05))
+    np.testing.assert_allclose(Discounted().discount_factor(0.1), np.exp(-0.05))
     assert cost.discount_factor(0.1) == 1.0
 
 

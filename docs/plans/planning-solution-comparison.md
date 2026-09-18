@@ -3,8 +3,9 @@
 Status: landed 2026-09-17 (steps 1–3 of §4: `LQRPlanner`, the solution contract and verbs,
 `compare`; R1–R8 taken as recommended). Open: the demo and notebook rewrites (§4 step 3,
 maintainer-owned, a runnable draft of `vi_pendulum_lqr.py` was shown), solver-specific views
-on the records (§2.4, maintainer), `cost_to_go` as a `Field` (phase 4). Delete this file once
-those land.
+on the records (§2.4, maintainer), `cost_to_go` as a `Field` (phase 4). Also ruled 2026-09-17: **one horizon** — `CostFunction.horizon` removed, `problem.tf`
+alone decides (`h` charged exactly when `tf` is finite; `episode_length` is the tool's run
+length). Delete this file once those land.
 Depends on core-objects-4-fields.md (4.2 `QuadraticField`, 4.4 `GridField`, 4.6 `CallableField`)
 for the cost-to-go plot; everything else stands alone.
 

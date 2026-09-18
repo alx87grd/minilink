@@ -59,10 +59,7 @@ def inspect_text(obj):
     if isinstance(obj, Distribution):
         return f"{type(obj).__name__}, dim={obj.dim}, mean={_arr(obj.mean)}"
     if isinstance(obj, CostFunction):
-        return (
-            f"{type(obj).__name__}, horizon={obj.horizon!r}, "
-            f"rho={float(obj.discount_rate):g}"
-        )
+        return f"{type(obj).__name__}, rho={float(obj.discount_rate):g}"
     if isinstance(obj, StateField):
         return type(obj).__name__
     if isinstance(obj, PlanningProblem):

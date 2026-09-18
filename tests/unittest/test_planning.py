@@ -2738,6 +2738,7 @@ def test_box_probes_stay_at_the_solver_boundary():
         "planning/trajectory_optimization/direct_collocation.py",
         "planning/trajectory_optimization/shooting.py",
         "planning/policy_synthesis/discretizer.py",
+        "core/inspect.py",  # the printer names the set's type; reporting, not math
     }
     offenders = []
     for path in sorted(root.rglob("*.py")):

@@ -5,15 +5,14 @@ The planning cost follows the textbook optimal-control form
 
 ``J = integral exp(-rho t) g(x, u, t) dt + h(x(tf), tf)``.
 
-A cost also states the *kind* of objective it is: :attr:`CostFunction.horizon`
-(``"finite"`` with the terminal cost ``h`` at ``tf``, ``"infinite"`` with no
-terminal cost, or ``None`` to follow the planning problem's ``tf``) and the
-continuous discount rate :attr:`CostFunction.discount_rate` ``rho`` (``0`` is
-undiscounted). Planners convert the rate to their own factor with
-:meth:`CostFunction.discount_factor`: value iteration's ``alpha`` and
+The horizon is the planning problem's: a finite ``tf`` ends the integral and
+charges ``h`` there, an infinite ``tf`` never does (``PlanningProblem.horizon_kind``).
+A cost states only its continuous discount rate :attr:`CostFunction.discount_rate`
+``rho`` (``0`` is undiscounted). Planners convert the rate to their own factor
+with :meth:`CostFunction.discount_factor`: value iteration's ``alpha`` and
 reinforcement learning's ``gamma`` are both ``exp(-rho dt)``. What happens when
-a trajectory leaves the allowed set is not the cost's business — it is the
-planning problem's exit rule (``PlanningProblem.on_exit`` / ``exit_cost``).
+a trajectory leaves the allowed set is not the cost's business either — it is
+the planning problem's price of infeasibility (``PlanningProblem.infeasible_cost``).
 
 Costs live in :mod:`minilink.core` (not on
 :class:`~minilink.core.system.System`) so the same model can be reused
@@ -45,15 +44,12 @@ class CostFunction(ABC):
     problems can later support parameter sweeps without putting costs on
     the system object.
 
-    Class attributes (override by assignment in a subclass or instance):
+    Class attribute (override by assignment in a subclass or instance):
 
-    - ``horizon``: ``"finite"``, ``"infinite"``, or ``None`` (follow the
-      problem's ``tf``: finite ``tf`` is a finite horizon).
     - ``discount_rate``: continuous rate ``rho >= 0`` in
       ``J = int exp(-rho t) g dt``; ``0`` is undiscounted.
     """
 
-    horizon = None
     discount_rate = 0.0
 
     @abstractmethod
@@ -71,18 +67,6 @@ class CostFunction(ABC):
 
     def _repr_pretty_(self, p, cycle):
         repr_pretty(self, p, cycle)
-
-    def horizon_kind(self, tf=None) -> str:
-        """Return ``"finite"`` or ``"infinite"``, resolving ``None`` from ``tf``."""
-        if self.horizon is not None:
-            if self.horizon not in ("finite", "infinite"):
-                raise ValueError(
-                    f"horizon must be 'finite', 'infinite' or None, got {self.horizon!r}"
-                )
-            return self.horizon
-        if tf is None or not np.isfinite(tf):
-            return "infinite"
-        return "finite"
 
     def discount_factor(self, dt) -> float:
         """Per-step factor ``exp(-rho dt)`` for a planner with time step ``dt``."""
