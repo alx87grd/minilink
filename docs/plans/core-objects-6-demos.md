@@ -18,7 +18,8 @@ The census behind the rule: docs/reviews/2026-09-15-foundations-review.md, comme
   shrinking with 6.3, as S12 did for imports.
 - [ ] **6.3 The sweep**, one file per step, maintainer reviews each diff (AGENTS: student-facing;
   the term gate is about names, so notebook content may change with an explicit ask). Order:
-  the tutorial chapters (`11_reinforcement_learning.ipynb` and `showcase_jax.ipynb` first),
+  the tutorial chapters (`11_reinforcement_learning.ipynb` and `showcase_jax.ipynb` first;
+  `showcase_jax` rewritten 2026-09-18, awaiting the maintainer's review),
   then the 20 non-clean demos, then the teaching notebooks; the three `compile/` demos wait for
   the differentiable closed-loop cost (their helpers *are* that feature);
   `manipulator_eom.ipynb` is reviewed for which of its 26 helpers the text teaches. Done
