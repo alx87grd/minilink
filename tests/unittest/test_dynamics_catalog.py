@@ -237,7 +237,7 @@ class TestCartPole(unittest.TestCase):
         ]
         self.assertEqual(len(cart_boxes), 1)
         self.assertEqual(cart_boxes[0].length_z, sys.cart_depth)
-        self.assertEqual(sys.camera_scale, 5.0)
+        self.assertEqual(sys.camera_scale, 10.0)
         wheels = [
             primitive
             for primitive in frame["primitives"]
