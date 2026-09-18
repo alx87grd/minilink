@@ -1062,9 +1062,12 @@ interpolates `J` (the raw `DynamicProgrammingResult`, `J` and `pi` as action ids
 transitions are charged a finite `out_of_bound_cost` (pyro's
 `cf.INF`). Three interchangeable backward-step backends share this workflow: `loop` (per-node
 Python, pyro's reference), `numpy` (vectorized over the precomputed lookup table, the default),
-and `jax` (the same backup as one jitted `lax.while_loop` with `map_coordinates`, built on a
-NumPy precompute so any plant works; linear/nearest only). `precompute` trades the `(N,A,n)`
-successor table for per-sweep recomputation (memory vs time-varying support). Plotting lives on
+and `jax` (the same backup as one jitted `lax.while_loop` with `map_coordinates`, on tables
+built with `vmap`, so the plant and cost must be JAX-traceable; linear/nearest only). The JAX
+engine lives in `dp_jax.py` and the progress reports in `progress.py`, so `dp.py` reads as the
+textbook algorithm. `precompute` trades the `(N,A,n)`
+successor table for per-sweep recomputation (memory vs time-varying support); a precomputed
+grid also freezes the running-cost table, so a time-varying `f` or `g` needs `precompute=False`. Plotting lives on
 `DynamicProgrammingPlanner` (`plot_cost2go`, `plot_policy`, `animate_*`, `get_controller`) and
 in `planning/policy_synthesis/plotting.py` for loaded results (`plotting.get_controller(result)`).
 `get_controller()` returns a `LookupTableController` (a static `System`, so `controller >> plant` simulates);
