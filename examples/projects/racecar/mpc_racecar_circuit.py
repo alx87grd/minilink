@@ -30,7 +30,7 @@ MPC_DT = 0.1  # [s] between two solves
 MPC_HORIZON = 1.2  # [s] ~4.5 m ahead at V_TARGET: one corner's worth
 MPC_STEPS = 12  # knots, 0.1 s apart: a cone must not fall between two of them
 SLSQP_MAXITER = 60
-SLSQP_FTOL = 0.05
+SLSQP_FTOL = 1.0
 # 110 warm-started solves at ~0.15 s each; the whole script takes about half a minute.
 
 BODY_LENGTH, BODY_WIDTH, BODY_MARGIN = 0.34, 0.20, 0.02  # [m] footprint the plan keeps
@@ -130,76 +130,32 @@ planner = TrajectoryOptimizationPlanner(
     optimizer_method="scipy_slsqp",
     optimizer_options={"maxiter": SLSQP_MAXITER, "ftol": SLSQP_FTOL},
 )
-mpc = ModelPredictiveController(planner, dt_mpc=MPC_DT, warm_start=True, verbose=False)
+mpc = ModelPredictiveController(planner, dt_mpc=MPC_DT, warm_start=True, verbose=True)
 
 car = UdeSRacecarDyn(named_ports=False)
-car.x0 = x0.copy()
-car.camera_follow_frame = None  # the whole circuit, not the car
-car.camera_scale = 7.0
+car.x0 = x0.copy()  # the whole circuit, not the car
+car.camera_scale = 2.0
 
 lap = mpc @ car
 lap.plot_diagram()
 result = lap.compute_trajectory(
     tf=TF_SIM, x0_plant=x0, plant_dt_inner=SIM_DT, compile_backend="jax"
 )
-lap.plot_trajectory(show=False)
-lap.animate(
-    result.plant.resample(n_samples=N_FRAMES),
-    overlays=mpc_animation_overlays(result, planner, scene=scene, track=track),
-    show=False,
-)
+lap.plot_trajectory()
+
+
+from minilink.graphical.catalog.racecar_skin import racecar_skin_3d
+
 
 lap.animate(
     result.plant.resample(n_samples=N_FRAMES),
     overlays=mpc_animation_overlays(result, planner, scene=scene, track=track),
-    show=False,
+)
+
+
+car.skin = racecar_skin_3d
+lap.animate(
+    result.plant.resample(n_samples=N_FRAMES),
+    overlays=mpc_animation_overlays(result, planner, scene=scene, track=track),
     renderer="meshcat",
 )
-
-# --- side analysis: the line driven, the lane kept, and the grip it took ---
-x = np.asarray(result.plant.x)[:, ::10]
-t = np.asarray(result.plant.t)[::10]
-offset = np.array([float(track.path.distance(p)) for p in x[0:2].T])
-grip = np.array([car.grip(x[:, k], np.zeros(2)) for k in range(x.shape[1])]).T
-half_body = 0.5 * BODY_WIDTH + BODY_MARGIN  # what the corridor term fits in the lane
-
-# the lap is over when the car comes back within a wheelbase of where it set off
-from_start = np.linalg.norm(x[0:2].T - start, axis=1)
-gone = np.argmax(from_start > 2.0 * RADIUS)
-lap_time = t[gone + np.argmax(from_start[gone:] < car.params["a"] + car.params["b"])]
-
-fig, axes = plt.subplots(1, 3, figsize=(13.5, 4.2))
-axes[0].plot(path[:, 0], path[:, 1], color="gray", lw=1.0, ls="--", label="centre line")
-axes[0].plot(x[0], x[1], lw=1.5, label=f"car, lap in {lap_time:.1f} s")
-for cone in cones:
-    axes[0].add_patch(plt.Circle(cone, CONE_RADIUS + CONE_MARGIN, color="mistyrose"))
-    axes[0].add_patch(plt.Circle(cone, CONE_RADIUS, color="tab:red"))
-axes[0].set_xlabel("x [m]")
-axes[0].set_ylabel("y [m]")
-axes[0].set_title(f"MPC lap, {V_TARGET:g} m/s asked for")
-axes[0].set_aspect("equal")
-axes[0].legend(loc="center")
-
-axes[1].plot(t, offset, lw=1.2)
-axes[1].axhline(
-    CORRIDOR_HALF_WIDTH - half_body,
-    color="gray",
-    lw=0.8,
-    ls=":",
-    label="body against the lane edge",
-)
-axes[1].set_xlabel("t [s]")
-axes[1].set_ylabel("distance from the line [m]")
-axes[1].set_title(f"worst {offset.max():.2f} m, at the cones")
-axes[1].legend()
-
-axes[2].plot(t, x[3], label="speed [m/s]")
-axes[2].plot(t, grip[0], label="front friction used")
-axes[2].plot(t, grip[1], label="rear friction used")
-axes[2].axhline(1.0, color="gray", lw=0.8, ls=":")
-axes[2].set_xlabel("t [s]")
-axes[2].set_title("what the corners cost")
-axes[2].legend()
-
-fig.tight_layout()
-plt.show()
