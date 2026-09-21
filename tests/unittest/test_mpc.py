@@ -963,6 +963,17 @@ class TestMpcHybridStraightLine(unittest.TestCase):
         overlays = mpc_animation_overlays(result, planner, reference_pad=5.0)
         self.assertEqual(len(overlays), 1)
         self.assertEqual(type(overlays[0]).__name__, "SceneHistory")
+        n = result.plant.n_samples
+        leaf = Trajectory(
+            t=result.plant.t,
+            x=np.vstack([np.linspace(0.0, 4.0, n), np.zeros(n)]),
+            u=result.plant.u,
+        )
+        custom = mpc_animation_overlays(result, planner, traj=leaf)
+        trail = custom[0]._dynamic_sources[0]
+        pts = trail.compute_pts(float(leaf.t[-1]))
+        np.testing.assert_allclose(pts[0, 0], 0.0)
+        np.testing.assert_allclose(pts[-1, 0], 4.0)
 
 
 pytest.importorskip("jax")

@@ -94,6 +94,7 @@ def mpc_animation_overlays(
     *,
     scene=None,
     track=None,
+    traj=None,
     reference_pad: float | None = None,
     t0: float = 0.0,
     dt_mpc: float | None = None,
@@ -117,6 +118,10 @@ def mpc_animation_overlays(
         Collision scene drawn via :meth:`~minilink.planning.spatial.scene.Scene.as_visualizer`.
     track : Track, optional
         2-D track corridor edges and centerline.
+    traj : Trajectory, optional
+        Executed path for the trail. Defaults to ``result.plant``. Pass the
+        leaf-car trajectory when the hybrid plant is a nested diagram, so the
+        trail is pose ``(x, y)`` and not the first two diagram states.
     reference_pad : float, optional
         When set, draw a dashed world ``y=0`` reference spanning the executed
         path in ``x`` by this padding on each end.
@@ -141,7 +146,7 @@ def mpc_animation_overlays(
             )
         dt_mpc = float(hybrid.computer.schedule.dt_base)
 
-    traj = result.plant
+    traj = result.plant if traj is None else traj
     mpc_plans = mpc_plans_from_rollout(
         result.computer,
         planner.transcription,
