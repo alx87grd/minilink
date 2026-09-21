@@ -17,6 +17,7 @@ examples/
     topics/<domain>/           # Textbook pages — refactorable (classical_control, optimal_control, …)
     courses/<id>/              # Live course pins (udes_gro860, udes_gro501, later udes_gmc714) — frozen paths
   demos/<chapter>/             # Canonical single-file textbook scripts (1:1 with tutorial chapters)
+  demos/udes_racecar/          # Plant folder: MPC and keyboard game on the 1/10 car
 
   # --- Research Lane (Repo-only, unconstrained, exploratory) ---
   projects/<name>/             # Multi-file applications (pathtracking, car_trajopt, mpc)
@@ -29,6 +30,7 @@ examples/
 | [`teaching/topics/`](teaching/topics/) | teaching, smoked unless long | Learn a **subject** — course-agnostic textbook page |
 | [`teaching/courses/<id>/`](teaching/courses/) | teaching, smoked unless long | Homework cited by a live course — do not rename without the notes |
 | [`demos/<chapter>/`](demos/) | teaching, nightly sweep | Canonical single-file demo (incl. pedagogical compares) |
+| [`demos/udes_racecar/`](demos/udes_racecar/) | teaching, nightly | 1/10 racecar plant folder (MPC, keyboard game) |
 | [`projects/<name>/`](projects/) | research | Multi-file experiment — outside release contract, repo-only |
 | [`experimental/<topic>/`](experimental/) | research | Non-core single files, scenario sprawl, WIP; `scratch/` for personal checks |
 
@@ -163,12 +165,13 @@ One demo folder per tutorial chapter; the research lane sits apart.
 | Control | [03_control](tutorial/03_control.ipynb) | [`demos/control/`](demos/control/), [`demos/robotic/`](demos/robotic/) | [manipulator_eom](teaching/topics/robotics/manipulator_eom.ipynb) |
 | Analysis | [04_analysis](tutorial/04_analysis.ipynb) | [`demos/analysis/`](demos/analysis/) | [frequency_response](teaching/topics/classical_control/frequency_response.ipynb) (Bode, margins, Nyquist, root locus, step response) |
 | Simulation | [05_simulation](tutorial/05_simulation.ipynb) | [`demos/graphical/`](demos/graphical/) | |
-| Hybrid / step | [06_hybrid](tutorial/06_hybrid.ipynb) | [`demos/hybrid/`](demos/hybrid/), [`demos/mpc/`](demos/mpc/) | [`projects/mpc/`](projects/mpc/) (spatial MPC stack, dual-rate `mpc_dual_rate.py`), [`projects/car_trajopt/`](projects/car_trajopt/), [`projects/pathtracking/`](projects/pathtracking/), [`projects/racecar/`](projects/racecar/) |
+| Hybrid / step | [06_hybrid](tutorial/06_hybrid.ipynb) | [`demos/hybrid/`](demos/hybrid/), [`demos/mpc/`](demos/mpc/) | [`projects/mpc/`](projects/mpc/) (spatial MPC stack, dual-rate `mpc_dual_rate.py`), [`projects/car_trajopt/`](projects/car_trajopt/), [`projects/pathtracking/`](projects/pathtracking/) |
 | Compile / autodiff | [07_compile](tutorial/07_compile.ipynb), [showcase_jax](tutorial/showcase_jax.ipynb) | [`demos/compile/`](demos/compile/) | [cartpole_rollout_gradients](teaching/topics/optimal_control/cartpole_rollout_gradients.ipynb) |
 | Optimization | [08_optimization](tutorial/08_optimization.ipynb) | [`demos/optimization/`](demos/optimization/) | |
 | Planning | [09_planning](tutorial/09_planning.ipynb) | [`demos/trajopt/`](demos/trajopt/), [`demos/rrt/`](demos/rrt/), [`demos/value_iteration/`](demos/value_iteration/) | [cost+VI](teaching/courses/udes_gro860/pendulum_value_iteration.ipynb), [VI vs LQR](teaching/courses/udes_gro860/pendulum_value_iteration_vs_lqr.ipynb), [grid world DP](teaching/courses/udes_gro860/grid_world_dynamic_programming.ipynb), [minimum-time VI](teaching/courses/udes_gro860/double_integrator_minimum_time.ipynb), [policy evaluation](teaching/courses/udes_gro860/double_integrator_policy_evaluation.ipynb), [cart-pole LQR](teaching/courses/udes_gro860/cartpole_lqr.ipynb); [`projects/car_trajopt/`](projects/car_trajopt/), [`projects/pathtracking/`](projects/pathtracking/), [`projects/racecar/`](projects/racecar/) |
 | Reinforcement learning | [11_reinforcement_learning](tutorial/11_reinforcement_learning.ipynb), [showcase_from_rl_to_bode](tutorial/showcase_from_rl_to_bode.ipynb) | [`demos/rl/`](demos/rl/) (pendulum swing-up, cart-pole, rocket landing, learn to fly) | [Gymnasium interface](teaching/courses/udes_gro860/gymnasium_interface.ipynb), [VI vs LQR vs RL](teaching/topics/reinforcement_learning/pendulum_value_iteration_vs_lqr_vs_rl.ipynb), [learn to fly](teaching/topics/reinforcement_learning/drone_ppo.ipynb), [function approximation by SGD](teaching/topics/machine_learning/least_squares_sgd.ipynb), [cost-to-go approximation](teaching/courses/udes_gro860/pendulum_cost_to_go_approximation.ipynb); Lyapunov check in [`experimental/rl/`](experimental/rl/) |
-| Graphical | [10_graphical](tutorial/10_graphical.ipynb) | [`demos/graphical/`](demos/graphical/), [`demos/realtime/`](demos/realtime/) (keyboard game mode: `game_cartpole.py`, `game_racecar.py`) | |
+| Graphical | [10_graphical](tutorial/10_graphical.ipynb) | [`demos/graphical/`](demos/graphical/), [`demos/realtime/`](demos/realtime/) (keyboard game mode: `game_cartpole.py`, `game_bicycle.py`) | |
+| UdeS racecar | — | [`demos/udes_racecar/`](demos/udes_racecar/) (kinematic MPC, dynamic MPC, keyboard game) | [`projects/racecar/`](projects/racecar/) |
 | Research lane | — | [`experimental/`](experimental/) (`c_export/`, `engine/`, `symbolic/`, `robotic/` UR5) | not nightly-swept; `c_export` is TRL 1 (flagship smoke in the JAX regression job); C export demos: `experimental/c_export/c_export_proportional.py`, `c_export.py` |
 | Solver benchmarks | — | [`benchmarks/`](../benchmarks/) | Performance tracking and backend sweeps live in repo-root [`benchmarks/`](../benchmarks/) (run locally or in Colab via [`benchmarks/ode_solver_benchmark.ipynb`](../benchmarks/ode_solver_benchmark.ipynb)) |
 

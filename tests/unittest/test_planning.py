@@ -1840,6 +1840,22 @@ def test_obstacle_and_corridor_compose():
     assert not free.contains(np.array([1.0, 2.0]))
 
 
+def test_jax_path_project_sample_tangent_match_numpy():
+    jax = pytest.importorskip("jax")
+    import jax.numpy as jnp
+
+    path = PolylinePath([[0.0, 0.0], [3.0, 4.0], [3.0, 9.0]])
+    p = np.array([3.0, 4.0])
+    s_np, q_np = path.project(p)
+    s_jax, q_jax = path.project(jnp.array(p))
+    assert float(s_jax) == pytest.approx(float(s_np))
+    assert np.asarray(q_jax) == pytest.approx(q_np)
+    assert np.asarray(path.sample(jnp.array(5.0))) == pytest.approx(path.sample(5.0))
+    assert np.asarray(path.tangent(jnp.array(5.0))) == pytest.approx(path.tangent(5.0))
+    grad = jax.grad(lambda q: path.project(q)[0])(jnp.array(p, dtype=float))
+    assert np.asarray(grad).shape == (2,)
+
+
 def test_jax_path_distance_matches():
     jax = pytest.importorskip("jax")
     import jax.numpy as jnp

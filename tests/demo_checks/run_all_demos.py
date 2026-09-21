@@ -27,7 +27,10 @@ FLAGSHIP_MANIFEST = CHECKS_DIR / "flagship_manifest.json"
 
 # Live keyboard / wall-clock sessions hang until the user quits — not suitable
 # for an unattended subprocess sweep. Keep discoverable under examples/; skip here.
-INTERACTIVE_DEMO_PREFIXES = ("examples/demos/realtime/",)
+INTERACTIVE_DEMO_PREFIXES = (
+    "examples/demos/realtime/",
+    "examples/demos/udes_racecar/game_racecar.py",
+)
 
 
 @dataclass(frozen=True)
