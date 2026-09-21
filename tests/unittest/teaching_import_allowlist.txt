@@ -50,5 +50,7 @@ examples/demos/realtime/game_ur5_setpoint.py minilink.simulation.realtime
 examples/tutorial/showcase_jax.ipynb minilink.experimental.c_export
 examples/tutorial/showcase_minilink.ipynb minilink.core.kinematics
 examples/tutorial/showcase_minilink.ipynb minilink.graphical.animation.primitives
+examples/teaching/topics/optimal_control/racecar_mpc.ipynb minilink.core.hybrid_composition
+examples/teaching/topics/optimal_control/racecar_mpc.ipynb minilink.graphical.catalog.racecar_skin
 examples/teaching/topics/robotics/manipulator_eom.ipynb minilink.experimental.symbolic.mechanics.model
 examples/teaching/courses/udes_gro860/pendulum_value_iteration_vs_lqr_vs_ppo_sb3.ipynb minilink.planning.policy_synthesis

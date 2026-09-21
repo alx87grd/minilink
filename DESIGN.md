@@ -377,8 +377,11 @@ The research rungs (`Holonomic`, `HolonomicAccel`, `BicycleKin`, `BicycleAcc`,
   (``vehicle:body``). Controllers may own their own visualization frames the
   same way (e.g. optional `TaskImpedance` `task_force` → `ctl:task_force`); the
   arrow shows the pre-gravity task wrench `f_task`, not `Jᵀ f_task` or `g(q)`.
-  Meshcat `native=True` freezes changing `Arrow` / `TorqueArrow` geometry at
-  `t=0` — use `native=False` for frame-accurate force playback.
+  Meshcat `native=True` freezes changing `Arrow` / `TorqueArrow` /
+  `CustomLine` geometry (MPC trail and horizon) at `t=0` — use
+  `native=False` for frame-accurate overlay playback. In 3-D, those
+  polylines are thin ribbons (matplotlib dash and width), not 1-pixel
+  WebGL lines.
   `animate(save=True)` writes the backend file: matplotlib a GIF, meshcat a
   standalone HTML page of that native animation.
 - **Facades:** user shortcuts only (lazy simulation/graphics); split across

@@ -95,6 +95,7 @@ def mpc_animation_overlays(
     scene=None,
     track=None,
     traj=None,
+    trail: bool = True,
     reference_pad: float | None = None,
     t0: float = 0.0,
     dt_mpc: float | None = None,
@@ -104,8 +105,8 @@ def mpc_animation_overlays(
     """
     Build ``animate(overlays=[...])`` layers for a hybrid MPC rollout.
 
-    Reconstructs horizon polylines from the computer tick history, adds an
-    executed-path trail, and optionally a straight reference line, obstacle
+    Reconstructs horizon polylines from the computer tick history, optionally
+    an executed-path trail, and optionally a straight reference line, obstacle
     scene skin, or track corridor.
 
     Parameters
@@ -122,6 +123,9 @@ def mpc_animation_overlays(
         Executed path for the trail. Defaults to ``result.plant``. Pass the
         leaf-car trajectory when the hybrid plant is a nested diagram, so the
         trail is pose ``(x, y)`` and not the first two diagram states.
+    trail : bool, optional
+        Draw the executed-path polyline. ``False`` keeps the receding horizon
+        and any track/scene layers without the growing trail.
     reference_pad : float, optional
         When set, draw a dashed world ``y=0`` reference spanning the executed
         path in ``x`` by this padding on each end.
@@ -156,13 +160,6 @@ def mpc_animation_overlays(
     )
 
     history_layers = {
-        "trail": TrajectoryPolyline(
-            traj,
-            window="prefix",
-            color="#1565c0",
-            style="--",
-            linewidth=1.0,
-        ),
         "horizon": HorizonPolyline(
             mpc_plans,
             color="#ef6c00",
@@ -170,6 +167,14 @@ def mpc_animation_overlays(
             style="--",
         ),
     }
+    if trail:
+        history_layers["trail"] = TrajectoryPolyline(
+            traj,
+            window="prefix",
+            color="#1565c0",
+            style="--",
+            linewidth=1.0,
+        )
     if reference_pad is not None:
         pad = float(reference_pad)
         x0_ref = float(traj.x[0, 0]) - pad

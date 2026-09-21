@@ -52,6 +52,216 @@ def _color_to_meshcat_hex(color) -> int:
     return (int(r * 255) << 16) | (int(g * 255) << 8) | int(b * 255)
 
 
+# WebGL LineBasicMaterial ignores dash and (on most GPUs) linewidth. Overlay
+# polylines become a thin ribbon so Meshcat 3-D matches matplotlib's dashed
+# plans and corridor edges.
+_LINE_WIDTH_M = 0.016
+_LINE_DASH_M = 0.05
+_LINE_LIFT_M = 0.01
+_LINE_THICKNESS_M = 0.003
+_GROUND_Z = 0.02
+
+
+def _as_xyz(pts) -> np.ndarray:
+    pts = np.asarray(pts, dtype=float)
+    if pts.ndim != 2 or pts.shape[0] == 0:
+        return np.zeros((0, 3))
+    if pts.shape[1] == 2:
+        return np.column_stack([pts, np.zeros(len(pts))])
+    return np.asarray(pts[:, :3], dtype=float)
+
+
+def _linestyle_dashes(style):
+    """Return the on/off cycle in pattern units, or ``None`` for a solid line.
+
+    Mirrors matplotlib: ``"-"`` / ``"--"`` / ``":"`` / ``"-."``, plus
+    ``(offset, (on, off, ...))``.
+    """
+    if style in (None, "-", "solid"):
+        return None
+    if isinstance(style, str):
+        return {
+            "--": (2.0, 1.25),
+            "dashed": (2.0, 1.25),
+            ":": (0.4, 0.55),
+            "dotted": (0.4, 0.55),
+            "-.": (2.0, 0.7, 0.4, 0.7),
+            "dashdot": (2.0, 0.7, 0.4, 0.7),
+        }.get(style)
+    if isinstance(style, tuple) and len(style) == 2:
+        seq = style[1]
+        if seq is None:
+            return None
+        return tuple(float(v) for v in seq)
+    return None
+
+
+def _polyline_point_at(pts: np.ndarray, cum: np.ndarray, s: float) -> np.ndarray:
+    if s <= 0.0:
+        return pts[0]
+    total = float(cum[-1])
+    if s >= total:
+        return pts[-1]
+    i = int(np.searchsorted(cum, s, side="right") - 1)
+    i = max(0, min(i, len(pts) - 2))
+    span = cum[i + 1] - cum[i]
+    alpha = 0.0 if span < 1e-15 else (s - cum[i]) / span
+    return pts[i] + alpha * (pts[i + 1] - pts[i])
+
+
+def _horizontal_normal(tangent: np.ndarray) -> np.ndarray:
+    n = np.array([-tangent[1], tangent[0], 0.0], dtype=float)
+    length = float(np.linalg.norm(n))
+    if length > 1e-9:
+        return n / length
+    return np.array([1.0, 0.0, 0.0], dtype=float)
+
+
+def _dash_windows(length: float, dashes, unit: float, offset: float = 0.0):
+    """Yield ``(s0, s1)`` intervals that should be drawn along ``[0, length]``."""
+    if length <= 1e-12:
+        return
+    if dashes is None:
+        yield 0.0, length
+        return
+    pattern = [max(float(v), 0.0) * unit for v in dashes]
+    if not pattern or all(v <= 1e-15 for v in pattern):
+        yield 0.0, length
+        return
+    s = -float(offset) * unit
+    phase = 0
+    while s < length:
+        seg = pattern[phase % len(pattern)]
+        if seg <= 1e-15:
+            phase += 1
+            if phase > 8 * len(pattern) and s < 0.0:
+                s = 0.0
+            continue
+        a, b = max(s, 0.0), min(s + seg, length)
+        if phase % 2 == 0 and b > a + 1e-12:
+            yield a, b
+        s += seg
+        phase += 1
+        if phase > 10_000:
+            break
+
+
+def _strip_from_stations(stations: np.ndarray, half_width: float, thickness: float):
+    """Box-strip mesh through ``stations`` (K×3), offset in the floor plane."""
+    if len(stations) < 2:
+        return None
+    tangents = np.diff(stations, axis=0)
+    tangents = np.vstack([tangents[:1], tangents])
+    for i in range(1, len(stations) - 1):
+        tangents[i] = stations[i + 1] - stations[i - 1]
+    normals = np.stack([_horizontal_normal(t) for t in tangents])
+    left = stations - half_width * normals
+    right = stations + half_width * normals
+    up = np.array([0.0, 0.0, thickness], dtype=float)
+    k = len(stations)
+    vertices = np.vstack([left, right, left + up, right + up])
+    faces = []
+    for i in range(k - 1):
+        a, b = i, i + 1
+        c, d = k + i, k + i + 1
+        e, f = 2 * k + i, 2 * k + i + 1
+        g, h = 3 * k + i, 3 * k + i + 1
+        faces.extend(
+            [
+                (a, b, d),
+                (a, d, c),
+                (e, h, f),
+                (e, g, h),
+                (a, c, g),
+                (a, g, e),
+                (b, f, h),
+                (b, h, d),
+            ]
+        )
+    return vertices, np.asarray(faces, dtype=np.uint32)
+
+
+def polyline_strip_mesh(
+    pts,
+    *,
+    linewidth=1.0,
+    style="-",
+    width=None,
+    dash_unit=None,
+    lift=_LINE_LIFT_M,
+    thickness=_LINE_THICKNESS_M,
+):
+    """Ribbon mesh for a polyline: visible width, matplotlib dash, floor lift.
+
+    Returns ``(vertices, faces)`` or ``None`` when the polyline is too short.
+    Ground-plane lines (all ``|z|`` small) are lifted so they do not z-fight a
+    tiled floor.
+    """
+    pts = _as_xyz(pts)
+    if len(pts) < 2:
+        return None
+    step = np.linalg.norm(np.diff(pts, axis=0), axis=1)
+    keep = np.ones(len(pts), dtype=bool)
+    keep[1:] = step > 1e-10
+    pts = pts[keep]
+    if len(pts) < 2:
+        return None
+    if float(np.max(np.abs(pts[:, 2]))) < _GROUND_Z:
+        pts = pts.copy()
+        pts[:, 2] = lift
+    cum = np.concatenate(
+        [[0.0], np.cumsum(np.linalg.norm(np.diff(pts, axis=0), axis=1))]
+    )
+    length = float(cum[-1])
+    if length < 1e-10:
+        return None
+    lw = max(float(linewidth), 0.8)
+    half = 0.5 * (float(width) if width is not None else _LINE_WIDTH_M * lw)
+    unit = float(dash_unit) if dash_unit is not None else _LINE_DASH_M * lw
+    offset = 0.0
+    dashes = style
+    if isinstance(style, tuple) and len(style) == 2:
+        offset = float(style[0])
+        dashes = style
+    dashes = _linestyle_dashes(dashes)
+    pieces = []
+    for s0, s1 in _dash_windows(length, dashes, unit, offset=offset):
+        samples = [s0]
+        for s in cum:
+            if s0 < s < s1:
+                samples.append(float(s))
+        samples.append(s1)
+        stations = np.stack([_polyline_point_at(pts, cum, s) for s in samples])
+        mesh = _strip_from_stations(stations, half, float(thickness))
+        if mesh is not None:
+            pieces.append(mesh)
+    if not pieces:
+        return None
+    if len(pieces) == 1:
+        return pieces[0]
+    from minilink.graphical.meshes import merge_meshes
+
+    return merge_meshes(*pieces)
+
+
+def _frames_have_changing_polylines(frames) -> bool:
+    """True when a line/arrow primitive changes vertices after the first frame."""
+    if len(frames) < 2:
+        return False
+    first = frames[0]["primitives"]
+    for frame in frames[1:]:
+        for a, b in zip(first, frame["primitives"]):
+            if not isinstance(a, (CustomLine, Arrow, TorqueArrow)):
+                continue
+            if type(a) is not type(b):
+                return True
+            pa = np.asarray(a.pts, dtype=float)
+            pb = np.asarray(b.pts, dtype=float)
+            if pa.shape != pb.shape or not np.allclose(pa, pb, atol=1e-9, rtol=0.0):
+                return True
+    return False
+
+
 def _rotation_from_a_to_b(a: np.ndarray, b: np.ndarray) -> np.ndarray:
     """Return 3x3 rotation matrix mapping unit vector a to unit vector b."""
     a = a / (np.linalg.norm(a) + 1e-12)
@@ -120,6 +330,8 @@ class MeshcatCanvas:
                 tuple(np.asarray(primitive.pts).reshape(-1).tolist()),
                 str(primitive.color),
                 float(primitive.linewidth),
+                repr(primitive.style),
+                bool(self.is_3d),
             )
         if isinstance(primitive, (Arrow, TorqueArrow)):
             # Honest arrows are baked polylines; key on the points so a reshaped
@@ -130,6 +342,8 @@ class MeshcatCanvas:
                 tuple(np.asarray(primitive.pts).reshape(-1).tolist()),
                 str(primitive.color),
                 float(primitive.linewidth),
+                repr(primitive.style),
+                bool(self.is_3d),
             )
         if isinstance(primitive, Circle):
             return (
@@ -303,6 +517,29 @@ class MeshcatCanvas:
             return
 
         if isinstance(primitive, (CustomLine, Arrow, TorqueArrow)):
+            style = getattr(primitive, "style", "-")
+            if self.is_3d:
+                mesh = polyline_strip_mesh(
+                    primitive.pts,
+                    linewidth=float(primitive.linewidth),
+                    style=style,
+                )
+                if mesh is None:
+                    path.delete()
+                    self._has_head[i] = False
+                    return
+                vertices, faces = mesh
+                path.set_object(
+                    g.Mesh(
+                        g.TriangularMeshGeometry(
+                            np.asarray(vertices, dtype=np.float32),
+                            np.asarray(faces, dtype=np.uint32),
+                        ),
+                        g.MeshLambertMaterial(color=hex_color),
+                    )
+                )
+                self._has_head[i] = False
+                return
             pts = primitive.pts
             if pts.shape[1] == 2:
                 pts = np.hstack((pts, np.zeros((pts.shape[0], 1))))
@@ -513,8 +750,8 @@ class MeshcatRenderer(AnimationRenderer):
         """
         Compile the frame list into a ``meshcat.animation.Animation`` keyframe
         track per rigid primitive path. Dynamic polylines (``Arrow``,
-        ``TorqueArrow``) are left frozen at ``t=0`` and a one-line notice is
-        printed if any are present.
+        ``TorqueArrow``, changing ``CustomLine`` trails/horizons) are left
+        frozen at ``t=0`` and a one-line notice is printed if any are present.
         """
         import meshcat.animation as mcanim
 
@@ -524,7 +761,7 @@ class MeshcatRenderer(AnimationRenderer):
         # and gives every rigid primitive a sane starting pose before keyframes
         # kick in.
         t0_transforms = frames[0]["transforms"]
-        has_dynamic = False
+        has_dynamic = _frames_have_changing_polylines(frames)
         for i, (prim, T0) in enumerate(zip(primitives, t0_transforms)):
             self.canvas.update_primitive(i, prim, T0)
             if isinstance(prim, (Arrow, TorqueArrow)):
@@ -545,9 +782,9 @@ class MeshcatRenderer(AnimationRenderer):
         if has_dynamic:
             print(
                 "Note: meshcat native animation freezes per-frame dynamic "
-                "geometry (e.g. Arrow length/direction, TorqueArrow sweep) at "
-                "t=0; use native=False for frame-accurate playback of those "
-                "primitives."
+                "geometry (e.g. Arrow length/direction, TorqueArrow sweep, "
+                "CustomLine trails/horizons) at t=0; use native=False for "
+                "frame-accurate playback of those primitives."
             )
 
         return animation_obj

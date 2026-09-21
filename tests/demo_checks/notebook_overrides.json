@@ -42,6 +42,12 @@
     ],
     "timeout": 300
   },
+  "examples/teaching/topics/optimal_control/racecar_mpc.ipynb": {
+    "requires": [
+      "jax"
+    ],
+    "smoke": false
+  },
   "examples/teaching/topics/robotics/manipulator_eom.ipynb": {
     "smoke": false
   },

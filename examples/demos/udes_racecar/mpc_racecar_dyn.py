@@ -1,5 +1,6 @@
 """Same kinematic MPC, now over a PID speed loop on the dynamic 1/10 racecar."""
 
+from control import model_reduction
 import numpy as np
 
 from minilink import (
@@ -12,6 +13,7 @@ from minilink import (
     UdeSRacecar,
     UdeSRacecarDyn3D,
 )
+from minilink.control import modelbased
 from minilink.control.mpc import ModelPredictiveController, mpc_animation_overlays
 from minilink.core.hybrid_composition import hybrid_closed_loop
 from minilink.graphical.catalog.racecar_skin import racecar_skin_2d, racecar_skin_3d
@@ -26,9 +28,9 @@ from minilink.planning import (
     quadratic_hinge,
 )
 
-MU = 0.5  # [-] floor grip; drop toward 0.4 and the rear saturates in the corners
+MU = 0.4  # [-] floor grip; drop toward 0.4 and the rear saturates in the corners
 V_REF = 2.0  # [m/s] the 1 m corners hold this at MU=1, not at MU=0.4
-TF = 10.0
+TF = 20.0
 MPC_DT = 0.05
 MPC_HORIZON = 1.8
 KP, KI, KD, TAU = 40.0, 20.0, 5.0, 0.05  # PID on drive power
@@ -47,23 +49,23 @@ scene = Scene(
 )
 
 # --- design model: the kinematic bicycle the MPC plans on ---
-design = UdeSRacecar()
-design.inputs["u"].lower_bound = np.array([0.0, -0.52])
-design.inputs["u"].upper_bound = np.array([5.0, 0.52])
+model = UdeSRacecar()
+model.inputs["u"].lower_bound = np.array([0.0, -0.52])
+model.inputs["u"].upper_bound = np.array([5.0, 0.52])
 
 start = path[0]
 heading = np.arctan2(path[1, 1] - start[1], path[1, 0] - start[0])
 x0 = np.array(
     [start[0] - 0.1 * np.sin(heading), start[1] + 0.1 * np.cos(heading), heading]
 )
-design.x0 = x0
+model.x0 = x0
 
 # --- plant: 11-state car (rolling angles spin the wheels); mu is the grip ---
-car = UdeSRacecarDyn3D()
-car.params["mu"] = MU
-car.camera_follow_frame = None
-car.camera_scale = 4.0
-car.x0 = np.array(
+plant = UdeSRacecarDyn3D()
+plant.params["mu"] = MU
+plant.camera_follow_frame = None
+plant.camera_scale = 4.0
+plant.x0 = np.array(
     [
         x0[0],
         x0[1],
@@ -71,7 +73,7 @@ car.x0 = np.array(
         V_REF,
         0.0,
         0.0,
-        V_REF / car.params["r_r"],
+        V_REF / plant.params["r_r"],
         0.0,
         P_CRUISE,
         0.0,
@@ -89,12 +91,12 @@ inner.add_subsystem(
         Kd=KD,
         tau=TAU,
         ports="reference",
-        u_min=-car.params["P_max"],
-        u_max=car.params["P_max"],
+        u_min=-plant.params["P_max"],
+        u_max=plant.params["P_max"],
     ),
     "speed",
 )
-inner.add_subsystem(car, "car")
+inner.add_subsystem(plant, "car")
 inner.add_subsystem(Demux((3, 8), port="y"), "pose")
 inner.add_input_port("u", dim=2)
 inner.connect("input", "u", "cmd", "u")
@@ -105,12 +107,12 @@ inner.connect("cmd", "u[1]", "car", "delta_cmd")
 inner.connect("car", "y", "pose", "y")
 inner.connect_new_output_port("pose", "y[0:3]", "y")
 
-inner.plot_diagram()
+# inner.plot_diagram()
 
 # --- cost: same three terms as the kinematic demo ---
-probe = bind(design, point_probe())
+probe = bind(model, point_probe())
 quad = QuadraticCost.from_system(
-    design, Q=np.zeros((3, 3)), R=np.diag([2.0, 1.0]), ubar=np.array([V_REF, 0.0])
+    model, Q=np.zeros((3, 3)), R=np.diag([2.0, 1.0]), ubar=np.array([V_REF, 0.0])
 )
 corridor = track.corridor_field(probe).as_cost(weight=20.0, shaping=quadratic_hinge())
 obstacle = scene.clearance_field(probe).as_cost(
@@ -120,7 +122,7 @@ cost = quad + corridor + obstacle
 
 # --- MPC: receding-horizon collocation on the kinematic design ---
 planner = TrajectoryOptimizationPlanner(
-    PlanningProblem(sys=design, x_start=x0, cost=cost, tf=MPC_HORIZON),
+    PlanningProblem(sys=model, x_start=x0, cost=cost, tf=MPC_HORIZON),
     n_steps=20,
     transcription="direct_collocation",
     compile_backend="jax",
@@ -146,18 +148,34 @@ diagram = hybrid_closed_loop(
 result = diagram.compute_trajectory(tf=TF, plant_dt_inner=0.002, compile_backend="jax")
 # trail from the car pose: result.plant is the inner diagram, whose first
 # states are the PID, not (x, y)
-car_run = inner.trajectory_of(car, result.plant)
+car_run = inner.trajectory_of(plant, result.plant)
 overlays = mpc_animation_overlays(
-    result, planner, scene=scene, track=track, traj=car_run
+    result,
+    planner,
+    scene=scene,
+    track=track,
+    traj=car_run,
+    trail=False,
 )
 # diagram.plot_trajectory(signals=("car:speed", "car:grip", "speed:u"))
-car.skin = racecar_skin_2d
-diagram.animate(overlays=overlays)
+plant.skin = racecar_skin_2d
 
-# --- 3-D look: same lap; the extra states are the wheel rolling angles ---
-car.skin = racecar_skin_3d
+
+# diagram.animate(overlays=overlays)
+
+# # --- 3-D look: same lap; the extra states are the wheel rolling angles ---
+# plant.skin = racecar_skin_3d
+# diagram.animate(
+#     overlays=overlays,
+#     renderer="meshcat",
+#     is_3d=True,
+#     native=True,
+# )
+
+plant.skin = racecar_skin_3d
 diagram.animate(
     overlays=overlays,
     renderer="meshcat",
     is_3d=True,
+    native=False,
 )

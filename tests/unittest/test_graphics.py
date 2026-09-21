@@ -552,11 +552,14 @@ class TestAnimatorOverlays(unittest.TestCase):
 
 import pytest
 from minilink.graphical.animation.primitives import Point
+from minilink.graphical.animation.primitives import CustomLine
 from minilink.graphical.animation.renderers.meshcat_renderer import (
     MeshcatCanvas,
     MeshcatRenderer,
+    _frames_have_changing_polylines,
     _import_meshcat,
     html_export_path,
+    polyline_strip_mesh,
 )
 from minilink.graphical.animation.renderers.pygame_renderer import (
     PygameCanvas,
@@ -580,18 +583,89 @@ def _has_pygame():
     return True
 
 
+class TestMeshcatPolylineStrip(unittest.TestCase):
+    def test_solid_ground_line_is_lifted_ribbon(self):
+        mesh = polyline_strip_mesh(
+            [[0.0, 0.0, 0.0], [1.0, 0.0, 0.0]],
+            linewidth=2.0,
+            style="-",
+        )
+        self.assertIsNotNone(mesh)
+        vertices, faces = mesh
+        self.assertGreaterEqual(len(vertices), 8)
+        self.assertGreaterEqual(len(faces), 2)
+        self.assertGreater(float(np.min(vertices[:, 2])), 0.0)
+
+    def test_dashed_style_leaves_a_gap(self):
+        dashed = polyline_strip_mesh(
+            [[0.0, 0.0, 0.0], [2.0, 0.0, 0.0]],
+            linewidth=1.0,
+            style="--",
+            dash_unit=0.2,
+        )
+        xs = dashed[0][:, 0]
+        # "--" is 2 on / 1.25 off → first on [0, 0.4], first gap (0.4, 0.65).
+        self.assertTrue(np.any(xs < 0.2))
+        self.assertFalse(np.any(np.abs(xs - 0.52) < 0.06))
+
+    def test_matplotlib_dash_tuple_is_honored(self):
+        mesh = polyline_strip_mesh(
+            [[0.0, 0.0, 0.0], [3.0, 0.0, 0.0]],
+            linewidth=1.1,
+            style=(0, (5, 4)),
+        )
+        self.assertIsNotNone(mesh)
+        self.assertGreater(len(mesh[1]), 0)
+
+    def test_short_polyline_is_skipped(self):
+        self.assertIsNone(polyline_strip_mesh([[0.0, 0.0, 0.0]]))
+
+    def test_changing_custom_line_is_detected(self):
+        T = np.eye(4)
+        cam = camera_matrix()
+        a = CustomLine([[0.0, 0.0, 0.0], [1.0, 0.0, 0.0]])
+        b = CustomLine([[0.0, 0.0, 0.0], [1.0, 0.0, 0.0], [2.0, 0.0, 0.0]])
+        frames = [
+            {"primitives": [a], "transforms": [T], "camera": cam, "t": 0.0},
+            {"primitives": [b], "transforms": [T], "camera": cam, "t": 0.1},
+        ]
+        self.assertTrue(_frames_have_changing_polylines(frames))
+        same = [
+            {"primitives": [a], "transforms": [T], "camera": cam, "t": 0.0},
+            {"primitives": [a], "transforms": [T], "camera": cam, "t": 0.1},
+        ]
+        self.assertFalse(_frames_have_changing_polylines(same))
+
+
+class _FakePath:
+    """Stand-in for meshcat.path.Path so Animation.at_frame can key clips."""
+
+    def __init__(self, name=""):
+        self._name = name
+
+    def append(self, other):
+        extra = other if isinstance(other, str) else getattr(other, "_name", str(other))
+        if not self._name:
+            return _FakePath(extra)
+        return _FakePath(f"{self._name}/{extra}")
+
+    def lower(self):
+        return self._name
+
+
 class _FakeMeshcatNode:
     """Minimal meshcat path tree for canvas smoke tests (no ZMQ server)."""
 
-    def __init__(self):
+    def __init__(self, path=None):
         self.children = {}
         self.object = None
         self.transform = None
+        self.path = _FakePath() if path is None else path
 
     def __getitem__(self, key):
         child = self.children.get(key)
         if child is None:
-            child = _FakeMeshcatNode()
+            child = _FakeMeshcatNode(path=self.path.append(key))
             self.children[key] = child
         return child
 
@@ -640,6 +714,53 @@ class TestMeshcatOptionalSmoke(unittest.TestCase):
         self.assertIsNotNone(slot.object)
         self.assertIsNotNone(slot.transform)
         canvas.clear()
+
+    @pytest.mark.skipif(not _has_meshcat(), reason="meshcat not installed")
+    def test_canvas_draws_3d_custom_line_as_a_mesh(self):
+        import meshcat.geometry as g
+
+        canvas = MeshcatCanvas(_FakeMeshcatNode(), is_3d=True)
+        line = CustomLine(
+            [[0.0, 0.0, 0.0], [1.0, 0.0, 0.0], [1.0, 1.0, 0.0]],
+            color="#ef6c00",
+            linewidth=2.0,
+            style="--",
+        )
+        canvas.ensure_objects([line])
+        obj = canvas.scene["p0"].object
+        self.assertIsInstance(obj, g.Mesh)
+        self.assertIsInstance(obj.geometry, g.TriangularMeshGeometry)
+        canvas.clear()
+
+    @pytest.mark.skipif(not _has_meshcat(), reason="meshcat not installed")
+    def test_native_clip_builds_when_custom_line_vertices_change(self):
+        import io
+        from contextlib import redirect_stdout
+
+        import meshcat.animation as mcanim
+        from minilink.graphical.animation.renderers.timing import AnimationFrameSchedule
+
+        class _Anim:
+            sys = type("S", (), {"name": "dot"})()
+
+        a = CustomLine([[0.0, 0.0, 0.0], [1.0, 0.0, 0.0]])
+        b = CustomLine([[0.0, 0.0, 0.0], [1.0, 0.0, 0.0], [2.0, 0.0, 0.0]])
+        T = np.eye(4)
+        cam = camera_matrix()
+        frames = [
+            {"primitives": [a], "transforms": [T], "camera": cam, "t": 0.0},
+            {"primitives": [b], "transforms": [T], "camera": cam, "t": 0.1},
+        ]
+        schedule = AnimationFrameSchedule(
+            nsteps=2, skip_steps=1, interval_ms=33.0, n_frames=2, target_fps=30.0
+        )
+        renderer = MeshcatRenderer(_Anim())
+        renderer.canvas = MeshcatCanvas(_FakeMeshcatNode(), is_3d=True)
+        buf = io.StringIO()
+        with redirect_stdout(buf):
+            animation_obj = renderer._build_meshcat_animation([a], frames, schedule)
+        self.assertIsInstance(animation_obj, mcanim.Animation)
+        self.assertIn("native=False", buf.getvalue())
 
     def test_html_export_path_keeps_or_appends_suffix(self):
         self.assertEqual(html_export_path("lap").name, "lap.html")

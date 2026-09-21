@@ -970,10 +970,18 @@ class TestMpcHybridStraightLine(unittest.TestCase):
             u=result.plant.u,
         )
         custom = mpc_animation_overlays(result, planner, traj=leaf)
-        trail = custom[0]._dynamic_sources[0]
+        trail = next(
+            layer
+            for layer in custom[0]._dynamic_sources
+            if type(layer).__name__ == "TrajectoryPolyline"
+        )
         pts = trail.compute_pts(float(leaf.t[-1]))
         np.testing.assert_allclose(pts[0, 0], 0.0)
         np.testing.assert_allclose(pts[-1, 0], 4.0)
+        no_trail = mpc_animation_overlays(result, planner, traj=leaf, trail=False)
+        names = {type(layer).__name__ for layer in no_trail[0]._dynamic_sources}
+        self.assertIn("HorizonPolyline", names)
+        self.assertNotIn("TrajectoryPolyline", names)
 
 
 pytest.importorskip("jax")
