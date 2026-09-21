@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import time
+from pathlib import Path
 
 import matplotlib.colors as mcolors
 import numpy as np
@@ -21,6 +22,18 @@ from minilink.graphical.animation.primitives import (
 )
 from minilink.graphical.animation.renderers.renderer import AnimationRenderer
 from minilink.graphical.common.environment import is_blocking_needed
+
+
+def html_export_path(file_name) -> Path:
+    """Destination of ``animate(save=True, renderer="meshcat")``.
+
+    ``Animation`` becomes ``Animation.html``. A name that already ends in
+    ``.html`` is left as written, so a project can pass a full page path.
+    """
+    path = Path(file_name)
+    if path.suffix.lower() != ".html":
+        path = Path(str(file_name) + ".html")
+    return path
 
 
 def _import_meshcat():
@@ -539,6 +552,25 @@ class MeshcatRenderer(AnimationRenderer):
 
         return animation_obj
 
+    def _set_native_animation(self, primitives, frames, schedule, *, is_3d: bool):
+        """Build a Visualizer, keyframe the native Meshcat animation, and play it."""
+        meshcat = _import_meshcat()
+        self.vis = meshcat.Visualizer()
+        self.canvas = MeshcatCanvas(self.vis, is_3d=is_3d)
+        animation_obj = self._build_meshcat_animation(primitives, frames, schedule)
+        self.vis.set_animation(animation_obj, play=True, repetitions=1)
+        return animation_obj
+
+    def export_animation(
+        self, primitives, frames, schedule, file_name: str, *, is_3d: bool = False
+    ) -> None:
+        """Write a standalone HTML page of the native Meshcat animation."""
+        self.show = False
+        self._set_native_animation(primitives, frames, schedule, is_3d=is_3d)
+        path = html_export_path(file_name)
+        path.write_text(self.vis.static_html())
+        print(f"Saving animation to {path} ...")
+
     def play_native(
         self,
         primitives,
@@ -553,15 +585,12 @@ class MeshcatRenderer(AnimationRenderer):
         ``Visualizer.set_animation`` instead of a Python frame loop. The browser
         plays keyframes natively; no ``time.sleep`` in Python.
         """
-        meshcat = _import_meshcat()
         self.show = True
-        self.vis = meshcat.Visualizer()
-        self.canvas = MeshcatCanvas(self.vis, is_3d=is_3d)
+        animation_obj = self._set_native_animation(
+            primitives, frames, schedule, is_3d=is_3d
+        )
         self.vis.open()
         self.vis.wait()
-
-        animation_obj = self._build_meshcat_animation(primitives, frames, schedule)
-        self.vis.set_animation(animation_obj, play=True, repetitions=1)
         return animation_obj
 
     def render_inline_animation(self, primitives, frames, schedule, *, is_3d: bool):
@@ -571,13 +600,8 @@ class MeshcatRenderer(AnimationRenderer):
         hood, which wraps ``static_html()`` in a self-contained ``srcdoc=``.
         Ideal for Colab: no zmq client, no port forwarding.
         """
-        meshcat = _import_meshcat()
         self.show = False
-        self.vis = meshcat.Visualizer()
-        self.canvas = MeshcatCanvas(self.vis, is_3d=is_3d)
-
-        animation_obj = self._build_meshcat_animation(primitives, frames, schedule)
-        self.vis.set_animation(animation_obj, play=True, repetitions=1)
+        self._set_native_animation(primitives, frames, schedule, is_3d=is_3d)
 
         try:
             return self.vis.render_static(height=480)

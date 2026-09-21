@@ -566,8 +566,10 @@ class MatplotlibRenderer(AnimationRenderer):
         except ImportError:
             return ani
 
-    def export_animation(self, primitives, frames, schedule, file_name: str) -> None:
-        fig, ani = self._build_animation(primitives, frames, schedule)
+    def export_animation(
+        self, primitives, frames, schedule, file_name: str, *, is_3d: bool = False
+    ) -> None:
+        fig, ani = self._build_animation(primitives, frames, schedule, is_3d=is_3d)
         print(f"Saving animation to {file_name}.gif ...")
         ani.save(
             file_name + ".gif",

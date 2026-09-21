@@ -26,7 +26,7 @@ from minilink.planning import (
     quadratic_hinge,
 )
 
-MU = 0.2  # [-] floor grip; drop toward 0.4 and the rear saturates in the corners
+MU = 0.5  # [-] floor grip; drop toward 0.4 and the rear saturates in the corners
 V_REF = 2.0  # [m/s] the 1 m corners hold this at MU=1, not at MU=0.4
 TF = 10.0
 MPC_DT = 0.05

@@ -554,7 +554,9 @@ import pytest
 from minilink.graphical.animation.primitives import Point
 from minilink.graphical.animation.renderers.meshcat_renderer import (
     MeshcatCanvas,
+    MeshcatRenderer,
     _import_meshcat,
+    html_export_path,
 )
 from minilink.graphical.animation.renderers.pygame_renderer import (
     PygameCanvas,
@@ -638,6 +640,40 @@ class TestMeshcatOptionalSmoke(unittest.TestCase):
         self.assertIsNotNone(slot.object)
         self.assertIsNotNone(slot.transform)
         canvas.clear()
+
+    def test_html_export_path_keeps_or_appends_suffix(self):
+        self.assertEqual(html_export_path("lap").name, "lap.html")
+        self.assertEqual(html_export_path("lap.html").name, "lap.html")
+
+    @pytest.mark.skipif(not _has_meshcat(), reason="meshcat not installed")
+    def test_export_animation_writes_standalone_html(self):
+        import tempfile
+        from pathlib import Path
+
+        from minilink.graphical.animation.renderers.timing import AnimationFrameSchedule
+
+        class _Anim:
+            sys = type("S", (), {"name": "dot"})()
+
+        prim = Point([0.0, 0.0, 0.0])
+        T = np.eye(4)
+        cam = camera_matrix()
+        frames = [
+            {"primitives": [prim], "transforms": [T], "camera": cam, "t": 0.0},
+            {"primitives": [prim], "transforms": [T], "camera": cam, "t": 0.1},
+        ]
+        schedule = AnimationFrameSchedule(
+            nsteps=2, skip_steps=1, interval_ms=33.0, n_frames=2, target_fps=30.0
+        )
+        with tempfile.TemporaryDirectory() as tmp:
+            dest = Path(tmp) / "lap.html"
+            MeshcatRenderer(_Anim()).export_animation(
+                [prim], frames, schedule, str(dest), is_3d=True
+            )
+            html = dest.read_text()
+            self.assertTrue(dest.is_file())
+            self.assertIn("<html", html.lower())
+            self.assertGreater(len(html), 100)
 
 
 @pytest.mark.optional

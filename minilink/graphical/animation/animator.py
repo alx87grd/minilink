@@ -279,6 +279,9 @@ class Animator:
         Plotly does not support the per-frame Python loop (``native=False`` with
         ``html=False``): use ``native=True`` or ``html=True`` for inline/browser
         playback.
+
+        ``save=True`` writes a file before playback: matplotlib a GIF, meshcat
+        a standalone HTML page of the native keyframed animation.
         """
         if html is None:
             html = prefers_inline_animation()
@@ -309,6 +312,18 @@ class Animator:
         # First frame's primitives as a representative list for APIs that need one.
         primitives = frames[0]["primitives"] if frames else []
 
+        if save:
+            try:
+                backend.export_animation(
+                    primitives, frames, schedule, file_name, is_3d=is_3d
+                )
+            except NotImplementedError:
+                warnings.warn(
+                    f"save=True is not supported for renderer={renderer!r}; "
+                    "skipping export.",
+                    stacklevel=2,
+                )
+
         if html:
             try:
                 return backend.render_inline_animation(
@@ -318,16 +333,6 @@ class Animator:
                 warnings.warn(
                     f"html=True is not supported for renderer={renderer!r}; "
                     "ignoring html.",
-                    stacklevel=2,
-                )
-
-        if save:
-            try:
-                backend.export_animation(primitives, frames, schedule, file_name)
-            except NotImplementedError:
-                warnings.warn(
-                    f"save=True is not supported for renderer={renderer!r}; "
-                    "skipping export.",
                     stacklevel=2,
                 )
 

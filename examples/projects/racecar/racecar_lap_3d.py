@@ -93,8 +93,12 @@ car.animate(
 
 # the same lap in 3-D: the URDF meshes as lit solids, orbit and zoom in a browser
 car.skin = racecar_skin_3d
-page = car.animate(run, renderer="meshcat", is_3d=True, html=True, show=False)
-PAGE.write_text(getattr(page, "data", page))  # an IPython object outside a notebook
-print("wrote", PAGE)
-
-plt.show()
+car.animate(
+    run,
+    renderer="meshcat",
+    is_3d=True,
+    html=False,
+    show=False,
+    save=True,
+    file_name=str(PAGE),
+)

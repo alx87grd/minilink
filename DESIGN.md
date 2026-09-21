@@ -377,6 +377,8 @@ The research rungs (`Holonomic`, `HolonomicAccel`, `BicycleKin`, `BicycleAcc`,
   arrow shows the pre-gravity task wrench `f_task`, not `Jᵀ f_task` or `g(q)`.
   Meshcat `native=True` freezes changing `Arrow` / `TorqueArrow` geometry at
   `t=0` — use `native=False` for frame-accurate force playback.
+  `animate(save=True)` writes the backend file: matplotlib a GIF, meshcat a
+  standalone HTML page of that native animation.
 - **Facades:** user shortcuts only (lazy simulation/graphics); split across
   `core.facades` mixins — `SharedSystemFacades` on `System` (compile, static
   `compute_trajectory`, `plot_trajectory`, `animate`, …),
