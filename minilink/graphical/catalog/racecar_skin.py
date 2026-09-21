@@ -1,27 +1,17 @@
-"""UdeS-Racecar skins for minilink, built on the racecar URDF.
+"""Looks and link frames for the 1/10 racecar.
 
-The geometry comes from ``racecar_description`` (URDF + meshes, shipped in
-``minilink/graphical/assets/racecar_description``): link frames, joint origins and axes, visual
-origins, meshes and materials. The colours and the parts the URDF leaves out
-(acrylic decks, RPLidar A2M8, RaspiCam, emergency stop, single-board computer,
-Arduino Mega, shocks, bumpers, rim and tread detail) were placed by eye from
-published pictures of the assembled platform; they are decoration, not measurements.
-
-Two pieces, following minilink's skin contract (DESIGN.md, ``graphical/catalog/skins.py``):
-
-- :func:`racecar_frames` is the placement: pure forward kinematics of the URDF
-  for a planar pose, a bicycle steering angle (split into Ackermann angles) and
-  wheel rolling angles. A plant calls it from its ``tf``.
-- :func:`racecar_skin_3d`, :func:`racecar_skin_2d` and :func:`urdf_skin` are the
-  looks: ``(plant) -> dict[frame, list[primitive]]`` with no state math, keyed to
-  the URDF link names that :func:`racecar_frames` returns.
+:func:`racecar_frames` is the placement: planar pose, Ackermann steering and
+wheel roll. A plant calls it from its ``tf``. :func:`racecar_skin_3d` and
+:func:`racecar_skin_2d` are the looks — ``(plant) -> dict[frame, list[primitive]]``
+with no state math. Chassis, tires and hinges are triangle meshes; decks, lidar,
+camera, electronics, shocks and bumpers are minilink primitives.
 
 Frame vocabulary (world poses, 4x4): ``body`` (the plant's reference point on the
 ground, heading ``psi``), ``axle_front`` (front axle centre on the ground turned
-by ``delta``, as in minilink's bicycles), and every URDF link:
-``base_footprint``, ``base_link``, ``chassis``, ``left/right_rear_wheel``,
-``left/right_steering_hinge``, ``left/right_front_wheel``, ``base_laser``,
-``camera_link``, ``camera_optical_link``, ``imu_link``, ``chassis_inertia``.
+by ``delta``), and the links ``base_footprint``, ``base_link``, ``chassis``,
+``left/right_rear_wheel``, ``left/right_steering_hinge``, ``left/right_front_wheel``,
+``base_laser``, ``camera_link``, ``camera_optical_link``, ``imu_link``,
+``chassis_inertia``.
 """
 
 from __future__ import annotations
@@ -32,7 +22,7 @@ from pathlib import Path
 import numpy as np
 
 from minilink.core.backends import array_module
-from minilink.core.kinematics import SE2, SE3, Rz, translation
+from minilink.core.kinematics import SE2, SE3, Rx, Ry, Rz, translation
 from minilink.graphical.catalog import (
     Arrow,
     Box,
@@ -47,74 +37,113 @@ from minilink.graphical.meshes import (
     box_mesh,
     cylinder_mesh,
     face_normals,
-    load_collada,
     load_stl,
     merge_meshes,
     ring_mesh,
     transform_mesh,
     weld,
 )
-from minilink.graphical.urdf import (
-    forward_kinematics,
-    load_urdf,
-    origin_transform,
-    resolve_mesh_path,
-    rpy_matrix,
-)
 
-ASSETS = Path(__file__).resolve().parents[1] / "assets" / "racecar_description"
-URDF_FILE = ASSETS / "urdf" / "racecar.xacro"
+ASSETS = Path(__file__).resolve().parents[1] / "assets" / "racecar"
 MESH_DIR = ASSETS / "meshes"
 
-HINGE_JOINTS = ("left_steering_hinge_joint", "right_steering_hinge_joint")
 WHEEL_LINKS = (
     "left_rear_wheel",
     "right_rear_wheel",
     "left_front_wheel",
     "right_front_wheel",
 )
+LINKS = (
+    "base_footprint",
+    "base_link",
+    "chassis",
+    "chassis_inertia",
+    "left_rear_wheel",
+    "right_rear_wheel",
+    "left_steering_hinge",
+    "right_steering_hinge",
+    "left_front_wheel",
+    "right_front_wheel",
+    "base_laser",
+    "camera_link",
+    "camera_optical_link",
+    "imu_link",
+)
 
-
-@lru_cache(maxsize=None)
-def racecar_urdf():
-    """The racecar URDF (xacro expanded without ROS), parsed once."""
-    return load_urdf(URDF_FILE)
+# 1/10 geometry [m] and joint rpy [rad].
+WHEELBASE = 0.34
+HALF_TRACK = 0.10
+AXLE_HEIGHT = 0.05
+HALF_PI = 1.5708
+LASER_XYZ = (0.1387, 0.0, 0.166)
+LASER_YAW = 3.14159
+CAMERA_XYZ = (0.21, 0.0, 0.13)
+CAMERA_OPTICAL_RPY = (-1.570796327, 0.0, -1.570796327)
+IMU_XYZ = (0.3, -0.115, 0.0)
+CHASSIS_VISUAL_XYZ = (0.0, 0.0, 0.05)
+CAMERA_BOX = (0.033, 0.03, 0.03)
+WHEEL_AXIS = (0.0, 0.0, -1.0)
+HINGE_AXIS = (-1.0, 0.0, 0.0)
+HINGE_RPY = (0.0, HALF_PI, 0.0)
+WHEEL_RPY = (HALF_PI, 0.0, 0.0)
 
 
 @lru_cache(maxsize=None)
 def _mesh(filename, scale=(1.0, 1.0, 1.0)):
-    """``(vertices, faces)`` of a URDF mesh file (STL), cached."""
-    return load_stl(resolve_mesh_path(filename, MESH_DIR), scale=np.asarray(scale))
+    """``(vertices, faces)`` of a chassis / wheel / hinge STL, cached."""
+    return load_stl(MESH_DIR / Path(filename).name, scale=np.asarray(scale))
 
 
 def racecar_geometry():
-    """Dimensions read from the URDF and its meshes [m].
+    """Vehicle dimensions [m], with tire size read from the wheel mesh.
 
     ``wheelbase`` (rear axle to the steering hinges), ``kingpin_track`` (between
     the hinges), ``wheel_track`` (between the tire mid-planes), ``axle_height``
     (``base_footprint`` to ``base_link``), ``wheel_radius`` and ``wheel_width``
     (wheel mesh), ``lidar_height`` (scan plane above the ground).
     """
-    urdf = racecar_urdf()
-    joints = urdf["joints"]
-    hinge = joints["left_steering_hinge_joint"]["xyz"]
-    wheel = _mesh(
-        urdf["links"]["left_rear_wheel"]["visuals"][0]["geometry"]["filename"]
-    )[0]
+    wheel = _mesh("left_rear_wheel.STL")[0]
     width = float(np.ptp(wheel[:, 2]))
-    frames = forward_kinematics(urdf)
     return {
-        "wheelbase": float(hinge[0]),
-        "kingpin_track": float(2.0 * hinge[1]),
-        "wheel_track": float(2.0 * hinge[1] + width),
-        "axle_height": float(joints["base_footprint_link_joint"]["xyz"][2]),
+        "wheelbase": WHEELBASE,
+        "kingpin_track": 2.0 * HALF_TRACK,
+        "wheel_track": 2.0 * HALF_TRACK + width,
+        "axle_height": AXLE_HEIGHT,
         "wheel_radius": float(np.max(np.hypot(wheel[:, 0], wheel[:, 1]))),
         "wheel_width": width,
-        "lidar_height": float(frames["base_laser"][2, 3]),
+        "lidar_height": AXLE_HEIGHT + LASER_XYZ[2],
     }
 
 
 GEOMETRY = racecar_geometry()
+
+
+def _rpy_matrix(rpy):
+    """Fixed-axis roll-pitch-yaw: ``R = Rz(yaw) Ry(pitch) Rx(roll)``."""
+    roll, pitch, yaw = (float(a) for a in rpy)
+    return np.asarray(Rz(yaw) @ Ry(pitch) @ Rx(roll))
+
+
+def _origin(xyz, rpy=(0.0, 0.0, 0.0)):
+    """4x4 pose of a joint or visual origin."""
+    return SE3(_rpy_matrix(rpy), np.asarray(xyz, dtype=float))
+
+
+def _axis_rotation(axis, q):
+    """4x4 rotation by *q* about the unit *axis* (Rodrigues; *q* may be a JAX tracer)."""
+    xp = array_module(q)
+    k = np.asarray(axis, dtype=float) / np.linalg.norm(axis)
+    K = np.array([[0.0, -k[2], k[1]], [k[2], 0.0, -k[0]], [-k[1], k[0], 0.0]])
+    R = np.eye(3) + xp.sin(q) * K + (1.0 - xp.cos(q)) * (K @ K)
+    return SE3(R, 0.0)
+
+
+def _join(parent, xyz, rpy=(0.0, 0.0, 0.0), q=None, axis=None):
+    """``T_child = T_parent @ T_origin(xyz, rpy) @ T_joint(axis, q)``."""
+    T = parent @ _origin(xyz, rpy)
+    if q is not None:
+        T = T @ _axis_rotation(axis, q)
+    return T
 
 
 # Placement: pure kinematics, called from a plant's tf
@@ -166,56 +195,67 @@ def racecar_frames(
         Distance [m] from the reference point forward of the rear axle: 0 for a
         rear-axle model, ``b`` for a model carrying its pose at the centre of gravity.
     wheelbase : float, optional
-        Moves the steering hinges to this distance from the rear axle, for a model
-        whose wheelbase is not the URDF's 0.34 m (the default). The generic racecar
-        plant of :mod:`minilink.dynamics.catalog.vehicles.racecar` uses the URDF value.
+        Moves the steering hinges to this distance from the rear axle (default
+        0.34 m).
     wheel_radius : float, optional
-        Raises ``base_link`` (the axles) to this height, for a look drawn at the same
-        radius, so that a tread spinning at the model's wheel rate rolls on the ground
-        without sliding. The URDF's 0.05 m by default, which is also what the generic
-        plant rolls on.
+        Raises ``base_link`` (the axles) to this height, so a tread spinning at
+        the model's wheel rate rolls on the ground without sliding (default
+        0.05 m).
 
     Returns
     -------
     dict[str, (4, 4) array]
-        ``body``, ``axle_front`` and every URDF link (module docstring).
+        ``body``, ``axle_front`` and every link (module docstring).
     """
-    xp = array_module(X, Y, psi, delta, phi_rear)
-    urdf = racecar_urdf()
-    L = GEOMETRY["wheelbase"] if wheelbase is None else wheelbase
+    L = WHEELBASE if wheelbase is None else wheelbase
+    r = AXLE_HEIGHT if wheel_radius is None else wheel_radius
     phi_front = phi_rear if phi_front is None else phi_front
-    delta_left, delta_right = ackermann_angles(delta, L, GEOMETRY["kingpin_track"])
-
-    q = {
-        "left_steering_hinge_joint": delta_left,
-        "right_steering_hinge_joint": delta_right,
-        "left_rear_wheel_joint": phi_rear,
-        "right_rear_wheel_joint": phi_rear,
-        "left_front_wheel_joint": phi_front,
-        "right_front_wheel_joint": phi_front,
-    }
-    origins = {}
-    if wheelbase is not None:
-        origins = {
-            name: xp.asarray([L, *urdf["joints"][name]["xyz"][1:]])
-            for name in HINGE_JOINTS
-        }
-    if wheel_radius is not None:
-        origins["base_footprint_link_joint"] = xp.asarray([0.0, 0.0, wheel_radius])
+    delta_left, delta_right = ackermann_angles(delta, L, 2.0 * HALF_TRACK)
 
     T_body = SE2(X, Y, psi)
     T_footprint = T_body @ translation(-ref_to_rear_axle, 0.0, 0.0)
-    frames = forward_kinematics(urdf, q, T_root=T_footprint, origins=origins)
-    frames["body"] = T_body
-    frames["axle_front"] = T_body @ SE2(L - ref_to_rear_axle, 0.0, delta)
+    T_base = _join(T_footprint, (0.0, 0.0, r))
+    T_chassis = _join(T_base, (0.0, 0.0, 0.0))
+    frames = {
+        "base_footprint": T_footprint,
+        "base_link": T_base,
+        "chassis": T_chassis,
+        "chassis_inertia": T_chassis,
+        "left_rear_wheel": _join(
+            T_chassis, (0.0, HALF_TRACK, 0.0), WHEEL_RPY, phi_rear, WHEEL_AXIS
+        ),
+        "right_rear_wheel": _join(
+            T_chassis, (0.0, -HALF_TRACK, 0.0), WHEEL_RPY, phi_rear, WHEEL_AXIS
+        ),
+        "left_steering_hinge": _join(
+            T_chassis, (L, HALF_TRACK, 0.0), HINGE_RPY, delta_left, HINGE_AXIS
+        ),
+        "right_steering_hinge": _join(
+            T_chassis, (L, -HALF_TRACK, 0.0), HINGE_RPY, delta_right, HINGE_AXIS
+        ),
+        "base_laser": _join(T_chassis, LASER_XYZ, (0.0, 0.0, LASER_YAW)),
+        "camera_link": _join(T_chassis, CAMERA_XYZ),
+        "imu_link": _join(T_base, IMU_XYZ),
+        "body": T_body,
+        "axle_front": T_body @ SE2(L - ref_to_rear_axle, 0.0, delta),
+    }
+    frames["left_front_wheel"] = _join(
+        frames["left_steering_hinge"], (0.0, 0.0, 0.0), WHEEL_RPY, phi_front, WHEEL_AXIS
+    )
+    frames["right_front_wheel"] = _join(
+        frames["right_steering_hinge"],
+        (0.0, 0.0, 0.0),
+        WHEEL_RPY,
+        phi_front,
+        WHEEL_AXIS,
+    )
+    frames["camera_optical_link"] = _join(
+        frames["camera_link"], (0.0, 0.0, 0.0), CAMERA_OPTICAL_RPY
+    )
     return frames
 
 
 # Colours
-
-
-def _rgb(rgba):
-    return tuple(float(c) for c in np.asarray(rgba)[:3])
 
 
 # The assembled platform: a 1/10-scale truck chassis in black plastic, black
@@ -259,110 +299,43 @@ REAL_PALETTE = {
 }
 
 
-def urdf_palette():
-    """Colours of the URDF materials (``materials.xacro``, rviz look), same keys."""
-    urdf = racecar_urdf()
-    materials = urdf["materials"]
-    palette = dict(REAL_PALETTE)
-    palette.update(
-        chassis=_rgb(urdf["links"]["chassis"]["visuals"][0]["material"]),
-        tire=_rgb(materials["Black"]),
-        rim=_rgb(materials["Black"]),
-        hinge=_rgb(materials["DarkGrey"]),
-        camera=_rgb(urdf["links"]["camera_link"]["visuals"][0]["material"]),
-    )
-    return palette
-
-
 def _palette(palette):
     if isinstance(palette, dict):
         return {**REAL_PALETTE, **palette}
-    if palette == "urdf":
-        return urdf_palette()
     if palette == "real":
         return dict(REAL_PALETTE)
-    raise ValueError(f"palette must be 'real', 'urdf' or a dict, got {palette!r}")
-
-
-# URDF visuals
-
-
-def _joint_to(child):
-    return next(j for j in racecar_urdf()["joints"].values() if j["child"] == child)
+    raise ValueError(f"palette must be 'real' or a dict, got {palette!r}")
 
 
 def _aligned(link):
     """Constant offset that re-expresses a link frame with its parent's axes.
 
-    The steering hinge frames are rotated by the joint ``rpy`` (0, pi/2, 0);
+    The steering hinge frames are rotated by the joint rpy ``(0, 1.5708, 0)``;
     geometry authored in chassis-like axes (x forward, y left, z up) at the hinge
     uses ``local_transform = _aligned(link) @ T``.
     """
-    return SE3(rpy_matrix(_joint_to(link)["rpy"]).T, 0.0)
+    return SE3(_rpy_matrix(HINGE_RPY).T, 0.0)
 
 
-def _mesh_primitive(visual, color, opacity=1.0, name=None, radial_scale=1.0):
-    """A URDF ``<mesh>`` visual as a :class:`TriangleMesh` at its visual origin.
+def _mesh_primitive(
+    filename, color, opacity=1.0, name=None, radial_scale=1.0, xyz=None
+):
+    """An STL as a :class:`TriangleMesh` at its visual origin.
 
     The wheel meshes are smooth (no crease above 40 deg): their wireframe uses a
     15 deg crease angle, which keeps the two tire-shoulder rings. *radial_scale*
     scales a wheel about its axle (the link's z axis).
     """
-    geometry = visual["geometry"]
-    vertices, faces = _mesh(geometry["filename"], tuple(geometry["scale"]))
+    vertices, faces = _mesh(filename)
     if radial_scale != 1.0:
         vertices = vertices * np.array([radial_scale, radial_scale, 1.0])
     crease_deg = 15.0 if name in WHEEL_LINKS else 40.0
     mesh = TriangleMesh(
         vertices, faces, color=color, opacity=opacity, name=name, crease_deg=crease_deg
     )
-    mesh.local_transform = origin_transform(visual["xyz"], visual["rpy"])
+    if xyz is not None:
+        mesh.local_transform = _origin(xyz)
     return mesh
-
-
-def _hokuyo(visual=None):
-    """The URDF laser (``hokuyo.dae``), one mesh per COLLADA material."""
-    visual = visual or racecar_urdf()["links"]["base_laser"]["visuals"][0]
-    path = resolve_mesh_path(visual["geometry"]["filename"], MESH_DIR)
-    parts = []
-    for vertices, faces, rgba in load_collada(path, scale=visual["geometry"]["scale"]):
-        mesh = TriangleMesh(vertices, faces, color=_rgb(rgba), name="base_laser")
-        mesh.local_transform = origin_transform(visual["xyz"], visual["rpy"])
-        parts.append(mesh)
-    return parts
-
-
-def urdf_skin(plant=None, palette="urdf"):
-    """The URDF visuals alone, as rviz shows them: every link's ``<visual>``.
-
-    Chassis, wheel and hinge meshes, the Hokuyo mesh and the camera box at their
-    URDF visual origins with the URDF materials (``palette="real"`` recolours
-    them). Keyed to the link frames of :func:`racecar_frames`.
-    """
-    colors = _palette(palette)
-    role = {
-        "chassis": "chassis",
-        "left_steering_hinge": "hinge",
-        "right_steering_hinge": "hinge",
-    }
-    geometry = {}
-    for link, data in racecar_urdf()["links"].items():
-        for visual in data["visuals"]:
-            kind = visual["geometry"]["type"]
-            if link == "base_laser":
-                parts = _hokuyo(visual)
-            elif kind == "mesh":
-                color = colors[role.get(link, "tire")]
-                parts = [_mesh_primitive(visual, color, name=link)]
-            elif kind == "box":
-                lx, ly, lz = visual["geometry"]["size"]
-                box = Box(length_x=lx, length_y=ly, length_z=lz, color=colors["camera"])
-                box.local_transform = origin_transform(visual["xyz"], visual["rpy"])
-                parts = [box]
-            else:
-                continue
-            geometry.setdefault(link, []).extend(parts)
-    return geometry
 
 
 # Real-car detail: wheels
@@ -376,7 +349,7 @@ def _side(link):
 def _wheel_details(link, colors, r):
     """Tread lugs, rim, spokes, beadlock ring and hub nut in the wheel frame.
 
-    The wheel frame's z is the axle; the URDF tire spans ``s z in [0, width]``
+    The wheel frame's z is the axle; the tire mesh spans ``s z in [0, width]``
     outward, with ``s = _side(link)``, and has radius *r*. Everything turns with
     the wheel, so the spokes and the tread show the rolling angle. The lugs
     stand 0.5 mm proud of the tire, so they do not sink into the floor.
@@ -464,7 +437,7 @@ UPPER_DECK = _rounded_rectangle(-0.105, 0.19, 0.078, 0.015)
 ESTOP_XY = (0.30, 0.056)  # emergency stop, front left of the lower deck
 # shocks (chassis frame): (x of the lower end, fore-aft lean of the top), rear pair
 # 3 cm ahead of the rear axle, front pair 3 cm behind the front one. Lower ends
-# (|y|, z) behind the tires; tops just outside the URDF chassis block (|y| <= 0.1,
+# (|y|, z) behind the tires; tops just outside the chassis plate (|y| <= 0.1,
 # 0.02 <= z <= 0.08), so the shocks show between the tires and the lower deck as on
 # the assembled vehicle. The top leans 12 mm fore / aft.
 SHOCK_X_LEAN = ((0.03, 1.0), (0.305, -1.0))
@@ -599,8 +572,7 @@ def _chassis_equipment(colors):
 def _rplidar(colors):
     """RPLidar A2M8 (76 mm x 41 mm, black, red ring) with its scan plane at ``base_laser``.
 
-    ``base_laser`` is yawed by pi in the URDF; the window is turned to face the
-    front of the car.
+    ``base_laser`` is yawed by pi; the window is turned to face the front of the car.
     """
     face_forward = SE3(Rz(np.pi), 0.0)
     parts = [
@@ -626,10 +598,8 @@ def _rplidar(colors):
 
 
 def _raspicam(colors):
-    """RaspiCam on its acrylic bracket, at the URDF camera box (``camera_link``)."""
-    lx, ly, lz = racecar_urdf()["links"]["camera_link"]["visuals"][0]["geometry"][
-        "size"
-    ]
+    """RaspiCam on its acrylic bracket, at the camera box (``camera_link``)."""
+    lx, ly, lz = CAMERA_BOX
     body = Box(length_x=0.5 * lx, length_y=ly, length_z=lz, color=colors["camera"])
     lens = _rod(
         (0.25 * lx, 0.0, 0.0), (0.25 * lx + 0.012, 0.0, 0.0), 0.0065, colors["lens"]
@@ -714,7 +684,7 @@ def track_scene(
         motion legible in a chase view.
     path : array of shape (N, 2), optional
         A line painted flat on the floor, e.g. the waypoints the vehicle is tracking.
-    palette : {"real", "urdf"} or dict
+    palette : {"real"} or dict
         Same colours as the vehicle looks.
 
     Returns
@@ -792,7 +762,7 @@ def _scene_from(plant, palette):
 
 
 def _wheel_radius(plant, wheel_radius):
-    """Drawn wheel radius [m]: the argument, else ``plant.wheel_radius``, else the URDF's."""
+    """Drawn wheel radius [m]: the argument, else ``plant.wheel_radius``, else the mesh."""
     if wheel_radius is None:
         wheel_radius = getattr(plant, "wheel_radius", None)
     return GEOMETRY["wheel_radius"] if wheel_radius is None else float(wheel_radius)
@@ -801,23 +771,20 @@ def _wheel_radius(plant, wheel_radius):
 def racecar_skin_3d(
     plant=None,
     palette="real",
-    lidar="rplidar",
     equipment=True,
     scene=True,
     wheel_radius=None,
 ):
-    """The racecar in 3-D: the URDF meshes plus the equipment of the built vehicle.
+    """The racecar in 3-D: chassis, tires and hinges, plus decks and equipment.
 
     Parameters
     ----------
     plant : System, optional
         Read for the scene (``scene_bounds`` and friends, :func:`_scene_from`) and
         for ``wheel_radius`` [m] when it has one.
-    palette : {"real", "urdf"} or dict
-        Colours of the assembled vehicle or of the URDF materials; a dict
-        overrides single entries of :data:`REAL_PALETTE`.
-    lidar : {"rplidar", "hokuyo"}
-        The RPLidar A2M8 of the built vehicle, or the URDF's Hokuyo mesh.
+    palette : {"real"} or dict
+        Colours of the assembled vehicle; a dict overrides single entries of
+        :data:`REAL_PALETTE`.
     equipment : bool
         Decks, electronics, e-stop, camera bracket, shocks, bumpers, wheel detail.
     scene : bool
@@ -825,7 +792,7 @@ def racecar_skin_3d(
     wheel_radius : float, optional
         Draws the tires at this radius (scaled about the axle), so that a wheel
         spinning at the model's rate rolls without sliding on the floor.
-        ``plant.wheel_radius`` when omitted, else the URDF's 0.05 m.
+        ``plant.wheel_radius`` when omitted, else 0.05 m.
         :func:`racecar_frames` must get the same ``wheel_radius`` so the tires
         touch the ground.
 
@@ -835,19 +802,21 @@ def racecar_skin_3d(
         Primitives keyed to the frames of :func:`racecar_frames`.
     """
     colors = _palette(palette)
-    urdf = racecar_urdf()["links"]
     r = _wheel_radius(plant, wheel_radius)
     geometry = {
         "chassis": [
             _mesh_primitive(
-                urdf["chassis"]["visuals"][0], colors["chassis"], name="chassis"
+                "chassis.STL",
+                colors["chassis"],
+                name="chassis",
+                xyz=CHASSIS_VISUAL_XYZ,
             )
         ],
-        "base_laser": _rplidar(colors) if lidar == "rplidar" else _hokuyo(),
+        "base_laser": _rplidar(colors),
     }
     for link in WHEEL_LINKS:
         tire = _mesh_primitive(
-            urdf[link]["visuals"][0],
+            f"{link}.STL",
             colors["tire"],
             name=link,
             radial_scale=r / GEOMETRY["wheel_radius"],
@@ -855,14 +824,14 @@ def racecar_skin_3d(
         details = _wheel_details(link, colors, r) if equipment else []
         geometry[link] = [tire] + details
     for link in ("left_steering_hinge", "right_steering_hinge"):
-        hinge = _mesh_primitive(urdf[link]["visuals"][0], colors["hinge"], name=link)
+        hinge = _mesh_primitive(f"{link}.STL", colors["hinge"], name=link)
         geometry[link] = [hinge] + (_knuckle(link, colors) if equipment else [])
 
     if equipment:
         geometry["chassis"] += _chassis_equipment(colors)
         geometry["camera_link"] = _raspicam(colors)
     else:
-        lx, ly, lz = urdf["camera_link"]["visuals"][0]["geometry"]["size"]
+        lx, ly, lz = CAMERA_BOX
         geometry["camera_link"] = [
             Box(length_x=lx, length_y=ly, length_z=lz, color=colors["camera"])
         ]
@@ -983,8 +952,8 @@ def racecar_skin_2d(
 ):
     """Top view of the racecar for fast matplotlib animations.
 
-    The chassis outline is the top face of the URDF chassis mesh; the four tires
-    sit at the URDF wheel joints (front ones on the steered hinges, Ackermann);
+    The chassis outline is the top face of the chassis mesh; the four tires
+    sit at the wheel joints (front ones on the steered hinges, Ackermann);
     the RPLidar is a filled disk with its red ring; the decks, electronics,
     e-stop and bumpers follow the assembled vehicle. Lines and circles only, so
     minilink's stock 2-D matplotlib renderer draws it fast — this is the look to
@@ -994,18 +963,14 @@ def racecar_skin_2d(
     (an arrow on ``body``).
     """
     colors = _palette(palette)
-    chassis_visual = racecar_urdf()["links"]["chassis"]["visuals"][0]
-    vertices, faces = _mesh(chassis_visual["geometry"]["filename"])
+    vertices, faces = _mesh("chassis.STL")
     outline = _outline_xy(
-        *transform_mesh(
-            (vertices, faces),
-            origin_transform(chassis_visual["xyz"], chassis_visual["rpy"]),
-        )
+        *transform_mesh((vertices, faces), _origin(CHASSIS_VISUAL_XYZ))
     )
     half_track = 0.5 * GEOMETRY["wheel_track"]
     r = _wheel_radius(plant, wheel_radius)
 
-    lidar_x = forward_kinematics(racecar_urdf())["base_laser"][0, 3]
+    lidar_x = LASER_XYZ[0]
     holes = [(lidar_x, 0.0, 0.041), (ESTOP_XY[0], ESTOP_XY[1], 0.022)]
     chassis = [
         Line(hatch, color="#9a9ca1", linewidth=0.6)
@@ -1137,13 +1102,13 @@ def track_lines(bounds, walls=False, tile=0.5, path=None, colors=None):
 
 
 def frame_axes_skin(plant=None, length=0.04, links=None):
-    """Debug look: an RGB triad (x red, y green, z blue) at every URDF link frame.
+    """Debug look: an RGB triad (x red, y green, z blue) at every link frame.
 
-    Stack it on a look with ``merge_skins(urdf_skin, frame_axes_skin)`` to check
-    that meshes sit in their joint frames.
+    Stack it on a look with ``merge_skins(racecar_skin_3d, frame_axes_skin)`` to
+    check that meshes sit in their joint frames.
     """
     geometry = {}
-    for link in links or racecar_urdf()["links"]:
+    for link in links or LINKS:
         geometry[link] = [
             Line(np.array([[0.0, 0.0, 0.0], axis]), color=color, linewidth=2.0)
             for axis, color in zip(

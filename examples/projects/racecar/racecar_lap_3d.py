@@ -1,4 +1,4 @@
-"""A lap of the circuit drawn with the URDF skin: a GIF, and an interactive 3-D page."""
+"""A lap of the circuit: a GIF, and an interactive 3-D page."""
 
 import pathlib
 
@@ -78,7 +78,7 @@ run = lap.trajectory_of(car, traj).resample(n_samples=N_FRAMES)
 # state, so a wheel that turns in the animation needs its angle carried by the plant
 car.plot_trajectory(run, show=False)
 
-# GIF: the stock matplotlib renderer with the top view built from the same URDF.
+# GIF: the stock matplotlib renderer with the top view.
 # A saved animation is drawn flat, so the 3-D look would come out as a wireframe.
 car.skin = racecar_skin_2d
 car.animate(
@@ -91,7 +91,7 @@ car.animate(
     time_factor_video=VIDEO_SPEED,
 )
 
-# the same lap in 3-D: the URDF meshes as lit solids, orbit and zoom in a browser
+# the same lap in 3-D: lit solids, orbit and zoom in a browser
 car.skin = racecar_skin_3d
 car.animate(
     run,

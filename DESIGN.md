@@ -206,16 +206,18 @@ serial arms. Joint impedance / task impedance / computed torque use
 `control/modelbased.py`. Mixed inputs → named ports + concrete allocation hooks; no
 `WithPositionInputs` inheritance branches.
 
-**Vehicle ladder** — four teaching rungs in
+**Vehicle ladder** — teaching rungs in
 :mod:`~minilink.dynamics.catalog.vehicles`, all dual-backend:
 
 | Class | $n$ | Input $\mathbf{u}$ | Role |
 | --- | --- | --- | --- |
 | `HolonomicMobileRobot` | 2 | $[v_x, v_y]$ | holonomic point |
 | `KinematicBicycle` / `KinematicCar` | 3 | $[v, \delta]$ | kinematic bicycle (car skin) |
-| `UdeSRacecar` | 3 | $[v, \delta]$ | same bicycle at the public 1/10 scale; `tf` accepts `racecar_skin_3d` |
+| `UdeSRacecar` | 3 | $[v, \delta]$ | same bicycle at the 1/10 scale; `tf` accepts `racecar_skin_3d` |
 | `DynamicBicycle` | 6 | `w_rear`, `delta` ports (`named_ports=False` stacks them) | rigid body + linear tires |
 | `BicycleDynRate` | 8 | $[\dot\omega_r, \dot\delta]$ (`named_ports=True` splits them) | integrated wheel / steer — the MPC plant |
+| `UdeSRacecarDyn` | 9 | $[P_\mathrm{cmd}, \delta_\mathrm{cmd}]$ | brush tires, power-limited drive, servo steering |
+| `UdeSRacecarDyn3D` | 11 | same | rolling wheel angles for `racecar_skin_3d` |
 
 The research rungs (`Holonomic`, `HolonomicAccel`, `BicycleKin`, `BicycleAcc`,
 `BicycleDynTauRate`, `BicycleDynServo`, `BicycleDynEngine`), the extra variants

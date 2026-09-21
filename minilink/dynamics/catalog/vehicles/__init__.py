@@ -1,7 +1,7 @@
 """Vehicle dynamics — the four-rung teaching ladder plus propulsion / suspension.
 
 ``HolonomicMobileRobot`` → ``KinematicBicycle`` / ``KinematicCar`` →
-``UdeSRacecar`` (same bicycle at the public 1/10 scale) →
+``UdeSRacecar`` (same bicycle at the 1/10 scale) →
 ``DynamicBicycle`` (linear tires, named ``w_rear`` / ``delta`` ports) →
 ``BicycleDynRate`` (wheel-rate / steer-rate inputs, the MPC plant) →
 ``UdeSRacecarDyn`` (brush tires that slip, power-limited drive, servo steering).

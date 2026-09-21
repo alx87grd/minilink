@@ -344,7 +344,7 @@ Two-column record of every symbol marked Done before the shrink; the source for 
 | Holonomic3DMobileRobot | HolonomicMobileRobot3D | `minilink/dynamics/catalog/vehicles/steering.py` |
 | KinematicCarModel | KinematicCar | `minilink/dynamics/catalog/vehicles/steering.py` |
 | ConstantSpeedKinematicCarModel | ConstantSpeedKinematicCar | `minilink/dynamics/catalog/vehicles/steering.py` |
-| UdeSRacecar | UdeSRacecar | `minilink/dynamics/catalog/vehicles/steering.py` |
+| UdeSRacecar | UdeSRacecar | `minilink/dynamics/catalog/vehicles/racecar.py` |
 | Manipulator | Manipulator | `minilink/dynamics/abstraction/manipulator.py` |
 | SpeedControlledManipulator | SpeedControlledManipulator | `minilink/dynamics/catalog/manipulators/arms.py` |
 | OneLinkManipulator | OneLinkManipulator | `minilink/dynamics/catalog/manipulators/arms.py` |

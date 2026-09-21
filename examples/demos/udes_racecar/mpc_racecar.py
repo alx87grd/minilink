@@ -82,7 +82,7 @@ diagram.animate(
     # renderer="meshcat",
 )
 
-# --- 3-D look: same lap with the URDF skin ---
+# --- 3-D look: same lap ---
 from minilink.graphical.catalog.racecar_skin import racecar_skin_3d
 
 car.skin = racecar_skin_3d

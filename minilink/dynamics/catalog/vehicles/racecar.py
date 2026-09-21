@@ -1,10 +1,7 @@
-"""Generic 1/10-scale racecar: power-limited rear drive, brush tires, servo steering.
+"""1/10-scale racecar: power-limited rear drive, brush tires, servo steering.
 
-The plant is a generic small electric car, not a model of one particular vehicle: the
-drive is described by the power it can put on the ground and by the torque the drivetrain
-can hold at low speed, never by a motor circuit. Every number in
-:data:`PUBLIC_RACECAR_PARAMS` is rounded and traceable to published material (the
-``racecar_description`` URDF and the open Arduino firmware of the platform).
+The drive is described by the power it can put on the ground and by the torque the
+drivetrain can hold at low speed, never by a motor circuit.
 
 State ``x = [x, y, theta, vx, vy, yaw_rate, w_rear, delta, P]``, inputs ``P_cmd`` [W] and
 ``delta_cmd`` [rad]. Both equation paths use the ``xp`` idiom, so the class runs on NumPy
@@ -26,40 +23,37 @@ from minilink.dynamics.catalog.vehicles.tires import (
 )
 from minilink.graphical.catalog.skins import car_skin_2d
 
-# Public parameters. Each value is rounded and traceable to published material:
-# [URDF] = the racecar_description URDF of the open-source platform,
-# [FW]   = the open Arduino firmware of the same platform,
-# [ENG]  = an engineering estimate at the scale of the vehicle (stated in notes/parameters.md).
+# Geometry and actuators of the 1/10 car.
 PUBLIC_RACECAR_PARAMS = {
     # chassis
-    "mass": 5.0,  # [kg]   URDF inertial macros sum to ~5.7 kg with the lidar; rounded down
-    "inertia": 0.06,  # [kg m^2] URDF chassis izz = 0.05865
-    "a": 0.17,  # [m]    half of the URDF wheelbase (front wheel joints at x = 0.34)
-    "b": 0.17,  # [m]    idem: the mass is taken centred between the axles
-    "r_f": 0.05,  # [m]    URDF wheel cylinder radius
-    "r_r": 0.05,  # [m]    idem
+    "mass": 5.0,  # [kg]
+    "inertia": 0.06,  # [kg m^2]
+    "a": 0.17,  # [m]    CG to front axle (wheelbase 0.34 m, mass centred)
+    "b": 0.17,  # [m]    CG to rear axle
+    "r_f": 0.05,  # [m]    front tire radius
+    "r_r": 0.05,  # [m]    rear tire radius
     "gravity": 9.81,  # [m/s^2]
     # aero and rolling resistance
     "rho": 1.2,  # [kg/m^3] air at room temperature
-    "CdA": 0.03,  # [m^2]  [ENG] ~0.03 m^2 frontal area at Cd ~ 1 for an open 1/10 body
-    "C_rr": 0.02,  # [-]   [ENG] rolling resistance of a rubber tire on a hard floor
+    "CdA": 0.03,  # [m^2]  frontal area at Cd ~ 1 for an open 1/10 body
+    "C_rr": 0.02,  # [-]   rolling resistance of a rubber tire on a hard floor
     # tires (stiffnesses per unit load)
-    "mu": 1.0,  # [-]      [ENG] soft rubber on a smooth hard floor
+    "mu": 1.0,  # [-]      soft rubber on a smooth hard floor
     "c_alpha_f": 4.0,  # [1/rad] front cornering stiffness per unit load
     "c_alpha_r": 5.0,  # [1/rad] rear: stiffer, so the car understeers at the limit
     "c_kappa": 10.0,  # [-]  longitudinal stiffness per unit load
     # propulsion (what the drive can deliver, not how it is built)
-    "P_max": 80.0,  # [W]  [FW] 8 V bus of the firmware at a ~10 A order of magnitude
-    "tau_sat": 1.5,  # [N m] [ENG] torque the drivetrain holds at the rear axle at rest
-    "engine_tau": 0.1,  # [s] [ENG] lag from the command to the power on the ground
-    "Jw_rear": 0.002,  # [kg m^2] URDF rear wheels (izz 4.1e-4 each) plus the drivetrain
-    "bw_drive": 0.001,  # [N m s] [ENG] viscous drag of the drivetrain
+    "P_max": 80.0,  # [W]
+    "tau_sat": 1.5,  # [N m] torque the drivetrain holds at the rear axle at rest
+    "engine_tau": 0.1,  # [s] lag from the command to the power on the ground
+    "Jw_rear": 0.002,  # [kg m^2] rear wheels plus the drivetrain
+    "bw_drive": 0.001,  # [N m s] viscous drag of the drivetrain
     "bw_rear": 0.0,  # [N m s] the base class's own wheel drag: f() adds bw_drive instead
-    "tau_fric": 0.02,  # [N m]  [ENG] dry friction of the drivetrain
+    "tau_fric": 0.02,  # [N m] dry friction of the drivetrain
     # steering
-    "delta_max": 0.52,  # [rad] [FW] firmware maxAngle = 30 deg
-    "steering_tau": 0.08,  # [s] [ENG] hobby servo closing its own position loop
-    "steer_rate_max": 5.0,  # [rad/s] [ENG] ~0.2 s per 60 deg, a hobby servo datasheet
+    "delta_max": 0.52,  # [rad] 30 deg
+    "steering_tau": 0.08,  # [s] hobby servo closing its own position loop
+    "steer_rate_max": 5.0,  # [rad/s] ~0.2 s per 60 deg
     # smoothing scales: they keep the equations finite and differentiable near rest
     "v_min_epsilon": 0.2,  # [m/s]   floor of the slip denominators
     "w_min_epsilon": 1.0,  # [rad/s] floor of the power-to-torque denominator
@@ -70,7 +64,7 @@ PUBLIC_RACECAR_PARAMS = {
 
 
 def _frames(X, Y, psi, delta, params, phi_rear=0.0, phi_front=None):
-    """URDF link poses for either racecar plant. Import is lazy so ``f`` stays mesh-free."""
+    """Link poses for either racecar plant. Import is lazy so ``f`` stays mesh-free."""
     from minilink.graphical.catalog.racecar_skin import racecar_frames
 
     b = params["b"]
@@ -88,10 +82,10 @@ def _frames(X, Y, psi, delta, params, phi_rear=0.0, phi_front=None):
 
 
 class UdeSRacecar(KinematicBicycle):
-    """Kinematic bicycle at the public 1/10 racecar scale.
+    """Kinematic bicycle at the 1/10 racecar scale.
 
     Same equations as :class:`KinematicBicycle`, with ``a = b`` from
-    :data:`PUBLIC_RACECAR_PARAMS`. ``tf`` publishes the URDF frames, so the 3-D
+    :data:`PUBLIC_RACECAR_PARAMS`. ``tf`` publishes the link frames, so the 3-D
     look attaches with ``car.skin = racecar_skin_3d``. There is no rolling angle
     in the state: the wheels steer, they do not spin.
     """
@@ -247,7 +241,7 @@ class UdeSRacecarDyn(DynamicBicycle):
             units=["W", "W"],
         )
 
-        # graphics: 1/10-scale car; ``tf`` publishes the URDF frames so
+        # graphics: 1/10-scale car; ``tf`` publishes the link frames so
         # ``car.skin = racecar_skin_3d`` attaches the 3-D look (wheels spin
         # only on :class:`UdeSRacecarDyn3D`, which carries the rolling angles)
         self.wheel_len = 2.0 * self.params["r_r"]
@@ -431,8 +425,7 @@ class UdeSRacecarDyn3D(UdeSRacecarDyn):
     def __init__(self):
         super().__init__()
 
-        # the skin lives beside this module; importing it here keeps the equations above
-        # free of the URDF and mesh readers
+        # the skin lives beside this module; importing it here keeps ``f`` mesh-free
         from minilink.graphical.catalog.racecar_skin import racecar_skin_3d
 
         self.name = "UdeS Racecar (3D)"
@@ -520,7 +513,6 @@ def stiff_tires(params):
 
 
 if __name__ == "__main__":
-
     from minilink.graphical.catalog.racecar_skin import racecar_skin_3d
 
     car = UdeSRacecar()  # or UdeSRacecarDyn()
