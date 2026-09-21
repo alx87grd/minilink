@@ -20,9 +20,12 @@ outputs (the fitted weights); run twice, `cmp`.
 
 - [ ] **4.1 Promote the noun** **[ask — file move, rename].** `StateField` → `Field`, with
   `FieldSet` and `FieldCost`, moves from `planning/spatial/state_fields.py` to
-  `core/fields.py`; the four spatial fields (`ClearanceField`, `CostDensityField`,
-  `PathDistanceField`, `CorridorMarginField`) stay where they are and subclass the core ABC.
-  RULES 3.4: call sites updated (`state_fields.py`, `scene.py`, `track.py`, `test_planning.py`,
+  `core/fields.py`. The four spatial fields (`ClearanceField`, `CostDensityField`,
+  `PathDistanceField`, `CorridorMarginField`) subclass that ABC in
+  `core/geometry/fields.py` — **not** `planning.spatial` ([geometry-module.md](geometry-module.md);
+  they are workspace→state maps that a controller eval needs with no planner).
+  Shaping (`quadratic_hinge`, …) lives next to `Field.as_cost` in `core/fields.py`.
+  RULES 3.4: call sites updated (`geometry` fields, `scene.py`, `track.py`, `test_planning.py`,
   DESIGN §6 twice), no shim; `minilink.core._EXPORTS` gains `Field`. New: `FieldInputSet
   (InputSet)` with `margin(u, x, t, params) = value(x, u, t, params) − lower` (and `upper −
   value`), built by `Field.as_input_constraint()`; and `gradient(x, u, t, params)` on `Field`:
