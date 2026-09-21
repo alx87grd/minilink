@@ -18,6 +18,9 @@ from minilink.catalog import (
     DynamicBicycleCar3D,
     PendulumWithNoisePort,
     Plane3D,
+    UdeSRacecar,
+    UdeSRacecarDyn,
+    UdeSRacecarDyn3D,
 )
 from minilink.dynamics.catalog.aerial.drone import (
     ConstantSpeedHelicopterTunnel,
@@ -147,6 +150,9 @@ CATALOG_CHECK_ENTRIES: tuple[CatalogCheckEntry, ...] = (
     CatalogCheckEntry("DoublePendulum", DoublePendulum),
     CatalogCheckEntry("PendulumWithNoisePort", PendulumWithNoisePort),
     CatalogCheckEntry("DynamicBicycle", DynamicBicycle),
+    CatalogCheckEntry("UdeSRacecar", UdeSRacecar),
+    CatalogCheckEntry("UdeSRacecarDyn", UdeSRacecarDyn),
+    CatalogCheckEntry("UdeSRacecarDyn3D", UdeSRacecarDyn3D),
     CatalogCheckEntry("DynamicBicycleCar3D", DynamicBicycleCar3D),
     CatalogCheckEntry("Boat2D", Boat2D),
     CatalogCheckEntry("Boat2DWithCurrent", Boat2DWithCurrent),

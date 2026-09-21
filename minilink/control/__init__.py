@@ -22,6 +22,7 @@ _EXPORTS: dict[str, tuple[str, str]] = {
     "NeuralPolicyController": ("minilink.control.neural", "NeuralPolicyController"),
     "angle_features": ("minilink.control.neural", "angle_features"),
     "PID": ("minilink.control.siso", "PID"),
+    "PurePursuit": ("minilink.control.geometric", "PurePursuit"),
     "PI": ("minilink.control.siso", "PI"),
     "PD": ("minilink.control.siso", "PD"),
     "ImpedanceController": ("minilink.control.impedance", "ImpedanceController"),

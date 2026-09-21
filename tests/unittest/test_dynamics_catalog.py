@@ -756,7 +756,7 @@ class TestCarProfile(unittest.TestCase):
 
     def test_udes_matches_kinematic_racecar_geometry(self):
         from examples.projects.car_trajopt.vehicles.car_profile import udes_1_5_profile
-        from examples.projects.car_trajopt.vehicles.extras import UdeSRacecar
+        from minilink.catalog import UdeSRacecar
 
         udes = UdeSRacecar()
         profile = udes_1_5_profile()

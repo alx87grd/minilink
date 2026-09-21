@@ -95,7 +95,12 @@ _EXPORTS: dict[str, tuple[str, str]] = {
     "Evaluation": ("minilink.planning.evaluation", "Evaluation"),
     # spatial scene: tracks, collision geometry, cost shaping
     "ReferenceTrack": ("minilink.planning.spatial.track", "ReferenceTrack"),
+    "circuit_waypoints": (
+        "minilink.planning.spatial.paths",
+        "circuit_waypoints",
+    ),
     "from_waypoints": ("minilink.planning.spatial.paths", "from_waypoints"),
+    "Sphere": ("minilink.core.geometry", "Sphere"),
     "Scene": ("minilink.planning.spatial.scene", "Scene"),
     "bind": ("minilink.planning.spatial.collision", "bind"),
     "car_outline": ("minilink.planning.spatial.collision", "car_outline"),

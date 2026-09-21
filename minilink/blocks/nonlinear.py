@@ -8,15 +8,17 @@ across a signal of dimension ``dim``.
 - :class:`Saturation` — clip to ``[lower, upper]``.
 - :class:`DeadZone` — zero inside ``[-width, width]``, shifted outside.
 - :class:`Relay` — bang-bang ``±amplitude`` on the sign of the input.
+- :class:`RateLimiter` — a stateful one: how fast a command may change, and
+  where it may end up (a first-order lag, a slew rate and two end stops).
 
-Stateful nonlinearities (rate limiter, hysteresis) are planned as small
-``DynamicSystem`` blocks and live here too once added.
+Hysteresis is planned as a small ``DynamicSystem`` block and lives here too
+once added.
 """
 
 import numpy as np
 
 from minilink.core.backends import array_module
-from minilink.core.system import System
+from minilink.core.system import DynamicSystem, System
 
 
 class Saturation(System):
@@ -98,6 +100,71 @@ class Relay(System):
         y = amplitude * xp.sign(u)
 
         return y
+
+
+class RateLimiter(DynamicSystem):
+    """Pass a command through, limited to ``rate_max`` per second and to the end stops.
+
+    Parameters
+    ----------
+    rate_max : float
+        Largest rate of change of the output [unit/s]; must be positive.
+    tau : float
+        Time constant of the lag the block shows for small steps [s]; must be positive.
+        The knee between the two regimes sits at a step of about ``tau * rate_max``.
+    lower, upper : float
+        End stops on the output [unit]; infinite by default, i.e. a rate limit only.
+    dim : int
+        Number of independent channels.
+    x0 : float or array
+        Output at ``t = 0`` [unit], one value or one per channel.
+    """
+
+    def __init__(
+        self,
+        rate_max: float = 1.0,
+        tau: float = 0.05,
+        lower: float = -np.inf,
+        upper: float = np.inf,
+        dim: int = 1,
+        x0=0.0,
+    ):
+        if rate_max <= 0.0:
+            raise ValueError("rate_max must be positive (it scales the tanh)")
+        if tau <= 0.0:
+            raise ValueError("tau must be positive (it divides the lag rate)")
+        if upper < lower:
+            raise ValueError("the upper end stop must sit above the lower one")
+
+        super().__init__(n=int(dim), input_dim=int(dim), output_dim=int(dim))
+
+        self.name = "Rate Limiter"
+        self.params = {
+            "rate_max": float(rate_max),
+            "tau": float(tau),
+            "lower": float(lower),
+            "upper": float(upper),
+        }
+        self.state.labels = [f"u_lim{i}" for i in range(self.n)]
+        self.x0 = np.clip(
+            np.broadcast_to(np.asarray(x0, dtype=float), (self.n,)).astype(float),
+            lower,
+            upper,
+        )
+        self.solver_info["smallest_time_constant"] = float(tau)
+
+    def f(self, x, u, t=0.0, params=None):
+        params = self.params if params is None else params
+        rate_max, tau = params["rate_max"], params["tau"]
+        xp = array_module(x, u)
+
+        x_ref = xp.clip(u, params["lower"], params["upper"])
+        dx = rate_max * xp.tanh((x_ref - x) / (tau * rate_max))
+
+        return dx
+
+    def h(self, x, u, t=0.0, params=None):
+        return x
 
 
 if __name__ == "__main__":

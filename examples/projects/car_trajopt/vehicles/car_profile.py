@@ -38,7 +38,7 @@ Profiles
 --------
 - :func:`passenger_car_profile` — full-size sedan-scale catalog defaults
 - :func:`racecar_profile` — lightweight race vehicle envelope
-- :func:`udes_1_5_profile` — 1:5 RC racecar scale (``UdeSRacecar`` (``extras.py``) geometry)
+- :func:`udes_1_5_profile` — 1:5 RC racecar scale (same ``a``, ``b`` as catalog ``UdeSRacecar``)
 """
 
 from __future__ import annotations
@@ -416,7 +416,7 @@ def racecar_profile() -> CarProfile:
 
 
 def udes_1_5_profile() -> CarProfile:
-    """1:5 UdeS racecar scale (``UdeSRacecar`` (``extras.py``)).
+    """1:5 UdeS racecar scale (same ``a``, ``b`` as catalog ``UdeSRacecar``).
 
     ``P = 200 W`` at ``v_nom = 5 m/s`` → ``tau ≈ 2.8 Nm``, ``w_rear_dot ≈ 41 rad/s²``.
     """

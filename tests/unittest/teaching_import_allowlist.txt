@@ -20,6 +20,7 @@ examples/demos/mpc/mpc_car_circuit.py minilink.planning.spatial.plotting
 examples/demos/mpc/mpc_car_circuit.py minilink.planning.spatial.scene
 examples/demos/mpc/mpc_car_circuit.py minilink.planning.spatial.shaping
 examples/demos/mpc/mpc_car_circuit.py minilink.planning.spatial.track
+examples/demos/mpc/mpc_racecar.py minilink.graphical.catalog.racecar_skin
 examples/demos/rrt/rrt_holonomic_obstacles.py minilink.core.geometry
 examples/demos/rrt/rrt_holonomic_obstacles.py minilink.planning.search.extenders
 examples/demos/rrt/rrt_holonomic_obstacles.py minilink.planning.search.steering

@@ -3,6 +3,7 @@ Workspace reference paths for path tracking and corridor constraints.
 
 Build a continuous primitive from waypoints with :func:`from_waypoints` (default
 ``kind="polyline"``) and pass it to :class:`~minilink.planning.spatial.track.ReferenceTrack`.
+:func:`circuit_waypoints` writes a closed test loop to track.
 """
 
 from __future__ import annotations
@@ -167,3 +168,56 @@ def from_waypoints(waypoints, *, kind: str = "polyline") -> ReferencePath:
     if kind == "polyline":
         return PolylinePath(np.asarray(waypoints, dtype=float))
     raise ValueError(f"unknown path kind {kind!r}; supported: 'polyline'")
+
+
+def circuit_waypoints(length=14.0, width=9.0, radius=2.5, spacing=0.25):
+    """Closed test circuit: a rounded rectangle, sampled counter-clockwise.
+
+    Four quarter turns joined by four straights, then resampled at a constant arc-length
+    spacing so that a tracker's lookahead always lands between two waypoints.
+
+    Parameters
+    ----------
+    length, width : float
+        Outer dimensions of the loop [m], corner to corner.
+    radius : float
+        Corner radius [m].
+    spacing : float
+        Distance between consecutive waypoints [m].
+
+    Returns
+    -------
+    waypoints : array of shape (N, 2)
+        Polyline [m] going once around the loop. The first point is not repeated at
+        the end: a zero-length closing segment has no tangent, and the path objects
+        that consume waypoints divide by it.
+    """
+    half_l, half_w = 0.5 * length - radius, 0.5 * width - radius
+    centers = [
+        (half_l, half_w, 0.0),
+        (-half_l, half_w, 0.5),
+        (-half_l, -half_w, 1.0),
+        (half_l, -half_w, 1.5),
+    ]
+
+    corners = []
+    for cx, cy, quarter in centers:
+        angles = np.pi * (quarter + np.linspace(0.0, 0.5, 16))
+        corners.append(
+            np.column_stack(
+                [cx + radius * np.cos(angles), cy + radius * np.sin(angles)]
+            )
+        )
+    loop = np.vstack([np.vstack(corners), np.vstack(corners)[:1]])
+
+    # constant spacing: walk the closed polyline by arc length, and stretch the step so
+    # that a whole number of them goes around (the closing gap is then one step too)
+    steps = np.linalg.norm(np.diff(loop, axis=0), axis=1)
+    s = np.concatenate([[0.0], np.cumsum(steps)])
+    n_samples = max(int(round(s[-1] / spacing)), 8)
+    s_uniform = np.linspace(0.0, s[-1], n_samples, endpoint=False)
+    waypoints = np.column_stack(
+        [np.interp(s_uniform, s, loop[:, 0]), np.interp(s_uniform, s, loop[:, 1])]
+    )
+
+    return waypoints

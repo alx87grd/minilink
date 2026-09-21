@@ -26,6 +26,7 @@ _EXPORTS: dict[str, tuple[str, str]] = {
     "Sum": ("minilink.blocks.routing", "Sum"),
     # nonlinear
     "DeadZone": ("minilink.blocks.nonlinear", "DeadZone"),
+    "RateLimiter": ("minilink.blocks.nonlinear", "RateLimiter"),
     "Relay": ("minilink.blocks.nonlinear", "Relay"),
     "Saturation": ("minilink.blocks.nonlinear", "Saturation"),
     # transfer functions and filters
