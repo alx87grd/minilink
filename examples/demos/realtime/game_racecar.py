@@ -7,7 +7,7 @@ from minilink import UdeSRacecarDyn3D
 
 sys = UdeSRacecarDyn3D()
 
-sys.plot_bode(of="speed", wrt="P_cmd")
+# sys.plot_bode(of="speed", wrt="P_cmd")
 
 
 sys.game(renderer="meshcat", is_3d=True)
