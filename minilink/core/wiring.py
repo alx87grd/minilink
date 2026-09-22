@@ -227,7 +227,8 @@ class DiagramOutputPort(OutputPort):
 class WiredDiagramMixin:
     """Evolution-agnostic diagram wiring, gather, and visualization helpers."""
 
-    def _init_wiring(self, *, name: str = "Diagram") -> None:
+    def init_wiring(self, *, name: str = "Diagram") -> None:
+        """Internal machinery: the wiring tables and the composition memory of a new diagram."""
         if not hasattr(self, "subsystems"):
             self.subsystems = {}
         if not hasattr(self, "connections"):
@@ -244,9 +245,9 @@ class WiredDiagramMixin:
         self.connections[sys_id] = {port_id: None for port_id in sys.inputs}
 
         self.compute_state_properties()
-        self._refresh_solver_info()
+        self.refresh_solver_info()
 
-    def _refresh_solver_info(self):
+    def refresh_solver_info(self):
         """Bubble subsystem solver hints to the diagram root."""
         if not hasattr(self, "solver_info"):
             return
@@ -485,7 +486,7 @@ class WiredDiagramMixin:
         for sys_id, subsystem_params in value.items():
             self.subsystems[sys_id].params = subsystem_params
 
-    def _subsystem_params(self, params, sys_id):
+    def subsystem_params(self, params, sys_id):
         """Route nested diagram params to one subsystem (strict contract).
 
         ``None`` → ``None`` (subsystem uses its live ``self.params``);
@@ -555,7 +556,7 @@ class WiredDiagramMixin:
         local_u = self.get_local_input(
             x, u, t, sys_id, port.dependencies, params=params
         )
-        local_params = self._subsystem_params(params, sys_id)
+        local_params = self.subsystem_params(params, sys_id)
 
         return port.compute(local_x, local_u, t, local_params)
 

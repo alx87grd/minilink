@@ -1,26 +1,9 @@
-"""Composition shortcuts: build common diagram topologies in one line.
+"""Composition shortcuts: the ``+``, ``>>`` and ``@`` operators that build a diagram in one line.
 
-Public functions (also reachable as operators on :class:`System`):
-
-- :func:`add_systems` — ``a + b``: flat diagram, no wiring inferred.
-- :func:`series` — ``a >> b``: connect default output to default input.
-- :func:`closed_loop` — ``controller @ plant``: standard feedback loop
-  (``feedback="auto"``, ``"y"``, or ``"qdq"``).
-- :func:`closed_loop_qdq` — ``closed_loop(..., feedback="qdq")`` alias.
-- :func:`autowire` — conservatively fill unconnected inputs.
-- :func:`resolve_standard_feedback` — shared port names for ``@`` closed loops
-  and hybrid ``Computer @ plant``.
-
-Shortcut-built diagrams remember a default *entry* input and *output* port
-(``diagram._composition_entry`` / ``_composition_output``, initialized by
-:class:`~minilink.core.diagram.DiagramSystem`) so chains like ``a >> b >> c``
-know where to attach the next stage. Diagram operands are flattened, not
-nested. Explicit ``add_subsystem`` / ``connect`` remains the canonical way to
-build any topology.
-
-**Mutation semantics (frozen v0.1):** a ``DiagramSystem`` left operand of
-``+`` / ``>>`` is extended in place and returned — subsystem operands are
-always shared references, never copied. See DESIGN §4.
+Shortcut-built diagrams remember a default entry input and output port so chains
+like ``a >> b >> c`` know where to attach the next stage; diagram operands are
+flattened, not nested, and a diagram left operand is extended in place (DESIGN §4).
+Explicit ``add_subsystem`` / ``connect`` remains the canonical way to build any topology.
 """
 
 from __future__ import annotations

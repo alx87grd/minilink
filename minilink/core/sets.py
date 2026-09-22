@@ -241,14 +241,18 @@ class SingletonSet(Set):
     def residual(self, z):
         """Return the equality residual ``z - point``, shape ``(n,)``."""
         point = self.point
-        return z - point
+
+        residual = z - point
+
+        return residual
 
     def margin(self, z, t=0.0, params=None):
         """Return zero only when ``z`` equals the singleton point."""
         xp = array_module(z)
+        residual = self.residual(z)
 
         # equality as a degenerate inequality: -|z - p| >= 0 holds only at p
-        margin = -xp.abs(self.residual(z))
+        margin = -xp.abs(residual)
 
         return margin
 

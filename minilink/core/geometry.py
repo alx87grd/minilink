@@ -1,19 +1,4 @@
-"""
-Signed-distance geometry primitives for workspace solids.
-
-A :class:`Shape` models a solid region of the robot workspace through its
-signed-distance function ``sdf(p)``: positive outside the solid, zero on the
-boundary, and negative inside (the magnitude inside is the penetration depth).
-One formula therefore yields collision (``sdf < 0``), clearance (the value), and
-the push-away gradient at once, which is why the same shape can drive both a
-hard free-space constraint and a soft proximity cost downstream.
-
-These shapes describe *occupied* space and are the dual of the allowable
-:class:`~minilink.core.sets.Set` objects, which describe *feasible* space
-(``margin >= 0`` inside). Construction and membership are NumPy/Python boundary
-utilities; :meth:`Shape.sdf` is a native-array math path that stays NumPy under
-NumPy input and traces under JAX.
-"""
+"""Workspace solids by their signed distance ``sdf(p)``: negative inside, zero on the surface."""
 
 import functools
 from abc import ABC, abstractmethod
@@ -161,11 +146,12 @@ class Union(Shape):
 
     def sdf(self, p, t=0.0, params=None):
         xp = array_module(p)
+        shapes = self.shapes
 
         # nearest surface among members; reduce with xp.minimum so it traces
         # under JAX (Python min() would compare traced values and break jit)
         sdf = functools.reduce(
-            xp.minimum, (shape.sdf(p, t, params) for shape in self.shapes)
+            xp.minimum, (shape.sdf(p, t, params) for shape in shapes)
         )
 
         return sdf

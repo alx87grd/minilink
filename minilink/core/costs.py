@@ -1,29 +1,4 @@
-"""
-Cost functions for deterministic planning.
-
-The planning cost follows the textbook optimal-control form
-
-``J = integral exp(-rho t) g(x, u, t) dt + h(x(tf), tf)``.
-
-The horizon is the planning problem's: a finite ``tf`` ends the integral and
-charges ``h`` there, an infinite ``tf`` never does (``PlanningProblem.horizon_kind``).
-A cost states only its continuous discount rate :attr:`CostFunction.discount_rate`
-``rho`` (``0`` is undiscounted). Planners convert the rate to their own factor
-with :meth:`CostFunction.discount_factor`: value iteration's ``alpha`` and
-reinforcement learning's ``gamma`` are both ``exp(-rho dt)``. What happens when
-a trajectory leaves the allowed set is not the cost's business either — it is
-the planning problem's price of infeasibility (``PlanningProblem.infeasible_cost``).
-
-Costs live in :mod:`minilink.core` (not on
-:class:`~minilink.core.system.System`) so the same model can be reused
-across many planning problems.
-
-The equation methods ``g`` and ``h`` are native-array math paths. They should
-return scalar expressions that stay native to the input backend: NumPy scalar
-expressions for NumPy inputs, JAX scalar expressions for JAX inputs. Reporting
-helpers such as :meth:`CostFunction.total_cost` convert those expressions to
-Python floats at the boundary.
-"""
+"""Cost functions: the running cost ``g(x, u, t)`` and the terminal cost ``h(x, t)`` of ``J``."""
 
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
@@ -39,15 +14,23 @@ class CostFunction(ABC):
     """
     Mother class for deterministic planning cost functions.
 
-    Subclasses define a running cost ``g(x, u, t)`` and terminal cost
-    ``h(x, t)``. Both methods accept optional parameters so planning
-    problems can later support parameter sweeps without putting costs on
-    the system object.
+    Subclasses define a running cost ``g(x, u, t)`` and a terminal cost
+    ``h(x, t)`` of the objective ``J = ∫ exp(-rho t) g dt + h(x(tf), tf)``.
+    The horizon is the planning problem's: a finite ``tf`` ends the integral
+    and charges ``h`` there, an infinite one never does. Leaving the allowed
+    set is priced by the problem (``infeasible_cost``), not by the cost.
+
+    ``g`` and ``h`` are native-array equation paths: NumPy in, NumPy out;
+    JAX in, JAX out. Reporting helpers such as :meth:`total_cost` convert to
+    Python floats at the boundary. A cost lives in :mod:`minilink.core`, not
+    on a :class:`~minilink.core.system.System`, so one model serves many
+    planning problems.
 
     Class attribute (override by assignment in a subclass or instance):
 
-    - ``discount_rate``: continuous rate ``rho >= 0`` in
-      ``J = int exp(-rho t) g dt``; ``0`` is undiscounted.
+    - ``discount_rate``: continuous rate ``rho >= 0``; ``0`` is undiscounted.
+      Planners convert it with :meth:`discount_factor` (value iteration's
+      ``alpha`` and reinforcement learning's ``gamma`` are both ``exp(-rho dt)``).
     """
 
     discount_rate = 0.0
@@ -299,11 +282,19 @@ class SumCost(CostFunction):
 
     def g(self, x, u, t=0.0, params=None):
         """Return the summed running cost."""
-        return sum(cost.g(x, u, t, params) for cost in self.terms)
+        terms = self.terms
+
+        g = sum(cost.g(x, u, t, params) for cost in terms)
+
+        return g
 
     def h(self, x, t=0.0, params=None):
         """Return the summed terminal cost."""
-        return sum(cost.h(x, t, params) for cost in self.terms)
+        terms = self.terms
+
+        h = sum(cost.h(x, t, params) for cost in terms)
+
+        return h
 
 
 @dataclass(frozen=True)
@@ -320,16 +311,16 @@ class ScaledCost(CostFunction):
 
     def g(self, x, u, t=0.0, params=None):
         """Return the weighted running cost."""
-        weight = self.weight
+        cost, weight = self.cost, self.weight
 
-        g = weight * self.cost.g(x, u, t, params)
+        g = weight * cost.g(x, u, t, params)
 
         return g
 
     def h(self, x, t=0.0, params=None):
         """Return the weighted terminal cost."""
-        weight = self.weight
+        cost, weight = self.cost, self.weight
 
-        h = weight * self.cost.h(x, t, params)
+        h = weight * cost.h(x, t, params)
 
         return h

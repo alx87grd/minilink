@@ -1,14 +1,7 @@
-"""
-The System contract: the base class every block, plant, and controller extends.
+"""The System contract: the base class every block, plant and controller extends.
 
-A static IO block is described by output maps on its ports (and optionally
-``h`` on the model). Continuous evolution ``dx = f(x, u, t; p)`` lives on
-:class:`DynamicSystem` only.
-
-Signal and port metadata live in :mod:`minilink.core.signals`; user shortcut
-methods (``compute_trajectory``, ``plot_*``, ``animate``, ``modal_analysis``, ...)
-live on the :class:`~minilink.core.facades.SharedSystemFacades` mixin and its
-evolution-specific subclasses.
+A static block is its output maps on its ports; continuous evolution
+``dx = f(x, u, t; p)`` lives on :class:`DynamicSystem`, a discrete step on :class:`StepSystem`.
 """
 
 from typing import TYPE_CHECKING
@@ -114,16 +107,13 @@ class System(SharedSystemFacades):
         # ``compute_trajectory``.
         self.traj = None
 
-        # Standard camera hints (resolved by ``Animator`` via ``camera.py``).
-        # ``camera_scale=None`` (default) fits the view to the drawn geometry at
-        # animation time; set a half-width in metres to frame the scene yourself.
+        # Camera hints, resolved by the Animator. ``camera_scale=None`` (default)
+        # fits the view to the drawn geometry; a half-width in metres frames the
+        # scene yourself. ``camera_follow_frame`` is a ``tf`` key to track (``None``
+        # for a fixed view); ``camera_priority`` tie-breaks between drawables.
         self.camera_target = np.zeros(3, dtype=float)
         self.camera_plot_axes = (0, 1)
         self.camera_scale = None
-        # Camera hints read by the ``Animator`` camera resolver.
-        # ``camera_follow_frame`` is a ``tf`` key to track (or ``None`` for a
-        # fixed view); ``camera_priority`` tie-breaks when several hint-carrying
-        # drawables exist.
         self.camera_follow_frame = None
         self.camera_priority = 0.0
 
@@ -627,13 +617,18 @@ class StepSystem(StepSystemFacades, System):
 
 if __name__ == "__main__":
     # Hello world: a double integrator dx = [x[1], u[0]]
+    from minilink.core.backends import array_module
 
     class DoubleIntegrator(DynamicSystem):
         def __init__(self):
             super().__init__(n=2, input_dim=1, output_dim=2)
 
         def f(self, x, u, t=0, params=None):
-            dx = np.array([x[1], u[0]])
+            xp = array_module(x)
+            position, velocity = x
+            force = u[0]
+
+            dx = xp.array([velocity, force])
 
             return dx
 

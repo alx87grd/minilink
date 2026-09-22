@@ -44,7 +44,7 @@ class DiagramSystem(WiredDiagramMixin, DynamicSystem):
         self.subsystems = {}
         self.connections = {}
         System.__init__(self, 0)
-        self._init_wiring(name="Diagram")
+        self.init_wiring(name="Diagram")
 
     def f(self, x, u, t=0, params=None):
         """
@@ -61,14 +61,18 @@ class DiagramSystem(WiredDiagramMixin, DynamicSystem):
                 continue
             local_x = self.get_local_state(x, sys_id)
             local_u = self.get_local_input(x, u, t, sys_id, params=params)
-            local_params = self._subsystem_params(params, sys_id)
+            local_params = self.subsystem_params(params, sys_id)
 
             dx_pieces.append(subsystem.f(local_x, local_u, t, local_params))
 
         xp = array_module(x, u, *dx_pieces)
         if not dx_pieces:
             return xp.array([])
-        return xp.concatenate([xp.asarray(dx).reshape(-1) for dx in dx_pieces])
+
+        # dx = [f_1(x_1, u_1, t); f_2(x_2, u_2, t); ...], one block per subsystem
+        dx = xp.concatenate([xp.asarray(dx).reshape(-1) for dx in dx_pieces])
+
+        return dx
 
     def compile(self, backend="numpy", bind_params=False, verbose=False):
         """
@@ -190,7 +194,7 @@ class StepDiagramSystem(WiredDiagramMixin, StepSystem):
         self.connections = {}
         System.__init__(self, 0)
         self.rollout = None
-        self._init_wiring(name="StepDiagram")
+        self.init_wiring(name="StepDiagram")
 
     def step(self, x, u, k=0, params=None):
         """
@@ -208,7 +212,7 @@ class StepDiagramSystem(WiredDiagramMixin, StepSystem):
                 continue
             local_x = self.get_local_state(x_arr, sys_id)
             local_u = self.get_local_input(x, u, k, sys_id, params=params)
-            local_params = self._subsystem_params(params, sys_id)
+            local_params = self.subsystem_params(params, sys_id)
             piece = subsystem.step(local_x, local_u, k, local_params)
             start, end = self.state_index[sys_id]
             x_new[start:end] = xp.asarray(piece, dtype=float).reshape(end - start)
