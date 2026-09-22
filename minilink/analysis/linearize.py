@@ -1,16 +1,4 @@
-"""Equilibrium linearization of :class:`~minilink.core.system.DynamicSystem` models.
-
-``linearize_matrices`` returns the first-order matrices
-
-    dDelta x = A Delta x + B Delta u
-    Delta y  = C Delta x + D Delta u
-
-about an operating point ``(x_bar, u_bar)``; ``linearize`` wraps them in an
-:class:`~minilink.dynamics.abstraction.state_space.LTISystem`. Both are
-compositions of :func:`~minilink.analysis.derivatives.jacobian`, so the
-``of`` / ``wrt`` selectors, the ``method`` and the ``eps`` keywords mean the
-same thing everywhere in the analysis family.
-"""
+"""Linearization of a ``System`` about an operating point: the Jacobians ``(A, B, C, D)`` and an ``LTISystem``."""
 
 from __future__ import annotations
 
@@ -66,6 +54,7 @@ def linearize_matrices(
         raise ValueError(f"{sys.name!r} has neither a state nor an output port")
 
     if n > 0:
+        # A = ∂f/∂x, B = ∂f/∂u, C = ∂h/∂x, D = ∂h/∂u at the operating point
         A = jacobian(sys, "f", "x", x_bar, u_bar, t, params, **at)
         B = _stack_columns(
             [

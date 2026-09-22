@@ -1,43 +1,7 @@
-"""
-Scoring and Monte Carlo evaluation of policies on a planning problem (the second verb).
+"""Scoring a closed loop on a planning problem: one trajectory, or Monte Carlo over the problem's draws.
 
-``solve(problem)`` finds a law; ``evaluate(problem, law)`` scores one. Both
-verbs, and the reporting of every planner, use one contract for the cost of a
-sampled trajectory, :func:`score_trajectory`:
-
-- the discounted running cost ``exp(-rho t) g(x, u, t)`` integrated by the
-  trapezoidal rule on the trajectory's own samples
-  (:meth:`~minilink.core.costs.CostFunction.evaluate_trajectory`);
-- cut at the first sample outside the constraint set ``X`` — that sample is the
-  last one counted, the trial is a *failure*, and the price of infeasibility is
-  charged (the problem's ``infeasible_cost``, else the bound the environment
-  derives, else ``+inf``);
-- plus the terminal cost ``h(x_f, tf)`` when a finite horizon is reached.
-
-:class:`MonteCarloEvaluator` draws initial states (and plant parameters and
-disturbances when the problem randomizes them), connects the policy by what
-its ports declare — a feedback block ``u = pi(x)`` through ``@``, an
-open-loop source ``u = pi(t)`` (a planned input, replayed) through ``>>`` —
-samples the loop on the control grid, and reports the distribution of that
-score as an :class:`Evaluation`: mean, spread, worst case, failure rate. A
-deterministic problem gives one trial. Three backends produce the samples:
-
-- ``"jax"``: every trial in one ``vmap`` over the compiled plant, the law held
-  over each control period (static laws that trace, and sources);
-- ``"numpy"``: the same held-input RK4 samples, one trial at a time on the
-  NumPy evaluator (identical numbers, no JAX needed);
-- ``"simulator"``: the continuous-time loop integrated by the
-  :class:`~minilink.simulation.simulator.Simulator` (any controller, dynamic
-  ones included; no parameter or disturbance draws).
-
-Every backend applies the law as the block computes it. Input-port bounds are
-information, not saturation: a law that must respect them saturates inside
-its own equations or through a :class:`~minilink.blocks.nonlinear.Saturation`
-block.
-
-Reinforcement learning trains on the left-Riemann discretization of the same
-running cost (``r_k = -g dt``); the trapezoidal score is the reporting rule
-shared with trajectory optimization and dynamic programming.
+``score_trajectory`` is the one scoring contract every tool reports with (the discounted
+trapezoid of ``g``, cut at the first exit from ``X``, plus ``h`` at a reached finite horizon).
 """
 
 import warnings

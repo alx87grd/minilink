@@ -116,9 +116,13 @@ def running_cost_samples(cost, x, u, t, params):
 
 
 def trapezoid_integral(values, dt):
-    """Trapezoid rule on a uniform grid: ``∫ v dt ≈ Σ dt/2 (v_k + v_{k+1})``."""
+    """Trapezoid rule on a uniform grid."""
     xp = array_module(values)
-    return xp.sum(0.5 * dt * (values[:-1] + values[1:]))
+
+    # ∫ v dt ≈ Σ dt/2 (v_k + v_{k+1})
+    integral = xp.sum(0.5 * dt * (values[:-1] + values[1:]))
+
+    return integral
 
 
 def trapezoidal_defect(x, dx, dt):
@@ -128,19 +132,24 @@ def trapezoidal_defect(x, dx, dt):
 
     ``x`` and ``dx`` have shape ``(n, N)``; the result has shape ``(n, N-1)``.
     """
-    return x[:, 1:] - x[:, :-1] - 0.5 * dt * (dx[:, :-1] + dx[:, 1:])
+    # d_k = x_{k+1} − x_k − dt/2 (f_k + f_{k+1})
+    defect = x[:, 1:] - x[:, :-1] - 0.5 * dt * (dx[:, :-1] + dx[:, 1:])
+
+    return defect
 
 
 def rk4_step_between_knots(f, x, u0, u1, t, dt):
     """One RK4 step from knot ``k`` to ``k+1`` with linear input interpolation."""
     umid = 0.5 * (u0 + u1)
 
+    # the four slopes, the input interpolated linearly between the knots
     k1 = f(x, u0, t)
     k2 = f(x + 0.5 * dt * k1, umid, t + 0.5 * dt)
     k3 = f(x + 0.5 * dt * k2, umid, t + 0.5 * dt)
     k4 = f(x + dt * k3, u1, t + dt)
+    x_next = x + (dt / 6.0) * (k1 + 2.0 * k2 + 2.0 * k3 + k4)
 
-    return x + (dt / 6.0) * (k1 + 2.0 * k2 + 2.0 * k3 + k4)
+    return x_next
 
 
 def fixed_grid_t(tf: float, n_steps: int) -> np.ndarray:

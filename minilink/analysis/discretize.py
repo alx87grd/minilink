@@ -25,14 +25,18 @@ class DiscretizedDynamicSystem(StepSystem):
         self.name = f"Discretized({source.name})"
         self.params = dict(params)
         self.integrator = integrator
-        self._source = source
+        self.source = source
 
     def h(self, x, u, k=0, params=None):
-        h = self._source.h
+        h = self.source.h
         p = self.params if params is None else params
         dt = p["dt"]
         t_k = k * dt
-        return h(x, u, t_k, p)
+
+        # the source's output map, sampled at t_k
+        y = h(x, u, t_k, p)
+
+        return y
 
 
 class DiscretizedEulerDynamicSystem(DiscretizedDynamicSystem):
@@ -42,11 +46,15 @@ class DiscretizedEulerDynamicSystem(DiscretizedDynamicSystem):
         super().__init__(source, params, integrator="euler")
 
     def step(self, x, u, k=0, params=None):
-        f = self._source.f
+        f = self.source.f
         p = self.params if params is None else params
         dt = p["dt"]
         t_k = k * dt
-        return x + dt * f(x, u, t_k, p)
+
+        # one forward-Euler step, the input held over [t_k, t_k + dt]
+        x_next = x + dt * f(x, u, t_k, p)
+
+        return x_next
 
 
 class DiscretizedRK4DynamicSystem(DiscretizedDynamicSystem):
@@ -56,15 +64,19 @@ class DiscretizedRK4DynamicSystem(DiscretizedDynamicSystem):
         super().__init__(source, params, integrator="rk4")
 
     def step(self, x, u, k=0, params=None):
-        f = self._source.f
+        f = self.source.f
         p = self.params if params is None else params
         dt = p["dt"]
         t_k = k * dt
+
+        # the four RK4 slopes over [t_k, t_k + dt], the input held
         k1 = f(x, u, t_k, p)
         k2 = f(x + 0.5 * dt * k1, u, t_k + 0.5 * dt, p)
         k3 = f(x + 0.5 * dt * k2, u, t_k + 0.5 * dt, p)
         k4 = f(x + dt * k3, u, t_k + dt, p)
-        return x + (dt / 6.0) * (k1 + 2.0 * k2 + 2.0 * k3 + k4)
+        x_next = x + (dt / 6.0) * (k1 + 2.0 * k2 + 2.0 * k3 + k4)
+
+        return x_next
 
 
 # Public API

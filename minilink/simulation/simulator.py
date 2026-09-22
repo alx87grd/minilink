@@ -1,20 +1,7 @@
-"""
-Time-domain ODE simulation of :class:`~minilink.core.system.DynamicSystem` models
-(including :class:`~minilink.core.diagram.DiagramSystem`).
+"""The continuous-time simulator: integrate ``dx = f(x, u, t)`` of a ``DynamicSystem`` or a diagram on a time grid.
 
-Integrates ``dx/dt = f(x, u, t)`` along a time grid using pluggable solver backends
-(SciPy, Euler, fixed-step RK4). Static ``System`` leaves use
-:class:`~minilink.simulation.static_simulator.StaticSimulator` instead.
-
-Discontinuous closed-loop diagrams (e.g. sliding-mode ``sign(s)``): grid-point
-``Trajectory`` / ``reconstruct_internal_signals`` torques need not match RK4
-sub-step behavior — see `DESIGN.md` §5 (*Discontinuous closed loops — known issues*).
-
-Public module symbols :data:`COMPILE_BACKEND_AUTO` and :data:`RK4_AUTO_MIN_TIME_POINTS`
-control automatic compile backend selection and optional fixed-step RK4 on long
-*explicit* uniform grids when using the JAX compiler. With neither ``n_steps``
-nor ``dt``, adaptive solvers report on :data:`~minilink.simulation.time_grid.DEFAULT_N_STEPS`
-points and fixed-step solvers take ``dt`` from the plant time constant.
+``compute_trajectory`` is the facade; use the class directly for repeated runs with the
+same solver, grid and backend.
 """
 
 import time
@@ -205,6 +192,9 @@ class Simulator:
         # Solver and time grid. With an automatic grid the solver is chosen
         # first and the grid is sized to it; with an explicit grid the solver
         # may still be chosen from the grid (JAX auto-RK4 on long uniform grids).
+        self.t = None
+        self.n_pts = None
+        self.solver_mode = None
         if self.auto_time_grid:
             self.solver_mode = self.select_solver(sys, solver)
             self.t, dt, n_steps = self.select_time_vector(

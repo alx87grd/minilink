@@ -91,7 +91,7 @@ class HybridSimulator:
             label="x0_computer",
         )
 
-        self._c2p, self._p2c = _index_boundary_connections(hybrid)
+        self.c2p, self.p2c = _index_boundary_connections(hybrid)
         self.last_result = None
 
         if self.verbose:
@@ -109,7 +109,7 @@ class HybridSimulator:
             u_forced = np.zeros((0, self.n_ticks))
         else:
             u_forced = np.repeat(u_nominal.reshape(-1, 1), self.n_ticks, axis=1)
-        return self._run(u_forced)
+        return self.run(u_forced)
 
     def solve_forced(self, u, *, input_port_id=None):
         """
@@ -125,9 +125,9 @@ class HybridSimulator:
             self.times,
             input_port_id=input_port_id,
         )
-        return self._run(u_traj)
+        return self.run(u_traj)
 
-    def _run(self, u_traj: np.ndarray) -> HybridSimResult:
+    def run(self, u_traj: np.ndarray) -> HybridSimResult:
         computer = self.computer
         diagram = computer.diagram
         computer.reset(self.x0_computer)
@@ -140,7 +140,7 @@ class HybridSimulator:
             x_plant,
             u_plant_nominal,
             self.t0,
-            self._p2c,
+            self.p2c,
         )
 
         n_computer = diagram.n
@@ -150,13 +150,13 @@ class HybridSimulator:
         k_hist = np.zeros(n_ticks, dtype=float)
         x_computer_hist = np.zeros((n_computer, n_ticks))
         computer_signal_hist = _allocate_signal_hist(
-            diagram, self._p2c, n_ticks, plant_signals=False
+            diagram, self.p2c, n_ticks, plant_signals=False
         )
         plant_port_aliases = {
-            plant_port: computer_port for plant_port, computer_port in self._p2c
+            plant_port: computer_port for plant_port, computer_port in self.p2c
         }
 
-        plant_signal_names = _collect_plant_signal_names(diagram, self._p2c)
+        plant_signal_names = _collect_plant_signal_names(diagram, self.p2c)
         t_plant_parts: list[np.ndarray] = []
         x_plant_parts: list[np.ndarray] = []
         u_plant_parts: list[np.ndarray] = []
@@ -169,11 +169,11 @@ class HybridSimulator:
                 diagram,
                 u_traj[:, tick_idx],
                 sample_buffers,
-                self._p2c,
+                self.p2c,
             )
             outs = computer.tick(u_computer)
 
-            for computer_port, plant_port in self._c2p:
+            for computer_port, plant_port in self.c2p:
                 zoh_buffers[plant_port] = np.asarray(
                     outs[computer_port], dtype=float
                 ).copy()
@@ -182,7 +182,7 @@ class HybridSimulator:
                 self.plant,
                 u_plant_nominal,
                 zoh_buffers,
-                self._c2p,
+                self.c2p,
             )
             t_seg, x_seg = self.plant_eval.integrate_zoh_rollout(
                 x_plant,
@@ -197,7 +197,7 @@ class HybridSimulator:
                 x_plant,
                 u_plant,
                 t_k + self.dt_base,
-                self._p2c,
+                self.p2c,
             )
 
             if tick_idx == 0:
@@ -316,7 +316,7 @@ class HybridSimResult:
         **kwargs,
     ):
         """Plot plant channels (continuous-time view)."""
-        return self._plot_view(
+        return self.plot_view(
             self.plant,
             sys=self.hybrid.plant if self.hybrid is not None else None,
             signals=signals,
@@ -339,7 +339,7 @@ class HybridSimResult:
 
         if signals is None:
             signals = tuple(self.computer.signals.keys())
-        return self._plot_view(
+        return self.plot_view(
             self.computer.as_trajectory(),
             sys=self.hybrid.computer.diagram if self.hybrid is not None else None,
             signals=signals,
@@ -349,7 +349,7 @@ class HybridSimResult:
             **kwargs,
         )
 
-    def _plot_view(
+    def plot_view(
         self,
         traj,
         *,
@@ -383,9 +383,9 @@ class HybridSimResult:
             if traj.u.shape[0]:
                 signals = tuple(dict.fromkeys((*signals, "u")))
 
-        plot_signals = self._normalize_plot_signal_names(
+        plot_signals = self.plot_signal_names(
             signals,
-            control_key=self._plant_control_signal_key(),
+            control_key=self.plant_control_signal_key(),
         )
         label = abscissa_label or TIME_ABSCISSA_LABEL
         return plot_time_signals(
@@ -399,7 +399,7 @@ class HybridSimResult:
         )
 
     @staticmethod
-    def _normalize_plot_signal_names(
+    def plot_signal_names(
         signals: tuple[str, ...],
         *,
         control_key: str | None,
@@ -412,7 +412,7 @@ class HybridSimResult:
             return signals
         return tuple(plot_key if name == control_key else name for name in signals)
 
-    def _plant_control_signal_key(self) -> str | None:
+    def plant_control_signal_key(self) -> str | None:
         if self.hybrid is None:
             return None
         for conn in self.hybrid.connections:

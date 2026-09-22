@@ -193,14 +193,22 @@ def quadratic_cost_to_go(x_bar, P, t_samples=None):
 
         def J(x, t=0.0):
             dx = np.asarray(x, dtype=float) - x_bar
-            return float(dx @ P @ dx)
+
+            # J = dxᵀ P dx
+            value = float(dx @ P @ dx)
+
+            return value
 
     else:
 
         def J(x, t=0.0):
             dx = np.asarray(x, dtype=float) - x_bar
             S = interpolate_schedule(np, t_samples, P, float(t))
-            return float(dx @ S @ dx)
+
+            # J(x, t) = dxᵀ S(t) dx
+            value = float(dx @ S @ dx)
+
+            return value
 
     return J
 

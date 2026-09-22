@@ -38,9 +38,14 @@ class Scene:
 
     def clearance(self, p, t=0.0, params=None):
         """Signed distance from ``p`` to the nearest obstacle."""
-        if not self.obstacles:
+        obstacles = self.obstacles
+        if not obstacles:
             raise ValueError("Scene has no obstacles; clearance is undefined")
-        return Union(self.obstacles).sdf(p, t=t, params=params)
+
+        # the signed distance to the union of the obstacles
+        clearance = Union(obstacles).sdf(p, t=t, params=params)
+
+        return clearance
 
     def cost_density(self, p, t=0.0, params=None):
         """Sum of workspace penalty densities at ``p``."""

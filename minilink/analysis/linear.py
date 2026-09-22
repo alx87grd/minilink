@@ -1,11 +1,7 @@
-"""Linear-algebra core of the frequency and time-response tools.
+"""Linear analysis on the matrices ``(A, B, C, D)``: poles, zeros, gain, frequency response, margins, root locus, step response.
 
-Every tool in :mod:`minilink.analysis.frequency` and
-:mod:`minilink.analysis.time_response` reduces a system to one state-space
-channel ``(A, b, c, d)`` — the linearization at the operating point, or the
-model itself for an ``LTISystem`` — and calls the functions below. Nothing
-here knows about ports, operating points or plotting backends: the inputs are
-matrices, the outputs are arrays.
+Matrices in, arrays out; the system tier (``frequency.py``, ``time_response.py``) reduces a
+``System`` to this channel first.
 """
 
 from __future__ import annotations
@@ -26,8 +22,9 @@ def poles(A):
     if A.size == 0:
         return np.array([], dtype=complex)
 
-    # λ = eig(A)
-    return np.linalg.eigvals(A)
+    poles = np.linalg.eigvals(A)
+
+    return poles
 
 
 def zeros(A, B, C, D):
@@ -151,7 +148,9 @@ def closed_loop_poles(A, B, C, D, K):
     loop = 1.0 + K * D[0, 0]
     if loop == 0.0:  # K = -1/d: the algebraic loop is singular, no finite poles
         return np.full(A.shape[0], np.inf, dtype=complex)
-    return np.linalg.eigvals(A - (K / loop) * (B @ C))
+    poles = np.linalg.eigvals(A - (K / loop) * (B @ C))
+
+    return poles
 
 
 def root_locus(A, B, C, D, gains=None, *, n=400):
@@ -217,8 +216,10 @@ def settling_horizon(A):
     if decay.size == 0:
         return 10.0
 
-    # 8 / min σ   (σ = −Re λ of the stable poles)
-    return float(8.0 / decay.min())
+    # eight times the slowest time constant 1/σ, σ = −Re λ of the stable poles
+    horizon = float(8.0 / decay.min())
+
+    return horizon
 
 
 # =============================================================================

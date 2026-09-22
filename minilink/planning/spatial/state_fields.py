@@ -101,7 +101,10 @@ class PathDistanceField(StateField):
         for world, radius in iter_probes(self.body, x, u, t, params):
             d.append(track.distance(world, t=t, params=params) - radius)
 
-        return xp.min(xp.stack(d))
+        # the closest probe decides
+        distance = xp.min(xp.stack(d))
+
+        return distance
 
 
 @dataclass(frozen=True)
@@ -120,7 +123,10 @@ class CorridorMarginField(StateField):
                 track.half_width - track.distance(world, t=t, params=params) - radius
             )
 
-        return xp.min(xp.stack(m))
+        # the probe nearest the corridor wall decides
+        margin = xp.min(xp.stack(m))
+
+        return margin
 
 
 @dataclass(frozen=True)

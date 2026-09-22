@@ -50,7 +50,9 @@ class ReferenceTrack:
     def corridor_margin(self, p, t=0.0, params=None):
         """Positive when ``p`` lies inside the corridor: ``half_width - distance``."""
         xp = array_module(p)
-        margin = xp.asarray(self.half_width) - self.path.distance(p, t=t, params=params)
+        half_width, path = self.half_width, self.path
+
+        margin = xp.asarray(half_width) - path.distance(p, t=t, params=params)
 
         return margin
 
