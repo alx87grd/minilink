@@ -5,17 +5,6 @@ import numpy as np
 from minilink.core.feedback import Controller, DynamicController
 
 
-def _as_dof_vector(value, dof: int):
-    arr = np.asarray(value, dtype=float).reshape(-1)
-    if arr.size == 1:
-        return np.full(dof, float(arr[0]))
-    if arr.size != dof:
-        raise ValueError(
-            f"expected scalar or length-{dof} vector, got shape {arr.shape}"
-        )
-    return arr
-
-
 class ImpedanceController(Controller):
     """Virtual spring-damper on ``[position; rate]``.
 
@@ -68,8 +57,8 @@ class ImpedanceController(Controller):
             u_units = [""] * n
 
         self.params = {
-            "Kp": _as_dof_vector(Kp, n),
-            "Kd": _as_dof_vector(Kd, n),
+            "Kp": as_dof_vector(Kp, n),
+            "Kd": as_dof_vector(Kd, n),
         }
 
         self.name = "Impedance Controller"
@@ -159,9 +148,9 @@ class ImpedanceIntegralController(DynamicController):
         self.dof = n
         self.name = "Impedance Integral Controller"
         self.params = {
-            "Kp": _as_dof_vector(Kp, n),
-            "Ki": _as_dof_vector(Ki, n),
-            "Kd": _as_dof_vector(Kd, n),
+            "Kp": as_dof_vector(Kp, n),
+            "Ki": as_dof_vector(Ki, n),
+            "Kd": as_dof_vector(Kd, n),
         }
         self.state.labels = [f"e_int{i}" for i in range(n)]
 
@@ -191,7 +180,8 @@ class ImpedanceIntegralController(DynamicController):
             units=list(u_units),
         )
 
-    def _split_measurement(self, u):
+    def split_measurement(self, u):
+        """``(ref_dim, r, pos, rate)`` from the flat input ``[r; pos; rate]``."""
         n = self.dof
         ref_dim = self.inputs["r"].dim
         r = u[:ref_dim]
@@ -199,20 +189,29 @@ class ImpedanceIntegralController(DynamicController):
         rate = u[ref_dim + n : ref_dim + 2 * n]
         return ref_dim, r, pos, rate
 
-    def _position_error(self, ref_dim, r, pos):
+    def position_error(self, ref_dim, r, pos):
+        """The position error ``e = pos_d - pos`` for either reference layout."""
         n = self.dof
         if ref_dim == n:
-            return r - pos
-        if ref_dim == 2 * n:
-            return r[:n] - pos
-        raise ValueError(
-            f"ImpedanceIntegralController r dim must be {n} or {2 * n}, got {ref_dim}"
-        )
+            pos_d = r
+        elif ref_dim == 2 * n:
+            pos_d = r[:n]
+        else:
+            raise ValueError(
+                f"ImpedanceIntegralController r dim must be {n} or {2 * n}, got {ref_dim}"
+            )
+
+        e_pos = pos_d - pos
+
+        return e_pos
 
     def f(self, x, u, t=0, params=None):
-        ref_dim, r, pos, _rate = self._split_measurement(u)
-        e_pos = self._position_error(ref_dim, r, pos)
-        return e_pos
+        ref_dim, r, pos, _rate = self.split_measurement(u)
+
+        # the integral state accumulates the position error
+        de_int = self.position_error(ref_dim, r, pos)
+
+        return de_int
 
     def ctl(self, x, u, t=0, params=None):
         params = self.params if params is None else params
@@ -223,8 +222,8 @@ class ImpedanceIntegralController(DynamicController):
         Kd = params["Kd"]
 
         e_int = x
-        ref_dim, r, pos, rate = self._split_measurement(u)
-        e_pos = self._position_error(ref_dim, r, pos)
+        ref_dim, r, pos, rate = self.split_measurement(u)
+        e_pos = self.position_error(ref_dim, r, pos)
 
         if ref_dim == n:
             u_cmd = Kp * e_pos + Ki * e_int - Kd * rate
@@ -233,3 +232,18 @@ class ImpedanceIntegralController(DynamicController):
             u_cmd = Kp * e_pos + Ki * e_int + Kd * (vel_d - rate)
 
         return u_cmd
+
+
+# Internal machinery
+
+
+def as_dof_vector(value, dof: int):
+    """A scalar broadcast to ``dof`` axes, or a length-``dof`` vector as given."""
+    arr = np.asarray(value, dtype=float).reshape(-1)
+    if arr.size == 1:
+        return np.full(dof, float(arr[0]))
+    if arr.size != dof:
+        raise ValueError(
+            f"expected scalar or length-{dof} vector, got shape {arr.shape}"
+        )
+    return arr

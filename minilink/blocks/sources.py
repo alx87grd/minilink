@@ -1,15 +1,4 @@
-"""
-Source blocks: systems that emit time signals.
-
-A source is a :class:`~minilink.core.system.System` with no states and no
-input ports; its single output port ``y`` is a function of time only,
-``y = h(t; p)``.
-
-The cached interpolators of :class:`WhiteNoise` and :class:`TrajectorySource`
-are the sanctioned source-block exception to statelessness: they are
-deterministic precomputations rebuilt by ``refresh()``, not evolving
-simulation state.
-"""
+"""Source blocks: constant, step, band-limited noise and a replayed trajectory as a signal."""
 
 import numpy as np
 from scipy.interpolate import interp1d
@@ -148,13 +137,14 @@ class Step(Source):
 
     def h(self, x, u, t=0, params=None):
         params = self.params if params is None else params
-
+        step_time = params["step_time"]
+        initial_value, final_value = params["initial_value"], params["final_value"]
         xp = array_module(t)
-        return xp.where(
-            t < params["step_time"],
-            params["initial_value"],
-            params["final_value"],
-        )
+
+        # y = initial value before the step time, final value after
+        y = xp.where(t < step_time, initial_value, final_value)
+
+        return y
 
 
 class WhiteNoise(Source):
@@ -181,7 +171,8 @@ class WhiteNoise(Source):
             "tf": 100.0,
         }
 
-        # Keep source ready to use without an explicit refresh() call.
+        # The interpolators of the drawn samples; refresh() rebuilds them from params
+        self._interpolators = []
         self.refresh()
 
     def refresh(self):
@@ -228,8 +219,11 @@ class WhiteNoise(Source):
                 "The block needs to be refreshed to reflect changes in parameters"
             )
 
-        y = np.zeros(self.p)
-        for i, interpolator in enumerate(self._interpolators):
+        p, interpolators = self.p, self._interpolators
+
+        # one interpolated sample per channel at time t
+        y = np.zeros(p)
+        for i, interpolator in enumerate(interpolators):
             y[i] = float(interpolator(float(t)))
 
         return y
@@ -267,6 +261,7 @@ class TrajectorySource(Source):
         self.sample_times = t
         self.sample_values = values
         self.interpolation = interpolation
+        self._interpolators = []
         self.refresh()
 
     @classmethod
@@ -288,8 +283,11 @@ class TrajectorySource(Source):
         ]
 
     def h(self, x, u, t=0, params=None):
-        y = np.zeros(self.p)
-        for i, interpolator in enumerate(self._interpolators):
+        p, interpolators = self.p, self._interpolators
+
+        # one interpolated sample per channel at time t
+        y = np.zeros(p)
+        for i, interpolator in enumerate(interpolators):
             y[i] = float(interpolator(float(t)))
 
         return y

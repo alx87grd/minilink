@@ -119,21 +119,22 @@ class MLP(System):
 
     def compute(self, x, u, t=0, params=None):
         params = self.params if params is None else params
+        activation, n_layers = self.activation, self.n_layers
         xp = array_module(u)
 
         def relu(v):
             return xp.maximum(v, 0.0)
 
-        act = xp.tanh if self.activation == "tanh" else relu
+        act = xp.tanh if activation == "tanh" else relu
 
         # Hidden layers: a_k = act(W_k a_k-1 + b_k), from a_0 = u
         a = u
-        for k in range(self.n_layers - 1):
+        for k in range(n_layers - 1):
             W, b = params[f"W{k}"], params[f"b{k}"]
             a = act(W @ a + b)
 
-        # Output layer, affine: y = W_L a_L-1 + b_L
-        L = self.n_layers - 1
+        # Output layer, affine (no activation)
+        L = n_layers - 1
         W, b = params[f"W{L}"], params[f"b{L}"]
         y = W @ a + b
 

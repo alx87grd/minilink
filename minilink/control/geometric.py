@@ -1,12 +1,4 @@
-"""Pure pursuit: the geometric path tracker.
-
-RULES 3.2 keeps ``minilink.control`` from importing ``minilink.planning``, so the tracker
-takes the path as a plain ``(N, 2)`` array of waypoints, not a path object. The same array
-also builds a ``ReferenceTrack`` on the planning side when a demo wants one.
-
-Reference: R. C. Coulter, "Implementation of the Pure Pursuit Path Tracking Algorithm",
-CMU-RI-TR-92-01 (1992).
-"""
+"""Pure pursuit: steer along the arc through a look-ahead point of a waypoint path."""
 
 import numpy as np
 
@@ -148,7 +140,10 @@ class PurePursuit(Controller):
         curvature = 2.0 * y_t / xp.maximum(x_t**2 + y_t**2, MIN_REACH**2)
         delta = xp.arctan(wheelbase * curvature)
 
-        return xp.clip(xp.array([delta]), -delta_max, delta_max)
+        # the steer command, held within the servo end stops
+        delta_cmd = xp.clip(xp.array([delta]), -delta_max, delta_max)
+
+        return delta_cmd
 
 
 def is_closed(waypoints):

@@ -1,19 +1,4 @@
-"""Static nonlinearity blocks.
-
-Memoryless input-output maps used for actuator and sensor realism. Each is a
-:class:`~minilink.core.system.System` with the standard ``u``/``y`` ports
-and JAX-traceable equations (``xp.clip`` / ``xp.where``), applied elementwise
-across a signal of dimension ``dim``.
-
-- :class:`Saturation` — clip to ``[lower, upper]``.
-- :class:`DeadZone` — zero inside ``[-width, width]``, shifted outside.
-- :class:`Relay` — bang-bang ``±amplitude`` on the sign of the input.
-- :class:`RateLimiter` — a stateful one: how fast a command may change, and
-  where it may end up (a first-order lag, a slew rate and two end stops).
-
-Hysteresis is planned as a small ``DynamicSystem`` block and lives here too
-once added.
-"""
+"""Static nonlinearities: saturation, dead zone, relay, and the stateful rate limiter."""
 
 import numpy as np
 
@@ -156,9 +141,11 @@ class RateLimiter(DynamicSystem):
     def f(self, x, u, t=0.0, params=None):
         params = self.params if params is None else params
         rate_max, tau = params["rate_max"], params["tau"]
+        lower, upper = params["lower"], params["upper"]
         xp = array_module(x, u)
 
-        x_ref = xp.clip(u, params["lower"], params["upper"])
+        # a first-order lag toward the clipped command, its slope limited to rate_max
+        x_ref = xp.clip(u, lower, upper)
         dx = rate_max * xp.tanh((x_ref - x) / (tau * rate_max))
 
         return dx

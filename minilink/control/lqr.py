@@ -1,24 +1,8 @@
-"""Linear–quadratic regulator design.
+"""Linear-quadratic regulator design: arrays in, a state-feedback block out.
 
-Array-in / block-out design factory (the dependency-law pattern for libraries):
-``lqr_gain`` solves the continuous-time algebraic Riccati equation for the
-optimal gain, and ``lqr`` wraps it as a ready-to-wire
-:class:`~minilink.control.state.StateFeedbackController`.
-
-``lqr_at_operating_point`` linearizes a plant about ``(x_bar, u_bar)`` (via
-:func:`~minilink.analysis.linearize.linearize_matrices`, lazy-imported) and
-returns the trimmed controller in one step.
-
-``lqr_gain_schedule`` solves the Riccati differential equation backward over
-a finite horizon — exactly, through the Hamiltonian system of the co-state —
-and ``lqr_finite_horizon`` wraps the resulting gain schedule ``K(t)`` as a
-:class:`~minilink.control.state.TimeVaryingStateFeedbackController`.
-``trajectory_lqr`` does the same along a reference trajectory of a nonlinear
-plant, linearized at every sample, and returns a
-:class:`~minilink.control.state.TrajectoryFeedbackController`.
-
-For matrix-only design, pass Jacobians from any source into ``lqr_gain`` /
-``lqr`` directly.
+The infinite horizon solves the algebraic Riccati equation; the finite horizon and
+the design along a trajectory sweep the Riccati differential equation backward,
+exactly, through the Hamiltonian system of the co-state.
 """
 
 import numpy as np
@@ -32,18 +16,16 @@ from minilink.control.state import (
 
 
 def lqr_gain(A, B, Q, R):
-    """Return the optimal feedback gain ``K`` minimizing ``∫ xᵀQx + uᵀRu dt``.
-
-    Solves the continuous-time ARE ``AᵀP + PA - PBR⁻¹BᵀP + Q = 0`` and returns
-    ``K = R⁻¹BᵀP`` for the law ``u = -K x``.
-    """
+    """Return the optimal feedback gain ``K`` of the law ``u = -K x`` minimizing ``∫ xᵀQx + uᵀRu dt``."""
     A = np.asarray(A, dtype=float)
     B = np.atleast_2d(np.asarray(B, dtype=float))
     Q = np.asarray(Q, dtype=float)
     R = np.atleast_2d(np.asarray(R, dtype=float))
 
+    # AᵀP + PA − P B R⁻¹ Bᵀ P + Q = 0
     P = solve_continuous_are(A, B, Q, R)
 
+    # K = R⁻¹ Bᵀ P
     K = np.linalg.solve(R, B.T @ P)
 
     return K
@@ -235,22 +217,29 @@ def trajectory_lqr(
     return TrajectoryFeedbackController(trajectory, K)
 
 
-# Riccati differential equation, one exact step at a time
+# Internal machinery: the Riccati differential equation, one exact step at a time
 
 
 def hamiltonian_matrix(A, B, Q, R_inv):
-    """``H = [[A, -B R⁻¹ Bᵀ], [-Q, -Aᵀ]]``: with the co-state ``λ = S x``, ``z = [x; λ]`` follows ``ż = H z``."""
+    """The Hamiltonian matrix: with the co-state ``λ = S x``, ``z = [x; λ]`` follows ``ż = H z``."""
     # fmt: off
-    return np.block([
+    H = np.block([
         [A, -B @ R_inv @ B.T],
         [-Q, -A.T],
     ])
     # fmt: on
 
+    return H
+
 
 def riccati_transition(A, B, Q, R_inv, dt):
-    """Transition ``E = expm(-H dt)`` of the Hamiltonian system, one step backward in time."""
-    return expm(-hamiltonian_matrix(A, B, Q, R_inv) * dt)
+    """Transition of the Hamiltonian system over one step backward in time."""
+    H = hamiltonian_matrix(A, B, Q, R_inv)
+
+    # E = expm(−H dt)
+    E = expm(-H * dt)
+
+    return E
 
 
 def riccati_step(A, B, Q, R_inv, S, dt):
@@ -276,10 +265,14 @@ def riccati_map(E, S):
     """
     n = S.shape[0]
     E11, E12, E21, E22 = E[:n, :n], E[:n, n:], E[n:, :n], E[n:, n:]
+
+    # [X; Y] = E [I; S(t)], then S(t − dt) = Y X⁻¹, symmetrized against roundoff
     X = E11 + E12 @ S
     Y = E21 + E22 @ S
     S_prev = np.linalg.solve(X.T, Y.T).T
-    return (S_prev + S_prev.T) / 2.0
+    S_prev = (S_prev + S_prev.T) / 2.0
+
+    return S_prev
 
 
 if __name__ == "__main__":
