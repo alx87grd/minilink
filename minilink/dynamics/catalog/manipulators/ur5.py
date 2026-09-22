@@ -1,20 +1,7 @@
-"""UR5 six-axis manipulator with numeric rigid-body dynamics.
+"""UR5 six-axis manipulator: spatial ABA forward dynamics and RNEA inverse dynamics.
 
-The kinematic dimensions, masses, and centers of mass follow the public
-``ros-industrial/universal_robot`` UR5 description. Link inertias are cylinder
-approximations, so this model is intended for controls teaching and simulation,
-not calibrated prediction of a particular robot.
-
-Dynamics, kinematics, Jacobian, and ``tf`` are native-array paths: the same
-methods run under NumPy and trace under JAX via ``array_module``.
-
-Equation of motion::
-
-    H(q) qdd + C(q, qd) qd + d(q, qd) + g(q) = tau
-
-Forward dynamics (``forward_dynamics`` / ``f``) uses the spatial **ABA**;
-``inverse_dynamics`` uses spatial **RNEA**. ``H``, ``C``, and ``g`` remain
-available via RNEA for analysis and matrix-form checks.
+Dimensions, masses and centres of mass follow the public ``ros-industrial/universal_robot``
+description; link inertias are cylinder approximations, so this is a teaching model.
 """
 
 import numpy as np
@@ -158,7 +145,7 @@ class UR5Manipulator(Manipulator):
         self.camera_scale = 1.3
         self.camera_target = np.array([-0.3, 0.0, 0.25])
 
-    def _chain(self, q, params=None):
+    def kinematic_chain(self, q, params=None):
         params = self.params if params is None else params
         xp = array_module(q)
         q = xp.asarray(q)
@@ -182,7 +169,7 @@ class UR5Manipulator(Manipulator):
             xp.stack(link_frames),
         )
 
-    def _rnea(self, q, dq, acceleration, params=None, *, gravity=True):
+    def rnea(self, q, dq, acceleration, params=None, *, gravity=True):
         """Recursive Newton-Euler inverse dynamics in link coordinates."""
         params = self.params if params is None else params
         xp = array_module(q, dq, acceleration)
@@ -243,7 +230,7 @@ class UR5Manipulator(Manipulator):
                 force[i - 1] = force[i - 1] + Xup[i].T @ force[i]
         return xp.stack(tau[::-1])
 
-    def _aba(self, q, dq, tau, params=None, *, gravity=True):
+    def aba(self, q, dq, tau, params=None, *, gravity=True):
         """Articulated-body forward dynamics — O(n) generalized accelerations."""
         params = self.params if params is None else params
         xp = array_module(q, dq, tau)
@@ -332,7 +319,11 @@ class UR5Manipulator(Manipulator):
         u = xp.asarray(u)
         tau = self.generalized_force(q, v, u, t, params)
         d = self.d(q, v, u, t, params)
-        return self._aba(q, v, tau - d, params, gravity=True)
+
+        # the articulated-body algorithm solves H q̈ = τ − d − C q̇ − g in O(n)
+        qdd = self.aba(q, v, tau - d, params, gravity=True)
+
+        return qdd
 
     def forward_dynamics_rnea_h(self, q, v, u, t=0.0, params=None):
         """Forward dynamics via RNEA bias + explicit ``H`` (teaching / verification)."""
@@ -342,10 +333,14 @@ class UR5Manipulator(Manipulator):
         v = xp.asarray(v)
         u = xp.asarray(u)
         H = self.H(q, params)
-        bias = self._rnea(q, v, xp.zeros(self.dof), params, gravity=True)
+        bias = self.rnea(q, v, xp.zeros(self.dof), params, gravity=True)
         d = self.d(q, v, u, t, params)
         tau = self.generalized_force(q, v, u, t, params)
-        return xp.linalg.solve(H, tau - bias - d)
+
+        # H q̈ = τ − (C q̇ + g) − d, the bias from RNEA at zero acceleration
+        qdd = xp.linalg.solve(H, tau - bias - d)
+
+        return qdd
 
     def forward_dynamics_aba(self, q, v, u, t=0.0, params=None):
         """Alias of :meth:`forward_dynamics` (explicit ABA name for comparisons)."""
@@ -354,9 +349,12 @@ class UR5Manipulator(Manipulator):
     def inverse_dynamics(self, q, v, acceleration, u=None, t=0.0, params=None):
         """Inverse dynamics via spatial RNEA (default path)."""
         params = self.params if params is None else params
-        return self._rnea(q, v, acceleration, params, gravity=True) + self.d(
-            q, v, u, t, params
-        )
+        d = self.d(q, v, u, t, params)
+
+        # τ = RNEA(q, q̇, q̈) + d(q, q̇)
+        tau = self.rnea(q, v, acceleration, params, gravity=True) + d
+
+        return tau
 
     def inverse_dynamics_matrix(self, q, v, acceleration, u=None, t=0.0, params=None):
         """Inverse dynamics via explicit ``H``, ``C``, ``g`` (teaching / verification)."""
@@ -369,7 +367,10 @@ class UR5Manipulator(Manipulator):
         C = self.C(q, v, params)
         g = self.g(q, params)
         d = self.d(q, v, u, t, params)
-        return H @ acceleration + C @ v + g + d
+
+        tau = H @ acceleration + C @ v + g + d
+
+        return tau
 
     def inverse_dynamics_rnea(self, q, v, acceleration, u=None, t=0.0, params=None):
         """Alias of :meth:`inverse_dynamics` (explicit RNEA name for comparisons)."""
@@ -382,7 +383,7 @@ class UR5Manipulator(Manipulator):
         q = xp.asarray(q)
         zero = xp.zeros(self.dof)
         columns = [
-            self._rnea(q, zero, direction, params, gravity=False)
+            self.rnea(q, zero, direction, params, gravity=False)
             for direction in xp.eye(self.dof)
         ]
         H = xp.stack(columns, axis=1)
@@ -399,7 +400,7 @@ class UR5Manipulator(Manipulator):
         speed_squared = dq @ dq
         # Near rest the rank-1 map is ill-conditioned; treat bias as zero.
         denom = xp.maximum(speed_squared, 1e-12)
-        bias = self._rnea(q, dq, xp.zeros(self.dof), params, gravity=False)
+        bias = self.rnea(q, dq, xp.zeros(self.dof), params, gravity=False)
         C = xp.outer(bias, dq) / denom
         C = xp.where(speed_squared < 1e-12, xp.zeros((self.dof, self.dof)), C)
 
@@ -411,7 +412,11 @@ class UR5Manipulator(Manipulator):
         xp = array_module(q)
         q = xp.asarray(q)
         zero = xp.zeros(self.dof)
-        return self._rnea(q, zero, zero, params, gravity=True)
+
+        # g(q) is the inverse dynamics at rest
+        g = self.rnea(q, zero, zero, params, gravity=True)
+
+        return g
 
     def d(self, q, dq, u=None, t=0.0, params=None):
         """Linear viscous joint damping."""
@@ -426,23 +431,27 @@ class UR5Manipulator(Manipulator):
     def forward_kinematics(self, q, params=None):
         """Tool-center position in the world frame."""
         params = self.params if params is None else params
-        _, _, _, links = self._chain(q, params)
+        _, _, _, links = self.kinematic_chain(q, params)
         return links[-1, :3, 3]
 
     def J(self, q, params=None):
         """Translational tool Jacobian."""
         params = self.params if params is None else params
         xp = array_module(q)
-        _, origins, axes, links = self._chain(q, params)
+        _, origins, axes, links = self.kinematic_chain(q, params)
         p = links[-1, :3, 3]
+
+        # column i: the tool velocity per unit rate of revolute joint i, ω_i × (p − o_i)
         columns = [xp.cross(axes[i], p - origins[i]) for i in range(self.dof)]
-        return xp.stack(columns, axis=1)
+        J = xp.stack(columns, axis=1)
+
+        return J
 
     def tf(self, x, u, t=0, params=None):
         params = self.params if params is None else params
         xp = array_module(x)
         q, _ = self.x2q(x)
-        joint_frames, origins, _, links = self._chain(q, params)
+        joint_frames, origins, _, links = self.kinematic_chain(q, params)
         tip = links[-1, :3, 3]
         points = xp.concatenate([origins, tip.reshape(1, 3)], axis=0)
 

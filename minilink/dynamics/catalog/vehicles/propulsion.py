@@ -1,3 +1,5 @@
+"""Longitudinal front-wheel-drive car with wheel slip or wheel torque as the input."""
+
 import numpy as np
 
 from minilink.core.backends import array_module
@@ -44,9 +46,12 @@ class LongitudinalFrontWheelDriveCarWithWheelSlipInput(DynamicSystem):
         mu_max = params["mu_max"]
         mu_slope = params["mu_slope"]
 
-        # sigmoid traction curve: friction ratio mu = |Fx / Fz| vs slip
         xp = array_module(slip)
-        return mu_max * (2.0 / (1.0 + xp.exp(-mu_slope * slip)) - 1.0)
+
+        # sigmoid traction curve: friction ratio mu = |Fx / Fz| vs slip
+        mu = mu_max * (2.0 / (1.0 + xp.exp(-mu_slope * slip)) - 1.0)
+
+        return mu
 
     def acceleration(self, speed, slip, params=None):
         params = self.params if params is None else params
@@ -72,7 +77,6 @@ class LongitudinalFrontWheelDriveCarWithWheelSlipInput(DynamicSystem):
         speed = x[1]
         acceleration = self.acceleration(speed, u[0], params)
 
-        # state derivative: position rate is speed, speed rate is acceleration
         dx = array_module(x, u).array([speed, acceleration])
 
         return dx
@@ -158,14 +162,17 @@ class LongitudinalFrontWheelDriveCarWithTorqueInput(
         # Camera follows the car body (the slip-input base keeps the fixed camera).
         self.camera_follow_frame = "body"
 
-    def _slip(self, speed, wheel_speed, params=None):
+    def slip_ratio(self, speed, wheel_speed, params=None):
         params = self.params if params is None else params
         wheel_radius = params["wheel_radius"]
 
-        # tire slip ratio, clipped: contact-point speed vs ground speed
         xp = array_module(speed, wheel_speed)
+
+        # tire slip ratio, clipped: contact-point speed vs ground speed
         denominator = xp.abs(speed) + 1e-6
-        return xp.clip((wheel_radius * wheel_speed - speed) / denominator, -0.5, 0.5)
+        slip = xp.clip((wheel_radius * wheel_speed - speed) / denominator, -0.5, 0.5)
+
+        return slip
 
     def f(self, x, u, t=0.0, params=None):
         params = self.params if params is None else params
@@ -179,7 +186,7 @@ class LongitudinalFrontWheelDriveCarWithTorqueInput(
         wheel_speed = x[2]
         torque = u[0]
         xp = array_module(x, u)
-        slip = self._slip(speed, wheel_speed, params)
+        slip = self.slip_ratio(speed, wheel_speed, params)
         acceleration = self.acceleration(speed, slip, params)
         drag = 0.5 * rho * cdA * speed * xp.abs(speed)
 
@@ -192,10 +199,15 @@ class LongitudinalFrontWheelDriveCarWithTorqueInput(
         return dx
 
     def h(self, x, u, t=0.0, params=None):
-        return array_module(x).array([self._slip(x[1], x[2], params)])
+        speed, wheel_speed = x[1], x[2]
+
+        # the measured output is the slip ratio
+        y = array_module(x).array([self.slip_ratio(speed, wheel_speed, params)])
+
+        return y
 
     def get_dynamic_geometry(self, x, u, t=0, params=None):
-        slip = self._slip(x[1], x[2])
+        slip = self.slip_ratio(x[1], x[2])
         return super().get_dynamic_geometry(x, np.array([slip]), t)
 
 

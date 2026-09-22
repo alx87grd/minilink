@@ -1,3 +1,5 @@
+"""Planar and spatial serial arms: one, two, three and five links, and a velocity-controlled base."""
+
 import numpy as np
 
 from minilink.core.backends import array_module
@@ -136,7 +138,7 @@ class SpeedControlledManipulator(DynamicSystem):
             labels=p_labels,
             units=["[m]"] * self.effector_dim,
         )
-        _set_planar_reach_camera(self, float(np.sum(self._link_lengths())))
+        _set_planar_reach_camera(self, float(np.sum(self.link_lengths())))
 
     @classmethod
     def from_manipulator(cls, arm: Manipulator):
@@ -146,7 +148,7 @@ class SpeedControlledManipulator(DynamicSystem):
         inst = cls(arm.dof, arm.task_dim)
         inst._kin_arm = arm
         inst.name = f"{arm.dof} Joint Speed Controlled {arm.name}"
-        reach = float(np.sum(inst._link_lengths()))
+        reach = float(np.sum(inst.link_lengths()))
         _set_planar_reach_camera(inst, reach)
         return inst
 
@@ -173,13 +175,17 @@ class SpeedControlledManipulator(DynamicSystem):
         return array_module(q).zeros((self.effector_dim, self.dof))
 
     def forward_differential_kinematic_effector(self, q, dq):
-        return self.J(q) @ dq
+        J = self.J(q)
 
-    def _link_lengths(self):
+        pdot = J @ dq
+
+        return pdot
+
+    def link_lengths(self):
         if self._kin_arm is not None:
             arm = self._kin_arm
-            if hasattr(arm, "_lengths"):
-                return arm._lengths()
+            if hasattr(arm, "lengths"):
+                return arm.lengths()
             if hasattr(arm, "params") and "l" in arm.params:
                 return np.asarray(arm.params["l"], dtype=float)
         if hasattr(self, "l"):
@@ -187,10 +193,10 @@ class SpeedControlledManipulator(DynamicSystem):
         return np.ones(self.dof)
 
     def get_kinematic_geometry(self):
-        return _planar_kinematic_geometry(self._link_lengths())
+        return _planar_kinematic_geometry(self.link_lengths())
 
     def tf(self, x, u, t=0, params=None):
-        lengths = self._link_lengths()
+        lengths = self.link_lengths()
         points, angles = _planar_joint_positions(x, lengths)
         effector = self.forward_kinematics(x)
         return _planar_frames(points, angles, effector)
@@ -228,7 +234,6 @@ class OneLinkManipulator(Manipulator):
         lc1 = params["lc1"]
         I1 = params["I1"]
 
-        # rotational inertia of the single link about the pivot
         H = array_module(q).array([[m1 * lc1**2 + I1]])
 
         return H
@@ -317,7 +322,7 @@ class TwoLinkManipulator(Manipulator):
         self.outputs["y"].units = list(self.state.units)
         _set_planar_reach_camera(self, self.params["l1"] + self.params["l2"])
 
-    def _trig(self, q):
+    def trig(self, q):
         xp = array_module(q)
         return (
             xp.cos(q[0]),
@@ -330,7 +335,7 @@ class TwoLinkManipulator(Manipulator):
 
     def H(self, q, params=None):
         params = self.params if params is None else params
-        _, _, c2, _, _, _ = self._trig(q)
+        _, _, c2, _, _, _ = self.trig(q)
 
         l1 = params["l1"]
         lc1 = params["lc1"]
@@ -355,7 +360,7 @@ class TwoLinkManipulator(Manipulator):
 
     def C(self, q, dq, params=None):
         params = self.params if params is None else params
-        _, _, _, s2, _, _ = self._trig(q)
+        _, _, _, s2, _, _ = self.trig(q)
 
         m2 = params["m2"]
         l1 = params["l1"]
@@ -374,7 +379,7 @@ class TwoLinkManipulator(Manipulator):
 
     def g(self, q, params=None):
         params = self.params if params is None else params
-        _, s1, _, _, _, s12 = self._trig(q)
+        _, s1, _, _, _, s12 = self.trig(q)
 
         m1 = params["m1"]
         m2 = params["m2"]
@@ -403,7 +408,7 @@ class TwoLinkManipulator(Manipulator):
     def forward_kinematics(self, q, params=None):
         l1 = self.params["l1"]
         l2 = self.params["l2"]
-        c1, s1, _, _, c12, s12 = self._trig(q)
+        c1, s1, _, _, c12, s12 = self.trig(q)
         p = array_module(q).array([l1 * s1 + l2 * s12, l1 * c1 + l2 * c12])
 
         return p
@@ -411,7 +416,7 @@ class TwoLinkManipulator(Manipulator):
     def J(self, q, params=None):
         l1 = self.params["l1"]
         l2 = self.params["l2"]
-        c1, s1, _, _, c12, s12 = self._trig(q)
+        c1, s1, _, _, c12, s12 = self.trig(q)
         # fmt: off
         J = array_module(q).array([
             [ l1 * c1 + l2 * c12,  l2 * c12],
@@ -421,19 +426,19 @@ class TwoLinkManipulator(Manipulator):
 
         return J
 
-    def _lengths(self):
+    def lengths(self):
         return np.array([self.params["l1"], self.params["l2"]])
 
     def get_kinematic_geometry(self):
-        return _planar_kinematic_geometry(self._lengths())
+        return _planar_kinematic_geometry(self.lengths())
 
     def tf(self, x, u, t=0, params=None):
         q, _ = self.x2q(x)
-        points, angles = _planar_joint_positions(q, self._lengths())
+        points, angles = _planar_joint_positions(q, self.lengths())
         return _planar_frames(points, angles)
 
     def get_dynamic_geometry(self, x, u, t=0, params=None):
-        return _planar_torque_geometry(self._lengths(), u, self.inputs["u"].upper_bound)
+        return _planar_torque_geometry(self.lengths(), u, self.inputs["u"].upper_bound)
 
 
 class ThreeLinkManipulator3D(Manipulator):
@@ -481,7 +486,7 @@ class ThreeLinkManipulator3D(Manipulator):
         self.camera_scale = max(1.5 * reach, 0.5)
         self.camera_target = np.array([0.0, 0.0, -0.5 * reach])
 
-    def _trig(self, q):
+    def trig(self, q):
         xp = array_module(q)
         c1, s1 = xp.cos(q[0]), xp.sin(q[0])
         c2, s2 = xp.cos(q[1]), xp.sin(q[1])
@@ -491,7 +496,7 @@ class ThreeLinkManipulator3D(Manipulator):
 
     def H(self, q, params=None):
         params = self.params if params is None else params
-        _, _, c2, s2, c3, _, c23, s23 = self._trig(q)
+        _, _, c2, s2, c3, _, c23, s23 = self.trig(q)
 
         m2 = params["m2"]
         m3 = params["m3"]
@@ -533,7 +538,7 @@ class ThreeLinkManipulator3D(Manipulator):
 
     def C(self, q, dq, params=None):
         params = self.params if params is None else params
-        _, _, c2, s2, c3, s3, c23, s23 = self._trig(q)
+        _, _, c2, s2, c3, s3, c23, s23 = self.trig(q)
 
         m2 = params["m2"]
         m3 = params["m3"]
@@ -568,7 +573,7 @@ class ThreeLinkManipulator3D(Manipulator):
 
     def g(self, q, params=None):
         params = self.params if params is None else params
-        _, _, c2, _, _, _, c23, _ = self._trig(q)
+        _, _, c2, _, _, _, c23, _ = self.trig(q)
 
         m2 = params["m2"]
         m3 = params["m3"]
@@ -599,7 +604,7 @@ class ThreeLinkManipulator3D(Manipulator):
         l1 = self.params["l1"]
         l2 = self.params["l2"]
         l3 = self.params["l3"]
-        c1, s1, c2, s2, _, _, c23, s23 = self._trig(q)
+        c1, s1, c2, s2, _, _, c23, s23 = self.trig(q)
         radius = l2 * c2 + l3 * c23
         p = array_module(q).array([radius * c1, radius * s1, l1 - l2 * s2 - l3 * s23])
 
@@ -608,7 +613,7 @@ class ThreeLinkManipulator3D(Manipulator):
     def J(self, q, params=None):
         l2 = self.params["l2"]
         l3 = self.params["l3"]
-        c1, s1, c2, s2, _, _, c23, s23 = self._trig(q)
+        c1, s1, c2, s2, _, _, c23, s23 = self.trig(q)
         radius = l2 * c2 + l3 * c23
         vertical = l2 * s2 + l3 * s23
         # fmt: off
@@ -641,7 +646,7 @@ class ThreeLinkManipulator3D(Manipulator):
         l2 = self.params["l2"]
         l3 = self.params["l3"]
         q, _ = self.x2q(x)
-        c1, s1, c2, s2, _, _, c23, s23 = self._trig(q)
+        c1, s1, c2, s2, _, _, c23, s23 = self.trig(q)
         p0 = np.array([0.0, 0.0, 0.0])
         p1 = np.array([0.0, 0.0, l1])
         p2 = np.array([l2 * c2 * c1, l2 * c2 * s1, l1 - l2 * s2])
@@ -695,7 +700,7 @@ class FiveLinkPlanarManipulator(Manipulator):
         self.outputs["y"].units = list(self.state.units)
         _set_planar_reach_camera(self, float(np.sum(self.params["l"])))
 
-    def _absolute_trig(self, q):
+    def absolute_trig(self, q):
         xp = array_module(q)
         angles = xp.cumsum(q)
         return xp.cos(angles), xp.sin(angles)
@@ -703,20 +708,27 @@ class FiveLinkPlanarManipulator(Manipulator):
     def forward_kinematics(self, q, params=None):
         l = self.params["l"]
         xp = array_module(q)
-        cos_abs, sin_abs = self._absolute_trig(q)
-        return xp.array([xp.sum(l * sin_abs), xp.sum(l * cos_abs)])
+        cos_abs, sin_abs = self.absolute_trig(q)
+
+        # the effector: links summed in absolute angles
+        p = xp.array([xp.sum(l * sin_abs), xp.sum(l * cos_abs)])
+
+        return p
 
     def J(self, q, params=None):
         l = self.params["l"]
         xp = array_module(q)
-        cos_abs, sin_abs = self._absolute_trig(q)
+        cos_abs, sin_abs = self.absolute_trig(q)
+
         # column j: the effector moves with every link from joint j outward
-        return xp.array(
+        J = xp.array(
             [
                 [xp.sum(l[j:] * cos_abs[j:]) for j in range(self.dof)],
                 [-xp.sum(l[j:] * sin_abs[j:]) for j in range(self.dof)],
             ]
         )
+
+        return J
 
     def get_kinematic_geometry(self):
         return _planar_kinematic_geometry(self.params["l"])

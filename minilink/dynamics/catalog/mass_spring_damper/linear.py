@@ -1,3 +1,5 @@
+"""Linear mass-spring-damper chains of one, two and three masses, grounded or floating."""
+
 import numpy as np
 
 from minilink.core.kinematics import translation

@@ -1,11 +1,6 @@
-"""Fiala brush tires with a friction ellipse — pure functions, NumPy or JAX.
+"""Fiala brush tires with a friction ellipse: pure functions on NumPy or JAX.
 
-Reference: H. B. Pacejka, *Tyre and Vehicle Dynamics*, 3rd ed., ch. 3 (the brush model);
-E. Fiala, "Seitenkrafte am rollenden Luftreifen", VDI Zeitschrift 96 (1954). The
-saturation factor ``g(z) = 1 - (1 - z/3)^3`` over ``z`` is the classical cubic form.
-
-All functions are pure and written with the ``xp`` idiom, so the same lines trace under
-``jax.jit`` and ``jax.jacfwd``.
+Reference: Pacejka, *Tyre and Vehicle Dynamics*, 3rd ed., ch. 3; Fiala, VDI Zeitschrift 96 (1954).
 """
 
 from minilink.core.backends import array_module

@@ -1,3 +1,5 @@
+"""Canonical nonlinear oscillators: Van der Pol and Lorenz."""
+
 import numpy as np
 
 from minilink.core.backends import array_module

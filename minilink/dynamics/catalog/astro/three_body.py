@@ -1,3 +1,5 @@
+"""The three-body problem: three point masses under mutual Newtonian gravitation."""
+
 import numpy as np
 
 from minilink.core.backends import array_module
@@ -110,11 +112,15 @@ class ThreeBodyProblem(DynamicSystem):
         masses = params["masses"]
         v1, v2, v3 = self.velocities(x)
         xp = array_module(x)
-        return 0.5 * (
+
+        # T = Σ ½ m_i |v_i|²
+        T = 0.5 * (
             masses[0] * xp.dot(v1, v1)
             + masses[1] * xp.dot(v2, v2)
             + masses[2] * xp.dot(v3, v3)
         )
+
+        return T
 
     def potential_energy(self, x, params=None):
         params = self.params if params is None else params
@@ -132,7 +138,12 @@ class ThreeBodyProblem(DynamicSystem):
         return phi
 
     def total_energy(self, x, params=None):
-        return self.kinetic_energy(x, params) + self.potential_energy(x, params)
+        T = self.kinetic_energy(x, params)
+        V = self.potential_energy(x, params)
+
+        E = T + V
+
+        return E
 
     def f(self, x, u, t=0, params=None):
         params = self.params if params is None else params
@@ -149,6 +160,7 @@ class ThreeBodyProblem(DynamicSystem):
             for j in range(3):
                 if i == j:
                     continue
+                # v̇_i = Σ_{j≠i} G m_j (r_j − r_i) / |r_j − r_i|³, softened by eps
                 dr = r[j] - r[i]
                 dist_sq = xp.dot(dr, dr) + eps**2
                 acc = acc + G * masses[j] * dr / (dist_sq * xp.sqrt(dist_sq))

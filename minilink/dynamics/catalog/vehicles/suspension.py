@@ -1,3 +1,5 @@
+"""Quarter-car suspension riding over a prescribed rough terrain."""
+
 import numpy as np
 
 from minilink.core.backends import array_module
@@ -45,9 +47,12 @@ class QuarterCarOnRoughTerrain(DynamicSystem):
         w = params["w"]
         phi = params["phi"]
 
-        # ground height: superposed sinusoidal road profile
         xp = array_module(x)
-        return xp.sum(a * xp.sin(w * (x - phi)))
+
+        # ground height: superposed sinusoidal road profile
+        z = xp.sum(a * xp.sin(w * (x - phi)))
+
+        return z
 
     def dz(self, x, params=None):
         params = self.params if params is None else params
@@ -55,9 +60,12 @@ class QuarterCarOnRoughTerrain(DynamicSystem):
         w = params["w"]
         phi = params["phi"]
 
-        # ground slope: spatial derivative of the road profile
         xp = array_module(x)
-        return xp.sum(a * w * xp.cos(w * (x - phi)))
+
+        # ground slope: spatial derivative of the road profile
+        dz = xp.sum(a * w * xp.cos(w * (x - phi)))
+
+        return dz
 
     def f(self, x, u, t=0.0, params=None):
         params = self.params if params is None else params

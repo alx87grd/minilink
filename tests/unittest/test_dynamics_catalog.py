@@ -393,7 +393,7 @@ class TestManipulatorCatalog(unittest.TestCase):
     def test_two_link_fk_matches_planar_geometry_tip(self):
         arm = TwoLinkManipulator()
         q = np.array([0.2, -0.1])
-        tip, _ = _planar_joint_positions(q, arm._lengths())
+        tip, _ = _planar_joint_positions(q, arm.lengths())
         np.testing.assert_allclose(arm.forward_kinematics(q), tip[-1])
 
     def test_three_link_fk_matches_tf_end_effector(self):

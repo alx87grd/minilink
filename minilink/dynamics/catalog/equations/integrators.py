@@ -1,3 +1,5 @@
+"""Integrator chains: the simple, double and triple integrators."""
+
 import numpy as np
 
 from minilink.core.backends import array_module

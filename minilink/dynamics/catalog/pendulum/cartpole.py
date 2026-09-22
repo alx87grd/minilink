@@ -1,16 +1,4 @@
-"""
-Pyro-ported cart-pole (linear cart, one pole).
-
-Dynamics match SherbyRobotics/pyro ``CartPole`` in ``pyro/dynamic/cartpole.py``.
-
-Kinematics: the ground + cart are drawn in the X–Y plane; the pole is offset
-slightly in ``z`` for volumetric renderers (MeshCat) so the rod cylinder does
-not pass through the cart body while matplotlib's default XY projection stays
-visually the same.
-
-The equations are written with ``xp = array_module(q)``, so every plant here
-compiles on both backends (``jit`` / ``grad`` / ``vmap`` on JAX).
-"""
+"""Cart-poles: the linear cart-pole and the rotating cart-pole, with a noise-port variant (pyro port)."""
 
 import numpy as np
 
@@ -392,12 +380,21 @@ class CartPoleWithNoisePort(CartPole):
 
     def generalized_force(self, q, v, u, t=0.0, params=None):
         F, w = self.get_port_values_from_u(u, "u", "w")
-        return self.B(q, params) @ (F + w)
+        B = self.B(q, params)
+
+        # the disturbance enters with the cart force
+        force = B @ (F + w)
+
+        return force
 
     def h(self, x, u, t=0.0, params=None):
         v_noise = self.get_port_values_from_u(u, "v")
         xp = array_module(x, u)
-        return xp.asarray(x) + xp.asarray(v_noise)
+
+        # the measurement is the state plus the noise port
+        y = xp.asarray(x) + xp.asarray(v_noise)
+
+        return y
 
 
 if __name__ == "__main__":

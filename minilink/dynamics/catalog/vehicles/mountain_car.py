@@ -1,3 +1,5 @@
+"""Mountain car: a one-coordinate mechanical system on a cosine hill."""
+
 import numpy as np
 
 from minilink.core.backends import array_module
@@ -38,21 +40,33 @@ class MountainCar(MechanicalSystem):
         a = params["a"]
         w = params["w"]
         xp = array_module(x)
-        return a * xp.cos(w * x)
+
+        # the hill profile
+        z = a * xp.cos(w * x)
+
+        return z
 
     def dz_dx(self, x, params=None):
         params = self.params if params is None else params
         a = params["a"]
         w = params["w"]
         xp = array_module(x)
-        return -a * w * xp.sin(w * x)
+
+        # its slope
+        dz_dx = -a * w * xp.sin(w * x)
+
+        return dz_dx
 
     def d2z_dx2(self, x, params=None):
         params = self.params if params is None else params
         a = params["a"]
         w = params["w"]
         xp = array_module(x)
-        return -a * w**2 * xp.cos(w * x)
+
+        # and its curvature
+        d2z_dx2 = -a * w**2 * xp.cos(w * x)
+
+        return d2z_dx2
 
     def H(self, q, params=None):
         params = self.params if params is None else params

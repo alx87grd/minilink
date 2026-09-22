@@ -1,3 +1,5 @@
+"""Aircraft: the planar plane with an elevator, and the six-DoF plane with elevator, aileron and rudder."""
+
 import numpy as np
 
 from minilink.core.backends import array_module
@@ -78,12 +80,12 @@ class Plane2D(MechanicalSystem):
         e = params["e_factor"]
         AR = params["AR"]
 
+        Cl = self.Cl(alpha, params)
+
+        # parasitic drag plus, below stall, the induced drag Cl² / (π e AR)
         cd = Cd0 + (1.0 - xp.cos(2.0 * alpha))
-        cd = xp.where(
-            xp.abs(alpha) < alpha_stall,
-            cd + self.Cl(alpha, params) ** 2 / (xp.pi * e * AR),
-            cd,
-        )
+        cd = xp.where(xp.abs(alpha) < alpha_stall, cd + Cl**2 / (xp.pi * e * AR), cd)
+
         return cd
 
     def Cm(self, alpha, params=None):
@@ -98,16 +100,26 @@ class Plane2D(MechanicalSystem):
         S_t = params["S_t"]
         AR = params["AR"]
 
+        Cl_w, Cd_w, Cm_w = (
+            self.Cl(alpha, params),
+            self.Cd(alpha, params),
+            self.Cm(alpha, params),
+        )
+        Cl_t = self.Cl(alpha + delta, params)
+        Cd_t = self.Cd(alpha + delta, params)
+        Cm_t = self.Cm(alpha + delta, params)
+
+        # lift, drag and pitching moment of the wing and of the deflected tail
         q_dyn = 0.5 * rho * speed**2
         chord_w = xp.sqrt(S_w / AR)
         chord_t = xp.sqrt(S_t / AR)
+        L_w = q_dyn * S_w * Cl_w
+        D_w = q_dyn * S_w * Cd_w
+        M_w = q_dyn * S_w * chord_w * Cm_w
+        L_t = q_dyn * S_t * Cl_t
+        D_t = q_dyn * S_t * Cd_t
+        M_t = q_dyn * S_t * chord_t * Cm_t
 
-        L_w = q_dyn * S_w * self.Cl(alpha, params)
-        D_w = q_dyn * S_w * self.Cd(alpha, params)
-        M_w = q_dyn * S_w * chord_w * self.Cm(alpha, params)
-        L_t = q_dyn * S_t * self.Cl(alpha + delta, params)
-        D_t = q_dyn * S_t * self.Cd(alpha + delta, params)
-        M_t = q_dyn * S_t * chord_t * self.Cm(alpha + delta, params)
         return L_w, D_w, M_w, L_t, D_t, M_t
 
     def H(self, q, params=None):
@@ -413,12 +425,12 @@ class Plane3D(GeneralizedMechanicalSystem):
         e = params["e_factor"]
         AR = params["AR"]
 
+        Cl = self.Cl(alpha, params)
+
+        # parasitic drag plus, below stall, the induced drag Cl² / (π e AR)
         cd = Cd0 + (1.0 - xp.cos(2.0 * alpha))
-        cd = xp.where(
-            xp.abs(alpha) < alpha_stall,
-            cd + self.Cl(alpha, params) ** 2 / (xp.pi * e * AR),
-            cd,
-        )
+        cd = xp.where(xp.abs(alpha) < alpha_stall, cd + Cl**2 / (xp.pi * e * AR), cd)
+
         return cd
 
     def Cm(self, alpha, params=None):
@@ -429,7 +441,11 @@ class Plane3D(GeneralizedMechanicalSystem):
         """Body-to-world rotation for configuration ``q``."""
         xp = array_module(q)
         phi, theta, psi = q[3], q[4], q[5]
-        return Rz(psi) @ Ry(theta) @ Rx(phi) @ Rx(xp.pi)
+
+        # yaw, pitch, roll, then the flip from the body's z-down convention
+        R = Rz(psi) @ Ry(theta) @ Rx(phi) @ Rx(xp.pi)
+
+        return R
 
     def velocity_angles(self, v):
         """Airspeed, angle of attack, and sideslip from body velocity."""
@@ -462,12 +478,20 @@ class Plane3D(GeneralizedMechanicalSystem):
         chord_t = xp.sqrt(S_t / AR)
 
         # Wing + horizontal tail (longitudinal), same Cl/Cd/Cm as Plane2D.
-        L_w = q_dyn * S_w * self.Cl(alpha, params)
-        D_w = q_dyn * S_w * self.Cd(alpha, params)
-        M_w = q_dyn * S_w * chord_w * self.Cm(alpha, params)
-        L_t = q_dyn * S_t * self.Cl(alpha + delta_e, params)
-        D_t = q_dyn * S_t * self.Cd(alpha + delta_e, params)
-        M_t = q_dyn * S_t * chord_t * self.Cm(alpha + delta_e, params)
+        Cl_w, Cd_w, Cm_w = (
+            self.Cl(alpha, params),
+            self.Cd(alpha, params),
+            self.Cm(alpha, params),
+        )
+        Cl_t = self.Cl(alpha + delta_e, params)
+        Cd_t = self.Cd(alpha + delta_e, params)
+        Cm_t = self.Cm(alpha + delta_e, params)
+        L_w = q_dyn * S_w * Cl_w
+        D_w = q_dyn * S_w * Cd_w
+        M_w = q_dyn * S_w * chord_w * Cm_w
+        L_t = q_dyn * S_t * Cl_t
+        D_t = q_dyn * S_t * Cd_t
+        M_t = q_dyn * S_t * chord_t * Cm_t
 
         c_a, s_a = xp.cos(alpha), xp.sin(alpha)
         # Wind-axis [-D, 0, -L] rotated by alpha about body y into the body frame.
@@ -475,8 +499,9 @@ class Plane3D(GeneralizedMechanicalSystem):
         F_t = xp.array([-c_a * D_t - s_a * L_t, 0.0, s_a * D_t - c_a * L_t])
 
         # Vertical fin + rudder (lateral): Cl/Cd only — no Cm0 (that trims pitch).
-        L_v = q_dyn * S_v * self.Cl(beta + delta_r, params)
-        D_v = q_dyn * S_v * self.Cd(beta + delta_r, params)
+        Cl_v, Cd_v = self.Cl(beta + delta_r, params), self.Cd(beta + delta_r, params)
+        L_v = q_dyn * S_v * Cl_v
+        D_v = q_dyn * S_v * Cd_v
         c_b, s_b = xp.cos(beta), xp.sin(beta)
         F_v = xp.array([-c_b * D_v + s_b * L_v, -s_b * D_v - c_b * L_v, 0.0])
 

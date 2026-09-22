@@ -1,11 +1,7 @@
 """1/10-scale racecar: power-limited rear drive, brush tires, servo steering.
 
-The drive is described by the power it can put on the ground and by the torque the
-drivetrain can hold at low speed, never by a motor circuit.
-
 State ``x = [x, y, theta, vx, vy, yaw_rate, w_rear, delta, P]``, inputs ``P_cmd`` [W] and
-``delta_cmd`` [rad]. Both equation paths use the ``xp`` idiom, so the class runs on NumPy
-and traces under JAX.
+``delta_cmd`` [rad]; both equation paths use the ``xp`` idiom and trace under JAX.
 """
 
 from functools import partial
@@ -311,6 +307,9 @@ class UdeSRacecarDyn(DynamicBicycle):
         dq = N @ v
 
         # drive: lagged power, a torque limit at low speed, and the drivetrain brake
+        #   Ṗ = (clip(P_cmd, ±P_max) − P) / engine_tau
+        #   τ = clip(P / sqrt(w_rear² + w_eps²), ±τ_sat)
+        #   Jw ẇ_rear = τ − τ_ground(v, w_rear, δ) − τ_brake(w_rear)
         P_dot = (xp.clip(P_cmd, -P_max, P_max) - P) / engine_tau
         tau = xp.clip(P / xp.sqrt(w_rear**2 + w_eps**2), -tau_sat, tau_sat)
         tau_ground = self.rear_wheel_ground_torque(v, w_rear, delta, params)
@@ -318,6 +317,7 @@ class UdeSRacecarDyn(DynamicBicycle):
         w_rear_dot = (tau - tau_ground - tau_brake) / Jw_rear
 
         # servo: first-order lag with a smooth rate limit, held by the end stops
+        #   δ̇ = rate_max tanh((δ_ref − δ) / (steering_tau rate_max))
         delta_ref = xp.clip(delta_cmd, -delta_max, delta_max)
         delta_dot = rate_max * xp.tanh((delta_ref - delta) / (steering_tau * rate_max))
         delta_dot = xp.where(delta > delta_max, xp.minimum(delta_dot, 0.0), delta_dot)

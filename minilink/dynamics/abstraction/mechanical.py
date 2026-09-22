@@ -1,18 +1,4 @@
-"""
-Second-order mechanical systems in generalized coordinates.
-
-Numeric template; see :mod:`minilink.dynamics.abstraction`.
-
-Equation of motion::
-
-    H(q) a + C(q, v) v + d(q, v, u, t) + g(q)
-        = generalized_force(q, v, u, t)
-
-* :class:`MechanicalSystem` — native-array default template. Concrete subclasses
-  remain JAX-traceable only if their hooks use JAX-compatible math.
-* :class:`JaxMechanicalSystem` — convenience base for explicit JAX plant
-  variants. JAX is loaded lazily when you call methods on that class.
-"""
+"""Second-order mechanical systems in generalized coordinates: ``H(q) v̇ + C(q, v) v + d + g(q) = τ``."""
 
 import numpy as np
 
@@ -124,7 +110,11 @@ class MechanicalSystem(DynamicSystem):
         method when inputs mix force commands, geometry commands, environment
         variables, or other non-actuator semantics.
         """
-        return self.B(q, params) @ u
+        B = self.B(q, params)
+
+        tau = B @ u
+
+        return tau
 
     def x2q(self, x):
         """Split state ``x`` into ``q`` and ``v``."""

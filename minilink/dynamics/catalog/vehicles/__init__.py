@@ -1,12 +1,4 @@
-"""Vehicle dynamics — the four-rung teaching ladder plus propulsion / suspension.
-
-``HolonomicMobileRobot`` → ``KinematicBicycle`` / ``KinematicCar`` →
-``UdeSRacecar`` (same bicycle at the 1/10 scale) →
-``DynamicBicycle`` (linear tires, named ``w_rear`` / ``delta`` ports) →
-``BicycleDynRate`` (wheel-rate / steer-rate inputs, the MPC plant) →
-``UdeSRacecarDyn`` (brush tires that slip, power-limited drive, servo steering).
-Research rungs live in ``examples/projects/car_trajopt/vehicles/``.
-"""
+"""Vehicle dynamics: the teaching ladder from the holonomic point to the UdeS racecar, plus propulsion and suspension."""
 
 # Tire math (``tire_slip`` / ``linear_tire_forces`` in dynamic_bicycle, the brush pair
 # in tires) and parameter sets stay in their modules — plants only in __all__.

@@ -1,3 +1,5 @@
+"""Planar boat: surge, sway and yaw with surge/sway force inputs, with or without a current."""
+
 import numpy as np
 
 from minilink.core.backends import array_module
@@ -250,11 +252,15 @@ class Boat2DWithCurrent(Boat2D):
         params = self.params if params is None else params
         current_velocity = params["current_velocity"]
 
-        # damp the water-relative velocity (current subtracted in body frame)
         xp = array_module(q, v)
+        N = self.N(q, params)
+
+        # damp the water-relative velocity (current subtracted in body frame)
         world_current = xp.array([current_velocity[0], current_velocity[1], 0.0])
-        body_current = self.N(q, params).T @ world_current
-        return self.damping(v - body_current, params)
+        body_current = N.T @ world_current
+        d = self.damping(v - body_current, params)
+
+        return d
 
     def tf(self, x, u, t=0, params=None):
         frames = super().tf(x, u, t)
