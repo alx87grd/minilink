@@ -28,11 +28,11 @@ Pytest policy: tests/README.md. Examples map: examples/README.md.
 | RULES.md | Universal code and review ladder (humans and agents) |
 | README.md | User workflows, install, examples table |
 | DESIGN.md | Public contracts, package layout, evaluator behavior |
-| ROADMAP.md | **Plan of record**: releases and milestones, two-lane operating contract, TRL ledger, GRO860 checklist, phases, review queue, out-of-scope |
+| ROADMAP.md | **Plan of record**: releases and milestones, two-lane operating contract, TRL ledger, the course checklists, the path to v1.0 (rungs and waves), open decisions, out-of-scope |
 | AGENTS.md | Agent workflow, doc map, local CI gate |
 | CLAUDE.md | Entry stub that points here; update only if this reading order changes |
-| docs/plans/TODO.md | Operational backlog: small fixes, pre-v0.2 hardening, demo pulls, new modules, Later ideas |
-| docs/plans/ | Active **design** writeups only (multi-step plans; delete finished plan docs) |
+| docs/plans/TODO.md | The workboard: every open step of ROADMAP §5, by rung, with files and "done when"; Later ideas at the end |
+| docs/plans/ | Design writeups for steps that need one (delete a plan doc once it lands; the index there says which rung each serves) |
 | docs/plans/pyro-port-remaining.md | Pyro parity rows when library or demos land |
 | docs/ | Sphinx autodoc of the teaching-lane API (`docs/api/`, `docs/index.rst`); `experimental/` is repo-only and not on the site. The user guide is `examples/tutorial/`. README GIFs and diagram PNG from `docs/make_assets.py` (`ur5_meshcat.gif` is a screen recording, not rebuilt) |
 | tests/README.md | Marker policy, test philosophy, **entry points (human · agent · CI)** |

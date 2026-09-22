@@ -2,7 +2,8 @@
 
 **Status:** core contract — design agreed 2026-09-21, not started.  
 **Lane:** core (`minilink.core.geometry`), then a teaching catalog of courses.  
-**Depends on:** [core-objects-4-fields.md](core-objects-4-fields.md) for the `Field` ABC (can move spatial files first and rename `StateField` → `Field` in the same pass or after).
+**Rung:** v0.2 wave A, step A3 of [TODO.md](TODO.md).  
+**Depends on:** [fields.md](fields.md) for the `Field` ABC (can move spatial files first and rename `StateField` → `Field` in the same pass or after).
 
 Workspace math is split today: SDF solids in [`core/geometry.py`](../../minilink/core/geometry.py), everything else under [`planning/spatial/`](../../minilink/planning/spatial/). That home is an accident of first consumer (trajopt). Control cannot import planning ([RULES.md](../../RULES.md) 3.2), so [`PurePursuit`](../../minilink/control/geometric.py) takes a raw waypoint array. Demos rebuild the same oval and cones by hand.
 
@@ -31,7 +32,7 @@ Graphics stay a second vocabulary on purpose ([architecture review §4.6](../rev
 | `WorkspaceField`, `GaussianField` | [`planning/spatial/workspace_fields.py`](../../minilink/planning/spatial/workspace_fields.py) | `core/geometry/` beside Scene |
 | `disc`, `point_probe`, `car_outline` | [`planning/spatial/collision.py`](../../minilink/planning/spatial/collision.py) | `core/geometry/probes.py` |
 | `CollisionBody`, `bind` | same file | `core/geometry/collision.py` |
-| `StateField` → `Field`, `FieldSet`, `FieldCost` | [`planning/spatial/state_fields.py`](../../minilink/planning/spatial/state_fields.py) | [`core/fields.py`](core-objects-4-fields.md) |
+| `StateField` → `Field`, `FieldSet`, `FieldCost` | [`planning/spatial/state_fields.py`](../../minilink/planning/spatial/state_fields.py) | [`core/fields.py`](fields.md) |
 | `ClearanceField`, `CostDensityField`, `PathDistanceField`, `CorridorMarginField` | same file | `core/geometry/fields.py` (subclass `Field`) |
 | `quadratic_hinge`, `quadratic_excess`, `inverse_barrier`, `occupancy` | [`planning/spatial/shaping.py`](../../minilink/planning/spatial/shaping.py) | `core/fields.py` next to `Field.as_cost` |
 | `FieldGrid`, `sample_grid` | [`planning/spatial/grid.py`](../../minilink/planning/spatial/grid.py) | `core/geometry/grid.py` |
@@ -111,7 +112,7 @@ minilink/graphical/          # drawing only
 3. `planning.spatial` re-exports, then delete in the same change as call-site updates ([RULES.md](../../RULES.md) 3.4).
 4. Catalog factories; switch the three UdeS racecar demos and the RRT forest demo.
 5. PurePursuit accepts a `Path` / `Track`.
-6. [core-objects-4](core-objects-4-fields.md) §4.1: spatial subclasses already live in geometry when `Field` lands.
+6. [fields.md](fields.md) §4.1: spatial subclasses already live in geometry when `Field` lands.
 
 ## Out of scope
 

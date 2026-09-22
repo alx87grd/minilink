@@ -2,6 +2,7 @@
 
 Status: core contract, design agreed with the maintainer 2026-09-13 (composite costs nest
 their parameters the way a diagram nests its subsystems'); implementation not started.
+Rung: v0.2 wave A, step A2 of [TODO.md](TODO.md).
 
 ## Problem
 

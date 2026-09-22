@@ -2,8 +2,10 @@
 
 Status: **wave 1 partly landed 2026-09-07.** P1 done (ruled: dedicated
 `PI` / `PD` classes); F1, F2, F4 done (second-pass defects, see the audit).
-P4 (estimation) and P6 (z tier) **held by the maintainer** — not scheduled.
-P2, P3 and wave 2 open.
+P4 (estimation) and P6 (z tier) **held by the maintainer** 2026-09-07; the
+roadmap schedules P4 for v0.2 once the hold is lifted and the disturbance
+convention is decided (ROADMAP §6). P2, P3 and wave 2 open.
+Rung: v0.2 wave B, steps P2–P11 of [TODO.md](TODO.md).
 Lane: teaching surface (`analysis/`, `control/`, `estimation/`, `blocks/`).
 Milestone: v0.2, [ROADMAP §4.2](../../ROADMAP.md#42-v02--gro501-end-to-end).
 Baseline audit: [../reviews/2026-09-07-gro501-coverage.md](../reviews/2026-09-07-gro501-coverage.md).

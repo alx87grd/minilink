@@ -16,7 +16,7 @@ package, no global mode. Explicit `compile_backend` and evaluator backend args.
 (`xp = array_module(x)`). A `Jax<Plant>` twin exists only when a single class would
 sacrifice textbook readability.
 
-**Precision policy (adopted 2026-09, lands in Phase 0 of [ROADMAP.md](ROADMAP.md)):**
+**Precision policy (adopted 2026-09):**
 JAX evaluators enable 64-bit floats on construction; `MINILINK_JAX_X64=0`
 opts out for GPU/RL workloads. Tools built on JAX evaluators (trajopt,
 `Optimizer`, DP) never require the caller to call `configure_jax` first.
@@ -71,8 +71,8 @@ imports stay valid in both lanes.
 Component maturity is tracked only in [ROADMAP.md](ROADMAP.md); this section
 describes package ownership. Every package belongs to one of four bands.
 Homes for planned content are pre-decided in the tables below; scheduling is
-in [ROADMAP.md](ROADMAP.md) (teaching-release priorities) and
-[docs/plans/TODO.md](docs/plans/TODO.md) (Later / operational backlog).
+in [ROADMAP.md](ROADMAP.md) §5 and the workboard
+[docs/plans/TODO.md](docs/plans/TODO.md).
 
 **Framework** — defines what a `System` is and how diagrams execute
 (NumPy-only; changes are design events):
@@ -438,7 +438,7 @@ object does not read `params` yet, the gap is tracked below.
   ([docs/plans/TODO.md](docs/plans/TODO.md) Later).
   **TODO: Prioritize threading $p$ into JAX parametric programs.** This will allow 
   moving obstacles online without rebuilding the NLP, unlocking real-time dynamic obstacle avoidance.
-  **Gap, tracked** ([docs/plans/TODO.md](docs/plans/TODO.md) Later, core-objects-5):
+  **Gap, tracked** ([docs/plans/TODO.md](docs/plans/TODO.md) step A5):
   call-time `params` on the base `Shape`, `Set`, `CostFunction` and field primitives in
   `core/` — those types declare `(t, params)` but read their own attributes only. The
   constitution's one-signature rule makes this a gap to close, not a design.

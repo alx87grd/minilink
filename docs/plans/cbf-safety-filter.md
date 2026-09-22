@@ -70,7 +70,7 @@ When $u$ controls acceleration (e.g., dynamic vehicle models, torque-driven mani
 1. **Geometry layer** (`minilink.core.geometry`, [geometry-module.md](geometry-module.md)):
    - `BicubicGridSDF`: 2D/3D signed-distance grid with JAX bicubic interpolation (a `Shape`).
    - Barrier $h(x)$ is `scene.clearance_field(body)` (a `Field`); no `Scene.as_cbf`.
-     ([core-objects-4-fields.md](core-objects-4-fields.md) §4.7.)
+     ([fields.md](fields.md) §4.7.)
 2. **Control layer** (`minilink.control.cbf`):
    - `CBFSafetyFilter(controller, cbf, bounds, gamma=0.1, slack_penalty=1e5)`: Wraps an existing controller or stands as an independent filter block in a `DiagramSystem`.
    - Per step: Solves a 1D–4D QP (OSQP, Clarabel, or an analytical projection for SISO).
