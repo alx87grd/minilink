@@ -83,8 +83,6 @@ diagram.animate(
 )
 
 # --- 3-D look: same lap ---
-from minilink.graphical.catalog.racecar_skin import racecar_skin_3d
-
 car.skin = racecar_skin_3d
 
 diagram.animate(

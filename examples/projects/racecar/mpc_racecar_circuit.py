@@ -1,11 +1,11 @@
 """Model predictive control round a closed circuit, past two cones on the far straight."""
 
-import matplotlib.pyplot as plt
 import numpy as np
 
 from minilink import PlanningProblem, QuadraticCost, TrajectoryOptimizationPlanner
 from minilink.catalog import UdeSRacecarDyn
 from minilink.control.mpc import ModelPredictiveController, mpc_animation_overlays
+from minilink.graphical.catalog.racecar_skin import racecar_skin_3d
 from minilink.planning import (
     ReferenceTrack,
     Scene,
@@ -142,10 +142,6 @@ result = lap.compute_trajectory(
     tf=TF_SIM, x0_plant=x0, plant_dt_inner=SIM_DT, compile_backend="jax"
 )
 lap.plot_trajectory()
-
-
-from minilink.graphical.catalog.racecar_skin import racecar_skin_3d
-
 
 lap.animate(
     result.plant.resample(n_samples=N_FRAMES),

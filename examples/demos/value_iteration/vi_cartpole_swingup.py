@@ -7,9 +7,8 @@ from minilink import (
     CartPole,
     CostFunction,
     DynamicProgrammingPlanner,
-    MonteCarloEvaluator,
-    StateSpaceGrid,
     PlanningProblem,
+    StateSpaceGrid,
 )
 
 DT = 0.02

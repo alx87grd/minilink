@@ -174,4 +174,3 @@ class HolonomicMobileRobot3D(DynamicSystem):
                 )
             ]
         }
-

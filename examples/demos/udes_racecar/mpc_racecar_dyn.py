@@ -1,6 +1,5 @@
 """Same kinematic MPC, now over a PID speed loop on the dynamic 1/10 racecar."""
 
-from control import model_reduction
 import numpy as np
 
 from minilink import (
@@ -13,7 +12,6 @@ from minilink import (
     UdeSRacecar,
     UdeSRacecarDyn3D,
 )
-from minilink.control import modelbased
 from minilink.control.mpc import ModelPredictiveController, mpc_animation_overlays
 from minilink.core.hybrid_composition import hybrid_closed_loop
 from minilink.graphical.catalog.racecar_skin import racecar_skin_2d, racecar_skin_3d
