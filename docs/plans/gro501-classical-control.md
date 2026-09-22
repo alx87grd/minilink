@@ -268,7 +268,7 @@ one source.
 
 *On hold by the maintainer 2026-09-07.*
 
-**The open question**, recorded in [ROADMAP §6](../../ROADMAP.md#6-review-queue).
+**The open question**, recorded in [ROADMAP §6](../../ROADMAP.md#6-decisions).
 §5.2.2 part 4 assigns Dorf 13.1–13.4 and §1.2 requires translating the
 compensator to difference equations for the Arduino. Today `discretize` gives
 Euler/RK4 *step models*, which simulate correctly but carry no z-domain

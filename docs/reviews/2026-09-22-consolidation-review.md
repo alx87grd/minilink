@@ -93,7 +93,7 @@ Measured on `dev` @ `1f0f7ce` in a clean Python 3.11 environment (`pip install -
 | Signal | State |
 | --- | --- |
 | `ruff check .` / `ruff format --check .` | **red** on arrival (11 errors, 1 unformatted file, all in `examples/demos/udes_racecar/`, `examples/demos/value_iteration/vi_cartpole_swingup.py`, `examples/projects/racecar/`); green after the lint-only commit of this pass |
-| `pytest` | green apart from the link check, which failed only on the review document this file now is; the count is in §4.3 |
+| `pytest` | 1 273 passed, 30 skipped after the pass (§4.3); on arrival the same suite passed up to the link check, which failed only on the review document this file now is |
 | Regression gates, flagship demos, notebook smoke | not run here (the `regression` job needs Ipopt, plotly, meshcat and pygame); last green on the maintainer's machine per the commits of 2026-09-18 to 2026-09-21 |
 | GRO860 path (§4.1 of ROADMAP) | every topic row green; gates 1–7 met; gate 8 (PyPI) waits on the `0.1.0` tag and the trusted-publisher registration (R1) |
 | GRO501 path (§4.2) | seven of eleven topic rows green; `minreal`, `place`, the sensitivity shortcuts, the `N` matrix and the estimation band are the v0.2 work (P2–P8); estimation is held since 2026-09-07 |
@@ -202,8 +202,10 @@ trailing blank line).
 
 ### 4.3 Verification
 
-`ruff check .` and `ruff format --check .` clean on the whole repository. The full
-`pytest` result is recorded in the final commit message of the pass. The regression gates
+`ruff check .` and `ruff format --check .` clean on the whole repository. Full `pytest`
+after the pass (Python 3.11, JAX, no plotly / meshcat / pygame / sympy / Ipopt / dot):
+1 273 passed, 30 skipped, 3 packaging tests deselected; the one failure was a renamed
+ROADMAP anchor in a plan doc, fixed in the follow-up commit. The regression gates
 and the notebook checks were not run in this environment (no Ipopt, plotly, meshcat,
 pygame); the touched paths are all covered by the baseline above and by the unit files.
 
