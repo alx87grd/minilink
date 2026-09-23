@@ -58,7 +58,6 @@
   },
   {
     "id": "bicycle_cascade_vehicle",
-    "demo_id": "cascade_path_tracking",
     "requires": [],
     "module": "minilink.dynamics.catalog.vehicles.dynamic_bicycle",
     "class": "DynamicBicycleCar3D",
@@ -98,7 +97,7 @@
   },
   {
     "id": "mpc_minimal_bicycle",
-    "demo_id": "mpc_minimal",
+    "demo_id": "mpc_car_minimal",
     "requires": [
       "jax"
     ],

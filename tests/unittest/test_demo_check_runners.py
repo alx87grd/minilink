@@ -8,16 +8,24 @@ Interactive flagships (viewer / prompt demos) always skip.
 Notebook smoke checks run in the CI ``regression`` job (and via
 ``tests/run/run_notebook_checks.py``). Opt in here with
 ``MINILINK_NOTEBOOK_CHECKS=1`` so default ``pytest`` stays fast.
+
+``TestDemoCheckManifests`` checks the data those runners read (``requires``
+lists and demo ids).
 """
 
 from __future__ import annotations
 
+import importlib.util
+import json
 import os
 import re
 import subprocess
 import sys
 import unittest
 from pathlib import Path
+from unittest import mock
+
+from tests.demo_checks import run_flagship_demos as flagship_runner
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 
@@ -109,6 +117,57 @@ class TestDemoCheckRunners(unittest.TestCase):
                 f"notebook checks failed (exit {proc.returncode})\n"
                 f"stdout:\n{proc.stdout}\nstderr:\n{proc.stderr}"
             )
+
+
+# Runners skip an entry when ``importlib.util.find_spec(name)`` is None for one
+# of its ``requires``, so each name must be an import name, not a distribution.
+_MODULE_NAME = re.compile(r"[A-Za-z_]\w*(\.[A-Za-z_]\w*)*")
+_REQUIRES_MANIFESTS = (
+    "tests/demo_checks/flagship_manifest.json",
+    "tests/demo_checks/notebook_overrides.json",
+    "tests/fixtures/flagship_graphics/manifest.json",
+    "tests/fixtures/kinematic_baseline/manifest.json",
+)
+
+
+def _load_json(relative_path: str):
+    return json.loads((REPO_ROOT / relative_path).read_text(encoding="utf-8"))
+
+
+class TestDemoCheckManifests(unittest.TestCase):
+    def test_requires_are_module_names(self):
+        for relative_path in _REQUIRES_MANIFESTS:
+            manifest = _load_json(relative_path)
+            entries = manifest.values() if isinstance(manifest, dict) else manifest
+            for entry in entries:
+                for name in entry.get("requires") or []:
+                    with self.subTest(manifest=relative_path, name=name):
+                        self.assertIsNotNone(_MODULE_NAME.fullmatch(name))
+
+    def test_graphics_demo_ids_name_flagships(self):
+        flagship_ids = {
+            entry["id"]
+            for entry in _load_json("tests/demo_checks/flagship_manifest.json")
+        }
+        for entry in _load_json("tests/fixtures/flagship_graphics/manifest.json"):
+            if "demo_id" in entry:
+                with self.subTest(entry=entry["id"]):
+                    self.assertIn(entry["demo_id"], flagship_ids)
+
+    def test_hybrid_diagram_flagships_skip_without_graphviz(self):
+        """``hybrid.plot_diagram()`` imports graphviz (the ``diagrams`` extra)."""
+        find_spec = importlib.util.find_spec
+
+        def find_spec_without_graphviz(name, *args, **kwargs):
+            if name == "graphviz":
+                return None
+            return find_spec(name, *args, **kwargs)
+
+        with mock.patch("importlib.util.find_spec", find_spec_without_graphviz):
+            for demo_id in ("mpc_integrator_numpy", "mpc_car_minimal"):
+                with self.subTest(demo=demo_id):
+                    [row] = flagship_runner.run_flagship_demos(demo_filter=demo_id)
+                    self.assertEqual(row.status, "skip")
 
 
 if __name__ == "__main__":

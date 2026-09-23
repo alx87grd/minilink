@@ -41,7 +41,9 @@
   {
     "id": "mpc_integrator_numpy",
     "path": "examples/demos/mpc/mpc_integrator_numpy.py",
-    "requires": []
+    "requires": [
+      "graphviz"
+    ]
   },
   {
     "id": "trajopt_cartpole_jax",
@@ -55,7 +57,8 @@
     "id": "mpc_car_minimal",
     "path": "examples/demos/mpc/mpc_car_minimal.py",
     "requires": [
-      "jax"
+      "jax",
+      "graphviz"
     ]
   },
   {
