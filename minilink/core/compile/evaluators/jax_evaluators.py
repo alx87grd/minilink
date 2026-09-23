@@ -922,7 +922,10 @@ class JaxDiagramEvaluator(
         jnp = self._jnp
         sample = x if getattr(x, "size", 0) else u
         dtype = getattr(sample, "dtype", None)
-        return dtype if dtype is not None else jnp.float32
+        if dtype is None:
+            return jnp.float32
+        # An integer x0 still gets float dx; float inputs keep their width.
+        return jnp.result_type(dtype, float)
 
     def f(self, x, u, t=0.0):
         return self._f_jit_fn(x, u, t)
