@@ -371,6 +371,17 @@ class TestFiniteHorizonLQR(unittest.TestCase):
         np.testing.assert_allclose(dS_dt, rhs, atol=1e-5)
         np.testing.assert_allclose(S, np.swapaxes(S, 1, 2))  # symmetric throughout
 
+    def test_stiff_pair_on_a_coarse_grid_matches_a_fine_grid(self):
+        # a fast pole at -1000 rad/s: ‖H‖ Δt ≫ 1 on every grid below
+        A = np.array([[0.0, 1.0], [-1.0, -1000.0]])
+        B, Q, R, S_f, tf = self.B, self.Q, self.R, np.zeros((2, 2)), 5.0
+        _, _, S_fine = lqr_gain_schedule(A, B, Q, R, S_f, tf, n_steps=10001)
+        for n_steps in (2, 11, 101):
+            _, K, S = lqr_gain_schedule(A, B, Q, R, S_f, tf, n_steps=n_steps)
+            stride = 10000 // (n_steps - 1)
+            self.assertTrue(np.all(np.isfinite(K)))
+            np.testing.assert_allclose(S, S_fine[::stride], rtol=1e-8, atol=1e-12)
+
     def test_scheduled_gain_interpolates_and_holds(self):
         t = np.array([0.0, 1.0, 2.0])
         K = np.array([[[1.0, 0.0]], [[2.0, 0.0]], [[3.0, 0.0]]])

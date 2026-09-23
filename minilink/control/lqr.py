@@ -103,7 +103,9 @@ def lqr_gain_schedule(A, B, Q, R, S_f, tf, *, n_steps=1001):
     ``z = [x; λ]`` follows the linear Hamiltonian system ``ż = H z``, so one
     step of ``Δt`` backward is the linear-fractional map
     ``S ← (E₂₁ + E₂₂ S)(E₁₁ + E₁₂ S)⁻¹`` with ``E = expm(-H Δt)``: no
-    integration error, no stiffness, and ``S`` stays symmetric. Returns
+    integration error, no stiffness, and ``S`` stays symmetric. A coarse grid
+    is cut into substeps with ``‖H‖ Δt ≤ 1`` each, as in :func:`riccati_step`,
+    so the transition stays well conditioned however stiff the pair. Returns
     ``K(t) = R⁻¹BᵀS(t)`` for the law ``u = -K(t) x``. ``t`` holds ``n_steps``
     samples from ``0`` to ``tf``; ``K`` has shape ``(n_steps, m, n)`` and ``S``
     shape ``(n_steps, n, n)``.
@@ -120,12 +122,18 @@ def lqr_gain_schedule(A, B, Q, R, S_f, tf, *, n_steps=1001):
     R_inv = np.linalg.inv(R)
     dt = float(tf) / (n_steps - 1)
 
-    # constant dynamics: one transition serves every interval of the backward sweep
-    E = riccati_transition(A, B, Q, R_inv, dt)
+    # constant dynamics: one transition serves every interval of the backward sweep,
+    # cut into n_sub substeps with ‖H‖ dt ≤ 1 each, as in riccati_step
+    H = hamiltonian_matrix(A, B, Q, R_inv)
+    n_sub = max(1, int(np.ceil(np.linalg.norm(H, 2) * dt)))
+    E = riccati_transition(A, B, Q, R_inv, dt / n_sub)
     S = np.empty((n_steps, n, n))
     S[-1] = S_f
     for k in range(n_steps - 1, 0, -1):
-        S[k - 1] = riccati_map(E, S[k])
+        S_k = S[k]
+        for _ in range(n_sub):
+            S_k = riccati_map(E, S_k)
+        S[k - 1] = S_k
 
     t = np.linspace(0.0, float(tf), n_steps)
     K = R_inv @ B.T @ S
