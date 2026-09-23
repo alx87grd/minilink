@@ -17,6 +17,11 @@
     ],
     "smoke": false
   },
+  "examples/tutorial/06_hybrid.ipynb": {
+    "requires": [
+      "graphviz"
+    ]
+  },
   "examples/tutorial/07_compile.ipynb": {
     "requires": [
       "jax"

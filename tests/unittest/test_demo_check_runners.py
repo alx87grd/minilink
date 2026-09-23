@@ -138,6 +138,18 @@ def _load_json(relative_path: str):
     return json.loads((REPO_ROOT / relative_path).read_text(encoding="utf-8"))
 
 
+def _without_graphviz():
+    """Patch ``find_spec`` so the runners see no graphviz (no ``diagrams`` extra)."""
+    find_spec = importlib.util.find_spec
+
+    def find_spec_without_graphviz(name, *args, **kwargs):
+        if name == "graphviz":
+            return None
+        return find_spec(name, *args, **kwargs)
+
+    return mock.patch("importlib.util.find_spec", find_spec_without_graphviz)
+
+
 class TestDemoCheckManifests(unittest.TestCase):
     def test_requires_are_module_names(self):
         for relative_path in _REQUIRES_MANIFESTS:
@@ -160,18 +172,22 @@ class TestDemoCheckManifests(unittest.TestCase):
 
     def test_hybrid_diagram_flagships_skip_without_graphviz(self):
         """``hybrid.plot_diagram()`` imports graphviz (the ``diagrams`` extra)."""
-        find_spec = importlib.util.find_spec
-
-        def find_spec_without_graphviz(name, *args, **kwargs):
-            if name == "graphviz":
-                return None
-            return find_spec(name, *args, **kwargs)
-
-        with mock.patch("importlib.util.find_spec", find_spec_without_graphviz):
+        with _without_graphviz():
             for demo_id in ("mpc_integrator_numpy", "mpc_car_minimal"):
                 with self.subTest(demo=demo_id):
                     [row] = flagship_runner.run_flagship_demos(demo_filter=demo_id)
                     self.assertEqual(row.status, "skip")
+
+    def test_hybrid_diagram_notebook_skips_without_graphviz(self):
+        """``06_hybrid`` calls ``hybrid.plot_diagram()`` too."""
+        execute = mock.patch.object(
+            notebook_runner, "_execute_notebook", return_value=("pass", "")
+        )
+        with _without_graphviz(), execute:
+            [row] = notebook_runner.run_notebook_checks(
+                notebook_filter="tutorial_06_hybrid"
+            )
+        self.assertEqual(row.status, "skip")
 
     def test_notebook_ids_are_unique(self):
         ids = notebook_runner.notebook_ids(notebook_runner._discover_notebooks())
