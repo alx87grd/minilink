@@ -519,6 +519,8 @@ class TestPlanningArchitecture(unittest.TestCase):
 
 
 import pytest
+from minilink.blocks.basic import Integrator
+from minilink.core.sets import CallableSet, InputSet
 from minilink.planning.problems import PlanningProblem
 from minilink.planning.search.extenders import KinodynamicExtender
 from minilink.planning.search.rrt import RRTOptions, RRTPlanner
@@ -623,6 +625,63 @@ class TestTrajoptFlatConstructor(unittest.TestCase):
         problem = _trajopt_problem()
         with self.assertRaises(ValueError):
             TrajectoryOptimizationPlanner(problem, n_steps=4, transcription="bogus")
+
+
+@pytest.mark.parametrize(
+    "compile_backend", ["numpy", pytest.param("jax", marks=pytest.mark.jax)]
+)
+@pytest.mark.parametrize(
+    "transcription, options",
+    [
+        (DirectCollocationTranscription, DirectCollocationOptions),
+        (ShootingTranscription, ShootingOptions),
+        (MultipleShootingTranscription, MultipleShootingOptions),
+    ],
+    ids=["direct_collocation", "shooting", "multiple_shooting"],
+)
+def test_trajopt_counts_a_scalar_set_margin_as_one_constraint(
+    transcription, options, compile_backend
+):
+    class MarginInputSet(InputSet):
+        def __init__(self, margin_fn):
+            self.margin_fn = margin_fn
+
+        def margin(self, u, x=None, t=0.0, params=None):
+            return self.margin_fn(u)
+
+    def inequalities(margin_fn):
+        sys = Integrator()
+        problem = PlanningProblem(
+            sys=sys,
+            tf=1.0,
+            x_start=np.array([0.0]),
+            cost=QuadraticCost.from_system(sys),
+            X=CallableSet(margin_fn=lambda z, t, params: margin_fn(z)),
+            U=MarginInputSet(margin_fn),
+            Xf=CallableSet(margin_fn=lambda z, t, params: margin_fn(z)),
+        )
+        program = transcription(options(n_steps=4)).transcribe(
+            problem, compile_backend=compile_backend
+        )
+        z = np.linspace(0.1, 0.5, program.n_z)
+        if compile_backend == "jax":
+            import jax.numpy as jnp
+
+            z = jnp.asarray(z)
+        return np.asarray(program.g(z))
+
+    def scalar(z):
+        if compile_backend == "jax":
+            return 2.0  # float() of a tracer does not trace; a constant does
+        return 2.0 - float(z[0])
+
+    def vector(z):
+        return np.atleast_1d(scalar(z))
+
+    g = inequalities(scalar)
+    # 4 state knots + 4 input knots + 1 terminal state, one margin each
+    assert g.shape == (9,)
+    np.testing.assert_array_equal(g, inequalities(vector))
 
 
 class TestRrtFlatConstructor(unittest.TestCase):

@@ -66,11 +66,14 @@ def dynamics_function(problem: PlanningProblem, compile_backend: str):
 
 
 def native_concatenate(values, like):
-    """Concatenate vector pieces with the array module used by ``like``."""
+    """Concatenate vector pieces with the array module used by ``like``.
+
+    A scalar piece (a set margin written as a Python float) counts as one entry.
+    """
     xp = array_module(like)
     pieces = []
     for value in values:
-        pieces.append(value.reshape(-1))
+        pieces.append(xp.reshape(xp.asarray(value), (-1,)))
 
     if not pieces:
         return xp.array([])
@@ -237,7 +240,11 @@ class Transcription(ABC):
 def stack_constraints(
     constraints: list[ConstraintFunction],
 ) -> ConstraintFunction | None:
-    """Return one native-array constraint vector from a list of vector functions."""
+    """Return one native-array constraint vector from a list of vector functions.
+
+    A constraint that returns a scalar (a terminal set margin written as a
+    Python float) contributes one entry.
+    """
     if not constraints:
         return None
 
@@ -245,7 +252,7 @@ def stack_constraints(
         xp = array_module(z)
         values = []
         for constraint in constraints:
-            values.append(constraint(z).reshape(-1))
+            values.append(xp.reshape(xp.asarray(constraint(z)), (-1,)))
         return xp.concatenate(values)
 
     return stacked
