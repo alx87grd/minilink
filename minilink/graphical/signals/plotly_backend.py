@@ -291,7 +291,7 @@ def _create_figure(spec: SignalPlotSpec, **kwargs):
             row=row,
             col=1,
         )
-        ylabel = f"{trace.label} [{trace.unit}]" if trace.unit else trace.label
+        ylabel = _ylabel_with_unit(trace.label, trace.unit)
         fig.update_yaxes(title_text=ylabel, row=row, col=1)
 
     fig.update_xaxes(title_text=spec.abscissa_label, row=len(spec.traces), col=1)
@@ -307,6 +307,16 @@ def _create_figure(spec: SignalPlotSpec, **kwargs):
     if kwargs:
         fig.update_layout(**kwargs)
     return fig
+
+
+def _ylabel_with_unit(label: str, unit: str) -> str:
+    """Same unit rule as the matplotlib backend: ``[m]`` stays ``[m]``."""
+    if not unit:
+        return label
+    unit = str(unit).strip()
+    if unit.startswith("[") and unit.endswith("]"):
+        return f"{label} {unit}"
+    return f"{label} [{unit}]"
 
 
 def _import_plotly():

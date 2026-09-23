@@ -1283,6 +1283,21 @@ class TestPlotlySignalPlot(unittest.TestCase):
         handle.update(traj1)
         np.testing.assert_allclose(handle.fig.data[0].y, np.array([0.0, 0.25]))
 
+    def test_plotly_ylabels_bracket_units_once(self):
+        pytest.importorskip("plotly")
+        sys = Integrator_plotly_renderer()
+        sys.state.units = ["[m]"]  # already bracketed, as the manipulator ports declare
+        sys.inputs["u"].units = ["N"]
+        traj = Trajectory(
+            t=np.array([0.0, 1.0]), x=np.array([[0.0, 1.0]]), u=np.array([[1.0, 1.0]])
+        )
+        result = plot_time_signals(
+            sys, traj, signals=("x", "u"), backend="plotly", show=False
+        )
+        layout = result.figure.layout
+        self.assertEqual(layout.yaxis.title.text, "x[0] [m]")
+        self.assertEqual(layout.yaxis2.title.text, "u[0] [N]")
+
     def test_stacked_figsize_caps_height_for_popup_layout(self):
         from minilink.graphical.common.matplotlib_style import (
             SIGNAL_PLOT_MAX_FIG_HEIGHT_POPUP,
