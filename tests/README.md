@@ -132,13 +132,8 @@ graphics frame keys, catalog equation references)—not implementation trivia or
 third-party print formatting. Prefer one parametrized or table-driven test over
 many near-duplicate files.
 
-**Domain modules** (22 files after contract-test consolidation): `test_core`, `test_backends`,
-`test_compile`, `test_diagrams`, `test_simulation`, `test_step_discrete`,
-`test_hybrid`, `test_dynamics_catalog`, `test_mechanical_robotics`, `test_blocks`,
-`test_control_analysis`, `test_costs_optimizer`, `test_planning`, `test_mpc`,
-`test_graphics`, `test_geometry`, `test_engine_jax`, `test_jax_planning`,
-`test_symbolic`, `test_benchmark_helpers`, `test_demo_check_runners`,
-`test_flagship_graphics_contract`.
+**Domain modules**: one `tests/unittest/test_<domain>.py` per band or contract; add a test
+to the module of the band it exercises before creating a new file.
 
 Kinematic render check (graphics contract): ``run_flagship_graphics.py`` and manifest under
 ``tests/fixtures/kinematic_baseline/``.
@@ -177,8 +172,7 @@ Opt-in pytest bridge for notebooks: `MINILINK_NOTEBOOK_CHECKS=1 pytest tests/uni
 
 IDE launchers: [`tests/run/`](run/). Headless PNG check: `tests/demo_checks/run_flagship_graphics.py`.
 
-`tests/manual/` and `tests/bugs/` are removed — use `examples/demos/` for
-demos and unittest for contracts.
+Demos live in `examples/demos/`; contracts live in `tests/unittest/`.
 
 ## Core behavior without optional extras
 

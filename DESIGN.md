@@ -821,9 +821,6 @@ holds controller torque constant between computer ticks (ZOH) and samples plant 
 at tick boundaries — the intended semantics for digital SMC. See
 ``examples/demos/hybrid/sampled_smc_pendulum.py``.
 
-**Diagnostics.** ``scratch/confirm_smc_solver_bug.py`` compares solvers, ``ddq_f`` vs
-numerical ``Δdq/Δt``, and RK4 k1–k4 cancellation on the pendulum SMC demo.
-
 **Mitigation (landed):**
 — ``SlidingModeController`` sets ``discontinuous_behavior``; diagrams aggregate the flag;
 auto ``select_solver`` picks **Euler** with finer default ``dt``; ``UserWarning`` on every
@@ -922,7 +919,7 @@ expectation). A deterministic planner given a stochastic problem plans from
 the mean start and warns; `Sys2Gym.from_problem(problem, dt=)` is the
 Gymnasium view (draws of `x0`, the exit rule, `h` at a finite horizon). Distributions
 (`core/distributions.py`: `Gaussian`, `Uniform`, `Particles`, `Sampler`)
-are a duck type — `dim`, `mean()`, `sample(key)` on a NumPy generator or a
+are a duck type — `dim`, `mean` (an array), `sample(key)` on a NumPy generator or a
 JAX key (traceable). `nominal()` is the certainty-equivalent
 `PlanningProblem`. Every planner that takes a `PlanningProblem` takes the
 stochastic one.

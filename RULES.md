@@ -136,7 +136,7 @@ Systems-as-descriptions: CONSTITUTION.md §4.*
 
 - **4.1 Three import layers (prefer the shortest that remains clear):**
   - **Root prelude:** `from minilink import Pendulum, lqr, Simulator` (the primary teaching surface).
-  - **Band facades:** `from minilink.control import lqr` or `from minilink.analysis import bode`.
+  - **Band facades:** `from minilink.control import PID` or `from minilink.analysis import bode`.
   - **Defining module:** `from minilink.control.lqr import lqr` (library internals, tests,
     and the research lane).
 - **4.2 Student code imports through the teaching surface.** README, tutorials, teaching
@@ -451,7 +451,8 @@ Systems-as-descriptions: CONSTITUTION.md §4.*
 - **7.5 Incremental refactoring.** No broad restructures unless the maintainer asks. Match the
   neighborhood; change only what the task requires.
 - **7.6 Cross-link sparingly.** Every link is a maintenance edge: renames and section
-  moves break them silently (no link checker in CI). Link on first mention only, and
+  moves break them (`tests/unittest/test_repo_contract.py` checks the links of the
+  governance documents and `docs/plans/`, nothing else). Link on first mention only, and
   only when the reader must open the target to act. Otherwise name the document in
   plain text. Documents meant to be read top to bottom (principle lists, the
   constitution) aim for zero links. A table of "related documents" inside a doc

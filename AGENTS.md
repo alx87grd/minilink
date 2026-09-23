@@ -83,7 +83,7 @@ stripped by pre-commit (`nbstripout`). After notebook edits, smoke-check with
 
 **Entry points:** tests/README.md (section "entry points") — humans use **`tests/run/`** (IDE Run); agents and CI use the CLI table in that doc.
 
-GitHub **CI** (`.github/workflows/test.yml`) is the merge gate and runs exactly: `ruff check .`, `ruff format --check .`, `pytest` on Python 3.10–3.13, then the **`regression`** job (regression gates + flagship demos + notebook smoke with JAX). Run the same checks **locally before push or PR** so CI does not fail on lint/format — do **not** poll GitHub Actions after every small commit unless the user asked you to push or verify remote CI.
+GitHub **CI** (`.github/workflows/test.yml`) is the merge gate. It has three jobs: **`test`** (`ruff check .`, `ruff format --check .`, `pytest` on Python 3.10–3.13), **`packaging`** (build the sdist and wheel, check them, import the installed wheel), and **`regression`** (regression gates + flagship demos + notebook smoke with JAX). Run the same checks **locally before push or PR** so CI does not fail on lint/format — do **not** poll GitHub Actions after every small commit unless the user asked you to push or verify remote CI.
 
 Two workflows are **not** merge gates: `nightly.yml` runs every script under `examples/demos/` and every teaching notebook with the full optional stack, and `docs.yml` builds the Sphinx site. A demo that only the nightly sweep exercises still has to run — check it locally when you land one.
 
