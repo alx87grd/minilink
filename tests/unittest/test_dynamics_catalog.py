@@ -104,6 +104,13 @@ class TestCatalogSmoke(unittest.TestCase):
         three = ThreeMass(m=2.0, k=4.0, b=0.0, output_mass=3)
         np.testing.assert_allclose(three.B()[-1], [0.5])
 
+    def test_mass_chain_rejects_an_output_mass_outside_the_chain(self):
+        # A typo in the measured mass must not silently measure another mass.
+        for plant_class, count in ((TwoMass, 2), (ThreeMass, 3)):
+            for output_mass in (0, count + 1):
+                with self.assertRaisesRegex(ValueError, f"between 1 and {count}"):
+                    plant_class(output_mass=output_mass)
+
     def test_vehicle_reference_values(self):
         bicycle = KinematicBicycle()
         np.testing.assert_allclose(
