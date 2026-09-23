@@ -121,6 +121,67 @@ Plausible from the cited code; each needs a five-minute check before a fix.
   runs exactly three things" (four jobs); `estimation/` and
   `identification/` docstrings point at a retired ROADMAP section.
 
+### 2.3 Outcome (S58, 2026-09-23)
+
+All 46 reported bugs reproduced and are fixed on `dev`, each with a regression
+test (the docs bugs excepted). Every code fix was made in its own worktree
+branch, reviewed adversarially by a second agent (reproduction re-run, the new
+test shown to fail on the old code, other call sites searched), repaired where
+the review blocked it, then merged. On the merged tree: 1 336 passed, 31
+skipped, 0 failed, and the regression gate passes, speed gates included. Two
+fixes carry a maintainer ruling: the time grid (compile-sim#0) and the
+quarter-car damper (dynamics#0). The overshoot of `step_info` had the same
+undershoot defect as its rise time and was fixed alongside (`e06ba19`).
+
+| Bug | Outcome | Commit |
+|-----|---------|--------|
+| analysis#0 | `discretize()` steps a closed loop: the sample time lives on the wrapper (`disc.dt`), params pass through | `2e98744, 33ea68c` |
+| analysis#1 | `discretize()` copies `x0`, labels, units and bounds; the demo rolls out from the plant's `x0` | `07bbb38, 33ea68c` |
+| analysis#2 | `step` takes the plant's own params; `dt` is not a parameter sensitivity | `2e98744, 33ea68c` |
+| analysis#3 | Rise time uses thresholds signed toward the final value | `198b6c4` |
+| analysis#4 | `plot_bode` prints the numbers of `margins()` | `108d7d6` |
+| compile-sim#0 | A `dt` that divides the horizon (within round-off) gives a grid ending at `tf`; kept samples are bit-identical; a `dt` that does not divide it keeps today's grid | `8b4d119` |
+| compile-sim#1 | The JAX diagram evaluator promotes integer states to a float buffer | `78161e1` |
+| compile-sim#2 | The step-diagram compiler probes each block once | `60b282b` |
+| control#0 | `lqr_gain_schedule` substeps when `‖H‖ dt > 1`; other cases byte-identical | `d23b70d` |
+| control#1 | The MPC tick latch keys on `(k, y)` | `759f349` |
+| control#2 | `mpc % dt` runs the `dt_mpc` cross-check | `a1c6e6c` |
+| control#3 | RULES 4.1's band example is an import that works | `fb76246` |
+| control#4 | A gravity hook's signature is read, so its own `TypeError` reaches the caller | `e530ec4` |
+| core#0 | `closed_loop` / `@` never extend the left operand | `47efe7f` |
+| core#1 | `ScaledCost` keeps its member's `discount_rate`; `SumCost` requires equal rates | `3ca8951` |
+| core#2 | A diagram bubbles `smallest_time_constant` from its stateful or hinted subsystems | `1ee4e4a` |
+| core#3 | `IntersectionSet.margin` accepts a member whose margin is a scalar | `da7467f` |
+| core#4 | A flow diagram refuses a `StepSystem` (and a step diagram a stateful `DynamicSystem`) at `add_subsystem` | `0736777` |
+| dynamics#0 | The quarter-car damper acts on the road's vertical velocity `vx · dz/dx` (ruled 2026-09-23) | `d012721` |
+| dynamics#1 | `Plane2D.d` / `Plane3D.d` take the nominal input when `u` is `None` | `21fc30b` |
+| dynamics#2 | `q` / `dq` ports read their labels and units from the state | `7145cf4` |
+| dynamics#3 | The mass chains reject an out-of-range `output_mass` | `239c809` |
+| examples#0 | Tutorial 00 prints the diagram's labels on its Diagram line | `5f587a2` |
+| examples#1 | The collocation demo falls back to SLSQP without `cyipopt`; a contract test pins the probe | `180c47d` |
+| graphics#0 | `Sys2Gym` resets draw from the problem first and refuse a spread on unbounded states | `6c97939` |
+| graphics#1 | Animations end on the last sample; a one-sample trajectory is a still frame | `6ceadb9, 9865016` |
+| graphics#2 | A `.gif` file name keeps one suffix | `7515d97` |
+| graphics#3 | Plotly y-labels bracket a unit once | `ddbf4b9` |
+| graphics#4 | `HybridDiagram.plot_trajectory` honours `abscissa` (`'t'` or the tick view `'k'`) | `6082bc6, 9428a05` |
+| planning#0 | `score_trajectory` reads `problem.params.sets` | `66708fc` |
+| planning#1 | `MonteCarloEvaluator` defaults to `backend='auto'` and names a NumPy-only law | `bb0e42c` |
+| planning#2 | DP charges a callable `infeasible_cost` at each exit, on both backends | `6da066c` |
+| planning#3 | DP plot and query verbs raise the planner's `No solution` error before `solve` | `6bbc4ef` |
+| tests-ci#0 | The CI `regression` job runs `pytest` with JAX (and the `rl` extra); later steps report after a failure | `23dd127, fb119a4` |
+| tests-ci#1 | JAX tests are guarded per test; 143 NumPy tests run without JAX; a contract test pins it | `d81c717` |
+| tests-ci#2 | The manifests declare `graphviz`; `requires` names are checked; dead `demo_id`s fixed | `4e8d409, 02afc26, 6c8179c` |
+| tests-ci#3 | Notebook ids are unique; unknown `--notebook` / `--demo` ids are rejected | `1026a49, 8b0621b` |
+| tests-ci#4 | The regression launcher's CI mode uses the CI factor | `ddec534` |
+| tests-ci#5 | tests/README drops its stale census and removed-folder note (the dead `demo_id`s: tests-ci#2) | `fb76246` |
+| docs-gov#0 | DESIGN §6 names `Distribution.mean` as an array | `fb76246` |
+| docs-gov#1 | DESIGN §5's pointer to a missing script is gone | `fb76246` |
+| docs-gov#2 | RULES 7.6 says what the link check covers | `fb76246` |
+| docs-gov#3 | tests/README drops the module census | `fb76246` |
+| docs-gov#4 | AGENTS names the three CI jobs | `fb76246` |
+| docs-gov#5 | The pyro parity table marks `ss2tf`, `TrajectoryLQRController` and PI/PD landed | `fb76246` |
+| docs-gov#6 | The estimation and identification docstrings point at their ROADMAP steps | `fb76246` |
+
 ## 3. Propositions
 
 Ordered by where the work lands. Each line names the finder id (band#n) so
