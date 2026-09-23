@@ -170,6 +170,35 @@ class TestHybridSimulator(unittest.TestCase):
         hybrid.compute_forced(np.array([1.0]), t0=0, tf=0.1, input_port_id="r")
         hybrid.plot_trajectory(signals=("r", "y", "u_cmd", "x"), show=False)
 
+    def test_plot_abscissa_selects_plant_time_or_computer_ticks(self):
+        import matplotlib
+
+        matplotlib.use("Agg")
+        import matplotlib.pyplot as plt
+
+        hybrid = _build_hybrid()
+        result = hybrid.compute_forced(
+            np.array([1.0]), t0=0, tf=0.1, input_port_id="r", verbose=False
+        )
+        views = {
+            "plant time": hybrid.plot_trajectory(show=False),
+            "computer ticks": hybrid.plot_trajectory(abscissa="k", show=False),
+            "result ticks": hybrid.plot_trajectory(result, abscissa="k", show=False),
+            "rollout ticks": hybrid.plot_trajectory(
+                result.computer.as_trajectory(), abscissa="k", show=False
+            ),
+        }
+        self.assertEqual(views["plant time"].axes[-1].get_xlabel(), "Time [s]")
+        for name in ("computer ticks", "result ticks", "rollout ticks"):
+            axes = views[name].axes
+            self.assertEqual(axes[-1].get_xlabel(), "Step [k]", msg=name)
+            np.testing.assert_array_equal(
+                axes[0].lines[0].get_xdata(), result.computer.k, err_msg=name
+            )
+        with self.assertRaisesRegex(ValueError, "abscissa"):
+            hybrid.plot_trajectory(abscissa="s", show=False)
+        plt.close("all")
+
     def test_plot_smoke_default_computer_out_u(self):
         """``hybrid_closed_loop`` default ``computer_out='u'`` must not clash with Trajectory.u."""
         import matplotlib
