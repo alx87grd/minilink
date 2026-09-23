@@ -75,7 +75,7 @@ def step_info(time, y) -> StepInfo:
     y = np.asarray(y, dtype=float).reshape(-1)
 
     # y_∞ = last sample if the tail stays in the 2 % band, else nan
-    # rise:      t(90%) − t(10%) of |y_∞|
+    # rise:      t(90%) − t(10%) of y_∞, from rest (y_0 = 0), signed
     # settling:  last time |y − y_∞| leaves the 2 % band
     # overshoot: 100 · (|peak| − |y_∞|) / |y_∞|
     final = y[-1]
@@ -138,8 +138,10 @@ def _overshoot(peak, final):
 def _rise_time(time, y, final):
     if final == 0.0:
         return float(np.nan)
-    crossed_10 = np.flatnonzero(np.abs(y) >= 0.1 * abs(final))
-    crossed_90 = np.flatnonzero(np.abs(y) >= 0.9 * abs(final))
+    # signed toward y_∞, so an undershoot (a zero in the right half plane) never counts
+    progress = np.sign(final) * y
+    crossed_10 = np.flatnonzero(progress >= 0.1 * abs(final))
+    crossed_90 = np.flatnonzero(progress >= 0.9 * abs(final))
     if crossed_10.size and crossed_90.size:
         return float(time[crossed_90[0]] - time[crossed_10[0]])
     return float(np.nan)

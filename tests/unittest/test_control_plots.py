@@ -117,6 +117,14 @@ class TestLinearCore(unittest.TestCase):
         )
         self.assertGreater(info.settling_time, info.rise_time)
 
+    def test_step_info_rise_time_skips_the_undershoot(self):
+        # G(s) = (1 - s) / (s + 1)²: y = 1 - (1 + 2t) e^(-t) dips to -0.21 at t = 0.5 s,
+        # then reaches 10 % at t = 1.483 s and 90 % at t = 4.631 s
+        tf = TransferFunction([-1.0, 1.0], [1.0, 2.0, 1.0])
+        t = np.linspace(0.0, 12.0, 12001)
+        info = step_info(t, linear.step_response(*_matrices(tf), t))
+        self.assertAlmostEqual(info.rise_time, 4.631 - 1.483, places=2)
+
 
 class TestChannelTools(unittest.TestCase):
     """The system-level verbs share the family signature and the channel selectors."""
