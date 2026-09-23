@@ -189,14 +189,23 @@ class TestHybridSimulator(unittest.TestCase):
             ),
         }
         self.assertEqual(views["plant time"].axes[-1].get_xlabel(), "Time [s]")
+        u_cmd = result.computer.signals["u_cmd"][0]
+        ylabels = [ax.get_ylabel() for ax in views["result ticks"].axes]
         for name in ("computer ticks", "result ticks", "rollout ticks"):
             axes = views[name].axes
             self.assertEqual(axes[-1].get_xlabel(), "Step [k]", msg=name)
+            self.assertEqual([ax.get_ylabel() for ax in axes], ylabels, msg=name)
             np.testing.assert_array_equal(
                 axes[0].lines[0].get_xdata(), result.computer.k, err_msg=name
             )
+            drawn = [line.get_ydata() for ax in axes for line in ax.lines]
+            self.assertTrue(
+                any(np.array_equal(y, u_cmd) for y in drawn), msg=f"{name}: u_cmd"
+            )
         with self.assertRaisesRegex(ValueError, "abscissa"):
             hybrid.plot_trajectory(abscissa="s", show=False)
+        with self.assertRaisesRegex(ValueError, "computer rollout"):
+            hybrid.plot_trajectory(result.plant, abscissa="k", show=False)
         plt.close("all")
 
     def test_plot_smoke_default_computer_out_u(self):

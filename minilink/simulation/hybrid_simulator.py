@@ -323,6 +323,7 @@ class HybridSimResult:
             show=show,
             backend=backend,
             abscissa_label=None,
+            control_key=self.plant_control_signal_key(),
             **kwargs,
         )
 
@@ -334,7 +335,11 @@ class HybridSimResult:
         backend="matplotlib",
         **kwargs,
     ):
-        """Plot computer boundary channels on the tick index ``k``."""
+        """Plot computer boundary channels on the tick index ``k``.
+
+        Channels keep their computer port names (a ``u_cmd`` command is drawn as
+        ``u_cmd``); ``u`` here is the computer's input vector, not the plant command.
+        """
         from minilink.graphical.signals.time_signals import STEP_ABSCISSA_LABEL
 
         if signals is None:
@@ -346,6 +351,7 @@ class HybridSimResult:
             show=show,
             backend=backend,
             abscissa_label=STEP_ABSCISSA_LABEL,
+            control_key=None,
             **kwargs,
         )
 
@@ -358,6 +364,7 @@ class HybridSimResult:
         show,
         backend,
         abscissa_label,
+        control_key,
         **kwargs,
     ):
         from minilink.core.system import System
@@ -383,10 +390,7 @@ class HybridSimResult:
             if traj.u.shape[0]:
                 signals = tuple(dict.fromkeys((*signals, "u")))
 
-        plot_signals = self.plot_signal_names(
-            signals,
-            control_key=self.plant_control_signal_key(),
-        )
+        plot_signals = self.plot_signal_names(signals, control_key=control_key)
         label = abscissa_label or TIME_ABSCISSA_LABEL
         return plot_time_signals(
             sys,

@@ -242,8 +242,10 @@ class HybridDiagram:
         ``abscissa`` picks the view: ``"t"`` plots the plant channels against time
         (:meth:`HybridSimResult.plot`); ``"k"`` plots the computer channels against
         the tick index (:meth:`HybridSimResult.plot_computer`). A plain
-        :class:`~minilink.core.trajectory.Trajectory` passed with ``abscissa="k"`` is
-        read as a computer rollout, ``traj=result.computer.as_trajectory()``.
+        :class:`~minilink.core.trajectory.Trajectory` passed with ``abscissa="k"``
+        must be a computer rollout, ``traj=result.computer.as_trajectory()``, and is
+        drawn with the same default channels; a plant trajectory raises
+        ``ValueError``.
         """
         if abscissa not in ("t", "k"):
             raise ValueError(
@@ -275,6 +277,15 @@ class HybridDiagram:
             sys, abscissa_label = self.plant, TIME_ABSCISSA_LABEL
         else:
             sys, abscissa_label = self.computer.diagram, STEP_ABSCISSA_LABEL
+            if traj.x.shape[0] != sys.n or traj.u.shape[0] != sys.m:
+                raise ValueError(
+                    "abscissa='k' plots a computer rollout: pass the HybridSimResult "
+                    "or result.computer.as_trajectory(). This trajectory has "
+                    f"n={traj.x.shape[0]}, m={traj.u.shape[0]}; the computer "
+                    f"diagram has n={sys.n}, m={sys.m}."
+                )
+            if signals is None and traj.signals:
+                signals = tuple(traj.signals)
         if signals is None:
             signals = resolve_plot_signals(sys)
             if traj.u.shape[0]:
