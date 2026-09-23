@@ -405,7 +405,8 @@ class System(SharedSystemFacades):
         error-driven left operand (a compensator, a transfer function, a
         series diagram ``C >> G``) gets an Error block ``e = r - y``
         inserted; ``sys @ 1`` closes ``sys`` on itself with unity feedback.
-        See :func:`~minilink.core.composition.closed_loop` and
+        Unlike ``+`` and ``>>``, neither operand is modified: the loop is a
+        new diagram. See :func:`~minilink.core.composition.closed_loop` and
         :func:`~minilink.core.composition.feedback`.
         """
         from minilink.core.composition import closed_loop
