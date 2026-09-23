@@ -1,6 +1,6 @@
 """The repo's contract with itself: rules that used to drift because nothing checked them.
 
-Three rules of RULES.md are cheap to verify and were all violated within days of
+Four rules of RULES.md are cheap to verify and were all violated within days of
 being written, so they are tests now rather than prose:
 
 - 6.9 public-facing prose never names another tool (the hand-written grep was
@@ -8,7 +8,9 @@ being written, so they are tests now rather than prose:
 - 7.6 internal documentation links resolve, paths and anchors alike (the review
   ladder's own table of contents pointed at two slugs that do not exist);
 - 5.8 no leading-underscore pseudo-privacy on the System family or the
-  teaching-lane simulators.
+  teaching-lane simulators;
+- 6.7 teaching-lane code that picks Ipopt probes for ``cyipopt`` first, so it
+  still runs on an install without it (a cart-pole demo hard-coded it).
 """
 
 from __future__ import annotations
@@ -64,6 +66,9 @@ NAMED_CLASS_MODULES = (
     "minilink/simulation/static_simulator.py",
 )
 
+# 6.7 — the teaching lane, which must run without the optional Ipopt build.
+TEACHING_EXAMPLE_ROOTS = ("examples/tutorial", "examples/teaching", "examples/demos")
+
 
 def heading_slug(heading: str) -> str:
     """GitHub's anchor rule: lowercase, drop punctuation, one hyphen per space."""
@@ -77,6 +82,21 @@ def notebook_markdown(path: pathlib.Path) -> str:
         "".join(cell.get("source", []))
         for cell in cells
         if cell.get("cell_type") == "markdown"
+    )
+
+
+def example_code(path: pathlib.Path) -> str:
+    """A script's source, or a notebook's code cells without shell and magic lines."""
+    if path.suffix == ".py":
+        return path.read_text()
+    cells = json.loads(path.read_text()).get("cells", [])
+    code = "\n".join(
+        "".join(cell.get("source", []))
+        for cell in cells
+        if cell.get("cell_type") == "code"
+    )
+    return "\n".join(
+        line for line in code.splitlines() if not line.lstrip().startswith(("%", "!"))
     )
 
 
@@ -153,6 +173,29 @@ class TestInternalNaming(unittest.TestCase):
                         f"{name}: {node.name}.{item.name} uses a leading underscore; "
                         "give it a plain name under a '# Internal machinery' comment",
                     )
+
+
+class TestOptionalIpopt(unittest.TestCase):
+    """RULES 6.7 — Ipopt is optional, so the teaching lane falls back without it."""
+
+    def test_code_that_picks_ipopt_probes_for_cyipopt(self):
+        for root in TEACHING_EXAMPLE_ROOTS:
+            for path in sorted((REPO / root).rglob("*")):
+                if path.suffix not in (".py", ".ipynb"):
+                    continue
+                tree = ast.parse(example_code(path))
+                constants = [
+                    node.value
+                    for node in ast.walk(tree)
+                    if isinstance(node, ast.Constant)
+                ]
+                if "ipopt" not in constants:
+                    continue
+                self.assertTrue(
+                    "cyipopt" in constants,
+                    f"{path.relative_to(REPO)} picks 'ipopt' without probing "
+                    "importlib.util.find_spec('cyipopt'); fall back to 'scipy_slsqp'",
+                )
 
 
 if __name__ == "__main__":
