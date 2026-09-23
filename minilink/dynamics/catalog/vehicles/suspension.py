@@ -78,8 +78,10 @@ class QuarterCarOnRoughTerrain(DynamicSystem):
         ground = self.z(x_pos, params)
         ground_slope = self.dz(x_pos, params)
 
+        # the road rises under the wheel at z' = (dz/dx) x', with x' = vx
+        ground_velocity = ground_slope * vx
         # mass y'' = u - k (y - z) - b (y' - z'): sprung mass over the road
-        acceleration = (u[0] - k * (y - ground) - b * (dy - ground_slope)) / mass
+        acceleration = (u[0] - k * (y - ground) - b * (dy - ground_velocity)) / mass
         dx = array_module(x, u).array([acceleration, dy, vx])
 
         return dx

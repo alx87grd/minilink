@@ -124,6 +124,17 @@ class TestCatalogSmoke(unittest.TestCase):
         mountain = MountainCar()
         np.testing.assert_allclose(mountain.H(np.array([0.0])), [[1.0]])
 
+    def test_quarter_car_damps_against_the_road_vertical_velocity(self):
+        # The road rises under the wheel at z' = dz/dx * vx, so the damper
+        # force b (y' - z') grows linearly with the forward speed vx.
+        car = QuarterCarOnRoughTerrain()
+        b, mass = car.params["b"], car.params["mass"]
+        x = np.array([0.0, 0.0, 2.0])
+        u = np.zeros(1)
+        a0, a3 = (car.f(x, u, params=dict(car.params, vx=vx))[0] for vx in (0.0, 3.0))
+        np.testing.assert_allclose(a3 - a0, 3.0 * b * car.dz(2.0) / mass)
+        np.testing.assert_allclose(a3, 1.5436826659862837, rtol=1e-12)
+
     def test_aerial_and_marine_force_split_reference_values(self):
         drone = Drone2D()
         q = np.zeros(3)
