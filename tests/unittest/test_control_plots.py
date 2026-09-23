@@ -224,6 +224,20 @@ class TestPlots(unittest.TestCase):
         r = plot_bode(self.loop, margins=False, show=False)
         self.assertEqual(len(r.axes[0].lines), 1)
 
+    def test_bode_plot_reports_the_margins_of_margins(self):
+        # the 200 plotted points put the gain crossover at 1.28 rad/s; margins() at 1.27
+        loop = TransferFunction([4.9], [1.0, 3.0, 2.0, 0.0])
+        m = margins(loop)
+        r = plot_bode(loop, show=False)
+        texts = [t.get_text() for t in r.axes[0].texts]
+        self.assertIn(
+            f"Gm = {m.gain_margin_db:.1f} dB (at {m.w_phase_crossover:.3g} rad/s)\n"
+            f"Pm = {m.phase_margin_deg:.1f} deg (at {m.w_gain_crossover:.3g} rad/s)",
+            texts,
+        )
+        crossovers = [line.get_xdata()[0] for line in r.axes[0].lines[1:3]]
+        self.assertEqual(crossovers, [m.w_gain_crossover, m.w_phase_crossover])
+
     def test_plotly_backend_draws_the_same_figures(self):
         pytest.importorskip("plotly")
         for plot, sys, expected in (
