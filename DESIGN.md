@@ -1057,7 +1057,9 @@ default.
 `DynamicProgrammingPlanner(problem, x_grid=, u_grid=, dt=)` builds that grid
 itself (`grid=` for a custom one), and `solve()` then pins saturated
 cost-to-go cells to `out_of_bound_cost` (`clean_infeasible=False` keeps the raw
-table; `clean_infeasible_set(tol)` reruns the pass with another tolerance).
+table; `clean_infeasible_set(tol)` reruns the pass with another tolerance). A
+callable `out_of_bound_cost` has no single saturation level, so it leaves the table as
+solved.
 `ValueIterationRecord.success` means the sweeps converged to `tol` (a
 fixed-horizon `solve_steps` always succeeds); the record carries the sweep
 count and the last cost-to-go change.
@@ -1076,7 +1078,8 @@ interpolates `J` (the raw `DynamicProgrammingResult`, `J` and `pi` as action ids
 transitions are charged a finite `out_of_bound_cost` (pyro's
 `cf.INF`), or, when it is a callable like the problem's `infeasible_cost`, its price
 `out_of_bound_cost(x_next, t)` at each such transition's successor. Three interchangeable
-backward-step backends share this workflow: `loop` (per-node Python, pyro's reference), `numpy` (vectorized over the precomputed lookup table, the default),
+backward-step backends share this workflow: `loop` (per-node Python, pyro's reference),
+`numpy` (vectorized over the precomputed lookup table, the default),
 and `jax` (the same backup as one jitted `lax.while_loop` with `map_coordinates`, on tables
 built with `vmap`, so the plant and cost must be JAX-traceable; linear/nearest only). The JAX
 engine lives in `dp_jax.py` and the progress reports in `progress.py`, so `dp.py` reads as the

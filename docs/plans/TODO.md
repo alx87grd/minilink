@@ -80,7 +80,9 @@ the triage in [2026-09-22-improvement-suggestions.md](../reviews/2026-09-22-impr
   entries, and the README rows marked Stable-Baselines3, once the course notes point only at
   the native twins.
 - [ ] **S54 `plot_cost2go` colour scale** clipped at `out_of_bound_cost` by default (the
-  showcase passes `jmax` by hand); review the DP `out_of_bound_cost` default.
+  showcase passes `jmax` by hand); review the DP `out_of_bound_cost` default. It can be a
+  callable `price(x, t)` (the problem's `infeasible_cost`), which has no single level to clip
+  at, so the default needs a rule for that case too.
 
 ---
 

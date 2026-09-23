@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from dataclasses import dataclass, replace
 
 import numpy as np
@@ -331,9 +332,10 @@ class DynamicProgrammingPlanner(Planner):
         when not given.
 
         Warning: on a precomputed grid the table is built once, at the first
-        sweep's time, and reused for every sweep. A running cost ``g`` that
-        depends on ``t`` is then frozen at that time. Use a grid with
-        ``precompute=False`` for a time-varying cost.
+        sweep's time, and reused for every sweep. A running cost ``g``, or a
+        price ``out_of_bound_cost(x_next, t)``, that depends on ``t`` is then
+        frozen at that time. Use a grid with ``precompute=False`` for a
+        time-varying cost.
         """
         # Built once on a precomputed grid: this assumes g does not depend on t
         if self._G is not None:
@@ -346,9 +348,11 @@ class DynamicProgrammingPlanner(Planner):
         N, A = grid.nodes_n, grid.actions_n
         INF = self.options.out_of_bound_cost  # a large finite penalty (pyro's cf.INF)
 
-        if admissible is None or x_next is None:
-            x_next, action_ok, x_next_ok = grid.transition(t)
-            admissible = action_ok & x_next_ok
+        # The grid's mask, and its successors when a callable price needs them
+        if admissible is None or (x_next is None and callable(INF)):
+            successors, action_ok, x_next_ok = grid.transition(t)
+            admissible = action_ok & x_next_ok if admissible is None else admissible
+            x_next = successors if x_next is None else x_next
 
         G = np.empty((N, A), dtype=float)
         nodes = progress(
@@ -413,6 +417,10 @@ class DynamicProgrammingPlanner(Planner):
         callable ``out_of_bound_cost(x_next, t)`` has no single saturation
         level: the tables are then left as solved.
         """
+        # The tables, not the solution: a solve cleans them before storing its solution
+        if self.result is None:
+            raise ValueError("No solution has been computed yet")
+
         result = self.result
         INF = self.options.out_of_bound_cost
 
@@ -537,8 +545,8 @@ class DynamicProgrammingOptions:
         Finite penalty charged to inadmissible inputs or out-of-domain
         successors: a scalar, or ``out_of_bound_cost(x_next, t)`` evaluated at
         each inadmissible pair's successor (the ``"jax"`` backend needs it
-        traceable). The planner reads the problem's ``infeasible_cost`` as its
-        default.
+        traceable and time-invariant). The planner reads the problem's
+        ``infeasible_cost`` as its default.
     final_time : float
         Terminal time ``tf``; sweeps step backward as ``t = tf - k dt``. Left
         at ``0.0``, the planner reads ``problem.tf`` when the problem sets one.
@@ -561,7 +569,7 @@ class DynamicProgrammingOptions:
     tol: float = 0.1
     max_iterations: int = 1000
     interpolation: str = "linear"
-    out_of_bound_cost: float = 1.0e6
+    out_of_bound_cost: float | Callable = 1.0e6
     final_time: float = 0.0
     record_history: bool = False
     verbose: bool = False

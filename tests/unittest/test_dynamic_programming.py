@@ -223,6 +223,7 @@ class TestControllerAndEvaluation(unittest.TestCase):
             "plot_policy": planner.plot_policy,
             "animate_cost2go": planner.animate_cost2go,
             "animate_policy": planner.animate_policy,
+            "clean_infeasible_set": planner.clean_infeasible_set,
         }
         for name, verb in verbs.items():
             with self.subTest(verb=name):
@@ -808,6 +809,27 @@ class TestInfeasibleCostPrice(unittest.TestCase):
         G_scalar = scalar.running_cost_table(0.0)
         np.testing.assert_array_equal(G_scalar[~inadmissible], G[~inadmissible])
         self.assertTrue(np.all(G_scalar[inadmissible] == 500.0))
+
+    def test_a_given_mask_is_charged_as_given(self):
+        for price in (300.0, exit_price):
+            with self.subTest(price=price):
+                planner = self.planner(price)
+                grid = planner.grid
+                g, cost_params = planner.problem.cost.g, planner.problem.params.cost
+                x_next = grid.transition(0.0)[0]
+
+                # Only the first pair is inadmissible, whatever the grid's own mask
+                admissible = np.ones((grid.nodes_n, grid.actions_n), bool)
+                admissible[0, 0] = False
+                G = planner.running_cost_table(0.0, admissible)
+
+                # The running cost of every pair, and the price on the masked one only
+                expected = np.empty(admissible.shape)
+                for s, x in enumerate(grid.states):
+                    for a, u in enumerate(grid.inputs):
+                        expected[s, a] = float(g(x, u, 0.0, cost_params)) * grid.dt
+                expected[0, 0] = price(x_next[0, 0], 0.0) if callable(price) else price
+                np.testing.assert_allclose(G, expected)
 
     def test_a_constant_price_solves_like_the_scalar(self):
         for backend in ("numpy", "loop"):
