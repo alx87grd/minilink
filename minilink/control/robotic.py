@@ -430,16 +430,20 @@ def gravity_feedforward(plant, gravity, q, model_params=None):
     subsystem do not reach this embedded copy; see DESIGN §4
     (*Embedded-model params rule*).
 
-    A custom hook is ``gravity(q)`` or ``gravity(q, params)``; its signature
-    says which, so a ``TypeError`` raised inside the hook reaches the caller.
+    A custom hook is ``gravity(q)``, or ``gravity(q, params)`` when its
+    signature requires the second argument. Only the signature is probed, so a
+    ``TypeError`` raised inside the hook reaches the caller.
     """
     xp = array_module(q)
     if gravity is not None:
         try:
-            inspect.signature(gravity).bind(q, model_params)
+            inspect.signature(gravity).bind(q)
+            takes_params = False
+        except TypeError:
+            # the signature requires a second argument
             takes_params = True
-        except (TypeError, ValueError):
-            # one positional argument, or no signature to read: the documented gravity(q)
+        except ValueError:
+            # no signature to read: the documented gravity(q)
             takes_params = False
         g = gravity(q, model_params) if takes_params else gravity(q)
     else:

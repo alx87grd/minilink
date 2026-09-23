@@ -539,6 +539,25 @@ class TestRoboticWrappers(unittest.TestCase):
                 with self.assertRaisesRegex(TypeError, "bug inside the hook"):
                     ctl.ctl(None, np.concatenate([q, q, np.zeros(2)]))
 
+    def test_gravity_hook_with_an_optional_second_argument_is_called_as_g_of_q(self):
+        from scipy.interpolate import CubicSpline
+
+        def g_of_q(q):
+            return np.array([1.0, 2.0]) * q
+
+        def wrapper(*args, **kwargs):
+            return g_of_q(*args, **kwargs)
+
+        grid = np.linspace(-np.pi, np.pi, 41)
+        spline = CubicSpline(grid, 9.81 * np.sin(grid))
+        arm = TwoLinkManipulator()
+        q = np.array([0.2, 0.3])
+        for name, hook in (("*args wrapper", wrapper), ("CubicSpline", spline)):
+            with self.subTest(hook=name):
+                ctl = ModelJointImpedance(arm, gravity_comp=True, gravity=hook)
+                u = ctl.ctl(None, np.concatenate([q, q, np.zeros(2)]))
+                np.testing.assert_allclose(u, hook(q))
+
     def test_joint_impedance_gravity_requires_plant(self):
         with self.assertRaises(ValueError):
             JointImpedance(dof=2, gravity_comp=True)
