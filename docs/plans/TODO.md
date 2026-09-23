@@ -206,7 +206,13 @@ Plan: [gro501-classical-control.md](gro501-classical-control.md) (P1, F1, F2, F4
   simulation. Reopen only if the sommatif examines z-plane analysis.
   When it reopens: an exact zero-order-hold option on `discretize`, shared with
   `step_response` (scan: analysis#1). The `discretize` bugs (dt in params, dropped `x0`) are
-  S58.
+  fixed under S58: the sample time is `disc.dt`, `params` reach the source untouched, and
+  the wrapper keeps the source's `x0` and signal metadata. Two follow-ups remain.
+  **[ask]** keep the `params["dt"]` fallback (`dt=` omitted) or make `dt` required: under
+  RULES 4.4, `params={"dt": 0.05}` alone now replaces the plant's params, so pass `dt=`.
+  A source whose `y` feeds through from a port other than `u` does not discretize
+  (`PendulumWithNoisePort`: unknown input dependency `v`), because the wrapper stacks every
+  port into one `u`; map `y`'s dependencies to `("u",)` or mirror the source's ports.
 - [ ] **P11 Two GRO501 notebooks** **[maintainer — student-facing]**:
   `teaching/topics/classical_control/dc_motor_propulsion.ipynb` (APP2) and
   `bicycle_autopilot.ipynb` (APP4), Basic tier, Colab-first; drafted for review. Done when
