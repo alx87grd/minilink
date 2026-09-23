@@ -1087,6 +1087,23 @@ class TestAutomaticTimeGrid(unittest.TestCase):
             closed = Simulator(loop, tf=1.0, verbose=False)
         self.assertEqual(closed.solver_mode, "euler")
 
+    def test_loop_takes_the_hint_a_block_sets_for_itself(self):
+        from minilink import Pendulum, RateLimiter, Saturation, StateFeedbackController
+
+        plant = Pendulum()
+        plant.solver_info["smallest_time_constant"] = 0.5
+        controller = StateFeedbackController(np.array([[10.0, 2.0]]))
+
+        # a static block that declares a time constant counts like a stateful one
+        saturation = Saturation(-1.0, 1.0)
+        saturation.solver_info["smallest_time_constant"] = 0.02
+        limiter = RateLimiter(rate_max=5.0, tau=0.02)
+        for block in (saturation, limiter):
+            with self.subTest(block=block.name):
+                loop = (controller >> block) @ plant
+                sim = Simulator(loop, tf=1.0, solver="euler", verbose=False)
+                self.assertAlmostEqual(sim.dt, 0.002)  # 0.02 * SMOOTH_AUTO_DT_SCALE
+
     def test_explicit_grid_still_wins(self):
         sim = Simulator(StableLinearSystem(), tf=1.0, n_steps=51, verbose=False)
         self.assertEqual(sim.n_pts, 51)
