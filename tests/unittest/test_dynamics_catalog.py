@@ -12,7 +12,7 @@ from minilink.dynamics.catalog.aerial.drone import (
     Drone2DWithSideThruster,
     SpeedControlledDrone2D,
 )
-from minilink.dynamics.catalog.aerial.plane import Plane2D
+from minilink.dynamics.catalog.aerial.plane import Plane2D, Plane3D
 from minilink.dynamics.catalog.aerial.rocket import Rocket
 from minilink.dynamics.catalog.equations.integrators import (
     DoubleIntegrator,
@@ -153,6 +153,22 @@ class TestCatalogSmoke(unittest.TestCase):
             boat.generalized_force(np.zeros(3), np.zeros(3), np.array([3.0, 4.0])),
             [3.0, 4.0, -12.0],
         )
+
+    def test_plane_inverse_dynamics_without_u_reads_the_nominal_input(self):
+        # Model-based controllers call inverse_dynamics(q, v, a) without u;
+        # the control-surface loads then come from the u port's nominal value.
+        for plane in (Plane2D(), Plane3D()):
+            q = np.zeros(plane.dof)
+            v = np.zeros(plane.dof)
+            v[0] = 10.0
+            acceleration = np.zeros(plane.dof)
+            nominal = np.zeros(plane.m)
+            nominal[1] = 0.05
+            plane.inputs["u"].set_nominal_value(nominal)
+            np.testing.assert_allclose(
+                plane.inverse_dynamics(q, v, acceleration),
+                plane.inverse_dynamics(q, v, acceleration, nominal),
+            )
 
     def test_manipulator_kinematics_reference_values(self):
         one = OneLinkManipulator()

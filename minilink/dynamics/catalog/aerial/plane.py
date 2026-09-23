@@ -148,6 +148,7 @@ class Plane2D(MechanicalSystem):
 
     def d(self, q, dq, u=None, t=0.0, params=None):
         params = self.params if params is None else params
+        u = self.get_u_from_input_ports() if u is None else u
         xp = array_module(q)
         l_w = params["l_w"]
         l_t = params["l_t"]
@@ -590,6 +591,7 @@ class Plane3D(GeneralizedMechanicalSystem):
 
     def d(self, q, v, u=None, t=0.0, params=None):
         params = self.params if params is None else params
+        u = self.get_u_from_input_ports() if u is None else u
         xp = array_module(v)
         speed, alpha, beta = self.velocity_angles(v)
         delta_e = u[1]
