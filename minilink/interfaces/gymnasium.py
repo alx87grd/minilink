@@ -154,9 +154,10 @@ class Sys2Gym(gym.Env):
 
         ``reset`` draws the initial state from the problem, the reward is the
         problem's running cost, a finite horizon ends the episode at ``tf``
-        with the terminal cost ``h``, leaving the constraint set ``X`` is a
-        failure (*terminated*, charged the price of infeasibility) and leaving
-        the plant's state box, the training zone, is a *truncation*.
+        with the terminal cost ``h``, leaving the constraint set ``X`` (read on
+        the problem's set parameters) is a failure (*terminated*, charged the
+        price of infeasibility) and leaving the plant's state box, the training
+        zone, is a *truncation*.
         Parameter and disturbance draws are not applied by this view. A
         deterministic :class:`~minilink.planning.problems.PlanningProblem`
         starts every episode at its ``x_start``.
@@ -374,7 +375,7 @@ class ProblemEnv(Sys2Gym):
         problem = self.problem
         y, r, terminated, truncated, info = super().step(u)
         x, t = self.x, self.t
-        if not problem.X.contains(x, t):
+        if not problem.X.contains(x, t, problem.params.sets):
             price = self.infeasible_cost
             r -= float(price(x, t) if callable(price) else price)
             terminated, truncated = True, False

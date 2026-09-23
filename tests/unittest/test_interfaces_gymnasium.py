@@ -211,6 +211,41 @@ class TestSys2Gym(unittest.TestCase):
             _, info = env.reset(seed=seed)
             np.testing.assert_array_equal(info["state"], start.sample(rng))
 
+    def test_from_problem_reads_the_constraint_set_on_its_parameters(self):
+        from minilink.core.backends import array_module
+        from minilink.core.sets import Set
+        from minilink.interfaces.gymnasium import Sys2Gym
+        from minilink.planning.problems import PlanningProblem, ProblemParameters
+
+        class Band(Set):
+            """|z_i| <= r, r = 1 by default."""
+
+            def margin(self, z, t=0.0, params=None):
+                r = 1.0 if params is None else params["r"]
+                xp = array_module(z)
+
+                return xp.concatenate([z + r, r - z])
+
+        plant = make_bounded_pendulum()
+        cost = QuadraticCost.from_system(plant, Q=np.eye(2), R=np.eye(1))
+        # r = 0.5: x = 0.7 has left X; r = 3: x = 1.5 is still inside
+        for r, x, leaves in ((0.5, 0.7, True), (3.0, 1.5, False)):
+            problem = PlanningProblem(
+                plant,
+                x_start=[0.0, 0.0],
+                cost=cost,
+                tf=np.inf,
+                X=Band(),
+                params=ProblemParameters(sets={"r": r}),
+                infeasible_cost=50.0,
+            )
+            env = Sys2Gym.from_problem(problem, compile_backend="numpy")
+            env.reset(seed=0)
+            env.x = np.array([x, 0.0])
+            _, reward, terminated, _, _ = env.step(np.array([0.0]))
+            self.assertEqual(terminated, leaves)
+            self.assertEqual(reward < -49.0, leaves)
+
 
 @pytest.mark.rl
 @pytest.mark.optional
