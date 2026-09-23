@@ -804,6 +804,7 @@ def export_mpc_to_computer(
     the export undoes the dual-rate hooks a ``dual_rate_computer`` call left on
     the block; a rejected schedule leaves the block as it was.
     """
+    from minilink.core.hybrid_composition import as_step_diagram
     from minilink.simulation.computer import StepSchedule, as_computer
 
     block_dt = dt_mpc if dt_mpc is not None else getattr(block, "_dt_mpc", None)
@@ -822,7 +823,8 @@ def export_mpc_to_computer(
             raise ValueError(
                 f"schedule dt_base={dt_sched} does not match block dt_mpc={block_dt}"
             )
-    computer = as_computer(block, schedule)
+    # Wrap first: as_computer on the bare block would call its own ``%`` again.
+    computer = as_computer(as_step_diagram(block), schedule)
 
     # Single-rate path: undo any dual-rate hooks left on the block.
     if hasattr(block, "_replan_divisor"):

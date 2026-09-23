@@ -52,7 +52,9 @@ def hybrid_closed_loop(
     plant : System or DiagramSystem
         Continuous plant wrapped in a flow diagram when needed.
     schedule : StepSchedule or float
-        Base tick schedule for the computer runtime.
+        Base tick schedule for the computer runtime. A leaf whose class defines
+        its own ``%`` builds the runtime there (an MPC block checks ``schedule``
+        against its ``dt_mpc``).
     computer : Computer, optional
         Reuse an existing compiled runtime (must match ``computer_side``).
     computer_out, plant_in, plant_out, computer_in : str
@@ -64,6 +66,11 @@ def hybrid_closed_loop(
     extra_boundaries : list of BoundaryConnection, optional
         Additional multi-channel boundary edges.
     """
+    if computer is None and _builds_own_computer(computer_side):
+        # Wire the runtime the block's own ``%`` built and checked.
+        computer = computer_side % schedule
+        computer_side, schedule = computer.diagram, computer.schedule
+
     step_diagram = _as_step_diagram(computer_side)
     plant_diagram = _as_plant_diagram(plant)
     _ensure_computer_boundary_ports(
@@ -195,6 +202,14 @@ def _plant_leaf(plant: System | DiagramSystem) -> System:
             )
         return next(iter(plant.subsystems.values()))
     return plant
+
+
+def _builds_own_computer(computer_side: System | StepDiagramSystem) -> bool:
+    """True when the block's class defines its own ``%`` (e.g. an MPC block)."""
+    return (
+        isinstance(computer_side, System)
+        and type(computer_side).__mod__ is not System.__mod__
+    )
 
 
 def expose_computer_boundary_ports(diagram: StepDiagramSystem) -> None:

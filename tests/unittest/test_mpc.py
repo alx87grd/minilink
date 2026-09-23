@@ -900,7 +900,31 @@ class TestMPCNumPyRebuild(unittest.TestCase):
         self.assertEqual(len(n_compile_parametric), 0)
 
 
+from minilink.core.hybrid_composition import hybrid_closed_loop
+from minilink.simulation.computer import as_computer
+
+
 class TestMpcComputerScheduleCheck(unittest.TestCase):
+    def test_every_computer_entry_point_checks_dt_mpc(self):
+        """``as_computer`` and ``hybrid_closed_loop`` run the block's ``dt_mpc`` check."""
+        planner = _make_numpy_planner()
+        plant = SingleIntegrator()
+        for warm_start in (True, False):
+            with self.subTest(warm_start=warm_start):
+                mpc = ModelPredictiveController(
+                    planner, dt_mpc=0.2, warm_start=warm_start
+                )
+                with self.assertRaises(ValueError):
+                    as_computer(mpc, 0.5)
+                with self.assertRaises(ValueError):
+                    hybrid_closed_loop(mpc, plant, schedule=0.5, computer_out="u_ff")
+                computer = as_computer(mpc, 0.2)
+                hybrid = hybrid_closed_loop(
+                    mpc, plant, schedule=0.2, computer_out="u_ff"
+                )
+                self.assertAlmostEqual(computer.schedule.dt_base, 0.2)
+                self.assertAlmostEqual(hybrid.computer.schedule.dt_base, 0.2)
+
     def test_rejected_schedule_keeps_dual_rate_computer(self):
         """A rejected ``mpc % dt`` leaves the block's dual-rate divisor and hook alone."""
         planner = _make_numpy_planner(0.5)

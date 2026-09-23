@@ -36,9 +36,12 @@ def as_computer(
 
     Wraps a leaf in a step diagram, exposes standard boundary ports, and attaches
     ``schedule``. Use the ``%`` operator as shorthand: ``computer = block % dt``.
+    A block whose class defines its own ``%`` builds the Computer there (an MPC
+    block checks ``schedule`` against its ``dt_mpc``).
     """
     from minilink.core.hybrid_composition import (
         _as_step_diagram,
+        _builds_own_computer,
         expose_computer_boundary_ports,
     )
     from minilink.core.system import DynamicSystem, System
@@ -59,6 +62,8 @@ def as_computer(
             f"as_computer() expected System or StepDiagramSystem, "
             f"got {type(side).__name__}"
         )
+    if _builds_own_computer(side):
+        return side % schedule
 
     if isinstance(schedule, StepSchedule):
         step_schedule = schedule
