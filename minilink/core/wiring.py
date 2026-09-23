@@ -256,6 +256,12 @@ class WiredDiagramMixin:
         stateful subsystem, and a stateless block that sets its own. A static
         block left at the default has no time constant and does not pin the
         diagram to the default.
+
+        Both hints are derived from the subsystems at every :meth:`add_subsystem`
+        and :meth:`refresh` (a ``Simulator`` refreshes before it solves), so a
+        hint changed on a block after composition reaches the diagram. Set a
+        hint on the block it describes: one set by hand on the diagram is
+        replaced at the next refresh.
         """
         if not hasattr(self, "solver_info"):
             return
@@ -461,11 +467,14 @@ class WiredDiagramMixin:
     def refresh(self):
         """Refresh all subsystems and rebuild the flattened state metadata.
 
-        Compiled evaluators are snapshots: recompile after structural changes.
+        The solver hints are then bubbled again from the refreshed subsystems
+        (:meth:`refresh_solver_info`). Compiled evaluators are snapshots:
+        recompile after structural changes.
         """
         for subsystem in self.subsystems.values():
             subsystem.refresh()
         self.compute_state_properties()
+        self.refresh_solver_info()
 
     def autowire(
         self,

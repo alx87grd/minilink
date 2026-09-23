@@ -776,8 +776,10 @@ is sized to it: adaptive solvers report on `DEFAULT_N_STEPS = 10001` points (a
 plotting resolution — the integrator picks its own steps); fixed-step solvers
 take `dt` from `solver_info["smallest_time_constant"]` × 0.1. A diagram's hint is
 the smallest over its stateful subsystems and any block that sets its own; a
-static block left at the default does not count. `StaticSimulator` shares the
-10001-point default.
+static block left at the default does not count. Both hints are bubbled again
+at every `refresh()`, which `Simulator` runs before solving, so a hint belongs on
+the block: one set by hand on the diagram is replaced. `StaticSimulator` shares
+the 10001-point default.
 
 Solver presets: `scipy`, `scipy_stiff`, `scipy_max`, `scipy_ultra`, `scipy_lsoda`,
 `euler` (variable knot spacing), `euler_fixedsteps` (uniform grid via

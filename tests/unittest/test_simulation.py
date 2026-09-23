@@ -1070,6 +1070,23 @@ class TestAutomaticTimeGrid(unittest.TestCase):
         with_filter = controller @ plant + Integrator()
         self.assertEqual(with_filter.solver_info["smallest_time_constant"], 0.001)
 
+    def test_loop_follows_a_plant_hint_changed_after_composing(self):
+        from minilink import Pendulum, StateFeedbackController
+
+        plant = Pendulum()
+        loop = StateFeedbackController(np.array([[10.0, 2.0]])) @ plant
+        plant.solver_info["smallest_time_constant"] = 0.5
+
+        alone = Simulator(plant, tf=1.0, solver="euler", verbose=False)
+        closed = Simulator(loop, tf=1.0, solver="euler", verbose=False)
+        np.testing.assert_array_equal(closed.t, alone.t)  # dt = 0.05, not 1e-4
+
+        plant.solver_info["discontinuous_behavior"] = True
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore")
+            closed = Simulator(loop, tf=1.0, verbose=False)
+        self.assertEqual(closed.solver_mode, "euler")
+
     def test_explicit_grid_still_wins(self):
         sim = Simulator(StableLinearSystem(), tf=1.0, n_steps=51, verbose=False)
         self.assertEqual(sim.n_pts, 51)
