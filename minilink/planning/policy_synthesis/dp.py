@@ -242,11 +242,11 @@ class DynamicProgrammingPlanner(Planner):
             for a in range(grid.actions_n):
                 u = grid.inputs[a]
 
+                # Forward dynamics
+                x_next = sys.f(x, u, t, params.system) * dt + x
+
                 # If action is in allowable set
                 if U.contains(u, x, t, params.sets):
-                    # Forward dynamics
-                    x_next = sys.f(x, u, t, params.system) * dt + x
-
                     # If the next state is in X and on the grid (the table's domain)
                     if X.contains(x_next, t, params.sets) and grid.X.contains(x_next):
                         # Estimated (interpolation) cost-to-go of the arrival state
@@ -258,11 +258,11 @@ class DynamicProgrammingPlanner(Planner):
 
                     else:
                         # The next state leaves the admissible states: the penalty
-                        Q[a] = INF
+                        Q[a] = infeasible_penalty(INF, x_next, t)
 
                 else:
                     # Invalid control input at this state
-                    Q[a] = INF
+                    Q[a] = infeasible_penalty(INF, x_next, t)
 
             # Best action at this node
             J[s] = Q.min()
@@ -283,7 +283,7 @@ class DynamicProgrammingPlanner(Planner):
         admissible = action_ok & x_next_ok
 
         # Running-cost table, with the out-of-bound cost on inadmissible pairs
-        G = self.running_cost_table(t, admissible)
+        G = self.running_cost_table(t, admissible, x_next)
 
         # Estimated (interpolation) cost-to-go of all the arrival states:
         # the (N, A, n) successors flattened to N*A states, then back to (N, A)
@@ -320,13 +320,15 @@ class DynamicProgrammingPlanner(Planner):
 
         return J
 
-    def running_cost_table(self, t, admissible=None) -> np.ndarray:
+    def running_cost_table(self, t, admissible=None, x_next=None) -> np.ndarray:
         """
         Running cost of every (node, action) pair over one step, shape ``(nodes_n, actions_n)``.
 
         Pairs that are not ``admissible`` (action outside the input set, or a
-        successor outside the state set or the grid) cost ``out_of_bound_cost``.
-        The mask is read from the grid's transition tables when not given.
+        successor outside the state set or the grid) cost ``out_of_bound_cost``:
+        the scalar, or ``out_of_bound_cost(x_next, t)`` at the pair's successor.
+        The mask and the successors are read from the grid's transition tables
+        when not given.
 
         Warning: on a precomputed grid the table is built once, at the first
         sweep's time, and reused for every sweep. A running cost ``g`` that
@@ -344,8 +346,8 @@ class DynamicProgrammingPlanner(Planner):
         N, A = grid.nodes_n, grid.actions_n
         INF = self.options.out_of_bound_cost  # a large finite penalty (pyro's cf.INF)
 
-        if admissible is None:
-            _, action_ok, x_next_ok = grid.transition(t)
+        if admissible is None or x_next is None:
+            x_next, action_ok, x_next_ok = grid.transition(t)
             admissible = action_ok & x_next_ok
 
         G = np.empty((N, A), dtype=float)
@@ -368,8 +370,13 @@ class DynamicProgrammingPlanner(Planner):
                 # Running cost over one step
                 G[s, a] = float(g(x, u, t, cost_params)) * dt
 
-        # Out of bound cost on the pairs that leave the admissible set
-        G[~admissible] = INF
+        # Out of bound cost on the pairs that leave the admissible set: the scalar,
+        # or the price of each pair's successor
+        if callable(INF):
+            exits = x_next[~admissible]
+            G[~admissible] = [infeasible_penalty(INF, x, t) for x in exits]
+        else:
+            G[~admissible] = INF
 
         if grid.precomputed:
             self._G = G
@@ -402,10 +409,16 @@ class DynamicProgrammingPlanner(Planner):
         Flag states whose cost-to-go has saturated at ``out_of_bound_cost``.
 
         Their value is pinned to the penalty and their policy to the action
-        nearest the system's nominal input, mirroring pyro's cleanup pass.
+        nearest the system's nominal input, mirroring pyro's cleanup pass. A
+        callable ``out_of_bound_cost(x_next, t)`` has no single saturation
+        level: the tables are then left as solved.
         """
         result = self.result
         INF = self.options.out_of_bound_cost
+
+        # A price that varies with the exit state saturates at no single level
+        if callable(INF):
+            return result
 
         # The action nearest the system's nominal input
         u_nominal = self.problem.sys.get_u_from_input_ports()
@@ -520,9 +533,12 @@ class DynamicProgrammingOptions:
         Cost-to-go interpolation. ``"linear"`` (default) and ``"nearest"`` are
         robust; spline methods (``"cubic"``, the ``"spline"`` alias, ``"quintic"``)
         are smoother but can ring across the infeasibility penalty.
-    out_of_bound_cost : float
+    out_of_bound_cost : float or callable
         Finite penalty charged to inadmissible inputs or out-of-domain
-        successors.
+        successors: a scalar, or ``out_of_bound_cost(x_next, t)`` evaluated at
+        each inadmissible pair's successor (the ``"jax"`` backend needs it
+        traceable). The planner reads the problem's ``infeasible_cost`` as its
+        default.
     final_time : float
         Terminal time ``tf``; sweeps step backward as ``t = tf - k dt``. Left
         at ``0.0``, the planner reads ``problem.tf`` when the problem sets one.
@@ -536,7 +552,8 @@ class DynamicProgrammingOptions:
         2% until each step completes. Set both to ``False`` for silent runs.
     clean_infeasible : bool
         After each solve, pin saturated cost-to-go cells to ``out_of_bound_cost``
-        and their policy to the nominal action (:meth:`DynamicProgrammingPlanner.clean_infeasible_set`).
+        and their policy to the nominal action (:meth:`DynamicProgrammingPlanner.clean_infeasible_set`);
+        a callable ``out_of_bound_cost`` leaves the tables as solved.
     """
 
     backend: str = BACKEND_NUMPY
@@ -650,9 +667,11 @@ def options_of(problem, grid, options, **flat) -> DynamicProgrammingOptions:
     given = {key: value for key, value in flat.items() if value is not _UNSET}
     opt = replace(base, **given) if given else base
 
-    # The problem's price of infeasibility is the default price of leaving the grid
-    if "out_of_bound_cost" not in given and isinstance(problem.infeasible_cost, float):
-        opt = replace(opt, out_of_bound_cost=problem.infeasible_cost)
+    # The problem's price of infeasibility, a scalar or price(x, t) at the exit state,
+    # is the default price of leaving the grid
+    price = problem.infeasible_cost
+    if "out_of_bound_cost" not in given and price is not None:
+        opt = replace(opt, out_of_bound_cost=price if callable(price) else float(price))
 
     # The cost's continuous discount rate becomes the per-step factor, unless alpha
     # is set
@@ -669,3 +688,8 @@ def options_of(problem, grid, options, **flat) -> DynamicProgrammingOptions:
         raise ValueError(f"Unknown backend {opt.backend!r}")
 
     return opt
+
+
+def infeasible_penalty(price, x_next, t):
+    """The penalty of one inadmissible pair: the scalar ``price``, or ``price(x_next, t)``."""
+    return float(price(x_next, t)) if callable(price) else price

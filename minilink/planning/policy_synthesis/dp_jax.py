@@ -133,9 +133,15 @@ def running_cost_table(planner, t) -> np.ndarray:
             "(QuadraticCost and TimeCost are supported)"
         ) from exc
 
-    # Out of bound cost on the pairs that leave the admissible set
-    _, action_ok, x_next_ok = grid.transition(t)
-    G[~(action_ok & x_next_ok)] = planner.options.out_of_bound_cost
+    # Out of bound cost on the pairs that leave the admissible set: the scalar, or
+    # the price of each pair's successor
+    x_next, action_ok, x_next_ok = grid.transition(t)
+    inadmissible = ~(action_ok & x_next_ok)
+    price = planner.options.out_of_bound_cost
+    if callable(price):
+        G[inadmissible] = exit_prices(price, x_next[inadmissible], t, verbose)
+    else:
+        G[inadmissible] = price
 
     return G
 
@@ -282,6 +288,35 @@ def sweep_by_sweep(planner, J0, G, coords, in_bounds, max_sweeps, stop_on_tol):
         delta=delta,
         history=log.history,
     )
+
+
+def exit_prices(price, x_exit, t, verbose) -> np.ndarray:
+    """The price ``price(x, t)`` of every exit state in ``x_exit`` (JAX vmap), shape ``(K,)``."""
+    jax = ensure_jax_x64()
+    jnp = jax.numpy
+    exits = jnp.asarray(x_exit)
+
+    # Price of one exit state
+    def exit_state(k):
+        return price(exits[k], t)
+
+    try:
+        prices = build_jax_node_chunks(
+            exit_state,
+            len(x_exit),
+            jax,
+            jnp,
+            interval=PAIR_CHUNK_SIZE,
+            verbose=verbose,
+            prefix="Computing out_of_bound_cost(x,t) of the exits",
+        )
+    except Exception as exc:
+        raise ValueError(
+            "JAX backend requires a JAX-traceable, scalar-valued out_of_bound_cost(x, t) "
+            "(the problem's infeasible_cost); use a scalar price or the 'numpy' backend"
+        ) from exc
+
+    return prices
 
 
 def build_jax_sa_chunks(pair_fn, N, A, jax, jnp, *, interval, verbose, prefix):

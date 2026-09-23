@@ -13,7 +13,10 @@ import numpy as np
 
 from minilink.core.feedback import feedback_ports
 from minilink.planning.evaluation import policy_of
-from minilink.planning.policy_synthesis.dp import DynamicProgrammingOptions
+from minilink.planning.policy_synthesis.dp import (
+    DynamicProgrammingOptions,
+    infeasible_penalty,
+)
 from minilink.planning.problems import PlanningProblem
 
 # Public API
@@ -122,7 +125,11 @@ class PolicyEvaluator:
                 and X.contains(xnext, t, set_params)
                 and grid.X.contains(xnext)
             )
-            G[s] = float(g(x, u, t, cost_params)) * dt if valid else out_of_bound_cost
+            G[s] = (
+                float(g(x, u, t, cost_params)) * dt
+                if valid
+                else infeasible_penalty(out_of_bound_cost, xnext, t)
+            )
 
         return x_next, G
 

@@ -767,6 +767,102 @@ class TestCleanInfeasible(unittest.TestCase):
         cleanup.assert_called_once()
 
 
+def exit_price(x, t):
+    """A price of leaving that grows with the exit state: 200 + 50 |x|^2."""
+    return 200.0 + 50.0 * (x[0] ** 2 + x[1] ** 2)
+
+
+class TestInfeasibleCostPrice(unittest.TestCase):
+    """The problem's infeasible_cost(x, t) prices each inadmissible pair at its successor."""
+
+    def planner(self, price, backend="numpy", **kwargs):
+        from dataclasses import replace
+
+        problem = replace(make_pendulum_problem(), infeasible_cost=price)
+        return DynamicProgrammingPlanner(
+            problem,
+            x_grid=(11, 11),
+            u_grid=(5,),
+            dt=0.1,
+            backend=backend,
+            alpha=0.95,
+            tol=1e-3,
+            max_iterations=200,
+            **kwargs,
+        )
+
+    def test_numpy_table_charges_the_price_of_each_successor(self):
+        planner = self.planner(exit_price)
+        self.assertIs(planner.options.out_of_bound_cost, exit_price)
+        x_next, action_ok, x_next_ok = planner.grid.transition(0.0)
+        inadmissible = ~(action_ok & x_next_ok)
+        self.assertTrue(np.any(inadmissible))
+
+        G = planner.running_cost_table(0.0)
+        expected = [exit_price(x, 0.0) for x in x_next[inadmissible]]
+        np.testing.assert_allclose(G[inadmissible], expected)
+
+        # A scalar price (an int like a float) keeps the scalar table
+        scalar = self.planner(500)
+        self.assertEqual(scalar.options.out_of_bound_cost, 500.0)
+        G_scalar = scalar.running_cost_table(0.0)
+        np.testing.assert_array_equal(G_scalar[~inadmissible], G[~inadmissible])
+        self.assertTrue(np.all(G_scalar[inadmissible] == 500.0))
+
+    def test_a_constant_price_solves_like_the_scalar(self):
+        for backend in ("numpy", "loop"):
+            with self.subTest(backend=backend):
+                scalar = self.planner(500.0, backend, clean_infeasible=False)
+                constant = self.planner(
+                    lambda x, t: 500.0, backend, clean_infeasible=False
+                )
+                scalar.solve_steps(30)
+                constant.solve_steps(30)
+                np.testing.assert_array_equal(constant.result.J, scalar.result.J)
+                np.testing.assert_array_equal(constant.result.pi, scalar.result.pi)
+
+    def test_loop_numpy_and_policy_evaluation_agree_on_the_price(self):
+        table = self.planner(exit_price)
+        loop = self.planner(exit_price, "loop")
+        table.solve()
+        loop.solve_steps(table.result.iterations)
+        np.testing.assert_allclose(loop.result.J, table.result.J)
+        # the priced exits, not the 1e6 default, bound the cost-to-go
+        self.assertLess(np.max(table.result.J), 1.0e3)
+
+        evaluator = PolicyEvaluator(
+            table.problem,
+            grid=table.grid,
+            policy=table.get_controller().action,
+            options=table.options,
+        )
+        J_pi = evaluator.solve()
+        self.assertLess(np.max(np.abs(J_pi - table.result.J)), 0.05)
+
+    def test_jax_table_charges_the_price(self):
+        import pytest
+
+        pytest.importorskip("jax")
+        numpy_planner = self.planner(exit_price)
+        jax_planner = self.planner(exit_price, "jax")
+        G_np = numpy_planner.running_cost_table(0.0)
+        G_jax = dp_jax.running_cost_table(jax_planner, 0.0)
+        np.testing.assert_allclose(G_jax, G_np)
+
+        numpy_planner.solve()
+        jax_planner.solve()
+        np.testing.assert_allclose(jax_planner.result.J, numpy_planner.result.J)
+        self.assertLess(np.max(jax_planner.result.J), 1.0e3)
+
+    def test_jax_rejects_an_untraceable_price(self):
+        import pytest
+
+        pytest.importorskip("jax")
+        planner = self.planner(lambda x, t: 100.0 + float(x[0] ** 2), "jax")
+        with self.assertRaisesRegex(ValueError, "JAX-traceable"):
+            planner.solve()
+
+
 class TestDpFlatConstructor(unittest.TestCase):
     def test_flat_matches_options(self):
         sys = DoubleIntegrator()
