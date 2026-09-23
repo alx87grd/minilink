@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import inspect
 from collections.abc import Callable
 
 import numpy as np
@@ -428,13 +429,19 @@ def gravity_feedforward(plant, gravity, q, model_params=None):
     dict (gains) is never forwarded. Diagram-level overrides of the plant
     subsystem do not reach this embedded copy; see DESIGN §4
     (*Embedded-model params rule*).
+
+    A custom hook is ``gravity(q)`` or ``gravity(q, params)``; its signature
+    says which, so a ``TypeError`` raised inside the hook reaches the caller.
     """
     xp = array_module(q)
     if gravity is not None:
         try:
-            g = gravity(q, model_params)
-        except TypeError:
-            g = gravity(q)
+            inspect.signature(gravity).bind(q, model_params)
+            takes_params = True
+        except (TypeError, ValueError):
+            # one positional argument, or no signature to read: the documented gravity(q)
+            takes_params = False
+        g = gravity(q, model_params) if takes_params else gravity(q)
     else:
         if plant is None:
             raise ValueError("gravity_comp requires plant or gravity hook")

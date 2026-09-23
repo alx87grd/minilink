@@ -524,6 +524,21 @@ class TestRoboticWrappers(unittest.TestCase):
         u = ctl.ctl(None, np.concatenate([q, q, np.zeros(2)]))
         np.testing.assert_allclose(u, [1.0, 2.0])
 
+    def test_gravity_hook_type_error_reaches_the_caller(self):
+        def hook_q(q):
+            raise TypeError("bug inside the hook")
+
+        def hook_q_params(q, params):
+            raise TypeError("bug inside the hook")
+
+        arm = TwoLinkManipulator()
+        q = np.array([0.2, 0.3])
+        for hook in (hook_q, hook_q_params):
+            with self.subTest(hook=hook.__name__):
+                ctl = ModelJointImpedance(arm, gravity_comp=True, gravity=hook)
+                with self.assertRaisesRegex(TypeError, "bug inside the hook"):
+                    ctl.ctl(None, np.concatenate([q, q, np.zeros(2)]))
+
     def test_joint_impedance_gravity_requires_plant(self):
         with self.assertRaises(ValueError):
             JointImpedance(dof=2, gravity_comp=True)
