@@ -13,10 +13,10 @@ class DiscretizedDynamicSystem(StepSystem):
     """
     Discrete-time wrapper over a continuous :class:`DynamicSystem`.
 
-    The hold interval :attr:`dt` lives on the wrapper; :attr:`params` are the
-    source's own parameters, handed to its ``f`` and ``h`` untouched. The
-    wrapper starts from the source's ``x0`` and copies its state and input
-    labels, units, bounds and nominal values.
+    The hold interval :attr:`dt` lives on the wrapper; :attr:`params` are
+    handed to the source's ``f`` and ``h`` untouched. The wrapper starts from
+    the source's ``x0`` and copies its state, input and ``y`` labels, units,
+    bounds and nominal values.
     """
 
     def __init__(
@@ -39,10 +39,10 @@ class DiscretizedDynamicSystem(StepSystem):
             y_dependencies=y_deps,
         )
         self.name = f"Discretized({source.name})"
-        self.params = source.params if params is None else params
-        self.dt = dt
-        self.integrator = integrator
         self.source = source
+        self.params_override = params
+        self.dt = _positive_dt(dt)
+        self.integrator = integrator
 
         # the source's initial state and state metadata
         state = source.state
@@ -61,6 +61,30 @@ class DiscretizedDynamicSystem(StepSystem):
             u_port.lower_bound = np.concatenate([port.lower_bound for port in ports])
             u_port.upper_bound = np.concatenate([port.upper_bound for port in ports])
             u_port.nominal_value = source.get_u_from_input_ports()
+
+        # the source's y output metadata
+        if source.p:
+            y_port, source_y = self.outputs["y"], source.outputs["y"]
+            y_port.labels = list(source_y.labels)
+            y_port.units = list(source_y.units)
+            y_port.lower_bound = np.array(source_y.lower_bound, dtype=float)
+            y_port.upper_bound = np.array(source_y.upper_bound, dtype=float)
+            y_port.nominal_value = np.array(source_y.nominal_value, dtype=float)
+
+    @property
+    def params(self) -> dict:
+        """
+        The source's live ``params`` while :attr:`params_override` is ``None``
+        (the same dict, so an in-place edit reaches the source), else that dict.
+        Assigning ``params`` sets :attr:`params_override`.
+        """
+        if self.params_override is None:
+            return self.source.params
+        return self.params_override
+
+    @params.setter
+    def params(self, value: dict | None):
+        self.params_override = value
 
     def h(self, x, u, k=0, params=None):
         h = self.source.h
@@ -131,10 +155,11 @@ def discretize(
     with ``integrator`` ``"rk4"`` or ``"euler"`` (the same word as ``Sys2Gym``),
     the input held. ``p`` defaults to the wrapper's :attr:`params`: the
     source's live ``params`` when ``params`` is ``None``, else the dict given,
-    which replaces them. The hold interval stays on the wrapper as :attr:`dt`,
-    never in ``params``; when ``dt`` is omitted it is read once from
-    ``params["dt"]``. The wrapper starts from the source's ``x0`` and keeps
-    its state and input metadata.
+    which replaces them (RULES 4.4). The hold interval stays on the wrapper as
+    :attr:`dt` and never reaches ``f`` or ``h``: when ``dt`` is omitted it is
+    read once from ``params["dt"]``, and a ``"dt"`` key is dropped from the
+    ``params`` given. The wrapper starts from the source's ``x0`` and keeps its
+    state, input and ``y`` metadata.
     """
     if not isinstance(system, DynamicSystem):
         raise TypeError(
@@ -146,6 +171,7 @@ def discretize(
         )
 
     dt = _hold_interval(system, dt, params)
+    params = _model_params(params)
 
     if integrator == "euler":
         return DiscretizedEulerDynamicSystem(system, dt, params)
@@ -165,6 +191,16 @@ def _hold_interval(
         if "dt" not in p:
             raise ValueError("discretize requires dt=... or params['dt'].")
         dt = p["dt"]
+    return dt
+
+
+def _model_params(params: dict | None) -> dict | None:
+    if params is None:
+        return None
+    return {key: value for key, value in params.items() if key != "dt"}
+
+
+def _positive_dt(dt: float) -> float:
     dt = float(dt)
     if dt <= 0.0:
         raise ValueError(f"dt must be positive, got {dt}")

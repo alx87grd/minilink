@@ -992,7 +992,7 @@ class TestPhasePlane(unittest.TestCase):
             plot_phase_plane(sys, backend="bokeh", show=False)
 
 
-from minilink.analysis.discretize import discretize
+from minilink.analysis.discretize import DiscretizedRK4DynamicSystem, discretize
 
 
 def _rk4_step(f, x, u, t, dt, params):
@@ -1060,8 +1060,11 @@ class TestDiscretize(unittest.TestCase):
         self.assertEqual(step_leaf.outputs["y"].dependencies, "all")
 
     def test_discretize_accepts_dt_in_params_only(self):
-        step_leaf = discretize(_GainIntegrator(), params={"gain": 1.0, "dt": 0.02})
+        step_leaf = discretize(_GainIntegrator(), params={"gain": 2.0, "dt": 0.02})
         self.assertEqual(step_leaf.dt, 0.02)
+        self.assertEqual(step_leaf.params, {"gain": 2.0})
+        x1 = step_leaf.step(np.array([0.0]), np.array([1.0]), k=0)
+        np.testing.assert_allclose(x1, [0.02 * 2.0])
 
     def test_step_params_override_gain(self):
         plant = _GainIntegrator(gain=1.0)
@@ -1100,6 +1103,9 @@ class TestDiscretize(unittest.TestCase):
         plant.params["gain"] = 3.0
         x_fast = step_leaf.step(x0, u, k=0)
         self.assertGreater(x_fast[0], x_nom[0])
+        plant.params = {**plant.params, "gain": 5.0}
+        x_faster = step_leaf.step(x0, u, k=0)
+        self.assertGreater(x_faster[0], x_fast[0])
 
     def test_discretize_steps_a_closed_loop(self):
         loop = PID(Kp=1.0, Ki=0.0, Kd=0.0) @ Pendulum()
@@ -1110,6 +1116,34 @@ class TestDiscretize(unittest.TestCase):
         x1_ref = _rk4_step(loop.f, x, u, 0.0, dt, None)
         x1 = step_leaf.step(x, u, k=0)
         np.testing.assert_allclose(x1, x1_ref, rtol=1e-09, atol=1e-09)
+
+    def test_discretize_steps_a_closed_loop_with_dt_in_params(self):
+        loop = PID(Kp=1.0, Ki=0.0, Kd=0.0) @ Pendulum()
+        dt = 0.01
+        x = np.linspace(0.1, 0.4, loop.n)
+        u = np.zeros(loop.m)
+        x1_ref = _rk4_step(loop.f, x, u, 0.0, dt, None)
+        for step_leaf in (
+            discretize(loop, params={**loop.params, "dt": dt}),
+            discretize(loop, dt, params={**loop.params, "dt": dt}),
+        ):
+            x1 = step_leaf.step(x, u, k=0)
+            np.testing.assert_allclose(x1, x1_ref, rtol=1e-09, atol=1e-09)
+            self.assertNotIn("dt", step_leaf.jacobian("step", "params"))
+
+    def test_discretized_system_checks_dt(self):
+        plant = _GainIntegrator()
+        with self.assertRaises(TypeError):
+            DiscretizedRK4DynamicSystem(plant, {"gain": 1.0, "dt": 0.1})
+        with self.assertRaises(ValueError):
+            DiscretizedRK4DynamicSystem(plant, -0.1)
+
+    def test_discretize_keeps_the_y_metadata(self):
+        plant = Pendulum()
+        step_leaf = discretize(plant, 0.05)
+        y_port, plant_y = step_leaf.outputs["y"], plant.outputs["y"]
+        self.assertEqual(y_port.labels, plant_y.labels)
+        self.assertEqual(y_port.units, plant_y.units)
 
     def test_discretize_keeps_source_x0_and_signal_metadata(self):
         plant = Pendulum()
