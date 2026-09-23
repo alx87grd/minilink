@@ -1,11 +1,11 @@
 # Improvement scan — raw ledger (2026-09-22)
 
-**Status:** unverified finder output, kept so the scan is not lost. The
-triaged propositions are in
-[2026-09-22-improvement-suggestions.md](2026-09-22-improvement-suggestions.md);
-delete this file once every item there has a workboard row, a decision, or a
-recorded rejection. One finder per band, no cross-check; line numbers are as
-of `dev` at `8a7226c`. Ids match the appendix of the propositions document.
+**Status:** unverified finder output, kept as the evidence store for the
+workboard rows that cite `scan: band#n`
+([docs/plans/TODO.md](../plans/TODO.md)). The triage is in
+[2026-09-22-improvement-suggestions.md](2026-09-22-improvement-suggestions.md).
+Delete this file when no workboard row cites it. One finder per band, no
+cross-check; line numbers are as of `dev` at `8a7226c`.
 
 
 ## core
@@ -256,9 +256,9 @@ The mirror case (a `DynamicSystem` with n > 0 in a `StepDiagramSystem`) is likew
 ```
 
 
-## compile-simulation
+## compile-sim
 
-### compile-simulation#0 — Give the try-JAX-then-NumPy policy one owner and a typed error
+### compile-sim#0 — Give the try-JAX-then-NumPy policy one owner and a typed error
 
 *consolidation · effort S · owner agent · rung v0.2 wave D · planned: —*  
 Files: `minilink/core/compile/compiler.py:183-200`, `minilink/simulation/compile_backend.py:12-28`, `minilink/simulation/realtime/simulator.py:378-396`, `minilink/core/compile/evaluators/jax_evaluators.py:1569-1584`
@@ -269,7 +269,7 @@ Files: `minilink/core/compile/compiler.py:183-200`, `minilink/simulation/compile
 
 **Evidence.** compiler.py:197-199 `except RuntimeError as exc: if "JAX-traceable" not in str(exc): raise`; compile_backend.py:24 `except Exception:` then `logging...debug(...)`; realtime/simulator.py:384-396 repeats compile_backend.py line for line; jax_evaluators.py:1575 `except (ConcretizationTypeError, TypeError, Exception)` (redundant tuple) builds the string the other module greps.
 
-### compile-simulation#1 — Give the automatic dt one owner and make the discontinuous scale mean something (or drop the claim)
+### compile-sim#1 — Give the automatic dt one owner and make the discontinuous scale mean something (or drop the claim)
 
 *trap · effort S · owner maintainer · rung v0.2 wave D · planned: D3*  
 Files: `minilink/simulation/simulator.py:90-92`, `minilink/simulation/simulator.py:255-262`, `minilink/simulation/realtime/simulator.py:398-405`, `minilink/simulation/solver_warnings.py:7`, `minilink/simulation/solver_warnings.py:54-55`, `DESIGN.md:826-831`
@@ -280,7 +280,7 @@ Files: `minilink/simulation/simulator.py:90-92`, `minilink/simulation/simulator.
 
 **Evidence.** simulator.py:91-92 `SMOOTH_AUTO_DT_SCALE = 0.1` / `DISCONTINUOUS_AUTO_DT_SCALE = 0.1` (equal since they were introduced, git -S shows no other value); simulator.py:256-261, realtime/simulator.py:400-405 and solver_warnings.py:54-55 each recompute `smallest_time_constant * scale`; DESIGN.md:829 "auto select_solver picks Euler with finer default dt"; simulator.py:250-252 "scaled by the smooth or discontinuous policy".
 
-### compile-simulation#2 — Make the forced-input hold model one option honoured by every solver
+### compile-sim#2 — Make the forced-input hold model one option honoured by every solver
 
 *api · effort M · owner maintainer · rung v0.2 wave D · planned: —*  
 Files: `minilink/simulation/solvers/rk4_fixed.py:54`, `minilink/simulation/solvers/euler_fixed.py:64`, `minilink/simulation/solvers/euler.py:55`, `minilink/simulation/solvers/scipy_ivp.py:89`, `minilink/simulation/input_interpolation.py:16`, `minilink/simulation/simulator.py:32-76`
@@ -291,7 +291,7 @@ Files: `minilink/simulation/solvers/rk4_fixed.py:54`, `minilink/simulation/solve
 
 **Evidence.** Probe on an `Integrator` with a unit step at t=0.5, dt=0.1: x(1) = 0.5000 (euler), 0.5000 (euler_fixedsteps), 0.5500 (rk4_fixedsteps), 0.5495 (scipy). rk4_fixed.py:54 `evaluator.rk4_integrate_linear(x0, u.T, ...)`; euler_fixed.py:64 `evaluator.euler_integrate_zoh(...)`; scipy_ivp.py:89 `scheme = kw.pop(INPUT_INTERP_KEY, "linear")` with no preset in simulator.py:32-76 carrying that key (repo-wide grep finds no other use).
 
-### compile-simulation#3 — State and test what `n_steps` counts on each simulation verb
+### compile-sim#3 — State and test what `n_steps` counts on each simulation verb
 
 *trap · effort S · owner maintainer · rung v0.2 wave D · planned: —*  
 Files: `minilink/simulation/simulator.py:126-127`, `minilink/core/facades.py:1282-1302`, `minilink/simulation/hybrid_simulator.py:36-37`, `minilink/core/compile/evaluators/jax_evaluators.py:348-372`, `DESIGN.md:771-779`
@@ -302,7 +302,7 @@ Files: `minilink/simulation/simulator.py:126-127`, `minilink/core/facades.py:128
 
 **Evidence.** Probe: `Simulator(Integrator(), tf=1.0, n_steps=100).n_pts == 100` with `dt = 0.010101...`; `acc.compute_rollout(n_steps=100).k.size == 101`; `HybridSimulator(..., n_steps=100).n_ticks == 100`. simulator.py:126 "Number of time samples (including endpoints)"; facades.py:1301 "Number of step transitions to apply".
 
-### compile-simulation#4 — Derive the hybrid plant sub-step from the plant time constant instead of one RK4 step per tick
+### compile-sim#4 — Derive the hybrid plant sub-step from the plant time constant instead of one RK4 step per tick
 
 *trap · effort M · owner maintainer · rung v0.2 wave D · planned: D3*  
 Files: `minilink/simulation/hybrid_simulator.py:56`, `minilink/simulation/hybrid_simulator.py:187-193`, `minilink/simulation/simulator.py:255-262`
@@ -313,7 +313,7 @@ Files: `minilink/simulation/hybrid_simulator.py:56`, `minilink/simulation/hybrid
 
 **Evidence.** Probe: first-order plant with `smallest_time_constant = 0.001`, `hybrid_closed_loop(P(0.0), plant, schedule=0.01)`, `HybridSimulator(tf=0.1).solve()` → `plant.x[0, -1] == 4.35e24`, no warning; `Simulator(plant, tf=0.1)` auto-selects `scipy`, dt=1e-05. hybrid_simulator.py:187-193 passes `dt_inner=self.plant_dt_inner` (None → one step, numpy_evaluators.py:281-283); `solver_info` is never read in hybrid_simulator.py.
 
-### compile-simulation#5 — Align HybridSimulator with its siblings: shared input coercion, positional `input_port_id`, the framed verbose panel
+### compile-sim#5 — Align HybridSimulator with its siblings: shared input coercion, positional `input_port_id`, the framed verbose panel
 
 *consolidation · effort S · owner agent · rung v0.2 wave D · planned: D3*  
 Files: `minilink/simulation/hybrid_simulator.py:114-128`, `minilink/simulation/hybrid_simulator.py:572-632`, `minilink/simulation/input_coercion.py:12-53`, `minilink/simulation/hybrid_simulator.py:97-101`, `minilink/simulation/sim_reporting.py:10-55`, `minilink/simulation/hybrid_simulator.py:518-542`
@@ -324,7 +324,7 @@ Files: `minilink/simulation/hybrid_simulator.py:114-128`, `minilink/simulation/h
 
 **Evidence.** Probe: `Simulator.solve_forced(u, 'u')` works; `HybridSimulator.solve_forced(u, 'r')` → `TypeError: takes 2 positional arguments but 3 were given` (hybrid_simulator.py:114 `def solve_forced(self, u, *, input_port_id=None)`). hybrid_simulator.py:597-632 duplicates input_coercion.py:56-100 (`_coerce_forced_signal`, `_sample_forced_callable`). `_allocate_signal_hist` is only ever called with `plant_signals=False` (line 152-154), so lines 518-519 and 536-537 are dead. hybrid_simulator.py:97-101 prints one line versus simulator.py:224-241.
 
-### compile-simulation#6 — Pin (or reconcile) the one-tick lag between chained blocks inside a Computer
+### compile-sim#6 — Pin (or reconcile) the one-tick lag between chained blocks inside a Computer
 
 *trap · effort S · owner maintainer · rung v0.2 wave D · planned: —*  
 Files: `minilink/simulation/computer.py:100-111`, `minilink/simulation/computer.py:201-229`, `minilink/core/compile/evaluators/numpy_evaluators.py:624-633`, `DESIGN.md:226-262`
@@ -335,7 +335,7 @@ Files: `minilink/simulation/computer.py:100-111`, `minilink/simulation/computer.
 
 **Evidence.** Probe: `StepDiagramSystem` with `Gain(2)` → `Gain(3)`: `ev.outputs(u=1) == {'y': [6.]}`; `computer.tick(u=1)` returns `{'y': [0.]}` then `{'y': [6.]}`. computer.py:108-111 documents the read-buffer rule; computer.py:4-6 claims the same lowering; DESIGN mentions "parallel tick semantics" only inside the MPC dual-rate paragraph (DESIGN.md:361); no test in test_hybrid.py or test_step_discrete.py chains two blocks under a Computer.
 
-### compile-simulation#7 — Make `has_trace_tier` a plain boolean on both backends and correct the frozen-subset sentence
+### compile-sim#7 — Make `has_trace_tier` a plain boolean on both backends and correct the frozen-subset sentence
 
 *api · effort S · owner agent · rung v0.2 wave D · planned: —*  
 Files: `minilink/core/compile/evaluators/tiers.py:11-25`, `minilink/core/compile/evaluators/tiers.py:28-33`, `minilink/planning/trajectory_optimization/transcription.py:59`, `DESIGN.md:711-720`
@@ -346,7 +346,7 @@ Files: `minilink/core/compile/evaluators/tiers.py:11-25`, `minilink/core/compile
 
 **Evidence.** Probe: `compile(Integrator()).has_trace_tier` → `AttributeError: 'NumpyDynamicEvaluator' object has no attribute 'has_trace_tier'`; tiers.py:12-13 special-cases the name only to fall through to the generic error. `grep -rn "def integrate_zoh_trace\|def rollout_trace" minilink` is empty while DESIGN.md:714-716 lists `integrate_zoh` / `integrate_zoh_rollout` / `integrate_zoh_p` / `rollout` "and the JAX trace-tier twins of those names".
 
-### compile-simulation#8 — Stop `simulation` importing from `optimization` for three display constants
+### compile-sim#8 — Stop `simulation` importing from `optimization` for three display constants
 
 *consolidation · effort S · owner agent · rung v0.2 wave D · planned: —*  
 Files: `minilink/simulation/sim_reporting.py:5-9`, `minilink/optimization/reporting.py:1-23`
@@ -357,7 +357,7 @@ Files: `minilink/simulation/sim_reporting.py:5-9`, `minilink/optimization/report
 
 **Evidence.** sim_reporting.py:5 `from minilink.optimization.reporting import (DISP_RULE_DIV, DISP_RULE_MAIN, preview_vector)`; optimization/reporting.py:3-5 describes itself as shared by `Optimizer` and the trajopt planner only. `grep -rn "from minilink.optimization" minilink/simulation minilink/core minilink/analysis minilink/control` shows this as the only cross-band import outside a TYPE_CHECKING guard.
 
-### compile-simulation#9 — Deduplicate the evaluator internals that S37 will otherwise carry: ZOH sugar, the JAX step rollout, the four `_jac_probe`s, the undeclared batch cache
+### compile-sim#9 — Deduplicate the evaluator internals that S37 will otherwise carry: ZOH sugar, the JAX step rollout, the four `_jac_probe`s, the undeclared batch cache
 
 *consolidation · effort M · owner agent · rung v1.0 · planned: S37*  
 Files: `minilink/core/compile/evaluators/numpy_evaluators.py:244-292`, `minilink/core/compile/evaluators/jax_evaluators.py:606-655`, `minilink/core/compile/evaluators/jax_evaluators.py:1279-1291`, `minilink/core/compile/evaluators/jax_evaluators.py:1546-1558`, `minilink/core/compile/evaluators/numpy_evaluators.py:381-399`, `minilink/core/compile/evaluators/numpy_evaluators.py:570-588`, `minilink/core/compile/evaluators/jax_evaluators.py:971-992`, `minilink/core/compile/evaluators/jax_evaluators.py:1454-1472`, `minilink/core/compile/evaluators/jax_evaluators.py:402`, `minilink/core/compile/evaluators/jax_evaluators.py:819-834`
@@ -368,7 +368,7 @@ Files: `minilink/core/compile/evaluators/numpy_evaluators.py:244-292`, `minilink
 
 **Evidence.** numpy_evaluators.py:244-292 and jax_evaluators.py:606-655 are line-for-line identical; jax_evaluators.py:1279-1291 and 1546-1558 identical; the four `_jac_probe` bodies differ only in the `dtype` argument; jax_evaluators.py:402 `cache = self.__dict__.setdefault("_rollout_batch_cache", {})`; jax_evaluators.py:819-828 wraps `import jax` in its own ImportError message after compiler.py:303 `require_jax_numpy()`; lines 831-834 `self._jax = jax; self._jnp = jnp; self.jax = jax; self.jnp = jnp`.
 
-### compile-simulation#10 — Make the `scipy_stiff` preset honest: explicit tolerances and a Jacobian on both backends
+### compile-sim#10 — Make the `scipy_stiff` preset honest: explicit tolerances and a Jacobian on both backends
 
 *trap · effort S · owner maintainer · rung v0.2 wave D · planned: —*  
 Files: `minilink/simulation/simulator.py:32-76`, `minilink/simulation/solvers/scipy_ivp.py:60-64`, `minilink/core/compile/evaluators/evaluators.py:98-101`, `minilink/core/compile/evaluators/jacobian.py:351-404`
@@ -379,7 +379,7 @@ Files: `minilink/simulation/simulator.py:32-76`, `minilink/simulation/solvers/sc
 
 **Evidence.** simulator.py:42-45 `"scipy_stiff": ("scipy", {"method": "Radau", "use_jac": True})` with no tolerances, versus 33-41 for `scipy`; scipy_ivp.py:60 `if use_jac and getattr(evaluator, "backend", None) == "jax"`; probe: `Simulator(Integrator(), solver="scipy_stiff").solve(); sim.last_debug["jac_applied"] is False`; evaluators.py:98-101 raises `NotImplementedError` while `compile(Integrator()).jacobian("f", "x")` already returns the finite-difference Jacobian.
 
-### compile-simulation#11 — Gate the quoted batch-rollout claim and give diagrams a frozen-params reference for the family rule
+### compile-sim#11 — Gate the quoted batch-rollout claim and give diagrams a frozen-params reference for the family rule
 
 *tooling · effort S · owner agent · rung v0.2 wave D · planned: S53*  
 Files: `README.md:182-186`, `DESIGN.md:663-667`, `ROADMAP.md:75`, `benchmarks/suites/core_perf.py:65-140`, `minilink/core/compile/evaluators/jax_evaluators.py:429-451`, `minilink/core/compile/evaluators/jax_evaluators.py:844`
@@ -390,7 +390,7 @@ Files: `README.md:182-186`, `DESIGN.md:663-667`, `ROADMAP.md:75`, `benchmarks/su
 
 **Evidence.** README.md:182-183 "1000 rollouts of 1000 RK4 steps take 27 ms as a compiled batch"; core_perf.py gates `loop_s`, `compile_s`, `speedup_vs_native` for `f` and the simulator, never a batch rollout; jax_evaluators.py:844 `self._frozen_params = None` on `JaxDiagramEvaluator`, so jax_evaluators.py:439-449 takes the `reference` empty branch and `axis()` returns `0 if (ndim >= 1 and np.shape(leaf)[0] == batch)`.
 
-### compile-simulation#12 — Batch the static-leaf time grid instead of dispatching 10 001 times
+### compile-sim#12 — Batch the static-leaf time grid instead of dispatching 10 001 times
 
 *performance · effort S · owner agent · rung v0.2 wave D · planned: —*  
 Files: `minilink/simulation/static_simulator.py:78-94`, `minilink/simulation/compile_backend.py:12-28`, `minilink/simulation/time_grid.py:11`
@@ -401,7 +401,7 @@ Files: `minilink/simulation/static_simulator.py:78-94`, `minilink/simulation/com
 
 **Evidence.** Probe: `Gain(2.0, dim=1).compute_trajectory(tf=10.0, compile_backend="jax")` 0.51 s versus 0.02 s on NumPy; static_simulator.py:85-87 `for i, ti in enumerate(self.t): out = self.evaluator.outputs(empty_x, u_i, float(ti))`; time_grid.py:11 `DEFAULT_N_STEPS = 10001`.
 
-### compile-simulation#13 — Let `compile(verbose=True)` read in order on every path
+### compile-sim#13 — Let `compile(verbose=True)` read in order on every path
 
 *trap · effort S · owner agent · rung v0.2 wave D · planned: —*  
 Files: `minilink/core/compile/compiler.py:260-291`, `minilink/core/compile/evaluators/jax_evaluators.py:849-867`, `minilink/core/compile/compiler.py:129-151`, `minilink/core/compile/compiler.py:142`
@@ -412,7 +412,7 @@ Files: `minilink/core/compile/compiler.py:260-291`, `minilink/core/compile/evalu
 
 **Evidence.** Probe output for a JAX diagram: `Step 1: Checking for algebraic loops`, `Step 2: Building execution plan`, `Step 0: Checking JAX compatibility`, `Step 3: JIT-compiling`; `compile(plant, backend="numpy", verbose=True)` prints `''`. compiler.py:263 / 280 versus jax_evaluators.py:853 / 864; `[compile] Done.` only at compiler.py:142, 158, 179 and 309, all after a JAX branch.
 
-### compile-simulation#14 — Share one uniform-grid check between the fixed-step backends and the simulator
+### compile-sim#14 — Share one uniform-grid check between the fixed-step backends and the simulator
 
 *consolidation · effort S · owner agent · rung v0.2 wave D · planned: T4*  
 Files: `minilink/simulation/simulator.py:100-105`, `minilink/simulation/solvers/euler_fixed.py:8-19`, `minilink/simulation/solvers/rk4_fixed.py:26-27`, `minilink/simulation/solvers/rk4_fixed.py:52-53`
@@ -423,9 +423,9 @@ Files: `minilink/simulation/simulator.py:100-105`, `minilink/simulation/solvers/
 
 **Evidence.** rk4_fixed.py:27 `dt = times[1] - times[0]` with no check; euler_fixed.py:8-19 `_require_uniform_times` raises `ValueError("euler_fixedsteps requires a uniform time grid...")`; simulator.py:100-105 `_time_grid_is_uniform` is a third spelling of the same `np.allclose(np.diff(times), ...)`.
 
-### Bugs reported by the compile-simulation finder
+### Bugs reported by the compile-sim finder
 
-#### bug compile-simulation#0 — (medium) `dt`-based time grids overshoot `tf` by one sample (float `arange`)
+#### bug compile-sim#0 — (medium) `dt`-based time grids overshoot `tf` by one sample (float `arange`)
 
 Files: `minilink/simulation/time_grid.py:47`, `minilink/simulation/time_grid.py:57`, `minilink/simulation/simulator.py:243-262`
 
@@ -438,7 +438,7 @@ print(sim.n_pts, sim.t[-1])   # 4 0.30000000000000004
 Scanning tf in 0.1..20 step 0.1 and dt in {0.1, 0.05, 0.02, 0.01, 0.001}: 65 of 995 pairs end past tf. Cause: `np.arange(t0, tf + dt, dt)` at time_grid.py:47 and :57. Fix: `n = int(round((tf - t0) / dt)); t = t0 + dt * np.arange(n + 1)` (and warn or extend when (tf - t0)/dt is not an integer), plus a test asserting `t[-1] <= tf + 1e-12` over a sweep. The only existing endpoint assertion (test_simulation.py:902) uses a benign pair.
 ```
 
-#### bug compile-simulation#1 — (medium) `JaxDiagramEvaluator` casts `dx` and the signal buffer to the dtype of `x`, truncating derivatives for integer states
+#### bug compile-sim#1 — (medium) `JaxDiagramEvaluator` casts `dx` and the signal buffer to the dtype of `x`, truncating derivatives for integer states
 
 Files: `minilink/core/compile/evaluators/jax_evaluators.py:921-926`, `minilink/core/compile/evaluators/jax_evaluators.py:939-950`, `minilink/core/compile/evaluators/jax_evaluators.py:1049-1057`
 
@@ -453,7 +453,7 @@ print(compile(Integrator(), backend='jax').f(jnp.array([0]), jnp.array([0.7]), 0
 `_infer_dtype` returns `x.dtype` (int64 here, float32 when neither x nor u carries a dtype), then `jnp.zeros(state_dim, dtype=dtype).at[...].set(float_piece)` truncates; JAX says the implicit cast will become an error. `Simulator` masks it by coercing `x0` to float (simulator.py:401), so only direct evaluator users hit it, but `compile()` is a public verb and `x0 = np.array([0, 0])` is a natural student line. Fix: `dtype = jnp.result_type(x, u, 0.0)` (float64 under the default x64) in `_infer_dtype`, and one test on the diagram evaluator with integer `x`.
 ```
 
-#### bug compile-simulation#2 — (low) `compile_step_diagram` probes every subsystem's `step` and `h` twice
+#### bug compile-sim#2 — (low) `compile_step_diagram` probes every subsystem's `step` and `h` twice
 
 Files: `minilink/core/compile/step_compiler.py:56-57`
 
@@ -1433,9 +1433,9 @@ planner.value_at([0.0, 0.0])
 ```
 
 
-## graphics-blocks-interfaces
+## graphics
 
-### graphics-blocks-interfaces#0 — Let plot_trajectory select a leaf's named output ports
+### graphics#0 — Let plot_trajectory select a leaf's named output ports
 
 *api · effort S · owner agent · rung v0.2 wave B · planned: —*  
 Files: `minilink/graphical/signals/time_signals.py:114-135`, `minilink/graphical/signals/time_signals.py:313-339`, `minilink/core/facades.py:194-242`, `DESIGN.md:1152`
@@ -1446,7 +1446,7 @@ Files: `minilink/graphical/signals/time_signals.py:114-135`, `minilink/graphical
 
 **Evidence.** Probe: TwoLinkManipulator().compute_trajectory(); build_signal_plot_spec(m, traj, signals=("y",)) -> ValueError 'Unknown signal(s): y. Available signals: x, u'; same for ("p",). _available_signal_names (time_signals.py:331-339) lists traj.signal_names = ('x','u') for a leaf and only enumerates subsystem ports for diagrams. DESIGN.md:1152 promises signals=("x", "u", "block:port") with no leaf output form. Diagram path works: ('sys:y',) -> labels ['sys:y[0]','sys:y[1]'] although the port has labels.
 
-### graphics-blocks-interfaces#1 — Give Sys2Gym a Distribution for the start state
+### graphics#1 — Give Sys2Gym a Distribution for the start state
 
 *api · effort M · owner agent · rung v0.2 wave C · planned: —*  
 Files: `minilink/interfaces/gymnasium.py:60`, `minilink/interfaces/gymnasium.py:132-136`, `minilink/interfaces/gymnasium.py:180-197`, `minilink/interfaces/gymnasium.py:345-358`, `minilink/core/signals.py:176-177`
@@ -1457,7 +1457,7 @@ Files: `minilink/interfaces/gymnasium.py:60`, `minilink/interfaces/gymnasium.py:
 
 **Evidence.** Probe on an unbounded 2-state DynamicSystem: x0_lb=[-inf -inf], x0_ub=[inf inf], x0_std=[inf inf]; reset_mode='uniform' -> OverflowError: Range exceeds valid bounds; 'gaussian' -> observation [inf -inf]; Sys2Gym.from_problem(PlanningProblem(sys, x_goal=0, cost=..., tf=1)).reset() -> OverflowError because ProblemEnv.reset (line 353) runs the uniform draw before problem.sample_x0. Docstring (line 60) names the third mode 'determinist' while the code accepts any string as deterministic.
 
-### graphics-blocks-interfaces#2 — Register the block names the facade exports and walk every band facade in the registry test
+### graphics#2 — Register the block names the facade exports and walk every band facade in the registry test
 
 *test · effort S · owner agent · rung v0.1 close-out · planned: —*  
 Files: `minilink/blocks/__init__.py:32-41`, `tests/unittest/test_teaching_surface.py:61-81`, `tests/unittest/test_teaching_surface.py:184-228`, `docs/api/blocks.rst`, `docs/api/graphical.rst`
@@ -1468,7 +1468,7 @@ Files: `minilink/blocks/__init__.py:32-41`, `tests/unittest/test_teaching_surfac
 
 **Evidence.** Probe: sorted(set(minilink.blocks.__all__) - set(TEACHING_SURFACE['minilink.blocks'])) == ['MLP', 'NeuralNetwork', 'NotchFilter', 'Washout']. test_teaching_surface.py:184-207 iterates TEACHING_SURFACE only; the full walk at 209-228 is root-only. docs/api/blocks.rst lists basic, sources, transfer_function, routing, nonlinear, filters (no step, no neural); docs/api/graphical.rst lists time_signals, phase_plane, topology, export, animator, primitives, renderer (no port_map, catalog, control).
 
-### graphics-blocks-interfaces#3 — Make minilink.graphical.catalog the one shapes-and-skins facade students import
+### graphics#3 — Make minilink.graphical.catalog the one shapes-and-skins facade students import
 
 *api · effort S · owner maintainer · rung v0.2 wave D · planned: —*  
 Files: `minilink/graphical/catalog/__init__.py:1-11`, `minilink/graphical/catalog/__init__.py:53-92`, `tests/unittest/test_teaching_imports.py:22-38`, `tests/unittest/teaching_import_allowlist.txt`, `tests/unittest/test_teaching_surface.py:158-170`, `README.md:78`, `minilink/graphical/catalog/racecar_skin.py:1-15`
@@ -1479,7 +1479,7 @@ Files: `minilink/graphical/catalog/__init__.py:1-11`, `minilink/graphical/catalo
 
 **Evidence.** teaching_import_allowlist.txt carries minilink.graphical.animation.primitives (readme_examples.py, showcase_minilink.ipynb, trajopt_holonomic_corridor.py), minilink.graphical.catalog (trajopt_holonomic_corridor.py), minilink.graphical.catalog.racecar_skin (mpc_racecar.py, mpc_racecar_dyn.py, racecar_mpc.ipynb) and more; grep over examples: 10 imports of graphical.animation.primitives, 5 of catalog.racecar_skin, 2 of catalog.skins. README.md:78 'from minilink.graphical.animation.primitives import Box, ground_line'. graphical/catalog/__all__ (lines 53-92) has no racecar entry.
 
-### graphics-blocks-interfaces#4 — One keyword vocabulary across the plot verbs (title, ax, backend) and one PlotResult.axes shape
+### graphics#4 — One keyword vocabulary across the plot verbs (title, ax, backend) and one PlotResult.axes shape
 
 *api · effort M · owner agent · rung v0.2 wave D · planned: —*  
 Files: `minilink/core/facades.py:194-242`, `minilink/core/facades.py:591-620`, `minilink/graphical/signals/time_signals.py:173-207`, `minilink/graphical/signals/matplotlib_backend.py:136-139`, `minilink/graphical/port_map.py:69-88`, `minilink/graphical/port_map.py:160-179`, `minilink/graphical/phase_plane/phase_plane.py:120-172`, `minilink/graphical/control/matplotlib_backend.py:54`, `minilink/core/hybrid_diagram.py:225-280`
@@ -1490,7 +1490,7 @@ Files: `minilink/core/facades.py:194-242`, `minilink/core/facades.py:591-620`, `
 
 **Evidence.** Probes: p.plot_trajectory(title='x') -> TypeError unexpected keyword 'title' (facade takes only signals/backend/show) while plot_time_signals(title=) works on plotly (kwargs -> fig.update_layout) and fails on matplotlib (_create_figure() got an unexpected keyword argument 'title'); plot_phase_plane(title=) OK; plot_trajectory(ax=) TypeError; plot_control_law(backend='plotly') TypeError; plot_phase_plane(backend='plotly', ax=1) silently OK. PlotResult.axes: plot_trajectory -> list (even one row), plot_bode -> list, plot_pzmap / plot_phase_plane / plot_control_law -> Axes (control/matplotlib_backend.py:54 'axes_out = axes[0] if n_panels == 1 else axes'). hybrid_diagram.py:230 accepts abscissa='t' and never reads it (line 276 always passes TIME_ABSCISSA_LABEL). The time-signal title only reaches set_window_title (matplotlib_backend.py:136-139), invisible in a notebook.
 
-### graphics-blocks-interfaces#5 — One axis-label formatter and one unit convention (no brackets in the catalog)
+### graphics#5 — One axis-label formatter and one unit convention (no brackets in the catalog)
 
 *consolidation · effort S · owner agent · rung v0.2 wave D · planned: T3*  
 Files: `minilink/graphical/signals/matplotlib_backend.py:46-52`, `minilink/graphical/signals/plotly_backend.py:294`, `minilink/graphical/phase_plane/phase_plane.py:566-571`, `minilink/graphical/port_map.py:675-680`, `minilink/dynamics/abstraction/manipulator.py:45`, `minilink/dynamics/abstraction/manipulator.py:53`, `minilink/dynamics/abstraction/generalized_mechanical.py:44`, `minilink/dynamics/abstraction/generalized_mechanical.py:51`, `minilink/dynamics/catalog/manipulators/arms.py:139`, `minilink/dynamics/catalog/mass_spring_damper/linear.py:53`
@@ -1501,7 +1501,7 @@ Files: `minilink/graphical/signals/matplotlib_backend.py:46-52`, `minilink/graph
 
 **Evidence.** Probe: _create_figure(SignalPlotSpec(... SignalTrace('p', 0, 'p[0]', '[m]', ...))).layout.yaxis.title.text == 'p[0] [[m]]' (plotly_backend.py:294 f"{trace.label} [{trace.unit}]"), _ylabel_with_unit('p[0]', '[m]') == 'p[0]\n[m]'. TwoLinkManipulator outputs: q ['[rad]', '[rad]'], p ['[m]', '[m]'], pdot ['[m/s]', ...] versus state units ['rad', 'rad', 'rad/s', 'rad/s'] and mass_spring_damper 'm'. phase_plane.py:566 and port_map.py:675 are identical _format_axis_label bodies.
 
-### graphics-blocks-interfaces#6 — One backend resolver and one optional-import helper for the graphical band
+### graphics#6 — One backend resolver and one optional-import helper for the graphical band
 
 *consolidation · effort S · owner agent · rung v0.2 wave D · planned: —*  
 Files: `minilink/graphical/signals/time_signals.py:190-207`, `minilink/graphical/control/__init__.py:13-26`, `minilink/graphical/phase_plane/phase_plane.py:398-402`, `minilink/graphical/animation/animator.py:59-78`, `minilink/graphical/signals/plotly_backend.py:312-321`, `minilink/graphical/control/plotly_backend.py:156-165`, `minilink/graphical/phase_plane/phase_plane.py:308-315`, `minilink/graphical/animation/renderers/plotly_renderer.py:51-59`, `minilink/graphical/signals/matplotlib_backend.py:116`, `minilink/graphical/control/matplotlib_backend.py:25`, `minilink/graphical/phase_plane/phase_plane.py:204`, `minilink/graphical/port_map.py:308`, `minilink/graphical/diagrams/mermaid.py:39`, `minilink/graphical/diagrams/hybrid_mermaid.py:69`, `minilink/graphical/signals/signal_colors.py:22-34`, `minilink/graphical/animation/renderers/plotly_renderer.py:124`
@@ -1512,7 +1512,7 @@ Files: `minilink/graphical/signals/time_signals.py:190-207`, `minilink/graphical
 
 **Evidence.** Probe: Pendulum().plot_trajectory(backend='mpl') -> ValueError "Unknown signal backend 'mpl'" while render_control_figure (control/__init__.py:16 key in ('matplotlib','mpl')) and _normalize_backend (phase_plane.py:398-402) accept it; plot_time_signals raises TypeError for a non-string backend, the others ValueError. grep: rcParams["pdf.fonttype"] = 42 at signals/matplotlib_backend.py:116, control/matplotlib_backend.py:25, phase_plane.py:204, port_map.py:308; _import_plotly at signals/plotly_backend.py:312, control/plotly_backend.py:156, plotly_renderer.py:51 plus an inline copy at phase_plane.py:308; _mermaid_id at mermaid.py:39 and hybrid_mermaid.py:69 (identical, the latter already imports two helpers from the former).
 
-### graphics-blocks-interfaces#7 — Publish a renderer capability table and give each cell an honest fallback
+### graphics#7 — Publish a renderer capability table and give each cell an honest fallback
 
 *trap · effort M · owner agent · rung v0.2 wave D · planned: S43*  
 Files: `minilink/graphical/animation/animator.py:289-295`, `minilink/graphical/animation/animator.py:318-340`, `minilink/graphical/animation/renderers/matplotlib_renderer.py:569-580`, `minilink/graphical/animation/renderers/meshcat_renderer.py:27-36`, `minilink/graphical/animation/renderers/meshcat_renderer.py:720-724`, `minilink/graphical/animation/renderers/plotly_renderer.py:311-380`, `DESIGN.md:380-386`, `DESIGN.md:1162-1164`
@@ -1523,7 +1523,7 @@ Files: `minilink/graphical/animation/animator.py:289-295`, `minilink/graphical/a
 
 **Evidence.** meshcat_renderer.py:724 '# Meshcat uses the viewer default camera; camera is ignored.' so camera_follow_frame and animate(camera=...) do nothing there; animator.py:294-295 'if google.colab in sys.modules and renderer == meshcat: html = True' after the docstring 'Explicit True/False is honored'; probe: animate(traj, save=True, file_name='.../clip.gif') writes 'clip.gif.gif' (matplotlib_renderer.py:575 file_name + '.gif') while html_export_path (meshcat_renderer.py:27-36) keeps a given suffix; animate(renderer='plotly', save=True) -> UserWarning 'save=True is not supported for renderer=plotly; skipping export' (PlotlyRenderer defines no export_animation).
 
-### graphics-blocks-interfaces#8 — Silence the renderers (RULES 4.6)
+### graphics#8 — Silence the renderers (RULES 4.6)
 
 *trap · effort S · owner agent · rung v0.1 close-out · planned: —*  
 Files: `minilink/graphical/animation/renderers/matplotlib_renderer.py:573`, `minilink/graphical/animation/renderers/meshcat_renderer.py:711-714`, `minilink/graphical/animation/renderers/meshcat_renderer.py:733`, `minilink/graphical/animation/renderers/meshcat_renderer.py:736`, `minilink/graphical/animation/renderers/meshcat_renderer.py:783-788`, `minilink/graphical/animation/renderers/meshcat_renderer.py:809`, `minilink/graphical/animation/renderers/plotly_renderer.py:81`
@@ -1534,7 +1534,7 @@ Files: `minilink/graphical/animation/renderers/matplotlib_renderer.py:573`, `min
 
 **Evidence.** grep 'print(' under minilink/graphical: matplotlib_renderer.py:573 f'Saving animation to {file_name}.gif ...'; meshcat_renderer.py:736 'Meshcat static frame ready.'; :784 'Note: meshcat native animation freezes per-frame dynamic geometry ...'; :809 f'Saving animation to {path} ...'; :711-714 Colab port notices; plotly_renderer.py:81 print(repr(self)). Probe stdout after animate(save=True, show=False): 'Saving animation to /tmp/.../clip.gif.gif ...'.
 
-### graphics-blocks-interfaces#9 — Warn on the +-10 phase-plane window and stop duplicating the default bounds
+### graphics#9 — Warn on the +-10 phase-plane window and stop duplicating the default bounds
 
 *trap · effort S · owner agent · rung v0.2 wave D · planned: —*  
 Files: `minilink/graphical/phase_plane/phase_plane.py:509-540`, `minilink/graphical/phase_plane/phase_plane.py:432-453`, `minilink/graphical/port_map.py:382`, `minilink/graphical/port_map.py:600-614`, `minilink/core/signals.py:176-177`
@@ -1545,7 +1545,7 @@ Files: `minilink/graphical/phase_plane/phase_plane.py:509-540`, `minilink/graphi
 
 **Evidence.** Probe on a 2-state DynamicSystem with default bounds: build_phase_plane_spec(sys).x_bounds == (-10.0, 10.0) == y_bounds; phase_plane.py:525 'return -10.0, 10.0' and :532 again; port_map.py:382 '_DEFAULT_BOUNDS = (-10.0, 10.0)'. examples/demos/graphical/plot_phase_plane.py has to set pendulum.state.lower_bound / upper_bound by hand before plotting.
 
-### graphics-blocks-interfaces#10 — A lazy facade for minilink.interfaces
+### graphics#10 — A lazy facade for minilink.interfaces
 
 *api · effort S · owner agent · rung v0.2 wave C · planned: —*  
 Files: `minilink/interfaces/__init__.py:1-26`, `minilink/interfaces/gymnasium.py:28`, `minilink/interfaces/gymnasium.py:272`, `minilink/interfaces/gymnasium.py:374`, `tests/unittest/test_teaching_imports.py:37`, `ROADMAP.md (section 7 Later)`
@@ -1556,7 +1556,7 @@ Files: `minilink/interfaces/__init__.py:1-26`, `minilink/interfaces/gymnasium.py
 
 **Evidence.** Probe: minilink.interfaces.__all__ is None; 'from minilink.interfaces import Sys2Gym' -> ImportError: cannot import name 'Sys2Gym'. gymnasium_interface.ipynb, drone_ppo_sb3.ipynb and pendulum_value_iteration_vs_lqr_vs_ppo_sb3.ipynb all read 'from minilink.interfaces.gymnasium import SB3Controller, Sys2Gym'; test_teaching_imports.py:37 lists 'minilink.interfaces.gymnasium' inside TEACHING_MODULES. interfaces/__init__.py:15-22 names torch.py / flax.py and cosimulation adapters; ROADMAP §7 Later lists MjxPlant, ROS2 / FMI, no torch/flax.
 
-### graphics-blocks-interfaces#11 — Give Integrator and ZOHHold a dim like every static block
+### graphics#11 — Give Integrator and ZOHHold a dim like every static block
 
 *api · effort S · owner maintainer · rung v0.2 wave C · planned: C3*  
 Files: `minilink/blocks/basic.py:14-19`, `minilink/blocks/step.py:17-19`, `minilink/blocks/nonlinear.py:12`, `minilink/blocks/routing.py:48`, `minilink/blocks/routing.py:79`
@@ -1567,7 +1567,7 @@ Files: `minilink/blocks/basic.py:14-19`, `minilink/blocks/step.py:17-19`, `minil
 
 **Evidence.** Probe: inspect.signature(Integrator.__init__) == (self), Integrator().n == Integrator().m == 1; inspect.signature(ZOHHold.__init__) == (self), ZOHHold().n == 1 (basic.py:15 'super().__init__(n=1, input_dim=1, output_dim=1 ...)', step.py:17 the same); Saturation(lower, upper, dim=1), Gain(K, dim=None), Error(dim=1), Sum(signs, dim=1).
 
-### graphics-blocks-interfaces#12 — Fold NeuralNetwork into MLP (one owner of the one-hidden-layer map)
+### graphics#12 — Fold NeuralNetwork into MLP (one owner of the one-hidden-layer map)
 
 *consolidation · effort S · owner maintainer · rung v0.2 wave D · planned: —*  
 Files: `minilink/blocks/neural.py:9-68`, `minilink/blocks/neural.py:71-141`, `minilink/blocks/__init__.py:40-41`, `examples/demos/compile/neural_controller_jax.py:9-16`, `tests/unittest/test_blocks.py:340-390`
@@ -1578,7 +1578,7 @@ Files: `minilink/blocks/neural.py:9-68`, `minilink/blocks/neural.py:71-141`, `mi
 
 **Evidence.** Probe: NeuralNetwork(2, 1, hidden_dim=8).params shapes {'W1': (8, 2), 'b1': (8,), 'W2': (1, 8), 'b2': (1,)} vs MLP(2, 1, hidden=(8,)).params {'W0': (8, 2), 'b0': (8,), 'W1': (1, 8), 'b1': (1,)}; grep: NeuralNetwork is used by one demo (neural_controller_jax.py:16) and one test class; both classes are on the blocks facade (__init__.py:40-41) and neither is in the teaching-surface table.
 
-### graphics-blocks-interfaces#13 — Add the graphical band to the textbook pass (T7)
+### graphics#13 — Add the graphical band to the textbook pass (T7)
 
 *docs · effort M · owner agent · rung v0.2 wave D · planned: T1*  
 Files: `docs/plans/TODO.md (section 5, T rows)`, `minilink/graphical/phase_plane/phase_plane.py:434`, `minilink/graphical/phase_plane/phase_plane.py:490-492`, `minilink/graphical/phase_plane/phase_plane.py:553-563`, `minilink/graphical/animation/camera.py:59-68`, `minilink/graphical/animation/animator.py:102`, `minilink/graphical/animation/animator.py:166`, `minilink/graphical/animation/animator.py:227`, `minilink/graphical/catalog/skins.py:46-54`, `minilink/graphical/catalog/skins.py:91-98`, `minilink/graphical/animation/renderers/matplotlib_renderer.py:618`, `minilink/graphical/animation/renderers/renderer.py:60`, `minilink/graphical/common/matplotlib_style.py:24-39`, `minilink/graphical/meshes.py:1-21`, `minilink/core/system.py:110-118`
@@ -1589,7 +1589,7 @@ Files: `docs/plans/TODO.md (section 5, T rows)`, `minilink/graphical/phase_plane
 
 **Evidence.** docs/reviews/2026-09-22-consolidation-review.md §4.1 lists five bands (core; blocks and control; dynamics; analysis and simulation; planning). phase_plane.py:434 getattr(getattr(sys, 'state', None), 'nominal_value', None); camera.py:59-68 getattr(source, 'camera_target' / 'camera_plot_axes' / 'camera_scale' / 'camera_follow_frame', default) while System.__init__ sets all four (system.py:114-118); animator.py:102/166/227 getattr(self.sys, 'camera_scale' | 'camera_plot_axes'); skins.py:48 hasattr(plant, 'a') and hasattr(plant, 'b'); renderer.py:60 ':meth:`minilink.graphical.animation.Animator._prepare_transforms`' (no such method; the animator has _resolve_frame / _build_frames); grep counts: 60 'def _' methods inside classes, 200 module-level.
 
-### graphics-blocks-interfaces#14 — Retire the sources demo and __main__ that only exist for show_signal
+### graphics#14 — Retire the sources demo and __main__ that only exist for show_signal
 
 *consolidation · effort S · owner maintainer · rung v0.2 wave D · planned: D2*  
 Files: `minilink/blocks/sources.py:30-111`, `minilink/blocks/sources.py:296-325`, `minilink/blocks/filters.py:55-63`, `examples/demos/blocks/blocks_sources.py`, `examples/tutorial/01_blocks.ipynb (Sources cells)`
@@ -1600,9 +1600,9 @@ Files: `minilink/blocks/sources.py:30-111`, `minilink/blocks/sources.py:296-325`
 
 **Evidence.** sources.py:111 'return fig, ax'; sources.py:296-325 __main__ loops demo_changes over eight params calling show_signal each time; blocks_sources.py repeats the loop with three variants and 'ax.set_title(f"Changed {key} -> {value}")'; filters.py:55-63 __main__ prints an amplitude the RULES 6.13 rule says should be a plot or a __str__. 01_blocks.ipynb cells 'step.show_signal(t0=0.0, tf=5.0)' / 'noise.show_signal(...)'.
 
-### Bugs reported by the graphics-blocks-interfaces finder
+### Bugs reported by the graphics finder
 
-#### bug graphics-blocks-interfaces#0 — (medium) Sys2Gym.reset fails or returns inf on any plant without finite state bounds (also through from_problem)
+#### bug graphics#0 — (medium) Sys2Gym.reset fails or returns inf on any plant without finite state bounds (also through from_problem)
 
 Files: `minilink/interfaces/gymnasium.py:134-136`, `minilink/interfaces/gymnasium.py:181-188`, `minilink/interfaces/gymnasium.py:352-358`, `minilink/core/signals.py:176-177`
 
@@ -1620,7 +1620,7 @@ Sys2Gym.from_problem(PlanningProblem(sys, x_goal=np.zeros(2), cost=cost, tf=1.0)
 # cause: x0_lb = x0 + 0.1 * (-inf), x0_std = 0.1 * inf; ProblemEnv.reset draws the uniform before problem.sample_x0
 ```
 
-#### bug graphics-blocks-interfaces#1 — (low) Animation frame schedule never draws the last sample and crashes on a one-sample trajectory
+#### bug graphics#1 — (low) Animation frame schedule never draws the last sample and crashes on a one-sample trajectory
 
 Files: `minilink/graphical/animation/renderers/timing.py:30`, `minilink/graphical/animation/renderers/timing.py:35`
 
@@ -1637,7 +1637,7 @@ p.animate(Trajectory(t=np.array([0.0]), x=traj.x[:, :1], u=traj.u[:, :1]), show=
 # fix: n_frames = ceil(nsteps / skip_steps) (sim_index_for_frame already clamps) and a guard for nsteps < 2
 ```
 
-#### bug graphics-blocks-interfaces#2 — (low) animate(save=True, file_name='clip.gif') writes clip.gif.gif
+#### bug graphics#2 — (low) animate(save=True, file_name='clip.gif') writes clip.gif.gif
 
 Files: `minilink/graphical/animation/renderers/matplotlib_renderer.py:573-575`, `minilink/graphical/animation/renderers/meshcat_renderer.py:27-36`
 
@@ -1653,7 +1653,7 @@ p.animate(traj, save=True, show=False, file_name=os.path.join(d, 'clip.gif'))
 os.listdir(d)   # ['clip.gif.gif'] (matplotlib_renderer.py:575 file_name + '.gif'); the meshcat sibling html_export_path keeps a given suffix
 ```
 
-#### bug graphics-blocks-interfaces#3 — (low) Plotly time-signal y-labels double the brackets of '[m]'-style units
+#### bug graphics#3 — (low) Plotly time-signal y-labels double the brackets of '[m]'-style units
 
 Files: `minilink/graphical/signals/plotly_backend.py:294`, `minilink/dynamics/abstraction/manipulator.py:45`, `minilink/dynamics/abstraction/manipulator.py:53`
 
@@ -1670,7 +1670,7 @@ _create_figure(spec).layout.yaxis.title.text   # 'p[0] [[m]]'
 # since TwoLinkManipulator().outputs['p'].units == ['[m]', '[m]']; the matplotlib backend guards (_ylabel_with_unit), plotly does not
 ```
 
-#### bug graphics-blocks-interfaces#4 — (low) HybridDiagram.plot_trajectory accepts a dead abscissa argument
+#### bug graphics#4 — (low) HybridDiagram.plot_trajectory accepts a dead abscissa argument
 
 Files: `minilink/core/hybrid_diagram.py:230`, `minilink/core/hybrid_diagram.py:276`
 
@@ -1681,9 +1681,9 @@ Files: `minilink/core/hybrid_diagram.py:230`, `minilink/core/hybrid_diagram.py:2
 ```
 
 
-## examples-teaching
+## examples
 
-### examples-teaching#0 — Declare controller ports from `feedback_profile` so a student writes only `ctl`
+### examples#0 — Declare controller ports from `feedback_profile` so a student writes only `ctl`
 
 *api · effort M · owner maintainer · rung v0.2 wave B · planned: P11 (the two GRO501 notebooks would be the first consumers)*  
 Files: `examples/teaching/courses/udes_gro501/cartpole_static_controller.ipynb (code cell 12)`, `examples/teaching/courses/udes_gro501/cartpole_dynamic_controller.ipynb (code cell 7)`, `examples/teaching/courses/udes_gro860/double_integrator_policy_evaluation.ipynb (code cell 6)`, `examples/tutorial/00_core.ipynb (code cell 24)`, `examples/demos/compile/diagram_compiling.py:27-41`, `examples/demos/compile/params_gradient.py:40-61`, `minilink/core/feedback.py`
@@ -1694,7 +1694,7 @@ Files: `examples/teaching/courses/udes_gro501/cartpole_static_controller.ipynb (
 
 **Evidence.** cartpole_static_controller cell 12: `self.add_input_port("y", dim=4); self.add_input_port("r", dim=1, nominal_value=0.0); self.add_output_port("u", dim=1, function=self.ctl, dependencies=("y",))` then `y = self.get_port_values_from_u(u, "y")`. double_integrator_policy_evaluation cell 6: `self.add_input_port("x", dim=2); self.add_output_port("u", dim=1, function=self.ctl, dependencies="all")` then `p, v = u`. cartpole_dynamic_controller cell 7: `dependencies=()` plus `add_output_port("z", dim=4, function=self.compute_state)`. 00_core cell 24 `PropController(System)` with `dependencies=("r", "y")`. diagram_compiling.py:32-33 gives `r` a scalar `nominal_value=0.0` and `y` an array `np.array([0.0])`.
 
-### examples-teaching#1 — Make `plot_diagram()` warn, not raise, when the `graphviz` wrapper is missing
+### examples#1 — Make `plot_diagram()` warn, not raise, when the `graphviz` wrapper is missing
 
 *trap · effort S · owner maintainer · rung v0.1 close-out · planned: R1 (the wheel's dependency list is what the tag freezes)*  
 Files: `minilink/graphical/diagrams/dot.py:37-41`, `minilink/graphical/diagrams/dot.py:132-148`, `pyproject.toml:36-38`, `pyproject.toml:67-69`, `install.md:6`, `install.md:169`, `examples/tutorial/00_core.ipynb (code cells 19, 21)`, `examples/tutorial/02_dynamics.ipynb (code cell 3)`, `examples/tutorial/06_hybrid.ipynb (code cells 5, 7)`
@@ -1705,7 +1705,7 @@ Files: `minilink/graphical/diagrams/dot.py:37-41`, `minilink/graphical/diagrams/
 
 **Evidence.** dot.py:37-41 `except ImportError as exc: raise ImportError("Graphviz topology export requires the graphviz Python package.")`; dot.py:132-148 `warnings.warn("Could not render the diagram inline. Is the Graphviz binary installed? ...")` for the binary; pyproject.toml:67-69 `diagrams = ["graphviz"]` is an extra, not in `dependencies` (:36); install.md:6 "Skip `plot_diagram()` (needs Graphviz)"; 00_core cell 19 `auto.plot_diagram()`, cell 21 `diagram.plot_diagram()`.
 
-### examples-teaching#2 — Let the linear records print themselves and add a `poles` verb
+### examples#2 — Let the linear records print themselves and add a `poles` verb
 
 *api · effort S · owner maintainer · rung v0.2 wave B · planned: P7 (generated facades) and P8 (ζ / ω_n need a pole pair to read from); the `__str__` half is agent-lane*  
 Files: `minilink/analysis/linear.py:19`, `minilink/analysis/linear.py:143`, `minilink/analysis/__init__.py:41`, `minilink/core/facades.py:622-723`, `minilink/dynamics/abstraction/state_space.py`, `minilink/blocks/transfer_function.py`, `examples/tutorial/04_analysis.ipynb (code cells 3, 5, 7)`, `examples/tutorial/01_blocks.ipynb (code cell 7)`, `examples/teaching/courses/udes_gro860/cartpole_lqr.ipynb (code cells 6, 8)`, `examples/teaching/courses/udes_gro501/numpy_state_space.ipynb (code cells 50-58)`, `examples/teaching/topics/classical_control/frequency_response.ipynb (code cells 6, 29)`, `examples/demos/analysis/analysis_linearize.py:19-24`, `examples/demos/analysis/analysis_structural.py:13-15`, `examples/demos/analysis/analysis_frequency.py:20-22`
@@ -1716,7 +1716,7 @@ Files: `minilink/analysis/linear.py:19`, `minilink/analysis/linear.py:143`, `min
 
 **Evidence.** Verified: `str(plant.linearize(x))` → 'Linearized Pendulum (LTISystem), n=2\n  inputs: u (1)\n  outputs: y (2), x (2)'; `str(TransferFunction([4],[1,1.2,4]))` → 'Transfer Function (TransferFunction), n=2 ...'. `poles(A)` and `closed_loop_poles(A, B, C, D, K)` exist in analysis/linear.py:19,143 but are absent from the `minilink.analysis` lazy table and from every facade (root-export probe: `poles []`). 04_analysis cell 3 `print("poles:", np.round(np.linalg.eigvals(lin.A()), 2))`; cartpole_lqr cell 8 `np.linalg.eigvals(A - B @ K_inf)`; frequency_response cell 29 `np.linalg.eigvals(T.jacobian("f", "x"))`; analysis_linearize.py:21-24 four `print("A =\n", np.round(lin.A(), 4))` lines.
 
-### examples-teaching#3 — Fill the placeholder sections of tutorials 01, 02, 03, 05, 08 and 09
+### examples#3 — Fill the placeholder sections of tutorials 01, 02, 03, 05, 08 and 09
 
 *docs · effort M · owner maintainer · rung v0.2 wave D · planned: D1.3 (its tutorial pass is a flatness sweep; the missing content is not in its scope)*  
 Files: `examples/tutorial/01_blocks.ipynb (code cells 5, 7)`, `examples/tutorial/02_dynamics.ipynb (markdown cell 6)`, `examples/tutorial/03_control.ipynb (markdown cell 2, code cells 3, 7)`, `examples/tutorial/05_simulation.ipynb (markdown cell 4)`, `examples/tutorial/08_optimization.ipynb (code cell 8)`, `examples/tutorial/09_planning.ipynb (markdown cell 4)`, `examples/tutorial/10_graphical.ipynb (code cells 13-23)`, `README.md:225`
@@ -1727,7 +1727,7 @@ Files: `examples/tutorial/01_blocks.ipynb (code cells 5, 7)`, `examples/tutorial
 
 **Evidence.** 03_control markdown cell 2: "Below: catalog sweep, forced cart-pole response, then LQR stabilization." while code cell 3 ends at `cartpole.plot_trajectory()`; cell 7 `print(ComputedTorqueController.__name__, SlidingModeController.__name__)`; 01_blocks cell 5 `print("Sum block:", Sum)`; 08 cell 8 `print(inspect.signature(Optimizer.__init__))`; 09 markdown cell 4 is a three-bullet list with no code after it; 05 markdown cell 4 ("construct a `Simulator`") is followed directly by markdown cell 5; 10_graphical cell 13 re-imports `Pendulum` and cell 14 rebuilds `sys`.
 
-### examples-teaching#4 — Pin one Colab setup cell per tier with a test, and align install.md's tiers to it
+### examples#4 — Pin one Colab setup cell per tier with a test, and align install.md's tiers to it
 
 *test · effort S · owner agent · rung v0.1 close-out · planned: R1 (the `%pip install minilink` switch), S49 (retires the SB3 variant)*  
 Files: `examples/tutorial/*.ipynb (code cell 1)`, `examples/teaching/**/*.ipynb (code cell 1)`, `examples/teaching/topics/optimal_control/cartpole_rollout_gradients.ipynb (code cell 1)`, `examples/teaching/topics/robotics/manipulator_eom.ipynb (code cell 1)`, `examples/tutorial/showcase_minilink.ipynb (code cell 1)`, `tests/demo_checks/run_notebook_checks.py`, `tests/unittest/test_repo_contract.py`, `install.md:17-25`, `install.md:138`
@@ -1738,7 +1738,7 @@ Files: `examples/tutorial/*.ipynb (code cell 1)`, `examples/teaching/**/*.ipynb 
 
 **Evidence.** Exact-text census of the first code cell: 14 tutorial-style "+ meshcat"; 11 teaching "clone + path"; 2 GRO501 with a trailing blank line; 3 SB3 variants with three different comment lines; cartpole_rollout_gradients.ipynb `git clone -b main https://github.com/alx87grd/minilink`; manipulator_eom.ipynb cell 1 `import sys` twice and `_OPTIMIZER_METHOD` never used; 4 notebooks with no Colab cell (numpy_state_space, grid_world_dynamic_programming, sgd_line, least_squares_sgd). run_notebook_checks.py has no reference to the setup cell. install.md:138 installs `stable-baselines3` in the Full Colab cell; install.md:25 "PPO notebooks need **Full**" while the native `drone_ppo.ipynb` runs on the Basic cell (JAX ships on Colab).
 
-### examples-teaching#5 — One name and one keyword for the cost-to-go plot across planner, evaluator and comparison
+### examples#5 — One name and one keyword for the cost-to-go plot across planner, evaluator and comparison
 
 *api · effort S · owner maintainer · rung v0.2 wave D · planned: S54 (the colour-scale default of the same plot)*  
 Files: `minilink/planning/policy_synthesis/dp.py:420`, `minilink/planning/planner.py:117`, `minilink/planning/policy_synthesis/policy_eval.py:88-92`, `minilink/planning/policy_synthesis/plotting.py:105-119`, `minilink/planning/comparison.py:111`, `minilink/planning/results.py:129`, `examples/teaching/courses/udes_gro860/double_integrator_policy_evaluation.ipynb (code cells 8, 10)`, `examples/demos/value_iteration/vi_pendulum_lqr.py:44-51`
@@ -1749,7 +1749,7 @@ Files: `minilink/planning/policy_synthesis/dp.py:420`, `minilink/planning/planne
 
 **Evidence.** Band census: 16 `plot_cost2go(jmax`, 2 `plot_cost2go(vmax` (policy_evaluation cell 8), 3 `plot_cost_to_go(jmax`. policy_eval.py:92 `return self.grid.plot_value(self.last_J, **kwargs)` (no `jmax`); plotting.py:108 `jmax=None`; planner.py:117 `def plot_cost_to_go(self, **kwargs)` on the base class while dp.py:420 adds `def plot_cost2go(self, **kwargs)`.
 
-### examples-teaching#6 — Overlay several trajectories on one phase plane and two fields on one grid surface
+### examples#6 — Overlay several trajectories on one phase plane and two fields on one grid surface
 
 *feature · effort S · owner agent · rung v0.2 wave D · planned: D1.1 (lists five native plots; neither of these is on it), D1.4 (the comparison verbs)*  
 Files: `minilink/graphical/phase_plane/phase_plane.py:120-135`, `minilink/core/facades.py:591`, `minilink/planning/policy_synthesis/discretizer.py:427`, `minilink/planning/policy_synthesis/plotting.py:15`, `minilink/planning/policy_synthesis/plotting.py:309`, `examples/tutorial/showcase_minilink.ipynb (code cell 33)`, `examples/teaching/courses/udes_gro860/pendulum_value_iteration_vs_lqr.ipynb (code cells 27-28)`, `examples/teaching/courses/udes_gro860/pendulum_cost_to_go_approximation.ipynb (code cells 24, 26, 28)`, `examples/demos/value_iteration/vi_double_pendulum_jax.py:116-117`
@@ -1760,7 +1760,7 @@ Files: `minilink/graphical/phase_plane/phase_plane.py:120-135`, `minilink/core/f
 
 **Evidence.** phase_plane.py:120-122 `def plot_phase_plane(sys, traj=None, ...)`; showcase cell 33 `phase = pend.plot_phase_plane(show=False)` then `phase.axes.plot(traj.x[0], traj.x[1], label=label, **style)` in a four-way loop and `phase.axes.legend()`; pendulum_value_iteration_vs_lqr cells 27-28 `plant.plot_phase_plane(traj_vi)` / `plant.plot_phase_plane(traj_lqr)`; pendulum_cost_to_go_approximation cells 24/26/28 `Z2 = grid_sys.slice_2d(grid_sys.grid_from_array(J_hat), 0, 1); X, Y = np.meshgrid(...); ax.plot_wireframe(X, Y, Z2.T)` three times.
 
-### examples-teaching#7 — Stop teaching code from rebinding `sys`; add it to the flatness ratchet
+### examples#7 — Stop teaching code from rebinding `sys`; add it to the flatness ratchet
 
 *trap · effort M · owner maintainer · rung v0.2 wave D · planned: D1.2 (one more rule for its ratchet; the rule itself is agent lane), A4 / ROADMAP §6 naming (`sys` vs `plant` as the loop's subsystem id)*  
 Files: `examples/tutorial/00_core.ipynb (code cells 1, 4, 21, 27)`, `examples/tutorial/09_planning.ipynb (code cell 3)`, `examples/tutorial/10_graphical.ipynb (code cell 14)`, `examples/teaching/courses/udes_gro501/cartpole_static_controller.ipynb (code cells 2, 5)`, `examples/teaching/courses/udes_gro501/cartpole_dynamic_controller.ipynb (code cells 2, 5, 9)`, `examples/teaching/courses/udes_gro860/pendulum_cost_to_go_approximation.ipynb (code cell 4)`, `examples/demos/mpc/mpc_car_minimal.py:20`, `examples/demos/rrt/rrt_pendulum_swingup.py:9`, `examples/demos/dynamics/lorenz_attractor.py:11`, `tests/unittest/test_teaching_imports.py`
@@ -1771,7 +1771,7 @@ Files: `examples/tutorial/00_core.ipynb (code cells 1, 4, 21, 27)`, `examples/tu
 
 **Evidence.** 25 files in the band bind `sys = <Plant>(...)`. 00_core cell 1 `import sys` … cell 4 `sys = Pendulum()`; cartpole_static_controller cell 2 `import sys` … cell 5 `sys  = CartPole()`; cartpole_dynamic_controller cell 5 `sys.inputs["u"].upper_bound[0] = +20; sys.x0[0] = 0.5` then cell 9 `sys = CartPole()`; showcase cell 10 `loop.plot_trajectory(signals=("ref:y", "sys:x", "ctl:u"))` uses `sys` as a subsystem id in the same notebook where `plant` is the variable.
 
-### examples-teaching#8 — Keep each course pin byte-identical to its topic twin with a `cmp` test
+### examples#8 — Keep each course pin byte-identical to its topic twin with a `cmp` test
 
 *test · effort S · owner maintainer · rung v0.1 close-out · planned: —*  
 Files: `examples/teaching/courses/udes_gro860/pendulum_value_iteration_vs_lqr_vs_rl.ipynb (code cells 4, 5, 18, 20-23)`, `examples/teaching/topics/reinforcement_learning/pendulum_value_iteration_vs_lqr_vs_rl.ipynb (code cells 4, 5, 18, 20-21)`, `examples/teaching/courses/udes_gro860/drone_ppo.ipynb`, `examples/teaching/topics/reinforcement_learning/drone_ppo.ipynb`, `examples/README.md:94`, `examples/teaching/courses/udes_gro860/README.md`, `tests/unittest/test_repo_contract.py`
@@ -1782,7 +1782,7 @@ Files: `examples/teaching/courses/udes_gro860/pendulum_value_iteration_vs_lqr_vs
 
 **Evidence.** `diff` of the code-cell dumps: `< TORQUE = 2.0 / > TORQUE = 1.0`, `< INF = 2000.0 / > INF = 500.0`, `< plant.params["m"] = 1.0 / > plant.params["m"] = 0.1`, `< plant.state.lower_bound = np.array([-3.0 * np.pi, -20]) / > ... [-2.0 * np.pi, -12]`, `< sol_ppo = ppo.solve(timesteps=400_000) / > ... 200_000`, `< race = compare(...) / > vi_lqr_ppo = compare(...)`, `< race.plot_cost_to_go(jmax=INF)` only in the course pin; the drone twins diff is empty.
 
-### examples-teaching#9 — `Trajectory.from_rollout(x0, xs, us, dt)` for compiled and scanned rollouts
+### examples#9 — `Trajectory.from_rollout(x0, xs, us, dt)` for compiled and scanned rollouts
 
 *api · effort S · owner maintainer · rung v0.2 wave A · planned: V1 (the differentiable closed-loop cost will need to hand back its rollout as a Trajectory)*  
 Files: `minilink/core/trajectory.py:19-45`, `examples/teaching/topics/optimal_control/cartpole_rollout_gradients.ipynb (code cell 5, `as_trajectory`)`, `examples/demos/compile/cartpole_rollout_gradients.py:71-79`, `examples/demos/compile/pid_autotuning_jax.py:62-65`, `examples/tutorial/11_reinforcement_learning.ipynb (code cell 26)`, `examples/tutorial/showcase_minilink.ipynb (code cell 45)`
@@ -1793,7 +1793,7 @@ Files: `minilink/core/trajectory.py:19-45`, `examples/teaching/topics/optimal_co
 
 **Evidence.** cartpole_rollout_gradients.py:71-79 `def make_trajectory(x0_vec, states, u_seq, dt_step): ... u = np.vstack([u, u[-1:]])  # hold last force at tf`; the notebook twin cell 5 `def as_trajectory(states, U)` with the same body; pid_autotuning_jax.py:65 `return Trajectory(t=plot_t, x=xs.T, u=plot_u_knots.T)`; trajectory.py exposes `resample`, `save`, `load` but no rollout constructor.
 
-### examples-teaching#10 — Give the double-integrator homework its two missing verbs: entry time into a set and the Bellman residual
+### examples#10 — Give the double-integrator homework its two missing verbs: entry time into a set and the Bellman residual
 
 *api · effort S · owner maintainer · rung v0.2 wave A · planned: A5 (later nouns, each with a first consumer: the set-entry verb is one), T5 (grid internals)*  
 Files: `examples/teaching/courses/udes_gro860/double_integrator_minimum_time.ipynb (code cells 14, 16)`, `examples/teaching/courses/udes_gro860/double_integrator_policy_evaluation.ipynb (code cell 14)`, `minilink/core/trajectory.py`, `minilink/core/sets.py`, `minilink/planning/policy_synthesis/dp.py:388-434`, `minilink/planning/policy_synthesis/discretizer.py`
@@ -1804,7 +1804,7 @@ Files: `examples/teaching/courses/udes_gro860/double_integrator_minimum_time.ipy
 
 **Evidence.** double_integrator_minimum_time cell 14 and policy_evaluation cell 14 (`def arrival_time(traj)`): `inside = np.linalg.norm(traj.x, axis=0) < EPS; t_arrival = traj.t[inside][0] if inside.any() else np.inf`; minimum_time cell 16 `x_next = grid.x_next  # (nodes, actions, n)` … `Q[~grid.x_next_ok] = INF`; pendulum_cost_to_go_approximation cell 21 builds a grid with `precompute=False`; TODO T5: "`x_next` / `action_ok` / `x_next_ok` only created under `precomputed`".
 
-### examples-teaching#11 — Accept `optimizer_method="auto"` that picks Ipopt when installed
+### examples#11 — Accept `optimizer_method="auto"` that picks Ipopt when installed
 
 *api · effort S · owner maintainer · rung v0.2 wave D · planned: —*  
 Files: `minilink/planning/trajectory_optimization/planner.py:90`, `minilink/planning/trajectory_optimization/planner.py:632-638`, `minilink/optimization/optimizer.py:139-142`, `examples/tutorial/showcase_minilink.ipynb (code cell 1)`, `examples/teaching/courses/udes_gro860/cartpole_lqr.ipynb (code cell 27)`, `examples/teaching/topics/robotics/manipulator_eom.ipynb (code cell 1)`, `examples/demos/control/trajectory_lqr_cartpole.py:20`, `examples/demos/trajopt/trajopt_cartpole_collocation_jax.py:42`
@@ -1815,7 +1815,7 @@ Files: `minilink/planning/trajectory_optimization/planner.py:90`, `minilink/plan
 
 **Evidence.** showcase cell 1 `_OPTIMIZER_METHOD = ("ipopt" if importlib.util.find_spec("cyipopt") is not None else "scipy_slsqp")`; cartpole_lqr cell 27 `OPTIMIZER = "ipopt" if importlib.util.find_spec("cyipopt") else "scipy_slsqp"`; trajectory_lqr_cartpole.py:20 the same line; manipulator_eom cell 1 computes `_OPTIMIZER_METHOD` and never uses it; trajopt_cartpole_collocation_jax.py:42 `optimizer_method="ipopt"`; optimizer.py:141 `raise ImportError("IpoptOptimizer requires the optional 'cyipopt' package.")`.
 
-### examples-teaching#12 — Let `mpc @ inner_loop` close on a multi-block plant diagram
+### examples#12 — Let `mpc @ inner_loop` close on a multi-block plant diagram
 
 *api · effort M · owner maintainer · rung v0.2 wave D · planned: T6 (the mpc/controller.py conversation), P10 (documenting the `@` dispatch paths), S31 (the sampled loop as a System)*  
 Files: `minilink/simulation/computer.py:237-251`, `minilink/core/hybrid_composition.py:24-70`, `minilink/core/hybrid_composition.py:182-190`, `minilink/control/mpc/controller.py:294-296`, `examples/teaching/topics/optimal_control/racecar_mpc.ipynb (code cells 2, 17)`, `examples/demos/udes_racecar/mpc_racecar_dyn.py:132-143`, `examples/demos/hybrid/hybrid_multi_rate.py:57-63`
@@ -1826,7 +1826,7 @@ Files: `minilink/simulation/computer.py:237-251`, `minilink/core/hybrid_composit
 
 **Evidence.** hybrid_composition.py:182-188 `if isinstance(plant, DiagramSystem): if len(plant.subsystems) != 1: raise ValueError("auto wiring requires a single-subsystem plant diagram or leaf plant")`; computer.py:244-246 the `@` path imports `hybrid_closed_loop, resolve_hybrid_feedback_ports`; racecar_mpc.ipynb cell 2 `from minilink.core.hybrid_composition import hybrid_closed_loop` (a teaching_import_allowlist.txt row); mpc_racecar_dyn.py:132 comment "closed loop: hybrid, because the inner plant is a diagram".
 
-### examples-teaching#13 — Close the facade gaps the import allowlist records
+### examples#13 — Close the facade gaps the import allowlist records
 
 *api · effort S · owner maintainer · rung v0.2 wave A · planned: A3 (geometry re-exports), S31 (the hybrid names), D1.3 (the per-file sweep that empties the list)*  
 Files: `tests/unittest/teaching_import_allowlist.txt (57 rows)`, `tests/unittest/test_teaching_imports.py:22-38`, `minilink/__init__.py`, `minilink/simulation/__init__.py`, `minilink/planning/__init__.py`, `examples/demos/realtime/game_cartpole.py:9`, `examples/demos/rrt/rrt_star_live.py:9-13`, `examples/demos/rrt/rrt_holonomic_obstacles.py:13-18`, `examples/demos/hybrid/sampled_smc_pendulum.py:6`, `examples/teaching/courses/udes_gro501/cartpole_dynamic_controller.ipynb (code cell 5)`, `examples/tutorial/showcase_minilink.ipynb (code cell 13)`, `README.md (section "What is a System", the `from minilink.core.kinematics import translation` and `from minilink.graphical.animation.primitives import Box, ground_line` lines)`
@@ -1837,7 +1837,7 @@ Files: `tests/unittest/teaching_import_allowlist.txt (57 rows)`, `tests/unittest
 
 **Evidence.** Root/facade export probe: `hybrid_closed_loop []`, `RRTStarOptions []`, `StraightLineSteering []`, `disc []`, `GaussianField []`, `PygameInput []`, `DynamicController ['minilink.core']` only; allowlist rows such as `examples/teaching/topics/optimal_control/racecar_mpc.ipynb minilink.core.hybrid_composition`, `examples/tutorial/showcase_minilink.ipynb minilink.graphical.animation.primitives`, `examples/demos/realtime/game_cartpole.py minilink.simulation.realtime`, `examples/demos/core/readme_examples.py minilink.core.kinematics`.
 
-### examples-teaching#14 — `WhiteNoise` samples are rebuilt only by Simulator's pre-read `refresh()`; S29 would silently break the noise demos
+### examples#14 — `WhiteNoise` samples are rebuilt only by Simulator's pre-read `refresh()`; S29 would silently break the noise demos
 
 *trap · effort M · owner maintainer · rung v0.2 wave A · planned: A5 (`NoiseSource`), T2 (`WhiteNoise.h` cannot trace), S29*  
 Files: `minilink/blocks/sources.py:176-226`, `minilink/core/system.py:152-158`, `examples/demos/core/diagram_noise_ports.py:49-66`, `examples/demos/blocks/blocks_sources.py:27-31`, `examples/tutorial/00_core.ipynb (code cell 27)`, `examples/teaching/courses/udes_gro501/cartpole_dynamic_controller.ipynb (code cell 11)`
@@ -1848,9 +1848,9 @@ Files: `minilink/blocks/sources.py:176-226`, `minilink/core/system.py:152-158`, 
 
 **Evidence.** Verified: after `params["var"] = 1.0` with no `refresh()`, the `compute_trajectory` output already differs from the var = 0 run and equals the run after an explicit `refresh()` (the Simulator refreshed it). sources.py:214-220 `if params is None: params = self.params else: raise ValueError("The block needs to be refreshed to reflect changes in parameters")`; sources.py:174 "refresh() rebuilds them from params"; diagram_noise_ports.py:62-63 `params["var"] = 100.0` / `params["sample_period"] = 0.2` with no refresh; TODO S29: "`Simulator` drops its pre-read `refresh()`".
 
-### Bugs reported by the examples-teaching finder
+### Bugs reported by the examples finder
 
-#### bug examples-teaching#0 — (low) Tutorial 00 §2 prints the plant's state labels on the "Diagram" line
+#### bug examples#0 — (low) Tutorial 00 §2 prints the plant's state labels on the "Diagram" line
 
 Files: `examples/tutorial/00_core.ipynb (code cell 11)`
 
@@ -1858,7 +1858,7 @@ Files: `examples/tutorial/00_core.ipynb (code cell 11)`
 Cell 11 reads `print("Diagram: ", diagram.n, sys.state.labels, sys.state.units)` — the diagram line reports the plant's labels and units, not `diagram.state.labels`. It is invisible today only because `diagram.n == sys.n == 2` (Step and ImpedanceController are static). Replace `ImpedanceController()` in cell 9 by `PID(Kp=1.0, Ki=1.0, Kd=0.1, tau=0.05)` and rerun cells 9 and 11: the line prints a state dimension of 3 or more next to the two pendulum labels.
 ```
 
-#### bug examples-teaching#1 — (medium) `trajopt_cartpole_collocation_jax.py` hard-codes `optimizer_method="ipopt"` and fails without cyipopt
+#### bug examples#1 — (medium) `trajopt_cartpole_collocation_jax.py` hard-codes `optimizer_method="ipopt"` and fails without cyipopt
 
 Files: `examples/demos/trajopt/trajopt_cartpole_collocation_jax.py:42`, `minilink/optimization/optimizer.py:139-142`
 
@@ -1867,9 +1867,9 @@ On the documented pip Full tier (`pip install "minilink[full]"`, which install.m
 ```
 
 
-## tests-ci-tooling
+## tests-ci
 
-### tests-ci-tooling#0 — Run pytest with JAX and Ipopt in the CI regression job so the optional-extra tests are gated
+### tests-ci#0 — Run pytest with JAX and Ipopt in the CI regression job so the optional-extra tests are gated
 
 *tooling · effort S · owner agent · rung v0.1 close-out · planned: —*  
 Files: `.github/workflows/test.yml:31`, `.github/workflows/test.yml:40`, `.github/workflows/test.yml:83-114`, `.github/workflows/nightly.yml:24-29`, `tests/demo_checks/flagship_manifest.json`
@@ -1880,7 +1880,7 @@ Files: `.github/workflows/test.yml:31`, `.github/workflows/test.yml:40`, `.githu
 
 **Evidence.** .github/workflows/test.yml:31 `pip install -e ".[dev,rl,diagrams]"`; :40 `run: pytest`; :88 `pip install -e ".[dev,jax,visualization,plotting,diagrams]"` followed only by run_regression_check / run_flagship_demos / run_notebook_checks (lines 94-114); :98 comment `JAX flagships skip in the test job (no jax extra); gate them here`. pyproject extras: rl = ["gymnasium"], diagrams = ["graphviz"] (no jax). nightly.yml:24 installs `coinor-libipopt-dev`, :29 `.[dev,jax,visualization,plotting,rl,ipopt,diagrams]`. flagship_manifest.json entry `trajopt_cartpole_jax` requires ["jax","cyipopt"] → always `skip (missing cyipopt)` in the gate. Local run with jax hidden: 5 whole-module SKIPPED lines (see bugs).
 
-### tests-ci-tooling#1 — Guard optional extras per test instead of per module: move mid-file importorskip into the JAX classes and fix marker misuse
+### tests-ci#1 — Guard optional extras per test instead of per module: move mid-file importorskip into the JAX classes and fix marker misuse
 
 *test · effort M · owner agent · rung v0.1 close-out · planned: —*  
 Files: `tests/unittest/test_dynamics_catalog.py:533`, `tests/unittest/test_mechanical_robotics.py:274`, `tests/unittest/test_geometric_control.py:11`, `tests/unittest/test_racecar_plant.py:10`, `tests/unittest/test_racecar_tires.py:14`, `tests/unittest/test_catalog_backends.py:17`, `tests/unittest/test_catalog_backends.py:67`, `tests/unittest/test_analysis_lyapunov.py:247`, `tests/unittest/test_control_analysis.py:606-624`, `tests/unittest/conftest.py`
@@ -1891,7 +1891,7 @@ Files: `tests/unittest/test_dynamics_catalog.py:533`, `tests/unittest/test_mecha
 
 **Evidence.** Simulated with `sys.modules['jax']=None`: `SKIPPED [1] tests/unittest/test_dynamics_catalog.py:533: could not import 'jax'`, same for test_mechanical_robotics.py:274, test_geometric_control.py:11, test_racecar_plant.py:10, test_racecar_tires.py:14 (whole modules; 51+59+33+14+12 = 169 collected tests). test_geometric_control.py has 23 `def test_` at lines 41-389; `grep -c "jnp\.\|jax\."` = 3. test_catalog_backends.py:17 `pytestmark = [pytest.mark.optional, pytest.mark.jax]` covers line 67 `test_catalog_check_registry_covers_every_catalog_plant` (pure registry check). test_analysis_lyapunov.py:247 `@pytest.mark.plotting` on `test_plot_draws_the_slice_and_the_basin` which only imports matplotlib. conftest.py OPTIONAL_MARKERS only aggregates markers; it never skips.
 
-### tests-ci-tooling#2 — Make the flagship manifests honest: `requires` must list every optional import a demo makes, and drop or validate dead `demo_id`s
+### tests-ci#2 — Make the flagship manifests honest: `requires` must list every optional import a demo makes, and drop or validate dead `demo_id`s
 
 *bug · effort S · owner agent · rung v0.1 close-out · planned: —*  
 Files: `tests/demo_checks/flagship_manifest.json`, `tests/demo_checks/run_flagship_demos.py:84-92`, `tests/fixtures/flagship_graphics/manifest.json`, `tests/unittest/test_flagship_graphics_contract.py`, `examples/demos/mpc/mpc_integrator_numpy.py:64`, `examples/demos/mpc/mpc_car_minimal.py:55`
@@ -1902,7 +1902,7 @@ Files: `tests/demo_checks/flagship_manifest.json`, `tests/demo_checks/run_flagsh
 
 **Evidence.** run_flagship_demos.py output: `mpc_integrator_numpy fail (exit 1: ... hybrid_dot.py line 22 ... ImportError: Graphviz hybrid export requires the graphviz Python package.)`, `mpc_car_minimal fail (...)`, `8 passed, 2 failed, 2 skipped`; manifest entries have `'requires': []` for both. minilink/graphical/diagrams/hybrid_dot.py:19-24 raises on `import graphviz`. flagship_graphics/manifest.json rows: `{'id': 'bicycle_cascade_vehicle', 'demo_id': 'cascade_path_tracking', ...}`, `{'id': 'mpc_minimal_bicycle', 'demo_id': 'mpc_minimal', ...}` — flagship ids are signal_blocks, computed_torque_pendulum, diagram_closed_loop, plot_readme, diagram_compiling, rrt_holonomic_obstacles, animation_renderers, mpc_integrator_numpy, trajopt_cartpole_jax, mpc_car_minimal, c_export, c_export_proportional.
 
-### tests-ci-tooling#3 — Gate the subprocess demo-check bridge tests behind a marker so the unit suite stays a unit suite
+### tests-ci#3 — Gate the subprocess demo-check bridge tests behind a marker so the unit suite stays a unit suite
 
 *performance · effort S · owner agent · rung v0.2 wave D · planned: —*  
 Files: `tests/unittest/test_demo_check_runners.py:67-101`, `tests/unittest/test_packaging.py:29-48`, `.github/workflows/test.yml:40`, `.github/workflows/test.yml:42-68`, `.github/workflows/test.yml:105-107`, `tests/README.md:176`
@@ -1913,7 +1913,7 @@ Files: `tests/unittest/test_demo_check_runners.py:67-101`, `tests/unittest/test_
 
 **Evidence.** test_demo_check_runners.py:78-84 `proc = self._run("tests/demo_checks/run_flagship_demos.py")`; :86-92 flagship graphics; :67-76 catalog checks; :103-105 notebook bridge is already opt-in (`if os.environ.get("MINILINK_NOTEBOOK_CHECKS") != "1": self.skipTest`). test_packaging.py:36-40 `subprocess.check_call([sys.executable, "-m", "build", "--outdir", str(out)], cwd=REPO)`. test.yml:105 `python tests/demo_checks/run_flagship_demos.py` in `regression`; :42-68 `packaging` job builds and runs check_wheel.py. Background full `pytest` in this session was still at 67 % after ~40 min on a loaded host.
 
-### tests-ci-tooling#4 — One owner for the CI regression-gate flags shared by tests/run, tests/README and test.yml
+### tests-ci#4 — One owner for the CI regression-gate flags shared by tests/run, tests/README and test.yml
 
 *consolidation · effort S · owner agent · rung v0.2 wave D · planned: —*  
 Files: `tests/run/_common.py:50-67`, `tests/run/run_regression_gates.py:22-27`, `.github/workflows/test.yml:94-96`, `tests/README.md`, `AGENTS.md:107`
@@ -1924,7 +1924,7 @@ Files: `tests/run/_common.py:50-67`, `tests/run/run_regression_gates.py:22-27`, 
 
 **Evidence.** tests/run/_common.py:57-66 `if ci_mode: cmd.extend(["--tiny", "--factor", "6", "--speed-gate-suffixes", "solve_s,nlp_s,speedup"])`; run_regression_gates.py:22 comment `True → same flags as GitHub CI regression job`; test.yml:94 `python benchmarks/run_regression_check.py --suite all --tiny \` … `--factor 10`; AGENTS.md:107 same `--factor 10` command.
 
-### tests-ci-tooling#5 — Give every teaching notebook a job that executes it: nightly `--all`, unique ids, and drop the stale intro branch
+### tests-ci#5 — Give every teaching notebook a job that executes it: nightly `--all`, unique ids, and drop the stale intro branch
 
 *tooling · effort S · owner agent · rung v0.1 close-out · planned: —*  
 Files: `tests/demo_checks/run_notebook_checks.py:48-57`, `tests/demo_checks/run_notebook_checks.py:170-178`, `tests/demo_checks/notebook_overrides.json`, `.github/workflows/nightly.yml:45`, `.github/workflows/test.yml:114`
@@ -1935,7 +1935,7 @@ Files: `tests/demo_checks/run_notebook_checks.py:48-57`, `tests/demo_checks/run_
 
 **Evidence.** run_notebook_checks.py:52 `if "/tutorial/" in rel_path or "/learn/intro/" in rel_path:`; :177 help `e.g. showcase_minilink, intro_00_core`; `--help` lists only `--notebook` and `--timeout`. Collisions computed over 38 notebooks: `teaching_drone_ppo -> [courses/udes_gro860/drone_ppo.ipynb, topics/reinforcement_learning/drone_ppo.ipynb]`, `teaching_pendulum_value_iteration_vs_lqr_vs_rl -> [courses/udes_gro860/..., topics/reinforcement_learning/...]`. nightly.yml:45 and test.yml:114 both run `python tests/demo_checks/run_notebook_checks.py` with no extra flag. AGENTS.md:88 claims nightly runs 'every teaching notebook'.
 
-### tests-ci-tooling#6 — Add ruff check and ruff format hooks to pre-commit so the 'always before push' gate runs itself
+### tests-ci#6 — Add ruff check and ruff format hooks to pre-commit so the 'always before push' gate runs itself
 
 *tooling · effort S · owner agent · rung v0.1 close-out · planned: —*  
 Files: `.pre-commit-config.yaml`, `AGENTS.md:90-98`, `pyproject.toml`
@@ -1946,7 +1946,7 @@ Files: `.pre-commit-config.yaml`, `AGENTS.md:90-98`, `pyproject.toml`
 
 **Evidence.** .pre-commit-config.yaml: single repo `kynan/nbstripout rev 0.9.1`, hook `nbstripout` on `^examples/.*\.ipynb$`. AGENTS.md:90-98 'Always before push … ruff check . ; ruff format --check .' and 'CI runs these on the whole repo'. pyproject dev extra lists `pre-commit`, `ruff`.
 
-### tests-ci-tooling#7 — One owner for the teaching-facade list shared by test_teaching_imports and test_teaching_surface
+### tests-ci#7 — One owner for the teaching-facade list shared by test_teaching_imports and test_teaching_surface
 
 *consolidation · effort S · owner agent · rung v0.2 wave D · planned: D1.2*  
 Files: `tests/unittest/test_teaching_imports.py:22-38`, `tests/unittest/test_teaching_surface.py:21`, `tests/unittest/test_teaching_surface.py:171-172`, `tests/unittest/test_teaching_surface.py:279`
@@ -1957,7 +1957,7 @@ Files: `tests/unittest/test_teaching_imports.py:22-38`, `tests/unittest/test_tea
 
 **Evidence.** test_teaching_imports.py:28 `"minilink.control.mpc"`, :37 `"minilink.interfaces.gymnasium"` inside `TEACHING_MODULES`; test_teaching_surface.py:171-172 `RESEARCH_LANE_PREFIXES = ("minilink.control.mpc", …)` used at :197/:225/:318 to assert names do NOT live there; :279 `env["PYTHONPATH"] = os.getcwd()`.
 
-### tests-ci-tooling#8 — Pin the Sphinx API pages to the teaching surface with a test and build docs with -W
+### tests-ci#8 — Pin the Sphinx API pages to the teaching surface with a test and build docs with -W
 
 *docs · effort M · owner agent · rung v0.1 close-out · planned: —*  
 Files: `docs/api/`, `docs/conf.py`, `.github/workflows/docs.yml:42`, `tests/unittest/test_teaching_surface.py:21`, `tests/unittest/test_repo_contract.py`
@@ -1968,7 +1968,7 @@ Files: `docs/api/`, `docs/conf.py`, `.github/workflows/docs.yml:42`, `tests/unit
 
 **Evidence.** Computed: `documented automodules: 85 | undocumented homes: 14` — minilink.analysis.frequency (transfer_function, bode, plot_bode, pzmap, plot_pzmap, margins …), minilink.analysis.time_response, minilink.analysis.derivatives, minilink.core.distributions, minilink.core.feedback, minilink.planning.evaluation, minilink.planning.reinforcement_learning.planner, .tabular, minilink.control.neural, minilink.control.geometric, minilink.simulation.static_simulator, minilink.blocks.step, minilink.planning.policy_synthesis.discretizer, .lookup_policy. docs/api/*.rst use `:members:` only (no `:imported-members:`). docs.yml:42 `run: sphinx-build -b html docs docs/_build/html` (no `-W`).
 
-### tests-ci-tooling#9 — Move wall-clock speed claims out of unit tests into the regression gates
+### tests-ci#9 — Move wall-clock speed claims out of unit tests into the regression gates
 
 *test · effort S · owner agent · rung v0.2 wave D · planned: —*  
 Files: `tests/unittest/test_mpc.py:511-523`, `tests/unittest/test_ur5_jax.py:163`, `tests/unittest/test_simulation.py:946-958`, `tests/unittest/test_simulation.py:918-944`, `benchmarks/suites/solve_speed.py`, `benchmarks/host_profiles.py`
@@ -1979,7 +1979,7 @@ Files: `tests/unittest/test_mpc.py:511-523`, `tests/unittest/test_ur5_jax.py:163
 
 **Evidence.** test_mpc.py:521-522 `self.assertLess(second_step_s, first_step_s)` / `self.assertLess(second_step_s, 0.5 * compile_s)`; test_ur5_jax.py:163 `self.assertLess(t_jx, 0.8 * t_np)`; test_simulation.py:955-958 comment `Default plant offline_dt=1e-4 → many steps fit; live ceiling (10) binds.` then `assertAlmostEqual(rt_sim.sim_dt, frame_dt / 10)` before and after `rt_sim.run()`; :918-944 relies on `time.sleep(0.03)` against `frame_dt=0.005`. test.yml:94-96 speed gates use `--factor 10` and `--speed-gate-suffixes solve_s,nlp_s,speedup`.
 
-### tests-ci-tooling#10 — Expose `Animator.resolve_frame` so the graphics harness stops calling a private method
+### tests-ci#10 — Expose `Animator.resolve_frame` so the graphics harness stops calling a private method
 
 *api · effort S · owner agent · rung v0.2 wave D · planned: —*  
 Files: `minilink/graphical/animation/animator.py:142`, `tests/demo_checks/helpers.py:39`, `tests/fixtures/kinematic_baseline/render.py:35`, `tests/unittest/graphics_contract_helpers.py:17`, `tests/unittest/test_graphics.py`
@@ -1990,7 +1990,7 @@ Files: `minilink/graphical/animation/animator.py:142`, `tests/demo_checks/helper
 
 **Evidence.** minilink/graphical/animation/animator.py:142 `def _resolve_frame(self, x, u, t, *, kinematic, camera_override=None, overlays=()):`; tests/demo_checks/helpers.py:39 `frame = animator._resolve_frame(x, u, t, kinematic=kinematic)`; tests/fixtures/kinematic_baseline/render.py:35 same; tests/unittest/graphics_contract_helpers.py:17 `return animator._resolve_frame(x, u, t, kinematic=kinematic)`; further direct calls in test_graphics.py (lines 531, 543, 1118, 1155, 1588).
 
-### tests-ci-tooling#11 — Turn the RULES 5.8 underscore check into a repo-wide ratchet with a shrinking allowlist
+### tests-ci#11 — Turn the RULES 5.8 underscore check into a repo-wide ratchet with a shrinking allowlist
 
 *test · effort M · owner agent · rung v0.2 wave D · planned: —*  
 Files: `tests/unittest/test_repo_contract.py:57-65`, `tests/unittest/test_teaching_imports.py:18`, `tests/unittest/teaching_import_allowlist.txt`, `docs/plans/TODO.md:177-236`
@@ -2001,7 +2001,7 @@ Files: `tests/unittest/test_repo_contract.py:57-65`, `tests/unittest/test_teachi
 
 **Evidence.** test_repo_contract.py:57-65 `NAMED_CLASS_MODULES = ("minilink/core/system.py", "minilink/core/facades.py", "minilink/core/diagram.py", "minilink/simulation/simulator.py", "minilink/simulation/static_simulator.py")` with comment 'simulation/realtime/ is provisional research lane … out of scope'. test_teaching_imports.py:18 `ALLOWLIST = pathlib.Path(__file__).with_name("teaching_import_allowlist.txt")` (the existing shrinking-allowlist pattern). TODO.md:177-236 lists T1–T6 as file-by-file textbook passes.
 
-### tests-ci-tooling#12 — Run the test suite before publishing to PyPI and put timeouts on the long CI jobs
+### tests-ci#12 — Run the test suite before publishing to PyPI and put timeouts on the long CI jobs
 
 *tooling · effort S · owner maintainer · rung v0.1 close-out · planned: R1*  
 Files: `.github/workflows/publish.yml:8`, `.github/workflows/publish.yml:30-42`, `.github/workflows/publish.yml:50-51`, `.github/workflows/test.yml:12`, `.github/workflows/test.yml:70`, `.github/workflows/nightly.yml:37`
@@ -2012,7 +2012,7 @@ Files: `.github/workflows/publish.yml:8`, `.github/workflows/publish.yml:30-42`,
 
 **Evidence.** publish.yml:8 `tags:` trigger; :35-36 `python tests/demo_checks/check_wheel.py dist/*.whl dist/*.tar.gz` / `python -m twine check dist/*`; :42 `ls "dist/minilink-${tag}-"*.whl`; :50-51 `needs: build` + `if: … startsWith(github.ref, 'refs/tags/')` — no pytest anywhere. test.yml:7 `branches: [main, refactor-v4, dev-alex]`; no `timeout-minutes` in test.yml, nightly.yml or publish.yml (grep returns nothing). nightly.yml:37 `run_all_demos.py --timeout 180 --continue-on-error` over every demo.
 
-### tests-ci-tooling#13 — Trap: showcase_jax.ipynb imports minilink.experimental.c_export, which the wheel does not ship
+### tests-ci#13 — Trap: showcase_jax.ipynb imports minilink.experimental.c_export, which the wheel does not ship
 
 *trap · effort S · owner maintainer · rung v0.1 close-out · planned: —*  
 Files: `examples/tutorial/showcase_jax.ipynb`, `pyproject.toml`, `tests/demo_checks/check_wheel.py`, `tests/unittest/teaching_import_allowlist.txt:50`, `tests/demo_checks/flagship_manifest.json`
@@ -2023,7 +2023,7 @@ Files: `examples/tutorial/showcase_jax.ipynb`, `pyproject.toml`, `tests/demo_che
 
 **Evidence.** showcase_jax.ipynb cell 33 (code): `from minilink.experimental.c_export import export_system_to_c, load_exported_c` after markdown cell 32 '## 9. From the trace to C (experimental)'; pyproject wheel excludes `minilink/experimental/**` (verified: built wheel contains no experimental/ and check_wheel.py asserts that); teaching_import_allowlist.txt:50 `examples/tutorial/showcase_jax.ipynb minilink.experimental.c_export` (the import ratchet already flags it); flagship_manifest.json entries `c_export`, `c_export_proportional` point at `examples/experimental/c_export/`.
 
-### tests-ci-tooling#14 — Stop unit tests from importing examples/projects and benchmarks/systems so the suite runs from the sdist and the Basic tier
+### tests-ci#14 — Stop unit tests from importing examples/projects and benchmarks/systems so the suite runs from the sdist and the Basic tier
 
 *consolidation · effort M · owner agent · rung v0.2 wave D · planned: —*  
 Files: `tests/unittest/test_dynamics_catalog.py:47`, `tests/unittest/test_dynamics_catalog.py:535`, `tests/unittest/test_dynamics_catalog.py:684-807`, `tests/unittest/test_jax_planning.py:190`, `tests/unittest/test_mechanical_robotics.py:390`, `tests/unittest/test_mechanical_robotics.py:397`, `pyproject.toml`
@@ -2034,9 +2034,9 @@ Files: `tests/unittest/test_dynamics_catalog.py:47`, `tests/unittest/test_dynami
 
 **Evidence.** test_dynamics_catalog.py:47 `from examples.projects.car_trajopt.vehicles.extras import (`; :535 `from examples.projects.car_trajopt.vehicles.ladder import (`; :684-807 eight `from examples.projects.car_trajopt.vehicles.car_profile import …`; test_jax_planning.py:190 `from examples.projects.car_trajopt.vehicles.ladder import BicycleAcc, BicycleKin`; test_mechanical_robotics.py:390/:397 `from benchmarks.systems.basic import JaxPendulum, NumpyPendulum`. Built sdist listing (this session) contains tests/ and benchmarks/ but no examples/projects/ (pyproject sdist exclude).
 
-### Bugs reported by the tests-ci-tooling finder
+### Bugs reported by the tests-ci finder
 
-#### bug tests-ci-tooling#0 — (high) CI merge gate never executes any JAX-dependent test: no job installs jax and runs pytest
+#### bug tests-ci#0 — (high) CI merge gate never executes any JAX-dependent test: no job installs jax and runs pytest
 
 Files: `.github/workflows/test.yml:31`, `.github/workflows/test.yml:40`, `.github/workflows/test.yml:88-114`, `.github/workflows/nightly.yml:29-45`, `pyproject.toml`
 
@@ -2044,7 +2044,7 @@ Files: `.github/workflows/test.yml:31`, `.github/workflows/test.yml:40`, `.githu
 Read .github/workflows/test.yml: the `test` job (line 31) installs `.[dev,rl,diagrams]` — pyproject extras `rl = ["gymnasium"]`, `diagrams = ["graphviz"]`, no jax — then runs `pytest` (line 40); the `regression` job installs `.[dev,jax,...]` (line 88) but runs only run_regression_check.py, run_flagship_demos.py and run_notebook_checks.py (lines 94-114); nightly.yml also never calls pytest. Locally: `python -c "import sys; sys.modules['jax']=None; import pytest; sys.exit(pytest.main(['-q','-rs','--co','tests/unittest/test_mpc.py','tests/unittest/test_dynamics_catalog.py','tests/unittest/test_geometric_control.py','tests/unittest/test_racecar_plant.py','tests/unittest/test_racecar_tires.py','tests/unittest/test_mechanical_robotics.py']))"` prints whole-module SKIPPED lines for each file (49+51+33+14+12+59 = 218 tests), and every `@pytest.mark.jax` test elsewhere (test_catalog_backends.py, test_engine_jax.py, test_ur5_jax.py, test_jax_planning.py, test_control_analysis.py jax classes) is skipped the same way, so a JAX backend regression merges green.
 ```
 
-#### bug tests-ci-tooling#1 — (medium) Module-level pytest.importorskip("jax") placed mid-file (or atop mostly-NumPy files) skips the NumPy tests too
+#### bug tests-ci#1 — (medium) Module-level pytest.importorskip("jax") placed mid-file (or atop mostly-NumPy files) skips the NumPy tests too
 
 Files: `tests/unittest/test_dynamics_catalog.py:533`, `tests/unittest/test_mechanical_robotics.py:274`, `tests/unittest/test_geometric_control.py:11`, `tests/unittest/test_racecar_plant.py:10`, `tests/unittest/test_racecar_tires.py:14`
 
@@ -2052,7 +2052,7 @@ Files: `tests/unittest/test_dynamics_catalog.py:533`, `tests/unittest/test_mecha
 `python -c "import sys; sys.modules['jax']=None; import pytest; sys.exit(pytest.main(['-q','-rs','tests/unittest/test_dynamics_catalog.py','tests/unittest/test_geometric_control.py']))"` → `SKIPPED [1] tests/unittest/test_dynamics_catalog.py:533: could not import 'jax'` and `SKIPPED [1] tests/unittest/test_geometric_control.py:11: the JAX parity checks need jax` with 0 tests run, although 29 `def test_` in test_dynamics_catalog.py precede line 533 (NumPy catalog checks) and only 2 of test_geometric_control.py's 23 tests touch jax (`grep -c 'jnp\.\|jax\.'` = 3). Same for test_mechanical_robotics.py (22 tests before line 274). This is the state of the CI `test` matrix and of a Basic-tier install.
 ```
 
-#### bug tests-ci-tooling#2 — (medium) Flagship manifest omits graphviz for the two MPC demos, so `pytest` fails without the diagrams extra
+#### bug tests-ci#2 — (medium) Flagship manifest omits graphviz for the two MPC demos, so `pytest` fails without the diagrams extra
 
 Files: `tests/demo_checks/flagship_manifest.json`, `tests/demo_checks/run_flagship_demos.py:84-92`, `tests/unittest/test_demo_check_runners.py:78-84`, `minilink/graphical/diagrams/hybrid_dot.py:19-24`
 
@@ -2060,7 +2060,7 @@ Files: `tests/demo_checks/flagship_manifest.json`, `tests/demo_checks/run_flagsh
 In an environment with `pip install -e .[dev]` but no `graphviz` Python package (`python -c 'import graphviz'` → ModuleNotFoundError): `MPLBACKEND=Agg PYTHONPATH=. python tests/demo_checks/run_flagship_demos.py` prints `mpc_integrator_numpy fail (exit 1: ... hybrid_dot.py, line 22, in export_hybrid_graphviz raise ImportError( ImportError: Graphviz hybrid export requires the graphviz Python package.)` and the same for `mpc_car_minimal`; `8 passed, 2 failed, 2 skipped`, exit 1. Consequently `pytest tests/unittest/test_demo_check_runners.py::TestDemoCheckRunners::test_flagship_demos_exit_zero` fails (observed as the single F in this session's full run). Both manifest entries carry `'requires': []` although examples/demos/mpc/mpc_integrator_numpy.py:64 and mpc_car_minimal.py:55 call `hybrid.plot_diagram()`; the runner only skips on `requires`.
 ```
 
-#### bug tests-ci-tooling#3 — (low) run_notebook_checks.py assigns the same id to two different notebooks, so overrides and --notebook filters are ambiguous
+#### bug tests-ci#3 — (low) run_notebook_checks.py assigns the same id to two different notebooks, so overrides and --notebook filters are ambiguous
 
 Files: `tests/demo_checks/run_notebook_checks.py:48-57`, `tests/demo_checks/notebook_overrides.json`
 
@@ -2068,7 +2068,7 @@ Files: `tests/demo_checks/run_notebook_checks.py:48-57`, `tests/demo_checks/note
 `PYTHONPATH=. python -c "import sys, pathlib; sys.path.insert(0,'tests/demo_checks'); import run_notebook_checks as r; from collections import defaultdict; d=defaultdict(list); [d[r._notebook_id(p.as_posix())].append(p.as_posix()) for p in pathlib.Path('examples').rglob('*.ipynb')]; print({k:v for k,v in d.items() if len(v)>1})"` → `teaching_drone_ppo: [examples/teaching/courses/udes_gro860/drone_ppo.ipynb, examples/teaching/topics/reinforcement_learning/drone_ppo.ipynb]` and `teaching_pendulum_value_iteration_vs_lqr_vs_rl: [courses/udes_gro860/…, topics/reinforcement_learning/…]`. `_notebook_id` uses only the stem for `/teaching/` paths (line 55) and still special-cases a non-existent `/learn/intro/` path (line 52); the `--notebook` help cites `intro_00_core`, which matches nothing.
 ```
 
-#### bug tests-ci-tooling#4 — (low) tests/run regression launcher claims CI parity but uses --factor 6 where CI uses --factor 10
+#### bug tests-ci#4 — (low) tests/run regression launcher claims CI parity but uses --factor 6 where CI uses --factor 10
 
 Files: `tests/run/_common.py:57-66`, `tests/run/run_regression_gates.py:22`, `.github/workflows/test.yml:94-96`
 
@@ -2076,7 +2076,7 @@ Files: `tests/run/_common.py:57-66`, `tests/run/run_regression_gates.py:22`, `.g
 `sed -n 57,66p tests/run/_common.py` shows `"--factor", "6"`; `grep -n factor .github/workflows/test.yml AGENTS.md` shows `--factor 10`; `sed -n 22p tests/run/run_regression_gates.py` reads `True → same flags as GitHub CI regression job`. Running the IDE launcher can fail a speed gate that CI would pass (or vice versa) with no way to tell which is authoritative.
 ```
 
-#### bug tests-ci-tooling#5 — (low) tests/README.md and the flagship-graphics manifest carry stale facts (file count, removed folders, dead demo_id links)
+#### bug tests-ci#5 — (low) tests/README.md and the flagship-graphics manifest carry stale facts (file count, removed folders, dead demo_id links)
 
 Files: `tests/README.md:135`, `tests/README.md:180`, `tests/fixtures/flagship_graphics/manifest.json`
 
@@ -2085,9 +2085,9 @@ Files: `tests/README.md:135`, `tests/README.md:180`, `tests/fixtures/flagship_gr
 ```
 
 
-## docs-governance
+## docs-gov
 
-### docs-governance#0 — Generate docs/api from the teaching-surface registry
+### docs-gov#0 — Generate docs/api from the teaching-surface registry
 
 *tooling · effort M · owner agent · rung v0.2 wave D · planned: —*  
 Files: `docs/api/analysis.rst:1-13`, `docs/api/dynamics.rst:1-22`, `docs/api/planning.rst:1-30 and 32-52`, `docs/api/core.rst:1-20`, `docs/api/simulation.rst:1-27`, `docs/conf.py:27-28`, `AGENTS.md:37`, `DESIGN.md:113-115`, `minilink/__init__.py (__all__, 150 names)`
@@ -2098,7 +2098,7 @@ Files: `docs/api/analysis.rst:1-13`, `docs/api/dynamics.rst:1-22`, `docs/api/pla
 
 **Evidence.** A script over `minilink.__all__` (150 names): 30 defining modules, 64 names, have no `automodule` entry — `analysis.frequency` (bode, margins, nyquist, pzmap, root_locus, transfer_function, plot_*), `analysis.time_response`, `analysis.derivatives` (jacobian), `analysis.discretize`, `core.distributions` (Gaussian, Uniform), `core.feedback` (Controller), `control.neural`, `control.geometric`, `blocks.step` (ZOHHold), `planning.evaluation` (Evaluation, MonteCarloEvaluator), `policy_synthesis.discretizer` / `lookup_policy`, `reinforcement_learning.planner` / `tabular`, `simulation.static_simulator`, and 16 `dynamics/catalog` modules (docs/api/dynamics.rst lists 4 of 20). docs/api/planning.rst:32-52 documents `planning.spatial.{scene,collision,state_fields,track,paths,shaping,workspace_fields}`, provisional per ROADMAP.md:31. AGENTS.md:37: "Sphinx autodoc of the teaching-lane API".
 
-### docs-governance#1 — Make the RULES 5.8 check a ratchet over every System-family class
+### docs-gov#1 — Make the RULES 5.8 check a ratchet over every System-family class
 
 *test · effort S · owner agent · rung v0.2 wave D · planned: T2, T3, T5, T6 (rename pass)*  
 Files: `tests/unittest/test_repo_contract.py:55-61 and 136-152`, `minilink/control/mpc/controller.py (MPCStatelessController, MPCStatefulController, MPCBroadcastController)`, `minilink/dynamics/catalog/vehicles/dynamic_bicycle.py (_u_in, _contact_fields)`, `minilink/planning/search/rrt.py (13 _methods)`, `minilink/planning/search/rrt_star.py (8)`, `minilink/planning/trajectory_optimization/planner.py (11)`, `RULES.md:272-275`
@@ -2109,7 +2109,7 @@ Files: `tests/unittest/test_repo_contract.py:55-61 and 136-152`, `minilink/contr
 
 **Evidence.** `test_repo_contract.py:55-61` checks five modules only. An AST count over the rest of the library: 80 leading-underscore methods on 13 System-family / planner classes — `MPCStatelessController` 4, `MPCStatefulController` 5, `MPCBroadcastController` 3 (controller.py), `DynamicBicycle` 2 (`_u_in`, `_contact_fields`), `RRTPlanner` 13, `RRTStarPlanner` 8, `TrajectoryOptimizationPlanner` 11, and 34 on the NumPy/JAX diagram evaluators (exempt under 5.16). The 2026-09-22 review §4.4 lists the same names under T2/T3/T5/T6; TODO.md:208-209 "Rename pass, the rest" is prose only.
 
-### docs-governance#2 — Test that ROADMAP §5 step ids and TODO rows agree
+### docs-gov#2 — Test that ROADMAP §5 step ids and TODO rows agree
 
 *test · effort S · owner agent · rung v0.2 wave D · planned: —*  
 Files: `ROADMAP.md:69-70, 197-208, 271-289`, `docs/plans/TODO.md:1-8, 36-48, 170-171, 226-238`, `tests/unittest/test_repo_contract.py`
@@ -2120,7 +2120,7 @@ Files: `ROADMAP.md:69-70, 197-208, 271-289`, `docs/plans/TODO.md:1-8, 36-48, 170
 
 **Evidence.** ROADMAP.md:202-203 `R3` (ruff green on every push) has no TODO.md row — TODO §1 (TODO.md:36-48) lists R1, R2, S49, S54 only. ROADMAP.md:288 lists "`StepDiagramSystem.step` writes in place under JAX" under D3; TODO.md:170-171 files it under T1 and TODO D3 (TODO.md:226-238) does not mention it. ROADMAP.md:69-70: "Step ids (`S29`, `P3`, `T2`, …) are the rows of docs/plans/TODO.md".
 
-### docs-governance#3 — Give plan-doc steps ids that cannot collide with the workboard's
+### docs-gov#3 — Give plan-doc steps ids that cannot collide with the workboard's
 
 *docs · effort S · owner agent · rung v0.2 wave D · planned: —*  
 Files: `docs/plans/cbf-safety-filter.md:79-83`, `docs/plans/optimizer-parametric-wiring.md:132, 151, 165, 173, 180`, `docs/plans/articulated-mechanism.md:347, 354, 361, 367`, `docs/plans/pyro-port-remaining.md:285-296`, `docs/plans/gro501-classical-control.md:19-34`, `docs/plans/TODO.md:100-115`, `docs/plans/README.md:1-12`
@@ -2131,7 +2131,7 @@ Files: `docs/plans/cbf-safety-filter.md:79-83`, `docs/plans/optimizer-parametric
 
 **Evidence.** cbf-safety-filter.md:79-83 `C1`–`C5` vs TODO.md:100-115 `C1`–`C5` (Pyro parity, GMC714, Blocks, Identification, RL follow-ups); optimizer-parametric-wiring.md:132-180 `P1`–`P5` and articulated-mechanism.md:347-370 `P1`–`P4` vs gro501-classical-control.md:19-34 `P1`–`P11` (the ids ROADMAP §5.2 wave B uses); pyro-port-remaining.md:287-296 "P2 … P3 … P4" as priorities. ROADMAP.md:69-70 declares one id space.
 
-### docs-governance#4 — Align RULES 3.3's teaching-surface definition with ROADMAP §2
+### docs-gov#4 — Align RULES 3.3's teaching-surface definition with ROADMAP §2
 
 *docs · effort S · owner agent · rung v0.1 close-out · planned: —*  
 Files: `RULES.md:91-96`, `ROADMAP.md:28-35`, `DESIGN.md:59-67`, `tests/unittest/test_public_imports.py:36-45`, `docs/reviews/2026-09-12-governance-stack-audit.md:90-93`
@@ -2142,7 +2142,7 @@ Files: `RULES.md:91-96`, `ROADMAP.md:28-35`, `DESIGN.md:59-67`, `tests/unittest/
 
 **Evidence.** RULES.md:93-94: "**Teaching surface** (`minilink/`, `examples/tutorial/`, `examples/teaching/`, `examples/demos/`): Strict public contract, high stability"; RULES.md:95-96 lists only `examples/projects/`, `examples/experimental/` as research lane. ROADMAP.md:30: teaching surface = "root prelude … and the band facades"; ROADMAP.md:31: research lane = "provisional bands (hybrid, MPC, realtime, spatial), the `minilink/experimental/` tier, …". test_public_imports.py:44-45 asserts `ModelPredictiveController` and `HybridDiagram` are not on the prelude.
 
-### docs-governance#5 — Keep the CI commands in one place and name every job
+### docs-gov#5 — Keep the CI commands in one place and name every job
 
 *consolidation · effort S · owner agent · rung v0.1 close-out · planned: —*  
 Files: `AGENTS.md:82-124`, `tests/README.md:48-71`, `benchmarks/README.md:104-121`, `.github/workflows/test.yml:12, 42, 70`
@@ -2153,7 +2153,7 @@ Files: `AGENTS.md:82-124`, `tests/README.md:48-71`, `benchmarks/README.md:104-12
 
 **Evidence.** `python benchmarks/run_regression_check.py --suite all --tiny --factor 10 --speed-gate-suffixes solve_s,nlp_s,speedup` at AGENTS.md:107, tests/README.md:56, benchmarks/README.md:107-109; `--suite all` again at AGENTS.md:122 and benchmarks/README.md:121. AGENTS.md:86: "CI … runs exactly: `ruff check .`, `ruff format --check .`, `pytest` …, then the **`regression`** job" — test.yml:42 has a `packaging` job (tests/README.md:70 lists it). AGENTS.md:110 already says "full command … tests/README.md (entry points)": the pointer and the copies coexist.
 
-### docs-governance#6 — Delete DESIGN §8's Package roles table (a stale copy of §3)
+### docs-gov#6 — Delete DESIGN §8's Package roles table (a stale copy of §3)
 
 *consolidation · effort S · owner agent · rung v0.2 wave D · planned: —*  
 Files: `DESIGN.md:1194-1206`, `DESIGN.md:80-110`, `AGENTS.md:41`, `minilink/control/ (neural.py, geometric.py, output.py, state.py)`
@@ -2164,7 +2164,7 @@ Files: `DESIGN.md:1194-1206`, `DESIGN.md:80-110`, `AGENTS.md:41`, `minilink/cont
 
 **Evidence.** DESIGN.md:1201 "`analysis` | `linearize`, `structural`, `equilibria`, `modal` …" vs DESIGN.md:105 (bode / pzmap / nyquist / margins / root_locus / step_response / region_of_attraction / discretize) and `ls minilink/analysis/` (11 modules). DESIGN.md:1200 `control` row vs DESIGN.md:94 and `ls minilink/control/`. AGENTS.md:41: "Keep DESIGN.md call chains minimal."
 
-### docs-governance#7 — Move DESIGN's inline TODOs to the workboard and fix its retired pointers
+### docs-gov#7 — Move DESIGN's inline TODOs to the workboard and fix its retired pointers
 
 *docs · effort S · owner agent · rung v0.1 close-out · planned: —*  
 Files: `DESIGN.md:438-444`, `DESIGN.md:619`, `DESIGN.md:779-780`, `DESIGN.md:788`, `DESIGN.md:790`, `DESIGN.md:824-831`, `minilink/estimation/__init__.py:8`, `minilink/identification/__init__.py:10`, `docs/plans/TODO.md:82-88, 326-342`, `docs/plans/README.md:3`
@@ -2175,7 +2175,7 @@ Files: `DESIGN.md:438-444`, `DESIGN.md:619`, `DESIGN.md:779-780`, `DESIGN.md:788
 
 **Evidence.** DESIGN.md:790 vs :827-831 ("Mitigation (landed): … `UserWarning` on every discontinuous solve"); DESIGN.md:439-440 vs TODO.md:326-327; DESIGN.md:779-780 "Planned: `SimulationOptions` (TODO.md Later)" — `grep -n SimulationOptions docs/plans/TODO.md` is empty; DESIGN.md:788 "teaching-release hardening" — no such ROADMAP heading (ROADMAP.md:183-321 is the §5 ladder); DESIGN.md:824 — `ls scratch` fails; estimation/__init__.py:8 and identification/__init__.py:10 "see ROADMAP.md teaching-release priorities"; DESIGN.md:441-444 vs TODO.md:82-88 (A5).
 
-### docs-governance#8 — Scrub retired phase numbers and line pointers from the plan docs; settle the optimizer-wiring rung
+### docs-gov#8 — Scrub retired phase numbers and line pointers from the plan docs; settle the optimizer-wiring rung
 
 *docs · effort S · owner agent · rung v0.2 wave D · planned: —*  
 Files: `docs/plans/fields.md:41, 83`, `docs/plans/cost-params.md:19`, `docs/plans/gro501-classical-control.md:229`, `docs/plans/optimizer-parametric-wiring.md:3-8`, `docs/plans/README.md:32-36`, `docs/plans/TODO.md:196-197, 229-230, 326`
@@ -2186,7 +2186,7 @@ Files: `docs/plans/fields.md:41, 83`, `docs/plans/cost-params.md:19`, `docs/plan
 
 **Evidence.** fields.md:83 "The list of phase 2 plus … the phase 4 baseline"; ROADMAP.md:185-187 "One ladder replaces the phase log kept here until 2026-09-22"; fields.md:41 "`tabular.py:262` docstring"; cost-params.md:19 "the ROADMAP review queue"; gro501-classical-control.md:229 "`facades.py`'s 1 228 lines" (`wc -l` → 1382); optimizer-parametric-wiring.md:3 "unscheduled — a Later idea in TODO.md §7"; plans/README.md:34 "Research lane, unscheduled"; TODO.md:229-230 (D3) and :196-197 (T5) cite it; TODO.md:326 Later "`SolverFactory`".
 
-### docs-governance#9 — Name the estimation API once, in the P4 plan
+### docs-gov#9 — Name the estimation API once, in the P4 plan
 
 *api · effort S · owner maintainer · rung v0.2 wave B · planned: P4*  
 Files: `DESIGN.md:141-144`, `minilink/estimation/__init__.py:8-14`, `ROADMAP.md:167, 244-246`, `docs/plans/TODO.md:121-127`, `docs/plans/gro501-classical-control.md:170-201`
@@ -2197,7 +2197,7 @@ Files: `DESIGN.md:141-144`, `minilink/estimation/__init__.py:8-14`, `ROADMAP.md:
 
 **Evidence.** DESIGN.md:143 "`estimation.kalman_design(A, C, Q, R) -> KalmanFilter`"; estimation/__init__.py:11 "`kalman.py` — Kalman filter (+ `kalman_design(A, C, Q, R)` factory)"; ROADMAP.md:167 "`LuenbergerObserver` and steady-state `KalmanFilter` closing the loop"; ROADMAP.md:244-245, TODO.md:121-123 and gro501-classical-control.md:173-179 "`LuenbergerObserver(A, B, C, L)` … `luenberger(A, B, C, poles)` … `kalman(A, B, C, Q, R)` … returning the same block".
 
-### docs-governance#10 — Add the DESIGN research-lane trim to D2 as a row with its three moves
+### docs-gov#10 — Add the DESIGN research-lane trim to D2 as a row with its three moves
 
 *consolidation · effort M · owner maintainer · rung v0.2 wave D · planned: D2 (inventory item 15 is named in the review, but D2 has no row)*  
 Files: `docs/plans/TODO.md:239-252`, `docs/reviews/2026-09-22-consolidation-review.md:70-73`, `docs/reviews/2026-09-05-consolidation-inventory.md:27`, `DESIGN.md:295-329 (realtime)`, `DESIGN.md:330-365 (dual-rate MPC)`, `DESIGN.md:1092-1123 (spatial pipeline)`, `minilink/simulation/realtime/__init__.py`, `minilink/control/mpc/__init__.py`
@@ -2208,7 +2208,7 @@ Files: `docs/plans/TODO.md:239-252`, `docs/reviews/2026-09-22-consolidation-revi
 
 **Evidence.** 2026-09-22-consolidation-review.md:70-73 "DESIGN.md is the next drift risk … it stays a D2 pick because it is the maintainer's document"; TODO.md:239-252 D2 rows: `Source.show_signal`, dead modules, benchmark shims, MPC debug figure, `HybridDiagram` facades, plotting homes — no DESIGN row; 2026-09-05-consolidation-inventory.md:27 item 15 "~250 lines"; DESIGN.md:295-329, :330-365, :1092-1123; ROADMAP.md:91 realtime TRL 2.
 
-### docs-governance#11 — Re-audit pyro-port-remaining against the code before the migration guide
+### docs-gov#11 — Re-audit pyro-port-remaining against the code before the migration guide
 
 *docs · effort M · owner agent · rung v0.2 wave C · planned: C1*  
 Files: `docs/plans/pyro-port-remaining.md:34, 43-45, 285-296`, `minilink/control/lqr.py:158`, `minilink/control/state.py:126`, `minilink/analysis/frequency.py:217`, `DESIGN.md:577`, `benchmarks/run_pyro_minilink_parity.py`
@@ -2219,7 +2219,7 @@ Files: `docs/plans/pyro-port-remaining.md:34, 43-45, 285-296`, `minilink/control
 
 **Evidence.** pyro-port-remaining.md:44 "TrajectoryLQRController | `minilink/control/lqr.py` | — | **TODO** | Trajectory stabilization demos" vs control/lqr.py:158 `def trajectory_lqr` and control/state.py:126 `class TrajectoryFeedbackController` (DESIGN.md:577 documents it). :34 "ss2tf() | `minilink/analysis/` | — | **TODO** | Frequency backlog" vs analysis/frequency.py:217 `def transfer_function` (ROADMAP.md:136-138: frequency tools landed 2026-09-07). :288 and :293 repeat both in the priority backlog; :43 "Dedicated PID wrapper pending" vs P1 landed (gro501-classical-control.md:53-98).
 
-### docs-governance#12 — Drop tests/README's stale module census and the duplicated smoke-policy lines
+### docs-gov#12 — Drop tests/README's stale module census and the duplicated smoke-policy lines
 
 *docs · effort S · owner agent · rung v0.1 close-out · planned: —*  
 Files: `tests/README.md:135-141`, `examples/README.md:94`, `examples/README.md:182-190`, `RULES.md:103-107`
@@ -2230,7 +2230,7 @@ Files: `tests/README.md:135-141`, `examples/README.md:94`, `examples/README.md:1
 
 **Evidence.** tests/README.md:135 "**Domain modules** (22 files after contract-test consolidation): `test_core`, …" — `ls tests/unittest/test_*.py` → 45 files (`test_racecar_*`, `test_rl_*`, `test_lqr_planner`, `test_planning_stochastic`, `test_feedback_composition`, … absent from the list). examples/README.md:94 "Long notebooks (UR5 EoM, DP grids, PPO training) are skipped in fast CI smoke checks" and :184-185 "except long notebooks with `"smoke": false` — UR5 EoM, DP grids, PPO".
 
-### docs-governance#13 — Name who owns ROADMAP §5 and §6 in the AGENTS lanes
+### docs-gov#13 — Name who owns ROADMAP §5 and §6 in the AGENTS lanes
 
 *docs · effort S · owner maintainer · rung v0.1 close-out · planned: —*  
 Files: `AGENTS.md:49-62`, `ROADMAP.md:183-190, 323-327`, `docs/plans/TODO.md:11-14`, `docs/reviews/2026-09-22-consolidation-review.md:131-137, 403-404`
@@ -2241,9 +2241,9 @@ Files: `AGENTS.md:49-62`, `ROADMAP.md:183-190, 323-327`, `docs/plans/TODO.md:11-
 
 **Evidence.** AGENTS.md:49-50 "ROADMAP §1, §2 and §4" (ask first); AGENTS.md:59 "the TRL ledger (ROADMAP §3)" (agent-managed); ROADMAP.md:326-327 "Each open item needs the maintainer"; 2026-09-22-consolidation-review.md:131-137 rewrote §5 and §6 and :403-404 requested confirmation for §1 only.
 
-### Bugs reported by the docs-governance finder
+### Bugs reported by the docs-gov finder
 
-#### bug docs-governance#0 — (low) DESIGN §6 documents `Distribution.mean()` as a method; it is an attribute and the call raises
+#### bug docs-gov#0 — (low) DESIGN §6 documents `Distribution.mean()` as a method; it is an attribute and the call raises
 
 Files: `DESIGN.md:925`, `DESIGN.md:620`, `CONSTITUTION.md:58`, `minilink/core/distributions.py:55, 82, 99, 130`
 
@@ -2256,7 +2256,7 @@ g.mean()    # TypeError: 'numpy.ndarray' object is not callable
 # DESIGN.md:925 reads "a duck type — `dim`, `mean()`, `sample(key)`"; DESIGN.md:620 and CONSTITUTION.md:58 say `mean` (an array).
 ```
 
-#### bug docs-governance#1 — (low) DESIGN §5 points at a diagnostics script that does not exist
+#### bug docs-gov#1 — (low) DESIGN §5 points at a diagnostics script that does not exist
 
 Files: `DESIGN.md:824-825`
 
@@ -2266,7 +2266,7 @@ ls scratch                                            # -> No such file or direc
 git ls-files | grep confirm_smc                       # -> empty
 ```
 
-#### bug docs-governance#2 — (low) RULES 7.6 says there is no link checker in CI; `test_repo_contract.py` checks links in the CI `test` job
+#### bug docs-gov#2 — (low) RULES 7.6 says there is no link checker in CI; `test_repo_contract.py` checks links in the CI `test` job
 
 Files: `RULES.md:456-458`, `tests/unittest/test_repo_contract.py:36-50, 96-128`, `.github/workflows/test.yml:12-40`
 
@@ -2277,7 +2277,7 @@ pytest tests/unittest/test_repo_contract.py -k links    # runs in the `test` job
 # The rule's justification is false; an agent may skip anchor hygiene believing nothing checks it.
 ```
 
-#### bug docs-governance#3 — (low) tests/README.md claims 22 domain test modules; 45 exist
+#### bug docs-gov#3 — (low) tests/README.md claims 22 domain test modules; 45 exist
 
 Files: `tests/README.md:135-141`
 
@@ -2286,7 +2286,7 @@ sed -n '135,141p' tests/README.md          # "Domain modules (22 files after con
 ls tests/unittest/test_*.py | wc -l        # -> 45
 ```
 
-#### bug docs-governance#4 — (low) AGENTS.md says CI runs "exactly" three things; the workflow also has a `packaging` job
+#### bug docs-gov#4 — (low) AGENTS.md says CI runs "exactly" three things; the workflow also has a `packaging` job
 
 Files: `AGENTS.md:86`, `.github/workflows/test.yml:42-68`, `tests/README.md:70`
 
@@ -2295,7 +2295,7 @@ sed -n '86p' AGENTS.md                                 # "runs exactly: ruff che
 grep -n '^  [a-z_]*:$' .github/workflows/test.yml      # -> test:, packaging:, regression:
 ```
 
-#### bug docs-governance#5 — (medium) pyro-port-remaining marks landed features as TODO (`ss2tf`, `TrajectoryLQRController`, dedicated PI/PD)
+#### bug docs-gov#5 — (medium) pyro-port-remaining marks landed features as TODO (`ss2tf`, `TrajectoryLQRController`, dedicated PI/PD)
 
 Files: `docs/plans/pyro-port-remaining.md:34, 43, 44, 288, 293`, `minilink/analysis/frequency.py:217`, `minilink/control/lqr.py:158`, `minilink/control/state.py:126`, `minilink/control/siso.py (PI, PD)`
 
@@ -2305,7 +2305,7 @@ python -c "from minilink.analysis import transfer_function; from minilink.contro
 # The table drives the C1 parity criterion (ROADMAP.md:97) and the README migration guide.
 ```
 
-#### bug docs-governance#6 — (low) `estimation/` and `identification/` package docstrings point at a ROADMAP section that no longer exists and pre-name an API the plan contradicts
+#### bug docs-gov#6 — (low) `estimation/` and `identification/` package docstrings point at a ROADMAP section that no longer exists and pre-name an API the plan contradicts
 
 Files: `minilink/estimation/__init__.py:8, 11`, `minilink/identification/__init__.py:10`, `ROADMAP.md:183-190`, `docs/plans/gro501-classical-control.md:173-179`
 

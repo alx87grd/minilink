@@ -1,8 +1,10 @@
 # Improvement scan — consolidated propositions (2026-09-22)
 
-**Status:** proposal for the maintainer. Nothing here is scheduled until a
-row lands on [docs/plans/TODO.md](../plans/TODO.md) or a decision on
-[ROADMAP §6](../../ROADMAP.md#6-decisions).
+**Status:** integrated 2026-09-23. Every suggestion has a workboard row that
+cites it as `scan: band#n` ([docs/plans/TODO.md](../plans/TODO.md): the
+existing rows it extends, and new rows R3, S58–S68, T7); the open questions
+are on [ROADMAP §6](../../ROADMAP.md#6-decisions). The bugs are workboard row
+S58, fixed on `dev` starting 2026-09-23; §2 records the outcome of each.
 
 **How it was produced.** Ten band scans of the whole library (core,
 compile/simulation, dynamics, control, analysis, planning,
@@ -47,9 +49,9 @@ Three findings change what the close-out should contain:
 3. **Six small confirmed bugs** (§2) are each an afternoon with a test and do
    not need a design decision.
 
-Recommendation: add the §3.1 items to the v0.1 close-out, fold the §3.2
-items into the wave rows they name, and rule on the §3.3 decisions. Work in
-small commits, one bug or one row per push.
+Recommendation (adopted 2026-09-23): add the §3.1 items to the v0.1
+close-out, fold the §3.2 items into the wave rows they name, and rule on the
+§3.3 decisions. Work in small commits, one bug or one row per push.
 
 ## 2. Bugs
 
@@ -246,28 +248,27 @@ false green.
 
 | Id | Question | My recommendation |
 |----|----------|-------------------|
-| D-a | Time-grid endpoint rule: `n = round((tf - t0) / dt)`, `t[-1] <= tf`, warn when `(tf - t0) / dt` is not an integer. Changes regression baselines and every `dt=` notebook by one sample. | Yes, in the close-out with one baseline update; a grid that ends past `tf` is a bug students will hit. |
+| D-a | Time-grid endpoint rule: `n = round((tf - t0) / dt)`, `t[-1] <= tf`, warn when `(tf - t0) / dt` is not an integer. Changes regression baselines and every `dt=` notebook by one sample. | **Ruled 2026-09-23: fix** (S58). |
 | D-b | Undeclared feedthrough (`h` reads `u` with `y_dependencies=()`): raise or warn at compile. | Raise. A silent wrong fixed point is the worst outcome. |
 | D-c | Retire the `JaxMechanicalSystem` twin (76 lines of `jnp`; the `xp` base already traces). Alias for one release. | Retire; it is the standing simplify-and-consolidate principle applied. |
 | D-d | Sampled seam time argument: ticks (today) or seconds. Seconds removes three copies of `t0` / `dt_mpc` and `_replan_divisor`. | Seconds, decided with S31 and T6 together. |
 | D-e | Mechanical bases' default bounds: keep the invented ±2π / ±5 or make each plant state its own. | Each plant states its own; `StateSpaceGrid` already errors on infinite bounds. |
 | D-f | `PlanningProblem.metadata`: document or retire. | Retire unless a consumer is named. |
-| D-g | `QuarterCarOnRoughTerrain` damper: is `b * (dy - dz/dx)` the intended model, or should it be `b * (dy - vx * dz/dx)`? | Physics check by the maintainer; the finder's derivation is the standard one. |
+| D-g | `QuarterCarOnRoughTerrain` damper: is `b * (dy - dz/dx)` the intended model, or should it be `b * (dy - vx * dz/dx)`? | **Ruled 2026-09-23: fix** to the road's vertical velocity (S58). |
 | D-h | `plot_diagram()` without the `graphviz` wrapper: warn, or move the pure-Python wrapper into the base dependencies. | Base dependency; the binary stays optional and already warns. |
 
 ## 4. Next small steps
 
-1. This document (this commit).
-2. Workboard rows for §3.1 items 1–5 under TODO §1 and the §3.3 rows on
-   ROADMAP §6 (one commit, docs only).
-3. Confirmed bug fixes B1+B2, B7, B9, B10, B11, B12, one commit each with a
-   test, after the maintainer's go on the close-out list.
-4. The §2.2 reproductions, five minutes each, before any of those fixes.
+1. This document (2026-09-22).
+2. Workboard rows and ROADMAP §6 decisions (2026-09-23, done).
+3. S58: every bug in §2 reproduced, fixed with a regression test, and
+   committed in small batches; the outcome of each is recorded in §2.
 
 ## Appendix: every finding, by band
 
 Kind / effort / owner / rung as the finder proposed them; `planned` names an
-existing step the finder judged the item belongs to. Full text in the
+existing step the finder judged the item belongs to. The workboard cites these
+ids as `scan: band#n`. Full text in the
 [ledger](2026-09-22-improvement-scan-ledger.md).
 
 
@@ -299,31 +300,31 @@ Bugs:
 - **bug core#3** (low) `IntersectionSet.margin` fails on a member whose margin returns a scalar — `minilink/core/sets.py:377-386`
 - **bug core#4** (low) `DiagramSystem.add_subsystem` accepts a StepSystem and the reference `f` returns a short vector — `minilink/core/wiring.py:242-248`
 
-### compile-simulation
+### compile-sim
 
 | id | kind | eff. | owner | rung | planned | title |
 |----|------|------|-------|------|---------|-------|
-| compile-simulation#0 | consolidation | S | agent | v0.2 wave D | — | Give the try-JAX-then-NumPy policy one owner and a typed error |
-| compile-simulation#1 | trap | S | maintainer | v0.2 wave D | D3 | Give the automatic dt one owner and make the discontinuous scale mean something (or drop the claim) |
-| compile-simulation#2 | api | M | maintainer | v0.2 wave D | — | Make the forced-input hold model one option honoured by every solver |
-| compile-simulation#3 | trap | S | maintainer | v0.2 wave D | — | State and test what `n_steps` counts on each simulation verb |
-| compile-simulation#4 | trap | M | maintainer | v0.2 wave D | D3 | Derive the hybrid plant sub-step from the plant time constant instead of one RK4 step per tick |
-| compile-simulation#5 | consolidation | S | agent | v0.2 wave D | D3 | Align HybridSimulator with its siblings: shared input coercion, positional `input_port_id`, the framed verbose panel |
-| compile-simulation#6 | trap | S | maintainer | v0.2 wave D | — | Pin (or reconcile) the one-tick lag between chained blocks inside a Computer |
-| compile-simulation#7 | api | S | agent | v0.2 wave D | — | Make `has_trace_tier` a plain boolean on both backends and correct the frozen-subset sentence |
-| compile-simulation#8 | consolidation | S | agent | v0.2 wave D | — | Stop `simulation` importing from `optimization` for three display constants |
-| compile-simulation#9 | consolidation | M | agent | v1.0 | S37 | Deduplicate the evaluator internals that S37 will otherwise carry: ZOH sugar, the JAX step rollout, the four `_jac_probe`s, the undeclared batch cache |
-| compile-simulation#10 | trap | S | maintainer | v0.2 wave D | — | Make the `scipy_stiff` preset honest: explicit tolerances and a Jacobian on both backends |
-| compile-simulation#11 | tooling | S | agent | v0.2 wave D | S53 | Gate the quoted batch-rollout claim and give diagrams a frozen-params reference for the family rule |
-| compile-simulation#12 | performance | S | agent | v0.2 wave D | — | Batch the static-leaf time grid instead of dispatching 10 001 times |
-| compile-simulation#13 | trap | S | agent | v0.2 wave D | — | Let `compile(verbose=True)` read in order on every path |
-| compile-simulation#14 | consolidation | S | agent | v0.2 wave D | T4 | Share one uniform-grid check between the fixed-step backends and the simulator |
+| compile-sim#0 | consolidation | S | agent | v0.2 wave D | — | Give the try-JAX-then-NumPy policy one owner and a typed error |
+| compile-sim#1 | trap | S | maintainer | v0.2 wave D | D3 | Give the automatic dt one owner and make the discontinuous scale mean something (or drop the claim) |
+| compile-sim#2 | api | M | maintainer | v0.2 wave D | — | Make the forced-input hold model one option honoured by every solver |
+| compile-sim#3 | trap | S | maintainer | v0.2 wave D | — | State and test what `n_steps` counts on each simulation verb |
+| compile-sim#4 | trap | M | maintainer | v0.2 wave D | D3 | Derive the hybrid plant sub-step from the plant time constant instead of one RK4 step per tick |
+| compile-sim#5 | consolidation | S | agent | v0.2 wave D | D3 | Align HybridSimulator with its siblings: shared input coercion, positional `input_port_id`, the framed verbose panel |
+| compile-sim#6 | trap | S | maintainer | v0.2 wave D | — | Pin (or reconcile) the one-tick lag between chained blocks inside a Computer |
+| compile-sim#7 | api | S | agent | v0.2 wave D | — | Make `has_trace_tier` a plain boolean on both backends and correct the frozen-subset sentence |
+| compile-sim#8 | consolidation | S | agent | v0.2 wave D | — | Stop `simulation` importing from `optimization` for three display constants |
+| compile-sim#9 | consolidation | M | agent | v1.0 | S37 | Deduplicate the evaluator internals that S37 will otherwise carry: ZOH sugar, the JAX step rollout, the four `_jac_probe`s, the undeclared batch cache |
+| compile-sim#10 | trap | S | maintainer | v0.2 wave D | — | Make the `scipy_stiff` preset honest: explicit tolerances and a Jacobian on both backends |
+| compile-sim#11 | tooling | S | agent | v0.2 wave D | S53 | Gate the quoted batch-rollout claim and give diagrams a frozen-params reference for the family rule |
+| compile-sim#12 | performance | S | agent | v0.2 wave D | — | Batch the static-leaf time grid instead of dispatching 10 001 times |
+| compile-sim#13 | trap | S | agent | v0.2 wave D | — | Let `compile(verbose=True)` read in order on every path |
+| compile-sim#14 | consolidation | S | agent | v0.2 wave D | T4 | Share one uniform-grid check between the fixed-step backends and the simulator |
 
 Bugs:
 
-- **bug compile-simulation#0** (medium) `dt`-based time grids overshoot `tf` by one sample (float `arange`) — `minilink/simulation/time_grid.py:47`
-- **bug compile-simulation#1** (medium) `JaxDiagramEvaluator` casts `dx` and the signal buffer to the dtype of `x`, truncating derivatives for integer states — `minilink/core/compile/evaluators/jax_evaluators.py:921-926`
-- **bug compile-simulation#2** (low) `compile_step_diagram` probes every subsystem's `step` and `h` twice — `minilink/core/compile/step_compiler.py:56-57`
+- **bug compile-sim#0** (medium) `dt`-based time grids overshoot `tf` by one sample (float `arange`) — `minilink/simulation/time_grid.py:47`
+- **bug compile-sim#1** (medium) `JaxDiagramEvaluator` casts `dx` and the signal buffer to the dtype of `x`, truncating derivatives for integer states — `minilink/core/compile/evaluators/jax_evaluators.py:921-926`
+- **bug compile-sim#2** (low) `compile_step_diagram` probes every subsystem's `step` and `h` twice — `minilink/core/compile/step_compiler.py:56-57`
 
 ### dynamics
 
@@ -434,113 +435,113 @@ Bugs:
 - **bug planning#2** (medium) DynamicProgrammingPlanner silently replaces a callable infeasible_cost with the 1e6 default — `minilink/planning/policy_synthesis/dp.py:648-649`
 - **bug planning#3** (low) DynamicProgrammingPlanner.value_at, plot_cost2go, plot_policy and animate_* raise AttributeError before solve instead of the planner's 'No solution' error — `minilink/planning/policy_synthesis/dp.py:386-438`
 
-### graphics-blocks-interfaces
+### graphics
 
 | id | kind | eff. | owner | rung | planned | title |
 |----|------|------|-------|------|---------|-------|
-| graphics-blocks-interfaces#0 | api | S | agent | v0.2 wave B | — | Let plot_trajectory select a leaf's named output ports |
-| graphics-blocks-interfaces#1 | api | M | agent | v0.2 wave C | — | Give Sys2Gym a Distribution for the start state |
-| graphics-blocks-interfaces#2 | test | S | agent | v0.1 close-out | — | Register the block names the facade exports and walk every band facade in the registry test |
-| graphics-blocks-interfaces#3 | api | S | maintainer | v0.2 wave D | — | Make minilink.graphical.catalog the one shapes-and-skins facade students import |
-| graphics-blocks-interfaces#4 | api | M | agent | v0.2 wave D | — | One keyword vocabulary across the plot verbs (title, ax, backend) and one PlotResult.axes shape |
-| graphics-blocks-interfaces#5 | consolidation | S | agent | v0.2 wave D | T3 | One axis-label formatter and one unit convention (no brackets in the catalog) |
-| graphics-blocks-interfaces#6 | consolidation | S | agent | v0.2 wave D | — | One backend resolver and one optional-import helper for the graphical band |
-| graphics-blocks-interfaces#7 | trap | M | agent | v0.2 wave D | S43 | Publish a renderer capability table and give each cell an honest fallback |
-| graphics-blocks-interfaces#8 | trap | S | agent | v0.1 close-out | — | Silence the renderers (RULES 4.6) |
-| graphics-blocks-interfaces#9 | trap | S | agent | v0.2 wave D | — | Warn on the +-10 phase-plane window and stop duplicating the default bounds |
-| graphics-blocks-interfaces#10 | api | S | agent | v0.2 wave C | — | A lazy facade for minilink.interfaces |
-| graphics-blocks-interfaces#11 | api | S | maintainer | v0.2 wave C | C3 | Give Integrator and ZOHHold a dim like every static block |
-| graphics-blocks-interfaces#12 | consolidation | S | maintainer | v0.2 wave D | — | Fold NeuralNetwork into MLP (one owner of the one-hidden-layer map) |
-| graphics-blocks-interfaces#13 | docs | M | agent | v0.2 wave D | T1 | Add the graphical band to the textbook pass (T7) |
-| graphics-blocks-interfaces#14 | consolidation | S | maintainer | v0.2 wave D | D2 | Retire the sources demo and __main__ that only exist for show_signal |
+| graphics#0 | api | S | agent | v0.2 wave B | — | Let plot_trajectory select a leaf's named output ports |
+| graphics#1 | api | M | agent | v0.2 wave C | — | Give Sys2Gym a Distribution for the start state |
+| graphics#2 | test | S | agent | v0.1 close-out | — | Register the block names the facade exports and walk every band facade in the registry test |
+| graphics#3 | api | S | maintainer | v0.2 wave D | — | Make minilink.graphical.catalog the one shapes-and-skins facade students import |
+| graphics#4 | api | M | agent | v0.2 wave D | — | One keyword vocabulary across the plot verbs (title, ax, backend) and one PlotResult.axes shape |
+| graphics#5 | consolidation | S | agent | v0.2 wave D | T3 | One axis-label formatter and one unit convention (no brackets in the catalog) |
+| graphics#6 | consolidation | S | agent | v0.2 wave D | — | One backend resolver and one optional-import helper for the graphical band |
+| graphics#7 | trap | M | agent | v0.2 wave D | S43 | Publish a renderer capability table and give each cell an honest fallback |
+| graphics#8 | trap | S | agent | v0.1 close-out | — | Silence the renderers (RULES 4.6) |
+| graphics#9 | trap | S | agent | v0.2 wave D | — | Warn on the +-10 phase-plane window and stop duplicating the default bounds |
+| graphics#10 | api | S | agent | v0.2 wave C | — | A lazy facade for minilink.interfaces |
+| graphics#11 | api | S | maintainer | v0.2 wave C | C3 | Give Integrator and ZOHHold a dim like every static block |
+| graphics#12 | consolidation | S | maintainer | v0.2 wave D | — | Fold NeuralNetwork into MLP (one owner of the one-hidden-layer map) |
+| graphics#13 | docs | M | agent | v0.2 wave D | T1 | Add the graphical band to the textbook pass (T7) |
+| graphics#14 | consolidation | S | maintainer | v0.2 wave D | D2 | Retire the sources demo and __main__ that only exist for show_signal |
 
 Bugs:
 
-- **bug graphics-blocks-interfaces#0** (medium) Sys2Gym.reset fails or returns inf on any plant without finite state bounds (also through from_problem) — `minilink/interfaces/gymnasium.py:134-136`
-- **bug graphics-blocks-interfaces#1** (low) Animation frame schedule never draws the last sample and crashes on a one-sample trajectory — `minilink/graphical/animation/renderers/timing.py:30`
-- **bug graphics-blocks-interfaces#2** (low) animate(save=True, file_name='clip.gif') writes clip.gif.gif — `minilink/graphical/animation/renderers/matplotlib_renderer.py:573-575`
-- **bug graphics-blocks-interfaces#3** (low) Plotly time-signal y-labels double the brackets of '[m]'-style units — `minilink/graphical/signals/plotly_backend.py:294`
-- **bug graphics-blocks-interfaces#4** (low) HybridDiagram.plot_trajectory accepts a dead abscissa argument — `minilink/core/hybrid_diagram.py:230`
+- **bug graphics#0** (medium) Sys2Gym.reset fails or returns inf on any plant without finite state bounds (also through from_problem) — `minilink/interfaces/gymnasium.py:134-136`
+- **bug graphics#1** (low) Animation frame schedule never draws the last sample and crashes on a one-sample trajectory — `minilink/graphical/animation/renderers/timing.py:30`
+- **bug graphics#2** (low) animate(save=True, file_name='clip.gif') writes clip.gif.gif — `minilink/graphical/animation/renderers/matplotlib_renderer.py:573-575`
+- **bug graphics#3** (low) Plotly time-signal y-labels double the brackets of '[m]'-style units — `minilink/graphical/signals/plotly_backend.py:294`
+- **bug graphics#4** (low) HybridDiagram.plot_trajectory accepts a dead abscissa argument — `minilink/core/hybrid_diagram.py:230`
 
-### examples-teaching
+### examples
 
 | id | kind | eff. | owner | rung | planned | title |
 |----|------|------|-------|------|---------|-------|
-| examples-teaching#0 | api | M | maintainer | v0.2 wave B | P11 | Declare controller ports from `feedback_profile` so a student writes only `ctl` |
-| examples-teaching#1 | trap | S | maintainer | v0.1 close-out | R1 | Make `plot_diagram()` warn, not raise, when the `graphviz` wrapper is missing |
-| examples-teaching#2 | api | S | maintainer | v0.2 wave B | P7 | Let the linear records print themselves and add a `poles` verb |
-| examples-teaching#3 | docs | M | maintainer | v0.2 wave D | D1.3 | Fill the placeholder sections of tutorials 01, 02, 03, 05, 08 and 09 |
-| examples-teaching#4 | test | S | agent | v0.1 close-out | R1 | Pin one Colab setup cell per tier with a test, and align install.md's tiers to it |
-| examples-teaching#5 | api | S | maintainer | v0.2 wave D | S54 | One name and one keyword for the cost-to-go plot across planner, evaluator and comparison |
-| examples-teaching#6 | feature | S | agent | v0.2 wave D | D1.1 | Overlay several trajectories on one phase plane and two fields on one grid surface |
-| examples-teaching#7 | trap | M | maintainer | v0.2 wave D | D1.2 | Stop teaching code from rebinding `sys`; add it to the flatness ratchet |
-| examples-teaching#8 | test | S | maintainer | v0.1 close-out | — | Keep each course pin byte-identical to its topic twin with a `cmp` test |
-| examples-teaching#9 | api | S | maintainer | v0.2 wave A | V1 | `Trajectory.from_rollout(x0, xs, us, dt)` for compiled and scanned rollouts |
-| examples-teaching#10 | api | S | maintainer | v0.2 wave A | A5 | Give the double-integrator homework its two missing verbs: entry time into a set and the Bellman residual |
-| examples-teaching#11 | api | S | maintainer | v0.2 wave D | — | Accept `optimizer_method="auto"` that picks Ipopt when installed |
-| examples-teaching#12 | api | M | maintainer | v0.2 wave D | T6 | Let `mpc @ inner_loop` close on a multi-block plant diagram |
-| examples-teaching#13 | api | S | maintainer | v0.2 wave A | A3 | Close the facade gaps the import allowlist records |
-| examples-teaching#14 | trap | M | maintainer | v0.2 wave A | A5 | `WhiteNoise` samples are rebuilt only by Simulator's pre-read `refresh()`; S29 would silently break the noise demos |
+| examples#0 | api | M | maintainer | v0.2 wave B | P11 | Declare controller ports from `feedback_profile` so a student writes only `ctl` |
+| examples#1 | trap | S | maintainer | v0.1 close-out | R1 | Make `plot_diagram()` warn, not raise, when the `graphviz` wrapper is missing |
+| examples#2 | api | S | maintainer | v0.2 wave B | P7 | Let the linear records print themselves and add a `poles` verb |
+| examples#3 | docs | M | maintainer | v0.2 wave D | D1.3 | Fill the placeholder sections of tutorials 01, 02, 03, 05, 08 and 09 |
+| examples#4 | test | S | agent | v0.1 close-out | R1 | Pin one Colab setup cell per tier with a test, and align install.md's tiers to it |
+| examples#5 | api | S | maintainer | v0.2 wave D | S54 | One name and one keyword for the cost-to-go plot across planner, evaluator and comparison |
+| examples#6 | feature | S | agent | v0.2 wave D | D1.1 | Overlay several trajectories on one phase plane and two fields on one grid surface |
+| examples#7 | trap | M | maintainer | v0.2 wave D | D1.2 | Stop teaching code from rebinding `sys`; add it to the flatness ratchet |
+| examples#8 | test | S | maintainer | v0.1 close-out | — | Keep each course pin byte-identical to its topic twin with a `cmp` test |
+| examples#9 | api | S | maintainer | v0.2 wave A | V1 | `Trajectory.from_rollout(x0, xs, us, dt)` for compiled and scanned rollouts |
+| examples#10 | api | S | maintainer | v0.2 wave A | A5 | Give the double-integrator homework its two missing verbs: entry time into a set and the Bellman residual |
+| examples#11 | api | S | maintainer | v0.2 wave D | — | Accept `optimizer_method="auto"` that picks Ipopt when installed |
+| examples#12 | api | M | maintainer | v0.2 wave D | T6 | Let `mpc @ inner_loop` close on a multi-block plant diagram |
+| examples#13 | api | S | maintainer | v0.2 wave A | A3 | Close the facade gaps the import allowlist records |
+| examples#14 | trap | M | maintainer | v0.2 wave A | A5 | `WhiteNoise` samples are rebuilt only by Simulator's pre-read `refresh()`; S29 would silently break the noise demos |
 
 Bugs:
 
-- **bug examples-teaching#0** (low) Tutorial 00 §2 prints the plant's state labels on the "Diagram" line — `examples/tutorial/00_core.ipynb (code cell 11)`
-- **bug examples-teaching#1** (medium) `trajopt_cartpole_collocation_jax.py` hard-codes `optimizer_method="ipopt"` and fails without cyipopt — `examples/demos/trajopt/trajopt_cartpole_collocation_jax.py:42`
+- **bug examples#0** (low) Tutorial 00 §2 prints the plant's state labels on the "Diagram" line — `examples/tutorial/00_core.ipynb (code cell 11)`
+- **bug examples#1** (medium) `trajopt_cartpole_collocation_jax.py` hard-codes `optimizer_method="ipopt"` and fails without cyipopt — `examples/demos/trajopt/trajopt_cartpole_collocation_jax.py:42`
 
-### tests-ci-tooling
+### tests-ci
 
 | id | kind | eff. | owner | rung | planned | title |
 |----|------|------|-------|------|---------|-------|
-| tests-ci-tooling#0 | tooling | S | agent | v0.1 close-out | — | Run pytest with JAX and Ipopt in the CI regression job so the optional-extra tests are gated |
-| tests-ci-tooling#1 | test | M | agent | v0.1 close-out | — | Guard optional extras per test instead of per module: move mid-file importorskip into the JAX classes and fix marker misuse |
-| tests-ci-tooling#2 | bug | S | agent | v0.1 close-out | — | Make the flagship manifests honest: `requires` must list every optional import a demo makes, and drop or validate dead `demo_id`s |
-| tests-ci-tooling#3 | performance | S | agent | v0.2 wave D | — | Gate the subprocess demo-check bridge tests behind a marker so the unit suite stays a unit suite |
-| tests-ci-tooling#4 | consolidation | S | agent | v0.2 wave D | — | One owner for the CI regression-gate flags shared by tests/run, tests/README and test.yml |
-| tests-ci-tooling#5 | tooling | S | agent | v0.1 close-out | — | Give every teaching notebook a job that executes it: nightly `--all`, unique ids, and drop the stale intro branch |
-| tests-ci-tooling#6 | tooling | S | agent | v0.1 close-out | — | Add ruff check and ruff format hooks to pre-commit so the 'always before push' gate runs itself |
-| tests-ci-tooling#7 | consolidation | S | agent | v0.2 wave D | D1.2 | One owner for the teaching-facade list shared by test_teaching_imports and test_teaching_surface |
-| tests-ci-tooling#8 | docs | M | agent | v0.1 close-out | — | Pin the Sphinx API pages to the teaching surface with a test and build docs with -W |
-| tests-ci-tooling#9 | test | S | agent | v0.2 wave D | — | Move wall-clock speed claims out of unit tests into the regression gates |
-| tests-ci-tooling#10 | api | S | agent | v0.2 wave D | — | Expose `Animator.resolve_frame` so the graphics harness stops calling a private method |
-| tests-ci-tooling#11 | test | M | agent | v0.2 wave D | — | Turn the RULES 5.8 underscore check into a repo-wide ratchet with a shrinking allowlist |
-| tests-ci-tooling#12 | tooling | S | maintainer | v0.1 close-out | R1 | Run the test suite before publishing to PyPI and put timeouts on the long CI jobs |
-| tests-ci-tooling#13 | trap | S | maintainer | v0.1 close-out | — | Trap: showcase_jax.ipynb imports minilink.experimental.c_export, which the wheel does not ship |
-| tests-ci-tooling#14 | consolidation | M | agent | v0.2 wave D | — | Stop unit tests from importing examples/projects and benchmarks/systems so the suite runs from the sdist and the Basic tier |
+| tests-ci#0 | tooling | S | agent | v0.1 close-out | — | Run pytest with JAX and Ipopt in the CI regression job so the optional-extra tests are gated |
+| tests-ci#1 | test | M | agent | v0.1 close-out | — | Guard optional extras per test instead of per module: move mid-file importorskip into the JAX classes and fix marker misuse |
+| tests-ci#2 | bug | S | agent | v0.1 close-out | — | Make the flagship manifests honest: `requires` must list every optional import a demo makes, and drop or validate dead `demo_id`s |
+| tests-ci#3 | performance | S | agent | v0.2 wave D | — | Gate the subprocess demo-check bridge tests behind a marker so the unit suite stays a unit suite |
+| tests-ci#4 | consolidation | S | agent | v0.2 wave D | — | One owner for the CI regression-gate flags shared by tests/run, tests/README and test.yml |
+| tests-ci#5 | tooling | S | agent | v0.1 close-out | — | Give every teaching notebook a job that executes it: nightly `--all`, unique ids, and drop the stale intro branch |
+| tests-ci#6 | tooling | S | agent | v0.1 close-out | — | Add ruff check and ruff format hooks to pre-commit so the 'always before push' gate runs itself |
+| tests-ci#7 | consolidation | S | agent | v0.2 wave D | D1.2 | One owner for the teaching-facade list shared by test_teaching_imports and test_teaching_surface |
+| tests-ci#8 | docs | M | agent | v0.1 close-out | — | Pin the Sphinx API pages to the teaching surface with a test and build docs with -W |
+| tests-ci#9 | test | S | agent | v0.2 wave D | — | Move wall-clock speed claims out of unit tests into the regression gates |
+| tests-ci#10 | api | S | agent | v0.2 wave D | — | Expose `Animator.resolve_frame` so the graphics harness stops calling a private method |
+| tests-ci#11 | test | M | agent | v0.2 wave D | — | Turn the RULES 5.8 underscore check into a repo-wide ratchet with a shrinking allowlist |
+| tests-ci#12 | tooling | S | maintainer | v0.1 close-out | R1 | Run the test suite before publishing to PyPI and put timeouts on the long CI jobs |
+| tests-ci#13 | trap | S | maintainer | v0.1 close-out | — | Trap: showcase_jax.ipynb imports minilink.experimental.c_export, which the wheel does not ship |
+| tests-ci#14 | consolidation | M | agent | v0.2 wave D | — | Stop unit tests from importing examples/projects and benchmarks/systems so the suite runs from the sdist and the Basic tier |
 
 Bugs:
 
-- **bug tests-ci-tooling#0** (high) CI merge gate never executes any JAX-dependent test: no job installs jax and runs pytest — `.github/workflows/test.yml:31`
-- **bug tests-ci-tooling#1** (medium) Module-level pytest.importorskip("jax") placed mid-file (or atop mostly-NumPy files) skips the NumPy tests too — `tests/unittest/test_dynamics_catalog.py:533`
-- **bug tests-ci-tooling#2** (medium) Flagship manifest omits graphviz for the two MPC demos, so `pytest` fails without the diagrams extra — `tests/demo_checks/flagship_manifest.json`
-- **bug tests-ci-tooling#3** (low) run_notebook_checks.py assigns the same id to two different notebooks, so overrides and --notebook filters are ambiguous — `tests/demo_checks/run_notebook_checks.py:48-57`
-- **bug tests-ci-tooling#4** (low) tests/run regression launcher claims CI parity but uses --factor 6 where CI uses --factor 10 — `tests/run/_common.py:57-66`
-- **bug tests-ci-tooling#5** (low) tests/README.md and the flagship-graphics manifest carry stale facts (file count, removed folders, dead demo_id links) — `tests/README.md:135`
+- **bug tests-ci#0** (high) CI merge gate never executes any JAX-dependent test: no job installs jax and runs pytest — `.github/workflows/test.yml:31`
+- **bug tests-ci#1** (medium) Module-level pytest.importorskip("jax") placed mid-file (or atop mostly-NumPy files) skips the NumPy tests too — `tests/unittest/test_dynamics_catalog.py:533`
+- **bug tests-ci#2** (medium) Flagship manifest omits graphviz for the two MPC demos, so `pytest` fails without the diagrams extra — `tests/demo_checks/flagship_manifest.json`
+- **bug tests-ci#3** (low) run_notebook_checks.py assigns the same id to two different notebooks, so overrides and --notebook filters are ambiguous — `tests/demo_checks/run_notebook_checks.py:48-57`
+- **bug tests-ci#4** (low) tests/run regression launcher claims CI parity but uses --factor 6 where CI uses --factor 10 — `tests/run/_common.py:57-66`
+- **bug tests-ci#5** (low) tests/README.md and the flagship-graphics manifest carry stale facts (file count, removed folders, dead demo_id links) — `tests/README.md:135`
 
-### docs-governance
+### docs-gov
 
 | id | kind | eff. | owner | rung | planned | title |
 |----|------|------|-------|------|---------|-------|
-| docs-governance#0 | tooling | M | agent | v0.2 wave D | — | Generate docs/api from the teaching-surface registry |
-| docs-governance#1 | test | S | agent | v0.2 wave D | T2, T3, T5, T6 | Make the RULES 5.8 check a ratchet over every System-family class |
-| docs-governance#2 | test | S | agent | v0.2 wave D | — | Test that ROADMAP §5 step ids and TODO rows agree |
-| docs-governance#3 | docs | S | agent | v0.2 wave D | — | Give plan-doc steps ids that cannot collide with the workboard's |
-| docs-governance#4 | docs | S | agent | v0.1 close-out | — | Align RULES 3.3's teaching-surface definition with ROADMAP §2 |
-| docs-governance#5 | consolidation | S | agent | v0.1 close-out | — | Keep the CI commands in one place and name every job |
-| docs-governance#6 | consolidation | S | agent | v0.2 wave D | — | Delete DESIGN §8's Package roles table (a stale copy of §3) |
-| docs-governance#7 | docs | S | agent | v0.1 close-out | — | Move DESIGN's inline TODOs to the workboard and fix its retired pointers |
-| docs-governance#8 | docs | S | agent | v0.2 wave D | — | Scrub retired phase numbers and line pointers from the plan docs; settle the optimizer-wiring rung |
-| docs-governance#9 | api | S | maintainer | v0.2 wave B | P4 | Name the estimation API once, in the P4 plan |
-| docs-governance#10 | consolidation | M | maintainer | v0.2 wave D | D2 | Add the DESIGN research-lane trim to D2 as a row with its three moves |
-| docs-governance#11 | docs | M | agent | v0.2 wave C | C1 | Re-audit pyro-port-remaining against the code before the migration guide |
-| docs-governance#12 | docs | S | agent | v0.1 close-out | — | Drop tests/README's stale module census and the duplicated smoke-policy lines |
-| docs-governance#13 | docs | S | maintainer | v0.1 close-out | — | Name who owns ROADMAP §5 and §6 in the AGENTS lanes |
+| docs-gov#0 | tooling | M | agent | v0.2 wave D | — | Generate docs/api from the teaching-surface registry |
+| docs-gov#1 | test | S | agent | v0.2 wave D | T2, T3, T5, T6 | Make the RULES 5.8 check a ratchet over every System-family class |
+| docs-gov#2 | test | S | agent | v0.2 wave D | — | Test that ROADMAP §5 step ids and TODO rows agree |
+| docs-gov#3 | docs | S | agent | v0.2 wave D | — | Give plan-doc steps ids that cannot collide with the workboard's |
+| docs-gov#4 | docs | S | agent | v0.1 close-out | — | Align RULES 3.3's teaching-surface definition with ROADMAP §2 |
+| docs-gov#5 | consolidation | S | agent | v0.1 close-out | — | Keep the CI commands in one place and name every job |
+| docs-gov#6 | consolidation | S | agent | v0.2 wave D | — | Delete DESIGN §8's Package roles table (a stale copy of §3) |
+| docs-gov#7 | docs | S | agent | v0.1 close-out | — | Move DESIGN's inline TODOs to the workboard and fix its retired pointers |
+| docs-gov#8 | docs | S | agent | v0.2 wave D | — | Scrub retired phase numbers and line pointers from the plan docs; settle the optimizer-wiring rung |
+| docs-gov#9 | api | S | maintainer | v0.2 wave B | P4 | Name the estimation API once, in the P4 plan |
+| docs-gov#10 | consolidation | M | maintainer | v0.2 wave D | D2 | Add the DESIGN research-lane trim to D2 as a row with its three moves |
+| docs-gov#11 | docs | M | agent | v0.2 wave C | C1 | Re-audit pyro-port-remaining against the code before the migration guide |
+| docs-gov#12 | docs | S | agent | v0.1 close-out | — | Drop tests/README's stale module census and the duplicated smoke-policy lines |
+| docs-gov#13 | docs | S | maintainer | v0.1 close-out | — | Name who owns ROADMAP §5 and §6 in the AGENTS lanes |
 
 Bugs:
 
-- **bug docs-governance#0** (low) DESIGN §6 documents `Distribution.mean()` as a method; it is an attribute and the call raises — `DESIGN.md:925`
-- **bug docs-governance#1** (low) DESIGN §5 points at a diagnostics script that does not exist — `DESIGN.md:824-825`
-- **bug docs-governance#2** (low) RULES 7.6 says there is no link checker in CI; `test_repo_contract.py` checks links in the CI `test` job — `RULES.md:456-458`
-- **bug docs-governance#3** (low) tests/README.md claims 22 domain test modules; 45 exist — `tests/README.md:135-141`
-- **bug docs-governance#4** (low) AGENTS.md says CI runs "exactly" three things; the workflow also has a `packaging` job — `AGENTS.md:86`
-- **bug docs-governance#5** (medium) pyro-port-remaining marks landed features as TODO (`ss2tf`, `TrajectoryLQRController`, dedicated PI/PD) — `docs/plans/pyro-port-remaining.md:34, 43, 44, 288, 293`
-- **bug docs-governance#6** (low) `estimation/` and `identification/` package docstrings point at a ROADMAP section that no longer exists and pre-name an API the plan contradicts — `minilink/estimation/__init__.py:8, 11`
+- **bug docs-gov#0** (low) DESIGN §6 documents `Distribution.mean()` as a method; it is an attribute and the call raises — `DESIGN.md:925`
+- **bug docs-gov#1** (low) DESIGN §5 points at a diagnostics script that does not exist — `DESIGN.md:824-825`
+- **bug docs-gov#2** (low) RULES 7.6 says there is no link checker in CI; `test_repo_contract.py` checks links in the CI `test` job — `RULES.md:456-458`
+- **bug docs-gov#3** (low) tests/README.md claims 22 domain test modules; 45 exist — `tests/README.md:135-141`
+- **bug docs-gov#4** (low) AGENTS.md says CI runs "exactly" three things; the workflow also has a `packaging` job — `AGENTS.md:86`
+- **bug docs-gov#5** (medium) pyro-port-remaining marks landed features as TODO (`ss2tf`, `TrajectoryLQRController`, dedicated PI/PD) — `docs/plans/pyro-port-remaining.md:34, 43, 44, 288, 293`
+- **bug docs-gov#6** (low) `estimation/` and `identification/` package docstrings point at a ROADMAP section that no longer exists and pre-name an API the plan contradicts — `minilink/estimation/__init__.py:8, 11`

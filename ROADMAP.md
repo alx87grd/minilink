@@ -200,7 +200,14 @@ term's hygiene:
   `main`, `refactor-v4` and `dev-alex`; add the branch the work happens on
   (`dev`) or the gate never runs before a merge. **[ask]**
 - **R3** Keep `ruff check .` and `ruff format --check .` green on every
-  push (the 2026-09-22 pass restored them after the racecar demos landed).
+  push (the 2026-09-22 pass restored them after the racecar demos landed),
+  with pre-commit hooks so the check runs itself.
+- **S58** Fix the bugs the 2026-09-22 improvement scan reported
+  ([docs/reviews/2026-09-22-improvement-suggestions.md](docs/reviews/2026-09-22-improvement-suggestions.md)),
+  among them: `discretize()` cannot step a closed loop, the CI merge gate
+  runs no JAX test, and time grids end one sample past `tf`.
+- **S59** Docs drift and **S60** the teaching surface checked by a test and
+  documented page by page.
 - **S49** Retire the two Stable-Baselines3 teaching notebooks once the
   course notes point only at the native twins. **[ask]**
 - **S54** `plot_cost2go` colour scale clipped at `out_of_bound_cost`.
@@ -248,7 +255,8 @@ names exist; three of them are not yet the objects the tools carry.
 - **B4** Polish: **P9** `TransferFunction` ports built once, **P10** the
   three `@` dispatch paths documented and pinned by a test; **P6** the z tier
   stays held (teach with `discretize` + simulation) unless the sommatif
-  examines z-plane analysis.
+  examines z-plane analysis; **S61** every analysis verb takes a `System`;
+  **S62** the LQR family on the control band facade. **[ask — public names]**
 - **B5** **P11** the two GRO501 notebooks (APP2 propulsion, APP4 autopilot),
   Basic tier, Colab-first. **[maintainer]**
 
@@ -264,6 +272,9 @@ names exist; three of them are not yet the objects the tools carry.
 - **C5** RL follow-ups: **S50** SAC actor step, **S51** policy iteration on
   the grid, **S52** deep Q-learning; approximate dynamic programming on the
   approximation bases.
+- **S63** DP reads a finite horizon from `problem.tf`, as LQR does; **S64**
+  catalog hygiene (bounds each plant states, port labels read from the
+  state, one wheelbase owner). **[ask]**
 
 **Wave D — the code reads like the textbook, and the demos like the API.**
 Standing work, behaviour-preserving, one module per step.
@@ -287,6 +298,12 @@ Standing work, behaviour-preserving, one module per step.
   duplication; `HybridSimulator` conventions; realtime review;
   `StepDiagramSystem.step` writes in place under JAX; camera hints (S43);
   `rollout_batch` family profile (S53).
+- **T7** The graphical band joins the textbook pass. **S65** One owner per
+  rule (the automatic `dt`, the backend fallback, the input-hold model, the
+  Monte Carlo defaults); **S66** wiring mistakes fail at wiring time
+  **[ask — core]**; **S67** one plot vocabulary; **S68** contracts as tests
+  (the RULES 5.8 ratchet, ROADMAP ids against the workboard, every notebook
+  executed nightly).
 
 ### 5.3 v1.0 — one `System`, closed (2027)
 
@@ -344,8 +361,23 @@ here. Each open item needs the maintainer.
   controller)` block with ports `r`, `y` → `u`, or an explicit `connect`
   recipe in the notebook.
 
+**Before the tag (R1)**
+
+- **`plot_diagram()` without the `graphviz` wrapper**: warn, as a missing
+  binary already does, or move the pure-Python wrapper into the base
+  dependencies (the binary stays optional). Every tutorial calls it.
+
 **During v0.2**
 
+- **Undeclared feedthrough** (S66): an output that moves with an input it
+  does not declare simulates a wrong fixed point silently today; raise or
+  warn at compile.
+- **Mechanical default bounds** (S64): keep the invented ±2π / ±5 on every
+  `MechanicalSystem`, or each plant states its own and `StateSpaceGrid`
+  refuses infinite bounds.
+- **`JaxMechanicalSystem`**: retire the twin (an alias for one release) now
+  that the `xp` base traces.
+- **`PlanningProblem.metadata`**: document it or retire it.
 - **The z tier** (P6): teach the Arduino law with `discretize` + simulation
   (default), or build a z-domain analysis family. Depends on what the
   sommatif examines.
@@ -366,7 +398,9 @@ here. Each open item needs the maintainer.
 
 **Before v1.0**
 
-- `HybridDiagram` as a `System` vs `HybridLoop` (S31).
+- `HybridDiagram` as a `System` vs `HybridLoop` (S31), and the sampled
+  seam's time argument: integer ticks (today) or seconds, which would remove
+  three copies of `t0` / `dt_mpc` in the MPC block.
 - Evaluator / solver layering, Diffrax (S37, S27).
 - The posed-geometry hook (S44) and the glyph / solid rename (S30).
 - Zenodo / DOI, and whether JOSS is wanted (V2).
