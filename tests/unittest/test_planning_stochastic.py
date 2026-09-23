@@ -259,6 +259,51 @@ def test_score_trajectory_cuts_at_the_exit_and_charges_the_problem_price():
     assert not failed and np.isclose(J, 1.0)
 
 
+def test_every_backend_scores_the_constraint_set_on_its_parameters_and_time():
+    """A parametric, time-varying X is read with problem.params.sets at each sample time."""
+    from minilink.control import StateFeedbackController
+    from minilink.core.backends import array_module
+    from minilink.core.sets import Set
+    from minilink.planning.evaluation import MonteCarloEvaluator
+    from minilink.planning.problems import ProblemParameters
+
+    class Band(Set):
+        """|z_i| <= r - 0.2 t: a band narrowing from its half-width r (1 by default)."""
+
+        def margin(self, z, t=0.0, params=None):
+            r0 = 1.0 if params is None else params["r"]
+            xp = array_module(z)
+
+            r = r0 - 0.2 * t
+
+            return xp.concatenate([z + r, r - z])
+
+    plant = pendulum()
+    ctl = StateFeedbackController(K=[[-20.0, 0.0]])  # u = 20 theta: the loop diverges
+    backends = ("numpy", "simulator") + (("jax",) if jax_available() else ())
+    for r, leaves in ((0.5, True), (3.0, False)):
+        problem = PlanningProblem(
+            plant,
+            x_start=[0.1, 0.0],
+            cost=quadratic(plant),
+            tf=np.inf,
+            X=Band(),
+            params=ProblemParameters(sets={"r": r}),
+            infeasible_cost=1.0,
+        )
+        reports = {
+            backend: MonteCarloEvaluator(
+                problem, dt=0.01, n_trials=1, episode_length=1.0, backend=backend
+            ).evaluate(ctl)
+            for backend in backends
+        }
+        assert all(bool(report.failed[0]) == leaves for report in reports.values())
+        if "jax" in reports:
+            np.testing.assert_allclose(reports["numpy"].J, reports["jax"].J, rtol=1e-6)
+        # the simulator integrates the continuous-time loop: same contract, O(dt) apart
+        np.testing.assert_allclose(reports["simulator"].J, reports["numpy"].J, rtol=0.1)
+
+
 @pytest.mark.optional
 @pytest.mark.jax
 def test_monte_carlo_backends_share_the_score_on_identical_starts():

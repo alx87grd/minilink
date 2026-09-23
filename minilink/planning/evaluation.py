@@ -22,12 +22,19 @@ def score_trajectory(problem, traj: Trajectory, params=None, infeasible_cost=np.
 
     ``traj`` carries the states and the applied inputs on a time grid;
     ``params`` are the cost parameters. ``failed`` is ``True`` when the
-    trajectory left ``X`` before the end of the grid; the trial is then charged
+    trajectory left ``X`` (read at each sample time on the problem's set
+    parameters) before the end of the grid; the trial is then charged
     the problem's ``infeasible_cost``, else ``infeasible_cost`` given here (an
     evaluator passes the bound its environment derived; ``+inf`` otherwise).
     """
     cost = problem.require_cost()
-    inside = np.array([problem.X.contains(traj.x[:, k]) for k in range(traj.n_samples)])
+    X, set_params = problem.X, problem.params.sets
+    inside = np.array(
+        [
+            X.contains(traj.x[:, k], float(traj.t[k]), set_params)
+            for k in range(traj.n_samples)
+        ]
+    )
     failed = not bool(inside.all())
     last = int(np.argmin(inside)) if failed else traj.n_samples - 1
     kept = Trajectory(
