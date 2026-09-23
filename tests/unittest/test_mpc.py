@@ -900,6 +900,24 @@ class TestMPCNumPyRebuild(unittest.TestCase):
         self.assertEqual(len(n_compile_parametric), 0)
 
 
+class TestMpcComputerScheduleCheck(unittest.TestCase):
+    def test_rejected_schedule_keeps_dual_rate_computer(self):
+        """A rejected ``mpc % dt`` leaves the block's dual-rate divisor and hook alone."""
+        planner = _make_numpy_planner(0.5)
+        mpc = ModelPredictiveController(planner, dt_mpc=0.2, warm_start=True)
+        computer = mpc.dual_rate_computer(dt_broadcast=0.05)
+        with self.assertRaises(ValueError):
+            mpc % 0.5
+        computer.compile()
+        computer.reset()
+        for _ in range(5):
+            out = computer.tick(np.array([0.5]))
+        # The after-solve hook builds the nominal cache the broadcast leaf reads,
+        # and the divisor maps base tick 4 to replan tick 1: t_solve = dt_mpc.
+        self.assertTrue(np.all(np.isfinite(out["u_nom"])))
+        self.assertAlmostEqual(mpc.latch.last_t_solve, 0.2)
+
+
 from minilink.control.mpc import (
     ModelPredictiveController,
     mpc_animation_overlays,

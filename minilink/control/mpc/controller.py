@@ -797,27 +797,21 @@ def export_mpc_to_computer(
     dt_mpc: float | None = None,
 ) -> "Computer":
     """
-    Build a :class:`~minilink.simulation.computer.Computer` from an MPC block.
+    Build a single-rate :class:`~minilink.simulation.computer.Computer` from an MPC block.
 
-    Warm-start blocks (``ModelPredictiveController(..., warm_start=True)``)
-    default ``schedule`` from ``dt_mpc``. Algebraic (``warm_start=False``)
-    blocks require an explicit ``schedule``.
+    ``schedule`` defaults to ``dt_mpc`` (the block's own when not passed); a
+    given ``schedule`` must tick at ``dt_mpc``. Once the schedule is accepted,
+    the export undoes the dual-rate hooks a ``dual_rate_computer`` call left on
+    the block; a rejected schedule leaves the block as it was.
     """
     from minilink.simulation.computer import StepSchedule, as_computer
-
-    # Single-rate path: undo any dual-rate hooks left on the block.
-    if hasattr(block, "_replan_divisor"):
-        block._replan_divisor = 1
-    latch = getattr(block, "_latch", None)
-    if latch is not None and hasattr(latch, "set_after_solve"):
-        latch.set_after_solve(None)
 
     block_dt = dt_mpc if dt_mpc is not None else getattr(block, "_dt_mpc", None)
     if schedule is None:
         if block_dt is None:
             raise ValueError(
-                "schedule is required for algebraic ModelPredictiveController "
-                "(warm_start=False); pass export_to_computer(dt_mpc) or use mpc % dt"
+                "schedule is required when the block has no dt_mpc; "
+                "pass a schedule or dt_mpc=..."
             )
         schedule = StepSchedule(dt_base=float(block_dt))
     elif block_dt is not None:
@@ -828,7 +822,15 @@ def export_mpc_to_computer(
             raise ValueError(
                 f"schedule dt_base={dt_sched} does not match block dt_mpc={block_dt}"
             )
-    return as_computer(block, schedule)
+    computer = as_computer(block, schedule)
+
+    # Single-rate path: undo any dual-rate hooks left on the block.
+    if hasattr(block, "_replan_divisor"):
+        block._replan_divisor = 1
+    latch = getattr(block, "_latch", None)
+    if latch is not None and hasattr(latch, "set_after_solve"):
+        latch.set_after_solve(None)
+    return computer
 
 
 def export_mpc_dual_rate_computer(block, *, dt_broadcast: float) -> "Computer":
