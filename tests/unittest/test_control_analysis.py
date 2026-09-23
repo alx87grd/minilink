@@ -1162,14 +1162,19 @@ class TestDiscretize(unittest.TestCase):
 
     def test_discretize_keeps_the_y_metadata(self):
         plant = Pendulum()
+        plant.outputs["y"].lower_bound = np.array([-np.pi, -8.0])
+        plant.outputs["y"].upper_bound = np.array([np.pi, 8.0])
         step_leaf = discretize(plant, 0.05)
         y_port, plant_y = step_leaf.outputs["y"], plant.outputs["y"]
         self.assertEqual(y_port.labels, plant_y.labels)
         self.assertEqual(y_port.units, plant_y.units)
+        np.testing.assert_array_equal(y_port.lower_bound, [-np.pi, -8.0])
+        np.testing.assert_array_equal(y_port.upper_bound, [np.pi, 8.0])
 
     def test_discretize_keeps_source_x0_and_signal_metadata(self):
         plant = Pendulum()
         plant.x0 = np.array([0.5, 0.0])
+        plant.inputs["u"].nominal_value = np.array([0.3])
         step_leaf = discretize(plant, 0.05)
         np.testing.assert_array_equal(step_leaf.x0, plant.x0)
         self.assertEqual(step_leaf.state.labels, plant.state.labels)
@@ -1179,7 +1184,9 @@ class TestDiscretize(unittest.TestCase):
         )
         u_port, plant_u = step_leaf.inputs["u"], plant.inputs["u"]
         self.assertEqual(u_port.labels, plant_u.labels)
+        self.assertEqual(u_port.units, plant_u.units)
         np.testing.assert_array_equal(u_port.lower_bound, plant_u.lower_bound)
+        np.testing.assert_array_equal(u_port.nominal_value, [0.3])
         rollout = step_leaf.compute_rollout(n_steps=3, u=np.zeros((3, 1)))
         self.assertGreater(np.abs(rollout.x[0, -1]), 0.4)
 
