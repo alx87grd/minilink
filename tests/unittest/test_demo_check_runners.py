@@ -124,8 +124,24 @@ class TestDemoCheckRunners(unittest.TestCase):
 
 
 # Runners skip an entry when ``importlib.util.find_spec(name)`` is None for one
-# of its ``requires``, so each name must be an import name, not a distribution.
-_MODULE_NAME = re.compile(r"[A-Za-z_]\w*(\.[A-Za-z_]\w*)*")
+# of its ``requires``, so each name must be an import name, not a distribution
+# name (``stable-baselines3``, ``pyyaml``): a wrong name skips forever. These
+# are the import names of the pyproject extras plus stable_baselines3; add one
+# here when a manifest first requires a new package.
+_OPTIONAL_IMPORT_NAMES = frozenset(
+    {
+        "cyipopt",
+        "graphviz",
+        "gymnasium",
+        "jax",
+        "jaxlib",
+        "meshcat",
+        "plotly",
+        "pygame",
+        "stable_baselines3",
+        "sympy",
+    }
+)
 _REQUIRES_MANIFESTS = (
     "tests/demo_checks/flagship_manifest.json",
     "tests/demo_checks/notebook_overrides.json",
@@ -151,14 +167,14 @@ def _without_graphviz():
 
 
 class TestDemoCheckManifests(unittest.TestCase):
-    def test_requires_are_module_names(self):
+    def test_requires_are_import_names(self):
         for relative_path in _REQUIRES_MANIFESTS:
             manifest = _load_json(relative_path)
             entries = manifest.values() if isinstance(manifest, dict) else manifest
             for entry in entries:
                 for name in entry.get("requires") or []:
                     with self.subTest(manifest=relative_path, name=name):
-                        self.assertIsNotNone(_MODULE_NAME.fullmatch(name))
+                        self.assertIn(name, _OPTIONAL_IMPORT_NAMES)
 
     def test_graphics_demo_ids_name_flagships(self):
         flagship_ids = {
