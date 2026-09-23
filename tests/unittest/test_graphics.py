@@ -1631,6 +1631,19 @@ class TestAnimationFrameSchedule(unittest.TestCase):
         self.assertGreater(schedule.interval_ms, 0.0)
         Pendulum().animate(traj, show=False, html=False)
 
+    def test_zero_duration_trajectory_shows_every_sample(self):
+        from minilink.graphical.animation.renderers.timing import sim_index_for_frame
+
+        traj = Trajectory(
+            t=np.zeros(3),
+            x=np.array([[1.0, 1.1, 1.2], [0.0, 0.0, 0.0]]),
+            u=np.zeros((1, 3)),
+        )
+        schedule = trajectory_frame_schedule(traj, 1.0)
+        self.assertEqual(schedule.n_frames, 3)
+        self.assertEqual(sim_index_for_frame(schedule.n_frames - 1, schedule), 2)
+        Pendulum().animate(traj, show=False, html=False)
+
 
 class TestGifExport(unittest.TestCase):
     """``animate(save=True)`` with matplotlib writes ``{file_name}.gif`` exactly once."""

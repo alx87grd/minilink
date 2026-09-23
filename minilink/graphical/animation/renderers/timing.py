@@ -28,11 +28,12 @@ def trajectory_frame_schedule(
     compute wall-clock interval between displayed frames.
 
     Frames sit on every ``skip_steps``-th sample and the last frame is always
-    the final sample. A one-sample trajectory is a single still frame.
+    the final sample. A trajectory with no duration (one sample, or every sample
+    at one instant) shows each sample for one frame.
     """
     nsteps = int(traj.t.size)
     frame_dt = 1.0 / target_fps
-    if nsteps < 2:
+    if nsteps < 2 or traj.t[-1] == traj.t[0]:
         return AnimationFrameSchedule(
             nsteps=nsteps,
             skip_steps=1,
