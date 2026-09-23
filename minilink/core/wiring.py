@@ -16,6 +16,7 @@ import numpy as np
 
 from minilink.core.backends import array_module
 from minilink.core.signals import OutputPort, VectorSignal
+from minilink.core.system import DEFAULT_SMALLEST_TIME_CONSTANT
 
 if TYPE_CHECKING:
     from minilink.core.diagram import DiagramSystem
@@ -248,12 +249,29 @@ class WiredDiagramMixin:
         self.refresh_solver_info()
 
     def refresh_solver_info(self):
-        """Bubble subsystem solver hints to the diagram root."""
+        """Bubble subsystem solver hints to the diagram root.
+
+        The diagram is discontinuous when any subsystem is. Its smallest time
+        constant is the smallest one among the subsystems that carry one: every
+        stateful subsystem, and a stateless block that sets its own. A static
+        block left at the default has no time constant and does not pin the
+        diagram to the default.
+        """
         if not hasattr(self, "solver_info"):
             return
         self.solver_info["discontinuous_behavior"] = any(
             subsystem.solver_info.get("discontinuous_behavior", False)
             for subsystem in self.subsystems.values()
+        )
+        time_constants = []
+        for subsystem in self.subsystems.values():
+            tau = subsystem.solver_info.get(
+                "smallest_time_constant", DEFAULT_SMALLEST_TIME_CONSTANT
+            )
+            if subsystem.n > 0 or tau != DEFAULT_SMALLEST_TIME_CONSTANT:
+                time_constants.append(tau)
+        self.solver_info["smallest_time_constant"] = min(
+            time_constants, default=DEFAULT_SMALLEST_TIME_CONSTANT
         )
 
     def subsystem_id(self, subsystem):

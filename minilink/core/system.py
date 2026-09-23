@@ -19,6 +19,9 @@ from minilink.core.signals import InputPort, OutputPort, VectorSignal
 if TYPE_CHECKING:
     from minilink.core.diagram import DiagramSystem
 
+# Solver hint of a system that declares no time constant of its own (seconds).
+DEFAULT_SMALLEST_TIME_CONSTANT = 0.001
+
 
 class System(SharedSystemFacades):
     """Static input-output shell: ports, parameters, metadata, and facades.
@@ -99,7 +102,7 @@ class System(SharedSystemFacades):
 
         # Solver hints used by high-level simulation shortcuts.
         self.solver_info = {
-            "smallest_time_constant": 0.001,
+            "smallest_time_constant": DEFAULT_SMALLEST_TIME_CONSTANT,
             "discontinuous_behavior": False,
         }
 

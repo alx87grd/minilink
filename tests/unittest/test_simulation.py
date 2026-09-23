@@ -1055,6 +1055,21 @@ class TestAutomaticTimeGrid(unittest.TestCase):
         self.assertEqual(sim.solver_mode, "euler")
         self.assertAlmostEqual(sim.dt, 0.005)
 
+    def test_loop_takes_dt_from_its_plant_time_constant(self):
+        from minilink import Integrator, Pendulum, StateFeedbackController
+
+        plant = Pendulum()
+        plant.solver_info["smallest_time_constant"] = 0.5
+        controller = StateFeedbackController(np.array([[10.0, 2.0]]))
+
+        alone = Simulator(plant, tf=1.0, solver="euler", verbose=False)
+        loop = Simulator(controller @ plant, tf=1.0, solver="euler", verbose=False)
+        np.testing.assert_array_equal(loop.t, alone.t)  # dt = 0.05, not 1e-4
+
+        # a stateful block without a hint keeps the conservative default
+        with_filter = controller @ plant + Integrator()
+        self.assertEqual(with_filter.solver_info["smallest_time_constant"], 0.001)
+
     def test_explicit_grid_still_wins(self):
         sim = Simulator(StableLinearSystem(), tf=1.0, n_steps=51, verbose=False)
         self.assertEqual(sim.n_pts, 51)
