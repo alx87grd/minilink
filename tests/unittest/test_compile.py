@@ -1064,6 +1064,31 @@ class TestEquationShapeValidation(unittest.TestCase):
         self.assertIn("step() of", str(ctx.exception))
         self.assertIn("(plant)", str(ctx.exception))
 
+    def test_step_diagram_compile_probes_each_hook_once(self):
+        from minilink.core.diagram import StepDiagramSystem
+        from minilink.core.system import StepSystem
+
+        class CountingStep(StepSystem):
+            def __init__(self):
+                super().__init__(n=1, input_dim=1, output_dim=1)
+                self.calls = {"step": 0, "h": 0}
+
+            def step(self, x, u, k=0, params=None):
+                self.calls["step"] += 1
+                return np.array([0.5 * x[0] + u[0]])
+
+            def h(self, x, u, t=0, params=None):
+                self.calls["h"] += 1
+                return np.array([x[0]])
+
+        block = CountingStep()
+        diagram = StepDiagramSystem()
+        diagram.add_subsystem(block, "plant")
+        diagram.add_input_port("u")
+        diagram.connect("input", "u", "plant", "u")
+        diagram.compile()
+        self.assertEqual(block.calls, {"step": 1, "h": 1})
+
     def test_wrong_f_shape_raises_from_compute_trajectory(self):
         with self.assertRaises(ValueError):
             self._bad_f().compute_trajectory(tf=1.0, verbose=False)
