@@ -8,7 +8,10 @@ composition.
 
 from __future__ import annotations
 
+import numpy as np
+
 from minilink.core.composition import (
+    _new_diagram_like,
     _propagate_animation_camera,
     default_computer_boundary_ports,
     resolve_standard_feedback,
@@ -38,6 +41,10 @@ def hybrid_closed_loop(
     """
     Build a canonical computer ↔ plant feedback :class:`HybridDiagram`.
 
+    The plant is not modified: when a plant diagram lacks a boundary port the
+    loop needs, the loop gets a new diagram with the same blocks, ids, wiring
+    and ``x0``, and the port is added there.
+
     Parameters
     ----------
     computer_side : System or StepDiagramSystem
@@ -66,12 +73,13 @@ def hybrid_closed_loop(
         computer_in=computer_in,
         computer_out=computer_out,
     )
-    _ensure_plant_boundary_ports(
+    plant_diagram = _ensure_plant_boundary_ports(
         plant_diagram,
         sys_id=_leaf_sys_id(plant, default="plant"),
         plant_in=plant_in,
         plant_out=plant_out,
         output_port=output_port,
+        in_place=plant_diagram is not plant,
     )
 
     if isinstance(schedule, StepSchedule):
@@ -295,11 +303,24 @@ def _ensure_plant_boundary_ports(
     plant_in: str,
     plant_out: str,
     output_port: str,
-) -> None:
+    in_place: bool,
+) -> DiagramSystem:
+    """Return *diagram* with the loop's plant boundary ports.
+
+    Missing ports are added to *diagram* itself only when ``in_place`` (a
+    diagram built here around a leaf plant); a user's plant diagram is left
+    unchanged and the ports go on a new diagram with its ids, wiring and ``x0``.
+    """
     if sys_id is None:
-        return
+        return diagram
     subsystem = diagram.subsystems[sys_id]
-    if plant_in in subsystem.inputs and plant_in not in diagram.inputs:
+    add_input = plant_in in subsystem.inputs and plant_in not in diagram.inputs
+    add_output = plant_out in subsystem.outputs and output_port not in diagram.outputs
+    if not in_place and (add_input or add_output):
+        x0 = np.copy(diagram.x0)
+        diagram = _new_diagram_like(diagram)
+        diagram.x0 = x0
+    if add_input:
         port = subsystem.inputs[plant_in]
         diagram.add_input_port(
             plant_in,
@@ -307,5 +328,6 @@ def _ensure_plant_boundary_ports(
             nominal_value=port.nominal_value,
         )
         diagram.connect("input", plant_in, sys_id, plant_in)
-    if plant_out in subsystem.outputs and output_port not in diagram.outputs:
+    if add_output:
         diagram.connect_new_output_port(sys_id, plant_out, output_port)
+    return diagram

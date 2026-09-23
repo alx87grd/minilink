@@ -490,6 +490,9 @@ deliberate: subsystem operands are always shared references (never copied), so a
 "fresh" diagram would only pretend to isolate state; in-place extension keeps
 `a >> b >> c` chains cheap and the object identity honest. Build a new
 `DiagramSystem` explicitly when you need an independent topology.
+`@` (both the continuous loop `ctl @ plant` and the sampled loop
+`ctl % dt @ plant`) and `feedback()` return a new diagram and never modify
+their operands; only `+` and `>>` extend a shortcut-built left diagram in place.
 
 **Shortcut subsystem ids** default by role: `ref` (sources), `ctl` (controllers),
 `sys` (stateful plants), with numeric suffix on collision (`sys2`, …). Override

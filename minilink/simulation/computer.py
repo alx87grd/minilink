@@ -240,6 +240,7 @@ class Computer:
 
         ``computer @ plant`` returns a :class:`~minilink.core.hybrid_diagram.HybridDiagram`
         with the same port-resolution rules as continuous ``ctl @ plant``.
+        Like the continuous ``@``, it leaves a plant diagram unchanged.
         """
         from minilink.core.hybrid_composition import (
             hybrid_closed_loop,

@@ -114,6 +114,32 @@ class TestHybridClosedLoop(unittest.TestCase):
         hybrid = computer @ _build_plant_diagram()
         self.assertEqual(len(hybrid.connections), 2)
 
+    def test_sampled_loop_leaves_plant_diagram_alone(self):
+        integrator = Integrator()
+        plant = DiagramSystem()
+        plant.add_subsystem(integrator, "integ")
+        plant.x0 = np.array([0.7])
+        hybrid = (ProportionalController(0.5) % 0.01) @ plant
+        self.assertEqual((list(plant.inputs), list(plant.outputs)), ([], []))
+        self.assertEqual(plant.connections, {"integ": {"u": None}})
+        self.assertEqual(list(hybrid.plant.subsystems), ["integ"])
+        self.assertIs(hybrid.plant.subsystems["integ"], integrator)
+        self.assertEqual(list(hybrid.plant.inputs), ["u"])
+        self.assertEqual(list(hybrid.plant.outputs), ["y"])
+        hybrid_closed_loop(ProportionalController(0.5), plant, schedule=0.01)
+        self.assertEqual((list(plant.inputs), list(plant.outputs)), ([], []))
+
+        leaf = Integrator()
+        leaf.x0 = np.array([0.7])
+        reference = (ProportionalController(0.5) % 0.01) @ leaf
+        runs = [
+            loop.compute_forced(
+                np.array([1.0]), t0=0, tf=0.05, input_port_id="r", verbose=False
+            )
+            for loop in (hybrid, reference)
+        ]
+        np.testing.assert_array_equal(runs[0].plant.x, runs[1].plant.x)
+
     def test_leaf_system_wrapping(self):
         hybrid = hybrid_closed_loop(
             ProportionalController(0.3), Integrator(), schedule=0.01
