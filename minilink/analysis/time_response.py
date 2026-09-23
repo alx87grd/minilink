@@ -77,14 +77,14 @@ def step_info(time, y) -> StepInfo:
     # y_∞ = last sample if the tail stays in the 2 % band, else nan
     # rise:      t(90%) − t(10%) of y_∞, from rest (y_0 = 0), signed
     # settling:  last time |y − y_∞| leaves the 2 % band
-    # overshoot: 100 · (|peak| − |y_∞|) / |y_∞|
+    # overshoot: 100 · (max sign(y_∞)·y − |y_∞|) / |y_∞|, signed
     final = y[-1]
     peak_index = int(np.argmax(np.abs(y)))
     peak = y[peak_index]
     return StepInfo(
         _rise_time(time, y, final),
         _settling_time(time, y, final),
-        _overshoot(peak, final),
+        _overshoot(y, final),
         float(peak),
         float(time[peak_index]),
         _steady_state(time, y, final),
@@ -129,10 +129,12 @@ def _steady_state(time, y, final):
     return float(final) if settled else float(np.nan)
 
 
-def _overshoot(peak, final):
+def _overshoot(y, final):
     if final == 0.0:
         return float(np.nan)
-    return float(100.0 * max((abs(peak) - abs(final)) / abs(final), 0.0))
+    # signed toward y_∞, so an undershoot (a zero in the right half plane) never counts
+    highest = np.max(np.sign(final) * y)
+    return float(100.0 * max((highest - abs(final)) / abs(final), 0.0))
 
 
 def _rise_time(time, y, final):

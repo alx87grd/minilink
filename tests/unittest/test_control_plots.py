@@ -125,6 +125,17 @@ class TestLinearCore(unittest.TestCase):
         info = step_info(t, linear.step_response(*_matrices(tf), t))
         self.assertAlmostEqual(info.rise_time, 4.631 - 1.483, places=2)
 
+    def test_step_info_undershoot_is_not_overshoot(self):
+        # G(s) = (1 - 5s) / (s + 1)²: y = 1 - (1 + 6t) e^(-t) dips to -1.608 at t = 5/6 s
+        # and then rises to 1 from below, so the overshoot is 0 while |peak| > |y_∞|
+        tf = TransferFunction([-5.0, 1.0], [1.0, 2.0, 1.0])
+        t = np.linspace(0.0, 20.0, 20001)
+        info = step_info(t, linear.step_response(*_matrices(tf), t))
+        self.assertEqual(info.overshoot, 0.0)
+        self.assertAlmostEqual(info.peak, 1.0 - 6.0 * np.exp(-5.0 / 6.0), places=4)
+        info_negative = step_info(t, -linear.step_response(*_matrices(tf), t))
+        self.assertEqual(info_negative.overshoot, 0.0)
+
 
 class TestChannelTools(unittest.TestCase):
     """The system-level verbs share the family signature and the channel selectors."""
