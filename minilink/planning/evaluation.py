@@ -183,26 +183,28 @@ class MonteCarloEvaluator:
 
     # Internal machinery
 
-    def auto_backend(self, controller) -> str:
-        """``"jax"`` when JAX is installed and the plant, the law, ``X`` and the cost trace on it, else ``"numpy"``."""
+    def auto_backend(self, *controllers) -> str:
+        """``"jax"`` when JAX is installed and the plant, every law, ``X`` and the cost trace on it, else ``"numpy"``."""
         from minilink.core.backends import jax_installed
         from minilink.core.compile.compiler import compile_auto
 
         problem = self.problem
         if not jax_installed():
             return "numpy"
-        loop = [problem.sys] if int(controller.m) == 0 else [problem.sys, controller]
+        feedback = [controller for controller in controllers if int(controller.m) > 0]
+        loop = [problem.sys, *feedback]
         numpy_only = [block.name for block in loop if compile_auto(block)[0] != "jax"]
         numpy_only += numpy_only_terms(problem)
         if not numpy_only:
             return "jax"
 
         # One seed, two random streams: random trials differ from a JAX-scored law's
+        culprits = ", ".join(dict.fromkeys(numpy_only))  # two lookup tables named once
         x0s = problem.sample_x0(np.random.default_rng(self.seed), n=self.n_trials)
         random_starts = bool(np.any(x0s != problem.x_start))
         if random_starts or problem.params_distribution or problem.disturbances:
             warnings.warn(
-                f"{', '.join(numpy_only)} does not trace on JAX: scored on NumPy, whose "
+                f"{culprits} does not trace on JAX: scored on NumPy, whose "
                 "draws of the starts, parameters and disturbances differ from the JAX "
                 "backend's for the same seed; pass backend='numpy' to score every "
                 "policy on the same draws",

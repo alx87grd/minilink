@@ -395,3 +395,37 @@ def test_compare_reads_the_solutions_side_by_side():
         compare(VI=vi.policy)
     with pytest.raises(ValueError):
         compare()
+
+
+@pytest.mark.optional
+@pytest.mark.jax
+def test_compare_scores_every_policy_on_one_backend_and_the_same_draws():
+    """The default backend is chosen once per race: NumPy for all when one law does not trace."""
+    from minilink.planning import compare
+
+    problem, vi, lqr = solved_pendulum()
+    spread = StochasticPlanningProblem(
+        problem.sys,
+        cost=problem.cost,
+        tf=np.inf,
+        X=problem.X,
+        infeasible_cost=500.0,
+        x0_distribution=Uniform([-0.5, -0.5], [0.5, 0.5]),
+    )
+    settings = dict(dt=0.1, n_trials=3, episode_length=1.0)
+    evaluator = MonteCarloEvaluator(spread, **settings)
+
+    # the lookup table runs on NumPy only, so the LQR law is scored there too
+    with pytest.warns(UserWarning, match="does not trace on JAX"):
+        scored = compare(VI=vi, LQR=lqr).evaluate(evaluator)
+    np.testing.assert_array_equal(
+        scored["VI"].evaluation.x0, scored["LQR"].evaluation.x0
+    )
+    on_numpy = MonteCarloEvaluator(spread, backend="numpy", **settings)
+    np.testing.assert_array_equal(scored["LQR"].evaluation.J, on_numpy.evaluate(lqr).J)
+    assert evaluator.backend == "auto"  # the caller's evaluator keeps its choice
+
+    # laws that all trace keep the JAX backend and its numbers
+    scored = compare(LQR=lqr).evaluate(evaluator)
+    on_jax = MonteCarloEvaluator(spread, backend="jax", **settings)
+    np.testing.assert_array_equal(scored["LQR"].evaluation.J, on_jax.evaluate(lqr).J)

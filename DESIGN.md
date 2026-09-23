@@ -868,7 +868,8 @@ simulation; the planner keeps one-line shortcuts to its latest solution.
 `compare(VI=..., LQR=..., PPO=...)` → `Comparison` reads named solutions
 side by side: `print` is the table of records and evaluations,
 `plot_control_law` / `plot_cost_to_go` / `plot_trajectory` the overlays on
-one scale, `evaluate(evaluator)` the same table with every policy scored on one evaluator's draws. `LQRPlanner
+one scale, `evaluate(evaluator)` the same table with every policy scored on one evaluator's draws (an `"auto"`
+backend is chosen once for all of them: NumPy when one law does not trace). `LQRPlanner
 (problem)` is the linear-quadratic method on a `QuadraticCost` problem: `A`,
 `B` at the cost's `(xbar, ubar)`, the algebraic Riccati equation for an
 infinite `tf`, the differential one swept from `S` for a finite `tf`; its

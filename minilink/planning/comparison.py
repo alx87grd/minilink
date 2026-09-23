@@ -11,12 +11,13 @@ nothing else: closing a loop and simulating it stays in the script,
 
 from __future__ import annotations
 
+from copy import copy
 from dataclasses import dataclass, replace
 
 import numpy as np
 
 from minilink.core.sets import is_finite_box
-from minilink.planning.evaluation import Evaluation
+from minilink.planning.evaluation import Evaluation, MonteCarloEvaluator
 from minilink.planning.results import PlanningSolution
 
 # Public API
@@ -89,7 +90,14 @@ class Comparison:
 
         Returns a new comparison whose solutions carry that ``evaluation``,
         so ``print(race.evaluate(evaluator))`` is the table with one yardstick.
+        A Monte Carlo evaluator's ``backend="auto"`` is chosen once for the
+        whole comparison: NumPy for every policy when one of them does not
+        trace on JAX, JAX otherwise.
         """
+        if isinstance(evaluator, MonteCarloEvaluator) and evaluator.backend == "auto":
+            policies = [solution.policy for solution in self.solutions.values()]
+            evaluator = copy(evaluator)
+            evaluator.backend = evaluator.auto_backend(*policies)
         return Comparison(
             {
                 name: replace(solution, evaluation=evaluator.evaluate(solution))
