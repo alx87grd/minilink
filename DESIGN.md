@@ -878,7 +878,8 @@ horizon and `h` is never charged (`problem.horizon_kind()`; the former
 `CostFunction.horizon` declaration is gone). How long to run an infinite-horizon
 problem is a tool setting, `episode_length` on the evaluator and the RL planner.
 A `CostFunction` states only its continuous `discount_rate` `rho`; planners
-convert it with `cost.discount_factor(dt)` (DP `alpha`, RL `gamma`). `X` is a hard constraint in every tool: a trajectory that
+convert it with `cost.discount_factor(dt)` (DP `alpha`, RL `gamma`);
+`weight * cost` keeps the rate and `a + b` refuses terms whose rates differ. `X` is a hard constraint in every tool: a trajectory that
 leaves it is a failure, with infinite cost. `X` is **unconstrained unless
 declared** (the whole state space; `X=sys.state.box` constrains the plant to its
 declared range); `U` defaults to the input ports' box, an actuator limit being

@@ -26,11 +26,15 @@ class CostFunction(ABC):
     on a :class:`~minilink.core.system.System`, so one model serves many
     planning problems.
 
-    Class attribute (override by assignment in a subclass or instance):
+    Class attribute (override it in the body of a subclass):
 
     - ``discount_rate``: continuous rate ``rho >= 0``; ``0`` is undiscounted.
       Planners convert it with :meth:`discount_factor` (value iteration's
       ``alpha`` and reinforcement learning's ``gamma`` are both ``exp(-rho dt)``).
+      The library costs are frozen dataclasses, so assigning it on one of their
+      instances raises. ``weight * cost`` keeps the cost's rate and ``a + b``
+      requires equal rates. A constructor field is planned (step A2,
+      docs/plans/cost-params.md).
     """
 
     discount_rate = 0.0
@@ -264,10 +268,26 @@ class SumCost(CostFunction):
     Additive cost ``J = sum_i J_i`` over several cost functions.
 
     Built by the ``+`` operator on :class:`CostFunction`; use it to add an
-    obstacle or traversability term to a base objective.
+    obstacle or traversability term to a base objective. The terms share one
+    ``discount_rate``; terms whose rates differ raise ``ValueError``.
     """
 
     terms: tuple
+
+    def __post_init__(self) -> None:
+        rates = sorted({float(cost.discount_rate) for cost in self.terms})
+        if len(rates) > 1:
+            raise ValueError(
+                f"SumCost terms have different discount rates {rates}; "
+                "one objective has one rate rho, so give every term the same "
+                "discount_rate"
+            )
+
+    @property
+    def discount_rate(self) -> float:
+        """The terms' common rate ``rho`` (``0`` for an empty sum)."""
+        terms = self.terms
+        return terms[0].discount_rate if terms else 0.0
 
     @classmethod
     def of(cls, *costs: CostFunction) -> "SumCost":
@@ -303,11 +323,17 @@ class ScaledCost(CostFunction):
     Cost scaled by a weight, ``J = weight * J0``.
 
     Built by the ``*`` operator on :class:`CostFunction`, so a weighted sum
-    reads as ``base + weight * obstacle_cost``.
+    reads as ``base + weight * obstacle_cost``. The weight leaves the
+    ``discount_rate`` of ``J0`` unchanged.
     """
 
     cost: CostFunction
     weight: float
+
+    @property
+    def discount_rate(self) -> float:
+        """The scaled cost's rate ``rho``."""
+        return self.cost.discount_rate
 
     def g(self, x, u, t=0.0, params=None):
         """Return the weighted running cost."""

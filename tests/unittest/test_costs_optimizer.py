@@ -87,6 +87,24 @@ def test_scaled_cost_weights():
     assert combo.g(x, u) == pytest.approx(3.0 * c.g(x, u))
 
 
+def test_scaled_and_summed_costs_keep_the_members_discount_rate():
+    class Discounted(QuadraticCost):
+        discount_rate = 0.5
+
+    d = Discounted(
+        Q=np.eye(2), R=np.eye(1), S=np.zeros((2, 2)), xbar=np.zeros(2), ubar=np.zeros(1)
+    )
+    assert (2.0 * d).discount_rate == 0.5
+    assert (d + d).discount_rate == 0.5
+    assert sum([d, 2.0 * d]).discount_rate == 0.5
+    assert (d + 2.0 * d).discount_factor(0.1) == pytest.approx(np.exp(-0.05))
+    t = np.linspace(0.0, 2.0, 21)
+    traj = Trajectory(t=t, x=np.ones((2, t.size)), u=np.ones((1, t.size)))
+    assert (2.0 * d).total_cost(traj) == pytest.approx(2.0 * d.total_cost(traj))
+    with pytest.raises(ValueError, match=r"0\.5"):
+        d + make_quadratic()
+
+
 def test_params_forwarded_to_terms():
     s = make_quadratic() + _ParamCost()
     x = np.array([1.0, 2.0])
