@@ -455,6 +455,54 @@ def test_randomized_parameters_reach_the_dynamics_on_both_backends():
     assert plant.params["m"] == 1.0  # the draw never touched the nominal plant
 
 
+def test_default_backend_scores_a_lookup_table_law_on_numpy():
+    """A DP law runs on NumPy only: the default falls back, an explicit JAX backend says why."""
+    import warnings
+
+    from minilink.control import StateFeedbackController
+    from minilink.planning.evaluation import MonteCarloEvaluator
+
+    plant = pendulum()
+    plant.inputs["u"].lower_bound = np.array([-5.0])
+    plant.inputs["u"].upper_bound = np.array([5.0])
+    task = dict(
+        cost=quadratic(plant), tf=np.inf, X=plant.state.box, infeasible_cost=500.0
+    )
+    problem = PlanningProblem(plant, x_start=[0.5, 0.0], **task)
+    vi = DynamicProgrammingPlanner(
+        problem, x_grid=(11, 11), u_grid=(3,), dt=0.1, alpha=0.95, tol=0.5
+    ).solve()
+    settings = dict(dt=0.1, n_trials=3, episode_length=1.0)
+
+    # one start: the NumPy trials are the JAX ones, the fallback is silent
+    with warnings.catch_warnings():
+        warnings.simplefilter("error")
+        report = MonteCarloEvaluator(problem, **settings).evaluate(vi)
+    on_numpy = MonteCarloEvaluator(problem, backend="numpy", **settings).evaluate(vi)
+    np.testing.assert_array_equal(report.J, on_numpy.J)
+    if not jax_available():
+        return
+
+    # random starts: NumPy draws other starts than a law scored on JAX, announced
+    spread = StochasticPlanningProblem(
+        plant, x0_distribution=Uniform([0.0, -0.5], [1.0, 0.5]), **task
+    )
+    with pytest.warns(UserWarning, match="same draws"):
+        report = MonteCarloEvaluator(spread, **settings).evaluate(vi)
+    on_numpy = MonteCarloEvaluator(spread, backend="numpy", **settings).evaluate(vi)
+    np.testing.assert_array_equal(report.J, on_numpy.J)
+
+    # an explicit JAX backend names the cause
+    with pytest.raises(RuntimeError, match="NumPy-only.*backend='numpy'"):
+        MonteCarloEvaluator(problem, backend="jax", **settings).evaluate(vi)
+
+    # a law that traces keeps the JAX backend and its numbers
+    law = StateFeedbackController(K=[[5.0, 1.0]])
+    on_jax = MonteCarloEvaluator(spread, backend="jax", **settings).evaluate(law)
+    report = MonteCarloEvaluator(spread, **settings).evaluate(law)
+    np.testing.assert_array_equal(report.J, on_jax.J)
+
+
 def test_deterministic_planner_warns_on_a_stochastic_problem():
     from minilink.planning.trajectory_optimization.planner import (
         TrajectoryOptimizationPlanner,

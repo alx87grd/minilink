@@ -124,8 +124,13 @@ class MonteCarloEvaluator:
         Number of draws.
     episode_length : float, optional
         Duration of each trial for an infinite-horizon problem (default 10 s).
-    backend : {"jax", "numpy", "simulator"}
-        See the module docstring.
+    backend : {"auto", "jax", "numpy", "simulator"}
+        ``"jax"`` vmaps the held-input rollout over the trials (static laws),
+        ``"numpy"`` runs the same trials one at a time, ``"simulator"``
+        integrates the continuous-time loop (any controller, no parameter or
+        disturbance draws). ``"auto"`` (default) is JAX when it is installed
+        and the plant and the law trace on it, NumPy otherwise (a lookup
+        table's law, say); that fallback warns when it changes the draws.
     seed : int
         Seed of the draws (the same seed gives the same draws on the JAX and
         NumPy backends only through a :class:`~minilink.core.distributions.Particles`
@@ -134,7 +139,7 @@ class MonteCarloEvaluator:
         Keep the trial trajectories (NumPy and simulator backends).
     """
 
-    BACKENDS = ("jax", "numpy", "simulator")
+    BACKENDS = ("auto", "jax", "numpy", "simulator")
 
     def __init__(
         self,
@@ -143,7 +148,7 @@ class MonteCarloEvaluator:
         dt=0.05,
         n_trials=100,
         episode_length=None,
-        backend="jax",
+        backend="auto",
         seed=0,
         record=False,
     ):
@@ -167,13 +172,42 @@ class MonteCarloEvaluator:
     def evaluate(self, controller) -> Evaluation:
         """Return the :class:`Evaluation` of a policy block (or of a solution's policy) on the problem."""
         controller = policy_of(controller)
-        if self.backend == "jax":
+        backend = self.backend
+        if backend == "auto":
+            backend = self.auto_backend(controller)
+        if backend == "jax":
             return self.evaluate_jax(controller)
-        if self.backend == "numpy":
+        if backend == "numpy":
             return self.evaluate_numpy(controller)
         return self.evaluate_simulator(controller)
 
     # Internal machinery
+
+    def auto_backend(self, controller) -> str:
+        """``"jax"`` when JAX is installed and the plant and the law trace on it, else ``"numpy"``."""
+        from minilink.core.backends import jax_installed
+        from minilink.core.compile.compiler import compile_auto
+
+        problem = self.problem
+        if not jax_installed():
+            return "numpy"
+        loop = [problem.sys] if int(controller.m) == 0 else [problem.sys, controller]
+        numpy_only = [block.name for block in loop if compile_auto(block)[0] != "jax"]
+        if not numpy_only:
+            return "jax"
+
+        # One seed, two random streams: random trials differ from a JAX-scored law's
+        x0s = problem.sample_x0(np.random.default_rng(self.seed), n=self.n_trials)
+        random_starts = bool(np.any(x0s != problem.x_start))
+        if random_starts or problem.params_distribution or problem.disturbances:
+            warnings.warn(
+                f"{', '.join(numpy_only)} does not trace on JAX: scored on NumPy, whose "
+                "draws of the starts, parameters and disturbances differ from the JAX "
+                "backend's for the same seed; pass backend='numpy' to score every "
+                "policy on the same draws",
+                stacklevel=3,
+            )
+        return "numpy"
 
     def evaluate_jax(self, controller) -> Evaluation:
         jax, jnp = require_jax(), require_jax_numpy()
@@ -373,7 +407,15 @@ def static_law(controller, backend="jax"):
             "static laws u = pi(x) only; use backend='simulator' for a controller "
             "with internal state"
         )
-    evaluator = controller.compile(backend=backend, verbose=False)
+    try:
+        evaluator = controller.compile(backend=backend, verbose=False)
+    except RuntimeError as exc:
+        if "JAX-traceable" not in str(exc):
+            raise
+        raise RuntimeError(
+            f"the law of {controller.name!r} is NumPy-only (not JAX-traceable): "
+            "pass backend='numpy' to score it"
+        ) from exc
     start = 0
     for port_id, port in controller.inputs.items():
         if port_id == roles.measurement:
