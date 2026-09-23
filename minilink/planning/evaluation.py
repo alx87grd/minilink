@@ -129,8 +129,8 @@ class MonteCarloEvaluator:
         ``"numpy"`` runs the same trials one at a time, ``"simulator"``
         integrates the continuous-time loop (any controller, no parameter or
         disturbance draws). ``"auto"`` (default) is JAX when it is installed
-        and the plant and the law trace on it, NumPy otherwise (a lookup
-        table's law, say); that fallback warns when it changes the draws.
+        and the plant, the law, ``X`` and the cost trace on it, NumPy otherwise
+        (a lookup table's law, say); that fallback warns when it changes the draws.
     seed : int
         Seed of the draws (the same seed gives the same draws on the JAX and
         NumPy backends only through a :class:`~minilink.core.distributions.Particles`
@@ -184,7 +184,7 @@ class MonteCarloEvaluator:
     # Internal machinery
 
     def auto_backend(self, controller) -> str:
-        """``"jax"`` when JAX is installed and the plant and the law trace on it, else ``"numpy"``."""
+        """``"jax"`` when JAX is installed and the plant, the law, ``X`` and the cost trace on it, else ``"numpy"``."""
         from minilink.core.backends import jax_installed
         from minilink.core.compile.compiler import compile_auto
 
@@ -193,6 +193,7 @@ class MonteCarloEvaluator:
             return "numpy"
         loop = [problem.sys] if int(controller.m) == 0 else [problem.sys, controller]
         numpy_only = [block.name for block in loop if compile_auto(block)[0] != "jax"]
+        numpy_only += numpy_only_terms(problem)
         if not numpy_only:
             return "jax"
 
@@ -365,6 +366,37 @@ def env_action_port(sys) -> str:
     from minilink.control.neural import action_port_of
 
     return action_port_of(sys)
+
+
+def numpy_only_terms(problem) -> list:
+    """
+    The problem's terms a JAX trial calls that do not trace on JAX, by name.
+
+    ``X.margin`` on the set parameters, the running cost ``g``, the terminal
+    cost ``h`` on a finite horizon and a callable ``infeasible_cost``, each
+    traced once on a state, an action and a time.
+    """
+    jax, jnp = require_jax(), require_jax_numpy()
+    sys, X, cost = problem.sys, problem.X, problem.require_cost()
+    set_params, price = problem.params.sets, problem.infeasible_cost
+    terms = {
+        "the constraint set X": lambda x, u, t: X.margin(x, t, set_params),
+        "the cost": lambda x, u, t: cost.g(x, u, t),
+    }
+    if problem.horizon_kind() == "finite":
+        terms["the terminal cost"] = lambda x, u, t: cost.h(x, t)
+    if callable(price):
+        terms["the infeasible_cost"] = lambda x, u, t: price(x, t)
+
+    x = jnp.zeros(int(sys.n))
+    u = jnp.zeros(int(sys.inputs[env_action_port(sys)].dim))
+    numpy_only = []
+    for name, term in terms.items():
+        try:
+            jax.make_jaxpr(term)(x, u, 0.0)
+        except Exception:
+            numpy_only.append(name)
+    return numpy_only
 
 
 def control_law(controller, t, backend="jax"):

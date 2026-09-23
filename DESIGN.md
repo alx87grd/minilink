@@ -938,9 +938,9 @@ compiled held-input rollout (static laws; parameter and disturbance draws
 applied); `backend="numpy"` produces the same samples one trial at a time on
 the NumPy evaluator (identical numbers, tested); `backend="simulator"` runs the
 continuous-time closed loop for any controller, dynamic ones included, without
-draws. The default, `backend="auto"`, is JAX when it is installed and the plant
-and the law trace on it, NumPy otherwise (a DP lookup table interpolates with
-SciPy), and warns when that fallback changes the draws; an explicit
+draws. The default, `backend="auto"`, is JAX when it is installed and the plant,
+the law, the constraint set and the cost trace on it, NumPy otherwise (a DP
+lookup table interpolates with SciPy), and warns when that fallback changes the draws; an explicit
 `backend="jax"` on a NumPy-only law raises and says so. No backend clips the
 law: port bounds are information, and saturation lives inside the law or in a
 `Saturation` block. Same contract for LQR, DP, MPC and RL laws.
