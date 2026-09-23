@@ -1066,6 +1066,15 @@ class TestDiscretize(unittest.TestCase):
         x1 = step_leaf.step(np.array([0.0]), np.array([1.0]), k=0)
         np.testing.assert_allclose(x1, [0.02 * 2.0])
 
+    def test_discretize_refuses_params_holding_only_dt(self):
+        with self.assertRaisesRegex(ValueError, r"discretize\(system, dt=0.05\)"):
+            discretize(Pendulum(), params={"dt": 0.05})
+        with self.assertRaisesRegex(ValueError, r"discretize\(system, dt=0.05\)"):
+            discretize(Pendulum(), 0.05, params={"dt": 0.05})
+        step_leaf = discretize(DoubleIntegrator(), params={"dt": 0.05})
+        self.assertEqual(step_leaf.dt, 0.05)
+        self.assertEqual(step_leaf.params, {})
+
     def test_step_params_override_gain(self):
         plant = _GainIntegrator(gain=1.0)
         step_leaf = discretize(plant, 0.1)

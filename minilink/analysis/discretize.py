@@ -158,8 +158,11 @@ def discretize(
     which replaces them (RULES 4.4). The hold interval stays on the wrapper as
     :attr:`dt` and never reaches ``f`` or ``h``: when ``dt`` is omitted it is
     read once from ``params["dt"]``, and a ``"dt"`` key is dropped from the
-    ``params`` given. The wrapper starts from the source's ``x0`` and keeps its
-    state, input and ``y`` metadata.
+    ``params`` given. A ``params`` that holds only ``"dt"`` is therefore
+    refused while the source has params of its own, since it would replace
+    them with ``{}``: pass the sample time as ``dt=`` to keep them. The
+    wrapper starts from the source's ``x0`` and keeps its state, input and
+    ``y`` metadata.
     """
     if not isinstance(system, DynamicSystem):
         raise TypeError(
@@ -171,7 +174,7 @@ def discretize(
         )
 
     dt = _hold_interval(system, dt, params)
-    params = _model_params(params)
+    params = _model_params(system, params)
 
     if integrator == "euler":
         return DiscretizedEulerDynamicSystem(system, dt, params)
@@ -194,9 +197,15 @@ def _hold_interval(
     return dt
 
 
-def _model_params(params: dict | None) -> dict | None:
+def _model_params(system: DynamicSystem, params: dict | None) -> dict | None:
     if params is None:
         return None
+    if set(params) == {"dt"} and system.params:
+        raise ValueError(
+            f"params={params!r} holds only the sample time, so it would replace "
+            f"the params of {system.name} with {{}}; call "
+            f"discretize(system, dt={params['dt']!r}) to keep them."
+        )
     return {key: value for key, value in params.items() if key != "dt"}
 
 
