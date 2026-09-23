@@ -66,15 +66,15 @@ Workflow: [`.github/workflows/test.yml`](../.github/workflows/test.yml).
 
 | Job | Steps |
 | --- | --- |
-| **`test`** | ruff + `pytest` (py 3.10–3.13; demo-check bridge; JAX demos may skip) |
+| **`test`** | ruff + `pytest` (py 3.10–3.13; demo-check bridge; JAX tests and demos skip) |
 | **`packaging`** | `python -m build` + wheel/sdist check (no `experimental/`) + `twine check` + install the wheel and `import minilink` |
-| **`regression`** | regression gates `--suite all --tiny …` + **flagship demos** + **notebook smoke** (py 3.12 + JAX + viz) |
+| **`regression`** | `pytest` (incl. the JAX tests) + regression gates `--suite all --tiny …` + **flagship demos** + **notebook smoke** (py 3.12 + JAX + viz) |
 
 ### At a glance
 
 | Layer | Human IDE (`tests/run/`) | Agent / CI | CI job |
 | --- | --- | --- | --- |
-| **Contract tests** | `run_contract_tests.py` | `pytest` | `test` |
+| **Contract tests** | `run_contract_tests.py` | `pytest` | `test` + `regression` |
 | **Regression gates** | `run_regression_gates.py` | `benchmarks/run_regression_check.py` | `regression` |
 | **Benchmark study** | `run_benchmark_study.py` | `benchmarks/run_study.py` | — |
 | **Graphics contract** | (in contract tests) | `test_flagship_graphics_contract.py` | `test` |
@@ -107,7 +107,7 @@ Detail: [benchmarks/README.md](../benchmarks/README.md).
 
 | Layer | Purpose | Entry command | CI job |
 | --- | --- | --- | --- |
-| **Contract tests** | API types, shapes, compile/sim/MPC behavior | `pytest` | `test` |
+| **Contract tests** | API types, shapes, compile/sim/MPC behavior | `pytest` | `test` + `regression` (w/ JAX) |
 | **Regression gates** | Accuracy goldens + guarded NLP/trajopt solve time | `run_regression_check.py --suite all` | `regression` |
 | **Benchmark study** | Machine/GPU exploration tables | `run_study.py --list` | — |
 | **Graphics contract** | Draw-list + headless PNG checks | `test_flagship_graphics_contract.py` (in `pytest`) | `test` |

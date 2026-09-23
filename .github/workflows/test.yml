@@ -1,5 +1,5 @@
 # CI — entry points documented in tests/README.md#entry-points
-# Jobs: test (ruff + pytest, py3.10–3.13) → regression (gates + flagships + notebooks, py3.12 + jax)
+# Jobs: test (ruff + pytest, py3.10–3.13) → regression (pytest + gates + flagships + notebooks, py3.12 + jax)
 name: CI
 
 on:
@@ -86,6 +86,12 @@ jobs:
       run: |
         python -m pip install --upgrade pip
         pip install -e ".[dev,jax,visualization,plotting,diagrams]"
+
+    # JAX tests skip in the ``test`` job (no jax extra); gate them here.
+    - name: Test with pytest (incl. JAX)
+      env:
+        SDL_VIDEODRIVER: dummy
+      run: pytest
 
     - name: Regression gates
       env:
