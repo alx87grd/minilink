@@ -1111,6 +1111,29 @@ class TestDiscretize(unittest.TestCase):
         x1 = step_leaf.step(x, u, k=0)
         np.testing.assert_allclose(x1, x1_ref, rtol=1e-09, atol=1e-09)
 
+    def test_discretize_keeps_source_x0_and_signal_metadata(self):
+        plant = Pendulum()
+        plant.x0 = np.array([0.5, 0.0])
+        step_leaf = discretize(plant, 0.05)
+        np.testing.assert_array_equal(step_leaf.x0, plant.x0)
+        self.assertEqual(step_leaf.state.labels, plant.state.labels)
+        self.assertEqual(step_leaf.state.units, plant.state.units)
+        np.testing.assert_array_equal(
+            step_leaf.state.upper_bound, plant.state.upper_bound
+        )
+        u_port, plant_u = step_leaf.inputs["u"], plant.inputs["u"]
+        self.assertEqual(u_port.labels, plant_u.labels)
+        np.testing.assert_array_equal(u_port.lower_bound, plant_u.lower_bound)
+        rollout = step_leaf.compute_rollout(n_steps=3, u=np.zeros((3, 1)))
+        self.assertGreater(np.abs(rollout.x[0, -1]), 0.4)
+
+    def test_discretize_stacks_each_input_port_into_u(self):
+        plant = _GainIntegrator()
+        plant.add_input_port("w", labels=["disturbance"], upper_bound=[1.0])
+        step_leaf = discretize(plant, 0.1)
+        self.assertEqual(step_leaf.inputs["u"].labels, ["u[0]", "disturbance"])
+        np.testing.assert_array_equal(step_leaf.inputs["u"].upper_bound, [np.inf, 1.0])
+
     def test_discretize_rejects_unknown_integrator(self):
         plant = DoubleIntegrator()
         with self.assertRaises(ValueError):

@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import numpy as np
+
 from minilink.core.system import DynamicSystem, StepSystem
 
 _INTEGRATORS = frozenset({"rk4", "euler"})
@@ -12,7 +14,9 @@ class DiscretizedDynamicSystem(StepSystem):
     Discrete-time wrapper over a continuous :class:`DynamicSystem`.
 
     The hold interval :attr:`dt` lives on the wrapper; :attr:`params` are the
-    source's own parameters, handed to its ``f`` and ``h`` untouched.
+    source's own parameters, handed to its ``f`` and ``h`` untouched. The
+    wrapper starts from the source's ``x0`` and copies its state and input
+    labels, units, bounds and nominal values.
     """
 
     def __init__(
@@ -39,6 +43,24 @@ class DiscretizedDynamicSystem(StepSystem):
         self.dt = dt
         self.integrator = integrator
         self.source = source
+
+        # the source's initial state and state metadata
+        state = source.state
+        self.x0 = np.array(source.x0, dtype=float)
+        self.state.labels = list(state.labels)
+        self.state.units = list(state.units)
+        self.state.lower_bound = np.array(state.lower_bound, dtype=float)
+        self.state.upper_bound = np.array(state.upper_bound, dtype=float)
+        self.state.nominal_value = np.array(state.nominal_value, dtype=float)
+
+        # each source input port's metadata, stacked in flat-u order into u
+        if source.m:
+            ports = source.inputs.values()
+            u_port = self.inputs["u"]
+            u_port.labels, u_port.units = source.get_all_input_labels_and_units()
+            u_port.lower_bound = np.concatenate([port.lower_bound for port in ports])
+            u_port.upper_bound = np.concatenate([port.upper_bound for port in ports])
+            u_port.nominal_value = source.get_u_from_input_ports()
 
     def h(self, x, u, k=0, params=None):
         h = self.source.h
@@ -111,7 +133,8 @@ def discretize(
     source's live ``params`` when ``params`` is ``None``, else the dict given,
     which replaces them. The hold interval stays on the wrapper as :attr:`dt`,
     never in ``params``; when ``dt`` is omitted it is read once from
-    ``params["dt"]``.
+    ``params["dt"]``. The wrapper starts from the source's ``x0`` and keeps
+    its state and input metadata.
     """
     if not isinstance(system, DynamicSystem):
         raise TypeError(
