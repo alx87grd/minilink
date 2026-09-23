@@ -8,9 +8,21 @@ _INTEGRATORS = frozenset({"rk4", "euler"})
 
 
 class DiscretizedDynamicSystem(StepSystem):
-    """Discrete-time wrapper over a continuous :class:`DynamicSystem`."""
+    """
+    Discrete-time wrapper over a continuous :class:`DynamicSystem`.
 
-    def __init__(self, source: DynamicSystem, params: dict, *, integrator: str):
+    The hold interval :attr:`dt` lives on the wrapper; :attr:`params` are the
+    source's own parameters, handed to its ``f`` and ``h`` untouched.
+    """
+
+    def __init__(
+        self,
+        source: DynamicSystem,
+        dt: float,
+        params: dict | None = None,
+        *,
+        integrator: str,
+    ):
         y_deps = ()
         if "y" in source.outputs:
             y_deps = source.outputs["y"].dependencies
@@ -23,14 +35,15 @@ class DiscretizedDynamicSystem(StepSystem):
             y_dependencies=y_deps,
         )
         self.name = f"Discretized({source.name})"
-        self.params = dict(params)
+        self.params = source.params if params is None else params
+        self.dt = dt
         self.integrator = integrator
         self.source = source
 
     def h(self, x, u, k=0, params=None):
         h = self.source.h
         p = self.params if params is None else params
-        dt = p["dt"]
+        dt = self.dt
         t_k = k * dt
 
         # the source's output map, sampled at t_k
@@ -42,13 +55,13 @@ class DiscretizedDynamicSystem(StepSystem):
 class DiscretizedEulerDynamicSystem(DiscretizedDynamicSystem):
     """``x_{k+1} = x_k + dt f(x_k, u_k, t_k; p)``."""
 
-    def __init__(self, source: DynamicSystem, params: dict):
-        super().__init__(source, params, integrator="euler")
+    def __init__(self, source: DynamicSystem, dt: float, params: dict | None = None):
+        super().__init__(source, dt, params, integrator="euler")
 
     def step(self, x, u, k=0, params=None):
         f = self.source.f
         p = self.params if params is None else params
-        dt = p["dt"]
+        dt = self.dt
         t_k = k * dt
 
         # one forward-Euler step, the input held over [t_k, t_k + dt]
@@ -60,13 +73,13 @@ class DiscretizedEulerDynamicSystem(DiscretizedDynamicSystem):
 class DiscretizedRK4DynamicSystem(DiscretizedDynamicSystem):
     """One RK4 step of ``f`` over ``[t_k, t_k + dt]`` with ZOH on ``u``."""
 
-    def __init__(self, source: DynamicSystem, params: dict):
-        super().__init__(source, params, integrator="rk4")
+    def __init__(self, source: DynamicSystem, dt: float, params: dict | None = None):
+        super().__init__(source, dt, params, integrator="rk4")
 
     def step(self, x, u, k=0, params=None):
         f = self.source.f
         p = self.params if params is None else params
-        dt = p["dt"]
+        dt = self.dt
         t_k = k * dt
 
         # the four RK4 slopes over [t_k, t_k + dt], the input held
@@ -90,12 +103,15 @@ def discretize(
     params: dict | None = None,
 ) -> StepSystem:
     """
-    Wrap a :class:`DynamicSystem` as a :class:`StepSystem` with sample time in ``params``.
+    Wrap a :class:`DynamicSystem` as a :class:`StepSystem` with hold interval ``dt``.
 
-    ``params["dt"]`` is the hold interval (set via ``dt=`` and/or ``params``).
-    ``x_{k+1} = step(x, u, k; p)`` integrates ``f`` with ``integrator``
-    ``"rk4"`` or ``"euler"`` (the same word as ``Sys2Gym``); ``p`` defaults to
-    the wrapper's :attr:`params`.
+    ``x_{k+1} = step(x, u, k; p)`` integrates ``f`` over ``[k dt, (k + 1) dt]``
+    with ``integrator`` ``"rk4"`` or ``"euler"`` (the same word as ``Sys2Gym``),
+    the input held. ``p`` defaults to the wrapper's :attr:`params`: the
+    source's live ``params`` when ``params`` is ``None``, else the dict given,
+    which replaces them. The hold interval stays on the wrapper as :attr:`dt`,
+    never in ``params``; when ``dt`` is omitted it is read once from
+    ``params["dt"]``.
     """
     if not isinstance(system, DynamicSystem):
         raise TypeError(
@@ -106,30 +122,27 @@ def discretize(
             f"Unknown integrator {integrator!r}; expected one of {sorted(_INTEGRATORS)!r}."
         )
 
-    merged = _merge_discretize_params(system, dt, params)
+    dt = _hold_interval(system, dt, params)
 
     if integrator == "euler":
-        return DiscretizedEulerDynamicSystem(system, merged)
-    return DiscretizedRK4DynamicSystem(system, merged)
+        return DiscretizedEulerDynamicSystem(system, dt, params)
+    return DiscretizedRK4DynamicSystem(system, dt, params)
 
 
 # Internal machinery
 
 
-def _merge_discretize_params(
+def _hold_interval(
     system: DynamicSystem,
     dt: float | None,
     params: dict | None,
-) -> dict:
-    merged = dict(getattr(system, "params", {}))
-    if params is not None:
-        merged.update(params)
-    if dt is not None:
-        merged["dt"] = float(dt)
-    if "dt" not in merged:
-        raise ValueError("discretize requires dt=... or params['dt'].")
-    dt_val = float(merged["dt"])
-    if dt_val <= 0.0:
-        raise ValueError(f"params['dt'] must be positive, got {dt_val}")
-    merged["dt"] = dt_val
-    return merged
+) -> float:
+    p = system.params if params is None else params
+    if dt is None:
+        if "dt" not in p:
+            raise ValueError("discretize requires dt=... or params['dt'].")
+        dt = p["dt"]
+    dt = float(dt)
+    if dt <= 0.0:
+        raise ValueError(f"dt must be positive, got {dt}")
+    return dt

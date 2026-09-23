@@ -1028,7 +1028,7 @@ class TestDiscretize(unittest.TestCase):
         x1_ref = _rk4_step(plant.f, x0, u, 0.0, dt, p)
         x1 = step_leaf.step(x0, u, k=0)
         np.testing.assert_allclose(x1, x1_ref, rtol=1e-09, atol=1e-09)
-        self.assertEqual(step_leaf.params["dt"], dt)
+        self.assertEqual(step_leaf.dt, dt)
 
     def test_discretize_h_delegates_to_source(self):
         plant = DoubleIntegrator()
@@ -1060,8 +1060,8 @@ class TestDiscretize(unittest.TestCase):
         self.assertEqual(step_leaf.outputs["y"].dependencies, "all")
 
     def test_discretize_accepts_dt_in_params_only(self):
-        step_leaf = discretize(_GainIntegrator(), params={"dt": 0.02})
-        self.assertEqual(step_leaf.params["dt"], 0.02)
+        step_leaf = discretize(_GainIntegrator(), params={"gain": 1.0, "dt": 0.02})
+        self.assertEqual(step_leaf.dt, 0.02)
 
     def test_step_params_override_gain(self):
         plant = _GainIntegrator(gain=1.0)
@@ -1073,16 +1073,43 @@ class TestDiscretize(unittest.TestCase):
         x_fast = step_leaf.step(x0, u, k=0, params=p_fast)
         self.assertGreater(x_fast[0], x_nom[0])
 
-    def test_step_params_override_dt(self):
+    def test_dt_sets_the_step_length(self):
+        plant = _GainIntegrator(gain=1.0)
+        u = np.array([1.0])
+        x0 = np.array([0.0])
+        x_short = discretize(plant, 0.02).step(x0, u, k=0)
+        x_long = discretize(plant, 0.2).step(x0, u, k=0)
+        self.assertLess(x_short[0], x_long[0])
+
+    def test_step_takes_the_source_params(self):
+        plant = Pendulum()
+        step_leaf = discretize(plant, 0.01)
+        x = np.array([0.3, 0.1])
+        u = np.array([0.2])
+        np.testing.assert_allclose(
+            step_leaf.step(x, u, 0, plant.params), step_leaf.step(x, u)
+        )
+        self.assertNotIn("dt", step_leaf.jacobian("step", "params"))
+
+    def test_step_reads_the_source_live_params(self):
         plant = _GainIntegrator(gain=1.0)
         step_leaf = discretize(plant, 0.1)
         u = np.array([1.0])
         x0 = np.array([0.0])
-        p_short = {**step_leaf.params, "dt": 0.02}
-        p_long = {**step_leaf.params, "dt": 0.2}
-        x_short = step_leaf.step(x0, u, k=0, params=p_short)
-        x_long = step_leaf.step(x0, u, k=0, params=p_long)
-        self.assertLess(x_short[0], x_long[0])
+        x_nom = step_leaf.step(x0, u, k=0)
+        plant.params["gain"] = 3.0
+        x_fast = step_leaf.step(x0, u, k=0)
+        self.assertGreater(x_fast[0], x_nom[0])
+
+    def test_discretize_steps_a_closed_loop(self):
+        loop = PID(Kp=1.0, Ki=0.0, Kd=0.0) @ Pendulum()
+        dt = 0.01
+        step_leaf = discretize(loop, dt)
+        x = np.linspace(0.1, 0.4, loop.n)
+        u = np.zeros(loop.m)
+        x1_ref = _rk4_step(loop.f, x, u, 0.0, dt, None)
+        x1 = step_leaf.step(x, u, k=0)
+        np.testing.assert_allclose(x1, x1_ref, rtol=1e-09, atol=1e-09)
 
     def test_discretize_rejects_unknown_integrator(self):
         plant = DoubleIntegrator()
