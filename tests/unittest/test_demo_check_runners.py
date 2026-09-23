@@ -10,7 +10,8 @@ Notebook smoke checks run in the CI ``regression`` job (and via
 ``MINILINK_NOTEBOOK_CHECKS=1`` so default ``pytest`` stays fast.
 
 ``TestDemoCheckManifests`` checks the data those runners read (``requires``
-lists, demo and notebook ids).
+lists, demo and notebook ids) and that the ``tests/run`` regression launcher
+passes the CI job's flags.
 """
 
 from __future__ import annotations
@@ -28,6 +29,7 @@ from unittest import mock
 
 from tests.demo_checks import run_flagship_demos as flagship_runner
 from tests.demo_checks import run_notebook_checks as notebook_runner
+from tests.run import _common as launcher
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 
@@ -182,6 +184,19 @@ class TestDemoCheckManifests(unittest.TestCase):
             ids["examples/tutorial/showcase_minilink.ipynb"], "showcase_minilink"
         )
         self.assertEqual(ids["examples/tutorial/00_core.ipynb"], "tutorial_00_core")
+
+    def test_regression_launcher_ci_mode_matches_ci_workflow(self):
+        workflow = (REPO_ROOT / ".github/workflows/test.yml").read_text(
+            encoding="utf-8"
+        )
+        command = re.search(
+            r"python benchmarks/run_regression_check\.py((?:.*\\\n)*.*)", workflow
+        )
+        ci_args = command.group(1).replace("\\\n", " ").split()
+        with mock.patch.object(launcher, "run_command", return_value=0) as run:
+            launcher.run_regression(ci_mode=True)
+        launcher_args = run.call_args.args[0][2:]
+        self.assertEqual(launcher_args, ci_args)
 
 
 if __name__ == "__main__":
