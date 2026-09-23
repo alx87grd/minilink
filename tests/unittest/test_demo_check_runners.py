@@ -10,7 +10,7 @@ Notebook smoke checks run in the CI ``regression`` job (and via
 ``MINILINK_NOTEBOOK_CHECKS=1`` so default ``pytest`` stays fast.
 
 ``TestDemoCheckManifests`` checks the data those runners read (``requires``
-lists and demo ids).
+lists, demo and notebook ids).
 """
 
 from __future__ import annotations
@@ -22,10 +22,12 @@ import re
 import subprocess
 import sys
 import unittest
+from collections import Counter
 from pathlib import Path
 from unittest import mock
 
 from tests.demo_checks import run_flagship_demos as flagship_runner
+from tests.demo_checks import run_notebook_checks as notebook_runner
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 
@@ -168,6 +170,18 @@ class TestDemoCheckManifests(unittest.TestCase):
                 with self.subTest(demo=demo_id):
                     [row] = flagship_runner.run_flagship_demos(demo_filter=demo_id)
                     self.assertEqual(row.status, "skip")
+
+    def test_notebook_ids_are_unique(self):
+        ids = notebook_runner.notebook_ids(notebook_runner._discover_notebooks())
+        repeated = sorted(
+            notebook_id for notebook_id, n in Counter(ids.values()).items() if n > 1
+        )
+        self.assertEqual(repeated, [])
+        # The ids the ``--notebook`` usage and help text cite.
+        self.assertEqual(
+            ids["examples/tutorial/showcase_minilink.ipynb"], "showcase_minilink"
+        )
+        self.assertEqual(ids["examples/tutorial/00_core.ipynb"], "tutorial_00_core")
 
 
 if __name__ == "__main__":

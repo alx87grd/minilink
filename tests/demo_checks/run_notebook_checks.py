@@ -25,6 +25,7 @@ import argparse
 import importlib.util
 import json
 import os
+from collections import Counter
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -48,13 +49,31 @@ class NotebookRow:
 def _notebook_id(rel_path: str) -> str:
     """Stable short id for CLI ``--notebook`` filters."""
     stem = Path(rel_path).stem
-    if "/tutorial/" in rel_path or "/learn/intro/" in rel_path:
+    if "/tutorial/" in rel_path:
         if stem.startswith("showcase_"):
             return stem
         return f"tutorial_{stem}"
     if "/teaching/" in rel_path:
         return f"teaching_{stem}"
     return "_".join(Path(rel_path).with_suffix("").parts[-2:])
+
+
+def notebook_ids(rel_paths: list[str]) -> dict[str, str]:
+    """Unique id per notebook: its short id, or its path when two share one.
+
+    ``courses/udes_gro860/drone_ppo`` and ``topics/reinforcement_learning/
+    drone_ppo`` both shorten to ``teaching_drone_ppo``; each then takes its
+    path under ``examples/`` joined by ``_``
+    (``teaching_courses_udes_gro860_drone_ppo``).
+    """
+    short = {rel: _notebook_id(rel) for rel in rel_paths}
+    counts = Counter(short.values())
+    ids = {}
+    for rel, notebook_id in short.items():
+        if counts[notebook_id] > 1:
+            notebook_id = "_".join(Path(rel).with_suffix("").parts[1:])
+        ids[rel] = notebook_id
+    return ids
 
 
 def _load_overrides() -> dict[str, dict]:
@@ -119,8 +138,8 @@ def run_notebook_checks(
     overrides = _load_overrides()
     rows: list[NotebookRow] = []
 
-    for rel in _discover_notebooks():
-        notebook_id = _notebook_id(rel)
+    ids = notebook_ids(_discover_notebooks())
+    for rel, notebook_id in ids.items():
         if notebook_filter is not None and notebook_id != notebook_filter:
             continue
 
@@ -174,7 +193,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument(
         "--notebook",
         default=None,
-        help="Run one notebook id (e.g. showcase_minilink, intro_00_core)",
+        help="Run one notebook id (e.g. showcase_minilink, tutorial_00_core)",
     )
     parser.add_argument(
         "--timeout",
