@@ -3,6 +3,7 @@
 import numpy as np
 
 from minilink.core.backends import array_module, require_jax_numpy
+from minilink.core.signals import OutputPort
 from minilink.core.system import DynamicSystem
 
 
@@ -63,12 +64,14 @@ class MechanicalSystem(DynamicSystem):
         self.outputs["y"].labels = list(self.state.labels)
         self.outputs["y"].units = list(self.state.units)
 
-        self.add_output_port("q", dim=dof, function=self.h_q, dependencies=())
-        self.add_output_port("dq", dim=dof, function=self.h_dq, dependencies=())
-        self.outputs["q"].labels = self.state.labels[:dof]
-        self.outputs["q"].units = self.state.units[:dof]
-        self.outputs["dq"].labels = self.state.labels[dof:]
-        self.outputs["dq"].units = self.state.units[dof:]
+        # q and dq name their entries from the state on each read, so a plant
+        # that relabels its state after this constructor still names its joints.
+        self.outputs["q"] = StateSliceOutputPort(
+            self, "q", start=0, dim=dof, function=self.h_q
+        )
+        self.outputs["dq"] = StateSliceOutputPort(
+            self, "dq", start=dof, dim=dof, function=self.h_dq
+        )
 
     def h_q(self, x, u, t=0, params=None):
         q, _ = self.x2q(x)
@@ -252,3 +255,48 @@ class JaxMechanicalSystem(MechanicalSystem):
         dx = self.q2x(v, vdot)
 
         return dx
+
+
+# Internal machinery
+
+
+class StateSliceOutputPort(OutputPort):
+    """
+    An output port carrying ``dim`` consecutive state entries, such as ``q`` or ``dq``.
+
+    Its labels and units are read from the matching entries of
+    ``system.state`` on each access unless declared explicitly, so a plant
+    that relabels its state after the port was built still names its joints.
+    Declare them by assigning a new list (``port.labels = [...]``); assigning
+    ``None`` returns to the state's names.
+    """
+
+    def __init__(self, system, id, *, start, dim, function):
+        self.system = system
+        self.state_slice = slice(start, start + dim)
+        OutputPort.__init__(self, id, dim=dim, function=function, dependencies=())
+        # Drop the placeholder names OutputPort just set: follow the state.
+        self.declared_labels = None
+        self.declared_units = None
+
+    @property
+    def labels(self):
+        """Declared labels, else the labels of this slice of the state."""
+        if self.declared_labels is not None:
+            return self.declared_labels
+        return self.system.state.labels[self.state_slice]
+
+    @labels.setter
+    def labels(self, value):
+        self.declared_labels = value
+
+    @property
+    def units(self):
+        """Declared units, else the units of this slice of the state."""
+        if self.declared_units is not None:
+            return self.declared_units
+        return self.system.state.units[self.state_slice]
+
+    @units.setter
+    def units(self, value):
+        self.declared_units = value

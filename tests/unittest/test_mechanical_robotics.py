@@ -418,6 +418,18 @@ class TestMechanicalJointPorts(unittest.TestCase):
         self.assertEqual(sys.outputs["q"].dim, 2)
         self.assertEqual(sys.outputs["dq"].dim, 2)
 
+    def test_q_and_dq_labels_follow_the_state_until_declared(self):
+        sys = MechanicalSystem(dof=2)
+        sys.state.labels = ["a", "b", "da", "db"]
+        sys.state.units = ["rad", "m", "rad/s", "m/s"]
+        self.assertEqual(sys.outputs["q"].labels, ["a", "b"])
+        self.assertEqual(sys.outputs["dq"].units, ["rad/s", "m/s"])
+
+        sys.outputs["q"].labels = ["shoulder", "elbow"]
+        sys.state.labels = ["c", "d", "dc", "dd"]
+        self.assertEqual(sys.outputs["q"].labels, ["shoulder", "elbow"])
+        self.assertEqual(sys.outputs["dq"].labels, ["dc", "dd"])
+
 
 class TestManipulator(unittest.TestCase):
     def test_default_kinematics_ports_are_zero(self):

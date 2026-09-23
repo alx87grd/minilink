@@ -562,6 +562,30 @@ class TestManipulatorCatalog(unittest.TestCase):
         )
 
 
+import minilink.catalog as catalog
+from minilink.dynamics.abstraction.mechanical import MechanicalSystem
+
+
+class TestMechanicalJointPortLabels(unittest.TestCase):
+    def test_q_and_dq_ports_carry_the_plant_state_labels_and_units(self):
+        checked = []
+        for name in catalog.__all__:
+            cls = getattr(catalog, name)
+            if not issubclass(cls, MechanicalSystem):
+                continue
+            with self.subTest(plant=name):
+                plant = cls()
+                dof = plant.dof
+                q_port, dq_port = plant.outputs["q"], plant.outputs["dq"]
+                self.assertEqual(q_port.labels, plant.state.labels[:dof])
+                self.assertEqual(dq_port.labels, plant.state.labels[dof:])
+                self.assertEqual(q_port.units, plant.state.units[:dof])
+                self.assertEqual(dq_port.units, plant.state.units[dof:])
+            checked.append(name)
+        self.assertIn("Pendulum", checked)
+        self.assertIn("TwoLinkManipulator", checked)
+
+
 import pytest
 
 pytest.importorskip("jax")
