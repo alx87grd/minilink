@@ -15,6 +15,7 @@ Usage (from repo root)::
 from __future__ import annotations
 
 import argparse
+import difflib
 import importlib.util
 import json
 import os
@@ -113,6 +114,14 @@ def _print_report(rows: list[DemoRow]) -> int:
     return 1 if failed else 0
 
 
+def _close_ids(name: str, ids: list[str]) -> str:
+    """Ids holding every ``_`` word of ``name``, else difflib's near misses."""
+    words = set(name.split("_"))
+    close = [id_ for id_ in ids if words <= set(id_.split("_"))]
+    close = close or difflib.get_close_matches(name, ids)
+    return ", ".join(close) or "none"
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
         description=(
@@ -128,6 +137,11 @@ def main(argv: list[str] | None = None) -> int:
         help="Per-script timeout seconds (default 120)",
     )
     args = parser.parse_args(argv)
+    ids = [entry["id"] for entry in _load_manifest()]
+    if args.demo is not None and args.demo not in ids:
+        parser.error(
+            f"unknown demo id {args.demo!r} (close ids: {_close_ids(args.demo, ids)})"
+        )
     rows = run_flagship_demos(demo_filter=args.demo, timeout=args.timeout)
     return _print_report(rows)
 

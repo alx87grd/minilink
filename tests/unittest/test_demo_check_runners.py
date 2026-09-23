@@ -16,7 +16,9 @@ passes the CI job's flags.
 
 from __future__ import annotations
 
+import contextlib
 import importlib.util
+import io
 import json
 import os
 import re
@@ -216,6 +218,29 @@ class TestDemoCheckManifests(unittest.TestCase):
             ids["examples/tutorial/showcase_minilink.ipynb"], "showcase_minilink"
         )
         self.assertEqual(ids["examples/tutorial/00_core.ipynb"], "tutorial_00_core")
+
+    def test_unknown_ids_are_cli_errors(self):
+        """A stale ``--demo`` or ``--notebook`` id fails and names the close ids."""
+        cases = (
+            (flagship_runner, ["--demo", "mpc_minimal"], ["mpc_car_minimal"]),
+            (
+                notebook_runner,
+                ["--notebook", "teaching_drone_ppo"],
+                [
+                    "teaching_courses_udes_gro860_drone_ppo",
+                    "teaching_topics_reinforcement_learning_drone_ppo",
+                ],
+            ),
+            (notebook_runner, ["--notebook", "intro_00_core"], ["tutorial_00_core"]),
+        )
+        for runner, argv, close_ids in cases:
+            with self.subTest(argv=argv):
+                redirect = contextlib.redirect_stderr(io.StringIO())
+                with redirect as stderr, self.assertRaises(SystemExit) as caught:
+                    runner.main(argv)
+                self.assertEqual(caught.exception.code, 2)
+                for close_id in close_ids:
+                    self.assertIn(close_id, stderr.getvalue())
 
     def test_regression_launcher_ci_mode_matches_ci_workflow(self):
         workflow = (REPO_ROOT / ".github/workflows/test.yml").read_text(

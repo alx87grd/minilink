@@ -22,6 +22,7 @@ Usage (from repo root)::
 from __future__ import annotations
 
 import argparse
+import difflib
 import importlib.util
 import json
 import os
@@ -183,6 +184,14 @@ def _print_report(rows: list[NotebookRow]) -> int:
     return 1 if failed else 0
 
 
+def _close_ids(name: str, ids: list[str]) -> str:
+    """Ids holding every ``_`` word of ``name``, else difflib's near misses."""
+    words = set(name.split("_"))
+    close = [id_ for id_ in ids if words <= set(id_.split("_"))]
+    close = close or difflib.get_close_matches(name, ids)
+    return ", ".join(close) or "none"
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
         description=(
@@ -202,6 +211,12 @@ def main(argv: list[str] | None = None) -> int:
         help="Override per-notebook timeout seconds (default: override or 180)",
     )
     args = parser.parse_args(argv)
+    ids = list(notebook_ids(_discover_notebooks()).values())
+    if args.notebook is not None and args.notebook not in ids:
+        parser.error(
+            f"unknown notebook id {args.notebook!r} "
+            f"(close ids: {_close_ids(args.notebook, ids)})"
+        )
     rows = run_notebook_checks(
         notebook_filter=args.notebook,
         timeout_override=args.timeout,
