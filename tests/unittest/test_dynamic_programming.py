@@ -212,6 +212,23 @@ class TestControllerAndEvaluation(unittest.TestCase):
         self.assertIsNot(nearest, planner.get_controller())
         np.testing.assert_array_equal(nearest.pi, planner.result.pi)
 
+    def test_verbs_before_solve_raise_the_no_solution_error(self):
+        planner = DynamicProgrammingPlanner(
+            make_problem(), x_grid=(5, 5), u_grid=(3,), dt=0.1
+        )
+        verbs = {
+            "value_at": lambda: planner.value_at([0.0, 0.0]),
+            "get_controller": lambda: planner.get_controller(interpolation="nearest"),
+            "plot_cost2go": planner.plot_cost2go,
+            "plot_policy": planner.plot_policy,
+            "animate_cost2go": planner.animate_cost2go,
+            "animate_policy": planner.animate_policy,
+        }
+        for name, verb in verbs.items():
+            with self.subTest(verb=name):
+                with self.assertRaisesRegex(ValueError, "No solution"):
+                    verb()
+
     def test_closed_loop_reaches_goal(self):
         problem = make_problem()
         planner, result = solve(problem)

@@ -380,13 +380,15 @@ class DynamicProgrammingPlanner(Planner):
 
     def get_controller(self, **kwargs):
         """The solution's greedy lookup law; ``interpolation=`` builds a variant of it."""
+        solution = self.require_solution()
         if not kwargs:
-            return self.require_solution().policy
+            return solution.policy
 
         return LookupTableController(self.result.grid, self.result.pi, **kwargs)
 
     def value_at(self, x) -> float:
         """Interpolate the cost-to-go at the latest solve."""
+        self.require_solution()
         return self.result.value_at(x)
 
     def nominal_trajectory(self, tf=None):
@@ -420,21 +422,25 @@ class DynamicProgrammingPlanner(Planner):
     def plot_cost2go(self, **kwargs):
         from minilink.planning.policy_synthesis import plotting
 
+        self.require_solution()
         return plotting.plot_cost2go(self.result, **kwargs)
 
     def plot_policy(self, **kwargs):
         from minilink.planning.policy_synthesis import plotting
 
+        self.require_solution()
         return plotting.plot_policy(self.result, **kwargs)
 
     def animate_cost2go(self, **kwargs):
         from minilink.planning.policy_synthesis import plotting
 
+        self.require_solution()
         return plotting.animate_cost2go(self.result, **kwargs)
 
     def animate_policy(self, **kwargs):
         from minilink.planning.policy_synthesis import plotting
 
+        self.require_solution()
         return plotting.animate_policy(self.result, **kwargs)
 
     # Internal machinery
