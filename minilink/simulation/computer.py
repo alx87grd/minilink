@@ -39,40 +39,18 @@ def as_computer(
     A block whose class defines its own ``%`` builds the Computer there (an MPC
     block checks ``schedule`` against its ``dt_mpc``).
     """
-    from minilink.core.hybrid_composition import (
-        _as_step_diagram,
-        _builds_own_computer,
-        expose_computer_boundary_ports,
-    )
-    from minilink.core.system import DynamicSystem, System
+    from minilink.core.hybrid_composition import _builds_own_computer
 
-    if isinstance(side, Computer):
-        raise TypeError("operand is already a Computer")
-    if isinstance(side, DiagramSystem) and not isinstance(side, StepDiagramSystem):
-        raise TypeError(
-            f"as_computer() requires a step block or StepDiagramSystem, "
-            f"got flow {type(side).__name__}"
-        )
-    if isinstance(side, DynamicSystem) and side.n > 0:
-        raise TypeError(
-            f"continuous plant {side.name!r} belongs in Simulator, not Computer"
-        )
-    if not isinstance(side, (StepDiagramSystem, System)):
-        raise TypeError(
-            f"as_computer() expected System or StepDiagramSystem, "
-            f"got {type(side).__name__}"
-        )
-    if _builds_own_computer(side):
-        return side % schedule
+    if not _builds_own_computer(side):
+        return _build_computer(side, schedule)
 
-    if isinstance(schedule, StepSchedule):
-        step_schedule = schedule
-    else:
-        step_schedule = StepSchedule(dt_base=float(schedule))
-
-    diagram = _as_step_diagram(side)
-    expose_computer_boundary_ports(diagram)
-    return Computer(diagram, step_schedule)
+    computer = side % schedule
+    if not isinstance(computer, Computer):
+        raise TypeError(
+            f"{type(side).__name__} % schedule returned "
+            f"{type(computer).__name__}, not a Computer"
+        )
+    return computer
 
 
 @dataclass
@@ -279,6 +257,44 @@ class Computer:
 
 
 # Internal machinery
+
+
+def _build_computer(
+    side: "System | StepDiagramSystem",
+    schedule: StepSchedule | float,
+) -> Computer:
+    """Plain build behind ``block % schedule``: never defers to the block's own ``%``."""
+    from minilink.core.hybrid_composition import (
+        _as_step_diagram,
+        expose_computer_boundary_ports,
+    )
+    from minilink.core.system import DynamicSystem, System
+
+    if isinstance(side, Computer):
+        raise TypeError("operand is already a Computer")
+    if isinstance(side, DiagramSystem) and not isinstance(side, StepDiagramSystem):
+        raise TypeError(
+            f"as_computer() requires a step block or StepDiagramSystem, "
+            f"got flow {type(side).__name__}"
+        )
+    if isinstance(side, DynamicSystem) and side.n > 0:
+        raise TypeError(
+            f"continuous plant {side.name!r} belongs in Simulator, not Computer"
+        )
+    if not isinstance(side, (StepDiagramSystem, System)):
+        raise TypeError(
+            f"as_computer() expected System or StepDiagramSystem, "
+            f"got {type(side).__name__}"
+        )
+
+    if isinstance(schedule, StepSchedule):
+        step_schedule = schedule
+    else:
+        step_schedule = StepSchedule(dt_base=float(schedule))
+
+    diagram = _as_step_diagram(side)
+    expose_computer_boundary_ports(diagram)
+    return Computer(diagram, step_schedule)
 
 
 def _validate_dt_base(dt_base: float) -> float:

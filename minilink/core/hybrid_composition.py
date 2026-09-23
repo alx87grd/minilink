@@ -19,7 +19,7 @@ from minilink.core.composition import (
 from minilink.core.diagram import DiagramSystem, StepDiagramSystem
 from minilink.core.hybrid_diagram import BoundaryConnection, HybridDiagram
 from minilink.core.system import StepSystem, System
-from minilink.simulation.computer import Computer, StepSchedule
+from minilink.simulation.computer import Computer, StepSchedule, as_computer
 
 # Public API
 
@@ -67,8 +67,21 @@ def hybrid_closed_loop(
         Additional multi-channel boundary edges.
     """
     if computer is None and _builds_own_computer(computer_side):
-        # Wire the runtime the block's own ``%`` built and checked.
-        computer = computer_side % schedule
+        # The block's own ``%`` may reset block state (an MPC block's dual-rate
+        # hooks), so it runs once the plant and ports have passed on a plain wrap.
+        hybrid_closed_loop(
+            _as_step_diagram(computer_side),
+            plant,
+            schedule=schedule,
+            computer_out=computer_out,
+            plant_in=plant_in,
+            plant_out=plant_out,
+            computer_in=computer_in,
+            ref_port=ref_port,
+            output_port=output_port,
+            extra_boundaries=extra_boundaries,
+        )
+        computer = as_computer(computer_side, schedule)
         computer_side, schedule = computer.diagram, computer.schedule
 
     step_diagram = _as_step_diagram(computer_side)

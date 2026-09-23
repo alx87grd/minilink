@@ -925,21 +925,38 @@ class TestMpcComputerScheduleCheck(unittest.TestCase):
                 self.assertAlmostEqual(computer.schedule.dt_base, 0.2)
                 self.assertAlmostEqual(hybrid.computer.schedule.dt_base, 0.2)
 
-    def test_rejected_schedule_keeps_dual_rate_computer(self):
-        """A rejected ``mpc % dt`` leaves the block's dual-rate divisor and hook alone."""
-        planner = _make_numpy_planner(0.5)
-        mpc = ModelPredictiveController(planner, dt_mpc=0.2, warm_start=True)
-        computer = mpc.dual_rate_computer(dt_broadcast=0.05)
-        with self.assertRaises(ValueError):
-            mpc % 0.5
-        computer.compile()
-        computer.reset()
-        for _ in range(5):
-            out = computer.tick(np.array([0.5]))
-        # The after-solve hook builds the nominal cache the broadcast leaf reads,
-        # and the divisor maps base tick 4 to replan tick 1: t_solve = dt_mpc.
-        self.assertTrue(np.all(np.isfinite(out["u_nom"])))
-        self.assertAlmostEqual(mpc.latch.last_t_solve, 0.2)
+    def test_rejected_call_keeps_dual_rate_computer(self):
+        """A rejected single-rate build leaves the block's dual-rate divisor and hook alone."""
+        plant = SingleIntegrator()
+        rejected_calls = {
+            "mpc % bad dt": lambda mpc: mpc % 0.5,
+            "as_computer bad dt": lambda mpc: as_computer(mpc, 0.5),
+            "hybrid bad dt": lambda mpc: hybrid_closed_loop(
+                mpc, plant, schedule=0.5, computer_out="u_ff"
+            ),
+            "hybrid unknown computer_out": lambda mpc: hybrid_closed_loop(
+                mpc, plant, schedule=0.2
+            ),
+            "hybrid plant not a System": lambda mpc: hybrid_closed_loop(
+                mpc, object(), schedule=0.2, computer_out="u_ff"
+            ),
+        }
+        for name, call in rejected_calls.items():
+            with self.subTest(name):
+                planner = _make_numpy_planner(0.5)
+                mpc = ModelPredictiveController(planner, dt_mpc=0.2, warm_start=True)
+                computer = mpc.dual_rate_computer(dt_broadcast=0.05)
+                with self.assertRaises((ValueError, TypeError)):
+                    call(mpc)
+                computer.compile()
+                computer.reset()
+                for _ in range(5):
+                    out = computer.tick(np.array([0.5]))
+                # The after-solve hook builds the nominal cache the broadcast leaf
+                # reads, and the divisor maps base tick 4 to replan tick 1:
+                # t_solve = dt_mpc.
+                self.assertTrue(np.all(np.isfinite(out["u_nom"])))
+                self.assertAlmostEqual(mpc.latch.last_t_solve, 0.2)
 
 
 from minilink.control.mpc import (
