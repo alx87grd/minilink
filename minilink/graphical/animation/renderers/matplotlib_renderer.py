@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from itertools import product
+from pathlib import Path
 
 import matplotlib.animation as animation
 import matplotlib.patches as patches
@@ -33,6 +34,18 @@ from minilink.graphical.common.matplotlib_style import (
 )
 
 _AXIS_LABEL_BY_INDEX = ("X", "Y", "Z")
+
+
+def gif_export_path(file_name) -> Path:
+    """Destination of ``animate(save=True)`` with ``renderer="matplotlib"``.
+
+    ``Animation`` becomes ``Animation.gif``. A name that already ends in
+    ``.gif`` is left as written.
+    """
+    path = Path(file_name)
+    if path.suffix.lower() != ".gif":
+        path = Path(str(file_name) + ".gif")
+    return path
 
 
 def _axis_label_from_column(col):
@@ -570,9 +583,10 @@ class MatplotlibRenderer(AnimationRenderer):
         self, primitives, frames, schedule, file_name: str, *, is_3d: bool = False
     ) -> None:
         fig, ani = self._build_animation(primitives, frames, schedule, is_3d=is_3d)
-        print(f"Saving animation to {file_name}.gif ...")
+        path = gif_export_path(file_name)
+        print(f"Saving animation to {path} ...")
         ani.save(
-            file_name + ".gif",
+            str(path),
             writer="pillow",
             fps=schedule.target_fps,
             dpi=DPI_EXPORT,

@@ -1615,3 +1615,28 @@ class TestAnimationFrameSchedule(unittest.TestCase):
         self.assertEqual(schedule.n_frames, 1)
         self.assertGreater(schedule.interval_ms, 0.0)
         Pendulum().animate(traj, show=False, html=False)
+
+
+class TestGifExport(unittest.TestCase):
+    """``animate(save=True)`` with matplotlib writes ``{file_name}.gif`` exactly once."""
+
+    def test_save_keeps_or_appends_the_gif_suffix(self):
+        import os
+        import tempfile
+
+        sys = DynamicSystem(1, output_dim=1, expose_state=True)
+        sys.skin = debug_state_skin
+        traj = Trajectory(
+            t=np.array([0.0, 0.1]), x=np.array([[0.0, 1.0]]), u=np.zeros((0, 2))
+        )
+        with tempfile.TemporaryDirectory() as tmp:
+            with contextlib.redirect_stdout(io.StringIO()):
+                for name in ("clip.gif", "plain"):
+                    sys.animate(
+                        traj,
+                        save=True,
+                        show=False,
+                        html=False,
+                        file_name=os.path.join(tmp, name),
+                    )
+            self.assertEqual(sorted(os.listdir(tmp)), ["clip.gif", "plain.gif"])

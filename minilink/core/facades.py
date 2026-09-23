@@ -405,10 +405,10 @@ class SharedSystemFacades:
         §4.7). ``camera`` accepts an
         optional override (a constant 4x4 or a ``camera(frames, x, u, t)``
         callable). ``save=True`` writes the backend's file: a Pillow GIF
-        for ``renderer="matplotlib"`` (``{file_name}.gif``), or a
-        self-contained HTML page of the native Meshcat animation for
-        ``renderer="meshcat"`` (``{file_name}.html`` when the name has no
-        suffix).
+        for ``renderer="matplotlib"`` (``{file_name}.gif`` when the name has
+        no ``.gif`` suffix), or a self-contained HTML page of the native
+        Meshcat animation for ``renderer="meshcat"`` (``{file_name}.html``
+        when the name has no suffix).
         """
         from minilink.graphical.animation import Animator
         from minilink.graphical.common.environment import prefers_inline_animation
