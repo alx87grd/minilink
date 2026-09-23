@@ -1074,6 +1074,33 @@ class TestDiscretize(unittest.TestCase):
         step_leaf = discretize(DoubleIntegrator(), params={"dt": 0.05})
         self.assertEqual(step_leaf.dt, 0.05)
         self.assertEqual(step_leaf.params, {})
+        plant = DoubleIntegrator()
+        plant.params = {"dt": 0.05}
+        step_leaf = discretize(plant, params=plant.params)
+        self.assertEqual(step_leaf.dt, 0.05)
+        self.assertEqual(step_leaf.params, {})
+
+    def test_discretize_refuses_two_different_sample_times(self):
+        with self.assertRaisesRegex(ValueError, r"dt=0.1 and params\['dt'\] = 0.02"):
+            discretize(_GainIntegrator(), 0.1, params={"gain": 2.0, "dt": 0.02})
+        step_leaf = discretize(
+            _GainIntegrator(), 0.02, params={"gain": 2.0, "dt": 0.02}
+        )
+        self.assertEqual(step_leaf.dt, 0.02)
+        self.assertEqual(step_leaf.params, {"gain": 2.0})
+
+    def test_assigning_params_refuses_a_dt(self):
+        step_leaf = discretize(Pendulum(), 0.05)
+        with self.assertRaisesRegex(ValueError, r"'dt' = 0.5.*dt = 0.05 s"):
+            step_leaf.params = {**Pendulum().params, "dt": 0.5}
+        self.assertNotIn("dt", step_leaf.params)
+        self.assertNotIn("dt", step_leaf.jacobian("step", "params"))
+        plant = _GainIntegrator()
+        step_leaf = discretize(plant, 0.05, params={"gain": 2.0})
+        plant.params["dt"] = 0.05
+        with self.assertRaisesRegex(ValueError, "the params of"):
+            step_leaf.params = None
+        self.assertEqual(step_leaf.params, {"gain": 2.0})
 
     def test_discretize_refuses_a_dt_in_the_source_params(self):
         plant = _GainIntegrator()
@@ -1204,7 +1231,7 @@ class TestDiscretize(unittest.TestCase):
 
     def test_discretize_rejects_missing_dt(self):
         plant = DoubleIntegrator()
-        with self.assertRaises(ValueError):
+        with self.assertRaisesRegex(ValueError, r"params=\{\.\.\., 'dt': \.\.\.\}"):
             discretize(plant)
 
     def test_discretize_rejects_static_system(self):

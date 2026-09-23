@@ -14,10 +14,11 @@ class DiscretizedDynamicSystem(StepSystem):
     Discrete-time wrapper over a continuous :class:`DynamicSystem`.
 
     The hold interval :attr:`dt` lives on the wrapper and nowhere else:
-    :attr:`params` are handed to the source's ``f`` and ``h`` untouched, so the
-    constructor refuses a ``"dt"`` key in them. The wrapper starts from the
-    source's ``x0`` and copies its state, input and ``y`` labels, units,
-    bounds and nominal values.
+    :attr:`params` are handed to the source's ``f`` and ``h`` untouched, so
+    building the wrapper or assigning :attr:`params` refuses a ``"dt"`` key in
+    them (a key added later in place to the source's live params is not
+    checked). The wrapper starts from the source's ``x0`` and copies its
+    state, input and ``y`` labels, units, bounds and nominal values.
     """
 
     def __init__(
@@ -41,19 +42,9 @@ class DiscretizedDynamicSystem(StepSystem):
         )
         self.name = f"Discretized({source.name})"
         self.source = source
-        self.params_override = params
         self.dt = _positive_dt(dt)
+        self.params = params
         self.integrator = integrator
-
-        # one owner for the sample time: the params that reach f never carry it
-        if "dt" in self.params:
-            where = "params" if params is not None else f"the params of {source.name}"
-            raise ValueError(
-                f"{where} carry 'dt' = {self.params['dt']!r}, a second copy of the "
-                f"sample time dt = {self.dt} s that f would receive and a later "
-                f"edit could set apart; remove 'dt' from {where} and call "
-                f"discretize(system, dt={self.dt})."
-            )
 
         # the source's initial state and state metadata
         state = source.state
@@ -87,7 +78,9 @@ class DiscretizedDynamicSystem(StepSystem):
         """
         The source's live ``params`` while :attr:`params_override` is ``None``
         (the same dict, so an in-place edit reaches the source), else that dict.
-        Assigning ``params`` sets :attr:`params_override`.
+        Assigning ``params`` sets :attr:`params_override`, and refuses a
+        ``"dt"`` key in the params that would reach ``f``: the value, or the
+        source's ``params`` when the value is ``None``.
         """
         if self.params_override is None:
             return self.source.params
@@ -95,6 +88,15 @@ class DiscretizedDynamicSystem(StepSystem):
 
     @params.setter
     def params(self, value: dict | None):
+        # one owner for the sample time: the params that reach f never carry it
+        p = self.source.params if value is None else value
+        if "dt" in p:
+            where = f"the params of {self.source.name}" if value is None else "params"
+            raise ValueError(
+                f"{where} carry 'dt' = {p['dt']!r}, but the sample time of "
+                f"{self.name} is its dt = {self.dt} s, which f never receives; "
+                f"remove 'dt' from {where} and set the sample time through dt alone."
+            )
         self.params_override = value
 
     def h(self, x, u, k=0, params=None):
@@ -169,13 +171,14 @@ def discretize(
     which replaces them (RULES 4.4). The hold interval has one owner, the
     wrapper's :attr:`dt`, and never reaches ``f`` or ``h``: when ``dt`` is
     omitted it is read once from ``params["dt"]``, and a ``"dt"`` key is
-    dropped from the ``params`` given. Two cases are therefore refused, each
-    with the call that fixes it: a ``params`` that holds only ``"dt"`` while
-    the source has params of its own, since it would replace them with
-    ``{}`` (pass ``dt=`` to keep them), and, when ``params`` is ``None``, a
-    source whose own params carry ``"dt"``, since they reach ``f`` live
-    beside :attr:`dt` (remove the key and pass ``dt=``). The wrapper starts
-    from the source's ``x0`` and keeps its state, input and ``y`` metadata.
+    dropped from the ``params`` given. Three cases are therefore refused:
+    ``dt`` and a ``params["dt"]`` that differ, since one would be dropped
+    unseen; a ``params`` that holds only ``"dt"`` while the source has other
+    params, since it would replace them with ``{}`` (pass ``dt=`` to keep
+    them); and, when ``params`` is ``None``, a source whose own params carry
+    ``"dt"``, since they reach ``f`` live beside :attr:`dt` (remove the key
+    and pass ``dt=``). The wrapper starts from the source's ``x0`` and keeps
+    its state, input and ``y`` metadata.
     """
     if not isinstance(system, DynamicSystem):
         raise TypeError(
@@ -187,7 +190,7 @@ def discretize(
         )
 
     dt = _hold_interval(system, dt, params)
-    params = _model_params(system, params)
+    params = _model_params(system, params, dt)
 
     if integrator == "euler":
         return DiscretizedEulerDynamicSystem(system, dt, params)
@@ -205,19 +208,31 @@ def _hold_interval(
     p = system.params if params is None else params
     if dt is None:
         if "dt" not in p:
-            raise ValueError("discretize requires dt=... or params['dt'].")
+            raise ValueError(
+                "discretize requires the sample time: call discretize(system, "
+                "dt=...) or discretize(system, params={..., 'dt': ...})."
+            )
         dt = p["dt"]
+    elif params is not None and "dt" in params and params["dt"] != dt:
+        raise ValueError(
+            f"dt={dt!r} and params['dt'] = {params['dt']!r} are two different "
+            f"sample times, and one would be dropped; pass the sample time once."
+        )
     return dt
 
 
-def _model_params(system: DynamicSystem, params: dict | None) -> dict | None:
+def _model_params(
+    system: DynamicSystem,
+    params: dict | None,
+    dt: float,
+) -> dict | None:
     if params is None:
         return None
-    if set(params) == {"dt"} and system.params:
+    if set(params) == {"dt"} and set(system.params) - {"dt"}:
         raise ValueError(
             f"params={params!r} holds only the sample time, so it would replace "
             f"the params of {system.name} with {{}}; call "
-            f"discretize(system, dt={params['dt']!r}) to keep them."
+            f"discretize(system, dt={dt!r}) to keep them."
         )
     return {key: value for key, value in params.items() if key != "dt"}
 
