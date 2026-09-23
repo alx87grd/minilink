@@ -696,6 +696,20 @@ class TestMpcExportComputer(unittest.TestCase):
         with self.assertRaises(ValueError):
             mpc.export_to_computer(0.1)
 
+    def test_mod_operator_checks_schedule_against_dt_mpc(self):
+        """``mpc % dt`` runs the same ``dt_mpc`` cross-check as export_to_computer."""
+        planner = _planner()
+        for warm_start in (True, False):
+            with self.subTest(warm_start=warm_start):
+                mpc = ModelPredictiveController(
+                    planner, dt_mpc=0.2, warm_start=warm_start
+                )
+                with self.assertRaises(ValueError):
+                    mpc % 0.5
+                computer = mpc % 0.2
+                self.assertIsInstance(computer, Computer)
+                self.assertAlmostEqual(computer.schedule.dt_base, 0.2)
+
     def test_dual_rate_computer_schedule_and_u_nom(self):
         planner = _planner()
         mpc = ModelPredictiveController(planner, dt_mpc=0.2, warm_start=True)

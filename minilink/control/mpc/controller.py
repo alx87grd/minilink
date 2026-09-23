@@ -295,6 +295,10 @@ class ModelPredictiveControllerMixin:
         """``mpc @ plant`` → hybrid via ``export_to_computer() @ plant`` (ZOH)."""
         return self.export_to_computer() @ plant
 
+    def __mod__(self, schedule):
+        """``mpc % schedule`` → :meth:`export_to_computer` (checks ``dt_mpc``)."""
+        return self.export_to_computer(schedule)
+
     def init_debug_figure(self, sys, **kwargs):
         """
         Create a matplotlib figure for live plan visualization.
