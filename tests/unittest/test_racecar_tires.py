@@ -11,9 +11,6 @@ from minilink.dynamics.catalog.vehicles.tires import (
     smooth_sign,
 )
 
-jax = pytest.importorskip("jax", reason="the JAX parity checks need jax")
-jnp = jax.numpy
-
 PARAMS = dict(PUBLIC_RACECAR_PARAMS)
 L = PARAMS["a"] + PARAMS["b"]
 FZ_F = PARAMS["mass"] * PARAMS["gravity"] * PARAMS["b"] / L
@@ -125,8 +122,11 @@ def test_smooth_sign_is_bounded_and_odd():
     assert s[0] == pytest.approx(-s[-1])
 
 
+@pytest.mark.jax
 def test_numpy_and_jax_agree():
     """The same lines give the same numbers on both backends."""
+    jax = pytest.importorskip("jax")
+    jnp = jax.numpy
     args = (0.08, 0.12, 0.05, 3.0)
 
     on_numpy = np.array(brush_tire_forces(*args, PARAMS))
@@ -137,8 +137,11 @@ def test_numpy_and_jax_agree():
     assert on_jax == pytest.approx(on_numpy, rel=1e-6)
 
 
+@pytest.mark.jax
 def test_gradients_are_finite_at_zero_slip():
     """``z_floor`` keeps the slip demand differentiable where every slip is zero."""
+    jax = pytest.importorskip("jax")
+    jnp = jax.numpy
     grad = jax.jacfwd(
         lambda slips: jnp.array(
             brush_tire_forces(slips[0], slips[1], slips[2], 3.0, PARAMS)

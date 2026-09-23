@@ -12,16 +12,23 @@ being written, so they are tests now rather than prose:
 - 6.7 teaching-lane code that picks Ipopt probes for ``cyipopt`` first, so it
   still runs on an install without it (a cart-pole demo hard-coded it).
 
-The merge gate drifted the same way: the one CI job that installs jax ran the
-demos but never ``pytest``, so no JAX test gated a merge. That is a test too.
+The test suite and the merge gate drifted the same way, so they are tests too:
+
+- 6.5 a missing extra skips its own tests only (a mid-file
+  ``pytest.importorskip("jax")`` skipped every NumPy test of its module);
+- the one CI job that installs jax runs ``pytest`` (it ran the demos only, so no
+  JAX test gated a merge).
 """
 
 from __future__ import annotations
 
 import ast
 import json
+import os
 import pathlib
 import re
+import subprocess
+import sys
 import unittest
 
 REPO = pathlib.Path(__file__).resolve().parents[2]
@@ -72,6 +79,46 @@ NAMED_CLASS_MODULES = (
 # 6.7 — the teaching lane, which must run without the optional Ipopt build.
 TEACHING_EXAMPLE_ROOTS = ("examples/tutorial", "examples/teaching", "examples/demos")
 
+
+# 6.5 — the unit-test modules that are JAX from end to end, the only ones a
+# missing jax may skip whole.  Elsewhere the ``jax`` marker skips the JAX tests
+# and the NumPy tests beside them still run.
+JAX_ONLY_TEST_MODULES = [
+    "tests/unittest/test_engine_jax.py",
+    "tests/unittest/test_jax_planning.py",
+    "tests/unittest/test_rl_planner.py",
+    "tests/unittest/test_ur5_jax.py",
+]
+
+# Collects the unit tests with jax blocked and prints, as JSON, the modules
+# skipped or broken at collection and the jax-marked tests left to run.
+COLLECT_WITHOUT_JAX = r"""
+import json, sys
+sys.modules["jax"] = None
+import pytest
+
+
+class Collection:
+    def __init__(self):
+        self.skipped_modules, self.broken_modules, self.jax_tests_left = [], [], []
+
+    def pytest_collectreport(self, report):
+        if report.skipped:
+            self.skipped_modules.append(report.nodeid)
+        if report.failed:
+            self.broken_modules.append(report.nodeid)
+
+    def pytest_collection_finish(self, session):
+        for item in session.items:
+            if item.get_closest_marker("jax") and not item.get_closest_marker("skip"):
+                self.jax_tests_left.append(item.nodeid)
+
+
+collection = Collection()
+pytest.main(["--collect-only", "-p", "no:cacheprovider", "tests/unittest"],
+            plugins=[collection])
+print(json.dumps(vars(collection)))
+"""
 
 # The merge gate: a CI job that installs the jax extra must also run pytest.
 CI_WORKFLOW = ".github/workflows/test.yml"
@@ -205,6 +252,27 @@ class TestOptionalIpopt(unittest.TestCase):
                     f"{path.relative_to(REPO)} picks 'ipopt' without probing "
                     "importlib.util.find_spec('cyipopt'); fall back to 'scipy_slsqp'",
                 )
+
+
+class TestOptionalDependencies(unittest.TestCase):
+    """RULES 6.5 — a missing extra skips its own tests, never the NumPy ones."""
+
+    def test_a_missing_jax_skips_only_the_jax_tests(self):
+        env = {**os.environ, "PYTHONPATH": str(REPO), "MPLBACKEND": "Agg"}
+        result = subprocess.run(
+            [sys.executable, "-c", COLLECT_WITHOUT_JAX],
+            cwd=REPO,
+            env=env,
+            capture_output=True,
+            text=True,
+            timeout=600,
+        )
+        self.assertEqual(result.returncode, 0, result.stderr[-3000:])
+        collection = json.loads(result.stdout.strip().splitlines()[-1])
+
+        self.assertEqual(collection["broken_modules"], [])
+        self.assertEqual(sorted(collection["skipped_modules"]), JAX_ONLY_TEST_MODULES)
+        self.assertEqual(collection["jax_tests_left"], [])
 
 
 class TestMergeGate(unittest.TestCase):

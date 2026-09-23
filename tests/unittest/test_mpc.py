@@ -3,14 +3,11 @@
 import unittest
 import numpy as np
 import pytest
-
-pytest.importorskip("jax")
-import jax.numpy as jnp
 import matplotlib
 
 matplotlib.use("Agg")
 from minilink.control.mpc import Command, ModelPredictiveController
-from minilink.core.backends import configure_jax
+from minilink.core.backends import configure_jax, require_jax_numpy
 from minilink.core.costs import QuadraticCost
 from minilink.core.hybrid_diagram import HybridDiagram
 from minilink.core.system import DynamicSystem, StepSystem, System
@@ -36,6 +33,7 @@ class JaxSingleIntegrator(DynamicSystem):
         self.inputs["u"].upper_bound = np.array([10.0])
 
     def f(self, x, u, t=0, params=None):
+        jnp = require_jax_numpy()
         return jnp.array([u[0]])
 
     def h(self, x, u, t=0, params=None):
@@ -278,7 +276,6 @@ class TestModelPredictiveController(unittest.TestCase):
 
 from unittest.mock import patch
 
-pytest.importorskip("jax")
 from minilink.control.mpc import ModelPredictiveController
 from minilink.core.system import DynamicSystem, System
 
@@ -360,7 +357,6 @@ class TestMPCAlgebraicController(unittest.TestCase):
             ModelPredictiveController(planner, dt_mpc=0.2, warm_start=False)
 
 
-pytest.importorskip("jax")
 from minilink.control.mpc.utilities import _shift_plan_trajectory, mpc_warm_start_guess
 from minilink.core.system import DynamicSystem, StepSystem
 from minilink.core.trajectory import Trajectory
@@ -466,7 +462,6 @@ class TestMPCWarmStartController(unittest.TestCase):
             ModelPredictiveController(planner, dt_mpc=0.2, warm_start=True)
 
 
-pytest.importorskip("jax")
 from minilink.core.system import DynamicSystem
 
 
@@ -538,7 +533,6 @@ class TestTrajectoryOptimizationPlanner(unittest.TestCase):
         self.assertIsInstance(plan.solver, TrajectoryOptimizationRecord)
 
 
-pytest.importorskip("jax")
 from minilink.planning.initial_guess import default_initial_trajectory
 
 
@@ -649,7 +643,6 @@ class TestMPCSolveTrajectoryFrom(unittest.TestCase):
         self.assertIsNotNone(planner.last_optimization_result.z)
 
 
-pytest.importorskip("jax")
 from minilink import BicycleDynRate
 from minilink.simulation.computer import Computer
 
@@ -674,6 +667,8 @@ def _planner():
     )
 
 
+@pytest.mark.optional
+@pytest.mark.jax
 class TestMpcExportComputer(unittest.TestCase):
     def test_step_block_defaults_schedule(self):
         planner = _planner()
@@ -905,7 +900,6 @@ class TestMPCNumPyRebuild(unittest.TestCase):
         self.assertEqual(len(n_compile_parametric), 0)
 
 
-pytest.importorskip("jax")
 from minilink.control.mpc import (
     ModelPredictiveController,
     mpc_animation_overlays,
@@ -1038,7 +1032,6 @@ class TestMpcHybridStraightLine(unittest.TestCase):
         self.assertNotIn("TrajectoryPolyline", names)
 
 
-pytest.importorskip("jax")
 from minilink.blocks.routing import Demux
 from minilink.control.mpc.utilities import mpc_default_computer_x0, mpc_warm_start_guess
 from minilink.core.diagram import DiagramSystem, StepDiagramSystem
@@ -1158,7 +1151,6 @@ class TestMpcHybridWarmStartParity(unittest.TestCase):
             )
 
 
-pytest.importorskip("jax")
 from minilink.control.mpc.utilities import (
     mpc_default_computer_x0,
     warm_start_guess_from_prev_plan,

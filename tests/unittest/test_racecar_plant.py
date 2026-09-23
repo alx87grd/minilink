@@ -7,9 +7,6 @@ from minilink import KinematicBicycle
 from minilink.catalog import UdeSRacecar, UdeSRacecarDyn
 from minilink.dynamics.catalog.vehicles.racecar import stiff_tires
 
-jax = pytest.importorskip("jax", reason="the JAX parity checks need jax")
-jnp = jax.numpy
-
 
 def cruise_state(car, speed, delta=0.0, power=0.0):
     """State of the car rolling at ``speed`` with its rear wheel matched."""
@@ -46,12 +43,15 @@ def test_ports_and_state_layout():
     assert car.h(car.x0, np.zeros(car.m)).shape == (9,)
 
 
+@pytest.mark.jax
 def test_solver_hint_is_under_the_fastest_mode():
     """The hint is shorter than the fastest time constant of the linearized plant.
 
     Measured on the Jacobian itself rather than on a restatement of the formula that
     produced the hint, so that a mode the estimate forgets shows up here.
     """
+    jax = pytest.importorskip("jax")
+    jnp = jax.numpy
     car = UdeSRacecarDyn(named_ports=False)
     hint = car.solver_info["smallest_time_constant"]
 
@@ -229,8 +229,11 @@ def test_coasting_never_gains_energy():
     assert np.max(np.diff(energy)) < 1.0e-6
 
 
+@pytest.mark.jax
 def test_numpy_and_jax_agree_on_the_equations_and_the_ports():
     """One equation path, two backends."""
+    jax = pytest.importorskip("jax")
+    jnp = jax.numpy
     car = UdeSRacecarDyn()
     x = np.array([1.0, 0.4, 0.2, 4.0, -0.3, 0.8, 85.0, 0.1, 30.0])
     u = np.array([40.0, 0.2])
@@ -260,8 +263,11 @@ def test_numpy_and_jax_agree_on_the_equations_and_the_ports():
     assert on_jax == pytest.approx(on_numpy, rel=1e-6, abs=1e-9)
 
 
+@pytest.mark.jax
 def test_jacobian_is_finite_at_rest():
     """The car parked at the origin still has a usable linearization."""
+    jax = pytest.importorskip("jax")
+    jnp = jax.numpy
     car = UdeSRacecarDyn()
 
     A = np.asarray(jax.jacfwd(car.f)(jnp.zeros(car.n), jnp.zeros(car.m)))

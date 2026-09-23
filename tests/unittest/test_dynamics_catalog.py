@@ -588,7 +588,6 @@ class TestMechanicalJointPortLabels(unittest.TestCase):
 
 import pytest
 
-pytest.importorskip("jax")
 from minilink.core.backends import configure_jax
 from examples.projects.car_trajopt.vehicles.ladder import (
     BicycleDynEngine,
@@ -597,6 +596,7 @@ from examples.projects.car_trajopt.vehicles.ladder import (
 from minilink.dynamics.catalog.vehicles.dynamic_bicycle import BicycleDynRate
 
 
+@pytest.mark.jax
 class TestBicycleDynRate(unittest.TestCase):
     def setUp(self):
         configure_jax(enable_x64=True)
@@ -638,6 +638,7 @@ class TestBicycleDynRate(unittest.TestCase):
         self.assertFalse(np.allclose(dx_nom, dx_heavy))
 
 
+@pytest.mark.jax
 class TestBicycleDynServo(unittest.TestCase):
     def setUp(self):
         configure_jax(enable_x64=True)
@@ -681,6 +682,7 @@ class TestBicycleDynServo(unittest.TestCase):
         self.assertFalse(np.allclose(dx_nom, dx_soft))
 
 
+@pytest.mark.jax
 class TestBicycleDynEngine(unittest.TestCase):
     def setUp(self):
         configure_jax(enable_x64=True)

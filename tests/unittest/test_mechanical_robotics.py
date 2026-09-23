@@ -271,9 +271,6 @@ class TestGeneralizedMechanicalSystem(unittest.TestCase):
         )
 
 
-pytest.importorskip("jax")
-import jax
-import jax.numpy as jnp
 from minilink.core.backends import configure_jax
 from minilink.dynamics.abstraction.mechanical import (
     JaxMechanicalSystem,
@@ -288,12 +285,15 @@ class TestMechanicalSystemJax(unittest.TestCase):
         configure_jax(enable_x64=True)
 
     def test_f_is_jaxpr_traceable(self):
+        jax = pytest.importorskip("jax")
+        jnp = pytest.importorskip("jax.numpy")
         sys = JaxMechanicalSystem(dof=2)
         x = jnp.zeros(4)
         u = jnp.zeros(2)
         jax.make_jaxpr(lambda xx, uu: sys.f(xx, uu))(x, u)
 
     def test_f_matches_numpy_1dof_linear_regime(self):
+        jnp = pytest.importorskip("jax.numpy")
         sys_j = JaxMechanicalSystem(dof=1)
         sys_n = MechanicalSystem(dof=1)
         x = jnp.array([0.2, -0.1])
@@ -305,6 +305,7 @@ class TestMechanicalSystemJax(unittest.TestCase):
         np.testing.assert_allclose(np.asarray(dx_j), dx_n, rtol=1e-05, atol=1e-05)
 
     def test_f_matches_numpy_2dof_nontrivial_regime(self):
+        jnp = pytest.importorskip("jax.numpy")
 
         class _NumpyTwoLink(MechanicalSystem):
             def H(self, q, params=None):
@@ -369,6 +370,7 @@ class TestMechanicalSystemJax(unittest.TestCase):
         np.testing.assert_allclose(dx_j, dx_n, rtol=1e-09, atol=1e-09)
 
     def test_f_uses_explicit_params_in_matrix_hooks(self):
+        jnp = pytest.importorskip("jax.numpy")
 
         class MassSystem(JaxMechanicalSystem):
             def __init__(self):
@@ -394,6 +396,7 @@ class TestMechanicalSystemJax(unittest.TestCase):
         self.assertEqual(p.n, 2)
 
     def test_jax_pendulum_f_matches_numpy(self):
+        jnp = pytest.importorskip("jax.numpy")
         from benchmarks.systems.basic import JaxPendulum, NumpyPendulum
 
         np_sys = NumpyPendulum(gravity=9.81, length=1.0, damping=0.1)

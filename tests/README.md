@@ -216,3 +216,8 @@ Cursor Cloud sessions.
 When adding optional behavior, put the import inside a guarded block and add the
 appropriate marker(s). This keeps `pytest -m "not optional"` a dependable
 behavior suite for minimal installations.
+
+A test marked `jax` is skipped when jax is not installed (`tests/unittest/conftest.py`).
+Guard JAX tests per test or per class: a module-level `pytest.importorskip("jax")`
+skips every test of its module, so it belongs only in the modules that are JAX
+from end to end (listed in `test_repo_contract.py`).

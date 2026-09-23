@@ -8,9 +8,6 @@ from minilink.control import PurePursuit
 from minilink.control.geometric import is_closed
 from minilink.planning.spatial.paths import circuit_waypoints
 
-jax = pytest.importorskip("jax", reason="the JAX parity checks need jax")
-jnp = jax.numpy
-
 WHEELBASE = 0.34
 LOOKAHEAD = 0.6
 
@@ -300,9 +297,12 @@ def test_an_open_path_stops_at_its_end_instead_of_wrapping():
 # Backends
 
 
+@pytest.mark.jax
 @pytest.mark.parametrize("where", ["corner", "seam", "off the path"])
 def test_the_law_traces_under_jax(where):
     """The tracker runs inside a compiled loop, with the same number out."""
+    jax = pytest.importorskip("jax")
+    jnp = jax.numpy
     path = circuit_waypoints(length=8.0, width=6.0, radius=1.5)
     tracker = PurePursuit(
         path, wheelbase=WHEELBASE, lookahead=LOOKAHEAD, rear_offset=0.17
@@ -386,8 +386,11 @@ def test_an_impossible_rate_limiter_is_refused():
         RateLimiter(lower=1.0, upper=-1.0)
 
 
+@pytest.mark.jax
 def test_the_rate_limiter_traces_under_jax():
     """Same equation on both backends, inside a compiled step."""
+    jax = pytest.importorskip("jax")
+    jnp = jax.numpy
     block = RateLimiter(rate_max=2.0, tau=0.05, lower=-1.0, upper=1.0)
     x, u = np.array([0.3]), np.array([4.0])
 
