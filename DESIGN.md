@@ -272,7 +272,9 @@ The research rungs (`Holonomic`, `HolonomicAccel`, `BicycleKin`, `BicycleAcc`,
   (same port auto-wiring as continuous ``ctl @ plant`` via
   :func:`~minilink.core.composition.resolve_standard_feedback`);
   :meth:`~minilink.control.mpc.controller.ModelPredictiveControllerMixin.export_to_computer`
-  for warm-start MPC (also via ``mpc % schedule``).
+  for MPC blocks, warm-start and algebraic alike; ``mpc % schedule``,
+  ``as_computer(mpc, dt)`` and ``hybrid_closed_loop(mpc, ...)`` all go through it
+  and refuse a ``dt`` other than ``dt_mpc``.
   Catalog plant :class:`~minilink.dynamics.catalog.vehicles.dynamic_bicycle.BicycleDynRate`
   exposes standard ``u`` / ``y`` ports for hybrid composition; the research
   ladder (``examples/projects/car_trajopt/vehicles/ladder.py``) runs through
@@ -492,7 +494,9 @@ deliberate: subsystem operands are always shared references (never copied), so a
 `DiagramSystem` explicitly when you need an independent topology.
 `@` (both the continuous loop `ctl @ plant` and the sampled loop
 `ctl % dt @ plant`) and `feedback()` return a new diagram and never modify
-their operands; only `+` and `>>` extend a shortcut-built left diagram in place.
+their operands; `+` and `>>` are the operators that extend a shortcut-built
+left diagram in place. Known gap: `step_diagram % dt` on a user-built
+`StepDiagramSystem` still adds its boundary ports to that diagram (TODO D3).
 
 **Shortcut subsystem ids** default by role: `ref` (sources), `ctl` (controllers),
 `sys` (stateful plants), with numeric suffix on collision (`sys2`, …). Override

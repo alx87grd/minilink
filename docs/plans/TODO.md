@@ -47,18 +47,10 @@ the triage in [2026-09-22-improvement-suggestions.md](../reviews/2026-09-22-impr
 - [ ] **R2 CI on the working branch** **[ask]**. `.github/workflows/test.yml` and `docs.yml`
   trigger on `main`, `refactor-v4`, `dev-alex`; add `dev` (or whichever branch carries the
   work) so the merge gate runs before a PR. One line each.
-  The JAX half of the gate (the `regression` job runs `pytest`) lands with S58.
+  The JAX half of the gate landed 2026-09-23: the `regression` job runs `pytest` with JAX.
 - [ ] **R3 Ruff runs itself**: `ruff` and `ruff-format` hooks in `.pre-commit-config.yaml`,
   pinned to the dev extra's ruff (scan: tests-ci#6). Done when `pre-commit run --all-files`
   matches the CI lint steps.
-- [ ] **S58 Bug fixes from the 2026-09-22 scan** (in flight 2026-09-23). The 46 reported bugs
-  in [the scan's §2](../reviews/2026-09-22-improvement-suggestions.md#2-bugs), each reproduced
-  first, then fixed with a regression test, one commit per fix or per file. Two carry a
-  ruling (2026-09-23, "fix all the bugs"): the time grid ends at `tf`, one sample fewer where
-  `dt` does not divide the horizon, with regression baselines updated; the quarter-car damper
-  acts on the road's vertical velocity. The fixes carry seven suggestions whole (scan:
-  core#0, core#1, analysis#0, planning#2, tests-ci#0, tests-ci#1, tests-ci#2). Done when every
-  bug is fixed or recorded as not reproduced in the scan document.
 - [ ] **S59 Docs drift** (scan: docs-gov#3, docs-gov#4, docs-gov#5, docs-gov#7, docs-gov#8,
   docs-gov#12, docs-gov#13, tests-ci#4, control#12, analysis#12): the CI commands written
   once (the tests/README agent table), AGENTS naming the jobs and the regression flags given
@@ -109,9 +101,11 @@ states; every step is name-preserving for the GRO860 notebooks.
   `problem.params.cost` through. Done when every planner baseline `cmp`s and `jax.grad` of a
   trajopt objective with respect to `Q` runs.
   Also (scan: core#3, core#4): `discount_rate` a constructor field (or a `params` entry) that
-  `ScaledCost` forwards and `SumCost` reconciles (S58 makes the composites keep it first);
+  `ScaledCost` forwards and `SumCost` reconciles (the composites keep it since 2026-09-23);
   `validate_diagram_params` checks each per-block dict against the block's keys, so a partial
-  dict fails at the setter instead of inside `f`.
+  dict fails at the setter instead of inside `f`. The Monte Carlo evaluator and the gym reward
+  never apply `problem.params.cost` while the DP table does, so the two disagree on a
+  parametric cost (found 2026-09-23).
 - [ ] **A3 Workspace geometry (S57)** **[ask — core]**. [geometry-module.md](geometry-module.md)
   implementation steps 1–6: `core/geometry/` package (shapes, paths, track, scene, probes,
   `bind`, spatial fields, grid, catalog `oval_circuit` / `racecar_circuit` /
@@ -207,8 +201,8 @@ Plan: [gro501-classical-control.md](gro501-classical-control.md) (P1, F1, F2, F4
 - [ ] **P6 Discrete (z) tier** **[held 2026-09-07]**. Default: teach with `discretize` +
   simulation. Reopen only if the sommatif examines z-plane analysis.
   When it reopens: an exact zero-order-hold option on `discretize`, shared with
-  `step_response` (scan: analysis#1). The `discretize` bugs (dt in params, dropped `x0`) are
-  fixed under S58: the sample time is `disc.dt`, `params` reach the source untouched, and
+  `step_response` (scan: analysis#1). The `discretize` bugs (dt in params, dropped `x0`) were
+  fixed 2026-09-23: the sample time is `disc.dt`, `params` reach the source untouched, and
   the wrapper keeps the source's `x0` and signal metadata. The sample time has one owner:
   a `"dt"` key in the params that reach `f` is refused at construction and on
   `disc.params = ...`, so the fallback to the source's own `params["dt"]` is gone;
@@ -234,8 +228,8 @@ Plan: [gro501-classical-control.md](gro501-classical-control.md) (P1, F1, F2, F4
 - [ ] **C1 Pyro parity** open rows — [pyro-port-remaining.md](pyro-port-remaining.md); then
   the pyro → minilink migration guide in README from the name map there. **[ask]** for the
   README.
-  Re-audit the table against the code first; S58 corrects the three landed rows the scan
-  found (scan: docs-gov#11).
+  Re-audit the table against the code first; the three landed rows the scan found were
+  corrected 2026-09-23 (scan: docs-gov#11).
 - [ ] **C2 GMC714 modelling ladder**: manipulators + the four-rung vehicle ladder as a
   `02_dynamics` lesson; robotic PID wrappers (`JointPD`, `EndEffectorPD` twins).
   Also: one constructor contract for the robotic laws (scan: control#6).
@@ -431,6 +425,19 @@ pick):
   (scan: compile-sim#11, compile-sim#12).
 - [ ] RRT* tracks goal nodes incrementally; the transcriptions lower the state set
   member-wise (scan: planning#6, planning#12).
+- [ ] **Third-round notes from the 2026-09-23 fix reviews** (small, or design questions;
+  details in the review records of docs/reviews/2026-09-22-improvement-suggestions.md §2.4):
+  `step_diagram % dt` adds boundary ports to a user `StepDiagramSystem` (DESIGN §4 names the
+  gap); the sampled `@` copy of a one-block plant diagram drops a diagram-level function
+  output port; a `%` override that ends in `as_computer(self, schedule)` would recurse, and
+  `System.__mod__` now calls a private helper; `RealtimeSimulator`'s offline automatic `dt`
+  reads the hint without `refresh()`; an explicit `backend='jax'` on a NumPy-only set or cost
+  raises a raw trace error; `discretize(diagram, params={'dt': v})` is refused although a
+  diagram would keep its blocks' params, and a raising params setter can leave a diagram
+  half-updated; `JaxMechanicalSystem` keeps the integer-state dtype defect (retires with the
+  ROADMAP §6 decision); assigning into `q.labels[i]` in place no longer sticks; the gravity
+  hook's signature is read on every call; the collocation demo's SLSQP fallback is not run in
+  CI (its manifest entry still requires Ipopt).
 - [ ] Bare `import jax` in `analysis/lyapunov.py` and
   `trajectory_optimization/parametric_evaluator.py` → `require_jax()` (RULES 5.12).
 
@@ -485,8 +492,9 @@ After two cohorts; each is a design conversation before code. **[ask — core]**
 - [ ] **S29** `DiagramSystem.x0` / `n` / `state` as derived properties (mirror the live
   `params` view); `Simulator` drops its pre-read `refresh()`.
   Also (scan: core#11, dynamics#10, examples#14): one owner for the initial state (`x0` or
-  `state.nominal_value`); the racecar solver hint and `WhiteNoise` stop depending on the
-  pre-read `refresh()`.
+  `state.nominal_value`); the racecar solver hint, `WhiteNoise` and the diagrams' bubbled
+  solver hints (re-bubbled by `refresh()` since 2026-09-23) stop depending on the pre-read
+  `refresh()`.
 - [ ] **S37** Evaluator / solver re-layering: evaluators keep pure maps and one scannable
   step; integrators move to `simulation/solvers/`. Then **S27** Diffrax as an optional JAX
   solver backend.

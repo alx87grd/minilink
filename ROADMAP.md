@@ -202,10 +202,9 @@ term's hygiene:
 - **R3** Keep `ruff check .` and `ruff format --check .` green on every
   push (the 2026-09-22 pass restored them after the racecar demos landed),
   with pre-commit hooks so the check runs itself.
-- **S58** Fix the bugs the 2026-09-22 improvement scan reported
-  ([docs/reviews/2026-09-22-improvement-suggestions.md](docs/reviews/2026-09-22-improvement-suggestions.md)),
-  among them: `discretize()` cannot step a closed loop, the CI merge gate
-  runs no JAX test, and time grids end one sample past `tf`.
+- The 46 bugs of the 2026-09-22 improvement scan and ten sibling defects
+  its fix reviews found landed 2026-09-23 (S58; outcomes in
+  [docs/reviews/2026-09-22-improvement-suggestions.md](docs/reviews/2026-09-22-improvement-suggestions.md)).
 - **S59** Docs drift and **S60** the teaching surface checked by a test and
   documented page by page.
 - **S49** Retire the two Stable-Baselines3 teaching notebooks once the

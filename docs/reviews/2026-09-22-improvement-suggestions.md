@@ -182,6 +182,28 @@ undershoot defect as its rise time and was fixed alongside (`e06ba19`).
 | docs-gov#5 | The pyro parity table marks `ss2tf`, `TrajectoryLQRController` and PI/PD landed | `fb76246` |
 | docs-gov#6 | The estimation and identification docstrings point at their ROADMAP steps | `fb76246` |
 
+### 2.4 Second-round defects (found by the fix reviewers, 2026-09-23)
+
+The reviewers of §2.3 found ten defects beside the fixes they checked, the same
+kind of bug at a sibling call site. Each went through the same fix, review and
+repair loop.
+
+| Defect | Outcome | Commit |
+|--------|---------|--------|
+| A loop kept a plant solver hint changed after composition | A diagram's `refresh()` bubbles the hints again, so `Simulator` sees the current hint | `1f32b71`, `3048260` |
+| `solver_warnings` hard-coded the default time constant | Reads `DEFAULT_SMALLEST_TIME_CONSTANT` | `fb95aa3` |
+| `(ctl % dt) @ plant_diagram` added ports to the user's plant | The sampled `@` leaves a plant diagram operand unchanged; DESIGN §4 states the rule | `e611091` |
+| A comparison scored a NumPy-only and a JAX law on different draws | `Comparison.evaluate` resolves `backend='auto'` once for every policy | `9a95aeb` |
+| A NumPy-only constraint set or cost crashed the `'auto'` backend | The probe traces the set, cost, terminal cost and callable price first | `308feb2` |
+| The gym view of a problem read `X` without its set parameters | `ProblemEnv.step` reads `problem.params.sets` | `0a9becb` |
+| `as_computer(mpc, dt)` and `hybrid_closed_loop(mpc, ...)` skipped the `dt_mpc` check | Both defer to the block's own export | `9836870`, `8414329` |
+| A rejected `mpc % bad_dt` had already reset the dual-rate hooks | The schedule is checked first | `d80b41b` |
+| `discretize(sys, params={'dt': v})` built a wrapper that failed at step time | The sample time has one owner (`disc.dt`); a `dt` key in params is refused | `a3ffc7b`, `2473cb7`, `15eee70`, `4a63d2c`, `4d1dd64` |
+| The transcriptions failed on a set whose margin is a scalar | Scalar margins transcribe as one inequality each | `401c3f6` |
+
+A third tier of review notes (smaller, or design questions rather than wrong
+results) is recorded on the workboard, TODO §5 D3, rather than chased further.
+
 ## 3. Propositions
 
 Ordered by where the work lands. Each line names the finder id (band#n) so
@@ -323,7 +345,7 @@ false green.
 1. This document (2026-09-22).
 2. Workboard rows and ROADMAP §6 decisions (2026-09-23, done).
 3. S58: every bug in §2 reproduced, fixed with a regression test, and
-   committed in small batches; the outcome of each is recorded in §2.
+   committed in small batches (2026-09-23, done; §2.3 and §2.4).
 
 ## Appendix: every finding, by band
 
