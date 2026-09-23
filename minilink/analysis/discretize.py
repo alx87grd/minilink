@@ -13,9 +13,10 @@ class DiscretizedDynamicSystem(StepSystem):
     """
     Discrete-time wrapper over a continuous :class:`DynamicSystem`.
 
-    The hold interval :attr:`dt` lives on the wrapper; :attr:`params` are
-    handed to the source's ``f`` and ``h`` untouched. The wrapper starts from
-    the source's ``x0`` and copies its state, input and ``y`` labels, units,
+    The hold interval :attr:`dt` lives on the wrapper and nowhere else:
+    :attr:`params` are handed to the source's ``f`` and ``h`` untouched, so the
+    constructor refuses a ``"dt"`` key in them. The wrapper starts from the
+    source's ``x0`` and copies its state, input and ``y`` labels, units,
     bounds and nominal values.
     """
 
@@ -43,6 +44,16 @@ class DiscretizedDynamicSystem(StepSystem):
         self.params_override = params
         self.dt = _positive_dt(dt)
         self.integrator = integrator
+
+        # one owner for the sample time: the params that reach f never carry it
+        if "dt" in self.params:
+            where = "params" if params is not None else f"the params of {source.name}"
+            raise ValueError(
+                f"{where} carry 'dt' = {self.params['dt']!r}, a second copy of the "
+                f"sample time dt = {self.dt} s that f would receive and a later "
+                f"edit could set apart; remove 'dt' from {where} and call "
+                f"discretize(system, dt={self.dt})."
+            )
 
         # the source's initial state and state metadata
         state = source.state
@@ -155,14 +166,16 @@ def discretize(
     with ``integrator`` ``"rk4"`` or ``"euler"`` (the same word as ``Sys2Gym``),
     the input held. ``p`` defaults to the wrapper's :attr:`params`: the
     source's live ``params`` when ``params`` is ``None``, else the dict given,
-    which replaces them (RULES 4.4). The hold interval stays on the wrapper as
-    :attr:`dt` and never reaches ``f`` or ``h``: when ``dt`` is omitted it is
-    read once from ``params["dt"]``, and a ``"dt"`` key is dropped from the
-    ``params`` given. A ``params`` that holds only ``"dt"`` is therefore
-    refused while the source has params of its own, since it would replace
-    them with ``{}``: pass the sample time as ``dt=`` to keep them. The
-    wrapper starts from the source's ``x0`` and keeps its state, input and
-    ``y`` metadata.
+    which replaces them (RULES 4.4). The hold interval has one owner, the
+    wrapper's :attr:`dt`, and never reaches ``f`` or ``h``: when ``dt`` is
+    omitted it is read once from ``params["dt"]``, and a ``"dt"`` key is
+    dropped from the ``params`` given. Two cases are therefore refused, each
+    with the call that fixes it: a ``params`` that holds only ``"dt"`` while
+    the source has params of its own, since it would replace them with
+    ``{}`` (pass ``dt=`` to keep them), and, when ``params`` is ``None``, a
+    source whose own params carry ``"dt"``, since they reach ``f`` live
+    beside :attr:`dt` (remove the key and pass ``dt=``). The wrapper starts
+    from the source's ``x0`` and keeps its state, input and ``y`` metadata.
     """
     if not isinstance(system, DynamicSystem):
         raise TypeError(

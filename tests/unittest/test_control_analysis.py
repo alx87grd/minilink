@@ -1006,7 +1006,7 @@ def _rk4_step(f, x, u, t, dt, params):
 class _GainIntegrator(DynamicSystem):
     def __init__(self, gain=1.0):
         super().__init__(n=1, input_dim=1, output_dim=1, expose_state=True)
-        self.params = {"gain": float(gain), "dt": 0.05}
+        self.params = {"gain": float(gain)}
 
     def f(self, x, u, t=0.0, params=None):
         p = self.params if params is None else params
@@ -1074,6 +1074,19 @@ class TestDiscretize(unittest.TestCase):
         step_leaf = discretize(DoubleIntegrator(), params={"dt": 0.05})
         self.assertEqual(step_leaf.dt, 0.05)
         self.assertEqual(step_leaf.params, {})
+
+    def test_discretize_refuses_a_dt_in_the_source_params(self):
+        plant = _GainIntegrator()
+        plant.params["dt"] = 0.05
+        for dt in (None, 0.05, 0.1):
+            with self.assertRaisesRegex(ValueError, "'dt'"):
+                discretize(plant, dt)
+        with self.assertRaisesRegex(ValueError, "'dt'"):
+            DiscretizedRK4DynamicSystem(plant, 0.05)
+        step_leaf = discretize(plant, params=plant.params)
+        self.assertEqual(step_leaf.dt, 0.05)
+        self.assertNotIn("dt", step_leaf.params)
+        self.assertNotIn("dt", step_leaf.jacobian("step", "params"))
 
     def test_step_params_override_gain(self):
         plant = _GainIntegrator(gain=1.0)
