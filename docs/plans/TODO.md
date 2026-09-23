@@ -209,9 +209,13 @@ Plan: [gro501-classical-control.md](gro501-classical-control.md) (P1, F1, F2, F4
   When it reopens: an exact zero-order-hold option on `discretize`, shared with
   `step_response` (scan: analysis#1). The `discretize` bugs (dt in params, dropped `x0`) are
   fixed under S58: the sample time is `disc.dt`, `params` reach the source untouched, and
-  the wrapper keeps the source's `x0` and signal metadata. Two follow-ups remain.
-  **[ask]** keep the `params["dt"]` fallback (`dt=` omitted) or make `dt` required: under
-  RULES 4.4, `params={"dt": 0.05}` alone now replaces the plant's params, so pass `dt=`.
+  the wrapper keeps the source's `x0` and signal metadata. The sample time has one owner:
+  a `"dt"` key in the params that reach `f` is refused at construction and on
+  `disc.params = ...`, so the fallback to the source's own `params["dt"]` is gone;
+  `params={"dt": 0.05}` alone is refused for a source with other params (pass `dt=`), and
+  `dt=` with a different `params["dt"]` is refused. Two follow-ups remain.
+  **[ask]** keep the remaining `params["dt"]` fallback (`dt=` omitted, read from the
+  `params=` dict given to `discretize`) or make `dt` required.
   A source whose `y` feeds through from a port other than `u` does not discretize
   (`PendulumWithNoisePort`: unknown input dependency `v`), because the wrapper stacks every
   port into one `u`; map `y`'s dependencies to `("u",)` or mirror the source's ports.
