@@ -7,7 +7,7 @@ from unittest.mock import patch
 import numpy as np
 import pytest
 from minilink.core.backends import array_module
-from minilink.core.system import DynamicSystem
+from minilink.core.system import DEFAULT_SMALLEST_TIME_CONSTANT, DynamicSystem
 from minilink.simulation.simulator import (
     COMPILE_BACKEND_AUTO,
     DISCONTINUOUS_AUTO_DT_SCALE,
@@ -147,7 +147,7 @@ class TestNewSimulator(unittest.TestCase):
             solver_warnings="ignore",
             verbose=False,
         )
-        expected_dt = 0.001 * DISCONTINUOUS_AUTO_DT_SCALE
+        expected_dt = DEFAULT_SMALLEST_TIME_CONSTANT * DISCONTINUOUS_AUTO_DT_SCALE
         self.assertAlmostEqual(sim.t[1] - sim.t[0], expected_dt)
 
     def test_discontinuous_auto_solver_emits_warning(self):
@@ -181,6 +181,15 @@ class TestNewSimulator(unittest.TestCase):
                 solver_warnings="warn",
                 verbose=False,
             )
+
+    def test_coarse_dt_warning_falls_back_to_the_system_default(self):
+        sys = DiscontinuousLinearSystem()
+        del sys.solver_info["smallest_time_constant"]
+        with patch(
+            "minilink.simulation.solver_warnings.DEFAULT_SMALLEST_TIME_CONSTANT", 0.02
+        ):
+            with pytest.warns(UserWarning, match=r"consider dt <= 0\.002"):
+                Simulator(sys, tf=1.0, dt=0.01, solver="euler", verbose=False)
 
     def test_smooth_system_emits_no_discontinuous_warning(self):
         with warnings.catch_warnings(record=True) as caught:
@@ -480,7 +489,7 @@ class TestDiscontinuousSolvers(unittest.TestCase):
 
     def test_auto_dt_uses_discontinuous_scale(self):
         sim = Simulator(self.diagram, tf=0.01, solver_warnings="ignore", verbose=False)
-        expected_dt = 0.001 * DISCONTINUOUS_AUTO_DT_SCALE
+        expected_dt = DEFAULT_SMALLEST_TIME_CONSTANT * DISCONTINUOUS_AUTO_DT_SCALE
         self.assertAlmostEqual(sim.t[1] - sim.t[0], expected_dt)
 
     def test_euler_matches_f_based_ddq_better_than_rk4_on_coarse_dt(self):
@@ -1068,7 +1077,10 @@ class TestAutomaticTimeGrid(unittest.TestCase):
 
         # a stateful block without a hint keeps the conservative default
         with_filter = controller @ plant + Integrator()
-        self.assertEqual(with_filter.solver_info["smallest_time_constant"], 0.001)
+        self.assertEqual(
+            with_filter.solver_info["smallest_time_constant"],
+            DEFAULT_SMALLEST_TIME_CONSTANT,
+        )
 
     def test_loop_follows_a_plant_hint_changed_after_composing(self):
         from minilink import Pendulum, StateFeedbackController
