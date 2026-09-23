@@ -592,12 +592,14 @@ class MPCTickSolve:
 
 class MPCTickLatch:
     """
-    Memoize one planner solve per integer replan tick ``k``.
+    Memoize one planner solve per integer replan tick ``k`` and measurement ``y``.
 
     Port ``compute`` paths on MPC blocks call :meth:`solve_for_tick`; the first
-    call at a new ``k`` runs the NLP via
+    call at a new ``(k, y)`` runs the NLP via
     :meth:`~TrajectoryOptimizationPlanner.solve_trajectory_from`, later calls
-    at the same ``k`` read the latch.
+    with the same ``k`` and an equal ``y`` read the latch. Inside a
+    :class:`~minilink.simulation.computer.Computer` tick every port sees the same
+    ``y``, so the block still solves once per tick.
     """
 
     def __init__(
@@ -613,6 +615,7 @@ class MPCTickLatch:
         self._dt_mpc = None if dt_mpc is None else float(dt_mpc)
         self._t0 = float(t0)
         self._latch_k: int | None = None
+        self._latch_y: np.ndarray | None = None
         self._latch: MPCTickSolve | None = None
         self._after_solve = None
 
@@ -638,10 +641,14 @@ class MPCTickLatch:
         params=None,
     ) -> MPCTickSolve:
         k_int = int(k)
-        if self._latch_k == k_int and self._latch is not None:
+        y_arr = np.asarray(y, dtype=float).reshape(-1)
+        if (
+            self._latch is not None
+            and self._latch_k == k_int
+            and np.array_equal(self._latch_y, y_arr, equal_nan=True)
+        ):
             return self._latch
 
-        y_arr = np.asarray(y, dtype=float).reshape(-1)
         guess = initial_guess
         if guess is None and z_warm is not None:
             if dt_mpc is None:
@@ -686,6 +693,7 @@ class MPCTickLatch:
             k=k_int,
         )
         self._latch_k = k_int
+        self._latch_y = y_arr.copy()
         self._latch = latch
         if self._after_solve is not None:
             self._after_solve()
@@ -718,6 +726,7 @@ class MPCTickLatch:
     def reset_latch(self) -> None:
         """Clear tick memo (e.g. after ``Computer.reset``)."""
         self._latch_k = None
+        self._latch_y = None
         self._latch = None
 
 

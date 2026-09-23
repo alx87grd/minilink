@@ -811,6 +811,46 @@ class TestMPCNumPyRebuild(unittest.TestCase):
         self.assertEqual(len(programs), 2)
         self.assertIsNot(programs[0], programs[1])
 
+    def test_same_tick_new_measurement_resolves(self):
+        """The tick latch memoizes on (k, y): a new y at the same k re-solves."""
+        for warm_start in (True, False):
+            with self.subTest(warm_start=warm_start):
+                planner = _make_numpy_planner(0.0)
+                mpc = ModelPredictiveController(
+                    planner, dt_mpc=0.2, warm_start=warm_start
+                )
+                y_pos, y_neg = np.array([2.0]), np.array([-2.0])
+                with patch.object(
+                    planner,
+                    "solve_trajectory_from",
+                    wraps=planner.solve_trajectory_from,
+                ) as solve:
+                    cmd_pos = mpc.compute_command(y_pos, k=0)
+                    cmd_neg = mpc.compute_command(y_neg, k=0)
+                    x_ff = mpc.outputs["x_ff"].compute(mpc.x0, y_neg, 0)
+                    self.assertEqual(solve.call_count, 2)
+                x_start_pos = cmd_pos.solution.trajectory.x[:, 0]
+                x_start_neg = cmd_neg.solution.trajectory.x[:, 0]
+                np.testing.assert_allclose(x_start_pos, y_pos, atol=1e-05)
+                np.testing.assert_allclose(x_start_neg, y_neg, atol=1e-05)
+                np.testing.assert_allclose(x_ff, cmd_neg.x_ff)
+
+    def test_hybrid_algebraic_one_solve_per_tick(self):
+        """``mpc % dt @ plant``: the u_ff, x_ff and z ports share one solve per tick."""
+        planner = _make_numpy_planner(0.0)
+        plant = SingleIntegrator()
+        plant.x0 = np.array([0.5])
+        dt_mpc = 0.2
+        tf = 0.6
+        n_ticks = int(round(tf / dt_mpc))
+        mpc = ModelPredictiveController(planner, dt_mpc=dt_mpc, warm_start=False)
+        hybrid = mpc % dt_mpc @ plant
+        with patch.object(
+            planner, "solve_trajectory_from", wraps=planner.solve_trajectory_from
+        ) as solve:
+            hybrid.compute_trajectory(tf=tf, compile_backend="numpy", verbose=False)
+            self.assertEqual(solve.call_count, n_ticks)
+
     def test_hybrid_closed_loop_smoke(self):
         planner = _make_numpy_planner(0.0)
         plant = SingleIntegrator()
