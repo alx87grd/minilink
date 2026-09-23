@@ -128,11 +128,12 @@ class TestStepDiagram(unittest.TestCase):
         )
         self.assertAlmostEqual(float(y[0]), 5.0)
 
-    def test_reject_dynamic_subsystem_at_compile(self):
+    def test_reject_dynamic_subsystem_at_wiring(self):
         diagram = StepDiagramSystem()
-        diagram.add_subsystem(Integrator(), "plant")
-        with self.assertRaises(TypeError):
-            diagram.compile()
+        with self.assertRaises(TypeError) as ctx:
+            diagram.add_subsystem(Integrator(), "plant")
+        self.assertIn("discretize", str(ctx.exception))
+        self.assertEqual(diagram.subsystems, {})
 
     def test_compile_returns_step_diagram_evaluator(self):
         diagram = _build_gain_plant_loop()

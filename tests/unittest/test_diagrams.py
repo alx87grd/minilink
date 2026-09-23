@@ -507,6 +507,19 @@ class TestCompileTypes(unittest.TestCase):
         self.assertIsInstance(diagram.compile(), NumpyDiagramEvaluator)
 
 
+class TestSubsystemEvolutionKind(unittest.TestCase):
+    """A flow diagram holds continuous and static blocks, never a step block."""
+
+    def test_flow_diagram_rejects_a_step_system(self):
+        diagram = DiagramSystem()
+        diagram.add_subsystem(Integrator(), "plant")
+        with self.assertRaises(TypeError) as ctx:
+            diagram.add_subsystem(_Counter(), "counter")
+        self.assertIn("block % dt @ plant", str(ctx.exception))
+        self.assertEqual(list(diagram.subsystems), ["plant"])
+        self.assertEqual(diagram.n, 1)
+
+
 class TestFeedbackMissingPortMessage(unittest.TestCase):
     """S04: a plant without a 'y' port gets a message that names the fix."""
 

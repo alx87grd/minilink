@@ -46,6 +46,20 @@ class DiagramSystem(WiredDiagramMixin, DynamicSystem):
         System.__init__(self, 0)
         self.init_wiring(name="Diagram")
 
+    def add_subsystem(self, sys, sys_id):
+        """Add a continuous or static subsystem under a unique id.
+
+        A :class:`StepSystem` has no ``f`` to stack, so it is refused here
+        rather than left out of the state derivative.
+        """
+        if isinstance(sys, StepSystem):
+            raise TypeError(
+                f"{type(sys).__name__} {sys_id!r} is a StepSystem and cannot join "
+                "a flow DiagramSystem: a StepSystem belongs in a StepDiagramSystem "
+                "or a Computer: block % dt @ plant"
+            )
+        super().add_subsystem(sys, sys_id)
+
     def f(self, x, u, t=0, params=None):
         """
         Stacked state derivative ``dx = [f_1(x_1, u_1, t); f_2(x_2, u_2, t); ...]``.
@@ -195,6 +209,21 @@ class StepDiagramSystem(WiredDiagramMixin, StepSystem):
         System.__init__(self, 0)
         self.rollout = None
         self.init_wiring(name="StepDiagram")
+
+    def add_subsystem(self, sys, sys_id):
+        """Add a step or static subsystem under a unique id.
+
+        A :class:`DynamicSystem` with states has no ``step`` to stack, so it is
+        refused here rather than left frozen by :meth:`step`.
+        """
+        if isinstance(sys, DynamicSystem) and sys.n > 0:
+            raise TypeError(
+                f"{type(sys).__name__} {sys_id!r} has continuous states and cannot "
+                "join a StepDiagramSystem: keep it in a DiagramSystem and close the "
+                "sampled loop with block % dt @ plant, or step it with "
+                "discretize(plant, dt)"
+            )
+        super().add_subsystem(sys, sys_id)
 
     def step(self, x, u, k=0, params=None):
         """

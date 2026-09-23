@@ -252,6 +252,9 @@ The research rungs (`Holonomic`, `HolonomicAccel`, `BicycleKin`, `BicycleAcc`,
   `step(x, u, k, params)` → `x_new`. Facades: `compute_rollout` / `plot_rollout`
   (state-only ``k/x/u``); cache `self.rollout`. Boundary signal histories:
   :class:`~minilink.simulation.computer.Computer` / hybrid sim, not evaluators.
+  A flow `DiagramSystem` refuses it at `add_subsystem` (a `StepDiagramSystem`
+  likewise refuses a `DynamicSystem` with states); it meets a continuous plant
+  only through a `Computer`: `block % dt @ plant`.
 - **Hybrid (computer + plant):** :class:`~minilink.core.hybrid_diagram.HybridDiagram`
   bundles :class:`~minilink.simulation.computer.Computer` (step side + schedule) and a
   continuous :class:`DiagramSystem` plant. Boundary channels use ZOH (computer → plant)
