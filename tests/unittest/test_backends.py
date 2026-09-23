@@ -263,6 +263,16 @@ def test_intersection_flattens_nested_and():
     )
 
 
+def test_intersection_accepts_a_member_whose_margin_is_a_scalar():
+    free = CallableSet(margin_fn=lambda z, t, params: 1.0 - float(z[0]))
+    box = BoxSet([0.0], [2.0])
+    np.testing.assert_allclose((box & free).margin(np.array([0.5])), [0.5, 1.5, 0.5])
+    jax = pytest.importorskip("jax")
+    constant = CallableSet(margin_fn=lambda z, t, params: 1.0)
+    margin = (box & constant).margin(jax.numpy.array([0.5]))
+    np.testing.assert_allclose(np.asarray(margin), [0.5, 1.5, 1.0])
+
+
 def test_box_sample_follows_the_draw_convention():
     box = BoxSet(lower=np.array([-1.0, -2.0]), upper=np.array([1.0, 2.0]))
     one = box.sample(0)

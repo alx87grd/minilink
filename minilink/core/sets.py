@@ -375,12 +375,15 @@ class IntersectionSet(Set):
         return BoxSet(lower, upper)
 
     def margin(self, z, t=0.0, params=None):
-        """Concatenate the margins of all member sets."""
+        """Concatenate the margins of all member sets (a scalar margin counts as one)."""
         xp = array_module(z)
         sets = self.sets
 
         margin = xp.concatenate(
-            [set_.margin(z, t=t, params=params).reshape(-1) for set_ in sets]
+            [
+                xp.reshape(xp.asarray(set_.margin(z, t=t, params=params)), (-1,))
+                for set_ in sets
+            ]
         )
 
         return margin
