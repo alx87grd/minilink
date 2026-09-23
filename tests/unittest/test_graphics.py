@@ -1589,3 +1589,29 @@ class TestAutoFitCamera(unittest.TestCase):
             np.array([25.0]), np.array([]), 0.0, kinematic=sys.get_kinematic_geometry()
         )
         self.assertEqual(frame["camera"][3, 3], 3.0)
+
+
+class TestAnimationFrameSchedule(unittest.TestCase):
+    """Playback subsamples the trajectory and always ends on its final sample."""
+
+    def test_last_frame_is_the_final_sample(self):
+        from minilink.graphical.animation.renderers.timing import sim_index_for_frame
+
+        for n in (2, 1000, 1001, 10001):
+            traj = Trajectory(
+                t=np.linspace(0.0, 10.0, n), x=np.zeros((1, n)), u=np.zeros((0, n))
+            )
+            schedule = trajectory_frame_schedule(traj, 1.0)
+            last = sim_index_for_frame(schedule.n_frames - 1, schedule)
+            before_last = sim_index_for_frame(schedule.n_frames - 2, schedule)
+            self.assertEqual(last, n - 1, msg=f"n={n}")
+            self.assertLess(before_last, n - 1, msg=f"n={n}")
+
+    def test_one_sample_trajectory_is_one_still_frame(self):
+        traj = Trajectory(
+            t=np.array([0.0]), x=np.array([[1.0], [0.0]]), u=np.zeros((1, 1))
+        )
+        schedule = trajectory_frame_schedule(traj, 1.0)
+        self.assertEqual(schedule.n_frames, 1)
+        self.assertGreater(schedule.interval_ms, 0.0)
+        Pendulum().animate(traj, show=False, html=False)
