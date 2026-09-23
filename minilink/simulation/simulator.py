@@ -126,7 +126,9 @@ class Simulator:
     n_steps : int, optional
         Number of time samples (including endpoints) when ``dt`` is not set.
     dt : float, optional
-        Step size when ``n_steps`` is not set.
+        Step size when ``n_steps`` is not set. The grid ends at ``tf`` when
+        ``dt`` divides ``tf - t0``; otherwise its last sample is the first
+        step past ``tf``.
     solver : str, optional
         Solver mode; if ``None``, chosen by :meth:`select_solver`. Use
         ``"euler"`` for variable ``dt`` per output knot, or

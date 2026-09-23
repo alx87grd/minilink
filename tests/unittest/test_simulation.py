@@ -1079,3 +1079,47 @@ class TestAutomaticTimeGrid(unittest.TestCase):
         )
         self.assertEqual(sim.solver_mode, "scipy")
         self.assertEqual(sim.n_pts, DEFAULT_N_STEPS)
+
+
+class TestDtTimeGrid(unittest.TestCase):
+    """A ``dt`` that divides the horizon gives a grid that ends at ``tf``."""
+
+    def test_dividing_dt_never_steps_past_tf(self):
+        from minilink.simulation.time_grid import build_time_grid
+
+        for t0 in (0.0, 0.5):
+            for dt in (0.1, 0.05, 0.02, 0.01, 0.001):
+                for k in range(1, 201):
+                    tf = round(t0 + 0.1 * k, 10)
+                    with self.subTest(t0=t0, tf=tf, dt=dt):
+                        t, _, n_pts = build_time_grid(t0, tf, dt=dt)
+                        self.assertLessEqual(t[-1], tf + 1e-12)
+                        self.assertEqual(n_pts, round((tf - t0) / dt) + 1)
+                        # Kept samples are the ones the grid always had.
+                        today = np.arange(t0, tf + dt, dt)[:n_pts]
+                        np.testing.assert_array_equal(t, today)
+
+    def test_simulator_dt_grid_ends_at_tf(self):
+        from minilink.blocks.basic import Integrator
+
+        sim = Simulator(Integrator(), tf=1.1, dt=0.1, verbose=False)
+        self.assertEqual(sim.n_pts, 12)
+        self.assertAlmostEqual(sim.t[-1], 1.1)
+        sim = Simulator(Integrator(), tf=0.2, dt=0.1, verbose=False)
+        self.assertEqual(sim.n_pts, 3)
+        self.assertAlmostEqual(sim.t[-1], 0.2)
+
+    def test_automatic_dt_grid_ends_at_tf(self):
+        from minilink.simulation.time_grid import build_time_grid
+
+        t, _, n_pts = build_time_grid(0.0, 1.1, default_dt=0.1)
+        self.assertEqual(n_pts, 12)
+        self.assertAlmostEqual(t[-1], 1.1)
+
+    def test_non_dividing_dt_still_covers_tf(self):
+        from minilink.simulation.time_grid import build_time_grid
+
+        t, dt, n_pts = build_time_grid(0.0, 1.0, dt=0.3)
+        self.assertEqual(n_pts, 5)
+        self.assertAlmostEqual(dt, 0.3)
+        np.testing.assert_allclose(t, [0.0, 0.3, 0.6, 0.9, 1.2])
