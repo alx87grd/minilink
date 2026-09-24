@@ -10,5 +10,6 @@ the plant, controllers, simulate, and plot/animate. C5.5
 (`racecar_toward_mpc`) is optional: from the LQR program to a finite-horizon
 MPC program with a non-quadratic cost and actuator bounds (JAX + SciPy).
 
-Do not rename, move, or delete a file here unless the notes and the course
-webpage change in the same commit.
+Do not rename, move, or delete a file here unless the Notes-Commande
+`\colab{}` changes in the same commit. For now that PDF is the only
+external pointer to these notebooks (no GRO501 course webpage).

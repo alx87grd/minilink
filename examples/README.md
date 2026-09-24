@@ -142,7 +142,7 @@ Pinned by the course notes. Rename or move only with the notes and webpage in th
 
 ### Teaching — UdeS GRO501
 
-Pinned by the course notes (C5.1, C5.3, C5.4, C5.5). Rename or move only with the notes and webpage in the same change.
+Pinned by the course notes (C5.1, C5.3, C5.4, C5.5). For now the only external pointer is the Notes-Commande `\colab{}` (no GRO501 course webpage). Rename or move only with that box in the same change.
 
 | Notebook | Colab |
 | --- | --- |
