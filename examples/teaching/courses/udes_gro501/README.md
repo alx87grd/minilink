@@ -14,6 +14,11 @@ MPC program with a non-quadratic cost and actuator bounds (JAX + SciPy).
 old MATLAB template *Analyse asservissement SISO* (plant, step / pzmap /
 bode, PID, L = C H, rlocus / bode, closed loop) redone three times,
 NumPy / SciPy, python-control, then minilink.
+`mass_spring_nonlinear_simulation` is its simulation twin and a template: a
+mass-spring with a cubic damper written as x' = f(x, u), an input signal u(t),
+a reference r(t) and a state-feedback law g(x, r), simulated in open loop and
+in closed loop with SciPy `solve_ivp`, then with custom minilink blocks
+(`DynamicSystem`, `System`, `Controller`).
 
 Do not rename, move, or delete a file here unless the Notes-Commande
 `\colab{}` changes in the same commit. For now that PDF is the only
