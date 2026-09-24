@@ -10,6 +10,11 @@ the plant, controllers, simulate, and plot/animate. C5.5
 (`racecar_toward_mpc`) is optional: from the LQR program to a finite-horizon
 MPC program with a non-quadratic cost and actuator bounds (JAX + SciPy).
 
+`siso_transfer_function_analysis` is not a numbered exercise: it is the
+old MATLAB template *Analyse asservissement SISO* (plant, step / pzmap /
+bode, PID, L = C H, rlocus / bode, closed loop) redone three times,
+NumPy / SciPy, python-control, then minilink.
+
 Do not rename, move, or delete a file here unless the Notes-Commande
 `\colab{}` changes in the same commit. For now that PDF is the only
 external pointer to these notebooks (no GRO501 course webpage).
