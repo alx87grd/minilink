@@ -50,24 +50,23 @@ def gain(A, B, C, D):
     """Leading coefficient ``k`` of ``G(s) = k prod(s - z) / prod(s - p)``.
 
     ``d`` when the channel has feedthrough, otherwise the first nonzero
-    Markov parameter ``c A^(r-1) b`` (``r`` the relative degree).
+    Markov parameter ``c A^(r-1) b`` (``r`` the relative degree). Read off
+    the response at one real point ``s0`` beyond every pole and zero, where
+    the factored form and ``C (s0 I - A)^-1 B + D`` must agree: a Markov
+    scan needs a tolerance to tell a structural zero from a small leading
+    coefficient, and any tolerance fails on a badly scaled channel.
     """
     A, B, C, D = _matrices(A, B, C, D)
+    z, p = zeros(A, B, C, D), poles(A)
+    s0 = 2.0 * max(np.max(np.abs(np.concatenate([z, p])), initial=0.0), 1.0)
 
-    # k = d  if the channel has feedthrough
-    if abs(D[0, 0]) > 0.0:
-        return float(D[0, 0])
+    # k = G(s0) ∏(s0 − p) / ∏(s0 − z)
+    G0 = D[0, 0]
+    if A.size:
+        G0 += (C @ np.linalg.solve(s0 * np.eye(A.shape[0]) - A, B))[0, 0]
+    k = G0 * np.prod(s0 - p) / np.prod(s0 - z)
 
-    # else k = first nonzero Markov parameter  c A^{r-1} b
-    markov = C @ B
-    power = np.eye(A.shape[0]) if A.size else np.zeros((0, 0))
-    scale = max(np.max(np.abs(A), initial=0.0), 1.0)
-    for _ in range(A.shape[0]):
-        if abs(markov[0, 0]) > 1e-12 * scale ** (A.shape[0]):
-            return float(markov[0, 0])
-        power = power @ A
-        markov = C @ power @ B
-    return 0.0
+    return float(np.real(k))
 
 
 def frequency_response(A, B, C, D, w):

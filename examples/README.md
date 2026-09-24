@@ -142,13 +142,14 @@ Pinned by the course notes. Rename or move only with the notes and webpage in th
 
 ### Teaching — UdeS GRO501
 
-Pinned by the course notes (C5.1, C5.3, C5.4). Rename or move only with the notes and webpage in the same change.
+Pinned by the course notes (C5.1, C5.3, C5.4, C5.5). Rename or move only with the notes and webpage in the same change.
 
 | Notebook | Colab |
 | --- | --- |
 | [numpy_state_space](teaching/courses/udes_gro501/numpy_state_space.ipynb) (C5.1: NumPy / SciPy, python-control, minilink) | [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/alx87grd/minilink/blob/main/examples/teaching/courses/udes_gro501/numpy_state_space.ipynb) |
 | [cartpole_static_controller](teaching/courses/udes_gro501/cartpole_static_controller.ipynb) (C5.3) | [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/alx87grd/minilink/blob/main/examples/teaching/courses/udes_gro501/cartpole_static_controller.ipynb) |
 | [cartpole_dynamic_controller](teaching/courses/udes_gro501/cartpole_dynamic_controller.ipynb) (C5.4) | [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/alx87grd/minilink/blob/main/examples/teaching/courses/udes_gro501/cartpole_dynamic_controller.ipynb) |
+| [racecar_toward_mpc](teaching/courses/udes_gro501/racecar_toward_mpc.ipynb) (C5.5, optional: from LQR to MPC) | [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/alx87grd/minilink/blob/main/examples/teaching/courses/udes_gro501/racecar_toward_mpc.ipynb) |
 
 **Colab tip:** open a badge → **File → Save a copy in Drive** → run from the top.
 The first code cell clones the repo and installs `meshcat` when needed. Locally,
@@ -172,7 +173,7 @@ One demo folder per tutorial chapter; the research lane sits apart.
 | Planning | [09_planning](tutorial/09_planning.ipynb) | [`demos/trajopt/`](demos/trajopt/), [`demos/rrt/`](demos/rrt/), [`demos/value_iteration/`](demos/value_iteration/) | [cost+VI](teaching/courses/udes_gro860/pendulum_value_iteration.ipynb), [VI vs LQR](teaching/courses/udes_gro860/pendulum_value_iteration_vs_lqr.ipynb), [grid world DP](teaching/courses/udes_gro860/grid_world_dynamic_programming.ipynb), [minimum-time VI](teaching/courses/udes_gro860/double_integrator_minimum_time.ipynb), [policy evaluation](teaching/courses/udes_gro860/double_integrator_policy_evaluation.ipynb), [cart-pole LQR](teaching/courses/udes_gro860/cartpole_lqr.ipynb); [`projects/car_trajopt/`](projects/car_trajopt/), [`projects/pathtracking/`](projects/pathtracking/), [`projects/racecar/`](projects/racecar/) |
 | Reinforcement learning | [11_reinforcement_learning](tutorial/11_reinforcement_learning.ipynb), [showcase_from_rl_to_bode](tutorial/showcase_from_rl_to_bode.ipynb) | [`demos/rl/`](demos/rl/) (pendulum swing-up, cart-pole, rocket landing, learn to fly) | [Gymnasium interface](teaching/courses/udes_gro860/gymnasium_interface.ipynb), [VI vs LQR vs RL](teaching/topics/reinforcement_learning/pendulum_value_iteration_vs_lqr_vs_rl.ipynb), [learn to fly](teaching/topics/reinforcement_learning/drone_ppo.ipynb), [function approximation by SGD](teaching/topics/machine_learning/least_squares_sgd.ipynb), [cost-to-go approximation](teaching/courses/udes_gro860/pendulum_cost_to_go_approximation.ipynb); Lyapunov check in [`experimental/rl/`](experimental/rl/) |
 | Graphical | [10_graphical](tutorial/10_graphical.ipynb) | [`demos/graphical/`](demos/graphical/), [`demos/realtime/`](demos/realtime/) (keyboard game mode: `game_cartpole.py`, `game_bicycle.py`) | |
-| UdeS racecar | — | [`demos/udes_racecar/`](demos/udes_racecar/) (kinematic MPC, dynamic MPC, keyboard game) | [racecar_mpc](teaching/topics/optimal_control/racecar_mpc.ipynb); [`projects/racecar/`](projects/racecar/) |
+| UdeS racecar | — | [`demos/udes_racecar/`](demos/udes_racecar/) (kinematic MPC, dynamic MPC, keyboard game) | [racecar_mpc](teaching/topics/optimal_control/racecar_mpc.ipynb); [racecar_toward_mpc](teaching/courses/udes_gro501/racecar_toward_mpc.ipynb) (GRO501 C5.5); [`projects/racecar/`](projects/racecar/) |
 | Research lane | — | [`experimental/`](experimental/) (`c_export/`, `engine/`, `symbolic/`, `robotic/` UR5) | not nightly-swept; `c_export` is TRL 1 (flagship smoke in the JAX regression job); C export demos: `experimental/c_export/c_export_proportional.py`, `c_export.py` |
 | Solver benchmarks | — | [`benchmarks/`](../benchmarks/) | Performance tracking and backend sweeps live in repo-root [`benchmarks/`](../benchmarks/) (run locally or in Colab via [`benchmarks/ode_solver_benchmark.ipynb`](../benchmarks/ode_solver_benchmark.ipynb)) |
 

@@ -669,7 +669,7 @@ class TestModalAPI(unittest.TestCase):
             modal_analysis(Pendulum(), x_bar=[0.0, 0.0], linearization="fd")
 
 
-from minilink.analysis.frequency import bode, pzmap
+from minilink.analysis.frequency import bode, pzmap, transfer_function
 from minilink.graphical.common import PlotResult
 
 
@@ -782,6 +782,52 @@ def test_pzmap_returns_zeros_poles_and_gain_for_selected_channel():
     np.testing.assert_allclose(zeros, [-36.0 / 13.0], atol=1e-06)
     np.testing.assert_allclose(poles, [-2.0], atol=1e-06)
     np.testing.assert_allclose(gain, 13.0, atol=1e-06)
+
+
+def quarter_car(scale_b=1.0, scale_c=1.0):
+    """Dorf P2.46: a badly scaled but regular 4-state channel, ``u`` on the sprung mass."""
+    mv, mt, k1, b1, k2, b2 = 300.0, 40.0, 15e3, 1e3, 150e3, 100.0
+    # fmt: off
+    A = np.array([
+        [0.0, 0.0, 1.0, 0.0],
+        [0.0, 0.0, 0.0, 1.0],
+        [-k1 / mv, k1 / mv, -b1 / mv, b1 / mv],
+        [k1 / mt, -(k1 + k2) / mt, b1 / mt, -(b1 + b2) / mt],
+    ])
+    # fmt: on
+    B = scale_b * np.array([[0.0], [0.0], [1.0 / mv], [0.0]])
+    C = scale_c * np.array([[1.0, 0.0, 0.0, 0.0], [0.0, 1.0, 0.0, 0.0]])
+    num = {
+        0: np.array([mt, b1 + b2, k1 + k2]) / (mv * mt),  # sprung-mass position
+        1: np.array([b1, k1]) / (mv * mt),  # tire position
+    }
+    return LTISystem(A, B, C), A, B, C, num
+
+
+@pytest.mark.parametrize("scale_b, scale_c", [(1.0, 1.0), (1e-6, 1e6), (1e5, 1e-8)])
+@pytest.mark.parametrize("i", [0, 1])
+def test_transfer_function_keeps_a_small_leading_gain(scale_b, scale_c, i):
+    # The leading Markov parameter is 1/mv = 3.3e-3 while |A| ~ 4e3: an absolute
+    # tolerance on the Markov scan drops it and returns a zero numerator.
+    sys, A, B, C, num = quarter_car(scale_b, scale_c)
+    G = transfer_function(sys, of=("y", i))
+    np.testing.assert_allclose(G.numerator, scale_b * scale_c * num[i], rtol=1e-09)
+    np.testing.assert_allclose(G.denominator, np.poly(np.linalg.eigvals(A)), rtol=1e-09)
+
+    s = 1j
+    exact = (C[[i]] @ np.linalg.solve(s * np.eye(4) - A, B))[0, 0]
+    np.testing.assert_allclose(
+        np.polyval(G.numerator, s) / np.polyval(G.denominator, s), exact, rtol=1e-09
+    )
+
+    zeros, poles, gain = pzmap(sys, of=("y", i))
+    np.testing.assert_allclose(gain, scale_b * scale_c * num[i][0], rtol=1e-09)
+    np.testing.assert_allclose(
+        np.sort_complex(zeros), np.sort_complex(np.roots(num[i])), rtol=1e-09
+    )
+    np.testing.assert_allclose(
+        np.sort_complex(poles), np.sort_complex(np.linalg.eigvals(A)), rtol=1e-09
+    )
 
 
 @pytest.mark.optional
