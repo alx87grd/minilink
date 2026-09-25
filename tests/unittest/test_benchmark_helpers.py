@@ -248,6 +248,37 @@ class TestBenchmarkRegression(unittest.TestCase):
         result = compare_metrics(recorded, baseline, factor=4.0)
         self.assertFalse(result.failed)
 
+    def test_speed_slack_absorbs_millisecond_noise_but_not_a_slowdown(self):
+        from benchmarks.baseline import BaselineFile, MetricRecord, compare_metrics
+
+        def solve_time(value):
+            return MetricRecord(
+                id="test.solve_s",
+                gate="speed",
+                direction="lower_better",
+                value=value,
+                unit="s",
+            )
+
+        baseline = BaselineFile(
+            schema_version=1,
+            suite="core_perf",
+            description="",
+            regression_factor=4.0,
+            recorded_at="",
+            host_hint="",
+            metrics=(solve_time(0.005),),
+        )
+        noisy = [solve_time(0.09)]
+        self.assertTrue(compare_metrics(noisy, baseline, factor=10.0).failed)
+        self.assertFalse(
+            compare_metrics(noisy, baseline, factor=10.0, slack_s=0.1).failed
+        )
+        slow = [solve_time(0.2)]
+        self.assertTrue(
+            compare_metrics(slow, baseline, factor=10.0, slack_s=0.1).failed
+        )
+
     def test_compare_metrics_fails_on_large_drop(self):
         from benchmarks.baseline import BaselineFile, MetricRecord, compare_metrics
 
