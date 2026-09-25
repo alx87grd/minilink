@@ -15,8 +15,8 @@ old MATLAB template *Analyse asservissement SISO* (plant, step / pzmap /
 bode, PID, L = C H, rlocus / bode, closed loop) redone three times,
 NumPy / SciPy, python-control, then minilink.
 `mass_spring_nonlinear_simulation` is its simulation twin and a template: a
-mass-spring with a cubic damper written as x' = f(x, u), an input signal u(t),
-a reference r(t) and a state-feedback law g(x, r), simulated in open loop and
+mass-spring with a cubic damper written as x' = f(x, u, t), an output y = h(x, u, t) = x, an input signal u(t),
+a reference r(t) and a state-feedback law ctl(y, r, t), simulated in open loop and
 in closed loop with SciPy `solve_ivp`, then with custom minilink blocks
 (`DynamicSystem`, `System`, `Controller`).
 
