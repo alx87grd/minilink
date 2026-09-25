@@ -24,6 +24,7 @@ TEACHING_MODULES = {
     "minilink.catalog",
     "minilink.core",
     "minilink.blocks",
+    "minilink.graphical.catalog",
     "minilink.control",
     "minilink.control.lqr",
     "minilink.control.mpc",

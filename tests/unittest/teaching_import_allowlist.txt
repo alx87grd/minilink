@@ -39,7 +39,6 @@ examples/demos/rrt/rrt_star_live.py minilink.planning.spatial.collision
 examples/demos/rrt/rrt_star_live.py minilink.planning.spatial.scene
 examples/demos/trajopt/trajopt_holonomic_corridor.py minilink.core.geometry
 examples/demos/trajopt/trajopt_holonomic_corridor.py minilink.graphical.animation.primitives
-examples/demos/trajopt/trajopt_holonomic_corridor.py minilink.graphical.catalog
 examples/demos/trajopt/trajopt_holonomic_corridor.py minilink.planning.spatial.collision
 examples/demos/trajopt/trajopt_holonomic_corridor.py minilink.planning.spatial.paths
 examples/demos/trajopt/trajopt_holonomic_corridor.py minilink.planning.spatial.scene
