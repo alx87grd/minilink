@@ -1,3 +1,5 @@
+"""Kinematic steering models: the bicycle, the full-size car and the holonomic point robot."""
+
 from functools import partial
 
 import numpy as np

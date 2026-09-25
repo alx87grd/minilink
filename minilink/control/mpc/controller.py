@@ -295,6 +295,10 @@ class ModelPredictiveControllerMixin:
         """``mpc @ plant`` → hybrid via ``export_to_computer() @ plant`` (ZOH)."""
         return self.export_to_computer() @ plant
 
+    def __mod__(self, schedule):
+        """``mpc % schedule`` → :meth:`export_to_computer` (checks ``dt_mpc``)."""
+        return self.export_to_computer(schedule)
+
     def init_debug_figure(self, sys, **kwargs):
         """
         Create a matplotlib figure for live plan visualization.
@@ -592,12 +596,14 @@ class MPCTickSolve:
 
 class MPCTickLatch:
     """
-    Memoize one planner solve per integer replan tick ``k``.
+    Memoize one planner solve per integer replan tick ``k`` and measurement ``y``.
 
     Port ``compute`` paths on MPC blocks call :meth:`solve_for_tick`; the first
-    call at a new ``k`` runs the NLP via
+    call at a new ``(k, y)`` runs the NLP via
     :meth:`~TrajectoryOptimizationPlanner.solve_trajectory_from`, later calls
-    at the same ``k`` read the latch.
+    with the same ``k`` and an equal ``y`` read the latch. Inside a
+    :class:`~minilink.simulation.computer.Computer` tick every port sees the same
+    ``y``, so the block still solves once per tick.
     """
 
     def __init__(
@@ -613,6 +619,7 @@ class MPCTickLatch:
         self._dt_mpc = None if dt_mpc is None else float(dt_mpc)
         self._t0 = float(t0)
         self._latch_k: int | None = None
+        self._latch_y: np.ndarray | None = None
         self._latch: MPCTickSolve | None = None
         self._after_solve = None
 
@@ -638,10 +645,14 @@ class MPCTickLatch:
         params=None,
     ) -> MPCTickSolve:
         k_int = int(k)
-        if self._latch_k == k_int and self._latch is not None:
+        y_arr = np.asarray(y, dtype=float).reshape(-1)
+        if (
+            self._latch is not None
+            and self._latch_k == k_int
+            and np.array_equal(self._latch_y, y_arr, equal_nan=True)
+        ):
             return self._latch
 
-        y_arr = np.asarray(y, dtype=float).reshape(-1)
         guess = initial_guess
         if guess is None and z_warm is not None:
             if dt_mpc is None:
@@ -686,6 +697,7 @@ class MPCTickLatch:
             k=k_int,
         )
         self._latch_k = k_int
+        self._latch_y = y_arr.copy()
         self._latch = latch
         if self._after_solve is not None:
             self._after_solve()
@@ -718,6 +730,7 @@ class MPCTickLatch:
     def reset_latch(self) -> None:
         """Clear tick memo (e.g. after ``Computer.reset``)."""
         self._latch_k = None
+        self._latch_y = None
         self._latch = None
 
 
@@ -784,27 +797,21 @@ def export_mpc_to_computer(
     dt_mpc: float | None = None,
 ) -> "Computer":
     """
-    Build a :class:`~minilink.simulation.computer.Computer` from an MPC block.
+    Build a single-rate :class:`~minilink.simulation.computer.Computer` from an MPC block.
 
-    Warm-start blocks (``ModelPredictiveController(..., warm_start=True)``)
-    default ``schedule`` from ``dt_mpc``. Algebraic (``warm_start=False``)
-    blocks require an explicit ``schedule``.
+    ``schedule`` defaults to ``dt_mpc`` (the block's own when not passed); a
+    given ``schedule`` must tick at ``dt_mpc``. Once the schedule is accepted,
+    the export undoes the dual-rate hooks a ``dual_rate_computer`` call left on
+    the block; a rejected schedule leaves the block as it was.
     """
-    from minilink.simulation.computer import StepSchedule, as_computer
-
-    # Single-rate path: undo any dual-rate hooks left on the block.
-    if hasattr(block, "_replan_divisor"):
-        block._replan_divisor = 1
-    latch = getattr(block, "_latch", None)
-    if latch is not None and hasattr(latch, "set_after_solve"):
-        latch.set_after_solve(None)
+    from minilink.simulation.computer import StepSchedule, _build_computer
 
     block_dt = dt_mpc if dt_mpc is not None else getattr(block, "_dt_mpc", None)
     if schedule is None:
         if block_dt is None:
             raise ValueError(
-                "schedule is required for algebraic ModelPredictiveController "
-                "(warm_start=False); pass export_to_computer(dt_mpc) or use mpc % dt"
+                "schedule is required when the block has no dt_mpc; "
+                "pass a schedule or dt_mpc=..."
             )
         schedule = StepSchedule(dt_base=float(block_dt))
     elif block_dt is not None:
@@ -815,7 +822,15 @@ def export_mpc_to_computer(
             raise ValueError(
                 f"schedule dt_base={dt_sched} does not match block dt_mpc={block_dt}"
             )
-    return as_computer(block, schedule)
+    computer = _build_computer(block, schedule)
+
+    # Single-rate path: undo any dual-rate hooks left on the block.
+    if hasattr(block, "_replan_divisor"):
+        block._replan_divisor = 1
+    latch = getattr(block, "_latch", None)
+    if latch is not None and hasattr(latch, "set_after_solve"):
+        latch.set_after_solve(None)
+    return computer
 
 
 def export_mpc_dual_rate_computer(block, *, dt_broadcast: float) -> "Computer":

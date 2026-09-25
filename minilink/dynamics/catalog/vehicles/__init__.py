@@ -1,13 +1,7 @@
-"""Vehicle dynamics — the four-rung teaching ladder plus propulsion / suspension.
+"""Vehicle dynamics: the teaching ladder from the holonomic point to the UdeS racecar, plus propulsion and suspension."""
 
-``HolonomicMobileRobot`` → ``KinematicBicycle`` / ``KinematicCar`` →
-``DynamicBicycle`` (linear tires, named ``w_rear`` / ``delta`` ports) →
-``BicycleDynRate`` (wheel-rate / steer-rate inputs, the MPC plant). Research
-rungs live in ``examples/projects/car_trajopt/vehicles/``.
-"""
-
-# Tire math (pure functions ``tire_slip`` / ``linear_tire_forces``) stays in
-# minilink.dynamics.catalog.vehicles.dynamic_bicycle — plants only in __all__.
+# Tire math (``tire_slip`` / ``linear_tire_forces`` in dynamic_bicycle, the brush pair
+# in tires) and parameter sets stay in their modules — plants only in __all__.
 from minilink.dynamics.catalog.vehicles.dynamic_bicycle import (
     BicycleDynRate,
     DynamicBicycle,
@@ -17,6 +11,11 @@ from minilink.dynamics.catalog.vehicles.mountain_car import MountainCar
 from minilink.dynamics.catalog.vehicles.propulsion import (
     LongitudinalFrontWheelDriveCarWithTorqueInput,
     LongitudinalFrontWheelDriveCarWithWheelSlipInput,
+)
+from minilink.dynamics.catalog.vehicles.racecar import (
+    UdeSRacecar,
+    UdeSRacecarDyn,
+    UdeSRacecarDyn3D,
 )
 from minilink.dynamics.catalog.vehicles.steering import (
     HolonomicMobileRobot,
@@ -36,4 +35,7 @@ __all__ = [
     "LongitudinalFrontWheelDriveCarWithWheelSlipInput",
     "MountainCar",
     "QuarterCarOnRoughTerrain",
+    "UdeSRacecar",
+    "UdeSRacecarDyn",
+    "UdeSRacecarDyn3D",
 ]

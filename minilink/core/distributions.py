@@ -15,6 +15,7 @@ from minilink.core.backends import (
     numpy_generator,
     require_jax,
 )
+from minilink.core.inspect import inspect_text, repr_pretty
 from minilink.core.sets import BoxSet, Set
 
 # Public API
@@ -29,6 +30,12 @@ class Distribution(ABC):
     @property
     @abstractmethod
     def dim(self) -> int: ...
+
+    def __str__(self):
+        return inspect_text(self)
+
+    def _repr_pretty_(self, p, cycle):
+        repr_pretty(self, p, cycle)
 
     @abstractmethod
     def sample(self, key, n=None):

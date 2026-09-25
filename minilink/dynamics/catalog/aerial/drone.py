@@ -1,3 +1,5 @@
+"""Planar drones: two vertical thrusters, a lateral thruster, velocity inputs, the tunnel helicopter."""
+
 from minilink.core.backends import array_module
 from minilink.core.kinematics import SE2, translation
 from minilink.core.system import DynamicSystem
@@ -50,7 +52,6 @@ class Drone2D(MechanicalSystem):
         inertia = params["inertia"]
         xp = array_module(q)
 
-        # diagonal translational and rotational inertia
         H = xp.diag(xp.array([mass, mass, inertia]))
 
         return H

@@ -1,26 +1,10 @@
-"""Composition shortcuts: build common diagram topologies in one line.
+"""Composition shortcuts: the ``+``, ``>>`` and ``@`` operators that build a diagram in one line.
 
-Public functions (also reachable as operators on :class:`System`):
-
-- :func:`add_systems` — ``a + b``: flat diagram, no wiring inferred.
-- :func:`series` — ``a >> b``: connect default output to default input.
-- :func:`closed_loop` — ``controller @ plant``: standard feedback loop
-  (``feedback="auto"``, ``"y"``, or ``"qdq"``).
-- :func:`closed_loop_qdq` — ``closed_loop(..., feedback="qdq")`` alias.
-- :func:`autowire` — conservatively fill unconnected inputs.
-- :func:`resolve_standard_feedback` — shared port names for ``@`` closed loops
-  and hybrid ``Computer @ plant``.
-
-Shortcut-built diagrams remember a default *entry* input and *output* port
-(``diagram._composition_entry`` / ``_composition_output``, initialized by
-:class:`~minilink.core.diagram.DiagramSystem`) so chains like ``a >> b >> c``
-know where to attach the next stage. Diagram operands are flattened, not
-nested. Explicit ``add_subsystem`` / ``connect`` remains the canonical way to
-build any topology.
-
-**Mutation semantics (frozen v0.1):** a ``DiagramSystem`` left operand of
-``+`` / ``>>`` is extended in place and returned — subsystem operands are
-always shared references, never copied. See DESIGN §4.
+Shortcut-built diagrams remember a default entry input and output port so chains
+like ``a >> b >> c`` know where to attach the next stage; diagram operands are
+flattened, not nested, and a diagram left operand of ``+`` or ``>>`` is extended in
+place (DESIGN §4); ``@`` always returns a new diagram.
+Explicit ``add_subsystem`` / ``connect`` remains the canonical way to build any topology.
 """
 
 from __future__ import annotations
@@ -324,6 +308,9 @@ def closed_loop(
       or matrix ``plant`` is the return-path gain (``L @ 1`` is unity
       feedback, ``L @ K`` is ``feedback(L, K)``).
 
+    Neither operand is modified: the result is a new diagram sharing their
+    blocks, also when ``controller`` is a diagram such as ``C >> S``.
+
     Parameters
     ----------
     controller : System
@@ -352,7 +339,8 @@ def closed_loop(
     if not isinstance(plant, System):
         return _close_with_junction(controller, plant, validate=validate)
     if error_input(controller) is not None:
-        return _close_with_junction(series(controller, plant), validate=validate)
+        loop_gain = series(_new_diagram_like(controller), plant)
+        return _close_with_junction(loop_gain, validate=validate)
 
     diagram = DiagramSystem()
     controller_id = _add_system_to_diagram(diagram, controller, role="ctl")
@@ -543,6 +531,21 @@ def _as_composition_diagram(sys, *, expose_entry: bool) -> DiagramSystem:
     sys_id = _add_system_to_diagram(diagram, sys)
     if expose_entry:
         _expose_entry_input(diagram, sys_id)
+    return diagram
+
+
+def _new_diagram_like(sys):
+    """A diagram operand as a new diagram with the same ids and wiring; a leaf as is.
+
+    ``series`` extends a diagram left operand in place (the ``>>`` rule), so
+    ``@`` hands it this new diagram and leaves the user's operand untouched.
+    """
+    if not isinstance(sys, DiagramSystem):
+        return sys
+
+    diagram = DiagramSystem()
+    _inline_diagram(diagram, sys, output_collision="replace")
+    diagram.name = sys.name
     return diagram
 
 

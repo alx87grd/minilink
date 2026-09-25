@@ -1,6 +1,6 @@
 """The repo's contract with itself: rules that used to drift because nothing checked them.
 
-Three rules of RULES.md are cheap to verify and were all violated within days of
+Four rules of RULES.md are cheap to verify and were all violated within days of
 being written, so they are tests now rather than prose:
 
 - 6.9 public-facing prose never names another tool (the hand-written grep was
@@ -8,15 +8,27 @@ being written, so they are tests now rather than prose:
 - 7.6 internal documentation links resolve, paths and anchors alike (the review
   ladder's own table of contents pointed at two slugs that do not exist);
 - 5.8 no leading-underscore pseudo-privacy on the System family or the
-  teaching-lane simulators.
+  teaching-lane simulators;
+- 6.7 teaching-lane code that picks Ipopt probes for ``cyipopt`` first, so it
+  still runs on an install without it (a cart-pole demo hard-coded it).
+
+The test suite and the merge gate drifted the same way, so they are tests too:
+
+- 6.5 a missing extra skips its own tests only (a mid-file
+  ``pytest.importorskip("jax")`` skipped every NumPy test of its module);
+- the one CI job that installs jax runs ``pytest`` (it ran the demos only, so no
+  JAX test gated a merge).
 """
 
 from __future__ import annotations
 
 import ast
 import json
+import os
 import pathlib
 import re
+import subprocess
+import sys
 import unittest
 
 REPO = pathlib.Path(__file__).resolve().parents[2]
@@ -64,6 +76,55 @@ NAMED_CLASS_MODULES = (
     "minilink/simulation/static_simulator.py",
 )
 
+# 6.7 — the teaching lane, which must run without the optional Ipopt build.
+TEACHING_EXAMPLE_ROOTS = ("examples/tutorial", "examples/teaching", "examples/demos")
+
+
+# 6.5 — the unit-test modules that are JAX from end to end, the only ones a
+# missing jax may skip whole.  Elsewhere the ``jax`` marker skips the JAX tests
+# and the NumPy tests beside them still run.
+JAX_ONLY_TEST_MODULES = [
+    "tests/unittest/test_engine_jax.py",
+    "tests/unittest/test_jax_planning.py",
+    "tests/unittest/test_rl_planner.py",
+    "tests/unittest/test_ur5_jax.py",
+]
+
+# Collects the unit tests with jax blocked and prints, as JSON, the modules
+# skipped or broken at collection and the jax-marked tests left to run.
+COLLECT_WITHOUT_JAX = r"""
+import json, sys
+sys.modules["jax"] = None
+import pytest
+
+
+class Collection:
+    def __init__(self):
+        self.skipped_modules, self.broken_modules, self.jax_tests_left = [], [], []
+
+    def pytest_collectreport(self, report):
+        if report.skipped:
+            self.skipped_modules.append(report.nodeid)
+        if report.failed:
+            self.broken_modules.append(report.nodeid)
+
+    def pytest_collection_finish(self, session):
+        for item in session.items:
+            if item.get_closest_marker("jax") and not item.get_closest_marker("skip"):
+                self.jax_tests_left.append(item.nodeid)
+
+
+collection = Collection()
+pytest.main(["--collect-only", "-p", "no:cacheprovider", "tests/unittest"],
+            plugins=[collection])
+print(json.dumps(vars(collection)))
+"""
+
+# The merge gate: a CI job that installs the jax extra must also run pytest.
+CI_WORKFLOW = ".github/workflows/test.yml"
+INSTALLS_JAX = re.compile(r"pip install[^\n]*\[[^\]]*\b(jax|full)\b[^\]]*\]")
+RUNS_PYTEST = re.compile(r"^\s*(python -m )?pytest\b", re.MULTILINE)
+
 
 def heading_slug(heading: str) -> str:
     """GitHub's anchor rule: lowercase, drop punctuation, one hyphen per space."""
@@ -77,6 +138,21 @@ def notebook_markdown(path: pathlib.Path) -> str:
         "".join(cell.get("source", []))
         for cell in cells
         if cell.get("cell_type") == "markdown"
+    )
+
+
+def example_code(path: pathlib.Path) -> str:
+    """A script's source, or a notebook's code cells without shell and magic lines."""
+    if path.suffix == ".py":
+        return path.read_text()
+    cells = json.loads(path.read_text()).get("cells", [])
+    code = "\n".join(
+        "".join(cell.get("source", []))
+        for cell in cells
+        if cell.get("cell_type") == "code"
+    )
+    return "\n".join(
+        line for line in code.splitlines() if not line.lstrip().startswith(("%", "!"))
     )
 
 
@@ -153,6 +229,78 @@ class TestInternalNaming(unittest.TestCase):
                         f"{name}: {node.name}.{item.name} uses a leading underscore; "
                         "give it a plain name under a '# Internal machinery' comment",
                     )
+
+
+class TestOptionalIpopt(unittest.TestCase):
+    """RULES 6.7 — Ipopt is optional, so the teaching lane falls back without it."""
+
+    def test_code_that_picks_ipopt_probes_for_cyipopt(self):
+        for root in TEACHING_EXAMPLE_ROOTS:
+            for path in sorted((REPO / root).rglob("*")):
+                if path.suffix not in (".py", ".ipynb"):
+                    continue
+                tree = ast.parse(example_code(path))
+                constants = [
+                    node.value
+                    for node in ast.walk(tree)
+                    if isinstance(node, ast.Constant)
+                ]
+                if "ipopt" not in constants:
+                    continue
+                self.assertTrue(
+                    "cyipopt" in constants,
+                    f"{path.relative_to(REPO)} picks 'ipopt' without probing "
+                    "importlib.util.find_spec('cyipopt'); fall back to 'scipy_slsqp'",
+                )
+
+
+class TestOptionalDependencies(unittest.TestCase):
+    """RULES 6.5 — a missing extra skips its own tests, never the NumPy ones."""
+
+    def test_a_missing_jax_skips_only_the_jax_tests(self):
+        env = {**os.environ, "PYTHONPATH": str(REPO), "MPLBACKEND": "Agg"}
+        result = subprocess.run(
+            [sys.executable, "-c", COLLECT_WITHOUT_JAX],
+            cwd=REPO,
+            env=env,
+            capture_output=True,
+            text=True,
+            timeout=600,
+        )
+        self.assertEqual(result.returncode, 0, result.stderr[-3000:])
+        collection = json.loads(result.stdout.strip().splitlines()[-1])
+
+        self.assertEqual(collection["broken_modules"], [])
+        self.assertEqual(sorted(collection["skipped_modules"]), JAX_ONLY_TEST_MODULES)
+        self.assertEqual(collection["jax_tests_left"], [])
+
+
+class TestMergeGate(unittest.TestCase):
+    """The JAX tests gate a merge, not only the JAX demos."""
+
+    def test_the_job_that_installs_jax_runs_pytest(self):
+        try:
+            import yaml
+        except ImportError:
+            self.skipTest("PyYAML is not installed")
+
+        workflow = yaml.safe_load((REPO / CI_WORKFLOW).read_text())
+        runs_by_job = {
+            name: [step.get("run", "") for step in job["steps"]]
+            for name, job in workflow["jobs"].items()
+        }
+        jax_jobs = [
+            name
+            for name, runs in runs_by_job.items()
+            if any(INSTALLS_JAX.search(run) for run in runs)
+        ]
+
+        self.assertTrue(jax_jobs, f"{CI_WORKFLOW}: no job installs the jax extra")
+        for name in jax_jobs:
+            self.assertTrue(
+                any(RUNS_PYTEST.search(run) for run in runs_by_job[name]),
+                f"{CI_WORKFLOW}: job '{name}' installs jax but never runs pytest",
+            )
 
 
 if __name__ == "__main__":

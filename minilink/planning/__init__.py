@@ -3,7 +3,8 @@
 Band facade for short teaching imports::
 
     from minilink.planning import PlanningProblem, TrajectoryOptimizationPlanner
-    from minilink.planning import StateSpaceGrid, DynamicProgrammingPlanner
+    from minilink.planning import StateSpaceGrid, DynamicProgrammingPlanner, LQRPlanner
+    from minilink.planning import compare
     from minilink.planning import ReinforcementLearningPlanner, TabularLearningPlanner
     from minilink.planning import QuadraticFeatures, LinearApproximator
 
@@ -29,6 +30,10 @@ _EXPORTS: dict[str, tuple[str, str]] = {
     "Particles": ("minilink.core.distributions", "Particles"),
     "Sampler": ("minilink.core.distributions", "Sampler"),
     "PlanningSolution": ("minilink.planning.results", "PlanningSolution"),
+    "compare": ("minilink.planning.comparison", "compare"),
+    "Comparison": ("minilink.planning.comparison", "Comparison"),
+    # linear-quadratic regulator (policy synthesis)
+    "LQRPlanner": ("minilink.planning.policy_synthesis.lqr", "LQRPlanner"),
     # trajectory optimization
     "TrajectoryOptimizationPlanner": (
         "minilink.planning.trajectory_optimization.planner",
@@ -90,7 +95,12 @@ _EXPORTS: dict[str, tuple[str, str]] = {
     "Evaluation": ("minilink.planning.evaluation", "Evaluation"),
     # spatial scene: tracks, collision geometry, cost shaping
     "ReferenceTrack": ("minilink.planning.spatial.track", "ReferenceTrack"),
+    "circuit_waypoints": (
+        "minilink.planning.spatial.paths",
+        "circuit_waypoints",
+    ),
     "from_waypoints": ("minilink.planning.spatial.paths", "from_waypoints"),
+    "Sphere": ("minilink.core.geometry", "Sphere"),
     "Scene": ("minilink.planning.spatial.scene", "Scene"),
     "bind": ("minilink.planning.spatial.collision", "bind"),
     "car_outline": ("minilink.planning.spatial.collision", "car_outline"),

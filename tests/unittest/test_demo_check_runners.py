@@ -8,16 +8,30 @@ Interactive flagships (viewer / prompt demos) always skip.
 Notebook smoke checks run in the CI ``regression`` job (and via
 ``tests/run/run_notebook_checks.py``). Opt in here with
 ``MINILINK_NOTEBOOK_CHECKS=1`` so default ``pytest`` stays fast.
+
+``TestDemoCheckManifests`` checks the data those runners read (``requires``
+lists, demo and notebook ids) and that the ``tests/run`` regression launcher
+passes the CI job's flags.
 """
 
 from __future__ import annotations
 
+import contextlib
+import importlib.util
+import io
+import json
 import os
 import re
 import subprocess
 import sys
 import unittest
+from collections import Counter
 from pathlib import Path
+from unittest import mock
+
+from tests.demo_checks import run_flagship_demos as flagship_runner
+from tests.demo_checks import run_notebook_checks as notebook_runner
+from tests.run import _common as launcher
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 
@@ -109,6 +123,137 @@ class TestDemoCheckRunners(unittest.TestCase):
                 f"notebook checks failed (exit {proc.returncode})\n"
                 f"stdout:\n{proc.stdout}\nstderr:\n{proc.stderr}"
             )
+
+
+# Runners skip an entry when ``importlib.util.find_spec(name)`` is None for one
+# of its ``requires``, so each name must be an import name, not a distribution
+# name (``stable-baselines3``, ``pyyaml``): a wrong name skips forever. These
+# are the import names of the pyproject extras plus stable_baselines3; add one
+# here when a manifest first requires a new package.
+_OPTIONAL_IMPORT_NAMES = frozenset(
+    {
+        "cyipopt",
+        "graphviz",
+        "gymnasium",
+        "jax",
+        "jaxlib",
+        "meshcat",
+        "plotly",
+        "pygame",
+        "stable_baselines3",
+        "sympy",
+    }
+)
+_REQUIRES_MANIFESTS = (
+    "tests/demo_checks/flagship_manifest.json",
+    "tests/demo_checks/notebook_overrides.json",
+    "tests/fixtures/flagship_graphics/manifest.json",
+    "tests/fixtures/kinematic_baseline/manifest.json",
+)
+
+
+def _load_json(relative_path: str):
+    return json.loads((REPO_ROOT / relative_path).read_text(encoding="utf-8"))
+
+
+def _without_graphviz():
+    """Patch ``find_spec`` so the runners see no graphviz (no ``diagrams`` extra)."""
+    find_spec = importlib.util.find_spec
+
+    def find_spec_without_graphviz(name, *args, **kwargs):
+        if name == "graphviz":
+            return None
+        return find_spec(name, *args, **kwargs)
+
+    return mock.patch("importlib.util.find_spec", find_spec_without_graphviz)
+
+
+class TestDemoCheckManifests(unittest.TestCase):
+    def test_requires_are_import_names(self):
+        for relative_path in _REQUIRES_MANIFESTS:
+            manifest = _load_json(relative_path)
+            entries = manifest.values() if isinstance(manifest, dict) else manifest
+            for entry in entries:
+                for name in entry.get("requires") or []:
+                    with self.subTest(manifest=relative_path, name=name):
+                        self.assertIn(name, _OPTIONAL_IMPORT_NAMES)
+
+    def test_graphics_demo_ids_name_flagships(self):
+        flagship_ids = {
+            entry["id"]
+            for entry in _load_json("tests/demo_checks/flagship_manifest.json")
+        }
+        for entry in _load_json("tests/fixtures/flagship_graphics/manifest.json"):
+            if "demo_id" in entry:
+                with self.subTest(entry=entry["id"]):
+                    self.assertIn(entry["demo_id"], flagship_ids)
+
+    def test_hybrid_diagram_flagships_skip_without_graphviz(self):
+        """``hybrid.plot_diagram()`` imports graphviz (the ``diagrams`` extra)."""
+        with _without_graphviz():
+            for demo_id in ("mpc_integrator_numpy", "mpc_car_minimal"):
+                with self.subTest(demo=demo_id):
+                    [row] = flagship_runner.run_flagship_demos(demo_filter=demo_id)
+                    self.assertEqual(row.status, "skip")
+
+    def test_hybrid_diagram_notebook_skips_without_graphviz(self):
+        """``06_hybrid`` calls ``hybrid.plot_diagram()`` too."""
+        execute = mock.patch.object(
+            notebook_runner, "_execute_notebook", return_value=("pass", "")
+        )
+        with _without_graphviz(), execute:
+            [row] = notebook_runner.run_notebook_checks(
+                notebook_filter="tutorial_06_hybrid"
+            )
+        self.assertEqual(row.status, "skip")
+
+    def test_notebook_ids_are_unique(self):
+        ids = notebook_runner.notebook_ids(notebook_runner._discover_notebooks())
+        repeated = sorted(
+            notebook_id for notebook_id, n in Counter(ids.values()).items() if n > 1
+        )
+        self.assertEqual(repeated, [])
+        # The ids the ``--notebook`` usage and help text cite.
+        self.assertEqual(
+            ids["examples/tutorial/showcase_minilink.ipynb"], "showcase_minilink"
+        )
+        self.assertEqual(ids["examples/tutorial/00_core.ipynb"], "tutorial_00_core")
+
+    def test_unknown_ids_are_cli_errors(self):
+        """A stale ``--demo`` or ``--notebook`` id fails and names the close ids."""
+        cases = (
+            (flagship_runner, ["--demo", "mpc_minimal"], ["mpc_car_minimal"]),
+            (
+                notebook_runner,
+                ["--notebook", "teaching_drone_ppo"],
+                [
+                    "teaching_courses_udes_gro860_drone_ppo",
+                    "teaching_topics_reinforcement_learning_drone_ppo",
+                ],
+            ),
+            (notebook_runner, ["--notebook", "intro_00_core"], ["tutorial_00_core"]),
+        )
+        for runner, argv, close_ids in cases:
+            with self.subTest(argv=argv):
+                redirect = contextlib.redirect_stderr(io.StringIO())
+                with redirect as stderr, self.assertRaises(SystemExit) as caught:
+                    runner.main(argv)
+                self.assertEqual(caught.exception.code, 2)
+                for close_id in close_ids:
+                    self.assertIn(close_id, stderr.getvalue())
+
+    def test_regression_launcher_ci_mode_matches_ci_workflow(self):
+        workflow = (REPO_ROOT / ".github/workflows/test.yml").read_text(
+            encoding="utf-8"
+        )
+        command = re.search(
+            r"python benchmarks/run_regression_check\.py((?:.*\\\n)*.*)", workflow
+        )
+        ci_args = command.group(1).replace("\\\n", " ").split()
+        with mock.patch.object(launcher, "run_command", return_value=0) as run:
+            launcher.run_regression(ci_mode=True)
+        launcher_args = run.call_args.args[0][2:]
+        self.assertEqual(launcher_args, ci_args)
 
 
 if __name__ == "__main__":

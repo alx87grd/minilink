@@ -8,7 +8,10 @@ composition.
 
 from __future__ import annotations
 
+import numpy as np
+
 from minilink.core.composition import (
+    _new_diagram_like,
     _propagate_animation_camera,
     default_computer_boundary_ports,
     resolve_standard_feedback,
@@ -16,7 +19,7 @@ from minilink.core.composition import (
 from minilink.core.diagram import DiagramSystem, StepDiagramSystem
 from minilink.core.hybrid_diagram import BoundaryConnection, HybridDiagram
 from minilink.core.system import StepSystem, System
-from minilink.simulation.computer import Computer, StepSchedule
+from minilink.simulation.computer import Computer, StepSchedule, as_computer
 
 # Public API
 
@@ -38,6 +41,10 @@ def hybrid_closed_loop(
     """
     Build a canonical computer ↔ plant feedback :class:`HybridDiagram`.
 
+    The plant is not modified: when a plant diagram lacks a boundary port the
+    loop needs, the loop gets a new diagram with the same blocks, ids, wiring
+    and ``x0``, and the port is added there.
+
     Parameters
     ----------
     computer_side : System or StepDiagramSystem
@@ -45,7 +52,9 @@ def hybrid_closed_loop(
     plant : System or DiagramSystem
         Continuous plant wrapped in a flow diagram when needed.
     schedule : StepSchedule or float
-        Base tick schedule for the computer runtime.
+        Base tick schedule for the computer runtime. A leaf whose class defines
+        its own ``%`` builds the runtime there (an MPC block checks ``schedule``
+        against its ``dt_mpc``).
     computer : Computer, optional
         Reuse an existing compiled runtime (must match ``computer_side``).
     computer_out, plant_in, plant_out, computer_in : str
@@ -57,6 +66,24 @@ def hybrid_closed_loop(
     extra_boundaries : list of BoundaryConnection, optional
         Additional multi-channel boundary edges.
     """
+    if computer is None and _builds_own_computer(computer_side):
+        # The block's own ``%`` may reset block state (an MPC block's dual-rate
+        # hooks), so it runs once the plant and ports have passed on a plain wrap.
+        hybrid_closed_loop(
+            _as_step_diagram(computer_side),
+            plant,
+            schedule=schedule,
+            computer_out=computer_out,
+            plant_in=plant_in,
+            plant_out=plant_out,
+            computer_in=computer_in,
+            ref_port=ref_port,
+            output_port=output_port,
+            extra_boundaries=extra_boundaries,
+        )
+        computer = as_computer(computer_side, schedule)
+        computer_side, schedule = computer.diagram, computer.schedule
+
     step_diagram = _as_step_diagram(computer_side)
     plant_diagram = _as_plant_diagram(plant)
     _ensure_computer_boundary_ports(
@@ -66,12 +93,13 @@ def hybrid_closed_loop(
         computer_in=computer_in,
         computer_out=computer_out,
     )
-    _ensure_plant_boundary_ports(
+    plant_diagram = _ensure_plant_boundary_ports(
         plant_diagram,
         sys_id=_leaf_sys_id(plant, default="plant"),
         plant_in=plant_in,
         plant_out=plant_out,
         output_port=output_port,
+        in_place=plant_diagram is not plant,
     )
 
     if isinstance(schedule, StepSchedule):
@@ -189,6 +217,14 @@ def _plant_leaf(plant: System | DiagramSystem) -> System:
     return plant
 
 
+def _builds_own_computer(computer_side: System | StepDiagramSystem) -> bool:
+    """True when the block's class defines its own ``%`` (e.g. an MPC block)."""
+    return (
+        isinstance(computer_side, System)
+        and type(computer_side).__mod__ is not System.__mod__
+    )
+
+
 def expose_computer_boundary_ports(diagram: StepDiagramSystem) -> None:
     """Expose standard measurement and control ports on a step diagram boundary."""
     if len(diagram.subsystems) != 1:
@@ -295,11 +331,24 @@ def _ensure_plant_boundary_ports(
     plant_in: str,
     plant_out: str,
     output_port: str,
-) -> None:
+    in_place: bool,
+) -> DiagramSystem:
+    """Return *diagram* with the loop's plant boundary ports.
+
+    Missing ports are added to *diagram* itself only when ``in_place`` (a
+    diagram built here around a leaf plant); a user's plant diagram is left
+    unchanged and the ports go on a new diagram with its ids, wiring and ``x0``.
+    """
     if sys_id is None:
-        return
+        return diagram
     subsystem = diagram.subsystems[sys_id]
-    if plant_in in subsystem.inputs and plant_in not in diagram.inputs:
+    add_input = plant_in in subsystem.inputs and plant_in not in diagram.inputs
+    add_output = plant_out in subsystem.outputs and output_port not in diagram.outputs
+    if not in_place and (add_input or add_output):
+        x0 = np.copy(diagram.x0)
+        diagram = _new_diagram_like(diagram)
+        diagram.x0 = x0
+    if add_input:
         port = subsystem.inputs[plant_in]
         diagram.add_input_port(
             plant_in,
@@ -307,5 +356,6 @@ def _ensure_plant_boundary_ports(
             nominal_value=port.nominal_value,
         )
         diagram.connect("input", plant_in, sys_id, plant_in)
-    if plant_out in subsystem.outputs and output_port not in diagram.outputs:
+    if add_output:
         diagram.connect_new_output_port(sys_id, plant_out, output_port)
+    return diagram

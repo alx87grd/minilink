@@ -325,11 +325,13 @@ class SharedSystemFacades:
         """
         Convenience shortcut to render the system diagram.
 
-        Jupyter / Colab get inline SVG by default. Bare scripts and IPython
-        REPLs open a Matplotlib window with the Graphviz PNG (same blocking
-        policy as trajectory plots). Pass ``show_pdf=True`` for the legacy
-        OS PDF viewer; pass ``filename`` to write Graphviz output to disk;
-        pass ``show=False`` to build the Digraph only.
+        Jupyter / Colab get inline SVG by default (the returned Graphviz
+        object is the cell output; this method does not also call
+        ``display()``, which would draw the figure twice). Bare scripts
+        and IPython REPLs open a Matplotlib window with the Graphviz PNG
+        (same blocking policy as trajectory plots). Pass ``show_pdf=True``
+        for the legacy OS PDF viewer; pass ``filename`` to write Graphviz
+        output to disk; pass ``show=False`` to build the Digraph only.
         """
         from minilink.graphical.diagrams import plot_diagram
 
@@ -402,8 +404,11 @@ class SharedSystemFacades:
         ``Arrow`` length/direction or ``TorqueArrow`` sweep; see ``DESIGN.md``
         §4.7). ``camera`` accepts an
         optional override (a constant 4x4 or a ``camera(frames, x, u, t)``
-        callable). ``save=True`` with ``renderer="matplotlib"`` writes a GIF
-        with the Pillow writer (``{file_name}.gif``).
+        callable). ``save=True`` writes the backend's file: a Pillow GIF
+        for ``renderer="matplotlib"`` (``{file_name}.gif`` when the name has
+        no ``.gif`` suffix), or a self-contained HTML page of the native
+        Meshcat animation for ``renderer="meshcat"`` (``{file_name}.html``
+        when the name has no suffix).
         """
         from minilink.graphical.animation import Animator
         from minilink.graphical.common.environment import prefers_inline_animation

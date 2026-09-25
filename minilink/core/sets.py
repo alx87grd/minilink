@@ -17,6 +17,7 @@ from minilink.core.backends import (
     numpy_generator,
     require_jax,
 )
+from minilink.core.inspect import inspect_text, repr_pretty
 
 
 class Set(ABC):
@@ -32,6 +33,12 @@ class Set(ABC):
     def margin(self, z, t=0.0, params=None):
         """Return nonnegative feasibility margins for ``z``, shape ``(k,)``."""
         ...
+
+    def __str__(self):
+        return inspect_text(self)
+
+    def _repr_pretty_(self, p, cycle):
+        repr_pretty(self, p, cycle)
 
     def contains(
         self,
@@ -78,6 +85,12 @@ class InputSet(ABC):
     def margin(self, u, x=None, t=0.0, params=None):
         """Return nonnegative feasibility margins for ``u``, shape ``(k,)``."""
         ...
+
+    def __str__(self):
+        return inspect_text(self)
+
+    def _repr_pretty_(self, p, cycle):
+        repr_pretty(self, p, cycle)
 
     def contains(
         self,
@@ -228,14 +241,18 @@ class SingletonSet(Set):
     def residual(self, z):
         """Return the equality residual ``z - point``, shape ``(n,)``."""
         point = self.point
-        return z - point
+
+        residual = z - point
+
+        return residual
 
     def margin(self, z, t=0.0, params=None):
         """Return zero only when ``z`` equals the singleton point."""
         xp = array_module(z)
+        residual = self.residual(z)
 
         # equality as a degenerate inequality: -|z - p| >= 0 holds only at p
-        margin = -xp.abs(self.residual(z))
+        margin = -xp.abs(residual)
 
         return margin
 
@@ -358,12 +375,15 @@ class IntersectionSet(Set):
         return BoxSet(lower, upper)
 
     def margin(self, z, t=0.0, params=None):
-        """Concatenate the margins of all member sets."""
+        """Concatenate the margins of all member sets (a scalar margin counts as one)."""
         xp = array_module(z)
         sets = self.sets
 
         margin = xp.concatenate(
-            [set_.margin(z, t=t, params=params).reshape(-1) for set_ in sets]
+            [
+                xp.reshape(xp.asarray(set_.margin(z, t=t, params=params)), (-1,))
+                for set_ in sets
+            ]
         )
 
         return margin

@@ -31,7 +31,7 @@ Release criterion carried over: every **in-scope** pyro library module has a min
 | Framework | `pyro/dynamic/statespace.py` | ObservedSystem | `minilink/estimation/` | — | **TODO** | LQG blocked on observers |
 | Framework | `pyro/dynamic/stochastic.py` | NoiseSignal | `minilink/blocks/sources.py` | noise ports in diagrams | **Partial** | No StochasticSystemWrapper |
 | Framework | `pyro/dynamic/stochastic.py` | StochasticSystemWrapper | `—` | — | **Drop** | Explicit non-goal unless reversed ([TODO.md](TODO.md) Later) |
-| Framework | `pyro/dynamic/tranferfunction.py` | ss2tf() | `minilink/analysis/` | — | **TODO** | Frequency backlog |
+| Framework | `pyro/dynamic/tranferfunction.py` | ss2tf() | `minilink/analysis/frequency.py` | transfer_function | **Done** | Landed 2026-09-07 with the frequency tools |
 | Catalog | `pyro/dynamic/vehicle_dynamic.py` | TireModel (ABC) | `minilink/dynamics/catalog/vehicles/dynamic_bicycle.py` | — | **Partial** | Only the linear tire implemented (pure functions) |
 | Catalog | `pyro/dynamic/vehicle_dynamic.py` | Pacejka | `—` | — | **TODO** | [TODO.md](TODO.md) Later |
 | Catalog | `pyro/dynamic/vehicle_steering.py` | HolonomicMobileRobotwithObstacles | `minilink/planning/spatial/` | Scene + bind() | **Partial** | Scene replaces plant wrapper |
@@ -40,8 +40,8 @@ Release criterion carried over: every **in-scope** pyro library module has a min
 | Catalog | `pyro/dynamic/manipulator.py` | TwoLinkManipulatorwithObstacles | `minilink/planning/spatial/` | Scene | **Partial** |  |
 | Catalog | `pyro/dynamic/manipulator.py` | FiveLinkPlanarManipulatorwithObstacles | `minilink/planning/spatial/` | Scene | **Partial** |  |
 | Control | `pyro/control/controller.py` | DynamicClosedLoopSystem | `minilink/core/diagram.py` | DiagramSystem | **Partial** |  |
-| Control | `pyro/control/linear.py` | PIDController | `minilink/control/siso.py` | PID (filtered PID) | **Partial** | Dedicated PID wrapper pending (v0.2 robotic PID wrappers) |
-| Control | `pyro/control/lqr.py` | TrajectoryLQRController | `minilink/control/lqr.py` | — | **TODO** | Trajectory stabilization demos |
+| Control | `pyro/control/linear.py` | PIDController | `minilink/control/siso.py` | PID (filtered PID), PI, PD | **Done** | PI / PD landed 2026-09-07 (P1); robotic PID wrappers are C2 |
+| Control | `pyro/control/lqr.py` | TrajectoryLQRController | `minilink/control/lqr.py`, `minilink/control/state.py` | trajectory_lqr, TrajectoryFeedbackController | **Done** | Demo: `examples/demos/control/trajectory_lqr_cartpole.py` |
 | Control | `pyro/control/robotcontrollers.py` | JointPD, EndEffectorPD, … | `minilink/control/robotic.py` | JointImpedance, TaskImpedance, TaskKinematic, TaskKinematicNullspace | **Partial** | Dynamic joint/effector PID wrappers TODO |
 | Planning | `pyro/planning/dynamicprogramming.py` | DynamicProgramming2DRectBivariateSpline | `minilink/planning/policy_synthesis/dp.py` | — | **Drop** | Not needed; grid backends cover use cases |
 | Planning | `pyro/planning/filters.py` | TrajectoryFilter | `minilink/planning/` | — | **TODO** | Butterworth filtfilt post-filter |
@@ -55,9 +55,9 @@ Release criterion carried over: every **in-scope** pyro library module has a min
 | Minilink | What | Notes |
 | --- | --- | --- |
 | `minilink/core/compile/` | ExecutionPlan, NumPy/JAX evaluators | Compile band; pyro has no separate compile layer |
-| `minilink/core/geometry.py` | SDF shapes, cost algebra | Spatial planning primitives |
+| `minilink/core/geometry.py` | SDF shapes, cost algebra | Spatial primitives (planned package `core/geometry/`, [geometry-module.md](geometry-module.md)) |
 | `minilink/optimization/` | MathematicalProgram, Optimizer | General NLP; pyro trajopt is narrower |
-| `minilink/planning/spatial/` | Scene, WorkspaceField, RobotBody | Obstacle/clearance layer replaces *withObstacles plants |
+| `minilink/planning/spatial/` | Scene, WorkspaceField, RobotBody | Obstacle/clearance layer replaces *withObstacles plants (retires into `core/geometry/`) |
 | `minilink/planning/search/dubins.py` | Dubins steering | Extra beyond pyro RRT |
 | `minilink/blocks/neural.py` | MLP block (JAX) | Prototype; pyro RL is SB3-only |
 | `minilink/experimental/symbolic/` | Symbolic derivation | Quarantine; no pyro equivalent |
@@ -224,9 +224,9 @@ All 195 pyro scripts under `examples/`, grouped by top-level folder.
 | `demos_by_tool/rl_with_stable_baseline3/pendulum_with_PPO_baseline_pyro_reproduction.py` | **Drop** | External SB3 training |
 | `demos_by_tool/trajectory_planning/double_pendulum_with_trajectory_optimization.py` | **Partial** | Trajopt done; plant-specific demo TODO |
 | `demos_by_tool/trajectory_planning/mountain_car_trajectory_optimization.py` | **Partial** | Trajopt done; plant-specific demo TODO |
-| `demos_by_tool/trajectory_stabilization/cartpole_swing_up_with_lqr_stabilization.py` | **TODO** | TrajectoryLQRController |
-| `demos_by_tool/trajectory_stabilization/double_pendulum_with_trajectory_following_lqr_controller.py` | **TODO** | TrajectoryLQRController |
-| `demos_by_tool/trajectory_stabilization/pendulum_swing_up_with_lqr_stabilization.py` | **TODO** | TrajectoryLQRController |
+| `demos_by_tool/trajectory_stabilization/cartpole_swing_up_with_lqr_stabilization.py` | **Partial** | examples/demos/control/trajectory_lqr_cartpole.py |
+| `demos_by_tool/trajectory_stabilization/double_pendulum_with_trajectory_following_lqr_controller.py` | **TODO** | Plant-specific demo TODO (`trajectory_lqr` landed) |
+| `demos_by_tool/trajectory_stabilization/pendulum_swing_up_with_lqr_stabilization.py` | **TODO** | Plant-specific demo TODO (`trajectory_lqr` landed) |
 | `demos_by_tool/transfer_functions/mass_with_pid.py` | **Partial** | examples/demos/control/pid_anti_windup.py |
 
 ### 3.4 `projects/`
@@ -285,12 +285,12 @@ Ordered by unblock count:
 | Priority | Work | Unblocks |
 | --- | --- | --- |
 | P2 | ~~`Manipulator` catalog rebase + `control/modelbased.py`, `control/robotic.py`~~ (library landed) | representative closed-loop demos per plant band |
-| P2 | `TrajectoryLQRController` | trajectory_stabilization/ demos |
+| P2 | ~~`TrajectoryLQRController`~~ (landed: `trajectory_lqr`) | trajectory_stabilization/ demos |
 | P3 | `planning/trajectory_generation/` (min-snap) | differentialflatness/ demos |
 | P3 | `estimation/luenberger.py`, `kalman.py` | LQG demos |
 | P3 | `identification/fitting.py` | params-gradient workflow |
 | P3 | ~~`interfaces/gymnasium.py`~~ (landed) | GRO860 course notebooks |
-| P3 | Frequency tools (pole-zero, Nyquist, margins, `ss2tf`) | transfer_functions/ completion |
+| P3 | ~~Frequency tools (pole-zero, Nyquist, margins, `ss2tf`)~~ (landed 2026-09-07) | transfer_functions/ completion |
 | P3 | `planning/filters.py` TrajectoryFilter | traj post-processing |
 | P4 | Representative closed-loop demo per `demos_by_system/*` plant band | ~93 TODO demos shrink to ~20 targets |
 | P4 | README pyro → minilink API mapping table | migration guide |
@@ -344,7 +344,7 @@ Two-column record of every symbol marked Done before the shrink; the source for 
 | Holonomic3DMobileRobot | HolonomicMobileRobot3D | `minilink/dynamics/catalog/vehicles/steering.py` |
 | KinematicCarModel | KinematicCar | `minilink/dynamics/catalog/vehicles/steering.py` |
 | ConstantSpeedKinematicCarModel | ConstantSpeedKinematicCar | `minilink/dynamics/catalog/vehicles/steering.py` |
-| UdeSRacecar | UdeSRacecar | `minilink/dynamics/catalog/vehicles/steering.py` |
+| UdeSRacecar | UdeSRacecar | `minilink/dynamics/catalog/vehicles/racecar.py` |
 | Manipulator | Manipulator | `minilink/dynamics/abstraction/manipulator.py` |
 | SpeedControlledManipulator | SpeedControlledManipulator | `minilink/dynamics/catalog/manipulators/arms.py` |
 | OneLinkManipulator | OneLinkManipulator | `minilink/dynamics/catalog/manipulators/arms.py` |

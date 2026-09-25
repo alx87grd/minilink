@@ -43,6 +43,7 @@ _EXPORTS: dict[str, tuple[str, str]] = {
     "Gain": ("minilink.blocks.routing", "Gain"),
     "Mux": ("minilink.blocks.routing", "Mux"),
     "Demux": ("minilink.blocks.routing", "Demux"),
+    "RateLimiter": ("minilink.blocks.nonlinear", "RateLimiter"),
     "Saturation": ("minilink.blocks.nonlinear", "Saturation"),
     "DeadZone": ("minilink.blocks.nonlinear", "DeadZone"),
     "Relay": ("minilink.blocks.nonlinear", "Relay"),
@@ -54,6 +55,7 @@ _EXPORTS: dict[str, tuple[str, str]] = {
     "ProportionalController": ("minilink.control.output", "ProportionalController"),
     "StateFeedbackController": ("minilink.control.state", "StateFeedbackController"),
     "PID": ("minilink.control.siso", "PID"),
+    "PurePursuit": ("minilink.control.geometric", "PurePursuit"),
     "PI": ("minilink.control.siso", "PI"),
     "PD": ("minilink.control.siso", "PD"),
     "ImpedanceController": ("minilink.control.impedance", "ImpedanceController"),
@@ -102,6 +104,8 @@ _EXPORTS: dict[str, tuple[str, str]] = {
     # planning
     "PlanningProblem": ("minilink.planning.problems", "PlanningProblem"),
     "PlanningSolution": ("minilink.planning.results", "PlanningSolution"),
+    "LQRPlanner": ("minilink.planning.policy_synthesis.lqr", "LQRPlanner"),
+    "compare": ("minilink.planning.comparison", "compare"),
     "TrajectoryOptimizationPlanner": (
         "minilink.planning.trajectory_optimization.planner",
         "TrajectoryOptimizationPlanner",

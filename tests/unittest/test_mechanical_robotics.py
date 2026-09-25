@@ -271,9 +271,6 @@ class TestGeneralizedMechanicalSystem(unittest.TestCase):
         )
 
 
-pytest.importorskip("jax")
-import jax
-import jax.numpy as jnp
 from minilink.core.backends import configure_jax
 from minilink.dynamics.abstraction.mechanical import (
     JaxMechanicalSystem,
@@ -288,12 +285,15 @@ class TestMechanicalSystemJax(unittest.TestCase):
         configure_jax(enable_x64=True)
 
     def test_f_is_jaxpr_traceable(self):
+        jax = pytest.importorskip("jax")
+        jnp = pytest.importorskip("jax.numpy")
         sys = JaxMechanicalSystem(dof=2)
         x = jnp.zeros(4)
         u = jnp.zeros(2)
         jax.make_jaxpr(lambda xx, uu: sys.f(xx, uu))(x, u)
 
     def test_f_matches_numpy_1dof_linear_regime(self):
+        jnp = pytest.importorskip("jax.numpy")
         sys_j = JaxMechanicalSystem(dof=1)
         sys_n = MechanicalSystem(dof=1)
         x = jnp.array([0.2, -0.1])
@@ -305,6 +305,7 @@ class TestMechanicalSystemJax(unittest.TestCase):
         np.testing.assert_allclose(np.asarray(dx_j), dx_n, rtol=1e-05, atol=1e-05)
 
     def test_f_matches_numpy_2dof_nontrivial_regime(self):
+        jnp = pytest.importorskip("jax.numpy")
 
         class _NumpyTwoLink(MechanicalSystem):
             def H(self, q, params=None):
@@ -369,6 +370,7 @@ class TestMechanicalSystemJax(unittest.TestCase):
         np.testing.assert_allclose(dx_j, dx_n, rtol=1e-09, atol=1e-09)
 
     def test_f_uses_explicit_params_in_matrix_hooks(self):
+        jnp = pytest.importorskip("jax.numpy")
 
         class MassSystem(JaxMechanicalSystem):
             def __init__(self):
@@ -394,6 +396,7 @@ class TestMechanicalSystemJax(unittest.TestCase):
         self.assertEqual(p.n, 2)
 
     def test_jax_pendulum_f_matches_numpy(self):
+        jnp = pytest.importorskip("jax.numpy")
         from benchmarks.systems.basic import JaxPendulum, NumpyPendulum
 
         np_sys = NumpyPendulum(gravity=9.81, length=1.0, damping=0.1)
@@ -417,6 +420,18 @@ class TestMechanicalJointPorts(unittest.TestCase):
         np.testing.assert_allclose(dq, x[2:])
         self.assertEqual(sys.outputs["q"].dim, 2)
         self.assertEqual(sys.outputs["dq"].dim, 2)
+
+    def test_q_and_dq_labels_follow_the_state_until_declared(self):
+        sys = MechanicalSystem(dof=2)
+        sys.state.labels = ["a", "b", "da", "db"]
+        sys.state.units = ["rad", "m", "rad/s", "m/s"]
+        self.assertEqual(sys.outputs["q"].labels, ["a", "b"])
+        self.assertEqual(sys.outputs["dq"].units, ["rad/s", "m/s"])
+
+        sys.outputs["q"].labels = ["shoulder", "elbow"]
+        sys.state.labels = ["c", "d", "dc", "dd"]
+        self.assertEqual(sys.outputs["q"].labels, ["shoulder", "elbow"])
+        self.assertEqual(sys.outputs["dq"].labels, ["dc", "dd"])
 
 
 class TestManipulator(unittest.TestCase):
@@ -511,6 +526,40 @@ class TestRoboticWrappers(unittest.TestCase):
         q = np.array([0.2, 0.3])
         u = ctl.ctl(None, np.concatenate([q, q, np.zeros(2)]))
         np.testing.assert_allclose(u, [1.0, 2.0])
+
+    def test_gravity_hook_type_error_reaches_the_caller(self):
+        def hook_q(q):
+            raise TypeError("bug inside the hook")
+
+        def hook_q_params(q, params):
+            raise TypeError("bug inside the hook")
+
+        arm = TwoLinkManipulator()
+        q = np.array([0.2, 0.3])
+        for hook in (hook_q, hook_q_params):
+            with self.subTest(hook=hook.__name__):
+                ctl = ModelJointImpedance(arm, gravity_comp=True, gravity=hook)
+                with self.assertRaisesRegex(TypeError, "bug inside the hook"):
+                    ctl.ctl(None, np.concatenate([q, q, np.zeros(2)]))
+
+    def test_gravity_hook_with_an_optional_second_argument_is_called_as_g_of_q(self):
+        from scipy.interpolate import CubicSpline
+
+        def g_of_q(q):
+            return np.array([1.0, 2.0]) * q
+
+        def wrapper(*args, **kwargs):
+            return g_of_q(*args, **kwargs)
+
+        grid = np.linspace(-np.pi, np.pi, 41)
+        spline = CubicSpline(grid, 9.81 * np.sin(grid))
+        arm = TwoLinkManipulator()
+        q = np.array([0.2, 0.3])
+        for name, hook in (("*args wrapper", wrapper), ("CubicSpline", spline)):
+            with self.subTest(hook=name):
+                ctl = ModelJointImpedance(arm, gravity_comp=True, gravity=hook)
+                u = ctl.ctl(None, np.concatenate([q, q, np.zeros(2)]))
+                np.testing.assert_allclose(u, hook(q))
 
     def test_joint_impedance_gravity_requires_plant(self):
         with self.assertRaises(ValueError):

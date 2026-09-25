@@ -621,7 +621,7 @@ class TrajectoryOptimizationPlanner(Planner):
             evaluation = self.evaluate(
                 policy, dt=dt, n_trials=n_trials, tf=float(trajectory.tf)
             )
-        return PlanningSolution(policy, record, trajectory, evaluation)
+        return PlanningSolution(self.problem, policy, record, trajectory, evaluation)
 
     def _make_optimizer(
         self, program: MathematicalProgram, z0: np.ndarray

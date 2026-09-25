@@ -1,20 +1,4 @@
-"""
-Serial manipulators: mechanical dynamics plus task-space kinematics.
-
-Equation of motion (from :class:`~minilink.dynamics.abstraction.mechanical.MechanicalSystem`)::
-
-    H(q) q̈ + C(q, q̇) q̇ + g(q) = τ
-
-Kinematics (this module)::
-
-    p = f(q)
-    ṗ = J(q) q̇
-
-Joint-space outputs ``q``, ``dq`` live on :class:`MechanicalSystem`.
-Task-space outputs ``p``, ``pdot`` are added here.
-
-See ``DESIGN.md`` (dynamics + control feedback profiles).
-"""
+"""Serial manipulators: the mechanical dynamics plus the task-space kinematics ``p = f(q)``, ``ṗ = J(q) q̇``."""
 
 from minilink.core.backends import array_module
 from minilink.dynamics.abstraction.mechanical import MechanicalSystem
@@ -87,8 +71,10 @@ class Manipulator(MechanicalSystem):
         q, dq = self.x2q(x)
         J = self.J(q, params)
 
-        # task-space velocity: ṗ = J(q) q̇
-        return J @ dq
+        # task-space velocity
+        pdot = J @ dq
+
+        return pdot
 
     def get_dynamic_geometry(self, x, u, t=0, params=None):
         """Crimson tool-force arrow when input port ``f`` is present and nonzero."""

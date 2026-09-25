@@ -1,3 +1,5 @@
+"""Planar rocket with thrust magnitude and gimbal angle inputs."""
+
 import numpy as np
 
 from minilink.core.backends import array_module

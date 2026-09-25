@@ -9,6 +9,7 @@ Validates that:
 """
 
 import unittest
+import warnings
 import numpy as np
 import pytest
 from minilink.blocks.basic import Integrator
@@ -422,6 +423,27 @@ class TestJaxDiagramEvaluatorOutputs(unittest.TestCase):
         np.testing.assert_allclose(
             np.asarray(dx_jit), ev_np.f(x_np, u_np, t), atol=1e-05
         )
+
+    def test_integer_state_gives_float_derivatives(self):
+        diag = DiagramSystem()
+        diag.add_subsystem(Integrator(), "plant")
+        diag.add_input_port("u")
+        diag.connect("input", "u", "plant", "u")
+        diag.connect_new_output_port("plant", "y", "y")
+        for xp in (jnp, np):
+            ev = compile_diagram(diag, backend="jax")
+            with warnings.catch_warnings(record=True) as caught:
+                warnings.simplefilter("always")
+                dx = ev.f(xp.array([0]), xp.array([0.7]), 0.0)
+            np.testing.assert_allclose(np.asarray(dx), [0.7])
+            self.assertEqual(
+                [w for w in caught if issubclass(w.category, FutureWarning)], []
+            )
+        x32 = jnp.array([0.0], dtype=jnp.float32)
+        u32 = jnp.array([0.7], dtype=jnp.float32)
+        self.assertEqual(ev.f(x32, u32, 0.0).dtype, jnp.float32)
+        x = jnp.array([0.0])
+        self.assertEqual(ev.f(x, jnp.array([0.7]), 0.0).dtype, x.dtype)
 
 
 class TestDiagramParamsContract(unittest.TestCase):
@@ -1041,6 +1063,31 @@ class TestEquationShapeValidation(unittest.TestCase):
             diagram.compile()
         self.assertIn("step() of", str(ctx.exception))
         self.assertIn("(plant)", str(ctx.exception))
+
+    def test_step_diagram_compile_probes_each_hook_once(self):
+        from minilink.core.diagram import StepDiagramSystem
+        from minilink.core.system import StepSystem
+
+        class CountingStep(StepSystem):
+            def __init__(self):
+                super().__init__(n=1, input_dim=1, output_dim=1)
+                self.calls = {"step": 0, "h": 0}
+
+            def step(self, x, u, k=0, params=None):
+                self.calls["step"] += 1
+                return np.array([0.5 * x[0] + u[0]])
+
+            def h(self, x, u, t=0, params=None):
+                self.calls["h"] += 1
+                return np.array([x[0]])
+
+        block = CountingStep()
+        diagram = StepDiagramSystem()
+        diagram.add_subsystem(block, "plant")
+        diagram.add_input_port("u")
+        diagram.connect("input", "u", "plant", "u")
+        diagram.compile()
+        self.assertEqual(block.calls, {"step": 1, "h": 1})
 
     def test_wrong_f_shape_raises_from_compute_trajectory(self):
         with self.assertRaises(ValueError):

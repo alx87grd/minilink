@@ -7,6 +7,7 @@ Usage (from repo root)::
     python benchmarks/run_regression_check.py --suite e4
     python benchmarks/run_regression_check.py --suite f_mpc
     python benchmarks/run_regression_check.py --suite solve_speed
+    python benchmarks/run_regression_check.py --suite dp_speed
     python benchmarks/run_regression_check.py --suite all
     python benchmarks/run_regression_check.py --suite all --tiny
     python benchmarks/run_regression_check.py --update
@@ -45,6 +46,7 @@ from benchmarks.scenarios.e4_trajopt_parity import (
 )
 from benchmarks.scenarios.f_mpc_parity import run_f_mpc_parity_suite
 from benchmarks.suites.core_perf import CorePerfSuiteConfig, run_core_perf_suite
+from benchmarks.suites.dp_speed import DpSpeedSuiteConfig, run_dp_speed_suite
 from benchmarks.suites.integration_check import (
     IntegrationCheckSuiteConfig,
     run_integration_check_suite,
@@ -57,6 +59,7 @@ SUITE_ORDER = (
     "core_perf",
     "integration",
     "solve_speed",
+    "dp_speed",
     "e4",
     "f_mpc",
 )
@@ -64,6 +67,7 @@ DEFAULT_BASELINE_PATHS = {
     "core_perf": BASELINES_DIR / "core_perf.json",
     "integration": BASELINES_DIR / "integration_check.json",
     "solve_speed": BASELINES_DIR / "solve_speed.json",
+    "dp_speed": BASELINES_DIR / "dp_speed.json",
     "e4": BASELINES_DIR / "e4_trajopt_parity.json",
     "f_mpc": BASELINES_DIR / "f_mpc_parity.json",
 }
@@ -284,6 +288,19 @@ def _suite_specs(tiny: bool) -> dict[str, SuiteSpec]:
             baseline_path=DEFAULT_BASELINE_PATHS["solve_speed"],
             run=lambda _tiny=tiny: run_solve_speed_suite(
                 SolveSpeedSuiteConfig(
+                    n_runs=1 if _tiny else 2,
+                    tiny=_tiny,
+                )
+            ),
+        ),
+        "dp_speed": SuiteSpec(
+            name="dp_speed",
+            description=(
+                "Value-iteration backward-sweep wall-time gates (numpy table + jax device loop)."
+            ),
+            baseline_path=DEFAULT_BASELINE_PATHS["dp_speed"],
+            run=lambda _tiny=tiny: run_dp_speed_suite(
+                DpSpeedSuiteConfig(
                     n_runs=1 if _tiny else 2,
                     tiny=_tiny,
                 )

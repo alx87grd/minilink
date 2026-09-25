@@ -1,7 +1,8 @@
 """G0 flagship graphics draw-list contract.
 
-Each manifest entry maps a README-tier demo to a canonical plant pose. Asserts
-finite kinematic transforms and expected primitive counts — no pixel I/O.
+Each manifest entry is a canonical plant pose, most tied to a flagship demo by
+``demo_id``. Asserts finite kinematic transforms and expected primitive counts
+— no pixel I/O.
 """
 
 from __future__ import annotations

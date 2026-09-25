@@ -14,8 +14,6 @@ import pytest
 
 import minilink.catalog as catalog
 
-pytestmark = [pytest.mark.optional, pytest.mark.jax]
-
 # Plants that need constructor arguments.
 FACTORIES = {
     "SpeedControlledManipulator": lambda: catalog.SpeedControlledManipulator(2, 2),
@@ -45,6 +43,8 @@ def _random_points(sys, count=3, seed=0):
         )
 
 
+@pytest.mark.optional
+@pytest.mark.jax
 @pytest.mark.parametrize("name", list(_cases()))
 def test_plant_compiles_on_both_backends_and_agrees(name):
     pytest.importorskip("jax")

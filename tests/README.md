@@ -35,7 +35,7 @@ Demos stay in `examples/demos/` for teaching; **demo-check runners** that execut
 | --- | --- |
 | **Daily** | [`tests/run/run_contract_tests.py`](run/run_contract_tests.py) |
 | **Before push** | [`tests/run/run_pre_push.py`](run/run_pre_push.py) |
-| **After sim/trajopt/MPC work** | [`tests/run/run_regression_gates.py`](run/run_regression_gates.py) |
+| **After sim/trajopt/MPC/value-iteration work** | [`tests/run/run_regression_gates.py`](run/run_regression_gates.py) |
 | **Demo/catalog sanity** | [`tests/run/run_demo_checks.py`](run/run_demo_checks.py) |
 | **Notebook smoke** | [`tests/run/run_notebook_checks.py`](run/run_notebook_checks.py) |
 | **Backend perf tables** | [`tests/run/run_benchmark_study.py`](run/run_benchmark_study.py) |
@@ -53,7 +53,7 @@ Optional toggles: constants at the top of each `tests/run/*.py` file.
 | Docs/markdown only | skip pytest |
 | Narrow module change | `pytest tests/unittest/test_<domain>.py` |
 | Cross-cutting or handoff | `pytest` |
-| Compile / `Simulator` / trajopt / MPC | `PYTHONPATH=. python benchmarks/run_regression_check.py --suite all --tiny --factor 10 --speed-gate-suffixes solve_s,nlp_s,speedup` |
+| Compile / `Simulator` / trajopt / MPC / value iteration | `PYTHONPATH=. python benchmarks/run_regression_check.py --suite all --tiny --factor 10 --speed-gate-suffixes solve_s,nlp_s,speedup` |
 | Backend perf exploration | `python benchmarks/run_study.py --list` |
 | Demo-check change | `python tests/demo_checks/run_catalog_checks.py --fast` and/or `run_flagship_demos.py` |
 | Notebook change | `MPLBACKEND=Agg python tests/demo_checks/run_notebook_checks.py` |
@@ -66,15 +66,15 @@ Workflow: [`.github/workflows/test.yml`](../.github/workflows/test.yml).
 
 | Job | Steps |
 | --- | --- |
-| **`test`** | ruff + `pytest` (py 3.10–3.13; demo-check bridge; JAX demos may skip) |
+| **`test`** | ruff + `pytest` (py 3.10–3.13; demo-check bridge; JAX tests and demos skip) |
 | **`packaging`** | `python -m build` + wheel/sdist check (no `experimental/`) + `twine check` + install the wheel and `import minilink` |
-| **`regression`** | regression gates `--suite all --tiny …` + **flagship demos** + **notebook smoke** (py 3.12 + JAX + viz) |
+| **`regression`** | `pytest` (incl. the JAX tests) + regression gates `--suite all --tiny …` + **flagship demos** + **notebook smoke** (py 3.12 + JAX + viz) |
 
 ### At a glance
 
 | Layer | Human IDE (`tests/run/`) | Agent / CI | CI job |
 | --- | --- | --- | --- |
-| **Contract tests** | `run_contract_tests.py` | `pytest` | `test` |
+| **Contract tests** | `run_contract_tests.py` | `pytest` | `test` + `regression` |
 | **Regression gates** | `run_regression_gates.py` | `benchmarks/run_regression_check.py` | `regression` |
 | **Benchmark study** | `run_benchmark_study.py` | `benchmarks/run_study.py` | — |
 | **Graphics contract** | (in contract tests) | `test_flagship_graphics_contract.py` | `test` |
@@ -107,7 +107,7 @@ Detail: [benchmarks/README.md](../benchmarks/README.md).
 
 | Layer | Purpose | Entry command | CI job |
 | --- | --- | --- | --- |
-| **Contract tests** | API types, shapes, compile/sim/MPC behavior | `pytest` | `test` |
+| **Contract tests** | API types, shapes, compile/sim/MPC behavior | `pytest` | `test` + `regression` (w/ JAX) |
 | **Regression gates** | Accuracy goldens + guarded NLP/trajopt solve time | `run_regression_check.py --suite all` | `regression` |
 | **Benchmark study** | Machine/GPU exploration tables | `run_study.py --list` | — |
 | **Graphics contract** | Draw-list + headless PNG checks | `test_flagship_graphics_contract.py` (in `pytest`) | `test` |
@@ -132,13 +132,8 @@ graphics frame keys, catalog equation references)—not implementation trivia or
 third-party print formatting. Prefer one parametrized or table-driven test over
 many near-duplicate files.
 
-**Domain modules** (22 files after contract-test consolidation): `test_core`, `test_backends`,
-`test_compile`, `test_diagrams`, `test_simulation`, `test_step_discrete`,
-`test_hybrid`, `test_dynamics_catalog`, `test_mechanical_robotics`, `test_blocks`,
-`test_control_analysis`, `test_costs_optimizer`, `test_planning`, `test_mpc`,
-`test_graphics`, `test_geometry`, `test_engine_jax`, `test_jax_planning`,
-`test_symbolic`, `test_benchmark_helpers`, `test_demo_check_runners`,
-`test_flagship_graphics_contract`.
+**Domain modules**: one `tests/unittest/test_<domain>.py` per band or contract; add a test
+to the module of the band it exercises before creating a new file.
 
 Kinematic render check (graphics contract): ``run_flagship_graphics.py`` and manifest under
 ``tests/fixtures/kinematic_baseline/``.
@@ -177,8 +172,7 @@ Opt-in pytest bridge for notebooks: `MINILINK_NOTEBOOK_CHECKS=1 pytest tests/uni
 
 IDE launchers: [`tests/run/`](run/). Headless PNG check: `tests/demo_checks/run_flagship_graphics.py`.
 
-`tests/manual/` and `tests/bugs/` are removed — use `examples/demos/` for
-demos and unittest for contracts.
+Demos live in `examples/demos/`; contracts live in `tests/unittest/`.
 
 ## Core behavior without optional extras
 
@@ -222,3 +216,8 @@ Cursor Cloud sessions.
 When adding optional behavior, put the import inside a guarded block and add the
 appropriate marker(s). This keeps `pytest -m "not optional"` a dependable
 behavior suite for minimal installations.
+
+A test marked `jax` is skipped when jax is not installed (`tests/unittest/conftest.py`).
+Guard JAX tests per test or per class: a module-level `pytest.importorskip("jax")`
+skips every test of its module, so it belongs only in the modules that are JAX
+from end to end (listed in `test_repo_contract.py`).

@@ -161,6 +161,34 @@ class TestBenchmarkSmoke(unittest.TestCase):
         self.assertGreater(row.build_s, 0.0)
         self.assertEqual(row.iterations, 2)
 
+    def test_dp_speed_suite_metrics_match_the_committed_baseline(self):
+        """The gate's metric ids must stay in sync with benchmarks/baselines/dp_speed.json."""
+        from pathlib import Path
+
+        from benchmarks.baseline import load_baseline
+        from benchmarks.suites.dp_speed import DpSpeedSuiteConfig, run_dp_speed_suite
+
+        # NumPy-only keeps this a fast import/API guard; the JAX rows need the extra
+        metrics = run_dp_speed_suite(DpSpeedSuiteConfig(tiny=True, include_jax=False))
+        recorded = {metric.id for metric in metrics}
+        self.assertEqual(
+            recorded, {"dp.pendulum.grid.build_s", "dp.pendulum.numpy.solve_s"}
+        )
+        for metric in metrics:
+            self.assertEqual(metric.gate, "speed")
+            self.assertEqual(metric.direction, "lower_better")
+            self.assertGreater(metric.value, 0.0)
+
+        baseline_path = (
+            Path(__file__).resolve().parents[2]
+            / "benchmarks"
+            / "baselines"
+            / "dp_speed.json"
+        )
+        baseline = load_baseline(baseline_path)
+        self.assertEqual(baseline.suite, "dp_speed")
+        self.assertTrue(recorded <= {metric.id for metric in baseline.metrics})
+
     def test_planning_rrt_fixture_and_benchmark_row(self):
         problem, extender, x_goal = holonomic_problem()
         self.assertEqual(problem.sys.n, 2)

@@ -271,14 +271,23 @@ def plot_bode(
 ) -> PlotResult:
     """Bode diagram of the selected channel; ``margins=True`` marks the crossovers.
 
+    The crossovers and the printed margins are those of :func:`margins`, read
+    on its 2000-point grid (or on ``w``), not on the ``n`` plotted frequencies.
     ``title`` overrides the figure heading (default ``"Bode Diagram"``).
     """
-    w, G = frequency_response(
-        sys, x_bar, u_bar, t, params, of=of, wrt=wrt, w=w, n=n, method=method, eps=eps
+    A, B, C, D = siso_matrices(
+        sys, x_bar, u_bar, t, params, of=of, wrt=wrt, method=method, eps=eps
     )
+    w_plot = frequency_grid(A, B, C, D, w, n)
+    G = linear.frequency_response(A, B, C, D, w_plot)
+    loop_margins = None
+    if margins:
+        w_margins = frequency_grid(A, B, C, D, w, 2000)  # the grid of margins()
+        G_margins = linear.frequency_response(A, B, C, D, w_margins)
+        loop_margins = linear.margins(w_margins, G_margins)
 
     return render_control_figure(
-        _bode_figure(w, G, sys, of, wrt, margins, title=title),
+        _bode_figure(w_plot, G, sys, of, wrt, loop_margins, title=title),
         backend=backend,
         show=show,
     )
@@ -501,15 +510,14 @@ def _root_markers(p, z):
     )
 
 
-def _bode_figure(w, G, sys, of, wrt, margins, title=None):
+def _bode_figure(w, G, sys, of, wrt, m, title=None):
     magnitude_db, phase_deg = _bode_coordinates(G)
     hover = tuple(
         f"ω = {wk:.3g} rad/s<br>|G| = {mk:.1f} dB<br>∠G = {pk:.1f}°"
         for wk, mk, pk in zip(w, magnitude_db, phase_deg)
     )
     crossovers, notes, references = (), (), ()
-    if margins:
-        m = linear.margins(w, G)
+    if m is not None:
         crossovers = tuple(
             RefLine("x", w_c)
             for w_c in (m.w_gain_crossover, m.w_phase_crossover)

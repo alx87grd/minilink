@@ -1,24 +1,8 @@
-"""
-Feedback-port declaration: which ports form a block's standard feedback loop.
+"""Feedback-port declaration: which ports of a controller block form its standard loop.
 
-A controller in minilink is an ordinary :class:`~minilink.core.system.System`:
-explicit ports, and a ``ctl`` port compute that *is* the control law. This
-module adds the read-only context that tools use to interpret such blocks:
-
-- :data:`PROFILE_PORTS` — the standard port roles implied by a block's
-  ``feedback_profile`` string.
-- :func:`feedback_ports` — resolve ``(measurement, ref, control)`` roles for
-  any block (explicit attrs first, profile registry second).
-- :class:`Controller` / :class:`DynamicController` — thin marker/facade base
-  classes providing the ``plot_control_law`` shortcut. They add no ports, no
-  state, and no behavior.
-- :func:`error_input` / :class:`ErrorDriven` — the summing-junction side:
-  which input a loop closed with ``@`` should drive with ``e = r - y``, and
-  the port-layout switch (``ports="error"`` vs ``"reference"``) shared by
-  the classical blocks.
-
-Nothing here changes how a block computes. Undeclared blocks keep working
-everywhere; ``@`` composition falls back to its name/dimension heuristics.
+A controller is an ordinary :class:`~minilink.core.system.System` whose ``ctl`` port
+compute is the law; this module only names the roles (measurement, reference, command,
+error) that ``@`` and ``plot_control_law`` read. Nothing here changes how a block computes.
 """
 
 from dataclasses import dataclass
@@ -198,4 +182,8 @@ class ErrorDriven:
         if self.port_layout == "error":
             return u
         p = self.inputs["r"].dim
-        return u[:p] - u[p:]
+        r, y = u[:p], u[p:]
+
+        e = r - y
+
+        return e

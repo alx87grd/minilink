@@ -552,9 +552,14 @@ class TestAnimatorOverlays(unittest.TestCase):
 
 import pytest
 from minilink.graphical.animation.primitives import Point
+from minilink.graphical.animation.primitives import CustomLine
 from minilink.graphical.animation.renderers.meshcat_renderer import (
     MeshcatCanvas,
+    MeshcatRenderer,
+    _frames_have_changing_polylines,
     _import_meshcat,
+    html_export_path,
+    polyline_strip_mesh,
 )
 from minilink.graphical.animation.renderers.pygame_renderer import (
     PygameCanvas,
@@ -578,18 +583,89 @@ def _has_pygame():
     return True
 
 
+class TestMeshcatPolylineStrip(unittest.TestCase):
+    def test_solid_ground_line_is_lifted_ribbon(self):
+        mesh = polyline_strip_mesh(
+            [[0.0, 0.0, 0.0], [1.0, 0.0, 0.0]],
+            linewidth=2.0,
+            style="-",
+        )
+        self.assertIsNotNone(mesh)
+        vertices, faces = mesh
+        self.assertGreaterEqual(len(vertices), 8)
+        self.assertGreaterEqual(len(faces), 2)
+        self.assertGreater(float(np.min(vertices[:, 2])), 0.0)
+
+    def test_dashed_style_leaves_a_gap(self):
+        dashed = polyline_strip_mesh(
+            [[0.0, 0.0, 0.0], [2.0, 0.0, 0.0]],
+            linewidth=1.0,
+            style="--",
+            dash_unit=0.2,
+        )
+        xs = dashed[0][:, 0]
+        # "--" is 2 on / 1.25 off → first on [0, 0.4], first gap (0.4, 0.65).
+        self.assertTrue(np.any(xs < 0.2))
+        self.assertFalse(np.any(np.abs(xs - 0.52) < 0.06))
+
+    def test_matplotlib_dash_tuple_is_honored(self):
+        mesh = polyline_strip_mesh(
+            [[0.0, 0.0, 0.0], [3.0, 0.0, 0.0]],
+            linewidth=1.1,
+            style=(0, (5, 4)),
+        )
+        self.assertIsNotNone(mesh)
+        self.assertGreater(len(mesh[1]), 0)
+
+    def test_short_polyline_is_skipped(self):
+        self.assertIsNone(polyline_strip_mesh([[0.0, 0.0, 0.0]]))
+
+    def test_changing_custom_line_is_detected(self):
+        T = np.eye(4)
+        cam = camera_matrix()
+        a = CustomLine([[0.0, 0.0, 0.0], [1.0, 0.0, 0.0]])
+        b = CustomLine([[0.0, 0.0, 0.0], [1.0, 0.0, 0.0], [2.0, 0.0, 0.0]])
+        frames = [
+            {"primitives": [a], "transforms": [T], "camera": cam, "t": 0.0},
+            {"primitives": [b], "transforms": [T], "camera": cam, "t": 0.1},
+        ]
+        self.assertTrue(_frames_have_changing_polylines(frames))
+        same = [
+            {"primitives": [a], "transforms": [T], "camera": cam, "t": 0.0},
+            {"primitives": [a], "transforms": [T], "camera": cam, "t": 0.1},
+        ]
+        self.assertFalse(_frames_have_changing_polylines(same))
+
+
+class _FakePath:
+    """Stand-in for meshcat.path.Path so Animation.at_frame can key clips."""
+
+    def __init__(self, name=""):
+        self._name = name
+
+    def append(self, other):
+        extra = other if isinstance(other, str) else getattr(other, "_name", str(other))
+        if not self._name:
+            return _FakePath(extra)
+        return _FakePath(f"{self._name}/{extra}")
+
+    def lower(self):
+        return self._name
+
+
 class _FakeMeshcatNode:
     """Minimal meshcat path tree for canvas smoke tests (no ZMQ server)."""
 
-    def __init__(self):
+    def __init__(self, path=None):
         self.children = {}
         self.object = None
         self.transform = None
+        self.path = _FakePath() if path is None else path
 
     def __getitem__(self, key):
         child = self.children.get(key)
         if child is None:
-            child = _FakeMeshcatNode()
+            child = _FakeMeshcatNode(path=self.path.append(key))
             self.children[key] = child
         return child
 
@@ -638,6 +714,87 @@ class TestMeshcatOptionalSmoke(unittest.TestCase):
         self.assertIsNotNone(slot.object)
         self.assertIsNotNone(slot.transform)
         canvas.clear()
+
+    @pytest.mark.skipif(not _has_meshcat(), reason="meshcat not installed")
+    def test_canvas_draws_3d_custom_line_as_a_mesh(self):
+        import meshcat.geometry as g
+
+        canvas = MeshcatCanvas(_FakeMeshcatNode(), is_3d=True)
+        line = CustomLine(
+            [[0.0, 0.0, 0.0], [1.0, 0.0, 0.0], [1.0, 1.0, 0.0]],
+            color="#ef6c00",
+            linewidth=2.0,
+            style="--",
+        )
+        canvas.ensure_objects([line])
+        obj = canvas.scene["p0"].object
+        self.assertIsInstance(obj, g.Mesh)
+        self.assertIsInstance(obj.geometry, g.TriangularMeshGeometry)
+        canvas.clear()
+
+    @pytest.mark.skipif(not _has_meshcat(), reason="meshcat not installed")
+    def test_native_clip_builds_when_custom_line_vertices_change(self):
+        import io
+        from contextlib import redirect_stdout
+
+        import meshcat.animation as mcanim
+        from minilink.graphical.animation.renderers.timing import AnimationFrameSchedule
+
+        class _Anim:
+            sys = type("S", (), {"name": "dot"})()
+
+        a = CustomLine([[0.0, 0.0, 0.0], [1.0, 0.0, 0.0]])
+        b = CustomLine([[0.0, 0.0, 0.0], [1.0, 0.0, 0.0], [2.0, 0.0, 0.0]])
+        T = np.eye(4)
+        cam = camera_matrix()
+        frames = [
+            {"primitives": [a], "transforms": [T], "camera": cam, "t": 0.0},
+            {"primitives": [b], "transforms": [T], "camera": cam, "t": 0.1},
+        ]
+        schedule = AnimationFrameSchedule(
+            nsteps=2, skip_steps=1, interval_ms=33.0, n_frames=2, target_fps=30.0
+        )
+        renderer = MeshcatRenderer(_Anim())
+        renderer.canvas = MeshcatCanvas(_FakeMeshcatNode(), is_3d=True)
+        buf = io.StringIO()
+        with redirect_stdout(buf):
+            animation_obj = renderer._build_meshcat_animation([a], frames, schedule)
+        self.assertIsInstance(animation_obj, mcanim.Animation)
+        self.assertIn("native=False", buf.getvalue())
+
+    def test_html_export_path_keeps_or_appends_suffix(self):
+        self.assertEqual(html_export_path("lap").name, "lap.html")
+        self.assertEqual(html_export_path("lap.html").name, "lap.html")
+
+    @pytest.mark.skipif(not _has_meshcat(), reason="meshcat not installed")
+    def test_export_animation_writes_standalone_html(self):
+        import tempfile
+        from pathlib import Path
+
+        from minilink.graphical.animation.renderers.timing import AnimationFrameSchedule
+
+        class _Anim:
+            sys = type("S", (), {"name": "dot"})()
+
+        prim = Point([0.0, 0.0, 0.0])
+        T = np.eye(4)
+        cam = camera_matrix()
+        frames = [
+            {"primitives": [prim], "transforms": [T], "camera": cam, "t": 0.0},
+            {"primitives": [prim], "transforms": [T], "camera": cam, "t": 0.1},
+        ]
+        schedule = AnimationFrameSchedule(
+            nsteps=2, skip_steps=1, interval_ms=33.0, n_frames=2, target_fps=30.0
+        )
+        with tempfile.TemporaryDirectory() as tmp:
+            dest = Path(tmp) / "lap.html"
+            MeshcatRenderer(_Anim()).export_animation(
+                [prim], frames, schedule, str(dest), is_3d=True
+            )
+            html = dest.read_text()
+            self.assertTrue(dest.is_file())
+            self.assertIn("<html", html.lower())
+            self.assertGreater(len(html), 100)
 
 
 @pytest.mark.optional
@@ -1126,6 +1283,21 @@ class TestPlotlySignalPlot(unittest.TestCase):
         handle.update(traj1)
         np.testing.assert_allclose(handle.fig.data[0].y, np.array([0.0, 0.25]))
 
+    def test_plotly_ylabels_bracket_units_once(self):
+        pytest.importorskip("plotly")
+        sys = Integrator_plotly_renderer()
+        sys.state.units = ["[m]"]  # already bracketed, as the manipulator ports declare
+        sys.inputs["u"].units = ["N"]
+        traj = Trajectory(
+            t=np.array([0.0, 1.0]), x=np.array([[0.0, 1.0]]), u=np.array([[1.0, 1.0]])
+        )
+        result = plot_time_signals(
+            sys, traj, signals=("x", "u"), backend="plotly", show=False
+        )
+        layout = result.figure.layout
+        self.assertEqual(layout.yaxis.title.text, "x[0] [m]")
+        self.assertEqual(layout.yaxis2.title.text, "u[0] [N]")
+
     def test_stacked_figsize_caps_height_for_popup_layout(self):
         from minilink.graphical.common.matplotlib_style import (
             SIGNAL_PLOT_MAX_FIG_HEIGHT_POPUP,
@@ -1432,3 +1604,67 @@ class TestAutoFitCamera(unittest.TestCase):
             np.array([25.0]), np.array([]), 0.0, kinematic=sys.get_kinematic_geometry()
         )
         self.assertEqual(frame["camera"][3, 3], 3.0)
+
+
+class TestAnimationFrameSchedule(unittest.TestCase):
+    """Playback subsamples the trajectory and always ends on its final sample."""
+
+    def test_last_frame_is_the_final_sample(self):
+        from minilink.graphical.animation.renderers.timing import sim_index_for_frame
+
+        for n in (2, 1000, 1001, 10001):
+            traj = Trajectory(
+                t=np.linspace(0.0, 10.0, n), x=np.zeros((1, n)), u=np.zeros((0, n))
+            )
+            schedule = trajectory_frame_schedule(traj, 1.0)
+            last = sim_index_for_frame(schedule.n_frames - 1, schedule)
+            before_last = sim_index_for_frame(schedule.n_frames - 2, schedule)
+            self.assertEqual(last, n - 1, msg=f"n={n}")
+            self.assertLess(before_last, n - 1, msg=f"n={n}")
+
+    def test_one_sample_trajectory_is_one_still_frame(self):
+        traj = Trajectory(
+            t=np.array([0.0]), x=np.array([[1.0], [0.0]]), u=np.zeros((1, 1))
+        )
+        schedule = trajectory_frame_schedule(traj, 1.0)
+        self.assertEqual(schedule.n_frames, 1)
+        self.assertGreater(schedule.interval_ms, 0.0)
+        Pendulum().animate(traj, show=False, html=False)
+
+    def test_zero_duration_trajectory_shows_every_sample(self):
+        from minilink.graphical.animation.renderers.timing import sim_index_for_frame
+
+        traj = Trajectory(
+            t=np.zeros(3),
+            x=np.array([[1.0, 1.1, 1.2], [0.0, 0.0, 0.0]]),
+            u=np.zeros((1, 3)),
+        )
+        schedule = trajectory_frame_schedule(traj, 1.0)
+        self.assertEqual(schedule.n_frames, 3)
+        self.assertEqual(sim_index_for_frame(schedule.n_frames - 1, schedule), 2)
+        Pendulum().animate(traj, show=False, html=False)
+
+
+class TestGifExport(unittest.TestCase):
+    """``animate(save=True)`` with matplotlib writes ``{file_name}.gif`` exactly once."""
+
+    def test_save_keeps_or_appends_the_gif_suffix(self):
+        import os
+        import tempfile
+
+        sys = DynamicSystem(1, output_dim=1, expose_state=True)
+        sys.skin = debug_state_skin
+        traj = Trajectory(
+            t=np.array([0.0, 0.1]), x=np.array([[0.0, 1.0]]), u=np.zeros((0, 2))
+        )
+        with tempfile.TemporaryDirectory() as tmp:
+            with contextlib.redirect_stdout(io.StringIO()):
+                for name in ("clip.gif", "plain"):
+                    sys.animate(
+                        traj,
+                        save=True,
+                        show=False,
+                        html=False,
+                        file_name=os.path.join(tmp, name),
+                    )
+            self.assertEqual(sorted(os.listdir(tmp)), ["clip.gif", "plain.gif"])

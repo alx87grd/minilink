@@ -1,16 +1,4 @@
-"""
-Pyro-ported double pendulum (2 actuators, 2 links).
-
-This matches SherbyRobotics/pyro ``DoublePendulum`` in
-``pyro/dynamic/vi_pendulum.py``:
-
-* ``q = [theta1, theta2]`` where ``theta1`` is the first joint and ``theta2`` is
-  measured relative to the first link
-* the same ``H``, ``C``, ``B``, ``g``, and linear joint damping in ``d``
-
-Visualization maps Pyro's line-based torque arcs to :class:`TorqueArrow` using
-the same sweep scaling as the tutorial single pendulum in ``vi_pendulum_swingup.py``.
-"""
+"""Double pendulum: two links, two actuators, the second angle relative to the first link (pyro port)."""
 
 import numpy as np
 
@@ -64,7 +52,7 @@ class DoublePendulum(MechanicalSystem):
         self.ground_half_width = 10.0
         self.camera_scale = 3.0
 
-    def _trig(self, q):
+    def trig(self, q):
         xp = array_module(q)
         c1 = xp.cos(q[0])
         s1 = xp.sin(q[0])
@@ -76,7 +64,7 @@ class DoublePendulum(MechanicalSystem):
 
     def H(self, q, params=None):
         params = self.params if params is None else params
-        _, _, c2, _, _, _ = self._trig(q)
+        _, _, c2, _, _, _ = self.trig(q)
 
         l1 = params["l1"]
         lc1 = params["lc1"]
@@ -102,7 +90,7 @@ class DoublePendulum(MechanicalSystem):
 
     def C(self, q, dq, params=None):
         params = self.params if params is None else params
-        _, _, _, s2, _, _ = self._trig(q)
+        _, _, _, s2, _, _ = self.trig(q)
 
         m2 = params["m2"]
         l1 = params["l1"]
@@ -126,7 +114,7 @@ class DoublePendulum(MechanicalSystem):
 
     def g(self, q, params=None):
         params = self.params if params is None else params
-        _, s1, _, _, _, s12 = self._trig(q)
+        _, s1, _, _, _, s12 = self.trig(q)
 
         m1 = params["m1"]
         m2 = params["m2"]
@@ -182,7 +170,7 @@ class DoublePendulum(MechanicalSystem):
         q = x[: self.dof]
         l1 = self.params["l1"]
         l2 = self.l2
-        _, s1, _, _, c12, s12 = self._trig(q)
+        _, s1, _, _, c12, s12 = self.trig(q)
         c1 = np.cos(q[0])
         p1 = np.array([l1 * s1, l1 * c1])
         p2 = p1 + np.array([l2 * s12, l2 * c12])

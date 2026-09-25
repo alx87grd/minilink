@@ -20,8 +20,16 @@ class ZOHHold(StepSystem):
 
     def step(self, x, u, k=0, params=None):
         xp = array_module(u)
-        return xp.asarray(u, dtype=float).reshape(1).copy()
+
+        # the latch: x_{k+1} = u_k
+        x_next = xp.asarray(u, dtype=float).reshape(1).copy()
+
+        return x_next
 
     def h(self, x, u, k=0, params=None):
         xp = array_module(x)
-        return xp.asarray(x, dtype=float).reshape(1).copy()
+
+        # y_k = x_k, the held value
+        y = xp.asarray(x, dtype=float).reshape(1).copy()
+
+        return y

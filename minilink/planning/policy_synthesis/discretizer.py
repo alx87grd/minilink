@@ -1,18 +1,4 @@
-"""
-State-space discretization for dynamic-programming policy synthesis.
-
-A :class:`StateSpaceGrid` turns the continuous plant of a
-:class:`~minilink.planning.problems.PlanningProblem` into the finite objects a
-value-iteration solver needs: a regular grid of states and admissible inputs,
-a forward-Euler successor map ``x_next = x + f(x, u, t) dt``, boolean validity
-masks sourced from the problem sets (``X.contains`` / ``U.contains``), and an
-interpolation of any node-indexed scalar field back onto the state space.
-
-The grid is dimension-generic (any state size ``n`` and input size ``m``) and
-cost-agnostic — the running and terminal costs live with the solver, not here.
-This module is library-developer facing; the value-iteration math reads from
-:mod:`minilink.planning.policy_synthesis.dp`.
-"""
+"""State-space grid for value iteration: states, inputs, Euler successors and interpolation."""
 
 import time
 
@@ -21,114 +7,15 @@ from scipy.interpolate import RegularGridInterpolator
 
 from minilink.core.backends import BACKEND_JAX, BACKEND_NUMPY
 from minilink.core.sets import BoxInputSet, BoxSet, is_finite_box
+from minilink.planning.policy_synthesis.progress import (
+    maybe_print_build_progress,
+    print_build_complete,
+    progress,
+)
 from minilink.planning.problems import PlanningProblem
 
+#: Node-action pairs evaluated per JAX chunk when building tables on device.
 PAIR_CHUNK_SIZE = 50_000
-PROGRESS_PCT_STEP = 2.0
-_PROGRESS_WIDTH = 72
-
-
-def print_build_progress(done, total, start, *, prefix, unit="pairs"):
-    """Overwrite one terminal line with percent, elapsed time, and ETA."""
-    elapsed = time.time() - start
-    pct = 100.0 * done / total if total else 100.0
-    eta = elapsed / done * (total - done) if 0 < done < total else 0.0
-    msg = f"{prefix}: {pct:5.1f}%  {elapsed:5.0f}s  ETA ~{eta:.0f}s"
-    pad = " " * max(0, _PROGRESS_WIDTH - len(msg))
-    print(f"\r{msg}{pad}", end="", flush=True)
-
-
-def maybe_print_build_progress(done, total, start, *, prefix, unit, state):
-    """Print at most once per ``PROGRESS_PCT_STEP`` percent (plus final 100%)."""
-    if not state.get("enabled", True) or total <= 0:
-        return state
-    pct = 100.0 * done / total
-    if done < total:
-        next_at = state.get("next_pct", PROGRESS_PCT_STEP)
-        if pct + 1e-9 < next_at:
-            return state
-        while next_at <= pct:
-            next_at += PROGRESS_PCT_STEP
-        state["next_pct"] = next_at
-    print_build_progress(done, total, start, prefix=prefix, unit=unit)
-    return state
-
-
-def print_build_complete(prefix, elapsed, detail):
-    """Finish a throttled progress line without leaving wrapped tail text."""
-    msg = f"{prefix}.. completed in {elapsed:4.2f} sec  {detail}"
-    pad = " " * max(0, _PROGRESS_WIDTH - len(msg))
-    print(f"\r{msg}{pad}")
-
-
-def build_jax_sa_chunks(pair_fn, N, A, jax, jnp, *, interval, verbose, prefix):
-    """Fill an ``(N, A)`` table by JAX ``vmap`` over flat state–action indices."""
-    total = N * A
-    out = np.empty((N, A), dtype=float)
-
-    @jax.jit
-    def eval_chunk(sa):
-        s = sa // A
-        a = sa % A
-        return jax.vmap(pair_fn)(s, a)
-
-    build_start = time.time()
-    progress = {"enabled": verbose}
-    for begin in range(0, total, interval):
-        end = min(begin + interval, total)
-        count = end - begin
-        if count == interval:
-            sa = jnp.arange(begin, end)
-            chunk = eval_chunk(sa)
-        else:
-            sa = jnp.arange(begin, end)
-            s = sa // A
-            a = sa % A
-            chunk = jax.vmap(pair_fn)(s, a)
-
-        chunk = np.asarray(chunk)
-        idx = np.arange(begin, end)
-        out[idx // A, idx % A] = chunk
-        maybe_print_build_progress(
-            end, total, build_start, prefix=prefix, unit="pairs", state=progress
-        )
-
-    if verbose:
-        print_build_complete(prefix, time.time() - build_start, f"({total:,} pairs)")
-
-    return out
-
-
-def build_jax_node_chunks(node_fn, N, jax, jnp, *, interval, verbose, prefix):
-    """Fill a length-``N`` vector by JAX ``vmap`` over node indices."""
-    out = np.empty(N, dtype=float)
-
-    @jax.jit
-    def eval_chunk(idx):
-        return jax.vmap(node_fn)(idx)
-
-    build_start = time.time()
-    progress = {"enabled": verbose}
-    for begin in range(0, N, interval):
-        end = min(begin + interval, N)
-        count = end - begin
-        if count == interval:
-            idx = jnp.arange(begin, end)
-            chunk = eval_chunk(idx)
-        else:
-            idx = jnp.arange(begin, end)
-            chunk = jax.vmap(node_fn)(idx)
-
-        out[begin:end] = np.asarray(chunk)
-        maybe_print_build_progress(
-            end, N, build_start, prefix=prefix, unit="nodes", state=progress
-        )
-
-    if verbose:
-        print_build_complete(prefix, time.time() - build_start, f"({N:,} nodes)")
-
-    return out
-
 
 # Public API
 
@@ -150,10 +37,11 @@ class StateSpaceGrid:
         Forward-Euler time step used by the successor map.
     precompute : bool, optional
         When ``True`` (default) the successor and validity tables are built once
-        at construction (``t = 0``) — fast sweeps, but only valid for
-        time-invariant dynamics. When ``False`` they are recomputed per call to
-        :meth:`transition`, which costs less memory and supports time-varying
-        dynamics.
+        at construction (``t = 0``) — fast sweeps, but only valid when neither
+        the dynamics ``f`` nor the running cost ``g`` depends on time: the
+        value-iteration planner then also builds its running-cost table once.
+        When ``False`` both are recomputed at each sweep's time, which costs
+        less memory and supports a time-varying ``f`` or ``g``.
     precompute_backend : {"numpy", "jax"}, optional
         Engine for building the successor lookup table. ``"numpy"`` (default) uses
         nested Python loops (pyro's reference). ``"jax"`` vectorizes the forward
@@ -294,55 +182,39 @@ class StateSpaceGrid:
 
     def _compute_transition_numpy(self, t):
         """Build the forward-Euler successors and the input/state validity masks."""
-        N, A, n = self.nodes_n, self.actions_n, self.n
         f = self.sys.f
         X, U = self.problem.X, self.problem.U
         sys_params = self.problem.params.system
         set_params = self.problem.params.sets
         dt = self.dt
-        verbose = self.verbose
-        start = time.time()
-        total_pairs = N * A
-
-        if verbose:
-            print("Computing x_next array.. ", end="", flush=True)
+        N, A, n = self.nodes_n, self.actions_n, self.n
 
         x_next = np.empty((N, A, n), dtype=float)
         action_ok = np.empty((N, A), dtype=bool)
         x_next_ok = np.empty((N, A), dtype=bool)
 
-        pairs_done = 0
-        progress = {"enabled": verbose}
-        for a in range(A):
-            u = self.inputs[a]
-            for s in range(N):
-                x = self.states[s]
+        nodes = progress(
+            range(N), "Computing x_next array", self.verbose, unit="pairs", per_item=A
+        )
 
-                # forward Euler step of the continuous dynamics
+        # For all state nodes
+        for s in nodes:
+            x = self.states[s]
+
+            # For all control actions
+            for a in range(A):
+                u = self.inputs[a]
+
+                # Forward Euler step of the continuous dynamics
                 xnext = x + f(x, u, t, sys_params) * dt
-
                 x_next[s, a] = xnext
+
+                # Admissible input, and a successor in X and on the grid (the table's
+                # domain)
                 action_ok[s, a] = U.contains(u, x, t, set_params)
                 x_next_ok[s, a] = X.contains(xnext, t, set_params) and bool(
                     self.on_grid(xnext)
                 )
-
-                pairs_done += 1
-                maybe_print_build_progress(
-                    pairs_done,
-                    total_pairs,
-                    start,
-                    prefix="Computing x_next array",
-                    unit="pairs",
-                    state=progress,
-                )
-
-        if verbose:
-            print_build_complete(
-                "Computing x_next array",
-                time.time() - start,
-                f"({total_pairs:,} pairs)",
-            )
 
         return x_next, action_ok, x_next_ok
 

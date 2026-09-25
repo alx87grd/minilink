@@ -371,6 +371,17 @@ class TestFiniteHorizonLQR(unittest.TestCase):
         np.testing.assert_allclose(dS_dt, rhs, atol=1e-5)
         np.testing.assert_allclose(S, np.swapaxes(S, 1, 2))  # symmetric throughout
 
+    def test_stiff_pair_on_a_coarse_grid_matches_a_fine_grid(self):
+        # a fast pole at -1000 rad/s: ‖H‖ Δt ≫ 1 on every grid below
+        A = np.array([[0.0, 1.0], [-1.0, -1000.0]])
+        B, Q, R, S_f, tf = self.B, self.Q, self.R, np.zeros((2, 2)), 5.0
+        _, _, S_fine = lqr_gain_schedule(A, B, Q, R, S_f, tf, n_steps=10001)
+        for n_steps in (2, 11, 101):
+            _, K, S = lqr_gain_schedule(A, B, Q, R, S_f, tf, n_steps=n_steps)
+            stride = 10000 // (n_steps - 1)
+            self.assertTrue(np.all(np.isfinite(K)))
+            np.testing.assert_allclose(S, S_fine[::stride], rtol=1e-8, atol=1e-12)
+
     def test_scheduled_gain_interpolates_and_holds(self):
         t = np.array([0.0, 1.0, 2.0])
         K = np.array([[[1.0, 0.0]], [[2.0, 0.0]], [[3.0, 0.0]]])
@@ -658,7 +669,7 @@ class TestModalAPI(unittest.TestCase):
             modal_analysis(Pendulum(), x_bar=[0.0, 0.0], linearization="fd")
 
 
-from minilink.analysis.frequency import bode, pzmap
+from minilink.analysis.frequency import bode, pzmap, transfer_function
 from minilink.graphical.common import PlotResult
 
 
@@ -771,6 +782,52 @@ def test_pzmap_returns_zeros_poles_and_gain_for_selected_channel():
     np.testing.assert_allclose(zeros, [-36.0 / 13.0], atol=1e-06)
     np.testing.assert_allclose(poles, [-2.0], atol=1e-06)
     np.testing.assert_allclose(gain, 13.0, atol=1e-06)
+
+
+def quarter_car(scale_b=1.0, scale_c=1.0):
+    """Dorf P2.46: a badly scaled but regular 4-state channel, ``u`` on the sprung mass."""
+    mv, mt, k1, b1, k2, b2 = 300.0, 40.0, 15e3, 1e3, 150e3, 100.0
+    # fmt: off
+    A = np.array([
+        [0.0, 0.0, 1.0, 0.0],
+        [0.0, 0.0, 0.0, 1.0],
+        [-k1 / mv, k1 / mv, -b1 / mv, b1 / mv],
+        [k1 / mt, -(k1 + k2) / mt, b1 / mt, -(b1 + b2) / mt],
+    ])
+    # fmt: on
+    B = scale_b * np.array([[0.0], [0.0], [1.0 / mv], [0.0]])
+    C = scale_c * np.array([[1.0, 0.0, 0.0, 0.0], [0.0, 1.0, 0.0, 0.0]])
+    num = {
+        0: np.array([mt, b1 + b2, k1 + k2]) / (mv * mt),  # sprung-mass position
+        1: np.array([b1, k1]) / (mv * mt),  # tire position
+    }
+    return LTISystem(A, B, C), A, B, C, num
+
+
+@pytest.mark.parametrize("scale_b, scale_c", [(1.0, 1.0), (1e-6, 1e6), (1e5, 1e-8)])
+@pytest.mark.parametrize("i", [0, 1])
+def test_transfer_function_keeps_a_small_leading_gain(scale_b, scale_c, i):
+    # The leading Markov parameter is 1/mv = 3.3e-3 while |A| ~ 4e3: an absolute
+    # tolerance on the Markov scan drops it and returns a zero numerator.
+    sys, A, B, C, num = quarter_car(scale_b, scale_c)
+    G = transfer_function(sys, of=("y", i))
+    np.testing.assert_allclose(G.numerator, scale_b * scale_c * num[i], rtol=1e-09)
+    np.testing.assert_allclose(G.denominator, np.poly(np.linalg.eigvals(A)), rtol=1e-09)
+
+    s = 1j
+    exact = (C[[i]] @ np.linalg.solve(s * np.eye(4) - A, B))[0, 0]
+    np.testing.assert_allclose(
+        np.polyval(G.numerator, s) / np.polyval(G.denominator, s), exact, rtol=1e-09
+    )
+
+    zeros, poles, gain = pzmap(sys, of=("y", i))
+    np.testing.assert_allclose(gain, scale_b * scale_c * num[i][0], rtol=1e-09)
+    np.testing.assert_allclose(
+        np.sort_complex(zeros), np.sort_complex(np.roots(num[i])), rtol=1e-09
+    )
+    np.testing.assert_allclose(
+        np.sort_complex(poles), np.sort_complex(np.linalg.eigvals(A)), rtol=1e-09
+    )
 
 
 @pytest.mark.optional
@@ -981,7 +1038,7 @@ class TestPhasePlane(unittest.TestCase):
             plot_phase_plane(sys, backend="bokeh", show=False)
 
 
-from minilink.analysis.discretize import discretize
+from minilink.analysis.discretize import DiscretizedRK4DynamicSystem, discretize
 
 
 def _rk4_step(f, x, u, t, dt, params):
@@ -995,7 +1052,7 @@ def _rk4_step(f, x, u, t, dt, params):
 class _GainIntegrator(DynamicSystem):
     def __init__(self, gain=1.0):
         super().__init__(n=1, input_dim=1, output_dim=1, expose_state=True)
-        self.params = {"gain": float(gain), "dt": 0.05}
+        self.params = {"gain": float(gain)}
 
     def f(self, x, u, t=0.0, params=None):
         p = self.params if params is None else params
@@ -1017,7 +1074,7 @@ class TestDiscretize(unittest.TestCase):
         x1_ref = _rk4_step(plant.f, x0, u, 0.0, dt, p)
         x1 = step_leaf.step(x0, u, k=0)
         np.testing.assert_allclose(x1, x1_ref, rtol=1e-09, atol=1e-09)
-        self.assertEqual(step_leaf.params["dt"], dt)
+        self.assertEqual(step_leaf.dt, dt)
 
     def test_discretize_h_delegates_to_source(self):
         plant = DoubleIntegrator()
@@ -1049,8 +1106,60 @@ class TestDiscretize(unittest.TestCase):
         self.assertEqual(step_leaf.outputs["y"].dependencies, "all")
 
     def test_discretize_accepts_dt_in_params_only(self):
-        step_leaf = discretize(_GainIntegrator(), params={"dt": 0.02})
-        self.assertEqual(step_leaf.params["dt"], 0.02)
+        step_leaf = discretize(_GainIntegrator(), params={"gain": 2.0, "dt": 0.02})
+        self.assertEqual(step_leaf.dt, 0.02)
+        self.assertEqual(step_leaf.params, {"gain": 2.0})
+        x1 = step_leaf.step(np.array([0.0]), np.array([1.0]), k=0)
+        np.testing.assert_allclose(x1, [0.02 * 2.0])
+
+    def test_discretize_refuses_params_holding_only_dt(self):
+        with self.assertRaisesRegex(ValueError, r"discretize\(system, dt=0.05\)"):
+            discretize(Pendulum(), params={"dt": 0.05})
+        with self.assertRaisesRegex(ValueError, r"discretize\(system, dt=0.05\)"):
+            discretize(Pendulum(), 0.05, params={"dt": 0.05})
+        step_leaf = discretize(DoubleIntegrator(), params={"dt": 0.05})
+        self.assertEqual(step_leaf.dt, 0.05)
+        self.assertEqual(step_leaf.params, {})
+        plant = DoubleIntegrator()
+        plant.params = {"dt": 0.05}
+        step_leaf = discretize(plant, params=plant.params)
+        self.assertEqual(step_leaf.dt, 0.05)
+        self.assertEqual(step_leaf.params, {})
+
+    def test_discretize_refuses_two_different_sample_times(self):
+        with self.assertRaisesRegex(ValueError, r"dt=0.1 and params\['dt'\] = 0.02"):
+            discretize(_GainIntegrator(), 0.1, params={"gain": 2.0, "dt": 0.02})
+        step_leaf = discretize(
+            _GainIntegrator(), 0.02, params={"gain": 2.0, "dt": 0.02}
+        )
+        self.assertEqual(step_leaf.dt, 0.02)
+        self.assertEqual(step_leaf.params, {"gain": 2.0})
+
+    def test_assigning_params_refuses_a_dt(self):
+        step_leaf = discretize(Pendulum(), 0.05)
+        with self.assertRaisesRegex(ValueError, r"'dt' = 0.5.*dt = 0.05 s"):
+            step_leaf.params = {**Pendulum().params, "dt": 0.5}
+        self.assertNotIn("dt", step_leaf.params)
+        self.assertNotIn("dt", step_leaf.jacobian("step", "params"))
+        plant = _GainIntegrator()
+        step_leaf = discretize(plant, 0.05, params={"gain": 2.0})
+        plant.params["dt"] = 0.05
+        with self.assertRaisesRegex(ValueError, "the params of"):
+            step_leaf.params = None
+        self.assertEqual(step_leaf.params, {"gain": 2.0})
+
+    def test_discretize_refuses_a_dt_in_the_source_params(self):
+        plant = _GainIntegrator()
+        plant.params["dt"] = 0.05
+        for dt in (None, 0.05, 0.1):
+            with self.assertRaisesRegex(ValueError, "'dt'"):
+                discretize(plant, dt)
+        with self.assertRaisesRegex(ValueError, "'dt'"):
+            DiscretizedRK4DynamicSystem(plant, 0.05)
+        step_leaf = discretize(plant, params=plant.params)
+        self.assertEqual(step_leaf.dt, 0.05)
+        self.assertNotIn("dt", step_leaf.params)
+        self.assertNotIn("dt", step_leaf.jacobian("step", "params"))
 
     def test_step_params_override_gain(self):
         plant = _GainIntegrator(gain=1.0)
@@ -1062,16 +1171,104 @@ class TestDiscretize(unittest.TestCase):
         x_fast = step_leaf.step(x0, u, k=0, params=p_fast)
         self.assertGreater(x_fast[0], x_nom[0])
 
-    def test_step_params_override_dt(self):
+    def test_dt_sets_the_step_length(self):
+        plant = _GainIntegrator(gain=1.0)
+        u = np.array([1.0])
+        x0 = np.array([0.0])
+        x_short = discretize(plant, 0.02).step(x0, u, k=0)
+        x_long = discretize(plant, 0.2).step(x0, u, k=0)
+        self.assertLess(x_short[0], x_long[0])
+
+    def test_step_takes_the_source_params(self):
+        plant = Pendulum()
+        step_leaf = discretize(plant, 0.01)
+        x = np.array([0.3, 0.1])
+        u = np.array([0.2])
+        np.testing.assert_allclose(
+            step_leaf.step(x, u, 0, plant.params), step_leaf.step(x, u)
+        )
+        self.assertNotIn("dt", step_leaf.jacobian("step", "params"))
+
+    def test_step_reads_the_source_live_params(self):
         plant = _GainIntegrator(gain=1.0)
         step_leaf = discretize(plant, 0.1)
         u = np.array([1.0])
         x0 = np.array([0.0])
-        p_short = {**step_leaf.params, "dt": 0.02}
-        p_long = {**step_leaf.params, "dt": 0.2}
-        x_short = step_leaf.step(x0, u, k=0, params=p_short)
-        x_long = step_leaf.step(x0, u, k=0, params=p_long)
-        self.assertLess(x_short[0], x_long[0])
+        x_nom = step_leaf.step(x0, u, k=0)
+        plant.params["gain"] = 3.0
+        x_fast = step_leaf.step(x0, u, k=0)
+        self.assertGreater(x_fast[0], x_nom[0])
+        plant.params = {**plant.params, "gain": 5.0}
+        x_faster = step_leaf.step(x0, u, k=0)
+        self.assertGreater(x_faster[0], x_fast[0])
+
+    def test_discretize_steps_a_closed_loop(self):
+        loop = PID(Kp=1.0, Ki=0.0, Kd=0.0) @ Pendulum()
+        dt = 0.01
+        step_leaf = discretize(loop, dt)
+        x = np.linspace(0.1, 0.4, loop.n)
+        u = np.zeros(loop.m)
+        x1_ref = _rk4_step(loop.f, x, u, 0.0, dt, None)
+        x1 = step_leaf.step(x, u, k=0)
+        np.testing.assert_allclose(x1, x1_ref, rtol=1e-09, atol=1e-09)
+
+    def test_discretize_steps_a_closed_loop_with_dt_in_params(self):
+        loop = PID(Kp=1.0, Ki=0.0, Kd=0.0) @ Pendulum()
+        dt = 0.01
+        x = np.linspace(0.1, 0.4, loop.n)
+        u = np.zeros(loop.m)
+        x1_ref = _rk4_step(loop.f, x, u, 0.0, dt, None)
+        for step_leaf in (
+            discretize(loop, params={**loop.params, "dt": dt}),
+            discretize(loop, dt, params={**loop.params, "dt": dt}),
+        ):
+            x1 = step_leaf.step(x, u, k=0)
+            np.testing.assert_allclose(x1, x1_ref, rtol=1e-09, atol=1e-09)
+            self.assertNotIn("dt", step_leaf.jacobian("step", "params"))
+
+    def test_discretized_system_checks_dt(self):
+        plant = _GainIntegrator()
+        with self.assertRaises(TypeError):
+            DiscretizedRK4DynamicSystem(plant, {"gain": 1.0, "dt": 0.1})
+        with self.assertRaises(ValueError):
+            DiscretizedRK4DynamicSystem(plant, -0.1)
+
+    def test_discretize_keeps_the_y_metadata(self):
+        plant = Pendulum()
+        plant.outputs["y"].lower_bound = np.array([-np.pi, -8.0])
+        plant.outputs["y"].upper_bound = np.array([np.pi, 8.0])
+        step_leaf = discretize(plant, 0.05)
+        y_port, plant_y = step_leaf.outputs["y"], plant.outputs["y"]
+        self.assertEqual(y_port.labels, plant_y.labels)
+        self.assertEqual(y_port.units, plant_y.units)
+        np.testing.assert_array_equal(y_port.lower_bound, [-np.pi, -8.0])
+        np.testing.assert_array_equal(y_port.upper_bound, [np.pi, 8.0])
+
+    def test_discretize_keeps_source_x0_and_signal_metadata(self):
+        plant = Pendulum()
+        plant.x0 = np.array([0.5, 0.0])
+        plant.inputs["u"].nominal_value = np.array([0.3])
+        step_leaf = discretize(plant, 0.05)
+        np.testing.assert_array_equal(step_leaf.x0, plant.x0)
+        self.assertEqual(step_leaf.state.labels, plant.state.labels)
+        self.assertEqual(step_leaf.state.units, plant.state.units)
+        np.testing.assert_array_equal(
+            step_leaf.state.upper_bound, plant.state.upper_bound
+        )
+        u_port, plant_u = step_leaf.inputs["u"], plant.inputs["u"]
+        self.assertEqual(u_port.labels, plant_u.labels)
+        self.assertEqual(u_port.units, plant_u.units)
+        np.testing.assert_array_equal(u_port.lower_bound, plant_u.lower_bound)
+        np.testing.assert_array_equal(u_port.nominal_value, [0.3])
+        rollout = step_leaf.compute_rollout(n_steps=3, u=np.zeros((3, 1)))
+        self.assertGreater(np.abs(rollout.x[0, -1]), 0.4)
+
+    def test_discretize_stacks_each_input_port_into_u(self):
+        plant = _GainIntegrator()
+        plant.add_input_port("w", labels=["disturbance"], upper_bound=[1.0])
+        step_leaf = discretize(plant, 0.1)
+        self.assertEqual(step_leaf.inputs["u"].labels, ["u[0]", "disturbance"])
+        np.testing.assert_array_equal(step_leaf.inputs["u"].upper_bound, [np.inf, 1.0])
 
     def test_discretize_rejects_unknown_integrator(self):
         plant = DoubleIntegrator()
@@ -1080,7 +1277,7 @@ class TestDiscretize(unittest.TestCase):
 
     def test_discretize_rejects_missing_dt(self):
         plant = DoubleIntegrator()
-        with self.assertRaises(ValueError):
+        with self.assertRaisesRegex(ValueError, r"params=\{\.\.\., 'dt': \.\.\.\}"):
             discretize(plant)
 
     def test_discretize_rejects_static_system(self):

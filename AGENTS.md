@@ -28,11 +28,11 @@ Pytest policy: tests/README.md. Examples map: examples/README.md.
 | RULES.md | Universal code and review ladder (humans and agents) |
 | README.md | User workflows, install, examples table |
 | DESIGN.md | Public contracts, package layout, evaluator behavior |
-| ROADMAP.md | **Plan of record**: releases and milestones, two-lane operating contract, TRL ledger, GRO860 checklist, phases, review queue, out-of-scope |
+| ROADMAP.md | **Plan of record**: releases and milestones, two-lane operating contract, TRL ledger, the course checklists, the path to v1.0 (rungs and waves), open decisions, out-of-scope |
 | AGENTS.md | Agent workflow, doc map, local CI gate |
 | CLAUDE.md | Entry stub that points here; update only if this reading order changes |
-| docs/plans/TODO.md | Operational backlog: small fixes, pre-v0.2 hardening, demo pulls, new modules, Later ideas |
-| docs/plans/ | Active **design** writeups only (multi-step plans; delete finished plan docs) |
+| docs/plans/TODO.md | The workboard: every open step of ROADMAP §5, by rung, with files and "done when"; Later ideas at the end |
+| docs/plans/ | Design writeups for steps that need one (delete a plan doc once it lands; the index there says which rung each serves) |
 | docs/plans/pyro-port-remaining.md | Pyro parity rows when library or demos land |
 | docs/ | Sphinx autodoc of the teaching-lane API (`docs/api/`, `docs/index.rst`); `experimental/` is repo-only and not on the site. The user guide is `examples/tutorial/`. README GIFs and diagram PNG from `docs/make_assets.py` (`ur5_meshcat.gif` is a screen recording, not rebuilt) |
 | tests/README.md | Marker policy, test philosophy, **entry points (human · agent · CI)** |
@@ -44,7 +44,7 @@ Keep DESIGN.md call chains minimal.
 
 **Do directly:** typos and stale docs; docstrings/types in files you are already changing for the task; small cleanups that directly support the requested change.
 
-**Never without explicit ask:** revert, uncomment, rename, or "polish" user manual edits in `examples/`, notebooks, or scratch files (tuning params, commented plot/animate calls, exploratory locals). Do not rename or move anything under `examples/teaching/courses/` without the course notes and webpage in the same change.
+**Never without explicit ask:** revert, uncomment, rename, or "polish" user manual edits in `examples/`, notebooks, or scratch files (tuning params, commented plot/animate calls, exploratory locals). Do not rename or move anything under `examples/teaching/courses/` without the citing documents in the same change: GRO860 is notes + webpage; GRO501 for now is only the Notes-Commande `\colab{}` (no course webpage).
 
 **Ask first (maintainer-owned):** anything student-facing (`README.md`,
 `examples/`, notebooks, ROADMAP §1, §2 and §4, public names); **core
@@ -83,7 +83,7 @@ stripped by pre-commit (`nbstripout`). After notebook edits, smoke-check with
 
 **Entry points:** tests/README.md (section "entry points") — humans use **`tests/run/`** (IDE Run); agents and CI use the CLI table in that doc.
 
-GitHub **CI** (`.github/workflows/test.yml`) is the merge gate and runs exactly: `ruff check .`, `ruff format --check .`, `pytest` on Python 3.10–3.13, then the **`regression`** job (regression gates + flagship demos + notebook smoke with JAX). Run the same checks **locally before push or PR** so CI does not fail on lint/format — do **not** poll GitHub Actions after every small commit unless the user asked you to push or verify remote CI.
+GitHub **CI** (`.github/workflows/test.yml`) is the merge gate. It has three jobs: **`test`** (`ruff check .`, `ruff format --check .`, `pytest` on Python 3.10–3.13), **`packaging`** (build the sdist and wheel, check them, import the installed wheel), and **`regression`** (`pytest` + regression gates + flagship demos + notebook smoke with JAX). Run the same checks **locally before push or PR** so CI does not fail on lint/format — do **not** poll GitHub Actions after every small commit unless the user asked you to push or verify remote CI.
 
 Two workflows are **not** merge gates: `nightly.yml` runs every script under `examples/demos/` and every teaching notebook with the full optional stack, and `docs.yml` builds the Sphinx site. A demo that only the nightly sweep exercises still has to run — check it locally when you land one.
 
@@ -104,7 +104,7 @@ Fix with `ruff check --fix .` and `ruff format .` when either fails. CI runs the
 | Docs/markdown only | skip pytest |
 | Narrow module + tests already updated | `pytest tests/unittest/test_<domain>.py` |
 | Cross-cutting or before handoff/push | `pytest` |
-| Compile backend, simulator, or trajopt changes (big review pass) | Regression gates: `PYTHONPATH=. python benchmarks/run_regression_check.py --suite all --tiny --factor 10 --speed-gate-suffixes solve_s,nlp_s,speedup` |
+| Compile backend, simulator, trajopt, or value-iteration changes (big review pass) | Regression gates: `PYTHONPATH=. python benchmarks/run_regression_check.py --suite all --tiny --factor 10 --speed-gate-suffixes solve_s,nlp_s,speedup` |
 | Teaching notebooks | `MPLBACKEND=Agg python tests/demo_checks/run_notebook_checks.py` |
 
 Regression gates full command and CI `regression` job flags: tests/README.md (entry points).

@@ -1,30 +1,4 @@
-"""
-Cost functions for deterministic planning.
-
-The planning cost follows the textbook optimal-control form
-
-``J = integral exp(-rho t) g(x, u, t) dt + h(x(tf), tf)``.
-
-A cost also states the *kind* of objective it is: :attr:`CostFunction.horizon`
-(``"finite"`` with the terminal cost ``h`` at ``tf``, ``"infinite"`` with no
-terminal cost, or ``None`` to follow the planning problem's ``tf``) and the
-continuous discount rate :attr:`CostFunction.discount_rate` ``rho`` (``0`` is
-undiscounted). Planners convert the rate to their own factor with
-:meth:`CostFunction.discount_factor`: value iteration's ``alpha`` and
-reinforcement learning's ``gamma`` are both ``exp(-rho dt)``. What happens when
-a trajectory leaves the allowed set is not the cost's business — it is the
-planning problem's exit rule (``PlanningProblem.on_exit`` / ``exit_cost``).
-
-Costs live in :mod:`minilink.core` (not on
-:class:`~minilink.core.system.System`) so the same model can be reused
-across many planning problems.
-
-The equation methods ``g`` and ``h`` are native-array math paths. They should
-return scalar expressions that stay native to the input backend: NumPy scalar
-expressions for NumPy inputs, JAX scalar expressions for JAX inputs. Reporting
-helpers such as :meth:`CostFunction.total_cost` convert those expressions to
-Python floats at the boundary.
-"""
+"""Cost functions: the running cost ``g(x, u, t)`` and the terminal cost ``h(x, t)`` of ``J``."""
 
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
@@ -32,6 +6,7 @@ from dataclasses import dataclass
 import numpy as np
 
 from minilink.core.backends import array_module
+from minilink.core.inspect import inspect_text, repr_pretty
 from minilink.core.trajectory import Trajectory
 
 
@@ -39,20 +14,29 @@ class CostFunction(ABC):
     """
     Mother class for deterministic planning cost functions.
 
-    Subclasses define a running cost ``g(x, u, t)`` and terminal cost
-    ``h(x, t)``. Both methods accept optional parameters so planning
-    problems can later support parameter sweeps without putting costs on
-    the system object.
+    Subclasses define a running cost ``g(x, u, t)`` and a terminal cost
+    ``h(x, t)`` of the objective ``J = ∫ exp(-rho t) g dt + h(x(tf), tf)``.
+    The horizon is the planning problem's: a finite ``tf`` ends the integral
+    and charges ``h`` there, an infinite one never does. Leaving the allowed
+    set is priced by the problem (``infeasible_cost``), not by the cost.
 
-    Class attributes (override by assignment in a subclass or instance):
+    ``g`` and ``h`` are native-array equation paths: NumPy in, NumPy out;
+    JAX in, JAX out. Reporting helpers such as :meth:`total_cost` convert to
+    Python floats at the boundary. A cost lives in :mod:`minilink.core`, not
+    on a :class:`~minilink.core.system.System`, so one model serves many
+    planning problems.
 
-    - ``horizon``: ``"finite"``, ``"infinite"``, or ``None`` (follow the
-      problem's ``tf``: finite ``tf`` is a finite horizon).
-    - ``discount_rate``: continuous rate ``rho >= 0`` in
-      ``J = int exp(-rho t) g dt``; ``0`` is undiscounted.
+    Class attribute (override it in the body of a subclass):
+
+    - ``discount_rate``: continuous rate ``rho >= 0``; ``0`` is undiscounted.
+      Planners convert it with :meth:`discount_factor` (value iteration's
+      ``alpha`` and reinforcement learning's ``gamma`` are both ``exp(-rho dt)``).
+      The library costs are frozen dataclasses, so assigning it on one of their
+      instances raises. ``weight * cost`` keeps the cost's rate and ``a + b``
+      requires equal rates. Setting it per instance (a constructor field or a
+      ``params`` entry) is workboard step A2 in docs/plans/TODO.md.
     """
 
-    horizon = None
     discount_rate = 0.0
 
     @abstractmethod
@@ -65,17 +49,11 @@ class CostFunction(ABC):
         """Return the native scalar terminal cost ``h(x, t)``."""
         ...
 
-    def horizon_kind(self, tf=None) -> str:
-        """Return ``"finite"`` or ``"infinite"``, resolving ``None`` from ``tf``."""
-        if self.horizon is not None:
-            if self.horizon not in ("finite", "infinite"):
-                raise ValueError(
-                    f"horizon must be 'finite', 'infinite' or None, got {self.horizon!r}"
-                )
-            return self.horizon
-        if tf is None or not np.isfinite(tf):
-            return "infinite"
-        return "finite"
+    def __str__(self):
+        return inspect_text(self)
+
+    def _repr_pretty_(self, p, cycle):
+        repr_pretty(self, p, cycle)
 
     def discount_factor(self, dt) -> float:
         """Per-step factor ``exp(-rho dt)`` for a planner with time step ``dt``."""
@@ -290,10 +268,26 @@ class SumCost(CostFunction):
     Additive cost ``J = sum_i J_i`` over several cost functions.
 
     Built by the ``+`` operator on :class:`CostFunction`; use it to add an
-    obstacle or traversability term to a base objective.
+    obstacle or traversability term to a base objective. The terms share one
+    ``discount_rate``; terms whose rates differ raise ``ValueError``.
     """
 
     terms: tuple
+
+    def __post_init__(self) -> None:
+        rates = sorted({float(cost.discount_rate) for cost in self.terms})
+        if len(rates) > 1:
+            raise ValueError(
+                f"SumCost terms have different discount rates {rates}; "
+                "one objective has one rate rho, so give every term the same "
+                "discount_rate"
+            )
+
+    @property
+    def discount_rate(self) -> float:
+        """The terms' common rate ``rho`` (``0`` for an empty sum)."""
+        terms = self.terms
+        return terms[0].discount_rate if terms else 0.0
 
     @classmethod
     def of(cls, *costs: CostFunction) -> "SumCost":
@@ -308,11 +302,19 @@ class SumCost(CostFunction):
 
     def g(self, x, u, t=0.0, params=None):
         """Return the summed running cost."""
-        return sum(cost.g(x, u, t, params) for cost in self.terms)
+        terms = self.terms
+
+        g = sum(cost.g(x, u, t, params) for cost in terms)
+
+        return g
 
     def h(self, x, t=0.0, params=None):
         """Return the summed terminal cost."""
-        return sum(cost.h(x, t, params) for cost in self.terms)
+        terms = self.terms
+
+        h = sum(cost.h(x, t, params) for cost in terms)
+
+        return h
 
 
 @dataclass(frozen=True)
@@ -321,24 +323,30 @@ class ScaledCost(CostFunction):
     Cost scaled by a weight, ``J = weight * J0``.
 
     Built by the ``*`` operator on :class:`CostFunction`, so a weighted sum
-    reads as ``base + weight * obstacle_cost``.
+    reads as ``base + weight * obstacle_cost``. The weight leaves the
+    ``discount_rate`` of ``J0`` unchanged.
     """
 
     cost: CostFunction
     weight: float
 
+    @property
+    def discount_rate(self) -> float:
+        """The scaled cost's rate ``rho``."""
+        return self.cost.discount_rate
+
     def g(self, x, u, t=0.0, params=None):
         """Return the weighted running cost."""
-        weight = self.weight
+        cost, weight = self.cost, self.weight
 
-        g = weight * self.cost.g(x, u, t, params)
+        g = weight * cost.g(x, u, t, params)
 
         return g
 
     def h(self, x, t=0.0, params=None):
         """Return the weighted terminal cost."""
-        weight = self.weight
+        cost, weight = self.cost, self.weight
 
-        h = weight * self.cost.h(x, t, params)
+        h = weight * cost.h(x, t, params)
 
         return h

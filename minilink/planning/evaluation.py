@@ -1,43 +1,7 @@
-"""
-Scoring and Monte Carlo evaluation of policies on a planning problem (the second verb).
+"""Scoring a closed loop on a planning problem: one trajectory, or Monte Carlo over the problem's draws.
 
-``solve(problem)`` finds a law; ``evaluate(problem, law)`` scores one. Both
-verbs, and the reporting of every planner, use one contract for the cost of a
-sampled trajectory, :func:`score_trajectory`:
-
-- the discounted running cost ``exp(-rho t) g(x, u, t)`` integrated by the
-  trapezoidal rule on the trajectory's own samples
-  (:meth:`~minilink.core.costs.CostFunction.evaluate_trajectory`);
-- cut at the first sample outside the constraint set ``X`` — that sample is the
-  last one counted, the trial is a *failure*, and the price of infeasibility is
-  charged (the problem's ``infeasible_cost``, else the bound the environment
-  derives, else ``+inf``);
-- plus the terminal cost ``h(x_f, tf)`` when a finite horizon is reached.
-
-:class:`MonteCarloEvaluator` draws initial states (and plant parameters and
-disturbances when the problem randomizes them), connects the policy by what
-its ports declare — a feedback block ``u = pi(x)`` through ``@``, an
-open-loop source ``u = pi(t)`` (a planned input, replayed) through ``>>`` —
-samples the loop on the control grid, and reports the distribution of that
-score as an :class:`Evaluation`: mean, spread, worst case, failure rate. A
-deterministic problem gives one trial. Three backends produce the samples:
-
-- ``"jax"``: every trial in one ``vmap`` over the compiled plant, the law held
-  over each control period (static laws that trace, and sources);
-- ``"numpy"``: the same held-input RK4 samples, one trial at a time on the
-  NumPy evaluator (identical numbers, no JAX needed);
-- ``"simulator"``: the continuous-time loop integrated by the
-  :class:`~minilink.simulation.simulator.Simulator` (any controller, dynamic
-  ones included; no parameter or disturbance draws).
-
-Every backend applies the law as the block computes it. Input-port bounds are
-information, not saturation: a law that must respect them saturates inside
-its own equations or through a :class:`~minilink.blocks.nonlinear.Saturation`
-block.
-
-Reinforcement learning trains on the left-Riemann discretization of the same
-running cost (``r_k = -g dt``); the trapezoidal score is the reporting rule
-shared with trajectory optimization and dynamic programming.
+``score_trajectory`` is the one scoring contract every tool reports with (the discounted
+trapezoid of ``g``, cut at the first exit from ``X``, plus ``h`` at a reached finite horizon).
 """
 
 import warnings
@@ -58,12 +22,19 @@ def score_trajectory(problem, traj: Trajectory, params=None, infeasible_cost=np.
 
     ``traj`` carries the states and the applied inputs on a time grid;
     ``params`` are the cost parameters. ``failed`` is ``True`` when the
-    trajectory left ``X`` before the end of the grid; the trial is then charged
+    trajectory left ``X`` (read at each sample time on the problem's set
+    parameters) before the end of the grid; the trial is then charged
     the problem's ``infeasible_cost``, else ``infeasible_cost`` given here (an
     evaluator passes the bound its environment derived; ``+inf`` otherwise).
     """
     cost = problem.require_cost()
-    inside = np.array([problem.X.contains(traj.x[:, k]) for k in range(traj.n_samples)])
+    X, set_params = problem.X, problem.params.sets
+    inside = np.array(
+        [
+            X.contains(traj.x[:, k], float(traj.t[k]), set_params)
+            for k in range(traj.n_samples)
+        ]
+    )
     failed = not bool(inside.all())
     last = int(np.argmin(inside)) if failed else traj.n_samples - 1
     kept = Trajectory(
@@ -153,8 +124,13 @@ class MonteCarloEvaluator:
         Number of draws.
     episode_length : float, optional
         Duration of each trial for an infinite-horizon problem (default 10 s).
-    backend : {"jax", "numpy", "simulator"}
-        See the module docstring.
+    backend : {"auto", "jax", "numpy", "simulator"}
+        ``"jax"`` vmaps the held-input rollout over the trials (static laws),
+        ``"numpy"`` runs the same trials one at a time, ``"simulator"``
+        integrates the continuous-time loop (any controller, no parameter or
+        disturbance draws). ``"auto"`` (default) is JAX when it is installed
+        and the plant, the law, ``X`` and the cost trace on it, NumPy otherwise
+        (a lookup table's law, say); that fallback warns when it changes the draws.
     seed : int
         Seed of the draws (the same seed gives the same draws on the JAX and
         NumPy backends only through a :class:`~minilink.core.distributions.Particles`
@@ -163,7 +139,7 @@ class MonteCarloEvaluator:
         Keep the trial trajectories (NumPy and simulator backends).
     """
 
-    BACKENDS = ("jax", "numpy", "simulator")
+    BACKENDS = ("auto", "jax", "numpy", "simulator")
 
     def __init__(
         self,
@@ -172,7 +148,7 @@ class MonteCarloEvaluator:
         dt=0.05,
         n_trials=100,
         episode_length=None,
-        backend="jax",
+        backend="auto",
         seed=0,
         record=False,
     ):
@@ -194,14 +170,47 @@ class MonteCarloEvaluator:
         return 10.0 if self.episode_length is None else float(self.episode_length)
 
     def evaluate(self, controller) -> Evaluation:
-        """Return the :class:`Evaluation` of a policy block on the problem."""
-        if self.backend == "jax":
+        """Return the :class:`Evaluation` of a policy block (or of a solution's policy) on the problem."""
+        controller = policy_of(controller)
+        backend = self.backend
+        if backend == "auto":
+            backend = self.auto_backend(controller)
+        if backend == "jax":
             return self.evaluate_jax(controller)
-        if self.backend == "numpy":
+        if backend == "numpy":
             return self.evaluate_numpy(controller)
         return self.evaluate_simulator(controller)
 
     # Internal machinery
+
+    def auto_backend(self, *controllers) -> str:
+        """``"jax"`` when JAX is installed and the plant, every law, ``X`` and the cost trace on it, else ``"numpy"``."""
+        from minilink.core.backends import jax_installed
+        from minilink.core.compile.compiler import compile_auto
+
+        problem = self.problem
+        if not jax_installed():
+            return "numpy"
+        feedback = [controller for controller in controllers if int(controller.m) > 0]
+        loop = [problem.sys, *feedback]
+        numpy_only = [block.name for block in loop if compile_auto(block)[0] != "jax"]
+        numpy_only += numpy_only_terms(problem)
+        if not numpy_only:
+            return "jax"
+
+        # One seed, two random streams: random trials differ from a JAX-scored law's
+        culprits = ", ".join(dict.fromkeys(numpy_only))  # two lookup tables named once
+        x0s = problem.sample_x0(np.random.default_rng(self.seed), n=self.n_trials)
+        random_starts = bool(np.any(x0s != problem.x_start))
+        if random_starts or problem.params_distribution or problem.disturbances:
+            warnings.warn(
+                f"{culprits} does not trace on JAX: scored on NumPy, whose "
+                "draws of the starts, parameters and disturbances differ from the JAX "
+                "backend's for the same seed; pass backend='numpy' to score every "
+                "policy on the same draws",
+                stacklevel=3,
+            )
+        return "numpy"
 
     def evaluate_jax(self, controller) -> Evaluation:
         jax, jnp = require_jax(), require_jax_numpy()
@@ -332,6 +341,15 @@ class MonteCarloEvaluator:
         return Evaluation(J, failed, x0s, trajectories)
 
 
+def policy_of(controller):
+    """The block itself, or the policy of a :class:`~minilink.planning.results.PlanningSolution`."""
+    from minilink.planning.results import PlanningSolution
+
+    if isinstance(controller, PlanningSolution):
+        return controller.policy
+    return controller
+
+
 def nominal_trajectory(problem, policy, *, dt, tf=None) -> Trajectory:
     """
     The policy from the problem's start on a control grid, nominal parameters and disturbances.
@@ -350,6 +368,37 @@ def env_action_port(sys) -> str:
     from minilink.control.neural import action_port_of
 
     return action_port_of(sys)
+
+
+def numpy_only_terms(problem) -> list:
+    """
+    The problem's terms a JAX trial calls that do not trace on JAX, by name.
+
+    ``X.margin`` on the set parameters, the running cost ``g``, the terminal
+    cost ``h`` on a finite horizon and a callable ``infeasible_cost``, each
+    traced once on a state, an action and a time.
+    """
+    jax, jnp = require_jax(), require_jax_numpy()
+    sys, X, cost = problem.sys, problem.X, problem.require_cost()
+    set_params, price = problem.params.sets, problem.infeasible_cost
+    terms = {
+        "the constraint set X": lambda x, u, t: X.margin(x, t, set_params),
+        "the cost": lambda x, u, t: cost.g(x, u, t),
+    }
+    if problem.horizon_kind() == "finite":
+        terms["the terminal cost"] = lambda x, u, t: cost.h(x, t)
+    if callable(price):
+        terms["the infeasible_cost"] = lambda x, u, t: price(x, t)
+
+    x = jnp.zeros(int(sys.n))
+    u = jnp.zeros(int(sys.inputs[env_action_port(sys)].dim))
+    numpy_only = []
+    for name, term in terms.items():
+        try:
+            jax.make_jaxpr(term)(x, u, 0.0)
+        except Exception:
+            numpy_only.append(name)
+    return numpy_only
 
 
 def control_law(controller, t, backend="jax"):
@@ -392,7 +441,15 @@ def static_law(controller, backend="jax"):
             "static laws u = pi(x) only; use backend='simulator' for a controller "
             "with internal state"
         )
-    evaluator = controller.compile(backend=backend, verbose=False)
+    try:
+        evaluator = controller.compile(backend=backend, verbose=False)
+    except RuntimeError as exc:
+        if "JAX-traceable" not in str(exc):
+            raise
+        raise RuntimeError(
+            f"the law of {controller.name!r} is NumPy-only (not JAX-traceable): "
+            "pass backend='numpy' to score it"
+        ) from exc
     start = 0
     for port_id, port in controller.inputs.items():
         if port_id == roles.measurement:

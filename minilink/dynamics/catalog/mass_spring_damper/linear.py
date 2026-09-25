@@ -1,3 +1,5 @@
+"""Linear mass-spring-damper chains of one, two and three masses, grounded or floating."""
+
 import numpy as np
 
 from minilink.core.kinematics import translation
@@ -33,7 +35,10 @@ def _force_arrow(force, base=(0.35, 0.0)):
 
 def _mass_output_matrix(count, output_mass):
     if output_mass < 1 or output_mass > count:
-        output_mass = count
+        raise ValueError(
+            f"output_mass must be between 1 and {count} (the masses of the chain), "
+            f"got {output_mass}"
+        )
     C = np.zeros((1, 2 * count))
     C[0, output_mass - 1] = 1.0
     return C, f"x{output_mass}"

@@ -479,7 +479,7 @@ class DirectCollocationTranscription(Transcription):
                         t=float(t_k),
                         params=problem.params.sets,
                     )
-                    margins.append(margin.reshape(-1))
+                    margins.append(margin)
                 return native_concatenate(margins, z)
 
             inequalities.append(state_margins)
@@ -496,7 +496,7 @@ class DirectCollocationTranscription(Transcription):
                         t=float(t_k),
                         params=problem.params.sets,
                     )
-                    margins.append(margin.reshape(-1))
+                    margins.append(margin)
                 return native_concatenate(margins, z)
 
             inequalities.append(input_margins)

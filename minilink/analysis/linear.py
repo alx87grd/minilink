@@ -1,11 +1,7 @@
-"""Linear-algebra core of the frequency and time-response tools.
+"""Linear analysis on the matrices ``(A, B, C, D)``: poles, zeros, gain, frequency response, margins, root locus, step response.
 
-Every tool in :mod:`minilink.analysis.frequency` and
-:mod:`minilink.analysis.time_response` reduces a system to one state-space
-channel ``(A, b, c, d)`` — the linearization at the operating point, or the
-model itself for an ``LTISystem`` — and calls the functions below. Nothing
-here knows about ports, operating points or plotting backends: the inputs are
-matrices, the outputs are arrays.
+Matrices in, arrays out; the system tier (``frequency.py``, ``time_response.py``) reduces a
+``System`` to this channel first.
 """
 
 from __future__ import annotations
@@ -26,8 +22,9 @@ def poles(A):
     if A.size == 0:
         return np.array([], dtype=complex)
 
-    # λ = eig(A)
-    return np.linalg.eigvals(A)
+    poles = np.linalg.eigvals(A)
+
+    return poles
 
 
 def zeros(A, B, C, D):
@@ -53,24 +50,23 @@ def gain(A, B, C, D):
     """Leading coefficient ``k`` of ``G(s) = k prod(s - z) / prod(s - p)``.
 
     ``d`` when the channel has feedthrough, otherwise the first nonzero
-    Markov parameter ``c A^(r-1) b`` (``r`` the relative degree).
+    Markov parameter ``c A^(r-1) b`` (``r`` the relative degree). Read off
+    the response at one real point ``s0`` beyond every pole and zero, where
+    the factored form and ``C (s0 I - A)^-1 B + D`` must agree: a Markov
+    scan needs a tolerance to tell a structural zero from a small leading
+    coefficient, and any tolerance fails on a badly scaled channel.
     """
     A, B, C, D = _matrices(A, B, C, D)
+    z, p = zeros(A, B, C, D), poles(A)
+    s0 = 2.0 * max(np.max(np.abs(np.concatenate([z, p])), initial=0.0), 1.0)
 
-    # k = d  if the channel has feedthrough
-    if abs(D[0, 0]) > 0.0:
-        return float(D[0, 0])
+    # k = G(s0) ∏(s0 − p) / ∏(s0 − z)
+    G0 = D[0, 0]
+    if A.size:
+        G0 += (C @ np.linalg.solve(s0 * np.eye(A.shape[0]) - A, B))[0, 0]
+    k = G0 * np.prod(s0 - p) / np.prod(s0 - z)
 
-    # else k = first nonzero Markov parameter  c A^{r-1} b
-    markov = C @ B
-    power = np.eye(A.shape[0]) if A.size else np.zeros((0, 0))
-    scale = max(np.max(np.abs(A), initial=0.0), 1.0)
-    for _ in range(A.shape[0]):
-        if abs(markov[0, 0]) > 1e-12 * scale ** (A.shape[0]):
-            return float(markov[0, 0])
-        power = power @ A
-        markov = C @ power @ B
-    return 0.0
+    return float(np.real(k))
 
 
 def frequency_response(A, B, C, D, w):
@@ -151,7 +147,9 @@ def closed_loop_poles(A, B, C, D, K):
     loop = 1.0 + K * D[0, 0]
     if loop == 0.0:  # K = -1/d: the algebraic loop is singular, no finite poles
         return np.full(A.shape[0], np.inf, dtype=complex)
-    return np.linalg.eigvals(A - (K / loop) * (B @ C))
+    poles = np.linalg.eigvals(A - (K / loop) * (B @ C))
+
+    return poles
 
 
 def root_locus(A, B, C, D, gains=None, *, n=400):
@@ -217,8 +215,10 @@ def settling_horizon(A):
     if decay.size == 0:
         return 10.0
 
-    # 8 / min σ   (σ = −Re λ of the stable poles)
-    return float(8.0 / decay.min())
+    # eight times the slowest time constant 1/σ, σ = −Re λ of the stable poles
+    horizon = float(8.0 / decay.min())
+
+    return horizon
 
 
 # =============================================================================

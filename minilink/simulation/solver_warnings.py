@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import warnings
 
+from minilink.core.system import DEFAULT_SMALLEST_TIME_CONSTANT
+
 _DISCONTINUOUS_AUTO_DT_SCALE = 0.1
 
 
@@ -51,7 +53,7 @@ def collect_discontinuous_solver_notes(
             "substeps near switching surfaces."
         )
 
-    smallest = solver_info.get("smallest_time_constant", 0.001)
+    smallest = solver_info.get("smallest_time_constant", DEFAULT_SMALLEST_TIME_CONSTANT)
     recommended_dt = smallest * _DISCONTINUOUS_AUTO_DT_SCALE
     if user_solver == "euler" and user_specified_dt and dt is not None:
         if dt > recommended_dt:

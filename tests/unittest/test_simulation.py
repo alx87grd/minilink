@@ -7,7 +7,7 @@ from unittest.mock import patch
 import numpy as np
 import pytest
 from minilink.core.backends import array_module
-from minilink.core.system import DynamicSystem
+from minilink.core.system import DEFAULT_SMALLEST_TIME_CONSTANT, DynamicSystem
 from minilink.simulation.simulator import (
     COMPILE_BACKEND_AUTO,
     DISCONTINUOUS_AUTO_DT_SCALE,
@@ -147,7 +147,7 @@ class TestNewSimulator(unittest.TestCase):
             solver_warnings="ignore",
             verbose=False,
         )
-        expected_dt = 0.001 * DISCONTINUOUS_AUTO_DT_SCALE
+        expected_dt = DEFAULT_SMALLEST_TIME_CONSTANT * DISCONTINUOUS_AUTO_DT_SCALE
         self.assertAlmostEqual(sim.t[1] - sim.t[0], expected_dt)
 
     def test_discontinuous_auto_solver_emits_warning(self):
@@ -181,6 +181,15 @@ class TestNewSimulator(unittest.TestCase):
                 solver_warnings="warn",
                 verbose=False,
             )
+
+    def test_coarse_dt_warning_falls_back_to_the_system_default(self):
+        sys = DiscontinuousLinearSystem()
+        del sys.solver_info["smallest_time_constant"]
+        with patch(
+            "minilink.simulation.solver_warnings.DEFAULT_SMALLEST_TIME_CONSTANT", 0.02
+        ):
+            with pytest.warns(UserWarning, match=r"consider dt <= 0\.002"):
+                Simulator(sys, tf=1.0, dt=0.01, solver="euler", verbose=False)
 
     def test_smooth_system_emits_no_discontinuous_warning(self):
         with warnings.catch_warnings(record=True) as caught:
@@ -480,7 +489,7 @@ class TestDiscontinuousSolvers(unittest.TestCase):
 
     def test_auto_dt_uses_discontinuous_scale(self):
         sim = Simulator(self.diagram, tf=0.01, solver_warnings="ignore", verbose=False)
-        expected_dt = 0.001 * DISCONTINUOUS_AUTO_DT_SCALE
+        expected_dt = DEFAULT_SMALLEST_TIME_CONSTANT * DISCONTINUOUS_AUTO_DT_SCALE
         self.assertAlmostEqual(sim.t[1] - sim.t[0], expected_dt)
 
     def test_euler_matches_f_based_ddq_better_than_rk4_on_coarse_dt(self):
@@ -766,7 +775,22 @@ class TestComputer(unittest.TestCase):
 
 
 from minilink.control.output import ProportionalController
+from minilink.core.hybrid_composition import hybrid_closed_loop
 from minilink.simulation.computer import Computer, StepSchedule, as_computer
+
+
+class ScheduledProportionalController(ProportionalController):
+    """A block whose own ``%`` extends the base operator."""
+
+    def __mod__(self, schedule):
+        return super().__mod__(schedule)
+
+
+class UnscheduledProportionalController(ProportionalController):
+    """A block whose own ``%`` returns something other than a Computer."""
+
+    def __mod__(self, schedule):
+        return self
 
 
 def _build_step_diagram():
@@ -795,6 +819,22 @@ class TestAsComputer(unittest.TestCase):
     def test_rejects_continuous_plant(self):
         with self.assertRaises(TypeError):
             Integrator() % 0.01
+
+    def test_mod_override_calling_super_builds_a_computer(self):
+        """``%``, ``as_computer`` and ``hybrid_closed_loop`` reach the plain build."""
+        ctl = ScheduledProportionalController(0.3)
+        computers = (
+            ctl % 0.02,
+            as_computer(ctl, 0.02),
+            hybrid_closed_loop(ctl, Integrator(), schedule=0.02).computer,
+        )
+        for computer in computers:
+            self.assertIsInstance(computer, Computer)
+            self.assertAlmostEqual(computer.schedule.dt_base, 0.02)
+
+    def test_as_computer_rejects_a_mod_that_is_not_a_computer(self):
+        with self.assertRaises(TypeError):
+            as_computer(UnscheduledProportionalController(0.3), 0.02)
 
     def test_mpc_mod_exposes_u_ff(self):
         pytest = __import__("pytest")
@@ -1055,6 +1095,58 @@ class TestAutomaticTimeGrid(unittest.TestCase):
         self.assertEqual(sim.solver_mode, "euler")
         self.assertAlmostEqual(sim.dt, 0.005)
 
+    def test_loop_takes_dt_from_its_plant_time_constant(self):
+        from minilink import Integrator, Pendulum, StateFeedbackController
+
+        plant = Pendulum()
+        plant.solver_info["smallest_time_constant"] = 0.5
+        controller = StateFeedbackController(np.array([[10.0, 2.0]]))
+
+        alone = Simulator(plant, tf=1.0, solver="euler", verbose=False)
+        loop = Simulator(controller @ plant, tf=1.0, solver="euler", verbose=False)
+        np.testing.assert_array_equal(loop.t, alone.t)  # dt = 0.05, not 1e-4
+
+        # a stateful block without a hint keeps the conservative default
+        with_filter = controller @ plant + Integrator()
+        self.assertEqual(
+            with_filter.solver_info["smallest_time_constant"],
+            DEFAULT_SMALLEST_TIME_CONSTANT,
+        )
+
+    def test_loop_follows_a_plant_hint_changed_after_composing(self):
+        from minilink import Pendulum, StateFeedbackController
+
+        plant = Pendulum()
+        loop = StateFeedbackController(np.array([[10.0, 2.0]])) @ plant
+        plant.solver_info["smallest_time_constant"] = 0.5
+
+        alone = Simulator(plant, tf=1.0, solver="euler", verbose=False)
+        closed = Simulator(loop, tf=1.0, solver="euler", verbose=False)
+        np.testing.assert_array_equal(closed.t, alone.t)  # dt = 0.05, not 1e-4
+
+        plant.solver_info["discontinuous_behavior"] = True
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore")
+            closed = Simulator(loop, tf=1.0, verbose=False)
+        self.assertEqual(closed.solver_mode, "euler")
+
+    def test_loop_takes_the_hint_a_block_sets_for_itself(self):
+        from minilink import Pendulum, RateLimiter, Saturation, StateFeedbackController
+
+        plant = Pendulum()
+        plant.solver_info["smallest_time_constant"] = 0.5
+        controller = StateFeedbackController(np.array([[10.0, 2.0]]))
+
+        # a static block that declares a time constant counts like a stateful one
+        saturation = Saturation(-1.0, 1.0)
+        saturation.solver_info["smallest_time_constant"] = 0.02
+        limiter = RateLimiter(rate_max=5.0, tau=0.02)
+        for block in (saturation, limiter):
+            with self.subTest(block=block.name):
+                loop = (controller >> block) @ plant
+                sim = Simulator(loop, tf=1.0, solver="euler", verbose=False)
+                self.assertAlmostEqual(sim.dt, 0.002)  # 0.02 * SMOOTH_AUTO_DT_SCALE
+
     def test_explicit_grid_still_wins(self):
         sim = Simulator(StableLinearSystem(), tf=1.0, n_steps=51, verbose=False)
         self.assertEqual(sim.n_pts, 51)
@@ -1079,3 +1171,47 @@ class TestAutomaticTimeGrid(unittest.TestCase):
         )
         self.assertEqual(sim.solver_mode, "scipy")
         self.assertEqual(sim.n_pts, DEFAULT_N_STEPS)
+
+
+class TestDtTimeGrid(unittest.TestCase):
+    """A ``dt`` that divides the horizon gives a grid that ends at ``tf``."""
+
+    def test_dividing_dt_never_steps_past_tf(self):
+        from minilink.simulation.time_grid import build_time_grid
+
+        for t0 in (0.0, 0.5):
+            for dt in (0.1, 0.05, 0.02, 0.01, 0.001):
+                for k in range(1, 201):
+                    tf = round(t0 + 0.1 * k, 10)
+                    with self.subTest(t0=t0, tf=tf, dt=dt):
+                        t, _, n_pts = build_time_grid(t0, tf, dt=dt)
+                        self.assertLessEqual(t[-1], tf + 1e-12)
+                        self.assertEqual(n_pts, round((tf - t0) / dt) + 1)
+                        # Kept samples are the ones the grid always had.
+                        today = np.arange(t0, tf + dt, dt)[:n_pts]
+                        np.testing.assert_array_equal(t, today)
+
+    def test_simulator_dt_grid_ends_at_tf(self):
+        from minilink.blocks.basic import Integrator
+
+        sim = Simulator(Integrator(), tf=1.1, dt=0.1, verbose=False)
+        self.assertEqual(sim.n_pts, 12)
+        self.assertAlmostEqual(sim.t[-1], 1.1)
+        sim = Simulator(Integrator(), tf=0.2, dt=0.1, verbose=False)
+        self.assertEqual(sim.n_pts, 3)
+        self.assertAlmostEqual(sim.t[-1], 0.2)
+
+    def test_automatic_dt_grid_ends_at_tf(self):
+        from minilink.simulation.time_grid import build_time_grid
+
+        t, _, n_pts = build_time_grid(0.0, 1.1, default_dt=0.1)
+        self.assertEqual(n_pts, 12)
+        self.assertAlmostEqual(t[-1], 1.1)
+
+    def test_non_dividing_dt_still_covers_tf(self):
+        from minilink.simulation.time_grid import build_time_grid
+
+        t, dt, n_pts = build_time_grid(0.0, 1.0, dt=0.3)
+        self.assertEqual(n_pts, 5)
+        self.assertAlmostEqual(dt, 0.3)
+        np.testing.assert_allclose(t, [0.0, 0.3, 0.6, 0.9, 1.2])

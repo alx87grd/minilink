@@ -229,7 +229,12 @@ class TabularLearningPlanner(Planner):
             )
         return self.store_solution(
             PlanningSolution(
-                policy, self.learning_record(), trajectory, evaluation, result.value_at
+                self.problem,
+                policy,
+                self.learning_record(),
+                trajectory,
+                evaluation,
+                result.value_at,
             )
         )
 

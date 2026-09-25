@@ -54,7 +54,6 @@ def compile_step_diagram(
                 "diagram; use DiagramSystem for continuous subsystems."
             )
         validate_equation_shapes(subsystem, label=f"{subsystem.name} ({sys_id})")
-        validate_equation_shapes(subsystem, label=f"{subsystem.name} ({sys_id})")
 
     t_total = time.perf_counter() if verbose else None
 

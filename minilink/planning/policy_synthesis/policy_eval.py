@@ -12,7 +12,11 @@ and returns the policy's cost-to-go field ``J``.
 import numpy as np
 
 from minilink.core.feedback import feedback_ports
-from minilink.planning.policy_synthesis.dp import DynamicProgrammingOptions
+from minilink.planning.evaluation import policy_of
+from minilink.planning.policy_synthesis.dp import (
+    DynamicProgrammingOptions,
+    infeasible_penalty,
+)
 from minilink.planning.problems import PlanningProblem
 
 # Public API
@@ -28,8 +32,8 @@ class PolicyEvaluator:
         Planning problem (system, sets, and cost). A cost is required.
     grid : StateSpaceGrid
         Discretization of the state and input spaces.
-    policy : callable or System
-        State-feedback law ``u = policy(x)``, or a controller block with a
+    policy : callable, System or PlanningSolution
+        State-feedback law ``u = policy(x)``, a solution (its policy), or a controller block with a
         feedback declaration (``feedback_profile`` or explicit port-role
         attrs — see :func:`minilink.core.feedback.feedback_ports`): the grid
         state feeds the measurement port, the reference stays pinned at its
@@ -50,6 +54,7 @@ class PolicyEvaluator:
             raise ValueError("PolicyEvaluator requires problem.cost")
         self.problem = problem
         self.grid = grid
+        policy = policy_of(policy)
         self.policy = policy if callable(policy) else _policy_from_block(policy)
         self.options = DynamicProgrammingOptions() if options is None else options
         self.last_J = None
@@ -120,7 +125,11 @@ class PolicyEvaluator:
                 and X.contains(xnext, t, set_params)
                 and grid.X.contains(xnext)
             )
-            G[s] = float(g(x, u, t, cost_params)) * dt if valid else out_of_bound_cost
+            G[s] = (
+                float(g(x, u, t, cost_params)) * dt
+                if valid
+                else infeasible_penalty(out_of_bound_cost, xnext, t)
+            )
 
         return x_next, G
 

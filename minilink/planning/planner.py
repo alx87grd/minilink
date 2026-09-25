@@ -38,7 +38,8 @@ class Planner(ABC):
     Offline entry is :meth:`solve`, which returns and stores the
     :class:`~minilink.planning.results.PlanningSolution`; :meth:`get_controller`
     is its policy, :meth:`plot_solution` and :meth:`animate_solution` its
-    trajectory.
+    trajectory, :meth:`plot_control_law` and :meth:`plot_cost_to_go` its law
+    and cost-to-go.
     """
 
     #: Planners that read the uncertainty of a stochastic problem set this;
@@ -108,6 +109,14 @@ class Planner(ABC):
     def animate_solution(self, **kwargs):
         """Animate the latest solution's trajectory with the problem system."""
         return self.problem.sys.animate(self.solution_trajectory(), **kwargs)
+
+    def plot_control_law(self, **kwargs):
+        """The latest solution's law over the problem's box (:meth:`PlanningSolution.plot_control_law`)."""
+        return self.require_solution().plot_control_law(**kwargs)
+
+    def plot_cost_to_go(self, **kwargs):
+        """The latest solution's cost-to-go field (:meth:`PlanningSolution.plot_cost_to_go`)."""
+        return self.require_solution().plot_cost_to_go(**kwargs)
 
     # Internal machinery
 

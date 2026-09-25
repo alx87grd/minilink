@@ -114,6 +114,32 @@ class TestHybridClosedLoop(unittest.TestCase):
         hybrid = computer @ _build_plant_diagram()
         self.assertEqual(len(hybrid.connections), 2)
 
+    def test_sampled_loop_leaves_plant_diagram_alone(self):
+        integrator = Integrator()
+        plant = DiagramSystem()
+        plant.add_subsystem(integrator, "integ")
+        plant.x0 = np.array([0.7])
+        hybrid = (ProportionalController(0.5) % 0.01) @ plant
+        self.assertEqual((list(plant.inputs), list(plant.outputs)), ([], []))
+        self.assertEqual(plant.connections, {"integ": {"u": None}})
+        self.assertEqual(list(hybrid.plant.subsystems), ["integ"])
+        self.assertIs(hybrid.plant.subsystems["integ"], integrator)
+        self.assertEqual(list(hybrid.plant.inputs), ["u"])
+        self.assertEqual(list(hybrid.plant.outputs), ["y"])
+        hybrid_closed_loop(ProportionalController(0.5), plant, schedule=0.01)
+        self.assertEqual((list(plant.inputs), list(plant.outputs)), ([], []))
+
+        leaf = Integrator()
+        leaf.x0 = np.array([0.7])
+        reference = (ProportionalController(0.5) % 0.01) @ leaf
+        runs = [
+            loop.compute_forced(
+                np.array([1.0]), t0=0, tf=0.05, input_port_id="r", verbose=False
+            )
+            for loop in (hybrid, reference)
+        ]
+        np.testing.assert_array_equal(runs[0].plant.x, runs[1].plant.x)
+
     def test_leaf_system_wrapping(self):
         hybrid = hybrid_closed_loop(
             ProportionalController(0.3), Integrator(), schedule=0.01
@@ -169,6 +195,44 @@ class TestHybridSimulator(unittest.TestCase):
         hybrid = _build_hybrid()
         hybrid.compute_forced(np.array([1.0]), t0=0, tf=0.1, input_port_id="r")
         hybrid.plot_trajectory(signals=("r", "y", "u_cmd", "x"), show=False)
+
+    def test_plot_abscissa_selects_plant_time_or_computer_ticks(self):
+        import matplotlib
+
+        matplotlib.use("Agg")
+        import matplotlib.pyplot as plt
+
+        hybrid = _build_hybrid()
+        result = hybrid.compute_forced(
+            np.array([1.0]), t0=0, tf=0.1, input_port_id="r", verbose=False
+        )
+        views = {
+            "plant time": hybrid.plot_trajectory(show=False),
+            "computer ticks": hybrid.plot_trajectory(abscissa="k", show=False),
+            "result ticks": hybrid.plot_trajectory(result, abscissa="k", show=False),
+            "rollout ticks": hybrid.plot_trajectory(
+                result.computer.as_trajectory(), abscissa="k", show=False
+            ),
+        }
+        self.assertEqual(views["plant time"].axes[-1].get_xlabel(), "Time [s]")
+        u_cmd = result.computer.signals["u_cmd"][0]
+        ylabels = [ax.get_ylabel() for ax in views["result ticks"].axes]
+        for name in ("computer ticks", "result ticks", "rollout ticks"):
+            axes = views[name].axes
+            self.assertEqual(axes[-1].get_xlabel(), "Step [k]", msg=name)
+            self.assertEqual([ax.get_ylabel() for ax in axes], ylabels, msg=name)
+            np.testing.assert_array_equal(
+                axes[0].lines[0].get_xdata(), result.computer.k, err_msg=name
+            )
+            drawn = [line.get_ydata() for ax in axes for line in ax.lines]
+            self.assertTrue(
+                any(np.array_equal(y, u_cmd) for y in drawn), msg=f"{name}: u_cmd"
+            )
+        with self.assertRaisesRegex(ValueError, "abscissa"):
+            hybrid.plot_trajectory(abscissa="s", show=False)
+        with self.assertRaisesRegex(ValueError, "computer rollout"):
+            hybrid.plot_trajectory(result.plant, abscissa="k", show=False)
+        plt.close("all")
 
     def test_plot_smoke_default_computer_out_u(self):
         """``hybrid_closed_loop`` default ``computer_out='u'`` must not clash with Trajectory.u."""

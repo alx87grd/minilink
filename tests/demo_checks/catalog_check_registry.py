@@ -18,6 +18,9 @@ from minilink.catalog import (
     DynamicBicycleCar3D,
     PendulumWithNoisePort,
     Plane3D,
+    UdeSRacecar,
+    UdeSRacecarDyn,
+    UdeSRacecarDyn3D,
 )
 from minilink.dynamics.catalog.aerial.drone import (
     ConstantSpeedHelicopterTunnel,
@@ -53,6 +56,7 @@ from minilink.dynamics.catalog.mass_spring_damper.linear import (
 )
 from minilink.dynamics.catalog.pendulum.cartpole import (
     CartPole,
+    CartPoleWithNoisePort,
     RotatingCartPole,
     UnderactuatedRotatingCartPole,
 )
@@ -121,6 +125,7 @@ CATALOG_CHECK_ENTRIES: tuple[CatalogCheckEntry, ...] = (
     CatalogCheckEntry("RotatingCartPole", RotatingCartPole),
     CatalogCheckEntry("UnderactuatedRotatingCartPole", UnderactuatedRotatingCartPole),
     CatalogCheckEntry("CartPole", CartPole),
+    CatalogCheckEntry("CartPoleWithNoisePort", CartPoleWithNoisePort),
     CatalogCheckEntry("KinematicBicycle", KinematicBicycle),
     CatalogCheckEntry("KinematicCar", KinematicCar),
     CatalogCheckEntry("HolonomicMobileRobot", HolonomicMobileRobot),
@@ -145,6 +150,9 @@ CATALOG_CHECK_ENTRIES: tuple[CatalogCheckEntry, ...] = (
     CatalogCheckEntry("DoublePendulum", DoublePendulum),
     CatalogCheckEntry("PendulumWithNoisePort", PendulumWithNoisePort),
     CatalogCheckEntry("DynamicBicycle", DynamicBicycle),
+    CatalogCheckEntry("UdeSRacecar", UdeSRacecar),
+    CatalogCheckEntry("UdeSRacecarDyn", UdeSRacecarDyn),
+    CatalogCheckEntry("UdeSRacecarDyn3D", UdeSRacecarDyn3D),
     CatalogCheckEntry("DynamicBicycleCar3D", DynamicBicycleCar3D),
     CatalogCheckEntry("Boat2D", Boat2D),
     CatalogCheckEntry("Boat2DWithCurrent", Boat2DWithCurrent),

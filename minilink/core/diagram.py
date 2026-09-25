@@ -44,7 +44,21 @@ class DiagramSystem(WiredDiagramMixin, DynamicSystem):
         self.subsystems = {}
         self.connections = {}
         System.__init__(self, 0)
-        self._init_wiring(name="Diagram")
+        self.init_wiring(name="Diagram")
+
+    def add_subsystem(self, sys, sys_id):
+        """Add a continuous or static subsystem under a unique id.
+
+        A :class:`StepSystem` has no ``f`` to stack, so it is refused here
+        rather than left out of the state derivative.
+        """
+        if isinstance(sys, StepSystem):
+            raise TypeError(
+                f"{type(sys).__name__} {sys_id!r} is a StepSystem and cannot join "
+                "a flow DiagramSystem: a StepSystem belongs in a StepDiagramSystem "
+                "or a Computer: block % dt @ plant"
+            )
+        super().add_subsystem(sys, sys_id)
 
     def f(self, x, u, t=0, params=None):
         """
@@ -61,14 +75,18 @@ class DiagramSystem(WiredDiagramMixin, DynamicSystem):
                 continue
             local_x = self.get_local_state(x, sys_id)
             local_u = self.get_local_input(x, u, t, sys_id, params=params)
-            local_params = self._subsystem_params(params, sys_id)
+            local_params = self.subsystem_params(params, sys_id)
 
             dx_pieces.append(subsystem.f(local_x, local_u, t, local_params))
 
         xp = array_module(x, u, *dx_pieces)
         if not dx_pieces:
             return xp.array([])
-        return xp.concatenate([xp.asarray(dx).reshape(-1) for dx in dx_pieces])
+
+        # dx = [f_1(x_1, u_1, t); f_2(x_2, u_2, t); ...], one block per subsystem
+        dx = xp.concatenate([xp.asarray(dx).reshape(-1) for dx in dx_pieces])
+
+        return dx
 
     def compile(self, backend="numpy", bind_params=False, verbose=False):
         """
@@ -190,7 +208,22 @@ class StepDiagramSystem(WiredDiagramMixin, StepSystem):
         self.connections = {}
         System.__init__(self, 0)
         self.rollout = None
-        self._init_wiring(name="StepDiagram")
+        self.init_wiring(name="StepDiagram")
+
+    def add_subsystem(self, sys, sys_id):
+        """Add a step or static subsystem under a unique id.
+
+        A :class:`DynamicSystem` with states has no ``step`` to stack, so it is
+        refused here rather than left frozen by :meth:`step`.
+        """
+        if isinstance(sys, DynamicSystem) and sys.n > 0:
+            raise TypeError(
+                f"{type(sys).__name__} {sys_id!r} has continuous states and cannot "
+                "join a StepDiagramSystem: keep it in a DiagramSystem and close the "
+                "sampled loop with block % dt @ plant, or step it with "
+                "discretize(plant, dt)"
+            )
+        super().add_subsystem(sys, sys_id)
 
     def step(self, x, u, k=0, params=None):
         """
@@ -208,7 +241,7 @@ class StepDiagramSystem(WiredDiagramMixin, StepSystem):
                 continue
             local_x = self.get_local_state(x_arr, sys_id)
             local_u = self.get_local_input(x, u, k, sys_id, params=params)
-            local_params = self._subsystem_params(params, sys_id)
+            local_params = self.subsystem_params(params, sys_id)
             piece = subsystem.step(local_x, local_u, k, local_params)
             start, end = self.state_index[sys_id]
             x_new[start:end] = xp.asarray(piece, dtype=float).reshape(end - start)

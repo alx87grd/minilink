@@ -117,6 +117,25 @@ class TestLinearCore(unittest.TestCase):
         )
         self.assertGreater(info.settling_time, info.rise_time)
 
+    def test_step_info_rise_time_skips_the_undershoot(self):
+        # G(s) = (1 - s) / (s + 1)²: y = 1 - (1 + 2t) e^(-t) dips to -0.21 at t = 0.5 s,
+        # then reaches 10 % at t = 1.483 s and 90 % at t = 4.631 s
+        tf = TransferFunction([-1.0, 1.0], [1.0, 2.0, 1.0])
+        t = np.linspace(0.0, 12.0, 12001)
+        info = step_info(t, linear.step_response(*_matrices(tf), t))
+        self.assertAlmostEqual(info.rise_time, 4.631 - 1.483, places=2)
+
+    def test_step_info_undershoot_is_not_overshoot(self):
+        # G(s) = (1 - 5s) / (s + 1)²: y = 1 - (1 + 6t) e^(-t) dips to -1.608 at t = 5/6 s
+        # and then rises to 1 from below, so the overshoot is 0 while |peak| > |y_∞|
+        tf = TransferFunction([-5.0, 1.0], [1.0, 2.0, 1.0])
+        t = np.linspace(0.0, 20.0, 20001)
+        info = step_info(t, linear.step_response(*_matrices(tf), t))
+        self.assertEqual(info.overshoot, 0.0)
+        self.assertAlmostEqual(info.peak, 1.0 - 6.0 * np.exp(-5.0 / 6.0), places=4)
+        info_negative = step_info(t, -linear.step_response(*_matrices(tf), t))
+        self.assertEqual(info_negative.overshoot, 0.0)
+
 
 class TestChannelTools(unittest.TestCase):
     """The system-level verbs share the family signature and the channel selectors."""
@@ -215,6 +234,20 @@ class TestPlots(unittest.TestCase):
         self.assertEqual(len(r.axes[0].lines), 1 + 2 + 1)  # curve, two crossovers, 0 dB
         r = plot_bode(self.loop, margins=False, show=False)
         self.assertEqual(len(r.axes[0].lines), 1)
+
+    def test_bode_plot_reports_the_margins_of_margins(self):
+        # the 200 plotted points put the gain crossover at 1.28 rad/s; margins() at 1.27
+        loop = TransferFunction([4.9], [1.0, 3.0, 2.0, 0.0])
+        m = margins(loop)
+        r = plot_bode(loop, show=False)
+        texts = [t.get_text() for t in r.axes[0].texts]
+        self.assertIn(
+            f"Gm = {m.gain_margin_db:.1f} dB (at {m.w_phase_crossover:.3g} rad/s)\n"
+            f"Pm = {m.phase_margin_deg:.1f} deg (at {m.w_gain_crossover:.3g} rad/s)",
+            texts,
+        )
+        crossovers = [line.get_xdata()[0] for line in r.axes[0].lines[1:3]]
+        self.assertEqual(crossovers, [m.w_gain_crossover, m.w_phase_crossover])
 
     def test_plotly_backend_draws_the_same_figures(self):
         pytest.importorskip("plotly")

@@ -268,3 +268,164 @@ def test_nominal_trajectory_verb_matches_the_rl_planner_rollout():
     verb = nominal_trajectory(problem, solution.policy, dt=0.1, tf=planner.env.tf)
     np.testing.assert_allclose(verb.x, solution.trajectory.x, atol=1e-10)
     assert isinstance(verb, Trajectory) and solution.evaluation.n_trials == 3
+
+
+# --- the solution knows its problem, shows what the planner produced, and compares ---
+
+
+def solved_pendulum():
+    """One problem, two feedback solutions (value iteration and LQR) with their rollouts."""
+    import matplotlib
+
+    matplotlib.use("Agg")
+    from minilink import LQRPlanner
+
+    plant = Pendulum()
+    plant.state.lower_bound = np.array([-2.0 * np.pi, -8.0])
+    plant.state.upper_bound = np.array([2.0 * np.pi, 8.0])
+    plant.inputs["u"].lower_bound = np.array([-5.0])
+    plant.inputs["u"].upper_bound = np.array([5.0])
+    cost = QuadraticCost.from_system(plant, Q=np.eye(2), R=np.eye(1), xbar=[np.pi, 0])
+    problem = PlanningProblem(
+        plant,
+        x_start=[0.0, 0.0],
+        x_goal=[np.pi, 0.0],
+        cost=cost,
+        tf=np.inf,
+        X=plant.state.box,
+        infeasible_cost=500.0,
+    )
+    vi = DynamicProgrammingPlanner(
+        problem, x_grid=(21, 21), u_grid=(3,), dt=0.1, alpha=0.95, tol=0.5
+    )
+    return (
+        problem,
+        vi.solve(evaluate=True),
+        LQRPlanner(problem, dt=0.1).solve(evaluate=True),
+    )
+
+
+def test_every_solution_carries_its_problem():
+    problem = move_problem()
+    solution = trajopt(problem, shooting).solve()
+    assert solution.problem is problem and solution.method == "trajectory optimization"
+    problem, vi, lqr = solved_pendulum()
+    assert vi.problem is problem and lqr.problem is problem
+    assert vi.method == "value iteration" and lqr.method == "riccati"
+
+
+def test_solution_verbs_draw_what_the_planner_produced():
+    from minilink.planning.comparison import sample_cost_to_go
+
+    problem, vi, lqr = solved_pendulum()
+    for solution in (vi, lqr):
+        fig, ax = solution.plot_cost_to_go(show=False, grid_shape=(11, 11))
+        assert ax.get_title().startswith("cost-to-go")
+        result = solution.plot_control_law(show=False)
+        # the sweep is the problem's state box and the colour scale its input box
+        x_lim, y_lim = result.axes.get_xlim(), result.axes.get_ylim()
+        assert x_lim[0] == pytest.approx(
+            -2.0 * np.pi, abs=0.2
+        )  # half a cell of padding
+        assert y_lim[1] == pytest.approx(8.0, abs=0.2)
+        assert result.axes.collections[0].get_clim() == (-5.0, 5.0)
+        assert solution.plot_trajectory(show=False).figure is not None
+        assert solution.plot_cost(show=False).figure is not None
+    x_level, y_level, J = sample_cost_to_go(lqr, grid_shape=(5, 7))
+    assert J.shape == (5, 7) and J[2, 3] == pytest.approx(lqr.cost_to_go([0.0, 0.0]))
+
+    plan = trajopt(move_problem(), shooting).solve()
+    with pytest.raises(ValueError, match="open-loop"):
+        plan.plot_control_law()
+    with pytest.raises(ValueError, match="cost_to_go"):
+        plan.plot_cost_to_go()
+    unrolled = DynamicProgrammingPlanner(
+        problem, x_grid=(11, 11), u_grid=(3,), dt=0.2, alpha=0.9, tol=1.0
+    ).solve()
+    with pytest.raises(ValueError, match="evaluate=True"):
+        unrolled.plot_trajectory()
+
+
+def test_planner_shortcuts_draw_the_latest_solution():
+    problem, vi, lqr = solved_pendulum()
+    planner = DynamicProgrammingPlanner(
+        problem, x_grid=(11, 11), u_grid=(3,), dt=0.2, alpha=0.9, tol=1.0
+    )
+    with pytest.raises(ValueError):
+        planner.plot_control_law()
+    planner.solve()
+    assert planner.plot_control_law(show=False).figure is not None
+    assert planner.plot_cost_to_go(show=False, grid_shape=(9, 9))[0] is not None
+
+
+def test_compare_reads_the_solutions_side_by_side():
+    from minilink.planning import PolicyEvaluator, compare
+
+    problem, vi, lqr = solved_pendulum()
+    race = compare(VI=vi, LQR=lqr)
+    assert len(race) == 2 and race["LQR"] is lqr and list(race) == ["VI", "LQR"]
+    table = str(race)
+    assert table.splitlines()[0].split() == ["success", "solver", "evaluation"]
+    assert "converged" in table and "closed-loop poles" in table and "J = " in table
+
+    fig, axes = race.plot_control_law(show=False)
+    assert [ax.get_title() for ax in axes] == ["VI", "LQR"]
+    assert axes[0].collections[0].get_clim() == axes[1].collections[0].get_clim()
+    fig, axes = race.plot_cost_to_go(show=False, grid_shape=(9, 9))
+    assert axes[0].collections[0].get_clim() == axes[1].collections[0].get_clim()
+    fig, axes = race.plot_trajectory(show=False)
+    assert len(axes) == 3 and len(axes[0].get_lines()) == 2
+
+    # one evaluator scores every policy on the same draws; a solution stands for its policy
+    evaluator = MonteCarloEvaluator(problem, dt=0.1, n_trials=1, backend="numpy")
+    scored = race.evaluate(evaluator)
+    assert list(scored) == ["VI", "LQR"] and scored["LQR"].policy is lqr.policy
+    assert scored["LQR"].evaluation.mean == evaluator.evaluate(lqr.policy).mean
+    assert (
+        "J = " in str(scored) and race["LQR"].evaluation is not scored["LQR"].evaluation
+    )
+    grid_eval = PolicyEvaluator(
+        problem, grid=DynamicProgrammingPlanner(
+            problem, x_grid=(11, 11), u_grid=(3,), dt=0.2
+        ).grid, policy=lqr,
+    )  # fmt: skip
+    assert np.all(np.isfinite(grid_eval.solve()))
+
+    with pytest.raises(TypeError):
+        compare(VI=vi.policy)
+    with pytest.raises(ValueError):
+        compare()
+
+
+@pytest.mark.optional
+@pytest.mark.jax
+def test_compare_scores_every_policy_on_one_backend_and_the_same_draws():
+    """The default backend is chosen once per race: NumPy for all when one law does not trace."""
+    from minilink.planning import compare
+
+    problem, vi, lqr = solved_pendulum()
+    spread = StochasticPlanningProblem(
+        problem.sys,
+        cost=problem.cost,
+        tf=np.inf,
+        X=problem.X,
+        infeasible_cost=500.0,
+        x0_distribution=Uniform([-0.5, -0.5], [0.5, 0.5]),
+    )
+    settings = dict(dt=0.1, n_trials=3, episode_length=1.0)
+    evaluator = MonteCarloEvaluator(spread, **settings)
+
+    # the lookup table runs on NumPy only, so the LQR law is scored there too
+    with pytest.warns(UserWarning, match="does not trace on JAX"):
+        scored = compare(VI=vi, LQR=lqr).evaluate(evaluator)
+    np.testing.assert_array_equal(
+        scored["VI"].evaluation.x0, scored["LQR"].evaluation.x0
+    )
+    on_numpy = MonteCarloEvaluator(spread, backend="numpy", **settings)
+    np.testing.assert_array_equal(scored["LQR"].evaluation.J, on_numpy.evaluate(lqr).J)
+    assert evaluator.backend == "auto"  # the caller's evaluator keeps its choice
+
+    # laws that all trace keep the JAX backend and its numbers
+    scored = compare(LQR=lqr).evaluate(evaluator)
+    on_jax = MonteCarloEvaluator(spread, backend="jax", **settings)
+    np.testing.assert_array_equal(scored["LQR"].evaluation.J, on_jax.evaluate(lqr).J)

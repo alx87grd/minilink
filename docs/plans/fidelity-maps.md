@@ -1,7 +1,7 @@
-# Phase 4 — Cross-fidelity maps (design)
+# Cross-fidelity maps (design)
 
-Status: draft plan (July 2026). Active backlog — not implemented yet.
-Lane: **research — Later** (not part of v0.1; see ROADMAP.md §2 and §5).
+Status: draft plan (July 2026), unscheduled — a Later idea in [TODO.md](TODO.md) §7.
+Lane: research (ROADMAP §2). The research rungs it maps now live in `examples/projects/car_trajopt/vehicles/`, so the maps belong beside them, not in the catalog.
 
 Locked defaults: **bicycle ladder only** (Kin → Acc → Dyn → Rate → TauRate →
 Servo → Engine); Holonomic deferred. Maps live in
@@ -103,7 +103,7 @@ flowchart TB
 
 Teaching demos already pad by hand in
 [`car_trajopt_compare.py`](../../examples/projects/car_trajopt/car_trajopt_compare.py).
-Phase 4 makes that shared and honest about when zeros are wrong.
+This design makes that shared and honest about when zeros are wrong.
 
 ## Ladder dimensions (reference)
 

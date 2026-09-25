@@ -1,5 +1,7 @@
 """Cart-pole swing-up with JAX-backed direct collocation."""
 
+import importlib.util
+
 import numpy as np
 
 from minilink import (
@@ -11,6 +13,7 @@ from minilink import (
 
 PRINT_SOLVE_REPORT = True  # Minilink's pre/post solve report
 LIVE_PLOT = False  # redraw the iterate trajectory during the solve
+OPTIMIZER = "ipopt" if importlib.util.find_spec("cyipopt") else "scipy_slsqp"
 
 sys = CartPole()
 sys.inputs["u"].lower_bound[0] = -10.0
@@ -39,7 +42,7 @@ planner = TrajectoryOptimizationPlanner(
     n_steps=40,
     transcription="direct_collocation",
     compile_backend="jax",
-    optimizer_method="ipopt",
+    optimizer_method=OPTIMIZER,
     # optimizer_method="scipy_slsqp",
     # optimizer_options={"maxiter": 500, "ftol": 1e-2},
     verbose=PRINT_SOLVE_REPORT,

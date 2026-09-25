@@ -1,42 +1,7 @@
-"""System analysis tools.
+"""Analysis verbs on a ``System``: derivatives, linearization, structure, equilibria, modes, frequency and time responses, Lyapunov certificates.
 
-Verbs that *characterize* a system; they return data, ``LTISystem`` models,
-or plots — never user-facing system classes (factories are fine).
-
-Teaching imports::
-
-    from minilink.analysis import bode, jacobian, modal_analysis
-    from minilink.analysis.linearize import linearize
-    from minilink.analysis.discretize import discretize
-
-Every verb reads ``tool(<what>, x_bar=None, u_bar=None, t=0.0, params=None, *,
-method="auto", eps=1e-6, ...)``: ``jacobian(sys, "f", "x")`` is ∂f/∂x, the
-channel tools (``bode``, ``pzmap``, ``transfer_function``) take ``of=`` /
-``wrt=`` keywords, and the same verbs are methods on every ``System``.
-
-Symbols whose **name matches a submodule** (``linearize``, ``discretize``) are
-imported from that submodule — not re-exported on the package attribute.
-
-Implemented modules:
-
-- ``derivatives.py`` — ``jacobian(sys, of, wrt)`` at an operating point
-- ``linearize.py`` — equilibrium linearization → matrices or ``LTISystem``
-- ``structural.py`` — controllability / observability
-- ``equilibria.py`` — trim points and root-finding on ``f``
-- ``modal.py`` — ``modal_analysis`` (poles, modes) and ``animate_modal``
-- ``linear.py`` — the linear-algebra core on one channel ``(A, b, c, d)``:
-  poles, zeros, frequency response, margins, root locus, step response
-- ``frequency.py`` — one-channel Bode, pole-zero, Nyquist, margins, root
-  locus, transfer function and their plots (matplotlib or plotly)
-- ``time_response.py`` — step response and ``StepInfo``
-- ``discretize.py`` — continuous→step plant wrappers
-
-Planned additions (see ROADMAP.md teaching-release priorities):
-
-- Nichols chart; multi-system overlays in one figure
-
-Placement rule: if it *characterizes* an existing system, it belongs here;
-if it *is* a block you wire into a diagram, it belongs in a library package.
+Every tool reads ``tool(sys, x_bar, u_bar, t, params, *, method="auto", eps)`` and the
+same verbs are methods on every ``System``.
 """
 
 from __future__ import annotations

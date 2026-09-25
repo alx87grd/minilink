@@ -58,7 +58,11 @@ class Sys2Gym(gym.Env):
     t0 : float
         Initial time (only relevant if the system is time dependent).
     reset_mode : {"uniform", "gaussian", "determinist"}
-        Distribution of the initial state on :meth:`reset`.
+        Distribution of the initial state on :meth:`reset`: uniform between
+        :attr:`x0_lb` and :attr:`x0_ub`, Gaussian around ``x0`` with
+        :attr:`x0_std`, or ``x0`` itself. The two random modes spread the start
+        over a tenth of the state bounds, so they need finite bounds (or the
+        spread set by hand); :meth:`reset` raises ``ValueError`` otherwise.
     render_mode : None or "human"
         ``"human"`` renders the system with the matplotlib animator.
     integrator : {"rk4", "euler"}
@@ -150,17 +154,23 @@ class Sys2Gym(gym.Env):
 
         ``reset`` draws the initial state from the problem, the reward is the
         problem's running cost, a finite horizon ends the episode at ``tf``
-        with the terminal cost ``h``, leaving the constraint set ``X`` is a
-        failure (*terminated*, charged the price of infeasibility) and leaving
-        the plant's state box, the training zone, is a *truncation*.
-        Parameter and disturbance draws are not applied by this view.
+        with the terminal cost ``h``, leaving the constraint set ``X`` (read on
+        the problem's set parameters) is a failure (*terminated*, charged the
+        price of infeasibility) and leaving the plant's state box, the training
+        zone, is a *truncation*.
+        Parameter and disturbance draws are not applied by this view. A
+        deterministic :class:`~minilink.planning.problems.PlanningProblem`
+        starts every episode at its ``x_start``.
         """
-        finite = problem.horizon_kind() == "finite"
-        tf = float(problem.tf) if finite else float(episode_length or 10.0)
         from minilink.control.neural import action_port_of
+        from minilink.planning.problems import as_stochastic
         from minilink.planning.reinforcement_learning.environment import (
             feasible_cost_bound,
         )
+
+        problem = as_stochastic(problem)
+        finite = problem.horizon_kind() == "finite"
+        tf = float(problem.tf) if finite else float(episode_length or 10.0)
 
         env = ProblemEnv(problem.sys, problem.require_cost(), dt=dt, tf=tf, **kwargs)
         env.problem = problem
@@ -181,8 +191,10 @@ class Sys2Gym(gym.Env):
         super().reset(seed=seed)
 
         if self.reset_mode == "uniform":
+            _require_finite_start(self.sys, self.reset_mode, self.x0_lb, self.x0_ub)
             self.x = self.np_random.uniform(self.x0_lb, self.x0_ub)
         elif self.reset_mode == "gaussian":
+            _require_finite_start(self.sys, self.reset_mode, self.x0_std)
             self.x = self.np_random.normal(self.sys.x0, self.x0_std)
         else:  # deterministic
             self.x = np.asarray(self.sys.x0, dtype=float).copy()
@@ -350,8 +362,10 @@ class ProblemEnv(Sys2Gym):
     infeasible_cost = None
 
     def reset(self, seed=None, options=None):
-        y, info = super().reset(seed=seed, options=options)
+        gym.Env.reset(self, seed=seed)  # seeds np_random; the problem draws the start
         self.x = np.asarray(self.problem.sample_x0(self.np_random), dtype=float)
+        self.u = self.sys.get_u_from_input_ports()
+        self.t = self.t0
         y = np.asarray(
             self.sys.h(self.x, self.u, self.t), dtype=self.observation_space.dtype
         )
@@ -361,7 +375,7 @@ class ProblemEnv(Sys2Gym):
         problem = self.problem
         y, r, terminated, truncated, info = super().step(u)
         x, t = self.x, self.t
-        if not problem.X.contains(x, t):
+        if not problem.X.contains(x, t, problem.params.sets):
             price = self.infeasible_cost
             r -= float(price(x, t) if callable(price) else price)
             terminated, truncated = True, False
@@ -408,6 +422,19 @@ def _compiled_step(sys, integrator, compile_backend):
     else:
         step = evaluator.rk4_step if integrator == "rk4" else evaluator.euler_step
     return backend, evaluator, step
+
+
+def _require_finite_start(sys, reset_mode, *spread):
+    """Raise when a random reset would spread the start over an unbounded range."""
+    finite = np.all(np.isfinite(spread), axis=0)
+    if not np.all(finite):
+        unbounded = [label for label, ok in zip(sys.state.labels, finite) if not ok]
+        raise ValueError(
+            f"reset_mode={reset_mode!r} spreads the start over a tenth of the state "
+            f"bounds, and {unbounded} have none: bound sys.state, set x0_lb / x0_ub "
+            "(uniform) or x0_std (gaussian), pass reset_mode='determinist', or use "
+            "Sys2Gym.from_problem with a start distribution"
+        )
 
 
 def _box_bounds(space):

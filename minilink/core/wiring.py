@@ -16,6 +16,7 @@ import numpy as np
 
 from minilink.core.backends import array_module
 from minilink.core.signals import OutputPort, VectorSignal
+from minilink.core.system import DEFAULT_SMALLEST_TIME_CONSTANT
 
 if TYPE_CHECKING:
     from minilink.core.diagram import DiagramSystem
@@ -227,7 +228,8 @@ class DiagramOutputPort(OutputPort):
 class WiredDiagramMixin:
     """Evolution-agnostic diagram wiring, gather, and visualization helpers."""
 
-    def _init_wiring(self, *, name: str = "Diagram") -> None:
+    def init_wiring(self, *, name: str = "Diagram") -> None:
+        """Internal machinery: the wiring tables and the composition memory of a new diagram."""
         if not hasattr(self, "subsystems"):
             self.subsystems = {}
         if not hasattr(self, "connections"):
@@ -244,15 +246,38 @@ class WiredDiagramMixin:
         self.connections[sys_id] = {port_id: None for port_id in sys.inputs}
 
         self.compute_state_properties()
-        self._refresh_solver_info()
+        self.refresh_solver_info()
 
-    def _refresh_solver_info(self):
-        """Bubble subsystem solver hints to the diagram root."""
+    def refresh_solver_info(self):
+        """Bubble subsystem solver hints to the diagram root.
+
+        The diagram is discontinuous when any subsystem is. Its smallest time
+        constant is the smallest one among the subsystems that carry one: every
+        stateful subsystem, and a stateless block that sets its own. A static
+        block left at the default has no time constant and does not pin the
+        diagram to the default.
+
+        Both hints are derived from the subsystems at every :meth:`add_subsystem`
+        and :meth:`refresh` (a ``Simulator`` refreshes before it solves), so a
+        hint changed on a block after composition reaches the diagram. Set a
+        hint on the block it describes: one set by hand on the diagram is
+        replaced at the next refresh.
+        """
         if not hasattr(self, "solver_info"):
             return
         self.solver_info["discontinuous_behavior"] = any(
             subsystem.solver_info.get("discontinuous_behavior", False)
             for subsystem in self.subsystems.values()
+        )
+        time_constants = []
+        for subsystem in self.subsystems.values():
+            tau = subsystem.solver_info.get(
+                "smallest_time_constant", DEFAULT_SMALLEST_TIME_CONSTANT
+            )
+            if subsystem.n > 0 or tau != DEFAULT_SMALLEST_TIME_CONSTANT:
+                time_constants.append(tau)
+        self.solver_info["smallest_time_constant"] = min(
+            time_constants, default=DEFAULT_SMALLEST_TIME_CONSTANT
         )
 
     def subsystem_id(self, subsystem):
@@ -442,11 +467,14 @@ class WiredDiagramMixin:
     def refresh(self):
         """Refresh all subsystems and rebuild the flattened state metadata.
 
-        Compiled evaluators are snapshots: recompile after structural changes.
+        The solver hints are then bubbled again from the refreshed subsystems
+        (:meth:`refresh_solver_info`). Compiled evaluators are snapshots:
+        recompile after structural changes.
         """
         for subsystem in self.subsystems.values():
             subsystem.refresh()
         self.compute_state_properties()
+        self.refresh_solver_info()
 
     def autowire(
         self,
@@ -485,7 +513,7 @@ class WiredDiagramMixin:
         for sys_id, subsystem_params in value.items():
             self.subsystems[sys_id].params = subsystem_params
 
-    def _subsystem_params(self, params, sys_id):
+    def subsystem_params(self, params, sys_id):
         """Route nested diagram params to one subsystem (strict contract).
 
         ``None`` → ``None`` (subsystem uses its live ``self.params``);
@@ -555,7 +583,7 @@ class WiredDiagramMixin:
         local_u = self.get_local_input(
             x, u, t, sys_id, port.dependencies, params=params
         )
-        local_params = self._subsystem_params(params, sys_id)
+        local_params = self.subsystem_params(params, sys_id)
 
         return port.compute(local_x, local_u, t, local_params)
 

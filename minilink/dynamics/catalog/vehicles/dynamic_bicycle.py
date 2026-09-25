@@ -1,16 +1,7 @@
-"""
-Dynamic bicycle (planar rigid body + tire forces), ported minimally from pyro
-``vehicle_dynamic.DynamicBicycle``.
+"""Dynamic bicycle: a planar rigid body on linear tires, and its wheel-rate / steer-rate rung.
 
-State ``x = [x, y, theta, vx, vy, yaw_rate]``: world pose and body velocities
-(surge, sway, yaw rate). Inputs are two named ports ``w_rear`` (rear wheel spin
-rate [rad/s]) and ``delta`` (steer angle [rad]) so diagrams can wire each
-command independently.
-
-:class:`DynamicBicycleCar3D` subclasses this model with identical dynamics and richer 3D graphics.
-The equations are written with ``xp = array_module(...)`` and trace under JAX.
-:class:`BicycleDynRate` adds wheel-rate / steer-rate inputs (the MPC plant); the
-torque, servo, and engine research rungs live in
+State ``x = [x, y, theta, vx, vy, yaw_rate]``, inputs ``w_rear`` (rear wheel rate [rad/s]) and
+``delta`` (steer angle [rad]) as two named ports. The research rungs live in
 ``examples/projects/car_trajopt/vehicles/ladder.py``.
 """
 
@@ -46,12 +37,16 @@ def linear_tire_forces(vx, vy, w, R, Fz, Ca, Ck, mu, v_min_epsilon):
     """
     xp = array_module(vx, vy, w)
     alpha, kappa = tire_slip(vx, vy, w, R, v_min_epsilon)
+
+    # linear slip forces, scaled back onto the friction circle |F| ≤ μ Fz
     Fx = Ck * kappa
     Fy = Ca * alpha
     F_max = mu * Fz
     F_total = xp.sqrt(Fx**2 + Fy**2)
     ratio = xp.where(F_total > F_max, F_max / xp.maximum(F_total, 1e-12), 1.0)
-    return Fx * ratio, Fy * ratio
+    Fx_sat, Fy_sat = Fx * ratio, Fy * ratio
+
+    return Fx_sat, Fy_sat
 
 
 def _wheel_rectangle_pts(wl, ww):
@@ -146,9 +141,11 @@ class DynamicBicycle(DynamicSystem):
         self._visual_tire_radius_ratio = 0.58
 
         # Default 2-D skin (black centerline chassis) and a camera that tracks
-        # the body frame.
+        # the body frame. A numeric scale keeps auto-fit from taking over
+        # (``camera_scale=None`` would frame the whole trail / overlays).
         self.skin = partial(car_skin_2d, color="#1a1a1a")
         self.camera_follow_frame = "body"
+        self.camera_scale = 10.0
 
     def M(self, q, params=None):
         params = self.params if params is None else params
@@ -278,7 +275,11 @@ class DynamicBicycle(DynamicSystem):
         Sum_Mz = a * Fy_f_b - b * Fy_r_b
         F_aero = 0.5 * rho * CdA * v[0] * xp.abs(v[0])
         Sum_Fx = Sum_Fx - F_aero
-        return -xp.array([Sum_Fx, Sum_Fy, Sum_Mz])
+
+        # the generalized damping is minus the resultant tire and drag wrench
+        d = -xp.array([Sum_Fx, Sum_Fy, Sum_Mz])
+
+        return d
 
     def f(self, x, u, t=0.0, params=None):
         params = self.params if params is None else params
@@ -315,7 +316,11 @@ class DynamicBicycle(DynamicSystem):
         xp = array_module(v_body, w_rear, delta)
         u_in = xp.array([w_rear, delta])
         _, _, Fx_r, _ = self.compute_tire_physics(v_body, u_in, params)
-        return r_r * Fx_r + bw * w_rear
+
+        # the road reaction through the rear tire plus the viscous bearing torque
+        tau_ground = r_r * Fx_r + bw * w_rear
+
+        return tau_ground
 
     def _u_in(self, x, u):
         """``[w_rear, delta]`` from the port vector (overridden by the rate variant)."""
@@ -547,10 +552,12 @@ class BicycleDynRate(DynamicBicycle):
         N = self.N(q, params)
         d = self.generalized_d(q, v, u_in, params)
 
+        rates = self.rates(x, u)
+
         # Body follows the rigid-body EoM; wheel rate and steer integrate the inputs
         dv = xp.linalg.solve(M, -C @ v - d)
         dq = N @ v
-        dx = xp.concatenate([dq, dv, self.rates(x, u)])
+        dx = xp.concatenate([dq, dv, rates])
 
         return dx
 
@@ -563,9 +570,15 @@ class BicycleDynRate(DynamicBicycle):
         Inverts ``Jw_rear * w_rear_dot = tau_rear - rear_wheel_ground_torque(...)``.
         """
         params = self.params if params is None else params
+        Jw_rear = params["Jw_rear"]
+        v_body, w_rear, delta = x[3:6], x[6], x[7]
         w_rear_dot = self.rates(x, u)[0]
-        tau_ground = self.rear_wheel_ground_torque(x[3:6], x[6], x[7], params)
-        return params["Jw_rear"] * w_rear_dot + tau_ground
+        tau_ground = self.rear_wheel_ground_torque(v_body, w_rear, delta, params)
+
+        # Jw ẇ_rear = τ_rear − τ_ground, solved for the motor torque
+        tau_rear = Jw_rear * w_rear_dot + tau_ground
+
+        return tau_rear
 
 
 if __name__ == "__main__":

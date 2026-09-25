@@ -1,14 +1,7 @@
-"""
-The System contract: the base class every block, plant, and controller extends.
+"""The System contract: the base class every block, plant and controller extends.
 
-A static IO block is described by output maps on its ports (and optionally
-``h`` on the model). Continuous evolution ``dx = f(x, u, t; p)`` lives on
-:class:`DynamicSystem` only.
-
-Signal and port metadata live in :mod:`minilink.core.signals`; user shortcut
-methods (``compute_trajectory``, ``plot_*``, ``animate``, ``modal_analysis``, ...)
-live on the :class:`~minilink.core.facades.SharedSystemFacades` mixin and its
-evolution-specific subclasses.
+A static block is its output maps on its ports; continuous evolution
+``dx = f(x, u, t; p)`` lives on :class:`DynamicSystem`, a discrete step on :class:`StepSystem`.
 """
 
 from typing import TYPE_CHECKING
@@ -20,10 +13,14 @@ from minilink.core.facades import (
     SharedSystemFacades,
     StepSystemFacades,
 )
+from minilink.core.inspect import inspect_text, repr_pretty
 from minilink.core.signals import InputPort, OutputPort, VectorSignal
 
 if TYPE_CHECKING:
     from minilink.core.diagram import DiagramSystem
+
+# Solver hint of a system that declares no time constant of its own (seconds).
+DEFAULT_SMALLEST_TIME_CONSTANT = 0.001
 
 
 class System(SharedSystemFacades):
@@ -51,6 +48,9 @@ class System(SharedSystemFacades):
       :meth:`render`, :meth:`animate` on
       :class:`~minilink.core.facades.SharedSystemFacades` (continuous analysis
       and :meth:`game` on :class:`~minilink.core.facades.DynamicSystemFacades`).
+    - **Inspect**: :meth:`__str__` is a short summary (name, class, ``n``,
+      ports with dimensions; a diagram adds its keys). A notebook last
+      expression still draws the Graphviz block.
 
     Overridden :meth:`h` and port ``compute`` functions are functions of
     ``(x, u, t, params)`` alone: no memory between calls, no cached side
@@ -102,7 +102,7 @@ class System(SharedSystemFacades):
 
         # Solver hints used by high-level simulation shortcuts.
         self.solver_info = {
-            "smallest_time_constant": 0.001,
+            "smallest_time_constant": DEFAULT_SMALLEST_TIME_CONSTANT,
             "discontinuous_behavior": False,
         }
 
@@ -110,18 +110,21 @@ class System(SharedSystemFacades):
         # ``compute_trajectory``.
         self.traj = None
 
-        # Standard camera hints (resolved by ``Animator`` via ``camera.py``).
-        # ``camera_scale=None`` (default) fits the view to the drawn geometry at
-        # animation time; set a half-width in metres to frame the scene yourself.
+        # Camera hints, resolved by the Animator. ``camera_scale=None`` (default)
+        # fits the view to the drawn geometry; a half-width in metres frames the
+        # scene yourself. ``camera_follow_frame`` is a ``tf`` key to track (``None``
+        # for a fixed view); ``camera_priority`` tie-breaks between drawables.
         self.camera_target = np.zeros(3, dtype=float)
         self.camera_plot_axes = (0, 1)
         self.camera_scale = None
-        # Camera hints read by the ``Animator`` camera resolver.
-        # ``camera_follow_frame`` is a ``tf`` key to track (or ``None`` for a
-        # fixed view); ``camera_priority`` tie-breaks when several hint-carrying
-        # drawables exist.
         self.camera_follow_frame = None
         self.camera_priority = 0.0
+
+    def __str__(self):
+        return inspect_text(self)
+
+    def _repr_pretty_(self, p, cycle):
+        repr_pretty(self, p, cycle)
 
     # Core output contract (static IO)
 
@@ -402,7 +405,8 @@ class System(SharedSystemFacades):
         error-driven left operand (a compensator, a transfer function, a
         series diagram ``C >> G``) gets an Error block ``e = r - y``
         inserted; ``sys @ 1`` closes ``sys`` on itself with unity feedback.
-        See :func:`~minilink.core.composition.closed_loop` and
+        Unlike ``+`` and ``>>``, neither operand is modified: the loop is a
+        new diagram. See :func:`~minilink.core.composition.closed_loop` and
         :func:`~minilink.core.composition.feedback`.
         """
         from minilink.core.composition import closed_loop
@@ -411,9 +415,9 @@ class System(SharedSystemFacades):
 
     def __mod__(self, schedule: object):
         """Return a scheduled :class:`~minilink.simulation.computer.Computer`."""
-        from minilink.simulation.computer import as_computer
+        from minilink.simulation.computer import _build_computer
 
-        return as_computer(self, schedule)
+        return _build_computer(self, schedule)
 
 
 # Specialized System Types
@@ -617,13 +621,18 @@ class StepSystem(StepSystemFacades, System):
 
 if __name__ == "__main__":
     # Hello world: a double integrator dx = [x[1], u[0]]
+    from minilink.core.backends import array_module
 
     class DoubleIntegrator(DynamicSystem):
         def __init__(self):
             super().__init__(n=2, input_dim=1, output_dim=2)
 
         def f(self, x, u, t=0, params=None):
-            dx = np.array([x[1], u[0]])
+            xp = array_module(x)
+            position, velocity = x
+            force = u[0]
+
+            dx = xp.array([velocity, force])
 
             return dx
 

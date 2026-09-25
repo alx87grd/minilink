@@ -99,7 +99,11 @@ class GeneralizedMechanicalSystem(DynamicSystem):
         inputs include steering angles, control-surface positions, tire laws,
         aerodynamic forces, propulsor maps, or other mixed input semantics.
         """
-        return self.B(q, params) @ u
+        B = self.B(q, params)
+
+        tau = B @ u
+
+        return tau
 
     def x2qv(self, x):
         """Split state ``x`` into configuration ``q`` and velocity ``v``."""
@@ -115,8 +119,9 @@ class GeneralizedMechanicalSystem(DynamicSystem):
     def qdot(self, q, v, params=None):
         """Configuration derivative ``qdot = N(q) @ v``."""
         params = self.params if params is None else params
+        N = self.N(q, params)
 
-        qdot = self.N(q, params) @ v
+        qdot = N @ v
 
         return qdot
 
@@ -140,10 +145,10 @@ class GeneralizedMechanicalSystem(DynamicSystem):
         g = self.g(q, params)
         d = self.d(q, v, u, t, params)
         tau = self.generalized_force(q, v, u, t, params)
-        rhs = tau - C @ v - g - d
-        xp = array_module(rhs)
+        xp = array_module(tau, C, v, g, d)
 
         # M v̇ = τ − C v − g − d
+        rhs = tau - C @ v - g - d
         vdot = xp.linalg.solve(M, rhs)
 
         return vdot

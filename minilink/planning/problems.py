@@ -15,6 +15,7 @@ import numpy as np
 
 from minilink.core.costs import CostFunction
 from minilink.core.distributions import Distribution, Particles, split_keys
+from minilink.core.inspect import inspect_text, repr_pretty
 from minilink.core.sets import BoxInputSet, BoxSet, InputSet, Set, SingletonSet
 from minilink.core.system import System
 
@@ -112,20 +113,26 @@ class PlanningProblem:
     metadata: Mapping[str, object] | None = None
     infeasible_cost: object = None
 
+    def __str__(self):
+        return inspect_text(self)
+
+    def _repr_pretty_(self, p, cycle):
+        repr_pretty(self, p, cycle)
+
     def __post_init__(self) -> None:
         n = int(self.sys.n)
 
-        tf = self._coerce_tf(self.tf)
+        tf = self.coerce_tf(self.tf)
         if self.infeasible_cost is not None and not callable(self.infeasible_cost):
             object.__setattr__(self, "infeasible_cost", float(self.infeasible_cost))
 
-        x_start = self._coerce_state(
-            self._default_x_start(),
+        x_start = self.coerce_state(
+            self.default_x_start(),
             label="x_start",
             required=True,
         )
-        x_goal = self._coerce_state(
-            self._default_x_goal(),
+        x_goal = self.coerce_state(
+            self.default_x_goal(),
             label="x_goal",
             required=False,
         )
@@ -134,20 +141,20 @@ class PlanningProblem:
         U = BoxInputSet.from_system_inputs(self.sys) if self.U is None else self.U
         X0 = SingletonSet(x_start) if self.X0 is None else self.X0
         Xf = SingletonSet(x_goal) if self.Xf is None and x_goal is not None else self.Xf
-        params = self._coerce_params(self.params)
-        metadata = self._coerce_metadata(self.metadata)
+        params = self.coerce_params(self.params)
+        metadata = self.coerce_metadata(self.metadata)
 
-        self._require_type("X", X, Set)
-        self._require_type("U", U, InputSet)
-        self._require_type("X0", X0, Set)
+        self.require_type("X", X, Set)
+        self.require_type("U", U, InputSet)
+        self.require_type("X0", X0, Set)
         if Xf is not None:
-            self._require_type("Xf", Xf, Set)
+            self.require_type("Xf", Xf, Set)
 
         if x_start.shape != (n,):
             raise ValueError(f"x_start must have shape ({n},)")
         if x_goal is not None and x_goal.shape != (n,):
             raise ValueError(f"x_goal must have shape ({n},)")
-        self._require_member(
+        self.require_member(
             X0,
             x_start,
             set_label="X0",
@@ -155,7 +162,7 @@ class PlanningProblem:
             set_params=params.sets,
         )
         if Xf is not None and x_goal is not None:
-            self._require_member(
+            self.require_member(
                 Xf,
                 x_goal,
                 set_label="Xf",
@@ -173,14 +180,14 @@ class PlanningProblem:
         object.__setattr__(self, "params", params)
         object.__setattr__(self, "metadata", metadata)
 
-    def _default_x_start(self):
+    def default_x_start(self):
         if self.x_start is not None:
             return self.x_start
         if isinstance(self.X0, SingletonSet):
             return self.X0.point
         return self.sys.x0
 
-    def _default_x_goal(self):
+    def default_x_goal(self):
         if self.x_goal is not None:
             return self.x_goal
         if isinstance(self.Xf, SingletonSet):
@@ -188,7 +195,7 @@ class PlanningProblem:
         return None
 
     @staticmethod
-    def _coerce_state(
+    def coerce_state(
         x: object,
         *,
         label: str,
@@ -201,7 +208,7 @@ class PlanningProblem:
         return np.asarray(x, dtype=float).reshape(-1).copy()
 
     @staticmethod
-    def _coerce_params(params) -> ProblemParameters:
+    def coerce_params(params) -> ProblemParameters:
         if params is None:
             return ProblemParameters()
         if isinstance(params, ProblemParameters):
@@ -209,7 +216,7 @@ class PlanningProblem:
         raise TypeError("params must be a ProblemParameters instance or None")
 
     @staticmethod
-    def _coerce_metadata(metadata) -> Mapping[str, object]:
+    def coerce_metadata(metadata) -> Mapping[str, object]:
         if metadata is None:
             return MappingProxyType({})
         if not isinstance(metadata, Mapping):
@@ -217,12 +224,12 @@ class PlanningProblem:
         return MappingProxyType(dict(metadata))
 
     @staticmethod
-    def _require_type(label: str, value: object, expected_type: type) -> None:
+    def require_type(label: str, value: object, expected_type: type) -> None:
         if not isinstance(value, expected_type):
             raise TypeError(f"{label} must be a {expected_type.__name__} instance")
 
     @staticmethod
-    def _require_member(
+    def require_member(
         set_: Set,
         point: np.ndarray,
         *,
@@ -251,12 +258,8 @@ class PlanningProblem:
         return price(x, t) if callable(price) else price
 
     def horizon_kind(self) -> str:
-        """``"finite"`` or ``"infinite"``: the cost's declaration, else from ``tf``."""
-        if self.cost is None:
-            return (
-                "infinite" if self.tf is None or not np.isfinite(self.tf) else "finite"
-            )
-        return self.cost.horizon_kind(self.tf)
+        """``"finite"`` when ``tf`` is a finite length (``h`` is charged there), ``"infinite"`` for ``+inf`` or unset."""
+        return "infinite" if self.tf is None or not np.isfinite(self.tf) else "finite"
 
     @property
     def has_cost(self) -> bool:
@@ -287,7 +290,7 @@ class PlanningProblem:
         return float(self.tf)
 
     @staticmethod
-    def _coerce_tf(tf: object) -> float | None:
+    def coerce_tf(tf: object) -> float | None:
         if tf is None:
             return None
         value = float(tf)

@@ -61,7 +61,9 @@ class AnimationRenderer(ABC):
         """
         raise NotImplementedError("Inline animation is not supported by this renderer.")
 
-    def export_animation(self, primitives, frames, schedule, file_name: str) -> None:
+    def export_animation(
+        self, primitives, frames, schedule, file_name: str, *, is_3d: bool = False
+    ) -> None:
         """Optional animation export (default: unsupported)."""
         raise NotImplementedError("Animation export is not supported by this renderer.")
 

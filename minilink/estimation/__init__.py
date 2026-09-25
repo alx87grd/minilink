@@ -5,10 +5,11 @@ inside a diagram in time — hidden **states** (Luenberger, Kalman, EKF) or
 hidden **parameters** (recursive least squares, adaptive laws). Port shape:
 ``(u, y) -> estimate``.
 
-Planned modules (see ROADMAP.md teaching-release priorities):
+Planned modules (ROADMAP.md §5, step P4; the factory names are settled in
+docs/plans/gro501-classical-control.md, P4):
 
 - ``luenberger.py`` — pole-placement observers (+ design factory)
-- ``kalman.py`` — Kalman filter (+ ``kalman_design(A, C, Q, R)`` factory)
+- ``kalman.py`` — steady-state Kalman filter (+ design factory)
 - ``ekf.py`` — extended Kalman filter (uses ``analysis/`` linearization)
 - ``recursive.py`` — online parameter estimators (RLS, gradient laws)
 

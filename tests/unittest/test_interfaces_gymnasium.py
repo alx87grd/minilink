@@ -24,6 +24,20 @@ def make_bounded_pendulum():
     return plant
 
 
+def make_unbounded_pendulum():
+    """A user plant that declares no state bounds (the ports default to +-inf)."""
+    from minilink.core.system import DynamicSystem
+
+    class UnboundedPendulum(DynamicSystem):
+        def __init__(self):
+            super().__init__(n=2, input_dim=1, output_dim=2, expose_state=True)
+
+        def f(self, x, u, t=0, params=None):
+            return np.array([x[1], -np.sin(x[0]) + u[0]])
+
+    return UnboundedPendulum()
+
+
 class _ConstantPolicy:
     """Duck-typed stand-in for a stable-baselines3 model."""
 
@@ -148,6 +162,89 @@ class TestSys2Gym(unittest.TestCase):
             y, info = env.reset(seed=1)
             self.assertEqual(y.shape, (2,))
             self.assertIn("state", info)
+
+    def test_random_reset_without_state_bounds_asks_for_them(self):
+        from minilink.interfaces.gymnasium import Sys2Gym
+
+        plant = make_unbounded_pendulum()
+        cost = QuadraticCost.from_system(plant, Q=np.eye(2), R=np.eye(1))
+        for mode in ("uniform", "gaussian"):
+            env = Sys2Gym(plant, cost, reset_mode=mode, compile_backend="numpy")
+            with self.assertRaisesRegex(ValueError, "state bounds"):
+                env.reset(seed=0)
+        env = Sys2Gym(plant, cost, reset_mode="determinist", compile_backend="numpy")
+        np.testing.assert_array_equal(env.reset(seed=0)[0], [0.0, 0.0])
+        # a start spread set by hand is drawn as given
+        env = Sys2Gym(plant, cost, compile_backend="numpy")
+        env.x0_lb, env.x0_ub = np.array([-0.5, -1.0]), np.array([0.5, 1.0])
+        y, _ = env.reset(seed=0)
+        self.assertTrue(np.all(np.abs(y) <= [0.5, 1.0]))
+
+    def test_from_problem_draws_the_start_from_the_problem_only(self):
+        from gymnasium.utils import seeding
+
+        from minilink.core.distributions import Uniform
+        from minilink.interfaces.gymnasium import Sys2Gym
+        from minilink.planning.problems import (
+            PlanningProblem,
+            StochasticPlanningProblem,
+        )
+
+        # A deterministic problem on a plant without state bounds starts at x_start
+        plant = make_unbounded_pendulum()
+        cost = QuadraticCost.from_system(plant, Q=np.eye(2), R=np.eye(1))
+        problem = PlanningProblem(
+            plant, x_start=np.array([0.2, 0.0]), x_goal=np.zeros(2), cost=cost, tf=1.0
+        )
+        env = Sys2Gym.from_problem(problem, compile_backend="numpy")
+        y, info = env.reset(seed=0)
+        np.testing.assert_allclose(info["state"], [0.2, 0.0])
+        np.testing.assert_allclose(y, [0.2, 0.0])
+        # The start is the problem's first draw on the seeded generator
+        start = Uniform([-1.0, -0.5], [1.0, 0.5])
+        problem = StochasticPlanningProblem(
+            make_bounded_pendulum(), cost=cost, tf=1.0, x0_distribution=start
+        )
+        env = Sys2Gym.from_problem(problem, compile_backend="numpy")
+        for seed in (0, 7):
+            rng, _ = seeding.np_random(seed)
+            _, info = env.reset(seed=seed)
+            np.testing.assert_array_equal(info["state"], start.sample(rng))
+
+    def test_from_problem_reads_the_constraint_set_on_its_parameters(self):
+        from minilink.core.backends import array_module
+        from minilink.core.sets import Set
+        from minilink.interfaces.gymnasium import Sys2Gym
+        from minilink.planning.problems import PlanningProblem, ProblemParameters
+
+        class Band(Set):
+            """|z_i| <= r, r = 1 by default."""
+
+            def margin(self, z, t=0.0, params=None):
+                r = 1.0 if params is None else params["r"]
+                xp = array_module(z)
+
+                return xp.concatenate([z + r, r - z])
+
+        plant = make_bounded_pendulum()
+        cost = QuadraticCost.from_system(plant, Q=np.eye(2), R=np.eye(1))
+        # r = 0.5: x = 0.7 has left X; r = 3: x = 1.5 is still inside
+        for r, x, leaves in ((0.5, 0.7, True), (3.0, 1.5, False)):
+            problem = PlanningProblem(
+                plant,
+                x_start=[0.0, 0.0],
+                cost=cost,
+                tf=np.inf,
+                X=Band(),
+                params=ProblemParameters(sets={"r": r}),
+                infeasible_cost=50.0,
+            )
+            env = Sys2Gym.from_problem(problem, compile_backend="numpy")
+            env.reset(seed=0)
+            env.x = np.array([x, 0.0])
+            _, reward, terminated, _, _ = env.step(np.array([0.0]))
+            self.assertEqual(terminated, leaves)
+            self.assertEqual(reward < -49.0, leaves)
 
 
 @pytest.mark.rl

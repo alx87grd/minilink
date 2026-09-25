@@ -11,6 +11,7 @@ from typing import TYPE_CHECKING
 
 from minilink.core.backends import array_module
 from minilink.core.costs import CostFunction
+from minilink.core.inspect import inspect_text, repr_pretty
 from minilink.core.sets import Set
 from minilink.planning.spatial.collision import (
     CollisionBody,
@@ -29,6 +30,12 @@ class StateField(ABC):
 
     @abstractmethod
     def value(self, x, u=None, t=0.0, params=None): ...
+
+    def __str__(self):
+        return inspect_text(self)
+
+    def _repr_pretty_(self, p, cycle):
+        repr_pretty(self, p, cycle)
 
     def as_constraint(
         self, *, lower: float | None = 0.0, upper: float | None = None
@@ -94,7 +101,10 @@ class PathDistanceField(StateField):
         for world, radius in iter_probes(self.body, x, u, t, params):
             d.append(track.distance(world, t=t, params=params) - radius)
 
-        return xp.min(xp.stack(d))
+        # the closest probe decides
+        distance = xp.min(xp.stack(d))
+
+        return distance
 
 
 @dataclass(frozen=True)
@@ -113,7 +123,10 @@ class CorridorMarginField(StateField):
                 track.half_width - track.distance(world, t=t, params=params) - radius
             )
 
-        return xp.min(xp.stack(m))
+        # the probe nearest the corridor wall decides
+        margin = xp.min(xp.stack(m))
+
+        return margin
 
 
 @dataclass(frozen=True)

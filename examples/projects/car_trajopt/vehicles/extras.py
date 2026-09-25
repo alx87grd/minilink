@@ -1,9 +1,10 @@
 """Vehicle variants outside the four-rung teaching ladder (research lane).
 
-``ConstantSpeedKinematicCar``, ``DynamicHolonomicMobileRobot``,
-``HolonomicMobileRobot3D`` and ``UdeSRacecar`` keep the catalog conventions
+``ConstantSpeedKinematicCar``, ``DynamicHolonomicMobileRobot`` and
+``HolonomicMobileRobot3D`` keep the catalog conventions
 (``xp = array_module(...)`` equations, skins, cameras) but live with the
-car_trajopt project.
+car_trajopt project. The kinematic UdeS racecar is
+:class:`~minilink.dynamics.catalog.vehicles.racecar.UdeSRacecar`.
 """
 
 from functools import partial
@@ -13,7 +14,8 @@ import numpy as np
 from minilink.core.backends import array_module
 from minilink.core.kinematics import translation
 from minilink.core.system import DynamicSystem
-from minilink.dynamics.catalog.vehicles.steering import KinematicBicycle, KinematicCar
+from minilink.dynamics.catalog.vehicles.racecar import UdeSRacecar  # noqa: F401
+from minilink.dynamics.catalog.vehicles.steering import KinematicBicycle
 from minilink.graphical.animation.primitives import Arrow, Circle, Sphere
 from minilink.graphical.catalog.skins import car_skin_2d
 
@@ -172,22 +174,3 @@ class HolonomicMobileRobot3D(DynamicSystem):
                 )
             ]
         }
-
-
-class UdeSRacecar(KinematicCar):
-    """Small kinematic car with UdeS racecar-scale parameters."""
-
-    def __init__(self):
-        super().__init__()
-        self.name = "UdeS Racecar"
-        self.a = 0.17
-        self.b = 0.17
-        self.params["a"] = self.a
-        self.params["b"] = self.b
-        self.params["length"] = self.a + self.b
-
-        # Graphic parameters (not part of the EoM)
-        self.width = 0.17
-        self.tire_length = 0.04
-        self.tire_width = 0.015
-        self.camera_scale = 2.0 * self.params["length"]

@@ -1,13 +1,4 @@
-"""Signal-conditioning filter blocks.
-
-Plant-agnostic linear filters for references, measurements, or derivatives.
-Each is a thin :class:`~minilink.blocks.transfer_function.TransferFunction`
-(hence an ``LTISystem``) built from a cutoff/centre frequency given in **Hz**.
-
-- :class:`LowPassFilter` — Butterworth low-pass (first-order by default).
-- :class:`NotchFilter` — second-order band-stop at a centre frequency.
-- :class:`Washout` — first-order high-pass (steady-state washout).
-"""
+"""Signal-conditioning filters: Butterworth low-pass, notch and washout, from a frequency in Hz."""
 
 import numpy as np
 from scipy import signal

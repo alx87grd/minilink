@@ -160,11 +160,17 @@ class NeuralPolicyController(Controller):
 
     def observe(self, x):
         """Features ``z(x)`` fed to the network."""
-        if self.features is not None:
-            return self.features(x)
-        if self.normalize:
-            return (x - self.x_mid) / self.x_half
-        return x
+        features, normalize = self.features, self.normalize
+        x_mid, x_half = self.x_mid, self.x_half
+        if features is not None:
+            return features(x)
+        if not normalize:
+            return x
+
+        # the state scaled by its box: z = (x − x_mid) / x_half
+        z = (x - x_mid) / x_half
+
+        return z
 
     def mean_action(self, x, params=None):
         """Normalized network output ``a = MLP(z(x))`` (unclipped)."""
@@ -174,13 +180,17 @@ class NeuralPolicyController(Controller):
     def action(self, x, params=None):
         """Plant input ``u = u_mid + u_half * squash(a)`` with ``squash`` clip or tanh."""
         xp = array_module(x)
+        squash = self.squash
+        u_mid, u_half = self.u_mid, self.u_half
 
         # Normalized action a = MLP(z(x)), kept in [-1, 1] by the family's squash
         a = self.mean_action(x, params)
-        a = xp.tanh(a) if self.squash == "tanh" else xp.clip(a, -1.0, 1.0)
+        a = xp.tanh(a) if squash == "tanh" else xp.clip(a, -1.0, 1.0)
 
         # Affine map onto the input-port bounds
-        return self.u_mid + self.u_half * a
+        u = u_mid + u_half * a
+
+        return u
 
     def ctl(self, x, u, t=0, params=None):
         """State feedback; the ``x`` input port carries the plant state in ``u``."""

@@ -17,6 +17,11 @@
     ],
     "smoke": false
   },
+  "examples/tutorial/06_hybrid.ipynb": {
+    "requires": [
+      "graphviz"
+    ]
+  },
   "examples/tutorial/07_compile.ipynb": {
     "requires": [
       "jax"
@@ -41,6 +46,18 @@
       "jax"
     ],
     "timeout": 300
+  },
+  "examples/teaching/topics/optimal_control/racecar_mpc.ipynb": {
+    "requires": [
+      "jax"
+    ],
+    "smoke": false
+  },
+  "examples/teaching/courses/udes_gro501/racecar_toward_mpc.ipynb": {
+    "requires": [
+      "jax"
+    ],
+    "smoke": false
   },
   "examples/teaching/topics/robotics/manipulator_eom.ipynb": {
     "smoke": false

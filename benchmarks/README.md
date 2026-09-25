@@ -28,6 +28,7 @@ scene for fast RRT contract tests.
 | [`suites/core_perf.py`](suites/core_perf.py) | Fast compile/`f()`/sim final-state regression gate |
 | [`suites/integration_check.py`](suites/integration_check.py) | Trajectory checkpoint goldens + JAX trajopt solve-time gates |
 | [`suites/solve_speed.py`](suites/solve_speed.py) | Standalone NLP + NumPy pendulum trajopt solve wall-time gates |
+| [`suites/dp_speed.py`](suites/dp_speed.py) | Value-iteration backward-sweep wall-time gates + jax/numpy agreement |
 | [`scenarios/`](scenarios/) | Frozen scenario configs (double pendulum, showcase pendulum, cart-pole trajopt, E4/F MPC parity) |
 | [`run_e4_trajopt_parity.py`](run_e4_trajopt_parity.py) | Thin wrapper → `--suite e4` (capture/compare) |
 | [`run_f_mpc_parity.py`](run_f_mpc_parity.py) | Thin wrapper → `--suite f_mpc` (capture/compare) |
@@ -63,6 +64,7 @@ python benchmarks/run_rrt_nearest_backends.py    # RRT nearest brute_force vs kd
 python benchmarks/run_regression_check.py                  # core_perf baseline (default)
 python benchmarks/run_regression_check.py --suite integration  # trajectory + JAX trajopt gate
 python benchmarks/run_regression_check.py --suite solve_speed  # NLP + NumPy trajopt solve gates
+python benchmarks/run_regression_check.py --suite dp_speed     # value-iteration sweep speed + backend agreement
 python benchmarks/run_regression_check.py --suite e4           # E4 trajopt/MPC parametric parity
 python benchmarks/run_regression_check.py --suite f_mpc        # F MPC hybrid/hand-loop/dual-rate
 python benchmarks/run_regression_check.py --suite all          # all regression-gate suites
@@ -83,6 +85,7 @@ Pytest only guards benchmark helpers (`test_benchmark_helpers.py`); **GitHub CI*
 | `core_perf` (default) | [`baselines/core_perf.json`](baselines/core_perf.json) | Compile/`f()` speed ratios, diagram `dx` accuracy, sim final-state goldens |
 | `integration` | [`baselines/integration_check.json`](baselines/integration_check.json) | Trajectory checkpoints, showcase cart-pole JAX trajopt accuracy + **`solve_s`** |
 | `solve_speed` | [`baselines/solve_speed.json`](baselines/solve_speed.json) | **`Optimizer.solve_s`** on textbook NLPs + **NumPy pendulum trajopt `solve_s`** |
+| `dp_speed` | [`baselines/dp_speed.json`](baselines/dp_speed.json) | Value-iteration **`solve_s`** (numpy table + jax device loop), jax **`speedup`**, and jax-vs-numpy `J` / policy agreement |
 | `e4` | [`baselines/e4_trajopt_parity.json`](baselines/e4_trajopt_parity.json) | TOP rebuild + MPC parametric JAX trajopt trajectories + **`solve_s` / `total_s`** |
 | `f_mpc` | [`baselines/f_mpc_parity.json`](baselines/f_mpc_parity.json) | `control/mpc` hybrid/hand-loop/dual-rate trajectories + **`nlp_s`** (factor **2×** locally) |
 

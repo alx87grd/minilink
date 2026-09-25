@@ -1,40 +1,8 @@
-"""
-Lyapunov certificates: where is a closed loop guaranteed to settle?
+"""Region of attraction of a closed loop: a quadratic Lyapunov certificate ``V = (x − x̄)ᵀ P (x − x̄) ≤ c``.
 
-:func:`region_of_attraction` answers that for any autonomous
-:class:`~minilink.core.system.DynamicSystem` — an LQR loop, a lookup table
-from value iteration, an impedance law, or a neural policy — because all of
-them are the same kind of object.
-
-The default method is the textbook one. About an equilibrium ``x_bar`` the
-linearization ``A = df/dx`` must be Hurwitz; the Lyapunov equation
-``AᵀP + PA = -Q`` then gives a quadratic
-
-    V(x) = (x - x_bar)ᵀ P (x - x_bar),    V̇(x) = 2 (x - x_bar)ᵀ P f(x)
-
-whose derivative is taken along the **nonlinear** dynamics, saturation and
-network and all. Every state of the largest sublevel set ``{V <= c}`` on
-which ``V̇ < 0`` converges to ``x_bar``, so that set is a certified region of
-attraction.
-
-Any :class:`~minilink.core.system.DynamicSystem` works. Under JAX the
-Jacobian is exact and the sweep is one vmapped call; a plant that does not
-trace falls back to finite differences and a Python loop, which costs a few
-times more and is still seconds on a small model.
-
-The level ``c`` is found by sampling, which makes it a *sharp estimate*
-rather than a proof: an unsampled state where ``V`` stops decreasing would
-lower it. Coverage thins out quickly with the number of states, so the search
-scores itself — :attr:`LyapunovCertificate.sample_limited` is ``True`` when
-two halves of the samples disagree about the level, which is the honest
-signal that the number is optimistic. :meth:`LyapunovCertificate.verify` is the counter-check — it draws
-states inside the certified set and integrates them — and
-:meth:`LyapunovCertificate.plot` shows how much of the true basin a quadratic
-``V`` gives up.
-
-Note
-----
-Provisional tool — maintainer review before assigning for coursework.
+``P`` solves the Lyapunov equation at the equilibrium the tool finds; the level ``c`` is the
+largest sampled sublevel set on which ``V̇ < 0`` inside the state box, so it is a sharp
+estimate, not a proof, and ``verify()`` is its simulation counter-check.
 """
 
 import textwrap
@@ -134,16 +102,24 @@ class LyapunovCertificate:
 
     def V(self, x):
         """Lyapunov function at one state ``(n,)`` or a stack of states ``(N, n)``."""
-        d = np.atleast_2d(np.asarray(x, dtype=float)) - self.x_bar
-        v = np.einsum("ij,jk,ik->i", d, self.P, d)
+        x_bar, P = self.x_bar, self.P
+        d = np.atleast_2d(np.asarray(x, dtype=float)) - x_bar
+
+        # V = dᵀ P d, one value per row
+        v = np.einsum("ij,jk,ik->i", d, P, d)
+
         return v if np.ndim(x) > 1 else float(v[0])
 
     def V_dot(self, x):
         """Derivative of ``V`` along the nonlinear dynamics, same shapes as :meth:`V`."""
+        x_bar, P = self.x_bar, self.P
         states = np.atleast_2d(np.asarray(x, dtype=float))
-        d = states - self.x_bar
+        d = states - x_bar
         f = self.dynamics()(states)
-        v_dot = 2.0 * np.einsum("ij,jk,ik->i", d, self.P, f)
+
+        # V̇ = 2 dᵀ P f(x) along the closed-loop dynamics
+        v_dot = 2.0 * np.einsum("ij,jk,ik->i", d, P, f)
+
         return v_dot if np.ndim(x) > 1 else float(v_dot[0])
 
     def contains(self, x):
@@ -153,8 +129,13 @@ class LyapunovCertificate:
 
     @property
     def extent(self) -> np.ndarray:
-        """Half-width of the certified region along each state, ``sqrt(c (P⁻¹)ᵢᵢ)``."""
-        return np.sqrt(self.level * np.diag(np.linalg.inv(self.P)))
+        """Half-width of the certified region along each state."""
+        P, level = self.P, self.level
+
+        # the shadow of the ellipsoid on axis i: sqrt(c (P⁻¹)ᵢᵢ)
+        extent = np.sqrt(level * np.diag(np.linalg.inv(P)))
+
+        return extent
 
     def slice_extent(self, x_axis: int = 0, y_axis: int = 1) -> np.ndarray:
         """
@@ -164,8 +145,13 @@ class LyapunovCertificate:
         smaller ellipse than :attr:`extent`, which is its shadow on each axis.
         The slice is what a phase-plane plot draws.
         """
-        block = self.P[np.ix_([x_axis, y_axis], [x_axis, y_axis])]
-        return np.sqrt(self.level * np.diag(np.linalg.inv(block)))
+        P, level = self.P, self.level
+        block = P[np.ix_([x_axis, y_axis], [x_axis, y_axis])]
+
+        # the same shadow, of the 2-D slice through the equilibrium
+        extent = np.sqrt(level * np.diag(np.linalg.inv(block)))
+
+        return extent
 
     @property
     def sample_limited(self) -> bool:
@@ -182,7 +168,11 @@ class LyapunovCertificate:
     @property
     def rate(self) -> float:
         """Slowest linearized decay rate: the natural time scale of the loop."""
-        return float(np.max(self.poles.real))
+        poles = self.poles
+
+        rate = float(np.max(poles.real))
+
+        return rate
 
     def __str__(self) -> str:
         extent = np.array2string(self.extent, precision=3, suppress_small=True)
@@ -328,7 +318,7 @@ def region_of_attraction(
     if method == "sos":
         raise NotImplementedError(
             "sum-of-squares certificates are not implemented; "
-            "see docs/plans/lyapunov-certificates.md"
+            "quadratic V only (ROADMAP §6, Lyapunov certificates)"
         )
 
     x_bar = find_equilibrium(sys, sys.x0 if x_bar is None else x_bar, u_bar, t, params)
@@ -636,7 +626,11 @@ def lyapunov_matrix(sys, x_bar, u_bar, t, params, Q):
             "there is no region of attraction to certify"
         )
     Q = np.eye(int(sys.n)) if Q is None else np.asarray(Q, dtype=float)
-    return solve_continuous_lyapunov(A.T, -Q), Q, poles
+
+    # AᵀP + PA = −Q
+    P = solve_continuous_lyapunov(A.T, -Q)
+
+    return P, Q, poles
 
 
 def as_box(window) -> BoxSet:
@@ -654,12 +648,20 @@ def as_box(window) -> BoxSet:
 
 def natural_window(x_bar, P, domain: BoxSet) -> BoxSet:
     """First-pass box: the extent of ``{V <= 9}``, trimmed to the model's domain."""
-    return clip_box(x_bar, 3.0 * np.sqrt(np.diag(np.linalg.inv(P))), domain)
+    half_width = 3.0 * np.sqrt(np.diag(np.linalg.inv(P)))
+
+    window = clip_box(x_bar, half_width, domain)
+
+    return window
 
 
 def level_window(x_bar, P, level, domain: BoxSet) -> BoxSet:
     """Second-pass box: half again the extent of the level set just found."""
-    return clip_box(x_bar, 1.5 * np.sqrt(level * np.diag(np.linalg.inv(P))), domain)
+    half_width = 1.5 * np.sqrt(level * np.diag(np.linalg.inv(P)))
+
+    window = clip_box(x_bar, half_width, domain)
+
+    return window
 
 
 def clip_box(x_bar, half_width, domain: BoxSet) -> BoxSet:

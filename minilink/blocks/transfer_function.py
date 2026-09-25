@@ -1,3 +1,5 @@
+"""Transfer-function blocks: a SISO ``TransferFunction`` in state space, and ``Lead`` / ``Lag``."""
+
 import numpy as np
 from scipy import signal
 
@@ -85,15 +87,6 @@ class TransferFunction(ErrorDriven, LTISystem):
         }
 
 
-if __name__ == "__main__":
-    sys = TransferFunction([1.0], [1.0, 1.0])
-
-    sys.x0 = np.array([2.0])
-    sys.compute_trajectory(tf=5.0)
-    sys.plot_trajectory()
-    sys.animate()
-
-
 class Lead(TransferFunction):
     """Lead compensator ``C(s) = K (s + z) / (s + p)`` with ``z < p``: phase lead between ``z`` and ``p``."""
 
@@ -110,3 +103,12 @@ class Lag(TransferFunction):
         if not 0.0 < p < z:
             raise ValueError(f"a lag compensator has 0 < p < z, got z={z}, p={p}")
         super().__init__([K, K * z], [1.0, p], ports=ports, name="Lag")
+
+
+if __name__ == "__main__":
+    sys = TransferFunction([1.0], [1.0, 1.0])
+
+    sys.x0 = np.array([2.0])
+    sys.compute_trajectory(tf=5.0)
+    sys.plot_trajectory()
+    sys.animate()

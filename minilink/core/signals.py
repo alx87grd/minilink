@@ -1,21 +1,8 @@
-"""
-Signals and ports: the wires of a block diagram.
+"""Signals and ports: the wires of a block diagram.
 
-A **signal** is a vector of known dimension plus its human metadata: component
-labels, physical units, lower/upper bounds, and a nominal (default) value. A
-**port** is a signal with a role on a system boundary:
-
-- :class:`InputPort` — a signal entering the system; its nominal value is the
-  constant fallback used when the port is left unconnected.
-- :class:`OutputPort` — a signal leaving the system; it carries the compute
-  function ``(x, u, t, params) -> value`` and the list of input-port ids it
-  directly feeds through from (used for algebraic-loop detection).
-
-The module-level helpers implement *dimension inference*: when a port is
-declared without an explicit ``dim``, the dimension is deduced from whichever
-metadata the user did provide (nominal value, labels, units, or bounds), and
-conflicting lengths raise immediately so dimension bugs surface at
-construction time, not at simulation time.
+A signal is a vector with labels, units, bounds and a nominal value; a port is a
+signal on a system boundary (an unconnected input reads its nominal value, an output
+carries its compute function and the inputs it feeds through from).
 """
 
 import numpy as np

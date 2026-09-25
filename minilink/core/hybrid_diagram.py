@@ -233,47 +233,68 @@ class HybridDiagram:
         **kwargs,
     ):
         """
-        Plot plant channels (continuous-time view) from the last rollout or result.
+        Plot plant channels (continuous-time view) from the last rollout or result,
+        or the computer channels on the tick index with ``abscissa="k"``.
 
         If ``traj`` is omitted and :attr:`traj` is unset, runs :meth:`compute_trajectory`
         first (same convenience pattern as :class:`~minilink.core.facades.SharedSystemFacades`).
-        Pass ``traj=result.computer.as_trajectory()`` and use :meth:`HybridSimResult.plot_computer`
-        on a :class:`~minilink.simulation.hybrid_simulator.HybridSimResult` for tick-indexed
-        computer internals.
+
+        ``abscissa`` picks the view: ``"t"`` plots the plant channels against time
+        (:meth:`HybridSimResult.plot`); ``"k"`` plots the computer channels against
+        the tick index (:meth:`HybridSimResult.plot_computer`). A plain
+        :class:`~minilink.core.trajectory.Trajectory` passed with ``abscissa="k"``
+        must be a computer rollout, ``traj=result.computer.as_trajectory()``, and is
+        drawn with the same default channels; a plant trajectory raises
+        ``ValueError``.
         """
+        if abscissa not in ("t", "k"):
+            raise ValueError(
+                "abscissa must be 't' (plant time) or 'k' (computer ticks), "
+                f"got {abscissa!r}"
+            )
         if traj is None:
             if self.last_result is None:
                 self.compute_trajectory(show=False, verbose=False)
-            return self.last_result.plot(
-                signals=signals,
-                show=show,
-                backend=backend,
-                **kwargs,
-            )
+            traj = self.last_result
         from minilink.simulation.hybrid_simulator import HybridSimResult
 
         if isinstance(traj, HybridSimResult):
-            return traj.plot(
+            plot_view = traj.plot if abscissa == "t" else traj.plot_computer
+            return plot_view(
                 signals=signals,
                 show=show,
                 backend=backend,
                 **kwargs,
             )
         from minilink.graphical.signals.time_signals import (
+            STEP_ABSCISSA_LABEL,
             TIME_ABSCISSA_LABEL,
             plot_time_signals,
             resolve_plot_signals,
         )
 
+        if abscissa == "t":
+            sys, abscissa_label = self.plant, TIME_ABSCISSA_LABEL
+        else:
+            sys, abscissa_label = self.computer.diagram, STEP_ABSCISSA_LABEL
+            if traj.x.shape[0] != sys.n or traj.u.shape[0] != sys.m:
+                raise ValueError(
+                    "abscissa='k' plots a computer rollout: pass the HybridSimResult "
+                    "or result.computer.as_trajectory(). This trajectory has "
+                    f"n={traj.x.shape[0]}, m={traj.u.shape[0]}; the computer "
+                    f"diagram has n={sys.n}, m={sys.m}."
+                )
+            if signals is None and traj.signals:
+                signals = tuple(traj.signals)
         if signals is None:
-            signals = resolve_plot_signals(self.plant)
+            signals = resolve_plot_signals(sys)
             if traj.u.shape[0]:
                 signals = tuple(dict.fromkeys((*signals, "u")))
         return plot_time_signals(
-            self.plant,
+            sys,
             traj,
             signals=signals,
-            abscissa_label=TIME_ABSCISSA_LABEL,
+            abscissa_label=abscissa_label,
             backend=backend,
             show=show,
             **kwargs,
@@ -351,7 +372,8 @@ class HybridDiagram:
         """Render Plant + Computer clusters with boundary ZOH/sample edges.
 
         Display policy matches :meth:`minilink.core.facades.SharedSystemFacades.plot_diagram`
-        (notebook SVG; script Matplotlib window; ``show_pdf`` / ``filename`` /
+        (notebook SVG as the returned cell output, without a second
+        ``display()``; script Matplotlib window; ``show_pdf`` / ``filename`` /
         ``show=False`` overrides). ``abstract_boundary=True`` (default) omits
         external Inputs/Outputs routing nodes and anchors hybrid edges on the
         wired subsystem ports.

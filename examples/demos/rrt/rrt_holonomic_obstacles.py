@@ -8,6 +8,7 @@ from minilink import (
     PlanningProblem,
     RRTPlanner,
     RRTStarPlanner,
+    compare,
 )
 from minilink.core.geometry import Sphere
 from minilink.planning.search.extenders import KinodynamicExtender, SteeringExtender
@@ -143,7 +144,7 @@ def run_rrt_vs_rrt_star():
         goal_tolerance=GOAL_TOLERANCE,
         max_nodes=MAX_NODES,
     )
-    rrt_traj = rrt.solve().trajectory
+    sol_rrt = rrt.solve()
     rrt_star = RRTStarPlanner(
         problem,
         extender,
@@ -154,18 +155,10 @@ def run_rrt_vs_rrt_star():
         cost_tol=COST_TOL,
         convergence_patience=CONVERGENCE_PATIENCE,
     )
-    rrt_star_traj = rrt_star.solve().trajectory
+    sol_rrt_star = rrt_star.solve()
     print(
-        f"RRT:  {len(rrt.tree.nodes)} nodes, "
-        f"{path_hops(rrt)} hops, cost={path_cost(rrt):.2f}, "
-        f"goal err={np.linalg.norm(rrt_traj.x[:, -1] - X_GOAL):.2f} m"
-    )
-    print(
-        f"RRT*: {len(rrt_star.tree.nodes)} nodes, "
-        f"{path_hops(rrt_star)} hops, cost={path_cost(rrt_star):.2f}, "
-        f"converged={rrt_star.converged}, "
-        f"goal err={np.linalg.norm(rrt_star_traj.x[:, -1] - X_GOAL):.2f} m"
-    )
+        compare({"RRT": sol_rrt, "RRT*": sol_rrt_star})
+    )  # the two search records side by side
 
     fig, axes = plt.subplots(1, 2, figsize=(12.0, 5.5), sharex=True, sharey=True)
     planners = (("RRT", rrt), ("RRT*", rrt_star))

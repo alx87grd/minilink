@@ -1,3 +1,5 @@
+"""Single pendulums: actuated, with noise ports, inverted, and two uncoupled ones."""
+
 import numpy as np
 
 from minilink.core.backends import array_module
@@ -128,7 +130,12 @@ class PendulumWithNoisePort(Pendulum):
 
     def generalized_force(self, q, v, u, t=0.0, params=None):
         tau, w = self.get_port_values_from_u(u, "u", "w")
-        return self.B(q, params) @ (tau + w)
+        B = self.B(q, params)
+
+        # the disturbance enters with the actuator torque
+        force = B @ (tau + w)
+
+        return force
 
     def h(self, x, u, t=0.0, params=None):
         v_noise = self.get_port_values_from_u(u, "v")
@@ -146,7 +153,10 @@ class InvertedPendulum(Pendulum):
         self.name = "Inverted Pendulum"
 
     def g(self, q, params=None):
-        return -super().g(q, params)
+        # the upright zero angle flips the sign of the hanging pendulum's gravity term
+        g = -super().g(q, params)
+
+        return g
 
     def tf(self, x, u, t=0, params=None):
         # theta is measured from the upward vertical (zero-angle = upright); the

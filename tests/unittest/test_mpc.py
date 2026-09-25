@@ -3,14 +3,11 @@
 import unittest
 import numpy as np
 import pytest
-
-pytest.importorskip("jax")
-import jax.numpy as jnp
 import matplotlib
 
 matplotlib.use("Agg")
 from minilink.control.mpc import Command, ModelPredictiveController
-from minilink.core.backends import configure_jax
+from minilink.core.backends import configure_jax, require_jax_numpy
 from minilink.core.costs import QuadraticCost
 from minilink.core.hybrid_diagram import HybridDiagram
 from minilink.core.system import DynamicSystem, StepSystem, System
@@ -36,6 +33,7 @@ class JaxSingleIntegrator(DynamicSystem):
         self.inputs["u"].upper_bound = np.array([10.0])
 
     def f(self, x, u, t=0, params=None):
+        jnp = require_jax_numpy()
         return jnp.array([u[0]])
 
     def h(self, x, u, t=0, params=None):
@@ -278,7 +276,6 @@ class TestModelPredictiveController(unittest.TestCase):
 
 from unittest.mock import patch
 
-pytest.importorskip("jax")
 from minilink.control.mpc import ModelPredictiveController
 from minilink.core.system import DynamicSystem, System
 
@@ -360,7 +357,6 @@ class TestMPCAlgebraicController(unittest.TestCase):
             ModelPredictiveController(planner, dt_mpc=0.2, warm_start=False)
 
 
-pytest.importorskip("jax")
 from minilink.control.mpc.utilities import _shift_plan_trajectory, mpc_warm_start_guess
 from minilink.core.system import DynamicSystem, StepSystem
 from minilink.core.trajectory import Trajectory
@@ -466,7 +462,6 @@ class TestMPCWarmStartController(unittest.TestCase):
             ModelPredictiveController(planner, dt_mpc=0.2, warm_start=True)
 
 
-pytest.importorskip("jax")
 from minilink.core.system import DynamicSystem
 
 
@@ -538,7 +533,6 @@ class TestTrajectoryOptimizationPlanner(unittest.TestCase):
         self.assertIsInstance(plan.solver, TrajectoryOptimizationRecord)
 
 
-pytest.importorskip("jax")
 from minilink.planning.initial_guess import default_initial_trajectory
 
 
@@ -649,7 +643,6 @@ class TestMPCSolveTrajectoryFrom(unittest.TestCase):
         self.assertIsNotNone(planner.last_optimization_result.z)
 
 
-pytest.importorskip("jax")
 from minilink import BicycleDynRate
 from minilink.simulation.computer import Computer
 
@@ -674,6 +667,8 @@ def _planner():
     )
 
 
+@pytest.mark.optional
+@pytest.mark.jax
 class TestMpcExportComputer(unittest.TestCase):
     def test_step_block_defaults_schedule(self):
         planner = _planner()
@@ -695,6 +690,20 @@ class TestMpcExportComputer(unittest.TestCase):
         self.assertAlmostEqual(computer.schedule.dt_base, 0.2)
         with self.assertRaises(ValueError):
             mpc.export_to_computer(0.1)
+
+    def test_mod_operator_checks_schedule_against_dt_mpc(self):
+        """``mpc % dt`` runs the same ``dt_mpc`` cross-check as export_to_computer."""
+        planner = _planner()
+        for warm_start in (True, False):
+            with self.subTest(warm_start=warm_start):
+                mpc = ModelPredictiveController(
+                    planner, dt_mpc=0.2, warm_start=warm_start
+                )
+                with self.assertRaises(ValueError):
+                    mpc % 0.5
+                computer = mpc % 0.2
+                self.assertIsInstance(computer, Computer)
+                self.assertAlmostEqual(computer.schedule.dt_base, 0.2)
 
     def test_dual_rate_computer_schedule_and_u_nom(self):
         planner = _planner()
@@ -811,6 +820,46 @@ class TestMPCNumPyRebuild(unittest.TestCase):
         self.assertEqual(len(programs), 2)
         self.assertIsNot(programs[0], programs[1])
 
+    def test_same_tick_new_measurement_resolves(self):
+        """The tick latch memoizes on (k, y): a new y at the same k re-solves."""
+        for warm_start in (True, False):
+            with self.subTest(warm_start=warm_start):
+                planner = _make_numpy_planner(0.0)
+                mpc = ModelPredictiveController(
+                    planner, dt_mpc=0.2, warm_start=warm_start
+                )
+                y_pos, y_neg = np.array([2.0]), np.array([-2.0])
+                with patch.object(
+                    planner,
+                    "solve_trajectory_from",
+                    wraps=planner.solve_trajectory_from,
+                ) as solve:
+                    cmd_pos = mpc.compute_command(y_pos, k=0)
+                    cmd_neg = mpc.compute_command(y_neg, k=0)
+                    x_ff = mpc.outputs["x_ff"].compute(mpc.x0, y_neg, 0)
+                    self.assertEqual(solve.call_count, 2)
+                x_start_pos = cmd_pos.solution.trajectory.x[:, 0]
+                x_start_neg = cmd_neg.solution.trajectory.x[:, 0]
+                np.testing.assert_allclose(x_start_pos, y_pos, atol=1e-05)
+                np.testing.assert_allclose(x_start_neg, y_neg, atol=1e-05)
+                np.testing.assert_allclose(x_ff, cmd_neg.x_ff)
+
+    def test_hybrid_algebraic_one_solve_per_tick(self):
+        """``mpc % dt @ plant``: the u_ff, x_ff and z ports share one solve per tick."""
+        planner = _make_numpy_planner(0.0)
+        plant = SingleIntegrator()
+        plant.x0 = np.array([0.5])
+        dt_mpc = 0.2
+        tf = 0.6
+        n_ticks = int(round(tf / dt_mpc))
+        mpc = ModelPredictiveController(planner, dt_mpc=dt_mpc, warm_start=False)
+        hybrid = mpc % dt_mpc @ plant
+        with patch.object(
+            planner, "solve_trajectory_from", wraps=planner.solve_trajectory_from
+        ) as solve:
+            hybrid.compute_trajectory(tf=tf, compile_backend="numpy", verbose=False)
+            self.assertEqual(solve.call_count, n_ticks)
+
     def test_hybrid_closed_loop_smoke(self):
         planner = _make_numpy_planner(0.0)
         plant = SingleIntegrator()
@@ -851,7 +900,65 @@ class TestMPCNumPyRebuild(unittest.TestCase):
         self.assertEqual(len(n_compile_parametric), 0)
 
 
-pytest.importorskip("jax")
+from minilink.core.hybrid_composition import hybrid_closed_loop
+from minilink.simulation.computer import as_computer
+
+
+class TestMpcComputerScheduleCheck(unittest.TestCase):
+    def test_every_computer_entry_point_checks_dt_mpc(self):
+        """``as_computer`` and ``hybrid_closed_loop`` run the block's ``dt_mpc`` check."""
+        planner = _make_numpy_planner()
+        plant = SingleIntegrator()
+        for warm_start in (True, False):
+            with self.subTest(warm_start=warm_start):
+                mpc = ModelPredictiveController(
+                    planner, dt_mpc=0.2, warm_start=warm_start
+                )
+                with self.assertRaises(ValueError):
+                    as_computer(mpc, 0.5)
+                with self.assertRaises(ValueError):
+                    hybrid_closed_loop(mpc, plant, schedule=0.5, computer_out="u_ff")
+                computer = as_computer(mpc, 0.2)
+                hybrid = hybrid_closed_loop(
+                    mpc, plant, schedule=0.2, computer_out="u_ff"
+                )
+                self.assertAlmostEqual(computer.schedule.dt_base, 0.2)
+                self.assertAlmostEqual(hybrid.computer.schedule.dt_base, 0.2)
+
+    def test_rejected_call_keeps_dual_rate_computer(self):
+        """A rejected single-rate build leaves the block's dual-rate divisor and hook alone."""
+        plant = SingleIntegrator()
+        rejected_calls = {
+            "mpc % bad dt": lambda mpc: mpc % 0.5,
+            "as_computer bad dt": lambda mpc: as_computer(mpc, 0.5),
+            "hybrid bad dt": lambda mpc: hybrid_closed_loop(
+                mpc, plant, schedule=0.5, computer_out="u_ff"
+            ),
+            "hybrid unknown computer_out": lambda mpc: hybrid_closed_loop(
+                mpc, plant, schedule=0.2
+            ),
+            "hybrid plant not a System": lambda mpc: hybrid_closed_loop(
+                mpc, object(), schedule=0.2, computer_out="u_ff"
+            ),
+        }
+        for name, call in rejected_calls.items():
+            with self.subTest(name):
+                planner = _make_numpy_planner(0.5)
+                mpc = ModelPredictiveController(planner, dt_mpc=0.2, warm_start=True)
+                computer = mpc.dual_rate_computer(dt_broadcast=0.05)
+                with self.assertRaises((ValueError, TypeError)):
+                    call(mpc)
+                computer.compile()
+                computer.reset()
+                for _ in range(5):
+                    out = computer.tick(np.array([0.5]))
+                # The after-solve hook builds the nominal cache the broadcast leaf
+                # reads, and the divisor maps base tick 4 to replan tick 1:
+                # t_solve = dt_mpc.
+                self.assertTrue(np.all(np.isfinite(out["u_nom"])))
+                self.assertAlmostEqual(mpc.latch.last_t_solve, 0.2)
+
+
 from minilink.control.mpc import (
     ModelPredictiveController,
     mpc_animation_overlays,
@@ -963,9 +1070,27 @@ class TestMpcHybridStraightLine(unittest.TestCase):
         overlays = mpc_animation_overlays(result, planner, reference_pad=5.0)
         self.assertEqual(len(overlays), 1)
         self.assertEqual(type(overlays[0]).__name__, "SceneHistory")
+        n = result.plant.n_samples
+        leaf = Trajectory(
+            t=result.plant.t,
+            x=np.vstack([np.linspace(0.0, 4.0, n), np.zeros(n)]),
+            u=result.plant.u,
+        )
+        custom = mpc_animation_overlays(result, planner, traj=leaf)
+        trail = next(
+            layer
+            for layer in custom[0]._dynamic_sources
+            if type(layer).__name__ == "TrajectoryPolyline"
+        )
+        pts = trail.compute_pts(float(leaf.t[-1]))
+        np.testing.assert_allclose(pts[0, 0], 0.0)
+        np.testing.assert_allclose(pts[-1, 0], 4.0)
+        no_trail = mpc_animation_overlays(result, planner, traj=leaf, trail=False)
+        names = {type(layer).__name__ for layer in no_trail[0]._dynamic_sources}
+        self.assertIn("HorizonPolyline", names)
+        self.assertNotIn("TrajectoryPolyline", names)
 
 
-pytest.importorskip("jax")
 from minilink.blocks.routing import Demux
 from minilink.control.mpc.utilities import mpc_default_computer_x0, mpc_warm_start_guess
 from minilink.core.diagram import DiagramSystem, StepDiagramSystem
@@ -1085,7 +1210,6 @@ class TestMpcHybridWarmStartParity(unittest.TestCase):
             )
 
 
-pytest.importorskip("jax")
 from minilink.control.mpc.utilities import (
     mpc_default_computer_x0,
     warm_start_guess_from_prev_plan,

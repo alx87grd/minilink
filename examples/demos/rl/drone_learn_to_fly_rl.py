@@ -11,7 +11,7 @@ from minilink import (
     StochasticPlanningProblem,
 )
 
-TRAINING_TIMESTEPS = 100_000  # a few seconds on a laptop CPU
+TRAINING_TIMESTEPS = 150_000  # a few seconds on a laptop CPU
 DT = 0.05
 
 

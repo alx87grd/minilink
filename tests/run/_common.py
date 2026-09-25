@@ -55,11 +55,12 @@ def run_regression(*, ci_mode: bool) -> int:
         "all",
     ]
     if ci_mode:
+        # The flags of the CI ``regression`` job in .github/workflows/test.yml.
         cmd.extend(
             [
                 "--tiny",
                 "--factor",
-                "6",
+                "10",
                 "--speed-gate-suffixes",
                 "solve_s,nlp_s,speedup",
             ]

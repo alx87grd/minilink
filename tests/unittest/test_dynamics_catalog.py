@@ -12,7 +12,7 @@ from minilink.dynamics.catalog.aerial.drone import (
     Drone2DWithSideThruster,
     SpeedControlledDrone2D,
 )
-from minilink.dynamics.catalog.aerial.plane import Plane2D
+from minilink.dynamics.catalog.aerial.plane import Plane2D, Plane3D
 from minilink.dynamics.catalog.aerial.rocket import Rocket
 from minilink.dynamics.catalog.equations.integrators import (
     DoubleIntegrator,
@@ -33,7 +33,7 @@ from minilink.dynamics.catalog.mass_spring_damper.linear import (
     ThreeMass,
     TwoMass,
 )
-from minilink.dynamics.catalog.pendulum.cartpole import CartPole
+from minilink.dynamics.catalog.pendulum.cartpole import CartPole, CartPoleWithNoisePort
 from minilink.dynamics.catalog.pendulum.double_pendulum import Acrobot
 from minilink.dynamics.catalog.pendulum.pendulum import (
     Pendulum,
@@ -104,6 +104,13 @@ class TestCatalogSmoke(unittest.TestCase):
         three = ThreeMass(m=2.0, k=4.0, b=0.0, output_mass=3)
         np.testing.assert_allclose(three.B()[-1], [0.5])
 
+    def test_mass_chain_rejects_an_output_mass_outside_the_chain(self):
+        # A typo in the measured mass must not silently measure another mass.
+        for plant_class, count in ((TwoMass, 2), (ThreeMass, 3)):
+            for output_mass in (0, count + 1):
+                with self.assertRaisesRegex(ValueError, f"between 1 and {count}"):
+                    plant_class(output_mass=output_mass)
+
     def test_vehicle_reference_values(self):
         bicycle = KinematicBicycle()
         np.testing.assert_allclose(
@@ -124,6 +131,17 @@ class TestCatalogSmoke(unittest.TestCase):
         mountain = MountainCar()
         np.testing.assert_allclose(mountain.H(np.array([0.0])), [[1.0]])
 
+    def test_quarter_car_damps_against_the_road_vertical_velocity(self):
+        # The road rises under the wheel at z' = dz/dx * vx, so the damper
+        # force b (y' - z') grows linearly with the forward speed vx.
+        car = QuarterCarOnRoughTerrain()
+        b, mass = car.params["b"], car.params["mass"]
+        x = np.array([0.0, 0.0, 2.0])
+        u = np.zeros(1)
+        a0, a3 = (car.f(x, u, params=dict(car.params, vx=vx))[0] for vx in (0.0, 3.0))
+        np.testing.assert_allclose(a3 - a0, 3.0 * b * car.dz(2.0) / mass)
+        np.testing.assert_allclose(a3, 1.5436826659862837, rtol=1e-12)
+
     def test_aerial_and_marine_force_split_reference_values(self):
         drone = Drone2D()
         q = np.zeros(3)
@@ -142,6 +160,22 @@ class TestCatalogSmoke(unittest.TestCase):
             boat.generalized_force(np.zeros(3), np.zeros(3), np.array([3.0, 4.0])),
             [3.0, 4.0, -12.0],
         )
+
+    def test_plane_inverse_dynamics_without_u_reads_the_nominal_input(self):
+        # Model-based controllers call inverse_dynamics(q, v, a) without u;
+        # the control-surface loads then come from the u port's nominal value.
+        for plane in (Plane2D(), Plane3D()):
+            q = np.zeros(plane.dof)
+            v = np.zeros(plane.dof)
+            v[0] = 10.0
+            acceleration = np.zeros(plane.dof)
+            nominal = np.zeros(plane.m)
+            nominal[1] = 0.05
+            plane.inputs["u"].set_nominal_value(nominal)
+            np.testing.assert_allclose(
+                plane.inverse_dynamics(q, v, acceleration),
+                plane.inverse_dynamics(q, v, acceleration, nominal),
+            )
 
     def test_manipulator_kinematics_reference_values(self):
         one = OneLinkManipulator()
@@ -197,7 +231,7 @@ class TestCatalogSmoke(unittest.TestCase):
 from minilink.dynamics.catalog.pendulum.double_pendulum import DoublePendulum
 from minilink.dynamics.catalog.vehicles.dynamic_bicycle import DynamicBicycle
 from minilink.graphical.animation.camera import resolve_camera_from_hints
-from minilink.graphical.animation.primitives import Arrow, Box, Rod
+from minilink.graphical.animation.primitives import Arrow, Box, Circle, Rod
 from tests.unittest.graphics_contract_helpers import geometry_smoke, resolve_draw_frame
 
 
@@ -237,8 +271,34 @@ class TestCartPole(unittest.TestCase):
         ]
         self.assertEqual(len(cart_boxes), 1)
         self.assertEqual(cart_boxes[0].length_z, sys.cart_depth)
+        self.assertEqual(sys.camera_scale, 10.0)
+        wheels = [
+            primitive
+            for primitive in frame["primitives"]
+            if isinstance(primitive, Circle) and primitive.color == "black"
+        ]
+        self.assertEqual(len(wheels), 2)
+        self.assertAlmostEqual(wheels[0].radius, sys.wheel_radius)
+        pole = next(p for p in frame["primitives"] if isinstance(p, Rod))
+        self.assertAlmostEqual(pole.linewidth, sys.line_width)
         self.assertTrue(any((isinstance(p, Rod) for p in frame["primitives"])))
         geometry_smoke(sys)
+
+    def test_noise_ports_add_disturbance_and_sensor_noise(self):
+        sys = CartPoleWithNoisePort()
+        self.assertEqual(sys.inputs["w"].dim, 1)
+        self.assertEqual(sys.inputs["v"].dim, 4)
+        x = np.array([0.1, 0.2, 0.3, 0.4])
+        F = np.array([1.0])
+        w = np.array([0.5])
+        v = np.array([0.01, 0.02, 0.03, 0.04])
+        u = np.concatenate([F, w, v])
+        np.testing.assert_allclose(sys.h(x, u), x + v)
+        q, dq = x[:2], x[2:]
+        np.testing.assert_allclose(
+            sys.generalized_force(q, dq, u),
+            sys.B(q) @ (F + w),
+        )
 
 
 class TestDoublePendulum(unittest.TestCase):
@@ -271,6 +331,8 @@ class TestDynamicBicycle(unittest.TestCase):
         sys = DynamicBicycle()
         self.assertEqual(sys.n, 6)
         self.assertEqual(sys.m, 2)
+        self.assertEqual(sys.camera_follow_frame, "body")
+        self.assertEqual(sys.camera_scale, 10.0)
         x = np.array([10.0, 3.0, 0.25, 4.0, 0.0, 0.0])
         u = np.zeros(sys.m)
         sys.camera_target[:] = (1.0, -2.0, 0.5)
@@ -365,7 +427,7 @@ class TestManipulatorCatalog(unittest.TestCase):
     def test_two_link_fk_matches_planar_geometry_tip(self):
         arm = TwoLinkManipulator()
         q = np.array([0.2, -0.1])
-        tip, _ = _planar_joint_positions(q, arm._lengths())
+        tip, _ = _planar_joint_positions(q, arm.lengths())
         np.testing.assert_allclose(arm.forward_kinematics(q), tip[-1])
 
     def test_three_link_fk_matches_tf_end_effector(self):
@@ -500,9 +562,32 @@ class TestManipulatorCatalog(unittest.TestCase):
         )
 
 
+import minilink.catalog as catalog
+from minilink.dynamics.abstraction.mechanical import MechanicalSystem
+
+
+class TestMechanicalJointPortLabels(unittest.TestCase):
+    def test_q_and_dq_ports_carry_the_plant_state_labels_and_units(self):
+        checked = []
+        for name in catalog.__all__:
+            cls = getattr(catalog, name)
+            if not issubclass(cls, MechanicalSystem):
+                continue
+            with self.subTest(plant=name):
+                plant = cls()
+                dof = plant.dof
+                q_port, dq_port = plant.outputs["q"], plant.outputs["dq"]
+                self.assertEqual(q_port.labels, plant.state.labels[:dof])
+                self.assertEqual(dq_port.labels, plant.state.labels[dof:])
+                self.assertEqual(q_port.units, plant.state.units[:dof])
+                self.assertEqual(dq_port.units, plant.state.units[dof:])
+            checked.append(name)
+        self.assertIn("Pendulum", checked)
+        self.assertIn("TwoLinkManipulator", checked)
+
+
 import pytest
 
-pytest.importorskip("jax")
 from minilink.core.backends import configure_jax
 from examples.projects.car_trajopt.vehicles.ladder import (
     BicycleDynEngine,
@@ -511,6 +596,7 @@ from examples.projects.car_trajopt.vehicles.ladder import (
 from minilink.dynamics.catalog.vehicles.dynamic_bicycle import BicycleDynRate
 
 
+@pytest.mark.jax
 class TestBicycleDynRate(unittest.TestCase):
     def setUp(self):
         configure_jax(enable_x64=True)
@@ -552,6 +638,7 @@ class TestBicycleDynRate(unittest.TestCase):
         self.assertFalse(np.allclose(dx_nom, dx_heavy))
 
 
+@pytest.mark.jax
 class TestBicycleDynServo(unittest.TestCase):
     def setUp(self):
         configure_jax(enable_x64=True)
@@ -595,6 +682,7 @@ class TestBicycleDynServo(unittest.TestCase):
         self.assertFalse(np.allclose(dx_nom, dx_soft))
 
 
+@pytest.mark.jax
 class TestBicycleDynEngine(unittest.TestCase):
     def setUp(self):
         configure_jax(enable_x64=True)
@@ -728,7 +816,7 @@ class TestCarProfile(unittest.TestCase):
 
     def test_udes_matches_kinematic_racecar_geometry(self):
         from examples.projects.car_trajopt.vehicles.car_profile import udes_1_5_profile
-        from examples.projects.car_trajopt.vehicles.extras import UdeSRacecar
+        from minilink.catalog import UdeSRacecar
 
         udes = UdeSRacecar()
         profile = udes_1_5_profile()

@@ -1,7 +1,7 @@
-# Core objects, phase 4: the field object
+# The field object
 
 Status: core contract — agreed 2026-09-15 (C12, time and action arguments included), not started.
-Depends on phase 2 and on the Lyapunov plan's rulings D1–D5 (lyapunov-certificates.md).
+Rung: v0.2 wave A, step A1 of [TODO.md](TODO.md). Depends on the sets-and-distributions pass (landed 2026-09-15: `bounding_box`, `.box`, the draw convention); the Lyapunov rulings it cites are the open items in ROADMAP §6.
 Name-preserving (`V(x)`, `value_at`, `cost_to_go` keep working). Finding F12: docs/reviews/2026-09-15-foundations-review.md.
 
 The scalar function on `(x, u, t)` becomes a core noun, `Field`, with the same verbs
@@ -12,17 +12,19 @@ amended; a field reads the arguments it depends on and ignores the rest, as `f` 
 `CostFunction`. No new verb for the sublevel set: `V.as_constraint(upper=level)` *is*
 `{x : V(x) ≤ level}`. Time enters through `t`; a schedule (`S(t)` from the Riccati sweep, the
 per-step DP tables) is held on the concrete field and interpolated in `t`.
-Depends on Phase 2 (`bounding_box`, the draw convention) and on the Lyapunov plan's rulings
-D1–D5 (`lyapunov-certificates.md`). Baseline first: the region-of-attraction level, extent and
+Baseline first: the region-of-attraction level, extent and
 `verify` report of `analysis_region_of_attraction.py`; the DP `J` table and
 `PolicyEvaluator.value_at` on a grid of points; `cost_to_go_function_approximation.ipynb`
 outputs (the fitted weights); run twice, `cmp`.
 
 - [ ] **4.1 Promote the noun** **[ask — file move, rename].** `StateField` → `Field`, with
   `FieldSet` and `FieldCost`, moves from `planning/spatial/state_fields.py` to
-  `core/fields.py`; the four spatial fields (`ClearanceField`, `CostDensityField`,
-  `PathDistanceField`, `CorridorMarginField`) stay where they are and subclass the core ABC.
-  RULES 3.4: call sites updated (`state_fields.py`, `scene.py`, `track.py`, `test_planning.py`,
+  `core/fields.py`. The four spatial fields (`ClearanceField`, `CostDensityField`,
+  `PathDistanceField`, `CorridorMarginField`) subclass that ABC in
+  `core/geometry/fields.py` — **not** `planning.spatial` ([geometry-module.md](geometry-module.md);
+  they are workspace→state maps that a controller eval needs with no planner).
+  Shaping (`quadratic_hinge`, …) lives next to `Field.as_cost` in `core/fields.py`.
+  RULES 3.4: call sites updated (`geometry` fields, `scene.py`, `track.py`, `test_planning.py`,
   DESIGN §6 twice), no shim; `minilink.core._EXPORTS` gains `Field`. New: `FieldInputSet
   (InputSet)` with `margin(u, x, t, params) = value(x, u, t, params) − lower` (and `upper −
   value`), built by `Field.as_input_constraint()`; and `gradient(x, u, t, params)` on `Field`:
@@ -44,8 +46,7 @@ outputs (the fitted weights); run twice, `cmp`.
   existing `certificate.V(x)` calls (tests, showcase §11, DESIGN §3) keep working and
   `certificate.V.as_constraint(upper=certificate.level)` reads as math; `region` property
   returns that set; `contains`, `extent`, `slice_extent` and `verify` delegate to it
-  (`sample_in_ellipsoid`, `state_box`, `as_box`, `clip_box` go — the window is a `BoxSet` from
-  Phase 2); `V_dot` is `gradient · f`; `search_level` reads `V.value` / `V.gradient`. Public
+  (`sample_in_ellipsoid`, `state_box`, `as_box`, `clip_box` go — the window is a `BoxSet`); `V_dot` is `gradient · f`; `search_level` reads `V.value` / `V.gradient`. Public
   names unchanged. Done when the RoA baseline `cmp`s and `test_analysis_lyapunov.py` passes.
 - [ ] **4.4 `GridField(grid, values)`** — `value(x)` interpolates a node-indexed table on a
   `StateSpaceGrid` (wraps `grid.interpolate`; the same `fill_value=0` outside the grid, so the

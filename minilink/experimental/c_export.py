@@ -35,16 +35,47 @@ def clean_name(v):
 def transpile_jaxpr_to_c(closed_jaxpr, func_name="evaluate"):
     jaxpr = getattr(closed_jaxpr, "jaxpr", closed_jaxpr)
 
+    # Readable C names, stable across JAX versions: the arguments x and u, the
+    # result y (y0, y1, ... for several), constants c0, c1, ..., and
+    # intermediates v1, v2, ...
+    names = {}
+    if len(jaxpr.invars) == 2:
+        arg_names = ("x", "u")
+    else:
+        arg_names = tuple(f"in{i}" for i in range(len(jaxpr.invars)))
+    for var, arg in zip(jaxpr.invars, arg_names):
+        names[var] = arg
+    for i, var in enumerate(jaxpr.constvars):
+        names[var] = f"c{i}"
+    single_output = len(jaxpr.outvars) == 1
+    for i, var in enumerate(jaxpr.outvars):
+        if type(var).__name__ != "Literal" and var not in names:
+            names[var] = "y" if single_output else f"y{i}"
+    count = 0
+    for eqn in jaxpr.eqns:
+        for var in eqn.outvars:
+            if var not in names:
+                count += 1
+                names[var] = f"v{count}"
+
+    def name_of(v):
+        if type(v).__name__ == "Literal":
+            return None
+        return names.get(v, clean_name(v))
+
+    def c_float(val):
+        """A float as a C literal; infinities and NaN use the math.h macros."""
+        if np.isinf(val):
+            return "INFINITY" if val > 0 else "-INFINITY"
+        if np.isnan(val):
+            return "NAN"
+        return f"{float(val)}f"
+
     def get_val(v, i):
         if type(v).__name__ == "Literal":
-            val = np.asarray(v.val).flatten()[i]
-            if np.isinf(val):
-                return "INFINITY" if val > 0 else "-INFINITY"
-            if np.isnan(val):
-                return "NAN"
-            return f"{float(val)}f"
+            return c_float(np.asarray(v.val).flatten()[i])
 
-        name = clean_name(v)
+        name = name_of(v)
         if get_size(v) == 1:
             return name
         return f"{name}[{i}]"
@@ -56,7 +87,7 @@ def transpile_jaxpr_to_c(closed_jaxpr, func_name="evaluate"):
     # Generate C function signature
     c_args = []
     for var in jaxpr.invars:
-        name = clean_name(var)
+        name = name_of(var)
         size = get_size(var)
         if size == 1:
             c_args.append(f"const float {name}")
@@ -64,7 +95,7 @@ def transpile_jaxpr_to_c(closed_jaxpr, func_name="evaluate"):
             c_args.append(f"const float* {name}")
 
     for var in jaxpr.outvars:
-        name = clean_name(var)
+        name = name_of(var)
         size = get_size(var)
         if size == 1:
             c_args.append(f"float* out_{name}")
@@ -76,7 +107,7 @@ def transpile_jaxpr_to_c(closed_jaxpr, func_name="evaluate"):
     # Declare intermediate variables
     for eqn in jaxpr.eqns:
         for outvar in eqn.outvars:
-            name = clean_name(outvar)
+            name = name_of(outvar)
             if name is None:
                 continue
             size = get_size(outvar)
@@ -88,13 +119,13 @@ def transpile_jaxpr_to_c(closed_jaxpr, func_name="evaluate"):
     # Declare and initialize constvars
     if hasattr(closed_jaxpr, "consts"):
         for var, c in zip(jaxpr.constvars, closed_jaxpr.consts):
-            name = clean_name(var)
+            name = name_of(var)
             size = get_size(var)
             vals = np.asarray(c).flatten()
             if size == 1:
-                lines.append(f"  const float {name} = {float(vals[0])}f;")
+                lines.append(f"  const float {name} = {c_float(vals[0])};")
             else:
-                val_strs = [f"{float(v)}f" for v in vals]
+                val_strs = [c_float(v) for v in vals]
                 lines.append(
                     f"  const float {name}[{size}] = {{{', '.join(val_strs)}}};"
                 )
@@ -329,7 +360,7 @@ def transpile_jaxpr_to_c(closed_jaxpr, func_name="evaluate"):
     # Assign to output pointers
     lines.append("")
     for var in jaxpr.outvars:
-        name = clean_name(var)
+        name = name_of(var)
         size = get_size(var)
         if size == 1:
             lines.append(f"  *out_{name} = {name};")

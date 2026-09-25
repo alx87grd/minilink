@@ -1,0 +1,60 @@
+{
+  "schema_version": 1,
+  "suite": "dp_speed",
+  "description": "Value-iteration backward-sweep wall-time gates (numpy table + jax device loop).",
+  "regression_factor": 4.0,
+  "recorded_at": "2026-09-18",
+  "host_hint": "macOS-26.6.2-arm64-arm-64bit-Mach-O",
+  "metrics": [
+    {
+      "id": "dp.pendulum.grid.build_s",
+      "gate": "speed",
+      "direction": "lower_better",
+      "value": 1.5639229580001484,
+      "unit": "s",
+      "notes": "pendulum swing-up, (101, 101)x(11,), 40 sweeps; shared grid and transition-table build"
+    },
+    {
+      "id": "dp.pendulum.numpy.solve_s",
+      "gate": "speed",
+      "direction": "lower_better",
+      "value": 0.10252629200022056,
+      "unit": "s",
+      "notes": "pendulum swing-up, (101, 101)x(11,), 40 sweeps; steady-state backward sweeps"
+    },
+    {
+      "id": "dp.pendulum.jax.solve_s",
+      "gate": "speed",
+      "direction": "lower_better",
+      "value": 0.006284250000135216,
+      "unit": "s",
+      "notes": "pendulum swing-up, (101, 101)x(11,), 40 sweeps; steady-state backward sweeps"
+    },
+    {
+      "id": "dp.pendulum.jax.max_rel_dJ_vs_numpy",
+      "gate": "accuracy",
+      "direction": "lower_better",
+      "value": 0.002773815394475323,
+      "unit": "ratio",
+      "max_allowed": 0.01,
+      "notes": "max |dJ| / max(|J|, 1) vs the numpy backend"
+    },
+    {
+      "id": "dp.pendulum.jax.policy_disagreement",
+      "gate": "accuracy",
+      "direction": "lower_better",
+      "value": 0.0,
+      "unit": "fraction",
+      "max_allowed": 0.02,
+      "notes": "share of nodes whose greedy action differs from the numpy backend"
+    },
+    {
+      "id": "dp.pendulum.jax.speedup_vs_numpy",
+      "gate": "speed",
+      "direction": "higher_better",
+      "value": 16.314801606876642,
+      "unit": "ratio",
+      "notes": "steady-state solve speedup; collapses if the path stops being jitted"
+    }
+  ]
+}

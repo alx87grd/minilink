@@ -1,27 +1,8 @@
-"""Rigid-body orientation and pose algebra (SO(3) / SE(3)).
+"""Rigid-body orientation and pose algebra: rotations ``R`` (SO(3)) and poses ``T`` (SE(3)).
 
-A native-array, JAX-functional transform toolkit — the rigid-body peer of
-:mod:`minilink.core.sets` and :mod:`minilink.core.costs`. Like them it is pure
-functions over arrays: no classes, no rendering, no solver, no knowledge of
-:class:`~minilink.core.system.System`. Anything that needs "how is this body
-oriented" or "where is this body in the world" imports it.
-
-Two layers mirror the course notes (*Orientation* and *Poses*):
-
-- an **orientation layer** of 3×3 rotations ``R`` (:func:`Rx` / :func:`Ry` /
-  :func:`Rz`; the inverse is simply ``R.T``);
-- a **pose layer** of 4×4 homogeneous transforms ``T`` built on it
-  (:func:`SE3`, :func:`SE2`, :func:`translation`, :func:`identity`, :func:`inv`,
-  :func:`apply`).
-
-Matrices are assembled with ``xp.array`` / ``xp.concatenate`` via
-``xp = array_module(...)`` and **never** by in-place index assignment, so a ``tf``
-written on top of this module traces under ``jax.jit`` / ``vmap`` and the same
-toolkit feeds both rendering (graphical ``tf``) and collision probing
-(``planning/spatial``).
-
-Composition is the matrix product ``@`` (``W_T_C = W_T_B @ B_T_C``); tag locals
-with frame keys so the algebra reads like the notes.
+Pure functions over native arrays, assembled with ``xp.concatenate`` so a ``tf``
+built on them traces under JAX. Composition is the matrix product,
+``W_T_C = W_T_B @ B_T_C``; tag locals with frame keys so the algebra reads like the notes.
 """
 
 import numpy as np
@@ -180,7 +161,11 @@ def apply(T, pts):
 
     R = T[:d, :d]
     p = T[:d, d] if n == d + 1 else T[:d, n - 1]
-    return pts @ R.T + p
+
+    # p_ref = R p_body + p, one row per point
+    pts_ref = pts @ R.T + p
+
+    return pts_ref
 
 
 if __name__ == "__main__":

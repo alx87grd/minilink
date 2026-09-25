@@ -9,6 +9,7 @@ import numpy as np
 from minilink import (
     PID,
     DoubleIntegrator,
+    Gain,
     ImpedanceController,
     Integrator,
     Lag,
@@ -76,6 +77,18 @@ class TestJunction(unittest.TestCase):
         np.testing.assert_allclose(_poles(T1), _poles(T2), atol=1e-9)
         self.assertEqual(list(L.inputs), ["e"])
         self.assertEqual(list(L.subsystems), ["ctl", "sys"])
+
+    def test_series_diagram_at_plant_leaves_both_operands_alone(self):
+        L = Gain(2.0, dim=1) >> Gain(3.0, dim=1)
+        T = L @ Pendulum()
+        self.assertEqual(list(T.subsystems), ["gain", "gain2", "sys", "demux", "error"])
+        self.assertEqual(list(L.subsystems), ["gain", "gain2"])
+        self.assertEqual(L.connections["output"], {"y": ("gain2", "y")})
+        G = Integrator() >> TransferFunction([1.0], [0.5, 1.0])
+        T = L @ G
+        self.assertEqual(list(T.subsystems), ["gain", "gain2", "sys", "sys2", "error"])
+        self.assertEqual(list(L.subsystems), ["gain", "gain2"])
+        self.assertEqual(list(G.subsystems), ["sys", "sys2"])
 
     def test_closed_loop_poles_are_the_roots_of_one_plus_L(self):
         C, G = PID(Kp=20.0, Ki=5.0, Kd=2.0, tau=0.05), _damped_pendulum()

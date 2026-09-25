@@ -2,7 +2,7 @@
 
 import numpy as np
 
-from minilink.control.impedance import _as_dof_vector
+from minilink.control.impedance import as_dof_vector
 from minilink.core.backends import array_module
 from minilink.core.feedback import DynamicController, ErrorDriven
 
@@ -69,7 +69,7 @@ class PID(ErrorDriven, DynamicController):
         n = int(dof)
         if n <= 0:
             raise ValueError("dof must be positive")
-        if self.has_filter and np.any(_as_dof_vector(tau, n) <= 0.0):
+        if self.has_filter and np.any(as_dof_vector(tau, n) <= 0.0):
             raise ValueError("tau must be positive (it divides the filter rate)")
 
         self.n_int = n if self.has_integrator else 0
@@ -78,21 +78,21 @@ class PID(ErrorDriven, DynamicController):
         self.dof = n
         self.name = type(self).__name__
 
-        self.params = {"Kp": _as_dof_vector(Kp, n)}
+        self.params = {"Kp": as_dof_vector(Kp, n)}
         labels, x0 = [], []
         if self.has_integrator:
-            self.params["Ki"] = _as_dof_vector(Ki, n)
-            self.params["e_int_min"] = _as_dof_vector(e_int_min, n)
-            self.params["e_int_max"] = _as_dof_vector(e_int_max, n)
+            self.params["Ki"] = as_dof_vector(Ki, n)
+            self.params["e_int_min"] = as_dof_vector(e_int_min, n)
+            self.params["e_int_max"] = as_dof_vector(e_int_max, n)
             labels += [f"e_int{i}" for i in range(n)]
             x0.append(np.zeros(n))
         if self.has_filter:
-            self.params["Kd"] = _as_dof_vector(Kd, n)
-            self.params["tau"] = _as_dof_vector(tau, n)
+            self.params["Kd"] = as_dof_vector(Kd, n)
+            self.params["tau"] = as_dof_vector(tau, n)
             labels += [f"d_filt{i}" for i in range(n)]
-            x0.append(_as_dof_vector(y_filt0, n))
-        self.params["u_min"] = _as_dof_vector(u_min, n)
-        self.params["u_max"] = _as_dof_vector(u_max, n)
+            x0.append(as_dof_vector(y_filt0, n))
+        self.params["u_min"] = as_dof_vector(u_min, n)
+        self.params["u_max"] = as_dof_vector(u_max, n)
 
         self.state.labels = labels
         self.x0 = np.concatenate(x0) if x0 else np.zeros(0)
@@ -111,16 +111,20 @@ class PID(ErrorDriven, DynamicController):
     def f(self, x, u, t=0, params=None):
         params = self.params if params is None else params
         xp = array_module(x)
-
+        n_int = self.n_int
+        has_integrator, has_filter = self.has_integrator, self.has_filter
         e = self.error(u)
-        e_int, m_filt = x[: self.n_int], x[self.n_int :]
-        dm_filt = self._filter_rate(u, m_filt, params, xp)
-        u_unsat = self._command(e, e_int, dm_filt, params, xp)
+        e_int, m_filt = x[:n_int], x[n_int:]
 
+        # The filtered-derivative rate and the unsaturated command it feeds
+        dm_filt = self.filter_rate(u, m_filt, params, xp)
+        u_unsat = self.command(e, e_int, dm_filt, params, xp)
+
+        # dx = [ė_int; ṁ_filt], each term only when the block carries that state
         rates = []
-        if self.has_integrator:
-            rates.append(self._integrator_rate(e, e_int, u_unsat, params, xp))
-        if self.has_filter:
+        if has_integrator:
+            rates.append(self.integrator_rate(e, e_int, u_unsat, params, xp))
+        if has_filter:
             rates.append(dm_filt)
         dx = xp.concatenate(rates) if rates else xp.zeros(0)
 
@@ -129,34 +133,50 @@ class PID(ErrorDriven, DynamicController):
     def ctl(self, x, u, t=0, params=None):
         params = self.params if params is None else params
         xp = array_module(x)
-
+        u_min, u_max = xp.asarray(params["u_min"]), xp.asarray(params["u_max"])
+        n_int = self.n_int
         e = self.error(u)
-        e_int, m_filt = x[: self.n_int], x[self.n_int :]
-        dm_filt = self._filter_rate(u, m_filt, params, xp)
-        u_cmd = self._command(e, e_int, dm_filt, params, xp)
-        u = xp.clip(u_cmd, xp.asarray(params["u_min"]), xp.asarray(params["u_max"]))
+        e_int, m_filt = x[:n_int], x[n_int:]
+        dm_filt = self.filter_rate(u, m_filt, params, xp)
+
+        # u = Kp e + Ki e_int − Kd ṁ_filt, then the actuator limits
+        u_cmd = self.command(e, e_int, dm_filt, params, xp)
+        u = xp.clip(u_cmd, u_min, u_max)
 
         return u
 
-    # -- the law, one term per carried state -------------------------------
+    # Internal machinery: the law, one term per carried state
 
-    def _filter_rate(self, u, m_filt, params, xp):
-        """``d(m_filt)/dt = (m - m_filt) / tau``, or ``None`` without a filter."""
+    def filter_rate(self, u, m_filt, params, xp):
+        """Rate of the filtered derivative state, or ``None`` without a filter."""
         if not self.has_filter:
             return None
-        return (self.derivative_signal(u) - m_filt) / xp.asarray(params["tau"])
+        m = self.derivative_signal(u)
+        tau = xp.asarray(params["tau"])
 
-    def _command(self, e, e_int, dm_filt, params, xp):
-        """``u = Kp e + Ki e_int - Kd dm_filt``, dropping the absent terms."""
-        u_cmd = xp.asarray(params["Kp"]) * e
-        if self.has_integrator:
-            u_cmd = u_cmd + xp.asarray(params["Ki"]) * e_int
-        if self.has_filter:
-            u_cmd = u_cmd - xp.asarray(params["Kd"]) * dm_filt
+        # first-order filter on the measured signal: tau ṁ_filt = m − m_filt
+        dm_filt = (m - m_filt) / tau
+
+        return dm_filt
+
+    def command(self, e, e_int, dm_filt, params, xp):
+        """The unsaturated command, dropping the terms the block does not carry."""
+        has_integrator, has_filter = self.has_integrator, self.has_filter
+        Kp = xp.asarray(params["Kp"])
+
+        # u = Kp e + Ki e_int − Kd ṁ_filt
+        u_cmd = Kp * e
+        if has_integrator:
+            Ki = xp.asarray(params["Ki"])
+            u_cmd = u_cmd + Ki * e_int
+        if has_filter:
+            Kd = xp.asarray(params["Kd"])
+            u_cmd = u_cmd - Kd * dm_filt
+
         return u_cmd
 
-    def _integrator_rate(self, e, e_int, u_unsat, params, xp):
-        """``de_int = e``, held at zero while the command or the integrator saturates."""
+    def integrator_rate(self, e, e_int, u_unsat, params, xp):
+        """Rate of the integral state: the error, held at zero while saturated."""
         u_min = xp.asarray(params["u_min"])
         u_max = xp.asarray(params["u_max"])
         e_int_min = xp.asarray(params["e_int_min"])
@@ -167,11 +187,15 @@ class PID(ErrorDriven, DynamicController):
         stop_lo = xp.logical_and(u_unsat <= u_min, e < 0.0)
         stop_sat = xp.logical_or(stop_hi, stop_lo)
 
+        # and while the integral state itself sits on one of its end stops
         stop_int_hi = xp.logical_and(e_int >= e_int_max, e > 0.0)
         stop_int_lo = xp.logical_and(e_int <= e_int_min, e < 0.0)
         stop_int = xp.logical_or(stop_int_hi, stop_int_lo)
 
-        return xp.where(xp.logical_or(stop_sat, stop_int), 0.0, e)
+        # ė_int = e, except when held
+        de_int = xp.where(xp.logical_or(stop_sat, stop_int), 0.0, e)
+
+        return de_int
 
 
 class PI(PID):

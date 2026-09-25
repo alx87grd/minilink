@@ -1,16 +1,4 @@
-"""Signal routing and combination blocks.
-
-Plant-agnostic plumbing for multi-signal diagrams. Each block is a
-:class:`~minilink.core.system.System` with explicit named ports whose
-dimensions are fixed at construction, so diagram wiring is validated at connect
-time.
-
-- :class:`Error` — tracking-error comparison ``e = r - y`` on ports ``+``, ``-``, ``e``.
-- :class:`Sum` — signed junction ``y = Σ sign_i · in_i``.
-- :class:`Gain` — constant gain ``y = K · u``.
-- :class:`Mux` — stack several input signals into one vector output.
-- :class:`Demux` — split one vector into NumPy-style slices (``y[0]``, ``y[1]``, …).
-"""
+"""Signal routing blocks: the error comparison, a signed sum, a gain, mux and demux."""
 
 import numpy as np
 
@@ -166,12 +154,12 @@ class Demux(System):
             self.add_output_port(
                 port_id,
                 dim=d,
-                function=self._slice(slice(start, start + d)),
+                function=self.slice_compute(slice(start, start + d)),
                 dependencies=(self.port,),
             )
             start += d
 
-    def _slice(self, port_slice):
+    def slice_compute(self, port_slice):
         """Build the compute for one output port: return that slice of ``u``."""
 
         def compute(x, u, t=0, params=None):
