@@ -63,6 +63,8 @@ def run_regression(*, ci_mode: bool) -> int:
                 "10",
                 "--speed-gate-suffixes",
                 "solve_s,nlp_s,speedup",
+                "--speed-slack-s",
+                "0.1",
             ]
         )
     return run_command(cmd)

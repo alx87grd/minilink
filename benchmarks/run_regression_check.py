@@ -105,6 +105,15 @@ def main(argv: list[str] | None = None) -> int:
         help="Speed regression factor override (default: each baseline JSON value)",
     )
     parser.add_argument(
+        "--speed-slack-s",
+        type=float,
+        default=0.0,
+        help=(
+            "Absolute seconds added to each speed ceiling "
+            "(baseline * factor + slack); CI sets it for millisecond solves"
+        ),
+    )
+    parser.add_argument(
         "--update",
         action="store_true",
         help="Refresh baseline values from the current run",
@@ -226,7 +235,9 @@ def main(argv: list[str] | None = None) -> int:
             factor = args.factor
         else:
             factor = baseline.regression_factor
-        result = compare_metrics(recorded, baseline, factor=factor)
+        result = compare_metrics(
+            recorded, baseline, factor=factor, slack_s=args.speed_slack_s
+        )
         if speed_suffixes:
             result = filter_speed_gate_failures(result, suffixes=speed_suffixes)
         print()

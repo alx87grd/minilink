@@ -101,7 +101,8 @@ jobs:
       run: |
         python benchmarks/run_regression_check.py --suite all --tiny \
           --factor 10 \
-          --speed-gate-suffixes solve_s,nlp_s,speedup
+          --speed-gate-suffixes solve_s,nlp_s,speedup \
+          --speed-slack-s 0.1
 
     # JAX flagships skip in the ``test`` job (no jax extra); gate them here.
     # Interactive flagships (viewer demos) stay skipped in both jobs.

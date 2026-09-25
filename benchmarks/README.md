@@ -106,13 +106,17 @@ slowdown on the next manual baseline refresh; CI uses **10×** on NLP solve gate
 ```bash
 python benchmarks/run_regression_check.py --suite all --tiny \
   --factor 10 \
-  --speed-gate-suffixes solve_s,nlp_s,speedup
+  --speed-gate-suffixes solve_s,nlp_s,speedup \
+  --speed-slack-s 0.1
 python tests/demo_checks/run_flagship_demos.py   # incl. JAX flagships
 ```
 
 Enforces accuracy goldens plus **NLP/trajopt solve wall times** (`solve_s`, `nlp_s`,
 speedup ratios). End-to-end `wall_s` / `total_s` are reported but not gated in CI
-(cross-runner variance). Flagship demos run here so JAX-required smokes are not
+(cross-runner variance). A time gate fails above `baseline * 10 + 0.1 s`: the
+e4 / f_mpc solves take a few milliseconds, and on a shared runner they swing
+4–19× the macOS baseline run to run with no code change, so a factor alone
+flips at random. Flagship demos run here so JAX-required smokes are not
 skipped (the ``test`` job installs ``.[dev]`` only).
 
 **Local pre-handoff** (reference machine, per-suite factors from JSON):
