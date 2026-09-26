@@ -104,6 +104,22 @@ class TestLinearCore(unittest.TestCase):
         )
         self.assertAlmostEqual(linear.settling_horizon(A), 8.0)
 
+    def test_siso_functions_refuse_a_mimo_realization(self):
+        # Two inputs and two outputs: G(jw) is a 2x2 matrix, not one number
+        A, B, C, D = -np.eye(2), np.eye(2), np.eye(2), np.zeros((2, 2))
+        for name, call in (
+            (
+                "frequency_response",
+                lambda: linear.frequency_response(A, B, C, D, [1.0]),
+            ),
+            ("gain", lambda: linear.gain(A, B, C, D)),
+            ("closed_loop_poles", lambda: linear.closed_loop_poles(A, B, C, D, 1.0)),
+            ("step_response", lambda: linear.step_response(A, B, C, D, [0.0, 0.1])),
+            ("root_locus", lambda: linear.root_locus(A, B, C, D, [0.0, 1.0])),
+        ):
+            with self.subTest(name), self.assertRaisesRegex(ValueError, "one input"):
+                call()
+
     def test_step_info_second_order(self):
         zeta, wn = 0.3, 2.0
         tf = TransferFunction([wn**2], [1.0, 2 * zeta * wn, wn**2])

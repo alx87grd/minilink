@@ -50,7 +50,7 @@ def gain(A, B, C, D):
     ``d`` when the channel has feedthrough, otherwise the first nonzero Markov
     parameter; read off the response at one real point beyond every pole and zero.
     """
-    A, B, C, D = as_matrices(A, B, C, D)
+    A, B, C, D = as_siso_matrices(A, B, C, D)
     n = A.shape[0]
 
     # The roots of G(s) = k ∏(s − z) / ∏(s − p)
@@ -72,7 +72,7 @@ def gain(A, B, C, D):
 
 def frequency_response(A, B, C, D, w):
     """Frequency response of a SISO channel, one complex value per frequency in ``w``."""
-    A, B, C, D = as_matrices(A, B, C, D)
+    A, B, C, D = as_siso_matrices(A, B, C, D)
     w = np.asarray(w, dtype=float).reshape(-1)
     I = np.eye(A.shape[0])
 
@@ -199,7 +199,7 @@ def margins(w, G):
 
 def closed_loop_poles(A, B, C, D, K):
     """Poles of the SISO loop closed with ``u = -K y``."""
-    A, B, C, D = as_matrices(A, B, C, D)
+    A, B, C, D = as_siso_matrices(A, B, C, D)
 
     # The algebraic loop 1 + K d; at K = −1/d it is singular and no pole is finite
     loop = 1.0 + K * D[0, 0]
@@ -221,7 +221,7 @@ def root_locus(A, B, C, D, gains=None, *, n_gains=400):
     while any branch moves by more than two percent of that radius. Returns
     ``(gains, roots)`` with ``roots`` of shape ``(len(gains), n_states)``.
     """
-    A, B, C, D = as_matrices(A, B, C, D)
+    A, B, C, D = as_siso_matrices(A, B, C, D)
     if gains is None:
         gains = default_gains(A, B, C, D, n_gains)
     gains = np.asarray(gains, dtype=float).reshape(-1)
@@ -248,7 +248,7 @@ def step_response(A, B, C, D, t):
     One matrix exponential gives the zero-order-hold pair ``(A_d, B_d)``; the
     state is then marched exactly.
     """
-    A, B, C, D = as_matrices(A, B, C, D)
+    A, B, C, D = as_siso_matrices(A, B, C, D)
     t = np.asarray(t, dtype=float).reshape(-1)
     dt = uniform_step(t)
     n, m = B.shape
@@ -329,6 +329,17 @@ def as_matrices(A, B, C, D):
         A = np.zeros((0, 0))
         B = np.zeros((0, D.shape[1]))
         C = np.zeros((D.shape[0], 0))
+    return A, B, C, D
+
+
+def as_siso_matrices(A, B, C, D):
+    """``as_matrices`` for a channel with one input and one output, which it checks."""
+    A, B, C, D = as_matrices(A, B, C, D)
+    if B.shape[1] != 1 or C.shape[0] != 1:
+        raise ValueError(
+            "this function takes one input and one output (a SISO channel); got "
+            f"{B.shape[1]} inputs and {C.shape[0]} outputs"
+        )
     return A, B, C, D
 
 
