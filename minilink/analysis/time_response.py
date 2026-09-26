@@ -7,7 +7,7 @@ from dataclasses import dataclass
 import numpy as np
 
 from minilink.analysis import linear
-from minilink.analysis.frequency import channel_subtitle, siso_matrices
+from minilink.analysis.linearize import channel_subtitle, siso_matrices
 from minilink.graphical.common import PlotResult
 from minilink.graphical.control import (
     ControlFigure,

@@ -10,7 +10,11 @@ import numpy as np
 
 from minilink.analysis import linear
 from minilink.analysis.linear import Margins
-from minilink.analysis.linearize import linearize_matrices, output_selectors
+from minilink.analysis.linearize import (
+    channel_label,
+    channel_subtitle,
+    siso_matrices,
+)
 from minilink.graphical.common import PlotResult
 from minilink.graphical.control import (
     ControlFigure,
@@ -433,61 +437,8 @@ def plot_nyquist(
 
 
 # =============================================================================
-# Channel helpers
+# Internal machinery
 # =============================================================================
-
-
-def siso_channel(sys, of, wrt):
-    """Normalize the channel to ``((of_name, index), (wrt_name, index))``.
-
-    ``of`` names the output and ``wrt`` the input: a port id means component
-    0, ``(port, index)`` one component, a diagram wire ``"block:port"`` an
-    internal signal. ``of_name`` is ``None`` when the output is the state
-    itself (no ``y`` port): the row is then taken from ``C = I``.
-    """
-    if wrt is None:
-        if not sys.inputs:
-            raise ValueError("Frequency analysis requires at least one input port.")
-        wrt = (next(iter(sys.inputs)), 0)
-    if of is None:
-        default = output_selectors(sys, None)
-        of = (None, 0) if default is None else (default[0][0], 0)
-    return siso_selector(of, "of"), siso_selector(wrt, "wrt")
-
-
-def channel_label(sys, of, wrt):
-    """``"y[1] / u[0]"`` for the selected channel."""
-    (of_name, i), (wrt_name, j) = siso_channel(sys, of, wrt)
-    return f"{'x' if of_name is None else of_name}[{i}] / {wrt_name}[{j}]"
-
-
-def channel_subtitle(sys, of, wrt):
-    """``"From: u[0]  To: y[1]"`` for the selected channel."""
-    (of_name, i), (wrt_name, j) = siso_channel(sys, of, wrt)
-    return style.channel_subtitle("x" if of_name is None else of_name, i, wrt_name, j)
-
-
-def siso_matrices(sys, x_bar, u_bar, t, params, *, of, wrt, method, eps):
-    """``A, b, c, d`` of the selected channel (``b`` a column, ``c`` a row)."""
-    (of_name, i), channel_in = siso_channel(sys, of, wrt)
-    A, B, C, D = linearize_matrices(
-        sys,
-        x_bar,
-        u_bar,
-        t,
-        params,
-        of=None if of_name is None else [(of_name, i)],
-        wrt=[channel_in],
-        method=method,
-        eps=eps,
-    )
-    if of_name is None:  # state output: pick the component of C = I
-        if i < 0 or i >= C.shape[0]:
-            raise ValueError(
-                f"of index must be in [0, {C.shape[0] - 1}] for the state."
-            )
-        C, D = C[[i], :], D[[i], :]
-    return A, B, C, D
 
 
 def minimal_channel(A, B, C, D, minimal):
@@ -525,29 +476,6 @@ def frequency_grid(A, B, C, D, w, n):
     if w.size == 0 or np.any(w <= 0.0):
         raise ValueError("Frequencies must be positive.")
     return w
-
-
-# =============================================================================
-# Internal machinery
-# =============================================================================
-
-
-def siso_selector(selector, name):
-    """One component ``(name, index)`` from a port id or a ``(port, index)`` pair."""
-    if isinstance(selector, str):
-        return (selector, 0)
-    if (
-        isinstance(selector, tuple)
-        and len(selector) == 2
-        and (selector[0] is None or isinstance(selector[0], str))
-        and isinstance(selector[1], (int, np.integer))
-        and not isinstance(selector[1], bool)
-    ):
-        return (selector[0], int(selector[1]))
-    raise TypeError(
-        f"{name} names one channel: a port id, a diagram wire 'block:port', or "
-        f"(selector, index); got {selector!r}"
-    )
 
 
 def margins_text(m: Margins) -> str:
