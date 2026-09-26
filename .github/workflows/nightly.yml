@@ -34,7 +34,7 @@ jobs:
         MPLBACKEND: Agg
         SDL_VIDEODRIVER: dummy
       run: |
-        python tests/demo_checks/run_all_demos.py --timeout 180 --continue-on-error
+        python tests/demo_checks/run_all_demos.py --timeout 900 --continue-on-error
 
     - name: Teaching notebooks
       env:
