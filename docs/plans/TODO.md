@@ -75,33 +75,16 @@ Design: [naming.md](naming.md). Every step is name-preserving for the GRO860 not
 Plan: [gro501-classical-control.md](gro501-classical-control.md) (P1, F1, F2, F4 landed
 2026-09-07). Release contract: [ROADMAP §4.2](../../ROADMAP.md#42-v02--gro501-end-to-end).
 
-**Next, in order (decided 2026-09-26):** clean-up and solidification first — TB-a (step 2
-running), P7, then P5 and P8 on the cleaned toolbox, TB-b, S61, P9, P10 — then the
+TB-a (the analysis toolbox reads like the textbook) landed 2026-09-26: the shortcut cut
+(`4412a18`), the audit
+([2026-09-26-analysis-toolbox-audit.md](../reviews/2026-09-26-analysis-toolbox-audit.md)), the
+byte-identical rewrite (`36a51e7`…`559cb37`) and four fixes (`19b75c1`…`b018cb5`).
+
+**Next, in order (decided 2026-09-26):** clean-up and solidification first — P7, then P5 and
+P8 on the cleaned toolbox, TB-b, S61, P9, P10 — then the
 disturbance convention and P4, then P11. The textbook pass comes before the new surface, so
 the new code copies clean patterns and no shortcut is added only to be dropped.
 
-- [ ] **TB-a The analysis toolbox reads like the textbook** (now; before P5 and P8, which build
-  on these files). The method of
-  [2026-09-22-consolidation-review.md](../reviews/2026-09-22-consolidation-review.md) §4.1
-  under AGENTS "The textbook rule": the math in the body, plain helper names, timeless
-  docstrings and comments; `planning/policy_synthesis/dp.py` is the reference.
-  1. **The shortcut review** — landed 2026-09-26 as a clean cut (ROADMAP §6 "System analysis
-     shortcuts"): eight shortcuts on every `System`, `plot_step_response` on `LTISystem` only,
-     ten removed to their band functions, every call site in `examples/` and `tests/` moved.
-  2. **The audit** — landed 2026-09-26:
-     [2026-09-26-analysis-toolbox-audit.md](../reviews/2026-09-26-analysis-toolbox-audit.md),
-     40 findings; decisions 1–4 ruled yes the same day.
-  3a. **The rewrite** — landed 2026-09-26 in eight commits (`36a51e7`…), each
-     byte-identical against a seeded baseline of 928 outputs on both differentiation
-     backends: plain helper names, the math of `linear`, `frequency`, `step_info`,
-     `structural`, `linearize` and `modal` as named lines, channel selection in
-     `linearize.py`, and decisions 1–4 (`n_gains`, the `(poles, modes)` tuple,
-     `animate_modal(sys, …)`, the `tol` keyword with NumPy's rule as its default until 3b).
-     Absorbs T4's analysis half.
-  3b. **The bugs**, after 3a, one commit each with its test first: LIN-8 (`root_locus` on a
-     singular user gain), TRS-3 (`step_info` on an unsettled response), X-6 (MIMO input to
-     the SISO functions of `linear`), X-5 (one rank rule as the default).
-  Done when the six modules read like `dp.py`, 3a's baselines `cmp`, and 3b's tests pass.
 - [ ] **TB-b The control objects and the loop read like the textbook** (after P5, which
   touches `feedback()`; before P11, so the notebooks students read sit on it). The same
   audit, review and pass on `control/siso.py` (P / PI / PD / PID / Lead / Lag),
@@ -313,14 +296,10 @@ findings, file by file and line by line, are in
   below), the 37 inline `array_module(q).array(...)` calls.
   Also: `Manipulator` kinematics defaults raise instead of returning zeros, with
   `link_lengths` the base contract (scan: dynamics#7).
-- [ ] **T4 analysis and simulation** (what T0 left; its classical-control modules move to TB-a):
-  `analysis/lyapunov.py` (primary
+- [ ] **T4 analysis and simulation** (what T0 left; its classical-control modules landed
+  with TB-a on 2026-09-26): `analysis/lyapunov.py` (primary
   function first, ceremony in a helper, `verify` / rollout unpacked, `EVEN` / `ODD` beside
-  `METHODS`, `require_jax`, `sample_in_ellipsoid` named), `analysis/linearize.py` (the `D`
-  comprehension unrolled, the early return), `analysis/linear.py` / `frequency.py` /
-  `time_response.py` / `structural.py` remaining return-line expressions and the
-  five-vs-eight settling docstring, `analysis/modal.py` (naming `eig`'s result is a
-  returned-type decision), `simulation/simulator.py` (solver table and helper below the
+  `METHODS`, `require_jax`, `sample_in_ellipsoid` named), `simulation/simulator.py` (solver table and helper below the
   class, `solve` before its helpers, the detached comments, a constructor of named
   steps), `simulation/computer.py` (`as_computer` below the classes, its coercion in a
   helper), the solver backends' comments and `_finalize_solution`, the duplicated

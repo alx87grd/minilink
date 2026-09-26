@@ -264,11 +264,13 @@ wave B. A4 and A5 stay here.
   `pzmap` / `root_locus` / `transfer_function` cancel by default), **P3** `place()`
   (landed 2026-09-26: Ackermann with one input, `place_poles` with several).
   Order reduction (P2b) is out of v0.2 by decision (2026-09-26; TODO §7).
-- **TB-a** Next (decided 2026-09-26): the analysis toolbox reads like the
-  textbook. First the review of which System shortcuts stay (reserved for
-  linearize + common analysis), then the `dp.py`-style audit and pass of
-  `linear`, `frequency`, `time_response`, `structural`, `linearize` and
-  `modal`; before P5 and P8, which build on these files. **[ask — public names]**
+- **TB-a** The analysis toolbox reads like the textbook — landed 2026-09-26:
+  the System shortcuts cut to objects and plots, the audit
+  ([2026-09-26-analysis-toolbox-audit.md](docs/reviews/2026-09-26-analysis-toolbox-audit.md)),
+  the byte-identical `dp.py`-style pass of `linear`, `frequency`,
+  `time_response`, `structural`, `linearize` and `modal`, and four fixes
+  (`root_locus` through K = −1/d, `step_info` on an unsettled response, MIMO
+  input to the SISO functions, one rank rule).
 - **B2** The missing surface, on the cleaned toolbox: **P5** named
   `S` / `T` / `PS` / `CS`, **P8** ζ / ω_n and the `N` matrix, **P7** the
   generated facades (only the shortcuts TB-a keeps).
@@ -278,7 +280,7 @@ wave B. A4 and A5 stay here.
 - **B3** **P4** `estimation/`: `LuenbergerObserver`, `luenberger()`,
   `kalman()`, and how observer and state feedback compose. Held 2026-09-07;
   it is the largest §4.2 gap. Decided 2026-09-26: the clean-up and
-  solidification (TB-a, P7, P5, P8, TB-b, S61, P9, P10) land first, then the
+  solidification (TB-a landed; P7, P5, P8, TB-b, S61, P9, P10) land first, then the
   disturbance convention (§6) is decided, then P4. **[ask]**
 - **B4** Polish: **P9** `TransferFunction` ports built once, **P10** the
   three `@` dispatch paths documented and pinned by a test; **P6** the z tier
