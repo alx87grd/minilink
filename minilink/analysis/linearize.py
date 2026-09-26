@@ -47,60 +47,30 @@ def linearize_matrices(
         Central-difference step.
     """
     at = dict(method=method, eps=eps)
+    point = (x_bar, u_bar, t, params)
     n = sys.n
     inputs = input_selectors(sys, wrt)
     outputs = output_selectors(sys, of)
     if n == 0 and outputs is None:
         raise ValueError(f"{sys.name!r} has neither a state nor an output port")
 
-    if n > 0:
-        # A = ∂f/∂x, B = ∂f/∂u, C = ∂h/∂x, D = ∂h/∂u at the operating point
-        A = jacobian(sys, "f", "x", x_bar, u_bar, t, params, **at)
-        B = stack_columns(
-            [
-                select_columns(
-                    jacobian(sys, "f", name, x_bar, u_bar, t, params, **at), index
-                )
-                for name, index in inputs
-            ],
-            rows=n,
-        )
-        if outputs is None:  # no y port: the output is the state itself
-            return A, B, np.eye(n), np.zeros((n, B.shape[1]))
-        C = np.vstack(
-            [
-                select_rows(
-                    jacobian(sys, name, "x", x_bar, u_bar, t, params, **at), index
-                )
-                for name, index in outputs
-            ]
-        )
-    else:  # static block: no state, the channel is the feedthrough D
-        A = np.zeros((0, 0))
+    # A = ∂f/∂x and B = ∂f/∂u at the operating point; a static block has no state
+    A = jacobian(sys, "f", "x", *point, **at) if n > 0 else np.zeros((0, 0))
+    B = jacobian_block(sys, [("f", None)], inputs, point, at) if n > 0 else None
 
-    D = np.vstack(
-        [
-            stack_columns(
-                [
-                    select_columns(
-                        select_rows(
-                            jacobian(
-                                sys, name, wrt_name, x_bar, u_bar, t, params, **at
-                            ),
-                            index,
-                        ),
-                        wrt_index,
-                    )
-                    for wrt_name, wrt_index in inputs
-                ],
-                rows=selector_rows(sys, name, index),
-            )
-            for name, index in outputs
-        ]
-    )
+    # C = ∂h/∂x and D = ∂h/∂u; with no output port the output is the state: C = I, D = 0
+    if outputs is None:
+        C = np.eye(n)
+        D = np.zeros((n, B.shape[1]))
+    else:
+        C = jacobian_block(sys, outputs, [("x", None)], point, at) if n > 0 else None
+        D = jacobian_block(sys, outputs, inputs, point, at)
+
+    # A static block's channel is its feedthrough D alone
     if n == 0:
         B = np.zeros((0, D.shape[1]))
         C = np.zeros((D.shape[0], 0))
+
     return A, B, C, D
 
 
@@ -196,10 +166,31 @@ def stack_columns(blocks, *, rows):
     return np.hstack(blocks) if blocks else np.zeros((rows, 0))
 
 
+def jacobian_block(sys, of, wrt, point, at):
+    """The Jacobian of the ``of`` selectors with respect to the ``wrt`` selectors, stacked."""
+    return np.vstack(
+        [
+            stack_columns(
+                [
+                    select_columns(
+                        select_rows(jacobian(sys, name, wrt_name, *point, **at), index),
+                        wrt_index,
+                    )
+                    for wrt_name, wrt_index in wrt
+                ],
+                rows=selector_rows(sys, name, index),
+            )
+            for name, index in of
+        ]
+    )
+
+
 def selector_rows(sys, name, index):
-    """Number of rows one output selector contributes."""
+    """Number of rows one output selector (or the state equation ``"f"``) contributes."""
     if index is not None:
         return 1
+    if name == "f":
+        return sys.n
     if name in sys.outputs:
         return sys.outputs[name].dim
     block, port = name.split(":", 1)
