@@ -164,7 +164,7 @@ python tests/demo_checks/run_catalog_checks.py --fast
 python tests/demo_checks/run_flagship_demos.py
 # Teaching notebooks under examples/tutorial/ and examples/teaching/ (auto-discovered; overrides for deps/timeouts):
 MPLBACKEND=Agg python tests/demo_checks/run_notebook_checks.py
-# Nightly / local: every example script:
+# Nightly / local: every example script (live Meshcat viewers skip the browser wait, see demo_checks/headless/):
 python tests/demo_checks/run_all_demos.py --continue-on-error
 ```
 

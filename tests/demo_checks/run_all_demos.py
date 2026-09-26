@@ -1,6 +1,7 @@
 """Run example scripts as subprocess demo checks (nightly / local sweep).
 
 Executes each script's ``__main__`` unchanged (no demo hooks required).
+A live Meshcat viewer does not wait for a browser here (``headless/``).
 For the smaller flagship whitelist, prefer ``run_flagship_demos.py``.
 
 Usage (from repo root)::
@@ -24,6 +25,8 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 CHECKS_DIR = Path(__file__).resolve().parent
 SCRIPTS_ROOT = REPO_ROOT / "examples" / "demos"
 FLAGSHIP_MANIFEST = CHECKS_DIR / "flagship_manifest.json"
+# sitecustomize.py here turns a live Meshcat viewer's browser wait into a no-op.
+HEADLESS_DIR = CHECKS_DIR / "headless"
 
 # Live keyboard / wall-clock sessions hang until the user quits — not suitable
 # for an unattended subprocess sweep. Keep discoverable under examples/; skip here.
@@ -58,7 +61,11 @@ def _run_script(path: Path, *, timeout: float) -> DemoRunRow:
     rel = path.relative_to(REPO_ROOT)
     if _is_interactive_demo(path):
         return DemoRunRow(str(rel), "skip", "interactive realtime session")
-    env = {**os.environ, "PYTHONPATH": str(REPO_ROOT), "MPLBACKEND": "Agg"}
+    env = {
+        **os.environ,
+        "PYTHONPATH": os.pathsep.join((str(HEADLESS_DIR), str(REPO_ROOT))),
+        "MPLBACKEND": "Agg",
+    }
     try:
         proc = subprocess.run(
             [sys.executable, str(path)],
