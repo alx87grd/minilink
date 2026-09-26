@@ -4,6 +4,10 @@ from dataclasses import dataclass
 
 import numpy as np
 
+# Relative singular-value threshold of every rank decision: the Kalman matrices raise
+# A to the power n − 1, so their rounding sits far above machine precision
+RANK_TOL = 1e-9
+
 
 @dataclass(frozen=True)
 class StructuralResult:
@@ -18,14 +22,14 @@ class StructuralResult:
         return self.rank == self.n
 
 
-def controllability(A, B=None, *, tol=None):
+def controllability(A, B=None, *, tol=RANK_TOL):
     """Return the controllability test for the pair ``(A, B)``.
 
     The pair is controllable when its Kalman controllability matrix has full
     row rank ``n``. Pass the two matrices or one ``LTISystem``
     (``controllability(plant.linearize(x_bar))``). ``tol`` is the relative
-    singular-value threshold below which a direction counts as missing;
-    ``None`` keeps NumPy's ``matrix_rank`` rule.
+    singular-value threshold below which a direction counts as missing, the
+    same as :func:`~minilink.analysis.linear.minreal`'s.
     """
     A, B = matrix_pair(A, B, "B")
     n = A.shape[0]
@@ -36,13 +40,14 @@ def controllability(A, B=None, *, tol=None):
         blocks.append(A @ blocks[-1])
     ctrb = np.hstack(blocks)
 
-    # Controllable ⇔ rank 𝒞 = n
-    r = rank(ctrb, tol)
+    # Controllable ⇔ rank 𝒞 = n, counting the singular values σᵢ > tol σ₁
+    sigma = np.linalg.svd(ctrb, compute_uv=False)
+    r = int(np.sum(sigma > tol * sigma.max(initial=0.0)))
 
     return StructuralResult(matrix=ctrb, rank=r, n=n)
 
 
-def observability(A, C=None, *, tol=None):
+def observability(A, C=None, *, tol=RANK_TOL):
     """Return the observability test for the pair ``(A, C)``.
 
     The pair is observable when its Kalman observability matrix has full
@@ -58,8 +63,9 @@ def observability(A, C=None, *, tol=None):
         blocks.append(blocks[-1] @ A)
     obsv = np.vstack(blocks)
 
-    # Observable ⇔ rank 𝒪 = n
-    r = rank(obsv, tol)
+    # Observable ⇔ rank 𝒪 = n, counting the singular values σᵢ > tol σ₁
+    sigma = np.linalg.svd(obsv, compute_uv=False)
+    r = int(np.sum(sigma > tol * sigma.max(initial=0.0)))
 
     return StructuralResult(matrix=obsv, rank=r, n=n)
 
@@ -78,14 +84,6 @@ def matrix_pair(A, M, second):
             )
         A, M = A.A(), getattr(A, second)()
     return np.asarray(A, dtype=float), np.atleast_2d(np.asarray(M, dtype=float))
-
-
-def rank(M, tol):
-    """Number of singular values of ``M`` above ``tol`` times the largest; NumPy's rule when ``tol`` is None."""
-    if tol is None:
-        return int(np.linalg.matrix_rank(M))
-    sigma = np.linalg.svd(M, compute_uv=False)
-    return int(np.sum(sigma > tol * sigma.max(initial=0.0)))
 
 
 if __name__ == "__main__":

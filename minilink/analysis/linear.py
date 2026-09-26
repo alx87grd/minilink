@@ -7,7 +7,7 @@ from dataclasses import dataclass
 import numpy as np
 from scipy import linalg
 
-from minilink.analysis.structural import controllability, observability
+from minilink.analysis.structural import RANK_TOL, controllability, observability
 
 # =============================================================================
 # Public API — poles, zeros, response
@@ -114,14 +114,14 @@ def frequency_range(A, B, C, D):
 # =============================================================================
 
 
-def minreal(A, B, C, D, *, tol=1e-9):
+def minreal(A, B, C, D, *, tol=RANK_TOL):
     """Minimal realization: drop the modes that are uncontrollable or unobservable.
 
     The pole/zero pairs of those modes cancel; ``pzmap``, ``root_locus`` and
     ``transfer_function`` run it by default.
     ``tol`` is the relative singular-value threshold below which a direction
-    counts as missing: the Kalman matrices raise ``A`` to the power ``n − 1``,
-    so their rounding sits far above machine precision. A realization that is
+    counts as missing, the one :func:`~minilink.analysis.structural.controllability`
+    and :func:`~minilink.analysis.structural.observability` use. A realization that is
     already minimal comes back in its own coordinates.
     """
     A, B, C, D = as_matrices(A, B, C, D)

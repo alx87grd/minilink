@@ -208,6 +208,19 @@ class TestStructural(unittest.TestCase):
         self.assertFalse(result.is_full_rank)
         self.assertEqual(result.rank, 1)
 
+    def test_one_rank_rule_for_the_structural_tests_and_the_cancellation(self):
+        # The second mode is reached through 1e-11: "controllable" and "cancels in
+        # pzmap" must give the same answer on the same pair
+        A = np.diag([-1.0, -2.0])
+        B = np.array([[1.0], [1e-11]])
+        C = np.array([[1.0, 1.0]])
+        from minilink.analysis import linear
+
+        self.assertEqual(controllability(A, B).rank, 1)
+        self.assertEqual(linear.minreal(A, B, C, np.zeros((1, 1)))[0].shape[0], 1)
+        self.assertEqual(observability(A.T, B.T).rank, 1)
+        self.assertEqual(controllability(A, B, tol=1e-13).rank, 2)
+
 
 class TestEquilibria(unittest.TestCase):
     def test_pendulum_hanging_equilibrium(self):
