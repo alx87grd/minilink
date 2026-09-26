@@ -10,6 +10,32 @@ This file is workflow: what to read, when to ask, and the local CI gate.
 User API: README.md. Contracts: DESIGN.md. Maturity: ROADMAP.md.
 Pytest policy: tests/README.md. Examples map: examples/README.md.
 
+## The textbook rule: every piece of math, every time
+
+Minilink is read by students next to the textbook. This rule applies to every line of
+math an agent writes or touches, in new code and in edits alike. That means equation
+methods (`f`, `h`, `g`, …) and also every algorithm: analysis tools, controller and
+observer design, planners, solvers, learning updates. It is not a refactor-pass nicety;
+it is the acceptance bar. The maintainer should never have to ask for it.
+
+- **The math is the story.** The function body shows every step of the algorithm in the
+  order the textbook derives it, with the textbook's symbols (`A, B, C, D`, `𝒞`, `𝒪`,
+  `K`, `P`, `J`, `π`, `n, m, p`). This includes the linear algebra: a Kalman matrix, an
+  SVD and its rank, a basis and a projection, a Riccati solve, a Bellman backup. Each is
+  a named line in the body, never hidden in a helper.
+- **The plumbing is not the story.** Array coercion, shape normalization, default
+  filling, validation, backend dispatch, caching and result wrapping go to helpers under
+  `# Internal machinery`, or to the unpack and output beats. If a helper contains an
+  equation from the textbook page, it is in the wrong place.
+- **Three beats, one equation per named line** (RULES 5.3): unpack, then the math, then
+  return a named result. No `self.` in math lines, and no equation on a `return` line.
+- **Equation comments** (RULES 5.22): a one-line comment carries the textbook form when
+  the code cannot. Equations never sit in docstrings.
+- **The reference is `planning/policy_synthesis/dp.py`.** Before committing any math,
+  read the diff next to it, and say in the report that you did.
+
+A change that breaks this rule is not done, even when the tests pass.
+
 ## Non-negotiables
 
 - **Preserve user edits:** never revert or "clean up" manual changes the user made in
@@ -107,6 +133,7 @@ Fix with `ruff check --fix .` and `ruff format .` when either fails. CI runs the
 | Change | Agent-table row |
 | --- | --- |
 | Docs/markdown only | skip pytest |
+| Any change touching math | the textbook check against `dp.py` (above), stated in the report, plus the row that fits |
 | Narrow module + tests already updated | "Narrow module change" |
 | Cross-cutting or before handoff/push | "Cross-cutting or handoff" |
 | Compile backend, simulator, trajopt, MPC or value-iteration changes | "Regression gates, CI flags" |
