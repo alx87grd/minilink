@@ -114,7 +114,7 @@ def plot_step_response(
     info = step_info(time, y)
 
     return render_control_figure(
-        _step_figure(time, y, info, sys, of, wrt), backend=backend, show=show
+        step_figure(time, y, info, sys, of, wrt), backend=backend, show=show
     )
 
 
@@ -160,7 +160,7 @@ def _settling_time(time, y, final):
     return float(time[0])
 
 
-def _step_figure(time, y, info, sys, of, wrt):
+def step_figure(time, y, info, sys, of, wrt):
     lines = () if np.isnan(info.steady_state) else (RefLine("y", info.steady_state),)
     note = "\n".join(
         f"{name} = {value:.3g} {unit}"

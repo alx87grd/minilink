@@ -56,9 +56,11 @@ def linearize_matrices(
     if n > 0:
         # A = ∂f/∂x, B = ∂f/∂u, C = ∂h/∂x, D = ∂h/∂u at the operating point
         A = jacobian(sys, "f", "x", x_bar, u_bar, t, params, **at)
-        B = _stack_columns(
+        B = stack_columns(
             [
-                _columns(jacobian(sys, "f", name, x_bar, u_bar, t, params, **at), index)
+                select_columns(
+                    jacobian(sys, "f", name, x_bar, u_bar, t, params, **at), index
+                )
                 for name, index in inputs
             ],
             rows=n,
@@ -67,7 +69,9 @@ def linearize_matrices(
             return A, B, np.eye(n), np.zeros((n, B.shape[1]))
         C = np.vstack(
             [
-                _rows(jacobian(sys, name, "x", x_bar, u_bar, t, params, **at), index)
+                select_rows(
+                    jacobian(sys, name, "x", x_bar, u_bar, t, params, **at), index
+                )
                 for name, index in outputs
             ]
         )
@@ -76,10 +80,10 @@ def linearize_matrices(
 
     D = np.vstack(
         [
-            _stack_columns(
+            stack_columns(
                 [
-                    _columns(
-                        _rows(
+                    select_columns(
+                        select_rows(
                             jacobian(
                                 sys, name, wrt_name, x_bar, u_bar, t, params, **at
                             ),
@@ -89,7 +93,7 @@ def linearize_matrices(
                     )
                     for wrt_name, wrt_index in inputs
                 ],
-                rows=_rows_of(sys, name, index),
+                rows=selector_rows(sys, name, index),
             )
             for name, index in outputs
         ]
@@ -125,14 +129,16 @@ def linearize(
     return lti
 
 
-# Selector helpers shared with the frequency tools
+# =============================================================================
+# Internal machinery
+# =============================================================================
 
 
 def input_selectors(sys, wrt):
     """Normalize ``wrt`` to a list of ``(name, index)``; default every input stacked."""
     if wrt is None:
         return [("u", None)] if sys.inputs else []
-    return [_selector(item, "wrt") for item in _as_list(wrt)]
+    return [as_selector(item, "wrt") for item in as_list(wrt)]
 
 
 def output_selectors(sys, of):
@@ -152,10 +158,10 @@ def output_selectors(sys, of):
         if sys.n == 0 and sys.outputs:
             return [(port_id, None) for port_id in sys.outputs]
         return None
-    return [_selector(item, "of") for item in _as_list(of)]
+    return [as_selector(item, "of") for item in as_list(of)]
 
 
-def _selector(item, name):
+def as_selector(item, name):
     if isinstance(item, str):
         return (item, None)
     if (
@@ -172,25 +178,25 @@ def _selector(item, name):
     )
 
 
-def _as_list(value):
+def as_list(value):
     if isinstance(value, (str, tuple)):
         return [value]
     return list(value)
 
 
-def _rows(J, index):
+def select_rows(J, index):
     return J if index is None else J[[index], :]
 
 
-def _columns(J, index):
+def select_columns(J, index):
     return J if index is None else J[:, [index]]
 
 
-def _stack_columns(blocks, *, rows):
+def stack_columns(blocks, *, rows):
     return np.hstack(blocks) if blocks else np.zeros((rows, 0))
 
 
-def _rows_of(sys, name, index):
+def selector_rows(sys, name, index):
     """Number of rows one output selector contributes."""
     if index is not None:
         return 1

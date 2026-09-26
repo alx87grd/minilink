@@ -35,7 +35,7 @@ def zeros(A, B, C, D):
     The finite generalized eigenvalues of the Rosenbrock pencil
     ``[[A, B], [C, D]] - s [[I, 0], [0, 0]]``; ``D`` must be square.
     """
-    A, B, C, D = _matrices(A, B, C, D)
+    A, B, C, D = as_matrices(A, B, C, D)
     n, m = B.shape
     if n == 0 or m != C.shape[0]:
         return np.array([], dtype=complex)
@@ -61,7 +61,7 @@ def gain(A, B, C, D):
     scan needs a tolerance to tell a structural zero from a small leading
     coefficient, and any tolerance fails on a badly scaled channel.
     """
-    A, B, C, D = _matrices(A, B, C, D)
+    A, B, C, D = as_matrices(A, B, C, D)
     z, p = zeros(A, B, C, D), poles(A)
     s0 = 2.0 * max(np.max(np.abs(np.concatenate([z, p])), initial=0.0), 1.0)
 
@@ -76,7 +76,7 @@ def gain(A, B, C, D):
 
 def frequency_response(A, B, C, D, w):
     """``G(jw) = C (jw I - A)^-1 B + D`` of a SISO channel, one complex value per ``w``."""
-    A, B, C, D = _matrices(A, B, C, D)
+    A, B, C, D = as_matrices(A, B, C, D)
     w = np.asarray(w, dtype=float).reshape(-1)
     if A.size == 0:
         return np.full(w.shape, complex(D[0, 0]))
@@ -107,7 +107,7 @@ def frequency_range(A, B, C, D):
         # one decade past min |λ| and max |λ|
         w_min = 10.0 ** np.floor(np.log10(rates.min()) - 1.0)
         w_max = 10.0 ** np.ceil(np.log10(rates.max()) + 1.0)
-    return _bracket_unit_gain(A, B, C, D, w_min, w_max)
+    return bracket_unit_gain(A, B, C, D, w_min, w_max)
 
 
 # =============================================================================
@@ -125,7 +125,7 @@ def minreal(A, B, C, D, *, tol=1e-9):
     so their rounding sits far above machine precision. A realization that is
     already minimal comes back in its own coordinates.
     """
-    A, B, C, D = _matrices(A, B, C, D)
+    A, B, C, D = as_matrices(A, B, C, D)
     n = A.shape[0]
 
     # Controllable subspace: 𝒞 = U Σ Vᵀ, keep the r directions with σᵢ > tol σ₁
@@ -175,8 +175,8 @@ def margins(w, G):
 
     # PM = 180° + ∠L at |L| = 1, wrapped to (−180, 180]
     # GM = −|L|_dB at ∠L = −180°
-    pm, w_gc = _phase_margin_from_samples(w, magnitude_db, phase_deg)
-    gm, w_pc = _gain_margin_from_samples(w, magnitude_db, phase_deg)
+    pm, w_gc = phase_margin_from_samples(w, magnitude_db, phase_deg)
+    gm, w_pc = gain_margin_from_samples(w, magnitude_db, phase_deg)
     return Margins(float(gm), float(pm), float(w_gc), float(w_pc))
 
 
@@ -187,7 +187,7 @@ def margins(w, G):
 
 def closed_loop_poles(A, B, C, D, K):
     """Poles of the loop closed with ``u = -K y``: ``eig(A - B K (1 + K d)^-1 C)``."""
-    A, B, C, D = _matrices(A, B, C, D)
+    A, B, C, D = as_matrices(A, B, C, D)
 
     # λ = eig(A − B K (1 + K d)^{-1} C)
     loop = 1.0 + K * D[0, 0]
@@ -207,17 +207,17 @@ def root_locus(A, B, C, D, gains=None, *, n=400):
     moves by more than two percent of that radius. Returns ``(gains, roots)``
     with ``roots`` of shape ``(len(gains), n_states)``.
     """
-    A, B, C, D = _matrices(A, B, C, D)
+    A, B, C, D = as_matrices(A, B, C, D)
     if gains is None:
-        gains = _default_gains(A, B, C, D, n)
+        gains = default_gains(A, B, C, D, n)
     gains = np.asarray(gains, dtype=float).reshape(-1)
 
     # λ(K) = eig(A − B K (1 + K d)^{-1} C)
     roots = [closed_loop_poles(A, B, C, D, gains[0])]
     for K in gains[1:]:
-        roots.append(_matched(roots[-1], closed_loop_poles(A, B, C, D, K)))
+        roots.append(matched_branches(roots[-1], closed_loop_poles(A, B, C, D, K)))
 
-    gains, roots = _refine_jumps(A, B, C, D, list(gains), roots)
+    gains, roots = refine_jumps(A, B, C, D, list(gains), roots)
     return np.asarray(gains), np.asarray(roots)
 
 
@@ -232,7 +232,7 @@ def step_response(A, B, C, D, t):
     One matrix exponential of the augmented ``[[A, B], [0, 0]]`` gives the
     zero-order-hold pair ``(A_d, B_d)``; the state is then marched exactly.
     """
-    A, B, C, D = _matrices(A, B, C, D)
+    A, B, C, D = as_matrices(A, B, C, D)
     t = np.asarray(t, dtype=float).reshape(-1)
     n, m = B.shape
     if t.size < 2:
@@ -276,7 +276,7 @@ def settling_horizon(A):
 _INFINITE_ZERO_RATIO = 1e-8
 
 
-def _bracket_unit_gain(A, B, C, D, w_min, w_max, *, decades=8):
+def bracket_unit_gain(A, B, C, D, w_min, w_max, *, decades=8):
     """Widen ``(w_min, w_max)`` until the band brackets ``|G| = 1``.
 
     Downward while the magnitude is below one *and still climbing steeply*
@@ -305,7 +305,7 @@ def _bracket_unit_gain(A, B, C, D, w_min, w_max, *, decades=8):
     return w_min, w_max
 
 
-def _matrices(A, B, C, D):
+def as_matrices(A, B, C, D):
     A = np.atleast_2d(np.asarray(A, dtype=float))
     B = np.atleast_2d(np.asarray(B, dtype=float))
     C = np.atleast_2d(np.asarray(C, dtype=float))
@@ -317,23 +317,23 @@ def _matrices(A, B, C, D):
     return A, B, C, D
 
 
-def _sign_changes(values):
+def sign_changes(values):
     """Indices ``k`` where ``values[k]`` and ``values[k + 1]`` have opposite signs."""
     signs = np.sign(values)
     return np.flatnonzero(signs[:-1] * signs[1:] < 0)
 
 
-def _interpolate(w_pair, values_pair, target):
+def interpolate_crossing(w_pair, values_pair, target):
     """Frequency where a linearly interpolated segment crosses ``target``."""
     (w0, w1), (v0, v1) = w_pair, values_pair
     return w0 + (target - v0) * (w1 - w0) / (v1 - v0)
 
 
-def _phase_margin_from_samples(w, magnitude_db, phase_deg):
+def phase_margin_from_samples(w, magnitude_db, phase_deg):
     """Phase margin at the gain crossover ``|L| = 1``: the smallest margin wins."""
     pm, w_gc = np.inf, np.inf
-    for k in _sign_changes(magnitude_db):
-        w_c = _interpolate(w[k : k + 2], magnitude_db[k : k + 2], 0.0)
+    for k in sign_changes(magnitude_db):
+        w_c = interpolate_crossing(w[k : k + 2], magnitude_db[k : k + 2], 0.0)
         phase_c = np.interp(w_c, w[k : k + 2], phase_deg[k : k + 2])
         # 180 + ∠L, folded into (−180, 180]
         margin = (phase_c + 180.0 + 180.0) % 360.0 - 180.0
@@ -342,39 +342,39 @@ def _phase_margin_from_samples(w, magnitude_db, phase_deg):
     return pm, w_gc
 
 
-def _gain_margin_from_samples(w, magnitude_db, phase_deg):
+def gain_margin_from_samples(w, magnitude_db, phase_deg):
     """Gain margin at the phase crossovers ``arg L = -180`` deg (mod 360)."""
     gm, w_pc = np.inf, np.inf
     lowest = int(np.floor((phase_deg.min() + 180.0) / 360.0))
     highest = int(np.ceil((phase_deg.max() + 180.0) / 360.0))
     for k_wrap in range(lowest, highest + 1):
         target = -180.0 + 360.0 * k_wrap
-        for k in _sign_changes(phase_deg - target):
-            w_c = _interpolate(w[k : k + 2], phase_deg[k : k + 2], target)
+        for k in sign_changes(phase_deg - target):
+            w_c = interpolate_crossing(w[k : k + 2], phase_deg[k : k + 2], target)
             gain_c = -np.interp(w_c, w[k : k + 2], magnitude_db[k : k + 2])
             if abs(gain_c) < abs(gm):
                 gm, w_pc = gain_c, w_c
     return gm, w_pc
 
 
-def _open_loop_radius(A, B, C, D):
+def open_loop_radius(A, B, C, D):
     return max(
         np.max(np.abs(np.concatenate([poles(A), zeros(A, B, C, D)])), initial=0.0),
         1.0,
     )
 
 
-def _default_gains(A, B, C, D, n):
+def default_gains(A, B, C, D, n):
     """``0`` then six log decades ending where the far branches leave the picture."""
-    k_max = _gain_reaching(A, B, C, D, 10.0 * _open_loop_radius(A, B, C, D))
+    k_max = gain_reaching(A, B, C, D, 10.0 * open_loop_radius(A, B, C, D))
     return np.concatenate(
         [[0.0], np.logspace(np.log10(k_max) - 6.0, np.log10(k_max), n)]
     )
 
 
-def _refine_jumps(A, B, C, D, gains, roots):
+def refine_jumps(A, B, C, D, gains, roots):
     """Insert the midpoint gain wherever a branch jumps more than two percent of the radius."""
-    step = 0.02 * _open_loop_radius(A, B, C, D)
+    step = 0.02 * open_loop_radius(A, B, C, D)
     k = 0
     while k < len(gains) - 1:
         if (
@@ -384,15 +384,15 @@ def _refine_jumps(A, B, C, D, gains, roots):
             K_mid = 0.5 * (gains[k] + gains[k + 1])
             gains.insert(k + 1, K_mid)
             roots.insert(
-                k + 1, _matched(roots[k], closed_loop_poles(A, B, C, D, K_mid))
+                k + 1, matched_branches(roots[k], closed_loop_poles(A, B, C, D, K_mid))
             )
-            roots[k + 2] = _matched(roots[k + 1], roots[k + 2])
+            roots[k + 2] = matched_branches(roots[k + 1], roots[k + 2])
         else:
             k += 1
     return gains, roots
 
 
-def _gain_reaching(A, B, C, D, radius):
+def gain_reaching(A, B, C, D, radius):
     """Gain at which the farthest closed-loop pole reaches ``radius``.
 
     Stops early when doubling the gain no longer moves the poles (every
@@ -403,14 +403,14 @@ def _gain_reaching(A, B, C, D, radius):
     for _ in range(60):
         if np.max(np.abs(previous), initial=0.0) >= radius:
             return K
-        current = _matched(previous, closed_loop_poles(A, B, C, D, 2.0 * K))
+        current = matched_branches(previous, closed_loop_poles(A, B, C, D, 2.0 * K))
         if np.max(np.abs(current - previous), initial=0.0) < 1e-4 * radius:
             return 2.0 * K
         K, previous = 2.0 * K, current
     return K
 
 
-def _matched(previous, current):
+def matched_branches(previous, current):
     """Reorder ``current`` so each entry continues the nearest ``previous`` branch."""
     from scipy.optimize import linear_sum_assignment
 

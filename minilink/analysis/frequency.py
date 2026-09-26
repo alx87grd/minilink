@@ -15,8 +15,8 @@ matplotlib or plotly.
 
 from __future__ import annotations
 
+import inspect
 import os
-import sys
 import warnings
 
 import numpy as np
@@ -109,7 +109,7 @@ def bode(
         sys, x_bar, u_bar, t, params, of=of, wrt=wrt, w=w, n=n, method=method, eps=eps
     )
 
-    magnitude_db, phase_deg = _bode_coordinates(G)
+    magnitude_db, phase_deg = bode_coordinates(G)
     return w, magnitude_db, phase_deg
 
 
@@ -314,7 +314,7 @@ def plot_bode(
         loop_margins = linear.margins(w_margins, G_margins)
 
     return render_control_figure(
-        _bode_figure(w_plot, G, sys, of, wrt, loop_margins, title=title),
+        bode_figure(w_plot, G, sys, of, wrt, loop_margins, title=title),
         backend=backend,
         show=show,
     )
@@ -350,7 +350,7 @@ def plot_pzmap(
     )
 
     return render_control_figure(
-        _pzmap_figure(z, p, sys, of, wrt), backend=backend, show=show
+        pzmap_figure(z, p, sys, of, wrt), backend=backend, show=show
     )
 
 
@@ -380,7 +380,7 @@ def plot_root_locus(
     K, roots = linear.root_locus(A, B, C, D, gains)
 
     return render_control_figure(
-        _root_locus_figure(A, B, C, D, K, roots, sys, of, wrt),
+        root_locus_figure(A, B, C, D, K, roots, sys, of, wrt),
         backend=backend,
         show=show,
     )
@@ -408,7 +408,7 @@ def plot_nyquist(
     )
 
     return render_control_figure(
-        _nyquist_figure(w, G, sys, of, wrt), backend=backend, show=show
+        nyquist_figure(w, G, sys, of, wrt), backend=backend, show=show
     )
 
 
@@ -430,7 +430,7 @@ def siso_channel(sys, of, wrt):
     if of is None:
         default = output_selectors(sys, None)
         of = (None, 0) if default is None else (default[0][0], 0)
-    return _component(of, "of"), _component(wrt, "wrt")
+    return siso_selector(of, "of"), siso_selector(wrt, "wrt")
 
 
 def channel_label(sys, of, wrt):
@@ -486,7 +486,7 @@ def minimal_channel(A, B, C, D, minimal):
 def caller_stacklevel():
     """``stacklevel`` of the first frame outside minilink, so a warning names the user's line."""
     package = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-    frame, level = sys._getframe(1), 1
+    frame, level = inspect.currentframe().f_back, 1
     while frame is not None and os.path.abspath(frame.f_code.co_filename).startswith(
         package
     ):
@@ -510,13 +510,13 @@ def frequency_grid(A, B, C, D, w, n):
 # =============================================================================
 
 
-def _bode_coordinates(G):
+def bode_coordinates(G):
     with np.errstate(divide="ignore"):
         magnitude_db = 20.0 * np.log10(np.abs(G))
     return magnitude_db, np.degrees(np.unwrap(np.angle(G)))
 
 
-def _component(selector, name):
+def siso_selector(selector, name):
     """One component ``(name, index)`` from a port id or a ``(port, index)`` pair."""
     if isinstance(selector, str):
         return (selector, 0)
@@ -534,7 +534,7 @@ def _component(selector, name):
     )
 
 
-def _margins_text(m: Margins) -> str:
+def margins_text(m: Margins) -> str:
     gm = (
         "inf"
         if not np.isfinite(m.gain_margin_db)
@@ -548,14 +548,14 @@ def _margins_text(m: Margins) -> str:
     return f"Gm = {gm}\nPm = {pm}"
 
 
-def _root_text(s) -> str:
+def root_text(s) -> str:
     damping = float(-s.real / abs(s)) if abs(s) > 0.0 else 1.0
     return (
         f"s = {s.real:.3g} {s.imag:+.3g}j<br>ζ = {damping:.3f}, ωn = {abs(s):.3g} rad/s"
     )
 
 
-def _root_markers(p, z):
+def root_markers(p, z):
     """Poles as ``x`` and zeros as ``o`` in the system colour."""
     return (
         Trace(
@@ -564,7 +564,7 @@ def _root_markers(p, z):
             style.SYSTEM_COLOR,
             mode="markers",
             marker="x",
-            hover=tuple(_root_text(s) for s in p),
+            hover=tuple(root_text(s) for s in p),
         ),
         Trace(
             z.real,
@@ -572,13 +572,13 @@ def _root_markers(p, z):
             style.SYSTEM_COLOR,
             mode="markers",
             marker="o",
-            hover=tuple(_root_text(s) for s in z),
+            hover=tuple(root_text(s) for s in z),
         ),
     )
 
 
-def _bode_figure(w, G, sys, of, wrt, m, title=None):
-    magnitude_db, phase_deg = _bode_coordinates(G)
+def bode_figure(w, G, sys, of, wrt, m, title=None):
+    magnitude_db, phase_deg = bode_coordinates(G)
     hover = tuple(
         f"ω = {wk:.3g} rad/s<br>|G| = {mk:.1f} dB<br>∠G = {pk:.1f}°"
         for wk, mk, pk in zip(w, magnitude_db, phase_deg)
@@ -590,7 +590,7 @@ def _bode_figure(w, G, sys, of, wrt, m, title=None):
             for w_c in (m.w_gain_crossover, m.w_phase_crossover)
             if np.isfinite(w_c)
         )
-        notes = (Note(_margins_text(m)),)
+        notes = (Note(margins_text(m)),)
         references = (RefLine("y", 0.0),), (RefLine("y", -180.0),)
     else:
         references = (), ()
@@ -619,14 +619,14 @@ def _bode_figure(w, G, sys, of, wrt, m, title=None):
     )
 
 
-def _pzmap_figure(z, p, sys, of, wrt):
+def pzmap_figure(z, p, sys, of, wrt):
     points = np.concatenate([z, p])
     return ControlFigure(
         title=style.PZMAP_TITLE,
         subtitle=channel_subtitle(sys, of, wrt),
         panels=(
             Panel(
-                traces=_root_markers(p, z),
+                traces=root_markers(p, z),
                 x_label=style.REAL_LABEL,
                 y_label=style.IMAG_LABEL,
                 zero_lines=True,
@@ -637,7 +637,7 @@ def _pzmap_figure(z, p, sys, of, wrt):
     )
 
 
-def _root_locus_figure(A, B, C, D, K, roots, sys, of, wrt):
+def root_locus_figure(A, B, C, D, K, roots, sys, of, wrt):
     # The view keeps the poles, zeros and the branches near them; the far tails
     # of the asymptotes leave the frame as they do in MATLAB.
     reach = 3.0 * max(
@@ -654,7 +654,7 @@ def _root_locus_figure(A, B, C, D, K, roots, sys, of, wrt):
             roots[:, j].imag,
             style.SYSTEM_COLOR,
             hover=tuple(
-                f"K = {k:.3g}<br>" + _root_text(s) for k, s in zip(K, roots[:, j])
+                f"K = {k:.3g}<br>" + root_text(s) for k, s in zip(K, roots[:, j])
             ),
         )
         for j in range(roots.shape[1])
@@ -665,7 +665,7 @@ def _root_locus_figure(A, B, C, D, K, roots, sys, of, wrt):
         panels=(
             Panel(
                 traces=branches
-                + _root_markers(linear.poles(A), linear.zeros(A, B, C, D)),
+                + root_markers(linear.poles(A), linear.zeros(A, B, C, D)),
                 x_label=style.REAL_LABEL,
                 y_label=style.IMAG_LABEL,
                 zero_lines=True,
@@ -676,7 +676,7 @@ def _root_locus_figure(A, B, C, D, K, roots, sys, of, wrt):
     )
 
 
-def _nyquist_figure(w, G, sys, of, wrt):
+def nyquist_figure(w, G, sys, of, wrt):
     hover = tuple(
         f"ω = {wk:.3g} rad/s<br>G = {g.real:.3g} {g.imag:+.3g}j" for wk, g in zip(w, G)
     )
