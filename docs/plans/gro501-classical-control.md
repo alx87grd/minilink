@@ -379,8 +379,9 @@ P3 gates P4 (the Luenberger factory places poles on the dual pair). P1 and P2
 gate P11 (until then the notebooks would teach wrong pole counts); both are
 in (P2 on 2026-09-26). P7 is independent and worth doing before P2
 and P5 add three more facade methods each by hand. With P4 and P6 held, the
-next actionable steps are **P5, P8**, then TB (the textbook review, whose
-shortcut list decides P7's scope).
+next steps are, in order: **TB-a** (the analysis toolbox read like the textbook,
+starting with the shortcut list that decides P7's scope), then **P5** and **P8** on the
+cleaned toolbox, then **TB-b** (the control objects and the loop), then **P11**.
 
 ## 3. What this plan does not do
 

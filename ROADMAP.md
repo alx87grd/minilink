@@ -275,8 +275,17 @@ names exist; three of them are not yet the objects the tools carry.
   `pzmap` / `root_locus` / `transfer_function` cancel by default), **P3** `place()`
   (landed 2026-09-26: Ackermann with one input, `place_poles` with several);
   **P2b** order reduction. **[ask — public name]**
-- **B2** The missing surface: **P5** named `S` / `T` / `PS` / `CS`, **P7**
-  generated analysis facades, **P8** ζ / ω_n and the `N` matrix.
+- **TB-a** Next (decided 2026-09-26): the analysis toolbox reads like the
+  textbook. First the review of which System shortcuts stay (reserved for
+  linearize + common analysis), then the `dp.py`-style audit and pass of
+  `linear`, `frequency`, `time_response`, `structural`, `linearize` and
+  `modal`; before P5 and P8, which build on these files. **[ask — public names]**
+- **B2** The missing surface, on the cleaned toolbox: **P5** named
+  `S` / `T` / `PS` / `CS`, **P8** ζ / ω_n and the `N` matrix, **P7** the
+  generated facades (only the shortcuts TB-a keeps).
+- **TB-b** The control objects and the loop (`siso`, `state`, `lqr`, `place`,
+  `TransferFunction`, `LTISystem`, `feedback` / `@`) read like the textbook;
+  after P5, before P11.
 - **B3** **P4** `estimation/`: `LuenbergerObserver`, `luenberger()`,
   `kalman()`, and how observer and state feedback compose. Held 2026-09-07;
   it is the largest §4.2 gap, so v0.2 needs the hold lifted and the
@@ -286,9 +295,6 @@ names exist; three of them are not yet the objects the tools carry.
   stays held (teach with `discretize` + simulation) unless the sommatif
   examines z-plane analysis; **S61** every analysis verb takes a `System`;
   **S62** the LQR family on the control band facade. **[ask — public names]**
-- **TB** The classical-control pipeline reads like the textbook: first the
-  review of which System shortcuts stay (reserved for linearize + common
-  analysis), then the `dp.py`-style audit and pass; before P11.
 - **B5** **P11** the two GRO501 notebooks (APP2 propulsion, APP4 autopilot),
   Basic tier, Colab-first. **[maintainer]**
 
@@ -418,7 +424,7 @@ here. Each open item needs the maintainer.
   `System` is reserved for the very common "linearize + analyse/plot"
   operations; the rest is called as a band function. `minreal` is the first
   case: no shortcut, it runs inside `pzmap` / `root_locus` /
-  `transfer_function`. The keep/drop list of today's 18 shortcuts is TB's
+  `transfer_function`. The keep/drop list of today's 18 shortcuts is TB-a's
   first step.
 - **Undeclared feedthrough** (S66): an output that moves with an input it
   does not declare simulates a wrong fixed point silently today; raise or
