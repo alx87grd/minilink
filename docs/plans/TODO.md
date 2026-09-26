@@ -41,14 +41,11 @@ the triage in [2026-09-22-improvement-suggestions.md](../reviews/2026-09-22-impr
   Confirm the GitHub Environment `pypi` and the PyPI trusted publisher (`alx87grd` /
   `minilink` / `publish.yml` / env `pypi`), then `git tag 0.1.1 && git push origin 0.1.1`.
   Done when `pip install minilink==0.1.1` installs the teaching surface from PyPI.
-  Before `0.1.1` (scan: tests-ci#12, tests-ci#13, examples#1, examples#4): `publish.yml`
-  runs ruff and `pytest` before uploading, and every long CI job gets `timeout-minutes`;
-  `showcase_jax.ipynb` stops importing `experimental.c_export`, which the wheel does not
+  Before `0.1.1` (scan: examples#1, examples#4; `publish.yml` running ruff and `pytest`
+  before the upload and the CI time limits landed 2026-09-26, the nightly job's limit
+  waits for its first green run): `showcase_jax.ipynb` stops importing `experimental.c_export`, which the wheel does not
   ship; `plot_diagram()` without the `graphviz` wrapper (ROADMAP §6); one canonical Colab
   setup cell per install tier, pinned by a test (38 notebooks carry 11 variants today).
-- [ ] **R3 Ruff runs itself**: `ruff` and `ruff-format` hooks in `.pre-commit-config.yaml`,
-  pinned to the dev extra's ruff (scan: tests-ci#6). Done when `pre-commit run --all-files`
-  matches the CI lint steps.
 - [ ] **S59 Docs drift** (scan: docs-gov#3, docs-gov#4, docs-gov#5, docs-gov#7, docs-gov#8,
   docs-gov#12, docs-gov#13, tests-ci#4, control#12, analysis#12): the CI commands written
   once (the tests/README agent table), AGENTS naming the jobs and the regression flags given

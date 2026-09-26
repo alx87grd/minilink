@@ -200,8 +200,8 @@ term's hygiene:
   below did not ride it; they gate `0.1.1`. **[ask]**
 - CI runs on `dev`, the working branch (R2, landed 2026-09-26).
 - **R3** Keep `ruff check .` and `ruff format --check .` green on every
-  push (the 2026-09-22 pass restored them after the racecar demos landed),
-  with pre-commit hooks so the check runs itself.
+  push; since 2026-09-26 the pre-commit hooks run both with the dev
+  extra's ruff (`pre-commit install` once per clone).
 - The 46 bugs of the 2026-09-22 improvement scan and ten sibling defects
   its fix reviews found landed 2026-09-23 (S58; outcomes in
   [docs/reviews/2026-09-22-improvement-suggestions.md](docs/reviews/2026-09-22-improvement-suggestions.md)).
