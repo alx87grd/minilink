@@ -3,7 +3,8 @@ System convenience facades.
 
 Evolution-aware mixin shortcuts for :class:`~minilink.core.system.System`
 subclasses: :class:`SharedSystemFacades` (all kinds), :class:`DynamicSystemFacades`
-(continuous evolution), and :class:`StepSystemFacades` (discrete rollout).
+(continuous evolution), :class:`StepSystemFacades` (discrete rollout), and
+:class:`LTISystemFacades` (linear models only).
 
 The mixins are shortcuts only: mathematical, structural, and visualization
 contracts stay in :mod:`minilink.core.system`. Heavy dependencies
@@ -674,72 +675,6 @@ class DynamicSystemFacades:
             minimal=minimal,
         )
 
-    def bode(
-        self,
-        x_bar=None,
-        u_bar=None,
-        t=0.0,
-        params=None,
-        *,
-        of=None,
-        wrt=None,
-        w=None,
-        n=200,
-        method="auto",
-        eps=1e-6,
-    ):
-        """Return ``(w, magnitude_db, phase_deg)`` of one SISO channel.
-
-        See :func:`minilink.analysis.frequency.bode`.
-        """
-        from minilink.analysis.frequency import bode
-
-        return bode(
-            self,
-            x_bar,
-            u_bar,
-            t,
-            params,
-            of=of,
-            wrt=wrt,
-            w=w,
-            n=n,
-            method=method,
-            eps=eps,
-        )
-
-    def pzmap(
-        self,
-        x_bar=None,
-        u_bar=None,
-        t=0.0,
-        params=None,
-        *,
-        of=None,
-        wrt=None,
-        method="auto",
-        eps=1e-6,
-        minimal=None,
-    ):
-        """Return ``(zeros, poles, gain)`` of one SISO channel.
-
-        See :func:`minilink.analysis.frequency.pzmap`.
-        """
-        from minilink.analysis.frequency import pzmap
-
-        return pzmap(
-            self,
-            x_bar,
-            u_bar,
-            t,
-            params,
-            of=of,
-            wrt=wrt,
-            method=method,
-            eps=eps,
-            minimal=minimal,
-        )
-
     def plot_bode(
         self,
         x_bar=None,
@@ -782,223 +717,6 @@ class DynamicSystemFacades:
             title=title,
         )
 
-    def margins(
-        self,
-        x_bar=None,
-        u_bar=None,
-        t=0.0,
-        params=None,
-        *,
-        of=None,
-        wrt=None,
-        w=None,
-        n=2000,
-        method="auto",
-        eps=1e-6,
-    ):
-        """Gain and phase margins of one SISO channel taken as a loop gain.
-
-        See :func:`minilink.analysis.frequency.margins`.
-        """
-        from minilink.analysis.frequency import margins
-
-        return margins(
-            self,
-            x_bar,
-            u_bar,
-            t,
-            params,
-            of=of,
-            wrt=wrt,
-            w=w,
-            n=n,
-            method=method,
-            eps=eps,
-        )
-
-    def nyquist(
-        self,
-        x_bar=None,
-        u_bar=None,
-        t=0.0,
-        params=None,
-        *,
-        of=None,
-        wrt=None,
-        w=None,
-        n=500,
-        method="auto",
-        eps=1e-6,
-    ):
-        """Return ``(w, G)`` of one SISO channel for the Nyquist contour.
-
-        See :func:`minilink.analysis.frequency.nyquist`.
-        """
-        from minilink.analysis.frequency import nyquist
-
-        return nyquist(
-            self,
-            x_bar,
-            u_bar,
-            t,
-            params,
-            of=of,
-            wrt=wrt,
-            w=w,
-            n=n,
-            method=method,
-            eps=eps,
-        )
-
-    def root_locus(
-        self,
-        x_bar=None,
-        u_bar=None,
-        t=0.0,
-        params=None,
-        *,
-        of=None,
-        wrt=None,
-        gains=None,
-        method="auto",
-        eps=1e-6,
-        minimal=None,
-    ):
-        """Return ``(gains, roots)`` of one SISO channel closed with ``u = -K y``.
-
-        See :func:`minilink.analysis.frequency.root_locus`.
-        """
-        from minilink.analysis.frequency import root_locus
-
-        return root_locus(
-            self,
-            x_bar,
-            u_bar,
-            t,
-            params,
-            of=of,
-            wrt=wrt,
-            gains=gains,
-            method=method,
-            eps=eps,
-            minimal=minimal,
-        )
-
-    def step_response(
-        self,
-        x_bar=None,
-        u_bar=None,
-        t=0.0,
-        params=None,
-        *,
-        of=None,
-        wrt=None,
-        tf=None,
-        n=500,
-        method="auto",
-        eps=1e-6,
-    ):
-        """Return ``(time, y)``, the unit-step response of one SISO channel.
-
-        See :func:`minilink.analysis.time_response.step_response`.
-        """
-        from minilink.analysis.time_response import step_response
-
-        return step_response(
-            self,
-            x_bar,
-            u_bar,
-            t,
-            params,
-            of=of,
-            wrt=wrt,
-            tf=tf,
-            n=n,
-            method=method,
-            eps=eps,
-        )
-
-    def region_of_attraction(
-        self,
-        x_bar=None,
-        u_bar=None,
-        t=0.0,
-        params=None,
-        *,
-        method="quadratic",
-        Q=None,
-        window=None,
-        samples=None,
-        search="auto",
-    ):
-        """Certify a region of attraction about an equilibrium of this loop.
-
-        See :func:`minilink.analysis.lyapunov.region_of_attraction`.
-        """
-        from minilink.analysis.lyapunov import region_of_attraction
-
-        return region_of_attraction(
-            self,
-            x_bar,
-            u_bar,
-            t,
-            params,
-            method=method,
-            Q=Q,
-            window=window,
-            samples=samples,
-            search=search,
-        )
-
-    def plot_region_of_attraction(
-        self,
-        x_bar=None,
-        u_bar=None,
-        t=0.0,
-        params=None,
-        *,
-        x_axis=0,
-        y_axis=1,
-        basin=False,
-        detail=True,
-        verified=0,
-        trajectories=(),
-        n=201,
-        limits=None,
-        show=True,
-        method="quadratic",
-        Q=None,
-        window=None,
-        samples=None,
-        search="auto",
-    ):
-        """Certify a region of attraction and draw a slice of it.
-
-        See :func:`minilink.analysis.lyapunov.plot_region_of_attraction`.
-        """
-        certificate = self.region_of_attraction(
-            x_bar,
-            u_bar,
-            t,
-            params,
-            method=method,
-            Q=Q,
-            window=window,
-            samples=samples,
-            search=search,
-        )
-        return certificate.plot(
-            x_axis,
-            y_axis,
-            basin=basin,
-            detail=detail,
-            verified=verified,
-            trajectories=trajectories,
-            n=n,
-            limits=limits,
-            show=show,
-        )
-
     def plot_root_locus(
         self,
         x_bar=None,
@@ -1033,82 +751,6 @@ class DynamicSystemFacades:
             method=method,
             eps=eps,
             minimal=minimal,
-            backend=backend,
-            show=show,
-        )
-
-    def plot_nyquist(
-        self,
-        x_bar=None,
-        u_bar=None,
-        t=0.0,
-        params=None,
-        *,
-        of=None,
-        wrt=None,
-        w=None,
-        n=500,
-        method="auto",
-        eps=1e-6,
-        backend="matplotlib",
-        show=True,
-    ):
-        """Nyquist diagram of one SISO channel with the critical point.
-
-        See :func:`minilink.analysis.frequency.plot_nyquist`.
-        """
-        from minilink.analysis.frequency import plot_nyquist
-
-        return plot_nyquist(
-            self,
-            x_bar,
-            u_bar,
-            t,
-            params,
-            of=of,
-            wrt=wrt,
-            w=w,
-            n=n,
-            method=method,
-            eps=eps,
-            backend=backend,
-            show=show,
-        )
-
-    def plot_step_response(
-        self,
-        x_bar=None,
-        u_bar=None,
-        t=0.0,
-        params=None,
-        *,
-        of=None,
-        wrt=None,
-        tf=None,
-        n=500,
-        method="auto",
-        eps=1e-6,
-        backend="matplotlib",
-        show=True,
-    ):
-        """Step response of one SISO channel with rise time, settling time and overshoot.
-
-        See :func:`minilink.analysis.time_response.plot_step_response`.
-        """
-        from minilink.analysis.time_response import plot_step_response
-
-        return plot_step_response(
-            self,
-            x_bar,
-            u_bar,
-            t,
-            params,
-            of=of,
-            wrt=wrt,
-            tf=tf,
-            n=n,
-            method=method,
-            eps=eps,
             backend=backend,
             show=show,
         )
@@ -1149,14 +791,14 @@ class DynamicSystemFacades:
             show=show,
         )
 
-    def modal_analysis(
+    def animate_modal(
         self,
         x_bar=None,
         u_bar=None,
         t=0.0,
         params=None,
         *,
-        mode=None,
+        mode="all",
         method="auto",
         eps=1e-6,
         amplitude=1.0,
@@ -1169,35 +811,31 @@ class DynamicSystemFacades:
         html=None,
         native=True,
     ):
-        """Linearize and eigendecompose ``A``; returns ``(poles, modes)``.
+        """Linearize, excite the selected mode(s), and animate them on this system.
 
-        With ``mode=None`` analyze only. With ``mode=0`` or ``mode="all"``,
-        also animate the mode shapes through
-        :func:`~minilink.analysis.modal.animate_modal`.
+        See :func:`minilink.analysis.modal.animate_modal`.
         """
-        from minilink.analysis.modal import animate_modal, modal_analysis
+        from minilink.analysis.modal import animate_modal
 
-        if mode is not None:
-            return animate_modal(
-                self,
-                x_bar,
-                u_bar,
-                t,
-                params,
-                mode=mode,
-                method=method,
-                eps=eps,
-                amplitude=amplitude,
-                tf=tf,
-                n_steps=n_steps,
-                time_factor_video=time_factor_video,
-                renderer=renderer,
-                is_3d=is_3d,
-                show=show,
-                html=html,
-                native=native,
-            )
-        return modal_analysis(self, x_bar, u_bar, t, params, method=method, eps=eps)
+        return animate_modal(
+            self,
+            x_bar,
+            u_bar,
+            t,
+            params,
+            mode=mode,
+            method=method,
+            eps=eps,
+            amplitude=amplitude,
+            tf=tf,
+            n_steps=n_steps,
+            time_factor_video=time_factor_video,
+            renderer=renderer,
+            is_3d=is_3d,
+            show=show,
+            html=html,
+            native=native,
+        )
 
     def find_equilibrium(self, x_guess, u_bar=None, t=0.0, params=None, *, tol=1e-9):
         """Return a state near ``x_guess`` where ``f`` vanishes.
@@ -1257,6 +895,36 @@ class DynamicSystemFacades:
         traj = rt_sim.run(x0=x0, t0=t0)
         self.traj = traj
         return traj
+
+
+class LTISystemFacades:
+    """
+    Shortcuts that only make sense on a linear model, for :class:`~minilink.dynamics.abstraction.state_space.LTISystem`.
+
+    A time response read off a nonlinear plant would look like a simulation of
+    that plant; on a diagram or a nonlinear system, call ``linearize()`` or
+    ``transfer_function()`` first.
+    """
+
+    def plot_step_response(
+        self,
+        *,
+        of=None,
+        wrt=None,
+        tf=None,
+        n=500,
+        backend="matplotlib",
+        show=True,
+    ):
+        """Step response of one SISO channel with rise time, settling time and overshoot.
+
+        See :func:`minilink.analysis.time_response.plot_step_response`.
+        """
+        from minilink.analysis.time_response import plot_step_response
+
+        return plot_step_response(
+            self, of=of, wrt=wrt, tf=tf, n=n, backend=backend, show=show
+        )
 
 
 class StepSystemFacades:

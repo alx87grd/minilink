@@ -167,27 +167,47 @@ class TestChannelTools(unittest.TestCase):
         )
         np.testing.assert_allclose(G_tf.numerator, [0.5], atol=1e-9)
 
-    def test_methods_mirror_the_functions(self):
+    def test_the_system_shortcuts(self):
+        # Objects and plots only; the data verbs are band functions, and the
+        # time response of a linearized model lives on LTISystem alone.
+        kept = {
+            "linearize",
+            "find_equilibrium",
+            "transfer_function",
+            "plot_phase_plane",
+            "plot_bode",
+            "plot_pzmap",
+            "plot_root_locus",
+            "animate_modal",
+        }
+        removed = {
+            "bode",
+            "pzmap",
+            "margins",
+            "root_locus",
+            "step_response",
+            "nyquist",
+            "plot_nyquist",
+            "region_of_attraction",
+            "plot_region_of_attraction",
+            "modal_analysis",
+            "plot_step_response",
+        }
         plant = InvertedPendulum()
-        x_bar = [0.0, 0.0]
-        np.testing.assert_allclose(
-            plant.root_locus(x_bar)[1], root_locus(plant, x_bar)[1]
-        )
-        np.testing.assert_allclose(
-            plant.nyquist(x_bar, w=[1.0, 2.0])[1],
-            nyquist(plant, x_bar, w=[1.0, 2.0])[1],
-        )
-        self.assertEqual(plant.margins(x_bar), margins(plant, x_bar))
-        np.testing.assert_allclose(
-            plant.step_response(x_bar, tf=1.0, n=20)[1],
-            step_response(plant, x_bar, tf=1.0, n=20)[1],
+        for name in kept:
+            self.assertTrue(callable(getattr(plant, name)), name)
+        for name in removed:
+            self.assertFalse(hasattr(plant, name), name)
+        self.assertTrue(callable(plant.linearize([0.0, 0.0]).plot_step_response))
+        self.assertTrue(
+            callable(TransferFunction([1.0], [1.0, 1.0]).plot_step_response)
         )
 
     def test_transfer_function_blocks_go_through_unchanged(self):
         L = TransferFunction([1.0], [1.0, 3.0, 2.0, 0.0])
-        m = L.margins()
+        m = margins(L)
         self.assertAlmostEqual(m.gain_margin_db, 20 * np.log10(6.0), places=2)
-        gains, roots = L.root_locus()
+        gains, roots = root_locus(L)
         self.assertEqual(roots.shape[1], 3)
 
 

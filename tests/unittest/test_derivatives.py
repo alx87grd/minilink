@@ -432,12 +432,6 @@ class TestFamilyPattern(unittest.TestCase):
             plant.linearize(x_bar).A(), linearize(plant, x_bar).A()
         )
         np.testing.assert_allclose(
-            plant.bode(x_bar, w=[1.0])[1], bode(plant, x_bar, w=[1.0])[1]
-        )
-        np.testing.assert_allclose(plant.pzmap(x_bar)[1], pzmap(plant, x_bar)[1])
-        poles, modes = plant.modal_analysis(x_bar)
-        self.assertEqual(len(poles), 2)
-        np.testing.assert_allclose(
             plant.find_equilibrium([0.3, 0.0]), [0.0, 0.0], atol=1e-6
         )
 

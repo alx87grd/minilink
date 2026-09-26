@@ -19,7 +19,7 @@ q_guess = np.array([0.0, -1.0, 1.2, -1.4, 0.0, 0.0])
 
 arm = UR5Manipulator()
 
-# arm.modal_analysis()
+# arm.animate_modal()
 
 q0 = arm.inverse_kinematics(p0, q_guess=q_guess)
 arm.x0 = arm.q2x(q0, np.zeros(6))

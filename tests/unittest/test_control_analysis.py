@@ -629,14 +629,10 @@ class TestAnimateModal(unittest.TestCase):
 
 
 class TestModalFacade(unittest.TestCase):
-    def test_returns_poles_and_modes(self):
-        poles, modes = Pendulum().modal_analysis(x_bar=[0.0, 0.0])
-        self.assertEqual(len(poles), 2)
-
     @pytest.mark.optional
     def test_facade_animate(self):
         os.environ.setdefault("MPLBACKEND", "Agg")
-        poles, modes = Pendulum().modal_analysis(x_bar=[0.0, 0.0], mode=0, show=False)
+        poles, modes = Pendulum().animate_modal(x_bar=[0.0, 0.0], mode=0, show=False)
         self.assertEqual(len(poles), 2)
 
 
@@ -670,7 +666,8 @@ class TestModalAPI(unittest.TestCase):
             modal_analysis(Pendulum(), x_bar=[0.0, 0.0], linearization="fd")
 
 
-from minilink.analysis.frequency import bode, pzmap, transfer_function
+from minilink.analysis.frequency import bode, margins, pzmap, transfer_function
+from minilink.analysis.time_response import step_response
 from minilink.graphical.common import PlotResult
 
 
@@ -1416,26 +1413,24 @@ class TestCompensatorStateLayout(unittest.TestCase):
             (PID(Kp=20.0, Ki=10.0, Kd=2.0, tau=0.05), 2, 2),
         ):
             with self.subTest(controller=type(controller).__name__):
-                zeros, poles, _ = (controller >> self.plant).pzmap()
+                zeros, poles, _ = pzmap(controller >> self.plant)
                 self.assertEqual(len(poles), plant_poles + extra_poles)
                 self.assertEqual(len(zeros), n_zeros)
 
     def test_pi_has_the_integrator_pole_and_pd_the_filter_pole(self):
-        _, pi_poles, _ = (PI(Kp=20.0, Ki=10.0) >> self.plant).pzmap()
+        _, pi_poles, _ = pzmap(PI(Kp=20.0, Ki=10.0) >> self.plant)
         self.assertEqual(np.sum(np.abs(pi_poles) < 1e-9), 1)
 
-        _, pd_poles, _ = (PD(Kp=20.0, Kd=2.0, tau=0.05) >> self.plant).pzmap()
+        _, pd_poles, _ = pzmap(PD(Kp=20.0, Kd=2.0, tau=0.05) >> self.plant)
         self.assertEqual(np.sum(np.abs(pd_poles) < 1e-9), 0)
         self.assertTrue(np.any(np.abs(pd_poles + 20.0) < 1e-9))  # -1/tau
 
     def test_integral_action_removes_the_static_error(self):
         from minilink.analysis import step_info
 
-        pd_final = step_info(
-            *(PD(Kp=20.0, Kd=2.0, tau=0.05) @ self.plant).step_response()
-        )
+        pd_final = step_info(*step_response(PD(Kp=20.0, Kd=2.0, tau=0.05) @ self.plant))
         pid_final = step_info(
-            *(PID(Kp=20.0, Ki=10.0, Kd=2.0, tau=0.05) @ self.plant).step_response()
+            *step_response(PID(Kp=20.0, Ki=10.0, Kd=2.0, tau=0.05) @ self.plant)
         )
         self.assertLess(pd_final.steady_state, 0.9)  # static offset without Ki
         self.assertAlmostEqual(pid_final.steady_state, 1.0, places=2)
@@ -1480,17 +1475,17 @@ class TestFrequencyRangeBracketsCrossover(unittest.TestCase):
 
     def test_integrator_loop(self):
         loop = self._tf([10.0], [1.0, 10.0, 0.0])  # 10 / (s (s + 10))
-        self.assertAlmostEqual(loop.margins().phase_margin_deg, 84.3173, places=3)
+        self.assertAlmostEqual(margins(loop).phase_margin_deg, 84.3173, places=3)
 
     def test_large_static_gain(self):
         loop = self._tf([1000.0], [1.0, 1.0])  # crossover three decades up
-        self.assertAlmostEqual(loop.margins().phase_margin_deg, 90.0573, places=3)
+        self.assertAlmostEqual(margins(loop).phase_margin_deg, 90.0573, places=3)
 
     def test_marginal_loop_is_exact(self):
         loop = self._tf([1.0], [1.0, 1.0, 1.0, 0.0])  # L(j1) = -1 exactly
-        margins = loop.margins()
-        self.assertAlmostEqual(margins.phase_margin_deg, 0.0, places=3)
-        self.assertAlmostEqual(margins.gain_margin_db, 0.0, places=3)
+        m = margins(loop)
+        self.assertAlmostEqual(m.phase_margin_deg, 0.0, places=3)
+        self.assertAlmostEqual(m.gain_margin_db, 0.0, places=3)
 
     def test_flat_low_frequency_gain_keeps_a_tidy_band(self):
         from minilink.analysis import linear
@@ -1501,7 +1496,7 @@ class TestFrequencyRangeBracketsCrossover(unittest.TestCase):
         w_min, w_max = linear.frequency_range(loop.A(), loop.B(), loop.C(), loop.D())
         self.assertAlmostEqual(w_min, 0.1)  # no walk down a DC plateau
         self.assertAlmostEqual(w_max, 100.0)
-        self.assertTrue(np.isinf(loop.margins().phase_margin_deg))
+        self.assertTrue(np.isinf(margins(loop).phase_margin_deg))
 
     def test_singular_feedback_gain_is_not_a_crash(self):
         from minilink.analysis import linear
@@ -1542,11 +1537,11 @@ class TestMinreal(unittest.TestCase):
         loop = lead >> plant
 
         with pytest.warns(UserWarning, match="Cancelled 1 pole/zero"):
-            zeros, poles, _ = loop.pzmap()
+            zeros, poles, _ = pzmap(loop)
         self.assertEqual(len(zeros), 0)
         np.testing.assert_allclose(np.sort(poles.real), [-10.0, -2.0], atol=1e-9)
 
-        zeros, poles, _ = loop.pzmap(minimal=False)
+        zeros, poles, _ = pzmap(loop, minimal=False)
         np.testing.assert_allclose(zeros, [-1.0], atol=1e-9)
         self.assertEqual(len(poles), 3)
 
@@ -1561,7 +1556,7 @@ class TestMinreal(unittest.TestCase):
                     np.testing.assert_array_equal(kept, given)
                 with warnings.catch_warnings():
                     warnings.simplefilter("error")
-                    lti.pzmap(of=("y", 0))
+                    pzmap(lti, of=("y", 0))
 
     def test_mimo_drops_the_uncontrollable_and_the_unobservable_mode(self):
         from minilink.analysis import linear

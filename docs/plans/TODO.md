@@ -35,17 +35,8 @@ the triage in [2026-09-22-improvement-suggestions.md](../reviews/2026-09-22-impr
 
 ## 1. v0.1 close-out
 
-- [ ] **R1 Publish `0.1.1` from a tag** **[ask]**. `publish.yml` published `minilink 0.1.0`
-  (2026-09-16, run 35139916195) from a `0.1.0` tag on `47cfd50`; the tag is gone from the
-  remote, and the trusted publisher works. Merge `dev` into `main`, then
-  `git tag 0.1.1 && git push origin 0.1.1` on `main`.
-  Done when `pip install minilink==0.1.1` installs the teaching surface from PyPI.
-  Before `0.1.1`: nothing open in the repo. Landed or decided 2026-09-26 (ROADMAP §6):
-  `publish.yml` runs ruff and `pytest` before the upload; CI time limits (the nightly
-  job's waits for its first green run); `plot_diagram()` warns and skips without
-  `graphviz`; `showcase_jax.ipynb` keeps its `experimental` import; every notebook that
-  imports minilink carries the one Colab setup cell, cloning the default branch, pinned by
-  `test_repo_contract.py` (`mpc_spatial_stack` no longer clones `dev-alex`).
+Nothing open. `minilink 0.1.1` is on PyPI (2026-09-26, tag `0.1.1` on `87fd4bd`, the
+first release a tag published); R1 left this file then.
 ---
 
 ## 2. v0.2 wave A — the textbook objects
@@ -127,21 +118,17 @@ patterns and no shortcut is added only to be dropped.
   [2026-09-22-consolidation-review.md](../reviews/2026-09-22-consolidation-review.md) §4.1
   under AGENTS "The textbook rule": the math in the body, plain helper names, timeless
   docstrings and comments; `planning/policy_synthesis/dp.py` is the reference.
-  1. **The shortcut review** **[ask — public names]**: a keep/drop table of the 18 analysis
-     methods on `DynamicSystemFacades` (`core/facades.py`), with their use counts. Shortcuts
-     are reserved for the very common "linearize + analyse/plot" operations; the rest is
-     called as a band function. Today in `examples/`: `plot_bode` 18, `linearize` 11,
-     `plot_root_locus` 8, `plot_pzmap` 7, down to `nyquist` and `plot_region_of_attraction`
-     at 0. No GRO860 notebook calls any, so the name freeze does not block the trim (dropped
-     shortcuts are deprecated first). P7 then generates only the kept ones.
+  1. **The shortcut review** — landed 2026-09-26 as a clean cut (ROADMAP §6 "System analysis
+     shortcuts"): eight shortcuts on every `System`, `plot_step_response` on `LTISystem` only,
+     ten removed to their band functions, every call site in `examples/` and `tests/` moved.
   2. **The audit**, read-only: `analysis/linear.py`, `frequency.py`, `time_response.py`,
-     `structural.py`, `linearize.py`, `modal.py` read line by line. The table of step 1 and
-     the findings go into one dated review in `docs/reviews/`, and the maintainer decides
+     `structural.py`, `linearize.py`, `modal.py` read line by line. The findings go into one
+     dated review in `docs/reviews/`, and the maintainer decides
      before any code changes.
-  3. **The pass**: behaviour-preserving (seeded baseline, byte-identical after), the dropped
-     shortcuts deprecated; public-name or returned-type changes only as decided in step 1 or
-     2. Absorbs T4's analysis half.
-  Done when the shortcut list is applied, the six modules read like `dp.py`, and the
+  3. **The pass**: behaviour-preserving (seeded baseline, byte-identical after);
+     public-name or returned-type changes only as decided in step 2. Absorbs T4's analysis
+     half.
+  Done when the six modules read like `dp.py`, and the
   baseline `cmp`s.
 - [ ] **TB-b The control objects and the loop read like the textbook** (after P5, which
   touches `feedback()`; before P11, so the notebooks students read sit on it). The same
@@ -159,13 +146,14 @@ patterns and no shortcut is added only to be dropped.
   into `TestPolePlacement`, once the matrices are in hand (stand-ins today).
 - [ ] **P5 Named sensitivity functions** `sensitivity` (`S = e/r`), `complementary_sensitivity`
   (`T = y/r`), `PS`, `CS` on a closed-loop diagram, each an `LTISystem`; `disturbance=` /
-  `noise=` injection points on `feedback()`. Done when `S + T = 1` holds to 1e-12 on a SISO
+  `noise=` injection points on `feedback()`; band functions, not `System` shortcuts (ROADMAP
+  §6). Done when `S + T = 1` holds to 1e-12 on a SISO
   loop and each Table 2 spec is one call plus a comparison.
 - [ ] **S61 Analysis verbs on any `System`** (scan: analysis#2, analysis#4, analysis#5,
   analysis#6, analysis#8): `controllability` / `observability` linearize like every sibling
-  and gain facades; `step_info` takes a `System`; `find_equilibrium` defaults its guess to
+  (band functions only, no facade: ROADMAP §6); `step_info` takes a `System`; `find_equilibrium` defaults its guess to
   `sys.x0`; the operating point's size is checked; margin crossings refined by a root solve so
-  `plot_bode` and `margins()` report one number. Done when P7's signature test covers them.
+  `plot_bode` and `margins` report one number. Done when P7's signature test covers them.
 - [ ] **S62 The LQR family on the control band** **[ask — public names]** (scan: control#0,
   control#1): rename the `control/lqr.py` module so `lqr`, `lqr_at_operating_point`,
   `lqr_finite_horizon`, `trajectory_lqr` and `lqr_gain_schedule` join the band facade and the
@@ -176,16 +164,18 @@ patterns and no shortcut is added only to be dropped.
 - [ ] **P7 Generate the analysis facades**: one helper builds a delegating method from the
   target function (signature and docstring copied), explicit form kept only where the facade
   differs; a test asserts every generated `__signature__` matches its target. Done when the
-  13 hand-copied methods are generated and `help(sys.bode)` is unchanged. Generates only
-  the shortcuts TB-a's review keeps (decided 2026-09-26: shortcuts are for the common
-  linearize + analyse/plot operations), so it runs after TB-a step 1.
+  kept shortcuts (TB-a step 1: seven analysis methods plus `animate_modal` on
+  `DynamicSystemFacades`, `plot_step_response` on `LTISystemFacades`) are generated and
+  `help(sys.plot_bode)` is unchanged; `test_the_system_shortcuts` pins the list.
   Also: a signature test pinning the band's calling pattern (scan: analysis#7); `linearize` and
   `discretize` freed from the band-facade name collision (scan: analysis#11).
 - [ ] **P8 Small teaching helpers**: ζ and ω_n from a complex pole pair (fields on the `pzmap`
   result or a `damping(sys)` verb); the `N` reference-scaling matrix giving `y = r` at steady
   state; the `settling_horizon` docstring (five vs eight). Done when §9.5 and §9.11 of the
   guide are each a short notebook cell.
-  Also: a `poles(sys)` verb with a `sys.poles()` facade, and `__str__` on `LTISystem`,
+  Also: a `poles(sys)` verb with a `poles()` facade on `LTISystem` only (ROADMAP §6);
+  `TransferFunction` stores `self.poles` as an array, which would shadow it — a property
+  or a renamed attribute, decided with the step; and `__str__` on `LTISystem`,
   `TransferFunction` and `StructuralResult`, so tutorial 01's `print(tf)` shows the transfer
   function and fourteen `np.linalg.eigvals(lin.A())` sites go (scan: analysis#3, examples#2).
 - [ ] **P4 `estimation/`** **[held 2026-09-07 — ask to lift]**. `LuenbergerObserver(A, B, C,

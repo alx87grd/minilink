@@ -3,6 +3,7 @@
 import numpy as np
 
 from minilink import InvertedPendulum, Lead
+from minilink.analysis import root_locus
 
 plant = InvertedPendulum()
 plant.x0 = np.array([0.0, 0.0])  # upright: the operating point every tool defaults to
@@ -24,7 +25,7 @@ L = C >> plant
 L.plot_pzmap()
 L.plot_root_locus()
 
-gains, roots = L.root_locus()
+gains, roots = root_locus(L)
 stable = np.all(roots.real < 0.0, axis=1)
 print(f"stable above K = {gains[np.argmax(stable)]:.3g}")
 

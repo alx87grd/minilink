@@ -5,4 +5,4 @@ import numpy as np
 from minilink import DoublePendulum
 
 plant = DoublePendulum()
-plant.modal_analysis([np.pi, 0.0, 0.0, 0.0], mode="all")
+plant.animate_modal([np.pi, 0.0, 0.0, 0.0])
