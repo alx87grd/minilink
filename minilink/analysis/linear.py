@@ -1,8 +1,4 @@
-"""Linear analysis on the matrices ``(A, B, C, D)``: poles, zeros, gain, minimal realization, frequency response, margins, root locus, step response.
-
-Matrices in, arrays out; the system tier (``frequency.py``, ``time_response.py``) reduces a
-``System`` to this channel first.
-"""
+"""Linear analysis on the matrices ``(A, B, C, D)`` of one channel: poles, zeros, gain, minimal realization, frequency response, margins, root locus, step response."""
 
 from __future__ import annotations
 
@@ -24,17 +20,14 @@ def poles(A):
     if A.size == 0:
         return np.array([], dtype=complex)
 
-    poles = np.linalg.eigvals(A)
+    # p = eig(A)
+    p = np.linalg.eigvals(A)
 
-    return poles
+    return p
 
 
 def zeros(A, B, C, D):
-    """Transmission zeros of the square channel ``(A, B, C, D)``.
-
-    The finite generalized eigenvalues of the Rosenbrock pencil
-    ``[[A, B], [C, D]] - s [[I, 0], [0, 0]]``; ``D`` must be square.
-    """
+    """Transmission zeros of the square channel ``(A, B, C, D)``: the finite eigenvalues of its Rosenbrock pencil."""
     A, B, C, D = as_matrices(A, B, C, D)
     n, m = B.shape
     if n == 0 or m != C.shape[0]:
@@ -46,46 +39,48 @@ def zeros(A, B, C, D):
     E[:n, :n] = np.eye(n)
     alpha, beta = linalg.eigvals(P, E, homogeneous_eigvals=True)
     finite = np.abs(beta) > _INFINITE_ZERO_RATIO * np.abs(alpha)
-    zeros = alpha[finite] / beta[finite]
+    z = alpha[finite] / beta[finite]
 
-    return zeros
+    return z
 
 
 def gain(A, B, C, D):
-    """Leading coefficient ``k`` of ``G(s) = k prod(s - z) / prod(s - p)``.
+    """Leading coefficient ``k`` of the factored transfer function of a SISO channel.
 
-    ``d`` when the channel has feedthrough, otherwise the first nonzero
-    Markov parameter ``c A^(r-1) b`` (``r`` the relative degree). Read off
-    the response at one real point ``s0`` beyond every pole and zero, where
-    the factored form and ``C (s0 I - A)^-1 B + D`` must agree: a Markov
-    scan needs a tolerance to tell a structural zero from a small leading
-    coefficient, and any tolerance fails on a badly scaled channel.
+    ``d`` when the channel has feedthrough, otherwise the first nonzero Markov
+    parameter; read off the response at one real point beyond every pole and zero.
     """
     A, B, C, D = as_matrices(A, B, C, D)
-    z, p = zeros(A, B, C, D), poles(A)
-    s0 = 2.0 * max(np.max(np.abs(np.concatenate([z, p])), initial=0.0), 1.0)
+    n = A.shape[0]
+
+    # The roots of G(s) = k ∏(s − z) / ∏(s − p)
+    z = zeros(A, B, C, D)
+    p = poles(A)
+
+    # One real point beyond every root, where the factored and state-space forms agree
+    # (a Markov-parameter scan would need a tolerance that fails on a badly scaled channel)
+    s0 = 2.0 * open_loop_radius(p, z)
+
+    # G(s0) = C (s0 I − A)⁻¹ B + D
+    G_s0 = (C @ np.linalg.solve(s0 * np.eye(n) - A, B) + D)[0, 0]
 
     # k = G(s0) ∏(s0 − p) / ∏(s0 − z)
-    G0 = D[0, 0]
-    if A.size:
-        G0 += (C @ np.linalg.solve(s0 * np.eye(A.shape[0]) - A, B))[0, 0]
-    k = G0 * np.prod(s0 - p) / np.prod(s0 - z)
+    k = G_s0 * np.prod(s0 - p) / np.prod(s0 - z)
 
     return float(np.real(k))
 
 
 def frequency_response(A, B, C, D, w):
-    """``G(jw) = C (jw I - A)^-1 B + D`` of a SISO channel, one complex value per ``w``."""
+    """Frequency response of a SISO channel, one complex value per frequency in ``w``."""
     A, B, C, D = as_matrices(A, B, C, D)
     w = np.asarray(w, dtype=float).reshape(-1)
-    if A.size == 0:
-        return np.full(w.shape, complex(D[0, 0]))
-
-    # G(jw) = C (jw I − A)^{-1} B + D
     I = np.eye(A.shape[0])
+
+    # G(jω) = C (jω I − A)⁻¹ B + D
     G = np.empty(w.size, dtype=complex)
     for k, omega in enumerate(w):
         G[k] = (C @ np.linalg.solve(1j * omega * I - A, B) + D)[0, 0]
+
     return G
 
 
@@ -104,10 +99,14 @@ def frequency_range(A, B, C, D):
     if rates.size == 0:
         w_min, w_max = 1e-2, 1e2
     else:
-        # one decade past min |λ| and max |λ|
+        # One decade past min |λ| and max |λ|
         w_min = 10.0 ** np.floor(np.log10(rates.min()) - 1.0)
         w_max = 10.0 ** np.ceil(np.log10(rates.max()) + 1.0)
-    return bracket_unit_gain(A, B, C, D, w_min, w_max)
+
+    # Widen until the band brackets |G| = 1
+    w_min, w_max = bracket_unit_gain(A, B, C, D, w_min, w_max)
+
+    return w_min, w_max
 
 
 # =============================================================================
@@ -170,13 +169,26 @@ def margins(w, G):
     """Margins from a sampled response: crossings found by interpolation."""
     w = np.asarray(w, dtype=float).reshape(-1)
 
+    # Bode coordinates: |L| in dB and the unwrapped ∠L in degrees
     magnitude_db = 20.0 * np.log10(np.abs(np.asarray(G)))
     phase_deg = np.degrees(np.unwrap(np.angle(np.asarray(G))))
 
-    # PM = 180° + ∠L at |L| = 1, wrapped to (−180, 180]
-    # GM = −|L|_dB at ∠L = −180°
-    pm, w_gc = phase_margin_from_samples(w, magnitude_db, phase_deg)
-    gm, w_pc = gain_margin_from_samples(w, magnitude_db, phase_deg)
+    # Gain crossovers |L(jω_gc)| = 1, with the phase there
+    w_gc, phase_gc = gain_crossovers(w, magnitude_db, phase_deg)
+
+    # PM = 180° + ∠L(jω_gc), folded into [−180°, 180°)
+    pm = (phase_gc + 180.0 + 180.0) % 360.0 - 180.0
+
+    # Phase crossovers ∠L(jω_pc) = −180° (mod 360°), with the magnitude there
+    w_pc, magnitude_pc = phase_crossovers(w, magnitude_db, phase_deg)
+
+    # GM = −|L(jω_pc)| in dB
+    gm = -magnitude_pc
+
+    # The loop is as robust as its smallest margin of each kind
+    pm, w_gc = smallest_margin(pm, w_gc)
+    gm, w_pc = smallest_margin(gm, w_pc)
+
     return Margins(float(gm), float(pm), float(w_gc), float(w_pc))
 
 
@@ -186,38 +198,42 @@ def margins(w, G):
 
 
 def closed_loop_poles(A, B, C, D, K):
-    """Poles of the loop closed with ``u = -K y``: ``eig(A - B K (1 + K d)^-1 C)``."""
+    """Poles of the SISO loop closed with ``u = -K y``."""
     A, B, C, D = as_matrices(A, B, C, D)
 
-    # λ = eig(A − B K (1 + K d)^{-1} C)
+    # The algebraic loop 1 + K d; at K = −1/d it is singular and no pole is finite
     loop = 1.0 + K * D[0, 0]
-    if loop == 0.0:  # K = -1/d: the algebraic loop is singular, no finite poles
+    if loop == 0.0:
         return np.full(A.shape[0], np.inf, dtype=complex)
-    poles = np.linalg.eigvals(A - (K / loop) * (B @ C))
 
-    return poles
+    # p = eig(A − B K (1 + K d)⁻¹ C)
+    p = np.linalg.eigvals(A - (K / loop) * (B @ C))
+
+    return p
 
 
-def root_locus(A, B, C, D, gains=None, *, n=400):
+def root_locus(A, B, C, D, gains=None, *, n_gains=400):
     """Closed-loop poles over a gain sweep, one continuous branch per column.
 
     ``gains`` defaults to ``0`` followed by six log-spaced decades ending
     where the far branches reach ten times the radius of the open-loop
-    poles and zeros; consecutive gain points are refined while any branch
-    moves by more than two percent of that radius. Returns ``(gains, roots)``
-    with ``roots`` of shape ``(len(gains), n_states)``.
+    poles and zeros (``n_gains`` points); consecutive gain points are refined
+    while any branch moves by more than two percent of that radius. Returns
+    ``(gains, roots)`` with ``roots`` of shape ``(len(gains), n_states)``.
     """
     A, B, C, D = as_matrices(A, B, C, D)
     if gains is None:
-        gains = default_gains(A, B, C, D, n)
+        gains = default_gains(A, B, C, D, n_gains)
     gains = np.asarray(gains, dtype=float).reshape(-1)
 
-    # λ(K) = eig(A − B K (1 + K d)^{-1} C)
+    # p(K) = eig(A − B K (1 + K d)⁻¹ C), each branch continued from the previous gain
     roots = [closed_loop_poles(A, B, C, D, gains[0])]
     for K in gains[1:]:
         roots.append(matched_branches(roots[-1], closed_loop_poles(A, B, C, D, K)))
 
+    # Refine the gains wherever a branch jumps
     gains, roots = refine_jumps(A, B, C, D, list(gains), roots)
+
     return np.asarray(gains), np.asarray(roots)
 
 
@@ -227,30 +243,29 @@ def root_locus(A, B, C, D, gains=None, *, n=400):
 
 
 def step_response(A, B, C, D, t):
-    """Unit-step response ``y(t)`` from rest, exact on a uniform time grid.
+    """Unit-step response from rest, exact on a uniform time grid ``t``.
 
-    One matrix exponential of the augmented ``[[A, B], [0, 0]]`` gives the
-    zero-order-hold pair ``(A_d, B_d)``; the state is then marched exactly.
+    One matrix exponential gives the zero-order-hold pair ``(A_d, B_d)``; the
+    state is then marched exactly.
     """
     A, B, C, D = as_matrices(A, B, C, D)
     t = np.asarray(t, dtype=float).reshape(-1)
+    dt = uniform_step(t)
     n, m = B.shape
-    if t.size < 2:
-        raise ValueError("step_response needs at least two time samples")
-    dt = t[1] - t[0]
-    if not np.allclose(np.diff(t), dt):
-        raise ValueError("step_response needs a uniform time grid")
 
-    # expm([[A, B], [0, 0]] dt) = [[A_d, B_d], [0, I]]
-    # y_k = C x_k + D u,   x_{k+1} = A_d x_k + B_d u,   x_0 = 0, u = 1
+    # expm([[A, B], [0, 0]] Δt) = [[A_d, B_d], [0, I]]
     hold = linalg.expm(np.block([[A, B], [np.zeros((m, n + m))]]) * dt)
-    A_d, B_d = hold[:n, :n], hold[:n, n:]
+    A_d = hold[:n, :n]
+    B_d = hold[:n, n:]
+
+    # y_k = C x_k + D u,   x_{k+1} = A_d x_k + B_d u,   from x_0 = 0 under u = 1
     u = np.ones(m)
     x = np.zeros(n)
     y = np.empty(t.size)
     for k in range(t.size):
         y[k] = (C @ x + D @ u)[0]
         x = A_d @ x + B_d @ u
+
     return y
 
 
@@ -261,7 +276,7 @@ def settling_horizon(A):
     if decay.size == 0:
         return 10.0
 
-    # eight times the slowest time constant 1/σ, σ = −Re λ of the stable poles
+    # Eight times the slowest time constant 1/σ, σ = −Re p of the stable poles
     horizon = float(8.0 / decay.min())
 
     return horizon
@@ -329,52 +344,66 @@ def interpolate_crossing(w_pair, values_pair, target):
     return w0 + (target - v0) * (w1 - w0) / (v1 - v0)
 
 
-def phase_margin_from_samples(w, magnitude_db, phase_deg):
-    """Phase margin at the gain crossover ``|L| = 1``: the smallest margin wins."""
-    pm, w_gc = np.inf, np.inf
+def gain_crossovers(w, magnitude_db, phase_deg):
+    """Frequencies where ``|L|`` crosses 1 (interpolated), with the phase there."""
+    w_c, phase_c = [], []
     for k in sign_changes(magnitude_db):
-        w_c = interpolate_crossing(w[k : k + 2], magnitude_db[k : k + 2], 0.0)
-        phase_c = np.interp(w_c, w[k : k + 2], phase_deg[k : k + 2])
-        # 180 + ∠L, folded into (−180, 180]
-        margin = (phase_c + 180.0 + 180.0) % 360.0 - 180.0
-        if abs(margin) < abs(pm):
-            pm, w_gc = margin, w_c
-    return pm, w_gc
+        w_k = interpolate_crossing(w[k : k + 2], magnitude_db[k : k + 2], 0.0)
+        w_c.append(w_k)
+        phase_c.append(np.interp(w_k, w[k : k + 2], phase_deg[k : k + 2]))
+    return np.array(w_c, dtype=float), np.array(phase_c, dtype=float)
 
 
-def gain_margin_from_samples(w, magnitude_db, phase_deg):
-    """Gain margin at the phase crossovers ``arg L = -180`` deg (mod 360)."""
-    gm, w_pc = np.inf, np.inf
+def phase_crossovers(w, magnitude_db, phase_deg):
+    """Frequencies where ``arg L`` crosses -180 deg (mod 360, interpolated), with the magnitude there."""
+    w_c, magnitude_c = [], []
     lowest = int(np.floor((phase_deg.min() + 180.0) / 360.0))
     highest = int(np.ceil((phase_deg.max() + 180.0) / 360.0))
     for k_wrap in range(lowest, highest + 1):
         target = -180.0 + 360.0 * k_wrap
         for k in sign_changes(phase_deg - target):
-            w_c = interpolate_crossing(w[k : k + 2], phase_deg[k : k + 2], target)
-            gain_c = -np.interp(w_c, w[k : k + 2], magnitude_db[k : k + 2])
-            if abs(gain_c) < abs(gm):
-                gm, w_pc = gain_c, w_c
-    return gm, w_pc
+            w_k = interpolate_crossing(w[k : k + 2], phase_deg[k : k + 2], target)
+            w_c.append(w_k)
+            magnitude_c.append(np.interp(w_k, w[k : k + 2], magnitude_db[k : k + 2]))
+    return np.array(w_c, dtype=float), np.array(magnitude_c, dtype=float)
 
 
-def open_loop_radius(A, B, C, D):
-    return max(
-        np.max(np.abs(np.concatenate([poles(A), zeros(A, B, C, D)])), initial=0.0),
-        1.0,
-    )
+def smallest_margin(margins, frequencies):
+    """The margin of least magnitude and its frequency; ``inf`` when there is no crossover."""
+    best, w_best = np.inf, np.inf
+    for margin, w_c in zip(margins, frequencies):
+        if abs(margin) < abs(best):
+            best, w_best = margin, w_c
+    return best, w_best
 
 
-def default_gains(A, B, C, D, n):
+def uniform_step(t):
+    """The step ``dt`` of a uniform time grid of at least two samples."""
+    if t.size < 2:
+        raise ValueError("step_response needs at least two time samples")
+    dt = t[1] - t[0]
+    if not np.allclose(np.diff(t), dt):
+        raise ValueError("step_response needs a uniform time grid")
+    return dt
+
+
+def open_loop_radius(p, z):
+    """Radius of the open-loop poles and zeros, at least 1."""
+    return max(np.max(np.abs(np.concatenate([p, z])), initial=0.0), 1.0)
+
+
+def default_gains(A, B, C, D, n_gains):
     """``0`` then six log decades ending where the far branches leave the picture."""
-    k_max = gain_reaching(A, B, C, D, 10.0 * open_loop_radius(A, B, C, D))
+    radius = open_loop_radius(poles(A), zeros(A, B, C, D))
+    k_max = gain_reaching(A, B, C, D, 10.0 * radius)
     return np.concatenate(
-        [[0.0], np.logspace(np.log10(k_max) - 6.0, np.log10(k_max), n)]
+        [[0.0], np.logspace(np.log10(k_max) - 6.0, np.log10(k_max), n_gains)]
     )
 
 
 def refine_jumps(A, B, C, D, gains, roots):
     """Insert the midpoint gain wherever a branch jumps more than two percent of the radius."""
-    step = 0.02 * open_loop_radius(A, B, C, D)
+    step = 0.02 * open_loop_radius(poles(A), zeros(A, B, C, D))
     k = 0
     while k < len(gains) - 1:
         if (

@@ -377,10 +377,10 @@ def plot_root_locus(
 
     # Minimal realization: the uncontrollable and unobservable modes cancel
     A, B, C, D = minimal_channel(A, B, C, D, minimal)
-    K, roots = linear.root_locus(A, B, C, D, gains)
+    gains, roots = linear.root_locus(A, B, C, D, gains)
 
     return render_control_figure(
-        root_locus_figure(A, B, C, D, K, roots, sys, of, wrt),
+        root_locus_figure(A, B, C, D, gains, roots, sys, of, wrt),
         backend=backend,
         show=show,
     )
@@ -637,16 +637,10 @@ def pzmap_figure(z, p, sys, of, wrt):
     )
 
 
-def root_locus_figure(A, B, C, D, K, roots, sys, of, wrt):
+def root_locus_figure(A, B, C, D, gains, roots, sys, of, wrt):
     # The view keeps the poles, zeros and the branches near them; the far tails
     # of the asymptotes leave the frame as they do in MATLAB.
-    reach = 3.0 * max(
-        np.max(
-            np.abs(np.concatenate([linear.poles(A), linear.zeros(A, B, C, D)])),
-            initial=0.0,
-        ),
-        1.0,
-    )
+    reach = 3.0 * linear.open_loop_radius(linear.poles(A), linear.zeros(A, B, C, D))
     near = roots[np.abs(roots) <= reach]
     branches = tuple(
         Trace(
@@ -654,7 +648,7 @@ def root_locus_figure(A, B, C, D, K, roots, sys, of, wrt):
             roots[:, j].imag,
             style.SYSTEM_COLOR,
             hover=tuple(
-                f"K = {k:.3g}<br>" + root_text(s) for k, s in zip(K, roots[:, j])
+                f"K = {k:.3g}<br>" + root_text(s) for k, s in zip(gains, roots[:, j])
             ),
         )
         for j in range(roots.shape[1])
