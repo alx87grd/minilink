@@ -45,12 +45,12 @@ the triage in [2026-09-22-improvement-suggestions.md](../reviews/2026-09-22-impr
   (ROADMAP §6): `publish.yml` runs ruff and `pytest` before the upload; CI time limits
   (the nightly job's waits for its first green run); `plot_diagram()` warns and skips
   without `graphviz`; `showcase_jax.ipynb` keeps its `experimental` import.
-  Colab cell: 33 of 38 notebooks already share one four-line cell (detect Colab, inline
+  Colab cell: 38 of 43 notebooks already share one four-line cell (detect Colab, inline
   matplotlib, `git clone`, `sys.path`) plus at most one `pip install` line for an extra;
-  two notebooks need none. Open: three notebooks clone a pinned branch
-  (`car_trajopt` and `cartpole_rollout_gradients` on `-b main`, `mpc_spatial_stack`
-  on `-b dev-alex`), `manipulator_eom`
-  merges the cell into its imports, and no test pins the cell. **[ask per notebook]**
+  two import no minilink and need none. Open: three notebooks clone a pinned branch
+  (`car_trajopt` and `cartpole_rollout_gradients` on `-b main`, `mpc_spatial_stack` on
+  `-b dev-alex`), `manipulator_eom` merges the cell into its imports, and no test pins
+  the cell. **[ask per notebook]**
 - [ ] **S59 Docs drift** (scan: docs-gov#3, docs-gov#4, docs-gov#5, docs-gov#7, docs-gov#8,
   docs-gov#12, docs-gov#13, tests-ci#4, control#12, analysis#12): the CI commands written
   once (the tests/README agent table), AGENTS naming the jobs and the regression flags given
