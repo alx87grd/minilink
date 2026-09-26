@@ -218,9 +218,9 @@ it is landed or explicitly dropped by the maintainer.
 The GRO860 path is green (§4.1). What remains is release mechanics and the
 term's hygiene:
 
-- **R1** Publish `0.1.1` from a GitHub tag. `0.1.0` is on PyPI since
-  2026-09-16, but no git tag marks its commit, and the pre-release checks
-  below did not ride it; they gate `0.1.1`. **[ask]**
+- **R1** Publish `0.1.1` from a GitHub tag. `publish.yml` published `0.1.0`
+  on 2026-09-16 from `47cfd50`, before the pre-release checks landed; they
+  gate `0.1.1`, and the repo side is ready. **[ask]**
 - CI runs on `dev`, the working branch (R2, landed 2026-09-26).
 - **R3** Keep `ruff check .` and `ruff format --check .` green on every
   push; since 2026-09-26 the pre-commit hooks run both with the dev

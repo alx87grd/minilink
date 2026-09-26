@@ -35,11 +35,10 @@ the triage in [2026-09-22-improvement-suggestions.md](../reviews/2026-09-22-impr
 
 ## 1. v0.1 close-out
 
-- [ ] **R1 Publish `0.1.1` from a tag** **[ask]**. `minilink 0.1.0` is on PyPI (2026-09-16)
-  with no git tag on its commit; tag that commit `0.1.0` for the record if it is known (the
-  tag push starts `publish.yml`, whose upload PyPI refuses for an existing version).
-  Confirm the GitHub Environment `pypi` and the PyPI trusted publisher (`alx87grd` /
-  `minilink` / `publish.yml` / env `pypi`), then `git tag 0.1.1 && git push origin 0.1.1`.
+- [ ] **R1 Publish `0.1.1` from a tag** **[ask]**. `publish.yml` published `minilink 0.1.0`
+  (2026-09-16, run 35139916195) from a `0.1.0` tag on `47cfd50`; the tag is gone from the
+  remote, and the trusted publisher works. Merge `dev` into `main`, then
+  `git tag 0.1.1 && git push origin 0.1.1` on `main`.
   Done when `pip install minilink==0.1.1` installs the teaching surface from PyPI.
   Before `0.1.1`: nothing open in the repo. Landed or decided 2026-09-26 (ROADMAP §6):
   `publish.yml` runs ruff and `pytest` before the upload; CI time limits (the nightly
