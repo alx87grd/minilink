@@ -26,8 +26,8 @@ the triage in [2026-09-22-improvement-suggestions.md](../reviews/2026-09-22-impr
 | [§1](#1-v01-close-out) | v0.1 close-out |
 | [§2](#2-v02-wave-a--the-textbook-objects) | v0.2 wave A — the textbook objects |
 | [§3](#3-v02-wave-b--gro501) | v0.2 wave B — GRO501 |
-| [§4](#4-v02-wave-c--catalog-parity-new-bands) | v0.2 wave C — catalog, parity, new bands |
-| [§5](#5-v02-wave-d--textbook-code-minimal-demos-consolidation) | v0.2 wave D — textbook code, minimal demos, consolidation |
+| [§4](#4-v03-wave-c--gmc714-catalog-parity) | v0.3 wave C — GMC714, catalog, parity |
+| [§5](#5-v02-wave-d--textbook-code-minimal-demos-consolidation) | v0.2 wave D (into v0.3) — textbook code, minimal demos, consolidation |
 | [§6](#6-v10-foundations) | v1.0 foundations |
 | [§7](#7-later-ideas) | Later ideas |
 
@@ -47,18 +47,6 @@ the triage in [2026-09-22-improvement-suggestions.md](../reviews/2026-09-22-impr
   `graphviz`; `showcase_jax.ipynb` keeps its `experimental` import; every notebook that
   imports minilink carries the one Colab setup cell, cloning the default branch, pinned by
   `test_repo_contract.py` (`mpc_spatial_stack` no longer clones `dev-alex`).
-- [ ] **S49 Retire the Stable-Baselines3 teaching notebooks** **[ask]**. Delete
-  `teaching/courses/udes_gro860/drone_ppo_sb3.ipynb` and
-  `pendulum_value_iteration_vs_lqr_vs_ppo_sb3.ipynb`, their notebook overrides and allowlist
-  entries, and the README rows marked Stable-Baselines3, once the course notes point only at
-  the native twins.
-- [ ] **S54 The DP `out_of_bound_cost` default** **[ask]**. Since 2026-09-26 the cost-to-go
-  plots (DP planner, its animation, tabular RL, `PolicyEvaluator`) top their colour scale at
-  the price of leaving the grid, and a callable or infinite price leaves the scale to
-  Matplotlib. Left: without a problem price the default `1e6` is that top, so feasible states
-  still read as one colour; choose a smaller default or a rule (e.g. the largest unsaturated
-  cost-to-go).
-
 ---
 
 ## 2. v0.2 wave A — the textbook objects
@@ -153,8 +141,9 @@ Plan: [gro501-classical-control.md](gro501-classical-control.md) (P1, F1, F2, F4
   control#1): rename the `control/lqr.py` module so `lqr`, `lqr_at_operating_point`,
   `lqr_finite_horizon`, `trajectory_lqr` and `lqr_gain_schedule` join the band facade and the
   registry; `P` joins the siso family; the `control/__init__.py` note on `control.lqr`
-  naming the submodule goes (scan: control#12). After the GRO860 term (gate 7), before P11
-  writes notebooks on the band layer.
+  naming the submodule goes (scan: control#12). Before P11 writes notebooks on the band
+  layer. The name freeze (gate 7) now runs to v1.0: `minilink.control.lqr` stays importable
+  as an alias until then, or S62 waits for v1.0 — part of the ask.
 - [ ] **P7 Generate the analysis facades**: one helper builds a delegating method from the
   target function (signature and docstring copied), explicit form kept only where the facade
   differs; a test asserts every generated `__signature__` matches its target. Done when the
@@ -209,7 +198,14 @@ Plan: [gro501-classical-control.md](gro501-classical-control.md) (P1, F1, F2, F4
 
 ---
 
-## 4. v0.2 wave C — catalog, parity, new bands
+## 4. v0.3 wave C — GMC714, catalog, parity
+
+- [ ] **G1 GMC714 baseline audit** **[ask — course scope]**. Run every topic of ROADMAP §4.3
+  (vehicle models, robotic arm, nonlinear control, robust control, trajectory optimization,
+  MPC) on the teaching surface, as the 2026-09-07 audit did for GRO501
+  ([docs/reviews/2026-09-07-gro501-coverage.md](../reviews/2026-09-07-gro501-coverage.md));
+  write the gaps as §4.3's gates and as rows here. Decide whether MPC joins the teaching
+  surface. Done when every §4.3 row has a status and a gate.
 
 - [ ] **C1 Pyro parity** open rows — [pyro-port-remaining.md](pyro-port-remaining.md); then
   the pyro → minilink migration guide in README from the name map there. **[ask]** for the
@@ -504,6 +500,11 @@ After two cohorts; each is a design conversation before code. **[ask — core]**
   reach plant, controller, cost, sets and `x0` alike; today tutorial 11 and
   `pid_autotuning_jax` write that scan by hand.
 - [ ] **S36** iLQR planner from parts (`jacfwd` of `f_trace`; idea, research lane).
+- [ ] **S49 Retire the Stable-Baselines3 teaching notebooks** **[ask]** (v1.0: at the end of the term, decided 2026-09-26). Delete
+  `teaching/courses/udes_gro860/drone_ppo_sb3.ipynb` and
+  `pendulum_value_iteration_vs_lqr_vs_ppo_sb3.ipynb`, their notebook overrides and allowlist
+  entries, and the README rows marked Stable-Baselines3, once the course notes point only at
+  the native twins.
 - [ ] **V2** Zenodo archive and a citable DOI (`CITATION.cff`) after PyPI; the JOSS entry
   and the RULES 6.9 carve-out for its state-of-the-field section, decided then.
 

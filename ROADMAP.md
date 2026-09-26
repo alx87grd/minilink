@@ -12,9 +12,10 @@ Identity: [CONSTITUTION.md](CONSTITUTION.md).
 
 | Release | Milestone | When |
 | --- | --- | --- |
-| **v0.1** | **GRO860 end to end**, plus a working **`pip install minilink` on PyPI**. Every topic of the running optimal-control & RL course runs on the teaching surface, in Colab (git-clone cell) and in the conda env: value iteration / DP on a grid · LQR + linearization · trajectory optimization · RL via native `ReinforcementLearningPlanner` (with `Sys2Gym` + SB3 as an optional bridge). See §4.1. | Fall 2026 — **`0.1.0` on PyPI** (2026-09-16); **`0.1.1`** is the first release a GitHub tag publishes. Conda from `environment.yml` stays the Full local stack. Names the course notebooks already use stay frozen. Close-out steps: §5.1. |
-| **v0.2** | **GRO501 end to end** (the classical-control course: multi-physics modelling · root locus / Bode / margins · PID to spec · digital implementation · state feedback, pole placement, LQR, observers — see §4.2), **pyro parity + the GMC714 modelling ladder** (manipulators, four-rung vehicle ladder, robotic controllers), and **the textbook objects finished** (fields, cost parameters, workspace geometry — §5.2 wave A). Conda stays the recommended Full local install. | Winter 2027 |
-| **v1.0** | The foundation questions deferred to §5.3 (hybrid as a `System`, derived `x0`, evaluator/solver layering, the posed-geometry drawing hook, one mechanical base, the differentiable closed-loop cost), after two cohorts. | 2027 |
+| **v0.1** | **GRO860 end to end**, plus a working **`pip install minilink` on PyPI**. Every topic of the running optimal-control & RL course runs on the teaching surface, in Colab (git-clone cell) and in the conda env: value iteration / DP on a grid · LQR + linearization · trajectory optimization · RL via native `ReinforcementLearningPlanner` (with `Sys2Gym` + SB3 as an optional bridge). See §4.1. | Fall 2026 — **`0.1.0` on PyPI** (2026-09-16); **`0.1.1`** is the first release a GitHub tag publishes. Conda from `environment.yml` stays the Full local stack. Names the course notebooks already use stay frozen until v1.0. Close-out steps: §5.1. |
+| **v0.2** | **GRO501 end to end** (the classical-control course: multi-physics modelling · root locus / Bode / margins · PID to spec · digital implementation · state feedback, pole placement, LQR, observers — see §4.2) and **the textbook objects finished** (fields, cost parameters, workspace geometry — §5.2 wave A). Conda stays the recommended Full local install. | October 2026 |
+| **v0.3** | **GMC714 end to end** — the teaching layer solidified for the class: robust control · robotic arm · trajectory optimization · MPC · vehicle models · nonlinear control (§4.3), with **pyro parity** and the catalog work of §5.3. | December 2026 |
+| **v1.0** | The foundation questions deferred to §5.4 (hybrid as a `System`, derived `x0`, evaluator/solver layering, the posed-geometry drawing hook, one mechanical base, the differentiable closed-loop cost), after two cohorts; the Stable-Baselines3 notebooks retire and the name freeze lifts. | 2027 |
 
 ## 2. Two lanes
 
@@ -78,7 +79,7 @@ State as of 2026-09-22. Step ids (`S29`, `P3`, `T2`, …) are the rows of
 | Control | teaching | 6 | Linear, LQR (infinite horizon, finite horizon, along a trajectory), `P` / `PI` / `PD` / `PID` carrying only the states their terms need, model-based SMC and computed torque, robotic impedance and kinematic laws, neural policy block. | `place()` (P3) and reference scaling (P8, v0.2); textbook pass (T2). |
 | Analysis | teaching | 6 | Jacobians, linearize, structural, equilibria, modal; one-channel Bode with margins, pole-zero, root locus, Nyquist, step response on matplotlib and plotly; the frequency band brackets the 0 dB crossing. | `minreal` (P2), named `S` / `T` / `PS` / `CS` (P5), ζ / ω_n (P8); z tier held; Nichols and overlays later; textbook pass (T4). |
 | Blocks | teaching | 5 | Routing, nonlinear, filters, sources, TF, 1-layer NN. | `Sine` / `Ramp` / `Chirp` / `Delay` / `Switch` (v0.2); textbook pass (T2). |
-| Planning / policy synthesis (DP) | teaching (GRO860) | 6 | Grid + value iteration (`loop` / `numpy` / `jax`), lookup controller, `PolicyEvaluator`, `LQRPlanner`; every planner returns a `PlanningSolution`; `compare()` reads solutions side by side; `dp.py` is the textbook reference of the style (2026-09-18). | the `out_of_bound_cost` default (S54); cost-to-go as a `Field` (A1); policy iteration (S51). |
+| Planning / policy synthesis (DP) | teaching (GRO860) | 6 | Grid + value iteration (`loop` / `numpy` / `jax`), lookup controller, `PolicyEvaluator`, `LQRPlanner`; every planner returns a `PlanningSolution`; `compare()` reads solutions side by side; `dp.py` is the textbook reference of the style (2026-09-18). | cost-to-go as a `Field` (A1); policy iteration (S51). |
 | Planning / trajopt | teaching (GRO860) | 5 | Collocation, shooting, multiple shooting; live plot; `success` means defects satisfied to `feasibility_tol`; float64 by default on JAX. | Harden SciPy/Ipopt before TRL 6; textbook pass (T5). |
 | Optimization | teaching (via trajopt) | 5 | `MathematicalProgram` + `Optimizer`, SciPy/Ipopt. | Harden SciPy/Ipopt before TRL 6. |
 | Interfaces / RL bridge | research lane (bridge) | 4 | `Sys2Gym` + `SB3Controller`; the env step is one compiled RK4 call. | Keep for external interop; courses solve with the native planner. |
@@ -98,8 +99,9 @@ State as of 2026-09-22. Step ids (`S29`, `P3`, `T2`, …) are the rows of
 
 ## 4. Course objectives
 
-Two courses drive the release contract: GRO860 (§4.1, v0.1, running now) and
-GRO501 (§4.2, v0.2, parallel objective adopted 2026-09-07). A course is
+Three courses drive the release contract: GRO860 (§4.1, v0.1, running now),
+GRO501 (§4.2, v0.2, parallel objective adopted 2026-09-07) and GMC714 (§4.3,
+v0.3, adopted 2026-09-26). A course is
 "end to end" when every topic row is green on the teaching surface — in Colab
 (git-clone cell) and in the conda env — and the cross-cutting gates hold.
 
@@ -127,7 +129,8 @@ GRO501 (§4.2, v0.2, parallel objective adopted 2026-09-07). A course is
 5. The Colab cell (git clone + path) and the conda environment from
    `environment.yml` both run every GRO860 notebook top to bottom.
 6. `ruff` + `pytest` + notebook smoke green; nightly full demo sweep green.
-7. No name a GRO860 notebook imports today changes during the term.
+7. No name a GRO860 notebook imports today changes before v1.0 (extended
+   from the term on 2026-09-26).
 8. `minilink 0.1.0` is on PyPI (2026-09-16); from `0.1.1` on, a tag publishes
    from GitHub (Trusted Publishing in `.github/workflows/publish.yml`, the
    version read from the tag). `pip install minilink` installs the
@@ -181,6 +184,26 @@ Out of the GRO501 checklist by decision: hardware, ROS, and the Arduino
 firmware itself (the course owns those); system identification from logged
 runs beyond what `identification/` already offers.
 
+### 4.3 v0.3 — GMC714 end to end
+
+The robotics course: the teaching layer solidified for GMC714, December 2026.
+Adopted 2026-09-26; no baseline audit yet — step G1 of the workboard runs it,
+as the 2026-09-07 audit did for GRO501, and turns this table into the release
+contract.
+
+| Topic | Surface today (to confirm in G1) | Status | Gate |
+| --- | --- | --- | --- |
+| Vehicle models — the four-rung ladder, kinematic to dynamic with tires | `dynamics.catalog` vehicles, `KinematicBicycle` | audit pending | the ladder runs as one lesson (C2) |
+| Robotic arm — kinematics, dynamics, joint and task-space control | `manipulators`, `UR5Manipulator`, `control.robotic`, `control.impedance` | audit pending | robotic PID wrappers (C2) |
+| Nonlinear control — feedback linearization, computed torque, sliding mode, Lyapunov | `control.modelbased`, `control.geometric`, `analysis.lyapunov` | audit pending | set by G1 |
+| Robust control — uncertainty, margins, robust design | `analysis` frequency tools | audit pending | set by G1 |
+| Trajectory optimization — direct collocation, shooting | `planning.trajectory_optimization` | audit pending | set by G1 |
+| MPC — receding horizon on the vehicle and the arm | `control.mpc` (provisional, research lane) | audit pending | MPC joins the teaching surface, or stays a lesson on the research lane, decided in G1 |
+
+**Cross-cutting gates** (as for GRO501): every topic row green with a demo
+or a notebook; one `examples/teaching/` notebook per topic, Colab-first;
+student-facing GMC714 material imports only through the teaching surface.
+
 ## 5. The path to v1.0
 
 One ladder replaces the phase log kept here until 2026-09-22 (Phases D, 0, 1
@@ -211,16 +234,15 @@ term's hygiene:
 - The teaching surface is checked by a test and documented page by page
   (S60, landed 2026-09-26): every band facade walked like the root prelude,
   every exported name's module on an API page, Sphinx built with `-W`.
-- **S49** Retire the two Stable-Baselines3 teaching notebooks once the
-  course notes point only at the native twins. **[ask]**
-- **S54** The colour scale tops at the price of leaving (landed
-  2026-09-26); the DP `out_of_bound_cost` default is left. **[ask]**
-- Name freeze: no name a GRO860 notebook imports changes during the term
+- **S54** The colour scale tops at the price of leaving; the DP
+  `out_of_bound_cost` default stays `1e6` (landed and decided 2026-09-26).
+- Name freeze: no name a GRO860 notebook imports changes before v1.0
   (§4.1 gate 7).
 
-### 5.2 v0.2 — GRO501, the textbook objects, the catalog (Winter 2027)
+### 5.2 v0.2 — GRO501 and the textbook objects (October 2026)
 
-Four waves. A and B can run in parallel; C follows A; D runs throughout.
+Three waves. A and B can run in parallel; D runs throughout and carries on
+into v0.3. Wave C moved to v0.3 on 2026-09-26 (§5.3).
 
 **Wave A — the textbook objects finish speaking.** The nouns the constitution
 names exist; three of them are not yet the objects the tools carry.
@@ -264,22 +286,6 @@ names exist; three of them are not yet the objects the tools carry.
 - **B5** **P11** the two GRO501 notebooks (APP2 propulsion, APP4 autopilot),
   Basic tier, Colab-first. **[maintainer]**
 
-**Wave C — catalog, parity, new bands.**
-
-- **C1** Pyro parity open rows ([pyro-port-remaining.md](docs/plans/pyro-port-remaining.md))
-  and the pyro → minilink migration guide in README.
-- **C2** GMC714 modelling ladder: manipulators and the vehicle ladder as a
-  `02_dynamics` lesson; robotic PID wrappers.
-- **C3** Blocks: `Sine` / `Ramp` / `Chirp` / `Delay` / `Switch`.
-- **C4** `identification/fitting.py` on `rollout_batch`;
-  `trajectory_generation/` port; SMC trajectory-following demo.
-- **C5** RL follow-ups: **S50** SAC actor step, **S51** policy iteration on
-  the grid, **S52** deep Q-learning; approximate dynamic programming on the
-  approximation bases.
-- **S63** DP reads a finite horizon from `problem.tf`, as LQR does; **S64**
-  catalog hygiene (bounds each plant states, port labels read from the
-  state, one wheelbase owner). **[ask]**
-
 **Wave D — the code reads like the textbook, and the demos like the API.**
 Standing work, behaviour-preserving, one module per step.
 
@@ -309,7 +315,29 @@ Standing work, behaviour-preserving, one module per step.
   (the RULES 5.8 ratchet, ROADMAP ids against the workboard, every notebook
   executed nightly).
 
-### 5.3 v1.0 — one `System`, closed (2027)
+### 5.3 v0.3 — GMC714 (December 2026)
+
+**Wave C — GMC714, the catalog, pyro parity.** Follows wave A.
+
+- **G1** GMC714 baseline audit: every §4.3 topic run on the teaching
+  surface, the gaps written as the release contract (the 2026-09-07 GRO501
+  audit is the model). **[ask — course scope]**
+
+- **C1** Pyro parity open rows ([pyro-port-remaining.md](docs/plans/pyro-port-remaining.md))
+  and the pyro → minilink migration guide in README.
+- **C2** GMC714 modelling ladder: manipulators and the vehicle ladder as a
+  `02_dynamics` lesson; robotic PID wrappers.
+- **C3** Blocks: `Sine` / `Ramp` / `Chirp` / `Delay` / `Switch`.
+- **C4** `identification/fitting.py` on `rollout_batch`;
+  `trajectory_generation/` port; SMC trajectory-following demo.
+- **C5** RL follow-ups: **S50** SAC actor step, **S51** policy iteration on
+  the grid, **S52** deep Q-learning; approximate dynamic programming on the
+  approximation bases.
+- **S63** DP reads a finite horizon from `problem.tf`, as LQR does; **S64**
+  catalog hygiene (bounds each plant states, port labels read from the
+  state, one wheelbase owner). **[ask]**
+
+### 5.4 v1.0 — one `System`, closed (2027)
 
 The foundation questions, after two cohorts have run on v0.2:
 
@@ -329,6 +357,9 @@ The foundation questions, after two cohorts have run on v0.2:
   traced scalar, on the nested parameter dictionary A2 introduces.
   **[ask — core]**
 - **S36** iLQR from parts (idea, research lane).
+- **S49** Retire the two Stable-Baselines3 teaching notebooks at the end of
+  the term, once the course notes point only at the native twins; the
+  GRO860 name freeze lifts with v1.0. **[ask]**
 - **V2** Release hygiene: Zenodo archive and DOI, `CITATION.cff`; the JOSS
   decision and the RULES 6.9 carve-out it would need, decided then.
 

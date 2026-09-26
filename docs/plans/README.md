@@ -29,7 +29,7 @@ workboard-style id.
 | [geometry-module.md](geometry-module.md) | Workspace geometry home `core/geometry/` (Shape, Path, Track, Scene, bind, spatial Fields, course catalog); `planning.spatial` retires | v0.2 wave A (A3) — agreed 2026-09-21, not started |
 | [naming.md](naming.md) | One naming rule for blocks and signals: the audit, six quick wins (five open), the larger alignments | v0.2 wave A (A4) — audit 2026-09-13 |
 | [gro501-classical-control.md](gro501-classical-control.md) | The GRO501 stack: `minreal`, `place`, sensitivity verbs, observers, facades, the z question, the two notebooks | v0.2 wave B (P2–P11) — wave 1 partly landed 2026-09-07 |
-| [pyro-port-remaining.md](pyro-port-remaining.md) | Pyro parity — open rows + name map | v0.2 wave C (C1) |
+| [pyro-port-remaining.md](pyro-port-remaining.md) | Pyro parity — open rows + name map | v0.3 wave C (C1) |
 | [optimizer-parametric-wiring.md](optimizer-parametric-wiring.md) | One optimizer backend table for the offline and the parametric (MPC) paths | v0.2 wave D (T5; the evaluator placement is a D3 row) — draft, July 2026 |
 
 ## Research lane, unscheduled (a design exists; no rung yet)
