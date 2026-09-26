@@ -362,9 +362,13 @@ here. Each open item needs the maintainer.
 
 **Before `0.1.1` (R1)**
 
-- **`plot_diagram()` without the `graphviz` wrapper**: warn, as a missing
-  binary already does, or move the pure-Python wrapper into the base
-  dependencies (the binary stays optional). Every tutorial calls it.
+- **`plot_diagram()` without the `graphviz` wrapper** — decided 2026-09-26:
+  warn once and skip the figure, as a missing binary already does; the
+  wrapper stays in the `diagrams` extra. Landed the same day, hybrid
+  diagrams included.
+- **`showcase_jax.ipynb` imports `experimental.c_export`**, which the wheel
+  does not ship — decided 2026-09-26: accepted for a showcase, which runs
+  from the clone; revisit if the notebooks move to `pip install minilink`.
 
 **During v0.2**
 

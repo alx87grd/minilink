@@ -41,11 +41,16 @@ the triage in [2026-09-22-improvement-suggestions.md](../reviews/2026-09-22-impr
   Confirm the GitHub Environment `pypi` and the PyPI trusted publisher (`alx87grd` /
   `minilink` / `publish.yml` / env `pypi`), then `git tag 0.1.1 && git push origin 0.1.1`.
   Done when `pip install minilink==0.1.1` installs the teaching surface from PyPI.
-  Before `0.1.1` (scan: examples#1, examples#4; `publish.yml` running ruff and `pytest`
-  before the upload and the CI time limits landed 2026-09-26, the nightly job's limit
-  waits for its first green run): `showcase_jax.ipynb` stops importing `experimental.c_export`, which the wheel does not
-  ship; `plot_diagram()` without the `graphviz` wrapper (ROADMAP §6); one canonical Colab
-  setup cell per install tier, pinned by a test (38 notebooks carry 11 variants today).
+  Before `0.1.1` (scan: examples#4): the Colab setup cell. Landed or decided 2026-09-26
+  (ROADMAP §6): `publish.yml` runs ruff and `pytest` before the upload; CI time limits
+  (the nightly job's waits for its first green run); `plot_diagram()` warns and skips
+  without `graphviz`; `showcase_jax.ipynb` keeps its `experimental` import.
+  Colab cell: 33 of 38 notebooks already share one four-line cell (detect Colab, inline
+  matplotlib, `git clone`, `sys.path`) plus at most one `pip install` line for an extra;
+  two notebooks need none. Open: three notebooks clone a pinned branch
+  (`car_trajopt` and `cartpole_rollout_gradients` on `-b main`, `mpc_spatial_stack`
+  on `-b dev-alex`), `manipulator_eom`
+  merges the cell into its imports, and no test pins the cell. **[ask per notebook]**
 - [ ] **S59 Docs drift** (scan: docs-gov#3, docs-gov#4, docs-gov#5, docs-gov#7, docs-gov#8,
   docs-gov#12, docs-gov#13, tests-ci#4, control#12, analysis#12): the CI commands written
   once (the tests/README agent table), AGENTS naming the jobs and the regression flags given
