@@ -13,8 +13,8 @@ Identity: [CONSTITUTION.md](CONSTITUTION.md).
 | Release | Milestone | When |
 | --- | --- | --- |
 | **v0.1** | **GRO860 end to end**, plus a working **`pip install minilink` on PyPI**. Every topic of the running optimal-control & RL course runs on the teaching surface, in Colab (git-clone cell) and in the conda env: value iteration / DP on a grid · LQR + linearization · trajectory optimization · RL via native `ReinforcementLearningPlanner` (with `Sys2Gym` + SB3 as an optional bridge). See §4.1. | Fall 2026 — **`0.1.0` on PyPI** (2026-09-16); **`0.1.1`** (2026-09-26) is the first release a GitHub tag published. Conda from `environment.yml` stays the Full local stack. Names the course notebooks already use stay frozen until v1.0. Close-out steps: §5.1. |
-| **v0.2** | **GRO501 end to end** (the classical-control course: multi-physics modelling · root locus / Bode / margins · PID to spec · digital implementation · state feedback, pole placement, LQR, observers — see §4.2) and **the textbook objects finished** (fields, cost parameters, workspace geometry — §5.2 wave A). Conda stays the recommended Full local install. | October 2026 |
-| **v0.3** | **GMC714 end to end** — the teaching layer solidified for the class: robust control · robotic arm · trajectory optimization · MPC · vehicle models · nonlinear control (§4.3), with **pyro parity** and the catalog work of §5.3. | December 2026 |
+| **v0.2** | **GRO501 end to end** (the classical-control course: multi-physics modelling · root locus / Bode / margins · PID to spec · digital implementation · state feedback, pole placement, LQR, observers — see §4.2). Conda stays the recommended Full local install. | October 2026 |
+| **v0.3** | **GMC714 end to end** — the teaching layer solidified for the class: robust control · robotic arm · trajectory optimization · MPC · vehicle models · nonlinear control (§4.3), with **pyro parity**, the catalog work of §5.3 and **the textbook objects** (fields, cost parameters, workspace geometry — moved from v0.2 on 2026-09-26). | December 2026 |
 | **v1.0** | The foundation questions deferred to §5.4 (hybrid as a `System`, derived `x0`, evaluator/solver layering, the posed-geometry drawing hook, one mechanical base, the differentiable closed-loop cost), after two cohorts; the Stable-Baselines3 notebooks retire and the name freeze lifts. | 2027 |
 
 ## 2. Two lanes
@@ -77,7 +77,7 @@ State as of 2026-09-22. Step ids (`S29`, `P3`, `T2`, …) are the rows of
 | Simulation | teaching | 7 | Mature; fixed 10 001-point default grid; `verbose` names unified. | Textbook pass (T4). |
 | Dynamics (abstraction + catalog) | teaching | 7 | Plants QA'd; `MechanicalSystem` / `Manipulator`; UR5 ABA/RNEA; **every catalog plant compiles on both backends** (contract test); four-rung vehicle ladder; UdeS racecar (kinematic, dynamic, 3-D). | Textbook pass (T3); mechanical-base unification (S32, v1.0). |
 | Control | teaching | 6 | Linear, LQR (infinite horizon, finite horizon, along a trajectory), pole placement, `P` / `PI` / `PD` / `PID` carrying only the states their terms need, model-based SMC and computed torque, robotic impedance and kinematic laws, neural policy block. | `place()` (P3) and reference scaling (P8, v0.2); textbook pass (T2). |
-| Analysis | teaching | 6 | Jacobians, linearize, structural, equilibria, modal; one-channel Bode with margins, pole-zero, root locus, Nyquist, step response on matplotlib and plotly; the frequency band brackets the 0 dB crossing. | order reduction (P2b), named `S` / `T` / `PS` / `CS` (P5), ζ / ω_n (P8); z tier held; Nichols and overlays later; textbook pass (T4). |
+| Analysis | teaching | 6 | Jacobians, linearize, structural, equilibria, modal; one-channel Bode with margins, pole-zero, root locus, Nyquist, step response on matplotlib and plotly; the frequency band brackets the 0 dB crossing. | named `S` / `T` / `PS` / `CS` (P5), ζ / ω_n (P8); z tier held; Nichols and overlays later; textbook pass (T4). |
 | Blocks | teaching | 5 | Routing, nonlinear, filters, sources, TF, 1-layer NN. | `Sine` / `Ramp` / `Chirp` / `Delay` / `Switch` (v0.2); textbook pass (T2). |
 | Planning / policy synthesis (DP) | teaching (GRO860) | 6 | Grid + value iteration (`loop` / `numpy` / `jax`), lookup controller, `PolicyEvaluator`, `LQRPlanner`; every planner returns a `PlanningSolution`; `compare()` reads solutions side by side; `dp.py` is the textbook reference of the style (2026-09-18). | cost-to-go as a `Field` (A1); policy iteration (S51). |
 | Planning / trajopt | teaching (GRO860) | 5 | Collocation, shooting, multiple shooting; live plot; `success` means defects satisfied to `feasibility_tol`; float64 by default on JAX. | Harden SciPy/Ipopt before TRL 6; textbook pass (T5). |
@@ -159,7 +159,7 @@ contract. Step-level work:
 
 | Topic | Surface | Status | Gate |
 | --- | --- | --- | --- |
-| Multi-physics modelling — nonlinear `f`/`h`, block diagram, linearize, `H(s)` | custom `DynamicSystem`, `plot_diagram`, `linearize`, `transfer_function` | green | a DC-motor + longitudinal-vehicle plant in the catalog; pole/zero cancellation landed 2026-09-26 (P2), order reduction by fast-mode neglect is P2b |
+| Multi-physics modelling — nonlinear `f`/`h`, block diagram, linearize, `H(s)` | custom `DynamicSystem`, `plot_diagram`, `linearize`, `transfer_function` | green | a DC-motor + longitudinal-vehicle plant in the catalog; pole/zero cancellation landed 2026-09-26 (P2); order reduction by fast-mode neglect is out of v0.2 (decided 2026-09-26) |
 | Closed-loop analysis — poles, root locus, Bode, margins, step specs | `pzmap`, `root_locus`, `bode`, `margins`, `step_info`, `P` / `PI` / `PD` / `PID` | green | met 2026-09-07: every compensator form reports the poles and zeros of the hand calculation, and margins are found wherever the crossover sits |
 | Design to specification — rise time, overshoot, final error, phase margin | `PI`, `PD`, `PID`, `Lead`, `Lag`, `step_info`, `margins` | green | the Table 2 specs of the guide are checkable in one notebook |
 | Loop-shaping specs — disturbance and measurement-noise sensitivity in dB at a frequency | `analysis` (v0.2) | scheduled v0.2 | named `S` / `T` / `PS` / `CS` sensitivity shortcuts on closed-loop diagrams |
@@ -238,26 +238,16 @@ term's hygiene:
 - Name freeze: no name a GRO860 notebook imports changes before v1.0
   (§4.1 gate 7).
 
-### 5.2 v0.2 — GRO501 and the textbook objects (October 2026)
+### 5.2 v0.2 — GRO501 (October 2026)
 
 Three waves. A and B can run in parallel; D runs throughout and carries on
 into v0.3. Wave C moved to v0.3 on 2026-09-26 (§5.3).
 
 **Wave A — the textbook objects finish speaking.** The nouns the constitution
-names exist; three of them are not yet the objects the tools carry.
+names exist; three of them are not yet the objects the tools carry. A1–A3 moved
+to v0.3 on 2026-09-26 (§5.3): GRO501 needs none of them, and October goes to
+wave B. A4 and A5 stay here.
 
-- **A1** `core/fields.py`: `Field` on `(x, u, t)` with `as_constraint`,
-  `as_input_constraint`, `as_cost`; `QuadraticField` (the Lyapunov `V`, the
-  LQR value, `S(t)` from the Riccati sweep), `GridField` (the DP and tabular
-  tables), `CallableField` (the RL critic); `LinearApproximator` as a field.
-  Plan: [fields.md](docs/plans/fields.md). **[ask — core]**
-- **A2** Cost parameters: `params` on every library cost, composite costs
-  nested like a diagram's. Plan: [cost-params.md](docs/plans/cost-params.md).
-  **[ask — core]**
-- **A3** Workspace geometry: package `core/geometry/` (shapes, Path, Track,
-  Scene, probes, `bind`, spatial fields, a course catalog); `planning.spatial`
-  retires; `PurePursuit` reads a Path. Plan:
-  [geometry-module.md](docs/plans/geometry-module.md) (S57). **[ask — core]**
 - **A4** Naming quick wins 1–4 and 6 of [naming.md](docs/plans/naming.md):
   class name as the default `name`, one closed-loop name, informative
   shortcut names, `id` honoured by the sampled loop, `id` documented.
@@ -272,8 +262,8 @@ names exist; three of them are not yet the objects the tools carry.
 
 - **B1** Correctness first: **P2** pole/zero cancellation (landed 2026-09-26:
   `pzmap` / `root_locus` / `transfer_function` cancel by default), **P3** `place()`
-  (landed 2026-09-26: Ackermann with one input, `place_poles` with several);
-  **P2b** order reduction. **[ask — public name]**
+  (landed 2026-09-26: Ackermann with one input, `place_poles` with several).
+  Order reduction (P2b) is out of v0.2 by decision (2026-09-26; TODO §7).
 - **TB-a** Next (decided 2026-09-26): the analysis toolbox reads like the
   textbook. First the review of which System shortcuts stay (reserved for
   linearize + common analysis), then the `dp.py`-style audit and pass of
@@ -287,8 +277,9 @@ names exist; three of them are not yet the objects the tools carry.
   after P5, before P11.
 - **B3** **P4** `estimation/`: `LuenbergerObserver`, `luenberger()`,
   `kalman()`, and how observer and state feedback compose. Held 2026-09-07;
-  it is the largest §4.2 gap, so v0.2 needs the hold lifted and the
-  disturbance convention (§6) decided first. **[ask]**
+  it is the largest §4.2 gap. Decided 2026-09-26: the clean-up and
+  solidification (TB-a, P7, P5, P8, TB-b, S61, P9, P10) land first, then the
+  disturbance convention (§6) is decided, then P4. **[ask]**
 - **B4** Polish: **P9** `TransferFunction` ports built once, **P10** the
   three `@` dispatch paths documented and pinned by a test; **P6** the z tier
   stays held (teach with `discretize` + simulation) unless the sommatif
@@ -327,6 +318,21 @@ Standing work, behaviour-preserving, one module per step.
   executed nightly).
 
 ### 5.3 v0.3 — GMC714 (December 2026)
+
+**Wave A's core objects** (moved from v0.2 on 2026-09-26), before wave C:
+
+- **A1** `core/fields.py`: `Field` on `(x, u, t)` with `as_constraint`,
+  `as_input_constraint`, `as_cost`; `QuadraticField` (the Lyapunov `V`, the
+  LQR value, `S(t)` from the Riccati sweep), `GridField` (the DP and tabular
+  tables), `CallableField` (the RL critic); `LinearApproximator` as a field.
+  Plan: [fields.md](docs/plans/fields.md). **[ask — core]**
+- **A2** Cost parameters: `params` on every library cost, composite costs
+  nested like a diagram's. Plan: [cost-params.md](docs/plans/cost-params.md).
+  **[ask — core]**
+- **A3** Workspace geometry: package `core/geometry/` (shapes, Path, Track,
+  Scene, probes, `bind`, spatial fields, a course catalog); `planning.spatial`
+  retires; `PurePursuit` reads a Path. Plan:
+  [geometry-module.md](docs/plans/geometry-module.md) (S57). **[ask — core]**
 
 **Wave C — GMC714, the catalog, pyro parity.** Follows wave A.
 
@@ -396,6 +402,7 @@ here. Each open item needs the maintainer.
   with `dt`; `WhiteNoise` carries `var` + `sample_period`, the same
   ambiguity. A Kalman filter needs the rule once: per-step covariance `Q_d`,
   or spectral density `Q_c` with `Q_d = Q_c / dt` (RULES 4.12 applies).
+  Taken up after the v0.2 clean-up and solidification (decided 2026-09-26).
   Recorded in docs/reviews/2026-09-15-foundations-review.md (F9).
 - **The terminal cost `h(x_f, t_f)`, one rule for every tool.** Since the
   one-horizon ruling (2026-09-17) `h` is charged exactly when `tf` is

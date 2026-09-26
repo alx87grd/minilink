@@ -22,7 +22,7 @@ additive or replaces boilerplate with generated equivalents.
 | **F1** `frequency_range` brackets the 0 dB crossing | — | 1 | **done** |
 | **F2** `PID.f` and `PID.ctl` agree on `tau` | — | 1 | **done** |
 | **F4** `closed_loop_poles` singular-gain guard | — | 1 | **done** |
-| **P2** `minreal` | G3 | 1 | **done** 2026-09-26; order reduction split to P2b [ask] |
+| **P2** `minreal` | G3 | 1 | **done** 2026-09-26; order reduction split out, then deferred out of v0.2 (2026-09-26; TODO §7) |
 | **P3** `place()` → `StateFeedbackController` | G2 | 1 | **done** 2026-09-26 |
 | **P4** `estimation/` — Luenberger, then Kalman | G1 | 2 | **held** |
 | **P5** Named `S` / `T` / `PS` / `CS` | G5 | 2 | agent |
@@ -140,7 +140,7 @@ was not the audit's own H(s). A lead zero on a plant pole drops both; a minimal 
 (the badly scaled quarter car standing in for §9.13) comes back in its own coordinates.
 `linear.zeros` now counts a pencil eigenvalue as finite only when `|β|` is not negligible
 against `|α|`, so rounding no longer reports zeros near 1e15. Tests: `TestMinreal`.
-Order reduction by neglecting fast modes is P2b.
+Order reduction by neglecting fast modes is out of v0.2 (decided 2026-09-26; TODO §7).
 
 ### P3. `place()`
 

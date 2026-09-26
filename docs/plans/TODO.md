@@ -41,44 +41,10 @@ first release a tag published); R1 left this file then.
 
 ## 2. v0.2 wave A — the textbook objects
 
-Design: [fields.md](fields.md), [cost-params.md](cost-params.md),
-[geometry-module.md](geometry-module.md), [naming.md](naming.md). Baselines first, as each plan
-states; every step is name-preserving for the GRO860 notebooks.
+A1–A3 (fields, cost parameters, workspace geometry) moved to v0.3 on 2026-09-26 ([§4](#4-v03-wave-c--gmc714-catalog-parity)):
+GRO501 needs none of them, and October goes to wave B. A4 and A5 stay.
+Design: [naming.md](naming.md). Every step is name-preserving for the GRO860 notebooks.
 
-- [ ] **A1 `core/fields.py`** **[ask — core]**. Steps 4.1–4.8 of [fields.md](fields.md):
-  promote `StateField` → `Field` on `(x, u, t)` with `as_constraint` / `as_input_constraint` /
-  `as_cost` and `gradient`; `QuadraticField` (Lyapunov `V`, LQR value, `S(t)` schedule) with the
-  ellipsoid as its sublevel set; `GridField` (DP and tabular tables, per-sweep time axis);
-  `CallableField` (RL critics); `LinearApproximator` as a field; `LyapunovCertificate.V` a
-  field; CBF plan amended; DESIGN §4 fields bullet. Done when the RoA and DP baselines `cmp`
-  and `test_analysis_lyapunov.py`, `test_planning_solution.py`, `test_rl_tabular.py`,
-  `test_rl_planner.py` pass.
-  Also: `PolicyEvaluator` takes the evaluators' verb and returns a field-shaped result
-  (scan: planning#4).
-- [ ] **A2 Cost parameters** **[ask — core]**. [cost-params.md](cost-params.md): `params` on
-  every library cost (`QuadraticCost`, `TimeCost`, `FieldCost`, `SumCost`, `ScaledCost`),
-  composite costs nested like diagram params with `cost.id`, attributes as views so the
-  notebooks' in-place writes keep working; then the trajopt, DP, evaluator and RL paths pass
-  `problem.params.cost` through. Done when every planner baseline `cmp`s and `jax.grad` of a
-  trajopt objective with respect to `Q` runs.
-  Also (scan: core#3, core#4): `discount_rate` a constructor field (or a `params` entry) that
-  `ScaledCost` forwards and `SumCost` reconciles (the composites keep it since 2026-09-23);
-  `validate_diagram_params` checks each per-block dict against the block's keys, so a partial
-  dict fails at the setter instead of inside `f`. The Monte Carlo evaluator and the gym reward
-  never apply `problem.params.cost` while the DP table does, so the two disagree on a
-  parametric cost (found 2026-09-23).
-- [ ] **A3 Workspace geometry (S57)** **[ask — core]**. [geometry-module.md](geometry-module.md)
-  implementation steps 1–6: `core/geometry/` package (shapes, paths, track, scene, probes,
-  `bind`, spatial fields, grid, catalog `oval_circuit` / `racecar_circuit` /
-  `holonomic_forest`); shaping next to `Field.as_cost`; plots and overlays under
-  `graphical/` with lazy methods on `Scene` / `Track`; `planning.spatial` re-exports then
-  deletes in the same change as the call sites; `PurePursuit` takes a Path / Track. Done when
-  the UdeS racecar trio and the RRT forest demo use the catalog, `control` imports geometry
-  with no planning import, and the suite is green. Glyph rename stays S30.
-  Also: `Shape` unions flatten like `IntersectionSet` and `SumCost` (scan: core#6);
-  `PurePursuit` sizes its measurement from the vehicle, not `state_dim=9` (scan: control#9).
-  `control/mpc/viz.py` imports `TrackCorridorOverlay` from `planning.spatial.overlays`;
-  retarget it in the change that deletes that module (scan: control#12).
 - [ ] **A4 Naming quick wins** 1–4 and 6 of [naming.md](naming.md), each a few lines plus a
   test: class name as the default `name`; one closed-loop name on both `@` paths; informative
   default names where a shortcut says `Diagram`; the sampled loop's plant wrapper honours
@@ -109,9 +75,10 @@ states; every step is name-preserving for the GRO860 notebooks.
 Plan: [gro501-classical-control.md](gro501-classical-control.md) (P1, F1, F2, F4 landed
 2026-09-07). Release contract: [ROADMAP §4.2](../../ROADMAP.md#42-v02--gro501-end-to-end).
 
-**Next, in order (decided 2026-09-26):** TB-a, then P5 and P8 on the cleaned toolbox, then
-TB-b, then P11. The textbook pass comes before the new surface, so the new code copies clean
-patterns and no shortcut is added only to be dropped.
+**Next, in order (decided 2026-09-26):** clean-up and solidification first — TB-a (step 2
+running), P7, then P5 and P8 on the cleaned toolbox, TB-b, S61, P9, P10 — then the
+disturbance convention and P4, then P11. The textbook pass comes before the new surface, so
+the new code copies clean patterns and no shortcut is added only to be dropped.
 
 - [ ] **TB-a The analysis toolbox reads like the textbook** (now; before P5 and P8, which build
   on these files). The method of
@@ -121,15 +88,17 @@ patterns and no shortcut is added only to be dropped.
   1. **The shortcut review** — landed 2026-09-26 as a clean cut (ROADMAP §6 "System analysis
      shortcuts"): eight shortcuts on every `System`, `plot_step_response` on `LTISystem` only,
      ten removed to their band functions, every call site in `examples/` and `tests/` moved.
-  2. **The audit**, read-only: `analysis/linear.py`, `frequency.py`, `time_response.py`,
-     `structural.py`, `linearize.py`, `modal.py` read line by line. The findings go into one
-     dated review in `docs/reviews/`, and the maintainer decides
-     before any code changes.
-  3. **The pass**: behaviour-preserving (seeded baseline, byte-identical after);
-     public-name or returned-type changes only as decided in step 2. Absorbs T4's analysis
-     half.
-  Done when the six modules read like `dp.py`, and the
-  baseline `cmp`s.
+  2. **The audit** — landed 2026-09-26:
+     [2026-09-26-analysis-toolbox-audit.md](../reviews/2026-09-26-analysis-toolbox-audit.md),
+     40 findings; decisions 1–4 ruled yes the same day.
+  3a. **The rewrite**: the review's behaviour-preserving rows plus decisions 1–4 (`n_gains`,
+     the `(poles, modes)` tuple, `animate_modal(sys, …)`, the `tol` keyword), in the
+     review's §9 order, one commit per concern, each byte-identical against a seeded
+     baseline. Absorbs T4's analysis half.
+  3b. **The bugs**, after 3a, one commit each with its test first: LIN-8 (`root_locus` on a
+     singular user gain), TRS-3 (`step_info` on an unsettled response), X-6 (MIMO input to
+     the SISO functions of `linear`), X-5 (one rank rule as the default).
+  Done when the six modules read like `dp.py`, 3a's baselines `cmp`, and 3b's tests pass.
 - [ ] **TB-b The control objects and the loop read like the textbook** (after P5, which
   touches `feedback()`; before P11, so the notebooks students read sit on it). The same
   audit, review and pass on `control/siso.py` (P / PI / PD / PID / Lead / Lag),
@@ -137,13 +106,6 @@ patterns and no shortcut is added only to be dropped.
   `dynamics/abstraction/state_space.py` (`LTISystem`) and the loop-building path students
   use (`feedback`, `closed_loop`, `@`). Done when every module in scope reads like `dp.py`
   and the baseline `cmp`s.
-- [ ] **P2b Order reduction by neglecting fast modes** **[ask — public name]** (split from P2
-  on 2026-09-26; GRO501 §1.1 "réduire l'ordre du système"): keep the slow modes and match
-  the DC gain (singular perturbation), in `analysis/modal.py`; the name is decided with the
-  step (`reduce_order(sys, n)` or a `wn_max` cutoff). Done when the DC-motor model drops its
-  electrical pole and keeps its static gain.
-  Also: swap the guide's §9.13 realization into `TestMinreal`, and its §1.4.2 parking model
-  into `TestPolePlacement`, once the matrices are in hand (stand-ins today).
 - [ ] **P5 Named sensitivity functions** `sensitivity` (`S = e/r`), `complementary_sensitivity`
   (`T = y/r`), `PS`, `CS` on a closed-loop diagram, each an `LTISystem`; `disturbance=` /
   `noise=` injection points on `feedback()`; band functions, not `System` shortcuts (ROADMAP
@@ -178,7 +140,8 @@ patterns and no shortcut is added only to be dropped.
   or a renamed attribute, decided with the step; and `__str__` on `LTISystem`,
   `TransferFunction` and `StructuralResult`, so tutorial 01's `print(tf)` shows the transfer
   function and fourteen `np.linalg.eigvals(lin.A())` sites go (scan: analysis#3, examples#2).
-- [ ] **P4 `estimation/`** **[held 2026-09-07 — ask to lift]**. `LuenbergerObserver(A, B, C,
+- [ ] **P4 `estimation/`** **[held 2026-09-07; 2026-09-26: stays held until the clean-up and
+  solidification above land, then the disturbance convention (ROADMAP §6) is decided first]**. `LuenbergerObserver(A, B, C,
   L)` as a `DynamicSystem` with ports `u`, `y` → `x_hat`; `luenberger(A, B, C, poles)` on the
   dual pair (`place_gain(Aᵀ, Cᵀ, poles)ᵀ`, P3 landed 2026-09-26); `kalman(A, B, C, Q, R)` from the filter Riccati equation; the
   observer + state-feedback composition ruled first (ROADMAP §6). Done when LQR + Kalman
@@ -220,6 +183,46 @@ patterns and no shortcut is added only to be dropped.
 ---
 
 ## 4. v0.3 wave C — GMC714, catalog, parity
+
+**Wave A's core objects** (moved from v0.2 on 2026-09-26). Design: [fields.md](fields.md),
+[cost-params.md](cost-params.md), [geometry-module.md](geometry-module.md). Baselines first, as
+each plan states; every step is name-preserving for the GRO860 notebooks.
+
+- [ ] **A1 `core/fields.py`** **[ask — core]**. Steps 4.1–4.8 of [fields.md](fields.md):
+  promote `StateField` → `Field` on `(x, u, t)` with `as_constraint` / `as_input_constraint` /
+  `as_cost` and `gradient`; `QuadraticField` (Lyapunov `V`, LQR value, `S(t)` schedule) with the
+  ellipsoid as its sublevel set; `GridField` (DP and tabular tables, per-sweep time axis);
+  `CallableField` (RL critics); `LinearApproximator` as a field; `LyapunovCertificate.V` a
+  field; CBF plan amended; DESIGN §4 fields bullet. Done when the RoA and DP baselines `cmp`
+  and `test_analysis_lyapunov.py`, `test_planning_solution.py`, `test_rl_tabular.py`,
+  `test_rl_planner.py` pass.
+  Also: `PolicyEvaluator` takes the evaluators' verb and returns a field-shaped result
+  (scan: planning#4).
+- [ ] **A2 Cost parameters** **[ask — core]**. [cost-params.md](cost-params.md): `params` on
+  every library cost (`QuadraticCost`, `TimeCost`, `FieldCost`, `SumCost`, `ScaledCost`),
+  composite costs nested like diagram params with `cost.id`, attributes as views so the
+  notebooks' in-place writes keep working; then the trajopt, DP, evaluator and RL paths pass
+  `problem.params.cost` through. Done when every planner baseline `cmp`s and `jax.grad` of a
+  trajopt objective with respect to `Q` runs.
+  Also (scan: core#3, core#4): `discount_rate` a constructor field (or a `params` entry) that
+  `ScaledCost` forwards and `SumCost` reconciles (the composites keep it since 2026-09-23);
+  `validate_diagram_params` checks each per-block dict against the block's keys, so a partial
+  dict fails at the setter instead of inside `f`. The Monte Carlo evaluator and the gym reward
+  never apply `problem.params.cost` while the DP table does, so the two disagree on a
+  parametric cost (found 2026-09-23).
+- [ ] **A3 Workspace geometry (S57)** **[ask — core]**. [geometry-module.md](geometry-module.md)
+  implementation steps 1–6: `core/geometry/` package (shapes, paths, track, scene, probes,
+  `bind`, spatial fields, grid, catalog `oval_circuit` / `racecar_circuit` /
+  `holonomic_forest`); shaping next to `Field.as_cost`; plots and overlays under
+  `graphical/` with lazy methods on `Scene` / `Track`; `planning.spatial` re-exports then
+  deletes in the same change as the call sites; `PurePursuit` takes a Path / Track. Done when
+  the UdeS racecar trio and the RRT forest demo use the catalog, `control` imports geometry
+  with no planning import, and the suite is green. Glyph rename stays S30.
+  Also: `Shape` unions flatten like `IntersectionSet` and `SumCost` (scan: core#6);
+  `PurePursuit` sizes its measurement from the vehicle, not `state_dim=9` (scan: control#9).
+  `control/mpc/viz.py` imports `TrackCorridorOverlay` from `planning.spatial.overlays`;
+  retarget it in the change that deletes that module (scan: control#12).
+**Wave C.**
 
 - [ ] **G1 GMC714 baseline audit** **[ask — course scope]**. Run every topic of ROADMAP §4.3
   (vehicle models, robotic arm, nonlinear control, robust control, trajectory optimization,
@@ -536,6 +539,10 @@ After two cohorts; each is a design conversation before code. **[ask — core]**
 
 One line each; open a plan doc only when a design needs a writeup.
 
+- Order reduction by neglecting fast modes (GRO501 §1.1; out of v0.2 by decision 2026-09-26):
+  keep the slow modes and the DC gain, a band function in `analysis/modal.py`. Separately,
+  swap the guide's §9.13 realization into `TestMinreal` and its §1.4.2 parking model into
+  `TestPolePlacement` once the matrices are in hand (stand-ins today).
 - Vehicle view ports (`pose` / `bodyvel` on `DynamicBicycle` for impedance / PID).
 - Scene params / `J(z, p)` bind (DESIGN §4 planning-params pipeline B; moving obstacles
   online without rebuilding the NLP).
