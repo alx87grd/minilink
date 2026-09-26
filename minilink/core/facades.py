@@ -653,6 +653,7 @@ class DynamicSystemFacades:
         wrt=None,
         method="auto",
         eps=1e-6,
+        minimal=None,
     ):
         """Return one SISO channel of the linearization as a ``TransferFunction``.
 
@@ -661,7 +662,16 @@ class DynamicSystemFacades:
         from minilink.analysis.frequency import transfer_function
 
         return transfer_function(
-            self, x_bar, u_bar, t, params, of=of, wrt=wrt, method=method, eps=eps
+            self,
+            x_bar,
+            u_bar,
+            t,
+            params,
+            of=of,
+            wrt=wrt,
+            method=method,
+            eps=eps,
+            minimal=minimal,
         )
 
     def bode(
@@ -709,6 +719,7 @@ class DynamicSystemFacades:
         wrt=None,
         method="auto",
         eps=1e-6,
+        minimal=None,
     ):
         """Return ``(zeros, poles, gain)`` of one SISO channel.
 
@@ -717,7 +728,16 @@ class DynamicSystemFacades:
         from minilink.analysis.frequency import pzmap
 
         return pzmap(
-            self, x_bar, u_bar, t, params, of=of, wrt=wrt, method=method, eps=eps
+            self,
+            x_bar,
+            u_bar,
+            t,
+            params,
+            of=of,
+            wrt=wrt,
+            method=method,
+            eps=eps,
+            minimal=minimal,
         )
 
     def plot_bode(
@@ -842,6 +862,7 @@ class DynamicSystemFacades:
         gains=None,
         method="auto",
         eps=1e-6,
+        minimal=None,
     ):
         """Return ``(gains, roots)`` of one SISO channel closed with ``u = -K y``.
 
@@ -860,6 +881,7 @@ class DynamicSystemFacades:
             gains=gains,
             method=method,
             eps=eps,
+            minimal=minimal,
         )
 
     def step_response(
@@ -989,6 +1011,7 @@ class DynamicSystemFacades:
         gains=None,
         method="auto",
         eps=1e-6,
+        minimal=None,
         backend="matplotlib",
         show=True,
     ):
@@ -1009,6 +1032,7 @@ class DynamicSystemFacades:
             gains=gains,
             method=method,
             eps=eps,
+            minimal=minimal,
             backend=backend,
             show=show,
         )
@@ -1100,6 +1124,7 @@ class DynamicSystemFacades:
         wrt=None,
         method="auto",
         eps=1e-6,
+        minimal=None,
         backend="matplotlib",
         show=True,
     ):
@@ -1119,6 +1144,7 @@ class DynamicSystemFacades:
             wrt=wrt,
             method=method,
             eps=eps,
+            minimal=minimal,
             backend=backend,
             show=show,
         )

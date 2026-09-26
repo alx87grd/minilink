@@ -118,11 +118,13 @@ states; every step is name-preserving for the GRO860 notebooks.
 Plan: [gro501-classical-control.md](gro501-classical-control.md) (P1, F1, F2, F4 landed
 2026-09-07). Release contract: [ROADMAP §4.2](../../ROADMAP.md#42-v02--gro501-end-to-end).
 
-- [ ] **P2 `minreal`** on the matrices tier + `sys.minreal()` returning an `LTISystem`; a
-  `tol` keyword on `transfer_function` / `pzmap` / `root_locus` (default: no cancellation);
-  order reduction by neglecting fast modes as a separate verb. Done when the pre-P1 pure-P
-  loop reduces to `200 / (s² + 0.5 s + 4.905)` and the guide's §9.13 realization survives
-  unchanged.
+- [ ] **P2b Order reduction by neglecting fast modes** **[ask — public name]** (split from P2
+  on 2026-09-26; GRO501 §1.1 "réduire l'ordre du système"): keep the slow modes and match
+  the DC gain (singular perturbation), in `analysis/modal.py`; the name is decided with the
+  step (`reduce_order(sys, n)` or a `wn_max` cutoff). Done when the DC-motor model drops its
+  electrical pole and keeps its static gain.
+  Also: swap the guide's §9.13 realization into `TestMinreal` once the matrices are in
+  hand (a minimal realization comes back unchanged; the quarter car stands in today).
 - [ ] **P3 `place()` / `place_gain()` / `place_at_operating_point()`** mirroring `lqr`;
   `scipy.signal.place_poles` plus an honest error when the pole set is not reachable; a demo
   in `examples/demos/control/`. Done when `eigvals(A − BK)` on the guide's parking model
@@ -146,7 +148,9 @@ Plan: [gro501-classical-control.md](gro501-classical-control.md) (P1, F1, F2, F4
 - [ ] **P7 Generate the analysis facades**: one helper builds a delegating method from the
   target function (signature and docstring copied), explicit form kept only where the facade
   differs; a test asserts every generated `__signature__` matches its target. Done when the
-  13 hand-copied methods are generated and `help(sys.bode)` is unchanged.
+  13 hand-copied methods are generated and `help(sys.bode)` is unchanged. Generates only
+  the shortcuts TB's review keeps (decided 2026-09-26: shortcuts are for the common
+  linearize + analyse/plot operations), so it runs after TB step 1.
   Also: a signature test pinning the band's calling pattern (scan: analysis#7); `linearize` and
   `discretize` freed from the band-facade name collision (scan: analysis#11).
 - [ ] **P8 Small teaching helpers**: ζ and ω_n from a complex pole pair (fields on the `pzmap`
@@ -187,6 +191,29 @@ Plan: [gro501-classical-control.md](gro501-classical-control.md) (P1, F1, F2, F4
   A source whose `y` feeds through from a port other than `u` does not discretize
   (`PendulumWithNoisePort`: unknown input dependency `v`), because the wrapper stacks every
   port into one `u`; map `y`'s dependencies to `("u",)` or mirror the source's ports.
+- [ ] **TB The classical-control pipeline reads like the textbook** (decided 2026-09-26;
+  after P2, P3, P5 and P8, before P11 so the notebooks students read sit on it).
+  1. **The shortcut review, first** **[ask — public names]**: a keep/drop list for the 18
+     analysis methods on `DynamicSystemFacades` (`core/facades.py`). Shortcuts are reserved
+     for the very common "linearize + analyse/plot" operations; the rest is called as a
+     band function. Today's use in `examples/`: `plot_bode` 18, `linearize` 11,
+     `plot_root_locus` 8, `plot_pzmap` 7, down to `nyquist` and
+     `plot_region_of_attraction` at 0; no GRO860 notebook calls any, so the name freeze
+     does not block the trim (dropped ones are deprecated first). P7 then generates only
+     the kept ones.
+  2. **The audit and pass**, the method of
+     [2026-09-22-consolidation-review.md](../reviews/2026-09-22-consolidation-review.md) §4.1
+     under AGENTS "The textbook rule", `planning/policy_synthesis/dp.py` the reference:
+     `analysis/linear.py`, `frequency.py`, `time_response.py`, `structural.py`,
+     `linearize.py`, `modal.py`; `control/siso.py` (P / PI / PD / PID / Lead / Lag),
+     `control/state.py`, `control/lqr.py`; `blocks/transfer_function.py`,
+     `dynamics/abstraction/state_space.py` (`LTISystem`); the loop-building path students
+     use (`feedback`, `closed_loop`, `@`). A line-level audit, a dated review in
+     `docs/reviews/`, then a behaviour-preserving pass (seeded baseline, byte-identical
+     after); public-name or returned-type changes go to the maintainer. Absorbs T4's
+     analysis half.
+  Done when the shortcut list is decided and applied, every module in scope reads like
+  `dp.py`, and the baseline `cmp`s.
 - [ ] **P11 Two GRO501 notebooks** **[maintainer — student-facing]**:
   `teaching/topics/classical_control/dc_motor_propulsion.ipynb` (APP2) and
   `bicycle_autopilot.ipynb` (APP4), Basic tier, Colab-first; drafted for review. Done when
@@ -285,7 +312,8 @@ findings, file by file and line by line, are in
   below), the 37 inline `array_module(q).array(...)` calls.
   Also: `Manipulator` kinematics defaults raise instead of returning zeros, with
   `link_lengths` the base contract (scan: dynamics#7).
-- [ ] **T4 analysis and simulation** (what T0 left): `analysis/lyapunov.py` (primary
+- [ ] **T4 analysis and simulation** (what T0 left; its classical-control modules move to TB):
+  `analysis/lyapunov.py` (primary
   function first, ceremony in a helper, `verify` / rollout unpacked, `EVEN` / `ODD` beside
   `METHODS`, `require_jax`, `sample_in_ellipsoid` named), `analysis/linearize.py` (the `D`
   comprehension unrolled, the early return), `analysis/linear.py` / `frequency.py` /

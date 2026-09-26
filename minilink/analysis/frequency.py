@@ -15,6 +15,8 @@ matplotlib or plotly.
 
 from __future__ import annotations
 
+import warnings
+
 import numpy as np
 
 from minilink.analysis import linear
@@ -172,17 +174,24 @@ def pzmap(
     wrt=None,
     method: str = "auto",
     eps: float = 1e-6,
+    minimal: bool | None = None,
 ) -> tuple[np.ndarray, np.ndarray, float]:
     """Return the selected SISO channel as ``(zeros, poles, gain)``.
 
     Same arguments as :func:`frequency_response` without the frequency grid:
     poles are the eigenvalues of ``A``, zeros the transmission zeros of the
     channel, ``gain`` the leading coefficient ``k`` of
-    ``G(s) = k prod(s - z) / prod(s - p)``.
+    ``G(s) = k prod(s - z) / prod(s - p)``. ``minimal`` (default: yes, with a
+    one-time notice when a pair cancels) first reduces the channel to its
+    minimal realization, so pole/zero pairs cancel as in the hand calculation;
+    ``minimal=False`` keeps every mode of the realization.
     """
     A, B, C, D = siso_matrices(
         sys, x_bar, u_bar, t, params, of=of, wrt=wrt, method=method, eps=eps
     )
+
+    # Minimal realization: the pole/zero pairs of the hand calculation cancel
+    A, B, C, D = minimal_channel(A, B, C, D, minimal)
 
     return linear.zeros(A, B, C, D), linear.poles(A), linear.gain(A, B, C, D)
 
@@ -199,6 +208,7 @@ def root_locus(
     gains=None,
     method: str = "auto",
     eps: float = 1e-6,
+    minimal: bool | None = None,
 ) -> tuple[np.ndarray, np.ndarray]:
     """Closed-loop poles of ``u = -K y`` on the selected channel over a gain sweep.
 
@@ -206,10 +216,14 @@ def root_locus(
     ``gains`` defaults to an adaptive sweep from ``K = 0`` to the gain where
     the far branches leave the picture. Returns ``(gains, roots)`` with
     ``roots`` of shape ``(len(gains), n)``, one continuous branch per column.
+    ``minimal`` as in :func:`pzmap`.
     """
     A, B, C, D = siso_matrices(
         sys, x_bar, u_bar, t, params, of=of, wrt=wrt, method=method, eps=eps
     )
+
+    # Minimal realization: the pole/zero pairs of the hand calculation cancel
+    A, B, C, D = minimal_channel(A, B, C, D, minimal)
 
     return linear.root_locus(A, B, C, D, gains)
 
@@ -225,10 +239,12 @@ def transfer_function(
     wrt=None,
     method: str = "auto",
     eps: float = 1e-6,
+    minimal: bool | None = None,
 ):
     """Return the selected SISO channel as a ``TransferFunction`` block.
 
-    Same arguments as :func:`frequency_response` without the frequency grid.
+    Same arguments as :func:`frequency_response` without the frequency grid;
+    ``minimal`` as in :func:`pzmap`.
     ``num(s) = k prod(s - z)`` and ``den(s) = prod(s - p)`` come from the
     zeros, poles and gain of :func:`pzmap`; the block is their state-space
     realization and carries ``numerator``, ``denominator``, ``poles`` and
@@ -237,7 +253,16 @@ def transfer_function(
     from minilink.blocks.transfer_function import TransferFunction
 
     z, p, k = pzmap(
-        sys, x_bar, u_bar, t, params, of=of, wrt=wrt, method=method, eps=eps
+        sys,
+        x_bar,
+        u_bar,
+        t,
+        params,
+        of=of,
+        wrt=wrt,
+        method=method,
+        eps=eps,
+        minimal=minimal,
     )
 
     # num(s) = k ∏(s − z),   den(s) = ∏(s − p)
@@ -304,12 +329,22 @@ def plot_pzmap(
     wrt=None,
     method: str = "auto",
     eps: float = 1e-6,
+    minimal: bool | None = None,
     backend="matplotlib",
     show: bool = True,
 ) -> PlotResult:
-    """Pole-zero map of the selected channel: ``x`` poles, ``o`` zeros."""
+    """Pole-zero map of the selected channel: ``x`` poles, ``o`` zeros; ``minimal`` as in :func:`pzmap`."""
     z, p, gain = pzmap(
-        sys, x_bar, u_bar, t, params, of=of, wrt=wrt, method=method, eps=eps
+        sys,
+        x_bar,
+        u_bar,
+        t,
+        params,
+        of=of,
+        wrt=wrt,
+        method=method,
+        eps=eps,
+        minimal=minimal,
     )
 
     return render_control_figure(
@@ -329,13 +364,17 @@ def plot_root_locus(
     gains=None,
     method: str = "auto",
     eps: float = 1e-6,
+    minimal: bool | None = None,
     backend="matplotlib",
     show: bool = True,
 ) -> PlotResult:
-    """Root locus of the selected channel closed with ``u = -K y``."""
+    """Root locus of the selected channel closed with ``u = -K y``; ``minimal`` as in :func:`pzmap`."""
     A, B, C, D = siso_matrices(
         sys, x_bar, u_bar, t, params, of=of, wrt=wrt, method=method, eps=eps
     )
+
+    # Minimal realization: the pole/zero pairs of the hand calculation cancel
+    A, B, C, D = minimal_channel(A, B, C, D, minimal)
     K, roots = linear.root_locus(A, B, C, D, gains)
 
     return render_control_figure(
@@ -425,6 +464,21 @@ def siso_matrices(sys, x_bar, u_bar, t, params, *, of, wrt, method, eps):
             )
         C, D = C[[i], :], D[[i], :]
     return A, B, C, D
+
+
+def minimal_channel(A, B, C, D, minimal):
+    """The channel's minimal realization unless ``minimal=False``; the default reports what it drops once."""
+    if minimal is False:
+        return A, B, C, D
+    A_min, B_min, C_min, D_min = linear.minreal(A, B, C, D)
+    dropped = A.shape[0] - A_min.shape[0]
+    if minimal is None and dropped > 0:
+        warnings.warn(
+            f"Cancelled {dropped} pole/zero pair(s): modes that are uncontrollable or "
+            "unobservable on this channel. Pass minimal=False to keep them.",
+            stacklevel=3,
+        )
+    return A_min, B_min, C_min, D_min
 
 
 def frequency_grid(A, B, C, D, w, n):

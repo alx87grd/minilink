@@ -1,4 +1,4 @@
-"""Linear analysis on the matrices ``(A, B, C, D)``: poles, zeros, gain, frequency response, margins, root locus, step response.
+"""Linear analysis on the matrices ``(A, B, C, D)``: poles, zeros, gain, minimal realization, frequency response, margins, root locus, step response.
 
 Matrices in, arrays out; the system tier (``frequency.py``, ``time_response.py``) reduces a
 ``System`` to this channel first.
@@ -10,6 +10,8 @@ from dataclasses import dataclass
 
 import numpy as np
 from scipy import linalg
+
+from minilink.analysis.structural import controllability, observability
 
 # =============================================================================
 # Public API — poles, zeros, response
@@ -38,12 +40,15 @@ def zeros(A, B, C, D):
     if n == 0 or m != C.shape[0]:
         return np.array([], dtype=complex)
 
-    # finite eig of  [[A, B], [C, D]] − s [[I, 0], [0, 0]]
+    # z = α / β over the eigenpairs of  [[A, B], [C, D]] − s [[I, 0], [0, 0]]  with β ≠ 0
     P = np.block([[A, B], [C, D]])
     E = np.zeros_like(P)
     E[:n, :n] = np.eye(n)
-    values = linalg.eigvals(P, E)
-    return values[np.isfinite(values)]
+    alpha, beta = linalg.eigvals(P, E, homogeneous_eigvals=True)
+    finite = np.abs(beta) > _INFINITE_ZERO_RATIO * np.abs(alpha)
+    zeros = alpha[finite] / beta[finite]
+
+    return zeros
 
 
 def gain(A, B, C, D):
@@ -103,6 +108,47 @@ def frequency_range(A, B, C, D):
         w_min = 10.0 ** np.floor(np.log10(rates.min()) - 1.0)
         w_max = 10.0 ** np.ceil(np.log10(rates.max()) + 1.0)
     return _bracket_unit_gain(A, B, C, D, w_min, w_max)
+
+
+# =============================================================================
+# Public API — minimal realization
+# =============================================================================
+
+
+def minreal(A, B, C, D, *, tol=1e-9):
+    """Minimal realization: drop the modes that are uncontrollable or unobservable.
+
+    The step that makes pole/zero pairs cancel as in the hand calculation;
+    ``pzmap``, ``root_locus`` and ``transfer_function`` run it by default.
+    ``tol`` is the relative singular-value threshold below which a direction
+    counts as missing: the Kalman matrices raise ``A`` to the power ``n − 1``,
+    so their rounding sits far above machine precision. A realization that is
+    already minimal comes back in its own coordinates.
+    """
+    A, B, C, D = _matrices(A, B, C, D)
+    n = A.shape[0]
+
+    # Controllable subspace: 𝒞 = U Σ Vᵀ, keep the r directions with σᵢ > tol σ₁
+    U, sigma, _ = np.linalg.svd(controllability(A, B).matrix)
+    r = int(np.sum(sigma > tol * sigma.max(initial=0.0)))
+    T_c = U[:, :r] if r < n else np.eye(n)
+
+    # Restrict to it: x = T_c z  ⇒  A_c = T_cᵀ A T_c,  B_c = T_cᵀ B,  C_c = C T_c
+    A_c = T_c.T @ A @ T_c
+    B_c = T_c.T @ B
+    C_c = C @ T_c
+
+    # Observable part of it: 𝒪ᵀ = U Σ Vᵀ, keep the q directions with σᵢ > tol σ₁
+    U, sigma, _ = np.linalg.svd(observability(A_c, C_c).matrix.T)
+    q = int(np.sum(sigma > tol * sigma.max(initial=0.0)))
+    T_o = U[:, :q] if q < r else np.eye(r)
+
+    # Restrict again: z = T_o w  ⇒  the minimal realization, D unchanged
+    A_min = T_o.T @ A_c @ T_o
+    B_min = T_o.T @ B_c
+    C_min = C_c @ T_o
+
+    return A_min, B_min, C_min, D
 
 
 # =============================================================================
@@ -224,6 +270,10 @@ def settling_horizon(A):
 # =============================================================================
 # Internal machinery
 # =============================================================================
+
+# A pencil eigenvalue with |β| below this fraction of |α| is infinite, not a zero:
+# rounding turns the pencil's infinite eigenvalues into finite ones near 1e15
+_INFINITE_ZERO_RATIO = 1e-8
 
 
 def _bracket_unit_gain(A, B, C, D, w_min, w_max, *, decades=8):

@@ -1,6 +1,7 @@
 """Unit tests for analysis verbs (linearize, structural, equilibria) and LQR."""
 
 import unittest
+import warnings
 import numpy as np
 import pytest
 from minilink.analysis.equilibria import find_equilibrium
@@ -1508,3 +1509,90 @@ class TestFrequencyRangeBracketsCrossover(unittest.TestCase):
         tf = self._tf([1.0, 2.0], [1.0, 1.0])  # d = 1, so K = -1 is singular
         poles = linear.closed_loop_poles(tf.A(), tf.B(), tf.C(), tf.D(), -1.0)
         self.assertTrue(np.all(np.isinf(poles)))
+
+
+class TestMinreal(unittest.TestCase):
+    """P2: pole/zero pairs cancel as in the hand calculation, and nothing else moves."""
+
+    def test_phantom_modes_cancel(self):
+        from minilink.analysis import linear
+        from minilink.blocks.transfer_function import TransferFunction
+
+        # The pure-P pendulum loop of the 2026-09-07 GRO501 audit:
+        # (10 s² + 200 s) / (s⁴ + 20.25 s³ + 9.905 s² + 98.1 s) = 10 / (s² + 0.25 s + 4.905)
+        loop = TransferFunction([10.0, 200.0, 0.0], [1.0, 20.25, 9.905, 98.1, 0.0])
+        A_min, _, _, _ = linear.minreal(loop.A(), loop.B(), loop.C(), loop.D())
+        self.assertEqual(A_min.shape, (2, 2))
+
+        with pytest.warns(UserWarning, match="Cancelled 2 pole/zero"):
+            H = loop.transfer_function()
+        np.testing.assert_allclose(H.numerator, [10.0], atol=1e-9)
+        np.testing.assert_allclose(H.denominator, [1.0, 0.25, 4.905], atol=1e-9)
+
+        with warnings.catch_warnings():
+            warnings.simplefilter("error")
+            raw = loop.transfer_function(minimal=False)
+        self.assertEqual(len(raw.denominator), 5)
+
+    def test_a_compensator_zero_on_a_plant_pole_drops_both(self):
+        from minilink.blocks.transfer_function import TransferFunction
+
+        plant = TransferFunction([1.0], [1.0, 3.0, 2.0])  # poles -1, -2
+        lead = TransferFunction([1.0, 1.0], [1.0, 10.0])  # zero on the plant pole -1
+        loop = lead >> plant
+
+        with pytest.warns(UserWarning, match="Cancelled 1 pole/zero"):
+            zeros, poles, _ = loop.pzmap()
+        self.assertEqual(len(zeros), 0)
+        np.testing.assert_allclose(np.sort(poles.real), [-10.0, -2.0], atol=1e-9)
+
+        zeros, poles, _ = loop.pzmap(minimal=False)
+        np.testing.assert_allclose(zeros, [-1.0], atol=1e-9)
+        self.assertEqual(len(poles), 3)
+
+    def test_a_minimal_realization_comes_back_unchanged(self):
+        from minilink.analysis import linear
+
+        for scale_b, scale_c in [(1.0, 1.0), (1e-6, 1e6), (1e5, 1e-8)]:
+            with self.subTest(scale_b=scale_b, scale_c=scale_c):
+                lti, A, B, C, _ = quarter_car(scale_b, scale_c)
+                D = np.zeros((C.shape[0], B.shape[1]))
+                for given, kept in zip((A, B, C, D), linear.minreal(A, B, C, D)):
+                    np.testing.assert_array_equal(kept, given)
+                with warnings.catch_warnings():
+                    warnings.simplefilter("error")
+                    lti.pzmap(of=("y", 0))
+
+    def test_mimo_drops_the_uncontrollable_and_the_unobservable_mode(self):
+        from minilink.analysis import linear
+
+        A = np.diag([-1.0, -2.0, -3.0, -4.0])
+        B = np.array(
+            [[1.0, 0.0], [0.0, 1.0], [0.0, 0.0], [1.0, 1.0]]
+        )  # mode 3 unreached
+        C = np.array([[1.0, 0.0, 1.0, 0.0], [0.0, 1.0, 1.0, 0.0]])  # mode 4 unseen
+        D = np.zeros((2, 2))
+
+        A_min, B_min, C_min, D_min = linear.minreal(A, B, C, D)
+        self.assertEqual(A_min.shape, (2, 2))
+
+        # G(s) = C (sI − A)⁻¹ B + D is the same transfer matrix
+        for s in 1j * np.array([0.1, 0.5, 1.0, 3.0, 10.0]):
+            G = C @ np.linalg.solve(s * np.eye(4) - A, B) + D
+            G_min = C_min @ np.linalg.solve(s * np.eye(2) - A_min, B_min) + D_min
+            np.testing.assert_allclose(G_min, G, atol=1e-12)
+
+    def test_empty_and_unreachable_systems(self):
+        from minilink.analysis import linear
+
+        A, B, C, D = linear.minreal(
+            np.zeros((0, 0)), np.zeros((0, 1)), np.zeros((1, 0)), [[2.0]]
+        )
+        self.assertEqual(A.shape, (0, 0))
+        np.testing.assert_array_equal(D, [[2.0]])
+
+        A, B, C, D = linear.minreal(
+            -np.eye(2), np.zeros((2, 1)), np.ones((1, 2)), [[0.5]]
+        )
+        self.assertEqual(A.shape, (0, 0))
+        np.testing.assert_array_equal(D, [[0.5]])

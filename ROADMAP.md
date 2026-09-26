@@ -77,7 +77,7 @@ State as of 2026-09-22. Step ids (`S29`, `P3`, `T2`, …) are the rows of
 | Simulation | teaching | 7 | Mature; fixed 10 001-point default grid; `verbose` names unified. | Textbook pass (T4). |
 | Dynamics (abstraction + catalog) | teaching | 7 | Plants QA'd; `MechanicalSystem` / `Manipulator`; UR5 ABA/RNEA; **every catalog plant compiles on both backends** (contract test); four-rung vehicle ladder; UdeS racecar (kinematic, dynamic, 3-D). | Textbook pass (T3); mechanical-base unification (S32, v1.0). |
 | Control | teaching | 6 | Linear, LQR (infinite horizon, finite horizon, along a trajectory), `P` / `PI` / `PD` / `PID` carrying only the states their terms need, model-based SMC and computed torque, robotic impedance and kinematic laws, neural policy block. | `place()` (P3) and reference scaling (P8, v0.2); textbook pass (T2). |
-| Analysis | teaching | 6 | Jacobians, linearize, structural, equilibria, modal; one-channel Bode with margins, pole-zero, root locus, Nyquist, step response on matplotlib and plotly; the frequency band brackets the 0 dB crossing. | `minreal` (P2), named `S` / `T` / `PS` / `CS` (P5), ζ / ω_n (P8); z tier held; Nichols and overlays later; textbook pass (T4). |
+| Analysis | teaching | 6 | Jacobians, linearize, structural, equilibria, modal; one-channel Bode with margins, pole-zero, root locus, Nyquist, step response on matplotlib and plotly; the frequency band brackets the 0 dB crossing. | order reduction (P2b), named `S` / `T` / `PS` / `CS` (P5), ζ / ω_n (P8); z tier held; Nichols and overlays later; textbook pass (T4). |
 | Blocks | teaching | 5 | Routing, nonlinear, filters, sources, TF, 1-layer NN. | `Sine` / `Ramp` / `Chirp` / `Delay` / `Switch` (v0.2); textbook pass (T2). |
 | Planning / policy synthesis (DP) | teaching (GRO860) | 6 | Grid + value iteration (`loop` / `numpy` / `jax`), lookup controller, `PolicyEvaluator`, `LQRPlanner`; every planner returns a `PlanningSolution`; `compare()` reads solutions side by side; `dp.py` is the textbook reference of the style (2026-09-18). | cost-to-go as a `Field` (A1); policy iteration (S51). |
 | Planning / trajopt | teaching (GRO860) | 5 | Collocation, shooting, multiple shooting; live plot; `success` means defects satisfied to `feasibility_tol`; float64 by default on JAX. | Harden SciPy/Ipopt before TRL 6; textbook pass (T5). |
@@ -159,7 +159,7 @@ contract. Step-level work:
 
 | Topic | Surface | Status | Gate |
 | --- | --- | --- | --- |
-| Multi-physics modelling — nonlinear `f`/`h`, block diagram, linearize, `H(s)` | custom `DynamicSystem`, `plot_diagram`, `linearize`, `transfer_function` | green | a DC-motor + longitudinal-vehicle plant in the catalog; order reduction (`minreal`) available |
+| Multi-physics modelling — nonlinear `f`/`h`, block diagram, linearize, `H(s)` | custom `DynamicSystem`, `plot_diagram`, `linearize`, `transfer_function` | green | a DC-motor + longitudinal-vehicle plant in the catalog; pole/zero cancellation landed 2026-09-26 (P2), order reduction by fast-mode neglect is P2b |
 | Closed-loop analysis — poles, root locus, Bode, margins, step specs | `pzmap`, `root_locus`, `bode`, `margins`, `step_info`, `P` / `PI` / `PD` / `PID` | green | met 2026-09-07: every compensator form reports the poles and zeros of the hand calculation, and margins are found wherever the crossover sits |
 | Design to specification — rise time, overshoot, final error, phase margin | `PI`, `PD`, `PID`, `Lead`, `Lag`, `step_info`, `margins` | green | the Table 2 specs of the guide are checkable in one notebook |
 | Loop-shaping specs — disturbance and measurement-noise sensitivity in dB at a frequency | `analysis` (v0.2) | scheduled v0.2 | named `S` / `T` / `PS` / `CS` sensitivity shortcuts on closed-loop diagrams |
@@ -271,7 +271,9 @@ names exist; three of them are not yet the objects the tools carry.
 **Wave B — GRO501 end to end** (§4.2; plan
 [gro501-classical-control.md](docs/plans/gro501-classical-control.md)).
 
-- **B1** Correctness first: **P2** `minreal`, **P3** `place()`.
+- **B1** Correctness first: **P2** pole/zero cancellation (landed 2026-09-26:
+  `pzmap` / `root_locus` / `transfer_function` cancel by default), **P3** `place()`;
+  **P2b** order reduction. **[ask — public name]**
 - **B2** The missing surface: **P5** named `S` / `T` / `PS` / `CS`, **P7**
   generated analysis facades, **P8** ζ / ω_n and the `N` matrix.
 - **B3** **P4** `estimation/`: `LuenbergerObserver`, `luenberger()`,
@@ -283,6 +285,9 @@ names exist; three of them are not yet the objects the tools carry.
   stays held (teach with `discretize` + simulation) unless the sommatif
   examines z-plane analysis; **S61** every analysis verb takes a `System`;
   **S62** the LQR family on the control band facade. **[ask — public names]**
+- **TB** The classical-control pipeline reads like the textbook: first the
+  review of which System shortcuts stay (reserved for linearize + common
+  analysis), then the `dp.py`-style audit and pass; before P11.
 - **B5** **P11** the two GRO501 notebooks (APP2 propulsion, APP4 autopilot),
   Basic tier, Colab-first. **[maintainer]**
 
@@ -408,6 +413,12 @@ here. Each open item needs the maintainer.
 
 **During v0.2**
 
+- **System analysis shortcuts** — decided 2026-09-26: a method on every
+  `System` is reserved for the very common "linearize + analyse/plot"
+  operations; the rest is called as a band function. `minreal` is the first
+  case: no shortcut, it runs inside `pzmap` / `root_locus` /
+  `transfer_function`. The keep/drop list of today's 18 shortcuts is TB's
+  first step.
 - **Undeclared feedthrough** (S66): an output that moves with an input it
   does not declare simulates a wrong fixed point silently today; raise or
   warn at compile.
