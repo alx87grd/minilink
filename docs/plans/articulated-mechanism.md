@@ -338,33 +338,33 @@ Later: `adapters/urdf.py` → fixed `MechanismModel`.
 | `sym MechanicalSystem` | Symbolic EoM | Keep |
 | `Manipulator` / `MechanicalSystem` | Numeric EoM API | Keep |
 | `UR5Manipulator` | Catalog | Thin wrapper |
-| `KinematicModel` delegate (ROADMAP) | — | Defer / drop |
+| `KinematicModel` delegate (ROADMAP §6) | — | Defer / drop |
 
 ---
 
 ## Phasing
 
-### P1 — Numeric extract (ROADMAP §6)
+### AM-1 — Numeric extract (the shared RNEA stack, TODO.md §7)
 
 - [ ] `spec.py`, `spatial.py`, `kinematics.py` (`MechanismConfiguration`)
 - [ ] `from_dh_params` adapter
 - [ ] `SerialSpatialManipulator`
 - [ ] Refactor `UR5Manipulator`; keep existing tests green
 
-### P2 — Symbolic collapse
+### AM-2 — Symbolic collapse
 
 - [ ] `SymbolicMechanismModel` with `from_dh`, `add_gravity`, `derive`, `to_mechanism_model`
 - [ ] Move derivation helpers to `symbolic/mechanism/`
 - [ ] `MechanicalModel = SymbolicMechanismModel` deprecation shim; migrate tests + EOM notebook
 - [ ] Remove shim once call sites updated
 
-### P3 — Second robot + adapters
+### AM-3 — Second robot + adapters
 
 - [ ] `from_joint_placements_params`
 - [ ] Second catalog arm or parameterized teaching arm
 - [ ] Optional planar adapter
 
-### P4 — URDF (later)
+### AM-4 — URDF (later)
 
 - [ ] `MechanismModel.from_urdf` → fixed spec
 - [ ] Plant with tunable-only `params`
@@ -389,7 +389,7 @@ Later: `adapters/urdf.py` → fixed `MechanismModel`.
 When landed:
 
 - **DESIGN.md** — mechanism IR, topology / model / configuration trio, plant wiring, params vs fixed spec, symbolic path.
-- **ROADMAP.md §6** — mark “Shared RNEA serial-chain stack” / “ABA on other arms” in progress or done.
-- Delete or archive this plan doc when P1–P2 complete.
+- **[TODO.md](TODO.md) §7** — retire the Later ideas “shared RNEA serial-chain stack” and “ABA on other RNEA arms”; ask the maintainer to close ROADMAP §6's `KinematicModel` decision.
+- Delete or archive this plan doc when AM-1–AM-2 complete.
 
-Related ROADMAP items: shared RNEA stack, ABA generalization, optional `KinematicModel` (prefer this plan instead).
+Related items: the shared RNEA stack and ABA generalization (TODO.md §7 Later), the optional `KinematicModel` delegate (ROADMAP §6; prefer this plan instead).

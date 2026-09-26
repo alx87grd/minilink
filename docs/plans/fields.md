@@ -54,7 +54,7 @@ outputs (the fitted weights); run twice, `cmp`.
   `record_history=True` / `solve_steps`, one per `dt`), and then `value(x, t)` picks the table
   of `t` — the finite-horizon `J(x, t)`; or a trailing action axis (the tabular `Q` table over
   `grid.actions`), and then `value(x, u)` reads `Q(x, u)`, `min_over_u()` returns the `J` field
-  and `greedy()` the `LookupTableController` — the two lines the `tabular.py:262` docstring
+  and `greedy()` the `LookupTableController` — the two lines the `TabularLearningPlanner` docstring
   already states. DP's `PlanningSolution.cost_to_go` becomes `GridField(grid, J)`;
   `TabularLearningPlanner`'s result the same; `PolicyEvaluator` holds a `GridField` and
   `value_at(x)` delegates (the name stays: `double_integrator_policy_evaluation.ipynb` uses it);
@@ -80,4 +80,4 @@ outputs (the fitted weights); run twice, `cmp`.
 
 ## Verification
 
-The list of phase 2 plus `tests/unittest/test_analysis_lyapunov.py`, `tests/unittest/test_planning_solution.py`, the demo `analysis_region_of_attraction.py`, and the notebooks `double_integrator_policy_evaluation.ipynb` and `cost_to_go_function_approximation.ipynb` through the notebook checks; the phase 4 baseline (RoA level and `verify` report, DP table, fitted weights) `cmp`s after every step.
+The tests and demos each step's "done when" names, plus `tests/unittest/test_analysis_lyapunov.py`, `tests/unittest/test_planning_solution.py`, the demo `analysis_region_of_attraction.py`, and the notebooks `double_integrator_policy_evaluation.ipynb` and `cost_to_go_function_approximation.ipynb` through the notebook checks; the baseline captured before step 4.1 (RoA level and `verify` report, DP table, fitted weights) `cmp`s after every step.
