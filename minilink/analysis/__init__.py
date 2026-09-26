@@ -10,7 +10,6 @@ from __future__ import annotations
 
 from minilink.core.facade import lazy_facade
 
-# Only names that do not collide with submodule filenames.
 _EXPORTS: dict[str, tuple[str, str]] = {
     "LyapunovCertificate": ("minilink.analysis.lyapunov", "LyapunovCertificate"),
     "StructuralResult": ("minilink.analysis.structural", "StructuralResult"),
@@ -18,9 +17,12 @@ _EXPORTS: dict[str, tuple[str, str]] = {
     "animate_modal": ("minilink.analysis.modal", "animate_modal"),
     "bode": ("minilink.analysis.frequency", "bode"),
     "controllability": ("minilink.analysis.structural", "controllability"),
+    "discretize": ("minilink.analysis.discretization", "discretize"),
     "find_equilibrium": ("minilink.analysis.equilibria", "find_equilibrium"),
     "frequency_response": ("minilink.analysis.frequency", "frequency_response"),
     "jacobian": ("minilink.analysis.derivatives", "jacobian"),
+    "linearize": ("minilink.analysis.linearization", "linearize"),
+    "linearize_matrices": ("minilink.analysis.linearization", "linearize_matrices"),
     "margins": ("minilink.analysis.frequency", "margins"),
     "modal_analysis": ("minilink.analysis.modal", "modal_analysis"),
     "nyquist": ("minilink.analysis.frequency", "nyquist"),

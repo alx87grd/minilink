@@ -23,13 +23,13 @@ class TestPublicImports(unittest.TestCase):
         self.assertIs(Pendulum, PendulumDef)
 
     def test_control_and_analysis_band_exports(self):
-        from minilink.analysis import bode, modal_analysis
-        from minilink.analysis.linearize import linearize
+        from minilink.analysis import bode, discretize, linearize, modal_analysis
         from minilink.control import ImpedanceController
         from minilink.control.lqr import lqr
 
         self.assertTrue(callable(lqr))
-        self.assertTrue(callable(linearize))
+        self.assertTrue(callable(linearize))  # the function, not a module of that name
+        self.assertTrue(callable(discretize))
         self.assertTrue(callable(bode))
         self.assertTrue(callable(modal_analysis))
         self.assertTrue(callable(ImpedanceController))
@@ -160,6 +160,7 @@ BAND_PATTERN_DEVIATIONS = {
     "observability": "takes the matrices (A, C) or one LTISystem",
     "plot_region_of_attraction": "draws a certificate: plot_region_of_attraction(certificate)",
     "region_of_attraction": 'method names the Lyapunov construction ("quadratic")',
+    "discretize": "wraps a continuous system in a step model: discretize(sys, dt, ...)",
 }
 
 

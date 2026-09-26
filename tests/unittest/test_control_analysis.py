@@ -5,7 +5,7 @@ import warnings
 import numpy as np
 import pytest
 from minilink.analysis.equilibria import find_equilibrium
-from minilink.analysis.linearize import linearize, linearize_matrices
+from minilink.analysis.linearization import linearize, linearize_matrices
 from minilink.analysis.structural import controllability, observability
 from minilink.control.lqr import (
     lqr,
@@ -579,7 +579,7 @@ class TestPIDMIMO(unittest.TestCase):
 
 
 import os
-from minilink.analysis.linearize import linearize
+from minilink.analysis.linearization import linearize
 from minilink.analysis.modal import animate_modal, modal_analysis
 from minilink.dynamics.abstraction.state_space import LTISystem
 from minilink.dynamics.catalog.mass_spring_damper.linear import TwoMass
@@ -1049,7 +1049,7 @@ class TestPhasePlane(unittest.TestCase):
             plot_phase_plane(sys, backend="bokeh", show=False)
 
 
-from minilink.analysis.discretize import DiscretizedRK4DynamicSystem, discretize
+from minilink.analysis.discretization import DiscretizedRK4DynamicSystem, discretize
 
 
 def _rk4_step(f, x, u, t, dt, params):

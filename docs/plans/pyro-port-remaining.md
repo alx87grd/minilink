@@ -305,7 +305,7 @@ Two-column record of every symbol marked Done before the shrink; the source for 
 | MechanicalSystem | MechanicalSystem | `minilink/dynamics/abstraction/mechanical.py` |
 | GeneralizedMechanicalSystem | GeneralizedMechanicalSystem | `minilink/dynamics/abstraction/generalized_mechanical.py` |
 | StateSpaceSystem | LTISystem, StateSpaceSystem | `minilink/dynamics/abstraction/state_space.py` |
-| linearize() | linearize() | `minilink/analysis/linearize.py` |
+| linearize() | linearize() | `minilink/analysis/linearization.py` |
 | TransferFunction | TransferFunction | `minilink/blocks/transfer_function.py` |
 | VanderPol | VanderPol | `minilink/dynamics/catalog/equations/oscillators.py` |
 | SimpleIntegrator | SimpleIntegrator | `minilink/dynamics/catalog/equations/integrators.py` |

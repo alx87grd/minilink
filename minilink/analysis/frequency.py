@@ -10,7 +10,7 @@ import numpy as np
 
 from minilink.analysis import linear
 from minilink.analysis.linear import Margins
-from minilink.analysis.linearize import (
+from minilink.analysis.linearization import (
     channel_label,
     channel_subtitle,
     siso_matrices,

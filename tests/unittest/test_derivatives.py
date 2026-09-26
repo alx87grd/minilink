@@ -19,7 +19,7 @@ from minilink import (
     observability,
 )
 from minilink.analysis.frequency import bode, pzmap, transfer_function
-from minilink.analysis.linearize import linearize, linearize_matrices
+from minilink.analysis.linearization import linearize, linearize_matrices
 from minilink.blocks.transfer_function import TransferFunction
 from minilink.control.state import StateFeedbackController
 from minilink.core.backends import array_module, jax_installed

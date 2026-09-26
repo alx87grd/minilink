@@ -14,7 +14,7 @@ from minilink.core.facades import DynamicSystemFacades, LTISystemFacades
 SHORTCUTS = {
     "linearize": (
         DynamicSystemFacades,
-        "minilink.analysis.linearize:linearize",
+        "minilink.analysis.linearization:linearize",
         "forward",
     ),
     "find_equilibrium": (

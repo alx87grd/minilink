@@ -121,6 +121,8 @@ TEACHING_SURFACE: dict[str, tuple[str, ...]] = {
         "controllability",
         "observability",
         "find_equilibrium",
+        "linearize",
+        "discretize",
     ),
     "minilink.simulation": ("Simulator", "StaticSimulator"),
     "minilink.optimization": ("MathematicalProgram", "Optimizer"),
@@ -160,8 +162,6 @@ TEACHING_MODULE_FUNCTIONS = (
     ("minilink.control.lqr", "trajectory_lqr"),
     ("minilink.control.place", "place"),
     ("minilink.control.place", "place_at_operating_point"),
-    ("minilink.analysis.linearize", "linearize"),
-    ("minilink.analysis.discretize", "discretize"),
 )
 
 # Module prefixes that belong to the teaching lane.
@@ -347,7 +347,7 @@ for mod in list(sys.modules):
 
 import numpy as np
 from minilink import ImpedanceController, Pendulum, lqr
-from minilink.analysis.linearize import linearize
+from minilink.analysis import linearize
 from minilink.core import QuadraticCost
 from minilink.planning import DynamicProgrammingPlanner, PlanningProblem, StateSpaceGrid
 

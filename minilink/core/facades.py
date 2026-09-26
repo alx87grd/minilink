@@ -636,9 +636,9 @@ class DynamicSystemFacades:
         """Linearize about ``(x_bar, u_bar)`` and return an ``LTISystem``.
 
         ``lin = plant.linearize(x_bar)`` gives ``lin.A()``, ``lin.B()``,
-        ``lin.C()``, ``lin.D()``. See :func:`minilink.analysis.linearize.linearize`.
+        ``lin.C()``, ``lin.D()``. See :func:`minilink.analysis.linearization.linearize`.
         """
-        from minilink.analysis.linearize import linearize
+        from minilink.analysis.linearization import linearize
 
         return linearize(
             self, x_bar, u_bar, t, params, of=of, wrt=wrt, method=method, eps=eps

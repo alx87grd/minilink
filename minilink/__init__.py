@@ -86,7 +86,7 @@ _EXPORTS: dict[str, tuple[str, str]] = {
     "NeuralPolicyController": ("minilink.control.neural", "NeuralPolicyController"),
     # analysis
     "jacobian": ("minilink.analysis.derivatives", "jacobian"),
-    "linearize": ("minilink.analysis.linearize", "linearize"),
+    "linearize": ("minilink.analysis.linearization", "linearize"),
     "transfer_function": ("minilink.analysis.frequency", "transfer_function"),
     "bode": ("minilink.analysis.frequency", "bode"),
     "plot_bode": ("minilink.analysis.frequency", "plot_bode"),
@@ -183,7 +183,7 @@ _EXPORTS: dict[str, tuple[str, str]] = {
         "minilink.control.impedance",
         "ImpedanceIntegralController",
     ),
-    "discretize": ("minilink.analysis.discretize", "discretize"),
+    "discretize": ("minilink.analysis.discretization", "discretize"),
     "RRTStarPlanner": ("minilink.planning.search.rrt_star", "RRTStarPlanner"),
     "Optimizer": ("minilink.optimization.optimizer", "Optimizer"),
 }

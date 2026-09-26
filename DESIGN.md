@@ -37,7 +37,7 @@ deep defining-module paths stay valid but are not what README / intro show.
 | Layer | Example | Role |
 | --- | --- | --- |
 | **Root prelude** | `from minilink import Pendulum, ImpedanceController, lqr, QuadraticCost, DynamicProgrammingPlanner, ReinforcementLearningPlanner` | **The teaching surface, one import line** — every name a student meets (tested as a set in `test_teaching_surface.py`) |
-| **Band facades** | `from minilink.catalog import Pendulum` · `from minilink.control import ImpedanceController` · `from minilink.analysis import bode` · `from minilink.control.lqr import lqr` · `from minilink.analysis.linearize import linearize` | Canonical course / script API |
+| **Band facades** | `from minilink.catalog import Pendulum` · `from minilink.control import ImpedanceController` · `from minilink.analysis import bode` · `from minilink.control.lqr import lqr` · `from minilink.analysis import linearize` | Canonical course / script API |
 | **Defining module** | `from minilink.dynamics.catalog.pendulum.pendulum import Pendulum` | Implementation home; always valid |
 
 Rules:
@@ -46,8 +46,8 @@ Rules:
   live under `dynamics/`; no math moves).
 - Band packages (`control/`, `analysis/`, `simulation/`, `control.mpc`, …)
   re-export their teaching symbols via `__all__` / lazy `__getattr__`.
-  Exception: when a **module name matches a factory** (e.g. `control.lqr`,
-  `analysis.linearize`), import the factory from that module
+  Exception: when a **module name matches a factory** (e.g. `control.lqr`),
+  import the factory from that module
   (`from minilink.control.lqr import lqr`) — do not shadow the submodule on
   the parent package.
 - Root `minilink/__init__.py` exports the **whole teaching surface** (lazily) so
