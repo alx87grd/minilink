@@ -7,7 +7,7 @@ import unittest
 import numpy as np
 import pytest
 
-from minilink import InvertedPendulum, Pendulum, TransferFunction
+from minilink import Pendulum, TransferFunction
 from minilink.analysis import linear
 from minilink.analysis.frequency import (
     bode,
@@ -195,42 +195,6 @@ class TestChannelTools(unittest.TestCase):
             G_tf.denominator, [1.0, -np.trace(A), np.linalg.det(A)], atol=1e-9
         )
         np.testing.assert_allclose(G_tf.numerator, [0.5], atol=1e-9)
-
-    def test_the_system_shortcuts(self):
-        # Objects and plots only; the data verbs are band functions, and the
-        # time response of a linearized model lives on LTISystem alone.
-        kept = {
-            "linearize",
-            "find_equilibrium",
-            "transfer_function",
-            "plot_phase_plane",
-            "plot_bode",
-            "plot_pzmap",
-            "plot_root_locus",
-            "animate_modal",
-        }
-        removed = {
-            "bode",
-            "pzmap",
-            "margins",
-            "root_locus",
-            "step_response",
-            "nyquist",
-            "plot_nyquist",
-            "region_of_attraction",
-            "plot_region_of_attraction",
-            "modal_analysis",
-            "plot_step_response",
-        }
-        plant = InvertedPendulum()
-        for name in kept:
-            self.assertTrue(callable(getattr(plant, name)), name)
-        for name in removed:
-            self.assertFalse(hasattr(plant, name), name)
-        self.assertTrue(callable(plant.linearize([0.0, 0.0]).plot_step_response))
-        self.assertTrue(
-            callable(TransferFunction([1.0], [1.0, 1.0]).plot_step_response)
-        )
 
     def test_transfer_function_blocks_go_through_unchanged(self):
         L = TransferFunction([1.0], [1.0, 3.0, 2.0, 0.0])

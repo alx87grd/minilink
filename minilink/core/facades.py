@@ -604,7 +604,8 @@ class DynamicSystemFacades:
 
         If ``traj`` is provided, or if :attr:`traj` contains a previous
         simulation result, the sampled state path is overlaid on the vector
-        field. Otherwise only the vector field is plotted.
+        field. Otherwise only the vector field is plotted. See
+        :func:`minilink.graphical.phase_plane.plot_phase_plane`.
         """
         from minilink.graphical.phase_plane import plot_phase_plane
 
