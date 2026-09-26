@@ -1,12 +1,4 @@
-"""Time response of one input–output channel of a linearized model.
-
-The ODE march lives in :func:`minilink.analysis.linear.step_response`. This
-module picks the channel and the horizon, then reads textbook step-response
-figures off the samples.
-
-``step_response`` keeps the same channel selection as
-:mod:`minilink.analysis.frequency`.
-"""
+"""Step response of one input–output channel of a linearized model, and its textbook figures."""
 
 from __future__ import annotations
 
@@ -57,16 +49,22 @@ def step_response(
     """Return ``(time, y)``: the unit-step response of the selected channel from rest.
 
     Same channel arguments as :func:`~minilink.analysis.frequency.bode`;
-    ``tf`` defaults to five times the slowest stable time constant.
+    ``tf`` defaults to eight times the slowest stable time constant, and
+    ``n`` samples span ``[0, tf]``.
     """
     A, B, C, D = siso_matrices(
         sys, x_bar, u_bar, t, params, of=of, wrt=wrt, method=method, eps=eps
     )
 
+    # The horizon: eight slowest time constants unless given
     if tf is None:
         tf = linear.settling_horizon(A)
     time = np.linspace(0.0, float(tf), int(n))
-    return time, linear.step_response(A, B, C, D, time)
+
+    # y(t) from rest under a unit step
+    y = linear.step_response(A, B, C, D, time)
+
+    return time, y
 
 
 def step_info(time, y) -> StepInfo:
@@ -74,20 +72,54 @@ def step_info(time, y) -> StepInfo:
     time = np.asarray(time, dtype=float).reshape(-1)
     y = np.asarray(y, dtype=float).reshape(-1)
 
-    # y_∞ = last sample if the tail stays in the 2 % band, else nan
-    # rise:      t(90%) − t(10%) of y_∞, from rest (y_0 = 0), signed
-    # settling:  last time |y − y_∞| leaves the 2 % band
-    # overshoot: 100 · (max sign(y_∞)·y − |y_∞|) / |y_∞|, signed
-    final = y[-1]
-    peak_index = int(np.argmax(np.abs(y)))
-    peak = y[peak_index]
+    # Final value y_f: the last sample
+    y_final = y[-1]
+
+    # Settled when the last fifth of the record stays within 2 % of y_f
+    tail = y[time >= 0.8 * time[-1]]
+    settled = np.all(np.abs(tail - y_final) <= 0.02 * max(abs(y_final), 1e-12))
+
+    # Steady state y_ss = y_f, once settled
+    y_ss = float(y_final) if settled else float(np.nan)
+
+    # Peak: the largest |y| and its time
+    k_p = int(np.argmax(np.abs(y)))
+    y_p = float(y[k_p])
+    t_p = float(time[k_p])
+
+    # Settling time t_s: the first sample after the last exit from the 2 % band
+    outside = np.flatnonzero(np.abs(y - y_final) > 0.02 * abs(y_final))
+    t_s = first_sample_after(time, outside) if settled else float(np.nan)
+
+    # Rise time and overshoot are relative to y_f, so a zero final value has neither
+    if y_final == 0.0:
+        return StepInfo(
+            rise_time=float(np.nan),
+            settling_time=t_s,
+            overshoot=float(np.nan),
+            peak=y_p,
+            peak_time=t_p,
+            steady_state=y_ss,
+        )
+
+    # Progress toward y_f, signed so an undershoot (a zero in the right half plane) never counts
+    progress = np.sign(y_final) * y
+
+    # Rise time t_r = t(90 % of y_f) − t(10 % of y_f)
+    t_10 = first_time_reaching(time, progress, 0.1 * abs(y_final))
+    t_90 = first_time_reaching(time, progress, 0.9 * abs(y_final))
+    t_r = float(t_90 - t_10)
+
+    # Overshoot M_p = 100 (max progress − |y_f|) / |y_f| in percent, floored at 0
+    M_p = float(100.0 * max((np.max(progress) - abs(y_final)) / abs(y_final), 0.0))
+
     return StepInfo(
-        _rise_time(time, y, final),
-        _settling_time(time, y, final),
-        _overshoot(y, final),
-        float(peak),
-        float(time[peak_index]),
-        _steady_state(time, y, final),
+        rise_time=t_r,
+        settling_time=t_s,
+        overshoot=M_p,
+        peak=y_p,
+        peak_time=t_p,
+        steady_state=y_ss,
     )
 
 
@@ -123,38 +155,14 @@ def plot_step_response(
 # =============================================================================
 
 
-def _steady_state(time, y, final):
-    tail = y[time >= 0.8 * time[-1]]
-    settled = np.all(np.abs(tail - final) <= 0.02 * max(abs(final), 1e-12))
-    return float(final) if settled else float(np.nan)
+def first_time_reaching(time, progress, level):
+    """The first time ``progress`` reaches ``level``; ``nan`` when it never does."""
+    reached = np.flatnonzero(progress >= level)
+    return time[reached[0]] if reached.size else np.nan
 
 
-def _overshoot(y, final):
-    if final == 0.0:
-        return float(np.nan)
-    # signed toward y_∞, so an undershoot (a zero in the right half plane) never counts
-    highest = np.max(np.sign(final) * y)
-    return float(100.0 * max((highest - abs(final)) / abs(final), 0.0))
-
-
-def _rise_time(time, y, final):
-    if final == 0.0:
-        return float(np.nan)
-    # signed toward y_∞, so an undershoot (a zero in the right half plane) never counts
-    progress = np.sign(final) * y
-    crossed_10 = np.flatnonzero(progress >= 0.1 * abs(final))
-    crossed_90 = np.flatnonzero(progress >= 0.9 * abs(final))
-    if crossed_10.size and crossed_90.size:
-        return float(time[crossed_90[0]] - time[crossed_10[0]])
-    return float(np.nan)
-
-
-def _settling_time(time, y, final):
-    tail = y[time >= 0.8 * time[-1]]
-    settled = np.all(np.abs(tail - final) <= 0.02 * max(abs(final), 1e-12))
-    if not settled:
-        return float(np.nan)
-    outside = np.flatnonzero(np.abs(y - final) > 0.02 * abs(final))
+def first_sample_after(time, outside):
+    """Time of the sample after the last index in ``outside``; the start when none is."""
     if outside.size and outside[-1] + 1 < time.size:
         return float(time[outside[-1] + 1])
     return float(time[0])
