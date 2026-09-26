@@ -1,7 +1,9 @@
 """Analysis verbs on a ``System``: derivatives, linearization, structure, equilibria, modes, frequency and time responses, Lyapunov certificates.
 
-Every tool reads ``tool(sys, x_bar, u_bar, t, params, *, method="auto", eps)`` and the
-same verbs are methods on every ``System``.
+Every tool reads ``tool(sys, x_bar, u_bar, t, params, *, method="auto", eps)``. A
+``System`` carries the common ones as methods: ``linearize``, ``find_equilibrium``,
+``transfer_function``, ``plot_bode``, ``plot_pzmap``, ``plot_root_locus`` and
+``animate_modal``; ``plot_step_response`` is a method of ``LTISystem``.
 """
 
 from __future__ import annotations

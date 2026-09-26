@@ -91,10 +91,13 @@ the new code copies clean patterns and no shortcut is added only to be dropped.
   2. **The audit** — landed 2026-09-26:
      [2026-09-26-analysis-toolbox-audit.md](../reviews/2026-09-26-analysis-toolbox-audit.md),
      40 findings; decisions 1–4 ruled yes the same day.
-  3a. **The rewrite**: the review's behaviour-preserving rows plus decisions 1–4 (`n_gains`,
-     the `(poles, modes)` tuple, `animate_modal(sys, …)`, the `tol` keyword), in the
-     review's §9 order, one commit per concern, each byte-identical against a seeded
-     baseline. Absorbs T4's analysis half.
+  3a. **The rewrite** — landed 2026-09-26 in eight commits (`36a51e7`…), each
+     byte-identical against a seeded baseline of 928 outputs on both differentiation
+     backends: plain helper names, the math of `linear`, `frequency`, `step_info`,
+     `structural`, `linearize` and `modal` as named lines, channel selection in
+     `linearize.py`, and decisions 1–4 (`n_gains`, the `(poles, modes)` tuple,
+     `animate_modal(sys, …)`, the `tol` keyword with NumPy's rule as its default until 3b).
+     Absorbs T4's analysis half.
   3b. **The bugs**, after 3a, one commit each with its test first: LIN-8 (`root_locus` on a
      singular user gain), TRS-3 (`step_info` on an unsettled response), X-6 (MIMO input to
      the SISO functions of `linear`), X-5 (one rank rule as the default).
@@ -133,7 +136,7 @@ the new code copies clean patterns and no shortcut is added only to be dropped.
   `discretize` freed from the band-facade name collision (scan: analysis#11).
 - [ ] **P8 Small teaching helpers**: ζ and ω_n from a complex pole pair (fields on the `pzmap`
   result or a `damping(sys)` verb); the `N` reference-scaling matrix giving `y = r` at steady
-  state; the `settling_horizon` docstring (five vs eight). Done when §9.5 and §9.11 of the
+  state. Done when §9.5 and §9.11 of the
   guide are each a short notebook cell.
   Also: a `poles(sys)` verb with a `poles()` facade on `LTISystem` only (ROADMAP §6);
   `TransferFunction` stores `self.poles` as an array, which would shadow it — a property
