@@ -44,10 +44,6 @@ the triage in [2026-09-22-improvement-suggestions.md](../reviews/2026-09-22-impr
   `showcase_jax.ipynb` stops importing `experimental.c_export`, which the wheel does not
   ship; `plot_diagram()` without the `graphviz` wrapper (ROADMAP §6); one canonical Colab
   setup cell per install tier, pinned by a test (38 notebooks carry 11 variants today).
-- [ ] **R2 CI on the working branch** **[ask]**. `.github/workflows/test.yml` and `docs.yml`
-  trigger on `main`, `refactor-v4`, `dev-alex`; add `dev` (or whichever branch carries the
-  work) so the merge gate runs before a PR. One line each.
-  The JAX half of the gate landed 2026-09-23: the `regression` job runs `pytest` with JAX.
 - [ ] **R3 Ruff runs itself**: `ruff` and `ruff-format` hooks in `.pre-commit-config.yaml`,
   pinned to the dev extra's ruff (scan: tests-ci#6). Done when `pre-commit run --all-files`
   matches the CI lint steps.

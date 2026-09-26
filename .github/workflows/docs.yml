@@ -2,7 +2,7 @@ name: Docs
 
 on:
   push:
-    branches: [main, dev-doc, dev-alex]
+    branches: [main, dev-doc, dev-alex, dev]
   pull_request:
     branches: [main]
   workflow_dispatch:

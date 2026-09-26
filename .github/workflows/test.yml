@@ -4,9 +4,9 @@ name: CI
 
 on:
   push:
-    branches: [main, refactor-v4, dev-alex]
+    branches: [main, refactor-v4, dev-alex, dev]
   pull_request:
-    branches: [main, refactor-v4, dev-alex]
+    branches: [main, refactor-v4, dev-alex, dev]
 
 jobs:
   test:

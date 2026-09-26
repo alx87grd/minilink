@@ -196,9 +196,7 @@ term's hygiene:
 
 - **R1** Tag `0.1.0` once the PyPI trusted publisher is registered; the tag
   publishes the wheel. **[ask]**
-- **R2** CI on the working branch: `.github/workflows/test.yml` triggers on
-  `main`, `refactor-v4` and `dev-alex`; add the branch the work happens on
-  (`dev`) or the gate never runs before a merge. **[ask]**
+- CI runs on `dev`, the working branch (R2, landed 2026-09-26).
 - **R3** Keep `ruff check .` and `ruff format --check .` green on every
   push (the 2026-09-22 pass restored them after the racecar demos landed),
   with pre-commit hooks so the check runs itself.
