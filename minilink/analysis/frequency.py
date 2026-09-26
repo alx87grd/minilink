@@ -15,6 +15,8 @@ matplotlib or plotly.
 
 from __future__ import annotations
 
+import os
+import sys
 import warnings
 
 import numpy as np
@@ -476,9 +478,20 @@ def minimal_channel(A, B, C, D, minimal):
         warnings.warn(
             f"Cancelled {dropped} pole/zero pair(s): modes that are uncontrollable or "
             "unobservable on this channel. Pass minimal=False to keep them.",
-            stacklevel=3,
+            stacklevel=_caller_stacklevel(),
         )
     return A_min, B_min, C_min, D_min
+
+
+def _caller_stacklevel():
+    """``stacklevel`` of the first frame outside minilink, so a warning names the user's line."""
+    package = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    frame, level = sys._getframe(1), 1
+    while frame is not None and os.path.abspath(frame.f_code.co_filename).startswith(
+        package
+    ):
+        frame, level = frame.f_back, level + 1
+    return level
 
 
 def frequency_grid(A, B, C, D, w, n):
