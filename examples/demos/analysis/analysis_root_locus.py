@@ -14,9 +14,24 @@ plant.plot_root_locus()
 
 # A lead compensator (s + 2) / (s + 20) adds rate feedback: its zero pulls
 # both branches into the left half-plane above a critical gain.
-L = Lead(K=1.0, z=2.0, p=20.0) >> plant
+
+C = Lead(K=1.0, z=2.0, p=20.0)
+
+C.plot_pzmap()
+
+L = C >> plant
+
+L.plot_pzmap()
 L.plot_root_locus()
 
 gains, roots = L.root_locus()
 stable = np.all(roots.real < 0.0, axis=1)
 print(f"stable above K = {gains[np.argmax(stable)]:.3g}")
+
+
+# Poles zero cancels
+C = Lead(K=1.0, z=2.21472346, p=20.0)
+L = C >> plant
+
+L.plot_pzmap(minimal=False)
+L.plot_pzmap()
