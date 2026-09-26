@@ -35,11 +35,13 @@ the triage in [2026-09-22-improvement-suggestions.md](../reviews/2026-09-22-impr
 
 ## 1. v0.1 close-out
 
-- [ ] **R1 Tag `0.1.0`** **[ask]**. Register the GitHub Environment `pypi` and the PyPI pending
-  publisher (`alx87grd` / `minilink` / `publish.yml` / env `pypi`), then
-  `git tag 0.1.0 && git push origin 0.1.0`. Done when `pip install minilink` installs the
-  teaching surface from PyPI.
-  Before the tag (scan: tests-ci#12, tests-ci#13, examples#1, examples#4): `publish.yml`
+- [ ] **R1 Publish `0.1.1` from a tag** **[ask]**. `minilink 0.1.0` is on PyPI (2026-09-16)
+  with no git tag on its commit; tag that commit `0.1.0` for the record if it is known (the
+  tag push starts `publish.yml`, whose upload PyPI refuses for an existing version).
+  Confirm the GitHub Environment `pypi` and the PyPI trusted publisher (`alx87grd` /
+  `minilink` / `publish.yml` / env `pypi`), then `git tag 0.1.1 && git push origin 0.1.1`.
+  Done when `pip install minilink==0.1.1` installs the teaching surface from PyPI.
+  Before `0.1.1` (scan: tests-ci#12, tests-ci#13, examples#1, examples#4): `publish.yml`
   runs ruff and `pytest` before uploading, and every long CI job gets `timeout-minutes`;
   `showcase_jax.ipynb` stops importing `experimental.c_export`, which the wheel does not
   ship; `plot_diagram()` without the `graphviz` wrapper (ROADMAP §6); one canonical Colab

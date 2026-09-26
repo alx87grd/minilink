@@ -12,7 +12,7 @@ Identity: [CONSTITUTION.md](CONSTITUTION.md).
 
 | Release | Milestone | When |
 | --- | --- | --- |
-| **v0.1** | **GRO860 end to end**, plus a working **`pip install minilink` on PyPI**. Every topic of the running optimal-control & RL course runs on the teaching surface, in Colab (git-clone cell) and in the conda env: value iteration / DP on a grid · LQR + linearization · trajectory optimization · RL via native `ReinforcementLearningPlanner` (with `Sys2Gym` + SB3 as an optional bridge). See §4.1. | Fall 2026 — **0.1.0 cut**; the `0.1.0` tag publishes the wheel from GitHub. Conda from `environment.yml` stays the Full local stack. Names the course notebooks already use stay frozen. Close-out steps: §5.1. |
+| **v0.1** | **GRO860 end to end**, plus a working **`pip install minilink` on PyPI**. Every topic of the running optimal-control & RL course runs on the teaching surface, in Colab (git-clone cell) and in the conda env: value iteration / DP on a grid · LQR + linearization · trajectory optimization · RL via native `ReinforcementLearningPlanner` (with `Sys2Gym` + SB3 as an optional bridge). See §4.1. | Fall 2026 — **`0.1.0` on PyPI** (2026-09-16); **`0.1.1`** is the first release a GitHub tag publishes. Conda from `environment.yml` stays the Full local stack. Names the course notebooks already use stay frozen. Close-out steps: §5.1. |
 | **v0.2** | **GRO501 end to end** (the classical-control course: multi-physics modelling · root locus / Bode / margins · PID to spec · digital implementation · state feedback, pole placement, LQR, observers — see §4.2), **pyro parity + the GMC714 modelling ladder** (manipulators, four-rung vehicle ladder, robotic controllers), and **the textbook objects finished** (fields, cost parameters, workspace geometry — §5.2 wave A). Conda stays the recommended Full local install. | Winter 2027 |
 | **v1.0** | The foundation questions deferred to §5.3 (hybrid as a `System`, derived `x0`, evaluator/solver layering, the posed-geometry drawing hook, one mechanical base, the differentiable closed-loop cost), after two cohorts. | 2027 |
 
@@ -128,8 +128,9 @@ GRO501 (§4.2, v0.2, parallel objective adopted 2026-09-07). A course is
    `environment.yml` both run every GRO860 notebook top to bottom.
 6. `ruff` + `pytest` + notebook smoke green; nightly full demo sweep green.
 7. No name a GRO860 notebook imports today changes during the term.
-8. Tagging `0.1.0` publishes `minilink` to PyPI from GitHub (Trusted Publishing
-   in `.github/workflows/publish.yml`). `pip install minilink` installs the
+8. `minilink 0.1.0` is on PyPI (2026-09-16); from `0.1.1` on, a tag publishes
+   from GitHub (Trusted Publishing in `.github/workflows/publish.yml`, the
+   version read from the tag). `pip install minilink` installs the
    teaching surface; extras (`[jax]`, `[visualization]`, …) match
    `pyproject.toml`. Conda remains the Full local stack (JAX, Ipopt, notebooks).
 
@@ -194,8 +195,9 @@ it is landed or explicitly dropped by the maintainer.
 The GRO860 path is green (§4.1). What remains is release mechanics and the
 term's hygiene:
 
-- **R1** Tag `0.1.0` once the PyPI trusted publisher is registered; the tag
-  publishes the wheel. **[ask]**
+- **R1** Publish `0.1.1` from a GitHub tag. `0.1.0` is on PyPI since
+  2026-09-16, but no git tag marks its commit, and the pre-release checks
+  below did not ride it; they gate `0.1.1`. **[ask]**
 - CI runs on `dev`, the working branch (R2, landed 2026-09-26).
 - **R3** Keep `ruff check .` and `ruff format --check .` green on every
   push (the 2026-09-22 pass restored them after the racecar demos landed),
@@ -358,7 +360,7 @@ here. Each open item needs the maintainer.
   controller)` block with ports `r`, `y` → `u`, or an explicit `connect`
   recipe in the notebook.
 
-**Before the tag (R1)**
+**Before `0.1.1` (R1)**
 
 - **`plot_diagram()` without the `graphviz` wrapper**: warn, as a missing
   binary already does, or move the pure-Python wrapper into the base
