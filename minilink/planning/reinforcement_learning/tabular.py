@@ -297,6 +297,7 @@ class TabularLearningPlanner(Planner):
     def plot_cost2go(self, **kwargs):
         from minilink.planning.policy_synthesis import plotting
 
+        kwargs.setdefault("jmax", plotting.cost_scale_limit(self.env.infeasible_cost))
         return plotting.plot_cost2go(self.result, **kwargs)
 
     def plot_policy(self, **kwargs):

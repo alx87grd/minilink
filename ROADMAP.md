@@ -78,7 +78,7 @@ State as of 2026-09-22. Step ids (`S29`, `P3`, `T2`, …) are the rows of
 | Control | teaching | 6 | Linear, LQR (infinite horizon, finite horizon, along a trajectory), `P` / `PI` / `PD` / `PID` carrying only the states their terms need, model-based SMC and computed torque, robotic impedance and kinematic laws, neural policy block. | `place()` (P3) and reference scaling (P8, v0.2); textbook pass (T2). |
 | Analysis | teaching | 6 | Jacobians, linearize, structural, equilibria, modal; one-channel Bode with margins, pole-zero, root locus, Nyquist, step response on matplotlib and plotly; the frequency band brackets the 0 dB crossing. | `minreal` (P2), named `S` / `T` / `PS` / `CS` (P5), ζ / ω_n (P8); z tier held; Nichols and overlays later; textbook pass (T4). |
 | Blocks | teaching | 5 | Routing, nonlinear, filters, sources, TF, 1-layer NN. | `Sine` / `Ramp` / `Chirp` / `Delay` / `Switch` (v0.2); textbook pass (T2). |
-| Planning / policy synthesis (DP) | teaching (GRO860) | 6 | Grid + value iteration (`loop` / `numpy` / `jax`), lookup controller, `PolicyEvaluator`, `LQRPlanner`; every planner returns a `PlanningSolution`; `compare()` reads solutions side by side; `dp.py` is the textbook reference of the style (2026-09-18). | `plot_cost2go` colour scale (S54); cost-to-go as a `Field` (A1); policy iteration (S51). |
+| Planning / policy synthesis (DP) | teaching (GRO860) | 6 | Grid + value iteration (`loop` / `numpy` / `jax`), lookup controller, `PolicyEvaluator`, `LQRPlanner`; every planner returns a `PlanningSolution`; `compare()` reads solutions side by side; `dp.py` is the textbook reference of the style (2026-09-18). | the `out_of_bound_cost` default (S54); cost-to-go as a `Field` (A1); policy iteration (S51). |
 | Planning / trajopt | teaching (GRO860) | 5 | Collocation, shooting, multiple shooting; live plot; `success` means defects satisfied to `feasibility_tol`; float64 by default on JAX. | Harden SciPy/Ipopt before TRL 6; textbook pass (T5). |
 | Optimization | teaching (via trajopt) | 5 | `MathematicalProgram` + `Optimizer`, SciPy/Ipopt. | Harden SciPy/Ipopt before TRL 6. |
 | Interfaces / RL bridge | research lane (bridge) | 4 | `Sys2Gym` + `SB3Controller`; the env step is one compiled RK4 call. | Keep for external interop; courses solve with the native planner. |
@@ -209,7 +209,8 @@ term's hygiene:
   documented page by page.
 - **S49** Retire the two Stable-Baselines3 teaching notebooks once the
   course notes point only at the native twins. **[ask]**
-- **S54** `plot_cost2go` colour scale clipped at `out_of_bound_cost`.
+- **S54** The colour scale tops at the price of leaving (landed
+  2026-09-26); the DP `out_of_bound_cost` default is left. **[ask]**
 - Name freeze: no name a GRO860 notebook imports changes during the term
   (§4.1 gate 7).
 

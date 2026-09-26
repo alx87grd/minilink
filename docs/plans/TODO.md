@@ -67,10 +67,12 @@ the triage in [2026-09-22-improvement-suggestions.md](../reviews/2026-09-22-impr
   `pendulum_value_iteration_vs_lqr_vs_ppo_sb3.ipynb`, their notebook overrides and allowlist
   entries, and the README rows marked Stable-Baselines3, once the course notes point only at
   the native twins.
-- [ ] **S54 `plot_cost2go` colour scale** clipped at `out_of_bound_cost` by default (the
-  showcase passes `jmax` by hand); review the DP `out_of_bound_cost` default. It can be a
-  callable `price(x, t)` (the problem's `infeasible_cost`), which has no single level to clip
-  at, so the default needs a rule for that case too.
+- [ ] **S54 The DP `out_of_bound_cost` default** **[ask]**. Since 2026-09-26 the cost-to-go
+  plots (DP planner, its animation, tabular RL, `PolicyEvaluator`) top their colour scale at
+  the price of leaving the grid, and a callable or infinite price leaves the scale to
+  Matplotlib. Left: without a problem price the default `1e6` is that top, so feasible states
+  still read as one colour; choose a smaller default or a rule (e.g. the largest unsaturated
+  cost-to-go).
 
 ---
 
