@@ -12,6 +12,10 @@ Planning
 
 .. automodule:: minilink.planning.comparison
    :members:
+   :exclude-members: Evaluation
+
+.. automodule:: minilink.planning.evaluation
+   :members:
 
 .. automodule:: minilink.planning.initial_guess
    :members:
@@ -52,6 +56,12 @@ Spatial
 .. automodule:: minilink.planning.spatial.workspace_fields
    :members:
 
+.. automodule:: minilink.planning.spatial.overlays
+   :members:
+
+.. automodule:: minilink.planning.spatial.plotting
+   :members:
+
 Search
 ------
 
@@ -76,6 +86,12 @@ Policy synthesis
 .. automodule:: minilink.planning.policy_synthesis.dp
    :members:
 
+.. automodule:: minilink.planning.policy_synthesis.discretizer
+   :members:
+
+.. automodule:: minilink.planning.policy_synthesis.lookup_policy
+   :members:
+
 .. automodule:: minilink.planning.policy_synthesis.lqr
    :members:
 
@@ -83,4 +99,13 @@ Policy synthesis
    :members:
 
 .. automodule:: minilink.planning.policy_synthesis.approximation
+   :members:
+
+Reinforcement learning
+----------------------
+
+.. automodule:: minilink.planning.reinforcement_learning.planner
+   :members:
+
+.. automodule:: minilink.planning.reinforcement_learning.tabular
    :members:

@@ -20,3 +20,12 @@ Core
 
 .. automodule:: minilink.core.costs
    :members:
+
+.. automodule:: minilink.core.feedback
+   :members:
+
+.. automodule:: minilink.core.distributions
+   :members:
+
+.. automodule:: minilink.core.geometry
+   :members:

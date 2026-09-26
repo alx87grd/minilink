@@ -110,8 +110,6 @@ class ReinforcementLearningPlanner(Planner):
         The controller with its exploration head, what the algorithm trains.
     critic : ValueFunction or QFunction or None
         The critic of the algorithm's family.
-    gamma : float
-        The one discount the algorithm trains with.
     history : list of dict
         One record per iteration (timesteps, mean episode return, losses, fps).
     env : RolloutEnvironment

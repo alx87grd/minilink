@@ -444,6 +444,9 @@ class DynamicProgrammingPlanner(Planner):
         from minilink.planning.policy_synthesis import plotting
 
         self.require_solution()
+        kwargs.setdefault(
+            "jmax", plotting.cost_scale_limit(self.options.out_of_bound_cost)
+        )
         return plotting.plot_cost2go(self.result, **kwargs)
 
     def plot_policy(self, **kwargs):
@@ -456,6 +459,9 @@ class DynamicProgrammingPlanner(Planner):
         from minilink.planning.policy_synthesis import plotting
 
         self.require_solution()
+        kwargs.setdefault(
+            "jmax", plotting.cost_scale_limit(self.options.out_of_bound_cost)
+        )
         return plotting.animate_cost2go(self.result, **kwargs)
 
     def animate_policy(self, **kwargs):

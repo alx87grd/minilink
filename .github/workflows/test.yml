@@ -1,16 +1,18 @@
 # CI — entry points documented in tests/README.md#entry-points
-# Jobs: test (ruff + pytest, py3.10–3.13) → regression (pytest + gates + flagships + notebooks, py3.12 + jax)
+# Jobs: test (ruff + pytest, py3.10–3.13) → regression (pytest + gates + flagships + notebooks, py3.12 + jax);
+# packaging (build, check and import the wheel) runs beside them.
 name: CI
 
 on:
   push:
-    branches: [main, refactor-v4, dev-alex]
+    branches: [main, refactor-v4, dev-alex, dev]
   pull_request:
-    branches: [main, refactor-v4, dev-alex]
+    branches: [main, refactor-v4, dev-alex, dev]
 
 jobs:
   test:
     runs-on: ubuntu-latest
+    timeout-minutes: 25
     strategy:
       matrix:
         python-version: ["3.10", "3.11", "3.12", "3.13"]
@@ -41,6 +43,7 @@ jobs:
 
   packaging:
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
     - uses: actions/checkout@v4
       with:
@@ -69,6 +72,7 @@ jobs:
 
   regression:
     runs-on: ubuntu-latest
+    timeout-minutes: 75
     needs: test
 
     steps:

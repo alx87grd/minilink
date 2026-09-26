@@ -1,11 +1,11 @@
 # Optimizer wiring for parametric trajopt / MPC
 
-Status: **draft plan** (July 2026), unscheduled — a Later idea in [TODO.md](TODO.md) §7.
-Lane: research (ROADMAP §2). Analysis + proposed fix for swapping
+Status: **draft plan** (July 2026). Rung: v0.2 wave D of [TODO.md](TODO.md) — OPW-1 to
+OPW-5 are step T5's parametric-optimizer item, and the parametric evaluator's placement
+is a D3 hardening row. Lane: research (ROADMAP §2). Analysis + proposed fix for swapping
 `optimizer_method` (e.g. SciPy SLSQP → IPOPT) on the parametric MPC path.
 
-Contracts in code: [DESIGN.md](../../DESIGN.md) §6 (Planning / NLP),
-[TODO.md](TODO.md) Later (`SolverFactory` / optimizer wiring).
+Contracts in code: [DESIGN.md](../../DESIGN.md) §6 (Planning / NLP).
 
 Related: DESIGN §4 planning-params pipeline B (parametric `x0` / reserved `scene` bind).
 
@@ -129,7 +129,7 @@ bind**, not at **solver catalog**.
 
 ## Proposed fix (minimal, keeps layers independent)
 
-### P1 — Shared optimizer backend factory
+### OPW-1 — Shared optimizer backend factory
 
 Extract from `optimization/optimizer.py` (or new `optimization/presets.py`):
 
@@ -148,7 +148,7 @@ def make_optimizer_backend(
   factory instead of constructing `ScipyMinimizeOptimizer` directly.
 - **Delete** planner-local `_USER_OPTIMIZER_METHODS`.
 
-### P2 — Unified solve shape (planner internal)
+### OPW-2 — Unified solve shape (planner internal)
 
 Both offline and parametric paths should read:
 
@@ -162,14 +162,14 @@ Offline keeps `Optimizer` as orchestrator (compile program + disp + timing).
 Parametric keeps pre-built evaluator + `bind(x0)` — **evaluator differs,
 solver API does not**.
 
-### P3 — Evaluator contract note (optional)
+### OPW-3 — Evaluator contract note (optional)
 
 Document the solver-facing evaluator surface in
 `optimization/evaluators/program_evaluator.py`. `JaxParametricProgramEvaluator`
 implements the same contract by duck typing; no need to spread parametric logic
 into MPC, hybrid, or transcription.
 
-### P4 — Tests
+### OPW-4 — Tests
 
 | Test | Asserts |
 | --- | --- |
@@ -177,7 +177,7 @@ into MPC, hybrid, or transcription.
 | `test_planner_parametric_ipopt_smoke` | `compile_parametric_program` + one `solve_trajectory_from` with IPOPT (skip if no `cyipopt`) |
 | `test_planner_parametric_rejects_bad_method` | Unknown method still raises clearly |
 
-### P5 — Docs sync
+### OPW-5 — Docs sync
 
 - `DESIGN.md` §6: path × solver matrix (offline vs parametric vs callback).
 - Delete stale implication that parametric path is SciPy-only by design.
@@ -189,7 +189,7 @@ into MPC, hybrid, or transcription.
 | Planner mode | `optimizer_method` | IPOPT | Callback / `record_history` |
 | --- | --- | --- | --- |
 | `solve()` / rebuild `solve_trajectory_from` | `ipopt` | Yes | Callback: SciPy only |
-| `compile_parametric_program` + MPC | `ipopt` | **Yes after P1** | Callback: SciPy only |
+| `compile_parametric_program` + MPC | `ipopt` | **Yes after OPW-1** | Callback: SciPy only |
 | NumPy rebuild MPC | `ipopt` | Yes | Callback: SciPy only |
 
 ---
@@ -216,7 +216,7 @@ into MPC, hybrid, or transcription.
 
 ---
 
-## Target usage (after P1)
+## Target usage (after OPW-1)
 
 ```python
 planner = TrajectoryOptimizationPlanner(

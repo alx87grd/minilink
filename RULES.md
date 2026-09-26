@@ -90,10 +90,14 @@ Systems-as-descriptions: CONSTITUTION.md §4.*
   each other without explicit architectural justification.
 - **3.3 Two lanes (Teaching vs. Research):** Philosophy in CONSTITUTION.md §3;
   operating contract (soft entry rule, wheel scope, CI-checked imports) in ROADMAP.md §2.
-  - **Teaching surface** (`minilink/`, `examples/tutorial/`, `examples/teaching/`, `examples/demos/`):
-    Strict public contract, high stability, fully documented, runs on standard scientific Python.
-  - **Research lane** (`examples/projects/`, `examples/experimental/`): Free experimentation,
-    repo-only, unconstrained by teaching stability guarantees.
+  - **Teaching surface** (the root prelude and the band facades, the set ROADMAP §2 registers
+    and the tests check; and the examples that import only through it: `examples/tutorial/`,
+    `examples/teaching/`, `examples/demos/`): Strict public contract, high stability, fully
+    documented, runs on standard scientific Python.
+  - **Research lane** (everything else: the provisional hybrid, MPC, realtime and spatial
+    bands, the `minilink/experimental/` tier, `examples/projects/`,
+    `examples/experimental/`): Free experimentation, unconstrained by teaching stability
+    guarantees; `experimental/` and the research examples are repo-only.
 - **3.4 Clean renaming:** When renaming a component or module, update all call sites across the
   entire repository in the same change. Do not leave deprecated aliases behind.
 - **3.5 Decoupled rendering & headless dynamics:** Classes in `minilink.dynamics` must never import

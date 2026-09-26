@@ -26,8 +26,8 @@ the triage in [2026-09-22-improvement-suggestions.md](../reviews/2026-09-22-impr
 | [§1](#1-v01-close-out) | v0.1 close-out |
 | [§2](#2-v02-wave-a--the-textbook-objects) | v0.2 wave A — the textbook objects |
 | [§3](#3-v02-wave-b--gro501) | v0.2 wave B — GRO501 |
-| [§4](#4-v02-wave-c--catalog-parity-new-bands) | v0.2 wave C — catalog, parity, new bands |
-| [§5](#5-v02-wave-d--textbook-code-minimal-demos-consolidation) | v0.2 wave D — textbook code, minimal demos, consolidation |
+| [§4](#4-v03-wave-c--gmc714-catalog-parity) | v0.3 wave C — GMC714, catalog, parity |
+| [§5](#5-v02-wave-d--textbook-code-minimal-demos-consolidation) | v0.2 wave D (into v0.3) — textbook code, minimal demos, consolidation |
 | [§6](#6-v10-foundations) | v1.0 foundations |
 | [§7](#7-later-ideas) | Later ideas |
 
@@ -35,47 +35,17 @@ the triage in [2026-09-22-improvement-suggestions.md](../reviews/2026-09-22-impr
 
 ## 1. v0.1 close-out
 
-- [ ] **R1 Tag `0.1.0`** **[ask]**. Register the GitHub Environment `pypi` and the PyPI pending
-  publisher (`alx87grd` / `minilink` / `publish.yml` / env `pypi`), then
-  `git tag 0.1.0 && git push origin 0.1.0`. Done when `pip install minilink` installs the
-  teaching surface from PyPI.
-  Before the tag (scan: tests-ci#12, tests-ci#13, examples#1, examples#4): `publish.yml`
-  runs ruff and `pytest` before uploading, and every long CI job gets `timeout-minutes`;
-  `showcase_jax.ipynb` stops importing `experimental.c_export`, which the wheel does not
-  ship; `plot_diagram()` without the `graphviz` wrapper (ROADMAP §6); one canonical Colab
-  setup cell per install tier, pinned by a test (38 notebooks carry 11 variants today).
-- [ ] **R2 CI on the working branch** **[ask]**. `.github/workflows/test.yml` and `docs.yml`
-  trigger on `main`, `refactor-v4`, `dev-alex`; add `dev` (or whichever branch carries the
-  work) so the merge gate runs before a PR. One line each.
-  The JAX half of the gate landed 2026-09-23: the `regression` job runs `pytest` with JAX.
-- [ ] **R3 Ruff runs itself**: `ruff` and `ruff-format` hooks in `.pre-commit-config.yaml`,
-  pinned to the dev extra's ruff (scan: tests-ci#6). Done when `pre-commit run --all-files`
-  matches the CI lint steps.
-- [ ] **S59 Docs drift** (scan: docs-gov#3, docs-gov#4, docs-gov#5, docs-gov#7, docs-gov#8,
-  docs-gov#12, docs-gov#13, tests-ci#4, control#12, analysis#12): the CI commands written
-  once (the tests/README agent table), AGENTS naming the jobs and the regression flags given
-  one owner; DESIGN's inline TODOs moved here and its retired pointers fixed; RULES 3.3's
-  teaching surface stated as ROADMAP §2 states it; plan-doc step ids that cannot collide
-  with the workboard's; retired phase numbers scrubbed from the plans; AGENTS naming who
-  edits ROADMAP §5 and §6; the control band's docs housekeeping; the analysis API page. Done
-  when `test_repo_contract.py` passes and no doc names a retired section.
-- [ ] **S60 The teaching surface, checked and documented** (scan: graphics#2, graphics#3,
-  graphics#10, tests-ci#8, docs-gov#0, dynamics#12): the registry test walks every band
-  facade's `__all__` as it walks the root prelude, then `NotchFilter`, `Washout` and `MLP`
-  join the blocks row; `docs/api` generated from the registry (or a test that every prelude
-  name's module has a page) and Sphinx built with `-W`; the dynamics page covers the catalog;
-  `minilink.graphical.catalog` and `minilink.interfaces` as lazy facades. Done when a prelude
-  name without a page fails a test.
-- [ ] **S49 Retire the Stable-Baselines3 teaching notebooks** **[ask]**. Delete
-  `teaching/courses/udes_gro860/drone_ppo_sb3.ipynb` and
-  `pendulum_value_iteration_vs_lqr_vs_ppo_sb3.ipynb`, their notebook overrides and allowlist
-  entries, and the README rows marked Stable-Baselines3, once the course notes point only at
-  the native twins.
-- [ ] **S54 `plot_cost2go` colour scale** clipped at `out_of_bound_cost` by default (the
-  showcase passes `jmax` by hand); review the DP `out_of_bound_cost` default. It can be a
-  callable `price(x, t)` (the problem's `infeasible_cost`), which has no single level to clip
-  at, so the default needs a rule for that case too.
-
+- [ ] **R1 Publish `0.1.1` from a tag** **[ask]**. `publish.yml` published `minilink 0.1.0`
+  (2026-09-16, run 35139916195) from a `0.1.0` tag on `47cfd50`; the tag is gone from the
+  remote, and the trusted publisher works. Merge `dev` into `main`, then
+  `git tag 0.1.1 && git push origin 0.1.1` on `main`.
+  Done when `pip install minilink==0.1.1` installs the teaching surface from PyPI.
+  Before `0.1.1`: nothing open in the repo. Landed or decided 2026-09-26 (ROADMAP §6):
+  `publish.yml` runs ruff and `pytest` before the upload; CI time limits (the nightly
+  job's waits for its first green run); `plot_diagram()` warns and skips without
+  `graphviz`; `showcase_jax.ipynb` keeps its `experimental` import; every notebook that
+  imports minilink carries the one Colab setup cell, cloning the default branch, pinned by
+  `test_repo_contract.py` (`mpc_spatial_stack` no longer clones `dev-alex`).
 ---
 
 ## 2. v0.2 wave A — the textbook objects
@@ -116,6 +86,8 @@ states; every step is name-preserving for the GRO860 notebooks.
   with no planning import, and the suite is green. Glyph rename stays S30.
   Also: `Shape` unions flatten like `IntersectionSet` and `SumCost` (scan: core#6);
   `PurePursuit` sizes its measurement from the vehicle, not `state_dim=9` (scan: control#9).
+  `control/mpc/viz.py` imports `TrackCorridorOverlay` from `planning.spatial.overlays`;
+  retarget it in the change that deletes that module (scan: control#12).
 - [ ] **A4 Naming quick wins** 1–4 and 6 of [naming.md](naming.md), each a few lines plus a
   test: class name as the default `name`; one closed-loop name on both `@` paths; informative
   default names where a shortcut says `Diagram`; the sampled loop's plant wrapper honours
@@ -130,8 +102,8 @@ states; every step is name-preserving for the GRO860 notebooks.
   support on sets and distributions (one flatten rule, with identification or the robust
   problem); `NoiseSource(distribution, sample_period)` replacing the hand-rolled `WhiteNoise`
   draw; `UnionSet` via `|` when reachability or multi-goal work needs it; vector bounds on
-  `Saturation`; library sets and fields reading `params` (the "one signature" gap, same rule
-  as A2, after it); `PlanningProblem.hamiltonian()` only if the course teaches Pontryagin; the
+  `Saturation`; library sets, shapes and fields reading `params` (the "one signature" gap,
+  same rule as A2, after it); `PlanningProblem.hamiltonian()` only if the course teaches Pontryagin; the
   RL critic as a `Field` once training is over.
   Also: `Distribution.sample(key=None)` like the sets (scan: core#5); a guard test that
   editing `WhiteNoise` params changes the next simulation without `refresh()`, so S29 cannot
@@ -167,8 +139,10 @@ Plan: [gro501-classical-control.md](gro501-classical-control.md) (P1, F1, F2, F4
 - [ ] **S62 The LQR family on the control band** **[ask — public names]** (scan: control#0,
   control#1): rename the `control/lqr.py` module so `lqr`, `lqr_at_operating_point`,
   `lqr_finite_horizon`, `trajectory_lqr` and `lqr_gain_schedule` join the band facade and the
-  registry; `P` joins the siso family. After the GRO860 term (gate 7), before P11 writes
-  notebooks on the band layer.
+  registry; `P` joins the siso family; the `control/__init__.py` note on `control.lqr`
+  naming the submodule goes (scan: control#12). Before P11 writes notebooks on the band
+  layer. The name freeze (gate 7) now runs to v1.0: `minilink.control.lqr` stays importable
+  as an alias until then, or S62 waits for v1.0 — part of the ask.
 - [ ] **P7 Generate the analysis facades**: one helper builds a delegating method from the
   target function (signature and docstring copied), explicit form kept only where the facade
   differs; a test asserts every generated `__signature__` matches its target. Done when the
@@ -223,7 +197,14 @@ Plan: [gro501-classical-control.md](gro501-classical-control.md) (P1, F1, F2, F4
 
 ---
 
-## 4. v0.2 wave C — catalog, parity, new bands
+## 4. v0.3 wave C — GMC714, catalog, parity
+
+- [ ] **G1 GMC714 baseline audit** **[ask — course scope]**. Run every topic of ROADMAP §4.3
+  (vehicle models, robotic arm, nonlinear control, robust control, trajectory optimization,
+  MPC) on the teaching surface, as the 2026-09-07 audit did for GRO501
+  ([docs/reviews/2026-09-07-gro501-coverage.md](../reviews/2026-09-07-gro501-coverage.md));
+  write the gaps as §4.3's gates and as rows here. Decide whether MPC joins the teaching
+  surface. Done when every §4.3 row has a status and a gate.
 
 - [ ] **C1 Pyro parity** open rows — [pyro-port-remaining.md](pyro-port-remaining.md); then
   the pyro → minilink migration guide in README from the name map there. **[ask]** for the
@@ -237,7 +218,8 @@ Plan: [gro501-classical-control.md](gro501-classical-control.md) (P1, F1, F2, F4
   take a `dim` like every static block (scan: graphics#11).
 - [ ] **C4 Identification and generation**: `identification/fitting.py` on `rollout_batch`
   (physical params and NN weights are one verb); `trajectory_generation/` port (polynomial,
-  min-snap); SMC trajectory-following demo; trajectory post-filter.
+  min-snap); SMC trajectory-following demo; trajectory post-filter; experiment-design
+  helpers (the PRBS / chirp inputs live in `blocks/sources`).
   Also: the simulated `Trajectory` logs `dx` and `y`, so an equation-error fit has its data
   (scan: analysis#14).
 - [ ] **C5 RL follow-ups**:
@@ -263,7 +245,7 @@ Plan: [gro501-classical-control.md](gro501-classical-control.md) (P1, F1, F2, F4
   `Drone2D.d` and `Rocket.d` named; `VanderPol` with a real input or none; constructor hygiene
   in the pendulum and mass-spring-damper families.
 - [ ] **Estimation follow-ups** after P4: EKF, time-varying and discrete Kalman as
-  `estimation/` rows.
+  `estimation/` rows; online parameter estimators (recursive least squares, gradient laws).
 
 ---
 
@@ -288,7 +270,8 @@ findings, file by file and line by line, are in
   the class; the joint-impedance law still in a helper.
   Also (scan: control#2, control#5, control#7): one time-interpolation for trajectories and
   gain schedules; one warm-start helper on the plan `Trajectory`; the impedance and robotic
-  law bodies consolidated.
+  law bodies consolidated; `mpc/viz.py`'s `HybridSimResult` import under
+  `TYPE_CHECKING`, since only an annotation reads it (RULES 3.2; scan: control#12).
 - [ ] **T3 dynamics catalog** (what T0 left): `manipulators/arms.py` (helpers below,
   `_set_planar_reach_camera` and `from_manipulator` setting attributes from outside
   `__init__`, `link_lengths` probing with `hasattr`, FK / J reading `params` — a fix with a
@@ -332,7 +315,7 @@ findings, file by file and line by line, are in
   `collision.py`, `plotting.py`. `ReinforcementLearningPlanner(verbose=True)` prints by
   default (RULES 4.6): ruled to stay 2026-09-15; recorded.
   Also: the parametric (MPC) optimizer goes through `Optimizer`'s backend table (scan:
-  planning#9).
+  planning#9; [optimizer-parametric-wiring.md](optimizer-parametric-wiring.md) OPW-1–OPW-5).
 - [ ] **T6 the two big ones** **[ask first]**: `core/composition.py` (24-line section-map
   docstring, 45 `_` helpers, public API buried under `# Internal machinery`, eleven external
   writes to `_composition_*`; and the three `@` semantics of P10) and
@@ -471,12 +454,15 @@ pick):
 - [ ] **S68 Contracts as tests** (RULES 6.12; scan: tests-ci#3, tests-ci#5, tests-ci#9,
   tests-ci#10, tests-ci#11, tests-ci#14, docs-gov#1, docs-gov#2, examples#8, control#11,
   planning#10, dynamics#11): the RULES 5.8 underscore check a repo-wide ratchet with a
-  shrinking allowlist; ROADMAP §5 step ids and TODO rows agree; every teaching notebook
-  executed nightly; the subprocess demo-check tests behind a marker; wall-clock claims out of
-  unit tests; unit tests stop importing `examples/projects` and `benchmarks/systems`;
-  `Animator.resolve_frame` public for the graphics harness; course pins byte-identical to
-  their topic twins; one both-backends test over every control law, the catalog with
-  perturbed `params`, and the `params.sets` scoring parity.
+  shrinking allowlist; ROADMAP §5 step ids and TODO rows agree, and no plan doc numbers
+  its steps with a bare workboard-style id (scan: docs-gov#3); the CI regression flags agree
+  across `test.yml`, `tests/run/_common.py` and the tests/README Agent table (scan:
+  tests-ci#4); every teaching notebook executed nightly; the subprocess demo-check tests
+  behind a marker; wall-clock claims out of unit tests; unit tests stop importing
+  `examples/projects` and `benchmarks/systems`; `Animator.resolve_frame` public for the
+  graphics harness; course pins byte-identical to their topic twins; one both-backends test
+  over every control law, the catalog with perturbed `params`, and the `params.sets` scoring
+  parity.
 
 ---
 
@@ -513,6 +499,11 @@ After two cohorts; each is a design conversation before code. **[ask — core]**
   reach plant, controller, cost, sets and `x0` alike; today tutorial 11 and
   `pid_autotuning_jax` write that scan by hand.
 - [ ] **S36** iLQR planner from parts (`jacfwd` of `f_trace`; idea, research lane).
+- [ ] **S49 Retire the Stable-Baselines3 teaching notebooks** **[ask]** (v1.0: at the end of the term, decided 2026-09-26). Delete
+  `teaching/courses/udes_gro860/drone_ppo_sb3.ipynb` and
+  `pendulum_value_iteration_vs_lqr_vs_ppo_sb3.ipynb`, their notebook overrides and allowlist
+  entries, and the README rows marked Stable-Baselines3, once the course notes point only at
+  the native twins.
 - [ ] **V2** Zenodo archive and a citable DOI (`CITATION.cff`) after PyPI; the JOSS entry
   and the RULES 6.9 carve-out for its state-of-the-field section, decided then.
 
@@ -525,15 +516,17 @@ One line each; open a plan doc only when a design needs a writeup.
 - Vehicle view ports (`pose` / `bodyvel` on `DynamicBicycle` for impedance / PID).
 - Scene params / `J(z, p)` bind (DESIGN §4 planning-params pipeline B; moving obstacles
   online without rebuilding the NLP).
-- `SolverFactory` — [optimizer-parametric-wiring.md](optimizer-parametric-wiring.md).
+- `SimulationOptions`, one record for the `Simulator` solver presets (DESIGN §5), weighed
+  against RULES 2.5 (no option bags) before it is built.
 - Cross-fidelity `lift` / `project` maps on the car ladder —
   [fidelity-maps.md](fidelity-maps.md).
 - Articulated mechanism layer (one mechanism description feeding RNEA/ABA and the symbolic
   path) — [articulated-mechanism.md](articulated-mechanism.md).
 - `RobustPlanningProblem` (set-bounded uncertainty, minimax criterion) only when a minimax
   consumer exists; the deterministic / stochastic pair is the taxonomy that shipped.
-- `MjxPlant` (`interfaces/mjx.py`); Pacejka tire; stochastic forcing; ROS2 / FMI; sparse
-  long-horizon trajopt; RRT-Connect; shared RNEA serial-chain stack; ABA on other RNEA arms.
+- `MjxPlant` (`interfaces/mjx.py`) and `torch` / `flax` model wrappers in `interfaces/`;
+  Pacejka tire; stochastic forcing; ROS2 / FMI; sparse long-horizon trajopt; RRT-Connect;
+  shared RNEA serial-chain stack; ABA on other RNEA arms.
 - Ipopt given the Lagrangian Hessian, not the objective's alone (scan: planning#13);
   `optimizer_method="auto"` picking Ipopt when installed (scan: examples#11);
   `PlanningProblem.metadata` documented or retired (scan: planning#14; ROADMAP §6).

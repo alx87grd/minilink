@@ -8,7 +8,7 @@ Status legend: **Done** = equivalent landed · **Partial** = framework exists, g
 
 ## Summary
 
-Shrunk 2026-09-05 (Phase D6) to the **open** rows; landed symbols are listed
+Shrunk 2026-09-05 to the **open** rows; landed symbols are listed
 once in the name map at the end. Status legend: **Partial** = framework exists,
 gap noted · **TODO** = planned/in-scope · **Drop** = explicit non-goal.
 
@@ -284,16 +284,16 @@ Ordered by unblock count:
 
 | Priority | Work | Unblocks |
 | --- | --- | --- |
-| P2 | ~~`Manipulator` catalog rebase + `control/modelbased.py`, `control/robotic.py`~~ (library landed) | representative closed-loop demos per plant band |
-| P2 | ~~`TrajectoryLQRController`~~ (landed: `trajectory_lqr`) | trajectory_stabilization/ demos |
-| P3 | `planning/trajectory_generation/` (min-snap) | differentialflatness/ demos |
-| P3 | `estimation/luenberger.py`, `kalman.py` | LQG demos |
-| P3 | `identification/fitting.py` | params-gradient workflow |
-| P3 | ~~`interfaces/gymnasium.py`~~ (landed) | GRO860 course notebooks |
-| P3 | ~~Frequency tools (pole-zero, Nyquist, margins, `ss2tf`)~~ (landed 2026-09-07) | transfer_functions/ completion |
-| P3 | `planning/filters.py` TrajectoryFilter | traj post-processing |
-| P4 | Representative closed-loop demo per `demos_by_system/*` plant band | ~93 TODO demos shrink to ~20 targets |
-| P4 | README pyro → minilink API mapping table | migration guide |
+| prio 2 | ~~`Manipulator` catalog rebase + `control/modelbased.py`, `control/robotic.py`~~ (library landed) | representative closed-loop demos per plant band |
+| prio 2 | ~~`TrajectoryLQRController`~~ (landed: `trajectory_lqr`) | trajectory_stabilization/ demos |
+| prio 3 | `planning/trajectory_generation/` (min-snap) | differentialflatness/ demos |
+| prio 3 | `estimation/luenberger.py`, `kalman.py` | LQG demos |
+| prio 3 | `identification/fitting.py` | params-gradient workflow |
+| prio 3 | ~~`interfaces/gymnasium.py`~~ (landed) | GRO860 course notebooks |
+| prio 3 | ~~Frequency tools (pole-zero, Nyquist, margins, `ss2tf`)~~ (landed 2026-09-07) | transfer_functions/ completion |
+| prio 3 | `planning/filters.py` TrajectoryFilter | traj post-processing |
+| prio 4 | Representative closed-loop demo per `demos_by_system/*` plant band | ~93 TODO demos shrink to ~20 targets |
+| prio 4 | README pyro → minilink API mapping table | migration guide |
 
 ## Appendix — pyro → minilink name map (landed)
 

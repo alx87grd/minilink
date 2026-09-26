@@ -1,17 +1,7 @@
-"""Model fitting from data (placeholder — content planned, home decided).
-
-Offline verbs over logged :class:`~minilink.core.trajectory.Trajectory` data
-that return fitted parameters or systems. One verb for physical parameters
-and neural-network weights alike — both ride the parametric evaluator tier
-(``f_p`` / ``evaluator.jacobian("f", "params")``; see
-``examples/demos/compile/params_gradient.py`` for the equation-error
-prototype).
-
-Planned modules (ROADMAP.md §5, step C4):
-
-- ``fitting.py`` — equation-error and prediction-error fits
-- experiment design helpers (PRBS/chirp inputs live in ``blocks/sources``)
+"""Model fitting from logged :class:`~minilink.core.trajectory.Trajectory` data (planned, step C4).
 
 Placement rule: batch fitting over data lives here; estimators that run
-*online inside a diagram* live in ``estimation/``.
+*online inside a diagram* live in ``estimation/``. The design is step C4 of
+docs/plans/TODO.md (ROADMAP.md §5); the equation-error prototype is
+``examples/demos/compile/params_gradient.py``.
 """
