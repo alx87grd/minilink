@@ -1512,13 +1512,13 @@ class TestFrequencyRangeBracketsCrossover(unittest.TestCase):
 
 
 class TestMinreal(unittest.TestCase):
-    """P2: pole/zero pairs cancel as in the hand calculation, and nothing else moves."""
+    """Uncontrollable and unobservable modes cancel, and nothing else moves."""
 
     def test_phantom_modes_cancel(self):
         from minilink.analysis import linear
         from minilink.blocks.transfer_function import TransferFunction
 
-        # The pure-P pendulum loop of the 2026-09-07 GRO501 audit:
+        # A pure-P pendulum loop with two phantom modes:
         # (10 s² + 200 s) / (s⁴ + 20.25 s³ + 9.905 s² + 98.1 s) = 10 / (s² + 0.25 s + 4.905)
         loop = TransferFunction([10.0, 200.0, 0.0], [1.0, 20.25, 9.905, 98.1, 0.0])
         A_min, _, _, _ = linear.minreal(loop.A(), loop.B(), loop.C(), loop.D())
@@ -1596,3 +1596,83 @@ class TestMinreal(unittest.TestCase):
         )
         self.assertEqual(A.shape, (0, 0))
         np.testing.assert_array_equal(D, [[0.5]])
+
+
+class TestPolePlacement(unittest.TestCase):
+    """Ackermann with one input, the robust choice with several, both checked."""
+
+    DOUBLE = (np.array([[0.0, 1.0], [0.0, 0.0]]), np.array([[0.0], [1.0]]))
+    TRIPLE = (
+        np.array([[0.0, 1.0, 0.0], [0.0, 0.0, 1.0], [0.0, 0.0, 0.0]]),
+        np.array([[0.0], [0.0], [1.0]]),
+    )
+
+    def test_single_input_matches_the_hand_calculation(self):
+        from minilink.control.place import place_gain
+
+        # s² + k₂ s + k₁ = (s + 1)(s + 2) = s² + 3 s + 2
+        np.testing.assert_allclose(
+            place_gain(*self.DOUBLE, [-1.0, -2.0]), [[2.0, 3.0]], atol=1e-12
+        )
+
+        # (s + 2)³ = s³ + 6 s² + 12 s + 8: a pole repeated more often than rank B
+        np.testing.assert_allclose(
+            place_gain(*self.TRIPLE, [-2.0] * 3), [[8.0, 12.0, 6.0]], atol=1e-12
+        )
+
+    def test_a_complex_pair_and_a_real_pole(self):
+        from minilink.control.place import place_gain
+
+        A, B = self.TRIPLE
+        poles = [-1.0 + 0.5j, -1.0 - 0.5j, -1.0]
+        K = place_gain(A, B, poles)
+        # det(sI − (A − B K)) = (s + 1 − 0.5i)(s + 1 + 0.5i)(s + 1)
+        np.testing.assert_allclose(
+            np.poly(A - B @ K), np.real(np.poly(poles)), atol=1e-9
+        )
+
+    def test_several_inputs_take_the_robust_gain(self):
+        from minilink.control.place import place_gain
+
+        A = np.diag([1.0, 2.0, 3.0])
+        B = np.array([[1.0, 0.0], [0.0, 1.0], [1.0, 1.0]])
+        K = place_gain(A, B, [-1.0, -2.0, -3.0])
+        self.assertEqual(K.shape, (2, 3))
+        np.testing.assert_allclose(
+            np.sort(np.linalg.eigvals(A - B @ K).real), [-3.0, -2.0, -1.0], atol=1e-9
+        )
+
+    def test_honest_errors(self):
+        from minilink.control.place import place_gain
+
+        A, B = self.DOUBLE
+        B_mimo = np.array([[1.0, 0.0], [0.0, 1.0], [1.0, 1.0]])
+        for args, message in (
+            ((A, [[1.0], [0.0]], [-1.0, -2.0]), "not controllable"),
+            ((A, B, [-1.0]), "2 poles needed"),
+            ((A, B, [-1.0 + 1.0j, -2.0]), "conjugate pairs"),
+            ((np.diag([1.0, 2.0, 3.0]), B_mimo, [-1.0] * 3), "repeated at most"),
+        ):
+            with (
+                self.subTest(message=message),
+                self.assertRaisesRegex(ValueError, message),
+            ):
+                place_gain(*args)
+
+    def test_operating_point_design_closes_the_loop(self):
+        from minilink import place, place_at_operating_point
+
+        plant = InvertedPendulum()
+        x_bar = np.zeros(2)
+        poles = [-3.0, -3.0]
+
+        ctl = place_at_operating_point(plant, x_bar, poles)
+        lin = linearize(plant, x_bar)
+        np.testing.assert_allclose(
+            ctl.params["K"], place(lin.A(), lin.B(), poles).params["K"]
+        )
+        np.testing.assert_allclose(ctl.inputs["r"].nominal_value, x_bar)
+
+        plant.x0 = np.array([0.4, 0.0])
+        trajectory = (ctl @ plant).compute_trajectory(tf=6.0)
+        self.assertLess(np.max(np.abs(trajectory.x[:, -1])), 1e-3)

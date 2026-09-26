@@ -118,8 +118,8 @@ def frequency_range(A, B, C, D):
 def minreal(A, B, C, D, *, tol=1e-9):
     """Minimal realization: drop the modes that are uncontrollable or unobservable.
 
-    The step that makes pole/zero pairs cancel as in the hand calculation;
-    ``pzmap``, ``root_locus`` and ``transfer_function`` run it by default.
+    The pole/zero pairs of those modes cancel; ``pzmap``, ``root_locus`` and
+    ``transfer_function`` run it by default.
     ``tol`` is the relative singular-value threshold below which a direction
     counts as missing: the Kalman matrices raise ``A`` to the power ``n − 1``,
     so their rounding sits far above machine precision. A realization that is

@@ -31,6 +31,14 @@ it is the acceptance bar. The maintainer should never have to ask for it.
   return a named result. No `self.` in math lines, and no equation on a `return` line.
 - **Equation comments** (RULES 5.22): a one-line comment carries the textbook form when
   the code cannot. Equations never sit in docstrings.
+- **Helpers carry plain names** (RULES 5.8): a module-level helper is `check_poles`, never
+  `_check_poles`; the `# Internal machinery` section comment is what marks it internal. A
+  leading underscore is only for module-level constants and local closures.
+- **Docstrings and comments are timeless.** They state the math and the contract as a
+  textbook would. They never name the design process (step ids such as `P2`, audits,
+  dates, "decided", "landed"), the course or its exercises, or what another library
+  refuses. That history lives in `docs/plans/`, `docs/reviews/` and the git log. The same
+  holds for test docstrings and comments.
 - **The reference is `planning/policy_synthesis/dp.py`.** Before committing any math,
   read the diff next to it, and say in the report that you did.
 

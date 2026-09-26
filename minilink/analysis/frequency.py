@@ -185,14 +185,14 @@ def pzmap(
     channel, ``gain`` the leading coefficient ``k`` of
     ``G(s) = k prod(s - z) / prod(s - p)``. ``minimal`` (default: yes, with a
     one-time notice when a pair cancels) first reduces the channel to its
-    minimal realization, so pole/zero pairs cancel as in the hand calculation;
+    minimal realization, so the uncontrollable and unobservable modes cancel;
     ``minimal=False`` keeps every mode of the realization.
     """
     A, B, C, D = siso_matrices(
         sys, x_bar, u_bar, t, params, of=of, wrt=wrt, method=method, eps=eps
     )
 
-    # Minimal realization: the pole/zero pairs of the hand calculation cancel
+    # Minimal realization: the uncontrollable and unobservable modes cancel
     A, B, C, D = minimal_channel(A, B, C, D, minimal)
 
     return linear.zeros(A, B, C, D), linear.poles(A), linear.gain(A, B, C, D)
@@ -224,7 +224,7 @@ def root_locus(
         sys, x_bar, u_bar, t, params, of=of, wrt=wrt, method=method, eps=eps
     )
 
-    # Minimal realization: the pole/zero pairs of the hand calculation cancel
+    # Minimal realization: the uncontrollable and unobservable modes cancel
     A, B, C, D = minimal_channel(A, B, C, D, minimal)
 
     return linear.root_locus(A, B, C, D, gains)
@@ -375,7 +375,7 @@ def plot_root_locus(
         sys, x_bar, u_bar, t, params, of=of, wrt=wrt, method=method, eps=eps
     )
 
-    # Minimal realization: the pole/zero pairs of the hand calculation cancel
+    # Minimal realization: the uncontrollable and unobservable modes cancel
     A, B, C, D = minimal_channel(A, B, C, D, minimal)
     K, roots = linear.root_locus(A, B, C, D, gains)
 
@@ -478,12 +478,12 @@ def minimal_channel(A, B, C, D, minimal):
         warnings.warn(
             f"Cancelled {dropped} pole/zero pair(s): modes that are uncontrollable or "
             "unobservable on this channel. Pass minimal=False to keep them.",
-            stacklevel=_caller_stacklevel(),
+            stacklevel=caller_stacklevel(),
         )
     return A_min, B_min, C_min, D_min
 
 
-def _caller_stacklevel():
+def caller_stacklevel():
     """``stacklevel`` of the first frame outside minilink, so a warning names the user's line."""
     package = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     frame, level = sys._getframe(1), 1

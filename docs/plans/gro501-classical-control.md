@@ -23,7 +23,7 @@ additive or replaces boilerplate with generated equivalents.
 | **F2** `PID.f` and `PID.ctl` agree on `tau` | — | 1 | **done** |
 | **F4** `closed_loop_poles` singular-gain guard | — | 1 | **done** |
 | **P2** `minreal` | G3 | 1 | **done** 2026-09-26; order reduction split to P2b [ask] |
-| **P3** `place()` → `StateFeedbackController` | G2 | 1 | agent (mirrors `lqr`) |
+| **P3** `place()` → `StateFeedbackController` | G2 | 1 | **done** 2026-09-26 |
 | **P4** `estimation/` — Luenberger, then Kalman | G1 | 2 | **held** |
 | **P5** Named `S` / `T` / `PS` / `CS` | G5 | 2 | agent |
 | **P6** Discrete (z) tier | G4 | 3 | **held** |
@@ -166,6 +166,18 @@ the block construction and an honest error when the pole set is not reachable
 **Done when.** `place` on the guide's parking model returns a `K` whose
 closed-loop `eigvals(A − BK)` match `{−1 ± 0.5i, −1}` to 1e-9, and the
 returned block closes the loop on the nonlinear plant with `@`.
+
+**Landed 2026-09-26, amending "thin wrapper" (maintainer decision).** `place_poles`
+refuses any pole repeated more than rank(B) times, so with one input it rejects
+"critically damped" `[-2, -2]` and "all at −2". `place_gain` therefore splits as MATLAB's
+`acker` / `place` do: with one input, Ackermann's formula `K = [0 … 0 1] 𝒞⁻¹ φ(A)`
+written step by step (the unique gain, repeated poles included); with several, the
+robust `place_poles` choice. Both check `det(sI − (A − BK)) = ∏(s − pᵢ)` by the
+characteristic polynomial (a repeated pole's eigenvalues are computed only to about
+`eps^(1/3)`), and the errors name the reason (uncontrollable pair, pole count, unpaired
+complex pole, multiplicity beyond rank B). Demo `examples/demos/control/pole_placement_pendulum.py`;
+tests `TestPolePlacement`. The parking model is not in the repo: a triple integrator
+with `{−1 ± 0.5i, −1}` stands in.
 
 ---
 
@@ -367,7 +379,7 @@ P3 gates P4 (the Luenberger factory places poles on the dual pair). P1 and P2
 gate P11 (until then the notebooks would teach wrong pole counts); both are
 in (P2 on 2026-09-26). P7 is independent and worth doing before P2
 and P5 add three more facade methods each by hand. With P4 and P6 held, the
-next actionable steps are **P3, P5, P8**, then TB (the textbook review, whose
+next actionable steps are **P5, P8**, then TB (the textbook review, whose
 shortcut list decides P7's scope).
 
 ## 3. What this plan does not do

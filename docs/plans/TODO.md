@@ -123,12 +123,8 @@ Plan: [gro501-classical-control.md](gro501-classical-control.md) (P1, F1, F2, F4
   the DC gain (singular perturbation), in `analysis/modal.py`; the name is decided with the
   step (`reduce_order(sys, n)` or a `wn_max` cutoff). Done when the DC-motor model drops its
   electrical pole and keeps its static gain.
-  Also: swap the guide's §9.13 realization into `TestMinreal` once the matrices are in
-  hand (a minimal realization comes back unchanged; the quarter car stands in today).
-- [ ] **P3 `place()` / `place_gain()` / `place_at_operating_point()`** mirroring `lqr`;
-  `scipy.signal.place_poles` plus an honest error when the pole set is not reachable; a demo
-  in `examples/demos/control/`. Done when `eigvals(A − BK)` on the guide's parking model
-  match `{−1 ± 0.5i, −1}` to 1e-9 and the block closes the loop with `@`.
+  Also: swap the guide's §9.13 realization into `TestMinreal`, and its §1.4.2 parking model
+  into `TestPolePlacement`, once the matrices are in hand (stand-ins today).
 - [ ] **P5 Named sensitivity functions** `sensitivity` (`S = e/r`), `complementary_sensitivity`
   (`T = y/r`), `PS`, `CS` on a closed-loop diagram, each an `LTISystem`; `disturbance=` /
   `noise=` injection points on `feedback()`. Done when `S + T = 1` holds to 1e-12 on a SISO
@@ -162,7 +158,7 @@ Plan: [gro501-classical-control.md](gro501-classical-control.md) (P1, F1, F2, F4
   function and fourteen `np.linalg.eigvals(lin.A())` sites go (scan: analysis#3, examples#2).
 - [ ] **P4 `estimation/`** **[held 2026-09-07 — ask to lift]**. `LuenbergerObserver(A, B, C,
   L)` as a `DynamicSystem` with ports `u`, `y` → `x_hat`; `luenberger(A, B, C, poles)` on the
-  dual pair (needs P3); `kalman(A, B, C, Q, R)` from the filter Riccati equation; the
+  dual pair (`place_gain(Aᵀ, Cᵀ, poles)ᵀ`, P3 landed 2026-09-26); `kalman(A, B, C, Q, R)` from the filter Riccati equation; the
   observer + state-feedback composition ruled first (ROADMAP §6). Done when LQR + Kalman
   stabilizes the guide's cart-pendulum from a disturbed start with noise on `u` and `y`, and
   `plot_diagram` shows the Figure 12 topology.

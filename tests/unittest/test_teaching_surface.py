@@ -32,6 +32,7 @@ TEACHING_SURFACE: dict[str, tuple[str, ...]] = {
         "CartPole",
         "ImpedanceController",
         "lqr",
+        "place",
         "Step",
         "feedback",
         "StochasticPlanningProblem",
@@ -157,6 +158,8 @@ TEACHING_MODULE_FUNCTIONS = (
     ("minilink.control.lqr", "lqr_at_operating_point"),
     ("minilink.control.lqr", "lqr_finite_horizon"),
     ("minilink.control.lqr", "trajectory_lqr"),
+    ("minilink.control.place", "place"),
+    ("minilink.control.place", "place_at_operating_point"),
     ("minilink.analysis.linearize", "linearize"),
     ("minilink.analysis.discretize", "discretize"),
 )

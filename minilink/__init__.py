@@ -73,6 +73,8 @@ _EXPORTS: dict[str, tuple[str, str]] = {
     "lqr_at_operating_point": ("minilink.control.lqr", "lqr_at_operating_point"),
     "lqr_finite_horizon": ("minilink.control.lqr", "lqr_finite_horizon"),
     "trajectory_lqr": ("minilink.control.lqr", "trajectory_lqr"),
+    "place": ("minilink.control.place", "place"),
+    "place_at_operating_point": ("minilink.control.place", "place_at_operating_point"),
     "TimeVaryingStateFeedbackController": (
         "minilink.control.state",
         "TimeVaryingStateFeedbackController",
