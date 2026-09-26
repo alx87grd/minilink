@@ -11,7 +11,6 @@ plant.x0 = np.array([0.0, 0.0])  # upright: the operating point every tool defau
 # u = -K theta: the two real poles meet at the origin and leave along the
 # imaginary axis, so no gain on the angle alone stabilizes the upright pole.
 plant.plot_pzmap()
-plant.plot_root_locus()
 
 # A lead compensator (s + 2) / (s + 20) adds rate feedback: its zero pulls
 # both branches into the left half-plane above a critical gain.
