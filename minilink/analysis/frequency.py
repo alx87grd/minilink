@@ -1,17 +1,4 @@
-"""Frequency-domain analysis of one input–output channel of a linearized model.
-
-Every number comes from :mod:`minilink.analysis.linear`. This module picks
-one SISO channel ``(A, b, c, d)`` and plots the result.
-
-``bode``, ``pzmap``, ``nyquist``, ``margins``, ``root_locus`` and
-``transfer_function`` linearize ``sys`` about ``(x_bar, u_bar)`` with the
-same arguments as :func:`~minilink.analysis.linearize.linearize`. ``of``
-names the output and ``wrt`` the input (a port id means component 0,
-``(port, index)`` one component, a diagram wire ``"block:port"`` an internal
-signal). The ``plot_`` tools build one
-:class:`~minilink.graphical.control.ControlFigure` and render it with
-matplotlib or plotly.
-"""
+"""Frequency-domain analysis of one input–output channel of a linearized model."""
 
 from __future__ import annotations
 
@@ -34,6 +21,9 @@ from minilink.graphical.control import (
     render_control_figure,
     style,
 )
+
+# Frequencies of the grid on which margins() reads the crossovers
+_MARGIN_GRID_POINTS = 2000
 
 
 def frequency_response(
@@ -71,7 +61,8 @@ def frequency_response(
         input port.
     w : array, optional
         Frequencies in rad/s. When omitted, a logarithmic grid runs one
-        decade below the slowest pole or zero to one decade above the fastest.
+        decade below the slowest pole or zero to one decade above the fastest,
+        widened until it brackets the 0 dB crossing.
     n : int, optional
         Number of frequencies for the automatic grid.
     method : {"auto", "fd", "jax"}, optional
@@ -84,7 +75,10 @@ def frequency_response(
     )
     w = frequency_grid(A, B, C, D, w, n)
 
-    return w, linear.frequency_response(A, B, C, D, w)
+    # G(jω) on the grid
+    G = linear.frequency_response(A, B, C, D, w)
+
+    return w, G
 
 
 def bode(
@@ -109,7 +103,11 @@ def bode(
         sys, x_bar, u_bar, t, params, of=of, wrt=wrt, w=w, n=n, method=method, eps=eps
     )
 
-    magnitude_db, phase_deg = bode_coordinates(G)
+    # |G(jω)| in dB and the unwrapped ∠G(jω) in degrees
+    with np.errstate(divide="ignore"):
+        magnitude_db = 20.0 * np.log10(np.abs(G))
+    phase_deg = np.degrees(np.unwrap(np.angle(G)))
+
     return w, magnitude_db, phase_deg
 
 
@@ -123,7 +121,7 @@ def margins(
     of=None,
     wrt=None,
     w=None,
-    n: int = 2000,
+    n: int = _MARGIN_GRID_POINTS,
     method: str = "auto",
     eps: float = 1e-6,
 ) -> Margins:
@@ -137,7 +135,10 @@ def margins(
         sys, x_bar, u_bar, t, params, of=of, wrt=wrt, w=w, n=n, method=method, eps=eps
     )
 
-    return linear.margins(w, G)
+    # Crossovers of L(jω) and the margins read there
+    loop_margins = linear.margins(w, G)
+
+    return loop_margins
 
 
 def nyquist(
@@ -160,9 +161,11 @@ def nyquist(
     conjugate branch; poles on the imaginary axis make ``|G|`` blow up at
     those frequencies (the indented contour is not drawn).
     """
-    return frequency_response(
+    w, G = frequency_response(
         sys, x_bar, u_bar, t, params, of=of, wrt=wrt, w=w, n=n, method=method, eps=eps
     )
+
+    return w, G
 
 
 def pzmap(
@@ -182,8 +185,8 @@ def pzmap(
 
     Same arguments as :func:`frequency_response` without the frequency grid:
     poles are the eigenvalues of ``A``, zeros the transmission zeros of the
-    channel, ``gain`` the leading coefficient ``k`` of
-    ``G(s) = k prod(s - z) / prod(s - p)``. ``minimal`` (default: yes, with a
+    channel, ``gain`` the leading coefficient of its factored transfer
+    function. ``minimal`` (default: yes, with a
     one-time notice when a pair cancels) first reduces the channel to its
     minimal realization, so the uncontrollable and unobservable modes cancel;
     ``minimal=False`` keeps every mode of the realization.
@@ -195,7 +198,12 @@ def pzmap(
     # Minimal realization: the uncontrollable and unobservable modes cancel
     A, B, C, D = minimal_channel(A, B, C, D, minimal)
 
-    return linear.zeros(A, B, C, D), linear.poles(A), linear.gain(A, B, C, D)
+    # G(s) = k ∏(s − z) / ∏(s − p)
+    z = linear.zeros(A, B, C, D)
+    p = linear.poles(A)
+    k = linear.gain(A, B, C, D)
+
+    return z, p, k
 
 
 def root_locus(
@@ -227,7 +235,10 @@ def root_locus(
     # Minimal realization: the uncontrollable and unobservable modes cancel
     A, B, C, D = minimal_channel(A, B, C, D, minimal)
 
-    return linear.root_locus(A, B, C, D, gains)
+    # p(K) = eig(A − B K (1 + K d)⁻¹ C) over the gain sweep
+    gains, roots = linear.root_locus(A, B, C, D, gains)
+
+    return gains, roots
 
 
 def transfer_function(
@@ -247,10 +258,10 @@ def transfer_function(
 
     Same arguments as :func:`frequency_response` without the frequency grid;
     ``minimal`` as in :func:`pzmap`.
-    ``num(s) = k prod(s - z)`` and ``den(s) = prod(s - p)`` come from the
-    zeros, poles and gain of :func:`pzmap`; the block is their state-space
-    realization and carries ``numerator``, ``denominator``, ``poles`` and
-    ``zeros``, so it can be plotted, simulated, or wired like any other block.
+    The numerator and denominator come from the zeros, poles and gain of
+    :func:`pzmap`; the block is their state-space realization and carries
+    ``numerator``, ``denominator``, ``poles`` and ``zeros``, so it can be
+    plotted, simulated, or wired like any other block.
     """
     from minilink.blocks.transfer_function import TransferFunction
 
@@ -299,22 +310,31 @@ def plot_bode(
     """Bode diagram of the selected channel; ``margins=True`` marks the crossovers.
 
     The crossovers and the printed margins are those of :func:`margins`, read
-    on its 2000-point grid (or on ``w``), not on the ``n`` plotted frequencies.
+    on its grid (or on ``w``), not on the ``n`` plotted frequencies.
     ``title`` overrides the figure heading (default ``"Bode Diagram"``).
     """
     A, B, C, D = siso_matrices(
         sys, x_bar, u_bar, t, params, of=of, wrt=wrt, method=method, eps=eps
     )
     w_plot = frequency_grid(A, B, C, D, w, n)
+
+    # |G(jω)| in dB and the unwrapped ∠G(jω) in degrees
     G = linear.frequency_response(A, B, C, D, w_plot)
+    with np.errstate(divide="ignore"):
+        magnitude_db = 20.0 * np.log10(np.abs(G))
+    phase_deg = np.degrees(np.unwrap(np.angle(G)))
+
+    # The margins, read on the grid of margins()
     loop_margins = None
     if margins:
-        w_margins = frequency_grid(A, B, C, D, w, 2000)  # the grid of margins()
+        w_margins = frequency_grid(A, B, C, D, w, _MARGIN_GRID_POINTS)
         G_margins = linear.frequency_response(A, B, C, D, w_margins)
         loop_margins = linear.margins(w_margins, G_margins)
 
     return render_control_figure(
-        bode_figure(w_plot, G, sys, of, wrt, loop_margins, title=title),
+        bode_figure(
+            w_plot, magnitude_db, phase_deg, sys, of, wrt, loop_margins, title=title
+        ),
         backend=backend,
         show=show,
     )
@@ -420,8 +440,10 @@ def plot_nyquist(
 def siso_channel(sys, of, wrt):
     """Normalize the channel to ``((of_name, index), (wrt_name, index))``.
 
-    ``of_name`` is ``None`` when the output is the state itself (no ``y``
-    port): the row is then taken from ``C = I``.
+    ``of`` names the output and ``wrt`` the input: a port id means component
+    0, ``(port, index)`` one component, a diagram wire ``"block:port"`` an
+    internal signal. ``of_name`` is ``None`` when the output is the state
+    itself (no ``y`` port): the row is then taken from ``C = I``.
     """
     if wrt is None:
         if not sys.inputs:
@@ -510,12 +532,6 @@ def frequency_grid(A, B, C, D, w, n):
 # =============================================================================
 
 
-def bode_coordinates(G):
-    with np.errstate(divide="ignore"):
-        magnitude_db = 20.0 * np.log10(np.abs(G))
-    return magnitude_db, np.degrees(np.unwrap(np.angle(G)))
-
-
 def siso_selector(selector, name):
     """One component ``(name, index)`` from a port id or a ``(port, index)`` pair."""
     if isinstance(selector, str):
@@ -549,10 +565,10 @@ def margins_text(m: Margins) -> str:
 
 
 def root_text(s) -> str:
-    damping = float(-s.real / abs(s)) if abs(s) > 0.0 else 1.0
-    return (
-        f"s = {s.real:.3g} {s.imag:+.3g}j<br>ζ = {damping:.3f}, ωn = {abs(s):.3g} rad/s"
-    )
+    # ζ = −Re s / |s| (1 at the origin by convention), ω_n = |s|
+    zeta = float(-s.real / abs(s)) if abs(s) > 0.0 else 1.0
+    wn = abs(s)
+    return f"s = {s.real:.3g} {s.imag:+.3g}j<br>ζ = {zeta:.3f}, ωn = {wn:.3g} rad/s"
 
 
 def root_markers(p, z):
@@ -577,8 +593,7 @@ def root_markers(p, z):
     )
 
 
-def bode_figure(w, G, sys, of, wrt, m, title=None):
-    magnitude_db, phase_deg = bode_coordinates(G)
+def bode_figure(w, magnitude_db, phase_deg, sys, of, wrt, m, title=None):
     hover = tuple(
         f"ω = {wk:.3g} rad/s<br>|G| = {mk:.1f} dB<br>∠G = {pk:.1f}°"
         for wk, mk, pk in zip(w, magnitude_db, phase_deg)
