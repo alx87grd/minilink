@@ -205,8 +205,10 @@ term's hygiene:
 - The 46 bugs of the 2026-09-22 improvement scan and ten sibling defects
   its fix reviews found landed 2026-09-23 (S58; outcomes in
   [docs/reviews/2026-09-22-improvement-suggestions.md](docs/reviews/2026-09-22-improvement-suggestions.md)).
-- **S59** Docs drift and **S60** the teaching surface checked by a test and
-  documented page by page.
+- The docs drift the scan found landed 2026-09-26 (S59): the CI commands
+  written once, the lane and ROADMAP-ownership lines in AGENTS and RULES, the
+  plan-doc ids, the analysis and control API pages.
+- **S60** The teaching surface checked by a test and documented page by page.
 - **S49** Retire the two Stable-Baselines3 teaching notebooks once the
   course notes point only at the native twins. **[ask]**
 - **S54** `plot_cost2go` colour scale clipped at `out_of_bound_cost`.

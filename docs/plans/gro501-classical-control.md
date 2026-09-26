@@ -163,7 +163,7 @@ returned block closes the loop on the nonlinear plant with `@`.
 is picked up.*
 
 **Problem.** The largest GRO501 gap. `minilink/estimation/__init__.py` is a
-docstring listing four planned modules and nothing else. The guide needs an
+placeholder docstring and nothing else. The guide needs an
 observer in §1.4.4 (bonus), Lab 2 steps 5–6, and oral-review deliverables
 8–9 ("schéma bloc de votre proposition de filtre de Kalman" + a simulation).
 
@@ -226,7 +226,7 @@ each of the four Table 2 specs is one call plus a comparison.
 
 ### P7. Generate the analysis facades
 
-**Problem.** ~400 of `facades.py`'s 1 228 lines are 13 hand-copied signatures
+**Problem.** About 400 lines of `facades.py` are 13 hand-copied signatures
 that forward unchanged. Already drifted once (the `settling_horizon`
 docstring says five, the code says eight).
 

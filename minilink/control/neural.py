@@ -65,6 +65,8 @@ class NeuralPolicyController(Controller):
     task_target_radius : float
         Radius of the task ball (default ``0.04``).
 
+    Notes
+    -----
     The trainable weights are ``params["mlp"]``; the normalized-action range
     ``[-1, 1]`` maps onto the ``u`` port bounds, which is what makes
     exploration cover the whole input range from the first step.

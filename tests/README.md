@@ -47,28 +47,44 @@ Optional toggles: constants at the top of each `tests/run/*.py` file.
 
 ### Agent (terminal / CI — exact commands)
 
+This table is the one written copy of the commands. AGENTS.md says *when* to run each row,
+by its name here.
+
 | Situation | Command |
 | --- | --- |
-| Always before push | `ruff check . && ruff format --check .` |
+| Always before push | `ruff check . && ruff format --check .` (the pre-commit hooks run the same two) |
 | Docs/markdown only | skip pytest |
 | Narrow module change | `pytest tests/unittest/test_<domain>.py` |
 | Cross-cutting or handoff | `pytest` |
-| Compile / `Simulator` / trajopt / MPC / value iteration | `PYTHONPATH=. python benchmarks/run_regression_check.py --suite all --tiny --factor 10 --speed-gate-suffixes solve_s,nlp_s,speedup --speed-slack-s 0.1` |
+| Regression gates, CI flags (compile / `Simulator` / trajopt / MPC / value iteration) | `PYTHONPATH=. python benchmarks/run_regression_check.py --suite all --tiny --factor 10 --speed-gate-suffixes solve_s,nlp_s,speedup --speed-slack-s 0.1` |
+| Regression gates, full local (big review pass) | `PYTHONPATH=. python benchmarks/run_regression_check.py --suite all` (per-suite factors from the baseline JSON) |
 | Backend perf exploration | `python benchmarks/run_study.py --list` |
 | Demo-check change | `python tests/demo_checks/run_catalog_checks.py --fast` and/or `run_flagship_demos.py` |
 | Notebook change | `MPLBACKEND=Agg python tests/demo_checks/run_notebook_checks.py` |
+
+The regression flags live in two places in code as well: the `regression` job of
+`.github/workflows/test.yml` and `run_regression(ci_mode=True)` in `tests/run/_common.py`.
+Change them with this row, in the same commit. Add `--update` only after an intentional
+perf or trajectory change, and review the JSON diff before committing; what each flag
+means is in [benchmarks/README.md](../benchmarks/README.md).
 
 Agent workflow: [AGENTS.md](../AGENTS.md). Code and review rules: [RULES.md](../RULES.md).
 
 ### CI (GitHub Actions)
 
-Workflow: [`.github/workflows/test.yml`](../.github/workflows/test.yml).
+Merge gate: [`.github/workflows/test.yml`](../.github/workflows/test.yml), on pushes and
+pull requests to the branches its `on:` block lists (`main` and `dev` among them).
 
 | Job | Steps |
 | --- | --- |
 | **`test`** | ruff + `pytest` (py 3.10–3.13; demo-check bridge; JAX tests and demos skip) |
 | **`packaging`** | `python -m build` + wheel/sdist check (no `experimental/`) + `twine check` + install the wheel and `import minilink` |
-| **`regression`** | `pytest` (incl. the JAX tests) + regression gates `--suite all --tiny …` + **flagship demos** + **notebook smoke** (py 3.12 + JAX + viz) |
+| **`regression`** | `pytest` (incl. the JAX tests) + regression gates (CI flags above) + **flagship demos** + **notebook smoke** (py 3.12 + JAX + viz) |
+
+Not merge gates: `publish.yml` runs on a `0.*` tag, and its **`check`** job (ruff +
+`pytest`) and **`build`** job (sdist and wheel, checked) must pass before **`publish`**
+uploads to PyPI; `nightly.yml` runs every demo script and teaching notebook with the full
+optional stack; `docs.yml` builds the Sphinx site.
 
 ### At a glance
 

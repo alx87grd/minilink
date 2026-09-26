@@ -16,7 +16,7 @@ nothing uses it.
   `jax.grad` with respect to `Q` raises `TracerArrayConversionError`.
 - `SumCost` hands the same dictionary to every term: two quadratic terms would both read
   `"Q"`, so their weights cannot be set or differentiated separately.
-- The differentiable closed-loop cost in the ROADMAP review queue needs cost weights and
+- The differentiable closed-loop cost (V1 in [TODO.md](TODO.md) §6) needs cost weights and
   targets as inputs, next to plant and controller parameters.
 
 ## What is already in place
@@ -161,7 +161,7 @@ the ODE solver differs from the trapezoid rule of the post-hoc path.
    the parameters become mutable, as a system's are.
 6. **The cost block.** Proposed: a separate step after this plan, in the research lane; its
    name (`CostIntegrator`), a wiring helper on `add_subsystem` / `connect`, which integration
-   rule each tool reports, and the terminal cost wait for the ROADMAP terminal-cost item.
+   rule each tool reports, and the terminal cost wait for the terminal-cost decision in ROADMAP §6.
 
 ## Consequences
 

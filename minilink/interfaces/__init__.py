@@ -12,7 +12,7 @@ Available modules:
   plant traces). Requires the optional ``gymnasium`` dependency (``pip install
   minilink[rl]``); training itself stays external (e.g. stable-baselines3).
 
-Planned modules (see ROADMAP.md Later):
+Planned modules (Later ideas in docs/plans/TODO.md §7):
 
 - ``torch.py`` / ``flax.py`` — NN model wrappers
 - cosimulation / FMI, multibody-description import — live adapters implement

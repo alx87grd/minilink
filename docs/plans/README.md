@@ -15,6 +15,11 @@ Pyro parity rows stay in [pyro-port-remaining.md](pyro-port-remaining.md)
 to a Later bullet in [TODO.md](TODO.md) first — open a plan doc only when the
 design needs a writeup.
 
+Step ids (`R1`, `A3`, `P4`, `S60`, …) are global and assigned in [TODO.md](TODO.md) only. A
+plan doc numbers its own steps locally (fields.md's 4.1–4.8, cited as "steps 4.1–4.8 of
+fields.md") or with a prefix of its own (`CBF-1`, `OPW-1`, `AM-1`), never with a bare
+workboard-style id.
+
 ## Scheduled (a rung of ROADMAP §5 names them)
 
 | Doc | Scope | Rung |
@@ -25,13 +30,13 @@ design needs a writeup.
 | [naming.md](naming.md) | One naming rule for blocks and signals: the audit, six quick wins (five open), the larger alignments | v0.2 wave A (A4) — audit 2026-09-13 |
 | [gro501-classical-control.md](gro501-classical-control.md) | The GRO501 stack: `minreal`, `place`, sensitivity verbs, observers, facades, the z question, the two notebooks | v0.2 wave B (P2–P11) — wave 1 partly landed 2026-09-07 |
 | [pyro-port-remaining.md](pyro-port-remaining.md) | Pyro parity — open rows + name map | v0.2 wave C (C1) |
+| [optimizer-parametric-wiring.md](optimizer-parametric-wiring.md) | One optimizer backend table for the offline and the parametric (MPC) paths | v0.2 wave D (T5; the evaluator placement is a D3 row) — draft, July 2026 |
 
 ## Research lane, unscheduled (a design exists; no rung yet)
 
 | Doc | Scope | Status |
 | --- | --- | --- |
 | [cbf-safety-filter.md](cbf-safety-filter.md) | Control Barrier Functions: bicubic SDF interpolation in JAX, DCBF with slacks, HOCBF relative degree, `CBFSafetyFilter` block; the barrier becomes a `Field` once A1 lands | design draft 2026-09-11 |
-| [optimizer-parametric-wiring.md](optimizer-parametric-wiring.md) | Solver backend factory for offline + parametric MPC | draft, July 2026 |
 | [fidelity-maps.md](fidelity-maps.md) | `lift` / `project` maps across the car fidelity ladder, MPC broadcast at high fidelity | draft, July 2026 |
 | [articulated-mechanism.md](articulated-mechanism.md) | One mechanism description (geometry, inertia, topology) feeding spatial RNEA/ABA and the symbolic path | draft, July 2026 |
 

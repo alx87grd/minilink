@@ -101,29 +101,24 @@ slowdown on the next manual baseline refresh; CI uses **10×** on NLP solve gate
 
 ### CI vs local
 
-**CI** (`.github/workflows/test.yml`, `regression` job):
+The two commands — the CI flags of the `regression` job in
+`.github/workflows/test.yml`, and the full local pre-handoff run — are written
+once, in the Agent table of [tests/README.md](../tests/README.md#entry-points).
+What the flags mean:
 
-```bash
-python benchmarks/run_regression_check.py --suite all --tiny \
-  --factor 10 \
-  --speed-gate-suffixes solve_s,nlp_s,speedup \
-  --speed-slack-s 0.1
-python tests/demo_checks/run_flagship_demos.py   # incl. JAX flagships
-```
+- `--suite all --tiny` — every gated suite on the reduced CI workload.
+- `--speed-gate-suffixes solve_s,nlp_s,speedup` — CI gates the **NLP/trajopt
+  solve wall times** (`solve_s`, `nlp_s`, speedup ratios) besides the accuracy
+  goldens. End-to-end `wall_s` / `total_s` are reported but not gated in CI
+  (cross-runner variance).
+- `--factor 10 --speed-slack-s 0.1` — a time gate fails above
+  `baseline * 10 + 0.1 s`: the e4 / f_mpc solves take a few milliseconds, and on
+  a shared runner they swing 4–19× the macOS baseline run to run with no code
+  change, so a factor alone flips at random.
 
-Enforces accuracy goldens plus **NLP/trajopt solve wall times** (`solve_s`, `nlp_s`,
-speedup ratios). End-to-end `wall_s` / `total_s` are reported but not gated in CI
-(cross-runner variance). A time gate fails above `baseline * 10 + 0.1 s`: the
-e4 / f_mpc solves take a few milliseconds, and on a shared runner they swing
-4–19× the macOS baseline run to run with no code change, so a factor alone
-flips at random. Flagship demos run here so JAX-required smokes are not
-skipped (the ``test`` job installs ``.[dev]`` only).
-
-**Local pre-handoff** (reference machine, per-suite factors from JSON):
-
-```bash
-python benchmarks/run_regression_check.py --suite all
-```
+The same job runs the flagship demos, so JAX-required smokes are not skipped
+(the ``test`` job installs no JAX). Locally, `--suite all` without flags uses
+the per-suite factors from the baseline JSON.
 
 ### Host speed context (multi-machine reference)
 

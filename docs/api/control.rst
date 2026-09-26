@@ -21,3 +21,18 @@ Control
 
 .. automodule:: minilink.control.lqr
    :members:
+
+.. automodule:: minilink.control.geometric
+   :members:
+
+.. automodule:: minilink.control.neural
+   :members:
+
+.. automodule:: minilink.control.mpc.controller
+   :members:
+
+.. automodule:: minilink.control.mpc.utilities
+   :members:
+
+.. automodule:: minilink.control.mpc.viz
+   :members:
