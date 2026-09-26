@@ -136,6 +136,19 @@ class TestLinearCore(unittest.TestCase):
         info_negative = step_info(t, -linear.step_response(*_matrices(tf), t))
         self.assertEqual(info_negative.overshoot, 0.0)
 
+    def test_step_info_of_a_response_that_never_settles(self):
+        # An integrator's step is a ramp: it has a peak (its last sample) but no
+        # final value, so no rise time, settling time or overshoot either
+        t = np.linspace(0.0, 5.0, 501)
+        integrator = TransferFunction([1.0], [1.0, 0.0])
+        for y in (t, linear.step_response(*_matrices(integrator), t)):
+            info = step_info(t, y)
+            self.assertTrue(np.isnan(info.rise_time))
+            self.assertTrue(np.isnan(info.settling_time))
+            self.assertTrue(np.isnan(info.overshoot))
+            self.assertTrue(np.isnan(info.steady_state))
+            self.assertAlmostEqual(info.peak_time, 5.0)
+
 
 class TestChannelTools(unittest.TestCase):
     """The system-level verbs share the family signature and the channel selectors."""

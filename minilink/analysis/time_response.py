@@ -24,9 +24,9 @@ from minilink.graphical.control import (
 class StepInfo:
     """Textbook step-response figures (MATLAB ``stepinfo`` conventions)."""
 
-    rise_time: float  # 10 % to 90 % of the final value
+    rise_time: float  # 10 % to 90 % of the final value; nan when there is none
     settling_time: float  # last time the response leaves the 2 % band
-    overshoot: float  # percent of the final value
+    overshoot: float  # percent of the final value; nan when there is none
     peak: float
     peak_time: float
     steady_state: float  # the last sample; nan when the response has not settled
@@ -91,8 +91,9 @@ def step_info(time, y) -> StepInfo:
     outside = np.flatnonzero(np.abs(y - y_final) > 0.02 * abs(y_final))
     t_s = first_sample_after(time, outside) if settled else float(np.nan)
 
-    # Rise time and overshoot are relative to y_f, so a zero final value has neither
-    if y_final == 0.0:
+    # Rise time and overshoot are relative to a final value: none when the response
+    # has not settled, or settles at zero
+    if not settled or y_final == 0.0:
         return StepInfo(
             rise_time=float(np.nan),
             settling_time=t_s,
