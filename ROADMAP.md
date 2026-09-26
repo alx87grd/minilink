@@ -208,7 +208,9 @@ term's hygiene:
 - The docs drift the scan found landed 2026-09-26 (S59): the CI commands
   written once, the lane and ROADMAP-ownership lines in AGENTS and RULES, the
   plan-doc ids, the analysis and control API pages.
-- **S60** The teaching surface checked by a test and documented page by page.
+- The teaching surface is checked by a test and documented page by page
+  (S60, landed 2026-09-26): every band facade walked like the root prelude,
+  every exported name's module on an API page, Sphinx built with `-W`.
 - **S49** Retire the two Stable-Baselines3 teaching notebooks once the
   course notes point only at the native twins. **[ask]**
 - **S54** The colour scale tops at the price of leaving (landed

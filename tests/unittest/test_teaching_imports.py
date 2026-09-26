@@ -35,6 +35,7 @@ TEACHING_MODULES = {
     "minilink.planning",
     "minilink.planning.reinforcement_learning",
     "minilink.optimization",
+    "minilink.interfaces",
     "minilink.interfaces.gymnasium",
 }
 

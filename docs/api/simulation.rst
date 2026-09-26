@@ -4,6 +4,9 @@ Simulation
 .. automodule:: minilink.simulation.simulator
    :members:
 
+.. automodule:: minilink.simulation.static_simulator
+   :members:
+
 .. automodule:: minilink.simulation.input_interpolation
    :members:
 
@@ -26,4 +29,7 @@ Simulation
    :members:
 
 .. automodule:: minilink.simulation.hybrid_simulator
+   :members:
+
+.. automodule:: minilink.simulation.realtime.simulator
    :members:

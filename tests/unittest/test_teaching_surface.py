@@ -11,8 +11,11 @@ from __future__ import annotations
 
 import importlib
 import os
+import pathlib
+import re
 import subprocess
 import sys
+import types
 import unittest
 
 # band -> names.  Adding a name here is the "entry gate" of ROADMAP §2 (soft
@@ -73,11 +76,14 @@ TEACHING_SURFACE: dict[str, tuple[str, ...]] = {
         "DeadZone",
         "Relay",
         "LowPassFilter",
+        "NotchFilter",
+        "Washout",
         "TransferFunction",
         "Lead",
         "Lag",
         "Source",
         "ZOHHold",
+        "MLP",
     ),
     "minilink.control": (
         "ProportionalController",
@@ -177,6 +183,39 @@ RESEARCH_LANE_PREFIXES = (
     "minilink.experimental",
 )
 
+# Every band facade the registry walks in full: the registry's bands plus the
+# plant catalog alias.
+BAND_FACADES = (
+    *(band for band in TEACHING_SURFACE if band != "minilink"),
+    "minilink.catalog",
+)
+
+# Research-lane names a band facade re-exports beside the teaching tool they
+# extend (the sibling hybrid algebra and the real-time loop next to
+# `Simulator`). They carry a docstring and an API page, never reach the root
+# prelude, and this list only shrinks.
+BAND_RESEARCH_NAMES = {
+    "minilink.simulation": (
+        "Computer",
+        "StepSchedule",
+        "HybridSimulator",
+        "HybridSimResult",
+        "RealtimeSimulator",
+    ),
+}
+
+# Facades whose every exported name must have an API page under docs/api.
+DOCUMENTED_FACADES = ("minilink", *BAND_FACADES, "minilink.graphical.catalog")
+API_PAGES = pathlib.Path(__file__).resolve().parents[2] / "docs" / "api"
+
+
+def documented_modules():
+    """Modules that some ``docs/api/*.rst`` page renders with ``automodule``."""
+    modules = set()
+    for page in API_PAGES.glob("*.rst"):
+        modules.update(re.findall(r"^\.\. automodule:: (\S+)", page.read_text(), re.M))
+    return modules
+
 
 class TestTeachingSurface(unittest.TestCase):
     def test_every_name_resolves_with_a_docstring_in_the_teaching_lane(self):
@@ -226,10 +265,66 @@ class TestTeachingSurface(unittest.TestCase):
                 f"minilink.{name} lives in the research lane ({home})",
             )
 
+    def test_every_band_facade_is_checked_like_the_root(self):
+        """Each band's ``__all__`` in full, not only its registry row.
+
+        A name a band exports is documented and lives in the teaching lane,
+        like a root name; the few research-lane re-exports are listed by name
+        in ``BAND_RESEARCH_NAMES`` and kept off the root prelude.
+        """
+        root = importlib.import_module("minilink")
+        for band in BAND_FACADES:
+            module = importlib.import_module(band)
+            research = BAND_RESEARCH_NAMES.get(band, ())
+            for name in module.__all__:
+                value = getattr(module, name)
+                if isinstance(value, types.ModuleType):
+                    continue  # a subpackage the band exposes, e.g. control.mpc
+                self.assertTrue(
+                    (getattr(value, "__doc__", None) or "").strip(),
+                    f"{band}.{name} is exported to students with no docstring",
+                )
+                home = getattr(value, "__module__", "")
+                if name in research:
+                    self.assertTrue(home.startswith(RESEARCH_LANE_PREFIXES), home)
+                    self.assertNotIn(name, root.__all__)
+                    continue
+                self.assertTrue(
+                    home.startswith(TEACHING_LANE_PREFIXES),
+                    f"{band}.{name} lives in {home}, outside the teaching lane",
+                )
+                self.assertFalse(
+                    home.startswith(RESEARCH_LANE_PREFIXES),
+                    f"{band}.{name} lives in the research lane ({home})",
+                )
+
     def test_catalog_plants_all_resolve(self):
         catalog = importlib.import_module("minilink.catalog")
         for name in catalog.__all__:
             self.assertIsNotNone(getattr(catalog, name), name)
+
+
+class TestApiPages(unittest.TestCase):
+    """The Sphinx site documents what the facades export (docs/api)."""
+
+    def test_every_exported_name_has_an_api_page(self):
+        """A name students import has its defining module on some API page."""
+        documented = documented_modules()
+        missing = {}
+        for facade in DOCUMENTED_FACADES:
+            module = importlib.import_module(facade)
+            for name in module.__all__:
+                value = getattr(module, name)
+                if isinstance(value, types.ModuleType):
+                    continue
+                home = value.__module__
+                if home not in documented:
+                    missing.setdefault(home, []).append(f"{facade}.{name}")
+        self.assertEqual(
+            missing,
+            {},
+            "add an `.. automodule::` for these modules to a docs/api page",
+        )
 
 
 _BASIC_TIER_PROBE = r"""

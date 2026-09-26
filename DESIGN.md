@@ -107,7 +107,7 @@ state-feedback block):
 | `optimization/` | `MathematicalProgram`, `Optimizer` (generic NLP) |
 | `identification/` | fit parametric systems to data (planned; physical params and NN weights are the same verb) |
 | `graphical/` | signals, phase plane, diagrams, animation |
-| `interfaces/` | `Sys2Gym` / `SB3Controller` (gymnasium extra); cosimulation / MJX planned |
+| `interfaces/` | lazy facade: `Sys2Gym` / `SB3Controller` / `ProblemEnv` / `to_gymnasium` (gymnasium extra); cosimulation / MJX planned |
 
 **Experimental tier** — `experimental/` (TRL < 3, research lane, repo-only);
 nothing in the library imports it, and the path itself states the maturity.
@@ -281,8 +281,8 @@ The research rungs (`Holonomic`, `HolonomicAccel`, `BicycleKin`, `BicycleAcc`,
   ``BicycleDynServo`` (torque lag) and ``BicycleDynEngine`` (wheel-frame power
   lag + stall torque + engine brake). Named vehicle envelopes (parameters +
   planning limits) live in ``examples/projects/car_trajopt/vehicles/car_profile.py``
-  (``passenger_car``, ``racecar``, ``udes_1_5``); apply with
-  :func:`~minilink.dynamics.catalog.vehicles.car_profile.apply_car_profile`.
+  (``passenger_car``, ``racecar``, ``udes_1_5``); apply with its
+  ``apply_car_profile``.
   Facades: :meth:`~minilink.core.hybrid_diagram.HybridDiagram.compute_trajectory`,
   :meth:`~minilink.core.hybrid_diagram.HybridDiagram.compute_forced`, and
   :meth:`~minilink.core.hybrid_diagram.HybridDiagram.plot_trajectory` /
