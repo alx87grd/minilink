@@ -402,13 +402,20 @@ def default_gains(A, B, C, D, n_gains):
 
 
 def refine_jumps(A, B, C, D, gains, roots):
-    """Insert the midpoint gain wherever a branch jumps more than two percent of the radius."""
+    """Insert the midpoint gain wherever a branch jumps more than two percent of the radius.
+
+    An interval that reaches or crosses the singular gain ``K = -1/d`` is left as
+    is: the branch passes through infinity there, and no midpoint shrinks the jump.
+    """
     step = 0.02 * open_loop_radius(poles(A), zeros(A, B, C, D))
+    d = D[0, 0]
     k = 0
     while k < len(gains) - 1:
+        regular = (1.0 + gains[k] * d) * (1.0 + gains[k + 1] * d) > 0.0
         if (
-            np.max(np.abs(roots[k + 1] - roots[k])) > step
-            and gains[k + 1] - gains[k] > 1e-12 * gains[k + 1]
+            regular
+            and np.max(np.abs(roots[k + 1] - roots[k])) > step
+            and gains[k + 1] - gains[k] > 1e-12 * abs(gains[k + 1])
         ):
             K_mid = 0.5 * (gains[k] + gains[k + 1])
             gains.insert(k + 1, K_mid)
@@ -440,9 +447,15 @@ def gain_reaching(A, B, C, D, radius):
 
 
 def matched_branches(previous, current):
-    """Reorder ``current`` so each entry continues the nearest ``previous`` branch."""
+    """Reorder ``current`` so each entry continues the nearest ``previous`` branch.
+
+    Across the singular gain ``K = -1/d`` no pole is finite and there is nothing to
+    match: ``current`` comes back in its own order.
+    """
     from scipy.optimize import linear_sum_assignment
 
+    if not (np.all(np.isfinite(previous)) and np.all(np.isfinite(current))):
+        return current
     cost = np.abs(previous[:, None] - current[None, :])
     rows, cols = linear_sum_assignment(cost)
     ordered = np.empty_like(current)

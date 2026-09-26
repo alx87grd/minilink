@@ -210,6 +210,23 @@ class TestChannelTools(unittest.TestCase):
         gains, roots = root_locus(L)
         self.assertEqual(roots.shape[1], 3)
 
+    def test_root_locus_through_the_singular_gain(self):
+        # (s + 1) / (s + 2) has d = 1: at K = -1/d the loop 1 + K d vanishes and no
+        # pole is finite; the sweep keeps going on both sides of it
+        tf = TransferFunction([1.0, 1.0], [1.0, 2.0])
+        gains, roots = root_locus(tf, gains=[0.0, -0.5, -1.0, -2.0])
+        self.assertEqual(roots.shape, (4, 1))
+        self.assertTrue(np.isinf(roots[2, 0]))
+        # p(K) = -(2 + K) / (1 + K) for this channel
+        for K, p in ((0.0, -2.0), (-0.5, -3.0), (-2.0, 0.0)):
+            np.testing.assert_allclose(roots[gains == K, 0], p, atol=1e-9)
+        gains, roots = root_locus(tf, gains=[-2.0, -1.0, 0.0])
+        self.assertTrue(np.all(np.isfinite(roots[gains != -1.0])))
+        # an interval that straddles K = -1/d is not refined: the branch passes
+        # through infinity there
+        gains, roots = root_locus(tf, gains=[-3.0, -0.9])
+        np.testing.assert_allclose(gains, [-3.0, -0.9])
+
 
 class TestPlots(unittest.TestCase):
     """Every control plot renders on both backends from one figure spec."""
