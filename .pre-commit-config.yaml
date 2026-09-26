@@ -1,5 +1,5 @@
-# Install: pip install pre-commit && pre-commit install
-# Run on all notebooks: pre-commit run nbstripout --all-files
+# Install: pip install -e ".[dev]" && pre-commit install
+# Run every hook on the whole tree: pre-commit run --all-files
 
 repos:
   - repo: https://github.com/kynan/nbstripout
@@ -7,3 +7,20 @@ repos:
     hooks:
       - id: nbstripout
         files: ^examples/.*\.ipynb$
+
+  # The CI lint steps, run with the ruff the dev extra installs
+  # (pip install -e ".[dev]"), so a hook and CI never disagree on a version.
+  - repo: local
+    hooks:
+      - id: ruff
+        name: ruff check
+        entry: ruff check .
+        language: system
+        pass_filenames: false
+        types_or: [python, pyi, jupyter]
+      - id: ruff-format
+        name: ruff format --check
+        entry: ruff format --check .
+        language: system
+        pass_filenames: false
+        types_or: [python, pyi, jupyter]

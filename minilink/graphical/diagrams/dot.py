@@ -8,6 +8,13 @@ import warnings
 from minilink.graphical.diagrams.export import TopologyExporter
 from minilink.graphical.diagrams.topology import build_diagram_topology
 
+# One warning when the graphviz Python wrapper is missing: diagrams are
+# optional, so plot_diagram skips the figure and the notebook keeps running.
+MISSING_GRAPHVIZ_MESSAGE = (
+    "Diagram skipped: the graphviz Python package is not installed "
+    "(pip install graphviz, or pip install minilink[diagrams])."
+)
+
 
 def graphviz_port_id(port_id):
     """Return a Graphviz HTML ``PORT`` identifier for a minilink port id.
@@ -110,11 +117,7 @@ def _render_diagram_graph(
     write Graphviz output to disk. ``show=False`` builds/returns only.
     """
     if graph is None:
-        warnings.warn(
-            "No graph to display (graphviz Python package unavailable or "
-            "graph build failed).",
-            stacklevel=2,
-        )
+        # get_diagram already warned that graphviz is missing.
         return
 
     from minilink.graphical.common.environment import (
@@ -227,7 +230,7 @@ def get_diagram(sys_or_diagram):
     try:
         return export_diagram_topology(sys_or_diagram, backend="graphviz")
     except ImportError:
-        warnings.warn("graphviz is not available", stacklevel=2)
+        warnings.warn(MISSING_GRAPHVIZ_MESSAGE, stacklevel=2)
         return None
 
 

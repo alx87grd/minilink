@@ -13,5 +13,7 @@ Until you have read those, four things hold:
   notebooks, or scratch files.
 - Never remove a feature or a user-importable name without an explicit
   maintainer decision.
-- Equations read like a textbook; no `self.` in math lines.
+- Math reads like the textbook page. Every step of an algorithm is visible in the body,
+  linear algebra included, and the plumbing goes to helpers. No `self.` in math lines.
+  `dp.py` is the reference (AGENTS: the textbook rule).
 - Run `ruff check .` and `ruff format --check .` before any push.

@@ -2,7 +2,10 @@
 
 from __future__ import annotations
 
+import warnings
+
 from minilink.graphical.diagrams.dot import (
+    MISSING_GRAPHVIZ_MESSAGE,
     _render_diagram_graph,
     block_html,
     graphviz_port_id,
@@ -52,9 +55,13 @@ def plot_hybrid_diagram(
     """Render Plant + Computer clusters with boundary ZOH/sample edges."""
     from minilink.graphical.diagrams.hybrid_topology import build_hybrid_topology
 
-    graph = export_hybrid_graphviz(
-        build_hybrid_topology(hybrid, abstract_boundary=abstract_boundary)
-    )
+    try:
+        graph = export_hybrid_graphviz(
+            build_hybrid_topology(hybrid, abstract_boundary=abstract_boundary)
+        )
+    except ImportError:
+        warnings.warn(MISSING_GRAPHVIZ_MESSAGE, stacklevel=2)
+        return None
     _render_diagram_graph(
         graph,
         show=show,

@@ -12,6 +12,19 @@ import numpy as np
 # Public API
 
 
+def cost_scale_limit(price):
+    """
+    Default top of the cost-to-go colour scale: the price of leaving the grid.
+
+    States that must leave saturate at that price, so clipping there keeps the
+    feasible states readable. A callable ``price(x, t)`` has no single level and
+    an infinite one is no limit: both leave the scale to Matplotlib (``None``).
+    """
+    if price is None or callable(price) or not np.isfinite(price):
+        return None
+    return float(price)
+
+
 def plot_value(
     grid,
     J,

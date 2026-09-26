@@ -10,6 +10,32 @@ This file is workflow: what to read, when to ask, and the local CI gate.
 User API: README.md. Contracts: DESIGN.md. Maturity: ROADMAP.md.
 Pytest policy: tests/README.md. Examples map: examples/README.md.
 
+## The textbook rule: every piece of math, every time
+
+Minilink is read by students next to the textbook. This rule applies to every line of
+math an agent writes or touches, in new code and in edits alike. That means equation
+methods (`f`, `h`, `g`, …) and also every algorithm: analysis tools, controller and
+observer design, planners, solvers, learning updates. It is not a refactor-pass nicety;
+it is the acceptance bar. The maintainer should never have to ask for it.
+
+- **The math is the story.** The function body shows every step of the algorithm in the
+  order the textbook derives it, with the textbook's symbols (`A, B, C, D`, `𝒞`, `𝒪`,
+  `K`, `P`, `J`, `π`, `n, m, p`). This includes the linear algebra: a Kalman matrix, an
+  SVD and its rank, a basis and a projection, a Riccati solve, a Bellman backup. Each is
+  a named line in the body, never hidden in a helper.
+- **The plumbing is not the story.** Array coercion, shape normalization, default
+  filling, validation, backend dispatch, caching and result wrapping go to helpers under
+  `# Internal machinery`, or to the unpack and output beats. If a helper contains an
+  equation from the textbook page, it is in the wrong place.
+- **Three beats, one equation per named line** (RULES 5.3): unpack, then the math, then
+  return a named result. No `self.` in math lines, and no equation on a `return` line.
+- **Equation comments** (RULES 5.22): a one-line comment carries the textbook form when
+  the code cannot. Equations never sit in docstrings.
+- **The reference is `planning/policy_synthesis/dp.py`.** Before committing any math,
+  read the diff next to it, and say in the report that you did.
+
+A change that breaks this rule is not done, even when the tests pass.
+
 ## Non-negotiables
 
 - **Preserve user edits:** never revert or "clean up" manual changes the user made in
@@ -53,11 +79,14 @@ mathematical objects — `Trajectory`, sets, distributions, costs, fields,
 `PlanningProblem`, `PlanningSolution` — diagrams, compile, `Simulator`,
 planners, `Optimizer`, controllers); any feature or
 user-importable-name removal; delete/rename files; new dependencies; removing
-user scratch code; `CONSTITUTION.md` amendments.
+user scratch code; `CONSTITUTION.md` amendments; dropping a step from ROADMAP §5
+(a rung is done when its steps land or the maintainer drops them) and closing an
+open decision in ROADMAP §6 (each open item there needs the maintainer).
 
 **Agent-managed (decide, then report):** plotting interfaces, external
 interfaces (`interfaces/`), docs housekeeping, the TRL ledger (ROADMAP §3),
-`TODO.md`, plan-doc housekeeping, tests, `RULES.md` wording that does not
+`TODO.md`, recording in ROADMAP §5 and §6 a step that landed or a decision the
+maintainer took, plan-doc housekeeping, tests, `RULES.md` wording that does not
 change a public contract, and internal code structure that does not change a
 public contract. When you spot an opportunity outside your lane, ask — do not act.
 
@@ -75,19 +104,21 @@ public contract. When you spot an opportunity outside your lane, ask — do not 
 6. Finish with lint, full `pytest`, the affected demos, and the notebook checks.
 
 **Notebooks:** skip review unless updating renamed imports or user asks; outputs
-stripped by pre-commit (`nbstripout`). After notebook edits, smoke-check with
-`MPLBACKEND=Agg python tests/demo_checks/run_notebook_checks.py` (CI
-``regression`` job runs the same).
+stripped by pre-commit (`nbstripout`). After notebook edits, run the notebook smoke check
+(tests/README.md, Agent table, "Notebook change"; the CI `regression` job runs the same).
 
 ## Before push or PR (local CI gate)
 
-**Entry points:** tests/README.md (section "entry points") — humans use **`tests/run/`** (IDE Run); agents and CI use the CLI table in that doc.
+**Entry points:** tests/README.md (section "entry points") is the one written copy of the
+commands — humans use **`tests/run/`** (IDE Run); agents use its Agent table, and its CI
+table says what each job runs. This section says *when*, by the Agent table's row names.
 
-GitHub **CI** (`.github/workflows/test.yml`) is the merge gate. It has three jobs: **`test`** (`ruff check .`, `ruff format --check .`, `pytest` on Python 3.10–3.13), **`packaging`** (build the sdist and wheel, check them, import the installed wheel), and **`regression`** (`pytest` + regression gates + flagship demos + notebook smoke with JAX). Run the same checks **locally before push or PR** so CI does not fail on lint/format — do **not** poll GitHub Actions after every small commit unless the user asked you to push or verify remote CI.
+GitHub **CI** (`.github/workflows/test.yml`) is the merge gate. It has three jobs: **`test`** (ruff and `pytest` on Python 3.10–3.13), **`packaging`** (build the sdist and wheel, check them, import the installed wheel), and **`regression`** (`pytest` with JAX, the regression gates, the flagship demos, the notebook smoke). Run the same checks **locally before push or PR** so CI does not fail on lint/format — do **not** poll GitHub Actions after every small commit unless the user asked you to push or verify remote CI.
 
-Two workflows are **not** merge gates: `nightly.yml` runs every script under `examples/demos/` and every teaching notebook with the full optional stack, and `docs.yml` builds the Sphinx site. A demo that only the nightly sweep exercises still has to run — check it locally when you land one.
+Three workflows are **not** merge gates: `publish.yml` uploads a `0.*` tag to PyPI once its **`check`** job (ruff and `pytest`) and **`build`** job pass; `nightly.yml` runs every script under `examples/demos/` and every teaching notebook with the full optional stack; `docs.yml` builds the Sphinx site. A demo that only the nightly sweep exercises still has to run — check it locally when you land one.
 
-**Always before push** (fast; mirrors CI `test` job):
+**Always before push** (fast; mirrors CI `test` job; the pre-commit hooks run the same two
+once `pre-commit install` has run in the clone):
 
 ```bash
 conda activate minilink
@@ -97,30 +128,22 @@ ruff format --check .
 
 Fix with `ruff check --fix .` and `ruff format .` when either fails. CI runs these on the **whole repo**, not only touched files.
 
-**Pytest — proportionate** (same command CI `test` job uses; scope by change):
+**Pytest and the gates — proportionate** (the command of each row is in the tests/README.md Agent table):
 
-| Change | Run |
+| Change | Agent-table row |
 | --- | --- |
 | Docs/markdown only | skip pytest |
-| Narrow module + tests already updated | `pytest tests/unittest/test_<domain>.py` |
-| Cross-cutting or before handoff/push | `pytest` |
-| Compile backend, simulator, trajopt, or value-iteration changes (big review pass) | Regression gates: `PYTHONPATH=. python benchmarks/run_regression_check.py --suite all --tiny --factor 10 --speed-gate-suffixes solve_s,nlp_s,speedup` |
-| Teaching notebooks | `MPLBACKEND=Agg python tests/demo_checks/run_notebook_checks.py` |
+| Any change touching math | the textbook check against `dp.py` (above), stated in the report, plus the row that fits |
+| Narrow module + tests already updated | "Narrow module change" |
+| Cross-cutting or before handoff/push | "Cross-cutting or handoff" |
+| Compile backend, simulator, trajopt, MPC or value-iteration changes | "Regression gates, CI flags" |
+| Big review pass (compile backend, `Simulator`, trajectory optimization, or cross-cutting dynamics changes) | "Regression gates, full local" (its `--update` rule included) |
+| Teaching notebooks | "Notebook change" |
 
-Regression gates full command and CI `regression` job flags: tests/README.md (entry points).
-
-Optional extras (not required every push): `SDL_VIDEODRIVER=dummy pytest` for headless pygame; graphics visual checklist and demo-check runners in tests/README.md when graphical or user-facing demos changed; `sphinx-build` only when editing `docs/` (separate Docs workflow).
+Optional extras (not required every push): `SDL_VIDEODRIVER=dummy pytest` for headless pygame; graphics visual checklist and demo-check runners in tests/README.md when graphical or user-facing demos changed; `sphinx-build -W --keep-going -b html docs docs/_build/html` only when editing `docs/` or docstrings (separate Docs workflow; warnings fail it).
 
 **After push:** only check GitHub CI when the user asked to push, open a PR, or debug a reported failure — not as a routine step on every edit.
 
 Use conda env **`minilink`** from environment.yml; setup in README.md (install) (`PYTHONPATH` = repo root).
-
-**Big review pass** (compile backend, `Simulator`, trajectory optimization, or cross-cutting dynamics changes):
-
-```bash
-python benchmarks/run_regression_check.py --suite all
-```
-
-Use `--update` only after intentional perf or trajectory changes; review the JSON diff before committing. See benchmarks/README.md.
 
 **Handoff:** re-read the diff for scope creep; preserve user manual edits in demos/notebooks; clean `git status`; short summary of changes and verification.

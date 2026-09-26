@@ -21,3 +21,24 @@ Graphical
 
 .. automodule:: minilink.graphical.animation.renderers.renderer
    :members:
+
+.. automodule:: minilink.graphical.port_map
+   :members:
+
+.. automodule:: minilink.graphical.control
+   :members:
+
+Graphical catalog
+-----------------
+
+.. automodule:: minilink.graphical.catalog.shapes
+   :members:
+
+.. automodule:: minilink.graphical.catalog.skins
+   :members:
+
+.. automodule:: minilink.graphical.animation.camera
+   :members:
+
+.. automodule:: minilink.graphical.animation.drawables
+   :members:

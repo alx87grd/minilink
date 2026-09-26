@@ -4,7 +4,7 @@ Status: **wave 1 partly landed 2026-09-07.** P1 done (ruled: dedicated
 `PI` / `PD` classes); F1, F2, F4 done (second-pass defects, see the audit).
 P4 (estimation) and P6 (z tier) **held by the maintainer** 2026-09-07; the
 roadmap schedules P4 for v0.2 once the hold is lifted and the disturbance
-convention is decided (ROADMAP §6). P2, P3 and wave 2 open.
+convention is decided (ROADMAP §6). P2 landed 2026-09-26; P3 and wave 2 open.
 Rung: v0.2 wave B, steps P2–P11 of [TODO.md](TODO.md).
 Lane: teaching surface (`analysis/`, `control/`, `estimation/`, `blocks/`).
 Milestone: v0.2, [ROADMAP §4.2](../../ROADMAP.md#42-v02--gro501-end-to-end).
@@ -22,7 +22,7 @@ additive or replaces boilerplate with generated equivalents.
 | **F1** `frequency_range` brackets the 0 dB crossing | — | 1 | **done** |
 | **F2** `PID.f` and `PID.ctl` agree on `tau` | — | 1 | **done** |
 | **F4** `closed_loop_poles` singular-gain guard | — | 1 | **done** |
-| **P2** `minreal` and order reduction | G3, G6 | 1 | agent |
+| **P2** `minreal` | G3 | 1 | **done** 2026-09-26; order reduction split to P2b [ask] |
 | **P3** `place()` → `StateFeedbackController` | G2 | 1 | agent (mirrors `lqr`) |
 | **P4** `estimation/` — Luenberger, then Kalman | G1 | 2 | **held** |
 | **P5** Named `S` / `T` / `PS` / `CS` | G5 | 2 | agent |
@@ -128,6 +128,20 @@ the same pass; keep it out of `minreal`, which must stay exact.
 a compensator zero cancelling a plant pole drops both from `pzmap`; the
 guide's §9.13 realization survives `minreal` unchanged (it is already minimal).
 
+**Landed 2026-09-26, as decided with the maintainer.** `minreal(A, B, C, D, *, tol=1e-9)`
+lives on the matrices tier only (`analysis/linear.py`, imported from there): the Kalman
+decomposition written step by step, the SVD, rank and projections in the body. There is no
+`sys.minreal()` and no prelude name: it is the internal step of `pzmap`, `root_locus`,
+`transfer_function`, `plot_pzmap` and `plot_root_locus`, which cancel **by default**
+(`minimal=None`, with a one-time warning naming what cancelled; `minimal=False` keeps the
+raw realization). The audit's pure-P loop `(10 s² + 200 s) / (s⁴ + 20.25 s³ + 9.905 s² +
+98.1 s)` reduces to `10 / (s² + 0.25 s + 4.905)`; the `200 / (s² + 0.5 s + 4.905)` above
+was not the audit's own H(s). A lead zero on a plant pole drops both; a minimal realization
+(the badly scaled quarter car standing in for §9.13) comes back in its own coordinates.
+`linear.zeros` now counts a pencil eigenvalue as finite only when `|β|` is not negligible
+against `|α|`, so rounding no longer reports zeros near 1e15. Tests: `TestMinreal`.
+Order reduction by neglecting fast modes is P2b.
+
 ### P3. `place()`
 
 **Problem.** No pole placement. §1.4.2 eq. (16) asks for `K_sta` putting the
@@ -163,7 +177,7 @@ returned block closes the loop on the nonlinear plant with `@`.
 is picked up.*
 
 **Problem.** The largest GRO501 gap. `minilink/estimation/__init__.py` is a
-docstring listing four planned modules and nothing else. The guide needs an
+placeholder docstring and nothing else. The guide needs an
 observer in §1.4.4 (bonus), Lab 2 steps 5–6, and oral-review deliverables
 8–9 ("schéma bloc de votre proposition de filtre de Kalman" + a simulation).
 
@@ -226,7 +240,7 @@ each of the four Table 2 specs is one call plus a comparison.
 
 ### P7. Generate the analysis facades
 
-**Problem.** ~400 of `facades.py`'s 1 228 lines are 13 hand-copied signatures
+**Problem.** About 400 lines of `facades.py` are 13 hand-copied signatures
 that forward unchanged. Already drifted once (the `settling_horizon`
 docstring says five, the code says eight).
 
@@ -350,10 +364,11 @@ Wave 3   P6? ── P9 ── P10 ── P11   polish, then the notebooks
 ```
 
 P3 gates P4 (the Luenberger factory places poles on the dual pair). P1 and P2
-gate P11 (until then the notebooks would teach wrong pole counts); P1 is in,
-so P2 is the remaining blocker. P7 is independent and worth doing before P2
+gate P11 (until then the notebooks would teach wrong pole counts); both are
+in (P2 on 2026-09-26). P7 is independent and worth doing before P2
 and P5 add three more facade methods each by hand. With P4 and P6 held, the
-next actionable steps are **P2, P3, P5, P7, P8**.
+next actionable steps are **P3, P5, P8**, then TB (the textbook review, whose
+shortcut list decides P7's scope).
 
 ## 3. What this plan does not do
 

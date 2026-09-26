@@ -92,6 +92,9 @@ class PolicyEvaluator:
         """Draw the policy's cost-to-go field; options as in :meth:`StateSpaceGrid.plot_value`."""
         if self.last_J is None:
             raise ValueError("call solve() before plot_cost2go()")
+        from minilink.planning.policy_synthesis.plotting import cost_scale_limit
+
+        kwargs.setdefault("vmax", cost_scale_limit(self.options.out_of_bound_cost))
         return self.grid.plot_value(self.last_J, **kwargs)
 
     # Internal machinery

@@ -12,6 +12,10 @@ being written, so they are tests now rather than prose:
 - 6.7 teaching-lane code that picks Ipopt probes for ``cyipopt`` first, so it
   still runs on an install without it (a cart-pole demo hard-coded it).
 
+Every notebook opens in Colab, so its setup cell is checked too: it clones the
+default branch and puts the clone on the path before minilink is imported (one
+notebook cloned a stale working branch).
+
 The test suite and the merge gate drifted the same way, so they are tests too:
 
 - 6.5 a missing extra skips its own tests only (a mid-file
@@ -62,6 +66,19 @@ LINKED_DOCS = (
     "benchmarks/README.md",
 )
 LINKED_DOC_TREES = ("docs/plans",)
+
+# Colab — the one setup cell every notebook that imports minilink carries.
+# ``-b main`` names the default branch and is allowed; any other pin is not.
+COLAB_SETUP_LINES = (
+    'if "google.colab" in sys.modules:',
+    'get_ipython().run_line_magic("matplotlib", "inline")',
+    'sys.path.insert(0, "/content/minilink")',
+)
+COLAB_CLONE = re.compile(
+    r'get_ipython\(\)\.system\("git clone (-b main )?'
+    r'https://github\.com/alx87grd/minilink"\)'
+)
+IMPORTS_MINILINK = re.compile(r"^\s*(from|import) minilink\b", re.MULTILINE)
 
 MARKDOWN_LINK = re.compile(r"\[[^\]]*\]\(([^)\s]+)\)")
 HEADING = re.compile(r"^#{1,6}\s+(.*)$", re.MULTILINE)
@@ -252,6 +269,27 @@ class TestOptionalIpopt(unittest.TestCase):
                     f"{path.relative_to(REPO)} picks 'ipopt' without probing "
                     "importlib.util.find_spec('cyipopt'); fall back to 'scipy_slsqp'",
                 )
+
+
+class TestColabSetup(unittest.TestCase):
+    """Every notebook runs in Colab from a clone of the default branch."""
+
+    def test_notebooks_that_import_minilink_set_up_colab_first(self):
+        for path in sorted((REPO / "examples").rglob("*.ipynb")):
+            name = path.relative_to(REPO)
+            code = example_code(path)
+            first_import = IMPORTS_MINILINK.search(code)
+            if first_import is None:
+                continue
+            setup = code[: first_import.start()]
+            for line in COLAB_SETUP_LINES:
+                self.assertIn(line, setup, f"{name}: Colab setup cell lacks {line!r}")
+            self.assertRegex(
+                setup,
+                COLAB_CLONE,
+                f"{name}: Colab cell must clone the default branch "
+                "(git clone https://github.com/alx87grd/minilink)",
+            )
 
 
 class TestOptionalDependencies(unittest.TestCase):

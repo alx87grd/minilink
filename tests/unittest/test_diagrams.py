@@ -100,6 +100,17 @@ class TestDiagrams(unittest.TestCase):
         self.assertIsNotNone(graph)
         self.assertIn("Integrator", graph.source)
 
+    def test_plot_diagram_without_graphviz_warns_once_and_skips(self):
+        import sys
+        from unittest import mock
+
+        # Diagrams are optional: a missing graphviz wrapper skips the figure.
+        with mock.patch.dict(sys.modules, {"graphviz": None}):
+            with pytest.warns(UserWarning, match="pip install graphviz") as record:
+                graph = plot_diagram(self._make_diagram(), show=False)
+        self.assertIsNone(graph)
+        self.assertEqual(len(record), 1)
+
     def test_topology_builder_contains_ports_and_edges(self):
         topology = build_diagram_topology(self._make_diagram())
         node_ids = [node.id for node in topology.nodes]

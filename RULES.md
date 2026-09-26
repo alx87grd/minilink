@@ -90,10 +90,14 @@ Systems-as-descriptions: CONSTITUTION.md §4.*
   each other without explicit architectural justification.
 - **3.3 Two lanes (Teaching vs. Research):** Philosophy in CONSTITUTION.md §3;
   operating contract (soft entry rule, wheel scope, CI-checked imports) in ROADMAP.md §2.
-  - **Teaching surface** (`minilink/`, `examples/tutorial/`, `examples/teaching/`, `examples/demos/`):
-    Strict public contract, high stability, fully documented, runs on standard scientific Python.
-  - **Research lane** (`examples/projects/`, `examples/experimental/`): Free experimentation,
-    repo-only, unconstrained by teaching stability guarantees.
+  - **Teaching surface** (the root prelude and the band facades, the set ROADMAP §2 registers
+    and the tests check; and the examples that import only through it: `examples/tutorial/`,
+    `examples/teaching/`, `examples/demos/`): Strict public contract, high stability, fully
+    documented, runs on standard scientific Python.
+  - **Research lane** (everything else: the provisional hybrid, MPC, realtime and spatial
+    bands, the `minilink/experimental/` tier, `examples/projects/`,
+    `examples/experimental/`): Free experimentation, unconstrained by teaching stability
+    guarantees; `experimental/` and the research examples are repo-only.
 - **3.4 Clean renaming:** When renaming a component or module, update all call sites across the
   entire repository in the same change. Do not leave deprecated aliases behind.
 - **3.5 Decoupled rendering & headless dynamics:** Classes in `minilink.dynamics` must never import
@@ -204,8 +208,9 @@ Systems-as-descriptions: CONSTITUTION.md §4.*
   Write the subsequent mathematical algebra using `xp` so the exact same equation path executes
   on both NumPy and JAX arrays without branching.
 - **5.3 Three beats in an equation path; no `self.` in math lines:** Every native-array
-  equation method (`f`, `h`, `g`, `margin`, `value`, `sdf`, `forward_dynamics`, …) is
-  three beats, with a blank line between them so the core equation is the thing the
+  equation method (`f`, `h`, `g`, `margin`, `value`, `sdf`, `forward_dynamics`, …) and
+  every algorithm body (analysis tools, design functions, planners, solvers, learning
+  updates) is three beats, with a blank line between them so the core equation is the thing the
   eye lands on:
 
   1. **Unpack.** Bind `params`, split `x`, and copy `self.` fields into short textbook
@@ -237,6 +242,16 @@ Systems-as-descriptions: CONSTITUTION.md §4.*
 
   # Bad — self. in the algebra, and the equation lives on the return line:
   return (u - self.m * self.g * self.l * xp.sin(x[0])) / (self.m * self.l**2)
+
+  # Bad — a textbook step hidden in a helper: the SVD, rank and basis of the
+  # Kalman decomposition are the lesson, so they belong in the body:
+  T_c = _orthonormal_range(ctrb, tol)
+
+  # Good — each step a named line; only the default tolerance is plumbing:
+  # 𝒞 = U Σ Vᵀ, keep the r directions with σᵢ > tol·σ₁
+  U, sigma, _ = np.linalg.svd(ctrb)
+  r = int(np.sum(sigma > _rank_tol(ctrb, sigma, tol)))
+  T_c = U[:, :r]
   ```
 - **5.4 Mathematical naming conventions:**
   - Matrices: uppercase (`A`, `B`, `C`, `D`, `H`, `M`, `K`).

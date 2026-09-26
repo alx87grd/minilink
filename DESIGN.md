@@ -91,7 +91,7 @@ or neural network alike):
 | `blocks/` | plant-agnostic wiring: sources, `Integrator`, `TransferFunction`, routing (`Sum`/`Gain`/`Mux`/`Demux`), nonlinear (`Saturation`/`DeadZone`/`Relay`), filters, neural (`NeuralNetwork`) |
 | `dynamics/` | plants: `abstraction/` mother classes, `catalog/` by physical domain |
 | `catalog/` | **teaching alias** of `dynamics/catalog/` — flat re-exports for short imports (`from minilink.catalog import Pendulum`); ownership stays in `dynamics/` |
-| `control/` | control laws and design factories (`lqr.py`, `impedance.py`, `output.py`, `state.py`, `siso.py` — `PID` with `ports="error"` (compensator, one input `e`) or `"reference"` (`r`, `y`), `modelbased.py`, `robotic.py`, **`mpc/`** — RH `ModelPredictiveController`) |
+| `control/` | control laws and design factories (`lqr.py`, `impedance.py`, `output.py`, `state.py`, `siso.py` — `PID` with `ports="error"` (compensator, one input `e`) or `"reference"` (`r`, `y`), `modelbased.py`, `robotic.py`, `geometric.py` — `PurePursuit`, `neural.py` — `NeuralPolicyController`, **`mpc/`** — RH `ModelPredictiveController`) |
 | `estimation/` | online state and parameter estimators (planned) |
 
 **Tools** — verbs on a `System`; they return data or plots and never define
@@ -107,7 +107,7 @@ state-feedback block):
 | `optimization/` | `MathematicalProgram`, `Optimizer` (generic NLP) |
 | `identification/` | fit parametric systems to data (planned; physical params and NN weights are the same verb) |
 | `graphical/` | signals, phase plane, diagrams, animation |
-| `interfaces/` | `Sys2Gym` / `SB3Controller` (gymnasium extra); cosimulation / MJX planned |
+| `interfaces/` | lazy facade: `Sys2Gym` / `SB3Controller` / `ProblemEnv` / `to_gymnasium` (gymnasium extra); cosimulation / MJX planned |
 
 **Experimental tier** — `experimental/` (TRL < 3, research lane, repo-only);
 nothing in the library imports it, and the path itself states the maturity.
@@ -140,7 +140,7 @@ publishes that wheel to PyPI (`.github/workflows/publish.yml`).
   open-loop plan is a `TrajectorySource` block).
 - Libraries may ship **factories for their own blocks** with array-in /
   block-out signatures (`control.lqr(A, B, Q, R) -> StateFeedback`,
-  `estimation.kalman_design(A, C, Q, R) -> KalmanFilter`); the linearization
+  and, planned in step P4, `estimation.kalman(A, B, C, Q, R) -> LuenbergerObserver`); the linearization
   producing those arrays lives in `analysis/`.
 - Tools import `core`; they may consume libraries in demos and benchmarks.
 - `graphical/` is imported lazily from anywhere; rendering stays optional.
@@ -281,8 +281,8 @@ The research rungs (`Holonomic`, `HolonomicAccel`, `BicycleKin`, `BicycleAcc`,
   ``BicycleDynServo`` (torque lag) and ``BicycleDynEngine`` (wheel-frame power
   lag + stall torque + engine brake). Named vehicle envelopes (parameters +
   planning limits) live in ``examples/projects/car_trajopt/vehicles/car_profile.py``
-  (``passenger_car``, ``racecar``, ``udes_1_5``); apply with
-  :func:`~minilink.dynamics.catalog.vehicles.car_profile.apply_car_profile`.
+  (``passenger_car``, ``racecar``, ``udes_1_5``); apply with its
+  ``apply_car_profile``.
   Facades: :meth:`~minilink.core.hybrid_diagram.HybridDiagram.compute_trajectory`,
   :meth:`~minilink.core.hybrid_diagram.HybridDiagram.compute_forced`, and
   :meth:`~minilink.core.hybrid_diagram.HybridDiagram.plot_trajectory` /
@@ -440,9 +440,8 @@ object does not read `params` yet, the gap is tracked below.
   Online façade on `solve_trajectory_from` / `compute_command`: `params=None`
   or `{}` binds `x0` only; `params={"scene": …}` raises `NotImplementedError`
   until `ParametricMathematicalProgram` gains `J(z, p)` / `ObstacleBank`
-  ([docs/plans/TODO.md](docs/plans/TODO.md) Later).
-  **TODO: Prioritize threading $p$ into JAX parametric programs.** This will allow 
-  moving obstacles online without rebuilding the NLP, unlocking real-time dynamic obstacle avoidance.
+  ([docs/plans/TODO.md](docs/plans/TODO.md) Later, "Scene params / `J(z, p)` bind": moving
+  obstacles online without rebuilding the NLP).
   **Gap, tracked** ([docs/plans/TODO.md](docs/plans/TODO.md) step A5):
   call-time `params` on the base `Shape`, `Set`, `CostFunction` and field primitives in
   `core/` — those types declare `(t, params)` but read their own attributes only. The
@@ -790,18 +789,16 @@ the 10001-point default.
 
 Solver presets: `scipy`, `scipy_stiff`, `scipy_max`, `scipy_ultra`, `scipy_lsoda`,
 `euler` (variable knot spacing), `euler_fixedsteps` (uniform grid via
-`euler_integrate_*` rollouts), `rk4_fixedsteps` (auto-picked on JAX only for an explicit uniform grid of ≥ 10 000 points). Planned: `SimulationOptions`
-([docs/plans/TODO.md](docs/plans/TODO.md) Later).
+`euler_integrate_*` rollouts), `rk4_fixedsteps` (auto-picked on JAX only for an explicit uniform grid of ≥ 10 000 points). An options record,
+`SimulationOptions`, is a Later idea in [docs/plans/TODO.md](docs/plans/TODO.md).
 
 ### Discontinuous closed loops — known issues
 
 Controllers with discontinuous laws (e.g. :class:`~minilink.control.modelbased.SlidingModeController`
 ``sign(s)``) on a **continuous** :class:`DiagramSystem` closed loop are supported today,
 but several solver/logging behaviors are misleading until a dedicated hybrid or
-event-handling path lands (hybrid path exists; see discontinuous guidance below and
-[ROADMAP.md](ROADMAP.md) teaching-release hardening / [docs/plans/TODO.md](docs/plans/TODO.md)).
-
-**TODO: Add a hard warning.** When a discontinuous controller is wired into a continuous `DiagramSystem`, we should warn the user and recommend wrapping it in a fast `Computer` inside a `HybridDiagram` to enforce physical digital-on-continuous reality.
+event-handling path lands (hybrid path exists; see discontinuous guidance below and the
+D3 hardening rows of [docs/plans/TODO.md](docs/plans/TODO.md)).
 
 **Algebraic feedback during integration.** Nominal closed-loop runs integrate
 ``f_ivp(x, t)`` — the diagram evaluator re-solves feedback at **every** call to

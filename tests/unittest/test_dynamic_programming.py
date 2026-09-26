@@ -508,6 +508,27 @@ class TestDynamicProgrammingPlotting(unittest.TestCase):
         controller = planner.get_controller()
         self.assertTrue(hasattr(controller, "action"))
 
+    def test_cost2go_colour_scale_tops_at_the_price_of_leaving(self):
+        import matplotlib
+
+        matplotlib.use("Agg")
+        planner, _ = solve(make_problem(), out_of_bound_cost=50.0)
+        _, ax = planner.plot_cost2go(show=False)
+        self.assertEqual(ax.collections[0].get_clim()[1], 50.0)
+
+        # An explicit jmax wins, and jmax=None hands the scale back to Matplotlib
+        _, ax = planner.plot_cost2go(jmax=10.0, show=False)
+        self.assertEqual(ax.collections[0].get_clim()[1], 10.0)
+        _, ax = planner.plot_cost2go(jmax=None, show=False)
+        self.assertEqual(
+            ax.collections[0].get_clim()[1], float(np.max(planner.result.J))
+        )
+
+    def test_cost2go_colour_scale_has_no_default_for_a_priced_exit(self):
+        self.assertIsNone(plotting.cost_scale_limit(exit_price))
+        self.assertIsNone(plotting.cost_scale_limit(np.inf))
+        self.assertEqual(plotting.cost_scale_limit(500), 500.0)
+
     def test_get_controller_smoke(self):
         _, result = solve(make_problem())
         controller = plotting.get_controller(result)

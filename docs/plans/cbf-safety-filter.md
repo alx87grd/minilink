@@ -83,8 +83,8 @@ When $u$ controls acceleration (e.g., dynamic vehicle models, torque-driven mani
 
 | Step | Scope | Description |
 | --- | --- | --- |
-| **C1** | `core/geometry/shapes.py` | Add `BicubicGridSDF` using `jax.scipy.ndimage.map_coordinates(..., order=3)`. Test gradient continuity against analytic primitives. |
-| **C2** | `core/geometry/fields.py` | Barrier is `scene.clearance_field(body)` (`Field`); `gradient` from the Field ABC. No `Scene.as_cbf`. |
-| **C3** | `control/cbf.py` | Implement `DiscreteCBFFilter` with QP solve and slack variable $\omega_k$. |
-| **C4** | `examples/demos/control/` | Canonical demo: `car_circuit_cbf_safety.py` — an aggressive or random nominal control law filtered in real time around obstacles. |
-| **C5** | HOCBF extension | Relative-degree 2 velocity-braking boundary for dynamic vehicles. |
+| **CBF-1** | `core/geometry/shapes.py` | Add `BicubicGridSDF` using `jax.scipy.ndimage.map_coordinates(..., order=3)`. Test gradient continuity against analytic primitives. |
+| **CBF-2** | `core/geometry/fields.py` | Barrier is `scene.clearance_field(body)` (`Field`); `gradient` from the Field ABC. No `Scene.as_cbf`. |
+| **CBF-3** | `control/cbf.py` | Implement `DiscreteCBFFilter` with QP solve and slack variable $\omega_k$. |
+| **CBF-4** | `examples/demos/control/` | Canonical demo: `car_circuit_cbf_safety.py` — an aggressive or random nominal control law filtered in real time around obstacles. |
+| **CBF-5** | HOCBF extension | Relative-degree 2 velocity-braking boundary for dynamic vehicles. |

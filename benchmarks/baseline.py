@@ -147,8 +147,14 @@ def compare_metrics(
     baseline: BaselineFile,
     *,
     factor: float | None = None,
+    slack_s: float = 0.0,
 ) -> ComparisonResult:
-    """Compare recorded metrics against a baseline file."""
+    """Compare recorded metrics against a baseline file.
+
+    ``slack_s`` widens each lower-is-better speed ceiling to
+    ``baseline * factor + slack_s``: millisecond timings on a shared runner
+    swing well past ``factor`` with no code change.
+    """
     factor = baseline.regression_factor if factor is None else factor
     baseline_by_id = {metric.id: metric for metric in baseline.metrics}
     rows: list[ComparisonRow] = []
@@ -167,7 +173,7 @@ def compare_metrics(
                 )
             )
             continue
-        status, message = _compare_one(current, ref, factor=factor)
+        status, message = _compare_one(current, ref, factor=factor, slack_s=slack_s)
         rows.append(
             ComparisonRow(
                 metric_id=current.id,
@@ -266,6 +272,7 @@ def _compare_one(
     baseline: MetricRecord,
     *,
     factor: float,
+    slack_s: float = 0.0,
 ) -> tuple[CompareStatus, str]:
     if current.direction == "vector_match":
         return _compare_vector_match(current, baseline)
@@ -292,9 +299,10 @@ def _compare_one(
         return "pass", ""
 
     if baseline.direction == "lower_better":
-        ceiling = baseline_f * factor
+        ceiling = baseline_f * factor + slack_s
         if current_f > ceiling:
-            return "fail", f"above baseline*{factor:g} ({ceiling:g})"
+            slack = f" + {slack_s:g}" if slack_s else ""
+            return "fail", f"above baseline*{factor:g}{slack} ({ceiling:g})"
         return "pass", ""
 
     return "fail", f"unknown direction {baseline.direction!r}"
