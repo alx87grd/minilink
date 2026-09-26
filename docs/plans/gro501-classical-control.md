@@ -27,7 +27,7 @@ additive or replaces boilerplate with generated equivalents.
 | **P4** `estimation/` — Luenberger, then Kalman | G1 | 2 | **held** |
 | **P5** Named `S` / `T` / `PS` / `CS` | G5 | 2 | agent |
 | **P6** Discrete (z) tier | G4 | 3 | **held** |
-| **P7** `facades.py` boilerplate | C2 | 2 | agent |
+| **P7** `facades.py` boilerplate | C2 | 2 | **done** 2026-09-26 (explicit + pinned) |
 | **P8** Small teaching helpers (ζ/ω_n, `N`) | G6 | 2 | agent |
 | **P9** `TransferFunction` port construction | C3 | 3 | agent |
 | **P10** Document what `@` means | C1 | 3 | agent (docs only) |
@@ -250,28 +250,16 @@ instead of manual `Sum` blocks.
 **Done when.** `S + T = 1` holds to 1e-12 across the grid on a SISO loop, and
 each of the four Table 2 specs is one call plus a comparison.
 
-### P7. Generate the analysis facades
+### P7. The analysis facades pinned to their band functions — **landed 2026-09-26**
 
-**Problem.** About 400 lines of `facades.py` are 13 hand-copied signatures
-that forward unchanged. Already drifted once (the `settling_horizon`
-docstring says five, the code says eight).
-
-**Shape.** One helper that builds a delegating method from the target
-function — signature copied with `functools.wraps` / `inspect.signature`, the
-docstring taken from the target with a "See ..." line appended, `self` passed
-as the first positional. Keep the explicit form only where the facade
-genuinely differs from the function (`compute_trajectory`, `animate`).
-
-Guard the readability cost: a test asserting every generated method's
-`__signature__` matches its target keeps tab-completion and `help()` intact,
-which is the reason the explicit form was written in the first place.
-
-**Files.** `minilink/core/facades.py`, `minilink/core/facade.py`,
-`tests/unittest/test_teaching_surface.py`.
-
-**Done when.** The 13 analysis methods are generated; `help(sys.bode)` and
-tab-completion are unchanged; the docstring drift is gone because there is
-one source.
+Ruled 2026-09-26: the shortcuts stay written out (runtime generation would hide their
+parameters from static editors such as VS Code/Pylance), and
+`tests/unittest/test_system_shortcuts.py` pins each to its band function: parameters,
+defaults, forwarding of every argument, and the docstring's target. A second test pins
+the band's calling pattern `tool(sys, x_bar, u_bar, t, params, …)` with its named
+exceptions (scan analysis#7). `analysis/linearize.py` and `discretize.py` became
+`linearization.py` and `discretization.py`, so `from minilink.analysis import
+linearize, discretize` returns the functions (scan analysis#11).
 
 ### P8. Small teaching helpers
 
@@ -282,7 +270,6 @@ one source.
 - The `N` reference-scaling matrix giving `y = r` at steady state
   (§9.11 Q3) — a factory alongside `place` / `lqr`, or an `N=` argument on
   `StateFeedbackController`.
-- Fix the `settling_horizon` docstring mismatch (five vs eight) as part of P7.
 
 **Done when.** §9.5 and §9.11 are each a short notebook cell.
 

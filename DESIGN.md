@@ -397,7 +397,9 @@ The research rungs (`Holonomic`, `HolonomicAccel`, `BicycleKin`, `BicycleAcc`,
   `transfer_function`, `plot_phase_plane`, `plot_bode`, `plot_pzmap`,
   `plot_root_locus`, `animate_modal` — and `game`), `StepSystemFacades` on
   `StepSystem` (`compute_rollout`, `jacobian` with `k`), `LTISystemFacades` on
-  `LTISystem` (`plot_step_response`). Every facade is a two-line delegation to the tool's module and
+  `LTISystem` (`plot_step_response`). The analysis shortcuts are written out, so every
+  editor shows their parameters, and `tests/unittest/test_system_shortcuts.py` pins each
+  to its band function (parameters, defaults, forwarding, docstring target). Every facade is a two-line delegation to the tool's module and
   stores nothing on the system (§1 principle 2): `jacobian` compiles its
   evaluator per call, about a millisecond on the eager JAX path, and loops
   keep the callable from `evaluator.jacobian(of, wrt)` instead. **MRO**
