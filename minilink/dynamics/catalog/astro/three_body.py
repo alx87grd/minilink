@@ -39,7 +39,7 @@ class ThreeBodyProblem(DynamicSystem):
 
         x = [r1, v1, r2, v2, r3, v3]
 
-    with ``r_i, v_i in R^3``. Each mass follows
+    with ``r_i, v_i in R^3``. Each mass follows::
 
         v_i_dot = sum_{j != i} G m_j (r_j - r_i) / |r_j - r_i|^3
 

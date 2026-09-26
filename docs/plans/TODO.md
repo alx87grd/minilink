@@ -57,15 +57,9 @@ the triage in [2026-09-22-improvement-suggestions.md](../reviews/2026-09-22-impr
   one owner; DESIGN's inline TODOs moved here and its retired pointers fixed; RULES 3.3's
   teaching surface stated as ROADMAP §2 states it; plan-doc step ids that cannot collide
   with the workboard's; retired phase numbers scrubbed from the plans; AGENTS naming who
-  edits ROADMAP §5 and §6; the control band's docs housekeeping; the analysis API page. Done
+  edits ROADMAP §5 and §6; the control band's docs housekeeping; the analysis placeholder
+  docstrings (`estimation/`, `identification/`; its API page landed with S60). Done
   when `test_repo_contract.py` passes and no doc names a retired section.
-- [ ] **S60 The teaching surface, checked and documented** (scan: graphics#2, graphics#3,
-  graphics#10, tests-ci#8, docs-gov#0, dynamics#12): the registry test walks every band
-  facade's `__all__` as it walks the root prelude, then `NotchFilter`, `Washout` and `MLP`
-  join the blocks row; `docs/api` generated from the registry (or a test that every prelude
-  name's module has a page) and Sphinx built with `-W`; the dynamics page covers the catalog;
-  `minilink.graphical.catalog` and `minilink.interfaces` as lazy facades. Done when a prelude
-  name without a page fails a test.
 - [ ] **S49 Retire the Stable-Baselines3 teaching notebooks** **[ask]**. Delete
   `teaching/courses/udes_gro860/drone_ppo_sb3.ipynb` and
   `pendulum_value_iteration_vs_lqr_vs_ppo_sb3.ipynb`, their notebook overrides and allowlist

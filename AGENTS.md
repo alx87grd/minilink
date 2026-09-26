@@ -109,7 +109,7 @@ Fix with `ruff check --fix .` and `ruff format .` when either fails. CI runs the
 
 Regression gates full command and CI `regression` job flags: tests/README.md (entry points).
 
-Optional extras (not required every push): `SDL_VIDEODRIVER=dummy pytest` for headless pygame; graphics visual checklist and demo-check runners in tests/README.md when graphical or user-facing demos changed; `sphinx-build` only when editing `docs/` (separate Docs workflow).
+Optional extras (not required every push): `SDL_VIDEODRIVER=dummy pytest` for headless pygame; graphics visual checklist and demo-check runners in tests/README.md when graphical or user-facing demos changed; `sphinx-build -W --keep-going -b html docs docs/_build/html` only when editing `docs/` or docstrings (separate Docs workflow; warnings fail it).
 
 **After push:** only check GitHub CI when the user asked to push, open a PR, or debug a reported failure — not as a routine step on every edit.
 

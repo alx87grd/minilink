@@ -29,6 +29,12 @@ autodoc_typehints = "description"
 napoleon_google_docstring = False
 napoleon_numpy_docstring = True
 
+# Docstring types such as ``u : array of shape (m,)`` turn the dimension name
+# into a cross-reference, and ``m`` matches both ``System.m`` and
+# ``Trajectory.m``. The build runs with ``-W``, so silence only that ambiguity;
+# a duplicate object description still fails it.
+suppress_warnings = ["ref.python"]
+
 templates_path = ["_templates"]
 exclude_patterns = ["_build", "Thumbs.db", ".DS_Store", "plans", "reviews"]
 

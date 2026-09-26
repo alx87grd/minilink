@@ -18,3 +18,9 @@ Blocks
 
 .. automodule:: minilink.blocks.filters
    :members:
+
+.. automodule:: minilink.blocks.step
+   :members:
+
+.. automodule:: minilink.blocks.neural
+   :members:
