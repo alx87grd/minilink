@@ -54,17 +54,18 @@ Design: [naming.md](naming.md). Every step is name-preserving for the GRO860 not
   `PolicyEvaluator` and `Comparison`, with `plot_cost2go` an alias for one release and S54's
   clipping (scan: planning#3, examples#5); the operators' named forms exported together
   (scan: core#9).
-- [ ] **A5 Later nouns, each with its first consumer.** `Gaussian(mean, std=None, cov=None)` +
-  `log_prob` with the disturbance convention (ROADMAP §6; before P4); parameter-dictionary
+- [ ] **A5 Later nouns, each with its first consumer.** `log_prob` on the distributions with
+  its first consumer (`Gaussian(cov=)`, `NoiseSource` and the draw convention moved to
+  [randomness.md](randomness.md), steps RN-1 to RN-6); parameter-dictionary
   support on sets and distributions (one flatten rule, with identification or the robust
-  problem); `NoiseSource(distribution, sample_period)` replacing the hand-rolled `WhiteNoise`
-  draw; `UnionSet` via `|` when reachability or multi-goal work needs it; vector bounds on
+  problem); `UnionSet` via `|` when reachability or multi-goal work needs it; vector bounds on
   `Saturation`; library sets, shapes and fields reading `params` (the "one signature" gap,
   same rule as A2, after it); `PlanningProblem.hamiltonian()` only if the course teaches Pontryagin; the
   RL critic as a `Field` once training is over.
-  Also: `Distribution.sample(key=None)` like the sets (scan: core#5); a guard test that
-  editing `WhiteNoise` params changes the next simulation without `refresh()`, so S29 cannot
-  land before `NoiseSource` (scan: examples#14); `Trajectory.from_rollout(x0, xs, us, dt)` for
+  Also: `Distribution.sample(key=None)` (scan: core#5) is retired the other way, every
+  `sample` takes a key (randomness.md D9); the guard test that editing `WhiteNoise` params
+  changes the next simulation without `refresh()` moved to RN-1, so S29 cannot land before
+  RN-1 (scan: examples#14); `Trajectory.from_rollout(x0, xs, us, dt)` for
   scanned rollouts, V1's first consumer (scan: examples#9); the double-integrator homework's
   two verbs, entry time into a set and the Bellman residual (scan: examples#10).
 
@@ -81,8 +82,8 @@ TB-a (the analysis toolbox reads like the textbook) landed 2026-09-26: the short
 byte-identical rewrite (`36a51e7`…`559cb37`) and four fixes (`19b75c1`…`b018cb5`).
 
 **Next, in order (decided 2026-09-26):** clean-up and solidification first — P7, then P5 and
-P8 on the cleaned toolbox, TB-b, S61, P9, P10 — then the
-disturbance convention and P4, then P11. The textbook pass comes before the new surface, so
+P8 on the cleaned toolbox, TB-b, S61, P9, P10 — then RN-1 of
+[randomness.md](randomness.md) (the disturbance convention, decided 2026-09-26) and P4, then P11. The textbook pass comes before the new surface, so
 the new code copies clean patterns and no shortcut is added only to be dropped.
 
 - [ ] **TB-b The control objects and the loop read like the textbook** (after P5, which
@@ -126,10 +127,18 @@ the new code copies clean patterns and no shortcut is added only to be dropped.
   or a renamed attribute, decided with the step; and `__str__` on `LTISystem`,
   `TransferFunction` and `StructuralResult`, so tutorial 01's `print(tf)` shows the transfer
   function and fourteen `np.linalg.eigvals(lin.A())` sites go (scan: analysis#3, examples#2).
+- [ ] **RN The randomness convention** ([randomness.md](randomness.md), agreed 2026-09-26,
+  rulings D1–D12). RN-1 `WhiteNoise` (seed and sample period in params, counter-based draw,
+  `psd`, zero-order hold by default, no time window) is P4's prerequisite. RN-2 distributions
+  read `params`, RN-3 `NoiseSource`, RN-4 `realize(key)` and signals on `disturbances`, RN-5 the
+  Monte Carlo evaluator's test set, RN-6 DESIGN; no rung yet for RN-2 to RN-6 **[ask]**. Done
+  when the plan's steps are ticked and DESIGN carries the convention.
+  Also: the evaluator's `simulator` backend fails on a diagram plant with a nested-diagram
+  error (found 2026-09-26, randomness.md §1).
 - [ ] **P4 `estimation/`** **[held 2026-09-07; 2026-09-26: stays held until the clean-up and
-  solidification above land, then the disturbance convention (ROADMAP §6) is decided first]**. `LuenbergerObserver(A, B, C,
+  solidification above land, then RN-1 of [randomness.md](randomness.md) lands first]**. `LuenbergerObserver(A, B, C,
   L)` as a `DynamicSystem` with ports `u`, `y` → `x_hat`; `luenberger(A, B, C, poles)` on the
-  dual pair (`place_gain(Aᵀ, Cᵀ, poles)ᵀ`, P3 landed 2026-09-26); `kalman(A, B, C, Q, R)` from the filter Riccati equation; the
+  dual pair (`place_gain(Aᵀ, Cᵀ, poles)ᵀ`, P3 landed 2026-09-26); `kalman(A, B, C, Q, R)` from the filter Riccati equation, `Q = B_w W B_wᵀ` and `R = V` read from the noise blocks' `psd` (randomness.md §2); the
   observer + state-feedback composition ruled first (ROADMAP §6). Done when LQR + Kalman
   stabilizes the guide's cart-pendulum from a disturbed start with noise on `u` and `y`, and
   `plot_diagram` shows the Figure 12 topology.
@@ -243,7 +252,8 @@ each plan states; every step is name-preserving for the GRO860 notebooks.
     levels, `QFunction` with replay and a target network. Research lane first.
   - [ ] **Approximate dynamic programming** on `policy_synthesis/approximation.py` (fitted
     value iteration); design first, it touches the planner API. **[ask]**
-  - [ ] `Sys2Gym` takes a `Distribution` for the start state (scan: graphics#1).
+  - [ ] `Sys2Gym` takes a `Distribution` for the start state (scan: graphics#1; randomness.md
+    R5, step RN-5).
 - [ ] **S63 DP reads the horizon** **[ask — planner API]** (scan: planning#1): a finite
   `problem.tf` runs `round(tf / dt)` backward sweeps as `solve_steps` does, the way
   `LQRPlanner` picks the Riccati ODE, or warns once. Done when LQR and DP agree on the
@@ -277,7 +287,8 @@ findings, file by file and line by line, are in
 - [ ] **T2 blocks and control** (what T0 left): `control/mpc/utilities.py` order and names
   (`_shift_plan_trajectory` is imported by `test_mpc.py`), the MPC package docstring;
   `blocks/transfer_function.py`'s `tf` on `np` without `params` (P9 rebuilds its ports);
-  `WhiteNoise.h` / `TrajectorySource.h` cannot trace (`interp1d`); `action_port_of` above
+  `TrajectorySource.h` cannot trace (`interp1d`; `WhiteNoise.h` is rebuilt by randomness.md
+  RN-1); `action_port_of` above
   the class; the joint-impedance law still in a helper.
   Also (scan: control#2, control#5, control#7): one time-interpolation for trajectories and
   gain schedules; one warm-start helper on the plan `Trajectory`; the impedance and robotic

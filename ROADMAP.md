@@ -90,7 +90,7 @@ State as of 2026-09-22. Step ids (`S29`, `P3`, `T2`, …) are the rows of
 | Graphics / animation | teaching | 5 | Frame-keyed `tf` / geometry / overlays; four renderers; auto-fit camera. | Constructor-derived camera hints (S43); glyph/solid rename (S30, v1.0). |
 | Hybrid / step / MPC | provisional (research) | 4 | `StepSystem`, `Computer`, `HybridDiagram`, `HybridSimulator`, MPC with parametric JAX. The sampled loop is the one thing that is not a `System`. | No new hybrid features before the v1.0 decision (S31); textbook pass on `mpc/controller.py` (T6). |
 | Realtime simulation | provisional | 2 | `RealtimeSimulator` + pygame I/O. | Architectural review (v1.0). |
-| Estimation | planned (GRO501) | 1 | Placeholder. The largest GRO501 gap. | Luenberger, then Kalman, as diagram blocks (P4, v0.2), after the disturbance-convention decision (§6). |
+| Estimation | planned (GRO501) | 1 | Placeholder. The largest GRO501 gap. | Luenberger, then Kalman, as diagram blocks (P4, v0.2), after step RN-1 of [randomness.md](docs/plans/randomness.md): the `WhiteNoise` whose `psd` the Kalman design reads (the disturbance convention, decided 2026-09-26). |
 | Identification | planned | 2 | Parametric-tier prototype only. | `fitting.py` (v0.2). |
 | C export (`experimental/c_export`) | research | 1 | JAX→C transpiler; two demos; flagship smoke in the JAX regression job. | Keep isolated; repo-only. |
 | Experimental tier (`experimental/symbolic`, `experimental/engines`) | research | 1 | Not on the teaching path nor the API site. | Keep isolated; repo-only. |
@@ -251,11 +251,12 @@ wave B. A4 and A5 stay here.
 - **A4** Naming quick wins 1–4 and 6 of [naming.md](docs/plans/naming.md):
   class name as the default `name`, one closed-loop name, informative
   shortcut names, `id` honoured by the sampled loop, `id` documented.
-- **A5** The later nouns, each with its first consumer: `Gaussian(cov=)` +
-  `log_prob` with the disturbance convention (before P4), sets and
-  distributions over parameter dictionaries (with identification or the
-  robust problem), `NoiseSource(distribution)`, `UnionSet`,
+- **A5** The later nouns, each with its first consumer: `log_prob` on the
+  distributions, sets and distributions over parameter dictionaries (with
+  identification or the robust problem), `UnionSet`,
   `PlanningProblem.hamiltonian()` only if the course teaches Pontryagin.
+  `Gaussian(cov=)`, `NoiseSource` and the draw convention moved to
+  [randomness.md](docs/plans/randomness.md) (steps RN-1 to RN-6).
 
 **Wave B — GRO501 end to end** (§4.2; plan
 [gro501-classical-control.md](docs/plans/gro501-classical-control.md)).
@@ -280,8 +281,9 @@ wave B. A4 and A5 stay here.
 - **B3** **P4** `estimation/`: `LuenbergerObserver`, `luenberger()`,
   `kalman()`, and how observer and state feedback compose. Held 2026-09-07;
   it is the largest §4.2 gap. Decided 2026-09-26: the clean-up and
-  solidification (TB-a landed; P7, P5, P8, TB-b, S61, P9, P10) land first, then the
-  disturbance convention (§6) is decided, then P4. **[ask]**
+  solidification (TB-a landed; P7, P5, P8, TB-b, S61, P9, P10) land first, then
+  RN-1 of [randomness.md](docs/plans/randomness.md) (`WhiteNoise` with its `psd`), then P4. The
+  disturbance convention was decided 2026-09-26 (§6). **[ask]**
 - **B4** Polish: **P9** `TransferFunction` ports built once, **P10** the
   three `@` dispatch paths documented and pinned by a test; **P6** the z tier
   stays held (teach with `discretize` + simulation) unless the sommatif
@@ -399,13 +401,18 @@ here. Each open item needs the maintainer.
 
 **Before wave B3 (`estimation/`)**
 
-- **The disturbance convention.** `disturbances={port: Distribution}` draws
-  one value per control period and holds it, so its variance does not scale
-  with `dt`; `WhiteNoise` carries `var` + `sample_period`, the same
-  ambiguity. A Kalman filter needs the rule once: per-step covariance `Q_d`,
-  or spectral density `Q_c` with `Q_d = Q_c / dt` (RULES 4.12 applies).
-  Taken up after the v0.2 clean-up and solidification (decided 2026-09-26).
-  Recorded in docs/reviews/2026-09-15-foundations-review.md (F9).
+- **The disturbance convention — decided 2026-09-26** in [randomness.md](docs/plans/randomness.md)
+  (rulings D1–D12; finding F9 of the 2026-09-15 foundations review). A
+  `Distribution` has no time: it is the law of one draw. A noise signal is a
+  block holding draws over a sample period Δ: `NoiseSource(law, Δ)` for
+  sampled noise, `WhiteNoise(psd=W, Δ)` for continuous white noise of
+  two-sided density `W`, drawn as `w_k ~ N(0, W / Δ)` so its physics does not
+  change with Δ. Seed, Δ and magnitude are params; `h` draws with a
+  counter-based generator (no table, no time window, traceable). A problem's
+  disturbance port takes a signal; `realize(key)` gives every random block
+  and parameter its own stream; the Monte Carlo evaluator scores every law on
+  one test set drawn once. Kalman reads `Q = B_w W B_wᵀ`, `R = V`. This entry
+  leaves §6 when step RN-6 moves the contract to DESIGN.
 - **The terminal cost `h(x_f, t_f)`, one rule for every tool.** Since the
   one-horizon ruling (2026-09-17) `h` is charged exactly when `tf` is
   finite; still to settle whether an infinite-horizon cost with a nonzero `h`
