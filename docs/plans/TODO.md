@@ -131,8 +131,11 @@ the new code copies clean patterns and no shortcut is added only to be dropped.
   rulings D1–D12). RN-1 `WhiteNoise` (seed and sample period in params, counter-based draw,
   `psd`, zero-order hold by default, no time window) is P4's prerequisite. RN-2 distributions
   read `params`, RN-3 `NoiseSource`, RN-4 `realize(key)` and signals on `disturbances`, RN-5 the
-  Monte Carlo evaluator's test set, RN-6 DESIGN; no rung yet for RN-2 to RN-6 **[ask]**. Done
-  when the plan's steps are ticked and DESIGN carries the convention.
+  Monte Carlo evaluator's test set, RN-6 DESIGN. Rungs (decided 2026-09-26): RN-1 v0.2 wave B
+  before P4; RN-2 v0.2 wave A with A5; RN-3 with its first consumer (P11 if a GRO501 notebook
+  shows sampled sensor noise, else v0.3); RN-4 and RN-5 together in v0.3, after the fall term,
+  before the v0.9 freeze; RN-6 with each step. Done when the plan's steps are ticked and DESIGN
+  carries the convention.
   Also: the evaluator's `simulator` backend fails on a diagram plant with a nested-diagram
   error (found 2026-09-26, randomness.md §1).
 - [ ] **P4 `estimation/`** **[held 2026-09-07; 2026-09-26: stays held until the clean-up and

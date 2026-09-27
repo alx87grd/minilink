@@ -256,7 +256,8 @@ wave B. A4 and A5 stay here.
   identification or the robust problem), `UnionSet`,
   `PlanningProblem.hamiltonian()` only if the course teaches Pontryagin.
   `Gaussian(cov=)`, `NoiseSource` and the draw convention moved to
-  [randomness.md](docs/plans/randomness.md) (steps RN-1 to RN-6).
+  [randomness.md](docs/plans/randomness.md) (steps RN-1 to RN-6). Its **RN-2** joins this wave:
+  distributions read `params`, `Gaussian(cov=)`, every `sample` takes a key.
 
 **Wave B — GRO501 end to end** (§4.2; plan
 [gro501-classical-control.md](docs/plans/gro501-classical-control.md)).
@@ -357,6 +358,12 @@ Standing work, behaviour-preserving, one module per step.
 - **S63** DP reads a finite horizon from `problem.tf`, as LQR does; **S64**
   catalog hygiene (bounds each plant states, port labels read from the
   state, one wheelbase owner). **[ask]**
+- **RN-4 / RN-5** of [randomness.md](docs/plans/randomness.md), together, after the fall term:
+  `realize(key)` and signals on `disturbances=` (the frozen-noise defect
+  fixed), then the Monte Carlo evaluator's test set. Both change public
+  behaviour and the Monte Carlo numbers once, so they land between cohorts
+  and before the v0.9 freeze. **RN-3** `NoiseSource` lands here too, unless a
+  GRO501 notebook needs sampled sensor noise first (then with P11).
 
 ### 5.4 v1.0 — one `System`, closed (2027)
 

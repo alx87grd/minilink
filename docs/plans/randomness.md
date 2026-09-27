@@ -1,8 +1,11 @@
 # One convention for randomness
 
 Status: design agreed 2026-09-26; every ruling decided (§8, D1–D12); not started.
-Rung: v0.2 wave B. Step RN-1 (`WhiteNoise`) is the prerequisite of B3 (`estimation/`, P4);
-RN-2 to RN-6 have no rung yet **[ask]**. It settles the disturbance convention ROADMAP §6
+Rungs (decided 2026-09-26): RN-1 (`WhiteNoise`) in v0.2 wave B, the prerequisite of B3
+(`estimation/`, P4); RN-2 in v0.2 wave A, with A5; RN-3 with its first consumer (P11 if a GRO501
+notebook shows sampled sensor noise, else v0.3); RN-4 and RN-5 together in v0.3, after the fall
+term, because they change public behaviour and the Monte Carlo numbers once, and before the v0.9
+freeze; RN-6 with each step. It settles the disturbance convention ROADMAP §6
 held open before B3, closes finding F9 of
 [2026-09-15-foundations-review.md](../reviews/2026-09-15-foundations-review.md), and absorbs the
 `Gaussian(cov=)`, `NoiseSource`, `Distribution.sample(key=None)` and `WhiteNoise` guard-test
@@ -520,7 +523,8 @@ All decided 2026-09-26 (maintainer):
 ## 9. Steps
 
 Order: RN-1 first (it unblocks P4); RN-2 before RN-3; RN-4 before RN-5; RN-6 closes each step's
-docs as it lands. Each step that changes draws records a seeded baseline before and pins the new
+docs as it lands. Rungs as in the header: RN-1 and RN-2 in v0.2, RN-3 with its first consumer,
+RN-4 and RN-5 in v0.3. Each step that changes draws records a seeded baseline before and pins the new
 numbers with a test after (RULES 7.7, AGENTS refactor recipe).
 
 - [ ] **RN-1 `WhiteNoise`** (D1–D5, D8): `sample_index` and `standard_normal` helpers under
