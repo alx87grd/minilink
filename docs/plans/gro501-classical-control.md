@@ -25,7 +25,7 @@ additive or replaces boilerplate with generated equivalents.
 | **P2** `minreal` | G3 | 1 | **done** 2026-09-26; order reduction split out, then deferred out of v0.2 (2026-09-26; TODO §7) |
 | **P3** `place()` → `StateFeedbackController` | G2 | 1 | **done** 2026-09-26 |
 | **P4** `estimation/` — Luenberger, then Kalman | G1 | 2 | **held** |
-| **P5** Named `S` / `T` / `PS` / `CS` | G5 | 2 | agent |
+| **P5** Named sensitivity functions | G5 | 2 | agent — design agreed 2026-09-26 |
 | **P6** Discrete (z) tier | G4 | 3 | **held** |
 | **P7** `facades.py` boilerplate | C2 | 2 | **done** 2026-09-26 (explicit + pinned) |
 | **P8** Small teaching helpers (ζ/ω_n, `N`) | G6 | 2 | agent |
@@ -226,29 +226,79 @@ Kalman observer stabilizes the nonlinear plant from a disturbed start with
 noise injected on `u` and `y`, and the estimate converges to the true state;
 `plot_diagram` shows the Figure 12 topology.
 
-### P5. Named sensitivity functions
+### P5. Named sensitivity functions — design agreed 2026-09-26
 
 **Problem.** Table 2 states four specs as "sous −40 dB @ 0.015 Hz" style
-bounds on disturbance and noise sensitivity. They are computable today only
-through the internal-wire selector (`of="error:e"`, `of="ctl:u"`), which is
-undocumented for this use, and an *input* disturbance needs a hand-wired `Sum`.
+bounds on disturbance and noise sensitivity. Today three of the four are
+reachable only through the undocumented internal-wire selector, which needs
+the loop's block names (`transfer_function(C @ G, of="error:e", wrt="r")`
+for `S`, `of="ctl:u"` for `CS`); the load sensitivity is out of reach, and
+simulating an input disturbance or sensor noise needs hand-wired `Sum` blocks.
 
-**Shape.** On a closed-loop diagram: `sensitivity(sys)` → `S = e/r`,
-`complementary_sensitivity(sys)` → `T = y/r`, plus `PS` (disturbance to
-output) and `CS` (noise to command), each returning an `LTISystem` so the
-whole `plot_bode` / `margins` family applies. Where the diagram has no
-disturbance port, say so in the error rather than guessing.
+**The loop and the four functions.** The book's notation: plant `H(s)`,
+controller `C(s)`, optional filter `F(s)` in the return path (the measurement
+passes through `F` before the comparison). Load disturbance `w` adds to the
+plant input, measurement noise `v` adds to the measurement before `F`.
 
-Also add a `disturbance=True` / `noise=True` option to `feedback()` (or a
-documented recipe) so the injection points exist as named boundary inputs
-instead of manual `Sum` blocks.
+| Function | Formula | Reads |
+| --- | --- | --- |
+| `sensitivity` | `S = 1 / (1 + C H F)` | output disturbance to `y`; `e / r` |
+| `complementary_sensitivity` | `T = C H / (1 + C H F)` | `y / r` |
+| `load_sensitivity` | `PS = H / (1 + C H F)` | `w` to `y` |
+| `noise_sensitivity` | `CS = C F / (1 + C H F)` | `v` to `u` |
 
-**Files.** `minilink/analysis/frequency.py` or a new
-`minilink/analysis/loopshaping.py`, `minilink/analysis/__init__.py`,
-`minilink/core/composition.py`, `tests/unittest/test_control_analysis.py`.
+With `F = 1`, `S + T = 1`.
 
-**Done when.** `S + T = 1` holds to 1e-12 across the grid on a SISO loop, and
-each of the four Table 2 specs is one call plus a comparison.
+**Rulings (maintainer, 2026-09-26).**
+
+1. *The functions take the pieces, not the finished loop.* The formula is
+   written in the body as on the page (the textbook rule), every function works
+   for any plant and controller that linearize, the load sensitivity needs no
+   change to loop building, and a nested loop passes the inner closed loop as
+   the plant of the outer one. Options weighed: the finished loop
+   (`sensitivity(C @ G)` reading its wires; any topology, but the formula
+   hidden and the load sensitivity dependent on a disturbance input), both.
+2. *Keyword-only, named arguments in the book's letters:*
+   `sensitivity(*, plant, controller, filter=None, …)`, the same for the other
+   three; the body unpacks `H, C, F` (each linearized to a transfer function,
+   `F = 1` when absent) and names the loop gain `L = C H F` on its own line.
+   `filter` is the book's word; it shadows the builtin only as a keyword name.
+3. *Four descriptive names*, each returning an `LTISystem` so `plot_bode`,
+   `margins` and the rest apply: `sensitivity`, `complementary_sensitivity`,
+   `load_sensitivity`, `noise_sensitivity` (Åström–Murray; the course's
+   "fonction de sensibilité", "sensibilité complémentaire"). No `gang_of_four`
+   until a notebook needs the four together; no one-letter names (they clash
+   with Python naming and with the `S`, `T` matrices elsewhere).
+4. *Simulation gets optional loop inputs.* `closed_loop(controller, plant, …)`
+   gains an option adding boundary inputs `w` (summed into the plant input)
+   and `v` (summed into the measurement), off by default so every existing
+   loop keeps its single input `r`. The names are the project's canonical
+   disturbance and noise ports (RULES 4.9), the ports a `WhiteNoise` block
+   connects to ([randomness.md](randomness.md)). The operator form `C @ H`
+   takes no options; the explicit call does. Options weighed: a documented
+   recipe with hand-wired `Sum` blocks, ports declared by the plant itself.
+5. *A spec check needs nothing new.* `bode` already evaluates one frequency,
+   in rad/s: `_, S_db, _ = bode(S, w=2 * np.pi * 0.015)` then `S_db[0] < -40`,
+   the conversion `ω = 2πf` visible on the student's line. Options weighed: a
+   scalar `magnitude_db(sys, w)`, a hertz keyword on every frequency tool.
+
+**Still to settle in the implementation, agent-owned.** The operating point
+of a nonlinear plant (`x_bar`, `u_bar`, `params` forwarded to its
+linearization, as every analysis verb does); SISO only, a MIMO piece refused
+with the channel named; the option keyword on `closed_loop` for the two
+inputs; whether `feedback()` alone (no controller/plant split) offers only
+`v`.
+
+**Files.** A new `minilink/analysis/sensitivity.py` (band functions, not
+System shortcuts, ROADMAP §6), `minilink/analysis/__init__.py`,
+`minilink/core/composition.py` (the loop inputs),
+`tests/unittest/test_control_analysis.py`; DESIGN's analysis bullet.
+
+**Done when.** `S + T = 1` holds to 1e-12 across the grid on a SISO loop
+without a filter; each function matches the internal-wire transfer function of
+the same loop (and `load_sensitivity` the `w`-to-`y` channel of a loop built
+with the new inputs); each of the four Table 2 specs is one `bode` call plus a
+comparison.
 
 ### P7. The analysis facades pinned to their band functions — **landed 2026-09-26**
 

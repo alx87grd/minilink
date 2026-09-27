@@ -99,11 +99,14 @@ the new code copies clean patterns and no shortcut is added only to be dropped.
   `dynamics/abstraction/state_space.py` (`LTISystem`) and the loop-building path students
   use (`feedback`, `closed_loop`, `@`). Done when every module in scope reads like `dp.py`
   and the baseline `cmp`s.
-- [ ] **P5 Named sensitivity functions** `sensitivity` (`S = e/r`), `complementary_sensitivity`
-  (`T = y/r`), `PS`, `CS` on a closed-loop diagram, each an `LTISystem`; `disturbance=` /
-  `noise=` injection points on `feedback()`; band functions, not `System` shortcuts (ROADMAP
-  §6). Done when `S + T = 1` holds to 1e-12 on a SISO
-  loop and each Table 2 spec is one call plus a comparison.
+- [ ] **P5 Named sensitivity functions** (design agreed 2026-09-26, in
+  [gro501-classical-control.md](gro501-classical-control.md) §P5): `sensitivity`,
+  `complementary_sensitivity`, `load_sensitivity`, `noise_sensitivity`, keyword-only
+  `(plant=H, controller=C, filter=F)`, each an `LTISystem` computed from the pieces with
+  `L = C H F` in the body; `closed_loop` gains optional loop inputs `w` (plant input) and `v`
+  (measurement), off by default; spec checks use `bode` as it is. Done when `S + T = 1` holds
+  to 1e-12 on a SISO loop, each function matches the loop's internal-wire transfer function,
+  and each Table 2 spec is one `bode` call plus a comparison.
 - [ ] **S61 Analysis verbs on any `System`** (scan: analysis#2, analysis#4, analysis#5,
   analysis#6, analysis#8): `controllability` / `observability` linearize like every sibling
   (band functions only, no facade: ROADMAP §6); `step_info` takes a `System`; `find_equilibrium` defaults its guess to
