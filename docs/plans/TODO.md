@@ -28,7 +28,7 @@ the triage in [2026-09-22-improvement-suggestions.md](../reviews/2026-09-22-impr
 | [§3](#3-v02-wave-b--gro501) | v0.2 wave B — GRO501 |
 | [§4](#4-v03-wave-c--gmc714-catalog-parity) | v0.3 wave C — GMC714, catalog, parity |
 | [§5](#5-v02-wave-d--textbook-code-minimal-demos-consolidation) | v0.2 wave D (into v0.3) — textbook code, minimal demos, consolidation |
-| [§6](#6-v10-foundations) | v1.0 foundations |
+| [§6](#6-v09-freeze-candidate-and-v10) | v0.9 freeze candidate and v1.0 |
 | [§7](#7-later-ideas) | Later ideas |
 
 ---
@@ -155,9 +155,10 @@ the new code copies clean patterns and no shortcut is added only to be dropped.
   rows that differ only in `plot_space` if that reads better.
   Also: one keyword vocabulary for the four feedback wires across `closed_loop`,
   `hybrid_closed_loop` and `StandardFeedbackWiring` (scan: core#12).
-- [ ] **P6 Discrete (z) tier** **[held 2026-09-07]**. Default: teach with `discretize` +
-  simulation. Reopen only if the sommatif examines z-plane analysis.
-  When it reopens: an exact zero-order-hold option on `discretize`, shared with
+- [ ] **P6 Discrete (z) tier** **[held for GRO501 2026-09-07; scheduled for v0.9, §6]**.
+  GRO501 default: teach with `discretize` + simulation, unless the sommatif examines z-plane
+  analysis. The v0.9 scope is its row in §6.
+  When it opens: an exact zero-order-hold option on `discretize`, shared with
   `step_response` (scan: analysis#1). The `discretize` bugs (dt in params, dropped `x0`) were
   fixed 2026-09-23: the sample time is `disc.dt`, `params` reach the source untouched, and
   the wrapper keeps the source's `x0` and signal metadata. The sample time has one owner:
@@ -486,11 +487,18 @@ pick):
   over every control law, the catalog with perturbed `params`, and the `params.sets` scoring
   parity.
 
+- [ ] **S69 Students' laptops**: `windows-latest` and `macos-latest` legs in `test.yml`
+  (Basic tier pytest and the notebook smoke), coverage reported on the Linux leg with no
+  gate. Done before the GRO501 cohort installs (v0.2).
+
 ---
 
-## 6. v1.0 foundations
+## 6. v0.9 freeze candidate and v1.0
 
-After two cohorts; each is a design conversation before code. **[ask — core]** throughout.
+ROADMAP §5.4 and §5.5: v1.0 means a colleague builds a course on minilink and trusts it for
+three years. The foundation rows are design conversations before code.
+
+### v0.9 — what could still break a name
 
 - [ ] **S31** `HybridDiagram` → a `System` (state `[plant; computer]`, periodic discrete
   update) or an honest `HybridLoop` rename with `%` → `on_schedule()`; the hand-copied
@@ -512,6 +520,75 @@ After two cohorts; each is a design conversation before code. **[ask — core]**
   today `tf` + skin.
 - [ ] **S30** Rename the graphical `Sphere` / `Box` glyphs so no two importable public types
   share a name with the geometry solids. **[ask — public names]**
+- [ ] **V3 The frozen surface** **[ask — public names]**: list the names the v1.0 freeze
+  covers. `StepSystem`, `StepDiagramSystem`, `ZOHHold` (root prelude) and `control.mpc`
+  (control facade) join it or move behind a visibly provisional name. Done when the
+  teaching-surface registry (`tests/unittest/test_teaching_surface.py`) marks each name
+  frozen or provisional and the API site shows the mark.
+
+### v0.9 — the trust contract
+
+- [ ] **V4 Deprecation policy** **[ask]**: from v1.0, a teaching-surface removal or rename
+  ships one minor release as a `DeprecationWarning` shim (RULES "no deprecated aliases" is
+  amended for v1.0 on). A snapshot of the export list is a test; changing it fails until the
+  snapshot and the CHANGELOG line move together. Done when RULES, ROADMAP §2 and the
+  snapshot test agree.
+- [ ] **V5 `CHANGELOG.md`**: user-facing, one entry per release from v0.9 (back-filled for
+  0.1.0 / 0.1.1 from ROADMAP §2); `pyproject.toml` `Changelog` URL points there. Done when
+  `publish.yml` refuses a tag without its CHANGELOG heading.
+- [ ] **V6 One install story** **[ask — student-facing]**: README and `install.md` lead with
+  `pip install minilink`, conda for the Full stack; `install.md` no longer says 0.1.0 is
+  pending. The Colab setup cell installs a pinned release (`%pip install minilink==X.Y`)
+  instead of `git clone main`; `COLAB_CLONE` in `tests/unittest/test_repo_contract.py`
+  follows. Done when every notebook carries the pinned cell and runs in Colab.
+- [ ] **S70 `MinilinkError` family** **[ask — core]**: `WiringError`, `ShapeError`,
+  `SolverError` subclassing the `ValueError` / `TypeError` raised today (no caller breaks);
+  S66's wiring-time checks raise them. Done when the wiring and compile paths of `core/`
+  raise only the family.
+
+### v0.9 — the syllabus holes
+
+- **P6 lands here** (its row is in §3) **[ask — public names]**: exact ZOH and
+  Tustin `c2d` on `LTISystem`, z-plane `pzmap`, discrete `step_response` and `bode`
+  (`analysis/`), checked against `scipy.signal.cont2discrete`. Done when a digital PID and a
+  discrete state feedback run in a topic notebook.
+- [ ] **S71 The classic first plants**: DC motor (if the GRO501 gate has not landed it), tank
+  / thermal first-order-plus-delay process, ball and beam, differential drive, 3-D quadrotor,
+  each with `tf`, a skin and the catalog both-backends contract test; LQI beside the `N`
+  matrix of P8. Done when each has a one-line demo in `examples/demos/dynamics/`.
+- C4 (identification, trajectory generation) moves here if GMC714 does not land it (§4).
+
+### v0.9 — the reference site
+
+- [ ] **V7 The docs site as a guide**: myst-nb (or nbsphinx) renders `examples/tutorial/`
+  from stored outputs; a plant gallery (one image per catalog plant from
+  `docs/make_assets.py`); a concept page (System, composition, tools as verbs). Done when the
+  Sphinx `-W` build on `docs.yml` publishes all three.
+
+### v1.0 — a colleague can build a course on it
+
+- [ ] **V8 Textbook-validation suite**: `tests/unittest/test_textbook_examples.py`, worked
+  examples from Dorf & Bishop, Ogata, Franklin–Powell asserted numerically (margins, step
+  specifications, root locus, LQR and Kalman gains), each citing its example number; GRO501
+  gate 3 is the seed. Done when the README links it as the correctness evidence.
+- [ ] **V9 Course-neutral labs** **[maintainer]**: `examples/teaching/topics/` grows from 7
+  to 10–15 labs (objectives, prerequisites, time, starter and solution), classical control
+  and robotics first; a "For instructors" page (pin a version, Colab, adapt a lab, report a
+  bug).
+- [ ] **V10 The public face** **[ask]**: the README opens on a teaching quickstart; TRL,
+  lanes, wave and step ids leave README and `examples/README.md`; the agent and governance
+  files stay at the root or move under `docs/dev/` (decided); `CONTRIBUTING.md`, issue
+  templates, a code of conduct.
+- [ ] **V2** Zenodo archive and a citable DOI (`CITATION.cff`) after PyPI; the JOSS entry
+  and the RULES 6.9 carve-out for its state-of-the-field section, decided then.
+- [ ] **S49 Retire the Stable-Baselines3 teaching notebooks** **[ask]** (v1.0: at the end of the term, decided 2026-09-26). Delete
+  `teaching/courses/udes_gro860/drone_ppo_sb3.ipynb` and
+  `pendulum_value_iteration_vs_lqr_vs_ppo_sb3.ipynb`, their notebook overrides and allowlist
+  entries, and the README rows marked Stable-Baselines3, once the course notes point only at
+  the native twins.
+
+### After v1.0 — 1.x features, additive
+
 - [ ] **S32** Unify `MechanicalSystem` / `GeneralizedMechanicalSystem` (`N = I` special
   case); `Boat2D` / `Plane3D` gain `q` / `dq` ports; `DynamicBicycle` on
   `GeneralizedMechanicalSystem` (scan: dynamics#5).
@@ -521,13 +598,8 @@ After two cohorts; each is a design conversation before code. **[ask — core]**
   reach plant, controller, cost, sets and `x0` alike; today tutorial 11 and
   `pid_autotuning_jax` write that scan by hand.
 - [ ] **S36** iLQR planner from parts (`jacfwd` of `f_trace`; idea, research lane).
-- [ ] **S49 Retire the Stable-Baselines3 teaching notebooks** **[ask]** (v1.0: at the end of the term, decided 2026-09-26). Delete
-  `teaching/courses/udes_gro860/drone_ppo_sb3.ipynb` and
-  `pendulum_value_iteration_vs_lqr_vs_ppo_sb3.ipynb`, their notebook overrides and allowlist
-  entries, and the README rows marked Stable-Baselines3, once the course notes point only at
-  the native twins.
-- [ ] **V2** Zenodo archive and a citable DOI (`CITATION.cff`) after PyPI; the JOSS entry
-  and the RULES 6.9 carve-out for its state-of-the-field section, decided then.
+- [ ] **General serial chain**: DH or URDF description to RNEA / ABA beyond the UR5 (joins
+  the articulated-mechanism Later idea).
 
 ---
 

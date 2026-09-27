@@ -15,7 +15,8 @@ Identity: [CONSTITUTION.md](CONSTITUTION.md).
 | **v0.1** | **GRO860 end to end**, plus a working **`pip install minilink` on PyPI**. Every topic of the running optimal-control & RL course runs on the teaching surface, in Colab (git-clone cell) and in the conda env: value iteration / DP on a grid · LQR + linearization · trajectory optimization · RL via native `ReinforcementLearningPlanner` (with `Sys2Gym` + SB3 as an optional bridge). See §4.1. | Fall 2026 — **`0.1.0` on PyPI** (2026-09-16); **`0.1.1`** (2026-09-26) is the first release a GitHub tag published. Conda from `environment.yml` stays the Full local stack. Names the course notebooks already use stay frozen until v1.0. Close-out steps: §5.1. |
 | **v0.2** | **GRO501 end to end** (the classical-control course: multi-physics modelling · root locus / Bode / margins · PID to spec · digital implementation · state feedback, pole placement, LQR, observers — see §4.2). Conda stays the recommended Full local install. | October 2026 |
 | **v0.3** | **GMC714 end to end** — the teaching layer solidified for the class: robust control · robotic arm · trajectory optimization · MPC · vehicle models · nonlinear control (§4.3), with **pyro parity**, the catalog work of §5.3 and **the textbook objects** (fields, cost parameters, workspace geometry — moved from v0.2 on 2026-09-26). | December 2026 |
-| **v1.0** | The foundation questions deferred to §5.4 (hybrid as a `System`, derived `x0`, evaluator/solver layering, the posed-geometry drawing hook, one mechanical base, the differentiable closed-loop cost), after two cohorts; the Stable-Baselines3 notebooks retire and the name freeze lifts. | 2027 |
+| **v0.9** | **Freeze candidate** (§5.4): the foundation questions that could still break a public name are decided (hybrid as a `System`, derived `x0`, evaluator/solver layering, the glyph/solid rename); the trust contract is in place (deprecation policy, pinned export list, CHANGELOG, pinned installs); the standard-syllabus holes close (estimation, discrete time, identification); the docs site renders the tutorials. | Early 2027 |
+| **v1.0** | **A colleague can build a course on it and trust it for three years** (§5.5): the API frozen under the deprecation policy, the standard control syllabus covered and checked against textbook worked examples, course-neutral labs an instructor adopts outside UdeS, green on Windows, macOS and Linux; after two cohorts. The Stable-Baselines3 notebooks retire and the GRO860 name freeze becomes the general one. | 2027 |
 
 ## 2. Two lanes
 
@@ -315,6 +316,9 @@ Standing work, behaviour-preserving, one module per step.
   duplication; `HybridSimulator` conventions; realtime review;
   `StepDiagramSystem.step` writes in place under JAX; camera hints (S43);
   `rollout_batch` family profile (S53).
+- **S69** Students' laptops: Windows and macOS legs in CI (Basic tier and a
+  notebook smoke), coverage reported (no gate). Lands in v0.2, before the
+  GRO501 cohort installs.
 - **T7** The graphical band joins the textbook pass. **S65** One owner per
   rule (the automatic `dt`, the backend fallback, the input-hold model, the
   Monte Carlo defaults); **S66** wiring mistakes fail at wiring time
@@ -365,9 +369,19 @@ Standing work, behaviour-preserving, one module per step.
   and before the v0.9 freeze. **RN-3** `NoiseSource` lands here too, unless a
   GRO501 notebook needs sampled sensor noise first (then with P11).
 
-### 5.4 v1.0 — one `System`, closed (2027)
+### 5.4 v0.9 — freeze candidate (early 2027)
 
-The foundation questions, after two cohorts have run on v0.2:
+What v1.0 asks is adoption, not architecture: a colleague builds a course on
+minilink and trusts it for three years. The
+[adoption review of 2026-09-26](docs/reviews/2026-09-26-adoption-review.md)
+found the engine ready and three things missing around it: a stability
+promise, the two syllabus holes every course hits (estimation, discrete
+time), and material packaged for an instructor. v0.9 closes the first two
+and settles every question that could still break a public name; v1.0 (§5.5)
+freezes.
+
+**The foundations that can break names** — decided before the freeze, not
+after:
 
 - **S31** The sampled loop as a `System` (state `[plant; computer]`, periodic
   discrete update) or an honest `HybridLoop` rename; `%` stays the one hybrid
@@ -377,19 +391,78 @@ The foundation questions, after two cohorts have run on v0.2:
 - **S37** Evaluator / solver re-layering: evaluators keep pure maps and one
   scannable step, integrators move to `simulation/solvers/`; **S27** Diffrax
   as an optional JAX solve. **[ask — core]**
-- **S44** One posed-geometry hook so "two functions" (`f` and a drawing
-  function) is literal; **S30** the glyph / solid rename. **[ask]**
-- **S32** One mechanical base (`N = I` special case); `Boat2D` / `Plane3D`
-  gain `q` / `dq` ports. **[ask — core]**
-- **V1** The differentiable closed-loop cost, `J = F(problem params)` as one
-  traced scalar, on the nested parameter dictionary A2 introduces.
-  **[ask — core]**
-- **S36** iLQR from parts (idea, research lane).
-- **S49** Retire the two Stable-Baselines3 teaching notebooks at the end of
-  the term, once the course notes point only at the native twins; the
-  GRO860 name freeze lifts with v1.0. **[ask]**
+- **S30** The glyph / solid rename; **S44** one posed-geometry hook so "two
+  functions" (`f` and a drawing function) is literal. **[ask]**
+- **V3** The frozen surface: which names the freeze covers. The provisional
+  bands on the root and band facades today (`StepSystem`,
+  `StepDiagramSystem`, `ZOHHold`, `control.mpc`) either join the frozen
+  surface or move behind a visibly provisional name. **[ask — public names]**
+
+**The trust contract:**
+
+- **V4** Deprecation policy: from v1.0 on, removing or renaming a
+  teaching-surface name costs one minor release with a `DeprecationWarning`
+  shim (RULES "no deprecated aliases" keeps holding until then). A snapshot
+  test pins the teaching-surface export list; a change to it names its
+  CHANGELOG line. **[ask]**
+- **V5** `CHANGELOG.md` for users (`pyproject` points there, not at this
+  file); every release from v0.9 carries its entry.
+- **V6** One install story: `pip install minilink` first, conda for the Full
+  stack; the Colab cell installs a pinned release instead of cloning `main`
+  (the repo-contract test follows); `install.md` current.
+- **S70** A `MinilinkError` family (wiring, shape, solver) under the plain
+  `ValueError` / `TypeError` it subclasses, so a message and an autograder
+  can catch the category. **[ask — core]**
+
+**The syllabus holes** (beyond GRO501's P4 / P5 / P8):
+
+- **P6** The z tier leaves hold: exact ZOH and Tustin `c2d`, z-plane pole-zero
+  map, discrete step and Bode. Every digital-control course needs it, whether
+  or not the GRO501 sommatif examines it. **[ask — public names]**
+- **C4** `identification/fitting.py` (least squares, ARX, step-response fit)
+  and trajectory generation (polynomial, trapezoidal, minimum jerk), pulled
+  from v0.3 if GMC714 does not land them.
+- **S71** The classic first plants: DC motor, tank / thermal process, ball and
+  beam, differential drive, 3-D quadrotor. LQI beside the `N` matrix (P8).
+
+**The reference site:**
+
+- **V7** The docs site renders the tutorials (myst-nb or nbsphinx), a plant
+  gallery with pictures, and a short concept guide (what a `System` is,
+  composition, tools as verbs).
+
+### 5.5 v1.0 — a colleague can build a course on it (2027)
+
+After two cohorts have run on v0.2 and the freeze candidate has held a term:
+
+- **V8** A textbook-validation suite: Dorf / Ogata / Franklin worked examples
+  asserted numerically (margins, step specifications, LQR and Kalman gains,
+  root locus), course-neutral and permanent; GRO501 gate 3 is its seed. It is
+  also the page an instructor reads first.
+- **V9** Course-neutral labs: `examples/teaching/topics/` grown to 10–15
+  self-contained labs (objectives, prerequisites, time, starter and solution),
+  classical control and robotics at the depth optimal control and RL already
+  have; the UdeS course folders stay as case studies. A "For instructors"
+  page: pin a version, run in Colab, adapt a lab, report a bug.
+  **[maintainer]**
+- **V10** The public face: the README opens on a teaching quickstart (JAX
+  speed, compile tiers and the Gym bridge lower down or on the site); no
+  internal vocabulary (TRL, lanes, wave and step ids) in user-facing files;
+  whether the agent and governance files stay at the root is decided;
+  `CONTRIBUTING.md`, issue templates, a code of conduct. **[ask]**
 - **V2** Release hygiene: Zenodo archive and DOI, `CITATION.cff`; the JOSS
   decision and the RULES 6.9 carve-out it would need, decided then.
+- **S49** Retire the two Stable-Baselines3 teaching notebooks at the end of
+  the term, once the course notes point only at the native twins. **[ask]**
+- The freeze: the V3 surface under the V4 policy; the GRO860 name freeze
+  becomes the general one.
+
+**After v1.0 (1.x features, additive by construction):** **V1** the
+differentiable closed-loop cost, `J = F(problem params)` as one traced scalar
+on the nested parameter dictionary A2 introduces **[ask — core]**; **S32** one
+mechanical base (`N = I` special case), if it lands without breaking a name
+**[ask — core]**; **S36** iLQR from parts (research lane); a general serial
+chain (DH or URDF to RNEA / ABA).
 
 **Simplify and consolidate — a standing principle, not a rung.** The repo
 must stay manageable by one maintainer, so every rung carries consolidation
@@ -480,13 +553,24 @@ here. Each open item needs the maintainer.
 - **CBF safety filter** ([cbf-safety-filter.md](docs/plans/cbf-safety-filter.md)):
   research lane until a course asks; the barrier is a `Field` once A1 lands.
 
-**Before v1.0**
+**Before v0.9 (the freeze candidate)**
 
 - `HybridDiagram` as a `System` vs `HybridLoop` (S31), and the sampled
   seam's time argument: integer ticks (today) or seconds, which would remove
   three copies of `t0` / `dt_mpc` in the MPC block.
 - Evaluator / solver layering, Diffrax (S37, S27).
 - The posed-geometry hook (S44) and the glyph / solid rename (S30).
+- The frozen surface (V3): do `StepSystem`, `StepDiagramSystem`, `ZOHHold`
+  and `control.mpc` join it, or sit behind a provisional name.
+- The deprecation policy (V4): shims from v1.0 on, overriding RULES "no
+  deprecated aliases" from then.
+- The z tier (P6) in scope for v0.9 (proposed yes).
+- A `MinilinkError` family (S70).
+
+**Before v1.0**
+
+- Whether AGENTS.md, CLAUDE.md, RULES.md and CONSTITUTION.md stay at the
+  repository root or move under `docs/dev/` (V10).
 - Zenodo / DOI, and whether JOSS is wanted (V2).
 
 ## 7. Out of scope
