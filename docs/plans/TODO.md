@@ -81,7 +81,13 @@ TB-a (the analysis toolbox reads like the textbook) landed 2026-09-26: the short
 ([2026-09-26-analysis-toolbox-audit.md](../reviews/2026-09-26-analysis-toolbox-audit.md)), the
 byte-identical rewrite (`36a51e7`…`559cb37`) and four fixes (`19b75c1`…`b018cb5`).
 
-**Next, in order (decided 2026-09-26):** clean-up and solidification first — P7, then P5 and
+P7 landed 2026-09-26 (`18b3b32`…`170bb1e`), ruled explicit and pinned rather than generated:
+the System shortcuts stay written out, so editors show their parameters, and
+`tests/unittest/test_system_shortcuts.py` pins each to its band function; a second test pins
+the band's calling pattern; `analysis/linearization.py` and `discretization.py` free
+`linearize` and `discretize` from the band-facade name collision.
+
+**Next, in order (decided 2026-09-26):** clean-up and solidification first — P5 and
 P8 on the cleaned toolbox, TB-b, S61, P9, P10 — then RN-1 of
 [randomness.md](randomness.md) (the disturbance convention, decided 2026-09-26) and P4, then P11. The textbook pass comes before the new surface, so
 the new code copies clean patterns and no shortcut is added only to be dropped.
@@ -110,14 +116,6 @@ the new code copies clean patterns and no shortcut is added only to be dropped.
   naming the submodule goes (scan: control#12). Before P11 writes notebooks on the band
   layer. The name freeze (gate 7) now runs to v1.0: `minilink.control.lqr` stays importable
   as an alias until then, or S62 waits for v1.0 — part of the ask.
-- [ ] **P7 Generate the analysis facades**: one helper builds a delegating method from the
-  target function (signature and docstring copied), explicit form kept only where the facade
-  differs; a test asserts every generated `__signature__` matches its target. Done when the
-  kept shortcuts (TB-a step 1: seven analysis methods plus `animate_modal` on
-  `DynamicSystemFacades`, `plot_step_response` on `LTISystemFacades`) are generated and
-  `help(sys.plot_bode)` is unchanged; `test_the_system_shortcuts` pins the list.
-  Also: a signature test pinning the band's calling pattern (scan: analysis#7); `linearize` and
-  `discretize` freed from the band-facade name collision (scan: analysis#11).
 - [ ] **P8 Small teaching helpers**: ζ and ω_n from a complex pole pair (fields on the `pzmap`
   result or a `damping(sys)` verb); the `N` reference-scaling matrix giving `y = r` at steady
   state. Done when §9.5 and §9.11 of the

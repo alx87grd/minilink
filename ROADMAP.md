@@ -275,15 +275,16 @@ wave B. A4 and A5 stay here.
   (`root_locus` through K = −1/d, `step_info` on an unsettled response, MIMO
   input to the SISO functions, one rank rule).
 - **B2** The missing surface, on the cleaned toolbox: **P5** named
-  `S` / `T` / `PS` / `CS`, **P8** ζ / ω_n and the `N` matrix, **P7** the
-  generated facades (only the shortcuts TB-a keeps).
+  `S` / `T` / `PS` / `CS`, **P8** ζ / ω_n and the `N` matrix. **P7** landed
+  2026-09-26: the shortcuts TB-a kept stay written out and are pinned to
+  their band functions by a test, not generated.
 - **TB-b** The control objects and the loop (`siso`, `state`, `lqr`, `place`,
   `TransferFunction`, `LTISystem`, `feedback` / `@`) read like the textbook;
   after P5, before P11.
 - **B3** **P4** `estimation/`: `LuenbergerObserver`, `luenberger()`,
   `kalman()`, and how observer and state feedback compose. Held 2026-09-07;
   it is the largest §4.2 gap. Decided 2026-09-26: the clean-up and
-  solidification (TB-a landed; P7, P5, P8, TB-b, S61, P9, P10) land first, then
+  solidification (TB-a and P7 landed; P5, P8, TB-b, S61, P9, P10) land first, then
   RN-1 of [randomness.md](docs/plans/randomness.md) (`WhiteNoise` with its `psd`), then P4. The
   disturbance convention was decided 2026-09-26 (§6). **[ask]**
 - **B4** Polish: **P9** `TransferFunction` ports built once, **P10** the
