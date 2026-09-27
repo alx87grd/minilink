@@ -547,6 +547,17 @@ three years. The foundation rows are design conversations before code.
   `SolverError` subclassing the `ValueError` / `TypeError` raised today (no caller breaks);
   S66's wiring-time checks raise them. Done when the wiring and compile paths of `core/`
   raise only the family.
+- [ ] **V11 Rewrite the history without notebook outputs** **[ask — force-push]**, in December
+  2026 after the v0.3 tag, between terms. A fresh clone is 161 MB for 19 MB of files: 169 MB of
+  the history is `.ipynb` outputs committed before the `nbstripout` hook worked, mostly five
+  notebooks deleted by May (`examples/notebooks/demo*.ipynb`, `animation_colab.ipynb`).
+  `main` carries it all, so deleting branches or `archive/*` tags does not help. Steps: keep a
+  bare mirror clone as the backup; `git filter-repo` stripping outputs from every `.ipynb` blob
+  (or dropping the deleted notebooks' paths); re-point the release tags `0.0.1`–`0.1.1` and the
+  `archive/*` tags; force-push branches and tags; the re-clone notice to students and
+  collaborators, and the line in the CHANGELOG (V5). PyPI releases are untouched. GitHub keeps
+  the old objects behind `refs/pull/*` until its support purges them; clones shrink regardless.
+  Done when `git clone` of the repo is under 25 MB and CI is green on the rewritten `dev`.
 
 ### v0.9 — the syllabus holes
 

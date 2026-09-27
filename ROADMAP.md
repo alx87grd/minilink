@@ -414,6 +414,11 @@ after:
 - **S70** A `MinilinkError` family (wiring, shape, solver) under the plain
   `ValueError` / `TypeError` it subclasses, so a message and an autograder
   can catch the category. **[ask — core]**
+- **V11** A light history: the notebook outputs committed before the
+  `nbstripout` hook worked (169 of the 176 MB a clone downloads, five
+  notebooks deleted since May) leave the git history. It breaks every commit
+  id and every local clone, so it runs once, in December 2026 after the v0.3
+  tag, between the fall and winter terms. **[ask]**
 
 **The syllabus holes** (beyond GRO501's P4 / P5 / P8):
 
