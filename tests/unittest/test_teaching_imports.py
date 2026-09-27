@@ -45,9 +45,9 @@ ROOTS = ("examples/tutorial", "examples/teaching", "examples/demos")
 def _sources():
     for root in ROOTS:
         for path in sorted((REPO / root).rglob("*.py")):
-            yield path, path.read_text(errors="ignore")
+            yield path, path.read_text(encoding="utf-8", errors="ignore")
         for path in sorted((REPO / root).rglob("*.ipynb")):
-            cells = json.loads(path.read_text()).get("cells", [])
+            cells = json.loads(path.read_text(encoding="utf-8")).get("cells", [])
             code = "\n".join(
                 "".join(c.get("source", []))
                 for c in cells
@@ -91,7 +91,7 @@ def load_allowlist():
         return set()
     return {
         tuple(line.split())
-        for line in ALLOWLIST.read_text().splitlines()
+        for line in ALLOWLIST.read_text(encoding="utf-8").splitlines()
         if line.strip() and not line.startswith("#")
     }
 

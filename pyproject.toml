@@ -50,6 +50,7 @@ Changelog = "https://github.com/alx87grd/minilink/blob/main/ROADMAP.md"
 dev = [
     "pre-commit",
     "pytest",
+    "pytest-cov",
     "ruff",
     "build",
     "twine",

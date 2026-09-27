@@ -77,7 +77,8 @@ pull requests to the branches its `on:` block lists (`main` and `dev` among them
 
 | Job | Steps |
 | --- | --- |
-| **`test`** | ruff + `pytest` (py 3.10–3.13; demo-check bridge; JAX tests and demos skip) |
+| **`test`** | ruff + `pytest` (py 3.10–3.13; demo-check bridge; JAX tests and demos skip); coverage report on py 3.12, no gate |
+| **`laptops`** | Basic tier (`pip install -e ".[dev]"`, no extras) on `windows-latest` and `macos-latest`, py 3.12: `pytest` + **notebook smoke** (notebooks that need an extra skip) |
 | **`packaging`** | `python -m build` + wheel/sdist check (no `experimental/`) + `twine check` + install the wheel and `import minilink` |
 | **`regression`** | `pytest` (incl. the JAX tests) + regression gates (CI flags above) + **flagship demos** + **notebook smoke** (py 3.12 + JAX + viz) |
 
@@ -90,13 +91,13 @@ optional stack; `docs.yml` builds the Sphinx site.
 
 | Layer | Human IDE (`tests/run/`) | Agent / CI | CI job |
 | --- | --- | --- | --- |
-| **Contract tests** | `run_contract_tests.py` | `pytest` | `test` + `regression` |
+| **Contract tests** | `run_contract_tests.py` | `pytest` | `test` + `laptops` + `regression` |
 | **Regression gates** | `run_regression_gates.py` | `benchmarks/run_regression_check.py` | `regression` |
 | **Benchmark study** | `run_benchmark_study.py` | `benchmarks/run_study.py` | — |
 | **Graphics contract** | (in contract tests) | `test_flagship_graphics_contract.py` | `test` |
 | **Graphics visual** | `tests/demo_checks/run_graphics_visual_check.py` | local | — |
 | **Demo checks** | `run_demo_checks.py` | `tests/demo_checks/run_*.py` | `test` + `regression` |
-| **Notebook smoke** | `run_notebook_checks.py` | `tests/demo_checks/run_notebook_checks.py` | `regression` |
+| **Notebook smoke** | `run_notebook_checks.py` | `tests/demo_checks/run_notebook_checks.py` | `laptops` + `regression` |
 | **Pre-push** | `run_pre_push.py` | ruff + pytest | `test` |
 | **Packaging** | — | `python -m build` + `check_wheel.py` | `packaging` |
 
@@ -123,13 +124,13 @@ Detail: [benchmarks/README.md](../benchmarks/README.md).
 
 | Layer | Purpose | Entry command | CI job |
 | --- | --- | --- | --- |
-| **Contract tests** | API types, shapes, compile/sim/MPC behavior | `pytest` | `test` + `regression` (w/ JAX) |
+| **Contract tests** | API types, shapes, compile/sim/MPC behavior | `pytest` | `test` + `laptops` (Basic tier) + `regression` (w/ JAX) |
 | **Regression gates** | Accuracy goldens + guarded NLP/trajopt solve time | `run_regression_check.py --suite all` | `regression` |
 | **Benchmark study** | Machine/GPU exploration tables | `run_study.py --list` | — |
 | **Graphics contract** | Draw-list + headless PNG checks | `test_flagship_graphics_contract.py` (in `pytest`) | `test` |
 | **Graphics visual** | You confirm Meshcat/MPL/Plotly locally | `run_graphics_visual_check.py` | — |
 | **Demo checks** | Catalog + flagship demos must not throw | `run_catalog_checks.py`, `run_flagship_demos.py` | `test` (pytest bridge) + `regression` (full flagships w/ JAX) |
-| **Notebook smoke** | Teaching notebooks' code cells must not throw | `run_notebook_checks.py` | `regression` |
+| **Notebook smoke** | Teaching notebooks' code cells must not throw | `run_notebook_checks.py` | `laptops` (Basic tier) + `regression` |
 | **Repo contract** | Doc links resolve, public prose names no other tool, no pseudo-private methods | `test_repo_contract.py` (in `pytest`) | `test` |
 | **Packaging** | Wheel/sdist ship the teaching surface, not `experimental/` | `python -m build` + `tests/demo_checks/check_wheel.py` | `packaging` |
 
@@ -167,7 +168,8 @@ there). A thin pytest bridge ([`test_demo_check_runners.py`](unittest/test_demo_
 invokes those runners so the CI ``test`` job covers catalog / non-JAX flagships /
 graphics without re-implementing checks as pytest cases. The CI ``regression``
 job (JAX installed) re-runs ``run_flagship_demos.py`` so JAX flagships are gated,
-and runs ``run_notebook_checks.py`` so teaching notebooks' code cells do not throw.
+and runs ``run_notebook_checks.py`` so teaching notebooks' code cells do not throw; the
+``laptops`` job runs the same smoke on the Basic tier under Windows and macOS.
 
 Demos and teaching notebooks must **not** branch on smoke/CI env vars — the runner
 only sets headless display knobs. A contract test scans ``examples/tutorial/``, ``examples/teaching/``,

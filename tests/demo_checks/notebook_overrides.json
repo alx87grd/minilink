@@ -30,6 +30,11 @@
   "examples/tutorial/09_planning.ipynb": {
     "timeout": 300
   },
+  "examples/tutorial/11_reinforcement_learning.ipynb": {
+    "requires": [
+      "jax"
+    ]
+  },
   "examples/tutorial/10_graphical.ipynb": {
     "requires": [
       "meshcat",

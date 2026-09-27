@@ -485,9 +485,10 @@ pick):
   over every control law, the catalog with perturbed `params`, and the `params.sets` scoring
   parity.
 
-- [ ] **S69 Students' laptops**: `windows-latest` and `macos-latest` legs in `test.yml`
+- [x] **S69 Students' laptops**: `windows-latest` and `macos-latest` legs in `test.yml`
   (Basic tier pytest and the notebook smoke), coverage reported on the Linux leg with no
-  gate. Done before the GRO501 cohort installs (v0.2).
+  gate. Done before the GRO501 cohort installs (v0.2). The `laptops` job; coverage on the
+  `test` job's py3.12 leg (remote run pending).
 
 ---
 

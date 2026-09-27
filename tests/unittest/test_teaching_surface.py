@@ -216,7 +216,8 @@ def documented_modules():
     """Modules that some ``docs/api/*.rst`` page renders with ``automodule``."""
     modules = set()
     for page in API_PAGES.glob("*.rst"):
-        modules.update(re.findall(r"^\.\. automodule:: (\S+)", page.read_text(), re.M))
+        text = page.read_text(encoding="utf-8")
+        modules.update(re.findall(r"^\.\. automodule:: (\S+)", text, re.M))
     return modules
 
 

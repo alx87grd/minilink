@@ -2186,7 +2186,7 @@ def test_box_probes_stay_at_the_solver_boundary():
         rel = path.relative_to(root).as_posix()
         if rel.startswith("experimental/") or rel in lowering:
             continue
-        for node in ast.walk(ast.parse(path.read_text())):
+        for node in ast.walk(ast.parse(path.read_text(encoding="utf-8"))):
             if not (
                 isinstance(node, ast.Call)
                 and getattr(node.func, "id", None) == "isinstance"

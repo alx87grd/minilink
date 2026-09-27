@@ -54,6 +54,7 @@ dependencies:
 
   # --- dev ([dev] + docs) ---
   - pytest
+  - pytest-cov
   - ruff
   - pre-commit
   - sphinx
