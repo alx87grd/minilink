@@ -1,15 +1,12 @@
-"""Structural analysis of linear systems: controllability and observability.
-
-These verbs take the constant matrices of a linear model (an
-:class:`~minilink.dynamics.abstraction.state_space.LTISystem` or raw arrays)
-and return the Kalman controllability/observability matrices, their rank, and
-the boolean verdict. Use :func:`minilink.analysis.linearize.linearize` first to
-get an ``LTISystem`` from a nonlinear plant.
-"""
+"""Structural analysis of linear systems: controllability and observability."""
 
 from dataclasses import dataclass
 
 import numpy as np
+
+# Relative singular-value threshold of every rank decision: the Kalman matrices raise
+# A to the power n − 1, so their rounding sits far above machine precision
+RANK_TOL = 1e-9
 
 
 @dataclass(frozen=True)
@@ -25,57 +22,68 @@ class StructuralResult:
         return self.rank == self.n
 
 
-def controllability(A, B=None):
-    """Return the controllability test for ``dx = A x + B u``.
+def controllability(A, B=None, *, tol=RANK_TOL):
+    """Return the controllability test for the pair ``(A, B)``.
 
-    The Kalman matrix is ``[B, AB, A²B, …, Aⁿ⁻¹B]``; the pair is controllable
-    when it has full row rank ``n``. Pass the two matrices or one
-    ``LTISystem`` (``controllability(plant.linearize(x_bar))``).
+    The pair is controllable when its Kalman controllability matrix has full
+    row rank ``n``. Pass the two matrices or one ``LTISystem``
+    (``controllability(plant.linearize(x_bar))``). ``tol`` is the relative
+    singular-value threshold below which a direction counts as missing, the
+    same as :func:`~minilink.analysis.linear.minreal`'s.
     """
-    if B is None:
-        A, B = _lti_matrices(A, "B")
-    A = np.asarray(A, dtype=float)
-    B = np.atleast_2d(np.asarray(B, dtype=float))
+    A, B = matrix_pair(A, B, "B")
     n = A.shape[0]
 
-    # 𝒞 = [B, AB, …, A^{n-1} B]
+    # 𝒞 = [B, AB, …, Aⁿ⁻¹B]
     blocks = [B]
     for _ in range(1, n):
         blocks.append(A @ blocks[-1])
     ctrb = np.hstack(blocks)
 
-    return StructuralResult(matrix=ctrb, rank=int(np.linalg.matrix_rank(ctrb)), n=n)
+    # Controllable ⇔ rank 𝒞 = n, counting the singular values σᵢ > tol σ₁
+    sigma = np.linalg.svd(ctrb, compute_uv=False)
+    r = int(np.sum(sigma > tol * sigma.max(initial=0.0)))
+
+    return StructuralResult(matrix=ctrb, rank=r, n=n)
 
 
-def observability(A, C=None):
-    """Return the observability test for ``dx = A x``, ``y = C x``.
+def observability(A, C=None, *, tol=RANK_TOL):
+    """Return the observability test for the pair ``(A, C)``.
 
-    The Kalman matrix is ``[C; CA; CA²; …; CAⁿ⁻¹]``; the pair is observable
-    when it has full column rank ``n``. Pass the two matrices or one
-    ``LTISystem``.
+    The pair is observable when its Kalman observability matrix has full
+    column rank ``n``. Pass the two matrices or one ``LTISystem``; ``tol`` as
+    in :func:`controllability`.
     """
-    if C is None:
-        A, C = _lti_matrices(A, "C")
-    A = np.asarray(A, dtype=float)
-    C = np.atleast_2d(np.asarray(C, dtype=float))
+    A, C = matrix_pair(A, C, "C")
     n = A.shape[0]
 
-    # 𝒪 = [C; CA; …; CA^{n-1}]
+    # 𝒪 = [C; CA; …; CAⁿ⁻¹]
     blocks = [C]
     for _ in range(1, n):
         blocks.append(blocks[-1] @ A)
     obsv = np.vstack(blocks)
 
-    return StructuralResult(matrix=obsv, rank=int(np.linalg.matrix_rank(obsv)), n=n)
+    # Observable ⇔ rank 𝒪 = n, counting the singular values σᵢ > tol σ₁
+    sigma = np.linalg.svd(obsv, compute_uv=False)
+    r = int(np.sum(sigma > tol * sigma.max(initial=0.0)))
+
+    return StructuralResult(matrix=obsv, rank=r, n=n)
 
 
-def _lti_matrices(lti, second):
-    """``(A, B)`` or ``(A, C)`` of an ``LTISystem`` passed as the only argument."""
-    if not all(callable(getattr(lti, name, None)) for name in ("A", second)):
-        raise TypeError(
-            f"pass the two matrices (A, {second}) or one LTISystem; got {type(lti).__name__}"
-        )
-    return lti.A(), getattr(lti, second)()
+# =============================================================================
+# Internal machinery
+# =============================================================================
+
+
+def matrix_pair(A, M, second):
+    """``(A, B)`` or ``(A, C)`` as float arrays, from the two matrices or from one ``LTISystem``."""
+    if M is None:
+        if not all(callable(getattr(A, name, None)) for name in ("A", second)):
+            raise TypeError(
+                f"pass the two matrices (A, {second}) or one LTISystem; got {type(A).__name__}"
+            )
+        A, M = A.A(), getattr(A, second)()
+    return np.asarray(A, dtype=float), np.atleast_2d(np.asarray(M, dtype=float))
 
 
 if __name__ == "__main__":

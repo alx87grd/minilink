@@ -22,7 +22,7 @@ _FIXTURE_DIR = Path(__file__).resolve().parents[1] / "fixtures" / "ur5_sim_basel
 
 
 def _load_baseline():
-    manifest = json.loads((_FIXTURE_DIR / "manifest.json").read_text())
+    manifest = json.loads((_FIXTURE_DIR / "manifest.json").read_text(encoding="utf-8"))
     data = np.load(_FIXTURE_DIR / "trajectory.npz")
     return manifest, data
 

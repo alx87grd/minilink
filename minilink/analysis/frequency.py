@@ -1,25 +1,20 @@
-"""Frequency-domain analysis of one input–output channel of a linearized model.
-
-Every number comes from :mod:`minilink.analysis.linear`. This module picks
-one SISO channel ``(A, b, c, d)`` and plots the result.
-
-``bode``, ``pzmap``, ``nyquist``, ``margins``, ``root_locus`` and
-``transfer_function`` linearize ``sys`` about ``(x_bar, u_bar)`` with the
-same arguments as :func:`~minilink.analysis.linearize.linearize`. ``of``
-names the output and ``wrt`` the input (a port id means component 0,
-``(port, index)`` one component, a diagram wire ``"block:port"`` an internal
-signal). The ``plot_`` tools build one
-:class:`~minilink.graphical.control.ControlFigure` and render it with
-matplotlib or plotly.
-"""
+"""Frequency-domain analysis of one input–output channel of a linearized model."""
 
 from __future__ import annotations
+
+import inspect
+import os
+import warnings
 
 import numpy as np
 
 from minilink.analysis import linear
 from minilink.analysis.linear import Margins
-from minilink.analysis.linearize import linearize_matrices, output_selectors
+from minilink.analysis.linearization import (
+    channel_label,
+    channel_subtitle,
+    siso_matrices,
+)
 from minilink.graphical.common import PlotResult
 from minilink.graphical.control import (
     ControlFigure,
@@ -30,6 +25,9 @@ from minilink.graphical.control import (
     render_control_figure,
     style,
 )
+
+# Frequencies of the grid on which margins() reads the crossovers
+_MARGIN_GRID_POINTS = 2000
 
 
 def frequency_response(
@@ -67,7 +65,8 @@ def frequency_response(
         input port.
     w : array, optional
         Frequencies in rad/s. When omitted, a logarithmic grid runs one
-        decade below the slowest pole or zero to one decade above the fastest.
+        decade below the slowest pole or zero to one decade above the fastest,
+        widened until it brackets the 0 dB crossing.
     n : int, optional
         Number of frequencies for the automatic grid.
     method : {"auto", "fd", "jax"}, optional
@@ -80,7 +79,10 @@ def frequency_response(
     )
     w = frequency_grid(A, B, C, D, w, n)
 
-    return w, linear.frequency_response(A, B, C, D, w)
+    # G(jω) on the grid
+    G = linear.frequency_response(A, B, C, D, w)
+
+    return w, G
 
 
 def bode(
@@ -105,7 +107,11 @@ def bode(
         sys, x_bar, u_bar, t, params, of=of, wrt=wrt, w=w, n=n, method=method, eps=eps
     )
 
-    magnitude_db, phase_deg = _bode_coordinates(G)
+    # |G(jω)| in dB and the unwrapped ∠G(jω) in degrees
+    with np.errstate(divide="ignore"):
+        magnitude_db = 20.0 * np.log10(np.abs(G))
+    phase_deg = np.degrees(np.unwrap(np.angle(G)))
+
     return w, magnitude_db, phase_deg
 
 
@@ -119,7 +125,7 @@ def margins(
     of=None,
     wrt=None,
     w=None,
-    n: int = 2000,
+    n: int = _MARGIN_GRID_POINTS,
     method: str = "auto",
     eps: float = 1e-6,
 ) -> Margins:
@@ -133,7 +139,10 @@ def margins(
         sys, x_bar, u_bar, t, params, of=of, wrt=wrt, w=w, n=n, method=method, eps=eps
     )
 
-    return linear.margins(w, G)
+    # Crossovers of L(jω) and the margins read there
+    loop_margins = linear.margins(w, G)
+
+    return loop_margins
 
 
 def nyquist(
@@ -156,9 +165,11 @@ def nyquist(
     conjugate branch; poles on the imaginary axis make ``|G|`` blow up at
     those frequencies (the indented contour is not drawn).
     """
-    return frequency_response(
+    w, G = frequency_response(
         sys, x_bar, u_bar, t, params, of=of, wrt=wrt, w=w, n=n, method=method, eps=eps
     )
+
+    return w, G
 
 
 def pzmap(
@@ -172,19 +183,31 @@ def pzmap(
     wrt=None,
     method: str = "auto",
     eps: float = 1e-6,
+    minimal: bool | None = None,
 ) -> tuple[np.ndarray, np.ndarray, float]:
     """Return the selected SISO channel as ``(zeros, poles, gain)``.
 
     Same arguments as :func:`frequency_response` without the frequency grid:
     poles are the eigenvalues of ``A``, zeros the transmission zeros of the
-    channel, ``gain`` the leading coefficient ``k`` of
-    ``G(s) = k prod(s - z) / prod(s - p)``.
+    channel, ``gain`` the leading coefficient of its factored transfer
+    function. ``minimal`` (default: yes, with a
+    one-time notice when a pair cancels) first reduces the channel to its
+    minimal realization, so the uncontrollable and unobservable modes cancel;
+    ``minimal=False`` keeps every mode of the realization.
     """
     A, B, C, D = siso_matrices(
         sys, x_bar, u_bar, t, params, of=of, wrt=wrt, method=method, eps=eps
     )
 
-    return linear.zeros(A, B, C, D), linear.poles(A), linear.gain(A, B, C, D)
+    # Minimal realization: the uncontrollable and unobservable modes cancel
+    A, B, C, D = minimal_channel(A, B, C, D, minimal)
+
+    # G(s) = k ∏(s − z) / ∏(s − p)
+    z = linear.zeros(A, B, C, D)
+    p = linear.poles(A)
+    k = linear.gain(A, B, C, D)
+
+    return z, p, k
 
 
 def root_locus(
@@ -199,6 +222,7 @@ def root_locus(
     gains=None,
     method: str = "auto",
     eps: float = 1e-6,
+    minimal: bool | None = None,
 ) -> tuple[np.ndarray, np.ndarray]:
     """Closed-loop poles of ``u = -K y`` on the selected channel over a gain sweep.
 
@@ -206,12 +230,19 @@ def root_locus(
     ``gains`` defaults to an adaptive sweep from ``K = 0`` to the gain where
     the far branches leave the picture. Returns ``(gains, roots)`` with
     ``roots`` of shape ``(len(gains), n)``, one continuous branch per column.
+    ``minimal`` as in :func:`pzmap`.
     """
     A, B, C, D = siso_matrices(
         sys, x_bar, u_bar, t, params, of=of, wrt=wrt, method=method, eps=eps
     )
 
-    return linear.root_locus(A, B, C, D, gains)
+    # Minimal realization: the uncontrollable and unobservable modes cancel
+    A, B, C, D = minimal_channel(A, B, C, D, minimal)
+
+    # p(K) = eig(A − B K (1 + K d)⁻¹ C) over the gain sweep
+    gains, roots = linear.root_locus(A, B, C, D, gains)
+
+    return gains, roots
 
 
 def transfer_function(
@@ -225,19 +256,30 @@ def transfer_function(
     wrt=None,
     method: str = "auto",
     eps: float = 1e-6,
+    minimal: bool | None = None,
 ):
     """Return the selected SISO channel as a ``TransferFunction`` block.
 
-    Same arguments as :func:`frequency_response` without the frequency grid.
-    ``num(s) = k prod(s - z)`` and ``den(s) = prod(s - p)`` come from the
-    zeros, poles and gain of :func:`pzmap`; the block is their state-space
-    realization and carries ``numerator``, ``denominator``, ``poles`` and
-    ``zeros``, so it can be plotted, simulated, or wired like any other block.
+    Same arguments as :func:`frequency_response` without the frequency grid;
+    ``minimal`` as in :func:`pzmap`.
+    The numerator and denominator come from the zeros, poles and gain of
+    :func:`pzmap`; the block is their state-space realization and carries
+    ``numerator``, ``denominator``, ``poles`` and ``zeros``, so it can be
+    plotted, simulated, or wired like any other block.
     """
     from minilink.blocks.transfer_function import TransferFunction
 
     z, p, k = pzmap(
-        sys, x_bar, u_bar, t, params, of=of, wrt=wrt, method=method, eps=eps
+        sys,
+        x_bar,
+        u_bar,
+        t,
+        params,
+        of=of,
+        wrt=wrt,
+        method=method,
+        eps=eps,
+        minimal=minimal,
     )
 
     # num(s) = k ∏(s − z),   den(s) = ∏(s − p)
@@ -272,22 +314,31 @@ def plot_bode(
     """Bode diagram of the selected channel; ``margins=True`` marks the crossovers.
 
     The crossovers and the printed margins are those of :func:`margins`, read
-    on its 2000-point grid (or on ``w``), not on the ``n`` plotted frequencies.
+    on its grid (or on ``w``), not on the ``n`` plotted frequencies.
     ``title`` overrides the figure heading (default ``"Bode Diagram"``).
     """
     A, B, C, D = siso_matrices(
         sys, x_bar, u_bar, t, params, of=of, wrt=wrt, method=method, eps=eps
     )
     w_plot = frequency_grid(A, B, C, D, w, n)
+
+    # |G(jω)| in dB and the unwrapped ∠G(jω) in degrees
     G = linear.frequency_response(A, B, C, D, w_plot)
+    with np.errstate(divide="ignore"):
+        magnitude_db = 20.0 * np.log10(np.abs(G))
+    phase_deg = np.degrees(np.unwrap(np.angle(G)))
+
+    # The margins, read on the grid of margins()
     loop_margins = None
     if margins:
-        w_margins = frequency_grid(A, B, C, D, w, 2000)  # the grid of margins()
+        w_margins = frequency_grid(A, B, C, D, w, _MARGIN_GRID_POINTS)
         G_margins = linear.frequency_response(A, B, C, D, w_margins)
         loop_margins = linear.margins(w_margins, G_margins)
 
     return render_control_figure(
-        _bode_figure(w_plot, G, sys, of, wrt, loop_margins, title=title),
+        bode_figure(
+            w_plot, magnitude_db, phase_deg, sys, of, wrt, loop_margins, title=title
+        ),
         backend=backend,
         show=show,
     )
@@ -304,16 +355,26 @@ def plot_pzmap(
     wrt=None,
     method: str = "auto",
     eps: float = 1e-6,
+    minimal: bool | None = None,
     backend="matplotlib",
     show: bool = True,
 ) -> PlotResult:
-    """Pole-zero map of the selected channel: ``x`` poles, ``o`` zeros."""
+    """Pole-zero map of the selected channel: ``x`` poles, ``o`` zeros; ``minimal`` as in :func:`pzmap`."""
     z, p, gain = pzmap(
-        sys, x_bar, u_bar, t, params, of=of, wrt=wrt, method=method, eps=eps
+        sys,
+        x_bar,
+        u_bar,
+        t,
+        params,
+        of=of,
+        wrt=wrt,
+        method=method,
+        eps=eps,
+        minimal=minimal,
     )
 
     return render_control_figure(
-        _pzmap_figure(z, p, sys, of, wrt), backend=backend, show=show
+        pzmap_figure(z, p, sys, of, wrt), backend=backend, show=show
     )
 
 
@@ -329,17 +390,21 @@ def plot_root_locus(
     gains=None,
     method: str = "auto",
     eps: float = 1e-6,
+    minimal: bool | None = None,
     backend="matplotlib",
     show: bool = True,
 ) -> PlotResult:
-    """Root locus of the selected channel closed with ``u = -K y``."""
+    """Root locus of the selected channel closed with ``u = -K y``; ``minimal`` as in :func:`pzmap`."""
     A, B, C, D = siso_matrices(
         sys, x_bar, u_bar, t, params, of=of, wrt=wrt, method=method, eps=eps
     )
-    K, roots = linear.root_locus(A, B, C, D, gains)
+
+    # Minimal realization: the uncontrollable and unobservable modes cancel
+    A, B, C, D = minimal_channel(A, B, C, D, minimal)
+    gains, roots = linear.root_locus(A, B, C, D, gains)
 
     return render_control_figure(
-        _root_locus_figure(A, B, C, D, K, roots, sys, of, wrt),
+        root_locus_figure(A, B, C, D, gains, roots, sys, of, wrt),
         backend=backend,
         show=show,
     )
@@ -367,64 +432,39 @@ def plot_nyquist(
     )
 
     return render_control_figure(
-        _nyquist_figure(w, G, sys, of, wrt), backend=backend, show=show
+        nyquist_figure(w, G, sys, of, wrt), backend=backend, show=show
     )
 
 
 # =============================================================================
-# Channel helpers
+# Internal machinery
 # =============================================================================
 
 
-def siso_channel(sys, of, wrt):
-    """Normalize the channel to ``((of_name, index), (wrt_name, index))``.
-
-    ``of_name`` is ``None`` when the output is the state itself (no ``y``
-    port): the row is then taken from ``C = I``.
-    """
-    if wrt is None:
-        if not sys.inputs:
-            raise ValueError("Frequency analysis requires at least one input port.")
-        wrt = (next(iter(sys.inputs)), 0)
-    if of is None:
-        default = output_selectors(sys, None)
-        of = (None, 0) if default is None else (default[0][0], 0)
-    return _component(of, "of"), _component(wrt, "wrt")
-
-
-def channel_label(sys, of, wrt):
-    """``"y[1] / u[0]"`` for the selected channel."""
-    (of_name, i), (wrt_name, j) = siso_channel(sys, of, wrt)
-    return f"{'x' if of_name is None else of_name}[{i}] / {wrt_name}[{j}]"
+def minimal_channel(A, B, C, D, minimal):
+    """The channel's minimal realization unless ``minimal=False``; the default reports what it drops once."""
+    if minimal is False:
+        return A, B, C, D
+    A_min, B_min, C_min, D_min = linear.minreal(A, B, C, D)
+    dropped = A.shape[0] - A_min.shape[0]
+    if minimal is None and dropped > 0:
+        warnings.warn(
+            f"Cancelled {dropped} pole/zero pair(s): modes that are uncontrollable or "
+            "unobservable on this channel. Pass minimal=False to keep them.",
+            stacklevel=caller_stacklevel(),
+        )
+    return A_min, B_min, C_min, D_min
 
 
-def channel_subtitle(sys, of, wrt):
-    """``"From: u[0]  To: y[1]"`` for the selected channel."""
-    (of_name, i), (wrt_name, j) = siso_channel(sys, of, wrt)
-    return style.channel_subtitle("x" if of_name is None else of_name, i, wrt_name, j)
-
-
-def siso_matrices(sys, x_bar, u_bar, t, params, *, of, wrt, method, eps):
-    """``A, b, c, d`` of the selected channel (``b`` a column, ``c`` a row)."""
-    (of_name, i), channel_in = siso_channel(sys, of, wrt)
-    A, B, C, D = linearize_matrices(
-        sys,
-        x_bar,
-        u_bar,
-        t,
-        params,
-        of=None if of_name is None else [(of_name, i)],
-        wrt=[channel_in],
-        method=method,
-        eps=eps,
-    )
-    if of_name is None:  # state output: pick the component of C = I
-        if i < 0 or i >= C.shape[0]:
-            raise ValueError(
-                f"of index must be in [0, {C.shape[0] - 1}] for the state."
-            )
-        C, D = C[[i], :], D[[i], :]
-    return A, B, C, D
+def caller_stacklevel():
+    """``stacklevel`` of the first frame outside minilink, so a warning names the user's line."""
+    package = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    frame, level = inspect.currentframe().f_back, 1
+    while frame is not None and os.path.abspath(frame.f_code.co_filename).startswith(
+        package
+    ):
+        frame, level = frame.f_back, level + 1
+    return level
 
 
 def frequency_grid(A, B, C, D, w, n):
@@ -438,36 +478,7 @@ def frequency_grid(A, B, C, D, w, n):
     return w
 
 
-# =============================================================================
-# Internal machinery
-# =============================================================================
-
-
-def _bode_coordinates(G):
-    with np.errstate(divide="ignore"):
-        magnitude_db = 20.0 * np.log10(np.abs(G))
-    return magnitude_db, np.degrees(np.unwrap(np.angle(G)))
-
-
-def _component(selector, name):
-    """One component ``(name, index)`` from a port id or a ``(port, index)`` pair."""
-    if isinstance(selector, str):
-        return (selector, 0)
-    if (
-        isinstance(selector, tuple)
-        and len(selector) == 2
-        and (selector[0] is None or isinstance(selector[0], str))
-        and isinstance(selector[1], (int, np.integer))
-        and not isinstance(selector[1], bool)
-    ):
-        return (selector[0], int(selector[1]))
-    raise TypeError(
-        f"{name} names one channel: a port id, a diagram wire 'block:port', or "
-        f"(selector, index); got {selector!r}"
-    )
-
-
-def _margins_text(m: Margins) -> str:
+def margins_text(m: Margins) -> str:
     gm = (
         "inf"
         if not np.isfinite(m.gain_margin_db)
@@ -481,14 +492,14 @@ def _margins_text(m: Margins) -> str:
     return f"Gm = {gm}\nPm = {pm}"
 
 
-def _root_text(s) -> str:
-    damping = float(-s.real / abs(s)) if abs(s) > 0.0 else 1.0
-    return (
-        f"s = {s.real:.3g} {s.imag:+.3g}j<br>ζ = {damping:.3f}, ωn = {abs(s):.3g} rad/s"
-    )
+def root_text(s) -> str:
+    # ζ = −Re s / |s| (1 at the origin by convention), ω_n = |s|
+    zeta = float(-s.real / abs(s)) if abs(s) > 0.0 else 1.0
+    wn = abs(s)
+    return f"s = {s.real:.3g} {s.imag:+.3g}j<br>ζ = {zeta:.3f}, ωn = {wn:.3g} rad/s"
 
 
-def _root_markers(p, z):
+def root_markers(p, z):
     """Poles as ``x`` and zeros as ``o`` in the system colour."""
     return (
         Trace(
@@ -497,7 +508,7 @@ def _root_markers(p, z):
             style.SYSTEM_COLOR,
             mode="markers",
             marker="x",
-            hover=tuple(_root_text(s) for s in p),
+            hover=tuple(root_text(s) for s in p),
         ),
         Trace(
             z.real,
@@ -505,13 +516,12 @@ def _root_markers(p, z):
             style.SYSTEM_COLOR,
             mode="markers",
             marker="o",
-            hover=tuple(_root_text(s) for s in z),
+            hover=tuple(root_text(s) for s in z),
         ),
     )
 
 
-def _bode_figure(w, G, sys, of, wrt, m, title=None):
-    magnitude_db, phase_deg = _bode_coordinates(G)
+def bode_figure(w, magnitude_db, phase_deg, sys, of, wrt, m, title=None):
     hover = tuple(
         f"ω = {wk:.3g} rad/s<br>|G| = {mk:.1f} dB<br>∠G = {pk:.1f}°"
         for wk, mk, pk in zip(w, magnitude_db, phase_deg)
@@ -523,7 +533,7 @@ def _bode_figure(w, G, sys, of, wrt, m, title=None):
             for w_c in (m.w_gain_crossover, m.w_phase_crossover)
             if np.isfinite(w_c)
         )
-        notes = (Note(_margins_text(m)),)
+        notes = (Note(margins_text(m)),)
         references = (RefLine("y", 0.0),), (RefLine("y", -180.0),)
     else:
         references = (), ()
@@ -552,14 +562,14 @@ def _bode_figure(w, G, sys, of, wrt, m, title=None):
     )
 
 
-def _pzmap_figure(z, p, sys, of, wrt):
+def pzmap_figure(z, p, sys, of, wrt):
     points = np.concatenate([z, p])
     return ControlFigure(
         title=style.PZMAP_TITLE,
         subtitle=channel_subtitle(sys, of, wrt),
         panels=(
             Panel(
-                traces=_root_markers(p, z),
+                traces=root_markers(p, z),
                 x_label=style.REAL_LABEL,
                 y_label=style.IMAG_LABEL,
                 zero_lines=True,
@@ -570,16 +580,10 @@ def _pzmap_figure(z, p, sys, of, wrt):
     )
 
 
-def _root_locus_figure(A, B, C, D, K, roots, sys, of, wrt):
+def root_locus_figure(A, B, C, D, gains, roots, sys, of, wrt):
     # The view keeps the poles, zeros and the branches near them; the far tails
     # of the asymptotes leave the frame as they do in MATLAB.
-    reach = 3.0 * max(
-        np.max(
-            np.abs(np.concatenate([linear.poles(A), linear.zeros(A, B, C, D)])),
-            initial=0.0,
-        ),
-        1.0,
-    )
+    reach = 3.0 * linear.open_loop_radius(linear.poles(A), linear.zeros(A, B, C, D))
     near = roots[np.abs(roots) <= reach]
     branches = tuple(
         Trace(
@@ -587,7 +591,7 @@ def _root_locus_figure(A, B, C, D, K, roots, sys, of, wrt):
             roots[:, j].imag,
             style.SYSTEM_COLOR,
             hover=tuple(
-                f"K = {k:.3g}<br>" + _root_text(s) for k, s in zip(K, roots[:, j])
+                f"K = {k:.3g}<br>" + root_text(s) for k, s in zip(gains, roots[:, j])
             ),
         )
         for j in range(roots.shape[1])
@@ -598,7 +602,7 @@ def _root_locus_figure(A, B, C, D, K, roots, sys, of, wrt):
         panels=(
             Panel(
                 traces=branches
-                + _root_markers(linear.poles(A), linear.zeros(A, B, C, D)),
+                + root_markers(linear.poles(A), linear.zeros(A, B, C, D)),
                 x_label=style.REAL_LABEL,
                 y_label=style.IMAG_LABEL,
                 zero_lines=True,
@@ -609,7 +613,7 @@ def _root_locus_figure(A, B, C, D, K, roots, sys, of, wrt):
     )
 
 
-def _nyquist_figure(w, G, sys, of, wrt):
+def nyquist_figure(w, G, sys, of, wrt):
     hover = tuple(
         f"ω = {wk:.3g} rad/s<br>G = {g.real:.3g} {g.imag:+.3g}j" for wk, g in zip(w, G)
     )

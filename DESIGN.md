@@ -37,7 +37,7 @@ deep defining-module paths stay valid but are not what README / intro show.
 | Layer | Example | Role |
 | --- | --- | --- |
 | **Root prelude** | `from minilink import Pendulum, ImpedanceController, lqr, QuadraticCost, DynamicProgrammingPlanner, ReinforcementLearningPlanner` | **The teaching surface, one import line** — every name a student meets (tested as a set in `test_teaching_surface.py`) |
-| **Band facades** | `from minilink.catalog import Pendulum` · `from minilink.control import ImpedanceController` · `from minilink.analysis import bode` · `from minilink.control.lqr import lqr` · `from minilink.analysis.linearize import linearize` | Canonical course / script API |
+| **Band facades** | `from minilink.catalog import Pendulum` · `from minilink.control import ImpedanceController` · `from minilink.analysis import bode` · `from minilink.control.lqr import lqr` · `from minilink.analysis import linearize` | Canonical course / script API |
 | **Defining module** | `from minilink.dynamics.catalog.pendulum.pendulum import Pendulum` | Implementation home; always valid |
 
 Rules:
@@ -46,8 +46,8 @@ Rules:
   live under `dynamics/`; no math moves).
 - Band packages (`control/`, `analysis/`, `simulation/`, `control.mpc`, …)
   re-export their teaching symbols via `__all__` / lazy `__getattr__`.
-  Exception: when a **module name matches a factory** (e.g. `control.lqr`,
-  `analysis.linearize`), import the factory from that module
+  Exception: when a **module name matches a factory** (e.g. `control.lqr`),
+  import the factory from that module
   (`from minilink.control.lqr import lqr`) — do not shadow the submodule on
   the parent package.
 - Root `minilink/__init__.py` exports the **whole teaching surface** (lazily) so
@@ -102,7 +102,7 @@ state-feedback block):
 | Package | Role |
 | --- | --- |
 | `simulation/` | `Simulator`, `StaticSimulator`, `Computer`, `StepSchedule`, `HybridSimulator`, solvers, forcing; `realtime/` (`RealtimeSimulator`, `RealtimeInput`/`RealtimeOutput`, `PygameInput`) |
-| `analysis/` | one calling pattern `tool(<what>, x_bar, u_bar, t, params, *, method="auto", eps)`: `jacobian(sys, "f", "x")` (∂f/∂x; `of` / `wrt` name `f`, ports, `t`, `params`, or diagram wires `"block:port"`), `linearize` (→ `LTISystem`), one-channel `bode` / `pzmap` / `nyquist` / `margins` / `root_locus` / `step_response` / `transfer_function` (`of=` / `wrt=`) with their `plot_` twins — every one reduces to the state-space channel `(A, b, c, d)` and computes with `analysis/linear.py` (eigenvalues, the Rosenbrock pencil, `C (jwI - A)^-1 B + D`, `eig(A - B K C)`, one `expm`); the plots build one `ControlFigure` (`graphical/control/`) rendered by matplotlib or plotly in the MATLAB look; controllability/observability (matrices or an `LTISystem`), equilibria, `modal`; `region_of_attraction(sys)` → a `LyapunovCertificate` (`V`, `V_dot`, `level`, `contains`, `verify`, `plot`) for any autonomous loop, LQR or neural alike — `method="quadratic"` solves `AᵀP + PA = -Q` at the equilibrium it *finds*, then samples the largest sublevel set on which `V̇ < 0` inside the state box, so the level is a sharp estimate — `sample_limited` flags the high-dimensional case where two halves of the samples disagree — and `verify()` is its Monte Carlo counter-check (`method="sos"` reserved); works on any system — exact Jacobian and a vmapped sweep under JAX, finite differences and a loop otherwise — and `plot` draws the *slice* through the equilibrium (`slice_extent`), not the set's shadow — legend, title, optional simulated basin and `verified=N` overlay of the states `verify` tests, so demos need no plotting code of their own; `discretize(integrator=)` for continuous→step wrappers. `method="auto"` is exact under JAX when the system traces, finite differences otherwise; the same verbs are methods on every `System`, stateless (each call compiles its evaluator) |
+| `analysis/` | one calling pattern `tool(<what>, x_bar, u_bar, t, params, *, method="auto", eps)`: `jacobian(sys, "f", "x")` (∂f/∂x; `of` / `wrt` name `f`, ports, `t`, `params`, or diagram wires `"block:port"`), `linearize` (→ `LTISystem`), one-channel `bode` / `pzmap` / `nyquist` / `margins` / `root_locus` / `step_response` / `transfer_function` (`of=` / `wrt=`) with their `plot_` twins — every one reduces to the state-space channel `(A, b, c, d)` and computes with `analysis/linear.py` (eigenvalues, the Rosenbrock pencil, `C (jwI - A)^-1 B + D`, `eig(A - B K C)`, one `expm`); the plots build one `ControlFigure` (`graphical/control/`) rendered by matplotlib or plotly in the MATLAB look; controllability/observability (matrices or an `LTISystem`; `tol` the relative singular-value threshold of the rank), equilibria, `modal`; `region_of_attraction(sys)` → a `LyapunovCertificate` (`V`, `V_dot`, `level`, `contains`, `verify`, `plot`) for any autonomous loop, LQR or neural alike — `method="quadratic"` solves `AᵀP + PA = -Q` at the equilibrium it *finds*, then samples the largest sublevel set on which `V̇ < 0` inside the state box, so the level is a sharp estimate — `sample_limited` flags the high-dimensional case where two halves of the samples disagree — and `verify()` is its Monte Carlo counter-check (`method="sos"` reserved); works on any system — exact Jacobian and a vmapped sweep under JAX, finite differences and a loop otherwise — and `plot` draws the *slice* through the equilibrium (`slice_extent`), not the set's shadow — legend, title, optional simulated basin and `verified=N` overlay of the states `verify` tests, so demos need no plotting code of their own; `discretize(integrator=)` for continuous→step wrappers. `method="auto"` is exact under JAX when the system traces, finite differences otherwise; a `System` carries shortcuts that are objects or plots only (`linearize`, `find_equilibrium`, `transfer_function`, `plot_phase_plane`, `plot_bode`, `plot_pzmap`, `plot_root_locus`, `animate_modal`), the data verbs stay band functions, and `plot_step_response` is a method of `LTISystem` alone (a time response read off a nonlinear plant would pass for its simulation: `T.linearize()` or `T.transfer_function()` first); every shortcut is stateless (each call compiles its evaluator) |
 | `planning/` | problems, trajopt, `spatial/` (scenes — **retires** into `core/geometry/`, [docs/plans/geometry-module.md](docs/plans/geometry-module.md)), `search/` (RRT) |
 | `optimization/` | `MathematicalProgram`, `Optimizer` (generic NLP) |
 | `identification/` | fit parametric systems to data (planned; physical params and NN weights are the same verb) |
@@ -393,10 +393,13 @@ The research rungs (`Holonomic`, `HolonomicAccel`, `BicycleKin`, `BicycleAcc`,
   `core.facades` mixins — `SharedSystemFacades` on `System` (compile, static
   `compute_trajectory`, `plot_trajectory`, `animate`, …),
   `DynamicSystemFacades` on `DynamicSystem` (continuous `compute_trajectory`,
-  the analysis family — `linearize`, `transfer_function`, `bode`, `pzmap`,
-  `plot_bode`, `plot_pzmap`, `modal_analysis`, `find_equilibrium` — and
-  `game`), `StepSystemFacades` on `StepSystem` (`compute_rollout`, `jacobian`
-  with `k`). Every facade is a two-line delegation to the tool's module and
+  the analysis shortcuts — `linearize`, `find_equilibrium`,
+  `transfer_function`, `plot_phase_plane`, `plot_bode`, `plot_pzmap`,
+  `plot_root_locus`, `animate_modal` — and `game`), `StepSystemFacades` on
+  `StepSystem` (`compute_rollout`, `jacobian` with `k`), `LTISystemFacades` on
+  `LTISystem` (`plot_step_response`). The analysis shortcuts are written out, so every
+  editor shows their parameters, and `tests/unittest/test_system_shortcuts.py` pins each
+  to its band function (parameters, defaults, forwarding, docstring target). Every facade is a two-line delegation to the tool's module and
   stores nothing on the system (§1 principle 2): `jacobian` compiles its
   evaluator per call, about a millisecond on the eager JAX path, and loops
   keep the callable from `evaluator.jacobian(of, wrt)` instead. **MRO**

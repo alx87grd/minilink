@@ -28,31 +28,165 @@ the triage in [2026-09-22-improvement-suggestions.md](../reviews/2026-09-22-impr
 | [§3](#3-v02-wave-b--gro501) | v0.2 wave B — GRO501 |
 | [§4](#4-v03-wave-c--gmc714-catalog-parity) | v0.3 wave C — GMC714, catalog, parity |
 | [§5](#5-v02-wave-d--textbook-code-minimal-demos-consolidation) | v0.2 wave D (into v0.3) — textbook code, minimal demos, consolidation |
-| [§6](#6-v10-foundations) | v1.0 foundations |
+| [§6](#6-v09-freeze-candidate-and-v10) | v0.9 freeze candidate and v1.0 |
 | [§7](#7-later-ideas) | Later ideas |
 
 ---
 
 ## 1. v0.1 close-out
 
-- [ ] **R1 Publish `0.1.1` from a tag** **[ask]**. `publish.yml` published `minilink 0.1.0`
-  (2026-09-16, run 35139916195) from a `0.1.0` tag on `47cfd50`; the tag is gone from the
-  remote, and the trusted publisher works. Merge `dev` into `main`, then
-  `git tag 0.1.1 && git push origin 0.1.1` on `main`.
-  Done when `pip install minilink==0.1.1` installs the teaching surface from PyPI.
-  Before `0.1.1`: nothing open in the repo. Landed or decided 2026-09-26 (ROADMAP §6):
-  `publish.yml` runs ruff and `pytest` before the upload; CI time limits (the nightly
-  job's waits for its first green run); `plot_diagram()` warns and skips without
-  `graphviz`; `showcase_jax.ipynb` keeps its `experimental` import; every notebook that
-  imports minilink carries the one Colab setup cell, cloning the default branch, pinned by
-  `test_repo_contract.py` (`mpc_spatial_stack` no longer clones `dev-alex`).
+Nothing open. `minilink 0.1.1` is on PyPI (2026-09-26, tag `0.1.1` on `87fd4bd`, the
+first release a tag published); R1 left this file then.
 ---
 
 ## 2. v0.2 wave A — the textbook objects
 
-Design: [fields.md](fields.md), [cost-params.md](cost-params.md),
-[geometry-module.md](geometry-module.md), [naming.md](naming.md). Baselines first, as each plan
-states; every step is name-preserving for the GRO860 notebooks.
+A1–A3 (fields, cost parameters, workspace geometry) moved to v0.3 on 2026-09-26 ([§4](#4-v03-wave-c--gmc714-catalog-parity)):
+GRO501 needs none of them, and October goes to wave B. A4 and A5 stay.
+Design: [naming.md](naming.md). Every step is name-preserving for the GRO860 notebooks.
+
+- [ ] **A4 Naming quick wins** 1–4 and 6 of [naming.md](naming.md), each a few lines plus a
+  test: class name as the default `name`; one closed-loop name on both `@` paths; informative
+  default names where a shortcut says `Diagram`; the sampled loop's plant wrapper honours
+  `plant.id`; `id` documented on `System`. Done when composed diagrams' keys, params
+  dictionaries and trajectories are byte-identical before and after.
+  Also: one name, `plot_cost_to_go`, and one colour keyword, `jmax`, across DP, tabular RL,
+  `PolicyEvaluator` and `Comparison`, with `plot_cost2go` an alias for one release and S54's
+  clipping (scan: planning#3, examples#5); the operators' named forms exported together
+  (scan: core#9).
+- [ ] **A5 Later nouns, each with its first consumer.** `log_prob` on the distributions with
+  its first consumer (`Gaussian(cov=)`, `NoiseSource` and the draw convention moved to
+  [randomness.md](randomness.md), steps RN-1 to RN-6); parameter-dictionary
+  support on sets and distributions (one flatten rule, with identification or the robust
+  problem); `UnionSet` via `|` when reachability or multi-goal work needs it; vector bounds on
+  `Saturation`; library sets, shapes and fields reading `params` (the "one signature" gap,
+  same rule as A2, after it); `PlanningProblem.hamiltonian()` only if the course teaches Pontryagin; the
+  RL critic as a `Field` once training is over.
+  Also: `Distribution.sample(key=None)` (scan: core#5) is retired the other way, every
+  `sample` takes a key (randomness.md D9); the guard test that editing `WhiteNoise` params
+  changes the next simulation without `refresh()` moved to RN-1, so S29 cannot land before
+  RN-1 (scan: examples#14); `Trajectory.from_rollout(x0, xs, us, dt)` for
+  scanned rollouts, V1's first consumer (scan: examples#9); the double-integrator homework's
+  two verbs, entry time into a set and the Bellman residual (scan: examples#10).
+
+---
+
+## 3. v0.2 wave B — GRO501
+
+Plan: [gro501-classical-control.md](gro501-classical-control.md) (P1, F1, F2, F4 landed
+2026-09-07). Release contract: [ROADMAP §4.2](../../ROADMAP.md#42-v02--gro501-end-to-end).
+
+TB-a (the analysis toolbox reads like the textbook) landed 2026-09-26: the shortcut cut
+(`4412a18`), the audit
+([2026-09-26-analysis-toolbox-audit.md](../reviews/2026-09-26-analysis-toolbox-audit.md)), the
+byte-identical rewrite (`36a51e7`…`559cb37`) and four fixes (`19b75c1`…`b018cb5`).
+
+P7 landed 2026-09-26 (`18b3b32`…`170bb1e`), ruled explicit and pinned rather than generated:
+the System shortcuts stay written out, so editors show their parameters, and
+`tests/unittest/test_system_shortcuts.py` pins each to its band function; a second test pins
+the band's calling pattern; `analysis/linearization.py` and `discretization.py` free
+`linearize` and `discretize` from the band-facade name collision.
+
+**Next, in order (decided 2026-09-26):** clean-up and solidification first — P5 and
+P8 on the cleaned toolbox, TB-b, S61, P9, P10 — then RN-1 of
+[randomness.md](randomness.md) (the disturbance convention, decided 2026-09-26) and P4, then P11. The textbook pass comes before the new surface, so
+the new code copies clean patterns and no shortcut is added only to be dropped.
+
+- [ ] **TB-b The control objects and the loop read like the textbook** (after P5, which
+  touches `feedback()`; before P11, so the notebooks students read sit on it). The same
+  audit, review and pass on `control/siso.py` (P / PI / PD / PID / Lead / Lag),
+  `control/state.py`, `control/lqr.py`, `control/place.py`, `blocks/transfer_function.py`,
+  `dynamics/abstraction/state_space.py` (`LTISystem`) and the loop-building path students
+  use (`feedback`, `closed_loop`, `@`). Done when every module in scope reads like `dp.py`
+  and the baseline `cmp`s.
+- [ ] **P5 Named sensitivity functions** (design agreed 2026-09-26, in
+  [gro501-classical-control.md](gro501-classical-control.md) §P5): `sensitivity`,
+  `complementary_sensitivity`, `load_sensitivity`, `noise_sensitivity`, keyword-only
+  `(plant=H, controller=C, filter=F)`, each an `LTISystem` computed from the pieces with
+  `L = C H F` in the body; `closed_loop` gains optional loop inputs `w` (plant input) and `v`
+  (measurement), off by default; spec checks use `bode` as it is. Done when `S + T = 1` holds
+  to 1e-12 on a SISO loop, each function matches the loop's internal-wire transfer function,
+  and each Table 2 spec is one `bode` call plus a comparison.
+- [ ] **S61 Analysis verbs on any `System`** (scan: analysis#2, analysis#4, analysis#5,
+  analysis#6, analysis#8): `controllability` / `observability` linearize like every sibling
+  (band functions only, no facade: ROADMAP §6); `step_info` takes a `System`; `find_equilibrium` defaults its guess to
+  `sys.x0`; the operating point's size is checked; margin crossings refined by a root solve so
+  `plot_bode` and `margins` report one number. Done when P7's signature test covers them.
+- [ ] **S62 The LQR family on the control band** **[ask — public names]** (scan: control#0,
+  control#1): rename the `control/lqr.py` module so `lqr`, `lqr_at_operating_point`,
+  `lqr_finite_horizon`, `trajectory_lqr` and `lqr_gain_schedule` join the band facade and the
+  registry; `P` joins the siso family; the `control/__init__.py` note on `control.lqr`
+  naming the submodule goes (scan: control#12). Before P11 writes notebooks on the band
+  layer. The name freeze (gate 7) now runs to v1.0: `minilink.control.lqr` stays importable
+  as an alias until then, or S62 waits for v1.0 — part of the ask.
+- [ ] **P8 Small teaching helpers**: ζ and ω_n from a complex pole pair (fields on the `pzmap`
+  result or a `damping(sys)` verb); the `N` reference-scaling matrix giving `y = r` at steady
+  state. Done when §9.5 and §9.11 of the
+  guide are each a short notebook cell.
+  Also: a `poles(sys)` verb with a `poles()` facade on `LTISystem` only (ROADMAP §6);
+  `TransferFunction` stores `self.poles` as an array, which would shadow it — a property
+  or a renamed attribute, decided with the step; and `__str__` on `LTISystem`,
+  `TransferFunction` and `StructuralResult`, so tutorial 01's `print(tf)` shows the transfer
+  function and fourteen `np.linalg.eigvals(lin.A())` sites go (scan: analysis#3, examples#2).
+- [ ] **RN The randomness convention** ([randomness.md](randomness.md), agreed 2026-09-26,
+  rulings D1–D12). RN-1 `WhiteNoise` (seed and sample period in params, counter-based draw,
+  `psd`, zero-order hold by default, no time window) is P4's prerequisite. RN-2 distributions
+  read `params`, RN-3 `NoiseSource`, RN-4 `realize(key)` and signals on `disturbances`, RN-5 the
+  Monte Carlo evaluator's test set, RN-6 DESIGN. Rungs (decided 2026-09-26): RN-1 v0.2 wave B
+  before P4; RN-2 v0.2 wave A with A5; RN-3 with its first consumer (P11 if a GRO501 notebook
+  shows sampled sensor noise, else v0.3); RN-4 and RN-5 together in v0.3, after the fall term,
+  before the v0.9 freeze; RN-6 with each step. Done when the plan's steps are ticked and DESIGN
+  carries the convention.
+  Also: the evaluator's `simulator` backend fails on a diagram plant with a nested-diagram
+  error (found 2026-09-26, randomness.md §1).
+- [ ] **P4 `estimation/`** **[held 2026-09-07; 2026-09-26: stays held until the clean-up and
+  solidification above land, then RN-1 of [randomness.md](randomness.md) lands first]**. `LuenbergerObserver(A, B, C,
+  L)` as a `DynamicSystem` with ports `u`, `y` → `x_hat`; `luenberger(A, B, C, poles)` on the
+  dual pair (`place_gain(Aᵀ, Cᵀ, poles)ᵀ`, P3 landed 2026-09-26); `kalman(A, B, C, Q, R)` from the filter Riccati equation, `Q = B_w W B_wᵀ` and `R = V` read from the noise blocks' `psd` (randomness.md §2); the
+  observer + state-feedback composition ruled first (ROADMAP §6). Done when LQR + Kalman
+  stabilizes the guide's cart-pendulum from a disturbed start with noise on `u` and `y`, and
+  `plot_diagram` shows the Figure 12 topology.
+  Also: named input ports on the state-space base so observers and sensitivity blocks share
+  one `f` (scan: analysis#13); the plan names the estimation API once (scan: docs-gov#9).
+- [ ] **P9 `TransferFunction` builds its ports once** (no clear-and-re-add); the four
+  `ports` values stay. Done when no `self.inputs = {}` remains in the constructor and the
+  `TransferFunction` / `Lead` / `Lag` tests pass untouched.
+- [ ] **P10 Document the three `@` dispatch paths** in DESIGN (operand shape → what `@`
+  builds); pin the `e`-input autowire heuristic with a test; collapse the `PROFILE_PORTS`
+  rows that differ only in `plot_space` if that reads better.
+  Also: one keyword vocabulary for the four feedback wires across `closed_loop`,
+  `hybrid_closed_loop` and `StandardFeedbackWiring` (scan: core#12).
+- [ ] **P6 Discrete (z) tier** **[held for GRO501 2026-09-07; scheduled for v0.9, §6]**.
+  GRO501 default: teach with `discretize` + simulation, unless the sommatif examines z-plane
+  analysis. The v0.9 scope is its row in §6.
+  When it opens: an exact zero-order-hold option on `discretize`, shared with
+  `step_response` (scan: analysis#1). The `discretize` bugs (dt in params, dropped `x0`) were
+  fixed 2026-09-23: the sample time is `disc.dt`, `params` reach the source untouched, and
+  the wrapper keeps the source's `x0` and signal metadata. The sample time has one owner:
+  a `"dt"` key in the params that reach `f` is refused at construction and on
+  `disc.params = ...`, so the fallback to the source's own `params["dt"]` is gone;
+  `params={"dt": 0.05}` alone is refused for a source with other params (pass `dt=`), and
+  `dt=` with a different `params["dt"]` is refused. Two follow-ups remain.
+  **[ask]** keep the remaining `params["dt"]` fallback (`dt=` omitted, read from the
+  `params=` dict given to `discretize`) or make `dt` required.
+  A source whose `y` feeds through from a port other than `u` does not discretize
+  (`PendulumWithNoisePort`: unknown input dependency `v`), because the wrapper stacks every
+  port into one `u`; map `y`'s dependencies to `("u",)` or mirror the source's ports.
+- [ ] **P11 Two GRO501 notebooks** **[maintainer — student-facing]**:
+  `teaching/topics/classical_control/dc_motor_propulsion.ipynb` (APP2) and
+  `bicycle_autopilot.ipynb` (APP4), Basic tier, Colab-first; drafted for review. Done when
+  both run top to bottom in Colab and the conda env, import only through the teaching
+  surface, and agree with the guide's worked exercises.
+  First, **[ask — core]**: `Controller(feedback="state" | "output", ...)` declares its ports
+  from `feedback_profile`, so the student writes gains and `ctl` only (scan: examples#0).
+
+---
+
+## 4. v0.3 wave C — GMC714, catalog, parity
+
+**Wave A's core objects** (moved from v0.2 on 2026-09-26). Design: [fields.md](fields.md),
+[cost-params.md](cost-params.md), [geometry-module.md](geometry-module.md). Baselines first, as
+each plan states; every step is name-preserving for the GRO860 notebooks.
 
 - [ ] **A1 `core/fields.py`** **[ask — core]**. Steps 4.1–4.8 of [fields.md](fields.md):
   promote `StateField` → `Field` on `(x, u, t)` with `as_constraint` / `as_input_constraint` /
@@ -88,116 +222,7 @@ states; every step is name-preserving for the GRO860 notebooks.
   `PurePursuit` sizes its measurement from the vehicle, not `state_dim=9` (scan: control#9).
   `control/mpc/viz.py` imports `TrackCorridorOverlay` from `planning.spatial.overlays`;
   retarget it in the change that deletes that module (scan: control#12).
-- [ ] **A4 Naming quick wins** 1–4 and 6 of [naming.md](naming.md), each a few lines plus a
-  test: class name as the default `name`; one closed-loop name on both `@` paths; informative
-  default names where a shortcut says `Diagram`; the sampled loop's plant wrapper honours
-  `plant.id`; `id` documented on `System`. Done when composed diagrams' keys, params
-  dictionaries and trajectories are byte-identical before and after.
-  Also: one name, `plot_cost_to_go`, and one colour keyword, `jmax`, across DP, tabular RL,
-  `PolicyEvaluator` and `Comparison`, with `plot_cost2go` an alias for one release and S54's
-  clipping (scan: planning#3, examples#5); the operators' named forms exported together
-  (scan: core#9).
-- [ ] **A5 Later nouns, each with its first consumer.** `Gaussian(mean, std=None, cov=None)` +
-  `log_prob` with the disturbance convention (ROADMAP §6; before P4); parameter-dictionary
-  support on sets and distributions (one flatten rule, with identification or the robust
-  problem); `NoiseSource(distribution, sample_period)` replacing the hand-rolled `WhiteNoise`
-  draw; `UnionSet` via `|` when reachability or multi-goal work needs it; vector bounds on
-  `Saturation`; library sets, shapes and fields reading `params` (the "one signature" gap,
-  same rule as A2, after it); `PlanningProblem.hamiltonian()` only if the course teaches Pontryagin; the
-  RL critic as a `Field` once training is over.
-  Also: `Distribution.sample(key=None)` like the sets (scan: core#5); a guard test that
-  editing `WhiteNoise` params changes the next simulation without `refresh()`, so S29 cannot
-  land before `NoiseSource` (scan: examples#14); `Trajectory.from_rollout(x0, xs, us, dt)` for
-  scanned rollouts, V1's first consumer (scan: examples#9); the double-integrator homework's
-  two verbs, entry time into a set and the Bellman residual (scan: examples#10).
-
----
-
-## 3. v0.2 wave B — GRO501
-
-Plan: [gro501-classical-control.md](gro501-classical-control.md) (P1, F1, F2, F4 landed
-2026-09-07). Release contract: [ROADMAP §4.2](../../ROADMAP.md#42-v02--gro501-end-to-end).
-
-- [ ] **P2 `minreal`** on the matrices tier + `sys.minreal()` returning an `LTISystem`; a
-  `tol` keyword on `transfer_function` / `pzmap` / `root_locus` (default: no cancellation);
-  order reduction by neglecting fast modes as a separate verb. Done when the pre-P1 pure-P
-  loop reduces to `200 / (s² + 0.5 s + 4.905)` and the guide's §9.13 realization survives
-  unchanged.
-- [ ] **P3 `place()` / `place_gain()` / `place_at_operating_point()`** mirroring `lqr`;
-  `scipy.signal.place_poles` plus an honest error when the pole set is not reachable; a demo
-  in `examples/demos/control/`. Done when `eigvals(A − BK)` on the guide's parking model
-  match `{−1 ± 0.5i, −1}` to 1e-9 and the block closes the loop with `@`.
-- [ ] **P5 Named sensitivity functions** `sensitivity` (`S = e/r`), `complementary_sensitivity`
-  (`T = y/r`), `PS`, `CS` on a closed-loop diagram, each an `LTISystem`; `disturbance=` /
-  `noise=` injection points on `feedback()`. Done when `S + T = 1` holds to 1e-12 on a SISO
-  loop and each Table 2 spec is one call plus a comparison.
-- [ ] **S61 Analysis verbs on any `System`** (scan: analysis#2, analysis#4, analysis#5,
-  analysis#6, analysis#8): `controllability` / `observability` linearize like every sibling
-  and gain facades; `step_info` takes a `System`; `find_equilibrium` defaults its guess to
-  `sys.x0`; the operating point's size is checked; margin crossings refined by a root solve so
-  `plot_bode` and `margins()` report one number. Done when P7's signature test covers them.
-- [ ] **S62 The LQR family on the control band** **[ask — public names]** (scan: control#0,
-  control#1): rename the `control/lqr.py` module so `lqr`, `lqr_at_operating_point`,
-  `lqr_finite_horizon`, `trajectory_lqr` and `lqr_gain_schedule` join the band facade and the
-  registry; `P` joins the siso family; the `control/__init__.py` note on `control.lqr`
-  naming the submodule goes (scan: control#12). Before P11 writes notebooks on the band
-  layer. The name freeze (gate 7) now runs to v1.0: `minilink.control.lqr` stays importable
-  as an alias until then, or S62 waits for v1.0 — part of the ask.
-- [ ] **P7 Generate the analysis facades**: one helper builds a delegating method from the
-  target function (signature and docstring copied), explicit form kept only where the facade
-  differs; a test asserts every generated `__signature__` matches its target. Done when the
-  13 hand-copied methods are generated and `help(sys.bode)` is unchanged.
-  Also: a signature test pinning the band's calling pattern (scan: analysis#7); `linearize` and
-  `discretize` freed from the band-facade name collision (scan: analysis#11).
-- [ ] **P8 Small teaching helpers**: ζ and ω_n from a complex pole pair (fields on the `pzmap`
-  result or a `damping(sys)` verb); the `N` reference-scaling matrix giving `y = r` at steady
-  state; the `settling_horizon` docstring (five vs eight). Done when §9.5 and §9.11 of the
-  guide are each a short notebook cell.
-  Also: a `poles(sys)` verb with a `sys.poles()` facade, and `__str__` on `LTISystem`,
-  `TransferFunction` and `StructuralResult`, so tutorial 01's `print(tf)` shows the transfer
-  function and fourteen `np.linalg.eigvals(lin.A())` sites go (scan: analysis#3, examples#2).
-- [ ] **P4 `estimation/`** **[held 2026-09-07 — ask to lift]**. `LuenbergerObserver(A, B, C,
-  L)` as a `DynamicSystem` with ports `u`, `y` → `x_hat`; `luenberger(A, B, C, poles)` on the
-  dual pair (needs P3); `kalman(A, B, C, Q, R)` from the filter Riccati equation; the
-  observer + state-feedback composition ruled first (ROADMAP §6). Done when LQR + Kalman
-  stabilizes the guide's cart-pendulum from a disturbed start with noise on `u` and `y`, and
-  `plot_diagram` shows the Figure 12 topology.
-  Also: named input ports on the state-space base so observers and sensitivity blocks share
-  one `f` (scan: analysis#13); the plan names the estimation API once (scan: docs-gov#9).
-- [ ] **P9 `TransferFunction` builds its ports once** (no clear-and-re-add); the four
-  `ports` values stay. Done when no `self.inputs = {}` remains in the constructor and the
-  `TransferFunction` / `Lead` / `Lag` tests pass untouched.
-- [ ] **P10 Document the three `@` dispatch paths** in DESIGN (operand shape → what `@`
-  builds); pin the `e`-input autowire heuristic with a test; collapse the `PROFILE_PORTS`
-  rows that differ only in `plot_space` if that reads better.
-  Also: one keyword vocabulary for the four feedback wires across `closed_loop`,
-  `hybrid_closed_loop` and `StandardFeedbackWiring` (scan: core#12).
-- [ ] **P6 Discrete (z) tier** **[held 2026-09-07]**. Default: teach with `discretize` +
-  simulation. Reopen only if the sommatif examines z-plane analysis.
-  When it reopens: an exact zero-order-hold option on `discretize`, shared with
-  `step_response` (scan: analysis#1). The `discretize` bugs (dt in params, dropped `x0`) were
-  fixed 2026-09-23: the sample time is `disc.dt`, `params` reach the source untouched, and
-  the wrapper keeps the source's `x0` and signal metadata. The sample time has one owner:
-  a `"dt"` key in the params that reach `f` is refused at construction and on
-  `disc.params = ...`, so the fallback to the source's own `params["dt"]` is gone;
-  `params={"dt": 0.05}` alone is refused for a source with other params (pass `dt=`), and
-  `dt=` with a different `params["dt"]` is refused. Two follow-ups remain.
-  **[ask]** keep the remaining `params["dt"]` fallback (`dt=` omitted, read from the
-  `params=` dict given to `discretize`) or make `dt` required.
-  A source whose `y` feeds through from a port other than `u` does not discretize
-  (`PendulumWithNoisePort`: unknown input dependency `v`), because the wrapper stacks every
-  port into one `u`; map `y`'s dependencies to `("u",)` or mirror the source's ports.
-- [ ] **P11 Two GRO501 notebooks** **[maintainer — student-facing]**:
-  `teaching/topics/classical_control/dc_motor_propulsion.ipynb` (APP2) and
-  `bicycle_autopilot.ipynb` (APP4), Basic tier, Colab-first; drafted for review. Done when
-  both run top to bottom in Colab and the conda env, import only through the teaching
-  surface, and agree with the guide's worked exercises.
-  First, **[ask — core]**: `Controller(feedback="state" | "output", ...)` declares its ports
-  from `feedback_profile`, so the student writes gains and `ctl` only (scan: examples#0).
-
----
-
-## 4. v0.3 wave C — GMC714, catalog, parity
+**Wave C.**
 
 - [ ] **G1 GMC714 baseline audit** **[ask — course scope]**. Run every topic of ROADMAP §4.3
   (vehicle models, robotic arm, nonlinear control, robust control, trajectory optimization,
@@ -232,7 +257,8 @@ Plan: [gro501-classical-control.md](gro501-classical-control.md) (P1, F1, F2, F4
     levels, `QFunction` with replay and a target network. Research lane first.
   - [ ] **Approximate dynamic programming** on `policy_synthesis/approximation.py` (fitted
     value iteration); design first, it touches the planner API. **[ask]**
-  - [ ] `Sys2Gym` takes a `Distribution` for the start state (scan: graphics#1).
+  - [ ] `Sys2Gym` takes a `Distribution` for the start state (scan: graphics#1; randomness.md
+    R5, step RN-5).
 - [ ] **S63 DP reads the horizon** **[ask — planner API]** (scan: planning#1): a finite
   `problem.tf` runs `round(tf / dt)` backward sweeps as `solve_steps` does, the way
   `LQRPlanner` picks the Riccati ODE, or warns once. Done when LQR and DP agree on the
@@ -266,7 +292,8 @@ findings, file by file and line by line, are in
 - [ ] **T2 blocks and control** (what T0 left): `control/mpc/utilities.py` order and names
   (`_shift_plan_trajectory` is imported by `test_mpc.py`), the MPC package docstring;
   `blocks/transfer_function.py`'s `tf` on `np` without `params` (P9 rebuilds its ports);
-  `WhiteNoise.h` / `TrajectorySource.h` cannot trace (`interp1d`); `action_port_of` above
+  `TrajectorySource.h` cannot trace (`interp1d`; `WhiteNoise.h` is rebuilt by randomness.md
+  RN-1); `action_port_of` above
   the class; the joint-impedance law still in a helper.
   Also (scan: control#2, control#5, control#7): one time-interpolation for trajectories and
   gain schedules; one warm-start helper on the plan `Trajectory`; the impedance and robotic
@@ -285,13 +312,10 @@ findings, file by file and line by line, are in
   below), the 37 inline `array_module(q).array(...)` calls.
   Also: `Manipulator` kinematics defaults raise instead of returning zeros, with
   `link_lengths` the base contract (scan: dynamics#7).
-- [ ] **T4 analysis and simulation** (what T0 left): `analysis/lyapunov.py` (primary
+- [ ] **T4 analysis and simulation** (what T0 left; its classical-control modules landed
+  with TB-a on 2026-09-26): `analysis/lyapunov.py` (primary
   function first, ceremony in a helper, `verify` / rollout unpacked, `EVEN` / `ODD` beside
-  `METHODS`, `require_jax`, `sample_in_ellipsoid` named), `analysis/linearize.py` (the `D`
-  comprehension unrolled, the early return), `analysis/linear.py` / `frequency.py` /
-  `time_response.py` / `structural.py` remaining return-line expressions and the
-  five-vs-eight settling docstring, `analysis/modal.py` (naming `eig`'s result is a
-  returned-type decision), `simulation/simulator.py` (solver table and helper below the
+  `METHODS`, `require_jax`, `sample_in_ellipsoid` named), `simulation/simulator.py` (solver table and helper below the
   class, `solve` before its helpers, the detached comments, a constructor of named
   steps), `simulation/computer.py` (`as_computer` below the classes, its coercion in a
   helper), the solver backends' comments and `_finalize_solution`, the duplicated
@@ -464,11 +488,19 @@ pick):
   over every control law, the catalog with perturbed `params`, and the `params.sets` scoring
   parity.
 
+- [x] **S69 Students' laptops**: `windows-latest` and `macos-latest` legs in `test.yml`
+  (Basic tier pytest and the notebook smoke), coverage reported on the Linux leg with no
+  gate. Done before the GRO501 cohort installs (v0.2). The `laptops` job; coverage on the
+  `test` job's py3.12 leg (remote run pending).
+
 ---
 
-## 6. v1.0 foundations
+## 6. v0.9 freeze candidate and v1.0
 
-After two cohorts; each is a design conversation before code. **[ask — core]** throughout.
+ROADMAP §5.4 and §5.5: v1.0 means a colleague builds a course on minilink and trusts it for
+three years. The foundation rows are design conversations before code.
+
+### v0.9 — what could still break a name
 
 - [ ] **S31** `HybridDiagram` → a `System` (state `[plant; computer]`, periodic discrete
   update) or an honest `HybridLoop` rename with `%` → `on_schedule()`; the hand-copied
@@ -490,6 +522,86 @@ After two cohorts; each is a design conversation before code. **[ask — core]**
   today `tf` + skin.
 - [ ] **S30** Rename the graphical `Sphere` / `Box` glyphs so no two importable public types
   share a name with the geometry solids. **[ask — public names]**
+- [ ] **V3 The frozen surface** **[ask — public names]**: list the names the v1.0 freeze
+  covers. `StepSystem`, `StepDiagramSystem`, `ZOHHold` (root prelude) and `control.mpc`
+  (control facade) join it or move behind a visibly provisional name. Done when the
+  teaching-surface registry (`tests/unittest/test_teaching_surface.py`) marks each name
+  frozen or provisional and the API site shows the mark.
+
+### v0.9 — the trust contract
+
+- [ ] **V4 Deprecation policy** **[ask]**: from v1.0, a teaching-surface removal or rename
+  ships one minor release as a `DeprecationWarning` shim (RULES "no deprecated aliases" is
+  amended for v1.0 on). A snapshot of the export list is a test; changing it fails until the
+  snapshot and the CHANGELOG line move together. Done when RULES, ROADMAP §2 and the
+  snapshot test agree.
+- [ ] **V5 `CHANGELOG.md`**: user-facing, one entry per release from v0.9 (back-filled for
+  0.1.0 / 0.1.1 from ROADMAP §2); `pyproject.toml` `Changelog` URL points there. Done when
+  `publish.yml` refuses a tag without its CHANGELOG heading.
+- [ ] **V6 One install story** **[ask — student-facing]**: README and `install.md` lead with
+  `pip install minilink`, conda for the Full stack; `install.md` no longer says 0.1.0 is
+  pending. The Colab setup cell installs a pinned release (`%pip install minilink==X.Y`)
+  instead of `git clone main`; `COLAB_CLONE` in `tests/unittest/test_repo_contract.py`
+  follows. Done when every notebook carries the pinned cell and runs in Colab.
+- [ ] **S70 `MinilinkError` family** **[ask — core]**: `WiringError`, `ShapeError`,
+  `SolverError` subclassing the `ValueError` / `TypeError` raised today (no caller breaks);
+  S66's wiring-time checks raise them. Done when the wiring and compile paths of `core/`
+  raise only the family.
+- [ ] **V11 Rewrite the history without notebook outputs** **[ask — force-push]**, in December
+  2026 after the v0.3 tag, between terms. A fresh clone is 161 MB for 19 MB of files: 169 MB of
+  the history is `.ipynb` outputs committed before the `nbstripout` hook worked, mostly five
+  notebooks deleted by May (`examples/notebooks/demo*.ipynb`, `animation_colab.ipynb`).
+  `main` carries it all, so deleting branches or `archive/*` tags does not help. Steps: keep a
+  bare mirror clone as the backup; `git filter-repo` stripping outputs from every `.ipynb` blob
+  (or dropping the deleted notebooks' paths); re-point the release tags `0.0.1`–`0.1.1` and the
+  `archive/*` tags; force-push branches and tags; the re-clone notice to students and
+  collaborators, and the line in the CHANGELOG (V5). PyPI releases are untouched. GitHub keeps
+  the old objects behind `refs/pull/*` until its support purges them; clones shrink regardless.
+  Done when `git clone` of the repo is under 25 MB and CI is green on the rewritten `dev`.
+
+### v0.9 — the syllabus holes
+
+- **P6 lands here** (its row is in §3) **[ask — public names]**: exact ZOH and
+  Tustin `c2d` on `LTISystem`, z-plane `pzmap`, discrete `step_response` and `bode`
+  (`analysis/`), checked against `scipy.signal.cont2discrete`. Done when a digital PID and a
+  discrete state feedback run in a topic notebook.
+- [ ] **S71 The classic first plants**: DC motor (if the GRO501 gate has not landed it), tank
+  / thermal first-order-plus-delay process, ball and beam, differential drive, 3-D quadrotor,
+  each with `tf`, a skin and the catalog both-backends contract test; LQI beside the `N`
+  matrix of P8. Done when each has a one-line demo in `examples/demos/dynamics/`.
+- C4 (identification, trajectory generation) moves here if GMC714 does not land it (§4).
+
+### v0.9 — the reference site
+
+- [ ] **V7 The docs site as a guide**: myst-nb (or nbsphinx) renders `examples/tutorial/`
+  from stored outputs; a plant gallery (one image per catalog plant from
+  `docs/make_assets.py`); a concept page (System, composition, tools as verbs). Done when the
+  Sphinx `-W` build on `docs.yml` publishes all three.
+
+### v1.0 — a colleague can build a course on it
+
+- [ ] **V8 Textbook-validation suite**: `tests/unittest/test_textbook_examples.py`, worked
+  examples from Dorf & Bishop, Ogata, Franklin–Powell asserted numerically (margins, step
+  specifications, root locus, LQR and Kalman gains), each citing its example number; GRO501
+  gate 3 is the seed. Done when the README links it as the correctness evidence.
+- [ ] **V9 Course-neutral labs** **[maintainer]**: `examples/teaching/topics/` grows from 7
+  to 10–15 labs (objectives, prerequisites, time, starter and solution), classical control
+  and robotics first; a "For instructors" page (pin a version, Colab, adapt a lab, report a
+  bug).
+- [ ] **V10 The public face** **[ask]**: the README opens on a teaching quickstart; TRL,
+  lanes, wave and step ids leave README and `examples/README.md`; the agent and governance
+  files stay at the root or move under `docs/dev/` (decided); `CONTRIBUTING.md`, issue
+  templates, a code of conduct.
+- [ ] **V2** Zenodo archive and a citable DOI (`CITATION.cff`) after PyPI; the JOSS entry
+  and the RULES 6.9 carve-out for its state-of-the-field section, decided then.
+- [ ] **S49 Retire the Stable-Baselines3 teaching notebooks** **[ask]** (v1.0: at the end of the term, decided 2026-09-26). Delete
+  `teaching/courses/udes_gro860/drone_ppo_sb3.ipynb` and
+  `pendulum_value_iteration_vs_lqr_vs_ppo_sb3.ipynb`, their notebook overrides and allowlist
+  entries, and the README rows marked Stable-Baselines3, once the course notes point only at
+  the native twins.
+
+### After v1.0 — 1.x features, additive
+
 - [ ] **S32** Unify `MechanicalSystem` / `GeneralizedMechanicalSystem` (`N = I` special
   case); `Boat2D` / `Plane3D` gain `q` / `dq` ports; `DynamicBicycle` on
   `GeneralizedMechanicalSystem` (scan: dynamics#5).
@@ -499,13 +611,8 @@ After two cohorts; each is a design conversation before code. **[ask — core]**
   reach plant, controller, cost, sets and `x0` alike; today tutorial 11 and
   `pid_autotuning_jax` write that scan by hand.
 - [ ] **S36** iLQR planner from parts (`jacfwd` of `f_trace`; idea, research lane).
-- [ ] **S49 Retire the Stable-Baselines3 teaching notebooks** **[ask]** (v1.0: at the end of the term, decided 2026-09-26). Delete
-  `teaching/courses/udes_gro860/drone_ppo_sb3.ipynb` and
-  `pendulum_value_iteration_vs_lqr_vs_ppo_sb3.ipynb`, their notebook overrides and allowlist
-  entries, and the README rows marked Stable-Baselines3, once the course notes point only at
-  the native twins.
-- [ ] **V2** Zenodo archive and a citable DOI (`CITATION.cff`) after PyPI; the JOSS entry
-  and the RULES 6.9 carve-out for its state-of-the-field section, decided then.
+- [ ] **General serial chain**: DH or URDF description to RNEA / ABA beyond the UR5 (joins
+  the articulated-mechanism Later idea).
 
 ---
 
@@ -513,6 +620,10 @@ After two cohorts; each is a design conversation before code. **[ask — core]**
 
 One line each; open a plan doc only when a design needs a writeup.
 
+- Order reduction by neglecting fast modes (GRO501 §1.1; out of v0.2 by decision 2026-09-26):
+  keep the slow modes and the DC gain, a band function in `analysis/modal.py`. Separately,
+  swap the guide's §9.13 realization into `TestMinreal` and its §1.4.2 parking model into
+  `TestPolePlacement` once the matrices are in hand (stand-ins today).
 - Vehicle view ports (`pose` / `bodyvel` on `DynamicBicycle` for impedance / PID).
 - Scene params / `J(z, p)` bind (DESIGN §4 planning-params pipeline B; moving obstacles
   online without rebuilding the NLP).

@@ -791,7 +791,7 @@ class TestMeshcatOptionalSmoke(unittest.TestCase):
             MeshcatRenderer(_Anim()).export_animation(
                 [prim], frames, schedule, str(dest), is_3d=True
             )
-            html = dest.read_text()
+            html = dest.read_text(encoding="utf-8")
             self.assertTrue(dest.is_file())
             self.assertIn("<html", html.lower())
             self.assertGreater(len(html), 100)

@@ -1,13 +1,13 @@
 Analysis
 ========
 
-.. automodule:: minilink.analysis.linearize
+.. automodule:: minilink.analysis.linearization
    :members:
 
 .. automodule:: minilink.analysis.derivatives
    :members:
 
-.. automodule:: minilink.analysis.discretize
+.. automodule:: minilink.analysis.discretization
    :members:
 
 .. automodule:: minilink.analysis.structural

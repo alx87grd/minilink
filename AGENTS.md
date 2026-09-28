@@ -10,6 +10,40 @@ This file is workflow: what to read, when to ask, and the local CI gate.
 User API: README.md. Contracts: DESIGN.md. Maturity: ROADMAP.md.
 Pytest policy: tests/README.md. Examples map: examples/README.md.
 
+## The textbook rule: every piece of math, every time
+
+Minilink is read by students next to the textbook. This rule applies to every line of
+math an agent writes or touches, in new code and in edits alike. That means equation
+methods (`f`, `h`, `g`, …) and also every algorithm: analysis tools, controller and
+observer design, planners, solvers, learning updates. It is not a refactor-pass nicety;
+it is the acceptance bar. The maintainer should never have to ask for it.
+
+- **The math is the story.** The function body shows every step of the algorithm in the
+  order the textbook derives it, with the textbook's symbols (`A, B, C, D`, `𝒞`, `𝒪`,
+  `K`, `P`, `J`, `π`, `n, m, p`). This includes the linear algebra: a Kalman matrix, an
+  SVD and its rank, a basis and a projection, a Riccati solve, a Bellman backup. Each is
+  a named line in the body, never hidden in a helper.
+- **The plumbing is not the story.** Array coercion, shape normalization, default
+  filling, validation, backend dispatch, caching and result wrapping go to helpers under
+  `# Internal machinery`, or to the unpack and output beats. If a helper contains an
+  equation from the textbook page, it is in the wrong place.
+- **Three beats, one equation per named line** (RULES 5.3): unpack, then the math, then
+  return a named result. No `self.` in math lines, and no equation on a `return` line.
+- **Equation comments** (RULES 5.22): a one-line comment carries the textbook form when
+  the code cannot. Equations never sit in docstrings.
+- **Helpers carry plain names** (RULES 5.8): a module-level helper is `check_poles`, never
+  `_check_poles`; the `# Internal machinery` section comment is what marks it internal. A
+  leading underscore is only for module-level constants and local closures.
+- **Docstrings and comments are timeless.** They state the math and the contract as a
+  textbook would. They never name the design process (step ids such as `P2`, audits,
+  dates, "decided", "landed"), the course or its exercises, or what another library
+  refuses. That history lives in `docs/plans/`, `docs/reviews/` and the git log. The same
+  holds for test docstrings and comments.
+- **The reference is `planning/policy_synthesis/dp.py`.** Before committing any math,
+  read the diff next to it, and say in the report that you did.
+
+A change that breaks this rule is not done, even when the tests pass.
+
 ## Non-negotiables
 
 - **Preserve user edits:** never revert or "clean up" manual changes the user made in
@@ -87,7 +121,7 @@ stripped by pre-commit (`nbstripout`). After notebook edits, run the notebook sm
 commands — humans use **`tests/run/`** (IDE Run); agents use its Agent table, and its CI
 table says what each job runs. This section says *when*, by the Agent table's row names.
 
-GitHub **CI** (`.github/workflows/test.yml`) is the merge gate. It has three jobs: **`test`** (ruff and `pytest` on Python 3.10–3.13), **`packaging`** (build the sdist and wheel, check them, import the installed wheel), and **`regression`** (`pytest` with JAX, the regression gates, the flagship demos, the notebook smoke). Run the same checks **locally before push or PR** so CI does not fail on lint/format — do **not** poll GitHub Actions after every small commit unless the user asked you to push or verify remote CI.
+GitHub **CI** (`.github/workflows/test.yml`) is the merge gate. It has four jobs: **`test`** (ruff and `pytest` on Python 3.10–3.13, with a coverage report and no gate on 3.12), **`laptops`** (the Basic tier's `pytest` and the notebook smoke on Windows and macOS, Python 3.12), **`packaging`** (build the sdist and wheel, check them, import the installed wheel), and **`regression`** (`pytest` with JAX, the regression gates, the flagship demos, the notebook smoke). Run the same checks **locally before push or PR** so CI does not fail on lint/format — do **not** poll GitHub Actions after every small commit unless the user asked you to push or verify remote CI.
 
 Three workflows are **not** merge gates: `publish.yml` uploads a `0.*` tag to PyPI once its **`check`** job (ruff and `pytest`) and **`build`** job pass; `nightly.yml` runs every script under `examples/demos/` and every teaching notebook with the full optional stack; `docs.yml` builds the Sphinx site. A demo that only the nightly sweep exercises still has to run — check it locally when you land one.
 
@@ -107,6 +141,7 @@ Fix with `ruff check --fix .` and `ruff format .` when either fails. CI runs the
 | Change | Agent-table row |
 | --- | --- |
 | Docs/markdown only | skip pytest |
+| Any change touching math | the textbook check against `dp.py` (above), stated in the report, plus the row that fits |
 | Narrow module + tests already updated | "Narrow module change" |
 | Cross-cutting or before handoff/push | "Cross-cutting or handoff" |
 | Compile backend, simulator, trajopt, MPC or value-iteration changes | "Regression gates, CI flags" |

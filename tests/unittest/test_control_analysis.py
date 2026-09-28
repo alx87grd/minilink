@@ -1,10 +1,11 @@
 """Unit tests for analysis verbs (linearize, structural, equilibria) and LQR."""
 
 import unittest
+import warnings
 import numpy as np
 import pytest
 from minilink.analysis.equilibria import find_equilibrium
-from minilink.analysis.linearize import linearize, linearize_matrices
+from minilink.analysis.linearization import linearize, linearize_matrices
 from minilink.analysis.structural import controllability, observability
 from minilink.control.lqr import (
     lqr,
@@ -206,6 +207,19 @@ class TestStructural(unittest.TestCase):
         result = controllability(A, B)
         self.assertFalse(result.is_full_rank)
         self.assertEqual(result.rank, 1)
+
+    def test_one_rank_rule_for_the_structural_tests_and_the_cancellation(self):
+        # The second mode is reached through 1e-11: "controllable" and "cancels in
+        # pzmap" must give the same answer on the same pair
+        A = np.diag([-1.0, -2.0])
+        B = np.array([[1.0], [1e-11]])
+        C = np.array([[1.0, 1.0]])
+        from minilink.analysis import linear
+
+        self.assertEqual(controllability(A, B).rank, 1)
+        self.assertEqual(linear.minreal(A, B, C, np.zeros((1, 1)))[0].shape[0], 1)
+        self.assertEqual(observability(A.T, B.T).rank, 1)
+        self.assertEqual(controllability(A, B, tol=1e-13).rank, 2)
 
 
 class TestEquilibria(unittest.TestCase):
@@ -565,7 +579,7 @@ class TestPIDMIMO(unittest.TestCase):
 
 
 import os
-from minilink.analysis.linearize import linearize
+from minilink.analysis.linearization import linearize
 from minilink.analysis.modal import animate_modal, modal_analysis
 from minilink.dynamics.abstraction.state_space import LTISystem
 from minilink.dynamics.catalog.mass_spring_damper.linear import TwoMass
@@ -628,14 +642,10 @@ class TestAnimateModal(unittest.TestCase):
 
 
 class TestModalFacade(unittest.TestCase):
-    def test_returns_poles_and_modes(self):
-        poles, modes = Pendulum().modal_analysis(x_bar=[0.0, 0.0])
-        self.assertEqual(len(poles), 2)
-
     @pytest.mark.optional
     def test_facade_animate(self):
         os.environ.setdefault("MPLBACKEND", "Agg")
-        poles, modes = Pendulum().modal_analysis(x_bar=[0.0, 0.0], mode=0, show=False)
+        poles, modes = Pendulum().animate_modal(x_bar=[0.0, 0.0], mode=0, show=False)
         self.assertEqual(len(poles), 2)
 
 
@@ -669,7 +679,8 @@ class TestModalAPI(unittest.TestCase):
             modal_analysis(Pendulum(), x_bar=[0.0, 0.0], linearization="fd")
 
 
-from minilink.analysis.frequency import bode, pzmap, transfer_function
+from minilink.analysis.frequency import bode, margins, pzmap, transfer_function
+from minilink.analysis.time_response import step_response
 from minilink.graphical.common import PlotResult
 
 
@@ -1038,7 +1049,7 @@ class TestPhasePlane(unittest.TestCase):
             plot_phase_plane(sys, backend="bokeh", show=False)
 
 
-from minilink.analysis.discretize import DiscretizedRK4DynamicSystem, discretize
+from minilink.analysis.discretization import DiscretizedRK4DynamicSystem, discretize
 
 
 def _rk4_step(f, x, u, t, dt, params):
@@ -1415,26 +1426,24 @@ class TestCompensatorStateLayout(unittest.TestCase):
             (PID(Kp=20.0, Ki=10.0, Kd=2.0, tau=0.05), 2, 2),
         ):
             with self.subTest(controller=type(controller).__name__):
-                zeros, poles, _ = (controller >> self.plant).pzmap()
+                zeros, poles, _ = pzmap(controller >> self.plant)
                 self.assertEqual(len(poles), plant_poles + extra_poles)
                 self.assertEqual(len(zeros), n_zeros)
 
     def test_pi_has_the_integrator_pole_and_pd_the_filter_pole(self):
-        _, pi_poles, _ = (PI(Kp=20.0, Ki=10.0) >> self.plant).pzmap()
+        _, pi_poles, _ = pzmap(PI(Kp=20.0, Ki=10.0) >> self.plant)
         self.assertEqual(np.sum(np.abs(pi_poles) < 1e-9), 1)
 
-        _, pd_poles, _ = (PD(Kp=20.0, Kd=2.0, tau=0.05) >> self.plant).pzmap()
+        _, pd_poles, _ = pzmap(PD(Kp=20.0, Kd=2.0, tau=0.05) >> self.plant)
         self.assertEqual(np.sum(np.abs(pd_poles) < 1e-9), 0)
         self.assertTrue(np.any(np.abs(pd_poles + 20.0) < 1e-9))  # -1/tau
 
     def test_integral_action_removes_the_static_error(self):
         from minilink.analysis import step_info
 
-        pd_final = step_info(
-            *(PD(Kp=20.0, Kd=2.0, tau=0.05) @ self.plant).step_response()
-        )
+        pd_final = step_info(*step_response(PD(Kp=20.0, Kd=2.0, tau=0.05) @ self.plant))
         pid_final = step_info(
-            *(PID(Kp=20.0, Ki=10.0, Kd=2.0, tau=0.05) @ self.plant).step_response()
+            *step_response(PID(Kp=20.0, Ki=10.0, Kd=2.0, tau=0.05) @ self.plant)
         )
         self.assertLess(pd_final.steady_state, 0.9)  # static offset without Ki
         self.assertAlmostEqual(pid_final.steady_state, 1.0, places=2)
@@ -1479,17 +1488,17 @@ class TestFrequencyRangeBracketsCrossover(unittest.TestCase):
 
     def test_integrator_loop(self):
         loop = self._tf([10.0], [1.0, 10.0, 0.0])  # 10 / (s (s + 10))
-        self.assertAlmostEqual(loop.margins().phase_margin_deg, 84.3173, places=3)
+        self.assertAlmostEqual(margins(loop).phase_margin_deg, 84.3173, places=3)
 
     def test_large_static_gain(self):
         loop = self._tf([1000.0], [1.0, 1.0])  # crossover three decades up
-        self.assertAlmostEqual(loop.margins().phase_margin_deg, 90.0573, places=3)
+        self.assertAlmostEqual(margins(loop).phase_margin_deg, 90.0573, places=3)
 
     def test_marginal_loop_is_exact(self):
         loop = self._tf([1.0], [1.0, 1.0, 1.0, 0.0])  # L(j1) = -1 exactly
-        margins = loop.margins()
-        self.assertAlmostEqual(margins.phase_margin_deg, 0.0, places=3)
-        self.assertAlmostEqual(margins.gain_margin_db, 0.0, places=3)
+        m = margins(loop)
+        self.assertAlmostEqual(m.phase_margin_deg, 0.0, places=3)
+        self.assertAlmostEqual(m.gain_margin_db, 0.0, places=3)
 
     def test_flat_low_frequency_gain_keeps_a_tidy_band(self):
         from minilink.analysis import linear
@@ -1500,7 +1509,7 @@ class TestFrequencyRangeBracketsCrossover(unittest.TestCase):
         w_min, w_max = linear.frequency_range(loop.A(), loop.B(), loop.C(), loop.D())
         self.assertAlmostEqual(w_min, 0.1)  # no walk down a DC plateau
         self.assertAlmostEqual(w_max, 100.0)
-        self.assertTrue(np.isinf(loop.margins().phase_margin_deg))
+        self.assertTrue(np.isinf(margins(loop).phase_margin_deg))
 
     def test_singular_feedback_gain_is_not_a_crash(self):
         from minilink.analysis import linear
@@ -1508,3 +1517,170 @@ class TestFrequencyRangeBracketsCrossover(unittest.TestCase):
         tf = self._tf([1.0, 2.0], [1.0, 1.0])  # d = 1, so K = -1 is singular
         poles = linear.closed_loop_poles(tf.A(), tf.B(), tf.C(), tf.D(), -1.0)
         self.assertTrue(np.all(np.isinf(poles)))
+
+
+class TestMinreal(unittest.TestCase):
+    """Uncontrollable and unobservable modes cancel, and nothing else moves."""
+
+    def test_phantom_modes_cancel(self):
+        from minilink.analysis import linear
+        from minilink.blocks.transfer_function import TransferFunction
+
+        # A pure-P pendulum loop with two phantom modes:
+        # (10 s² + 200 s) / (s⁴ + 20.25 s³ + 9.905 s² + 98.1 s) = 10 / (s² + 0.25 s + 4.905)
+        loop = TransferFunction([10.0, 200.0, 0.0], [1.0, 20.25, 9.905, 98.1, 0.0])
+        A_min, _, _, _ = linear.minreal(loop.A(), loop.B(), loop.C(), loop.D())
+        self.assertEqual(A_min.shape, (2, 2))
+
+        with pytest.warns(UserWarning, match="Cancelled 2 pole/zero"):
+            H = loop.transfer_function()
+        np.testing.assert_allclose(H.numerator, [10.0], atol=1e-9)
+        np.testing.assert_allclose(H.denominator, [1.0, 0.25, 4.905], atol=1e-9)
+
+        with warnings.catch_warnings():
+            warnings.simplefilter("error")
+            raw = loop.transfer_function(minimal=False)
+        self.assertEqual(len(raw.denominator), 5)
+
+    def test_a_compensator_zero_on_a_plant_pole_drops_both(self):
+        from minilink.blocks.transfer_function import TransferFunction
+
+        plant = TransferFunction([1.0], [1.0, 3.0, 2.0])  # poles -1, -2
+        lead = TransferFunction([1.0, 1.0], [1.0, 10.0])  # zero on the plant pole -1
+        loop = lead >> plant
+
+        with pytest.warns(UserWarning, match="Cancelled 1 pole/zero"):
+            zeros, poles, _ = pzmap(loop)
+        self.assertEqual(len(zeros), 0)
+        np.testing.assert_allclose(np.sort(poles.real), [-10.0, -2.0], atol=1e-9)
+
+        zeros, poles, _ = pzmap(loop, minimal=False)
+        np.testing.assert_allclose(zeros, [-1.0], atol=1e-9)
+        self.assertEqual(len(poles), 3)
+
+    def test_a_minimal_realization_comes_back_unchanged(self):
+        from minilink.analysis import linear
+
+        for scale_b, scale_c in [(1.0, 1.0), (1e-6, 1e6), (1e5, 1e-8)]:
+            with self.subTest(scale_b=scale_b, scale_c=scale_c):
+                lti, A, B, C, _ = quarter_car(scale_b, scale_c)
+                D = np.zeros((C.shape[0], B.shape[1]))
+                for given, kept in zip((A, B, C, D), linear.minreal(A, B, C, D)):
+                    np.testing.assert_array_equal(kept, given)
+                with warnings.catch_warnings():
+                    warnings.simplefilter("error")
+                    pzmap(lti, of=("y", 0))
+
+    def test_mimo_drops_the_uncontrollable_and_the_unobservable_mode(self):
+        from minilink.analysis import linear
+
+        A = np.diag([-1.0, -2.0, -3.0, -4.0])
+        B = np.array(
+            [[1.0, 0.0], [0.0, 1.0], [0.0, 0.0], [1.0, 1.0]]
+        )  # mode 3 unreached
+        C = np.array([[1.0, 0.0, 1.0, 0.0], [0.0, 1.0, 1.0, 0.0]])  # mode 4 unseen
+        D = np.zeros((2, 2))
+
+        A_min, B_min, C_min, D_min = linear.minreal(A, B, C, D)
+        self.assertEqual(A_min.shape, (2, 2))
+
+        # G(s) = C (sI − A)⁻¹ B + D is the same transfer matrix
+        for s in 1j * np.array([0.1, 0.5, 1.0, 3.0, 10.0]):
+            G = C @ np.linalg.solve(s * np.eye(4) - A, B) + D
+            G_min = C_min @ np.linalg.solve(s * np.eye(2) - A_min, B_min) + D_min
+            np.testing.assert_allclose(G_min, G, atol=1e-12)
+
+    def test_empty_and_unreachable_systems(self):
+        from minilink.analysis import linear
+
+        A, B, C, D = linear.minreal(
+            np.zeros((0, 0)), np.zeros((0, 1)), np.zeros((1, 0)), [[2.0]]
+        )
+        self.assertEqual(A.shape, (0, 0))
+        np.testing.assert_array_equal(D, [[2.0]])
+
+        A, B, C, D = linear.minreal(
+            -np.eye(2), np.zeros((2, 1)), np.ones((1, 2)), [[0.5]]
+        )
+        self.assertEqual(A.shape, (0, 0))
+        np.testing.assert_array_equal(D, [[0.5]])
+
+
+class TestPolePlacement(unittest.TestCase):
+    """Ackermann with one input, the robust choice with several, both checked."""
+
+    DOUBLE = (np.array([[0.0, 1.0], [0.0, 0.0]]), np.array([[0.0], [1.0]]))
+    TRIPLE = (
+        np.array([[0.0, 1.0, 0.0], [0.0, 0.0, 1.0], [0.0, 0.0, 0.0]]),
+        np.array([[0.0], [0.0], [1.0]]),
+    )
+
+    def test_single_input_matches_the_hand_calculation(self):
+        from minilink.control.place import place_gain
+
+        # s² + k₂ s + k₁ = (s + 1)(s + 2) = s² + 3 s + 2
+        np.testing.assert_allclose(
+            place_gain(*self.DOUBLE, [-1.0, -2.0]), [[2.0, 3.0]], atol=1e-12
+        )
+
+        # (s + 2)³ = s³ + 6 s² + 12 s + 8: a pole repeated more often than rank B
+        np.testing.assert_allclose(
+            place_gain(*self.TRIPLE, [-2.0] * 3), [[8.0, 12.0, 6.0]], atol=1e-12
+        )
+
+    def test_a_complex_pair_and_a_real_pole(self):
+        from minilink.control.place import place_gain
+
+        A, B = self.TRIPLE
+        poles = [-1.0 + 0.5j, -1.0 - 0.5j, -1.0]
+        K = place_gain(A, B, poles)
+        # det(sI − (A − B K)) = (s + 1 − 0.5i)(s + 1 + 0.5i)(s + 1)
+        np.testing.assert_allclose(
+            np.poly(A - B @ K), np.real(np.poly(poles)), atol=1e-9
+        )
+
+    def test_several_inputs_take_the_robust_gain(self):
+        from minilink.control.place import place_gain
+
+        A = np.diag([1.0, 2.0, 3.0])
+        B = np.array([[1.0, 0.0], [0.0, 1.0], [1.0, 1.0]])
+        K = place_gain(A, B, [-1.0, -2.0, -3.0])
+        self.assertEqual(K.shape, (2, 3))
+        np.testing.assert_allclose(
+            np.sort(np.linalg.eigvals(A - B @ K).real), [-3.0, -2.0, -1.0], atol=1e-9
+        )
+
+    def test_honest_errors(self):
+        from minilink.control.place import place_gain
+
+        A, B = self.DOUBLE
+        B_mimo = np.array([[1.0, 0.0], [0.0, 1.0], [1.0, 1.0]])
+        for args, message in (
+            ((A, [[1.0], [0.0]], [-1.0, -2.0]), "not controllable"),
+            ((A, B, [-1.0]), "2 poles needed"),
+            ((A, B, [-1.0 + 1.0j, -2.0]), "conjugate pairs"),
+            ((np.diag([1.0, 2.0, 3.0]), B_mimo, [-1.0] * 3), "repeated at most"),
+        ):
+            with (
+                self.subTest(message=message),
+                self.assertRaisesRegex(ValueError, message),
+            ):
+                place_gain(*args)
+
+    def test_operating_point_design_closes_the_loop(self):
+        from minilink import place, place_at_operating_point
+
+        plant = InvertedPendulum()
+        x_bar = np.zeros(2)
+        poles = [-3.0, -3.0]
+
+        ctl = place_at_operating_point(plant, x_bar, poles)
+        lin = linearize(plant, x_bar)
+        np.testing.assert_allclose(
+            ctl.params["K"], place(lin.A(), lin.B(), poles).params["K"]
+        )
+        np.testing.assert_allclose(ctl.inputs["r"].nominal_value, x_bar)
+
+        plant.x0 = np.array([0.4, 0.0])
+        trajectory = (ctl @ plant).compute_trajectory(tf=6.0)
+        self.assertLess(np.max(np.abs(trajectory.x[:, -1])), 1e-3)

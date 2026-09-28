@@ -208,8 +208,9 @@ Systems-as-descriptions: CONSTITUTION.md §4.*
   Write the subsequent mathematical algebra using `xp` so the exact same equation path executes
   on both NumPy and JAX arrays without branching.
 - **5.3 Three beats in an equation path; no `self.` in math lines:** Every native-array
-  equation method (`f`, `h`, `g`, `margin`, `value`, `sdf`, `forward_dynamics`, …) is
-  three beats, with a blank line between them so the core equation is the thing the
+  equation method (`f`, `h`, `g`, `margin`, `value`, `sdf`, `forward_dynamics`, …) and
+  every algorithm body (analysis tools, design functions, planners, solvers, learning
+  updates) is three beats, with a blank line between them so the core equation is the thing the
   eye lands on:
 
   1. **Unpack.** Bind `params`, split `x`, and copy `self.` fields into short textbook
@@ -241,6 +242,16 @@ Systems-as-descriptions: CONSTITUTION.md §4.*
 
   # Bad — self. in the algebra, and the equation lives on the return line:
   return (u - self.m * self.g * self.l * xp.sin(x[0])) / (self.m * self.l**2)
+
+  # Bad — a textbook step hidden in a helper: the SVD, rank and basis of the
+  # Kalman decomposition are the lesson, so they belong in the body:
+  T_c = _orthonormal_range(ctrb, tol)
+
+  # Good — each step a named line; only the default tolerance is plumbing:
+  # 𝒞 = U Σ Vᵀ, keep the r directions with σᵢ > tol·σ₁
+  U, sigma, _ = np.linalg.svd(ctrb)
+  r = int(np.sum(sigma > _rank_tol(ctrb, sigma, tol)))
+  T_c = U[:, :r]
   ```
 - **5.4 Mathematical naming conventions:**
   - Matrices: uppercase (`A`, `B`, `C`, `D`, `H`, `M`, `K`).

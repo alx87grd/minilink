@@ -4,10 +4,12 @@ Teaching imports::
 
     from minilink.control import ImpedanceController
     from minilink.control.lqr import lqr
+    from minilink.control.place import place
     from minilink.control.mpc import ModelPredictiveController
 
-Note: ``lqr`` lives in the ``control.lqr`` module — it is not re-exported on
-the package attribute ``control.lqr`` (that name is the submodule itself).
+Note: ``lqr`` lives in the ``control.lqr`` module and ``place`` in ``control.place``
+— neither is re-exported on the package attribute of the same name (that name
+is the submodule itself).
 """
 
 from __future__ import annotations

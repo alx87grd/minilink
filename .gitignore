@@ -77,6 +77,7 @@ site/
 .idea/vcs.xml
 .pytest_cache/v/cache/lastfailed
 .pytest_cache/v/cache/nodeids
+.coverage
 .idea/other.xml
 .idea/workspace.xml
 build/

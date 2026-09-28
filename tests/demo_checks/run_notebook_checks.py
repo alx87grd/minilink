@@ -6,6 +6,8 @@ Auto-discovers ``.ipynb`` under mature tutorial/teaching trees:
 * ``examples/teaching/``
 
 Code cells must not raise; outputs are discarded. Uses ``MPLBACKEND=Agg``.
+A cell that starts a live keyboard session (``.game(``) is left out: it runs
+until the user quits, as ``run_all_demos.py`` skips the interactive scripts.
 Defaults: ``timeout=180``, ``requires=[]``. Overrides in
 ``notebook_overrides.json`` (``smoke: false`` drops a notebook from the
 default suite). Not smoked: ``projects/``, ``experimental/``, and long topic
@@ -26,6 +28,7 @@ import difflib
 import importlib.util
 import json
 import os
+import re
 from collections import Counter
 from dataclasses import dataclass
 from pathlib import Path
@@ -38,6 +41,8 @@ NOTEBOOK_ROOTS = (
     REPO_ROOT / "examples" / "teaching",
 )
 DEFAULT_TIMEOUT = 180.0
+# A live keyboard session hangs until the user quits; the cell calling it is not run.
+INTERACTIVE_CALL = re.compile(r"^[^#\n]*\.game\(", re.MULTILINE)
 
 
 @dataclass(frozen=True)
@@ -111,6 +116,9 @@ def _execute_notebook(path: Path, *, timeout: float) -> tuple[str, str]:
 
     try:
         nb = nbformat.read(path, as_version=4)
+        for cell in nb.cells:
+            if cell.cell_type == "code" and INTERACTIVE_CALL.search(cell.source):
+                cell.source = ""
         client = NotebookClient(
             nb,
             timeout=int(timeout),

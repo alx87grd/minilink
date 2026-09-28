@@ -1,5 +1,6 @@
 """Teaching public-import facades (DESIGN §2)."""
 
+import inspect
 import unittest
 
 from minilink.dynamics.catalog.pendulum.pendulum import Pendulum as PendulumDef
@@ -22,13 +23,13 @@ class TestPublicImports(unittest.TestCase):
         self.assertIs(Pendulum, PendulumDef)
 
     def test_control_and_analysis_band_exports(self):
-        from minilink.analysis import bode, modal_analysis
-        from minilink.analysis.linearize import linearize
+        from minilink.analysis import bode, discretize, linearize, modal_analysis
         from minilink.control import ImpedanceController
         from minilink.control.lqr import lqr
 
         self.assertTrue(callable(lqr))
-        self.assertTrue(callable(linearize))
+        self.assertTrue(callable(linearize))  # the function, not a module of that name
+        self.assertTrue(callable(discretize))
         self.assertTrue(callable(bode))
         self.assertTrue(callable(modal_analysis))
         self.assertTrue(callable(ImpedanceController))
@@ -146,6 +147,58 @@ class TestPublicImports(unittest.TestCase):
                 isinstance(value, type) and issubclass(value, System),
                 f"catalog.{name} is not a System subclass",
             )
+
+
+# Every analysis verb reads tool(sys, x_bar=None, u_bar=None, t=0.0, params=None, *, ...),
+# with method="auto" and eps=1e-6 where it differentiates. Today's exceptions, each with
+# its reason; the list can only shrink.
+BAND_PATTERN_DEVIATIONS = {
+    "jacobian": "names the function and the variable first: jacobian(sys, of, wrt, ...)",
+    "find_equilibrium": "requires the guess x_guess where the others take x_bar",
+    "step_info": "reads a sampled response: step_info(time, y)",
+    "controllability": "takes the matrices (A, B) or one LTISystem",
+    "observability": "takes the matrices (A, C) or one LTISystem",
+    "plot_region_of_attraction": "draws a certificate: plot_region_of_attraction(certificate)",
+    "region_of_attraction": 'method names the Lyapunov construction ("quadratic")',
+    "discretize": "wraps a continuous system in a step model: discretize(sys, dt, ...)",
+}
+
+
+def band_pattern_issues(fn):
+    """How ``fn`` departs from the band's calling pattern; empty when it follows it."""
+    params = list(inspect.signature(fn).parameters.values())
+    issues = []
+    if not params or params[0].name != "sys":
+        issues.append("first parameter is not sys")
+    prefix = [(p.name, p.default) for p in params[1:5]]
+    if prefix != [("x_bar", None), ("u_bar", None), ("t", 0.0), ("params", None)]:
+        issues.append(f"positional prefix {prefix}")
+    for p in params:
+        if p.name == "method" and p.default != "auto":
+            issues.append(f"method={p.default!r}")
+        if p.name == "eps" and p.default != 1e-6:
+            issues.append(f"eps={p.default!r}")
+    return issues
+
+
+class TestBandCallingPattern(unittest.TestCase):
+    def test_every_analysis_verb_follows_the_pattern(self):
+        import minilink.analysis as band
+
+        for name in band.__all__:
+            fn = getattr(band, name)
+            if not inspect.isfunction(fn) or name in BAND_PATTERN_DEVIATIONS:
+                continue
+            with self.subTest(name):
+                self.assertEqual(band_pattern_issues(fn), [])
+
+    def test_every_allowed_deviation_still_deviates(self):
+        import minilink.analysis as band
+
+        for name in BAND_PATTERN_DEVIATIONS:
+            with self.subTest(name):
+                self.assertIn(name, band.__all__)
+                self.assertNotEqual(band_pattern_issues(getattr(band, name)), [])
 
 
 if __name__ == "__main__":

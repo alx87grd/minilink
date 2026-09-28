@@ -805,7 +805,7 @@ class MeshcatRenderer(AnimationRenderer):
         self.show = False
         self._set_native_animation(primitives, frames, schedule, is_3d=is_3d)
         path = html_export_path(file_name)
-        path.write_text(self.vis.static_html())
+        path.write_text(self.vis.static_html(), encoding="utf-8")
         print(f"Saving animation to {path} ...")
 
     def play_native(

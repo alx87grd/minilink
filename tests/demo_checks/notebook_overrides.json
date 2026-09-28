@@ -15,7 +15,7 @@
     "requires": [
       "jax"
     ],
-    "smoke": false
+    "timeout": 300
   },
   "examples/tutorial/06_hybrid.ipynb": {
     "requires": [
@@ -29,6 +29,11 @@
   },
   "examples/tutorial/09_planning.ipynb": {
     "timeout": 300
+  },
+  "examples/tutorial/11_reinforcement_learning.ipynb": {
+    "requires": [
+      "jax"
+    ]
   },
   "examples/tutorial/10_graphical.ipynb": {
     "requires": [
@@ -98,6 +103,15 @@
     "requires": [
       "gymnasium",
       "jax",
+      "stable_baselines3"
+    ],
+    "smoke": false
+  },
+  "examples/teaching/courses/udes_gro860/particle_gymnasium_sb3.ipynb": {
+    "requires": [
+      "gymnasium",
+      "jax",
+      "pygame",
       "stable_baselines3"
     ],
     "smoke": false

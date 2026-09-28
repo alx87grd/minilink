@@ -73,6 +73,8 @@ _EXPORTS: dict[str, tuple[str, str]] = {
     "lqr_at_operating_point": ("minilink.control.lqr", "lqr_at_operating_point"),
     "lqr_finite_horizon": ("minilink.control.lqr", "lqr_finite_horizon"),
     "trajectory_lqr": ("minilink.control.lqr", "trajectory_lqr"),
+    "place": ("minilink.control.place", "place"),
+    "place_at_operating_point": ("minilink.control.place", "place_at_operating_point"),
     "TimeVaryingStateFeedbackController": (
         "minilink.control.state",
         "TimeVaryingStateFeedbackController",
@@ -84,7 +86,7 @@ _EXPORTS: dict[str, tuple[str, str]] = {
     "NeuralPolicyController": ("minilink.control.neural", "NeuralPolicyController"),
     # analysis
     "jacobian": ("minilink.analysis.derivatives", "jacobian"),
-    "linearize": ("minilink.analysis.linearize", "linearize"),
+    "linearize": ("minilink.analysis.linearization", "linearize"),
     "transfer_function": ("minilink.analysis.frequency", "transfer_function"),
     "bode": ("minilink.analysis.frequency", "bode"),
     "plot_bode": ("minilink.analysis.frequency", "plot_bode"),
@@ -181,7 +183,7 @@ _EXPORTS: dict[str, tuple[str, str]] = {
         "minilink.control.impedance",
         "ImpedanceIntegralController",
     ),
-    "discretize": ("minilink.analysis.discretize", "discretize"),
+    "discretize": ("minilink.analysis.discretization", "discretize"),
     "RRTStarPlanner": ("minilink.planning.search.rrt_star", "RRTStarPlanner"),
     "Optimizer": ("minilink.optimization.optimizer", "Optimizer"),
 }

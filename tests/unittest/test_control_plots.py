@@ -7,7 +7,7 @@ import unittest
 import numpy as np
 import pytest
 
-from minilink import InvertedPendulum, Pendulum, TransferFunction
+from minilink import Pendulum, TransferFunction
 from minilink.analysis import linear
 from minilink.analysis.frequency import (
     bode,
@@ -104,6 +104,22 @@ class TestLinearCore(unittest.TestCase):
         )
         self.assertAlmostEqual(linear.settling_horizon(A), 8.0)
 
+    def test_siso_functions_refuse_a_mimo_realization(self):
+        # Two inputs and two outputs: G(jw) is a 2x2 matrix, not one number
+        A, B, C, D = -np.eye(2), np.eye(2), np.eye(2), np.zeros((2, 2))
+        for name, call in (
+            (
+                "frequency_response",
+                lambda: linear.frequency_response(A, B, C, D, [1.0]),
+            ),
+            ("gain", lambda: linear.gain(A, B, C, D)),
+            ("closed_loop_poles", lambda: linear.closed_loop_poles(A, B, C, D, 1.0)),
+            ("step_response", lambda: linear.step_response(A, B, C, D, [0.0, 0.1])),
+            ("root_locus", lambda: linear.root_locus(A, B, C, D, [0.0, 1.0])),
+        ):
+            with self.subTest(name), self.assertRaisesRegex(ValueError, "one input"):
+                call()
+
     def test_step_info_second_order(self):
         zeta, wn = 0.3, 2.0
         tf = TransferFunction([wn**2], [1.0, 2 * zeta * wn, wn**2])
@@ -136,6 +152,19 @@ class TestLinearCore(unittest.TestCase):
         info_negative = step_info(t, -linear.step_response(*_matrices(tf), t))
         self.assertEqual(info_negative.overshoot, 0.0)
 
+    def test_step_info_of_a_response_that_never_settles(self):
+        # An integrator's step is a ramp: it has a peak (its last sample) but no
+        # final value, so no rise time, settling time or overshoot either
+        t = np.linspace(0.0, 5.0, 501)
+        integrator = TransferFunction([1.0], [1.0, 0.0])
+        for y in (t, linear.step_response(*_matrices(integrator), t)):
+            info = step_info(t, y)
+            self.assertTrue(np.isnan(info.rise_time))
+            self.assertTrue(np.isnan(info.settling_time))
+            self.assertTrue(np.isnan(info.overshoot))
+            self.assertTrue(np.isnan(info.steady_state))
+            self.assertAlmostEqual(info.peak_time, 5.0)
+
 
 class TestChannelTools(unittest.TestCase):
     """The system-level verbs share the family signature and the channel selectors."""
@@ -167,28 +196,29 @@ class TestChannelTools(unittest.TestCase):
         )
         np.testing.assert_allclose(G_tf.numerator, [0.5], atol=1e-9)
 
-    def test_methods_mirror_the_functions(self):
-        plant = InvertedPendulum()
-        x_bar = [0.0, 0.0]
-        np.testing.assert_allclose(
-            plant.root_locus(x_bar)[1], root_locus(plant, x_bar)[1]
-        )
-        np.testing.assert_allclose(
-            plant.nyquist(x_bar, w=[1.0, 2.0])[1],
-            nyquist(plant, x_bar, w=[1.0, 2.0])[1],
-        )
-        self.assertEqual(plant.margins(x_bar), margins(plant, x_bar))
-        np.testing.assert_allclose(
-            plant.step_response(x_bar, tf=1.0, n=20)[1],
-            step_response(plant, x_bar, tf=1.0, n=20)[1],
-        )
-
     def test_transfer_function_blocks_go_through_unchanged(self):
         L = TransferFunction([1.0], [1.0, 3.0, 2.0, 0.0])
-        m = L.margins()
+        m = margins(L)
         self.assertAlmostEqual(m.gain_margin_db, 20 * np.log10(6.0), places=2)
-        gains, roots = L.root_locus()
+        gains, roots = root_locus(L)
         self.assertEqual(roots.shape[1], 3)
+
+    def test_root_locus_through_the_singular_gain(self):
+        # (s + 1) / (s + 2) has d = 1: at K = -1/d the loop 1 + K d vanishes and no
+        # pole is finite; the sweep keeps going on both sides of it
+        tf = TransferFunction([1.0, 1.0], [1.0, 2.0])
+        gains, roots = root_locus(tf, gains=[0.0, -0.5, -1.0, -2.0])
+        self.assertEqual(roots.shape, (4, 1))
+        self.assertTrue(np.isinf(roots[2, 0]))
+        # p(K) = -(2 + K) / (1 + K) for this channel
+        for K, p in ((0.0, -2.0), (-0.5, -3.0), (-2.0, 0.0)):
+            np.testing.assert_allclose(roots[gains == K, 0], p, atol=1e-9)
+        gains, roots = root_locus(tf, gains=[-2.0, -1.0, 0.0])
+        self.assertTrue(np.all(np.isfinite(roots[gains != -1.0])))
+        # an interval that straddles K = -1/d is not refined: the branch passes
+        # through infinity there
+        gains, roots = root_locus(tf, gains=[-3.0, -0.9])
+        np.testing.assert_allclose(gains, [-3.0, -0.9])
 
 
 class TestPlots(unittest.TestCase):

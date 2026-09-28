@@ -150,7 +150,7 @@ def heading_slug(heading: str) -> str:
 
 
 def notebook_markdown(path: pathlib.Path) -> str:
-    cells = json.loads(path.read_text()).get("cells", [])
+    cells = json.loads(path.read_text(encoding="utf-8")).get("cells", [])
     return "\n".join(
         "".join(cell.get("source", []))
         for cell in cells
@@ -161,8 +161,8 @@ def notebook_markdown(path: pathlib.Path) -> str:
 def example_code(path: pathlib.Path) -> str:
     """A script's source, or a notebook's code cells without shell and magic lines."""
     if path.suffix == ".py":
-        return path.read_text()
-    cells = json.loads(path.read_text()).get("cells", [])
+        return path.read_text(encoding="utf-8")
+    cells = json.loads(path.read_text(encoding="utf-8")).get("cells", [])
     code = "\n".join(
         "".join(cell.get("source", []))
         for cell in cells
@@ -178,7 +178,7 @@ class TestPublicProse(unittest.TestCase):
 
     def test_prose_files_name_no_other_tool(self):
         for name in PROSE_FILES:
-            text = (REPO / name).read_text()
+            text = (REPO / name).read_text(encoding="utf-8")
             found = OTHER_TOOLS.findall(text)
             self.assertEqual(found, [], f"{name} names another tool: {set(found)}")
 
@@ -204,12 +204,13 @@ class TestDocumentLinks(unittest.TestCase):
         def headings_of(path: pathlib.Path) -> set[str]:
             if path not in anchors:
                 anchors[path] = {
-                    heading_slug(h) for h in HEADING.findall(path.read_text())
+                    heading_slug(h)
+                    for h in HEADING.findall(path.read_text(encoding="utf-8"))
                 }
             return anchors[path]
 
         for doc in self.documents():
-            text = doc.read_text()
+            text = doc.read_text(encoding="utf-8")
             where = doc.relative_to(REPO)
             for target in MARKDOWN_LINK.findall(text):
                 if target.startswith(("http://", "https://", "mailto:", "#/")):
@@ -233,7 +234,7 @@ class TestInternalNaming(unittest.TestCase):
 
     def test_no_pseudo_private_methods_on_the_named_classes(self):
         for name in NAMED_CLASS_MODULES:
-            tree = ast.parse((REPO / name).read_text())
+            tree = ast.parse((REPO / name).read_text(encoding="utf-8"))
             for node in ast.walk(tree):
                 if not isinstance(node, ast.ClassDef):
                     continue
@@ -322,7 +323,7 @@ class TestMergeGate(unittest.TestCase):
         except ImportError:
             self.skipTest("PyYAML is not installed")
 
-        workflow = yaml.safe_load((REPO / CI_WORKFLOW).read_text())
+        workflow = yaml.safe_load((REPO / CI_WORKFLOW).read_text(encoding="utf-8"))
         runs_by_job = {
             name: [step.get("run", "") for step in job["steps"]]
             for name, job in workflow["jobs"].items()

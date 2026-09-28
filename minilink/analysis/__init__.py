@@ -1,14 +1,15 @@
 """Analysis verbs on a ``System``: derivatives, linearization, structure, equilibria, modes, frequency and time responses, Lyapunov certificates.
 
-Every tool reads ``tool(sys, x_bar, u_bar, t, params, *, method="auto", eps)`` and the
-same verbs are methods on every ``System``.
+Every tool reads ``tool(sys, x_bar, u_bar, t, params, *, method="auto", eps)``. A
+``System`` carries the common ones as methods: ``linearize``, ``find_equilibrium``,
+``transfer_function``, ``plot_bode``, ``plot_pzmap``, ``plot_root_locus`` and
+``animate_modal``; ``plot_step_response`` is a method of ``LTISystem``.
 """
 
 from __future__ import annotations
 
 from minilink.core.facade import lazy_facade
 
-# Only names that do not collide with submodule filenames.
 _EXPORTS: dict[str, tuple[str, str]] = {
     "LyapunovCertificate": ("minilink.analysis.lyapunov", "LyapunovCertificate"),
     "StructuralResult": ("minilink.analysis.structural", "StructuralResult"),
@@ -16,9 +17,12 @@ _EXPORTS: dict[str, tuple[str, str]] = {
     "animate_modal": ("minilink.analysis.modal", "animate_modal"),
     "bode": ("minilink.analysis.frequency", "bode"),
     "controllability": ("minilink.analysis.structural", "controllability"),
+    "discretize": ("minilink.analysis.discretization", "discretize"),
     "find_equilibrium": ("minilink.analysis.equilibria", "find_equilibrium"),
     "frequency_response": ("minilink.analysis.frequency", "frequency_response"),
     "jacobian": ("minilink.analysis.derivatives", "jacobian"),
+    "linearize": ("minilink.analysis.linearization", "linearize"),
+    "linearize_matrices": ("minilink.analysis.linearization", "linearize_matrices"),
     "margins": ("minilink.analysis.frequency", "margins"),
     "modal_analysis": ("minilink.analysis.modal", "modal_analysis"),
     "nyquist": ("minilink.analysis.frequency", "nyquist"),

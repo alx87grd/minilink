@@ -14,14 +14,14 @@ CHECK_WHEEL = REPO / "tests" / "demo_checks" / "check_wheel.py"
 
 class TestWheelConfig(unittest.TestCase):
     def test_wheel_and_sdist_exclude_research_lane(self):
-        text = (REPO / "pyproject.toml").read_text()
+        text = (REPO / "pyproject.toml").read_text(encoding="utf-8")
         self.assertIn('"minilink/experimental/**"', text)
         self.assertIn('"/minilink/experimental"', text)
         self.assertIn('"/examples/experimental"', text)
         self.assertIn('"/examples/projects"', text)
 
     def test_full_extra_is_declared(self):
-        text = (REPO / "pyproject.toml").read_text()
+        text = (REPO / "pyproject.toml").read_text(encoding="utf-8")
         self.assertIn("full = [", text)
         self.assertIn("minilink[diagrams,visualization,plotting,symbolic,jax,rl]", text)
 

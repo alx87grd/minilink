@@ -8,6 +8,7 @@ import pytest
 from minilink import CartPole, InvertedPendulum, VanderPol
 from minilink.analysis.lyapunov import (
     LyapunovCertificate,
+    plot_region_of_attraction,
     region_of_attraction,
     sample_in_ellipsoid,
 )
@@ -259,5 +260,5 @@ def test_plot_draws_the_slice_and_the_basin():
     assert len(ax.collections) >= 1  # the shaded basin
     assert ax.get_xlabel() == loop.state.labels[0]
 
-    fig_shortcut, _ = loop.plot_region_of_attraction(n=21, show=False)
-    assert fig_shortcut is not None
+    fig_band, _ = plot_region_of_attraction(roa, n=21, show=False)
+    assert fig_band is not None

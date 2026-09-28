@@ -19,7 +19,7 @@ from minilink import (
     observability,
 )
 from minilink.analysis.frequency import bode, pzmap, transfer_function
-from minilink.analysis.linearize import linearize, linearize_matrices
+from minilink.analysis.linearization import linearize, linearize_matrices
 from minilink.blocks.transfer_function import TransferFunction
 from minilink.control.state import StateFeedbackController
 from minilink.core.backends import array_module, jax_installed
@@ -431,12 +431,6 @@ class TestFamilyPattern(unittest.TestCase):
         np.testing.assert_allclose(
             plant.linearize(x_bar).A(), linearize(plant, x_bar).A()
         )
-        np.testing.assert_allclose(
-            plant.bode(x_bar, w=[1.0])[1], bode(plant, x_bar, w=[1.0])[1]
-        )
-        np.testing.assert_allclose(plant.pzmap(x_bar)[1], pzmap(plant, x_bar)[1])
-        poles, modes = plant.modal_analysis(x_bar)
-        self.assertEqual(len(poles), 2)
         np.testing.assert_allclose(
             plant.find_equilibrium([0.3, 0.0]), [0.0, 0.0], atol=1e-6
         )

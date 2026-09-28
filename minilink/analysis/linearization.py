@@ -7,6 +7,7 @@ import numpy as np
 from minilink.analysis.derivatives import jacobian
 from minilink.core.diagram import DiagramSystem
 from minilink.dynamics.abstraction.state_space import LTISystem
+from minilink.graphical.control import style
 
 
 def linearize_matrices(
@@ -47,56 +48,30 @@ def linearize_matrices(
         Central-difference step.
     """
     at = dict(method=method, eps=eps)
+    point = (x_bar, u_bar, t, params)
     n = sys.n
     inputs = input_selectors(sys, wrt)
     outputs = output_selectors(sys, of)
     if n == 0 and outputs is None:
         raise ValueError(f"{sys.name!r} has neither a state nor an output port")
 
-    if n > 0:
-        # A = ∂f/∂x, B = ∂f/∂u, C = ∂h/∂x, D = ∂h/∂u at the operating point
-        A = jacobian(sys, "f", "x", x_bar, u_bar, t, params, **at)
-        B = _stack_columns(
-            [
-                _columns(jacobian(sys, "f", name, x_bar, u_bar, t, params, **at), index)
-                for name, index in inputs
-            ],
-            rows=n,
-        )
-        if outputs is None:  # no y port: the output is the state itself
-            return A, B, np.eye(n), np.zeros((n, B.shape[1]))
-        C = np.vstack(
-            [
-                _rows(jacobian(sys, name, "x", x_bar, u_bar, t, params, **at), index)
-                for name, index in outputs
-            ]
-        )
-    else:  # static block: no state, the channel is the feedthrough D
-        A = np.zeros((0, 0))
+    # A = ∂f/∂x and B = ∂f/∂u at the operating point; a static block has no state
+    A = jacobian(sys, "f", "x", *point, **at) if n > 0 else np.zeros((0, 0))
+    B = jacobian_block(sys, [("f", None)], inputs, point, at) if n > 0 else None
 
-    D = np.vstack(
-        [
-            _stack_columns(
-                [
-                    _columns(
-                        _rows(
-                            jacobian(
-                                sys, name, wrt_name, x_bar, u_bar, t, params, **at
-                            ),
-                            index,
-                        ),
-                        wrt_index,
-                    )
-                    for wrt_name, wrt_index in inputs
-                ],
-                rows=_rows_of(sys, name, index),
-            )
-            for name, index in outputs
-        ]
-    )
+    # C = ∂h/∂x and D = ∂h/∂u; with no output port the output is the state: C = I, D = 0
+    if outputs is None:
+        C = np.eye(n)
+        D = np.zeros((n, B.shape[1]))
+    else:
+        C = jacobian_block(sys, outputs, [("x", None)], point, at) if n > 0 else None
+        D = jacobian_block(sys, outputs, inputs, point, at)
+
+    # A static block's channel is its feedthrough D alone
     if n == 0:
         B = np.zeros((0, D.shape[1]))
         C = np.zeros((D.shape[0], 0))
+
     return A, B, C, D
 
 
@@ -125,14 +100,16 @@ def linearize(
     return lti
 
 
-# Selector helpers shared with the frequency tools
+# =============================================================================
+# Internal machinery
+# =============================================================================
 
 
 def input_selectors(sys, wrt):
     """Normalize ``wrt`` to a list of ``(name, index)``; default every input stacked."""
     if wrt is None:
         return [("u", None)] if sys.inputs else []
-    return [_selector(item, "wrt") for item in _as_list(wrt)]
+    return [as_selector(item, "wrt") for item in as_list(wrt)]
 
 
 def output_selectors(sys, of):
@@ -152,10 +129,81 @@ def output_selectors(sys, of):
         if sys.n == 0 and sys.outputs:
             return [(port_id, None) for port_id in sys.outputs]
         return None
-    return [_selector(item, "of") for item in _as_list(of)]
+    return [as_selector(item, "of") for item in as_list(of)]
 
 
-def _selector(item, name):
+def siso_channel(sys, of, wrt):
+    """Normalize the channel to ``((of_name, index), (wrt_name, index))``.
+
+    ``of`` names the output and ``wrt`` the input: a port id means component
+    0, ``(port, index)`` one component, a diagram wire ``"block:port"`` an
+    internal signal. ``of_name`` is ``None`` when the output is the state
+    itself (no ``y`` port): the row is then taken from ``C = I``.
+    """
+    if wrt is None:
+        if not sys.inputs:
+            raise ValueError("Frequency analysis requires at least one input port.")
+        wrt = (next(iter(sys.inputs)), 0)
+    if of is None:
+        default = output_selectors(sys, None)
+        of = (None, 0) if default is None else (default[0][0], 0)
+    return siso_selector(of, "of"), siso_selector(wrt, "wrt")
+
+
+def channel_label(sys, of, wrt):
+    """``"y[1] / u[0]"`` for the selected channel."""
+    (of_name, i), (wrt_name, j) = siso_channel(sys, of, wrt)
+    return f"{'x' if of_name is None else of_name}[{i}] / {wrt_name}[{j}]"
+
+
+def channel_subtitle(sys, of, wrt):
+    """``"From: u[0]  To: y[1]"`` for the selected channel."""
+    (of_name, i), (wrt_name, j) = siso_channel(sys, of, wrt)
+    return style.channel_subtitle("x" if of_name is None else of_name, i, wrt_name, j)
+
+
+def siso_matrices(sys, x_bar, u_bar, t, params, *, of, wrt, method, eps):
+    """``A, b, c, d`` of the selected channel (``b`` a column, ``c`` a row)."""
+    (of_name, i), channel_in = siso_channel(sys, of, wrt)
+    A, B, C, D = linearize_matrices(
+        sys,
+        x_bar,
+        u_bar,
+        t,
+        params,
+        of=None if of_name is None else [(of_name, i)],
+        wrt=[channel_in],
+        method=method,
+        eps=eps,
+    )
+    if of_name is None:  # state output: pick the component of C = I
+        if i < 0 or i >= C.shape[0]:
+            raise ValueError(
+                f"of index must be in [0, {C.shape[0] - 1}] for the state."
+            )
+        C, D = C[[i], :], D[[i], :]
+    return A, B, C, D
+
+
+def siso_selector(selector, name):
+    """One component ``(name, index)`` from a port id or a ``(port, index)`` pair."""
+    if isinstance(selector, str):
+        return (selector, 0)
+    if (
+        isinstance(selector, tuple)
+        and len(selector) == 2
+        and (selector[0] is None or isinstance(selector[0], str))
+        and isinstance(selector[1], (int, np.integer))
+        and not isinstance(selector[1], bool)
+    ):
+        return (selector[0], int(selector[1]))
+    raise TypeError(
+        f"{name} names one channel: a port id, a diagram wire 'block:port', or "
+        f"(selector, index); got {selector!r}"
+    )
+
+
+def as_selector(item, name):
     if isinstance(item, str):
         return (item, None)
     if (
@@ -172,28 +220,49 @@ def _selector(item, name):
     )
 
 
-def _as_list(value):
+def as_list(value):
     if isinstance(value, (str, tuple)):
         return [value]
     return list(value)
 
 
-def _rows(J, index):
+def select_rows(J, index):
     return J if index is None else J[[index], :]
 
 
-def _columns(J, index):
+def select_columns(J, index):
     return J if index is None else J[:, [index]]
 
 
-def _stack_columns(blocks, *, rows):
+def stack_columns(blocks, *, rows):
     return np.hstack(blocks) if blocks else np.zeros((rows, 0))
 
 
-def _rows_of(sys, name, index):
-    """Number of rows one output selector contributes."""
+def jacobian_block(sys, of, wrt, point, at):
+    """The Jacobian of the ``of`` selectors with respect to the ``wrt`` selectors, stacked."""
+    return np.vstack(
+        [
+            stack_columns(
+                [
+                    select_columns(
+                        select_rows(jacobian(sys, name, wrt_name, *point, **at), index),
+                        wrt_index,
+                    )
+                    for wrt_name, wrt_index in wrt
+                ],
+                rows=selector_rows(sys, name, index),
+            )
+            for name, index in of
+        ]
+    )
+
+
+def selector_rows(sys, name, index):
+    """Number of rows one output selector (or the state equation ``"f"``) contributes."""
     if index is not None:
         return 1
+    if name == "f":
+        return sys.n
     if name in sys.outputs:
         return sys.outputs[name].dim
     block, port = name.split(":", 1)

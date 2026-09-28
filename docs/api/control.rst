@@ -22,6 +22,9 @@ Control
 .. automodule:: minilink.control.lqr
    :members:
 
+.. automodule:: minilink.control.place
+   :members:
+
 .. automodule:: minilink.control.geometric
    :members:
 

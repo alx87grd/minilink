@@ -4,7 +4,7 @@ Status: **wave 1 partly landed 2026-09-07.** P1 done (ruled: dedicated
 `PI` / `PD` classes); F1, F2, F4 done (second-pass defects, see the audit).
 P4 (estimation) and P6 (z tier) **held by the maintainer** 2026-09-07; the
 roadmap schedules P4 for v0.2 once the hold is lifted and the disturbance
-convention is decided (ROADMAP §6). P2, P3 and wave 2 open.
+convention is decided (ROADMAP §6). P2 landed 2026-09-26; P3 and wave 2 open.
 Rung: v0.2 wave B, steps P2–P11 of [TODO.md](TODO.md).
 Lane: teaching surface (`analysis/`, `control/`, `estimation/`, `blocks/`).
 Milestone: v0.2, [ROADMAP §4.2](../../ROADMAP.md#42-v02--gro501-end-to-end).
@@ -22,12 +22,12 @@ additive or replaces boilerplate with generated equivalents.
 | **F1** `frequency_range` brackets the 0 dB crossing | — | 1 | **done** |
 | **F2** `PID.f` and `PID.ctl` agree on `tau` | — | 1 | **done** |
 | **F4** `closed_loop_poles` singular-gain guard | — | 1 | **done** |
-| **P2** `minreal` and order reduction | G3, G6 | 1 | agent |
-| **P3** `place()` → `StateFeedbackController` | G2 | 1 | agent (mirrors `lqr`) |
+| **P2** `minreal` | G3 | 1 | **done** 2026-09-26; order reduction split out, then deferred out of v0.2 (2026-09-26; TODO §7) |
+| **P3** `place()` → `StateFeedbackController` | G2 | 1 | **done** 2026-09-26 |
 | **P4** `estimation/` — Luenberger, then Kalman | G1 | 2 | **held** |
-| **P5** Named `S` / `T` / `PS` / `CS` | G5 | 2 | agent |
+| **P5** Named sensitivity functions | G5 | 2 | agent — design agreed 2026-09-26 |
 | **P6** Discrete (z) tier | G4 | 3 | **held** |
-| **P7** `facades.py` boilerplate | C2 | 2 | agent |
+| **P7** `facades.py` boilerplate | C2 | 2 | **done** 2026-09-26 (explicit + pinned) |
 | **P8** Small teaching helpers (ζ/ω_n, `N`) | G6 | 2 | agent |
 | **P9** `TransferFunction` port construction | C3 | 3 | agent |
 | **P10** Document what `@` means | C1 | 3 | agent (docs only) |
@@ -128,6 +128,20 @@ the same pass; keep it out of `minreal`, which must stay exact.
 a compensator zero cancelling a plant pole drops both from `pzmap`; the
 guide's §9.13 realization survives `minreal` unchanged (it is already minimal).
 
+**Landed 2026-09-26, as decided with the maintainer.** `minreal(A, B, C, D, *, tol=1e-9)`
+lives on the matrices tier only (`analysis/linear.py`, imported from there): the Kalman
+decomposition written step by step, the SVD, rank and projections in the body. There is no
+`sys.minreal()` and no prelude name: it is the internal step of `pzmap`, `root_locus`,
+`transfer_function`, `plot_pzmap` and `plot_root_locus`, which cancel **by default**
+(`minimal=None`, with a one-time warning naming what cancelled; `minimal=False` keeps the
+raw realization). The audit's pure-P loop `(10 s² + 200 s) / (s⁴ + 20.25 s³ + 9.905 s² +
+98.1 s)` reduces to `10 / (s² + 0.25 s + 4.905)`; the `200 / (s² + 0.5 s + 4.905)` above
+was not the audit's own H(s). A lead zero on a plant pole drops both; a minimal realization
+(the badly scaled quarter car standing in for §9.13) comes back in its own coordinates.
+`linear.zeros` now counts a pencil eigenvalue as finite only when `|β|` is not negligible
+against `|α|`, so rounding no longer reports zeros near 1e15. Tests: `TestMinreal`.
+Order reduction by neglecting fast modes is out of v0.2 (decided 2026-09-26; TODO §7).
+
 ### P3. `place()`
 
 **Problem.** No pole placement. §1.4.2 eq. (16) asks for `K_sta` putting the
@@ -152,6 +166,18 @@ the block construction and an honest error when the pole set is not reachable
 **Done when.** `place` on the guide's parking model returns a `K` whose
 closed-loop `eigvals(A − BK)` match `{−1 ± 0.5i, −1}` to 1e-9, and the
 returned block closes the loop on the nonlinear plant with `@`.
+
+**Landed 2026-09-26, amending "thin wrapper" (maintainer decision).** `place_poles`
+refuses any pole repeated more than rank(B) times, so with one input it rejects
+"critically damped" `[-2, -2]` and "all at −2". `place_gain` therefore splits as MATLAB's
+`acker` / `place` do: with one input, Ackermann's formula `K = [0 … 0 1] 𝒞⁻¹ φ(A)`
+written step by step (the unique gain, repeated poles included); with several, the
+robust `place_poles` choice. Both check `det(sI − (A − BK)) = ∏(s − pᵢ)` by the
+characteristic polynomial (a repeated pole's eigenvalues are computed only to about
+`eps^(1/3)`), and the errors name the reason (uncontrollable pair, pole count, unpaired
+complex pole, multiplicity beyond rank B). Demo `examples/demos/control/pole_placement_pendulum.py`;
+tests `TestPolePlacement`. The parking model is not in the repo: a triple integrator
+with `{−1 ± 0.5i, −1}` stands in.
 
 ---
 
@@ -200,52 +226,90 @@ Kalman observer stabilizes the nonlinear plant from a disturbed start with
 noise injected on `u` and `y`, and the estimate converges to the true state;
 `plot_diagram` shows the Figure 12 topology.
 
-### P5. Named sensitivity functions
+### P5. Named sensitivity functions — design agreed 2026-09-26
 
 **Problem.** Table 2 states four specs as "sous −40 dB @ 0.015 Hz" style
-bounds on disturbance and noise sensitivity. They are computable today only
-through the internal-wire selector (`of="error:e"`, `of="ctl:u"`), which is
-undocumented for this use, and an *input* disturbance needs a hand-wired `Sum`.
+bounds on disturbance and noise sensitivity. Today three of the four are
+reachable only through the undocumented internal-wire selector, which needs
+the loop's block names (`transfer_function(C @ G, of="error:e", wrt="r")`
+for `S`, `of="ctl:u"` for `CS`); the load sensitivity is out of reach, and
+simulating an input disturbance or sensor noise needs hand-wired `Sum` blocks.
 
-**Shape.** On a closed-loop diagram: `sensitivity(sys)` → `S = e/r`,
-`complementary_sensitivity(sys)` → `T = y/r`, plus `PS` (disturbance to
-output) and `CS` (noise to command), each returning an `LTISystem` so the
-whole `plot_bode` / `margins` family applies. Where the diagram has no
-disturbance port, say so in the error rather than guessing.
+**The loop and the four functions.** The book's notation: plant `H(s)`,
+controller `C(s)`, optional filter `F(s)` in the return path (the measurement
+passes through `F` before the comparison). Load disturbance `w` adds to the
+plant input, measurement noise `v` adds to the measurement before `F`.
 
-Also add a `disturbance=True` / `noise=True` option to `feedback()` (or a
-documented recipe) so the injection points exist as named boundary inputs
-instead of manual `Sum` blocks.
+| Function | Formula | Reads |
+| --- | --- | --- |
+| `sensitivity` | `S = 1 / (1 + C H F)` | output disturbance to `y`; `e / r` |
+| `complementary_sensitivity` | `T = C H / (1 + C H F)` | `y / r` |
+| `load_sensitivity` | `PS = H / (1 + C H F)` | `w` to `y` |
+| `noise_sensitivity` | `CS = C F / (1 + C H F)` | `v` to `u` |
 
-**Files.** `minilink/analysis/frequency.py` or a new
-`minilink/analysis/loopshaping.py`, `minilink/analysis/__init__.py`,
-`minilink/core/composition.py`, `tests/unittest/test_control_analysis.py`.
+With `F = 1`, `S + T = 1`.
 
-**Done when.** `S + T = 1` holds to 1e-12 across the grid on a SISO loop, and
-each of the four Table 2 specs is one call plus a comparison.
+**Rulings (maintainer, 2026-09-26).**
 
-### P7. Generate the analysis facades
+1. *The functions take the pieces, not the finished loop.* The formula is
+   written in the body as on the page (the textbook rule), every function works
+   for any plant and controller that linearize, the load sensitivity needs no
+   change to loop building, and a nested loop passes the inner closed loop as
+   the plant of the outer one. Options weighed: the finished loop
+   (`sensitivity(C @ G)` reading its wires; any topology, but the formula
+   hidden and the load sensitivity dependent on a disturbance input), both.
+2. *Keyword-only, named arguments in the book's letters:*
+   `sensitivity(*, plant, controller, filter=None, …)`, the same for the other
+   three; the body unpacks `H, C, F` (each linearized to a transfer function,
+   `F = 1` when absent) and names the loop gain `L = C H F` on its own line.
+   `filter` is the book's word; it shadows the builtin only as a keyword name.
+3. *Four descriptive names*, each returning an `LTISystem` so `plot_bode`,
+   `margins` and the rest apply: `sensitivity`, `complementary_sensitivity`,
+   `load_sensitivity`, `noise_sensitivity` (Åström–Murray; the course's
+   "fonction de sensibilité", "sensibilité complémentaire"). No `gang_of_four`
+   until a notebook needs the four together; no one-letter names (they clash
+   with Python naming and with the `S`, `T` matrices elsewhere).
+4. *Simulation gets optional loop inputs.* `closed_loop(controller, plant, …)`
+   gains an option adding boundary inputs `w` (summed into the plant input)
+   and `v` (summed into the measurement), off by default so every existing
+   loop keeps its single input `r`. The names are the project's canonical
+   disturbance and noise ports (RULES 4.9), the ports a `WhiteNoise` block
+   connects to ([randomness.md](randomness.md)). The operator form `C @ H`
+   takes no options; the explicit call does. Options weighed: a documented
+   recipe with hand-wired `Sum` blocks, ports declared by the plant itself.
+5. *A spec check needs nothing new.* `bode` already evaluates one frequency,
+   in rad/s: `_, S_db, _ = bode(S, w=2 * np.pi * 0.015)` then `S_db[0] < -40`,
+   the conversion `ω = 2πf` visible on the student's line. Options weighed: a
+   scalar `magnitude_db(sys, w)`, a hertz keyword on every frequency tool.
 
-**Problem.** About 400 lines of `facades.py` are 13 hand-copied signatures
-that forward unchanged. Already drifted once (the `settling_horizon`
-docstring says five, the code says eight).
+**Still to settle in the implementation, agent-owned.** The operating point
+of a nonlinear plant (`x_bar`, `u_bar`, `params` forwarded to its
+linearization, as every analysis verb does); SISO only, a MIMO piece refused
+with the channel named; the option keyword on `closed_loop` for the two
+inputs; whether `feedback()` alone (no controller/plant split) offers only
+`v`.
 
-**Shape.** One helper that builds a delegating method from the target
-function — signature copied with `functools.wraps` / `inspect.signature`, the
-docstring taken from the target with a "See ..." line appended, `self` passed
-as the first positional. Keep the explicit form only where the facade
-genuinely differs from the function (`compute_trajectory`, `animate`).
+**Files.** A new `minilink/analysis/sensitivity.py` (band functions, not
+System shortcuts, ROADMAP §6), `minilink/analysis/__init__.py`,
+`minilink/core/composition.py` (the loop inputs),
+`tests/unittest/test_control_analysis.py`; DESIGN's analysis bullet.
 
-Guard the readability cost: a test asserting every generated method's
-`__signature__` matches its target keeps tab-completion and `help()` intact,
-which is the reason the explicit form was written in the first place.
+**Done when.** `S + T = 1` holds to 1e-12 across the grid on a SISO loop
+without a filter; each function matches the internal-wire transfer function of
+the same loop (and `load_sensitivity` the `w`-to-`y` channel of a loop built
+with the new inputs); each of the four Table 2 specs is one `bode` call plus a
+comparison.
 
-**Files.** `minilink/core/facades.py`, `minilink/core/facade.py`,
-`tests/unittest/test_teaching_surface.py`.
+### P7. The analysis facades pinned to their band functions — **landed 2026-09-26**
 
-**Done when.** The 13 analysis methods are generated; `help(sys.bode)` and
-tab-completion are unchanged; the docstring drift is gone because there is
-one source.
+Ruled 2026-09-26: the shortcuts stay written out (runtime generation would hide their
+parameters from static editors such as VS Code/Pylance), and
+`tests/unittest/test_system_shortcuts.py` pins each to its band function: parameters,
+defaults, forwarding of every argument, and the docstring's target. A second test pins
+the band's calling pattern `tool(sys, x_bar, u_bar, t, params, …)` with its named
+exceptions (scan analysis#7). `analysis/linearize.py` and `discretize.py` became
+`linearization.py` and `discretization.py`, so `from minilink.analysis import
+linearize, discretize` returns the functions (scan analysis#11).
 
 ### P8. Small teaching helpers
 
@@ -256,7 +320,6 @@ one source.
 - The `N` reference-scaling matrix giving `y = r` at steady state
   (§9.11 Q3) — a factory alongside `place` / `lqr`, or an `N=` argument on
   `StateFeedbackController`.
-- Fix the `settling_horizon` docstring mismatch (five vs eight) as part of P7.
 
 **Done when.** §9.5 and §9.11 are each a short notebook cell.
 
@@ -350,10 +413,12 @@ Wave 3   P6? ── P9 ── P10 ── P11   polish, then the notebooks
 ```
 
 P3 gates P4 (the Luenberger factory places poles on the dual pair). P1 and P2
-gate P11 (until then the notebooks would teach wrong pole counts); P1 is in,
-so P2 is the remaining blocker. P7 is independent and worth doing before P2
+gate P11 (until then the notebooks would teach wrong pole counts); both are
+in (P2 on 2026-09-26). P7 is independent and worth doing before P2
 and P5 add three more facade methods each by hand. With P4 and P6 held, the
-next actionable steps are **P2, P3, P5, P7, P8**.
+next steps are, in order: **TB-a** (the analysis toolbox read like the textbook,
+starting with the shortcut list that decides P7's scope), then **P5** and **P8** on the
+cleaned toolbox, then **TB-b** (the control objects and the loop), then **P11**.
 
 ## 3. What this plan does not do
 

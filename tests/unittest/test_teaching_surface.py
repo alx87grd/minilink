@@ -32,6 +32,7 @@ TEACHING_SURFACE: dict[str, tuple[str, ...]] = {
         "CartPole",
         "ImpedanceController",
         "lqr",
+        "place",
         "Step",
         "feedback",
         "StochasticPlanningProblem",
@@ -120,6 +121,8 @@ TEACHING_SURFACE: dict[str, tuple[str, ...]] = {
         "controllability",
         "observability",
         "find_equilibrium",
+        "linearize",
+        "discretize",
     ),
     "minilink.simulation": ("Simulator", "StaticSimulator"),
     "minilink.optimization": ("MathematicalProgram", "Optimizer"),
@@ -157,8 +160,8 @@ TEACHING_MODULE_FUNCTIONS = (
     ("minilink.control.lqr", "lqr_at_operating_point"),
     ("minilink.control.lqr", "lqr_finite_horizon"),
     ("minilink.control.lqr", "trajectory_lqr"),
-    ("minilink.analysis.linearize", "linearize"),
-    ("minilink.analysis.discretize", "discretize"),
+    ("minilink.control.place", "place"),
+    ("minilink.control.place", "place_at_operating_point"),
 )
 
 # Module prefixes that belong to the teaching lane.
@@ -213,7 +216,8 @@ def documented_modules():
     """Modules that some ``docs/api/*.rst`` page renders with ``automodule``."""
     modules = set()
     for page in API_PAGES.glob("*.rst"):
-        modules.update(re.findall(r"^\.\. automodule:: (\S+)", page.read_text(), re.M))
+        text = page.read_text(encoding="utf-8")
+        modules.update(re.findall(r"^\.\. automodule:: (\S+)", text, re.M))
     return modules
 
 
@@ -344,7 +348,7 @@ for mod in list(sys.modules):
 
 import numpy as np
 from minilink import ImpedanceController, Pendulum, lqr
-from minilink.analysis.linearize import linearize
+from minilink.analysis import linearize
 from minilink.core import QuadraticCost
 from minilink.planning import DynamicProgrammingPlanner, PlanningProblem, StateSpaceGrid
 

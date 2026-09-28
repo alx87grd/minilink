@@ -12,10 +12,11 @@ Identity: [CONSTITUTION.md](CONSTITUTION.md).
 
 | Release | Milestone | When |
 | --- | --- | --- |
-| **v0.1** | **GRO860 end to end**, plus a working **`pip install minilink` on PyPI**. Every topic of the running optimal-control & RL course runs on the teaching surface, in Colab (git-clone cell) and in the conda env: value iteration / DP on a grid · LQR + linearization · trajectory optimization · RL via native `ReinforcementLearningPlanner` (with `Sys2Gym` + SB3 as an optional bridge). See §4.1. | Fall 2026 — **`0.1.0` on PyPI** (2026-09-16); **`0.1.1`** is the first release a GitHub tag publishes. Conda from `environment.yml` stays the Full local stack. Names the course notebooks already use stay frozen until v1.0. Close-out steps: §5.1. |
-| **v0.2** | **GRO501 end to end** (the classical-control course: multi-physics modelling · root locus / Bode / margins · PID to spec · digital implementation · state feedback, pole placement, LQR, observers — see §4.2) and **the textbook objects finished** (fields, cost parameters, workspace geometry — §5.2 wave A). Conda stays the recommended Full local install. | October 2026 |
-| **v0.3** | **GMC714 end to end** — the teaching layer solidified for the class: robust control · robotic arm · trajectory optimization · MPC · vehicle models · nonlinear control (§4.3), with **pyro parity** and the catalog work of §5.3. | December 2026 |
-| **v1.0** | The foundation questions deferred to §5.4 (hybrid as a `System`, derived `x0`, evaluator/solver layering, the posed-geometry drawing hook, one mechanical base, the differentiable closed-loop cost), after two cohorts; the Stable-Baselines3 notebooks retire and the name freeze lifts. | 2027 |
+| **v0.1** | **GRO860 end to end**, plus a working **`pip install minilink` on PyPI**. Every topic of the running optimal-control & RL course runs on the teaching surface, in Colab (git-clone cell) and in the conda env: value iteration / DP on a grid · LQR + linearization · trajectory optimization · RL via native `ReinforcementLearningPlanner` (with `Sys2Gym` + SB3 as an optional bridge). See §4.1. | Fall 2026 — **`0.1.0` on PyPI** (2026-09-16); **`0.1.1`** (2026-09-26) is the first release a GitHub tag published. Conda from `environment.yml` stays the Full local stack. Names the course notebooks already use stay frozen until v1.0. Close-out steps: §5.1. |
+| **v0.2** | **GRO501 end to end** (the classical-control course: multi-physics modelling · root locus / Bode / margins · PID to spec · digital implementation · state feedback, pole placement, LQR, observers — see §4.2). Conda stays the recommended Full local install. | October 2026 |
+| **v0.3** | **GMC714 end to end** — the teaching layer solidified for the class: robust control · robotic arm · trajectory optimization · MPC · vehicle models · nonlinear control (§4.3), with **pyro parity**, the catalog work of §5.3 and **the textbook objects** (fields, cost parameters, workspace geometry — moved from v0.2 on 2026-09-26). | December 2026 |
+| **v0.9** | **Freeze candidate** (§5.4): the foundation questions that could still break a public name are decided (hybrid as a `System`, derived `x0`, evaluator/solver layering, the glyph/solid rename); the trust contract is in place (deprecation policy, pinned export list, CHANGELOG, pinned installs); the standard-syllabus holes close (estimation, discrete time, identification); the docs site renders the tutorials. | Early 2027 |
+| **v1.0** | **A colleague can build a course on it and trust it for three years** (§5.5): the API frozen under the deprecation policy, the standard control syllabus covered and checked against textbook worked examples, course-neutral labs an instructor adopts outside UdeS, green on Windows, macOS and Linux; after two cohorts. The Stable-Baselines3 notebooks retire and the GRO860 name freeze becomes the general one. | 2027 |
 
 ## 2. Two lanes
 
@@ -76,8 +77,8 @@ State as of 2026-09-22. Step ids (`S29`, `P3`, `T2`, …) are the rows of
 | Compile (`core/compile/`) | teaching (frozen subset) | 4 | Integrated; the frozen evaluator subset is named in DESIGN §5, the stable-internal helper grid kept by ruling. Speed lives in batches (1000 rollouts × 1000 RK4 steps in 27 ms); float64 on JAX by default. | `rollout_batch` with a `params` family (S53); evaluator/solver re-layering (S37, v1.0). |
 | Simulation | teaching | 7 | Mature; fixed 10 001-point default grid; `verbose` names unified. | Textbook pass (T4). |
 | Dynamics (abstraction + catalog) | teaching | 7 | Plants QA'd; `MechanicalSystem` / `Manipulator`; UR5 ABA/RNEA; **every catalog plant compiles on both backends** (contract test); four-rung vehicle ladder; UdeS racecar (kinematic, dynamic, 3-D). | Textbook pass (T3); mechanical-base unification (S32, v1.0). |
-| Control | teaching | 6 | Linear, LQR (infinite horizon, finite horizon, along a trajectory), `P` / `PI` / `PD` / `PID` carrying only the states their terms need, model-based SMC and computed torque, robotic impedance and kinematic laws, neural policy block. | `place()` (P3) and reference scaling (P8, v0.2); textbook pass (T2). |
-| Analysis | teaching | 6 | Jacobians, linearize, structural, equilibria, modal; one-channel Bode with margins, pole-zero, root locus, Nyquist, step response on matplotlib and plotly; the frequency band brackets the 0 dB crossing. | `minreal` (P2), named `S` / `T` / `PS` / `CS` (P5), ζ / ω_n (P8); z tier held; Nichols and overlays later; textbook pass (T4). |
+| Control | teaching | 6 | Linear, LQR (infinite horizon, finite horizon, along a trajectory), pole placement, `P` / `PI` / `PD` / `PID` carrying only the states their terms need, model-based SMC and computed torque, robotic impedance and kinematic laws, neural policy block. | `place()` (P3) and reference scaling (P8, v0.2); textbook pass (T2). |
+| Analysis | teaching | 6 | Jacobians, linearize, structural, equilibria, modal; one-channel Bode with margins, pole-zero, root locus, Nyquist, step response on matplotlib and plotly; the frequency band brackets the 0 dB crossing. | named `S` / `T` / `PS` / `CS` (P5), ζ / ω_n (P8); z tier held; Nichols and overlays later; textbook pass (T4). |
 | Blocks | teaching | 5 | Routing, nonlinear, filters, sources, TF, 1-layer NN. | `Sine` / `Ramp` / `Chirp` / `Delay` / `Switch` (v0.2); textbook pass (T2). |
 | Planning / policy synthesis (DP) | teaching (GRO860) | 6 | Grid + value iteration (`loop` / `numpy` / `jax`), lookup controller, `PolicyEvaluator`, `LQRPlanner`; every planner returns a `PlanningSolution`; `compare()` reads solutions side by side; `dp.py` is the textbook reference of the style (2026-09-18). | cost-to-go as a `Field` (A1); policy iteration (S51). |
 | Planning / trajopt | teaching (GRO860) | 5 | Collocation, shooting, multiple shooting; live plot; `success` means defects satisfied to `feasibility_tol`; float64 by default on JAX. | Harden SciPy/Ipopt before TRL 6; textbook pass (T5). |
@@ -90,7 +91,7 @@ State as of 2026-09-22. Step ids (`S29`, `P3`, `T2`, …) are the rows of
 | Graphics / animation | teaching | 5 | Frame-keyed `tf` / geometry / overlays; four renderers; auto-fit camera. | Constructor-derived camera hints (S43); glyph/solid rename (S30, v1.0). |
 | Hybrid / step / MPC | provisional (research) | 4 | `StepSystem`, `Computer`, `HybridDiagram`, `HybridSimulator`, MPC with parametric JAX. The sampled loop is the one thing that is not a `System`. | No new hybrid features before the v1.0 decision (S31); textbook pass on `mpc/controller.py` (T6). |
 | Realtime simulation | provisional | 2 | `RealtimeSimulator` + pygame I/O. | Architectural review (v1.0). |
-| Estimation | planned (GRO501) | 1 | Placeholder. The largest GRO501 gap. | Luenberger, then Kalman, as diagram blocks (P4, v0.2), after the disturbance-convention decision (§6). |
+| Estimation | planned (GRO501) | 1 | Placeholder. The largest GRO501 gap. | Luenberger, then Kalman, as diagram blocks (P4, v0.2), after step RN-1 of [randomness.md](docs/plans/randomness.md): the `WhiteNoise` whose `psd` the Kalman design reads (the disturbance convention, decided 2026-09-26). |
 | Identification | planned | 2 | Parametric-tier prototype only. | `fitting.py` (v0.2). |
 | C export (`experimental/c_export`) | research | 1 | JAX→C transpiler; two demos; flagship smoke in the JAX regression job. | Keep isolated; repo-only. |
 | Experimental tier (`experimental/symbolic`, `experimental/engines`) | research | 1 | Not on the teaching path nor the API site. | Keep isolated; repo-only. |
@@ -131,8 +132,8 @@ v0.3, adopted 2026-09-26). A course is
 6. `ruff` + `pytest` + notebook smoke green; nightly full demo sweep green.
 7. No name a GRO860 notebook imports today changes before v1.0 (extended
    from the term on 2026-09-26).
-8. `minilink 0.1.0` is on PyPI (2026-09-16); from `0.1.1` on, a tag publishes
-   from GitHub (Trusted Publishing in `.github/workflows/publish.yml`, the
+8. `minilink 0.1.1` is on PyPI (2026-09-26, after `0.1.0` on 2026-09-16); a tag
+   publishes from GitHub (Trusted Publishing in `.github/workflows/publish.yml`, the
    version read from the tag). `pip install minilink` installs the
    teaching surface; extras (`[jax]`, `[visualization]`, …) match
    `pyproject.toml`. Conda remains the Full local stack (JAX, Ipopt, notebooks).
@@ -159,14 +160,14 @@ contract. Step-level work:
 
 | Topic | Surface | Status | Gate |
 | --- | --- | --- | --- |
-| Multi-physics modelling — nonlinear `f`/`h`, block diagram, linearize, `H(s)` | custom `DynamicSystem`, `plot_diagram`, `linearize`, `transfer_function` | green | a DC-motor + longitudinal-vehicle plant in the catalog; order reduction (`minreal`) available |
+| Multi-physics modelling — nonlinear `f`/`h`, block diagram, linearize, `H(s)` | custom `DynamicSystem`, `plot_diagram`, `linearize`, `transfer_function` | green | a DC-motor + longitudinal-vehicle plant in the catalog; pole/zero cancellation landed 2026-09-26 (P2); order reduction by fast-mode neglect is out of v0.2 (decided 2026-09-26) |
 | Closed-loop analysis — poles, root locus, Bode, margins, step specs | `pzmap`, `root_locus`, `bode`, `margins`, `step_info`, `P` / `PI` / `PD` / `PID` | green | met 2026-09-07: every compensator form reports the poles and zeros of the hand calculation, and margins are found wherever the crossover sits |
 | Design to specification — rise time, overshoot, final error, phase margin | `PI`, `PD`, `PID`, `Lead`, `Lag`, `step_info`, `margins` | green | the Table 2 specs of the guide are checkable in one notebook |
 | Loop-shaping specs — disturbance and measurement-noise sensitivity in dB at a frequency | `analysis` (v0.2) | scheduled v0.2 | named `S` / `T` / `PS` / `CS` sensitivity shortcuts on closed-loop diagrams |
 | Digital implementation — difference equations on the Arduino | `discretize` (Euler / RK4 step models) | continuous only, **z tier held** | the sampled loop is validated by simulation; a z tier stays out of v0.2 unless the sommatif examines z-plane analysis (§6) |
 | State-space MIMO — bicycle model, controllability at every nominal speed | `KinematicBicycle`, `controllability`, `observability` | green | — |
 | Optimal control — LQR on the guide's cost, closed-loop poles, nonlinear check | `lqr_at_operating_point`, `StateFeedbackController` | green | — |
-| Pole placement — `K_sta` for a prescribed pole set | `control` (v0.2) | scheduled v0.2 | `place(A, B, poles)` returning a `StateFeedbackController` |
+| Pole placement — `K_sta` for a prescribed pole set | `place`, `place_at_operating_point` | green (2026-09-26) | — |
 | Nested loops — inner speed loop, outer position loop | `@` composition | green (verified) | stays green with the observer in the loop |
 | State estimation — Luenberger observer and Kalman filter | `estimation` (v0.2) | scheduled v0.2 | `LuenbergerObserver` and steady-state `KalmanFilter` closing the loop as standard diagram blocks |
 | Reference scaling — the `N` matrix giving `y = r` at steady state | `control` (v0.2) | scheduled v0.2 | `steady_state_feedforward(sys)` or `N` matrix helper for tracking |
@@ -218,9 +219,8 @@ it is landed or explicitly dropped by the maintainer.
 The GRO860 path is green (§4.1). What remains is release mechanics and the
 term's hygiene:
 
-- **R1** Publish `0.1.1` from a GitHub tag. `publish.yml` published `0.1.0`
-  on 2026-09-16 from `47cfd50`, before the pre-release checks landed; they
-  gate `0.1.1`, and the repo side is ready. **[ask]**
+- `0.1.1` published from the GitHub tag on 2026-09-26 (R1), the first
+  release through the pre-release checks of `publish.yml`.
 - CI runs on `dev`, the working branch (R2, landed 2026-09-26).
 - **R3** Keep `ruff check .` and `ruff format --check .` green on every
   push; since 2026-09-26 the pre-commit hooks run both with the dev
@@ -239,45 +239,54 @@ term's hygiene:
 - Name freeze: no name a GRO860 notebook imports changes before v1.0
   (§4.1 gate 7).
 
-### 5.2 v0.2 — GRO501 and the textbook objects (October 2026)
+### 5.2 v0.2 — GRO501 (October 2026)
 
 Three waves. A and B can run in parallel; D runs throughout and carries on
 into v0.3. Wave C moved to v0.3 on 2026-09-26 (§5.3).
 
 **Wave A — the textbook objects finish speaking.** The nouns the constitution
-names exist; three of them are not yet the objects the tools carry.
+names exist; three of them are not yet the objects the tools carry. A1–A3 moved
+to v0.3 on 2026-09-26 (§5.3): GRO501 needs none of them, and October goes to
+wave B. A4 and A5 stay here.
 
-- **A1** `core/fields.py`: `Field` on `(x, u, t)` with `as_constraint`,
-  `as_input_constraint`, `as_cost`; `QuadraticField` (the Lyapunov `V`, the
-  LQR value, `S(t)` from the Riccati sweep), `GridField` (the DP and tabular
-  tables), `CallableField` (the RL critic); `LinearApproximator` as a field.
-  Plan: [fields.md](docs/plans/fields.md). **[ask — core]**
-- **A2** Cost parameters: `params` on every library cost, composite costs
-  nested like a diagram's. Plan: [cost-params.md](docs/plans/cost-params.md).
-  **[ask — core]**
-- **A3** Workspace geometry: package `core/geometry/` (shapes, Path, Track,
-  Scene, probes, `bind`, spatial fields, a course catalog); `planning.spatial`
-  retires; `PurePursuit` reads a Path. Plan:
-  [geometry-module.md](docs/plans/geometry-module.md) (S57). **[ask — core]**
 - **A4** Naming quick wins 1–4 and 6 of [naming.md](docs/plans/naming.md):
   class name as the default `name`, one closed-loop name, informative
   shortcut names, `id` honoured by the sampled loop, `id` documented.
-- **A5** The later nouns, each with its first consumer: `Gaussian(cov=)` +
-  `log_prob` with the disturbance convention (before P4), sets and
-  distributions over parameter dictionaries (with identification or the
-  robust problem), `NoiseSource(distribution)`, `UnionSet`,
+- **A5** The later nouns, each with its first consumer: `log_prob` on the
+  distributions, sets and distributions over parameter dictionaries (with
+  identification or the robust problem), `UnionSet`,
   `PlanningProblem.hamiltonian()` only if the course teaches Pontryagin.
+  `Gaussian(cov=)`, `NoiseSource` and the draw convention moved to
+  [randomness.md](docs/plans/randomness.md) (steps RN-1 to RN-6). Its **RN-2** joins this wave:
+  distributions read `params`, `Gaussian(cov=)`, every `sample` takes a key.
 
 **Wave B — GRO501 end to end** (§4.2; plan
 [gro501-classical-control.md](docs/plans/gro501-classical-control.md)).
 
-- **B1** Correctness first: **P2** `minreal`, **P3** `place()`.
-- **B2** The missing surface: **P5** named `S` / `T` / `PS` / `CS`, **P7**
-  generated analysis facades, **P8** ζ / ω_n and the `N` matrix.
+- **B1** Correctness first: **P2** pole/zero cancellation (landed 2026-09-26:
+  `pzmap` / `root_locus` / `transfer_function` cancel by default), **P3** `place()`
+  (landed 2026-09-26: Ackermann with one input, `place_poles` with several).
+  Order reduction (P2b) is out of v0.2 by decision (2026-09-26; TODO §7).
+- **TB-a** The analysis toolbox reads like the textbook — landed 2026-09-26:
+  the System shortcuts cut to objects and plots, the audit
+  ([2026-09-26-analysis-toolbox-audit.md](docs/reviews/2026-09-26-analysis-toolbox-audit.md)),
+  the byte-identical `dp.py`-style pass of `linear`, `frequency`,
+  `time_response`, `structural`, `linearize` and `modal`, and four fixes
+  (`root_locus` through K = −1/d, `step_info` on an unsettled response, MIMO
+  input to the SISO functions, one rank rule).
+- **B2** The missing surface, on the cleaned toolbox: **P5** named
+  `S` / `T` / `PS` / `CS`, **P8** ζ / ω_n and the `N` matrix. **P7** landed
+  2026-09-26: the shortcuts TB-a kept stay written out and are pinned to
+  their band functions by a test, not generated.
+- **TB-b** The control objects and the loop (`siso`, `state`, `lqr`, `place`,
+  `TransferFunction`, `LTISystem`, `feedback` / `@`) read like the textbook;
+  after P5, before P11.
 - **B3** **P4** `estimation/`: `LuenbergerObserver`, `luenberger()`,
   `kalman()`, and how observer and state feedback compose. Held 2026-09-07;
-  it is the largest §4.2 gap, so v0.2 needs the hold lifted and the
-  disturbance convention (§6) decided first. **[ask]**
+  it is the largest §4.2 gap. Decided 2026-09-26: the clean-up and
+  solidification (TB-a and P7 landed; P5, P8, TB-b, S61, P9, P10) land first, then
+  RN-1 of [randomness.md](docs/plans/randomness.md) (`WhiteNoise` with its `psd`), then P4. The
+  disturbance convention was decided 2026-09-26 (§6). **[ask]**
 - **B4** Polish: **P9** `TransferFunction` ports built once, **P10** the
   three `@` dispatch paths documented and pinned by a test; **P6** the z tier
   stays held (teach with `discretize` + simulation) unless the sommatif
@@ -308,6 +317,9 @@ Standing work, behaviour-preserving, one module per step.
   duplication; `HybridSimulator` conventions; realtime review;
   `StepDiagramSystem.step` writes in place under JAX; camera hints (S43);
   `rollout_batch` family profile (S53).
+- **S69** Students' laptops: Windows and macOS legs in CI (Basic tier and a
+  notebook smoke), coverage reported (no gate). Lands in v0.2, before the
+  GRO501 cohort installs.
 - **T7** The graphical band joins the textbook pass. **S65** One owner per
   rule (the automatic `dt`, the backend fallback, the input-hold model, the
   Monte Carlo defaults); **S66** wiring mistakes fail at wiring time
@@ -316,6 +328,21 @@ Standing work, behaviour-preserving, one module per step.
   executed nightly).
 
 ### 5.3 v0.3 — GMC714 (December 2026)
+
+**Wave A's core objects** (moved from v0.2 on 2026-09-26), before wave C:
+
+- **A1** `core/fields.py`: `Field` on `(x, u, t)` with `as_constraint`,
+  `as_input_constraint`, `as_cost`; `QuadraticField` (the Lyapunov `V`, the
+  LQR value, `S(t)` from the Riccati sweep), `GridField` (the DP and tabular
+  tables), `CallableField` (the RL critic); `LinearApproximator` as a field.
+  Plan: [fields.md](docs/plans/fields.md). **[ask — core]**
+- **A2** Cost parameters: `params` on every library cost, composite costs
+  nested like a diagram's. Plan: [cost-params.md](docs/plans/cost-params.md).
+  **[ask — core]**
+- **A3** Workspace geometry: package `core/geometry/` (shapes, Path, Track,
+  Scene, probes, `bind`, spatial fields, a course catalog); `planning.spatial`
+  retires; `PurePursuit` reads a Path. Plan:
+  [geometry-module.md](docs/plans/geometry-module.md) (S57). **[ask — core]**
 
 **Wave C — GMC714, the catalog, pyro parity.** Follows wave A.
 
@@ -336,10 +363,26 @@ Standing work, behaviour-preserving, one module per step.
 - **S63** DP reads a finite horizon from `problem.tf`, as LQR does; **S64**
   catalog hygiene (bounds each plant states, port labels read from the
   state, one wheelbase owner). **[ask]**
+- **RN-4 / RN-5** of [randomness.md](docs/plans/randomness.md), together, after the fall term:
+  `realize(key)` and signals on `disturbances=` (the frozen-noise defect
+  fixed), then the Monte Carlo evaluator's test set. Both change public
+  behaviour and the Monte Carlo numbers once, so they land between cohorts
+  and before the v0.9 freeze. **RN-3** `NoiseSource` lands here too, unless a
+  GRO501 notebook needs sampled sensor noise first (then with P11).
 
-### 5.4 v1.0 — one `System`, closed (2027)
+### 5.4 v0.9 — freeze candidate (early 2027)
 
-The foundation questions, after two cohorts have run on v0.2:
+What v1.0 asks is adoption, not architecture: a colleague builds a course on
+minilink and trusts it for three years. The
+[adoption review of 2026-09-26](docs/reviews/2026-09-26-adoption-review.md)
+found the engine ready and three things missing around it: a stability
+promise, the two syllabus holes every course hits (estimation, discrete
+time), and material packaged for an instructor. v0.9 closes the first two
+and settles every question that could still break a public name; v1.0 (§5.5)
+freezes.
+
+**The foundations that can break names** — decided before the freeze, not
+after:
 
 - **S31** The sampled loop as a `System` (state `[plant; computer]`, periodic
   discrete update) or an honest `HybridLoop` rename; `%` stays the one hybrid
@@ -349,19 +392,83 @@ The foundation questions, after two cohorts have run on v0.2:
 - **S37** Evaluator / solver re-layering: evaluators keep pure maps and one
   scannable step, integrators move to `simulation/solvers/`; **S27** Diffrax
   as an optional JAX solve. **[ask — core]**
-- **S44** One posed-geometry hook so "two functions" (`f` and a drawing
-  function) is literal; **S30** the glyph / solid rename. **[ask]**
-- **S32** One mechanical base (`N = I` special case); `Boat2D` / `Plane3D`
-  gain `q` / `dq` ports. **[ask — core]**
-- **V1** The differentiable closed-loop cost, `J = F(problem params)` as one
-  traced scalar, on the nested parameter dictionary A2 introduces.
-  **[ask — core]**
-- **S36** iLQR from parts (idea, research lane).
-- **S49** Retire the two Stable-Baselines3 teaching notebooks at the end of
-  the term, once the course notes point only at the native twins; the
-  GRO860 name freeze lifts with v1.0. **[ask]**
+- **S30** The glyph / solid rename; **S44** one posed-geometry hook so "two
+  functions" (`f` and a drawing function) is literal. **[ask]**
+- **V3** The frozen surface: which names the freeze covers. The provisional
+  bands on the root and band facades today (`StepSystem`,
+  `StepDiagramSystem`, `ZOHHold`, `control.mpc`) either join the frozen
+  surface or move behind a visibly provisional name. **[ask — public names]**
+
+**The trust contract:**
+
+- **V4** Deprecation policy: from v1.0 on, removing or renaming a
+  teaching-surface name costs one minor release with a `DeprecationWarning`
+  shim (RULES "no deprecated aliases" keeps holding until then). A snapshot
+  test pins the teaching-surface export list; a change to it names its
+  CHANGELOG line. **[ask]**
+- **V5** `CHANGELOG.md` for users (`pyproject` points there, not at this
+  file); every release from v0.9 carries its entry.
+- **V6** One install story: `pip install minilink` first, conda for the Full
+  stack; the Colab cell installs a pinned release instead of cloning `main`
+  (the repo-contract test follows); `install.md` current.
+- **S70** A `MinilinkError` family (wiring, shape, solver) under the plain
+  `ValueError` / `TypeError` it subclasses, so a message and an autograder
+  can catch the category. **[ask — core]**
+- **V11** A light history: the notebook outputs committed before the
+  `nbstripout` hook worked (169 of the 176 MB a clone downloads, five
+  notebooks deleted since May) leave the git history. It breaks every commit
+  id and every local clone, so it runs once, in December 2026 after the v0.3
+  tag, between the fall and winter terms. **[ask]**
+
+**The syllabus holes** (beyond GRO501's P4 / P5 / P8):
+
+- **P6** The z tier leaves hold: exact ZOH and Tustin `c2d`, z-plane pole-zero
+  map, discrete step and Bode. Every digital-control course needs it, whether
+  or not the GRO501 sommatif examines it. **[ask — public names]**
+- **C4** `identification/fitting.py` (least squares, ARX, step-response fit)
+  and trajectory generation (polynomial, trapezoidal, minimum jerk), pulled
+  from v0.3 if GMC714 does not land them.
+- **S71** The classic first plants: DC motor, tank / thermal process, ball and
+  beam, differential drive, 3-D quadrotor. LQI beside the `N` matrix (P8).
+
+**The reference site:**
+
+- **V7** The docs site renders the tutorials (myst-nb or nbsphinx), a plant
+  gallery with pictures, and a short concept guide (what a `System` is,
+  composition, tools as verbs).
+
+### 5.5 v1.0 — a colleague can build a course on it (2027)
+
+After two cohorts have run on v0.2 and the freeze candidate has held a term:
+
+- **V8** A textbook-validation suite: Dorf / Ogata / Franklin worked examples
+  asserted numerically (margins, step specifications, LQR and Kalman gains,
+  root locus), course-neutral and permanent; GRO501 gate 3 is its seed. It is
+  also the page an instructor reads first.
+- **V9** Course-neutral labs: `examples/teaching/topics/` grown to 10–15
+  self-contained labs (objectives, prerequisites, time, starter and solution),
+  classical control and robotics at the depth optimal control and RL already
+  have; the UdeS course folders stay as case studies. A "For instructors"
+  page: pin a version, run in Colab, adapt a lab, report a bug.
+  **[maintainer]**
+- **V10** The public face: the README opens on a teaching quickstart (JAX
+  speed, compile tiers and the Gym bridge lower down or on the site); no
+  internal vocabulary (TRL, lanes, wave and step ids) in user-facing files;
+  whether the agent and governance files stay at the root is decided;
+  `CONTRIBUTING.md`, issue templates, a code of conduct. **[ask]**
 - **V2** Release hygiene: Zenodo archive and DOI, `CITATION.cff`; the JOSS
   decision and the RULES 6.9 carve-out it would need, decided then.
+- **S49** Retire the two Stable-Baselines3 teaching notebooks at the end of
+  the term, once the course notes point only at the native twins. **[ask]**
+- The freeze: the V3 surface under the V4 policy; the GRO860 name freeze
+  becomes the general one.
+
+**After v1.0 (1.x features, additive by construction):** **V1** the
+differentiable closed-loop cost, `J = F(problem params)` as one traced scalar
+on the nested parameter dictionary A2 introduces **[ask — core]**; **S32** one
+mechanical base (`N = I` special case), if it lands without breaking a name
+**[ask — core]**; **S36** iLQR from parts (research lane); a general serial
+chain (DH or URDF to RNEA / ABA).
 
 **Simplify and consolidate — a standing principle, not a rung.** The repo
 must stay manageable by one maintainer, so every rung carries consolidation
@@ -380,12 +487,18 @@ here. Each open item needs the maintainer.
 
 **Before wave B3 (`estimation/`)**
 
-- **The disturbance convention.** `disturbances={port: Distribution}` draws
-  one value per control period and holds it, so its variance does not scale
-  with `dt`; `WhiteNoise` carries `var` + `sample_period`, the same
-  ambiguity. A Kalman filter needs the rule once: per-step covariance `Q_d`,
-  or spectral density `Q_c` with `Q_d = Q_c / dt` (RULES 4.12 applies).
-  Recorded in docs/reviews/2026-09-15-foundations-review.md (F9).
+- **The disturbance convention — decided 2026-09-26** in [randomness.md](docs/plans/randomness.md)
+  (rulings D1–D12; finding F9 of the 2026-09-15 foundations review). A
+  `Distribution` has no time: it is the law of one draw. A noise signal is a
+  block holding draws over a sample period Δ: `NoiseSource(law, Δ)` for
+  sampled noise, `WhiteNoise(psd=W, Δ)` for continuous white noise of
+  two-sided density `W`, drawn as `w_k ~ N(0, W / Δ)` so its physics does not
+  change with Δ. Seed, Δ and magnitude are params; `h` draws with a
+  counter-based generator (no table, no time window, traceable). A problem's
+  disturbance port takes a signal; `realize(key)` gives every random block
+  and parameter its own stream; the Monte Carlo evaluator scores every law on
+  one test set drawn once. Kalman reads `Q = B_w W B_wᵀ`, `R = V`. This entry
+  leaves §6 when step RN-6 moves the contract to DESIGN.
 - **The terminal cost `h(x_f, t_f)`, one rule for every tool.** Since the
   one-horizon ruling (2026-09-17) `h` is charged exactly when `tf` is
   finite; still to settle whether an infinite-horizon cost with a nonzero `h`
@@ -396,7 +509,7 @@ here. Each open item needs the maintainer.
   controller)` block with ports `r`, `y` → `u`, or an explicit `connect`
   recipe in the notebook.
 
-**Before `0.1.1` (R1)**
+**Decided for `0.1.1` (R1, published 2026-09-26)**
 
 - **`plot_diagram()` without the `graphviz` wrapper** — decided 2026-09-26:
   warn once and skip the figure, as a missing binary already does; the
@@ -408,6 +521,17 @@ here. Each open item needs the maintainer.
 
 **During v0.2**
 
+- **System analysis shortcuts** — decided 2026-09-26: a method on every
+  `System` is reserved for the very common "linearize + analyse/plot"
+  operations; the rest is called as a band function. `minreal` is the first
+  case: no shortcut, it runs inside `pzmap` / `root_locus` /
+  `transfer_function`. Landed 2026-09-26 as a clean cut, no deprecation: a
+  shortcut is an object or a plot (`linearize`, `find_equilibrium`,
+  `transfer_function`, `plot_phase_plane`, `plot_bode`, `plot_pzmap`,
+  `plot_root_locus`, `animate_modal`); `plot_step_response` lives on
+  `LTISystem` only; `bode`, `pzmap`, `margins`, `root_locus`, `step_response`,
+  `nyquist`, `plot_nyquist`, `region_of_attraction`,
+  `plot_region_of_attraction` and `modal_analysis` are band functions only.
 - **Undeclared feedthrough** (S66): an output that moves with an input it
   does not declare simulates a wrong fixed point silently today; raise or
   warn at compile.
@@ -435,13 +559,24 @@ here. Each open item needs the maintainer.
 - **CBF safety filter** ([cbf-safety-filter.md](docs/plans/cbf-safety-filter.md)):
   research lane until a course asks; the barrier is a `Field` once A1 lands.
 
-**Before v1.0**
+**Before v0.9 (the freeze candidate)**
 
 - `HybridDiagram` as a `System` vs `HybridLoop` (S31), and the sampled
   seam's time argument: integer ticks (today) or seconds, which would remove
   three copies of `t0` / `dt_mpc` in the MPC block.
 - Evaluator / solver layering, Diffrax (S37, S27).
 - The posed-geometry hook (S44) and the glyph / solid rename (S30).
+- The frozen surface (V3): do `StepSystem`, `StepDiagramSystem`, `ZOHHold`
+  and `control.mpc` join it, or sit behind a provisional name.
+- The deprecation policy (V4): shims from v1.0 on, overriding RULES "no
+  deprecated aliases" from then.
+- The z tier (P6) in scope for v0.9 (proposed yes).
+- A `MinilinkError` family (S70).
+
+**Before v1.0**
+
+- Whether AGENTS.md, CLAUDE.md, RULES.md and CONSTITUTION.md stay at the
+  repository root or move under `docs/dev/` (V10).
 - Zenodo / DOI, and whether JOSS is wanted (V2).
 
 ## 7. Out of scope

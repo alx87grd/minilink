@@ -1,6 +1,8 @@
 # CI — entry points documented in tests/README.md#entry-points
-# Jobs: test (ruff + pytest, py3.10–3.13) → regression (pytest + gates + flagships + notebooks, py3.12 + jax);
-# packaging (build, check and import the wheel) runs beside them.
+# Jobs: test (ruff + pytest, py3.10–3.13; coverage report on 3.12, no gate)
+#   → regression (pytest + gates + flagships + notebooks, py3.12 + jax);
+# packaging (build, check and import the wheel) and laptops (Basic tier pytest +
+# notebook smoke on Windows and macOS, py3.12) run beside them.
 name: CI
 
 on:
@@ -39,7 +41,57 @@ jobs:
       run: ruff format --check .
 
     - name: Test with pytest
+      if: matrix.python-version != '3.12'
       run: pytest
+
+    # Coverage is reported, not gated: one leg, no fail-under threshold.
+    - name: Test with pytest (coverage report)
+      if: matrix.python-version == '3.12'
+      run: pytest --cov=minilink --cov-report=term --cov-report=markdown-append:"$GITHUB_STEP_SUMMARY"
+
+  # Students' laptops: the Basic tier (NumPy, SciPy, Matplotlib; no Graphviz,
+  # JAX or other extras) on Windows and macOS. Tests and notebooks that need an
+  # extra skip, as they do on a Basic install.
+  laptops:
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, macos-latest]
+    defaults:
+      run:
+        shell: bash
+    # UTF-8 on the runner pipes that the test harness reads from its subprocesses.
+    env:
+      PYTHONUTF8: "1"
+      MPLBACKEND: Agg
+
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+
+    - name: Set up Python 3.12
+      uses: actions/setup-python@v5
+      with:
+        python-version: "3.12"
+
+    - name: Install the Basic tier and the test tools
+      run: |
+        python -m pip install --upgrade pip
+        pip install -e ".[dev]"
+
+    - name: Test with pytest
+      run: pytest
+
+    # Teaching notebooks: the ones the Basic tier runs; the rest skip on their extra.
+    - name: Notebook smoke checks
+      if: ${{ !cancelled() }}
+      env:
+        PYTHONPATH: ${{ github.workspace }}
+      run: |
+        python tests/demo_checks/run_notebook_checks.py
 
   packaging:
     runs-on: ubuntu-latest
