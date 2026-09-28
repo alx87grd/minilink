@@ -107,6 +107,15 @@
     ],
     "smoke": false
   },
+  "examples/teaching/courses/udes_gro860/particle_gymnasium_sb3.ipynb": {
+    "requires": [
+      "gymnasium",
+      "jax",
+      "pygame",
+      "stable_baselines3"
+    ],
+    "smoke": false
+  },
   "examples/teaching/topics/reinforcement_learning/pendulum_value_iteration_vs_lqr_vs_rl.ipynb": {
     "requires": [
       "jax"
