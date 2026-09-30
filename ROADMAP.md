@@ -51,6 +51,15 @@ state bounds), `U` still defaults to the input ports' box. Files that meant the 
 bounds as a constraint now say `X=plant.state.box`; the RL planner's new
 `training_zone` (the state box by default) keeps every RL demo's training unchanged.
 
+2026-09-30: `WhiteNoise` is rewritten as a pure block, `WhiteNoise(p, *, psd,
+sample_period, seed, hold)`; its `var`, `mean`, `t0` and `tf` params and its
+`refresh()` are removed without aliases, and an old per-sample variance reads as
+the intensity `psd = var × sample_period`. Seeded realizations change once (a
+counter-based cipher replaces the drawn table); a diagram holding noise now picks
+fixed-step RK4 on a divisor of the sample period by itself, and is linearized at
+the noise's mean instead of raising. The tutorial and course cells were rewritten
+in the same commit.
+
 ## 3. Maturity (TRL)
 
 Readiness levels are an internal maturity scale for planning and review — not
@@ -510,7 +519,11 @@ here. Each open item needs the maintainer.
   streams are derived by name with the library's cipher; and the Monte
   Carlo evaluator simulates the closed-loop diagram, batched, so any
   controller and any noise block go through the one simulation path. The
-  implementation plan is the plan's §9.
+  implementation plan is the plan's §9. RN-1 landed 2026-09-30 (the block,
+  the cipher, the solver hint, `realize(key)` on every `System`, the two
+  warnings, the notebooks); three implementation notes there: the hint is a
+  float `sample_period` key, the stepped-tools check warns on a Jacobian
+  probe, and `realize(key)` landed whole with the systems.
 - **The terminal cost `h(x_f, t_f)`, one rule for every tool.** Since the
   one-horizon ruling (2026-09-17) `h` is charged exactly when `tf` is
   finite; still to settle whether an infinite-horizon cost with a nonzero `h`

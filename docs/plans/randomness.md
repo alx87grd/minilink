@@ -1,7 +1,7 @@
 # One convention for randomness
 
 Status: design agreed 2026-09-26 (§8, D1–D12), amended 2026-09-30 (D13–D24); implementation
-plan in §9; not started.
+plan in §9; RN-1 landed 2026-09-30, RN-2 to RN-6 open.
 Reviewed 2026-09-30: factual corrections applied in place; the ten amendments of §10 are ruled
 (A1 as D13, A2–A10 as D14–D23) and the maintainer added D24 (the evaluator simulates the
 closed-loop diagram). §10 stays as the record of the findings.
@@ -329,15 +329,16 @@ holds it while the plant integrates inside the period.
   rough signal defeats step-size control however it is smoothed.
 - A fixed step aligned to Δ is the fastest and the most accurate: the recommended setup for a
   noisy simulation, and what the warning points to.
-- **The default (D16).** The block publishes `solver_info["smallest_time_constant"] = Δ` and
-  `solver_info["held_signal"] = True`; a diagram gathers the first as a minimum and the second
-  with `any`, as it already does for the time constant and the discontinuous flag. With no
-  solver named, `select_solver` returns `rk4_fixedsteps` for a held signal, and the automatic
-  grid's existing policy gives `dt = 0.1 × Δ` when the noise is the fastest thing in the loop.
-  Ten steps per sample cost about 2 s on this pendulum, against 5 to 8 s for adaptive SciPy on a
-  zero-order hold, and the last-stage effect below shrinks tenfold, since one step in ten
-  straddles a sample boundary. A user-named solver or `dt` wins; a fixed `dt` that does not
-  divide Δ warns (D18).
+- **The default (D16, as landed).** The block publishes `solver_info["sample_period"] = Δ`
+  (a float; a diagram gathers the minimum, so the period survives a plant faster than the
+  noise) and `Δ` as its time constant. With no solver named, `select_solver` returns
+  `rk4_fixedsteps` for a held signal, and the automatic grid steps at the largest `Δ / n` at or
+  under the smooth policy's `0.1 × τ_min`; when no block declares a time constant (the library
+  default is no declaration) it is ten steps per sample, `HELD_SIGNAL_STEPS_PER_SAMPLE`. On the
+  five-block noise demo (20 s, Δ = 10 ms) that is 11 s on NumPy and under 1 s on JAX, against
+  17 s for adaptive SciPy on the zero-order hold and 1.3 s for one step per sample; the
+  last-stage effect below shrinks tenfold, since one step in ten straddles a boundary. A
+  user-named solver or `dt` wins; a fixed `dt` that does not divide Δ warns (D18).
 - A fixed step coarser than Δ reads the right signal and gets the wrong physics: it holds one
   sample for its whole step, so the intensity it feels is multiplied by `dt / Δ` (Euler on
   `ẋ = −x + w`, theory 0.0100: Var[x] = 0.0098, 0.0099, 0.0205, 0.0523 at dt = Δ/2, Δ, 2Δ, 5Δ).
@@ -619,7 +620,8 @@ Decided 2026-09-30 (maintainer), from the decision batch on A2–A10 of §10:
   library-wide key check on leaf params is a Later row. `psd = 0` and a semidefinite `psd` are
   legal (element-wise root for a diagonal); a negative seed is refused.
 - **D16. A noisy diagram picks fixed-step RK4 at `Δ / 10` by itself.** The block publishes
-  `Δ` as `solver_info["smallest_time_constant"]` and `solver_info["held_signal"] = True`;
+  `Δ` as `solver_info["smallest_time_constant"]` and as `solver_info["sample_period"]` (a
+  float gathered as a minimum, since a boolean would lose Δ under a faster plant; landed so);
   `select_solver` maps a held signal to `rk4_fixedsteps` when no solver is named, and the
   automatic grid's existing `0.1 × τ_min` policy sets the step (§4): with a held signal the
   automatic step is the largest `Δ / n`, `n` an integer, at or under `0.1 × τ_min`, so a plant
@@ -684,7 +686,15 @@ step that changes draws records a seeded baseline before and pins the new number
 after (RULES 7.7, AGENTS refactor recipe); each step's math is read next to `dp.py` before it
 lands. The acceptance test of every step is its deterministic twin (D23).
 
-- [ ] **RN-1 `WhiteNoise`** (D1–D5, D8, D13–D17, D19). Unblocks P4's Kalman demo.
+- [x] **RN-1 `WhiteNoise`** (D1–D5, D8, D13–D17, D19). Landed 2026-09-30, five commits on
+  `dev-random`; the noise-free baseline stayed byte-identical through every commit, the twin
+  test holds the Lyapunov variance within its sampling error. Three implementation notes: the
+  hint is the float key `sample_period` (a boolean would lose Δ under a faster plant); the
+  stepped-tools check of D19 warns on a Jacobian probe of `f` at the nominal point rather than
+  refusing, since no port metadata says what `f` reads; `System.realize(key)` landed whole
+  (leaf, block, diagram, both the `None` and the keyed path). The cipher runs on Python
+  integers on NumPy (a draw is 21 µs; array ops on one element were five times slower).
+  `discretize` and the Lyapunov rollouts keep the seeded draw. Unblocks P4's Kalman demo.
   1. *The cipher.* `threefry_2x32`, `standard_normal(seed, k, p)` and `sample_index(t, Δ)` under
      `# Internal machinery` of `core/distributions.py`, in Python integers on NumPy and the same
      function on `jax.numpy`. Tests: the published Random123 vectors (no JAX), equality with
@@ -697,18 +707,19 @@ lands. The acceptance test of every step is its deterministic twin (D23).
      the 32-bit warning, the shared-seed warning at compile. `refresh()`, `var`, `mean`, `t0`, `tf` removed
      (a release note). `show_signal(t0=, tf=)` keeps its arguments and evaluates `h` on a grid.
   3. *The solver hints* (D16) in `blocks/sources.py`, `core/wiring.py` and
-     `simulation/simulator.py`: `smallest_time_constant = Δ` and `held_signal = True` on the
+     `simulation/simulator.py`: `smallest_time_constant = Δ` and `sample_period = Δ` on the
      block, gathered by the diagram; `select_solver` maps a held signal to `rk4_fixedsteps`
      (after the discontinuous check, which wins when both are set); the automatic step is the
-     largest `Δ / n` at or under `0.1 × τ_min`; the integrators are untouched (`sample_index`'s
+     largest `Δ / n` at or under `0.1 × τ_min`, ten steps per sample when no time constant is
+     declared; the integrators are untouched (`sample_index`'s
      relative tolerance absorbs the accumulated `t + dt`); a user `dt` that does not divide Δ
      warns (D18); the block warns when JAX is not in 64-bit.
   4. *The analysis verbs* (D17): `System.realize(None)` gathered over subsystems in
      `core/system.py` and `core/wiring.py`, applied by `linearize`, `find_equilibrium`,
      `transfer_function`, the LQR shortcuts and the deterministic transcriptions.
-  5. *The stepped tools* (D19), one line each in `planning/evaluation.py` and
-     `reinforcement_learning/environment.py`: a `disturbances` port reaching only `h` refused; a
-     random block inside `problem.sys` warned once.
+  5. *The stepped tools* (D19), in `reinforcement_learning/environment.py`, which the RL
+     planner and the evaluator's backends share: a `disturbances` port that does not reach `f`
+     at the nominal point (a Jacobian probe) warned; a random block inside `problem.sys` warned.
   6. *The blast radius* (D14), in the same commit: `examples/demos/blocks/blocks_sources.py`,
      `examples/demos/core/diagram_noise_ports.py`, `examples/demos/core/diagram_shortcuts.py`
      (distinct seeds, `psd`); `tutorial/00_core.ipynb` cell 27, `tutorial/01_blocks.ipynb` cell

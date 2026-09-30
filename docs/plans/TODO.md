@@ -149,6 +149,8 @@ the new code copies clean patterns and no shortcut is added only to be dropped.
   notebook `udes_gro501/cartpole_dynamic_controller.ipynb` and `test_blocks.py` in the same
   commit (decided 2026-09-30, D14). RN-1 does not block P4's array API (`kalman(A, B, C, Q, R)`),
   only the Kalman demo that reads `psd`.
+  **RN-1 landed 2026-09-30** (five commits on `dev-random`): P4's Kalman demo is unblocked;
+  DESIGN §4 carries the convention. Next: RN-2, then RN-3 with its first consumer.
 - [ ] **P4 `estimation/`** **[held 2026-09-07; 2026-09-26: stays held until the clean-up and
   solidification above land, then RN-1 of [randomness.md](randomness.md) lands first]**. `LuenbergerObserver(A, B, C,
   L)` as a `DynamicSystem` with ports `u`, `y` → `x_hat`; `luenberger(A, B, C, poles)` on the
