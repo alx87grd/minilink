@@ -139,6 +139,13 @@ the new code copies clean patterns and no shortcut is added only to be dropped.
   carries the convention.
   Also: the evaluator's `simulator` backend fails on a diagram plant with a nested-diagram
   error (found 2026-09-26, randomness.md §1).
+  Reviewed 2026-09-30 (randomness.md §10): D13 decided that day (one counter generator on both
+  backends, the test set holds seeds and no noise values; it lands with RN-1 and amends D11);
+  amendments A2–A10 proposed, awaiting ruling. **[ask]**
+  RN-1 also touches `tutorial/00_core.ipynb`, `tutorial/01_blocks.ipynb`, the live course
+  notebook `udes_gro501/cartpole_dynamic_controller.ipynb` and `test_blocks.py`
+  **[ask — student-facing]**. RN-1 does not block P4's array API (`kalman(A, B, C, Q, R)`),
+  only the Kalman demo that reads `psd`.
 - [ ] **P4 `estimation/`** **[held 2026-09-07; 2026-09-26: stays held until the clean-up and
   solidification above land, then RN-1 of [randomness.md](randomness.md) lands first]**. `LuenbergerObserver(A, B, C,
   L)` as a `DynamicSystem` with ports `u`, `y` → `x_hat`; `luenberger(A, B, C, poles)` on the
@@ -548,7 +555,7 @@ three years. The foundation rows are design conversations before code.
   S66's wiring-time checks raise them. Done when the wiring and compile paths of `core/`
   raise only the family.
 - [ ] **V11 Rewrite the history without notebook outputs** **[ask — force-push]**, in December
-  2026 after the v0.3 tag, between terms. A fresh clone is 161 MB for 19 MB of files: 169 MB of
+  2026 after the v0.3 tag, between terms. A fresh clone is 176 MB for 19 MB of files: 169 MB of
   the history is `.ipynb` outputs committed before the `nbstripout` hook worked, mostly five
   notebooks deleted by May (`examples/notebooks/demo*.ipynb`, `animation_colab.ipynb`).
   `main` carries it all, so deleting branches or `archive/*` tags does not help. Steps: keep a
