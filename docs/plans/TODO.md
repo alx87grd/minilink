@@ -654,5 +654,10 @@ One line each; open a plan doc only when a design needs a writeup.
 - Ipopt given the Lagrangian Hessian, not the objective's alone (scan: planning#13);
   `optimizer_method="auto"` picking Ipopt when installed (scan: examples#11);
   `PlanningProblem.metadata` documented or retired (scan: planning#14; ROADMAP §6).
+- A fixed-step RK4 that samples held sources once per step, so the four stages read one
+  sample and the block route equals the port route (randomness.md §10 A8, D18): fourth order
+  with no boundary error at `dt = Δ`, ten times fewer evaluations than the `Δ / 10` default.
+  Deferred 2026-09-30 (the randomness API lands first; it touches `compile` and the solvers);
+  worth it only if a twin test shows the first-order bias.
 - Declined 2026-09-05 (do not re-propose): scalar / list signal bounds and a coercing `x0`;
   scalar `Q` / `R` / `S` in `QuadraticCost.from_system`.

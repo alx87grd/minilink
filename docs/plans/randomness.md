@@ -632,9 +632,11 @@ Decided 2026-09-30 (maintainer), from the decision batch on A2–A10 of §10:
   readable by the Kalman design. It mirrors `RolloutEnvironment.step(key=None)`.
 - **D18. The hold across RK4 stages is accepted as first order in `dt`.** The effect and the
   rule `dt = Δ / n` are stated in the docstring and DESIGN; a fixed step that does not divide
-  Δ warns; "the left limit at RK4's last stage" leaves RN-4. Evaluating a held source once per
-  solver step in `compile` is the one open question of RN-4, triggered if the twin test of P4's
-  Kalman demo (D23) shows the bias.
+  Δ warns; "the left limit at RK4's last stage" leaves RN-4. The integrator is the vanilla
+  fixed-step RK4 as it exists: the block's `h` is evaluated at every stage like any source's, and
+  neither `compile` nor a solver changes (decided 2026-09-30: the randomness API lands first; a
+  solver that samples held sources once per step is a Later row, taken up only if a twin test
+  shows the bias matters).
 - **D19. No silent noise in the stepped tools.** A `disturbances` port that reaches only `h`
   is refused with a message until a tool reads `y`; the evaluator and the RL environment warn
   once when `problem.sys` holds a random block, until RN-4 realizes it per trial. With RN-1.
@@ -659,8 +661,9 @@ Decided 2026-09-30 (maintainer), from the decision batch on A2–A10 of §10:
   `NoiseSource(Gaussian(0, cov=R_d), sample_period=Tₛ)`, `W = n² / 2` for a one-sided density)
   into §2; A9 (H2 reads `psd`, H∞ reads ports and filters) into §2; A10 (the deterministic
   twin as the acceptance test of RN-1, P4 and colored noise, the shaping filter's state started
-  from `N(0, W / 2τ)`) into §9. `LowPassFilter(tau=)` is a Later row, not an RN step. Fixed-step
-  rollouts compute `t_k = t0 + k·dt` and 64-bit is required on JAX (A4).
+  from `N(0, W / 2τ)`) into §9. `LowPassFilter(tau=)` is a Later row, not an RN step. The
+  fixed-step loops keep accumulating `t + dt`; the block's `sample_index` absorbs the drift with
+  a relative tolerance (§4, held over 2·10⁶ steps), and 64-bit is required on JAX (A4).
 - **D24. The evaluator is a batched simulation of the closed-loop diagram.** `MonteCarloEvaluator`
   builds `ctl @ sys` (or `source >> sys`) with the disturbance blocks on their ports, draws
   `ev.trials` once, and simulates that diagram over the trials: `rollout_batch` on JAX, a loop
@@ -695,8 +698,9 @@ lands. The acceptance test of every step is its deterministic twin (D23).
      `simulation/simulator.py`: `smallest_time_constant = Δ` and `held_signal = True` on the
      block, gathered by the diagram; `select_solver` maps a held signal to `rk4_fixedsteps`
      (after the discontinuous check, which wins when both are set); the automatic step is the
-     largest `Δ / n` at or under `0.1 × τ_min`; fixed-step rollouts compute `t_k = t0 + k·dt`; a user `dt` that does not divide Δ warns
-     (D18); the block warns when JAX is not in 64-bit.
+     largest `Δ / n` at or under `0.1 × τ_min`; the integrators are untouched (`sample_index`'s
+     relative tolerance absorbs the accumulated `t + dt`); a user `dt` that does not divide Δ
+     warns (D18); the block warns when JAX is not in 64-bit.
   4. *The analysis verbs* (D17): `System.realize(None)` gathered over subsystems in
      `core/system.py` and `core/wiring.py`, applied by `linearize`, `find_equilibrium`,
      `transfer_function`, the LQR shortcuts and the deterministic transcriptions.
@@ -737,9 +741,8 @@ lands. The acceptance test of every step is its deterministic twin (D23).
      block's `h` at `t_k` with the episode's seeds (D21); `ProblemEnv` realizes at reset, its
      action space the action port alone. Files: `reinforcement_learning/environment.py`,
      `interfaces/gymnasium.py`.
-  4. The hold across stages: the D18 rule in DESIGN and the block's docstring; the compile
-     change (a held source evaluated once per solver step) stays the one open question, decided
-     by the twin test of P4's Kalman demo.
+  4. The hold across stages: the D18 rule in DESIGN and the block's docstring. No integrator
+     change (D18).
   5. Colored noise: the recipe of §6 with the shaping filter's state started from
      `N(0, W / 2τ)` (D23), as a demo and its twin test (`W = 2 τ σ²`); `LowPassFilter(tau=)` a
      Later row in TODO.
