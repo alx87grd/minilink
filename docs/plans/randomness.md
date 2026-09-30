@@ -619,9 +619,12 @@ Decided 2026-09-30 (maintainer), from the decision batch on A2–A10 of §10:
 - **D16. A noisy diagram picks fixed-step RK4 at `Δ / 10` by itself.** The block publishes
   `Δ` as `solver_info["smallest_time_constant"]` and `solver_info["held_signal"] = True`;
   `select_solver` maps a held signal to `rk4_fixedsteps` when no solver is named, and the
-  automatic grid's existing `0.1 × τ_min` policy sets the step (§4). Moved from RN-4 into RN-1 so
+  automatic grid's existing `0.1 × τ_min` policy sets the step (§4): with a held signal the
+  automatic step is the largest `Δ / n`, `n` an integer, at or under `0.1 × τ_min`, so a plant
+  faster than the noise still steps on a grid that divides Δ. Moved from RN-4 into RN-1 so
   the default run never degrades. A named solver or `dt` wins. The block's hint follows
-  `params["sample_period"]`.
+  `params["sample_period"]`. The flag says what the signal is, not what to do: any block whose
+  output is piecewise constant on a known grid may set it.
 - **D17. `seed = None` is the mean.** `sys.realize(None)` returns the nominal params, every
   random block's seed `None` (a leaf-free pytree node, so it traces), and `h` returns zero there.
   `linearize`, `find_equilibrium`, `transfer_function`, the LQR shortcuts and the deterministic
@@ -690,8 +693,9 @@ lands. The acceptance test of every step is its deterministic twin (D23).
      (a release note). `show_signal(t0=, tf=)` keeps its arguments and evaluates `h` on a grid.
   3. *The solver hints* (D16) in `blocks/sources.py`, `core/wiring.py` and
      `simulation/simulator.py`: `smallest_time_constant = Δ` and `held_signal = True` on the
-     block, gathered by the diagram; `select_solver` maps a held signal to `rk4_fixedsteps`;
-     fixed-step rollouts compute `t_k = t0 + k·dt`; a user `dt` that does not divide Δ warns
+     block, gathered by the diagram; `select_solver` maps a held signal to `rk4_fixedsteps`
+     (after the discontinuous check, which wins when both are set); the automatic step is the
+     largest `Δ / n` at or under `0.1 × τ_min`; fixed-step rollouts compute `t_k = t0 + k·dt`; a user `dt` that does not divide Δ warns
      (D18); the block warns when JAX is not in 64-bit.
   4. *The analysis verbs* (D17): `System.realize(None)` gathered over subsystems in
      `core/system.py` and `core/wiring.py`, applied by `linearize`, `find_equilibrium`,
