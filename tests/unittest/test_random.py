@@ -123,3 +123,26 @@ def test_child_seed_is_stable_and_distinct_by_name():
     assert child_seed(1, "plant") != child_seed(1, "noise")
     assert child_seed(1, "plant") != child_seed(2, "plant")
     assert 0 <= child_seed(5, "seed") < 2**31
+
+
+def test_the_held_train_reproduces_the_lyapunov_variance():
+    # ẋ = −a x + w, w white of intensity W: the stationary variance solves 0 = −2 a P + W
+    from minilink import WhiteNoise
+    from minilink.dynamics.abstraction.state_space import LTISystem
+
+    a, W, period = 1.0, 1.0, 0.01
+    P = W / (2.0 * a)
+    plant = LTISystem(np.array([[-a]]), np.array([[1.0]]))
+    noise = WhiteNoise(1, psd=W, sample_period=period)
+    loop = noise >> plant
+    samples = []
+    for seed in range(12):
+        noise.params["seed"] = seed
+        traj = loop.compute_trajectory(
+            tf=40.0, dt=period, solver="rk4_fixedsteps", verbose=False
+        )
+        samples.append(
+            traj.x[0, 500:]
+        )  # after five time constants, at the sample instants
+    variance = np.var(np.concatenate(samples))
+    assert abs(variance / P - 1.0) < 0.15
