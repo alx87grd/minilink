@@ -502,7 +502,15 @@ here. Each open item needs the maintainer.
   (§10 of the plan). Decided that day, D13: the noise block draws with one
   counter generator on NumPy and JAX, so the same seed is the same signal on
   both, and the test set holds starts, parameter values and seeds, no noise
-  values (it amends D11). Amendments A2–A10 of the review await a ruling.
+  values (it amends D11). A2–A10 ruled the same day as D14–D23, and D24
+  added: RN-1 lands now with the course cell rewritten in the same commit;
+  `WhiteNoise(p, *, psd, sample_period, seed, hold)`; a noisy diagram
+  publishes Δ as its solver hint and runs fixed-step RK4 at Δ / 10 by
+  itself; `seed = None` is the mean, so analysis linearizes at `E[w] = 0`;
+  streams are derived by name with the library's cipher; and the Monte
+  Carlo evaluator simulates the closed-loop diagram, batched, so any
+  controller and any noise block go through the one simulation path. The
+  implementation plan is the plan's §9.
 - **The terminal cost `h(x_f, t_f)`, one rule for every tool.** Since the
   one-horizon ruling (2026-09-17) `h` is charged exactly when `tf` is
   finite; still to settle whether an infinite-horizon cost with a nonzero `h`

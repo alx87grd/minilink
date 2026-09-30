@@ -129,10 +129,12 @@ the new code copies clean patterns and no shortcut is added only to be dropped.
   `TransferFunction` and `StructuralResult`, so tutorial 01's `print(tf)` shows the transfer
   function and fourteen `np.linalg.eigvals(lin.A())` sites go (scan: analysis#3, examples#2).
 - [ ] **RN The randomness convention** ([randomness.md](randomness.md), agreed 2026-09-26,
-  rulings D1–D12). RN-1 `WhiteNoise` (seed and sample period in params, counter-based draw,
-  `psd`, zero-order hold by default, no time window) is P4's prerequisite. RN-2 distributions
-  read `params`, RN-3 `NoiseSource`, RN-4 `realize(key)` and signals on `disturbances`, RN-5 the
-  Monte Carlo evaluator's test set, RN-6 DESIGN. Rungs (decided 2026-09-26): RN-1 v0.2 wave B
+  rulings D1–D24). RN-1 `WhiteNoise` (seed and sample period in params, counter-based draw,
+  `psd`, zero-order hold by default, no time window, the solver hint, `seed = None` the mean)
+  is P4's Kalman demo's prerequisite. RN-2 distributions
+  read `params`, RN-3 `NoiseSource`, RN-4 `realize(key)` by name and signals on `disturbances`,
+  RN-5 the Monte Carlo evaluator as a batched simulation of the closed-loop diagram on its test
+  set, RN-6 DESIGN. Rungs (decided 2026-09-26): RN-1 v0.2 wave B
   before P4; RN-2 v0.2 wave A with A5; RN-3 with its first consumer (P11 if a GRO501 notebook
   shows sampled sensor noise, else v0.3); RN-4 and RN-5 together in v0.3, after the fall term,
   before the v0.9 freeze; RN-6 with each step. Done when the plan's steps are ticked and DESIGN
@@ -141,10 +143,11 @@ the new code copies clean patterns and no shortcut is added only to be dropped.
   error (found 2026-09-26, randomness.md §1).
   Reviewed 2026-09-30 (randomness.md §10): D13 decided that day (one counter generator on both
   backends, the test set holds seeds and no noise values; it lands with RN-1 and amends D11);
-  amendments A2–A10 proposed, awaiting ruling. **[ask]**
-  RN-1 also touches `tutorial/00_core.ipynb`, `tutorial/01_blocks.ipynb`, the live course
-  notebook `udes_gro501/cartpole_dynamic_controller.ipynb` and `test_blocks.py`
-  **[ask — student-facing]**. RN-1 does not block P4's array API (`kalman(A, B, C, Q, R)`),
+  A2–A10 ruled the same day as D14–D23, D24 added (the evaluator simulates the diagram). The
+  implementation plan, files and "done when" per step, is randomness.md §9.
+  RN-1 rewrites `tutorial/00_core.ipynb`, `tutorial/01_blocks.ipynb`, the live course
+  notebook `udes_gro501/cartpole_dynamic_controller.ipynb` and `test_blocks.py` in the same
+  commit (decided 2026-09-30, D14). RN-1 does not block P4's array API (`kalman(A, B, C, Q, R)`),
   only the Kalman demo that reads `psd`.
 - [ ] **P4 `estimation/`** **[held 2026-09-07; 2026-09-26: stays held until the clean-up and
   solidification above land, then RN-1 of [randomness.md](randomness.md) lands first]**. `LuenbergerObserver(A, B, C,
