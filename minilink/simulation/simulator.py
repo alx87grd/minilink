@@ -13,6 +13,7 @@ from minilink.core.backends import (
     BACKEND_JAX,
     BACKEND_NUMPY,
 )
+from minilink.core.system import DEFAULT_SMALLEST_TIME_CONSTANT
 from minilink.core.trajectory import Trajectory
 from minilink.simulation.compile_backend import resolve_auto_backend
 from minilink.simulation.input_coercion import coerce_forced_input
@@ -90,6 +91,9 @@ FIXED_STEP_SOLVERS = tuple(
 # Default automatic dt scale relative to ``solver_info["smallest_time_constant"]``
 SMOOTH_AUTO_DT_SCALE = 0.1
 DISCONTINUOUS_AUTO_DT_SCALE = 0.1
+
+# Steps per sample period of a held signal when no block declares a time constant
+HELD_SIGNAL_STEPS_PER_SAMPLE = 10
 
 # Pass ``compile_backend=COMPILE_BACKEND_AUTO`` to try JAX first, then NumPy.
 # Re-exported from :mod:`minilink.core.backends` so legacy callers
@@ -250,7 +254,8 @@ class Simulator:
         logged warning). With neither, the automatic grid depends on the
         solver: fixed-step solvers (:data:`FIXED_STEP_SOLVERS`) integrate on
         the grid, so ``dt`` comes from the system's smallest time constant
-        scaled by the smooth or discontinuous policy; adaptive solvers pick
+        scaled by the smooth or discontinuous policy, rounded down to a
+        divisor of the sample period when a block holds a signal; adaptive solvers pick
         their own steps, so the grid is only a reporting resolution with
         :data:`~minilink.simulation.time_grid.DEFAULT_N_STEPS` points.
         """
@@ -260,7 +265,18 @@ class Simulator:
                 scale = DISCONTINUOUS_AUTO_DT_SCALE
             else:
                 scale = SMOOTH_AUTO_DT_SCALE
-            default_dt = sys.solver_info["smallest_time_constant"] * scale
+            tau = sys.solver_info["smallest_time_constant"]
+            default_dt = tau * scale
+            period = sys.solver_info.get("sample_period")
+            if period is not None:
+                # a held signal: the largest step Δ / n at or under the policy's step;
+                # the library's default time constant is no declaration, so it is
+                # HELD_SIGNAL_STEPS_PER_SAMPLE steps per sample instead
+                if tau == DEFAULT_SMALLEST_TIME_CONSTANT:
+                    n = HELD_SIGNAL_STEPS_PER_SAMPLE
+                else:
+                    n = int(np.ceil(period / default_dt))
+                default_dt = period / n
         return build_time_grid(t0, tf, n_steps=n_steps, dt=dt, default_dt=default_dt)
 
     def select_solver(self, sys, user_solver=None):
@@ -269,6 +285,9 @@ class Simulator:
 
         - If the user has specified a solver, return it.
         - If the system has discontinuous behavior, return ``"euler"``.
+        - If a block holds a signal over a sample period (``solver_info
+          ["sample_period"]``, a noise source), return ``"rk4_fixedsteps"``:
+          the automatic grid then steps at a divisor of that period.
         - If the time grid was given explicitly, ``compile_backend`` is
           ``"jax"``, the grid is uniform, and it has at least
           :data:`RK4_AUTO_MIN_TIME_POINTS` points, return ``"rk4_fixedsteps"``
@@ -279,6 +298,8 @@ class Simulator:
             return user_solver
         if sys.solver_info.get("discontinuous_behavior", False):
             return "euler"
+        if sys.solver_info.get("sample_period") is not None:
+            return "rk4_fixedsteps"
         if (
             not self.auto_time_grid
             and self.compile_backend == BACKEND_JAX

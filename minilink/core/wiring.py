@@ -279,6 +279,15 @@ class WiredDiagramMixin:
         self.solver_info["smallest_time_constant"] = min(
             time_constants, default=DEFAULT_SMALLEST_TIME_CONSTANT
         )
+        periods = [
+            subsystem.solver_info["sample_period"]
+            for subsystem in self.subsystems.values()
+            if "sample_period" in subsystem.solver_info
+        ]
+        if periods:
+            self.solver_info["sample_period"] = min(periods)
+        else:
+            self.solver_info.pop("sample_period", None)
 
     def subsystem_id(self, subsystem):
         """Return the diagram id for a subsystem instance added to this diagram."""

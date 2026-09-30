@@ -19,7 +19,7 @@ def test_threefry_matches_the_random123_vectors():
     count = np.array(
         [[0, 0xFFFFFFFF, 0x243F6A88], [0, 0xFFFFFFFF, 0x85A308D3]], dtype=np.uint32
     )
-    x0, x1 = threefry_2x32(key, count)
+    x0, x1 = threefry_2x32((key[0], key[1]), (count[0], count[1]))
     assert x0.tolist() == [0x6B200159, 0x1CB996FC, 0xC4923A9C]
     assert x1.tolist() == [0x99BA4EFE, 0xBB002BE7, 0x483DF7A0]
 
@@ -35,7 +35,7 @@ def test_threefry_matches_the_jax_primitive():
     n = 64
     key = rng.integers(0, 2**32, size=2, dtype=np.uint32)
     count = rng.integers(0, 2**32, size=(2, n), dtype=np.uint32)
-    ours_0, ours_1 = threefry_2x32(np.repeat(key[:, None], n, axis=1), count)
+    ours_0, ours_1 = threefry_2x32((int(key[0]), int(key[1])), (count[0], count[1]))
     theirs = np.asarray(jax_threefry(jnp.asarray(key), jnp.concatenate(list(count))))
     np.testing.assert_array_equal(ours_0, theirs[:n])
     np.testing.assert_array_equal(ours_1, theirs[n:])

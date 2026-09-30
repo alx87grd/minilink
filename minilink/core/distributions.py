@@ -164,26 +164,28 @@ def split_keys(key, n):
 def threefry_2x32(key, count):
     """Threefry-2x32, 20 rounds: two words of bits from a key pair and a counter pair.
 
-    ``key`` and ``count`` are ``uint32`` arrays of shape ``(2, n)``; the rounds follow
-    the Random123 schedule, so the bits match the published vectors and JAX's own
-    generator on both backends.
+    ``key`` and ``count`` are pairs of 32-bit words: Python integers, or ``uint32``
+    arrays of one shape. The rounds follow the Random123 schedule, so the bits match
+    the published vectors and JAX's own generator; the mask keeps Python integers to
+    32 bits and is a no-op on ``uint32`` arrays.
     """
-    xp = array_module(key, count)
+    mask = 0xFFFFFFFF
     rotations = (13, 15, 26, 6, 17, 29, 16, 24)
-    parity = xp.asarray(0x1BD11BDA, dtype=xp.uint32)
-    ks = (key[0], key[1], key[0] ^ key[1] ^ parity)
+    k0, k1 = key
+    c0, c1 = count
+    ks = (k0, k1, k0 ^ k1 ^ 0x1BD11BDA)
 
-    x0 = count[0] + ks[0]
-    x1 = count[1] + ks[1]
+    x0 = (c0 + k0) & mask
+    x1 = (c1 + k1) & mask
     for i in range(20):
         r = rotations[i % 8]
-        x0 = x0 + x1
-        x1 = (x1 << r) | (x1 >> (32 - r))
+        x0 = (x0 + x1) & mask
+        x1 = ((x1 << r) | (x1 >> (32 - r))) & mask
         x1 = x0 ^ x1
         if i % 4 == 3:
             j = i // 4 + 1
-            x0 = x0 + ks[j % 3]
-            x1 = x1 + ks[(j + 1) % 3] + xp.asarray(j, dtype=xp.uint32)
+            x0 = (x0 + ks[j % 3]) & mask
+            x1 = (x1 + ks[(j + 1) % 3] + j) & mask
     return x0, x1
 
 
@@ -192,16 +194,25 @@ def random_bits(seed, k, p):
 
     The key words are the seed's low and high halves, the counter words the sample
     index and the channel: every sample of every channel is one cipher block, and a
-    negative index wraps the same way on both backends.
+    negative index wraps the same way on both backends. On NumPy the rounds run on
+    Python integers, one channel at a time; on JAX on ``uint32`` arrays under the trace.
     """
     xp = array_module(seed, k)
+    if xp is np:
+        seed, k = int(seed), int(k)
+        key = (seed & 0xFFFFFFFF, (seed >> 32) & 0xFFFFFFFF)
+        words = [threefry_2x32(key, (k & 0xFFFFFFFF, channel)) for channel in range(p)]
+        return (
+            np.array([w[0] for w in words], dtype=np.uint32),
+            np.array([w[1] for w in words], dtype=np.uint32),
+        )
     seed = xp.asarray(seed)
     k = xp.asarray(k)
     low = xp.broadcast_to(seed.astype(xp.uint32), (p,))
     high = xp.broadcast_to((seed >> 32).astype(xp.uint32), (p,))
     sample = xp.broadcast_to(k.astype(xp.uint32), (p,))
     channel = xp.arange(p, dtype=xp.uint32)
-    return threefry_2x32(xp.stack([low, high]), xp.stack([sample, channel]))
+    return threefry_2x32((low, high), (sample, channel))
 
 
 def standard_normal(seed, k, p):

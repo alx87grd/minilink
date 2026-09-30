@@ -1147,6 +1147,66 @@ class TestAutomaticTimeGrid(unittest.TestCase):
                 sim = Simulator(loop, tf=1.0, solver="euler", verbose=False)
                 self.assertAlmostEqual(sim.dt, 0.002)  # 0.02 * SMOOTH_AUTO_DT_SCALE
 
+    def test_a_held_signal_selects_rk4_on_a_divisor_of_its_period(self):
+        from minilink import Pendulum, WhiteNoise
+        from minilink.simulation.simulator import HELD_SIGNAL_STEPS_PER_SAMPLE
+
+        cases = [
+            # (declared plant time constant, sample period, discontinuous) -> (solver, dt)
+            (None, 0.01, False, "rk4_fixedsteps", 0.01 / HELD_SIGNAL_STEPS_PER_SAMPLE),
+            (0.003, 0.01, False, "rk4_fixedsteps", 0.01 / 34),
+            (0.5, 0.01, False, "rk4_fixedsteps", 0.01 / 10),
+            (
+                None,
+                0.001,
+                False,
+                "rk4_fixedsteps",
+                0.001 / HELD_SIGNAL_STEPS_PER_SAMPLE,
+            ),
+            (None, 0.01, True, "euler", 0.01 / HELD_SIGNAL_STEPS_PER_SAMPLE),
+        ]
+        for tau, period, discontinuous, solver, dt in cases:
+            with self.subTest(tau=tau, period=period, discontinuous=discontinuous):
+                plant = Pendulum()
+                if tau is not None:
+                    plant.solver_info["smallest_time_constant"] = tau
+                plant.solver_info["discontinuous_behavior"] = discontinuous
+                loop = WhiteNoise(1, sample_period=period) >> plant
+                self.assertEqual(loop.solver_info["sample_period"], period)
+                with warnings.catch_warnings():
+                    warnings.simplefilter("ignore")
+                    sim = Simulator(loop, tf=1.0, verbose=False)
+                self.assertEqual(sim.solver_mode, solver)
+                self.assertAlmostEqual(sim.dt, dt)
+                self.assertAlmostEqual(period / sim.dt, round(period / sim.dt))
+
+    def test_a_held_signal_warns_on_a_forced_adaptive_solver_or_a_stray_dt(self):
+        from minilink import Pendulum, WhiteNoise
+
+        loop = WhiteNoise(1, sample_period=0.01) >> Pendulum()
+        with warnings.catch_warnings(record=True) as caught:
+            warnings.simplefilter("always")
+            sim = Simulator(loop, tf=1.0, solver="scipy", verbose=False)
+        self.assertEqual(sim.solver_mode, "scipy")
+        self.assertTrue(any("held over 0.01 s" in str(w.message) for w in caught))
+
+        with warnings.catch_warnings(record=True) as caught:
+            warnings.simplefilter("always")
+            Simulator(loop, tf=1.0, dt=0.003, solver="rk4_fixedsteps", verbose=False)
+        self.assertTrue(any("does not divide" in str(w.message) for w in caught))
+
+        with warnings.catch_warnings(record=True) as caught:
+            warnings.simplefilter("always")
+            Simulator(loop, tf=1.0, dt=0.005, solver="rk4_fixedsteps", verbose=False)
+        self.assertFalse(any("does not divide" in str(w.message) for w in caught))
+
+        # a loop without a held signal keeps its adaptive default, silently
+        with warnings.catch_warnings(record=True) as caught:
+            warnings.simplefilter("always")
+            sim = Simulator(Pendulum(), tf=1.0, verbose=False)
+        self.assertEqual(sim.solver_mode, "scipy")
+        self.assertEqual(caught, [])
+
     def test_explicit_grid_still_wins(self):
         sim = Simulator(StableLinearSystem(), tf=1.0, n_steps=51, verbose=False)
         self.assertEqual(sim.n_pts, 51)
