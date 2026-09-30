@@ -174,6 +174,19 @@ def noisy_loop(seed_w=1, seed_v=2):
     return loop
 
 
+def noisy_plant():
+    """A pendulum with white noise on its sensor and its action port exported."""
+    from minilink import DiagramSystem, PendulumWithNoisePort, WhiteNoise
+
+    plant = DiagramSystem()
+    plant.add_subsystem(PendulumWithNoisePort(), "plant")
+    plant.add_subsystem(WhiteNoise(seed=5), "sensor_noise")
+    plant.connect("sensor_noise", "y", "plant", "v")
+    plant.add_input_port("u", dim=1)
+    plant.connect("input", "u", "plant", "u")
+    return plant
+
+
 def test_realize_none_is_the_mean_nested_like_params():
     loop = noisy_loop()
     nominal = loop.realize(None)
@@ -221,14 +234,7 @@ def test_analysis_verbs_see_the_noise_at_its_mean():
     x_eq = find_equilibrium(noisy, noisy.x0)
     np.testing.assert_allclose(x_eq, find_equilibrium(quiet, quiet.x0))
 
-    from minilink import DiagramSystem, PendulumWithNoisePort, WhiteNoise
-
-    plant = DiagramSystem()
-    plant.add_subsystem(PendulumWithNoisePort(), "plant")
-    plant.add_subsystem(WhiteNoise(seed=5), "sensor_noise")
-    plant.connect("sensor_noise", "y", "plant", "v")
-    plant.add_input_port("u", dim=1)
-    plant.connect("input", "u", "plant", "u")
+    plant = noisy_plant()
     assert plant.is_random
     K = lqr_at_operating_point(plant, np.zeros(2), np.eye(2), np.eye(1), method="fd")
     assert np.all(np.isfinite(K.params["K"]))
@@ -245,3 +251,54 @@ def test_a_problem_on_a_random_system_plans_against_the_mean():
 
     quiet = PlanningProblem(Pendulum(), x_start=np.zeros(2))
     assert quiet.params.system is None
+
+
+# --- the two warnings: a shared seed, noise the stepped tools never see ---
+
+
+def test_compile_warns_when_two_random_blocks_share_a_seed():
+    import warnings
+
+    with warnings.catch_warnings(record=True) as caught:
+        warnings.simplefilter("always")
+        noisy_loop(1, 1).compile(backend="numpy", verbose=False)
+    assert any("share seed 1" in str(w.message) for w in caught)
+
+    with warnings.catch_warnings(record=True) as caught:
+        warnings.simplefilter("always")
+        noisy_loop(1, 2).compile(backend="numpy", verbose=False)
+    assert not any("share seed" in str(w.message) for w in caught)
+
+
+def test_the_rollout_environment_warns_about_noise_it_never_sees():
+    import warnings
+
+    from minilink import PendulumWithNoisePort
+    from minilink.core.costs import QuadraticCost
+    from minilink.core.distributions import Gaussian, Uniform
+    from minilink.planning.problems import StochasticPlanningProblem
+    from minilink.planning.reinforcement_learning.environment import RolloutEnvironment
+
+    def problem(sys, **disturbances):
+        return StochasticPlanningProblem(
+            sys,
+            cost=QuadraticCost.from_system(sys),
+            tf=1.0,
+            x0_distribution=Uniform([-0.5, -0.5], [0.5, 0.5]),
+            disturbances=disturbances or None,
+        )
+
+    cases = [
+        (problem(PendulumWithNoisePort(), w=Gaussian(0.0, 0.1)), None),
+        (problem(PendulumWithNoisePort(), v=Gaussian(0.0, 0.1)), "never calls h"),
+        (problem(noisy_plant()), "fixed seed"),
+    ]
+    for prob, expected in cases:
+        with warnings.catch_warnings(record=True) as caught:
+            warnings.simplefilter("always")
+            RolloutEnvironment(prob, dt=0.1, backend="numpy")
+        messages = [str(w.message) for w in caught]
+        if expected is None:
+            assert not any("never calls h" in m or "fixed seed" in m for m in messages)
+        else:
+            assert any(expected in m for m in messages), messages
