@@ -514,7 +514,7 @@ here. Each open item needs the maintainer.
   values (it amends D11). A2–A10 ruled the same day as D14–D23, and D24
   added: RN-1 lands now with the course cell rewritten in the same commit;
   `WhiteNoise(p, *, psd, sample_period, seed, hold)`; a noisy diagram
-  publishes Δ as its solver hint and runs fixed-step RK4 at Δ / 10 by
+  publishes Δ as its solver hint and runs fixed-step RK4 at Δ by
   itself; `seed = None` is the mean, so analysis linearizes at `E[w] = 0`;
   streams are derived by name with the library's cipher; and the Monte
   Carlo evaluator simulates the closed-loop diagram, batched, so any

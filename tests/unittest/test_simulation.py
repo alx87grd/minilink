@@ -1163,7 +1163,13 @@ class TestAutomaticTimeGrid(unittest.TestCase):
                 "rk4_fixedsteps",
                 0.001 / HELD_SIGNAL_STEPS_PER_SAMPLE,
             ),
-            (None, 0.01, True, "euler", 0.01 / HELD_SIGNAL_STEPS_PER_SAMPLE),
+            (
+                None,
+                0.01,
+                True,
+                "euler",
+                0.01 / 100,
+            ),  # the discontinuous policy keeps its scale
         ]
         for tau, period, discontinuous, solver, dt in cases:
             with self.subTest(tau=tau, period=period, discontinuous=discontinuous):

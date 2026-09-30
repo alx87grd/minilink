@@ -92,8 +92,9 @@ FIXED_STEP_SOLVERS = tuple(
 SMOOTH_AUTO_DT_SCALE = 0.1
 DISCONTINUOUS_AUTO_DT_SCALE = 0.1
 
-# Steps per sample period of a held signal when no block declares a time constant
-HELD_SIGNAL_STEPS_PER_SAMPLE = 10
+# Steps per sample period of a held signal on a smooth loop with no declared time
+# constant: the period is the resolution the user chose; ``dt`` buys a finer one
+HELD_SIGNAL_STEPS_PER_SAMPLE = 1
 
 # Pass ``compile_backend=COMPILE_BACKEND_AUTO`` to try JAX first, then NumPy.
 # Re-exported from :mod:`minilink.core.backends` so legacy callers
@@ -261,18 +262,19 @@ class Simulator:
         """
         default_dt = None  # -> DEFAULT_N_STEPS reporting grid
         if solver_mode in FIXED_STEP_SOLVERS:
-            if sys.solver_info.get("discontinuous_behavior", False):
-                scale = DISCONTINUOUS_AUTO_DT_SCALE
-            else:
-                scale = SMOOTH_AUTO_DT_SCALE
+            discontinuous = sys.solver_info.get("discontinuous_behavior", False)
+            scale = (
+                DISCONTINUOUS_AUTO_DT_SCALE if discontinuous else SMOOTH_AUTO_DT_SCALE
+            )
             tau = sys.solver_info["smallest_time_constant"]
             default_dt = tau * scale
             period = sys.solver_info.get("sample_period")
             if period is not None:
-                # a held signal: the largest step Δ / n at or under the policy's step;
-                # the library's default time constant is no declaration, so it is
-                # HELD_SIGNAL_STEPS_PER_SAMPLE steps per sample instead
-                if tau == DEFAULT_SMALLEST_TIME_CONSTANT:
+                # a held signal steps on a divisor of its period, Δ / n, at or under the
+                # policy's step; on a smooth loop with no declared time constant the
+                # period itself is the resolution: HELD_SIGNAL_STEPS_PER_SAMPLE per sample
+                undeclared = tau == DEFAULT_SMALLEST_TIME_CONSTANT and not discontinuous
+                if undeclared:
                     n = HELD_SIGNAL_STEPS_PER_SAMPLE
                 else:
                     n = int(np.ceil(period / default_dt))

@@ -40,7 +40,7 @@ time**, and **where a random draw happens** in a library whose equation paths ar
   (starts, parameter values, seeds), and runs that diagram on every trial, batched. Any
   controller, any noise block, any parameter draw goes through the one simulation path.
 - **A noisy diagram picks its own solver.** The noise block publishes its period as the
-  solver hint, so a plain `compute_trajectory()` runs fixed-step RK4 at `Δ / 10`.
+  solver hint, so a plain `compute_trajectory()` runs fixed-step RK4 at `dt = Δ`.
 - **LQG reads the same numbers the simulation draws from**: `Q = B_w W B_wᵀ`, `R = V` for the
   continuous filter; `Q_d = B_w W B_wᵀ Δ`, `R_d = V / Δ` for the discrete one.
 
@@ -333,12 +333,30 @@ holds it while the plant integrates inside the period.
   (a float; a diagram gathers the minimum, so the period survives a plant faster than the
   noise) and `Δ` as its time constant. With no solver named, `select_solver` returns
   `rk4_fixedsteps` for a held signal, and the automatic grid steps at the largest `Δ / n` at or
-  under the smooth policy's `0.1 × τ_min`; when no block declares a time constant (the library
-  default is no declaration) it is ten steps per sample, `HELD_SIGNAL_STEPS_PER_SAMPLE`. On the
-  five-block noise demo (20 s, Δ = 10 ms) that is 11 s on NumPy and under 1 s on JAX, against
-  17 s for adaptive SciPy on the zero-order hold and 1.3 s for one step per sample; the
-  last-stage effect below shrinks tenfold, since one step in ten straddles a boundary. A
-  user-named solver or `dt` wins; a fixed `dt` that does not divide Δ warns (D18).
+  under the policy's `0.1 × τ_min`; on a smooth loop where no block declares a time constant
+  (the library default is no declaration) it is one step per sample,
+  `HELD_SIGNAL_STEPS_PER_SAMPLE = 1`: the period is the resolution the user chose, and `dt`
+  buys a finer one. A discontinuous loop keeps its own scale. Measured 2026-09-30 on NumPy,
+  the five-block noise demo (20 s, Δ = 10 ms; the path error against RK4 at Δ/40 on the same
+  realization, 5 s) and `ẋ = −10x + w` at Δ = 10 ms (a plant at the rule-of-thumb limit,
+  Δ = τ/10; the variance at the sample instants against `W / 2a`, and the path error):
+
+  | Scheme | Loop, 20 s | Loop path error | Fast plant Var/(W/2a) | Fast plant path error |
+  | --- | --- | --- | --- | --- |
+  | RK4, dt = Δ (the default) | 1.1 s | 0.07% | 0.972 | 6.3% |
+  | RK4, dt = Δ/2 | 2.5 s | 0.04% | 0.985 | 3.4% |
+  | RK4, dt = Δ/5 | 6.1 s | 0.02% | 0.993 | 1.3% |
+  | RK4, dt = Δ/10 | 11.3 s | 0.01% | 0.997 | 0.6% |
+  | Euler, dt = Δ | 0.3 s | 1.9% | 1.055 | 3.8% |
+  | Euler, dt = Δ/10 | 2.9 s | 0.19% | 1.005 | 0.4% |
+  | adaptive SciPy, zero-order hold | 12.3 s | 1.6% | 1.012 | 10.1% |
+  | adaptive SciPy, linear hold | 4.7 s | 0.38% | 0.950 | 1.3% |
+
+  One step per sample is as fast as the drawn-table block was under the adaptive solver
+  (about 1.2 s), and on the teaching loop its path error is a tenth of a percent; the finer
+  steps buy accuracy only on a plant at the resolution limit, where `dt = Δ/10` is one
+  keyword away. On JAX every row is under a second. A user-named solver or `dt` wins; a
+  fixed `dt` that does not divide Δ warns (D18).
 - A fixed step coarser than Δ reads the right signal and gets the wrong physics: it holds one
   sample for its whole step, so the intensity it feels is multiplied by `dt / Δ` (Euler on
   `ẋ = −x + w`, theory 0.0100: Var[x] = 0.0098, 0.0099, 0.0205, 0.0523 at dt = Δ/2, Δ, 2Δ, 5Δ).
@@ -619,7 +637,8 @@ Decided 2026-09-30 (maintainer), from the decision batch on A2–A10 of §10:
   block adds no check); the docstring and the release note carry `psd = var × sample_period`. A
   library-wide key check on leaf params is a Later row. `psd = 0` and a semidefinite `psd` are
   legal (element-wise root for a diagonal); a negative seed is refused.
-- **D16. A noisy diagram picks fixed-step RK4 at `Δ / 10` by itself.** The block publishes
+- **D16. A noisy diagram picks fixed-step RK4 on a divisor of its period by itself** (one step
+  per sample by default, measured 2026-09-30, §4). The block publishes
   `Δ` as `solver_info["smallest_time_constant"]` and as `solver_info["sample_period"]` (a
   float gathered as a minimum, since a boolean would lose Δ under a faster plant; landed so);
   `select_solver` maps a held signal to `rk4_fixedsteps` when no solver is named, and the
@@ -710,8 +729,8 @@ lands. The acceptance test of every step is its deterministic twin (D23).
      `simulation/simulator.py`: `smallest_time_constant = Δ` and `sample_period = Δ` on the
      block, gathered by the diagram; `select_solver` maps a held signal to `rk4_fixedsteps`
      (after the discontinuous check, which wins when both are set); the automatic step is the
-     largest `Δ / n` at or under `0.1 × τ_min`, ten steps per sample when no time constant is
-     declared; the integrators are untouched (`sample_index`'s
+     largest `Δ / n` at or under `0.1 × τ_min`, one step per sample on a smooth loop when no
+     time constant is declared; the integrators are untouched (`sample_index`'s
      relative tolerance absorbs the accumulated `t + dt`); a user `dt` that does not divide Δ
      warns (D18); the block warns when JAX is not in 64-bit.
   4. *The analysis verbs* (D17): `System.realize(None)` gathered over subsystems in
@@ -728,7 +747,7 @@ lands. The acceptance test of every step is its deterministic twin (D23).
      test of TODO A5 (editing params changes the next simulation, no `refresh()`).
   Done when: the twin test passes (the simulated variance at the sample instants against
   `A P + P Aᵀ + B_w W B_wᵀ = 0`, within one realization's sampling error), the two cipher pin
-  tests pass, a plain `compute_trajectory()` on `diagram_noise_ports`'s loop runs RK4 at `Δ / 10`
+  tests pass, a plain `compute_trajectory()` on `diagram_noise_ports`'s loop runs RK4 at `dt = Δ`
   with no argument, `linearize` of that loop returns the noise-free `A`, the three demos and the
   three notebooks run, and `pytest` is green.
 - [ ] **RN-2 Distributions read `params`** (R1, D9, D12): `Gaussian(cov=)`, `cov` on every law,

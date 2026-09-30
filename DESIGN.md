@@ -650,7 +650,8 @@ deliberately not provided in v0.1.
   controller's period, the solver's step. A block publishes `Δ` as
   `solver_info["sample_period"]` (a diagram gathers the minimum) and as its time constant;
   with no solver named the simulator takes fixed-step RK4 at the largest `Δ / n` at or under
-  the smooth policy's step, ten steps per sample when no block declares a time constant (the
+  the smooth policy's step, one step per sample when no block declares a time constant, since
+  the period is the resolution the user chose, and `dt` buys a finer one (the
   realtime simulator reads only the time constant). A step that does not divide `Δ`, a forced
   adaptive solver, two blocks sharing a seed, and a declared disturbance the stepped tools
   never read are announced. Kalman reads `Q = B_w W B_wᵀ`, `R = D_v V D_vᵀ` for the

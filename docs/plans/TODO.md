@@ -658,7 +658,7 @@ One line each; open a plan doc only when a design needs a writeup.
   `PlanningProblem.metadata` documented or retired (scan: planning#14; ROADMAP §6).
 - A fixed-step RK4 that samples held sources once per step, so the four stages read one
   sample and the block route equals the port route (randomness.md §10 A8, D18): fourth order
-  with no boundary error at `dt = Δ`, ten times fewer evaluations than the `Δ / 10` default.
+  with no boundary error at `dt = Δ`, one draw per step instead of four.
   Deferred 2026-09-30 (the randomness API lands first; it touches `compile` and the solvers);
   worth it only if a twin test shows the first-order bias.
 - A key check on leaf params (a `validate_params` hook on `System`, no-op by default, called
