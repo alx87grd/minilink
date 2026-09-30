@@ -160,6 +160,21 @@ class System(SharedSystemFacades):
         """
         return
 
+    #: Whether the block draws random numbers from a seed in its ``params``.
+    is_random = False
+
+    def realize(self, key):
+        """
+        The params of one realization of the block's randomness under ``key``.
+
+        A block with no randomness returns its ``params`` unchanged. A random
+        block returns a copy with a fresh seed derived from ``key``, or with
+        ``seed=None``, the mean, when ``key`` is ``None``. A diagram realizes
+        every subsystem, each under its own stream named by its id, so the
+        result nests like :attr:`params` and can be assigned to it.
+        """
+        return self.params
+
     # Structural Model API
 
     @property

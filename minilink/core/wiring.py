@@ -15,6 +15,7 @@ from typing import TYPE_CHECKING
 import numpy as np
 
 from minilink.core.backends import array_module
+from minilink.core.distributions import child_seed
 from minilink.core.signals import OutputPort, VectorSignal
 from minilink.core.system import DEFAULT_SMALLEST_TIME_CONSTANT
 
@@ -163,6 +164,15 @@ def feedthrough_inputs(diagram, sys_id, port_id) -> tuple[str, ...]:
                 stack.append(source)
 
     return tuple(input_id for input_id in diagram.inputs if input_id in reached)
+
+
+def iter_subsystems(diagram, prefix=()):
+    """Yield ``(id_path, subsystem)`` for every block of a diagram, nested diagrams included."""
+    for sys_id, subsystem in diagram.subsystems.items():
+        path = (*prefix, sys_id)
+        yield path, subsystem
+        if hasattr(subsystem, "subsystems"):
+            yield from iter_subsystems(subsystem, path)
 
 
 class DiagramOutputPort(OutputPort):
@@ -521,6 +531,18 @@ class WiredDiagramMixin:
             return
         for sys_id, subsystem_params in value.items():
             self.subsystems[sys_id].params = subsystem_params
+
+    @property
+    def is_random(self):
+        """Whether any subsystem draws random numbers from a seed in its ``params``."""
+        return any(subsystem.is_random for subsystem in self.subsystems.values())
+
+    def realize(self, key):
+        """Nested params with every random block realized under its own stream, named by its id."""
+        return {
+            sys_id: subsystem.realize(None if key is None else child_seed(key, sys_id))
+            for sys_id, subsystem in self.subsystems.items()
+        }
 
     def subsystem_params(self, params, sys_id):
         """Route nested diagram params to one subsystem (strict contract).

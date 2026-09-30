@@ -146,3 +146,102 @@ def test_the_held_train_reproduces_the_lyapunov_variance():
         )  # after five time constants, at the sample instants
     variance = np.var(np.concatenate(samples))
     assert abs(variance / P - 1.0) < 0.15
+
+
+# --- realizations: one key per experiment, the mean for analysis ---
+
+
+def noisy_loop(seed_w=1, seed_v=2):
+    from minilink import (
+        DiagramSystem,
+        ImpedanceController,
+        PendulumWithNoisePort,
+        Step,
+        WhiteNoise,
+    )
+
+    loop = DiagramSystem()
+    loop.add_subsystem(Step(final_value=1.0, step_time=10.0), "step")
+    loop.add_subsystem(ImpedanceController(Kp=100.0, Kd=50.0), "controller")
+    loop.add_subsystem(PendulumWithNoisePort(), "plant")
+    loop.add_subsystem(WhiteNoise(seed=seed_w), "process_noise")
+    loop.add_subsystem(WhiteNoise(seed=seed_v), "measurement_noise")
+    loop.connect("step", "y", "controller", "r")
+    loop.connect("controller", "u", "plant", "u")
+    loop.connect("plant", "y", "controller", "y")
+    loop.connect("process_noise", "y", "plant", "w")
+    loop.connect("measurement_noise", "y", "plant", "v")
+    return loop
+
+
+def test_realize_none_is_the_mean_nested_like_params():
+    loop = noisy_loop()
+    nominal = loop.realize(None)
+    assert loop.is_random and not loop.subsystems["plant"].is_random
+    assert set(nominal) == set(loop.params)
+    assert nominal["process_noise"]["seed"] is None
+    assert nominal["measurement_noise"]["seed"] is None
+    assert (
+        nominal["plant"] is loop.subsystems["plant"].params
+    )  # untouched, by reference
+    assert loop.params["process_noise"]["seed"] == 1  # the block's own seed stays
+
+
+def test_realize_key_names_each_stream_so_an_added_block_moves_no_other():
+    loop = noisy_loop()
+    drawn = loop.realize(3)
+    seeds = {drawn["process_noise"]["seed"], drawn["measurement_noise"]["seed"]}
+    assert len(seeds) == 2 and None not in seeds
+    assert drawn == loop.realize(3)
+    assert drawn["process_noise"]["seed"] != loop.realize(4)["process_noise"]["seed"]
+
+    from minilink import WhiteNoise
+
+    loop.add_subsystem(WhiteNoise(seed=9), "another")
+    again = loop.realize(3)
+    assert again["process_noise"] == drawn["process_noise"]
+    assert again["measurement_noise"] == drawn["measurement_noise"]
+
+    loop.params = again  # a realization is assignable, like params
+    assert (
+        loop.subsystems["process_noise"].params["seed"]
+        == again["process_noise"]["seed"]
+    )
+
+
+def test_analysis_verbs_see_the_noise_at_its_mean():
+    from minilink.analysis import find_equilibrium, jacobian
+    from minilink.control.lqr import lqr_at_operating_point
+
+    noisy, quiet = noisy_loop(), noisy_loop(None, None)
+    A = jacobian(noisy, "f", "x", method="fd")
+    np.testing.assert_allclose(A, jacobian(quiet, "f", "x", method="fd"))
+    assert np.all(np.isfinite(A))
+
+    x_eq = find_equilibrium(noisy, noisy.x0)
+    np.testing.assert_allclose(x_eq, find_equilibrium(quiet, quiet.x0))
+
+    from minilink import DiagramSystem, PendulumWithNoisePort, WhiteNoise
+
+    plant = DiagramSystem()
+    plant.add_subsystem(PendulumWithNoisePort(), "plant")
+    plant.add_subsystem(WhiteNoise(seed=5), "sensor_noise")
+    plant.connect("sensor_noise", "y", "plant", "v")
+    plant.add_input_port("u", dim=1)
+    plant.connect("input", "u", "plant", "u")
+    assert plant.is_random
+    K = lqr_at_operating_point(plant, np.zeros(2), np.eye(2), np.eye(1), method="fd")
+    assert np.all(np.isfinite(K.params["K"]))
+
+
+def test_a_problem_on_a_random_system_plans_against_the_mean():
+    from minilink import Pendulum
+    from minilink.planning.problems import PlanningProblem
+
+    noisy = noisy_loop()
+    problem = PlanningProblem(noisy, x_start=noisy.x0)
+    assert problem.params.system["process_noise"]["seed"] is None
+    assert problem.params.system["plant"] is noisy.subsystems["plant"].params
+
+    quiet = PlanningProblem(Pendulum(), x_start=np.zeros(2))
+    assert quiet.params.system is None
