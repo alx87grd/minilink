@@ -659,5 +659,9 @@ One line each; open a plan doc only when a design needs a writeup.
   with no boundary error at `dt = Δ`, ten times fewer evaluations than the `Δ / 10` default.
   Deferred 2026-09-30 (the randomness API lands first; it touches `compile` and the solvers);
   worth it only if a twin test shows the first-order bias.
+- A key check on leaf params (a `validate_params` hook on `System`, no-op by default, called
+  where diagram params are validated): today a typo or a retired key in any block's params is
+  ignored silently. Raised with the noise block's retired keys (randomness.md D15) and declined
+  there 2026-09-30 in favour of the library-wide behaviour; a question for the whole library.
 - Declined 2026-09-05 (do not re-propose): scalar / list signal bounds and a coercing `x0`;
   scalar `Q` / `R` / `S` in `QuadraticCost.from_system`.

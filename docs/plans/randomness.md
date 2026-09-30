@@ -613,9 +613,11 @@ Decided 2026-09-30 (maintainer), from the decision batch on A2–A10 of §10:
 - **D15. The constructor keeps `p` first; the rest is keyword-only.**
   `WhiteNoise(p=1, *, psd=1.0, sample_period=0.01, seed=0, hold="zoh")`, a scalar `psd` meaning
   `W = psd·I`; params `{seed, sample_period, psd}`. `mean` is dropped (white noise is zero-mean;
-  a bias is a `Sum` with a `Source`). Writing a retired key (`var`, `mean`, `t0`, `tf`) raises at
-  validation with the hint `psd = var × sample_period`, never in `h`. `psd = 0` and a
-  semidefinite `psd` are legal (element-wise root for a diagonal); a negative seed is refused.
+  a bias is a `Sum` with a `Source`). A retired key (`var`, `mean`, `t0`, `tf`) is ignored like
+  any unknown key, as in every block (decided 2026-09-30: no leaf validates its keys, and the
+  block adds no check); the docstring and the release note carry `psd = var × sample_period`. A
+  library-wide key check on leaf params is a Later row. `psd = 0` and a semidefinite `psd` are
+  legal (element-wise root for a diagonal); a negative seed is refused.
 - **D16. A noisy diagram picks fixed-step RK4 at `Δ / 10` by itself.** The block publishes
   `Δ` as `solver_info["smallest_time_constant"]` and `solver_info["held_signal"] = True`;
   `select_solver` maps a held signal to `rk4_fixedsteps` when no solver is named, and the
@@ -691,8 +693,8 @@ lands. The acceptance test of every step is its deterministic twin (D23).
      the seed staying an integer through a parameter-family vmap).
   2. *The block* in `blocks/sources.py`: the D15 constructor and params, `h` as in §4 with the
      `hold` keyword, `seed = None` returning the mean (D17), `psd = 0` legal, a negative seed
-     refused, retired keys refused at validation with `psd = var × sample_period`, the 32-bit
-     warning, the shared-seed warning at compile. `refresh()`, `var`, `mean`, `t0`, `tf` removed
+     refused, the conversion `psd = var × sample_period` in the docstring and the release note,
+     the 32-bit warning, the shared-seed warning at compile. `refresh()`, `var`, `mean`, `t0`, `tf` removed
      (a release note). `show_signal(t0=, tf=)` keeps its arguments and evaluates `h` on a grid.
   3. *The solver hints* (D16) in `blocks/sources.py`, `core/wiring.py` and
      `simulation/simulator.py`: `smallest_time_constant = Δ` and `held_signal = True` on the
