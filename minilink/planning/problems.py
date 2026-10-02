@@ -8,7 +8,7 @@ discretization choices belong to solver packages, not the problem object.
 """
 
 from collections.abc import Mapping
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from types import MappingProxyType
 
 import numpy as np
@@ -142,6 +142,8 @@ class PlanningProblem:
         X0 = SingletonSet(x_start) if self.X0 is None else self.X0
         Xf = SingletonSet(x_goal) if self.Xf is None and x_goal is not None else self.Xf
         params = self.coerce_params(self.params)
+        if params.system is None and self.sys.is_random:
+            params = replace(params, system=self.sys.realize(None))  # noise at its mean
         metadata = self.coerce_metadata(self.metadata)
 
         self.require_type("X", X, Set)

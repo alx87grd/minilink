@@ -280,61 +280,102 @@ from minilink.blocks.sources import WhiteNoise
 
 
 class TestWhiteNoiseSource(unittest.TestCase):
-    def test_same_seed_same_refresh_same_output(self):
+    def signal(self, noise, times, params=None):
+        empty = np.array([])
+        return np.array([noise.h(empty, empty, t, params) for t in times])
+
+    def test_same_seed_same_signal_and_a_different_seed_differs(self):
         times = np.linspace(0.0, 2.0, 200)
-        n1 = WhiteNoise(1)
-        n1.params["seed"] = 123
-        n1.params["sample_period"] = 0.01
-        n1.params["t0"] = -1.0
-        n1.params["tf"] = 3.0
-        n1.refresh()
-        y1 = np.array([n1.h(np.array([]), np.array([]), t)[0] for t in times])
-        n2 = WhiteNoise(1)
-        n2.params["seed"] = 123
-        n2.params["sample_period"] = 0.01
-        n2.params["t0"] = -1.0
-        n2.params["tf"] = 3.0
-        n2.refresh()
-        y2 = np.array([n2.h(np.array([]), np.array([]), t)[0] for t in times])
-        self.assertTrue(np.allclose(y1, y2))
+        y1 = self.signal(WhiteNoise(1, seed=123), times)
+        y2 = self.signal(WhiteNoise(1, seed=123), times)
+        y3 = self.signal(WhiteNoise(1, seed=124), times)
+        np.testing.assert_array_equal(y1, y2)
+        self.assertFalse(np.allclose(y1, y3))
 
-    def test_different_seed_changes_output(self):
-        times = np.linspace(0.0, 2.0, 200)
-        n1 = WhiteNoise(1)
-        n1.params["seed"] = 1
-        n1.refresh()
-        y1 = np.array([n1.h(np.array([]), np.array([]), t)[0] for t in times])
-        n2 = WhiteNoise(1)
-        n2.params["seed"] = 2
-        n2.refresh()
-        y2 = np.array([n2.h(np.array([]), np.array([]), t)[0] for t in times])
-        self.assertFalse(np.allclose(y1, y2))
+    def test_the_mean_for_a_none_seed_or_a_zero_intensity(self):
+        times = np.linspace(0.0, 1.0, 50)
+        np.testing.assert_array_equal(self.signal(WhiteNoise(2, seed=None), times), 0.0)
+        np.testing.assert_array_equal(self.signal(WhiteNoise(2, psd=0.0), times), 0.0)
+        with self.assertRaises(ValueError):
+            WhiteNoise(1, seed=-1)
 
-    def test_continuity_with_interpolation(self):
-        n = WhiteNoise(1)
-        n.params["seed"] = 77
-        n.params["sample_period"] = 0.05
-        n.params["t0"] = 0.0
-        n.params["tf"] = 1.0
-        n.refresh()
-        t_left = 0.5 - 1e-06
-        t_right = 0.5 + 1e-06
-        y_left = n.h(np.array([]), np.array([]), t_left)[0]
-        y_right = n.h(np.array([]), np.array([]), t_right)[0]
-        self.assertLess(abs(y_right - y_left), 0.01)
+    def test_per_sample_covariance_is_the_intensity_over_the_period(self):
+        period = 0.02
+        instants = period * np.arange(20_000) + 0.5 * period
+        for psd in ([1.0, 4.0], [[1.0, 0.6], [0.6, 2.0]]):
+            noise = WhiteNoise(2, psd=psd, sample_period=period, seed=5)
+            W = np.diag(psd) if np.ndim(psd) == 1 else np.asarray(psd)
+            samples = self.signal(noise, instants)
+            scale = np.max(W / period)
+            np.testing.assert_allclose(
+                np.cov(samples.T), W / period, rtol=0.06, atol=0.02 * scale
+            )
 
-    def test_refresh_horizon_changes_edge_values(self):
-        n = WhiteNoise(1)
-        n.params["seed"] = 10
-        n.params["t0"] = -100.0
-        n.params["tf"] = 100.0
-        n.refresh()
-        y_at_minus_five = n.h(np.array([]), np.array([]), -5.0)[0]
-        n.params["t0"] = 0.0
-        n.params["tf"] = 1.0
-        n.refresh()
-        y_left_clamped = n.h(np.array([]), np.array([]), -5.0)[0]
-        self.assertNotEqual(y_at_minus_five, y_left_clamped)
+    def test_editing_params_changes_the_next_signal_without_refresh(self):
+        noise = WhiteNoise(1, seed=0)
+        times = np.linspace(0.0, 1.0, 20)
+        before = self.signal(noise, times)
+        noise.params["seed"] = 1
+        self.assertFalse(np.allclose(before, self.signal(noise, times)))
+        noise.params["psd"] = 4.0
+        scaled = self.signal(noise, times)
+        noise.params["psd"] = 1.0
+        np.testing.assert_allclose(scaled, 2.0 * self.signal(noise, times))
+        edited = self.signal(WhiteNoise(1, seed=0), times, dict(noise.params, seed=1))
+        self.assertFalse(np.allclose(before, edited))
+
+    def test_zero_order_hold_is_constant_and_the_linear_hold_continuous(self):
+        zoh = WhiteNoise(1, sample_period=0.1, seed=7)
+        inside = self.signal(zoh, [0.30, 0.34, 0.39])
+        np.testing.assert_array_equal(inside[0], inside[1])
+        np.testing.assert_array_equal(inside[0], inside[2])
+        self.assertNotEqual(inside[0, 0], self.signal(zoh, [0.4])[0, 0])
+
+        linear = WhiteNoise(1, sample_period=0.1, seed=7, hold="linear")
+        left, right = self.signal(linear, [0.4 - 1e-9, 0.4 + 1e-9])[:, 0]
+        self.assertLess(abs(left - right), 1e-6)
+        with self.assertRaises(ValueError):
+            WhiteNoise(1, hold="cubic")
+
+    @pytest.mark.optional
+    @pytest.mark.jax
+    def test_the_same_signal_on_numpy_and_jax_and_a_traced_params_family(self):
+        pytest.importorskip("jax")
+        from minilink.core.backends import require_jax, require_jax_numpy
+
+        jax, jnp = require_jax(), require_jax_numpy()
+        noise = WhiteNoise(2, psd=[1.0, 2.0], sample_period=0.05, seed=9)
+        empty = np.array([])
+        times = np.linspace(0.0, 1.0, 40)
+        on_numpy = self.signal(noise, times)
+        on_jax = np.array([noise.h(empty, empty, jnp.asarray(t)) for t in times])
+        np.testing.assert_array_equal(on_numpy, on_jax)
+
+        jitted = jax.jit(lambda t, params: noise.h(empty, empty, t, params))
+        np.testing.assert_allclose(
+            jitted(0.3, noise.params), noise.h(empty, empty, 0.3)
+        )
+
+        # a family of three intensities, the seed a shared integer leaf
+        family = dict(
+            noise.params, psd=jnp.asarray([[1.0, 2.0], [4.0, 8.0], [9.0, 18.0]])
+        )
+        axes = ({"seed": None, "sample_period": None, "psd": 0},)
+        ws = jax.vmap(lambda params: noise.h(empty, empty, 0.3, params), in_axes=axes)(
+            family
+        )
+        np.testing.assert_allclose(ws[1], 2.0 * ws[0])
+        np.testing.assert_allclose(ws[2], 3.0 * ws[0])
+
+    def test_a_loop_with_noise_has_a_finite_params_jacobian(self):
+        from minilink import Pendulum
+        from minilink.analysis import jacobian
+
+        loop = WhiteNoise(1, seed=2) >> Pendulum()
+        J = jacobian(loop, "f", "params", loop.x0, method="fd")
+        for leaf in J.values():
+            for value in leaf.values():
+                self.assertTrue(np.all(np.isfinite(value)))
 
 
 from minilink.blocks.neural import NeuralNetwork

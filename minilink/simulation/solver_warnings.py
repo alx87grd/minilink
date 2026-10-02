@@ -1,4 +1,4 @@
-"""User-facing warnings for discontinuous closed-loop simulation."""
+"""User-facing warnings for discontinuous closed loops and held signals."""
 
 from __future__ import annotations
 
@@ -71,6 +71,46 @@ def collect_discontinuous_solver_notes(
     return notes
 
 
+def collect_held_signal_notes(
+    *,
+    solver_mode: str,
+    solver_info: dict,
+    dt: float | None,
+    user_solver: str | None,
+    user_specified_dt: bool,
+) -> list[str]:
+    """
+    Build advisory notes when a block holds a signal over a sample period.
+
+    Returns an empty list when no subsystem publishes ``sample_period``.
+    """
+    period = solver_info.get("sample_period")
+    if period is None:
+        return []
+
+    notes = []
+    if user_solver is not None and (
+        user_solver == "scipy" or user_solver.startswith("scipy_")
+    ):
+        notes.append(
+            f"Forced {user_solver} on a signal held over {period:g} s: adaptive "
+            "stepping fights the jump at every sample; rk4_fixedsteps with a dt "
+            "that divides the sample period is faster and more accurate."
+        )
+    if user_specified_dt and dt is not None and not solver_mode.startswith("scipy"):
+        steps_per_sample = period / dt
+        if abs(steps_per_sample - round(steps_per_sample)) > 1e-9 * max(
+            1.0, steps_per_sample
+        ):
+            notes.append(
+                f"dt={dt:g} does not divide the sample period {period:g} s: a step "
+                "straddles a sample boundary, or holds one sample over several, and "
+                "the plant feels an intensity scaled by dt / sample_period; use "
+                "dt = sample_period / n."
+            )
+    return notes
+
+
 def emit_discontinuous_solver_warnings(
     *,
     solver_mode: str,
@@ -82,7 +122,7 @@ def emit_discontinuous_solver_warnings(
     verbose: bool = False,
 ) -> list[str]:
     """
-    Emit :class:`UserWarning` messages for discontinuous closed loops.
+    Emit :class:`UserWarning` messages for discontinuous closed loops and held signals.
 
     When ``verbose`` is true, returns notes for the setup panel and does **not**
     call :func:`warnings.warn` (avoids duplicate output after the preamble).
@@ -94,6 +134,13 @@ def emit_discontinuous_solver_warnings(
         user_solver=user_solver,
         user_specified_dt=user_specified_dt,
         verbose=verbose,
+    )
+    notes += collect_held_signal_notes(
+        solver_mode=solver_mode,
+        solver_info=solver_info,
+        dt=dt,
+        user_solver=user_solver,
+        user_specified_dt=user_specified_dt,
     )
     if not notes:
         return notes

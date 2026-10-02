@@ -1,9 +1,10 @@
 # One convention for randomness
 
-Status: design agreed 2026-09-26 (§8, D1–D12), amended 2026-09-30 (D13); not started.
-Reviewed 2026-09-30: factual corrections applied in place; ten amendments proposed in §10.
-A1 is ruled (D13: one counter generator on both backends, which amends D11); A2–A10 await
-the maintainer's ruling.
+Status: design agreed 2026-09-26 (§8, D1–D12), amended 2026-09-30 (D13–D24); implementation
+plan in §9; RN-1 landed 2026-09-30, RN-2 to RN-6 open.
+Reviewed 2026-09-30: factual corrections applied in place; the ten amendments of §10 are ruled
+(A1 as D13, A2–A10 as D14–D23) and the maintainer added D24 (the evaluator simulates the
+closed-loop diagram). §10 stays as the record of the findings.
 Rungs (decided 2026-09-26): RN-1 (`WhiteNoise`) in v0.2 wave B, the prerequisite of B3
 (`estimation/`, P4); RN-2 in v0.2 wave A, with A5; RN-3 with its first consumer (P11 if a GRO501
 notebook shows sampled sensor noise, else v0.3); RN-4 and RN-5 together in v0.3, after the fall
@@ -34,9 +35,12 @@ time**, and **where a random draw happens** in a library whose equation paths ar
 - **A problem declares noise on ports**, `disturbances={"w": WhiteNoise(psd=W)}`; a noise block
   already inside the system also works. Planners see the nominal port; the RL environment and
   the evaluator draw on it.
-- **The Monte Carlo evaluator holds a fixed test set.** Starts, parameter values and seeds are
-  drawn once, on NumPy; the noise follows from the seeds, the same on every backend. Every law
-  is scored on the same trials, whatever backend rolls it out.
+- **The Monte Carlo evaluator simulates the closed-loop diagram on a fixed test set.** It
+  builds `ctl @ sys` with the disturbance blocks wired on their ports, draws the trials once
+  (starts, parameter values, seeds), and runs that diagram on every trial, batched. Any
+  controller, any noise block, any parameter draw goes through the one simulation path.
+- **A noisy diagram picks its own solver.** The noise block publishes its period as the
+  solver hint, so a plain `compute_trajectory()` runs fixed-step RK4 at `dt = Δ`.
 - **LQG reads the same numbers the simulation draws from**: `Q = B_w W B_wᵀ`, `R = V` for the
   continuous filter; `Q_d = B_w W B_wᵀ Δ`, `R_d = V / Δ` for the discrete one.
 
@@ -209,12 +213,13 @@ time `τ`. The textbook handles it by augmenting the state with `z`; so does a d
 - **R6. Seeds enter at a tool's boundary as an integer, or live in a random block's params.**
   No global RNG anywhere (Constitution §4.4; JAX has none). Every `sample` takes a key: there
   is no unseeded draw in the library. A tool may take `seed=None` for fresh entropy and then
-  reports the seed it drew, so the run can be replayed. Inside a tool one generator or one JAX
-  key is split into one independent stream per consumer, on both backends (`Generator.spawn` on
-  NumPy, written once in `realize`). A `Distribution.sample` gives different numbers on NumPy
-  and JAX for the same seed, with the same law; the evaluator removes that difference by drawing
-  its starts and parameter values once on NumPy (§5). A noise block gives the same signal on
-  both (D13).
+  reports the seed it drew, so the run can be replayed. Inside a tool one key is derived into one
+  independent stream per consumer, each from a stable name (a subsystem's id path, a parameter's
+  name) with the library's own cipher, `child = F(key, crc32(name))`, the same on both backends
+  (D21): adding a random block never reshuffles the others. A `Distribution.sample` gives
+  different numbers on NumPy and JAX for the same seed, with the same law; the evaluator removes
+  that difference by drawing its starts and parameter values once on NumPy (§5). A noise block
+  gives the same signal on both (D13). A `seed` of `None` is the mean: no draw (D17).
 
 ## 4. The noise block
 
@@ -324,6 +329,34 @@ holds it while the plant integrates inside the period.
   rough signal defeats step-size control however it is smoothed.
 - A fixed step aligned to Δ is the fastest and the most accurate: the recommended setup for a
   noisy simulation, and what the warning points to.
+- **The default (D16, as landed).** The block publishes `solver_info["sample_period"] = Δ`
+  (a float; a diagram gathers the minimum, so the period survives a plant faster than the
+  noise) and `Δ` as its time constant. With no solver named, `select_solver` returns
+  `rk4_fixedsteps` for a held signal, and the automatic grid steps at the largest `Δ / n` at or
+  under the policy's `0.1 × τ_min`; on a smooth loop where no block declares a time constant
+  (the library default is no declaration) it is one step per sample,
+  `HELD_SIGNAL_STEPS_PER_SAMPLE = 1`: the period is the resolution the user chose, and `dt`
+  buys a finer one. A discontinuous loop keeps its own scale. Measured 2026-09-30 on NumPy,
+  the five-block noise demo (20 s, Δ = 10 ms; the path error against RK4 at Δ/40 on the same
+  realization, 5 s) and `ẋ = −10x + w` at Δ = 10 ms (a plant at the rule-of-thumb limit,
+  Δ = τ/10; the variance at the sample instants against `W / 2a`, and the path error):
+
+  | Scheme | Loop, 20 s | Loop path error | Fast plant Var/(W/2a) | Fast plant path error |
+  | --- | --- | --- | --- | --- |
+  | RK4, dt = Δ (the default) | 1.1 s | 0.07% | 0.972 | 6.3% |
+  | RK4, dt = Δ/2 | 2.5 s | 0.04% | 0.985 | 3.4% |
+  | RK4, dt = Δ/5 | 6.1 s | 0.02% | 0.993 | 1.3% |
+  | RK4, dt = Δ/10 | 11.3 s | 0.01% | 0.997 | 0.6% |
+  | Euler, dt = Δ | 0.3 s | 1.9% | 1.055 | 3.8% |
+  | Euler, dt = Δ/10 | 2.9 s | 0.19% | 1.005 | 0.4% |
+  | adaptive SciPy, zero-order hold | 12.3 s | 1.6% | 1.012 | 10.1% |
+  | adaptive SciPy, linear hold | 4.7 s | 0.38% | 0.950 | 1.3% |
+
+  One step per sample is as fast as the drawn-table block was under the adaptive solver
+  (about 1.2 s), and on the teaching loop its path error is a tenth of a percent; the finer
+  steps buy accuracy only on a plant at the resolution limit, where `dt = Δ/10` is one
+  keyword away. On JAX every row is under a second. A user-named solver or `dt` wins; a
+  fixed `dt` that does not divide Δ warns (D18).
 - A fixed step coarser than Δ reads the right signal and gets the wrong physics: it holds one
   sample for its whole step, so the intensity it feels is multiplied by `dt / Δ` (Euler on
   `ẋ = −x + w`, theory 0.0100: Var[x] = 0.0098, 0.0099, 0.0205, 0.0523 at dt = Δ/2, Δ, 2Δ, 5Δ).
@@ -436,6 +469,19 @@ a test compares with a tolerance); the "one seed, two streams" warning and `comp
 forcing go; any trial replays in the continuous `Simulator`. Cost: a few numbers per trial
 (80 kB of seeds for 10,000 trials, against 320 MB for the noise values of 10,000 × 1,000 × 4).
 The options weighed are in §7. RL training stays key-threaded in JAX, where cross-backend identity buys nothing.
+
+**The evaluator simulates the closed-loop diagram (D24).** A trial is a realization, and a
+realization is simulated by the one path every diagram uses. So the evaluator builds the loop
+as a diagram, `ctl @ sys` for a feedback block or `source >> sys` for an open-loop law, wires
+each `disturbances` signal onto its port, and simulates that diagram on `ev.trials`:
+`rollout_batch` over the family of `(x0, params)` on JAX, a loop of `Simulator` runs on NumPy,
+RK4 at the automatic grid of D16. The cost is scored on the plant's own trajectory
+(`trajectory_of`), as the `simulator` backend does today. There is no static-law assumption
+left: a `DynamicController`, the observer-based compensator of P4, a `Computer @ plant` sampled
+loop (on the NumPy path until the hybrid seam batches) and a noise block already inside `sys`
+all go through it. A continuous law acts continuously; a sampled law is a `Computer`. The
+held-input rollout of `RolloutEnvironment` stays the learner's stepped view and is no longer the
+evaluator's.
 
 ## 6. The six uses, one page
 
@@ -576,56 +622,200 @@ Decided 2026-09-30 (maintainer), from the review of §10:
   D11: the test set holds no noise values. It lands with RN-1, so seeded realizations change
   once.
 
-## 9. Steps
+Decided 2026-09-30 (maintainer), from the decision batch on A2–A10 of §10:
 
-Order: RN-1 first (it unblocks P4); RN-2 before RN-3; RN-4 before RN-5; RN-6 closes each step's
-docs as it lands. Rungs as in the header: RN-1 and RN-2 in v0.2, RN-3 with its first consumer,
-RN-4 and RN-5 in v0.3. Each step that changes draws records a seeded baseline before and pins the new
-numbers with a test after (RULES 7.7, AGENTS refactor recipe).
+- **D14. RN-1 lands now, in v0.2 wave B**, with every cell it touches rewritten in the same
+  commit (`tutorial/00_core.ipynb` 27, `tutorial/01_blocks.ipynb` 3,
+  `udes_gro501/cartpole_dynamic_controller.ipynb` 11, the three demos, the four tests), so
+  nothing a student opens from `main` breaks. Finding 10 stands: P4's array API does not need
+  it; its Kalman demo and the GRO501 notebook, the first consumers of `psd`, do.
+- **D15. The constructor keeps `p` first; the rest is keyword-only.**
+  `WhiteNoise(p=1, *, psd=1.0, sample_period=0.01, seed=0, hold="zoh")`, a scalar `psd` meaning
+  `W = psd·I`; params `{seed, sample_period, psd}`. `mean` is dropped (white noise is zero-mean;
+  a bias is a `Sum` with a `Source`). A retired key (`var`, `mean`, `t0`, `tf`) is ignored like
+  any unknown key, as in every block (decided 2026-09-30: no leaf validates its keys, and the
+  block adds no check); the docstring and the release note carry `psd = var × sample_period`. A
+  library-wide key check on leaf params is a Later row. `psd = 0` and a semidefinite `psd` are
+  legal (element-wise root for a diagonal); a negative seed is refused.
+- **D16. A noisy diagram picks fixed-step RK4 on a divisor of its period by itself** (one step
+  per sample by default, measured 2026-09-30, §4). The block publishes
+  `Δ` as `solver_info["smallest_time_constant"]` and as `solver_info["sample_period"]` (a
+  float gathered as a minimum, since a boolean would lose Δ under a faster plant; landed so);
+  `select_solver` maps a held signal to `rk4_fixedsteps` when no solver is named, and the
+  automatic grid's existing `0.1 × τ_min` policy sets the step (§4): with a held signal the
+  automatic step is the largest `Δ / n`, `n` an integer, at or under `0.1 × τ_min`, so a plant
+  faster than the noise still steps on a grid that divides Δ. Moved from RN-4 into RN-1 so
+  the default run never degrades. A named solver or `dt` wins. The block's hint follows
+  `params["sample_period"]`. The flag says what the signal is, not what to do: any block whose
+  output is piecewise constant on a known grid may set it.
+- **D17. `seed = None` is the mean.** `sys.realize(None)` returns the nominal params, every
+  random block's seed `None` (a leaf-free pytree node, so it traces), and `h` returns zero there.
+  `linearize`, `find_equilibrium`, `transfer_function`, the LQR shortcuts and the deterministic
+  transcriptions apply it themselves: a noisy loop linearizes at `E[w] = 0`, and `psd` stays
+  readable by the Kalman design. It mirrors `RolloutEnvironment.step(key=None)`.
+- **D18. The hold across RK4 stages is accepted as first order in `dt`.** The effect and the
+  rule `dt = Δ / n` are stated in the docstring and DESIGN; a fixed step that does not divide
+  Δ warns; "the left limit at RK4's last stage" leaves RN-4. The integrator is the vanilla
+  fixed-step RK4 as it exists: the block's `h` is evaluated at every stage like any source's, and
+  neither `compile` nor a solver changes (decided 2026-09-30: the randomness API lands first; a
+  solver that samples held sources once per step is a Later row, taken up only if a twin test
+  shows the bias matters).
+- **D19. No silent noise in the stepped tools.** A `disturbances` port that reaches only `h`
+  is refused with a message until a tool reads `y`; the evaluator and the RL environment warn
+  once when `problem.sys` holds a random block, until RN-4 realizes it per trial. With RN-1.
+- **D20. Monte Carlo of an observer-based loop is in scope** for RN-4 and RN-5: the
+  disturbance signals wired onto the plant ports inside the closed loop, `realize(key)` and the
+  parameter draws applied per trial, the loop stepped at the noise grid, a controller with
+  state accepted. D24 makes this the general path rather than a route of the `simulator`
+  backend. Needs P4's compensator ruling for its demo. A JAX batch of the same loop is D24's
+  `rollout_batch`.
+- **D21. One key per episode; streams derived by name.** The episode's realization (start,
+  parameter values, block seeds) is drawn at `reset` and carried, so two episodes never replay
+  one noise (finding 8). `realize` derives each stream from a stable name with the library's
+  own cipher, `child = F(key, crc32(name))`, identical on both backends; `Generator.spawn`
+  and the `numpy>=1.25` floor go. D10 keeps its intent (one independent stream per consumer)
+  with this derivation. `ProblemEnv` realizes at reset; its action space is the action port
+  alone.
+- **D22. A problem pins its declared disturbance ports at their nominal value** for every
+  planner. The bare shortcuts on a multi-input system stay as they are: a two-input plant with
+  no problem is an ordinary MIMO plant, and the user passes `wrt=("u", 0)`.
+- **D23. The review's text amendments are accepted as written**: A2 (the three conditions
+  under which the physics is Δ-free, the bridge table with two periods, a datasheet sensor as
+  `NoiseSource(Gaussian(0, cov=R_d), sample_period=Tₛ)`, `W = n² / 2` for a one-sided density)
+  into §2; A9 (H2 reads `psd`, H∞ reads ports and filters) into §2; A10 (the deterministic
+  twin as the acceptance test of RN-1, P4 and colored noise, the shaping filter's state started
+  from `N(0, W / 2τ)`) into §9. `LowPassFilter(tau=)` is a Later row, not an RN step. The
+  fixed-step loops keep accumulating `t + dt`; the block's `sample_index` absorbs the drift with
+  a relative tolerance (§4, held over 2·10⁶ steps), and 64-bit is required on JAX (A4).
+- **D24. The evaluator is a batched simulation of the closed-loop diagram.** `MonteCarloEvaluator`
+  builds `ctl @ sys` (or `source >> sys`) with the disturbance blocks on their ports, draws
+  `ev.trials` once, and simulates that diagram over the trials: `rollout_batch` on JAX, a loop
+  of `Simulator` runs on NumPy, RK4 at the automatic grid of D16 (§5). It replaces the three
+  hand-written held-input rollouts (`evaluate_jax`, `evaluate_numpy`, `evaluate_simulator`)
+  with one path; `backend` chooses the arrays only. Any controller, any noise block, any
+  parameter draw is a regular diagram simulation. `dt` becomes the simulation step rather than
+  a control period, so the evaluator's numbers change once, in v0.3 with RN-5.
 
-- [ ] **RN-1 `WhiteNoise`** (D1–D5, D8, D13): `sample_index` and `standard_normal` helpers under
-  `# Internal machinery` with the trap tests; the Threefry cipher with its two pin tests (the
-  Random123 vectors, equality with the JAX primitive) and a NumPy against JAX test of the block's
-  signal; `hold`; the shared-seed and 32-bit warnings;
-  `refresh()`, `var`, `t0`, `tf` removed (a release note). Demos `blocks_sources.py`,
-  `diagram_noise_ports.py`, `diagram_shortcuts.py` updated (distinct seeds); the guard test of
-  TODO A5 (editing params changes the next simulation). Unblocks P4.
-  Also in its blast radius (found 2026-09-30): `tutorial/00_core.ipynb` (cell 27),
-  `tutorial/01_blocks.ipynb` (cell 3), the live course notebook
-  `udes_gro501/cartpole_dynamic_controller.ipynb` (cell 11), `tests/unittest/test_blocks.py`
-  (four tests on `refresh()`, `t0`, `tf`), and the block's own `__main__`. The `mean` param's
-  fate and the constructor's first argument are unruled (§10, A4). **[ask — student-facing]**
+## 9. Steps: the implementation plan
+
+Order: RN-1 first (D14: it unblocks P4's Kalman demo, and rewrites the course cell in the same
+commit); RN-2 before RN-3; RN-4 before RN-5; RN-6 closes each step's docs as it lands. Rungs as
+in the header: RN-1 and RN-2 in v0.2, RN-3 with its first consumer, RN-4 and RN-5 in v0.3. Each
+step that changes draws records a seeded baseline before and pins the new numbers with a test
+after (RULES 7.7, AGENTS refactor recipe); each step's math is read next to `dp.py` before it
+lands. The acceptance test of every step is its deterministic twin (D23).
+
+- [x] **RN-1 `WhiteNoise`** (D1–D5, D8, D13–D17, D19). Landed 2026-09-30, five commits on
+  `dev-random`; the noise-free baseline stayed byte-identical through every commit, the twin
+  test holds the Lyapunov variance within its sampling error. Three implementation notes: the
+  hint is the float key `sample_period` (a boolean would lose Δ under a faster plant); the
+  stepped-tools check of D19 warns on a Jacobian probe of `f` at the nominal point rather than
+  refusing, since no port metadata says what `f` reads; `System.realize(key)` landed whole
+  (leaf, block, diagram, both the `None` and the keyed path). The cipher runs on Python
+  integers on NumPy (a draw is 21 µs; array ops on one element were five times slower).
+  `discretize` and the Lyapunov rollouts keep the seeded draw. Unblocks P4's Kalman demo.
+  1. *The cipher.* `threefry_2x32`, `standard_normal(seed, k, p)` and `sample_index(t, Δ)` under
+     `# Internal machinery` of `core/distributions.py`, in Python integers on NumPy and the same
+     function on `jax.numpy`. Tests: the published Random123 vectors (no JAX), equality with
+     `jax.extend.random.threefry_2x32` when JAX is installed, the block's signal NumPy against
+     JAX, and the traps of §4 (a boundary at `t_k = t0 + k·dt` over 2·10⁶ steps, negative time,
+     the seed staying an integer through a parameter-family vmap).
+  2. *The block* in `blocks/sources.py`: the D15 constructor and params, `h` as in §4 with the
+     `hold` keyword, `seed = None` returning the mean (D17), `psd = 0` legal, a negative seed
+     refused, the conversion `psd = var × sample_period` in the docstring and the release note,
+     the 32-bit warning, the shared-seed warning at compile. `refresh()`, `var`, `mean`, `t0`, `tf` removed
+     (a release note). `show_signal(t0=, tf=)` keeps its arguments and evaluates `h` on a grid.
+  3. *The solver hints* (D16) in `blocks/sources.py`, `core/wiring.py` and
+     `simulation/simulator.py`: `smallest_time_constant = Δ` and `sample_period = Δ` on the
+     block, gathered by the diagram; `select_solver` maps a held signal to `rk4_fixedsteps`
+     (after the discontinuous check, which wins when both are set); the automatic step is the
+     largest `Δ / n` at or under `0.1 × τ_min`, one step per sample on a smooth loop when no
+     time constant is declared; the integrators are untouched (`sample_index`'s
+     relative tolerance absorbs the accumulated `t + dt`); a user `dt` that does not divide Δ
+     warns (D18); the block warns when JAX is not in 64-bit.
+  4. *The analysis verbs* (D17): `System.realize(None)` gathered over subsystems in
+     `core/system.py` and `core/wiring.py`, applied by `linearize`, `find_equilibrium`,
+     `transfer_function`, the LQR shortcuts and the deterministic transcriptions.
+  5. *The stepped tools* (D19), in `reinforcement_learning/environment.py`, which the RL
+     planner and the evaluator's backends share: a `disturbances` port that does not reach `f`
+     at the nominal point (a Jacobian probe) warned; a random block inside `problem.sys` warned.
+  6. *The blast radius* (D14), in the same commit: `examples/demos/blocks/blocks_sources.py`,
+     `examples/demos/core/diagram_noise_ports.py`, `examples/demos/core/diagram_shortcuts.py`
+     (distinct seeds, `psd`); `tutorial/00_core.ipynb` cell 27, `tutorial/01_blocks.ipynb` cell
+     3, `udes_gro501/cartpole_dynamic_controller.ipynb` cell 11; `tests/unittest/test_blocks.py`
+     (four tests on `refresh()`, `t0`, `tf`), `test_core.py`, the block's `__main__`; the guard
+     test of TODO A5 (editing params changes the next simulation, no `refresh()`).
+  Done when: the twin test passes (the simulated variance at the sample instants against
+  `A P + P Aᵀ + B_w W B_wᵀ = 0`, within one realization's sampling error), the two cipher pin
+  tests pass, a plain `compute_trajectory()` on `diagram_noise_ports`'s loop runs RK4 at `dt = Δ`
+  with no argument, `linearize` of that loop returns the noise-free `A`, the three demos and the
+  three notebooks run, and `pytest` is green.
 - [ ] **RN-2 Distributions read `params`** (R1, D9, D12): `Gaussian(cov=)`, `cov` on every law,
   `sample(key, n=None, params=None)`, a `params` dict on `Gaussian`, `Uniform`, `Particles`;
-  `Set.sample` and `InputSet.sample` take a required key. Baseline: every `sample` call site.
-- [ ] **RN-3 `NoiseSource`** (D3, D12): the law's numbers under `params["law"]`; `WhiteNoise`
-  becomes its subclass.
-- [ ] **RN-4 `realize` and the problem** (R4, R4b, D6, D7, D10): `System.realize(key)` gathered
-  over subsystems, one spawned stream per consumer (`numpy>=1.25`); `StochasticPlanningProblem.realize(key)`;
-  `disturbances` takes signals only, the one test line updated; the RL environment reads the
-  block's `h` at its `dt`; the simulator warns once when an adaptive solver meets a noise
-  source, or a fixed step exceeds Δ; RK4's last stage at the left limit of a jump. A seeded
-  baseline records the one change of draws.
-- [ ] **RN-5 The evaluator's test set** (D11, D13): `ev.trials` (starts, params with their seeds)
-  drawn once on NumPy; every backend rolls out the same realizations, the noise computed by the
-  block; the fallback warning and `compare`'s NumPy forcing removed with their tests; every
-  random block inside `sys` realized per trial. `Sys2Gym` takes a `Distribution` (R5).
-- [ ] **RN-6 Docs**: DESIGN §4 (the distributions entry: the convention, the three periods, the
-  bridge table) and §6 (the stochastic problem's `disturbances`, the evaluator's test set);
-  ROADMAP §6 closes F9; TODO A5 rows retired; `kalman()` (P4) reads intensities, the discrete
-  filter later reads `Q_d`, `R_d`.
+  `Set.sample` and `InputSet.sample` take a required key. Files: `core/distributions.py`,
+  `core/sets.py`, every `sample` call site. Baseline: every `sample` call site, byte-identical.
+  Done when a family of noise levels vmaps like a family of masses (one test).
+- [ ] **RN-3 `NoiseSource`** (D3, D12, D23): the law's numbers under `params["law"]`;
+  `WhiteNoise` becomes its subclass; the datasheet-sensor recipe
+  `NoiseSource(Gaussian(0, cov=R_d), sample_period=Tₛ)` as the first demo. Done when the twin
+  test of a sampled sensor passes (the sample covariance against `R_d`) and `WhiteNoise`'s tests
+  pass untouched.
+- [ ] **RN-4 `realize` and the problem** (R4, R4b, D6, D7, D10, D18, D20–D22).
+  1. `System.realize(key)` gathered over subsystems, each block's seed
+     `child_seed(key, id_path)` with the cipher of RN-1 (D21); `StochasticPlanningProblem.realize(key)`
+     returns `(x0, params)`: the start, the drawn parameter values (`child_seed(key, name)` per
+     parameter), a seed for each `disturbances` block and for each random block inside `sys`.
+     Files: `core/system.py`, `core/wiring.py`, `planning/problems.py`, `core/distributions.py`.
+  2. `disturbances` takes signals only (D6), the one line of `test_rl_planner.py` updated; a
+     planner pins the declared disturbance ports at their nominal value (D22), in
+     `planning/problems.py` (`nominal()`) and the transcriptions that read a problem.
+  3. `RolloutEnvironment.reset(key)` returns the episode's realization and `step` reads each
+     block's `h` at `t_k` with the episode's seeds (D21); `ProblemEnv` realizes at reset, its
+     action space the action port alone. Files: `reinforcement_learning/environment.py`,
+     `interfaces/gymnasium.py`.
+  4. The hold across stages: the D18 rule in DESIGN and the block's docstring. No integrator
+     change (D18).
+  5. Colored noise: the recipe of §6 with the shaping filter's state started from
+     `N(0, W / 2τ)` (D23), as a demo and its twin test (`W = 2 τ σ²`); `LowPassFilter(tau=)` a
+     Later row in TODO.
+  A seeded baseline records the one change of draws. Done when `problem.realize(key)` is
+  bit-identical on NumPy and JAX, two episodes from one training key draw distinct noise, and
+  adding a random parameter leaves every other stream unchanged (the table of §5, by name).
+- [ ] **RN-5 The evaluator simulates the closed-loop diagram** (D11, D13, D20, D24).
+  1. `MonteCarloEvaluator` builds the loop as a diagram (`ctl @ sys`, or `source >> sys`), wires
+     each `disturbances` signal onto its port, draws `ev.trials` once on NumPy (the realizations
+     `(x0, params)`), and simulates the diagram on every trial: `rollout_batch` over the family
+     on JAX, a loop of `Simulator` runs on NumPy, RK4 at the automatic grid of D16; the cost
+     scored on the plant's trajectory (`trajectory_of`). One path replaces `evaluate_jax`,
+     `evaluate_numpy` and `evaluate_simulator`; `backend` chooses the arrays only (`"auto"`: JAX
+     when the loop traces); `dt` is the simulation step. Files: `planning/evaluation.py`,
+     `core/compile/evaluators/jax_evaluators.py` (`rollout_batch` over `(x0, params)`).
+  2. The fallback warning, `compare`'s NumPy forcing and the `simulator` backend's nested-diagram
+     failure go with their tests; a controller with state, a `Computer @ plant` loop (NumPy path
+     until the hybrid seam batches) and a noise block inside `sys` are accepted.
+  3. `Sys2Gym` takes a `Distribution` for the start (R5); `x0_lb / x0_ub / x0_std` go.
+  Done when an LQG loop (P4's compensator, noise on `w` and `v`) scores a mean cost within the
+  sampling error of the covariance prediction (1.013 ± 0.023 measured by hand, §10 A6);
+  `ev.evaluate(lqr)` on JAX and `ev.evaluate(vi)` on NumPy agree to a tolerance on the same
+  trials; the release note records the one change of the evaluator's numbers.
+- [ ] **RN-6 Docs**, with each step: DESIGN §4 (the distributions entry: the convention, the
+  three periods, the bridge table with its two periods, the solver hint) and §6 (the stochastic
+  problem's `disturbances`, `realize`, the evaluator as a diagram simulation); ROADMAP §6 closes
+  the entry; TODO A5 rows retired; `kalman()` (P4) reads intensities, the discrete filter later
+  reads `Q_d`, `R_d`; the release notes of RN-1, RN-4 and RN-5.
 
 Out of scope on purpose: time-varying laws `p(t)` (a gust is `Step` times a noise source),
 a `ColoredNoise` class (a filter), a stochastic system wrapper (randomness enters only through
-named ports, RULES 4.9), a Brownian-bridge refinement that keeps one path across changes of Δ.
+named ports, RULES 4.9), a Brownian-bridge refinement that keeps one path across changes of Δ,
+RL with observation noise until a learner reads `y`.
 
 ## 10. Review 2026-09-30: findings and proposed amendments
 
 A second opinion on D1–D12, measured on the current code and on an in-memory prototype of the
 §4 block (NumPy 2.5, JAX 0.10.2; nothing landed). The convention holds: `Σ = W / Δ`, the two
 classes, `psd` as the dt-free number, the counter-based pure block. The findings are around it.
-A1 was ruled on 2026-09-30 (D13). A2–A10 are proposals; their remedies were not stress-tested
-by a second reviewer.
+All ten amendments are ruled (A1 as D13, A2–A10 as D14–D23, §8); the findings stay as the
+evidence. Their remedies were not stress-tested by a second reviewer.
 
 ### Findings
 

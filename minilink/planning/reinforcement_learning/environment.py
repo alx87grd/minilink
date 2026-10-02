@@ -96,6 +96,7 @@ class RolloutEnvironment:
         self.m = int(self.sys.inputs[self.action_port].dim)
         self.nominal_inputs = self.nominal_port_values()
         self.infeasible_cost = self.price_of_infeasibility()
+        warn_inert_noise(self.sys, problem.disturbances)
 
     def reset(self, key):
         """An initial state drawn from the problem's start distribution."""
@@ -249,6 +250,28 @@ class RolloutEnvironment:
             values[port_id] = u_nominal[i : i + port.dim]
             i += port.dim
         return values
+
+
+def warn_inert_noise(sys, disturbances):
+    """Warn about noise the held-input rollout never sees: a port only ``h`` reads, a random block inside the plant."""
+    inert = [
+        port
+        for port in disturbances
+        if not np.any(sys.jacobian("f", port, method="fd"))
+    ]
+    if inert:
+        warnings.warn(
+            f"disturbances on {inert} do not reach f at the nominal point: the stepped "
+            "rollout feeds the true state to the law and never calls h, so these draws "
+            "change nothing here",
+            stacklevel=3,
+        )
+    if sys.is_random:
+        warnings.warn(
+            "the plant holds a random block with a fixed seed: every trial and episode "
+            "sees the same noise signal until the tools realize it per trial",
+            stacklevel=3,
+        )
 
 
 def feasible_cost_bound(
