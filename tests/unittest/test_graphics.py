@@ -558,6 +558,8 @@ from minilink.graphical.animation.renderers.meshcat_renderer import (
     MeshcatRenderer,
     _frames_have_changing_polylines,
     _import_meshcat,
+    camera_eye_position,
+    camera_world_shift,
     html_export_path,
     polyline_strip_mesh,
 )
@@ -637,6 +639,22 @@ class TestMeshcatPolylineStrip(unittest.TestCase):
         self.assertFalse(_frames_have_changing_polylines(same))
 
 
+class TestMeshcatCamera(unittest.TestCase):
+    def test_world_slides_so_the_target_sits_at_the_orbit_origin(self):
+        shift = camera_world_shift(camera_matrix(target=(1.0, 2.0, 3.0), scale=4.0))
+        np.testing.assert_allclose(shift, [-1.0, -2.0, -3.0])
+
+    def test_eye_sits_on_the_view_out_side_at_the_camera_distance(self):
+        # x-z side view: the view-out axis is -y, so the eye is 5 m toward -y,
+        # which the viewer's Y-up camera frame writes as +z.
+        eye = camera_eye_position(camera_matrix(plot_axes=(0, 2), scale=5.0))
+        np.testing.assert_allclose(eye, [0.0, 0.0, 5.0], atol=1e-12)
+
+    def test_top_down_hint_lands_on_the_viewer_default_eye(self):
+        eye = camera_eye_position(camera_matrix(scale=np.sqrt(10.0)))
+        np.testing.assert_allclose(eye, [3.0, 1.0, 0.0], atol=1e-12)
+
+
 class _FakePath:
     """Stand-in for meshcat.path.Path so Animation.at_frame can key clips."""
 
@@ -660,6 +678,7 @@ class _FakeMeshcatNode:
         self.children = {}
         self.object = None
         self.transform = None
+        self.properties = {}
         self.path = _FakePath() if path is None else path
 
     def __getitem__(self, key):
@@ -674,6 +693,9 @@ class _FakeMeshcatNode:
 
     def set_transform(self, transform):
         self.transform = transform
+
+    def set_property(self, key, value):
+        self.properties[key] = value
 
     def delete(self):
         self.children.clear()
@@ -761,6 +783,54 @@ class TestMeshcatOptionalSmoke(unittest.TestCase):
             animation_obj = renderer._build_meshcat_animation([a], frames, schedule)
         self.assertIsInstance(animation_obj, mcanim.Animation)
         self.assertIn("native=False", buf.getvalue())
+
+    @pytest.mark.skipif(not _has_meshcat(), reason="meshcat not installed")
+    def test_native_clip_keyframes_the_world_slide(self):
+        from minilink.graphical.animation.renderers.timing import AnimationFrameSchedule
+
+        class _Anim:
+            sys = type("S", (), {"name": "dot"})()
+
+        prim = Point([0.0, 0.0, 0.0])
+        T = np.eye(4)
+        targets = [(0.0, 0.0, 0.0), (1.0, 0.5, 0.0), (2.0, 1.0, 0.0)]
+        frames = [
+            {
+                "primitives": [prim],
+                "transforms": [T],
+                "camera": camera_matrix(target=target, scale=2.0),
+                "t": 0.1 * k,
+            }
+            for k, target in enumerate(targets)
+        ]
+        schedule = AnimationFrameSchedule(
+            nsteps=3, skip_steps=1, interval_ms=33.0, n_frames=3, target_fps=30.0
+        )
+        renderer = MeshcatRenderer(_Anim())
+        renderer.canvas = MeshcatCanvas(_FakeMeshcatNode(), is_3d=True)
+        animation_obj = renderer._build_meshcat_animation([prim], frames, schedule)
+        clips = {path.lower(): clip for path, clip in animation_obj.clips.items()}
+        for path in ("", "/Grid", "/Axes"):
+            slide = clips[path].tracks["position"]
+            self.assertEqual(slide.frames, [0, 1, 2])
+            np.testing.assert_allclose(slide.values, -np.asarray(targets))
+        eye = renderer.canvas.vis["/Cameras/default/rotated/<object>"]
+        np.testing.assert_allclose(
+            eye.properties["position"], camera_eye_position(frames[0]["camera"])
+        )
+
+    @pytest.mark.skipif(not _has_meshcat(), reason="meshcat not installed")
+    def test_draw_frame_slides_the_world_to_the_camera_target(self):
+        class _Anim:
+            sys = type("S", (), {"name": "dot"})()
+
+        renderer = MeshcatRenderer(_Anim())
+        renderer.canvas = MeshcatCanvas(_FakeMeshcatNode(), is_3d=True)
+        camera = camera_matrix(target=(3.0, -1.0, 0.5), scale=2.0)
+        renderer.draw_frame([Point([0.0, 0.0, 0.0])], [np.eye(4)], 0.0, camera)
+        vis = renderer.canvas.vis
+        for node in (vis, vis["/Grid"], vis["/Axes"]):
+            np.testing.assert_allclose(node.properties["position"], [-3.0, 1.0, -0.5])
 
     def test_html_export_path_keeps_or_appends_suffix(self):
         self.assertEqual(html_export_path("lap").name, "lap.html")

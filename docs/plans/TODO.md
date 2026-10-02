@@ -425,7 +425,9 @@ pick):
 - [ ] **S43** Constructor-derived `camera_scale` hints (boat, steering, propulsion, plane,
   arms, rotating cart-poles) → auto-fit or params-derived; raw ground `CustomLine`s in catalog
   skins → `ground_line()`. Also: a renderer capability table with honest fallbacks (scan:
-  graphics#7); the physics owns the drawn lengths (scan: dynamics#9).
+  graphics#7; the meshcat camera cell landed, on by default: the drawn world slides to the
+  target, the eye sits at the `T[3, 3]` distance); the physics owns the drawn lengths (scan:
+  dynamics#9).
 - [ ] **S53** Profile `rollout_batch` with a `params` family: 278 ms vs 27 ms for the plain
   batch (pendulum, 1000 × 1000 RK4 steps). Done when the family path is within 2× of the
   plain batch. Also: gate the quoted batch-rollout claim; batch the static-leaf time grid
