@@ -90,7 +90,8 @@ class TestDiagrams(unittest.TestCase):
 
         pytest.importorskip("graphviz")
         inner, outer = self._make_case_diagrams()
-        source = get_diagram(outer).source
+        # the one-block view of the nested diagram: its own ``v`` / ``V`` cells
+        source = get_diagram(outer, expand=False).source
         self.assertIn('PORT="in_v"', source)
         self.assertIn('PORT="out__v"', source)
         self.assertIn("racecar:out_y:e -> arduino:in_v:w", source)
@@ -250,6 +251,181 @@ class TestDiagrams(unittest.TestCase):
         diagram.connect("ctl", "u", "plant", "u")
         diagram.connect_new_output_port("plant", "y", "y_meas")
         return diagram
+
+
+def _build_nested_speed_loop():
+    """A speed loop whose controller is a nested diagram, itself holding a limiter diagram."""
+    from minilink.blocks import Gain, LowPassFilter, Saturation, Step, Sum
+    from minilink.control import PI
+
+    limiter = DiagramSystem()
+    limiter.name = "Limiter"
+    limiter.add_subsystem(Gain([2.0]), "scale")
+    limiter.add_subsystem(Saturation(), "sat")
+    limiter.add_input_port("u")
+    limiter.connect("input", "u", "scale", "u")
+    limiter.connect("scale", "y", "sat", "u")
+    limiter.connect_new_output_port("sat", "y", "y")
+
+    controller = DiagramSystem()
+    controller.name = "Controller"
+    controller.add_subsystem(LowPassFilter(), "lpf")
+    controller.add_subsystem(PI(ports="reference"), "pi")
+    controller.add_subsystem(Gain([0.5]), "ff")
+    controller.add_subsystem(Sum(signs=(1.0, 1.0)), "sum")
+    controller.add_subsystem(limiter, "limiter")
+    controller.add_input_port("r")
+    controller.add_input_port("y")
+    controller.add_input_port("spare")
+    controller.connect("input", "r", "pi", "r")
+    controller.connect("input", "r", "ff", "u")
+    controller.connect("input", "y", "lpf", "u")
+    controller.connect("lpf", "y", "pi", "y")
+    controller.connect("pi", "u", "sum", "in0")
+    controller.connect("ff", "y", "sum", "in1")
+    controller.connect("sum", "y", "limiter", "u")
+    controller.connect_new_output_port("limiter", "y", "u")
+    controller.connect_new_output_port("pi", "u", "u_raw")
+
+    loop = DiagramSystem()
+    loop.add_subsystem(Step(), "ref")
+    loop.add_subsystem(controller, "controller")
+    loop.add_subsystem(Integrator(), "plant")
+    loop.connect("ref", "y", "controller", "r")
+    loop.connect("plant", "y", "controller", "y")
+    loop.connect("controller", "u", "plant", "u")
+    loop.connect_new_output_port("plant", "y", "speed")
+    return loop
+
+
+def _edge_tuples(topology):
+    return [
+        (edge.source_node, edge.source_port, edge.target_node, edge.target_port)
+        for edge in topology.edges
+    ]
+
+
+class TestNestedDiagramPlot(unittest.TestCase):
+    def test_expanded_topology_is_the_flat_diagram(self):
+        topology = build_diagram_topology(_build_nested_speed_loop(), expand=True)
+        node_ids = [node.id for node in topology.nodes]
+        self.assertEqual(
+            node_ids,
+            [
+                "ref",
+                "controller__lpf",
+                "controller__pi",
+                "controller__ff",
+                "controller__sum",
+                "controller__limiter__scale",
+                "controller__limiter__sat",
+                "plant",
+                "output",
+            ],
+        )
+        edges = _edge_tuples(topology)
+        # A boundary input read by two inner blocks becomes two edges.
+        self.assertIn(("ref", "y", "controller__pi", "r"), edges)
+        self.assertIn(("ref", "y", "controller__ff", "u"), edges)
+        self.assertIn(("plant", "y", "controller__lpf", "u"), edges)
+        # Two boundaries are crossed between the saturation and the plant.
+        self.assertIn(("controller__limiter__sat", "y", "plant", "u"), edges)
+        self.assertIn(
+            ("controller__sum", "y", "controller__limiter__scale", "u"), edges
+        )
+        self.assertIn(("controller__lpf", "y", "controller__pi", "y"), edges)
+        # No edge ends on a nested diagram or on its boundary nodes.
+        for source_node, _, target_node, _ in edges:
+            self.assertIn(source_node, node_ids)
+            self.assertIn(target_node, node_ids)
+
+    def test_expanded_topology_clusters_follow_the_nesting(self):
+        topology = build_diagram_topology(_build_nested_speed_loop(), expand=True)
+        (controller,) = topology.clusters
+        self.assertEqual(
+            (controller.id, controller.name, controller.display_id),
+            ("controller", "Controller", "controller"),
+        )
+        self.assertEqual(
+            controller.node_ids,
+            ("controller__lpf", "controller__pi", "controller__ff", "controller__sum"),
+        )
+        (limiter,) = controller.clusters
+        self.assertEqual(limiter.id, "controller__limiter")
+        self.assertEqual(limiter.display_id, "limiter")
+        self.assertEqual(
+            limiter.node_ids,
+            ("controller__limiter__scale", "controller__limiter__sat"),
+        )
+
+    def test_boundary_port_unconnected_outside_draws_no_edge(self):
+        loop = _build_nested_speed_loop()
+        loop.connections["controller"]["y"] = None
+        topology = build_diagram_topology(loop, expand=True)
+        edges = _edge_tuples(topology)
+        self.assertNotIn(("plant", "y", "controller__lpf", "u"), edges)
+        self.assertFalse(
+            [edge for edge in edges if edge[2:] == ("controller__lpf", "u")]
+        )
+        # The unused boundary output and the unwired boundary input leave no trace.
+        self.assertFalse([edge for edge in edges if "u_raw" in edge or "spare" in edge])
+
+    def test_expanded_graph_boxes_the_nested_diagrams(self):
+        pytest.importorskip("graphviz")
+        source = get_diagram(_build_nested_speed_loop()).source
+        self.assertIn("subgraph cluster_controller {", source)
+        self.assertIn('label="Controller::controller"', source)
+        self.assertIn("subgraph cluster_controller__limiter {", source)
+        self.assertIn('label="Limiter::limiter"', source)
+        for node_id in ("lpf", "pi", "ff", "sum", "limiter__scale", "limiter__sat"):
+            self.assertIn(f"controller__{node_id} [label=<", source)
+        self.assertNotIn("controller [label=<", source)
+        # Wires go from the outer ports straight to the inner block ports.
+        self.assertRegex(source, r"ref:\w+:e -> controller__pi:\w+:w")
+        self.assertRegex(source, r"ref:\w+:e -> controller__ff:\w+:w")
+        self.assertRegex(source, r"plant:\w+:e -> controller__lpf:\w+:w")
+        self.assertRegex(source, r"controller__limiter__sat:\w+:e -> plant:\w+:w")
+        self.assertNotRegex(source, r"-> controller:")
+
+    def test_collapsed_graph_draws_a_nested_diagram_as_one_block(self):
+        pytest.importorskip("graphviz")
+        loop = _build_nested_speed_loop()
+        source = get_diagram(loop, expand=False).source
+        self.assertNotIn("cluster", source)
+        self.assertNotIn("controller__", source)
+        self.assertIn("controller [label=<", source)
+        self.assertIn("Controller::controller", source)
+        self.assertRegex(source, r"ref:\w+:e -> controller:\w+:w")
+        self.assertRegex(source, r"controller:\w+:e -> plant:\w+:w")
+        self.assertEqual(source, loop.plot_diagram(show=False, expand=False).source)
+        topology = build_diagram_topology(loop)
+        self.assertEqual(
+            [node.id for node in topology.nodes],
+            ["ref", "controller", "plant", "output"],
+        )
+        self.assertEqual(topology.clusters, ())
+
+    def test_expand_leaves_a_diagram_without_nesting_unchanged(self):
+        pytest.importorskip("graphviz")
+        diagram = TestDiagrams._make_diagram()
+        self.assertEqual(
+            get_diagram(diagram, expand=True).source,
+            get_diagram(diagram, expand=False).source,
+        )
+
+    def test_mermaid_exporter_nests_subgraphs(self):
+        loop = _build_nested_speed_loop()
+        source = export_diagram_topology(loop, backend="mermaid")
+        self.assertIn('  subgraph controller["Controller::controller"]', source)
+        self.assertIn('    controller__pi["PI::pi"]', source)
+        self.assertIn('    subgraph controller__limiter["Limiter::limiter"]', source)
+        self.assertIn('      controller__limiter__sat["Saturation::sat"]', source)
+        self.assertEqual(source.count("  end"), 2)
+        self.assertIn('ref -- "y -> r" --> controller__pi', source)
+        self.assertIn('controller__limiter__sat -- "y -> u" --> plant', source)
+        collapsed = export_diagram_topology(loop, backend="mermaid", expand=False)
+        self.assertNotIn("subgraph", collapsed)
+        self.assertIn('controller["Controller::controller"]', collapsed)
 
 
 import numpy as np

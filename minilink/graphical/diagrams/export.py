@@ -15,9 +15,15 @@ class TopologyExporter:
         raise NotImplementedError
 
 
-def export_diagram_topology(sys_or_diagram, *, backend="graphviz", **kwargs):
-    """Export a system or diagram topology with the selected backend."""
-    topology = build_diagram_topology(sys_or_diagram)
+def export_diagram_topology(
+    sys_or_diagram, *, backend="graphviz", expand=True, **kwargs
+):
+    """Export a system or diagram topology with the selected backend.
+
+    ``expand=True`` exports the blocks of every nested diagram, grouped in a
+    labelled box; ``expand=False`` exports a nested diagram as one block.
+    """
+    topology = build_diagram_topology(sys_or_diagram, expand=expand)
     return _resolve_topology_exporter(backend).export(topology, **kwargs)
 
 

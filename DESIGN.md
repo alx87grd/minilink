@@ -504,6 +504,10 @@ left diagram in place. Known gap: `step_diagram % dt` on a user-built
 `sys` (stateful plants), with numeric suffix on collision (`sys2`, …). Override
 with ``System.id`` before wiring or explicit ``add_subsystem(..., "plant")``.
 Block titles in ``plot_diagram()`` still show ``sys.name`` (human type).
+A diagram nested with ``add_subsystem`` is drawn expanded: its blocks sit in a
+box labelled ``name::id``, at every depth, and the wires go straight to the inner
+block ports, with no boundary nodes. ``plot_diagram(expand=False)`` draws each
+nested diagram as one block with its boundary ports.
 ``print(sys)`` is a short text summary: name, class, ``n``, ports with
 dimensions; a diagram adds its keys.
 :func:`~minilink.graphical.diagrams.build_diagram_topology` accepts
