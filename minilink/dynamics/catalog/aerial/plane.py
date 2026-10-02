@@ -656,10 +656,10 @@ if __name__ == "__main__":
     u.upper_bound[:] = [T_max, 0.12, 0.12, 0.12]
     u.set_nominal_value(np.array([T_trim, 0.0, 0.0, 0.0]))
 
-    sys.compute_trajectory()
+    # sys.compute_trajectory()
 
-    sys.camera_plot_axes = (0, 1)
-    sys.animate()
+    # sys.camera_plot_axes = (0, 1)
+    # sys.animate()
 
     RealtimeSimulator(
         sys,

@@ -83,6 +83,7 @@ diagram.animate(
 )
 
 # --- 3-D look: same lap ---
+car.camera_follow_frame = "body"
 car.skin = racecar_skin_3d
 
 diagram.animate(

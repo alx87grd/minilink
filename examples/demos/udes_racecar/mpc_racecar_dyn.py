@@ -170,6 +170,10 @@ plant.skin = racecar_skin_2d
 #     native=True,
 # )
 
+# plant.camera_follow_frame = None
+# plant.camera_follow_frame = "body"
+# plant.camera_scale = 4.0
+
 plant.skin = racecar_skin_3d
 diagram.animate(
     overlays=overlays,
