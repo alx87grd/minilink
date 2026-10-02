@@ -744,7 +744,6 @@ class MeshcatRenderer(AnimationRenderer):
         self.show = show
         self.vis = meshcat.Visualizer()
         self.canvas = MeshcatCanvas(self.vis, is_3d=is_3d)
-        self._place_camera(camera)
         if show:
             import sys
 
@@ -760,6 +759,10 @@ class MeshcatRenderer(AnimationRenderer):
             else:
                 self.vis.open()
                 self.vis.wait()
+        # Only after the browser handshake: the meshcat server stops answering
+        # commands when a browser connects through ``wait()`` while its scene
+        # tree already holds commands, so nothing is sent before it.
+        self._place_camera(camera)
 
     def draw_frame(self, primitives, transforms, t: float, camera) -> None:
         self.canvas.ensure_objects(primitives)
