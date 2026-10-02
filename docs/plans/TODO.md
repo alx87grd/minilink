@@ -284,8 +284,8 @@ each plan states; every step is name-preserving for the GRO860 notebooks.
   in the pendulum and mass-spring-damper families.
 - [ ] **S72 The path-integral planner (MPPI)** **[ask — name, MPC block contract]**, after
   RN-4 and RN-5 (decided 2026-10-02: the planner lands on the evaluator's batched rollout over
-  realizations, not before it). Design: [mppi.md](mppi.md); the standalone prototype
-  `examples/experimental/mppi/pendulum_mppi.py` runs today. MP-1 `planning/trajectory_optimization/path_integral.py`:
+  realizations, not before it). Design: [mppi.md](mppi.md); the standalone prototypes
+  `examples/experimental/mppi/pendulum_mppi.py` and `racecar_mppi.py` run today. MP-1 `planning/trajectory_optimization/path_integral.py`:
   `PathIntegralPlanner` / `PathIntegralRecord`, `solve` and `solve_trajectory_from` on
   `RolloutEnvironment` (`jit(vmap(scan))` over `K` samples), the six-beat body of the plan's
   §5, `decision_dimension` and `warm_start_guess`; MP-2 the hand-loop demo

@@ -5,8 +5,10 @@
 block once MP-5 lands, teaching-surface decision at V3 (v0.9).
 **Rung proposed:** S72 on the workboard, after RN-4 and RN-5 of the randomness plan (the
 ordering of §8), hardened before the v0.9 freeze; see §9.
-**Prototype:** `examples/experimental/mppi/pendulum_mppi.py` (2026-10-02), one standalone
-script on the library as it stands — the swing-up works, with the findings recorded in §1.
+**Prototype:** `examples/experimental/mppi/pendulum_mppi.py` and `racecar_mppi.py`
+(2026-10-02), two standalone scripts on the library as it stands — the swing-up works, and
+the racecar laps the circuit with the cone against the collocation MPC on the same problem;
+the findings are in §1.
 
 MPPI (model predictive path integral control, Williams et al. 2016–2018) is the
 sampling-based MPC modern robotics stacks run: no gradients, no NLP, thousands of
@@ -107,6 +109,30 @@ so, and the record's effective sample size is how a user sees it (`≈ K` means 
 `≈ 1` means `λ` too small). (2) The pieces MPPI reads from the library are exactly the
 ones RN-5 rewrites — a batched held-input rollout and the problem's cost on a path — so
 the planner should be built on that contract once, not before it (§8).
+
+**The racecar benchmark.** `examples/experimental/mppi/racecar_mppi.py` runs the same MPPI
+on the problem of `demos/udes_racecar/mpc_racecar_kinematic.py` — the kinematic UdeS
+racecar, the rounded circuit, the corridor and the cone, the demo's own cost objects — and
+then the demo's collocation MPC on the same plant and run, and scores both with
+`score_trajectory`. On the 10 s run (`K = 1024`, `N = 10` at `dt = 0.1 s`, `λ = 0.05`,
+`σ = (0.5 m/s, 0.2 rad)`, control term off):
+
+| Controller | closed-loop `J` | min cone clearance | min corridor margin | driven | tick (CPU) |
+| --- | --- | --- | --- | --- | --- |
+| MPPI | 0.32 | 0.25 m | 0.00 m | 34.5 m | 9 ms |
+| collocation MPC (SLSQP, 8 knots) | 0.51 | 0.23 m | −0.01 m | 36.0 m | 23 ms |
+
+Three findings. (3) The information-theoretic control term `λ (1 − α) Σ uᵀ Σ⁻¹ ε` scales
+with the nominal input: at a 3.5 m/s cruise it dominates a path cost of order one and
+pushes the speed down until the car stops (`J = 223` with `α = 0`, `λ = 2`). The planner's
+default should be `α = 1` (the term off), with the term as an option for plants whose
+nominal input is near zero, and the docstring should say why. (4) The temperature must be
+read against the path cost's spread: `λ = 2` gave an effective sample size of 800 of 1024
+(no selection), `λ = 0.05` gives 10–30, which drives. An adaptive rule (`λ` from a target
+effective sample size) is the first option worth adding after the prototype. (5) The lap is
+visibly jittery: i.i.d. input noise with no smoothing. Smoothing the update along `t`, or
+time-correlated noise, is the second option; it is what the car demo needs before it is a
+teaching figure.
 
 **The MPC exemplar.** `examples/demos/mpc/mpc_car_minimal.py` is the whole user story:
 a `PlanningProblem` with a quadratic cost, a planner, `ModelPredictiveController(planner,
