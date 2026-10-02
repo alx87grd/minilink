@@ -3,8 +3,10 @@
 **Status:** design draft (2026-10-02), for the maintainer's ruling on the asks of §10.
 **Lane:** research lane first (`examples/experimental/`), provisional band with the MPC
 block once MP-5 lands, teaching-surface decision at V3 (v0.9).
-**Rung proposed:** prototype in v0.3 wave C (S72 on the workboard), hardened before the
-v0.9 freeze; see §9.
+**Rung proposed:** S72 on the workboard, after RN-4 and RN-5 of the randomness plan (the
+ordering of §8), hardened before the v0.9 freeze; see §9.
+**Prototype:** `examples/experimental/mppi/pendulum_mppi.py` (2026-10-02), one standalone
+script on the library as it stands — the swing-up works, with the findings recorded in §1.
 
 MPPI (model predictive path integral control, Williams et al. 2016–2018) is the
 sampling-based MPC modern robotics stacks run: no gradients, no NLP, thousands of
@@ -91,6 +93,21 @@ collectors, the tabular learners and the NumPy Monte Carlo trials. The randomnes
 (`randomness.md`, RN-4) will turn `disturbances` into signals realized per episode by
 `realize(key)`; the env's `reset(key)` / `step` keep their shape.
 
+**The standalone prototype.** `examples/experimental/mppi/pendulum_mppi.py` is the
+algorithm of §2 as one script on the library as it stands: `plant.compile(backend="jax")`,
+a `vmap` of `rk4_integrate_zoh_trace` over `K = 1024` sampled sequences of `N = 40` held
+inputs, the cost's `g` vmapped along each path, the softmin, the update, a hand receding-
+horizon loop, `plot_trajectory` and a fan figure of the sampled futures. The pendulum
+swings up with 4 Nm (below `m g l`) at `λ = 0.1`, `σ = 3 Nm`, a 2 s horizon; one tick is
+one jitted call. Two things it taught: (1) the cost `1 + cos θ` of the RL demo gives MPPI
+no signal — it is flat at the bottom, so input noise around a zero sequence changes the
+path cost by nothing and every weight is equal; the wrapped angle error `atan2(sin(θ−π),
+cos(θ−π))²` with a rate term swings up in every sweep. The planner's docstring should say
+so, and the record's effective sample size is how a user sees it (`≈ K` means no signal,
+`≈ 1` means `λ` too small). (2) The pieces MPPI reads from the library are exactly the
+ones RN-5 rewrites — a batched held-input rollout and the problem's cost on a path — so
+the planner should be built on that contract once, not before it (§8).
+
 **The MPC exemplar.** `examples/demos/mpc/mpc_car_minimal.py` is the whole user story:
 a `PlanningProblem` with a quadratic cost, a planner, `ModelPredictiveController(planner,
 dt_mpc=)`, `mpc @ sys`, `compute_trajectory`, `animate` with `mpc_animation_overlays`.
@@ -176,6 +193,13 @@ PathIntegralPlanner(
   is not raised.
 - **Returned `trajectory`** has `N + 1` samples, so the MPC block's `x_ff = plan.x[:, 1]`
   and `u_ff = plan.u[:, 0]` read as they do for trajopt.
+- **The picture.** The fan of sampled futures is the MPPI figure, so the record keeps
+  the `n_shown` heaviest sampled rollouts of the tick with their weights (a bounded
+  array, not the `K` paths), and `solution.plot_samples(signal=)` draws them shaded by
+  weight with the updated plan on top and, when the solve was online, the closed loop so
+  far — the figure the prototype draws. On the car, `mpc_animation_overlays(samples=)`
+  draws the same fan on the track at each replan (MP-5); a phase-plane form is
+  `plot_samples(signal="phase")`.
 - **`problem.tf` must be finite** (`require_finite_tf`, as trajopt). `problem.U` must
   bound a box (`U.bounding_box()`); `X` is any set, read through `margin`.
 - **Backend.** The prototype requires JAX (`require_jax()` in the constructor, RULES
@@ -346,6 +370,19 @@ refactor in the abstract.
 
 ## 8. Steps
 
+**Order (decided with the maintainer 2026-10-02):** RN-4 and RN-5 of the randomness plan
+land first — `realize(key)`, signals on `disturbances`, the Monte Carlo evaluator as a
+batched simulation of the closed-loop diagram over realizations `(x0, params, seeds)`,
+any diagram and any output. Then the path-integral planner lands on that contract: its
+`K × M` rollouts are the evaluator's own batch over realizations, so MP-1 and MP-3 share
+one rollout path with the evaluator and the RL collectors instead of a scan of their own,
+and MP-3 is written once. Two things RN-4 and RN-5 should settle with this consumer in
+view: a realization carries seeds per sample, never drawn noise arrays, so `K × M`
+realizations vmap like a family of masses (D13 already says so); and the batch takes an
+input *sequence* per member as `rollout_batch` does today, not only a closed loop, since
+a sampling planner rolls out the open-loop plant. Until then the standalone script is the
+prototype.
+
 Ids are local to this doc (`MP-1` …); the workboard row is S72. Each step: `ruff check
 .`, `ruff format --check .`, the planning tests, the textbook check next to `dp.py`
 stated in the report.
@@ -395,23 +432,20 @@ stated in the report.
   smoothing / adaptive-temperature options if a course asks. Done when the teaching
   surface test lists the names, or V3 rules them provisional.
 
-Dependencies: MP-1–MP-3 need nothing that is not on `dev` today. MP-3's disturbance
-path is rewritten once by RN-4 (held draws → realized signals); landing it before RN-4
-means one small rewrite, landing it after means waiting for the v0.3 late-term rung —
-the proposal is to land MP-3 on the current draws so the planner is demonstrable, and
-fold the RN-4 rewrite into RN-4's blast radius (one more consumer of `realize`). MP-4
-is the T6 conversation and needs the maintainer in the room.
+Dependencies: MP-1 to MP-3 follow RN-4 and RN-5 (the order above); the deterministic
+core would run on `dev` today, as the script shows, but a planner that waits for its
+rollout contract is written once. MP-4 is the T6 conversation and needs the maintainer
+in the room.
 
 ## 9. Timing
 
 The question asked: when. The proposal, against the rungs of ROADMAP §5:
 
-- **v0.3 wave C (October–December 2026): MP-1, MP-2, MP-3** on the research lane,
-  beside G1. GMC714 is the robotics course and §4.3 names MPC as a topic row whose
-  surface G1 decides; an MPPI prototype in hand when G1 runs lets the audit decide "MPC
-  joins the teaching surface" with both flavours on the table instead of one. The three
-  steps touch no public name and no teaching file, so they do not compete with wave B
-  (GRO501, October) for maintainer time beyond the two asks of §10.
+- **Now (2026-10-02): the standalone script** under `examples/experimental/mppi/`, so
+  the G1 audit of GMC714 sees both MPC flavours running; it touches no library file.
+- **v0.3, after RN-4 and RN-5 (after the fall term): MP-1, MP-2, MP-3** on the
+  research lane, on the evaluator's batched rollout over realizations. The three steps
+  touch no public name and no teaching file.
 - **Before the v0.9 freeze (early 2027): MP-4 and MP-5.** MP-4 is T6's
   `control/mpc/controller.py` conversation, already queued before v0.9 because V3 must
   decide whether `control.mpc` joins the frozen surface; narrowing the planner contract
@@ -421,11 +455,9 @@ The question asked: when. The proposal, against the rungs of ROADMAP §5:
   facade names, the DESIGN paragraph. Not before: a planner reaches the teaching
   surface through a demo, a both-backends test and a cohort (ROADMAP §2).
 
-So: prototype in v0.3 (the maintainer's "before v1" is met with a term to spare),
-provisional in v0.9, frozen or visibly provisional at v1.0 with the rest of the MPC
-band. The one thing that moves earlier if the maintainer wants the MPPI car demo in
-the GMC714 notebook for December: MP-4, which then runs in November on `dev` as the
-T6 step, with the trajopt baselines as its safety net.
+So: a running script now, the planner in v0.3 on the finished rollout contract (the
+maintainer's "before v1" is met with a term to spare), provisional in v0.9, frozen or
+visibly provisional at v1.0 with the rest of the MPC band.
 
 ## 10. Asks for the maintainer
 
@@ -437,7 +469,8 @@ T6 step, with the trajopt baselines as its safety net.
    before any code.
 3. **The stochastic default** (§4): `n_plant_samples = 4` on a stochastic problem, or
    `1` with the bias stated in the docstring.
-4. **Timing** (§9): MP-1–MP-3 in v0.3 wave C as S72, or held until G1 reports.
+4. **Timing** (§9): decided 2026-10-02 — RN-4 and RN-5 first, then MP-1 to MP-3; the
+   standalone script stands in until then.
 5. **`RolloutEnvironment`'s home**: stays in `reinforcement_learning/` (an intra-band
    import from `trajectory_optimization/`), or moves to `planning/environment.py` as a
    housekeeping step first.

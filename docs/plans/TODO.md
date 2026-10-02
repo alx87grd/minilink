@@ -282,14 +282,16 @@ each plan states; every step is name-preserving for the GRO860 notebooks.
   layout across the bicycle rungs; one owner for the wheelbase; the hidden `0.01` damping in
   `Drone2D.d` and `Rocket.d` named; `VanderPol` with a real input or none; constructor hygiene
   in the pendulum and mass-spring-damper families.
-- [ ] **S72 The path-integral planner (MPPI)** **[ask — name, MPC block contract, timing]**.
-  Design: [mppi.md](mppi.md). MP-1 `planning/trajectory_optimization/path_integral.py`:
+- [ ] **S72 The path-integral planner (MPPI)** **[ask — name, MPC block contract]**, after
+  RN-4 and RN-5 (decided 2026-10-02: the planner lands on the evaluator's batched rollout over
+  realizations, not before it). Design: [mppi.md](mppi.md); the standalone prototype
+  `examples/experimental/mppi/pendulum_mppi.py` runs today. MP-1 `planning/trajectory_optimization/path_integral.py`:
   `PathIntegralPlanner` / `PathIntegralRecord`, `solve` and `solve_trajectory_from` on
   `RolloutEnvironment` (`jit(vmap(scan))` over `K` samples), the six-beat body of the plan's
   §5, `decision_dimension` and `warm_start_guess`; MP-2 the hand-loop demo
   `examples/experimental/mppi/pendulum_mppi.py`; MP-3 the stochastic branch
-  (`n_plant_samples` realizations per control sample from `sample_params` /
-  `sample_disturbances`, mean or CVaR by the problem's criterion; rewritten once by RN-4).
+  (`n_plant_samples` realizations per control sample, mean or CVaR by the problem's
+  criterion) and the fan of sampled futures as `solution.plot_samples()`.
   Done when the seeded-determinism, LQR-agreement and swing-up tests pass, the deterministic
   twin of the stochastic branch is byte-identical, and the body reads next to `dp.py`.
   MP-4 (the MPC block reads the planner verbs: T6, §5) and MP-5 (demos, `compare(MPC=, MPPI=)`)
