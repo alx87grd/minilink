@@ -6,6 +6,7 @@ import jax
 import jax.numpy as jnp
 import matplotlib.pyplot as plt
 import numpy as np
+from matplotlib import colormaps
 
 from minilink import (
     PlanningProblem,
@@ -18,6 +19,7 @@ from minilink.control.mpc import ModelPredictiveController
 from minilink.graphical.animation.drawables import Overlay, SceneHistory
 from minilink.graphical.animation.primitives import CustomLine, TrajectoryPolyline
 from minilink.graphical.animation.visualization import WORLD
+from minilink.graphical.catalog.racecar_skin import racecar_skin_3d
 from minilink.planning import (
     ReferenceTrack,
     Scene,
@@ -227,11 +229,15 @@ plt.show()
 
 # --- the animation: at each tick, the sampled futures shaded by weight and the plan ---
 class SampledFutures(Overlay):
-    """The latest tick's sampled rollouts (alpha = weight) and its updated plan, in the world frame."""
+    """The latest tick's sampled rollouts and its updated plan, in the world frame.
 
-    def __init__(self, futures, *, color=(0.12, 0.47, 0.71)):
+    A sample's weight sets its hue on the colormap and its alpha (matplotlib), and
+    its ribbon width (meshcat, which keeps the hue and drops the alpha).
+    """
+
+    def __init__(self, futures, *, cmap="Blues"):
         self.futures = futures
-        self.color = color
+        self.cmap = colormaps[cmap]
 
     def get_dynamic_geometry(self, t=0.0, params=None):
         t_solve, X_fan, w_fan, x_plan = max(
@@ -239,7 +245,9 @@ class SampledFutures(Overlay):
         )
         lines = [
             CustomLine(
-                x_path[:, :2], color=(*self.color, 0.08 + 0.6 * w_path), linewidth=0.8
+                x_path[:, :2],
+                color=(*self.cmap(0.35 + 0.65 * w_path)[:3], 0.1 + 0.6 * w_path),
+                linewidth=0.6 + 1.2 * w_path,
             )
             for x_path, w_path in zip(X_fan, w_fan / w_fan.max())
         ]
@@ -258,3 +266,8 @@ overlays = [
     ),
 ]
 car.animate(traj_mppi, overlays=overlays)
+
+# --- the 3-D look: the racecar skin, the camera on the body, frame-accurate overlays ---
+car.camera_follow_frame = "body"
+car.skin = racecar_skin_3d
+car.animate(traj_mppi, overlays=overlays, renderer="meshcat", native=False)
