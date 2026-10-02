@@ -626,6 +626,9 @@ One line each; open a plan doc only when a design needs a writeup.
   keep the slow modes and the DC gain, a band function in `analysis/modal.py`. Separately,
   swap the guide's §9.13 realization into `TestMinreal` and its §1.4.2 parking model into
   `TestPolePlacement` once the matrices are in hand (stand-ins today).
+- Automatic reward scaling for the RL planner (`reward_scale="auto"` = `1 / (g_max dt)`): raw
+  costs throttle PPO through the joint gradient clip; the scaled planner reaches LQR on every
+  seed tested — [rl-reward-scaling.md](rl-reward-scaling.md) (RS-1–RS-4, rung for the maintainer).
 - Vehicle view ports (`pose` / `bodyvel` on `DynamicBicycle` for impedance / PID).
 - Scene params / `J(z, p)` bind (DESIGN §4 planning-params pipeline B; moving obstacles
   online without rebuilding the NLP).
