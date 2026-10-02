@@ -52,6 +52,49 @@ def _color_to_meshcat_hex(color) -> int:
     return (int(r * 255) << 16) | (int(g * 255) << 8) | int(b * 255)
 
 
+# The camera 4x4 (``camera_matrix``) in the viewer. The mouse orbit is anchored
+# at the viewer origin, so the look-at target is honoured by sliding the drawn
+# world, with the viewer's grid and axes, by minus the target; the eye sits on
+# the view-out side of the origin at the ``T[3, 3]`` distance, as the position
+# of the viewer's own camera under ``/Cameras/default/rotated``. Orbit, pan and
+# zoom stay with the mouse.
+_CAMERA_EYE = "/Cameras/default/rotated/<object>"
+_VIEWER_FURNITURE = ("/Grid", "/Axes")
+# A top-down hint would put the eye on the orbit's pole, where the view is
+# undefined; the elevation is capped at the viewer's default eye ``(3, 1, 0)``.
+_EYE_ELEVATION_MAX = float(np.arctan2(1.0, 3.0))
+
+
+def camera_world_shift(camera) -> list[float]:
+    """Position of the drawn world that brings the camera target to the origin."""
+    target = np.asarray(camera, dtype=float)[:3, 3]
+    return [float(v) for v in -target]
+
+
+def camera_eye_position(camera) -> list[float]:
+    """Eye offset from the orbit origin, in the viewer's Y-up camera frame.
+
+    The eye lies on the view-out side (``camera[:3, 2]``) at the distance
+    ``camera[3, 3]``. Its elevation above the ground plane is capped so a
+    top-down hint lands on the viewer's default inclination, on the +X side.
+    """
+    camera = np.asarray(camera, dtype=float)
+    view_out = camera[:3, 2]
+    distance = float(camera[3, 3])
+    norm = float(np.linalg.norm(view_out))
+    if norm < 1e-12:
+        view_out, norm = np.array([0.0, 0.0, 1.0]), 1.0
+    azimuth = float(np.arctan2(view_out[1], view_out[0]))
+    elevation = float(np.arcsin(np.clip(view_out[2] / norm, -1.0, 1.0)))
+    elevation = float(np.clip(elevation, -_EYE_ELEVATION_MAX, _EYE_ELEVATION_MAX))
+    x = distance * np.cos(elevation) * np.cos(azimuth)
+    y = distance * np.cos(elevation) * np.sin(azimuth)
+    z = distance * np.sin(elevation)
+    # The viewer turns its camera frame by +90 deg about X: world (x, y, z)
+    # reads (x, z, -y) there.
+    return [float(x), float(z), float(-y)]
+
+
 # WebGL LineBasicMaterial ignores dash and (on most GPUs) linewidth. Overlay
 # polylines become a thin ribbon so Meshcat 3-D matches matplotlib's dashed
 # plans and corridor edges.
@@ -556,21 +599,27 @@ class MeshcatCanvas:
             return
 
     def ensure_objects(self, primitives):
-        n = len(primitives)
+        self.reserve_slots(len(primitives))
+        for i, primitive in enumerate(primitives):
+            self.ensure_object(i, primitive)
+
+    def reserve_slots(self, n: int):
+        """One scene slot per primitive; a new count starts from an empty scene."""
         if n != self._n_slots:
             self.clear()
             self._n_slots = n
             self._geom_keys = [None] * n
             self._has_head = [False] * n
 
-        for i, primitive in enumerate(primitives):
-            key = self._primitive_key(primitive)
-            if self._geom_keys[i] != key:
-                if i < len(self._has_head) and self._has_head[i]:
-                    self._head_path(i).delete()
-                    self._has_head[i] = False
-                self._set_static_geometry(i, primitive)
-                self._geom_keys[i] = key
+    def ensure_object(self, i: int, primitive):
+        """(Re)build the geometry of slot ``i`` when the primitive's shape changed."""
+        key = self._primitive_key(primitive)
+        if self._geom_keys[i] != key:
+            if i < len(self._has_head) and self._has_head[i]:
+                self._head_path(i).delete()
+                self._has_head[i] = False
+            self._set_static_geometry(i, primitive)
+            self._geom_keys[i] = key
 
     def update_primitive(self, i: int, primitive, transform_matrix):
         path = self._base_path(i)
@@ -681,7 +730,12 @@ def _rigid_effective_transform(primitive, transform_matrix, tf):
 
 
 class MeshcatRenderer(AnimationRenderer):
-    """Browser-based playback and static-HTML snapshots."""
+    """Browser-based playback and static-HTML snapshots.
+
+    The viewer is always 3-D, so the ``is_3d`` argument of the renderer
+    interface is accepted and ignored: lines are always drawn as ribbons with a
+    visible width and dash pattern.
+    """
 
     def __init__(self, animator):
         super().__init__(animator)
@@ -700,7 +754,8 @@ class MeshcatRenderer(AnimationRenderer):
         meshcat = _import_meshcat()
         self.show = show
         self.vis = meshcat.Visualizer()
-        self.canvas = MeshcatCanvas(self.vis, is_3d=is_3d)
+        # the viewer is always 3-D: ``is_3d`` only picks the axes of flat renderers
+        self.canvas = MeshcatCanvas(self.vis, is_3d=True)
         if show:
             import sys
 
@@ -716,12 +771,25 @@ class MeshcatRenderer(AnimationRenderer):
             else:
                 self.vis.open()
                 self.vis.wait()
+        # Only after the browser handshake: the meshcat server stops answering
+        # commands when a browser connects through ``wait()`` while its scene
+        # tree already holds commands, so nothing is sent before it.
+        self._place_eye(camera)
 
     def draw_frame(self, primitives, transforms, t: float, camera) -> None:
-        self.canvas.ensure_objects(primitives)
+        # The camera target stays at the orbit origin, so everything is drawn
+        # shifted by -target. Here the shift rides in each primitive's own
+        # transform. One scene-level slide sent after the primitives would let the
+        # browser render in between: a followed body would show at its new pose
+        # in the old view, then snap back, and flicker between the two.
+        shift = self.canvas._tf.translation_matrix(camera_world_shift(camera))
+        self.canvas.reserve_slots(len(primitives))
         for i, (prim, T) in enumerate(zip(primitives, transforms)):
-            self.canvas.update_primitive(i, prim, T)
-        # Meshcat uses the viewer default camera; ``camera`` is ignored.
+            # geometry then pose, back to back: a rebuilt polyline (plan, trail)
+            # never waits at the previous frame's shift
+            self.canvas.ensure_object(i, prim)
+            self.canvas.update_primitive(i, prim, shift @ np.asarray(T, dtype=float))
+        self._slide_furniture(camera)
 
     def present(self, *, block: bool, interval_s: float | None = None) -> None:
         if block:
@@ -746,16 +814,46 @@ class MeshcatRenderer(AnimationRenderer):
         self.canvas = None
         self.vis = None
 
+    def _world_nodes(self):
+        """The drawn world and the viewer's grid and axes: what slides with the target."""
+        vis = self.canvas.vis
+        return (vis, *(vis[path] for path in _VIEWER_FURNITURE))
+
+    def _place_eye(self, camera) -> None:
+        """Eye at the camera distance on the view-out side."""
+        self.canvas.vis[_CAMERA_EYE].set_property(
+            "position", camera_eye_position(camera)
+        )
+
+    def _place_camera(self, camera) -> None:
+        """Eye placed; world slid to the target (the native clip keyframes that slide)."""
+        self._place_eye(camera)
+        self._slide_world(camera)
+
+    def _slide_furniture(self, camera) -> None:
+        """Slide the viewer's grid and axes with the target (live frames)."""
+        shift = camera_world_shift(camera)
+        for path in _VIEWER_FURNITURE:
+            self.canvas.vis[path].set_property("position", shift)
+
+    def _slide_world(self, camera) -> None:
+        shift = camera_world_shift(camera)
+        for node in self._world_nodes():
+            node.set_property("position", shift)
+
     def _build_meshcat_animation(self, primitives, frames, schedule):
         """
         Compile the frame list into a ``meshcat.animation.Animation`` keyframe
-        track per rigid primitive path. Dynamic polylines (``Arrow``,
-        ``TorqueArrow``, changing ``CustomLine`` trails/horizons) are left
-        frozen at ``t=0`` and a one-line notice is printed if any are present.
+        track per rigid primitive path, plus the world slide that keeps the
+        per-frame camera target under the eye (the eye distance is the first
+        frame's). Dynamic polylines (``Arrow``, ``TorqueArrow``,
+        changing ``CustomLine`` trails/horizons) are left frozen at ``t=0``
+        and a one-line notice is printed if any are present.
         """
         import meshcat.animation as mcanim
 
         self.canvas.ensure_objects(primitives)
+        self._place_camera(frames[0]["camera"])
 
         # Draw t=0 once: this sets the (frozen) geometry of dynamic polylines
         # and gives every rigid primitive a sane starting pose before keyframes
@@ -778,6 +876,10 @@ class MeshcatRenderer(AnimationRenderer):
                 path_vis = self.canvas._base_path(i)
                 with animation_obj.at_frame(path_vis, frame_idx) as frame_vis:
                     frame_vis.set_transform(np.asarray(T_eff, dtype=float))
+            shift = camera_world_shift(frame["camera"])
+            for node in self._world_nodes():
+                with animation_obj.at_frame(node, frame_idx) as frame_vis:
+                    frame_vis.set_property("position", "vector3", shift)
 
         if has_dynamic:
             print(
@@ -793,7 +895,8 @@ class MeshcatRenderer(AnimationRenderer):
         """Build a Visualizer, keyframe the native Meshcat animation, and play it."""
         meshcat = _import_meshcat()
         self.vis = meshcat.Visualizer()
-        self.canvas = MeshcatCanvas(self.vis, is_3d=is_3d)
+        # the viewer is always 3-D: ``is_3d`` only picks the axes of flat renderers
+        self.canvas = MeshcatCanvas(self.vis, is_3d=True)
         animation_obj = self._build_meshcat_animation(primitives, frames, schedule)
         self.vis.set_animation(animation_obj, play=True, repetitions=1)
         return animation_obj

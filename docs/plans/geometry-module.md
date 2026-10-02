@@ -66,7 +66,7 @@ Short teaching list, like `minilink.catalog` for plants. No `Course` DTO: `track
 
 | Factory | What | Today |
 | --- | --- | --- |
-| `oval_circuit(length, width, radius, half_width=…)` | rounded-rectangle `Track` (wraps `circuit_waypoints`) | tests, [`racecar_lap_3d.py`](../../examples/projects/racecar/racecar_lap_3d.py) |
+| `oval_circuit(length, width, radius, half_width=…)` | rounded-rectangle `Track` (wraps `circuit_waypoints`) | tests |
 | `racecar_circuit()` | 6×4 m oval, `half_width=0.6`, far-straight cones | three UdeS racecar demos (MPC, dyn MPC, RL) |
 | `holonomic_forest()` | scatter of discs in `[-6, 6]²` | [`rrt_holonomic_obstacles.py`](../../examples/demos/rrt/rrt_holonomic_obstacles.py) |
 

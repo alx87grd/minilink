@@ -37,6 +37,7 @@ workboard-style id.
 
 | Doc | Scope | Status |
 | --- | --- | --- |
+| [rl-reward-scaling.md](rl-reward-scaling.md) | Automatic reward scaling for `ReinforcementLearningPlanner`: raw costs throttle PPO through the joint policy / critic gradient clip; `reward_scale="auto"` = `1 / (g_max dt)` from the failure-price sampling; evidence, options, steps RS-1–RS-4 | proposal 2026-09-27; rung for the maintainer (moves every RL demo's numbers once: between cohorts) |
 | [cbf-safety-filter.md](cbf-safety-filter.md) | Control Barrier Functions: bicubic SDF interpolation in JAX, DCBF with slacks, HOCBF relative degree, `CBFSafetyFilter` block; the barrier becomes a `Field` once A1 lands | design draft 2026-09-11 |
 | [fidelity-maps.md](fidelity-maps.md) | `lift` / `project` maps across the car fidelity ladder, MPC broadcast at high fidelity | draft, July 2026 |
 | [articulated-mechanism.md](articulated-mechanism.md) | One mechanism description (geometry, inertia, topology) feeding spatial RNEA/ABA and the symbolic path | draft, July 2026 |

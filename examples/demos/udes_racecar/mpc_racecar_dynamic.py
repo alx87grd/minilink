@@ -5,7 +5,10 @@ import numpy as np
 from minilink import PlanningProblem, QuadraticCost, TrajectoryOptimizationPlanner
 from minilink.catalog import UdeSRacecarDyn
 from minilink.control.mpc import ModelPredictiveController, mpc_animation_overlays
-from minilink.graphical.catalog.racecar_skin import racecar_skin_3d
+from minilink.graphical.catalog.racecar_skin import (
+    racecar_skin_2d,  # noqa: F401  (used by the commented 2-D look below)
+    racecar_skin_3d,
+)
 from minilink.planning import (
     ReferenceTrack,
     Scene,
@@ -20,11 +23,11 @@ from minilink.planning import (
 )
 
 LENGTH, WIDTH, RADIUS = 12.0, 8.0, 2.0  # [m] the circuit: a rounded rectangle, 36.6 m
-V_TARGET = 4.0  # [m/s] asked for everywhere; the corners are what take it back
+V_TARGET = 6.0  # [m/s] asked for everywhere; the corners are what take it back
 P_CRUISE = 15.0  # [W] about what holds V_TARGET on a straight
-TF_SIM = 11.0  # [s] a little more than one lap
+TF_SIM = 5.0  # [s] a little more than one lap
 SIM_DT = 0.002  # [s] inner plant step
-N_FRAMES = 111  # animation frames; the GIF is written at 250 dpi, so keep it short
+N_FRAMES = 250  # animation frames; the GIF is written at 250 dpi, so keep it short
 
 MPC_DT = 0.1  # [s] between two solves
 MPC_HORIZON = 1.2  # [s] ~4.5 m ahead at V_TARGET: one corner's worth
@@ -44,7 +47,8 @@ CONE_X = (2.0, -2.0)  # [m] where the two cones stand along the far straight
 CONE_LEAN = (-0.13, 0.13)  # [m] how far each leans off the line, one way then the other
 CONE_CLEARANCE = 0.30  # [m] clearance the plan is charged for losing
 CONE_WEIGHT = 400.0  # [1/m^2]
-PLANNER_MU = 1.1  # [-] the plan believes in a little more grip than the floor gives
+PLANNER_MU = 0.7  # [-] the plan believes in a little more grip than the floor gives
+PLANT_MU = 0.6
 
 LATERAL_START = 0.15  # [m] the car sets off beside the line, and the plan pulls it in
 HEADING_NUDGE = 1.0e-4  # [rad] off the axis of the straight: see the start, below
@@ -133,20 +137,23 @@ planner = TrajectoryOptimizationPlanner(
 mpc = ModelPredictiveController(planner, dt_mpc=MPC_DT, warm_start=True, verbose=True)
 
 car = UdeSRacecarDyn(named_ports=False)
+car.params["mu"] = PLANT_MU
 car.x0 = x0.copy()  # the whole circuit, not the car
 car.camera_scale = 2.0
 
 lap = mpc @ car
-lap.plot_diagram()
+# lap.plot_diagram()
 result = lap.compute_trajectory(
     tf=TF_SIM, x0_plant=x0, plant_dt_inner=SIM_DT, compile_backend="jax"
 )
-lap.plot_trajectory()
+# lap.plot_trajectory()
 
-lap.animate(
-    result.plant.resample(n_samples=N_FRAMES),
-    overlays=mpc_animation_overlays(result, planner, scene=scene, track=track),
-)
+
+# car.skin = racecar_skin_2d
+# lap.animate(
+#     result.plant.resample(n_samples=N_FRAMES),
+#     overlays=mpc_animation_overlays(result, planner, scene=scene, track=track),
+# )
 
 
 car.skin = racecar_skin_3d
@@ -154,4 +161,5 @@ lap.animate(
     result.plant.resample(n_samples=N_FRAMES),
     overlays=mpc_animation_overlays(result, planner, scene=scene, track=track),
     renderer="meshcat",
+    native=False,
 )
