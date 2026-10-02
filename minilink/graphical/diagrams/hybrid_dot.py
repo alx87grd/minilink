@@ -82,8 +82,8 @@ def _render_diagram_cluster(graph, topology: DiagramTopology) -> None:
 
     for edge in topology.edges:
         graph.edge(
-            f"{edge.source_node}:{graphviz_port_id(edge.source_port)}:e",
-            f"{edge.target_node}:{graphviz_port_id(edge.target_port)}:w",
+            f"{edge.source_node}:{graphviz_port_id(edge.source_port, 'out')}:e",
+            f"{edge.target_node}:{graphviz_port_id(edge.target_port, 'in')}:w",
         )
 
 
@@ -99,9 +99,9 @@ def _render_boundary_edges(graph, topology) -> None:
             direction=edge.direction,
             plant_port=edge.plant_port,
         )
-        source = f"{c_node}:{graphviz_port_id(c_port)}:e"
-        target = f"{p_node}:{graphviz_port_id(p_port)}:w"
+        source = f"{c_node}:{graphviz_port_id(c_port, 'out')}:e"
+        target = f"{p_node}:{graphviz_port_id(p_port, 'in')}:w"
         if edge.direction == "plant_to_computer":
-            source = f"{p_node}:{graphviz_port_id(p_port)}:e"
-            target = f"{c_node}:{graphviz_port_id(c_port)}:w"
+            source = f"{p_node}:{graphviz_port_id(p_port, 'out')}:e"
+            target = f"{c_node}:{graphviz_port_id(c_port, 'in')}:w"
         graph.edge(source, target, label=edge.label, style="dashed")
