@@ -6,7 +6,10 @@ import re
 import warnings
 
 from minilink.graphical.diagrams.export import TopologyExporter
-from minilink.graphical.diagrams.topology import build_diagram_topology
+from minilink.graphical.diagrams.topology import (
+    build_diagram_topology,
+    clustered_node_ids,
+)
 
 # One warning when the graphviz Python wrapper is missing: diagrams are
 # optional, so plot_diagram skips the figure and the notebook keeps running.
@@ -51,12 +54,7 @@ class GraphvizTopologyExporter(TopologyExporter):
         graph = graphviz.Digraph(topology.name, engine=kwargs.pop("engine", "dot"))
         graph.attr(rankdir=kwargs.pop("rankdir", "LR"))
 
-        for node in topology.nodes:
-            graph.node(
-                node.id,
-                shape="none",
-                label=f"<{block_html(node)}>",
-            )
+        render_blocks(graph, topology)
 
         for edge in topology.edges:
             graph.edge(
@@ -102,6 +100,28 @@ def block_html(node):
 
     html += "</TABLE>"
     return html
+
+
+def render_blocks(graph, topology):
+    """Declare the blocks of a topology, each nested diagram inside its box."""
+    nodes = {node.id: node for node in topology.nodes}
+    boxed = clustered_node_ids(topology.clusters)
+    for node in topology.nodes:
+        if node.id not in boxed:
+            graph.node(node.id, shape="none", label=f"<{block_html(node)}>")
+    for cluster in topology.clusters:
+        render_cluster(graph, cluster, nodes)
+
+
+def render_cluster(graph, cluster, nodes):
+    """Draw one nested diagram as a labelled Graphviz cluster around its blocks."""
+    with graph.subgraph(name=f"cluster_{cluster.id}") as box:
+        box.attr(label=f"{cluster.name}::{cluster.display_id}")
+        for node_id in cluster.node_ids:
+            node = nodes[node_id]
+            box.node(node.id, shape="none", label=f"<{block_html(node)}>")
+        for child in cluster.clusters:
+            render_cluster(box, child, nodes)
 
 
 def _render_diagram_graph(
@@ -223,22 +243,38 @@ def get_system_block_html(sys, html_id="sys1"):
     return block_html(node)
 
 
-def get_diagram(sys_or_diagram):
-    """Return the renderable diagram object for a system or assembled diagram."""
+def get_diagram(sys_or_diagram, *, expand=True):
+    """Return the renderable diagram object for a system or assembled diagram.
+
+    ``expand=True`` draws the blocks of every nested diagram inside a labelled
+    box; ``expand=False`` draws a nested diagram as one block.
+    """
     from minilink.graphical.diagrams.export import export_diagram_topology
 
     try:
-        return export_diagram_topology(sys_or_diagram, backend="graphviz")
+        return export_diagram_topology(
+            sys_or_diagram, backend="graphviz", expand=expand
+        )
     except ImportError:
         warnings.warn(MISSING_GRAPHVIZ_MESSAGE, stacklevel=2)
         return None
 
 
 def plot_diagram(
-    sys_or_diagram, filename=None, show=True, show_inline=None, show_pdf=None
+    sys_or_diagram,
+    filename=None,
+    show=True,
+    show_inline=None,
+    show_pdf=None,
+    *,
+    expand=True,
 ):
-    """Render a system or assembled diagram."""
-    graph = get_diagram(sys_or_diagram)
+    """Render a system or assembled diagram.
+
+    ``expand=True`` draws the blocks of every nested diagram inside a labelled
+    box; ``expand=False`` draws a nested diagram as one block.
+    """
+    graph = get_diagram(sys_or_diagram, expand=expand)
     _render_diagram_graph(
         graph,
         show=show,
