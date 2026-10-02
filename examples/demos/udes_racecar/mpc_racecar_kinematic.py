@@ -72,15 +72,11 @@ mpc = ModelPredictiveController(planner, dt_mpc=MPC_DT, warm_start=True, verbose
 # --- closed loop ---
 diagram = mpc @ car
 
-diagram.plot_diagram()
+# diagram.plot_diagram()
 result = diagram.compute_trajectory(
     tf=TF, x0_plant=x0, plant_dt_inner=0.01, compile_backend="jax"
 )
-diagram.plot_trajectory()
-diagram.animate(
-    overlays=mpc_animation_overlays(result, planner, scene=scene, track=track),
-    # renderer="meshcat",
-)
+# diagram.plot_trajectory()
 
 # --- 3-D look: same lap ---
 car.camera_follow_frame = "body"
@@ -89,5 +85,5 @@ car.skin = racecar_skin_3d
 diagram.animate(
     overlays=mpc_animation_overlays(result, planner, scene=scene, track=track),
     renderer="meshcat",
-    native=True,
+    native=False,
 )

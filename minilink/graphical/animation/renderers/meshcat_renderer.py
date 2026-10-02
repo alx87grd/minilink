@@ -599,21 +599,27 @@ class MeshcatCanvas:
             return
 
     def ensure_objects(self, primitives):
-        n = len(primitives)
+        self.reserve_slots(len(primitives))
+        for i, primitive in enumerate(primitives):
+            self.ensure_object(i, primitive)
+
+    def reserve_slots(self, n: int):
+        """One scene slot per primitive; a new count starts from an empty scene."""
         if n != self._n_slots:
             self.clear()
             self._n_slots = n
             self._geom_keys = [None] * n
             self._has_head = [False] * n
 
-        for i, primitive in enumerate(primitives):
-            key = self._primitive_key(primitive)
-            if self._geom_keys[i] != key:
-                if i < len(self._has_head) and self._has_head[i]:
-                    self._head_path(i).delete()
-                    self._has_head[i] = False
-                self._set_static_geometry(i, primitive)
-                self._geom_keys[i] = key
+    def ensure_object(self, i: int, primitive):
+        """(Re)build the geometry of slot ``i`` when the primitive's shape changed."""
+        key = self._primitive_key(primitive)
+        if self._geom_keys[i] != key:
+            if i < len(self._has_head) and self._has_head[i]:
+                self._head_path(i).delete()
+                self._has_head[i] = False
+            self._set_static_geometry(i, primitive)
+            self._geom_keys[i] = key
 
     def update_primitive(self, i: int, primitive, transform_matrix):
         path = self._base_path(i)
@@ -724,7 +730,12 @@ def _rigid_effective_transform(primitive, transform_matrix, tf):
 
 
 class MeshcatRenderer(AnimationRenderer):
-    """Browser-based playback and static-HTML snapshots."""
+    """Browser-based playback and static-HTML snapshots.
+
+    The viewer is always 3-D, so the ``is_3d`` argument of the renderer
+    interface is accepted and ignored: lines are always drawn as ribbons with a
+    visible width and dash pattern.
+    """
 
     def __init__(self, animator):
         super().__init__(animator)
@@ -743,7 +754,8 @@ class MeshcatRenderer(AnimationRenderer):
         meshcat = _import_meshcat()
         self.show = show
         self.vis = meshcat.Visualizer()
-        self.canvas = MeshcatCanvas(self.vis, is_3d=is_3d)
+        # the viewer is always 3-D: ``is_3d`` only picks the axes of flat renderers
+        self.canvas = MeshcatCanvas(self.vis, is_3d=True)
         if show:
             import sys
 
@@ -762,13 +774,22 @@ class MeshcatRenderer(AnimationRenderer):
         # Only after the browser handshake: the meshcat server stops answering
         # commands when a browser connects through ``wait()`` while its scene
         # tree already holds commands, so nothing is sent before it.
-        self._place_camera(camera)
+        self._place_eye(camera)
 
     def draw_frame(self, primitives, transforms, t: float, camera) -> None:
-        self.canvas.ensure_objects(primitives)
+        # The camera target stays at the orbit origin, so everything is drawn
+        # shifted by -target. Here the shift rides in each primitive's own
+        # transform. One scene-level slide sent after the primitives would let the
+        # browser render in between: a followed body would show at its new pose
+        # in the old view, then snap back, and flicker between the two.
+        shift = self.canvas._tf.translation_matrix(camera_world_shift(camera))
+        self.canvas.reserve_slots(len(primitives))
         for i, (prim, T) in enumerate(zip(primitives, transforms)):
-            self.canvas.update_primitive(i, prim, T)
-        self._slide_world(camera)
+            # geometry then pose, back to back: a rebuilt polyline (plan, trail)
+            # never waits at the previous frame's shift
+            self.canvas.ensure_object(i, prim)
+            self.canvas.update_primitive(i, prim, shift @ np.asarray(T, dtype=float))
+        self._slide_furniture(camera)
 
     def present(self, *, block: bool, interval_s: float | None = None) -> None:
         if block:
@@ -798,12 +819,22 @@ class MeshcatRenderer(AnimationRenderer):
         vis = self.canvas.vis
         return (vis, *(vis[path] for path in _VIEWER_FURNITURE))
 
-    def _place_camera(self, camera) -> None:
-        """Eye at the camera distance on the view-out side; world slid to the target."""
+    def _place_eye(self, camera) -> None:
+        """Eye at the camera distance on the view-out side."""
         self.canvas.vis[_CAMERA_EYE].set_property(
             "position", camera_eye_position(camera)
         )
+
+    def _place_camera(self, camera) -> None:
+        """Eye placed; world slid to the target (the native clip keyframes that slide)."""
+        self._place_eye(camera)
         self._slide_world(camera)
+
+    def _slide_furniture(self, camera) -> None:
+        """Slide the viewer's grid and axes with the target (live frames)."""
+        shift = camera_world_shift(camera)
+        for path in _VIEWER_FURNITURE:
+            self.canvas.vis[path].set_property("position", shift)
 
     def _slide_world(self, camera) -> None:
         shift = camera_world_shift(camera)
@@ -864,7 +895,8 @@ class MeshcatRenderer(AnimationRenderer):
         """Build a Visualizer, keyframe the native Meshcat animation, and play it."""
         meshcat = _import_meshcat()
         self.vis = meshcat.Visualizer()
-        self.canvas = MeshcatCanvas(self.vis, is_3d=is_3d)
+        # the viewer is always 3-D: ``is_3d`` only picks the axes of flat renderers
+        self.canvas = MeshcatCanvas(self.vis, is_3d=True)
         animation_obj = self._build_meshcat_animation(primitives, frames, schedule)
         self.vis.set_animation(animation_obj, play=True, repetitions=1)
         return animation_obj

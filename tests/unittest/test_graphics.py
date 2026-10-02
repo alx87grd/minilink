@@ -820,17 +820,44 @@ class TestMeshcatOptionalSmoke(unittest.TestCase):
         )
 
     @pytest.mark.skipif(not _has_meshcat(), reason="meshcat not installed")
-    def test_draw_frame_slides_the_world_to_the_camera_target(self):
+    def test_draw_frame_shifts_each_primitive_to_the_camera_target(self):
         class _Anim:
             sys = type("S", (), {"name": "dot"})()
 
         renderer = MeshcatRenderer(_Anim())
         renderer.canvas = MeshcatCanvas(_FakeMeshcatNode(), is_3d=True)
         camera = camera_matrix(target=(3.0, -1.0, 0.5), scale=2.0)
-        renderer.draw_frame([Point([0.0, 0.0, 0.0])], [np.eye(4)], 0.0, camera)
+        renderer.draw_frame(
+            [Point([0.0, 0.0, 0.0])], [translation(3.0, -1.0, 0.5)], 0.0, camera
+        )
         vis = renderer.canvas.vis
-        for node in (vis, vis["/Grid"], vis["/Axes"]):
+        # the followed point sits on the orbit origin through its own transform;
+        # the scene root is not slid, so no frame shows the point ahead of the view
+        point = renderer.canvas._base_path(0)
+        np.testing.assert_allclose(point.transform[:3, 3], [0.0, 0.0, 0.0], atol=1e-12)
+        self.assertNotIn("position", vis.properties)
+        for node in (vis["/Grid"], vis["/Axes"]):
             np.testing.assert_allclose(node.properties["position"], [-3.0, 1.0, -0.5])
+
+    @pytest.mark.skipif(not _has_meshcat(), reason="meshcat not installed")
+    def test_meshcat_draws_lines_as_ribbons_whatever_is_3d(self):
+        from unittest import mock
+
+        import meshcat.geometry as g
+
+        class _Anim:
+            sys = type("S", (), {"name": "line"})()
+
+        line = CustomLine(np.array([[0.0, 0.0, 0.0], [1.0, 0.0, 0.0]]), linewidth=2.0)
+        for is_3d in (False, True):
+            renderer = MeshcatRenderer(_Anim())
+            with mock.patch("meshcat.Visualizer", _FakeMeshcatNode):
+                renderer.open_scene(is_3d=is_3d, show=False, camera=camera_matrix())
+            renderer.draw_frame([line], [np.eye(4)], 0.0, camera_matrix())
+            drawn = renderer.canvas._base_path(0).object
+            # a ribbon mesh with a real width, never a one-pixel WebGL line
+            self.assertIsInstance(drawn, g.Mesh)
+            self.assertNotIsInstance(drawn, g.Line)
 
     def test_html_export_path_keeps_or_appends_suffix(self):
         self.assertEqual(html_export_path("lap").name, "lap.html")

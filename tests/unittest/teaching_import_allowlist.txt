@@ -20,9 +20,8 @@ examples/demos/mpc/mpc_car_circuit.py minilink.planning.spatial.plotting
 examples/demos/mpc/mpc_car_circuit.py minilink.planning.spatial.scene
 examples/demos/mpc/mpc_car_circuit.py minilink.planning.spatial.shaping
 examples/demos/mpc/mpc_car_circuit.py minilink.planning.spatial.track
-examples/demos/udes_racecar/mpc_racecar.py minilink.graphical.catalog.racecar_skin
-examples/demos/udes_racecar/mpc_racecar_dyn.py minilink.core.hybrid_composition
-examples/demos/udes_racecar/mpc_racecar_dyn.py minilink.graphical.catalog.racecar_skin
+examples/demos/udes_racecar/mpc_racecar_dynamic.py minilink.graphical.catalog.racecar_skin
+examples/demos/udes_racecar/mpc_racecar_kinematic.py minilink.graphical.catalog.racecar_skin
 examples/demos/rrt/rrt_holonomic_obstacles.py minilink.core.geometry
 examples/demos/rrt/rrt_holonomic_obstacles.py minilink.planning.search.extenders
 examples/demos/rrt/rrt_holonomic_obstacles.py minilink.planning.search.steering
@@ -49,8 +48,7 @@ examples/demos/realtime/game_ur5_setpoint.py minilink.simulation.realtime
 examples/tutorial/showcase_jax.ipynb minilink.experimental.c_export
 examples/tutorial/showcase_minilink.ipynb minilink.core.kinematics
 examples/tutorial/showcase_minilink.ipynb minilink.graphical.animation.primitives
-examples/teaching/topics/optimal_control/racecar_mpc.ipynb minilink.core.hybrid_composition
-examples/teaching/topics/optimal_control/racecar_mpc.ipynb minilink.graphical.catalog.racecar_skin
+examples/teaching/courses/udes_gro501/racecar_toward_mpc.ipynb minilink.core.hybrid_composition
 examples/teaching/courses/udes_gro501/racecar_toward_mpc.ipynb minilink.graphical.catalog.racecar_skin
 examples/teaching/courses/udes_gro501/racecar_toward_mpc.ipynb minilink.planning.spatial.grid
 examples/teaching/courses/udes_gro501/racecar_toward_mpc.ipynb minilink.planning.spatial.plotting
