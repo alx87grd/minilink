@@ -77,7 +77,7 @@ a release process by themselves.
 | **TRL 8** | Demo Released | Demo script is created and validated |
 | **TRL 9** | Mission Complete | Tests, demo, and user approval are all complete |
 
-State as of 2026-09-30. Step ids (`S29`, `P3`, `T2`, …) are the rows of
+State as of 2026-10-02. Step ids (`S29`, `P3`, `T2`, …) are the rows of
 [docs/plans/TODO.md](docs/plans/TODO.md).
 
 | Area | Lane | TRL | State | Next |
@@ -96,6 +96,7 @@ State as of 2026-09-30. Step ids (`S29`, `P3`, `T2`, …) are the rows of
 | Analysis / Lyapunov certificates | provisional (research) | 4 | `region_of_attraction` → `LyapunovCertificate` (quadratic `V`, sampled level, `verify`, `plot`, `contains`); demo and showcase §11. | Cohort validation; `V` as a `QuadraticField` (A1); SOS and discrete time later. |
 | Planning / RL planner | teaching (GRO860) | 6 | `ReinforcementLearningPlanner` (REINFORCE, actor-critic, PPO, SAC in pure JAX), `TabularLearningPlanner` (Q-learning, SARSA, Monte Carlo control), `StochasticPlanningProblem`, `MonteCarloEvaluator`; the names are on the root prelude; canonical demos in `examples/demos/rl/`, chapter 11 and the native teaching notebooks. | SAC actor step (S50); deep Q-learning (S52); automatic reward scaling ([rl-reward-scaling.md](docs/plans/rl-reward-scaling.md)); textbook pass (T5). |
 | Planning / search (RRT) | provisional | 5 | RRT / RRT*; `RRTPlanner(problem)` works from the input bounds alone (bang-bang extender); returns a `PlanningSolution`. | RRT-Connect later; textbook pass (T5). |
+| Planning / path integral (MPPI) | research lane (planned) | 0 | Not started. Design [mppi.md](docs/plans/mppi.md) (2026-10-02): a `PathIntegralPlanner` beside trajopt, wrapped by the existing `ModelPredictiveController`; both problem classes (input noise on a deterministic problem, plant draws per sample on a stochastic one); the batched JAX rollout and `RolloutEnvironment` as the step's owner. | Prototype in v0.3 wave C (S72); the MPC block reads three planner verbs instead of trajopt internals (T6) before v0.9; teaching form with V3. |
 | Geometry / spatial | provisional | 4 | SDF + `Scene` / fields / bodies under `planning/spatial/`, JAX twins tested. Home designed: `core/geometry/` (S57). | Package move and course catalog (A3); bicubic SDF and CBF filter (research). |
 | Graphics / animation | teaching | 5 | Frame-keyed `tf` / geometry / overlays; four renderers; auto-fit camera. | Constructor-derived camera hints (S43); glyph/solid rename (S30, v0.9). |
 | Hybrid / step / MPC | provisional (research) | 4 | `StepSystem`, `Computer`, `HybridDiagram`, `HybridSimulator`, MPC with parametric JAX. The sampled loop is the one thing that is not a `System`. | No new hybrid features before the v0.9 decision (S31); textbook pass on `mpc/controller.py` (T6). |
@@ -208,7 +209,7 @@ contract.
 | Nonlinear control — feedback linearization, computed torque, sliding mode, Lyapunov | `control.modelbased`, `control.geometric`, `analysis.lyapunov` | audit pending | set by G1 |
 | Robust control — uncertainty, margins, robust design | `analysis` frequency tools | audit pending | set by G1 |
 | Trajectory optimization — direct collocation, shooting | `planning.trajectory_optimization` | audit pending | set by G1 |
-| MPC — receding horizon on the vehicle and the arm | `control.mpc` (provisional, research lane) | audit pending | MPC joins the teaching surface, or stays a lesson on the research lane, decided in G1 |
+| MPC — receding horizon on the vehicle and the arm | `control.mpc` (provisional, research lane) | audit pending | MPC joins the teaching surface, or stays a lesson on the research lane, decided in G1; the sampling flavour (MPPI, [mppi.md](docs/plans/mppi.md), S72) is on the table for that audit |
 
 **Cross-cutting gates** (as for GRO501): every topic row green with a demo
 or a notebook; one `examples/teaching/` notebook per topic, Colab-first;
@@ -372,6 +373,14 @@ Standing work, behaviour-preserving, one module per step.
 - **S63** DP reads a finite horizon from `problem.tf`, as LQR does; **S64**
   catalog hygiene (bounds each plant states, port labels read from the
   state, one wheelbase owner). **[ask]**
+- **S72** The path-integral planner (MPPI), prototype on the research lane
+  ([mppi.md](docs/plans/mppi.md), proposed 2026-10-02): `PathIntegralPlanner`
+  on the batched JAX rollout, deterministic first (noise on the inputs), then the
+  stochastic branch (a plant realization per sample from the problem's
+  distributions), a hand-loop demo under `examples/experimental/`; wrapping it in
+  `ModelPredictiveController` is the T6 contract narrowing of `mpc/controller.py`
+  (steps MP-1 to MP-3 here, MP-4 and MP-5 before v0.9, MP-6 with V3).
+  **[ask — name, the MPC block contract, timing]**
 - **RN-4 / RN-5** of [randomness.md](docs/plans/randomness.md), together, after the fall term:
   `realize(key)` and signals on `disturbances=` (the frozen-noise defect
   fixed), then the Monte Carlo evaluator's test set. Both change public
@@ -583,6 +592,17 @@ here. Each open item needs the maintainer.
   plot labels for internal signals; a style sweep of display names.
 - **CBF safety filter** ([cbf-safety-filter.md](docs/plans/cbf-safety-filter.md)):
   research lane until a course asks; the barrier is a `Field` once A1 lands.
+
+**Before v0.3 wave C (S72, the path-integral planner)**
+
+- **MPPI** — proposed 2026-10-02 in [mppi.md](docs/plans/mppi.md) §10: the
+  planner's name (`PathIntegralPlanner`, so that the composition with
+  `ModelPredictiveController` spells the acronym, or `MPPIPlanner`); the three
+  planner verbs the MPC block reads instead of trajopt internals
+  (`decision_dimension`, `prepare_online`, `warm_start_guess`, and `z` on the
+  tick's record — the shape of T6); the stochastic default (plant draws per
+  control sample); whether MP-1 to MP-3 run in wave C beside G1 or wait for its
+  report; where `RolloutEnvironment` lives once a second band reads it.
 
 **Before v0.9 (the freeze candidate)**
 

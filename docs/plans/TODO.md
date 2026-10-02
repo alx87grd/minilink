@@ -282,6 +282,18 @@ each plan states; every step is name-preserving for the GRO860 notebooks.
   layout across the bicycle rungs; one owner for the wheelbase; the hidden `0.01` damping in
   `Drone2D.d` and `Rocket.d` named; `VanderPol` with a real input or none; constructor hygiene
   in the pendulum and mass-spring-damper families.
+- [ ] **S72 The path-integral planner (MPPI)** **[ask — name, MPC block contract, timing]**.
+  Design: [mppi.md](mppi.md). MP-1 `planning/trajectory_optimization/path_integral.py`:
+  `PathIntegralPlanner` / `PathIntegralRecord`, `solve` and `solve_trajectory_from` on
+  `RolloutEnvironment` (`jit(vmap(scan))` over `K` samples), the six-beat body of the plan's
+  §5, `decision_dimension` and `warm_start_guess`; MP-2 the hand-loop demo
+  `examples/experimental/mppi/pendulum_mppi.py`; MP-3 the stochastic branch
+  (`n_plant_samples` realizations per control sample from `sample_params` /
+  `sample_disturbances`, mean or CVaR by the problem's criterion; rewritten once by RN-4).
+  Done when the seeded-determinism, LQR-agreement and swing-up tests pass, the deterministic
+  twin of the stochastic branch is byte-identical, and the body reads next to `dp.py`.
+  MP-4 (the MPC block reads the planner verbs: T6, §5) and MP-5 (demos, `compare(MPC=, MPPI=)`)
+  before v0.9; MP-6 (the `loop` backend, facade names, DESIGN §6) with V3.
 - [ ] **Estimation follow-ups** after P4: EKF, time-varying and discrete Kalman as
   `estimation/` rows; online parameter estimators (recursive least squares, gradient laws).
 
@@ -361,6 +373,9 @@ findings, file by file and line by line, are in
   Also: one record per MPC tick, `Command` and `MPCTickSolve` folded into the
   `PlanningSolution` (scan: control#4); `mpc @ inner_loop` closing on a multi-block plant
   (scan: examples#12).
+  The shape proposed for the planner contract (three `Planner` verbs, `z` on the tick's
+  record, `validate_mpc_planner` reading them) is [mppi.md](mppi.md) §6; MP-4 there is this
+  step's second consumer, and the trajopt MPC baselines are its safety net.
 - [ ] **T7 graphical** (scan: graphics#13): the graphical band joins the textbook pass
   (renderers, catalog skins, signal plots), same recipe.
 - [ ] **Rename pass, the rest**: the remaining `_method` names on `System` subclasses not
@@ -651,7 +666,11 @@ One line each; open a plan doc only when a design needs a writeup.
 - Articulated mechanism layer (one mechanism description feeding RNEA/ABA and the symbolic
   path) — [articulated-mechanism.md](articulated-mechanism.md).
 - `RobustPlanningProblem` (set-bounded uncertainty, minimax criterion) only when a minimax
-  consumer exists; the deterministic / stochastic pair is the taxonomy that shipped.
+  consumer exists; the deterministic / stochastic pair is the taxonomy that shipped. The path-integral planner's `"worst_case"` branch (CVaR over plant draws,
+  [mppi.md](mppi.md) §4) would be that consumer; the two decisions go together.
+- `RolloutEnvironment` moves from `reinforcement_learning/` to `planning/environment.py` once
+  a second band reads it (the path-integral planner; the evaluator and the tabular learners
+  already do): one import rewrite, no behaviour change.
 - `MjxPlant` (`interfaces/mjx.py`) and `torch` / `flax` model wrappers in `interfaces/`;
   Pacejka tire; stochastic forcing; ROS2 / FMI; sparse long-horizon trajopt; RRT-Connect;
   shared RNEA serial-chain stack; ABA on other RNEA arms.
