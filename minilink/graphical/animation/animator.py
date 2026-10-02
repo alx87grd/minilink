@@ -252,6 +252,8 @@ class Animator:
 
         - ``renderer``  : graphics tech
           (``"matplotlib"``, ``"meshcat"``, ``"plotly"``, ``"pygame"``).
+        - ``is_3d``     : 2-D or 3-D axes for the flat renderers (matplotlib,
+          plotly, pygame). Meshcat is always a 3-D viewer and ignores it.
         - ``html``      : output channel. ``None`` auto-resolves via
           :func:`minilink.graphical.common.environment.prefers_inline_animation`:
           ``True`` in Colab and in local Jupyter when the active matplotlib

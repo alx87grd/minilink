@@ -9,6 +9,7 @@ sys = UdeSRacecarDyn3D()
 
 # sys.plot_bode(of="speed", wrt="P_cmd")
 
+# sys.camera_follow_frame = None
 
 sys.game(renderer="meshcat", is_3d=True)
 # sys.game(renderer="pygame")
