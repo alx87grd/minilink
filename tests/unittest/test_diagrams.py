@@ -16,8 +16,8 @@ class TestDiagrams(unittest.TestCase):
     def test_system_block_html_includes_named_ports(self):
         html = get_system_block_html(ProportionalController(), "ctl")
         self.assertIn("P Controller::ctl", html)
-        self.assertIn('PORT="r"', html)
-        self.assertIn('PORT="u"', html)
+        self.assertIn('PORT="in_r"', html)
+        self.assertIn('PORT="out_u"', html)
 
     def test_error_block_html_shows_plus_minus_e(self):
         from minilink.blocks.routing import Error
@@ -27,9 +27,9 @@ class TestDiagrams(unittest.TestCase):
         self.assertIn(">+<", html)
         self.assertIn(">-<", html)
         self.assertIn(">e<", html)
-        self.assertIn('PORT="plus"', html)
-        self.assertIn('PORT="minus"', html)
-        self.assertIn('PORT="e"', html)
+        self.assertIn('PORT="in_plus"', html)
+        self.assertIn('PORT="in_minus"', html)
+        self.assertIn('PORT="out_e"', html)
 
     def test_demux_block_html_shows_numpy_slices(self):
         from minilink.blocks.routing import Demux
@@ -38,16 +38,16 @@ class TestDiagrams(unittest.TestCase):
         self.assertIn("Demux::demux", html)
         self.assertIn(">y[0]<", html)
         self.assertIn(">y[1]<", html)
-        self.assertIn('PORT="y"', html)
-        self.assertIn('PORT="y_0"', html)
-        self.assertIn('PORT="y_1"', html)
+        self.assertIn('PORT="in_y"', html)
+        self.assertIn('PORT="out_y_0_"', html)
+        self.assertIn('PORT="out_y_1_"', html)
 
     def test_system_diagram_contains_block_label(self):
         pytest.importorskip("graphviz")
         graph = get_diagram(Integrator())
         self.assertIsNotNone(graph)
         self.assertIn("Integrator", graph.source)
-        self.assertIn('PORT="y"', graph.source)
+        self.assertIn('PORT="out_y"', graph.source)
 
     def test_diagram_graph_contains_subsystems_and_connections(self):
         pytest.importorskip("graphviz")
@@ -56,8 +56,57 @@ class TestDiagrams(unittest.TestCase):
         self.assertIsNotNone(graph)
         self.assertIn("ctl", graph.source)
         self.assertIn("plant", graph.source)
-        self.assertIn("input:r:e -> ctl:r:w", graph.source)
-        self.assertIn("output:y_meas:w", graph.source)
+        self.assertIn("input:out_r:e -> ctl:in_r:w", graph.source)
+        self.assertIn("output:in_y__meas:w", graph.source)
+
+    def test_port_ids_stay_distinct_across_case_and_role(self):
+        # Graphviz matches HTML PORT names case-insensitively: a block with an
+        # input ``v`` and an output ``V`` needs two identifiers that differ
+        # once folded, or the edge into ``v`` lands on the ``V`` cell.
+        from minilink.graphical.diagrams.dot import graphviz_port_id
+
+        block = Integrator()
+        block.add_input_port("v")
+        block.add_input_port("v_d")
+        block.add_output_port("V")
+        html = get_system_block_html(block, "arduino")
+        self.assertIn('PORT="in_v"', html)
+        self.assertIn('PORT="out__v"', html)
+        self.assertIn('PORT="in_v__d"', html)
+        self.assertNotIn('PORT="v"', html)
+        self.assertNotIn('PORT="V"', html)
+
+        folded = {
+            graphviz_port_id("v", "in").lower(),
+            graphviz_port_id("V", "in").lower(),
+            graphviz_port_id("v", "out").lower(),
+            graphviz_port_id("V", "out").lower(),
+            graphviz_port_id("v_d", "in").lower(),
+            graphviz_port_id("vD", "in").lower(),
+        }
+        self.assertEqual(len(folded), 6)
+        with self.assertRaises(ValueError):
+            graphviz_port_id("v", "left")
+
+        pytest.importorskip("graphviz")
+        inner, outer = self._make_case_diagrams()
+        source = get_diagram(outer).source
+        self.assertIn('PORT="in_v"', source)
+        self.assertIn('PORT="out__v"', source)
+        self.assertIn("racecar:out_y:e -> arduino:in_v:w", source)
+        self.assertIn("racecar:out_y:e -> arduino:in_v__d:w", source)
+        self.assertIn("arduino:out__v:e -> output:in__v__out:w", source)
+        self.assertNotIn("arduino:v:w", source)
+        self.assertNotIn("arduino:V:e", source)
+
+        # The nested diagram's own ::Inputs / ::Outputs boundary nodes carry
+        # the same role-prefixed identifiers.
+        source = get_diagram(inner).source
+        self.assertIn('PORT="out_v"', source)
+        self.assertIn('PORT="out_v__d"', source)
+        self.assertIn('PORT="in__v"', source)
+        self.assertIn("input:out_v:e -> integ:in_u:w", source)
+        self.assertIn("integ:out_y:e -> output:in__v:w", source)
 
     def test_plot_diagram_no_display_returns_graph(self):
         pytest.importorskip("graphviz")
@@ -166,6 +215,28 @@ class TestDiagrams(unittest.TestCase):
         self.assertIn("inputs: r (1)", text)
         self.assertIn("outputs: y_meas (1)", text)
         self.assertIn("blocks: ctl, plant", text)
+
+    @staticmethod
+    def _make_case_diagrams():
+        # A subsystem with an input ``v``, an output ``V`` and an input ``v_d``.
+        inner = DiagramSystem()
+        inner.connection_verbose = False
+        inner.add_subsystem(Integrator(), "integ")
+        inner.add_input_port("v")
+        inner.add_input_port("v_d")
+        inner.connect("input", "v", "integ", "u")
+        inner.connect_new_output_port("integ", "y", "V")
+
+        outer = DiagramSystem()
+        outer.connection_verbose = False
+        outer.add_subsystem(Integrator(), "racecar")
+        outer.add_subsystem(inner, "arduino")
+        outer.add_input_port("r")
+        outer.connect("input", "r", "racecar", "u")
+        outer.connect("racecar", "y", "arduino", "v")
+        outer.connect("racecar", "y", "arduino", "v_d")
+        outer.connect_new_output_port("arduino", "V", "V_out")
+        return inner, outer
 
     @staticmethod
     def _make_diagram():

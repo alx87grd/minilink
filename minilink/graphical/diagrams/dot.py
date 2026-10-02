@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import re
 import warnings
 
 from minilink.graphical.diagrams.export import TopologyExporter
@@ -16,23 +15,37 @@ MISSING_GRAPHVIZ_MESSAGE = (
 )
 
 
-def graphviz_port_id(port_id):
-    """Return a Graphviz HTML ``PORT`` identifier for a minilink port id.
+def graphviz_port_id(port_id, role):
+    """Return the Graphviz HTML ``PORT`` identifier of one minilink port.
 
-    Graphviz port names must be identifiers; ``+`` / ``-`` become ``plus`` /
-    ``minus``, and ``y[0]``-style Demux ids drop the brackets. The cell
-    still displays the original port id.
+    Graphviz matches port names case-insensitively and the same table holds
+    the block's inputs and outputs, so the identifier carries the port's
+    ``role`` (``"in"`` or ``"out"``) and an escaped name that stays unique
+    under case folding: ``+`` / ``-`` become ``plus`` / ``minus``, an
+    underscore doubles, an uppercase letter becomes ``_`` plus its lowercase,
+    and any other character outside ``[0-9a-z]`` (the brackets of a ``y[0]``
+    Demux id) becomes ``_``. The cell still displays the original port id.
     """
+    if role not in ("in", "out"):
+        raise ValueError(f"port role must be 'in' or 'out', got {role!r}")
     if port_id == "+":
-        return "plus"
-    if port_id == "-":
-        return "minus"
-    text = re.sub(r"[^0-9A-Za-z_]", "_", port_id).strip("_")
-    if not text:
-        text = "port"
-    if text[0].isdigit():
-        text = "p_" + text
-    return text
+        text = "plus"
+    elif port_id == "-":
+        text = "minus"
+    else:
+        text = "".join(escape_port_char(char) for char in port_id)
+    return f"{role}_{text}"
+
+
+def escape_port_char(char):
+    """Map one character of a port id onto ``[0-9a-z_]``, injectively."""
+    if char == "_":
+        return "__"
+    if "A" <= char <= "Z":
+        return "_" + char.lower()
+    if "a" <= char <= "z" or "0" <= char <= "9":
+        return char
+    return "_"
 
 
 class GraphvizTopologyExporter(TopologyExporter):
@@ -60,8 +73,8 @@ class GraphvizTopologyExporter(TopologyExporter):
 
         for edge in topology.edges:
             graph.edge(
-                f"{edge.source_node}:{graphviz_port_id(edge.source_port)}:e",
-                f"{edge.target_node}:{graphviz_port_id(edge.target_port)}:w",
+                f"{edge.source_node}:{graphviz_port_id(edge.source_port, 'out')}:e",
+                f"{edge.target_node}:{graphviz_port_id(edge.target_port, 'in')}:w",
             )
 
         return graph
@@ -85,7 +98,7 @@ def block_html(node):
         if j < len(node.inputs):
             port_id = node.inputs[j].id
             html += (
-                f'<TD PORT="{graphviz_port_id(port_id)}" align="left" '
+                f'<TD PORT="{graphviz_port_id(port_id, "in")}" align="left" '
                 f'BORDER="1">{port_id}</TD>\n'
             )
         else:
@@ -94,7 +107,8 @@ def block_html(node):
         if j < len(node.outputs):
             port_id = node.outputs[j].id
             html += (
-                f'<TD PORT="{graphviz_port_id(port_id)}" BORDER="1">{port_id}</TD>\n'
+                f'<TD PORT="{graphviz_port_id(port_id, "out")}" '
+                f'BORDER="1">{port_id}</TD>\n'
             )
         else:
             html += '<TD BORDER="1"> </TD>\n'
