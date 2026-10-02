@@ -282,6 +282,20 @@ each plan states; every step is name-preserving for the GRO860 notebooks.
   layout across the bicycle rungs; one owner for the wheelbase; the hidden `0.01` damping in
   `Drone2D.d` and `Rocket.d` named; `VanderPol` with a real input or none; constructor hygiene
   in the pendulum and mass-spring-damper families.
+- [ ] **S72 The path-integral planner (MPPI)** **[ask — name, MPC block contract]**, after
+  RN-4 and RN-5 (decided 2026-10-02: the planner lands on the evaluator's batched rollout over
+  realizations, not before it). Design: [mppi.md](mppi.md); the standalone prototypes
+  `examples/experimental/mppi/pendulum_mppi.py` and `racecar_mppi.py` run today. MP-1 `planning/trajectory_optimization/path_integral.py`:
+  `PathIntegralPlanner` / `PathIntegralRecord`, `solve` and `solve_trajectory_from` on
+  `RolloutEnvironment` (`jit(vmap(scan))` over `K` samples), the six-beat body of the plan's
+  §5, `decision_dimension` and `warm_start_guess`; MP-2 the hand-loop demo
+  `examples/experimental/mppi/pendulum_mppi.py`; MP-3 the stochastic branch
+  (`n_plant_samples` realizations per control sample, mean or CVaR by the problem's
+  criterion) and the fan of sampled futures as `solution.plot_samples()`.
+  Done when the seeded-determinism, LQR-agreement and swing-up tests pass, the deterministic
+  twin of the stochastic branch is byte-identical, and the body reads next to `dp.py`.
+  MP-4 (the MPC block reads the planner verbs: T6, §5) and MP-5 (demos, `compare(MPC=, MPPI=)`)
+  before v0.9; MP-6 (the `loop` backend, facade names, DESIGN §6) with V3.
 - [ ] **Estimation follow-ups** after P4: EKF, time-varying and discrete Kalman as
   `estimation/` rows; online parameter estimators (recursive least squares, gradient laws).
 
@@ -361,6 +375,9 @@ findings, file by file and line by line, are in
   Also: one record per MPC tick, `Command` and `MPCTickSolve` folded into the
   `PlanningSolution` (scan: control#4); `mpc @ inner_loop` closing on a multi-block plant
   (scan: examples#12).
+  The shape proposed for the planner contract (three `Planner` verbs, `z` on the tick's
+  record, `validate_mpc_planner` reading them) is [mppi.md](mppi.md) §6; MP-4 there is this
+  step's second consumer, and the trajopt MPC baselines are its safety net.
 - [ ] **T7 graphical** (scan: graphics#13): the graphical band joins the textbook pass
   (renderers, catalog skins, signal plots), same recipe.
 - [ ] **Rename pass, the rest**: the remaining `_method` names on `System` subclasses not
@@ -651,7 +668,11 @@ One line each; open a plan doc only when a design needs a writeup.
 - Articulated mechanism layer (one mechanism description feeding RNEA/ABA and the symbolic
   path) — [articulated-mechanism.md](articulated-mechanism.md).
 - `RobustPlanningProblem` (set-bounded uncertainty, minimax criterion) only when a minimax
-  consumer exists; the deterministic / stochastic pair is the taxonomy that shipped.
+  consumer exists; the deterministic / stochastic pair is the taxonomy that shipped. The path-integral planner's `"worst_case"` branch (CVaR over plant draws,
+  [mppi.md](mppi.md) §4) would be that consumer; the two decisions go together.
+- `RolloutEnvironment` moves from `reinforcement_learning/` to `planning/environment.py` once
+  a second band reads it (the path-integral planner; the evaluator and the tabular learners
+  already do): one import rewrite, no behaviour change.
 - `MjxPlant` (`interfaces/mjx.py`) and `torch` / `flax` model wrappers in `interfaces/`;
   Pacejka tire; stochastic forcing; ROS2 / FMI; sparse long-horizon trajopt; RRT-Connect;
   shared RNEA serial-chain stack; ABA on other RNEA arms.
@@ -667,5 +688,12 @@ One line each; open a plan doc only when a design needs a writeup.
   where diagram params are validated): today a typo or a retired key in any block's params is
   ignored silently. Raised with the noise block's retired keys (randomness.md D15) and declined
   there 2026-09-30 in favour of the library-wide behaviour; a question for the whole library.
+- A 3-D still of any animation: `save_frame(t)` on the meshcat renderer writes the static HTML
+  of one frame (the MPPI prototype did it by hand: build the frames with `Animator`, draw one
+  into a viewer-less `MeshcatRenderer`, write `static_html()`), and a headless screenshot of
+  that page is then a one-liner for docs and CI. With it, two camera notes for S43: the
+  default meshcat eye sits low so the viewer's grid reads as horizon lines, and an overlay
+  (a track corridor) drives the auto-fit camera, so a follow camera cannot zoom on the car;
+  overlays should opt out of the fit as the ground lines already do.
 - Declined 2026-09-05 (do not re-propose): scalar / list signal bounds and a coercing `x0`;
   scalar `Q` / `R` / `S` in `QuadraticCost.from_system`.
