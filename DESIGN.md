@@ -1187,7 +1187,12 @@ whole animation (`fit_camera_to_frames`, margin 1.15; backdrops such as
 `ground_line` and `Plane` and force glyphs such as `Arrow` are excluded via
 `primitive.camera_fit = False`), so a plant whose
 `params` change keeps a sensible view; a numeric `camera_scale` frames the
-scene yourself.
+scene yourself. Meshcat consumes the same matrix: the mouse orbit of its viewer
+is anchored at the origin, so the target is honoured by sliding the drawn world
+(with the viewer's grid and axes) until the target sits there, and the eye sits
+on the view-out side at the `T[3, 3]` distance (elevation capped at the
+viewer's default); orbit, pan and zoom stay with the mouse, and a native
+animation keyframes the slide alongside the bodies.
 
 All performance benchmarking lives in repo-root `benchmarks/` (helpers,
 synthetic fixtures, `run_*` scripts) — outside the shipped package, importing
