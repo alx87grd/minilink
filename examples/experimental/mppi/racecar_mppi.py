@@ -15,6 +15,9 @@ from minilink import (
     UdeSRacecar,
 )
 from minilink.control.mpc import ModelPredictiveController
+from minilink.graphical.animation.drawables import Overlay, SceneHistory
+from minilink.graphical.animation.primitives import CustomLine, TrajectoryPolyline
+from minilink.graphical.animation.visualization import WORLD
 from minilink.planning import (
     ReferenceTrack,
     Scene,
@@ -41,6 +44,7 @@ ALPHA = 1.0  # 1 turns the information-theoretic control term off: it scales wit
 SEED = 0
 FAN_TICKS = (5, 20, 40, 60)  # ticks whose sampled futures the track figure shows
 FAN_SAMPLES = 48
+ANIMATION_SAMPLES = 32  # sampled futures drawn at every tick of the animation
 
 # --- the same problem as demos/udes_racecar/mpc_racecar_kinematic.py ---
 path = circuit_waypoints(length=6.0, width=4.0, radius=1.0)
@@ -129,13 +133,17 @@ key = jax.random.PRNGKey(SEED)
 U = jnp.tile(jnp.array([V_REF, 0.0]), (N, 1))
 x = jnp.array(x0)
 n_ticks = int(round(TF / DT))
-ts, xs, us, fans, tick_times = [], [], [], {}, []
+ts, xs, us, fans, futures, tick_times = [], [], [], {}, [], []
 for k in range(n_ticks):
     key, k_tick = jax.random.split(key)
     t0 = time.perf_counter()
     U, x_plan, X, S, w, ess = mppi_tick(U, x, k_tick)
     U.block_until_ready()
     tick_times.append(time.perf_counter() - t0)
+    shown = jnp.argsort(w)[-ANIMATION_SAMPLES:]
+    futures.append(
+        (k * DT, np.asarray(X[shown]), np.asarray(w[shown]), np.asarray(x_plan))
+    )
     if k in FAN_TICKS:
         best = jnp.argsort(w)[-FAN_SAMPLES:]
         fans[k] = (np.asarray(X[best]), np.asarray(w[best]), np.asarray(x_plan))
@@ -216,4 +224,37 @@ ax.legend(loc="upper right", fontsize=8)
 ax.set_title(f"UdeS racecar circuit: MPPI ({K} samples) vs collocation MPC")
 plt.show()
 
-car.animate(traj_mppi, overlays=[TrackCorridorOverlay(track), scene.as_visualizer()])
+
+# --- the animation: at each tick, the sampled futures shaded by weight and the plan ---
+class SampledFutures(Overlay):
+    """The latest tick's sampled rollouts (alpha = weight) and its updated plan, in the world frame."""
+
+    def __init__(self, futures, *, color=(0.12, 0.47, 0.71)):
+        self.futures = futures
+        self.color = color
+
+    def get_dynamic_geometry(self, t=0.0, params=None):
+        t_solve, X_fan, w_fan, x_plan = max(
+            (f for f in self.futures if f[0] <= t + 1e-9), key=lambda f: f[0]
+        )
+        lines = [
+            CustomLine(
+                x_path[:, :2], color=(*self.color, 0.08 + 0.6 * w_path), linewidth=0.8
+            )
+            for x_path, w_path in zip(X_fan, w_fan / w_fan.max())
+        ]
+        lines.append(CustomLine(x_plan[:, :2], color="black", linewidth=2.0))
+        return {WORLD: lines}
+
+
+overlays = [
+    TrackCorridorOverlay(track),
+    scene.as_visualizer(),
+    SampledFutures(futures),
+    SceneHistory(
+        trail=TrajectoryPolyline(
+            traj_mppi, window="prefix", color="#1565c0", style="--", linewidth=1.0
+        )
+    ),
+]
+car.animate(traj_mppi, overlays=overlays)
