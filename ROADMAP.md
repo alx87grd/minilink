@@ -390,7 +390,8 @@ after:
 - **S29** `DiagramSystem.x0` / `n` / `state` as derived properties.
   **[ask — core]**
 - **S37** Evaluator / solver re-layering: evaluators keep pure maps and one
-  scannable step, integrators move to `simulation/solvers/`; **S27** Diffrax
+  scannable step, integrators move to `simulation/solvers/`, and the fixed-step
+  solvers take a sample stride (`substeps`, TODO §7); **S27** Diffrax
   as an optional JAX solve. **[ask — core]**
 - **S30** The glyph / solid rename; **S44** one posed-geometry hook so "two
   functions" (`f` and a drawing function) is literal. **[ask]**
