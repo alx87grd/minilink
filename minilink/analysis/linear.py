@@ -64,8 +64,10 @@ def gain(A, B, C, D):
     # G(s0) = C (s0 I − A)⁻¹ B + D
     G_s0 = (C @ np.linalg.solve(s0 * np.eye(n) - A, B) + D)[0, 0]
 
-    # k = G(s0) ∏(s0 − p) / ∏(s0 − z)
-    k = G_s0 * np.prod(s0 - p) / np.prod(s0 - z)
+    # k = G(s0) ∏(s0 − p) / ∏(s0 − z), the products as sums of logarithms so
+    # that hundreds of roots do not overflow
+    log_ratio = np.sum(np.log(s0 - p)) - np.sum(np.log(s0 - z))
+    k = G_s0 * np.exp(log_ratio)
 
     return float(np.real(k))
 

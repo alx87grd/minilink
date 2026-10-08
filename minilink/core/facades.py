@@ -731,6 +731,7 @@ class DynamicSystemFacades:
         method="auto",
         eps=1e-6,
         minimal=None,
+        radius=None,
         backend="matplotlib",
         show=True,
     ):
@@ -752,6 +753,7 @@ class DynamicSystemFacades:
             method=method,
             eps=eps,
             minimal=minimal,
+            radius=radius,
             backend=backend,
             show=show,
         )
@@ -768,6 +770,7 @@ class DynamicSystemFacades:
         method="auto",
         eps=1e-6,
         minimal=None,
+        radius=None,
         backend="matplotlib",
         show=True,
     ):
@@ -788,6 +791,7 @@ class DynamicSystemFacades:
             method=method,
             eps=eps,
             minimal=minimal,
+            radius=radius,
             backend=backend,
             show=show,
         )
