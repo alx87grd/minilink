@@ -840,6 +840,41 @@ class TestMeshcatOptionalSmoke(unittest.TestCase):
             np.testing.assert_allclose(node.properties["position"], [-3.0, 1.0, -0.5])
 
     @pytest.mark.skipif(not _has_meshcat(), reason="meshcat not installed")
+    def test_scene_grid_hint_hides_the_viewer_grid_and_axes(self):
+        from unittest import mock
+
+        from minilink.graphical.animation.renderers.timing import AnimationFrameSchedule
+
+        class _Underwater:
+            sys = type("S", (), {"name": "net", "scene_grid": False})()
+
+        class _Default:
+            sys = type("S", (), {"name": "dot"})()
+
+        prim = Point([0.0, 0.0, 0.0])
+        cam = camera_matrix()
+        frames = [{"primitives": [prim], "transforms": [np.eye(4)], "camera": cam}]
+        schedule = AnimationFrameSchedule(
+            nsteps=1, skip_steps=1, interval_ms=33.0, n_frames=1, target_fps=30.0
+        )
+        # the live viewer and the native clip read the same hint
+        live = MeshcatRenderer(_Underwater())
+        with mock.patch("meshcat.Visualizer", _FakeMeshcatNode):
+            live.open_scene(is_3d=True, show=False, camera=cam)
+        native = MeshcatRenderer(_Underwater())
+        native.canvas = MeshcatCanvas(_FakeMeshcatNode(), is_3d=True)
+        native._build_meshcat_animation([prim], frames, schedule)
+        for renderer in (live, native):
+            for path in ("/Grid", "/Axes"):
+                self.assertIs(renderer.canvas.vis[path].properties["visible"], False)
+        # without the hint the viewer keeps its grid and axes
+        default = MeshcatRenderer(_Default())
+        with mock.patch("meshcat.Visualizer", _FakeMeshcatNode):
+            default.open_scene(is_3d=True, show=False, camera=cam)
+        for path in ("/Grid", "/Axes"):
+            self.assertNotIn("visible", default.canvas.vis[path].properties)
+
+    @pytest.mark.skipif(not _has_meshcat(), reason="meshcat not installed")
     def test_meshcat_draws_lines_as_ribbons_whatever_is_3d(self):
         from unittest import mock
 

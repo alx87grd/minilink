@@ -356,10 +356,16 @@ def plot_pzmap(
     method: str = "auto",
     eps: float = 1e-6,
     minimal: bool | None = None,
+    radius: float | None = None,
     backend="matplotlib",
     show: bool = True,
 ) -> PlotResult:
-    """Pole-zero map of the selected channel: ``x`` poles, ``o`` zeros; ``minimal`` as in :func:`pzmap`."""
+    """Pole-zero map of the selected channel: ``x`` poles, ``o`` zeros.
+
+    ``minimal`` as in :func:`pzmap`. ``radius`` frames the roots within that
+    distance of the origin, the window a stiff model needs to show its slow
+    roots; the default frames every root.
+    """
     z, p, gain = pzmap(
         sys,
         x_bar,
@@ -374,7 +380,7 @@ def plot_pzmap(
     )
 
     return render_control_figure(
-        pzmap_figure(z, p, sys, of, wrt), backend=backend, show=show
+        pzmap_figure(z, p, sys, of, wrt, radius), backend=backend, show=show
     )
 
 
@@ -391,10 +397,16 @@ def plot_root_locus(
     method: str = "auto",
     eps: float = 1e-6,
     minimal: bool | None = None,
+    radius: float | None = None,
     backend="matplotlib",
     show: bool = True,
 ) -> PlotResult:
-    """Root locus of the selected channel closed with ``u = -K y``; ``minimal`` as in :func:`pzmap`."""
+    """Root locus of the selected channel closed with ``u = -K y``.
+
+    ``minimal`` as in :func:`pzmap`. ``radius`` frames the branches within that
+    distance of the origin; the default frames three times the radius of the
+    open-loop roots, so the far tails of the asymptotes leave the picture.
+    """
     A, B, C, D = siso_matrices(
         sys, x_bar, u_bar, t, params, of=of, wrt=wrt, method=method, eps=eps
     )
@@ -404,7 +416,7 @@ def plot_root_locus(
     gains, roots = linear.root_locus(A, B, C, D, gains)
 
     return render_control_figure(
-        root_locus_figure(A, B, C, D, gains, roots, sys, of, wrt),
+        root_locus_figure(A, B, C, D, gains, roots, sys, of, wrt, radius),
         backend=backend,
         show=show,
     )
@@ -562,8 +574,11 @@ def bode_figure(w, magnitude_db, phase_deg, sys, of, wrt, m, title=None):
     )
 
 
-def pzmap_figure(z, p, sys, of, wrt):
+def pzmap_figure(z, p, sys, of, wrt, radius=None):
+    # The view frames every root, or those within radius of the origin
     points = np.concatenate([z, p])
+    if radius is not None:
+        points = points[np.abs(points) <= radius]
     return ControlFigure(
         title=style.PZMAP_TITLE,
         subtitle=channel_subtitle(sys, of, wrt),
@@ -580,10 +595,15 @@ def pzmap_figure(z, p, sys, of, wrt):
     )
 
 
-def root_locus_figure(A, B, C, D, gains, roots, sys, of, wrt):
+def root_locus_figure(A, B, C, D, gains, roots, sys, of, wrt, radius=None):
     # The view keeps the poles, zeros and the branches near them; the far tails
-    # of the asymptotes leave the frame as they do in MATLAB.
-    reach = 3.0 * linear.open_loop_radius(linear.poles(A), linear.zeros(A, B, C, D))
+    # of the asymptotes leave the frame as they do in MATLAB, or the window
+    # within radius of the origin when one is given.
+    if radius is None:
+        radius = 3.0 * linear.open_loop_radius(
+            linear.poles(A), linear.zeros(A, B, C, D)
+        )
+    reach = float(radius)
     near = roots[np.abs(roots) <= reach]
     branches = tuple(
         Trace(

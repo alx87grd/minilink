@@ -120,6 +120,10 @@ class System(SharedSystemFacades):
         self.camera_follow_frame = None
         self.camera_priority = 0.0
 
+        # Backdrop hint, read by the meshcat viewer: ``scene_grid`` whether its
+        # ground grid and axes are drawn (``False`` for an underwater scene).
+        self.scene_grid = True
+
     def __str__(self):
         return inspect_text(self)
 

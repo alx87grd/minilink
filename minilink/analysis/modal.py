@@ -118,7 +118,7 @@ def animate_modal(
 
         traj = Trajectory(t=time, x=x, u=np.tile(u_bar[:, None], (1, n_steps)))
         title = f"Mode {index}: {pole.real:.1f}{pole.imag:+.1f}j"
-        sys.animate(
+        inline = sys.animate(
             traj,
             time_factor_video=time_factor_video,
             is_3d=is_3d,
@@ -128,6 +128,7 @@ def animate_modal(
             scene_title=title,
             show=show,
         )
+        display_inline(inline)
 
     return poles, modes
 
@@ -135,6 +136,15 @@ def animate_modal(
 # =============================================================================
 # Internal machinery
 # =============================================================================
+
+
+def display_inline(animation):
+    """Show the inline animation a notebook renderer returned (``html=True``); nothing otherwise."""
+    if animation is None:
+        return
+    from IPython.display import display
+
+    display(animation)
 
 
 def mode_horizon(pole, tf):

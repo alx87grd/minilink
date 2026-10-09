@@ -634,6 +634,10 @@ One line each; open a plan doc only when a design needs a writeup.
   online without rebuilding the NLP).
 - `SimulationOptions`, one record for the `Simulator` solver presets (DESIGN §5), weighed
   against RULES 2.5 (no option bags) before it is built.
+- A sample stride on the fixed-step solvers (`compute_trajectory(..., substeps=k)`: `k`
+  RK4 steps per stored sample, the scan keeping only the samples): a stiff model stepped
+  at 0.5 ms over 40 s stores 80k states today, which is what pushed jaxnet to keep its own
+  decimated `lax.scan` rollout beside `Simulator` (2026-10-07).
 - Cross-fidelity `lift` / `project` maps on the car ladder —
   [fidelity-maps.md](fidelity-maps.md).
 - Articulated mechanism layer (one mechanism description feeding RNEA/ABA and the symbolic
