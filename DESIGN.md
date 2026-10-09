@@ -1192,7 +1192,9 @@ is anchored at the origin, so the target is honoured by sliding the drawn world
 (with the viewer's grid and axes) until the target sits there, and the eye sits
 on the view-out side at the `T[3, 3]` distance (elevation capped at the
 viewer's default); orbit, pan and zoom stay with the mouse, and a native
-animation keyframes the slide alongside the bodies.
+animation keyframes the slide alongside the bodies. One backdrop hint sits
+beside the camera's: `scene_grid=False` hides the viewer's ground grid and axes
+(an underwater or open-sea scene); the flat renderers ignore it.
 
 All performance benchmarking lives in repo-root `benchmarks/` (helpers,
 synthetic fixtures, `run_*` scripts) — outside the shipped package, importing

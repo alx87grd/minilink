@@ -775,6 +775,7 @@ class MeshcatRenderer(AnimationRenderer):
         # commands when a browser connects through ``wait()`` while its scene
         # tree already holds commands, so nothing is sent before it.
         self._place_eye(camera)
+        self._set_backdrop()
 
     def draw_frame(self, primitives, transforms, t: float, camera) -> None:
         # The camera target stays at the orbit origin, so everything is drawn
@@ -828,6 +829,12 @@ class MeshcatRenderer(AnimationRenderer):
         eye.set_property("near", max(0.01, 1.0e-4 * distance))
         eye.set_property("far", max(100.0, 50.0 * distance))
 
+    def _set_backdrop(self) -> None:
+        """The system's backdrop hint: the viewer's grid and axes hidden when ``scene_grid`` is off."""
+        if not getattr(self.sys, "scene_grid", True):
+            for path in _VIEWER_FURNITURE:
+                self.canvas.vis[path].set_property("visible", False)
+
     def _place_camera(self, camera) -> None:
         """Eye placed; world slid to the target (the native clip keyframes that slide)."""
         self._place_eye(camera)
@@ -857,6 +864,7 @@ class MeshcatRenderer(AnimationRenderer):
 
         self.canvas.ensure_objects(primitives)
         self._place_camera(frames[0]["camera"])
+        self._set_backdrop()
 
         # Draw t=0 once: this sets the (frozen) geometry of dynamic polylines
         # and gives every rigid primitive a sane starting pose before keyframes
