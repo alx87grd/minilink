@@ -129,16 +129,28 @@ the new code copies clean patterns and no shortcut is added only to be dropped.
   `TransferFunction` and `StructuralResult`, so tutorial 01's `print(tf)` shows the transfer
   function and fourteen `np.linalg.eigvals(lin.A())` sites go (scan: analysis#3, examples#2).
 - [ ] **RN The randomness convention** ([randomness.md](randomness.md), agreed 2026-09-26,
-  rulings D1–D12). RN-1 `WhiteNoise` (seed and sample period in params, counter-based draw,
-  `psd`, zero-order hold by default, no time window) is P4's prerequisite. RN-2 distributions
-  read `params`, RN-3 `NoiseSource`, RN-4 `realize(key)` and signals on `disturbances`, RN-5 the
-  Monte Carlo evaluator's test set, RN-6 DESIGN. Rungs (decided 2026-09-26): RN-1 v0.2 wave B
+  rulings D1–D24). RN-1 `WhiteNoise` (seed and sample period in params, counter-based draw,
+  `psd`, zero-order hold by default, no time window, the solver hint, `seed = None` the mean)
+  is P4's Kalman demo's prerequisite. RN-2 distributions
+  read `params`, RN-3 `NoiseSource`, RN-4 `realize(key)` by name and signals on `disturbances`,
+  RN-5 the Monte Carlo evaluator as a batched simulation of the closed-loop diagram on its test
+  set, RN-6 DESIGN. Rungs (decided 2026-09-26): RN-1 v0.2 wave B
   before P4; RN-2 v0.2 wave A with A5; RN-3 with its first consumer (P11 if a GRO501 notebook
   shows sampled sensor noise, else v0.3); RN-4 and RN-5 together in v0.3, after the fall term,
   before the v0.9 freeze; RN-6 with each step. Done when the plan's steps are ticked and DESIGN
   carries the convention.
   Also: the evaluator's `simulator` backend fails on a diagram plant with a nested-diagram
   error (found 2026-09-26, randomness.md §1).
+  Reviewed 2026-09-30 (randomness.md §10): D13 decided that day (one counter generator on both
+  backends, the test set holds seeds and no noise values; it lands with RN-1 and amends D11);
+  A2–A10 ruled the same day as D14–D23, D24 added (the evaluator simulates the diagram). The
+  implementation plan, files and "done when" per step, is randomness.md §9.
+  RN-1 rewrites `tutorial/00_core.ipynb`, `tutorial/01_blocks.ipynb`, the live course
+  notebook `udes_gro501/cartpole_dynamic_controller.ipynb` and `test_blocks.py` in the same
+  commit (decided 2026-09-30, D14). RN-1 does not block P4's array API (`kalman(A, B, C, Q, R)`),
+  only the Kalman demo that reads `psd`.
+  **RN-1 landed 2026-09-30** (five commits on `dev-random`): P4's Kalman demo is unblocked;
+  DESIGN §4 carries the convention. Next: RN-2, then RN-3 with its first consumer.
 - [ ] **P4 `estimation/`** **[held 2026-09-07; 2026-09-26: stays held until the clean-up and
   solidification above land, then RN-1 of [randomness.md](randomness.md) lands first]**. `LuenbergerObserver(A, B, C,
   L)` as a `DynamicSystem` with ports `u`, `y` → `x_hat`; `luenberger(A, B, C, poles)` on the
@@ -270,6 +282,20 @@ each plan states; every step is name-preserving for the GRO860 notebooks.
   layout across the bicycle rungs; one owner for the wheelbase; the hidden `0.01` damping in
   `Drone2D.d` and `Rocket.d` named; `VanderPol` with a real input or none; constructor hygiene
   in the pendulum and mass-spring-damper families.
+- [ ] **S72 The path-integral planner (MPPI)** **[ask — name, MPC block contract]**, after
+  RN-4 and RN-5 (decided 2026-10-02: the planner lands on the evaluator's batched rollout over
+  realizations, not before it). Design: [mppi.md](mppi.md); the standalone prototypes
+  `examples/experimental/mppi/pendulum_mppi.py` and `racecar_mppi.py` run today. MP-1 `planning/trajectory_optimization/path_integral.py`:
+  `PathIntegralPlanner` / `PathIntegralRecord`, `solve` and `solve_trajectory_from` on
+  `RolloutEnvironment` (`jit(vmap(scan))` over `K` samples), the six-beat body of the plan's
+  §5, `decision_dimension` and `warm_start_guess`; MP-2 the hand-loop demo
+  `examples/experimental/mppi/pendulum_mppi.py`; MP-3 the stochastic branch
+  (`n_plant_samples` realizations per control sample, mean or CVaR by the problem's
+  criterion) and the fan of sampled futures as `solution.plot_samples()`.
+  Done when the seeded-determinism, LQR-agreement and swing-up tests pass, the deterministic
+  twin of the stochastic branch is byte-identical, and the body reads next to `dp.py`.
+  MP-4 (the MPC block reads the planner verbs: T6, §5) and MP-5 (demos, `compare(MPC=, MPPI=)`)
+  before v0.9; MP-6 (the `loop` backend, facade names, DESIGN §6) with V3.
 - [ ] **Estimation follow-ups** after P4: EKF, time-varying and discrete Kalman as
   `estimation/` rows; online parameter estimators (recursive least squares, gradient laws).
 
@@ -349,6 +375,9 @@ findings, file by file and line by line, are in
   Also: one record per MPC tick, `Command` and `MPCTickSolve` folded into the
   `PlanningSolution` (scan: control#4); `mpc @ inner_loop` closing on a multi-block plant
   (scan: examples#12).
+  The shape proposed for the planner contract (three `Planner` verbs, `z` on the tick's
+  record, `validate_mpc_planner` reading them) is [mppi.md](mppi.md) §6; MP-4 there is this
+  step's second consumer, and the trajopt MPC baselines are its safety net.
 - [ ] **T7 graphical** (scan: graphics#13): the graphical band joins the textbook pass
   (renderers, catalog skins, signal plots), same recipe.
 - [ ] **Rename pass, the rest**: the remaining `_method` names on `System` subclasses not
@@ -550,7 +579,7 @@ three years. The foundation rows are design conversations before code.
   S66's wiring-time checks raise them. Done when the wiring and compile paths of `core/`
   raise only the family.
 - [ ] **V11 Rewrite the history without notebook outputs** **[ask — force-push]**, in December
-  2026 after the v0.3 tag, between terms. A fresh clone is 161 MB for 19 MB of files: 169 MB of
+  2026 after the v0.3 tag, between terms. A fresh clone is 176 MB for 19 MB of files: 169 MB of
   the history is `.ipynb` outputs committed before the `nbstripout` hook worked, mostly five
   notebooks deleted by May (`examples/notebooks/demo*.ipynb`, `animation_colab.ipynb`).
   `main` carries it all, so deleting branches or `archive/*` tags does not help. Steps: keep a
@@ -643,12 +672,32 @@ One line each; open a plan doc only when a design needs a writeup.
 - Articulated mechanism layer (one mechanism description feeding RNEA/ABA and the symbolic
   path) — [articulated-mechanism.md](articulated-mechanism.md).
 - `RobustPlanningProblem` (set-bounded uncertainty, minimax criterion) only when a minimax
-  consumer exists; the deterministic / stochastic pair is the taxonomy that shipped.
+  consumer exists; the deterministic / stochastic pair is the taxonomy that shipped. The path-integral planner's `"worst_case"` branch (CVaR over plant draws,
+  [mppi.md](mppi.md) §4) would be that consumer; the two decisions go together.
+- `RolloutEnvironment` moves from `reinforcement_learning/` to `planning/environment.py` once
+  a second band reads it (the path-integral planner; the evaluator and the tabular learners
+  already do): one import rewrite, no behaviour change.
 - `MjxPlant` (`interfaces/mjx.py`) and `torch` / `flax` model wrappers in `interfaces/`;
   Pacejka tire; stochastic forcing; ROS2 / FMI; sparse long-horizon trajopt; RRT-Connect;
   shared RNEA serial-chain stack; ABA on other RNEA arms.
 - Ipopt given the Lagrangian Hessian, not the objective's alone (scan: planning#13);
   `optimizer_method="auto"` picking Ipopt when installed (scan: examples#11);
   `PlanningProblem.metadata` documented or retired (scan: planning#14; ROADMAP §6).
+- A fixed-step RK4 that samples held sources once per step, so the four stages read one
+  sample and the block route equals the port route (randomness.md §10 A8, D18): fourth order
+  with no boundary error at `dt = Δ`, one draw per step instead of four.
+  Deferred 2026-09-30 (the randomness API lands first; it touches `compile` and the solvers);
+  worth it only if a twin test shows the first-order bias.
+- A key check on leaf params (a `validate_params` hook on `System`, no-op by default, called
+  where diagram params are validated): today a typo or a retired key in any block's params is
+  ignored silently. Raised with the noise block's retired keys (randomness.md D15) and declined
+  there 2026-09-30 in favour of the library-wide behaviour; a question for the whole library.
+- A 3-D still of any animation: `save_frame(t)` on the meshcat renderer writes the static HTML
+  of one frame (the MPPI prototype did it by hand: build the frames with `Animator`, draw one
+  into a viewer-less `MeshcatRenderer`, write `static_html()`), and a headless screenshot of
+  that page is then a one-liner for docs and CI. With it, two camera notes for S43: the
+  default meshcat eye sits low so the viewer's grid reads as horizon lines, and an overlay
+  (a track corridor) drives the auto-fit camera, so a follow camera cannot zoom on the car;
+  overlays should opt out of the fit as the ground lines already do.
 - Declined 2026-09-05 (do not re-propose): scalar / list signal bounds and a coercing `x0`;
   scalar `Q` / `R` / `S` in `QuadraticCost.from_system`.

@@ -5,6 +5,8 @@ A duck type, not a probability library: anything with ``dim``, ``sample(key)`` a
 (JAX arrays out, traceable under ``jit`` / ``vmap`` / ``scan``).
 """
 
+import warnings
+import zlib
 from abc import ABC, abstractmethod
 
 import numpy as np
@@ -12,6 +14,7 @@ import numpy as np
 from minilink.core.backends import (
     array_module,
     is_jax_key,
+    jax_x64_policy,
     numpy_generator,
     require_jax,
 )
@@ -156,3 +159,101 @@ def split_keys(key, n):
         jax = require_jax()
         return list(jax.random.split(key, n))
     return [numpy_generator(key)] * n
+
+
+def threefry_2x32(key, count):
+    """Threefry-2x32, 20 rounds: two words of bits from a key pair and a counter pair.
+
+    ``key`` and ``count`` are pairs of 32-bit words: Python integers, or ``uint32``
+    arrays of one shape. The rounds follow the Random123 schedule, so the bits match
+    the published vectors and JAX's own generator; the mask keeps Python integers to
+    32 bits and is a no-op on ``uint32`` arrays.
+    """
+    mask = 0xFFFFFFFF
+    rotations = (13, 15, 26, 6, 17, 29, 16, 24)
+    k0, k1 = key
+    c0, c1 = count
+    ks = (k0, k1, k0 ^ k1 ^ 0x1BD11BDA)
+
+    x0 = (c0 + k0) & mask
+    x1 = (c1 + k1) & mask
+    for i in range(20):
+        r = rotations[i % 8]
+        x0 = (x0 + x1) & mask
+        x1 = ((x1 << r) | (x1 >> (32 - r))) & mask
+        x1 = x0 ^ x1
+        if i % 4 == 3:
+            j = i // 4 + 1
+            x0 = (x0 + ks[j % 3]) & mask
+            x1 = (x1 + ks[(j + 1) % 3] + j) & mask
+    return x0, x1
+
+
+def random_bits(seed, k, p):
+    """Two ``(p,)`` words of bits for sample ``k`` of a ``p``-channel stream keyed by ``seed``.
+
+    The key words are the seed's low and high halves, the counter words the sample
+    index and the channel: every sample of every channel is one cipher block, and a
+    negative index wraps the same way on both backends. On NumPy the rounds run on
+    Python integers, one channel at a time; on JAX on ``uint32`` arrays under the trace.
+    """
+    xp = array_module(seed, k)
+    if xp is np:
+        seed, k = int(seed), int(k)
+        key = (seed & 0xFFFFFFFF, (seed >> 32) & 0xFFFFFFFF)
+        words = [threefry_2x32(key, (k & 0xFFFFFFFF, channel)) for channel in range(p)]
+        return (
+            np.array([w[0] for w in words], dtype=np.uint32),
+            np.array([w[1] for w in words], dtype=np.uint32),
+        )
+    seed = xp.asarray(seed)
+    k = xp.asarray(k)
+    low = xp.broadcast_to(seed.astype(xp.uint32), (p,))
+    high = xp.broadcast_to((seed >> 32).astype(xp.uint32), (p,))
+    sample = xp.broadcast_to(k.astype(xp.uint32), (p,))
+    channel = xp.arange(p, dtype=xp.uint32)
+    return threefry_2x32((low, high), (sample, channel))
+
+
+def standard_normal(seed, k, p):
+    """``p`` independent standard normal draws for sample ``k`` of the stream keyed by ``seed``.
+
+    Box–Muller on the two words of the cipher block, so the draw is a pure function of
+    ``(seed, k)`` and identical on NumPy and JAX.
+    """
+    xp = array_module(seed, k)
+    bits_1, bits_2 = random_bits(seed, k, p)
+
+    # two uniforms in (0, 1) from the top 24 bits of each word
+    u_1 = (bits_1 >> 8).astype(float) * 2.0**-24 + 2.0**-25
+    u_2 = (bits_2 >> 8).astype(float) * 2.0**-24 + 2.0**-25
+
+    # ε = √(−2 ln u₁) cos(2π u₂)
+    eps = xp.sqrt(-2.0 * xp.log(u_1)) * xp.cos(2.0 * xp.pi * u_2)
+
+    return eps
+
+
+def sample_index(t, period):
+    """The index ``k`` of the sample held at time ``t``, the floor of ``t / period``.
+
+    A relative tolerance absorbs a ``t`` accumulated step by step that lands a rounding
+    error before a boundary. Returned as a 0-d integer array; the 32-bit JAX mode cannot
+    hold the index past a few boundaries and is announced once.
+    """
+    xp = array_module(t)
+    if xp is not np and not jax_x64_policy():
+        warnings.warn(
+            "JAX runs in 32-bit floats (MINILINK_JAX_X64=0): the sample index of a held "
+            "signal is wrong from the first boundaries; noise blocks need the 64-bit default",
+            stacklevel=2,
+        )
+    s = xp.asarray(t) / period
+    k = xp.floor(s + 1e-10 * (1.0 + xp.abs(s)))
+    return xp.asarray(k).astype(int)
+
+
+def child_seed(seed, name):
+    """The seed of the stream named ``name`` under ``seed``: one cipher word, 31 bits, both backends alike."""
+    word, _ = random_bits(seed, np.asarray(zlib.crc32(name.encode())), 1)
+    return int(word[0] >> 1)

@@ -51,6 +51,15 @@ state bounds), `U` still defaults to the input ports' box. Files that meant the 
 bounds as a constraint now say `X=plant.state.box`; the RL planner's new
 `training_zone` (the state box by default) keeps every RL demo's training unchanged.
 
+2026-09-30: `WhiteNoise` is rewritten as a pure block, `WhiteNoise(p, *, psd,
+sample_period, seed, hold)`; its `var`, `mean`, `t0` and `tf` params and its
+`refresh()` are removed without aliases, and an old per-sample variance reads as
+the intensity `psd = var × sample_period`. Seeded realizations change once (a
+counter-based cipher replaces the drawn table); a diagram holding noise now picks
+fixed-step RK4 on a divisor of the sample period by itself, and is linearized at
+the noise's mean instead of raising. The tutorial and course cells were rewritten
+in the same commit.
+
 ## 3. Maturity (TRL)
 
 Readiness levels are an internal maturity scale for planning and review — not
@@ -68,18 +77,18 @@ a release process by themselves.
 | **TRL 8** | Demo Released | Demo script is created and validated |
 | **TRL 9** | Mission Complete | Tests, demo, and user approval are all complete |
 
-State as of 2026-09-22. Step ids (`S29`, `P3`, `T2`, …) are the rows of
+State as of 2026-10-02. Step ids (`S29`, `P3`, `T2`, …) are the rows of
 [docs/plans/TODO.md](docs/plans/TODO.md).
 
 | Area | Lane | TRL | State | Next |
 | --- | --- | --- | --- | --- |
-| Core + diagrams | teaching | 7 | Public API and diagram API stable; compile-vs-reference parity tested; wrong-shape `f` / `h` fails at `compile()`. | Derived `x0` (S29, v1.0). |
-| Compile (`core/compile/`) | teaching (frozen subset) | 4 | Integrated; the frozen evaluator subset is named in DESIGN §5, the stable-internal helper grid kept by ruling. Speed lives in batches (1000 rollouts × 1000 RK4 steps in 27 ms); float64 on JAX by default. | `rollout_batch` with a `params` family (S53); evaluator/solver re-layering (S37, v1.0). |
+| Core + diagrams | teaching | 7 | Public API and diagram API stable; compile-vs-reference parity tested; wrong-shape `f` / `h` fails at `compile()`. | Derived `x0` (S29, v0.9). |
+| Compile (`core/compile/`) | teaching (frozen subset) | 4 | Integrated; the frozen evaluator subset is named in DESIGN §5, the stable-internal helper grid kept by ruling. Speed lives in batches (1000 rollouts × 1000 RK4 steps in 27 ms); float64 on JAX by default. | `rollout_batch` with a `params` family (S53); evaluator/solver re-layering (S37, v0.9). |
 | Simulation | teaching | 7 | Mature; fixed 10 001-point default grid; `verbose` names unified. | Textbook pass (T4). |
-| Dynamics (abstraction + catalog) | teaching | 7 | Plants QA'd; `MechanicalSystem` / `Manipulator`; UR5 ABA/RNEA; **every catalog plant compiles on both backends** (contract test); four-rung vehicle ladder; UdeS racecar (kinematic, dynamic, 3-D). | Textbook pass (T3); mechanical-base unification (S32, v1.0). |
-| Control | teaching | 6 | Linear, LQR (infinite horizon, finite horizon, along a trajectory), pole placement, `P` / `PI` / `PD` / `PID` carrying only the states their terms need, model-based SMC and computed torque, robotic impedance and kinematic laws, neural policy block. | `place()` (P3) and reference scaling (P8, v0.2); textbook pass (T2). |
+| Dynamics (abstraction + catalog) | teaching | 7 | Plants QA'd; `MechanicalSystem` / `Manipulator`; UR5 ABA/RNEA; **every catalog plant compiles on both backends** (contract test); four-rung vehicle ladder; UdeS racecar (kinematic, dynamic, 3-D). | Textbook pass (T3); mechanical-base unification (S32, after v1.0). |
+| Control | teaching | 6 | Linear, LQR (infinite horizon, finite horizon, along a trajectory), pole placement, `P` / `PI` / `PD` / `PID` carrying only the states their terms need, model-based SMC and computed torque, robotic impedance and kinematic laws, neural policy block. | Reference scaling (P8, v0.2); textbook pass (TB-b, T2). |
 | Analysis | teaching | 6 | Jacobians, linearize, structural, equilibria, modal; one-channel Bode with margins, pole-zero, root locus, Nyquist, step response on matplotlib and plotly; the frequency band brackets the 0 dB crossing. | named `S` / `T` / `PS` / `CS` (P5), ζ / ω_n (P8); z tier held; Nichols and overlays later; textbook pass (T4). |
-| Blocks | teaching | 5 | Routing, nonlinear, filters, sources, TF, 1-layer NN. | `Sine` / `Ramp` / `Chirp` / `Delay` / `Switch` (v0.2); textbook pass (T2). |
+| Blocks | teaching | 5 | Routing, nonlinear, filters, sources, TF, 1-layer NN. | `Sine` / `Ramp` / `Chirp` / `Delay` / `Switch` (C3, v0.3); textbook pass (T2). |
 | Planning / policy synthesis (DP) | teaching (GRO860) | 6 | Grid + value iteration (`loop` / `numpy` / `jax`), lookup controller, `PolicyEvaluator`, `LQRPlanner`; every planner returns a `PlanningSolution`; `compare()` reads solutions side by side; `dp.py` is the textbook reference of the style (2026-09-18). | cost-to-go as a `Field` (A1); policy iteration (S51). |
 | Planning / trajopt | teaching (GRO860) | 5 | Collocation, shooting, multiple shooting; live plot; `success` means defects satisfied to `feasibility_tol`; float64 by default on JAX. | Harden SciPy/Ipopt before TRL 6; textbook pass (T5). |
 | Optimization | teaching (via trajopt) | 5 | `MathematicalProgram` + `Optimizer`, SciPy/Ipopt. | Harden SciPy/Ipopt before TRL 6. |
@@ -87,16 +96,17 @@ State as of 2026-09-22. Step ids (`S29`, `P3`, `T2`, …) are the rows of
 | Analysis / Lyapunov certificates | provisional (research) | 4 | `region_of_attraction` → `LyapunovCertificate` (quadratic `V`, sampled level, `verify`, `plot`, `contains`); demo and showcase §11. | Cohort validation; `V` as a `QuadraticField` (A1); SOS and discrete time later. |
 | Planning / RL planner | teaching (GRO860) | 6 | `ReinforcementLearningPlanner` (REINFORCE, actor-critic, PPO, SAC in pure JAX), `TabularLearningPlanner` (Q-learning, SARSA, Monte Carlo control), `StochasticPlanningProblem`, `MonteCarloEvaluator`; the names are on the root prelude; canonical demos in `examples/demos/rl/`, chapter 11 and the native teaching notebooks. | SAC actor step (S50); deep Q-learning (S52); automatic reward scaling ([rl-reward-scaling.md](docs/plans/rl-reward-scaling.md)); textbook pass (T5). |
 | Planning / search (RRT) | provisional | 5 | RRT / RRT*; `RRTPlanner(problem)` works from the input bounds alone (bang-bang extender); returns a `PlanningSolution`. | RRT-Connect later; textbook pass (T5). |
+| Planning / path integral (MPPI) | research lane (planned) | 1 | Two standalone scripts (`examples/experimental/mppi/`, 2026-10-02): the pendulum swings up; the kinematic racecar laps the cone circuit at a lower closed-loop cost than the collocation MPC on the same problem, 9 ms a tick on CPU. Design [mppi.md](docs/plans/mppi.md) (2026-10-02): a `PathIntegralPlanner` beside trajopt, wrapped by the existing `ModelPredictiveController`; both problem classes (input noise on a deterministic problem, plant draws per sample on a stochastic one); the batched JAX rollout and `RolloutEnvironment` as the step's owner. | The planner (S72) after RN-4 / RN-5, on the evaluator's batched rollout over realizations; the MPC block reads three planner verbs instead of trajopt internals (T6) before v0.9; teaching form with V3. |
 | Geometry / spatial | provisional | 4 | SDF + `Scene` / fields / bodies under `planning/spatial/`, JAX twins tested. Home designed: `core/geometry/` (S57). | Package move and course catalog (A3); bicubic SDF and CBF filter (research). |
-| Graphics / animation | teaching | 5 | Frame-keyed `tf` / geometry / overlays; four renderers; auto-fit camera. | Constructor-derived camera hints (S43); glyph/solid rename (S30, v1.0). |
-| Hybrid / step / MPC | provisional (research) | 4 | `StepSystem`, `Computer`, `HybridDiagram`, `HybridSimulator`, MPC with parametric JAX. The sampled loop is the one thing that is not a `System`. | No new hybrid features before the v1.0 decision (S31); textbook pass on `mpc/controller.py` (T6). |
+| Graphics / animation | teaching | 5 | Frame-keyed `tf` / geometry / overlays; four renderers; auto-fit camera. | Constructor-derived camera hints (S43); glyph/solid rename (S30, v0.9). |
+| Hybrid / step / MPC | provisional (research) | 4 | `StepSystem`, `Computer`, `HybridDiagram`, `HybridSimulator`, MPC with parametric JAX. The sampled loop is the one thing that is not a `System`. | No new hybrid features before the v0.9 decision (S31); textbook pass on `mpc/controller.py` (T6). |
 | Realtime simulation | provisional | 2 | `RealtimeSimulator` + pygame I/O. | Architectural review (v1.0). |
 | Estimation | planned (GRO501) | 1 | Placeholder. The largest GRO501 gap. | Luenberger, then Kalman, as diagram blocks (P4, v0.2), after step RN-1 of [randomness.md](docs/plans/randomness.md): the `WhiteNoise` whose `psd` the Kalman design reads (the disturbance convention, decided 2026-09-26). |
-| Identification | planned | 2 | Parametric-tier prototype only. | `fitting.py` (v0.2). |
+| Identification | planned | 2 | Parametric-tier prototype only. | `fitting.py` (C4, v0.3). |
 | C export (`experimental/c_export`) | research | 1 | JAX→C transpiler; two demos; flagship smoke in the JAX regression job. | Keep isolated; repo-only. |
 | Experimental tier (`experimental/symbolic`, `experimental/engines`) | research | 1 | Not on the teaching path nor the API site. | Keep isolated; repo-only. |
 | External multibody leaf (MJX) | research | 0 | Not started. | Spike later. |
-| Pyro 2.0 overall | v0.2 | 3 | Catalog + core + search/DP/trajopt done; many demos unported. | Remaining rows in [pyro-port-remaining.md](docs/plans/pyro-port-remaining.md). |
+| Pyro 2.0 overall | v0.3 | 3 | Catalog + core + search/DP/trajopt done; many demos unported. | Remaining rows in [pyro-port-remaining.md](docs/plans/pyro-port-remaining.md). |
 
 ## 4. Course objectives
 
@@ -199,7 +209,7 @@ contract.
 | Nonlinear control — feedback linearization, computed torque, sliding mode, Lyapunov | `control.modelbased`, `control.geometric`, `analysis.lyapunov` | audit pending | set by G1 |
 | Robust control — uncertainty, margins, robust design | `analysis` frequency tools | audit pending | set by G1 |
 | Trajectory optimization — direct collocation, shooting | `planning.trajectory_optimization` | audit pending | set by G1 |
-| MPC — receding horizon on the vehicle and the arm | `control.mpc` (provisional, research lane) | audit pending | MPC joins the teaching surface, or stays a lesson on the research lane, decided in G1 |
+| MPC — receding horizon on the vehicle and the arm | `control.mpc` (provisional, research lane) | audit pending | MPC joins the teaching surface, or stays a lesson on the research lane, decided in G1; the sampling flavour (MPPI, [mppi.md](docs/plans/mppi.md), S72) is on the table for that audit |
 
 **Cross-cutting gates** (as for GRO501): every topic row green with a demo
 or a notebook; one `examples/teaching/` notebook per topic, Colab-first;
@@ -363,6 +373,16 @@ Standing work, behaviour-preserving, one module per step.
 - **S63** DP reads a finite horizon from `problem.tf`, as LQR does; **S64**
   catalog hygiene (bounds each plant states, port labels read from the
   state, one wheelbase owner). **[ask]**
+- **S72** The path-integral planner (MPPI) on the research lane
+  ([mppi.md](docs/plans/mppi.md), proposed 2026-10-02): two standalone scripts
+  run today (`examples/experimental/mppi/`: the pendulum swing-up, the racecar
+  circuit against the collocation MPC); the planner,
+  `PathIntegralPlanner`, lands after RN-4 / RN-5 on the evaluator's batched
+  rollout over realizations (decided 2026-10-02), deterministic first (noise on
+  the inputs), then the stochastic branch (a plant realization per sample from
+  the problem's distributions); wrapping it in `ModelPredictiveController` is
+  the T6 contract narrowing of `mpc/controller.py` (steps MP-1 to MP-3 here,
+  MP-4 and MP-5 before v0.9, MP-6 with V3). **[ask — name, the MPC block contract]**
 - **RN-4 / RN-5** of [randomness.md](docs/plans/randomness.md), together, after the fall term:
   `realize(key)` and signals on `disturbances=` (the frozen-noise defect
   fixed), then the Monte Carlo evaluator's test set. Both change public
@@ -499,7 +519,23 @@ here. Each open item needs the maintainer.
   disturbance port takes a signal; `realize(key)` gives every random block
   and parameter its own stream; the Monte Carlo evaluator scores every law on
   one test set drawn once. Kalman reads `Q = B_w W B_wᵀ`, `R = V`. This entry
-  leaves §6 when step RN-6 moves the contract to DESIGN.
+  leaves §6 when step RN-6 moves the contract to DESIGN. Reviewed 2026-09-30
+  (§10 of the plan). Decided that day, D13: the noise block draws with one
+  counter generator on NumPy and JAX, so the same seed is the same signal on
+  both, and the test set holds starts, parameter values and seeds, no noise
+  values (it amends D11). A2–A10 ruled the same day as D14–D23, and D24
+  added: RN-1 lands now with the course cell rewritten in the same commit;
+  `WhiteNoise(p, *, psd, sample_period, seed, hold)`; a noisy diagram
+  publishes Δ as its solver hint and runs fixed-step RK4 at Δ by
+  itself; `seed = None` is the mean, so analysis linearizes at `E[w] = 0`;
+  streams are derived by name with the library's cipher; and the Monte
+  Carlo evaluator simulates the closed-loop diagram, batched, so any
+  controller and any noise block go through the one simulation path. The
+  implementation plan is the plan's §9. RN-1 landed 2026-09-30 (the block,
+  the cipher, the solver hint, `realize(key)` on every `System`, the two
+  warnings, the notebooks); three implementation notes there: the hint is a
+  float `sample_period` key, the stepped-tools check warns on a Jacobian
+  probe, and `realize(key)` landed whole with the systems.
 - **The terminal cost `h(x_f, t_f)`, one rule for every tool.** Since the
   one-horizon ruling (2026-09-17) `h` is charged exactly when `tf` is
   finite; still to settle whether an infinite-horizon cost with a nonzero `h`
@@ -560,6 +596,17 @@ here. Each open item needs the maintainer.
 - **CBF safety filter** ([cbf-safety-filter.md](docs/plans/cbf-safety-filter.md)):
   research lane until a course asks; the barrier is a `Field` once A1 lands.
 
+**Before v0.3 wave C (S72, the path-integral planner)**
+
+- **MPPI** — proposed 2026-10-02 in [mppi.md](docs/plans/mppi.md) §10: the
+  planner's name (`PathIntegralPlanner`, so that the composition with
+  `ModelPredictiveController` spells the acronym, or `MPPIPlanner`); the three
+  planner verbs the MPC block reads instead of trajopt internals
+  (`decision_dimension`, `prepare_online`, `warm_start_guess`, and `z` on the
+  tick's record — the shape of T6); the stochastic default (plant draws per
+  control sample); where `RolloutEnvironment` lives once a second band reads it.
+  Timing decided 2026-10-02: RN-4 and RN-5 first, then the planner.
+
 **Before v0.9 (the freeze candidate)**
 
 - `HybridDiagram` as a `System` vs `HybridLoop` (S31), and the sampled
@@ -603,6 +650,6 @@ README, the showcases and the tutorial do present it. Live interaction is
 | Doc | Job |
 | --- | --- |
 | [docs/plans/TODO.md](docs/plans/TODO.md) | The workboard: every open step of §5, by rung, with files and "done when" |
-| [docs/plans/pyro-port-remaining.md](docs/plans/pyro-port-remaining.md) | Open pyro parity rows (v0.2) |
+| [docs/plans/pyro-port-remaining.md](docs/plans/pyro-port-remaining.md) | Open pyro parity rows (v0.3) |
 | [docs/plans/](docs/plans/) | Design writeups for the steps that need one (see [plans README](docs/plans/README.md)) |
 | [docs/reviews/](docs/reviews/) | Dated architecture audits and decision records |
