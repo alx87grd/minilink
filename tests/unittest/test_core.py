@@ -265,6 +265,22 @@ class TestDiagramCompositionShortcuts(unittest.TestCase):
         self.assertEqual(diagram.connections["ctl2"]["y"], None)
         self.assertEqual(diagram.connections["sys"]["u"], None)
 
+    def test_autowire_never_routes_one_command_to_two_inputs(self):
+        def blocks():
+            return (
+                Step(final_value=[1.0])
+                + ProportionalController()
+                + Saturation()
+                + Integrator()
+            )
+
+        with self.assertWarnsRegex(UserWarning, "ctl:u; it matches several inputs"):
+            diagram = blocks().autowire()
+        self.assertIsNone(diagram.connections["sys"]["u"])
+        self.assertIsNone(diagram.connections["saturation"]["u"])
+        with self.assertRaisesRegex(ValueError, "Ambiguous autowire"):
+            blocks().autowire(strict=True)
+
     def test_closed_loop_qdq_inserts_mux(self):
         diagram = closed_loop_qdq(ImpedanceController(), Pendulum())
         self.assertIn("mux", diagram.subsystems)

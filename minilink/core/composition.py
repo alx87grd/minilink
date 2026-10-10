@@ -10,6 +10,7 @@ Explicit ``add_subsystem`` / ``connect`` remains the canonical way to build any 
 from __future__ import annotations
 
 import re
+import warnings
 from collections.abc import Iterable
 from dataclasses import dataclass
 
@@ -535,8 +536,9 @@ def autowire(
     diagram : DiagramSystem
         Diagram to modify in place.
     strict : bool, optional
-        If ``True``, raise when any unconnected input has multiple candidates.
-        No new connections are applied before that error is raised.
+        If ``True``, raise when any match is ambiguous. No new connections are
+        applied before that error is raised. If ``False``, the ambiguous inputs
+        are left unconnected and a warning lists them.
     validate : bool, optional
         If ``True``, run algebraic-loop detection after wiring.
 
@@ -552,6 +554,10 @@ def autowire(
     - exact same port name and dimension, except generic measurement ``y``;
     - source-like ``y`` output to a ``r`` input;
     - non-source-like ``y`` output to a measurement ``y`` input.
+
+    An input with several candidates is ambiguous, and so is an output that
+    matches several inputs by name (a command reaching both a saturation and
+    the plant).
     """
     if not isinstance(diagram, DiagramSystem):
         raise TypeError("autowire() expects a DiagramSystem")
@@ -567,14 +573,42 @@ def autowire(
             if len(candidates) == 1:
                 source_id, source_port = candidates[0]
                 decisions.append((source_id, source_port, target_id, input_id))
-            elif len(candidates) > 1 and strict:
-                ambiguities.append((target_id, input_id, candidates))
+            elif len(candidates) > 1:
+                rendered = ", ".join(f"{s}:{p}" for s, p in candidates)
+                ambiguities.append(
+                    f"Ambiguous autowire target {target_id}:{input_id}; "
+                    f"candidates: {rendered}"
+                )
 
+    # One output matched by name to several inputs (a command reaching both a
+    # saturation and the plant) is ambiguous too: which one it drives is a choice.
+    # A measurement `y` read by several blocks is not: every reader gets it.
+    by_name = {}
+    for source_id, source_port, target_id, input_id in decisions:
+        if source_port == input_id != "y":
+            by_name.setdefault((source_id, source_port), []).append(
+                f"{target_id}:{input_id}"
+            )
+    fanned = {source for source, targets in by_name.items() if len(targets) > 1}
+    for source_id, source_port in fanned:
+        targets = ", ".join(by_name[source_id, source_port])
+        ambiguities.append(
+            f"Ambiguous autowire source {source_id}:{source_port}; it matches "
+            f"several inputs: {targets}"
+        )
+    decisions = [
+        decision
+        for decision in decisions
+        if not (decision[1] == decision[3] != "y" and decision[:2] in fanned)
+    ]
+
+    if ambiguities and strict:
+        raise ValueError(ambiguities[0])
     if ambiguities:
-        target_id, input_id, candidates = ambiguities[0]
-        rendered = ", ".join(f"{sys_id}:{port_id}" for sys_id, port_id in candidates)
-        raise ValueError(
-            f"Ambiguous autowire target {target_id}:{input_id}; candidates: {rendered}"
+        warnings.warn(
+            "autowire left these inputs unconnected (wire them with connect): "
+            + "; ".join(ambiguities),
+            stacklevel=3,
         )
 
     for source_id, source_port, target_id, input_id in decisions:
