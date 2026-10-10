@@ -313,6 +313,62 @@ def flipbook_pages(frames, i: int, key) -> list:
     return pages
 
 
+def fold_growing_prefix(pages) -> list:
+    """Flipbook pages of a growing polyline (a trail), each drawing only what it adds.
+
+    Where a page's line extends the previous page's, frame after frame and
+    drawn alike, the later page keeps just its new piece and every page of
+    the chain stays shown to the chain's last frame: the pieces add up to the
+    line of each frame, at a size linear in the frame count.
+    """
+    folded = []
+    k = 0
+    while k < len(pages):
+        end = k
+        while end + 1 < len(pages) and extends_polyline(pages[end], pages[end + 1]):
+            end += 1
+        chain_stop = pages[end][1]
+        start, _, primitive = pages[k]
+        folded.append((start, chain_stop, primitive))
+        for j in range(k + 1, end + 1):
+            start, _, primitive = pages[j]
+            folded.append(
+                (start, chain_stop, polyline_tail(pages[j - 1][2], primitive))
+            )
+        k = end + 1
+    return folded
+
+
+def extends_polyline(page, later) -> bool:
+    """True when ``later`` follows ``page`` in time with the same line, grown at its end."""
+    _, stop, before = page
+    start, _, after = later
+    if stop != start or type(before) is not CustomLine or type(after) is not CustomLine:
+        return False
+    look = (str(before.color), float(before.linewidth), repr(before.style))
+    if look != (str(after.color), float(after.linewidth), repr(after.style)):
+        return False
+    n = len(before.pts)
+    return 2 <= n < len(after.pts) and np.array_equal(after.pts[:n], before.pts)
+
+
+def polyline_tail(before, after) -> CustomLine:
+    """The piece of ``after`` past ``before``, from its last point, dashes in phase."""
+    n = len(before.pts)
+    style = before.style
+    dashes = _linestyle_dashes(style)
+    if dashes is not None:
+        offset = float(style[0]) if isinstance(style, tuple) else 0.0
+        unit = _LINE_DASH_M * max(float(before.linewidth), 0.8)
+        length = float(
+            np.sum(np.linalg.norm(np.diff(_as_xyz(before.pts), axis=0), axis=1))
+        )
+        style = (offset + length / unit, dashes)
+    return CustomLine(
+        after.pts[n - 1 :], color=after.color, linewidth=after.linewidth, style=style
+    )
+
+
 def page_visibility(start: int, stop: int, n_frames: int) -> dict:
     """Keyframes ``{frame: shown}`` of a page shown over ``start <= k < stop``.
 
@@ -891,7 +947,9 @@ class MeshcatRenderer(AnimationRenderer):
         animation_obj = mcanim.Animation(default_framerate=schedule.target_fps)
 
         for i in range(n_slots):
-            pages = flipbook_pages(frames, i, canvas._primitive_key)
+            pages = fold_growing_prefix(
+                flipbook_pages(frames, i, canvas._primitive_key)
+            )
             if len(pages) == 1 and pages[0][:2] == (0, n_frames):
                 canvas.ensure_object(i, pages[0][2])
             else:

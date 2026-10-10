@@ -560,6 +560,7 @@ from minilink.graphical.animation.renderers.meshcat_renderer import (
     camera_eye_position,
     camera_world_shift,
     flipbook_pages,
+    fold_growing_prefix,
     html_export_path,
     page_visibility,
     polyline_strip_mesh,
@@ -662,6 +663,31 @@ class TestMeshcatFlipbook(unittest.TestCase):
         frames = [{"primitives": [a]}, {"primitives": []}, {"primitives": [a]}]
         pages = flipbook_pages(frames, 0, key=id)
         self.assertEqual(pages, [(0, 1, a), (2, 3, a)])
+
+    def test_a_growing_trail_folds_into_pieces_that_add_up(self):
+        pts = np.array([[0.0, 0.0, 0.0], [0.7, 0.0, 0.0], [1.3, 0.0, 0.0], [2.0, 0, 0]])
+        trail = [CustomLine(pts[:n], linewidth=1.0, style="--") for n in (2, 3, 4)]
+        folded = fold_growing_prefix([(k, k + 1, line) for k, line in enumerate(trail)])
+        # each piece is shown from its own frame to the end of the chain
+        self.assertEqual([(a, b) for a, b, _ in folded], [(0, 3), (1, 3), (2, 3)])
+        self.assertIs(folded[0][2], trail[0])
+        np.testing.assert_allclose(folded[2][2].pts, pts[2:])
+
+        def stations(line):
+            vertices, _ = polyline_strip_mesh(
+                line.pts, linewidth=line.linewidth, style=line.style
+            )
+            return np.unique(np.round(vertices[:, 0], 9))
+
+        # the pieces carry the dash phase: together they dash like the whole line
+        pieces = np.unique(np.concatenate([stations(p) for _, _, p in folded]))
+        np.testing.assert_allclose(pieces, stations(trail[-1]))
+
+    def test_a_line_that_does_not_grow_keeps_its_pages(self):
+        a = CustomLine([[0.0, 0.0, 0.0], [1.0, 0.0, 0.0]])
+        b = CustomLine([[0.5, 0.0, 0.0], [1.0, 0.0, 0.0], [2.0, 0.0, 0.0]])
+        pages = [(0, 1, a), (1, 2, b)]
+        self.assertEqual(fold_growing_prefix(pages), pages)
 
     def test_page_visibility_spans_its_run_and_keys_the_last_frame(self):
         self.assertEqual(page_visibility(0, 6, 6), {0: True, 5: True})
@@ -798,7 +824,7 @@ class TestMeshcatOptionalSmoke(unittest.TestCase):
             sys = type("S", (), {"name": "trail"})()
 
         a = CustomLine([[0.0, 0.0, 0.0], [1.0, 0.0, 0.0]])
-        b = CustomLine([[0.0, 0.0, 0.0], [1.0, 0.0, 0.0], [2.0, 0.0, 0.0]])
+        b = CustomLine([[0.0, 1.0, 0.0], [1.0, 1.0, 0.0]])  # moved, not grown
         renderer = MeshcatRenderer(_Anim())
         renderer.canvas = canvas = MeshcatCanvas(_FakeMeshcatNode(), is_3d=True)
         buf = io.StringIO()
