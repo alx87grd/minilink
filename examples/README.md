@@ -97,6 +97,7 @@ Course-agnostic textbook pages. Long notebooks (UR5 EoM, DP grids, PPO training)
 | Notebook | Colab |
 | --- | --- |
 | [frequency_response](teaching/topics/classical_control/frequency_response.ipynb) (Bode, Nyquist, margins) | [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/alx87grd/minilink/blob/main/examples/teaching/topics/classical_control/frequency_response.ipynb) |
+| [sensitivity_functions](teaching/topics/classical_control/sensitivity_functions.ipynb) (S, T, PS, CS; disturbance and noise in simulation) | [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/alx87grd/minilink/blob/main/examples/teaching/topics/classical_control/sensitivity_functions.ipynb) |
 
 #### Optimal control
 | Notebook | Colab |

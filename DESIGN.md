@@ -482,7 +482,10 @@ loop nested with `add_subsystem` therefore declares what the same leaf would, an
 closing an outer loop around it is not a false algebraic loop.
 
 Shortcuts (`core.composition`): `+` flat add only, `>>` series, `@` closed loop
-(with ``closed_loop(..., feedback="auto"|"y"|"qdq")`` and ``closed_loop_qdq``),
+(with ``closed_loop(..., feedback="auto"|"y"|"qdq")`` and ``closed_loop_qdq``;
+``closed_loop(C, plant, r=True, w=False, v=False)`` exposes the reference, a load
+disturbance ``w`` summed into the plant input and a measurement noise ``v`` summed into
+the measurement, each through a visible `Sum` block; `@` keeps the single input ``r``),
 `autowire()` conservative fill — **never inserts Mux**; use `feedback="qdq"` or
 `closed_loop_qdq` for explicit `Mux(q, dq)` wiring. Diagram operands are flattened,
 not nested. Explicit `add_subsystem` / `connect` remains canonical for general topology.

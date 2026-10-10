@@ -87,8 +87,8 @@ the System shortcuts stay written out, so editors show their parameters, and
 the band's calling pattern; `analysis/linearization.py` and `discretization.py` free
 `linearize` and `discretize` from the band-facade name collision.
 
-**Next, in order (decided 2026-09-26):** clean-up and solidification first — P5 and
-P8 on the cleaned toolbox, TB-b, S61, P9, P10 — then RN-1 of
+**Next, in order (decided 2026-09-26):** clean-up and solidification first — P5 (landed
+2026-10-10) and P8 on the cleaned toolbox, TB-b, S61, P9, P10 — then RN-1 of
 [randomness.md](randomness.md) (the disturbance convention, decided 2026-09-26) and P4, then P11. The textbook pass comes before the new surface, so
 the new code copies clean patterns and no shortcut is added only to be dropped.
 
@@ -99,19 +99,6 @@ the new code copies clean patterns and no shortcut is added only to be dropped.
   `dynamics/abstraction/state_space.py` (`LTISystem`) and the loop-building path students
   use (`feedback`, `closed_loop`, `@`). Done when every module in scope reads like `dp.py`
   and the baseline `cmp`s.
-- [ ] **P5 Named sensitivity functions** (design agreed 2026-09-26, in
-  [gro501-classical-control.md](gro501-classical-control.md) §P5): `sensitivity`,
-  `complementary_sensitivity`, `load_sensitivity`, `noise_sensitivity`, keyword-only
-  `(plant=H, controller=C, filter=F)`, each an `LTISystem` computed from the pieces with
-  `L = C H F` in the body; `closed_loop` gains optional loop inputs `w` (plant input) and `v`
-  (measurement), off by default; spec checks use `bode` as it is. Done when `S + T = 1` holds
-  to 1e-12 on a SISO loop, each function matches the loop's internal-wire transfer function,
-  and each Table 2 spec is one `bode` call plus a comparison.
-  **The four functions landed 2026-10-10** (`analysis/sensitivity_functions.py`, the module
-  name kept off the facade's `sensitivity`; a piece with several channels is refused;
-  `TestSensitivity` covers the three gates). Open: the `w` / `v` loop inputs on
-  `closed_loop` **[ask — the keyword, core]**, then the `load_sensitivity` check against the
-  loop's `w`-to-`y` channel.
 - [ ] **S61 Analysis verbs on any `System`** (scan: analysis#2, analysis#4, analysis#5,
   analysis#6, analysis#8): `controllability` / `observability` linearize like every sibling
   (band functions only, no facade: ROADMAP §6); `step_info` takes a `System`; `find_equilibrium` defaults its guess to
@@ -256,8 +243,9 @@ each plan states; every step is name-preserving for the GRO860 notebooks.
 - [ ] **C2 GMC714 modelling ladder**: manipulators + the four-rung vehicle ladder as a
   `02_dynamics` lesson; robotic PID wrappers (`JointPD`, `EndEffectorPD` twins).
   Also: one constructor contract for the robotic laws (scan: control#6).
-- [ ] **C3 Blocks**: `Sine` / `Ramp` / `Chirp` / `Delay` / `Switch`; `Integrator` and `ZOHHold`
-  take a `dim` like every static block (scan: graphics#11).
+- [ ] **C3 Blocks**: `Ramp` / `Chirp` / `Delay` / `Switch`; `Integrator` and `ZOHHold`
+  take a `dim` like every static block (scan: graphics#11). `Sine(amplitude, omega, phase,
+  offset)` landed 2026-10-10 with P5's notebook.
 - [ ] **C4 Identification and generation**: `identification/fitting.py` on `rollout_batch`
   (physical params and NN weights are one verb); `trajectory_generation/` port (polynomial,
   min-snap); SMC trajectory-following demo; trajectory post-filter; experiment-design

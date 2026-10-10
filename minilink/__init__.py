@@ -36,6 +36,7 @@ _EXPORTS: dict[str, tuple[str, str]] = {
     # blocks
     "Integrator": ("minilink.blocks.basic", "Integrator"),
     "Step": ("minilink.blocks.sources", "Step"),
+    "Sine": ("minilink.blocks.sources", "Sine"),
     "WhiteNoise": ("minilink.blocks.sources", "WhiteNoise"),
     "TrajectorySource": ("minilink.blocks.sources", "TrajectorySource"),
     "Error": ("minilink.blocks.routing", "Error"),
@@ -176,6 +177,7 @@ _EXPORTS: dict[str, tuple[str, str]] = {
     "StepDiagramSystem": ("minilink.core.diagram", "StepDiagramSystem"),
     "BallSet": ("minilink.core.sets", "BallSet"),
     "closed_loop_qdq": ("minilink.core.composition", "closed_loop_qdq"),
+    "closed_loop": ("minilink.core.composition", "closed_loop"),
     "feedback": ("minilink.core.composition", "feedback"),
     "ZOHHold": ("minilink.blocks.step", "ZOHHold"),
     "Source": ("minilink.blocks.sources", "Source"),

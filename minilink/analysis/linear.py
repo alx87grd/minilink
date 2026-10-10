@@ -298,7 +298,9 @@ def bracket_unit_gain(A, B, C, D, w_min, w_max, *, decades=8):
 
     Downward while the magnitude is below one *and still climbing steeply*
     (an integrator gains a decade per decade; a static gain approaches its
-    plateau and stops the walk), upward while it is above one. At most
+    plateau and stops the walk), upward while it is above one *and still
+    falling steeply* (a biproper function such as a sensitivity or a PID
+    levels off at its high-frequency gain and never crosses). At most
     ``decades`` steps each way.
     """
 
@@ -314,10 +316,14 @@ def bracket_unit_gain(A, B, C, D, w_min, w_max, *, decades=8):
             break
         w_min, low = 0.1 * w_min, lower
 
+    high = magnitude(w_max)
     for _ in range(decades):
-        if magnitude(w_max) <= 1.0:
+        if high <= 1.0:
             break
-        w_max = 10.0 * w_max
+        higher = magnitude(10.0 * w_max)
+        if higher >= 0.5 * high:  # approaching the high-frequency plateau
+            break
+        w_max, high = 10.0 * w_max, higher
 
     return w_min, w_max
 

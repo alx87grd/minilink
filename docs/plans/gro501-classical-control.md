@@ -26,7 +26,7 @@ additive or replaces boilerplate with generated equivalents.
 | **P2** `minreal` | G3 | 1 | **done** 2026-09-26; order reduction split out, then deferred out of v0.2 (2026-09-26; TODO §7) |
 | **P3** `place()` → `StateFeedbackController` | G2 | 1 | **done** 2026-09-26 |
 | **P4** `estimation/` — Luenberger, then Kalman | G1 | 2 | **held** |
-| **P5** Named sensitivity functions | G5 | 2 | agent — design agreed 2026-09-26 |
+| **P5** Named sensitivity functions | G5 | 2 | landed 2026-10-10 |
 | **P6** Discrete (z) tier | G4 | 3 | **held** |
 | **P7** `facades.py` boilerplate | C2 | 2 | **done** 2026-09-26 (explicit + pinned) |
 | **P8** Small teaching helpers (ζ/ω_n, `N`) | G6 | 2 | agent |
@@ -228,6 +228,12 @@ noise injected on `u` and `y`, and the estimate converges to the true state;
 `plot_diagram` shows the Figure 12 topology.
 
 ### P5. Named sensitivity functions — design agreed 2026-09-26
+
+**Landed 2026-10-10.** The module is `analysis/sensitivity_functions.py` (the name
+`sensitivity.py` would shadow the facade's `sensitivity`); a piece with several
+channels is refused; the loop inputs are `closed_loop(C, plant, r=True, w=False,
+v=False)` (the maintainer's keyword); the teaching notebook is
+`classical_control/sensitivity_functions.ipynb`, with `Sine` sources on `w` and `v`.
 
 **Problem.** Table 2 states four specs as "sous −40 dB @ 0.015 Hz" style
 bounds on disturbance and noise sensitivity. Today three of the four are

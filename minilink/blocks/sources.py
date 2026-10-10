@@ -1,4 +1,4 @@
-"""Source blocks: constant, step, white noise and a replayed trajectory as a signal."""
+"""Source blocks: constant, step, sine, white noise and a replayed trajectory as a signal."""
 
 import numpy as np
 from scipy.interpolate import interp1d
@@ -144,6 +144,42 @@ class Step(Source):
 
         # y = initial value before the step time, final value after
         y = xp.where(t < step_time, initial_value, final_value)
+
+        return y
+
+
+class Sine(Source):
+    """Sine source: ``y = offset + amplitude sin(omega t + phase)``, ``omega`` in rad/s.
+
+    ``amplitude`` sets the dimension; ``omega``, ``phase`` and ``offset`` are
+    scalars or arrays of the same shape. A frequency ``f`` in hertz is
+    ``omega = 2 * np.pi * f``.
+    """
+
+    def __init__(self, amplitude=1.0, omega=1.0, phase=0.0, offset=0.0):
+        amplitude = np.asarray(amplitude, dtype=float).reshape(-1)
+        p = amplitude.shape[0]
+        Source.__init__(self, p)
+
+        self.name = "Sine"
+        self.params = {
+            "amplitude": amplitude,
+            "omega": np.broadcast_to(np.asarray(omega, dtype=float), (p,)).copy(),
+            "phase": np.broadcast_to(np.asarray(phase, dtype=float), (p,)).copy(),
+            "offset": np.broadcast_to(np.asarray(offset, dtype=float), (p,)).copy(),
+        }
+
+    def h(self, x, u, t=0, params=None):
+        params = self.params if params is None else params
+        a, omega, phi, y0 = (
+            params["amplitude"],
+            params["omega"],
+            params["phase"],
+            params["offset"],
+        )
+        xp = array_module(t)
+
+        y = y0 + a * xp.sin(omega * t + phi)
 
         return y
 

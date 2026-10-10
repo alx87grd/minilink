@@ -1807,6 +1807,21 @@ class TestSensitivity(unittest.TestCase):
                 expected = 20 * np.log10(np.abs(G_s))
                 self.assertAlmostEqual(G_db[0], expected, places=9)
 
+    def test_the_automatic_grid_stops_at_the_high_frequency_plateau(self):
+        from minilink.analysis import bode, noise_sensitivity, sensitivity
+        from minilink.blocks.transfer_function import TransferFunction
+
+        H = TransferFunction([1.0], [1.0, 3.0, 2.0])
+        C = PID(4.0, 2.0, 0.5)
+        for G in (
+            sensitivity(plant=H, controller=C),
+            noise_sensitivity(plant=H, controller=C),
+            C,
+        ):
+            with self.subTest(G=G.name):
+                w, _, _ = bode(G)
+                self.assertLessEqual(w.max(), 1e4)
+
     def test_the_operating_point_reaches_the_plant(self):
         from minilink.analysis import sensitivity, transfer_function
 

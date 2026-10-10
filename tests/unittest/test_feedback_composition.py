@@ -211,3 +211,72 @@ class TestPortLayouts(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class TestLoopInputs(unittest.TestCase):
+    """``closed_loop(r=, w=, v=)``: the reference, load disturbance and noise inputs."""
+
+    def setUp(self):
+        self.H = TransferFunction([1.0], [1.0, 3.0, 2.0])
+
+    def layouts(self):
+        return (
+            ("error", PID(4.0, 2.0, 0.5)),
+            ("reference", PID(4.0, 2.0, 0.5, ports="reference")),
+        )
+
+    def test_defaults_keep_the_single_reference_input(self):
+        from minilink.core.composition import closed_loop
+
+        for layout, C in self.layouts():
+            with self.subTest(layout=layout):
+                self.assertEqual(list(closed_loop(C, self.H).inputs), ["r"])
+                self.assertEqual(list((C @ self.H).inputs), ["r"])
+
+    def test_each_flag_adds_or_drops_its_port(self):
+        from minilink.core.composition import closed_loop
+
+        for layout, C in self.layouts():
+            with self.subTest(layout=layout):
+                loop = closed_loop(C, self.H, w=True, v=True)
+                self.assertEqual(list(loop.inputs), ["r", "w", "v"])
+                loop = closed_loop(C, self.H, r=False, w=True)
+                self.assertEqual(list(loop.inputs), ["w"])
+
+    def test_w_and_v_enter_where_the_formulas_say(self):
+        from minilink.analysis import (
+            frequency_response,
+            load_sensitivity,
+            noise_sensitivity,
+            sensitivity,
+        )
+        from minilink.core.composition import closed_loop
+
+        w = np.logspace(-2, 3, 200)
+        pieces = dict(plant=self.H, controller=PID(4.0, 2.0, 0.5))
+        PS = frequency_response(load_sensitivity(**pieces), w=w)[1]
+        CS = frequency_response(noise_sensitivity(**pieces), w=w)[1]
+        S = frequency_response(sensitivity(**pieces), w=w)[1]
+        for layout, C in self.layouts():
+            with self.subTest(layout=layout):
+                loop = closed_loop(C, self.H, w=True, v=True)
+                np.testing.assert_allclose(
+                    frequency_response(loop, of="sys:y", wrt="w", w=w)[1], PS, atol=1e-9
+                )
+                np.testing.assert_allclose(
+                    frequency_response(loop, of="ctl:u", wrt="v", w=w)[1],
+                    -CS,
+                    atol=1e-9,
+                )
+                np.testing.assert_allclose(
+                    frequency_response(loop, of="disturbance:y", wrt="w", w=w)[1],
+                    S,
+                    atol=1e-9,
+                )
+
+    def test_a_return_path_gain_takes_no_w_or_v(self):
+        from minilink.core.composition import closed_loop
+
+        with self.assertRaisesRegex(ValueError, "w= and v= need a plant System"):
+            closed_loop(self.H, 1, w=True)
+        self.assertEqual(list(closed_loop(self.H, 1, r=False).inputs), [])

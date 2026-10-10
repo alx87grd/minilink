@@ -88,7 +88,7 @@ State as of 2026-10-02. Step ids (`S29`, `P3`, `T2`, …) are the rows of
 | Dynamics (abstraction + catalog) | teaching | 7 | Plants QA'd; `MechanicalSystem` / `Manipulator`; UR5 ABA/RNEA; **every catalog plant compiles on both backends** (contract test); four-rung vehicle ladder; UdeS racecar (kinematic, dynamic, 3-D). | Textbook pass (T3); mechanical-base unification (S32, after v1.0). |
 | Control | teaching | 6 | Linear, LQR (infinite horizon, finite horizon, along a trajectory), pole placement, `P` / `PI` / `PD` / `PID` carrying only the states their terms need, model-based SMC and computed torque, robotic impedance and kinematic laws, neural policy block. | Reference scaling (P8, v0.2); textbook pass (TB-b, T2). |
 | Analysis | teaching | 6 | Jacobians, linearize, structural, equilibria, modal; one-channel Bode with margins, pole-zero, root locus, Nyquist, step response on matplotlib and plotly; the frequency band brackets the 0 dB crossing. | named `S` / `T` / `PS` / `CS` (P5), ζ / ω_n (P8); z tier held; Nichols and overlays later; textbook pass (T4). |
-| Blocks | teaching | 5 | Routing, nonlinear, filters, sources, TF, 1-layer NN. | `Sine` / `Ramp` / `Chirp` / `Delay` / `Switch` (C3, v0.3); textbook pass (T2). |
+| Blocks | teaching | 5 | Routing, nonlinear, filters, sources, TF, 1-layer NN. | `Ramp` / `Chirp` / `Delay` / `Switch` (C3, v0.3; `Sine` landed with P5); textbook pass (T2). |
 | Planning / policy synthesis (DP) | teaching (GRO860) | 6 | Grid + value iteration (`loop` / `numpy` / `jax`), lookup controller, `PolicyEvaluator`, `LQRPlanner`; every planner returns a `PlanningSolution`; `compare()` reads solutions side by side; `dp.py` is the textbook reference of the style (2026-09-18). | cost-to-go as a `Field` (A1); policy iteration (S51). |
 | Planning / trajopt | teaching (GRO860) | 5 | Collocation, shooting, multiple shooting; live plot; `success` means defects satisfied to `feasibility_tol`; float64 by default on JAX. | Harden SciPy/Ipopt before TRL 6; textbook pass (T5). |
 | Optimization | teaching (via trajopt) | 5 | `MathematicalProgram` + `Optimizer`, SciPy/Ipopt. | Harden SciPy/Ipopt before TRL 6. |
@@ -285,7 +285,9 @@ wave B. A4 and A5 stay here.
   (`root_locus` through K = −1/d, `step_info` on an unsettled response, MIMO
   input to the SISO functions, one rank rule).
 - **B2** The missing surface, on the cleaned toolbox: **P5** named
-  `S` / `T` / `PS` / `CS`, **P8** ζ / ω_n and the `N` matrix. **P7** landed
+  `S` / `T` / `PS` / `CS` (landed 2026-10-10: the four functions from the loop's
+  pieces, `closed_loop(r=, w=, v=)`, `Sine`, the `sensitivity_functions` teaching
+  notebook), **P8** ζ / ω_n and the `N` matrix. **P7** landed
   2026-09-26: the shortcuts TB-a kept stay written out and are pinned to
   their band functions by a test, not generated.
 - **TB-b** The control objects and the loop (`siso`, `state`, `lqr`, `place`,
@@ -364,7 +366,7 @@ Standing work, behaviour-preserving, one module per step.
   and the pyro → minilink migration guide in README.
 - **C2** GMC714 modelling ladder: manipulators and the vehicle ladder as a
   `02_dynamics` lesson; robotic PID wrappers.
-- **C3** Blocks: `Sine` / `Ramp` / `Chirp` / `Delay` / `Switch`.
+- **C3** Blocks: `Ramp` / `Chirp` / `Delay` / `Switch` (`Sine` landed with P5).
 - **C4** `identification/fitting.py` on `rollout_batch`;
   `trajectory_generation/` port; SMC trajectory-following demo.
 - **C5** RL follow-ups: **S50** SAC actor step, **S51** policy iteration on

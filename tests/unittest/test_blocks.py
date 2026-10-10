@@ -2,7 +2,7 @@ import unittest
 import numpy as np
 import pytest
 from minilink.blocks.basic import Integrator
-from minilink.blocks.sources import Source, Step
+from minilink.blocks.sources import Sine, Source, Step
 from minilink.blocks.transfer_function import TransferFunction
 from minilink.control.output import ProportionalController
 
@@ -22,6 +22,22 @@ class TestBlocks(unittest.TestCase):
         y_after = step.h(x=[], u=[], t=3.0)
         np.testing.assert_array_equal(y_before, np.array([0.0]))
         np.testing.assert_array_equal(y_after, np.array([1.0]))
+
+    def test_sine_source(self):
+        sine = Sine(amplitude=[2.0, 1.0], omega=3.0, phase=[0.0, np.pi / 2], offset=1.0)
+        t = 0.4
+        np.testing.assert_allclose(
+            sine.h(x=[], u=[], t=t),
+            [1.0 + 2.0 * np.sin(3.0 * t), 1.0 + np.sin(3.0 * t + np.pi / 2)],
+        )
+        self.assertEqual(sine.p, 2)
+
+    def test_sine_source_traces_under_jax(self):
+        jnp = pytest.importorskip("jax.numpy")
+        sine = Sine(amplitude=0.5, omega=2.0)
+        np.testing.assert_allclose(
+            sine.h(x=None, u=None, t=jnp.asarray(0.3)), sine.h(x=[], u=[], t=0.3)
+        )
 
     def test_integrator_dynamics_and_output(self):
         plant = Integrator()
