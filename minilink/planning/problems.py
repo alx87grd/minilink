@@ -375,10 +375,18 @@ class StochasticPlanningProblem(PlanningProblem):
                     f"params_distribution over {name!r}: distributions apply to "
                     "array-valued parameters, not to a whole subsystem dict"
                 )
+        inputs = list(self.sys.inputs)
+        command = "u" if "u" in inputs else (inputs[0] if len(inputs) == 1 else None)
         for port in self.disturbances or {}:
             if port not in self.sys.inputs:
                 raise ValueError(
                     f"disturbances key {port!r} is not an input port of sys"
+                )
+            if port == command:
+                raise ValueError(
+                    f"disturbances key {port!r} is the command port of sys: a draw "
+                    "there would replace the policy's command. Give the disturbance "
+                    "its own input port (for example 'w')."
                 )
         object.__setattr__(
             self, "params_distribution", dict(self.params_distribution or {})

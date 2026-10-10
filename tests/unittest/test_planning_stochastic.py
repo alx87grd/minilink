@@ -722,3 +722,13 @@ def test_monte_carlo_scores_a_time_varying_law_at_each_instant():
     np.testing.assert_allclose(reports["jax"].J, reports["numpy"].J, rtol=1e-6)
     # O(dt) apart; the law frozen at t = 0 scored 0.97 against 45 here
     np.testing.assert_allclose(reports["simulator"].J, reports["numpy"].J, rtol=0.05)
+
+
+def test_a_disturbance_on_the_command_port_is_refused():
+    with pytest.raises(ValueError, match="command port of sys"):
+        StochasticPlanningProblem(
+            pendulum(),
+            cost=QuadraticCost.from_system(pendulum()),
+            x0_distribution=Particles([[0.5, 0.0]]),
+            disturbances={"u": Gaussian([0.0], 0.1)},
+        )
