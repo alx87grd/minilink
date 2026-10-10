@@ -161,6 +161,10 @@ BAND_PATTERN_DEVIATIONS = {
     "plot_region_of_attraction": "draws a certificate: plot_region_of_attraction(certificate)",
     "region_of_attraction": 'method names the Lyapunov construction ("quadratic")',
     "discretize": "wraps a continuous system in a step model: discretize(sys, dt, ...)",
+    "sensitivity": "takes the loop's pieces, keyword-only: (plant=, controller=, filter=)",
+    "complementary_sensitivity": "takes the loop's pieces, as sensitivity",
+    "load_sensitivity": "takes the loop's pieces, as sensitivity",
+    "noise_sensitivity": "takes the loop's pieces, as sensitivity",
 }
 
 
