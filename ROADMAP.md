@@ -630,6 +630,9 @@ here. Each open item needs the maintainer.
   - State is `n`, and every leaf exposes `x`.
   - RULES 4.9 is extended with `e`, `x`, `q`, `dq` and the ids, and DESIGN gets a §4
     "Conventions" section.
+  - The compromise (plan §3.9): standard diagrams resolve automatically. Custom port
+    names, several controllers or several plants take a few manual steps, and they keep
+    the plots, camera and cost through the role keys.
 
   Recommended: yes.
 - **Standard names only.** `feedback_profile`, `PROFILE_PORTS`, the override attributes,

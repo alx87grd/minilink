@@ -563,6 +563,38 @@ estimator's `x`), and the rest need the defect fixes listed in §2.
 - **What is left is small:** one resolver, two tables (RULES 4.9 extended), and evaluation
   by identity.
 
+### 3.9 The compromise: automatic for standard diagrams, a few manual steps otherwise
+
+**Automatic.** Standard diagrams get everything from one line: the wiring, the plot
+defaults, the camera, the cost on the plant, the params paths and the random streams. This
+covers:
+- every library controller (the port rule reproduces all 19 wirings checked);
+- every course-notebook loop;
+- almost every catalog plant.
+
+This is an estimate of most cases, not a measured share.
+
+**Manual steps.**
+
+| Situation | Manual step |
+|---|---|
+| Plant inputs with custom names (racecar `P_cmd`, bicycle `w_rear`, `delta`) | wire with `connect`; the key `plant` brings back the plots, camera and cost |
+| Several controllers on one plant (the path-tracking cascade) | wired by hand; at most one block holds the `controller` key |
+| Two physical plants in one diagram | the second gets its own key; tools are pointed at it explicitly |
+| A hand-wired safety filter, extra inputs such as `r_null` | wired by hand; the rest still works |
+
+**Never affected.** The manual path does not depend on roles:
+- simulation, `linearize`, `bode`, `plot_diagram` and `trajectory_of` work on any
+  `System`, whatever its keys and port names;
+- without role keys, plots and the camera keep today's defaults instead of guessing;
+- a tool that needs a plant (the cost) asks for it rather than picking a block.
+
+**Details still open inside the steps.** They do not change the model:
+- AC-5: the deduplication rule of the plot auto mode, and whether a plant with many outputs
+  (the racecar) needs a name filter;
+- AC-4: the keys inside the `w` / `v` plant wrapper, and how its boundary re-exposes the
+  leaf's `x`, `q` and `dq`.
+
 ## 4. Steps
 
 Each step lands on its own commit with the checks of §6.
