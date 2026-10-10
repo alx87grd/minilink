@@ -16,7 +16,7 @@ from dataclasses import dataclass
 import numpy as np
 
 from minilink.core.diagram import DiagramSystem
-from minilink.core.feedback import feedback_ports
+from minilink.core.feedback import error_input, feedback_ports
 from minilink.core.system import System
 
 _VALID_FEEDBACK = frozenset({"auto", "y", "qdq"})
@@ -189,11 +189,15 @@ def feedback(sys, through=1, *, of=None, sign=-1.0, validate=True) -> DiagramSys
     diagram = DiagramSystem()
     if isinstance(sys, DiagramSystem):
         source_entry = _get_available_diagram_entry(sys)
+        refuse_two_port_entry(sys.subsystems[source_entry.sys_id])
         id_map = _inline_diagram(diagram, sys, output_collision="replace")
         entry_sys, entry_port = id_map[source_entry.sys_id], source_entry.port_id
     else:
+        entry_port = error_input(sys)
+        if entry_port is None:
+            refuse_two_port_entry(sys)
+            entry_port = _default_input_port(sys)
         entry_sys = _add_system_to_diagram(diagram, sys)
-        entry_port = _default_input_port(sys)
     entry_dim = diagram.subsystems[entry_sys].inputs[entry_port].dim
 
     # The free boundary input that fed the entry goes away: the junction feeds it.
@@ -242,6 +246,25 @@ def feedback(sys, through=1, *, of=None, sign=-1.0, validate=True) -> DiagramSys
     if validate:
         diagram.check_algebraic_loops()
     return diagram
+
+
+def refuse_two_port_entry(block):
+    """Refuse to drive ``block`` from an Error junction when it reads its own measurement.
+
+    A block with a reference and a measurement port (``r`` and ``y``, or ``r``
+    and ``x``) is not driven by an error: a junction on its first input would
+    leave the measurement unconnected and feed ``e = r - y`` into ``r``.
+    """
+    roles = feedback_ports(block)
+    if roles is None:
+        return
+    raise ValueError(
+        f"{block.name} reads its measurement on {roles.measurement!r}"
+        + (f" and its reference on {roles.ref!r}" if roles.ref else "")
+        + ": an Error block cannot drive it. Close it on the plant directly "
+        "(controller @ plant), use its error layout (ports='error') if it has one, "
+        "or wire the loop with DiagramSystem.connect."
+    )
 
 
 def _return_signal(diagram, of, entry_dim, Demux):
@@ -342,8 +365,6 @@ def closed_loop(
         A diagram exposing the controller reference as input and plant output as
         output.
     """
-    from minilink.core.feedback import error_input
-
     if not isinstance(plant, System):
         if w or v:
             raise ValueError("w= and v= need a plant System, not a return-path gain.")

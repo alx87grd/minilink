@@ -131,6 +131,17 @@ class TestJunction(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "of index must be in"):
             feedback(_damped_pendulum(), of=("y", 5))
 
+    def test_a_block_after_a_two_port_controller_is_refused_not_miswired(self):
+        from minilink import Saturation, StateFeedbackController
+
+        K = np.array([[10.0, 2.0]])
+        for plant in (Pendulum(), DoubleIntegrator()):
+            with self.subTest(plant=plant.name):
+                with self.assertRaisesRegex(
+                    ValueError, "measurement on 'x'.*DiagramSystem.connect"
+                ):
+                    (StateFeedbackController(K) >> Saturation()) @ plant
+
     def test_two_port_wiring_is_unchanged(self):
         T = ImpedanceController() @ Pendulum()
         self.assertEqual(list(T.subsystems), ["ctl", "sys"])
@@ -191,6 +202,14 @@ class TestPortLayouts(unittest.TestCase):
             _poles(ProportionalController(3.0) @ plant),
             atol=1e-9,
         )
+
+    def test_unity_feedback_refuses_a_reference_layout(self):
+        for block in (PID(ports="reference"), ProportionalController()):
+            with self.subTest(block=block.name):
+                with self.assertRaisesRegex(ValueError, "measurement on 'y'"):
+                    block @ 1
+                with self.assertRaisesRegex(ValueError, "measurement on 'y'"):
+                    feedback(block)
 
     def test_lead_and_lag(self):
         lead = Lead(K=2.0, z=1.0, p=10.0)

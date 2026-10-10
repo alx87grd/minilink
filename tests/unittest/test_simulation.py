@@ -1131,7 +1131,13 @@ class TestAutomaticTimeGrid(unittest.TestCase):
         self.assertEqual(closed.solver_mode, "euler")
 
     def test_loop_takes_the_hint_a_block_sets_for_itself(self):
-        from minilink import Pendulum, RateLimiter, Saturation, StateFeedbackController
+        from minilink import (
+            DiagramSystem,
+            Pendulum,
+            RateLimiter,
+            Saturation,
+            StateFeedbackController,
+        )
 
         plant = Pendulum()
         plant.solver_info["smallest_time_constant"] = 0.5
@@ -1143,7 +1149,13 @@ class TestAutomaticTimeGrid(unittest.TestCase):
         limiter = RateLimiter(rate_max=5.0, tau=0.02)
         for block in (saturation, limiter):
             with self.subTest(block=block.name):
-                loop = (controller >> block) @ plant
+                loop = DiagramSystem()
+                loop.add_subsystem(controller, "ctl")
+                loop.add_subsystem(block, "actuator")
+                loop.add_subsystem(plant, "sys")
+                loop.connect("sys", "x", "ctl", "x")
+                loop.connect("ctl", "u", "actuator", "u")
+                loop.connect("actuator", "y", "sys", "u")
                 sim = Simulator(loop, tf=1.0, solver="euler", verbose=False)
                 self.assertAlmostEqual(sim.dt, 0.002)  # 0.02 * SMOOTH_AUTO_DT_SCALE
 
