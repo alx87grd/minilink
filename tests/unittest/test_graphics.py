@@ -556,11 +556,12 @@ from minilink.graphical.animation.primitives import CustomLine
 from minilink.graphical.animation.renderers.meshcat_renderer import (
     MeshcatCanvas,
     MeshcatRenderer,
-    _frames_have_changing_polylines,
     _import_meshcat,
     camera_eye_position,
     camera_world_shift,
+    flipbook_pages,
     html_export_path,
+    page_visibility,
     polyline_strip_mesh,
 )
 from minilink.graphical.animation.renderers.pygame_renderer import (
@@ -622,21 +623,53 @@ class TestMeshcatPolylineStrip(unittest.TestCase):
     def test_short_polyline_is_skipped(self):
         self.assertIsNone(polyline_strip_mesh([[0.0, 0.0, 0.0]]))
 
-    def test_changing_custom_line_is_detected(self):
-        T = np.eye(4)
-        cam = camera_matrix()
+
+def _line_frames(*lines):
+    """One frame per line, every line drawn in slot 0 at the identity."""
+    cam = camera_matrix()
+    return [
+        {"primitives": [line], "transforms": [np.eye(4)], "camera": cam, "t": 0.1 * k}
+        for k, line in enumerate(lines)
+    ]
+
+
+def _schedule(n_frames):
+    from minilink.graphical.animation.renderers.timing import AnimationFrameSchedule
+
+    return AnimationFrameSchedule(
+        nsteps=n_frames,
+        skip_steps=1,
+        interval_ms=33.0,
+        n_frames=n_frames,
+        target_fps=30.0,
+    )
+
+
+class TestMeshcatFlipbook(unittest.TestCase):
+    def test_one_primitive_throughout_is_a_single_page(self):
         a = CustomLine([[0.0, 0.0, 0.0], [1.0, 0.0, 0.0]])
-        b = CustomLine([[0.0, 0.0, 0.0], [1.0, 0.0, 0.0], [2.0, 0.0, 0.0]])
-        frames = [
-            {"primitives": [a], "transforms": [T], "camera": cam, "t": 0.0},
-            {"primitives": [b], "transforms": [T], "camera": cam, "t": 0.1},
-        ]
-        self.assertTrue(_frames_have_changing_polylines(frames))
-        same = [
-            {"primitives": [a], "transforms": [T], "camera": cam, "t": 0.0},
-            {"primitives": [a], "transforms": [T], "camera": cam, "t": 0.1},
-        ]
-        self.assertFalse(_frames_have_changing_polylines(same))
+        pages = flipbook_pages(_line_frames(a, a, a), 0, key=id)
+        self.assertEqual(pages, [(0, 3, a)])
+
+    def test_runs_of_equal_geometry_share_a_page(self):
+        a, b = object(), object()
+        frames = [{"primitives": [p]} for p in (a, a, b, b, a)]
+        pages = flipbook_pages(frames, 0, key=id)
+        self.assertEqual(pages, [(0, 2, a), (2, 4, b), (4, 5, a)])
+
+    def test_a_frame_without_the_slot_is_in_no_page(self):
+        a = object()
+        frames = [{"primitives": [a]}, {"primitives": []}, {"primitives": [a]}]
+        pages = flipbook_pages(frames, 0, key=id)
+        self.assertEqual(pages, [(0, 1, a), (2, 3, a)])
+
+    def test_page_visibility_spans_its_run_and_keys_the_last_frame(self):
+        self.assertEqual(page_visibility(0, 6, 6), {0: True, 5: True})
+        self.assertEqual(
+            page_visibility(2, 4, 6), {0: False, 2: True, 4: False, 5: False}
+        )
+        self.assertEqual(page_visibility(5, 6, 6), {0: False, 5: True})
+        self.assertEqual(page_visibility(0, 1, 6), {0: True, 1: False, 5: False})
 
 
 class TestMeshcatCamera(unittest.TestCase):
@@ -755,34 +788,83 @@ class TestMeshcatOptionalSmoke(unittest.TestCase):
         canvas.clear()
 
     @pytest.mark.skipif(not _has_meshcat(), reason="meshcat not installed")
-    def test_native_clip_builds_when_custom_line_vertices_change(self):
+    def test_native_clip_flips_pages_when_a_line_changes(self):
         import io
         from contextlib import redirect_stdout
 
-        import meshcat.animation as mcanim
-        from minilink.graphical.animation.renderers.timing import AnimationFrameSchedule
+        import meshcat.geometry as g
 
         class _Anim:
-            sys = type("S", (), {"name": "dot"})()
+            sys = type("S", (), {"name": "trail"})()
 
         a = CustomLine([[0.0, 0.0, 0.0], [1.0, 0.0, 0.0]])
         b = CustomLine([[0.0, 0.0, 0.0], [1.0, 0.0, 0.0], [2.0, 0.0, 0.0]])
-        T = np.eye(4)
-        cam = camera_matrix()
-        frames = [
-            {"primitives": [a], "transforms": [T], "camera": cam, "t": 0.0},
-            {"primitives": [b], "transforms": [T], "camera": cam, "t": 0.1},
-        ]
-        schedule = AnimationFrameSchedule(
-            nsteps=2, skip_steps=1, interval_ms=33.0, n_frames=2, target_fps=30.0
-        )
         renderer = MeshcatRenderer(_Anim())
-        renderer.canvas = MeshcatCanvas(_FakeMeshcatNode(), is_3d=True)
+        renderer.canvas = canvas = MeshcatCanvas(_FakeMeshcatNode(), is_3d=True)
         buf = io.StringIO()
         with redirect_stdout(buf):
-            animation_obj = renderer._build_meshcat_animation([a], frames, schedule)
-        self.assertIsInstance(animation_obj, mcanim.Animation)
-        self.assertIn("native=False", buf.getvalue())
+            animation_obj = renderer._build_meshcat_animation(
+                _line_frames(a, a, b), _schedule(3)
+            )
+        self.assertEqual(buf.getvalue(), "")
+        # the slot holds no geometry of its own, one page per run
+        self.assertIsNone(canvas._base_path(0).object)
+        first, second = canvas.page_path(0, 0), canvas.page_path(0, 2)
+        self.assertIsInstance(first.object, g.Mesh)
+        self.assertIsInstance(second.object, g.Mesh)
+        self.assertNotIn("visible", first.properties)
+        self.assertIs(second.properties["visible"], False)
+        clips = {path.lower(): clip for path, clip in animation_obj.clips.items()}
+        for page, values in ((first, [True, False]), (second, [False, True])):
+            track = clips[page.path.lower()].tracks["visible"]
+            self.assertEqual(track.jstype, "boolean")
+            self.assertEqual(track.frames, [0, 2])
+            self.assertEqual(track.values, values)
+
+    @pytest.mark.skipif(not _has_meshcat(), reason="meshcat not installed")
+    def test_native_clip_moves_an_arrow_and_skips_a_collapsed_one(self):
+        from minilink.graphical.animation.primitives import Arrow
+
+        class _Anim:
+            sys = type("S", (), {"name": "force"})()
+
+        long = Arrow([0.0, 0.0, 0.0], [1.0, 0.0, 0.0])
+        collapsed = CustomLine([[0.0, 0.0, 0.0]])
+        short = Arrow([0.0, 0.0, 0.0], [0.5, 0.0, 0.0])
+        cam = camera_matrix()
+        frames = [
+            {"primitives": [p], "transforms": [translation(x, 0.0, 0.0)], "camera": cam}
+            for x, p in ((0.0, long), (1.0, collapsed), (2.0, short))
+        ]
+        renderer = MeshcatRenderer(_Anim())
+        renderer.canvas = canvas = MeshcatCanvas(_FakeMeshcatNode(), is_3d=True)
+        animation_obj = renderer._build_meshcat_animation(frames, _schedule(3))
+        clips = {path.lower(): clip for path, clip in animation_obj.clips.items()}
+        # the slot carries the pose, its pages the shapes
+        pose = clips[canvas._base_path(0).path.lower()].tracks["position"]
+        np.testing.assert_allclose(np.asarray(pose.values)[:, 0], [0.0, 1.0, 2.0])
+        collapsed_page = canvas.page_path(0, 1)
+        self.assertIsNone(collapsed_page.object)
+        self.assertNotIn(collapsed_page.path.lower(), clips)
+        shown = clips[canvas.page_path(0, 0).path.lower()].tracks["visible"]
+        self.assertEqual(
+            dict(zip(shown.frames, shown.values)), {0: True, 1: False, 2: False}
+        )
+
+    @pytest.mark.skipif(not _has_meshcat(), reason="meshcat not installed")
+    def test_native_clip_keeps_a_still_rigid_slot_as_one_object(self):
+        class _Anim:
+            sys = type("S", (), {"name": "dot"})()
+
+        prim = Point([0.0, 0.0, 0.0])
+        frames = _line_frames(prim, prim, prim)
+        renderer = MeshcatRenderer(_Anim())
+        renderer.canvas = canvas = MeshcatCanvas(_FakeMeshcatNode(), is_3d=True)
+        animation_obj = renderer._build_meshcat_animation(frames, _schedule(3))
+        slot = canvas._base_path(0)
+        self.assertIsNotNone(slot.object)
+        self.assertEqual(slot.children, {})
+        self.assertNotIn(slot.path.lower(), {p.lower() for p in animation_obj.clips})
 
     @pytest.mark.skipif(not _has_meshcat(), reason="meshcat not installed")
     def test_native_clip_keyframes_the_world_slide(self):
@@ -808,7 +890,7 @@ class TestMeshcatOptionalSmoke(unittest.TestCase):
         )
         renderer = MeshcatRenderer(_Anim())
         renderer.canvas = MeshcatCanvas(_FakeMeshcatNode(), is_3d=True)
-        animation_obj = renderer._build_meshcat_animation([prim], frames, schedule)
+        animation_obj = renderer._build_meshcat_animation(frames, schedule)
         clips = {path.lower(): clip for path, clip in animation_obj.clips.items()}
         for path in ("", "/Grid", "/Axes"):
             slide = clips[path].tracks["position"]
@@ -863,7 +945,7 @@ class TestMeshcatOptionalSmoke(unittest.TestCase):
             live.open_scene(is_3d=True, show=False, camera=cam)
         native = MeshcatRenderer(_Underwater())
         native.canvas = MeshcatCanvas(_FakeMeshcatNode(), is_3d=True)
-        native._build_meshcat_animation([prim], frames, schedule)
+        native._build_meshcat_animation(frames, schedule)
         for renderer in (live, native):
             for path in ("/Grid", "/Axes"):
                 self.assertIs(renderer.canvas.vis[path].properties["visible"], False)
@@ -927,6 +1009,51 @@ class TestMeshcatOptionalSmoke(unittest.TestCase):
             self.assertTrue(dest.is_file())
             self.assertIn("<html", html.lower())
             self.assertGreater(len(html), 100)
+
+    @pytest.mark.skipif(not _has_meshcat(), reason="meshcat not installed")
+    def test_exported_page_flips_its_pages_through_the_server(self):
+        import base64
+        import re
+        import tempfile
+        from pathlib import Path
+
+        import umsgpack
+
+        class _Anim:
+            sys = type("S", (), {"name": "trail"})()
+
+        a = CustomLine([[0.0, 0.0, 0.0], [1.0, 0.0, 0.0]])
+        b = CustomLine([[0.0, 0.0, 0.0], [1.0, 0.0, 0.0], [2.0, 0.0, 0.0]])
+        with tempfile.TemporaryDirectory() as tmp:
+            dest = Path(tmp) / "trail.html"
+            MeshcatRenderer(_Anim()).export_animation(
+                [a], _line_frames(a, a, b), _schedule(3), str(dest), is_3d=True
+            )
+            html = dest.read_text(encoding="utf-8")
+        commands = [
+            umsgpack.unpackb(base64.b64decode(blob))
+            for blob in re.findall(r'base64,([A-Za-z0-9+/=]+)"', html)
+        ]
+        tracks = {
+            animation["path"]: animation["clip"]["tracks"]
+            for command in commands
+            if command["type"] == "set_animation"
+            for animation in command["animations"]
+        }
+        late_page = "/meshcat/minilink_scene/p0/f2"
+        self.assertEqual(
+            [(track["name"], track["type"]) for track in tracks[late_page]],
+            [(".visible", "boolean")],
+        )
+        # the page stays hidden in the page itself, before the clip plays
+        self.assertIn(
+            (late_page, "visible", False),
+            [
+                (c["path"], c["property"], c["value"])
+                for c in commands
+                if c["type"] == "set_property"
+            ],
+        )
 
 
 @pytest.mark.optional
