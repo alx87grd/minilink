@@ -103,10 +103,10 @@ def _is_tracing_error(exc):
 
 
 def operating_point(sys, x_bar=None, u_bar=None, params=None):
-    """Fill the family defaults: ``x0``, the nominal inputs, the live ``sys.params``."""
+    """Fill the family defaults: ``x0``, the nominal inputs, ``sys.params`` with every random block at its mean."""
     x_bar = sys.x0 if x_bar is None else x_bar
     u_bar = sys.get_u_from_input_ports() if u_bar is None else u_bar
-    params = sys.params if params is None else params
+    params = sys.realize(None) if params is None else params
     return (
         np.asarray(x_bar, dtype=float).reshape(-1),
         np.asarray(u_bar, dtype=float).reshape(-1),

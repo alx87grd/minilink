@@ -504,6 +504,10 @@ left diagram in place. Known gap: `step_diagram % dt` on a user-built
 `sys` (stateful plants), with numeric suffix on collision (`sys2`, …). Override
 with ``System.id`` before wiring or explicit ``add_subsystem(..., "plant")``.
 Block titles in ``plot_diagram()`` still show ``sys.name`` (human type).
+A diagram nested with ``add_subsystem`` is drawn expanded: its blocks sit in a
+box labelled ``name::id``, at every depth, and the wires go straight to the inner
+block ports, with no boundary nodes. ``plot_diagram(expand=False)`` draws each
+nested diagram as one block with its boundary ports.
 ``print(sys)`` is a short text summary: name, class, ``n``, ports with
 dimensions; a diagram adds its keys.
 :func:`~minilink.graphical.diagrams.build_diagram_topology` accepts
@@ -635,6 +639,27 @@ deliberately not provided in v0.1.
   optional `Set`. `Uniform(lower, upper)` holds its `BoxSet`; the same `sample` convention
   holds on sets. `Gaussian`, `Uniform`, `Particles`, `Sampler`; sets are support,
   distributions are probability.
+- Randomness (`blocks/sources.py`, `core/distributions.py`): a `Distribution` has no time; a
+  noise signal is a block holding draws over a sample period. `WhiteNoise(p, *, psd,
+  sample_period, seed, hold)` is white noise of two-sided intensity `psd`, each sample
+  `w_k ~ N(0, psd / Δ)` held over `Δ` (`hold="zoh"`; `"linear"` interpolates), so the physics
+  does not change with the period; `seed`, `sample_period` and `psd` are params, and `h`
+  computes `w(t)` from `(t, params)` with a counter-based cipher (Threefry-2x32, the same bits
+  on NumPy and JAX), so the block is pure, traces, and edits without a refresh. `seed=None` is
+  the mean. `System.realize(key)` returns the params of one realization: every random block
+  reseeded under its own stream, named by its id (a diagram nests it like `params`), or every
+  seed `None` for `key=None`; the analysis verbs (`operating_point`, `find_equilibrium`) and a
+  `PlanningProblem` on a random system resolve `params=None` through `realize(None)`, so a
+  noisy loop is linearized and planned at `E[w] = 0`. Three periods: the block's `Δ`, a
+  controller's period, the solver's step. A block publishes `Δ` as
+  `solver_info["sample_period"]` (a diagram gathers the minimum) and as its time constant;
+  with no solver named the simulator takes fixed-step RK4 at the largest `Δ / n` at or under
+  the smooth policy's step, one step per sample when no block declares a time constant, since
+  the period is the resolution the user chose, and `dt` buys a finer one (the
+  realtime simulator reads only the time constant). A step that does not divide `Δ`, a forced
+  adaptive solver, two blocks sharing a seed, and a declared disturbance the stepped tools
+  never read are announced. Kalman reads `Q = B_w W B_wᵀ`, `R = D_v V D_vᵀ` for the
+  continuous filter, `Q_d = B_w W B_wᵀ Δ`, `R_d = D_v V D_vᵀ / Δ` for the discrete one.
 - Costs: `g(x,u,t)`, `h(x,t)` on `CostFunction` in `core`; attach to
   `PlanningProblem`, not the plant. Compose with `+` → `SumCost` and `*` →
   `ScaledCost` (e.g. `base + w * obstacle_cost`). `g`/`h` receive
@@ -1187,7 +1212,14 @@ whole animation (`fit_camera_to_frames`, margin 1.15; backdrops such as
 `ground_line` and `Plane` and force glyphs such as `Arrow` are excluded via
 `primitive.camera_fit = False`), so a plant whose
 `params` change keeps a sensible view; a numeric `camera_scale` frames the
-scene yourself.
+scene yourself. Meshcat consumes the same matrix: the mouse orbit of its viewer
+is anchored at the origin, so the target is honoured by sliding the drawn world
+(with the viewer's grid and axes) until the target sits there, and the eye sits
+on the view-out side at the `T[3, 3]` distance (elevation capped at the
+viewer's default); orbit, pan and zoom stay with the mouse, and a native
+animation keyframes the slide alongside the bodies. One backdrop hint sits
+beside the camera's: `scene_grid=False` hides the viewer's ground grid and axes
+(an underwater or open-sea scene); the flat renderers ignore it.
 
 All performance benchmarking lives in repo-root `benchmarks/` (helpers,
 synthetic fixtures, `run_*` scripts) — outside the shipped package, importing

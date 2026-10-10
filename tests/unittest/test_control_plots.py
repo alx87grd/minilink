@@ -255,6 +255,16 @@ class TestPlots(unittest.TestCase):
         self.assertEqual(r.figure._suptitle.get_text(), "Step Response")
         self.assertEqual(r.axes.get_xlabel(), "Time (seconds)")
 
+    def test_radius_frames_the_slow_roots_of_a_stiff_channel(self):
+        stiff = TransferFunction([1.0], [1.0, 101.0, 100.0])  # poles at -1 and -100
+        r = plot_pzmap(stiff, show=False)
+        self.assertLess(r.axes.get_xlim()[0], -100.0)
+        r = plot_pzmap(stiff, radius=5.0, show=False)
+        self.assertGreater(r.axes.get_xlim()[0], -10.0)
+        r = plot_root_locus(stiff, radius=5.0, show=False)
+        self.assertGreater(r.axes.get_xlim()[0], -10.0)
+        self.assertEqual(len(r.axes.lines), 2 + 2 + 2)  # two branches, markers, axes
+
     def test_margins_are_drawn_on_the_bode_plot(self):
         r = plot_bode(self.loop, show=False)
         texts = [t.get_text() for t in r.axes[0].texts]

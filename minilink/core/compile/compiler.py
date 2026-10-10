@@ -21,6 +21,7 @@ from __future__ import annotations
 
 import copy
 import time
+import warnings
 from typing import TYPE_CHECKING
 
 import numpy as np
@@ -39,7 +40,7 @@ from minilink.core.compile.execution_plan import (
     StateOperation,
 )
 from minilink.core.system import DynamicSystem
-from minilink.core.wiring import check_algebraic_loops
+from minilink.core.wiring import check_algebraic_loops, iter_subsystems
 
 if TYPE_CHECKING:
     from minilink.core.diagram import DiagramSystem
@@ -264,6 +265,7 @@ def compile_diagram(
 
     for sys_id, subsystem in diagram.subsystems.items():
         validate_equation_shapes(subsystem, label=f"{subsystem.name} ({sys_id})")
+    warn_shared_seeds(diagram)
     port_execution_order = check_algebraic_loops(diagram)
 
     if verbose:
@@ -342,6 +344,22 @@ def build_execution_plan(
 
 
 # Private helpers
+def warn_shared_seeds(diagram):
+    """Warn when two random blocks hold one seed: they would draw the same signal."""
+    blocks_by_seed = {}
+    for path, subsystem in iter_subsystems(diagram):
+        seed = subsystem.params.get("seed") if subsystem.is_random else None
+        if seed is not None:
+            blocks_by_seed.setdefault(int(seed), []).append(".".join(path))
+    for seed, ids in blocks_by_seed.items():
+        if len(ids) > 1:
+            warnings.warn(
+                f"random blocks {', '.join(ids)} share seed {seed} and draw the same "
+                "signal; give each its own seed, or realize the diagram under one key",
+                stacklevel=2,
+            )
+
+
 def _build_execution_plan_from_order(
     diagram: DiagramSystem,
     port_execution_order: list[tuple[str, str]],

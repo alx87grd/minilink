@@ -1,10 +1,11 @@
 # GRO501 classical-control stack — fix plan (draft, 2026-09-07)
 
-Status: **wave 1 partly landed 2026-09-07.** P1 done (ruled: dedicated
-`PI` / `PD` classes); F1, F2, F4 done (second-pass defects, see the audit).
+Status: **wave 1 landed.** P1 done 2026-09-07 (ruled: dedicated
+`PI` / `PD` classes); F1, F2, F4 done (second-pass defects, see the audit);
+P2 and P3 landed 2026-09-26.
 P4 (estimation) and P6 (z tier) **held by the maintainer** 2026-09-07; the
-roadmap schedules P4 for v0.2 once the hold is lifted and the disturbance
-convention is decided (ROADMAP §6). P2 landed 2026-09-26; P3 and wave 2 open.
+roadmap schedules P4 for v0.2 once the hold is lifted; the disturbance
+convention was decided 2026-09-26 (ROADMAP §6). Wave 2 is open except P7.
 Rung: v0.2 wave B, steps P2–P11 of [TODO.md](TODO.md).
 Lane: teaching surface (`analysis/`, `control/`, `estimation/`, `blocks/`).
 Milestone: v0.2, [ROADMAP §4.2](../../ROADMAP.md#42-v02--gro501-end-to-end).
@@ -36,7 +37,7 @@ additive or replaces boilerplate with generated equivalents.
 Wave 1 is the correctness wave and should land before any GRO501 material is
 written: until it is in, the tools disagree with the course's own exercises.
 P1, F1, F2 and F4 landed 2026-09-07 (suite 1 063 green, notebook and demos
-re-run); P2 and P3 remain. Wave 2 is the missing surface. Wave 3 is polish
+re-run); P2 and P3 landed 2026-09-26. Wave 2 is the missing surface. Wave 3 is polish
 and material.
 
 F1, F2 and F4 came out of a second pass that ran the guide's §9.6 / §9.7 /
@@ -418,7 +419,9 @@ in (P2 on 2026-09-26). P7 is independent and worth doing before P2
 and P5 add three more facade methods each by hand. With P4 and P6 held, the
 next steps are, in order: **TB-a** (the analysis toolbox read like the textbook,
 starting with the shortcut list that decides P7's scope), then **P5** and **P8** on the
-cleaned toolbox, then **TB-b** (the control objects and the loop), then **P11**.
+cleaned toolbox, then **TB-b** (the control objects and the loop), then S61, P9 and P10,
+then RN-1 of [randomness.md](randomness.md) and **P4**, then **P11** (the order decided
+2026-09-26, [TODO.md](TODO.md) §3; TB-a and P7 landed that day).
 
 ## 3. What this plan does not do
 

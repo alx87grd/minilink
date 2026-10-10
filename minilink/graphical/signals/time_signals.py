@@ -318,9 +318,14 @@ def _labels_and_units_for_extra_signal(sys, name: str, dim: int):
         subsystem = sys.subsystems.get(sys_id)
         if subsystem is not None and port_id in subsystem.outputs:
             port = subsystem.outputs[port_id]
-            labels = tuple(
-                f"{name}" if dim == 1 else f"{name}[{i}]" for i in range(dim)
-            )
+            # the labels the port declares, else the signal's own name
+            declared = list(port.labels) != [f"{port_id}[{i}]" for i in range(dim)]
+            if declared and len(port.labels) >= dim:
+                labels = tuple(str(label) for label in port.labels[:dim])
+            else:
+                labels = tuple(
+                    f"{name}" if dim == 1 else f"{name}[{i}]" for i in range(dim)
+                )
             return labels, _units_for_vector(port.units, dim)
 
     labels = tuple(f"{name}" if dim == 1 else f"{name}[{i}]" for i in range(dim))

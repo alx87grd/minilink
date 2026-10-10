@@ -2,14 +2,13 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass, replace
+from dataclasses import dataclass
 
 from minilink.core.hybrid_diagram import HybridDiagram
 from minilink.graphical.diagrams.topology import (
-    BoundaryPortRef,
     DiagramTopology,
-    TopologyEdge,
     build_diagram_topology,
+    prefix_topology,
 )
 from minilink.simulation.computer import StepSchedule
 
@@ -55,11 +54,11 @@ def build_hybrid_topology(
 
     ``abstract_boundary=True`` (default) omits per-side external routing nodes.
     """
-    plant = _prefix_topology(
+    plant = prefix_topology(
         build_diagram_topology(hybrid.plant, abstract_boundary=abstract_boundary),
         _PLANT_PREFIX,
     )
-    step_diagram = _prefix_topology(
+    step_diagram = prefix_topology(
         build_diagram_topology(
             hybrid.computer.diagram,
             abstract_boundary=abstract_boundary,
@@ -104,45 +103,6 @@ def export_hybrid_topology(
         return export_hybrid_mermaid(topology, **kwargs)
     raise ValueError(
         f"Unknown hybrid topology backend {backend!r}. Expected 'graphviz' or 'mermaid'."
-    )
-
-
-def _prefix_topology(topology: DiagramTopology, prefix: str) -> DiagramTopology:
-    def pid(node_id: str) -> str:
-        return f"{prefix}{node_id}"
-
-    nodes = tuple(replace(node, id=pid(node.id)) for node in topology.nodes)
-    edges = tuple(
-        TopologyEdge(
-            source_node=pid(edge.source_node),
-            source_port=edge.source_port,
-            target_node=pid(edge.target_node),
-            target_port=edge.target_port,
-        )
-        for edge in topology.edges
-    )
-    boundary_inputs = tuple(
-        BoundaryPortRef(
-            diagram_port=ref.diagram_port,
-            node_id=pid(ref.node_id),
-            port_id=ref.port_id,
-        )
-        for ref in topology.boundary_inputs
-    )
-    boundary_outputs = tuple(
-        BoundaryPortRef(
-            diagram_port=ref.diagram_port,
-            node_id=pid(ref.node_id),
-            port_id=ref.port_id,
-        )
-        for ref in topology.boundary_outputs
-    )
-    return DiagramTopology(
-        name=topology.name,
-        nodes=nodes,
-        edges=edges,
-        boundary_inputs=boundary_inputs,
-        boundary_outputs=boundary_outputs,
     )
 
 

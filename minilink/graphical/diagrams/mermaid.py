@@ -5,6 +5,7 @@ from __future__ import annotations
 import re
 
 from minilink.graphical.diagrams.export import TopologyExporter
+from minilink.graphical.diagrams.topology import clustered_node_ids
 
 
 class MermaidTopologyExporter(TopologyExporter):
@@ -14,10 +15,13 @@ class MermaidTopologyExporter(TopologyExporter):
 
     def export(self, topology, **kwargs) -> str:
         lines = ["flowchart LR"]
+        nodes = {node.id: node for node in topology.nodes}
+        boxed = clustered_node_ids(topology.clusters)
         for node in topology.nodes:
-            node_id = _mermaid_id(node.id)
-            label = _escape_label(_node_label(node))
-            lines.append(f'  {node_id}["{label}"]')
+            if node.id not in boxed:
+                lines.append(block_line(node, indent="  "))
+        for cluster in topology.clusters:
+            lines.extend(cluster_lines(cluster, nodes, indent="  "))
 
         for edge in topology.edges:
             source = _mermaid_id(edge.source_node)
@@ -26,6 +30,24 @@ class MermaidTopologyExporter(TopologyExporter):
             lines.append(f'  {source} -- "{label}" --> {target}')
 
         return "\n".join(lines)
+
+
+def block_line(node, *, indent: str) -> str:
+    """Return the Mermaid declaration of one block."""
+    label = _escape_label(_node_label(node))
+    return f'{indent}{_mermaid_id(node.id)}["{label}"]'
+
+
+def cluster_lines(cluster, nodes, *, indent: str) -> list[str]:
+    """Return the Mermaid ``subgraph`` of one nested diagram, recursively."""
+    label = _escape_label(f"{cluster.name}::{cluster.display_id}")
+    lines = [f'{indent}subgraph {_mermaid_id(cluster.id)}["{label}"]']
+    for node_id in cluster.node_ids:
+        lines.append(block_line(nodes[node_id], indent=indent + "  "))
+    for child in cluster.clusters:
+        lines.extend(cluster_lines(child, nodes, indent=indent + "  "))
+    lines.append(f"{indent}end")
+    return lines
 
 
 def _node_label(node) -> str:

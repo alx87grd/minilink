@@ -2,11 +2,13 @@
 
 from __future__ import annotations
 
-import re
 import warnings
 
 from minilink.graphical.diagrams.export import TopologyExporter
-from minilink.graphical.diagrams.topology import build_diagram_topology
+from minilink.graphical.diagrams.topology import (
+    build_diagram_topology,
+    clustered_node_ids,
+)
 
 # One warning when the graphviz Python wrapper is missing: diagrams are
 # optional, so plot_diagram skips the figure and the notebook keeps running.
@@ -16,23 +18,37 @@ MISSING_GRAPHVIZ_MESSAGE = (
 )
 
 
-def graphviz_port_id(port_id):
-    """Return a Graphviz HTML ``PORT`` identifier for a minilink port id.
+def graphviz_port_id(port_id, role):
+    """Return the Graphviz HTML ``PORT`` identifier of one minilink port.
 
-    Graphviz port names must be identifiers; ``+`` / ``-`` become ``plus`` /
-    ``minus``, and ``y[0]``-style Demux ids drop the brackets. The cell
-    still displays the original port id.
+    Graphviz matches port names case-insensitively and the same table holds
+    the block's inputs and outputs, so the identifier carries the port's
+    ``role`` (``"in"`` or ``"out"``) and an escaped name that stays unique
+    under case folding: ``+`` / ``-`` become ``plus`` / ``minus``, an
+    underscore doubles, an uppercase letter becomes ``_`` plus its lowercase,
+    and any other character outside ``[0-9a-z]`` (the brackets of a ``y[0]``
+    Demux id) becomes ``_``. The cell still displays the original port id.
     """
+    if role not in ("in", "out"):
+        raise ValueError(f"port role must be 'in' or 'out', got {role!r}")
     if port_id == "+":
-        return "plus"
-    if port_id == "-":
-        return "minus"
-    text = re.sub(r"[^0-9A-Za-z_]", "_", port_id).strip("_")
-    if not text:
-        text = "port"
-    if text[0].isdigit():
-        text = "p_" + text
-    return text
+        text = "plus"
+    elif port_id == "-":
+        text = "minus"
+    else:
+        text = "".join(escape_port_char(char) for char in port_id)
+    return f"{role}_{text}"
+
+
+def escape_port_char(char):
+    """Map one character of a port id onto ``[0-9a-z_]``, injectively."""
+    if char == "_":
+        return "__"
+    if "A" <= char <= "Z":
+        return "_" + char.lower()
+    if "a" <= char <= "z" or "0" <= char <= "9":
+        return char
+    return "_"
 
 
 class GraphvizTopologyExporter(TopologyExporter):
@@ -51,17 +67,12 @@ class GraphvizTopologyExporter(TopologyExporter):
         graph = graphviz.Digraph(topology.name, engine=kwargs.pop("engine", "dot"))
         graph.attr(rankdir=kwargs.pop("rankdir", "LR"))
 
-        for node in topology.nodes:
-            graph.node(
-                node.id,
-                shape="none",
-                label=f"<{block_html(node)}>",
-            )
+        render_blocks(graph, topology)
 
         for edge in topology.edges:
             graph.edge(
-                f"{edge.source_node}:{graphviz_port_id(edge.source_port)}:e",
-                f"{edge.target_node}:{graphviz_port_id(edge.target_port)}:w",
+                f"{edge.source_node}:{graphviz_port_id(edge.source_port, 'out')}:e",
+                f"{edge.target_node}:{graphviz_port_id(edge.target_port, 'in')}:w",
             )
 
         return graph
@@ -85,7 +96,7 @@ def block_html(node):
         if j < len(node.inputs):
             port_id = node.inputs[j].id
             html += (
-                f'<TD PORT="{graphviz_port_id(port_id)}" align="left" '
+                f'<TD PORT="{graphviz_port_id(port_id, "in")}" align="left" '
                 f'BORDER="1">{port_id}</TD>\n'
             )
         else:
@@ -94,7 +105,8 @@ def block_html(node):
         if j < len(node.outputs):
             port_id = node.outputs[j].id
             html += (
-                f'<TD PORT="{graphviz_port_id(port_id)}" BORDER="1">{port_id}</TD>\n'
+                f'<TD PORT="{graphviz_port_id(port_id, "out")}" '
+                f'BORDER="1">{port_id}</TD>\n'
             )
         else:
             html += '<TD BORDER="1"> </TD>\n'
@@ -102,6 +114,28 @@ def block_html(node):
 
     html += "</TABLE>"
     return html
+
+
+def render_blocks(graph, topology):
+    """Declare the blocks of a topology, each nested diagram inside its box."""
+    nodes = {node.id: node for node in topology.nodes}
+    boxed = clustered_node_ids(topology.clusters)
+    for node in topology.nodes:
+        if node.id not in boxed:
+            graph.node(node.id, shape="none", label=f"<{block_html(node)}>")
+    for cluster in topology.clusters:
+        render_cluster(graph, cluster, nodes)
+
+
+def render_cluster(graph, cluster, nodes):
+    """Draw one nested diagram as a labelled Graphviz cluster around its blocks."""
+    with graph.subgraph(name=f"cluster_{cluster.id}") as box:
+        box.attr(label=f"{cluster.name}::{cluster.display_id}")
+        for node_id in cluster.node_ids:
+            node = nodes[node_id]
+            box.node(node.id, shape="none", label=f"<{block_html(node)}>")
+        for child in cluster.clusters:
+            render_cluster(box, child, nodes)
 
 
 def _render_diagram_graph(
@@ -223,22 +257,38 @@ def get_system_block_html(sys, html_id="sys1"):
     return block_html(node)
 
 
-def get_diagram(sys_or_diagram):
-    """Return the renderable diagram object for a system or assembled diagram."""
+def get_diagram(sys_or_diagram, *, expand=True):
+    """Return the renderable diagram object for a system or assembled diagram.
+
+    ``expand=True`` draws the blocks of every nested diagram inside a labelled
+    box; ``expand=False`` draws a nested diagram as one block.
+    """
     from minilink.graphical.diagrams.export import export_diagram_topology
 
     try:
-        return export_diagram_topology(sys_or_diagram, backend="graphviz")
+        return export_diagram_topology(
+            sys_or_diagram, backend="graphviz", expand=expand
+        )
     except ImportError:
         warnings.warn(MISSING_GRAPHVIZ_MESSAGE, stacklevel=2)
         return None
 
 
 def plot_diagram(
-    sys_or_diagram, filename=None, show=True, show_inline=None, show_pdf=None
+    sys_or_diagram,
+    filename=None,
+    show=True,
+    show_inline=None,
+    show_pdf=None,
+    *,
+    expand=True,
 ):
-    """Render a system or assembled diagram."""
-    graph = get_diagram(sys_or_diagram)
+    """Render a system or assembled diagram.
+
+    ``expand=True`` draws the blocks of every nested diagram inside a labelled
+    box; ``expand=False`` draws a nested diagram as one block.
+    """
+    graph = get_diagram(sys_or_diagram, expand=expand)
     _render_diagram_graph(
         graph,
         show=show,

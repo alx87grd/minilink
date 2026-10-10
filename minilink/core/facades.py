@@ -302,13 +302,16 @@ class SharedSystemFacades:
 
         return plot_input_output_map(self, **kwargs)
 
-    def get_diagram(self):
+    def get_diagram(self, *, expand=True):
         """
         Convenience shortcut returning a renderable diagram representation.
+
+        ``expand=False`` draws a nested diagram as one block instead of a
+        labelled box around its own blocks.
         """
         from minilink.graphical.diagrams import get_diagram
 
-        return get_diagram(self)
+        return get_diagram(self, expand=expand)
 
     def _repr_svg_(self):
         """
@@ -322,9 +325,22 @@ class SharedSystemFacades:
         except Exception:
             return None
 
-    def plot_diagram(self, filename=None, show=True, show_inline=None, show_pdf=None):
+    def plot_diagram(
+        self,
+        filename=None,
+        show=True,
+        show_inline=None,
+        show_pdf=None,
+        *,
+        expand=True,
+    ):
         """
         Convenience shortcut to render the system diagram.
+
+        A diagram that contains another diagram shows the inner blocks inside
+        a labelled box, at every depth, with the wires going straight to the
+        inner ports. Pass ``expand=False`` to draw each nested diagram as one
+        block with its boundary ports.
 
         Jupyter / Colab get inline SVG by default (the returned Graphviz
         object is the cell output; this method does not also call
@@ -342,6 +358,7 @@ class SharedSystemFacades:
             show_inline=show_inline,
             show_pdf=show_pdf,
             filename=filename,
+            expand=expand,
         )
 
     def render(
@@ -731,6 +748,7 @@ class DynamicSystemFacades:
         method="auto",
         eps=1e-6,
         minimal=None,
+        radius=None,
         backend="matplotlib",
         show=True,
     ):
@@ -752,6 +770,7 @@ class DynamicSystemFacades:
             method=method,
             eps=eps,
             minimal=minimal,
+            radius=radius,
             backend=backend,
             show=show,
         )
@@ -768,6 +787,7 @@ class DynamicSystemFacades:
         method="auto",
         eps=1e-6,
         minimal=None,
+        radius=None,
         backend="matplotlib",
         show=True,
     ):
@@ -788,6 +808,7 @@ class DynamicSystemFacades:
             method=method,
             eps=eps,
             minimal=minimal,
+            radius=radius,
             backend=backend,
             show=show,
         )

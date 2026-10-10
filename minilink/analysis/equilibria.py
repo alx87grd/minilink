@@ -39,6 +39,9 @@ def find_equilibrium(sys, x_guess, u_bar=None, t=0.0, params=None, *, tol=1e-9):
     if u_bar is None:
         u_bar = sys.get_u_from_input_ports()
     u_bar = np.asarray(u_bar, dtype=float).reshape(-1)
+    params = (
+        sys.realize(None) if params is None else params
+    )  # random blocks at their mean
 
     def residual(x):
         return np.asarray(sys.f(x, u_bar, t, params), dtype=float).reshape(-1)

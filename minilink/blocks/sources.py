@@ -1,9 +1,10 @@
-"""Source blocks: constant, step, band-limited noise and a replayed trajectory as a signal."""
+"""Source blocks: constant, step, white noise and a replayed trajectory as a signal."""
 
 import numpy as np
 from scipy.interpolate import interp1d
 
 from minilink.core.backends import array_module
+from minilink.core.distributions import child_seed, sample_index, standard_normal
 from minilink.core.system import System
 
 
@@ -148,85 +149,86 @@ class Step(Source):
 
 
 class WhiteNoise(Source):
-    """Band-limited white-noise source.
+    """White noise of intensity ``psd``, held over each ``sample_period``.
 
-    Gaussian samples (``mean``, ``var``) are drawn once on a uniform grid
-    with spacing ``sample_period`` over ``[t0, tf]`` and linearly
-    interpolated in between, so ``y(t)`` is deterministic for a given
-    ``seed`` and well-behaved under adaptive ODE solvers. Call
-    :meth:`refresh` after changing ``params``.
+    The intensity is the two-sided spectral density of the signal (a one-sided
+    estimate such as ``scipy.signal.welch``'s default reads twice it). The
+    per-sample covariance is the intensity over the period, so the physics does
+    not change with the period; a per-sample variance over a period is an
+    intensity of variance times period. The zero-order hold keeps each sample
+    for its whole period; ``hold="linear"`` interpolates between samples, with a
+    mid-period variance of half the per-sample one. A fixed step that divides the
+    period keeps RK4's stages inside one sample except the last stage of a
+    boundary step, an effect first order in the step. The sample counter is
+    32 bits: the signal repeats after 2³² samples. ``seed=None`` gives the mean
+    (zero); the seed is the block's default realization, :meth:`realize` draws
+    another. A scalar or vector ``psd`` is a diagonal intensity, a matrix a full
+    one.
     """
 
-    def __init__(self, p=1):
+    HOLDS = ("zoh", "linear")
+    is_random = True
+
+    def __init__(self, p=1, *, psd=1.0, sample_period=0.01, seed=0, hold="zoh"):
+        if hold not in self.HOLDS:
+            raise ValueError(f"hold must be one of {self.HOLDS}, got {hold!r}")
+        if seed is not None and int(seed) < 0:
+            raise ValueError(
+                f"seed must be a non-negative integer or None, got {seed!r}"
+            )
+        if float(sample_period) <= 0.0:
+            raise ValueError("sample_period must be > 0")
 
         Source.__init__(self, p)
 
         self.name = "WhiteNoise"
+        self.hold = hold
         self.params = {
-            "var": 1.0,
-            "mean": 0.0,
-            "seed": 0,
-            "sample_period": 0.01,
-            "t0": -100.0,
-            "tf": 100.0,
+            "seed": seed,
+            "sample_period": float(sample_period),
+            "psd": as_intensity(psd, p),
         }
-
-        # The interpolators of the drawn samples; refresh() rebuilds them from params
-        self._interpolators = []
         self.refresh()
 
+    @property
+    def psd(self):
+        """The intensity ``W``: a ``(p,)`` diagonal or a ``(p, p)`` matrix."""
+        return self.params["psd"]
+
     def refresh(self):
-        t0 = float(self.params["t0"])
-        tf = float(self.params["tf"])
-        if tf < t0:
-            t0, tf = tf, t0
+        """Publish the sample period as the solver hint of the block."""
+        period = float(self.params["sample_period"])
+        self.solver_info["sample_period"] = period
+        self.solver_info["smallest_time_constant"] = period
 
-        sample_period = float(self.params["sample_period"])
-
-        if sample_period <= 0:
-            raise ValueError("sample_period must be > 0")
-
-        mean = float(self.params["mean"])
-        var = max(0.0, float(self.params["var"]))
-        seed = int(self.params["seed"])
-        sigma = np.sqrt(var)
-
-        n_steps = int(np.ceil((tf - t0) / sample_period)) + 1
-        noise_time = np.linspace(t0, tf, n_steps)
-
-        rng = np.random.default_rng(seed)
-        white = rng.normal(loc=mean, scale=sigma, size=(self.p, n_steps))
-        white[:, 0] = mean
-        white[:, -1] = mean
-
-        self._interpolators = []
-        for i in range(self.p):
-            interpolator = interp1d(
-                noise_time,
-                white[i, :],
-                kind="linear",
-                bounds_error=False,
-                fill_value=(mean, mean),
-                assume_sorted=True,
-            )
-            self._interpolators.append(interpolator)
+    def realize(self, key):
+        """The params of one realization: a fresh seed under ``key``, or the mean for ``None``."""
+        seed = None if key is None else child_seed(key, "seed")
+        return dict(self.params, seed=seed)
 
     def h(self, x, u, t=0, params=None):
-        if params is None:
-            params = self.params
-        else:
-            raise ValueError(
-                "The block needs to be refreshed to reflect changes in parameters"
-            )
+        params = self.params if params is None else params
+        seed, W, period = params["seed"], params["psd"], params["sample_period"]
+        hold, p = self.hold, self.p
+        xp = array_module(t, W)
+        if seed is None:
+            return xp.zeros(p)  # the mean: no draw
 
-        p, interpolators = self.p, self._interpolators
+        # the sample index of the held train: w(t) = w_k on [kΔ, (k+1)Δ)
+        k = sample_index(t, period)
+        s = t / period - k
 
-        # one interpolated sample per channel at time t
-        y = np.zeros(p)
-        for i, interpolator in enumerate(interpolators):
-            y[i] = float(interpolator(float(t)))
+        # Σ = W / Δ: the per-sample covariance of an intensity W held over Δ
+        Sigma = W / period
+        L = intensity_root(Sigma, p)
 
-        return y
+        # w_k = Σ^{1/2} ε_k, with ε_k = F(seed, k) ~ N(0, I); the linear hold blends in w_k+1
+        w = L @ standard_normal(seed, k, p)
+        if hold == "linear":
+            w_next = L @ standard_normal(seed, k + 1, p)
+            w = (1 - s) * w + s * w_next
+
+        return w
 
 
 class TrajectorySource(Source):
@@ -293,33 +295,40 @@ class TrajectorySource(Source):
         return y
 
 
-if __name__ == "__main__":
-    noise = WhiteNoise(1)
-    # Baseline
-    noise.params["t0"] = 0.0
-    noise.params["tf"] = 10.0
-    noise.params["sample_period"] = 0.01
-    noise.params["mean"] = 0.0
-    noise.params["var"] = 1.0
-    noise.params["seed"] = 1
+# Internal machinery
 
+
+def as_intensity(psd, p):
+    """The intensity as a ``(p,)`` diagonal (a scalar broadcast) or a ``(p, p)`` matrix."""
+    W = np.asarray(psd, dtype=float)
+    if W.ndim == 0:
+        W = np.full(p, float(W))
+    if W.shape not in ((p,), (p, p)):
+        raise ValueError(
+            f"psd must be a scalar, a ({p},) diagonal or a ({p}, {p}) matrix"
+        )
+    if np.any(W.diagonal() < 0.0) if W.ndim == 2 else np.any(W < 0.0):
+        raise ValueError("psd must be non-negative")
+    return W
+
+
+def intensity_root(W, p):
+    """A square root ``L`` with ``L Lᵀ = W``: element-wise for a diagonal, symmetric for a matrix."""
+    xp = array_module(W)
+    W = xp.asarray(W)
+    if W.ndim < 2:
+        return xp.diag(xp.sqrt(W) * xp.ones(p))
+    values, vectors = xp.linalg.eigh(W)
+    return (vectors * xp.sqrt(xp.maximum(values, 0.0))) @ vectors.T
+
+
+if __name__ == "__main__":
+    noise = WhiteNoise(1, psd=0.01, sample_period=0.01, seed=1)
     fig, ax = noise.show_signal(t0=-2.0, tf=12.0)
     ax.set_title("Baseline")
 
-    # Change one parameter at a time to visualize each effect.
-    demo_changes = [
-        ("mean", 10.0),
-        ("var", 8.0),
-        ("sample_period", 0.05),
-        ("sample_period", 0.2),
-        ("sample_period", 0.5),
-        ("sample_period", 1.0),
-        ("sample_period", 2.0),
-        ("sample_period", 5.0),
-    ]
-
-    for key, value in demo_changes:
-        noise.params[key] = value
-        noise.refresh()
+    # the intensity is fixed: a longer period holds smaller samples for longer
+    for period in (0.05, 0.2, 1.0):
+        noise.params["sample_period"] = period
         fig, ax = noise.show_signal(t0=-2.0, tf=12.0)
-        ax.set_title(f"Changed {key} -> {value}")
+        ax.set_title(f"sample_period = {period}")

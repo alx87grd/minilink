@@ -52,12 +52,6 @@
     ],
     "timeout": 300
   },
-  "examples/teaching/topics/optimal_control/racecar_mpc.ipynb": {
-    "requires": [
-      "jax"
-    ],
-    "smoke": false
-  },
   "examples/teaching/courses/udes_gro501/racecar_toward_mpc.ipynb": {
     "requires": [
       "jax"

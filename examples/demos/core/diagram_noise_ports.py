@@ -20,10 +20,10 @@ sys.x0[0] = 2.0
 step = Step(final_value=1.0, step_time=10.0)
 
 # Noisy input
-noise = WhiteNoise()
+noise = WhiteNoise(seed=1)
 
 # Noisy measurement
-noise2 = WhiteNoise()
+noise2 = WhiteNoise(seed=2)
 
 # Closed loop system
 ctl = ImpedanceController(Kp=100.0, Kd=50.0)
@@ -46,22 +46,22 @@ diagram.plot_diagram()
 
 
 diagram.name = "Pendulum without Noise"
-diagram.subsystems["process_noise"].params["var"] = 0.0
-diagram.subsystems["measurement_noise"].params["var"] = 0.0
+diagram.subsystems["process_noise"].params["psd"] = 0.0
+diagram.subsystems["measurement_noise"].params["psd"] = 0.0
 diagram.compute_trajectory(tf=20)
 diagram.plot_trajectory()
 
 diagram.name = "Pendulum with Measurement Noise "
-diagram.subsystems["process_noise"].params["var"] = 0.0
-diagram.subsystems["measurement_noise"].params["var"] = 1.0
+diagram.subsystems["process_noise"].params["psd"] = 0.0
+diagram.subsystems["measurement_noise"].params["psd"] = 0.01
 # diagram.subsystems["measurement_noise"].show_signal()
 diagram.compute_trajectory(tf=20)
 diagram.plot_trajectory()
 
 diagram.name = "Pendulum with Process Noise "
-diagram.subsystems["process_noise"].params["var"] = 100.0
+diagram.subsystems["process_noise"].params["psd"] = 20.0
 diagram.subsystems["process_noise"].params["sample_period"] = 0.2
-diagram.subsystems["measurement_noise"].params["var"] = 0.0
+diagram.subsystems["measurement_noise"].params["psd"] = 0.0
 # diagram.subsystems["process_noise"].show_signal()
 diagram.compute_trajectory(tf=20)
 diagram.plot_trajectory()
