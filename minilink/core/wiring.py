@@ -482,17 +482,28 @@ class WiredDiagramMixin:
                 [s.nominal_value for s in substates]
             )
             self.x0 = np.concatenate([sub.x0 for sub in self.subsystems.values()])
+        # The x0 stacked from the subsystems, so refresh() can tell a user's diagram
+        # x0 from a stale stacked one (a stopgap until x0 is derived, ROADMAP S29).
+        self.derived_x0 = np.copy(self.x0)
 
     def refresh(self):
         """Refresh all subsystems and rebuild the flattened state metadata.
 
         The solver hints are then bubbled again from the refreshed subsystems
         (:meth:`refresh_solver_info`). Compiled evaluators are snapshots:
-        recompile after structural changes.
+        recompile after structural changes. An ``x0`` set on the diagram itself
+        is kept; otherwise the subsystems' current ``x0`` are stacked again.
         """
+        x0 = np.copy(self.x0)
+        derived_x0 = getattr(self, "derived_x0", x0)
+        user_set_x0 = x0.shape == derived_x0.shape and not np.array_equal(
+            x0, derived_x0
+        )
         for subsystem in self.subsystems.values():
             subsystem.refresh()
         self.compute_state_properties()
+        if user_set_x0 and x0.shape == self.x0.shape:
+            self.x0 = x0
         self.refresh_solver_info()
 
     def autowire(

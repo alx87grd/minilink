@@ -63,6 +63,22 @@ class DiscontinuousLinearSystem(StableLinearSystem):
 
 
 class TestNewSimulator(unittest.TestCase):
+    def test_a_diagram_x0_set_by_the_user_is_kept(self):
+        from minilink import Pendulum, StateFeedbackController
+
+        K = np.array([[10.0, 2.0]])
+        loop = StateFeedbackController(K) @ Pendulum()
+        loop.x0 = np.array([0.5, -0.2])
+        traj = loop.compute_trajectory(tf=0.05, verbose=False)
+        np.testing.assert_allclose(traj.x[:, 0], [0.5, -0.2])
+        np.testing.assert_allclose(loop.x0, [0.5, -0.2])
+
+        plant = Pendulum()
+        loop = StateFeedbackController(K) @ plant
+        plant.x0 = np.array([0.7, 0.0])  # set on the block after composition
+        traj = loop.compute_trajectory(tf=0.05, verbose=False)
+        np.testing.assert_allclose(traj.x[:, 0], [0.7, 0.0])
+
     def test_default_solver_auto_selects_euler_for_discontinuous_system(self):
         sim = Simulator(
             DiscontinuousLinearSystem(),
