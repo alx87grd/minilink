@@ -142,6 +142,20 @@ class TestJunction(unittest.TestCase):
                 ):
                     (StateFeedbackController(K) >> Saturation()) @ plant
 
+    def test_unknown_or_unused_keywords_are_refused(self):
+        from minilink import closed_loop
+
+        with self.assertRaisesRegex(ValueError, "feedback must be one of"):
+            closed_loop(PID(), Pendulum(), feedback="bogus")
+        with self.assertRaisesRegex(ValueError, "feedback must be one of"):
+            closed_loop(Integrator(), 2.0, feedback="bogus")
+        with self.assertRaisesRegex(ValueError, "feedback not honoured"):
+            closed_loop(PID(), Pendulum(), feedback="qdq")
+        with self.assertRaisesRegex(ValueError, "plant_output_port not honoured"):
+            closed_loop(PID(), Pendulum(), plant_output_port="x")
+        with self.assertRaisesRegex(ValueError, "output_port not honoured"):
+            closed_loop(Integrator(), 2.0, output_port="z")
+
     def test_two_port_wiring_is_unchanged(self):
         T = ImpedanceController() @ Pendulum()
         self.assertEqual(list(T.subsystems), ["ctl", "sys"])

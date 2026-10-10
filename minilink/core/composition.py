@@ -248,6 +248,22 @@ def feedback(sys, through=1, *, of=None, sign=-1.0, validate=True) -> DiagramSys
     return diagram
 
 
+def refuse_unused_keywords(port_keywords):
+    """Refuse port and feedback keywords that an Error-junction loop does not read.
+
+    ``port_keywords`` maps each keyword to ``(value, default)``.
+    """
+    changed = [
+        name for name, (value, default) in port_keywords.items() if value != default
+    ]
+    if changed:
+        raise ValueError(
+            f"{', '.join(changed)} not honoured by the Error-block loop: an "
+            "error-driven block or a return-path gain closes on its one input and "
+            "returns y. Drop them, or wire the loop with DiagramSystem.connect."
+        )
+
+
 def refuse_two_port_entry(block):
     """Refuse to drive ``block`` from an Error junction when it reads its own measurement.
 
@@ -365,6 +381,23 @@ def closed_loop(
         A diagram exposing the controller reference as input and plant output as
         output.
     """
+    if feedback not in _VALID_FEEDBACK:
+        raise ValueError(
+            f"feedback must be one of {sorted(_VALID_FEEDBACK)!r}, got {feedback!r}"
+        )
+    port_keywords = {
+        "ref_port": (ref_port, "r"),
+        "measurement_port": (measurement_port, "y"),
+        "control_port": (control_port, "u"),
+        "plant_input_port": (plant_input_port, "u"),
+        "plant_output_port": (plant_output_port, "y"),
+        "output_port": (output_port, "y"),
+        "feedback": (feedback, "auto"),
+    }
+    junction_loop = not isinstance(plant, System) or error_input(controller) is not None
+    if junction_loop:
+        refuse_unused_keywords(port_keywords)
+
     if not isinstance(plant, System):
         if w or v:
             raise ValueError("w= and v= need a plant System, not a return-path gain.")
