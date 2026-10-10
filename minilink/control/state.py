@@ -7,13 +7,21 @@ from minilink.core.feedback import Controller
 
 
 class StateFeedbackController(Controller):
-    """Full-state feedback ``u = ubar - K (x - r)``.
+    """Full-state feedback on a state reference, or on an output reference with ``N``.
 
-    Ports: the plant state ``x`` (dimension ``n``) and a reference ``r`` (also
-    ``n``); when ``r`` is left unconnected it holds ``xbar``, so the law
-    regulates to ``xbar``. ``K`` has shape ``(m, n)``; ``ubar`` is the
-    feedforward command. This is the block :func:`minilink.control.lqr.lqr`
-    returns.
+    Without ``N``: ``u = ubar - K (x - r)``. The reference ``r`` is a state
+    (dimension ``n``); left unconnected it holds ``xbar``, so the law
+    regulates to ``xbar``. This is the block :func:`minilink.control.lqr.lqr`
+    and :func:`minilink.control.place.place` return.
+
+    With ``N``: ``u = ubar - K (x - xbar) + N r``. The reference ``r`` is a
+    desired output (dimension ``p``, zero when unconnected), and ``N`` of shape
+    ``(m, p)`` scales it to a command: the textbook's
+    ``N = -(C (A - B K)^-1 B)^-1`` gives ``y = r`` at steady state for the
+    plant ``(A, B, C)`` linearized about ``(xbar, ubar)``.
+
+    Ports: the plant state ``x`` (dimension ``n``) and the reference ``r``.
+    ``K`` has shape ``(m, n)``; ``ubar`` is the feedforward command.
 
     This is *state* feedback on the full ``x`` port. For *output* feedback on a
     measured ``y`` (and ``@``-operator wiring), use
@@ -22,7 +30,7 @@ class StateFeedbackController(Controller):
 
     feedback_profile = "state"
 
-    def __init__(self, K, xbar=None, ubar=None):
+    def __init__(self, K, xbar=None, ubar=None, *, N=None):
         super().__init__()
         self.name = "State Feedback Controller"
 
@@ -34,22 +42,30 @@ class StateFeedbackController(Controller):
         ubar = (
             np.zeros(m) if ubar is None else np.asarray(ubar, dtype=float).reshape(-1)
         )
-        self.params = {"K": K, "ubar": ubar}
+        self.reference = "state" if N is None else "output"
 
         self.add_input_port("x", dim=n)
-        self.add_input_port("r", dim=n, nominal_value=xbar)
+        if N is None:
+            self.params = {"K": K, "ubar": ubar}
+            self.add_input_port("r", dim=n, nominal_value=xbar)
+        else:
+            N = reference_gain(N, m)
+            self.params = {"K": K, "ubar": ubar, "xbar": xbar, "N": N}
+            self.add_input_port("r", dim=N.shape[1])
         self.add_output_port("u", dim=m, function=self.ctl, dependencies=("x", "r"))
 
     def ctl(self, x, u, t=0, params=None):
         params = self.params if params is None else params
-        K = params["K"]
-        ubar = params["ubar"]
-
+        K, ubar = params["K"], params["ubar"]
+        reference = self.reference
         n = K.shape[1]
-        x_meas = u[:n]
-        r = u[n:]
+        x_meas, r = u[:n], u[n:]
 
-        u_cmd = ubar - K @ (x_meas - r)
+        if reference == "output":
+            xbar, N = params["xbar"], params["N"]
+            u_cmd = ubar - K @ (x_meas - xbar) + N @ r
+        else:
+            u_cmd = ubar - K @ (x_meas - r)
 
         return u_cmd
 
@@ -225,3 +241,19 @@ def plot_gain_schedule(t, K, *, title="Gain schedule", ax=None, show=True):
     if show and plt.get_backend().lower() != "agg":
         plt.show()
     return ax
+
+
+# =============================================================================
+# Internal machinery
+# =============================================================================
+
+
+def reference_gain(N, m):
+    """``N`` as an ``(m, p)`` matrix; a scalar is ``(1, 1)``."""
+    N = np.atleast_2d(np.asarray(N, dtype=float))
+    if N.shape[0] != m:
+        raise ValueError(
+            f"N maps the output reference to the {m} command(s): it needs {m} "
+            f"row(s), got shape {N.shape}"
+        )
+    return N

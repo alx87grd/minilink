@@ -4,6 +4,7 @@ import numpy as np
 from scipy import signal
 
 from minilink.core.feedback import ErrorDriven
+from minilink.core.inspect import inspect_text
 from minilink.core.kinematics import translation
 from minilink.dynamics.abstraction.state_space import LTISystem
 from minilink.graphical.animation.primitives import (
@@ -52,6 +53,11 @@ class TransferFunction(ErrorDriven, LTISystem):
         else:
             # plant: ``error()`` is the identity so ``f`` / ``h`` stay ``u -> y``
             self.port_layout = "error"
+
+    def __str__(self):
+        num = polynomial_text(self.numerator)
+        den = polynomial_text(self.denominator)
+        return f"{inspect_text(self)}\n  G(s) = {num} / {den}"
 
     def f(self, x, u, t=0, params=None):
         return super().f(x, self.error(u), t, params)
@@ -103,6 +109,42 @@ class Lag(TransferFunction):
         if not 0.0 < p < z:
             raise ValueError(f"a lag compensator has 0 < p < z, got z={z}, p={p}")
         super().__init__([K, K * z], [1.0, p], ports=ports, name="Lag")
+
+
+# =============================================================================
+# Internal machinery
+# =============================================================================
+
+_SUPERSCRIPT = str.maketrans("0123456789", "⁰¹²³⁴⁵⁶⁷⁸⁹")
+
+
+def polynomial_text(coefficients):
+    """``(s² + 3 s + 2)`` from the coefficients, highest power first; one term needs no brackets."""
+    c = np.trim_zeros(np.atleast_1d(np.asarray(coefficients, dtype=float)), "f")
+    degree = c.size - 1
+    terms = []
+    for k, a in enumerate(c):
+        power = degree - k
+        if a == 0.0:
+            continue
+        coefficient = "" if abs(a) == 1.0 and power > 0 else f"{abs(a):.4g}"
+        variable = (
+            ""
+            if power == 0
+            else "s" + (str(power).translate(_SUPERSCRIPT) if power > 1 else "")
+        )
+        terms.append(
+            (
+                "-" if a < 0 else "+",
+                " ".join(part for part in (coefficient, variable) if part),
+            )
+        )
+    if not terms:
+        return "0"
+    text = ("-" if terms[0][0] == "-" else "") + terms[0][1]
+    for sign, term in terms[1:]:
+        text += f" {sign} {term}"
+    return f"({text})" if len(terms) > 1 else text
 
 
 if __name__ == "__main__":

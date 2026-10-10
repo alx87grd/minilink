@@ -29,7 +29,7 @@ additive or replaces boilerplate with generated equivalents.
 | **P5** Named sensitivity functions | G5 | 2 | landed 2026-10-10 |
 | **P6** Discrete (z) tier | G4 | 3 | **held** |
 | **P7** `facades.py` boilerplate | C2 | 2 | **done** 2026-09-26 (explicit + pinned) |
-| **P8** Small teaching helpers (ζ/ω_n, `N`) | G6 | 2 | agent |
+| **P8** Small teaching helpers (ζ/ω_n, `N`) | G6 | 2 | landed 2026-10-10 (`N` only) |
 | **P9** `TransferFunction` port construction | C3 | 3 | agent |
 | **P10** Document what `@` means | C1 | 3 | agent (docs only) |
 | **P11** Two GRO501 notebooks | gate 2 | 3 | maintainer reviews |
@@ -320,6 +320,12 @@ exceptions (scan analysis#7). `analysis/linearize.py` and `discretize.py` became
 linearize, discretize` returns the functions (scan analysis#11).
 
 ### P8. Small teaching helpers
+
+**Landed 2026-10-10, reduced.** The maintainer dropped the ζ / ω_n verb and the `poles` verb
+(two textbook lines on `np.linalg.eigvals`, written by the student). The `N` matrix is
+`StateFeedbackController(K, N=N)`: without `N` the state reference is unchanged; with it,
+`r` is the output reference and `u = ubar - K (x - xbar) + N r`. `print` shows an
+`LTISystem`'s matrices, a `TransferFunction`'s `G(s)` and a `StructuralResult`'s rank.
 
 - ζ and ω_n from a complex pole pair, so §9.5's `tr ≈ 1.8/ω_n` and
   `ts ≈ 4.6/ζω_n` rules of thumb can be checked against `step_info`. Natural

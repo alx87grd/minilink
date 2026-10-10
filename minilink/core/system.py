@@ -13,7 +13,7 @@ from minilink.core.facades import (
     SharedSystemFacades,
     StepSystemFacades,
 )
-from minilink.core.inspect import inspect_text, repr_pretty
+from minilink.core.inspect import inspect_text
 from minilink.core.signals import InputPort, OutputPort, VectorSignal
 
 if TYPE_CHECKING:
@@ -128,7 +128,7 @@ class System(SharedSystemFacades):
         return inspect_text(self)
 
     def _repr_pretty_(self, p, cycle):
-        repr_pretty(self, p, cycle)
+        p.text("..." if cycle else str(self))
 
     # Core output contract (static IO)
 

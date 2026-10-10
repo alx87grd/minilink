@@ -21,6 +21,10 @@ class StructuralResult:
     def is_full_rank(self) -> bool:
         return self.rank == self.n
 
+    def __str__(self):
+        verdict = "full rank" if self.is_full_rank else "rank deficient"
+        return f"StructuralResult: rank {self.rank} of n = {self.n}, {verdict}"
+
 
 def controllability(A, B=None, *, tol=RANK_TOL):
     """Return the controllability test for the pair ``(A, B)``.

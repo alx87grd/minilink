@@ -512,7 +512,8 @@ box labelled ``name::id``, at every depth, and the wires go straight to the inne
 block ports, with no boundary nodes. ``plot_diagram(expand=False)`` draws each
 nested diagram as one block with its boundary ports.
 ``print(sys)`` is a short text summary: name, class, ``n``, ports with
-dimensions; a diagram adds its keys.
+dimensions; a diagram adds its keys, an ``LTISystem`` its ``A``, ``B``, ``C``, ``D``, a
+``TransferFunction`` its ``G(s) = (s + 2) / (s² + 3 s + 2)``; a notebook displays the same text.
 :func:`~minilink.graphical.diagrams.build_diagram_topology` accepts
 ``abstract_boundary=True`` to omit external Inputs/Outputs routing nodes and record
 ``boundary_inputs`` / ``boundary_outputs`` port anchors (used by hybrid export).
@@ -593,7 +594,7 @@ declaration only unlocks the smart tools.
 | `error` | `output.py` | `y` (error-driven, `u = c(r - y)`) | error `e = r − y` |
 | `output` | (reserved) | `y` used absolutely, `u = c(y, r)` (learned policies) | measurement, `r` pinned |
 | `impedance` | `impedance.py` | `y = [pos; rate]` dim `2n`; optional robotic `+ g(q)` via `robotic.py` | `(e, de)` plane |
-| `state` | `state.py` | full state `x`; constant gain `K` (`StateFeedbackController`, what `lqr` returns) or a gain schedule `K(t)` interpolated between samples and held or replaced past its end (`TimeVaryingStateFeedbackController`, what `lqr_finite_horizon` returns; the schedule itself comes from `lqr_gain_schedule`, the Riccati differential equation propagated exactly through the Hamiltonian system); feedback around a reference trajectory `u = u_d(t) - K(t)(x - x_d(t))` (`TrajectoryFeedbackController`, no reference port — the trajectory is the reference; what `trajectory_lqr` returns: the plant linearized at every sample of the reference, the Riccati equation swept backward interval by interval from the stationary solution at the end point) | `(x0, x1)` |
+| `state` | `state.py` | full state `x`; constant gain `K` (`StateFeedbackController`, what `lqr` returns: `u = ubar - K (x - r)` on a state reference, or with `N=` the textbook output reference `u = ubar - K (x - xbar) + N r`, `r` of the output's dimension) or a gain schedule `K(t)` interpolated between samples and held or replaced past its end (`TimeVaryingStateFeedbackController`, what `lqr_finite_horizon` returns; the schedule itself comes from `lqr_gain_schedule`, the Riccati differential equation propagated exactly through the Hamiltonian system); feedback around a reference trajectory `u = u_d(t) - K(t)(x - x_d(t))` (`TrajectoryFeedbackController`, no reference port — the trajectory is the reference; what `trajectory_lqr` returns: the plant linearized at every sample of the reference, the Riccati equation swept backward interval by interval from the stationary solution at the end point) | `(x0, x1)` |
 | `siso` | `siso.py` | `y` dim `n` only (decoupled loops) | error per axis |
 | `task` | `robotic.py` | Joint ``[q; dq]`` feedback; internal FK/J; optional ``+ g(q)``; optional task-force arrow | `(q0, dq0)` absolute |
 | `kinematic` | `robotic.py` | Joint ``q`` only; outputs ``dq`` for speed-controlled plants | measurement |

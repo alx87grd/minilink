@@ -180,7 +180,7 @@ contract. Step-level work:
 | Pole placement — `K_sta` for a prescribed pole set | `place`, `place_at_operating_point` | green (2026-09-26) | — |
 | Nested loops — inner speed loop, outer position loop | `@` composition | green (verified) | stays green with the observer in the loop |
 | State estimation — Luenberger observer and Kalman filter | `estimation` (v0.2) | scheduled v0.2 | `LuenbergerObserver` and steady-state `KalmanFilter` closing the loop as standard diagram blocks |
-| Reference scaling — the `N` matrix giving `y = r` at steady state | `control` (v0.2) | scheduled v0.2 | `steady_state_feedforward(sys)` or `N` matrix helper for tracking |
+| Reference scaling — the `N` matrix giving `y = r` at steady state | `StateFeedbackController(K, N=N)` | green (2026-10-10) | the student writes `N = -(C (A - B K)⁻¹ B)⁻¹`; the block takes the output reference |
 
 **Cross-cutting gates**
 
@@ -287,7 +287,11 @@ wave B. A4 and A5 stay here.
 - **B2** The missing surface, on the cleaned toolbox: **P5** named
   `S` / `T` / `PS` / `CS` (landed 2026-10-10: the four functions from the loop's
   pieces, `closed_loop(r=, w=, v=)`, `Sine`, the `sensitivity_functions` teaching
-  notebook), **P8** ζ / ω_n and the `N` matrix. **P7** landed
+  notebook), **P8** the `N` matrix (landed 2026-10-10:
+  `StateFeedbackController(K, N=N)` on an output reference, `print` of `LTISystem`,
+  `TransferFunction` and `StructuralResult`; a `damping` verb and a `poles` verb were
+  dropped by the maintainer the same day: both are two textbook lines on
+  `np.linalg.eigvals`). **P7** landed
   2026-09-26: the shortcuts TB-a kept stay written out and are pinned to
   their band functions by a test, not generated.
 - **TB-b** The control objects and the loop (`siso`, `state`, `lqr`, `place`,

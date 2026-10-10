@@ -147,3 +147,19 @@ class LTISystem(LTISystemFacades, StateSpaceSystem):
 
     def D(self, t=0.0, params=None):
         return self._D
+
+    def __str__(self):
+        return f"{super().__str__()}\n{matrices_text(self)}"
+
+
+def matrices_text(sys):
+    """``A``, ``B``, ``C`` and ``D``, one aligned block each."""
+    blocks = []
+    for name, M in (("A", sys.A()), ("B", sys.B()), ("C", sys.C()), ("D", sys.D())):
+        prefix = f"  {name} = "
+        values = np.asarray(M, dtype=float) + 0.0  # -0.0 prints as 0.0
+        blocks.append(
+            prefix
+            + np.array2string(values, precision=4, suppress_small=True, prefix=prefix)
+        )
+    return "\n".join(blocks)

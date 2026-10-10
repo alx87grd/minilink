@@ -87,8 +87,8 @@ the System shortcuts stay written out, so editors show their parameters, and
 the band's calling pattern; `analysis/linearization.py` and `discretization.py` free
 `linearize` and `discretize` from the band-facade name collision.
 
-**Next, in order (decided 2026-09-26):** clean-up and solidification first — P5 (landed
-2026-10-10) and P8 on the cleaned toolbox, TB-b, S61, P9, P10 — then RN-1 of
+**Next, in order (decided 2026-09-26):** clean-up and solidification first — P5 and P8 (landed
+2026-10-10) on the cleaned toolbox, TB-b, S61, P9, P10 — then RN-1 of
 [randomness.md](randomness.md) (the disturbance convention, decided 2026-09-26) and P4, then P11. The textbook pass comes before the new surface, so
 the new code copies clean patterns and no shortcut is added only to be dropped.
 
@@ -111,15 +111,6 @@ the new code copies clean patterns and no shortcut is added only to be dropped.
   naming the submodule goes (scan: control#12). Before P11 writes notebooks on the band
   layer. The name freeze (gate 7) now runs to v1.0: `minilink.control.lqr` stays importable
   as an alias until then, or S62 waits for v1.0 — part of the ask.
-- [ ] **P8 Small teaching helpers**: ζ and ω_n from a complex pole pair (fields on the `pzmap`
-  result or a `damping(sys)` verb); the `N` reference-scaling matrix giving `y = r` at steady
-  state. Done when §9.5 and §9.11 of the
-  guide are each a short notebook cell.
-  Also: a `poles(sys)` verb with a `poles()` facade on `LTISystem` only (ROADMAP §6);
-  `TransferFunction` stores `self.poles` as an array, which would shadow it — a property
-  or a renamed attribute, decided with the step; and `__str__` on `LTISystem`,
-  `TransferFunction` and `StructuralResult`, so tutorial 01's `print(tf)` shows the transfer
-  function and fourteen `np.linalg.eigvals(lin.A())` sites go (scan: analysis#3, examples#2).
 - [ ] **RN The randomness convention** ([randomness.md](randomness.md), agreed 2026-09-26,
   rulings D1–D24). RN-1 `WhiteNoise` (seed and sample period in params, counter-based draw,
   `psd`, zero-order hold by default, no time window, the solver hint, `seed = None` the mean)

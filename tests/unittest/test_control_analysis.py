@@ -1686,6 +1686,86 @@ class TestPolePlacement(unittest.TestCase):
         self.assertLess(np.max(np.abs(trajectory.x[:, -1])), 1e-3)
 
 
+class TestOutputReference(unittest.TestCase):
+    """``StateFeedbackController(K, N=N)``: the textbook output reference."""
+
+    def setUp(self):
+        from minilink.control.place import place_gain
+
+        self.plant = SingleMass()
+        self.plant.params["b"] = 0.5
+        lin = linearize(self.plant, np.zeros(2))
+        self.A, self.B, self.C = lin.A(), lin.B(), lin.C()
+        self.K = place_gain(self.A, self.B, [-2.0, -3.0])
+
+    def test_y_tracks_r_at_steady_state(self):
+        from minilink.control.state import StateFeedbackController
+
+        A, B, C, K = self.A, self.B, self.C, self.K
+        N = -np.linalg.inv(C @ np.linalg.inv(A - B @ K) @ B)
+        ctl = StateFeedbackController(K, N=N)
+        self.assertEqual(ctl.inputs["r"].dim, 1)
+
+        loop = ctl @ self.plant
+        loop.inputs["r"].set_nominal_value(np.array([0.5]))
+        self.plant.x0 = np.zeros(2)
+        trajectory = loop.compute_trajectory(tf=8.0, verbose=False)
+        np.testing.assert_allclose(C @ trajectory.x[:, -1], [0.5], atol=1e-4)
+
+    def test_without_n_the_state_reference_is_unchanged(self):
+        from minilink.control.state import StateFeedbackController
+
+        ctl = StateFeedbackController(self.K, xbar=[0.1, 0.0])
+        self.assertEqual(ctl.inputs["r"].dim, 2)
+        np.testing.assert_allclose(ctl.inputs["r"].nominal_value, [0.1, 0.0])
+        self.assertEqual(set(ctl.params), {"K", "ubar"})
+        x, r = np.array([0.3, -0.2]), np.array([0.1, 0.0])
+        np.testing.assert_allclose(
+            ctl.ctl(None, np.concatenate([x, r])), -self.K @ (x - r)
+        )
+
+    def test_n_needs_one_row_per_command(self):
+        from minilink.control.state import StateFeedbackController
+
+        with self.assertRaisesRegex(ValueError, "needs 1 row"):
+            StateFeedbackController(self.K, N=np.ones((2, 1)))
+
+
+class TestPrint(unittest.TestCase):
+    """``print`` shows the mathematics under the system's summary."""
+
+    def test_transfer_function_prints_g_of_s(self):
+        from minilink.blocks.transfer_function import Lead, TransferFunction
+
+        self.assertIn(
+            "G(s) = (s + 2) / (s² + 3 s + 2)",
+            str(TransferFunction([1.0, 2.0], [1.0, 3.0, 2.0])),
+        )
+        self.assertIn("G(s) = (5 s + 5) / (s + 10)", str(Lead(5.0, 1.0, 10.0)))
+        self.assertIn(
+            "G(s) = (-2 s² + 1) / s²",
+            str(TransferFunction([-2.0, 0.0, 1.0], [1.0, 0.0, 0.0])),
+        )
+
+    def test_lti_system_prints_its_matrices(self):
+        text = str(linearize(Pendulum(), np.zeros(2)))
+        self.assertIn("inputs: u (1)", text)
+        for name in ("A = ", "B = ", "C = ", "D = "):
+            self.assertIn(name, text)
+        self.assertNotIn("-0. ", text)
+
+    def test_structural_result_prints_its_verdict(self):
+        A = np.array([[0.0, 1.0], [0.0, 0.0]])
+        self.assertEqual(
+            str(controllability(A, np.array([[0.0], [1.0]]))),
+            "StructuralResult: rank 2 of n = 2, full rank",
+        )
+        self.assertEqual(
+            str(controllability(A, np.array([[1.0], [0.0]]))),
+            "StructuralResult: rank 1 of n = 2, rank deficient",
+        )
+
+
 class _NonlinearTank(DynamicSystem):
     """A SISO plant whose linearization depends on the operating point."""
 
