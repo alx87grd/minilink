@@ -209,10 +209,6 @@ class TestPortLayouts(unittest.TestCase):
         self.assertEqual(list(L.subsystems), ["ctl", "sys"])
 
 
-if __name__ == "__main__":
-    unittest.main()
-
-
 class TestLoopInputs(unittest.TestCase):
     """``closed_loop(r=, w=, v=)``: the reference, load disturbance and noise inputs."""
 
@@ -280,3 +276,122 @@ class TestLoopInputs(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "w= and v= need a plant System"):
             closed_loop(self.H, 1, w=True)
         self.assertEqual(list(closed_loop(self.H, 1, r=False).inputs), [])
+
+
+class TestDispatchTable(unittest.TestCase):
+    """Which loop ``@`` builds for each library controller, pinned as it is today.
+
+    Error-driven blocks get an Error junction on ``e``; two-port blocks read the
+    plant's ``y`` or ``x`` directly. A change to any row is a change to the loop
+    a student gets, and lands with its own decision.
+    """
+
+    def rows(self):
+        from minilink import (
+            PD,
+            PI,
+            ComputedTorqueController,
+            ImpedanceIntegralController,
+            NeuralPolicyController,
+            SingleMass,
+            SlidingModeController,
+            StateFeedbackController,
+            TwoLinkManipulator,
+        )
+
+        K = np.array([[10.0, 2.0]])
+        G = TransferFunction([1.0], [1.0, 3.0, 2.0])
+        junction = {"e": ("error", "e")}
+        reads_y = {"r": ("input", "r"), "y": ("sys", "y")}
+        reads_x = {"x": ("sys", "x"), "r": ("input", "r")}
+        return (
+            ("PID", PID() @ Pendulum(), ["ctl", "sys", "demux", "error"], junction),
+            ("PI", PI() @ SingleMass(), ["ctl", "sys", "error"], junction),
+            ("PD", PD() @ DoubleIntegrator(), ["ctl", "sys", "error"], junction),
+            ("Lead", Lead() @ G, ["ctl", "sys", "error"], junction),
+            ("Lag", Lag() @ G, ["ctl", "sys", "error"], junction),
+            (
+                "TransferFunction error",
+                TransferFunction([2.0, 1.0], [1.0, 5.0], ports="error") @ G,
+                ["ctl", "sys", "error"],
+                junction,
+            ),
+            (
+                "TransferFunction reference",
+                TransferFunction([2.0, 1.0], [1.0, 5.0], ports="reference") @ G,
+                ["ctl", "sys"],
+                reads_y,
+            ),
+            (
+                "Proportional error",
+                ProportionalController(ports="error") @ SingleMass(),
+                ["ctl", "sys", "error"],
+                junction,
+            ),
+            (
+                "Proportional",
+                ProportionalController() @ SingleMass(),
+                ["ctl", "sys"],
+                reads_y,
+            ),
+            (
+                "PID reference",
+                PID(ports="reference") @ Integrator(),
+                ["ctl", "sys"],
+                reads_y,
+            ),
+            (
+                "StateFeedback",
+                StateFeedbackController(K) @ Pendulum(),
+                ["ctl", "sys"],
+                reads_x,
+            ),
+            (
+                "StateFeedback N",
+                StateFeedbackController(K, N=np.array([[10.0]])) @ DoubleIntegrator(),
+                ["ctl", "sys"],
+                reads_x,
+            ),
+            ("Impedance", ImpedanceController() @ Pendulum(), ["ctl", "sys"], reads_y),
+            (
+                "ImpedanceIntegral",
+                ImpedanceIntegralController() @ Pendulum(),
+                ["ctl", "sys"],
+                reads_y,
+            ),
+            (
+                "NeuralPolicy",
+                NeuralPolicyController(Pendulum()) @ Pendulum(),
+                ["ctl", "sys"],
+                {"x": ("sys", "x")},
+            ),
+            (
+                "ComputedTorque",
+                ComputedTorqueController(TwoLinkManipulator()) @ TwoLinkManipulator(),
+                ["ctl", "sys"],
+                reads_y,
+            ),
+            (
+                "SlidingMode",
+                SlidingModeController(TwoLinkManipulator()) @ TwoLinkManipulator(),
+                ["ctl", "sys"],
+                reads_y,
+            ),
+        )
+
+    def test_each_controller_closes_the_loop_it_closes_today(self):
+        for name, loop, ids, ctl_inputs in self.rows():
+            with self.subTest(controller=name):
+                self.assertEqual(list(loop.subsystems), ids)
+                self.assertEqual(loop.connections["ctl"], ctl_inputs)
+
+    def test_a_plant_alone_closes_through_the_junction(self):
+        loop = TransferFunction([1.0], [1.0, 3.0, 2.0]) @ 1
+        self.assertEqual(list(loop.subsystems), ["sys", "error"])
+        self.assertEqual(
+            loop.connections["error"], {"+": ("input", "r"), "-": ("sys", "y")}
+        )
+
+
+if __name__ == "__main__":
+    unittest.main()
