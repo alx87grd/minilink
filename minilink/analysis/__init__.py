@@ -1,6 +1,8 @@
 """Analysis verbs on a ``System``: derivatives, linearization, structure, equilibria, modes, frequency and time responses, sensitivity functions, Lyapunov certificates.
 
-Every tool reads ``tool(sys, x_bar, u_bar, t, params, *, method="auto", eps)``. A
+Every tool reads ``tool(sys, x_bar, u_bar, t, params, *, method="auto", eps)``; the
+sensitivity functions take the loop's pieces instead,
+``sensitivity(plant=H, controller=C, filter=F)``. A
 ``System`` carries the common ones as methods: ``linearize``, ``find_equilibrium``,
 ``transfer_function``, ``plot_bode``, ``plot_pzmap``, ``plot_root_locus`` and
 ``animate_modal``; ``plot_step_response`` is a method of ``LTISystem``.

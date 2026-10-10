@@ -324,7 +324,7 @@ def closed_loop(
         The loop's boundary inputs: the reference ``r`` (default on), the load
         disturbance ``w`` summed into the plant input, and the measurement
         noise ``v`` summed into the measurement before it returns (both off by
-        default). A port left off reads zero.
+        default). With ``r=False`` the reference reads its nominal value.
     ref_port, measurement_port, control_port, plant_input_port, plant_output_port : str
         Port names used for the standard feedback wiring.
     feedback : str, optional
@@ -348,15 +348,13 @@ def closed_loop(
         if w or v:
             raise ValueError("w= and v= need a plant System, not a return-path gain.")
         diagram = _close_with_junction(controller, plant, validate=validate)
-        return _add_loop_inputs(diagram, None, None, None, r=r, w=False, v=False)
+        return add_loop_inputs(diagram, None, None, None, r=r, w=w, v=v)
     if error_input(controller) is not None:
         loop_gain = series(_new_diagram_like(controller), plant)
-        diagram = _close_with_junction(loop_gain, validate=validate)
+        diagram = _close_with_junction(loop_gain, validate=False)
         junction_id = diagram._composition_entry[0]
-        diagram = _add_loop_inputs(
-            diagram, plant, None, (junction_id, "-"), r=r, w=w, v=v
-        )
-        if validate and (w or v):
+        add_loop_inputs(diagram, plant, None, (junction_id, "-"), r=r, w=w, v=v)
+        if validate:
             diagram.check_algebraic_loops()
         return diagram
 
@@ -447,12 +445,12 @@ def closed_loop(
 
     _propagate_animation_camera(diagram, plant)
 
-    diagram = _add_loop_inputs(
+    add_loop_inputs(
         diagram,
         plant,
         plant_input_port,
         (controller_id, measurement_port),
-        r=True,
+        r=r,
         w=w,
         v=v,
     )
@@ -741,7 +739,7 @@ def _add_system_to_diagram(diagram, sys, *, role=None) -> str:
     return sys_id
 
 
-def _add_loop_inputs(diagram, plant, plant_port, measurement, *, r, w, v):
+def add_loop_inputs(diagram, plant, plant_port, measurement, *, r, w, v):
     """Drop the boundary ``r`` unless ``r``; sum ``w`` into the plant input and ``v`` into the measurement."""
     from minilink.blocks.routing import Sum
 
@@ -753,16 +751,16 @@ def _add_loop_inputs(diagram, plant, plant_port, measurement, *, r, w, v):
                     ports[port_id] = None
         del diagram.inputs["r"]
     if w:
-        plant_id = _loop_block_id(diagram, plant, "plant")
+        plant_id = loop_block_id(diagram, plant, "plant")
         port = _default_input_port(plant) if plant_port is None else plant_port
-        _sum_into(diagram, (plant_id, port), "w", "disturbance", Sum)
+        sum_into(diagram, (plant_id, port), "w", "disturbance", Sum)
     if v:
-        _sum_into(diagram, measurement, "v", "noise", Sum)
+        sum_into(diagram, measurement, "v", "noise", Sum)
     diagram._composition_entry, diagram._composition_output = entry, output
     return diagram
 
 
-def _sum_into(diagram, target, port_id, role, Sum):
+def sum_into(diagram, target, port_id, role, Sum):
     """Rewire ``target`` to read its source plus a new boundary input ``port_id``."""
     sys_id, in_port = target
     source = diagram.connections[sys_id][in_port]
@@ -774,7 +772,7 @@ def _sum_into(diagram, target, port_id, role, Sum):
     diagram.connect(sum_id, "y", sys_id, in_port)
 
 
-def _loop_block_id(diagram, sys, role):
+def loop_block_id(diagram, sys, role):
     """The id of ``sys`` among the diagram's blocks; a nested diagram is refused."""
     for sys_id, block in diagram.subsystems.items():
         if block is sys:

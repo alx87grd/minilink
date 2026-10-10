@@ -24,11 +24,31 @@ def sensitivity(
 
     ``S`` maps an output disturbance to ``y`` and the reference ``r`` to the
     error ``e``. The loop is the plant ``H``, the controller ``C`` and the
-    optional filter ``F`` on the measurement (``F = 1`` when absent); each is a
-    SISO ``System``, linearized first. ``x_bar``, ``u_bar``, ``t`` and
-    ``params`` give the plant's operating point, as in
-    :func:`~minilink.analysis.frequency.bode`; the controller and the filter
-    are taken at their nominal point.
+    optional filter ``F`` on the measurement, each a SISO ``System``
+    linearized first.
+
+    Parameters
+    ----------
+    plant : System
+        The plant ``H``, from its first input to its output.
+    controller : System
+        The controller ``C``, from the error (or the reference) to the command.
+    filter : System, optional
+        The filter ``F`` on the measurement; ``F = 1`` when omitted.
+    x_bar, u_bar, t, params : optional
+        The plant's operating point, as in
+        :func:`~minilink.analysis.frequency.bode`; the controller and the
+        filter are taken at their nominal point.
+    method : {"auto", "fd", "jax"}, optional
+        Differentiation backend of the linearizations.
+    eps : float, optional
+        Central-difference step.
+
+    Returns
+    -------
+    TransferFunction
+        ``S(s)``, ready for :func:`~minilink.analysis.frequency.bode`,
+        ``plot_bode`` or a simulation.
     """
     H, C, F = loop_pieces(
         plant, controller, filter, x_bar, u_bar, t, params, method, eps
@@ -121,8 +141,8 @@ def noise_sensitivity(
 ):
     """Return the noise sensitivity ``CS``, the map from measurement noise ``v`` to the command ``u``.
 
-    Same arguments as :func:`sensitivity`; the magnitude is returned, the
-    loop's negative sign on ``v`` left out.
+    Same arguments as :func:`sensitivity`. In the loop, ``v`` reaches ``u``
+    as ``-CS``: the sign of the negative feedback is left out.
     """
     H, C, F = loop_pieces(
         plant, controller, filter, x_bar, u_bar, t, params, method, eps

@@ -171,12 +171,8 @@ class Sine(Source):
 
     def h(self, x, u, t=0, params=None):
         params = self.params if params is None else params
-        a, omega, phi, y0 = (
-            params["amplitude"],
-            params["omega"],
-            params["phase"],
-            params["offset"],
-        )
+        a, omega = params["amplitude"], params["omega"]
+        phi, y0 = params["phase"], params["offset"]
         xp = array_module(t)
 
         y = y0 + a * xp.sin(omega * t + phi)
