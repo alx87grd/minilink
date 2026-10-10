@@ -5,23 +5,29 @@ from __future__ import annotations
 from pathlib import Path
 from xml.sax.saxutils import escape
 
-GIF_WIDTH = 480  # px
+GIF_SIZE = 480  # px, the side of a square README tile
 GIF_FPS = 15
 GIF_MAX_BYTES = 1_000_000  # RULES 6.9
-GIF_COLORS = (96, 64, 48, 32)  # palettes tried in turn until the GIF fits the budget
+GIF_COLORS = (255, 128, 64)  # palette sizes tried in turn until the GIF fits the budget
 
 
-def write_gif(frames, path: Path, *, fps: int = GIF_FPS, width: int = GIF_WIDTH):
-    """Resize RGB frames to ``width`` and save a looping GIF under the size budget."""
+def write_gif(frames, path: Path, *, fps: int = GIF_FPS, size: int = GIF_SIZE):
+    """Resize square RGB frames to ``size`` and save a looping GIF under the budget.
+
+    One palette serves the whole clip: colours hold still from frame to frame,
+    and a small saturated mark (a force arrow, a target ball) keeps its colour.
+    """
     from PIL import Image
 
-    resized = []
-    for frame in frames:
-        frame = frame.convert("RGB")
-        height = int(round(frame.height * width / frame.width))
-        resized.append(frame.resize((width, height), Image.LANCZOS))
+    resized = [
+        frame.convert("RGB").resize((size, size), Image.LANCZOS) for frame in frames
+    ]
     for colors in GIF_COLORS:
-        quantized = [frame.quantize(colors=colors) for frame in resized]
+        palette = clip_palette(resized, colors)
+        quantized = [
+            frame.quantize(palette=palette, dither=Image.Dither.NONE)
+            for frame in resized
+        ]
         quantized[0].save(
             path,
             save_all=True,
@@ -30,16 +36,58 @@ def write_gif(frames, path: Path, *, fps: int = GIF_FPS, width: int = GIF_WIDTH)
             loop=0,
             optimize=True,
         )
-        size = path.stat().st_size
-        if size <= GIF_MAX_BYTES:
+        size_bytes = path.stat().st_size
+        if size_bytes <= GIF_MAX_BYTES:
             break
-    print(f"{path.name}: {len(resized)} frames, {colors} colors, {size / 1e6:.2f} MB")
-    if size > GIF_MAX_BYTES:
+    print(
+        f"{path.name}: {len(resized)} frames, {colors} colors, {size_bytes / 1e6:.2f} MB"
+    )
+    if size_bytes > GIF_MAX_BYTES:
         print(f"  warning: above the {GIF_MAX_BYTES / 1e6:.0f} MB budget")
 
 
-def shrink_gif(path: Path, *, width: int = GIF_WIDTH, fps: int = GIF_FPS) -> None:
-    """Resize and resample a GIF written at export DPI down to README size."""
+def clip_palette(frames, colors: int, samples: int = 16):
+    """An octree palette of ``colors`` over frames sampled evenly through the clip."""
+    from PIL import Image
+
+    picks = [
+        frames[round(k * (len(frames) - 1) / (samples - 1))] for k in range(samples)
+    ]
+    width, height = picks[0].size
+    strip = Image.new("RGB", (width, height * samples))
+    for k, frame in enumerate(picks):
+        strip.paste(frame, (0, height * k))
+    return strip.quantize(colors=colors, method=Image.Quantize.FASTOCTREE)
+
+
+def square_crop(frames, *, background=(255, 255, 255), margin: int = 12) -> list:
+    """Crop every frame to one square round what any frame draws on the background.
+
+    The square is centred on the drawn region, ``margin`` pixels wider, and
+    padded with the background where it leaves the frame.
+    """
+    from PIL import Image, ImageChops
+
+    blank = Image.new("RGB", frames[0].size, background)
+    boxes = [ImageChops.difference(frame, blank).getbbox() for frame in frames]
+    boxes = [box for box in boxes if box is not None]
+    left = min(box[0] for box in boxes)
+    top = min(box[1] for box in boxes)
+    right = max(box[2] for box in boxes)
+    bottom = max(box[3] for box in boxes)
+    side = max(right - left, bottom - top) + 2 * margin
+    x0 = (left + right - side) // 2
+    y0 = (top + bottom - side) // 2
+    cropped = []
+    for frame in frames:
+        tile = Image.new("RGB", (side, side), background)
+        tile.paste(frame, (-x0, -y0))
+        cropped.append(tile)
+    return cropped
+
+
+def shrink_gif(path: Path, *, fps: int = GIF_FPS) -> None:
+    """Resample a GIF written at export DPI and crop it to a square README tile."""
     from PIL import Image, ImageSequence
 
     with Image.open(path) as im:
@@ -50,7 +98,7 @@ def shrink_gif(path: Path, *, width: int = GIF_WIDTH, fps: int = GIF_FPS) -> Non
             for k, frame in enumerate(ImageSequence.Iterator(im))
             if k % keep_every == 0
         ]
-    write_gif(frames, path, fps=fps, width=width)
+    write_gif(square_crop(frames), path, fps=fps)
 
 
 def require_playwright():
@@ -84,7 +132,7 @@ def html_to_gif(
     gif_path: Path,
     *,
     fps: int = GIF_FPS,
-    viewport: tuple[int, int] = (640, 480),
+    viewport: tuple[int, int] = (GIF_SIZE, GIF_SIZE),
     scale: int = 2,
     timeout_ms: int = 120_000,
 ) -> None:

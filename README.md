@@ -10,19 +10,33 @@
 
 <table>
   <tr>
-    <td width="50%" align="center" valign="bottom">
+    <td width="25%" align="center" valign="bottom">
       <img src="https://raw.githubusercontent.com/alx87grd/minilink/main/docs/_static/cartpole_swingup.gif" alt="trajectory optimization" width="100%"/>
     </td>
-    <td width="50%" align="center" valign="bottom">
+    <td width="25%" align="center" valign="bottom">
       <img src="https://raw.githubusercontent.com/alx87grd/minilink/main/docs/_static/ur5_meshcat.gif" alt="task-space impedance control" width="100%"/>
+    </td>
+    <td width="25%" align="center" valign="bottom">
+      <img src="https://raw.githubusercontent.com/alx87grd/minilink/main/docs/_static/racecar_mpc.gif" alt="model predictive control" width="100%"/>
+    </td>
+    <td width="25%" align="center" valign="bottom">
+      <img src="https://raw.githubusercontent.com/alx87grd/minilink/main/docs/_static/rocket_landing.gif" alt="reinforcement learning" width="100%"/>
     </td>
   </tr>
   <tr>
-    <td width="50%" align="center" valign="top">
+    <td width="25%" align="center" valign="top">
       trajectory optimization
     </td>
-    <td width="50%" align="center" valign="top">
-      task-space impedance control
+    <td width="25%" align="center" valign="top">
+      task-space impedance control<br/>
+      <a href="https://alx87grd.github.io/minilink/_static/showcase/ur5_impedance.html">interactive 3-D</a>
+    </td>
+    <td width="25%" align="center" valign="top">
+      model predictive control<br/>
+      <a href="https://alx87grd.github.io/minilink/_static/showcase/racecar_mpc.html">interactive 3-D</a>
+    </td>
+    <td width="25%" align="center" valign="top">
+      reinforcement learning
     </td>
   </tr>
 </table>

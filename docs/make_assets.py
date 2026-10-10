@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import argparse
 import os
 import sys
 from pathlib import Path
@@ -71,8 +70,8 @@ def oblique_camera(target, *, azimuth_deg, elevation_deg, distance):
 
 
 def save_meshcat(sys_or_diagram, traj, page: str, gif: str, **animate_kwargs) -> None:
-    """Write the interactive 3-D page, then the GIF screenshot from that page."""
-    SHOWCASE.mkdir(exist_ok=True)
+    """Write the interactive 3-D page, then the GIF screenshot of that page."""
+    SHOWCASE.mkdir(parents=True, exist_ok=True)
     html = SHOWCASE / page
     sys_or_diagram.animate(
         traj,
@@ -83,7 +82,7 @@ def save_meshcat(sys_or_diagram, traj, page: str, gif: str, **animate_kwargs) ->
         file_name=str(html),
         **animate_kwargs,
     )
-    print(f"{html.name}: {html.stat().st_size / 1e6:.2f} MB")
+    print(f"{html}: {html.stat().st_size / 1e6:.2f} MB")
     html_to_gif(html, STATIC / gif)
 
 
@@ -102,16 +101,6 @@ def diagram_png() -> None:
     print("diagram_closed_loop.png")
 
 
-def gif_pendulum() -> None:
-    from minilink import ImpedanceController, Pendulum
-
-    plant = Pendulum()  # catalog defaults: the camera frames the rod
-    plant.x0[0] = 2.0
-    diagram = ImpedanceController() @ plant
-    traj = diagram.compute_trajectory(tf=8.0, verbose=False)
-    save_gif(diagram, traj, "pendulum_impedance.gif")
-
-
 def gif_cartpole() -> None:
     from minilink import (
         CartPole,
@@ -119,6 +108,7 @@ def gif_cartpole() -> None:
         QuadraticCost,
         TrajectoryOptimizationPlanner,
     )
+    from minilink.graphical.animation.camera import fixed_camera
 
     plant = CartPole()
     plant.inputs["u"].lower_bound[0] = -10.0
@@ -138,13 +128,12 @@ def gif_cartpole() -> None:
         n_steps=40,
         transcription="direct_collocation",
         compile_backend="jax",
-        optimizer_method="ipopt",
+        optimizer_method="scipy_slsqp",
         verbose=False,
     )
     traj = planner.solve().trajectory.resample(n_samples=240)
-    save_gif(
-        plant, traj, "cartpole_swingup.gif", time_factor_video=1.0
-    )  # default camera
+    camera = fixed_camera((-1.0, 0.75, 0.0), scale=3.6)  # the cart's run and the pole
+    save_gif(plant, traj, "cartpole_swingup.gif", time_factor_video=1.0, camera=camera)
 
 
 def ur5_impedance() -> None:
@@ -177,14 +166,16 @@ def ur5_impedance() -> None:
 
     ref = TrajectorySource(t_knots, np.array(p_knots).T)
     ctl = TaskImpedance(arm, gravity_comp=True, show_task_force=True)
-    ctl.params["Kp"] = np.array([200.0, 200.0, 200.0])
-    ctl.params["Kd"] = np.array([40.0, 40.0, 40.0])
-    ctl.task_force_scale = 0.03  # [m/N]
+    # a soft spring: the hand trails its target, so the ball and the force show
+    ctl.params["Kp"] = np.array([100.0, 100.0, 100.0])
+    ctl.params["Kd"] = np.array([20.0, 20.0, 20.0])
+    ctl.task_force_scale = 0.08  # [m/N]
 
     diagram = ref >> ctl @ arm
     traj = diagram.compute_trajectory(tf=TF, n_steps=int(30 * TF) + 1)
+    # the eye on the hand's side of the base: the target ball and the force in view
     camera = oblique_camera(
-        [-0.25, 0.1, 0.35], azimuth_deg=25.0, elevation_deg=18.0, distance=1.1
+        [-0.33, 0.08, 0.4], azimuth_deg=160.0, elevation_deg=18.0, distance=0.95
     )
     save_meshcat(
         diagram,
@@ -215,10 +206,12 @@ def racecar_mpc() -> None:
     )
 
     # examples/demos/udes_racecar/mpc_racecar_dynamic.py: a lap past two cones,
-    # the plan believing in a little more grip than the floor gives.
+    # the plan believing in a little more grip than the floor gives. At 4.5 m/s
+    # the car keeps clear of both cones and inside the lane the whole lap.
     LENGTH, WIDTH, RADIUS = 12.0, 8.0, 2.0  # [m]
-    V_TARGET, P_CRUISE = 6.0, 15.0  # [m/s], [W]
-    TF_SIM, SIM_DT = 5.0, 0.002  # [s]
+    V_TARGET, P_CRUISE = 4.5, 10.0  # [m/s], [W]
+    TF_SIM, SIM_DT = 10.3, 0.002  # [s] one lap, back to the start
+    PLAYBACK = 2.0  # the page and the GIF play the lap at twice real time
     MPC_DT, MPC_HORIZON, MPC_STEPS = 0.1, 1.2, 12
     BODY_LENGTH, BODY_WIDTH, BODY_MARGIN = 0.34, 0.20, 0.02  # [m]
     CORRIDOR_HALF_WIDTH = 0.6  # [m]
@@ -226,7 +219,7 @@ def racecar_mpc() -> None:
     CONE_X, CONE_LEAN = (2.0, -2.0), (-0.13, 0.13)  # [m]
     PLANNER_MU, PLANT_MU = 0.7, 0.6
     LATERAL_START, HEADING_NUDGE = 0.15, 1.0e-4  # [m], [rad]
-    CAMERA_SCALE = 2.6  # [m] follow-camera distance
+    CAMERA_SCALE = 2.1  # [m] follow-camera distance
 
     path = circuit_waypoints(length=LENGTH, width=WIDTH, radius=RADIUS)
     track = ReferenceTrack(from_waypoints(path), half_width=CORRIDOR_HALF_WIDTH)
@@ -311,7 +304,7 @@ def racecar_mpc() -> None:
         tf=TF_SIM, x0_plant=x0, plant_dt_inner=SIM_DT, compile_backend="jax"
     )
     # one sample per video frame: the trail's pages stay small
-    traj = result.plant.resample(n_samples=int(30 * TF_SIM) + 1)
+    traj = result.plant.resample(n_samples=int(30 * TF_SIM / PLAYBACK) + 1)
     overlays = mpc_animation_overlays(
         result, planner, scene=scene, track=track, traj=traj
     )
@@ -320,7 +313,7 @@ def racecar_mpc() -> None:
         traj,
         "racecar_mpc.html",
         "racecar_mpc.gif",
-        time_factor_video=1.0,
+        time_factor_video=PLAYBACK,
         overlays=overlays,
     )
 
@@ -333,6 +326,7 @@ def gif_rocket() -> None:
         Rocket,
         StochasticPlanningProblem,
     )
+    from minilink.graphical.animation.camera import fixed_camera
 
     # examples/demos/rl/rocket_landing_rl.py: PPO learns to land from 20 m.
     TRAINING_TIMESTEPS = 4_000_000
@@ -340,7 +334,7 @@ def gif_rocket() -> None:
     GIMBAL, THRUST_TO_WEIGHT = 0.05, 2.0  # [rad], [-]
     X_LANDED = np.array([0.0, 1.0, 0.0, 0.0, 0.0, 0.0])
     FEATURE_SCALE = np.array([0.25, 0.25, 1.0, 0.25, 0.25, 1.0])
-    TF_SHOWN = 12.0  # [s] the clip: the descent, the touchdown, a beat after
+    TF_SHOWN = 7.0  # [s] the clip: the descent, the touchdown, a beat after
 
     plant = Rocket()
     plant.params["inertia"] = 1000.0
@@ -388,66 +382,11 @@ def gif_rocket() -> None:
     )
     planner.solve(timesteps=TRAINING_TIMESTEPS)
 
-    plant.x0 = np.array([10.0, 30.0, 0.0, 0.0, 0.0, 0.0])
+    plant.x0 = np.array([6.0, 14.0, 0.0, 0.0, 0.0, 0.0])
     cl_sys = planner.get_controller() @ plant
     traj = cl_sys.compute_trajectory(tf=TF_SHOWN, dt=0.01)
-    save_gif(cl_sys, traj, "rocket_landing.gif", time_factor_video=2.0)
-
-
-def gif_mpc_car() -> None:
-    from minilink import (
-        BicycleDynRate,
-        PlanningProblem,
-        QuadraticCost,
-        TrajectoryOptimizationPlanner,
-    )
-    from minilink.control.mpc import ModelPredictiveController, mpc_animation_overlays
-    from minilink.graphical.animation.camera import follow_frame_camera
-
-    u_target = 4.0
-    plant = BicycleDynRate()
-    r_r = plant.params["r_r"]
-    x_ref = np.array([0.0, 0.0, 0.0, u_target, 0.0, 0.0, u_target / r_r, 0.0])
-    x0 = np.array([0.0, 3.0, 0.0, 0.8 * u_target, 0.0, 0.0, 0.8 * u_target / r_r, 0.0])
-    plant.x0 = x0.copy()
-    mpc_planner = TrajectoryOptimizationPlanner(
-        PlanningProblem(
-            sys=plant,
-            tf=2.0,
-            x_start=x0,
-            cost=QuadraticCost.from_system(
-                plant,
-                Q=np.diag([0.0, 12.0, 18.0, 0.5, 4.0, 6.0, 0.1, 100.0]),
-                R=np.diag([1.0, 25.0]),
-                S=np.diag([0.0, 30.0, 40.0, 2.0, 12.0, 18.0, 0.1, 100.0]),
-                xbar=x_ref,
-            ),
-        ),
-        n_steps=5,
-        transcription="direct_collocation",
-        compile_backend="jax",
-        optimizer_method="scipy_slsqp",
-        optimizer_options={"maxiter": 10, "ftol": 1.0},
-    )
-    mpc = ModelPredictiveController(
-        mpc_planner, dt_mpc=0.2, warm_start=True, verbose=False
-    )
-    hybrid = mpc @ plant
-    result = hybrid.compute_trajectory(
-        tf=8.0, x0_plant=x0, plant_dt_inner=0.02, compile_backend="jax"
-    )
-    out = STATIC / "mpc_car.gif"
-    hybrid.animate(
-        renderer="matplotlib",
-        html=False,
-        show=False,
-        save=True,
-        file_name=str(out.with_suffix("")),
-        time_factor_video=2.0,
-        overlays=mpc_animation_overlays(result, mpc_planner, reference_pad=20.0),
-        camera=follow_frame_camera("plant:body", scale=7.0),
-    )
-    shrink_gif(out)
+    camera = fixed_camera((3.0, 7.0, 0.0), scale=8.0)  # the whole descent, still
+    save_gif(cl_sys, traj, "rocket_landing.gif", time_factor_video=1.0, camera=camera)
 
 
 # name: (builder, the files it writes under docs/_static)
@@ -458,30 +397,10 @@ ASSETS = {
     "ur5": (ur5_impedance, ["ur5_meshcat.gif", "showcase/ur5_impedance.html"]),
     "racecar": (racecar_mpc, ["racecar_mpc.gif", "showcase/racecar_mpc.html"]),
     "rocket": (gif_rocket, ["rocket_landing.gif"]),
-    "pendulum": (gif_pendulum, ["pendulum_impedance.gif"]),
-    "mpc": (gif_mpc_car, ["mpc_car.gif"]),
 }
 
 
-def list_assets() -> None:
-    readme = (ROOT / "README.md").read_text(encoding="utf-8")
-    for name, (_, outputs) in ASSETS.items():
-        role = "README" if any(out in readme for out in outputs) else "extra"
-        print(f"{name:10s} {role:7s} {', '.join(outputs)}")
-
-
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument(
-        "names", nargs="*", help=f"assets to build, default all: {', '.join(ASSETS)}"
-    )
-    parser.add_argument("--list", action="store_true", help="list the assets")
-    args = parser.parse_args()
-    unknown = [name for name in args.names if name not in ASSETS]
-    if unknown:
-        parser.error(f"unknown asset {', '.join(unknown)}; choose from {list(ASSETS)}")
-    if args.list:
-        list_assets()
-    for name in [] if args.list else args.names or list(ASSETS):
+    for name in sys.argv[1:] or list(ASSETS):
         print(f"--- {name}")
         ASSETS[name][0]()
