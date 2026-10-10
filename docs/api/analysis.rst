@@ -28,5 +28,8 @@ Analysis
 .. automodule:: minilink.analysis.frequency
    :members:
 
+.. automodule:: minilink.analysis.sensitivity_functions
+   :members:
+
 .. automodule:: minilink.analysis.lyapunov
    :members:

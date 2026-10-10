@@ -1684,3 +1684,148 @@ class TestPolePlacement(unittest.TestCase):
         plant.x0 = np.array([0.4, 0.0])
         trajectory = (ctl @ plant).compute_trajectory(tf=6.0)
         self.assertLess(np.max(np.abs(trajectory.x[:, -1])), 1e-3)
+
+
+class _NonlinearTank(DynamicSystem):
+    """A SISO plant whose linearization depends on the operating point."""
+
+    def __init__(self):
+        super().__init__(n=1)
+        self.name = "Nonlinear Tank"
+        self.add_input_port("u")
+        self.add_output_port("y", dim=1, function=self.h)
+
+    def f(self, x, u, t=0, params=None):
+        xp = array_module(x, u)
+        return xp.array([-xp.sqrt(1.0 + x[0] ** 2) + u[0]])
+
+    def h(self, x, u, t=0, params=None):
+        return x
+
+
+class TestSensitivity(unittest.TestCase):
+    """S, T, PS and CS built from the pieces agree with the loop they describe."""
+
+    w = np.logspace(-2, 3, 300)
+
+    def response(self, sys, **channel):
+        from minilink.analysis.frequency import frequency_response
+
+        return frequency_response(sys, w=self.w, **channel)[1]
+
+    def pieces(self):
+        from minilink.blocks.transfer_function import Lead, TransferFunction
+
+        H = TransferFunction([1.0], [1.0, 3.0, 2.0])
+        return (
+            ("PID", H, PID(4.0, 2.0, 0.5)),
+            ("PI", H, PI(2.0, 1.0)),
+            ("Lead", TransferFunction([2.0], [1.0, 1.0, 0.0]), Lead(5.0, 1.0, 10.0)),
+        )
+
+    def test_s_plus_t_is_one(self):
+        from minilink.analysis import complementary_sensitivity, sensitivity
+
+        for label, H, C in self.pieces():
+            with self.subTest(controller=label):
+                S = sensitivity(plant=H, controller=C)
+                T = complementary_sensitivity(plant=H, controller=C)
+                np.testing.assert_allclose(
+                    self.response(S) + self.response(T), 1.0, atol=1e-12
+                )
+
+    def test_each_function_matches_the_loop_wire(self):
+        from minilink.analysis import (
+            complementary_sensitivity,
+            load_sensitivity,
+            noise_sensitivity,
+            sensitivity,
+        )
+
+        for label, H, C in self.pieces():
+            with self.subTest(controller=label):
+                loop = C @ H
+                S = self.response(sensitivity(plant=H, controller=C))
+                T = self.response(complementary_sensitivity(plant=H, controller=C))
+                PS = self.response(load_sensitivity(plant=H, controller=C))
+                CS = self.response(noise_sensitivity(plant=H, controller=C))
+
+                np.testing.assert_allclose(
+                    S, self.response(loop, of="error:e", wrt="r"), atol=1e-9
+                )
+                np.testing.assert_allclose(
+                    T, self.response(loop, of="sys:y", wrt="r"), atol=1e-9
+                )
+                np.testing.assert_allclose(
+                    CS, self.response(loop, of="ctl:u", wrt="r"), atol=1e-9
+                )
+                np.testing.assert_allclose(PS, self.response(H) * S, atol=1e-9)
+
+    def test_a_filter_on_the_measurement(self):
+        from minilink.analysis import complementary_sensitivity, sensitivity
+        from minilink.blocks.transfer_function import TransferFunction
+        from minilink.core.composition import feedback
+
+        H = TransferFunction([1.0], [1.0, 3.0, 2.0])
+        C = PID(4.0, 2.0, 0.5)
+        F = TransferFunction([1.0], [0.05, 1.0])
+        loop = feedback(C >> H, F)
+
+        S = sensitivity(plant=H, controller=C, filter=F)
+        T = complementary_sensitivity(plant=H, controller=C, filter=F)
+        np.testing.assert_allclose(
+            self.response(S), self.response(loop, of="error:e", wrt="r"), atol=1e-9
+        )
+        np.testing.assert_allclose(
+            self.response(T), self.response(loop, of="sys:y", wrt="r"), atol=1e-9
+        )
+
+    def test_a_spec_is_one_bode_call(self):
+        from minilink.analysis import (
+            bode,
+            complementary_sensitivity,
+            load_sensitivity,
+            noise_sensitivity,
+            sensitivity,
+        )
+        from minilink.blocks.transfer_function import TransferFunction
+
+        H = TransferFunction([1.0], [1.0, 3.0, 2.0])
+        C = PID(4.0, 2.0, 0.5)
+        for function in (
+            sensitivity,
+            complementary_sensitivity,
+            load_sensitivity,
+            noise_sensitivity,
+        ):
+            with self.subTest(function=function.__name__):
+                G = function(plant=H, controller=C)
+                _, G_db, _ = bode(G, w=2 * np.pi * 0.015)
+                self.assertEqual(G_db.shape, (1,))
+                s = 2j * np.pi * 0.015
+                G_s = np.polyval(G.numerator, s) / np.polyval(G.denominator, s)
+                expected = 20 * np.log10(np.abs(G_s))
+                self.assertAlmostEqual(G_db[0], expected, places=9)
+
+    def test_the_operating_point_reaches_the_plant(self):
+        from minilink.analysis import sensitivity, transfer_function
+
+        plant, C = _NonlinearTank(), PI(2.0, 1.0)
+        for x_bar in ([0.0], [2.0]):
+            with self.subTest(x_bar=x_bar):
+                S = sensitivity(plant=plant, controller=C, x_bar=x_bar, u_bar=[1.0])
+                H = transfer_function(plant, x_bar, [1.0])
+                np.testing.assert_allclose(
+                    self.response(S),
+                    self.response(sensitivity(plant=H, controller=C)),
+                    atol=1e-9,
+                )
+
+    def test_a_piece_with_several_channels_is_refused(self):
+        from minilink.analysis import sensitivity, transfer_function
+
+        plant, C = Pendulum(), PID(4.0, 2.0, 0.5)
+        with self.assertRaisesRegex(ValueError, "plant 'Pendulum' must be SISO"):
+            sensitivity(plant=plant, controller=C)
+        H = transfer_function(plant, of="q")
+        self.assertEqual(sensitivity(plant=H, controller=C).n, 4)

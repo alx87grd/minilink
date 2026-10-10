@@ -1,4 +1,4 @@
-"""Analysis verbs on a ``System``: derivatives, linearization, structure, equilibria, modes, frequency and time responses, Lyapunov certificates.
+"""Analysis verbs on a ``System``: derivatives, linearization, structure, equilibria, modes, frequency and time responses, sensitivity functions, Lyapunov certificates.
 
 Every tool reads ``tool(sys, x_bar, u_bar, t, params, *, method="auto", eps)``. A
 ``System`` carries the common ones as methods: ``linearize``, ``find_equilibrium``,
@@ -16,6 +16,10 @@ _EXPORTS: dict[str, tuple[str, str]] = {
     "VerificationReport": ("minilink.analysis.lyapunov", "VerificationReport"),
     "animate_modal": ("minilink.analysis.modal", "animate_modal"),
     "bode": ("minilink.analysis.frequency", "bode"),
+    "complementary_sensitivity": (
+        "minilink.analysis.sensitivity_functions",
+        "complementary_sensitivity",
+    ),
     "controllability": ("minilink.analysis.structural", "controllability"),
     "discretize": ("minilink.analysis.discretization", "discretize"),
     "find_equilibrium": ("minilink.analysis.equilibria", "find_equilibrium"),
@@ -23,8 +27,13 @@ _EXPORTS: dict[str, tuple[str, str]] = {
     "jacobian": ("minilink.analysis.derivatives", "jacobian"),
     "linearize": ("minilink.analysis.linearization", "linearize"),
     "linearize_matrices": ("minilink.analysis.linearization", "linearize_matrices"),
+    "load_sensitivity": ("minilink.analysis.sensitivity_functions", "load_sensitivity"),
     "margins": ("minilink.analysis.frequency", "margins"),
     "modal_analysis": ("minilink.analysis.modal", "modal_analysis"),
+    "noise_sensitivity": (
+        "minilink.analysis.sensitivity_functions",
+        "noise_sensitivity",
+    ),
     "nyquist": ("minilink.analysis.frequency", "nyquist"),
     "observability": ("minilink.analysis.structural", "observability"),
     "region_of_attraction": (
@@ -42,6 +51,7 @@ _EXPORTS: dict[str, tuple[str, str]] = {
     "plot_step_response": ("minilink.analysis.time_response", "plot_step_response"),
     "pzmap": ("minilink.analysis.frequency", "pzmap"),
     "root_locus": ("minilink.analysis.frequency", "root_locus"),
+    "sensitivity": ("minilink.analysis.sensitivity_functions", "sensitivity"),
     "step_info": ("minilink.analysis.time_response", "step_info"),
     "step_response": ("minilink.analysis.time_response", "step_response"),
     "transfer_function": ("minilink.analysis.frequency", "transfer_function"),

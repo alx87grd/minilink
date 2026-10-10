@@ -107,6 +107,11 @@ the new code copies clean patterns and no shortcut is added only to be dropped.
   (measurement), off by default; spec checks use `bode` as it is. Done when `S + T = 1` holds
   to 1e-12 on a SISO loop, each function matches the loop's internal-wire transfer function,
   and each Table 2 spec is one `bode` call plus a comparison.
+  **The four functions landed 2026-10-10** (`analysis/sensitivity_functions.py`, the module
+  name kept off the facade's `sensitivity`; a piece with several channels is refused;
+  `TestSensitivity` covers the three gates). Open: the `w` / `v` loop inputs on
+  `closed_loop` **[ask — the keyword, core]**, then the `load_sensitivity` check against the
+  loop's `w`-to-`y` channel.
 - [ ] **S61 Analysis verbs on any `System`** (scan: analysis#2, analysis#4, analysis#5,
   analysis#6, analysis#8): `controllability` / `observability` linearize like every sibling
   (band functions only, no facade: ROADMAP §6); `step_info` takes a `System`; `find_equilibrium` defaults its guess to
