@@ -287,22 +287,97 @@ def polyline_strip_mesh(
     return merge_meshes(*pieces)
 
 
-def _frames_have_changing_polylines(frames) -> bool:
-    """True when a line/arrow primitive changes vertices after the first frame."""
-    if len(frames) < 2:
+def flipbook_pages(frames, i: int, key) -> list:
+    """Runs of slot ``i`` over the frames, as ``(start, stop, primitive)``.
+
+    A run covers the frames ``start <= k < stop``; consecutive frames whose
+    primitives share one ``key`` (the geometry) share a run, and a frame
+    without slot ``i`` is in none. A slot drawn the same way throughout is the
+    single run ``(0, len(frames), primitive)``.
+    """
+    pages = []
+    previous, previous_key = None, None
+    for k, frame in enumerate(frames):
+        if i >= len(frame["primitives"]):
+            previous, previous_key = None, None
+            continue
+        primitive = frame["primitives"][i]
+        # the kinematic geometry is one object for every frame: key it once
+        primitive_key = previous_key if primitive is previous else key(primitive)
+        if previous is not None and primitive_key == previous_key:
+            start, _, first = pages[-1]
+            pages[-1] = (start, k + 1, first)
+        else:
+            pages.append((k, k + 1, primitive))
+        previous, previous_key = primitive, primitive_key
+    return pages
+
+
+def fold_growing_prefix(pages) -> list:
+    """Flipbook pages of a growing polyline (a trail), each drawing only what it adds.
+
+    Where a page's line extends the previous page's, frame after frame and
+    drawn alike, the later page keeps just its new piece and every page of
+    the chain stays shown to the chain's last frame: the pieces add up to the
+    line of each frame, at a size linear in the frame count.
+    """
+    folded = []
+    k = 0
+    while k < len(pages):
+        end = k
+        while end + 1 < len(pages) and extends_polyline(pages[end], pages[end + 1]):
+            end += 1
+        chain_stop = pages[end][1]
+        start, _, primitive = pages[k]
+        folded.append((start, chain_stop, primitive))
+        for j in range(k + 1, end + 1):
+            start, _, primitive = pages[j]
+            folded.append(
+                (start, chain_stop, polyline_tail(pages[j - 1][2], primitive))
+            )
+        k = end + 1
+    return folded
+
+
+def extends_polyline(page, later) -> bool:
+    """True when ``later`` follows ``page`` in time with the same line, grown at its end."""
+    _, stop, before = page
+    start, _, after = later
+    if stop != start or type(before) is not CustomLine or type(after) is not CustomLine:
         return False
-    first = frames[0]["primitives"]
-    for frame in frames[1:]:
-        for a, b in zip(first, frame["primitives"]):
-            if not isinstance(a, (CustomLine, Arrow, TorqueArrow)):
-                continue
-            if type(a) is not type(b):
-                return True
-            pa = np.asarray(a.pts, dtype=float)
-            pb = np.asarray(b.pts, dtype=float)
-            if pa.shape != pb.shape or not np.allclose(pa, pb, atol=1e-9, rtol=0.0):
-                return True
-    return False
+    look = (str(before.color), float(before.linewidth), repr(before.style))
+    if look != (str(after.color), float(after.linewidth), repr(after.style)):
+        return False
+    n = len(before.pts)
+    return 2 <= n < len(after.pts) and np.array_equal(after.pts[:n], before.pts)
+
+
+def polyline_tail(before, after) -> CustomLine:
+    """The piece of ``after`` past ``before``, from its last point, dashes in phase."""
+    n = len(before.pts)
+    style = before.style
+    dashes = _linestyle_dashes(style)
+    if dashes is not None:
+        offset = float(style[0]) if isinstance(style, tuple) else 0.0
+        unit = _LINE_DASH_M * max(float(before.linewidth), 0.8)
+        length = float(
+            np.sum(np.linalg.norm(np.diff(_as_xyz(before.pts), axis=0), axis=1))
+        )
+        style = (offset + length / unit, dashes)
+    return CustomLine(
+        after.pts[n - 1 :], color=after.color, linewidth=after.linewidth, style=style
+    )
+
+
+def page_visibility(start: int, stop: int, n_frames: int) -> dict:
+    """Keyframes ``{frame: shown}`` of a page shown over ``start <= k < stop``.
+
+    The last frame is always keyed, so every clip lasts the whole animation.
+    """
+    keys = {0: start == 0, start: True, n_frames - 1: stop >= n_frames}
+    if stop < n_frames:
+        keys[stop] = False
+    return dict(sorted(keys.items()))
 
 
 def _rotation_from_a_to_b(a: np.ndarray, b: np.ndarray) -> np.ndarray:
@@ -347,20 +422,15 @@ class MeshcatCanvas:
         self._g = g
         self._tf = tf
         self._geom_keys = []
-        self._has_head = []
         self._n_slots = 0
 
     def clear(self):
         self.scene.delete()
         self._geom_keys = []
-        self._has_head = []
         self._n_slots = 0
 
     def _base_path(self, i: int):
         return self.scene[f"p{i}"]
-
-    def _head_path(self, i: int):
-        return self.scene[f"p{i}_head"]
 
     def _primitive_key(self, primitive):
         # Conservative key: rebuild when any meaningful visual parameter changes.
@@ -444,9 +514,9 @@ class MeshcatCanvas:
             )
         return (primitive.__class__.__name__,)
 
-    def _set_static_geometry(self, i: int, primitive):
+    def set_geometry(self, path, primitive) -> bool:
+        """Draw ``primitive`` at ``path`` in its local frame; ``False`` when it draws nothing."""
         g = self._g
-        path = self._base_path(i)
         hex_color = _color_to_meshcat_hex(primitive.color)
 
         if isinstance(primitive, Point):
@@ -454,8 +524,7 @@ class MeshcatCanvas:
             path.set_object(
                 g.Mesh(g.Sphere(radius), g.MeshLambertMaterial(color=hex_color))
             )
-            self._has_head[i] = False
-            return
+            return True
 
         if isinstance(primitive, Sphere):
             path.set_object(
@@ -468,8 +537,7 @@ class MeshcatCanvas:
                     ),
                 )
             )
-            self._has_head[i] = False
-            return
+            return True
 
         if isinstance(primitive, Rod):
             path.set_object(
@@ -482,8 +550,7 @@ class MeshcatCanvas:
                     ),
                 )
             )
-            self._has_head[i] = False
-            return
+            return True
 
         if isinstance(primitive, Plane):
             path.set_object(
@@ -502,8 +569,7 @@ class MeshcatCanvas:
                     ),
                 )
             )
-            self._has_head[i] = False
-            return
+            return True
 
         if isinstance(primitive, Box):
             path.set_object(
@@ -522,8 +588,7 @@ class MeshcatCanvas:
                     ),
                 )
             )
-            self._has_head[i] = False
-            return
+            return True
 
         if isinstance(primitive, ExtrudedPolygon):
             vertices, faces = primitive.mesh_data()
@@ -540,8 +605,7 @@ class MeshcatCanvas:
                     ),
                 )
             )
-            self._has_head[i] = False
-            return
+            return True
 
         if isinstance(primitive, Circle):
             # Interpret 2D circle primitives as volumetric 3D spheres in meshcat.
@@ -556,8 +620,7 @@ class MeshcatCanvas:
                     ),
                 )
             )
-            self._has_head[i] = False
-            return
+            return True
 
         if isinstance(primitive, (CustomLine, Arrow, TorqueArrow)):
             style = getattr(primitive, "style", "-")
@@ -568,9 +631,7 @@ class MeshcatCanvas:
                     style=style,
                 )
                 if mesh is None:
-                    path.delete()
-                    self._has_head[i] = False
-                    return
+                    return False
                 vertices, faces = mesh
                 path.set_object(
                     g.Mesh(
@@ -581,8 +642,7 @@ class MeshcatCanvas:
                         g.MeshLambertMaterial(color=hex_color),
                     )
                 )
-                self._has_head[i] = False
-                return
+                return True
             pts = primitive.pts
             if pts.shape[1] == 2:
                 pts = np.hstack((pts, np.zeros((pts.shape[0], 1))))
@@ -595,8 +655,26 @@ class MeshcatCanvas:
                     ),
                 )
             )
-            self._has_head[i] = False
-            return
+            return True
+        return False
+
+    def _set_static_geometry(self, i: int, primitive):
+        if not self.set_geometry(self._base_path(i), primitive):
+            self._base_path(i).delete()
+
+    def page_path(self, i: int, start: int):
+        """Flipbook page of slot ``i`` first shown at frame ``start``."""
+        return self._base_path(i)[f"f{start}"]
+
+    def set_page(self, i: int, start: int, primitive) -> bool:
+        """Draw one flipbook page, hidden unless it is the first frame's."""
+        page = self.page_path(i, start)
+        if not self.set_geometry(page, primitive):
+            return False
+        # after set_object: the meshcat server drops a node's properties on it
+        if start > 0:
+            page.set_property("visible", False)
+        return True
 
     def ensure_objects(self, primitives):
         self.reserve_slots(len(primitives))
@@ -609,15 +687,11 @@ class MeshcatCanvas:
             self.clear()
             self._n_slots = n
             self._geom_keys = [None] * n
-            self._has_head = [False] * n
 
     def ensure_object(self, i: int, primitive):
         """(Re)build the geometry of slot ``i`` when the primitive's shape changed."""
         key = self._primitive_key(primitive)
         if self._geom_keys[i] != key:
-            if i < len(self._has_head) and self._has_head[i]:
-                self._head_path(i).delete()
-                self._has_head[i] = False
             self._set_static_geometry(i, primitive)
             self._geom_keys[i] = key
 
@@ -681,10 +755,9 @@ class MeshcatCanvas:
 def _rigid_effective_transform(primitive, transform_matrix, tf):
     """
     Return the 4x4 transform that ``MeshcatCanvas.update_primitive`` would apply
-    for the given rigid primitive, or ``None`` for primitives whose geometry is
-    rebuilt each frame (honest ``Arrow`` / ``TorqueArrow`` overlays) — in native
-    meshcat keyframing only the transform animates, so per-frame geometry is
-    frozen at ``t=0`` (use ``native=False`` for frame-accurate dynamic geometry).
+    to the primitive's slot, or ``None`` for a primitive type it does not place.
+    Lines and arrows are placed by their frame alone: their points, baked in
+    that frame, are the geometry.
     """
     transform_matrix = np.asarray(transform_matrix, dtype=float)
     if isinstance(primitive, Point):
@@ -851,64 +924,81 @@ class MeshcatRenderer(AnimationRenderer):
         for node in self._world_nodes():
             node.set_property("position", shift)
 
-    def _build_meshcat_animation(self, primitives, frames, schedule):
+    def _build_meshcat_animation(self, frames, schedule):
         """
-        Compile the frame list into a ``meshcat.animation.Animation`` keyframe
-        track per rigid primitive path, plus the world slide that keeps the
-        per-frame camera target under the eye (the eye distance is the first
-        frame's). Dynamic polylines (``Arrow``, ``TorqueArrow``,
-        changing ``CustomLine`` trails/horizons) are left frozen at ``t=0``
-        and a one-line notice is printed if any are present.
+        Compile the frame list into a ``meshcat.animation.Animation``.
+
+        A slot drawn the same way in every frame is one object with a pose
+        track (none when it never moves). A slot whose geometry changes (an
+        ``Arrow``, a ``TorqueArrow``, a growing trail, a receding horizon) is a
+        flipbook: one page per run of frames with the same geometry, under the
+        slot's pose, each shown by a ``visible`` track over its own run. The
+        world slide keeps the per-frame camera target under the eye (the eye
+        distance is the first frame's).
         """
         import meshcat.animation as mcanim
 
-        self.canvas.ensure_objects(primitives)
+        canvas = self.canvas
+        n_frames = len(frames)
+        n_slots = max(len(frame["primitives"]) for frame in frames)
+        canvas.reserve_slots(n_slots)
         self._place_camera(frames[0]["camera"])
         self._set_backdrop()
-
-        # Draw t=0 once: this sets the (frozen) geometry of dynamic polylines
-        # and gives every rigid primitive a sane starting pose before keyframes
-        # kick in.
-        t0_transforms = frames[0]["transforms"]
-        has_dynamic = _frames_have_changing_polylines(frames)
-        for i, (prim, T0) in enumerate(zip(primitives, t0_transforms)):
-            self.canvas.update_primitive(i, prim, T0)
-            if isinstance(prim, (Arrow, TorqueArrow)):
-                has_dynamic = True
-
         animation_obj = mcanim.Animation(default_framerate=schedule.target_fps)
-        tf = self.canvas._tf
 
-        for frame_idx, frame in enumerate(frames):
-            for i, (prim, T) in enumerate(zip(primitives, frame["transforms"])):
-                T_eff = _rigid_effective_transform(prim, T, tf)
-                if T_eff is None:
-                    continue
-                path_vis = self.canvas._base_path(i)
-                with animation_obj.at_frame(path_vis, frame_idx) as frame_vis:
-                    frame_vis.set_transform(np.asarray(T_eff, dtype=float))
+        for i in range(n_slots):
+            pages = fold_growing_prefix(
+                flipbook_pages(frames, i, canvas._primitive_key)
+            )
+            if len(pages) == 1 and pages[0][:2] == (0, n_frames):
+                canvas.ensure_object(i, pages[0][2])
+            else:
+                for start, stop, primitive in pages:
+                    if not canvas.set_page(i, start, primitive):
+                        continue
+                    page = canvas.page_path(i, start)
+                    for k, shown in page_visibility(start, stop, n_frames).items():
+                        with animation_obj.at_frame(page, k) as frame_vis:
+                            frame_vis.set_property("visible", "boolean", shown)
+            self._keyframe_slot_pose(animation_obj, frames, i)
+
+        for k, frame in enumerate(frames):
             shift = camera_world_shift(frame["camera"])
             for node in self._world_nodes():
-                with animation_obj.at_frame(node, frame_idx) as frame_vis:
+                with animation_obj.at_frame(node, k) as frame_vis:
                     frame_vis.set_property("position", "vector3", shift)
-
-        if has_dynamic:
-            print(
-                "Note: meshcat native animation freezes per-frame dynamic "
-                "geometry (e.g. Arrow length/direction, TorqueArrow sweep, "
-                "CustomLine trails/horizons) at t=0; use native=False for "
-                "frame-accurate playback of those primitives."
-            )
 
         return animation_obj
 
-    def _set_native_animation(self, primitives, frames, schedule, *, is_3d: bool):
+    def _keyframe_slot_pose(self, animation_obj, frames, i: int) -> None:
+        """Pose of slot ``i``: placed at its first frame, keyframed only if it moves."""
+        tf = self.canvas._tf
+        poses = []
+        for k, frame in enumerate(frames):
+            if i >= len(frame["primitives"]):
+                continue
+            T = _rigid_effective_transform(
+                frame["primitives"][i], frame["transforms"][i], tf
+            )
+            if T is not None:
+                poses.append((k, np.asarray(T, dtype=float)))
+        if not poses:
+            return
+        path = self.canvas._base_path(i)
+        path.set_transform(poses[0][1])
+        if all(np.allclose(T, poses[0][1], rtol=0.0, atol=1e-12) for _, T in poses):
+            return
+        for k, T in poses:
+            with animation_obj.at_frame(path, k) as frame_vis:
+                frame_vis.set_transform(T)
+
+    def _set_native_animation(self, frames, schedule):
         """Build a Visualizer, keyframe the native Meshcat animation, and play it."""
         meshcat = _import_meshcat()
         self.vis = meshcat.Visualizer()
         # the viewer is always 3-D: ``is_3d`` only picks the axes of flat renderers
         self.canvas = MeshcatCanvas(self.vis, is_3d=True)
-        animation_obj = self._build_meshcat_animation(primitives, frames, schedule)
+        animation_obj = self._build_meshcat_animation(frames, schedule)
         self.vis.set_animation(animation_obj, play=True, repetitions=1)
         return animation_obj
 
@@ -917,7 +1007,7 @@ class MeshcatRenderer(AnimationRenderer):
     ) -> None:
         """Write a standalone HTML page of the native Meshcat animation."""
         self.show = False
-        self._set_native_animation(primitives, frames, schedule, is_3d=is_3d)
+        self._set_native_animation(frames, schedule)
         path = html_export_path(file_name)
         path.write_text(self.vis.static_html(), encoding="utf-8")
         print(f"Saving animation to {path} ...")
@@ -937,9 +1027,7 @@ class MeshcatRenderer(AnimationRenderer):
         plays keyframes natively; no ``time.sleep`` in Python.
         """
         self.show = True
-        animation_obj = self._set_native_animation(
-            primitives, frames, schedule, is_3d=is_3d
-        )
+        animation_obj = self._set_native_animation(frames, schedule)
         self.vis.open()
         self.vis.wait()
         return animation_obj
@@ -952,7 +1040,7 @@ class MeshcatRenderer(AnimationRenderer):
         Ideal for Colab: no zmq client, no port forwarding.
         """
         self.show = False
-        self._set_native_animation(primitives, frames, schedule, is_3d=is_3d)
+        self._set_native_animation(frames, schedule)
 
         try:
             return self.vis.render_static(height=480)

@@ -158,6 +158,7 @@ exclude = [
     "/minilink/experimental",
     "/examples/experimental",
     "/examples/projects",
+    "/docs/_static/showcase",
 ]
 
 [tool.hatch.build.targets.wheel]

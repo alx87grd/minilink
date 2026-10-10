@@ -12,6 +12,10 @@ being written, so they are tests now rather than prose:
 - 6.7 teaching-lane code that picks Ipopt probes for ``cyipopt`` first, so it
   still runs on an install without it (a cart-pole demo hard-coded it).
 
+The README figures are built by one script, ``docs/make_assets.py``, so the
+README shows only what it rebuilds, every GIF keeps to the 6.9 size budget, and
+the hand-drawn bridges figure stays the output of its tile list.
+
 Every notebook opens in Colab, so its setup cell is checked too: it clones the
 default branch and puts the clone on the path before minilink is imported (one
 notebook cloned a stale working branch).
@@ -137,10 +141,27 @@ pytest.main(["--collect-only", "-p", "no:cacheprovider", "tests/unittest"],
 print(json.dumps(vars(collection)))
 """
 
+# The README figures: docs/make_assets.py rebuilds each one.
+MAKE_ASSETS = "docs/make_assets.py"
+ASSET_EXPORT = "docs/asset_export.py"
+STATIC = "docs/_static"
+README_ASSET = re.compile(r"(?:/docs/_static/|github\.io/minilink/_static/)([\w./-]+)")
+GIF_MAX_BYTES = 1_000_000  # 6.9
+
 # The merge gate: a CI job that installs the jax extra must also run pytest.
 CI_WORKFLOW = ".github/workflows/test.yml"
 INSTALLS_JAX = re.compile(r"pip install[^\n]*\[[^\]]*\b(jax|full)\b[^\]]*\]")
 RUNS_PYTEST = re.compile(r"^\s*(python -m )?pytest\b", re.MULTILINE)
+
+
+def make_assets_literals() -> dict:
+    """The literal assignments of docs/make_assets.py, read without running it."""
+    tree = ast.parse((REPO / MAKE_ASSETS).read_text(encoding="utf-8"))
+    return {
+        node.targets[0].id: node.value
+        for node in tree.body
+        if isinstance(node, ast.Assign) and isinstance(node.targets[0], ast.Name)
+    }
 
 
 def heading_slug(heading: str) -> str:
@@ -312,6 +333,47 @@ class TestOptionalDependencies(unittest.TestCase):
         self.assertEqual(collection["broken_modules"], [])
         self.assertEqual(sorted(collection["skipped_modules"]), JAX_ONLY_TEST_MODULES)
         self.assertEqual(collection["jax_tests_left"], [])
+
+
+class TestReadmeAssets(unittest.TestCase):
+    """docs/make_assets.py rebuilds every README figure, each within its budget."""
+
+    def test_every_readme_figure_is_built_by_the_script(self):
+        assets = make_assets_literals()["ASSETS"]
+        outputs = {
+            out for entry in assets.values for out in ast.literal_eval(entry.elts[1])
+        }
+        readme = (REPO / "README.md").read_text(encoding="utf-8")
+        shown = README_ASSET.findall(readme)
+
+        self.assertTrue(shown, "README.md shows no figure from docs/_static")
+        for name in shown:
+            self.assertTrue((REPO / STATIC / name).is_file(), f"missing {name}")
+            self.assertIn(name, outputs, f"{MAKE_ASSETS} does not build {name}")
+
+    def test_every_gif_fits_the_budget(self):
+        for gif in sorted((REPO / STATIC).rglob("*.gif")):
+            self.assertLessEqual(
+                gif.stat().st_size, GIF_MAX_BYTES, f"{gif.name} is over 1 MB"
+            )
+
+    def test_the_bridges_figure_is_its_tile_list(self):
+        import importlib.util
+
+        spec = importlib.util.spec_from_file_location(
+            "asset_export", REPO / ASSET_EXPORT
+        )
+        asset_export = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(asset_export)
+        literals = make_assets_literals()
+        svg = asset_export.bridges_svg(
+            ast.literal_eval(literals["BRIDGES_TILES"]),
+            ast.literal_eval(literals["BRIDGES_CORE"]),
+        )
+
+        self.assertEqual(
+            svg, (REPO / STATIC / "bridges.svg").read_text(encoding="utf-8")
+        )
 
 
 class TestMergeGate(unittest.TestCase):
