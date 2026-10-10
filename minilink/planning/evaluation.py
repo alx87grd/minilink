@@ -405,8 +405,7 @@ def control_law(controller, t, backend="jax"):
     """``u = pi(x, t)`` of a policy block: a source by its time table, a feedback block by its state law."""
     if int(controller.m) == 0:
         return time_law(controller, t, backend)
-    pi = static_law(controller, backend)
-    return lambda x, t: pi(x)
+    return static_law(controller, backend)
 
 
 def time_law(source, t, backend="jax"):
@@ -425,11 +424,13 @@ def time_law(source, t, backend="jax"):
 
 def static_law(controller, backend="jax"):
     """
-    ``u = pi(x)`` of any static feedback block, on the NumPy or JAX backend.
+    ``u = pi(x, t)`` of any static feedback block, on the NumPy or JAX backend.
 
     Compiles the block and evaluates its control port with the measurement
     port fed the plant state and the other inputs at their nominal values
     (a reference port left unconnected holds its set point, as in a diagram).
+    The time reaches the block, so a time-varying law (a finite-horizon LQR
+    gain ``K(t)``) is scored with the gain of each instant.
     """
     from minilink.core.feedback import feedback_ports
 
@@ -462,17 +463,17 @@ def static_law(controller, backend="jax"):
         u_nominal = jnp.asarray(controller.get_u_from_input_ports(), dtype=float)
         x_ctl = jnp.zeros(0)
 
-        def law(x):
+        def law(x, t=0.0):
             u_in = u_nominal.at[measurement].set(x)
-            return evaluator.outputs_trace(x_ctl, u_in, 0.0)[roles.control]
+            return evaluator.outputs_trace(x_ctl, u_in, t)[roles.control]
 
     else:
         u_nominal = np.asarray(controller.get_u_from_input_ports(), dtype=float)
         x_ctl = np.zeros(0)
 
-        def law(x):
+        def law(x, t=0.0):
             u_in = u_nominal.copy()
             u_in[measurement] = x
-            return np.asarray(evaluator.outputs(x_ctl, u_in, 0.0)[roles.control])
+            return np.asarray(evaluator.outputs(x_ctl, u_in, float(t))[roles.control])
 
     return law

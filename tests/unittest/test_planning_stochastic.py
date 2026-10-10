@@ -685,3 +685,40 @@ def jax_available():
     import importlib.util
 
     return importlib.util.find_spec("jax") is not None
+
+
+def test_monte_carlo_scores_a_time_varying_law_at_each_instant():
+    pytest.importorskip("jax")
+    import jax
+
+    from minilink.control.state import TimeVaryingStateFeedbackController
+    from minilink.planning.evaluation import MonteCarloEvaluator, control_law
+
+    t = np.linspace(0.0, 1.0, 5)
+    K = np.stack([np.array([[1.0 + 10.0 * k, 0.5]]) for k in range(5)])
+    ctl = TimeVaryingStateFeedbackController(t, K)
+    x = np.array([0.3, -0.1])
+    grid = np.linspace(0.0, 1.0, 21)
+    for backend in ("numpy", "jax"):
+        law = control_law(ctl, grid, backend)
+        if backend == "jax":
+            law = jax.jit(law)
+        for t_k in (0.0, 0.5, 0.95):
+            expected = ctl.ctl(None, np.concatenate([x, np.zeros(2)]), t_k)
+            np.testing.assert_allclose(np.asarray(law(x, t_k)), expected, rtol=1e-12)
+
+    problem = StochasticPlanningProblem(
+        pendulum(),
+        cost=QuadraticCost.from_system(pendulum()),
+        x0_distribution=Particles([[0.5, 0.0]]),
+        tf=1.0,
+    )
+    reports = {
+        backend: MonteCarloEvaluator(
+            problem, dt=0.01, n_trials=1, episode_length=1.0, backend=backend
+        ).evaluate(ctl)
+        for backend in ("jax", "numpy", "simulator")
+    }
+    np.testing.assert_allclose(reports["jax"].J, reports["numpy"].J, rtol=1e-6)
+    # O(dt) apart; the law frozen at t = 0 scored 0.97 against 45 here
+    np.testing.assert_allclose(reports["simulator"].J, reports["numpy"].J, rtol=0.05)
