@@ -233,7 +233,8 @@ noise injected on `u` and `y`, and the estimate converges to the true state;
 `sensitivity.py` would shadow the facade's `sensitivity`); a piece with several
 channels is refused; the loop inputs are `closed_loop(C, plant, r=True, w=False,
 v=False)` (the maintainer's keyword); the teaching notebook is
-`classical_control/sensitivity_functions.ipynb`, with `Sine` sources on `w` and `v`.
+`classical_control/sensitivity_functions.ipynb`, on the mass-spring-damper (one output, no
+`Demux`), with a `Step` on `r` and `Sine` sources on `w` and `v`.
 
 **Problem.** Table 2 states four specs as "sous −40 dB @ 0.015 Hz" style
 bounds on disturbance and noise sensitivity. Today three of the four are
