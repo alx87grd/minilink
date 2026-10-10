@@ -314,7 +314,7 @@ wave B. A4 and A5 stay here.
   (`plant`, `controller`, `estimator`) are the roles every other tool reads, and the cost is
   scored on the plant. AC-0 to AC-3 land in this wave:
   - AC-0, no controller classes;
-  - AC-1, bug fixes, now;
+  - AC-1, bug fixes (landed 2026-10-10);
   - AC-2, the resolver and the id rename, before RN-4;
   - AC-3, composition on standard names, after the §6 decisions.
 

@@ -173,9 +173,9 @@ the new code copies clean patterns and no shortcut is added only to be dropped.
   Steps AC-0 to AC-8 of the plan; decisions 1–7 in its §5 **[ask — core]**:
   - AC-0: no controller classes; `plot_control_law` on `System`; the four course
     notebooks migrated (import line and base class). Agent, after decision 7.
-  - AC-1: safe fixes and pinning tests (D1, D2, D4, D6 of the 2026-10-10 review; defects A–D
-    of the plan; time-varying laws scored at t = 0; `disturbances={"u"}` refused) and the
-    census baseline. Agent, now.
+  - AC-1 landed 2026-10-10: the ten safe fixes (D1, D2, D4, D6 of the 2026-10-10 review;
+    defects A–D of the plan; time-varying laws scored at t = 0; `disturbances={"u"}`
+    refused), each with its test, and `TestDispatchTable`.
   - AC-2: `roles()`, `block_roles()` and `command_port()`, with every reader switched;
     reserved ids raise on a clash. (a) byte-identical; (b) the id rename, in flow and hybrid,
     before RN-4: `ctl` → `controller`, `sys` → `plant`, `ref` → `reference`; sources
