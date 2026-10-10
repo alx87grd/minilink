@@ -90,6 +90,7 @@ class TestCoreComponents(unittest.TestCase):
 
 
 from minilink.blocks.basic import Integrator
+from minilink.blocks.nonlinear import Saturation
 from minilink.blocks.sources import Step, WhiteNoise
 from minilink.control.impedance import ImpedanceController
 from minilink.control.output import ProportionalController
@@ -226,6 +227,16 @@ class TestDiagramCompositionShortcuts(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "no available boundary input"):
             WhiteNoise() >> diagram
         self.assertEqual(diagram.connections["sys"]["u"], ("ctl", "u"))
+
+    def test_series_on_a_hand_wired_diagram_reads_its_declared_output(self):
+        diagram = DiagramSystem()
+        diagram.add_subsystem(Integrator(), "plant")
+        diagram.add_input_port("u", dim=1)
+        diagram.connect("input", "u", "plant", "u")
+        diagram.connect_new_output_port("plant", "y", "y")
+        diagram.add_subsystem(ProportionalController(), "monitor")  # added last
+        chain = diagram >> Saturation()
+        self.assertEqual(chain.connections["saturation"]["u"], ("plant", "y"))
 
     def test_autowire_connects_unique_matches_without_overwrites(self):
         diagram = (

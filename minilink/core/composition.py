@@ -893,12 +893,7 @@ def _get_composition_output(diagram):
     if output is not None:
         return output
 
-    # Fallback: the most recently added subsystem with an output port.
-    for sys_id in reversed(diagram.subsystems):
-        sys = diagram.subsystems[sys_id]
-        if sys.outputs:
-            return sys_id, _default_output_port(sys)
-
+    # A declared boundary output wins: `y`, else the only one.
     boundary_outputs = []
     if "output" in diagram.connections:
         for output_id in diagram.outputs:
@@ -911,6 +906,12 @@ def _get_composition_output(diagram):
             return edge
     if len(boundary_outputs) == 1:
         return boundary_outputs[0]
+
+    # Fallback: the most recently added subsystem with an output port.
+    for sys_id in reversed(diagram.subsystems):
+        sys = diagram.subsystems[sys_id]
+        if sys.outputs:
+            return sys_id, _default_output_port(sys)
     return None
 
 
