@@ -63,12 +63,21 @@ class StateSpaceSystem(DynamicSystem):
     :class:`LTISystem` convenience subclass.
     """
 
-    def __init__(self, *, n, m, p=None, feedthrough=False, name="State Space System"):
+    def __init__(
+        self,
+        *,
+        n,
+        m,
+        p=None,
+        feedthrough=False,
+        name="State Space System",
+        declare_ports=True,
+    ):
         super().__init__(
             n=n,
-            input_dim=m,
-            output_dim=n if p is None else p,
-            expose_state=True,
+            input_dim=m if declare_ports else None,
+            output_dim=(n if p is None else p) if declare_ports else None,
+            expose_state=declare_ports,
             y_dependencies=("u",) if feedthrough else (),
         )
         self.name = name
@@ -117,10 +126,12 @@ class LTISystem(LTISystemFacades, StateSpaceSystem):
     The matrices are stored exactly as passed so NumPy arrays, JAX arrays, or
     other matrix objects can drive the same equation code. Access them through
     the zero-argument method calls, e.g. ``sys.A()`` (useful for introspection
-    such as ``numpy.linalg.eigvals(sys.A())``).
+    such as ``numpy.linalg.eigvals(sys.A())``). ``declare_ports=False`` leaves
+    the ports ``u``, ``y`` and ``x`` undeclared, for a subclass that declares
+    its own layout (a compensator ``TransferFunction``).
     """
 
-    def __init__(self, A, B, C=None, D=None, *, name="LTI System"):
+    def __init__(self, A, B, C=None, D=None, *, name="LTI System", declare_ports=True):
         self._A = A
         self._B = B
         self._C = _identity_like(A, _shape("A", A)[0]) if C is None else C
@@ -134,7 +145,14 @@ class LTISystem(LTISystemFacades, StateSpaceSystem):
         # Structural feedthrough only when D has a nonzero entry — an explicit
         # zero D must not create an algebraic y <- u dependency.
         feedthrough = bool(np.any(np.asarray(self._D)))
-        super().__init__(n=n, m=m, p=p, feedthrough=feedthrough, name=name)
+        super().__init__(
+            n=n,
+            m=m,
+            p=p,
+            feedthrough=feedthrough,
+            name=name,
+            declare_ports=declare_ports,
+        )
 
     def A(self, t=0.0, params=None):
         return self._A

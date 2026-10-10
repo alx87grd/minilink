@@ -303,7 +303,8 @@ wave B. A4 and A5 stay here.
   solidification (TB-a and P7 landed; P5, P8, TB-b, S61, P9, P10) land first, then
   RN-1 of [randomness.md](docs/plans/randomness.md) (`WhiteNoise` with its `psd`), then P4. The
   disturbance convention was decided 2026-09-26 (§6). **[ask]**
-- **B4** Polish: **P9** `TransferFunction` ports built once, **P10** the
+- **B4** Polish: **P9** `TransferFunction` ports built once (landed 2026-10-10:
+  `LTISystem(..., declare_ports=False)` for a subclass's own layout), **P10** the
   three `@` dispatch paths documented and pinned by a test; **P6** the z tier
   stays held (teach with `discretize` + simulation) unless the sommatif
   examines z-plane analysis; **S61** every analysis verb takes a `System`;

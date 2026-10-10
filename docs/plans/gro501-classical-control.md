@@ -30,7 +30,7 @@ additive or replaces boilerplate with generated equivalents.
 | **P6** Discrete (z) tier | G4 | 3 | **held** |
 | **P7** `facades.py` boilerplate | C2 | 2 | **done** 2026-09-26 (explicit + pinned) |
 | **P8** Small teaching helpers (ζ/ω_n, `N`) | G6 | 2 | landed 2026-10-10 (`N` only) |
-| **P9** `TransferFunction` port construction | C3 | 3 | agent |
+| **P9** `TransferFunction` port construction | C3 | 3 | landed 2026-10-10 |
 | **P10** Document what `@` means | C1 | 3 | agent (docs only) |
 | **P11** Two GRO501 notebooks | gate 2 | 3 | maintainer reviews |
 

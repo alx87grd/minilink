@@ -39,6 +39,15 @@ class TestBlocks(unittest.TestCase):
             sine.h(x=None, u=None, t=jnp.asarray(0.3)), sine.h(x=[], u=[], t=0.3)
         )
 
+    def test_a_compensator_transfer_function_declares_only_its_own_ports(self):
+        from minilink.dynamics.abstraction.state_space import LTISystem
+
+        bare = LTISystem([[-1.0]], [[1.0]], declare_ports=False)
+        self.assertEqual((dict(bare.inputs), dict(bare.outputs)), ({}, {}))
+        lead = TransferFunction([5.0, 5.0], [1.0, 10.0], ports="error")
+        self.assertEqual((list(lead.inputs), list(lead.outputs)), (["e"], ["u"]))
+        self.assertEqual(lead.outputs["u"].dependencies, ("e",))
+
     def test_integrator_dynamics_and_output(self):
         plant = Integrator()
         plant.params["k"] = 2.0

@@ -24,18 +24,22 @@ class TransferFunction(ErrorDriven, LTISystem):
     """
 
     def __init__(self, numerator, denominator, *, ports=None, name="Transfer Function"):
+        if ports not in (None, "plant", "error", "reference"):
+            raise ValueError(
+                f"ports must be None, 'plant', 'error', or 'reference', got {ports!r}"
+            )
+        compensator = ports in ("error", "reference")
         self.numerator = np.asarray(numerator, dtype=float)
         self.denominator = np.asarray(denominator, dtype=float)
         A, B, C, D = signal.tf2ss(self.numerator, self.denominator)
-        super().__init__(A, B, C, D, name=name)
+        # a plant takes LTISystem's ports u -> y, x; a compensator declares its own below
+        super().__init__(A, B, C, D, name=name, declare_ports=not compensator)
         tf = signal.TransferFunction(self.numerator, self.denominator)
         self.poles = tf.poles
         self.zeros = tf.zeros
 
-        if ports in ("error", "reference"):
-            feedthrough = tuple(self.outputs["y"].dependencies)
-            self.inputs = {}
-            self.outputs = {}
+        if compensator:
+            feedthrough = bool(np.any(D))
             self.add_error_ports(ports, 1)
             self.add_output_port(
                 "u",
@@ -46,10 +50,6 @@ class TransferFunction(ErrorDriven, LTISystem):
             if ports == "reference":
                 self.measurement_port, self.ref_port, self.control_port = "y", "r", "u"
                 self.plot_space = "error"
-        elif ports not in (None, "plant"):
-            raise ValueError(
-                f"ports must be None, 'plant', 'error', or 'reference', got {ports!r}"
-            )
         else:
             # plant: ``error()`` is the identity so ``f`` / ``h`` stay ``u -> y``
             self.port_layout = "error"

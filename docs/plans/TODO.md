@@ -88,7 +88,7 @@ the band's calling pattern; `analysis/linearization.py` and `discretization.py` 
 `linearize` and `discretize` from the band-facade name collision.
 
 **Next, in order (decided 2026-09-26):** clean-up and solidification first — P5 and P8 (landed
-2026-10-10) on the cleaned toolbox, TB-b, S61, P9, P10 — then RN-1 of
+2026-10-10) on the cleaned toolbox, TB-b, S61, P9 (landed 2026-10-10), P10 — then RN-1 of
 [randomness.md](randomness.md) (the disturbance convention, decided 2026-09-26) and P4, then P11. The textbook pass comes before the new surface, so
 the new code copies clean patterns and no shortcut is added only to be dropped.
 
@@ -143,9 +143,6 @@ the new code copies clean patterns and no shortcut is added only to be dropped.
   `plot_diagram` shows the Figure 12 topology.
   Also: named input ports on the state-space base so observers and sensitivity blocks share
   one `f` (scan: analysis#13); the plan names the estimation API once (scan: docs-gov#9).
-- [ ] **P9 `TransferFunction` builds its ports once** (no clear-and-re-add); the four
-  `ports` values stay. Done when no `self.inputs = {}` remains in the constructor and the
-  `TransferFunction` / `Lead` / `Lag` tests pass untouched.
 - [ ] **P10 Document the three `@` dispatch paths** in DESIGN (operand shape → what `@`
   builds); pin the `e`-input autowire heuristic with a test; collapse the `PROFILE_PORTS`
   rows that differ only in `plot_space` if that reads better.
@@ -301,7 +298,7 @@ findings, file by file and line by line, are in
   `StepDiagramSystem.step` assigns in place on a JAX array.
 - [ ] **T2 blocks and control** (what T0 left): `control/mpc/utilities.py` order and names
   (`_shift_plan_trajectory` is imported by `test_mpc.py`), the MPC package docstring;
-  `blocks/transfer_function.py`'s `tf` on `np` without `params` (P9 rebuilds its ports);
+  `blocks/transfer_function.py`'s `tf` on `np` without `params`;
   `TrajectorySource.h` cannot trace (`interp1d`; `WhiteNoise.h` is rebuilt by randomness.md
   RN-1); `action_port_of` above
   the class; the joint-impedance law still in a helper.
