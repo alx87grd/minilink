@@ -94,19 +94,19 @@ def block_html(node):
     for j in range(n_rows):
         html += "<TR>\n"
         if j < len(node.inputs):
-            port_id = node.inputs[j].id
+            port = node.inputs[j]
             html += (
-                f'<TD PORT="{graphviz_port_id(port_id, "in")}" align="left" '
-                f'BORDER="1">{port_id}</TD>\n'
+                f'<TD PORT="{graphviz_port_id(port.id, "in")}" align="left" '
+                f'BORDER="1">{port.text}</TD>\n'
             )
         else:
             html += '<TD BORDER="1"> </TD>\n'
 
         if j < len(node.outputs):
-            port_id = node.outputs[j].id
+            port = node.outputs[j]
             html += (
-                f'<TD PORT="{graphviz_port_id(port_id, "out")}" '
-                f'BORDER="1">{port_id}</TD>\n'
+                f'<TD PORT="{graphviz_port_id(port.id, "out")}" '
+                f'BORDER="1">{port.text}</TD>\n'
             )
         else:
             html += '<TD BORDER="1"> </TD>\n'

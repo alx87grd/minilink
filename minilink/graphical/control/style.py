@@ -28,9 +28,9 @@ TIME_LABEL = "Time (seconds)"
 AMPLITUDE_LABEL = "Amplitude"
 
 
-def channel_subtitle(of_name: str, of_index: int, wrt_name: str, wrt_index: int) -> str:
-    """``"From: u[0]  To: y[1]"``."""
-    return f"From: {wrt_name}[{wrt_index}]  To: {of_name}[{of_index}]"
+def channel_subtitle(of_label: str, wrt_label: str) -> str:
+    """``"From: u[0]  To: y[1]"``, or the components' declared labels."""
+    return f"From: {wrt_label}  To: {of_label}"
 
 
 def phase_ticks(phase_deg) -> tuple[float, ...]:

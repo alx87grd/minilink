@@ -157,9 +157,30 @@ def channel_label(sys, of, wrt):
 
 
 def channel_subtitle(sys, of, wrt):
-    """``"From: u[0]  To: y[1]"`` for the selected channel."""
+    """``"From: u[0]  To: y[1]"`` for the selected channel, in declared labels where a port has them."""
     (of_name, i), (wrt_name, j) = siso_channel(sys, of, wrt)
-    return style.channel_subtitle("x" if of_name is None else of_name, i, wrt_name, j)
+    return style.channel_subtitle(
+        component_label(sys, of_name, i, sys.outputs),
+        component_label(sys, wrt_name, j, sys.inputs),
+    )
+
+
+def component_label(sys, name, index, ports):
+    """A port's declared label for one component, else ``name[index]`` (``x`` for the state)."""
+    signal = None
+    if name is None:
+        signal = sys.state
+    elif name in ports:
+        signal = ports[name]
+    elif isinstance(sys, DiagramSystem) and ":" in name:
+        block, port_id = name.split(":", 1)
+        if block in sys.subsystems:
+            signal = sys.subsystems[block].outputs.get(port_id)
+    default = f"{'x' if name is None else name}[{index}]"
+    if signal is None or not 0 <= index < len(signal.labels):
+        return default
+    declared = signal.labels[index] != f"{signal.id}[{index}]"
+    return signal.labels[index] if declared else default
 
 
 def siso_matrices(sys, x_bar, u_bar, t, params, *, of, wrt, method, eps):

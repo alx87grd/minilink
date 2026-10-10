@@ -10,10 +10,15 @@ from minilink.core.wiring import WiredDiagramMixin
 
 @dataclass(frozen=True)
 class TopologyPort:
-    """One input or output port on a topology node."""
+    """One input or output port on a topology node; ``label`` is the text drawn, the id by default."""
 
     id: str
     dim: int
+    label: str | None = None
+
+    @property
+    def text(self) -> str:
+        return self.id if self.label is None else self.label
 
 
 @dataclass(frozen=True)
@@ -353,7 +358,7 @@ def _find_node(topology: DiagramTopology, node_id: str, *, kind: str | None = No
 
 
 def _node_from_system(node_id: str, sys, *, display_id: str, kind: str):
-    return _node_from_ports(
+    node = _node_from_ports(
         node_id,
         name=sys.name,
         display_id=display_id,
@@ -361,6 +366,24 @@ def _node_from_system(node_id: str, sys, *, display_id: str, kind: str):
         inputs=sys.inputs,
         outputs=sys.outputs,
     )
+    labels = input_sign_labels(sys)
+    if not labels:
+        return node
+    inputs = tuple(replace(port, label=labels.get(port.id)) for port in node.inputs)
+    return replace(node, inputs=inputs)
+
+
+def input_sign_labels(sys) -> dict[str, str]:
+    """A summing junction draws each input's sign beside its id: ``+ in0``, ``- in1``."""
+    from minilink.blocks.routing import Sum
+
+    if not isinstance(sys, Sum):
+        return {}
+    signs = {1.0: "+", -1.0: "-"}
+    return {
+        f"in{i}": f"{signs.get(float(sign), f'{sign:+g}')} in{i}"
+        for i, sign in enumerate(sys.signs)
+    }
 
 
 def _node_from_ports(

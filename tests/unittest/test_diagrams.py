@@ -305,6 +305,33 @@ def _edge_tuples(topology):
     ]
 
 
+class TestSumSigns(unittest.TestCase):
+    """A summing junction draws its signs beside the port ids it is wired by."""
+
+    def test_the_topology_carries_the_signs(self):
+        from minilink.blocks.routing import Error, Sum
+
+        d = DiagramSystem()
+        d.add_subsystem(Sum(signs=(1.0, -1.0, 2.5)), "sum")
+        d.add_subsystem(Error(), "error")
+        nodes = {node.id: node for node in build_diagram_topology(d).nodes}
+        self.assertEqual(
+            [port.text for port in nodes["sum"].inputs], ["+ in0", "- in1", "+2.5 in2"]
+        )
+        self.assertEqual([port.text for port in nodes["error"].inputs], ["+", "-"])
+
+    def test_graphviz_draws_the_signs_and_keeps_the_port_ids(self):
+        from minilink.blocks.routing import Sum
+
+        d = DiagramSystem()
+        d.add_subsystem(Sum(signs=(1.0, 1.0)), "sum")
+        graph = get_diagram(d)
+        if graph is None:
+            self.skipTest("graphviz Python package not installed")
+        self.assertIn(">+ in0</TD>", graph.source)
+        self.assertIn('PORT="in_in0"', graph.source)
+
+
 class TestNestedDiagramPlot(unittest.TestCase):
     def test_expanded_topology_is_the_flat_diagram(self):
         topology = build_diagram_topology(_build_nested_speed_loop(), expand=True)

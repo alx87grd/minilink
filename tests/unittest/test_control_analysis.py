@@ -907,7 +907,7 @@ def test_plot_bode_facade_returns_plot_result():
     )
     assert isinstance(result, PlotResult)
     assert len(result.axes) == 2
-    assert "From: force[1]  To: y[1]" in result.axes[0].get_title()
+    assert "From: right_force  To: speed" in result.axes[0].get_title()
     plt.close(result.figure)
 
 
@@ -924,7 +924,7 @@ def test_plot_pzmap_facade_returns_plot_result():
     )
     assert isinstance(result, PlotResult)
     assert result.axes is not None
-    assert "From: force[1]  To: y[1]" in result.axes.get_title()
+    assert "From: right_force  To: speed" in result.axes.get_title()
     plt.close(result.figure)
 
 
@@ -1821,6 +1821,29 @@ class TestSensitivity(unittest.TestCase):
             with self.subTest(G=G.name):
                 w, _, _ = bode(G)
                 self.assertLessEqual(w.max(), 1e4)
+
+    def test_each_function_names_its_channel(self):
+        from minilink.analysis import (
+            complementary_sensitivity,
+            load_sensitivity,
+            noise_sensitivity,
+            plot_bode,
+            sensitivity,
+        )
+        from minilink.blocks.transfer_function import TransferFunction
+
+        H = TransferFunction([1.0], [1.0, 3.0, 2.0])
+        C = PID(4.0, 2.0, 0.5)
+        for function, subtitle in (
+            (sensitivity, "From: r  To: e"),
+            (complementary_sensitivity, "From: r  To: y"),
+            (load_sensitivity, "From: w  To: y"),
+            (noise_sensitivity, "From: v  To: u"),
+        ):
+            with self.subTest(function=function.__name__):
+                result = plot_bode(function(plant=H, controller=C), show=False)
+                self.assertEqual(result.axes[0].get_title(), subtitle)
+                result.figure.clf()
 
     def test_the_operating_point_reaches_the_plant(self):
         from minilink.analysis import sensitivity, transfer_function

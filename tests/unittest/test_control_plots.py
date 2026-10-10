@@ -235,12 +235,22 @@ class TestPlots(unittest.TestCase):
 
         plt.close("all")
 
+    def test_the_subtitle_reads_declared_labels_else_the_port_id(self):
+        from minilink.analysis.linearization import channel_subtitle
+
+        self.assertEqual(
+            channel_subtitle(self.loop, None, None), "From: u[0]  To: y[0]"
+        )
+        self.assertEqual(
+            channel_subtitle(self.plant, ("y", 1), None), "From: tau  To: dtheta"
+        )
+
     def test_matplotlib_titles_labels_and_axes(self):
         r = plot_bode(self.plant, self.x_bar, of=("y", 1), show=False)
         self.assertIsInstance(r, PlotResult)
         self.assertEqual(len(r.axes), 2)
         self.assertEqual(r.figure._suptitle.get_text(), "Bode Diagram")
-        self.assertEqual(r.axes[0].get_title(), "From: u[0]  To: y[1]")
+        self.assertEqual(r.axes[0].get_title(), "From: tau  To: dtheta")
         self.assertEqual(r.axes[0].get_ylabel(), "Magnitude (dB)")
         self.assertEqual(r.axes[1].get_xlabel(), "Frequency (rad/s)")
         self.assertEqual(r.axes[0].get_xscale(), "log")
@@ -304,7 +314,7 @@ class TestPlots(unittest.TestCase):
         r = plot_bode(self.plant, backend="plotly", show=False)
         self.assertEqual(r.figure.layout.xaxis.type, "log")
         self.assertIn("Bode Diagram", r.figure.layout.title.text)
-        self.assertIn("From: u[0]", r.figure.layout.title.text)
+        self.assertIn("From: tau", r.figure.layout.title.text)
         self.assertTrue(r.figure.data[0].hovertext[0].startswith("ω ="))
         r = plot_root_locus(self.plant, backend="plotly", show=False)
         self.assertIn("K =", r.figure.data[0].hovertext[1])

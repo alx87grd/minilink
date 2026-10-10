@@ -48,7 +48,8 @@ def sensitivity(
     -------
     TransferFunction
         ``S(s)``, ready for :func:`~minilink.analysis.frequency.bode`,
-        ``plot_bode`` or a simulation.
+        ``plot_bode`` or a simulation; its ports are labelled ``r`` and ``e``
+        (``T``: ``r`` to ``y``, ``PS``: ``w`` to ``y``, ``CS``: ``v`` to ``u``).
     """
     H, C, F = loop_pieces(
         plant, controller, filter, x_bar, u_bar, t, params, method, eps
@@ -62,7 +63,7 @@ def sensitivity(
     S_num = L_den
     S_den = np.polyadd(L_den, L_num)
 
-    return loop_function(S_num, S_den, "Sensitivity S")
+    return loop_function(S_num, S_den, "Sensitivity S", "r", "e")
 
 
 def complementary_sensitivity(
@@ -93,7 +94,7 @@ def complementary_sensitivity(
     T_num = np.polymul(np.polymul(C.numerator, H.numerator), F.denominator)
     T_den = np.polyadd(L_den, L_num)
 
-    return loop_function(T_num, T_den, "Complementary sensitivity T")
+    return loop_function(T_num, T_den, "Complementary sensitivity T", "r", "y")
 
 
 def load_sensitivity(
@@ -124,7 +125,7 @@ def load_sensitivity(
     PS_num = np.polymul(np.polymul(H.numerator, C.denominator), F.denominator)
     PS_den = np.polyadd(L_den, L_num)
 
-    return loop_function(PS_num, PS_den, "Load sensitivity PS")
+    return loop_function(PS_num, PS_den, "Load sensitivity PS", "w", "y")
 
 
 def noise_sensitivity(
@@ -156,7 +157,7 @@ def noise_sensitivity(
     CS_num = np.polymul(np.polymul(C.numerator, F.numerator), H.denominator)
     CS_den = np.polyadd(L_den, L_num)
 
-    return loop_function(CS_num, CS_den, "Noise sensitivity CS")
+    return loop_function(CS_num, CS_den, "Noise sensitivity CS", "v", "u")
 
 
 # =============================================================================
@@ -193,10 +194,13 @@ def siso_piece(sys, role, x_bar, u_bar, t, params, method, eps):
     )
 
 
-def loop_function(numerator, denominator, name):
-    """The closed-loop function as a ``TransferFunction`` block."""
+def loop_function(numerator, denominator, name, wrt, of):
+    """The closed-loop function as a ``TransferFunction`` block, its ports labelled by the loop signals."""
     from minilink.blocks.transfer_function import TransferFunction
 
-    return TransferFunction(
+    G = TransferFunction(
         np.atleast_1d(numerator), np.atleast_1d(denominator), name=name
     )
+    G.inputs["u"].labels = [wrt]
+    G.outputs["y"].labels = [of]
+    return G
