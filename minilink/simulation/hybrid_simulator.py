@@ -244,7 +244,7 @@ class HybridSimulator:
         )
         plant_signals = {}
         for name, parts in plant_signal_parts.items():
-            if not parts:
+            if not parts or name in {"x", "u"}:
                 continue
             plant_signals[name] = np.column_stack(parts)
 

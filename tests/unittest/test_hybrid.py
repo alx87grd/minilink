@@ -83,6 +83,24 @@ from minilink.core.hybrid_diagram import HybridDiagram
 
 
 class TestHybridClosedLoop(unittest.TestCase):
+    def test_sampled_state_feedback_runs_close_to_the_continuous_loop(self):
+        from minilink.control.state import StateFeedbackController
+        from minilink.dynamics.catalog.pendulum.pendulum import Pendulum
+
+        K = np.array([[10.0, 2.0]])
+        plant = Pendulum()
+        plant.x0 = np.array([0.3, 0.0])
+        loop = StateFeedbackController(K) % 0.01 @ plant
+        self.assertIn("x", loop.plant.outputs)
+        sampled = loop.compute_trajectory(tf=2.0, verbose=False)
+        continuous = (StateFeedbackController(K) @ plant).compute_trajectory(
+            tf=2.0, verbose=False
+        )
+        np.testing.assert_allclose(sampled.plant.x[:, 0], [0.3, 0.0])
+        np.testing.assert_allclose(
+            sampled.plant.x[:, -1], continuous.x[:, -1], atol=0.01
+        )
+
     def test_shortcut_matches_manual_wiring(self):
         schedule = StepSchedule(dt_base=0.01)
         shortcut = hybrid_closed_loop(

@@ -343,8 +343,13 @@ def _ensure_plant_boundary_ports(
         return diagram
     subsystem = diagram.subsystems[sys_id]
     add_input = plant_in in subsystem.inputs and plant_in not in diagram.inputs
-    add_output = plant_out in subsystem.outputs and output_port not in diagram.outputs
-    if not in_place and (add_input or add_output):
+    # The loop reads `plant_out`; `output_port` is also exposed for logging.
+    add_outputs = [
+        port
+        for port in dict.fromkeys((plant_out, output_port))
+        if port in subsystem.outputs and port not in diagram.outputs
+    ]
+    if not in_place and (add_input or add_outputs):
         x0 = np.copy(diagram.x0)
         diagram = _new_diagram_like(diagram)
         diagram.x0 = x0
@@ -356,6 +361,6 @@ def _ensure_plant_boundary_ports(
             nominal_value=port.nominal_value,
         )
         diagram.connect("input", plant_in, sys_id, plant_in)
-    if add_output:
-        diagram.connect_new_output_port(sys_id, plant_out, output_port)
+    for port in add_outputs:
+        diagram.connect_new_output_port(sys_id, port, port)
     return diagram
