@@ -86,6 +86,8 @@ class StaticSimulator:
             u_i = u_traj[:, i] if m > 0 else np.array([])
             out = self.evaluator.outputs(empty_x, u_i, float(ti))
             for key, value in out.items():
+                if key in {"x", "u"}:
+                    continue  # the trajectory's own channels, as in the hybrid simulator
                 arr = np.asarray(value, dtype=float).reshape(-1)
                 if key not in signals:
                     signals[key] = np.zeros((arr.size, n_pts))

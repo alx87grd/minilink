@@ -418,6 +418,14 @@ class TestStaticSimulator(unittest.TestCase):
         self.assertIn("y", traj.signals)
         np.testing.assert_allclose(traj.signals["y"], np.zeros((1, 5)))
 
+    def test_a_block_whose_output_is_named_u_simulates(self):
+        from minilink import ProportionalController
+
+        ctl = ProportionalController(2.0)
+        traj = ctl.compute_trajectory(t0=0, tf=1, n_steps=5, verbose=False)
+        self.assertEqual(traj.u.shape, (2, 5))  # the stacked inputs r, y
+        self.assertNotIn("u", traj.signals)
+
     def test_step_source_signals_on_grid(self):
         step = Step(
             initial_value=np.array([0.0]), final_value=np.array([1.0]), step_time=0.5
