@@ -141,7 +141,10 @@ v0.3, adopted 2026-09-26). A course is
    `environment.yml` both run every GRO860 notebook top to bottom.
 6. `ruff` + `pytest` + notebook smoke green; nightly full demo sweep green.
 7. No name a GRO860 notebook imports today changes before v1.0 (extended
-   from the term on 2026-09-26).
+   from the term on 2026-09-26). **Paused 2026-10-10** (maintainer): between
+   terms the teaching design is unfrozen; a rename migrates every course
+   notebook that uses the name in the same commit, with no alias. The freeze
+   resumes when the next term's notebooks are pinned.
 8. `minilink 0.1.1` is on PyPI (2026-09-26, after `0.1.0` on 2026-09-16); a tag
    publishes from GitHub (Trusted Publishing in `.github/workflows/publish.yml`, the
    version read from the tag). `pip install minilink` installs the
@@ -178,7 +181,7 @@ contract. Step-level work:
 | State-space MIMO — bicycle model, controllability at every nominal speed | `KinematicBicycle`, `controllability`, `observability` | green | — |
 | Optimal control — LQR on the guide's cost, closed-loop poles, nonlinear check | `lqr_at_operating_point`, `StateFeedbackController` | green | — |
 | Pole placement — `K_sta` for a prescribed pole set | `place`, `place_at_operating_point` | green (2026-09-26) | — |
-| Nested loops — inner speed loop, outer position loop | `@` composition | green for error-driven compensators (`PID @ (PID @ G)`); an outer `r, y` or state controller is refused today (2026-10-10 review, D5) | AC-3 of [automation-by-convention.md](docs/plans/automation-by-convention.md) inlines plant-side diagrams; stays green with the observer in the loop |
+| Nested loops — inner speed loop, outer position loop | `@` composition | green for error-driven compensators (`PID @ (PID @ G)`); an outer `r, y` or state controller is refused today (2026-10-10 review, D5) | AC-3 of [automation-by-convention.md](docs/plans/automation-by-convention.md) nests the inner loop as the outer loop's `plant`; stays green with the observer in the loop |
 | State estimation — Luenberger observer and Kalman filter | `estimation` (v0.2) | scheduled v0.2 | `LuenbergerObserver` and steady-state `KalmanFilter` closing the loop as standard diagram blocks |
 | Reference scaling — the `N` matrix giving `y = r` at steady state | `StateFeedbackController(K, N=N)` | green (2026-10-10) | the student writes `N = -(C (A - B K)⁻¹ B)⁻¹`; the block takes the output reference |
 
@@ -247,7 +250,8 @@ term's hygiene:
 - **S54** The colour scale tops at the price of leaving; the DP
   `out_of_bound_cost` default stays `1e6` (landed and decided 2026-09-26).
 - Name freeze: no name a GRO860 notebook imports changes before v1.0
-  (§4.1 gate 7).
+  (§4.1 gate 7); paused between terms on 2026-10-10, renames migrating the
+  course notebooks in the same commit.
 
 ### 5.2 v0.2 — GRO501 (October 2026)
 
@@ -306,10 +310,16 @@ wave B. A4 and A5 stay here.
 - **B4** Polish: **P9** `TransferFunction` ports built once (landed 2026-10-10:
   `LTISystem(..., declare_ports=False)` for a subclass's own layout), **P10**
   automation by convention ([automation-by-convention.md](docs/plans/automation-by-convention.md),
-  analysis 2026-10-10): ports are the declaration and one role resolver serves composition,
-  plot signals, the camera and every plant-and-controller tool — AC-1 to AC-3 in this wave
-  (AC-1 bug fixes now; AC-2, AC-3 after the §6 decisions), AC-4 beside P4 and before P11,
-  AC-5 / AC-6 in the plotting lane, AC-7 in v0.3 with RN-4 / RN-5, AC-8 in v0.9 with S31;
+  v2 2026-10-10): standard port names drive the wiring, three reserved subsystem ids
+  (`plant`, `controller`, `estimator`) are the roles every other tool reads, and the cost is
+  scored on the plant. AC-0 to AC-3 land in this wave:
+  - AC-0, no controller classes;
+  - AC-1, bug fixes, now;
+  - AC-2, the resolver and the id rename, before RN-4;
+  - AC-3, composition on standard names, after the §6 decisions.
+
+  The later steps: AC-4 beside P4 and before P11; AC-5 / AC-6 in the plotting lane; AC-7
+  (cost relative to the plant) in v0.3 with RN-4 / RN-5; AC-8 in v0.9 with S31;
   **P6** the z tier
   stays held (teach with `discretize` + simulation) unless the sommatif
   examines z-plane analysis; **S61** every analysis verb takes a `System`;
@@ -603,30 +613,52 @@ here. Each open item needs the maintainer.
   planning-solution work, 2026-09-17).
 - **Naming, the larger alignments** ([naming.md](docs/plans/naming.md)): one
   separator rule for wires, params paths, block labels and duplicate state
-  labels; `sys` versus `plant` across loop kinds (changes a tested key);
+  labels; `sys` versus `plant` across loop kinds (changes a tested key; settled
+  by decision 5 of automation by convention below, if taken);
   plot labels for internal signals; a style sweep of display names.
 - **CBF safety filter** ([cbf-safety-filter.md](docs/plans/cbf-safety-filter.md)):
   research lane until a course asks; the barrier is a `Field` once A1 lands.
 
-**Automation by convention** ([automation-by-convention.md](docs/plans/automation-by-convention.md) §5, P10; analysis 2026-10-10)
+**Automation by convention** ([automation-by-convention.md](docs/plans/automation-by-convention.md) §5, P10; v2 2026-10-10)
 
-- **Principles and conventions:** manual first (a loop is `add_subsystem` + `connect` of
-  plain Systems; shortcuts build that diagram and store nothing), port names are the
-  declaration (RULES 4.9 extended with `e`, `x`, `q`, `dq`; a DESIGN §4 "Conventions"
-  section), roles resolved at use time by one resolver, state is `n`, a few explicit hints
-  (`plot_space`, `solver_info`, seeds, camera, one override per role). Recommended: yes.
-- **`feedback_profile` leaves wiring** and becomes a plot hint; the course strings `state`
-  and `output` stay accepted, an unknown string raises. Recommended: yes.
-- **Loop inputs:** a plant's own `w` / `v` port wins over a loop Sum (`v` only when the
-  measured output depends on it); `r=`, `w=`, `v=` accept a source block with a fixed id.
-  Reconciles randomness.md A9 / D24. Recommended: yes.
-- **The command is the port `u` for every tool** (planners, LQR, place, value iteration,
-  Gym, `discretize`, the cost's `u`): `w` / `v` stop being actuators on multi-input plants.
+- **Principles and the two convention tables.**
+  - Manual first: a loop is `add_subsystem` + `connect` of plain Systems; shortcuts build
+    that diagram and store nothing else.
+  - Port names drive the wiring.
+  - Three reserved subsystem ids (`plant`, `controller`, `estimator`) are the roles every
+    tool reads, at use time, never inferred from the graph.
+  - State is `n`, and every leaf exposes `x`.
+  - RULES 4.9 is extended with `e`, `x`, `q`, `dq` and the ids, and DESIGN gets a §4
+    "Conventions" section.
+
+  Recommended: yes.
+- **Standard names only.** `feedback_profile`, `PROFILE_PORTS`, the override attributes,
+  `closed_loop`'s port keywords and the shape-based ids go. MPC becomes `x` → `u`. Custom
+  names are wired by hand. Recommended: yes.
+- **Loop inputs.** The plant, or the wrapper the loop builds around it, owns `w` / `v`;
+  `r=`, `w=`, `v=` accept a source block; `estimator=` comes with P4. This reconciles
+  randomness.md A9 / D24. Recommended: yes.
+- **Cost relative to the plant.**
+  - The evaluators build the loop themselves and score `trajectory_of(problem.sys)` by
+    identity.
+  - Controller and estimator states are never scored.
+  - `command_port` (`u`, else the single non-`w`/`v` input) is the only input that
+    planners, LQR, `place`, value iteration, Gym and the cost decide.
+
   Recommended: yes, in v0.3 with RN-4 / RN-5.
-- **One id scheme across flow and hybrid** (params keys and random-stream names change
-  once). Recommended: yes, in v0.9 with S31.
+- **Role ids.** `ctl` → `controller` and `sys` → `plant`, in flow and hybrid, renamed once
+  before RN-4 names the random streams by id path; a role id wins over `System.id`.
+  Recommended: yes, in v0.2.
 - **P11's `Controller(feedback=…)`**: unnecessary once ports are the declaration.
-  Recommended: drop the ask unless the P11 notebooks show a gap.
+  Recommended: drop the ask.
+- **No controller classes.**
+  - `Controller` and `DynamicController` are deleted, with no aliases, and the four
+    course notebooks are migrated.
+  - `plot_control_law()` moves onto `System`, beside `plot_input_output_map()`.
+
+  Agreed in principle on 2026-10-10.
+- **Ruling:** the GRO860 name freeze (§4.1 gate 7) is paused between terms (maintainer,
+  2026-10-10).
 
 **Before v0.3 wave C (S72, the path-integral planner)**
 

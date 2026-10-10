@@ -1,21 +1,39 @@
 # Automation by convention: plants, controllers, loops, plots and tools
 
-**Status:** analysis and recommendation (2026-10-10), for the maintainer's ruling on §5.
-**Rung:** v0.2 wave B4 (P10, widened) for AC-1 to AC-3; AC-4 to AC-8 placed in §4.
-**Evidence:** seven read-only surveys on `dev` at `d1b4bae`:
-- loop dispatch internals;
-- a census of every shortcut and hand-wired loop;
-- controller declarations;
-- plant disturbance and noise ports;
-- plotting and animation automation;
-- tools that take or return a plant and a controller;
-- every other core heuristic.
+**Status:** v2, analysis and recommendation (2026-10-10), for the maintainer's ruling on §5.
+- v1 (commit 4b654d8) read the roles from the wiring.
+- v2 reads them from three reserved subsystem ids. It follows the maintainer's direction
+  of the same day (§1, requirements 5–8), an adversarial review, and a check against every
+  planned feature (§3.7).
+
+**Rung:** v0.2 wave B4 (P10, widened) for AC-0 to AC-3; AC-4 to AC-8 placed in §4.
+
+**Evidence:** eleven read-only surveys.
+- Seven on `dev` at `d1b4bae`:
+  - loop dispatch internals;
+  - a census of every shortcut and hand-wired loop;
+  - controller declarations;
+  - plant disturbance and noise ports;
+  - plotting and animation automation;
+  - tools that take or return a plant and a controller;
+  - every other core heuristic.
+- Four at `4b654d8`:
+  - what the cost sees on a closed loop;
+  - the planned features that put more than a plant and a controller in a loop;
+  - a census of port names and override attributes;
+  - an adversarial review of the v2 design.
 
 The defects marked *reproduced* were re-run by hand. The loop-building defects D1–D8 come from [2026-10-10-feedback-loop-review.md](../reviews/2026-10-10-feedback-loop-review.md).
 
 The question this plan answers is: *what is the minimum the library must know about a plant
 and a controller to build a loop in one line, pick the signals worth plotting, frame the
-animation, and score a policy?* The answer it argues for is: **the port names, read at the moment of use, and nothing else.** A handful of explicit hints remain for the things port names cannot say.
+animation, and score a policy?*
+
+The answer it argues for: **standard names, read at the moment of use, and nothing else.**
+- Port names say what a block reads and commands, and drive the automatic wiring.
+- Three reserved subsystem ids (`plant`, `controller`, `estimator`) say what role a block
+  plays, and every other tool reads them.
+- A handful of explicit hints remain for the things names cannot say.
 
 ## 1. Requirements (maintainer, 2026-10-10)
 
@@ -30,6 +48,19 @@ animation, and score a policy?* The answer it argues for is: **the port names, r
 4. **Every automatic use case.** Cover all of them, not only composition: plot signal
    selection, the animation camera, Monte Carlo evaluation and every tool that takes or
    returns a plant with a controller, plus any other place that guesses.
+5. **Roles.** A diagram assigns roles automatically: `plant` and `controller`, later
+   `estimator`. The tools use them:
+   - plots get an auto mode, the signals of the plant and/or the controller;
+   - the animation camera comes from the plant;
+   - evaluation scores the cost on the plant, never on a controller's internal states.
+6. **Standard names only.** Port names are standardized. The automatic mode works only with
+   standard names; a block with custom names is wired by hand. There are no override
+   attributes.
+7. **Future-proof.** Project every coming feature onto the proposal and check that it holds:
+   randomness, RL, MPC, estimation and the rest (§3.7).
+8. **No freeze.** We are between terms, so the teaching design is unfrozen: no decision
+   rests on the name freeze (ROADMAP §4.1 gate 7, paused on 2026-10-10). A rename migrates
+   every course notebook in the same commit, with no alias.
 
 ## 2. Analysis: what the library automates today
 
@@ -160,6 +191,40 @@ They all agree only on a single-input plant whose input is named `u` and whose `
 - **`wrt="u"` means every input stacked**, even when a port is named `u`. `wrt="x"`
   raises on the same ambiguity.
 
+**What the cost sees.**
+- The evaluators already score `problem.sys` in its own coordinates; only the simulator
+  backend builds a diagram.
+- The primitive for scoring a block inside a loop exists:
+  - `DiagramSystem.trajectory_of(block)` (`core/diagram.py:150`) returns the block's own
+    `x` and the `u` it received;
+  - its docstring shows `cost.total_cost(loop.trajectory_of(plant))`.
+- Six disagreements remain:
+  1. **Which `u`.**
+     - The action port: Monte Carlo, the rollout environment, RL.
+     - Every input stacked: DP, LQR, tabular, Gym, trajopt and MPC, `compute_cost`.
+
+     A loop built with `w=True` therefore charges the disturbance as control effort in
+     `compute_cost(of=plant)`.
+  2. **What the controller measures.** The plant state `x` on the numpy and jax backends
+     (`planning/evaluation.py:466, 475`); the plant `y` on the simulator backend.
+  3. **Controller state.**
+     - Refused by numpy and jax (`evaluation.py:439-443`).
+     - Integrated from `controller.x0` by the simulator backend.
+     - Pinned at `x0` by `PolicyEvaluator` (`policy_eval.py:165`).
+  4. **Time.** Laws run at `t = 0` everywhere except on the simulator backend.
+  5. **Cost params.** Honoured by DP and `PolicyEvaluator`; ignored by Monte Carlo and the
+     rollout environment.
+  6. **The price of leaving `X`.** `+inf` on the simulator backend, a derived bound on
+     numpy and jax.
+- Also broken:
+  - The simulator backend fails on MPC: `Computer @ plant` is a `HybridDiagram`, which has
+    no `trajectory_of`.
+  - Gym's observation is `sys.h`, but its observation space is the state box
+    (`interfaces/gymnasium.py:124, 205, 245`).
+  - The rollout environment's step reward and its price bound call `g` with different
+    `u` (`environment.py:132` against `:303-309`).
+  - MPC's internal cost is undiscounted.
+
 ### 2.5 Other places that guess
 
 - **Analysis channel defaults** (`analysis/linearization.py`). The output is `y`, then `u`,
@@ -192,125 +257,313 @@ They all agree only on a single-input plant whose input is named `u` and whose `
 | `n` (static vs stateful) | `%`, `static_law`, plot pinning, source detection | yes, and already the only test |
 | Port `dependencies` | algebraic loops, feedthrough | yes |
 | Nominal values and labels | defaults, unconnected inputs, plot labels | yes |
-| `feedback_profile`, `PROFILE_PORTS`, role overrides | wiring, plot sweep, naming | wiring: **no** (ports suffice); plot sweep: yes, as `plot_space` |
-| `Controller` / `DynamicController` | `.plot_control_law()` only; never `isinstance`-checked | authoring convenience only |
+| `feedback_profile`, `PROFILE_PORTS` | wiring, plot sweep, naming | **no**: the ports decide the wiring; the sweep reads the ports, plus `plot_space` where it differs |
+| Role overrides (`measurement_port`, `control_port`, `ref_port`) | nonstandard names (only MPC's `u_ff` needs one) | **no**: standard names, or wire by hand |
+| `Controller` / `DynamicController` | `.plot_control_law()` only; never `isinstance`-checked | **no**: deleted (§3.6) |
+| Subsystem ids (`ctl`, `sys`, `plant`, `ref`, minted from shape) | params keys, random streams, plot names, the hybrid plant | **yes: the roles**, as three reserved ids written by the shortcuts (§3.2) |
 | `ErrorDriven` layouts | which ports a classical law exposes | yes, as a port-layout choice; not as a tool hint |
 | `_composition_entry` / `_composition_output` | where the next `>>` attaches | **no**: shortcut state on every diagram |
-| `camera_*`, `skin`, `scene_grid`, `camera_priority` | animation | yes, but read at animate time; `camera_priority` is unused |
+| `camera_*`, `skin`, `scene_grid`, `camera_priority` | animation | yes, read at animate time; `camera_priority` is unused and goes |
 | `solver_info` (time constant, discontinuity, sample period) | solver and `dt` | yes: physical, not structural |
 | `is_random`, `params["seed"]`, ids | realizations | yes, and ids must be stable |
 | Insertion order | tie-breaks (`>>` fallback, analysis `wrt`, hybrid ports) | **no**: the weakest hint and the cause of defect A |
 
+### 2.7 Port names in use
+
+- **Plants.** Almost every plant follows the convention through its base class:
+  - `DynamicSystem`, `StateSpaceSystem`, `LTISystem`: `u` → `y`, with `x` when
+    `expose_state=True` (`core/system.py:467`);
+  - `MechanicalSystem` adds `q` and `dq`.
+- **The exceptions among plants:**
+  - `PendulumWithNoisePort` and `CartPoleWithNoisePort` add `w` and `v`.
+  - `DynamicBicycle` (`w_rear`, `delta`) and `UdeSRacecarDyn` (`P_cmd`, `delta_cmd`) have
+    no `u` unless built with `named_ports=False`.
+  - Manipulators add the outputs `p` and `pdot`; the racecar adds `speed`, `slip`,
+    `grip`, `imu` and `power`.
+  - Only about 16 of 50 catalog constructors expose `x`; the racecar does not.
+- **Controllers.** Every library controller reads `e`, `y` or `x` (plus `r`) and commands
+  `u`, except two:
+  - MPC reads the full state on a port named `y` and commands `u_ff`, with `x_ff` and
+    `z` beside it (`control/mpc/controller.py:426-444`); its dual-rate broadcast block
+    outputs `u_nom` and `x_nom`.
+  - `TaskKinematicNullspace` adds `r_null`.
+- **Blocks.**
+  - Generic blocks use `u` → `y`: `Gain`, `Saturation`, `Integrator`, `ZOHHold`,
+    `TransferFunction` and the filters.
+  - Error uses `+`, `-` → `e`; Sum and Mux use `in0..`; sources output `y`.
+- **Override attributes.**
+  - MPC (`control_port="u_ff"`) and `TransferFunction(ports="reference")` set them.
+  - So do four controllers whose ports are already standard, for nothing:
+    `NeuralPolicyController`, `SB3Controller`, `LookupTableController` and `PurePursuit`.
+- **Port keywords.**
+  - `closed_loop`'s five port keywords have no caller outside the tests.
+  - `hybrid_closed_loop`'s four have 22 uses in 6 files, including the course notebook
+    `racecar_toward_mpc`.
+- **Estimators.** None exists yet; P4 plans `x_hat`.
+
+### 2.8 Why roles cannot be read from the wiring
+
+v1 found the plant from the graph: "the block whose `u` is driven by another block's
+command". The planned features break that rule:
+
+| Case | What the graph shows | Where |
+|---|---|---|
+| An observer | inputs `u` and `y`, driven by the controller: a second plant | P4 |
+| An actuator | `Saturation` or `ZOHHold`, `u` → `y`, between the controller and the plant: the actuator looks like the plant | AC-3 |
+| `closed_loop(w=True)` | a Sum between the command and the plant: no plant is driven by a command | today |
+| An open-loop policy | a source drives the plant's `u`: no controller | MPPI, S72 |
+| A cascade | the outer controller's `u` drives the inner loop's `r` | nested loops |
+| A cost block or a CBF filter | reads `x` and `u`: a plant candidate | V1, research |
+
+Shape-based naming already fails silently:
+- `_default_subsystem_id` (`core/composition.py:1374`) mints `ref`, `ctl` and `sys` from a
+  block's ports, after `System.id`;
+- `_unique_id` (`:1417`) turns a clash into `plant2` without a word.
+
+The ids, by contrast, are already half a role system:
+- hybrid loops use `ctl` / `plant`;
+- `HybridDiagram.plant` and `.computer` are explicit fields;
+- `closed_loop` knows the plant at build time, then drops it.
+
 ## 3. Main recommendation: the minimal system
 
-### 3.1 Five principles
+### 3.1 Six principles
 
-1. **Manual first.** A controller is a `System`, a plant is a `System`, a loop is
-   `add_subsystem` plus `connect`. This needs no base class, no declaration and no hint.
-   Every shortcut builds exactly the diagram a student could write by hand (the same
-   visible blocks), and stores nothing on `System` or `DiagramSystem`.
-2. **Port names are the declaration.** Wiring, plot defaults, the camera owner, the
-   evaluators and the design tools read one convention table (§3.2), which extends
-   RULES 4.9. Dimensions decide the Mux (`[q; dq]`) and the Demux (component 0).
-3. **Roles are resolved at use time, from ports and wiring, by one resolver** (§3.3). Every
-   tool calls it, so a hand-wired diagram and a shortcut-built one behave the same by
-   construction.
-4. **State is `n`.** No class carries it. `Controller` and `DynamicController` stay as
-   optional conveniences for authoring and for `.plot_control_law()`. Their names are frozen
-   by the course notebooks, and no tool checks them. A plain `System` / `DynamicSystem`
-   with the right ports is wired, scored and plotted identically.
-5. **The few true exceptions stay explicit hints.**
-   - `plot_space` (the control-law sweep);
-   - `solver_info` (physical);
-   - `is_random` and seeds;
-   - camera, skin and `scene_grid` (visual);
-   - one override attribute per role for nonstandard port names (`measurement_port`,
-     `control_port`, `ref_port`; today only MPC's `u_ff` needs one).
+1. **Manual first.** A controller is a `System`, a plant is a `System`, and a loop is
+   `add_subsystem` plus `connect`.
+   - This needs no base class, no declaration and no hint.
+   - Every shortcut builds exactly the diagram a student could write by hand (the same
+     blocks, the same ids), and stores nothing else on `System` or `DiagramSystem`.
+2. **Two kinds of standard names are the declaration.**
+   - Port names say what a block reads and commands; they drive the automatic wiring.
+   - Three subsystem ids say what role a block plays in a diagram; every other tool reads
+     them.
+   - The two tables of §3.2 extend RULES 4.9.
+3. **Roles are read at use time, by one resolver, from the ids.**
+   - They are never inferred from the graph, and never stored beyond the ids.
+   - They are never guessed: a diagram with no `plant` id has no plant.
+4. **State is `n`.** No class carries it, and there are no controller classes (§3.6).
+5. **Standard names only.**
+   - A block with custom names is wired by hand. It can still use the role ids, which give
+     it the camera, the plot defaults and the cost.
+   - There are no override attributes.
+   - The few hints that remain explicit say what names cannot:
+     - `plot_space`, the control-law sweep;
+     - `solver_info`, which is physical;
+     - `is_random` and seeds;
+     - camera, skin and `scene_grid`, which are visual.
+6. **Evaluation by identity.** A tool that receives a plant and a policy builds the loop
+   itself and scores the plant it was given.
 
-### 3.2 The convention table
+### 3.2 The two convention tables
 
-| Side | Port | Meaning |
+**Ports: what a block reads and commands.**
+
+| Block | Reads | Gives |
 |---|---|---|
-| Plant input | `u` | the command: the one port a controller drives and a planner decides |
-| Plant input | `w` | disturbance (exogenous, drawn or held at nominal; never decided) |
-| Plant input | `v` | measurement noise (enters the measured output) |
-| Plant input | other names | exogenous inputs, held at nominal unless wired or drawn |
-| Plant output | `y` | measured output |
-| Plant output | `x` | state |
-| Plant output | `q`, `dq` | positions and velocities (the `[q; dq]` Mux) |
-| Controller input | `e` | error: the loop inserts `Error`, `e = r − y` |
-| Controller input | `y` | reads the plant's measured output |
-| Controller input | `x` | reads the plant's state |
-| Controller input | `r` | reference |
-| Controller output | `u` | command |
+| Plant | `u` (the command), `w` (disturbance), `v` (measurement noise), other names held at nominal | `y` (measured output), `x` (state), `q` / `dq` (positions and velocities) |
+| Controller | `e` (the loop inserts `Error`, `e = r − y`), or `y`, or `x`; plus `r` | `u` |
+| Estimator | `u` and `y` | `x`, the estimate (labelled x̂) |
 
-A block whose ports do not follow the table either sets the one override attribute for the
-role it renames, or is wired by hand.
+- Every leaf plant exposes `x`: `expose_state` becomes the default.
+- Dimensions decide the Mux (`[q; dq]`) and the Demux (component 0).
+- Other names are allowed on any block, and the automation leaves them alone:
+  - the controller extras `x_ff` and `z`;
+  - the manipulator outputs `p` and `pdot`;
+  - the input `r_null`.
 
-### 3.3 One resolver, two questions
+**Ids: what role a block plays.**
 
-- **`block_roles(block)`: what a block reads and commands.** It answers from the port
-  names and the three overrides:
+| Id | Role | Written by |
+|---|---|---|
+| `plant` | the system under control | `@`, `closed_loop`, `% dt @` (as `HybridDiagram.plant`), the evaluators, a hand-wired diagram |
+| `controller` | the law that commands the plant | the same |
+| `estimator` | the state estimate the controller reads | `closed_loop(estimator=)`, or inside a `controller` composite |
+
+- The three role ids are reserved: a clash raises and is never suffixed.
+- Every other id is a name, not a role, but it still matters, because ids are the params
+  keys and the random-stream names:
+  - sources take the name of the plant port they drive (`r`, `w`, `v`, or `wind` for a
+    port of that name);
+  - helpers are `error` and `filter`.
+
+### 3.3 One resolver, three questions
+
+- **`roles(diagram)`: who is who.**
+  - It returns the top-level `plant`, `controller` and `estimator`, read from the ids. The
+    estimator may also sit inside the controller (`controller/estimator`).
+  - A leaf is its own plant.
+  - A `HybridDiagram` answers from its `.plant` and `.computer` fields, which is the shape
+    S31 keeps.
+  - There is no "deepest plant" rule. In a cascade the outer loop's plant is the inner
+    loop (compositional closure), and `plant/plant` reaches the motor.
+  - With no `plant` id the plant is `None`: a tool that needs it raises, and plots and the
+    camera keep today's defaults.
+- **`block_roles(block)`: what a block reads and commands.** It reads the port names only,
+  and serves composition:
   - the measurement (`e`, `y` or `x`);
   - the reference (`r` or none);
   - the command (`u`);
-  - whether it is error-driven, from the port `e`;
-  - whether it is stateful, from `n`.
+  - whether the block is error-driven (it has the port `e`);
+  - whether it is stateful (from `n`).
 
-  It replaces `feedback_ports`, `error_input`, `PROFILE_PORTS` lookups, the five fallback
-  chains and `action_port_of`.
-- **`loop_roles(diagram)`: who is who in any diagram, from the wiring.**
-  - The plant is the block whose `u` is driven by another block's command.
-  - The controller is that driver.
-  - Each source is classified by what it drives: the reference, a disturbance or noise.
-  - It works on hand-wired diagrams and on shortcuts alike, and is computed when a tool
-    asks, never stored.
+  It replaces `feedback_ports`, `error_input`, the `PROFILE_PORTS` lookups and the five
+  fallback chains.
+- **`command_port(sys)`: which input a decision drives.**
+  - It is `u`, else the single input that is not `w` or `v`, else it refuses.
+  - It replaces `action_port_of` (`control/neural.py:12`).
+  - Gym, the cost, the design tools and a cascade's outer `@` all use it.
 
-### 3.4 What each use case becomes
+### 3.4 Composition writes the ids
+
+- **`@`:**
+  - `ctl @ plant` gives `controller` and `plant`.
+  - `G @ 1` and `G @ K` give the left operand `plant` and the return block `filter`.
+- **Diagram operands are nested under their role, not inlined.**
+  - A closed loop used as a plant is `plant`, holding its own `controller` and `plant`.
+  - P4's `compensator(observer, K)` is `controller`, holding `estimator` and `gain`.
+  - Ids stay unique at each level, and the params keys follow the nesting.
+- **Loop inputs.** `closed_loop(w=, v=)` on a plant without those ports nests a plant
+  wrapper whose boundary is `u`, `w`, `v`, so the plant always owns its disturbance and
+  noise.
+  - `w` is never charged as control effort.
+  - `v` enters what the controller reads, `y` or `x`.
+
+  A plant that declares `w` / `v` itself is used as is.
+- **`>>` and `+`** stop minting role ids from block shape. They name blocks plainly, and a
+  hand-written role id is kept.
+- In a shortcut, a role id wins over `System.id`.
+- The composition-time state goes: `_composition_entry`, `_composition_output` and the
+  camera copy.
+
+### 3.5 What each use case becomes
 
 | Use case | After |
 |---|---|
-| Composition | One port-based dispatch: error junction, reads `y`, reads `x`, loop gain, or refuse with a message. `closed_loop(controller, plant, *, r, w, v, filter)`: each of `r`, `w`, `v` is `False`, `True` (a boundary port) or a source block. A plant's own `w` / `v` port wins over a loop Sum; `v` only when the measured output depends on it. Plant-side diagrams are inlined, so cascades and actuator chains build in one line. `_composition_entry` / `_composition_output` leave `DiagramSystem` if derivable. |
-| Plot signals | Defaults from `loop_roles`: the reference, the command, the plant output, and `w` / `v` when present. Boundary names are plottable. Labels and units are copied onto every exposed port. Colours follow roles: command red, state blue. `compute_trajectory(show=True)` uses the same default. |
-| Animation | The camera, follow frame and `scene_grid` come from the plant role, resolved at animate time, for any diagram, nested ones included. A compensator does not draw a skin inside a loop. The composition-time copy goes. `camera_priority` is read or removed. |
-| Monte Carlo and plant + controller tools | The command is port `u` (else the single input) everywhere: `problem.U`, LQR, place, trajopt, value iteration, Gym's action space, `discretize`, and the `u` a cost sees. The disturbances are `w`, `v` and `problem.disturbances`, never decision variables. The measurement is what the controller's ports say. A time-varying law is honoured. The three Monte Carlo backends score the same loop. |
-| Analysis | The default channel follows the same table: from `u` to `y`. `wrt="u"` means the port `u` when one exists. |
-| Ids | One scheme across flow and hybrid: `ctl` and `plant` (or the block's role), `ref`, `w`, `v`. They are documented as the params keys and the random-stream names they are. |
+| Composition | One port-based dispatch: an error junction, reads `y`, reads `x`, a loop gain, or a refusal that points to hand wiring. `closed_loop(controller, plant, *, r, w, v, filter, estimator)`: each loop input is `False`, `True` (a boundary port) or a source block. No port keywords. |
+| Plot signals | `signals="plant"`, `"controller"` or `"estimator"` selects every port of that block, as `"plant:y"` selects one. The default *auto* mode shows every port of the plant and the controller, each wire once; the reference, the error, `w` and `v` come in through their inputs. Signal names take id paths (`plant/plant:y`), reconstructed recursively. Labels and units are copied onto exposed ports, and colours follow roles. With no roles, plots keep today's default. A leaf keeps `("x", "u")`. `compute_trajectory(show=True)` and the planning and comparison plots use the same default. |
+| Animation | Resolved at animate time. The camera comes from the one drawable block anywhere in the tree, else the drawable block on the `plant` path, else an auto-fit view. A compensator draws no skin inside a loop. `camera_priority` is removed, and `scene_grid` and the follow frame come from the same block. |
+| Cost and evaluation | The cost is relative to the plant. The tools build `policy @ problem.sys` (compiled once for all three Monte Carlo backends) and score `trajectory_of(problem.sys)` by identity: `x` is the plant's state, and `u` is its `command_port`. Controller and estimator states are integrated, never scored. A dynamic controller is integrated, not refused; `t` is honoured; the cost's params are passed; there is one price for leaving `X`. The `x0` draw is on the plant only, and the controller and the estimator start at their own `x0`. |
+| Design and planning tools | DP, LQR, `place`, trajopt, MPC and value iteration decide `command_port` only. `w` and `v` are never decision variables; they are drawn or held at nominal. `discretize` keeps the plant's ports. |
+| RL and Gym | The observation is what the controller reads (`x` today). The action is `command_port`, and the reward is `−g` on the plant. A policy with state is integrated by the loop. Gym's observation space matches its observation. |
+| Analysis | The default input is `r`, else the command port; the default output is `y`. `wrt="u"` means the port `u` when one exists. |
+| Ids | Renamed once: `ctl` → `controller` and `sys` → `plant`, in flow and hybrid, before RN-4 names the random streams by id path. |
 
-### 3.5 Why this is the minimal system
+### 3.6 No controller classes
 
-- Every decision in §2 reads, or could read, a port name, a dimension, `n` or a
-  `dependencies` entry. All of these already exist on every `System`.
-- Nothing new is declared. Profiles shrink to a plot hint, and the composition-time state
-  disappears.
-- The `isinstance` checks on controller classes were never there.
-- The cost is a single resolver, plus a convention table that the course material already
-  follows (RULES 4.9).
+- **What the classes carry.** `Controller(System)` (`core/feedback.py:93`) adds no ports,
+  state or behaviour; its one method, `plot_control_law(**kw)`, forwards to
+  `graphical/port_map.plot_control_law`. `DynamicController` (`:123`) adds nothing.
+- **Who checks them.** No `isinstance` or `issubclass` on either class exists in the
+  library or the tests. Wiring, plotting and evaluation read attributes and `n`, never
+  the class.
+- **Who uses them.**
+  - 16 library classes;
+  - the root and `minilink.core` exports;
+  - two test subclasses;
+  - four course notebooks.
+
+  Each course controller already uses the conventional ports, so its `feedback_profile`
+  line is redundant:
+
+  | Notebook | Class | Ports | Profile line |
+  |---|---|---|---|
+  | GRO860 `double_integrator_policy_evaluation` | `PositioningPolicy(Controller)` | `x` → `u` | `"state"`, plus a markdown sentence explaining it |
+  | GRO501 `cartpole_static_controller` | `CustomController(Controller)` | `y`, `r` → `u` | `"output"` |
+  | GRO501 `cartpole_dynamic_controller` | `LQG_Controller(DynamicController)` | `y`, `r` → `u`, `z`; `n = 4` | `"output"` |
+  | GRO501 `ode_simulation` | `MyCustomController(Controller)` | `y`, `r` → `u` | none |
+
+**Recommendation:**
+1. **A controller is a `System`**, or a `DynamicSystem` when `n > 0`.
+   - The 16 library classes take those bases.
+   - `Controller` and `DynamicController` are deleted, with no aliases.
+   - `ErrorDriven` stays: it is a port layout, not a role marker.
+2. **`plot_control_law()` moves onto `System`** (`core/facades.py`), beside
+   `plot_input_output_map()`.
+   - The free function in `graphical/port_map.py` stays the engine.
+   - It reads the measurement and the reference from `block_roles`; the sweep space comes
+     from the ports, or from `plot_space` where it differs.
+   - A block with no measurement input refuses and names `plot_input_output_map()`.
+   - On a diagram it plots the law of `roles(diagram).controller`.
+   - Every existing call keeps working, and a hand-written plain-`System` controller gets
+     the method too.
+3. **The course notebooks are migrated, not polished.**
+   - Only the lines a removed name touches change:
+     - the import line;
+     - the base class (AC-0);
+     - the profile line, with the GRO860 sentence reworded to "the input port is named
+       `x`, so the tools know the block reads the full state" (AC-3).
+   - The `PlanningSolution`, `Planner` and `Comparison` methods of the same name keep
+     delegating to their policy.
+
+### 3.7 Future-proof check
+
+Each planned feature, projected onto §3.2 to §3.5:
+
+| Feature (where) | In the loop | How it fits | Rename or gap |
+|---|---|---|---|
+| Luenberger and Kalman estimators (P4, v0.2 B3) | estimator `u`, `y` → `x` | id `estimator`, either top-level or inside the `controller` composite. `closed_loop(estimator=)` wires `y`, `u` and `x`. Plots compare `estimator:x` with `plant:x`. x̂0 starts at the estimator's own `x0` | `x_hat` → `x`; P4's composition ruling stays open |
+| MPC (today; T6, MP-4) | `x` (+ `r`) → `u` | the internal cost is the same `CostFunction` on the model's `x` and `u`; `v` reaches the `x` it reads | `y` → `x`, `u_ff` → `u`; the racecar exposes `x`; the undiscounted internal cost is a defect to fix |
+| Dual-rate MPC (S31) | replan and broadcast | roles from the hybrid fields; the composite exposes `x` → `u` | the broadcast's `u_nom` → `u`; replan's `u` not exposed |
+| MPPI (S72, v0.3) | an open-loop source on the plant's `u` | the evaluator wires `controller` and `plant` itself | none |
+| CBF safety filter (research lane) | `CBFSafetyFilter(controller, …)`, `x` → `u` | a filtered controller is a controller; hand-wired, `x` fans out by hand; the cost sees the plant's command | `u_nom` and `u_safe` stay internal |
+| Actuators, zero-order hold | inside the nested `plant` | part of the plant (the textbook H); to score the saturated command, put the saturation on the controller side | none |
+| Loop noise and randomness (AC-4; RN-1 to RN-5) | `w` and `v`, owned by the plant or its wrapper | source ids name the random streams; coloured noise (`WhiteNoise >> LowPassFilter`) is the `w` source, not a role; Kalman design reads the plant's `w` and `v` | ids renamed before RN-4 |
+| RL, Gym, policies with state | `x` → `u` | the observation is what the controller reads; the action is `command_port`; the reward is `−g` on the plant; the loop integrates a stateful policy | Gym's observation space |
+| Hybrid as a System (S31, v0.9) | `[plant; computer]` | the roles are its fields; the ids are renamed for params keys and streams | `hybrid_closed_loop` keywords settled there |
+| A cost block, the differentiable cost V1 | reads `plant:x` and the command | id `cost`, not a role | none |
+| Discrete time (P6, v0.9) | `discretize(plant)` | keeps the plant's ports (follow-up) | today it stacks the inputs and drops `q`, `dq` |
+| Cascades, LQI, tracking, gain schedules | the inner loop as `plant` | closure, as in §3.3; LQI is `r`, `y` → `u` with state; tracking is `x` → `u`, time-varying | none |
+| Named-port plants (racecar, bicycle) | custom names | wired by hand; the `plant` id still gives the camera, plots and cost | none |
+
+None of these needs a new role, a class or an override. Two need a rename (MPC and the
+estimator's `x`), and the rest need the defect fixes listed in §2.
+
+### 3.8 Why this is the minimal system
+
+- **Nothing new is declared.** Every decision in §2 reads a port name, a dimension, `n`, a
+  `dependencies` entry or a subsystem id, and all of these already exist.
+- **The roles cost three reserved words.** They are the ids the shortcuts and the hybrid
+  loop already half use. They are written by hand as easily as by a shortcut, and they
+  are visible in `plot_diagram`, in the params keys and in the random streams.
+- **Things get deleted:**
+  - the profiles, the overrides and the port keywords;
+  - the controller classes;
+  - the composition-time state and the shape-based ids.
+- **What is left is small:** one resolver, two tables (RULES 4.9 extended), and evaluation
+  by identity.
 
 ## 4. Steps
 
-Each step lands on its own commit with the checks of §6. The census baseline is built in
-AC-1 and reused: about 40 loops across every path, plus the course controllers, recording
-ids, connections, boundary ports with labels and units, entry and output, names, params
-keys, `x0`, a fixed-step history, roles and control-law sweeps. It is captured twice and
-`cmp`'d.
+Each step lands on its own commit with the checks of §6.
 
-| Step | Scope | Lane | Rung |
-|---|---|---|---|
-| **AC-1** | Safe fixes and pinning tests: D1 (refuse), D2, D4, D6, A, B, C, D, the t = 0 scoring, `disturbances={"u"}` refused; a `TestDispatchTable`; the census baseline | agent (bug fixes) | v0.2 B4, now |
-| **AC-2** | `block_roles` / `loop_roles` in `core/feedback.py`; every reader switched to them; byte-identical census | agent, after §5 decision 1 | v0.2 B4 |
-| **AC-3** | Composition on ports: profiles become plot hints (course strings accepted, an unknown string raises); one vocabulary (`*_port`); `filter=` on `feedback` and `closed_loop`; plant-side diagram operands inlined; `_composition_*` off `DiagramSystem` if derivable | core: §5 decisions 1–2 | v0.2 B4, gates P4 |
-| **AC-4** | Loop inputs: sources as values of `r` / `w` / `v`; plant-owned `w` / `v` win; the Sum built before wiring (ahead of S66); randomness A9 / D24 reconciled | §5 decision 3 | beside P4, before P11 |
-| **AC-5** | Plot defaults, labels, units and colours from `loop_roles`; boundary names plottable; one default for `show=True` | agent (plotting lane) | v0.2 D |
-| **AC-6** | Camera, follow frame and `scene_grid` from the plant role at animate time; compensators draw no skin in a loop | agent (plotting lane) | v0.2 D |
-| **AC-7** | Tools on one command / disturbance / measurement convention: evaluation (one loop for the three backends), planning (`U` over `u`), design (LQR, place, trajopt, value iteration), Gym, `discretize`, analysis defaults, the cost's `u` | §5 decision 4 (changes multi-port plants) | v0.3, with RN-4 / RN-5 |
-| **AC-8** | One id scheme across flow and hybrid; ids documented as stream names and params keys | §5 decision 5 (keys change); hybrid part with S31 | v0.9 |
+The census baseline is built in AC-1 and reused. It covers about 40 loops across every
+path, plus the course controllers, and records for each:
+- ids, connections, and boundary ports with labels and units;
+- entry and output, names and params keys;
+- `x0` and a fixed-step history;
+- roles and control-law sweeps.
+
+It is captured twice and `cmp`'d.
+
+| Step | Scope | Lane, rung |
+|---|---|---|
+| **AC-0** | No controller classes; `plot_control_law` on `System`; the four course notebooks migrated (import line and base class) | agent, after decision 7; v0.2 B4 |
+| **AC-1** | Safe fixes and pinning tests: D1 (refuse), D2, D4, D6, A, B, C, D, the `t = 0` scoring, `disturbances={"u"}` refused; a `TestDispatchTable`; the census baseline | agent (bug fixes), now |
+| **AC-2** | `roles()`, `block_roles()` and `command_port()` in `core/feedback.py`, with every reader switched; reserved ids raise on a clash. (a) Byte-identical census, with today's ids mapped. (b) The id rename (`controller`, `plant`, `estimator`, sources by port, `error`, `filter`) in flow and hybrid; the expected diff is ids, params keys, signal names and stream names | after decisions 1 and 5; v0.2 B4, before RN-4 |
+| **AC-3** | Composition on standard names. Removed: profiles, overrides, port keywords, `error_input`, `_composition_*`, shape ids, the camera copy. Changed: diagram operands nested; `G @ K` naming; leaves expose `x`; MPC renamed; `filter=`; refusals point to hand wiring. The course notebooks drop `feedback_profile` | after decision 2; v0.2 B4, gates P4 |
+| **AC-4** | Loop inputs: the plant wrapper owns `w` and `v`; sources as values, named by port; `estimator=` (with P4); randomness A9 / D24 reconciled | after decision 3; beside P4, before P11 |
+| **AC-5** | Plot auto mode, role selectors, id paths, labels, units and colours by role, one default | plotting lane, v0.2 D |
+| **AC-6** | The camera rule at animate time; no compensator skin inside a loop | plotting lane |
+| **AC-7** | Cost relative to the plant across every evaluator and design tool (§3.5): one compiled loop for the three backends, `command_port`, stateful and time-varying laws, cost params, one price; Gym and the rollout environment aligned | after decision 4; v0.3, with RN-4 / RN-5 |
+| **AC-8** | Hybrid on the same rules: fields as roles, the `hybrid_closed_loop` keywords, the dual-rate MPC composite | with S31, v0.9 |
 
 **Done when:**
 
-- `ctl @ plant`, a hand-wired loop of the same blocks, and `closed_loop` with sources give
-  the same roles, plots, camera and Monte Carlo score;
-- the census is byte-identical for every case that worked before;
+- `ctl @ plant`, the same loop hand-wired with the role ids, and `closed_loop` with sources
+  give the same roles, plots, camera and Monte Carlo score;
+- the census is byte-identical for every case that worked before, apart from AC-2b's
+  expected id diff;
 - every defect of §2 has a test.
 
 **Absorbed or reshaped workboard steps:**
@@ -320,56 +573,71 @@ keys, `x0`, a fixed-step history, roles and control-law sweeps. It is captured t
 - TB-b's loop part is AC-3.
 - S65's automatic-dt and hold-model rows are noted under AC-1 (C) and left to S65.
 - S66 lands after AC-4.
-- A4's "one closed-loop name" is AC-3; its default names are AC-8.
-- P4's observer + state feedback becomes a plain `DynamicSystem` with ports `r`, `y` → `u`,
-  wired by the port rule.
-- P11's `Controller(feedback=…)` is likely unnecessary (§5 decision 6).
-- RN-4 and RN-5 consume AC-4 and AC-7.
+- A4's "one closed-loop name" is AC-3; its default ids are AC-2b.
+- P4 builds its estimator to the table of §3.2 (`u`, `y` → `x`, id `estimator`); the
+  observer + state feedback composite is a `controller` holding `estimator` and `gain`.
+- P11's `Controller(feedback=…)` is unnecessary (§5 decision 6).
+- RN-4 and RN-5 consume AC-2b, AC-4 and AC-7.
+- S62 renames the LQR module with no alias, since the freeze is paused.
 - S70 turns the refusals into `WiringError`.
-- S31 takes the hybrid vocabulary, ids, `w` / `v` and `filter`.
+- S31 takes the hybrid vocabulary.
 
 ## 5. Decisions for the maintainer
 
-Each is recorded as open in ROADMAP §6.
+Each is recorded in ROADMAP §6.
 
-1. **The five principles of §3.1 and the convention table of §3.2.** This includes
-   extending RULES 4.9 with `e`, `x`, `q` and `dq`, and a DESIGN §4 "Conventions" section.
+1. **The principles of §3.1 and the two tables of §3.2.** This includes:
+   - ports for wiring, and three reserved role ids;
+   - every leaf exposing `x`;
+   - RULES 4.9 extended with `e`, `x`, `q`, `dq` and the ids;
+   - a DESIGN §4 "Conventions" section.
+
    *Recommended: yes.*
-2. **`feedback_profile` leaves wiring and becomes a plot hint.** Every library controller
-   wires from its ports. The course strings `state` and `output` stay accepted, and an
-   unknown string raises. *Recommended: yes.*
-3. **Loop inputs.** A plant's own `w` / `v` port wins over a loop Sum, with `v` taken only
-   when the measured output depends on it. `r=`, `w=` and `v=` accept a source block, with
-   fixed ids because they name random streams. *Recommended: yes.*
-4. **The command is the port `u` for every tool.** This changes plants with several inputs
-   (`*WithNoisePort`) in planners, LQR, place, value iteration and Gym: `w` and `v` stop
-   being actuators. *Recommended: yes.*
-5. **One id scheme across flow and hybrid.** This changes params keys and stream names
-   once; the hybrid part waits for S31. *Recommended: yes, at v0.9.*
-6. **P11's `Controller(feedback=…)`.** With ports as the declaration, a student writes a
-   `System` with the ports of §3.2 and gets everything. *Recommended: drop the ask unless
-   the P11 notebooks show a gap.*
+2. **Standard names only.** Profiles, overrides, port keywords and shape ids are removed;
+   MPC is renamed to `x` → `u`; custom names are wired by hand. *Recommended: yes.*
+3. **Loop inputs.** The plant, or the wrapper the loop builds around it, owns `w` and `v`;
+   `r=`, `w=`, `v=` accept a source block; `estimator=`. *Recommended: yes.*
+4. **Cost relative to the plant.** Scored by identity on `trajectory_of(problem.sys)`, with
+   `command_port` the only decided input for every tool. This changes plants with several
+   inputs (`*WithNoisePort`) in planners, LQR, `place`, value iteration and Gym.
+   *Recommended: yes, in v0.3.*
+5. **Role ids** `plant`, `controller` and `estimator`. `ctl` and `sys` are renamed once,
+   in flow and hybrid, before RN-4, and a role id wins over `System.id`. *Recommended:
+   yes, in v0.2.*
+6. **P11's `Controller(feedback=…)`.** A student writes a `System` with the ports of §3.2
+   and gets everything. *Recommended: drop the ask.*
+7. **No controller classes, no aliases; `plot_control_law` on `System`.** *Agreed in
+   principle on 2026-10-10.*
+
+**Ruling, not a decision.** The name freeze (ROADMAP §4.1 gate 7) is paused between terms
+(maintainer, 2026-10-10). A rename migrates every course notebook in the same commit, with
+no alias.
 
 ## 6. Checks for every step
 
 - `ruff check .` and `ruff format --check .`.
 - The targeted tests: `test_feedback_composition`, `test_core`, `test_hybrid`,
-  `test_simulation`, `test_mpc`, `test_graphics`, `test_mechanical_robotics` and the
+  `test_simulation`, `test_mpc`, `test_graphics`, `test_mechanical_robotics`, and the
   planning and evaluation tests touched.
-- A census `cmp` after each sub-step: byte-identical for AC-2 and the refactor parts of
-  AC-3; only cases that failed before, plus new cases, may change elsewhere.
+- A census `cmp` after each sub-step: byte-identical for AC-2a and the refactor parts of
+  AC-3. Elsewhere only these may change:
+  - AC-2b's ids;
+  - cases that failed before;
+  - new cases.
 - At the end of each step:
   - the full `pytest` suite, the regression gates and the flagship demos;
   - a notebook smoke run of `06_hybrid`, `sensitivity_functions`, `frequency_response`,
-    `double_integrator_policy_evaluation`, `cartpole_static_controller` and
-    `cartpole_dynamic_controller`;
+    `double_integrator_policy_evaluation`, `cartpole_static_controller`,
+    `cartpole_dynamic_controller`, `ode_simulation` and `racecar_toward_mpc`;
   - `sphinx-build -W` for docstrings.
 
 ## 7. Not in scope
 
 - No new operator, no options on `@`, no `Loop` block.
-- No new base classes, traits or intent declarations.
+- No new base classes, traits, intent declarations or override attributes.
+- No inference of roles from the graph, and no "deepest plant" rule.
 - No tuple operands.
 - No hybrid features before S31.
 - No flip of `ProportionalController`'s default layout.
 - No sources on arbitrary ports such as a manipulator's tool force `f`.
+- No renaming of named-port plants: they are wired by hand.

@@ -385,8 +385,8 @@ declared. Behaviour-preserving; the four accepted `ports` values stay.
 
 **Widened 2026-10-10.** The census of the 2026-10-10 review found defects on every path
 and the same questions answered differently by every tool; P10 is now
-[automation-by-convention.md](automation-by-convention.md) (ports are the declaration, one
-role resolver, steps AC-1–AC-8). The text below is the original scope. Correction: the
+[automation-by-convention.md](automation-by-convention.md) (v2: port names drive the wiring,
+three reserved subsystem ids are the roles, steps AC-0–AC-8). The text below is the original scope. Correction: the
 `e`-input rule (`_is_controller_like`) only names a block `ctl`; it does not drive
 `autowire`.
 

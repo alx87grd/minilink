@@ -50,8 +50,9 @@ Design: [naming.md](naming.md). Every step is name-preserving for the GRO860 not
   default names where a shortcut says `Diagram`; the sampled loop's plant wrapper honours
   `plant.id`; `id` documented on `System`. Done when composed diagrams' keys, params
   dictionaries and trajectories are byte-identical before and after. The closed-loop name is
-  folded into AC-3 and the id scheme into AC-8 of
-  [automation-by-convention.md](automation-by-convention.md).
+  folded into AC-3 and the id scheme into AC-2b of
+  [automation-by-convention.md](automation-by-convention.md), where a role id (`plant`,
+  `controller`, `estimator`) wins over `System.id` in a shortcut.
   Also: one name, `plot_cost_to_go`, and one colour keyword, `jmax`, across DP, tabular RL,
   `PolicyEvaluator` and `Comparison`, with `plot_cost2go` an alias for one release and S54's
   clipping (scan: planning#3, examples#5); the operators' named forms exported together
@@ -112,8 +113,9 @@ the new code copies clean patterns and no shortcut is added only to be dropped.
   `lqr_finite_horizon`, `trajectory_lqr` and `lqr_gain_schedule` join the band facade and the
   registry; `P` joins the siso family; the `control/__init__.py` note on `control.lqr`
   naming the submodule goes (scan: control#12). Before P11 writes notebooks on the band
-  layer. The name freeze (gate 7) now runs to v1.0: `minilink.control.lqr` stays importable
-  as an alias until then, or S62 waits for v1.0 — part of the ask.
+  layer. The name freeze (gate 7) is paused between terms (2026-10-10): the module can be
+  renamed now, with no alias, migrating the course notebooks in the same commit. The names
+  themselves stay the ask.
 - [ ] **RN The randomness convention** ([randomness.md](randomness.md), agreed 2026-09-26,
   rulings D1–D24). RN-1 `WhiteNoise` (seed and sample period in params, counter-based draw,
   `psd`, zero-order hold by default, no time window, the solver hint, `seed = None` the mean)
@@ -125,6 +127,9 @@ the new code copies clean patterns and no shortcut is added only to be dropped.
   shows sampled sensor noise, else v0.3); RN-4 and RN-5 together in v0.3, after the fall term,
   before the v0.9 freeze; RN-6 with each step. Done when the plan's steps are ticked and DESIGN
   carries the convention.
+  The subsystem ids that name the random streams (D21) are renamed once, before RN-4, by AC-2b
+  of [automation-by-convention.md](automation-by-convention.md): `controller`, `plant`,
+  `estimator`, and sources named by the plant port they drive (`r`, `w`, `v`).
   Also: the evaluator's `simulator` backend fails on a diagram plant with a nested-diagram
   error (found 2026-09-26, randomness.md §1).
   Reviewed 2026-09-30 (randomness.md §10): D13 decided that day (one counter generator on both
@@ -146,27 +151,51 @@ the new code copies clean patterns and no shortcut is added only to be dropped.
   `plot_diagram` shows the Figure 12 topology.
   Also: named input ports on the state-space base so observers and sensitivity blocks share
   one `f` (scan: analysis#13); the plan names the estimation API once (scan: docs-gov#9).
-  Under P10's port rule the observer + state feedback is a plain `DynamicSystem` with ports
-  `r`, `y` → `u`, wired by `@` with no new rule (automation-by-convention.md §4).
+  Under P10 v2 the estimator follows the port table: `u`, `y` → `x`, the estimate labelled
+  x̂ (not `x_hat`), with the reserved id `estimator`.
+  - Hand-wired, it sits beside the `controller`; `closed_loop(estimator=)` wires `y`, `u`
+    and `x` (AC-4).
+  - The observer + state feedback composite is a `controller` holding `estimator` and
+    `gain`, with ports `r`, `y` → `u`, wired by `@` with no new rule.
+  - Monte Carlo starts x̂0 at the estimator's own `x0`.
+
+  (automation-by-convention.md §3.2, §3.7.)
 - [ ] **P10 Automation by convention** ([automation-by-convention.md](automation-by-convention.md),
-  analysis and recommendation 2026-10-10, widened from "document the three `@` dispatch
-  paths"). Ports are the declaration and roles are resolved at use time by one resolver, for
-  composition, plot signals, the animation camera and every plant-and-controller tool. Steps
-  AC-1 to AC-8 of the plan, decisions 1–6 in its §5 **[ask — core]**:
-  - AC-1 safe fixes and pinning tests (D1, D2, D4, D6 of the 2026-10-10 review; defects A–D
+  v2 2026-10-10, widened from "document the three `@` dispatch paths").
+  - Port names drive the wiring.
+  - Three reserved subsystem ids (`plant`, `controller`, `estimator`) are the roles. The
+    shortcuts write them, a hand-wired diagram uses them, and every tool reads them at use
+    time; they are never inferred from the graph.
+  - Automation works with standard names only; custom names are wired by hand.
+  - The cost is scored on the plant.
+
+  Steps AC-0 to AC-8 of the plan; decisions 1–7 in its §5 **[ask — core]**:
+  - AC-0: no controller classes; `plot_control_law` on `System`; the four course
+    notebooks migrated (import line and base class). Agent, after decision 7.
+  - AC-1: safe fixes and pinning tests (D1, D2, D4, D6 of the 2026-10-10 review; defects A–D
     of the plan; time-varying laws scored at t = 0; `disturbances={"u"}` refused) and the
-    census baseline — agent, now.
-  - AC-2 `block_roles` / `loop_roles` and every reader switched, byte-identical — after
-    decision 1.
-  - AC-3 composition on ports (profiles become plot hints, one `*_port` vocabulary, `filter=`,
-    plant-side diagram operands inlined, `_composition_*` off `DiagramSystem`) — gates P4.
-  - AC-4 loop inputs (sources as values, plant-owned `w` / `v`) — before P11.
-  - AC-5 plot defaults and AC-6 camera from roles — plotting lane.
-  - AC-7 one command / disturbance / measurement convention for the tools — v0.3 with RN-4 /
-    RN-5. AC-8 one id scheme — v0.9 with S31.
-  Done when a hand-wired loop and its shortcut give the same roles, plots, camera and score,
-  and the census is byte-identical for every case that worked before. The `e`-input rule
-  (`_is_controller_like`) is a naming rule for block ids, not an autowire heuristic.
+    census baseline. Agent, now.
+  - AC-2: `roles()`, `block_roles()` and `command_port()`, with every reader switched;
+    reserved ids raise on a clash. (a) byte-identical; (b) the id rename `ctl` →
+    `controller`, `sys` → `plant`, in flow and hybrid, before RN-4. After decisions 1 and 5.
+  - AC-3: composition on standard names.
+    - Removed: profiles, overrides, port keywords, `error_input`, `_composition_*`, shape
+      ids.
+    - Changed: diagram operands nested under their role; leaves expose `x`; MPC renamed to
+      `x` → `u`; `filter=`.
+    - The course notebooks drop `feedback_profile`.
+    - It gates P4.
+  - AC-4: loop inputs. The plant wrapper owns `w` / `v`; sources as values; `estimator=`.
+    Before P11.
+  - AC-5: plot auto mode and AC-6: the camera from roles. Plotting lane.
+  - AC-7: cost relative to the plant. One compiled loop for the three Monte Carlo
+    backends, `trajectory_of(problem.sys)` by identity, `command_port` the only decided
+    input. v0.3, with RN-4 / RN-5.
+  - AC-8: hybrid on the same rules. v0.9, with S31.
+
+  Done when a hand-wired loop with the role ids and its shortcut give the same roles,
+  plots, camera and score, and the census is byte-identical for every case that worked
+  before, apart from AC-2b's ids.
 - [ ] **P6 Discrete (z) tier** **[held for GRO501 2026-09-07; scheduled for v0.9, §6]**.
   GRO501 default: teach with `discretize` + simulation, unless the sommatif examines z-plane
   analysis. The v0.9 scope is its row in §6.
@@ -313,7 +342,8 @@ findings, file by file and line by line, are in
 
 - [ ] **T1 core** (what T0 left): `system.py` default stubs on `xp` (a returned-type decision
   under JAX) and section comments; `feedback.py`'s `ErrorDriven` shadow state and order
-  **[ask — core]**; `wiring.py`'s hasattr-and-create, attribute-assigning helpers and the
+  **[ask — core]** (`ErrorDriven` stays a port-layout mixin when the controller classes go,
+  P10 AC-0); `wiring.py`'s hasattr-and-create, attribute-assigning helpers and the
   `_composition_*` writes; `signals.py` helpers below the class; `hybrid_diagram.py` /
   `hybrid_composition.py` names and sections. Bug found by the audit, its own test first:
   `StepDiagramSystem.step` assigns in place on a JAX array.
@@ -377,7 +407,9 @@ findings, file by file and line by line, are in
   step ladder of its own.
   Also: one record per MPC tick, `Command` and `MPCTickSolve` folded into the
   `PlanningSolution` (scan: control#4); `mpc @ inner_loop` closing on a multi-block plant
-  (scan: examples#12).
+  (scan: examples#12). P10 v2 renames the MPC ports to `x` (+ `r`) → `u`. The extras
+  `x_ff` and `z` stay. In the dual-rate composite, the broadcast's `u_nom` becomes `u` and
+  replan's `u` is not exposed (AC-3, AC-8).
   The shape proposed for the planner contract (three `Planner` verbs, `z` on the tick's
   record, `validate_mpc_planner` reading them) is [mppi.md](mppi.md) §6; MP-4 there is this
   step's second consumer, and the trajopt MPC baselines are its safety net.
