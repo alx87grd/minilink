@@ -129,7 +129,8 @@ the new code copies clean patterns and no shortcut is added only to be dropped.
   carries the convention.
   The subsystem ids that name the random streams (D21) are renamed once, before RN-4, by AC-2b
   of [automation-by-convention.md](automation-by-convention.md): `controller`, `plant`,
-  `estimator`, and sources named by the plant port they drive (`r`, `w`, `v`).
+  `estimator`, and the sources `reference`, `disturbance` and `noise` (a custom port's
+  source takes the port's name).
   Also: the evaluator's `simulator` backend fails on a diagram plant with a nested-diagram
   error (found 2026-09-26, randomness.md §1).
   Reviewed 2026-09-30 (randomness.md §10): D13 decided that day (one counter generator on both
@@ -176,8 +177,10 @@ the new code copies clean patterns and no shortcut is added only to be dropped.
     of the plan; time-varying laws scored at t = 0; `disturbances={"u"}` refused) and the
     census baseline. Agent, now.
   - AC-2: `roles()`, `block_roles()` and `command_port()`, with every reader switched;
-    reserved ids raise on a clash. (a) byte-identical; (b) the id rename `ctl` →
-    `controller`, `sys` → `plant`, in flow and hybrid, before RN-4. After decisions 1 and 5.
+    reserved ids raise on a clash. (a) byte-identical; (b) the id rename, in flow and hybrid,
+    before RN-4: `ctl` → `controller`, `sys` → `plant`, `ref` → `reference`; sources
+    `disturbance` and `noise` (blocks get words, signals get symbols). After decisions 1 and
+    5.
   - AC-3: composition on standard names.
     - Removed: profiles, overrides, port keywords, `error_input`, `_composition_*`, shape
       ids.

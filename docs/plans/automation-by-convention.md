@@ -374,22 +374,52 @@ The ids, by contrast, are already half a role system:
 
 **Ids: what role a block plays.**
 
+The rule is: **blocks get words, signals get symbols.**
+- Ports are mathematical variables (`u`, `r`, `w`, `v`, `y`, `x`, `e`, `q`, `dq`).
+- Subsystem ids are things in the diagram, so they are nouns.
+
+A role is a reserved key of `diagram.subsystems`: the `sys_id` given to `add_subsystem`.
+The same key names everything else about that block:
+- its state slice (`state_index`);
+- its params (`params["controller"]["Kp"]`, `"plant.mass"` in a distribution);
+- its signals (`"plant:y"`);
+- its random stream;
+- its box in `plot_diagram` (`Pendulum::plant`).
+
 | Id | Role | Written by |
 |---|---|---|
 | `plant` | the system under control | `@`, `closed_loop`, `% dt @` (as `HybridDiagram.plant`), the evaluators, a hand-wired diagram |
 | `controller` | the law that commands the plant | the same |
 | `estimator` | the state estimate the controller reads | `closed_loop(estimator=)`, or inside a `controller` composite |
 
-- The three role ids are reserved: a clash raises and is never suffixed.
+- The three role ids are reserved.
+  - There is one of each per diagram level, and a clash raises; it is never suffixed.
+  - A cascade nests (`plant/plant`).
+  - A second physical plant gets a name of its own and is handled by hand.
+- Variable names stay free: `ctl @ plant` gives the keys `controller` and `plant`.
 - Every other id is a name, not a role, but it still matters, because ids are the params
   keys and the random-stream names:
-  - sources take the name of the plant port they drive (`r`, `w`, `v`, or `wind` for a
-    port of that name);
+  - sources take the word for the input they drive: `reference`, `disturbance`, `noise`,
+    or the port's own name for a custom port (`wind`);
   - helpers are `error` and `filter`.
+
+**Names considered and rejected:**
+- `sys`, `system`: they mean any `System` (`problem.sys`, every `sys` argument).
+- `ctl`: an abbreviation, and already the course notebooks' law method `def ctl(self, x, u, t)`.
+- `policy`, `agent`: RL nouns; a policy plays the controller role, and one word across the
+  three courses wins.
+- `process`, `model`, `env`:
+  - `process` is a process-control dialect;
+  - `model` clashes with MPC's internal model;
+  - `env` is RL vocabulary, kept for the Gym bridge.
+- `observer`: Luenberger only; a Kalman filter is an estimator.
+- `G`, `C`, `F`, the textbook letters: `C` is already the output matrix (RULES 5.4), and a
+  nonlinear plant is not a G(s).
 
 ### 3.3 One resolver, three questions
 
-- **`roles(diagram)`: who is who.**
+- **`roles(diagram)`: who is who.** A role is a reserved key of `diagram.subsystems`, so
+  `roles()` is three lookups.
   - It returns the top-level `plant`, `controller` and `estimator`, read from the ids. The
     estimator may also sit inside the controller (`controller/estimator`).
   - A leaf is its own plant.
@@ -447,7 +477,7 @@ The ids, by contrast, are already half a role system:
 | Design and planning tools | DP, LQR, `place`, trajopt, MPC and value iteration decide `command_port` only. `w` and `v` are never decision variables; they are drawn or held at nominal. `discretize` keeps the plant's ports. |
 | RL and Gym | The observation is what the controller reads (`x` today). The action is `command_port`, and the reward is `−g` on the plant. A policy with state is integrated by the loop. Gym's observation space matches its observation. |
 | Analysis | The default input is `r`, else the command port; the default output is `y`. `wrt="u"` means the port `u` when one exists. |
-| Ids | Renamed once: `ctl` → `controller` and `sys` → `plant`, in flow and hybrid, before RN-4 names the random streams by id path. |
+| Ids | Renamed once, in flow and hybrid, before RN-4 names the random streams by id path: `ctl` → `controller`, `sys` → `plant`, `ref` → `reference`; sources named `disturbance` and `noise`. |
 
 ### 3.6 No controller classes
 
@@ -508,7 +538,7 @@ Each planned feature, projected onto §3.2 to §3.5:
 | MPPI (S72, v0.3) | an open-loop source on the plant's `u` | the evaluator wires `controller` and `plant` itself | none |
 | CBF safety filter (research lane) | `CBFSafetyFilter(controller, …)`, `x` → `u` | a filtered controller is a controller; hand-wired, `x` fans out by hand; the cost sees the plant's command | `u_nom` and `u_safe` stay internal |
 | Actuators, zero-order hold | inside the nested `plant` | part of the plant (the textbook H); to score the saturated command, put the saturation on the controller side | none |
-| Loop noise and randomness (AC-4; RN-1 to RN-5) | `w` and `v`, owned by the plant or its wrapper | source ids name the random streams; coloured noise (`WhiteNoise >> LowPassFilter`) is the `w` source, not a role; Kalman design reads the plant's `w` and `v` | ids renamed before RN-4 |
+| Loop noise and randomness (AC-4; RN-1 to RN-5) | `w` and `v`, owned by the plant or its wrapper | the source ids `disturbance` and `noise` name the random streams; coloured noise (`WhiteNoise >> LowPassFilter`) is the `w` source, not a role; Kalman design reads the plant's `w` and `v` | ids renamed before RN-4 |
 | RL, Gym, policies with state | `x` → `u` | the observation is what the controller reads; the action is `command_port`; the reward is `−g` on the plant; the loop integrates a stateful policy | Gym's observation space |
 | Hybrid as a System (S31, v0.9) | `[plant; computer]` | the roles are its fields; the ids are renamed for params keys and streams | `hybrid_closed_loop` keywords settled there |
 | A cost block, the differentiable cost V1 | reads `plant:x` and the command | id `cost`, not a role | none |
@@ -550,9 +580,9 @@ It is captured twice and `cmp`'d.
 |---|---|---|
 | **AC-0** | No controller classes; `plot_control_law` on `System`; the four course notebooks migrated (import line and base class) | agent, after decision 7; v0.2 B4 |
 | **AC-1** | Safe fixes and pinning tests: D1 (refuse), D2, D4, D6, A, B, C, D, the `t = 0` scoring, `disturbances={"u"}` refused; a `TestDispatchTable`; the census baseline | agent (bug fixes), now |
-| **AC-2** | `roles()`, `block_roles()` and `command_port()` in `core/feedback.py`, with every reader switched; reserved ids raise on a clash. (a) Byte-identical census, with today's ids mapped. (b) The id rename (`controller`, `plant`, `estimator`, sources by port, `error`, `filter`) in flow and hybrid; the expected diff is ids, params keys, signal names and stream names | after decisions 1 and 5; v0.2 B4, before RN-4 |
+| **AC-2** | `roles()`, `block_roles()` and `command_port()` in `core/feedback.py`, with every reader switched; reserved ids raise on a clash. (a) Byte-identical census, with today's ids mapped. (b) The id rename in flow and hybrid: `ctl` → `controller`, `sys` → `plant`, `ref` → `reference`; sources `disturbance` and `noise`; helpers `error` and `filter`; the expected diff is ids, params keys, signal names and stream names | after decisions 1 and 5; v0.2 B4, before RN-4 |
 | **AC-3** | Composition on standard names. Removed: profiles, overrides, port keywords, `error_input`, `_composition_*`, shape ids, the camera copy. Changed: diagram operands nested; `G @ K` naming; leaves expose `x`; MPC renamed; `filter=`; refusals point to hand wiring. The course notebooks drop `feedback_profile` | after decision 2; v0.2 B4, gates P4 |
-| **AC-4** | Loop inputs: the plant wrapper owns `w` and `v`; sources as values, named by port; `estimator=` (with P4); randomness A9 / D24 reconciled | after decision 3; beside P4, before P11 |
+| **AC-4** | Loop inputs: the plant wrapper owns `w` and `v`; sources as values, named `reference`, `disturbance`, `noise`; `estimator=` (with P4); randomness A9 / D24 reconciled | after decision 3; beside P4, before P11 |
 | **AC-5** | Plot auto mode, role selectors, id paths, labels, units and colours by role, one default | plotting lane, v0.2 D |
 | **AC-6** | The camera rule at animate time; no compensator skin inside a loop | plotting lane |
 | **AC-7** | Cost relative to the plant across every evaluator and design tool (§3.5): one compiled loop for the three backends, `command_port`, stateful and time-varying laws, cost params, one price; Gym and the rollout environment aligned | after decision 4; v0.3, with RN-4 / RN-5 |
@@ -601,9 +631,17 @@ Each is recorded in ROADMAP §6.
    `command_port` the only decided input for every tool. This changes plants with several
    inputs (`*WithNoisePort`) in planners, LQR, `place`, value iteration and Gym.
    *Recommended: yes, in v0.3.*
-5. **Role ids** `plant`, `controller` and `estimator`. `ctl` and `sys` are renamed once,
-   in flow and hybrid, before RN-4, and a role id wins over `System.id`. *Recommended:
-   yes, in v0.2.*
+5. **Role ids** `plant`, `controller` and `estimator`, as reserved subsystem keys. Blocks
+   get words and signals get symbols.
+   - Renamed once, in flow and hybrid, before RN-4:
+     - `ctl` → `controller` (about 216 string uses in tests, examples, the library and one
+       course notebook);
+     - `sys` → `plant`;
+     - `ref` → `reference` (about 31).
+   - Sources are named `disturbance` and `noise`.
+   - A role id wins over `System.id`.
+
+   *Recommended: yes, in v0.2.*
 6. **P11's `Controller(feedback=…)`.** A student writes a `System` with the ports of §3.2
    and gets everything. *Recommended: drop the ask.*
 7. **No controller classes, no aliases; `plot_control_law` on `System`.** *Agreed in

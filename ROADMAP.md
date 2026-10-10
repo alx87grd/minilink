@@ -646,8 +646,13 @@ here. Each open item needs the maintainer.
     planners, LQR, `place`, value iteration, Gym and the cost decide.
 
   Recommended: yes, in v0.3 with RN-4 / RN-5.
-- **Role ids.** `ctl` → `controller` and `sys` → `plant`, in flow and hybrid, renamed once
-  before RN-4 names the random streams by id path; a role id wins over `System.id`.
+- **Role ids.** The roles are reserved subsystem keys; blocks get words and signals get
+  symbols.
+  - Renamed once, in flow and hybrid, before RN-4 names the random streams by id path:
+    `ctl` → `controller`, `sys` → `plant`, `ref` → `reference`.
+  - Sources are named `disturbance` and `noise`.
+  - A role id wins over `System.id`.
+
   Recommended: yes, in v0.2.
 - **P11's `Controller(feedback=…)`**: unnecessary once ports are the declaration.
   Recommended: drop the ask.
