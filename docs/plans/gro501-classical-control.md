@@ -31,7 +31,7 @@ additive or replaces boilerplate with generated equivalents.
 | **P7** `facades.py` boilerplate | C2 | 2 | **done** 2026-09-26 (explicit + pinned) |
 | **P8** Small teaching helpers (ζ/ω_n, `N`) | G6 | 2 | landed 2026-10-10 (`N` only) |
 | **P9** `TransferFunction` port construction | C3 | 3 | landed 2026-10-10 |
-| **P10** Document what `@` means | C1 | 3 | agent (docs only) |
+| **P10** Document what `@` means | C1 | 3 | widened 2026-10-10 into [automation-by-convention.md](automation-by-convention.md) |
 | **P11** Two GRO501 notebooks | gate 2 | 3 | maintainer reviews |
 
 Wave 1 is the correctness wave and should land before any GRO501 material is
@@ -382,6 +382,13 @@ declared. Behaviour-preserving; the four accepted `ports` values stay.
 `TransferFunction` / `Lead` / `Lag` tests pass untouched.
 
 ### P10. Document what `@` means
+
+**Widened 2026-10-10.** The census of the 2026-10-10 review found defects on every path
+and the same questions answered differently by every tool; P10 is now
+[automation-by-convention.md](automation-by-convention.md) (ports are the declaration, one
+role resolver, steps AC-1–AC-8). The text below is the original scope. Correction: the
+`e`-input rule (`_is_controller_like`) only names a block `ctl`; it does not drive
+`autowire`.
 
 C1 is not a bug and does not need a rewrite — the three dispatch paths each
 read well and only two of them fire on a classical-control course. What is

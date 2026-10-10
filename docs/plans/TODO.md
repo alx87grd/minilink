@@ -49,7 +49,9 @@ Design: [naming.md](naming.md). Every step is name-preserving for the GRO860 not
   test: class name as the default `name`; one closed-loop name on both `@` paths; informative
   default names where a shortcut says `Diagram`; the sampled loop's plant wrapper honours
   `plant.id`; `id` documented on `System`. Done when composed diagrams' keys, params
-  dictionaries and trajectories are byte-identical before and after.
+  dictionaries and trajectories are byte-identical before and after. The closed-loop name is
+  folded into AC-3 and the id scheme into AC-8 of
+  [automation-by-convention.md](automation-by-convention.md).
   Also: one name, `plot_cost_to_go`, and one colour keyword, `jmax`, across DP, tabular RL,
   `PolicyEvaluator` and `Comparison`, with `plot_cost2go` an alias for one release and S54's
   clipping (scan: planning#3, examples#5); the operators' named forms exported together
@@ -98,7 +100,8 @@ the new code copies clean patterns and no shortcut is added only to be dropped.
   `control/state.py`, `control/lqr.py`, `control/place.py`, `blocks/transfer_function.py`,
   `dynamics/abstraction/state_space.py` (`LTISystem`) and the loop-building path students
   use (`feedback`, `closed_loop`, `@`). Done when every module in scope reads like `dp.py`
-  and the baseline `cmp`s.
+  and the baseline `cmp`s. The loop-building part waits for AC-3 of
+  [automation-by-convention.md](automation-by-convention.md) (P10).
 - [ ] **S61 Analysis verbs on any `System`** (scan: analysis#2, analysis#4, analysis#5,
   analysis#6, analysis#8): `controllability` / `observability` linearize like every sibling
   (band functions only, no facade: ROADMAP §6); `step_info` takes a `System`; `find_equilibrium` defaults its guess to
@@ -143,11 +146,27 @@ the new code copies clean patterns and no shortcut is added only to be dropped.
   `plot_diagram` shows the Figure 12 topology.
   Also: named input ports on the state-space base so observers and sensitivity blocks share
   one `f` (scan: analysis#13); the plan names the estimation API once (scan: docs-gov#9).
-- [ ] **P10 Document the three `@` dispatch paths** in DESIGN (operand shape → what `@`
-  builds); pin the `e`-input autowire heuristic with a test; collapse the `PROFILE_PORTS`
-  rows that differ only in `plot_space` if that reads better.
-  Also: one keyword vocabulary for the four feedback wires across `closed_loop`,
-  `hybrid_closed_loop` and `StandardFeedbackWiring` (scan: core#12).
+  Under P10's port rule the observer + state feedback is a plain `DynamicSystem` with ports
+  `r`, `y` → `u`, wired by `@` with no new rule (automation-by-convention.md §4).
+- [ ] **P10 Automation by convention** ([automation-by-convention.md](automation-by-convention.md),
+  analysis and recommendation 2026-10-10, widened from "document the three `@` dispatch
+  paths"). Ports are the declaration and roles are resolved at use time by one resolver, for
+  composition, plot signals, the animation camera and every plant-and-controller tool. Steps
+  AC-1 to AC-8 of the plan, decisions 1–6 in its §5 **[ask — core]**:
+  - AC-1 safe fixes and pinning tests (D1, D2, D4, D6 of the 2026-10-10 review; defects A–D
+    of the plan; time-varying laws scored at t = 0; `disturbances={"u"}` refused) and the
+    census baseline — agent, now.
+  - AC-2 `block_roles` / `loop_roles` and every reader switched, byte-identical — after
+    decision 1.
+  - AC-3 composition on ports (profiles become plot hints, one `*_port` vocabulary, `filter=`,
+    plant-side diagram operands inlined, `_composition_*` off `DiagramSystem`) — gates P4.
+  - AC-4 loop inputs (sources as values, plant-owned `w` / `v`) — before P11.
+  - AC-5 plot defaults and AC-6 camera from roles — plotting lane.
+  - AC-7 one command / disturbance / measurement convention for the tools — v0.3 with RN-4 /
+    RN-5. AC-8 one id scheme — v0.9 with S31.
+  Done when a hand-wired loop and its shortcut give the same roles, plots, camera and score,
+  and the census is byte-identical for every case that worked before. The `e`-input rule
+  (`_is_controller_like`) is a naming rule for block ids, not an autowire heuristic.
 - [ ] **P6 Discrete (z) tier** **[held for GRO501 2026-09-07; scheduled for v0.9, §6]**.
   GRO501 default: teach with `discretize` + simulation, unless the sommatif examines z-plane
   analysis. The v0.9 scope is its row in §6.
@@ -171,6 +190,8 @@ the new code copies clean patterns and no shortcut is added only to be dropped.
   surface, and agree with the guide's worked exercises.
   First, **[ask — core]**: `Controller(feedback="state" | "output", ...)` declares its ports
   from `feedback_profile`, so the student writes gains and `ctl` only (scan: examples#0).
+  P10 recommends dropping this ask: with ports as the declaration a student writes a `System`
+  with the conventional ports (automation-by-convention.md §5, decision 6).
 
 ---
 
@@ -349,7 +370,8 @@ findings, file by file and line by line, are in
   planning#9; [optimizer-parametric-wiring.md](optimizer-parametric-wiring.md) OPW-1–OPW-5).
 - [ ] **T6 the two big ones** **[ask first]**: `core/composition.py` (24-line section-map
   docstring, 45 `_` helpers, public API buried under `# Internal machinery`, eleven external
-  writes to `_composition_*`; and the three `@` semantics of P10) and
+  writes to `_composition_*`; and the three `@` semantics of P10, now AC-3 of
+  [automation-by-convention.md](automation-by-convention.md)) and
   `control/mpc/controller.py` (seventeen `_` methods, hasattr-and-set from
   `export_mpc_dual_rate_computer`, the factory at line 340). Each is a conversation, then a
   step ladder of its own.
@@ -475,11 +497,14 @@ pick):
   in order; one set of Monte Carlo defaults for `MonteCarloEvaluator` and `Planner.evaluate`;
   flat-kwarg keys derived from the option dataclasses; one owner of the sets between
   `StateSpaceGrid` and its planner; one print-text rule for the textbook objects; one verbose
-  and empty-cache rule across the `compute_*` facades.
+  and empty-cache rule across the `compute_*` facades. Related findings recorded in
+  [automation-by-convention.md](automation-by-convention.md) §2.5: the automatic solver choice
+  changes the input-hold model; the backend fallback is written three times.
 - [ ] **S66 Wiring mistakes fail at wiring time** **[ask — core]** (RULES 4.10; scan: core#2,
   core#13): `connect` refuses to rewire a connected subsystem input; the compile probe
   detects an output that moves with an input it does not declare (raise or warn: ROADMAP
-  §6).
+  §6). Lands after AC-4 of [automation-by-convention.md](automation-by-convention.md), whose
+  loop-input Sums stop rewiring a connected input.
 - [ ] **S67 One plot vocabulary** (scan: graphics#0, graphics#4, graphics#5, graphics#6,
   graphics#8, graphics#9, analysis#9, analysis#10): `title`, `ax`, `backend` and `show`
   honoured by every plot verb, one `PlotResult.axes` shape; `plot_trajectory` selects a

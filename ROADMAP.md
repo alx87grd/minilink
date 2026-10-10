@@ -178,7 +178,7 @@ contract. Step-level work:
 | State-space MIMO — bicycle model, controllability at every nominal speed | `KinematicBicycle`, `controllability`, `observability` | green | — |
 | Optimal control — LQR on the guide's cost, closed-loop poles, nonlinear check | `lqr_at_operating_point`, `StateFeedbackController` | green | — |
 | Pole placement — `K_sta` for a prescribed pole set | `place`, `place_at_operating_point` | green (2026-09-26) | — |
-| Nested loops — inner speed loop, outer position loop | `@` composition | green (verified) | stays green with the observer in the loop |
+| Nested loops — inner speed loop, outer position loop | `@` composition | green for error-driven compensators (`PID @ (PID @ G)`); an outer `r, y` or state controller is refused today (2026-10-10 review, D5) | AC-3 of [automation-by-convention.md](docs/plans/automation-by-convention.md) inlines plant-side diagrams; stays green with the observer in the loop |
 | State estimation — Luenberger observer and Kalman filter | `estimation` (v0.2) | scheduled v0.2 | `LuenbergerObserver` and steady-state `KalmanFilter` closing the loop as standard diagram blocks |
 | Reference scaling — the `N` matrix giving `y = r` at steady state | `StateFeedbackController(K, N=N)` | green (2026-10-10) | the student writes `N = -(C (A - B K)⁻¹ B)⁻¹`; the block takes the output reference |
 
@@ -304,8 +304,13 @@ wave B. A4 and A5 stay here.
   RN-1 of [randomness.md](docs/plans/randomness.md) (`WhiteNoise` with its `psd`), then P4. The
   disturbance convention was decided 2026-09-26 (§6). **[ask]**
 - **B4** Polish: **P9** `TransferFunction` ports built once (landed 2026-10-10:
-  `LTISystem(..., declare_ports=False)` for a subclass's own layout), **P10** the
-  three `@` dispatch paths documented and pinned by a test; **P6** the z tier
+  `LTISystem(..., declare_ports=False)` for a subclass's own layout), **P10**
+  automation by convention ([automation-by-convention.md](docs/plans/automation-by-convention.md),
+  analysis 2026-10-10): ports are the declaration and one role resolver serves composition,
+  plot signals, the camera and every plant-and-controller tool — AC-1 to AC-3 in this wave
+  (AC-1 bug fixes now; AC-2, AC-3 after the §6 decisions), AC-4 beside P4 and before P11,
+  AC-5 / AC-6 in the plotting lane, AC-7 in v0.3 with RN-4 / RN-5, AC-8 in v0.9 with S31;
+  **P6** the z tier
   stays held (teach with `discretize` + simulation) unless the sommatif
   examines z-plane analysis; **S61** every analysis verb takes a `System`;
   **S62** the LQR family on the control band facade. **[ask — public names]**
@@ -602,6 +607,26 @@ here. Each open item needs the maintainer.
   plot labels for internal signals; a style sweep of display names.
 - **CBF safety filter** ([cbf-safety-filter.md](docs/plans/cbf-safety-filter.md)):
   research lane until a course asks; the barrier is a `Field` once A1 lands.
+
+**Automation by convention** ([automation-by-convention.md](docs/plans/automation-by-convention.md) §5, P10; analysis 2026-10-10)
+
+- **Principles and conventions:** manual first (a loop is `add_subsystem` + `connect` of
+  plain Systems; shortcuts build that diagram and store nothing), port names are the
+  declaration (RULES 4.9 extended with `e`, `x`, `q`, `dq`; a DESIGN §4 "Conventions"
+  section), roles resolved at use time by one resolver, state is `n`, a few explicit hints
+  (`plot_space`, `solver_info`, seeds, camera, one override per role). Recommended: yes.
+- **`feedback_profile` leaves wiring** and becomes a plot hint; the course strings `state`
+  and `output` stay accepted, an unknown string raises. Recommended: yes.
+- **Loop inputs:** a plant's own `w` / `v` port wins over a loop Sum (`v` only when the
+  measured output depends on it); `r=`, `w=`, `v=` accept a source block with a fixed id.
+  Reconciles randomness.md A9 / D24. Recommended: yes.
+- **The command is the port `u` for every tool** (planners, LQR, place, value iteration,
+  Gym, `discretize`, the cost's `u`): `w` / `v` stop being actuators on multi-input plants.
+  Recommended: yes, in v0.3 with RN-4 / RN-5.
+- **One id scheme across flow and hybrid** (params keys and random-stream names change
+  once). Recommended: yes, in v0.9 with S31.
+- **P11's `Controller(feedback=…)`**: unnecessary once ports are the declaration.
+  Recommended: drop the ask unless the P11 notebooks show a gap.
 
 **Before v0.3 wave C (S72, the path-integral planner)**
 
