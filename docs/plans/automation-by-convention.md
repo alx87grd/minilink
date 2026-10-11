@@ -661,8 +661,75 @@ Notes on the evidence:
   and `w`. No code does this, and the message points to `closed_loop(r=Step(), w=...)`
   (AC-4).
 
+**Decision 10 (agreed 2026-10-11): `+` is plain, `autowire` matches names only, and a
+port has one name.** Custom diagrams are built from blocks whose port names already say
+how they connect; `autowire` then joins equal names with no guessing.
+
+1. **Ports outside, positions inside.** A port name is the block's external interface:
+   wiring, `autowire`, plot signals, diagram drawings, error messages. The equations see one
+   stacked `u = [port_1; port_2; ...]` in port order, the textbook `f(x, u)`, and read slices
+   by position. Port order is fixed at construction, and renaming changes only the outside.
+2. **One name per port, no aliases.** A second, external name would appear everywhere a port
+   is named and double every concept. The only reason for aliases is to protect equations
+   that read by name, and point 3 handles that.
+3. **Reading by position is the default; reading by name stays supported.**
+   - Library code, docs and examples read `u` by position. Only 8 library lines read their
+     own inputs by name today, all in plants: the noisy pendulum and cart-pole, the two
+     bicycles, the racecar, and the arm's tool force. They become positional
+     (`tau, w = u[0], u[1]`) with identical results, and RULES gets one line.
+   - Students and user blocks keep `get_port_values_from_u(u, "y")`, the readable helper.
+4. **`rename_ports(**names)` on the base `System`.**
+   - About 15 lines, written once. It moves each port to its new name, keeping the order,
+     and updates the output dependency lists.
+   - It works for every library block, catalog plant and user block.
+   - It is chained at creation: `ProportionalController(2.0).rename_ports(u="u_cmd")`.
+   - Leaf blocks only; a diagram names its boundary ports when it exposes them.
+   - A renamed block opts out of `@` automation by design.
+   - A keyword on every constructor was rejected: dozens of classes to edit, for uneven
+     coverage.
+5. **Sources name their signal at creation**, the most common case:
+   - `Step(final_value=1.0, port="r")`, `Sine(..., port="v")`, `WhiteNoise(port="w")`,
+     `TrajectorySource(..., port="u")`; the default stays `y`.
+   - The four sources build their one output in the shared `Source.__init__`, so it is one
+     keyword there, passed through by four constructors.
+6. **No silent mistake.** An in-memory probe found two cases:
+   - **A block whose equation asks for `"y"` after `y` was renamed** fails loudly but with
+     a bare `KeyError: 'y'`, and `compile()` does not catch it. The name lookup will raise a
+     clear message naming the block, its current inputs, and the fix.
+   - **Swapping two names in one call** is silently wrong: the equation reads the other
+     port, and in the probe the controller's sign flipped. `rename_ports` refuses any new
+     name that is already a port of the block, so swaps and chains are impossible.
+
+   A stale name can then only fail loudly, never resolve to another port. Renaming a block
+   already placed in a diagram also fails loudly, and the docs say to rename at creation.
+7. **`autowire()` connects by name only.**
+   - Each unconnected input takes the one output with the same name and size.
+   - An output may feed several inputs.
+   - No match, or several, leaves the input open and listed in a warning; `strict=True`
+     raises.
+   - The three guessing rules go (source → `r`, plant `y` → measurement, the `r_` prefix).
+     About 160 lines become about 30.
+8. **`+` stays plain:** blocks side by side in a new flat diagram, with no wiring.
+
+```python
+ref = Step(final_value=1.0, port="r")
+ctl = ProportionalController(2.0).rename_ports(u="u_cmd")
+sat = Saturation(-1, 1).rename_ports(u="u_cmd", y="u")
+plant = Integrator()
+loop = (ref + ctl + sat + plant).autowire()   # every connection read from the names
+```
+
+**Evidence for decision 10.** A read-only replay of today's four `autowire` uses with the
+name-only rule:
+
+| Use | Name-only result |
+|---|---|
+| The bicycle cascade demo (planner, tracking, heading, yaw-rate and speed loops, vehicle; custom names) | the same wiring on all 10 inputs: it replaces ten `connect` lines |
+| `Step() + ImpedanceController() + Pendulum()` (`00_core`, a demo) | the reference stays open: the step's output is named `y`. It becomes `Step() >> ctl @ plant`, or `Step(port="r")` |
+| `Step() + ProportionalController() + Integrator()` (tests) | the reference open, the measurement ambiguous; rewritten to the new rule |
+| The arm's second reference | stays open; one `connect` line, or `port="r_null"` on its source |
+
 **Still open, to plan before any code:**
-- `+` and `autowire()`;
 - what `@` builds and names: §3.4 proposes nesting diagram operands under their role keys,
   to reconcile with the flat result of decision 8;
 - `feedback()` and its own preference for `r`;
@@ -685,7 +752,7 @@ It is captured twice and `cmp`'d.
 |---|---|---|
 | **AC-0** | No controller classes; `plot_control_law` on `System`; the four course notebooks migrated (import line and base class) | agent, after decision 7; v0.2 B4 |
 | **AC-1** | **Landed 2026-10-10.** Safe fixes and pinning tests, one commit each with its own test: D1 and D6 refused (an Error junction on a block that reads its own measurement); D2 (sampled state feedback runs); D4 (unknown or unused `closed_loop` keywords refused); A (`>>` reads a hand-wired diagram's declared output); B (a diagram `x0` set by the user is kept, until S29); C (a static block whose output is `u` simulates; the command's signal name waits for AC-5); D (`autowire` never routes one command to two inputs, and warns when it leaves inputs open); the `t = 0` scoring; `disturbances={"u"}` refused. `TestDispatchTable` pins the loop each library controller gets. The census is a scratchpad script (AGENTS recipe), captured again before each later step | agent (bug fixes) |
-| **AC-OP** | The operators of §3.10: no operator modifies its operands (decision 8), then the plain `>>` rule (decision 9); one commit each, with the census and the replay of every `>>` call | core, after the operator review closes; v0.2 B4 |
+| **AC-OP** | The operators of §3.10, one commit each, with the census and the replay of every `>>` and `autowire` call: no operator modifies its operands (decision 8); the plain `>>` rule (decision 9); then decision 10 (the 8 positional plant lines, `rename_ports` with its two safety rules, `port=` on sources, name-only `autowire`, and the migration of `00_core`, two demos and their tests) | core, after the operator review closes; v0.2 B4 |
 | **AC-2** | `roles()`, `block_roles()` and `command_port()` in `core/feedback.py`, with every reader switched; reserved ids raise on a clash. (a) Byte-identical census, with today's ids mapped. (b) The id rename in flow and hybrid: `ctl` → `controller`, `sys` → `plant`, `ref` → `reference`; sources `disturbance` and `noise`; helpers `error` and `filter`; the expected diff is ids, params keys, signal names and stream names | after decisions 1 and 5; v0.2 B4, before RN-4 |
 | **AC-3** | Composition on standard names. Removed: profiles, overrides, port keywords, `error_input`, `_composition_*`, shape ids, the camera copy. Changed: diagram operands nested; `G @ K` naming; leaves expose `x`; MPC renamed; `filter=`; refusals point to hand wiring. The course notebooks drop `feedback_profile` | after decision 2; v0.2 B4, gates P4 |
 | **AC-4** | Loop inputs: the plant wrapper owns `w` and `v`; sources as values, named `reference`, `disturbance`, `noise`; `estimator=` (with P4); randomness A9 / D24 reconciled | after decision 3; beside P4, before P11 |
@@ -757,6 +824,10 @@ Each is recorded in ROADMAP §6.
    2026-10-10.*
 9. **`>>` is a plain serial connection** by the four rules of §3.10: one-to-one, same name,
    `y` → `u`, else refuse. *Agreed in principle on 2026-10-10.*
+10. **`+` is plain, `autowire` matches names only, one name per port.** Ports outside,
+    positions inside: library equations read `u` by position, and the name helper stays for
+    students. `rename_ports` at creation, `port=` on sources, and no silent mistake.
+    *Agreed on 2026-10-11.*
 
 **Ruling, not a decision.** The name freeze (ROADMAP §4.1 gate 7) is paused between terms
 (maintainer, 2026-10-10). A rename migrates every course notebook in the same commit, with

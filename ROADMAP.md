@@ -317,8 +317,9 @@ wave B. A4 and A5 stay here.
   - AC-1, bug fixes (landed 2026-10-10);
   - AC-2, the resolver and the id rename, before RN-4;
   - AC-3, composition on standard names, after the §6 decisions;
-  - AC-OP, the operators: none modifies its operands, and `>>` becomes a plain serial
-    connection, after the operator review closes.
+  - AC-OP, the operators, after the operator review closes: none modifies its operands,
+    `>>` becomes a plain serial connection, `+` is plain, and `autowire` matches names
+    only.
 
   The later steps: AC-4 beside P4 and before P11; AC-5 / AC-6 in the plotting lane; AC-7
   (cost relative to the plant) in v0.3 with RN-4 / RN-5; AC-8 in v0.9 with S31;
@@ -674,6 +675,14 @@ here. Each open item needs the maintainer.
   one-to-one, else the same name, else `y` → `u`, else it refuses. There is no `r`
   preference and no hidden memory. Agreed in principle on 2026-10-10. A replay of the
   104 `>>` calls that run shows 100 unchanged.
+- **`+` is plain, `autowire` matches names only, one name per port** (decision 10).
+  - Port names are the block's interface; equations read `u` by position (library
+    default), and the name helper stays for students.
+  - `rename_ports` at creation, plus `port=` on sources (`Step(port="r")`).
+  - Renames can't fail silently: a clear error for a stale name, and swaps are refused.
+  - `autowire` joins equal names only, and its guessing rules go.
+
+  Agreed on 2026-10-11.
 - **Ruling:** the GRO860 name freeze (§4.1 gate 7) is paused between terms (maintainer,
   2026-10-10).
 
