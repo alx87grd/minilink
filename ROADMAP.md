@@ -322,7 +322,8 @@ wave B. A4 and A5 stay here.
     `expose` builds role boxes, `@` needs a plant and `feedback` closes an open loop.
 
   The later steps: AC-4 beside P4 and before P11; AC-5 / AC-6 in the plotting lane; AC-7
-  (cost relative to the plant) in v0.3 with RN-4 / RN-5; AC-8 in v0.9 with S31;
+  (cost relative to the plant) in v0.3 with RN-4 / RN-5; AC-8a (the hybrid helpers keep
+  in step) with the core steps it mirrors, and AC-8b (mainstream hybrid) in v0.9 with S31;
   **P6** the z tier
   stays held (teach with `discretize` + simulation) unless the sommatif
   examines z-plane analysis; **S61** every analysis verb takes a `System`;
@@ -721,6 +722,9 @@ here. Each open item needs the maintainer.
   - Boxes are allowed on both sides.
   - The reference is sampled from the continuous side.
   - The `hybrid_closed_loop` port keywords go.
+  - Scope: the hybrid loop is a side helper for MPC simulation, not mainstream yet. What
+    exists keeps in step with the core (AC-8a); mainstream integration comes later, with
+    S31 (AC-8b).
 
   Chosen on 2026-10-11. **The operator review is closed:** `+`, `autowire`, `>>`, `@`,
   `feedback` and `%` are all planned.

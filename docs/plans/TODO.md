@@ -216,14 +216,22 @@ the new code copies clean patterns and no shortcut is added only to be dropped.
   - AC-7: cost relative to the plant. One compiled loop for the three Monte Carlo
     backends, `trajectory_of(problem.sys)` by identity, `command_port` the only decided
     input. v0.3, with RN-4 / RN-5.
-  - AC-8: hybrid on the same rules (decision 15). v0.9, with S31.
-    - `%` accepts anything with no continuous state, and `(P >> Sat) % dt` works. A
-      continuous controller (PID, Lead) raises `NotImplementedError` (future work, see P6).
-    - `computer @ plant` dispatches like `@`, with the error inside the computer.
-    - Boxes on both sides; the `u_nom` / `u_ff` / first-port guesses go.
-    - `source >> sampled loop` puts the source on the continuous side.
-    - The `hybrid_closed_loop` port keywords go: 2 demos and the GRO501 racecar notebook
-      (`mpc % dt @ inner`) are migrated.
+  - AC-8: hybrid on the same rules (decision 15). The hybrid loop is a side helper for MPC
+    simulation, not mainstream yet; what exists behaves like the core so that integrating
+    it later is easy.
+    - AC-8a, keep in step: each item lands with the core step it mirrors (AC-2b, AC-3, the
+      MPC rename). No new hybrid feature.
+      - The same ids.
+      - A continuous controller (PID, Lead) in `%` raises `NotImplementedError` (future
+        work, see P6).
+      - `computer @ plant` dispatches like `@`, with the error inside the computer.
+      - Boxes on both sides; the `u_nom` / `u_ff` / first-port guesses go.
+      - The `hybrid_closed_loop` port keywords go: 2 demos and the GRO501 racecar
+        notebook (`mpc % dt @ inner`) are migrated.
+    - AC-8b, mainstream integration, v0.9 with S31:
+      - `source >> sampled loop`, with the source on the continuous side;
+      - `(P >> Sat) % dt`;
+      - the hybrid loop as a `System` for plots, cost and Monte Carlo.
 
   Done when a hand-wired loop with the role ids and its shortcut give the same roles,
   plots, camera and score, and the census is byte-identical for every case that worked

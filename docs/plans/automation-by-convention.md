@@ -526,7 +526,7 @@ Why they stay apart:
     by the `command_port` rule;
   - P4's `compensator(observer, K)` is `controller`, holding `estimator` and `gain`;
   - actuator limits belong to the plant box (`Saturation >> arm`), not to the controller;
-  - the hybrid loop's `computer` and `plant` fields are boxes already (AC-8).
+  - the hybrid loop's `computer` and `plant` fields are boxes already (AC-8a).
 - **Facts on `dev` @ 178f290.**
   - `@` refuses a diagram operand (`_add_system_to_diagram`, `composition.py:806`).
   - From the top of a nested loop, only the box's edge can be plotted (`plant:y`); a block
@@ -708,7 +708,7 @@ This is an estimate of most cases, not a measured share.
 
 The composition operators were reviewed one at a time, and the review closed on 2026-10-11
 with decision 15. This section records what was decided; code follows in AC-OP, and in
-AC-8 for `%`.
+AC-8a / AC-8b for `%`.
 
 **Decision 8 (agreed 2026-10-10): no operator modifies its operands.**
 - Today `+` and `>>` extend a diagram left operand in place and return it. After
@@ -943,6 +943,25 @@ The entry comes from three mechanisms:
 sampled loop: the computer reads the plant through a sampler and drives it through a
 zero-order hold.
 
+**Scope (maintainer, 2026-10-11).** The hybrid loop is not a mainstream core component
+yet: today it is mostly a side helper for MPC simulation. What exists should still behave
+like the core, so that integrating it later is easy. Decision 15 therefore splits in two:
+- **Keep in step (AC-8a), now.** As each core rule lands, the hybrid helpers follow it:
+  - the same ids;
+  - the same dispatch as `@`;
+  - boxes on both sides;
+  - no port guessing;
+  - no port keywords;
+  - clear refusals.
+
+  No new hybrid feature is built for this.
+- **Mainstream integration (AC-8b), later, with S31 (v0.9):**
+  - `source >> sampled loop`;
+  - `(P >> Sat) % dt` (a flow diagram with no continuous state converted to a step
+    diagram);
+  - the hybrid loop as a `System` for plots, cost and Monte Carlo;
+  - sampled dynamic controllers, which are future work.
+
 **What `%` does today** (probe on `dev` @ 2bf1c2d):
 
 | You write | Today |
@@ -1003,7 +1022,8 @@ zero-order hold.
 5. **The reference.** `Step() >> ctl % dt @ plant` reads like the continuous loop.
    - The source sits on the continuous side, and the computer samples it at its own rate:
      the reference is a world signal the computer reads.
-   - It lands with AC-8. Until then, `compute_forced(r, input_port_id="r")` as today.
+   - It lands with AC-8b (mainstream integration). Until then,
+     `compute_forced(r, input_port_id="r")` as today.
 6. **Manual path and keywords.** Custom names use `HybridDiagram` + `connect_boundary`.
    - The port keywords of `hybrid_closed_loop` go, like `closed_loop`'s (decision 2).
    - Migration: the 2 demos use standard names or the manual path, and the GRO501
@@ -1043,7 +1063,8 @@ It is captured twice and `cmp`'d.
 | **AC-5** | Plot auto mode, role selectors, id paths, labels, units and colours by role, one default; signals inside a role box found by object and by path (`plant:motor:y`) | plotting lane, v0.2 D |
 | **AC-6** | The camera rule at animate time, looking inside the `plant` box; no compensator skin inside a loop | plotting lane |
 | **AC-7** | Cost relative to the plant across every evaluator and design tool (§3.5), on the `plant` box's state and `u`: one compiled loop for the three backends, `command_port`, stateful and time-varying laws, cost params, one price; Gym and the rollout environment aligned | after decision 4; v0.3, with RN-4 / RN-5 |
-| **AC-8** | Hybrid on the same rules (decision 15): fields as roles; `%` accepts anything with no continuous state, and a continuous controller raises `NotImplementedError`; `computer @ plant` dispatches like `@`, with the error inside the computer; boxes on both sides, and the `u_nom` / `u_ff` / first-port guesses go; `source >> sampled loop` puts the source on the continuous side; the `hybrid_closed_loop` port keywords go (2 demos and the GRO501 racecar notebook migrated); the dual-rate MPC composite exposes `u` | with S31, v0.9 |
+| **AC-8a** | The hybrid helpers keep in step with the core (decision 15; the hybrid loop is a side helper for MPC simulation, not mainstream yet). Fields as roles; the same ids (AC-2b); a continuous controller in `%` raises `NotImplementedError`; `computer @ plant` dispatches like `@`, with the error inside the computer; boxes on both sides, and the `u_nom` / `u_ff` / first-port guesses go; the dual-rate MPC composite exposes `u`; the `hybrid_closed_loop` port keywords go (2 demos and the GRO501 racecar notebook migrated). No new hybrid feature | each item with the core step it mirrors (AC-2b, AC-3, the MPC rename) |
+| **AC-8b** | Mainstream integration: `source >> sampled loop` with the source on the continuous side; `(P >> Sat) % dt`; the hybrid loop as a `System` for plots, cost and Monte Carlo; sampled dynamic controllers (future work, TODO beside P6) | with S31, v0.9 |
 
 **Done when:**
 
@@ -1159,6 +1180,9 @@ Each is recorded in ROADMAP §6.
     - Boxes are allowed on both sides.
     - The reference is sampled from the continuous side.
     - The port keywords of `hybrid_closed_loop` go.
+    - Scope: the hybrid loop is a side helper for MPC simulation today. AC-8a keeps it in
+      step with each core rule as that rule lands; AC-8b integrates it into the mainstream
+      later, with S31.
 
     *Chosen on 2026-10-11.* With it, the operator review is closed.
 
