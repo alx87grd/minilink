@@ -1030,6 +1030,54 @@ like the core, so that integrating it later is easy. Decision 15 therefore split
      notebook becomes `mpc % dt @ inner`.
    - MPC keeps its own `%` (its `dt` check).
 
+**The port keywords that go** (decisions 2 and 15; facts on `dev` @ 09ee075). These exist
+only to tell a loop builder about non-standard port names. Standard names plus hand wiring
+(`connect`, `connect_boundary`), `rename_ports` and `expose` cover the same cases.
+
+*1. Keywords of `closed_loop` / `@`, removed in AC-3.*
+
+| Keyword | What it does | Callers outside the library |
+|---|---|---|
+| `ref_port="r"` | names the controller's reference input | none |
+| `measurement_port="y"` | names the controller's measurement input | none |
+| `control_port="u"` | names the controller's command output | none |
+| `plant_input_port="u"` | names the plant's command input | none |
+| `plant_output_port="y"` | names the plant's measured output | 1 test, which checks a refusal |
+| `output_port="y"` | names the loop's boundary output | 1 test, which checks a refusal |
+| `feedback="auto"` / `"y"` / `"qdq"` | forces how the measurement is wired | `"qdq"` goes with decision 11; `"y"` only in tests |
+
+The 2 refusal tests go.
+
+*2. Override attributes on block classes, removed in AC-3.* `measurement_port`, `ref_port`
+and `control_port` are class attributes on 6 library classes, and `feedback_profile`
+appears in 13 places.
+
+| Class | Overrides today | After |
+|---|---|---|
+| MPC controller | `y` → `u_ff` | ports `x` → `u` (the MPC rename of decision 2) |
+| `LookupPolicy`, the Gym policy, the neural controller | `x` → `u`, no reference | nothing to declare: the ports already say `x` → `u` |
+| the geometric controller | `y` → `u`, no reference | nothing to declare |
+| `TransferFunction` (`ports=` layout) | sets the three names from the layout | nothing: the layout's port names are read directly |
+| impedance, model-based and task controllers | `feedback_profile` | nothing: their `r`, `y`, `u` ports say it |
+
+*3. Keywords of `hybrid_closed_loop`, removed in AC-8a:* `computer_out`, `computer_in`,
+`plant_in`, `plant_out`, `ref_port`, `output_port`, `extra_boundaries`.
+
+| Callers | Today | After |
+|---|---|---|
+| `sampled_smc_pendulum` demo, 4 tests | pass the defaults (`computer_in="y"`, `plant_out="y"`) | drop the keywords |
+| GRO501 `racecar_toward_mpc`, 4 MPC tests | `computer_out="u_ff"` | `mpc % dt @ inner`, once MPC gives `u` |
+| `hybrid_multi_rate` demo, 1 test | `computer_out="u_cmd"`, `computer_in="y_meas"` | name the step diagram's ports `u` and `y`, or wire by hand |
+| `projects/pathtracking/mpc_v1/run_demo.py` | `x_nom`, `y_mpc` (custom names) | the manual path: `HybridDiagram(...)` + `connect_boundary(...)` |
+| `extra_boundaries` | no caller | `connect_boundary`, which exists |
+
+*What stays, because these are not port keywords:*
+- `closed_loop`'s loop inputs: `r=`, `d=`, `n=`, `filter=`, `estimator=`, `validate=`;
+- `hybrid_closed_loop`'s `schedule=` and `computer=`;
+- `feedback(L, of=(port, i))`, an explicit choice of what returns (decision 14);
+- naming at creation: `Demux(port=)` and the sources' `port=` (decision 10);
+- analysis keywords such as `bode(of=, wrt=)`.
+
 **Settled since:**
 - what `@` builds and names: it nests a box under its role key and keeps a leaf a leaf,
   while `>>` and `+` stay flat (decision 12, §3.4);
@@ -1103,7 +1151,8 @@ Each is recorded in ROADMAP §6.
 
    *Recommended: yes.*
 2. **Standard names only.** Profiles, overrides, port keywords and shape ids are removed;
-   MPC is renamed to `x` → `u`; custom names are wired by hand. *Recommended: yes.*
+   MPC is renamed to `x` → `u`; custom names are wired by hand. The exact list is in
+   §3.10, *The port keywords that go*. *Recommended: yes.*
 3. **Loop inputs.** The plant, or the wrapper the loop builds around it, owns `d` and `n`;
    `r=`, `d=`, `n=` accept a source block; `estimator=`. *Recommended: yes.*
 4. **Cost relative to the plant.** Scored by identity on `trajectory_of(problem.sys)`, with

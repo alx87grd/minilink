@@ -201,7 +201,7 @@ the new code copies clean patterns and no shortcut is added only to be dropped.
     RULES 4.9). After decisions 1 and 5.
   - AC-3: composition on standard names.
     - Removed: profiles, overrides, port keywords, `error_input`, `_composition_*`, shape
-      ids.
+      ids (exact list: plan §3.10, *The port keywords that go*).
     - Changed: role boxes nested by `@` with the edge check (decision 12); leaves expose
       `x`; MPC renamed to `x` → `u`; `filter=`.
     - Decision 11: a mechanical plant gives `y` (`[q; dq]`) and `x`; the `q` / `dq` ports,
@@ -220,7 +220,8 @@ the new code copies clean patterns and no shortcut is added only to be dropped.
     simulation, not mainstream yet; what exists behaves like the core so that integrating
     it later is easy.
     - AC-8a, keep in step: each item lands with the core step it mirrors (AC-2b, AC-3, the
-      MPC rename). No new hybrid feature.
+      MPC rename). No new hybrid feature. The exact list of keywords that go is in plan
+      §3.10.
       - The same ids.
       - A continuous controller (PID, Lead) in `%` raises `NotImplementedError` (future
         work, see P6).
