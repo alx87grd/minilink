@@ -658,6 +658,9 @@ here. Each open item needs the maintainer.
     `ctl` → `controller`, `sys` → `plant`, `ref` → `reference`.
   - Sources are named `disturbance` and `noise`.
   - A role id wins over `System.id`.
+  - `estimator` is a state estimate only; a filter on the measurement is the helper
+    `filter` at the loop's top level, and a physical sensor goes in the plant box
+    (ruling 2026-10-11).
 
   Recommended: yes, in v0.2.
 - **P11's `Controller(feedback=…)`**: unnecessary once ports are the declaration.

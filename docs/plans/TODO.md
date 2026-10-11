@@ -187,6 +187,9 @@ the new code copies clean patterns and no shortcut is added only to be dropped.
     - decision 14: `@` needs a plant on the right; `L @ number` becomes `feedback(L, ...)`
       (5 test lines, the anti-windup demo, one notebook table line); `feedback` closes on
       the command input and returns `y`; `through=` becomes `filter=`; one junction helper.
+    - Ruling 2026-10-11: `estimator` is a state estimate only; the filter is the helper
+      `filter` at the loop's top level, beside `error`; a physical sensor goes in the plant
+      box.
 
     Docs only for now; code after the operator review (`%`) closes. `@` and `feedback` are
     settled (decisions 12 and 14).

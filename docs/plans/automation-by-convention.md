@@ -404,7 +404,7 @@ The same key names everything else about that block:
 |---|---|---|
 | `plant` | the system under control | `@`, `closed_loop`, `% dt @` (as `HybridDiagram.plant`), the evaluators, a hand-wired diagram |
 | `controller` | the law that commands the plant | the same |
-| `estimator` | the state estimate the controller reads | `closed_loop(estimator=)`, or inside a `controller` composite |
+| `estimator` | the state estimate the controller reads (`u`, `y` → `x`); a filter or a sensor is not an estimator | `closed_loop(estimator=)`, or inside a `controller` composite |
 
 - The three role ids are reserved.
   - There is one of each per diagram level, and a clash raises; it is never suffixed.
@@ -415,7 +415,31 @@ The same key names everything else about that block:
   keys and the random-stream names:
   - sources take the word for the input they drive: `reference`, `disturbance`, `noise`,
     or the port's own name for a custom port (`wind`);
-  - helpers are `error` and `filter`.
+  - helpers are `error` and `filter`; a filter on the measurement is a helper, not the
+    estimator role.
+
+**What sits on the way back (ruling 2026-10-11).** The `estimator` role is a state estimate
+only. A filter and a sensor are not estimators.
+
+| On the way back | What it is | Where it belongs |
+|---|---|---|
+| a sensor's lag, gain or quantization | physics | inside the plant box: the plant is what you measure through |
+| a low-pass or notch filter on `y` | an algorithm that gives a cleaned `y` | the helper `filter`: `feedback(C >> G, F)`, `closed_loop(filter=)`, or inside a controller box |
+| a Luenberger observer, a Kalman filter | an algorithm that gives the state estimate x̂ | the role `estimator`: reads `u` and `y`, gives `x` (P4) |
+
+Why they stay apart:
+- **Physics and algorithms are scored differently.** An estimator's state is integrated,
+  never scored; a physical sensor filed as an estimator would leave the plant.
+- **Port names would wire a filter wrong, silently.**
+  - Library filters (`LowPassFilter`, `NotchFilter`, a `TransferFunction`) read an input
+    named `u` and give `y` plus their own state `x`.
+  - Under the estimator convention, `u` is the command and `x` the estimate of the plant's
+    state.
+  - A state controller would read the filter's internal state as the plant's, unnoticed
+    when the sizes match.
+  - Only a special rule ("one input means a filter") could fix that.
+- **The textbook keeps them apart:** `H` or `F` on the measurement in classical control,
+  and an observer or a Kalman filter in state space.
 
 **Names considered and rejected:**
 - `sys`, `system`: they mean any `System` (`problem.sys`, every `sys` argument).
@@ -509,6 +533,34 @@ The same key names everything else about that block:
   - `P >> Sat` has no controller edge: its measurement stays open inside, and its output is
     `y`. A multi-block controller is therefore built by hand or with `expose`.
   - A `DiagramSystem` has no `x` output today.
+- **Where the filter goes (ruling 2026-10-11).** In `closed_loop(C, G, filter=F)` and in
+  `feedback(C >> G, F)`, the filter is a plain helper block at the loop's top level, beside
+  `error`. It is in neither the plant nor the controller.
+
+  ```
+  r ──► error(+) ──► controller ──► plant ──┬──► y   (true output, the loop's output)
+          ▲(−)                              │
+          └─────────── filter ◄─────────────┘   (plant y + n when noise is on)
+  ```
+
+  - **Wiring by keyword, with no name guessed:**
+    - plant `y` goes into F's one input;
+    - F's `y` (else its only output) goes where the controller's measurement goes: the
+      Error's minus input, or the controller's `y`;
+    - a transfer-function filter's input named `u` does not matter.
+  - **A controller that reads `x` with `filter=` is refused:** "a filter on the state is an
+    estimator; use `estimator=`".
+  - **Why the top level:**
+    - only the plant's state and command are scored;
+    - `plant:y` stays the true output, and the filtered signal is `filter:y`;
+    - the sensitivity functions take `plant=`, `controller=` and `filter=` as three blocks;
+    - the noise `n` enters before the filter, so the filter filters it.
+  - **Elsewhere, by building a box (decision 12):**
+    - a physical sensor goes in the plant box (`G >> SensorLag(...)`), and `plant:y` is then
+      the measured value;
+    - a filter that belongs to a reusable or sampled controller goes in a controller box
+      (edge `r`, `y` → `u`). This is the form the `%` review will use, since the computer
+      runs the filter.
 - **Loop inputs.** `closed_loop(d=, n=)` on a plant without those ports nests a plant
   wrapper whose boundary is `u`, `d`, `n`, so the plant always owns its disturbance and
   noise.
@@ -526,7 +578,7 @@ The same key names everything else about that block:
 
 | Use case | After |
 |---|---|
-| Composition | One port-based dispatch for `controller @ plant`: reads `y`, reads `x`, else an error junction on its entry, or a refusal that points to hand wiring; `feedback(L, K)` closes an open loop on itself (decision 14). `closed_loop(controller, plant, *, r, d, n, filter, estimator)`: each loop input is `False`, `True` (a boundary port) or a source block. No port keywords. |
+| Composition | One port-based dispatch for `controller @ plant`: reads `y`, reads `x`, else an error junction on its entry, or a refusal that points to hand wiring; `feedback(L, K)` closes an open loop on itself (decision 14). `closed_loop(controller, plant, *, r, d, n, filter, estimator)`: each loop input is `False`, `True` (a boundary port) or a source block. `filter=` puts the helper `filter` at the loop's top level, on what the controller reads. No port keywords. |
 | Plot signals | `signals="plant"`, `"controller"` or `"estimator"` selects every port of that block, as `"plant:y"` selects one. The default *auto* mode shows every port of the plant and the controller, each wire once; the reference, the error, `d` and `n` come in through their inputs. Signal names take id paths (`plant/plant:y`), reconstructed recursively, and a block inside a box is found by object too. Labels and units are copied onto exposed ports, and colours follow roles. With no roles, plots keep today's default. A leaf keeps `("x", "u")`. `compute_trajectory(show=True)` and the planning and comparison plots use the same default. |
 | Animation | Resolved at animate time. The camera comes from the one drawable block anywhere in the tree, else the drawable block on the `plant` path, else an auto-fit view. A compensator draws no skin inside a loop. `camera_priority` is removed, and `scene_grid` and the follow frame come from the same block. |
 | Cost and evaluation | The cost is relative to the plant. The tools build `policy @ problem.sys` (compiled once for all three Monte Carlo backends) and score `trajectory_of(problem.sys)` by identity: `x` is the plant's state, and `u` is its `command_port`. Controller and estimator states are integrated, never scored. A dynamic controller is integrated, not refused; `t` is honoured; the cost's params are passed; there is one price for leaving `X`. The `x0` draw is on the plant only, and the controller and the estimator start at their own `x0`. |
@@ -854,6 +906,7 @@ The entry comes from three mechanisms:
      `sensitivity(..., filter=)` already use. Positional calls (`feedback(C >> H, F)`) are
      unchanged.
    - The junction stays `error` (`sum` for positive feedback).
+   - The `filter` is a plain helper, never the `estimator` role (ruling 2026-10-11, §3.2).
 5. **Roles: only `controller @ plant` assigns them.**
    - In `feedback(L)`, a leaf `L` is `plant`, the one system in the loop.
    - A diagram `L` is laid out flat with its own ids (decision 8), so `feedback(C >> G)` is
@@ -967,6 +1020,8 @@ Each is recorded in ROADMAP §6.
      - `ref` → `reference` (about 31).
    - Sources are named `disturbance` and `noise`.
    - A role id wins over `System.id`.
+   - `estimator` is a state estimate only; filters and sensors are not estimators. A filter
+     is the helper `filter` at the loop's top level (ruling 2026-10-11, §3.2 and §3.4).
 
    *Recommended: yes, in v0.2.*
 6. **P11's `Controller(feedback=…)`.** A student writes a `System` with the ports of §3.2
