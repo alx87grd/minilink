@@ -93,8 +93,10 @@ open decision in ROADMAP §6 (each open item there needs the maintainer).
 
 **Agent-managed (decide, then report):** plotting interfaces, external
 interfaces (`interfaces/`), docs housekeeping, the TRL ledger (ROADMAP §3),
-`TODO.md`, recording in ROADMAP §5 and §6 a step that landed or a decision the
-maintainer took, plan-doc housekeeping, tests, `RULES.md` wording that does not
+`TODO.md`, recording a decision the maintainer took (in the plan doc it shapes and a
+dated record under `docs/reviews/`; it then leaves ROADMAP §6), removing a landed step
+from ROADMAP §5 and TODO (one fact, one home:
+[docs/plans/README.md](docs/plans/README.md)), plan-doc housekeeping, tests, `RULES.md` wording that does not
 change a public contract, and internal code structure that does not change a
 public contract. When you spot an opportunity outside your lane, ask — do not act.
 
