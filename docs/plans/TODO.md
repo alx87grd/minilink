@@ -106,7 +106,9 @@ loop part after AC-3); P4 with AC-4; P11. P6 stays held.
   LQR + Kalman stabilizes the guide's cart-pendulum from a disturbed start with noise on `u`
   and `y`, and `plot_diagram` shows the Figure 12 topology.
   Also: named input ports on the state-space base so observers and sensitivity blocks share
-  one `f` (scan: analysis#13); the plan names the estimation API once (scan: docs-gov#9).
+  one `f` (scan: analysis#13); the plan names the estimation API once (scan: docs-gov#9);
+  review the `estimator` role and the names around it against the real blocks
+  ([automation-by-convention.md](automation-by-convention.md) §10).
 - [ ] **P11 Two GRO501 notebooks** **[maintainer — student-facing]**:
   `teaching/topics/classical_control/dc_motor_propulsion.ipynb` (APP2) and
   `bicycle_autopilot.ipynb` (APP4), Basic tier, Colab-first; drafted for review. Students
@@ -468,6 +470,8 @@ together with P10's AC-7, between cohorts; S72 after them.
   MP-6 (the `loop` backend, facade names, DESIGN §6) with V3.
 - [ ] **Estimation follow-ups** after P4: EKF, time-varying and discrete Kalman as
   `estimation/` rows; online parameter estimators (recursive least squares, gradient laws).
+  Each revisits the estimator conventions of
+  [automation-by-convention.md](automation-by-convention.md) §10.
 
 ---
 

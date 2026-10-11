@@ -455,3 +455,15 @@ These do not change the rules:
   (the racecar) needs a name filter.
 - **The deferred wrapper**, if it is ever built: the names inside it, and how its edge shows
   the plant's `x`. Until then, the cost limit of §4.3 stands.
+
+**To revisit when the estimation features land** (P4, then the EKF and the time-varying and
+discrete Kalman filters). The `estimator` role and the standard names around it were set
+before any estimator existed, so they get a review then, against the real blocks:
+- the estimator's ports (`u`, `y` → `x`, labelled x̂), and whether the controller should read
+  the estimate under its own name rather than `x`;
+- how `closed_loop(..., estimator=)` wires them, and where the estimator sits in a
+  controller box;
+- what else a filter gives: a covariance, an innovation;
+- the noise inputs `d` and `n` that a Kalman design reads, and their link to the noise
+  blocks' `psd`;
+- how plots compare the estimate with the plant's state, and how Monte Carlo starts x̂0.
