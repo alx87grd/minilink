@@ -631,20 +631,22 @@ here. Each open item needs the maintainer.
   - Port names drive the wiring.
   - Three reserved subsystem ids (`plant`, `controller`, `estimator`) are the roles every
     tool reads, at use time, never inferred from the graph.
-  - State is `n`, and every leaf exposes `x`.
+  - State is `n`. `x` only where needed: plants expose it (every catalog plant already
+    does; a user plant opts in with `expose_state=True`), other blocks do not.
   - RULES 4.9 is extended with `e`, `x` and the ids, its `w` / `v` become `d` / `n`, and
     DESIGN gets a §4 "Conventions" section.
   - The compromise (plan §3.9): standard diagrams resolve automatically. Custom port
     names, several controllers or several plants take a few manual steps, and they keep
     the plots, camera and cost through the role keys.
 
-  Recommended: yes.
+  Approved on 2026-10-11, amended: `x` only where needed, not on every block.
 - **Standard names only.** `feedback_profile`, `PROFILE_PORTS`, the override attributes,
   `closed_loop`'s port keywords and the shape-based ids go. MPC becomes `x` → `u`. Custom
-  names are wired by hand. Recommended: yes.
-- **Loop inputs.** The plant, or the wrapper the loop builds around it, owns `d` / `n`;
-  `r=`, `d=`, `n=` accept a source block; `estimator=` comes with P4. This reconciles
-  randomness.md A9 / D24. Recommended: yes.
+  names are wired by hand. Approved on 2026-10-11.
+- **Loop inputs.** The plant that declares `d` / `n` owns them; `r=`, `d=`, `n=` accept a
+  source block; `estimator=` comes with P4. This reconciles randomness.md A9 / D24.
+  Approved on 2026-10-11. The automatic wrapper for a plant without `d` / `n` is deferred:
+  today's summing junctions stay, and the cost then sees `u + d` as the command.
 - **Cost relative to the plant.**
   - The evaluators build the loop themselves and score `trajectory_of(problem.sys)` by
     identity.
@@ -652,7 +654,7 @@ here. Each open item needs the maintainer.
   - `command_port` (`u`, else the single non-`d`/`n` input) is the only input that
     planners, LQR, `place`, value iteration, Gym and the cost decide.
 
-  Recommended: yes, in v0.3 with RN-4 / RN-5.
+  Approved on 2026-10-11, in v0.3 with RN-4 / RN-5.
 - **Role ids.** The roles are reserved subsystem keys; blocks get words and signals get
   symbols.
   - Renamed once, in flow and hybrid, before RN-4 names the random streams by id path:
@@ -663,9 +665,9 @@ here. Each open item needs the maintainer.
     `filter` at the loop's top level, and a physical sensor goes in the plant box
     (ruling 2026-10-11).
 
-  Recommended: yes, in v0.2.
+  Approved on 2026-10-11, in v0.2.
 - **P11's `Controller(feedback=…)`**: unnecessary once ports are the declaration.
-  Recommended: drop the ask.
+  Approved on 2026-10-11: the request is dropped.
 - **No controller classes.**
   - `Controller` and `DynamicController` are deleted, with no aliases, and the four
     course notebooks are migrated.

@@ -170,8 +170,8 @@ the new code copies clean patterns and no shortcut is added only to be dropped.
   - Automation works with standard names only; custom names are wired by hand.
   - The cost is scored on the plant.
 
-  Steps AC-0 to AC-8 of the plan; decisions 1–7 in its §5 **[ask — core]**, decisions
-  8–14 agreed or chosen 2026-10-10/11:
+  Steps AC-0 to AC-8 of the plan; decisions 1–15 of its §5 are all ruled (2026-10-10/11),
+  so no step waits on a decision:
   - AC-0: no controller classes; `plot_control_law` on `System`; the four course
     notebooks migrated (import line and base class). Agent, after decision 7.
   - AC-1 landed 2026-10-10: the ten safe fixes (D1, D2, D4, D6 of the 2026-10-10 review;
@@ -198,19 +198,21 @@ the new code copies clean patterns and no shortcut is added only to be dropped.
     `disturbance` and `noise` (blocks get words, signals get symbols); (c) the letters of
     decision 13 in the same pass, no alias: disturbance `w` → `d`, noise `v` → `n`
     (two noisy plants, `closed_loop(d=, n=)`, the sensitivity module and P5 notebook, tests,
-    RULES 4.9). After decisions 1 and 5.
+    RULES 4.9).
   - AC-3: composition on standard names.
     - Removed: profiles, overrides, port keywords, `error_input`, `_composition_*`, shape
       ids (exact list: plan §3.10, *The port keywords that go*).
-    - Changed: role boxes nested by `@` with the edge check (decision 12); leaves expose
-      `x`; MPC renamed to `x` → `u`; `filter=`.
+    - Changed: role boxes nested by `@` with the edge check (decision 12); plants expose
+      `x`, filters stop (check users first), and an `x` controller on a plant without `x`
+      is refused (decision 1, `x` only where needed); MPC renamed to `x` → `u`; `filter=`.
     - Decision 11: a mechanical plant gives `y` (`[q; dq]`) and `x`; the `q` / `dq` ports,
       `closed_loop_qdq`, `feedback="qdq"` and the Mux branch go; three demos, the showcase
       UR5 cell and the tests become `ctl @ plant`.
     - The course notebooks drop `feedback_profile`.
     - It gates P4.
-  - AC-4: loop inputs. The plant wrapper owns `d` / `n`; sources as values; `estimator=`.
-    Before P11.
+  - AC-4: loop inputs. A plant that declares `d` / `n` owns them; sources as values;
+    `estimator=`. The automatic wrapper is deferred (decision 3): a plant without `d` / `n`
+    keeps today's summing junctions, and the cost then sees `u + d`. Before P11.
   - AC-5: plot auto mode and AC-6: the camera from roles, both looking inside role boxes.
     Plotting lane.
   - AC-7: cost relative to the plant. One compiled loop for the three Monte Carlo
@@ -266,10 +268,9 @@ the new code copies clean patterns and no shortcut is added only to be dropped.
   `bicycle_autopilot.ipynb` (APP4), Basic tier, Colab-first; drafted for review. Done when
   both run top to bottom in Colab and the conda env, import only through the teaching
   surface, and agree with the guide's worked exercises.
-  First, **[ask — core]**: `Controller(feedback="state" | "output", ...)` declares its ports
-  from `feedback_profile`, so the student writes gains and `ctl` only (scan: examples#0).
-  P10 recommends dropping this ask: with ports as the declaration a student writes a `System`
-  with the conventional ports (automation-by-convention.md §5, decision 6).
+  The earlier ask for `Controller(feedback="state" | "output", ...)` was **dropped on
+  2026-10-11** (automation-by-convention.md §5, decision 6): with ports as the declaration, a
+  student writes a `System` with the conventional ports.
 
 ---
 
