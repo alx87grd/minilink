@@ -218,7 +218,8 @@ PathIntegralPlanner(
   deterministic problem is the textbook algorithm. A deterministic planner's warning
   is not raised.
 - **Returned `trajectory`** has `N + 1` samples, so the MPC block's `x_ff = plan.x[:, 1]`
-  and `u_ff = plan.u[:, 0]` read as they do for trajopt.
+  and its command `u = plan.u[:, 0]` (named `u_ff` until P10 renames the MPC port) read as
+  they do for trajopt.
 - **The picture.** The fan of sampled futures is the MPPI figure, so the record keeps
   the `n_shown` heaviest sampled rollouts of the tick with their weights (a bounded
   array, not the `K` paths), and `solution.plot_samples(signal=)` draws them shaded by

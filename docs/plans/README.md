@@ -9,6 +9,12 @@ Three backlog homes (do not invent a fourth); audits live separately:
 | **This folder** (other docs) | Design writeups for steps that need one — multi-step architecture / tradeoff docs |
 | [../reviews/](../reviews/) | Dated architecture audits and decision records (read-only history) |
 
+**One fact, one home.** What to build lives in the plan doc; the order of work and each
+step's "done when" in TODO; milestones, maturity, course goals and *open* questions in
+ROADMAP; how and why a decision was taken in a dated record under `docs/reviews/`; landed
+contracts in DESIGN. Other docs link to the home instead of restating it. A ruling goes to
+the plan doc it shapes and to its dated record; it leaves ROADMAP §6 when it is taken.
+
 Pyro parity rows stay in [pyro-port-remaining.md](pyro-port-remaining.md)
 (v0.3; open rows plus the landed name map). Landed contracts move into
 [DESIGN.md](../../DESIGN.md) and the plan doc is deleted; one-line ideas go
@@ -22,18 +28,18 @@ workboard-style id.
 
 ## Scheduled (a rung of ROADMAP §5 names them)
 
-| Doc | Scope | Rung |
-| --- | --- | --- |
-| [fields.md](fields.md) | The `Field` object on `(x, u, t)`: `QuadraticField`, `GridField`, `CallableField`; the Lyapunov certificate, DP and the approximator speaking it | v0.3 (A1; moved from v0.2 on 2026-09-26) — agreed 2026-09-15, not started |
-| [cost-params.md](cost-params.md) | Cost parameters as a dictionary like a system's; composite costs nested like diagram params | v0.3 (A2; moved from v0.2 on 2026-09-26) — agreed 2026-09-13, not started |
-| [geometry-module.md](geometry-module.md) | Workspace geometry home `core/geometry/` (Shape, Path, Track, Scene, bind, spatial Fields, course catalog); `planning.spatial` retires | v0.3 (A3; moved from v0.2 on 2026-09-26) — agreed 2026-09-21, not started |
-| [automation-by-convention.md](automation-by-convention.md) | v2: port names drive the wiring, three reserved subsystem ids (`plant`, `controller`, `estimator`) are the roles every tool reads, the cost is scored on the plant; no controller classes; a future-proof check against estimation, MPC, MPPI, randomness and RL; the inventory of today's hints and defects; steps AC-0–AC-8 | v0.2 B4 (P10: AC-0–AC-3), then beside P4 / before P11 (AC-4), plotting lane (AC-5, AC-6), v0.3 (AC-7), v0.9 (AC-8) — analysis 2026-10-10, awaiting the decisions of its §5 |
-| [naming.md](naming.md) | One naming rule for blocks and signals: the audit, six quick wins (five open), the larger alignments | v0.2 wave A (A4) — audit 2026-09-13 |
-| [randomness.md](randomness.md) | One convention for randomness: a `Distribution` has no time, a noise signal is a law held over a period, spectral density is the dt-free number; `NoiseSource` / `WhiteNoise` with the seed and period in params and a counter-based draw; one key per experiment (`realize`); the F9 decision before P4 | v0.2 (RN-1 wave B before P4, RN-2 wave A) and v0.3 (RN-4, RN-5; RN-3 with its first consumer) — agreed 2026-09-26 (rulings D1–D12), not started; reviewed 2026-09-30: D13 decided (one counter generator on both backends), amendments A2–A10 of its §10 awaiting ruling |
-| [gro501-classical-control.md](gro501-classical-control.md) | The GRO501 stack: `minreal`, `place`, sensitivity verbs, observers, facades, the z question, the two notebooks | v0.2 wave B (P2–P11) — wave 1 landed (P2, P3 on 2026-09-26), P7 and TB-a landed 2026-09-26; P4 held |
-| [pyro-port-remaining.md](pyro-port-remaining.md) | Pyro parity — open rows + name map | v0.3 wave C (C1) |
-| [mppi.md](mppi.md) | Path integral control (MPPI): `PathIntegralPlanner` beside trajopt, wrapped by `ModelPredictiveController`; both problem classes; the MPC block reads three planner verbs (T6); steps MP-1–MP-6 | v0.3 wave C (S72, MP-1–MP-3), before v0.9 (MP-4, MP-5), with V3 (MP-6) — proposed 2026-10-02, awaiting the asks of its §10 |
-| [optimizer-parametric-wiring.md](optimizer-parametric-wiring.md) | One optimizer backend table for the offline and the parametric (MPC) paths | v0.2 wave D (T5; the evaluator placement is a D3 row) — draft, July 2026 |
+| Doc | Scope | Rung | Status |
+| --- | --- | --- | --- |
+| [automation-by-convention.md](automation-by-convention.md) | Port names drive the wiring; three reserved names (`plant`, `controller`, `estimator`) are the roles every tool reads; the operators; the cost scored on the plant; steps AC-0–AC-8 in build order. History: [the decision record](../reviews/2026-10-11-automation-by-convention.md) | v0.2 B (P10), later steps to v0.3 and v0.9 | decided 2026-10-11, ready to build |
+| [gro501-classical-control.md](gro501-classical-control.md) | The GRO501 stack: `minreal`, `place`, sensitivity verbs, observers, facades, the z question, the two notebooks | v0.2 B (P2–P11) | mostly landed; open: P4, P6 (held), TB-b, S61, P11 |
+| [randomness.md](randomness.md) | One convention for randomness: a `Distribution` has no time, a noise signal is a law held over a period, spectral density is the dt-free number; `NoiseSource` / `WhiteNoise`, counter-based draws, one key per experiment (`realize`) | v0.2 A (RN-2), v0.3 (RN-3 to RN-5) | decided (D1–D24); RN-1 landed, RN-2 to RN-6 open |
+| [naming.md](naming.md) | One naming rule for blocks and signals: the audit, the quick wins, the larger alignments | v0.2 A (A4) | quick wins 1, 3, 6 open |
+| [fields.md](fields.md) | The `Field` object on `(x, u, t)`: `QuadraticField`, `GridField`, `CallableField`; the Lyapunov certificate, DP and the approximator speaking it | v0.3 (A1) | agreed, not started |
+| [cost-params.md](cost-params.md) | Cost parameters as a dictionary like a system's; composite costs nested like diagram params | v0.3 (A2) | agreed, not started |
+| [geometry-module.md](geometry-module.md) | Workspace geometry home `core/geometry/` (Shape, Path, Track, Scene, bind, spatial Fields, course catalog); `planning.spatial` retires | v0.3 (A3) | agreed, not started |
+| [pyro-port-remaining.md](pyro-port-remaining.md) | Pyro parity — open rows + name map | v0.3 C (C1) | open |
+| [mppi.md](mppi.md) | Path integral control (MPPI): `PathIntegralPlanner` beside trajopt, wrapped by `ModelPredictiveController`; steps MP-1–MP-6 | v0.3 C (S72), v0.9 (MP-4, MP-5) | proposed; asks in its §10 |
+| [optimizer-parametric-wiring.md](optimizer-parametric-wiring.md) | One optimizer backend table for the offline and the parametric (MPC) paths | v0.2 D (T5) | draft |
 
 ## Research lane, unscheduled (a design exists; no rung yet)
 

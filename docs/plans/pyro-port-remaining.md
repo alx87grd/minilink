@@ -354,7 +354,7 @@ Two-column record of every symbol marked Done before the shrink; the source for 
 | StaticController | DiagramSystem wiring | `minilink/core/diagram.py` |
 | StaticController.plot_control_law | plot_control_law(), plot_input_output_map() | `minilink/graphical/port_map.py` |
 | ClosedLoopSystem | `@`, `>>`, `+` composition | `minilink/core/diagram.py` |
-| DynamicController | DynamicController marker (PID, ImpedanceIntegralController) | `minilink/core/feedback.py` |
+| DynamicController | a `DynamicSystem` with the standard ports (the controller classes are removed by P10's AC-0) | `minilink/core/system.py` |
 | ProportionalController | ProportionalController | `minilink/control/output.py` |
 | synthesize_lqr_controller | synthesize_lqr | `minilink/control/lqr.py` |
 | linearize_and_synthesize_lqr_controller | linearize + synthesize_lqr | `minilink/control/lqr.py` |

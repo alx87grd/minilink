@@ -1,11 +1,9 @@
 # GRO501 classical-control stack — fix plan (draft, 2026-09-07)
 
-Status: **wave 1 landed.** P1 done 2026-09-07 (ruled: dedicated
-`PI` / `PD` classes); F1, F2, F4 done (second-pass defects, see the audit);
-P2 and P3 landed 2026-09-26.
-P4 (estimation) and P6 (z tier) **held by the maintainer** 2026-09-07; the
-roadmap schedules P4 for v0.2 once the hold is lifted; the disturbance
-convention was decided 2026-09-26 (ROADMAP §6). Wave 2 is open except P7.
+Status: **mostly landed.** P1, F1, F2, F4 (2026-09-07); P2, P3, P7 and TB-a (2026-09-26);
+P5, P8 and P9 (2026-10-10). Open: P10 (now automation-by-convention), TB-b, S61, P4 (after
+P10's composition steps), P11; P6 (z tier) stays held. The order is in [TODO.md](TODO.md)
+§2.
 Rung: v0.2 wave B, steps P2–P11 of [TODO.md](TODO.md).
 Lane: teaching surface (`analysis/`, `control/`, `estimation/`, `blocks/`).
 Milestone: v0.2, [ROADMAP §4.2](../../ROADMAP.md#42-v02--gro501-end-to-end).
@@ -197,8 +195,10 @@ observer in §1.4.4 (bonus), Lab 2 steps 5–6, and oral-review deliverables
 **Shape.** The band's own docstring already fixes the port contract:
 `(u, y) -> estimate`. Build it in that order:
 
-1. `LuenbergerObserver(A, B, C, L)` — a `DynamicSystem` with state `x_hat`,
-   `f = A x_hat + B u + L (y − C x_hat)`, output port `x_hat`. Ports `u`, `y`.
+1. `LuenbergerObserver(A, B, C, L)` — a `DynamicSystem` with state x̂,
+   `f = A x̂ + B u + L (y − C x̂)`. Ports `u`, `y` → `x` (the estimate, labelled x̂), with
+   the role name `estimator` ([automation-by-convention.md](automation-by-convention.md)
+   §2.1).
 2. `luenberger(A, B, C, poles)` — design factory, `place` on the dual pair
    `(Aᵀ, Cᵀ)`. Depends on P3.
 3. `kalman(A, B, C, Q, R)` — steady-state gain from the filter Riccati
@@ -290,7 +290,7 @@ With `F = 1`, `S + T = 1`.
    the conversion `ω = 2πf` visible on the student's line. Options weighed: a
    scalar `magnitude_db(sys, w)`, a hertz keyword on every frequency tool.
 
-**Still to settle in the implementation, agent-owned.** The operating point
+**Settled when P5 landed (2026-10-10)**, kept here as its record. The operating point
 of a nonlinear plant (`x_bar`, `u_bar`, `params` forwarded to its
 linearization, as every analysis verb does); SISO only, a MIMO piece refused
 with the channel named; the option keyword on `closed_loop` for the two
@@ -383,26 +383,13 @@ declared. Behaviour-preserving; the four accepted `ports` values stay.
 
 ### P10. Document what `@` means
 
-**Widened 2026-10-10.** The census of the 2026-10-10 review found defects on every path
-and the same questions answered differently by every tool; P10 is now
-[automation-by-convention.md](automation-by-convention.md) (v2: port names drive the wiring,
-three reserved subsystem ids are the roles, steps AC-0–AC-8). The text below is the original scope. Correction: the
-`e`-input rule (`_is_controller_like`) only names a block `ctl`; it does not drive
-`autowire`.
-
-C1 is not a bug and does not need a rewrite — the three dispatch paths each
-read well and only two of them fire on a classical-control course. What is
-missing is one place that says so. Add a short table to
-[DESIGN.md](../../DESIGN.md) (operand shape → what `@` builds → the diagram
-it produces) and collapse the five `PROFILE_PORTS` rows that differ only in
-`plot_space` into one row plus a `plot_space` override, if that reads better
-after P1 lands.
-
-Also note in the same pass that `_is_controller_like` now fires on any block
-with an `e` input — a widened `autowire` heuristic that no test pins.
-
-**Done when.** DESIGN carries the table; a test pins the `e`-input autowire
-behaviour so it cannot drift silently.
+P10 became [automation-by-convention.md](automation-by-convention.md), decided on
+2026-10-11: port names drive the wiring, three reserved names (`plant`, `controller`,
+`estimator`) are the roles every tool reads, and `@` is one port-based dispatch. Its steps
+and their "done when" are that plan's §7. The original scope here (a DESIGN table of the
+three `@` paths, a test pinning the `e`-input autowire, a smaller `PROFILE_PORTS`) is
+superseded: the profiles go, and the history is in
+[the decision record](../reviews/2026-10-11-automation-by-convention.md).
 
 ### P11. Two classical control notebooks (course-agnostic)
 
@@ -437,18 +424,16 @@ P3 gates P4 (the Luenberger factory places poles on the dual pair). P1 and P2
 gate P11 (until then the notebooks would teach wrong pole counts); both are
 in (P2 on 2026-09-26). P7 is independent and worth doing before P2
 and P5 add three more facade methods each by hand. With P4 and P6 held, the
-next steps are, in order: **TB-a** (the analysis toolbox read like the textbook,
-starting with the shortcut list that decides P7's scope), then **P5** and **P8** on the
-cleaned toolbox, then **TB-b** (the control objects and the loop), then S61, P9 and P10,
-then RN-1 of [randomness.md](randomness.md) and **P4**, then **P11** (the order decided
-2026-09-26, [TODO.md](TODO.md) §3; TB-a and P7 landed that day).
+next steps are, in order: P10's composition steps with S61 and S62, then **TB-b** (the
+control objects and the loop), then **P4**, then **P11** ([TODO.md](TODO.md) §2 holds the
+order; TB-a, P7, P5, P8, P9 and RN-1 have landed).
 
 ## 3. What this plan does not do
 
 - No feature removal. `PID` kept its full-state form and its behaviour;
-  `Sum` keeps its role beside `Error`; the `closed_loop` heuristic path stays
-  for the robotics courses.
-- No change to the `@` dispatch itself — C1 is documented, not rewritten.
+  `Sum` keeps its role beside `Error`.
+- `@` and `closed_loop` change under P10
+  ([automation-by-convention.md](automation-by-convention.md)), not under this plan.
 - No EKF, no time-varying Kalman, no Nichols, no multi-system overlay. Those
   stay roadmap rows.
 - No hardware, ROS, or Arduino firmware: the course owns those.

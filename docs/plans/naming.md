@@ -1,8 +1,13 @@
 # Names of blocks and signals: one rule
 
 Status: core contract, audit done 2026-09-13. Quick win 5 (`print(sys)`) landed
-2026-09-17; wins 1–4 and 6 are still unapplied. Rung: v0.2 wave A, step A4 of
-[TODO.md](TODO.md); the "not quick" alignments are open decisions in ROADMAP §6.
+2026-09-17; wins 1, 3 and 6 are step A4 of [TODO.md](TODO.md) (v0.2 wave A); wins 2 and 4
+moved to P10. The "not quick" alignments are open decisions in ROADMAP §6.
+
+**Since 2026-10-11** ([automation-by-convention.md](automation-by-convention.md) §2.2): the
+role names `plant`, `controller` and `estimator` are reserved keys. In a shortcut a role name
+wins over `System.id`, and a clash raises instead of taking a suffix. The text below is
+amended to match.
 
 ## Problem
 
@@ -16,9 +21,10 @@ in `arm`.
 
 - String keys stay. Params dictionaries, gradients, distributions and saved files need string
   keys, and a key must not change when a variable is renamed.
-- `id` is the explicit override: `arm.id = "arm"` makes `ctl @ arm` key the block `arm`, so the
-  params dictionary, the dotted paths (`"arm.m"`) and the wires (`"arm:y"`) all read `arm`.
-  Costs mirror it with `cost.id` (cost-params plan).
+- `id` is the explicit name of a block placed by `+` or `>>`: `arm.id = "arm"` keys the block
+  `arm`, so the params dictionary, the dotted paths (`"arm.m"`) and the wires (`"arm:y"`) all
+  read `arm`. In `@` the role names win: `ctl @ arm` keys the arm `plant`. Costs keep their own
+  `cost.id` (cost-params plan).
 - Rejected as too complicated for what they save: reading variable names from the caller's
   frame, registering blocks by attribute assignment (`loop.plant = Pendulum()`), keyword
   builders, accepting objects wherever an id is written, ports as objects in `connect`, and
@@ -51,8 +57,8 @@ anything.
 3. Informative default names where a shortcut would say `Diagram`: `P Controller >> Integrator`
    for a series, and the plant's own name for the sampled loop's plant wrapper. Only a default
    name is replaced.
-4. The sampled loop's plant wrapper honors `plant.id`, keeping `plant` as its default so the
-   tested key stays; the override rule then holds for every loop kind.
+4. ~~The sampled loop's plant wrapper honors `plant.id`.~~ Replaced by the role names
+   (P10): the sampled loop's plant is `plant`, as in every loop kind.
 5. ~~`print(sys)` gives a short text summary: name, class, `n`, and the ports with their
    dimensions; a diagram adds its keys.~~ Landed 2026-09-17 (`System.__str__`).
 6. The `System` docstring documents `id` as the key override.
@@ -60,7 +66,8 @@ anything.
 ## Not quick
 
 - One separator rule for wires, params paths, block labels and duplicate state labels.
-- `sys` versus `plant` for the same plant across loop kinds: changes a tested key.
+- ~~`sys` versus `plant` for the same plant across loop kinds.~~ Settled: `plant` everywhere
+  (P10's step AC-2).
 - Plot labels for internal signals: port labels or keys.
 - A style sweep of display names: some diagram ids derive from them, so renaming can change keys.
 
@@ -70,7 +77,5 @@ anything.
   titles and closed-loop names.
 - `PID() @ SingleMass()` and `StateFeedbackController @ Pendulum()` produce names of the same
   form.
-- `ctl % dt @ plant` with `plant.id = "arm"` keys the plant `arm`; without an `id` it stays
-  `plant`.
 - Composed diagrams' keys, params dictionaries and trajectories are byte-identical before and
   after quick wins 1–4 and 6.

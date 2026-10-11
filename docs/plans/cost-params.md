@@ -80,7 +80,7 @@ The diagram's rules, so there is one mental model for both:
 | `diagram.params`: live view `{sys_id: block.params}`, setter distributes | `SumCost.params`: live view `{term_id: cost.params}`, setter distributes |
 | `f` routes `params.get(sys_id)` to each block, `None` falls back to the block's own | `g` and `h` route `params.get(term_id)` the same way |
 | partial dictionaries allowed, unknown ids raise (`validate_diagram_params`) | same (`validate_cost_params`) |
-| ids from roles and class names, numeric suffix for repeats, `System.id` overrides | ids from class names, numeric suffix for repeats, `cost.id` overrides |
+| the role names `plant`, `controller`, `estimator` (a clash raises), plain names elsewhere with a numeric suffix for repeats, `System.id` naming a block placed by `+` or `>>` | ids from class names, numeric suffix for repeats, `cost.id` overrides |
 | nested diagrams nest the dictionary | named sums nest the dictionary |
 
 Rules proposed for the questions below:
@@ -127,7 +127,7 @@ already reserved for them. Nothing changes numerically today.
 
 A prototype `CostIntegrator(cost)` is a `DynamicSystem` with state `J` and
 `dJ/dt = exp(-rho t) g(x, u, t; p)`, wired to the plant state and the controller output. The
-closed loop then holds one nested dictionary, `{"ctl": ..., "sys": ..., "cost": ...}`, and
+closed loop then holds one nested dictionary, `{"controller": ..., "plant": ..., "cost": ...}`, and
 `jax.grad` through the compiled loop returned `dJ/dK`, `dJ/dQ`, `dJ/dR` and `dJ/dm` in one
 call. Its `J` matched the post-hoc `compute_cost` to 0.02 % on a pendulum loop. This is the
 route to the differentiable closed-loop cost; it depends on the cost dictionary above.

@@ -18,6 +18,13 @@ Consumers: the `WhiteNoise` block, a colored-noise recipe, random starts, LQG, R
 Monte Carlo evaluation. One question underneath all six: **what a number on a noise means in
 time**, and **where a random draw happens** in a library whose equation paths are pure.
 
+**Port names (2026-10-11).** The loop's disturbance port is `d` and its measurement-noise
+port `n` ([automation-by-convention.md](automation-by-convention.md) §2.1; renamed in
+P10's step AC-2). The examples below use them; where §1 and §10 say port `w` or `v`, they
+describe the code and the review of that time. The math symbols (`w_k`, `W`, `V`, `B_w`)
+are unchanged. A plant that declares `d` and `n` owns them, and `closed_loop(d=, n=)`
+accepts a noise block (P10's AC-4), which is how the loop inputs meet A9 and D24.
+
 ## The design in one screen
 
 - **A `Distribution` has no time.** It is the law of one vector: a start, a parameter value,
@@ -32,7 +39,7 @@ time**, and **where a random draw happens** in a library whose equation paths ar
   under JAX. Zero-order hold by default, linear interpolation as an option.
 - **One key reproduces an experiment.** `realize(key)` gives every random block and every random
   parameter its own independent stream, following the diagram and the problem.
-- **A problem declares noise on ports**, `disturbances={"w": WhiteNoise(psd=W)}`; a noise block
+- **A problem declares noise on ports**, `disturbances={"d": WhiteNoise(psd=W)}`; a noise block
   already inside the system also works. Planners see the nominal port; the RL environment and
   the evaluator draw on it.
 - **The Monte Carlo evaluator simulates the closed-loop diagram on a fixed test set.** It
@@ -189,7 +196,7 @@ time `τ`. The textbook handles it by augmenting the state with `z`; so does a d
   noise means.
 
 - **R4. On a problem, a disturbance port takes a signal, never a bare law.**
-  `disturbances={"w": WhiteNoise(psd=W)}` or `{"w": NoiseSource(Gaussian(0, cov=Σ))}`: the
+  `disturbances={"d": WhiteNoise(psd=W)}` or `{"d": NoiseSource(Gaussian(0, cov=Σ))}`: the
   object says what its number means in time. With no `sample_period`, the tool's `dt` is Δ,
   and a `WhiteNoise`'s physics does not change between a planner at `0.05 s` and an evaluator at
   `0.01 s`. A tool refuses a `sample_period` shorter than its `dt`: it holds the input over its
@@ -486,7 +493,7 @@ evaluator's.
 ## 6. The six uses, one page
 
 ```python
-plant = PendulumWithNoisePort()                        # ports u, w [N m], v [rad/s]
+plant = PendulumWithNoisePort()                        # ports u, d [N m], n [rad/s]
 
 # white noise: the intensity is the dt-free number; w_k ~ N(0, psd / Δ)
 w = WhiteNoise(psd=1e-2, sample_period=0.01, seed=1)
@@ -503,14 +510,14 @@ problem = StochasticPlanningProblem(
     plant, cost, tf=10.0,
     x0_distribution=Gaussian(x_bar, std=[0.2, 0.1]),
     params_distribution={"m": Uniform(0.8, 1.2)},
-    disturbances={"w": WhiteNoise(psd=1e-2), "v": WhiteNoise(psd=1e-4)},
-)   # v reaches only h: inert in the stepped tools until they read y (§10, A5 and A6)
+    disturbances={"d": WhiteNoise(psd=1e-2), "n": WhiteNoise(psd=1e-4)},
+)   # n reaches only h: inert in the stepped tools until they read y (§10, A5 and A6)
 
 # LQG: the design reads the same two numbers the simulation draws from
 rate = ("y", 1)                                                  # the output the noise corrupts
 A, B, C, _ = linearize_matrices(plant, of=rate, wrt=("u", 0))    # the control port alone
-_, B_w, _, _ = linearize_matrices(plant, wrt="w")                # B_w = ∂f/∂w
-_, _, _, D_v = linearize_matrices(plant, of=rate, wrt="v")       # D_v = ∂h/∂v
+_, B_w, _, _ = linearize_matrices(plant, wrt="d")                # B_w = ∂f/∂d
+_, _, _, D_v = linearize_matrices(plant, of=rate, wrt="n")       # D_v = ∂h/∂n
 W, V = w.psd, v.psd                                              # (1, 1) arrays
 K = lqr_gain(A, B, Q_x, R_u)
 observer = kalman(A, B, C, B_w @ W @ B_w.T, D_v @ V @ D_v.T)     # Q = B_w W B_wᵀ,  R = D_v V D_vᵀ
@@ -520,7 +527,7 @@ ctl = ReinforcementLearningPlanner(problem, dt=0.05, seed=0).solve().ctl
 report = MonteCarloEvaluator(problem, dt=0.05, n_trials=100, seed=1).evaluate(ctl)
 
 # one continuous closed-loop run of a fresh realization, on a fixed step at Δ
-loop = ...                                              # a diagram: w and v wired to the plant, ctl @ plant
+loop = ...                                              # a diagram: d and n wired to the plant, ctl @ plant
 loop.params = loop.realize(key=3)
 traj = loop.compute_trajectory(tf=10.0, solver="rk4_fixedsteps", dt=0.01)
 ```
@@ -794,7 +801,7 @@ lands. The acceptance test of every step is its deterministic twin (D23).
      failure go with their tests; a controller with state, a `Computer @ plant` loop (NumPy path
      until the hybrid seam batches) and a noise block inside `sys` are accepted.
   3. `Sys2Gym` takes a `Distribution` for the start (R5); `x0_lb / x0_ub / x0_std` go.
-  Done when an LQG loop (P4's compensator, noise on `w` and `v`) scores a mean cost within the
+  Done when an LQG loop (P4's observer and gain, noise on `d` and `n`) scores a mean cost within the
   sampling error of the covariance prediction (1.013 ± 0.023 measured by hand, §10 A6);
   `ev.evaluate(lqr)` on JAX and `ev.evaluate(vi)` on NumPy agree to a tolerance on the same
   trials; the release note records the one change of the evaluator's numbers.
