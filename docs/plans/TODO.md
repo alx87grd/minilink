@@ -171,7 +171,7 @@ the new code copies clean patterns and no shortcut is added only to be dropped.
   - The cost is scored on the plant.
 
   Steps AC-0 to AC-8 of the plan; decisions 1–7 in its §5 **[ask — core]**, decisions
-  8–13 agreed or chosen 2026-10-10/11:
+  8–14 agreed or chosen 2026-10-10/11:
   - AC-0: no controller classes; `plot_control_law` on `System`; the four course
     notebooks migrated (import line and base class). Agent, after decision 7.
   - AC-1 landed 2026-10-10: the ten safe fixes (D1, D2, D4, D6 of the 2026-10-10 review;
@@ -183,10 +183,13 @@ the new code copies clean patterns and no shortcut is added only to be dropped.
     - decision 10: library equations read `u` by position (8 plant lines),
       `rename_ports` with its two safety rules, `port=` on sources, name-only `autowire`,
       and the `00_core` cell, two demos and their tests migrated;
-    - `expose(*names)` for role boxes (decision 12).
+    - `expose(*names)` for role boxes (decision 12);
+    - decision 14: `@` needs a plant on the right; `L @ number` becomes `feedback(L, ...)`
+      (5 test lines, the anti-windup demo, one notebook table line); `feedback` closes on
+      the command input and returns `y`; `through=` becomes `filter=`; one junction helper.
 
-    Docs only for now; code after the operator review (`feedback`, `%`) closes. `@` is
-    settled: it nests a role box under its key and keeps a leaf a leaf (decision 12).
+    Docs only for now; code after the operator review (`%`) closes. `@` and `feedback` are
+    settled (decisions 12 and 14).
   - AC-2: `roles()`, `block_roles()` and `command_port()`, with every reader switched;
     reserved ids raise on a clash. (a) byte-identical; (b) the id rename, in flow and hybrid,
     before RN-4: `ctl` → `controller`, `sys` → `plant`, `ref` → `reference`; sources

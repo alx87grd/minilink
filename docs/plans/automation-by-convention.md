@@ -448,7 +448,8 @@ The same key names everything else about that block:
   - the measurement (`e`, `y` or `x`);
   - the reference (`r` or none);
   - the command (`u`);
-  - whether the block is error-driven (it has the port `e`);
+  - whether the block is error-driven: it reads no `y` and no `x`, so the error drives its
+    entry (`e`, or a plain compensator's one input; decision 14);
   - whether it is stateful (from `n`).
 
   It replaces `feedback_ports`, `error_input`, the `PROFILE_PORTS` lookups and the five
@@ -462,7 +463,9 @@ The same key names everything else about that block:
 
 - **`@`:**
   - `ctl @ plant` gives `controller` and `plant`.
-  - `G @ 1` and `G @ K` give the left operand `plant` and the return block `filter`.
+  - `@` needs a plant on the right (decision 14). `feedback(L)` and `feedback(L, K)` close
+    an open loop on itself: a leaf `L` is `plant`, a diagram `L` stays flat with its own
+    ids, and the return block is `filter`.
 - **Role boxes (decision 12): a plant, a controller or an estimator is one block or many.**
   - A role is a box with the ports of §3.2 on its edge. `@` and every tool read only the
     edge, so what is inside is free.
@@ -523,7 +526,7 @@ The same key names everything else about that block:
 
 | Use case | After |
 |---|---|
-| Composition | One port-based dispatch: an error junction, reads `y`, reads `x`, a loop gain, or a refusal that points to hand wiring. `closed_loop(controller, plant, *, r, d, n, filter, estimator)`: each loop input is `False`, `True` (a boundary port) or a source block. No port keywords. |
+| Composition | One port-based dispatch for `controller @ plant`: reads `y`, reads `x`, else an error junction on its entry, or a refusal that points to hand wiring; `feedback(L, K)` closes an open loop on itself (decision 14). `closed_loop(controller, plant, *, r, d, n, filter, estimator)`: each loop input is `False`, `True` (a boundary port) or a source block. No port keywords. |
 | Plot signals | `signals="plant"`, `"controller"` or `"estimator"` selects every port of that block, as `"plant:y"` selects one. The default *auto* mode shows every port of the plant and the controller, each wire once; the reference, the error, `d` and `n` come in through their inputs. Signal names take id paths (`plant/plant:y`), reconstructed recursively, and a block inside a box is found by object too. Labels and units are copied onto exposed ports, and colours follow roles. With no roles, plots keep today's default. A leaf keeps `("x", "u")`. `compute_trajectory(show=True)` and the planning and comparison plots use the same default. |
 | Animation | Resolved at animate time. The camera comes from the one drawable block anywhere in the tree, else the drawable block on the `plant` path, else an auto-fit view. A compensator draws no skin inside a loop. `camera_priority` is removed, and `scene_grid` and the follow frame come from the same block. |
 | Cost and evaluation | The cost is relative to the plant. The tools build `policy @ problem.sys` (compiled once for all three Monte Carlo backends) and score `trajectory_of(problem.sys)` by identity: `x` is the plant's state, and `u` is its `command_port`. Controller and estimator states are integrated, never scored. A dynamic controller is integrated, not refused; `t` is honoured; the cost's params are passed; there is one price for leaving `X`. The `x0` draw is on the plant only, and the controller and the estimator start at their own `x0`. |
@@ -779,12 +782,111 @@ name-only rule:
 | `Step() + ProportionalController() + Integrator()` (tests) | the reference open, the measurement ambiguous; rewritten to the new rule |
 | The arm's second reference | stays open; one `connect` line, or `port="r_null"` on its source |
 
-**Settled since:** what `@` builds and names. It nests a box under its role key and keeps a
-leaf a leaf, while `>>` and `+` stay flat (decision 12, §3.4).
+**Decision 14 (chosen 2026-10-11): `@` always means controller at plant; `feedback()`
+closes an open loop on itself.**
 
-**Still open, to plan before any code:**
-- `feedback()` and its own preference for `r`;
-- `%` for sampled loops.
+**When `@` builds what, today** (`composition.py:398-413`; `@` always calls `closed_loop`):
+
+| You write | Right side | The left block reads | `@` builds | Blocks |
+|---|---|---|---|---|
+| `PID(ports="reference") @ plant` | a System | `r` and `y` | plant `y` → controller `y`; the controller computes `r − y` itself | controller, plant |
+| `StateFeedback(K) @ plant` | a System | `x` | plant `x` → controller `x` | controller, plant |
+| `PID() @ plant`, `Lead() @ plant`, `TransferFunction(...) @ plant` | a System | only its error (`e`, or one plain input) | an `Error` block `e = r − y` in front of the controller | controller, plant, error |
+| `L @ 1`, `L @ 0.5` | a number | n/a: `L` is the whole forward path | `L` closed on itself, `y` back through 1 or K | L's blocks, error, (gain) |
+| `feedback(L, H, of=, sign=)` | (function) | n/a | the same as the row above, plus what `@` cannot say: a System on the way back, one component, positive sign | same |
+
+- **The first three rows are all `controller @ plant`.** It is one loop, and the roles are
+  assigned. The Error block appears only when the controller does not read the measurement
+  itself.
+- **The last two rows are block-diagram algebra.** `L` already holds controller and plant
+  together; you only close it. `feedback()` is not another kind of loop: it is the code
+  that adds the Error block, and the third row uses it too.
+- **Same math, different form.** `C @ G` equals `(C >> G) @ 1`, which equals
+  `feedback(C >> G)`, for a controller that reads only its error.
+- **The confusion it removes:** `@` meant "controller at plant" with a System on the right,
+  but "close on yourself" with a number on the right.
+
+**Where `feedback()` guesses today** (probe on `dev` @ ce1094d):
+
+| Call | Today |
+|---|---|
+| `H @ 1`, `Pendulum() @ 1` | closes on `u`; `y` returns (a Demux takes component 0 for the pendulum) |
+| `(PID() >> H) @ 1` | closes on the entry `>>` remembered (`e`) |
+| `(P(2) >> H) @ 1` | refused by a special check (AC-1), because the remembered entry was `r` |
+| `TransferFunction(...) @ H` (default ports `u → y`) | treated as a compensator; ids `sys`, `sys2` |
+| `feedback(L, through=TF)` / `L @ 0.5` | return block id `sensor` / `gain` |
+| no `y` output on `L` | takes the *first* output |
+
+The entry comes from three mechanisms:
+- the `_composition_entry` memory (`_get_available_diagram_entry`);
+- `error_input` (`feedback.py:132`);
+- `refuse_two_port_entry`.
+
+**Decision 14, item by item:**
+
+0. **`@` needs a plant on the right.** The `L @ number` form is removed (a feature removal,
+   decided by the maintainer). `L @ 1` is refused with: "`@` needs a plant on the right; to
+   close an open loop on itself use `feedback(L)` or `feedback(L, K)`". This is the MATLAB
+   and python-control notation.
+   - `(C >> G) @ 1` becomes `feedback(C >> G)`.
+   - `L @ 0.5` becomes `feedback(L, 0.5)`.
+1. **Kept as is:**
+   - the textbook loop `T = L / (1 + L H)` with a visible `Error` block;
+   - the return path: `1`, a gain or a System;
+   - `of=(port, i)`, the component-0 Demux for a scalar entry on a vector output, and
+     `sign=+1`;
+   - the function on the teaching surface.
+
+   The loop's only boundary input stays `r`. A plant's `d` / `n` stay at nominal unless
+   `closed_loop(d=, n=)` asks for them (AC-4).
+2. **The entry is plain, with no memory.** `L` closes on its command input, by the
+   `command_port` rule: `u`, else its one free input that is not `d` or `n`, else refuse.
+   - A diagram counts its free boundary inputs, as for `>>`.
+   - `feedback(PID >> H)` closes on `e`, the one free input.
+   - `feedback(P >> H)` has two free inputs (`r`, `y`) and is refused. The message points to
+     `P @ H`, as today, without the special check.
+   - `error_input`, `refuse_two_port_entry` and the entry memory go.
+3. **What returns is plain:** `of=`, else `y`, else `L`'s only output, else refuse. The
+   "first output" guess goes.
+4. **One name for the return block: `filter`.**
+   - It is the block's id, whether a gain or a System (today `gain` or `sensor`).
+   - The keyword `through=` becomes `filter=`, the word `closed_loop(filter=)` and
+     `sensitivity(..., filter=)` already use. Positional calls (`feedback(C >> H, F)`) are
+     unchanged.
+   - The junction stays `error` (`sum` for positive feedback).
+5. **Roles: only `controller @ plant` assigns them.**
+   - In `feedback(L)`, a leaf `L` is `plant`, the one system in the loop.
+   - A diagram `L` is laid out flat with its own ids (decision 8), so `feedback(C >> G)` is
+     plain topology.
+   - The role-keeping form of the same loop is `C @ G`, or `pid @ (sat >> plant)` with a
+     plant box (decision 12).
+6. **`C @ G` dispatch, in three cases:**
+   - if C reads `y`, it is the measurement loop;
+   - if C reads `x`, it is the state loop;
+   - otherwise the error drives C's entry, by the rule of item 2.
+
+   This keeps a plain `TransferFunction` compensator working (tested today) without
+   requiring a port `e`. It refines `block_roles` (§3.3).
+7. **One junction helper**, shared by `feedback` and `C @ G`. It adds the Error, the
+   optional `filter` and the Demux. `C @ G` is then the same loop as `feedback(C >> G)`, with
+   the role ids `controller` and `plant`, where the plant may be a box.
+
+**Migration when the code lands (AC-OP):**
+- `L @ number` becomes `feedback(L, ...)`:
+  - 5 test lines;
+  - the anti-windup demo's second loop, as `feedback(pid2 >> sat >> sys)`, or
+    `pid2 @ (sat >> sys)` to keep the roles;
+  - the `L @ 1` mention in the frequency-response notebook table and the `@` docstrings.
+- The tests' `through=` becomes `filter=`.
+- The asserts on ids `gain` / `sensor` become `filter`.
+- The asserts on `sys` / `sys2` ids follow AC-2b.
+
+**Settled since:**
+- what `@` builds and names: it nests a box under its role key and keeps a leaf a leaf,
+  while `>>` and `+` stay flat (decision 12, §3.4);
+- `feedback()` and its preference for `r` (decision 14).
+
+**Still open, to plan before any code:** `%` for sampled loops.
 
 ## 4. Steps
 
@@ -803,9 +905,9 @@ It is captured twice and `cmp`'d.
 |---|---|---|
 | **AC-0** | No controller classes; `plot_control_law` on `System`; the four course notebooks migrated (import line and base class) | agent, after decision 7; v0.2 B4 |
 | **AC-1** | **Landed 2026-10-10.** Safe fixes and pinning tests, one commit each with its own test: D1 and D6 refused (an Error junction on a block that reads its own measurement); D2 (sampled state feedback runs); D4 (unknown or unused `closed_loop` keywords refused); A (`>>` reads a hand-wired diagram's declared output); B (a diagram `x0` set by the user is kept, until S29); C (a static block whose output is `u` simulates; the command's signal name waits for AC-5); D (`autowire` never routes one command to two inputs, and warns when it leaves inputs open); the `t = 0` scoring; `disturbances={"u"}` refused. `TestDispatchTable` pins the loop each library controller gets. The census is a scratchpad script (AGENTS recipe), captured again before each later step | agent (bug fixes) |
-| **AC-OP** | The operators of §3.10, one commit each, with the census and the replay of every `>>` and `autowire` call: no operator modifies its operands (decision 8); the plain `>>` rule (decision 9); then decision 10 (the 8 positional plant lines, `rename_ports` with its two safety rules, `port=` on sources, name-only `autowire`, and the migration of `00_core`, two demos and their tests); then `expose` for role boxes (decision 12) | core, after the operator review closes; v0.2 B4 |
+| **AC-OP** | The operators of §3.10, one commit each, with the census and the replay of every `>>` and `autowire` call: no operator modifies its operands (decision 8); the plain `>>` rule (decision 9); then decision 10 (the 8 positional plant lines, `rename_ports` with its two safety rules, `port=` on sources, name-only `autowire`, and the migration of `00_core`, two demos and their tests); then `expose` for role boxes (decision 12); then decision 14 (`@` needs a plant, `L @ number` refused and migrated to `feedback`, the plain entry and output rules, `filter=` for `through=`, one junction helper) | core, after the operator review closes; v0.2 B4 |
 | **AC-2** | `roles()`, `block_roles()` and `command_port()` in `core/feedback.py`, with every reader switched; reserved ids raise on a clash. (a) Byte-identical census, with today's ids mapped. (b) The id rename in flow and hybrid: `ctl` → `controller`, `sys` → `plant`, `ref` → `reference`; sources `disturbance` and `noise`; helpers `error` and `filter`; the expected diff is ids, params keys, signal names and stream names. (c) The letters of decision 13 in the same pass, no alias: the two noisy plants' ports (`v_noise` becomes `n`), `closed_loop(d=, n=)`, `add_loop_inputs`, the sensitivity module docstrings and the P5 notebook, `diagram_noise_ports`, the tests and RULES 4.9 | after decisions 1 and 5; v0.2 B4, before RN-4 |
-| **AC-3** | Composition on standard names. Removed: profiles, overrides, port keywords, `error_input`, `_composition_*`, shape ids, the camera copy. Changed: role boxes nested by `@` with the edge check (decision 12); `G @ K` naming; leaves expose `x`; MPC renamed; `filter=`; refusals point to hand wiring. The course notebooks drop `feedback_profile`. Decision 11: `MechanicalSystem.h` returns `[q; dq]`; removed are the `q` / `dq` ports, `StateSliceOutputPort`, `closed_loop_qdq`, `feedback="qdq"` and the Mux branch (about 140 lines); the three demos, the showcase UR5 cell and the tests become `ctl @ plant`; the IK guess reads the state; DESIGN lines 205 and 485-490 | after decision 2; v0.2 B4, gates P4 |
+| **AC-3** | Composition on standard names. Removed: profiles, overrides, port keywords, `error_input`, `_composition_*`, shape ids, the camera copy. Changed: role boxes nested by `@` with the edge check (decision 12); `error_input` and `refuse_two_port_entry` removed (decision 14); leaves expose `x`; MPC renamed; `filter=`; refusals point to hand wiring. The course notebooks drop `feedback_profile`. Decision 11: `MechanicalSystem.h` returns `[q; dq]`; removed are the `q` / `dq` ports, `StateSliceOutputPort`, `closed_loop_qdq`, `feedback="qdq"` and the Mux branch (about 140 lines); the three demos, the showcase UR5 cell and the tests become `ctl @ plant`; the IK guess reads the state; DESIGN lines 205 and 485-490 | after decision 2; v0.2 B4, gates P4 |
 | **AC-4** | Loop inputs: the plant wrapper owns `d` and `n`; sources as values, named `reference`, `disturbance`, `noise`; `estimator=` (with P4); randomness A9 / D24 reconciled | after decision 3; beside P4, before P11 |
 | **AC-5** | Plot auto mode, role selectors, id paths, labels, units and colours by role, one default; signals inside a role box found by object and by path (`plant:motor:y`) | plotting lane, v0.2 D |
 | **AC-6** | The camera rule at animate time, looking inside the `plant` box; no compensator skin inside a loop | plotting lane |
@@ -906,6 +1008,14 @@ Each is recorded in ROADMAP §6.
       attribute and a method, not ports, so they cause no wiring mistake.
     - The source ids stay `disturbance` and `noise`.
     - Renamed in AC-2c, no alias.
+
+    *Chosen on 2026-10-11.*
+14. **`@` always means controller at plant; `feedback()` closes an open loop on itself.**
+    - `L @ number` is removed: `feedback(L)` and `feedback(L, K)`, the MATLAB and
+      python-control notation.
+    - `feedback` closes on the command input and returns `y`, with no memory and no guess.
+    - The return block is `filter` (id and keyword).
+    - Only `controller @ plant` assigns roles.
 
     *Chosen on 2026-10-11.*
 

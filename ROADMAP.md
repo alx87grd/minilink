@@ -701,6 +701,15 @@ here. Each open item needs the maintainer.
 - **Disturbance `d`, measurement noise `n`; `v` is velocity** (decision 13). These are the
   classical loop letters; `v` and `w` stay free for velocity and angular speed. Renamed
   once in AC-2c, no alias. Chosen on 2026-10-11.
+- **`@` always means controller at plant; `feedback()` closes an open loop on itself**
+  (decision 14).
+  - `L @ number` is removed in favour of `feedback(L)` / `feedback(L, K)` (MATLAB and
+    python-control notation).
+  - `feedback` closes on the command input and returns `y`, with no memory and no guess.
+  - The return block is `filter`, as id and keyword.
+  - Only `controller @ plant` assigns roles.
+
+  Chosen on 2026-10-11.
 - **Ruling:** the GRO860 name freeze (§4.1 gate 7) is paused between terms (maintainer,
   2026-10-10).
 
