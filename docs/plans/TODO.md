@@ -170,7 +170,8 @@ the new code copies clean patterns and no shortcut is added only to be dropped.
   - Automation works with standard names only; custom names are wired by hand.
   - The cost is scored on the plant.
 
-  Steps AC-0 to AC-8 of the plan; decisions 1–7 in its §5 **[ask — core]**:
+  Steps AC-0 to AC-8 of the plan; decisions 1–7 in its §5 **[ask — core]**, decisions
+  8–13 agreed or chosen 2026-10-10/11:
   - AC-0: no controller classes; `plot_control_law` on `System`; the four course
     notebooks migrated (import line and base class). Agent, after decision 7.
   - AC-1 landed 2026-10-10: the ten safe fixes (D1, D2, D4, D6 of the 2026-10-10 review;
@@ -181,24 +182,32 @@ the new code copies clean patterns and no shortcut is added only to be dropped.
     - the plain `>>` rule (decision 9);
     - decision 10: library equations read `u` by position (8 plant lines),
       `rename_ports` with its two safety rules, `port=` on sources, name-only `autowire`,
-      and the `00_core` cell, two demos and their tests migrated.
+      and the `00_core` cell, two demos and their tests migrated;
+    - `expose(*names)` for role boxes (decision 12).
 
-    Docs only for now; code after the operator review (`@`, `feedback`, `%`) closes.
+    Docs only for now; code after the operator review (`feedback`, `%`) closes. `@` is
+    settled: it nests a role box under its key and keeps a leaf a leaf (decision 12).
   - AC-2: `roles()`, `block_roles()` and `command_port()`, with every reader switched;
     reserved ids raise on a clash. (a) byte-identical; (b) the id rename, in flow and hybrid,
     before RN-4: `ctl` → `controller`, `sys` → `plant`, `ref` → `reference`; sources
-    `disturbance` and `noise` (blocks get words, signals get symbols). After decisions 1 and
-    5.
+    `disturbance` and `noise` (blocks get words, signals get symbols); (c) the letters of
+    decision 13 in the same pass, no alias: disturbance `w` → `d`, noise `v` → `n`
+    (two noisy plants, `closed_loop(d=, n=)`, the sensitivity module and P5 notebook, tests,
+    RULES 4.9). After decisions 1 and 5.
   - AC-3: composition on standard names.
     - Removed: profiles, overrides, port keywords, `error_input`, `_composition_*`, shape
       ids.
-    - Changed: diagram operands nested under their role; leaves expose `x`; MPC renamed to
-      `x` → `u`; `filter=`.
+    - Changed: role boxes nested by `@` with the edge check (decision 12); leaves expose
+      `x`; MPC renamed to `x` → `u`; `filter=`.
+    - Decision 11: a mechanical plant gives `y` (`[q; dq]`) and `x`; the `q` / `dq` ports,
+      `closed_loop_qdq`, `feedback="qdq"` and the Mux branch go; three demos, the showcase
+      UR5 cell and the tests become `ctl @ plant`.
     - The course notebooks drop `feedback_profile`.
     - It gates P4.
-  - AC-4: loop inputs. The plant wrapper owns `w` / `v`; sources as values; `estimator=`.
+  - AC-4: loop inputs. The plant wrapper owns `d` / `n`; sources as values; `estimator=`.
     Before P11.
-  - AC-5: plot auto mode and AC-6: the camera from roles. Plotting lane.
+  - AC-5: plot auto mode and AC-6: the camera from roles, both looking inside role boxes.
+    Plotting lane.
   - AC-7: cost relative to the plant. One compiled loop for the three Monte Carlo
     backends, `trajectory_of(problem.sys)` by identity, `command_port` the only decided
     input. v0.3, with RN-4 / RN-5.

@@ -631,8 +631,8 @@ here. Each open item needs the maintainer.
   - Three reserved subsystem ids (`plant`, `controller`, `estimator`) are the roles every
     tool reads, at use time, never inferred from the graph.
   - State is `n`, and every leaf exposes `x`.
-  - RULES 4.9 is extended with `e`, `x`, `q`, `dq` and the ids, and DESIGN gets a §4
-    "Conventions" section.
+  - RULES 4.9 is extended with `e`, `x` and the ids, its `w` / `v` become `d` / `n`, and
+    DESIGN gets a §4 "Conventions" section.
   - The compromise (plan §3.9): standard diagrams resolve automatically. Custom port
     names, several controllers or several plants take a few manual steps, and they keep
     the plots, camera and cost through the role keys.
@@ -641,14 +641,14 @@ here. Each open item needs the maintainer.
 - **Standard names only.** `feedback_profile`, `PROFILE_PORTS`, the override attributes,
   `closed_loop`'s port keywords and the shape-based ids go. MPC becomes `x` → `u`. Custom
   names are wired by hand. Recommended: yes.
-- **Loop inputs.** The plant, or the wrapper the loop builds around it, owns `w` / `v`;
-  `r=`, `w=`, `v=` accept a source block; `estimator=` comes with P4. This reconciles
+- **Loop inputs.** The plant, or the wrapper the loop builds around it, owns `d` / `n`;
+  `r=`, `d=`, `n=` accept a source block; `estimator=` comes with P4. This reconciles
   randomness.md A9 / D24. Recommended: yes.
 - **Cost relative to the plant.**
   - The evaluators build the loop themselves and score `trajectory_of(problem.sys)` by
     identity.
   - Controller and estimator states are never scored.
-  - `command_port` (`u`, else the single non-`w`/`v` input) is the only input that
+  - `command_port` (`u`, else the single non-`d`/`n` input) is the only input that
     planners, LQR, `place`, value iteration, Gym and the cost decide.
 
   Recommended: yes, in v0.3 with RN-4 / RN-5.
@@ -683,6 +683,24 @@ here. Each open item needs the maintainer.
   - `autowire` joins equal names only, and its guessing rules go.
 
   Agreed on 2026-10-11.
+- **A mechanical plant gives `y` and `x`** (decision 11).
+  - `y` is `[q; dq]` by default.
+  - The `q` / `dq` ports, `closed_loop_qdq` (removed, no alias), `feedback="qdq"` and the
+    Mux branch go, about 140 lines.
+  - Impedance controllers are unaffected: they read `y` straight.
+
+  Agreed on 2026-10-11.
+- **Role boxes** (decision 12).
+  - A plant, controller or estimator is one block or many, with the standard ports on its
+    edge.
+  - `@` nests a box under its role key; a leaf stays a leaf; `>>` and `+` stay flat.
+  - A box is built by hand, with `>>`, or with a new `expose(*names)`.
+  - Plots, camera and cost look inside boxes.
+
+  Agreed in principle on 2026-10-11.
+- **Disturbance `d`, measurement noise `n`; `v` is velocity** (decision 13). These are the
+  classical loop letters; `v` and `w` stay free for velocity and angular speed. Renamed
+  once in AC-2c, no alias. Chosen on 2026-10-11.
 - **Ruling:** the GRO860 name freeze (§4.1 gate 7) is paused between terms (maintainer,
   2026-10-10).
 
