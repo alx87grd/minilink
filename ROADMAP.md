@@ -231,11 +231,11 @@ TB-a, P7, P5, P8, P9.
 - **P10** Automation by convention ([automation-by-convention.md](docs/plans/automation-by-convention.md),
   decided 2026-10-11): standard port names drive the wiring, three reserved names (`plant`,
   `controller`, `estimator`) are the roles every tool reads, and the cost is scored on the
-  plant. In this wave, in order: AC-0, AC-2, AC-OP, AC-3. Then AC-4 with P4, AC-5 and AC-6
-  in the plotting lane, AC-7 in v0.3, AC-8b in v0.9; AC-8a goes alongside the others.
+  plant. Its composition steps land in this wave; the order is in TODO §2 and the plan's
+  §7.
 - **TB-b** The control objects and the loop (`siso`, `state`, `lqr`, `place`,
-  `TransferFunction`, `LTISystem`, `feedback` / `@`) read like the textbook; after P10's
-  composition steps.
+  `TransferFunction`, `LTISystem`, `feedback` / `@`) read like the textbook; its loop part
+  after P10's AC-3.
 - **P4** `estimation/`: `LuenbergerObserver`, `luenberger()`, `kalman()`, after AC-3. The
   largest §4.2 gap.
 - **S61** Every analysis verb takes a `System`. **S62** The LQR family on the control band
@@ -320,8 +320,8 @@ public name; v1.0 (§5.5) freezes.
   git history, once, in December 2026 after the v0.3 tag. **[ask]**
 
 **The syllabus holes** (beyond GRO501's P4):
-- **P6** The z tier: exact ZOH and Tustin `c2d`, z-plane pole-zero map, discrete step and
-  Bode. **[ask — public names]**
+- **P6** The z tier, if v0.9 takes it (proposed yes, §6): exact ZOH and Tustin `c2d`, z-plane
+  pole-zero map, discrete step and Bode. **[ask — public names]**
 - **C4** Identification and trajectory generation, pulled from v0.3 if GMC714 does not
   land them.
 - **S71** The classic first plants (DC motor, tank / thermal process, ball and beam,
@@ -367,11 +367,16 @@ The automation-by-convention rulings (2026-10-11) are in
 [their record](docs/reviews/2026-10-11-automation-by-convention.md); the disturbance
 convention in [randomness.md](docs/plans/randomness.md).
 
-**During v0.2**
+**During v0.2 — these two block GRO501**
 
 - **Observer + state feedback for P4:** ship a `compensator(observer, K)` helper (a
   controller box holding `estimator` and `gain`), or rely on `closed_loop(..., estimator=)`
   and the `expose` recipe in the notebook.
+- **The z tier** (P6): teach the Arduino law with `discretize` + simulation (default), or
+  build a z-domain analysis family. Depends on what the sommatif examines.
+
+**During v0.2 — the others**
+
 - **The terminal cost `h(x_f, t_f)`, one rule for every tool.** `h` is charged exactly when
   `tf` is finite; still to settle whether an infinite-horizon cost with a nonzero `h` warns
   or raises, and that exits are priced only by `infeasible_cost`.
@@ -382,8 +387,6 @@ convention in [randomness.md](docs/plans/randomness.md).
   bounds.
 - **`JaxMechanicalSystem`**: retire the twin now that the `xp` base traces.
 - **`PlanningProblem.metadata`**: document it or retire it.
-- **The z tier** (P6): teach the Arduino law with `discretize` + simulation (default), or
-  build a z-domain analysis family. Depends on what the sommatif examines.
 - **Optional `KinematicModel` delegate** — adopt or drop.
 - **Pyro game demos** — port the rest to `simulation/realtime/` or drop.
 - **Which pyro demos the courses still need** (drives the parity rows).

@@ -1,7 +1,7 @@
 # Automation by convention: plants, controllers, loops, plots and tools
 
 **Status:** decided on 2026-10-11 and ready to build; steps in §7. Workboard row P10 (v0.2
-wave B4) for the core steps; the later steps are placed in §7. How each rule was reached
+wave B) for the core steps; the later steps are placed in §7. How each rule was reached
 (the analysis of the old code, the evidence, the options rejected, the fifteen rulings) is in
 the decision record,
 [2026-10-11-automation-by-convention.md](../reviews/2026-10-11-automation-by-convention.md).
@@ -69,7 +69,7 @@ A few explicit hints stay, for what names cannot say:
 
 | Name | Role | Written by |
 |---|---|---|
-| `plant` | the system under control | `@`, `closed_loop`, `%`, the evaluators, or by hand |
+| `plant` | the system under control | `@`, `closed_loop`, `feedback` (a single-block `L`), `%`, the evaluators, or by hand |
 | `controller` | the law that commands the plant | the same |
 | `estimator` | the state estimate the controller reads (`u`, `y` → `x`) | `closed_loop(estimator=)`, or inside a controller box |
 
@@ -163,7 +163,7 @@ the operands' blocks, so long chains stay cheap, and the operands keep their blo
 ports, name, `x0` and camera settings.
 - `+` and `>>` give a **flat** diagram: the operands' blocks side by side, with their names.
   The left operand's `x0`, camera settings and name are carried into the result.
-- Only `@` nests, because only `@` assigns roles (§2.4).
+- Only `@` nests: it is the operator that assigns the roles `controller` and `plant` (§2.4).
 - `connect()`, `autowire()` and `expose()` are methods and change the diagram they are
   called on.
 
@@ -237,7 +237,8 @@ loop = (ref + ctl + sat + plant).autowire()   # every connection read from the n
   - a box without the standard edge: build it by hand or with `expose`;
   - a controller that reads `x` on a plant without `x`: build the plant with
     `expose_state=True`.
-- **`closed_loop(controller, plant, *, r, d, n, filter, estimator)`** is `@` with options.
+- **`closed_loop(controller, plant, *, r, d, n, filter, estimator, validate)`** is `@` with
+  options.
   Each loop input `r`, `d`, `n` is `False`, `True` (an edge port) or a source block. It has
   no port-name keywords.
 - **The filter** (`filter=F`) is a helper block at the loop's top level, beside `error`; it
@@ -347,22 +348,22 @@ stays: it is a port layout, not a role marker.
 
 **Removed:**
 
-| What | Replaced by |
-|---|---|
-| `feedback_profile` and `PROFILE_PORTS` (13 places) | the port names |
-| The override attributes `measurement_port`, `ref_port`, `control_port` (6 classes) | the port names; MPC is renamed to read `x` and give `u` (today `y` → `u_ff`) |
-| `closed_loop`'s port keywords `ref_port`, `measurement_port`, `control_port`, `plant_input_port`, `plant_output_port`, `output_port`, and `feedback=` | standard names, or wiring by hand |
-| `hybrid_closed_loop`'s `computer_out`, `computer_in`, `plant_in`, `plant_out`, `ref_port`, `output_port`, `extra_boundaries` | standard names, or `connect_boundary` |
-| The sampled loop's port guesses (`u_nom`, then `u`, then `u_ff`; the first port) | the standard edge; the dual-rate MPC composite exposes `u` |
-| Names minted from a block's shape, and their silent suffixes (`plant2`) | the role names, and plain names elsewhere |
-| The composition-time memory (`_composition_entry`, `_composition_output`) and the camera copy | the plain `>>` rule, and the camera chosen when animating |
-| `error_input`, `refuse_two_port_entry` | `block_roles` and the `feedback` entry rule |
-| `camera_priority` (never read) | nothing |
-| A mechanical plant's `q` and `dq` ports, `StateSliceOutputPort`, `closed_loop_qdq`, the `qdq` Mux branch (about 140 lines) | `y = [q; dq]`, read straight |
-| `Controller`, `DynamicController` | `System`, `DynamicSystem` |
-| `L @ number` | `feedback(L)`, `feedback(L, K)` |
-| `feedback(..., through=)` | `feedback(..., filter=)` |
-| The `x` port of `LowPassFilter` and `NotchFilter` (check its users first) | nothing: filters are not plants |
+| What | Replaced by | Step |
+|---|---|---|
+| `feedback_profile` and `PROFILE_PORTS` (13 places) | the port names | AC-3 |
+| The override attributes `measurement_port`, `ref_port`, `control_port` (6 classes) | the port names; MPC is renamed to read `x` and give `u` (today `y` → `u_ff`) | AC-3 |
+| `closed_loop`'s port keywords `ref_port`, `measurement_port`, `control_port`, `plant_input_port`, `plant_output_port`, `output_port`, and `feedback=` | standard names, or wiring by hand | AC-3 |
+| `hybrid_closed_loop`'s `computer_out`, `computer_in`, `plant_in`, `plant_out`, `ref_port`, `output_port`, `extra_boundaries` | standard names, or `connect_boundary` | AC-8a |
+| The sampled loop's port guesses (`u_nom`, then `u`, then `u_ff`; the first port) | the standard edge; the dual-rate MPC composite exposes `u` | AC-8a |
+| Names minted from a block's shape, and their silent suffixes (`plant2`) | the role names, and plain names elsewhere | AC-2 |
+| The composition-time memory (`_composition_entry`, `_composition_output`) | the plain `>>` rule | AC-OP |
+| The camera copied at composition time, and `camera_priority` (never read) | the camera chosen when animating | AC-6 |
+| `error_input`, `refuse_two_port_entry` | `block_roles` and the `feedback` entry rule | AC-OP |
+| A mechanical plant's `q` and `dq` ports, `StateSliceOutputPort`, `closed_loop_qdq`, the `qdq` Mux branch (about 140 lines) | `y = [q; dq]`, read straight | AC-3 |
+| `Controller`, `DynamicController` | `System`, `DynamicSystem` | AC-0 |
+| `L @ number` | `feedback(L)`, `feedback(L, K)` | AC-OP |
+| `feedback(..., through=)` | `feedback(..., filter=)` | AC-OP |
+| The `x` port of `LowPassFilter` and `NotchFilter` (check its users first) | nothing: filters are not plants | AC-3 |
 
 **Kept:** `closed_loop`'s `r=`, `d=`, `n=`, `filter=`, `estimator=` and `validate=`; the
 sampled loop's `schedule=` and `computer=`; `feedback(L, of=)`; `port=` on sources and
@@ -398,10 +399,10 @@ roles and control-law sweeps) is captured before and after each step and compare
 | Step | What | When |
 |---|---|---|
 | AC-1 | Safe bug fixes and pinning tests. **Landed 2026-10-10.** | — |
-| AC-0 | No controller classes; `plot_control_law` on `System`; the four course notebooks migrated (the import line and the base class; their profile line goes in AC-3) | v0.2 B4 |
-| AC-2 | The resolver (§3), with every reader switched; reserved names raise on a clash. (a) Byte-identical census. (b) The one-time rename of the subsystem names, in flow and sampled loops; shortcuts stop naming blocks from their shape. (c) The ports `d` and `n` in the same pass. | v0.2 B4, before the randomness steps that name streams (RN-4) |
-| AC-OP | The operators (§4.1–§4.4), one commit each: no operator modifies its operands; the plain `>>`; `+`, `autowire`, `rename_ports`, `port=` and the 8 positional lines; `expose`; `@` needs a plant, `feedback`'s entry, return and `filter=`, one junction helper | v0.2 B4 |
-| AC-3 | Composition on standard names: the removals of §6; boxes nested by `@`, with the edge check; `x` only where needed and its refusal; the mechanical plant's `y` and `x`; MPC renamed; `filter=` and `estimator=` | v0.2 B4; unblocks P4 |
+| AC-0 | No controller classes; `plot_control_law` on `System`; the four course notebooks migrated (the import line and the base class; their profile line goes in AC-3) | v0.2 wave B |
+| AC-2 | The resolver (§3), with every reader switched; reserved names raise on a clash. (a) Byte-identical census. (b) The one-time rename of the subsystem names, in flow and sampled loops; shortcuts stop naming blocks from their shape. (c) The ports `d` and `n` in the same pass. | v0.2 wave B, before the randomness steps that name streams (RN-4) |
+| AC-OP | The operators (§4.1–§4.4), one commit each: no operator modifies its operands; the plain `>>`; `+`, `autowire`, `rename_ports`, `port=` and the 8 positional lines; `expose`; `@` needs a plant, `feedback`'s entry, return and `filter=`, one junction helper | v0.2 wave B |
+| AC-3 | Composition on standard names: the removals §6 assigns to AC-3; boxes nested by `@`, with the edge check; `x` only where needed and its refusal; the mechanical plant's `y` and `x`; MPC renamed; `filter=` | v0.2 wave B; unblocks P4 |
 | AC-4 | Loop inputs: plants that declare `d` and `n` own them; sources as values, named `reference`, `disturbance`, `noise`; `estimator=` with P4; the randomness plan's loop-input rulings reconciled | beside P4, before P11 |
 | AC-5 | Plots (§5): the auto mode, role selectors, paths into boxes, labels, units and colours by role, one default | plotting lane, v0.2 wave D |
 | AC-6 | Animation (§5): the camera chosen when animating, looking inside `plant`; no compensator skin in a loop; the camera copy goes | plotting lane |

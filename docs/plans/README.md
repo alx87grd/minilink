@@ -38,7 +38,7 @@ workboard-style id.
 | [cost-params.md](cost-params.md) | Cost parameters as a dictionary like a system's; composite costs nested like diagram params | v0.3 (A2) | agreed, not started |
 | [geometry-module.md](geometry-module.md) | Workspace geometry home `core/geometry/` (Shape, Path, Track, Scene, bind, spatial Fields, course catalog); `planning.spatial` retires | v0.3 (A3) | agreed, not started |
 | [pyro-port-remaining.md](pyro-port-remaining.md) | Pyro parity — open rows + name map | v0.3 C (C1) | open |
-| [mppi.md](mppi.md) | Path integral control (MPPI): `PathIntegralPlanner` beside trajopt, wrapped by `ModelPredictiveController`; steps MP-1–MP-6 | v0.3 C (S72), v0.9 (MP-4, MP-5) | proposed; asks in its §10 |
+| [mppi.md](mppi.md) | Path integral control (MPPI): a planner beside trajopt (working name `PathIntegralPlanner`), wrapped by `ModelPredictiveController`; steps MP-1–MP-6 | v0.3 C (S72), v0.9 (MP-4, MP-5) | proposed; asks in its §10 |
 | [optimizer-parametric-wiring.md](optimizer-parametric-wiring.md) | One optimizer backend table for the offline and the parametric (MPC) paths | v0.2 D (T5) | draft |
 
 ## Research lane, unscheduled (a design exists; no rung yet)

@@ -16,6 +16,10 @@ Rulings made after the text below was frozen (2026-10-11):
 - Decisions 7, 9 and 12, marked "agreed in principle" below, are final.
 - The composition steps are built in the order AC-0, AC-2, AC-OP, AC-3, then AC-4 to AC-8.
 - The camera copy is removed in AC-6 and the shape-based ids in AC-2b, not in AC-3.
+- Decision 12 (role boxes) amends decision 8 for `@`: `@` nests a box under its role name;
+  `+` and `>>` stay flat.
+- Where the text below says a ruling "is recorded in ROADMAP §6", that was the practice of
+  the time: rulings now live in this record and in the plan, and leave ROADMAP §6.
 
 ---
 

@@ -136,7 +136,7 @@ loop part after AC-3); P4 with AC-4; P11. P6 stays held.
 
 Standing work through v0.2 and into v0.3, behaviour-preserving, one module per step.
 
-**Order:** the S69 follow-up now; T1–T7 in order, with T6 after P10; D1.1, D1.2, then D1.3
+**Order:** the S69 follow-up now; T1–T7 in order, with T6 after P10's AC-3; D1.1, D1.2, then D1.3
 file by file; D2, D3 and S65–S68 as picked.
 
 **T — the textbook pass.** The AGENTS recipe (seeded baseline in the scratchpad,
@@ -440,8 +440,8 @@ together with P10's AC-7, between cohorts; S72 after them.
   `LQRPlanner` picks the Riccati ODE, or warns once. Done when LQR and DP agree on the
   finite-horizon double integrator.
 - [ ] **S64 Catalog hygiene** **[ask — catalog]** (scan: dynamics#0, dynamics#1,
-  dynamics#2, dynamics#3, dynamics#4, dynamics#6, dynamics#8): the mechanical bases stop
-  inventing ±2π / ±5 bounds and each plant states its own (ROADMAP §6); output ports that are
+  dynamics#2, dynamics#3, dynamics#4, dynamics#6, dynamics#8): the mechanical default
+  bounds as ROADMAP §6 decides (keep the invented ±2π / ±5, or each plant states its own); output ports that are
   the state or a slice of it read labels and units from the state (the 56 copy lines go);
   one port layout across the bicycle rungs; one owner for the wheelbase; the hidden `0.01`
   damping in `Drone2D.d` and `Rocket.d` named; `VanderPol` with a real input or none;
@@ -454,11 +454,14 @@ together with P10's AC-7, between cohorts; S72 after them.
   shows sampled sensor noise). RN-6, the contract in DESIGN, goes with each step.
   Also: the evaluator's `simulator` backend fails on a diagram plant with a nested-diagram
   error (randomness.md §1).
+- [ ] **AC-7 of P10: the cost scored on the plant** across every evaluator and design tool
+  ([automation-by-convention.md](automation-by-convention.md) §5, §7), with RN-4 and RN-5.
 - [ ] **S72 The path-integral planner (MPPI)** **[ask — name, MPC block contract]**, after
   RN-4 and RN-5, on the evaluator's batched rollout over realizations. Design:
   [mppi.md](mppi.md); the standalone prototypes `examples/experimental/mppi/pendulum_mppi.py`
   and `racecar_mppi.py` run today. MP-1 `planning/trajectory_optimization/path_integral.py`:
-  `PathIntegralPlanner` / `PathIntegralRecord`, `solve` and `solve_trajectory_from` on
+  `PathIntegralPlanner` / `PathIntegralRecord` (working names; the name is the ask), `solve`
+  and `solve_trajectory_from` on
   `RolloutEnvironment` (`jit(vmap(scan))` over `K` samples), the six-beat body of the plan's
   §5, `decision_dimension` and `warm_start_guess`; MP-2 the hand-loop demo
   `examples/experimental/mppi/pendulum_mppi.py`; MP-3 the stochastic branch
@@ -544,7 +547,8 @@ in December 2026 after the v0.3 tag; the v1.0 rows after two cohorts.
 
 ### v0.9 — the syllabus holes
 
-- **P6 lands here** (its row is in §2) **[ask — public names]**: exact ZOH and Tustin `c2d`
+- **P6 lands here** if v0.9 takes it (proposed yes, ROADMAP §6; its row is in §2) **[ask —
+  public names]**: exact ZOH and Tustin `c2d`
   on `LTISystem`, z-plane `pzmap`, discrete `step_response` and `bode` (`analysis/`),
   checked against `scipy.signal.cont2discrete`. Done when a digital PID and a discrete state
   feedback run in a topic notebook.
@@ -573,7 +577,7 @@ in December 2026 after the v0.3 tag; the v1.0 rows after two cohorts.
   bug).
 - [ ] **V10 The public face** **[ask]**: the README opens on a teaching quickstart; TRL,
   lanes, wave and step ids leave README and `examples/README.md`; the agent and governance
-  files stay at the root or move under `docs/dev/` (decided); `CONTRIBUTING.md`, issue
+  files stay at the root or move under `docs/dev/` (ROADMAP §6); `CONTRIBUTING.md`, issue
   templates, a code of conduct.
 - [ ] **V2** Zenodo archive and a citable DOI (`CITATION.cff`) after PyPI; the JOSS entry
   and the RULES 6.9 carve-out for its state-of-the-field section, decided then.
@@ -630,8 +634,8 @@ One line each; open a plan doc only when a design needs a writeup.
 - `RobustPlanningProblem` (set-bounded uncertainty, minimax criterion) only when a minimax
   consumer exists; the path-integral planner's `"worst_case"` branch (CVaR over plant draws,
   [mppi.md](mppi.md) §4) would be that consumer; the two decisions go together.
-- `RolloutEnvironment` moves from `reinforcement_learning/` to `planning/environment.py` once
-  a second band reads it (the path-integral planner; the evaluator and the tabular learners
+- `RolloutEnvironment` may move from `reinforcement_learning/` to `planning/environment.py`
+  once a second band reads it (open in ROADMAP §6) (the path-integral planner; the evaluator and the tabular learners
   already do): one import rewrite, no behaviour change.
 - `MjxPlant` (`interfaces/mjx.py`) and `torch` / `flax` model wrappers in `interfaces/`;
   Pacejka tire; stochastic forcing; ROS2 / FMI; sparse long-horizon trajopt; RRT-Connect;
