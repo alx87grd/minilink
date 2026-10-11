@@ -6,6 +6,58 @@ wave B) for the core steps; the later steps are placed in §7. How each rule was
 the decision record,
 [2026-10-11-automation-by-convention.md](../reviews/2026-10-11-automation-by-convention.md).
 
+## At a glance
+
+Once this plan is built, the core of minilink is four ideas.
+
+1. **Everything is a `System` with named ports.** A plant, a controller, a filter, an
+   estimator and a source are all `System`s: a state `x` of size `n`, `ẋ = f(x, u, t; p)`,
+   `y = h(x, u, t; p)`, and params. There are no controller classes, no profiles and no
+   override attributes. Port names are the outside of a block; inside, the equations read
+   one stacked `u` by position (§2.1).
+2. **Standard names say what a block is.** A plant reads `u`, `d`, `n` and gives `y`, `x`;
+   a controller reads `e`, `y` or `x`, plus `r`, and gives `u`; an estimator reads `u`, `y`
+   and gives `x`. Three reserved subsystem names, `plant`, `controller` and `estimator`,
+   say which block plays which role. Blocks get words, signals get symbols. Custom names
+   are allowed and are wired by hand (§2).
+3. **A diagram is `System`s wired by name, and the operators are shortcuts for it.** Each
+   one builds exactly the diagram a student could write with `add_subsystem` and `connect`
+   (§4):
+   - `a + b`, then `.autowire()`: side by side, connected by name;
+   - `a >> b`: one output to one input;
+   - `controller @ plant`: a loop, with the roles named;
+   - `closed_loop(controller, plant, r=, d=, n=, filter=, estimator=)`: the same, with
+     options;
+   - `feedback(L, K)`: an open loop closed on itself;
+   - `law % dt @ plant`: a sampled loop, a side helper for MPC for now;
+   - role boxes, `rename_ports`, `port=` on sources, and `expose` for many blocks acting
+     as one.
+4. **One small resolver, read by every tool.** `roles`, `block_roles` and `command_port`
+   (§3). Plots default to the plant and controller signals, the camera points at the plant,
+   the cost is scored on the plant only (the three Monte Carlo backends score the same
+   loop), and LQR, pole placement, value iteration, trajectory optimization, MPC and Gym
+   decide the command only (§5).
+
+```python
+plant = Pendulum()
+loop = Step() >> PID(Kp=20, Ki=10, Kd=2) @ plant   # an error block is added, roles named
+loop.compute_trajectory(tf=10)
+loop.plot_trajectory()                              # plant and controller signals
+loop.animate()                                      # camera on the plant
+
+loop2 = closed_loop(StateFeedbackController(K), PendulumWithNoisePort(),
+                    r=Step(), d=WhiteNoise(psd=1e-2), n=WhiteNoise(psd=1e-4),
+                    estimator=observer)             # u, y → x̂ → controller
+```
+
+**What disappears** (§6): the controller classes, the feedback profiles, the override
+attributes, `closed_loop`'s port keywords, the `q` and `dq` ports and `closed_loop_qdq`,
+`L @ number`, the memory `>>` kept of its entry, and the "first port" guesses.
+
+In one sentence: everything is a `System` with named ports, a diagram is `System`s wired by
+name, and three reserved names tell every tool which block is the plant, the controller and
+the estimator.
+
 ## 1. Goal
 
 One line, `controller @ plant`, should build a loop, and every tool should know what to plot,
