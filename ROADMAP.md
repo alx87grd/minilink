@@ -317,9 +317,9 @@ wave B. A4 and A5 stay here.
   - AC-1, bug fixes (landed 2026-10-10);
   - AC-2, the resolver and the id rename, before RN-4;
   - AC-3, composition on standard names, after the §6 decisions;
-  - AC-OP, the operators, after the operator review closes: none modifies its operands,
-    `>>` becomes a plain serial connection, `+` is plain, and `autowire` matches names
-    only.
+  - AC-OP, the operators (the review closed 2026-10-11): none modifies its operands,
+    `>>` becomes a plain serial connection, `+` is plain, `autowire` matches names only,
+    `expose` builds role boxes, `@` needs a plant and `feedback` closes an open loop.
 
   The later steps: AC-4 beside P4 and before P11; AC-5 / AC-6 in the plotting lane; AC-7
   (cost relative to the plant) in v0.3 with RN-4 / RN-5; AC-8 in v0.9 with S31;
@@ -673,7 +673,7 @@ here. Each open item needs the maintainer.
   Agreed in principle on 2026-10-10.
 - **No operator modifies its operands** (plan §3.10, decision 8). `+`, `>>` and `@`
   return a new flat diagram sharing the operands' blocks; this reverses the v0.1 DESIGN
-  record. Agreed on 2026-10-10. Code waits for the operator review to close.
+  record. Agreed on 2026-10-10. The operator review closed on 2026-10-11 (decision 15).
 - **`>>` is a plain serial connection** (decision 9). It connects one output to one input:
   one-to-one, else the same name, else `y` → `u`, else it refuses. There is no `r`
   preference and no hidden memory. Agreed in principle on 2026-10-10. A replay of the
@@ -713,6 +713,17 @@ here. Each open item needs the maintainer.
   - Only `controller @ plant` assigns roles.
 
   Chosen on 2026-10-11.
+- **`%` runs something with no continuous state on a clock; `computer @ plant` follows the
+  rules of `@`** (decision 15).
+  - A continuous controller (PID, Lead) raises `NotImplementedError`: sampled dynamic
+    controllers are future work.
+  - The error and the filter sit inside the computer.
+  - Boxes are allowed on both sides.
+  - The reference is sampled from the continuous side.
+  - The `hybrid_closed_loop` port keywords go.
+
+  Chosen on 2026-10-11. **The operator review is closed:** `+`, `autowire`, `>>`, `@`,
+  `feedback` and `%` are all planned.
 - **Ruling:** the GRO860 name freeze (§4.1 gate 7) is paused between terms (maintainer,
   2026-10-10).
 

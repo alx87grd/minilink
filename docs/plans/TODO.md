@@ -191,8 +191,7 @@ the new code copies clean patterns and no shortcut is added only to be dropped.
       `filter` at the loop's top level, beside `error`; a physical sensor goes in the plant
       box.
 
-    Docs only for now; code after the operator review (`%`) closes. `@` and `feedback` are
-    settled (decisions 12 and 14).
+    The operator review closed 2026-10-11 (decision 15), so AC-OP no longer waits on it.
   - AC-2: `roles()`, `block_roles()` and `command_port()`, with every reader switched;
     reserved ids raise on a clash. (a) byte-identical; (b) the id rename, in flow and hybrid,
     before RN-4: `ctl` → `controller`, `sys` → `plant`, `ref` → `reference`; sources
@@ -217,7 +216,14 @@ the new code copies clean patterns and no shortcut is added only to be dropped.
   - AC-7: cost relative to the plant. One compiled loop for the three Monte Carlo
     backends, `trajectory_of(problem.sys)` by identity, `command_port` the only decided
     input. v0.3, with RN-4 / RN-5.
-  - AC-8: hybrid on the same rules. v0.9, with S31.
+  - AC-8: hybrid on the same rules (decision 15). v0.9, with S31.
+    - `%` accepts anything with no continuous state, and `(P >> Sat) % dt` works. A
+      continuous controller (PID, Lead) raises `NotImplementedError` (future work, see P6).
+    - `computer @ plant` dispatches like `@`, with the error inside the computer.
+    - Boxes on both sides; the `u_nom` / `u_ff` / first-port guesses go.
+    - `source >> sampled loop` puts the source on the continuous side.
+    - The `hybrid_closed_loop` port keywords go: 2 demos and the GRO501 racecar notebook
+      (`mpc % dt @ inner`) are migrated.
 
   Done when a hand-wired loop with the role ids and its shortcut give the same roles,
   plots, camera and score, and the census is byte-identical for every case that worked
@@ -238,6 +244,14 @@ the new code copies clean patterns and no shortcut is added only to be dropped.
   A source whose `y` feeds through from a port other than `u` does not discretize
   (`PendulumWithNoisePort`: unknown input dependency `v`), because the wrapper stacks every
   port into one `u`; map `y`'s dependencies to `("u",)` or mirror the source's ports.
+  **Future work, sampled dynamic controllers (`PID % dt`)** **[ask]**. Decision 15 of
+  automation-by-convention makes `%` raise `NotImplementedError` for a controller with
+  continuous states (PID, Lead, a transfer function). Supporting it means choosing:
+  - the discretization method (Euler, Tustin, RK4);
+  - whether `%` discretizes or the user calls `discretize` first.
+
+  It needs the port follow-up above first: `discretize` must keep the controller's ports
+  (`r`, `y` → `u`, or `e` → `u`), where today it gives one stacked `u` and no output.
 - [ ] **P11 Two GRO501 notebooks** **[maintainer — student-facing]**:
   `teaching/topics/classical_control/dc_motor_propulsion.ipynb` (APP2) and
   `bicycle_autopilot.ipynb` (APP4), Basic tier, Colab-first; drafted for review. Done when

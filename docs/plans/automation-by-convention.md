@@ -462,7 +462,8 @@ Why they stay apart:
     estimator may also sit inside the controller (`controller/estimator`).
   - A leaf is its own plant.
   - A `HybridDiagram` answers from its `.plant` and `.computer` fields, which is the shape
-    S31 keeps.
+    S31 keeps. The error and the filter of a sampled loop sit inside the computer
+    (decision 15).
   - There is no "deepest plant" rule. In a cascade the outer loop's plant is the inner
     loop (compositional closure), and `plant/plant` reaches the motor.
   - With no `plant` id the plant is `None`: a tool that needs it raises, and plots and the
@@ -705,8 +706,9 @@ This is an estimate of most cases, not a measured share.
 
 ### 3.10 The operators
 
-The composition operators are under review, one at a time. Nothing changes in code until
-the review closes; this section records what is decided so far.
+The composition operators were reviewed one at a time, and the review closed on 2026-10-11
+with decision 15. This section records what was decided; code follows in AC-OP, and in
+AC-8 for `%`.
 
 **Decision 8 (agreed 2026-10-10): no operator modifies its operands.**
 - Today `+` and `>>` extend a diagram left operand in place and return it. After
@@ -934,12 +936,88 @@ The entry comes from three mechanisms:
 - The asserts on ids `gain` / `sensor` become `filter`.
 - The asserts on `sys` / `sys2` ids follow AC-2b.
 
+**Decision 15 (chosen 2026-10-11): `%` runs something with no continuous state on a clock;
+`computer @ plant` follows the same rules as `@`.**
+
+`block % dt` runs a block on a computer clock (a `Computer`). `computer @ plant` closes a
+sampled loop: the computer reads the plant through a sampler and drives it through a
+zero-order hold.
+
+**What `%` does today** (probe on `dev` @ 2bf1c2d):
+
+| You write | Today |
+|---|---|
+| `P(0.5) % 0.01 @ Integrator()` | works: computer ids `ctl`, plant ids `plant` |
+| `StateFeedback(K) % 0.01 @ Pendulum()`, `SMC % 0.05 @ Pendulum()` | works |
+| `PID() % 0.01 @ plant`, `Lead() % 0.01 @ plant` | refused, with a wrong message: "continuous **plant** 'PID' belongs in Simulator" |
+| `discretize(PID(), 0.01) % 0.01 @ plant` | refused: `discretize` returns a block with one stacked `u` and no output port (the P6 follow-up) |
+| `P(ports="error") % 0.01 @ plant` | refused: no Error block in sampled loops |
+| `P % 0.01 @ (Sat >> Integrator())` | refused: "a single-subsystem plant diagram or leaf plant" |
+| `(P >> Sat) % 0.01 @ plant` | refused: `>>` builds a flow diagram and `%` wants a step diagram, although nothing in it has a continuous state |
+| `Step() >> (P % 0.01 @ plant)` | refused: a `HybridDiagram` is not a `System` (S31, v0.9); the reference goes through `compute_forced(r, input_port_id="r")` |
+
+- **The port resolver guesses** (`resolve_hybrid_feedback_ports`,
+  `hybrid_composition.py:148`):
+  - for a multi-block computer, the output is `u_nom`, else `u`, else `u_ff`;
+  - the plant's input and output fall back to the *first* port.
+- **Users.**
+  - `%`: 3 tests, the MPC tests (`mpc % dt @ plant`), and the showcase notebook.
+  - `hybrid_closed_loop` with port keywords: 2 demos (`sampled_smc_pendulum`,
+    `hybrid_multi_rate`) and the GRO501 `racecar_toward_mpc` notebook.
+  - That notebook hand-builds a plant box `inner` (edge `u` → `y`: speed loop, car, pose
+    Demux). It passes `computer_out="u_ff"` because `@` refuses multi-block plants and MPC
+    gives `u_ff`.
+
+**Decision 15, item by item:**
+
+1. **What `%` accepts:** anything with no continuous state.
+   - Accepted: a static block (P, state feedback, sliding mode), a step block, a step
+     diagram, or a flow diagram whose blocks have no continuous state. `(P >> Sat) % dt`
+     works: it is converted to a step diagram.
+   - A block with a continuous state (PID, Lead, a transfer function) raises
+     `NotImplementedError`: "sampling a controller with continuous states (PID) is future
+     work; use a static or discrete controller". This is the maintainer's choice.
+     - It replaces today's wrong "continuous plant" message.
+     - It does not depend on the `discretize` port fix.
+     - Sampled dynamic controllers are a future-work item in TODO.
+2. **`computer @ plant` dispatches like `@` (decision 14):**
+   - the computer reads `y`: the sampler reads the plant's `y`;
+   - it reads `x`: the sampler reads the plant's `x`;
+   - otherwise an `Error` block `e = r − y` sits **inside the computer**, on the sampled
+     measurement. This is the digital error.
+3. **Boxes (decision 12) on both sides:**
+   - the plant may be a box with the edge `u` → `y`. The GRO501 racecar becomes
+     `mpc % dt @ inner`, once MPC gives `u` (decision 2);
+   - the computer may be a box (filter + controller, multi-rate) with the edge `r`, `y` (or
+     `x`) → `u`;
+   - the guessing chain (`u_nom` / `u` / `u_ff`, the first port) goes, and the dual-rate MPC
+     composite exposes `u`.
+4. **Where things sit:**
+   - the filter and the error run on the computer, inside the computer box (the filter
+     ruling, §3.4);
+   - the sampler and the zero-order hold are the boundary between the two boxes, not blocks;
+   - the roles are the hybrid fields: `.plant` is the plant box, and `.computer` holds the
+     controller;
+   - inside the computer the ids are `controller`, `error`, `filter` (AC-2b), and the
+     multi-rate schedule's keys use those ids.
+5. **The reference.** `Step() >> ctl % dt @ plant` reads like the continuous loop.
+   - The source sits on the continuous side, and the computer samples it at its own rate:
+     the reference is a world signal the computer reads.
+   - It lands with AC-8. Until then, `compute_forced(r, input_port_id="r")` as today.
+6. **Manual path and keywords.** Custom names use `HybridDiagram` + `connect_boundary`.
+   - The port keywords of `hybrid_closed_loop` go, like `closed_loop`'s (decision 2).
+   - Migration: the 2 demos use standard names or the manual path, and the GRO501
+     notebook becomes `mpc % dt @ inner`.
+   - MPC keeps its own `%` (its `dt` check).
+
 **Settled since:**
 - what `@` builds and names: it nests a box under its role key and keeps a leaf a leaf,
   while `>>` and `+` stay flat (decision 12, §3.4);
-- `feedback()` and its preference for `r` (decision 14).
+- `feedback()` and its preference for `r` (decision 14);
+- `%` for sampled loops (decision 15).
 
-**Still open, to plan before any code:** `%` for sampled loops.
+**The operator review is closed (2026-10-11).** Every operator is planned: `+`,
+`autowire`, `>>`, `@`, `feedback` and `%`. Code can start with AC-OP.
 
 ## 4. Steps
 
@@ -965,7 +1043,7 @@ It is captured twice and `cmp`'d.
 | **AC-5** | Plot auto mode, role selectors, id paths, labels, units and colours by role, one default; signals inside a role box found by object and by path (`plant:motor:y`) | plotting lane, v0.2 D |
 | **AC-6** | The camera rule at animate time, looking inside the `plant` box; no compensator skin inside a loop | plotting lane |
 | **AC-7** | Cost relative to the plant across every evaluator and design tool (§3.5), on the `plant` box's state and `u`: one compiled loop for the three backends, `command_port`, stateful and time-varying laws, cost params, one price; Gym and the rollout environment aligned | after decision 4; v0.3, with RN-4 / RN-5 |
-| **AC-8** | Hybrid on the same rules: fields as roles, the `hybrid_closed_loop` keywords, the dual-rate MPC composite | with S31, v0.9 |
+| **AC-8** | Hybrid on the same rules (decision 15): fields as roles; `%` accepts anything with no continuous state, and a continuous controller raises `NotImplementedError`; `computer @ plant` dispatches like `@`, with the error inside the computer; boxes on both sides, and the `u_nom` / `u_ff` / first-port guesses go; `source >> sampled loop` puts the source on the continuous side; the `hybrid_closed_loop` port keywords go (2 demos and the GRO501 racecar notebook migrated); the dual-rate MPC composite exposes `u` | with S31, v0.9 |
 
 **Done when:**
 
@@ -1073,6 +1151,16 @@ Each is recorded in ROADMAP §6.
     - Only `controller @ plant` assigns roles.
 
     *Chosen on 2026-10-11.*
+15. **`%` runs something with no continuous state on a clock; `computer @ plant` follows
+    the rules of `@`.**
+    - A continuous controller (PID, Lead) raises `NotImplementedError`: sampled dynamic
+      controllers are future work.
+    - The error and the filter sit inside the computer.
+    - Boxes are allowed on both sides.
+    - The reference is sampled from the continuous side.
+    - The port keywords of `hybrid_closed_loop` go.
+
+    *Chosen on 2026-10-11.* With it, the operator review is closed.
 
 **Ruling, not a decision.** The name freeze (ROADMAP §4.1 gate 7) is paused between terms
 (maintainer, 2026-10-10). A rename migrates every course notebook in the same commit, with
