@@ -61,6 +61,9 @@ The answer it argues for: **standard names, read at the moment of use, and nothi
 8. **No freeze.** We are between terms, so the teaching design is unfrozen: no decision
    rests on the name freeze (ROADMAP §4.1 gate 7, paused on 2026-10-10). A rename migrates
    every course notebook in the same commit, with no alias.
+9. **Operators stay simple** (2026-10-10). `>>` is a plain manual serial connection, not an
+   auto-wiring operator; the automation lives in `@`. No operator modifies its operands
+   (§3.10).
 
 ## 2. Analysis: what the library automates today
 
@@ -595,6 +598,76 @@ This is an estimate of most cases, not a measured share.
 - AC-4: the keys inside the `w` / `v` plant wrapper, and how its boundary re-exposes the
   leaf's `x`, `q` and `dq`.
 
+### 3.10 The operators
+
+The composition operators are under review, one at a time. Nothing changes in code until
+the review closes; this section records what is decided so far.
+
+**Decision 8 (agreed 2026-10-10): no operator modifies its operands.**
+- Today `+` and `>>` extend a diagram left operand in place and return it. After
+  `L = C >> G; L2 = L >> H`, `L` itself contains `H`, and a start state set on `L` is
+  reset to zero. `@` already returns a new diagram.
+- After the change, `L >> H` and `L + H` return a new diagram, and `L` keeps its blocks,
+  wiring, ports, name, `x0` and camera settings.
+- **The result stays flat:**
+  - operands' blocks are laid out side by side, with their ids kept;
+  - the left diagram's `x0`, camera settings and name are carried into it;
+  - blocks are shared, not copied, so long chains stay cheap.
+- `connect()` and `autowire()` are methods and still modify the diagram they are called on.
+- **Evidence:**
+  - no code reuses a left diagram after `>>` or `+`;
+  - no test asserts the in-place identity;
+  - `closed_loop` loses the copy it makes only to protect the user's controller.
+- This reverses the v0.1 "operator mutation semantics" record of DESIGN §4. DESIGN is
+  rewritten when the change lands.
+
+**Decision 9 (agreed in principle 2026-10-10): `>>` is a plain serial connection.** `A >> B`
+wires one output of A to one input of B. The first case that applies wins:
+1. A has one output and B has one input: connect them, whatever their names.
+2. Exactly one output of A and one input of B share a name (`y`→`y`, `x`→`x`, `u`→`u`):
+   connect those.
+3. A has an output `y` and B has an input `u`: connect `y` → `u`, the textbook output and
+   input.
+4. Otherwise refuse: "`>>` connects one output to one input; wire this one with connect".
+
+Details of the rule:
+- **Sizes are a check, never a choice.** A mismatch is refused, as today.
+- **A diagram operand counts by its boundary ports**: its boundary outputs and its free
+  boundary inputs.
+- **The result** keeps A's free inputs as its inputs, and B's output (`y`, else its only
+  one) as its output. So `C >> G` still exposes `e`.
+- **Dropped from `>>`:** the preference for `r` and the hidden entry and output memory.
+- **Kept until their own steps:** the composition-time camera copy (AC-6) and the guessed
+  ids (AC-2b).
+
+**Evidence for decision 9.** Every `>>` call that runs was replayed: the tests, 16 demo
+scripts and 10 notebooks, 104 calls in all.
+
+| Outcome | Calls |
+|---|---|
+| One-to-one (rule 1), connected exactly as today; includes all 31 `Step() >> ctl @ plant`, since every `@` loop has the single input `r` | 100 |
+| Series of two transfer functions (`G1 >> G2`, `G >> Integrator()`): a transfer-function plant has outputs `y` and `x`, so rule 3 is needed | 2 |
+| Changes: `Step() >> ProportionalController()` goes to the measurement `y` by name, not `r` (a test) | 1 |
+| Refused today and still refused: white noise into a loop with no free input | 1 |
+
+Notes on the evidence:
+- **The rule fixes a bug of today's `>>`.** `plant >> P` fed the controller's reference
+  `r` and left its measurement at zero; rule 2 gives `y` → `y`, and
+  `Pendulum >> StateFeedback` gives `x` → `x`.
+- **Choosing by size was considered and rejected.** On the two transfer-function calls,
+  `y` and `x` both have size 1, so size is just as ambiguous. It would also make the wiring
+  depend on model order.
+- **`Step() >> closed_loop(..., w=True)` becomes a refusal.** The loop's inputs are `r`
+  and `w`. No code does this, and the message points to `closed_loop(r=Step(), w=...)`
+  (AC-4).
+
+**Still open, to plan before any code:**
+- `+` and `autowire()`;
+- what `@` builds and names: §3.4 proposes nesting diagram operands under their role keys,
+  to reconcile with the flat result of decision 8;
+- `feedback()` and its own preference for `r`;
+- `%` for sampled loops.
+
 ## 4. Steps
 
 Each step lands on its own commit with the checks of §6.
@@ -612,6 +685,7 @@ It is captured twice and `cmp`'d.
 |---|---|---|
 | **AC-0** | No controller classes; `plot_control_law` on `System`; the four course notebooks migrated (import line and base class) | agent, after decision 7; v0.2 B4 |
 | **AC-1** | **Landed 2026-10-10.** Safe fixes and pinning tests, one commit each with its own test: D1 and D6 refused (an Error junction on a block that reads its own measurement); D2 (sampled state feedback runs); D4 (unknown or unused `closed_loop` keywords refused); A (`>>` reads a hand-wired diagram's declared output); B (a diagram `x0` set by the user is kept, until S29); C (a static block whose output is `u` simulates; the command's signal name waits for AC-5); D (`autowire` never routes one command to two inputs, and warns when it leaves inputs open); the `t = 0` scoring; `disturbances={"u"}` refused. `TestDispatchTable` pins the loop each library controller gets. The census is a scratchpad script (AGENTS recipe), captured again before each later step | agent (bug fixes) |
+| **AC-OP** | The operators of §3.10: no operator modifies its operands (decision 8), then the plain `>>` rule (decision 9); one commit each, with the census and the replay of every `>>` call | core, after the operator review closes; v0.2 B4 |
 | **AC-2** | `roles()`, `block_roles()` and `command_port()` in `core/feedback.py`, with every reader switched; reserved ids raise on a clash. (a) Byte-identical census, with today's ids mapped. (b) The id rename in flow and hybrid: `ctl` → `controller`, `sys` → `plant`, `ref` → `reference`; sources `disturbance` and `noise`; helpers `error` and `filter`; the expected diff is ids, params keys, signal names and stream names | after decisions 1 and 5; v0.2 B4, before RN-4 |
 | **AC-3** | Composition on standard names. Removed: profiles, overrides, port keywords, `error_input`, `_composition_*`, shape ids, the camera copy. Changed: diagram operands nested; `G @ K` naming; leaves expose `x`; MPC renamed; `filter=`; refusals point to hand wiring. The course notebooks drop `feedback_profile` | after decision 2; v0.2 B4, gates P4 |
 | **AC-4** | Loop inputs: the plant wrapper owns `w` and `v`; sources as values, named `reference`, `disturbance`, `noise`; `estimator=` (with P4); randomness A9 / D24 reconciled | after decision 3; beside P4, before P11 |
@@ -678,6 +752,11 @@ Each is recorded in ROADMAP §6.
    and gets everything. *Recommended: drop the ask.*
 7. **No controller classes, no aliases; `plot_control_law` on `System`.** *Agreed in
    principle on 2026-10-10.*
+8. **No operator modifies its operands.** `+`, `>>` and `@` return a new flat diagram that
+   shares the operands' blocks; this reverses the v0.1 DESIGN record. *Agreed on
+   2026-10-10.*
+9. **`>>` is a plain serial connection** by the four rules of §3.10: one-to-one, same name,
+   `y` → `u`, else refuse. *Agreed in principle on 2026-10-10.*
 
 **Ruling, not a decision.** The name freeze (ROADMAP §4.1 gate 7) is paused between terms
 (maintainer, 2026-10-10). A rename migrates every course notebook in the same commit, with
@@ -704,6 +783,7 @@ no alias.
 ## 7. Not in scope
 
 - No new operator, no options on `@`, no `Loop` block.
+- No auto-wiring in `>>`: it connects one output to one input by the fixed rule of §3.10.
 - No new base classes, traits, intent declarations or override attributes.
 - No inference of roles from the graph, and no "deepest plant" rule.
 - No tuple operands.

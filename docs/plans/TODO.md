@@ -176,6 +176,9 @@ the new code copies clean patterns and no shortcut is added only to be dropped.
   - AC-1 landed 2026-10-10: the ten safe fixes (D1, D2, D4, D6 of the 2026-10-10 review;
     defects A–D of the plan; time-varying laws scored at t = 0; `disturbances={"u"}`
     refused), each with its test, and `TestDispatchTable`.
+  - AC-OP: the operators (plan §3.10). No operator modifies its operands (decision 8),
+    then the plain `>>` rule (decision 9). Docs only for now; code after the operator
+    review (`+`, `autowire`, `@`, `feedback`, `%`) closes.
   - AC-2: `roles()`, `block_roles()` and `command_port()`, with every reader switched;
     reserved ids raise on a clash. (a) byte-identical; (b) the id rename, in flow and hybrid,
     before RN-4: `ctl` → `controller`, `sys` → `plant`, `ref` → `reference`; sources
