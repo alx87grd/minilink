@@ -33,8 +33,8 @@ class CostFunction(ABC):
       ``alpha`` and reinforcement learning's ``gamma`` are both ``exp(-rho dt)``).
       The library costs are frozen dataclasses, so assigning it on one of their
       instances raises. ``weight * cost`` keeps the cost's rate and ``a + b``
-      requires equal rates. Setting it per instance (a constructor field or a
-      ``params`` entry) is workboard step A2 in docs/plans/TODO.md.
+      requires equal rates. No constructor field or ``params`` entry sets
+      the rate; a subclass does.
     """
 
     discount_rate = 0.0

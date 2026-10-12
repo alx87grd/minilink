@@ -1,5 +1,5 @@
 # Basic tier — core simulation and plotting (+ Graphviz for plot_diagram()).
-# Pip mirror: requirements.txt (or requirements-nographviz.txt without Graphviz).
+# Pip mirror: `pip install minilink` (install.md).
 # Colab already ships this stack (numpy, scipy, matplotlib).
 #
 # Create:

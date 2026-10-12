@@ -1,31 +1,18 @@
-"""The repo's contract with itself: rules that used to drift because nothing checked them.
+"""The repo's contract with itself: the rules a grep or an AST walk can check.
 
-Four rules of RULES.md are cheap to verify and were all violated within days of
-being written, so they are tests now rather than prose:
-
-- 6.9 public-facing prose never names another tool (the hand-written grep was
-  BRE, so its alternation was literal and the gate passed on anything);
-- 7.6 internal documentation links resolve, paths and anchors alike (the review
-  ladder's own table of contents pointed at two slugs that do not exist);
+- 6.9 public-facing prose never names another tool;
+- 7.6 internal documentation links resolve, paths and anchors alike;
 - 5.8 no leading-underscore pseudo-privacy on the System family or the
   teaching-lane simulators;
 - 6.7 teaching-lane code that picks Ipopt probes for ``cyipopt`` first, so it
-  still runs on an install without it (a cart-pole demo hard-coded it).
-
-The README figures are built by one script, ``docs/make_assets.py``, so the
-README shows only what it rebuilds, every GIF keeps to the 6.9 size budget, and
-the hand-drawn bridges figure stays the output of its tile list.
-
-Every notebook opens in Colab, so its setup cell is checked too: it clones the
-default branch and puts the clone on the path before minilink is imported (one
-notebook cloned a stale working branch).
-
-The test suite and the merge gate drifted the same way, so they are tests too:
-
-- 6.5 a missing extra skips its own tests only (a mid-file
-  ``pytest.importorskip("jax")`` skipped every NumPy test of its module);
-- the one CI job that installs jax runs ``pytest`` (it ran the demos only, so no
-  JAX test gated a merge).
+  still runs on an install without it;
+- the README figures are built by one script, ``docs/make_assets.py``, so the
+  README shows only what it rebuilds, every GIF keeps to the 6.9 size budget, and
+  the bridges figure stays the output of its tile list;
+- every notebook that imports minilink opens in Colab: its setup cell clones the
+  default branch and puts the clone on the path before the first import;
+- 6.5 a missing extra skips its own tests only, never the NumPy tests beside them;
+- the CI job that installs jax runs ``pytest``, so the JAX tests gate a merge.
 """
 
 from __future__ import annotations
@@ -86,6 +73,9 @@ IMPORTS_MINILINK = re.compile(r"^\s*(from|import) minilink\b", re.MULTILINE)
 
 MARKDOWN_LINK = re.compile(r"\[[^\]]*\]\(([^)\s]+)\)")
 HEADING = re.compile(r"^#{1,6}\s+(.*)$", re.MULTILINE)
+# README renders on PyPI too, so it links this repository by absolute URL;
+# such a link is checked as the local path it names.
+REPO_URL = re.compile(r"https://github\.com/alx87grd/minilink/(?:blob|tree)/main/(.*)")
 
 # 5.8 — the classes the rule names.  simulation/realtime/ is provisional
 # research lane (ROADMAP §3, TRL 2) and is out of scope until its review.
@@ -234,10 +224,15 @@ class TestDocumentLinks(unittest.TestCase):
             text = doc.read_text(encoding="utf-8")
             where = doc.relative_to(REPO)
             for target in MARKDOWN_LINK.findall(text):
-                if target.startswith(("http://", "https://", "mailto:", "#/")):
+                in_repo = REPO_URL.match(target)
+                if in_repo:
+                    target, base = in_repo.group(1), REPO
+                elif target.startswith(("http://", "https://", "mailto:", "#/")):
                     continue
+                else:
+                    base = doc.parent
                 path, _, anchor = target.partition("#")
-                destination = doc if not path else (doc.parent / path).resolve()
+                destination = doc if not path else (base / path).resolve()
                 self.assertTrue(
                     destination.exists(),
                     f"{where} links to a missing path: {target}",

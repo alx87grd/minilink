@@ -1,6 +1,10 @@
-# Nightly — every example script and every teaching notebook, with the full
-# optional stack. Not a merge gate (see tests/README.md); CI `test` /
-# `regression` remain the per-push gates. Run on demand with workflow_dispatch.
+# Nightly — everything the per-push gates leave out, with the full optional
+# stack (every extra, Ipopt, Stable-Baselines3 on CPU torch): the whole pytest
+# suite (symbolic and Ipopt tests included), every example script, and every
+# teaching notebook (`--all`: the ones marked `smoke: false` in
+# notebook_overrides.json too, except `nightly: false`). Not a merge gate (see tests/README.md); CI
+# `test` / `regression` remain the per-push gates. Run on demand with
+# workflow_dispatch.
 name: Nightly demos
 
 on:
@@ -23,12 +27,26 @@ jobs:
     - name: Install system dependencies
       run: sudo apt-get update && sudo apt-get install -y graphviz coinor-libipopt-dev libblas-dev liblapack-dev pkg-config
 
+    # Stable-Baselines3 is not a minilink extra: the SB3 notebooks need it and
+    # torch, installed from the CPU wheel index (the default wheel pulls CUDA).
     - name: Install dependencies (full optional stack)
       run: |
         python -m pip install --upgrade pip
-        pip install -e ".[dev,jax,visualization,plotting,rl,ipopt,diagrams]"
+        pip install -e ".[dev,full,ipopt]"
+        pip install torch --index-url https://download.pytorch.org/whl/cpu
+        pip install stable-baselines3
+
+    # A missing package would only skip its tests and notebooks; fail instead.
+    - name: Check the optional stack imports
+      run: python -c "import cyipopt, sympy, jax, graphviz, meshcat, pygame, plotly, gymnasium, torch, stable_baselines3"
+
+    - name: Test with pytest (every marker)
+      env:
+        SDL_VIDEODRIVER: dummy
+      run: pytest
 
     - name: All example scripts under examples/demos
+      if: ${{ !cancelled() }}
       env:
         PYTHONPATH: ${{ github.workspace }}
         MPLBACKEND: Agg
@@ -36,10 +54,11 @@ jobs:
       run: |
         python tests/demo_checks/run_all_demos.py --timeout 900 --continue-on-error
 
-    - name: Teaching notebooks
+    - name: Teaching notebooks (all, long ones included)
+      if: ${{ !cancelled() }}
       env:
         PYTHONPATH: ${{ github.workspace }}
         MPLBACKEND: Agg
         SDL_VIDEODRIVER: dummy
       run: |
-        python tests/demo_checks/run_notebook_checks.py
+        python tests/demo_checks/run_notebook_checks.py --all --timeout 1800

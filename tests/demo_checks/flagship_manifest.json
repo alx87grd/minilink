@@ -17,7 +17,9 @@
   {
     "id": "plot_readme",
     "path": "examples/demos/core/readme_examples.py",
-    "requires": []
+    "requires": [
+      "jax"
+    ]
   },
   {
     "id": "diagram_compiling",

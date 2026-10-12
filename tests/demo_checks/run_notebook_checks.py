@@ -9,15 +9,16 @@ Code cells must not raise; outputs are discarded. Uses ``MPLBACKEND=Agg``.
 A cell that starts a live keyboard session (``.game(``) is left out: it runs
 until the user quits, as ``run_all_demos.py`` skips the interactive scripts.
 Defaults: ``timeout=180``, ``requires=[]``. Overrides in
-``notebook_overrides.json`` (``smoke: false`` drops a notebook from the
-default suite). Not smoked: ``projects/``, ``experimental/``, and long topic
-notebooks (UR5 symbolic EoM, DP grids, PPO training). Performance benchmarks
-live under ``benchmarks/`` (run via ``benchmarks/run_study.py`` or
-``benchmarks/ode_solver_benchmark.ipynb``).
+``notebook_overrides.json`` (``smoke: false`` drops a long notebook from the
+default suite; ``--all`` keeps it; ``nightly: false`` drops it from ``--all``
+too, so it runs only when named with ``--notebook``). Not run: ``projects/`` and
+``experimental/``. Performance benchmarks live under ``benchmarks/`` (run via
+``benchmarks/run_study.py`` or ``benchmarks/ode_solver_benchmark.ipynb``).
 
 Usage (from repo root)::
 
     python tests/demo_checks/run_notebook_checks.py
+    python tests/demo_checks/run_notebook_checks.py --all
     python tests/demo_checks/run_notebook_checks.py --notebook showcase_minilink
 """
 
@@ -143,6 +144,7 @@ def run_notebook_checks(
     *,
     notebook_filter: str | None = None,
     timeout_override: float | None = None,
+    all_notebooks: bool = False,
 ) -> list[NotebookRow]:
     overrides = _load_overrides()
     rows: list[NotebookRow] = []
@@ -153,7 +155,11 @@ def run_notebook_checks(
             continue
 
         entry = overrides.get(rel) or {}
-        if entry.get("smoke") is False and notebook_filter is None:
+        long_notebook = entry.get("smoke") is False
+        too_long_for_nightly = entry.get("nightly") is False
+        if notebook_filter is None and (
+            too_long_for_nightly or (long_notebook and not all_notebooks)
+        ):
             continue
         requires = tuple(entry.get("requires") or ())
         missing = False
@@ -218,6 +224,11 @@ def main(argv: list[str] | None = None) -> int:
         default=None,
         help="Override per-notebook timeout seconds (default: override or 180)",
     )
+    parser.add_argument(
+        "--all",
+        action="store_true",
+        help='Include the notebooks marked "smoke": false (the nightly sweep)',
+    )
     args = parser.parse_args(argv)
     ids = list(notebook_ids(_discover_notebooks()).values())
     if args.notebook is not None and args.notebook not in ids:
@@ -228,6 +239,7 @@ def main(argv: list[str] | None = None) -> int:
     rows = run_notebook_checks(
         notebook_filter=args.notebook,
         timeout_override=args.timeout,
+        all_notebooks=args.all,
     )
     return _print_report(rows)
 

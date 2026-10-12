@@ -1,15 +1,15 @@
 # CI — entry points documented in tests/README.md#entry-points
 # Jobs: test (ruff + pytest, py3.10–3.13; coverage report on 3.12, no gate)
-#   → regression (pytest + gates + flagships + notebooks, py3.12 + jax);
+#   → regression (pytest + gates + flagships + notebooks, py3.12 + jax + symbolic);
 # packaging (build, check and import the wheel) and laptops (Basic tier pytest +
 # notebook smoke on Windows and macOS, py3.12) run beside them.
 name: CI
 
 on:
   push:
-    branches: [main, refactor-v4, dev-alex, dev]
+    branches: [main, dev-alex, dev]
   pull_request:
-    branches: [main, refactor-v4, dev-alex, dev]
+    branches: [main, dev-alex, dev]
 
 jobs:
   test:
@@ -138,13 +138,13 @@ jobs:
     - name: Install system dependencies
       run: sudo apt-get update && sudo apt-get install -y graphviz
 
-    - name: Install dependencies (with JAX + viz)
+    - name: Install dependencies (with JAX + viz + symbolic)
       run: |
         python -m pip install --upgrade pip
-        pip install -e ".[dev,jax,visualization,plotting,diagrams,rl]"
+        pip install -e ".[dev,jax,visualization,plotting,diagrams,rl,symbolic]"
 
-    # JAX tests skip in the ``test`` job (no jax extra); gate them here.
-    - name: Test with pytest (incl. JAX)
+    # JAX and symbolic tests skip in the ``test`` job (no extra); gate them here.
+    - name: Test with pytest (incl. JAX and symbolic)
       env:
         SDL_VIDEODRIVER: dummy
       run: pytest
