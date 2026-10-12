@@ -119,8 +119,11 @@ public contract. When you spot an opportunity outside your lane, ask — do not 
 5. Never edit modules while a background sweep imports them; write the next edit as a script in the scratchpad and apply it once the sweep reports.
 6. Finish with lint, full `pytest`, the affected demos, and the notebook checks.
 
-**Notebooks:** skip review unless updating renamed imports or user asks; outputs
-stripped by pre-commit (`nbstripout`). After notebook edits, run the notebook smoke check
+**Notebooks:** skip review unless updating renamed imports or user asks; outputs and
+volatile metadata are stripped by the `nbstripout` git filter and pre-commit hook (one
+key list, in `.pre-commit-config.yaml`), and CI fails a notebook committed without them.
+A session without the filter (a cloud clone) runs `pre-commit run nbstripout --all-files`
+before committing a notebook. After notebook edits, run the notebook smoke check
 (tests/README.md, Agent table, "Notebook change"; CI runs it too).
 
 ## Before push or PR (local CI gate)

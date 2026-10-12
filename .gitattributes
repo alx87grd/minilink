@@ -1,0 +1,4 @@
+# Notebooks are stored without outputs or volatile metadata: the nbstripout
+# filter, set up once per clone (see .pre-commit-config.yaml).
+*.ipynb filter=nbstripout diff=ipynb
+*.zpln filter=nbstripout
