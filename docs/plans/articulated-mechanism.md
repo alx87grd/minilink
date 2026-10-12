@@ -1,6 +1,6 @@
 # Articulated mechanism layer (design)
 
-Status: draft plan (July 2026), unscheduled — a Later idea in [TODO.md](TODO.md) §7.
+Status: draft plan (July 2026) — the "General serial chain" row of [TODO.md](TODO.md) §5 (after v1.0).
 Lane: research (ROADMAP §2).
 
 ## Problem
@@ -178,7 +178,7 @@ config = configure(spec, q)  # or forward_kinematics(spec, q)
 tau = rnea(q, dq, qdd, spec, config=config)  # optional intra-call reuse
 ```
 
-**Stateless rules (DESIGN §1):**
+**Stateless rules (RULES 2.4):**
 
 - Never `self._config`, never “last `q`” on the plant.
 - `MechanismConfiguration` is a **local variable** or optional argument **within one method call** (e.g. building `H` from \(n\) RNEA columns at the same `q`).
@@ -344,7 +344,7 @@ Later: `adapters/urdf.py` → fixed `MechanismModel`.
 
 ## Phasing
 
-### AM-1 — Numeric extract (the shared RNEA stack, TODO.md §7)
+### AM-1 — Numeric extract (the shared RNEA stack; TODO.md §5, general serial chain)
 
 - [ ] `spec.py`, `spatial.py`, `kinematics.py` (`MechanismConfiguration`)
 - [ ] `from_dh_params` adapter
@@ -389,7 +389,7 @@ Later: `adapters/urdf.py` → fixed `MechanismModel`.
 When landed:
 
 - **DESIGN.md** — mechanism IR, topology / model / configuration trio, plant wiring, params vs fixed spec, symbolic path.
-- **[TODO.md](TODO.md) §7** — retire the Later ideas “shared RNEA serial-chain stack” and “ABA on other RNEA arms”; ask the maintainer to close ROADMAP §6's `KinematicModel` decision.
+- **[TODO.md](TODO.md) §5** — the "General serial chain" row leaves; ask the maintainer to close ROADMAP §6's `KinematicModel` decision.
 - Delete or archive this plan doc when AM-1–AM-2 complete.
 
-Related items: the shared RNEA stack and ABA generalization (TODO.md §7 Later), the optional `KinematicModel` delegate (ROADMAP §6; prefer this plan instead).
+Related items: the optional `KinematicModel` delegate (ROADMAP §6; prefer this plan instead).

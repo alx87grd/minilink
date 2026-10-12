@@ -1,46 +1,47 @@
 # GRO501 classical-control stack — fix plan (draft, 2026-09-07)
 
-Status: **mostly landed.** P1, F1, F2, F4 (2026-09-07); P2, P3, P7 and TB-a (2026-09-26);
+Status: **mostly landed.** P1, GRO-F1, GRO-F2, GRO-F4 (2026-09-07); P2, P3, P7 and TB-a (2026-09-26);
 P5, P8 and P9 (2026-10-10). Open: P10 (now automation-by-convention), TB-b, S61, P4 (after
 P10's composition steps), P11; P6 (z tier) stays held. The order is in [TODO.md](TODO.md)
 §2.
-Rung: v0.2 wave B, steps P2–P11 of [TODO.md](TODO.md).
+Rung: v0.2 wave B, steps P2–P11 of [TODO.md](TODO.md); P6's row sits in its v0.9 section.
 Lane: teaching surface (`analysis/`, `control/`, `estimation/`, `blocks/`).
 Milestone: v0.2, [ROADMAP §4.2](../../ROADMAP.md#42-v02--gro501-end-to-end).
 Baseline audit: [../reviews/2026-09-07-gro501-coverage.md](../reviews/2026-09-07-gro501-coverage.md).
 
-Acts on the ten items that audit found: four complexity findings (C1–C4) and
-six coverage gaps (G1–G6). Nothing here removes a feature; every step is
+Acts on the ten items that audit found: four complexity findings (GRO-C1–GRO-C4) and
+six coverage gaps (GRO-G1–GRO-G6); `GRO-` marks the audit's own ids (its C1, G1, F1, …),
+apart from the workboard's. Nothing here removes a feature; every step is
 additive or replaces boilerplate with generated equivalents.
 
 ## 1. Step map
 
 | Step | Closes | Wave | Decision |
 | --- | --- | --- | --- |
-| **P1** PI / PD without phantom states | C4, G3 | 1 | **done** — ruled: dedicated classes |
-| **F1** `frequency_range` brackets the 0 dB crossing | — | 1 | **done** |
-| **F2** `PID.f` and `PID.ctl` agree on `tau` | — | 1 | **done** |
-| **F4** `closed_loop_poles` singular-gain guard | — | 1 | **done** |
-| **P2** `minreal` | G3 | 1 | **done** 2026-09-26; order reduction split out, then deferred out of v0.2 (2026-09-26; TODO §7) |
-| **P3** `place()` → `StateFeedbackController` | G2 | 1 | **done** 2026-09-26 |
-| **P4** `estimation/` — Luenberger, then Kalman | G1 | 2 | **held** |
-| **P5** Named sensitivity functions | G5 | 2 | landed 2026-10-10 |
-| **P6** Discrete (z) tier | G4 | 3 | **held** |
-| **P7** `facades.py` boilerplate | C2 | 2 | **done** 2026-09-26 (explicit + pinned) |
-| **P8** Small teaching helpers (ζ/ω_n, `N`) | G6 | 2 | landed 2026-10-10 (`N` only) |
-| **P9** `TransferFunction` port construction | C3 | 3 | landed 2026-10-10 |
-| **P10** Document what `@` means | C1 | 3 | widened 2026-10-10 into [automation-by-convention.md](automation-by-convention.md) |
+| **P1** PI / PD without phantom states | GRO-C4, GRO-G3 | 1 | **done** — ruled: dedicated classes |
+| **GRO-F1** `frequency_range` brackets the 0 dB crossing | — | 1 | **done** |
+| **GRO-F2** `PID.f` and `PID.ctl` agree on `tau` | — | 1 | **done** |
+| **GRO-F4** `closed_loop_poles` singular-gain guard | — | 1 | **done** |
+| **P2** `minreal` | GRO-G3 | 1 | **done** 2026-09-26; order reduction split out, then deferred out of v0.2 (2026-09-26; TODO §6) |
+| **P3** `place()` → `StateFeedbackController` | GRO-G2 | 1 | **done** 2026-09-26 |
+| **P4** `estimation/` — Luenberger, then Kalman | GRO-G1 | 2 | **held** |
+| **P5** Named sensitivity functions | GRO-G5 | 2 | landed 2026-10-10 |
+| **P6** Discrete (z) tier | GRO-G4 | 3 | **held** for GRO501; a v0.9 row |
+| **P7** `facades.py` boilerplate | GRO-C2 | 2 | **done** 2026-09-26 (explicit + pinned) |
+| **P8** Small teaching helpers (ζ/ω_n, `N`) | GRO-G6 | 2 | landed 2026-10-10 (`N` only) |
+| **P9** `TransferFunction` port construction | GRO-C3 | 3 | landed 2026-10-10 |
+| **P10** Document what `@` means | GRO-C1 | 3 | widened 2026-10-10 into [automation-by-convention.md](automation-by-convention.md) |
 | **P11** Two GRO501 notebooks | gate 2 | 3 | maintainer reviews |
 
 Wave 1 is the correctness wave and should land before any GRO501 material is
 written: until it is in, the tools disagree with the course's own exercises.
-P1, F1, F2 and F4 landed 2026-09-07 (suite 1 063 green, notebook and demos
+P1, GRO-F1, GRO-F2 and GRO-F4 landed 2026-09-07 (suite 1 063 green, notebook and demos
 re-run); P2 and P3 landed 2026-09-26. Wave 2 is the missing surface. Wave 3 is polish
 and material.
 
-F1, F2 and F4 came out of a second pass that ran the guide's §9.6 / §9.7 /
+GRO-F1, GRO-F2 and GRO-F4 came out of a second pass that ran the guide's §9.6 / §9.7 /
 §9.10 systems through every verb — see
-[§4 of the audit](../reviews/2026-09-07-gro501-coverage.md). F1 was the
+[§4 of the audit](../reviews/2026-09-07-gro501-coverage.md). GRO-F1 was the
 serious one: `margins()` reported `inf` for any PI or I loop and for any loop
 with a large static gain, because the automatic frequency band was read from
 the poles and zeros without checking where `|G| = 1`.
@@ -94,7 +95,7 @@ them, and the law is assembled term by term (`_command`, `_filter_rate`,
 | `PID` | 2 | 4 | 2 |
 
 Every count now matches the hand calculation. `tau > 0` is validated at
-construction, which is also what fixed F2.
+construction, which is also what fixed GRO-F2.
 
 **Files.** `minilink/control/siso.py`, `minilink/control/__init__.py`,
 `minilink/__init__.py`, `tests/unittest/test_control_analysis.py`
@@ -139,7 +140,7 @@ was not the audit's own H(s). A lead zero on a plant pole drops both; a minimal 
 (the badly scaled quarter car standing in for §9.13) comes back in its own coordinates.
 `linear.zeros` now counts a pencil eigenvalue as finite only when `|β|` is not negligible
 against `|α|`, so rounding no longer reports zeros near 1e15. Tests: `TestMinreal`.
-Order reduction by neglecting fast modes is out of v0.2 (decided 2026-09-26; TODO §7).
+Order reduction by neglecting fast modes is out of v0.2 (decided 2026-09-26; TODO §6).
 
 ### P3. `place()`
 
@@ -297,7 +298,7 @@ with the channel named; the option keyword on `closed_loop` for the two
 inputs; whether `feedback()` alone (no controller/plant split) offers only
 `v`.
 
-**Files.** A new `minilink/analysis/sensitivity.py` (band functions, not
+**Files.** A new `minilink/analysis/sensitivity_functions.py` (band functions, not
 System shortcuts, ROADMAP §6), `minilink/analysis/__init__.py`,
 `minilink/core/composition.py` (the loop inputs),
 `tests/unittest/test_control_analysis.py`; DESIGN's analysis bullet.

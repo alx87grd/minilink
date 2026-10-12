@@ -69,8 +69,11 @@ When $u$ controls acceleration (e.g., dynamic vehicle models, torque-driven mani
 
 1. **Geometry layer** (`minilink.core.geometry`, [geometry-module.md](geometry-module.md)):
    - `BicubicGridSDF`: 2D/3D signed-distance grid with JAX bicubic interpolation (a `Shape`).
-   - Barrier $h(x)$ is `scene.clearance_field(body)` (a `Field`); no `Scene.as_cbf`.
-     ([fields.md](fields.md) §4.7.)
+   - Barrier $h(x)$ is `scene.clearance_field(body)` (a `Field`), its safe set
+     `h.as_constraint(lower=0)` a `Set`; the barrier condition $\nabla h \cdot f(x, u) + \alpha h(x)$
+     is a second `Field` on $(x, u)$ built from `h.gradient` and `sys.f`, and its superlevel set
+     `.as_input_constraint(lower=0)` is the `InputSet` $U(x)$ the safety QP enforces. No
+     `Scene.as_cbf`, no barrier type of its own ([fields.md](fields.md) step 4.7).
 2. **Control layer** (`minilink.control.cbf`):
    - `CBFSafetyFilter(controller, cbf, bounds, gamma=0.1, slack_penalty=1e5)`: Wraps an existing controller or stands as an independent filter block in a `DiagramSystem`.
    - Per step: Solves a 1D–4D QP (OSQP, Clarabel, or an analytical projection for SISO).
@@ -85,6 +88,6 @@ When $u$ controls acceleration (e.g., dynamic vehicle models, torque-driven mani
 | --- | --- | --- |
 | **CBF-1** | `core/geometry/shapes.py` | Add `BicubicGridSDF` using `jax.scipy.ndimage.map_coordinates(..., order=3)`. Test gradient continuity against analytic primitives. |
 | **CBF-2** | `core/geometry/fields.py` | Barrier is `scene.clearance_field(body)` (`Field`); `gradient` from the Field ABC. No `Scene.as_cbf`. |
-| **CBF-3** | `control/cbf.py` | Implement `DiscreteCBFFilter` with QP solve and slack variable $\omega_k$. |
+| **CBF-3** | `control/cbf.py` | Implement `CBFSafetyFilter` (the discrete condition of §2.1) with QP solve and slack variable $\omega_k$. |
 | **CBF-4** | `examples/demos/control/` | Canonical demo: `car_circuit_cbf_safety.py` — an aggressive or random nominal control law filtered in real time around obstacles. |
 | **CBF-5** | HOCBF extension | Relative-degree 2 velocity-braking boundary for dynamic vehicles. |

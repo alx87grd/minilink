@@ -1,8 +1,9 @@
 # Optimizer wiring for parametric trajopt / MPC
 
 Status: **draft plan** (July 2026). Rung: v0.2 wave D of [TODO.md](TODO.md) — OPW-1 to
-OPW-5 are step T5's parametric-optimizer item, and the parametric evaluator's placement
-is a D3 hardening row. Lane: research (ROADMAP §2). Analysis + proposed fix for swapping
+OPW-5 are a D3 hardening row of their own (moved out of T5 on 2026-10-12: they change
+behaviour, and T5 is byte-identical), and the parametric evaluator's placement is another
+D3 row. Lane: research (ROADMAP §2). Analysis + proposed fix for swapping
 `optimizer_method` (e.g. SciPy SLSQP → IPOPT) on the parametric MPC path.
 
 Contracts in code: [DESIGN.md](../../DESIGN.md) §6 (Planning / NLP).

@@ -1,11 +1,11 @@
 # Cross-fidelity maps (design)
 
-Status: draft plan (July 2026), unscheduled — a Later idea in [TODO.md](TODO.md) §7.
+Status: draft plan (July 2026), unscheduled — a Later idea in [TODO.md](TODO.md) §6.
 Lane: research (ROADMAP §2). The research rungs it maps now live in `examples/projects/car_trajopt/vehicles/`, so the maps belong beside them, not in the catalog.
 
 Locked defaults: **bicycle ladder only** (Kin → Acc → Dyn → Rate → TauRate →
 Servo → Engine); Holonomic deferred. Maps live in
-`minilink/dynamics/catalog/vehicles/jax_vehicle_maps.py` (to create). Pointwise functions are the core; trajectory wrappers batch them
+`examples/projects/car_trajopt/vehicles/jax_vehicle_maps.py` (to create), beside `ladder.py`. Pointwise functions are the core; trajectory wrappers batch them
 and supply derivatives via finite differences (same spirit as MPC
 `_finite_diff_knots` in
 [`minilink/control/mpc/utilities.py`](../../minilink/control/mpc/utilities.py)).

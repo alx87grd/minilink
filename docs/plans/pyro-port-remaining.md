@@ -17,7 +17,7 @@ gap noted · **TODO** = planned/in-scope · **Drop** = explicit non-goal.
 | Library symbols | 105 | 80 | 11 | 8 | 6 |
 | Example scripts | 195 | 28 | 45 | 87 | 35 |
 
-Parity is the **v0.2** milestone ([ROADMAP.md §1](../../ROADMAP.md#1-releases)); v0.1 is GRO860 end to end.
+Parity is part of the **v0.3** milestone ([ROADMAP.md §1](../../ROADMAP.md#1-releases)); v0.1 is GRO860 end to end.
 Release criterion carried over: every **in-scope** pyro library module has a minilink home or a documented drop; representative closed-loop demo per major plant family; README pyro → minilink migration guide (built from the name map below).
 
 ## 1. Library modules — pyro → minilink
@@ -57,7 +57,7 @@ Release criterion carried over: every **in-scope** pyro library module has a min
 | `minilink/core/compile/` | ExecutionPlan, NumPy/JAX evaluators | Compile band; pyro has no separate compile layer |
 | `minilink/core/geometry.py` | SDF shapes, cost algebra | Spatial primitives (planned package `core/geometry/`, [geometry-module.md](geometry-module.md)) |
 | `minilink/optimization/` | MathematicalProgram, Optimizer | General NLP; pyro trajopt is narrower |
-| `minilink/planning/spatial/` | Scene, WorkspaceField, RobotBody | Obstacle/clearance layer replaces *withObstacles plants (retires into `core/geometry/`) |
+| `minilink/planning/spatial/` | Scene, WorkspaceField, CollisionBody (`bind()`) | Obstacle/clearance layer replaces *withObstacles plants (retires into `core/geometry/`) |
 | `minilink/planning/search/dubins.py` | Dubins steering | Extra beyond pyro RRT |
 | `minilink/blocks/neural.py` | MLP block (JAX) | Prototype; pyro RL is SB3-only |
 | `minilink/experimental/symbolic/` | Symbolic derivation | Quarantine; no pyro equivalent |
@@ -212,7 +212,7 @@ All 195 pyro scripts under `examples/`, grouped by top-level folder.
 | `demos_by_tool/dynamicprogramming/double_pendulum_optimal_swingup_load.py` | **Partial** | examples/demos/value_iteration/vi_double_pendulum_jax.py |
 | `demos_by_tool/dynamicprogramming/helicopter_tunnel.py` | **TODO** | DP specialty demo not ported |
 | `demos_by_tool/dynamicprogramming/pendulum_optimal_swingup_low_def_fast_computation.py` | **Partial** | examples/demos/value_iteration/vi_pendulum_swingup.py (grid tuning differs) |
-| `demos_by_tool/dynamicprogramming/pendulum_reachability.py` | **Partial** | ReachabilityCost exists; demo TODO |
+| `demos_by_tool/dynamicprogramming/pendulum_reachability.py` | **Partial** | `ReachabilityCost` not in minilink (check at C1); demo TODO |
 | `demos_by_tool/dynamicprogramming/policy_evaluator_with_computed_torque.py` | **TODO** | control/modelbased.py |
 | `demos_by_tool/optimal_control_demo.py` | **TODO** | Not yet audited |
 | `demos_by_tool/rl_with_stable_baseline3/double_pendulum_with_ppo.py` | **Drop** | External SB3 training |
@@ -263,7 +263,7 @@ All 195 pyro scripts under `examples/`, grouped by top-level folder.
 
 | Item | Decision | Replacement |
 | --- | --- | --- |
-| Discrete-time / ZOH library | **Drop** | Continuous-time only (DESIGN §3) |
+| Discrete-time / ZOH library | **TODO (v0.9)** | The z tier, P6 ([TODO.md](TODO.md) §5, v0.9): exact ZOH and Tustin `c2d`, z-plane tools |
 | RNN / recurrent blocks | **Drop** | — |
 | Hybrid events / mixed-rate sim | **Drop** | — |
 | Pyro `sys2game` framework | **Drop** | superseded by `simulation/realtime/` (`RealtimeSimulator`) |
@@ -297,7 +297,7 @@ Ordered by unblock count:
 
 ## Appendix — pyro → minilink name map (landed)
 
-Two-column record of every symbol marked Done before the shrink; the source for the v0.2 migration guide.
+Two-column record of every symbol marked Done before the shrink; the source for the v0.3 migration guide.
 
 | Pyro symbol | Minilink symbol | Minilink module |
 | --- | --- | --- |
@@ -318,7 +318,7 @@ Two-column record of every symbol marked Done before the shrink; the source for 
 | TwoIndependentSinglePendulum | TwoIndependentPendulums | `minilink/dynamics/catalog/pendulum/pendulum.py` |
 | CartPole | CartPole | `minilink/dynamics/catalog/pendulum/cartpole.py` |
 | RotatingCartPole | RotatingCartPole | `minilink/dynamics/catalog/pendulum/cartpole.py` |
-| UnderActuatedRotatingCartPole | UnderActuatedRotatingCartPole | `minilink/dynamics/catalog/pendulum/cartpole.py` |
+| UnderActuatedRotatingCartPole | UnderactuatedRotatingCartPole | `minilink/dynamics/catalog/pendulum/cartpole.py` |
 | SingleMass | SingleMass | `minilink/dynamics/catalog/mass_spring_damper/linear.py` |
 | TwoMass | TwoMass | `minilink/dynamics/catalog/mass_spring_damper/linear.py` |
 | ThreeMass | ThreeMass | `minilink/dynamics/catalog/mass_spring_damper/linear.py` |
@@ -341,9 +341,9 @@ Two-column record of every symbol marked Done before the shrink; the source for 
 | LongitudinalFrontWheelDriveCarWithTorqueInput | same | `minilink/dynamics/catalog/vehicles/propulsion.py` |
 | KinematicBicyleModel | KinematicBicycle | `minilink/dynamics/catalog/vehicles/steering.py` |
 | HolonomicMobileRobot | HolonomicMobileRobot | `minilink/dynamics/catalog/vehicles/steering.py` |
-| Holonomic3DMobileRobot | HolonomicMobileRobot3D | `minilink/dynamics/catalog/vehicles/steering.py` |
+| Holonomic3DMobileRobot | not in minilink (check at C1) | project only: `examples/projects/car_trajopt/vehicles/extras.py` |
 | KinematicCarModel | KinematicCar | `minilink/dynamics/catalog/vehicles/steering.py` |
-| ConstantSpeedKinematicCarModel | ConstantSpeedKinematicCar | `minilink/dynamics/catalog/vehicles/steering.py` |
+| ConstantSpeedKinematicCarModel | not in minilink (check at C1) | project only: `examples/projects/car_trajopt/vehicles/extras.py` |
 | UdeSRacecar | UdeSRacecar | `minilink/dynamics/catalog/vehicles/racecar.py` |
 | Manipulator | Manipulator | `minilink/dynamics/abstraction/manipulator.py` |
 | SpeedControlledManipulator | SpeedControlledManipulator | `minilink/dynamics/catalog/manipulators/arms.py` |
@@ -356,8 +356,8 @@ Two-column record of every symbol marked Done before the shrink; the source for 
 | ClosedLoopSystem | `@`, `>>`, `+` composition | `minilink/core/diagram.py` |
 | DynamicController | a `DynamicSystem` with the standard ports (the controller classes are removed by P10's AC-0) | `minilink/core/system.py` |
 | ProportionalController | ProportionalController | `minilink/control/output.py` |
-| synthesize_lqr_controller | synthesize_lqr | `minilink/control/lqr.py` |
-| linearize_and_synthesize_lqr_controller | linearize + synthesize_lqr | `minilink/control/lqr.py` |
+| synthesize_lqr_controller | not in minilink (check at C1) | `minilink/control/lqr.py` |
+| linearize_and_synthesize_lqr_controller | not in minilink (check at C1) | `minilink/control/lqr.py` |
 | ComputedTorqueController | ComputedTorqueController | `minilink/control/modelbased.py` |
 | SlidingModeController | SlidingModeController | `minilink/control/modelbased.py` |
 | stable_baseline3_controller | SB3Controller | `minilink/interfaces/gymnasium.py` |
@@ -366,7 +366,7 @@ Two-column record of every symbol marked Done before the shrink; the source for 
 | CLosedLoopSimulator | compute_trajectory() | `minilink/core/facades.py` |
 | DynamicCLosedLoopSimulator | Simulator | `minilink/simulation/simulator.py` |
 | CostFunction, QuadraticCostFunction, … | CostFunction, QuadraticCost, … | `minilink/core/costs.py` |
-| Reachability | ReachabilityCost | `minilink/core/costs.py` |
+| Reachability | not in minilink (check at C1) | — |
 | TrajectoryPlotter | plot_trajectory() | `minilink/graphical/` |
 | Animator | animate() | `minilink/graphical/animation/` |
 | PhasePlot, PhasePlot3 | plot_phase_plane() | `minilink/graphical/phase_plane/` |
@@ -377,7 +377,7 @@ Two-column record of every symbol marked Done before the shrink; the source for 
 | PolicyEvaluator | PolicyEvaluator | `minilink/planning/policy_synthesis/policy_eval.py` |
 | Planner | Planner | `minilink/planning/planner.py` |
 | RRT | RRTPlanner, RRTStarPlanner | `minilink/planning/search/` |
-| DirectCollocationTrajectoryOptimisation | DirectCollocation, Shooting, MS | `minilink/planning/trajectory_optimization/` |
+| DirectCollocationTrajectoryOptimisation | TrajectoryOptimizationPlanner (DirectCollocationTranscription, ShootingTranscription, MultipleShootingTranscription) | `minilink/planning/trajectory_optimization/` |
 | transformation_matrix_2D | frame tf helpers | `minilink/core/kinematics.py` |
 | transform_points_2D, arrows | primitives, drawables | `minilink/graphical/animation/` |
 | Sys2Gym | Sys2Gym | `minilink/interfaces/gymnasium.py` |

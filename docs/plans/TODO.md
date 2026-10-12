@@ -40,9 +40,10 @@ Design: [naming.md](naming.md). Runs in parallel with wave B.
   `Diagram`; `id` documented on `System`. (The closed-loop name and the role names are P10's
   AC-3 and AC-2.) Done when composed diagrams' keys, params dictionaries and trajectories are
   byte-identical before and after.
-  Also: one name, `plot_cost_to_go`, and one colour keyword, `jmax`, across DP, tabular RL,
-  `PolicyEvaluator` and `Comparison`, with no alias, and S54's clipping (scan: planning#3,
-  examples#5); the operators' named forms exported together (scan: core#9).
+  Also: one colour keyword, `jmax`, across DP, tabular RL, `PolicyEvaluator` and
+  `Comparison`, with S54's clipping (scan: planning#3, examples#5); `plot_cost2go` keeps its
+  name to v1.0 and its rename to `plot_cost_to_go` (the name the solution and `Comparison`
+  already use) is on V4's list; the operators' named forms exported together (scan: core#9).
 - [ ] **A5 Later nouns, each with its first consumer.** `log_prob` on the distributions;
   parameter-dictionary support on sets and distributions (one flatten rule, with
   identification or the robust problem); `UnionSet` via `|` when reachability or multi-goal
@@ -63,7 +64,7 @@ Plan: [gro501-classical-control.md](gro501-classical-control.md). Release contra
 [ROADMAP §4.2](../../ROADMAP.md#42-v02--gro501-end-to-end).
 
 **Order:** S61 and S62 at any time before P11; P10's AC-0, AC-2, AC-OP, AC-3; TB-b (its
-loop part after AC-3); P4 with AC-4; P11. P6 stays held.
+loop part after AC-3); P4 with AC-4; P11. P6 stays held for GRO501; its row is in §5 (v0.9).
 
 - [ ] **P10 Automation by convention** ([automation-by-convention.md](automation-by-convention.md),
   decided 2026-10-11): standard port names drive the wiring, three reserved names (`plant`,
@@ -115,20 +116,8 @@ loop part after AC-3); P4 with AC-4; P11. P6 stays held.
   write their controllers as plain `System`s with the standard ports. Done when both run top
   to bottom in Colab and the conda env, import only through the teaching surface, and agree
   with the guide's worked exercises.
-- [ ] **P6 Discrete (z) tier** **[held for GRO501; scheduled for v0.9, §5]**. GRO501
-  default: teach with `discretize` + simulation, unless the sommatif examines z-plane
-  analysis. When it opens: an exact zero-order-hold option on `discretize`, shared with
-  `step_response` (scan: analysis#1). Two follow-ups:
-  - **[ask]** keep the remaining `params["dt"]` fallback (`dt=` omitted, read from the
-    `params=` dict given to `discretize`) or make `dt` required;
-  - a source whose `y` feeds through from a port other than `u` does not discretize
-    (`PendulumWithNoisePort`), because the wrapper stacks every port into one `u`: map `y`'s
-    dependencies to `("u",)`, or keep the source's ports.
-
-  **Future work, sampled controllers with continuous states (`PID % dt`)** **[ask]**: `%`
-  raises `NotImplementedError` for them (P10). Supporting them means choosing the
-  discretization method (Euler, Tustin, RK4) and whether `%` discretizes or the user calls
-  `discretize` first. It needs `discretize` to keep the controller's ports first.
+- **P6** held for GRO501 (teach the Arduino law with `discretize` + simulation, unless the
+  sommatif examines z-plane analysis); its row is in §5, v0.9.
 
 ---
 
@@ -197,9 +186,8 @@ byte-identical after; ruff and the module's tests). The findings, file by file, 
   `environment.py`, `critics.py`, `optim.py`, `algorithms/*` (`self.` out of the loss and
   update math; `base.py` shadow state), `spatial/paths.py` (undeclared cached fields),
   `collision.py`, `plotting.py`. `ReinforcementLearningPlanner(verbose=True)` keeps printing
-  by default (ruled).
-  Also: the parametric (MPC) optimizer goes through `Optimizer`'s backend table (scan:
-  planning#9; [optimizer-parametric-wiring.md](optimizer-parametric-wiring.md) OPW-1–OPW-5).
+  by default (ruled). The parametric optimizer's backend table (OPW-1–OPW-5) changes
+  behaviour, so it is a D3 row of its own.
 - [ ] **T6 the two big ones** **[ask first]**: `core/composition.py` (after P10's AC-3: the
   section-map docstring, the `_` helpers, the public API buried under `# Internal
   machinery`) and `control/mpc/controller.py` (seventeen `_` methods, hasattr-and-set from
@@ -216,15 +204,14 @@ byte-identical after; ruff and the module's tests). The findings, file by file, 
 - [ ] **Rename pass, the rest**: the remaining `_method` names on `System` subclasses not
   covered by T1–T6 → plain names (maintainer style rule). **[ask per module]**
 
-**D1 — demos to the rule** (RULES 6.1 / 6.10 / 6.11; the census is comment C14 of
-docs/reviews/2026-09-15-foundations-review.md).
+**D1 — demos to the rule** (RULES 6.1 / 6.10 / 6.11; the census is comment FD-C14 of the
+foundations review, docs/reviews/2026-09-15-foundations-review.md).
 
 - [ ] **D1.1 Native reporting the demos hand-roll** (agent lane, plotting): an `Optimizer`
   convergence plot (`optim_plot.py`); two planners' trees or solutions side by side
-  (`rrt_car_parking.py`, `rrt_holonomic_obstacles.py`); learning curves of several learners
-  on one axis (`double_integrator_sarsa_vs_q_learning_rl.py`); a `rollout_batch` family plot
-  (`rollout_param_family.py`); a 3-D phase plot (`lorenz_attractor.py`). Each one `plot_*` or
-  `__str__` with a test; DESIGN §7 lists them.
+  (`rrt_holonomic_obstacles.py`); a `rollout_batch` family plot (`rollout_param_family.py`);
+  a 3-D phase plot (`lorenz_attractor.py`). Each one `plot_*` or `__str__` with a test;
+  DESIGN §7 lists them.
   Also: `print` on `StepRollout` and `HybridSimResult`, one validator shared with
   `Trajectory` (scan: core#7); `print(controller)` shows the gains (scan: control#10);
   several trajectories on one phase plane and two fields on one grid surface (scan:
@@ -257,8 +244,6 @@ pick):
   it (scan: graphics#14) **[ask — user-callable]**.
 - [ ] Dead modules `planning/spatial/overlays.py` (retires with A3) and
   `experimental/symbolic/mechanics/utils.py` **[ask — importable names]**.
-- [ ] Deprecated benchmark shims (`run_pendulum_f_speed.py`, `run_diagram_f_speed.py`; check
-  `run_study.py` presets cover the `run_step_*` / `run_simulator_*` scripts).
 - [ ] MPC debug figure → `control/mpc/viz.py`.
 - [ ] `HybridDiagram` hand-copied facades (with S31).
 - [ ] Plotting in eight homes: write the placement rule in DESIGN first, then move
@@ -266,8 +251,9 @@ pick):
 - [ ] DESIGN §8's package-roles table (a stale copy of §3) and the DESIGN research-lane trim
   (scan: docs-gov#6, docs-gov#10).
 - [ ] The three catalog rows the dynamics scan names (scan: dynamics#13).
-- [ ] `JaxMechanicalSystem` retired, the `xp` base already traces (scan: dynamics#14;
-  ROADMAP §6) **[ask — importable name]**.
+- [ ] `JaxMechanicalSystem` retired, the `xp` base already traces (scan: dynamics#14)
+  **[ask — importable name]**: the name stays to v1.0 and leaves on V4's list, with no alias
+  before.
 - [ ] `NeuralNetwork` folded into `MLP` (scan: graphics#12) **[ask — importable name]**.
 - [ ] One `ctl` for the model-based laws; `LookupTableController` beside the other laws
   (scan: control#8, control#13).
@@ -283,8 +269,11 @@ pick):
   [optimizer-parametric-wiring.md](optimizer-parametric-wiring.md)).
 - [ ] `HybridSimulator` conventions drift (shared input coercion, positional
   `input_port_id`, the framed verbose panel; the plant sub-step from the plant time constant
-  instead of one RK4 step per tick; scan: compile-sim#4, compile-sim#5); realtime `TODO:
-  User Architectural Review`.
+  instead of one RK4 step per tick; scan: compile-sim#4, compile-sim#5).
+- [ ] **OPW-1–OPW-5** The parametric (MPC) optimizer goes through `Optimizer`'s backend table
+  ([optimizer-parametric-wiring.md](optimizer-parametric-wiring.md); scan: planning#9). Out of
+  T5, which is byte-identical, because it changes behaviour. Done when
+  `optimizer_method="ipopt"` reaches the parametric MPC path and the plan's OPW-4 tests pass.
 - [ ] `CostDensityField` / `WorkspaceField` export decision (with A3).
 - [ ] **S43** Constructor-derived `camera_scale` hints (boat, steering, propulsion, plane,
   arms, rotating cart-poles) → auto-fit or params-derived; raw ground `CustomLine`s in catalog
@@ -305,10 +294,10 @@ pick):
   explicit `backend='jax'` on a NumPy-only set or cost raises a raw trace error;
   `discretize(diagram, params={'dt': v})` is refused although a diagram would keep its
   blocks' params, and a raising params setter can leave a diagram half-updated;
-  `JaxMechanicalSystem` keeps the integer-state dtype defect (retires with the ROADMAP §6
-  decision); assigning into `q.labels[i]` in place no longer sticks; the gravity hook's
-  signature is read on every call; the collocation demo's SLSQP fallback is not run in CI
-  (its manifest entry still requires Ipopt).
+  `JaxMechanicalSystem` keeps the integer-state dtype defect (it retires on V4's list);
+  assigning into `q.labels[i]` in place no longer sticks; the gravity hook's signature is
+  read on every call; the collocation demo's SLSQP fallback is not run in CI (its manifest
+  entry still requires Ipopt).
 - [ ] Bare `import jax` in `analysis/lyapunov.py` and
   `trajectory_optimization/parametric_evaluator.py` → `require_jax()` (RULES 5.12).
 
@@ -347,8 +336,8 @@ pick):
   shrinking allowlist; ROADMAP §5 step ids and TODO rows agree, and no plan doc numbers its
   steps with a bare workboard-style id (scan: docs-gov#3); the CI regression flags agree
   across `test.yml`, `tests/run/_common.py` and the tests/README Agent table (scan:
-  tests-ci#4); every teaching notebook executed nightly; the subprocess demo-check tests
-  behind a marker; wall-clock claims out of unit tests; unit tests stop importing
+  tests-ci#4); the subprocess demo-check tests behind a marker; wall-clock claims out of
+  unit tests; unit tests stop importing
   `examples/projects` and `benchmarks/systems`; `Animator.resolve_frame` public for the
   graphics harness; course pins byte-identical to their topic twins; one both-backends test
   over every control law, the catalog with perturbed `params`, and the `params.sets`
@@ -361,7 +350,8 @@ pick):
 ## 4. v0.3 — GMC714, catalog, parity
 
 **Order:** A1–A3 (the textbook objects) before wave C; G1 first in wave C; RN-4 and RN-5
-together with P10's AC-7, between cohorts; S72 after them.
+together with P10's AC-7, between cohorts; S72 after them; V1 after A2, its Monte Carlo part
+after RN-5.
 
 **The textbook objects.** Design: [fields.md](fields.md), [cost-params.md](cost-params.md),
 [geometry-module.md](geometry-module.md). Baselines first, as each plan states.
@@ -371,9 +361,9 @@ together with P10's AC-7, between cohorts; S72 after them.
   / `as_cost` and `gradient`; `QuadraticField` (Lyapunov `V`, LQR value, `S(t)` schedule)
   with the ellipsoid as its sublevel set; `GridField` (DP and tabular tables, per-sweep time
   axis); `CallableField` (RL critics); `LinearApproximator` as a field;
-  `LyapunovCertificate.V` a field; CBF plan amended; DESIGN §4 fields bullet. Done when the
-  RoA and DP baselines `cmp` and `test_analysis_lyapunov.py`, `test_planning_solution.py`,
-  `test_rl_tabular.py`, `test_rl_planner.py` pass.
+  `LyapunovCertificate.V` a field; DESIGN §4 fields bullet (step 4.7, the CBF plan, is
+  done). Done when the RoA and DP baselines `cmp` and `test_analysis_lyapunov.py`,
+  `test_planning_solution.py`, `test_rl_tabular.py`, `test_rl_planner.py` pass.
   Also: `PolicyEvaluator` takes the evaluators' verb and returns a field-shaped result
   (scan: planning#4).
 - [ ] **A2 Cost parameters** **[ask — core]**. [cost-params.md](cost-params.md): `params` on
@@ -387,7 +377,7 @@ together with P10's AC-7, between cohorts; S72 after them.
   per-block dict against the block's keys, so a partial dict fails at the setter instead of
   inside `f`. The Monte Carlo evaluator and the gym reward never apply `problem.params.cost`
   while the DP table does, so the two disagree on a parametric cost.
-- [ ] **A3 Workspace geometry (S57)** **[ask — core]**.
+- [ ] **A3 Workspace geometry** **[ask — core]** (S57 was its earlier id).
   [geometry-module.md](geometry-module.md) implementation steps 1–6: `core/geometry/`
   package (shapes, paths, track, scene, probes, `bind`, spatial fields, grid, catalog
   `oval_circuit` / `racecar_circuit` / `holonomic_forest`); shaping next to `Field.as_cost`;
@@ -434,7 +424,7 @@ together with P10's AC-7, between cohorts; S72 after them.
   - [ ] **Approximate dynamic programming** on `policy_synthesis/approximation.py` (fitted
     value iteration); design first, it touches the planner API. **[ask]**
   - [ ] `Sys2Gym` takes a `Distribution` for the start state (scan: graphics#1;
-    randomness.md R5, step RN-5).
+    randomness.md RD-R5, step RN-5).
 - [ ] **S63 DP reads the horizon** **[ask — planner API]** (scan: planning#1): a finite
   `problem.tf` runs `round(tf / dt)` backward sweeps as `solve_steps` does, the way
   `LQRPlanner` picks the Riccati ODE, or warns once. Done when LQR and DP agree on the
@@ -471,10 +461,18 @@ together with P10's AC-7, between cohorts; S72 after them.
   stochastic branch is byte-identical, and the body reads next to `dp.py`. MP-4 (the MPC
   block reads the planner verbs: T6) and MP-5 (demos, `compare(MPC=, MPPI=)`) before v0.9;
   MP-6 (the `loop` backend, facade names, DESIGN §6) with V3.
-- [ ] **Estimation follow-ups** after P4: EKF, time-varying and discrete Kalman as
-  `estimation/` rows; online parameter estimators (recursive least squares, gradient laws).
-  Each revisits the estimator conventions of
-  [automation-by-convention.md](automation-by-convention.md) §10.
+- [ ] **V1 The differentiable closed-loop cost** **[ask — core]** (API and architecture not
+  decided). One fully differentiable JAX path: controller params → closed-loop dynamics → RK4
+  step → the run on a horizon → the cost `J` → the mean of `J` over stochastic rollouts, every
+  parameter an input (controller, plant, cost (A2), sets, `x0`), behind one standard entry
+  point; teaching surface once mature. Today tutorial 11 and `pid_autotuning_jax` write that
+  scan by hand. In place: the params-traced closed-loop run (`rk4_integrate_zoh_trace_p`; the
+  grad of a PID gain through `PID() @ Pendulum()` matched finite differences to 8 digits on
+  2026-10-12). Missing: the plant's `(x, u)` along a traced run, one traced cost integral, the
+  Monte Carlo path with the controller's params as an input (RN-5 and AC-7 are its
+  neighbours). Done when the pathwise gradient of the mean closed-loop cost with respect to
+  the controller's params matches a central difference on the same draws, through the
+  standard entry point.
 
 ---
 
@@ -492,6 +490,8 @@ in December 2026 after the v0.3 tag; the v1.0 rows after two cohorts.
   update) or an honest `HybridLoop` rename; `%` stays the one hybrid operator either way; the
   hand-copied facades go with it; P10's AC-8b lands with it.
   Also: the sampled seam's time argument, ticks or seconds (ROADMAP §6; scan: control#3); the
+  run-state caches, decided here: RULES 2.4 allows only `self.traj`, while
+  `StepSystem.rollout` and `HybridDiagram.last_result` cache a run too (ROADMAP §6); the
   `core` → `simulation` import (scan: core#14).
 - [ ] **S29** `DiagramSystem.x0` / `n` / `state` as derived properties (mirror the live
   `params` view); `Simulator` drops its pre-read `refresh()`.
@@ -508,8 +508,9 @@ in December 2026 after the v0.3 tag; the v1.0 rows after two cohorts.
 - [ ] **S30** Rename the graphical `Sphere` / `Box` glyphs so no two importable public types
   share a name with the geometry solids. **[ask — public names]**
 - [ ] **V3 The frozen surface** **[ask — public names]**: list the names the v1.0 freeze
-  covers. `StepSystem`, `StepDiagramSystem`, `ZOHHold` (root prelude) and `control.mpc`
-  (control facade) join it or move behind a visibly provisional name. Done when the
+  covers. `StepSystem`, `StepDiagramSystem`, `ZOHHold` (root prelude), `control.mpc`
+  (control facade) and the spatial names A3 moves to `core/geometry/` (provisional teaching
+  names, ROADMAP §2) join it or move behind a visibly provisional name. Done when the
   teaching-surface registry (`tests/unittest/test_teaching_surface.py`) marks each name
   frozen or provisional and the API site shows the mark.
 
@@ -520,14 +521,21 @@ in December 2026 after the v0.3 tag; the v1.0 rows after two cohorts.
   amended for v1.0 on). A snapshot of the export list is a test; changing it fails until the
   snapshot and the CHANGELOG line move together. Done when RULES, ROADMAP §2 and the
   snapshot test agree.
+  The rename list, applied with shims under the policy (the names hold until then, with no
+  alias before): `xbar` / `ubar` → `x_bar` / `u_bar`, the name everywhere else, on the costs
+  (`QuadraticCost.from_system(xbar=, ubar=)`, `cost.xbar`, `cost.ubar`, `TimeCost`'s
+  `xbar`); `plot_cost2go` → `plot_cost_to_go` (A4); `JaxMechanicalSystem` retired into the
+  `xp` base (D2).
 - [ ] **V5 `CHANGELOG.md`**: user-facing, one entry per release from v0.9 (back-filled for
   0.1.0 / 0.1.1 from ROADMAP §2's breaking changes); `pyproject.toml` `Changelog` URL points
   there. Done when `publish.yml` refuses a tag without its CHANGELOG heading.
-- [ ] **V6 One install story** **[ask — student-facing]**: README and `install.md` lead with
-  `pip install minilink`, conda for the Full stack; `install.md` no longer says 0.1.0 is
-  pending. The Colab setup cell installs a pinned release (`%pip install minilink==X.Y`)
-  instead of `git clone main`; `COLAB_CLONE` in `tests/unittest/test_repo_contract.py`
-  follows. Done when every notebook carries the pinned cell and runs in Colab.
+- [ ] **V6 The pinned Colab cell** **[ask — student-facing]**: conda from `environment.yml`
+  stays the default supported install and README leads with it; `pip install minilink` is the
+  Basic alternative in `install.md` (both in place). What remains: the Colab setup cell
+  installs a pinned release (`%pip install minilink==X.Y`) instead of `git clone main`;
+  `COLAB_CLONE` in `tests/unittest/test_repo_contract.py` follows. `showcase_jax.ipynb`
+  imports `minilink.experimental.c_export`, which the wheel does not ship: settle it here.
+  Done when every notebook carries the pinned cell and runs in Colab.
 - [ ] **S70 `MinilinkError` family** **[ask — core]**: `WiringError`, `ShapeError`,
   `SolverError` subclassing the `ValueError` / `TypeError` raised today (no caller breaks);
   S66's wiring-time checks and P10's refusals raise them. Done when the wiring and compile
@@ -547,15 +555,31 @@ in December 2026 after the v0.3 tag; the v1.0 rows after two cohorts.
 
 ### v0.9 — the syllabus holes
 
-- **P6 lands here** if v0.9 takes it (proposed yes, ROADMAP §6; its row is in §2) **[ask —
-  public names]**: exact ZOH and Tustin `c2d`
-  on `LTISystem`, z-plane `pzmap`, discrete `step_response` and `bode` (`analysis/`),
-  checked against `scipy.signal.cont2discrete`. Done when a digital PID and a discrete state
-  feedback run in a topic notebook.
-- [ ] **S71 The classic first plants**: DC motor (if the GRO501 gate has not landed it),
-  tank / thermal first-order-plus-delay process, ball and beam, differential drive, 3-D
-  quadrotor, each with `tf`, a skin and the catalog both-backends contract test; LQI beside
-  the `N` matrix of P8. Done when each has a one-line demo in `examples/demos/dynamics/`.
+- [ ] **P6 Discrete (z) tier** **[ask — public names]**, if v0.9 takes it (proposed yes,
+  ROADMAP §6); held for GRO501, which teaches with `discretize` + simulation unless the
+  sommatif examines z-plane analysis. Exact ZOH and Tustin `c2d` on `LTISystem`, z-plane
+  `pzmap`, discrete `step_response` and `bode` (`analysis/`), checked against
+  `scipy.signal.cont2discrete`; an exact zero-order-hold option on `discretize`, shared with
+  `step_response` (scan: analysis#1). Done when a digital PID and a discrete state feedback
+  run in a topic notebook. Two follow-ups:
+  - **[ask]** keep the remaining `params["dt"]` fallback (`dt=` omitted, read from the
+    `params=` dict given to `discretize`) or make `dt` required;
+  - a source whose `y` feeds through from a port other than `u` does not discretize
+    (`PendulumWithNoisePort`), because the wrapper stacks every port into one `u`: map `y`'s
+    dependencies to `("u",)`, or keep the source's ports.
+
+  **Future work, sampled controllers with continuous states (`PID % dt`)** **[ask]**: `%`
+  raises `NotImplementedError` for them (P10). Supporting them means choosing the
+  discretization method (Euler, Tustin, RK4) and whether `%` discretizes or the user calls
+  `discretize` first. It needs `discretize` to keep the controller's ports first.
+- [ ] **Estimation follow-ups** after P4: EKF, time-varying and discrete Kalman as
+  `estimation/` rows; online parameter estimators (recursive least squares, gradient laws).
+  Each revisits the estimator conventions of
+  [automation-by-convention.md](automation-by-convention.md) §10.
+- [ ] **S71 The classic first plants**: DC motor, tank / thermal first-order-plus-delay
+  process, ball and beam, differential drive, 3-D quadrotor, each with `tf`, a skin and the
+  catalog both-backends contract test; LQI beside the `N` matrix of P8. Done when each has a
+  one-line demo in `examples/demos/dynamics/`.
 - C4 (identification, trajectory generation) moves here if GMC714 does not land it (§4).
 
 ### v0.9 — the reference site
@@ -581,11 +605,16 @@ in December 2026 after the v0.3 tag; the v1.0 rows after two cohorts.
   templates, a code of conduct.
 - [ ] **V2** Zenodo archive and a citable DOI (`CITATION.cff`) after PyPI; the JOSS entry
   and the RULES 6.9 carve-out for its state-of-the-field section, decided then.
-- [ ] **S49 Retire the Stable-Baselines3 teaching notebooks** **[ask]**, at the end of the
-  term: delete `teaching/courses/udes_gro860/drone_ppo_sb3.ipynb` and
-  `pendulum_value_iteration_vs_lqr_vs_ppo_sb3.ipynb`, their notebook overrides and allowlist
-  entries, and the README rows marked Stable-Baselines3, once the course notes point only at
-  the native twins.
+- [ ] **S49 The Stable-Baselines3 teaching notebooks** **[ask]**, at the end of the term.
+  Four, in `teaching/courses/udes_gro860/`: retire `drone_ppo_sb3.ipynb` and
+  `pendulum_value_iteration_vs_lqr_vs_ppo_sb3.ipynb` (delete them, their notebook overrides
+  and allowlist entries, and the README rows marked Stable-Baselines3) once the course notes
+  point only at the native twins; decide `particle_gymnasium_sb3.ipynb` and
+  `gymnasium_interface.ipynb` then.
+- [ ] **Realtime architectural review** **[ask — core]**: `RealtimeSimulator` and the pygame
+  I/O (`simulation/realtime/simulator.py`, `io.py`, each marked `TODO: User Architectural
+  Review`) reviewed before the freeze; the band joins the V3 surface or stays provisional.
+  Done when both markers are gone.
 
 ### After v1.0 — 1.x features, additive
 
@@ -593,14 +622,15 @@ in December 2026 after the v0.3 tag; the v1.0 rows after two cohorts.
   case); `Boat2D` / `Plane3D` on the mechanical base, with `y` and `x` like every mechanical
   plant (no `q` / `dq` ports); `DynamicBicycle` on `GeneralizedMechanicalSystem` (scan:
   dynamics#5).
-- [ ] **V1 The differentiable closed-loop cost**: `J = F(problem params)` as one traced
-  scalar — simulate the closed loop and integrate the plant's cost with every parameter an
-  input (`system` nested by subsystem name, `cost` (A2), `sets`, `x0`), so `jax.grad` and
-  `vmap` reach plant, controller, cost, sets and `x0` alike; today tutorial 11 and
-  `pid_autotuning_jax` write that scan by hand.
 - [ ] **S36** iLQR planner from parts (`jacfwd` of `f_trace`; idea, research lane).
-- [ ] **General serial chain**: DH or URDF description to RNEA / ABA beyond the UR5 (joins
-  the articulated-mechanism Later idea).
+- [ ] **General serial chain**: one mechanism description (DH or URDF) feeding RNEA / ABA
+  beyond the UR5 and the symbolic path, the shared serial-chain stack and ABA on the other
+  RNEA arms included — [articulated-mechanism.md](articulated-mechanism.md).
+- [ ] **Behavior-cloning pipeline** **[ask]**: a game mode on `RealtimeSimulator` that records
+  human demonstrations (keyboard or joystick driving the plant live) as trajectory datasets; a
+  planner that fits a policy to them (imitation beside the RL planner, `NeuralPolicyController`
+  as its output); the cloned controller closed on the plant and compared against the
+  demonstrator. The pyro game demos, if ported (ROADMAP §6), are its first scenes.
 
 ---
 
@@ -629,8 +659,6 @@ One line each; open a plan doc only when a design needs a writeup.
   decimated `lax.scan` rollout beside `Simulator`.
 - Cross-fidelity `lift` / `project` maps on the car ladder —
   [fidelity-maps.md](fidelity-maps.md).
-- Articulated mechanism layer (one mechanism description feeding RNEA/ABA and the symbolic
-  path) — [articulated-mechanism.md](articulated-mechanism.md).
 - `RobustPlanningProblem` (set-bounded uncertainty, minimax criterion) only when a minimax
   consumer exists; the path-integral planner's `"worst_case"` branch (CVaR over plant draws,
   [mppi.md](mppi.md) §4) would be that consumer; the two decisions go together.
@@ -638,13 +666,14 @@ One line each; open a plan doc only when a design needs a writeup.
   once a second band reads it (open in ROADMAP §6) (the path-integral planner; the evaluator and the tabular learners
   already do): one import rewrite, no behaviour change.
 - `MjxPlant` (`interfaces/mjx.py`) and `torch` / `flax` model wrappers in `interfaces/`;
-  Pacejka tire; stochastic forcing; ROS2 / FMI; sparse long-horizon trajopt; RRT-Connect;
-  shared RNEA serial-chain stack; ABA on other RNEA arms.
+  Pacejka tire; stochastic forcing; ROS2 / FMI; sparse long-horizon trajopt; RRT-Connect.
 - Ipopt given the Lagrangian Hessian, not the objective's alone (scan: planning#13);
   `optimizer_method="auto"` picking Ipopt when installed (scan: examples#11);
   `PlanningProblem.metadata` documented or retired (scan: planning#14; ROADMAP §6).
+- `LowPassFilter(tau=)`: the shaping filter of the colored-noise recipe parameterized by its
+  time constant, beside `cutoff_hz` (randomness.md RD-D23, RN-4).
 - A fixed-step RK4 that samples held sources once per step, so the four stages read one
-  sample and the block route equals the port route (randomness.md §10 A8, D18): fourth order
+  sample and the block route equals the port route (randomness.md RD-A8, RD-D18): fourth order
   with no boundary error at `dt = Δ`, one draw per step instead of four. Worth it only if a
   twin test shows the first-order bias.
 - A key check on leaf params (a `validate_params` hook on `System`, no-op by default, called

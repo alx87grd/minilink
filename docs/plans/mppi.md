@@ -405,7 +405,7 @@ any diagram and any output. Then the path-integral planner lands on that contrac
 one rollout path with the evaluator and the RL collectors instead of a scan of their own,
 and MP-3 is written once. Two things RN-4 and RN-5 should settle with this consumer in
 view: a realization carries seeds per sample, never drawn noise arrays, so `K × M`
-realizations vmap like a family of masses (D13 already says so); and the batch takes an
+realizations vmap like a family of masses (randomness.md's RD-D13 already says so); and the batch takes an
 input *sequence* per member as `rollout_batch` does today, not only a closed loop, since
 a sampling planner rolls out the open-loop plant. Until then the standalone script is the
 prototype.

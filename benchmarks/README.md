@@ -23,7 +23,7 @@ scene for fast RRT contract tests.
 | --- | --- |
 | [`ode_solver_benchmark.ipynb`](ode_solver_benchmark.ipynb) | **Interactive notebook** — ODE solver × backend sweeps on local or Colab hardware |
 | [`run_regression_check.py`](run_regression_check.py) | Single entry point for all committed baselines |
-| [`run_study.py`](run_study.py) | **Benchmark study** unified machine-exploration presets (replaces older `run_*_speed.py` / backend sweeps) |
+| [`run_study.py`](run_study.py) | **Benchmark study** unified machine-exploration presets |
 | [`studies/presets.py`](studies/presets.py) | Preset implementations invoked by `run_study.py` |
 | [`suites/core_perf.py`](suites/core_perf.py) | Fast compile/`f()`/sim final-state regression gate |
 | [`suites/integration_check.py`](suites/integration_check.py) | Trajectory checkpoint goldens + JAX trajopt solve-time gates |
@@ -39,29 +39,22 @@ scene for fast RRT contract tests.
 From the repo root with the **`minilink`** conda env active (see
 [environment.yml](../environment.yml)), or any environment with the extras you
 want to measure (`minilink[jax]` for JAX variants; `cyipopt` for Ipopt
-variants — both are skipped gracefully when missing):
+variants — both are skipped gracefully when missing). Gate commands (lint, `pytest`,
+the regression CI flags, demo and notebook checks) are in the Agent table of
+[tests/README.md](../tests/README.md#entry-points); this is the benchmark CLI.
 
 ```bash
-python benchmarks/run_study.py --list
-python benchmarks/run_study.py --preset f_eval --plant pendulum
-python benchmarks/run_study.py --preset sim --mode matrix
-python benchmarks/run_study.py --preset trajopt --mode backends
-python benchmarks/run_study.py --preset optimizer
-python benchmarks/run_study.py --preset dp
-python benchmarks/run_study.py --preset rrt_nearest
-python benchmarks/run_pendulum_f_speed.py        # deprecated shim → f_eval pendulum
-python benchmarks/run_diagram_f_speed.py         # deprecated shim → f_eval diagram_dense
-python benchmarks/run_step_speed.py            # step() call speed, leaf StepSystem
-python benchmarks/run_step_diagram_speed.py    # step() call speed, step diagram
-python benchmarks/run_simulator_standard.py      # one variant on standard cases
-python benchmarks/run_simulator_speed_matrix.py  # solver x backend sweep (euler vs euler_fixedsteps)
-python benchmarks/run_simulator_speed_manual.py  # hand-picked simulator runs
-python benchmarks/run_optimizer_backends.py      # NLP solver presets on textbook problems
-python benchmarks/run_trajopt_backends.py        # trajopt transcription x backend sweep
-python benchmarks/run_trajopt_solver_presets.py  # direct-collocation solver presets
-python benchmarks/run_dp_backends.py             # value-iteration loop/numpy/jax backends
-python benchmarks/run_rrt_nearest_backends.py    # RRT nearest brute_force vs kd_tree
-python benchmarks/run_regression_check.py                  # core_perf baseline (default)
+python benchmarks/run_study.py --list                            # every preset, one line each
+python benchmarks/run_study.py --preset f_eval --plant pendulum  # f() call speed; or --plant diagram_dense
+python benchmarks/run_study.py --preset step_eval --plant leaf   # step() call speed; or --plant step_diagram
+python benchmarks/run_study.py --preset sim --mode matrix        # solver x backend; or --mode standard | manual
+python benchmarks/run_study.py --preset trajopt --mode backends  # transcription x backend; or --mode solvers
+python benchmarks/run_study.py --preset optimizer                # NLP solver presets on textbook problems
+python benchmarks/run_study.py --preset dp                       # value-iteration loop/numpy/jax backends
+python benchmarks/run_study.py --preset rrt_nearest              # RRT nearest brute_force vs kd_tree
+python benchmarks/run_study.py --preset pyro_parity -- --fast    # Pyro vs Minilink DP/RRT (external Pyro env)
+
+python benchmarks/run_regression_check.py                      # core_perf baseline (default)
 python benchmarks/run_regression_check.py --suite integration  # trajectory + JAX trajopt gate
 python benchmarks/run_regression_check.py --suite solve_speed  # NLP + NumPy trajopt solve gates
 python benchmarks/run_regression_check.py --suite dp_speed     # value-iteration sweep speed + backend agreement
@@ -69,9 +62,9 @@ python benchmarks/run_regression_check.py --suite e4           # E4 trajopt/MPC 
 python benchmarks/run_regression_check.py --suite f_mpc        # F MPC hybrid/hand-loop/dual-rate
 python benchmarks/run_regression_check.py --suite all          # all regression-gate suites
 python benchmarks/run_regression_check.py --suite all --tiny   # CI reduced workload
-python benchmarks/run_regression_check.py --update           # refresh committed JSON
-python benchmarks/run_e4_trajopt_parity.py --capture         # same as --suite e4 --update
-python benchmarks/run_f_mpc_parity.py --capture              # same as --suite f_mpc --update
+python benchmarks/run_regression_check.py --update             # refresh committed JSON
+python benchmarks/run_e4_trajopt_parity.py --capture           # same as --suite e4 --update
+python benchmarks/run_f_mpc_parity.py --capture                # same as --suite f_mpc --update
 ```
 
 ## Regression baselines
@@ -137,13 +130,5 @@ python benchmarks/run_regression_check.py --suite f_mpc --tiny \
 
 Skip context: `--no-host-context`.
 
-```bash
-python benchmarks/run_regression_check.py
-python benchmarks/run_regression_check.py --suite integration
-python benchmarks/run_regression_check.py --suite all
-python benchmarks/run_regression_check.py --suite integration --update   # after intentional changes
-```
-
-Review the JSON diff before committing an `--update`. Older speed/backend CLIs are
-**deprecated shims** forwarding to [`run_study.py`](run_study.py); Pyro parity remains
-manual benchmark-study only (external Pyro env).
+Run `--update` only after an intentional change, and review the JSON diff before
+committing it.

@@ -2,7 +2,7 @@
 
 **Status:** core contract — design agreed 2026-09-21, not started.  
 **Lane:** core (`minilink.core.geometry`), then a teaching catalog of courses.  
-**Rung:** v0.2 wave A, step A3 of [TODO.md](TODO.md).  
+**Rung:** v0.3, step A3 of [TODO.md](TODO.md).  
 **Depends on:** [fields.md](fields.md) for the `Field` ABC (can move spatial files first and rename `StateField` → `Field` in the same pass or after).
 
 Workspace math is split today: SDF solids in [`core/geometry.py`](../../minilink/core/geometry.py), everything else under [`planning/spatial/`](../../minilink/planning/spatial/). That home is an accident of first consumer (trajopt). Control cannot import planning ([RULES.md](../../RULES.md) 3.2), so [`PurePursuit`](../../minilink/control/geometric.py) takes a raw waypoint array. Demos rebuild the same oval and cones by hand.
@@ -112,7 +112,7 @@ minilink/graphical/          # drawing only
 3. `planning.spatial` re-exports, then delete in the same change as call-site updates ([RULES.md](../../RULES.md) 3.4).
 4. Catalog factories; switch the three UdeS racecar demos and the RRT forest demo.
 5. PurePursuit accepts a `Path` / `Track`.
-6. [fields.md](fields.md) §4.1: spatial subclasses already live in geometry when `Field` lands.
+6. Step 4.1 of [fields.md](fields.md): spatial subclasses already live in geometry when `Field` lands.
 
 ## Out of scope
 

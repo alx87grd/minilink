@@ -6,8 +6,8 @@ A basic Python environment with NumPy, SciPy, and Matplotlib is enough for most
 of the library. Skip `plot_diagram()` (needs Graphviz) and optional plotting or
 optimization backends.
 
-**Conda** from [`environment.yml`](environment.yml) is the Full local stack
-(JAX, Ipopt, notebooks) that CI and the course validate.
+**Conda** from [`environment.yml`](environment.yml) is the recommended install:
+the whole Full stack (JAX, Ipopt, Jupyter, Stable-Baselines3) the courses use.
 
 Graphviz and Ipopt are non-Python binaries pip cannot install. Graphviz is only
 for `plot_diagram()`. Ipopt is an optional NLP backend; trajopt defaults to SciPy.
@@ -17,14 +17,17 @@ for `plot_diagram()`. Ipopt is an optional NLP backend; trajopt defaults to SciP
 | | **Basic** | **Full** (recommended locally) |
 | --- | --- | --- |
 | **For** | Scripts: sim, trajectory plots, LQR, value iteration | Notebooks, JAX, animators, symbolic, PPO |
-| **PyPI** | `pip install minilink` | `pip install "minilink[full]"` |
-| **Conda** | [`environment-basic.yml`](environment-basic.yml) | [`environment.yml`](environment.yml) |
-| **From a clone** | `pip install -e .` | `pip install -e ".[full]"` |
+| **Conda** | [`environment-basic.yml`](environment-basic.yml) | [`environment.yml`](environment.yml): everything, notebooks included |
+| **PyPI** | `pip install minilink` | `pip install "minilink[full]"`: the libraries only |
+| **From a clone** | `pip install -e .` | `pip install -e ".[full]"`: the libraries only |
 | **Colab** | clone + path (NumPy/SciPy/Matplotlib already present) | clone + path + Full extras |
 
-PPO notebooks need **Full**. VI and LQR run on **Basic**. Pip extras: `jax`,
+VI and LQR run on **Basic**. Pip's `full` extra installs every library extra
+(JAX, plotting, 3-D animation, symbolic math, diagrams, Gymnasium) but no
+Jupyter, PyTorch or Stable-Baselines3: run the notebooks, the
+Stable-Baselines3 ones included, on the conda environment. Pip extras: `jax`,
 `visualization`, `plotting`, `diagrams`, `symbolic`, `rl`, `ipopt`, `full`
-(everything except `ipopt` — that extra needs a system Ipopt).
+(every one except `ipopt`, which needs a system Ipopt).
 
 ---
 
@@ -34,13 +37,6 @@ PPO notebooks need **Full**. VI and LQR run on **Basic**. Pip extras: `jax`,
 
 ```bash
 pip install minilink
-```
-
-Until the `0.1.0` tag is on PyPI, install from a clone (`pip install -e .`
-below) or from GitHub:
-
-```bash
-pip install "minilink @ git+https://github.com/alx87grd/minilink.git"
 ```
 
 ### Conda
@@ -82,8 +78,8 @@ if "google.colab" in sys.modules:
 ```
 
 Colab already ships NumPy, SciPy, and Matplotlib (the Basic stack). Skip
-`plot_diagram()` unless you install Graphviz on the runtime. After `0.1.0` is
-on PyPI, `%pip install minilink` is enough for Basic scripts.
+`plot_diagram()` unless you install Graphviz on the runtime. In a notebook of
+your own, `%pip install minilink` is enough for Basic scripts.
 
 ---
 
@@ -95,13 +91,11 @@ on PyPI, `%pip install minilink` is enough for Basic scripts.
 pip install "minilink[full]"
 ```
 
-Same GitHub fallback as Basic until the tag lands. Pip Full does not include
-Ipopt/`cyipopt` (conda Full does); trajopt still runs with SciPy. For Ipopt:
-`pip install "minilink[full,ipopt]"` after a system Ipopt.
+Pip Full installs the libraries only: no Jupyter, PyTorch, Stable-Baselines3 or
+Ipopt (the conda environment has all four). Trajectory optimization still runs
+with SciPy. For Ipopt: `pip install "minilink[full,ipopt]"` after a system Ipopt.
 
 ### Conda
-
-Same as [README § Install](README.md#install):
 
 ```bash
 git clone https://github.com/alx87grd/minilink.git && cd minilink
@@ -112,7 +106,8 @@ conda env config vars set PYTHONPATH="$PWD" && conda deactivate && conda activat
 
 ### From a clone (pip)
 
-Same Graphviz note as Basic (`dot` binary, or skip the `diagrams` extra).
+Same Graphviz note as Basic (`dot` binary, or skip the `diagrams` extra), and
+the same libraries as pip Full above.
 
 ```bash
 git clone https://github.com/alx87grd/minilink.git && cd minilink
@@ -141,26 +136,6 @@ if "google.colab" in sys.modules:
 
 ---
 
-## Publish from GitHub
-
-The wheel is built by hatchling + hatch-vcs. Version comes from a **`0.*` git
-tag** (`0.1.0`, not `v0.1.0`). The published package is the teaching surface
-plus provisional bands; `minilink/experimental/` stays repo-only.
-
-`.github/workflows/publish.yml` builds the sdist and wheel on a `0.*` tag (and
-on `workflow_dispatch` for a dry build) and uploads to PyPI with Trusted
-Publishing. One-time setup, on the maintainer account:
-
-1. Create a GitHub Environment named `pypi` on `alx87grd/minilink`.
-2. On PyPI, add a trusted publisher: owner `alx87grd`, repository `minilink`,
-   workflow `publish.yml`, environment `pypi`. A pending publisher is enough
-   before the first upload; the first successful publish creates the project.
-3. Tag and push: `git tag 0.1.0 && git push origin 0.1.0`.
-
-`workflow_dispatch` without a tag only builds; it does not upload.
-
----
-
 ## Troubleshooting
 
 - **`No module named 'minilink'`** — `pip install minilink` (or `pip install -e .`
@@ -168,7 +143,7 @@ Publishing. One-time setup, on the maintainer account:
   (`export PYTHONPATH="$PWD"`).
 - **`failed to execute 'dot'`** — install Graphviz, or skip `plot_diagram()` /
   the `diagrams` extra.
-- **Missing `stable_baselines3` / `torch`** — you need the **Full** tier for PPO notebooks.
+- **Missing `stable_baselines3` / `torch`** — the Stable-Baselines3 notebooks
+  run on the conda environment ([`environment.yml`](environment.yml)); pip's
+  `full` extra does not install them.
 - **`cyipopt` / Ipopt errors** — optional; Basic omits it. Use default SciPy solvers, or Full conda / `conda install -c conda-forge ipopt cyipopt`.
-- **PyPI 404 for `minilink`** — the first upload is the `0.1.0` tag. Until then
-  use a clone or `pip install "minilink @ git+https://github.com/alx87grd/minilink.git"`.

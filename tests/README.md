@@ -2,13 +2,11 @@
 
 **Entry points (human · agent · CI):** see [Entry points](#entry-points) below — authoritative for all three audiences.
 
-The historical six-layer test plan was retired on 2026-09-05 (see [docs/plans/README.md](../docs/plans/README.md)); notebook smoke is an additional layer on top of the unit and demo-check layers.
-
 ---
 
 ## Entry points
 
-**Prerequisites:** repo root, conda env **`minilink`**, `PYTHONPATH=.` (see [README.md#install](../README.md#install)).
+**Prerequisites:** repo root, conda env **`minilink`**, `PYTHONPATH=.` (see [install.md](../install.md)).
 
 ### Folder layout (everything under `tests/` or `benchmarks/`)
 
@@ -52,7 +50,7 @@ by its name here.
 
 | Situation | Command |
 | --- | --- |
-| Always before push | `ruff check . && ruff format --check .` (the pre-commit hooks run the same two) |
+| Always before push | `ruff check . && ruff format --check .` (the pre-commit hooks run the same two); fix with `ruff check --fix . && ruff format .` |
 | Docs/markdown only | skip pytest |
 | Narrow module change | `pytest tests/unittest/test_<domain>.py` |
 | Cross-cutting or handoff | `pytest` |
@@ -61,6 +59,8 @@ by its name here.
 | Backend perf exploration | `python benchmarks/run_study.py --list` |
 | Demo-check change | `python tests/demo_checks/run_catalog_checks.py --fast` and/or `run_flagship_demos.py` |
 | Notebook change | `MPLBACKEND=Agg python tests/demo_checks/run_notebook_checks.py` |
+| Docs build (when editing `docs/` or docstrings) | `sphinx-build -W --keep-going -b html docs docs/_build/html` |
+| Headless pygame (optional) | `SDL_VIDEODRIVER=dummy pytest` |
 
 The regression flags live in two places in code as well: the `regression` job of
 `.github/workflows/test.yml` and `run_regression(ci_mode=True)` in `tests/run/_common.py`.
@@ -80,26 +80,30 @@ pull requests to the branches its `on:` block lists (`main` and `dev` among them
 | **`test`** | ruff + `pytest` (py 3.10–3.13; demo-check bridge; JAX tests and demos skip); coverage report on py 3.12, no gate |
 | **`laptops`** | Basic tier (`pip install -e ".[dev]"`, no extras) on `windows-latest` and `macos-latest`, py 3.12: `pytest` + **notebook smoke** (notebooks that need an extra skip) |
 | **`packaging`** | `python -m build` + wheel/sdist check (no `experimental/`) + `twine check` + install the wheel and `import minilink` |
-| **`regression`** | `pytest` (incl. the JAX tests) + regression gates (CI flags above) + **flagship demos** + **notebook smoke** (py 3.12 + JAX + viz) |
+| **`regression`** | `pytest` (incl. the JAX and symbolic tests) + regression gates (CI flags above) + **flagship demos** + **notebook smoke** (py 3.12 + JAX + viz + symbolic) |
 
 Not merge gates: `publish.yml` runs on a `0.*` tag, and its **`check`** job (ruff +
 `pytest`) and **`build`** job (sdist and wheel, checked) must pass before **`publish`**
-uploads to PyPI; `nightly.yml` runs every demo script and teaching notebook with the full
-optional stack; `docs.yml` builds the Sphinx site.
+uploads to PyPI; `nightly.yml` installs the full optional stack (every extra, Ipopt,
+Stable-Baselines3) and runs `pytest` (the symbolic and Ipopt tests included), every demo
+script, and every notebook (`run_notebook_checks.py --all`: those marked `smoke: false`
+in `notebook_overrides.json` too, except those marked `nightly: false`, run only by name);
+`docs.yml` builds the Sphinx site.
 
-### At a glance
+### Validation layers
 
-| Layer | Human IDE (`tests/run/`) | Agent / CI | CI job |
-| --- | --- | --- | --- |
-| **Contract tests** | `run_contract_tests.py` | `pytest` | `test` + `laptops` + `regression` |
-| **Regression gates** | `run_regression_gates.py` | `benchmarks/run_regression_check.py` | `regression` |
-| **Benchmark study** | `run_benchmark_study.py` | `benchmarks/run_study.py` | — |
-| **Graphics contract** | (in contract tests) | `test_flagship_graphics_contract.py` | `test` |
-| **Graphics visual** | `tests/demo_checks/run_graphics_visual_check.py` | local | — |
-| **Demo checks** | `run_demo_checks.py` | `tests/demo_checks/run_*.py` | `test` + `regression` |
-| **Notebook smoke** | `run_notebook_checks.py` | `tests/demo_checks/run_notebook_checks.py` | `laptops` + `regression` |
-| **Pre-push** | `run_pre_push.py` | ruff + pytest | `test` |
-| **Packaging** | — | `python -m build` + `check_wheel.py` | `packaging` |
+| Layer | Purpose | Human IDE (`tests/run/`) | Agent / CI | CI job |
+| --- | --- | --- | --- | --- |
+| **Contract tests** | API types, shapes, compile/sim/MPC behavior | `run_contract_tests.py` | `pytest` | `test` + `laptops` (Basic tier) + `regression` (w/ JAX) |
+| **Regression gates** | Accuracy goldens + guarded NLP/trajopt solve time | `run_regression_gates.py` | `benchmarks/run_regression_check.py` | `regression` |
+| **Benchmark study** | Machine/GPU exploration tables | `run_benchmark_study.py` | `benchmarks/run_study.py` | — |
+| **Graphics contract** | Draw-list + headless PNG checks | (in contract tests) | `test_flagship_graphics_contract.py` (in `pytest`) | `test` |
+| **Graphics visual** | You confirm Meshcat/MPL/Plotly locally | `tests/demo_checks/run_graphics_visual_check.py` | local | — |
+| **Demo checks** | Catalog + flagship demos must not throw | `run_demo_checks.py` | `run_catalog_checks.py`, `run_flagship_demos.py` | `test` (pytest bridge) + `regression` (full flagships w/ JAX) |
+| **Notebook smoke** | Teaching notebooks' code cells must not throw | `run_notebook_checks.py` | `tests/demo_checks/run_notebook_checks.py` | `laptops` (Basic tier) + `regression`; nightly with `--all` |
+| **Repo contract** | Doc links resolve, public prose names no other tool, no pseudo-private methods | (in contract tests) | `test_repo_contract.py` (in `pytest`) | `test` |
+| **Pre-push** | Lint and format, then the contract tests | `run_pre_push.py` | ruff + `pytest` | `test` |
+| **Packaging** | Wheel/sdist ship the library (teaching surface and provisional bands), not `experimental/` | — | `python -m build` + `tests/demo_checks/check_wheel.py` | `packaging` |
 
 ### Performance — regression gates vs benchmark study vs host context
 
@@ -109,34 +113,15 @@ optional stack; `docs.yml` builds the Sphinx site.
 | **Location** | `benchmarks/` | `benchmarks/` | `benchmarks/host_profiles/*.json` |
 | **CI** | ✅ | ❌ | printed on regression runs (informational) |
 
-Regression gates print a **host speed context** table after each suite (compare current run to recorded profiles). Gates unchanged. Record your machine:
-
-```bash
-python benchmarks/run_regression_check.py --suite f_mpc --tiny \
-  --record-host-profile my_laptop --host-profile-label "My workstation"
-```
-
-Detail: [benchmarks/README.md](../benchmarks/README.md).
+Regression gates print a **host speed context** table after each suite (compare current
+run to recorded profiles; gates unchanged). Recording your machine's profile and the
+detail: [benchmarks/README.md](../benchmarks/README.md).
 
 ---
 
-## Validation layers
-
-| Layer | Purpose | Entry command | CI job |
-| --- | --- | --- | --- |
-| **Contract tests** | API types, shapes, compile/sim/MPC behavior | `pytest` | `test` + `laptops` (Basic tier) + `regression` (w/ JAX) |
-| **Regression gates** | Accuracy goldens + guarded NLP/trajopt solve time | `run_regression_check.py --suite all` | `regression` |
-| **Benchmark study** | Machine/GPU exploration tables | `run_study.py --list` | — |
-| **Graphics contract** | Draw-list + headless PNG checks | `test_flagship_graphics_contract.py` (in `pytest`) | `test` |
-| **Graphics visual** | You confirm Meshcat/MPL/Plotly locally | `run_graphics_visual_check.py` | — |
-| **Demo checks** | Catalog + flagship demos must not throw | `run_catalog_checks.py`, `run_flagship_demos.py` | `test` (pytest bridge) + `regression` (full flagships w/ JAX) |
-| **Notebook smoke** | Teaching notebooks' code cells must not throw | `run_notebook_checks.py` | `laptops` (Basic tier) + `regression` |
-| **Repo contract** | Doc links resolve, public prose names no other tool, no pseudo-private methods | `test_repo_contract.py` (in `pytest`) | `test` |
-| **Packaging** | Wheel/sdist ship the teaching surface, not `experimental/` | `python -m build` + `tests/demo_checks/check_wheel.py` | `packaging` |
-
 ## Local environment
 
-Setup: [README.md#install](../README.md#install). Non-interactive:
+Setup: [install.md](../install.md). Non-interactive:
 
 ```bash
 conda run -n minilink python -m pytest
@@ -182,6 +167,8 @@ python tests/demo_checks/run_catalog_checks.py --fast
 python tests/demo_checks/run_flagship_demos.py
 # Teaching notebooks under examples/tutorial/ and examples/teaching/ (auto-discovered; overrides for deps/timeouts):
 MPLBACKEND=Agg python tests/demo_checks/run_notebook_checks.py
+# Nightly: the long notebooks marked "smoke": false as well:
+MPLBACKEND=Agg python tests/demo_checks/run_notebook_checks.py --all
 # Nightly / local: every example script (live Meshcat viewers skip the browser wait, see demo_checks/headless/):
 python tests/demo_checks/run_all_demos.py --continue-on-error
 ```

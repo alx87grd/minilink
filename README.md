@@ -6,7 +6,7 @@
 [![Notebooks](https://img.shields.io/badge/notebooks-examples%2Ftutorial-F37626?logo=jupyter&logoColor=white)](https://github.com/alx87grd/minilink/tree/main/examples/tutorial)
 [![PyPI](https://img.shields.io/pypi/v/minilink)](https://pypi.org/project/minilink/)
 [![API](https://img.shields.io/badge/API-alx87grd.github.io%2Fminilink-2563eb)](https://alx87grd.github.io/minilink/)
-[![License: MIT](https://img.shields.io/badge/license-MIT-lightgrey)](LICENSE)
+[![License: MIT](https://img.shields.io/badge/license-MIT-lightgrey)](https://github.com/alx87grd/minilink/blob/main/LICENSE)
 
 <table>
   <tr>
@@ -51,7 +51,7 @@ optimization, model predictive control and reinforcement learning. The same
 equations compile and differentiate under JAX, so a course model is also a
 research model.
 
-## Ten lines
+## Eleven lines
 
 ```python
 from minilink import ImpedanceController, Pendulum
@@ -105,10 +105,14 @@ class MassSpringDamper(DynamicSystem):
         self.camera_scale = 4.0
 
     def f(self, x, u, t=0, params=None):
-        p = self.params if params is None else params
-        pos, vel = x
-        acc = (u[0] - p["c"] * vel - p["k"] * pos) / p["m"]
-        return np.array([vel, acc])
+        params = self.params if params is None else params
+        m, k, c = params["m"], params["k"], params["c"]
+        p, v = x
+
+        # m p̈ + c ṗ + k p = u
+        a = (u[0] - c * v - k * p) / m
+
+        return np.array([v, a])
 
     def tf(self, x, u, t=0, params=None):
         return {"body": translation(x[0], 0.0, 0.0)}
@@ -151,6 +155,7 @@ is a system, a cost and boundary sets; every planner takes it and returns a
 `PlanningSolution` (a policy, plus the trajectory when the solver computes one):
 
 ```python
+import numpy as np
 from minilink import (
     BallSet, DynamicProgrammingPlanner, Pendulum, PlanningProblem,
     QuadraticCost, RRTPlanner, TrajectoryOptimizationPlanner,
@@ -185,7 +190,14 @@ The same `f` traces under JAX. One evaluator gives exact derivatives, batched
 rollouts and gradients through a whole simulation:
 
 ```python
+import numpy as np
+from minilink import Pendulum
+
+plant = Pendulum()
 ev = plant.compile(backend="jax")
+x_bar = np.array([np.pi, 0.0])                    # upright
+x0s = np.tile([1.0, 0.0], (1000, 1))              # 1000 rollouts released at 1 rad
+lengths = np.linspace(0.5, 2.0, 1000)             # one rod length per rollout
 
 A = plant.jacobian("f", "x", x_bar)               # exact linearization
 S = plant.jacobian("f", "params", x_bar)          # sensitivity to each physical parameter
@@ -200,8 +212,8 @@ default. Under the hood, `compile()` lowers a leaf or a wired diagram to flat
 NumPy or JAX primitives (`f`, `rk4_step`, `rk4_integrate_zoh`,
 `rollout_batch`); the trace tier (`f_trace`, `f_trace_p`) is what you
 differentiate inside your own `jit`. See
-[07_compile](examples/tutorial/07_compile.ipynb) and the
-[JAX showcase](examples/tutorial/showcase_jax.ipynb).
+[07_compile](https://github.com/alx87grd/minilink/blob/main/examples/tutorial/07_compile.ipynb) and the
+[JAX showcase](https://github.com/alx87grd/minilink/blob/main/examples/tutorial/showcase_jax.ipynb).
 
 ## Two audiences, one codebase
 
@@ -215,12 +227,12 @@ differentiate inside your own `jit`. See
   backends.
 
 The boundary between the two is a contract, not a convention:
-[ROADMAP.md §2](ROADMAP.md#2-two-lanes).
+[ROADMAP.md §2](https://github.com/alx87grd/minilink/blob/main/ROADMAP.md#2-two-lanes).
 
 ## Install
 
 Python 3.10+. Recommended: the conda environment from
-[`environment.yml`](environment.yml).
+[`environment.yml`](https://github.com/alx87grd/minilink/blob/main/environment.yml).
 
 ```bash
 git clone https://github.com/alx87grd/minilink.git && cd minilink
@@ -229,18 +241,18 @@ conda env config vars set PYTHONPATH="$PWD" && conda deactivate && conda activat
 ```
 
 Or open any notebook in Colab: the first cell clones the repository. Basic
-tier, pip, and options: [install.md](install.md).
+tier, pip, and options: [install.md](https://github.com/alx87grd/minilink/blob/main/install.md).
 
 ## Learn more
 
-- [Showcase notebook](examples/tutorial/showcase_minilink.ipynb), the tool ladder on real plants
-- [JAX showcase](examples/tutorial/showcase_jax.ipynb), write `f` once, get every gradient
-- [From RL to Bode showcase](examples/tutorial/showcase_from_rl_to_bode.ipynb), six-axis robot, impedance loop, neural policy, frequency response and Lyapunov certificates
-- [Tutorial series 00–11](examples/tutorial/), one notebook per package (core dynamics to reinforcement learning)
-- [Teaching notebooks](examples/teaching/), swing-up, DP, PPO, robot equations of motion
-- [Examples index](examples/README.md), demos and projects by chapter
-- [API reference](https://alx87grd.github.io/minilink/), [DESIGN.md](DESIGN.md), [ROADMAP.md](ROADMAP.md), [tests](tests/README.md)
-- [CONSTITUTION.md](CONSTITUTION.md) and [RULES.md](RULES.md), the design law and the code rules every contributor and agent follows
+- [Showcase notebook](https://github.com/alx87grd/minilink/blob/main/examples/tutorial/showcase_minilink.ipynb), the tool ladder on real plants
+- [JAX showcase](https://github.com/alx87grd/minilink/blob/main/examples/tutorial/showcase_jax.ipynb), write `f` once, get every gradient
+- [From RL to Bode showcase](https://github.com/alx87grd/minilink/blob/main/examples/tutorial/showcase_from_rl_to_bode.ipynb), six-axis robot, impedance loop, neural policy, frequency response and Lyapunov certificates
+- [Tutorial series 00–11](https://github.com/alx87grd/minilink/tree/main/examples/tutorial), one notebook per package (core dynamics to reinforcement learning)
+- [Teaching notebooks](https://github.com/alx87grd/minilink/tree/main/examples/teaching), swing-up, DP, PPO, robot equations of motion
+- [Examples index](https://github.com/alx87grd/minilink/blob/main/examples/README.md), demos and projects by chapter
+- [API reference](https://alx87grd.github.io/minilink/), [DESIGN.md](https://github.com/alx87grd/minilink/blob/main/DESIGN.md), [ROADMAP.md](https://github.com/alx87grd/minilink/blob/main/ROADMAP.md), [tests](https://github.com/alx87grd/minilink/blob/main/tests/README.md)
+- [CONSTITUTION.md](https://github.com/alx87grd/minilink/blob/main/CONSTITUTION.md) and [RULES.md](https://github.com/alx87grd/minilink/blob/main/RULES.md), the design law and the code rules every contributor and agent follows
 
 Minilink is the successor of [pyro](https://github.com/SherbyRobotics/pyro),
 the toolbox behind the robotics and control courses at Université de

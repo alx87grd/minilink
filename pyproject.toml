@@ -5,7 +5,7 @@ build-backend = "hatchling.build"
 [project]
 name = "minilink"
 dynamic = ["version"]
-description = "Python-native block-diagram framework for modeling, simulating, optimizing, and visualizing dynamical systems"
+description = "Write the equations once. Simulate, analyze, control, plan, optimize, learn."
 readme = "README.md"
 requires-python = ">=3.10"
 license = "MIT"
@@ -162,9 +162,9 @@ exclude = [
 ]
 
 [tool.hatch.build.targets.wheel]
-# Only the library ships; tests/ and benchmarks/ stay repo-only. The research
-# lane (ROADMAP §2) is repo-only too: the experimental tier is excluded from
-# the published wheel.
+# Only the library ships; tests/ and benchmarks/ stay repo-only. The
+# provisional bands ship; the experimental tier is excluded from the published
+# wheel (ROADMAP §2).
 packages = ["minilink"]
 exclude = [
     "minilink/experimental/**",

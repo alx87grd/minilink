@@ -156,7 +156,7 @@ Pinned by the course notes (C5.1, C5.3, C5.4, C5.5). For now the only external p
 
 **Colab tip:** open a badge → **File → Save a copy in Drive** → run from the top.
 The first code cell clones the repo and installs `meshcat` when needed. Locally,
-use the `minilink` conda env (see root [README](../README.md#install)).
+use the `minilink` conda env (see [install.md](../install.md)).
 
 ## By chapter
 
@@ -185,13 +185,7 @@ Run demos from the repo root, e.g.
 
 ## CI smoke
 
-Notebook smoke covers `tutorial/` and `teaching/` (except long
-notebooks with `"smoke": false` — UR5 EoM, DP grids, PPO;
-not `projects/` or `experimental/`). Locally:
-
-```bash
-MPLBACKEND=Agg python tests/demo_checks/run_notebook_checks.py
-```
-
-The nightly sweep runs every script under `demos/`; the JAX regression job runs
-the flagship manifest (`tests/demo_checks/flagship_manifest.json`).
+Notebook smoke runs `tutorial/` and `teaching/`, minus the long notebooks marked
+`"smoke": false` in `tests/demo_checks/notebook_overrides.json`; the flagship demos are
+listed in `tests/demo_checks/flagship_manifest.json`. Commands and CI jobs:
+[tests/README.md](../tests/README.md#entry-points).
