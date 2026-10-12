@@ -57,7 +57,8 @@ site/
 *.msg
 *.gv
 # Claude Code #
-.claude/
+.claude/*
+!.claude/settings.json
 
 # Matplotlib (e.g. MPLCONFIGDIR in repo or sandbox)
 .mpl/

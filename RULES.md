@@ -28,16 +28,15 @@ concrete formatting, ordered by the cost of being wrong:
 *An early "no" prevents expensive architectural mistakes. Identity and
 boundaries: CONSTITUTION.md §1.*
 
-- **1.1 Stay inside the product scope.** Reject work that would make Minilink an interactive GUI,
-  an acausal DAE solver, a heavy multibody contact engine, or a mathematical programming language.
-- **1.2 Continuous-time core is primary.** Never complicate continuous core classes
-  (`DynamicSystem`, `DiagramSystem`, flow `compile()`, `Simulator`) to accommodate discrete
-  conveniences. `StepSystem`, `Computer`, and hybrid diagrams are sibling utilities for
-  sampled control in the loop.
+- **1.1 Stay inside the product scope.** Would it make Minilink one of the things it is not?
+  Law: CONSTITUTION §1.4, 'Product Boundaries'.
+- **1.2 Continuous-time core is primary.** Does it complicate `DynamicSystem`,
+  `DiagramSystem`, flow `compile()` or `Simulator` for a discrete convenience? Law:
+  CONSTITUTION §2, invariant 4.
 - **1.3 Expose structure, never black-box dynamics.** Models make equations, state variables, and
   parameters transparent and inspectable.
-- **1.4 One class for NumPy/JAX.** Write one equation path (`xp`) that runs on both backends.
-  A `Jax<Plant>` twin exists only when a single class would sacrifice textbook readability.
+- **1.4 One class for NumPy/JAX.** Would a `Jax<Plant>` twin buy readability that one `xp`
+  body (5.2) cannot? Law: CONSTITUTION §6, 'Backend-native math'.
 - **1.5 Be hard where the identity is.** Guard compile-versus-reference parity, JAX twin
   agreement, and discontinuous closed-loop solvers. Soften elsewhere.
 
@@ -59,18 +58,21 @@ Systems-as-descriptions: CONSTITUTION.md §4.*
   equations accept an explicit argument (`f(x, u, t, params=None)`) for computing parameter gradients
   ($\partial f / \partial p$) and system identification. However, the core framework remains forgiving:
   models where a student hard-codes constants directly into equations must simulate without friction.
-  The same rule holds for costs, sets, fields and shapes: `params is None` resolves to the
-  object's own defaults; any dictionary replaces them at that level.
+  Costs, sets, fields and shapes owe the same signature; the library ones do not read
+  `params` yet (costs: workboard step A2; sets, shapes and fields: A5). Override rule and
+  gap: DESIGN §4, 'Parameters'.
 - **2.4 No run state on a System.** A `System` does not store simulation trajectories, solver state,
   or run history. Exception: `self.traj` is the one daily-use shortcut; a new exception needs a
-  reason of that weight.
+  reason of that weight. `StepSystem.rollout` and `HybridDiagram.last_result` are an open
+  question of S31 (ROADMAP §6).
 - **2.5 Prefer arrays and existing core objects.** New APIs take and return arrays or types
   students already know (`System`, `Trajectory`, `PlanningProblem`, sets, costs). Do not add
   request/response dataclasses, option bags, or adapter layers that only wrap those. A new
   named record is justified when it is a domain noun (a trajectory, a certificate, a plan) —
   not when it is a programming convenience. Before adding a record, name the object it already
   is: a `(lower, upper)` pair is a `BoxSet`, a reset rule is a `Distribution`, a sublevel set
-  is a `Set`, a scalar function of the state is a `Field`, a sampled run is a `Trajectory`.
+  is a `Set`, a scalar function of the state is a `Field` (planned, workboard step A1; today
+  `StateField` and `WorkspaceField` in `planning/spatial`), a sampled run is a `Trajectory`.
 
 ---
 
@@ -78,26 +80,14 @@ Systems-as-descriptions: CONSTITUTION.md §4.*
 
 *Maintain strict modularity and clear dependency boundaries.*
 
-- **3.1 Placement algorithm:**
-  - A dynamic system or physical model lives under `minilink.dynamics` (or `minilink.catalog`).
-  - An operation or algorithm on a system lives in its respective tool band (`minilink.simulation`,
-    `minilink.analysis`, `minilink.control`, `minilink.planning`, `minilink.optimization`).
-  - Unproven prototypes and research experiments live in the research lane (`examples/experimental/`
-    or `examples/projects/`). Runnable example layout, naming, and promotion live in
-    examples/README.md. Developer benches live under `benchmarks/`.
-- **3.2 The dependency law:** Domain libraries (`control`, `analysis`, `simulation`, `planning`) may
-  import only from `minilink.core` and shared mathematical bases. Peer domain libraries do not import
-  each other without explicit architectural justification.
-- **3.3 Two lanes (Teaching vs. Research):** Philosophy in CONSTITUTION.md §3;
-  operating contract (soft entry rule, wheel scope, CI-checked imports) in ROADMAP.md §2.
-  - **Teaching surface** (the root prelude and the band facades, the set ROADMAP §2 registers
-    and the tests check; and the examples that import only through it: `examples/tutorial/`,
-    `examples/teaching/`, `examples/demos/`): Strict public contract, high stability, fully
-    documented, runs on standard scientific Python.
-  - **Research lane** (everything else: the provisional hybrid, MPC, realtime and spatial
-    bands, the `minilink/experimental/` tier, `examples/projects/`,
-    `examples/experimental/`): Free experimentation, unconstrained by teaching stability
-    guarantees; `experimental/` and the research examples are repo-only.
+- **3.1 Placement algorithm.** Is a `System` shelved by its diagram role and a verb by its
+  tool band, with plant math under `dynamics/` and never under the `minilink.catalog` alias?
+  Algorithm: DESIGN §3, 'Placement algorithm'. Runnable examples, prototypes included,
+  follow examples/README.md; developer benches live under `benchmarks/`.
+- **3.2 The dependency law.** Does a library import a peer library or catalog content outside
+  the exceptions DESIGN names? Law: DESIGN §3, 'Dependency law'.
+- **3.3 Two lanes.** Which lane does it join, and does it meet that lane's rules? Contract:
+  [ROADMAP.md §2](ROADMAP.md#2-two-lanes); philosophy: CONSTITUTION §3.
 - **3.4 Clean renaming:** When renaming a component or module, update all call sites across the
   entire repository in the same change. Do not leave deprecated aliases behind.
 - **3.5 Decoupled rendering & headless dynamics:** Classes in `minilink.dynamics` must never import
@@ -114,8 +104,8 @@ Systems-as-descriptions: CONSTITUTION.md §4.*
   compile, analysis, planning trajopt, the hybrid step path (`StepSystem`,
   `StepDiagramSystem`, `Computer`, `HybridDiagram`), and MPC as the hybrid exemplar.
   Do not update them to track every new demo, compare script, or research-lane
-  experiment. New demos land under `examples/`. Add a README examples-table row only
-  when a demo is a canonical teaching entry for a core tool.
+  experiment. New demos land under `examples/`, whose map is `examples/README.md`. Add a
+  row to README's verb table only when a core tool gains its canonical call.
 - **3.8 Notebooks are not a second map.** The catalog is `examples/README.md` (plus
   root README entry points). Do not duplicate it with See also / Where next /
   Scripts for depth / peer hrefs.
@@ -138,18 +128,15 @@ Systems-as-descriptions: CONSTITUTION.md §4.*
 
 *Provide clean, zero-boilerplate access for students and power for researchers.*
 
-- **4.1 Three import layers (prefer the shortest that remains clear):**
-  - **Root prelude:** `from minilink import Pendulum, lqr, Simulator` (the primary teaching surface).
-  - **Band facades:** `from minilink.control import PID` or `from minilink.analysis import bode`.
-  - **Defining module:** `from minilink.control.lqr import lqr` (library internals, tests,
-    and the research lane).
+- **4.1 Three import layers.** Does the import use the shortest layer that stays clear: root
+  prelude, band facade, defining module? Layers and the factory-module exception: DESIGN §2,
+  'Public imports'.
 - **4.2 Student code imports through the teaching surface.** README, tutorials, teaching
   examples, and demos import strictly via the root prelude or band facades, never through
   internal paths.
   Reader-facing imports stay light in demos; internal packages may import richly when that is
   clearer. Where a band facade does not exist yet, use the shortest import that works and
-  leave the facade to a planned step — do not invent a name. *(Exception: when a factory
-  name matches its module, import from the module: `from minilink.control.lqr import lqr`).*
+  leave the facade to a planned step — do not invent a name.
 - **4.3 Preconditions met by named adapters.** Never ask the user to write a separate model for
   different tools. A tool requiring a linear model accepts any `System` via `linearize()`; a tool
   requiring discrete stepping accepts a continuous system via a discretization adapter; a tool
@@ -158,23 +145,19 @@ Systems-as-descriptions: CONSTITUTION.md §4.*
   `getattr` defaults inside the math. A tool that needs a box asks the set
   (`X.bounding_box()`); it does not `isinstance` the set. The one `isinstance` on a set is the
   lowering at the solver boundary: a singleton to an equality residual, a box to decision bounds.
-- **4.4 Parameter override rule:** `params is None` resolves to the system's default parameters.
-  Any provided `params` dictionary replaces them entirely (never write `params or self.params`).
-- **4.5 Unconnected input ports are silent.** Unconnected inputs automatically read their nominal
-  values without emitting warnings or errors.
+- **4.4 Parameter override rule.** Does `params is None` resolve to the defaults and any
+  dictionary replace them, never `params or self.params`? Contract: DESIGN §4, 'Parameters'.
+- **4.5 Unconnected input ports are silent.** Does an unwired input read its nominal value
+  without a warning or an error? Contract: DESIGN §5.
 - **4.6 Libraries are silent.** Library functions and classes must never `print()`, except when
   an explicit `verbose=True` argument is passed. Delete debug scaffolding before handoff.
 - **4.7 Unified flag names.** Standardize parameter names across tools (e.g., use `verbose`,
   `solver`, `compile_backend`). Unify the *name*, not the format: `verbose=True` keeps the
   framed simulation panel.
-- **4.8 Diagram connection operators and feedback topologies:** Operators provide rapid algebraic
-  composition: `>>` for series cascade, `+` for parallel sum, and `@` for feedback closure.
-  While `@` provides rapid synthesis for standard negative feedback loops (`controller @ plant`),
-  systems support multiple feedback topologies (unity feedback, sensor dynamics, observer loops,
-  MIMO architectures) composed via operator chaining or explicit wiring through `DiagramSystem.connect()`
-  and `feedback()`. Those five entry points are the whole continuous wiring dialect. The sibling
-  hybrid algebra adds one operator, `block % schedule`, which returns a `Computer`; it is not a
-  sixth way to wire a flow diagram. Do not add a seventh.
+- **4.8 Diagram connection operators and feedback topologies.** Does it add a way to wire a
+  diagram beside `>>`, `+`, `@`, `DiagramSystem.connect()` and `feedback()`, or a hybrid
+  operator beside `%`? Law: CONSTITUTION §6, 'Composition grammar is frozen early'; operator
+  semantics: DESIGN §4, `DiagramSystem`.
 - **4.9 Canonical port terminology:** Prefer these names when they fit; this is not a rename sweep.
   Custom and multi-channel port names remain fully valid.
   - Inputs: `u` (control action / actuation), `r` (reference / setpoint), `w` (disturbance / exogenous input), `v` (measurement noise).
@@ -183,8 +166,8 @@ Systems-as-descriptions: CONSTITUTION.md §4.*
   validate port existence and dimensional compatibility at wiring time, failing with explicit
   error messages naming the mismatched ports and blocks. This rule covers wiring, not `f`/`h`
   return-shape checks at ODE time.
-- **4.11 Build vs run.** Wiring, validation, and `compile()` freeze diagram structure.
-  Runtime stepping must not mutate topology.
+- **4.11 Build vs run.** Does runtime stepping mutate what wiring and `compile()` froze? Law:
+  CONSTITUTION §6, 'Build vs run'.
 - **4.12 Defaults that change the mathematics are announced.** When a tool fills in a value
   that changes what is optimized or reported (a discount, a horizon, a tolerance), it warns
   once with `warnings.warn`, stating the consequence in domain units (an effective horizon in
@@ -196,22 +179,22 @@ Systems-as-descriptions: CONSTITUTION.md §4.*
 
 *Reading Minilink source code should feel like reading an engineering textbook.*
 
-- **5.1 Bare signatures in equation paths:** Do not put type hints inside $f, h, tf$, port
-  computations, or any other native-array equation path (`Set.margin`, `CostFunction.g` / `h`,
-  `Field.value`, `Shape.sdf`, `Distribution.sample`). Document expected array shapes and physical units clearly in the NumPy-style docstring.
-  Type hints belong on class constructors, public methods, and tool orchestrators.
+- **5.1 Bare signatures in equation paths:** An equation path is a method CONSTITUTION §2
+  names ('One signature') or one of DESIGN §4's additions ('Native-array equation rule').
+  Do not put type hints inside one. Document expected array shapes and physical units clearly
+  in the NumPy-style docstring. Type hints belong on class constructors, public methods, and
+  tool orchestrators.
 - **5.2 The `xp` idiom for hybrid NumPy/JAX:** Immediately after unpacking parameters in any
-  equation path ($f$, $h$, `margin`, `g`, `value`, `sdf`, ...), bind the array module:
+  equation path (5.1), bind the array module:
   ```python
   xp = array_module(x)
   ```
   Write the subsequent mathematical algebra using `xp` so the exact same equation path executes
   on both NumPy and JAX arrays without branching.
-- **5.3 Three beats in an equation path; no `self.` in math lines:** Every native-array
-  equation method (`f`, `h`, `g`, `margin`, `value`, `sdf`, `forward_dynamics`, …) and
-  every algorithm body (analysis tools, design functions, planners, solvers, learning
-  updates) is three beats, with a blank line between them so the core equation is the thing the
-  eye lands on:
+- **5.3 Three beats in an equation path; no `self.` in math lines:** Every equation path
+  (5.1), the model hooks it calls (`forward_dynamics`, …), and every algorithm body
+  (analysis tools, design functions, planners, solvers, learning updates) is three beats,
+  with a blank line between them so the core equation is the thing the eye lands on:
 
   1. **Unpack.** Bind `params`, split `x`, and copy `self.` fields into short textbook
      names. No `self.` remains in the algebra.
@@ -220,6 +203,15 @@ Systems-as-descriptions: CONSTITUTION.md §4.*
      The equation is never on the `return` line.
   3. **Output machinery.** Stack, wrap, or `return` the named result. This beat is
      plumbing, not the lesson.
+
+  **The math is the story.** The body shows every step of the algorithm in the order the
+  textbook derives it, with the textbook's symbols (`A, B, C, D`, `𝒞`, `𝒪`, `K`, `P`, `J`,
+  `π`, `n, m, p`). The linear algebra is part of it: a Kalman matrix, an SVD and its rank, a
+  basis and a projection, a Riccati solve, a Bellman backup are each a named line in the
+  body, never hidden in a helper. **The plumbing is not the story.** Array coercion, shape
+  normalization, default filling, validation, backend dispatch, caching and result
+  wrapping go to helpers under `# Internal machinery`, or to the unpack and output beats.
+  If a helper contains an equation from the textbook page, it is in the wrong place.
 
   ```python
   # Good — the comment is the implicit form; the code is the solved assignment:
@@ -245,12 +237,12 @@ Systems-as-descriptions: CONSTITUTION.md §4.*
 
   # Bad — a textbook step hidden in a helper: the SVD, rank and basis of the
   # Kalman decomposition are the lesson, so they belong in the body:
-  T_c = _orthonormal_range(ctrb, tol)
+  T_c = orthonormal_range(ctrb, tol)
 
-  # Good — each step a named line; only the default tolerance is plumbing:
-  # 𝒞 = U Σ Vᵀ, keep the r directions with σᵢ > tol·σ₁
+  # Good — each step a named line, the tolerance included:
+  # 𝒞 = U Σ Vᵀ, keep the r directions with σᵢ > tol σ₁
   U, sigma, _ = np.linalg.svd(ctrb)
-  r = int(np.sum(sigma > _rank_tol(ctrb, sigma, tol)))
+  r = int(np.sum(sigma > tol * sigma.max(initial=0.0)))
   T_c = U[:, :r]
   ```
 - **5.4 Mathematical naming conventions:**
@@ -260,10 +252,8 @@ Systems-as-descriptions: CONSTITUTION.md §4.*
   - A symbol keeps one meaning within an object, and one meaning across the codebase wherever
     the literature allows: `A` is the state matrix, `rho` the discount rate, `z` the policy
     features. Name a local that would collide by its role (`advantage`, `ratio`, `eps`)
-    rather than reusing the symbol. The textbook's own overloads across objects (`h`: output
-    map on a `System`, terminal cost on a `CostFunction`; `g`: running cost, gravity vector,
-    NLP inequality; `B`, `C`: mechanical vs state-space) are inherited, listed in DESIGN §4 as
-    a closed list, and never added to.
+    rather than reusing the symbol. The textbook's own overloads across objects are
+    inherited and never added to: the closed list is DESIGN §4, 'Notation collisions'.
 - **5.5 Format 2D array literals row by row:** Align matrices visually using `# fmt: off` and
   `# fmt: on` to ensure equations remain readable at a glance:
   ```python
@@ -284,10 +274,13 @@ Systems-as-descriptions: CONSTITUTION.md §4.*
   grows reads as named steps: helpers below return values and `__init__` assigns them, so every
   attribute is still visibly set there. Attributes that only one branch fills start as `None`
   before the branch.
-- **5.8 No leading-underscore pseudo-privacy on public classes:** Do not mark methods with a leading
-  underscore (`_`) on `System`, `Facade`, or `Simulator` classes. Separate public interfaces from
-  internal machinery using standard file section comments (`# Public API` and `# Internal machinery`).
-  Reserve leading underscores for module-level private constants and purely local closures.
+- **5.8 No leading-underscore pseudo-privacy:** Do not mark a method or a function internal with
+  a leading underscore (`_`): not on the `System`, facade and simulator classes, not on
+  planners and tools, not on module-level helpers (`check_poles`, never `_check_poles`).
+  Separate public interfaces from internal machinery using standard file section comments
+  (`# Public API` and `# Internal machinery`). Reserve leading underscores for module-level
+  private constants and purely local closures. Existing underscore helpers migrate under
+  workboard step S68, which widens the check to the whole repo with a shrinking allowlist.
 - **5.9 The first-screen rule:** The module docstring and primary class definition must appear within
   the first screen (~50 lines). Place complex validation and helper machinery below.
 - **5.10 Standard module section order:**
@@ -301,7 +294,7 @@ Systems-as-descriptions: CONSTITUTION.md §4.*
   Heavy ceremony and validation belong in helper functions below.
 - **5.12 Backend imports come from `minilink.core.backends`:** Never import from `minilink.core.compile`
   inside the system libraries (`blocks/`, `dynamics/`, `control/`, `estimation/`). Use
-  `require_jax_numpy()`, `array_module()`, and `require_scipy()` from `core.backends`. Tools that
+  `require_jax_numpy()` and `array_module()` from `core.backends`. Tools that
   compile a system for a living (`simulation/`, `analysis/`) import the compiler directly. A
   JAX-only function opens with one binding line, `jax, jnp = require_jax(), require_jax_numpy()`,
   never a bare `import jax`; the lazy-import rule (5.20) keeps that line inside the function.
@@ -320,16 +313,19 @@ Systems-as-descriptions: CONSTITUTION.md §4.*
   non-performance analytical paths—standard Python `if` branching is fully supported and welcomed
   if it enhances pedagogical clarity.
 - **5.16 Two-audience files:** Write each file for its primary reader. Student-facing modules
-  (`core/system.py`, `blocks/`, `dynamics/`, `control/`) read like a textbook. Library-developer
-  modules (`core/compile/`, evaluators) may carry compiler machinery.
-- **5.17 Native-array equation paths:** Keep every equation path (the list of 5.1) on native
-  arrays, traceable in every argument, `params` included; convert at API boundaries only.
+  (`core/system.py`, `blocks/`, `dynamics/`, `control/`) and every algorithm (analysis tools,
+  controller and observer design, planners, solvers, learning updates) read like a textbook;
+  the reference is `planning/policy_synthesis/dp.py`. Library-developer modules
+  (`core/compile/`, evaluators) may carry compiler machinery.
+- **5.17 Native-array equation paths:** Does an equation path (5.1) convert its arrays inside,
+  or stop tracing in an argument, `params` included? Contract: DESIGN §4, 'Native-array
+  equation rule'.
 - **5.18 `__main__` hello-worlds:** Core modules may ship a `__main__` smoke that constructs the
   class and runs it once. Keep it short enough to read at a glance, and stop where the teaching
   starts: a smoke that grows plots, sweeps, or commentary has become a demo and belongs under
   `examples/`. Do not add plant-only demo scripts whose only job is to smoke a catalog class.
-- **5.19 JAX float64 by default:** JAX evaluators enable 64-bit floats on construction;
-  `MINILINK_JAX_X64=0` opts out. Tools never require the caller to call `configure_jax` first.
+- **5.19 JAX float64 by default:** Does a tool require the caller to call `configure_jax`
+  first? Policy: DESIGN §1, 'Precision policy'.
 - **5.20 Match the neighborhood:** Change only what the task requires. Public APIs use type hints
   and NumPy docstrings except in equation paths (rule 5.1). Lazy optional imports. Prefer a low
   helper count in math tools; inline single-use helpers.
@@ -347,12 +343,18 @@ Systems-as-descriptions: CONSTITUTION.md §4.*
   textbook (`dx = A @ x + B @ u`, `g = dx.T @ Q @ dx + du.T @ R @ du`,
   `H = xp.array([[m * l**2 + I]])`) — the name and the blank lines still highlight
   it. Never put the equation on `return`; never put it in a module or method
-  docstring. Apply this to new math; when restyling an existing path (only if the
-  maintainer asks), use the three beats of rule 5.3.
+  docstring. Apply this to new math and to every math line you edit, without being
+  asked; restyling a whole function or module you did not otherwise touch waits for a
+  picked step, and then uses the three beats of rule 5.3.
 - **5.23 No preamble walls.** A module or demo opens with a one-line title docstring. Do not
   add a long introduction, section map, run recipe, or flag explanation at the top — the
   code plus inline comments must tell the story. Notebooks are course material: do not
   trim their markdown unless asked.
+- **5.24 Docstrings and comments are timeless.** They state the math and the contract as a
+  textbook would. They never name the design process (step ids, audits, dates, "decided",
+  "landed"), the course or its exercises, or what another library refuses; that history
+  lives in `docs/plans/`, `docs/reviews/` and the git log. The same holds for test
+  docstrings and comments.
 
 ---
 
@@ -390,29 +392,27 @@ Systems-as-descriptions: CONSTITUTION.md §4.*
   Colab (CPU runtime) and on a standard student laptop without external C++ build chains,
   proprietary licenses, or specialized GPU hardware. Keep the main teaching path short; a hard
   wall-clock cap is not the rule (trajopt and RL cells may take longer).
-- **6.8 Demo-gate maturity.** Nothing enters the teaching surface without a demo or notebook,
-  a both-backends test where it defines dynamics, and a docstring (ROADMAP.md §2).
+- **6.8 Demo-gate maturity.** Does it meet the teaching surface's entry rule before it enters?
+  Contract: ROADMAP §2.
 - **6.9 Public-facing prose is foundational, not a bake-off.** README, the three showcases,
   and the docs landing page stay positive about minilink and never name
   other tools. Framing: minilink bridges capabilities that usually live in separate tools.
-  No superlatives; quote measured notebook batches, never a per-call speedup. The main
+  No superlatives; speed claims follow DESIGN §5 (batches, never a per-call ratio). The main
   line is readable by an undergraduate; expert depth sits in short "under the hood"
   asides. GIF assets stay under 1 MB
-  and use catalog plant framing (the MPC clip may follow the car). Before pushing those
-  files, `grep -rniE "simulink|matlab|drake|casadi|mujoco"` over README and the
-  showcase notebook markdown must be empty (the `-E` matters: without it the alternation is
-  literal and the gate passes on anything). `test_repo_contract.py` runs the same check.
+  and use catalog plant framing. The no-other-tool rule
+  is enforced by `tests/unittest/test_repo_contract.py`.
 - **6.10 Flat demos.** No functions or classes in a demo or a teaching notebook except the
   model or cost it is about (its `f`, `h`, `g`) and a step the notebook's text teaches by hand
   (a hand-written RK4, a policy-gradient update). No wiring, tuning or plotting helpers, no
   configuration dictionaries feeding them, no `main()`, no `try / except ImportError` around
-  plots (6.2). A loop over variants is fine; a factory is not.
+  plots. A loop over variants is fine; a factory is not.
 - **6.11 Side work is quarantined.** A custom plot or a side analysis that earns its place is
   its own cell in a notebook, or its own block at the end of a script under one comment line.
   It never interleaves with the API lines, and the demo still reads with that cell removed.
 - **6.12 Cheap rules are tests.** When a rule can be checked by an AST walk or a grep, the
   check lands with the rule (`test_teaching_imports.py`, `test_repo_contract.py`, the
-  set-probe and flat-demo checks).
+  set-probe check).
 - **6.13 `print` is rare; a teaching cell stays readable.** A demo *script* is the API
   sequence, then a native plot or `animate`. A notebook splits that (6.14). `print` is
   not how the student is shown what happened. Use it only when the number is the lesson
@@ -467,8 +467,9 @@ Systems-as-descriptions: CONSTITUTION.md §4.*
   neighborhood; change only what the task requires.
 - **7.6 Cross-link sparingly.** Every link is a maintenance edge: renames and section
   moves break them (`tests/unittest/test_repo_contract.py` checks the links of the
-  governance documents and `docs/plans/`, nothing else). Link on first mention only, and
-  only when the reader must open the target to act. Otherwise name the document in
+  governance documents, `README.md`, `install.md`, the `examples/`, `tests/` and
+  `benchmarks/` READMEs, and `docs/plans/`; not `docs/reviews/`). Link on first mention
+  only, and only when the reader must open the target to act. Otherwise name the document in
   plain text. Documents meant to be read top to bottom (principle lists, the
   constitution) aim for zero links. A table of "related documents" inside a doc
   usually means the content is in the wrong file. Do not weave "see also" tables,

@@ -66,7 +66,8 @@ one of these quantities takes or returns the object, never its arrays:
 - `PlanningProblem` — a system, its sets, a cost and a horizon; the stochastic sibling adds
   distributions over starts, parameters and disturbances.
 - `PlanningSolution` — a policy, itself a `System`, and the evidence for it.
-- `MathematicalProgram` — the one NLP shape every transcription lowers to.
+- `MathematicalProgram` — the one NLP shape every transcription lowers to; its parametric
+  form, with the problem's parameters as an input, is the same shape.
 
 **Lower late.** A tool carries these objects to the solver boundary and converts to arrays
 there, once.
@@ -83,8 +84,8 @@ parameter family reach any object the way they reach `f`. An object that does no
 1. **Everything that can be viewed as a system is a System.** Plants, controllers, observers,
    filters, neural policies, and flow diagrams share the identical object model. One seam
    stands open: the sampled-loop containers `Computer` and `HybridDiagram` are not Systems,
-   though `StepSystem` and `StepDiagramSystem` are. Closing it is a v1.0 question in the
-   ROADMAP review queue, not a licence to open a second one.
+   though `StepSystem` and `StepDiagramSystem` are. Closing it is an open ROADMAP §6
+   decision, not a licence to open a second one.
 2. **Functional purity in equation paths.** Arrays in, arrays out. Equation paths — $f$, $h$,
    and the equation methods of sets, costs, fields, shapes and distributions (`margin`, `g`,
    `h`, `value`, `sdf`, `sample`) — have no internal mutable state, no cached side effects,
