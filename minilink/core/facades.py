@@ -417,12 +417,9 @@ class SharedSystemFacades:
         ``native=True`` (default) drives each backend's own animation
         engine (matplotlib ``FuncAnimation`` / meshcat ``Animation``).
         Pass ``native=False`` to fall back to the per-frame Python-loop
-        playback (useful for debugging or when the native path's limitations
-        matter — e.g. meshcat freezes per-frame dynamic geometry such as an
-        ``Arrow`` length/direction or ``TorqueArrow`` sweep; see ``DESIGN.md``
-        §4.7). ``camera`` accepts an
-        optional override (a constant 4x4 or a ``camera(frames, x, u, t)``
-        callable). ``save=True`` writes the backend's file: a Pillow GIF
+        playback (useful for debugging; see ``DESIGN.md`` §4.7). ``camera``
+        accepts an optional override (a constant 4x4 or a
+        ``camera(frames, x, u, t)`` callable). ``save=True`` writes the backend's file: a Pillow GIF
         for ``renderer="matplotlib"`` (``{file_name}.gif`` when the name has
         no ``.gif`` suffix), or a self-contained HTML page of the native
         Meshcat animation for ``renderer="meshcat"`` (``{file_name}.html``

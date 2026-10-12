@@ -651,10 +651,11 @@ One line each; open a plan doc only when a design needs a writeup.
   where diagram params are validated): today a typo or a retired key in any block's params is
   ignored silently; a question for the whole library.
 - A 3-D still of any animation: `save_frame(t)` on the meshcat renderer writes the static
-  HTML of one frame, and a headless screenshot of that page is then a one-liner for docs and
-  CI. With it, two camera notes for S43: the default meshcat eye sits low so the viewer's
-  grid reads as horizon lines, and an overlay (a track corridor) drives the auto-fit camera,
-  so a follow camera cannot zoom on the car; overlays should opt out of the fit as the ground
-  lines already do.
+  HTML of one frame. The headless screenshot side exists: `docs/asset_export.py::html_to_gif`
+  seeks an exported page frame by frame, so a still is one `seek` and one screenshot. With it,
+  two camera notes for S43: the default meshcat eye sits low so the viewer's grid reads as
+  horizon lines, and an overlay (a track corridor) drives the auto-fit camera, so a follow
+  camera cannot zoom on the car; overlays should opt out of the fit as the ground lines
+  already do.
 - Declined (do not re-propose): scalar / list signal bounds and a coercing `x0`; scalar `Q` /
   `R` / `S` in `QuadraticCost.from_system`.

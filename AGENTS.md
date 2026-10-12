@@ -68,7 +68,7 @@ A change that breaks this rule is not done, even when the tests pass.
 | docs/plans/TODO.md | The workboard: every open step of ROADMAP §5, by rung, with files and "done when"; Later ideas at the end |
 | docs/plans/ | Design writeups for steps that need one (delete a plan doc once it lands; the index there says which rung each serves) |
 | docs/plans/pyro-port-remaining.md | Pyro parity rows when library or demos land |
-| docs/ | Sphinx autodoc of the teaching-lane API (`docs/api/`, `docs/index.rst`); `experimental/` is repo-only and not on the site. The user guide is `examples/tutorial/`. README GIFs and diagram PNG from `docs/make_assets.py` (`ur5_meshcat.gif` is a screen recording, not rebuilt) |
+| docs/ | Sphinx autodoc of the teaching-lane API (`docs/api/`, `docs/index.rst`); `experimental/` is repo-only and not on the site. The user guide is `examples/tutorial/`. Every README figure (the showcase GIFs, their interactive 3-D pages in `docs/_static/showcase/`, the diagram PNG, `bridges.svg`) is built by `docs/make_assets.py`; the 3-D GIFs are screenshots of those pages and need Playwright with Chromium, a build-only tool |
 | tests/README.md | Marker policy, test philosophy, **entry points (human · agent · CI)** |
 | docs/reviews/ | Dated architecture audits and the interview decision records; read-only history, never a backlog |
 

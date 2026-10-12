@@ -274,12 +274,12 @@ class Animator:
 
         Notes
         -----
-        Meshcat native animation only keyframes rigid pose (position+quaternion).
-        Per-frame dynamic geometry (e.g. ``Arrow`` length/direction,
-        ``TorqueArrow`` sweep, ``CustomLine`` trails / horizons) is frozen at
-        ``t=0`` in the native path; use ``native=False`` for a live trail and
-        receding horizon. In 3-D, Meshcat draws line primitives as thin ribbons
-        so matplotlib dash styles and widths remain visible.
+        Meshcat native animation keyframes rigid poses (position+quaternion),
+        and plays geometry that changes (``Arrow`` length/direction,
+        ``TorqueArrow`` sweep, ``CustomLine`` trails / horizons) as a flipbook
+        of pages, each shown over its own frames. In 3-D, Meshcat draws line
+        primitives as thin ribbons so matplotlib dash styles and widths remain
+        visible.
 
         Plotly does not support the per-frame Python loop (``native=False`` with
         ``html=False``): use ``native=True`` or ``html=True`` for inline/browser
