@@ -756,12 +756,12 @@ class TestRoboticWrappers(unittest.TestCase):
         arm = SpeedControlledManipulator.from_manipulator(FiveLinkPlanarManipulator())
         ref_p = Source(2)
         ref_p.params["value"] = np.array([1.0, 1.0])
-        ref_q = Source(5)
+        ref_q = Source(5, port="r_null")
         ref_q.params["value"] = np.array([-1.0] * 5)
         ctl = TaskKinematicNullspace(arm, Kp=[1.0, 1.0], K_null=[10.0] * 5)
         diagram = (ref_q + (ref_p >> ctl @ arm)).autowire(strict=True)
         self.assertEqual(diagram.connections["ctl"]["r"][1], "y")
-        self.assertEqual(diagram.connections["ctl"]["r_null"][1], "y")
+        self.assertEqual(diagram.connections["ctl"]["r_null"][1], "r_null")
         self.assertNotEqual(
             diagram.connections["ctl"]["r"][0], diagram.connections["ctl"]["r_null"][0]
         )
