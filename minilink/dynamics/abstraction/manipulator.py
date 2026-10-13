@@ -113,14 +113,14 @@ class Manipulator(MechanicalSystem):
 
         Uses ``scipy.optimize.fsolve`` when ``task_dim == dof`` and no joint
         bounds apply; otherwise ``scipy.optimize.least_squares``. Returns one
-        solution near ``q_guess`` (default: nominal ``q`` output).
+        solution near ``q_guess`` (default: the nominal state's ``q``).
         """
         import numpy as np
         from scipy.optimize import fsolve, least_squares
 
         p_d = np.asarray(p_d, dtype=float).reshape(-1)
         if q_guess is None:
-            q_guess = np.asarray(self.outputs["q"].nominal_value, dtype=float)
+            q_guess = np.asarray(self.state.nominal_value[: self.dof], dtype=float)
         else:
             q_guess = np.asarray(q_guess, dtype=float)
         q_guess = q_guess.reshape(-1)

@@ -183,7 +183,7 @@ def resolve_hybrid_feedback_ports(
 
     controller = _computer_leaf(computer_side)
     plant_leaf = _plant_leaf(plant)
-    wiring = resolve_standard_feedback(controller, plant_leaf, diagram=None)
+    wiring = resolve_standard_feedback(controller, plant_leaf)
     return (
         wiring.control_out,
         wiring.measurement_in,

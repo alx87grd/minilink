@@ -16,7 +16,7 @@ class ComputedTorqueController(System):
     Desired acceleration ``qdd = Kp (q_d - q) + Kd (dq_d - dq)`` (regulation
     uses ``dq_d = 0``), then ``τ = inverse_dynamics(q, dq, qdd)``.
 
-    Wire ``y`` from ``[q; dq]`` (``closed_loop`` / ``closed_loop_qdq``); reference
+    ``y`` is the plant's state ``[q; dq]`` (``ctl @ plant``); reference
     ``r`` is ``q_d`` (dim ``dof``) or stacked ``[q_d; dq_d]`` when
     ``tracking_ref=True``.
 

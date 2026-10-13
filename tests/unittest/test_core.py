@@ -94,7 +94,7 @@ from minilink.blocks.nonlinear import Saturation
 from minilink.blocks.sources import Step, WhiteNoise
 from minilink.control.impedance import ImpedanceController
 from minilink.control.output import ProportionalController
-from minilink.core.composition import closed_loop, closed_loop_qdq
+from minilink.core.composition import closed_loop
 from minilink.core.diagram import DiagramSystem
 from minilink.dynamics.abstraction.mechanical import MechanicalSystem
 from minilink.dynamics.catalog.manipulators.arms import TwoLinkManipulator
@@ -359,29 +359,25 @@ class TestDiagramCompositionShortcuts(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "neither an open input nor an output"):
             Integrator().__add__(Integrator()).expose("bogus")
 
-    def test_closed_loop_qdq_inserts_mux(self):
-        diagram = closed_loop_qdq(ImpedanceController(), Pendulum())
-        self.assertIn("mux", diagram.subsystems)
-        self.assertEqual(diagram.connections["ctl"]["y"], ("mux", "y"))
-        self.assertEqual(diagram.connections["mux"]["in0"], ("sys", "q"))
-        self.assertEqual(diagram.connections["mux"]["in1"], ("sys", "dq"))
+    def test_closed_loop_reads_the_mechanical_state_straight(self):
+        plant = Pendulum()
+        self.assertNotIn("q", plant.outputs)
+        self.assertNotIn("dq", plant.outputs)
+        diagram = closed_loop(ImpedanceController(), plant)
+        self.assertNotIn("mux", diagram.subsystems)
+        self.assertEqual(diagram.connections["ctl"]["y"], ("sys", "y"))
 
-    def test_closed_loop_qdq_two_link_requires_matching_controller_dim(self):
-        with self.assertRaisesRegex(ValueError, "feedback='qdq' expects"):
-            closed_loop_qdq(ImpedanceController(dof=1), TwoLinkManipulator())
-
-    def test_closed_loop_qdq_two_link(self):
-        diagram = closed_loop_qdq(ImpedanceController(dof=2), TwoLinkManipulator())
-        self.assertIn("mux", diagram.subsystems)
-
-    def test_closed_loop_auto_uses_mux_for_augmented_plant(self):
-        diagram = closed_loop(ImpedanceController(), AugmentedMechanicalPlant())
-        self.assertIn("mux", diagram.subsystems)
-        self.assertEqual(diagram.connections["ctl"]["y"], ("mux", "y"))
-
-    def test_closed_loop_feedback_y_raises_on_dim_mismatch(self):
+    def test_closed_loop_two_link_requires_matching_controller_dim(self):
         with self.assertRaisesRegex(ValueError, "Cannot wire closed-loop feedback"):
-            closed_loop(ImpedanceController(), AugmentedMechanicalPlant(), feedback="y")
+            closed_loop(ImpedanceController(dof=1), TwoLinkManipulator())
+        diagram = closed_loop(ImpedanceController(dof=2), TwoLinkManipulator())
+        self.assertEqual(diagram.connections["ctl"]["y"], ("sys", "y"))
+
+    def test_closed_loop_refuses_an_augmented_plant_without_a_matching_y(self):
+        with self.assertRaisesRegex(ValueError, "'y' output has dim 3"):
+            closed_loop(ImpedanceController(), AugmentedMechanicalPlant())
+        with self.assertRaises(TypeError):
+            closed_loop(ImpedanceController(), Pendulum(), feedback="qdq")
 
 
 from minilink.core.composition import closed_loop, resolve_standard_feedback

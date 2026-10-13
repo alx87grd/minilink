@@ -4,7 +4,6 @@ import numpy as np
 
 from minilink.blocks.sources import Step
 from minilink.control.robotic import JointImpedance
-from minilink.core.composition import closed_loop_qdq
 from minilink.dynamics.catalog.manipulators import UR5Manipulator
 
 STEP_TIME = 1.0
@@ -21,7 +20,7 @@ ctl = JointImpedance(arm, gravity_comp=True)
 ctl.params["Kp"] = np.array([10.0, 60.0, 20.0, 0.5, 0.1, 0.003])
 ctl.params["Kd"] = np.array([3.0, 25.0, 8.0, 0.2, 0.05, 0.003])
 
-diagram = ref >> closed_loop_qdq(ctl, arm)
+diagram = ref >> ctl @ arm  # the arm's y is its state [q; dq]
 diagram.plot_diagram()
 diagram.compute_trajectory(tf=TF, n_steps=240, compile_backend="jax")
 diagram.plot_trajectory()

@@ -1945,5 +1945,5 @@ class TestSensitivity(unittest.TestCase):
         plant, C = Pendulum(), PID(4.0, 2.0, 0.5)
         with self.assertRaisesRegex(ValueError, "plant 'Pendulum' must be SISO"):
             sensitivity(plant=plant, controller=C)
-        H = transfer_function(plant, of="q")
+        H = transfer_function(plant, of=("y", 0))
         self.assertEqual(sensitivity(plant=H, controller=C).n, 4)

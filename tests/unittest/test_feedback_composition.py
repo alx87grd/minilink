@@ -144,19 +144,15 @@ class TestJunction(unittest.TestCase):
                 ):
                     (StateFeedbackController(K) >> Saturation()) @ plant
 
-    def test_unknown_or_unused_keywords_are_refused(self):
+    def test_a_number_or_a_port_keyword_is_refused(self):
         from minilink import closed_loop
 
-        with self.assertRaisesRegex(ValueError, "feedback must be one of"):
-            closed_loop(PID(), Pendulum(), feedback="bogus")
         with self.assertRaisesRegex(TypeError, "needs a plant on the right"):
             closed_loop(Integrator(), 2.0)
-        with self.assertRaisesRegex(ValueError, "feedback not honoured"):
-            closed_loop(PID(), Pendulum(), feedback="qdq")
-        with self.assertRaisesRegex(ValueError, "plant_output_port not honoured"):
-            closed_loop(PID(), Pendulum(), plant_output_port="x")
-        with self.assertRaisesRegex(ValueError, "output_port not honoured"):
-            closed_loop(PID(), Pendulum(), output_port="z")
+        for keyword in ("feedback", "plant_output_port", "output_port", "ref_port"):
+            with self.subTest(keyword=keyword):
+                with self.assertRaises(TypeError):
+                    closed_loop(PID(), Pendulum(), **{keyword: "y"})
 
     def test_two_port_wiring_is_unchanged(self):
         T = ImpedanceController() @ Pendulum()
@@ -223,8 +219,8 @@ class TestSeriesRule(unittest.TestCase):
         two_outputs.add_subsystem(Pendulum(), "plant")
         two_outputs.add_input_port("u", dim=1)
         two_outputs.connect("input", "u", "plant", "u")
-        two_outputs.connect_new_output_port("plant", "q", "q")
-        two_outputs.connect_new_output_port("plant", "dq", "dq")
+        two_outputs.connect_new_output_port("plant", "y", "angles")
+        two_outputs.connect_new_output_port("plant", "x", "state")
         with self.assertRaisesRegex(ValueError, "Cannot choose what comes back"):
             feedback(two_outputs)
 

@@ -204,8 +204,8 @@ constant-matrix convenience built from `A, B, C, D` arrays (introspect via
 `sys.A()`). Catalog names: `Pendulum`, `CartPole`,
 `DynamicBicycle`. **`Manipulator`** (`MechanicalSystem` + task ports `p`, `pdot`;
 methods `forward_kinematics`, `J`, `inverse_kinematics`) is the catalog base for
-serial arms. Joint impedance / task impedance / computed torque use
-``closed_loop_qdq`` or ``feedback="auto"``; see `control/robotic.py` and
+serial arms. Joint impedance / task impedance / computed torque read the
+plant's `y = [q; dq]` straight (`ctl @ plant`); see `control/robotic.py` and
 `control/modelbased.py`. Mixed inputs → named ports + concrete allocation hooks; no
 `WithPositionInputs` inheritance branches.
 
@@ -488,15 +488,15 @@ loop nested with `add_subsystem` therefore declares what the same leaf would, an
 closing an outer loop around it is not a false algebraic loop.
 
 Shortcuts (`core.composition`): `+` flat add only, `>>` series, `@` closed loop
-(with ``closed_loop(..., feedback="auto"|"y"|"qdq")`` and ``closed_loop_qdq``;
-``closed_loop(C, plant, r=True, w=False, v=False)`` exposes the reference, a load
+(``closed_loop(C, plant, r=True, w=False, v=False)`` is `@` with options, and has
+no port-name keyword: it exposes the reference, a load
 disturbance ``w`` summed into the plant input and a measurement noise ``v`` summed into
 the measurement, each through a visible `Sum` block; `@` keeps the single input ``r``),
 `autowire()` connects by name only: each unconnected input takes the one output
 with the same name and size, an output may feed several inputs, and an input
 with no match or several stays open and is listed in a warning (`strict=True`
 raises); a disturbance `d` or a noise `n` left open reads its nominal value
-silently. It **never inserts a Mux**; `feedback="qdq"` or `closed_loop_qdq` do.
+silently. It never inserts a block.
 Sources name their signal at creation (`Step(port="r")`), blocks their ports
 with `rename_ports` (the renames of one call apply at once; a collision with an
 untouched port is refused). Diagram operands are flattened, not nested.
@@ -606,9 +606,9 @@ The port names drive three tools:
 
 - **`@` composition** reads `block_roles` (`resolve_standard_feedback` and the
   hybrid `default_computer_boundary_ports`): a block that reads `y` closes on
-  the plant's `y`, one that reads `x` on its `x`, with a `Mux(q, dq)` when the
-  measurement is the `[q; dq]` of a mechanical plant; dimensions are a check,
-  never a choice.
+  the plant's `y`, one that reads `x` on its `x` (a mechanical plant's `y` is
+  its state `[q; dq]`, read straight); dimensions are a check, never a
+  choice.
 - **`plot_control_law()`** on every `System`, beside the generic
   `plot_input_output_map()`. There are no controller base classes: a
   controller is a `System`, or a `DynamicSystem` when it has state, and the

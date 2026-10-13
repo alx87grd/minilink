@@ -32,7 +32,6 @@ _EXPORTS: dict[str, tuple[str, str]] = {
     "BoxSet": ("minilink.core.sets", "BoxSet"),
     "BoxInputSet": ("minilink.core.sets", "BoxInputSet"),
     "BallSet": ("minilink.core.sets", "BallSet"),
-    "closed_loop_qdq": ("minilink.core.composition", "closed_loop_qdq"),
     "SingletonSet": ("minilink.core.sets", "SingletonSet"),
     # distributions
     "Distribution": ("minilink.core.distributions", "Distribution"),

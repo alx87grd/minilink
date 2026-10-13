@@ -20,8 +20,6 @@ from minilink.core.diagram import DiagramSystem
 from minilink.core.feedback import block_roles, check_reserved_id, command_port
 from minilink.core.system import System
 
-_VALID_FEEDBACK = frozenset({"auto", "y", "qdq"})
-
 #: Inputs that read their nominal value when left open, without a word from
 #: autowire: a plant's disturbance and measurement noise.
 _NOMINAL_WHEN_OPEN = frozenset({"d", "n", "w", "v"})
@@ -268,22 +266,6 @@ def _command_entry(sys) -> str:
         ) from exc
 
 
-def refuse_unused_keywords(port_keywords):
-    """Refuse port and feedback keywords that an Error-junction loop does not read.
-
-    ``port_keywords`` maps each keyword to ``(value, default)``.
-    """
-    changed = [
-        name for name, (value, default) in port_keywords.items() if value != default
-    ]
-    if changed:
-        raise ValueError(
-            f"{', '.join(changed)} not honoured by the Error-block loop: an "
-            "error-driven block closes on its one input and returns y. Drop them, "
-            "or wire the loop with DiagramSystem.connect."
-        )
-
-
 def refuse_two_port_entry(block):
     """Refuse to drive ``block`` from an Error junction when it reads its own measurement.
 
@@ -352,25 +334,23 @@ def closed_loop(
     r: bool = True,
     w: bool = False,
     v: bool = False,
-    ref_port: str = "r",
-    measurement_port: str = "y",
-    control_port: str = "u",
-    plant_input_port: str = "u",
-    plant_output_port: str = "y",
-    output_port: str = "y",
-    feedback: str = "auto",
     validate: bool = True,
 ) -> DiagramSystem:
     """Build a controller/plant feedback diagram — the ``controller @ plant`` operator.
 
     Two layouts, one rule "A drives B and B's output returns to A":
 
-    - a controller with a measurement port (``r``, ``y`` → ``u``) is wired
-      the standard way, the measurement returning to ``y``;
+    - a controller with a measurement port (``r``, ``y`` → ``u``, or ``x``) is
+      wired the standard way, the plant output of the same name returning to
+      the measurement;
     - an error-driven block (:func:`~minilink.core.feedback.block_roles`: a
       compensator, a transfer function, a plant, a series diagram) gets an
       :class:`~minilink.blocks.routing.Error` block ``e = r - y`` inserted by
       :func:`feedback`.
+
+    The port names are the whole declaration: there is no port-name keyword.
+    A mechanical plant's ``y`` is its state ``[q; dq]``, read straight; a block
+    with other names is renamed (``rename_ports``) or wired by hand.
 
     ``@`` needs a plant on the right: :func:`feedback` closes an open loop on
     itself (``feedback(L)``, ``feedback(L, K)``).
@@ -389,43 +369,21 @@ def closed_loop(
         disturbance ``w`` summed into the plant input, and the measurement
         noise ``v`` summed into the measurement before it returns (both off by
         default). With ``r=False`` the reference reads its nominal value.
-    ref_port, measurement_port, control_port, plant_input_port, plant_output_port : str
-        Port names used for the standard feedback wiring.
-    feedback : str, optional
-        How to wire the controller measurement input: ``"auto"`` (default) tries
-        ``plant.y``, then Mux ``(q, dq)``, then ``plant.x``; ``"y"`` forces
-        ``plant.y``; ``"qdq"`` inserts ``Mux(q, dq) → controller.y``.
-    output_port : str, optional
-        Diagram boundary output name.
     validate : bool, optional
         If ``True``, run algebraic-loop detection before returning.
 
     Returns
     -------
     DiagramSystem
-        A diagram exposing the controller reference as input and plant output as
-        output.
+        A diagram exposing the controller reference as input and the plant
+        output as output.
     """
-    if feedback not in _VALID_FEEDBACK:
-        raise ValueError(
-            f"feedback must be one of {sorted(_VALID_FEEDBACK)!r}, got {feedback!r}"
-        )
-    port_keywords = {
-        "ref_port": (ref_port, "r"),
-        "measurement_port": (measurement_port, "y"),
-        "control_port": (control_port, "u"),
-        "plant_input_port": (plant_input_port, "u"),
-        "plant_output_port": (plant_output_port, "y"),
-        "output_port": (output_port, "y"),
-        "feedback": (feedback, "auto"),
-    }
     if not isinstance(plant, System):
         raise TypeError(
             "@ needs a plant on the right; to close an open loop on itself use "
             "feedback(L) or feedback(L, K)"
         )
     if block_roles(controller).error_driven:
-        refuse_unused_keywords(port_keywords)
         loop_gain = series(controller, plant)
         diagram, junction_id = _close_with_junction(loop_gain, validate=False)
         add_loop_inputs(diagram, plant, None, (junction_id, "-"), r=r, w=w, v=v)
@@ -444,51 +402,13 @@ def closed_loop(
     controller_id = _add_system_to_diagram(diagram, controller, role="ctl")
     plant_id = _add_system_to_diagram(diagram, plant, role="sys")
 
-    using_defaults = (
-        measurement_port == "y"
-        and plant_output_port == "y"
-        and control_port == "u"
-        and plant_input_port == "u"
+    wiring = resolve_standard_feedback(
+        controller, plant, controller_id=controller_id, plant_id=plant_id
     )
-    if feedback in ("auto", "qdq", "y") and using_defaults:
-        wiring = resolve_standard_feedback(
-            controller,
-            plant,
-            diagram,
-            feedback=feedback,
-            controller_id=controller_id,
-            plant_id=plant_id,
-        )
-    else:
-        wiring = resolve_standard_feedback(
-            controller,
-            plant,
-            diagram,
-            feedback=feedback,
-            measurement_in=measurement_port,
-            plant_out=plant_output_port,
-            control_out=control_port,
-            plant_in=plant_input_port,
-            controller_id=controller_id,
-            plant_id=plant_id,
-        )
     measurement_port = wiring.measurement_in
     plant_output_port = wiring.plant_out
     control_port = wiring.control_out
     plant_input_port = wiring.plant_in
-
-    _require_input(
-        controller,
-        measurement_port,
-        f"controller measurement port {measurement_port!r}",
-    )
-    _require_output(
-        controller, control_port, f"controller output port {control_port!r}"
-    )
-    _require_input(plant, plant_input_port, f"plant input port {plant_input_port!r}")
-    _require_output(
-        plant, plant_output_port, f"plant output port {plant_output_port!r}"
-    )
 
     _require_same_dim(
         controller.outputs[control_port].dim,
@@ -496,27 +416,20 @@ def closed_loop(
         f"{controller_id}:{control_port}",
         f"{plant_id}:{plant_input_port}",
     )
-    if wiring.mux_id is None:
-        _require_same_dim(
-            plant.outputs[plant_output_port].dim,
-            controller.inputs[measurement_port].dim,
-            f"{plant_id}:{plant_output_port}",
-            f"{controller_id}:{measurement_port}",
-        )
+    _require_same_dim(
+        plant.outputs[plant_output_port].dim,
+        controller.inputs[measurement_port].dim,
+        f"{plant_id}:{plant_output_port}",
+        f"{controller_id}:{measurement_port}",
+    )
 
-    if r and ref_port in controller.inputs:
-        ref = controller.inputs[ref_port]
-        _add_input_port_like(diagram, ref_port, ref)
-        diagram.connect("input", ref_port, controller_id, ref_port)
+    if r and "r" in controller.inputs:
+        _add_input_port_like(diagram, "r", controller.inputs["r"])
+        diagram.connect("input", "r", controller_id, "r")
 
-    if wiring.mux_id is not None:
-        diagram.connect(plant_id, "q", wiring.mux_id, "in0")
-        diagram.connect(plant_id, "dq", wiring.mux_id, "in1")
-        diagram.connect(wiring.mux_id, "y", controller_id, measurement_port)
-    else:
-        diagram.connect(plant_id, plant_output_port, controller_id, measurement_port)
+    diagram.connect(plant_id, plant_output_port, controller_id, measurement_port)
     diagram.connect(controller_id, control_port, plant_id, plant_input_port)
-    diagram.connect_new_output_port(plant_id, plant_output_port, output_port)
+    diagram.connect_new_output_port(plant_id, plant_output_port, "y")
 
     diagram.name = f"Closed loop {plant.name} with {controller.name}"
 
@@ -534,15 +447,6 @@ def closed_loop(
     if validate:
         diagram.check_algebraic_loops()
     return diagram
-
-
-def closed_loop_qdq(
-    controller: System,
-    plant: System,
-    **kwargs,
-) -> DiagramSystem:
-    """Build a closed loop with ``Mux(plant.q, plant.dq) → controller.y``."""
-    return closed_loop(controller, plant, feedback="qdq", **kwargs)
 
 
 def autowire(
@@ -973,18 +877,6 @@ def _default_input_port(sys) -> str:
     )
 
 
-def _require_input(sys, port_id: str, label: str) -> None:
-    if port_id not in sys.inputs:
-        ports = ", ".join(sys.inputs)
-        raise ValueError(f"Missing {label}; available input ports: {ports}")
-
-
-def _require_output(sys, port_id: str, label: str) -> None:
-    if port_id not in sys.outputs:
-        ports = ", ".join(sys.outputs)
-        raise ValueError(f"Missing {label}; available output ports: {ports}")
-
-
 def _require_same_dim(left_dim: int, right_dim: int, left_label: str, right_label: str):
     if left_dim != right_dim:
         raise ValueError(
@@ -1001,143 +893,54 @@ class StandardFeedbackWiring:
     measurement_in: str
     plant_in: str
     plant_out: str
-    mux_id: str | None = None
 
 
 def resolve_standard_feedback(
     controller,
     plant,
-    diagram: DiagramSystem | None = None,
     *,
-    feedback: str = "auto",
-    measurement_in: str | None = None,
-    plant_out: str | None = None,
-    control_out: str | None = None,
-    plant_in: str | None = None,
     controller_id: str = "ctl",
     plant_id: str = "plant",
 ) -> StandardFeedbackWiring:
-    """
-    Choose standard feedback port names shared by ``closed_loop`` and hybrid wiring.
+    """Choose the feedback port names shared by ``closed_loop`` and the sampled loop.
 
     The controller's port names decide (:func:`minilink.core.feedback.block_roles`):
     a block that reads ``y`` closes on the plant's ``y``, one that reads ``x`` on
-    its ``x``; the dimensions are a check, with a ``Mux(q, dq)`` for a mechanical
-    plant whose measurement is ``[q; dq]``.
-
-    Unset ``control_out`` / ``plant_in`` resolve to ``u`` (or ``u_ff`` / single port).
-    Unset ``measurement_in`` / ``plant_out`` use ``feedback`` auto rules (``y``, ``qdq``, ``x``).
+    its ``x``, and one that reads both on the first the plant can serve. The
+    command leaves on ``u`` (``u_ff`` for a solver, else the one output) and
+    enters the plant on ``u`` (else its one input). Dimensions are a check,
+    never a choice: a mechanical plant's ``y`` is its state ``[q; dq]``.
     """
-    if feedback not in _VALID_FEEDBACK:
+    roles = block_roles(controller)
+    if not roles.measurements:
         raise ValueError(
-            f"feedback must be one of {sorted(_VALID_FEEDBACK)!r}, got {feedback!r}"
+            f"Cannot wire closed-loop feedback: {controller_id} "
+            f"({controller.name!r}) reads neither 'y' nor 'x'; its inputs are "
+            f"{list(controller.inputs)}. Name its measurement port y or x "
+            "(rename_ports), or wire the loop with DiagramSystem.connect."
         )
-
-    resolved_control = control_out or _default_control_out(controller)
-    resolved_plant_in = plant_in or _default_plant_in(plant)
-
-    if measurement_in is not None and plant_out is not None:
-        return StandardFeedbackWiring(
-            resolved_control,
-            measurement_in,
-            resolved_plant_in,
-            plant_out,
-        )
-
-    path = _resolve_feedback_path(
+    measurement_in, plant_out = _feedback_path(
         controller,
         plant,
-        diagram,
-        feedback=feedback,
-        plant_output_port=plant_out or "y",
+        measurements=roles.measurements,
         controller_id=controller_id,
         plant_id=plant_id,
     )
     return StandardFeedbackWiring(
-        resolved_control,
-        path.measurement_in,
-        resolved_plant_in,
-        path.plant_out,
-        path.mux_id,
+        _default_control_out(controller),
+        measurement_in,
+        _default_plant_in(plant),
+        plant_out,
     )
 
 
-@dataclass(frozen=True)
-class _FeedbackPath:
-    measurement_in: str
-    plant_out: str
-    mux_id: str | None = None
+def _feedback_path(
+    controller, plant, *, measurements: tuple, controller_id: str, plant_id: str
+) -> tuple[str, str]:
+    """The (controller input, plant output) pair: the first measurement the plant serves.
 
-
-def _resolve_feedback_path(
-    controller,
-    plant,
-    diagram: DiagramSystem | None,
-    *,
-    feedback: str,
-    plant_output_port: str,
-    controller_id: str,
-    plant_id: str,
-) -> _FeedbackPath:
-    if feedback == "qdq":
-        return _feedback_path_qdq(
-            controller, plant, diagram, plant_output_port=plant_output_port
-        )
-
-    if feedback == "y":
-        if not _y_feedback_available(controller, plant):
-            raise ValueError(
-                _feedback_mismatch_message(
-                    controller,
-                    plant,
-                    controller_id,
-                    plant_id,
-                    attempted="y",
-                )
-            )
-        return _FeedbackPath("y", "y")
-
-    # auto: the controller's port names decide; a block that reads both ``y``
-    # and ``x`` closes on the first the plant can serve.
-    roles = block_roles(controller)
-    if roles.measurements:
-        return _feedback_path_from_declaration(
-            controller,
-            plant,
-            diagram,
-            measurements=roles.measurements,
-            plant_output_port=plant_output_port,
-            controller_id=controller_id,
-            plant_id=plant_id,
-        )
-
-    raise ValueError(
-        _feedback_mismatch_message(
-            controller,
-            plant,
-            controller_id,
-            plant_id,
-            attempted="auto",
-        )
-    )
-
-
-def _feedback_path_from_declaration(
-    controller,
-    plant,
-    diagram,
-    *,
-    measurements: tuple,
-    plant_output_port: str,
-    controller_id: str,
-    plant_id: str,
-) -> _FeedbackPath:
-    """Wire the first measurement the plant can serve to the matching plant output.
-
-    A measurement ``x`` reads the plant state output; ``y`` reads the plant
-    ``y``, inserting a ``Mux(q, dq)`` when its dimension is twice the plant
-    dof. With several measurements the first wireable one wins, and the
-    first one's mismatch is reported when none is.
+    With several measurements the first wireable one wins, and the first
+    one's mismatch is reported when none is.
     """
     first_error = None
     for measurement in measurements:
@@ -1145,9 +948,7 @@ def _feedback_path_from_declaration(
             return _feedback_path_for_measurement(
                 controller,
                 plant,
-                diagram,
                 measurement=measurement,
-                plant_output_port=plant_output_port,
                 controller_id=controller_id,
                 plant_id=plant_id,
             )
@@ -1157,20 +958,13 @@ def _feedback_path_from_declaration(
 
 
 def _feedback_path_for_measurement(
-    controller,
-    plant,
-    diagram,
-    *,
-    measurement: str,
-    plant_output_port: str,
-    controller_id: str,
-    plant_id: str,
-) -> _FeedbackPath:
+    controller, plant, *, measurement: str, controller_id: str, plant_id: str
+) -> tuple[str, str]:
     dim = controller.inputs[measurement].dim
 
     if measurement == "x":
         if "x" in plant.outputs and plant.outputs["x"].dim == dim:
-            return _FeedbackPath("x", "x")
+            return "x", "x"
         plant_x = plant.outputs["x"].dim if "x" in plant.outputs else None
         raise ValueError(
             f"Cannot wire closed-loop feedback: {controller_id} declares "
@@ -1179,13 +973,7 @@ def _feedback_path_for_measurement(
         )
 
     if "y" in plant.outputs and plant.outputs["y"].dim == dim:
-        return _FeedbackPath(measurement, "y")
-
-    qdq_n = _plant_qdq_dof(plant)
-    if diagram is not None and qdq_n is not None and dim == 2 * qdq_n:
-        mux_id = _add_qdq_mux(diagram, qdq_n)
-        return _FeedbackPath(measurement, plant_output_port, mux_id)
-
+        return "y", "y"
     if "y" not in plant.outputs:
         raise ValueError(
             f"Cannot wire closed-loop feedback: plant '{plant.name}' ({plant_id}) "
@@ -1193,40 +981,11 @@ def _feedback_path_for_measurement(
             "port, y = x by default) or wire ports explicitly with "
             "add_subsystem/connect"
         )
-    plant_y = plant.outputs["y"].dim
-    hint = ""
-    if qdq_n is not None:
-        hint = (
-            f"; plant exposes q/dq dof {qdq_n} — the measurement must be "
-            f"dim {2 * qdq_n} for Mux(q, dq) wiring (or pass feedback='qdq')"
-        )
     raise ValueError(
         f"Cannot wire closed-loop feedback: {controller_id} declares "
-        f"measurement {measurement!r} dim {dim}, but {plant_id} 'y' output "
-        f"has dim {plant_y}{hint}"
+        f"measurement 'y' dim {dim}, but {plant_id} 'y' output "
+        f"has dim {plant.outputs['y'].dim}"
     )
-
-
-def _feedback_path_qdq(controller, plant, diagram, *, plant_output_port: str):
-    if "y" not in controller.inputs:
-        raise ValueError(
-            "feedback='qdq' requires controller measurement port 'y'; "
-            f"available inputs: {', '.join(controller.inputs)}"
-        )
-    qdq_n = _plant_qdq_dof(plant)
-    if qdq_n is None:
-        raise ValueError(
-            "feedback='qdq' requires plant outputs 'q' and 'dq' with equal dim"
-        )
-    if controller.inputs["y"].dim != 2 * qdq_n:
-        raise ValueError(
-            f"feedback='qdq' expects controller.y dim {2 * qdq_n} "
-            f"(2 * plant dof), got {controller.inputs['y'].dim}"
-        )
-    if diagram is None:
-        raise ValueError("feedback='qdq' requires a diagram for Mux insertion")
-    mux_id = _add_qdq_mux(diagram, qdq_n)
-    return _FeedbackPath("y", plant_output_port, mux_id)
 
 
 def _default_control_out(sys) -> str:
@@ -1242,57 +1001,6 @@ def default_computer_boundary_ports(controller) -> tuple[str, str]:
     roles = block_roles(controller)
     measurement_in = roles.measurement or roles.entry or _default_input_port(controller)
     return measurement_in, _default_control_out(controller)
-
-
-def _add_qdq_mux(diagram: DiagramSystem, dof: int) -> str:
-    from minilink.blocks.routing import Mux
-
-    return _add_system_to_diagram(diagram, Mux((dof, dof)))
-
-
-def _plant_qdq_dof(plant) -> int | None:
-    if "q" not in plant.outputs or "dq" not in plant.outputs:
-        return None
-    n = plant.outputs["q"].dim
-    if plant.outputs["dq"].dim != n:
-        return None
-    return n
-
-
-def _y_feedback_available(controller, plant) -> bool:
-    return (
-        "y" in controller.inputs
-        and "y" in plant.outputs
-        and controller.inputs["y"].dim == plant.outputs["y"].dim
-    )
-
-
-def _feedback_mismatch_message(
-    controller,
-    plant,
-    controller_id: str,
-    plant_id: str,
-    *,
-    attempted: str,
-) -> str:
-    if "y" not in plant.outputs and "y" in controller.inputs:
-        return (
-            f"Cannot wire closed-loop feedback: plant '{plant.name}' ({plant_id}) "
-            "has no 'y' output port; declare it with output_dim=... (the standard "
-            "port, y = x by default) or wire ports explicitly with "
-            "add_subsystem/connect"
-        )
-    ctl_y = controller.inputs["y"].dim if "y" in controller.inputs else None
-    plant_y = plant.outputs["y"].dim if "y" in plant.outputs else None
-    qdq_n = _plant_qdq_dof(plant)
-    hint = ""
-    if attempted == "auto" and qdq_n is not None and ctl_y == 2 * qdq_n:
-        hint = "; try feedback='qdq'"
-    return (
-        f"Cannot wire closed-loop feedback ({attempted!r}): "
-        f"{controller_id}.y dim {ctl_y}, {plant_id}.y dim {plant_y}"
-        f"{hint}"
-    )
 
 
 def _iter_output_ports(diagram, target_id: str):

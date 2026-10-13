@@ -57,7 +57,6 @@ TEACHING_SURFACE: dict[str, tuple[str, ...]] = {
         "BallSet",
         "TimeCost",
         "StepDiagramSystem",
-        "closed_loop_qdq",
         "Gaussian",
         "Uniform",
     ),

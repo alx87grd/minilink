@@ -380,7 +380,7 @@ class TestManipulatorCatalog(unittest.TestCase):
             with self.subTest(cls=cls.__name__):
                 arm = cls()
                 self.assertIsInstance(arm, Manipulator)
-                for port in ("q", "dq", "p", "pdot", "y"):
+                for port in ("p", "pdot", "y"):
                     self.assertIn(port, arm.outputs)
 
     def test_camera_scale_matches_reach_not_default(self):
@@ -567,7 +567,7 @@ from minilink.dynamics.abstraction.mechanical import MechanicalSystem
 
 
 class TestMechanicalJointPortLabels(unittest.TestCase):
-    def test_q_and_dq_ports_carry_the_plant_state_labels_and_units(self):
+    def test_a_mechanical_plant_has_no_joint_slice_ports(self):
         checked = []
         for name in catalog.__all__:
             cls = getattr(catalog, name)
@@ -575,12 +575,15 @@ class TestMechanicalJointPortLabels(unittest.TestCase):
                 continue
             with self.subTest(plant=name):
                 plant = cls()
-                dof = plant.dof
-                q_port, dq_port = plant.outputs["q"], plant.outputs["dq"]
-                self.assertEqual(q_port.labels, plant.state.labels[:dof])
-                self.assertEqual(dq_port.labels, plant.state.labels[dof:])
-                self.assertEqual(q_port.units, plant.state.units[:dof])
-                self.assertEqual(dq_port.units, plant.state.units[dof:])
+                self.assertNotIn("q", plant.outputs)
+                self.assertNotIn("dq", plant.outputs)
+                self.assertEqual(plant.outputs["y"].dim, 2 * plant.dof)
+                self.assertEqual(
+                    list(plant.outputs["y"].labels), list(plant.state.labels)
+                )
+                self.assertEqual(
+                    list(plant.outputs["y"].units), list(plant.state.units)
+                )
             checked.append(name)
         self.assertIn("Pendulum", checked)
         self.assertIn("TwoLinkManipulator", checked)

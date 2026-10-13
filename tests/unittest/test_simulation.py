@@ -458,7 +458,7 @@ class TestStaticSimulatorJax(unittest.TestCase):
 
 
 from minilink.control.modelbased import SlidingModeController
-from minilink.core.composition import closed_loop_qdq
+from minilink.core.composition import closed_loop
 from minilink.dynamics.catalog.pendulum.pendulum import Pendulum
 from minilink.simulation.simulator import DISCONTINUOUS_AUTO_DT_SCALE, Simulator
 
@@ -477,7 +477,7 @@ def _build_smc_diagram():
         step_time=0.5,
     )
     smc = SlidingModeController(model, lam=20.0, gain=8.0, nab=0.15)
-    return ref >> closed_loop_qdq(smc, plant)
+    return ref >> closed_loop(smc, plant)
 
 
 def _max_ddq_consistency_error(diagram, traj):

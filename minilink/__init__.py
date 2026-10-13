@@ -175,7 +175,6 @@ _EXPORTS: dict[str, tuple[str, str]] = {
     "TimeCost": ("minilink.core.costs", "TimeCost"),
     "StepDiagramSystem": ("minilink.core.diagram", "StepDiagramSystem"),
     "BallSet": ("minilink.core.sets", "BallSet"),
-    "closed_loop_qdq": ("minilink.core.composition", "closed_loop_qdq"),
     "closed_loop": ("minilink.core.composition", "closed_loop"),
     "feedback": ("minilink.core.composition", "feedback"),
     "ZOHHold": ("minilink.blocks.step", "ZOHHold"),
