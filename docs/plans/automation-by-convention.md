@@ -1,10 +1,12 @@
 # Automation by convention: plants, controllers, loops, plots and tools
 
-**Status:** decided on 2026-10-11 and ready to build; steps in §7. Workboard row P10 (v0.2
-wave B) for the core steps; the later steps are placed in §7. How each rule was reached
-(the analysis of the old code, the evidence, the options rejected, the fifteen rulings) is in
-the decision record,
-[2026-10-11-automation-by-convention.md](../reviews/2026-10-11-automation-by-convention.md).
+**Status:** decided on 2026-10-11, amended on 2026-10-13, and ready to build; steps in §7.
+Workboard row P10 (v0.2 wave B) for the core steps; the later steps are placed in §7. How
+each rule was reached (the analysis of the old code, the evidence, the options rejected, the
+fifteen rulings) is in the decision record,
+[2026-10-11-automation-by-convention.md](../reviews/2026-10-11-automation-by-convention.md);
+the second opinion and its eight rulings (R1–R8) are in
+[2026-10-13-automation-by-convention-second-opinion.md](../reviews/2026-10-13-automation-by-convention-second-opinion.md).
 
 ## At a glance
 
@@ -24,10 +26,11 @@ Once this plan is built, the core of minilink is four ideas.
    one builds exactly the diagram a student could write with `add_subsystem` and `connect`
    (§4):
    - `a + b`, then `.autowire()`: side by side, connected by name;
-   - `a >> b`: one output to one input;
+   - `a >> b`: one output to one input (one guard: a source into a controller's `y` is
+     refused);
    - `controller @ plant`: a loop, with the roles named;
-   - `closed_loop(controller, plant, r=, d=, n=, filter=, estimator=)`: the same, with
-     options;
+   - `closed_loop(controller, plant, reference=, disturbance=, noise=, filter=,
+     estimator=)`: the same, with options;
    - `feedback(L, K)`: an open loop closed on itself;
    - `law % dt @ plant`: a sampled loop, a side helper for MPC for now;
    - role boxes, `rename_ports`, `port=` on sources, and `expose` for many blocks acting
@@ -46,7 +49,8 @@ loop.plot_trajectory()                              # plant and controller signa
 loop.animate()                                      # camera on the plant
 
 loop2 = closed_loop(StateFeedbackController(K), PendulumWithNoisePort(),
-                    r=Step(), d=WhiteNoise(psd=1e-2), n=WhiteNoise(psd=1e-4),
+                    reference=Step(), disturbance=WhiteNoise(psd=1e-2),
+                    noise=WhiteNoise(psd=1e-4),
                     estimator=observer)             # u, y → x̂ → controller
 ```
 
@@ -101,7 +105,9 @@ A few explicit hints stay, for what names cannot say:
 - **`x` only where needed.**
   - Plants expose `x`: the catalog, and `StateSpace` and `TransferFunction` in the plant
     layout.
-  - A user plant opts in with `expose_state=True`, and a box with `expose("x")` (§2.4).
+  - A user plant opts in with `expose_state=True`. A box is a diagram and always has a
+    state: `@` reads it for an `x`-reading controller (§4.3), and `expose("x")` puts it on
+    the edge for hand wiring and plots (§2.4).
   - Controllers, compensators, filters, sources and routing blocks do not expose `x`.
 - **Other names are allowed** on any block, and the automation leaves them alone: the
   controller extras `x_ff` and `z`, the manipulator outputs `p` and `pdot`, the input
@@ -166,8 +172,9 @@ and every tool read only the edge; the inside is one block or many.
 - **Building a box, simplest first:**
   1. by hand: `DiagramSystem`, `add_subsystem`, `connect`, `add_input_port`,
      `connect_new_output_port`;
-  2. a serial chain with `>>` already has a plant's edge (`u` in, `y` out):
-     `ctl @ (Saturation(-1, 1) >> arm)`;
+  2. a serial chain with `>>` already has a plant's edge (`u` in, `y` out), and `@` reads
+     its state, so `ctl @ (Saturation(-1, 1) >> arm)` works for a `y` controller and
+     `lqr @ (Saturation(-1, 1) >> arm)` for a state controller alike;
   3. `diagram.expose(*names)`, a small new helper:
      - a name left open on inside inputs becomes one edge input that feeds all of them;
      - the name of one inside output becomes an edge output;
@@ -200,7 +207,8 @@ Three small functions answer every question the tools ask.
   - With no `plant` key the plant is `None`. A tool that needs it raises; plots and the
     camera keep their plain defaults.
 - **`block_roles(block)`: what a block reads and commands**, from its port names only:
-  - the measurement (`e`, `y` or `x`), the reference (`r` or none), the command (`u`);
+  - the measurements it reads (`e`, `y`, `x`, or both `y` and `x`), the reference (`r` or
+    none), the command (`u`);
   - whether it is error-driven: it reads no `y` and no `x`, so the error drives its entry
     (`e`, or a plain compensator's one input);
   - whether it has state (from `n`).
@@ -216,6 +224,9 @@ ports, name, `x0` and camera settings.
 - `+` and `>>` give a **flat** diagram: the operands' blocks side by side, with their names.
   The left operand's `x0`, camera settings and name are carried into the result.
 - Only `@` nests: it is the operator that assigns the roles `controller` and `plant` (§2.4).
+- Two loops cannot be laid side by side: `loop >> loop` and `loop + loop` clash on
+  `controller` and `plant` and are refused. To compare two controllers, run them separately
+  and `compare()`.
 - `connect()`, `autowire()` and `expose()` are methods and change the diagram they are
   called on.
 
@@ -238,8 +249,11 @@ ports, name, `x0` and camera settings.
   default stays `y`.
 - **No silent mistake.**
   - A stale name raises a clear message that names the block, its inputs and the fix.
-  - `rename_ports` refuses a new name that is already a port of the block, so a swap
-    cannot flip a sign silently.
+  - The renames of one `rename_ports` call apply at once, so a chain such as
+    `Saturation(-1, 1).rename_ports(u="u_cmd", y="u")` is one step and works.
+  - `rename_ports` refuses a new name that is a port not renamed in the same call, and two
+    equal new names. Library equations read `u` by position, so a rename never changes
+    the math; a block that reads by name gets the clear message above.
   - Renaming a block already placed in a diagram fails loudly; rename at creation.
 
 ```python
@@ -259,40 +273,53 @@ loop = (ref + ctl + sat + plant).autowire()   # every connection read from the n
 3. A has an output `y` and B has an input `u`: connect `y` → `u`.
 4. Otherwise refuse: "`>>` connects one output to one input; wire this one with connect".
 
+One guard, checked before rule 2: when A has no inputs and B has a free input `r`, a
+`y`→`y` match is refused: "`Step() >> P()` would drive the measurement `y`; write
+`Step(port="r") >> P()` for the controller alone, or `Step() >> (P() @ plant)` for the
+loop". A source's output is `y` and a reference-layout controller reads `r` and `y`, so
+without the guard the step would enter through `e = r − y` with a minus sign and no
+message. It is the only special case in `>>`.
+
 - Sizes are a check, never a choice; a mismatch is refused.
 - A diagram operand counts its edge: its outputs and its free inputs.
 - The result keeps A's free inputs as its inputs, and B's output (`y`, else its only one)
   as its output. So `C >> G` still exposes `e`.
 - `>>` has no preference for `r` and no hidden memory of an entry or an output.
-- A loop built with a `d` input has two free inputs, so `Step() >> closed_loop(..., d=True)`
-  is refused; the message points to `closed_loop(..., r=Step(), d=True)`.
+- A loop built with a `d` input has two free inputs, so
+  `Step() >> closed_loop(..., disturbance=True)` is refused; the message points to
+  `closed_loop(..., reference=Step(), disturbance=True)`.
 
 ### 4.3 `@`: controller at plant
 
 `@` always means controller at plant: a System, or a box, on each side.
 
-- **What it builds**, from what the controller reads:
+- **What it builds, one rule:** connect every controller input named `y` or `x` to the
+  plant output of the same name; if the controller has neither, insert an `Error` block
+  `e = r − y` on its command entry. So:
 
   | The controller reads | `@` wires |
   |---|---|
   | `y` (and `r`) | plant `y` → controller `y`; the controller computes `r − y` itself |
   | `x` (and `r`) | plant `x` → controller `x` |
+  | `y` and `x` (an LQI on the state plus the output error, a safety filter) | both, each to the plant port of the same name |
   | only its error (`e`, or a plain compensator's one input) | an `Error` block `e = r − y` in front of the controller |
 
   `PID() @ plant`, `Lead() @ plant` and a plain `TransferFunction` compensator take the
-  third row.
+  last row.
 - **Names.** The left side is `controller`, the right side `plant`. A box is nested under
   its role name, one level deep; a single block stays a single block.
 - **Refusals**, each with a message that names the fix:
   - a number on the right: "`@` needs a plant on the right; to close an open loop on
     itself use `feedback(L)` or `feedback(L, K)`";
   - a box without the standard edge: build it by hand or with `expose`;
-  - a controller that reads `x` on a plant without `x`: build the plant with
-    `expose_state=True`.
-- **`closed_loop(controller, plant, *, r, d, n, filter, estimator, validate)`** is `@` with
-  options.
-  Each loop input `r`, `d`, `n` is `False`, `True` (an edge port) or a source block. It has
-  no port-name keywords.
+  - a controller that reads `x` on a leaf plant without `x`: build the plant with
+    `expose_state=True`. A diagram plant always has a state, and `@` reads it: no
+    `expose("x")` is needed.
+- **`closed_loop(controller, plant, *, reference, disturbance, noise, filter, estimator,
+  validate)`** is `@` with options.
+  Each loop input `reference`, `disturbance`, `noise` is `False`, `True` (an edge port) or
+  a source block. The keywords are the words, the ports are the letters `r`, `d`, `n`, and
+  a source block takes the word as its name. It has no port-name keywords.
 - **The filter** (`filter=F`) is a helper block at the loop's top level, beside `error`; it
   is in neither the plant nor the controller.
 
@@ -315,8 +342,8 @@ loop = (ref + ctl + sat + plant).autowire()   # every connection read from the n
 - **Disturbance and noise.**
   - A plant that declares `d` and `n` owns them: `d` is never charged as control effort,
     and `n` enters what the controller reads.
-  - For a plant without those ports, `d=` and `n=` add summing junctions in the loop, as
-    today. The cost then sees `u + d` as the plant's command, a known limit.
+  - For a plant without those ports, `disturbance=` and `noise=` add summing junctions in
+    the loop, as today. The cost then sees `u + d` as the plant's command, a known limit.
   - An automatic wrapper that would give such a plant its own `d` and `n` is deferred
     until someone needs it.
 
@@ -362,8 +389,9 @@ zero-order hold.
 - **`computer @ plant` follows §4.3:**
   - the computer reads `y` or `x`, and the sampler reads that port of the plant;
   - otherwise an `Error` block sits **inside the computer**, on the sampled measurement.
-- **Boxes on both sides.** The plant may be a box with edge `u` → `y`; the computer may be
-  a box (filter and controller, at several rates) with edge `r`, `y` (or `x`) → `u`.
+- **Boxes on both sides.** The plant may be a box with edge `u` → `y`, and its state is
+  read for an `x`-reading computer (MPC), as in §4.3; the computer may be a box (filter and
+  controller, at several rates) with edge `r`, `y` (or `x`) → `u`.
 - **Where things sit.**
   - The error and the filter run on the computer.
   - The sampler and the hold are the boundary between the two boxes, not blocks.
@@ -417,7 +445,8 @@ stays: it is a port layout, not a role marker.
 | `feedback(..., through=)` | `feedback(..., filter=)` | AC-OP |
 | The `x` port of `LowPassFilter` and `NotchFilter` (check its users first) | nothing: filters are not plants | AC-3 |
 
-**Kept:** `closed_loop`'s `r=`, `d=`, `n=`, `filter=`, `estimator=` and `validate=`; the
+**Kept:** `closed_loop`'s `reference=`, `disturbance=`, `noise=`, `filter=`, `estimator=`
+and `validate=`; the
 sampled loop's `schedule=` and `computer=`; `feedback(L, of=)`; `port=` on sources and
 `Demux`; analysis keywords such as `bode(of=, wrt=)`.
 
@@ -425,8 +454,8 @@ sampled loop's `schedule=` and `computer=`; `feedback(L, of=)`; `port=` on sourc
 migrates every course notebook in the same commit):
 - the subsystem names `ctl` → `controller`, `sys` → `plant`, `ref` → `reference`; sources
   `disturbance` and `noise`;
-- the ports `w` → `d` and `v` → `n` on the two noisy plants, and
-  `closed_loop(w=, v=)` → `closed_loop(d=, n=)`;
+- the ports `w` → `d` and `v` → `n` on the two noisy plants, and the keywords
+  `closed_loop(w=, v=)` → `closed_loop(disturbance=, noise=)`;
 - the estimator's output `x_hat` → `x` (P4 builds it so).
 
 **Migrations:**
@@ -452,9 +481,9 @@ roles and control-law sweeps) is captured before and after each step and compare
 |---|---|---|
 | AC-1 | Safe bug fixes and pinning tests. **Landed 2026-10-10.** | — |
 | AC-0 | No controller classes; `plot_control_law` on `System`; the four course notebooks migrated (the import line and the base class; their profile line goes in AC-3) | v0.2 wave B |
-| AC-2 | The resolver (§3), with every reader switched; reserved names raise on a clash. (a) Byte-identical census. (b) The one-time rename of the subsystem names, in flow and sampled loops; shortcuts stop naming blocks from their shape. (c) The ports `d` and `n` in the same pass. | v0.2 wave B, before the randomness steps that name streams (RN-4) |
-| AC-OP | The operators (§4.1–§4.4), one commit each: no operator modifies its operands; the plain `>>`; `+`, `autowire`, `rename_ports`, `port=` and the 8 positional lines; `expose`; `@` needs a plant, `feedback`'s entry, return and `filter=`, one junction helper | v0.2 wave B |
-| AC-3 | Composition on standard names: the removals §6 assigns to AC-3; boxes nested by `@`, with the edge check; `x` only where needed and its refusal; the mechanical plant's `y` and `x`; MPC renamed; `filter=` | v0.2 wave B; unblocks P4 |
+| AC-2 | The resolver (§3), with every reader switched; reserved names raise on a clash. (a) Byte-identical census. (b) The one-time rename of the subsystem names, in flow and sampled loops; shortcuts stop naming blocks from their shape. (c) The ports `d` and `n` in the same pass. | (a) v0.2 wave B, before AC-OP; (b) and (c) the last step of wave B, one sweep after AC-3, before the randomness steps that name streams (RN-4) |
+| AC-OP | The operators (§4.1–§4.4), one commit each: no operator modifies its operands; the plain `>>` and its one guard; `+`, `autowire`, `rename_ports`, `port=` and the 8 positional lines; `expose`; `@` needs a plant, `feedback`'s entry, return and `filter=`, one junction helper | v0.2 wave B |
+| AC-3 | Composition on standard names: the removals §6 assigns to AC-3; boxes nested by `@`, with the edge check and the box's state read for an `x` controller; `x` only where needed and its leaf refusal; the mechanical plant's `y` and `x`; MPC renamed; `filter=` | v0.2 wave B |
 | AC-4 | Loop inputs: plants that declare `d` and `n` own them; sources as values, named `reference`, `disturbance`, `noise`; `estimator=` with P4; the randomness plan's loop-input rulings reconciled | beside P4, before P11 |
 | AC-5 | Plots (§5): the auto mode, role selectors, paths into boxes, labels, units and colours by role, one default | plotting lane, v0.2 wave D |
 | AC-6 | Animation (§5): the camera chosen when animating, looking inside `plant`; no compensator skin in a loop; the camera copy goes | plotting lane |
@@ -462,7 +491,11 @@ roles and control-law sweeps) is captured before and after each step and compare
 | AC-8a | The sampled loop keeps in step (§4.5): each item with the core step it mirrors (names with AC-2, the dispatch and boxes with AC-OP and AC-3, the MPC rename with AC-3) | alongside |
 | AC-8b | The sampled loop goes mainstream (§4.5, "later") | v0.9, with S31 |
 
-AC-2 comes before AC-OP because `feedback`'s entry rule uses `command_port`.
+AC-2a comes before AC-OP because `feedback`'s entry rule uses `command_port`. The rename
+(AC-2b, AC-2c) is one sweep after AC-3, so the composition module is rewritten once rather
+than renamed and then rewritten. P4's block needs none of these steps: it starts now and is
+wired by hand until AC-4. The mechanical plant's `q` / `dq` removal, `rename_ports` and
+`port=`, the MPC rename and AC-8a are off the GRO501 path and may trail P11.
 
 **Done when:**
 - `controller @ plant`, the same loop wired by hand with the role names, and `closed_loop`
@@ -490,7 +523,8 @@ AC-2 comes before AC-OP because `feedback`'s entry rule uses `command_port`.
 ## 9. Not in scope
 
 - No new operator, no options on `@`, no `Loop` block, no tuple operands.
-- No automatic wiring in `>>`.
+- No automatic wiring in `>>`, and no second guard in it: the source-into-`y` refusal of
+  §4.2 is the only special case.
 - No new base classes, traits, intent declarations or override attributes.
 - No inference of roles from the wiring, and no "deepest plant" rule.
 - No new sampled-loop features before S31.
@@ -503,7 +537,8 @@ AC-2 comes before AC-OP because `feedback`'s entry rule uses `command_port`.
 These do not change the rules:
 - **AC-OP:** whether `expose` runs before or after `autowire`, and how the open-input
   warning treats edge inputs.
-- **AC-3:** who uses the filters' `x` port, before it goes.
+- **AC-3:** who uses the filters' `x` port, before it goes; the wording of the refusal for
+  a leaf plant without `x`, and whether `expose("x")` stays needed for hand wiring only.
 - **AC-5:** how the auto mode removes duplicate wires, and whether a plant with many outputs
   (the racecar) needs a name filter.
 - **The deferred wrapper**, if it is ever built: the names inside it, and how its edge shows

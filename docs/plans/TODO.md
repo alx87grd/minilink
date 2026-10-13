@@ -63,15 +63,19 @@ Design: [naming.md](naming.md). Runs in parallel with wave B.
 Plan: [gro501-classical-control.md](gro501-classical-control.md). Release contract:
 [ROADMAP §4.2](../../ROADMAP.md#42-v02--gro501-end-to-end).
 
-**Order:** S61 and S62 at any time before P11; P10's AC-0, AC-2, AC-OP, AC-3; TB-b (its
-loop part after AC-3); P4 with AC-4; P11. P6 stays held for GRO501; its row is in §5 (v0.9).
+**Order:** S61 and S62 at any time before P11; P4 now, in parallel (wired by hand until
+AC-4); P10's AC-0, AC-2a, AC-OP, AC-3, then AC-2b/c as one sweep; TB-b (its loop part after
+AC-3); AC-4 with P4; P11. P6 stays held for GRO501; its row is in §5 (v0.9).
 
 - [ ] **P10 Automation by convention** ([automation-by-convention.md](automation-by-convention.md),
-  decided 2026-10-11): standard port names drive the wiring, three reserved names (`plant`,
-  `controller`, `estimator`) are the roles every tool reads, and the cost is scored on the
-  plant. Its steps, in build order, are the plan's §7, each with its "done when":
-  - AC-0 no controller classes; AC-2 the resolver, the one-time rename and the ports `d` /
-    `n`; AC-OP the operators; AC-3 composition on standard names (unblocks P4). This wave.
+  decided 2026-10-11, amended 2026-10-13 by
+  [the second-opinion record](../reviews/2026-10-13-automation-by-convention-second-opinion.md)):
+  standard port names drive the wiring, three reserved names (`plant`, `controller`,
+  `estimator`) are the roles every tool reads, and the cost is scored on the plant. Its
+  steps, in build order, are the plan's §7, each with its "done when":
+  - AC-0 no controller classes; AC-2a the resolver; AC-OP the operators; AC-3 composition
+    on standard names; AC-2b/c the one-time rename and the ports `d` / `n`, last, as one
+    sweep. This wave.
   - AC-4 loop inputs, with P4; AC-5 plots and AC-6 animation, in the plotting lane; AC-7
     the cost on the plant, v0.3; AC-8a the sampled loop keeps in step, alongside; AC-8b with
     S31, v0.9.
@@ -97,7 +101,9 @@ loop part after AC-3); P4 with AC-4; P11. P6 stays held for GRO501; its row is i
   `dynamics/abstraction/state_space.py` (`LTISystem`) and the loop-building path students use
   (`feedback`, `closed_loop`, `@`; after AC-3). Before P11. Done when every module in scope
   reads like `dp.py` and the baseline `cmp`s.
-- [ ] **P4 `estimation/`**, after AC-3. `LuenbergerObserver(A, B, C, L)` as a
+- [ ] **P4 `estimation/`**, now, in parallel with P10: the block needs none of its steps,
+  and the notebook wires it by hand until AC-4's `closed_loop(estimator=)`.
+  `LuenbergerObserver(A, B, C, L)` as a
   `DynamicSystem` with ports `u`, `y` → `x` (the estimate, labelled x̂) and the role name
   `estimator`; `luenberger(A, B, C, poles)` on the dual pair (`place_gain(Aᵀ, Cᵀ, poles)ᵀ`);
   `kalman(A, B, C, Q, R)` from the filter Riccati equation, `Q = B_w W B_wᵀ` and `R = V` read

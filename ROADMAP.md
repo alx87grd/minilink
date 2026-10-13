@@ -94,7 +94,7 @@ State as of 2026-10-12. Step ids (`S29`, `P4`, `T2`, …) are the rows of
 | Graphics / animation | teaching | 5 | Frame-keyed `tf` / geometry / overlays; four renderers; auto-fit camera. | Camera and plot defaults from roles (P10); constructor-derived camera hints (S43); glyph/solid rename (S30, v0.9). |
 | Hybrid / step / MPC | provisional (research) | 4 | `StepSystem`, `Computer`, `HybridDiagram`, `HybridSimulator`, MPC with parametric JAX. A side helper for MPC simulation; the sampled loop is the one thing that is not a `System`. | Keeps in step with the core rules (P10); no new hybrid features before S31 (v0.9); textbook pass on `mpc/controller.py` (T6). |
 | Realtime simulation | provisional | 2 | `RealtimeSimulator` + pygame I/O. | Architectural review (v1.0); later the human-demonstration recorder of the behavior-cloning pipeline (after v1.0). |
-| Estimation | planned (GRO501) | 1 | Placeholder. The largest GRO501 gap; the `WhiteNoise` whose `psd` the Kalman design reads has landed (RN-1). | Luenberger, then Kalman, as diagram blocks (P4, v0.2), after the composition steps of P10; EKF, time-varying and discrete Kalman, online parameter estimators (v0.9). |
+| Estimation | planned (GRO501) | 1 | Placeholder. The largest GRO501 gap; the `WhiteNoise` whose `psd` the Kalman design reads has landed (RN-1). | Luenberger, then Kalman, as diagram blocks (P4, v0.2), in parallel with P10's composition steps; EKF, time-varying and discrete Kalman, online parameter estimators (v0.9). |
 | Identification | planned | 2 | Parametric-tier prototype only. | `fitting.py` (C4, v0.3). |
 | C export (`experimental/c_export`) | research | 1 | JAX→C transpiler; two demos; flagship smoke in the JAX regression job. | Keep isolated; repo-only. |
 | Experimental tier (`experimental/symbolic`, `experimental/engines`) | research | 1 | Not on the teaching path nor the API site. | Keep isolated; repo-only. |
@@ -242,8 +242,8 @@ TB-a, P7, P5, P8, P9.
 - **TB-b** The control objects and the loop (`siso`, `state`, `lqr`, `place`,
   `TransferFunction`, `LTISystem`, `feedback` / `@`) read like the textbook; its loop part
   after P10's AC-3.
-- **P4** `estimation/`: `LuenbergerObserver`, `luenberger()`, `kalman()`, after AC-3. The
-  largest §4.2 gap.
+- **P4** `estimation/`: `LuenbergerObserver`, `luenberger()`, `kalman()`, in parallel with
+  P10 (hand-wired until AC-4). The largest §4.2 gap.
 - **S61** Every analysis verb takes a `System`. **S62** The LQR family on the control band
   facade. **[ask — public names]**
 - **P6** The z tier stays held (teach with `discretize` + simulation) unless the sommatif

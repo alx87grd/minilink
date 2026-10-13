@@ -21,6 +21,20 @@ Rulings made after the text below was frozen (2026-10-11):
 - Where the text below says a ruling "is recorded in ROADMAP §6", that was the practice of
   the time: rulings now live in this record and in the plan, and leave ROADMAP §6.
 
+Rulings of 2026-10-13, from the second opinion
+([2026-10-13-automation-by-convention-second-opinion.md](2026-10-13-automation-by-convention-second-opinion.md)):
+- `rename_ports` is simultaneous: chains work, only a collision with an untouched port is
+  refused (R1).
+- `@` reads a diagram plant's state for an `x`-reading controller; no `expose("x")` (R2).
+- One guard in `>>`: a source into a controller's `y` is refused (R3).
+- The loop keywords are words, `reference=`, `disturbance=`, `noise=`; the ports stay
+  `r`, `d`, `n`. Where the text below says `closed_loop(d=, n=)` or `r=`, read the words
+  (R4).
+- The `@` dispatch is one rule, "same-name `y` and `x`, else an Error on the entry" (R5).
+- `loop >> loop` and `loop + loop` refuse (R6).
+- P4 starts now, in parallel, hand-wired until AC-4 (R7).
+- The build order is AC-0, AC-2a, AC-OP, AC-3, then AC-2b and AC-2c as one sweep (R8).
+
 ---
 
 **Status:** v2, analysis and recommendation (2026-10-10). Every decision of §5 (1 to 15) is
