@@ -517,7 +517,7 @@ class WiredDiagramMixin:
         validate: bool = True,
     ) -> "DiagramSystem":
         """
-        Conservatively connect unconnected inputs when one safe source matches.
+        Connect unconnected inputs by name: each takes the one output with its name and size.
 
         This is an optional diagram-building shortcut. It does not overwrite
         existing connections and returns ``self`` so it can be used fluently.
@@ -525,6 +525,90 @@ class WiredDiagramMixin:
         from minilink.core.composition import autowire
 
         return autowire(self, strict=strict, validate=validate)
+
+    def expose(self, *names):
+        """
+        Put inside ports on the diagram's edge, by name: ``box.expose("r", "y", "u")``.
+
+        Each name is resolved in this order: the open inputs of that name inside
+        the diagram become one edge input that feeds all of them; the one inside
+        output of that name becomes an edge output; ``"x"`` with no such port is
+        the box's own state, the stack of its blocks' states, as an edge output.
+        A name that is none of these, or an output several blocks carry, is
+        refused. Call it once the box is wired (after ``autowire`` or
+        ``connect``: an input already connected is not open) and complete.
+        Returns the diagram, for chaining.
+        """
+        for name in names:
+            open_inputs = [
+                (sys_id, port_id)
+                for sys_id, sys in self.subsystems.items()
+                for port_id in sys.inputs
+                if port_id == name and self.connections[sys_id][port_id] is None
+            ]
+            outputs = [
+                sys_id for sys_id, sys in self.subsystems.items() if name in sys.outputs
+            ]
+            if open_inputs:
+                self.expose_input(name, open_inputs)
+            elif len(outputs) == 1:
+                port = self.subsystems[outputs[0]].outputs[name]
+                self.connect_new_output_port(
+                    outputs[0],
+                    name,
+                    name,
+                    nominal_value=port.nominal_value,
+                    labels=port.labels,
+                    units=port.units,
+                    lower_bound=port.lower_bound,
+                    upper_bound=port.upper_bound,
+                )
+            elif len(outputs) > 1:
+                raise ValueError(
+                    f"{name!r} is an output of several blocks ({', '.join(outputs)}); "
+                    "expose one of them with connect_new_output_port"
+                )
+            elif name == "x":
+                self.add_output_port(
+                    "x",
+                    dim=self.n,
+                    function=self.compute_state,
+                    dependencies=(),
+                    labels=list(self.state.labels),
+                    units=list(self.state.units),
+                )
+            else:
+                raise ValueError(
+                    f"{name!r} is neither an open input nor an output of a block in "
+                    f"{self.name!r}; blocks: {', '.join(self.subsystems) or '(none)'}"
+                )
+        return self
+
+    def expose_input(self, name, targets):
+        """Internal machinery: one edge input ``name`` feeding the open inputs ``targets``."""
+        if name in self.inputs:
+            raise ValueError(
+                f"{name!r} is already an input on the edge of {self.name!r}"
+            )
+        ports = [self.subsystems[sys_id].inputs[port_id] for sys_id, port_id in targets]
+        dims = {port.dim for port in ports}
+        if len(dims) != 1:
+            raise ValueError(
+                f"the open inputs named {name!r} have different sizes ({sorted(dims)}); "
+                "wire them with connect"
+            )
+        first = ports[0]
+        self.add_input_port(
+            name,
+            dim=first.dim,
+            nominal_value=first.nominal_value,
+            labels=first.labels,
+            units=first.units,
+            lower_bound=first.lower_bound,
+            upper_bound=first.upper_bound,
+        )
+        for sys_id, port_id in targets:
+            self.connect("input", name, sys_id, port_id)
 
     @property
     def params(self):

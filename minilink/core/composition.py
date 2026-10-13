@@ -720,9 +720,12 @@ def _series_pair(diagram, right):
 def _edge_outputs(diagram) -> dict:
     """The chain's outputs by name: its boundary outputs, or the ports of its one block."""
     if diagram.outputs:
+        # A box's own state (``expose("x")``) has no source block; it is not a chain output.
         return {
-            output_id: tuple(diagram.connections["output"][output_id])
+            output_id: tuple(source)
             for output_id in diagram.outputs
+            if (source := diagram.connections.get("output", {}).get(output_id))
+            is not None
         }
     if len(diagram.subsystems) == 1:
         ((sys_id, sys),) = diagram.subsystems.items()

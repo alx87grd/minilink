@@ -328,6 +328,37 @@ class TestDiagramCompositionShortcuts(unittest.TestCase):
         swapped = ProportionalController().rename_ports(r="y", y="r")
         self.assertEqual(list(swapped.inputs), ["y", "r"])
 
+    def test_expose_names_the_edge_of_a_box(self):
+        from minilink import StateFeedbackController
+
+        K = np.array([[10.0, 2.0]])
+        box = (StateFeedbackController(K) + Saturation()).autowire()
+        box.expose("x", "r", "y")
+        self.assertEqual(list(box.inputs), ["x", "r"])
+        self.assertEqual(list(box.outputs), ["y"])
+        self.assertEqual(box.connections["ctl"]["x"], ("input", "x"))
+        self.assertEqual(box.connections["ctl"]["r"], ("input", "r"))
+        self.assertEqual(box.connections["saturation"]["u"], ("ctl", "u"))
+        self.assertEqual(box.connections["output"]["y"], ("saturation", "y"))
+        self.assertEqual(box.inputs["x"].dim, 2)
+
+        fan_in = (Integrator() + Integrator()).expose("u")
+        self.assertEqual(fan_in.connections["sys"]["u"], ("input", "u"))
+        self.assertEqual(fan_in.connections["sys2"]["u"], ("input", "u"))
+
+        chain = (Integrator() >> Integrator()).expose("x")
+        self.assertEqual(chain.outputs["x"].dim, 2)
+        np.testing.assert_allclose(
+            chain.outputs["x"].compute(np.array([1.0, 2.0]), np.zeros(1), 0.0, None),
+            [1.0, 2.0],
+        )
+        self.assertEqual(list((chain >> Integrator()).outputs), ["y"])
+
+        with self.assertRaisesRegex(ValueError, "output of several blocks"):
+            (Integrator() + Integrator()).expose("y")
+        with self.assertRaisesRegex(ValueError, "neither an open input nor an output"):
+            Integrator().__add__(Integrator()).expose("bogus")
+
     def test_closed_loop_qdq_inserts_mux(self):
         diagram = closed_loop_qdq(ImpedanceController(), Pendulum())
         self.assertIn("mux", diagram.subsystems)
