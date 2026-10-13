@@ -565,8 +565,12 @@ diagram `C >> G`) gets an `Error` block (`e = r - y`, ports `+`, `-`, `e`)
 inserted by `core.composition.feedback`. `@` always means controller at plant
 and refuses a number on the right; `feedback(sys)` closes any such system on
 itself, through a `Gain` (`feedback(sys, K)`) or a sensor or filter block
-(`feedback(sys, F)`), the return block named `filter` either way. Positive
-feedback still uses a signed `Sum`. A scalar error against a vector output takes
+(`feedback(sys, F)`), the return block named `filter` either way;
+`closed_loop(C, plant, filter=F)` puts the same block, at the loop's top level,
+between the plant's `y` and what the controller reads (its `y`, or the `Error`
+block): the plant's `y` stays the output, a noise `v` enters before the filter,
+and a controller that reads `x` is refused (a filter on the state is an
+estimator). Positive feedback still uses a signed `Sum`. A scalar error against a vector output takes
 component 0 through a visible `Demux`; equal dimensions close a vector loop;
 anything else raises and names `feedback(sys, of=(port, index))`. No `Loop`
 block, no new operator.

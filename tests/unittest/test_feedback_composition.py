@@ -286,6 +286,50 @@ class TestSeriesRule(unittest.TestCase):
             feedback(two_outputs)
 
 
+class TestClosedLoopFilter(unittest.TestCase):
+    """``closed_loop(..., filter=F)``: the return path, beside ``error``, at the top level."""
+
+    def test_the_filter_sits_before_the_error_block(self):
+        from minilink import LowPassFilter, closed_loop
+
+        T = closed_loop(PID(), Integrator(), filter=LowPassFilter(2.0))
+        self.assertEqual(list(T.subsystems), ["ctl", "sys", "filter", "error"])
+        self.assertEqual(T.connections["filter"]["u"], ("sys", "y"))
+        self.assertEqual(T.connections["error"]["-"], ("filter", "y"))
+        self.assertEqual(T.connections["output"]["y"], ("sys", "y"))
+
+    def test_the_filter_feeds_the_measurement_of_a_y_controller(self):
+        from minilink import LowPassFilter, closed_loop
+
+        T = closed_loop(ProportionalController(), Integrator(), filter=0.5)
+        self.assertEqual(list(T.subsystems), ["ctl", "sys", "filter"])
+        self.assertEqual(T.connections["filter"]["u"], ("sys", "y"))
+        self.assertEqual(T.connections["ctl"]["y"], ("filter", "y"))
+        self.assertEqual(T.connections["output"]["y"], ("sys", "y"))
+        np.testing.assert_allclose(T.subsystems["filter"].params["K"], [[0.5]])
+        T = closed_loop(ProportionalController(), Integrator(), filter=LowPassFilter())
+        self.assertEqual(T.connections["ctl"]["y"], ("filter", "y"))
+
+    def test_a_noise_enters_before_the_filter(self):
+        from minilink import LowPassFilter, closed_loop
+
+        for controller in (ProportionalController(), PID()):
+            with self.subTest(controller=controller.name):
+                T = closed_loop(
+                    controller, Integrator(), filter=LowPassFilter(), v=True
+                )
+                self.assertEqual(T.connections["noise"]["in0"], ("sys", "y"))
+                self.assertEqual(T.connections["noise"]["in1"], ("input", "v"))
+                self.assertEqual(T.connections["filter"]["u"], ("noise", "y"))
+
+    def test_a_filter_on_the_state_is_refused(self):
+        from minilink import LowPassFilter, StateFeedbackController, closed_loop
+
+        K = np.array([[10.0, 2.0]])
+        with self.assertRaisesRegex(ValueError, "estimator"):
+            closed_loop(StateFeedbackController(K), Pendulum(), filter=LowPassFilter())
+
+
 class TestPortLayouts(unittest.TestCase):
     def test_pid_layouts_share_one_law(self):
         plant = Integrator()

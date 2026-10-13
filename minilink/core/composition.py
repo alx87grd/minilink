@@ -195,15 +195,19 @@ def feedback(sys, filter=1, *, of=None, sign=-1.0, validate=True) -> DiagramSyst
     validate : bool
         Run algebraic-loop detection before returning.
     """
-    diagram, _junction = _close_with_junction(
+    diagram, _junction, _measurement = _close_with_junction(
         sys, filter, of=of, sign=sign, validate=validate
     )
     return diagram
 
 
 def _close_with_junction(sys, filter=1, *, of=None, sign=-1.0, validate=True):
-    """The loop of :func:`feedback` and the id of its junction block."""
-    from minilink.blocks.routing import Demux, Error, Gain, Sum
+    """The loop of :func:`feedback`, the id of its junction block and where a noise enters.
+
+    The last item is the ``(block, port)`` the measurement reaches first: the
+    filter's input when there is one, else the junction's minus input.
+    """
+    from minilink.blocks.routing import Demux, Error, Sum
 
     refuse_two_port_entry(sys)
     entry = _command_entry(sys)
@@ -221,18 +225,8 @@ def _close_with_junction(sys, filter=1, *, of=None, sign=-1.0, validate=True):
         diagram.connect_new_output_port(entry_sys, _default_output_port(sys), "y")
     entry_dim = diagram.subsystems[targets[0][0]].inputs[targets[0][1]].dim
 
-    signal_sys, signal_port = _return_signal(diagram, of, entry_dim, Demux)
-
-    if isinstance(filter, System):
-        filter_id = _add_system_to_diagram(diagram, filter, role="filter")
-        diagram.connect(signal_sys, signal_port, filter_id, _default_input_port(filter))
-        signal_sys, signal_port = filter_id, _default_output_port(filter)
-    elif not (np.isscalar(filter) and float(filter) == 1.0):
-        filter_id = _add_system_to_diagram(
-            diagram, Gain(filter, dim=entry_dim), role="filter"
-        )
-        diagram.connect(signal_sys, signal_port, filter_id, "u")
-        signal_sys, signal_port = filter_id, "y"
+    signal = _return_signal(diagram, of, entry_dim, Demux)
+    (signal_sys, signal_port), filter_in = _insert_filter(diagram, filter, signal)
 
     if float(sign) == -1.0:
         junction_id = _add_system_to_diagram(
@@ -252,7 +246,41 @@ def _close_with_junction(sys, filter=1, *, of=None, sign=-1.0, validate=True):
     diagram.name = f"Closed loop of {sys.name}"
     if validate:
         diagram.check_algebraic_loops()
-    return diagram, junction_id
+    return diagram, junction_id, filter_in or (junction_id, minus_port)
+
+
+def _insert_filter(diagram, filter, signal):
+    """Put the return filter after ``signal``: a block, a ``Gain``, nothing for ``1`` or ``None``.
+
+    Returns the filtered signal ``(block, port)`` and the filter's input
+    ``(block, port)``, where a measurement noise enters, or ``None`` without a
+    filter. The block is named ``filter`` either way.
+    """
+    from minilink.blocks.routing import Gain
+
+    signal_sys, signal_port = signal
+    signal_dim = diagram.subsystems[signal_sys].outputs[signal_port].dim
+    if filter is None or (np.isscalar(filter) and float(filter) == 1.0):
+        return signal, None
+    if isinstance(filter, System):
+        filter_id = _add_system_to_diagram(diagram, filter, role="filter")
+        filter_in, filter_out = (
+            _default_input_port(filter),
+            _default_output_port(filter),
+        )
+    else:
+        filter_id = _add_system_to_diagram(
+            diagram, Gain(filter, dim=signal_dim), role="filter"
+        )
+        filter_in, filter_out = "u", "y"
+    _require_same_dim(
+        signal_dim,
+        diagram.subsystems[filter_id].inputs[filter_in].dim,
+        f"{signal_sys}:{signal_port}",
+        f"{filter_id}:{filter_in}",
+    )
+    diagram.connect(signal_sys, signal_port, filter_id, filter_in)
+    return (filter_id, filter_out), (filter_id, filter_in)
 
 
 def _command_entry(sys) -> str:
@@ -335,6 +363,7 @@ def closed_loop(
     r: bool = True,
     w: bool = False,
     v: bool = False,
+    filter=None,
     validate: bool = True,
 ) -> DiagramSystem:
     """Build a controller/plant feedback diagram — the ``controller @ plant`` operator.
@@ -373,6 +402,13 @@ def closed_loop(
         disturbance ``w`` summed into the plant input, and the measurement
         noise ``v`` summed into the measurement before it returns (both off by
         default). With ``r=False`` the reference reads its nominal value.
+    filter : System, scalar or array, optional
+        The return path: a sensor or filter block, or a gain (a ``Gain``
+        block), named ``filter``, between the plant's ``y`` and what the
+        controller reads (its ``y``, or the ``Error`` block). The plant's
+        ``y`` stays the loop's output and the noise ``v`` enters before the
+        filter. A controller that reads ``x`` is refused: a filter on the
+        state is an estimator.
     validate : bool, optional
         If ``True``, run algebraic-loop detection before returning.
 
@@ -392,27 +428,30 @@ def closed_loop(
         open_loop, _controller_id, plant_id = _open_loop(
             controller, plant, expose_inputs=True
         )
-        diagram, junction_id = _close_with_junction(open_loop, validate=False)
+        diagram, _junction_id, measurement = _close_with_junction(
+            open_loop, 1 if filter is None else filter, validate=False
+        )
         add_loop_inputs(
-            diagram,
-            plant_id,
-            _default_plant_in(plant),
-            (junction_id, "-"),
-            r=r,
-            w=w,
-            v=v,
+            diagram, plant_id, _default_plant_in(plant), measurement, r=r, w=w, v=v
         )
         if validate:
             diagram.check_algebraic_loops()
         return diagram
     if not roles.measurements:
         raise ValueError(_no_measurement_message(controller, "ctl"))
+    if filter is not None and "x" in roles.measurements:
+        raise ValueError(
+            f"{controller.name!r} reads the state 'x': a filter on the state is an "
+            "estimator; use estimator="
+        )
 
     plant_box = _plant_box_with_state(plant) if "x" in roles.measurements else plant
     controller_id = _default_subsystem_id(controller, role="ctl")
     plant_id = _default_subsystem_id(plant_box, role="sys")
     paths = [
-        _feedback_path_for_measurement(
+        ("y", _plant_y(plant_box, plant_id))
+        if measurement == "y" and filter is not None
+        else _feedback_path_for_measurement(
             controller,
             plant_box,
             measurement=measurement,
@@ -424,8 +463,18 @@ def closed_loop(
     diagram, controller_id, plant_id = _open_loop(
         controller, plant_box, expose_inputs=False
     )
-    for measurement, plant_port in paths:
-        diagram.connect(plant_id, plant_port, controller_id, measurement)
+    measurement = (controller_id, roles.measurement)
+    for port, plant_port in paths:
+        source = (plant_id, plant_port)
+        if port == "y" and filter is not None:
+            source, measurement = _insert_filter(diagram, filter, source)
+            _require_same_dim(
+                diagram.subsystems[source[0]].outputs[source[1]].dim,
+                controller.inputs["y"].dim,
+                f"{source[0]}:{source[1]}",
+                f"{controller_id}:y",
+            )
+        diagram.connect(*source, controller_id, port)
 
     if r and "r" in controller.inputs:
         _add_input_port_like(diagram, "r", controller.inputs["r"])
@@ -434,13 +483,7 @@ def closed_loop(
     diagram.name = f"Closed loop {plant.name} with {controller.name}"
 
     add_loop_inputs(
-        diagram,
-        plant_id,
-        _default_plant_in(plant_box),
-        (controller_id, roles.measurement),
-        r=r,
-        w=w,
-        v=v,
+        diagram, plant_id, _default_plant_in(plant_box), measurement, r=r, w=w, v=v
     )
     if validate:
         diagram.check_algebraic_loops()
@@ -1012,8 +1055,18 @@ def _feedback_path_for_measurement(
             f"{plant.outputs['x'].dim}"
         )
 
-    if "y" in plant.outputs and plant.outputs["y"].dim == dim:
+    _plant_y(plant, plant_id)
+    if plant.outputs["y"].dim == dim:
         return "y", "y"
+    raise ValueError(
+        f"Cannot wire closed-loop feedback: {controller_id} declares "
+        f"measurement 'y' dim {dim}, but {plant_id} 'y' output "
+        f"has dim {plant.outputs['y'].dim}"
+    )
+
+
+def _plant_y(plant, plant_id: str) -> str:
+    """The plant's ``y`` port, or the refusal that names the fix."""
     if "y" not in plant.outputs:
         raise ValueError(
             f"Cannot wire closed-loop feedback: plant '{plant.name}' ({plant_id}) "
@@ -1021,11 +1074,7 @@ def _feedback_path_for_measurement(
             "port, y = x by default) or wire ports explicitly with "
             "add_subsystem/connect"
         )
-    raise ValueError(
-        f"Cannot wire closed-loop feedback: {controller_id} declares "
-        f"measurement 'y' dim {dim}, but {plant_id} 'y' output "
-        f"has dim {plant.outputs['y'].dim}"
-    )
+    return "y"
 
 
 def _default_control_out(sys) -> str:
