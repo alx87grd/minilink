@@ -4,21 +4,10 @@ import numpy as np
 
 from minilink.blocks.neural import MLP
 from minilink.core.backends import array_module
+from minilink.core.feedback import command_port
 from minilink.core.system import System
 
 # Public API
-
-
-def action_port_of(sys) -> str:
-    """The input port a learned law drives: ``"u"`` when it exists, else the plant's single input."""
-    if "u" in sys.inputs:
-        return "u"
-    if len(sys.inputs) == 1:
-        return next(iter(sys.inputs))
-    raise ValueError(
-        "the plant needs an input port named 'u' or a single input port; "
-        f"got {list(sys.inputs)}"
-    )
 
 
 class NeuralPolicyController(System):
@@ -113,7 +102,7 @@ class NeuralPolicyController(System):
         if squash not in ("clip", "tanh"):
             raise ValueError(f"squash must be 'clip' or 'tanh', got {squash!r}")
         self.squash = squash
-        port = sys.inputs[action_port_of(sys)]
+        port = sys.inputs[command_port(sys)]
         n, m = int(sys.n), int(port.dim)
         x_box, u_box = sys.state.box, port.box
         x_lb, x_ub = x_box.lower, x_box.upper

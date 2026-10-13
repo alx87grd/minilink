@@ -20,7 +20,7 @@ from minilink import (
     TransferFunction,
     feedback,
 )
-from minilink.core.feedback import error_input
+from minilink.core.feedback import block_roles, command_port, error_input, roles
 from minilink.core.system import DynamicSystem
 
 
@@ -424,6 +424,104 @@ class TestDispatchTable(unittest.TestCase):
         self.assertEqual(
             loop.connections["error"], {"+": ("input", "r"), "-": ("sys", "y")}
         )
+
+
+class TestResolver(unittest.TestCase):
+    """The roles every tool reads: the port names of a block, the reserved names of a diagram."""
+
+    def test_block_roles_read_the_port_names(self):
+        from minilink import PendulumWithNoisePort, StateFeedbackController
+
+        pid = block_roles(PID())
+        self.assertEqual(
+            (pid.measurements, pid.reference, pid.command), ((), None, "u")
+        )
+        self.assertEqual(pid.entry, "e")
+        self.assertTrue(pid.error_driven and pid.stateful)
+
+        p = block_roles(ProportionalController())
+        self.assertEqual((p.measurement, p.reference, p.entry), ("y", "r", None))
+        self.assertFalse(p.error_driven or p.stateful)
+
+        lqr = block_roles(StateFeedbackController(np.array([[1.0, 1.0]])))
+        self.assertEqual((lqr.measurements, lqr.reference), (("x",), "r"))
+
+        compensator = block_roles(TransferFunction([1.0], [1.0, 1.0]))
+        self.assertEqual((compensator.measurements, compensator.entry), ((), "u"))
+
+        plant = block_roles(PendulumWithNoisePort())
+        self.assertEqual(
+            (plant.measurements, plant.command, plant.entry), ((), None, None)
+        )
+
+    def test_command_port_is_u_or_the_one_free_input(self):
+        from minilink import PendulumWithNoisePort
+
+        self.assertEqual(command_port(Pendulum()), "u")
+        self.assertEqual(command_port(PendulumWithNoisePort()), "u")
+        self.assertEqual(command_port(PID() @ Pendulum()), "r")
+        self.assertEqual(command_port(Lead()), "e")
+        with self.assertRaisesRegex(ValueError, "input port named 'u'"):
+            command_port(ProportionalController())
+        with self.assertRaisesRegex(ValueError, "input port named 'u'"):
+            command_port(Step())
+
+    def test_roles_read_the_reserved_names(self):
+        from minilink import DiagramSystem, StateFeedbackController
+
+        K = np.array([[10.0, 2.0]])
+        plant, ctl = Pendulum(), StateFeedbackController(K)
+        hand_wired = DiagramSystem()
+        hand_wired.add_subsystem(ctl, "controller")
+        hand_wired.add_subsystem(plant, "plant")
+        who = roles(hand_wired)
+        self.assertIs(who.plant, plant)
+        self.assertIs(who.controller, ctl)
+        self.assertIsNone(who.estimator)
+
+        loop = ctl @ plant
+        self.assertIs(roles(loop).plant, plant)
+        self.assertIs(roles(loop).controller, ctl)
+
+        leaf = roles(plant)
+        self.assertIs(leaf.plant, plant)
+        self.assertIsNone(leaf.controller)
+
+        empty = roles(DiagramSystem())
+        self.assertEqual(
+            (empty.plant, empty.controller, empty.estimator), (None, None, None)
+        )
+
+    def test_roles_find_an_estimator_inside_the_controller(self):
+        from minilink import DiagramSystem, StateFeedbackController
+
+        gain, observer = StateFeedbackController(np.array([[1.0, 1.0]])), Integrator()
+        box = DiagramSystem()
+        box.add_subsystem(observer, "estimator")
+        box.add_subsystem(gain, "gain")
+        loop = DiagramSystem()
+        loop.add_subsystem(box, "controller")
+        loop.add_subsystem(Pendulum(), "plant")
+        self.assertIs(roles(loop).estimator, observer)
+
+    def test_roles_of_a_sampled_loop_come_from_its_two_sides(self):
+        from minilink import StateFeedbackController
+
+        plant, ctl = Pendulum(), StateFeedbackController(np.array([[10.0, 2.0]]))
+        sampled = ctl % 0.01 @ plant
+        self.assertIs(roles(sampled).plant, plant)
+        self.assertIs(roles(sampled).controller, ctl)
+
+    def test_a_second_block_under_a_reserved_name_is_refused(self):
+        from minilink import DiagramSystem
+
+        first, second = DiagramSystem(), DiagramSystem()
+        first.add_subsystem(Pendulum(), "plant")
+        second.add_subsystem(Pendulum(), "plant")
+        with self.assertRaisesRegex(ValueError, "one plant per diagram level"):
+            first.add_subsystem(Pendulum(), "plant")
+        with self.assertRaisesRegex(ValueError, "one plant per diagram level"):
+            first + second
 
 
 if __name__ == "__main__":

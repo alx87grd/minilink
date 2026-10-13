@@ -365,9 +365,9 @@ def nominal_trajectory(problem, policy, *, dt, tf=None) -> Trajectory:
 
 
 def env_action_port(sys) -> str:
-    from minilink.control.neural import action_port_of
+    from minilink.core.feedback import command_port
 
-    return action_port_of(sys)
+    return command_port(sys)
 
 
 def numpy_only_terms(problem) -> list:
@@ -432,11 +432,15 @@ def static_law(controller, backend="jax"):
     The time reaches the block, so a time-varying law (a finite-horizon LQR
     gain ``K(t)``) is scored with the gain of each instant.
     """
-    from minilink.core.feedback import feedback_ports
+    from minilink.core.feedback import block_roles
 
-    roles = feedback_ports(controller)
-    if roles is None:
-        raise ValueError("the controller must declare measurement and control ports")
+    roles = block_roles(controller)
+    if roles.measurement is None or roles.command is None:
+        raise ValueError(
+            "the controller must read the state on an input named 'x' (or 'y') "
+            f"and command 'u'; {controller.name!r} reads {list(controller.inputs)} "
+            f"and gives {list(controller.outputs)}"
+        )
     if int(controller.n) > 0:
         raise ValueError(
             "static laws u = pi(x) only; use backend='simulator' for a controller "
@@ -465,7 +469,7 @@ def static_law(controller, backend="jax"):
 
         def law(x, t=0.0):
             u_in = u_nominal.at[measurement].set(x)
-            return evaluator.outputs_trace(x_ctl, u_in, t)[roles.control]
+            return evaluator.outputs_trace(x_ctl, u_in, t)[roles.command]
 
     else:
         u_nominal = np.asarray(controller.get_u_from_input_ports(), dtype=float)
@@ -474,6 +478,6 @@ def static_law(controller, backend="jax"):
         def law(x, t=0.0):
             u_in = u_nominal.copy()
             u_in[measurement] = x
-            return np.asarray(evaluator.outputs(x_ctl, u_in, float(t))[roles.control])
+            return np.asarray(evaluator.outputs(x_ctl, u_in, float(t))[roles.command])
 
     return law

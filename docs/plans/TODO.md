@@ -73,7 +73,7 @@ AC-3); AC-4 with P4; P11. P6 stays held for GRO501; its row is in §5 (v0.9).
   standard port names drive the wiring, three reserved names (`plant`, `controller`,
   `estimator`) are the roles every tool reads, and the cost is scored on the plant. Its
   steps, in build order, are the plan's §7, each with its "done when":
-  - AC-0 no controller classes (landed 2026-10-13); AC-2a the resolver; AC-OP the operators; AC-3 composition
+  - AC-0 no controller classes and AC-2a the resolver (both landed 2026-10-13); AC-OP the operators; AC-3 composition
     on standard names; AC-2b/c the one-time rename and the ports `d` / `n`, last, as one
     sweep. This wave.
   - AC-4 loop inputs, with P4; AC-5 plots and AC-6 animation, in the plotting lane; AC-7

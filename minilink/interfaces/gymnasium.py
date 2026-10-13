@@ -162,7 +162,7 @@ class Sys2Gym(gym.Env):
         deterministic :class:`~minilink.planning.problems.PlanningProblem`
         starts every episode at its ``x_start``.
         """
-        from minilink.control.neural import action_port_of
+        from minilink.core.feedback import command_port
         from minilink.planning.problems import as_stochastic
         from minilink.planning.reinforcement_learning.environment import (
             feasible_cost_bound,
@@ -180,7 +180,7 @@ class Sys2Gym(gym.Env):
             env.infeasible_cost = feasible_cost_bound(
                 problem,
                 problem.sys.state.box,
-                action_port_of(problem.sys),
+                command_port(problem.sys),
                 dt,
                 int(round(tf / dt)),
                 float(problem.require_cost().discount_rate),

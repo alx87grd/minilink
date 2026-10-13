@@ -1803,7 +1803,7 @@ class TestPlotControlLaw(unittest.TestCase):
                     dependencies=("v", "w_in"),
                 )
 
-        with self.assertRaisesRegex(ValueError, "feedback_profile"):
+        with self.assertRaisesRegex(ValueError, "plot_input_output_map"):
             port_map.plot_control_law(Bare(), show=False)
 
     def test_solver_block_without_plot_space_refuses(self):

@@ -15,8 +15,8 @@ import warnings
 from abc import ABC
 
 from minilink.blocks.sources import TrajectorySource
-from minilink.control.neural import action_port_of
 from minilink.core.costs import CostFunction
+from minilink.core.feedback import command_port
 from minilink.core.sets import Set
 from minilink.core.trajectory import Trajectory
 from minilink.planning.evaluation import Evaluation, MonteCarloEvaluator
@@ -138,7 +138,7 @@ class Planner(ABC):
         sys = self.problem.sys
         u = trajectory.u
         if "u" in sys.inputs or len(sys.inputs) == 1:
-            u = sys.get_port_values_from_u(u, action_port_of(sys))
+            u = sys.get_port_values_from_u(u, command_port(sys))
         return TrajectorySource(trajectory.t, u, interpolation=interpolation)
 
     def solution_trajectory(self) -> Trajectory:

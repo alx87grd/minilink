@@ -5,8 +5,8 @@ import warnings
 import numpy as np
 from scipy.stats import qmc
 
-from minilink.control.neural import action_port_of
 from minilink.core.backends import BACKEND_JAX, BACKEND_NUMPY, array_module
+from minilink.core.feedback import command_port
 from minilink.core.sets import is_finite_box
 from minilink.planning.problems import as_stochastic, merge_params
 
@@ -92,7 +92,7 @@ class RolloutEnvironment:
         )
 
         # Input vector: the action fills its port, disturbances fill theirs
-        self.action_port = action_port_of(self.sys)
+        self.action_port = command_port(self.sys)
         self.m = int(self.sys.inputs[self.action_port].dim)
         self.nominal_inputs = self.nominal_port_values()
         self.infeasible_cost = self.price_of_infeasibility()

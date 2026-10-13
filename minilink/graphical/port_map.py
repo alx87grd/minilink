@@ -23,7 +23,7 @@ from dataclasses import dataclass
 
 import numpy as np
 
-from minilink.core.feedback import feedback_ports
+from minilink.core.feedback import block_roles, plot_space_of
 from minilink.graphical.common import PlotResult
 
 # Public API
@@ -179,10 +179,12 @@ def plot_control_law(
 ) -> PlotResult:
     """Plot the textbook slice of a controller block's control law.
 
-    Requires a resolvable feedback declaration
-    (:func:`minilink.core.feedback.feedback_ports`). The zero-argument call
-    picks the sweep space from the declared profile (error space for
-    error-driven laws, absolute measurement/state otherwise), sweeps the
+    The block's port names say what it reads
+    (:func:`minilink.core.feedback.block_roles`): the measurement ``y`` or
+    ``x``, or the error entry of a compensator. The zero-argument call
+    picks the sweep space (:func:`minilink.core.feedback.plot_space_of`:
+    error space for error-driven laws, absolute measurement/state
+    otherwise), sweeps the
     first relevant coordinates, and pins the reference and every other
     coordinate at its nominal value. Blocks with internal state are
     evaluated at ``x0``.
@@ -190,7 +192,8 @@ def plot_control_law(
     Parameters
     ----------
     block : System
-        Controller block with a feedback declaration.
+        A block that reads a measurement (``y``, ``x`` or an error entry) and
+        commands ``u``.
     x_axis, y_axis : int, optional
         Workspace components to sweep. Components ``0 .. p-1`` are the
         measurement-space coordinates; ``p ..`` index the block's internal
@@ -214,19 +217,17 @@ def plot_control_law(
     -------
     PlotResult
     """
-    roles = feedback_ports(block)
-    if roles is None:
-        roles = _error_driven_roles(block)
+    roles = _law_roles(block)
     if roles is None:
         raise ValueError(
-            f"{block.name} has no resolvable feedback declaration — declare "
-            "feedback_profile (or measurement_port / control_port) to use "
-            "plot_control_law"
+            f"{block.name} reads no measurement (an input named 'y' or 'x', or "
+            "the error entry of a compensator) and commands no 'u', so it has no "
+            "control law to draw; plot_input_output_map() sweeps any input"
         )
-    space = roles.plot_space if space is None else space
+    space = plot_space_of(block) if space is None else space
     if space is None:
         raise ValueError(
-            f"{block.name} declares feedback ports but no static control-law "
+            f"{block.name} reads a measurement but has no static control-law "
             "semantics (its command is not a static map — e.g. an MPC solver "
             "call); set a plot_space attr or pass space= only if a static "
             "sweep is meaningful"
@@ -270,16 +271,24 @@ def plot_control_law(
     )
 
 
-def _error_driven_roles(block):
-    """Roles for a compensator (one input ``e``): sweep the error port itself."""
-    from minilink.core.feedback import FeedbackRoles, error_input
+@dataclass(frozen=True)
+class _LawRoles:
+    """The ports a control-law sweep reads: the swept input, the pinned reference, the command."""
 
-    port = error_input(block)
+    measurement: str
+    ref: str | None
+    control: str
+
+
+def _law_roles(block):
+    """The swept port (a measurement, else a compensator's entry), the reference and the command."""
+    roles = block_roles(block)
+    measurement = roles.measurement or roles.entry
     outputs = list(getattr(block, "outputs", {}))
-    if port is None or not outputs:
+    if measurement is None or not outputs:
         return None
-    control = "u" if "u" in outputs else outputs[0]
-    return FeedbackRoles(port, None, control, "measurement")
+    control = roles.command or outputs[0]
+    return _LawRoles(measurement, roles.reference, control)
 
 
 def render_port_map_matplotlib(

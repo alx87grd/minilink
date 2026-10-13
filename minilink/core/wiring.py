@@ -16,6 +16,7 @@ import numpy as np
 
 from minilink.core.backends import array_module
 from minilink.core.distributions import child_seed
+from minilink.core.feedback import check_reserved_id
 from minilink.core.signals import OutputPort, VectorSignal
 from minilink.core.system import DEFAULT_SMALLEST_TIME_CONSTANT
 
@@ -251,7 +252,12 @@ class WiredDiagramMixin:
         self.compute_state_properties()
 
     def add_subsystem(self, sys, sys_id):
-        """Add a subsystem under a unique id, with all its inputs unconnected."""
+        """Add a subsystem under a unique id, with all its inputs unconnected.
+
+        The ids ``plant``, ``controller`` and ``estimator`` name the roles every
+        tool reads (:func:`minilink.core.feedback.roles`); one of each per level.
+        """
+        check_reserved_id(sys_id, self.subsystems)
         self.subsystems[sys_id] = sys
         self.connections[sys_id] = {port_id: None for port_id in sys.inputs}
 

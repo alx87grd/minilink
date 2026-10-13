@@ -11,7 +11,7 @@ and returns the policy's cost-to-go field ``J``.
 
 import numpy as np
 
-from minilink.core.feedback import feedback_ports
+from minilink.core.feedback import block_roles
 from minilink.planning.evaluation import policy_of
 from minilink.planning.policy_synthesis.dp import (
     DynamicProgrammingOptions,
@@ -33,10 +33,10 @@ class PolicyEvaluator:
     grid : StateSpaceGrid
         Discretization of the state and input spaces.
     policy : callable, System or PlanningSolution
-        State-feedback law ``u = policy(x)``, a solution (its policy), or a controller block with a
-        feedback declaration (``feedback_profile`` or explicit port-role
-        attrs — see :func:`minilink.core.feedback.feedback_ports`): the grid
-        state feeds the measurement port, the reference stays pinned at its
+        State-feedback law ``u = policy(x)``, a solution (its policy), or a
+        controller block that reads the state on an input named ``x`` (or
+        ``y``) and commands ``u`` (:func:`minilink.core.feedback.block_roles`):
+        the grid state feeds that port, the reference stays pinned at its
         nominal value, and the control port supplies ``u``.
     options : DynamicProgrammingOptions, optional
         Shared workflow options (``alpha``, ``tol``, ``interpolation``, ...).
@@ -146,20 +146,21 @@ class PolicyEvaluator:
 
 
 def _policy_from_block(block):
-    """Adapt a declared controller block into a ``u = policy(x)`` callable.
+    """Adapt a controller block into a ``u = policy(x)`` callable.
 
     The block is evaluated through its control-port compute at nominal
     internal state, with the grid state on the measurement port and every
     other input (reference) pinned at its port nominal.
     """
-    roles = feedback_ports(block)
-    if roles is None:
+    roles = block_roles(block)
+    if roles.measurement is None or roles.command is None:
         raise ValueError(
-            "policy must be a callable u = policy(x) or a controller block "
-            "with a feedback declaration (feedback_profile or "
-            f"measurement_port / control_port); got {type(block).__name__}"
+            "policy must be a callable u = policy(x) or a controller block that "
+            "reads the state on an input named 'x' (or 'y') and commands 'u'; "
+            f"{type(block).__name__} reads {list(block.inputs)} and gives "
+            f"{list(block.outputs)}"
         )
-    output = block.outputs[roles.control]
+    output = block.outputs[roles.command]
     measurement = block.get_input_port_slice(roles.measurement)
     u_base = block.get_u_from_input_ports().astype(float)
     x_ctrl = np.asarray(block.x0, dtype=float)

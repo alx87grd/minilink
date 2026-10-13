@@ -585,7 +585,7 @@ class TestDynamicProgrammingPlotting(unittest.TestCase):
 
         problem = make_problem()
         _, result = solve(problem)
-        with self.assertRaisesRegex(ValueError, "feedback declaration"):
+        with self.assertRaisesRegex(ValueError, "reads the state"):
             PolicyEvaluator(problem, grid=result.grid, policy=Integrator())
 
 

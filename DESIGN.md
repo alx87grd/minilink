@@ -509,9 +509,12 @@ their operands; `+` and `>>` are the operators that extend a shortcut-built
 left diagram in place. Known gap: `step_diagram % dt` on a user-built
 `StepDiagramSystem` still adds its boundary ports to that diagram (TODO D3).
 
-**Shortcut subsystem ids** default by role: `ref` (sources), `ctl` (controllers),
-`sys` (stateful plants), with numeric suffix on collision (`sys2`, …). Override
-with ``System.id`` before wiring or explicit ``add_subsystem(..., "plant")``.
+**Shortcut subsystem ids** default by role: `ref` (sources), `ctl` (controllers:
+a block that commands `u` and reads `r`, `y`, `x` or `e`), `sys` (stateful
+plants), with numeric suffix on collision (`sys2`, …). Override with
+``System.id`` before wiring or explicit ``add_subsystem(..., "plant")``. The
+reserved names `plant`, `controller` and `estimator` are never suffixed: a
+second block under one of them is refused.
 Block titles in ``plot_diagram()`` still show ``sys.name`` (human type).
 A diagram nested with ``add_subsystem`` is drawn expanded: its blocks sit in a
 box labelled ``name::id``, at every depth, and the wires go straight to the inner
@@ -533,10 +536,10 @@ form, `PID`, `Lead`, `Lag`, `TransferFunction(ports="error")`,
 `ProportionalController(ports="error")`),
 `ports="reference"` declares `r` and `y` (the controller form the generic
 framework uses). A bare `TransferFunction` stays a plant (`u`, `y`). `@` keeps one rule — the left operand drives the right
-one and the output returns to the left — with two layouts: a declared
-measurement port is wired directly; an error-driven block
-(`core.feedback.error_input`: a declared `error_port`, or a single input
-with no roles — a compensator, a transfer function, a plant, a series
+one and the output returns to the left — with two layouts: a block that reads
+a measurement (`y` or `x`) is wired directly; an error-driven block
+(`core.feedback.block_roles`: an input `e`, or a single input with no
+measurement — a compensator, a transfer function, a plant, a series
 diagram `C >> G`) gets an `Error` block (`e = r - y`, ports `+`, `-`, `e`)
 inserted by `core.composition.feedback`, and `sys @ 1` closes any such
 system on itself (`sys @ K` through a `Gain`). Positive feedback still
@@ -546,28 +549,39 @@ anything else raises and names `feedback(sys, of=(port, index))`. No `Loop`
 block, no new operator.
 
 A controller is an ordinary `System`: explicit ports, and `ctl` as the port
-compute — `ctl` *is* the control law. The **feedback-port declaration** is
-read-only context for tools, never behavior: the class attribute
-`feedback_profile` names the law family, and
-`minilink/core/feedback.py` maps it to standard port roles
-(`PROFILE_PORTS` registry + `feedback_ports(block)` resolver). Explicit
-attrs `measurement_port` / `ref_port` / `control_port` / `plot_space`
-override the registry for nonstandard blocks (`LookupTableController`
-and `SB3Controller` declare `measurement_port="x"`, `ref_port=None`;
-MPC declares `control_port="u_ff"`, no `plot_space`). Resolution is duck-typed
-(`getattr`), never `isinstance`.
+compute — `ctl` *is* the control law. **The port names are the declaration**,
+and `minilink/core/feedback.py` reads them, never a class or an `isinstance`:
+
+- `block_roles(block)` says what a block measures (`y`, `x`, or both), its
+  reference `r`, its command `u`, and whether an `Error` block drives it (an
+  input `e`, or the one input of a plain compensator; a disturbance `d` or a
+  noise `n` is never the entry);
+- `command_port(sys)` is the input a decision drives on a plant or a box: `u`,
+  else the one input that is not `d` or `n`;
+- `roles(diagram)` returns the blocks under the reserved subsystem names
+  `plant`, `controller` and `estimator` (the estimator may sit inside the
+  controller; a leaf is its own plant; a sampled loop answers from its two
+  sides; the shortcuts' `sys` and `ctl` read as `plant` and `controller`
+  until they are renamed). One of each per diagram level: a second block
+  under a reserved name is refused, never suffixed.
+
+The profile table (`feedback_profile`, `PROFILE_PORTS`) and the override
+attributes (`measurement_port` / `ref_port` / `control_port` / `plot_space`)
+stay readable for one thing, the sweep space of `plot_control_law`
+(`plot_space_of`), until the composition on standard names retires them.
 
 Not adopted: a `StaticController` base owning a `control_law(y, r, t)` method that a
 base-class `ctl` unbundles from the ports (it hides the block's behaviour behind two
 methods and changes how students author controllers), and per-family law bases (premature
 while a family has one to three members; revisit when an observer family lands).
 
-The declaration drives three tools:
+The port names drive three tools:
 
-- **`@` composition** resolves the controller side from the declaration
-  first (`resolve_standard_feedback` and the hybrid
-  `default_computer_boundary_ports`); the name/dimension heuristics
-  (`y↔y`, `Mux(q, dq)`, `x↔x`) remain as fallback for undeclared blocks.
+- **`@` composition** reads `block_roles` (`resolve_standard_feedback` and the
+  hybrid `default_computer_boundary_ports`): a block that reads `y` closes on
+  the plant's `y`, one that reads `x` on its `x`, with a `Mux(q, dq)` when the
+  measurement is the `[q; dq]` of a mechanical plant; dimensions are a check,
+  never a choice.
 - **`plot_control_law()`** on every `System`, beside the generic
   `plot_input_output_map()`. There are no controller base classes: a
   controller is a `System`, or a `DynamicSystem` when it has state, and the
@@ -578,12 +592,13 @@ The declaration drives three tools:
   declaration (a plant, a filter) refuses, and `plot_input_output_map()`
   sweeps any input of any block. Engine in `graphical/port_map.py` (module
   twin for third-party blocks).
-- **`PolicyEvaluator(policy=block)`** adapts a declared block into
-  `u = policy(x)` (grid state on the measurement port, reference pinned).
+- **`PolicyEvaluator(policy=block)`** adapts a block that reads the state on
+  `x` (or `y`) and commands `u` into `u = policy(x)` (grid state on the
+  measurement port, reference pinned).
 
-An undeclared block still simulates, compiles, and wires manually — the
-declaration only unlocks the smart tools. The `error` and `output` profiles
-wire identically and differ in what `plot_control_law` sweeps.
+A block with other port names still simulates, compiles, and wires by hand —
+the standard names only unlock the shortcuts and the tools. The `error` and
+`output` profiles wire identically and differ in what `plot_control_law` sweeps.
 
 | Profile | Module | Measurement | `plot_control_law` sweep |
 | --- | --- | --- | --- |
