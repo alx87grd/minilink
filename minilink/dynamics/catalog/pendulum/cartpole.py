@@ -379,7 +379,7 @@ class CartPoleWithNoisePort(CartPole):
         self.outputs["y"].dependencies = ("v",)
 
     def generalized_force(self, q, v, u, t=0.0, params=None):
-        F, w = self.get_port_values_from_u(u, "u", "w")
+        F, w = u[:1], u[1:2]  # the ports in order: the cart force, the disturbance
         B = self.B(q, params)
 
         # the disturbance enters with the cart force
@@ -388,7 +388,7 @@ class CartPoleWithNoisePort(CartPole):
         return force
 
     def h(self, x, u, t=0.0, params=None):
-        v_noise = self.get_port_values_from_u(u, "v")
+        v_noise = u[2:]  # the third port: the measurement noise
         xp = array_module(x, u)
 
         # the measurement is the state plus the noise port

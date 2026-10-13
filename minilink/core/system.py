@@ -269,6 +269,58 @@ class System(SharedSystemFacades):
             upper_bound=upper_bound,
         )
 
+    def rename_ports(self, **names):
+        """
+        Rename ports at creation: ``Saturation(-1, 1).rename_ports(u="u_cmd", y="u")``.
+
+        A port name is the block's outside: wiring, ``autowire``, plot signals,
+        drawings. The equations read the stacked ``u`` by position, so a rename
+        changes nothing inside. The renames of one call apply at once (a chain
+        such as ``u="u_cmd", y="u"`` is one step), the port order is kept, and
+        the output dependency lists follow. Refused: a name that is not a port,
+        a new name that is a port not renamed in the same call, two equal new
+        names, and a diagram, whose edge is named with ``expose``. Rename a
+        block before placing it in a diagram, whose wiring refers to the names.
+
+        Returns the block, for chaining.
+        """
+        if hasattr(self, "subsystems"):
+            raise ValueError(
+                f"rename_ports renames the ports of a block; {self.name!r} is a "
+                "diagram, whose edge is named with expose(...)"
+            )
+        ports = {**self.inputs, **self.outputs}
+        unknown = [old for old in names if old not in ports]
+        if unknown:
+            raise ValueError(
+                f"{self.name!r} has no port {', '.join(map(repr, unknown))}; "
+                f"its ports are {', '.join(ports)}"
+            )
+        new_names = list(names.values())
+        if len(set(new_names)) != len(new_names):
+            raise ValueError(f"two ports cannot take the same name: {new_names}")
+        untouched = set(ports) - set(names)
+        taken = [new for new in new_names if new in untouched]
+        if taken:
+            raise ValueError(
+                f"{', '.join(map(repr, taken))} is already a port of {self.name!r}; "
+                "rename that port in the same call, or pick another name"
+            )
+
+        def renamed(table):
+            renamed_table = {}
+            for old, port in table.items():
+                port.id = names.get(old, old)
+                renamed_table[port.id] = port
+            return renamed_table
+
+        self.inputs = renamed(self.inputs)
+        self.outputs = renamed(self.outputs)
+        for port in self.outputs.values():
+            if port.dependencies != "all":
+                port.dependencies = tuple(names.get(d, d) for d in port.dependencies)
+        return self
+
     def get_u_from_input_ports(self):
         """
         Concatenated default values of all input ports.

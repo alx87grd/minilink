@@ -323,11 +323,11 @@ class DynamicBicycle(DynamicSystem):
         return tau_ground
 
     def _u_in(self, x, u):
-        """``[w_rear, delta]`` from the port vector (overridden by the rate variant)."""
+        """``[w_rear, delta]`` from the port vector (overridden by the rate variant).
+
+        The two named ports stack in that order, so the port vector is the pair.
+        """
         xp = array_module(x, u)
-        if self.named_ports:
-            w_rear, delta = self.get_port_values_from_u(u, "w_rear", "delta")
-            return xp.array([w_rear[0], delta[0]])
         return xp.asarray(u)
 
     def tf(self, x, u, t=0, params=None):
@@ -535,11 +535,8 @@ class BicycleDynRate(DynamicBicycle):
         self.add_output_port("x", dim=self.n, function=self.compute_state)
 
     def rates(self, x, u):
-        """``[w_rear_dot, delta_dot]`` from the port vector."""
+        """``[w_rear_dot, delta_dot]`` from the port vector: the two named ports in order."""
         xp = array_module(x, u)
-        if self.named_ports:
-            w_dot, d_dot = self.get_port_values_from_u(u, "w_rear_dot", "delta_dot")
-            return xp.array([w_dot[0], d_dot[0]])
         return xp.asarray(u)
 
     def f(self, x, u, t=0.0, params=None):

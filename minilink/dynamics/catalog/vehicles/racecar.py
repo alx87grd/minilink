@@ -331,13 +331,9 @@ class UdeSRacecarDyn(DynamicBicycle):
         return x
 
     def commands(self, x, u):
-        """``[P_cmd, delta_cmd]`` from the port vector."""
+        """``[P_cmd, delta_cmd]`` from the port vector: the two named ports in order."""
         xp = array_module(x, u)
-        if not self.named_ports:
-            return xp.asarray(u)
-        P_cmd, delta_cmd = self.get_port_values_from_u(u, "P_cmd", "delta_cmd")
-
-        return xp.array([P_cmd[0], delta_cmd[0]])
+        return xp.asarray(u)
 
     # Sensor outputs
 

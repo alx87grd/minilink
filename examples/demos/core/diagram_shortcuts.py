@@ -97,9 +97,9 @@ noisy.plot_diagram()
 # auto.connect("step", "y", "controller", "r")
 # auto.connect("pendulum", "y", "controller", "y")
 # auto.connect("controller", "u", "pendulum", "u")
-auto = (Step() + ImpedanceController() + Pendulum()).autowire(strict=True)
+auto = (Step(port="r") + ImpedanceController() + Pendulum()).autowire(strict=True)
 show(
     auto,
     "Autowired shortcut diagram",
-    "(Step() + ImpedanceController() + Pendulum()).autowire(strict=True)",
+    '(Step(port="r") + ImpedanceController() + Pendulum()).autowire(strict=True)',
 )

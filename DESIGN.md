@@ -492,9 +492,15 @@ Shortcuts (`core.composition`): `+` flat add only, `>>` series, `@` closed loop
 ``closed_loop(C, plant, r=True, w=False, v=False)`` exposes the reference, a load
 disturbance ``w`` summed into the plant input and a measurement noise ``v`` summed into
 the measurement, each through a visible `Sum` block; `@` keeps the single input ``r``),
-`autowire()` conservative fill — **never inserts Mux**; use `feedback="qdq"` or
-`closed_loop_qdq` for explicit `Mux(q, dq)` wiring. Diagram operands are flattened,
-not nested. Explicit `add_subsystem` / `connect` remains canonical for general topology.
+`autowire()` connects by name only: each unconnected input takes the one output
+with the same name and size, an output may feed several inputs, and an input
+with no match or several stays open and is listed in a warning (`strict=True`
+raises); a disturbance `d` or a noise `n` left open reads its nominal value
+silently. It **never inserts a Mux**; `feedback="qdq"` or `closed_loop_qdq` do.
+Sources name their signal at creation (`Step(port="r")`), blocks their ports
+with `rename_ports` (the renames of one call apply at once; a collision with an
+untouched port is refused). Diagram operands are flattened, not nested.
+Explicit `add_subsystem` / `connect` remains canonical for general topology.
 
 **No operator modifies its operands.** `+`, `>>` and `@` (the continuous loop
 `ctl @ plant` and the sampled loop `ctl % dt @ plant`), like `feedback()`, return

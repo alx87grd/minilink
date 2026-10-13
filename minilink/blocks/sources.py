@@ -12,17 +12,19 @@ class Source(System):
     """Constant source: ``y = value`` for all ``t``.
 
     Also the base class for time-signal sources; subclasses override
-    :meth:`h` with their own ``y = h(t; p)``.
+    :meth:`h` with their own ``y = h(t; p)``. ``port`` names the output
+    signal: ``y`` by default, or the input it drives (``Step(port="r")``,
+    ``WhiteNoise(port="d")``), which is how ``autowire`` finds it.
     """
 
-    def __init__(self, p):
+    def __init__(self, p, *, port="y"):
 
         super().__init__()
 
         self.name = "Source"
         self.params = {"value": np.zeros(p)}
 
-        self.add_output_port("y", dim=p, function=self.h)
+        self.add_output_port(port, dim=p, function=self.h)
 
     def h(self, x, u, t=0, params=None):
         params = self.params if params is None else params
@@ -115,7 +117,9 @@ class Source(System):
 class Step(Source):
     """Step source: ``y = initial_value`` if ``t < step_time``, else ``final_value``."""
 
-    def __init__(self, initial_value=None, final_value=None, step_time=1.0):
+    def __init__(
+        self, initial_value=None, final_value=None, step_time=1.0, *, port="y"
+    ):
         if initial_value is None:
             initial_value = np.zeros(1)
         if final_value is None:
@@ -127,7 +131,7 @@ class Step(Source):
             raise ValueError("initial_value and final_value must have the same shape")
 
         p = initial_value.shape[0]
-        Source.__init__(self, p)
+        Source.__init__(self, p, port=port)
 
         self.name = "Step"
         self.params = {
@@ -156,10 +160,10 @@ class Sine(Source):
     ``omega = 2 * np.pi * f``.
     """
 
-    def __init__(self, amplitude=1.0, omega=1.0, phase=0.0, offset=0.0):
+    def __init__(self, amplitude=1.0, omega=1.0, phase=0.0, offset=0.0, *, port="y"):
         amplitude = np.asarray(amplitude, dtype=float).reshape(-1)
         p = amplitude.shape[0]
-        Source.__init__(self, p)
+        Source.__init__(self, p, port=port)
 
         self.name = "Sine"
         self.params = {
@@ -201,7 +205,9 @@ class WhiteNoise(Source):
     HOLDS = ("zoh", "linear")
     is_random = True
 
-    def __init__(self, p=1, *, psd=1.0, sample_period=0.01, seed=0, hold="zoh"):
+    def __init__(
+        self, p=1, *, psd=1.0, sample_period=0.01, seed=0, hold="zoh", port="y"
+    ):
         if hold not in self.HOLDS:
             raise ValueError(f"hold must be one of {self.HOLDS}, got {hold!r}")
         if seed is not None and int(seed) < 0:
@@ -211,7 +217,7 @@ class WhiteNoise(Source):
         if float(sample_period) <= 0.0:
             raise ValueError("sample_period must be > 0")
 
-        Source.__init__(self, p)
+        Source.__init__(self, p, port=port)
 
         self.name = "WhiteNoise"
         self.hold = hold
@@ -278,7 +284,7 @@ class TrajectorySource(Source):
 
     INTERPOLATIONS = ("linear", "previous")
 
-    def __init__(self, t, values, *, interpolation="linear"):
+    def __init__(self, t, values, *, interpolation="linear", port="y"):
         t = np.asarray(t, dtype=float).reshape(-1)
         values = np.asarray(values, dtype=float)
         if values.ndim == 1:
@@ -290,7 +296,7 @@ class TrajectorySource(Source):
                 f"interpolation must be one of {self.INTERPOLATIONS}, got {interpolation!r}"
             )
 
-        Source.__init__(self, values.shape[0])
+        Source.__init__(self, values.shape[0], port=port)
         self.name = "Trajectory Source"
         self.sample_times = t
         self.sample_values = values

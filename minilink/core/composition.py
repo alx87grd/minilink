@@ -12,7 +12,6 @@ from __future__ import annotations
 
 import re
 import warnings
-from collections.abc import Iterable
 from dataclasses import dataclass
 
 import numpy as np
@@ -22,6 +21,10 @@ from minilink.core.feedback import block_roles, check_reserved_id, command_port
 from minilink.core.system import System
 
 _VALID_FEEDBACK = frozenset({"auto", "y", "qdq"})
+
+#: Inputs that read their nominal value when left open, without a word from
+#: autowire: a plant's disturbance and measurement noise.
+_NOMINAL_WHEN_OPEN = frozenset({"d", "n", "w", "v"})
 
 
 def _animated_geometry_source(obj):
@@ -552,16 +555,16 @@ def autowire(
     strict: bool = False,
     validate: bool = True,
 ) -> DiagramSystem:
-    """Fill unconnected diagram inputs when exactly one safe source matches.
+    """Connect unconnected inputs by name: each takes the one output with its name and size.
 
     Parameters
     ----------
     diagram : DiagramSystem
         Diagram to modify in place.
     strict : bool, optional
-        If ``True``, raise when any match is ambiguous. No new connections are
-        applied before that error is raised. If ``False``, the ambiguous inputs
-        are left unconnected and a warning lists them.
+        If ``True``, raise when an input stays open (no match, or several). No
+        new connections are applied before that error is raised. If ``False``,
+        the open inputs are left unconnected and a warning lists them.
     validate : bool, optional
         If ``True``, run algebraic-loop detection after wiring.
 
@@ -572,65 +575,48 @@ def autowire(
 
     Notes
     -----
-    The rules are conservative and never overwrite existing connections:
-
-    - exact same port name and dimension, except generic measurement ``y``;
-    - source-like ``y`` output to a ``r`` input;
-    - non-source-like ``y`` output to a measurement ``y`` input.
-
-    An input with several candidates is ambiguous, and so is an output that
-    matches several inputs by name (a command reaching both a saturation and
-    the plant).
+    Names only, no guessing: an output may feed several inputs, existing
+    connections are never overwritten, and a disturbance ``d`` or a noise
+    ``n`` left open reads its nominal value without a word. Name a source's
+    signal after the input it drives (``Step(port="r")``) and a block's
+    ports at creation (``rename_ports``).
     """
     if not isinstance(diagram, DiagramSystem):
         raise TypeError("autowire() expects a DiagramSystem")
 
     decisions = []
-    ambiguities = []
+    open_inputs = []
     for target_id, target in diagram.subsystems.items():
         for input_id, input_port in target.inputs.items():
             if diagram.connections[target_id][input_id] is not None:
                 continue
-
-            candidates = _autowire_candidates(diagram, target_id, input_id, input_port)
+            candidates = [
+                (source_id, port_id)
+                for source_id, _source, port_id, output in _iter_output_ports(
+                    diagram, target_id
+                )
+                if port_id == input_id and output.dim == input_port.dim
+            ]
             if len(candidates) == 1:
                 source_id, source_port = candidates[0]
                 decisions.append((source_id, source_port, target_id, input_id))
             elif len(candidates) > 1:
                 rendered = ", ".join(f"{s}:{p}" for s, p in candidates)
-                ambiguities.append(
+                open_inputs.append(
                     f"Ambiguous autowire target {target_id}:{input_id}; "
                     f"candidates: {rendered}"
                 )
+            elif input_id not in _NOMINAL_WHEN_OPEN:
+                open_inputs.append(
+                    f"no output named {input_id!r} for {target_id}:{input_id}"
+                )
 
-    # One output matched by name to several inputs (a command reaching both a
-    # saturation and the plant) is ambiguous too: which one it drives is a choice.
-    # A measurement `y` read by several blocks is not: every reader gets it.
-    by_name = {}
-    for source_id, source_port, target_id, input_id in decisions:
-        if source_port == input_id != "y":
-            by_name.setdefault((source_id, source_port), []).append(
-                f"{target_id}:{input_id}"
-            )
-    fanned = {source for source, targets in by_name.items() if len(targets) > 1}
-    for source_id, source_port in fanned:
-        targets = ", ".join(by_name[source_id, source_port])
-        ambiguities.append(
-            f"Ambiguous autowire source {source_id}:{source_port}; it matches "
-            f"several inputs: {targets}"
-        )
-    decisions = [
-        decision
-        for decision in decisions
-        if not (decision[1] == decision[3] != "y" and decision[:2] in fanned)
-    ]
-
-    if ambiguities and strict:
-        raise ValueError(ambiguities[0])
-    if ambiguities:
+    if open_inputs and strict:
+        raise ValueError(open_inputs[0])
+    if open_inputs:
         warnings.warn(
             "autowire left these inputs unconnected (wire them with connect): "
-            + "; ".join(ambiguities),
+            + "; ".join(open_inputs),
             stacklevel=3,
         )
 
@@ -1318,62 +1304,6 @@ def _feedback_mismatch_message(
     )
 
 
-def _autowire_candidates(diagram, target_id: str, input_id: str, input_port):
-    candidates = list(_matching_exact_outputs(diagram, target_id, input_id, input_port))
-    if input_id == "y":
-        candidates = [
-            (sys_id, port_id)
-            for sys_id, port_id in candidates
-            if not _is_source_like(diagram.subsystems[sys_id])
-        ]
-        candidates.extend(
-            _matching_named_y_outputs(
-                diagram,
-                target_id,
-                input_port,
-                source_like=False,
-                exclude=candidates,
-            )
-        )
-    elif input_id == "r" or input_id.startswith("r_"):
-        candidates.extend(
-            _matching_named_y_outputs(
-                diagram,
-                target_id,
-                input_port,
-                source_like=True,
-                exclude=candidates,
-            )
-        )
-    return _dedupe(candidates)
-
-
-def _matching_exact_outputs(diagram, target_id: str, input_id: str, input_port):
-    if input_id == "y":
-        return []
-    for source_id, _source, port_id, output in _iter_output_ports(diagram, target_id):
-        if port_id == input_id and output.dim == input_port.dim:
-            yield source_id, port_id
-
-
-def _matching_named_y_outputs(
-    diagram,
-    target_id: str,
-    input_port,
-    *,
-    source_like: bool,
-    exclude: Iterable[tuple[str, str]],
-):
-    excluded = set(exclude)
-    for source_id, source, port_id, output in _iter_output_ports(diagram, target_id):
-        if (source_id, port_id) in excluded:
-            continue
-        if port_id != "y" or output.dim != input_port.dim:
-            continue
-        if _is_source_like(source) == source_like:
-            yield source_id, port_id
-
-
 def _iter_output_ports(diagram, target_id: str):
     for source_id, source in diagram.subsystems.items():
         if source_id == target_id:
@@ -1405,17 +1335,6 @@ def _default_subsystem_id(sys, *, role=None) -> str:
     if sys.n > 0:
         return "sys"
     return _base_system_id(sys)
-
-
-def _dedupe(candidates):
-    seen = set()
-    result = []
-    for candidate in candidates:
-        if candidate in seen:
-            continue
-        seen.add(candidate)
-        result.append(candidate)
-    return result
 
 
 def _base_system_id(sys) -> str:

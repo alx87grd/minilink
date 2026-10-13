@@ -129,7 +129,7 @@ class PendulumWithNoisePort(Pendulum):
         return xp.array([[1.0]])
 
     def generalized_force(self, q, v, u, t=0.0, params=None):
-        tau, w = self.get_port_values_from_u(u, "u", "w")
+        tau, w = u[:1], u[1:2]  # the ports in order: the torque, the disturbance
         B = self.B(q, params)
 
         # the disturbance enters with the actuator torque
@@ -138,7 +138,7 @@ class PendulumWithNoisePort(Pendulum):
         return force
 
     def h(self, x, u, t=0.0, params=None):
-        v_noise = self.get_port_values_from_u(u, "v")
+        v_noise = u[2:]  # the third port: the measurement noise
         xp = array_module(x, u)
         k = self.dof
         y = xp.concatenate([x[:k], x[k : k + 1] + v_noise[0], x[k + 1 :]])

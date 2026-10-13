@@ -260,46 +260,73 @@ class TestDiagramCompositionShortcuts(unittest.TestCase):
 
     def test_autowire_connects_unique_matches_without_overwrites(self):
         diagram = (
-            Step(final_value=[1.0]) + ProportionalController() + Integrator()
+            Step(final_value=[1.0], port="r") + ProportionalController() + Integrator()
         ).autowire(strict=True)
-        self.assertEqual(diagram.connections["ctl"]["r"], ("ref", "y"))
+        self.assertEqual(diagram.connections["ctl"]["r"], ("ref", "r"))
         self.assertEqual(diagram.connections["ctl"]["y"], ("sys", "y"))
         self.assertEqual(diagram.connections["sys"]["u"], ("ctl", "u"))
-        diagram.connect("ref", "y", "sys", "u")
+        diagram.connect("ref", "r", "sys", "u")
         diagram.autowire(strict=True)
-        self.assertEqual(diagram.connections["sys"]["u"], ("ref", "y"))
+        self.assertEqual(diagram.connections["sys"]["u"], ("ref", "r"))
 
     def test_autowire_handles_pendulum_closed_loop_convention(self):
         diagram = (
-            Step(final_value=[1.0]) + ImpedanceController() + Pendulum()
+            Step(final_value=[1.0], port="r") + ImpedanceController() + Pendulum()
         ).autowire(strict=True)
-        self.assertEqual(diagram.connections["ctl"]["r"], ("ref", "y"))
+        self.assertEqual(diagram.connections["ctl"]["r"], ("ref", "r"))
         self.assertEqual(diagram.connections["ctl"]["y"], ("sys", "y"))
         self.assertEqual(diagram.connections["sys"]["u"], ("ctl", "u"))
 
+    def test_autowire_reads_names_only(self):
+        with self.assertWarnsRegex(UserWarning, "no output named 'r'"):
+            diagram = (
+                Step(final_value=[1.0]) + ImpedanceController() + Pendulum()
+            ).autowire()
+        self.assertIsNone(diagram.connections["ctl"]["r"])
+        self.assertEqual(diagram.connections["ctl"]["y"], ("sys", "y"))
+        with self.assertRaisesRegex(ValueError, "no output named 'r'"):
+            (Step(final_value=[1.0]) + ImpedanceController() + Pendulum()).autowire(
+                strict=True
+            )
+
     def test_autowire_strict_refuses_ambiguous_matches(self):
-        diagram = ProportionalController() + ProportionalController() + Integrator()
-        with self.assertRaisesRegex(ValueError, "Ambiguous autowire target"):
+        diagram = (
+            Step(final_value=[1.0], port="r")
+            + ProportionalController()
+            + ProportionalController()
+            + Integrator()
+        )
+        with self.assertRaisesRegex(ValueError, "Ambiguous autowire target sys:u"):
             diagram.autowire(strict=True)
         self.assertEqual(diagram.connections["ctl"]["y"], None)
         self.assertEqual(diagram.connections["ctl2"]["y"], None)
         self.assertEqual(diagram.connections["sys"]["u"], None)
 
-    def test_autowire_never_routes_one_command_to_two_inputs(self):
-        def blocks():
-            return (
-                Step(final_value=[1.0])
-                + ProportionalController()
-                + Saturation()
-                + Integrator()
-            )
+    def test_autowire_follows_renamed_ports_through_an_actuator(self):
+        ref = Step(final_value=[1.0], port="r")
+        ctl = ProportionalController(2.0).rename_ports(u="u_cmd")
+        sat = Saturation(-1, 1).rename_ports(u="u_cmd", y="u")
+        diagram = (ref + ctl + sat + Integrator()).autowire(strict=True)
+        ctl_id = diagram.subsystem_id(ctl)
+        self.assertEqual(diagram.connections["saturation"]["u_cmd"], (ctl_id, "u_cmd"))
+        self.assertEqual(diagram.connections["sys"]["u"], ("saturation", "u"))
+        self.assertEqual(diagram.connections[ctl_id]["y"], ("sys", "y"))
+        self.assertEqual(list(sat.inputs), ["u_cmd"])
+        self.assertEqual(list(sat.outputs), ["u"])
+        measured = ProportionalController().rename_ports(y="y_meas")
+        self.assertEqual(measured.outputs["u"].dependencies, ("r", "y_meas"))
 
-        with self.assertWarnsRegex(UserWarning, "ctl:u; it matches several inputs"):
-            diagram = blocks().autowire()
-        self.assertIsNone(diagram.connections["sys"]["u"])
-        self.assertIsNone(diagram.connections["saturation"]["u"])
-        with self.assertRaisesRegex(ValueError, "Ambiguous autowire"):
-            blocks().autowire(strict=True)
+    def test_rename_ports_refuses_a_silent_mistake(self):
+        with self.assertRaisesRegex(ValueError, "has no port 'z'"):
+            Integrator().rename_ports(z="u")
+        with self.assertRaisesRegex(ValueError, "already a port"):
+            ProportionalController().rename_ports(r="y")
+        with self.assertRaisesRegex(ValueError, "same name"):
+            ProportionalController().rename_ports(r="e", y="e")
+        with self.assertRaisesRegex(ValueError, "is a diagram"):
+            (Integrator() >> Integrator()).rename_ports(u="w")
+        swapped = ProportionalController().rename_ports(r="y", y="r")
+        self.assertEqual(list(swapped.inputs), ["y", "r"])
 
     def test_closed_loop_qdq_inserts_mux(self):
         diagram = closed_loop_qdq(ImpedanceController(), Pendulum())

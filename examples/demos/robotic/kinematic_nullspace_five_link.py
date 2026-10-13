@@ -24,6 +24,7 @@ ref_q = Step(
     initial_value=-q2,
     final_value=q2,
     step_time=NULLSPACE_STEP_TIME,
+    port="r_null",
 )
 ref_q.name = "Joint posture ref"
 
