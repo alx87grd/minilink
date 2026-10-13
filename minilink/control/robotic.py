@@ -22,7 +22,7 @@ class ModelJointImpedance(System):
     Law: ``τ = Kp e + Kd ė + g(q)`` when ``gravity_comp`` is enabled.
     """
 
-    feedback_profile = "impedance"
+    plot_space = "error_qdq"  # plot_control_law sweeps the (e, de) plane
 
     def __init__(
         self,
@@ -156,7 +156,7 @@ class TaskImpedance(System):
     ``ctl:task_force``.
     """
 
-    feedback_profile = "task"
+    plot_space = "absolute_qdq"  # plot_control_law sweeps the (q, dq) plane
 
     def __init__(
         self,
@@ -300,7 +300,7 @@ class TaskKinematic(System):
     Reference ``r`` is the desired end-effector position ``p_d`` (dim ``task_dim``).
     """
 
-    feedback_profile = "kinematic"
+    plot_space = "measurement"  # the task reference is not a joint error
 
     def __init__(self, plant, *, Kp=None):
         if not hasattr(plant, "forward_kinematics") or not hasattr(plant, "J"):

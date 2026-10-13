@@ -12,7 +12,8 @@ how a block computes; this module only reads names:
 - :func:`command_port` names the input a decision drives on a plant or a box.
 
 ``@``, ``feedback``, the sampled loop, ``plot_control_law`` and the evaluators read
-these; a block with other names is wired by hand.
+these; a block with other names is wired by hand. The one explicit hint left is
+``plot_space``, the sweep of ``plot_control_law`` where the ports cannot say it.
 """
 
 from dataclasses import dataclass
@@ -150,109 +151,34 @@ def check_reserved_id(sys_id, existing) -> None:
         )
 
 
-def error_input(block):
-    """The input an Error block drives when ``block`` is closed on itself, or ``None``.
+# The sweep space of a law
 
-    A block with an input ``e``, or with exactly one input and no measurement
-    (a transfer function, a plant, a series diagram ``C >> G``) is error-driven
-    at that port. A block that reads its measurement (``y`` or ``x``) returns
-    ``None``: ``@`` wires that port instead.
-    """
-    return block_roles(block).entry
-
-
-# Transitional declaration: the profile table and the override attributes stay
-# readable until the composition on standard names removes them; today only
-# ``plot_control_law`` reads them, for the sweep space of a law.
-
-
-@dataclass(frozen=True)
-class FeedbackRoles:
-    """Resolved feedback port roles (and plot semantics) for a block.
-
-    Attributes
-    ----------
-    measurement : str
-        Input-port id carrying the feedback measurement (``"y"`` or ``"x"``).
-    ref : str or None
-        Input-port id carrying the reference, or ``None`` when the block has
-        no boundary reference (lookup policies, MPC).
-    control : str
-        Output-port id carrying the control command.
-    plot_space : str or None
-        Sweep-space semantics for ``plot_control_law``: ``"error"``,
-        ``"error_qdq"``, ``"measurement"``, ``"state"``, ``"absolute_qdq"``,
-        or ``None`` when the block has no static law to plot (e.g. MPC).
-    """
-
-    measurement: str
-    ref: str | None
-    control: str
-    plot_space: str | None = None
-
-
-#: ``feedback_profile`` → standard port roles + plot semantics.
-PROFILE_PORTS = {
-    "error": FeedbackRoles("y", "r", "u", "error"),  # u = c(e), e = r - y
-    "output": FeedbackRoles("y", "r", "u", "measurement"),  # general u = c(y, r)
-    "state": FeedbackRoles("x", "r", "u", "state"),  # u = c(x), absolute state
-    "impedance": FeedbackRoles("y", "r", "u", "error_qdq"),  # y=[pos; rate]
-    "modelbased": FeedbackRoles("y", "r", "u", "absolute_qdq"),  # y=[q; dq]
-    "task": FeedbackRoles("y", "r", "u", "absolute_qdq"),  # y=[q; dq], FK inside
-    "kinematic": FeedbackRoles("y", "r", "u", "measurement"),  # y=q, FK inside
-    "siso": FeedbackRoles("y", "r", "u", "error"),  # decoupled PID loops
-}
-
-# Sentinel distinguishing "attr not declared" from an explicit ``None``
-# (e.g. ``ref_port = None`` on a block with no boundary reference).
+#: Marks an unset ``plot_space`` attribute: the ports then decide.
 _UNSET = object()
-
-
-def feedback_ports(block):
-    """Resolve the feedback port roles declared by ``block``, or ``None``.
-
-    Priority per role: explicit class attr (``measurement_port`` /
-    ``ref_port`` / ``control_port`` / ``plot_space``) → the block's
-    ``feedback_profile`` row in :data:`PROFILE_PORTS` → ``None``.
-
-    Returns ``None`` unless the resolved measurement and control port names
-    actually exist on the block — the declaration never guesses silently;
-    callers fall back to heuristics or raise their own precise error.
-    """
-    profile_roles = PROFILE_PORTS.get(getattr(block, "feedback_profile", None))
-
-    def resolve(attr, default):
-        value = getattr(block, attr, _UNSET)
-        return default if value is _UNSET else value
-
-    defaults = profile_roles or FeedbackRoles(None, None, None, None)
-    measurement = resolve("measurement_port", defaults.measurement)
-    ref = resolve("ref_port", defaults.ref)
-    control = resolve("control_port", defaults.control)
-    plot_space = resolve("plot_space", defaults.plot_space)
-
-    if measurement is None or control is None:
-        return None
-    inputs = getattr(block, "inputs", {})
-    outputs = getattr(block, "outputs", {})
-    if measurement not in inputs or control not in outputs:
-        return None
-    if ref is not None and ref not in inputs:
-        ref = None
-    return FeedbackRoles(measurement, ref, control, plot_space)
 
 
 def plot_space_of(block):
     """The sweep space of ``block``'s law for ``plot_control_law``, or ``None``.
 
-    An explicit ``plot_space`` attribute wins, then the block's profile; an
-    error-driven block sweeps its entry port (``"measurement"``). ``None`` means
-    the block has no static law to draw (a solver call such as MPC).
+    An explicit ``plot_space`` attribute wins (``None`` says the block has no
+    static law to draw, a solver call such as MPC); else the ports decide: a
+    block that reads ``x`` sweeps the state, one that reads ``y`` and a
+    reference of the same size the error ``e = r - y`` with ``r`` pinned, one
+    that reads ``y`` otherwise the measurement, and an error-driven block its
+    entry port.
     """
-    declared = feedback_ports(block)
-    if declared is not None:
-        return declared.plot_space
-    return "measurement" if block_roles(block).error_driven else None
+    declared = getattr(block, "plot_space", _UNSET)
+    if declared is not _UNSET:
+        return declared
+    roles = block_roles(block)
+    if "x" in roles.measurements:
+        return "state"
+    if "y" in roles.measurements:
+        inputs = block.inputs
+        if roles.reference and inputs["r"].dim == inputs["y"].dim:
+            return "error"
+        return "measurement"
+    return "measurement" if roles.error_driven else None
 
 
 class ErrorDriven:

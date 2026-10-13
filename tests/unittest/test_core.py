@@ -418,48 +418,30 @@ class TestStandardFeedback(unittest.TestCase):
 
 
 from minilink.control.state import StateFeedbackController
-from minilink.core.feedback import feedback_ports
 from minilink.core.system import System
 
 
-class TestFeedbackDeclaration(unittest.TestCase):
-    def test_profile_registry_resolves_roles(self):
-        roles = feedback_ports(ProportionalController(0.5))
-        self.assertEqual((roles.measurement, roles.ref, roles.control), ("y", "r", "u"))
-        self.assertEqual(roles.plot_space, "error")
+class TestPortNamesDriveTheLoop(unittest.TestCase):
+    def test_the_sweep_space_comes_from_the_ports_or_plot_space(self):
+        from minilink import ImpedanceController
+        from minilink.core.feedback import plot_space_of
 
-    def test_state_profile_resolves_x_measurement(self):
-        roles = feedback_ports(StateFeedbackController(np.array([[1.0, 1.0]])))
-        self.assertEqual(roles.measurement, "x")
-        self.assertEqual(roles.plot_space, "state")
+        self.assertEqual(plot_space_of(ProportionalController(0.5)), "error")
+        self.assertEqual(
+            plot_space_of(StateFeedbackController(np.array([[1.0, 1.0]]))), "state"
+        )
+        self.assertEqual(plot_space_of(Integrator()), "measurement")
+        self.assertEqual(plot_space_of(ImpedanceController()), "error_qdq")
 
-    def test_explicit_attrs_override_profile(self):
-        class Custom(System):
-            feedback_profile = "error"
-            measurement_port = "meas"
-            ref_port = None
-
+        class Measured(System):
             def __init__(self):
                 super().__init__()
-                self.add_input_port("meas", dim=1)
-                self.add_output_port(
-                    "u",
-                    dim=1,
-                    function=lambda x, u, t, params=None: -u,
-                    dependencies=("meas",),
-                )
+                self.add_input_port("y", dim=4)
+                self.add_input_port("r", dim=1)
+                self.add_output_port("u", dim=1, dependencies=("y", "r"))
 
-        roles = feedback_ports(Custom())
-        self.assertEqual(roles.measurement, "meas")
-        self.assertIsNone(roles.ref)
-
-    def test_undeclared_or_missing_ports_return_none(self):
-        self.assertIsNone(feedback_ports(Integrator()))
-
-        class BadDeclaration(System):
-            feedback_profile = "error"  # but no y/u ports exist
-
-        self.assertIsNone(feedback_ports(BadDeclaration()))
+        self.assertEqual(plot_space_of(Measured()), "measurement")
+        self.assertIsNone(plot_space_of(Step(final_value=[1.0])))
 
     def test_declared_state_feedback_wires_x(self):
         lqr = StateFeedbackController(np.array([[1.0, 1.0]]))

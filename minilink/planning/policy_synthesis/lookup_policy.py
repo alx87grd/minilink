@@ -32,12 +32,6 @@ class LookupTableController(System):
         Per-axis input interpolation method.
     """
 
-    # Explicit port roles: state measurement, no boundary reference.
-    measurement_port = "x"
-    ref_port = None
-    control_port = "u"
-    plot_space = "state"
-
     def __init__(self, grid, pi, *, interpolation: str = "linear") -> None:
         super().__init__()
         self.name = "Lookup Table Controller"

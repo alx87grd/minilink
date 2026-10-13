@@ -1,4 +1,4 @@
-"""Feedback profile: siso — decoupled PID loops, compensator or controller form."""
+"""Decoupled PID loops, compensator or controller form."""
 
 import numpy as np
 
@@ -45,8 +45,6 @@ class PID(ErrorDriven, DynamicSystem):
     u_min, u_max, e_int_min, e_int_max : float or vector
         Saturation limits per axis.
     """
-
-    feedback_profile = "siso"
 
     #: Which terms this form carries — the state layout follows.
     has_integrator = True

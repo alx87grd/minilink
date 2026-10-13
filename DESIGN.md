@@ -547,7 +547,7 @@ nested diagram as one block with its boundary ports.
 Visualization: subsystem `"world"` geometry merges into one shared diagram
 `"world"` frame; only articulated frames get `{sys_id}:` prefixes.
 
-### Control feedback profiles
+### Control laws: the port names are the declaration
 
 **Compensators and the Error block.** Classical laws are
 written once on the tracking error and take a port-layout switch:
@@ -587,10 +587,15 @@ and `minilink/core/feedback.py` reads them, never a class or an `isinstance`:
   until they are renamed). One of each per diagram level: a second block
   under a reserved name is refused, never suffixed.
 
-The profile table (`feedback_profile`, `PROFILE_PORTS`) and the override
-attributes (`measurement_port` / `ref_port` / `control_port` / `plot_space`)
-stay readable for one thing, the sweep space of `plot_control_law`
-(`plot_space_of`), until the composition on standard names retires them.
+The one explicit hint left is `plot_space`, a class attribute read only by
+`plot_control_law` (`plot_space_of`) where the ports cannot say what to sweep:
+the `(e, de)` and `(q, dq)` planes of the robotic laws (`error_qdq`,
+`absolute_qdq`), and `None` for a solver call such as MPC, which has no static
+law to draw. Without it the ports decide: a block that reads `x` sweeps the
+state; one that reads `y` and a reference of the same size sweeps the error
+`e = r - y` with `r` pinned; one that reads `y` otherwise sweeps the
+measurement; an error-driven block sweeps its entry port. There is no profile
+table and no port override attribute: a block that reads `meas` wires by hand.
 
 Not adopted: a `StaticController` base owning a `control_law(y, r, t)` method that a
 base-class `ctl` unbundles from the ports (it hides the block's behaviour behind two
@@ -607,31 +612,33 @@ The port names drive three tools:
 - **`plot_control_law()`** on every `System`, beside the generic
   `plot_input_output_map()`. There are no controller base classes: a
   controller is a `System`, or a `DynamicSystem` when it has state, and the
-  declaration is what makes the method draw. The zero-argument call sweeps
-  the textbook slice per profile (error space for error-driven laws,
-  absolute measurement or state otherwise), pinning the reference, unswept
-  components, and any internal state (`x0`) at nominal; a block with no
-  declaration (a plant, a filter) refuses, and `plot_input_output_map()`
-  sweeps any input of any block. Engine in `graphical/port_map.py` (module
+  port names are what make the method draw. The zero-argument call sweeps
+  the textbook slice the ports or `plot_space` name (error space for
+  error-driven laws, absolute measurement or state otherwise), pinning the
+  reference, unswept components, and any internal state (`x0`) at nominal; a
+  block with no law to draw (a plant, a filter, `plot_space = None`) refuses,
+  and `plot_input_output_map()` sweeps any input of any block. Engine in `graphical/port_map.py` (module
   twin for third-party blocks).
 - **`PolicyEvaluator(policy=block)`** adapts a block that reads the state on
   `x` (or `y`) and commands `u` into `u = policy(x)` (grid state on the
   measurement port, reference pinned).
 
 A block with other port names still simulates, compiles, and wires by hand —
-the standard names only unlock the shortcuts and the tools. The `error` and
-`output` profiles wire identically and differ in what `plot_control_law` sweeps.
+the standard names only unlock the shortcuts and the tools. A law on `y` with
+a same-size `r` and a law on `y` used absolutely wire identically and differ
+only in what `plot_control_law` sweeps. The library's control modules, by what
+they read and what the zero-argument sweep draws:
 
-| Profile | Module | Measurement | `plot_control_law` sweep |
-| --- | --- | --- | --- |
-| `error` | `output.py` | `y` (error-driven, `u = c(r - y)`) | error `e = r − y` |
-| `output` | (reserved) | `y` used absolutely, `u = c(y, r)` (learned policies) | measurement, `r` pinned |
-| `impedance` | `impedance.py` | `y = [pos; rate]` dim `2n`; optional robotic `+ g(q)` via `robotic.py` | `(e, de)` plane |
-| `state` | `state.py` | full state `x`; constant gain `K` (`StateFeedbackController`, what `lqr` returns: `u = ubar - K (x - r)` on a state reference, or with `N=` the textbook output reference `u = ubar - K (x - xbar) + N r`, `r` of the output's dimension) or a gain schedule `K(t)` interpolated between samples and held or replaced past its end (`TimeVaryingStateFeedbackController`, what `lqr_finite_horizon` returns; the schedule itself comes from `lqr_gain_schedule`, the Riccati differential equation propagated exactly through the Hamiltonian system); feedback around a reference trajectory `u = u_d(t) - K(t)(x - x_d(t))` (`TrajectoryFeedbackController`, no reference port — the trajectory is the reference; what `trajectory_lqr` returns: the plant linearized at every sample of the reference, the Riccati equation swept backward interval by interval from the stationary solution at the end point) | `(x0, x1)` |
-| `siso` | `siso.py` | `y` dim `n` only (decoupled loops) | error per axis |
-| `task` | `robotic.py` | Joint ``[q; dq]`` feedback; internal FK/J; optional ``+ g(q)``; optional task-force arrow | `(q0, dq0)` absolute |
-| `kinematic` | `robotic.py` | Joint ``q`` only; outputs ``dq`` for speed-controlled plants | measurement |
-| `modelbased` | `modelbased.py` | ``y = [q; dq]``; computed torque; Pyro sliding mode ``τ = ID(q,dq,ddq_r) - K(q) sign(s)`` | `(q0, dq0)` absolute |
+| Module | Measurement | `plot_control_law` sweep |
+| --- | --- | --- |
+| `output.py` | `y` with `r` (`u = c(r - y)`) | error `e = r − y` |
+| (a law on `y` used absolutely, `u = c(y, r)`: learned policies) | `y`, `r` of another size or absent | measurement, `r` pinned |
+| `impedance.py` | `y = [pos; rate]` dim `2n`; optional robotic `+ g(q)` via `robotic.py` | `(e, de)` plane (`plot_space = "error_qdq"`) |
+| `state.py` | full state `x`; constant gain `K` (`StateFeedbackController`, what `lqr` returns: `u = ubar - K (x - r)` on a state reference, or with `N=` the textbook output reference `u = ubar - K (x - xbar) + N r`, `r` of the output's dimension) or a gain schedule `K(t)` interpolated between samples and held or replaced past its end (`TimeVaryingStateFeedbackController`, what `lqr_finite_horizon` returns; the schedule itself comes from `lqr_gain_schedule`, the Riccati differential equation propagated exactly through the Hamiltonian system); feedback around a reference trajectory `u = u_d(t) - K(t)(x - x_d(t))` (`TrajectoryFeedbackController`, no reference port — the trajectory is the reference; what `trajectory_lqr` returns: the plant linearized at every sample of the reference, the Riccati equation swept backward interval by interval from the stationary solution at the end point) | `(x0, x1)` |
+| `siso.py` | `y` dim `n` only (decoupled loops) | error per axis |
+| `robotic.py` (task laws) | Joint ``[q; dq]`` feedback; internal FK/J; optional ``+ g(q)``; optional task-force arrow | `(q0, dq0)` absolute (`plot_space = "absolute_qdq"`) |
+| `robotic.py` (kinematic laws) | Joint ``q`` only; outputs ``dq`` for speed-controlled plants | measurement (`plot_space = "measurement"`: the task reference is not a joint error) |
+| `modelbased.py` | ``y = [q; dq]``; computed torque; Pyro sliding mode ``τ = ID(q,dq,ddq_r) - K(q) sign(s)`` | `(q0, dq0)` absolute (`plot_space = "absolute_qdq"`) |
 
 **Controller naming conventions.** PID-style gain params keys are
 uppercase (`Kp`, `Ki`, `Kd`, `K_null`) across `impedance`, `siso`, `robotic`,

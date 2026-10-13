@@ -66,12 +66,6 @@ class NeuralPolicyController(System):
     ``task_target`` draws a second, fixed ball at the task point.
     """
 
-    # Explicit port roles: state measurement, no boundary reference.
-    measurement_port = "x"
-    ref_port = None
-    control_port = "u"
-    plot_space = "state"
-
     def __init__(
         self,
         sys,

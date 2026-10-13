@@ -69,12 +69,8 @@ class ModelPredictiveControllerMixin:
     ``_debug``, and optional warm-start via ``_z_warm_for_command``.
     """
 
-    # Feedback-port declaration (see minilink.core.feedback): measurement
-    # ``y``, no boundary reference, solver command on ``u_ff``. No
-    # ``plot_space`` — the output is a solve call, not a static law.
-    measurement_port = "y"
-    ref_port = None
-    control_port = "u_ff"
+    # The command is a solve call, not a static law: nothing to sweep.
+    plot_space = None
 
     _planner: TrajectoryOptimizationPlanner
     _latch: object

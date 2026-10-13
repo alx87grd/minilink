@@ -1,4 +1,4 @@
-"""Feedback profile: state — full-state linear feedback, constant or scheduled gain."""
+"""Full-state linear feedback, constant or scheduled gain."""
 
 import numpy as np
 
@@ -27,8 +27,6 @@ class StateFeedbackController(System):
     measured ``y`` (and ``@``-operator wiring), use
     :class:`~minilink.control.output.ProportionalController`.
     """
-
-    feedback_profile = "state"
 
     def __init__(self, K, xbar=None, ubar=None, *, N=None):
         super().__init__()
@@ -81,8 +79,6 @@ class TimeVaryingStateFeedbackController(System):
     :class:`StateFeedbackController`. This is the block
     :func:`minilink.control.lqr.lqr_finite_horizon` returns.
     """
-
-    feedback_profile = "state"
 
     def __init__(self, t, K, xbar=None, ubar=None, K_after=None):
         super().__init__()
@@ -151,8 +147,6 @@ class TrajectoryFeedbackController(System):
     trajectory itself, so there is no reference port. This is the block
     :func:`minilink.control.lqr.trajectory_lqr` returns.
     """
-
-    feedback_profile = "state"
 
     def __init__(self, trajectory, K):
         super().__init__()

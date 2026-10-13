@@ -5,8 +5,8 @@ static block and draws the resulting output component: a line (one swept
 component), a heatmap (two), or a 3-D surface (``show_3d=True``).
 
 :func:`plot_control_law` is the smart controller shortcut: it reads the
-block's feedback-port declaration (:mod:`minilink.core.feedback`) and sweeps
-the textbook coordinates for the declared profile — error space for
+block's port names (:mod:`minilink.core.feedback`) and sweeps the textbook
+coordinates the ports or the block's ``plot_space`` name — error space for
 error-driven laws, absolute measurement or state space otherwise — pinning
 the reference and every unswept coordinate at its nominal value. Blocks with
 internal state are evaluated at pinned ``x0`` (the instantaneous law);
@@ -205,7 +205,8 @@ def plot_control_law(
         Pin the reference at this value; default the ref-port nominal.
     space : str, optional
         Override the sweep space: ``"error"``, ``"error_qdq"``,
-        ``"measurement"``, or ``"state"``; default from the profile.
+        ``"measurement"``, or ``"state"``; default from the ports or the
+        block's ``plot_space``.
     bounds : optional
         Sweep ranges, as in :func:`plot_input_output_map`.
     show_3d : bool, optional

@@ -20,7 +20,7 @@ from minilink import (
     TransferFunction,
     feedback,
 )
-from minilink.core.feedback import block_roles, command_port, error_input, roles
+from minilink.core.feedback import block_roles, command_port, roles
 from minilink.core.system import DynamicSystem
 
 
@@ -163,10 +163,10 @@ class TestJunction(unittest.TestCase):
         self.assertEqual(list(T.subsystems), ["ctl", "sys"])
         T = PID(Kp=5.0, ports="reference") @ Integrator()
         self.assertEqual(list(T.subsystems), ["ctl", "sys"])
-        self.assertIsNone(error_input(PID(ports="reference")))
-        self.assertEqual(error_input(PID()), "e")
-        self.assertEqual(error_input(TransferFunction([1.0], [1.0, 1.0])), "u")
-        self.assertEqual(error_input(Lead()), "e")
+        self.assertIsNone(block_roles(PID(ports="reference")).entry)
+        self.assertEqual(block_roles(PID()).entry, "e")
+        self.assertEqual(block_roles(TransferFunction([1.0], [1.0, 1.0])).entry, "u")
+        self.assertEqual(block_roles(Lead()).entry, "e")
 
     def test_step_reference_drives_the_classical_loop(self):
         plant = _damped_pendulum()

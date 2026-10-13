@@ -47,9 +47,6 @@ class TransferFunction(ErrorDriven, LTISystem):
                 function=self.h,
                 dependencies=self.error_dependencies if feedthrough else (),
             )
-            if ports == "reference":
-                self.measurement_port, self.ref_port, self.control_port = "y", "r", "u"
-                self.plot_space = "error"
         else:
             # plant: ``error()`` is the identity so ``f`` / ``h`` stay ``u -> y``
             self.port_layout = "error"

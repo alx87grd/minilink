@@ -25,7 +25,7 @@ class ComputedTorqueController(System):
     See DESIGN §4 (*Embedded-model params rule*).
     """
 
-    feedback_profile = "modelbased"
+    plot_space = "absolute_qdq"  # plot_control_law sweeps the (q, dq) plane
 
     def __init__(
         self,
@@ -118,7 +118,7 @@ class SlidingModeController(ComputedTorqueController):
     equations are written in :meth:`sliding_torque`).
     """
 
-    feedback_profile = "modelbased"
+    plot_space = "absolute_qdq"  # plot_control_law sweeps the (q, dq) plane
 
     def __init__(
         self,

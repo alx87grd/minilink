@@ -299,12 +299,6 @@ class SB3Controller(System):
     ports (sweep domain and axis names for ``plot_control_law``).
     """
 
-    # Explicit port roles: state measurement, no boundary reference.
-    measurement_port = "x"
-    ref_port = None
-    control_port = "u"
-    plot_space = "state"
-
     def __init__(self, model, sys=None, name="RL Policy Controller"):
         super().__init__()
         self.name = name

@@ -58,12 +58,6 @@ class PurePursuit(System):
         Dimension of the state the block reads (the plant's ``y`` port).
     """
 
-    feedback_profile = "state"
-    measurement_port = "y"
-    ref_port = None
-    control_port = "u"
-    plot_space = "measurement"
-
     def __init__(
         self,
         waypoints,

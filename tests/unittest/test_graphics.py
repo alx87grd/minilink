@@ -1692,7 +1692,7 @@ class TestPlotInputOutputMap(unittest.TestCase):
 
 
 class TestPlotControlLaw(unittest.TestCase):
-    def test_error_profile_line_values(self):
+    def test_error_space_line_values(self):
         prop = ProportionalController(K=2.0)
         res = prop.plot_control_law(bounds=(-1.0, 1.0), show=False)
         line = res.axes.lines[0]
@@ -1701,7 +1701,7 @@ class TestPlotControlLaw(unittest.TestCase):
         self.assertEqual(res.axes.get_xlabel(), "e")
         plt.close(res.figure)
 
-    def test_state_profile_surface_values(self):
+    def test_state_space_surface_values(self):
         K = np.array([[3.0, 1.0]])
         xbar = np.array([np.pi, 0.0])
         ubar = np.array([0.5])
@@ -1808,15 +1808,13 @@ class TestPlotControlLaw(unittest.TestCase):
 
     def test_solver_block_without_plot_space_refuses(self):
         class SolverLike(System):
-            measurement_port = "y"
-            ref_port = None
-            control_port = "u_ff"
+            plot_space = None  # a solve call, not a static law
 
             def __init__(self):
                 super().__init__()
                 self.add_input_port("y", dim=1)
                 self.add_output_port(
-                    "u_ff",
+                    "u",
                     dim=1,
                     function=lambda x, u, t, params=None: u,
                     dependencies=("y",),

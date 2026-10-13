@@ -1,4 +1,4 @@
-"""Feedback profile: impedance — virtual spring-damper on [position; rate]."""
+"""Virtual spring-damper laws on ``[position; rate]`` measurements."""
 
 import numpy as np
 
@@ -25,7 +25,7 @@ class ImpedanceController(System):
         Display metadata for ports.
     """
 
-    feedback_profile = "impedance"
+    plot_space = "error_qdq"  # plot_control_law sweeps the (e, de) plane
 
     def __init__(
         self,
@@ -124,7 +124,7 @@ class ImpedanceIntegralController(DynamicSystem):
         Stored in ``self.params``; defaults ``Kp=10``, ``Ki=1``, ``Kd=1``.
     """
 
-    feedback_profile = "impedance"
+    plot_space = "error_qdq"  # plot_control_law sweeps the (e, de) plane
 
     def __init__(
         self,

@@ -1,4 +1,4 @@
-"""Feedback profile: error — static output-error proportional control."""
+"""Static output-error proportional control."""
 
 import numpy as np
 
@@ -20,8 +20,6 @@ class ProportionalController(ErrorDriven, System):
     feedback with a feedforward offset — the form LQR produces — use
     :class:`~minilink.control.state.StateFeedbackController`.
     """
-
-    feedback_profile = "error"
 
     def __init__(self, K=1.0, *, ports="reference"):
         super().__init__()

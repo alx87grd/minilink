@@ -1285,17 +1285,9 @@ def _feedback_mismatch_message(
     ctl_y = controller.inputs["y"].dim if "y" in controller.inputs else None
     plant_y = plant.outputs["y"].dim if "y" in plant.outputs else None
     qdq_n = _plant_qdq_dof(plant)
-    profile = getattr(controller, "feedback_profile", None)
     hint = ""
     if attempted == "auto" and qdq_n is not None and ctl_y == 2 * qdq_n:
         hint = "; try feedback='qdq'"
-    elif profile == "impedance" and qdq_n is not None:
-        hint = "; impedance controller may need feedback='qdq'"
-    elif profile is None:
-        hint = (
-            "; declare feedback_profile (or measurement_port / control_port) "
-            "on the controller for declaration-driven wiring"
-        )
     return (
         f"Cannot wire closed-loop feedback ({attempted!r}): "
         f"{controller_id}.y dim {ctl_y}, {plant_id}.y dim {plant_y}"
