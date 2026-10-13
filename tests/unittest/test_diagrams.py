@@ -56,7 +56,7 @@ class TestDiagrams(unittest.TestCase):
         self.assertIsNotNone(graph)
         self.assertIn("controller", graph.source)
         self.assertIn("plant", graph.source)
-        self.assertIn("input:out_r:e -> ctl:in_r:w", graph.source)
+        self.assertIn("input:out_r:e -> controller:in_r:w", graph.source)
         self.assertIn("output:in_y__meas:w", graph.source)
 
     def test_port_ids_stay_distinct_across_case_and_role(self):
