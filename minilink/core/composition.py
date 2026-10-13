@@ -162,9 +162,9 @@ def series(
     return diagram
 
 
-def feedback(sys, through=1, *, of=None, sign=-1.0, validate=True) -> DiagramSystem:
+def feedback(sys, filter=1, *, of=None, sign=-1.0, validate=True) -> DiagramSystem:
     """Close ``sys`` on itself with an :class:`~minilink.blocks.routing.Error`
-    block: ``r -> e = r - y -> sys -> y``.
+    block: ``r -> e = r - y -> sys -> y``, the textbook ``T = L / (1 + L H)``.
 
     Negative feedback (the default) inserts ``Error``, so the diagram shows
     ports ``+``, ``-``, and ``e``. Positive feedback still uses a signed
@@ -175,14 +175,16 @@ def feedback(sys, through=1, *, of=None, sign=-1.0, validate=True) -> DiagramSys
     measurement (``y`` or ``x``) is closed on its plant with ``@`` instead.
     What comes back is ``of``, else ``y``, else the only output. ``sys`` is
     not modified: the result is a new diagram sharing its blocks, with
-    boundary input ``r`` and that output as boundary output ``y``. The
-    operator form is ``sys @ 1`` (and ``sys @ K`` for ``through=K``).
+    boundary input ``r`` and that output as boundary output ``y``. ``@``
+    always means controller at plant; this is the one way to close an open
+    loop on itself.
 
     Parameters
     ----------
-    through : 1, scalar, array, or System
-        The return path: ``1`` is a direct wire, a scalar or matrix inserts a
-        ``Gain`` block, a system (sensor dynamics) is inserted as a block.
+    filter : 1, scalar, array, or System
+        The return path ``H``: ``1`` is a direct wire, a scalar or matrix
+        inserts a ``Gain`` block, a system (a sensor, a low-pass) is inserted
+        as a block; the block is named ``filter`` either way.
     of : str or (str, int), optional
         Which output comes back: a boundary output port id, or
         ``(port, index)`` for one component. Default: the whole output when
@@ -195,12 +197,12 @@ def feedback(sys, through=1, *, of=None, sign=-1.0, validate=True) -> DiagramSys
         Run algebraic-loop detection before returning.
     """
     diagram, _junction = _close_with_junction(
-        sys, through, of=of, sign=sign, validate=validate
+        sys, filter, of=of, sign=sign, validate=validate
     )
     return diagram
 
 
-def _close_with_junction(sys, through=1, *, of=None, sign=-1.0, validate=True):
+def _close_with_junction(sys, filter=1, *, of=None, sign=-1.0, validate=True):
     """The loop of :func:`feedback` and the id of its junction block."""
     from minilink.blocks.routing import Demux, Error, Gain, Sum
 
@@ -222,18 +224,16 @@ def _close_with_junction(sys, through=1, *, of=None, sign=-1.0, validate=True):
 
     signal_sys, signal_port = _return_signal(diagram, of, entry_dim, Demux)
 
-    if isinstance(through, System):
-        sensor_id = _add_system_to_diagram(diagram, through, role="sensor")
-        diagram.connect(
-            signal_sys, signal_port, sensor_id, _default_input_port(through)
+    if isinstance(filter, System):
+        filter_id = _add_system_to_diagram(diagram, filter, role="filter")
+        diagram.connect(signal_sys, signal_port, filter_id, _default_input_port(filter))
+        signal_sys, signal_port = filter_id, _default_output_port(filter)
+    elif not (np.isscalar(filter) and float(filter) == 1.0):
+        filter_id = _add_system_to_diagram(
+            diagram, Gain(filter, dim=entry_dim), role="filter"
         )
-        signal_sys, signal_port = sensor_id, _default_output_port(through)
-    elif not (np.isscalar(through) and float(through) == 1.0):
-        gain_id = _add_system_to_diagram(
-            diagram, Gain(through, dim=entry_dim), role="gain"
-        )
-        diagram.connect(signal_sys, signal_port, gain_id, "u")
-        signal_sys, signal_port = gain_id, "y"
+        diagram.connect(signal_sys, signal_port, filter_id, "u")
+        signal_sys, signal_port = filter_id, "y"
 
     if float(sign) == -1.0:
         junction_id = _add_system_to_diagram(
@@ -279,8 +279,8 @@ def refuse_unused_keywords(port_keywords):
     if changed:
         raise ValueError(
             f"{', '.join(changed)} not honoured by the Error-block loop: an "
-            "error-driven block or a return-path gain closes on its one input and "
-            "returns y. Drop them, or wire the loop with DiagramSystem.connect."
+            "error-driven block closes on its one input and returns y. Drop them, "
+            "or wire the loop with DiagramSystem.connect."
         )
 
 
@@ -370,9 +370,10 @@ def closed_loop(
     - an error-driven block (:func:`~minilink.core.feedback.block_roles`: a
       compensator, a transfer function, a plant, a series diagram) gets an
       :class:`~minilink.blocks.routing.Error` block ``e = r - y`` inserted by
-      :func:`feedback`; a scalar
-      or matrix ``plant`` is the return-path gain (``L @ 1`` is unity
-      feedback, ``L @ K`` is ``feedback(L, K)``).
+      :func:`feedback`.
+
+    ``@`` needs a plant on the right: :func:`feedback` closes an open loop on
+    itself (``feedback(L)``, ``feedback(L, K)``).
 
     Neither operand is modified: the result is a new diagram sharing their
     blocks, also when ``controller`` is a diagram such as ``C >> S``.
@@ -418,18 +419,13 @@ def closed_loop(
         "output_port": (output_port, "y"),
         "feedback": (feedback, "auto"),
     }
-    junction_loop = (
-        not isinstance(plant, System) or block_roles(controller).error_driven
-    )
-    if junction_loop:
-        refuse_unused_keywords(port_keywords)
-
     if not isinstance(plant, System):
-        if w or v:
-            raise ValueError("w= and v= need a plant System, not a return-path gain.")
-        diagram, _junction = _close_with_junction(controller, plant, validate=validate)
-        return add_loop_inputs(diagram, None, None, None, r=r, w=w, v=v)
+        raise TypeError(
+            "@ needs a plant on the right; to close an open loop on itself use "
+            "feedback(L) or feedback(L, K)"
+        )
     if block_roles(controller).error_driven:
+        refuse_unused_keywords(port_keywords)
         loop_gain = series(controller, plant)
         diagram, junction_id = _close_with_junction(loop_gain, validate=False)
         add_loop_inputs(diagram, plant, None, (junction_id, "-"), r=r, w=w, v=v)

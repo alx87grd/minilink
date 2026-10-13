@@ -9,7 +9,7 @@ from minilink.core.system import System
 class Error(System):
     """Tracking-error comparison ``e = r - y`` on ports ``+``, ``-``, ``e``.
 
-    The automatic feedback pattern (``C @ plant``, ``sys @ 1``) inserts this
+    The automatic feedback pattern (``C @ plant``, ``feedback(L)``) inserts this
     block so the diagram reads as a comparison, not a generic summer. All
     three ports share the same dimension ``dim``.
     """

@@ -513,6 +513,22 @@ change the diagram they are called on. Known gap: `step_diagram % dt` on a
 user-built `StepDiagramSystem` still adds its boundary ports to that diagram
 (TODO D3).
 
+**`A >> B` connects one output of A to one input of B** by a fixed rule on their
+edges, with no memory of how either was built: A has one output and B one input;
+else exactly one output of A and one input of B share a name; else A has `y` and B
+has `u`; else it refuses. A diagram counts its edge (its boundary outputs and its
+free boundary inputs), a leaf its ports, and a leaf left operand puts all its
+inputs on the edge. Sizes are a check, never a choice. One guard, the only special
+case: a source into a block that reads both `r` and `y` is refused, since the
+name match would feed the measurement (`Step(port="r")` names the signal). The
+result keeps A's free inputs as its inputs and B's `y` (else its only output) as
+its output `y`. `feedback(L)` closes an open loop on its command input
+(`command_port`: `u`, else the one free input), refuses a block or a diagram
+that reads its own measurement, and brings back `y` or the only output.
+**`expose(*names)`** names the edge of a box: the open inputs of a name become
+one edge input feeding all of them, the one inside output of a name becomes an
+edge output, and `"x"` with no such port is the box's own state as an output.
+
 **Shortcut subsystem ids** default by role: `ref` (sources), `ctl` (controllers:
 a block that commands `u` and reads `r`, `y`, `x` or `e`), `sys` (stateful
 plants), with numeric suffix on collision (`sys2`, …). Override with
@@ -545,9 +561,11 @@ a measurement (`y` or `x`) is wired directly; an error-driven block
 (`core.feedback.block_roles`: an input `e`, or a single input with no
 measurement — a compensator, a transfer function, a plant, a series
 diagram `C >> G`) gets an `Error` block (`e = r - y`, ports `+`, `-`, `e`)
-inserted by `core.composition.feedback`, and `sys @ 1` closes any such
-system on itself (`sys @ K` through a `Gain`). Positive feedback still
-uses a signed `Sum`. A scalar error against a vector output takes
+inserted by `core.composition.feedback`. `@` always means controller at plant
+and refuses a number on the right; `feedback(sys)` closes any such system on
+itself, through a `Gain` (`feedback(sys, K)`) or a sensor or filter block
+(`feedback(sys, F)`), the return block named `filter` either way. Positive
+feedback still uses a signed `Sum`. A scalar error against a vector output takes
 component 0 through a visible `Demux`; equal dimensions close a vector loop;
 anything else raises and names `feedback(sys, of=(port, index))`. No `Loop`
 block, no new operator.

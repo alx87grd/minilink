@@ -73,7 +73,7 @@ class TestJunction(unittest.TestCase):
         C, G = PID(Kp=20.0, Ki=5.0, Kd=2.0, tau=0.05), _damped_pendulum()
         L = C >> G
         T1 = C @ G
-        T2 = L @ 1
+        T2 = feedback(L)
         np.testing.assert_allclose(_poles(T1), _poles(T2), atol=1e-9)
         self.assertEqual(list(L.inputs), ["e"])
         self.assertEqual(list(L.subsystems), ["ctl", "sys"])
@@ -110,17 +110,19 @@ class TestJunction(unittest.TestCase):
         T = feedback(L, of=("y", 1))
         self.assertEqual(T.subsystems["demux"].dims, [1, 1])
         self.assertEqual(T.connections["error"]["-"], ("demux", "y[1]"))
-        T = L @ 0.5
-        self.assertEqual(list(T.subsystems), ["ctl", "sys", "demux", "gain", "error"])
-        np.testing.assert_allclose(T.subsystems["gain"].params["K"], [[0.5]])
-        T = feedback(L, through=TransferFunction([1.0], [0.1, 1.0]))
-        self.assertIn("sensor", T.subsystems)
-        self.assertEqual(T.connections["error"]["-"], ("sensor", "y"))
+        T = feedback(L, 0.5)
+        self.assertEqual(list(T.subsystems), ["ctl", "sys", "demux", "filter", "error"])
+        np.testing.assert_allclose(T.subsystems["filter"].params["K"], [[0.5]])
+        T = feedback(L, filter=TransferFunction([1.0], [0.1, 1.0]))
+        self.assertIn("filter", T.subsystems)
+        self.assertEqual(T.connections["error"]["-"], ("filter", "y"))
+        with self.assertRaisesRegex(TypeError, "needs a plant on the right"):
+            L @ 0.5
 
     def test_sign_and_plant_alone(self):
         T = feedback(_damped_pendulum(), sign=+1.0)
         np.testing.assert_allclose(T.subsystems["sum"].signs, [1.0, 1.0])
-        T = _damped_pendulum() @ 1
+        T = feedback(_damped_pendulum())
         self.assertEqual(list(T.subsystems), ["sys", "demux", "error"])
 
     def test_mismatches_are_refused_with_guidance(self):
@@ -147,14 +149,14 @@ class TestJunction(unittest.TestCase):
 
         with self.assertRaisesRegex(ValueError, "feedback must be one of"):
             closed_loop(PID(), Pendulum(), feedback="bogus")
-        with self.assertRaisesRegex(ValueError, "feedback must be one of"):
-            closed_loop(Integrator(), 2.0, feedback="bogus")
+        with self.assertRaisesRegex(TypeError, "needs a plant on the right"):
+            closed_loop(Integrator(), 2.0)
         with self.assertRaisesRegex(ValueError, "feedback not honoured"):
             closed_loop(PID(), Pendulum(), feedback="qdq")
         with self.assertRaisesRegex(ValueError, "plant_output_port not honoured"):
             closed_loop(PID(), Pendulum(), plant_output_port="x")
         with self.assertRaisesRegex(ValueError, "output_port not honoured"):
-            closed_loop(Integrator(), 2.0, output_port="z")
+            closed_loop(PID(), Pendulum(), output_port="z")
 
     def test_two_port_wiring_is_unchanged(self):
         T = ImpedanceController() @ Pendulum()
@@ -269,7 +271,7 @@ class TestPortLayouts(unittest.TestCase):
     def test_unity_feedback_refuses_a_reference_layout(self):
         for block in (PID(ports="reference"), ProportionalController()):
             with self.subTest(block=block.name):
-                with self.assertRaisesRegex(ValueError, "measurement on 'y'"):
+                with self.assertRaisesRegex(TypeError, "needs a plant on the right"):
                     block @ 1
                 with self.assertRaisesRegex(ValueError, "measurement on 'y'"):
                     feedback(block)
@@ -352,12 +354,12 @@ class TestLoopInputs(unittest.TestCase):
                     atol=1e-9,
                 )
 
-    def test_a_return_path_gain_takes_no_w_or_v(self):
+    def test_a_number_on_the_right_is_refused(self):
         from minilink.core.composition import closed_loop
 
-        with self.assertRaisesRegex(ValueError, "w= and v= need a plant System"):
+        with self.assertRaisesRegex(TypeError, "needs a plant on the right"):
             closed_loop(self.H, 1, w=True)
-        self.assertEqual(list(closed_loop(self.H, 1, r=False).inputs), [])
+        self.assertEqual(list(closed_loop(PID(), self.H, r=False).inputs), [])
 
 
 class TestDispatchTable(unittest.TestCase):
@@ -468,7 +470,7 @@ class TestDispatchTable(unittest.TestCase):
                 self.assertEqual(loop.connections["ctl"], ctl_inputs)
 
     def test_a_plant_alone_closes_through_the_junction(self):
-        loop = TransferFunction([1.0], [1.0, 3.0, 2.0]) @ 1
+        loop = feedback(TransferFunction([1.0], [1.0, 3.0, 2.0]))
         self.assertEqual(list(loop.subsystems), ["sys", "error"])
         self.assertEqual(
             loop.connections["error"], {"+": ("input", "r"), "-": ("sys", "y")}

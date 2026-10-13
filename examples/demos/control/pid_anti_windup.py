@@ -1,6 +1,6 @@
 """PID step tracking with and without anti-windup, the classical loop closed with @."""
 
-from minilink import PID, DoubleIntegrator, Saturation, Step
+from minilink import PID, DoubleIntegrator, Saturation, Step, feedback
 
 step = Step(final_value=4.0, step_time=3.0)
 sys = DoubleIntegrator()
@@ -17,7 +17,7 @@ loop.plot_trajectory()
 pid2 = PID(Kp=5.0, Ki=1.0, Kd=3.0, tau=0.1)
 sat = Saturation(-0.5, 0.5)
 
-loop2 = step >> (pid2 >> sat >> sys) @ 1  # the same loop closed on the series diagram
+loop2 = step >> feedback(pid2 >> sat >> sys)  # the same loop, closed on the open loop
 loop2.plot_diagram()
 loop2.compute_trajectory(tf=20)
 loop2.plot_trajectory()
