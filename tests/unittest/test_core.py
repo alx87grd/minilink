@@ -340,7 +340,8 @@ class TestStandardFeedback(unittest.TestCase):
 
 
 from minilink.control.state import StateFeedbackController
-from minilink.core.feedback import Controller, feedback_ports
+from minilink.core.feedback import feedback_ports
+from minilink.core.system import System
 
 
 class TestFeedbackDeclaration(unittest.TestCase):
@@ -355,7 +356,7 @@ class TestFeedbackDeclaration(unittest.TestCase):
         self.assertEqual(roles.plot_space, "state")
 
     def test_explicit_attrs_override_profile(self):
-        class Custom(Controller):
+        class Custom(System):
             feedback_profile = "error"
             measurement_port = "meas"
             ref_port = None
@@ -377,7 +378,7 @@ class TestFeedbackDeclaration(unittest.TestCase):
     def test_undeclared_or_missing_ports_return_none(self):
         self.assertIsNone(feedback_ports(Integrator()))
 
-        class BadDeclaration(Controller):
+        class BadDeclaration(System):
             feedback_profile = "error"  # but no y/u ports exist
 
         self.assertIsNone(feedback_ports(BadDeclaration()))

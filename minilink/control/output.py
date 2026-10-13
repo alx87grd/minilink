@@ -2,10 +2,11 @@
 
 import numpy as np
 
-from minilink.core.feedback import Controller, ErrorDriven
+from minilink.core.feedback import ErrorDriven
+from minilink.core.system import System
 
 
-class ProportionalController(ErrorDriven, Controller):
+class ProportionalController(ErrorDriven, System):
     """Output-error proportional control ``u = K e`` (SISO or MIMO).
 
     ``K`` is a scalar (SISO, a ``1×1`` gain) or an ``(m, p)`` matrix mapping a

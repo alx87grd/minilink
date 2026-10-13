@@ -9,14 +9,14 @@ import numpy as np
 
 from minilink.control.impedance import ImpedanceController, as_dof_vector
 from minilink.core.backends import array_module
-from minilink.core.feedback import Controller
+from minilink.core.system import System
 from minilink.dynamics.abstraction.manipulator import Manipulator
 from minilink.dynamics.abstraction.mechanical import MechanicalSystem
 
 GravityHook = Callable[..., np.ndarray]
 
 
-class ModelJointImpedance(Controller):
+class ModelJointImpedance(System):
     """Joint-space impedance on a mechanical plant with optional gravity feedforward.
 
     Law: ``τ = Kp e + Kd ė + g(q)`` when ``gravity_comp`` is enabled.
@@ -133,7 +133,7 @@ def JointImpedance(
     )
 
 
-class TaskImpedance(Controller):
+class TaskImpedance(System):
     """Task-space impedance using an internal kinematic model.
 
     Joint measurements ``y = [q; dq]`` are mapped to task space via the
@@ -288,7 +288,7 @@ class TaskImpedance(Controller):
         }
 
 
-class TaskKinematic(Controller):
+class TaskKinematic(System):
     """Task-space kinematic controller for velocity-controlled manipulators.
 
     Joint measurements ``y = q``; output ``u = dq`` drives a

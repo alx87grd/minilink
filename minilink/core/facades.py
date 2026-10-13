@@ -302,6 +302,23 @@ class SharedSystemFacades:
 
         return plot_input_output_map(self, **kwargs)
 
+    def plot_control_law(self, **kwargs):
+        """
+        Convenience shortcut plotting the textbook slice of this block's control law.
+
+        The zero-argument call sweeps the coordinates the block's feedback
+        declaration names (the error for an error-driven law, the measurement
+        or the state otherwise) and pins the reference, every other coordinate
+        and any internal state at nominal; ``x_axis`` / ``y_axis`` index the
+        workspace ``z = [measurement-space; x_ctrl]`` for teaching slices such
+        as windup. A block that reads no measurement has no control law to
+        draw; :meth:`plot_input_output_map` sweeps any input of any block. See
+        :func:`minilink.graphical.port_map.plot_control_law`.
+        """
+        from minilink.graphical.port_map import plot_control_law
+
+        return plot_control_law(self, **kwargs)
+
     def get_diagram(self, *, expand=True):
         """
         Convenience shortcut returning a renderable diagram representation.

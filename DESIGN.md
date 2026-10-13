@@ -568,17 +568,16 @@ The declaration drives three tools:
   first (`resolve_standard_feedback` and the hybrid
   `default_computer_boundary_ports`); the name/dimension heuristics
   (`y↔y`, `Mux(q, dq)`, `x↔x`) remain as fallback for undeclared blocks.
-- **`plot_control_law()`** on the `Controller` / `DynamicController`
-  marker facades, never on `System`: a plant carries no feedback vocabulary
-  (also in `core/feedback.py` — no ports, no state, no
-  behavior; static blocks subclass `Controller`, stateful ones
-  `DynamicController`). The zero-argument call sweeps the textbook slice
-  per profile (error space for error-driven laws, absolute measurement or
-  state otherwise), pinning the reference, unswept components, and any
-  internal state (`x0`) at nominal; engine in
-  `graphical/port_map.py` (module twin for third-party blocks). The
-  generic `plot_input_output_map()` lives on every `System` and needs no
-  declaration.
+- **`plot_control_law()`** on every `System`, beside the generic
+  `plot_input_output_map()`. There are no controller base classes: a
+  controller is a `System`, or a `DynamicSystem` when it has state, and the
+  declaration is what makes the method draw. The zero-argument call sweeps
+  the textbook slice per profile (error space for error-driven laws,
+  absolute measurement or state otherwise), pinning the reference, unswept
+  components, and any internal state (`x0`) at nominal; a block with no
+  declaration (a plant, a filter) refuses, and `plot_input_output_map()`
+  sweeps any input of any block. Engine in `graphical/port_map.py` (module
+  twin for third-party blocks).
 - **`PolicyEvaluator(policy=block)`** adapts a declared block into
   `u = policy(x)` (grid state on the measurement port, reference pinned).
 

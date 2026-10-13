@@ -2,10 +2,10 @@
 
 import numpy as np
 
-from minilink.core.feedback import Controller, DynamicController
+from minilink.core.system import DynamicSystem, System
 
 
-class ImpedanceController(Controller):
+class ImpedanceController(System):
     """Virtual spring-damper on ``[position; rate]``.
 
     The measurement port ``y`` carries ``[pos; rate]`` (dim ``2·dof``). Reference
@@ -106,7 +106,7 @@ class ImpedanceController(Controller):
         return u_cmd
 
 
-class ImpedanceIntegralController(DynamicController):
+class ImpedanceIntegralController(DynamicSystem):
     """Impedance control with integral action on position error.
 
     Measurement ``y = [pos; rate]`` (dim ``2·dof``). Integrator acts on

@@ -20,9 +20,6 @@ _EXPORTS: dict[str, tuple[str, str]] = {
     "StepSystem": ("minilink.core.system", "StepSystem"),
     "DiagramSystem": ("minilink.core.diagram", "DiagramSystem"),
     "StepDiagramSystem": ("minilink.core.diagram", "StepDiagramSystem"),
-    # controller markers
-    "Controller": ("minilink.core.feedback", "Controller"),
-    "DynamicController": ("minilink.core.feedback", "DynamicController"),
     # data
     "Trajectory": ("minilink.core.trajectory", "Trajectory"),
     # costs

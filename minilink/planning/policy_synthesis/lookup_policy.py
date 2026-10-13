@@ -3,9 +3,9 @@ Tabular feedback controller from a dynamic-programming policy.
 
 :class:`LookupTableController` wraps a discrete policy ``pi`` (action ids over a
 :class:`~minilink.planning.policy_synthesis.discretizer.StateSpaceGrid`) as a
-state-feedback block ``u = pi(x)``. It is a
-:class:`~minilink.core.feedback.Controller`, so it composes with a plant
-through ``controller @ plant`` and simulates like any other block. Each input
+state-feedback block ``u = pi(x)``. Its input port is named ``x``, so it
+composes with a plant through ``controller @ plant`` and simulates like any
+other block. Each input
 axis is interpolated independently so the discrete table yields a smooth
 command.
 """
@@ -13,12 +13,12 @@ command.
 import numpy as np
 from scipy.interpolate import RegularGridInterpolator
 
-from minilink.core.feedback import Controller
+from minilink.core.system import System
 
 # Public API
 
 
-class LookupTableController(Controller):
+class LookupTableController(System):
     """
     State-feedback controller backed by a policy lookup table.
 

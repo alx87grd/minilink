@@ -3,7 +3,7 @@
 import numpy as np
 
 from minilink.core.backends import array_module
-from minilink.core.feedback import Controller
+from minilink.core.system import System
 
 #: [m] floor on the distance to the target, so the arc stays finite if the target ever
 #: lands on the axle itself (a path shorter than one lookahead, driven to its end).
@@ -12,7 +12,7 @@ MIN_REACH = 1.0e-6
 # Public API
 
 
-class PurePursuit(Controller):
+class PurePursuit(System):
     """Steer toward the point of the path one lookahead distance ahead.
 
     The law is geometry only. Write the target in the body frame at the rear axle,

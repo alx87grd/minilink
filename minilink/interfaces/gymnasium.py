@@ -19,8 +19,8 @@ import gymnasium as gym
 import numpy as np
 from gymnasium import spaces
 
-from minilink.core.feedback import Controller
 from minilink.core.sets import BoxInputSet
+from minilink.core.system import System
 
 # Public API
 
@@ -281,15 +281,15 @@ class Sys2Gym(gym.Env):
         self._animator.open_live_scene(self._render_backend, self.x, self.u, self.t)
 
 
-class SB3Controller(Controller):
+class SB3Controller(System):
     """
     State-feedback controller wrapping a trained RL policy.
 
     Wraps any model exposing ``predict(obs, deterministic=True)`` (the
     stable-baselines3 API) as a static feedback block ``u = pi(x)``, so a
     learned policy composes with a plant exactly like the other minilink
-    controllers. It is a :class:`~minilink.core.feedback.Controller`, so
-    ``plot_control_law()`` draws the same textbook slice as LQR / VI::
+    controllers. Its input port is named ``x``, so ``plot_control_law()``
+    draws the same textbook slice as LQR / VI::
 
         ctl = SB3Controller(model, sys=plant)
         ctl.plot_control_law(x_axis=2, y_axis=5)

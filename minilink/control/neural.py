@@ -4,7 +4,7 @@ import numpy as np
 
 from minilink.blocks.neural import MLP
 from minilink.core.backends import array_module
-from minilink.core.feedback import Controller
+from minilink.core.system import System
 
 # Public API
 
@@ -21,15 +21,15 @@ def action_port_of(sys) -> str:
     )
 
 
-class NeuralPolicyController(Controller):
+class NeuralPolicyController(System):
     """
     State feedback ``u = u_mid + u_half * clip(MLP(z(x)), -1, 1)``.
 
     The law reinforcement learning, or any policy search, trains: features of
     the state, a multilayer perceptron, and a map from the network's normalized
-    output to the input-port bounds. It is a
-    :class:`~minilink.core.feedback.Controller`, so ``ctl @ plant`` closes the
-    loop, ``plot_control_law`` draws the law, and the weights are ordinary
+    output to the input-port bounds. Its input port is named ``x``, so
+    ``ctl @ plant`` closes the loop on the plant state,
+    ``plot_control_law`` draws the law, and the weights are ordinary
     ``params`` entries that a planner updates in place.
 
     Parameters

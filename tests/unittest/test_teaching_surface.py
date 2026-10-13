@@ -49,7 +49,6 @@ TEACHING_SURFACE: dict[str, tuple[str, ...]] = {
         "System",
         "DynamicSystem",
         "DiagramSystem",
-        "Controller",
         "Trajectory",
         "CostFunction",
         "QuadraticCost",

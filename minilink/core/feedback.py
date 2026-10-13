@@ -1,6 +1,7 @@
 """Feedback-port declaration: which ports of a controller block form its standard loop.
 
-A controller is an ordinary :class:`~minilink.core.system.System` whose ``ctl`` port
+A controller is an ordinary :class:`~minilink.core.system.System` (a
+:class:`~minilink.core.system.DynamicSystem` when it has state) whose ``ctl`` port
 compute is the law; this module only names the roles (measurement, reference, command,
 error) that ``@`` and ``plot_control_law`` read. Nothing here changes how a block computes.
 """
@@ -8,8 +9,6 @@ error) that ``@`` and ``plot_control_law`` read. Nothing here changes how a bloc
 from dataclasses import dataclass
 
 import numpy as np
-
-from minilink.core.system import DynamicSystem, System
 
 # Public API
 
@@ -88,45 +87,6 @@ def feedback_ports(block):
     if ref is not None and ref not in inputs:
         ref = None
     return FeedbackRoles(measurement, ref, control, plot_space)
-
-
-class Controller(System):
-    """A :class:`System` wired as a feedback controller (marker + facade).
-
-    Adds no ports, no state, and no behavior — subclasses declare ports and
-    the ``ctl`` port compute exactly like any :class:`System`. Subclassing
-    (or duck-typing the same attrs on a plain ``System``) gives tools the
-    declaration context:
-
-    - ``feedback_profile`` names the law family (see :data:`PROFILE_PORTS`);
-    - explicit ``measurement_port`` / ``ref_port`` / ``control_port`` /
-      ``plot_space`` attrs override the profile defaults for nonstandard
-      blocks.
-
-    The declaration drives ``ctl @ plant`` wiring and the
-    :meth:`plot_control_law` teaching shortcut; it never changes how the
-    block computes.
-    """
-
-    def plot_control_law(self, **kwargs):
-        """Plot the textbook slice of this block's control law.
-
-        Zero-argument call sweeps the most relevant coordinates for the
-        declared ``feedback_profile`` and pins everything else at nominal.
-        See :func:`minilink.graphical.port_map.plot_control_law`.
-        """
-        from minilink.graphical.port_map import plot_control_law
-
-        return plot_control_law(self, **kwargs)
-
-
-class DynamicController(Controller, DynamicSystem):
-    """Controller with internal state ``x`` (filters, integrators, observers).
-
-    ``plot_control_law`` draws the instantaneous map with the internal state
-    pinned at ``x0`` by default; ``x_axis`` / ``y_axis`` index the workspace
-    ``z = [measurement-space; x_ctrl]`` for teaching slices (e.g. windup).
-    """
 
 
 def error_input(block):

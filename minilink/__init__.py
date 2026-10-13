@@ -27,7 +27,6 @@ _EXPORTS: dict[str, tuple[str, str]] = {
     "DynamicSystem": ("minilink.core.system", "DynamicSystem"),
     "StepSystem": ("minilink.core.system", "StepSystem"),
     "DiagramSystem": ("minilink.core.diagram", "DiagramSystem"),
-    "Controller": ("minilink.core.feedback", "Controller"),
     "Trajectory": ("minilink.core.trajectory", "Trajectory"),
     "CostFunction": ("minilink.core.costs", "CostFunction"),
     "QuadraticCost": ("minilink.core.costs", "QuadraticCost"),

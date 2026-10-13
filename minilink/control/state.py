@@ -3,10 +3,10 @@
 import numpy as np
 
 from minilink.core.backends import array_module
-from minilink.core.feedback import Controller
+from minilink.core.system import System
 
 
-class StateFeedbackController(Controller):
+class StateFeedbackController(System):
     """Full-state feedback on a state reference, or on an output reference with ``N``.
 
     Without ``N``: ``u = ubar - K (x - r)``. The reference ``r`` is a state
@@ -70,7 +70,7 @@ class StateFeedbackController(Controller):
         return u_cmd
 
 
-class TimeVaryingStateFeedbackController(Controller):
+class TimeVaryingStateFeedbackController(System):
     """Full-state feedback with a gain schedule ``u = ubar - K(t) (x - r)``.
 
     ``t`` holds ``N`` increasing sample times and ``K`` the matching gains,
@@ -139,7 +139,7 @@ class TimeVaryingStateFeedbackController(Controller):
         )
 
 
-class TrajectoryFeedbackController(Controller):
+class TrajectoryFeedbackController(System):
     """Feedback around a reference trajectory ``u = u_d(t) - K(t) (x - x_d(t))``.
 
     ``trajectory`` is the reference, a :class:`~minilink.core.trajectory.Trajectory`

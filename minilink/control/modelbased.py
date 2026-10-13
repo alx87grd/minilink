@@ -6,11 +6,11 @@ import numpy as np
 
 from minilink.control.impedance import as_dof_vector
 from minilink.core.backends import array_module
-from minilink.core.feedback import Controller
+from minilink.core.system import System
 from minilink.dynamics.abstraction.mechanical import MechanicalSystem
 
 
-class ComputedTorqueController(Controller):
+class ComputedTorqueController(System):
     """Computed torque with built-in outer PD on joint space.
 
     Desired acceleration ``qdd = Kp (q_d - q) + Kd (dq_d - dq)`` (regulation

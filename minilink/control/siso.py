@@ -4,10 +4,11 @@ import numpy as np
 
 from minilink.control.impedance import as_dof_vector
 from minilink.core.backends import array_module
-from minilink.core.feedback import DynamicController, ErrorDriven
+from minilink.core.feedback import ErrorDriven
+from minilink.core.system import DynamicSystem
 
 
-class PID(ErrorDriven, DynamicController):
+class PID(ErrorDriven, DynamicSystem):
     """Decoupled PID with filtered derivative and anti-windup.
 
     ``ports="error"`` (default) is the compensator form: one input ``e``, so
