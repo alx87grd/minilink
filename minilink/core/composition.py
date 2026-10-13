@@ -153,7 +153,7 @@ def series(
     DiagramSystem
         A new diagram with each stage connected output-to-input.
     """
-    diagram = _as_composition_diagram(left, expose_entry=True)
+    diagram = _as_composition_diagram(left)
     _series_pair(diagram, right)
     for next_sys in rest:
         _series_pair(diagram, next_sys)
@@ -425,26 +425,7 @@ def closed_loop(
             "feedback(L) or feedback(L, K)"
         )
     roles = block_roles(controller)
-    if roles.error_driven:
-        open_loop, _controller_id, plant_id = _open_loop(
-            controller, plant, expose_inputs=True
-        )
-        diagram, _junction_id, measurement = _close_with_junction(
-            open_loop, 1 if filter is None else filter, validate=False
-        )
-        add_loop_inputs(
-            diagram,
-            plant_id,
-            _default_plant_in(plant),
-            measurement,
-            reference=reference,
-            disturbance=disturbance,
-            noise=noise,
-        )
-        if validate:
-            diagram.check_algebraic_loops()
-        return diagram
-    if not roles.measurements:
+    if not roles.measurements and not roles.error_driven:
         raise ValueError(_no_measurement_message(controller, "controller"))
     if filter is not None and "x" in roles.measurements:
         raise ValueError(
@@ -453,46 +434,30 @@ def closed_loop(
         )
 
     plant_box = _plant_box_with_state(plant) if "x" in roles.measurements else plant
-    controller_id = _default_subsystem_id(controller, role="controller")
-    plant_id = _default_subsystem_id(plant_box, role="plant")
-    paths = [
-        ("y", _plant_y(plant_box, plant_id))
-        if measurement == "y" and filter is not None
-        else _feedback_path_for_measurement(
-            controller,
-            plant_box,
-            measurement=measurement,
-            controller_id=controller_id,
-            plant_id=plant_id,
-        )
-        for measurement in roles.measurements
-    ]
-    diagram, controller_id, plant_id = _open_loop(
-        controller, plant_box, expose_inputs=False
-    )
-    measurement = (controller_id, roles.measurement)
-    for port, plant_port in paths:
-        source = (plant_id, plant_port)
-        if port == "y" and filter is not None:
-            source, measurement = _insert_filter(diagram, filter, source)
-            _require_same_dim(
-                diagram.subsystems[source[0]].outputs[source[1]].dim,
-                controller.inputs["y"].dim,
-                f"{source[0]}:{source[1]}",
-                f"{controller_id}:y",
-            )
-        diagram.connect(*source, controller_id, port)
+    diagram, controller_id, plant_id = _role_blocks(controller, plant_box)
+    for port in roles.measurements:  # plant y -> controller y, plant x -> controller x
+        _check_measurement(controller, plant_box, port, controller_id, plant_id)
+        diagram.connect(plant_id, port, controller_id, port)
+    _wire_command(diagram, controller, controller_id, plant_box, plant_id)
 
-    if reference and "r" in controller.inputs:
-        _add_input_port_like(diagram, "r", controller.inputs["r"])
-        diagram.connect("input", "r", controller_id, "r")
+    if roles.error_driven:
+        _expose_free_inputs(diagram, controller_id)
+        diagram, _junction_id, measurement = _close_with_junction(
+            diagram, 1 if filter is None else filter, validate=False
+        )
+    else:
+        measurement = (controller_id, roles.measurement)
+        if filter is not None:
+            measurement = _interpose_filter(diagram, filter, measurement)
+        if reference and "r" in controller.inputs:
+            _add_input_port_like(diagram, "r", controller.inputs["r"])
+            diagram.connect("input", "r", controller_id, "r")
 
     diagram.name = f"Closed loop {plant.name} with {controller.name}"
-
     add_loop_inputs(
         diagram,
         plant_id,
-        _default_plant_in(plant_box),
+        _default_input_port(plant_box),
         measurement,
         reference=reference,
         disturbance=disturbance,
@@ -503,21 +468,32 @@ def closed_loop(
     return diagram
 
 
-def _open_loop(controller, plant, *, expose_inputs):
-    """``controller → plant`` as a new diagram under the role names; a box is nested.
+def _role_blocks(controller, plant):
+    """A new diagram with ``controller`` and ``plant`` under their role names.
 
-    The controller's command (``u``, else its one output) drives the plant's
-    command input (``u``, else its one input); the plant's ``y`` (else its one
-    output) is the output ``y``. With ``expose_inputs`` the controller's free
-    inputs go on the edge, for a junction to drive.
+    A leaf is added as is; a box (a diagram) is nested as one block.
     """
     diagram = DiagramSystem()
     controller_id = _add_role_block(diagram, controller, "controller")
     plant_id = _add_role_block(diagram, plant, "plant")
-    if expose_inputs:
-        _expose_free_inputs(diagram, controller_id)
+    _propagate_animation_camera(diagram, plant)
+    return diagram, controller_id, plant_id
 
-    command, entry = _default_control_out(controller), _default_plant_in(plant)
+
+def _add_role_block(diagram, sys, role) -> str:
+    if not isinstance(sys, DiagramSystem):
+        return _add_system_to_diagram(diagram, sys, role=role)
+    sys_id = _unique_id(_default_subsystem_id(sys, role=role), diagram.subsystems)
+    diagram.add_subsystem(sys, sys_id)
+    return sys_id
+
+
+def _wire_command(diagram, controller, controller_id, plant, plant_id) -> None:
+    """The controller's command (``u``, else its one output) into the plant's command input.
+
+    The plant's ``y`` (else its one output) becomes the loop's output ``y``.
+    """
+    command, entry = _default_control_out(controller), _default_input_port(plant)
     _require_same_dim(
         controller.outputs[command].dim,
         plant.inputs[entry].dim,
@@ -527,26 +503,29 @@ def _open_loop(controller, plant, *, expose_inputs):
     diagram.connect(controller_id, command, plant_id, entry)
     diagram.connect_new_output_port(plant_id, _default_output_port(plant), "y")
 
-    _propagate_animation_camera(diagram, plant)
-    if isinstance(controller, DiagramSystem):
-        diagram.name = controller.name
-    return diagram, controller_id, plant_id
-
-
-def _add_role_block(diagram, sys, role) -> str:
-    """Add ``sys`` under its role id: a leaf as is, a box nested as one block."""
-    if not isinstance(sys, DiagramSystem):
-        return _add_system_to_diagram(diagram, sys, role=role)
-    sys_id = _unique_id(_default_subsystem_id(sys, role=role), diagram.subsystems)
-    diagram.add_subsystem(sys, sys_id)
-    return sys_id
-
 
 def _plant_box_with_state(plant):
     """``plant`` with its state on its edge: a box gets its own ``x``, a leaf is as built."""
     if not isinstance(plant, DiagramSystem) or "x" in plant.outputs:
         return plant
     return _copy_diagram(plant).expose("x")
+
+
+def _interpose_filter(diagram, filter, target):
+    """Put the return filter on the wire into ``target``; returns where a noise then enters."""
+    sys_id, port_id = target
+    source = diagram.connections[sys_id][port_id]
+    (filtered_sys, filtered_port), filter_in = _insert_filter(diagram, filter, source)
+    if filter_in is None:
+        return target
+    _require_same_dim(
+        diagram.subsystems[filtered_sys].outputs[filtered_port].dim,
+        diagram.subsystems[sys_id].inputs[port_id].dim,
+        f"{filtered_sys}:{filtered_port}",
+        f"{sys_id}:{port_id}",
+    )
+    diagram.connect(filtered_sys, filtered_port, sys_id, port_id)
+    return filter_in
 
 
 def autowire(
@@ -630,20 +609,18 @@ def autowire(
 
 # Internal machinery
 #
-# Everything below implements the shortcut bookkeeping: choosing default
-# ports, remembering entry/output, flattening diagram operands, and the
-# conservative autowire matching rules.
+# The shortcut bookkeeping: default ports, flattening diagram operands, the
+# loop's blocks and wires, and the autowire matching.
 
 
-def _as_composition_diagram(sys, *, expose_entry: bool) -> DiagramSystem:
+def _as_composition_diagram(sys) -> DiagramSystem:
     """A diagram operand as a copy; a leaf as a diagram with its inputs on the edge."""
     if isinstance(sys, DiagramSystem):
         return _copy_diagram(sys)
 
     diagram = DiagramSystem()
     sys_id = _add_system_to_diagram(diagram, sys)
-    if expose_entry:
-        _expose_free_inputs(diagram, sys_id)
+    _expose_free_inputs(diagram, sys_id)
     return diagram
 
 
@@ -687,7 +664,7 @@ def _carry_left_operand(diagram, left) -> None:
 def _series_pair(diagram, right):
     """Append ``right`` to ``diagram`` (the chain so far) by the ``>>`` rule."""
     outputs = _edge_outputs(diagram)
-    inputs = right.inputs if not isinstance(right, DiagramSystem) else right.inputs
+    inputs = right.inputs
     source_name, target_name = _series_connection(diagram, outputs, inputs)
     source_id, source_port = outputs[source_name]
     _require_same_dim(
@@ -720,12 +697,12 @@ def _series_pair(diagram, right):
 def _edge_outputs(diagram) -> dict:
     """The chain's outputs by name: its boundary outputs, or the ports of its one block."""
     if diagram.outputs:
+        sources = diagram.connections.get("output", {})
         # A box's own state (``expose("x")``) has no source block; it is not a chain output.
         return {
-            output_id: tuple(source)
+            output_id: tuple(sources[output_id])
             for output_id in diagram.outputs
-            if (source := diagram.connections.get("output", {}).get(output_id))
-            is not None
+            if sources.get(output_id) is not None
         }
     if len(diagram.subsystems) == 1:
         ((sys_id, sys),) = diagram.subsystems.items()
@@ -1013,7 +990,7 @@ def resolve_standard_feedback(
     return StandardFeedbackWiring(
         _default_control_out(controller),
         measurement_in,
-        _default_plant_in(plant),
+        _default_input_port(plant),
         plant_out,
     )
 
@@ -1038,66 +1015,36 @@ def _feedback_path(
     first_error = None
     for measurement in measurements:
         try:
-            return _feedback_path_for_measurement(
-                controller,
-                plant,
-                measurement=measurement,
-                controller_id=controller_id,
-                plant_id=plant_id,
-            )
+            _check_measurement(controller, plant, measurement, controller_id, plant_id)
+            return measurement, measurement
         except ValueError as exc:
             first_error = first_error or exc
     raise first_error
 
 
-def _feedback_path_for_measurement(
-    controller, plant, *, measurement: str, controller_id: str, plant_id: str
-) -> tuple[str, str]:
+def _check_measurement(controller, plant, measurement, controller_id, plant_id) -> None:
+    """Refuse a measurement the plant cannot serve: the port of the same name, same size."""
     dim = controller.inputs[measurement].dim
-
-    if measurement == "x":
-        if "x" not in plant.outputs:
-            raise ValueError(
-                f"Cannot wire closed-loop feedback: {controller_id} reads the state 'x', "
-                f"but {plant_id} ({plant.name!r}) exposes no 'x'; build the plant with "
-                "expose_state=True, or wire the loop with DiagramSystem.connect"
-            )
-        if plant.outputs["x"].dim == dim:
-            return "x", "x"
+    if measurement not in plant.outputs:
+        fix = {
+            "y": "declare it with output_dim=... (the standard port, y = x by default)",
+            "x": "build the plant with expose_state=True",
+        }[measurement]
         raise ValueError(
-            f"Cannot wire closed-loop feedback: {controller_id} declares "
-            f"measurement 'x' dim {dim}, but {plant_id} 'x' output has dim "
-            f"{plant.outputs['x'].dim}"
+            f"Cannot wire closed-loop feedback: plant {plant.name!r} ({plant_id}) has "
+            f"no {measurement!r} output port; {fix}, or wire the loop with "
+            "DiagramSystem.connect"
         )
-
-    _plant_y(plant, plant_id)
-    if plant.outputs["y"].dim == dim:
-        return "y", "y"
-    raise ValueError(
-        f"Cannot wire closed-loop feedback: {controller_id} declares "
-        f"measurement 'y' dim {dim}, but {plant_id} 'y' output "
-        f"has dim {plant.outputs['y'].dim}"
-    )
-
-
-def _plant_y(plant, plant_id: str) -> str:
-    """The plant's ``y`` port, or the refusal that names the fix."""
-    if "y" not in plant.outputs:
+    if plant.outputs[measurement].dim != dim:
         raise ValueError(
-            f"Cannot wire closed-loop feedback: plant '{plant.name}' ({plant_id}) "
-            "has no 'y' output port; declare it with output_dim=... (the standard "
-            "port, y = x by default) or wire ports explicitly with "
-            "add_subsystem/connect"
+            f"Cannot wire closed-loop feedback: {controller_id} declares measurement "
+            f"{measurement!r} dim {dim}, but {plant_id} {measurement!r} output has "
+            f"dim {plant.outputs[measurement].dim}"
         )
-    return "y"
 
 
 def _default_control_out(sys) -> str:
     return block_roles(sys).command or _default_output_port(sys)
-
-
-def _default_plant_in(sys) -> str:
-    return _default_input_port(sys)
 
 
 def default_computer_boundary_ports(controller) -> tuple[str, str]:
