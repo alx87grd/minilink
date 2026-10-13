@@ -14,8 +14,8 @@ from minilink.graphical.diagrams import (
 
 class TestDiagrams(unittest.TestCase):
     def test_system_block_html_includes_named_ports(self):
-        html = get_system_block_html(ProportionalController(), "ctl")
-        self.assertIn("P Controller::ctl", html)
+        html = get_system_block_html(ProportionalController(), "controller")
+        self.assertIn("P Controller::controller", html)
         self.assertIn('PORT="in_r"', html)
         self.assertIn('PORT="out_u"', html)
 
@@ -54,7 +54,7 @@ class TestDiagrams(unittest.TestCase):
         diagram = self._make_diagram()
         graph = get_diagram(diagram)
         self.assertIsNotNone(graph)
-        self.assertIn("ctl", graph.source)
+        self.assertIn("controller", graph.source)
         self.assertIn("plant", graph.source)
         self.assertIn("input:out_r:e -> ctl:in_r:w", graph.source)
         self.assertIn("output:in_y__meas:w", graph.source)
@@ -164,25 +164,25 @@ class TestDiagrams(unittest.TestCase):
     def test_topology_builder_contains_ports_and_edges(self):
         topology = build_diagram_topology(self._make_diagram())
         node_ids = [node.id for node in topology.nodes]
-        self.assertEqual(node_ids, ["input", "ctl", "plant", "output"])
+        self.assertEqual(node_ids, ["input", "controller", "plant", "output"])
         edges = [
             (edge.source_node, edge.source_port, edge.target_node, edge.target_port)
             for edge in topology.edges
         ]
-        self.assertIn(("input", "r", "ctl", "r"), edges)
-        self.assertIn(("ctl", "u", "plant", "u"), edges)
+        self.assertIn(("input", "r", "controller", "r"), edges)
+        self.assertIn(("controller", "u", "plant", "u"), edges)
         self.assertIn(("plant", "y", "output", "y_meas"), edges)
 
     def test_topology_abstract_boundary_collapses_external_nodes(self):
         topology = build_diagram_topology(self._make_diagram(), abstract_boundary=True)
         node_ids = [node.id for node in topology.nodes]
-        self.assertEqual(node_ids, ["ctl", "plant"])
+        self.assertEqual(node_ids, ["controller", "plant"])
         edges = [
             (edge.source_node, edge.source_port, edge.target_node, edge.target_port)
             for edge in topology.edges
         ]
-        self.assertIn(("ctl", "u", "plant", "u"), edges)
-        self.assertNotIn(("input", "r", "ctl", "r"), edges)
+        self.assertIn(("controller", "u", "plant", "u"), edges)
+        self.assertNotIn(("input", "r", "controller", "r"), edges)
         inputs = {
             ref.diagram_port: (ref.node_id, ref.port_id)
             for ref in topology.boundary_inputs
@@ -191,14 +191,14 @@ class TestDiagrams(unittest.TestCase):
             ref.diagram_port: (ref.node_id, ref.port_id)
             for ref in topology.boundary_outputs
         }
-        self.assertEqual(inputs["r"], ("ctl", "r"))
+        self.assertEqual(inputs["r"], ("controller", "r"))
         self.assertEqual(outputs["y_meas"], ("plant", "y"))
 
     def test_mermaid_exporter_returns_deterministic_source(self):
         source = export_diagram_topology(self._make_diagram(), backend="mermaid")
         self.assertIn("flowchart LR", source)
-        self.assertIn('ctl["P Controller::ctl"]', source)
-        self.assertIn('input -- "r -> r" --> ctl', source)
+        self.assertIn('controller["P Controller::controller"]', source)
+        self.assertIn('input -- "r -> r" --> controller', source)
         self.assertIn('plant -- "y -> y_meas" --> output', source)
 
     def test_print_system_is_a_short_summary(self):
@@ -215,7 +215,7 @@ class TestDiagrams(unittest.TestCase):
         self.assertIn("n=1", text)
         self.assertIn("inputs: r (1)", text)
         self.assertIn("outputs: y_meas (1)", text)
-        self.assertIn("blocks: ctl, plant", text)
+        self.assertIn("blocks: controller, plant", text)
 
     @staticmethod
     def _make_case_diagrams():
@@ -243,12 +243,12 @@ class TestDiagrams(unittest.TestCase):
     def _make_diagram():
         diagram = DiagramSystem()
         diagram.connection_verbose = False
-        diagram.add_subsystem(ProportionalController(), "ctl")
+        diagram.add_subsystem(ProportionalController(), "controller")
         diagram.add_subsystem(Integrator(), "plant")
         diagram.add_input_port("r")
-        diagram.connect("input", "r", "ctl", "r")
-        diagram.connect("plant", "y", "ctl", "y")
-        diagram.connect("ctl", "u", "plant", "u")
+        diagram.connect("input", "r", "controller", "r")
+        diagram.connect("plant", "y", "controller", "y")
+        diagram.connect("controller", "u", "plant", "u")
         diagram.connect_new_output_port("plant", "y", "y_meas")
         return diagram
 
@@ -465,12 +465,12 @@ from minilink.graphical.diagrams import build_diagram_topology
 def _build_closed_loop():
     diagram = DiagramSystem()
     diagram.connection_verbose = False
-    diagram.add_subsystem(ProportionalController(2.5), "ctl")
+    diagram.add_subsystem(ProportionalController(2.5), "controller")
     diagram.add_subsystem(Integrator(), "plant")
     diagram.add_input_port("r")
-    diagram.connect("input", "r", "ctl", "r")
-    diagram.connect("plant", "y", "ctl", "y")
-    diagram.connect("ctl", "u", "plant", "u")
+    diagram.connect("input", "r", "controller", "r")
+    diagram.connect("plant", "y", "controller", "y")
+    diagram.connect("controller", "u", "plant", "u")
     return diagram
 
 
@@ -485,13 +485,13 @@ def _nested_and_flat_outer_loops():
     outer = Gain([-0.5])
 
     inner = DiagramSystem()
-    inner.add_subsystem(pid, "ctl")
-    inner.add_subsystem(mass, "sys")
+    inner.add_subsystem(pid, "controller")
+    inner.add_subsystem(mass, "plant")
     inner.add_input_port("r")
-    inner.connect("input", "r", "ctl", "r")
-    inner.connect("sys", "y", "ctl", "y")
-    inner.connect("ctl", "u", "sys", "u")
-    inner.connect_new_output_port("sys", "y", "y")
+    inner.connect("input", "r", "controller", "r")
+    inner.connect("plant", "y", "controller", "y")
+    inner.connect("controller", "u", "plant", "u")
+    inner.connect_new_output_port("plant", "y", "y")
 
     nested = DiagramSystem()
     nested.add_subsystem(outer, "outer")
@@ -501,12 +501,12 @@ def _nested_and_flat_outer_loops():
 
     flat = DiagramSystem()
     flat.add_subsystem(outer, "outer")
-    flat.add_subsystem(pid, "ctl")
-    flat.add_subsystem(mass, "sys")
-    flat.connect("sys", "y", "outer", "u")
-    flat.connect("outer", "y", "ctl", "r")
-    flat.connect("sys", "y", "ctl", "y")
-    flat.connect("ctl", "u", "sys", "u")
+    flat.add_subsystem(pid, "controller")
+    flat.add_subsystem(mass, "plant")
+    flat.connect("plant", "y", "outer", "u")
+    flat.connect("outer", "y", "controller", "r")
+    flat.connect("plant", "y", "controller", "y")
+    flat.connect("controller", "u", "plant", "u")
 
     mass.x0 = np.array([1.0, 0.0])  # a diagram rebuilds its x0 from its blocks' x0
     return nested, flat
@@ -545,21 +545,21 @@ class TestWiringMixin(unittest.TestCase):
         diagram.connect_new_output_port("plant", "y", "y_meas")
         topology = build_diagram_topology(diagram)
         node_ids = [node.id for node in topology.nodes]
-        self.assertEqual(node_ids, ["input", "ctl", "plant", "output"])
+        self.assertEqual(node_ids, ["input", "controller", "plant", "output"])
         edges = [
             (edge.source_node, edge.source_port, edge.target_node, edge.target_port)
             for edge in topology.edges
         ]
-        self.assertIn(("input", "r", "ctl", "r"), edges)
-        self.assertIn(("ctl", "u", "plant", "u"), edges)
+        self.assertIn(("input", "r", "controller", "r"), edges)
+        self.assertIn(("controller", "u", "plant", "u"), edges)
         self.assertIn(("plant", "y", "output", "y_meas"), edges)
 
     def test_connect_dimension_mismatch_raises(self):
         diagram = DiagramSystem()
-        diagram.add_subsystem(ProportionalController(), "ctl")
+        diagram.add_subsystem(ProportionalController(), "controller")
         diagram.add_input_port("r", dim=2)
         with self.assertRaises(ValueError) as ctx:
-            diagram.connect("input", "r", "ctl", "r")
+            diagram.connect("input", "r", "controller", "r")
         self.assertIn("dimension mismatch", str(ctx.exception).lower())
 
     def test_gather_chain_matches_ports(self):
@@ -568,10 +568,10 @@ class TestWiringMixin(unittest.TestCase):
         u = np.array([1.0])
         t = 0.5
         plant_y = diagram.compute_subsys_output_port(x, u, t, "plant", "y")
-        ctl_u = diagram.compute_subsys_output_port(x, u, t, "ctl", "u")
+        ctl_u = diagram.compute_subsys_output_port(x, u, t, "controller", "u")
         np.testing.assert_allclose(plant_y, np.array([0.25]))
         np.testing.assert_allclose(ctl_u, np.array([2.5 * (1.0 - 0.25)]))
-        local_u = diagram.get_local_input(x, u, t, "ctl")
+        local_u = diagram.get_local_input(x, u, t, "controller")
         self.assertEqual(local_u.shape, (2,))
 
     def test_check_algebraic_loops_valid_order(self):
@@ -589,7 +589,7 @@ class TestWiringMixin(unittest.TestCase):
     def test_state_index_after_multi_subsystem_add(self):
         diagram = _build_closed_loop()
         self.assertEqual(diagram.n, 1)
-        self.assertEqual(diagram.state_index["ctl"], (0, 0))
+        self.assertEqual(diagram.state_index["controller"], (0, 0))
         self.assertEqual(diagram.state_index["plant"], (0, 1))
 
     def test_validate_diagram_params_unknown_sys_id(self):
@@ -606,19 +606,19 @@ class TestWiringMixin(unittest.TestCase):
     def test_boundary_output_feedthrough_is_derived_from_wiring(self):
         diagram = _build_closed_loop()
         diagram.connect_new_output_port("plant", "y", "y_meas")
-        diagram.connect_new_output_port("ctl", "u", "u_meas")
-        diagram.connect_new_output_port("ctl", "u", "u_all", dependencies="all")
+        diagram.connect_new_output_port("controller", "u", "u_meas")
+        diagram.connect_new_output_port("controller", "u", "u_all", dependencies="all")
         self.assertEqual(diagram.outputs["y_meas"].dependencies, ())
         self.assertEqual(diagram.outputs["u_meas"].dependencies, ("r",))
         self.assertEqual(diagram.outputs["u_all"].dependencies, "all")
 
     def test_boundary_output_feedthrough_tracks_later_wiring(self):
         diagram = DiagramSystem()
-        diagram.add_subsystem(ProportionalController(2.5), "ctl")
+        diagram.add_subsystem(ProportionalController(2.5), "controller")
         diagram.add_input_port("r")
-        diagram.connect_new_output_port("ctl", "u", "u")
+        diagram.connect_new_output_port("controller", "u", "u")
         self.assertEqual(diagram.outputs["u"].dependencies, ())
-        diagram.connect("input", "r", "ctl", "r")
+        diagram.connect("input", "r", "controller", "r")
         self.assertEqual(diagram.outputs["u"].dependencies, ("r",))
 
     def test_nested_closed_loop_matches_flat_diagram(self):
@@ -649,14 +649,14 @@ class TestWiringMixin(unittest.TestCase):
     def test_trajectory_of_is_the_block_seen_from_its_ports(self):
         """State slice and received input match the reconstructed internal signals."""
         nested, flat = _nested_and_flat_outer_loops()
-        mass = flat.subsystems["sys"]
+        mass = flat.subsystems["plant"]
         traj = flat.compute_trajectory(tf=1.0, dt=0.01, verbose=False)
         signals = flat.reconstruct_internal_signals(traj).signals
 
         mass_traj = flat.trajectory_of(mass)
         np.testing.assert_array_equal(mass_traj.t, traj.t)
-        np.testing.assert_allclose(mass_traj.x, signals["sys:x"])
-        np.testing.assert_allclose(mass_traj.u, signals["ctl:u"])
+        np.testing.assert_allclose(mass_traj.x, signals["plant:x"])
+        np.testing.assert_allclose(mass_traj.u, signals["controller:u"])
 
         # A block inside a nested loop: one call per level
         inner = nested.subsystems["inner"]
@@ -720,12 +720,12 @@ def _unity_feedback_diagram():
     from minilink.control.output import ProportionalController
 
     diagram = DiagramSystem()
-    diagram.add_subsystem(ProportionalController(), "ctl")
+    diagram.add_subsystem(ProportionalController(), "controller")
     diagram.add_subsystem(Integrator(), "plant")
     diagram.add_input_port("r")
-    diagram.connect("input", "r", "ctl", "r")
-    diagram.connect("plant", "y", "ctl", "y")
-    diagram.connect("ctl", "u", "plant", "u")
+    diagram.connect("input", "r", "controller", "r")
+    diagram.connect("plant", "y", "controller", "y")
+    diagram.connect("controller", "u", "plant", "u")
     return diagram
 
 

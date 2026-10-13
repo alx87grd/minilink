@@ -1159,11 +1159,11 @@ class TestAdvancedPlotting(unittest.TestCase):
         self.step = Step()
         self.diagram = DiagramSystem()
         self.diagram.add_subsystem(self.step, "step")
-        self.diagram.add_subsystem(self.ctl, "ctl")
+        self.diagram.add_subsystem(self.ctl, "controller")
         self.diagram.add_subsystem(self.sys, "plant")
-        self.diagram.connect("step", "y", "ctl", "r")
-        self.diagram.connect("ctl", "u", "plant", "u")
-        self.diagram.connect("plant", "y", "ctl", "y")
+        self.diagram.connect("step", "y", "controller", "r")
+        self.diagram.connect("controller", "u", "plant", "u")
+        self.diagram.connect("plant", "y", "controller", "y")
         self.sim = Simulator(self.diagram, t0=0, tf=2.0, dt=0.1, verbose=False)
         self.traj = self.sim.solve()
 
@@ -1181,10 +1181,10 @@ class TestAdvancedPlotting(unittest.TestCase):
         self.assertFalse(self.traj.has_signal("step:y"))
         traj_plus = self.diagram.reconstruct_internal_signals(self.traj)
         self.assertTrue(traj_plus.has_signal("step:y"))
-        self.assertTrue(traj_plus.has_signal("ctl:u"))
+        self.assertTrue(traj_plus.has_signal("controller:u"))
         self.assertTrue(traj_plus.has_signal("plant:y"))
         n_pts = len(self.traj.t)
-        self.assertEqual(traj_plus.get_signal("ctl:u").shape, (1, n_pts))
+        self.assertEqual(traj_plus.get_signal("controller:u").shape, (1, n_pts))
 
     def test_plot_time_signals_does_not_crash(self):
         from minilink.graphical.common.environment import override_env
@@ -1192,7 +1192,10 @@ class TestAdvancedPlotting(unittest.TestCase):
         override_env("jupyter")
         self.addCleanup(override_env, None)
         result = plot_time_signals(
-            self.diagram, self.traj, signals=("x", "ctl:u", "plant:y"), show=False
+            self.diagram,
+            self.traj,
+            signals=("x", "controller:u", "plant:y"),
+            show=False,
         )
         self.assertIsNotNone(result.figure)
         plt.close(result.figure)
@@ -1224,7 +1227,7 @@ class TestAdvancedPlotting(unittest.TestCase):
 
     def test_subsystem_signal_resolves_diagram_id(self):
         self.assertEqual(self.diagram.subsystem_signal(self.sys, "y"), "plant:y")
-        self.assertEqual(self.diagram.subsystem_signal(self.ctl, "u"), "ctl:u")
+        self.assertEqual(self.diagram.subsystem_signal(self.ctl, "u"), "controller:u")
 
     def test_plot_trajectory_computes_missing_trajectory_then_plots(self):
         sys = Integrator()
@@ -1238,7 +1241,9 @@ class TestAdvancedPlotting(unittest.TestCase):
         self.assertEqual(resolve_plot_signals(self.sys), ("x", "u"))
 
     def test_resolve_plot_signals_closed_loop_diagram(self):
-        self.assertEqual(resolve_plot_signals(self.diagram), ("x", "step:y", "ctl:u"))
+        self.assertEqual(
+            resolve_plot_signals(self.diagram), ("x", "step:y", "controller:u")
+        )
 
     def test_resolve_plot_signals_lqr_at_cartpole(self):
         from minilink.control.lqr import lqr_at_operating_point
@@ -1264,7 +1269,7 @@ class TestAdvancedPlotting(unittest.TestCase):
         diagram = (
             Step(final_value=[1.0], step_time=0.0) >> ImpedanceController() @ Pendulum()
         )
-        self.assertEqual(resolve_plot_signals(diagram), ("x", "ref:y", "ctl:u"))
+        self.assertEqual(resolve_plot_signals(diagram), ("x", "step:y", "controller:u"))
 
     def test_resolve_plot_signals_dynamic_controller(self):
         from minilink.blocks.sources import Step
@@ -1275,7 +1280,7 @@ class TestAdvancedPlotting(unittest.TestCase):
             Step(final_value=[1.0], step_time=0.0)
             >> PID(ports="reference") @ DoubleIntegrator()
         )
-        self.assertEqual(resolve_plot_signals(diagram), ("x", "ref:y", "ctl:u"))
+        self.assertEqual(resolve_plot_signals(diagram), ("x", "step:y", "controller:u"))
 
     def test_plot_trajectory_uses_default_signals_for_closed_loop(self):
         from minilink.graphical.common.environment import override_env
@@ -1303,15 +1308,15 @@ class TestAdvancedPlotting(unittest.TestCase):
     def test_signal_spec_assigns_distinct_tier_colors(self):
         traj_plus = self.diagram.reconstruct_internal_signals(self.traj)
         spec = build_signal_plot_spec(
-            self.diagram, traj_plus, signals=("x", "step:y", "ctl:u")
+            self.diagram, traj_plus, signals=("x", "step:y", "controller:u")
         )
         colors = {trace.signal: trace.color for trace in spec.traces}
         self.assertNotEqual(colors["x"], colors["step:y"])
-        self.assertNotEqual(colors["step:y"], colors["ctl:u"])
-        self.assertNotEqual(colors["x"], colors["ctl:u"])
+        self.assertNotEqual(colors["step:y"], colors["controller:u"])
+        self.assertNotEqual(colors["x"], colors["controller:u"])
 
     def test_unknown_signal_reports_available_names(self):
-        with self.assertRaisesRegex(ValueError, "ctl:u"):
+        with self.assertRaisesRegex(ValueError, "controller:u"):
             build_signal_plot_spec(self.diagram, self.traj, signals=("missing",))
 
     def test_live_time_signal_plot_reuses_artists(self):

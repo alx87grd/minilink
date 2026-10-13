@@ -383,7 +383,7 @@ The research rungs (`Holonomic`, `HolonomicAccel`, `BicycleKin`, `BicycleAcc`,
   `"world"` without every plant returning `"world": I`. In **diagrams**, `"world"`
   stays unprefixed (one shared root); articulated frames are namespaced
   (``vehicle:body``). Controllers may own their own visualization frames the
-  same way (e.g. optional `TaskImpedance` `task_force` → `ctl:task_force`); the
+  same way (e.g. optional `TaskImpedance` `task_force` → `controller:task_force`); the
   arrow shows the pre-gravity task wrench `f_task`, not `Jᵀ f_task` or `g(q)`.
   Meshcat `native=True` keyframes rigid poses, and turns geometry that changes
   (`Arrow`, `TorqueArrow`, the MPC trail and horizon) into a flipbook: one page
@@ -425,7 +425,7 @@ read `params` yet, the gap is tracked below.
 
 - `params is None` → `self.params`; any other value overrides (never
   `params or self.params`).
-- **Diagram params are nested by subsystem id**: `{"plant": {…}, "ctl": {…}}`.
+- **Diagram params are nested by subsystem id**: `{"plant": {…}, "controller": {…}}`.
   `DiagramSystem.params` is a live-view property — the getter assembles
   `{sys_id: subsystem.params}` from live references (subsystems stay the
   single source of truth), the setter distributes by sys_id. Partial dicts are
@@ -488,10 +488,11 @@ loop nested with `add_subsystem` therefore declares what the same leaf would, an
 closing an outer loop around it is not a false algebraic loop.
 
 Shortcuts (`core.composition`): `+` flat add only, `>>` series, `@` closed loop
-(``closed_loop(C, plant, r=True, w=False, v=False)`` is `@` with options, and has
-no port-name keyword: it exposes the reference, a load
-disturbance ``w`` summed into the plant input and a measurement noise ``v`` summed into
-the measurement, each through a visible `Sum` block; `@` keeps the single input ``r``),
+(``closed_loop(C, plant, reference=True, disturbance=False, noise=False)`` is `@`
+with options, and has no port-name keyword: the keywords are the words, the
+ports are the letters ``r``, ``d``, ``n``; a load disturbance is summed into the
+plant input and a measurement noise into the measurement, each through a
+visible `Sum` block; `@` keeps the single input ``r``),
 `autowire()` connects by name only: each unconnected input takes the one output
 with the same name and size, an output may feed several inputs, and an input
 with no match or several stays open and is listed in a warning (`strict=True`
@@ -530,10 +531,12 @@ that reads its own measurement, and brings back `y` or the only output.
 one edge input feeding all of them, the one inside output of a name becomes an
 edge output, and `"x"` with no such port is the box's own state as an output.
 
-**Shortcut subsystem ids** default by role: `ref` (sources), `ctl` (controllers:
-a block that commands `u` and reads `r`, `y`, `x` or `e`), `sys` (stateful
-plants), with numeric suffix on collision (`sys2`, …). Override with
-``System.id`` before wiring or explicit ``add_subsystem(..., "plant")``. The
+**Shortcut subsystem ids.** `@` names its two sides `controller` and `plant`,
+and `feedback(leaf)` names the leaf `plant`; `+` and `>>` keep each block's
+own name (`step`, `pid`, `pendulum`: ``System.id``, else the name), with a
+numeric suffix when a plain name repeats (`integrator2`). No id is minted
+from a block's shape. Override with ``System.id`` before wiring or explicit
+``add_subsystem(..., "plant")``. The
 reserved names `plant`, `controller` and `estimator` are never suffixed: a
 second block under one of them is refused.
 Block titles in ``plot_diagram()`` still show ``sys.name`` (human type).
@@ -568,7 +571,7 @@ itself, through a `Gain` (`feedback(sys, K)`) or a sensor or filter block
 (`feedback(sys, F)`), the return block named `filter` either way;
 `closed_loop(C, plant, filter=F)` puts the same block, at the loop's top level,
 between the plant's `y` and what the controller reads (its `y`, or the `Error`
-block): the plant's `y` stays the output, a noise `v` enters before the filter,
+block): the plant's `y` stays the output, a noise `n` enters before the filter,
 and a controller that reads `x` is refused (a filter on the state is an
 estimator). Positive feedback still uses a signed `Sum`. A scalar error against a vector output takes
 component 0 through a visible `Demux`; equal dimensions close a vector loop;
@@ -588,9 +591,9 @@ and `minilink/core/feedback.py` reads them, never a class or an `isinstance`:
 - `roles(diagram)` returns the blocks under the reserved subsystem names
   `plant`, `controller` and `estimator` (the estimator may sit inside the
   controller; a leaf is its own plant; a sampled loop answers from its two
-  sides; the shortcuts' `sys` and `ctl` read as `plant` and `controller`
-  until they are renamed). One of each per diagram level: a second block
-  under a reserved name is refused, never suffixed.
+  sides). One of each per diagram level: a second block under a reserved
+  name is refused, never suffixed, so two loops cannot be laid side by side
+  (`loop >> loop`, `loop + loop`): run them separately and compare.
 
 The one explicit hint left is `plot_space`, a class attribute read only by
 `plot_control_law` (`plot_space_of`) where the ports cannot say what to sweep:
@@ -666,7 +669,7 @@ model always reads that plant object's **live** ``self.params``. The
 controller's own params dict carries gains only and is never forwarded to the
 embedded model. Consequences: mutating ``plant.params`` updates both the real
 plant and the controller model (they are usually the same object — nominal
-model-based control); diagram-level ``params={"sys": {...}}`` overrides and the
+model-based control); diagram-level ``params={"plant": {...}}`` overrides and the
 evaluator parametric tier reach the plant subsystem but **not** the
 controller's embedded copy (which is exactly the model-mismatch semantics —
 override the plant to study robustness). No forwarded model-params channel is
@@ -883,11 +886,11 @@ point imply large ``ddq``.
 **What the trajectory records.** :class:`~minilink.core.trajectory.Trajectory` stores
 ``x`` (and boundary ``u``) on the **output time grid only**. It does **not** log
 internal RK4 sub-step torques. :meth:`~minilink.core.diagram.DiagramSystem.reconstruct_internal_signals`
-and ``plot_trajectory`` evaluate ``ctl:u`` and ``f(x, u, t)`` at those **grid states**
+and ``plot_trajectory`` evaluate ``controller:u`` and ``f(x, u, t)`` at those **grid states**
 — equivalent to the k1/start-of-interval algebraic map, **not** the effective
 piecewise dynamics integrated over ``[t_k, t_k + dt]``. Therefore:
 
-- Reconstructed ``ctl:u`` can appear **smooth or constant** while sub-step torques oscillate.
+- Reconstructed ``controller:u`` can appear **smooth or constant** while sub-step torques oscillate.
 - ``f``-based ``ddq`` at a grid point can **disagree** with ``Δdq/Δt`` from the stored
   state (especially under ``rk4_fixedsteps``).
 - This is **not** a compile-backend bug; NumPy and JAX evaluators show the same pattern.
@@ -1080,7 +1083,7 @@ arm` (input `r`) is a plant for an outer learned law; a step that leaves the
 box or blows up (non-finite state) ends the episode. The learned law is a `System`:
 `ctl @ plant` compiles on both backends, `linearize` / `jacobian` differentiate
 through the network, and the parametric tier (`rk4_step_trace_p` with
-`params={"ctl": ..., "sys": ...}`) gives gradients of a rollout with respect
+`params={"controller": ..., "plant": ...}`) gives gradients of a rollout with respect
 to the policy weights. Official demos: `examples/demos/rl/` (pendulum swing-up, cart-pole,
 drone, rocket); the tutorial chapter is
 `examples/tutorial/11_reinforcement_learning.ipynb`; native teaching
@@ -1316,7 +1319,8 @@ NLP:       MathematicalProgram → Optimizer → OptimizationResult
 
 - `Trajectory` is numeric only (`t`, `x`, `u`, optional `signals`); labels stay on `System`.
 - Diagram internal signals in plots: `"sys_id:port_id"`, or ``(subsystem, "port")``
-  tuples; shortcut-built diagrams default to ``ref`` / ``ctl`` / ``sys``.
+  tuples; a loop built by `@` has ``controller`` and ``plant``, the other blocks
+  their own names.
 - `DiagramSystem.connection_verbose` defaults to `False`; set `True` to print one line per connection.
-- Shortcuts flatten diagram operands instead of nesting them; `+` does not infer cross-wiring.
+- `+` and `>>` flatten diagram operands; only `@` nests, a box under its role name; `+` does not infer cross-wiring.
 - `compute_*` returns `Trajectory`; `plot_*` returns `PlotResult`; `show=False` skips display.

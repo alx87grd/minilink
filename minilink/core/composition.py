@@ -23,7 +23,7 @@ from minilink.core.system import System
 
 #: Inputs that read their nominal value when left open, without a word from
 #: autowire: a plant's disturbance and measurement noise.
-_NOMINAL_WHEN_OPEN = frozenset({"d", "n", "w", "v"})
+_NOMINAL_WHEN_OPEN = frozenset({"d", "n"})
 
 
 def _animated_geometry_source(obj):
@@ -220,7 +220,7 @@ def _close_with_junction(sys, filter=1, *, of=None, sign=-1.0, validate=True):
         for target_sys, target_port in targets:
             diagram.connections[target_sys][target_port] = None
     else:
-        entry_sys = _add_system_to_diagram(diagram, sys)
+        entry_sys = _add_system_to_diagram(diagram, sys, role="plant")
         targets = [(entry_sys, entry)]
         diagram.connect_new_output_port(entry_sys, _default_output_port(sys), "y")
     entry_dim = diagram.subsystems[targets[0][0]].inputs[targets[0][1]].dim
@@ -360,9 +360,9 @@ def closed_loop(
     controller: System,
     plant: System,
     *,
-    r: bool = True,
-    w: bool = False,
-    v: bool = False,
+    reference: bool = True,
+    disturbance: bool = False,
+    noise: bool = False,
     filter=None,
     validate: bool = True,
 ) -> DiagramSystem:
@@ -397,16 +397,17 @@ def closed_loop(
         Controller subsystem with reference, measurement, and control ports.
     plant : System
         Plant subsystem with control input and measurement output ports.
-    r, w, v : bool, optional
-        The loop's boundary inputs: the reference ``r`` (default on), the load
-        disturbance ``w`` summed into the plant input, and the measurement
-        noise ``v`` summed into the measurement before it returns (both off by
-        default). With ``r=False`` the reference reads its nominal value.
+    reference, disturbance, noise : bool, optional
+        The loop's boundary inputs, on the ports ``r``, ``d`` and ``n``: the
+        reference (default on), the load disturbance summed into the plant
+        input, and the measurement noise summed into the measurement before
+        it returns (both off by default). With ``reference=False`` the
+        reference reads its nominal value.
     filter : System, scalar or array, optional
         The return path: a sensor or filter block, or a gain (a ``Gain``
         block), named ``filter``, between the plant's ``y`` and what the
         controller reads (its ``y``, or the ``Error`` block). The plant's
-        ``y`` stays the loop's output and the noise ``v`` enters before the
+        ``y`` stays the loop's output and the noise ``n`` enters before the
         filter. A controller that reads ``x`` is refused: a filter on the
         state is an estimator.
     validate : bool, optional
@@ -432,13 +433,19 @@ def closed_loop(
             open_loop, 1 if filter is None else filter, validate=False
         )
         add_loop_inputs(
-            diagram, plant_id, _default_plant_in(plant), measurement, r=r, w=w, v=v
+            diagram,
+            plant_id,
+            _default_plant_in(plant),
+            measurement,
+            reference=reference,
+            disturbance=disturbance,
+            noise=noise,
         )
         if validate:
             diagram.check_algebraic_loops()
         return diagram
     if not roles.measurements:
-        raise ValueError(_no_measurement_message(controller, "ctl"))
+        raise ValueError(_no_measurement_message(controller, "controller"))
     if filter is not None and "x" in roles.measurements:
         raise ValueError(
             f"{controller.name!r} reads the state 'x': a filter on the state is an "
@@ -446,8 +453,8 @@ def closed_loop(
         )
 
     plant_box = _plant_box_with_state(plant) if "x" in roles.measurements else plant
-    controller_id = _default_subsystem_id(controller, role="ctl")
-    plant_id = _default_subsystem_id(plant_box, role="sys")
+    controller_id = _default_subsystem_id(controller, role="controller")
+    plant_id = _default_subsystem_id(plant_box, role="plant")
     paths = [
         ("y", _plant_y(plant_box, plant_id))
         if measurement == "y" and filter is not None
@@ -476,14 +483,20 @@ def closed_loop(
             )
         diagram.connect(*source, controller_id, port)
 
-    if r and "r" in controller.inputs:
+    if reference and "r" in controller.inputs:
         _add_input_port_like(diagram, "r", controller.inputs["r"])
         diagram.connect("input", "r", controller_id, "r")
 
     diagram.name = f"Closed loop {plant.name} with {controller.name}"
 
     add_loop_inputs(
-        diagram, plant_id, _default_plant_in(plant_box), measurement, r=r, w=w, v=v
+        diagram,
+        plant_id,
+        _default_plant_in(plant_box),
+        measurement,
+        reference=reference,
+        disturbance=disturbance,
+        noise=noise,
     )
     if validate:
         diagram.check_algebraic_loops()
@@ -499,8 +512,8 @@ def _open_loop(controller, plant, *, expose_inputs):
     inputs go on the edge, for a junction to drive.
     """
     diagram = DiagramSystem()
-    controller_id = _add_role_block(diagram, controller, "ctl")
-    plant_id = _add_role_block(diagram, plant, "sys")
+    controller_id = _add_role_block(diagram, controller, "controller")
+    plant_id = _add_role_block(diagram, plant, "plant")
     if expose_inputs:
         _expose_free_inputs(diagram, controller_id)
 
@@ -843,20 +856,22 @@ def _add_system_to_diagram(diagram, sys, *, role=None) -> str:
     return sys_id
 
 
-def add_loop_inputs(diagram, plant_id, plant_port, measurement, *, r, w, v):
-    """Drop the boundary ``r`` unless ``r``; sum ``w`` into the plant input and ``v`` into the measurement."""
+def add_loop_inputs(
+    diagram, plant_id, plant_port, measurement, *, reference, disturbance, noise
+):
+    """Drop the boundary ``r`` unless ``reference``; sum ``d`` into the plant input and ``n`` into the measurement."""
     from minilink.blocks.routing import Sum
 
-    if not r and "r" in diagram.inputs:
+    if not reference and "r" in diagram.inputs:
         for sys_id, ports in diagram.connections.items():
             for port_id, source in ports.items():
                 if source == ("input", "r"):
                     ports[port_id] = None
         del diagram.inputs["r"]
-    if w:
-        sum_into(diagram, (plant_id, plant_port), "w", "disturbance", Sum)
-    if v:
-        sum_into(diagram, measurement, "v", "noise", Sum)
+    if disturbance:
+        sum_into(diagram, (plant_id, plant_port), "d", "disturbance", Sum)
+    if noise:
+        sum_into(diagram, measurement, "n", "noise", Sum)
     return diagram
 
 
@@ -973,7 +988,7 @@ def resolve_standard_feedback(
     controller,
     plant,
     *,
-    controller_id: str = "ctl",
+    controller_id: str = "controller",
     plant_id: str = "plant",
 ) -> StandardFeedbackWiring:
     """Choose the feedback port names shared by ``closed_loop`` and the sampled loop.
@@ -1100,28 +1115,12 @@ def _iter_output_ports(diagram, target_id: str):
             yield source_id, source, port_id, output
 
 
-def _is_source_like(sys) -> bool:
-    return sys.n == 0 and len(sys.inputs) == 0
-
-
-def _is_controller_like(sys) -> bool:
-    roles = block_roles(sys)
-    return roles.command == "u" and (
-        roles.reference is not None or bool(roles.measurements) or roles.entry == "e"
-    )
-
-
 def _default_subsystem_id(sys, *, role=None) -> str:
+    """The id a block takes: its ``id``, else its role in a loop, else its own name."""
     if sys.id:
         return _normalize_identifier(str(sys.id))
     if role is not None:
         return _normalize_identifier(str(role))
-    if _is_source_like(sys):
-        return "ref"
-    if _is_controller_like(sys):
-        return "ctl"
-    if sys.n > 0:
-        return "sys"
     return _base_system_id(sys)
 
 

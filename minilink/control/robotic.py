@@ -152,8 +152,8 @@ class TaskImpedance(System):
       current end-effector (frame ``task_force``) — not gravity feedforward and
       not the mapped joint torque.
 
-    In a diagram those frames namespace to ``ctl:task_target`` /
-    ``ctl:task_force``.
+    In a diagram those frames namespace to ``controller:task_target`` /
+    ``controller:task_force``.
     """
 
     plot_space = "absolute_qdq"  # plot_control_law sweeps the (q, dq) plane

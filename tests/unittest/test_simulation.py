@@ -819,12 +819,12 @@ class UnscheduledProportionalController(ProportionalController):
 
 def _build_step_diagram():
     diagram = StepDiagramSystem()
-    diagram.add_subsystem(ProportionalController(0.5), "ctl")
+    diagram.add_subsystem(ProportionalController(0.5), "controller")
     diagram.add_input_port("r")
     diagram.add_input_port("y")
-    diagram.connect("input", "r", "ctl", "r")
-    diagram.connect("input", "y", "ctl", "y")
-    diagram.connect_new_output_port("ctl", "u", "u")
+    diagram.connect("input", "r", "controller", "r")
+    diagram.connect("input", "y", "controller", "y")
+    diagram.connect_new_output_port("controller", "u", "u")
     return diagram
 
 
@@ -833,7 +833,7 @@ class TestAsComputer(unittest.TestCase):
         computer = ProportionalController(0.3) % 0.02
         self.assertIsInstance(computer, Computer)
         self.assertAlmostEqual(computer.schedule.dt_base, 0.02)
-        self.assertIn("ctl", computer.diagram.subsystems)
+        self.assertIn("controller", computer.diagram.subsystems)
 
     def test_step_diagram_as_computer(self):
         diagram = _build_step_diagram()
@@ -1174,12 +1174,12 @@ class TestAutomaticTimeGrid(unittest.TestCase):
         for block in (saturation, limiter):
             with self.subTest(block=block.name):
                 loop = DiagramSystem()
-                loop.add_subsystem(controller, "ctl")
+                loop.add_subsystem(controller, "controller")
                 loop.add_subsystem(block, "actuator")
-                loop.add_subsystem(plant, "sys")
-                loop.connect("sys", "x", "ctl", "x")
-                loop.connect("ctl", "u", "actuator", "u")
-                loop.connect("actuator", "y", "sys", "u")
+                loop.add_subsystem(plant, "plant")
+                loop.connect("plant", "x", "controller", "x")
+                loop.connect("controller", "u", "actuator", "u")
+                loop.connect("actuator", "y", "plant", "u")
                 sim = Simulator(loop, tf=1.0, solver="euler", verbose=False)
                 self.assertAlmostEqual(sim.dt, 0.002)  # 0.02 * SMOOTH_AUTO_DT_SCALE
 

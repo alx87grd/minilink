@@ -216,12 +216,12 @@ def _build_unity_feedback(K=0.3):
     diagram = StepDiagramSystem()
     ctl = ProportionalController(K)
     plant = DiscreteAccumulator()
-    diagram.add_subsystem(ctl, "ctl")
+    diagram.add_subsystem(ctl, "controller")
     diagram.add_subsystem(plant, "plant")
     diagram.add_input_port("r")
-    diagram.connect("input", "r", "ctl", "r")
-    diagram.connect("plant", "y", "ctl", "y")
-    diagram.connect("ctl", "u", "plant", "u")
+    diagram.connect("input", "r", "controller", "r")
+    diagram.connect("plant", "y", "controller", "y")
+    diagram.connect("controller", "u", "plant", "u")
     diagram.connect_new_output_port("plant", "y", "y")
     return diagram
 

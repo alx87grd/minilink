@@ -26,8 +26,9 @@ class DiagramSystem(WiredDiagramMixin, DynamicSystem):
     where each local input ``u_i`` is gathered from the output ports connected
     to subsystem ``i``, from the diagram boundary inputs, or from the port's
     constant nominal value when unconnected. Diagram-level params are nested
-    by subsystem id: ``{"sys": {...}, "ctl": {...}}``. Shortcut-built
-    diagrams default to role ids ``ref``, ``ctl``, and ``sys``.
+    by subsystem id: ``{"plant": {...}, "controller": {...}}``. ``@`` names
+    its blocks ``controller`` and ``plant``; ``+`` and ``>>`` keep the blocks'
+    own names.
 
     Build diagrams with :meth:`add_subsystem` + :meth:`connect` (canonical
     wiring for any topology) or with the shortcuts ``+``, ``>>``, ``@``, and
@@ -278,12 +279,12 @@ if __name__ == "__main__":
     from minilink.control.output import ProportionalController
 
     diagram = DiagramSystem()
-    diagram.add_subsystem(ProportionalController(), "ctl")
+    diagram.add_subsystem(ProportionalController(), "controller")
     diagram.add_subsystem(Integrator(), "plant")
     diagram.add_input_port("r")
-    diagram.connect("input", "r", "ctl", "r")
-    diagram.connect("plant", "y", "ctl", "y")
-    diagram.connect("ctl", "u", "plant", "u")
+    diagram.connect("input", "r", "controller", "r")
+    diagram.connect("plant", "y", "controller", "y")
+    diagram.connect("controller", "u", "plant", "u")
 
     diagram.plot_diagram()
 

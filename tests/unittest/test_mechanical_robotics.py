@@ -488,7 +488,7 @@ class TestRoboticWrappers(unittest.TestCase):
     def test_joint_impedance_closed_loop(self):
         diagram = closed_loop(JointImpedance(dof=2), TwoLinkManipulator())
         self.assertNotIn("mux", diagram.subsystems)
-        self.assertEqual(diagram.connections["ctl"]["y"], ("sys", "y"))
+        self.assertEqual(diagram.connections["controller"]["y"], ("plant", "y"))
 
     def test_model_joint_impedance_gravity_at_setpoint(self):
         arm = TwoLinkManipulator()
@@ -578,7 +578,7 @@ class TestRoboticWrappers(unittest.TestCase):
     def test_task_impedance_closed_loop(self):
         diagram = closed_loop(TaskImpedance(TwoLinkManipulator()), TwoLinkManipulator())
         self.assertNotIn("mux", diagram.subsystems)
-        self.assertEqual(diagram.connections["ctl"]["y"], ("sys", "y"))
+        self.assertEqual(diagram.connections["controller"]["y"], ("plant", "y"))
 
     def test_task_impedance_force_arrow_off_by_default(self):
         arm = TwoLinkManipulator()
@@ -630,14 +630,14 @@ class TestRoboticWrappers(unittest.TestCase):
         # Diagram external input is controller reference ``r``.
         frames = diagram.tf(x, p_d)
         geom = diagram.get_dynamic_geometry(x, p_d)
-        self.assertIn("ctl:task_force", frames)
-        self.assertIn("ctl:task_force", geom)
-        self.assertIn("ctl:task_target", frames)
-        self.assertIn("ctl:task_target", geom)
+        self.assertIn("controller:task_force", frames)
+        self.assertIn("controller:task_force", geom)
+        self.assertIn("controller:task_target", frames)
+        self.assertIn("controller:task_target", geom)
         np.testing.assert_allclose(
-            frames["ctl:task_force"][:2, 3], arm.forward_kinematics(q)
+            frames["controller:task_force"][:2, 3], arm.forward_kinematics(q)
         )
-        np.testing.assert_allclose(frames["ctl:task_target"][:2, 3], p_d)
+        np.testing.assert_allclose(frames["controller:task_target"][:2, 3], p_d)
         resolve_draw_frame(diagram, x, p_d)
 
         ur5 = UR5Manipulator()
@@ -718,7 +718,7 @@ class TestRoboticWrappers(unittest.TestCase):
     def test_task_kinematic_closed_loop_y(self):
         arm = SpeedControlledManipulator.from_manipulator(TwoLinkManipulator())
         diagram = closed_loop(TaskKinematic(arm), arm)
-        self.assertEqual(diagram.connections["ctl"]["y"], ("sys", "y"))
+        self.assertEqual(diagram.connections["controller"]["y"], ("plant", "y"))
         self.assertNotIn("mux", diagram.subsystems)
 
     def test_task_kinematic_nullspace_projection(self):
@@ -745,10 +745,11 @@ class TestRoboticWrappers(unittest.TestCase):
         ref_q.params["value"] = np.array([-1.0] * 5)
         ctl = TaskKinematicNullspace(arm, Kp=[1.0, 1.0], K_null=[10.0] * 5)
         diagram = (ref_q + (ref_p >> ctl @ arm)).autowire(strict=True)
-        self.assertEqual(diagram.connections["ctl"]["r"][1], "y")
-        self.assertEqual(diagram.connections["ctl"]["r_null"][1], "r_null")
+        self.assertEqual(diagram.connections["controller"]["r"][1], "y")
+        self.assertEqual(diagram.connections["controller"]["r_null"][1], "r_null")
         self.assertNotEqual(
-            diagram.connections["ctl"]["r"][0], diagram.connections["ctl"]["r_null"][0]
+            diagram.connections["controller"]["r"][0],
+            diagram.connections["controller"]["r_null"][0],
         )
 
 

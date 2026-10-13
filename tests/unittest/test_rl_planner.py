@@ -259,7 +259,7 @@ def test_nominal_trajectory_is_the_undisturbed_rollout_from_the_start():
         bounded_pendulum(PendulumWithNoisePort()),
         cost=HangCost(),
         x0_distribution=Uniform([-0.5, -0.5], [0.5, 0.5]),
-        disturbances={"w": Gaussian([0.0], [1.0])},
+        disturbances={"d": Gaussian([0.0], [1.0])},
     )
     planner = ReinforcementLearningPlanner(noisy, **small)
     first, second = (
@@ -378,7 +378,7 @@ def test_neural_closed_loop_compiles_and_differentiates_under_jax():
         x_next = evaluator.rk4_step_trace_p(x, jnp.zeros(0), 0.0, 0.05, params)
         return jnp.sum(x_next**2)
 
-    grads = jax.grad(J)({"ctl": ctl.params, "sys": plant.params})
+    grads = jax.grad(J)({"controller": ctl.params, "plant": plant.params})
     assert all(bool(jnp.all(jnp.isfinite(g))) for g in jax.tree_util.tree_leaves(grads))
 
 
@@ -446,14 +446,16 @@ def test_outer_loop_on_an_inner_loop_with_nested_params():
         inner,
         cost=HangCost(),
         x0_distribution=Uniform([-0.3, -0.3], [0.3, 0.3]),
-        params_distribution={"sys.m": Particles([[0.5], [2.0]])},  # the plant inside
+        params_distribution={"plant.m": Particles([[0.5], [2.0]])},  # the plant inside
     )
-    assert lookup_param(inner.params, "sys.m") == 1.0
+    assert lookup_param(inner.params, "plant.m") == 1.0
     draw = prob.sample_params(0)
-    assert set(draw) == {"sys"} and float(draw["sys"]["m"]) in (0.5, 2.0)
+    assert set(draw) == {"plant"} and float(draw["plant"]["m"]) in (0.5, 2.0)
     merged = merge_params(inner.params, draw)
-    assert merged["ctl"] is not None and merged["sys"]["m"] == float(draw["sys"]["m"])
-    assert inner.params["sys"]["m"] == 1.0  # untouched
+    assert merged["controller"] is not None and merged["plant"]["m"] == float(
+        draw["plant"]["m"]
+    )
+    assert inner.params["plant"]["m"] == 1.0  # untouched
 
     planner = ReinforcementLearningPlanner(
         prob, dt=0.1, hidden=(8, 8), n_envs=4, n_steps=16, batch_size=32, verbose=0

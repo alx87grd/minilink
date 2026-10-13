@@ -256,10 +256,10 @@ class TestLQR(unittest.TestCase):
         )
         diagram = DiagramSystem()
         diagram.connection_verbose = False
-        diagram.add_subsystem(controller, "ctl")
+        diagram.add_subsystem(controller, "controller")
         diagram.add_subsystem(plant, "plant")
-        diagram.connect("plant", "x", "ctl", "x")
-        diagram.connect("ctl", "u", "plant", "u")
+        diagram.connect("plant", "x", "controller", "x")
+        diagram.connect("controller", "u", "plant", "u")
         plant.x0 = np.array([0.2, 0.0])
         traj = diagram.compute_trajectory(tf=10.0, n_steps=1001, verbose=False)
         np.testing.assert_allclose(traj.x[:, -1], [0.0, 0.0], atol=0.01)
@@ -1834,10 +1834,10 @@ class TestSensitivity(unittest.TestCase):
                     S, self.response(loop, of="error:e", wrt="r"), atol=1e-9
                 )
                 np.testing.assert_allclose(
-                    T, self.response(loop, of="sys:y", wrt="r"), atol=1e-9
+                    T, self.response(loop, of="plant:y", wrt="r"), atol=1e-9
                 )
                 np.testing.assert_allclose(
-                    CS, self.response(loop, of="ctl:u", wrt="r"), atol=1e-9
+                    CS, self.response(loop, of="controller:u", wrt="r"), atol=1e-9
                 )
                 np.testing.assert_allclose(PS, self.response(H) * S, atol=1e-9)
 
@@ -1857,7 +1857,9 @@ class TestSensitivity(unittest.TestCase):
             self.response(S), self.response(loop, of="error:e", wrt="r"), atol=1e-9
         )
         np.testing.assert_allclose(
-            self.response(T), self.response(loop, of="sys:y", wrt="r"), atol=1e-9
+            self.response(T),
+            self.response(loop, of="transfer_function:y", wrt="r"),
+            atol=1e-9,
         )
 
     def test_a_spec_is_one_bode_call(self):
@@ -1917,8 +1919,8 @@ class TestSensitivity(unittest.TestCase):
         for function, subtitle in (
             (sensitivity, "From: r  To: e"),
             (complementary_sensitivity, "From: r  To: y"),
-            (load_sensitivity, "From: w  To: y"),
-            (noise_sensitivity, "From: v  To: u"),
+            (load_sensitivity, "From: d  To: y"),
+            (noise_sensitivity, "From: n  To: u"),
         ):
             with self.subTest(function=function.__name__):
                 result = plot_bode(function(plant=H, controller=C), show=False)

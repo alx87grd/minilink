@@ -73,12 +73,12 @@ def _build_small_closed_loop_jax():
     ctl = _JAXFriendlyPController()
     plant = _JAXFriendlyIntegrator()
     ctl.params["Kp"] = 2.5
-    diag.add_subsystem(ctl, "ctl")
+    diag.add_subsystem(ctl, "controller")
     diag.add_subsystem(plant, "plant")
     diag.add_input_port("r")
-    diag.connect("input", "r", "ctl", "r")
-    diag.connect("plant", "y", "ctl", "y")
-    diag.connect("ctl", "u", "plant", "u")
+    diag.connect("input", "r", "controller", "r")
+    diag.connect("plant", "y", "controller", "y")
+    diag.connect("controller", "u", "plant", "u")
     return diag
 
 
@@ -94,12 +94,12 @@ def _build_small_closed_loop():
     diag.connection_verbose = False
     ctl = ProportionalController(2.5)
     plant = Integrator()
-    diag.add_subsystem(ctl, "ctl")
+    diag.add_subsystem(ctl, "controller")
     diag.add_subsystem(plant, "plant")
     diag.add_input_port("r")
-    diag.connect("input", "r", "ctl", "r")
-    diag.connect("plant", "y", "ctl", "y")
-    diag.connect("ctl", "u", "plant", "u")
+    diag.connect("input", "r", "controller", "r")
+    diag.connect("plant", "y", "controller", "y")
+    diag.connect("controller", "u", "plant", "u")
     return diag
 
 
@@ -236,7 +236,7 @@ class TestNumpyDiagramEvaluator(unittest.TestCase):
         diag = _build_small_closed_loop()
         x = np.array([0.5])
         u = np.array([2.0])
-        params = {"ctl": {"K": np.array([[4.0]])}, "plant": {"k": 3.0}}
+        params = {"controller": {"K": np.array([[4.0]])}, "plant": {"k": 3.0}}
         dx = diag.f(x, u, 0.0, params=params)
         np.testing.assert_allclose(dx, np.array([18.0]), atol=1e-10)
 
@@ -456,7 +456,7 @@ class TestDiagramParamsContract(unittest.TestCase):
 
     def test_params_property_is_nested_live_view(self):
         params = self.diag.params
-        self.assertEqual(set(params), {"ctl", "plant"})
+        self.assertEqual(set(params), {"controller", "plant"})
         self.assertIs(params["plant"], self.diag.subsystems["plant"].params)
 
     def test_params_setter_distributes_by_sys_id(self):
@@ -499,7 +499,7 @@ class TestNumpyDiagramParametricTier(unittest.TestCase):
         self.u = np.array([2.0])
 
     def test_f_p_matches_recursive_reference(self):
-        params = {"ctl": {"K": np.array([[4.0]])}, "plant": {"k": 3.0}}
+        params = {"controller": {"K": np.array([[4.0]])}, "plant": {"k": 3.0}}
         for x_val, u_val, t in [(0.3, 1.2, 0.1), (0.0, 0.0, 0.0), (-5.0, 10.0, 0.0)]:
             x, u = (np.array([x_val]), np.array([u_val]))
             np.testing.assert_allclose(
@@ -524,7 +524,7 @@ class TestNumpyDiagramParametricTier(unittest.TestCase):
             self.evaluator.f_p(self.x, self.u, 0.0, {"plnt": {"k": 3.0}})
 
     def test_outputs_p_single_boundary(self):
-        params = {"ctl": {"K": np.array([[4.0]])}}
+        params = {"controller": {"K": np.array([[4.0]])}}
         out = self.evaluator.outputs_p(self.x, self.u, 0.0, params)
         self.assertEqual(set(out), {"y_meas"})
         np.testing.assert_allclose(out["y_meas"], [0.5], atol=1e-10)
@@ -546,7 +546,7 @@ class TestJaxDiagramParametricTier(unittest.TestCase):
         self.u_np = np.array([2.0])
 
     def test_f_p_matches_numpy(self):
-        params = {"ctl": {"Kp": 4.0}, "plant": {"k": 3.0}}
+        params = {"controller": {"Kp": 4.0}, "plant": {"k": 3.0}}
         np.testing.assert_allclose(
             np.asarray(self.ev.f_p(self.x_j, self.u_j, 0.0, params)),
             self.ev_np.f_p(self.x_np, self.u_np, 0.0, params),
@@ -562,12 +562,14 @@ class TestJaxDiagramParametricTier(unittest.TestCase):
             np.testing.assert_allclose(np.asarray(out_j[key]), out_n[key], atol=1e-05)
 
     def test_jacobian_wrt_params_analytic(self):
-        params = {"ctl": {"Kp": 2.5}, "plant": {"k": 1.0}}
+        params = {"controller": {"Kp": 2.5}, "plant": {"k": 1.0}}
         jac = self.ev.jacobian("f", "params")(self.x_j, self.u_j, 0.0, params)
         np.testing.assert_allclose(
             np.asarray(jac["plant"]["k"]), [2.5 * 1.5], atol=1e-05
         )
-        np.testing.assert_allclose(np.asarray(jac["ctl"]["Kp"]), [1.5], atol=1e-05)
+        np.testing.assert_allclose(
+            np.asarray(jac["controller"]["Kp"]), [1.5], atol=1e-05
+        )
 
     def test_grad_flows_through_f_p(self):
         f_p = self.ev.f_p

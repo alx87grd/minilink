@@ -222,16 +222,18 @@ class TestJacobianDiagram(unittest.TestCase):
             loop.jacobian(f"{plant}:y", "x", method="fd"), np.eye(2), atol=1e-6
         )
         # a disturbance added to the controller command enters f like u does
-        B_dist = loop.jacobian("f", "ctl:u", method="fd")
+        B_dist = loop.jacobian("f", "controller:u", method="fd")
         np.testing.assert_allclose(
             B_dist, Pendulum().jacobian("f", "u", method="fd"), atol=1e-6
         )
         np.testing.assert_allclose(
-            loop.jacobian("ctl:u", "ctl:u", method="fd"), [[1.0]], atol=1e-6
+            loop.jacobian("controller:u", "controller:u", method="fd"),
+            [[1.0]],
+            atol=1e-6,
         )
         if JAX:
             np.testing.assert_allclose(
-                loop.jacobian("f", "ctl:u", method="jax"), B_dist, atol=1e-6
+                loop.jacobian("f", "controller:u", method="jax"), B_dist, atol=1e-6
             )
         with self.assertRaisesRegex(ValueError, "Unknown wire"):
             loop.jacobian("f", "nowhere:u")
@@ -244,7 +246,9 @@ class TestJacobianDiagram(unittest.TestCase):
                 self.assertEqual(value.shape[0], 2, (block, key))
         if JAX:
             S_jax = self.loop.jacobian("f", "params", method="jax")
-            np.testing.assert_allclose(S_jax["ctl"]["Kp"], S["ctl"]["Kp"], atol=1e-5)
+            np.testing.assert_allclose(
+                S_jax["controller"]["Kp"], S["controller"]["Kp"], atol=1e-5
+            )
 
 
 class TestCatalogAgreement(unittest.TestCase):
@@ -300,7 +304,7 @@ class TestMethod(unittest.TestCase):
         # a port added to a block already inside a diagram is seen by the diagram
         loop = _closed_loop()
         loop.jacobian("f", "x")
-        ctl = loop.subsystems["ctl"]
+        ctl = loop.subsystems["controller"]
         ctl.add_output_port(
             "twice",
             dim=1,
@@ -308,8 +312,8 @@ class TestMethod(unittest.TestCase):
             dependencies="all",
         )
         np.testing.assert_allclose(
-            loop.jacobian("ctl:twice", "r")[0, 0],
-            2.0 * loop.jacobian("ctl:u", "r")[0, 0],
+            loop.jacobian("controller:twice", "r")[0, 0],
+            2.0 * loop.jacobian("controller:u", "r")[0, 0],
         )
 
     def test_nothing_is_stored_on_the_system(self):
@@ -468,7 +472,9 @@ class TestFamilyPattern(unittest.TestCase):
             linearize_matrices(Pendulum(), epsilon=1e-6)
         loop = _closed_loop()
         with self.assertRaisesRegex(TypeError, "integer index"):
-            linearize_matrices(loop, of=("ctl", "u"))  # the old (sys_id, port_id) form
+            linearize_matrices(
+                loop, of=("controller", "u")
+            )  # the old (sys_id, port_id) form
         with self.assertRaisesRegex(TypeError, "one channel"):
             bode(loop, of=["y", "y"])
         with self.assertRaisesRegex(TypeError, "LTISystem"):

@@ -20,11 +20,11 @@ plant.state.upper_bound = -plant.state.lower_bound
 # saturation the real loop has, not the linear law the designer wrote.
 loop = DiagramSystem()
 loop.name = "Pendulum under LQR"
-loop.add_subsystem(lqr_at_operating_point(plant, X_UP, Q=Q, R=np.eye(1)), "ctl")
+loop.add_subsystem(lqr_at_operating_point(plant, X_UP, Q=Q, R=np.eye(1)), "controller")
 loop.add_subsystem(Saturation(-TORQUE, TORQUE), "limit")
 loop.add_subsystem(plant, "plant")
-loop.connect("plant", "y", "ctl", "x")
-loop.connect("ctl", "u", "limit", "u")
+loop.connect("plant", "y", "controller", "x")
+loop.connect("controller", "u", "limit", "u")
 loop.connect("limit", "y", "plant", "u")
 loop.plot_diagram()
 

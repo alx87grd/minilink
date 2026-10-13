@@ -86,7 +86,7 @@ def hybrid_closed_loop(
     plant_diagram = _as_plant_diagram(plant)
     _ensure_computer_boundary_ports(
         step_diagram,
-        sys_id=_leaf_sys_id(computer_side, default="ctl"),
+        sys_id=_leaf_sys_id(computer_side, default="controller"),
         ref_port=ref_port,
         computer_in=computer_in,
         computer_out=computer_out,
@@ -255,7 +255,7 @@ def _as_step_diagram(computer_side: System | StepDiagramSystem) -> StepDiagramSy
         return computer_side
     if isinstance(computer_side, (StepSystem, System)):
         diagram = StepDiagramSystem()
-        diagram.add_subsystem(computer_side, "ctl")
+        diagram.add_subsystem(computer_side, "controller")
         return diagram
     raise TypeError(
         f"computer_side must be StepDiagramSystem or System, "

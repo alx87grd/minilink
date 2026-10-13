@@ -109,7 +109,7 @@ def load_sensitivity(
     method: str = "auto",
     eps: float = 1e-6,
 ):
-    """Return the load sensitivity ``PS``, the map from a disturbance ``w`` at the plant input to ``y``.
+    """Return the load sensitivity ``PS``, the map from a disturbance ``d`` at the plant input to ``y``.
 
     Same arguments as :func:`sensitivity`.
     """
@@ -125,7 +125,7 @@ def load_sensitivity(
     PS_num = np.polymul(np.polymul(H.numerator, C.denominator), F.denominator)
     PS_den = np.polyadd(L_den, L_num)
 
-    return loop_function(PS_num, PS_den, "Load sensitivity PS", "w", "y")
+    return loop_function(PS_num, PS_den, "Load sensitivity PS", "d", "y")
 
 
 def noise_sensitivity(
@@ -140,9 +140,9 @@ def noise_sensitivity(
     method: str = "auto",
     eps: float = 1e-6,
 ):
-    """Return the noise sensitivity ``CS``, the map from measurement noise ``v`` to the command ``u``.
+    """Return the noise sensitivity ``CS``, the map from measurement noise ``n`` to the command ``u``.
 
-    Same arguments as :func:`sensitivity`. In the loop, ``v`` reaches ``u``
+    Same arguments as :func:`sensitivity`. In the loop, ``n`` reaches ``u``
     as ``-CS``: the sign of the negative feedback is left out.
     """
     H, C, F = loop_pieces(
@@ -157,7 +157,7 @@ def noise_sensitivity(
     CS_num = np.polymul(np.polymul(C.numerator, F.numerator), H.denominator)
     CS_den = np.polyadd(L_den, L_num)
 
-    return loop_function(CS_num, CS_den, "Noise sensitivity CS", "v", "u")
+    return loop_function(CS_num, CS_den, "Noise sensitivity CS", "n", "u")
 
 
 # =============================================================================

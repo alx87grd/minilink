@@ -28,11 +28,11 @@ ctl.params = {"Kp": 1.0, "Ki": 0.0, "Kd": 1.0}
 
 diagram = DiagramSystem()
 diagram.add_subsystem(plant, "plant")
-diagram.add_subsystem(ctl, "ctl")
+diagram.add_subsystem(ctl, "controller")
 diagram.add_input_port("r", dim=1)
-diagram.connect("input", "r", "ctl", "r")
-diagram.connect("plant", "y", "ctl", "y")
-diagram.connect("ctl", "u", "plant", "u")
+diagram.connect("input", "r", "controller", "r")
+diagram.connect("plant", "y", "controller", "y")
+diagram.connect("controller", "u", "plant", "u")
 diagram.inputs["r"].nominal_value = np.array([1.0])
 
 evaluator = diagram.compile(backend="jax")
@@ -51,7 +51,7 @@ plot_signals = resolve_plot_signals(diagram)
 
 def apply_pid_params(pid):
     diagram.params = {
-        "ctl": {
+        "controller": {
             "Kp": float(pid[0]),
             "Ki": float(pid[1]),
             "Kd": float(pid[2]),
@@ -67,7 +67,7 @@ def simulate_traj(pid):
 
 def rollout_loss(pid):
     params = {
-        "ctl": {"Kp": pid[0], "Ki": pid[1], "Kd": pid[2]},
+        "controller": {"Kp": pid[0], "Ki": pid[1], "Kd": pid[2]},
         "plant": plant_params,
     }
 

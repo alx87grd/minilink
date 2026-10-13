@@ -38,7 +38,7 @@ def collect_discontinuous_solver_notes(
     if user_solver == "rk4_fixedsteps":
         notes.append(
             "Forced rk4_fixedsteps: sub-step torques may oscillate and cancel; "
-            "ctl:u on the output grid may not match the effective integrated torque."
+            "controller:u on the output grid may not match the effective integrated torque."
         )
     elif user_solver == "euler_fixedsteps":
         notes.append(

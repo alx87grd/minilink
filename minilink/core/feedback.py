@@ -118,10 +118,9 @@ def roles(system) -> Roles:
 
     A leaf is its own plant. A diagram answers from its top-level keys ``plant``,
     ``controller`` and ``estimator`` (the estimator may also sit inside the
-    controller); a sampled loop from its ``plant`` and ``computer`` sides. The
-    shortcuts' own keys ``sys`` and ``ctl`` are read as ``plant`` and ``controller``
-    until they are renamed. A missing name is ``None``: a tool that needs that block
-    raises, and the plots and the camera keep their plain defaults.
+    controller); a sampled loop from its ``plant`` and ``computer`` sides. A
+    missing name is ``None``: a tool that needs that block raises, and the plots
+    and the camera keep their plain defaults.
     """
     if hasattr(system, "computer") and hasattr(system, "plant"):
         plant_side = roles(system.plant)
@@ -134,8 +133,8 @@ def roles(system) -> Roles:
     subsystems = getattr(system, "subsystems", None)
     if subsystems is None:
         return Roles(system, None, None)
-    plant = _block_under(subsystems, "plant", "sys")
-    controller = _block_under(subsystems, "controller", "ctl")
+    plant = _block_under(subsystems, "plant")
+    controller = _block_under(subsystems, "controller")
     estimator = _block_under(subsystems, "estimator")
     if estimator is None and controller is not None:
         estimator = _block_under(getattr(controller, "subsystems", {}), "estimator")

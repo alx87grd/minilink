@@ -40,8 +40,8 @@ diagram.add_subsystem(noise2, "measurement_noise")
 diagram.connect("step", "y", "controller", "r")
 diagram.connect("controller", "u", "plant", "u")
 diagram.connect("plant", "y", "controller", "y")
-diagram.connect("process_noise", "y", "plant", "w")
-diagram.connect("measurement_noise", "y", "plant", "v")
+diagram.connect("process_noise", "y", "plant", "d")
+diagram.connect("measurement_noise", "y", "plant", "n")
 diagram.plot_diagram()
 
 

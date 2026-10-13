@@ -160,7 +160,7 @@ Systems-as-descriptions: CONSTITUTION.md §4.*
   semantics: DESIGN §4, `DiagramSystem`.
 - **4.9 Canonical port terminology:** Prefer these names when they fit; this is not a rename sweep.
   Custom and multi-channel port names remain fully valid.
-  - Inputs: `u` (control action / actuation), `r` (reference / setpoint), `w` (disturbance / exogenous input), `v` (measurement noise).
+  - Inputs: `u` (control action / actuation), `r` (reference / setpoint), `d` (disturbance / exogenous input), `n` (measurement noise).
   - Outputs: `y` (measured output / sensor signal).
 - **4.10 Early structural validation:** Diagram connection utilities (`@`, `>>`, `DiagramSystem.connect`)
   validate port existence and dimensional compatibility at wiring time, failing with explicit

@@ -24,12 +24,12 @@ class DiscreteAccumulator(StepSystem):
 
 
 diagram = StepDiagramSystem()
-diagram.add_subsystem(ProportionalController(0.3), "ctl")
+diagram.add_subsystem(ProportionalController(0.3), "controller")
 diagram.add_subsystem(DiscreteAccumulator(), "plant")
 diagram.add_input_port("r")
-diagram.connect("input", "r", "ctl", "r")
-diagram.connect("plant", "y", "ctl", "y")
-diagram.connect("ctl", "u", "plant", "u")
+diagram.connect("input", "r", "controller", "r")
+diagram.connect("plant", "y", "controller", "y")
+diagram.connect("controller", "u", "plant", "u")
 diagram.connect_new_output_port("plant", "y", "y")
 
 diagram.plot_diagram()

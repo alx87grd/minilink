@@ -169,8 +169,8 @@ def noisy_loop(seed_w=1, seed_v=2):
     loop.connect("step", "y", "controller", "r")
     loop.connect("controller", "u", "plant", "u")
     loop.connect("plant", "y", "controller", "y")
-    loop.connect("process_noise", "y", "plant", "w")
-    loop.connect("measurement_noise", "y", "plant", "v")
+    loop.connect("process_noise", "y", "plant", "d")
+    loop.connect("measurement_noise", "y", "plant", "n")
     return loop
 
 
@@ -181,7 +181,7 @@ def noisy_plant():
     plant = DiagramSystem()
     plant.add_subsystem(PendulumWithNoisePort(), "plant")
     plant.add_subsystem(WhiteNoise(seed=5), "sensor_noise")
-    plant.connect("sensor_noise", "y", "plant", "v")
+    plant.connect("sensor_noise", "y", "plant", "n")
     plant.add_input_port("u", dim=1)
     plant.connect("input", "u", "plant", "u")
     return plant
@@ -289,8 +289,8 @@ def test_the_rollout_environment_warns_about_noise_it_never_sees():
         )
 
     cases = [
-        (problem(PendulumWithNoisePort(), w=Gaussian(0.0, 0.1)), None),
-        (problem(PendulumWithNoisePort(), v=Gaussian(0.0, 0.1)), "never calls h"),
+        (problem(PendulumWithNoisePort(), d=Gaussian(0.0, 0.1)), None),
+        (problem(PendulumWithNoisePort(), n=Gaussian(0.0, 0.1)), "never calls h"),
         (problem(noisy_plant()), "fixed seed"),
     ]
     for prob, expected in cases:

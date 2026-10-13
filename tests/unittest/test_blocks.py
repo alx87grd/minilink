@@ -272,7 +272,7 @@ class TestSignalColors(unittest.TestCase):
             self.assertEqual(style.linewidth, 2.0)
 
     def test_internal_signals_are_not_red(self):
-        for name in ("ctl:u", "y", "r", "plant:dq"):
+        for name in ("controller:u", "y", "r", "plant:dq"):
             style = color_for_signal(name, internal_index=0)
             self.assertNotEqual(style.color, INPUT_COLOR)
 
@@ -298,8 +298,8 @@ class TestSignalColors(unittest.TestCase):
         self.assertFalse(is_core_state("u"))
         self.assertTrue(is_core_input("u"))
         self.assertTrue(is_core_input("u_cmd"))
-        self.assertFalse(is_core_input("ctl:u"))
-        self.assertTrue(is_internal_signal("ctl:u"))
+        self.assertFalse(is_core_input("controller:u"))
+        self.assertTrue(is_internal_signal("controller:u"))
         self.assertFalse(is_internal_signal("x"))
 
     def test_plotly_color_maps_tab_names(self):

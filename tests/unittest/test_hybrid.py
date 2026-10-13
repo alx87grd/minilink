@@ -11,12 +11,12 @@ from minilink.simulation.computer import Computer, StepSchedule
 
 def _build_computer_diagram():
     diagram = StepDiagramSystem()
-    diagram.add_subsystem(ProportionalController(0.5), "ctl")
+    diagram.add_subsystem(ProportionalController(0.5), "controller")
     diagram.add_input_port("r")
     diagram.add_input_port("y")
-    diagram.connect("input", "r", "ctl", "r")
-    diagram.connect("input", "y", "ctl", "y")
-    diagram.connect_new_output_port("ctl", "u", "u")
+    diagram.connect("input", "r", "controller", "r")
+    diagram.connect("input", "y", "controller", "y")
+    diagram.connect_new_output_port("controller", "u", "u")
     return diagram
 
 
@@ -162,7 +162,7 @@ class TestHybridClosedLoop(unittest.TestCase):
         hybrid = hybrid_closed_loop(
             ProportionalController(0.3), Integrator(), schedule=0.01
         )
-        self.assertIn("ctl", hybrid.computer.diagram.subsystems)
+        self.assertIn("controller", hybrid.computer.diagram.subsystems)
         self.assertIn("plant", hybrid.plant.subsystems)
 
 
@@ -173,12 +173,12 @@ from minilink.simulation.hybrid_simulator import HybridSimulator
 
 def _build_hybrid():
     step_diagram = StepDiagramSystem()
-    step_diagram.add_subsystem(ProportionalController(0.5), "ctl")
+    step_diagram.add_subsystem(ProportionalController(0.5), "controller")
     step_diagram.add_input_port("r")
     step_diagram.add_input_port("y")
-    step_diagram.connect("input", "r", "ctl", "r")
-    step_diagram.connect("input", "y", "ctl", "y")
-    step_diagram.connect_new_output_port("ctl", "u", "u_cmd")
+    step_diagram.connect("input", "r", "controller", "r")
+    step_diagram.connect("input", "y", "controller", "y")
+    step_diagram.connect_new_output_port("controller", "u", "u_cmd")
     plant = DiagramSystem()
     plant.add_subsystem(Integrator(), "plant")
     plant.add_input_port("u")
@@ -367,20 +367,20 @@ class DiscreteLowPass(StepSystem):
 def _build_step_diagram():
     diagram = StepDiagramSystem()
     diagram.add_subsystem(DiscreteLowPass(alpha=0.3), "filter")
-    diagram.add_subsystem(ProportionalController(0.35), "ctl")
+    diagram.add_subsystem(ProportionalController(0.35), "controller")
     diagram.add_input_port("r")
     diagram.add_input_port("y_meas")
-    diagram.connect("input", "r", "ctl", "r")
+    diagram.connect("input", "r", "controller", "r")
     diagram.connect("input", "y_meas", "filter", "u")
-    diagram.connect("filter", "y", "ctl", "y")
+    diagram.connect("filter", "y", "controller", "y")
     diagram.connect_new_output_port("filter", "y", "y_f")
-    diagram.connect_new_output_port("ctl", "u", "u_cmd")
+    diagram.connect_new_output_port("controller", "u", "u_cmd")
     return diagram
 
 
 def _build_hybrid_hybrid_topology():
     schedule = StepSchedule.from_rates(
-        dt_base=0.01, rates_hz={"filter": 100.0, "ctl": 10.0}
+        dt_base=0.01, rates_hz={"filter": 100.0, "controller": 10.0}
     )
     computer = Computer(_build_step_diagram(), schedule)
     plant = _build_plant_diagram()
@@ -399,10 +399,10 @@ class TestHybridTopology(unittest.TestCase):
         topology = build_hybrid_topology(_build_hybrid_hybrid_topology())
         self.assertIn("dt_base=0.01", topology.computer.schedule_label)
         self.assertIn("filter@100 Hz", topology.computer.schedule_label)
-        self.assertIn("ctl@10 Hz", topology.computer.schedule_label)
+        self.assertIn("controller@10 Hz", topology.computer.schedule_label)
         step_ids = {node.id for node in topology.step_diagram.nodes}
         self.assertIn("computer__filter", step_ids)
-        self.assertIn("computer__ctl", step_ids)
+        self.assertIn("computer__controller", step_ids)
         self.assertNotIn("computer__input", step_ids)
         self.assertNotIn("computer__output", step_ids)
         plant_ids = {node.id for node in topology.plant.nodes}
@@ -426,7 +426,7 @@ class TestHybridTopology(unittest.TestCase):
             direction="computer_to_plant",
             computer_port=zoh.computer_port,
         )
-        self.assertEqual((c_out, c_port), ("computer__ctl", "u"))
+        self.assertEqual((c_out, c_port), ("computer__controller", "u"))
         c_in, c_in_port = resolve_computer_boundary_anchor(
             topology.step_diagram,
             direction="plant_to_computer",
@@ -476,7 +476,7 @@ class TestHybridTopology(unittest.TestCase):
         self.assertIn("cluster_computer", source)
         self.assertIn("cluster_step_diagram", source)
         self.assertIn("computer__filter", source)
-        self.assertIn("computer__ctl", source)
+        self.assertIn("computer__controller", source)
         self.assertIn("ZOH", source)
         self.assertIn("sample", source)
         self.assertIn("dt_base=0.01", source)

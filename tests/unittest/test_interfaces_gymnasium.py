@@ -317,8 +317,8 @@ class TestSB3Controller(unittest.TestCase):
         ctl = SB3Controller(_ConstantPolicy(n=2, m=1, value=0.2))
 
         diagram = ctl @ plant
-        self.assertEqual(diagram.connections["ctl"]["x"], ("sys", "x"))
-        self.assertEqual(diagram.connections["sys"]["u"], ("ctl", "u"))
+        self.assertEqual(diagram.connections["controller"]["x"], ("plant", "x"))
+        self.assertEqual(diagram.connections["plant"]["u"], ("controller", "u"))
 
         traj = diagram.compute_trajectory(tf=0.5, n_steps=51, verbose=False)
         self.assertEqual(traj.x.shape[0], 2)

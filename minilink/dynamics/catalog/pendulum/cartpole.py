@@ -361,7 +361,7 @@ class CartPole(MechanicalSystem):
 class CartPoleWithNoisePort(CartPole):
     """Linear cart-pole with process and measurement noise ports.
 
-    ``w`` injects a disturbance force into the cart; ``v`` corrupts the
+    ``d`` injects a disturbance force into the cart; ``n`` corrupts the
     measured state in ``y``.
     """
 
@@ -369,30 +369,30 @@ class CartPoleWithNoisePort(CartPole):
         super().__init__()
         self.name = "Cart Pole"
 
-        self.add_input_port("w", dim=1, nominal_value=np.array([0.0]))
-        self.add_input_port("v", dim=4, nominal_value=np.zeros(4))
-        self.inputs["w"].labels = ["disturbance"]
-        self.inputs["w"].units = ["N"]
-        self.inputs["v"].labels = list(self.state.labels)
-        self.inputs["v"].units = list(self.state.units)
+        self.add_input_port("d", dim=1, nominal_value=np.array([0.0]))
+        self.add_input_port("n", dim=4, nominal_value=np.zeros(4))
+        self.inputs["d"].labels = ["disturbance"]
+        self.inputs["d"].units = ["N"]
+        self.inputs["n"].labels = list(self.state.labels)
+        self.inputs["n"].units = list(self.state.units)
 
-        self.outputs["y"].dependencies = ("v",)
+        self.outputs["y"].dependencies = ("n",)
 
     def generalized_force(self, q, v, u, t=0.0, params=None):
-        F, w = u[:1], u[1:2]  # the ports in order: the cart force, the disturbance
+        F, d = u[:1], u[1:2]  # the ports in order: the cart force, the disturbance
         B = self.B(q, params)
 
         # the disturbance enters with the cart force
-        force = B @ (F + w)
+        force = B @ (F + d)
 
         return force
 
     def h(self, x, u, t=0.0, params=None):
-        v_noise = u[2:]  # the third port: the measurement noise
+        n = u[2:]  # the third port: the measurement noise
         xp = array_module(x, u)
 
         # the measurement is the state plus the noise port
-        y = xp.asarray(x) + xp.asarray(v_noise)
+        y = xp.asarray(x) + xp.asarray(n)
 
         return y
 

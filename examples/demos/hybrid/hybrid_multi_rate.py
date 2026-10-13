@@ -40,18 +40,18 @@ def reference(t):
 
 step_diagram = StepDiagramSystem()
 step_diagram.add_subsystem(DiscreteLowPass(alpha=0.6), "filter")
-step_diagram.add_subsystem(ProportionalController(10.0), "ctl")
+step_diagram.add_subsystem(ProportionalController(10.0), "controller")
 step_diagram.add_input_port("r")
 step_diagram.add_input_port("y_meas")
-step_diagram.connect("input", "r", "ctl", "r")
+step_diagram.connect("input", "r", "controller", "r")
 step_diagram.connect("input", "y_meas", "filter", "u")
-step_diagram.connect("filter", "y", "ctl", "y")
+step_diagram.connect("filter", "y", "controller", "y")
 step_diagram.connect_new_output_port("filter", "y", "y_f")
-step_diagram.connect_new_output_port("ctl", "u", "u_cmd")
+step_diagram.connect_new_output_port("controller", "u", "u_cmd")
 
 schedule = StepSchedule.from_rates(
     dt_base=DT_BASE,
-    rates_hz={"filter": 100.0, "ctl": 10.0},
+    rates_hz={"filter": 100.0, "controller": 10.0},
 )
 
 hybrid = hybrid_closed_loop(

@@ -386,7 +386,7 @@ class StochasticPlanningProblem(PlanningProblem):
                 raise ValueError(
                     f"disturbances key {port!r} is the command port of sys: a draw "
                     "there would replace the policy's command. Give the disturbance "
-                    "its own input port (for example 'w')."
+                    "its own input port (for example 'd')."
                 )
         object.__setattr__(
             self, "params_distribution", dict(self.params_distribution or {})

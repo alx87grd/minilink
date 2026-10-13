@@ -553,8 +553,8 @@ class TestDynamicProgrammingPlotting(unittest.TestCase):
         problem = make_problem()
         planner, _ = solve(problem)
         diagram = planner.get_controller() @ problem.sys
-        self.assertEqual(diagram.connections["ctl"]["x"], ("sys", "x"))
-        self.assertEqual(diagram.connections["sys"]["u"], ("ctl", "u"))
+        self.assertEqual(diagram.connections["controller"]["x"], ("plant", "x"))
+        self.assertEqual(diagram.connections["plant"]["u"], ("controller", "u"))
         self.assertNotIn("r", diagram.inputs)
 
     def test_lookup_controller_plot_control_law_smoke(self):

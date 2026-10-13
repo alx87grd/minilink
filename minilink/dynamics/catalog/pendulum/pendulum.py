@@ -107,7 +107,7 @@ class Pendulum(MechanicalSystem):
 class PendulumWithNoisePort(Pendulum):
     """Single actuated pendulum with process and measurement noise ports.
 
-    ``w`` injects disturbance torque into the dynamics; ``v`` corrupts the
+    ``d`` injects disturbance torque into the dynamics; ``n`` corrupts the
     measured angular velocity in ``y``.
     """
 
@@ -115,33 +115,33 @@ class PendulumWithNoisePort(Pendulum):
         super().__init__()
         self.name = "Pendulum"
 
-        self.add_input_port("w", dim=1, nominal_value=np.array([0.0]))
-        self.add_input_port("v", dim=1, nominal_value=np.array([0.0]))
-        self.inputs["w"].labels = ["disturbance"]
-        self.inputs["w"].units = ["Nm"]
-        self.inputs["v"].labels = ["noise"]
-        self.inputs["v"].units = ["rad/s"]
+        self.add_input_port("d", dim=1, nominal_value=np.array([0.0]))
+        self.add_input_port("n", dim=1, nominal_value=np.array([0.0]))
+        self.inputs["d"].labels = ["disturbance"]
+        self.inputs["d"].units = ["Nm"]
+        self.inputs["n"].labels = ["noise"]
+        self.inputs["n"].units = ["rad/s"]
 
-        self.outputs["y"].dependencies = ("v",)
+        self.outputs["y"].dependencies = ("n",)
 
     def B(self, q, params=None):
         xp = array_module(q)
         return xp.array([[1.0]])
 
     def generalized_force(self, q, v, u, t=0.0, params=None):
-        tau, w = u[:1], u[1:2]  # the ports in order: the torque, the disturbance
+        tau, d = u[:1], u[1:2]  # the ports in order: the torque, the disturbance
         B = self.B(q, params)
 
         # the disturbance enters with the actuator torque
-        force = B @ (tau + w)
+        force = B @ (tau + d)
 
         return force
 
     def h(self, x, u, t=0.0, params=None):
-        v_noise = u[2:]  # the third port: the measurement noise
+        n = u[2:]  # the third port: the measurement noise
         xp = array_module(x, u)
         k = self.dof
-        y = xp.concatenate([x[:k], x[k : k + 1] + v_noise[0], x[k + 1 :]])
+        y = xp.concatenate([x[:k], x[k : k + 1] + n[0], x[k + 1 :]])
         return y
 
 
