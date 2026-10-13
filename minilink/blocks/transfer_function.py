@@ -17,13 +17,22 @@ from minilink.graphical.animation.primitives import (
 class TransferFunction(ErrorDriven, LTISystem):
     """Continuous-time SISO transfer function in state-space realization.
 
-    The default is a plant: input ``u``, outputs ``y`` and ``x``. Compensator
-    layouts match the other classical blocks: ``ports="error"`` is ``e -> u``
-    (``C @ plant`` inserts the Error block; ``C >> plant`` is the loop gain);
-    ``ports="reference"`` is ``r, y -> u``.
+    The default is a plant: input ``u``, outputs ``y`` and ``x``;
+    ``expose_state=False`` keeps ``u -> y`` only (a filter is not a plant).
+    Compensator layouts match the other classical blocks: ``ports="error"``
+    is ``e -> u`` (``C @ plant`` inserts the Error block; ``C >> plant`` is the
+    loop gain); ``ports="reference"`` is ``r, y -> u``.
     """
 
-    def __init__(self, numerator, denominator, *, ports=None, name="Transfer Function"):
+    def __init__(
+        self,
+        numerator,
+        denominator,
+        *,
+        ports=None,
+        name="Transfer Function",
+        expose_state=True,
+    ):
         if ports not in (None, "plant", "error", "reference"):
             raise ValueError(
                 f"ports must be None, 'plant', 'error', or 'reference', got {ports!r}"
@@ -33,7 +42,15 @@ class TransferFunction(ErrorDriven, LTISystem):
         self.denominator = np.asarray(denominator, dtype=float)
         A, B, C, D = signal.tf2ss(self.numerator, self.denominator)
         # a plant takes LTISystem's ports u -> y, x; a compensator declares its own below
-        super().__init__(A, B, C, D, name=name, declare_ports=not compensator)
+        super().__init__(
+            A,
+            B,
+            C,
+            D,
+            name=name,
+            declare_ports=not compensator,
+            expose_state=expose_state,
+        )
         tf = signal.TransferFunction(self.numerator, self.denominator)
         self.poles = tf.poles
         self.zeros = tf.zeros

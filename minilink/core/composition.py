@@ -4,7 +4,8 @@ No operator modifies its operands: each returns a new diagram that shares the
 operands' blocks. ``+`` and ``>>`` lay a diagram operand out flat, with its ids,
 wiring, boundary ports, ``x0`` and camera settings, and keep the left operand's
 name. ``a >> b`` connects one output of ``a`` to one input of ``b`` by a fixed
-rule on their edges, with no memory of how either was built.
+rule on their edges, with no memory of how either was built. Only ``@`` nests:
+a box on either side sits under its role name as one block.
 Explicit ``add_subsystem`` / ``connect`` remains the canonical way to build any topology.
 """
 
@@ -338,25 +339,28 @@ def closed_loop(
 ) -> DiagramSystem:
     """Build a controller/plant feedback diagram — the ``controller @ plant`` operator.
 
-    Two layouts, one rule "A drives B and B's output returns to A":
-
-    - a controller with a measurement port (``r``, ``y`` → ``u``, or ``x``) is
-      wired the standard way, the plant output of the same name returning to
-      the measurement;
-    - an error-driven block (:func:`~minilink.core.feedback.block_roles`: a
-      compensator, a transfer function, a plant, a series diagram) gets an
-      :class:`~minilink.blocks.routing.Error` block ``e = r - y`` inserted by
-      :func:`feedback`.
+    One rule, read from the port names (:func:`~minilink.core.feedback.block_roles`):
+    every controller input named ``y`` or ``x`` is wired to the plant output of
+    the same name; a controller with neither (an error-driven block: a
+    compensator, a transfer function, a plant, a series diagram) gets an
+    :class:`~minilink.blocks.routing.Error` block ``e = r - y`` on its command
+    entry, inserted by :func:`feedback`. The controller's command (``u``, else
+    its one output) drives the plant's command input, and the plant's ``y``
+    (else its one output) is the loop's output ``y``.
 
     The port names are the whole declaration: there is no port-name keyword.
     A mechanical plant's ``y`` is its state ``[q; dq]``, read straight; a block
-    with other names is renamed (``rename_ports``) or wired by hand.
+    with other names is renamed (``rename_ports``) or wired by hand. A
+    controller that reads ``x`` needs a plant that exposes it: a leaf built
+    with ``expose_state=True``, or a box, whose own state is read.
 
-    ``@`` needs a plant on the right: :func:`feedback` closes an open loop on
-    itself (``feedback(L)``, ``feedback(L, K)``).
+    A box (a diagram) on either side is nested under its role name as one
+    block; a leaf stays a leaf. ``@`` needs a plant on the right:
+    :func:`feedback` closes an open loop on itself (``feedback(L)``,
+    ``feedback(L, K)``).
 
     Neither operand is modified: the result is a new diagram sharing their
-    blocks, also when ``controller`` is a diagram such as ``C >> S``.
+    blocks; a plant box whose state is read is copied, with its blocks shared.
 
     Parameters
     ----------
@@ -383,63 +387,57 @@ def closed_loop(
             "@ needs a plant on the right; to close an open loop on itself use "
             "feedback(L) or feedback(L, K)"
         )
-    if block_roles(controller).error_driven:
-        loop_gain = series(controller, plant)
-        diagram, junction_id = _close_with_junction(loop_gain, validate=False)
-        add_loop_inputs(diagram, plant, None, (junction_id, "-"), r=r, w=w, v=v)
+    roles = block_roles(controller)
+    if roles.error_driven:
+        open_loop, _controller_id, plant_id = _open_loop(
+            controller, plant, expose_inputs=True
+        )
+        diagram, junction_id = _close_with_junction(open_loop, validate=False)
+        add_loop_inputs(
+            diagram,
+            plant_id,
+            _default_plant_in(plant),
+            (junction_id, "-"),
+            r=r,
+            w=w,
+            v=v,
+        )
         if validate:
             diagram.check_algebraic_loops()
         return diagram
-    if isinstance(controller, DiagramSystem):
-        roles = block_roles(controller)
-        raise ValueError(
-            f"{controller.name} is a diagram that reads its measurement on "
-            f"{roles.measurement!r} on its edge: close one block on the plant "
-            "(controller @ plant), or wire the loop with DiagramSystem.connect."
+    if not roles.measurements:
+        raise ValueError(_no_measurement_message(controller, "ctl"))
+
+    plant_box = _plant_box_with_state(plant) if "x" in roles.measurements else plant
+    controller_id = _default_subsystem_id(controller, role="ctl")
+    plant_id = _default_subsystem_id(plant_box, role="sys")
+    paths = [
+        _feedback_path_for_measurement(
+            controller,
+            plant_box,
+            measurement=measurement,
+            controller_id=controller_id,
+            plant_id=plant_id,
         )
-
-    diagram = DiagramSystem()
-    controller_id = _add_system_to_diagram(diagram, controller, role="ctl")
-    plant_id = _add_system_to_diagram(diagram, plant, role="sys")
-
-    wiring = resolve_standard_feedback(
-        controller, plant, controller_id=controller_id, plant_id=plant_id
+        for measurement in roles.measurements
+    ]
+    diagram, controller_id, plant_id = _open_loop(
+        controller, plant_box, expose_inputs=False
     )
-    measurement_port = wiring.measurement_in
-    plant_output_port = wiring.plant_out
-    control_port = wiring.control_out
-    plant_input_port = wiring.plant_in
-
-    _require_same_dim(
-        controller.outputs[control_port].dim,
-        plant.inputs[plant_input_port].dim,
-        f"{controller_id}:{control_port}",
-        f"{plant_id}:{plant_input_port}",
-    )
-    _require_same_dim(
-        plant.outputs[plant_output_port].dim,
-        controller.inputs[measurement_port].dim,
-        f"{plant_id}:{plant_output_port}",
-        f"{controller_id}:{measurement_port}",
-    )
+    for measurement, plant_port in paths:
+        diagram.connect(plant_id, plant_port, controller_id, measurement)
 
     if r and "r" in controller.inputs:
         _add_input_port_like(diagram, "r", controller.inputs["r"])
         diagram.connect("input", "r", controller_id, "r")
 
-    diagram.connect(plant_id, plant_output_port, controller_id, measurement_port)
-    diagram.connect(controller_id, control_port, plant_id, plant_input_port)
-    diagram.connect_new_output_port(plant_id, plant_output_port, "y")
-
     diagram.name = f"Closed loop {plant.name} with {controller.name}"
-
-    _propagate_animation_camera(diagram, plant)
 
     add_loop_inputs(
         diagram,
-        plant,
-        plant_input_port,
-        (controller_id, measurement_port),
+        plant_id,
+        _default_plant_in(plant_box),
+        (controller_id, roles.measurement),
         r=r,
         w=w,
         v=v,
@@ -447,6 +445,52 @@ def closed_loop(
     if validate:
         diagram.check_algebraic_loops()
     return diagram
+
+
+def _open_loop(controller, plant, *, expose_inputs):
+    """``controller → plant`` as a new diagram under the role names; a box is nested.
+
+    The controller's command (``u``, else its one output) drives the plant's
+    command input (``u``, else its one input); the plant's ``y`` (else its one
+    output) is the output ``y``. With ``expose_inputs`` the controller's free
+    inputs go on the edge, for a junction to drive.
+    """
+    diagram = DiagramSystem()
+    controller_id = _add_role_block(diagram, controller, "ctl")
+    plant_id = _add_role_block(diagram, plant, "sys")
+    if expose_inputs:
+        _expose_free_inputs(diagram, controller_id)
+
+    command, entry = _default_control_out(controller), _default_plant_in(plant)
+    _require_same_dim(
+        controller.outputs[command].dim,
+        plant.inputs[entry].dim,
+        f"{controller_id}:{command}",
+        f"{plant_id}:{entry}",
+    )
+    diagram.connect(controller_id, command, plant_id, entry)
+    diagram.connect_new_output_port(plant_id, _default_output_port(plant), "y")
+
+    _propagate_animation_camera(diagram, plant)
+    if isinstance(controller, DiagramSystem):
+        diagram.name = controller.name
+    return diagram, controller_id, plant_id
+
+
+def _add_role_block(diagram, sys, role) -> str:
+    """Add ``sys`` under its role id: a leaf as is, a box nested as one block."""
+    if not isinstance(sys, DiagramSystem):
+        return _add_system_to_diagram(diagram, sys, role=role)
+    sys_id = _unique_id(_default_subsystem_id(sys, role=role), diagram.subsystems)
+    diagram.add_subsystem(sys, sys_id)
+    return sys_id
+
+
+def _plant_box_with_state(plant):
+    """``plant`` with its state on its edge: a box gets its own ``x``, a leaf is as built."""
+    if not isinstance(plant, DiagramSystem) or "x" in plant.outputs:
+        return plant
+    return _copy_diagram(plant).expose("x")
 
 
 def autowire(
@@ -756,7 +800,7 @@ def _add_system_to_diagram(diagram, sys, *, role=None) -> str:
     return sys_id
 
 
-def add_loop_inputs(diagram, plant, plant_port, measurement, *, r, w, v):
+def add_loop_inputs(diagram, plant_id, plant_port, measurement, *, r, w, v):
     """Drop the boundary ``r`` unless ``r``; sum ``w`` into the plant input and ``v`` into the measurement."""
     from minilink.blocks.routing import Sum
 
@@ -767,9 +811,7 @@ def add_loop_inputs(diagram, plant, plant_port, measurement, *, r, w, v):
                     ports[port_id] = None
         del diagram.inputs["r"]
     if w:
-        plant_id = loop_block_id(diagram, plant, "plant")
-        port = _default_input_port(plant) if plant_port is None else plant_port
-        sum_into(diagram, (plant_id, port), "w", "disturbance", Sum)
+        sum_into(diagram, (plant_id, plant_port), "w", "disturbance", Sum)
     if v:
         sum_into(diagram, measurement, "v", "noise", Sum)
     return diagram
@@ -785,17 +827,6 @@ def sum_into(diagram, target, port_id, role, Sum):
     diagram.connect(*source, sum_id, "in0")
     diagram.connect("input", port_id, sum_id, "in1")
     diagram.connect(sum_id, "y", sys_id, in_port)
-
-
-def loop_block_id(diagram, sys, role):
-    """The id of ``sys`` among the diagram's blocks; a nested diagram is refused."""
-    for sys_id, block in diagram.subsystems.items():
-        if block is sys:
-            return sys_id
-    raise ValueError(
-        f"w= needs the {role} as one block; {sys.name!r} is a diagram. Wire the "
-        "disturbance with DiagramSystem.connect and a Sum block instead."
-    )
 
 
 def _add_input_port_like(diagram, port_id: str, port) -> None:
@@ -913,12 +944,7 @@ def resolve_standard_feedback(
     """
     roles = block_roles(controller)
     if not roles.measurements:
-        raise ValueError(
-            f"Cannot wire closed-loop feedback: {controller_id} "
-            f"({controller.name!r}) reads neither 'y' nor 'x'; its inputs are "
-            f"{list(controller.inputs)}. Name its measurement port y or x "
-            "(rename_ports), or wire the loop with DiagramSystem.connect."
-        )
+        raise ValueError(_no_measurement_message(controller, controller_id))
     measurement_in, plant_out = _feedback_path(
         controller,
         plant,
@@ -931,6 +957,15 @@ def resolve_standard_feedback(
         measurement_in,
         _default_plant_in(plant),
         plant_out,
+    )
+
+
+def _no_measurement_message(controller, controller_id: str) -> str:
+    return (
+        f"Cannot wire closed-loop feedback: {controller_id} "
+        f"({controller.name!r}) reads neither 'y' nor 'x'; its inputs are "
+        f"{list(controller.inputs)}. Name its measurement port y or x "
+        "(rename_ports), or wire the loop with DiagramSystem.connect."
     )
 
 
@@ -963,13 +998,18 @@ def _feedback_path_for_measurement(
     dim = controller.inputs[measurement].dim
 
     if measurement == "x":
-        if "x" in plant.outputs and plant.outputs["x"].dim == dim:
+        if "x" not in plant.outputs:
+            raise ValueError(
+                f"Cannot wire closed-loop feedback: {controller_id} reads the state 'x', "
+                f"but {plant_id} ({plant.name!r}) exposes no 'x'; build the plant with "
+                "expose_state=True, or wire the loop with DiagramSystem.connect"
+            )
+        if plant.outputs["x"].dim == dim:
             return "x", "x"
-        plant_x = plant.outputs["x"].dim if "x" in plant.outputs else None
         raise ValueError(
             f"Cannot wire closed-loop feedback: {controller_id} declares "
             f"measurement 'x' dim {dim}, but {plant_id} 'x' output has dim "
-            f"{plant_x}"
+            f"{plant.outputs['x'].dim}"
         )
 
     if "y" in plant.outputs and plant.outputs["y"].dim == dim:

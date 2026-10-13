@@ -72,12 +72,13 @@ class StateSpaceSystem(DynamicSystem):
         feedthrough=False,
         name="State Space System",
         declare_ports=True,
+        expose_state=True,
     ):
         super().__init__(
             n=n,
             input_dim=m if declare_ports else None,
             output_dim=(n if p is None else p) if declare_ports else None,
-            expose_state=declare_ports,
+            expose_state=declare_ports and expose_state,
             y_dependencies=("u",) if feedthrough else (),
         )
         self.name = name
@@ -128,10 +129,21 @@ class LTISystem(LTISystemFacades, StateSpaceSystem):
     the zero-argument method calls, e.g. ``sys.A()`` (useful for introspection
     such as ``numpy.linalg.eigvals(sys.A())``). ``declare_ports=False`` leaves
     the ports ``u``, ``y`` and ``x`` undeclared, for a subclass that declares
-    its own layout (a compensator ``TransferFunction``).
+    its own layout (a compensator ``TransferFunction``); ``expose_state=False``
+    declares ``u`` and ``y`` only (a filter is not a plant).
     """
 
-    def __init__(self, A, B, C=None, D=None, *, name="LTI System", declare_ports=True):
+    def __init__(
+        self,
+        A,
+        B,
+        C=None,
+        D=None,
+        *,
+        name="LTI System",
+        declare_ports=True,
+        expose_state=True,
+    ):
         self._A = A
         self._B = B
         self._C = _identity_like(A, _shape("A", A)[0]) if C is None else C
@@ -152,6 +164,7 @@ class LTISystem(LTISystemFacades, StateSpaceSystem):
             feedthrough=feedthrough,
             name=name,
             declare_ports=declare_ports,
+            expose_state=expose_state,
         )
 
     def A(self, t=0.0, params=None):

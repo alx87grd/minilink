@@ -1,4 +1,7 @@
-"""Signal-conditioning filters: Butterworth low-pass, notch and washout, from a frequency in Hz."""
+"""Signal-conditioning filters: Butterworth low-pass, notch and washout, from a frequency in Hz.
+
+A filter is ``u -> y`` and not a plant: it exposes no state ``x``.
+"""
 
 import numpy as np
 from scipy import signal
@@ -19,7 +22,7 @@ class LowPassFilter(TransferFunction):
 
         wc = 2.0 * np.pi * self.cutoff_hz
         num, den = signal.butter(self.order, wc, btype="low", analog=True, output="ba")
-        super().__init__(num, den, name="Low-Pass Filter")
+        super().__init__(num, den, name="Low-Pass Filter", expose_state=False)
 
 
 class NotchFilter(TransferFunction):
@@ -36,7 +39,7 @@ class NotchFilter(TransferFunction):
         w0 = 2.0 * np.pi * self.notch_hz
         num = [1.0, 0.0, w0**2]
         den = [1.0, w0 / self.quality, w0**2]
-        super().__init__(num, den, name="Notch Filter")
+        super().__init__(num, den, name="Notch Filter", expose_state=False)
 
 
 class Washout(TransferFunction):
@@ -49,7 +52,9 @@ class Washout(TransferFunction):
         self.cutoff_hz = float(cutoff_hz)
 
         wc = 2.0 * np.pi * self.cutoff_hz
-        super().__init__([1.0, 0.0], [1.0, wc], name="Washout Filter")
+        super().__init__(
+            [1.0, 0.0], [1.0, wc], name="Washout Filter", expose_state=False
+        )
 
 
 if __name__ == "__main__":

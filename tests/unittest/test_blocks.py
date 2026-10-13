@@ -211,6 +211,12 @@ class TestFilterBlocks(unittest.TestCase):
         np.testing.assert_allclose(lpf.poles, [-2.0 * np.pi * 0.5])
         self.assertAlmostEqual(self._dc_gain(lpf), 1.0, places=6)
 
+    def test_a_filter_is_not_a_plant_and_exposes_no_state(self):
+        for block in (LowPassFilter(), NotchFilter(), Washout()):
+            with self.subTest(block=block.name):
+                self.assertEqual(list(block.inputs), ["u"])
+                self.assertEqual(list(block.outputs), ["y"])
+
     def test_washout_blocks_dc(self):
         self.assertAlmostEqual(self._dc_gain(Washout(cutoff_hz=1.0)), 0.0, places=6)
 

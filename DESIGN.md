@@ -499,7 +499,8 @@ raises); a disturbance `d` or a noise `n` left open reads its nominal value
 silently. It never inserts a block.
 Sources name their signal at creation (`Step(port="r")`), blocks their ports
 with `rename_ports` (the renames of one call apply at once; a collision with an
-untouched port is refused). Diagram operands are flattened, not nested.
+untouched port is refused). `+` and `>>` lay a diagram operand out flat; only
+`@` nests, a box on either side under its role name as one block.
 Explicit `add_subsystem` / `connect` remains canonical for general topology.
 
 **No operator modifies its operands.** `+`, `>>` and `@` (the continuous loop
@@ -604,11 +605,14 @@ while a family has one to three members; revisit when an observer family lands).
 
 The port names drive three tools:
 
-- **`@` composition** reads `block_roles` (`resolve_standard_feedback` and the
-  hybrid `default_computer_boundary_ports`): a block that reads `y` closes on
-  the plant's `y`, one that reads `x` on its `x` (a mechanical plant's `y` is
-  its state `[q; dq]`, read straight); dimensions are a check, never a
-  choice.
+- **`@` composition** reads `block_roles` (the sampled loop through
+  `resolve_standard_feedback` and `default_computer_boundary_ports`): every
+  controller input named `y` or `x` is wired to the plant output of the same
+  name (a mechanical plant's `y` is its state `[q; dq]`, read straight; a
+  plant box gives its own state), a controller with neither gets an `Error`
+  block on its command entry, the loop's output is the plant's `y`, and a
+  box on either side is nested under its role name; dimensions are a check,
+  never a choice.
 - **`plot_control_law()`** on every `System`, beside the generic
   `plot_input_output_map()`. There are no controller base classes: a
   controller is a `System`, or a `DynamicSystem` when it has state, and the
