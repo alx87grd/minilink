@@ -179,6 +179,26 @@ class TestDiagramCompositionShortcuts(unittest.TestCase):
         self.assertEqual(diagram.connections["ctl"]["x"], ("sys", "x"))
         self.assertEqual(diagram.connections["sys"]["u"], ("ctl", "u"))
 
+    def test_operators_leave_their_operands_alone(self):
+        left = Step(final_value=[1.0], step_time=0.0) >> Integrator()
+        left.name = "chain"
+        left.x0 = np.array([2.0])
+
+        chain = left >> Integrator()
+        side_by_side = left + Pendulum()
+
+        for result in (chain, side_by_side):
+            self.assertIsNot(result, left)
+            self.assertEqual(result.name, "chain")
+            self.assertEqual(result.x0[0], 2.0)
+            self.assertIs(result.subsystems["sys"], left.subsystems["sys"])
+        self.assertEqual(list(left.subsystems), ["ref", "sys"])
+        self.assertEqual(left.connections["output"]["y"], ("sys", "y"))
+        self.assertEqual(list(chain.subsystems), ["ref", "sys", "sys2"])
+        self.assertEqual(chain.connections["sys2"]["u"], ("sys", "y"))
+        self.assertEqual(list(side_by_side.subsystems), ["ref", "sys", "sys2"])
+        self.assertIsNone(side_by_side.connections["sys2"]["u"])
+
     def test_series_operator_flattens_source_into_closed_loop_diagram(self):
         diagram = (
             Step(final_value=[1.0], step_time=0.0) >> ImpedanceController() @ Pendulum()

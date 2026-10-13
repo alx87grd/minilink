@@ -1,9 +1,10 @@
 """Composition shortcuts: the ``+``, ``>>`` and ``@`` operators that build a diagram in one line.
 
-Shortcut-built diagrams remember a default entry input and output port so chains
-like ``a >> b >> c`` know where to attach the next stage; diagram operands are
-flattened, not nested, and a diagram left operand of ``+`` or ``>>`` is extended in
-place (DESIGN §4); ``@`` always returns a new diagram.
+No operator modifies its operands: each returns a new diagram that shares the
+operands' blocks. ``+`` and ``>>`` lay a diagram operand out flat, with its ids,
+wiring, boundary ports, ``x0`` and camera settings, and keep the left operand's
+name; shortcut-built diagrams remember a default entry input and output port so
+chains like ``a >> b >> c`` know where to attach the next stage.
 Explicit ``add_subsystem`` / ``connect`` remains the canonical way to build any topology.
 """
 
@@ -91,14 +92,15 @@ def _copy_animation_camera_hints(diagram, animated):
 
 
 def add_systems(*systems: System | DiagramSystem) -> DiagramSystem:
-    """Return a flat diagram containing ``systems`` as subsystems.
+    """Return a new flat diagram containing ``systems`` as subsystems.
 
     Parameters
     ----------
     *systems : System or DiagramSystem
-        Systems or diagrams to add. Diagram operands are flattened into the
-        result; passing an existing diagram as the first argument extends that
-        diagram in place.
+        Systems or diagrams to add, side by side. A diagram operand is laid
+        out flat in the result, with its ids, wiring and boundary ports; it is
+        not modified. The first operand's name, ``x0`` and camera settings
+        are carried into the result when it is a diagram.
 
     Returns
     -------
@@ -107,25 +109,15 @@ def add_systems(*systems: System | DiagramSystem) -> DiagramSystem:
         Existing diagram-internal connections are preserved, but no new
         cross-connections are inferred.
     """
-    if len(systems) == 1 and isinstance(systems[0], DiagramSystem):
-        return systems[0]
-
-    diagram = None
+    diagram = DiagramSystem()
     for sys in systems:
-        if diagram is None:
-            if isinstance(sys, DiagramSystem):
-                diagram = sys
-            else:
-                diagram = DiagramSystem()
-                _add_system_to_diagram(diagram, sys)
-            continue
-
         if isinstance(sys, DiagramSystem):
             _inline_diagram(diagram, sys, output_collision="unique")
         else:
             _add_system_to_diagram(diagram, sys)
-
-    return DiagramSystem() if diagram is None else diagram
+    if systems:
+        _carry_left_operand(diagram, systems[0])
+    return diagram
 
 
 def series(
@@ -138,7 +130,8 @@ def series(
     Parameters
     ----------
     left : System or DiagramSystem
-        The first system or an existing shortcut-built diagram.
+        The first system or diagram; a diagram is laid out flat in the result
+        and left unchanged, its name, ``x0`` and camera settings carried.
     right : System or DiagramSystem
         System or diagram to connect after ``left``.
     *rest : System or DiagramSystem
@@ -147,12 +140,13 @@ def series(
     Returns
     -------
     DiagramSystem
-        A normal diagram with each stage connected output-to-input.
+        A new diagram with each stage connected output-to-input.
     """
     diagram = _as_composition_diagram(left, expose_entry=True)
     _series_pair(diagram, right)
     for next_sys in rest:
         _series_pair(diagram, next_sys)
+    _carry_left_operand(diagram, left)
     return diagram
 
 
@@ -640,7 +634,7 @@ class _DiagramEntry:
 
 def _as_composition_diagram(sys, *, expose_entry: bool) -> DiagramSystem:
     if isinstance(sys, DiagramSystem):
-        return sys
+        return _copy_diagram(sys)
 
     diagram = DiagramSystem()
     sys_id = _add_system_to_diagram(diagram, sys)
@@ -649,19 +643,41 @@ def _as_composition_diagram(sys, *, expose_entry: bool) -> DiagramSystem:
     return diagram
 
 
-def _new_diagram_like(sys):
-    """A diagram operand as a new diagram with the same ids and wiring; a leaf as is.
+def _copy_diagram(diagram):
+    """A new diagram with the same blocks, ids, wiring, boundary ports, name, ``x0`` and camera.
 
-    ``series`` extends a diagram left operand in place (the ``>>`` rule), so
-    ``@`` hands it this new diagram and leaves the user's operand untouched.
+    The blocks are shared, not copied; the operators build on the copy and leave
+    the user's diagram untouched.
     """
-    if not isinstance(sys, DiagramSystem):
-        return sys
+    copy = DiagramSystem()
+    _inline_diagram(copy, diagram, output_collision="replace")
+    _carry_left_operand(copy, diagram)
+    return copy
 
-    diagram = DiagramSystem()
-    _inline_diagram(diagram, sys, output_collision="replace")
-    diagram.name = sys.name
-    return diagram
+
+def _new_diagram_like(sys):
+    """A diagram operand as a new diagram with the same ids and wiring; a leaf as is."""
+    return _copy_diagram(sys) if isinstance(sys, DiagramSystem) else sys
+
+
+def _carry_left_operand(diagram, left) -> None:
+    """Carry a diagram left operand's name, ``x0`` and camera settings into ``diagram``.
+
+    The left operand's blocks come first in the result, so its ``x0`` is the
+    head of the stacked state; a leaf left operand carries nothing.
+    """
+    if not isinstance(left, DiagramSystem):
+        return
+    diagram.name = left.name
+    diagram.x0 = np.concatenate(
+        [np.asarray(left.x0, dtype=float), diagram.x0[left.n :]]
+    )
+    diagram.camera_scale = left.camera_scale
+    diagram.camera_target = np.array(left.camera_target, dtype=float).copy()
+    diagram.camera_plot_axes = left.camera_plot_axes
+    diagram.camera_follow_frame = left.camera_follow_frame
+    diagram.camera_priority = left.camera_priority
+    diagram.scene_grid = left.scene_grid
 
 
 def _series_pair(diagram, right):

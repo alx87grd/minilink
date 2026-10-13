@@ -397,21 +397,24 @@ class System(SharedSystemFacades):
     # Composition Operators
 
     def __add__(self, other: object) -> "DiagramSystem":
-        """Return a diagram containing ``self`` and ``other`` as subsystems.
+        """Return a new diagram containing ``self`` and ``other`` side by side.
 
-        If ``self`` is already a :class:`~minilink.core.diagram.DiagramSystem`,
-        it is extended **in place** and returned (subsystems are shared
-        references, never copied) — see DESIGN §4 operator mutation semantics.
+        Neither operand is modified: a diagram operand is laid out flat in the
+        result, which shares its blocks and carries the left operand's name,
+        ``x0`` and camera settings. See
+        :func:`~minilink.core.composition.add_systems`.
         """
         from minilink.core.composition import add_systems
 
         return add_systems(self, other)
 
     def __rshift__(self, other: object) -> "DiagramSystem":
-        """Return a diagram with ``self`` connected in series to ``other``.
+        """Return a new diagram with ``self`` connected in series to ``other``.
 
-        A diagram left operand is extended **in place** and returned — see
-        DESIGN §4 operator mutation semantics.
+        Neither operand is modified: a diagram operand is laid out flat in the
+        result, which shares its blocks and carries the left operand's name,
+        ``x0`` and camera settings. See
+        :func:`~minilink.core.composition.series`.
         """
         from minilink.core.composition import series
 
@@ -424,8 +427,8 @@ class System(SharedSystemFacades):
         error-driven left operand (a compensator, a transfer function, a
         series diagram ``C >> G``) gets an Error block ``e = r - y``
         inserted; ``sys @ 1`` closes ``sys`` on itself with unity feedback.
-        Unlike ``+`` and ``>>``, neither operand is modified: the loop is a
-        new diagram. See :func:`~minilink.core.composition.closed_loop` and
+        Neither operand is modified: the loop is a new diagram. See
+        :func:`~minilink.core.composition.closed_loop` and
         :func:`~minilink.core.composition.feedback`.
         """
         from minilink.core.composition import closed_loop

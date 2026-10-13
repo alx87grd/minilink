@@ -496,18 +496,16 @@ the measurement, each through a visible `Sum` block; `@` keeps the single input 
 `closed_loop_qdq` for explicit `Mux(q, dq)` wiring. Diagram operands are flattened,
 not nested. Explicit `add_subsystem` / `connect` remains canonical for general topology.
 
-**Operator mutation semantics (frozen):** when the left operand of
-`+` or `>>` is already a `DiagramSystem`, the shortcut **extends that diagram in
-place and returns it** — `bigger = loop + estimator` mutates `loop`. This is
-deliberate: subsystem operands are always shared references (never copied), so a
-"fresh" diagram would only pretend to isolate state; in-place extension keeps
-`a >> b >> c` chains cheap and the object identity honest. Build a new
-`DiagramSystem` explicitly when you need an independent topology.
-`@` (both the continuous loop `ctl @ plant` and the sampled loop
-`ctl % dt @ plant`) and `feedback()` return a new diagram and never modify
-their operands; `+` and `>>` are the operators that extend a shortcut-built
-left diagram in place. Known gap: `step_diagram % dt` on a user-built
-`StepDiagramSystem` still adds its boundary ports to that diagram (TODO D3).
+**No operator modifies its operands.** `+`, `>>` and `@` (the continuous loop
+`ctl @ plant` and the sampled loop `ctl % dt @ plant`), like `feedback()`, return
+a new diagram that shares the operands' blocks: a diagram operand is laid out
+flat in the result with its ids, wiring and boundary ports, and the left operand
+keeps its blocks, wiring, ports, name, `x0` and camera settings, which `+` and
+`>>` carry into the result. Blocks are shared, never copied, so `a >> b >> c`
+chains stay cheap. `connect()`, `autowire()` and `expose()` are methods and
+change the diagram they are called on. Known gap: `step_diagram % dt` on a
+user-built `StepDiagramSystem` still adds its boundary ports to that diagram
+(TODO D3).
 
 **Shortcut subsystem ids** default by role: `ref` (sources), `ctl` (controllers:
 a block that commands `u` and reads `r`, `y`, `x` or `e`), `sys` (stateful

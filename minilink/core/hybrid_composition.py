@@ -8,8 +8,6 @@ composition.
 
 from __future__ import annotations
 
-import numpy as np
-
 from minilink.core.composition import (
     _new_diagram_like,
     _propagate_animation_camera,
@@ -350,9 +348,7 @@ def _ensure_plant_boundary_ports(
         if port in subsystem.outputs and port not in diagram.outputs
     ]
     if not in_place and (add_input or add_outputs):
-        x0 = np.copy(diagram.x0)
         diagram = _new_diagram_like(diagram)
-        diagram.x0 = x0
     if add_input:
         port = subsystem.inputs[plant_in]
         diagram.add_input_port(
