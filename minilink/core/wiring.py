@@ -240,14 +240,12 @@ class WiredDiagramMixin:
     """Evolution-agnostic diagram wiring, gather, and visualization helpers."""
 
     def init_wiring(self, *, name: str = "Diagram") -> None:
-        """Internal machinery: the wiring tables and the composition memory of a new diagram."""
+        """Internal machinery: the wiring tables of a new diagram."""
         if not hasattr(self, "subsystems"):
             self.subsystems = {}
         if not hasattr(self, "connections"):
             self.connections = {}
         self.connection_verbose = False
-        self._composition_entry = None
-        self._composition_output = None
         self.name = name
         self.compute_state_properties()
 

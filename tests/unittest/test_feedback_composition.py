@@ -178,6 +178,55 @@ class TestJunction(unittest.TestCase):
         self.assertAlmostEqual(traj.x[-2, -1], 0.3 * static_gain, delta=0.01)
 
 
+class TestSeriesRule(unittest.TestCase):
+    """``A >> B`` connects one output to one input by a fixed rule on the edges."""
+
+    def test_one_output_to_one_input_whatever_the_names(self):
+        L = PID() >> Pendulum()
+        self.assertEqual(list(L.inputs), ["e"])
+        self.assertEqual(L.connections["sys"]["u"], ("ctl", "u"))
+        self.assertEqual(list(L.outputs), ["y"])
+
+    def test_a_shared_name_wins_over_the_textbook_pair(self):
+        from minilink import StateFeedbackController
+
+        L = Pendulum() >> StateFeedbackController(np.array([[10.0, 2.0]]))
+        self.assertEqual(L.connections["ctl"]["x"], ("sys", "x"))
+        self.assertIsNone(L.connections["ctl"]["r"])
+
+    def test_y_to_u_when_no_name_is_shared(self):
+        L = TransferFunction([1.0], [1.0, 3.0, 2.0]) >> Integrator()
+        self.assertEqual(L.connections["sys2"]["u"], ("sys", "y"))
+
+    def test_a_leaf_puts_all_its_inputs_on_the_edge(self):
+        from minilink import Saturation, StateFeedbackController
+
+        L = StateFeedbackController(np.array([[10.0, 2.0]])) >> Saturation()
+        self.assertEqual(list(L.inputs), ["x", "r"])
+
+    def test_a_source_into_a_reference_and_measurement_block_is_refused(self):
+        with self.assertRaisesRegex(ValueError, "would drive the measurement"):
+            Step() >> ProportionalController()
+        with self.assertRaisesRegex(ValueError, "one output to one input"):
+            ProportionalController() >> ProportionalController()
+
+    def test_feedback_closes_on_the_command_input_or_refuses(self):
+        T = feedback(PID() >> Integrator())
+        self.assertEqual(T.connections["ctl"]["e"], ("error", "e"))
+        with self.assertRaisesRegex(ValueError, "measurement on 'y' \\(on its edge\\)"):
+            feedback(ProportionalController() >> Integrator())
+        from minilink import DiagramSystem
+
+        two_outputs = DiagramSystem()
+        two_outputs.add_subsystem(Pendulum(), "plant")
+        two_outputs.add_input_port("u", dim=1)
+        two_outputs.connect("input", "u", "plant", "u")
+        two_outputs.connect_new_output_port("plant", "q", "q")
+        two_outputs.connect_new_output_port("plant", "dq", "dq")
+        with self.assertRaisesRegex(ValueError, "Cannot choose what comes back"):
+            feedback(two_outputs)
+
+
 class TestPortLayouts(unittest.TestCase):
     def test_pid_layouts_share_one_law(self):
         plant = Integrator()

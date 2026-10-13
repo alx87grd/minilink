@@ -3,8 +3,8 @@
 No operator modifies its operands: each returns a new diagram that shares the
 operands' blocks. ``+`` and ``>>`` lay a diagram operand out flat, with its ids,
 wiring, boundary ports, ``x0`` and camera settings, and keep the left operand's
-name; shortcut-built diagrams remember a default entry input and output port so
-chains like ``a >> b >> c`` know where to attach the next stage.
+name. ``a >> b`` connects one output of ``a`` to one input of ``b`` by a fixed
+rule on their edges, with no memory of how either was built.
 Explicit ``add_subsystem`` / ``connect`` remains the canonical way to build any topology.
 """
 
@@ -18,7 +18,7 @@ from dataclasses import dataclass
 import numpy as np
 
 from minilink.core.diagram import DiagramSystem
-from minilink.core.feedback import block_roles, check_reserved_id
+from minilink.core.feedback import block_roles, check_reserved_id, command_port
 from minilink.core.system import System
 
 _VALID_FEEDBACK = frozenset({"auto", "y", "qdq"})
@@ -125,7 +125,16 @@ def series(
     right: System | DiagramSystem,
     *rest: System | DiagramSystem,
 ) -> DiagramSystem:
-    """Connect systems in series using default output and input ports.
+    """Connect systems in series: one output of each stage to one input of the next.
+
+    ``A >> B`` wires one output of A to one input of B, the first rule that
+    applies: A has one output and B one input; exactly one output of A and
+    one input of B share a name; A has ``y`` and B has ``u``; else it refuses.
+    A diagram counts its edge (its boundary outputs and its free boundary
+    inputs), a leaf its ports. Sizes are a check, never a choice. One guard: a
+    source into a block that reads both ``r`` and ``y`` is refused, since the
+    name match would feed the measurement. The result keeps A's free inputs as
+    its inputs and B's ``y`` (else its only output) as its output ``y``.
 
     Parameters
     ----------
@@ -156,12 +165,15 @@ def feedback(sys, through=1, *, of=None, sign=-1.0, validate=True) -> DiagramSys
 
     Negative feedback (the default) inserts ``Error``, so the diagram shows
     ports ``+``, ``-``, and ``e``. Positive feedback still uses a signed
-    :class:`~minilink.blocks.routing.Sum`. The junction drives the one free
-    input of ``sys`` — a plant, a transfer function, a compensator, or a
-    series diagram such as ``C >> G``. ``sys`` is not modified: the result
-    is a new diagram sharing its blocks, with boundary input ``r`` and the
-    output of ``sys`` as boundary output ``y``. The operator form is
-    ``sys @ 1`` (and ``sys @ K`` for ``through=K``).
+    :class:`~minilink.blocks.routing.Sum`. The junction drives the command
+    input of ``sys`` (:func:`~minilink.core.feedback.command_port`: ``u``,
+    else its one free input) — a plant, a transfer function, a compensator,
+    or a series diagram such as ``C >> G``; a block that reads its own
+    measurement (``y`` or ``x``) is closed on its plant with ``@`` instead.
+    What comes back is ``of``, else ``y``, else the only output. ``sys`` is
+    not modified: the result is a new diagram sharing its blocks, with
+    boundary input ``r`` and that output as boundary output ``y``. The
+    operator form is ``sys @ 1`` (and ``sys @ K`` for ``through=K``).
 
     Parameters
     ----------
@@ -179,32 +191,31 @@ def feedback(sys, through=1, *, of=None, sign=-1.0, validate=True) -> DiagramSys
     validate : bool
         Run algebraic-loop detection before returning.
     """
+    diagram, _junction = _close_with_junction(
+        sys, through, of=of, sign=sign, validate=validate
+    )
+    return diagram
+
+
+def _close_with_junction(sys, through=1, *, of=None, sign=-1.0, validate=True):
+    """The loop of :func:`feedback` and the id of its junction block."""
     from minilink.blocks.routing import Demux, Error, Gain, Sum
 
+    refuse_two_port_entry(sys)
+    entry = _command_entry(sys)
     diagram = DiagramSystem()
     if isinstance(sys, DiagramSystem):
-        source_entry = _get_available_diagram_entry(sys)
-        refuse_two_port_entry(sys.subsystems[source_entry.sys_id])
-        id_map = _inline_diagram(diagram, sys, output_collision="replace")
-        entry_sys, entry_port = id_map[source_entry.sys_id], source_entry.port_id
+        _inline_diagram(diagram, sys, output_collision="replace")
+        targets = _boundary_input_targets(diagram, entry)
+        # The free boundary input that fed the entry goes away: the junction feeds it.
+        del diagram.inputs[entry]
+        for target_sys, target_port in targets:
+            diagram.connections[target_sys][target_port] = None
     else:
-        entry_port = block_roles(sys).entry
-        if entry_port is None:
-            refuse_two_port_entry(sys)
-            entry_port = _default_input_port(sys)
         entry_sys = _add_system_to_diagram(diagram, sys)
-    entry_dim = diagram.subsystems[entry_sys].inputs[entry_port].dim
-
-    # The free boundary input that fed the entry goes away: the junction feeds it.
-    edge = diagram.connections[entry_sys][entry_port]
-    if edge is not None:
-        del diagram.inputs[edge[1]]
-        diagram.connections[entry_sys][entry_port] = None
-
-    if not diagram.outputs:
-        out_sys, out_port = _get_composition_output(diagram)
-        diagram.connect_new_output_port(out_sys, out_port, "y")
-    output_sys, output_port = _get_composition_output(diagram)
+        targets = [(entry_sys, entry)]
+        diagram.connect_new_output_port(entry_sys, _default_output_port(sys), "y")
+    entry_dim = diagram.subsystems[targets[0][0]].inputs[targets[0][1]].dim
 
     signal_sys, signal_port = _return_signal(diagram, of, entry_dim, Demux)
 
@@ -234,13 +245,24 @@ def feedback(sys, through=1, *, of=None, sign=-1.0, validate=True) -> DiagramSys
     diagram.add_input_port("r", dim=entry_dim)
     diagram.connect("input", "r", junction_id, plus_port)
     diagram.connect(signal_sys, signal_port, junction_id, minus_port)
-    diagram.connect(junction_id, out_port, entry_sys, entry_port)
-    diagram._composition_entry = (junction_id, plus_port)
-    diagram._composition_output = (output_sys, output_port)
+    for target_sys, target_port in targets:
+        diagram.connect(junction_id, out_port, target_sys, target_port)
     diagram.name = f"Closed loop of {sys.name}"
     if validate:
         diagram.check_algebraic_loops()
-    return diagram
+    return diagram, junction_id
+
+
+def _command_entry(sys) -> str:
+    """The input the junction drives: the command port of a leaf or of a diagram's edge."""
+    try:
+        return command_port(sys)
+    except ValueError as exc:
+        raise ValueError(
+            f"feedback() closes {sys.name!r} on its command input: 'u', else its one "
+            f"free input; it has {list(sys.inputs)}. Close a controller on its plant "
+            "with controller @ plant, or wire the loop with DiagramSystem.connect."
+        ) from exc
 
 
 def refuse_unused_keywords(port_keywords):
@@ -271,6 +293,7 @@ def refuse_two_port_entry(block):
         return
     raise ValueError(
         f"{block.name} reads its measurement on {roles.measurement!r}"
+        + (" (on its edge)" if isinstance(block, DiagramSystem) else "")
         + (f" and its reference on {roles.reference!r}" if roles.reference else "")
         + ": an Error block cannot drive it. Close it on the plant directly "
         "(controller @ plant), use its error layout (ports='error') if it has one, "
@@ -282,7 +305,13 @@ def _return_signal(diagram, of, entry_dim, Demux):
     """Source ``(sys_id, port_id)`` of what comes back to the junction."""
     port_id, index = of if isinstance(of, tuple) else (of, None)
     if port_id is None:
-        port_id = "y" if "y" in diagram.outputs else next(iter(diagram.outputs))
+        if "y" in diagram.outputs or len(diagram.outputs) == 1:
+            port_id = "y" if "y" in diagram.outputs else next(iter(diagram.outputs))
+        else:
+            raise ValueError(
+                "Cannot choose what comes back: no output 'y' among "
+                f"{', '.join(diagram.outputs)}; pass of=(port, index)"
+            )
     if port_id not in diagram.outputs:
         raise ValueError(
             f"Unknown output {port_id!r}; boundary outputs: {', '.join(diagram.outputs)}"
@@ -311,9 +340,6 @@ def _return_signal(diagram, of, entry_dim, Demux):
     )
     diagram.connect(out_sys, out_port, demux_id, out_port)
     return demux_id, f"{out_port}[{index}]"
-
-
-_close_with_junction = feedback
 
 
 def closed_loop(
@@ -398,16 +424,22 @@ def closed_loop(
     if not isinstance(plant, System):
         if w or v:
             raise ValueError("w= and v= need a plant System, not a return-path gain.")
-        diagram = _close_with_junction(controller, plant, validate=validate)
+        diagram, _junction = _close_with_junction(controller, plant, validate=validate)
         return add_loop_inputs(diagram, None, None, None, r=r, w=w, v=v)
     if block_roles(controller).error_driven:
-        loop_gain = series(_new_diagram_like(controller), plant)
-        diagram = _close_with_junction(loop_gain, validate=False)
-        junction_id = diagram._composition_entry[0]
+        loop_gain = series(controller, plant)
+        diagram, junction_id = _close_with_junction(loop_gain, validate=False)
         add_loop_inputs(diagram, plant, None, (junction_id, "-"), r=r, w=w, v=v)
         if validate:
             diagram.check_algebraic_loops()
         return diagram
+    if isinstance(controller, DiagramSystem):
+        roles = block_roles(controller)
+        raise ValueError(
+            f"{controller.name} is a diagram that reads its measurement on "
+            f"{roles.measurement!r} on its edge: close one block on the plant "
+            "(controller @ plant), or wire the loop with DiagramSystem.connect."
+        )
 
     diagram = DiagramSystem()
     controller_id = _add_system_to_diagram(diagram, controller, role="ctl")
@@ -488,11 +520,6 @@ def closed_loop(
     diagram.connect_new_output_port(plant_id, plant_output_port, output_port)
 
     diagram.name = f"Closed loop {plant.name} with {controller.name}"
-    if ref_port in controller.inputs:
-        diagram._composition_entry = (controller_id, ref_port)
-    else:
-        diagram._composition_entry = (controller_id, measurement_port)
-    diagram._composition_output = (plant_id, plant_output_port)
 
     _propagate_animation_camera(diagram, plant)
 
@@ -622,24 +649,15 @@ def autowire(
 # conservative autowire matching rules.
 
 
-@dataclass(frozen=True)
-class _DiagramEntry:
-    """Where '>>' should attach on the right operand of a series chain."""
-
-    sys_id: str
-    port_id: str
-    dim: int
-    boundary_port_id: str | None = None
-
-
 def _as_composition_diagram(sys, *, expose_entry: bool) -> DiagramSystem:
+    """A diagram operand as a copy; a leaf as a diagram with its inputs on the edge."""
     if isinstance(sys, DiagramSystem):
         return _copy_diagram(sys)
 
     diagram = DiagramSystem()
     sys_id = _add_system_to_diagram(diagram, sys)
     if expose_entry:
-        _expose_entry_input(diagram, sys_id)
+        _expose_free_inputs(diagram, sys_id)
     return diagram
 
 
@@ -681,52 +699,74 @@ def _carry_left_operand(diagram, left) -> None:
 
 
 def _series_pair(diagram, right):
-    source = _get_composition_output(diagram)
-    if source is None:
-        raise ValueError("Left side of '>>' has no output port to connect")
-    source_id, source_port = source
+    """Append ``right`` to ``diagram`` (the chain so far) by the ``>>`` rule."""
+    outputs = _edge_outputs(diagram)
+    inputs = right.inputs if not isinstance(right, DiagramSystem) else right.inputs
+    source_name, target_name = _series_connection(diagram, outputs, inputs)
+    source_id, source_port = outputs[source_name]
+    _require_same_dim(
+        diagram.subsystems[source_id].outputs[source_port].dim,
+        inputs[target_name].dim,
+        f"{source_id}:{source_port}",
+        f"{right.name}:{target_name}",
+    )
+    # The chain's outputs are consumed; the result's output is the right side's.
+    for output_id in list(diagram.outputs):
+        del diagram.outputs[output_id]
+        diagram.connections["output"].pop(output_id, None)
 
     if isinstance(right, DiagramSystem):
-        entry = _get_available_diagram_entry(right)
-        _require_same_dim(
-            diagram.subsystems[source_id].outputs[source_port].dim,
-            entry.dim,
-            f"{source_id}:{source_port}",
-            _entry_label(entry),
-        )
-        bindings = {}
-        if entry.boundary_port_id is not None:
-            bindings[entry.boundary_port_id] = source
-        result = _inline_diagram(
+        _inline_diagram(
             diagram,
             right,
-            input_bindings=bindings,
+            input_bindings={target_name: (source_id, source_port)},
             output_collision="replace",
         )
-        if entry.boundary_port_id is None:
-            diagram.connect(
-                source_id,
-                source_port,
-                result[entry.sys_id],
-                entry.port_id,
-            )
         return diagram
 
     right_id = _add_system_to_diagram(diagram, right)
-    target_port = _default_input_port(right)
-
-    _require_same_dim(
-        diagram.subsystems[source_id].outputs[source_port].dim,
-        right.inputs[target_port].dim,
-        f"{source_id}:{source_port}",
-        f"{right_id}:{target_port}",
-    )
-    diagram.connect(source_id, source_port, right_id, target_port)
-    output_port = _default_output_port(right)
-    diagram.connect_new_output_port(right_id, output_port, "y")
-    diagram._composition_output = (right_id, output_port)
+    diagram.connect(source_id, source_port, right_id, target_name)
+    diagram.connect_new_output_port(right_id, _default_output_port(right), "y")
     _propagate_animation_camera(diagram, right)
     return diagram
+
+
+def _edge_outputs(diagram) -> dict:
+    """The chain's outputs by name: its boundary outputs, or the ports of its one block."""
+    if diagram.outputs:
+        return {
+            output_id: tuple(diagram.connections["output"][output_id])
+            for output_id in diagram.outputs
+        }
+    if len(diagram.subsystems) == 1:
+        ((sys_id, sys),) = diagram.subsystems.items()
+        return {port_id: (sys_id, port_id) for port_id in sys.outputs}
+    raise ValueError("Left side of '>>' has no output port to connect")
+
+
+def _series_connection(diagram, outputs, inputs) -> tuple[str, str]:
+    """The ``(output, input)`` names ``>>`` connects, by the first rule that applies."""
+    if not outputs:
+        raise ValueError("Left side of '>>' has no output port to connect")
+    if not inputs:
+        raise ValueError("Right side of '>>' has no free input port to connect")
+    if len(outputs) == 1 and len(inputs) == 1:
+        return next(iter(outputs)), next(iter(inputs))
+    shared = [name for name in outputs if name in inputs]
+    if shared == ["y"] and "r" in inputs and not diagram.inputs:
+        raise ValueError(
+            "a source into a block that reads 'r' and 'y' would drive the measurement "
+            "'y'; name the source's signal after the input it drives (port='r') for "
+            "the block alone, or feed the loop: source >> (controller @ plant)"
+        )
+    if len(shared) == 1:
+        return shared[0], shared[0]
+    if "y" in outputs and "u" in inputs:
+        return "y", "u"
+    raise ValueError(
+        "'>>' connects one output to one input; wire this one with connect "
+        f"(outputs: {', '.join(outputs)}; free inputs: {', '.join(inputs)})"
+    )
 
 
 def _inline_diagram(
@@ -746,8 +786,6 @@ def _inline_diagram(
     }
     source_output_connections = dict(source.connections.get("output", {}))
     source_outputs = dict(source.outputs)
-    source_entry = _get_composition_entry(source)
-    source_output = _get_composition_output(source)
 
     id_map = {}
     for source_id, subsystem in source_subsystems:
@@ -808,14 +846,6 @@ def _inline_diagram(
             source_outputs[output_id],
         )
 
-    if diagram._composition_entry is None and source_entry is not None:
-        entry_sys_id, entry_port_id = source_entry
-        diagram._composition_entry = (id_map[entry_sys_id], entry_port_id)
-
-    if source_output is not None:
-        output_sys_id, output_port_id = source_output
-        diagram._composition_output = (id_map[output_sys_id], output_port_id)
-
     _propagate_animation_camera(diagram, source)
 
     return id_map
@@ -834,17 +864,6 @@ def _add_system_to_diagram(diagram, sys, *, role=None) -> str:
     check_reserved_id(sys_id, diagram.subsystems)
     sys_id = _unique_id(sys_id, diagram.subsystems)
     diagram.add_subsystem(sys, sys_id)
-
-    if sys.inputs and diagram._composition_entry is None:
-        try:
-            diagram._composition_entry = (sys_id, _default_input_port(sys))
-        except ValueError:
-            pass
-    if sys.outputs:
-        try:
-            diagram._composition_output = (sys_id, _default_output_port(sys))
-        except ValueError:
-            pass
     return sys_id
 
 
@@ -852,7 +871,6 @@ def add_loop_inputs(diagram, plant, plant_port, measurement, *, r, w, v):
     """Drop the boundary ``r`` unless ``r``; sum ``w`` into the plant input and ``v`` into the measurement."""
     from minilink.blocks.routing import Sum
 
-    entry, output = diagram._composition_entry, diagram._composition_output
     if not r and "r" in diagram.inputs:
         for sys_id, ports in diagram.connections.items():
             for port_id, source in ports.items():
@@ -865,7 +883,6 @@ def add_loop_inputs(diagram, plant, plant_port, measurement, *, r, w, v):
         sum_into(diagram, (plant_id, port), "w", "disturbance", Sum)
     if v:
         sum_into(diagram, measurement, "v", "noise", Sum)
-    diagram._composition_entry, diagram._composition_output = entry, output
     return diagram
 
 
@@ -931,91 +948,6 @@ def _output_port_id(diagram, output_id: str, collision: str) -> str:
     raise ValueError(f"Unknown output collision policy {collision!r}")
 
 
-def _get_composition_entry(diagram):
-    entry = diagram._composition_entry
-    if entry is not None:
-        sys_id, port_id = entry
-        if (
-            sys_id in diagram.subsystems
-            and port_id in diagram.subsystems[sys_id].inputs
-        ):
-            return entry
-    return None
-
-
-def _get_composition_output(diagram):
-    output = diagram._composition_output
-    if output is not None:
-        return output
-
-    # A declared boundary output wins: `y`, else the only one.
-    boundary_outputs = []
-    if "output" in diagram.connections:
-        for output_id in diagram.outputs:
-            edge = diagram.connections["output"].get(output_id)
-            if edge is not None and edge[0] != "input":
-                boundary_outputs.append(edge)
-    if "y" in diagram.outputs:
-        edge = diagram.connections.get("output", {}).get("y")
-        if edge is not None and edge[0] != "input":
-            return edge
-    if len(boundary_outputs) == 1:
-        return boundary_outputs[0]
-
-    # Fallback: the most recently added subsystem with an output port.
-    for sys_id in reversed(diagram.subsystems):
-        sys = diagram.subsystems[sys_id]
-        if sys.outputs:
-            return sys_id, _default_output_port(sys)
-    return None
-
-
-def _get_available_diagram_entry(diagram) -> _DiagramEntry:
-    entry = _get_composition_entry(diagram)
-    if entry is not None:
-        sys_id, port_id = entry
-        target_port = diagram.subsystems[sys_id].inputs[port_id]
-        edge = diagram.connections[sys_id][port_id]
-        if edge is None:
-            return _DiagramEntry(sys_id, port_id, target_port.dim)
-        if edge[0] == "input":
-            boundary_port_id = edge[1]
-            return _DiagramEntry(
-                sys_id,
-                port_id,
-                diagram.inputs[boundary_port_id].dim,
-                boundary_port_id,
-            )
-        raise ValueError(
-            "Right side of '>>' has no available boundary input; "
-            f"composition entry {sys_id}:{port_id} is already connected. "
-            "Use explicit DiagramSystem.connect for this topology."
-        )
-
-    boundary_inputs = list(diagram.inputs)
-    if len(boundary_inputs) != 1:
-        raise ValueError(
-            "Right side of '>>' must have exactly one composition entry or "
-            "exposed boundary input. Use explicit DiagramSystem.connect for "
-            "this topology."
-        )
-
-    boundary_port_id = boundary_inputs[0]
-    targets = _boundary_input_targets(diagram, boundary_port_id)
-    if len(targets) == 0:
-        raise ValueError(
-            "Right side of '>>' has an exposed boundary input that is not "
-            "connected to any subsystem input."
-        )
-    sys_id, port_id = targets[0]
-    return _DiagramEntry(
-        sys_id,
-        port_id,
-        diagram.inputs[boundary_port_id].dim,
-        boundary_port_id,
-    )
-
-
 def _boundary_input_targets(diagram, boundary_port_id: str) -> list[tuple[str, str]]:
     targets = []
     for sys_id, subsystem in diagram.subsystems.items():
@@ -1025,21 +957,12 @@ def _boundary_input_targets(diagram, boundary_port_id: str) -> list[tuple[str, s
     return targets
 
 
-def _entry_label(entry: _DiagramEntry) -> str:
-    if entry.boundary_port_id is not None:
-        return f"input:{entry.boundary_port_id}"
-    return f"{entry.sys_id}:{entry.port_id}"
-
-
-def _expose_entry_input(diagram, sys_id: str) -> None:
+def _expose_free_inputs(diagram, sys_id: str) -> None:
+    """Put every input of a leaf on the diagram's edge, under the same name."""
     sys = diagram.subsystems[sys_id]
-    if not sys.inputs:
-        return
-
-    port_id = _default_input_port(sys)
-    _add_input_port_like(diagram, port_id, sys.inputs[port_id])
-    diagram.connect("input", port_id, sys_id, port_id)
-    diagram._composition_entry = (sys_id, port_id)
+    for port_id, port in sys.inputs.items():
+        _add_input_port_like(diagram, port_id, port)
+        diagram.connect("input", port_id, sys_id, port_id)
 
 
 def _default_output_port(sys) -> str:

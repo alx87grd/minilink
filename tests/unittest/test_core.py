@@ -227,24 +227,24 @@ class TestDiagramCompositionShortcuts(unittest.TestCase):
         self.assertEqual(diagram.connections["sys2"]["u"], ("ctl", "u"))
 
     def test_series_operator_flattens_diagram_to_diagram_boundary(self):
-        left = Step(final_value=[1.0], step_time=0.0) >> ProportionalController()
-        right = Integrator() >> Integrator()
+        left = Step(final_value=[1.0], step_time=0.0) >> Integrator()
+        right = Gain(2.0, dim=1) >> Gain(3.0, dim=1)
         diagram = left >> right
-        self.assertEqual(list(diagram.subsystems), ["ref", "ctl", "sys", "sys2"])
+        self.assertEqual(list(diagram.subsystems), ["ref", "sys", "gain", "gain2"])
         self.assertFalse(
             any((isinstance(sys, DiagramSystem) for sys in diagram.subsystems.values()))
         )
-        self.assertEqual(diagram.connections["ctl"]["r"], ("ref", "y"))
-        self.assertEqual(diagram.connections["sys"]["u"], ("ctl", "u"))
-        self.assertEqual(diagram.connections["sys2"]["u"], ("sys", "y"))
-        self.assertEqual(diagram.connections["output"]["y"], ("sys2", "y"))
+        self.assertEqual(diagram.connections["sys"]["u"], ("ref", "y"))
+        self.assertEqual(diagram.connections["gain"]["u"], ("sys", "y"))
+        self.assertEqual(diagram.connections["gain2"]["u"], ("gain", "y"))
+        self.assertEqual(diagram.connections["output"]["y"], ("gain2", "y"))
         self.assertNotIn("u", diagram.inputs)
 
     def test_series_into_closed_loop_without_free_boundary_input_fails(self):
         diagram = (
             Step(final_value=[1.0], step_time=0.0) >> ImpedanceController() @ Pendulum()
         )
-        with self.assertRaisesRegex(ValueError, "no available boundary input"):
+        with self.assertRaisesRegex(ValueError, "no free input port"):
             WhiteNoise() >> diagram
         self.assertEqual(diagram.connections["sys"]["u"], ("ctl", "u"))
 
