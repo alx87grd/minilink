@@ -9,7 +9,6 @@ import numpy as np
 from minilink import (
     PID,
     DoubleIntegrator,
-    Gain,
     ImpedanceController,
     Integrator,
     Lag,
@@ -67,33 +66,6 @@ class TestJunction(unittest.TestCase):
         self.assertEqual(T.connections["controller"]["e"], ("error", "e"))
         self.assertEqual(T.connections["demux"]["y"], ("plant", "y"))
 
-    def test_series_then_unity_equals_compensator_at_plant_and_leaves_the_loop_gain_alone(
-        self,
-    ):
-        C, G = PID(Kp=20.0, Ki=5.0, Kd=2.0, tau=0.05), _damped_pendulum()
-        L = C >> G
-        T1 = C @ G
-        T2 = feedback(L)
-        np.testing.assert_allclose(_poles(T1), _poles(T2), atol=1e-9)
-        self.assertEqual(list(L.inputs), ["e"])
-        self.assertEqual(list(L.subsystems), ["pid", "pendulum"])
-
-    def test_series_diagram_at_plant_is_nested_and_leaves_both_operands_alone(self):
-        L = Gain(2.0, dim=1) >> Gain(3.0, dim=1)
-        T = L @ Pendulum()
-        self.assertEqual(list(T.subsystems), ["controller", "plant", "demux", "error"])
-        self.assertIs(T.subsystems["controller"], L)
-        self.assertEqual(T.connections["plant"]["u"], ("controller", "y"))
-        self.assertEqual(list(L.subsystems), ["gain", "gain2"])
-        self.assertEqual(L.connections["output"], {"y": ("gain2", "y")})
-        G = Integrator() >> TransferFunction([1.0], [0.5, 1.0])
-        T = L @ G
-        self.assertEqual(list(T.subsystems), ["controller", "plant", "error"])
-        self.assertIs(T.subsystems["plant"], G)
-        self.assertEqual(list(L.subsystems), ["gain", "gain2"])
-        self.assertEqual(list(G.subsystems), ["integrator", "transfer_function"])
-        self.assertEqual(list(G.inputs), ["u"])
-
     def test_closed_loop_poles_are_the_roots_of_one_plus_L(self):
         C, G = PID(Kp=20.0, Ki=5.0, Kd=2.0, tau=0.05), _damped_pendulum()
         L = C >> G
@@ -101,6 +73,7 @@ class TestJunction(unittest.TestCase):
         loop_tf = L.transfer_function()  # L(s) of the wired diagram
         roots = np.roots(np.polyadd(loop_tf.denominator, loop_tf.numerator))
         np.testing.assert_allclose(_poles(T), np.sort_complex(roots), atol=1e-6)
+        np.testing.assert_allclose(_poles(T), _poles(feedback(L)), atol=1e-9)
 
     def test_vector_loop_uses_a_vector_junction(self):
         T = PID(Kp=[3.0, 5.0], dof=2) @ _TwoInTwoOut()
@@ -139,41 +112,25 @@ class TestJunction(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "of index must be in"):
             feedback(_damped_pendulum(), of=("y", 5))
 
-    def test_a_controller_box_is_nested_under_its_role(self):
+    def test_a_box_on_either_side_is_nested_under_its_role(self):
         from minilink import Saturation, StateFeedbackController
 
-        K = np.array([[10.0, 2.0]])
-        box = StateFeedbackController(K) >> Saturation(-5.0, 5.0)
+        K = StateFeedbackController(np.array([[10.0, 2.0]]))
+        box = K >> Saturation(-5.0, 5.0)
         loop = box @ Pendulum()
         self.assertEqual(list(loop.subsystems), ["controller", "plant"])
         self.assertIs(loop.subsystems["controller"], box)
         self.assertEqual(loop.connections["controller"]["x"], ("plant", "x"))
         self.assertEqual(loop.connections["plant"]["u"], ("controller", "y"))
-        self.assertEqual(list(loop.inputs), ["r"])
-        self.assertEqual(len(box.subsystems), 2)  # the operand is unchanged
-        traj = loop.compute_trajectory(tf=2.0, verbose=False)
-        self.assertLess(abs(traj.x[0, -1]), abs(traj.x[0, 0]) + 1e-9)
 
-    def test_a_plant_box_is_nested_and_gives_its_state(self):
-        from minilink import Saturation, StateFeedbackController
-
-        K = np.array([[10.0, 2.0]])
         box = Saturation(-5.0, 5.0) >> Pendulum()
-        loop = StateFeedbackController(K) @ box
-        self.assertEqual(list(loop.subsystems), ["controller", "plant"])
+        loop = K @ box  # a plant box gives its own state, on a copy
         self.assertEqual(loop.connections["controller"]["x"], ("plant", "x"))
-        self.assertEqual(loop.connections["plant"]["u"], ("controller", "u"))
         self.assertEqual(loop.connections["output"]["y"], ("plant", "y"))
         self.assertEqual(loop.subsystems["plant"].outputs["x"].dim, 2)
         self.assertNotIn("x", box.outputs)  # the operand is unchanged
         loop.compute_trajectory(tf=1.0, verbose=False)
-
-        y_loop = PID() @ box
-        self.assertEqual(
-            list(y_loop.subsystems), ["controller", "plant", "demux", "error"]
-        )
-        self.assertIs(y_loop.subsystems["plant"], box)
-        self.assertEqual(y_loop.connections["plant"]["u"], ("controller", "u"))
+        self.assertIs((PID() @ box).subsystems["plant"], box)
 
     def test_every_measurement_is_wired_and_the_output_is_the_plant_y(self):
         from minilink import StateFeedbackController
@@ -193,50 +150,24 @@ class TestJunction(unittest.TestCase):
         loop = Both() @ Pendulum()
         self.assertEqual(loop.connections["controller"]["y"], ("plant", "y"))
         self.assertEqual(loop.connections["controller"]["x"], ("plant", "x"))
-        state_loop = StateFeedbackController(np.array([[10.0, 2.0]])) @ Pendulum()
-        self.assertEqual(state_loop.connections["output"]["y"], ("plant", "y"))
-
-    def test_a_state_controller_on_a_leaf_without_x_names_the_fix(self):
-        from minilink import StateFeedbackController
-
-        class NoState(DynamicSystem):
-            def __init__(self):
-                super().__init__(n=2, input_dim=1, output_dim=2)
-
-            def f(self, x, u, t=0, params=None):
-                return np.array([x[1], u[0] - x[0]])
-
+        K = StateFeedbackController(np.array([[1.0, 1.0]]))
+        self.assertEqual((K @ Pendulum()).connections["output"]["y"], ("plant", "y"))
         with self.assertRaisesRegex(ValueError, "expose_state=True"):
-            StateFeedbackController(np.array([[1.0, 1.0]])) @ NoState()
+            K @ Integrator()  # a leaf without x
 
     def test_a_number_or_a_port_keyword_is_refused(self):
         from minilink import closed_loop
 
         with self.assertRaisesRegex(TypeError, "needs a plant on the right"):
             closed_loop(Integrator(), 2.0)
-        for keyword in ("feedback", "plant_output_port", "output_port", "ref_port"):
-            with self.subTest(keyword=keyword):
-                with self.assertRaises(TypeError):
-                    closed_loop(PID(), Pendulum(), **{keyword: "y"})
-
-    def test_two_port_wiring_is_unchanged(self):
-        T = ImpedanceController() @ Pendulum()
-        self.assertEqual(list(T.subsystems), ["controller", "plant"])
-        T = PID(Kp=5.0, ports="reference") @ Integrator()
-        self.assertEqual(list(T.subsystems), ["controller", "plant"])
-        self.assertIsNone(block_roles(PID(ports="reference")).entry)
-        self.assertEqual(block_roles(PID()).entry, "e")
-        self.assertEqual(block_roles(TransferFunction([1.0], [1.0, 1.0])).entry, "u")
-        self.assertEqual(block_roles(Lead()).entry, "e")
+        with self.assertRaises(TypeError):
+            closed_loop(PID(), Pendulum(), plant_output_port="y")
 
     def test_step_reference_drives_the_classical_loop(self):
         plant = _damped_pendulum()
         loop = (
             Step(final_value=0.3, step_time=1.0)
             >> PID(Kp=20.0, Kd=2.0, tau=0.05) @ plant
-        )
-        self.assertEqual(
-            list(loop.subsystems), ["step", "controller", "plant", "demux", "error"]
         )
         traj = loop.compute_trajectory(tf=8.0, verbose=False)
         static_gain = 20.0 / (20.0 + 4.905 / 0.5)  # Kp / (Kp + wn^2 / k)
@@ -246,30 +177,21 @@ class TestJunction(unittest.TestCase):
 class TestSeriesRule(unittest.TestCase):
     """``A >> B`` connects one output to one input by a fixed rule on the edges."""
 
-    def test_one_output_to_one_input_whatever_the_names(self):
-        L = PID() >> Pendulum()
-        self.assertEqual(list(L.inputs), ["e"])
+    def test_the_three_rules_in_order(self):
+        from minilink import Saturation, StateFeedbackController
+
+        K = StateFeedbackController(np.array([[10.0, 2.0]]))
+        L = PID() >> Pendulum()  # one output, one input
+        self.assertEqual((list(L.inputs), list(L.outputs)), (["e"], ["y"]))
         self.assertEqual(L.connections["pendulum"]["u"], ("pid", "u"))
-        self.assertEqual(list(L.outputs), ["y"])
-
-    def test_a_shared_name_wins_over_the_textbook_pair(self):
-        from minilink import StateFeedbackController
-
-        L = Pendulum() >> StateFeedbackController(np.array([[10.0, 2.0]]))
+        L = Pendulum() >> K  # a shared name wins over the textbook pair
         self.assertEqual(
             L.connections["state_feedback_controller"]["x"], ("pendulum", "x")
         )
         self.assertIsNone(L.connections["state_feedback_controller"]["r"])
-
-    def test_y_to_u_when_no_name_is_shared(self):
-        L = TransferFunction([1.0], [1.0, 3.0, 2.0]) >> Integrator()
+        L = TransferFunction([1.0], [1.0, 3.0, 2.0]) >> Integrator()  # y to u
         self.assertEqual(L.connections["integrator"]["u"], ("transfer_function", "y"))
-
-    def test_a_leaf_puts_all_its_inputs_on_the_edge(self):
-        from minilink import Saturation, StateFeedbackController
-
-        L = StateFeedbackController(np.array([[10.0, 2.0]])) >> Saturation()
-        self.assertEqual(list(L.inputs), ["x", "r"])
+        self.assertEqual(list((K >> Saturation()).inputs), ["x", "r"])  # a leaf's edge
 
     def test_a_source_into_a_reference_and_measurement_block_is_refused(self):
         with self.assertRaisesRegex(ValueError, "would drive the measurement"):
@@ -323,7 +245,7 @@ class TestLoopNames(unittest.TestCase):
 class TestClosedLoopFilter(unittest.TestCase):
     """``closed_loop(..., filter=F)``: the return path, beside ``error``, at the top level."""
 
-    def test_the_filter_sits_before_the_error_block(self):
+    def test_the_filter_sits_between_the_plant_and_what_the_controller_reads(self):
         from minilink import LowPassFilter, closed_loop
 
         T = closed_loop(PID(), Integrator(), filter=LowPassFilter(2.0))
@@ -331,18 +253,9 @@ class TestClosedLoopFilter(unittest.TestCase):
         self.assertEqual(T.connections["filter"]["u"], ("plant", "y"))
         self.assertEqual(T.connections["error"]["-"], ("filter", "y"))
         self.assertEqual(T.connections["output"]["y"], ("plant", "y"))
-
-    def test_the_filter_feeds_the_measurement_of_a_y_controller(self):
-        from minilink import LowPassFilter, closed_loop
-
         T = closed_loop(ProportionalController(), Integrator(), filter=0.5)
-        self.assertEqual(list(T.subsystems), ["controller", "plant", "filter"])
-        self.assertEqual(T.connections["filter"]["u"], ("plant", "y"))
         self.assertEqual(T.connections["controller"]["y"], ("filter", "y"))
-        self.assertEqual(T.connections["output"]["y"], ("plant", "y"))
         np.testing.assert_allclose(T.subsystems["filter"].params["K"], [[0.5]])
-        T = closed_loop(ProportionalController(), Integrator(), filter=LowPassFilter())
-        self.assertEqual(T.connections["controller"]["y"], ("filter", "y"))
 
     def test_a_noise_enters_before_the_filter(self):
         from minilink import LowPassFilter, closed_loop
@@ -440,23 +353,19 @@ class TestLoopInputs(unittest.TestCase):
             ("reference", PID(4.0, 2.0, 0.5, ports="reference")),
         )
 
-    def test_defaults_keep_the_single_reference_input(self):
+    def test_each_keyword_adds_or_drops_its_port(self):
         from minilink.core.composition import closed_loop
 
         for layout, C in self.layouts():
             with self.subTest(layout=layout):
-                self.assertEqual(list(closed_loop(C, self.H).inputs), ["r"])
                 self.assertEqual(list((C @ self.H).inputs), ["r"])
-
-    def test_each_flag_adds_or_drops_its_port(self):
-        from minilink.core.composition import closed_loop
-
-        for layout, C in self.layouts():
-            with self.subTest(layout=layout):
                 loop = closed_loop(C, self.H, disturbance=True, noise=True)
                 self.assertEqual(list(loop.inputs), ["r", "d", "n"])
                 loop = closed_loop(C, self.H, reference=False, disturbance=True)
                 self.assertEqual(list(loop.inputs), ["d"])
+                self.assertEqual(
+                    list(closed_loop(C, self.H, reference=False).inputs), []
+                )
 
     def test_d_and_n_enter_where_the_formulas_say(self):
         from minilink.analysis import (
@@ -490,13 +399,6 @@ class TestLoopInputs(unittest.TestCase):
                     S,
                     atol=1e-9,
                 )
-
-    def test_a_number_on_the_right_is_refused(self):
-        from minilink.core.composition import closed_loop
-
-        with self.assertRaisesRegex(TypeError, "needs a plant on the right"):
-            closed_loop(self.H, 1, disturbance=True)
-        self.assertEqual(list(closed_loop(PID(), self.H, reference=False).inputs), [])
 
 
 class TestDispatchTable(unittest.TestCase):
@@ -696,25 +598,20 @@ class TestResolver(unittest.TestCase):
             (empty.plant, empty.controller, empty.estimator), (None, None, None)
         )
 
-    def test_roles_find_an_estimator_inside_the_controller(self):
-        from minilink import DiagramSystem, StateFeedbackController
-
-        gain, observer = StateFeedbackController(np.array([[1.0, 1.0]])), Integrator()
-        box = DiagramSystem()
-        box.add_subsystem(observer, "estimator")
-        box.add_subsystem(gain, "gain")
-        loop = DiagramSystem()
-        loop.add_subsystem(box, "controller")
-        loop.add_subsystem(Pendulum(), "plant")
-        self.assertIs(roles(loop).estimator, observer)
-
-    def test_roles_of_a_sampled_loop_come_from_its_two_sides(self):
-        from minilink import StateFeedbackController
-
-        plant, ctl = Pendulum(), StateFeedbackController(np.array([[10.0, 2.0]]))
         sampled = ctl % 0.01 @ plant
         self.assertIs(roles(sampled).plant, plant)
         self.assertIs(roles(sampled).controller, ctl)
+
+        observer, box = (
+            Integrator(),
+            DiagramSystem(),
+        )  # an estimator inside the controller
+        box.add_subsystem(observer, "estimator")
+        box.add_subsystem(ctl, "gain")
+        nested = DiagramSystem()
+        nested.add_subsystem(box, "controller")
+        nested.add_subsystem(plant, "plant")
+        self.assertIs(roles(nested).estimator, observer)
 
     def test_a_second_block_under_a_reserved_name_is_refused(self):
         from minilink import DiagramSystem

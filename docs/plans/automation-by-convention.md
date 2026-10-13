@@ -481,7 +481,7 @@ roles and control-law sweeps) is captured before and after each step and compare
 |---|---|---|
 | AC-1 | Safe bug fixes and pinning tests. **Landed 2026-10-10.** | — |
 | AC-0 | No controller classes; `plot_control_law` on `System`; the four course notebooks migrated (the import line and the base class; their profile line goes in AC-3). **Landed 2026-10-13.** | — |
-| AC-2 | The resolver (§3), with every reader switched; reserved names raise on a clash. (a) Byte-identical census. **(a) landed 2026-10-13.** (b) The one-time rename of the subsystem names, in flow and sampled loops; shortcuts stop naming blocks from their shape. (c) The ports `d` and `n` in the same pass. **(b) and (c) landed 2026-10-13** as one sweep: `@` names `controller` and `plant`, `feedback(leaf)` names `plant`, `+` and `>>` keep each block's own name (`step`, `pid`, `pendulum`), the noisy plants read `d` and `n`, `closed_loop(reference=, disturbance=, noise=)`; rollouts identical. | — |
+| AC-2 | The resolver (§3), with every reader switched; reserved names raise on a clash. (a) Byte-identical census. **(a) landed 2026-10-13.** (b) The one-time rename of the subsystem names, in flow and sampled loops; shortcuts stop naming blocks from their shape. (c) The ports `d` and `n` in the same pass. **(b) and (c) landed 2026-10-13** as one sweep (the rule is in DESIGN; rollouts identical). | — |
 | AC-OP | The operators (§4.1–§4.4), one commit each: no operator modifies its operands; the plain `>>` and its one guard; `+`, `autowire`, `rename_ports`, `port=` and the 8 positional lines; `expose`; `@` needs a plant, `feedback`'s entry, return and `filter=`, one junction helper. **Landed 2026-10-13** (five commits; `autowire` by name reverses AC-1's fan-out guard, by decision). | — |
 | AC-3 | Composition on standard names: the removals §6 assigns to AC-3; boxes nested by `@`, with the edge check and the box's state read for an `x` controller; `x` only where needed and its leaf refusal; the mechanical plant's `y` and `x`; MPC renamed; `filter=`. **Landed 2026-10-13** (five commits), except the MPC rename, which trails with AC-8a (§10). | — |
 | AC-4 | Loop inputs: plants that declare `d` and `n` own them; sources as values, named `reference`, `disturbance`, `noise`; `estimator=` with P4; the randomness plan's loop-input rulings reconciled | beside P4, before P11 |
@@ -537,18 +537,13 @@ wired by hand until AC-4. The mechanical plant's `q` / `dq` removal, `rename_por
 These do not change the rules:
 - **AC-OP:** whether `expose` runs before or after `autowire`, and how the open-input
   warning treats edge inputs.
-- **AC-3 (settled 2026-10-13):** nobody used the filters' `x` port; the three filters lost
-  it through `TransferFunction(..., expose_state=False)`. The refusal for a leaf plant
-  without `x` reads "build the plant with `expose_state=True`, or wire the loop with
-  `DiagramSystem.connect`". `expose("x")` stays for hand wiring and plots; `@` reads a
-  plant box's own state itself, from a copy that shares the box's blocks. The loop's
-  output is the plant's `y` whatever the controller reads. **The MPC rename, found while
-  building:** the MPC reads the state of *its model*, and where the plant is a
-  higher-fidelity box that is the box's `y`, not its state (the GRO501 racecar's `inner`
-  box gives the pose as `y`; its own state is the car's and the speed loop's). So `y` is
-  the right name for the MPC's input, and only `u_ff` → `u` is a pure rename; it lands
-  with AC-8a, which drops the sampled loop's port keywords (the racecar notebook passes
-  `computer_out="u_ff"` by hand today).
+- **AC-3 (settled 2026-10-13):** nobody used the filters' `x`, so it went
+  (`TransferFunction(..., expose_state=False)`); `expose("x")` stays for hand wiring,
+  `@` reads a plant box's state itself, from a copy that shares the blocks. **The MPC
+  rename, found while building:** the MPC reads the state of *its model*, which for a
+  higher-fidelity plant box is the box's `y`, not its state (the racecar's `inner` box
+  gives the pose as `y`). So the MPC keeps `y`, and only `u_ff` → `u` is a rename; it
+  lands with AC-8a, which drops the sampled loop's port keywords.
 - **AC-5:** how the auto mode removes duplicate wires, and whether a plant with many outputs
   (the racecar) needs a name filter.
 - **The deferred wrapper**, if it is ever built: the names inside it, and how its edge shows

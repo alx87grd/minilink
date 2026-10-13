@@ -488,11 +488,9 @@ loop nested with `add_subsystem` therefore declares what the same leaf would, an
 closing an outer loop around it is not a false algebraic loop.
 
 Shortcuts (`core.composition`): `+` flat add only, `>>` series, `@` closed loop
-(``closed_loop(C, plant, reference=True, disturbance=False, noise=False)`` is `@`
-with options, and has no port-name keyword: the keywords are the words, the
-ports are the letters ``r``, ``d``, ``n``; a load disturbance is summed into the
-plant input and a measurement noise into the measurement, each through a
-visible `Sum` block; `@` keeps the single input ``r``),
+(``closed_loop(C, plant, reference=, disturbance=, noise=, filter=)`` is `@` with
+options: the keywords are words, the ports the letters ``r``, ``d``, ``n``, each
+extra input summed in through a visible `Sum`; `@` keeps the single input ``r``),
 `autowire()` connects by name only: each unconnected input takes the one output
 with the same name and size, an output may feed several inputs, and an input
 with no match or several stays open and is listed in a warning (`strict=True`
@@ -532,12 +530,9 @@ one edge input feeding all of them, the one inside output of a name becomes an
 edge output, and `"x"` with no such port is the box's own state as an output.
 
 **Shortcut subsystem ids.** `@` names its two sides `controller` and `plant`,
-and `feedback(leaf)` names the leaf `plant`; `+` and `>>` keep each block's
-own name (`step`, `pid`, `pendulum`: ``System.id``, else the name), with a
-numeric suffix when a plain name repeats (`integrator2`). No id is minted
-from a block's shape. Override with ``System.id`` before wiring or explicit
-``add_subsystem(..., "plant")``. The
-reserved names `plant`, `controller` and `estimator` are never suffixed: a
+`feedback(leaf)` names the leaf `plant`; `+` and `>>` keep each block's own
+name (``System.id``, else the name: `step`, `pid`, `integrator2` on a repeat).
+The reserved names `plant`, `controller` and `estimator` are never suffixed: a
 second block under one of them is refused.
 Block titles in ``plot_diagram()`` still show ``sys.name`` (human type).
 A diagram nested with ``add_subsystem`` is drawn expanded: its blocks sit in a
@@ -559,21 +554,18 @@ written once on the tracking error and take a port-layout switch:
 form, `PID`, `Lead`, `Lag`, `TransferFunction(ports="error")`,
 `ProportionalController(ports="error")`),
 `ports="reference"` declares `r` and `y` (the controller form the generic
-framework uses). A bare `TransferFunction` stays a plant (`u`, `y`). `@` keeps one rule — the left operand drives the right
-one and the output returns to the left — with two layouts: a block that reads
-a measurement (`y` or `x`) is wired directly; an error-driven block
-(`core.feedback.block_roles`: an input `e`, or a single input with no
-measurement — a compensator, a transfer function, a plant, a series
-diagram `C >> G`) gets an `Error` block (`e = r - y`, ports `+`, `-`, `e`)
-inserted by `core.composition.feedback`. `@` always means controller at plant
-and refuses a number on the right; `feedback(sys)` closes any such system on
-itself, through a `Gain` (`feedback(sys, K)`) or a sensor or filter block
+framework uses). A bare `TransferFunction` stays a plant (`u`, `y`). An
+error-driven block (`core.feedback.block_roles`: an input `e`, or a single
+input with no measurement — a compensator, a transfer function, a plant, a
+series diagram `C >> G`) gets an `Error` block (`e = r - y`, ports `+`, `-`,
+`e`) inserted by `core.composition.feedback`. `@` always means controller at
+plant and refuses a number on the right; `feedback(sys)` closes any such system
+on itself, through a `Gain` (`feedback(sys, K)`) or a sensor or filter block
 (`feedback(sys, F)`), the return block named `filter` either way;
-`closed_loop(C, plant, filter=F)` puts the same block, at the loop's top level,
-between the plant's `y` and what the controller reads (its `y`, or the `Error`
-block): the plant's `y` stays the output, a noise `n` enters before the filter,
-and a controller that reads `x` is refused (a filter on the state is an
-estimator). Positive feedback still uses a signed `Sum`. A scalar error against a vector output takes
+`closed_loop(C, plant, filter=F)` puts the same block between the plant's `y`
+and what the controller reads, a noise `n` entering before it, and refuses a
+controller that reads `x` (a filter on the state is an estimator). Positive
+feedback still uses a signed `Sum`. A scalar error against a vector output takes
 component 0 through a visible `Demux`; equal dimensions close a vector loop;
 anything else raises and names `feedback(sys, of=(port, index))`. No `Loop`
 block, no new operator.
@@ -595,15 +587,12 @@ and `minilink/core/feedback.py` reads them, never a class or an `isinstance`:
   name is refused, never suffixed, so two loops cannot be laid side by side
   (`loop >> loop`, `loop + loop`): run them separately and compare.
 
-The one explicit hint left is `plot_space`, a class attribute read only by
-`plot_control_law` (`plot_space_of`) where the ports cannot say what to sweep:
-the `(e, de)` and `(q, dq)` planes of the robotic laws (`error_qdq`,
-`absolute_qdq`), and `None` for a solver call such as MPC, which has no static
-law to draw. Without it the ports decide: a block that reads `x` sweeps the
-state; one that reads `y` and a reference of the same size sweeps the error
-`e = r - y` with `r` pinned; one that reads `y` otherwise sweeps the
-measurement; an error-driven block sweeps its entry port. There is no profile
-table and no port override attribute: a block that reads `meas` wires by hand.
+The one explicit hint left is `plot_space`, read only by `plot_control_law`
+(`plot_space_of`) where the ports cannot say the sweep: the `(e, de)` and
+`(q, dq)` planes of the robotic laws, and `None` for a solver call such as MPC.
+Otherwise the ports decide: `x` sweeps the state, `y` with a same-size `r` the
+error `e = r - y`, `y` alone the measurement, an error-driven block its entry.
+There is no profile table and no port override attribute.
 
 Not adopted: a `StaticController` base owning a `control_law(y, r, t)` method that a
 base-class `ctl` unbundles from the ports (it hides the block's behaviour behind two

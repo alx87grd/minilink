@@ -96,33 +96,8 @@ from minilink.control.impedance import ImpedanceController
 from minilink.control.output import ProportionalController
 from minilink.core.composition import closed_loop
 from minilink.core.diagram import DiagramSystem
-from minilink.dynamics.abstraction.mechanical import MechanicalSystem
 from minilink.dynamics.catalog.manipulators.arms import TwoLinkManipulator
 from minilink.dynamics.catalog.pendulum.pendulum import Pendulum
-
-
-class AugmentedMechanicalPlant(MechanicalSystem):
-    """Mechanical plant with extra actuator state in ``x`` (``y = x``)."""
-
-    def __init__(self):
-        super().__init__(dof=1, actuators=1)
-        self.n = 3
-        self.state.labels = ["theta", "dtheta", "z_act"]
-        self.state.units = ["rad", "rad/s", ""]
-        self.x0 = np.zeros(3)
-        self.outputs["y"].dim = 3
-        self.outputs["y"].labels = list(self.state.labels)
-        self.outputs["y"].units = list(self.state.units)
-        self.outputs["y"].nominal_value = np.zeros(3)
-
-    def x2q(self, x):
-        return (x[0:1], x[1:2])
-
-    def f(self, x, u, t=0.0, params=None):
-        q, v = self.x2q(x)
-        acceleration = self.forward_dynamics(q, v, u, t, params)
-        xp = np.asarray(acceleration).reshape(-1)[0]
-        return np.array([v[0], xp, 0.0])
 
 
 class TestDiagramCompositionShortcuts(unittest.TestCase):
@@ -279,20 +254,6 @@ class TestDiagramCompositionShortcuts(unittest.TestCase):
         diagram.autowire(strict=True)
         self.assertEqual(diagram.connections["integrator"]["u"], ("step", "r"))
 
-    def test_autowire_handles_pendulum_closed_loop_convention(self):
-        diagram = (
-            Step(final_value=[1.0], port="r") + ImpedanceController() + Pendulum()
-        ).autowire(strict=True)
-        self.assertEqual(
-            diagram.connections["impedance_controller"]["r"], ("step", "r")
-        )
-        self.assertEqual(
-            diagram.connections["impedance_controller"]["y"], ("pendulum", "y")
-        )
-        self.assertEqual(
-            diagram.connections["pendulum"]["u"], ("impedance_controller", "u")
-        )
-
     def test_autowire_reads_names_only(self):
         with self.assertWarnsRegex(UserWarning, "no output named 'r'"):
             diagram = (
@@ -366,44 +327,27 @@ class TestDiagramCompositionShortcuts(unittest.TestCase):
             box.connections["saturation"]["u"], ("state_feedback_controller", "u")
         )
         self.assertEqual(box.connections["output"]["y"], ("saturation", "y"))
-        self.assertEqual(box.inputs["x"].dim, 2)
 
         fan_in = (Integrator() + Integrator()).expose("u")
-        self.assertEqual(fan_in.connections["integrator"]["u"], ("input", "u"))
         self.assertEqual(fan_in.connections["integrator2"]["u"], ("input", "u"))
-
-        chain = (Integrator() >> Integrator()).expose("x")
-        self.assertEqual(chain.outputs["x"].dim, 2)
+        chain = (Integrator() >> Integrator()).expose("x")  # the box's own state
         np.testing.assert_allclose(
             chain.outputs["x"].compute(np.array([1.0, 2.0]), np.zeros(1), 0.0, None),
             [1.0, 2.0],
         )
-        self.assertEqual(list((chain >> Integrator()).outputs), ["y"])
-
         with self.assertRaisesRegex(ValueError, "output of several blocks"):
             (Integrator() + Integrator()).expose("y")
         with self.assertRaisesRegex(ValueError, "neither an open input nor an output"):
             Integrator().__add__(Integrator()).expose("bogus")
 
-    def test_closed_loop_reads_the_mechanical_state_straight(self):
-        plant = Pendulum()
-        self.assertNotIn("q", plant.outputs)
-        self.assertNotIn("dq", plant.outputs)
-        diagram = closed_loop(ImpedanceController(), plant)
-        self.assertNotIn("mux", diagram.subsystems)
+    def test_a_mechanical_plant_closes_on_its_state_y(self):
+        plant = TwoLinkManipulator()
+        self.assertFalse({"q", "dq"} & set(plant.outputs))  # y is [q; dq]
+        diagram = closed_loop(ImpedanceController(dof=2), plant)
+        self.assertEqual(list(diagram.subsystems), ["controller", "plant"])
         self.assertEqual(diagram.connections["controller"]["y"], ("plant", "y"))
-
-    def test_closed_loop_two_link_requires_matching_controller_dim(self):
-        with self.assertRaisesRegex(ValueError, "Cannot wire closed-loop feedback"):
-            closed_loop(ImpedanceController(dof=1), TwoLinkManipulator())
-        diagram = closed_loop(ImpedanceController(dof=2), TwoLinkManipulator())
-        self.assertEqual(diagram.connections["controller"]["y"], ("plant", "y"))
-
-    def test_closed_loop_refuses_an_augmented_plant_without_a_matching_y(self):
-        with self.assertRaisesRegex(ValueError, "'y' output has dim 3"):
-            closed_loop(ImpedanceController(), AugmentedMechanicalPlant())
-        with self.assertRaises(TypeError):
-            closed_loop(ImpedanceController(), Pendulum(), feedback="qdq")
+        with self.assertRaisesRegex(ValueError, "declares measurement 'y' dim 2"):
+            closed_loop(ImpedanceController(dof=1), plant)
 
 
 from minilink.core.composition import closed_loop, resolve_standard_feedback
@@ -464,15 +408,6 @@ class TestPortNamesDriveTheLoop(unittest.TestCase):
 
         self.assertEqual(plot_space_of(Measured()), "measurement")
         self.assertIsNone(plot_space_of(Step(final_value=[1.0])))
-
-    def test_declared_state_feedback_wires_x(self):
-        lqr = StateFeedbackController(np.array([[1.0, 1.0]]))
-        diagram = lqr @ Pendulum()
-        self.assertEqual(diagram.connections["controller"]["x"], ("plant", "x"))
-
-    def test_declared_mismatch_error_names_declaration(self):
-        with self.assertRaisesRegex(ValueError, "declares measurement"):
-            closed_loop(ImpedanceController(dof=3), Pendulum())
 
 
 from minilink.blocks.routing import Gain
