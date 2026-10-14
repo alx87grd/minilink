@@ -98,6 +98,7 @@ Course-agnostic textbook pages. Long notebooks (UR5 EoM, DP grids, PPO training)
 | --- | --- |
 | [frequency_response](teaching/topics/classical_control/frequency_response.ipynb) (Bode, Nyquist, margins) | [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/alx87grd/minilink/blob/main/examples/teaching/topics/classical_control/frequency_response.ipynb) |
 | [sensitivity_functions](teaching/topics/classical_control/sensitivity_functions.ipynb) (S, T, PS, CS; disturbance and noise in simulation) | [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/alx87grd/minilink/blob/main/examples/teaching/topics/classical_control/sensitivity_functions.ipynb) |
+| [state_space_design](teaching/topics/classical_control/state_space_design.ipynb) (pole placement, LQR, Luenberger and Kalman observers, LQG, the reference gain N) | [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/alx87grd/minilink/blob/main/examples/teaching/topics/classical_control/state_space_design.ipynb) |
 
 #### Optimal control
 | Notebook | Colab |
@@ -167,7 +168,7 @@ One demo folder per tutorial chapter; the research lane sits apart.
 | Core / diagrams | [00_core](tutorial/00_core.ipynb) | [`demos/core/`](demos/core/) | |
 | Blocks | [01_blocks](tutorial/01_blocks.ipynb) | [`demos/blocks/`](demos/blocks/) | |
 | Dynamics catalog | [02_dynamics](tutorial/02_dynamics.ipynb) | [`demos/dynamics/`](demos/dynamics/) | `from minilink import Pendulum, CartPole, …` |
-| Control | [03_control](tutorial/03_control.ipynb) | [`demos/control/`](demos/control/), [`demos/robotic/`](demos/robotic/) | [manipulator_eom](teaching/topics/robotics/manipulator_eom.ipynb) |
+| Control | [03_control](tutorial/03_control.ipynb) | [`demos/control/`](demos/control/), [`demos/robotic/`](demos/robotic/) | [state_space_design](teaching/topics/classical_control/state_space_design.ipynb) (place, LQR, observers, LQG), [manipulator_eom](teaching/topics/robotics/manipulator_eom.ipynb) |
 | Analysis | [04_analysis](tutorial/04_analysis.ipynb) | [`demos/analysis/`](demos/analysis/) | [frequency_response](teaching/topics/classical_control/frequency_response.ipynb) (Bode, margins, Nyquist, root locus, step response) |
 | Simulation | [05_simulation](tutorial/05_simulation.ipynb) | [`demos/graphical/`](demos/graphical/) | |
 | Hybrid / step | [06_hybrid](tutorial/06_hybrid.ipynb) | [`demos/hybrid/`](demos/hybrid/), [`demos/mpc/`](demos/mpc/) | [`projects/mpc/`](projects/mpc/) (spatial MPC stack, dual-rate `mpc_dual_rate.py`), [`projects/car_trajopt/`](projects/car_trajopt/), [`projects/pathtracking/`](projects/pathtracking/) |
