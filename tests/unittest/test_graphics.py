@@ -1225,6 +1225,38 @@ class TestAdvancedPlotting(unittest.TestCase):
         self.assertIsNotNone(result.figure)
         plt.close(result.figure)
 
+    def test_a_block_nested_in_a_sub_diagram_is_plotted_by_identity(self):
+        from minilink.control.impedance import ImpedanceController
+        from minilink.dynamics.catalog.pendulum.pendulum import Pendulum
+
+        pendulum = Pendulum()
+        pendulum.x0 = np.array([0.3, 0.0])
+        outer = DiagramSystem()
+        outer.add_subsystem(ImpedanceController() @ pendulum, "loop")
+        traj = outer.compute_trajectory(tf=0.5, verbose=False)
+
+        spec = build_signal_plot_spec(outer, traj, signals=((pendulum, "y"),))
+        self.assertEqual({trace.signal for trace in spec.traces}, {"loop/plant:y"})
+        values = np.vstack([trace.values for trace in spec.traces])
+        np.testing.assert_allclose(
+            values, traj.x
+        )  # the static controller adds no state
+        with self.assertRaisesRegex(ValueError, "not part of this diagram"):
+            build_signal_plot_spec(outer, traj, signals=((Pendulum(), "y"),))
+
+    def test_the_state_port_reads_the_state_labels(self):
+        from minilink.control.impedance import ImpedanceController
+        from minilink.dynamics.catalog.pendulum.pendulum import Pendulum
+
+        pendulum = Pendulum()
+        outer = DiagramSystem()
+        outer.add_subsystem(ImpedanceController() @ pendulum, "loop")
+        traj = outer.compute_trajectory(tf=0.2, verbose=False)
+        spec = build_signal_plot_spec(outer, traj, signals=((pendulum, "x"),))
+        self.assertEqual(
+            [trace.label for trace in spec.traces], list(pendulum.state.labels)
+        )
+
     def test_subsystem_signal_resolves_diagram_id(self):
         self.assertEqual(self.diagram.subsystem_signal(self.sys, "y"), "plant:y")
         self.assertEqual(self.diagram.subsystem_signal(self.ctl, "u"), "controller:u")

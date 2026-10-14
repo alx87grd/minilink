@@ -214,7 +214,8 @@ class SharedSystemFacades:
             :func:`minilink.graphical.signals.plot_time_signals`.
             For diagrams, each entry may be a boundary name (``"x"``),
             an internal port (``"plant:p"``), or a ``(subsystem, port)``
-            pair resolved via :meth:`~minilink.core.diagram.DiagramSystem.subsystem_signal`.
+            pair resolved via :meth:`~minilink.core.diagram.DiagramSystem.subsystem_signal`;
+            the pair may name a block nested in a sub-diagram (``"loop/plant:x"``).
             When ``None``, defaults are chosen via
             :func:`minilink.graphical.signals.resolve_plot_signals`.
 

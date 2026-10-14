@@ -99,6 +99,14 @@ def build_signal_plot_spec(
     """Build a one-component-per-row plot specification."""
     requested = _normalize_plot_signals(sys, signals)
 
+    # a block nested in a sub-diagram ("loop/plant:x"), sampled level by level
+    nested = {}
+    for name in requested:
+        if "/" in name.split(":", 1)[0] and not traj.has_signal(name):
+            values, labels, units = nested_signal(sys, traj, name)
+            traj = traj.with_signal(name, values)
+            nested[name] = (labels, units)
+
     if isinstance(sys, DiagramSystem):
         for name in requested:
             if ":" not in name or traj.has_signal(name):
@@ -121,6 +129,9 @@ def build_signal_plot_spec(
             input_labels, input_units = sys.get_all_input_labels_and_units()
             labels = _labels_for_vector(input_labels, values.shape[0], "u")
             units = _units_for_vector(input_units, values.shape[0])
+        elif signal_name in nested:
+            values = np.asarray(traj.get_signal(signal_name), dtype=float)
+            labels, units = nested[signal_name]
         elif traj.has_signal(signal_name):
             values = np.asarray(traj.get_signal(signal_name), dtype=float)
             labels, units = _labels_and_units_for_extra_signal(
@@ -276,7 +287,12 @@ def _normalize_plot_signals(sys, signals) -> tuple[str, ...]:
     for item in items:
         if _is_subsystem_port_pair(item):
             subsystem, port_id = item
-            resolved.append(sys.subsystem_signal(subsystem, port_id))
+            path = subsystem_path(sys, subsystem)
+            if path is None or "/" not in path or port_id not in subsystem.outputs:
+                # a block of this diagram, or the reason it cannot be plotted
+                resolved.append(sys.subsystem_signal(subsystem, port_id))
+            else:
+                resolved.append(f"{path}:{port_id}")
             continue
         if not isinstance(item, str):
             raise TypeError(
@@ -285,6 +301,42 @@ def _normalize_plot_signals(sys, signals) -> tuple[str, ...]:
             )
         resolved.append(item)
     return tuple(resolved)
+
+
+def subsystem_path(diagram, subsystem):
+    """The ``"a/b/c"`` path to ``subsystem`` through ``diagram``'s nested diagrams, or ``None``.
+
+    A block of ``diagram`` itself is found before a block nested deeper.
+    """
+    for sys_id, block in diagram.subsystems.items():
+        if block is subsystem:
+            return sys_id
+    for sys_id, block in diagram.subsystems.items():
+        if isinstance(block, DiagramSystem):
+            inner = subsystem_path(block, subsystem)
+            if inner is not None:
+                return f"{sys_id}/{inner}"
+    return None
+
+
+def nested_signal(sys, traj, name):
+    """Sample the output ``"a/b/c:port"`` of a nested block along ``traj``: ``(values, labels, units)``.
+
+    The trajectory is narrowed one diagram level at a time (``trajectory_of``)
+    to the diagram holding the block, whose internal signals give the port.
+    """
+    path, port_id = name.rsplit(":", 1)
+    *outer, block_id = path.split("/")
+    diagram, diagram_traj = sys, traj
+    for sys_id in outer:
+        inner = diagram.subsystems[sys_id]
+        diagram_traj = diagram.trajectory_of(inner, diagram_traj)
+        diagram = inner
+    diagram_traj = diagram.reconstruct_internal_signals(diagram_traj)
+    key = f"{block_id}:{port_id}"
+    values = np.asarray(diagram_traj.get_signal(key), dtype=float)
+    labels, units = _labels_and_units_for_extra_signal(diagram, key, values.shape[0])
+    return values, labels, units
 
 
 def _is_subsystem_port_pair(item) -> bool:
@@ -318,10 +370,14 @@ def _labels_and_units_for_extra_signal(sys, name: str, dim: int):
         subsystem = sys.subsystems.get(sys_id)
         if subsystem is not None and port_id in subsystem.outputs:
             port = subsystem.outputs[port_id]
-            # the labels the port declares, else the signal's own name
+            # the labels the port declares, else the state's on the state port,
+            # else the signal's own name
             declared = list(port.labels) != [f"{port_id}[{i}]" for i in range(dim)]
             if declared and len(port.labels) >= dim:
                 labels = tuple(str(label) for label in port.labels[:dim])
+            elif port_id == "x" and len(subsystem.state.labels) == dim:
+                labels = tuple(str(label) for label in subsystem.state.labels)
+                return labels, _units_for_vector(subsystem.state.units, dim)
             else:
                 labels = tuple(
                     f"{name}" if dim == 1 else f"{name}[{i}]" for i in range(dim)
