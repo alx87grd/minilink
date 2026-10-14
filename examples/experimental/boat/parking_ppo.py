@@ -10,10 +10,10 @@ from minilink import (
     StochasticPlanningProblem,
 )
 
-TRAINING_TIMESTEPS = 3_000_000
+TRAINING_TIMESTEPS = 6_000_000  # about four minutes on a laptop CPU
 DT = 0.1  # [s] control period
 EPISODE = 60.0  # [s]
-GAMMA = 0.995  # a 20 s discount horizon: the dock is a few hull lengths away
+GAMMA = 0.998  # a 50 s discount horizon: turning round for the dock pays off slowly
 INFEASIBLE_COST = 2000.0  # leaving the box: more than any run that stays in it
 
 boat = ParkingBoat(CURRENT)
@@ -38,8 +38,8 @@ planner = ReinforcementLearningPlanner(
     hidden=(64, 64),
     algorithm="ppo",
     n_envs=64,
-    n_steps=64,
-    batch_size=512,
+    n_steps=128,
+    batch_size=1024,
     learning_rate=3e-4,
     gamma=GAMMA,
     episode_length=EPISODE,

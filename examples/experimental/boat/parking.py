@@ -92,14 +92,19 @@ def dock_thrust(boat, x_dock=X_DOCK):
     return u_dock
 
 
+def wrap_angle(theta, xp):
+    """The angle brought back to [-π, π)."""
+    return (theta + xp.pi) % (2.0 * xp.pi) - xp.pi
+
+
 class ParkingCost(CostFunction):
     """Quadratic cost about the dock, with the heading error measured on the circle.
 
-    ``g = e_pᵀ Q_p e_p + 2 Q_θ (1 − cos e_θ) + vᵀ Q_v v + (u − u_dock)ᵀ R (u − u_dock)``
-    for the pose error ``e = x − x_dock``, where ``2 (1 − cos e_θ)`` is ``e_θ²`` to
-    second order and periodic, so a law that reads the heading as a point on the
-    circle sees the same cost. The terminal cost ``h`` is ``terminal`` times the
-    state part of ``g``.
+    ``g = eᵀ Q e + (u − u_dock)ᵀ R (u − u_dock)`` for the pose error ``e = x − x_dock``
+    with its heading component wrapped to ``[−π, π)``: periodic, so a law that reads
+    the heading as a point on the circle sees the same cost, and with a slope
+    everywhere but at the wrap, so a boat parked stern first is not at a stationary
+    point of the cost. The terminal cost ``h`` is ``terminal`` times the state part.
     """
 
     def __init__(self, x_dock, u_dock, Q=Q, R=R, terminal=0.0):
@@ -121,14 +126,10 @@ class ParkingCost(CostFunction):
         )
         xp = array_module(x)
         e = x - x_dock
+        e = xp.array([e[0], e[1], wrap_angle(e[2], xp), e[3], e[4], e[5]])
         du = u - u_dock
 
-        g = (
-            e[:2] @ Q[:2, :2] @ e[:2]
-            + 2.0 * Q[2, 2] * (1.0 - xp.cos(e[2]))
-            + e[3:] @ Q[3:, 3:] @ e[3:]
-            + du @ R @ du
-        )
+        g = e @ Q @ e + du @ R @ du
 
         return g
 
@@ -137,12 +138,9 @@ class ParkingCost(CostFunction):
         Q, x_dock, terminal = params["Q"], params["x_dock"], params["terminal"]
         xp = array_module(x)
         e = x - x_dock
+        e = xp.array([e[0], e[1], wrap_angle(e[2], xp), e[3], e[4], e[5]])
 
-        h = terminal * (
-            e[:2] @ Q[:2, :2] @ e[:2]
-            + 2.0 * Q[2, 2] * (1.0 - xp.cos(e[2]))
-            + e[3:] @ Q[3:, 3:] @ e[3:]
-        )
+        h = terminal * (e @ Q @ e)
 
         return h
 
@@ -164,11 +162,6 @@ def dock_features(x):
     )
 
     return z
-
-
-def wrap_angle(theta, xp):
-    """The angle brought back to [-π, π)."""
-    return (theta + xp.pi) % (2.0 * xp.pi) - xp.pi
 
 
 class CascadeParkingController(System):
