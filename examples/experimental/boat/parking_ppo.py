@@ -19,7 +19,7 @@ from minilink import (
 )
 from minilink.graphical.catalog.boat_skin import boat_skin_3d
 
-TRAINING_TIMESTEPS = 1_500_000  # about two minutes on a laptop CPU
+TRAINING_TIMESTEPS = 8_000_000  # about six minutes on a laptop CPU
 DT = 0.1  # [s] control period
 TF = 40.0  # [s] a finite horizon: the episode ends at tf with the terminal pose cost
 START_RADIUS = 25.0  # [m] training starts anywhere in this box round the dock
