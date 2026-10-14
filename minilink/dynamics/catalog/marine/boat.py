@@ -7,12 +7,8 @@ from minilink.core.kinematics import SE2, translation
 from minilink.dynamics.abstraction.generalized_mechanical import (
     GeneralizedMechanicalSystem,
 )
-from minilink.graphical.animation.primitives import (
-    Arrow,
-    CustomLine,
-    Point,
-    TorqueArrow,
-)
+from minilink.graphical.animation.primitives import Arrow, CustomLine, TorqueArrow
+from minilink.graphical.catalog.boat_skin import boat_skin_2d
 
 
 class Boat2D(GeneralizedMechanicalSystem):
@@ -54,6 +50,9 @@ class Boat2D(GeneralizedMechanicalSystem):
         self.camera_scale = 3.0 * self.params["loa"]
         self.camera_follow_frame = "body"
         self.show_hydrodynamic_forces = False
+        self.skin = (
+            boat_skin_2d  # the top view; ``boat_skin_3d`` is the hull on the water
+        )
 
     def M(self, q, params=None):
         params = self.params if params is None else params
@@ -175,12 +174,6 @@ class Boat2D(GeneralizedMechanicalSystem):
             ]
         )
         return CustomLine(pts, color="blue", linewidth=2)
-
-    def get_kinematic_geometry(self):
-        return {
-            "body": [self.body_shape()],
-            "center": [Point(color="blue", marker="o", size=5)],
-        }
 
     def tf(self, x, u, t=0, params=None):
         q = x[:3]

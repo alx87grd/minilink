@@ -3,6 +3,8 @@
 import numpy as np
 from parking import CURRENT, CascadeParkingController, ParkingBoat
 
+from minilink.graphical.catalog.boat_skin import boat_skin_3d
+
 TF = 60.0  # [s]
 DT = 0.05  # [s]
 
@@ -14,3 +16,6 @@ for current in (np.zeros(2), CURRENT):
     traj = cl.compute_trajectory(tf=TF, dt=DT)
     cl.plot_trajectory(traj)
     cl.animate(traj)
+
+boat.skin = boat_skin_3d  # the last run again, as the hull on the water in the browser
+cl.animate(traj, renderer="meshcat", native=False)

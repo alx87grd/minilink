@@ -9,6 +9,7 @@ from minilink import (
     ReinforcementLearningPlanner,
     StochasticPlanningProblem,
 )
+from minilink.graphical.catalog.boat_skin import boat_skin_3d
 
 TRAINING_TIMESTEPS = 15_000_000  # about eight minutes on a laptop CPU
 DT = 0.1  # [s] control period
@@ -63,3 +64,6 @@ cl.name = "Boat with the learned parking law"
 traj = cl.compute_trajectory(tf=EPISODE, dt=0.05)
 cl.plot_trajectory(traj)
 cl.animate(traj)
+
+boat.skin = boat_skin_3d  # the hull on the water, in the browser
+cl.animate(traj, renderer="meshcat", native=False)

@@ -4,6 +4,7 @@ from parking import CURRENT, X_START, ParkingBoat, parking_cost
 
 from minilink import PlanningProblem, TrajectoryOptimizationPlanner
 from minilink.control.mpc import ModelPredictiveController, mpc_animation_overlays
+from minilink.graphical.catalog.boat_skin import boat_skin_3d
 
 TF_SIM = 60.0  # [s]
 SIM_DT = 0.05  # [s] inner plant step
@@ -42,4 +43,12 @@ loop.plot_trajectory()
 loop.animate(
     result.plant.resample(n_samples=N_FRAMES),
     overlays=mpc_animation_overlays(result, planner),
+)
+
+boat.skin = boat_skin_3d  # the hull on the water, in the browser
+loop.animate(
+    result.plant.resample(n_samples=N_FRAMES),
+    overlays=mpc_animation_overlays(result, planner),
+    renderer="meshcat",
+    native=False,
 )
