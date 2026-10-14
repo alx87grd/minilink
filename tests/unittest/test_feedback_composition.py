@@ -265,9 +265,9 @@ class TestClosedLoopFilter(unittest.TestCase):
                 T = closed_loop(
                     controller, Integrator(), filter=LowPassFilter(), noise=True
                 )
-                self.assertEqual(T.connections["noise"]["in0"], ("plant", "y"))
-                self.assertEqual(T.connections["noise"]["in1"], ("input", "n"))
-                self.assertEqual(T.connections["filter"]["u"], ("noise", "y"))
+                self.assertEqual(T.connections["noise_sum"]["in0"], ("plant", "y"))
+                self.assertEqual(T.connections["noise_sum"]["in1"], ("input", "n"))
+                self.assertEqual(T.connections["filter"]["u"], ("noise_sum", "y"))
 
     def test_a_filter_on_the_state_is_refused(self):
         from minilink import LowPassFilter, StateFeedbackController, closed_loop
@@ -395,10 +395,87 @@ class TestLoopInputs(unittest.TestCase):
                     atol=1e-9,
                 )
                 np.testing.assert_allclose(
-                    frequency_response(loop, of="disturbance:y", wrt="d", w=w)[1],
+                    frequency_response(loop, of="disturbance_sum:y", wrt="d", w=w)[1],
                     S,
                     atol=1e-9,
                 )
+
+    def test_a_source_block_drives_its_input_inside_the_loop(self):
+        from minilink import WhiteNoise
+        from minilink.core.composition import closed_loop
+
+        entries = {"error": ("error", "+"), "reference": ("controller", "r")}
+        for layout, C in self.layouts():
+            with self.subTest(layout=layout):
+                loop = closed_loop(
+                    C,
+                    self.H,
+                    reference=Step(0.0, 1.0),
+                    disturbance=WhiteNoise(1, psd=1e-2, seed=1),
+                    noise=WhiteNoise(1, psd=1e-4, seed=2),
+                )
+                self.assertEqual(list(loop.inputs), [])
+                block, port = entries[layout]
+                self.assertEqual(loop.connections[block][port], ("reference", "y"))
+                self.assertEqual(
+                    loop.connections["disturbance_sum"]["in1"], ("disturbance", "y")
+                )
+                self.assertEqual(loop.connections["noise_sum"]["in1"], ("noise", "y"))
+
+    def test_a_source_inside_equals_the_same_source_outside(self):
+        from minilink.core.composition import closed_loop
+        from minilink.core.diagram import DiagramSystem
+
+        C = PID(4.0, 2.0, 0.5)
+        inside = closed_loop(C, self.H, reference=Step(0.0, 1.0))
+        outside = DiagramSystem()
+        outside.add_subsystem(Step(0.0, 1.0), "reference")
+        outside.add_subsystem(closed_loop(C, self.H), "loop")
+        outside.connect("reference", "y", "loop", "r")
+        np.testing.assert_allclose(
+            inside.compute_trajectory(tf=4.0, n_steps=201).x,
+            outside.compute_trajectory(tf=4.0, n_steps=201).x,
+            atol=1e-9,
+        )
+
+    def test_a_plant_that_declares_d_and_n_owns_them(self):
+        from minilink import PendulumWithNoisePort, WhiteNoise, lqg
+        from minilink.core.composition import closed_loop
+
+        plant = PendulumWithNoisePort()
+        box = lqg(plant, np.eye(2), np.eye(1), 1e-2 * np.eye(2), 1e-3 * np.eye(2))
+        loop = closed_loop(box, plant, disturbance=True, noise=True)
+        self.assertEqual(list(loop.inputs), ["r", "d", "n"])
+        self.assertEqual(list(loop.subsystems), ["controller", "plant"])
+        self.assertEqual(loop.connections["plant"]["d"], ("input", "d"))
+        self.assertEqual(loop.connections["plant"]["n"], ("input", "n"))
+        self.assertEqual(list(loop.inputs["d"].labels), ["disturbance"])
+        self.assertEqual(list(loop.inputs["d"].units), ["Nm"])
+
+        sources = closed_loop(
+            box,
+            plant,
+            disturbance=WhiteNoise(1, psd=1e-2, seed=1),
+            noise=WhiteNoise(1, psd=1e-4, seed=2),
+        )
+        self.assertEqual(list(sources.inputs), ["r"])
+        self.assertEqual(sources.connections["plant"]["d"], ("disturbance", "y"))
+        self.assertEqual(sources.connections["plant"]["n"], ("noise", "y"))
+
+    def test_a_loop_input_is_a_flag_or_a_source(self):
+        from minilink.blocks.routing import Gain
+        from minilink.core.composition import closed_loop
+
+        with self.assertRaisesRegex(TypeError, "source block"):
+            closed_loop(PID(4.0, 2.0, 0.5), self.H, disturbance=0.1)
+        reads_x_alone = Gain(np.array([[1.0, 2.0]])).rename_ports(u="x", y="u")
+        plant = DoubleIntegrator()
+        plant.add_output_port("x", dim=2)
+        with self.assertRaisesRegex(ValueError, "reads no reference"):
+            closed_loop(reads_x_alone, plant, reference=Step())
+        loop = closed_loop(PID(4.0, 2.0, 0.5), self.H, disturbance=True)
+        with self.assertRaisesRegex(ValueError, r"closed_loop\(\.\.\., reference="):
+            Step() >> loop
 
 
 class TestDispatchTable(unittest.TestCase):

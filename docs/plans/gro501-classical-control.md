@@ -190,7 +190,8 @@ landed: `StateObserver(A, B, C, L, D, xbar, ubar, ybar)` (ports `u`, `y` → `x`
 id `observer`), `luenberger` and `kalman` on arrays, a linear model or the plant (the duals
 of `place` and `lqr`, which took the same three forms the same day), and `lqg`, the
 observer + gain box with `r`, `y` → `u`. The composition question closed as the recipe by
-hand plus `lqg()` for the design; `closed_loop(observer=)` is AC-4's. The guide's
+hand plus `lqg()` for the design; `closed_loop(gain, plant, observer=obs)` landed with AC-4
+(2026-10-14). The guide's
 cart-pendulum check is `examples/demos/control/lqg_cartpole.py`; the Kalman observer alone,
 `kalman_observer_pendulum.py`. The GRO501 from-scratch notebooks stay as they are.
 

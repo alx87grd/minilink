@@ -61,7 +61,7 @@ was ruled, one entry each, and where each ruling now lives.
   included (`kalman_gain(A, C, Q_n, R_n)`), so `Q`, `R` keep one meaning, the LQR weights
   (RULES 5.4). `Q_n` is the n×n state-noise intensity; no pyro-style `G=` whose presence
   changes `Q`'s shape. The plant-taking form reads `B_w = ∂f/∂d`, `D_v = ∂h/∂n` from the
-  ports when noise blocks are given (RN-4). P4 / RN-4.
+  ports when noise blocks are given (RN-4); reversed by R20. P4 / RN-4.
 - **R8 `kalman_gain` returns `L` only**, mirroring `lqr_gain -> K`; the error covariance is
   the evidence layer's, never the block's (pyro stored `obs.P`). No estimation planner now.
 - **R9 The LQG compensator is a design verb, `lqg(model, Q, R, Q_n, R_n)`**, in
@@ -69,7 +69,7 @@ was ruled, one entry each, and where each ruling now lives.
   `connect` (the `autowire` recipe warns about the open `y` and `r`). The ROADMAP §6 question
   "a `compensator(observer, K)` helper or the `expose` recipe" closes as **the recipe by hand,
   `lqg()` for the design**: no third wiring entry beside the operators and `closed_loop`.
-  `closed_loop(observer=)` stays AC-4's. P4.
+  `closed_loop(observer=)` stays AC-4's (landed 2026-10-14, R18). P4.
 - **R10 An observer is not a controller.** A block that reads a measurement and commands
   nothing is refused as a controller by `@`, `closed_loop`, the sampled loop's boundary ports
   and `plot_control_law`, through one `require_command` in `core/feedback.py`; today all three
@@ -130,6 +130,33 @@ was ruled, one entry each, and where each ruling now lives.
   in `jacobian` / `linearize` stays as it is (renaming it is a public API change). Lives
   in: `analysis/linearization.py` (`design_model`), `planning/policy_synthesis/lqr.py`,
   DESIGN §4.
+- **R18 AC-4: the loop's inputs and its observer, wired by role.**
+  `closed_loop(controller, plant, *, reference, disturbance, noise, filter, observer,
+  validate)`:
+  - each loop input is `True` (an edge port `r`, `d`, `n`), `False` (none) or a source
+    block (`Step()`, `WhiteNoise(...)`) named `reference`, `disturbance` or `noise`;
+  - a plant that declares `d` or `n` owns it, so the input drives the plant's own port;
+  - otherwise a `Sum` adds it to the command or to the measurement. These junctions are
+    renamed `disturbance_sum` and `noise_sum`, since the words now name the sources.
+  - `observer=` takes the plant's `y` and the controller's `u`, and gives its `x` to a
+    controller that reads `x` alone. The plant's own state is never read.
+  - `filter=` sits before the observer, and the noise enters before the filter.
+
+  `lqg()` keeps its box (R9). `closed_loop(lqr(...), plant, observer=kalman(...))` and
+  `closed_loop(lqg(...), plant)` give one loop, and the tests hold them to one
+  trajectory. Lives in: `core/composition.py`, DESIGN (shortcuts, control laws).
+- **R19 The estimate stays on `x`.** This answers the automation plan's §10 review
+  question. The observer gives `x`, labelled x̂, and a state-feedback controller reads `x`
+  whether it comes from the plant or from the observer; the role says which. Nothing is
+  renamed.
+- **R20 `kalman` takes the textbook intensities only** (reverses R7's last sentence).
+  There is no `kalman(..., disturbance=, noise=)` that reads `B_w`, `D_v` and the noise
+  blocks' `psd`, for three reasons:
+  - `Q_n = B_w W B_wᵀ`, with `B_w = plant.jacobian("f", "d", x̄)`, is one line and is the
+    lesson;
+  - a noise block is a simulation source, whose seed, sample period and spectral
+    convention a design verb should not interpret;
+  - the same `W` and `V` already feed the design and, since R18, the loop's sources.
 
 ## Where the earlier records and this one differ
 

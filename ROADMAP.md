@@ -94,7 +94,7 @@ State as of 2026-10-12. Step ids (`S29`, `P4`, `T2`, …) are the rows of
 | Graphics / animation | teaching | 5 | Frame-keyed `tf` / geometry / overlays; four renderers; auto-fit camera. | Camera and plot defaults from roles (P10); constructor-derived camera hints (S43); glyph/solid rename (S30, v0.9). |
 | Hybrid / step / MPC | provisional (research) | 4 | `StepSystem`, `Computer`, `HybridDiagram`, `HybridSimulator`, MPC with parametric JAX. A side helper for MPC simulation; the sampled loop is the one thing that is not a `System`. | Keeps in step with the core rules (P10); no new hybrid features before S31 (v0.9); textbook pass on `mpc/controller.py` (T6). |
 | Realtime simulation | provisional | 2 | `RealtimeSimulator` + pygame I/O. | Architectural review (v1.0); later the human-demonstration recorder of the behavior-cloning pipeline (after v1.0). |
-| Estimation | teaching (GRO501) | 6 | `StateObserver` (innovation form, operating point on the block, hat labels), `luenberger` and `kalman` on arrays, a linear model or the plant (the duals of `place` and `lqr`, 2026-10-14); `lqg` returns the observer + gain box; an observer is refused as a controller. | `closed_loop(observer=)` (AC-4); `kalman(plant, disturbance=, noise=)` reading `psd` (RN-4); the trajectory observer and the finite-horizon filter, the EKF, the estimation problem and its tools (v0.9, [the plan](docs/plans/estimation-and-state-feedback.md)). |
+| Estimation | teaching (GRO501) | 6 | `StateObserver` (innovation form, operating point on the block, hat labels), `luenberger` and `kalman` on arrays, a linear model or the plant (the duals of `place` and `lqr`, 2026-10-14); `lqg` returns the observer + gain box; an observer is refused as a controller; `closed_loop(gain, plant, observer=obs)` wires the LQG loop by role (AC-4, 2026-10-14). | the trajectory observer and the finite-horizon filter, the EKF, the estimation problem and its tools (v0.9, [the plan](docs/plans/estimation-and-state-feedback.md)). |
 | Identification | planned | 2 | Parametric-tier prototype only. | `fitting.py` (C4, v0.3). |
 | C export (`experimental/c_export`) | research | 1 | JAX→C transpiler; two demos; flagship smoke in the JAX regression job. | Keep isolated; repo-only. |
 | Experimental tier (`experimental/symbolic`, `experimental/engines`) | research | 1 | Not on the teaching path nor the API site. | Keep isolated; repo-only. |
@@ -170,7 +170,7 @@ Step-level work:
 | Optimal control — LQR on the guide's cost, closed-loop poles, nonlinear check | `lqr(plant, Q, R, x_bar=)`, `StateFeedbackController` | green | — |
 | Pole placement — `K_sta` for a prescribed pole set | `place` (on a linear model or the plant; `place_gain` on arrays) | green | — |
 | Nested loops — inner speed loop, outer position loop | `@` composition | green for error-driven compensators (`PID @ (PID @ G)`); an outer `r, y` or state controller is refused today | P10 ([automation-by-convention.md](docs/plans/automation-by-convention.md)) nests the inner loop as the outer loop's `plant`; stays green with the observer in the loop |
-| State estimation — Luenberger observer and Kalman filter | `StateObserver`, `luenberger`, `kalman`, `lqg` | green (2026-10-14) | the observer closes the loop as a standard diagram block, by hand or in the `lqg` box; `closed_loop(observer=)` with AC-4 |
+| State estimation — Luenberger observer and Kalman filter | `StateObserver`, `luenberger`, `kalman`, `lqg` | green (2026-10-14) | the observer closes the loop as a standard diagram block: by role with `closed_loop(gain, plant, observer=obs)`, in the `lqg` box, or by hand |
 | Reference scaling — the `N` matrix giving `y = r` at steady state | `OutputReferenceController(K, N)` | green (2026-10-10) | the student writes `N = -(C (A - B K)⁻¹ B)⁻¹`; the block takes the output reference |
 
 **Cross-cutting gates**
@@ -244,7 +244,8 @@ TB-a, P7, P5, P8, P9.
   after P10's AC-3.
 - **P4** `estimation/` landed 2026-10-14 (`StateObserver`, `luenberger`, `kalman`, `lqg`;
   the control band reshaped with it: `control/design.py`, the model-taking verbs, the
-  nominal state as the operating point). Open from it: `closed_loop(observer=)` (AC-4).
+  nominal state as the operating point). `closed_loop(observer=)` followed with AC-4
+  (2026-10-14).
 - **S61** Every analysis verb takes a `System`. **S62** The LQR family on the control band
   facade. **[ask — public names]**
 - **P6** The z tier stays held (teach with `discretize` + simulation) unless the sommatif

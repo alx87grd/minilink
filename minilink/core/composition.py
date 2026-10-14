@@ -148,10 +148,11 @@ def closed_loop(
     controller: System,
     plant: System,
     *,
-    reference: bool = True,
-    disturbance: bool = False,
-    noise: bool = False,
+    reference: bool | System = True,
+    disturbance: bool | System = False,
+    noise: bool | System = False,
     filter=None,
+    observer: System | None = None,
     validate: bool = True,
 ) -> DiagramSystem:
     """Build a controller/plant feedback diagram — the ``controller @ plant`` operator.
@@ -185,27 +186,38 @@ def closed_loop(
         Controller subsystem with reference, measurement, and control ports.
     plant : System
         Plant subsystem with control input and measurement output ports.
-    reference, disturbance, noise : bool, optional
-        The loop's boundary inputs, on the ports ``r``, ``d`` and ``n``: the
-        reference (default on), the load disturbance summed into the plant
-        input, and the measurement noise summed into the measurement before
-        it returns (both off by default). With ``reference=False`` the
-        reference reads its nominal value.
+    reference, disturbance, noise : bool or System, optional
+        The loop's inputs, on the ports ``r``, ``d`` and ``n``: the reference
+        (default on), the load disturbance and the measurement noise (both
+        off by default). ``True`` puts the port on the loop's edge, ``False``
+        leaves it out (the reference then reads its nominal value), and a
+        source block (``Step()``, ``WhiteNoise(...)``) drives it inside the
+        loop, named ``reference``, ``disturbance`` or ``noise``. A plant that
+        declares ``d`` or ``n`` owns it: the input drives the plant's own port.
+        Otherwise a ``Sum`` adds the disturbance to the plant's command
+        (``disturbance_sum``) and the noise to the measurement before it
+        returns (``noise_sum``).
     filter : System, scalar or array, optional
         The return path: a sensor or filter block, or a gain (a ``Gain``
-        block), named ``filter``, between the plant's ``y`` and what the
-        controller reads (its ``y``, or the ``Error`` block). The plant's
-        ``y`` stays the loop's output and the noise ``n`` enters before the
-        filter. A controller that reads ``x`` is refused: a filter on the
-        state is an observer.
+        block), named ``filter``, between the plant's ``y`` and what reads
+        the measurement (the controller's ``y``, the ``Error`` block, or the
+        observer). The plant's ``y`` stays the loop's output and the noise
+        ``n`` enters before the filter. A controller that reads ``x`` without
+        an observer is refused: a filter on the state is an observer.
+    observer : System, optional
+        The state estimator, named ``observer``, for a controller that reads
+        ``x``: the plant's ``y`` and the controller's ``u`` go in, and its
+        ``x`` (the estimate) goes to the controller's ``x``, so the plant's
+        own state is never read. A ``kalman`` or ``luenberger`` observer with a
+        state-feedback gain is the LQG loop.
     validate : bool, optional
         If ``True``, run algebraic-loop detection before returning.
 
     Returns
     -------
     DiagramSystem
-        A diagram exposing the controller reference as input and the plant
-        output as output.
+        A diagram with the plant's ``y`` as output and the inputs left on
+        its edge (``r``, ``d``, ``n``) as inputs.
     """
     if not isinstance(plant, System):
         raise TypeError(
@@ -215,36 +227,78 @@ def closed_loop(
     roles = block_roles(controller)
     if not roles.measurements and not roles.error_driven:
         raise ValueError(_no_measurement_message(controller, "controller"))
-    if filter is not None and "x" in roles.measurements:
+    for word, value in (
+        ("reference", reference),
+        ("disturbance", disturbance),
+        ("noise", noise),
+    ):
+        if not isinstance(value, (bool, System)):
+            raise TypeError(
+                f"{word}= takes True (an input on the loop's edge), False (none) or a "
+                f"source block such as Step() or WhiteNoise(...); got {value!r}"
+            )
+    if observer is not None:
+        _check_observer(controller, roles, observer, plant)
+    elif filter is not None and "x" in roles.measurements:
         raise ValueError(
             f"{controller.name!r} reads the state 'x': a filter on the state is an "
-            "observer; put the observer in a controller box"
+            "observer; pass it as observer="
         )
 
-    plant_box = _plant_box_with_state(plant) if "x" in roles.measurements else plant
+    reads_plant_state = "x" in roles.measurements and observer is None
+    plant_box = _plant_box_with_state(plant) if reads_plant_state else plant
     diagram = DiagramSystem()
     controller_id = _add_system_to_diagram(diagram, controller, role="controller")
     plant_id = _add_system_to_diagram(diagram, plant_box, role="plant")
-    for port in roles.measurements:  # plant y -> controller y, plant x -> controller x
-        _check_measurement(controller, plant_box, port, controller_id, plant_id)
-        diagram.connect(plant_id, port, controller_id, port)
     command, entry = _default_control_out(controller), _default_input_port(plant_box)
+    if observer is not None:  # plant y and the command u in, the estimate x out
+        observer_id = _add_system_to_diagram(diagram, observer, role="observer")
+        diagram.connect(plant_id, "y", observer_id, "y")
+        diagram.connect(controller_id, command, observer_id, "u")
+        diagram.connect(observer_id, "x", controller_id, "x")
+    else:  # plant y -> controller y, plant x -> controller x
+        for port in roles.measurements:
+            _check_measurement(controller, plant_box, port, controller_id, plant_id)
+            diagram.connect(plant_id, port, controller_id, port)
     diagram.connect(controller_id, command, plant_id, entry)
     diagram.connect_new_output_port(plant_id, _default_output_port(plant_box), "y")
 
     if roles.error_driven:  # e = r - y drives the controller's entry
         measurement = _close_on(diagram, [(controller_id, roles.entry)], filter)
-    else:  # the controller reads y, through the filter, and r
-        measurement = _filter_into(diagram, filter, (controller_id, roles.measurement))
+    else:  # the controller (or its observer) reads y, through the filter, and r
+        reader = (
+            (observer_id, "y")
+            if observer is not None
+            else (controller_id, roles.measurement)
+        )
+        measurement = _filter_into(diagram, filter, reader)
         if "r" in controller.inputs:
             _add_input_port_like(diagram, "r", controller.inputs["r"])
             diagram.connect("input", "r", controller_id, "r")
-    if not reference and "r" in diagram.inputs:  # the reference reads its nominal value
-        _drop_input(diagram, "r")
-    if disturbance:
-        sum_into(diagram, (plant_id, entry), "d", "disturbance")
-    if noise:
-        sum_into(diagram, measurement, "n", "noise")
+
+    # the loop's inputs: r, then d on the plant's command, then n on the measurement
+    if isinstance(reference, System) and "r" not in diagram.inputs:
+        raise ValueError(
+            f"reference= has nothing to drive: {controller.name!r} reads no reference 'r'"
+        )
+    if reference is not True and "r" in diagram.inputs:
+        (target,) = _drop_input(diagram, "r")  # False: r reads its nominal value
+        if reference is not False:
+            drive(diagram, target, "r", reference, "reference")
+    if disturbance is not False:
+        target = (
+            (plant_id, "d")  # the plant owns its disturbance
+            if "d" in plant_box.inputs
+            else sum_into(diagram, (plant_id, entry), "disturbance_sum")
+        )
+        drive(diagram, target, "d", disturbance, "disturbance")
+    if noise is not False:
+        target = (
+            (plant_id, "n")  # the plant owns its measurement noise
+            if "n" in plant_box.inputs
+            else sum_into(diagram, measurement, "noise_sum")
+        )
+        drive(diagram, target, "n", noise, "noise")
 
     diagram.name = f"Closed loop {plant.name} with {controller.name}"
     _propagate_animation_camera(diagram, plant_box)
@@ -607,9 +661,14 @@ def _series_connection(diagram, outputs, inputs) -> tuple[str, str]:
         return shared[0], shared[0]
     if "y" in outputs and "u" in inputs:
         return "y", "u"
+    hint = (
+        "; a source for a loop's reference goes in closed_loop(..., reference=source)"
+        if "r" in inputs
+        else ""
+    )
     raise ValueError(
         "'>>' connects one output to one input; wire this one with connect "
-        f"(outputs: {', '.join(outputs)}; free inputs: {', '.join(inputs)})"
+        f"(outputs: {', '.join(outputs)}; free inputs: {', '.join(inputs)}){hint}"
     )
 
 
@@ -641,6 +700,31 @@ def _check_measurement(controller, plant, measurement, controller_id, plant_id) 
             f"Cannot wire closed-loop feedback: {controller_id} declares measurement "
             f"{measurement!r} dim {dim}, but {plant_id} {measurement!r} output has "
             f"dim {plant.outputs[measurement].dim}"
+        )
+
+
+def _check_observer(controller, roles, observer, plant) -> None:
+    """Refuse an observer the loop cannot wire: ``u``, ``y`` -> ``x``, for a controller that reads ``x`` alone."""
+    if roles.measurements != ("x",):
+        reads = (
+            f"reads {' and '.join(repr(p) for p in roles.measurements)}"
+            if roles.measurements
+            else "is driven by the error"
+        )
+        raise ValueError(
+            "observer= gives the state estimate 'x' to a controller that reads 'x' "
+            f"alone; {controller.name!r} {reads}. Wire it with DiagramSystem.connect."
+        )
+    if not ({"u", "y"} <= set(observer.inputs) and "x" in observer.outputs):
+        raise ValueError(
+            f"observer {observer.name!r} must read 'u' and 'y' and give 'x' (a "
+            f"kalman or luenberger observer); it reads {list(observer.inputs)} and "
+            f"gives {list(observer.outputs)}"
+        )
+    if "y" not in plant.outputs:
+        raise ValueError(
+            f"the observer reads the plant's measurement 'y'; plant {plant.name!r} "
+            f"gives {list(plant.outputs)}"
         )
 
 
@@ -689,18 +773,35 @@ def _insert_filter(diagram, filter, signal):
     return (filter_id, filter_out), (filter_id, filter_in)
 
 
-def sum_into(diagram, target, port_id, role):
-    """Rewire ``target`` to read its source plus a new boundary input ``port_id``."""
+def sum_into(diagram, target, name):
+    """Rewire ``target`` to read its source plus a second signal, through a ``Sum`` named ``name``.
+
+    Returns the ``Sum``'s open input ``(name, "in1")``, where the added signal enters.
+    """
     from minilink.blocks.routing import Sum
 
     sys_id, in_port = target
     source = diagram.connections[sys_id][in_port]
     dim = diagram.subsystems[sys_id].inputs[in_port].dim
-    sum_id = _add_system_to_diagram(diagram, Sum(signs=(1.0, 1.0), dim=dim), role=role)
-    diagram.add_input_port(port_id, dim=dim)
+    sum_id = _add_system_to_diagram(diagram, Sum(signs=(1.0, 1.0), dim=dim), role=name)
     diagram.connect(*source, sum_id, "in0")
-    diagram.connect("input", port_id, sum_id, "in1")
     diagram.connect(sum_id, "y", sys_id, in_port)
+    return sum_id, "in1"
+
+
+def drive(diagram, target, port_id, value, name):
+    """Drive the input ``target`` from a new edge input ``port_id`` (``value=True``), or from ``value``, a source block named ``name``."""
+    sys_id, in_port = target
+    if isinstance(value, System):
+        source_id = _add_system_to_diagram(diagram, value, role=name)
+        diagram.connect(source_id, _default_output_port(value), sys_id, in_port)
+        return
+    port = diagram.subsystems[sys_id].inputs[in_port]
+    if in_port == port_id:  # a plant's own d or n: the edge keeps its labels and units
+        _add_input_port_like(diagram, port_id, port)
+    else:  # a junction's input
+        diagram.add_input_port(port_id, dim=port.dim)
+    diagram.connect("input", port_id, sys_id, in_port)
 
 
 def _open_loop(sys):

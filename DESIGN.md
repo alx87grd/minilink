@@ -85,7 +85,7 @@ or neural network alike):
 | `dynamics/` | plants: `abstraction/` mother classes, `catalog/` by physical domain |
 | `catalog/` | **teaching alias** of `dynamics/catalog/` — flat re-exports for short imports (`from minilink.catalog import Pendulum`); ownership stays in `dynamics/` |
 | `control/` | control laws and design verbs (`design.py` — `lqr`, `place`, `lqr_finite_horizon`, `lqg`, `trajectory_lqr` on a linear model (`LTISystem`) or any plant linearized about its command port, and their gains `lqr_gain`, `place_gain`, `lqr_gain_schedule` on arrays; `impedance.py`, `output.py`, `state.py`, `siso.py` — `PID` with `ports="error"` (compensator, one input `e`) or `"reference"` (`r`, `y`), `modelbased.py`, `robotic.py`, `geometric.py` — `PurePursuit`, `neural.py` — `NeuralPolicyController`, **`mpc/`** — RH `ModelPredictiveController`) |
-| `estimation/` | state observers and their designs: `observer.py` — `StateObserver`, the innovation form `dx̂ = A (x̂ − x̄) + B (u − ū) + L (y − ŷ)` with ports `u`, `y` → `x` (the estimate, hat labels) and the role id `observer`; `design.py` — `luenberger` (error poles placed on the dual pair) and `kalman` (the stationary Kalman–Bucy gain), each on a linear model or a plant linearized about its command port, with `kalman_gain(A, C, Q_n, R_n)` / `luenberger_gain` on arrays. The LQG box, `observer` + `gain` under one controller, is `control.design.lqg`. Later: time-varying and trajectory observers, the EKF, the sampled filters, the estimation problem and its tools ([docs/plans/estimation-and-state-feedback.md](docs/plans/estimation-and-state-feedback.md)) |
+| `estimation/` | state observers and their designs: `observer.py` — `StateObserver`, the innovation form `dx̂ = A (x̂ − x̄) + B (u − ū) + L (y − ŷ)` with ports `u`, `y` → `x` (the estimate, hat labels) and the role id `observer`; `design.py` — `luenberger` (error poles placed on the dual pair) and `kalman` (the stationary Kalman–Bucy gain), each on a linear model or a plant linearized about its command port, with `kalman_gain(A, C, Q_n, R_n)` / `luenberger_gain` on arrays. The LQG box, `observer` + `gain` under one controller, is `control.design.lqg`; `closed_loop(gain, plant, observer=obs)` wires the same loop by role. Later: time-varying and trajectory observers, the EKF, the sampled filters, the estimation problem and its tools ([docs/plans/estimation-and-state-feedback.md](docs/plans/estimation-and-state-feedback.md)) |
 
 **Tools** — verbs on a `System`; they return data or plots and never define
 user-facing systems (factories are fine: `linearize_matrices()` returns arrays,
@@ -393,7 +393,8 @@ The research rungs (`Holonomic`, `HolonomicAccel`, `BicycleKin`, `BicycleAcc`,
   estimate). Under the id `observer`, top level or inside the controller box, `roles()`
   finds it. A block that reads a measurement and gives the state back with no `u` and no
   `y` is refused as a controller by `@`, `closed_loop`, `%` and `plot_control_law`
-  (`core.feedback.require_command`): put it in a controller box with a gain, or design
+  (`core.feedback.require_command`): pass it with its gain as
+  `closed_loop(gain, plant, observer=obs)`, put the two in a controller box, or design
   the pair with `lqg`. The designs read the plant's command port for `B` (every other
   input held at its nominal; `LQRPlanner` too) and, for an observer, its `y` for `C`: a
   plant without `y` is refused, and another output is designed on
@@ -514,9 +515,13 @@ loop nested with `add_subsystem` therefore declares what the same leaf would, an
 closing an outer loop around it is not a false algebraic loop.
 
 Shortcuts (`core.composition`): `+` flat add only, `>>` series, `@` closed loop
-(``closed_loop(C, plant, reference=, disturbance=, noise=, filter=)`` is `@` with
-options: the keywords are words, the ports the letters ``r``, ``d``, ``n``, each
-extra input summed in through a visible `Sum`; `@` keeps the single input ``r``),
+(``closed_loop(C, plant, reference=, disturbance=, noise=, filter=, observer=)`` is
+`@` with options: the keywords are words, the ports the letters ``r``, ``d``, ``n``;
+each is `True` (an edge port), `False` (none) or a source block driving it inside
+the loop, named after the word (``reference=Step()``,
+``disturbance=WhiteNoise(...)``); a plant that declares ``d`` or ``n`` owns it,
+otherwise a visible `Sum` adds it to the command (``disturbance_sum``) or the
+measurement (``noise_sum``); `@` keeps the single input ``r``),
 `autowire()` connects by name only: each unconnected input takes the one output
 with the same name and size, an output may feed several inputs, and an input
 with no match or several stays open and is listed in a warning (`strict=True`
@@ -589,8 +594,12 @@ plant and refuses a number on the right; `feedback(sys)` closes any such system
 on itself, through a `Gain` (`feedback(sys, K)`) or a sensor or filter block
 (`feedback(sys, F)`), the return block named `filter` either way;
 `closed_loop(C, plant, filter=F)` puts the same block between the plant's `y`
-and what the controller reads, a noise `n` entering before it, and refuses a
-controller that reads `x` (a filter on the state is an observer). Positive
+and what reads the measurement, a noise `n` entering before it, and refuses a
+controller that reads `x` without an observer (a filter on the state is an
+observer). `closed_loop(gain, plant, observer=E)` wires the estimator by role:
+the plant's `y` and the controller's `u` go into `E` (named `observer`), and
+`E`'s `x` (labelled x̂) goes to a controller that reads `x` alone, so the plant's
+own state is never read; it is the loop the `lqg` box gives. Positive
 feedback still uses a signed `Sum`. A scalar error against a vector output takes
 component 0 through a visible `Demux`; equal dimensions close a vector loop;
 anything else raises and names `feedback(sys, of=(port, index))`. No `Loop`

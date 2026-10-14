@@ -125,9 +125,9 @@ The EKF along a trajectory is the middle rung: the same block shape as `Trajecto
 - Noise: `Q_n`, `R_n` everywhere in the estimation band, gains included
   (`kalman_gain(A, C, Q_n, R_n)`), so `Q`, `R` keep their one meaning as LQR weights (RULES
   5.4): `Q_n` the n×n state-noise intensity, `R_n` the p×p measurement intensity
-  (randomness.md: `Q_n = B_w W B_wᵀ`, `R_n = D_v V D_vᵀ`). No `G=`. The plant-taking form
-  reads `B_w = ∂f/∂d`, `D_v = ∂h/∂n` from the ports when `disturbance=` / `noise=` blocks are
-  given (RN-4).
+  (randomness.md: `Q_n = B_w W B_wᵀ`, `R_n = D_v V D_vᵀ`). No `G=`. A plant-taking form
+  reading `B_w = ∂f/∂d`, `D_v = ∂h/∂n` and the noise blocks' `psd` was planned here and
+  dropped (rulings R20): the design takes the textbook `Q_n`, `R_n`.
 - **A block that reads a measurement and commands nothing is an estimator, not a
   controller**: `require_command(block)` in `core/feedback.py` refuses it with one message
   ("… reads y but gives no u: an estimator; put it in a controller box"), used by
@@ -313,7 +313,7 @@ C1. **Demos, the library's evidence** (the GRO501 from-scratch notebooks are not
       is `cartpole_LQG.py`).
     RULES 6.1 / 6.10 / 6.13; both join `examples/README.md` and the nightly sweep.
 C2. **Docs**: TODO P4 row leaves; new rows: `LQGPlanner` (v0.3, with RN-4), the plant-taking
-    `kalman(…, disturbance=, noise=)` reading `psd` (RN-4), `trajectory_kalman` +
+    `kalman(…, disturbance=, noise=)` reading `psd` (RN-4; dropped by R20), `trajectory_kalman` +
     `TrajectoryObserver` and `kalman_finite_horizon` (estimation follow-ups), the EKF, the
     `EstimationProblem` / `EstimationSolution` / estimator tools (v0.9 estimation follow-ups,
     §5 of this plan as their design note); ROADMAP §3 estimation TRL 1 -> 6, control row
@@ -327,7 +327,7 @@ C2. **Docs**: TODO P4 row leaves; new rows: `LQGPlanner` (v0.3, with RN-4), the 
     ruling: their hand-written Riccati solve and `LQG_Controller` are the lesson; the
     library's own evidence is the demos of C1 (P11 decides what the APP notebooks show).
 
-**Not in this plan**: `closed_loop(estimator=)` (AC-4); `trajectory_kalman`, the EKF, UKF,
+**Not in this plan**: `closed_loop(observer=)` (AC-4, landed 2026-10-14); `trajectory_kalman`, the EKF, UKF,
 particle and discrete filters; `EstimationProblem` and the estimator tools; `LQGPlanner`;
 `sys.xbar` as a property (the nominal state is reached as `state.nominal_value`).
 
@@ -349,7 +349,8 @@ the backward step on the dual pair being the forward filter step (no direction p
 the role name `observer` settled before the first observer shipped; `require_command` in the
 resolver so no reader takes an estimate for a command. **Noted for AC-4**: once a plant
 exposes `x` and an observer gives `x` in one diagram, `autowire` finds two candidates for any
-`x` input and `expose("x")` refuses; the `observer=` keyword wires by role, not by name.
+`x` input and `expose("x")` refuses; the `observer=` keyword wires by role, not by name
+(landed 2026-10-14).
 
 ## 7b. Ask-first items, by name (AGENTS "Ask first")
 

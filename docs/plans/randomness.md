@@ -26,7 +26,7 @@ port `n` ([automation-by-convention.md](automation-by-convention.md) §2.1; rena
 P10's step AC-2). The examples below use them; where §1 and §10 say port `w` or `v`, they
 describe the code and the review of that time. The math symbols (`w_k`, `W`, `V`, `B_w`)
 are unchanged. A plant that declares `d` and `n` owns them, and
-`closed_loop(disturbance=, noise=)` accepts a noise block (P10's AC-4), which is how the loop
+`closed_loop(disturbance=, noise=)` accepts a noise block (P10's AC-4, landed 2026-10-14), which is how the loop
 inputs meet RD-A9 and RD-D24.
 
 ## The design in one screen

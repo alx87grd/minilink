@@ -315,7 +315,7 @@ message. It is the only special case in `>>`.
   - a controller that reads `x` on a leaf plant without `x`: build the plant with
     `expose_state=True`. A diagram plant always has a state, and `@` reads it: no
     `expose("x")` is needed.
-- **`closed_loop(controller, plant, *, reference, disturbance, noise, filter, estimator,
+- **`closed_loop(controller, plant, *, reference, disturbance, noise, filter, observer,
   validate)`** is `@` with options.
   Each loop input `reference`, `disturbance`, `noise` is `False`, `True` (an edge port) or
   a source block. The keywords are the words, the ports are the letters `r`, `d`, `n`, and
@@ -338,12 +338,14 @@ message. It is the only special case in `>>`.
   - `plant:y` stays the true output; the filtered signal is `filter:y`. The noise `n`
     enters before the filter.
 - **The estimator** (`observer=E`): plant `y` and the controller's `u` go into `E`, and
-  `E`'s `x` goes to the controller's `x`.
+  `E`'s `x` goes to the controller's `x`. The controller reads `x` alone, and the plant's
+  own state is never read; a filter sits before `E`.
 - **Disturbance and noise.**
   - A plant that declares `d` and `n` owns them: `d` is never charged as control effort,
     and `n` enters what the controller reads.
   - For a plant without those ports, `disturbance=` and `noise=` add summing junctions in
-    the loop, as today. The cost then sees `u + d` as the plant's command, a known limit.
+    the loop, as today, named `disturbance_sum` and `noise_sum` (the words name the
+    sources). The cost then sees `u + d` as the plant's command, a known limit.
   - An automatic wrapper that would give such a plant its own `d` and `n` is deferred
     until someone needs it.
 
@@ -484,7 +486,7 @@ roles and control-law sweeps) is captured before and after each step and compare
 | AC-2 | The resolver (§3), with every reader switched; reserved names raise on a clash. (a) Byte-identical census. **(a) landed 2026-10-13.** (b) The one-time rename of the subsystem names, in flow and sampled loops; shortcuts stop naming blocks from their shape. (c) The ports `d` and `n` in the same pass. **(b) and (c) landed 2026-10-13** as one sweep (the rule is in DESIGN; rollouts identical). | — |
 | AC-OP | The operators (§4.1–§4.4), one commit each: no operator modifies its operands; the plain `>>` and its one guard; `+`, `autowire`, `rename_ports`, `port=` and the 8 positional lines; `expose`; `@` needs a plant, `feedback`'s entry, return and `filter=`, one junction helper. **Landed 2026-10-13** (five commits; `autowire` by name reverses AC-1's fan-out guard, by decision). | — |
 | AC-3 | Composition on standard names: the removals §6 assigns to AC-3; boxes nested by `@`, with the edge check and the box's state read for an `x` controller; `x` only where needed and its leaf refusal; the mechanical plant's `y` and `x`; MPC renamed; `filter=`. **Landed 2026-10-13** (five commits), except the MPC rename, which trails with AC-8a (§10). | — |
-| AC-4 | Loop inputs: plants that declare `d` and `n` own them; sources as values, named `reference`, `disturbance`, `noise`; `observer=` with P4; the randomness plan's loop-input rulings reconciled | beside P4, before P11 |
+| AC-4 | Loop inputs: plants that declare `d` and `n` own them; sources as values, named `reference`, `disturbance`, `noise`; `observer=` with P4; the randomness plan's loop-input rulings reconciled. **Landed 2026-10-14** (rulings R18–R20 of the [state-space record](../reviews/2026-10-14-state-space-design-rulings.md)). | — |
 | AC-5 | Plots (§5): the auto mode, role selectors, paths into boxes, labels, units and colours by role, one default | plotting lane, v0.2 wave D |
 | AC-6 | Animation (§5): the camera chosen when animating, looking inside `plant`; no compensator skin in a loop; the camera copy goes | plotting lane |
 | AC-7 | Cost and tools (§5): one compiled loop for the three Monte Carlo backends, `command_port`, controllers with state, time, cost params, one price; Gym and the rollout environment aligned | v0.3, with RN-4 and RN-5 |
@@ -553,10 +555,12 @@ These do not change the rules:
 discrete Kalman filters). The `observer` role and the standard names around it were set
 before any estimator existed, so they get a review then, against the real blocks:
 - the estimator's ports (`u`, `y` → `x`, labelled x̂), and whether the controller should read
-  the estimate under its own name rather than `x`;
+  the estimate under its own name rather than `x` (**settled 2026-10-14, R19:** it stays
+  `x`; the role says whose);
 - how `closed_loop(..., observer=)` wires them, and where the estimator sits in a
-  controller box;
+  controller box (**settled with AC-4, R18:** by role at the loop's top level, or in the
+  `lqg` box; both give one loop);
 - what else a filter gives: a covariance, an innovation;
 - the noise inputs `d` and `n` that a Kalman design reads, and their link to the noise
-  blocks' `psd`;
+  blocks' `psd` (**settled 2026-10-14, R20:** the design takes `Q_n`, `R_n`; no link);
 - how plots compare the estimate with the plant's state, and how Monte Carlo starts x̂0.

@@ -7,6 +7,7 @@ from scipy.linalg import solve_continuous_are
 from minilink.analysis.linearization import linearize
 from minilink.control.design import lqg, lqr, lqr_gain, place_gain
 from minilink.control.state import StateFeedbackController
+from minilink.core.composition import closed_loop
 from minilink.core.diagram import DiagramSystem
 from minilink.core.feedback import roles
 from minilink.core.system import DynamicSystem
@@ -289,3 +290,77 @@ def test_lqg_holds_the_cart_pole_upright_from_a_disturbed_start():
     traj = loop.compute_trajectory(tf=8.0)
     plant_state = traj.x[slice(*loop.state_index["plant"]), -1]
     np.testing.assert_allclose(plant_state, x_up, atol=1e-2)
+
+
+# closed_loop(observer=): the gain and the filter wired by role
+
+
+def test_closed_loop_wires_the_observer_by_role():
+    Q, R = np.diag([1.0, 0.1]), np.array([[0.5]])
+    Q_n, R_n = np.diag([0.1, 0.3]), np.array([[0.2]])
+    plant = LTISystem(A, B, C)  # measures the position only: no state to read
+    gain, filter_ = lqr(plant, Q, R), kalman(plant, Q_n, R_n)
+    loop = closed_loop(gain, plant, observer=filter_)
+    assert list(loop.subsystems) == ["controller", "plant", "observer"]
+    assert loop.connections["observer"]["y"] == ("plant", "y")
+    assert loop.connections["observer"]["u"] == ("controller", "u")
+    assert loop.connections["controller"]["x"] == ("observer", "x")
+    who = roles(loop)
+    assert who.controller is gain and who.observer is filter_
+    # the same loop as the lqg box: the gain's poles and the filter's
+    boxed = lqg(plant, Q, R, Q_n, R_n) @ plant
+    np.testing.assert_allclose(
+        np.sort_complex(np.linalg.eigvals(loop.linearize().A())),
+        np.sort_complex(np.linalg.eigvals(boxed.linearize().A())),
+        atol=1e-8,
+    )
+
+
+def test_the_role_loop_and_the_box_loop_give_one_trajectory():
+    from minilink.dynamics.catalog.pendulum.cartpole import CartPole
+
+    plant = CartPole()
+    plant.x0 = np.array([-0.5, np.pi + 0.2, 0.0, 0.0])
+    x_up = np.array([0.0, np.pi, 0.0, 0.0])
+    Q, R = np.diag([1.0, 10.0, 1.0, 1.0]), np.array([[0.1]])
+    Q_n, R_n = 1e-2 * np.eye(4), 1e-3 * np.eye(4)
+    by_role = closed_loop(
+        lqr(plant, Q, R, x_bar=x_up),
+        plant,
+        observer=kalman(plant, Q_n, R_n, x_bar=x_up),
+        reference=False,
+    )
+    boxed = closed_loop(lqg(plant, Q, R, Q_n, R_n, x_bar=x_up), plant, reference=False)
+    a = by_role.compute_trajectory(tf=4.0, n_steps=201)
+    b = boxed.compute_trajectory(tf=4.0, n_steps=201)
+    np.testing.assert_allclose(
+        a.x[slice(*by_role.state_index["plant"])],
+        b.x[slice(*boxed.state_index["plant"])],
+        atol=1e-6,
+    )
+
+
+def test_the_filter_sits_before_the_observer():
+    plant = LTISystem(A, B, C)
+    loop = closed_loop(
+        lqr(plant, np.eye(2), np.eye(1)),
+        plant,
+        observer=observer(),
+        filter=2.0,
+        noise=True,
+    )
+    assert loop.connections["noise_sum"]["in0"] == ("plant", "y")
+    assert loop.connections["filter"]["u"] == ("noise_sum", "y")
+    assert loop.connections["observer"]["y"] == ("filter", "y")
+
+
+def test_what_closed_loop_refuses_with_an_observer():
+    from minilink import PID, LowPassFilter
+
+    plant = LTISystem(A, B, C)
+    with pytest.raises(ValueError, match="reads 'x' alone"):
+        closed_loop(PID(4.0, 2.0, 0.5, ports="reference"), plant, observer=observer())
+    with pytest.raises(ValueError, match="must read 'u' and 'y'"):
+        closed_loop(lqr(plant, np.eye(2), np.eye(1)), plant, observer=LowPassFilter())
+    with pytest.raises(ValueError, match="pass it as observer="):
+        closed_loop(lqr(plant, np.eye(2), np.eye(1)), plant, filter=observer())
