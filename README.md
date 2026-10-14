@@ -128,21 +128,6 @@ and one `f`, so a closed loop linearizes, animates and nests like a plant.
 
 ![one System (f, h, tf) connected to simulation, analysis, control, planning, learning](https://raw.githubusercontent.com/alx87grd/minilink/main/docs/_static/bridges.svg)
 
-| Verb | Call |
-| --- | --- |
-| Simulate | `plant.compute_trajectory(tf=10.0)` |
-| Frequency domain | `plot_bode(plant, x_bar)`, `plot_root_locus(C >> G)` |
-| Classical loop | `PID(Kp, Ki, Kd) @ plant` |
-| State feedback | `lqr_at_operating_point(plant, x_bar, Q, R) @ plant` |
-| Robot control | `ComputedTorqueController(arm)`, `JointImpedance(arm)` |
-| 3D robots | `UR5Manipulator()`, then `animate(renderer="meshcat", is_3d=True)` |
-| Value iteration | `DynamicProgrammingPlanner(problem, x_grid=(101, 101))` |
-| Sampling search | `RRTPlanner(problem)` |
-| Trajectory optimization | `TrajectoryOptimizationPlanner(problem, transcription="direct_collocation")` |
-| Model predictive control | `ModelPredictiveController(planner, dt_mpc=0.1) @ plant` |
-| Reinforcement learning | `ReinforcementLearningPlanner(problem)` |
-| Sensitivity | `plant.jacobian("f", "params", x_bar)` |
-
 The objects between the tools are the textbook's nouns. A `PlanningProblem`
 is a system, a cost and boundary sets; every planner takes it and returns a
 `PlanningSolution` (a policy, plus the trajectory when the solver computes one):
@@ -173,8 +158,7 @@ opt_traj = opt.solve().trajectory            # direct collocation
 ```
 
 Trajectory optimization transcribes the problem into a `MathematicalProgram`
-solved by an `Optimizer`; a sampled controller closes the loop on the
-continuous plant with `ctl % dt`, zero-order hold included.
+solved by an `Optimizer`.
 
 ## Differentiable and compiled
 
@@ -207,13 +191,9 @@ differentiate inside your own `jit`. See
   from one setup cell. One import line covers a course:
   `from minilink import Pendulum, PID, lqr, PlanningProblem, ReinforcementLearningPlanner`.
 - **Research.** Optional JAX for compile and autodiff, Ipopt for large NLPs,
-  meshcat for 3D, a hybrid stack for sampled MPC, a Gymnasium bridge
-  (`Sys2Gym`) for external RL agents. Every catalog plant compiles on both
+  meshcat for 3D, a hybrid stack for sampled MPC. Every catalog plant compiles on both
   backends.
-
-The boundary between the two is a contract, not a convention:
-[ROADMAP.md §2](ROADMAP.md#2-two-lanes).
-
+  
 ## Install
 
 Python 3.10+. Recommended: the conda environment from
@@ -239,6 +219,4 @@ tier, pip, and options: [install.md](install.md).
 - [API reference](https://alx87grd.github.io/minilink/), [DESIGN.md](DESIGN.md), [ROADMAP.md](ROADMAP.md), [tests](tests/README.md)
 - [CONSTITUTION.md](CONSTITUTION.md) and [RULES.md](RULES.md), the design law and the code rules every contributor and agent follows
 
-Minilink is the successor of [pyro](https://github.com/SherbyRobotics/pyro),
-the toolbox behind the robotics and control courses at Université de
-Sherbrooke. MIT license.
+Minilink is the successor of [pyro](https://github.com/SherbyRobotics/pyro).
