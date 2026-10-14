@@ -7,7 +7,7 @@ from minilink.core.backends import array_module
 from minilink.core.system import System
 
 THRUST_MAX = np.array([10000.0, 1000.0])  # [N] surge and sway thrust limits
-CURRENT = np.array([-1.0, -1.0])  # [m/s] world-frame current, flowing to the south-west
+CURRENT = np.array([-1.0, -0.0])  # [m/s] world-frame current, flowing to the south-west
 XY_RANGE = 40.0  # [m] half-width of the state box round the dock
 # The start: downstream of the dock, at rest, bow along +x
 X_START = np.array([-25.0, -10.0, 0.0, 0.0, 0.0, 0.0])
