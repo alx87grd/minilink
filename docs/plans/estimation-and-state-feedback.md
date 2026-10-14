@@ -67,10 +67,9 @@ Layer 2  designs on a model         lqr(model, Q, R)  place(model, poles)       
          or a plant                 lqr_finite_horizon(model, Q, R, S_f, tf)  kalman_finite_horizon(model, Q_n, R_n, P0, tf)  [later]
                                     trajectory_lqr(sys, traj, Q, R)           trajectory_kalman(sys, traj, Q_n, R_n, P0)       [later]
                                     lqg(model, Q, R, Q_n, R_n) -> controller box {observer, gain}
-                                    two signatures, one boundary test isinstance(first, System) (MATLAB: lqr(sys, Q, R) / lqr(A, B, Q, R)):
-                                      lqr(A, B, Q, R, *, xbar=None, ubar=None)                                  arrays, today's form
-                                      lqr(sys, Q, R, *, x_bar=None, u_bar=None, t=0.0, params=None, method, eps)  an LTISystem as is, with the
-                                      point it carries; any other DynamicSystem linearized at (x̄, ū), about its command port only
+                                    one signature (R14): lqr(sys, Q, R, *, x_bar=None, u_bar=None, t=0.0, params=None, method, eps):
+                                      an LTISystem as is, with the point it carries; any other System linearized at (x̄, ū),
+                                      about its command port only; arrays go to the gains, lqr_gain(A, B, Q, R) -> K
 
 Layer 3  problems and solutions     PlanningProblem / StochasticPlanningProblem        EstimationProblem                                  [later]
                                     Planner(problem).solve() -> PlanningSolution      Estimator-tool(problem).solve() -> EstimationSolution

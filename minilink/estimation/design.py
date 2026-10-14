@@ -4,9 +4,10 @@ import re
 
 import numpy as np
 
+from minilink.analysis.linearization import design_model
 from minilink.analysis.riccati import care
 from minilink.analysis.structural import observability
-from minilink.control.design import design_arguments, place_gain
+from minilink.control.design import place_gain
 from minilink.estimation.observer import StateObserver
 
 # Public API
@@ -44,39 +45,19 @@ def kalman_gain(A, C, Q_n, R_n):
 
 
 def luenberger(
-    model,
-    *args,
-    poles=None,
-    x_bar=None,
-    u_bar=None,
-    t=0.0,
-    params=None,
-    method="auto",
-    eps=1e-6,
+    sys, poles, *, x_bar=None, u_bar=None, t=0.0, params=None, method="auto", eps=1e-6
 ):
-    """Design an observer by pole placement and return a ``StateObserver``.
+    """Design an observer for ``sys`` by pole placement and return a ``StateObserver``.
 
-    ``luenberger(A, B, C, poles)`` designs on arrays (``D`` is zero);
-    ``luenberger(sys, poles)`` on a linear model, used as is with the operating
-    point it carries, or on any plant, linearized first about its command port
-    at ``(x_bar, u_bar)``, the nominal state and inputs when omitted. The block
-    runs the model about that point and corrects it with ``L (y − ŷ)``, so the
-    estimation error has the requested poles. Arguments as in
-    :func:`~minilink.control.design.lqr`, with ``poles`` in place of ``Q, R``.
+    ``sys`` is a linear model, used as is with the operating point it carries,
+    or any plant, linearized first about its command port at ``(x_bar, u_bar)``,
+    the nominal state and inputs when omitted. The block runs the model about
+    that point and corrects it with ``L (y − ŷ)``, so the estimation error has
+    the requested poles. Arguments as in :func:`~minilink.control.design.lqr`,
+    with ``poles`` in place of ``Q, R``. On arrays the gain is
+    :func:`luenberger_gain`, and the model ``LTISystem(A, B, C)``.
     """
-    model, (poles,) = design_arguments(
-        "luenberger",
-        model,
-        args,
-        {"poles": poles},
-        x_bar,
-        u_bar,
-        t,
-        params,
-        method,
-        eps,
-        matrices=2,
-    )
+    model = design_model(sys, x_bar, u_bar, t, params, method=method, eps=eps)
     A, C = model.A(), model.C()
 
     L = luenberger_gain(A, C, poles)
@@ -85,10 +66,10 @@ def luenberger(
 
 
 def kalman(
-    model,
-    *args,
-    Q_n=None,
-    R_n=None,
+    sys,
+    Q_n,
+    R_n,
+    *,
     x_bar=None,
     u_bar=None,
     t=0.0,
@@ -96,29 +77,16 @@ def kalman(
     method="auto",
     eps=1e-6,
 ):
-    """Design a stationary Kalman filter and return a ``StateObserver``.
+    """Design a stationary Kalman filter for ``sys`` and return a ``StateObserver``.
 
-    ``kalman(A, B, C, Q_n, R_n)`` designs on arrays (``D`` is zero);
-    ``kalman(sys, Q_n, R_n)`` on a linear model or on any plant, as in
-    :func:`luenberger`. ``Q_n`` is the intensity of the white process noise on
+    ``sys`` is a linear model or any plant, as in :func:`luenberger`. On
+    arrays the gain is :func:`kalman_gain`. ``Q_n`` is the intensity of the white process noise on
     the state, ``n × n`` (a noise ``w`` entering through ``B_w`` has
     ``Q_n = B_w W B_wᵀ``), and ``R_n`` the intensity of the white measurement
     noise, ``p × p``. The gain minimizes the steady-state estimation error
     covariance, and the block is the stationary Kalman–Bucy filter.
     """
-    model, (Q_n, R_n) = design_arguments(
-        "kalman",
-        model,
-        args,
-        {"Q_n": Q_n, "R_n": R_n},
-        x_bar,
-        u_bar,
-        t,
-        params,
-        method,
-        eps,
-        matrices=2,
-    )
+    model = design_model(sys, x_bar, u_bar, t, params, method=method, eps=eps)
     A, C = model.A(), model.C()
 
     L = kalman_gain(A, C, Q_n, R_n)

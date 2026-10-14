@@ -32,6 +32,7 @@ TEACHING_SURFACE: dict[str, tuple[str, ...]] = {
         "CartPole",
         "ImpedanceController",
         "lqr",
+        "lqr_gain",
         "place",
         "lqg",
         "StateObserver",
@@ -159,12 +160,16 @@ TEACHING_SURFACE: dict[str, tuple[str, ...]] = {
 # Design verbs the band facade re-exports from their defining module.
 TEACHING_MODULE_FUNCTIONS = (
     ("minilink.control.design", "lqr"),
+    ("minilink.control.design", "lqr_gain"),
     ("minilink.control.design", "lqr_finite_horizon"),
     ("minilink.control.design", "trajectory_lqr"),
     ("minilink.control.design", "place"),
+    ("minilink.control.design", "place_gain"),
     ("minilink.control.design", "lqg"),
     ("minilink.estimation.design", "kalman"),
+    ("minilink.estimation.design", "kalman_gain"),
     ("minilink.estimation.design", "luenberger"),
+    ("minilink.estimation.design", "luenberger_gain"),
 )
 
 # Module prefixes that belong to the teaching lane.
@@ -365,7 +370,7 @@ loop.plot_phase_plane(show=False)
 loop.animate(show=False)
 loop.plot_diagram(show=False)          # degrades without graphviz
 lti = linearize(plant, x_bar=[0.0, 0.0])
-lqr(lti.A(), lti.B(), np.eye(2), np.eye(1))
+lqr(lti, np.eye(2), np.eye(1))
 goal = np.array([np.pi, 0.0])
 problem = PlanningProblem(plant, x_goal=goal,
     cost=QuadraticCost.from_system(plant, Q=np.eye(2), R=np.eye(1), xbar=goal))

@@ -5,10 +5,10 @@ Teaching imports::
     from minilink.estimation import StateObserver, kalman, luenberger
 
 Placement rule: online, in-the-loop inference lives here; *offline* fitting over
-logged data is a verb and lives in ``identification/``. The designs take arrays or a
-linear model in (``kalman(A, B, C, Q_n, R_n)``, ``kalman(plant, Q_n, R_n)``) and return
-this package's blocks out; the LQG box that pairs an observer with an LQR gain is
-``minilink.control.lqg``.
+logged data is a verb and lives in ``identification/``. The designs take a linear model
+or a plant in (``kalman(plant, Q_n, R_n)``) and return this package's blocks out; their
+gains take arrays (``kalman_gain(A, C, Q_n, R_n)``). The LQG box that pairs an observer
+with an LQR gain is ``minilink.control.lqg``.
 """
 
 from __future__ import annotations

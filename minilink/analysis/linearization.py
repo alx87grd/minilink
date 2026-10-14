@@ -7,6 +7,7 @@ import numpy as np
 from minilink.analysis.derivatives import compiled, jacobian, operating_point
 from minilink.core.diagram import DiagramSystem
 from minilink.core.feedback import command_port
+from minilink.core.system import System
 from minilink.dynamics.abstraction.state_space import LTISystem
 from minilink.graphical.control import style
 
@@ -129,6 +130,13 @@ def design_model(
     measured output ``y`` alone, so a plant with noise ports gives a gain over
     its command and a box exposing its state is measured through ``y``.
     """
+    if not isinstance(sys, System):
+        raise TypeError(
+            "a design takes a system, a linear model LTISystem(A, B, C) or a plant, "
+            f"not {type(sys).__name__}; on arrays the gains are lqr_gain(A, B, Q, R), "
+            "place_gain(A, B, poles), kalman_gain(A, C, Q_n, R_n) and "
+            "luenberger_gain(A, C, poles)"
+        )
     if isinstance(sys, LTISystem):
         if x_bar is not None or u_bar is not None:
             raise ValueError(

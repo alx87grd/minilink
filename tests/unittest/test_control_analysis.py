@@ -20,6 +20,7 @@ from minilink.core.compile.compiler import compile_auto
 from minilink.core.diagram import DiagramSystem
 from minilink.core.system import DynamicSystem
 from minilink.dynamics.catalog.mass_spring_damper.linear import SingleMass
+from minilink.dynamics.abstraction.state_space import LTISystem
 from minilink.dynamics.catalog.pendulum.pendulum import InvertedPendulum, Pendulum
 
 
@@ -235,17 +236,18 @@ class TestLQR(unittest.TestCase):
         closed_poles = np.linalg.eigvals(A - B @ K)
         self.assertTrue(np.all(closed_poles.real < 0.0))
 
-    def test_the_three_forms_give_one_design(self):
+    def test_the_model_and_the_plant_give_one_design(self):
         plant = InvertedPendulum()
         x_bar = [0.3, 0.0]
         Q = np.diag([10.0, 1.0])
         R = np.array([[1.0]])
         lti = linearize(plant, x_bar=x_bar)
-        on_arrays = lqr(lti.A(), lti.B(), Q, R, x_bar=x_bar, u_bar=lti.ubar)
         on_model = lqr(lti, Q, R)
         on_plant = lqr(plant, Q, R, x_bar=x_bar)
         for controller in (on_model, on_plant):
-            np.testing.assert_allclose(controller.params["K"], on_arrays.params["K"])
+            np.testing.assert_allclose(
+                controller.params["K"], lqr_gain(lti.A(), lti.B(), Q, R)
+            )
             np.testing.assert_allclose(controller.inputs["r"].nominal_value, x_bar)
             np.testing.assert_allclose(controller.params["ubar"], lti.ubar)
         # keywords for the weights, and the nominal state when x_bar is omitted
@@ -284,15 +286,11 @@ class TestLQR(unittest.TestCase):
         self.assertEqual(K_noisy.shape, (1, 4))
         np.testing.assert_allclose(K_noisy, K_quiet)
 
-    def test_the_signature_is_checked(self):
-        plant, lti = InvertedPendulum(), linearize(InvertedPendulum(), [0.0, 0.0])
+    def test_a_design_takes_a_system(self):
+        lti = linearize(InvertedPendulum(), [0.0, 0.0])
         Q, R = np.eye(2), np.eye(1)
-        with self.assertRaisesRegex(TypeError, r"lqr\(sys, Q, R\)"):
-            lqr(plant, [0.0, 0.0], Q, R)  # the retired order: the point is a keyword
-        with self.assertRaisesRegex(TypeError, "R is missing"):
-            lqr(plant, Q)
-        with self.assertRaisesRegex(TypeError, "Q given twice"):
-            lqr(plant, Q, R, Q=Q)
+        with self.assertRaisesRegex(TypeError, r"lqr_gain\(A, B, Q, R\)"):
+            lqr(lti.A(), Q, R)  # arrays go to the gain
         with self.assertRaisesRegex(ValueError, "carries its operating point"):
             lqr(lti, Q, R, x_bar=[0.1, 0.0])
 
@@ -461,15 +459,14 @@ class TestFiniteHorizonLQR(unittest.TestCase):
 
         matplotlib.use("Agg")
         ctl = lqr_finite_horizon(
-            self.A, self.B, self.Q, self.R, S_f=np.zeros((2, 2)), tf=1.0
+            LTISystem(self.A, self.B), self.Q, self.R, S_f=np.zeros((2, 2)), tf=1.0
         )
         ax = ctl.plot_gain_schedule(show=False)
         self.assertEqual(len(ax.lines), 2)  # one line per entry of the 1 x 2 gain
 
     def test_finite_horizon_after_stationary_keeps_regulating(self):
         ctl = lqr_finite_horizon(
-            self.A,
-            self.B,
+            LTISystem(self.A, self.B),
             self.Q,
             self.R,
             S_f=np.zeros((2, 2)),
@@ -485,7 +482,7 @@ class TestFiniteHorizonLQR(unittest.TestCase):
 
     def test_finite_horizon_loop_reaches_the_target(self):
         ctl = lqr_finite_horizon(
-            self.A, self.B, self.Q, self.R, S_f=20.0 * np.eye(2), tf=5.0
+            LTISystem(self.A, self.B), self.Q, self.R, S_f=20.0 * np.eye(2), tf=5.0
         )
         plant = DoubleIntegrator()
         plant.x0 = np.array([1.0, 0.0])
@@ -1722,7 +1719,7 @@ class TestPolePlacement(unittest.TestCase):
                 place_gain(*args)
 
     def test_operating_point_design_closes_the_loop(self):
-        from minilink import place
+        from minilink import place, place_gain
 
         plant = InvertedPendulum()
         x_bar = np.zeros(2)
@@ -1730,9 +1727,7 @@ class TestPolePlacement(unittest.TestCase):
 
         ctl = place(plant, poles, x_bar=x_bar)
         lin = linearize(plant, x_bar)
-        np.testing.assert_allclose(
-            ctl.params["K"], place(lin.A(), lin.B(), poles).params["K"]
-        )
+        np.testing.assert_allclose(ctl.params["K"], place_gain(lin.A(), lin.B(), poles))
         np.testing.assert_allclose(ctl.params["K"], place(lin, poles).params["K"])
         np.testing.assert_allclose(ctl.inputs["r"].nominal_value, x_bar)
 

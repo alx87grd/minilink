@@ -97,6 +97,17 @@ was ruled, one entry each, and where each ruling now lives.
 - **R13 The GRO501 from-scratch notebooks are not migrated.** `numpy_state_space.ipynb` and
   `cartpole_dynamic_controller.ipynb` hand-write LQR, Kalman and LQG on purpose; the library's
   evidence is the demos (an LQR demo updated, a Kalman observer demo and an LQG demo added).
+- **R14 The design verbs take a system; arrays go to the gains** (reverses R3's arrays
+  form). `lqr(sys, Q, R, *, x_bar, u_bar, t, params, method, eps)`, and the same for
+  `place`, `lqr_finite_horizon`, `lqg`, `kalman` and `luenberger`: `sys` is an `LTISystem`,
+  used as is with its operating point, or any plant, linearized about its command port.
+  The `*args` parser that read the arrays form leaves; on arrays, the gains `lqr_gain`,
+  `place_gain`, `kalman_gain` and `luenberger_gain` join the root prelude, and
+  `design_model` refuses a non-system argument by naming them. Course notebooks change only
+  the lines that already call the minilink API (`03_control`, GRO860 `cartpole_lqr`, and one
+  line of GRO501 `numpy_state_space`, an exception to R13); their from-scratch code stays.
+  Lives in: `control/design.py`, `estimation/design.py`, `analysis/linearization.py`,
+  DESIGN §2–§3.
 
 ## Where the earlier records and this one differ
 

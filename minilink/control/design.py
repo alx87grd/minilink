@@ -20,8 +20,6 @@ from minilink.control.state import (
     TrajectoryFeedbackController,
 )
 from minilink.core.diagram import DiagramSystem
-from minilink.core.system import System
-from minilink.dynamics.abstraction.state_space import LTISystem
 
 # Public API
 
@@ -75,46 +73,31 @@ def place_gain(A, B, poles):
 
 
 def lqr(
-    model,
-    *args,
-    Q=None,
-    R=None,
-    x_bar=None,
-    u_bar=None,
-    t=0.0,
-    params=None,
-    method="auto",
-    eps=1e-6,
+    sys, Q, R, *, x_bar=None, u_bar=None, t=0.0, params=None, method="auto", eps=1e-6
 ):
-    """Design an LQR and return a ``StateFeedbackController``.
+    """Design an LQR on ``sys`` and return a ``StateFeedbackController``.
 
-    ``lqr(A, B, Q, R)`` designs on arrays; ``lqr(sys, Q, R)`` on a linear model
-    (an ``LTISystem``, used as is with the operating point it carries) or on any
-    plant, linearized first about its command port at ``(x_bar, u_bar)``, the
-    nominal state and inputs when omitted. The block implements
-    ``u = ubar - K (x - r)`` with ``r`` defaulting to ``xbar``, the operating
-    point of the model; wire the plant state into its ``x`` port.
+    ``sys`` is a linear model (an ``LTISystem``, used as is with the operating
+    point it carries) or any plant, linearized first about its command port at
+    ``(x_bar, u_bar)``, the nominal state and inputs when omitted. The block
+    implements ``u = ubar - K (x - r)`` with ``r`` defaulting to ``xbar``, the
+    operating point of the model; wire the plant state into its ``x`` port. On
+    arrays the gain is :func:`lqr_gain`, and the model ``LTISystem(A, B)``.
 
     Parameters
     ----------
-    model : array-like or System
-        ``A`` when designing on arrays, else the model or the plant.
-    *args
-        ``B, Q, R`` on arrays; ``Q, R`` on a system. ``Q`` and ``R`` may also be
-        given by keyword.
+    sys : System
+        The linear model or the plant.
     Q, R : array-like
         State and input weights of ``∫ xᵀQx + uᵀRu dt``.
     x_bar, u_bar : array-like, optional
-        Operating point: on arrays the point the block regulates to (the
-        origin by default); on a plant the point to linearize about (the
-        nominal by default). A linear model carries its own.
+        Operating point to linearize a plant about, the nominal by default; a
+        linear model carries its own.
     t, params, method, eps : optional
         Linearization time, parameter set, differentiation backend and
         central-difference step, as in :func:`~minilink.analysis.linearize`.
     """
-    model, (Q, R) = design_arguments(
-        "lqr", model, args, {"Q": Q, "R": R}, x_bar, u_bar, t, params, method, eps
-    )
+    model = design_model(sys, x_bar, u_bar, t, params, method=method, eps=eps)
     A, B = model.A(), model.B()
 
     K = lqr_gain(A, B, Q, R)
@@ -123,29 +106,17 @@ def lqr(
 
 
 def place(
-    model,
-    *args,
-    poles=None,
-    x_bar=None,
-    u_bar=None,
-    t=0.0,
-    params=None,
-    method="auto",
-    eps=1e-6,
+    sys, poles, *, x_bar=None, u_bar=None, t=0.0, params=None, method="auto", eps=1e-6
 ):
-    """Place the closed-loop poles and return a ``StateFeedbackController``.
+    """Place the closed-loop poles of ``sys`` and return a ``StateFeedbackController``.
 
-    ``place(A, B, poles)`` designs on arrays; ``place(sys, poles)`` on a linear
-    model or on any plant, linearized first about its command port at
-    ``(x_bar, u_bar)``. The block implements ``u = ubar - K (x - r)`` with
-    ``r`` defaulting to ``xbar``, the operating point of the model; wire the
-    plant state into its ``x`` port. Arguments as in :func:`lqr`, with
-    ``poles`` (``n`` of them, complex ones in conjugate pairs) in place of
-    ``Q, R``.
+    ``sys`` is a linear model or any plant, linearized first about its command
+    port at ``(x_bar, u_bar)``, as in :func:`lqr`, with ``poles`` (``n`` of
+    them, complex ones in conjugate pairs) in place of ``Q, R``. The block
+    implements ``u = ubar - K (x - r)`` with ``r`` defaulting to ``xbar``. On
+    arrays the gain is :func:`place_gain`.
     """
-    model, (poles,) = design_arguments(
-        "place", model, args, {"poles": poles}, x_bar, u_bar, t, params, method, eps
-    )
+    model = design_model(sys, x_bar, u_bar, t, params, method=method, eps=eps)
     A, B = model.A(), model.B()
 
     K = place_gain(A, B, poles)
@@ -154,12 +125,12 @@ def place(
 
 
 def lqg(
-    model,
-    *args,
-    Q=None,
-    R=None,
-    Q_n=None,
-    R_n=None,
+    sys,
+    Q,
+    R,
+    Q_n,
+    R_n,
+    *,
     x_bar=None,
     u_bar=None,
     t=0.0,
@@ -167,10 +138,9 @@ def lqg(
     method="auto",
     eps=1e-6,
 ):
-    """Design an LQG compensator, an LQR gain on a Kalman estimate, and return it as one controller box.
+    """Design an LQG compensator on ``sys``, an LQR gain on a Kalman estimate, and return it as one controller box.
 
-    ``lqg(A, B, C, Q, R, Q_n, R_n)`` designs on arrays; ``lqg(sys, Q, R, Q_n, R_n)``
-    on a linear model or on any plant, as in :func:`lqr`. ``Q, R`` are the LQR
+    ``sys`` is a linear model or any plant, as in :func:`lqr`. ``Q, R`` are the LQR
     weights, ``Q_n, R_n`` the process and measurement noise intensities of
     :func:`~minilink.estimation.design.kalman`. The box holds the
     :class:`~minilink.estimation.observer.StateObserver` under ``observer`` and
@@ -182,19 +152,7 @@ def lqg(
     """
     from minilink.estimation.design import kalman  # the dual design, for this verb only
 
-    model, (Q, R, Q_n, R_n) = design_arguments(
-        "lqg",
-        model,
-        args,
-        {"Q": Q, "R": R, "Q_n": Q_n, "R_n": R_n},
-        x_bar,
-        u_bar,
-        t,
-        params,
-        method,
-        eps,
-        matrices=2,
-    )
+    model = design_model(sys, x_bar, u_bar, t, params, method=method, eps=eps)
 
     gain = lqr(model, Q, R)
     observer = kalman(model, Q_n, R_n)
@@ -254,12 +212,12 @@ def lqr_gain_schedule(A, B, Q, R, S_f, tf, *, n_steps=1001):
 
 
 def lqr_finite_horizon(
-    model,
-    *args,
-    Q=None,
-    R=None,
-    S_f=None,
-    tf=None,
+    sys,
+    Q,
+    R,
+    S_f,
+    tf,
+    *,
     n_steps=1001,
     after="hold",
     x_bar=None,
@@ -269,30 +227,18 @@ def lqr_finite_horizon(
     method="auto",
     eps=1e-6,
 ):
-    """Design a finite-horizon LQR and return a ``TimeVaryingStateFeedbackController``.
+    """Design a finite-horizon LQR on ``sys`` and return a ``TimeVaryingStateFeedbackController``.
 
-    ``lqr_finite_horizon(A, B, Q, R, S_f, tf)`` on arrays or
-    ``lqr_finite_horizon(sys, Q, R, S_f, tf)`` on a model or a plant, as in
-    :func:`lqr`. The block implements ``u = ubar - K(t) (x - r)`` with
+    ``sys`` is a linear model or any plant, as in :func:`lqr`. The block
+    implements ``u = ubar - K(t) (x - r)`` with
     ``K(t)`` from :func:`lqr_gain_schedule`, minimizing
     ``∫₀^tf xᵀQx + uᵀRu dt + x(tf)ᵀ S_f x(tf)`` for the linear model. Past the
     horizon the block keeps ``K(tf)`` (``after="hold"``) or switches to the
     infinite-horizon gain of :func:`lqr_gain` (``after="stationary"``).
     """
-    model, (Q, R, S_f, tf) = design_arguments(
-        "lqr_finite_horizon",
-        model,
-        args,
-        {"Q": Q, "R": R, "S_f": S_f, "tf": tf},
-        x_bar,
-        u_bar,
-        t,
-        params,
-        method,
-        eps,
-    )
     if after not in ("hold", "stationary"):
         raise ValueError("after must be 'hold' or 'stationary'")
+    model = design_model(sys, x_bar, u_bar, t, params, method=method, eps=eps)
     A, B = model.A(), model.B()
 
     t_schedule, K, _ = lqr_gain_schedule(A, B, Q, R, S_f, tf, n_steps=n_steps)
@@ -364,41 +310,7 @@ def trajectory_lqr(
     return TrajectoryFeedbackController(trajectory, K)
 
 
-# Internal machinery: the model a design reads, the request checked, the result checked
-
-
-def design_arguments(
-    verb, model, args, named, x_bar, u_bar, t, params, method, eps, *, matrices=1
-):
-    """Split ``verb(model, *args, **named)`` into the linear model and the design's own arguments.
-
-    On arrays, ``args`` starts with ``B`` (``matrices=1``, the state-feedback
-    designs) or ``B, C`` (``matrices=2``, the observer designs) and the model is
-    an ``LTISystem`` at ``(x_bar, u_bar)``, the origin by default. On a
-    ``System`` the model comes from
-    :func:`~minilink.analysis.linearization.design_model`. The design's own
-    arguments (``Q, R``, ``poles``, …) follow positionally or by keyword, in the
-    order of ``named``; a refusal quotes the verb's two signatures.
-    """
-    arrays = ("A", "B", "C")[: matrices + 1] + tuple(named)
-    forms = f"{verb}({', '.join(arrays)}) or {verb}(sys, {', '.join(named)})"
-    on_system = isinstance(model, System)
-    matrices = 0 if on_system else matrices
-    if len(args) < matrices or len(args) - matrices > len(named):
-        raise TypeError(f"{forms}: got {len(args) + 1} positional arguments")
-    design = list(args[matrices:])
-    for name, value in list(named.items())[len(design) :]:
-        if value is None:
-            raise TypeError(f"{forms}: {name} is missing")
-        design.append(value)
-    for name, value in list(named.items())[: len(args) - matrices]:
-        if value is not None:
-            raise TypeError(f"{forms}: {name} given twice")
-    if on_system:
-        lti = design_model(model, x_bar, u_bar, t, params, method=method, eps=eps)
-    else:
-        lti = LTISystem(model, *args[:matrices], xbar=x_bar, ubar=u_bar)
-    return lti, tuple(design)
+# Internal machinery: the request checked, the result checked
 
 
 def requested_poles(poles, n):

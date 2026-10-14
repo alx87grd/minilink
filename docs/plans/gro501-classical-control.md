@@ -150,9 +150,8 @@ parking-mode poles at `{−1 ± 0.5i, −1}`; `place` is in the Lab 2 command li
 **Shape.** Mirror `lqr` exactly — the API precedent is settled:
 
 ```python
-place(A, B, poles)                       -> StateFeedbackController
 place_gain(A, B, poles)                  -> K
-place(sys, poles, x_bar=...)             -> StateFeedbackController   (renamed from place_at_operating_point, 2026-10-14)
+place(sys, poles, x_bar=...)             -> StateFeedbackController   (a linear model or a plant; arrays go to place_gain, 2026-10-14)
 ```
 
 `scipy.signal.place_poles` does the algorithm; this is a thin wrapper plus

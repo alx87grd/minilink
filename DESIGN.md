@@ -84,8 +84,8 @@ or neural network alike):
 | `blocks/` | plant-agnostic wiring: sources, `Integrator`, `TransferFunction`, routing (`Sum`/`Gain`/`Mux`/`Demux`), nonlinear (`Saturation`/`DeadZone`/`Relay`), filters, neural (`NeuralNetwork`) |
 | `dynamics/` | plants: `abstraction/` mother classes, `catalog/` by physical domain |
 | `catalog/` | **teaching alias** of `dynamics/catalog/` — flat re-exports for short imports (`from minilink.catalog import Pendulum`); ownership stays in `dynamics/` |
-| `control/` | control laws and design verbs (`design.py` — `lqr`, `place`, `lqr_finite_horizon`, `trajectory_lqr` and their gains, each on arrays, an `LTISystem` or any plant linearized about its command port; `impedance.py`, `output.py`, `state.py`, `siso.py` — `PID` with `ports="error"` (compensator, one input `e`) or `"reference"` (`r`, `y`), `modelbased.py`, `robotic.py`, `geometric.py` — `PurePursuit`, `neural.py` — `NeuralPolicyController`, **`mpc/`** — RH `ModelPredictiveController`) |
-| `estimation/` | state observers and their designs: `observer.py` — `StateObserver`, the innovation form `dx̂ = A (x̂ − x̄) + B (u − ū) + L (y − ŷ)` with ports `u`, `y` → `x` (the estimate, hat labels) and the role id `observer`; `design.py` — `luenberger` (error poles placed on the dual pair) and `kalman` (the stationary Kalman–Bucy gain), each on arrays (`kalman(A, B, C, Q_n, R_n)`), a linear model or a plant linearized about its command port, with `kalman_gain` / `luenberger_gain` on arrays. The LQG box, `observer` + `gain` under one controller, is `control.design.lqg`. Later: time-varying and trajectory observers, the EKF, the sampled filters, the estimation problem and its tools ([docs/plans/estimation-and-state-feedback.md](docs/plans/estimation-and-state-feedback.md)) |
+| `control/` | control laws and design verbs (`design.py` — `lqr`, `place`, `lqr_finite_horizon`, `lqg`, `trajectory_lqr` on a linear model (`LTISystem`) or any plant linearized about its command port, and their gains `lqr_gain`, `place_gain`, `lqr_gain_schedule` on arrays; `impedance.py`, `output.py`, `state.py`, `siso.py` — `PID` with `ports="error"` (compensator, one input `e`) or `"reference"` (`r`, `y`), `modelbased.py`, `robotic.py`, `geometric.py` — `PurePursuit`, `neural.py` — `NeuralPolicyController`, **`mpc/`** — RH `ModelPredictiveController`) |
+| `estimation/` | state observers and their designs: `observer.py` — `StateObserver`, the innovation form `dx̂ = A (x̂ − x̄) + B (u − ū) + L (y − ŷ)` with ports `u`, `y` → `x` (the estimate, hat labels) and the role id `observer`; `design.py` — `luenberger` (error poles placed on the dual pair) and `kalman` (the stationary Kalman–Bucy gain), each on a linear model or a plant linearized about its command port, with `kalman_gain(A, C, Q_n, R_n)` / `luenberger_gain` on arrays. The LQG box, `observer` + `gain` under one controller, is `control.design.lqg`. Later: time-varying and trajectory observers, the EKF, the sampled filters, the estimation problem and its tools ([docs/plans/estimation-and-state-feedback.md](docs/plans/estimation-and-state-feedback.md)) |
 
 **Tools** — verbs on a `System`; they return data or plots and never define
 user-facing systems (factories are fine: `linearize_matrices()` returns arrays,
@@ -136,13 +136,13 @@ state-feedback block):
 - **Exception:** `graphical/animation` imports `planning.spatial.Scene`, to
   draw a scene as an overlay.
 - A new import across libraries needs an exception here, with its reason.
-- Libraries may ship **design verbs for their own blocks**, arrays or a model in,
-  block out (`control.design.lqr(A, B, Q, R) -> StateFeedbackController`,
-  `estimation.design.kalman(A, B, C, Q_n, R_n) -> StateObserver`); the linearization
-  producing those arrays lives in `analysis/`.
-- **Exception:** `estimation.design` imports `control.design` (`place_gain`, the
-  argument parser the two design families share): the observer gains are the dual
-  designs; and `control.design.lqg` imports `estimation.design.kalman`, inside the
+- Libraries may ship **design verbs for their own blocks**, a model in, block out
+  (`control.design.lqr(sys, Q, R) -> StateFeedbackController`,
+  `estimation.design.kalman(sys, Q_n, R_n) -> StateObserver`), and their gains on
+  arrays (`lqr_gain(A, B, Q, R) -> K`); the linearization producing the model lives in
+  `analysis/`.
+- **Exception:** `estimation.design` imports `control.design.place_gain`: the observer
+  gains are the dual designs; and `control.design.lqg` imports `estimation.design.kalman`, inside the
   function: an LQR gain on a Kalman estimate.
 - **Exception:** `control/` (and `estimation/`) import `analysis`
   (`linearization.design_model`, `riccati`, `structural`): a design on a plant is

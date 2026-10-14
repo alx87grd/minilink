@@ -70,14 +70,18 @@ _EXPORTS: dict[str, tuple[str, str]] = {
     ),
     "SlidingModeController": ("minilink.control.modelbased", "SlidingModeController"),
     "lqr": ("minilink.control.design", "lqr"),
+    "lqr_gain": ("minilink.control.design", "lqr_gain"),
     "lqr_finite_horizon": ("minilink.control.design", "lqr_finite_horizon"),
     "trajectory_lqr": ("minilink.control.design", "trajectory_lqr"),
     "place": ("minilink.control.design", "place"),
+    "place_gain": ("minilink.control.design", "place_gain"),
     "lqg": ("minilink.control.design", "lqg"),
     # estimation
     "StateObserver": ("minilink.estimation.observer", "StateObserver"),
     "kalman": ("minilink.estimation.design", "kalman"),
+    "kalman_gain": ("minilink.estimation.design", "kalman_gain"),
     "luenberger": ("minilink.estimation.design", "luenberger"),
+    "luenberger_gain": ("minilink.estimation.design", "luenberger_gain"),
     "TimeVaryingStateFeedbackController": (
         "minilink.control.state",
         "TimeVaryingStateFeedbackController",

@@ -524,7 +524,7 @@ _, B_w, _, _ = linearize_matrices(plant, wrt="d")                # B_w = ∂f/�
 _, _, _, D_v = linearize_matrices(plant, of=rate, wrt="n")       # D_v = ∂h/∂n
 W, V = w.psd, v.psd                                              # (1, 1) arrays
 K = lqr_gain(A, B, Q_x, R_u)
-observer = kalman(A, B, C, B_w @ W @ B_w.T, D_v @ V @ D_v.T)     # Q = B_w W B_wᵀ,  R = D_v V D_vᵀ
+observer = kalman(LTISystem(A, B, C), B_w @ W @ B_w.T, D_v @ V @ D_v.T)     # Q_n = B_w W B_wᵀ,  R_n = D_v V D_vᵀ
 
 # RL training and Monte Carlo: one integer seed per tool, draws at the tool's dt
 ctl = ReinforcementLearningPlanner(problem, dt=0.05, seed=0).solve().ctl
@@ -886,7 +886,7 @@ stay as the evidence. Their remedies were not stress-tested by a second reviewer
    zero: the ensemble standard deviation is 43% of its stationary value at 0.1 τ and 92% at τ,
    and a 10 s Monte Carlo cost is 11% low at τ = 2 s. A filter has state, and the stepped tools
    integrate `problem.sys` only. `LowPassFilter(cutoff_hz, order)` has no `tau` and no params.
-10. **RN-1 is not a technical prerequisite of P4.** `kalman(A, B, C, Q, R)` takes arrays. On
+10. **RN-1 is not a technical prerequisite of P4.** `kalman_gain(A, C, Q_n, R_n)` takes arrays. On
     today's block, reading `W = var · Δ`, a Kalman–Bucy filter in the diagram had error
     variances `[9.69e-5, 4.35e-4]` against `[9.23e-5, 4.52e-4]` predicted. The live GRO501
     notebook designs with `Qn = I`, `Rn = 1e-3 I` and simulates `var` 0.01 and 0.001: FD-F9 is in

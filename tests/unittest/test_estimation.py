@@ -157,18 +157,17 @@ def test_kalman_gain_is_the_dual_of_lqr():
     np.testing.assert_allclose(L_design, P @ C.T @ np.linalg.inv(R_n))
 
 
-def test_the_three_forms_give_one_observer():
+def test_the_model_and_the_plant_give_one_observer():
     plant = Pendulum()  # y is the state, C = I
     x_bar = np.array([0.3, 0.0])
     Q_n, R_n = np.diag([0.01, 0.1]), 1e-3 * np.eye(2)
     model = linearize(plant, x_bar)
-    on_arrays = kalman(
-        model.A(), model.B(), model.C(), Q_n, R_n, x_bar=x_bar, u_bar=model.ubar
-    )
     on_model = kalman(model, Q_n, R_n)
     on_plant = kalman(plant, Q_n, R_n, x_bar=x_bar)
     for obs in (on_model, on_plant):
-        np.testing.assert_allclose(obs.params["L"], on_arrays.params["L"])
+        np.testing.assert_allclose(
+            obs.params["L"], kalman_gain(model.A(), model.C(), Q_n, R_n)
+        )
         np.testing.assert_allclose(obs.params["xbar"], x_bar)
         np.testing.assert_allclose(obs.params["ybar"], plant.h(x_bar, model.ubar))
         assert obs.state.labels == ["theta_hat", "dtheta_hat"]
@@ -176,8 +175,8 @@ def test_the_three_forms_give_one_observer():
     np.testing.assert_allclose(
         kalman(plant, Q_n=Q_n, R_n=R_n, x_bar=x_bar).params["L"], on_plant.params["L"]
     )
-    with pytest.raises(TypeError, match=r"kalman\(sys, Q_n, R_n\)"):
-        kalman(plant, x_bar, Q_n, R_n)
+    with pytest.raises(TypeError, match=r"kalman_gain\(A, C, Q_n, R_n\)"):
+        kalman(model.A(), Q_n, R_n)  # arrays go to the gain
 
 
 def test_luenberger_on_the_plant_and_the_hat():
@@ -198,7 +197,7 @@ def test_luenberger_on_the_plant_and_the_hat():
 def test_lqg_is_the_observer_and_the_gain_in_one_box():
     Q, R = np.diag([1.0, 0.1]), np.array([[0.5]])
     Q_n, R_n = np.diag([0.1, 0.3]), np.array([[0.2]])
-    box = lqg(A, B, C, Q, R, Q_n, R_n)
+    box = lqg(LTISystem(A, B, C), Q, R, Q_n, R_n)
     assert list(box.subsystems) == ["observer", "gain"]
     assert list(box.inputs) == ["r", "y"] and list(box.outputs) == ["u"]
     np.testing.assert_allclose(box.subsystems["gain"].params["K"], lqr_gain(A, B, Q, R))

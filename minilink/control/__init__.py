@@ -6,7 +6,8 @@ Teaching imports::
     from minilink.control.mpc import ModelPredictiveController
 
 The design verbs (``lqr``, ``place``, ``lqg``, ``lqr_finite_horizon``,
-``trajectory_lqr`` and their gains) live in ``control.design``.
+``trajectory_lqr``) take a linear model or a plant; their gains (``lqr_gain``,
+``place_gain``, ``lqr_gain_schedule``) take arrays. Both live in ``control.design``.
 """
 
 from __future__ import annotations
