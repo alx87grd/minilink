@@ -28,7 +28,7 @@
       trajectory optimization
     </td>
     <td width="25%" align="center" valign="top">
-      task-space impedance control<br/>
+      impedance control<br/>
       <a href="https://alx87grd.github.io/minilink/_static/showcase/ur5_impedance.html">interactive 3-D</a>
     </td>
     <td width="25%" align="center" valign="top">
@@ -42,16 +42,17 @@
 </table>
 
 Minilink is an open-source Python toolbox for dynamical systems and control.
-A model is a short class whose equations read like the textbook, and diagrams
-are built from models with `+`, `>>` and `@`. Because every model, controller
-and diagram is the same kind of object, one set of tools applies to all of
-them: simulation and animation in 2D and 3D, frequency-domain analysis,
-classical and state-space control, value iteration, sampling-based planning, trajectory
-optimization, model predictive control and reinforcement learning. The same
-equations compile and differentiate under JAX, so a course model is also a
+A model is a short class whose equations read like the textbook. Models
+connect into block diagrams in code, with composition operators. Because
+every model, controller and diagram is the same kind of object, one set of
+tools applies to all of them: simulation and animation in 2D and 3D,
+frequency-domain analysis, classical and state-space control, value
+iteration, sampling-based planning, trajectory optimization, model predictive
+control and reinforcement learning. The same equations compile and
+differentiate under JAX, so a course model is also a high-performance
 research model.
 
-## Eleven lines
+## Ten lines
 
 ```python
 from minilink import ImpedanceController, Pendulum
@@ -61,7 +62,6 @@ plant = Pendulum()
 
 plant.x0[0] = 2.0
 plant.params["l"] = 5.0
-plant.params["m"] = 1.0
 
 diagram = controller @ plant
 diagram.compute_trajectory(tf=10.0)
@@ -81,50 +81,42 @@ state `x`, the input `u`, the time `t` and the parameters `params`:
     y     = h(x, u, t; params)      one per output port, default y = x
     T     = tf(x, u, t; params)     body poses, for animation
 
-Write `f`, and the plant simulates and plots. Add `tf` and a skin, and it
-animates on matplotlib, plotly, meshcat (3D) or pygame, and you can drive it
-from the keyboard:
+Write `f`, and the plant simulates and plots. Write `h` to choose what the
+sensor measures:
 
 ```python
 import numpy as np
-from minilink import DynamicSystem, Step
-from minilink.core.kinematics import translation
-from minilink.graphical.animation.primitives import Box, ground_line
+from minilink import DynamicSystem
 
 
 class MassSpringDamper(DynamicSystem):
-    # m p'' + c p' + k p = u
-
     def __init__(self):
-        super().__init__(n=2, input_dim=1, output_dim=2)
-        self.params = {"m": 1.0, "k": 4.0, "c": 0.3}
-        self.skin = lambda sys: {
-            "world": [ground_line(length=8.0)],
-            "body": [Box(length_x=0.6, length_y=0.6, length_z=0.1)],
-        }
-        self.camera_scale = 4.0
+        super().__init__(n=2, input_dim=1, output_dim=1)
 
     def f(self, x, u, t=0, params=None):
-        params = self.params if params is None else params
-        m, k, c = params["m"], params["k"], params["c"]
+        m, k, b = 1.0, 4.0, 0.3
         p, v = x
 
-        # m p̈ + c ṗ + k p = u
-        a = (u[0] - c * v - k * p) / m
+        # m p̈ + b ṗ + k p = u
+        a = (u[0] - b * v - k * p) / m
 
         return np.array([v, a])
 
-    def tf(self, x, u, t=0, params=None):
-        return {"body": translation(x[0], 0.0, 0.0)}
+    def h(self, x, u, t=0, params=None):
+        p, v = x
+
+        return np.array([p])  # the sensor reads the position only
 
 
-msd = MassSpringDamper()
-msd.x0[0] = 1.0
-loop = Step(final_value=np.array([10.0]), step_time=2.0) >> msd
-loop.compute_trajectory(tf=20.0)
-loop.animate()  # renderer="plotly" | "meshcat" | "pygame"
-# msd.game()    # keyboard drives u, live
+plant = MassSpringDamper()
+plant.x0[0] = 1.0
+plant.compute_trajectory(tf=10.0)
+plant.plot_trajectory()
 ```
+
+Add `tf` and a skin, and it animates on matplotlib, plotly, meshcat (3D) or
+pygame, and you can drive it from the keyboard
+([10_graphical](https://github.com/alx87grd/minilink/blob/main/examples/tutorial/10_graphical.ipynb)).
 
 `f`, `h` and `tf` are functions of `(x, u, t; params)` only: no hidden state on
 the object. That one convention is what lets a model compose into diagrams,
@@ -134,21 +126,6 @@ and one `f`, so a closed loop linearizes, animates and nests like a plant.
 ## One model, every tool
 
 ![one System (f, h, tf) connected to simulation, analysis, control, planning, learning](https://raw.githubusercontent.com/alx87grd/minilink/main/docs/_static/bridges.svg)
-
-| Verb | Call |
-| --- | --- |
-| Simulate | `plant.compute_trajectory(tf=10.0)` |
-| Frequency domain | `plot_bode(plant, x_bar)`, `plot_root_locus(C >> G)` |
-| Classical loop | `PID(Kp, Ki, Kd) @ plant` |
-| State feedback | `lqr(plant, Q, R, x_bar=x_bar) @ plant` |
-| Robot control | `ComputedTorqueController(arm)`, `JointImpedance(arm)` |
-| 3D robots | `UR5Manipulator()`, then `animate(renderer="meshcat", is_3d=True)` |
-| Value iteration | `DynamicProgrammingPlanner(problem, x_grid=(101, 101))` |
-| Sampling search | `RRTPlanner(problem)` |
-| Trajectory optimization | `TrajectoryOptimizationPlanner(problem, transcription="direct_collocation")` |
-| Model predictive control | `ModelPredictiveController(planner, dt_mpc=0.1) @ plant` |
-| Reinforcement learning | `ReinforcementLearningPlanner(problem)` |
-| Sensitivity | `plant.jacobian("f", "params", x_bar)` |
 
 The objects between the tools are the textbook's nouns. A `PlanningProblem`
 is a system, a cost and boundary sets; every planner takes it and returns a
@@ -181,8 +158,7 @@ opt_traj = opt.solve().trajectory            # direct collocation
 ```
 
 Trajectory optimization transcribes the problem into a `MathematicalProgram`
-solved by an `Optimizer`; a sampled controller closes the loop on the
-continuous plant with `ctl % dt`, zero-order hold included.
+solved by an `Optimizer`.
 
 ## Differentiable and compiled
 
@@ -222,12 +198,8 @@ differentiate inside your own `jit`. See
   from one setup cell. One import line covers a course:
   `from minilink import Pendulum, PID, lqr, PlanningProblem, ReinforcementLearningPlanner`.
 - **Research.** Optional JAX for compile and autodiff, Ipopt for large NLPs,
-  meshcat for 3D, a hybrid stack for sampled MPC, a Gymnasium bridge
-  (`Sys2Gym`) for external RL agents. Every catalog plant compiles on both
+  meshcat for 3D, a hybrid stack for sampled MPC. Every catalog plant compiles on both
   backends.
-
-The boundary between the two is a contract, not a convention:
-[ROADMAP.md §2](https://github.com/alx87grd/minilink/blob/main/ROADMAP.md#2-two-lanes).
 
 ## Install
 
@@ -254,6 +226,4 @@ tier, pip, and options: [install.md](https://github.com/alx87grd/minilink/blob/m
 - [API reference](https://alx87grd.github.io/minilink/), [DESIGN.md](https://github.com/alx87grd/minilink/blob/main/DESIGN.md), [ROADMAP.md](https://github.com/alx87grd/minilink/blob/main/ROADMAP.md), [tests](https://github.com/alx87grd/minilink/blob/main/tests/README.md)
 - [CONSTITUTION.md](https://github.com/alx87grd/minilink/blob/main/CONSTITUTION.md) and [RULES.md](https://github.com/alx87grd/minilink/blob/main/RULES.md), the design law and the code rules every contributor and agent follows
 
-Minilink is the successor of [pyro](https://github.com/SherbyRobotics/pyro),
-the toolbox behind the robotics and control courses at Université de
-Sherbrooke. MIT license.
+Minilink is the successor of [pyro](https://github.com/SherbyRobotics/pyro).
