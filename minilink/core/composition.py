@@ -18,7 +18,12 @@ from dataclasses import dataclass
 import numpy as np
 
 from minilink.core.diagram import DiagramSystem
-from minilink.core.feedback import block_roles, check_reserved_id, command_port
+from minilink.core.feedback import (
+    block_roles,
+    check_reserved_id,
+    command_port,
+    require_command,
+)
 from minilink.core.system import System
 
 #: Inputs that read their nominal value when left open, without a word from
@@ -649,7 +654,7 @@ def _no_measurement_message(controller, controller_id: str) -> str:
 
 
 def _default_control_out(sys) -> str:
-    return block_roles(sys).command or _default_output_port(sys)
+    return require_command(sys) or _default_output_port(sys)
 
 
 def _filter_into(diagram, filter, target):

@@ -23,7 +23,7 @@ from dataclasses import dataclass
 
 import numpy as np
 
-from minilink.core.feedback import block_roles, plot_space_of
+from minilink.core.feedback import block_roles, plot_space_of, require_command
 from minilink.graphical.common import PlotResult
 
 # Public API
@@ -288,7 +288,7 @@ def _law_roles(block):
     outputs = list(getattr(block, "outputs", {}))
     if measurement is None or not outputs:
         return None
-    control = roles.command or outputs[0]
+    control = require_command(block) or outputs[0]
     return _LawRoles(measurement, roles.reference, control)
 
 

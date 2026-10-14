@@ -113,6 +113,33 @@ def command_port(sys) -> str:
     )
 
 
+def require_command(block) -> str | None:
+    """The command output of ``block`` (``u``, else ``u_ff``), or ``None`` to fall back on its default output.
+
+    A block that reads a measurement (``y`` or ``x``) and gives the state ``x``
+    back, with no ``u`` and no ``y`` to command through, is an observer: it is
+    refused as a controller, with the recipe that makes it one. A compensator
+    (no measurement) or a box that commands through an output named ``y`` (a
+    gain in series with a saturation) is left to its default output.
+    """
+    roles = block_roles(block)
+    outputs = getattr(block, "outputs", {})
+    if (
+        roles.command is None
+        and roles.measurements
+        and "x" in outputs
+        and "y" not in outputs
+    ):
+        raise ValueError(
+            f"{getattr(block, 'name', block)!r} reads {roles.measurement!r} but gives "
+            "no command 'u': an observer, not a controller. Put it in a controller box "
+            "with a gain (add_subsystem(observer, 'observer'), add_subsystem(gain, "
+            "'gain'), connect its x to the gain and the gain's u back, then "
+            "expose('r', 'y', 'u')) and close that box on the plant."
+        )
+    return roles.command
+
+
 def roles(system) -> Roles:
     """The plant, the controller and the observer of ``system``, from the reserved names.
 
