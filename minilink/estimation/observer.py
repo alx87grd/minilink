@@ -36,17 +36,9 @@ class StateObserver(DynamicSystem):
         p = C.shape[0]
         D = np.zeros((p, m)) if D is None else np.atleast_2d(np.asarray(D, dtype=float))
         check_dimensions(A, B, C, D, L)
-        xbar = (
-            np.zeros(n) if xbar is None else np.asarray(xbar, dtype=float).reshape(-1)
-        )
-        ubar = (
-            np.zeros(m) if ubar is None else np.asarray(ubar, dtype=float).reshape(-1)
-        )
-        ybar = (
-            C @ xbar + D @ ubar
-            if ybar is None
-            else np.asarray(ybar, dtype=float).reshape(-1)
-        )
+        xbar = vector(xbar, n)
+        ubar = vector(ubar, m)
+        ybar = C @ xbar + D @ ubar if ybar is None else vector(ybar, p)
 
         super().__init__(n)
         self.name = "State Observer"
@@ -113,6 +105,13 @@ class StateObserver(DynamicSystem):
 
 
 # Internal machinery
+
+
+def vector(value, dim):
+    """``value`` as a float vector of length ``dim``; zeros when ``None``."""
+    if value is None:
+        return np.zeros(dim)
+    return np.asarray(value, dtype=float).reshape(-1)
 
 
 def check_dimensions(A, B, C, D, L):

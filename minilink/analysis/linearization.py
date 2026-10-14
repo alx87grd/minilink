@@ -142,9 +142,8 @@ def design_model(
         # "u" alone names every input stacked: pick the components of the port named u
         columns = sys.get_input_port_slice("u")
         command = [("u", i) for i in range(columns.start, columns.stop)]
-    measurement = (
-        "y" if "y" in sys.outputs else None
-    )  # the measured output, not every edge port
+    # the measured output alone, not every edge port of a box
+    measurement = "y" if "y" in sys.outputs else None
     return linearize(
         sys,
         x_bar,

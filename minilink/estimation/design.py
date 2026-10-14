@@ -45,8 +45,8 @@ def kalman_gain(A, C, Q_n, R_n):
     # A P + P Aᵀ − P Cᵀ R_n⁻¹ C P + Q_n = 0: the control equation on the dual pair (Aᵀ, Cᵀ)
     P = care(A.T, C.T, Q_n, R_n)
 
-    # L = P Cᵀ R_n⁻¹
-    L = np.linalg.solve(R_n.T, C @ P.T).T
+    # L = P Cᵀ R_n⁻¹   (P and R_n symmetric: the transpose of R_n⁻¹ C P)
+    L = np.linalg.solve(R_n, C @ P).T
 
     return L
 

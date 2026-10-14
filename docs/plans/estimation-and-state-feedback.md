@@ -1,6 +1,6 @@
 # State feedback and state estimation as one pattern: the design for P4 and beyond
 
-**Status:** decided 2026-10-13, landing from 2026-10-14; the rulings and their reasons are in
+**Status:** decided 2026-10-13; §6 (the control sweep, the observer, the designs, `lqg`, the demos) landed 2026-10-14 in nine commits, the open follow-ups are TODO rows (P4 follow-ups, `LQGPlanner`, the estimation follow-ups); §3, §5 and §7 are the live design for what comes next. The rulings and their reasons are in
 [2026-10-14-state-space-design-rulings.md](../reviews/2026-10-14-state-space-design-rulings.md).
 Workboard row P4 (v0.2 wave B). Items marked **[ruled]** were decided in the design
 conversation; the role name was ruled `observer` (R11) and `analysis/riccati.py` taken (R5).
@@ -166,7 +166,7 @@ past data). The evaluator's dual scores estimation error, consistency (NEES) and
 whiteness. Where the pieces come from today: `Planner` base (`planning/planner.py`),
 `PlanningSolution` (`planning/results.py`), `MonteCarloEvaluator`, `nominal_trajectory`.
 
-## 6. What changes now (P4 + the control sweep), in order
+## 6. What changed on 2026-10-14 (P4 + the control sweep), in the order it landed
 
 Behaviour-preserving steps follow the AGENTS recipe: a seeded baseline of every gain and
 closed-loop rollout the tests and demos build, `cmp` byte-identical after.
