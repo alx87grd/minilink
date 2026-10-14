@@ -42,14 +42,15 @@
 </table>
 
 Minilink is an open-source Python toolbox for dynamical systems and control.
-A model is a short class whose equations read like the textbook. Multiple 
-model can be connected into a block diagrams from code using composition operators.
-Because every model, controller and diagram is the same kind of object, one set 
-of tools applies to all of them: simulation and animation in 2D and 3D, 
-frequency-domain analysis, classical and state-space control, value iteration, 
-sampling-based planning, trajectory optimization, model predictive control 
-and reinforcement learning. The same equations compile and differentiate under JAX, 
-allowing high-performance research model.
+A model is a short class whose equations read like the textbook. Models
+connect into block diagrams in code, with composition operators. Because
+every model, controller and diagram is the same kind of object, one set of
+tools applies to all of them: simulation and animation in 2D and 3D,
+frequency-domain analysis, classical and state-space control, value
+iteration, sampling-based planning, trajectory optimization, model predictive
+control and reinforcement learning. The same equations compile and
+differentiate under JAX, so a course model is also a high-performance
+research model.
 
 ## Ten lines
 
@@ -81,43 +82,42 @@ state `x`, the input `u`, the time `t` and the parameters `params`:
     y     = h(x, u, t; params)      one per output port, default y = x
     T     = tf(x, u, t; params)     body poses, for animation
 
-Write `f`, and the plant simulates and plots. Add `tf` and a skin, and it
-animates on matplotlib, plotly, meshcat (3D) or pygame, and you can drive it
-from the keyboard:
+Write `f`, and the plant simulates and plots. Write `h` to choose what the
+sensor measures:
 
 ```python
 import numpy as np
-from minilink import DynamicSystem, Step
+from minilink import DynamicSystem
 
-class MyCustomMassSpringDamper(DynamicSystem):
 
+class MassSpringDamper(DynamicSystem):
     def __init__(self):
-        super().__init__(n=2, input_dim=1, output_dim=2)
+        super().__init__(n=2, input_dim=1, output_dim=1)
 
     def f(self, x, u, t=0, params=None):
-        p = x[0]
-        v = x[1]
-        f = u[0]
-        m = 10.
-        k = 10.
-        b = 2.0
+        m, k, b = 1.0, 4.0, 0.3
+        p, v = x
 
-        # EoM in Python/Numpy (or JAX-compatible to enable autodiff and compilation features
-        a = (f - b * v - k * p) / m
+        # m p̈ + b ṗ + k p = u
+        a = (u[0] - b * v - k * p) / m
 
-        dx = np.array([v, a])
+        return np.array([v, a])
 
-        return dx
+    def h(self, x, u, t=0, params=None):
+        p, v = x
 
-      def h(self, x, u, t=0, params=None):
-
-        y = x[0] # Output is the position
-
-        return y
+        return np.array([p])  # the sensor reads the position only
 
 
-plant = MyCustomMassSpringDamper()
+plant = MassSpringDamper()
+plant.x0[0] = 1.0
+plant.compute_trajectory(tf=10.0)
+plant.plot_trajectory()
 ```
+
+Add `tf` and a skin, and it animates on matplotlib, plotly, meshcat (3D) or
+pygame, and you can drive it from the keyboard
+([10_graphical](examples/tutorial/10_graphical.ipynb)).
 
 `f`, `h` and `tf` are functions of `(x, u, t; params)` only: no hidden state on
 the object. That one convention is what lets a model compose into diagrams,
@@ -193,7 +193,7 @@ differentiate inside your own `jit`. See
 - **Research.** Optional JAX for compile and autodiff, Ipopt for large NLPs,
   meshcat for 3D, a hybrid stack for sampled MPC. Every catalog plant compiles on both
   backends.
-  
+
 ## Install
 
 Python 3.10+. Recommended: the conda environment from
