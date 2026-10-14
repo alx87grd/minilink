@@ -77,7 +77,7 @@ pull requests to the branches its `on:` block lists (`main` and `dev` among them
 
 | Job | Steps |
 | --- | --- |
-| **`test`** | ruff + `pytest` (py 3.10–3.13; demo-check bridge; JAX tests and demos skip); coverage report on py 3.12, no gate |
+| **`test`** | ruff + `pytest` (py 3.10–3.13; demo-check bridge; JAX tests and demos skip); coverage report on py 3.12, no gate; on py 3.12, the `nbstripout` hook over every notebook (committed notebooks carry no outputs and no volatile metadata) |
 | **`laptops`** | Basic tier (`pip install -e ".[dev]"`, no extras) on `windows-latest` and `macos-latest`, py 3.12: `pytest` + **notebook smoke** (notebooks that need an extra skip) |
 | **`packaging`** | `python -m build` + wheel/sdist check (no `experimental/`) + `twine check` + install the wheel and `import minilink` |
 | **`regression`** | `pytest` (incl. the JAX and symbolic tests) + regression gates (CI flags above) + **flagship demos** + **notebook smoke** (py 3.12 + JAX + viz + symbolic) |

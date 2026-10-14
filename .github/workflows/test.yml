@@ -40,6 +40,12 @@ jobs:
     - name: Check formatting with Ruff
       run: ruff format --check .
 
+    # Notebooks are committed stripped (no outputs, no volatile metadata); one
+    # committed without the hook or the filter fails here.
+    - name: Check notebooks are stripped
+      if: matrix.python-version == '3.12'
+      run: pre-commit run nbstripout --all-files --show-diff-on-failure
+
     - name: Test with pytest
       if: matrix.python-version != '3.12'
       run: pytest

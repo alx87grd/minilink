@@ -1,12 +1,24 @@
 # Install: pip install -e ".[dev]" && pre-commit install
 # Run every hook on the whole tree: pre-commit run --all-files
+#
+# Notebooks, once per clone: the git filter strips the same keys as the hook
+# below, so running a notebook locally leaves `git status` clean:
+#   nbstripout --install
+#   git config filter.nbstripout.extrakeys "metadata.kernelspec metadata.language_info metadata.colab metadata.accelerator cell.metadata.colab cell.metadata.id cell.metadata.outputId cell.metadata.executionInfo"
 
 repos:
   - repo: https://github.com/kynan/nbstripout
     rev: 0.9.1
     hooks:
       - id: nbstripout
-        files: ^examples/.*\.ipynb$
+        # Volatile metadata a local run or Colab rewrites. The same list is the
+        # git filter's (header above); CI runs this hook (test.yml).
+        args:
+          - --extra-keys
+          - >-
+            metadata.kernelspec metadata.language_info metadata.colab
+            metadata.accelerator cell.metadata.colab cell.metadata.id
+            cell.metadata.outputId cell.metadata.executionInfo
 
   # The CI lint steps, run with the ruff the dev extra installs
   # (pip install -e ".[dev]"), so a hook and CI never disagree on a version.
