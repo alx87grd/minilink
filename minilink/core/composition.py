@@ -238,7 +238,7 @@ def closed_loop(
                 f"source block such as Step() or WhiteNoise(...); got {value!r}"
             )
     if observer is not None:
-        _check_observer(controller, roles, observer, plant)
+        check_observer(controller, roles, observer, plant)
     elif filter is not None and "x" in roles.measurements:
         raise ValueError(
             f"{controller.name!r} reads the state 'x': a filter on the state is an "
@@ -703,7 +703,7 @@ def _check_measurement(controller, plant, measurement, controller_id, plant_id) 
         )
 
 
-def _check_observer(controller, roles, observer, plant) -> None:
+def check_observer(controller, roles, observer, plant) -> None:
     """Refuse an observer the loop cannot wire: ``u``, ``y`` -> ``x``, for a controller that reads ``x`` alone."""
     if roles.measurements != ("x",):
         reads = (
