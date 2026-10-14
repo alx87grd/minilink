@@ -23,9 +23,9 @@ from minilink.control.lqr import lqr_gain_schedule
 from minilink.control.state import (
     StateFeedbackController,
     TimeVaryingStateFeedbackController,
-    interpolate_schedule,
 )
 from minilink.core.costs import QuadraticCost
+from minilink.core.trajectory import interpolate_schedule
 from minilink.planning.evaluation import nominal_trajectory
 from minilink.planning.planner import Planner
 from minilink.planning.problems import PlanningProblem

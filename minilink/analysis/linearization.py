@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import numpy as np
 
-from minilink.analysis.derivatives import jacobian
+from minilink.analysis.derivatives import compiled, jacobian, operating_point
 from minilink.core.diagram import DiagramSystem
 from minilink.dynamics.abstraction.state_space import LTISystem
 from minilink.graphical.control import style
@@ -90,12 +90,27 @@ def linearize(
     """Linearize ``sys`` about ``(x_bar, u_bar)`` and return an ``LTISystem``.
 
     Same arguments as :func:`linearize_matrices`; ``x_bar=None`` defaults to
-    the nominal state like every tool of the analysis family.
+    the nominal state like every tool of the analysis family. The model
+    carries the operating point it was taken at (``xbar``, ``ubar`` for the
+    selected inputs, ``ybar`` for the selected outputs), so a design made on
+    it (``lqr``, ``kalman``) knows where it applies.
     """
+    x_bar, u_bar, params = operating_point(sys, x_bar, u_bar, params)
     A, B, C, D = linearize_matrices(
         sys, x_bar, u_bar, t, params, of=of, wrt=wrt, method=method, eps=eps
     )
-    lti = LTISystem(A, B, C, D, name=f"Linearized {sys.name}")
+    inputs = input_selectors(sys, wrt)
+    outputs = output_selectors(sys, of)
+    lti = LTISystem(
+        A,
+        B,
+        C,
+        D,
+        name=f"Linearized {sys.name}",
+        xbar=x_bar,
+        ubar=point_inputs(sys, u_bar, inputs),
+        ybar=point_outputs(sys, outputs, x_bar, u_bar, t, params),
+    )
     lti.state.labels = [f"Delta {label}" for label in sys.state.labels]
     return lti
 
@@ -130,6 +145,47 @@ def output_selectors(sys, of):
             return [(port_id, None) for port_id in sys.outputs]
         return None
     return [as_selector(item, "of") for item in as_list(of)]
+
+
+def point_inputs(sys, u_bar, inputs):
+    """The components of ``u_bar`` the ``wrt`` selectors pick, in the order of the ``B`` columns.
+
+    A diagram wire is an additive perturbation of a signal, so its nominal is zero.
+    """
+    pieces = []
+    for name, index in inputs:
+        if name == "u":
+            values = u_bar
+        elif name in sys.inputs:
+            values = u_bar[sys.get_input_port_slice(name)]
+        else:
+            values = np.zeros(wire_dim(sys, name))
+        pieces.append(values if index is None else values[[index]])
+    return np.concatenate(pieces) if pieces else np.zeros(0)
+
+
+def point_outputs(sys, outputs, x_bar, u_bar, t, params):
+    """The outputs the ``of`` selectors pick, evaluated at the operating point (the state itself when ``None``)."""
+    if outputs is None:
+        return x_bar
+    evaluator = compiled(sys, "fd")
+    ports = evaluator.outputs_p(x_bar, u_bar, t, params)
+    wires = (
+        evaluator.compute_internal_signals_dict(x_bar, u_bar, t)
+        if any(name not in ports for name, _ in outputs)
+        else {}
+    )
+    pieces = []
+    for name, index in outputs:
+        values = np.asarray(ports[name] if name in ports else wires[name], dtype=float)
+        pieces.append(values if index is None else values[[index]])
+    return np.concatenate(pieces)
+
+
+def wire_dim(sys, wire):
+    """The dimension of the diagram wire ``"block:port"``."""
+    block, port_id = wire.split(":", 1)
+    return sys.subsystems[block].outputs[port_id].dim
 
 
 def siso_channel(sys, of, wrt):

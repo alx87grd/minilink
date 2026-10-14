@@ -382,6 +382,27 @@ class TestFamilyPattern(unittest.TestCase):
         np.testing.assert_allclose(lti.A(), A)
         self.assertEqual(lti.state.labels[0], "Delta x[0]")
 
+    def test_the_linear_model_carries_its_operating_point(self):
+        plant = _Affine()
+        x_bar, u_bar = np.array([0.1, 0.2]), np.array([0.3, 0.4])
+        lti = plant.linearize(x_bar, u_bar)
+        np.testing.assert_allclose(lti.xbar, x_bar)
+        np.testing.assert_allclose(lti.ubar, u_bar)
+        np.testing.assert_allclose(lti.ybar, plant.h(x_bar, u_bar))
+        # the selected columns and rows: ubar and ybar follow B and C
+        part = linearize(plant, x_bar, u_bar, of=["z", ("y", 0)], wrt=("bias", 0))
+        np.testing.assert_allclose(part.ubar, [0.4])
+        np.testing.assert_allclose(part.ybar, [x_bar[0], plant.h(x_bar, u_bar)[0]])
+        # the nominal state is the default point; a model from arrays sits at the origin
+        plant.state.set_nominal_value(x_bar)
+        np.testing.assert_allclose(plant.linearize().xbar, x_bar)
+        from minilink.dynamics.abstraction.state_space import LTISystem
+
+        origin = LTISystem(_Affine.A, _Affine.B, _Affine.C, _Affine.D)
+        np.testing.assert_allclose(origin.xbar, 0.0)
+        np.testing.assert_allclose(origin.ubar, 0.0)
+        np.testing.assert_allclose(origin.ybar, 0.0)
+
     def test_linearize_selects_rows_and_columns(self):
         plant = _Affine()
         A, B, C, D = linearize_matrices(

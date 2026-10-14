@@ -32,6 +32,16 @@ def _zeros_like(template, shape):
     return xp.zeros(shape, dtype=dtype)
 
 
+def _point(value, dim, name):
+    """One component of the operating point as a float vector of length ``dim`` (zeros when ``None``)."""
+    if value is None:
+        return np.zeros(dim)
+    point = np.asarray(value, dtype=float).reshape(-1)
+    if point.shape != (dim,):
+        raise ValueError(f"{name} must have shape ({dim},), got {point.shape}")
+    return point
+
+
 def _check_dimensions(A, B, C, D):
     A_shape = _shape("A", A)
     B_shape = _shape("B", B)
@@ -131,6 +141,12 @@ class LTISystem(LTISystemFacades, StateSpaceSystem):
     the ports ``u``, ``y`` and ``x`` undeclared, for a subclass that declares
     its own layout (a compensator ``TransferFunction``); ``expose_state=False``
     declares ``u`` and ``y`` only (a filter is not a plant).
+
+    A model obtained by :func:`~minilink.analysis.linearization.linearize`
+    describes deviations about an operating point, which it carries as
+    ``xbar``, ``ubar`` and ``ybar`` (the state, the inputs of its ``B``
+    columns, and the outputs of its ``C`` rows), so a design made on it knows
+    where it applies. A model built from arrays sits at the origin.
     """
 
     def __init__(
@@ -143,6 +159,9 @@ class LTISystem(LTISystemFacades, StateSpaceSystem):
         name="LTI System",
         declare_ports=True,
         expose_state=True,
+        xbar=None,
+        ubar=None,
+        ybar=None,
     ):
         self._A = A
         self._B = B
@@ -165,6 +184,16 @@ class LTISystem(LTISystemFacades, StateSpaceSystem):
             name=name,
             declare_ports=declare_ports,
             expose_state=expose_state,
+        )
+
+        # The operating point the deviations are measured from (the origin by default)
+        self.xbar = _point(xbar, n, "xbar")
+        self.ubar = _point(ubar, m, "ubar")
+        self.ybar = (
+            np.asarray(self._C, dtype=float) @ self.xbar
+            + np.asarray(self._D, dtype=float) @ self.ubar
+            if ybar is None
+            else _point(ybar, p, "ybar")
         )
 
     def A(self, t=0.0, params=None):

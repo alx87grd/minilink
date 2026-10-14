@@ -250,3 +250,24 @@ class Trajectory:
             u=_interp(self.u),
             signals={name: _interp(values) for name, values in self.signals.items()},
         )
+
+
+# Public functions
+
+
+def interpolate_schedule(xp, t_samples, values, t):
+    """Value of a sampled schedule at time ``t``: linear between samples, held outside.
+
+    ``t_samples`` holds ``N`` increasing sample times and ``values`` the
+    samples, shape ``(N, ...)``; the result has the shape of one sample.
+    ``xp`` is the array module of the caller (NumPy or JAX).
+    """
+    ts = xp.asarray(t_samples)
+    values = xp.asarray(values)
+
+    # interval [t_i, t_i+1] holding t, clipped to the schedule
+    i = xp.clip(xp.searchsorted(ts, t, side="right") - 1, 0, len(t_samples) - 2)
+    w = xp.clip((t - ts[i]) / (ts[i + 1] - ts[i]), 0.0, 1.0)
+    value = (1.0 - w) * values[i] + w * values[i + 1]
+
+    return value
