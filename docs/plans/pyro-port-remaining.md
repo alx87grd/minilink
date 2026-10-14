@@ -27,8 +27,8 @@ Release criterion carried over: every **in-scope** pyro library module has a min
 | Framework | `pyro/dynamic/mechanical.py` | MechanicalSystemWithPositionInputs | `—` | — | **Drop** | No such class in minilink; DESIGN rejects `WithPositionInputs` inheritance branches — mixed inputs use named ports + `generalized_force` |
 | Framework | `pyro/dynamic/rigidbody.py` | GeneralizedMechanicalSystemWithPositionInputs | `—` | — | **Drop** | No such class in minilink; DESIGN rejects `WithPositionInputs` inheritance branches — mixed inputs use named ports + `generalized_force` |
 | Framework | `pyro/dynamic/rigidbody.py` | RigidBody2D | `—` | — | **Drop** | Use GeneralizedMechanicalSystem or catalog plant |
-| Framework | `pyro/dynamic/statespace.py` | StateObserver | `minilink/estimation/` | — | **TODO** | estimation/luenberger.py |
-| Framework | `pyro/dynamic/statespace.py` | ObservedSystem | `minilink/estimation/` | — | **TODO** | LQG blocked on observers |
+| Framework | `pyro/dynamic/statespace.py` | StateObserver | `minilink/estimation/observer.py` | StateObserver | **Done** | 2026-10-14; `kalman()` / `luenberger()` in `estimation/design.py` replace the `kalman` / `kalman_from_ss` classmethods; pyro's `G=` (noise on the input) is the caller's `Q_n = B W Bᵀ`; the covariance is not stored on the block |
+| Framework | `pyro/dynamic/statespace.py` | ObservedSystem | `minilink/control/design.py` | lqg | **Done** | 2026-10-14; the observer + gain box, `lqg(...) @ plant` |
 | Framework | `pyro/dynamic/stochastic.py` | NoiseSignal | `minilink/blocks/sources.py` | noise ports in diagrams | **Partial** | No StochasticSystemWrapper |
 | Framework | `pyro/dynamic/stochastic.py` | StochasticSystemWrapper | `—` | — | **Drop** | Explicit non-goal unless reversed ([TODO.md](TODO.md) Later) |
 | Framework | `pyro/dynamic/tranferfunction.py` | ss2tf() | `minilink/analysis/frequency.py` | transfer_function | **Done** | Landed 2026-09-07 with the frequency tools |

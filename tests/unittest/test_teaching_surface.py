@@ -33,6 +33,9 @@ TEACHING_SURFACE: dict[str, tuple[str, ...]] = {
         "ImpedanceController",
         "lqr",
         "place",
+        "lqg",
+        "StateObserver",
+        "kalman",
         "Step",
         "feedback",
         "StochasticPlanningProblem",
@@ -45,6 +48,7 @@ TEACHING_SURFACE: dict[str, tuple[str, ...]] = {
         "Gaussian",
         "Uniform",
     ),
+    "minilink.estimation": ("StateObserver", "kalman", "luenberger"),
     "minilink.core": (
         "System",
         "DynamicSystem",
@@ -158,6 +162,9 @@ TEACHING_MODULE_FUNCTIONS = (
     ("minilink.control.design", "lqr_finite_horizon"),
     ("minilink.control.design", "trajectory_lqr"),
     ("minilink.control.design", "place"),
+    ("minilink.control.design", "lqg"),
+    ("minilink.estimation.design", "kalman"),
+    ("minilink.estimation.design", "luenberger"),
 )
 
 # Module prefixes that belong to the teaching lane.
@@ -167,6 +174,7 @@ TEACHING_LANE_PREFIXES = (
     "minilink.dynamics.abstraction.",
     "minilink.dynamics.catalog.",
     "minilink.control.",
+    "minilink.estimation.",
     "minilink.analysis.",
     "minilink.simulation.simulator",
     "minilink.simulation.static_simulator",

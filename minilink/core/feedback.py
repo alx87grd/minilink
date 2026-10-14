@@ -135,7 +135,8 @@ def require_command(block) -> str | None:
             "no command 'u': an observer, not a controller. Put it in a controller box "
             "with a gain (add_subsystem(observer, 'observer'), add_subsystem(gain, "
             "'gain'), connect its x to the gain and the gain's u back, then "
-            "expose('r', 'y', 'u')) and close that box on the plant."
+            "expose('r', 'y', 'u')) and close that box on the plant, or design the "
+            "pair with lqg()."
         )
     return roles.command
 

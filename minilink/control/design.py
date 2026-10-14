@@ -25,6 +25,7 @@ from minilink.control.state import (
     TimeVaryingStateFeedbackController,
     TrajectoryFeedbackController,
 )
+from minilink.core.diagram import DiagramSystem
 from minilink.core.system import System
 from minilink.dynamics.abstraction.state_space import LTISystem
 
@@ -169,6 +170,62 @@ def place(
     )
     K = place_gain(model.A(), model.B(), poles)
     return StateFeedbackController(K, xbar=model.xbar, ubar=model.ubar)
+
+
+def lqg(
+    model,
+    *args,
+    Q=None,
+    R=None,
+    Q_n=None,
+    R_n=None,
+    x_bar=None,
+    u_bar=None,
+    t=0.0,
+    params=None,
+    method="auto",
+    eps=1e-6,
+):
+    """Design an LQG compensator, an LQR gain on a Kalman estimate, and return it as one controller box.
+
+    ``lqg(A, B, C, Q, R, Q_n, R_n)`` designs on arrays; ``lqg(sys, Q, R, Q_n, R_n)``
+    on a linear model or on any plant, as in :func:`lqr`. ``Q, R`` are the LQR
+    weights, ``Q_n, R_n`` the process and measurement noise intensities of
+    :func:`~minilink.estimation.design.kalman`. The box holds the
+    :class:`~minilink.estimation.observer.StateObserver` under ``observer`` and
+    the :class:`~minilink.control.state.StateFeedbackController` under ``gain``,
+    the estimate wired into the gain and the command back into the observer,
+    with ``r``, ``y`` -> ``u`` on its edge: ``box @ plant`` closes the loop, and
+    the closed-loop poles are the gain's and the observer's together (the
+    separation principle).
+    """
+    from minilink.estimation.design import kalman  # the dual design, for this verb only
+
+    model, (Q, R, Q_n, R_n) = design_arguments(
+        model,
+        args,
+        {"Q": Q, "R": R, "Q_n": Q_n, "R_n": R_n},
+        "lqg(A, B, C, Q, R, Q_n, R_n) or lqg(sys, Q, R, Q_n, R_n)",
+        x_bar,
+        u_bar,
+        t,
+        params,
+        method,
+        eps,
+        matrices=2,
+    )
+    gain = lqr(model, Q, R)
+    observer = kalman(model, Q_n, R_n)
+
+    # the estimate feeds the gain, the command feeds the observer; r, y in and u out
+    box = DiagramSystem()
+    box.name = "LQG Controller"
+    box.add_subsystem(observer, "observer")
+    box.add_subsystem(gain, "gain")
+    box.connect("observer", "x", "gain", "x")
+    box.connect("gain", "u", "observer", "u")
+    box.expose("r", "y", "u")
+    return box
 
 
 def lqr_gain_schedule(A, B, Q, R, S_f, tf, *, n_steps=1001):

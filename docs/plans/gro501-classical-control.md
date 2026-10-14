@@ -1,8 +1,8 @@
 # GRO501 classical-control stack — fix plan (draft, 2026-09-07)
 
 Status: **mostly landed.** P1, GRO-F1, GRO-F2, GRO-F4 (2026-09-07); P2, P3, P7 and TB-a (2026-09-26);
-P5, P8 and P9 (2026-10-10). Open: P10 (now automation-by-convention), TB-b, S61, P4 (after
-P10's composition steps), P11; P6 (z tier) stays held. The order is in [TODO.md](TODO.md)
+P5, P8 and P9 (2026-10-10); P4 (2026-10-14). Open: P10 (now automation-by-convention), TB-b,
+S61, P11; P6 (z tier) stays held. The order is in [TODO.md](TODO.md)
 §2.
 Rung: v0.2 wave B, steps P2–P11 of [TODO.md](TODO.md); P6's row sits in its v0.9 section.
 Lane: teaching surface (`analysis/`, `control/`, `estimation/`, `blocks/`).
@@ -24,7 +24,7 @@ additive or replaces boilerplate with generated equivalents.
 | **GRO-F4** `closed_loop_poles` singular-gain guard | — | 1 | **done** |
 | **P2** `minreal` | GRO-G3 | 1 | **done** 2026-09-26; order reduction split out, then deferred out of v0.2 (2026-09-26; TODO §6) |
 | **P3** `place()` → `StateFeedbackController` | GRO-G2 | 1 | **done** 2026-09-26 |
-| **P4** `estimation/` — Luenberger, then Kalman | GRO-G1 | 2 | **held** |
+| **P4** `estimation/` — `StateObserver`, `luenberger`, `kalman`, `lqg` | GRO-G1 | 2 | landed 2026-10-14 |
 | **P5** Named sensitivity functions | GRO-G5 | 2 | landed 2026-10-10 |
 | **P6** Discrete (z) tier | GRO-G4 | 3 | **held** for GRO501; a v0.9 row |
 | **P7** `facades.py` boilerplate | GRO-C2 | 2 | **done** 2026-09-26 (explicit + pinned) |
@@ -183,50 +183,17 @@ with `{−1 ± 0.5i, −1}` stands in.
 
 ## Wave 2 — the missing surface
 
-### P4. `estimation/` — Luenberger, then Kalman — **held**
+### P4. `estimation/` — the observer and its designs — **landed 2026-10-14**
 
-*On hold by the maintainer 2026-09-07. The design below stands for when it
-is picked up.*
-
-**Problem.** The largest GRO501 gap. `minilink/estimation/__init__.py` is a
-placeholder docstring and nothing else. The guide needs an
-observer in §1.4.4 (bonus), Lab 2 steps 5–6, and oral-review deliverables
-8–9 ("schéma bloc de votre proposition de filtre de Kalman" + a simulation).
-
-**Shape.** The band's own docstring already fixes the port contract:
-`(u, y) -> estimate`. Build it in that order:
-
-1. `LuenbergerObserver(A, B, C, L)` — a `DynamicSystem` with state x̂,
-   `f = A x̂ + B u + L (y − C x̂)`. Ports `u`, `y` → `x` (the estimate, labelled x̂), with
-   the role name `observer` ([automation-by-convention.md](automation-by-convention.md)
-   §2.1).
-2. `luenberger(A, B, C, poles)` — design factory, `place` on the dual pair
-   `(Aᵀ, Cᵀ)`. Depends on P3.
-3. `kalman(A, B, C, Q, R)` — steady-state gain from the filter Riccati
-   equation, returning the same block. `scipy.linalg.solve_continuous_are`,
-   the same call `lqr_gain` already makes.
-
-Deliberately *not* in this step: time-varying KF, EKF, discrete KF. They are
-`estimation/` rows on the roadmap, not GRO501 blockers — the guide asks for a
-steady-state design validated in simulation.
-
-**The composition question is the part to rule on.** The observer must feed
-`StateFeedbackController`'s `x` port while the plant's `y` feeds the observer:
-that is a two-block loop `@` does not currently express. Either (i) a
-`compensator(observer, controller)` helper returning the wired pair as one
-block with ports `r`, `y` → `u`, or (ii) an explicit `add_subsystem` /
-`connect` recipe in the notebook. Recommend (i): the guide's Figure 12 is
-exactly that block, and observer-plus-state-feedback is the standard
-output-feedback compensator, not a one-off wiring.
-
-**Files.** new `minilink/estimation/luenberger.py`, `kalman.py`;
-`minilink/estimation/__init__.py`; `minilink/__init__.py`;
-new `tests/unittest/test_estimation.py`; demo in `examples/demos/control/`.
-
-**Done when.** On the guide's cart-pendulum (Lab 2, eq. 17), an LQR plus a
-Kalman observer stabilizes the nonlinear plant from a disturbed start with
-noise injected on `u` and `y`, and the estimate converges to the true state;
-`plot_diagram` shows the Figure 12 topology.
+The design and its rulings: [estimation-and-state-feedback.md](estimation-and-state-feedback.md)
+and [the 2026-10-14 record](../reviews/2026-10-14-state-space-design-rulings.md). What
+landed: `StateObserver(A, B, C, L, D, xbar, ubar, ybar)` (ports `u`, `y` → `x`, the role
+id `observer`), `luenberger` and `kalman` on arrays, a linear model or the plant (the duals
+of `place` and `lqr`, which took the same three forms the same day), and `lqg`, the
+observer + gain box with `r`, `y` → `u`. The composition question closed as the recipe by
+hand plus `lqg()` for the design; `closed_loop(observer=)` is AC-4's. The guide's
+cart-pendulum check is `examples/demos/control/lqg_cartpole.py`; the Kalman observer alone,
+`kalman_observer_pendulum.py`. The GRO501 from-scratch notebooks stay as they are.
 
 ### P5. Named sensitivity functions — design agreed 2026-09-26
 

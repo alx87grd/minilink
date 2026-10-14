@@ -98,20 +98,12 @@ AC-3); AC-4 with P4; P11. P6 stays held for GRO501; its row is in §5 (v0.9).
   `dynamics/abstraction/state_space.py` (`LTISystem`) and the loop-building path students use
   (`feedback`, `closed_loop`, `@`; after AC-3). Before P11. Done when every module in scope
   reads like `dp.py` and the baseline `cmp`s.
-- [ ] **P4 `estimation/`**, now, in parallel with P10: the block needs none of its steps,
-  and the notebook wires it by hand until AC-4's `closed_loop(observer=)`.
-  `LuenbergerObserver(A, B, C, L)` as a
-  `DynamicSystem` with ports `u`, `y` → `x` (the estimate, labelled x̂) and the role name
-  `observer`; `luenberger(A, B, C, poles)` on the dual pair (`place_gain(Aᵀ, Cᵀ, poles)ᵀ`);
-  `kalman(A, B, C, Q, R)` from the filter Riccati equation, `Q = B_w W B_wᵀ` and `R = V` read
-  from the noise blocks' `psd` (randomness.md §2). `closed_loop(..., observer=)` wires `y`,
-  `u` and `x` (AC-4); Monte Carlo starts x̂0 at the estimator's own `x0`. The open question,
-  a `compensator(observer, K)` helper or the `expose` recipe, is in ROADMAP §6. Done when
-  LQR + Kalman stabilizes the guide's cart-pendulum from a disturbed start with noise on `u`
-  and `y`, and `plot_diagram` shows the Figure 12 topology.
-  Also: named input ports on the state-space base so observers and sensitivity blocks share
-  one `f` (scan: analysis#13); the plan names the estimation API once (scan: docs-gov#9);
-  review the `observer` role and the names around it against the real blocks
+- [ ] **P4 follow-ups** (P4 landed 2026-10-14; design and rulings in
+  [estimation-and-state-feedback.md](estimation-and-state-feedback.md)): `closed_loop(observer=)`
+  is AC-4's; named input ports on the state-space base so observers and sensitivity blocks
+  share one `f` (scan: analysis#13); `kalman(plant, Q_n, R_n)` reading `B_w = ∂f/∂d`,
+  `D_v = ∂h/∂n` and the noise blocks' `psd` when `disturbance=` / `noise=` are given (RN-4);
+  the review of the `observer` role against the real blocks when the EKF lands
   ([automation-by-convention.md](automation-by-convention.md) §10).
 - [ ] **P11 Two GRO501 notebooks** **[maintainer — student-facing]**:
   `teaching/topics/classical_control/dc_motor_propulsion.ipynb` (APP2) and
@@ -464,6 +456,12 @@ after RN-5.
   stochastic branch is byte-identical, and the body reads next to `dp.py`. MP-4 (the MPC
   block reads the planner verbs: T6) and MP-5 (demos, `compare(MPC=, MPPI=)`) before v0.9;
   MP-6 (the `loop` backend, facade names, DESIGN §6) with V3.
+- [ ] **LQGPlanner** **[ask — planner API]**: `LQGPlanner(problem)` on a
+  `StochasticPlanningProblem` with a `QuadraticCost` and `disturbances` on `d` / `n`, beside
+  `LQRPlanner`: the policy is the `lqg` box, the record holds `K`, `L`, both Riccati matrices
+  and the poles, the cost-to-go the certainty-equivalent form; `Q_n = B_w W B_wᵀ`,
+  `R_n = D_v V D_vᵀ` from `linearize_matrices(sys, wrt="d")` / `wrt="n"` and the blocks'
+  `psd`. With RN-4. Design: [estimation-and-state-feedback.md](estimation-and-state-feedback.md) §5.
 - [ ] **V1 The differentiable closed-loop cost** **[ask — core]** (API and architecture not
   decided). One fully differentiable JAX path: controller params → closed-loop dynamics → RK4
   step → the run on a horizon → the cost `J` → the mean of `J` over stochastic rollouts, every
@@ -576,9 +574,17 @@ in December 2026 after the v0.3 tag; the v1.0 rows after two cohorts.
   raises `NotImplementedError` for them (P10). Supporting them means choosing the
   discretization method (Euler, Tustin, RK4) and whether `%` discretizes or the user calls
   `discretize` first. It needs `discretize` to keep the controller's ports first.
-- [ ] **Estimation follow-ups** after P4: EKF, time-varying and discrete Kalman as
-  `estimation/` rows; online parameter estimators (recursive least squares, gradient laws).
-  Each revisits the estimator conventions of
+- [ ] **Estimation follow-ups** after P4, each in the slot
+  [estimation-and-state-feedback.md](estimation-and-state-feedback.md) §7 names: the
+  finite-horizon filter (`kalman_finite_horizon` → a time-varying observer, the dual of
+  `lqr_finite_horizon`, the forward sweep on the dual pair with `riccati_step`); the
+  linearized Kalman filter along a trajectory (`trajectory_kalman` → `TrajectoryObserver`,
+  the dual of `trajectory_lqr`); the extended Kalman filter (`ExtendedKalmanFilter(model, Q_n,
+  R_n, x0, P0)`, `P` a state, Jacobians taken on the model's `f`, `h` inside its own `f`);
+  the sampled filters (unscented, discrete Kalman, particle) after AC-8a / S31 and P6; the
+  `EstimationProblem` / `EstimationSolution` and the `*Estimator` tools (§5 of the plan);
+  online parameter estimators (recursive least squares, gradient laws) under a role of their
+  own. Each revisits the observer conventions of
   [automation-by-convention.md](automation-by-convention.md) §10.
 - [ ] **S71 The classic first plants**: DC motor, tank / thermal first-order-plus-delay
   process, ball and beam, differential drive, 3-D quadrotor, each with `tf`, a skin and the

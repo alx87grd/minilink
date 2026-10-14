@@ -5,8 +5,8 @@ Teaching imports::
     from minilink.control import ImpedanceController, lqr, place
     from minilink.control.mpc import ModelPredictiveController
 
-The design verbs (``lqr``, ``place``, ``lqr_finite_horizon``, ``trajectory_lqr``
-and their gains) live in ``control.design``.
+The design verbs (``lqr``, ``place``, ``lqg``, ``lqr_finite_horizon``,
+``trajectory_lqr`` and their gains) live in ``control.design``.
 """
 
 from __future__ import annotations
@@ -32,6 +32,7 @@ _EXPORTS: dict[str, tuple[str, str]] = {
     "trajectory_lqr": ("minilink.control.design", "trajectory_lqr"),
     "place": ("minilink.control.design", "place"),
     "place_gain": ("minilink.control.design", "place_gain"),
+    "lqg": ("minilink.control.design", "lqg"),
     "ImpedanceIntegralController": (
         "minilink.control.impedance",
         "ImpedanceIntegralController",

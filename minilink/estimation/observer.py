@@ -18,7 +18,7 @@ class StateObserver(DynamicSystem):
 
     Ports: the plant's command ``u`` (dimension ``m``) and measurement ``y``
     (dimension ``p``) in; the estimate ``x`` (dimension ``n``, labelled with a
-    hat) out. The initial estimate is ``x0``. The matrices, the gain and the
+    hat) out. The initial estimate ``x0`` starts at x̄. The matrices, the gain and the
     operating point live in ``params``; ``ȳ`` defaults to ``C x̄ + D ū``, the
     linear model's own output, and the plant-taking designs pass ``h(x̄, ū)``.
     A box holding this block under the key ``observer`` and a state-feedback
@@ -64,6 +64,9 @@ class StateObserver(DynamicSystem):
         self.state.labels = (
             [f"x̂[{i}]" for i in range(n)] if labels is None else list(labels)
         )
+        # the estimate starts at the operating point, where the model holds
+        self.state.set_nominal_value(xbar)
+        self.x0 = xbar.copy()
 
         self.add_input_port("u", dim=m, nominal_value=ubar)
         self.add_input_port("y", dim=p, nominal_value=ybar)

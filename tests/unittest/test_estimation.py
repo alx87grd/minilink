@@ -5,7 +5,7 @@ import pytest
 from scipy.linalg import solve_continuous_are
 
 from minilink.analysis.linearization import linearize
-from minilink.control.design import lqr_gain, place_gain
+from minilink.control.design import lqg, lqr_gain, place_gain
 from minilink.control.state import StateFeedbackController
 from minilink.core.diagram import DiagramSystem
 from minilink.core.feedback import roles
@@ -188,3 +188,71 @@ def test_luenberger_on_the_plant_and_the_hat():
     one_letter = LTISystem(A, B, C)
     one_letter.state.labels = ["q", "v"]
     assert luenberger(one_letter, POLES).state.labels == ["q\u0302", "v\u0302"]
+
+
+# lqg: an LQR gain on a Kalman estimate, one controller box
+
+
+def test_lqg_is_the_observer_and_the_gain_in_one_box():
+    Q, R = np.diag([1.0, 0.1]), np.array([[0.5]])
+    Q_n, R_n = np.diag([0.1, 0.3]), np.array([[0.2]])
+    box = lqg(A, B, C, Q, R, Q_n, R_n)
+    assert list(box.subsystems) == ["observer", "gain"]
+    assert list(box.inputs) == ["r", "y"] and list(box.outputs) == ["u"]
+    np.testing.assert_allclose(box.subsystems["gain"].params["K"], lqr_gain(A, B, Q, R))
+    np.testing.assert_allclose(
+        box.subsystems["observer"].params["L"], kalman_gain(A, C, Q_n, R_n)
+    )
+    plant = LTISystem(A, B, C)
+    loop = box @ plant
+    who = roles(loop)
+    assert who.controller is box and who.observer is box.subsystems["observer"]
+    # the separation principle: the loop's poles are the gain's and the observer's
+    K, L_design = (
+        box.subsystems["gain"].params["K"],
+        box.subsystems["observer"].params["L"],
+    )
+    expected = np.concatenate(
+        [np.linalg.eigvals(A - B @ K), np.linalg.eigvals(A - L_design @ C)]
+    )
+    closed = np.linalg.eigvals(loop.linearize().A())
+    np.testing.assert_allclose(
+        np.sort_complex(closed), np.sort_complex(expected), atol=1e-8
+    )
+    # the same box from the model and from the plant
+    model = linearize(plant)
+    np.testing.assert_allclose(
+        lqg(model, Q, R, Q_n, R_n).subsystems["gain"].params["K"], K
+    )
+    np.testing.assert_allclose(
+        lqg(plant, Q=Q, R=R, Q_n=Q_n, R_n=R_n).subsystems["observer"].params["L"],
+        L_design,
+    )
+
+
+def test_lqg_holds_the_cart_pole_upright_from_a_disturbed_start():
+    from minilink.dynamics.catalog.pendulum.cartpole import CartPole
+
+    plant = CartPole()
+    x_up = np.array([0.0, np.pi, 0.0, 0.0])
+    box = lqg(
+        plant,
+        Q=np.diag([1.0, 10.0, 1.0, 1.0]),
+        R=np.array([[0.1]]),
+        Q_n=1e-2 * np.eye(4),
+        R_n=1e-3 * np.eye(4),
+        x_bar=x_up,
+    )
+    np.testing.assert_allclose(box.subsystems["observer"].params["xbar"], x_up)
+    assert box.subsystems["observer"].state.labels == [
+        "x̂",
+        "theta_hat",
+        "dx_hat",
+        "dtheta_hat",
+    ]
+    loop = box @ plant
+    plant.x0 = np.array([-0.5, np.pi + 0.2, 0.0, 0.0])
+    loop.refresh()
+    traj = loop.compute_trajectory(tf=8.0)
+    plant_state = traj.x[slice(*loop.state_index["plant"]), -1]
+    np.testing.assert_allclose(plant_state, x_up, atol=1e-2)

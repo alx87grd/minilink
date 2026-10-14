@@ -27,6 +27,7 @@ TEACHING_MODULES = {
     "minilink.graphical.catalog",
     "minilink.control",
     "minilink.control.mpc",
+    "minilink.estimation",
     "minilink.analysis",
     "minilink.analysis.linearization",
     "minilink.analysis.discretization",
