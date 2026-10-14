@@ -2,12 +2,16 @@
 
 import numpy as np
 import pytest
+from scipy.linalg import solve_continuous_are
 
-from minilink.control.design import place_gain
+from minilink.analysis.linearization import linearize
+from minilink.control.design import lqr_gain, place_gain
 from minilink.control.state import StateFeedbackController
 from minilink.core.diagram import DiagramSystem
 from minilink.core.feedback import roles
 from minilink.dynamics.abstraction.state_space import LTISystem
+from minilink.dynamics.catalog.pendulum.pendulum import Pendulum
+from minilink.estimation.design import kalman, kalman_gain, luenberger, luenberger_gain
 from minilink.estimation.observer import StateObserver
 
 # the double integrator, position measured
@@ -126,3 +130,61 @@ def test_print_shows_the_gain_and_the_poles():
     assert (
         "L = " in text and "poles of A − L C" in text and "-2" in text and "-3" in text
     )
+
+
+# The designs: the duals of place and lqr
+
+
+def test_luenberger_gain_places_the_error_poles():
+    L_design = luenberger_gain(A, C, POLES)
+    np.testing.assert_allclose(np.poly(A - L_design @ C), np.poly(POLES), atol=1e-9)
+    np.testing.assert_allclose(L_design, place_gain(A.T, C.T, POLES).T)
+    with pytest.raises(ValueError, match="not observable"):
+        luenberger_gain(
+            A, np.array([[0.0, 1.0]]), POLES
+        )  # velocity alone hides position
+
+
+def test_kalman_gain_is_the_dual_of_lqr():
+    Q_n, R_n = np.diag([0.1, 0.3]), np.array([[0.2]])
+    L_design = kalman_gain(A, C, Q_n, R_n)
+    np.testing.assert_allclose(L_design, lqr_gain(A.T, C.T, Q_n, R_n).T)
+    assert np.all(np.linalg.eigvals(A - L_design @ C).real < 0)
+    # the hand calculation of the GRO501 notebook
+    P = solve_continuous_are(A.T, C.T, Q_n, R_n)
+    np.testing.assert_allclose(L_design, P @ C.T @ np.linalg.inv(R_n))
+
+
+def test_the_three_forms_give_one_observer():
+    plant = Pendulum()  # y is the state, C = I
+    x_bar = np.array([0.3, 0.0])
+    Q_n, R_n = np.diag([0.01, 0.1]), 1e-3 * np.eye(2)
+    model = linearize(plant, x_bar)
+    on_arrays = kalman(
+        model.A(), model.B(), model.C(), Q_n, R_n, x_bar=x_bar, u_bar=model.ubar
+    )
+    on_model = kalman(model, Q_n, R_n)
+    on_plant = kalman(plant, Q_n, R_n, x_bar=x_bar)
+    for obs in (on_model, on_plant):
+        np.testing.assert_allclose(obs.params["L"], on_arrays.params["L"])
+        np.testing.assert_allclose(obs.params["xbar"], x_bar)
+        np.testing.assert_allclose(obs.params["ybar"], plant.h(x_bar, model.ubar))
+        assert obs.state.labels == ["theta_hat", "dtheta_hat"]
+        assert obs.name == "Kalman Filter" and obs.id == "observer"
+    np.testing.assert_allclose(
+        kalman(plant, Q_n=Q_n, R_n=R_n, x_bar=x_bar).params["L"], on_plant.params["L"]
+    )
+    with pytest.raises(TypeError, match=r"kalman\(sys, Q_n, R_n\)"):
+        kalman(plant, x_bar, Q_n, R_n)
+
+
+def test_luenberger_on_the_plant_and_the_hat():
+    obs = luenberger(LTISystem(A, B, C), POLES)
+    np.testing.assert_allclose(np.sort(obs.poles.real), np.sort(POLES))
+    assert obs.name == "Luenberger Observer" and obs.state.labels == [
+        "x̂[0]",
+        "x̂[1]",
+    ]
+    one_letter = LTISystem(A, B, C)
+    one_letter.state.labels = ["q", "v"]
+    assert luenberger(one_letter, POLES).state.labels == ["q\u0302", "v\u0302"]

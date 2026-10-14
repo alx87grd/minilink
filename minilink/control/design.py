@@ -336,17 +336,21 @@ def trajectory_lqr(
 # Internal machinery: the model a design reads, the request checked, the result checked
 
 
-def design_arguments(model, args, named, forms, x_bar, u_bar, t, params, method, eps):
+def design_arguments(
+    model, args, named, forms, x_bar, u_bar, t, params, method, eps, *, matrices=1
+):
     """Split ``design(model, *args, **named)`` into the linear model and the design's own arguments.
 
-    On arrays, ``args`` starts with ``B`` and the model is an ``LTISystem`` at
-    ``(x_bar, u_bar)``, the origin by default. On a ``System`` the model comes
-    from :func:`~minilink.analysis.linearization.design_model`. The design's own
+    On arrays, ``args`` starts with ``B`` (``matrices=1``, the state-feedback
+    designs) or ``B, C`` (``matrices=2``, the observer designs) and the model is
+    an ``LTISystem`` at ``(x_bar, u_bar)``, the origin by default. On a
+    ``System`` the model comes from
+    :func:`~minilink.analysis.linearization.design_model`. The design's own
     arguments (``Q, R``, ``poles``, …) follow positionally or by keyword, in the
     order of ``named``; ``forms`` is the signature quoted in a refusal.
     """
     on_system = isinstance(model, System)
-    matrices = 0 if on_system else 1
+    matrices = 0 if on_system else matrices
     if len(args) < matrices or len(args) - matrices > len(named):
         raise TypeError(f"{forms}: got {len(args) + 1} positional arguments")
     design = list(args[matrices:])
@@ -360,7 +364,7 @@ def design_arguments(model, args, named, forms, x_bar, u_bar, t, params, method,
     if on_system:
         lti = design_model(model, x_bar, u_bar, t, params, method=method, eps=eps)
     else:
-        lti = LTISystem(model, args[0], xbar=x_bar, ubar=u_bar)
+        lti = LTISystem(model, *args[:matrices], xbar=x_bar, ubar=u_bar)
     return lti, tuple(design)
 
 
