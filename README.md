@@ -89,22 +89,20 @@ from the keyboard:
 import numpy as np
 from minilink import DynamicSystem, Step
 
-class MassSpringDamper(DynamicSystem):
+class MyCustomMassSpringDamper(DynamicSystem):
 
     def __init__(self):
         super().__init__(n=2, input_dim=1, output_dim=2)
 
     def f(self, x, u, t=0, params=None):
-
         p = x[0]
         v = x[1]
-
         f = u[0]
-
         m = 10.
         k = 10.
         b = 2.0
 
+        # EoM in Python/Numpy (or JAX-compatible to enable autodiff and compilation features
         a = (f - b * v - k * p) / m
 
         dx = np.array([v, a])
@@ -118,12 +116,7 @@ class MassSpringDamper(DynamicSystem):
         return y
 
 
-plant = MassSpringDamper()
-plant.x0[0] = 1.0
-
-ref = Step(final_value=np.array([10.0]), step_time=2.0)
-loop = ref >> plant
-loop.compute_trajectory(tf=20.0)
+plant = MyCustomMassSpringDamper()
 ```
 
 `f`, `h` and `tf` are functions of `(x, u, t; params)` only: no hidden state on
