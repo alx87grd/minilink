@@ -28,7 +28,7 @@
       trajectory optimization
     </td>
     <td width="25%" align="center" valign="top">
-      task-space impedance control<br/>
+      impedance control<br/>
       <a href="https://alx87grd.github.io/minilink/_static/showcase/ur5_impedance.html">interactive 3-D</a>
     </td>
     <td width="25%" align="center" valign="top">
