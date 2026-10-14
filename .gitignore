@@ -59,7 +59,6 @@ site/
 # Claude Code #
 .claude/*
 !.claude/settings.json
-!.claude/hooks/
 
 # Matplotlib (e.g. MPLCONFIGDIR in repo or sandbox)
 .mpl/

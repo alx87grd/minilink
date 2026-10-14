@@ -8,12 +8,6 @@
             "command": "GIT_TERMINAL_PROMPT=0 git fetch -q 2>/dev/null; n=$(git rev-list --count HEAD..@{u} 2>/dev/null || echo 0); if [ \"$n\" -gt 0 ]; then m=\"WARNING: $(git branch --show-current) is $n commits behind $(git rev-parse --abbrev-ref @{u}). Stop and sync before any work (AGENTS.md: Before you start).\"; printf \"{\\\"systemMessage\\\": \\\"%s\\\", \\\"hookSpecificOutput\\\": {\\\"hookEventName\\\": \\\"SessionStart\\\", \\\"additionalContext\\\": \\\"%s\\\"}}\\n\" \"$m\" \"$m\"; fi",
             "timeout": 30,
             "statusMessage": "Checking the branch against origin"
-          },
-          {
-            "type": "command",
-            "command": "$CLAUDE_PROJECT_DIR/.claude/hooks/session-start.sh",
-            "timeout": 900,
-            "statusMessage": "Installing the Full tier for the cloud session"
           }
         ]
       }
