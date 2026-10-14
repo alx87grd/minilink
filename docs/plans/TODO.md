@@ -86,10 +86,10 @@ AC-3); AC-4 with P4; P11. P6 stays held for GRO501; its row is in §5 (v0.9).
   `WiringError`; S31 brings AC-8b. The automatic `dt` and input-hold findings stay with S65.
 - [ ] **S61 Analysis verbs on any `System`** (scan: analysis#2, analysis#4, analysis#5,
   analysis#6, analysis#8): `controllability` / `observability` linearize like every sibling
-  (band functions only, no facade); `step_info` takes a `System`; `find_equilibrium` defaults
-  its guess to `sys.x0`; the operating point's size is checked; margin crossings refined by a
-  root solve so `plot_bode` and `margins` report one number. Done when P7's signature test
-  covers them.
+  (band functions only, no facade); `step_info` takes a `System`; the operating point's size
+  is checked; margin crossings refined by a root solve so `plot_bode` and `margins` report
+  one number. Done when P7's signature test covers them. `find_equilibrium`'s guess defaults
+  to the nominal state (R1, not `sys.x0`) since 2026-10-14; the name `x_guess` stays.
 - [ ] **S62, the rest** **[ask — public names]** (scan: control#0): `P` joins the siso family.
   The LQR family joined the control band facade on 2026-10-14 (`control/design.py`).
 - [ ] **TB-b The control objects and the loop read like the textbook.** The audit, review

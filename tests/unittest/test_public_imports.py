@@ -153,7 +153,7 @@ class TestPublicImports(unittest.TestCase):
 # its reason; the list can only shrink.
 BAND_PATTERN_DEVIATIONS = {
     "jacobian": "names the function and the variable first: jacobian(sys, of, wrt, ...)",
-    "find_equilibrium": "requires the guess x_guess where the others take x_bar",
+    "find_equilibrium": "names its guess x_guess where the others take x_bar",
     "step_info": "reads a sampled response: step_info(time, y)",
     "controllability": "takes the matrices (A, B) or one LTISystem",
     "observability": "takes the matrices (A, C) or one LTISystem",

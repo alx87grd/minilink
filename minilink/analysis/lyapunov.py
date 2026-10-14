@@ -321,9 +321,7 @@ def region_of_attraction(
             "quadratic V only (ROADMAP §6, Lyapunov certificates)"
         )
 
-    x_bar = find_equilibrium(
-        sys, sys.state.nominal_value if x_bar is None else x_bar, u_bar, t, params
-    )
+    x_bar = find_equilibrium(sys, x_bar, u_bar, t, params)
     u_bar = np.asarray(
         sys.get_u_from_input_ports() if u_bar is None else u_bar, dtype=float
     )

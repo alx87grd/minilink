@@ -876,7 +876,9 @@ class DynamicSystemFacades:
             native=native,
         )
 
-    def find_equilibrium(self, x_guess, u_bar=None, t=0.0, params=None, *, tol=1e-9):
+    def find_equilibrium(
+        self, x_guess=None, u_bar=None, t=0.0, params=None, *, tol=1e-9
+    ):
         """Return a state near ``x_guess`` where ``f`` vanishes.
 
         See :func:`minilink.analysis.equilibria.find_equilibrium`.

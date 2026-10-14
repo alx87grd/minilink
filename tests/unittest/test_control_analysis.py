@@ -227,6 +227,14 @@ class TestEquilibria(unittest.TestCase):
         x_eq = find_equilibrium(Pendulum(), x_guess=[0.3, 0.0])
         np.testing.assert_allclose(x_eq, [0.0, 0.0], atol=1e-06)
 
+    def test_the_guess_defaults_to_the_nominal_state_not_x0(self):
+        pendulum = Pendulum()
+        pendulum.x0 = np.array([3.0, 0.0])
+        np.testing.assert_allclose(pendulum.find_equilibrium(), [0.0, 0.0], atol=1e-6)
+
+        pendulum.state.nominal_value = np.array([3.0, 0.0])
+        np.testing.assert_allclose(pendulum.find_equilibrium(), [np.pi, 0.0], atol=1e-6)
+
 
 class TestLQR(unittest.TestCase):
     def test_gain_stabilizes_double_integrator(self):

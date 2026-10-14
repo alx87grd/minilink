@@ -6,7 +6,7 @@ import numpy as np
 from scipy.optimize import fsolve
 
 
-def find_equilibrium(sys, x_guess, u_bar=None, t=0.0, params=None, *, tol=1e-9):
+def find_equilibrium(sys, x_guess=None, u_bar=None, t=0.0, params=None, *, tol=1e-9):
     """Return a state ``x_eq`` near ``x_guess`` with ``f(x_eq, u_bar, t) ≈ 0``.
 
     Parameters
@@ -14,8 +14,8 @@ def find_equilibrium(sys, x_guess, u_bar=None, t=0.0, params=None, *, tol=1e-9):
     sys : DynamicSystem
         Continuous-time model whose ``f`` defines the dynamics (leaf subclass
         or wired diagram with stacked ``f``).
-    x_guess : array of shape (n,)
-        Initial guess for the equilibrium state.
+    x_guess : array of shape (n,), optional
+        Initial guess for the equilibrium state. Defaults to the nominal state.
     u_bar : array of shape (m,), optional
         Held input. Defaults to the system's nominal port values.
     t : float, optional
@@ -35,6 +35,8 @@ def find_equilibrium(sys, x_guess, u_bar=None, t=0.0, params=None, *, tol=1e-9):
     RuntimeError
         If the solver does not drive ``‖f‖`` below ``tol``.
     """
+    if x_guess is None:
+        x_guess = sys.state.nominal_value
     x_guess = np.asarray(x_guess, dtype=float).reshape(-1)
     if u_bar is None:
         u_bar = sys.get_u_from_input_ports()
