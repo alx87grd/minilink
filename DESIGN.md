@@ -599,7 +599,7 @@ and `minilink/core/feedback.py` reads them, never a class or an `isinstance`:
 - `command_port(sys)` is the input a decision drives on a plant or a box: `u`,
   else the one input that is not `d` or `n`;
 - `roles(diagram)` returns the blocks under the reserved subsystem names
-  `plant`, `controller` and `observer` (the estimator may sit inside the
+  `plant`, `controller` and `observer` (the observer may sit inside the
   controller; a leaf is its own plant; a sampled loop answers from its two
   sides). One of each per diagram level: a second block under a reserved
   name is refused, never suffixed, so two loops cannot be laid side by side

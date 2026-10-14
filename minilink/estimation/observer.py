@@ -3,6 +3,7 @@
 import numpy as np
 
 from minilink.core.system import DynamicSystem
+from minilink.dynamics.abstraction.state_space import point_component
 
 
 class StateObserver(DynamicSystem):
@@ -36,9 +37,9 @@ class StateObserver(DynamicSystem):
         p = C.shape[0]
         D = np.zeros((p, m)) if D is None else np.atleast_2d(np.asarray(D, dtype=float))
         check_dimensions(A, B, C, D, L)
-        xbar = vector(xbar, n)
-        ubar = vector(ubar, m)
-        ybar = C @ xbar + D @ ubar if ybar is None else vector(ybar, p)
+        xbar = point_component(xbar, n, "xbar")
+        ubar = point_component(ubar, m, "ubar")
+        ybar = C @ xbar + D @ ubar if ybar is None else point_component(ybar, p, "ybar")
 
         super().__init__(n)
         self.name = "State Observer"
@@ -78,10 +79,9 @@ class StateObserver(DynamicSystem):
         x_hat = x
         u_in, y = u[:m], u[m:]
 
-        # dx̂ = A (x̂ − x̄) + B (u − ū) + L (y − ŷ),   ŷ = ȳ + C (x̂ − x̄) + D (u − ū)
-        e_x, e_u = x_hat - xbar, u_in - ubar
-        y_hat = ybar + C @ e_x + D @ e_u
-        dx_hat = A @ e_x + B @ e_u + L @ (y - y_hat)
+        # the predicted output, then the model corrected by the innovation y − ŷ
+        y_hat = ybar + C @ (x_hat - xbar) + D @ (u_in - ubar)
+        dx_hat = A @ (x_hat - xbar) + B @ (u_in - ubar) + L @ (y - y_hat)
 
         return dx_hat
 
@@ -105,13 +105,6 @@ class StateObserver(DynamicSystem):
 
 
 # Internal machinery
-
-
-def vector(value, dim):
-    """``value`` as a float vector of length ``dim``; zeros when ``None``."""
-    if value is None:
-        return np.zeros(dim)
-    return np.asarray(value, dtype=float).reshape(-1)
 
 
 def check_dimensions(A, B, C, D, L):

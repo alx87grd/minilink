@@ -508,6 +508,13 @@ class TestStateFeedbackController(unittest.TestCase):
         )
         np.testing.assert_allclose(ctl.inputs["r"].nominal_value, [0.5, 0.0])
 
+    def test_an_operating_point_of_the_wrong_size_is_refused(self):
+        K = np.array([[1.0, 2.0]])
+        with self.assertRaisesRegex(ValueError, r"ubar must have shape \(1,\)"):
+            StateFeedbackController(K, ubar=[0.5, 0.5])
+        with self.assertRaisesRegex(ValueError, r"xbar must have shape \(2,\)"):
+            TimeVaryingStateFeedbackController([0.0, 1.0], [K, K], xbar=[0.0])
+
     def test_state_feedback_law(self):
         K = np.array([[1.0, 2.0]])
         ctl = StateFeedbackController(K, xbar=[0.0, 0.0], ubar=[0.5])

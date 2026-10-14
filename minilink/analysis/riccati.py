@@ -1,18 +1,11 @@
-"""The Riccati equations of linear-quadratic design: the algebraic solution and one exact step of the differential one.
-
-The algebraic equation gives the stationary gain (:func:`care`); the differential
-equation gives a schedule. The control weight ``S(t)`` is swept backward from the
-terminal weight, and the same step on the dual pair ``(Aᵀ, Cᵀ)`` sweeps a filter
-covariance ``P(t)`` forward from its initial value: the two equations differ by the
-sign of time and the transpose. With the co-state ``λ = S x``, the pair ``z = [x; λ]``
-follows the linear Hamiltonian system ``ż = H z``, so a step of ``dt`` is a matrix
-exponential and a linear-fractional map, with no integration error and no stiffness.
-"""
+"""The Riccati equations of linear-quadratic design: the algebraic solution and the exact step of the differential one."""
 
 from __future__ import annotations
 
 import numpy as np
 from scipy.linalg import expm, solve_continuous_are
+
+# Public API
 
 
 def care(A, B, Q, R):
@@ -22,7 +15,7 @@ def care(A, B, Q, R):
     Q = np.asarray(Q, dtype=float)
     R = np.atleast_2d(np.asarray(R, dtype=float))
 
-    # AᵀP + PA − P B R⁻¹ Bᵀ P + Q = 0
+    # Aᵀ P + P A − P B R⁻¹ Bᵀ P + Q = 0
     P = solve_continuous_are(A, B, Q, R)
 
     return P
@@ -41,36 +34,35 @@ def hamiltonian_matrix(A, B, Q, R_inv):
 
 
 def riccati_transition(A, B, Q, R_inv, dt):
-    """Transition of the Hamiltonian system over one step backward in time."""
+    """The transition ``E`` of the Hamiltonian system over one step of ``dt`` backward in time."""
     H = hamiltonian_matrix(A, B, Q, R_inv)
 
-    # E = expm(−H dt)
     E = expm(-H * dt)
 
     return E
 
 
 def riccati_step(A, B, Q, R_inv, S, dt):
-    """``S(t) → S(t - dt)`` with the dynamics frozen over the interval, exactly.
+    """``S(t) → S(t − dt)`` with the dynamics frozen over the interval, exactly.
 
-    The interval is cut into substeps with ``‖H‖ dt ≤ 1`` each, so that the
-    transition stays well conditioned however stiff the dynamics or long the
-    interval; the map is exact on every substep and preserves ``S ⪰ 0``.
+    The same step on the dual pair ``(Aᵀ, Cᵀ)`` carries a filter covariance from
+    ``P(t)`` forward to ``P(t + dt)``: the filter equation is the control equation
+    with time reversed and the matrices transposed.
     """
     H = hamiltonian_matrix(A, B, Q, R_inv)
-    n_sub = max(1, int(np.ceil(np.linalg.norm(H, 2) * dt)))
+    n_sub = substeps(H, dt)
+
+    # −dS/dt = S A + Aᵀ S − S B R⁻¹ Bᵀ S + Q: z = [x; λ] follows ż = H z, so
+    # E = expm(−H dt) carries it back exactly, one substep at a time
     E = expm(-H * dt / n_sub)
     for _ in range(n_sub):
         S = riccati_map(E, S)
+
     return S
 
 
 def riccati_map(E, S):
-    """One exact step ``S(t) → S(t - dt)`` of the Riccati equation, from the transition ``E``.
-
-    ``[X; Y] = E [I; S(t)]`` propagates the pair ``(x, λ)``; the new Riccati matrix
-    is ``S(t - dt) = Y X⁻¹``, symmetrized against roundoff.
-    """
+    """One exact step ``S(t) → S(t − dt)`` of the Riccati equation, from the transition ``E``."""
     n = S.shape[0]
     E11, E12, E21, E22 = E[:n, :n], E[:n, n:], E[n:, :n], E[n:, n:]
 
@@ -81,3 +73,11 @@ def riccati_map(E, S):
     S_new = (S_new + S_new.T) / 2.0
 
     return S_new
+
+
+# Internal machinery
+
+
+def substeps(H, dt):
+    """The substeps that cut ``dt`` to ``‖H‖ dt ≤ 1`` each, so the transition stays well conditioned however stiff the pair."""
+    return max(1, int(np.ceil(np.linalg.norm(H, 2) * dt)))

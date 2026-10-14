@@ -56,6 +56,8 @@ def test_the_operating_point_is_an_equilibrium_of_the_estimate():
     # a shape that describes no plant is refused
     with pytest.raises(ValueError, match="L must be"):
         StateObserver(A, B, C, np.ones((3, 1)))
+    with pytest.raises(ValueError, match=r"xbar must have shape \(2,\)"):
+        StateObserver(A, B, C, L, xbar=[0.7, 0.0, 0.0])
 
 
 def test_the_estimate_converges_on_the_plant():

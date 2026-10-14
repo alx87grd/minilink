@@ -5,6 +5,7 @@ import numpy as np
 from minilink.core.backends import array_module
 from minilink.core.system import System
 from minilink.core.trajectory import interpolate_schedule
+from minilink.dynamics.abstraction.state_space import point_component
 
 
 class StateFeedbackController(System):
@@ -35,12 +36,8 @@ class StateFeedbackController(System):
 
         K = np.atleast_2d(np.asarray(K, dtype=float))
         m, n = K.shape
-        xbar = (
-            np.zeros(n) if xbar is None else np.asarray(xbar, dtype=float).reshape(-1)
-        )
-        ubar = (
-            np.zeros(m) if ubar is None else np.asarray(ubar, dtype=float).reshape(-1)
-        )
+        xbar = point_component(xbar, n, "xbar")
+        ubar = point_component(ubar, m, "ubar")
         self.reference = "state" if N is None else "output"
 
         self.add_input_port("x", dim=n)
@@ -92,12 +89,8 @@ class TimeVaryingStateFeedbackController(System):
         if np.any(np.diff(t) <= 0.0):
             raise ValueError("t must be strictly increasing")
         _, m, n = K.shape
-        xbar = (
-            np.zeros(n) if xbar is None else np.asarray(xbar, dtype=float).reshape(-1)
-        )
-        ubar = (
-            np.zeros(m) if ubar is None else np.asarray(ubar, dtype=float).reshape(-1)
-        )
+        xbar = point_component(xbar, n, "xbar")
+        ubar = point_component(ubar, m, "ubar")
         K_after = (
             K[-1]
             if K_after is None

@@ -27,9 +27,9 @@ operating point subtracted by hand in a demo.
 ## 2. Principles, from the core
 
 1. **A block is what its ports say** (`core/feedback.py`): a controller reads `y` or `x`
-   and `r` and gives `u`; an estimator reads `u` and `y` and gives `x`, the estimate. Role
-   keys `plant`, `controller`, `estimator` name blocks in a diagram. No controller or
-   estimator base class.
+   and `r` and gives `u`; an observer reads `u` and `y` and gives `x`, the estimate. Role
+   keys `plant`, `controller`, `observer` name blocks in a diagram. No controller or
+   observer base class.
 2. **Arrays at the boundary, objects inside.** Gains are array functions; blocks carry their
    gain in `params`; designs take a model or a plant; problems and solutions are the nouns
    researchers hold.
@@ -50,7 +50,7 @@ operating point subtracted by hand in a demo.
 ## 3. The layers, both families side by side
 
 ```
-Layer 0  gains on arrays            lqr_gain(A, B, Q, R) -> K                 kalman_gain(A, C, Q, R) -> L  (= lqr_gain(Aᵀ, Cᵀ, Q, R)ᵀ)
+Layer 0  gains on arrays            lqr_gain(A, B, Q, R) -> K                 kalman_gain(A, C, Q_n, R_n) -> L  (= lqr_gain(Aᵀ, Cᵀ, Q_n, R_n)ᵀ)
                                     place_gain(A, B, poles) -> K              luenberger_gain(A, C, poles) -> L  (= place_gain(Aᵀ, Cᵀ, poles)ᵀ)
                                     lqr_gain_schedule(..., tf) -> (t, K, S)   kalman_gain_schedule(..., P0, tf) -> (t, L, P)   [later]
 
@@ -66,7 +66,7 @@ Layer 1  blocks                     StateFeedbackController(K, xbar, ubar)      
 Layer 2  designs on a model         lqr(model, Q, R)  place(model, poles)       kalman(model, Q_n, R_n)  luenberger(model, poles)
          or a plant                 lqr_finite_horizon(model, Q, R, S_f, tf)  kalman_finite_horizon(model, Q_n, R_n, P0, tf)  [later]
                                     trajectory_lqr(sys, traj, Q, R)           trajectory_kalman(sys, traj, Q_n, R_n, P0)       [later]
-                                    lqg(model, Q, R, Q_n, R_n) -> controller box {estimator, gain}
+                                    lqg(model, Q, R, Q_n, R_n) -> controller box {observer, gain}
                                     two signatures, one boundary test isinstance(first, System) (MATLAB: lqr(sys, Q, R) / lqr(A, B, Q, R)):
                                       lqr(A, B, Q, R, *, xbar=None, ubar=None)                                  arrays, today's form
                                       lqr(sys, Q, R, *, x_bar=None, u_bar=None, t=0.0, params=None, method, eps)  an LTISystem as is, with the
@@ -80,8 +80,8 @@ Layer 3  problems and solutions     PlanningProblem / StochasticPlanningProblem 
                                       cost_to_go J(x)                                   covariance P(t), the dual of J
                                     LQRPlanner, LQGPlanner (v0.3)                      KalmanEstimator, ExtendedKalmanEstimator, ParticleEstimator, MovingHorizonEstimator
 
-The loop  ctl @ plant       lqg(…) @ plant       a hand-built box: add_subsystem(observer, "estimator"), add_subsystem(gain, "gain"),
-                                                 connect x and u, expose("r", "y", "u"), then box @ plant       closed_loop(ctl, plant, estimator=obs)  (AC-4)
+The loop  ctl @ plant       lqg(…) @ plant       a hand-built box: add_subsystem(observer, "observer"), add_subsystem(gain, "gain"),
+                                                 connect x and u, expose("r", "y", "u"), then box @ plant       closed_loop(ctl, plant, observer=obs)  (AC-4)
 ```
 
 (`(observer + gain).autowire()` also builds the box, but warns about the open `y` and `r`
@@ -339,18 +339,18 @@ particle and discrete filters; `EstimationProblem` and the estimator tools; `LQG
 | Time-varying Kalman (continuous) | `TimeVaryingStateObserver`, `L(t)` from the forward Riccati schedule | `u`, `y` -> `x`; x̂ only | `kalman_finite_horizon(model, Q_n, R_n, P0, tf)` | holds: the dual of `lqr_finite_horizon` line for line |
 | Linearized Kalman along a trajectory | `TrajectoryObserver`: schedules `t, x_d, u_d, y_d, A, B, C, L` in `params`; `x̂ = x_d(t) + δx̂` | `u`, `y` -> `x` | `trajectory_kalman(sys, traj, Q_n, R_n, P0)` | holds: the dual of `trajectory_lqr`; needs `riccati_step` forward and `interpolate_schedule` in `core` (A1, A2) |
 | Extended Kalman filter | `ExtendedKalmanFilter(model, Q_n, R_n, x0, P0)`: state `[x̂; vec(P)]`; `A(x̂) = ∂f/∂x`, `C(x̂) = ∂h/∂x` taken **directly on `model.f` / `model.h`** inside `f` (`jax.jacfwd` when tracing, central differences on NumPy), never through `analysis.jacobian`, which compiles an evaluator and coerces to NumPy per call | `u`, `y` -> `x` (a slice), `P` | the block is the algorithm; later `ExtendedKalmanEstimator(problem)` | holds: `estimate` is already a port function, not `compute_state`; the model-based params rule (DESIGN §4) covers `model.params` |
-| Unscented Kalman, discrete Kalman | `StepSystem`s in a hand-built `StepDiagramSystem` (the flow `+` refuses a `StepSystem`, `%` refuses a flow diagram): `computer = StepDiagramSystem(); add_subsystem(ukf, "estimator"); add_subsystem(gain, "gain"); connect…; computer % dt @ plant` | `u`, `y` -> `x`, `P`; `k` | `UnscentedKalmanFilter(model, Q_d, R_d, dt)`; `kalman(…, dt=)` or `kalman_discrete` with `c2d` (P6) | strains the sampled seam: `expose_computer_boundary_ports` auto-exposes one block only and `_as_step_diagram` names it `controller` regardless of `id` (AC-8a, S31), and the numbers need P6; P4 keeps `kalman` continuous in name |
+| Unscented Kalman, discrete Kalman | `StepSystem`s in a hand-built `StepDiagramSystem` (the flow `+` refuses a `StepSystem`, `%` refuses a flow diagram): `computer = StepDiagramSystem(); add_subsystem(ukf, "observer"); add_subsystem(gain, "gain"); connect…; computer % dt @ plant` | `u`, `y` -> `x`, `P`; `k` | `UnscentedKalmanFilter(model, Q_d, R_d, dt)`; `kalman(…, dt=)` or `kalman_discrete` with `c2d` (P6) | strains the sampled seam: `expose_computer_boundary_ports` auto-exposes one block only and `_as_step_diagram` names it `controller` regardless of `id` (AC-8a, S31), and the numbers need P6; P4 keeps `kalman` continuous in name |
 | Particle filter | `StepSystem(N·n + N)`, counter-based draws from `(seed, k)`, `is_random`, `realize(key)` | `u`, `y` -> `x` (weighted mean) | `ParticleFilter(model, process_noise: Distribution, measurement_noise: Distribution, n_particles, seed)` | holds the port convention; needs RN-2 (`sample(key)`) and the `realize` tree |
 | Moving-horizon estimator | a trajopt over a window of past data | `u`, `y` -> `x` | `MovingHorizonEstimator(problem)` (Layer 3) | holds: the dual of MPC; needs `EstimationProblem.data` |
 | Parameter estimators (RLS, gradient laws) | `u`, `y` -> `theta` | not `x` | `identification/` online, or a new role | the role means a *state* estimate; decide the noun when it lands |
 
 **What P4 does so these fit**: `estimate` as an explicit port function; `kalman` continuous
 and steady-state in name; `interpolate_schedule` and the Riccati machinery in shared homes,
-the Riccati direction a parameter; the role-name question settled before the first
-estimator ships; `require_command` in the resolver so no reader takes an estimate for a
-command. **Noted for AC-4**: once a plant exposes `x` and an estimator gives `x` in one
-diagram, `autowire` finds two candidates for any `x` input and `expose("x")` refuses; the
-`estimator=` keyword wires by role, not by name.
+the backward step on the dual pair being the forward filter step (no direction parameter);
+the role name `observer` settled before the first observer shipped; `require_command` in the
+resolver so no reader takes an estimate for a command. **Noted for AC-4**: once a plant
+exposes `x` and an observer gives `x` in one diagram, `autowire` finds two candidates for any
+`x` input and `expose("x")` refuses; the `observer=` keyword wires by role, not by name.
 
 ## 7b. Ask-first items, by name (AGENTS "Ask first")
 

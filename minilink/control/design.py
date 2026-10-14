@@ -1,17 +1,9 @@
-"""Linear state-feedback design: a model or arrays in, a controller block out.
-
-``lqr`` solves the algebraic Riccati equation, ``place`` puts the closed-loop poles where
-asked, ``lqr_finite_horizon`` sweeps the Riccati differential equation backward from a
-terminal weight, and ``trajectory_lqr`` does so along a reference trajectory. Every design
-reads one linear model ``(A, B)``, given three ways: ``lqr(A, B, Q, R)`` on arrays, as the
-textbooks and MATLAB write it; ``lqr(model, Q, R)`` on an ``LTISystem``, which carries the
-operating point it was linearized about; or ``lqr(plant, Q, R)`` on any plant, linearized
-first at ``x_bar`` or, when omitted, at its nominal state.
-"""
+"""Linear state-feedback design: a model or arrays in, a controller block out."""
 
 import numpy as np
 from scipy.signal import place_poles
 
+from minilink.analysis.derivatives import jacobian
 from minilink.analysis.linearization import design_model
 from minilink.analysis.riccati import (
     care,
@@ -19,7 +11,9 @@ from minilink.analysis.riccati import (
     riccati_map,
     riccati_step,
     riccati_transition,
+    substeps,
 )
+from minilink.analysis.structural import controllability
 from minilink.control.state import (
     StateFeedbackController,
     TimeVaryingStateFeedbackController,
@@ -39,6 +33,7 @@ def lqr_gain(A, B, Q, R):
     Q = np.asarray(Q, dtype=float)
     R = np.atleast_2d(np.asarray(R, dtype=float))
 
+    # Aᵀ P + P A − P B R⁻¹ Bᵀ P + Q = 0
     P = care(A, B, Q, R)
 
     # K = R⁻¹ Bᵀ P
@@ -49,8 +44,6 @@ def lqr_gain(A, B, Q, R):
 
 def place_gain(A, B, poles):
     """Return the gain ``K`` of the law ``u = -K x`` that puts the eigenvalues of ``A − B K`` at ``poles``."""
-    from minilink.analysis.structural import controllability
-
     A = np.asarray(A, dtype=float)
     B = np.atleast_2d(np.asarray(B, dtype=float))
     n, m = B.shape
@@ -120,18 +113,12 @@ def lqr(
         central-difference step, as in :func:`~minilink.analysis.linearize`.
     """
     model, (Q, R) = design_arguments(
-        model,
-        args,
-        {"Q": Q, "R": R},
-        "lqr(A, B, Q, R) or lqr(sys, Q, R)",
-        x_bar,
-        u_bar,
-        t,
-        params,
-        method,
-        eps,
+        "lqr", model, args, {"Q": Q, "R": R}, x_bar, u_bar, t, params, method, eps
     )
-    K = lqr_gain(model.A(), model.B(), Q, R)
+    A, B = model.A(), model.B()
+
+    K = lqr_gain(A, B, Q, R)
+
     return StateFeedbackController(K, xbar=model.xbar, ubar=model.ubar)
 
 
@@ -157,18 +144,12 @@ def place(
     ``Q, R``.
     """
     model, (poles,) = design_arguments(
-        model,
-        args,
-        {"poles": poles},
-        "place(A, B, poles) or place(sys, poles)",
-        x_bar,
-        u_bar,
-        t,
-        params,
-        method,
-        eps,
+        "place", model, args, {"poles": poles}, x_bar, u_bar, t, params, method, eps
     )
-    K = place_gain(model.A(), model.B(), poles)
+    A, B = model.A(), model.B()
+
+    K = place_gain(A, B, poles)
+
     return StateFeedbackController(K, xbar=model.xbar, ubar=model.ubar)
 
 
@@ -202,10 +183,10 @@ def lqg(
     from minilink.estimation.design import kalman  # the dual design, for this verb only
 
     model, (Q, R, Q_n, R_n) = design_arguments(
+        "lqg",
         model,
         args,
         {"Q": Q, "R": R, "Q_n": Q_n, "R_n": R_n},
-        "lqg(A, B, C, Q, R, Q_n, R_n) or lqg(sys, Q, R, Q_n, R_n)",
         x_bar,
         u_bar,
         t,
@@ -214,6 +195,7 @@ def lqg(
         eps,
         matrices=2,
     )
+
     gain = lqr(model, Q, R)
     observer = kalman(model, Q_n, R_n)
 
@@ -225,26 +207,18 @@ def lqg(
     box.connect("observer", "x", "gain", "x")
     box.connect("gain", "u", "observer", "u")
     box.expose("r", "y", "u")
+
     return box
 
 
 def lqr_gain_schedule(A, B, Q, R, S_f, tf, *, n_steps=1001):
-    """Return ``(t, K, S)``: the finite-horizon gain ``K(t)`` and Riccati matrix ``S(t)``.
+    """Return ``(t, K, S)``: the finite-horizon gain ``K(t)`` of the law ``u = -K(t) x`` and the Riccati matrix ``S(t)``.
 
-    Solves the Riccati differential equation backward from the terminal weight,
-
-        -dS/dt = SA + AᵀS - SBR⁻¹BᵀS + Q,   S(t_f) = S_f,
-
-    exactly on a uniform time grid. With the co-state ``λ = S x``, the pair
-    ``z = [x; λ]`` follows the linear Hamiltonian system ``ż = H z``, so one
-    step of ``Δt`` backward is the linear-fractional map
-    ``S ← (E₂₁ + E₂₂ S)(E₁₁ + E₁₂ S)⁻¹`` with ``E = expm(-H Δt)``: no
-    integration error, no stiffness, and ``S`` stays symmetric. A coarse grid
-    is cut into substeps with ``‖H‖ Δt ≤ 1`` each, as in
-    :func:`~minilink.analysis.riccati.riccati_step`, so the transition stays
-    well conditioned however stiff the pair. Returns ``K(t) = R⁻¹BᵀS(t)`` for
-    the law ``u = -K(t) x``. ``t`` holds ``n_steps`` samples from ``0`` to
-    ``tf``; ``K`` has shape ``(n_steps, m, n)`` and ``S`` shape
+    ``S`` is swept backward from the terminal weight ``S(t_f) = S_f``, exactly on
+    a uniform grid, through the Hamiltonian system of the co-state
+    (:func:`~minilink.analysis.riccati.riccati_step`): no integration error, no
+    stiffness, and ``S`` stays symmetric. ``t`` holds ``n_steps`` samples from
+    ``0`` to ``tf``; ``K`` has shape ``(n_steps, m, n)`` and ``S`` shape
     ``(n_steps, n, n)``.
     """
     A = np.asarray(A, dtype=float)
@@ -257,12 +231,13 @@ def lqr_gain_schedule(A, B, Q, R, S_f, tf, *, n_steps=1001):
     if n_steps < 2 or tf <= 0.0:
         raise ValueError("lqr_gain_schedule needs tf > 0 and n_steps >= 2")
     R_inv = np.linalg.inv(R)
+    t = np.linspace(0.0, float(tf), n_steps)
     dt = float(tf) / (n_steps - 1)
 
-    # constant dynamics: one transition serves every interval of the backward sweep,
-    # cut into n_sub substeps with ‖H‖ dt ≤ 1 each, as in riccati_step
+    # −dS/dt = S A + Aᵀ S − S B R⁻¹ Bᵀ S + Q, swept backward from S(t_f) = S_f; the
+    # dynamics are constant, so one transition over a substep serves the whole sweep
     H = hamiltonian_matrix(A, B, Q, R_inv)
-    n_sub = max(1, int(np.ceil(np.linalg.norm(H, 2) * dt)))
+    n_sub = substeps(H, dt)
     E = riccati_transition(A, B, Q, R_inv, dt / n_sub)
     S = np.empty((n_steps, n, n))
     S[-1] = S_f
@@ -272,8 +247,9 @@ def lqr_gain_schedule(A, B, Q, R, S_f, tf, *, n_steps=1001):
             S_k = riccati_map(E, S_k)
         S[k - 1] = S_k
 
-    t = np.linspace(0.0, float(tf), n_steps)
+    # K(t) = R⁻¹ Bᵀ S(t)
     K = R_inv @ B.T @ S
+
     return t, K, S
 
 
@@ -304,10 +280,10 @@ def lqr_finite_horizon(
     infinite-horizon gain of :func:`lqr_gain` (``after="stationary"``).
     """
     model, (Q, R, S_f, tf) = design_arguments(
+        "lqr_finite_horizon",
         model,
         args,
         {"Q": Q, "R": R, "S_f": S_f, "tf": tf},
-        "lqr_finite_horizon(A, B, Q, R, S_f, tf) or lqr_finite_horizon(sys, Q, R, S_f, tf)",
         x_bar,
         u_bar,
         t,
@@ -315,14 +291,15 @@ def lqr_finite_horizon(
         method,
         eps,
     )
-    A, B = model.A(), model.B()
-    t_schedule, K, _ = lqr_gain_schedule(A, B, Q, R, S_f, tf, n_steps=n_steps)
-    if after == "stationary":
-        K_after = lqr_gain(A, B, Q, R)
-    elif after == "hold":
-        K_after = None
-    else:
+    if after not in ("hold", "stationary"):
         raise ValueError("after must be 'hold' or 'stationary'")
+    A, B = model.A(), model.B()
+
+    t_schedule, K, _ = lqr_gain_schedule(A, B, Q, R, S_f, tf, n_steps=n_steps)
+
+    # past the horizon: K(t_f) held, or the stationary gain
+    K_after = lqr_gain(A, B, Q, R) if after == "stationary" else None
+
     return TimeVaryingStateFeedbackController(
         t_schedule, K, xbar=model.xbar, ubar=model.ubar, K_after=K_after
     )
@@ -334,16 +311,12 @@ def trajectory_lqr(
     """Design an LQR along a reference trajectory and return a ``TrajectoryFeedbackController``.
 
     ``sys`` is linearized at every sample ``(x_d(t_k), u_d(t_k))`` of
-    ``trajectory``, ``A_k = ∂f/∂x`` and ``B_k = ∂f/∂u``, and the Riccati
-    differential equation of the error ``x - x_d`` is solved backward along
-    the samples with the dynamics frozen on each interval,
-
-        -dS/dt = S A_k + A_kᵀ S - S B_k R⁻¹ B_kᵀ S + Q,   S(t_f) = S_f,
-
-    each interval exactly, as in :func:`lqr_gain_schedule`. The gains
-    ``K_k = R⁻¹ B_kᵀ S_k`` give the law ``u = u_d(t) - K(t) (x - x_d(t))``.
-    ``S_f`` defaults to the algebraic Riccati solution at the final sample, so
-    the gain held past the horizon is the stationary LQR of the end point.
+    ``trajectory``, and the Riccati differential equation of the error
+    ``x - x_d`` is swept backward along the samples, the dynamics frozen on
+    each interval and each interval exact, as in :func:`lqr_gain_schedule`.
+    The gains give the law ``u = u_d(t) - K(t) (x - x_d(t))``. ``S_f``
+    defaults to the algebraic Riccati solution at the final sample, so the
+    gain held past the horizon is the stationary LQR of the end point.
 
     Parameters
     ----------
@@ -362,8 +335,6 @@ def trajectory_lqr(
     eps : float, optional
         Central-difference step.
     """
-    from minilink.analysis.derivatives import jacobian
-
     t = np.asarray(trajectory.t, dtype=float).reshape(-1)
     X = np.asarray(trajectory.x, dtype=float).T
     U = np.asarray(trajectory.u, dtype=float).T
@@ -373,20 +344,23 @@ def trajectory_lqr(
     m = U.shape[1]
     R_inv = np.linalg.inv(R)
 
-    # the dynamics linearized at every sample of the reference
+    # A_k = ∂f/∂x and B_k = ∂f/∂u at every sample of the reference
     A = np.empty((N, n, n))
     B = np.empty((N, n, m))
     for k in range(N):
         A[k] = jacobian(sys, "f", "x", X[k], U[k], t[k], params, method=method, eps=eps)
         B[k] = jacobian(sys, "f", "u", X[k], U[k], t[k], params, method=method, eps=eps)
 
-    # backward sweep from the terminal weight, dynamics frozen on each interval
+    # −dS/dt = S A_k + A_kᵀ S − S B_k R⁻¹ B_kᵀ S + Q, swept backward from S(t_f) = S_f
+    # with the dynamics frozen on each interval
     S = np.empty((N, n, n))
     S[-1] = care(A[-1], B[-1], Q, R) if S_f is None else S_f
     for k in range(N - 1, 0, -1):
         S[k - 1] = riccati_step(A[k - 1], B[k - 1], Q, R_inv, S[k], t[k] - t[k - 1])
 
+    # K_k = R⁻¹ B_kᵀ S_k
     K = R_inv @ np.swapaxes(B, 1, 2) @ S
+
     return TrajectoryFeedbackController(trajectory, K)
 
 
@@ -394,9 +368,9 @@ def trajectory_lqr(
 
 
 def design_arguments(
-    model, args, named, forms, x_bar, u_bar, t, params, method, eps, *, matrices=1
+    verb, model, args, named, x_bar, u_bar, t, params, method, eps, *, matrices=1
 ):
-    """Split ``design(model, *args, **named)`` into the linear model and the design's own arguments.
+    """Split ``verb(model, *args, **named)`` into the linear model and the design's own arguments.
 
     On arrays, ``args`` starts with ``B`` (``matrices=1``, the state-feedback
     designs) or ``B, C`` (``matrices=2``, the observer designs) and the model is
@@ -404,8 +378,10 @@ def design_arguments(
     ``System`` the model comes from
     :func:`~minilink.analysis.linearization.design_model`. The design's own
     arguments (``Q, R``, ``poles``, …) follow positionally or by keyword, in the
-    order of ``named``; ``forms`` is the signature quoted in a refusal.
+    order of ``named``; a refusal quotes the verb's two signatures.
     """
+    arrays = ("A", "B", "C")[: matrices + 1] + tuple(named)
+    forms = f"{verb}({', '.join(arrays)}) or {verb}(sys, {', '.join(named)})"
     on_system = isinstance(model, System)
     matrices = 0 if on_system else matrices
     if len(args) < matrices or len(args) - matrices > len(named):

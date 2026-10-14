@@ -1,12 +1,4 @@
-"""State-observer design: a model or arrays in, a ``StateObserver`` out, the dual of the state-feedback designs.
-
-``luenberger`` places the poles of the estimation error, ``kalman`` makes them optimal
-for white process and measurement noise. Each reads the linear model ``(A, B, C, D)``
-the same three ways as :func:`~minilink.control.design.lqr`: ``kalman(A, B, C, Q_n, R_n)``
-on arrays, ``kalman(model, Q_n, R_n)`` on an ``LTISystem`` carrying its operating point,
-or ``kalman(plant, Q_n, R_n)`` on any plant, linearized first at ``x_bar`` or at its nominal
-state. The gains are the control gains on the dual pair ``(Aᵀ, Cᵀ)``, transposed.
-"""
+"""State-observer design: a model or arrays in, a ``StateObserver`` out, the duals of the state-feedback designs."""
 
 import re
 
@@ -73,10 +65,10 @@ def luenberger(
     :func:`~minilink.control.design.lqr`, with ``poles`` in place of ``Q, R``.
     """
     model, (poles,) = design_arguments(
+        "luenberger",
         model,
         args,
         {"poles": poles},
-        "luenberger(A, B, C, poles) or luenberger(sys, poles)",
         x_bar,
         u_bar,
         t,
@@ -85,10 +77,11 @@ def luenberger(
         eps,
         matrices=2,
     )
-    L = luenberger_gain(model.A(), model.C(), poles)
-    observer = observer_of(model, L)
-    observer.name = "Luenberger Observer"
-    return observer
+    A, C = model.A(), model.C()
+
+    L = luenberger_gain(A, C, poles)
+
+    return observer_of(model, L, "Luenberger Observer")
 
 
 def kalman(
@@ -114,10 +107,10 @@ def kalman(
     covariance, and the block is the stationary Kalman–Bucy filter.
     """
     model, (Q_n, R_n) = design_arguments(
+        "kalman",
         model,
         args,
         {"Q_n": Q_n, "R_n": R_n},
-        "kalman(A, B, C, Q_n, R_n) or kalman(sys, Q_n, R_n)",
         x_bar,
         u_bar,
         t,
@@ -126,19 +119,20 @@ def kalman(
         eps,
         matrices=2,
     )
-    L = kalman_gain(model.A(), model.C(), Q_n, R_n)
-    observer = observer_of(model, L)
-    observer.name = "Kalman Filter"
-    return observer
+    A, C = model.A(), model.C()
+
+    L = kalman_gain(A, C, Q_n, R_n)
+
+    return observer_of(model, L, "Kalman Filter")
 
 
 # Internal machinery: the block from the model, the request checked
 
 
-def observer_of(model, L):
-    """The ``StateObserver`` running ``model`` with gain ``L``, at the model's operating point, labels with a hat."""
+def observer_of(model, L, name):
+    """The ``StateObserver`` called ``name`` running ``model`` with gain ``L`` at the model's operating point, its labels with a hat."""
     labels = [hat(label) for label in model.state.labels]
-    return StateObserver(
+    observer = StateObserver(
         model.A(),
         model.B(),
         model.C(),
@@ -149,6 +143,8 @@ def observer_of(model, L):
         ybar=model.ybar,
         labels=labels,
     )
+    observer.name = name
+    return observer
 
 
 def hat(label):
@@ -173,7 +169,5 @@ if __name__ == "__main__":
     from minilink.dynamics.catalog.pendulum.pendulum import Pendulum
 
     plant = Pendulum()
-    observer = kalman(
-        plant, Q_n=np.diag([0.01, 0.1]), R_n=np.array([[1e-3, 0.0], [0.0, 1e-3]])
-    )
+    observer = kalman(plant, Q_n=np.diag([0.01, 0.1]), R_n=1e-3 * np.eye(2))
     print(observer)
