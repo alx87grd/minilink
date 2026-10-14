@@ -100,20 +100,25 @@ def wrap_angle(theta, xp):
 class ParkingCost(CostFunction):
     """Quadratic cost about the dock, with the heading error measured on the circle.
 
-    ``g = eᵀ Q e + (u − u_dock)ᵀ R (u − u_dock)`` for the pose error ``e = x − x_dock``
-    with its heading component wrapped to ``[−π, π)``: periodic, so a law that reads
-    the heading as a point on the circle sees the same cost, and with a slope
-    everywhere but at the wrap, so a boat parked stern first is not at a stationary
-    point of the cost. The terminal cost ``h`` is ``terminal`` times the state part.
+    ``g = eᵀ Q e + (u − u_dock)ᵀ R (u − u_dock) + w (1 − exp(−|e_p|² / 2 ρ²))`` for the
+    pose error ``e = x − x_dock`` with its heading component wrapped to ``[−π, π)``:
+    periodic, so a law that reads the heading as a point on the circle sees the same
+    cost, and with a slope everywhere but at the wrap, so a boat parked stern first
+    is not at a stationary point. The last term is a docking well of weight ``w``
+    and radius ``ρ`` [m], a bounded reward for the last metres that a learned law
+    needs and a planner does not (``well=0`` by default). The terminal cost ``h`` is
+    ``terminal`` times the state part of ``g``.
     """
 
-    def __init__(self, x_dock, u_dock, Q=Q, R=R, terminal=0.0):
+    def __init__(self, x_dock, u_dock, Q=Q, R=R, terminal=0.0, well=0.0, radius=2.0):
         self.params = {
             "Q": np.asarray(Q, dtype=float),
             "R": np.asarray(R, dtype=float),
             "x_dock": np.asarray(x_dock, dtype=float),
             "u_dock": np.asarray(u_dock, dtype=float),
             "terminal": float(terminal),
+            "well": float(well),
+            "radius": float(radius),
         }
 
     def g(self, x, u, t=0.0, params=None):
@@ -124,12 +129,17 @@ class ParkingCost(CostFunction):
             params["x_dock"],
             params["u_dock"],
         )
+        w, rho = params["well"], params["radius"]
         xp = array_module(x)
         e = x - x_dock
         e = xp.array([e[0], e[1], wrap_angle(e[2], xp), e[3], e[4], e[5]])
         du = u - u_dock
 
-        g = e @ Q @ e + du @ R @ du
+        g = (
+            e @ Q @ e
+            + du @ R @ du
+            + w * (1.0 - xp.exp(-(e[:2] @ e[:2]) / (2.0 * rho**2)))
+        )
 
         return g
 
@@ -145,9 +155,15 @@ class ParkingCost(CostFunction):
         return h
 
 
-def parking_cost(boat, x_dock=X_DOCK, terminal=0.0):
+def parking_cost(boat, x_dock=X_DOCK, terminal=0.0, well=0.0):
     """The parking cost about the dock and the thrust that holds it."""
-    return ParkingCost(x_dock, dock_thrust(boat, x_dock), terminal=terminal)
+    return ParkingCost(x_dock, dock_thrust(boat, x_dock), terminal=terminal, well=well)
+
+
+POLICY_HIDDEN = (64, 64)  # the learned law's network
+POLICY_WEIGHTS = (
+    "examples/experimental/boat/parking_ppo_policy.npz"  # written by parking_ppo.py
+)
 
 
 def dock_features(x):
@@ -172,7 +188,8 @@ class CascadeParkingController(System):
     (beyond ``d_switch``) the heading error is the bearing of the dock minus the
     course over ground, heading plus sideslip, with the sideslip faded out below
     the speed ``v_blend``; the sway reference is dropped there, so the boat closes
-    in bow first. Within ``d_switch`` the reference is the dock pose. The inner
+    in bow first. Within ``d_switch`` the reference is the dock pose, its heading
+    biased by ``K_lat`` [rad/m] toward the lateral offset, up to ``bias_max``. The inner
     loop is the LQR gain of the velocity subsystem linearized at the dock,
     ``u = K (v_ref − v)``, with no weight on sway (``Q_v[1] = 0``): a stern thruster
     cannot push sideways without yawing, and a sway loop only fights the yaw loop.
@@ -184,11 +201,13 @@ class CascadeParkingController(System):
         boat,
         x_dock=X_DOCK,
         K_p=(0.2, 0.2, 1.0),
-        d_switch=3.0,
+        d_switch=5.0,
         v_max=(2.0, 0.5, 0.5),
         Q_v=(1.0, 0.0, 5.0),
         R_v=(1.0, 0.1),
         v_blend=0.5,
+        K_lat=0.5,
+        bias_max=1.0,
     ):
         super().__init__()
         self.name = "Cascade Parking Controller"
@@ -205,6 +224,8 @@ class CascadeParkingController(System):
             "d_switch": float(d_switch),
             "v_max": np.asarray(v_max, dtype=float),
             "v_blend": float(v_blend),
+            "K_lat": float(K_lat),
+            "bias_max": float(bias_max),
         }
         self.add_input_port("y", dim=6)
         self.add_output_port("u", dim=2, function=self.ctl, dependencies=("y",))
@@ -217,6 +238,7 @@ class CascadeParkingController(System):
             params["v_max"],
             params["v_blend"],
         )
+        K_lat, bias_max = params["K_lat"], params["bias_max"]
         xp = array_module(u)
         q, v = u[:3], u[3:]
         q_dock = x_dock[:3]
@@ -224,14 +246,22 @@ class CascadeParkingController(System):
         # Pose error: when far, the course over ground (heading plus sideslip) steered
         # onto the dock's bearing, since a hull that slides sideways can point at the dock
         # and still orbit it; the sideslip fades out below ``v_blend``, where the course
-        # of a boat is noise and its heading is what the thruster steers; when close,
-        # the heading steered onto the dock's
+        # of a boat is noise and its heading is what the thruster steers. When close,
+        # the heading steered onto the dock's, biased toward the lateral offset (a line
+        # of sight), the bias reversed when the dock lies astern
         e_xy = q_dock[:2] - q[:2]
         distance = xp.hypot(e_xy[0], e_xy[1])
         far = distance > d_switch
         course = q[2] + xp.arctan2(v[1], v[0] + v_blend)
         e_course = wrap_angle(xp.arctan2(e_xy[1], e_xy[0]) - course, xp)
-        e_theta = xp.where(far, e_course, wrap_angle(q_dock[2] - q[2], xp))
+        c_d, s_d = xp.cos(q_dock[2]), xp.sin(q_dock[2])
+        e_along, e_lateral = (
+            c_d * e_xy[0] + s_d * e_xy[1],
+            -s_d * e_xy[0] + c_d * e_xy[1],
+        )
+        astern = xp.tanh(2.0 * e_along + 1.0)  # −1 when the dock is well behind
+        bias = xp.clip(K_lat * e_lateral * astern, -bias_max, bias_max)
+        e_theta = xp.where(far, e_course, wrap_angle(q_dock[2] + bias - q[2], xp))
         e = xp.array([e_xy[0], e_xy[1], e_theta])
 
         # Outer loop: a world-frame rate, mapped to a saturated body-frame velocity
