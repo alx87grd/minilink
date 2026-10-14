@@ -236,7 +236,7 @@ Three waves: A and B in parallel, D throughout.
 TB-a, P7, P5, P8, P9.
 - **P10** Automation by convention ([automation-by-convention.md](docs/plans/automation-by-convention.md),
   decided 2026-10-11): standard port names drive the wiring, three reserved names (`plant`,
-  `controller`, `estimator`) are the roles every tool reads, and the cost is scored on the
+  `controller`, `observer`) are the roles every tool reads, and the cost is scored on the
   plant. Its composition steps land in this wave; the order is in TODO §2 and the plan's
   §7.
 - **TB-b** The control objects and the loop (`siso`, `state`, `lqr`, `place`,
@@ -391,7 +391,7 @@ convention in [randomness.md](docs/plans/randomness.md); the docs-consistency ru
 **During v0.2 — these two block GRO501**
 
 - **Observer + state feedback for P4:** ship a `compensator(observer, K)` helper (a
-  controller box holding `estimator` and `gain`), or rely on `closed_loop(..., estimator=)`
+  controller box holding `observer` and `gain`), or rely on `closed_loop(..., observer=)`
   and the `expose` recipe in the notebook.
 - **The z tier** (P6): teach the Arduino law with `discretize` + simulation (default), or
   build a z-domain analysis family. Depends on what the sommatif examines.

@@ -19,7 +19,7 @@ Once this plan is built, the core of minilink is four ideas.
    one stacked `u` by position (§2.1).
 2. **Standard names say what a block is.** A plant reads `u`, `d`, `n` and gives `y`, `x`;
    a controller reads `e`, `y` or `x`, plus `r`, and gives `u`; an estimator reads `u`, `y`
-   and gives `x`. Three reserved subsystem names, `plant`, `controller` and `estimator`,
+   and gives `x`. Three reserved subsystem names, `plant`, `controller` and `observer`,
    say which block plays which role. Blocks get words, signals get symbols. Custom names
    are allowed and are wired by hand (§2).
 3. **A diagram is `System`s wired by name, and the operators are shortcuts for it.** Each
@@ -30,7 +30,7 @@ Once this plan is built, the core of minilink is four ideas.
      refused);
    - `controller @ plant`: a loop, with the roles named;
    - `closed_loop(controller, plant, reference=, disturbance=, noise=, filter=,
-     estimator=)`: the same, with options;
+     observer=)`: the same, with options;
    - `feedback(L, K)`: an open loop closed on itself;
    - `law % dt @ plant`: a sampled loop, a side helper for MPC for now;
    - role boxes, `rename_ports`, `port=` on sources, and `expose` for many blocks acting
@@ -51,7 +51,7 @@ loop.animate()                                      # camera on the plant
 loop2 = closed_loop(StateFeedbackController(K), PendulumWithNoisePort(),
                     reference=Step(), disturbance=WhiteNoise(psd=1e-2),
                     noise=WhiteNoise(psd=1e-4),
-                    estimator=observer)             # u, y → x̂ → controller
+                    observer=observer)             # u, y → x̂ → controller
 ```
 
 **What disappears** (§6): the controller classes, the feedback profiles, the override
@@ -68,7 +68,7 @@ One line, `controller @ plant`, should build a loop, and every tool should know 
 where to point the camera and what to score. The library learns all of this from **standard
 names, read at the moment of use, and nothing else**:
 - **port names** say what a block reads and commands, and drive the automatic wiring;
-- **three reserved subsystem names**, `plant`, `controller` and `estimator`, say what role a
+- **three reserved subsystem names**, `plant`, `controller` and `observer`, say what role a
   block plays, and every tool reads them.
 
 **Manual first.** A controller is a `System`, a plant is a `System`, and a loop is
@@ -129,7 +129,7 @@ A few explicit hints stay, for what names cannot say:
 |---|---|---|
 | `plant` | the system under control | `@`, `closed_loop`, `feedback` (a single-block `L`), `%`, the evaluators, or by hand |
 | `controller` | the law that commands the plant | the same |
-| `estimator` | the state estimate the controller reads (`u`, `y` → `x`) | `closed_loop(estimator=)`, or inside a controller box |
+| `observer` | the state estimate the controller reads (`u`, `y` → `x`) | `closed_loop(observer=)`, or inside a controller box |
 
 - A role is a reserved key of `diagram.subsystems`, the name given to `add_subsystem`. The
   same key names everything else about the block:
@@ -156,9 +156,9 @@ A few explicit hints stay, for what names cannot say:
 |---|---|---|
 | a sensor's lag, gain or quantization | physics | inside the plant box: the plant is what you measure through |
 | a low-pass or notch filter on `y` | an algorithm that gives a cleaned `y` | the helper `filter` (§4.3, §4.4), or inside a controller box |
-| a Luenberger observer, a Kalman filter | an algorithm that gives the state estimate x̂ | the role `estimator` |
+| a Luenberger observer, a Kalman filter | an algorithm that gives the state estimate x̂ | the role `observer` |
 
-A filter is not an estimator. A physical sensor filed as an estimator would leave the plant
+A filter is not an observer. A physical sensor filed as an observer would leave the plant
 and its scoring. Also, library filters read `u` and give their own state as `x`, so the port
 names would wire them wrongly.
 
@@ -189,7 +189,7 @@ and every tool read only the edge; the inside is one block or many.
   - a closed loop used as a plant: it holds its own `controller` and `plant`;
   - a cascade, `outer @ ((inner @ motor) >> load)`: the inner loop's command input is `r`
     (§3);
-  - an observer with a state-feedback gain: a controller box holding `estimator` and
+  - an observer with a state-feedback gain: a controller box holding `observer` and
     `gain`;
   - actuator limits, which belong in the plant box (`Saturation >> arm`);
   - a sampled loop's computer and plant (§4.5).
@@ -200,7 +200,7 @@ Three small functions answer every question the tools ask.
 
 - **`roles(diagram)`: who is who.**
   - Three lookups of the reserved keys at the top level. The estimator may also sit inside
-    the controller (`controller/estimator`).
+    the controller (`controller/observer`).
   - A leaf is its own plant.
   - A sampled loop answers from its `.plant` and `.computer` fields.
   - There is no "deepest plant" rule: in a cascade the outer loop's plant is the inner loop.
@@ -334,10 +334,10 @@ message. It is the only special case in `>>`.
   - The keyword says what the block is, so a filter whose input is named `u` is wired
     right.
   - A controller that reads `x` with `filter=` is refused: "a filter on the state is an
-    estimator; use `estimator=`".
+    estimator; use `observer=`".
   - `plant:y` stays the true output; the filtered signal is `filter:y`. The noise `n`
     enters before the filter.
-- **The estimator** (`estimator=E`): plant `y` and the controller's `u` go into `E`, and
+- **The estimator** (`observer=E`): plant `y` and the controller's `u` go into `E`, and
   `E`'s `x` goes to the controller's `x`.
 - **Disturbance and noise.**
   - A plant that declares `d` and `n` owns them: `d` is never charged as control effort,
@@ -412,7 +412,7 @@ zero-order hold.
 
 | Tool | Rule |
 |---|---|
-| Plots | `signals="plant"`, `"controller"` or `"estimator"` selects every port of that block, as `"plant:y"` selects one. The default *auto* mode shows every port of the plant and the controller, each wire once; the reference, the error, `d` and `n` come in through their inputs. Signal names take paths (`plant/plant:y`), and a block inside a box is found by object too. Labels and units are copied onto edge ports, and colours follow roles. With no roles, plots keep their plain default; a leaf keeps `("x", "u")`. `compute_trajectory(show=True)` and the planning and comparison plots use the same default. |
+| Plots | `signals="plant"`, `"controller"` or `"observer"` selects every port of that block, as `"plant:y"` selects one. The default *auto* mode shows every port of the plant and the controller, each wire once; the reference, the error, `d` and `n` come in through their inputs. Signal names take paths (`plant/plant:y`), and a block inside a box is found by object too. Labels and units are copied onto edge ports, and colours follow roles. With no roles, plots keep their plain default; a leaf keeps `("x", "u")`. `compute_trajectory(show=True)` and the planning and comparison plots use the same default. |
 | Animation | Resolved when animating. The camera comes from the one drawable block anywhere in the tree, else the drawable block inside `plant`, else an auto-fit view. A compensator draws no skin inside a loop. `scene_grid` and the follow frame come from the same block. |
 | Cost and evaluation | The cost is scored on the plant. A tool given a plant and a policy builds `policy @ plant` itself, compiled once for the three Monte Carlo backends, and scores `trajectory_of(plant)`: the plant's state and its `command_port`. Controller and estimator states are integrated, never scored. A controller with state is integrated, not refused; time is honoured; the cost's params are passed; leaving `X` has one price. The `x0` draw is on the plant only. |
 | Design and planning tools | DP, LQR, `place`, trajectory optimization, MPC and value iteration decide `command_port` only. `d` and `n` are never decision variables: they are drawn or held at nominal. `discretize` keeps the plant's ports. |
@@ -445,7 +445,7 @@ stays: it is a port layout, not a role marker.
 | `feedback(..., through=)` | `feedback(..., filter=)` | AC-OP |
 | The `x` port of `LowPassFilter` and `NotchFilter` (check its users first) | nothing: filters are not plants | AC-3 |
 
-**Kept:** `closed_loop`'s `reference=`, `disturbance=`, `noise=`, `filter=`, `estimator=`
+**Kept:** `closed_loop`'s `reference=`, `disturbance=`, `noise=`, `filter=`, `observer=`
 and `validate=`; the
 sampled loop's `schedule=` and `computer=`; `feedback(L, of=)`; `port=` on sources and
 `Demux`; analysis keywords such as `bode(of=, wrt=)`.
@@ -484,7 +484,7 @@ roles and control-law sweeps) is captured before and after each step and compare
 | AC-2 | The resolver (§3), with every reader switched; reserved names raise on a clash. (a) Byte-identical census. **(a) landed 2026-10-13.** (b) The one-time rename of the subsystem names, in flow and sampled loops; shortcuts stop naming blocks from their shape. (c) The ports `d` and `n` in the same pass. **(b) and (c) landed 2026-10-13** as one sweep (the rule is in DESIGN; rollouts identical). | — |
 | AC-OP | The operators (§4.1–§4.4), one commit each: no operator modifies its operands; the plain `>>` and its one guard; `+`, `autowire`, `rename_ports`, `port=` and the 8 positional lines; `expose`; `@` needs a plant, `feedback`'s entry, return and `filter=`, one junction helper. **Landed 2026-10-13** (five commits; `autowire` by name reverses AC-1's fan-out guard, by decision). | — |
 | AC-3 | Composition on standard names: the removals §6 assigns to AC-3; boxes nested by `@`, with the edge check and the box's state read for an `x` controller; `x` only where needed and its leaf refusal; the mechanical plant's `y` and `x`; MPC renamed; `filter=`. **Landed 2026-10-13** (five commits), except the MPC rename, which trails with AC-8a (§10). | — |
-| AC-4 | Loop inputs: plants that declare `d` and `n` own them; sources as values, named `reference`, `disturbance`, `noise`; `estimator=` with P4; the randomness plan's loop-input rulings reconciled | beside P4, before P11 |
+| AC-4 | Loop inputs: plants that declare `d` and `n` own them; sources as values, named `reference`, `disturbance`, `noise`; `observer=` with P4; the randomness plan's loop-input rulings reconciled | beside P4, before P11 |
 | AC-5 | Plots (§5): the auto mode, role selectors, paths into boxes, labels, units and colours by role, one default | plotting lane, v0.2 wave D |
 | AC-6 | Animation (§5): the camera chosen when animating, looking inside `plant`; no compensator skin in a loop; the camera copy goes | plotting lane |
 | AC-7 | Cost and tools (§5): one compiled loop for the three Monte Carlo backends, `command_port`, controllers with state, time, cost params, one price; Gym and the rollout environment aligned | v0.3, with RN-4 and RN-5 |
@@ -550,11 +550,11 @@ These do not change the rules:
   the plant's `x`. Until then, the cost limit of §4.3 stands.
 
 **To revisit when the estimation features land** (P4, then the EKF and the time-varying and
-discrete Kalman filters). The `estimator` role and the standard names around it were set
+discrete Kalman filters). The `observer` role and the standard names around it were set
 before any estimator existed, so they get a review then, against the real blocks:
 - the estimator's ports (`u`, `y` → `x`, labelled x̂), and whether the controller should read
   the estimate under its own name rather than `x`;
-- how `closed_loop(..., estimator=)` wires them, and where the estimator sits in a
+- how `closed_loop(..., observer=)` wires them, and where the estimator sits in a
   controller box;
 - what else a filter gives: a covariance, an innovation;
 - the noise inputs `d` and `n` that a Kalman design reads, and their link to the noise

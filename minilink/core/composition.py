@@ -192,7 +192,7 @@ def closed_loop(
         controller reads (its ``y``, or the ``Error`` block). The plant's
         ``y`` stays the loop's output and the noise ``n`` enters before the
         filter. A controller that reads ``x`` is refused: a filter on the
-        state is an estimator.
+        state is an observer.
     validate : bool, optional
         If ``True``, run algebraic-loop detection before returning.
 
@@ -213,7 +213,7 @@ def closed_loop(
     if filter is not None and "x" in roles.measurements:
         raise ValueError(
             f"{controller.name!r} reads the state 'x': a filter on the state is an "
-            "estimator; use estimator="
+            "observer; put the observer in a controller box"
         )
 
     plant_box = _plant_box_with_state(plant) if "x" in roles.measurements else plant

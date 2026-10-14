@@ -71,7 +71,7 @@ AC-3); AC-4 with P4; P11. P6 stays held for GRO501; its row is in §5 (v0.9).
   decided 2026-10-11, amended 2026-10-13 by
   [the second-opinion record](../reviews/2026-10-13-automation-by-convention-second-opinion.md)):
   standard port names drive the wiring, three reserved names (`plant`, `controller`,
-  `estimator`) are the roles every tool reads, and the cost is scored on the plant. Its
+  `observer`) are the roles every tool reads, and the cost is scored on the plant. Its
   steps, in build order, are the plan's §7, each with its "done when":
   - AC-0 no controller classes, AC-2a the resolver, AC-OP the operators, AC-3
     composition on standard names and AC-2b/c the one-time rename and the ports `d` / `n`
@@ -99,19 +99,19 @@ AC-3); AC-4 with P4; P11. P6 stays held for GRO501; its row is in §5 (v0.9).
   (`feedback`, `closed_loop`, `@`; after AC-3). Before P11. Done when every module in scope
   reads like `dp.py` and the baseline `cmp`s.
 - [ ] **P4 `estimation/`**, now, in parallel with P10: the block needs none of its steps,
-  and the notebook wires it by hand until AC-4's `closed_loop(estimator=)`.
+  and the notebook wires it by hand until AC-4's `closed_loop(observer=)`.
   `LuenbergerObserver(A, B, C, L)` as a
   `DynamicSystem` with ports `u`, `y` → `x` (the estimate, labelled x̂) and the role name
-  `estimator`; `luenberger(A, B, C, poles)` on the dual pair (`place_gain(Aᵀ, Cᵀ, poles)ᵀ`);
+  `observer`; `luenberger(A, B, C, poles)` on the dual pair (`place_gain(Aᵀ, Cᵀ, poles)ᵀ`);
   `kalman(A, B, C, Q, R)` from the filter Riccati equation, `Q = B_w W B_wᵀ` and `R = V` read
-  from the noise blocks' `psd` (randomness.md §2). `closed_loop(..., estimator=)` wires `y`,
+  from the noise blocks' `psd` (randomness.md §2). `closed_loop(..., observer=)` wires `y`,
   `u` and `x` (AC-4); Monte Carlo starts x̂0 at the estimator's own `x0`. The open question,
   a `compensator(observer, K)` helper or the `expose` recipe, is in ROADMAP §6. Done when
   LQR + Kalman stabilizes the guide's cart-pendulum from a disturbed start with noise on `u`
   and `y`, and `plot_diagram` shows the Figure 12 topology.
   Also: named input ports on the state-space base so observers and sensitivity blocks share
   one `f` (scan: analysis#13); the plan names the estimation API once (scan: docs-gov#9);
-  review the `estimator` role and the names around it against the real blocks
+  review the `observer` role and the names around it against the real blocks
   ([automation-by-convention.md](automation-by-convention.md) §10).
 - [ ] **P11 Two GRO501 notebooks** **[maintainer — student-facing]**:
   `teaching/topics/classical_control/dc_motor_propulsion.ipynb` (APP2) and

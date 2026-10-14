@@ -539,7 +539,7 @@ edge output, and `"x"` with no such port is the box's own state as an output.
 **Shortcut subsystem ids.** `@` names its two sides `controller` and `plant`,
 `feedback(leaf)` names the leaf `plant`; `+` and `>>` keep each block's own
 name (``System.id``, else the name: `step`, `pid`, `integrator2` on a repeat).
-The reserved names `plant`, `controller` and `estimator` are never suffixed: a
+The reserved names `plant`, `controller` and `observer` are never suffixed: a
 second block under one of them is refused.
 Block titles in ``plot_diagram()`` still show ``sys.name`` (human type).
 A diagram nested with ``add_subsystem`` is drawn expanded: its blocks sit in a
@@ -571,7 +571,7 @@ on itself, through a `Gain` (`feedback(sys, K)`) or a sensor or filter block
 (`feedback(sys, F)`), the return block named `filter` either way;
 `closed_loop(C, plant, filter=F)` puts the same block between the plant's `y`
 and what the controller reads, a noise `n` entering before it, and refuses a
-controller that reads `x` (a filter on the state is an estimator). Positive
+controller that reads `x` (a filter on the state is an observer). Positive
 feedback still uses a signed `Sum`. A scalar error against a vector output takes
 component 0 through a visible `Demux`; equal dimensions close a vector loop;
 anything else raises and names `feedback(sys, of=(port, index))`. No `Loop`
@@ -588,7 +588,7 @@ and `minilink/core/feedback.py` reads them, never a class or an `isinstance`:
 - `command_port(sys)` is the input a decision drives on a plant or a box: `u`,
   else the one input that is not `d` or `n`;
 - `roles(diagram)` returns the blocks under the reserved subsystem names
-  `plant`, `controller` and `estimator` (the estimator may sit inside the
+  `plant`, `controller` and `observer` (the estimator may sit inside the
   controller; a leaf is its own plant; a sampled loop answers from its two
   sides). One of each per diagram level: a second block under a reserved
   name is refused, never suffixed, so two loops cannot be laid side by side

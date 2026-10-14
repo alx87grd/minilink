@@ -252,7 +252,7 @@ class WiredDiagramMixin:
     def add_subsystem(self, sys, sys_id):
         """Add a subsystem under a unique id, with all its inputs unconnected.
 
-        The ids ``plant``, ``controller`` and ``estimator`` name the roles every
+        The ids ``plant``, ``controller`` and ``observer`` name the roles every
         tool reads (:func:`minilink.core.feedback.roles`); one of each per level.
         """
         check_reserved_id(sys_id, self.subsystems)

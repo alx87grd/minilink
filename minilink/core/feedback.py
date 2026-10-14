@@ -8,7 +8,7 @@ how a block computes; this module only reads names:
   its reference ``r``, its command ``u``, and whether an ``Error`` block drives it
   (an input ``e``, or the one input of a plain compensator);
 - :func:`roles` reads a diagram's **subsystem names**: the blocks under the reserved
-  names ``plant``, ``controller`` and ``estimator``;
+  names ``plant``, ``controller`` and ``observer``;
 - :func:`command_port` names the input a decision drives on a plant or a box.
 
 ``@``, ``feedback``, the sampled loop, ``plot_control_law`` and the evaluators read
@@ -24,16 +24,16 @@ import numpy as np
 
 #: The three subsystem names that say what role a block plays in a diagram. One of
 #: each per diagram level; a second one is refused, never suffixed.
-RESERVED_IDS = ("plant", "controller", "estimator")
+RESERVED_IDS = ("plant", "controller", "observer")
 
 
 @dataclass(frozen=True)
 class Roles:
-    """The plant, the controller and the estimator of a diagram, or ``None`` each."""
+    """The plant, the controller and the observer of a diagram, or ``None`` each."""
 
     plant: object | None
     controller: object | None
-    estimator: object | None
+    observer: object | None
 
 
 @dataclass(frozen=True)
@@ -114,10 +114,10 @@ def command_port(sys) -> str:
 
 
 def roles(system) -> Roles:
-    """The plant, the controller and the estimator of ``system``, from the reserved names.
+    """The plant, the controller and the observer of ``system``, from the reserved names.
 
     A leaf is its own plant. A diagram answers from its top-level keys ``plant``,
-    ``controller`` and ``estimator`` (the estimator may also sit inside the
+    ``controller`` and ``observer`` (the observer may also sit inside the
     controller); a sampled loop from its ``plant`` and ``computer`` sides. A
     missing name is ``None``: a tool that needs that block raises, and the plots
     and the camera keep their plain defaults.
@@ -128,17 +128,17 @@ def roles(system) -> Roles:
         return Roles(
             plant_side.plant,
             computer_side.controller,
-            computer_side.estimator or plant_side.estimator,
+            computer_side.observer or plant_side.observer,
         )
     subsystems = getattr(system, "subsystems", None)
     if subsystems is None:
         return Roles(system, None, None)
     plant = _block_under(subsystems, "plant")
     controller = _block_under(subsystems, "controller")
-    estimator = _block_under(subsystems, "estimator")
-    if estimator is None and controller is not None:
-        estimator = _block_under(getattr(controller, "subsystems", {}), "estimator")
-    return Roles(plant, controller, estimator)
+    observer = _block_under(subsystems, "observer")
+    if observer is None and controller is not None:
+        observer = _block_under(getattr(controller, "subsystems", {}), "observer")
+    return Roles(plant, controller, observer)
 
 
 def check_reserved_id(sys_id, existing) -> None:

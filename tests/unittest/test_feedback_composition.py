@@ -273,7 +273,7 @@ class TestClosedLoopFilter(unittest.TestCase):
         from minilink import LowPassFilter, StateFeedbackController, closed_loop
 
         K = np.array([[10.0, 2.0]])
-        with self.assertRaisesRegex(ValueError, "estimator"):
+        with self.assertRaisesRegex(ValueError, "observer"):
             closed_loop(StateFeedbackController(K), Pendulum(), filter=LowPassFilter())
 
 
@@ -583,7 +583,7 @@ class TestResolver(unittest.TestCase):
         who = roles(hand_wired)
         self.assertIs(who.plant, plant)
         self.assertIs(who.controller, ctl)
-        self.assertIsNone(who.estimator)
+        self.assertIsNone(who.observer)
 
         loop = ctl @ plant
         self.assertIs(roles(loop).plant, plant)
@@ -595,7 +595,7 @@ class TestResolver(unittest.TestCase):
 
         empty = roles(DiagramSystem())
         self.assertEqual(
-            (empty.plant, empty.controller, empty.estimator), (None, None, None)
+            (empty.plant, empty.controller, empty.observer), (None, None, None)
         )
 
         sampled = ctl % 0.01 @ plant
@@ -605,13 +605,13 @@ class TestResolver(unittest.TestCase):
         observer, box = (
             Integrator(),
             DiagramSystem(),
-        )  # an estimator inside the controller
-        box.add_subsystem(observer, "estimator")
+        )  # an observer inside the controller
+        box.add_subsystem(observer, "observer")
         box.add_subsystem(ctl, "gain")
         nested = DiagramSystem()
         nested.add_subsystem(box, "controller")
         nested.add_subsystem(plant, "plant")
-        self.assertIs(roles(nested).estimator, observer)
+        self.assertIs(roles(nested).observer, observer)
 
     def test_a_second_block_under_a_reserved_name_is_refused(self):
         from minilink import DiagramSystem

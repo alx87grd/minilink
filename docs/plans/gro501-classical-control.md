@@ -198,7 +198,7 @@ observer in §1.4.4 (bonus), Lab 2 steps 5–6, and oral-review deliverables
 
 1. `LuenbergerObserver(A, B, C, L)` — a `DynamicSystem` with state x̂,
    `f = A x̂ + B u + L (y − C x̂)`. Ports `u`, `y` → `x` (the estimate, labelled x̂), with
-   the role name `estimator` ([automation-by-convention.md](automation-by-convention.md)
+   the role name `observer` ([automation-by-convention.md](automation-by-convention.md)
    §2.1).
 2. `luenberger(A, B, C, poles)` — design factory, `place` on the dual pair
    `(Aᵀ, Cᵀ)`. Depends on P3.
@@ -386,7 +386,7 @@ declared. Behaviour-preserving; the four accepted `ports` values stay.
 
 P10 became [automation-by-convention.md](automation-by-convention.md), decided on
 2026-10-11: port names drive the wiring, three reserved names (`plant`, `controller`,
-`estimator`) are the roles every tool reads, and `@` is one port-based dispatch. Its steps
+`observer`) are the roles every tool reads, and `@` is one port-based dispatch. Its steps
 and their "done when" are that plan's §7. The original scope here (a DESIGN table of the
 three `@` paths, a test pinning the `e`-input autowire, a smaller `PROFILE_PORTS`) is
 superseded: the profiles go, and the history is in
