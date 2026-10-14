@@ -32,7 +32,7 @@ def _zeros_like(template, shape):
     return xp.zeros(shape, dtype=dtype)
 
 
-def _point(value, dim, name):
+def point_component(value, dim, name):
     """One component of the operating point as a float vector of length ``dim`` (zeros when ``None``)."""
     if value is None:
         return np.zeros(dim)
@@ -187,13 +187,13 @@ class LTISystem(LTISystemFacades, StateSpaceSystem):
         )
 
         # The operating point the deviations are measured from (the origin by default)
-        self.xbar = _point(xbar, n, "xbar")
-        self.ubar = _point(ubar, m, "ubar")
+        self.xbar = point_component(xbar, n, "xbar")
+        self.ubar = point_component(ubar, m, "ubar")
         self.ybar = (
             np.asarray(self._C, dtype=float) @ self.xbar
             + np.asarray(self._D, dtype=float) @ self.ubar
             if ybar is None
-            else _point(ybar, p, "ybar")
+            else point_component(ybar, p, "ybar")
         )
 
     def A(self, t=0.0, params=None):

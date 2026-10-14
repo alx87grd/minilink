@@ -125,8 +125,9 @@ def design_model(
     given here is refused: linearize the plant at ``x_bar`` instead. Any other
     system is linearized at ``(x_bar, u_bar)``, the nominal state and inputs
     by default, with ``B`` over the command port alone (``u``, else the one
-    input that is not a disturbance ``d`` or a noise ``n``), so a plant with
-    noise ports gives a gain over its command.
+    input that is not a disturbance ``d`` or a noise ``n``) and ``C`` over the
+    measured output ``y`` alone, so a plant with noise ports gives a gain over
+    its command and a box exposing its state is measured through ``y``.
     """
     if isinstance(sys, LTISystem):
         if x_bar is not None or u_bar is not None:
@@ -136,8 +137,24 @@ def design_model(
                 "passing it here"
             )
         return sys
+    command = command_port(sys)
+    if command == "u" and len(sys.inputs) > 1:
+        # "u" alone names every input stacked: pick the components of the port named u
+        columns = sys.get_input_port_slice("u")
+        command = [("u", i) for i in range(columns.start, columns.stop)]
+    measurement = (
+        "y" if "y" in sys.outputs else None
+    )  # the measured output, not every edge port
     return linearize(
-        sys, x_bar, u_bar, t, params, wrt=command_port(sys), method=method, eps=eps
+        sys,
+        x_bar,
+        u_bar,
+        t,
+        params,
+        of=measurement,
+        wrt=command,
+        method=method,
+        eps=eps,
     )
 
 

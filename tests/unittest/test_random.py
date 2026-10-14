@@ -302,3 +302,12 @@ def test_the_rollout_environment_warns_about_noise_it_never_sees():
             assert not any("never calls h" in m or "fixed seed" in m for m in messages)
         else:
             assert any(expected in m for m in messages), messages
+
+
+def test_a_renamed_noise_source_keeps_its_dimension():
+    from minilink.blocks.sources import WhiteNoise
+
+    noise = WhiteNoise(4, psd=1e-4, port="n")
+    assert list(noise.outputs) == ["n"] and noise.dim == 4
+    assert noise.h(np.array([]), np.array([]), 0.3).shape == (4,)
+    assert noise.compile().outputs(np.array([]), np.array([]), 0.3)["n"].shape == (4,)

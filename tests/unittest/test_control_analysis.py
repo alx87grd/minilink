@@ -255,6 +255,35 @@ class TestLQR(unittest.TestCase):
         plant.state.set_nominal_value(x_bar)
         np.testing.assert_allclose(lqr(plant, Q, R).params["K"], on_plant.params["K"])
 
+    def test_a_plant_with_noise_ports_is_designed_about_its_command(self):
+        from minilink.analysis.linearization import design_model
+        from minilink.dynamics.catalog.pendulum.cartpole import (
+            CartPole,
+            CartPoleWithNoisePort,
+        )
+
+        x_up = np.array([0.0, np.pi, 0.0, 0.0])
+        model = design_model(CartPoleWithNoisePort(), x_up)
+        self.assertEqual(model.B().shape, (4, 1))
+        self.assertEqual(model.D().shape, (4, 1))
+        np.testing.assert_allclose(model.ubar, [0.0])
+        quiet = design_model(CartPole(), x_up)
+        np.testing.assert_allclose(model.A(), quiet.A())
+        np.testing.assert_allclose(model.B(), quiet.B())
+        from minilink.blocks.routing import Gain
+
+        box = (CartPole() >> Gain(np.eye(4)[:2])).expose(
+            "x"
+        )  # positions measured, state on the edge
+        sensed = design_model(box, x_up)
+        self.assertEqual(sensed.C().shape, (2, 4))
+        np.testing.assert_allclose(sensed.ybar, x_up[:2])
+        Q, R = np.diag([1.0, 10.0, 1.0, 1.0]), np.array([[0.1]])
+        K_noisy = lqr(CartPoleWithNoisePort(), Q, R, x_bar=x_up).params["K"]
+        K_quiet = lqr(CartPole(), Q, R, x_bar=x_up).params["K"]
+        self.assertEqual(K_noisy.shape, (1, 4))
+        np.testing.assert_allclose(K_noisy, K_quiet)
+
     def test_the_signature_is_checked(self):
         plant, lti = InvertedPendulum(), linearize(InvertedPendulum(), [0.0, 0.0])
         Q, R = np.eye(2), np.eye(1)

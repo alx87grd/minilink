@@ -24,7 +24,14 @@ class Source(System):
         self.name = "Source"
         self.params = {"value": np.zeros(p)}
 
+        # The one output: ``y`` by default, or the input it drives (``port="r"``)
+        self.port = port
         self.add_output_port(port, dim=p, function=self.h)
+
+    @property
+    def dim(self):
+        """The signal's dimension, whatever the output port is named."""
+        return self.outputs[self.port].dim
 
     def h(self, x, u, t=0, params=None):
         params = self.params if params is None else params
@@ -73,12 +80,12 @@ class Source(System):
             raise ValueError("n_pts must be >= 2")
 
         t = np.linspace(t0, tf, int(n_pts))
-        y = np.zeros((self.p, t.size), dtype=float)
+        y = np.zeros((self.dim, t.size), dtype=float)
         empty_x = np.array([])
         empty_u = np.array([])
         for i, ti in enumerate(t):
             y[:, i] = np.asarray(self.h(empty_x, empty_u, ti), dtype=float).reshape(
-                self.p
+                self.dim
             )
 
         _created = ax is None
@@ -99,8 +106,8 @@ class Source(System):
         else:
             fig = ax.figure
 
-        for i in range(self.p):
-            label = f"{self.name}[{i}]" if self.p > 1 else self.name
+        for i in range(self.dim):
+            label = f"{self.name}[{i}]" if self.dim > 1 else self.name
             ax.plot(t, y[i, :], "b", linewidth=1.5, alpha=0.8, label=label)
 
         ax.set_ylabel("value", fontsize=FONT_SIZE, multialignment="center")
@@ -247,7 +254,7 @@ class WhiteNoise(Source):
     def h(self, x, u, t=0, params=None):
         params = self.params if params is None else params
         seed, W, period = params["seed"], params["psd"], params["sample_period"]
-        hold, p = self.hold, self.p
+        hold, p = self.hold, self.dim
         xp = array_module(t, W)
         if seed is None:
             return xp.zeros(p)  # the mean: no draw
@@ -319,11 +326,11 @@ class TrajectorySource(Source):
                 fill_value=(self.sample_values[i, 0], self.sample_values[i, -1]),
                 assume_sorted=True,
             )
-            for i in range(self.p)
+            for i in range(self.dim)
         ]
 
     def h(self, x, u, t=0, params=None):
-        p, interpolators = self.p, self._interpolators
+        p, interpolators = self.dim, self._interpolators
 
         # one interpolated sample per channel at time t
         y = np.zeros(p)
