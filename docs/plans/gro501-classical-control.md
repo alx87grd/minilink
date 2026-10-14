@@ -290,7 +290,7 @@ linearize, discretize` returns the functions (scan analysis#11).
 
 **Landed 2026-10-10, reduced.** The maintainer dropped the ζ / ω_n verb and the `poles` verb
 (two textbook lines on `np.linalg.eigvals`, written by the student). The `N` matrix is
-`StateFeedbackController(K, N=N)`: without `N` the state reference is unchanged; with it,
+`OutputReferenceController(K, N)` (split out of `StateFeedbackController`, 2026-10-14):
 `r` is the output reference and `u = ubar - K (x - xbar) + N r`. `print` shows an
 `LTISystem`'s matrices, a `TransferFunction`'s `G(s)` and a `StructuralResult`'s rank.
 

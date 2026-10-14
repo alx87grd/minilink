@@ -416,6 +416,7 @@ class TestDispatchTable(unittest.TestCase):
             ComputedTorqueController,
             ImpedanceIntegralController,
             NeuralPolicyController,
+            OutputReferenceController,
             SingleMass,
             SlidingModeController,
             StateFeedbackController,
@@ -480,8 +481,8 @@ class TestDispatchTable(unittest.TestCase):
                 reads_x,
             ),
             (
-                "StateFeedback N",
-                StateFeedbackController(K, N=np.array([[10.0]])) @ DoubleIntegrator(),
+                "OutputReference",
+                OutputReferenceController(K, np.array([[10.0]])) @ DoubleIntegrator(),
                 ["controller", "plant"],
                 reads_x,
             ),

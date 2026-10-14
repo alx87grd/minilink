@@ -9,18 +9,12 @@ from minilink.dynamics.abstraction.state_space import point_component
 
 
 class StateFeedbackController(System):
-    """Full-state feedback on a state reference, or on an output reference with ``N``.
+    """Full-state feedback ``u = ubar - K (x - r)`` on a state reference.
 
-    Without ``N``: ``u = ubar - K (x - r)``. The reference ``r`` is a state
-    (dimension ``n``); left unconnected it holds ``xbar``, so the law
-    regulates to ``xbar``. This is the block :func:`minilink.control.design.lqr`
-    and :func:`minilink.control.design.place` return.
-
-    With ``N``: ``u = ubar - K (x - xbar) + N r``. The reference ``r`` is a
-    desired output (dimension ``p``, zero when unconnected), and ``N`` of shape
-    ``(m, p)`` scales it to a command: the textbook's
-    ``N = -(C (A - B K)^-1 B)^-1`` gives ``y = r`` at steady state for the
-    plant ``(A, B, C)`` linearized about ``(xbar, ubar)``.
+    The reference ``r`` is a state (dimension ``n``); left unconnected it holds
+    ``xbar``, so the law regulates to ``xbar``. This is the block
+    :func:`minilink.control.design.lqr` and :func:`minilink.control.design.place`
+    return. A reference on the output is :class:`OutputReferenceController`.
 
     Ports: the plant state ``x`` (dimension ``n``) and the reference ``r``.
     ``K`` has shape ``(m, n)``; ``ubar`` is the feedforward command.
@@ -30,7 +24,7 @@ class StateFeedbackController(System):
     :class:`~minilink.control.output.ProportionalController`.
     """
 
-    def __init__(self, K, xbar=None, ubar=None, *, N=None):
+    def __init__(self, K, xbar=None, ubar=None):
         super().__init__()
         self.name = "State Feedback Controller"
 
@@ -38,30 +32,58 @@ class StateFeedbackController(System):
         m, n = K.shape
         xbar = point_component(xbar, n, "xbar")
         ubar = point_component(ubar, m, "ubar")
-        self.reference = "state" if N is None else "output"
+        self.params = {"K": K, "ubar": ubar}
 
         self.add_input_port("x", dim=n)
-        if N is None:
-            self.params = {"K": K, "ubar": ubar}
-            self.add_input_port("r", dim=n, nominal_value=xbar)
-        else:
-            N = reference_gain(N, m)
-            self.params = {"K": K, "ubar": ubar, "xbar": xbar, "N": N}
-            self.add_input_port("r", dim=N.shape[1])
+        self.add_input_port("r", dim=n, nominal_value=xbar)
         self.add_output_port("u", dim=m, function=self.ctl, dependencies=("x", "r"))
 
     def ctl(self, x, u, t=0, params=None):
         params = self.params if params is None else params
         K, ubar = params["K"], params["ubar"]
-        reference = self.reference
         n = K.shape[1]
         x_meas, r = u[:n], u[n:]
 
-        if reference == "output":
-            xbar, N = params["xbar"], params["N"]
-            u_cmd = ubar - K @ (x_meas - xbar) + N @ r
-        else:
-            u_cmd = ubar - K @ (x_meas - r)
+        u_cmd = ubar - K @ (x_meas - r)
+
+        return u_cmd
+
+
+class OutputReferenceController(System):
+    """Full-state feedback ``u = ubar - K (x - xbar) + N r`` on an output reference.
+
+    The reference ``r`` is a desired output (dimension ``p``, zero when
+    unconnected), and ``N`` of shape ``(m, p)`` scales it to a command: the
+    textbook's ``N = -(C (A - B K)^-1 B)^-1`` gives ``y = r`` at steady state
+    for the plant ``(A, B, C)`` linearized about ``(xbar, ubar)``. A reference
+    on the state is :class:`StateFeedbackController`.
+
+    Ports: the plant state ``x`` (dimension ``n``) and the reference ``r``.
+    ``K`` has shape ``(m, n)``; ``ubar`` is the feedforward command.
+    """
+
+    def __init__(self, K, N, xbar=None, ubar=None):
+        super().__init__()
+        self.name = "Output Reference Controller"
+
+        K = np.atleast_2d(np.asarray(K, dtype=float))
+        m, n = K.shape
+        xbar = point_component(xbar, n, "xbar")
+        ubar = point_component(ubar, m, "ubar")
+        N = reference_gain(N, m)
+        self.params = {"K": K, "ubar": ubar, "xbar": xbar, "N": N}
+
+        self.add_input_port("x", dim=n)
+        self.add_input_port("r", dim=N.shape[1])
+        self.add_output_port("u", dim=m, function=self.ctl, dependencies=("x", "r"))
+
+    def ctl(self, x, u, t=0, params=None):
+        params = self.params if params is None else params
+        K, N, xbar, ubar = params["K"], params["N"], params["xbar"], params["ubar"]
+        n = K.shape[1]
+        x_meas, r = u[:n], u[n:]
+
+        u_cmd = ubar - K @ (x_meas - xbar) + N @ r
 
         return u_cmd
 

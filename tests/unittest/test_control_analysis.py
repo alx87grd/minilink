@@ -1737,7 +1737,7 @@ class TestPolePlacement(unittest.TestCase):
 
 
 class TestOutputReference(unittest.TestCase):
-    """``StateFeedbackController(K, N=N)``: the textbook output reference."""
+    """``OutputReferenceController(K, N)``: the textbook output reference."""
 
     def setUp(self):
         from minilink.control.design import place_gain
@@ -1749,11 +1749,11 @@ class TestOutputReference(unittest.TestCase):
         self.K = place_gain(self.A, self.B, [-2.0, -3.0])
 
     def test_y_tracks_r_at_steady_state(self):
-        from minilink.control.state import StateFeedbackController
+        from minilink.control.state import OutputReferenceController
 
         A, B, C, K = self.A, self.B, self.C, self.K
         N = -np.linalg.inv(C @ np.linalg.inv(A - B @ K) @ B)
-        ctl = StateFeedbackController(K, N=N)
+        ctl = OutputReferenceController(K, N)
         self.assertEqual(ctl.inputs["r"].dim, 1)
 
         loop = ctl @ self.plant
@@ -1762,7 +1762,7 @@ class TestOutputReference(unittest.TestCase):
         trajectory = loop.compute_trajectory(tf=8.0, verbose=False)
         np.testing.assert_allclose(C @ trajectory.x[:, -1], [0.5], atol=1e-4)
 
-    def test_without_n_the_state_reference_is_unchanged(self):
+    def test_the_state_reference_is_the_other_block(self):
         from minilink.control.state import StateFeedbackController
 
         ctl = StateFeedbackController(self.K, xbar=[0.1, 0.0])
@@ -1773,12 +1773,14 @@ class TestOutputReference(unittest.TestCase):
         np.testing.assert_allclose(
             ctl.ctl(None, np.concatenate([x, r])), -self.K @ (x - r)
         )
+        with self.assertRaises(TypeError):
+            StateFeedbackController(self.K, N=np.ones((1, 1)))
 
     def test_n_needs_one_row_per_command(self):
-        from minilink.control.state import StateFeedbackController
+        from minilink.control.state import OutputReferenceController
 
         with self.assertRaisesRegex(ValueError, "needs 1 row"):
-            StateFeedbackController(self.K, N=np.ones((2, 1)))
+            OutputReferenceController(self.K, np.ones((2, 1)))
 
 
 class TestPrint(unittest.TestCase):

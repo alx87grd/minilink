@@ -108,6 +108,12 @@ was ruled, one entry each, and where each ruling now lives.
   line of GRO501 `numpy_state_space`, an exception to R13); their from-scratch code stays.
   Lives in: `control/design.py`, `estimation/design.py`, `analysis/linearization.py`,
   DESIGN §2–§3.
+- **R15 One law per state-feedback block** (reverses the P8 `N=` keyword of 2026-10-10).
+  `StateFeedbackController(K, xbar, ubar)` is the state reference, `u = ū − K (x − r)` with
+  `r` defaulting to x̄; `OutputReferenceController(K, N, xbar, ubar)` is the output
+  reference, `u = ū − K (x − x̄) + N r`, with x̄ in `params` because its law reads it.
+  Each block has one home for x̄ and no mode switch in its law; `lqr` and `place` still
+  return the first. Lives in: `control/state.py`, DESIGN `state.py` row, ROADMAP §4.
 
 ## Where the earlier records and this one differ
 

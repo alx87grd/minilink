@@ -57,6 +57,10 @@ _EXPORTS: dict[str, tuple[str, str]] = {
     # control
     "ProportionalController": ("minilink.control.output", "ProportionalController"),
     "StateFeedbackController": ("minilink.control.state", "StateFeedbackController"),
+    "OutputReferenceController": (
+        "minilink.control.state",
+        "OutputReferenceController",
+    ),
     "PID": ("minilink.control.siso", "PID"),
     "PurePursuit": ("minilink.control.geometric", "PurePursuit"),
     "PI": ("minilink.control.siso", "PI"),

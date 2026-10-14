@@ -52,6 +52,10 @@ _EXPORTS: dict[str, tuple[str, str]] = {
         "minilink.control.state",
         "StateFeedbackController",
     ),
+    "OutputReferenceController": (
+        "minilink.control.state",
+        "OutputReferenceController",
+    ),
     "TimeVaryingStateFeedbackController": (
         "minilink.control.state",
         "TimeVaryingStateFeedbackController",
