@@ -851,3 +851,21 @@ class TestDiagramRenderWithoutDot(unittest.TestCase):
                 warnings.simplefilter("always")
                 dot_module._render_diagram_graph(graph, show=True, show_inline=True)
         self.assertTrue(any("Graphviz binary" in str(w.message) for w in caught))
+
+    def test_plot_diagram_returns_nothing_for_the_cell_to_render(self):
+        """A notebook auto-displays the returned graph, which would call ``dot`` and raise."""
+        import warnings
+        from unittest import mock
+
+        graphviz = pytest.importorskip("graphviz")
+        from minilink.control.impedance import ImpedanceController
+        from minilink.dynamics.catalog.pendulum.pendulum import Pendulum
+
+        loop = ImpedanceController() @ Pendulum()
+        missing_dot = RuntimeError("failed to execute PosixPath('dot')")
+        with mock.patch.object(graphviz.Digraph, "pipe", side_effect=missing_dot):
+            with warnings.catch_warnings(record=True) as caught:
+                warnings.simplefilter("always")
+                graph = loop.plot_diagram(show=True, show_inline=True)
+        self.assertIsNone(graph)
+        self.assertTrue(any("Graphviz binary" in str(w.message) for w in caught))

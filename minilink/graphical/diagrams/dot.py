@@ -149,10 +149,13 @@ def _render_diagram_graph(
     Graphviz PNG (same blocking policy as trajectory plots). Pass
     ``show_pdf=True`` for the legacy OS PDF viewer; pass ``filename`` to
     write Graphviz output to disk. ``show=False`` builds/returns only.
+
+    Returns ``False`` when the figure cannot be drawn (no graphviz wrapper, or
+    no ``dot`` binary for the inline SVG), ``True`` otherwise.
     """
     if graph is None:
         # get_diagram already warned that graphviz is missing.
-        return
+        return False
 
     from minilink.graphical.common.environment import (
         is_blocking_needed,
@@ -165,6 +168,7 @@ def _render_diagram_graph(
     if show_pdf is None:
         show_pdf = False
 
+    drawn = True
     if show and show_inline:
         # Probe Graphviz here so a missing ``dot`` binary warns instead of
         # raising. Do not IPython.display the graph: plot_diagram returns it,
@@ -177,7 +181,8 @@ def _render_diagram_graph(
             # graphviz raises ExecutableNotFound when the ``dot`` binary is
             # missing (a bare Colab runtime, or a pip install without the
             # system package). The notebook keeps running; the diagram is
-            # simply not drawn.
+            # simply not drawn, and nothing is returned for the cell to render.
+            drawn = False
             warnings.warn(
                 "Could not render the diagram inline. Is the Graphviz binary "
                 "installed? (conda install graphviz / apt install graphviz / "
@@ -226,7 +231,7 @@ def _render_diagram_graph(
 
     need_disk = show_pdf or filename is not None
     if not need_disk:
-        return
+        return drawn
 
     if filename is None:
         import tempfile
@@ -244,6 +249,8 @@ def _render_diagram_graph(
             f"Could not render graph. Is Graphviz installed? Error: {exc}",
             stacklevel=2,
         )
+
+    return drawn
 
 
 def get_system_block_html(sys, html_id="sys1"):
@@ -286,14 +293,16 @@ def plot_diagram(
     """Render a system or assembled diagram.
 
     ``expand=True`` draws the blocks of every nested diagram inside a labelled
-    box; ``expand=False`` draws a nested diagram as one block.
+    box; ``expand=False`` draws a nested diagram as one block. Returns the
+    Graphviz object, or ``None`` when the figure cannot be drawn, so that a
+    notebook cell without the Graphviz binary shows the warning and no error.
     """
     graph = get_diagram(sys_or_diagram, expand=expand)
-    _render_diagram_graph(
+    drawn = _render_diagram_graph(
         graph,
         show=show,
         show_inline=show_inline,
         show_pdf=show_pdf,
         filename=filename,
     )
-    return graph
+    return graph if drawn else None

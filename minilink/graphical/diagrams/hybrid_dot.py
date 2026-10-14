@@ -62,14 +62,14 @@ def plot_hybrid_diagram(
     except ImportError:
         warnings.warn(MISSING_GRAPHVIZ_MESSAGE, stacklevel=2)
         return None
-    _render_diagram_graph(
+    drawn = _render_diagram_graph(
         graph,
         show=show,
         show_inline=show_inline,
         show_pdf=show_pdf,
         filename=filename,
     )
-    return graph
+    return graph if drawn else None
 
 
 def _render_diagram_cluster(graph, topology: DiagramTopology) -> None:

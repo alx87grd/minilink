@@ -366,6 +366,8 @@ class SharedSystemFacades:
         (same blocking policy as trajectory plots). Pass ``show_pdf=True``
         for the legacy OS PDF viewer; pass ``filename`` to write Graphviz
         output to disk; pass ``show=False`` to build the Digraph only.
+        Without the Graphviz binary the figure is skipped with a warning and
+        ``None`` is returned, so a notebook cell does not fail.
         """
         from minilink.graphical.diagrams import plot_diagram
 
