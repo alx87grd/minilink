@@ -103,8 +103,8 @@ All 195 pyro scripts under `examples/`, grouped by top-level folder.
 | --- | --- | --- |
 | `demos_by_system/acrobot/acrobot_with_lqr.py` | **Partial** | Controller exists; plant demo TODO |
 | `demos_by_system/acrobot/acrobot_with_trajectory_optimization.py` | **Partial** | Trajopt done; plant-specific demo TODO |
-| `demos_by_system/boat/boat_position_controller.py` | **TODO** | Representative closed-loop for boat |
-| `demos_by_system/boat/boat_with_ppo_demo.py` | **TODO** | Representative closed-loop for boat |
+| `demos_by_system/boat/boat_position_controller.py` | **Partial** | Research-lane prototype `examples/experimental/boat/parking_cascade.py` (cascade with a heading switch, in a current); no `demos/` twin yet |
+| `demos_by_system/boat/boat_with_ppo_demo.py` | **Partial** | Research-lane prototype `examples/experimental/boat/parking_ppo.py` (native PPO planner, in a current); no `demos/` twin yet |
 | `demos_by_system/car_dynamic/demo_oversteer.py` | **TODO** | Representative closed-loop for car_dynamic |
 | `demos_by_system/car_dynamic/demo_understeer.py` | **TODO** | Representative closed-loop for car_dynamic |
 | `demos_by_system/car_propulsion/longitudinal_car_braking_value_iteration.py` | **Partial** | DP done; plant-specific demo TODO |
