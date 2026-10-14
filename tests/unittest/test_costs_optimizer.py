@@ -155,6 +155,17 @@ def test_compute_cost_scores_a_system_or_a_block_inside_a_diagram():
     assert plant.plot_cost(cost, show=False) is not None
 
 
+def test_a_quadratic_cost_targets_the_operating_point_by_default():
+    from minilink import Pendulum
+
+    plant = Pendulum()
+    plant.state.set_nominal_value(np.array([np.pi, 0.0]))
+    plant.inputs["u"].set_nominal_value(np.array([0.2]))
+    cost = QuadraticCost.from_system(plant)
+    np.testing.assert_allclose(cost.xbar, [np.pi, 0.0])
+    np.testing.assert_allclose(cost.ubar, [0.2])
+
+
 def test_compute_cost_needs_a_trajectory_and_a_diagram_for_of():
     from minilink import Pendulum
 

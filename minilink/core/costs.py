@@ -183,12 +183,13 @@ class QuadraticCost(CostFunction):
         Create a default quadratic cost from a Minilink system.
 
         Parameters not provided default to identity running weights, zero
-        terminal weight, zero state target, and the system's nominal input.
+        terminal weight, and the system's operating point as the target: its
+        nominal state and nominal input.
         """
         n = int(sys.n)
         m = int(sys.m)
         if xbar is None:
-            xbar = np.zeros(n)
+            xbar = sys.state.nominal_value
         if ubar is None:
             ubar = sys.get_u_from_input_ports()
         return cls(
