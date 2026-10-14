@@ -42,14 +42,14 @@
 </table>
 
 Minilink is an open-source Python toolbox for dynamical systems and control.
-A model is a short class whose equations read like the textbook, and diagrams
-are built from models with `+`, `>>` and `@`. Because every model, controller
-and diagram is the same kind of object, one set of tools applies to all of
-them: simulation and animation in 2D and 3D, frequency-domain analysis,
-classical and state-space control, value iteration, sampling-based planning, trajectory
-optimization, model predictive control and reinforcement learning. The same
-equations compile and differentiate under JAX, so a course model is also a
-research model.
+A model is a short class whose equations read like the textbook. Multiple 
+model can be connected into a block diagrams from code using composition operators.
+Because every model, controller and diagram is the same kind of object, one set 
+of tools applies to all of them: simulation and animation in 2D and 3D, 
+frequency-domain analysis, classical and state-space control, value iteration, 
+sampling-based planning, trajectory optimization, model predictive control 
+and reinforcement learning. The same equations compile and differentiate under JAX, 
+allowing high-performance research model.
 
 ## Ten lines
 
@@ -88,38 +88,42 @@ from the keyboard:
 ```python
 import numpy as np
 from minilink import DynamicSystem, Step
-from minilink.core.kinematics import translation
-from minilink.graphical.animation.primitives import Box, ground_line
-
 
 class MassSpringDamper(DynamicSystem):
-    # m p'' + c p' + k p = u
 
     def __init__(self):
         super().__init__(n=2, input_dim=1, output_dim=2)
-        self.params = {"m": 1.0, "k": 4.0, "c": 0.3}
-        self.skin = lambda sys: {
-            "world": [ground_line(length=8.0)],
-            "body": [Box(length_x=0.6, length_y=0.6, length_z=0.1)],
-        }
-        self.camera_scale = 4.0
 
     def f(self, x, u, t=0, params=None):
-        p = self.params if params is None else params
-        pos, vel = x
-        acc = (u[0] - p["c"] * vel - p["k"] * pos) / p["m"]
-        return np.array([vel, acc])
 
-    def tf(self, x, u, t=0, params=None):
-        return {"body": translation(x[0], 0.0, 0.0)}
+        p = x[0]
+        v = x[1]
+
+        f = u[0]
+
+        m = 10.
+        k = 10.
+        b = 2.0
+
+        a = (f - b * v - k * p) / m
+
+        dx = np.array([v, a])
+
+        return dx
+
+      def h(self, x, u, t=0, params=None):
+
+        y = x[0] # Output is the position
+
+        return y
 
 
-msd = MassSpringDamper()
-msd.x0[0] = 1.0
-loop = Step(final_value=np.array([10.0]), step_time=2.0) >> msd
+plant = MassSpringDamper()
+plant.x0[0] = 1.0
+
+ref = Step(final_value=np.array([10.0]), step_time=2.0)
+loop = ref >> plant
 loop.compute_trajectory(tf=20.0)
-loop.animate()  # renderer="plotly" | "meshcat" | "pygame"
-# msd.game()    # keyboard drives u, live
 ```
 
 `f`, `h` and `tf` are functions of `(x, u, t; params)` only: no hidden state on
