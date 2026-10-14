@@ -121,9 +121,10 @@ public contract. When you spot an opportunity outside your lane, ask — do not 
 
 **Notebooks:** skip review unless updating renamed imports or user asks; outputs and
 volatile metadata are stripped by the `nbstripout` git filter and pre-commit hook (one
-key list, in `.pre-commit-config.yaml`), and CI fails a notebook committed without them.
-A session without the filter (a cloud clone) runs `pre-commit run nbstripout --all-files`
-before committing a notebook. After notebook edits, run the notebook smoke check
+key list, in `.pre-commit-config.yaml`; set up once per clone, install.md "Developer
+clone"), and CI fails a notebook committed without them. A clone without the filter (a
+cloud clone, a new machine) runs `pre-commit run nbstripout --all-files` before committing
+a notebook, or sets the filter up first. After notebook edits, run the notebook smoke check
 (tests/README.md, Agent table, "Notebook change"; CI runs it too).
 
 ## Before push or PR (local CI gate)
@@ -141,8 +142,8 @@ you to push or verify remote CI. A demo that only the nightly sweep exercises st
 run — check it locally when you land one.
 
 **Always before push:** the "Always before push" row, every time. CI runs it on the
-**whole repo**, not only touched files; the pre-commit hooks run the same once
-`pre-commit install` has run in the clone.
+**whole repo**, not only touched files; the pre-commit hooks run the same once the clone
+is set up (install.md, "Developer clone").
 
 **Pytest and the gates — proportionate:**
 

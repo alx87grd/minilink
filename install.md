@@ -136,6 +136,27 @@ if "google.colab" in sys.modules:
 
 ---
 
+## Developer clone (contributing)
+
+Any tier above, then the dev tools and the two git hooks, **once per clone**:
+
+```bash
+pip install -e ".[dev]"      # conda env: already installed
+pre-commit install
+nbstripout --install
+git config filter.nbstripout.extrakeys "metadata.kernelspec metadata.language_info metadata.colab metadata.accelerator cell.metadata.colab cell.metadata.id cell.metadata.outputId cell.metadata.executionInfo"
+```
+
+`pre-commit install` runs ruff and the `nbstripout` hook on every commit.
+`nbstripout --install` sets the git filter that strips notebook outputs on commit
+and diff; the `extrakeys` line makes it strip the same volatile metadata as the
+hook (kernelspec, language_info, Colab keys), the keys a local run or Colab
+rewrites. Without this step, running a notebook makes `git status` dirty, and
+after a commit made elsewhere with the filter, `git pull` refuses on notebooks
+you never edited. Hooks and filter are per clone: redo them on every machine.
+
+---
+
 ## Troubleshooting
 
 - **`No module named 'minilink'`** — `pip install minilink` (or `pip install -e .`
@@ -147,3 +168,8 @@ if "google.colab" in sys.modules:
   run on the conda environment ([`environment.yml`](environment.yml)); pip's
   `full` extra does not install them.
 - **`cyipopt` / Ipopt errors** — optional; Basic omits it. Use default SciPy solvers, or Full conda / `conda install -c conda-forge ipopt cyipopt`.
+- **Notebooks show as modified after running them, or `git pull` refuses on
+  notebooks you never edited** — the per-clone notebook filter is missing or
+  stripping fewer keys than the hook: run the [Developer clone](#developer-clone-contributing)
+  block. The files are byte-identical to HEAD; `git -c filter.nbstripout.clean=cat pull --ff-only`
+  gets the pull through once, then the filter and the stored notebooks agree.

@@ -1,10 +1,9 @@
-# Install: pip install -e ".[dev]" && pre-commit install
-# Run every hook on the whole tree: pre-commit run --all-files
+# Install, once per clone: install.md, "Developer clone" (pre-commit install,
+# nbstripout --install, the filter's extrakeys). Run every hook on the whole
+# tree: pre-commit run --all-files
 #
-# Notebooks, once per clone: the git filter strips the same keys as the hook
-# below, so running a notebook locally leaves `git status` clean:
-#   nbstripout --install
-#   git config filter.nbstripout.extrakeys "metadata.kernelspec metadata.language_info metadata.colab metadata.accelerator cell.metadata.colab cell.metadata.id cell.metadata.outputId cell.metadata.executionInfo"
+# The nbstripout hook below and the git filter strip the same keys, so running a
+# notebook locally leaves `git status` clean.
 
 repos:
   - repo: https://github.com/kynan/nbstripout

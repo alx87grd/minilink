@@ -58,6 +58,7 @@ dependencies:
   - pytest-cov
   - ruff
   - pre-commit
+  - nbstripout
   - python-build      # PyPI name: build
   - twine
   - sphinx
