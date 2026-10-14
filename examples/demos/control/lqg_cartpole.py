@@ -2,7 +2,7 @@
 
 import numpy as np
 
-from minilink import CartPoleWithNoisePort, WhiteNoise, closed_loop, lqg
+from minilink import CartPoleWithNoisePort, WhiteNoise, lqg
 
 X_UP = np.array([0.0, np.pi, 0.0, 0.0])  # pole inverted, cart at origin
 Q = np.diag([1.0, 10.0, 1.0, 1.0])  # LQR weights
@@ -21,9 +21,11 @@ R_N = V * np.eye(4)
 controller = lqg(plant, Q, R, Q_N, R_N, x_bar=X_UP)
 print(controller)
 
-loop = closed_loop(controller, plant, reference=False)
+loop = controller @ plant
 noisy = (
-    WhiteNoise(1, psd=W, port="d") + WhiteNoise(4, psd=V, port="n") + loop
+    WhiteNoise(1, psd=W, seed=1, port="d")
+    + WhiteNoise(4, psd=V, seed=2, port="n")
+    + loop
 ).autowire()
 noisy.plot_diagram()
 
