@@ -17,7 +17,6 @@ from minilink import (
     StochasticPlanningProblem,
     Uniform,
 )
-from minilink.graphical.catalog.boat_skin import boat_skin_3d
 
 TRAINING_TIMESTEPS = 2_000_000  # about six minutes on a laptop CPU
 DT = 0.1  # [s] control period
@@ -75,5 +74,7 @@ traj = cl.compute_trajectory(tf=60.0, dt=0.05)
 cl.plot_trajectory(traj)
 cl.animate(traj)
 
-boat.skin = boat_skin_3d  # the hull on the water, in the browser
-cl.animate(traj, renderer="meshcat", native=False)
+
+# from minilink.graphical.catalog.boat_skin import boat_skin_3d
+# boat.skin = boat_skin_3d  # the hull on the water, in the browser
+# cl.animate(traj, renderer="meshcat", native=False)
