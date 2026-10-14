@@ -6,8 +6,14 @@ exactly, through the Hamiltonian system of the co-state.
 """
 
 import numpy as np
-from scipy.linalg import expm, solve_continuous_are
 
+from minilink.analysis.riccati import (
+    care,
+    hamiltonian_matrix,
+    riccati_map,
+    riccati_step,
+    riccati_transition,
+)
 from minilink.control.state import (
     StateFeedbackController,
     TimeVaryingStateFeedbackController,
@@ -22,8 +28,7 @@ def lqr_gain(A, B, Q, R):
     Q = np.asarray(Q, dtype=float)
     R = np.atleast_2d(np.asarray(R, dtype=float))
 
-    # AᵀP + PA − P B R⁻¹ Bᵀ P + Q = 0
-    P = solve_continuous_are(A, B, Q, R)
+    P = care(A, B, Q, R)
 
     # K = R⁻¹ Bᵀ P
     K = np.linalg.solve(R, B.T @ P)
@@ -217,70 +222,12 @@ def trajectory_lqr(
 
     # backward sweep from the terminal weight, dynamics frozen on each interval
     S = np.empty((N, n, n))
-    S[-1] = solve_continuous_are(A[-1], B[-1], Q, R) if S_f is None else S_f
+    S[-1] = care(A[-1], B[-1], Q, R) if S_f is None else S_f
     for k in range(N - 1, 0, -1):
         S[k - 1] = riccati_step(A[k - 1], B[k - 1], Q, R_inv, S[k], t[k] - t[k - 1])
 
     K = R_inv @ np.swapaxes(B, 1, 2) @ S
     return TrajectoryFeedbackController(trajectory, K)
-
-
-# Internal machinery: the Riccati differential equation, one exact step at a time
-
-
-def hamiltonian_matrix(A, B, Q, R_inv):
-    """The Hamiltonian matrix: with the co-state ``λ = S x``, ``z = [x; λ]`` follows ``ż = H z``."""
-    # fmt: off
-    H = np.block([
-        [A, -B @ R_inv @ B.T],
-        [-Q, -A.T],
-    ])
-    # fmt: on
-
-    return H
-
-
-def riccati_transition(A, B, Q, R_inv, dt):
-    """Transition of the Hamiltonian system over one step backward in time."""
-    H = hamiltonian_matrix(A, B, Q, R_inv)
-
-    # E = expm(−H dt)
-    E = expm(-H * dt)
-
-    return E
-
-
-def riccati_step(A, B, Q, R_inv, S, dt):
-    """``S(t) → S(t - dt)`` with the dynamics frozen over the interval, exactly.
-
-    The interval is cut into substeps with ``‖H‖ dt ≤ 1`` each, so that the
-    transition stays well conditioned however stiff the dynamics or long the
-    interval; the map is exact on every substep and preserves ``S ⪰ 0``.
-    """
-    H = hamiltonian_matrix(A, B, Q, R_inv)
-    n_sub = max(1, int(np.ceil(np.linalg.norm(H, 2) * dt)))
-    E = expm(-H * dt / n_sub)
-    for _ in range(n_sub):
-        S = riccati_map(E, S)
-    return S
-
-
-def riccati_map(E, S):
-    """One exact step ``S(t) → S(t - dt)`` of the Riccati equation, from the transition ``E``.
-
-    ``[X; Y] = E [I; S(t)]`` propagates the pair ``(x, λ)``; the new Riccati
-    matrix is ``S(t - dt) = Y X⁻¹``, symmetrized against roundoff.
-    """
-    n = S.shape[0]
-    E11, E12, E21, E22 = E[:n, :n], E[:n, n:], E[n:, :n], E[n:, n:]
-
-    # [X; Y] = E [I; S(t)], then S(t − dt) = Y X⁻¹, symmetrized against roundoff
-    X = E11 + E12 @ S
-    Y = E21 + E22 @ S
-    S_prev = np.linalg.solve(X.T, Y.T).T
-    S_prev = (S_prev + S_prev.T) / 2.0
-
-    return S_prev
 
 
 if __name__ == "__main__":

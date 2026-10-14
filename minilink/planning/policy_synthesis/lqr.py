@@ -17,8 +17,8 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 import numpy as np
-from scipy.linalg import solve_continuous_are
 
+from minilink.analysis.riccati import care
 from minilink.control.lqr import lqr_gain_schedule
 from minilink.control.state import (
     StateFeedbackController,
@@ -119,7 +119,7 @@ class LQRPlanner(Planner):
             )
             cost_to_go = quadratic_cost_to_go(x_bar, S, t)
         else:
-            P = solve_continuous_are(A, B, Q, R)
+            P = care(A, B, Q, R)
             K = np.linalg.solve(R, B.T @ P)
             policy = StateFeedbackController(K, xbar=x_bar, ubar=u_bar)
             record = RiccatiRecord(

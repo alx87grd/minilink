@@ -22,6 +22,9 @@ Analysis
 .. automodule:: minilink.analysis.linear
    :members:
 
+.. automodule:: minilink.analysis.riccati
+   :members:
+
 .. automodule:: minilink.analysis.time_response
    :members:
 
