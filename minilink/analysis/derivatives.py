@@ -40,7 +40,7 @@ def jacobian(
         ``"x"``, ``"u"`` (every input stacked), an input port id, ``"t"``,
         ``"params"``, or a diagram wire (additive perturbation of that signal).
     x_bar, u_bar : array-like, optional
-        Operating point; default ``sys.x0`` and the nominal port values.
+        Operating point; default the nominal state and the nominal port values.
     t : float, optional
         Time (the step index ``k`` on step systems).
     params : dict, optional
@@ -103,8 +103,13 @@ def _is_tracing_error(exc):
 
 
 def operating_point(sys, x_bar=None, u_bar=None, params=None):
-    """Fill the family defaults: ``x0``, the nominal inputs, ``sys.params`` with every random block at its mean."""
-    x_bar = sys.x0 if x_bar is None else x_bar
+    """Fill the family defaults: the nominal state and inputs, ``sys.params`` with every random block at its mean.
+
+    The operating point is the system's declared nominal, ``state.nominal_value``
+    and the input ports' nominal values; ``x0`` is the start of a simulation
+    and plays no part here.
+    """
+    x_bar = sys.state.nominal_value if x_bar is None else x_bar
     u_bar = sys.get_u_from_input_ports() if u_bar is None else u_bar
     params = sys.realize(None) if params is None else params
     return (

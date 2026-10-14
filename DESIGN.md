@@ -247,6 +247,11 @@ The research rungs (`Holonomic`, `HolonomicAccel`, `BicycleKin`, `BicycleAcc`,
   `"y"` only (aux `"x"` does not change `p`; no `"y"` ⇒ `p==0`).
 - **Shape:** Inheritance for core system types (`System`, `DynamicSystem`,
   `StepSystem`); composition for diagrams and optional behaviors.
+- **Nominal and start, two quantities with one owner each:** `state.nominal_value` is
+  the nominal state x̄ and the input ports' `nominal_value` the nominal inputs ū, the
+  operating point every analysis and design verb reads when `x_bar` / `u_bar` are
+  omitted (`analysis.derivatives.operating_point`); `x0` is the start of a simulation
+  and nothing else. Both default to zeros; a diagram derives both from its blocks.
 - **Ports:** explicit, ID-first; infer `dim` from metadata or default 1. Extract
   slices with `get_port_values_from_u(u, "r", "y")`.
 - **DynamicSystem shortcut:** `input_dim`, `output_dim`, `expose_state`,

@@ -93,7 +93,8 @@ class System(SharedSystemFacades):
         self.outputs = {}
 
         # Model defaults and metadata
-        # Default initial condition used by convenience simulation paths.
+        # Default initial condition of a simulation; the operating point the
+        # analysis tools read is the nominal state, ``self.state.nominal_value``.
         self.x0 = np.zeros(self.n)
 
         # Default model parameter set. Explicit ``params=...`` arguments

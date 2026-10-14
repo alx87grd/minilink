@@ -127,13 +127,19 @@ class TestJacobianValues(unittest.TestCase):
 
     def test_defaults_are_the_nominal_point(self):
         plant = self.plant
-        plant.x0 = np.array([1.0, 2.0])
+        plant.state.set_nominal_value(np.array([1.0, 2.0]))
+        plant.x0 = np.array([-3.0, 4.0])  # the simulation start plays no part
         plant.inputs["bias"].set_nominal_value(np.array([0.7]))
         expected = plant.jacobian(
-            "f", "params", plant.x0, plant.get_u_from_input_ports()
+            "f", "params", plant.state.nominal_value, plant.get_u_from_input_ports()
         )
         np.testing.assert_allclose(
             plant.jacobian("f", "params")["gain"], expected["gain"]
+        )
+        self.assertFalse(
+            np.allclose(
+                plant.jacobian("f", "params", plant.x0)["gain"], expected["gain"]
+            )
         )
 
     def test_returns_numpy_float_arrays(self):

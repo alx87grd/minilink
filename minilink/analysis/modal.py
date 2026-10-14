@@ -24,7 +24,7 @@ def modal_analysis(
     sys : System
         Plant or other system with ``f`` (and ``h``).
     x_bar : array of shape (n,), optional
-        Operating-point state. Defaults to ``sys.x0``.
+        Operating-point state. Defaults to the nominal state.
     u_bar : array of shape (m,), optional
         Operating-point input. Defaults to port nominals.
     t : float, optional
@@ -85,7 +85,7 @@ def animate_modal(
     sys : System
         System used for graphics (usually the nonlinear plant).
     x_bar : array of shape (n,), optional
-        Linearization operating point. Defaults to ``sys.x0``.
+        Linearization operating point. Defaults to the nominal state.
     u_bar : array of shape (m,), optional
         Operating-point input during the animation.
     mode : int or ``'all'``

@@ -502,8 +502,9 @@ in December 2026 after the v0.3 tag; the v1.0 rows after two cohorts.
   `core` → `simulation` import (scan: core#14).
 - [ ] **S29** `DiagramSystem.x0` / `n` / `state` as derived properties (mirror the live
   `params` view); `Simulator` drops its pre-read `refresh()`.
-  Also (scan: core#11, dynamics#10, examples#14): one owner for the initial state (`x0` or
-  `state.nominal_value`); the racecar solver hint, `WhiteNoise` and the diagrams' bubbled
+  Also (scan: core#11, dynamics#10, examples#14): `x0` (the simulation start) and
+  `state.nominal_value` (the operating point x̄, ruled 2026-10-13) are two quantities with
+  one owner each; a diagram derives both from its blocks; the racecar solver hint, `WhiteNoise` and the diagrams' bubbled
   solver hints stop depending on the pre-read `refresh()`.
 - [ ] **S37** Evaluator / solver re-layering: evaluators keep pure maps and one scannable
   step; integrators move to `simulation/solvers/`. Then **S27** Diffrax as an optional JAX

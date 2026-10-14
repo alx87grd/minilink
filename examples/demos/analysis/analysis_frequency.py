@@ -7,9 +7,7 @@ from minilink.analysis import bode, margins, plot_nyquist
 
 plant = Pendulum()
 plant.params["d"] = 1.0  # add damping to the default pendulum
-plant.x0 = np.array(
-    [0.0, 0.0]
-)  # hanging down: the operating point every tool defaults to
+plant.x0 = np.array([0.0, 0.0])  # start hanging down, at the nominal state
 
 # The plant alone, channel theta from the torque
 w, magnitude_db, phase_deg = bode(plant, w=np.logspace(-1, 2, 5))

@@ -29,7 +29,7 @@ def linearize_matrices(
     sys : DynamicSystem
         Leaf or diagram whose ``f`` defines the dynamics.
     x_bar, u_bar : array-like, optional
-        Operating point; default ``sys.x0`` and the nominal port values.
+        Operating point; default the nominal state and the nominal port values.
     t : float, optional
         Time at which the Jacobians are evaluated.
     params : dict, optional
@@ -90,7 +90,7 @@ def linearize(
     """Linearize ``sys`` about ``(x_bar, u_bar)`` and return an ``LTISystem``.
 
     Same arguments as :func:`linearize_matrices`; ``x_bar=None`` defaults to
-    ``sys.x0`` like every tool of the analysis family.
+    the nominal state like every tool of the analysis family.
     """
     A, B, C, D = linearize_matrices(
         sys, x_bar, u_bar, t, params, of=of, wrt=wrt, method=method, eps=eps

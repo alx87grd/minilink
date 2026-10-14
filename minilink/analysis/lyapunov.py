@@ -276,7 +276,7 @@ def region_of_attraction(
     x_bar : array of shape (n,), optional
         Guess of the equilibrium; refined by
         :func:`~minilink.analysis.equilibria.find_equilibrium`. Defaults to
-        ``sys.x0``. The refined point is what the certificate reports: a law
+        the nominal state. The refined point is what the certificate reports: a law
         tuned by learning often settles beside the state it was aimed at.
     u_bar, t, params : optional
         Held input, time, and parameter set, as in every analysis tool.
@@ -321,7 +321,9 @@ def region_of_attraction(
             "quadratic V only (ROADMAP §6, Lyapunov certificates)"
         )
 
-    x_bar = find_equilibrium(sys, sys.x0 if x_bar is None else x_bar, u_bar, t, params)
+    x_bar = find_equilibrium(
+        sys, sys.state.nominal_value if x_bar is None else x_bar, u_bar, t, params
+    )
     u_bar = np.asarray(
         sys.get_u_from_input_ports() if u_bar is None else u_bar, dtype=float
     )

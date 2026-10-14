@@ -51,7 +51,7 @@ def frequency_response(
     sys : System
         System or diagram to linearize before computing the frequency response.
     x_bar, u_bar : array-like, optional
-        Operating point; default ``sys.x0`` and the nominal port values.
+        Operating point; default the nominal state and the nominal port values.
     t : float, optional
         Time at which the Jacobians are evaluated.
     params : dict, optional
