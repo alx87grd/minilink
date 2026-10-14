@@ -308,7 +308,9 @@ C1. **Demos, the library's evidence** (the GRO501 from-scratch notebooks are not
       truth, and `print(observer)` for `L` and the observer poles.
     - `examples/demos/control/lqg_cartpole.py`: `plant = CartPoleWithNoisePort()`,
       `ctl = lqg(plant, Q, R, Q_n, R_n, x_bar=x_up)`, `loop = closed_loop(ctl, plant)`, noise by
-      port `(WhiteNoise(1, psd=…, port="d") + WhiteNoise(4, psd=…, port="n") + loop).autowire()`,
+      port `(WhiteNoise(1, psd=…, port="d") + WhiteNoise(4, psd=…, port="n") + loop).autowire()`
+      (since AC-4: `closed_loop(lqr(...), plant, observer=kalman(...), disturbance=WhiteNoise(...),
+      noise=WhiteNoise(...))`),
       disturbed start, `plot_trajectory`, `plot_diagram` (the guide's Figure 12; pyro's twin
       is `cartpole_LQG.py`).
     RULES 6.1 / 6.10 / 6.13; both join `examples/README.md` and the nightly sweep.
