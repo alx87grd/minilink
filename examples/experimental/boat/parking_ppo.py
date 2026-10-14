@@ -60,6 +60,9 @@ print(solution.solver)
 planner.plot_learning_curve()
 
 ppo_ctl = planner.get_controller()
+np.savez(
+    POLICY_WEIGHTS, **ppo_ctl.params["mlp"]
+)  # parking_compare.py rebuilds the law from these
 ppo_ctl.plot_control_law(x_axis=0, y_axis=1, u_axis=0)  # surge thrust vs (x, y)
 
 report = MonteCarloEvaluator(problem, dt=DT, n_trials=100, seed=1).evaluate(ppo_ctl)
@@ -74,6 +77,3 @@ cl.animate(traj)
 
 boat.skin = boat_skin_3d  # the hull on the water, in the browser
 cl.animate(traj, renderer="meshcat", native=False)
-
-# The weights, so the comparison script rebuilds the law without training
-np.savez(POLICY_WEIGHTS, **ppo_ctl.params["mlp"])
