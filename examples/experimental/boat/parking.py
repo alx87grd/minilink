@@ -16,12 +16,12 @@ X_START = np.array([-25.0, -10.0, 0.0, 0.0, 0.0, 0.0])
 # other heading asks for a sway force whose yaw moment the boat cannot cancel.
 X_DOCK = np.array([0.0, 0.0, np.arctan2(-CURRENT[1], -CURRENT[0]), 0.0, 0.0, 0.0])
 
-# The cost shared by every planner: position and heading error, a little velocity, a
-# little thrust, scaled so a parking run costs of the order of a hundred. Surge thrust
-# is ten times the sway thrust, so the same weight on the normalized inputs charges a
-# sway newton ten times more than a surge newton.
-Q = 0.01 * np.diag([1.0, 1.0, 10.0, 1.0, 1.0, 10.0])
-R = 0.01 * np.diag([0.5, 0.5])
+# The cost shared by every planner: position error at a 10 m scale, heading error on
+# the circle, the body velocities and the normalized thrust, scaled so a parking run
+# costs of the order of a hundred. Heading and velocities weigh more than position:
+# a learned law with light weights there wanders round the dock instead of settling.
+Q = np.diag([0.01, 0.01, 1.0, 0.1, 0.1, 0.5])
+R = np.diag([0.1, 0.1])
 
 
 class ParkingBoat(Boat2DWithCurrent):
@@ -167,14 +167,22 @@ POLICY_WEIGHTS = (
 
 
 def dock_features(x):
-    """Policy features: the dock-relative position in hull lengths, the heading as a
-    point on the circle, the body velocities."""
+    """Policy features: the dock-relative position in hull lengths, the heading error
+    as a point on the circle, the body velocities in units of 2 m/s."""
     xp = array_module(x)
     e = x - X_DOCK
-    scale = 10.0 / XY_RANGE
+    scale, speed = 10.0 / XY_RANGE, 2.0  # [1/m], [m/s]
 
     z = xp.array(
-        [scale * e[0], scale * e[1], xp.cos(x[2]), xp.sin(x[2]), x[3], x[4], x[5]]
+        [
+            scale * e[0],
+            scale * e[1],
+            xp.cos(e[2]),
+            xp.sin(e[2]),
+            x[3] / speed,
+            x[4] / speed,
+            x[5],
+        ]
     )
 
     return z
