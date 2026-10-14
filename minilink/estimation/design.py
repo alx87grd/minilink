@@ -56,8 +56,15 @@ def luenberger(
     the requested poles. Arguments as in :func:`~minilink.control.design.lqr`,
     with ``poles`` in place of ``Q, R``. On arrays the gain is
     :func:`luenberger_gain`, and the model ``LTISystem(A, B, C)``.
+
+    The observer reads the plant's output ``y``: a plant without one is
+    refused (make the sensor part of the plant box, ``plant >> Gain(...)``),
+    and a design on another output is made on ``linearize(plant, x_bar,
+    of=...)``.
     """
-    model = design_model(sys, x_bar, u_bar, t, params, method=method, eps=eps)
+    model = design_model(
+        sys, x_bar, u_bar, t, params, method=method, eps=eps, measured=True
+    )
     A, C = model.A(), model.C()
 
     L = luenberger_gain(A, C, poles)
@@ -79,14 +86,16 @@ def kalman(
 ):
     """Design a stationary Kalman filter for ``sys`` and return a ``StateObserver``.
 
-    ``sys`` is a linear model or any plant, as in :func:`luenberger`. On
-    arrays the gain is :func:`kalman_gain`. ``Q_n`` is the intensity of the white process noise on
+    ``sys`` is a linear model or any plant measured through ``y``, as in
+    :func:`luenberger`. On arrays the gain is :func:`kalman_gain`. ``Q_n`` is the intensity of the white process noise on
     the state, ``n × n`` (a noise ``w`` entering through ``B_w`` has
     ``Q_n = B_w W B_wᵀ``), and ``R_n`` the intensity of the white measurement
     noise, ``p × p``. The gain minimizes the steady-state estimation error
     covariance, and the block is the stationary Kalman–Bucy filter.
     """
-    model = design_model(sys, x_bar, u_bar, t, params, method=method, eps=eps)
+    model = design_model(
+        sys, x_bar, u_bar, t, params, method=method, eps=eps, measured=True
+    )
     A, C = model.A(), model.C()
 
     L = kalman_gain(A, C, Q_n, R_n)

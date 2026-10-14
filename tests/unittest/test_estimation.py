@@ -5,10 +5,11 @@ import pytest
 from scipy.linalg import solve_continuous_are
 
 from minilink.analysis.linearization import linearize
-from minilink.control.design import lqg, lqr_gain, place_gain
+from minilink.control.design import lqg, lqr, lqr_gain, place_gain
 from minilink.control.state import StateFeedbackController
 from minilink.core.diagram import DiagramSystem
 from minilink.core.feedback import roles
+from minilink.core.system import DynamicSystem
 from minilink.dynamics.abstraction.state_space import LTISystem
 from minilink.dynamics.catalog.pendulum.pendulum import Pendulum
 from minilink.estimation.design import kalman, kalman_gain, luenberger, luenberger_gain
@@ -189,6 +190,37 @@ def test_luenberger_on_the_plant_and_the_hat():
     one_letter = LTISystem(A, B, C)
     one_letter.state.labels = ["q", "v"]
     assert luenberger(one_letter, POLES).state.labels == ["q\u0302", "v\u0302"]
+
+
+class PositionSensor(DynamicSystem):
+    """The double integrator measured through a sensor port named ``z``, not ``y``."""
+
+    def __init__(self):
+        super().__init__(2)
+        self.add_input_port("u", dim=1)
+        self.add_output_port("z", dim=1, function=self.position, dependencies=())
+
+    def f(self, x, u, t=0, params=None):
+        dx = A @ x + B @ u
+
+        return dx
+
+    def position(self, x, u, t=0, params=None):
+        return x[:1]
+
+
+def test_an_observer_needs_a_measured_y():
+    plant = PositionSensor()
+    with pytest.raises(ValueError, match="no measured output 'y'"):
+        kalman(plant, np.eye(2), np.eye(1))
+    with pytest.raises(ValueError, match="no measured output 'y'"):
+        lqg(plant, np.eye(2), np.eye(1), np.eye(2), np.eye(1))
+    # another output is designed on its linear model, picked by hand
+    obs = luenberger(linearize(plant, of="z"), POLES)
+    np.testing.assert_allclose(np.sort(obs.poles.real), np.sort(POLES))
+    assert obs.inputs["y"].dim == 1
+    # a state feedback reads no output
+    assert lqr(plant, np.eye(2), np.eye(1)).params["K"].shape == (1, 2)
 
 
 # lqg: an LQR gain on a Kalman estimate, one controller box

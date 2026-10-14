@@ -118,7 +118,15 @@ def linearize(
 
 
 def design_model(
-    sys, x_bar=None, u_bar=None, t=0.0, params=None, *, method="auto", eps=1e-6
+    sys,
+    x_bar=None,
+    u_bar=None,
+    t=0.0,
+    params=None,
+    *,
+    method="auto",
+    eps=1e-6,
+    measured=False,
 ):
     """The linear model a design verb reads: ``sys`` itself when it is an ``LTISystem``, else ``sys`` linearized about its command port.
 
@@ -126,9 +134,12 @@ def design_model(
     given here is refused: linearize the plant at ``x_bar`` instead. Any other
     system is linearized at ``(x_bar, u_bar)``, the nominal state and inputs
     by default, with ``B`` over the command port alone (``u``, else the one
-    input that is not a disturbance ``d`` or a noise ``n``) and ``C`` over the
-    measured output ``y`` alone, so a plant with noise ports gives a gain over
-    its command and a box exposing its state is measured through ``y``.
+    input that is not a disturbance ``d`` or a noise ``n``; every other input
+    is held at its nominal value) and ``C`` over the measured output ``y``
+    alone, so a plant with noise ports gives a gain over its command and a box
+    exposing its state is measured through ``y``. ``measured=True`` (the
+    observer designs) refuses a plant without ``y`` rather than reading its
+    state as the measurement.
     """
     if not isinstance(sys, System):
         raise TypeError(
@@ -145,6 +156,12 @@ def design_model(
                 "passing it here"
             )
         return sys
+    if measured and "y" not in sys.outputs:
+        raise ValueError(
+            f"{sys.name!r} has no measured output 'y' for an observer to read: make "
+            "the sensor part of the plant box (plant >> Gain(...)), or design on "
+            "linearize(plant, x_bar, of=...)"
+        )
     command = command_port(sys)
     if command == "u" and len(sys.inputs) > 1:
         # "u" alone names every input stacked: pick the components of the port named u

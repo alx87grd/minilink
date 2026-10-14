@@ -83,6 +83,9 @@ def lqr(
     implements ``u = ubar - K (x - r)`` with ``r`` defaulting to ``xbar``, the
     operating point of the model; wire the plant state into its ``x`` port. On
     arrays the gain is :func:`lqr_gain`, and the model ``LTISystem(A, B)``.
+    Only the command port enters ``B`` (``u``, else the one input that is not a
+    disturbance ``d`` or a noise ``n``); every other input is held at its
+    nominal value.
 
     Parameters
     ----------
@@ -140,7 +143,8 @@ def lqg(
 ):
     """Design an LQG compensator on ``sys``, an LQR gain on a Kalman estimate, and return it as one controller box.
 
-    ``sys`` is a linear model or any plant, as in :func:`lqr`. ``Q, R`` are the LQR
+    ``sys`` is a linear model or any plant measured through ``y``, as in
+    :func:`~minilink.estimation.design.kalman`. ``Q, R`` are the LQR
     weights, ``Q_n, R_n`` the process and measurement noise intensities of
     :func:`~minilink.estimation.design.kalman`. The box holds the
     :class:`~minilink.estimation.observer.StateObserver` under ``observer`` and
@@ -152,7 +156,9 @@ def lqg(
     """
     from minilink.estimation.design import kalman  # the dual design, for this verb only
 
-    model = design_model(sys, x_bar, u_bar, t, params, method=method, eps=eps)
+    model = design_model(
+        sys, x_bar, u_bar, t, params, method=method, eps=eps, measured=True
+    )
 
     gain = lqr(model, Q, R)
     observer = kalman(model, Q_n, R_n)
