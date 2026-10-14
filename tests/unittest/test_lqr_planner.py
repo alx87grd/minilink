@@ -68,6 +68,25 @@ def test_finite_horizon_is_the_riccati_differential_equation():
     )
 
 
+def test_a_plant_with_noise_ports_is_designed_about_its_command():
+    from minilink import CartPoleWithNoisePort, lqr
+
+    plant = CartPoleWithNoisePort()  # inputs u, d, n
+    x_up = np.array([0.0, np.pi, 0.0, 0.0])
+    Q_x = np.diag([1.0, 10.0, 1.0, 1.0])
+    R_all = 0.1 * np.eye(plant.m)  # a cost over every input stacked
+    cost = QuadraticCost.from_system(plant, Q=Q_x, R=R_all, xbar=x_up)
+
+    stationary = LQRPlanner(PlanningProblem(plant, cost=cost)).solve()
+    K = stationary.policy.params["K"]
+    assert K.shape == (1, 4)
+    np.testing.assert_allclose(
+        K, lqr(plant, Q_x, R_all[:1, :1], x_bar=x_up).params["K"]
+    )
+    finite = LQRPlanner(PlanningProblem(plant, cost=cost, tf=2.0), n_steps=51).solve()
+    assert finite.policy.params["K"].shape == (51, 1, 4)
+
+
 def test_lqr_needs_a_quadratic_cost():
     plant = Pendulum()
     problem = PlanningProblem(plant, cost=TimeCost.from_system(plant), tf=np.inf)

@@ -3,7 +3,8 @@ The linear-quadratic regulator as a planner: the Riccati solution of a quadratic
 
 :class:`LQRPlanner` lowers a :class:`~minilink.planning.problems.PlanningProblem`
 whose cost is a :class:`~minilink.core.costs.QuadraticCost` to the matrices
-``(A, B, Q, R)`` of the plant linearized at ``(x̄, ū)`` and solves the Riccati
+``(A, B, Q, R)`` of the plant linearized at ``(x̄, ū)`` about its command port
+(a disturbance ``d`` or a noise ``n`` is never decided) and solves the Riccati
 equation with the factories of :mod:`minilink.control.design`. Its solution
 carries the law, ``u = ū − K (x − x̄)``, and what the method itself knows
 about it: the cost-to-go ``J(x) = (x − x̄)ᵀ P (x − x̄)`` of the linear model and
@@ -18,6 +19,7 @@ from dataclasses import dataclass
 
 import numpy as np
 
+from minilink.analysis.linearization import design_model
 from minilink.analysis.riccati import care
 from minilink.control.design import lqr_gain_schedule
 from minilink.control.state import (
@@ -25,6 +27,7 @@ from minilink.control.state import (
     TimeVaryingStateFeedbackController,
 )
 from minilink.core.costs import QuadraticCost
+from minilink.core.feedback import command_port
 from minilink.core.trajectory import interpolate_schedule
 from minilink.planning.evaluation import nominal_trajectory
 from minilink.planning.planner import Planner
@@ -42,7 +45,9 @@ class LQRPlanner(Planner):
     ----------
     problem : PlanningProblem
         Its cost must be a :class:`~minilink.core.costs.QuadraticCost`; the
-        operating point is the cost's ``(xbar, ubar)`` unless given here.
+        operating point is the cost's ``(xbar, ubar)`` unless given here. A
+        cost over every input stacked weighs the command by its block of
+        ``R``.
         A finite ``tf`` selects the finite-horizon design with the cost's
         terminal weight ``S``; an infinite or unset ``tf`` the stationary one.
     x_bar, u_bar : array-like, optional
@@ -102,9 +107,10 @@ class LQRPlanner(Planner):
 
     def solve_policy(self, *, evaluate=False, n_trials=50) -> PlanningSolution:
         """Policy-family name of :meth:`solve`."""
+        sys = self.problem.sys
         A, B = self.linear_model()
-        Q, R, S_f = self.cost.Q, self.cost.R, self.cost.S
-        x_bar, u_bar = self.x_bar, self.u_bar
+        Q, R, S_f = self.cost.Q, command_block(sys, self.cost.R), self.cost.S
+        x_bar, u_bar = self.x_bar, command_block(sys, self.u_bar)
 
         if self.problem.horizon_kind() == "finite":
             tf = self.problem.require_finite_tf()
@@ -119,8 +125,12 @@ class LQRPlanner(Planner):
             )
             cost_to_go = quadratic_cost_to_go(x_bar, S, t)
         else:
+            # Aᵀ P + P A − P B R⁻¹ Bᵀ P + Q = 0
             P = care(A, B, Q, R)
+
+            # K = R⁻¹ Bᵀ P
             K = np.linalg.solve(R, B.T @ P)
+
             policy = StateFeedbackController(K, xbar=x_bar, ubar=u_bar)
             record = RiccatiRecord(
                 K=K, P=P, poles=np.linalg.eigvals(A - B @ K), horizon=np.inf
@@ -144,15 +154,13 @@ class LQRPlanner(Planner):
         )
 
     def linear_model(self):
-        """``(A, B)``: the plant's Jacobians at the operating point."""
-        from minilink.analysis.derivatives import jacobian
-
+        """``(A, B)``: the plant's Jacobians at the operating point, ``B`` over its command port."""
         sys, x_bar, u_bar, t = self.problem.sys, self.x_bar, self.u_bar, self.t
         params = self.problem.params.system
-        method, eps = self.method, self.eps
-        A = jacobian(sys, "f", "x", x_bar, u_bar, t, params, method=method, eps=eps)
-        B = jacobian(sys, "f", "u", x_bar, u_bar, t, params, method=method, eps=eps)
-        return A, B
+        model = design_model(
+            sys, x_bar, u_bar, t, params, method=self.method, eps=self.eps
+        )
+        return model.A(), model.B()
 
 
 @dataclass(frozen=True)
@@ -211,6 +219,22 @@ def quadratic_cost_to_go(x_bar, P, t_samples=None):
             return value
 
     return J
+
+
+# Internal machinery
+
+
+def command_block(sys, value):
+    """The command port's block of a weight ``R`` or a point ``ubar`` that spans every input of ``sys``.
+
+    ``R[c, c]`` and ``ubar[c]`` with ``c`` the command's components; a value
+    already of the command's size is returned as is.
+    """
+    value = np.asarray(value, dtype=float)
+    if value.shape[0] != sys.m:
+        return value
+    c = sys.get_input_port_slice(command_port(sys))
+    return value[c, c] if value.ndim == 2 else value[c]
 
 
 if __name__ == "__main__":
