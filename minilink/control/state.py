@@ -12,8 +12,8 @@ class StateFeedbackController(System):
 
     Without ``N``: ``u = ubar - K (x - r)``. The reference ``r`` is a state
     (dimension ``n``); left unconnected it holds ``xbar``, so the law
-    regulates to ``xbar``. This is the block :func:`minilink.control.lqr.lqr`
-    and :func:`minilink.control.place.place` return.
+    regulates to ``xbar``. This is the block :func:`minilink.control.design.lqr`
+    and :func:`minilink.control.design.place` return.
 
     With ``N``: ``u = ubar - K (x - xbar) + N r``. The reference ``r`` is a
     desired output (dimension ``p``, zero when unconnected), and ``N`` of shape
@@ -78,7 +78,7 @@ class TimeVaryingStateFeedbackController(System):
     block keeps ``K[-1]`` — or applies ``K_after`` when one is given (for a
     finite-horizon design, the stationary gain). Ports are those of
     :class:`StateFeedbackController`. This is the block
-    :func:`minilink.control.lqr.lqr_finite_horizon` returns.
+    :func:`minilink.control.design.lqr_finite_horizon` returns.
     """
 
     def __init__(self, t, K, xbar=None, ubar=None, K_after=None):
@@ -146,7 +146,7 @@ class TrajectoryFeedbackController(System):
     gain, so it keeps regulating where the trajectory ends — usually an
     equilibrium. The measurement is the full state and the reference is the
     trajectory itself, so there is no reference port. This is the block
-    :func:`minilink.control.lqr.trajectory_lqr` returns.
+    :func:`minilink.control.design.trajectory_lqr` returns.
     """
 
     def __init__(self, trajectory, K):

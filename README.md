@@ -140,7 +140,7 @@ and one `f`, so a closed loop linearizes, animates and nests like a plant.
 | Simulate | `plant.compute_trajectory(tf=10.0)` |
 | Frequency domain | `plot_bode(plant, x_bar)`, `plot_root_locus(C >> G)` |
 | Classical loop | `PID(Kp, Ki, Kd) @ plant` |
-| State feedback | `lqr_at_operating_point(plant, x_bar, Q, R) @ plant` |
+| State feedback | `lqr(plant, Q, R, x_bar=x_bar) @ plant` |
 | Robot control | `ComputedTorqueController(arm)`, `JointImpedance(arm)` |
 | 3D robots | `UR5Manipulator()`, then `animate(renderer="meshcat", is_3d=True)` |
 | Value iteration | `DynamicProgrammingPlanner(problem, x_grid=(101, 101))` |

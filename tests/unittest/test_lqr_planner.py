@@ -5,7 +5,7 @@ import pytest
 from scipy.linalg import solve_continuous_are
 
 from minilink import LQRPlanner, Pendulum, PlanningProblem, QuadraticCost
-from minilink.control.lqr import lqr_gain, lqr_gain_schedule
+from minilink.control.design import lqr_gain, lqr_gain_schedule
 from minilink.control.state import (
     StateFeedbackController,
     TimeVaryingStateFeedbackController,

@@ -4,7 +4,7 @@ The linear-quadratic regulator as a planner: the Riccati solution of a quadratic
 :class:`LQRPlanner` lowers a :class:`~minilink.planning.problems.PlanningProblem`
 whose cost is a :class:`~minilink.core.costs.QuadraticCost` to the matrices
 ``(A, B, Q, R)`` of the plant linearized at ``(x̄, ū)`` and solves the Riccati
-equation with the factories of :mod:`minilink.control.lqr`. Its solution
+equation with the factories of :mod:`minilink.control.design`. Its solution
 carries the law, ``u = ū − K (x − x̄)``, and what the method itself knows
 about it: the cost-to-go ``J(x) = (x − x̄)ᵀ P (x − x̄)`` of the linear model and
 the closed-loop poles. The problem's horizon picks the equation: infinite,
@@ -19,7 +19,7 @@ from dataclasses import dataclass
 import numpy as np
 
 from minilink.analysis.riccati import care
-from minilink.control.lqr import lqr_gain_schedule
+from minilink.control.design import lqr_gain_schedule
 from minilink.control.state import (
     StateFeedbackController,
     TimeVaryingStateFeedbackController,

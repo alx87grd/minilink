@@ -1246,15 +1246,15 @@ class TestAdvancedPlotting(unittest.TestCase):
         )
 
     def test_resolve_plot_signals_lqr_at_cartpole(self):
-        from minilink.control.lqr import lqr_at_operating_point
+        from minilink.control.design import lqr
         from minilink.dynamics.catalog.pendulum.cartpole import CartPole
 
         plant = CartPole()
-        controller = lqr_at_operating_point(
+        controller = lqr(
             plant,
-            [0.0, np.pi, 0.0, 0.0],
             np.diag([1.0, 10.0, 1.0, 1.0]),
             np.array([[0.1]]),
+            x_bar=[0.0, np.pi, 0.0, 0.0],
         )
         diagram = controller @ plant
         signals = resolve_plot_signals(diagram)

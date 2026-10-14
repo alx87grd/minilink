@@ -12,7 +12,7 @@ from minilink.analysis.lyapunov import (
     region_of_attraction,
     sample_in_ellipsoid,
 )
-from minilink.control.lqr import lqr_at_operating_point
+from minilink.control.design import lqr
 from minilink.core.backends import array_module
 from minilink.core.system import DynamicSystem
 
@@ -83,9 +83,7 @@ class TestQuadraticCertificate(unittest.TestCase):
 
     def test_saturated_pendulum_certificate_sits_inside_the_true_basin(self):
         plant = saturated_pendulum()
-        loop = (
-            lqr_at_operating_point(plant, np.zeros(2), Q=np.eye(2), R=np.eye(1)) @ plant
-        )
+        loop = lqr(plant, Q=np.eye(2), R=np.eye(1), x_bar=np.zeros(2)) @ plant
         roa = region_of_attraction(loop)
 
         self.assertGreater(roa.level, 0.0)
@@ -119,7 +117,7 @@ class TestQuadraticCertificate(unittest.TestCase):
     def test_equilibrium_is_found_not_assumed(self):
         # A law with a steady offset settles beside the state it was aimed at.
         plant = saturated_pendulum()
-        ctl = lqr_at_operating_point(plant, np.zeros(2), Q=np.eye(2), R=np.eye(1))
+        ctl = lqr(plant, Q=np.eye(2), R=np.eye(1), x_bar=np.zeros(2))
         ctl.params["ubar"] = np.array([0.5])  # a bias the design did not intend
         roa = region_of_attraction(ctl @ plant, np.zeros(2))
 
@@ -129,9 +127,7 @@ class TestQuadraticCertificate(unittest.TestCase):
     def test_every_certified_state_of_a_grid_converges(self):
         # The property the plot draws: the certified set is inside the basin.
         plant = saturated_pendulum()
-        loop = (
-            lqr_at_operating_point(plant, np.zeros(2), Q=np.eye(2), R=np.eye(1)) @ plant
-        )
+        loop = lqr(plant, Q=np.eye(2), R=np.eye(1), x_bar=np.zeros(2)) @ plant
         roa = region_of_attraction(loop)
 
         half = 2.5 * roa.extent
@@ -166,12 +162,7 @@ class TestQuadraticCertificate(unittest.TestCase):
         arm.state.lower_bound = np.array([-3.0, -4 * np.pi, -10.0, -10.0])
         arm.state.upper_bound = -arm.state.lower_bound
         x_up = np.array([0.0, np.pi, 0.0, 0.0])
-        loop = (
-            lqr_at_operating_point(
-                arm, x_up, Q=np.diag([1.0, 10.0, 1.0, 1.0]), R=np.eye(1)
-            )
-            @ arm
-        )
+        loop = lqr(arm, Q=np.diag([1.0, 10.0, 1.0, 1.0]), R=np.eye(1), x_bar=x_up) @ arm
         roa = region_of_attraction(loop, x_up)
 
         self.assertEqual(roa.extent.size, 4)
@@ -187,9 +178,7 @@ class TestQuadraticCertificate(unittest.TestCase):
     def test_the_search_reports_whether_it_had_enough_samples(self):
         # Two states on a grid: the halves agree, so the level is sharp.
         plant = saturated_pendulum()
-        loop = (
-            lqr_at_operating_point(plant, np.zeros(2), Q=np.eye(2), R=np.eye(1)) @ plant
-        )
+        loop = lqr(plant, Q=np.eye(2), R=np.eye(1), x_bar=np.zeros(2)) @ plant
         roa = region_of_attraction(loop)
         self.assertLess(roa.sample_spread, 0.1)
         self.assertFalse(roa.sample_limited)
@@ -228,7 +217,7 @@ class TestQuadraticCertificate(unittest.TestCase):
 def test_numpy_and_jax_backends_agree():
     pytest.importorskip("jax")
     plant = saturated_pendulum()
-    loop = lqr_at_operating_point(plant, np.zeros(2), Q=np.eye(2), R=np.eye(1)) @ plant
+    loop = lqr(plant, Q=np.eye(2), R=np.eye(1), x_bar=np.zeros(2)) @ plant
 
     from minilink.analysis import lyapunov
 
@@ -251,7 +240,7 @@ def test_plot_draws_the_slice_and_the_basin():
 
     matplotlib.use("Agg")
     plant = saturated_pendulum()
-    loop = lqr_at_operating_point(plant, np.zeros(2), Q=np.eye(2), R=np.eye(1)) @ plant
+    loop = lqr(plant, Q=np.eye(2), R=np.eye(1), x_bar=np.zeros(2)) @ plant
     roa = region_of_attraction(loop)
 
     fig, ax = roa.plot(basin=True, n=41, show=False)

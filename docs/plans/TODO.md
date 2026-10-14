@@ -90,15 +90,11 @@ AC-3); AC-4 with P4; P11. P6 stays held for GRO501; its row is in §5 (v0.9).
   its guess to `sys.x0`; the operating point's size is checked; margin crossings refined by a
   root solve so `plot_bode` and `margins` report one number. Done when P7's signature test
   covers them.
-- [ ] **S62 The LQR family on the control band** **[ask — public names]** (scan: control#0,
-  control#1): rename the `control/lqr.py` module so `lqr`, `lqr_at_operating_point`,
-  `lqr_finite_horizon`, `trajectory_lqr` and `lqr_gain_schedule` join the band facade and the
-  registry; `P` joins the siso family; the `control/__init__.py` note on `control.lqr` goes
-  (scan: control#12). Before P11 writes notebooks on the band layer. The names themselves are
-  the ask.
+- [ ] **S62, the rest** **[ask — public names]** (scan: control#0): `P` joins the siso family.
+  The LQR family joined the control band facade on 2026-10-14 (`control/design.py`).
 - [ ] **TB-b The control objects and the loop read like the textbook.** The audit, review
   and pass of TB-a on `control/siso.py` (P / PI / PD / PID / Lead / Lag), `control/state.py`,
-  `control/lqr.py`, `control/place.py`, `blocks/transfer_function.py`,
+  `control/design.py`, `blocks/transfer_function.py`,
   `dynamics/abstraction/state_space.py` (`LTISystem`) and the loop-building path students use
   (`feedback`, `closed_loop`, `@`; after AC-3). Before P11. Done when every module in scope
   reads like `dp.py` and the baseline `cmp`s.

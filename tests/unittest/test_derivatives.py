@@ -15,7 +15,7 @@ from minilink import (
     Pendulum,
     controllability,
     discretize,
-    lqr_at_operating_point,
+    lqr,
     observability,
 )
 from minilink.analysis.frequency import bode, pzmap, transfer_function
@@ -474,11 +474,11 @@ class TestFamilyPattern(unittest.TestCase):
             controllability(lti).rank, controllability(lti.A(), lti.B()).rank
         )
 
-    def test_lqr_at_operating_point_takes_method_and_eps(self):
+    def test_lqr_on_a_plant_takes_method_and_eps(self):
         plant = InvertedPendulum()
         Q, R = np.diag([10.0, 1.0]), [[1.0]]
-        fd = lqr_at_operating_point(plant, [0.0, 0.0], Q, R, method="fd", eps=1e-5)
-        auto = lqr_at_operating_point(plant, [0.0, 0.0], Q, R)
+        fd = lqr(plant, Q, R, x_bar=[0.0, 0.0], method="fd", eps=1e-5)
+        auto = lqr(plant, Q, R, x_bar=[0.0, 0.0])
         np.testing.assert_allclose(fd.params["K"], auto.params["K"], atol=1e-4)
 
     def test_discretize_names_its_integrator(self):

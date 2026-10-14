@@ -7,9 +7,8 @@ import pytest
 from minilink.analysis.equilibria import find_equilibrium
 from minilink.analysis.linearization import linearize, linearize_matrices
 from minilink.analysis.structural import controllability, observability
-from minilink.control.lqr import (
+from minilink.control.design import (
     lqr,
-    lqr_at_operating_point,
     lqr_finite_horizon,
     lqr_gain,
     lqr_gain_schedule,
@@ -236,23 +235,42 @@ class TestLQR(unittest.TestCase):
         closed_poles = np.linalg.eigvals(A - B @ K)
         self.assertTrue(np.all(closed_poles.real < 0.0))
 
-    def test_lqr_at_operating_point_matches_two_step_design(self):
+    def test_the_three_forms_give_one_design(self):
         plant = InvertedPendulum()
-        x_bar = [0.0, 0.0]
+        x_bar = [0.3, 0.0]
         Q = np.diag([10.0, 1.0])
         R = np.array([[1.0]])
         lti = linearize(plant, x_bar=x_bar)
-        expected = lqr(lti.A(), lti.B(), Q, R, xbar=x_bar, ubar=[0.0])
-        controller = lqr_at_operating_point(plant, x_bar, Q, R)
-        np.testing.assert_allclose(controller.params["K"], expected.params["K"])
+        on_arrays = lqr(lti.A(), lti.B(), Q, R, x_bar=x_bar, u_bar=lti.ubar)
+        on_model = lqr(lti, Q, R)
+        on_plant = lqr(plant, Q, R, x_bar=x_bar)
+        for controller in (on_model, on_plant):
+            np.testing.assert_allclose(controller.params["K"], on_arrays.params["K"])
+            np.testing.assert_allclose(controller.inputs["r"].nominal_value, x_bar)
+            np.testing.assert_allclose(controller.params["ubar"], lti.ubar)
+        # keywords for the weights, and the nominal state when x_bar is omitted
         np.testing.assert_allclose(
-            controller.inputs["r"].nominal_value, expected.inputs["r"].nominal_value
+            lqr(plant, Q=Q, R=R, x_bar=x_bar).params["K"], on_plant.params["K"]
         )
+        plant.state.set_nominal_value(x_bar)
+        np.testing.assert_allclose(lqr(plant, Q, R).params["K"], on_plant.params["K"])
+
+    def test_the_signature_is_checked(self):
+        plant, lti = InvertedPendulum(), linearize(InvertedPendulum(), [0.0, 0.0])
+        Q, R = np.eye(2), np.eye(1)
+        with self.assertRaisesRegex(TypeError, r"lqr\(sys, Q, R\)"):
+            lqr(plant, [0.0, 0.0], Q, R)  # the retired order: the point is a keyword
+        with self.assertRaisesRegex(TypeError, "R is missing"):
+            lqr(plant, Q)
+        with self.assertRaisesRegex(TypeError, "Q given twice"):
+            lqr(plant, Q, R, Q=Q)
+        with self.assertRaisesRegex(ValueError, "carries its operating point"):
+            lqr(lti, Q, R, x_bar=[0.1, 0.0])
 
     def test_lqr_closed_loop_stabilizes_inverted_pendulum(self):
         plant = InvertedPendulum()
-        controller = lqr_at_operating_point(
-            plant, x_bar=[0.0, 0.0], Q=np.diag([10.0, 1.0]), R=np.array([[1.0]])
+        controller = lqr(
+            plant, Q=np.diag([10.0, 1.0]), R=np.array([[1.0]]), x_bar=[0.0, 0.0]
         )
         diagram = DiagramSystem()
         diagram.connection_verbose = False
@@ -1616,7 +1634,7 @@ class TestPolePlacement(unittest.TestCase):
     )
 
     def test_single_input_matches_the_hand_calculation(self):
-        from minilink.control.place import place_gain
+        from minilink.control.design import place_gain
 
         # s² + k₂ s + k₁ = (s + 1)(s + 2) = s² + 3 s + 2
         np.testing.assert_allclose(
@@ -1629,7 +1647,7 @@ class TestPolePlacement(unittest.TestCase):
         )
 
     def test_a_complex_pair_and_a_real_pole(self):
-        from minilink.control.place import place_gain
+        from minilink.control.design import place_gain
 
         A, B = self.TRIPLE
         poles = [-1.0 + 0.5j, -1.0 - 0.5j, -1.0]
@@ -1640,7 +1658,7 @@ class TestPolePlacement(unittest.TestCase):
         )
 
     def test_several_inputs_take_the_robust_gain(self):
-        from minilink.control.place import place_gain
+        from minilink.control.design import place_gain
 
         A = np.diag([1.0, 2.0, 3.0])
         B = np.array([[1.0, 0.0], [0.0, 1.0], [1.0, 1.0]])
@@ -1651,7 +1669,7 @@ class TestPolePlacement(unittest.TestCase):
         )
 
     def test_honest_errors(self):
-        from minilink.control.place import place_gain
+        from minilink.control.design import place_gain
 
         A, B = self.DOUBLE
         B_mimo = np.array([[1.0, 0.0], [0.0, 1.0], [1.0, 1.0]])
@@ -1668,17 +1686,18 @@ class TestPolePlacement(unittest.TestCase):
                 place_gain(*args)
 
     def test_operating_point_design_closes_the_loop(self):
-        from minilink import place, place_at_operating_point
+        from minilink import place
 
         plant = InvertedPendulum()
         x_bar = np.zeros(2)
         poles = [-3.0, -3.0]
 
-        ctl = place_at_operating_point(plant, x_bar, poles)
+        ctl = place(plant, poles, x_bar=x_bar)
         lin = linearize(plant, x_bar)
         np.testing.assert_allclose(
             ctl.params["K"], place(lin.A(), lin.B(), poles).params["K"]
         )
+        np.testing.assert_allclose(ctl.params["K"], place(lin, poles).params["K"])
         np.testing.assert_allclose(ctl.inputs["r"].nominal_value, x_bar)
 
         plant.x0 = np.array([0.4, 0.0])
@@ -1690,7 +1709,7 @@ class TestOutputReference(unittest.TestCase):
     """``StateFeedbackController(K, N=N)``: the textbook output reference."""
 
     def setUp(self):
-        from minilink.control.place import place_gain
+        from minilink.control.design import place_gain
 
         self.plant = SingleMass()
         self.plant.params["b"] = 0.5

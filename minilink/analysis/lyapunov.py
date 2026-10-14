@@ -820,13 +820,12 @@ def rollout_on(backend, evaluator, u_bar, t, dt: float, tf: float):
 
 
 if __name__ == "__main__":
-    from minilink import InvertedPendulum
-    from minilink.control.lqr import lqr_at_operating_point
+    from minilink import InvertedPendulum, lqr
 
     plant = InvertedPendulum()
     plant.inputs["u"].lower_bound = np.array([-2.0])  # too weak to hold it far over
     plant.inputs["u"].upper_bound = np.array([2.0])
-    ctl = lqr_at_operating_point(plant, np.zeros(2), Q=np.eye(2), R=np.eye(1))
+    ctl = lqr(plant, Q=np.eye(2), R=np.eye(1), x_bar=np.zeros(2))
     certificate = region_of_attraction(ctl @ plant)
     print(certificate)
     print(certificate.verify())

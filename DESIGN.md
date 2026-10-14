@@ -32,7 +32,7 @@ deep defining-module paths stay valid but are not what README / intro show.
 | Layer | Example | Role |
 | --- | --- | --- |
 | **Root prelude** | `from minilink import Pendulum, ImpedanceController, lqr, QuadraticCost, DynamicProgrammingPlanner, ReinforcementLearningPlanner` | **The teaching surface, one import line** — every name a student meets (tested as a set in `test_teaching_surface.py`) |
-| **Band facades** | `from minilink.catalog import Pendulum` · `from minilink.control import ImpedanceController` · `from minilink.analysis import bode` · `from minilink.control.lqr import lqr` · `from minilink.analysis import linearize` | Canonical course / script API |
+| **Band facades** | `from minilink.catalog import Pendulum` · `from minilink.control import ImpedanceController` · `from minilink.analysis import bode` · `from minilink.control import lqr` · `from minilink.analysis import linearize` | Canonical course / script API |
 | **Defining module** | `from minilink.dynamics.catalog.pendulum.pendulum import Pendulum` | Implementation home; always valid |
 
 Rules:
@@ -40,11 +40,9 @@ Rules:
 - `minilink.catalog` is a **teaching alias** of `dynamics/catalog/` (plants still
   live under `dynamics/`; no math moves).
 - Band packages (`control/`, `analysis/`, `simulation/`, `control.mpc`, …)
-  re-export their teaching symbols via `__all__` / lazy `__getattr__`.
-  Exception: when a **module name matches a factory** (e.g. `control.lqr`),
-  import the factory from that module
-  (`from minilink.control.lqr import lqr`) — do not shadow the submodule on
-  the parent package.
+  re-export their teaching symbols via `__all__` / lazy `__getattr__`. A
+  module never takes the name of a function it defines (`control/design.py`
+  holds `lqr`), so the facade can export the function.
 - Root `minilink/__init__.py` exports the **whole teaching surface** (lazily) so
   student-facing code needs one import line; band facades organise the same
   names by role. Research-lane names never appear at the root.
@@ -86,7 +84,7 @@ or neural network alike):
 | `blocks/` | plant-agnostic wiring: sources, `Integrator`, `TransferFunction`, routing (`Sum`/`Gain`/`Mux`/`Demux`), nonlinear (`Saturation`/`DeadZone`/`Relay`), filters, neural (`NeuralNetwork`) |
 | `dynamics/` | plants: `abstraction/` mother classes, `catalog/` by physical domain |
 | `catalog/` | **teaching alias** of `dynamics/catalog/` — flat re-exports for short imports (`from minilink.catalog import Pendulum`); ownership stays in `dynamics/` |
-| `control/` | control laws and design factories (`lqr.py`, `impedance.py`, `output.py`, `state.py`, `siso.py` — `PID` with `ports="error"` (compensator, one input `e`) or `"reference"` (`r`, `y`), `modelbased.py`, `robotic.py`, `geometric.py` — `PurePursuit`, `neural.py` — `NeuralPolicyController`, **`mpc/`** — RH `ModelPredictiveController`) |
+| `control/` | control laws and design verbs (`design.py` — `lqr`, `place`, `lqr_finite_horizon`, `trajectory_lqr` and their gains, each on arrays, an `LTISystem` or any plant linearized about its command port; `impedance.py`, `output.py`, `state.py`, `siso.py` — `PID` with `ports="error"` (compensator, one input `e`) or `"reference"` (`r`, `y`), `modelbased.py`, `robotic.py`, `geometric.py` — `PurePursuit`, `neural.py` — `NeuralPolicyController`, **`mpc/`** — RH `ModelPredictiveController`) |
 | `estimation/` | online state and parameter estimators (planned) |
 
 **Tools** — verbs on a `System`; they return data or plots and never define
@@ -138,10 +136,14 @@ state-feedback block):
 - **Exception:** `graphical/animation` imports `planning.spatial.Scene`, to
   draw a scene as an overlay.
 - A new import across libraries needs an exception here, with its reason.
-- Libraries may ship **factories for their own blocks** with array-in /
-  block-out signatures (`control.lqr(A, B, Q, R) -> StateFeedbackController`,
-  and, not yet in the library, `estimation.kalman(A, B, C, Q, R) -> LuenbergerObserver`); the linearization
-  producing those arrays lives in `analysis/`.
+- Libraries may ship **design verbs for their own blocks**, arrays or a model in,
+  block out (`control.design.lqr(A, B, Q, R) -> StateFeedbackController`, and, not
+  yet in the library, `estimation.kalman(A, B, C, Q_n, R_n) -> StateObserver`); the
+  linearization producing those arrays lives in `analysis/`.
+- **Exception:** `control/` (and `estimation/`) import `analysis`
+  (`linearization.design_model`, `riccati`, `structural`): a design on a plant is
+  an adapter on its linearization (RULES 4.3), and the Riccati equations are
+  analysis-tier math shared with the planners.
 - Tools import `core`; they may consume libraries in demos and benchmarks.
 - `graphical/` is imported lazily from anywhere; rendering stays optional.
 - The `experimental/` tier is imported by nothing.
@@ -946,7 +948,7 @@ backend is chosen once for all of them: NumPy when one law does not trace). `LQR
 `B` at the cost's `(xbar, ubar)`, the algebraic Riccati equation for an
 infinite `tf`, the differential one swept from `S` for a finite `tf`; its
 `RiccatiRecord` holds `K`, `P`, the closed-loop poles (success = Hurwitz) and
-the finite-horizon schedule. `control.lqr` stays the array-in / block-out
+the finite-horizon schedule. `control.design` stays the array-in / block-out
 factory the planner calls.
 
 **Horizon and the constraint set:** the horizon has one owner, `problem.tf` — a

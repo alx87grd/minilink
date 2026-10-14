@@ -2,14 +2,11 @@
 
 Teaching imports::
 
-    from minilink.control import ImpedanceController
-    from minilink.control.lqr import lqr
-    from minilink.control.place import place
+    from minilink.control import ImpedanceController, lqr, place
     from minilink.control.mpc import ModelPredictiveController
 
-Note: ``lqr`` lives in the ``control.lqr`` module and ``place`` in ``control.place``
-— neither is re-exported on the package attribute of the same name (that name
-is the submodule itself).
+The design verbs (``lqr``, ``place``, ``lqr_finite_horizon``, ``trajectory_lqr``
+and their gains) live in ``control.design``.
 """
 
 from __future__ import annotations
@@ -28,6 +25,13 @@ _EXPORTS: dict[str, tuple[str, str]] = {
     "PI": ("minilink.control.siso", "PI"),
     "PD": ("minilink.control.siso", "PD"),
     "ImpedanceController": ("minilink.control.impedance", "ImpedanceController"),
+    "lqr": ("minilink.control.design", "lqr"),
+    "lqr_gain": ("minilink.control.design", "lqr_gain"),
+    "lqr_gain_schedule": ("minilink.control.design", "lqr_gain_schedule"),
+    "lqr_finite_horizon": ("minilink.control.design", "lqr_finite_horizon"),
+    "trajectory_lqr": ("minilink.control.design", "trajectory_lqr"),
+    "place": ("minilink.control.design", "place"),
+    "place_gain": ("minilink.control.design", "place_gain"),
     "ImpedanceIntegralController": (
         "minilink.control.impedance",
         "ImpedanceIntegralController",

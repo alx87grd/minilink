@@ -224,7 +224,7 @@ def test_realize_key_names_each_stream_so_an_added_block_moves_no_other():
 
 def test_analysis_verbs_see_the_noise_at_its_mean():
     from minilink.analysis import find_equilibrium, jacobian
-    from minilink.control.lqr import lqr_at_operating_point
+    from minilink.control.design import lqr
 
     noisy, quiet = noisy_loop(), noisy_loop(None, None)
     A = jacobian(noisy, "f", "x", method="fd")
@@ -236,7 +236,7 @@ def test_analysis_verbs_see_the_noise_at_its_mean():
 
     plant = noisy_plant()
     assert plant.is_random
-    K = lqr_at_operating_point(plant, np.zeros(2), np.eye(2), np.eye(1), method="fd")
+    K = lqr(plant, np.eye(2), np.eye(1), x_bar=np.zeros(2), method="fd")
     assert np.all(np.isfinite(K.params["K"]))
 
 

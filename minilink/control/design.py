@@ -1,0 +1,433 @@
+"""Linear state-feedback design: a model or arrays in, a controller block out.
+
+``lqr`` solves the algebraic Riccati equation, ``place`` puts the closed-loop poles where
+asked, ``lqr_finite_horizon`` sweeps the Riccati differential equation backward from a
+terminal weight, and ``trajectory_lqr`` does so along a reference trajectory. Every design
+reads one linear model ``(A, B)``, given three ways: ``lqr(A, B, Q, R)`` on arrays, as the
+textbooks and MATLAB write it; ``lqr(model, Q, R)`` on an ``LTISystem``, which carries the
+operating point it was linearized about; or ``lqr(plant, Q, R)`` on any plant, linearized
+first at ``x_bar`` or, when omitted, at its nominal state.
+"""
+
+import numpy as np
+from scipy.signal import place_poles
+
+from minilink.analysis.linearization import design_model
+from minilink.analysis.riccati import (
+    care,
+    hamiltonian_matrix,
+    riccati_map,
+    riccati_step,
+    riccati_transition,
+)
+from minilink.control.state import (
+    StateFeedbackController,
+    TimeVaryingStateFeedbackController,
+    TrajectoryFeedbackController,
+)
+from minilink.core.system import System
+from minilink.dynamics.abstraction.state_space import LTISystem
+
+# Public API
+
+
+def lqr_gain(A, B, Q, R):
+    """Return the optimal feedback gain ``K`` of the law ``u = -K x`` minimizing ``∫ xᵀQx + uᵀRu dt``."""
+    A = np.asarray(A, dtype=float)
+    B = np.atleast_2d(np.asarray(B, dtype=float))
+    Q = np.asarray(Q, dtype=float)
+    R = np.atleast_2d(np.asarray(R, dtype=float))
+
+    P = care(A, B, Q, R)
+
+    # K = R⁻¹ Bᵀ P
+    K = np.linalg.solve(R, B.T @ P)
+
+    return K
+
+
+def place_gain(A, B, poles):
+    """Return the gain ``K`` of the law ``u = -K x`` that puts the eigenvalues of ``A − B K`` at ``poles``."""
+    from minilink.analysis.structural import controllability
+
+    A = np.asarray(A, dtype=float)
+    B = np.atleast_2d(np.asarray(B, dtype=float))
+    n, m = B.shape
+    poles = requested_poles(poles, n)
+
+    # 𝒞 = [B, AB, …, Aⁿ⁻¹B]: every pole can be moved only when rank 𝒞 = n
+    ctrb = controllability(A, B)
+    require_controllable(ctrb)
+
+    if m == 1:
+        # φ(s) = ∏ (s − pᵢ) = sⁿ + a₁ sⁿ⁻¹ + … + aₙ
+        a = np.real(np.poly(poles))
+
+        # φ(A) = Aⁿ + a₁ Aⁿ⁻¹ + … + aₙ I   (Horner)
+        phi_A = np.zeros((n, n))
+        for a_k in a:
+            phi_A = phi_A @ A + a_k * np.eye(n)
+
+        # Ackermann: K = [0 … 0 1] 𝒞⁻¹ φ(A)
+        e_n = np.eye(n)[-1]
+        K = np.linalg.solve(ctrb.matrix.T, e_n)[np.newaxis, :] @ phi_A
+    else:
+        # Several inputs: many K place these poles; take the robust one (Kautz–Nichols–Van Dooren)
+        K = robust_gain(A, B, poles)
+
+    require_placed(A, B, K, poles)
+
+    return K
+
+
+def lqr(
+    model,
+    *args,
+    Q=None,
+    R=None,
+    x_bar=None,
+    u_bar=None,
+    t=0.0,
+    params=None,
+    method="auto",
+    eps=1e-6,
+):
+    """Design an LQR and return a ``StateFeedbackController``.
+
+    ``lqr(A, B, Q, R)`` designs on arrays; ``lqr(sys, Q, R)`` on a linear model
+    (an ``LTISystem``, used as is with the operating point it carries) or on any
+    plant, linearized first about its command port at ``(x_bar, u_bar)``, the
+    nominal state and inputs when omitted. The block implements
+    ``u = ubar - K (x - r)`` with ``r`` defaulting to ``xbar``, the operating
+    point of the model; wire the plant state into its ``x`` port.
+
+    Parameters
+    ----------
+    model : array-like or System
+        ``A`` when designing on arrays, else the model or the plant.
+    *args
+        ``B, Q, R`` on arrays; ``Q, R`` on a system. ``Q`` and ``R`` may also be
+        given by keyword.
+    Q, R : array-like
+        State and input weights of ``∫ xᵀQx + uᵀRu dt``.
+    x_bar, u_bar : array-like, optional
+        Operating point: on arrays the point the block regulates to (the
+        origin by default); on a plant the point to linearize about (the
+        nominal by default). A linear model carries its own.
+    t, params, method, eps : optional
+        Linearization time, parameter set, differentiation backend and
+        central-difference step, as in :func:`~minilink.analysis.linearize`.
+    """
+    model, (Q, R) = design_arguments(
+        model,
+        args,
+        {"Q": Q, "R": R},
+        "lqr(A, B, Q, R) or lqr(sys, Q, R)",
+        x_bar,
+        u_bar,
+        t,
+        params,
+        method,
+        eps,
+    )
+    K = lqr_gain(model.A(), model.B(), Q, R)
+    return StateFeedbackController(K, xbar=model.xbar, ubar=model.ubar)
+
+
+def place(
+    model,
+    *args,
+    poles=None,
+    x_bar=None,
+    u_bar=None,
+    t=0.0,
+    params=None,
+    method="auto",
+    eps=1e-6,
+):
+    """Place the closed-loop poles and return a ``StateFeedbackController``.
+
+    ``place(A, B, poles)`` designs on arrays; ``place(sys, poles)`` on a linear
+    model or on any plant, linearized first about its command port at
+    ``(x_bar, u_bar)``. The block implements ``u = ubar - K (x - r)`` with
+    ``r`` defaulting to ``xbar``, the operating point of the model; wire the
+    plant state into its ``x`` port. Arguments as in :func:`lqr`, with
+    ``poles`` (``n`` of them, complex ones in conjugate pairs) in place of
+    ``Q, R``.
+    """
+    model, (poles,) = design_arguments(
+        model,
+        args,
+        {"poles": poles},
+        "place(A, B, poles) or place(sys, poles)",
+        x_bar,
+        u_bar,
+        t,
+        params,
+        method,
+        eps,
+    )
+    K = place_gain(model.A(), model.B(), poles)
+    return StateFeedbackController(K, xbar=model.xbar, ubar=model.ubar)
+
+
+def lqr_gain_schedule(A, B, Q, R, S_f, tf, *, n_steps=1001):
+    """Return ``(t, K, S)``: the finite-horizon gain ``K(t)`` and Riccati matrix ``S(t)``.
+
+    Solves the Riccati differential equation backward from the terminal weight,
+
+        -dS/dt = SA + AᵀS - SBR⁻¹BᵀS + Q,   S(t_f) = S_f,
+
+    exactly on a uniform time grid. With the co-state ``λ = S x``, the pair
+    ``z = [x; λ]`` follows the linear Hamiltonian system ``ż = H z``, so one
+    step of ``Δt`` backward is the linear-fractional map
+    ``S ← (E₂₁ + E₂₂ S)(E₁₁ + E₁₂ S)⁻¹`` with ``E = expm(-H Δt)``: no
+    integration error, no stiffness, and ``S`` stays symmetric. A coarse grid
+    is cut into substeps with ``‖H‖ Δt ≤ 1`` each, as in
+    :func:`~minilink.analysis.riccati.riccati_step`, so the transition stays
+    well conditioned however stiff the pair. Returns ``K(t) = R⁻¹BᵀS(t)`` for
+    the law ``u = -K(t) x``. ``t`` holds ``n_steps`` samples from ``0`` to
+    ``tf``; ``K`` has shape ``(n_steps, m, n)`` and ``S`` shape
+    ``(n_steps, n, n)``.
+    """
+    A = np.asarray(A, dtype=float)
+    B = np.atleast_2d(np.asarray(B, dtype=float))
+    Q = np.asarray(Q, dtype=float)
+    R = np.atleast_2d(np.asarray(R, dtype=float))
+    S_f = np.asarray(S_f, dtype=float)
+    n = A.shape[0]
+    n_steps = int(n_steps)
+    if n_steps < 2 or tf <= 0.0:
+        raise ValueError("lqr_gain_schedule needs tf > 0 and n_steps >= 2")
+    R_inv = np.linalg.inv(R)
+    dt = float(tf) / (n_steps - 1)
+
+    # constant dynamics: one transition serves every interval of the backward sweep,
+    # cut into n_sub substeps with ‖H‖ dt ≤ 1 each, as in riccati_step
+    H = hamiltonian_matrix(A, B, Q, R_inv)
+    n_sub = max(1, int(np.ceil(np.linalg.norm(H, 2) * dt)))
+    E = riccati_transition(A, B, Q, R_inv, dt / n_sub)
+    S = np.empty((n_steps, n, n))
+    S[-1] = S_f
+    for k in range(n_steps - 1, 0, -1):
+        S_k = S[k]
+        for _ in range(n_sub):
+            S_k = riccati_map(E, S_k)
+        S[k - 1] = S_k
+
+    t = np.linspace(0.0, float(tf), n_steps)
+    K = R_inv @ B.T @ S
+    return t, K, S
+
+
+def lqr_finite_horizon(
+    model,
+    *args,
+    Q=None,
+    R=None,
+    S_f=None,
+    tf=None,
+    n_steps=1001,
+    after="hold",
+    x_bar=None,
+    u_bar=None,
+    t=0.0,
+    params=None,
+    method="auto",
+    eps=1e-6,
+):
+    """Design a finite-horizon LQR and return a ``TimeVaryingStateFeedbackController``.
+
+    ``lqr_finite_horizon(A, B, Q, R, S_f, tf)`` on arrays or
+    ``lqr_finite_horizon(sys, Q, R, S_f, tf)`` on a model or a plant, as in
+    :func:`lqr`. The block implements ``u = ubar - K(t) (x - r)`` with
+    ``K(t)`` from :func:`lqr_gain_schedule`, minimizing
+    ``∫₀^tf xᵀQx + uᵀRu dt + x(tf)ᵀ S_f x(tf)`` for the linear model. Past the
+    horizon the block keeps ``K(tf)`` (``after="hold"``) or switches to the
+    infinite-horizon gain of :func:`lqr_gain` (``after="stationary"``).
+    """
+    model, (Q, R, S_f, tf) = design_arguments(
+        model,
+        args,
+        {"Q": Q, "R": R, "S_f": S_f, "tf": tf},
+        "lqr_finite_horizon(A, B, Q, R, S_f, tf) or lqr_finite_horizon(sys, Q, R, S_f, tf)",
+        x_bar,
+        u_bar,
+        t,
+        params,
+        method,
+        eps,
+    )
+    A, B = model.A(), model.B()
+    t_schedule, K, _ = lqr_gain_schedule(A, B, Q, R, S_f, tf, n_steps=n_steps)
+    if after == "stationary":
+        K_after = lqr_gain(A, B, Q, R)
+    elif after == "hold":
+        K_after = None
+    else:
+        raise ValueError("after must be 'hold' or 'stationary'")
+    return TimeVaryingStateFeedbackController(
+        t_schedule, K, xbar=model.xbar, ubar=model.ubar, K_after=K_after
+    )
+
+
+def trajectory_lqr(
+    sys, trajectory, Q, R, S_f=None, *, params=None, method="auto", eps=1e-6
+):
+    """Design an LQR along a reference trajectory and return a ``TrajectoryFeedbackController``.
+
+    ``sys`` is linearized at every sample ``(x_d(t_k), u_d(t_k))`` of
+    ``trajectory``, ``A_k = ∂f/∂x`` and ``B_k = ∂f/∂u``, and the Riccati
+    differential equation of the error ``x - x_d`` is solved backward along
+    the samples with the dynamics frozen on each interval,
+
+        -dS/dt = S A_k + A_kᵀ S - S B_k R⁻¹ B_kᵀ S + Q,   S(t_f) = S_f,
+
+    each interval exactly, as in :func:`lqr_gain_schedule`. The gains
+    ``K_k = R⁻¹ B_kᵀ S_k`` give the law ``u = u_d(t) - K(t) (x - x_d(t))``.
+    ``S_f`` defaults to the algebraic Riccati solution at the final sample, so
+    the gain held past the horizon is the stationary LQR of the end point.
+
+    Parameters
+    ----------
+    sys : System
+        Plant to stabilize.
+    trajectory : Trajectory
+        Reference ``(t, x_d, u_d)``, ``N`` samples at increasing times.
+    Q, R : array-like
+        LQR weights on the tracking error and on the input deviation.
+    S_f : array-like, optional
+        Terminal weight ``S(t_f)``; default the stationary solution at the end.
+    params : dict, optional
+        Parameter dict forwarded to ``sys.f``.
+    method : {"auto", "fd", "jax"}, optional
+        Differentiation backend, see :func:`~minilink.analysis.derivatives.jacobian`.
+    eps : float, optional
+        Central-difference step.
+    """
+    from minilink.analysis.derivatives import jacobian
+
+    t = np.asarray(trajectory.t, dtype=float).reshape(-1)
+    X = np.asarray(trajectory.x, dtype=float).T
+    U = np.asarray(trajectory.u, dtype=float).T
+    Q = np.asarray(Q, dtype=float)
+    R = np.atleast_2d(np.asarray(R, dtype=float))
+    N, n = X.shape
+    m = U.shape[1]
+    R_inv = np.linalg.inv(R)
+
+    # the dynamics linearized at every sample of the reference
+    A = np.empty((N, n, n))
+    B = np.empty((N, n, m))
+    for k in range(N):
+        A[k] = jacobian(sys, "f", "x", X[k], U[k], t[k], params, method=method, eps=eps)
+        B[k] = jacobian(sys, "f", "u", X[k], U[k], t[k], params, method=method, eps=eps)
+
+    # backward sweep from the terminal weight, dynamics frozen on each interval
+    S = np.empty((N, n, n))
+    S[-1] = care(A[-1], B[-1], Q, R) if S_f is None else S_f
+    for k in range(N - 1, 0, -1):
+        S[k - 1] = riccati_step(A[k - 1], B[k - 1], Q, R_inv, S[k], t[k] - t[k - 1])
+
+    K = R_inv @ np.swapaxes(B, 1, 2) @ S
+    return TrajectoryFeedbackController(trajectory, K)
+
+
+# Internal machinery: the model a design reads, the request checked, the result checked
+
+
+def design_arguments(model, args, named, forms, x_bar, u_bar, t, params, method, eps):
+    """Split ``design(model, *args, **named)`` into the linear model and the design's own arguments.
+
+    On arrays, ``args`` starts with ``B`` and the model is an ``LTISystem`` at
+    ``(x_bar, u_bar)``, the origin by default. On a ``System`` the model comes
+    from :func:`~minilink.analysis.linearization.design_model`. The design's own
+    arguments (``Q, R``, ``poles``, …) follow positionally or by keyword, in the
+    order of ``named``; ``forms`` is the signature quoted in a refusal.
+    """
+    on_system = isinstance(model, System)
+    matrices = 0 if on_system else 1
+    if len(args) < matrices or len(args) - matrices > len(named):
+        raise TypeError(f"{forms}: got {len(args) + 1} positional arguments")
+    design = list(args[matrices:])
+    for name, value in list(named.items())[len(design) :]:
+        if value is None:
+            raise TypeError(f"{forms}: {name} is missing")
+        design.append(value)
+    for name, value in list(named.items())[: len(args) - matrices]:
+        if value is not None:
+            raise TypeError(f"{forms}: {name} given twice")
+    if on_system:
+        lti = design_model(model, x_bar, u_bar, t, params, method=method, eps=eps)
+    else:
+        lti = LTISystem(model, args[0], xbar=x_bar, ubar=u_bar)
+    return lti, tuple(design)
+
+
+def requested_poles(poles, n):
+    """The requested poles as a complex array: exactly ``n``, complex ones in conjugate pairs."""
+    poles = np.atleast_1d(np.asarray(poles, dtype=complex))
+    if poles.shape != (n,):
+        raise ValueError(f"place: {n} poles needed for {n} states, got {poles.size}.")
+    if not np.allclose(np.sort_complex(poles), np.sort_complex(poles.conj())):
+        raise ValueError(
+            "place: complex poles must come in conjugate pairs (a real gain K "
+            f"gives a real characteristic polynomial), got {poles}."
+        )
+    return poles
+
+
+def require_controllable(ctrb):
+    """Refuse an uncontrollable pair, naming the rank of the controllability matrix."""
+    if ctrb.rank < ctrb.n:
+        raise ValueError(
+            f"place: (A, B) is not controllable (rank 𝒞 = {ctrb.rank} < n = "
+            f"{ctrb.n}): only the controllable modes can be moved."
+        )
+
+
+def robust_gain(A, B, poles):
+    """``scipy.signal.place_poles``, its multiplicity limit said in plain words."""
+    try:
+        return place_poles(A, B, poles).gain_matrix
+    except ValueError as error:
+        raise ValueError(
+            f"place: with {B.shape[1]} inputs a pole can be repeated at most "
+            f"{np.linalg.matrix_rank(B)} times; spread the repeated poles ({error})."
+        ) from error
+
+
+def require_placed(A, B, K, poles):
+    """Check ``det(sI − (A − B K)) = ∏ (s − pᵢ)``; a badly conditioned design fails loudly.
+
+    The characteristic polynomials are compared, not the eigenvalues: a repeated
+    pole is computed only to about the cube root of machine precision, while its
+    polynomial stays exact.
+    """
+    placed = np.real(np.poly(A - B @ K))
+    requested = np.real(np.poly(poles))
+    if not np.allclose(
+        placed, requested, rtol=1e-6, atol=1e-9 * np.max(np.abs(requested))
+    ):
+        raise ValueError(
+            f"place: the closed loop landed at {np.linalg.eigvals(A - B @ K)}, not at "
+            f"the requested {poles}; the design is badly conditioned."
+        )
+
+
+if __name__ == "__main__":
+    from minilink.dynamics.catalog.pendulum.cartpole import CartPole
+
+    plant = CartPole()
+    x_bar = np.array([0.0, np.pi, 0.0, 0.0])  # pole inverted, cart at origin
+
+    controller = lqr(
+        plant, Q=np.diag([1.0, 10.0, 1.0, 1.0]), R=np.array([[0.1]]), x_bar=x_bar
+    )
+    print("LQR gain K =\n", np.round(controller.params["K"], 4))
+
+    diagram = controller @ plant
+    plant.x0 = np.array([-1.0, np.pi + 0.3, 0.0, 0.0])
+    diagram.compute_trajectory(tf=8.0)
+    diagram.plot_trajectory()
+    diagram.animate()

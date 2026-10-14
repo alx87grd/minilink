@@ -19,10 +19,7 @@ Control
 .. automodule:: minilink.control.modelbased
    :members:
 
-.. automodule:: minilink.control.lqr
-   :members:
-
-.. automodule:: minilink.control.place
+.. automodule:: minilink.control.design
    :members:
 
 .. automodule:: minilink.control.geometric

@@ -851,12 +851,12 @@ stay as the evidence. Their remedies were not stress-tested by a second reviewer
    `ẋ = −10x + w` the block route is 7.5% off the exact held-train path. Moving the last stage's
    time does not give the left limit under any tolerance, and the stage is written at 22 sites.
 3. **RN-1 removes an accidental guard.** Today `linearize`, `transfer_function` and
-   `lqr_at_operating_point` raise on a diagram holding `WhiteNoise` (`h` refuses `params`). With
+   `lqr(plant, …)` (then `lqr_at_operating_point`) raise on a diagram holding `WhiteNoise` (`h` refuses `params`). With
    the pure block they run at `t = 0` and read the draw `w(0)`, of standard deviation `√(W / Δ)`:
    on the drag plant `A` went from −0.40 to −1.6 (Δ = 0.01) and −6.1 (Δ = 0.001), equilibria
    moved with the seed, and direct collocation planned against the frozen realization with
    `success=True`. Separately, planners treat a declared disturbance port as an actuator today:
-   `lqr_at_operating_point(PendulumWithNoisePort())` returns a 3 × 2 gain, and `wrt="u"` names
+   the then `lqr_at_operating_point(PendulumWithNoisePort())` returned a 3 × 2 gain (fixed 2026-10-14: `lqr(plant, …)` linearizes about the command port alone), and `wrt="u"` names
    every input stacked, so the control port is `("u", 0)`.
 4. **RD-D11's noise array reaches ports only.** The evaluator steps `plant_step(x, u, t, params)`;
    a block inside `sys` is a compiled port operation with no override. With Philox on NumPy and

@@ -152,14 +152,12 @@ TEACHING_SURFACE: dict[str, tuple[str, ...]] = {
     ),
 }
 
-# Factories whose module name matches the factory (DESIGN §2 exception).
+# Design verbs the band facade re-exports from their defining module.
 TEACHING_MODULE_FUNCTIONS = (
-    ("minilink.control.lqr", "lqr"),
-    ("minilink.control.lqr", "lqr_at_operating_point"),
-    ("minilink.control.lqr", "lqr_finite_horizon"),
-    ("minilink.control.lqr", "trajectory_lqr"),
-    ("minilink.control.place", "place"),
-    ("minilink.control.place", "place_at_operating_point"),
+    ("minilink.control.design", "lqr"),
+    ("minilink.control.design", "lqr_finite_horizon"),
+    ("minilink.control.design", "trajectory_lqr"),
+    ("minilink.control.design", "place"),
 )
 
 # Module prefixes that belong to the teaching lane.

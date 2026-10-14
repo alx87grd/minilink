@@ -6,6 +6,7 @@ import numpy as np
 
 from minilink.analysis.derivatives import compiled, jacobian, operating_point
 from minilink.core.diagram import DiagramSystem
+from minilink.core.feedback import command_port
 from minilink.dynamics.abstraction.state_space import LTISystem
 from minilink.graphical.control import style
 
@@ -113,6 +114,31 @@ def linearize(
     )
     lti.state.labels = [f"Delta {label}" for label in sys.state.labels]
     return lti
+
+
+def design_model(
+    sys, x_bar=None, u_bar=None, t=0.0, params=None, *, method="auto", eps=1e-6
+):
+    """The linear model a design verb reads: ``sys`` itself when it is an ``LTISystem``, else ``sys`` linearized about its command port.
+
+    An ``LTISystem`` carries the operating point it was taken at, so a point
+    given here is refused: linearize the plant at ``x_bar`` instead. Any other
+    system is linearized at ``(x_bar, u_bar)``, the nominal state and inputs
+    by default, with ``B`` over the command port alone (``u``, else the one
+    input that is not a disturbance ``d`` or a noise ``n``), so a plant with
+    noise ports gives a gain over its command.
+    """
+    if isinstance(sys, LTISystem):
+        if x_bar is not None or u_bar is not None:
+            raise ValueError(
+                f"{sys.name!r} is a linear model and carries its operating point "
+                f"(xbar = {sys.xbar}); linearize the plant at x_bar instead of "
+                "passing it here"
+            )
+        return sys
+    return linearize(
+        sys, x_bar, u_bar, t, params, wrt=command_port(sys), method=method, eps=eps
+    )
 
 
 # =============================================================================

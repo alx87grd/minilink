@@ -152,14 +152,14 @@ parking-mode poles at `{−1 ± 0.5i, −1}`; `place` is in the Lab 2 command li
 ```python
 place(A, B, poles)                       -> StateFeedbackController
 place_gain(A, B, poles)                  -> K
-place_at_operating_point(sys, x_bar, poles, ...)  -> StateFeedbackController
+place(sys, poles, x_bar=...)             -> StateFeedbackController   (renamed from place_at_operating_point, 2026-10-14)
 ```
 
 `scipy.signal.place_poles` does the algorithm; this is a thin wrapper plus
 the block construction and an honest error when the pole set is not reachable
 (repeated poles beyond the input rank).
 
-**Files.** new `minilink/control/place.py`, `minilink/control/__init__.py`,
+**Files.** new `minilink/control/place.py` (folded into `control/design.py` on 2026-10-14), `minilink/control/__init__.py`,
 `minilink/__init__.py`, `tests/unittest/test_control_analysis.py`, a demo in
 `examples/demos/control/`.
 
