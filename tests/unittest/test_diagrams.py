@@ -136,13 +136,17 @@ class TestDiagrams(unittest.TestCase):
         """Notebook cells auto-display the returned graph; display() would draw twice."""
         from unittest import mock
 
-        pytest.importorskip("graphviz")
+        graphviz = pytest.importorskip("graphviz")
         try:
             import IPython.display  # noqa: F401
         except ImportError:
             self.skipTest("IPython not installed")
 
-        with mock.patch("IPython.display.display") as display:
+        # dot renders (the binary itself is not needed here), so the graph comes back
+        with (
+            mock.patch.object(graphviz.Digraph, "pipe", return_value=b"<svg/>"),
+            mock.patch("IPython.display.display") as display,
+        ):
             graph = plot_diagram(
                 Integrator(), show=True, show_inline=True, show_pdf=False
             )
