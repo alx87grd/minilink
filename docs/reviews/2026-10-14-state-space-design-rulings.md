@@ -114,6 +114,22 @@ was ruled, one entry each, and where each ruling now lives.
   reference, `u = ū − K (x − x̄) + N r`, with x̄ in `params` because its law reads it.
   Each block has one home for x̄ and no mode switch in its law; `lqr` and `place` still
   return the first. Lives in: `control/state.py`, DESIGN `state.py` row, ROADMAP §4.
+- **R16 The operating point's homes, one rule.** On a system, the nominal value of its
+  signals (R1); in a block whose law reads it, `params` (`OutputReferenceController`,
+  `StateObserver`); in a tool, `x_bar` / `u_bar`, defaulting to the nominal; on a linear
+  model, `xbar`, `ubar`, `ybar`, where its deviations are measured from (the model stays in
+  deviation variables). `QuadraticCost.from_system` now defaults x̄ to the nominal state,
+  as ū already defaulted to the nominal inputs. Lives in: DESIGN §4, `core/costs.py`.
+- **R17 Multi-port plants: the command port for B, the measured y for C.** The designs and
+  `LQRPlanner` linearize about the command port alone (`u`, else the one input that is not
+  `d` or `n`; every other input held at its nominal), so `LQRPlanner` no longer returns a
+  gain over the disturbance and the noise; a cost over every input weighs the command by
+  its block of `R`. `kalman`, `luenberger` and `lqg` refuse a plant without `y` instead of
+  reading its state as the measurement; another output, or another input, is designed on
+  `linearize(plant, x_bar, of=..., wrt=...)`. The selector `"u"` naming every input stacked
+  in `jacobian` / `linearize` stays as it is (renaming it is a public API change). Lives
+  in: `analysis/linearization.py` (`design_model`), `planning/policy_synthesis/lqr.py`,
+  DESIGN §4.
 
 ## Where the earlier records and this one differ
 

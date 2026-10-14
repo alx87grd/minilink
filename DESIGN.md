@@ -257,7 +257,12 @@ The research rungs (`Holonomic`, `HolonomicAccel`, `BicycleKin`, `BicycleAcc`,
   the nominal state x̄ and the input ports' `nominal_value` the nominal inputs ū, the
   operating point every analysis and design verb reads when `x_bar` / `u_bar` are
   omitted (`analysis.derivatives.operating_point`); `x0` is the start of a simulation
-  and nothing else. Both default to zeros; a diagram derives both from its blocks.
+  and nothing else. Both default to zeros; a diagram derives both from its blocks. Where
+  the point lives: on a system, the nominal value of its signals; in a block whose law
+  reads it (`OutputReferenceController`, `StateObserver`), its `params`; in a tool, the
+  `x_bar` / `u_bar` arguments, defaulting to the nominal (the target of
+  `QuadraticCost.from_system` included); on a linear model, `xbar`, `ubar` and `ybar`,
+  where its deviations are measured from.
 - **Ports:** explicit, ID-first; infer `dim` from metadata or default 1. Extract
   slices with `get_port_values_from_u(u, "r", "y")`.
 - **DynamicSystem shortcut:** `input_dim`, `output_dim`, `expose_state`,
@@ -389,7 +394,10 @@ The research rungs (`Holonomic`, `HolonomicAccel`, `BicycleKin`, `BicycleAcc`,
   finds it. A block that reads a measurement and gives the state back with no `u` and no
   `y` is refused as a controller by `@`, `closed_loop`, `%` and `plot_control_law`
   (`core.feedback.require_command`): put it in a controller box with a gain, or design
-  the pair with `lqg`.
+  the pair with `lqg`. The designs read the plant's command port for `B` (every other
+  input held at its nominal; `LQRPlanner` too) and, for an observer, its `y` for `C`: a
+  plant without `y` is refused, and another output is designed on
+  `linearize(plant, x_bar, of=...)`.
 - **Visualization contract:** keyed `get_kinematic_geometry`, `tf`,
   `get_dynamic_geometry` are part of the core `System` contract in
   `core/system.py` (graphical primitives imported lazily). Camera hints

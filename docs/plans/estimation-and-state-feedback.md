@@ -1,6 +1,6 @@
 # State feedback and state estimation as one pattern: the design for P4 and beyond
 
-**Status:** decided 2026-10-13; §6 (the control sweep, the observer, the designs, `lqg`, the demos) landed 2026-10-14 in nine commits, the open follow-ups are TODO rows (P4 follow-ups, `LQGPlanner`, the estimation follow-ups); §3, §5 and §7 are the live design for what comes next. The rulings and their reasons are in
+**Status:** decided 2026-10-13; §6 (the control sweep, the observer, the designs, `lqg`, the demos) landed 2026-10-14 in nine commits, and the review that followed made the verbs system-only, split the output reference out of `StateFeedbackController` and put `LQRPlanner` on the command port (rulings R14–R17), the open follow-ups are TODO rows (P4 follow-ups, `LQGPlanner`, the estimation follow-ups); §3, §5 and §7 are the live design for what comes next. The rulings and their reasons are in
 [2026-10-14-state-space-design-rulings.md](../reviews/2026-10-14-state-space-design-rulings.md).
 Workboard row P4 (v0.2 wave B). Items marked **[ruled]** were decided in the design
 conversation; the role name was ruled `observer` (R11) and `analysis/riccati.py` taken (R5).
