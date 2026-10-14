@@ -10,7 +10,7 @@ from minilink import (
     StochasticPlanningProblem,
 )
 
-TRAINING_TIMESTEPS = 6_000_000  # about four minutes on a laptop CPU
+TRAINING_TIMESTEPS = 15_000_000  # about eight minutes on a laptop CPU
 DT = 0.1  # [s] control period
 EPISODE = 60.0  # [s]
 GAMMA = 0.998  # a 50 s discount horizon: turning round for the dock pays off slowly

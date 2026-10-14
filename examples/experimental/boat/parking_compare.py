@@ -27,7 +27,7 @@ from minilink.planning.evaluation import score_trajectory
 TF = 60.0  # [s]
 DT = 0.05  # [s] plant step
 MPC_DT, MPC_HORIZON, MPC_STEPS, MPC_TERMINAL = 0.5, 15.0, 15, 10.0
-PPO_DT, PPO_TIMESTEPS, PPO_GAMMA, INFEASIBLE_COST = 0.1, 6_000_000, 0.998, 2000.0
+PPO_DT, PPO_TIMESTEPS, PPO_GAMMA, INFEASIBLE_COST = 0.1, 15_000_000, 0.998, 2000.0
 
 boat = ParkingBoat(CURRENT)
 problem = PlanningProblem(
