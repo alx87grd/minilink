@@ -62,7 +62,6 @@ plant = Pendulum()
 
 plant.x0[0] = 2.0
 plant.params["l"] = 5.0
-plant.params["m"] = 1.0
 
 diagram = controller @ plant
 diagram.compute_trajectory(tf=10.0)
@@ -133,6 +132,7 @@ is a system, a cost and boundary sets; every planner takes it and returns a
 `PlanningSolution` (a policy, plus the trajectory when the solver computes one):
 
 ```python
+import numpy as np
 from minilink import (
     BallSet, DynamicProgrammingPlanner, Pendulum, PlanningProblem,
     QuadraticCost, RRTPlanner, TrajectoryOptimizationPlanner,

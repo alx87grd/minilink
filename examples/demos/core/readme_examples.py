@@ -4,12 +4,11 @@ import numpy as np
 
 from minilink import ImpedanceController, Pendulum
 
-controller = ImpedanceController()  # u = Kp * (r - theta) - Kd * theta_dot
-plant = Pendulum()  # theta_ddot = -(g / l) * sin(theta) + tau / (m * l**2)
+controller = ImpedanceController()
+plant = Pendulum()
 
 plant.x0[0] = 2.0
 plant.params["l"] = 5.0
-plant.params["m"] = 1.0
 
 diagram = controller @ plant
 diagram.compute_trajectory(tf=10.0)
@@ -19,48 +18,37 @@ diagram.animate()
 
 
 ########################################################
-# What is a System: f for the dynamics, tf and a skin for the animation
-from minilink import DynamicSystem, Step  # noqa: E402
-from minilink.core.kinematics import translation  # noqa: E402
-from minilink.graphical.animation.primitives import Box, ground_line  # noqa: E402
+# What is a System: write f, and h to choose what the sensor measures
+from minilink import DynamicSystem  # noqa: E402
 
 
 class MassSpringDamper(DynamicSystem):
-    # m p'' + c p' + k p = u
-
     def __init__(self):
-        super().__init__(n=2, input_dim=1, output_dim=2)
-        self.params = {"m": 1.0, "k": 4.0, "c": 0.3}
-        self.skin = lambda sys: {
-            "world": [ground_line(length=8.0)],
-            "body": [Box(length_x=0.6, length_y=0.6, length_z=0.1)],
-        }
-        self.camera_scale = 4.0
+        super().__init__(n=2, input_dim=1, output_dim=1)
 
     def f(self, x, u, t=0, params=None):
-        params = self.params if params is None else params
-        m, k, c = params["m"], params["k"], params["c"]
+        m, k, b = 1.0, 4.0, 0.3
         p, v = x
 
-        # m p̈ + c ṗ + k p = u
-        a = (u[0] - c * v - k * p) / m
+        # m p̈ + b ṗ + k p = u
+        a = (u[0] - b * v - k * p) / m
 
         return np.array([v, a])
 
-    def tf(self, x, u, t=0, params=None):
-        return {"body": translation(x[0], 0.0, 0.0)}
+    def h(self, x, u, t=0, params=None):
+        p, v = x
+
+        return np.array([p])  # the sensor reads the position only
 
 
-msd = MassSpringDamper()
-msd.x0[0] = 1.0
-loop = Step(final_value=np.array([10.0]), step_time=2.0) >> msd
-loop.compute_trajectory(tf=20.0)
-loop.animate()  # renderer="plotly" | "meshcat" | "pygame"
-# msd.game()    # keyboard drives u, live (opens a window)
+plant = MassSpringDamper()
+plant.x0[0] = 1.0
+plant.compute_trajectory(tf=10.0)
+plant.plot_trajectory()
 
 
 ########################################################
-# One problem, three planners
+# One model, every tool: one problem, three planners
 from minilink import (  # noqa: E402
     BallSet,
     DynamicProgrammingPlanner,
@@ -71,11 +59,6 @@ from minilink import (  # noqa: E402
 )
 
 plant = Pendulum()
-plant.inputs["u"].lower_bound[:] = -5.0
-plant.inputs["u"].upper_bound[:] = 5.0
-plant.state.lower_bound = np.array([-2.0 * np.pi, -12.0])
-plant.state.upper_bound = np.array([2.0 * np.pi, 12.0])
-
 x_down, x_up = np.array([0.0, 0.0]), np.array([np.pi, 0.0])
 problem = PlanningProblem(
     sys=plant,
