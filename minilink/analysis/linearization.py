@@ -49,6 +49,7 @@ def linearize_matrices(
     eps : float, optional
         Central-difference step.
     """
+    require_own_point(sys, x_bar, u_bar)
     at = dict(method=method, eps=eps)
     point = (x_bar, u_bar, t, params)
     n = sys.n
@@ -97,10 +98,11 @@ def linearize(
     selected inputs, ``ybar`` for the selected outputs), so a design made on
     it (``lqr``, ``kalman``) knows where it applies.
     """
-    x_bar, u_bar, params = operating_point(sys, x_bar, u_bar, params)
     A, B, C, D = linearize_matrices(
         sys, x_bar, u_bar, t, params, of=of, wrt=wrt, method=method, eps=eps
     )
+    # The point the model carries: the one given, else the nominal
+    x_bar, u_bar, params = operating_point(sys, x_bar, u_bar, params)
     inputs = input_selectors(sys, wrt)
     outputs = output_selectors(sys, of)
     lti = LTISystem(
@@ -148,13 +150,8 @@ def design_model(
             "place_gain(A, B, poles), kalman_gain(A, C, Q_n, R_n) and "
             "luenberger_gain(A, C, poles)"
         )
+    require_own_point(sys, x_bar, u_bar)
     if isinstance(sys, LTISystem):
-        if x_bar is not None or u_bar is not None:
-            raise ValueError(
-                f"{sys.name!r} is a linear model and carries its operating point "
-                f"(xbar = {sys.xbar}); linearize the plant at x_bar instead of "
-                "passing it here"
-            )
         return sys
     if measured and "y" not in sys.outputs:
         raise ValueError(
@@ -185,6 +182,16 @@ def design_model(
 # =============================================================================
 # Internal machinery
 # =============================================================================
+
+
+def require_own_point(sys, x_bar, u_bar):
+    """Refuse a point given with a linear model: an ``LTISystem`` carries the one it was taken at."""
+    if isinstance(sys, LTISystem) and (x_bar is not None or u_bar is not None):
+        raise ValueError(
+            f"{sys.name!r} is a linear model and carries its operating point "
+            f"(xbar = {sys.xbar}); linearize the plant at x_bar instead of passing "
+            "it here"
+        )
 
 
 def input_selectors(sys, wrt):
@@ -260,13 +267,14 @@ def siso_channel(sys, of, wrt):
 
     ``of`` names the output and ``wrt`` the input: a port id means component
     0, ``(port, index)`` one component, a diagram wire ``"block:port"`` an
-    internal signal. ``of_name`` is ``None`` when the output is the state
-    itself (no ``y`` port): the row is then taken from ``C = I``.
+    internal signal. The default input is the command port (``u``, else the
+    one input that is not ``d`` or ``n``), as the design verbs read it; the
+    default output is the first component of ``y``. ``of_name`` is ``None``
+    when the output is the state itself (no ``y`` port): the row is then
+    taken from ``C = I``.
     """
     if wrt is None:
-        if not sys.inputs:
-            raise ValueError("Frequency analysis requires at least one input port.")
-        wrt = (next(iter(sys.inputs)), 0)
+        wrt = (command_port(sys), 0)
     if of is None:
         default = output_selectors(sys, None)
         of = (None, 0) if default is None else (default[0][0], 0)

@@ -107,16 +107,25 @@ def operating_point(sys, x_bar=None, u_bar=None, params=None):
 
     The operating point is the system's declared nominal, ``state.nominal_value``
     and the input ports' nominal values; ``x0`` is the start of a simulation
-    and plays no part here.
+    and plays no part here. A point of the wrong size is refused by name, so
+    it never surfaces as a broadcast error inside the evaluator.
     """
+    nominal_u = sys.get_u_from_input_ports()
     x_bar = sys.state.nominal_value if x_bar is None else x_bar
-    u_bar = sys.get_u_from_input_ports() if u_bar is None else u_bar
+    u_bar = nominal_u if u_bar is None else u_bar
     params = sys.realize(None) if params is None else params
-    return (
-        np.asarray(x_bar, dtype=float).reshape(-1),
-        np.asarray(u_bar, dtype=float).reshape(-1),
-        params,
-    )
+    x_bar = np.asarray(x_bar, dtype=float).reshape(-1)
+    u_bar = np.asarray(u_bar, dtype=float).reshape(-1)
+    if x_bar.size != sys.n:
+        raise ValueError(
+            f"{sys.name!r}: x_bar has {x_bar.size} entries, the system has {sys.n} states"
+        )
+    if u_bar.size != nominal_u.size:
+        raise ValueError(
+            f"{sys.name!r}: u_bar has {u_bar.size} entries, the inputs stack to "
+            f"{nominal_u.size}"
+        )
+    return x_bar, u_bar, params
 
 
 def as_numpy(value):

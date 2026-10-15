@@ -6,6 +6,7 @@ from dataclasses import dataclass
 
 import numpy as np
 from scipy import linalg
+from scipy.optimize import brentq
 
 from minilink.analysis.structural import (
     RANK_TOL,
@@ -171,8 +172,13 @@ class Margins:
     w_phase_crossover: float  # rad/s where arg L = -180 deg (gain margin is read here)
 
 
-def margins(w, G):
-    """Margins from a sampled response: crossings found by interpolation."""
+def margins(w, G, response=None):
+    """Margins from a sampled response ``G = L(jw)``; crossings found by interpolation.
+
+    With ``response``, a callable ``w -> L(jw)``, each bracketed crossing is
+    solved exactly on it (Brent's method), so the margins do not depend on
+    the grid, which only has to bracket them.
+    """
     w = np.asarray(w, dtype=float).reshape(-1)
 
     # Bode coordinates: |L| in dB and the unwrapped ∠L in degrees
@@ -180,13 +186,13 @@ def margins(w, G):
     phase_deg = np.degrees(np.unwrap(np.angle(np.asarray(G))))
 
     # Gain crossovers |L(jω_gc)| = 1, with the phase there
-    w_gc, phase_gc = gain_crossovers(w, magnitude_db, phase_deg)
+    w_gc, phase_gc = gain_crossovers(w, magnitude_db, phase_deg, response)
 
     # PM = 180° + ∠L(jω_gc), folded into [−180°, 180°)
     pm = (phase_gc + 180.0 + 180.0) % 360.0 - 180.0
 
     # Phase crossovers ∠L(jω_pc) = −180° (mod 360°), with the magnitude there
-    w_pc, magnitude_pc = phase_crossovers(w, magnitude_db, phase_deg)
+    w_pc, magnitude_pc = phase_crossovers(w, magnitude_db, phase_deg, response)
 
     # GM = −|L(jω_pc)| in dB
     gm = -magnitude_pc
@@ -356,9 +362,11 @@ def as_siso_matrices(A, B, C, D):
 
 
 def sign_changes(values):
-    """Indices ``k`` where ``values[k]`` and ``values[k + 1]`` have opposite signs."""
+    """Indices ``k`` where ``values`` crosses zero between ``k`` and ``k + 1``, a sample sitting on zero included."""
     signs = np.sign(values)
-    return np.flatnonzero(signs[:-1] * signs[1:] < 0)
+    crosses = signs[:-1] * signs[1:] < 0
+    on_zero = (signs[:-1] == 0) & (signs[1:] != 0)
+    return np.flatnonzero(crosses | on_zero)
 
 
 def interpolate_crossing(w_pair, values_pair, target):
@@ -367,18 +375,24 @@ def interpolate_crossing(w_pair, values_pair, target):
     return w0 + (target - v0) * (w1 - w0) / (v1 - v0)
 
 
-def gain_crossovers(w, magnitude_db, phase_deg):
-    """Frequencies where ``|L|`` crosses 1 (interpolated), with the phase there."""
+def gain_crossovers(w, magnitude_db, phase_deg, response=None):
+    """Frequencies where ``|L|`` crosses 1, with the phase there; interpolated, then solved on ``response`` when given."""
     w_c, phase_c = [], []
     for k in sign_changes(magnitude_db):
         w_k = interpolate_crossing(w[k : k + 2], magnitude_db[k : k + 2], 0.0)
+        phase_k = np.interp(w_k, w[k : k + 2], phase_deg[k : k + 2])
+        if response is not None:
+            w_k = solve_crossing(
+                lambda ww: magnitude_db_at(response, ww), w[k], w[k + 1], w_k
+            )
+            phase_k = unwrap_to(phase_deg_at(response, w_k), phase_deg[k])
         w_c.append(w_k)
-        phase_c.append(np.interp(w_k, w[k : k + 2], phase_deg[k : k + 2]))
+        phase_c.append(phase_k)
     return np.array(w_c, dtype=float), np.array(phase_c, dtype=float)
 
 
-def phase_crossovers(w, magnitude_db, phase_deg):
-    """Frequencies where ``arg L`` crosses -180 deg (mod 360, interpolated), with the magnitude there."""
+def phase_crossovers(w, magnitude_db, phase_deg, response=None):
+    """Frequencies where ``arg L`` crosses -180 deg (mod 360), with the magnitude there; interpolated, then solved on ``response`` when given."""
     w_c, magnitude_c = [], []
     lowest = int(np.floor((phase_deg.min() + 180.0) / 360.0))
     highest = int(np.ceil((phase_deg.max() + 180.0) / 360.0))
@@ -386,9 +400,51 @@ def phase_crossovers(w, magnitude_db, phase_deg):
         target = -180.0 + 360.0 * k_wrap
         for k in sign_changes(phase_deg - target):
             w_k = interpolate_crossing(w[k : k + 2], phase_deg[k : k + 2], target)
+            magnitude_k = np.interp(w_k, w[k : k + 2], magnitude_db[k : k + 2])
+            if response is not None:
+                w_k = solve_crossing(
+                    lambda ww: wrap_degrees(phase_deg_at(response, ww) - target),
+                    w[k],
+                    w[k + 1],
+                    w_k,
+                )
+                magnitude_k = magnitude_db_at(response, w_k)
             w_c.append(w_k)
-            magnitude_c.append(np.interp(w_k, w[k : k + 2], magnitude_db[k : k + 2]))
+            magnitude_c.append(magnitude_k)
     return np.array(w_c, dtype=float), np.array(magnitude_c, dtype=float)
+
+
+def solve_crossing(residual, w0, w1, w_guess):
+    """The root of ``residual`` in ``[w0, w1]`` by Brent's method; the interpolated guess when the ends do not bracket it."""
+    r0, r1 = residual(w0), residual(w1)
+    if r0 == 0.0:
+        return float(w0)
+    if r1 == 0.0:
+        return float(w1)
+    if r0 * r1 > 0.0:
+        return float(w_guess)
+    return float(brentq(residual, w0, w1, xtol=1e-12, rtol=1e-12))
+
+
+def magnitude_db_at(response, w):
+    """``20 log10 |L(jw)|`` from the exact response."""
+    with np.errstate(divide="ignore"):
+        return float(20.0 * np.log10(np.abs(response(w))))
+
+
+def phase_deg_at(response, w):
+    """``arg L(jw)`` in degrees, in ``(-180, 180]``, from the exact response."""
+    return float(np.degrees(np.angle(response(w))))
+
+
+def wrap_degrees(angle):
+    """``angle`` folded into ``[-180, 180)``."""
+    return (angle + 180.0) % 360.0 - 180.0
+
+
+def unwrap_to(angle, reference):
+    """``angle`` shifted by a multiple of 360 deg to sit within 180 deg of ``reference``."""
+    return reference + wrap_degrees(angle - reference)
 
 
 def smallest_margin(margins, frequencies):

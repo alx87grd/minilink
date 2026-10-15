@@ -3,6 +3,7 @@
 import numpy as np
 
 from minilink.analysis.derivatives import jacobian, operating_point
+from minilink.analysis.linearization import require_own_point
 from minilink.core.trajectory import Trajectory
 
 
@@ -43,6 +44,8 @@ def modal_analysis(
     modes : ndarray of shape (n, n)
         Eigenvectors (columns are mode shapes in perturbation coordinates).
     """
+    require_own_point(sys, x_bar, u_bar)
+
     # A = ∂f/∂x at (x_bar, u_bar)
     A = jacobian(sys, "f", "x", x_bar, u_bar, t, params, method=method, eps=eps)
 

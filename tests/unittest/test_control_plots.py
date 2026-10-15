@@ -196,6 +196,32 @@ class TestChannelTools(unittest.TestCase):
         )
         np.testing.assert_allclose(G_tf.numerator, [0.5], atol=1e-9)
 
+    def test_margins_are_solved_on_the_exact_response_not_read_off_the_grid(self):
+        from minilink.analysis.frequency import margins_text
+
+        L = TransferFunction([1.0], [1.0, 3.0, 2.0, 0.0])
+        coarse, fine = margins(L, n=60), margins(L, n=4000)
+        # L(s) = 1 / (s (s + 1)(s + 2)): Gm = 20 log10(6) at sqrt(2) rad/s, exactly
+        self.assertAlmostEqual(coarse.gain_margin_db, 20 * np.log10(6.0), places=9)
+        self.assertAlmostEqual(coarse.w_phase_crossover, np.sqrt(2.0), places=9)
+        self.assertAlmostEqual(coarse.phase_margin_deg, fine.phase_margin_deg, places=8)
+        self.assertAlmostEqual(coarse.w_gain_crossover, fine.w_gain_crossover, places=8)
+        # the Bode note and margins() print one number
+        self.assertEqual(margins_text(coarse), margins_text(fine))
+
+    def test_the_default_channel_is_the_command_port(self):
+        from minilink import PendulumWithNoisePort
+
+        plant = PendulumWithNoisePort()
+        _, mag_default, _ = bode(plant, w=[1.0])
+        _, mag_command, _ = bode(plant, wrt="u", w=[1.0])
+        np.testing.assert_allclose(mag_default, mag_command)
+        with self.assertRaisesRegex(ValueError, "input port named 'u'"):
+            bode(
+                TransferFunction([1.0], [1.0, 1.0])
+                + TransferFunction([1.0], [1.0, 2.0])
+            )
+
     def test_transfer_function_blocks_go_through_unchanged(self):
         L = TransferFunction([1.0], [1.0, 3.0, 2.0, 0.0])
         m = margins(L)

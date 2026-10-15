@@ -467,6 +467,31 @@ class TestFamilyPattern(unittest.TestCase):
             plant.find_equilibrium([0.3, 0.0]), [0.0, 0.0], atol=1e-6
         )
 
+    def test_a_point_given_with_a_linear_model_is_refused(self):
+        from minilink.analysis.derivatives import jacobian
+        from minilink.analysis.modal import modal_analysis
+
+        lti = InvertedPendulum().linearize([0.0, 0.0])
+        for name, call in (
+            ("linearize", lambda: linearize(lti, [0.0, 0.0])),
+            ("bode", lambda: bode(lti, u_bar=[0.0], w=[1.0])),
+            ("modal_analysis", lambda: modal_analysis(lti, [0.0, 0.0])),
+            ("lqr", lambda: lqr(lti, np.eye(2), [[1.0]], x_bar=[0.0, 0.0])),
+            ("shortcut", lambda: lti.linearize([0.0, 0.0])),
+        ):
+            with self.subTest(name):
+                with self.assertRaisesRegex(ValueError, "carries its operating point"):
+                    call()
+        # the raw derivative evaluates where it is told: trajectory_lqr reads it along x(t)
+        np.testing.assert_allclose(jacobian(lti, "f", "x", [0.1, 0.0]), lti.A())
+
+    def test_the_operating_point_size_is_checked_by_name(self):
+        plant = Pendulum()
+        with self.assertRaisesRegex(ValueError, "x_bar has 3 entries"):
+            bode(plant, [0.0, 0.0, 0.0], w=[1.0])
+        with self.assertRaisesRegex(ValueError, "u_bar has 2 entries"):
+            pzmap(plant, u_bar=[0.0, 0.0])
+
     def test_structural_tests_accept_an_lti_system(self):
         lti = InvertedPendulum().linearize([0.0, 0.0])
         self.assertTrue(controllability(lti).is_full_rank)

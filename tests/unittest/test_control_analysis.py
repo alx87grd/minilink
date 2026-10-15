@@ -699,7 +699,7 @@ class TestModalAnalysis(unittest.TestCase):
     def test_oscillator_poles(self):
         w = 2.0
         A = np.array([[0.0, 1.0], [-(w**2), 0.0]])
-        poles, modes = modal_analysis(LTISystem(A, np.zeros((2, 1))), x_bar=[0.0, 0.0])
+        poles, modes = modal_analysis(LTISystem(A, np.zeros((2, 1))))
         np.testing.assert_allclose(
             np.sort(poles), np.sort([1j * w, -1j * w]), atol=1e-10
         )

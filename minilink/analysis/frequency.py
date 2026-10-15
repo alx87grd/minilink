@@ -135,12 +135,14 @@ def margins(
     :class:`~minilink.analysis.linear.Margins` (``inf`` where a crossover
     does not exist).
     """
-    w, G = frequency_response(
-        sys, x_bar, u_bar, t, params, of=of, wrt=wrt, w=w, n=n, method=method, eps=eps
+    A, B, C, D = siso_matrices(
+        sys, x_bar, u_bar, t, params, of=of, wrt=wrt, method=method, eps=eps
     )
+    w = frequency_grid(A, B, C, D, w, n)
 
-    # Crossovers of L(jω) and the margins read there
-    loop_margins = linear.margins(w, G)
+    # L(jω) on the grid brackets the crossovers; each is then solved on the exact L(jω)
+    G = linear.frequency_response(A, B, C, D, w)
+    loop_margins = linear.margins(w, G, loop_response(A, B, C, D))
 
     return loop_margins
 
@@ -328,12 +330,12 @@ def plot_bode(
         magnitude_db = 20.0 * np.log10(np.abs(G))
     phase_deg = np.degrees(np.unwrap(np.angle(G)))
 
-    # The margins, read on the grid of margins()
+    # The margins, bracketed on the grid of margins() and solved on the exact L(jω)
     loop_margins = None
     if margins:
         w_margins = frequency_grid(A, B, C, D, w, _MARGIN_GRID_POINTS)
         G_margins = linear.frequency_response(A, B, C, D, w_margins)
-        loop_margins = linear.margins(w_margins, G_margins)
+        loop_margins = linear.margins(w_margins, G_margins, loop_response(A, B, C, D))
 
     return render_control_figure(
         bode_figure(
@@ -488,6 +490,15 @@ def frequency_grid(A, B, C, D, w, n):
     if w.size == 0 or np.any(w <= 0.0):
         raise ValueError("Frequencies must be positive.")
     return w
+
+
+def loop_response(A, B, C, D):
+    """``w -> L(jw)``, one complex value, for the root solve of the crossovers."""
+
+    def response(w):
+        return linear.frequency_response(A, B, C, D, np.atleast_1d(w))[0]
+
+    return response
 
 
 def margins_text(m: Margins) -> str:
