@@ -1551,6 +1551,17 @@ class TestCompensatorStateLayout(unittest.TestCase):
                 self.assertEqual(len(poles), plant_poles + extra_poles)
                 self.assertEqual(len(zeros), n_zeros)
 
+    def test_the_rate_measured_pair_adds_no_filter_pole(self):
+        plant_poles = 2
+        for controller, extra_poles in (
+            (ImpedanceController(Kp=20.0, Kd=2.0), 0),
+            (ImpedanceIntegralController(Kp=20.0, Ki=10.0, Kd=2.0), 1),
+        ):
+            with self.subTest(controller=type(controller).__name__):
+                _, poles, _ = pzmap(controller @ self.plant)
+                self.assertEqual(len(poles), plant_poles + extra_poles)
+                self.assertFalse(np.any(np.abs(poles + 20.0) < 1e-9))  # no -1/tau
+
     def test_pi_has_the_integrator_pole_and_pd_the_filter_pole(self):
         _, pi_poles, _ = pzmap(PI(Kp=20.0, Ki=10.0) >> self.plant)
         self.assertEqual(np.sum(np.abs(pi_poles) < 1e-9), 1)
