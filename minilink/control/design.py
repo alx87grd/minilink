@@ -13,7 +13,7 @@ from minilink.analysis.riccati import (
     riccati_transition,
     substeps,
 )
-from minilink.analysis.structural import controllability
+from minilink.analysis.structural import controllability_matrix, rank
 from minilink.control.state import (
     StateFeedbackController,
     TimeVaryingStateFeedbackController,
@@ -48,8 +48,8 @@ def place_gain(A, B, poles):
     poles = requested_poles(poles, n)
 
     # 𝒞 = [B, AB, …, Aⁿ⁻¹B]: every pole can be moved only when rank 𝒞 = n
-    ctrb = controllability(A, B)
-    require_controllable(ctrb)
+    ctrb = controllability_matrix(A, B)
+    require_controllable(ctrb, n)
 
     if m == 1:
         # φ(s) = ∏ (s − pᵢ) = sⁿ + a₁ sⁿ⁻¹ + … + aₙ
@@ -62,7 +62,7 @@ def place_gain(A, B, poles):
 
         # Ackermann: K = [0 … 0 1] 𝒞⁻¹ φ(A)
         e_n = np.eye(n)[-1]
-        K = np.linalg.solve(ctrb.matrix.T, e_n)[np.newaxis, :] @ phi_A
+        K = np.linalg.solve(ctrb.T, e_n)[np.newaxis, :] @ phi_A
     else:
         # Several inputs: many K place these poles; take the robust one (Kautz–Nichols–Van Dooren)
         K = robust_gain(A, B, poles)
@@ -332,12 +332,13 @@ def requested_poles(poles, n):
     return poles
 
 
-def require_controllable(ctrb):
+def require_controllable(ctrb, n):
     """Refuse an uncontrollable pair, naming the rank of the controllability matrix."""
-    if ctrb.rank < ctrb.n:
+    r = rank(ctrb)
+    if r < n:
         raise ValueError(
-            f"place: (A, B) is not controllable (rank 𝒞 = {ctrb.rank} < n = "
-            f"{ctrb.n}): only the controllable modes can be moved."
+            f"place: (A, B) is not controllable (rank 𝒞 = {r} < n = {n}): only the "
+            "controllable modes can be moved."
         )
 
 

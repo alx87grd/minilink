@@ -25,6 +25,10 @@ _EXPORTS: dict[str, tuple[str, str]] = {
         "complementary_sensitivity",
     ),
     "controllability": ("minilink.analysis.structural", "controllability"),
+    "controllability_matrix": (
+        "minilink.analysis.structural",
+        "controllability_matrix",
+    ),
     "discretize": ("minilink.analysis.discretization", "discretize"),
     "find_equilibrium": ("minilink.analysis.equilibria", "find_equilibrium"),
     "frequency_response": ("minilink.analysis.frequency", "frequency_response"),
@@ -40,6 +44,10 @@ _EXPORTS: dict[str, tuple[str, str]] = {
     ),
     "nyquist": ("minilink.analysis.frequency", "nyquist"),
     "observability": ("minilink.analysis.structural", "observability"),
+    "observability_matrix": (
+        "minilink.analysis.structural",
+        "observability_matrix",
+    ),
     "region_of_attraction": (
         "minilink.analysis.lyapunov",
         "region_of_attraction",

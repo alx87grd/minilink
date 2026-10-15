@@ -7,7 +7,11 @@ from dataclasses import dataclass
 import numpy as np
 from scipy import linalg
 
-from minilink.analysis.structural import RANK_TOL, controllability, observability
+from minilink.analysis.structural import (
+    RANK_TOL,
+    controllability_matrix,
+    observability_matrix,
+)
 
 # =============================================================================
 # Public API — poles, zeros, response
@@ -130,7 +134,7 @@ def minreal(A, B, C, D, *, tol=RANK_TOL):
     n = A.shape[0]
 
     # Controllable subspace: 𝒞 = U Σ Vᵀ, keep the r directions with σᵢ > tol σ₁
-    U, sigma, _ = np.linalg.svd(controllability(A, B).matrix)
+    U, sigma, _ = np.linalg.svd(controllability_matrix(A, B))
     r = int(np.sum(sigma > tol * sigma.max(initial=0.0)))
     T_c = U[:, :r] if r < n else np.eye(n)
 
@@ -140,7 +144,7 @@ def minreal(A, B, C, D, *, tol=RANK_TOL):
     C_c = C @ T_c
 
     # Observable part of it: 𝒪ᵀ = U Σ Vᵀ, keep the q directions with σᵢ > tol σ₁
-    U, sigma, _ = np.linalg.svd(observability(A_c, C_c).matrix.T)
+    U, sigma, _ = np.linalg.svd(observability_matrix(A_c, C_c).T)
     q = int(np.sum(sigma > tol * sigma.max(initial=0.0)))
     T_o = U[:, :q] if q < r else np.eye(r)
 

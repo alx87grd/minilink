@@ -264,7 +264,7 @@ B1. **`estimation/observer.py`: `StateObserver(A, B, C, L, D=None, xbar=None, ub
     convergence from a wrong x̂₀, with and without an operating point; `block_roles` /
     `roles`; `print`; the three refusals.
 B2. **`estimation/design.py`: the gains and `luenberger`.** `luenberger_gain(A, C, poles)`:
-    `observability(A, C)` with its own refusal, then `L = place_gain(Aᵀ, Cᵀ, poles)ᵀ` under the
+    `observability_matrix(A, C)` with its own refusal, then `L = place_gain(Aᵀ, Cᵀ, poles)ᵀ` under the
     duality comment. `kalman_gain(A, C, Q_n, R_n)`: `P = care(Aᵀ, Cᵀ, Q_n, R_n)` under
     `# A P + P Aᵀ − P Cᵀ R_n⁻¹ C P + Q_n = 0`, then `# L = P Cᵀ R_n⁻¹`. `luenberger(A, B, C,
     poles, *, xbar, ubar, ybar)` and `luenberger(sys, poles, *, x_bar, u_bar, t, params, method,

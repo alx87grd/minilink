@@ -20,6 +20,7 @@ from minilink import (
 )
 from minilink.analysis.frequency import bode, pzmap, transfer_function
 from minilink.analysis.linearization import linearize, linearize_matrices
+from minilink.analysis.structural import controllability_matrix
 from minilink.blocks.transfer_function import TransferFunction
 from minilink.control.state import StateFeedbackController
 from minilink.core.backends import array_module, jax_installed
@@ -471,7 +472,8 @@ class TestFamilyPattern(unittest.TestCase):
         self.assertTrue(controllability(lti).is_full_rank)
         self.assertTrue(observability(lti).is_full_rank)
         self.assertEqual(
-            controllability(lti).rank, controllability(lti.A(), lti.B()).rank
+            controllability(lti).rank,
+            np.linalg.matrix_rank(controllability_matrix(lti.A(), lti.B())),
         )
 
     def test_lqr_on_a_plant_takes_method_and_eps(self):

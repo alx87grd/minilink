@@ -6,7 +6,7 @@ import numpy as np
 
 from minilink.analysis.linearization import design_model
 from minilink.analysis.riccati import care
-from minilink.analysis.structural import observability
+from minilink.analysis.structural import observability_matrix, rank
 from minilink.control.design import place_gain
 from minilink.estimation.observer import StateObserver
 
@@ -19,8 +19,8 @@ def luenberger_gain(A, C, poles):
     C = np.atleast_2d(np.asarray(C, dtype=float))
 
     # 𝒪 = [C; CA; …; CAⁿ⁻¹]: every error pole can be moved only when rank 𝒪 = n
-    obsv = observability(A, C)
-    require_observable(obsv)
+    obsv = observability_matrix(A, C)
+    require_observable(obsv, A.shape[0])
 
     # eig(A − L C) = eig(Aᵀ − Cᵀ Lᵀ): the placement for the pair (Aᵀ, Cᵀ), transposed
     L = place_gain(A.T, C.T, poles).T
@@ -133,12 +133,13 @@ def hat(label):
     return f"{label}̂" if len(label) == 1 else f"{label}_hat"
 
 
-def require_observable(obsv):
+def require_observable(obsv, n):
     """Refuse an unobservable pair, naming the rank of the observability matrix."""
-    if obsv.rank < obsv.n:
+    r = rank(obsv)
+    if r < n:
         raise ValueError(
-            f"luenberger: (A, C) is not observable (rank 𝒪 = {obsv.rank} < n = "
-            f"{obsv.n}): only the observable modes' error poles can be moved."
+            f"luenberger: (A, C) is not observable (rank 𝒪 = {r} < n = {n}): only "
+            "the observable modes' error poles can be moved."
         )
 
 

@@ -6,7 +6,12 @@ import numpy as np
 import pytest
 from minilink.analysis.equilibria import find_equilibrium
 from minilink.analysis.linearization import linearize, linearize_matrices
-from minilink.analysis.structural import controllability, observability
+from minilink.analysis.structural import (
+    controllability,
+    controllability_matrix,
+    observability,
+    observability_matrix,
+)
 from minilink.control.design import (
     lqr,
     lqr_finite_horizon,
@@ -198,15 +203,38 @@ class TestStructural(unittest.TestCase):
         A = np.array([[0.0, 1.0], [0.0, 0.0]])
         B = np.array([[0.0], [1.0]])
         C = np.array([[1.0, 0.0]])
-        self.assertTrue(controllability(A, B).is_full_rank)
-        self.assertTrue(observability(A, C).is_full_rank)
+        model = LTISystem(A, B, C)
+        self.assertTrue(controllability(model).is_full_rank)
+        self.assertTrue(observability(model).is_full_rank)
+        # the arrays twins give the Kalman matrices themselves
+        np.testing.assert_allclose(
+            controllability_matrix(A, B), [[0.0, 1.0], [1.0, 0.0]]
+        )
+        np.testing.assert_allclose(observability_matrix(A, C), [[1.0, 0.0], [0.0, 1.0]])
 
     def test_uncontrollable_pair_detected(self):
         A = np.array([[1.0, 0.0], [0.0, 2.0]])
         B = np.array([[1.0], [0.0]])
-        result = controllability(A, B)
+        result = controllability(LTISystem(A, B))
         self.assertFalse(result.is_full_rank)
         self.assertEqual(result.rank, 1)
+
+    def test_structural_verbs_linearize_a_plant_like_the_designs(self):
+        plant = Pendulum()
+        x_bar = [0.0, 0.0]
+        model = plant.linearize(x_bar)
+        self.assertTrue(controllability(plant, x_bar).is_full_rank)
+        np.testing.assert_allclose(
+            controllability(plant, x_bar).matrix,
+            controllability_matrix(model.A(), model.B()),
+        )
+        self.assertTrue(observability(plant, x_bar).is_full_rank)
+        np.testing.assert_allclose(
+            observability(plant, x_bar).matrix,
+            observability_matrix(model.A(), model.C()),
+        )
+        with self.assertRaisesRegex(TypeError, "controllability_matrix"):
+            controllability(np.eye(2), np.eye(2))
 
     def test_one_rank_rule_for_the_structural_tests_and_the_cancellation(self):
         # The second mode is reached through 1e-11: "controllable" and "cancels in
@@ -216,10 +244,11 @@ class TestStructural(unittest.TestCase):
         C = np.array([[1.0, 1.0]])
         from minilink.analysis import linear
 
-        self.assertEqual(controllability(A, B).rank, 1)
+        model = LTISystem(A, B, C)
+        self.assertEqual(controllability(model).rank, 1)
         self.assertEqual(linear.minreal(A, B, C, np.zeros((1, 1)))[0].shape[0], 1)
-        self.assertEqual(observability(A.T, B.T).rank, 1)
-        self.assertEqual(controllability(A, B, tol=1e-13).rank, 2)
+        self.assertEqual(observability(LTISystem(A.T, B, B.T)).rank, 1)
+        self.assertEqual(controllability(model, tol=1e-13).rank, 2)
 
 
 class TestEquilibria(unittest.TestCase):
@@ -1817,11 +1846,11 @@ class TestPrint(unittest.TestCase):
     def test_structural_result_prints_its_verdict(self):
         A = np.array([[0.0, 1.0], [0.0, 0.0]])
         self.assertEqual(
-            str(controllability(A, np.array([[0.0], [1.0]]))),
+            str(controllability(LTISystem(A, np.array([[0.0], [1.0]])))),
             "StructuralResult: rank 2 of n = 2, full rank",
         )
         self.assertEqual(
-            str(controllability(A, np.array([[1.0], [0.0]]))),
+            str(controllability(LTISystem(A, np.array([[1.0], [0.0]])))),
             "StructuralResult: rank 1 of n = 2, rank deficient",
         )
 
