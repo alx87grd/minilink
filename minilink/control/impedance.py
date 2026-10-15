@@ -30,7 +30,8 @@ class ImpedanceController(System):
         If ``True``, ``r`` is ``[q_d; dq_d]``; otherwise ``q_d`` alone.
     Kp, Kd : float, vector or (dof, dof) array
         Stiffness and damping: a scalar or a per-axis vector is a diagonal
-        matrix, a full matrix couples the axes. Stored in ``self.params``.
+        matrix, a full matrix couples the axes. Stored in ``self.params`` as
+        ``(dof, dof)`` arrays, the shape a value assigned there later must have.
     u_min, u_max : float or vector
         Actuator limits per axis.
     y_labels, y_units, u_labels, u_units : sequence of str, optional
