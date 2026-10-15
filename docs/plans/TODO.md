@@ -63,8 +63,10 @@ Design: [naming.md](naming.md). Runs in parallel with wave B.
 Plan: [gro501-classical-control.md](gro501-classical-control.md). Release contract:
 [ROADMAP §4.2](../../ROADMAP.md#42-v02--gro501-end-to-end).
 
-**Order:** S61 and S62 at any time before P11; P10's AC-0, AC-2a, AC-OP, AC-3, AC-2b/c and
-AC-4 have landed, P4 with them; TB-b (its loop part after AC-3); P11. P6 stays held for GRO501; its row is in §5 (v0.9).
+**Order:** S61 and S62 at any time before v0.2 ships; P10's AC-0, AC-2a, AC-OP, AC-3,
+AC-2b/c and AC-4 have landed, P4 with them; TB-b (its loop part after AC-3). P11, the two
+GRO501 notebooks, was dropped on 2026-10-15: the students write the APP work themselves. P6
+stays held for GRO501; its row is in §5 (v0.9).
 
 - [ ] **P10 Automation by convention** ([automation-by-convention.md](automation-by-convention.md),
   decided 2026-10-11, amended 2026-10-13 by
@@ -95,8 +97,8 @@ AC-4 have landed, P4 with them; TB-b (its loop part after AC-3); P11. P6 stays h
   and pass of TB-a on `control/siso.py` (P / PI / PD / PID / Lead / Lag), `control/state.py`,
   `control/design.py`, `blocks/transfer_function.py`,
   `dynamics/abstraction/state_space.py` (`LTISystem`) and the loop-building path students use
-  (`feedback`, `closed_loop`, `@`; after AC-3). Before P11. Done when every module in scope
-  reads like `dp.py` and the baseline `cmp`s.
+  (`feedback`, `closed_loop`, `@`; after AC-3). Before v0.2 ships. Done when every module in
+  scope reads like `dp.py` and the baseline `cmp`s.
 - [ ] **P4 follow-ups** (P4 landed 2026-10-14; design and rulings in
   [estimation-and-state-feedback.md](estimation-and-state-feedback.md)): named input ports
   on the state-space base so observers and sensitivity blocks share one `f` (scan:
@@ -105,12 +107,6 @@ AC-4 have landed, P4 with them; TB-b (its loop part after AC-3); P11. P6 stays h
   landed with AC-4 (2026-10-14). Dropped, by decision (rulings R20): a `kalman(...,
   disturbance=, noise=)` reading `B_w`, `D_v` and the noise blocks' `psd`; the design verb
   takes the textbook `Q_n`, `R_n`.
-- [ ] **P11 Two GRO501 notebooks** **[maintainer — student-facing]**:
-  `teaching/topics/classical_control/dc_motor_propulsion.ipynb` (APP2) and
-  `bicycle_autopilot.ipynb` (APP4), Basic tier, Colab-first; drafted for review. Students
-  write their controllers as plain `System`s with the standard ports. Done when both run top
-  to bottom in Colab and the conda env, import only through the teaching surface, and agree
-  with the guide's worked exercises.
 - **P6** held for GRO501 (teach the Arduino law with `discretize` + simulation, unless the
   sommatif examines z-plane analysis); its row is in §5, v0.9.
 
@@ -435,8 +431,8 @@ after RN-5.
   "done when" per step): RN-4 `realize(key)` by name and signals on `disturbances=` (the
   frozen-noise defect fixed), RN-5 the Monte Carlo evaluator as a batched simulation of the
   closed-loop diagram on its test set; together, between cohorts, before the v0.9 freeze,
-  with P10's AC-7. RN-3 `NoiseSource` with its first consumer (with P11 if a GRO501 notebook
-  shows sampled sensor noise). RN-6, the contract in DESIGN, goes with each step.
+  with P10's AC-7. RN-3 `NoiseSource` with its first consumer. RN-6, the contract in DESIGN,
+  goes with each step.
   Also: the evaluator's `simulator` backend fails on a diagram plant with a nested-diagram
   error (randomness.md §1).
 - [ ] **AC-7 of P10: the cost scored on the plant** across every evaluator and design tool

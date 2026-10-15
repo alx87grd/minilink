@@ -2,9 +2,9 @@
 
 Status: **mostly landed.** P1, GRO-F1, GRO-F2, GRO-F4 (2026-09-07); P2, P3, P7 and TB-a (2026-09-26);
 P5, P8 and P9 (2026-10-10); P4 (2026-10-14). Open: P10 (now automation-by-convention), TB-b,
-S61, P11; P6 (z tier) stays held. The order is in [TODO.md](TODO.md)
+S61; P6 (z tier) stays held; P11 dropped (2026-10-15). The order is in [TODO.md](TODO.md)
 §2.
-Rung: v0.2 wave B, steps P2–P11 of [TODO.md](TODO.md); P6's row sits in its v0.9 section.
+Rung: v0.2 wave B, steps P2–P10 of [TODO.md](TODO.md); P6's row sits in its v0.9 section.
 Lane: teaching surface (`analysis/`, `control/`, `estimation/`, `blocks/`).
 Milestone: v0.2, [ROADMAP §4.2](../../ROADMAP.md#42-v02--gro501-end-to-end).
 Baseline audit: [../reviews/2026-09-07-gro501-coverage.md](../reviews/2026-09-07-gro501-coverage.md).
@@ -31,7 +31,7 @@ additive or replaces boilerplate with generated equivalents.
 | **P8** Small teaching helpers (ζ/ω_n, `N`) | GRO-G6 | 2 | landed 2026-10-10 (`N` only) |
 | **P9** `TransferFunction` port construction | GRO-C3 | 3 | landed 2026-10-10 |
 | **P10** Document what `@` means | GRO-C1 | 3 | widened 2026-10-10 into [automation-by-convention.md](automation-by-convention.md) |
-| **P11** Two GRO501 notebooks | gate 2 | 3 | maintainer reviews |
+| **P11** Two GRO501 notebooks | — | 3 | **dropped** 2026-10-15: the students write the APP work themselves |
 
 Wave 1 is the correctness wave and should land before any GRO501 material is
 written: until it is in, the tools disagree with the course's own exercises.
@@ -359,22 +359,13 @@ three `@` paths, a test pinning the `e`-input autowire, a smaller `PROFILE_PORTS
 superseded: the profiles go, and the history is in
 [the decision record](../reviews/2026-10-11-automation-by-convention.md).
 
-### P11. Two classical control notebooks (course-agnostic)
+### P11. Two classical control notebooks — dropped (2026-10-15)
 
-`examples/teaching/topics/classical_control/dc_motor_propulsion.ipynb` (multi-physics DC
-motor + longitudinal dynamics → linearize → `H(s)` → root locus → PID to the
-Table 2 specs → discrete implementation → nonlinear check with disturbance and
-noise) and `examples/teaching/topics/classical_control/bicycle_autopilot.ipynb` (bicycle model → controllability
-across speeds → LQR on the guide's cost → nested loops → pole placement →
-Kalman observer). Basic tier only, Colab-first, no JAX.
-
-The existing `frequency_response.ipynb` stays as the tool tour; these two
-are the course path. Maintainer owns student-facing material, so these are
-drafted for review, not merged by the agent.
-
-**Done when.** Both run top to bottom in Colab and in the conda env, import
-only through the teaching surface, and the numbers agree with the guide's
-worked exercises.
+Dropped by the maintainer: the APP2 propulsion loops and the APP4 bicycle autopilot are the
+students' own work, so the repository ships no notebook for either
+([the record](../reviews/2026-10-15-gro501-app-notebooks-dropped.md)). The tools they use
+are the topic rows of ROADMAP §4.2, each with its demo or topic notebook;
+`frequency_response.ipynb` stays the tool tour.
 
 ---
 
@@ -385,16 +376,16 @@ Wave 1   P1 ─┬─ P2                 correctness; blocks all GRO501 material
              └─ P3 ──┐
 Wave 2   P7          ├─ P4 ── P5   the missing surface
                      └─ P8
-Wave 3   P6? ── P9 ── P10 ── P11   polish, then the notebooks
+Wave 3   P6? ── P9 ── P10          polish
 ```
 
 P3 gates P4 (the Luenberger factory places poles on the dual pair). P1 and P2
-gate P11 (until then the notebooks would teach wrong pole counts); both are
+gated all GRO501 material (until then the tools taught wrong pole counts); both are
 in (P2 on 2026-09-26). P7 is independent and worth doing before P2
-and P5 add three more facade methods each by hand. With P6 held, the next
-steps are, in order: P10's composition steps with S61 and S62, then **TB-b** (the
-control objects and the loop), then **P4**, then **P11** ([TODO.md](TODO.md) §2 holds the
-order; TB-a, P7, P5, P8, P9 and RN-1 have landed).
+and P5 add three more facade methods each by hand. With P6 held and P11 dropped, what
+remains is S61 and S62, then **TB-b** (the control objects and the loop)
+([TODO.md](TODO.md) §2 holds the order; TB-a, P7, P5, P8, P9, RN-1, P4 and P10's
+composition steps have landed).
 
 ## 3. What this plan does not do
 

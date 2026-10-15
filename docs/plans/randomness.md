@@ -9,8 +9,8 @@ Ids: `RD-` marks this doc's own, the rules RD-R1–RD-R6 (§3), the rulings RD-D
 the review's amendments RD-A1–RD-A10 (§10); `FD-F9` is finding F9 of the foundations review;
 a bare `A5`, `P4`, `RN-2` is a workboard step.
 Rungs (decided 2026-09-26): RN-1 (`WhiteNoise`) in v0.2 wave B, the prerequisite of B3
-(`estimation/`, P4); RN-2 in v0.2 wave A, with A5; RN-3 with its first consumer (P11 if a GRO501
-notebook shows sampled sensor noise, else v0.3); RN-4 and RN-5 together in v0.3, after the fall
+(`estimation/`, P4); RN-2 in v0.2 wave A, with A5; RN-3 with its first consumer (v0.3,
+unless a teaching notebook needs sampled sensor noise first); RN-4 and RN-5 together in v0.3, after the fall
 term, because they change public behaviour and the Monte Carlo numbers once, and before the v0.9
 freeze; RN-6 with each step. It settles the disturbance convention ROADMAP §6
 held open before B3, closes finding FD-F9 of

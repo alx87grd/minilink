@@ -176,7 +176,8 @@ Step-level work:
 **Cross-cutting gates**
 
 1. Every topic row above is green, with a demo or a notebook.
-2. One `examples/teaching/` notebook per APP, Colab-first, Basic tier
+2. No APP notebook in the repository: the students write the APP work themselves (ruled
+   2026-10-15). The demos and notebooks of gate 1 run Colab-first on the Basic tier
    (NumPy + SciPy + Matplotlib) — no JAX on the GRO501 path.
 3. Every tool agrees with the hand calculation for the guide's §9 exercises;
    the closed-loop analysis exercises (§9.6, §9.7) are the acceptance test.
@@ -250,8 +251,6 @@ TB-a, P7, P5, P8, P9.
   facade. **[ask — public names]**
 - **P6** The z tier stays held (teach with `discretize` + simulation) unless the sommatif
   examines z-plane analysis.
-- **P11** The two GRO501 notebooks (APP2 propulsion, APP4 autopilot), Basic tier,
-  Colab-first. **[maintainer]**
 
 **Wave D — the code reads like the textbook, and the demos like the API.** Standing work,
 behaviour-preserving, one module per step.

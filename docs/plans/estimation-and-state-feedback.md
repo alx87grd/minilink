@@ -327,7 +327,7 @@ C2. **Docs**: TODO P4 row leaves; new rows: `LQGPlanner` (v0.3, with RN-4), the 
     automation plan §10 note stays for the EKF review. The GRO501 from-scratch notebooks
     (`numpy_state_space.ipynb`, `cartpole_dynamic_controller.ipynb`) stay as they are, by
     ruling: their hand-written Riccati solve and `LQG_Controller` are the lesson; the
-    library's own evidence is the demos of C1 (P11 decides what the APP notebooks show).
+    library's own evidence is the demos of C1.
 
 **Not in this plan**: `closed_loop(observer=)` (AC-4, landed 2026-10-14); `trajectory_kalman`, the EKF, UKF,
 particle and discrete filters; `EstimationProblem` and the estimator tools; `LQGPlanner`;

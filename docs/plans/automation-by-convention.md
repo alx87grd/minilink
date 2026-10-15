@@ -497,7 +497,7 @@ AC-2a comes before AC-OP because `feedback`'s entry rule uses `command_port`. Th
 (AC-2b, AC-2c) is one sweep after AC-3, so the composition module is rewritten once rather
 than renamed and then rewritten. P4's block needs none of these steps: it starts now and is
 wired by hand until AC-4. The mechanical plant's `q` / `dq` removal, `rename_ports` and
-`port=`, the MPC rename and AC-8a are off the GRO501 path and may trail P11.
+`port=`, the MPC rename and AC-8a are off the GRO501 path and may trail v0.2.
 
 **Done when:**
 - `controller @ plant`, the same loop wired by hand with the role names, and `closed_loop`
