@@ -27,6 +27,8 @@ git status -sb
   own.
 - Fetch again before every commit and every push; if the remote moved, say so first.
 - Never force-push a shared branch.
+- Never delete the `main`, `dev` or `dev-alex` branches, even when one is fully merged:
+  they are the maintainer's long-lived branches.
 
 The SessionStart hook in `.claude/settings.json` runs the fetch and prints a warning when
 the branch is behind its upstream; act on it.
