@@ -134,13 +134,20 @@ def f(self, x, u, t=0, params=None):
   `clipped` are module-level functions of `siso.py`, arrays in, arrays out, called from
   each member's `f` and `ctl`; no member inherits them from another member.
 
+- **CC-R5 The family is decoupled; a coupled gain is a `Gain` in the loop.** Every member
+  runs `dof` independent loops with per-axis gains, because the integrator hold pairs each
+  command with its own error and the filter is per axis; a coupled MIMO PID needs another
+  anti-windup (back-calculation) and no course asks for it. A coupled static output feedback
+  `u = K e` is `Gain(K) @ plant` (the loop builder inserts the Error block; same trajectory
+  as today's matrix `ProportionalController`), and a coupled law on the state is
+  `StateFeedbackController(K)`. `P` takes no matrix: a length-2 vector would be two axes or
+  a `1×2` row.
 ## 4. Steps
 
 - **CC-1 (S62) `P` joins the family.** `P(Kp, *, dof, ports="error", u_min, u_max)` in
   `siso.py`, zero states, display name "P"; `ProportionalController` and `control/output.py`
   leave with no alias; the seven example call sites and the root prelude migrate in the same
-  commit; the two matrix-gain tests move to `Gain` + `closed_loop` or to
-  `StateFeedbackController`. **[ask — public name]**
+  commit; the two matrix-gain tests move to `Gain(K) @ plant` (CC-R5). **[ask — public name]**
 - **CC-2 The three functions.** `held_integral`, `filtered_rate`, `clipped` extracted from
   `PID`'s methods, behaviour-preserving (seeded baseline, byte-identical); `PI`, `PD`, `PID`
   call them. `as_dof_vector` moves to `siso.py`.
@@ -176,5 +183,5 @@ byte-identical before and after CC-2; the family demo runs on the Basic tier.
    (the GMC714 vocabulary, 25 examples), or rename into the family's grammar (`PDRate`,
    `PIDRate`). Proposed: keep.
 3. `tracking_ref` stays the rate-measured pair's second port layout. Proposed: keep.
-4. Whether the matrix-gain form of today's `ProportionalController` needs a home beyond
-   `Gain` + `closed_loop`. Proposed: no.
+4. Closed 2026-10-15 by CC-R5: the matrix-gain form of today's `ProportionalController` is
+   `Gain(K) @ plant`, verified to give the same trajectory.
