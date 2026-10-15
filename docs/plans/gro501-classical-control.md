@@ -1,8 +1,8 @@
 # GRO501 classical-control stack — fix plan (draft, 2026-09-07)
 
 Status: **mostly landed.** P1, GRO-F1, GRO-F2, GRO-F4 (2026-09-07); P2, P3, P7 and TB-a (2026-09-26);
-P5, P8 and P9 (2026-10-10); P4 (2026-10-14). Open: P10 (now automation-by-convention), TB-b,
-S61; P6 (z tier) stays held; P11 dropped (2026-10-15). The order is in [TODO.md](TODO.md)
+P5, P8 and P9 (2026-10-10); P4 (2026-10-14); S61 (2026-10-15). Open: P10 (now
+automation-by-convention), TB-b; P6 (z tier) stays held; P11 dropped (2026-10-15). The order is in [TODO.md](TODO.md)
 §2.
 Rung: v0.2 wave B, steps P2–P10 of [TODO.md](TODO.md); P6's row sits in its v0.9 section.
 Lane: teaching surface (`analysis/`, `control/`, `estimation/`, `blocks/`).
@@ -383,7 +383,7 @@ P3 gates P4 (the Luenberger factory places poles on the dual pair). P1 and P2
 gated all GRO501 material (until then the tools taught wrong pole counts); both are
 in (P2 on 2026-09-26). P7 is independent and worth doing before P2
 and P5 add three more facade methods each by hand. With P6 held and P11 dropped, what
-remains is S61 and S62, then **TB-b** (the control objects and the loop)
+remains is S62, then **TB-b** (the control objects and the loop)
 ([TODO.md](TODO.md) §2 holds the order; TB-a, P7, P5, P8, P9, RN-1, P4 and P10's
 composition steps have landed).
 

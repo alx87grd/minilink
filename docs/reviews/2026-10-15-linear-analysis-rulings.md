@@ -9,7 +9,7 @@ step response, which has a nonlinear meaning, an exception. The review found the
 pattern of `lqr` / `lqr_gain` and `kalman` / `kalman_gain` already governing the analysis
 band (arrays in, arrays out in `analysis/linear.py`; any `System` in, linearized once at the
 boundary, in the band verbs), with five departures. This file records the rulings, one
-entry each, and where each lands. Code lands with S61.
+entry each, and where each lands. The code landed with S61 the same day.
 
 ---
 
@@ -50,10 +50,13 @@ entry each, and where each lands. Code lands with S61.
   the family-signature test's deviation ledger (two entries fewer), DESIGN §3.
 - **R4 A point given with a linear model is refused by every verb.** `design_model`
   already refuses `x_bar` / `u_bar` on an `LTISystem`, which carries its point (R2 of
-  2026-10-14); the analysis verbs accepted one silently, with no effect. The check moves to
-  the band's one boundary, `operating_point` in `analysis/derivatives.py`, so `jacobian`,
-  `linearize`, every channel verb and every design verb give the same error. Lives in:
-  `analysis/derivatives.py`, `analysis/linearization.py` (the check leaves `design_model`).
+  2026-10-14); the analysis verbs accepted one silently, with no effect. One check,
+  `require_own_point` in `analysis/linearization.py`, now serves every verb that reads *the
+  linear model* of a system: `linearize`, the channel verbs, `modal_analysis` and the
+  designs give the same error. `jacobian` alone evaluates where it is told, since
+  `trajectory_lqr` and `region_of_attraction` read it along a trajectory or at the
+  equilibrium they find. The size of `x_bar` / `u_bar` is checked by name in
+  `operating_point`. Landed 2026-10-15.
 - **R5 The default channel is the command port.** `siso_channel` defaults `wrt` to
   component 0 of `command_port(sys)`, the rule `design_model` and R17 already read (`u`,
   else the one input that is not `d` or `n`), not the first declared input port. The default

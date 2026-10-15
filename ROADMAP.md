@@ -80,7 +80,7 @@ State as of 2026-10-12. Step ids (`S29`, `P4`, `T2`, …) are the rows of
 | Simulation | teaching | 7 | Mature; fixed 10 001-point default grid; `verbose` names unified. | Textbook pass (T4). |
 | Dynamics (abstraction + catalog) | teaching | 7 | Plants QA'd; `MechanicalSystem` / `Manipulator`; UR5 ABA/RNEA; **every catalog plant compiles on both backends** (contract test); four-rung vehicle ladder; UdeS racecar (kinematic, dynamic, 3-D). | Textbook pass (T3); catalog hygiene (S64); mechanical-base unification (S32, after v1.0). |
 | Control | teaching | 6 | Linear, LQR (infinite horizon, finite horizon, along a trajectory), pole placement, reference scaling (`N`), `P` / `PI` / `PD` / `PID` carrying only the states their terms need, model-based SMC and computed torque, robotic impedance and kinematic laws, neural policy block; a controller is a plain `System`. | P10's resolver and composition steps; textbook pass (TB-b, T2). |
-| Analysis | teaching | 6 | Jacobians, linearize, structural, equilibria, modal; one-channel Bode with margins, pole-zero, root locus, Nyquist, step response on matplotlib and plotly; the sensitivity functions `S` / `T` / `PS` / `CS`. | Every verb takes a `System` (S61); z tier held (P6); Nichols and overlays later; textbook pass (T4). |
+| Analysis | teaching | 6 | Jacobians, linearize, structural, equilibria, modal; one-channel Bode with grid-free margins, pole-zero, root locus, Nyquist, the linear step response on matplotlib and plotly; the sensitivity functions `S` / `T` / `PS` / `CS`. Every verb takes any `System`, the linear model as is, the rest linearized at the operating point (2026-10-15). | z tier held (P6); Nichols and overlays later; textbook pass (T4). |
 | Blocks | teaching | 5 | Routing, nonlinear, filters, sources (with `Sine`), TF, 1-layer NN. | `Ramp` / `Chirp` / `Delay` / `Switch` (C3, v0.3); textbook pass (T2). |
 | Planning / policy synthesis (DP) | teaching (GRO860) | 6 | Grid + value iteration (`loop` / `numpy` / `jax`), lookup controller, `PolicyEvaluator`, `LQRPlanner`; every planner returns a `PlanningSolution`; `compare()` reads solutions side by side; `dp.py` is the textbook reference of the style. | cost-to-go as a `Field` (A1); policy iteration (S51). |
 | Planning / trajopt | teaching (GRO860) | 5 | Collocation, shooting, multiple shooting; live plot; `success` means defects satisfied to `feasibility_tol`; float64 by default on JAX. | Harden SciPy/Ipopt before TRL 6; textbook pass (T5). |
@@ -247,8 +247,8 @@ TB-a, P7, P5, P8, P9.
   the control band reshaped with it: `control/design.py`, the model-taking verbs, the
   nominal state as the operating point). `closed_loop(observer=)` followed with AC-4
   (2026-10-14).
-- **S61** Every analysis verb takes a `System`. **S62** The LQR family on the control band
-  facade. **[ask — public names]**
+- **S62** The LQR family on the control band facade. **[ask — public names]** S61 (every
+  analysis verb takes a `System`) landed 2026-10-15.
 - **P6** The z tier stays held (teach with `discretize` + simulation) unless the sommatif
   examines z-plane analysis.
 
