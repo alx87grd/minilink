@@ -7,7 +7,8 @@ from collections.abc import Callable
 
 import numpy as np
 
-from minilink.control.impedance import ImpedanceController, as_dof_vector
+from minilink.control.impedance import ImpedanceController
+from minilink.control.siso import as_dof_vector
 from minilink.core.backends import array_module
 from minilink.core.system import System
 from minilink.dynamics.abstraction.manipulator import Manipulator

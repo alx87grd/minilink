@@ -2,6 +2,7 @@
 
 import numpy as np
 
+from minilink.control.siso import as_dof_vector
 from minilink.core.system import DynamicSystem, System
 
 
@@ -232,18 +233,3 @@ class ImpedanceIntegralController(DynamicSystem):
             u_cmd = Kp * e_pos + Ki * e_int + Kd * (vel_d - rate)
 
         return u_cmd
-
-
-# Internal machinery
-
-
-def as_dof_vector(value, dof: int):
-    """A scalar broadcast to ``dof`` axes, or a length-``dof`` vector as given."""
-    arr = np.asarray(value, dtype=float).reshape(-1)
-    if arr.size == 1:
-        return np.full(dof, float(arr[0]))
-    if arr.size != dof:
-        raise ValueError(
-            f"expected scalar or length-{dof} vector, got shape {arr.shape}"
-        )
-    return arr

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import numpy as np
 
-from minilink.control.impedance import as_dof_vector
+from minilink.control.siso import as_dof_vector
 from minilink.core.backends import array_module
 from minilink.core.system import System
 from minilink.dynamics.abstraction.mechanical import MechanicalSystem

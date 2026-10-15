@@ -2,7 +2,6 @@
 
 import numpy as np
 
-from minilink.control.impedance import as_dof_vector
 from minilink.core.backends import array_module
 from minilink.core.feedback import ErrorDriven
 from minilink.core.system import DynamicSystem, System
@@ -60,12 +59,11 @@ class P(ErrorDriven, System):
         params = self.params if params is None else params
         xp = array_module(u)
         Kp = xp.asarray(params["Kp"])
-        u_min, u_max = xp.asarray(params["u_min"]), xp.asarray(params["u_max"])
         e = self.error(u)
 
         # u = Kp e, then the actuator limits
         u_cmd = Kp * e
-        u = xp.clip(u_cmd, u_min, u_max)
+        u = clipped(u_cmd, params, xp)
 
         return u
 
@@ -176,14 +174,16 @@ class PID(ErrorDriven, DynamicSystem):
         e = self.error(u)
         e_int, m_filt = x[:n_int], x[n_int:]
 
-        # The filtered-derivative rate and the unsaturated command it feeds
-        dm_filt = self.filter_rate(u, m_filt, params, xp)
-        u_unsat = self.command(e, e_int, dm_filt, params, xp)
+        # ṁ_filt from the filter, and the unsaturated command it feeds
+        dm_filt = None
+        if has_filter:
+            dm_filt = filtered_rate(self.derivative_signal(u), m_filt, params, xp)
+        u_cmd = self.command(e, e_int, dm_filt, params, xp)
 
         # dx = [ė_int; ṁ_filt], each term only when the block carries that state
         rates = []
         if has_integrator:
-            rates.append(self.integrator_rate(e, e_int, u_unsat, params, xp))
+            rates.append(held_integral(e, e_int, u_cmd, params, xp))
         if has_filter:
             rates.append(dm_filt)
         dx = xp.concatenate(rates) if rates else xp.zeros(0)
@@ -193,31 +193,18 @@ class PID(ErrorDriven, DynamicSystem):
     def ctl(self, x, u, t=0, params=None):
         params = self.params if params is None else params
         xp = array_module(x)
-        u_min, u_max = xp.asarray(params["u_min"]), xp.asarray(params["u_max"])
         n_int = self.n_int
         e = self.error(u)
         e_int, m_filt = x[:n_int], x[n_int:]
-        dm_filt = self.filter_rate(u, m_filt, params, xp)
+        dm_filt = None
+        if self.has_filter:
+            dm_filt = filtered_rate(self.derivative_signal(u), m_filt, params, xp)
 
         # u = Kp e + Ki e_int − Kd ṁ_filt, then the actuator limits
         u_cmd = self.command(e, e_int, dm_filt, params, xp)
-        u = xp.clip(u_cmd, u_min, u_max)
+        u = clipped(u_cmd, params, xp)
 
         return u
-
-    # Internal machinery: the law, one term per carried state
-
-    def filter_rate(self, u, m_filt, params, xp):
-        """Rate of the filtered derivative state, or ``None`` without a filter."""
-        if not self.has_filter:
-            return None
-        m = self.derivative_signal(u)
-        tau = xp.asarray(params["tau"])
-
-        # first-order filter on the measured signal: tau ṁ_filt = m − m_filt
-        dm_filt = (m - m_filt) / tau
-
-        return dm_filt
 
     def command(self, e, e_int, dm_filt, params, xp):
         """The unsaturated command, dropping the terms the block does not carry."""
@@ -234,28 +221,6 @@ class PID(ErrorDriven, DynamicSystem):
             u_cmd = u_cmd - Kd * dm_filt
 
         return u_cmd
-
-    def integrator_rate(self, e, e_int, u_unsat, params, xp):
-        """Rate of the integral state: the error, held at zero while saturated."""
-        u_min = xp.asarray(params["u_min"])
-        u_max = xp.asarray(params["u_max"])
-        e_int_min = xp.asarray(params["e_int_min"])
-        e_int_max = xp.asarray(params["e_int_max"])
-
-        # anti-windup: the integrator stops while the command is saturated
-        stop_hi = xp.logical_and(u_unsat >= u_max, e > 0.0)
-        stop_lo = xp.logical_and(u_unsat <= u_min, e < 0.0)
-        stop_sat = xp.logical_or(stop_hi, stop_lo)
-
-        # and while the integral state itself sits on one of its end stops
-        stop_int_hi = xp.logical_and(e_int >= e_int_max, e > 0.0)
-        stop_int_lo = xp.logical_and(e_int <= e_int_min, e < 0.0)
-        stop_int = xp.logical_or(stop_int_hi, stop_int_lo)
-
-        # ė_int = e, except when held
-        de_int = xp.where(xp.logical_or(stop_sat, stop_int), 0.0, e)
-
-        return de_int
 
 
 class PI(PID):
@@ -325,3 +290,61 @@ class PD(PID):
             u_min=u_min,
             u_max=u_max,
         )
+
+
+# =============================================================================
+# Internal machinery: the pieces every member of the family shares
+# =============================================================================
+
+
+def filtered_rate(m, m_filt, params, xp):
+    """``tau ṁ_filt = m − m_filt``: the first-order filter whose state approximates ``ṁ``."""
+    tau = xp.asarray(params["tau"])
+
+    dm_filt = (m - m_filt) / tau
+
+    return dm_filt
+
+
+def held_integral(e, e_int, u_cmd, params, xp):
+    """``ė_int = e``, held at zero on an axis whose command or integral state sits on a limit."""
+    u_min = xp.asarray(params["u_min"])
+    u_max = xp.asarray(params["u_max"])
+    e_int_min = xp.asarray(params["e_int_min"])
+    e_int_max = xp.asarray(params["e_int_max"])
+
+    # anti-windup: the integrator stops while the command is saturated
+    stop_hi = xp.logical_and(u_cmd >= u_max, e > 0.0)
+    stop_lo = xp.logical_and(u_cmd <= u_min, e < 0.0)
+    stop_sat = xp.logical_or(stop_hi, stop_lo)
+
+    # and while the integral state itself sits on one of its end stops
+    stop_int_hi = xp.logical_and(e_int >= e_int_max, e > 0.0)
+    stop_int_lo = xp.logical_and(e_int <= e_int_min, e < 0.0)
+    stop_int = xp.logical_or(stop_int_hi, stop_int_lo)
+
+    # ė_int = e, except when held
+    de_int = xp.where(xp.logical_or(stop_sat, stop_int), 0.0, e)
+
+    return de_int
+
+
+def clipped(u_cmd, params, xp):
+    """The command inside the actuator limits ``u_min ≤ u ≤ u_max``."""
+    u_min, u_max = xp.asarray(params["u_min"]), xp.asarray(params["u_max"])
+
+    u = xp.clip(u_cmd, u_min, u_max)
+
+    return u
+
+
+def as_dof_vector(value, dof: int):
+    """A scalar broadcast to ``dof`` axes, or a length-``dof`` vector as given."""
+    arr = np.asarray(value, dtype=float).reshape(-1)
+    if arr.size == 1:
+        return np.full(dof, float(arr[0]))
+    if arr.size != dof:
+        raise ValueError(
+            f"expected scalar or length-{dof} vector, got shape {arr.shape}"
+        )
+    return arr
