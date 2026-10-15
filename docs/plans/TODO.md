@@ -63,7 +63,7 @@ Design: [naming.md](naming.md). Runs in parallel with wave B.
 Plan: [gro501-classical-control.md](gro501-classical-control.md). Release contract:
 [ROADMAP §4.2](../../ROADMAP.md#42-v02--gro501-end-to-end).
 
-**Order:** S62 then S73 before TB-b (S61 landed 2026-10-15); P10's AC-0, AC-2a, AC-OP, AC-3,
+**Order:** TB-b next (S61, S62 and S73 landed 2026-10-15); P10's AC-0, AC-2a, AC-OP, AC-3,
 AC-2b/c and AC-4 have landed, P4 with them; TB-b (its loop part after AC-3). P11, the two
 GRO501 notebooks, was dropped on 2026-10-15: the students write the APP work themselves. P6
 stays held for GRO501; its row is in §5 (v0.9).
@@ -85,19 +85,9 @@ stays held for GRO501; its row is in §5 (v0.9).
   Related rows: TB-b's loop part and T6's composition half follow AC-3; S66 lands after
   AC-4; RN-4 and RN-5 build on AC-2, AC-4 and AC-7; S70 turns P10's refusals into
   `WiringError`; S31 brings AC-8b. The automatic `dt` and input-hold findings stay with S65.
-- [ ] **S62, the rest** **[ask — public names]** (scan: control#0): `P` joins the siso family,
-  step CC-1 of [classical-control-family.md](classical-control-family.md). The LQR family
-  joined the control band facade on 2026-10-14 (`control/design.py`).
-  Later, not v0.2: `sensitivity(T)` reading the roles of one loop diagram instead of
-  `plant=, controller=` ([the 2026-10-15 record](../reviews/2026-10-15-linear-analysis-rulings.md),
+- Later, not v0.2: `sensitivity(T)` reading the roles of one loop diagram instead of
+  `plant=, controller=` ([the 2026-10-15 analysis record](../reviews/2026-10-15-linear-analysis-rulings.md),
   last note).
-- [ ] **S73 One classical family** **[ask — names]**, steps CC-2 to CC-5 of
-  [classical-control-family.md](classical-control-family.md): the integrator hold, the
-  filtered-derivative rate and the clip as three pure functions in `control/siso.py`, shared
-  by `PI` / `PD` / `PID` and by the rate-measured `ImpedanceController` /
-  `ImpedanceIntegralController`, which join the family's grammar and limits; `as_dof_vector`
-  moves with them; a family demo on the pendulum. Behaviour-preserving (seeded baseline).
-  Done when the plan's §5 holds. Before TB-b.
 - [ ] **TB-b The control objects and the loop read like the textbook.** The audit, review
   and pass of TB-a on `control/siso.py` (P / PI / PD / PID / Lead / Lag), `control/state.py`,
   `control/design.py`, `blocks/transfer_function.py`,

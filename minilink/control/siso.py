@@ -1,4 +1,10 @@
-"""Decoupled classical compensators ``P``, ``PI``, ``PD``, ``PID``, compensator or controller form."""
+"""Decoupled classical compensators ``P``, ``PI``, ``PD``, ``PID``, compensator or controller form.
+
+One measurement per axis, so the derivative is filtered (a pole at ``-1/tau``); the
+rate-measured members of the same family are in :mod:`minilink.control.impedance`. The
+limits are parameters with infinite defaults, and the pieces every member shares (the
+integrator hold, the filtered rate, the clip) are the functions at the end of this module.
+"""
 
 import numpy as np
 
@@ -263,7 +269,11 @@ class PD(PID):
     :class:`PID` without the integrator, so a PD loop carries only the
     derivative-filter pole at ``-1/tau`` per axis and no pole at the origin.
     Without integral action the loop keeps a static error; that is the point
-    of the comparison. For the proportional law alone use :class:`P`.
+    of the comparison. An unfiltered ``Kp + Kd s`` is improper and has no
+    block: filter the derivative (this block, or its frequency-domain twin
+    :class:`~minilink.blocks.transfer_function.Lead`) or measure the rate
+    (:class:`~minilink.control.impedance.ImpedanceController`). For the
+    proportional law alone use :class:`P`.
     """
 
     has_integrator = False

@@ -2,8 +2,13 @@
 
 Teaching imports::
 
-    from minilink.control import ImpedanceController, lqr, place
+    from minilink.control import PID, ImpedanceController, lqr, place
     from minilink.control.mpc import ModelPredictiveController
+
+The classical family is ``P``, ``PI``, ``PD``, ``PID`` (one measurement per axis, the
+derivative filtered) and ``ImpedanceController``, ``ImpedanceIntegralController`` (a
+measured ``[q; dq]``, the rate read), six blocks in one grammar: per-axis gains, ``dof``
+independent loops, actuator limits that are infinite by default.
 
 The design verbs (``lqr``, ``place``, ``lqg``, ``lqr_finite_horizon``,
 ``trajectory_lqr``) take a linear model or a plant; their gains (``lqr_gain``,
