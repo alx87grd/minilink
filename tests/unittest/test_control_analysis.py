@@ -1531,7 +1531,7 @@ class TestCompensatorStateLayout(unittest.TestCase):
         self.plant.x0 = np.zeros(2)
 
     def test_state_dimensions(self):
-        self.assertEqual(P(2.0, ports="error").n, 0)
+        self.assertEqual(P(2.0).n, 0)
         self.assertEqual(PI(Kp=2.0, Ki=1.0).n, 1)
         self.assertEqual(PD(Kp=2.0, Kd=1.0).n, 1)
         self.assertEqual(PID(Kp=2.0, Ki=1.0, Kd=1.0).n, 2)
@@ -1541,7 +1541,7 @@ class TestCompensatorStateLayout(unittest.TestCase):
     def test_loop_gain_pole_and_zero_counts(self):
         plant_poles = 2
         for controller, extra_poles, n_zeros in (
-            (P(20.0, ports="error"), 0, 0),
+            (P(20.0), 0, 0),
             (PI(Kp=20.0, Ki=10.0), 1, 1),
             (PD(Kp=20.0, Kd=2.0, tau=0.05), 1, 1),
             (PID(Kp=20.0, Ki=10.0, Kd=2.0, tau=0.05), 2, 2),

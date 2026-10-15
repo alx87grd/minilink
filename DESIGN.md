@@ -584,8 +584,7 @@ measured decides the derivative (one measurement per axis, the filtered derivati
 `PD` / `PID`, a pole at `−1/tau`; a measured `[q; dq]`, the rate as read by the impedance
 pair), the limits are parameters with infinite defaults, and the integrator hold, the
 filtered rate and the clip are the three functions of `control/siso.py` every member
-calls. Classical laws are
-written once on the tracking error and take a port-layout switch:
+calls. They are written once on the tracking error and take a port-layout switch:
 `ports="error"` declares one input `e` and command `u` (the compensator
 form, `P`, `PI`, `PD`, `PID`, `Lead`, `Lag`, `TransferFunction(ports="error")`),
 `ports="reference"` declares `r` and `y` (the controller form the generic

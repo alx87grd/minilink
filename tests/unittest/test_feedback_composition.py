@@ -309,7 +309,7 @@ class TestPortLayouts(unittest.TestCase):
             reference.f(np.array([0.0]), np.array([1.0, 0.25])), [0.75]
         )
         np.testing.assert_allclose(
-            _poles(P(3.0, ports="error") @ plant),
+            _poles(P(3.0) @ plant),
             _poles(P(3.0, ports="reference") @ plant),
             atol=1e-9,
         )
@@ -533,7 +533,7 @@ class TestDispatchTable(unittest.TestCase):
             ),
             (
                 "Proportional error",
-                P(ports="error") @ SingleMass(),
+                P() @ SingleMass(),
                 ["controller", "plant", "error"],
                 junction,
             ),
