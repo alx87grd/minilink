@@ -15,6 +15,7 @@ import numpy as np
 
 from minilink.analysis import linear
 from minilink.analysis.linearization import channel_subtitle, siso_matrices
+from minilink.dynamics.abstraction.state_space import LTISystem
 from minilink.graphical.common import PlotResult
 from minilink.graphical.control import (
     ControlFigure,
@@ -188,15 +189,6 @@ def first_sample_after(time, outside):
     return float(time[0])
 
 
-def step_title(sys):
-    """ "Linear Step Response" for a linear model, "Linearized Step Response" otherwise."""
-    from minilink.dynamics.abstraction.state_space import LTISystem
-
-    if isinstance(sys, LTISystem):
-        return style.LINEAR_STEP_TITLE
-    return style.LINEARIZED_STEP_TITLE
-
-
 def step_figure(time, y, info, sys, of, wrt):
     lines = () if np.isnan(info.steady_state) else (RefLine("y", info.steady_state),)
     note = "\n".join(
@@ -209,8 +201,9 @@ def step_figure(time, y, info, sys, of, wrt):
         if np.isfinite(value)
     )
     span = float(np.ptp(y)) or 1.0
+    linear_model = isinstance(sys, LTISystem)
     return ControlFigure(
-        title=step_title(sys),
+        title=style.LINEAR_STEP_TITLE if linear_model else style.LINEARIZED_STEP_TITLE,
         subtitle=channel_subtitle(sys, of, wrt),
         panels=(
             Panel(

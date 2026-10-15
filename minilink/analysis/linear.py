@@ -382,10 +382,13 @@ def gain_crossovers(w, magnitude_db, phase_deg, response=None):
         w_k = interpolate_crossing(w[k : k + 2], magnitude_db[k : k + 2], 0.0)
         phase_k = np.interp(w_k, w[k : k + 2], phase_deg[k : k + 2])
         if response is not None:
+            # |L(jω_gc)| = 1 solved on the bracket; the phase read on the exact L, unwrapped to the grid
             w_k = solve_crossing(
-                lambda ww: magnitude_db_at(response, ww), w[k], w[k + 1], w_k
+                lambda ww: 20.0 * np.log10(np.abs(response(ww))), w[k], w[k + 1], w_k
             )
-            phase_k = unwrap_to(phase_deg_at(response, w_k), phase_deg[k])
+            phase_k = phase_deg[k] + wrap_degrees(
+                np.degrees(np.angle(response(w_k))) - phase_deg[k]
+            )
         w_c.append(w_k)
         phase_c.append(phase_k)
     return np.array(w_c, dtype=float), np.array(phase_c, dtype=float)
@@ -402,13 +405,16 @@ def phase_crossovers(w, magnitude_db, phase_deg, response=None):
             w_k = interpolate_crossing(w[k : k + 2], phase_deg[k : k + 2], target)
             magnitude_k = np.interp(w_k, w[k : k + 2], magnitude_db[k : k + 2])
             if response is not None:
+                # ∠L(jω_pc) = −180° solved on the bracket; the magnitude read on the exact L
                 w_k = solve_crossing(
-                    lambda ww: wrap_degrees(phase_deg_at(response, ww) - target),
+                    lambda ww: wrap_degrees(
+                        np.degrees(np.angle(response(ww))) - target
+                    ),
                     w[k],
                     w[k + 1],
                     w_k,
                 )
-                magnitude_k = magnitude_db_at(response, w_k)
+                magnitude_k = 20.0 * np.log10(np.abs(response(w_k)))
             w_c.append(w_k)
             magnitude_c.append(magnitude_k)
     return np.array(w_c, dtype=float), np.array(magnitude_c, dtype=float)
@@ -426,25 +432,9 @@ def solve_crossing(residual, w0, w1, w_guess):
     return float(brentq(residual, w0, w1, xtol=1e-12, rtol=1e-12))
 
 
-def magnitude_db_at(response, w):
-    """``20 log10 |L(jw)|`` from the exact response."""
-    with np.errstate(divide="ignore"):
-        return float(20.0 * np.log10(np.abs(response(w))))
-
-
-def phase_deg_at(response, w):
-    """``arg L(jw)`` in degrees, in ``(-180, 180]``, from the exact response."""
-    return float(np.degrees(np.angle(response(w))))
-
-
 def wrap_degrees(angle):
     """``angle`` folded into ``[-180, 180)``."""
     return (angle + 180.0) % 360.0 - 180.0
-
-
-def unwrap_to(angle, reference):
-    """``angle`` shifted by a multiple of 360 deg to sit within 180 deg of ``reference``."""
-    return reference + wrap_degrees(angle - reference)
 
 
 def smallest_margin(margins, frequencies):

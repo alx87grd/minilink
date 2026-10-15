@@ -95,7 +95,8 @@ def controllability(
     ctrb = controllability_matrix(A, B)
 
     # Controllable ⇔ rank 𝒞 = n, counting the singular values σᵢ > tol σ₁
-    r = rank(ctrb, tol)
+    sigma = np.linalg.svd(ctrb, compute_uv=False)
+    r = int(np.sum(sigma > tol * sigma.max(initial=0.0)))
 
     return StructuralResult(matrix=ctrb, rank=r, n=n)
 
@@ -131,7 +132,8 @@ def observability(
     obsv = observability_matrix(A, C)
 
     # Observable ⇔ rank 𝒪 = n, counting the singular values σᵢ > tol σ₁
-    r = rank(obsv, tol)
+    sigma = np.linalg.svd(obsv, compute_uv=False)
+    r = int(np.sum(sigma > tol * sigma.max(initial=0.0)))
 
     return StructuralResult(matrix=obsv, rank=r, n=n)
 
@@ -142,7 +144,7 @@ def observability(
 
 
 def rank(matrix, tol=RANK_TOL):
-    """The rank of ``matrix``, counting the singular values ``σᵢ > tol σ₁``."""
+    """The rank of ``matrix``, counting the singular values ``σᵢ > tol σ₁``; the designs' precondition."""
     sigma = np.linalg.svd(matrix, compute_uv=False)
     return int(np.sum(sigma > tol * sigma.max(initial=0.0)))
 
