@@ -85,12 +85,23 @@ stays held for GRO501; its row is in §5 (v0.9).
   Related rows: TB-b's loop part and T6's composition half follow AC-3; S66 lands after
   AC-4; RN-4 and RN-5 build on AC-2, AC-4 and AC-7; S70 turns P10's refusals into
   `WiringError`; S31 brings AC-8b. The automatic `dt` and input-hold findings stay with S65.
-- [ ] **S61 Analysis verbs on any `System`** (scan: analysis#2, analysis#4, analysis#5,
-  analysis#6, analysis#8): `controllability` / `observability` linearize like every sibling
-  (band functions only, no facade); `step_info` takes a `System`; the operating point's size
-  is checked; margin crossings refined by a root solve so `plot_bode` and `margins` report
-  one number. Done when P7's signature test covers them. `find_equilibrium`'s guess defaults
-  to the nominal state (R1, not `sys.x0`) since 2026-10-14; the name `x_guess` stays.
+- [ ] **S61 Analysis verbs on any `System`** (scan: analysis#2, analysis#5, analysis#6,
+  analysis#8; rulings in
+  [the 2026-10-15 record](../reviews/2026-10-15-linear-analysis-rulings.md)): the band is
+  linear analysis at an operating point, the step response included: every step figure is
+  titled "Linear Step Response" (an `LTISystem`) or "Linearized Step Response" (anything
+  else) and the `plot_step_response` shortcut moves to `DynamicSystemFacades` (R1);
+  `controllability` / `observability` take a system through `design_model`, with
+  `controllability_matrix(A, B)` / `observability_matrix(A, C)` as their arrays twins, as
+  `lqr` / `lqr_gain` (R3); a point given with an `LTISystem` is refused at
+  `operating_point`, for every verb (R4); the default channel is the command port (R5); the
+  operating point's size is checked; margin crossings refined by a root solve so
+  `plot_bode` and `margins` report one number. Done when P7's signature test covers the
+  structural verbs and the ledger loses their entries. Struck by ruling R2: `step_info`
+  stays on arrays. `find_equilibrium`'s guess defaults to the nominal state (R1 of
+  2026-10-14, not `sys.x0`) since 2026-10-14; the name `x_guess` stays.
+  Later, not v0.2: `sensitivity(T)` reading the roles of one loop diagram instead of
+  `plant=, controller=` (the record's last note).
 - [ ] **S62, the rest** **[ask — public names]** (scan: control#0): `P` joins the siso family.
   The LQR family joined the control band facade on 2026-10-14 (`control/design.py`).
 - [ ] **TB-b The control objects and the loop read like the textbook.** The audit, review

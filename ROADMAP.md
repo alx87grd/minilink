@@ -390,7 +390,10 @@ convention in [randomness.md](docs/plans/randomness.md); the docs-consistency ru
 (2026-10-12) in [theirs](docs/reviews/2026-10-12-docs-consistency-rulings.md); the
 state-space design rulings (2026-10-14: the nominal state, the model-taking verbs, the
 observer, `lqg`, the role name) in
-[theirs](docs/reviews/2026-10-14-state-space-design-rulings.md).
+[theirs](docs/reviews/2026-10-14-state-space-design-rulings.md); the linear analysis band
+rulings (2026-10-15: the step response linearized and labelled, the structural verbs on a
+system, the command port as the default channel) in
+[theirs](docs/reviews/2026-10-15-linear-analysis-rulings.md).
 
 **During v0.2 — this one blocks GRO501**
 
