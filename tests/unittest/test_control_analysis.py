@@ -580,8 +580,7 @@ class TestImpedanceIntegralController(unittest.TestCase):
 
     def test_closed_loop_removes_steady_state_error(self):
         plant = DoubleIntegrator()
-        pid = ImpedanceIntegralController()
-        pid.params.update({"Kp": 5.0, "Ki": 1.0, "Kd": 4.0})
+        pid = ImpedanceIntegralController(Kp=5.0, Ki=1.0, Kd=4.0)
         setpoint = 1.0
         pid.inputs["r"].nominal_value = np.array([setpoint])
         diagram = DiagramSystem()
@@ -648,18 +647,40 @@ class TestPID(unittest.TestCase):
 class TestImpedanceController(unittest.TestCase):
     def test_gain_init_kwargs(self):
         ctl = ImpedanceController(Kp=100.0, Kd=10.0)
-        np.testing.assert_allclose(ctl.params["Kp"], [100.0])
-        np.testing.assert_allclose(ctl.params["Kd"], [10.0])
+        np.testing.assert_allclose(ctl.params["Kp"], [[100.0]])
+        np.testing.assert_allclose(ctl.params["Kd"], [[10.0]])
 
     def test_vector_regulation(self):
-        ctl = ImpedanceController(dof=2)
-        ctl.params.update({"Kp": [2.0, 3.0], "Kd": [0.5, 0.5]})
+        ctl = ImpedanceController(dof=2, Kp=[2.0, 3.0], Kd=[0.5, 0.5])
         u = ctl.ctl(None, np.array([1.0, 2.0, 0.1, 0.2, 0.3, 0.4]))
         np.testing.assert_allclose(u, [2.0 * 0.9 - 0.5 * 0.3, 3.0 * 1.8 - 0.5 * 0.4])
 
+    def test_a_full_stiffness_matrix_couples_the_axes(self):
+        Kp = np.array([[2.0, 1.0], [0.0, 3.0]])
+        ctl = ImpedanceController(dof=2, Kp=Kp, Kd=0.0)
+        e = np.array([0.9, 1.8])
+        u = ctl.ctl(None, np.array([1.0, 2.0, 0.1, 0.2, 0.0, 0.0]))
+        np.testing.assert_allclose(u, Kp @ e)
+        with self.assertRaisesRegex(ValueError, r"\(2, 2\) matrix"):
+            ImpedanceController(dof=2, Kp=np.ones((3, 3)))
+
+    def test_the_limits_clip_the_command_and_hold_the_integrator(self):
+        ctl = ImpedanceController(Kp=10.0, Kd=0.0, u_max=1.0)
+        np.testing.assert_allclose(ctl.ctl(None, np.array([1.0, 0.0, 0.0])), [1.0])
+        pid = ImpedanceIntegralController(Kp=10.0, Ki=1.0, Kd=0.0, u_max=1.0)
+        # the command sits on u_max with the error pushing further: the integrator is held
+        np.testing.assert_allclose(
+            pid.f(np.array([0.0]), np.array([1.0, 0.0, 0.0])), [0.0]
+        )
+        # a small error, no saturation: ė_int = e
+        np.testing.assert_allclose(
+            pid.f(np.array([0.0]), np.array([0.05, 0.0, 0.0])), [0.05]
+        )
+
     def test_vector_tracking_ref(self):
-        ctl = ImpedanceController(dof=2, tracking_ref=True)
-        ctl.params.update({"Kp": [1.0, 1.0], "Kd": [1.0, 1.0]})
+        ctl = ImpedanceController(
+            dof=2, tracking_ref=True, Kp=[1.0, 1.0], Kd=[1.0, 1.0]
+        )
         u = ctl.ctl(None, np.array([1.0, 2.0, 0.0, 0.0, 0.5, 0.1, 0.2, 0.3]))
         np.testing.assert_allclose(
             u,

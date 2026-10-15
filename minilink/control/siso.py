@@ -338,6 +338,18 @@ def clipped(u_cmd, params, xp):
     return u
 
 
+def as_gain_matrix(value, n: int):
+    """A scalar or a per-axis vector as the diagonal ``(n, n)`` gain, or an ``(n, n)`` matrix as given."""
+    arr = np.asarray(value, dtype=float)
+    if arr.ndim <= 1:
+        return np.diag(as_dof_vector(arr, n))
+    if arr.shape != (n, n):
+        raise ValueError(
+            f"expected a scalar, a length-{n} vector or an ({n}, {n}) matrix, got shape {arr.shape}"
+        )
+    return arr
+
+
 def as_dof_vector(value, dof: int):
     """A scalar broadcast to ``dof`` axes, or a length-``dof`` vector as given."""
     arr = np.asarray(value, dtype=float).reshape(-1)

@@ -579,7 +579,12 @@ Visualization: subsystem `"world"` geometry merges into one shared diagram
 
 ### Control laws: the port names are the declaration
 
-**Compensators and the Error block.** Classical laws are
+**Compensators and the Error block.** Classical laws are one family: what is
+measured decides the derivative (one measurement per axis, the filtered derivative of
+`PD` / `PID`, a pole at `−1/tau`; a measured `[q; dq]`, the rate as read by the impedance
+pair), the limits are parameters with infinite defaults, and the integrator hold, the
+filtered rate and the clip are the three functions of `control/siso.py` every member
+calls. Classical laws are
 written once on the tracking error and take a port-layout switch:
 `ports="error"` declares one input `e` and command `u` (the compensator
 form, `P`, `PI`, `PD`, `PID`, `Lead`, `Lag`, `TransferFunction(ports="error")`),
@@ -666,7 +671,7 @@ they read and what the zero-argument sweep draws:
 | Module | Measurement | `plot_control_law` sweep |
 | --- | --- | --- |
 | (a law on `y` used absolutely, `u = c(y, r)`: learned policies) | `y`, `r` of another size or absent | measurement, `r` pinned |
-| `impedance.py` | `y = [pos; rate]` dim `2n`; optional robotic `+ g(q)` via `robotic.py` | `(e, de)` plane (`plot_space = "error_qdq"`) |
+| `impedance.py` (`ImpedanceController`, `ImpedanceIntegralController`) | `y = [q; dq]` dim `2n`, the rate measured so no filter state; `Kp`, `Kd` are `n×n` (a scalar or vector is diagonal, a matrix couples the axes), `Ki` per axis; the same limits and integrator hold as `siso.py`; optional robotic `+ g(q)` via `robotic.py` | `(e, de)` plane (`plot_space = "error_qdq"`) |
 | `state.py` | full state `x`; constant gain `K` (`StateFeedbackController`, what `lqr` returns: `u = ubar - K (x - r)` on a state reference, `r` defaulting to `xbar`; `OutputReferenceController(K, N)`, the textbook output reference `u = ubar - K (x - xbar) + N r`, `r` of the output's dimension) or a gain schedule `K(t)` interpolated between samples and held or replaced past its end (`TimeVaryingStateFeedbackController`, what `lqr_finite_horizon` returns; the schedule itself comes from `lqr_gain_schedule`, the Riccati differential equation propagated exactly through the Hamiltonian system); feedback around a reference trajectory `u = u_d(t) - K(t)(x - x_d(t))` (`TrajectoryFeedbackController`, no reference port — the trajectory is the reference; what `trajectory_lqr` returns: the plant linearized at every sample of the reference, the Riccati equation swept backward interval by interval from the stationary solution at the end point) | `(x0, x1)` |
 | `siso.py` (`P`, `PI`, `PD`, `PID`) | `e` per axis, or `y` with `r` (decoupled loops) | error per axis |
 | `robotic.py` (task laws) | Joint ``[q; dq]`` feedback; internal FK/J; optional ``+ g(q)``; optional task-force arrow | `(q0, dq0)` absolute (`plot_space = "absolute_qdq"`) |
