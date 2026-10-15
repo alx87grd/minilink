@@ -3,7 +3,6 @@
 import numpy as np
 
 from minilink.core.backends import array_module
-from minilink.core.facades import LTISystemFacades
 from minilink.core.system import DynamicSystem
 
 
@@ -128,7 +127,7 @@ class StateSpaceSystem(DynamicSystem):
         return y
 
 
-class LTISystem(LTISystemFacades, StateSpaceSystem):
+class LTISystem(StateSpaceSystem):
     """Linear time-invariant system with constant matrices::
 
         dx = A @ x + B @ u

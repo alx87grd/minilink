@@ -262,8 +262,10 @@ class TestPlots(unittest.TestCase):
         r = plot_nyquist(self.loop, show=False)
         self.assertEqual(r.figure._suptitle.get_text(), "Nyquist Diagram")
         r = plot_step_response(self.loop, show=False)
-        self.assertEqual(r.figure._suptitle.get_text(), "Step Response")
+        self.assertEqual(r.figure._suptitle.get_text(), "Linear Step Response")
         self.assertEqual(r.axes.get_xlabel(), "Time (seconds)")
+        r = self.plant.plot_step_response(self.x_bar, show=False)
+        self.assertEqual(r.figure._suptitle.get_text(), "Linearized Step Response")
 
     def test_radius_frames_the_slow_roots_of_a_stiff_channel(self):
         stiff = TransferFunction([1.0], [1.0, 101.0, 100.0])  # poles at -1 and -100

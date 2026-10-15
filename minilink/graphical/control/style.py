@@ -17,7 +17,8 @@ BODE_TITLE = "Bode Diagram"
 PZMAP_TITLE = "Pole-Zero Map"
 ROOT_LOCUS_TITLE = "Root Locus"
 NYQUIST_TITLE = "Nyquist Diagram"
-STEP_TITLE = "Step Response"
+LINEAR_STEP_TITLE = "Linear Step Response"  # the system is a linear model
+LINEARIZED_STEP_TITLE = "Linearized Step Response"  # it was linearized first
 
 MAGNITUDE_LABEL = "Magnitude (dB)"
 PHASE_LABEL = "Phase (deg)"

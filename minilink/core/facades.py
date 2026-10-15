@@ -3,8 +3,7 @@ System convenience facades.
 
 Evolution-aware mixin shortcuts for :class:`~minilink.core.system.System`
 subclasses: :class:`SharedSystemFacades` (all kinds), :class:`DynamicSystemFacades`
-(continuous evolution), :class:`StepSystemFacades` (discrete rollout), and
-:class:`LTISystemFacades` (linear models only).
+(continuous evolution) and :class:`StepSystemFacades` (discrete rollout).
 
 The mixins are shortcuts only: mathematical, structural, and visualization
 contracts stay in :mod:`minilink.core.system`. Heavy dependencies
@@ -830,6 +829,44 @@ class DynamicSystemFacades:
             show=show,
         )
 
+    def plot_step_response(
+        self,
+        x_bar=None,
+        u_bar=None,
+        t=0.0,
+        params=None,
+        *,
+        of=None,
+        wrt=None,
+        tf=None,
+        n=500,
+        method="auto",
+        eps=1e-6,
+        backend="matplotlib",
+        show=True,
+    ):
+        """Step response of one SISO channel of the linear model, with rise time, settling time and overshoot.
+
+        See :func:`minilink.analysis.time_response.plot_step_response`.
+        """
+        from minilink.analysis.time_response import plot_step_response
+
+        return plot_step_response(
+            self,
+            x_bar,
+            u_bar,
+            t,
+            params,
+            of=of,
+            wrt=wrt,
+            tf=tf,
+            n=n,
+            method=method,
+            eps=eps,
+            backend=backend,
+            show=show,
+        )
+
     def animate_modal(
         self,
         x_bar=None,
@@ -936,36 +973,6 @@ class DynamicSystemFacades:
         traj = rt_sim.run(x0=x0, t0=t0)
         self.traj = traj
         return traj
-
-
-class LTISystemFacades:
-    """
-    Shortcuts that only make sense on a linear model, for :class:`~minilink.dynamics.abstraction.state_space.LTISystem`.
-
-    A time response read off a nonlinear plant would look like a simulation of
-    that plant; on a diagram or a nonlinear system, call ``linearize()`` or
-    ``transfer_function()`` first.
-    """
-
-    def plot_step_response(
-        self,
-        *,
-        of=None,
-        wrt=None,
-        tf=None,
-        n=500,
-        backend="matplotlib",
-        show=True,
-    ):
-        """Step response of one SISO channel with rise time, settling time and overshoot.
-
-        See :func:`minilink.analysis.time_response.plot_step_response`.
-        """
-        from minilink.analysis.time_response import plot_step_response
-
-        return plot_step_response(
-            self, of=of, wrt=wrt, tf=tf, n=n, backend=backend, show=show
-        )
 
 
 class StepSystemFacades:

@@ -33,4 +33,4 @@ plot_nyquist(L)
 # The closed loop r -> theta: the junction e = r - theta is inserted by @
 T = C @ plant
 T.plot_diagram()
-T.linearize().plot_step_response()  # a time response of the linear model
+T.plot_step_response()  # the step of the loop linearized at its nominal state

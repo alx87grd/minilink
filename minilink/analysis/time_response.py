@@ -1,4 +1,11 @@
-"""Step response of one input–output channel of a linearized model, and its textbook figures."""
+"""Step response of one input–output channel of the linear model, and its textbook figures.
+
+The band is linear analysis at an operating point: an ``LTISystem`` is read as is and
+any other system is linearized first, the step response included. The figures say
+which: "Linear Step Response" or "Linearized Step Response". The step of the nonlinear
+loop itself is a simulation, ``closed_loop(C, plant, reference=Step(...))`` then
+``compute_trajectory``, and ``step_info`` reads its sampled output the same way.
+"""
 
 from __future__ import annotations
 
@@ -48,9 +55,12 @@ def step_response(
 ) -> tuple[np.ndarray, np.ndarray]:
     """Return ``(time, y)``: the unit-step response of the selected channel from rest.
 
-    Same channel arguments as :func:`~minilink.analysis.frequency.bode`;
-    ``tf`` defaults to eight times the slowest stable time constant, and
-    ``n`` samples span ``[0, tf]``.
+    The response of the linear model, in deviation variables: ``sys`` as is
+    when it is an ``LTISystem``, else linearized at ``(x_bar, u_bar)``. Same
+    channel arguments as :func:`~minilink.analysis.frequency.bode`; ``tf``
+    defaults to eight times the slowest stable time constant, and ``n``
+    samples span ``[0, tf]``. For the step of the nonlinear system, simulate
+    it with a ``Step`` source and read the figures with :func:`step_info`.
     """
     A, B, C, D = siso_matrices(
         sys, x_bar, u_bar, t, params, of=of, wrt=wrt, method=method, eps=eps
@@ -68,7 +78,11 @@ def step_response(
 
 
 def step_info(time, y) -> StepInfo:
-    """Rise time, settling time, overshoot, peak and steady state of a sampled step response."""
+    """Rise time, settling time, overshoot, peak and steady state of a sampled step response.
+
+    Reads any sampled response: the linear one from :func:`step_response`, or
+    a simulated trajectory's time and output arrays.
+    """
     time = np.asarray(time, dtype=float).reshape(-1)
     y = np.asarray(y, dtype=float).reshape(-1)
 
@@ -140,7 +154,12 @@ def plot_step_response(
     backend="matplotlib",
     show: bool = True,
 ) -> PlotResult:
-    """Step response of the selected channel with rise time, settling time and overshoot."""
+    """Step response of the selected channel with rise time, settling time and overshoot.
+
+    The linear model's response, as :func:`step_response`; the title reads
+    "Linear Step Response" for an ``LTISystem`` and "Linearized Step
+    Response" for a system linearized here.
+    """
     time, y = step_response(
         sys, x_bar, u_bar, t, params, of=of, wrt=wrt, tf=tf, n=n, method=method, eps=eps
     )
@@ -169,6 +188,15 @@ def first_sample_after(time, outside):
     return float(time[0])
 
 
+def step_title(sys):
+    """ "Linear Step Response" for a linear model, "Linearized Step Response" otherwise."""
+    from minilink.dynamics.abstraction.state_space import LTISystem
+
+    if isinstance(sys, LTISystem):
+        return style.LINEAR_STEP_TITLE
+    return style.LINEARIZED_STEP_TITLE
+
+
 def step_figure(time, y, info, sys, of, wrt):
     lines = () if np.isnan(info.steady_state) else (RefLine("y", info.steady_state),)
     note = "\n".join(
@@ -182,7 +210,7 @@ def step_figure(time, y, info, sys, of, wrt):
     )
     span = float(np.ptp(y)) or 1.0
     return ControlFigure(
-        title=style.STEP_TITLE,
+        title=step_title(sys),
         subtitle=channel_subtitle(sys, of, wrt),
         panels=(
             Panel(
