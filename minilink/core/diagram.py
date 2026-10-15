@@ -276,10 +276,10 @@ class StepDiagramSystem(WiredDiagramMixin, StepSystem):
 if __name__ == "__main__":
     # Hello world: unity-feedback loop  dx = Kp (r - x)
     from minilink.blocks.basic import Integrator
-    from minilink.control.output import ProportionalController
+    from minilink.control.siso import P
 
     diagram = DiagramSystem()
-    diagram.add_subsystem(ProportionalController(), "controller")
+    diagram.add_subsystem(P(ports="reference"), "controller")
     diagram.add_subsystem(Integrator(), "plant")
     diagram.add_input_port("r")
     diagram.connect("input", "r", "controller", "r")

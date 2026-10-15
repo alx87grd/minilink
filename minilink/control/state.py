@@ -20,8 +20,7 @@ class StateFeedbackController(System):
     ``K`` has shape ``(m, n)``; ``ubar`` is the feedforward command.
 
     This is *state* feedback on the full ``x`` port. For *output* feedback on a
-    measured ``y`` (and ``@``-operator wiring), use
-    :class:`~minilink.control.output.ProportionalController`.
+    measured ``y`` (and ``@``-operator wiring), use :class:`~minilink.control.siso.P`.
     """
 
     def __init__(self, K, xbar=None, ubar=None):

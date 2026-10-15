@@ -192,7 +192,7 @@ class TestStepDiagramTopology(unittest.TestCase):
         self.assertIn("Step:", html)
 
 
-from minilink.control.output import ProportionalController
+from minilink.control.siso import P
 
 
 class DiscreteAccumulator(StepSystem):
@@ -214,7 +214,7 @@ class DiscreteAccumulator(StepSystem):
 
 def _build_unity_feedback(K=0.3):
     diagram = StepDiagramSystem()
-    ctl = ProportionalController(K)
+    ctl = P(K, ports="reference")
     plant = DiscreteAccumulator()
     diagram.add_subsystem(ctl, "controller")
     diagram.add_subsystem(plant, "plant")

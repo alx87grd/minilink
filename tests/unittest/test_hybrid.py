@@ -3,7 +3,7 @@
 import unittest
 import numpy as np
 from minilink.blocks.basic import Integrator
-from minilink.control.output import ProportionalController
+from minilink.control.siso import P
 from minilink.core.diagram import DiagramSystem, StepDiagramSystem
 from minilink.core.hybrid_diagram import BoundaryConnection, HybridDiagram
 from minilink.simulation.computer import Computer, StepSchedule
@@ -11,7 +11,7 @@ from minilink.simulation.computer import Computer, StepSchedule
 
 def _build_computer_diagram():
     diagram = StepDiagramSystem()
-    diagram.add_subsystem(ProportionalController(0.5), "controller")
+    diagram.add_subsystem(P(0.5, ports="reference"), "controller")
     diagram.add_input_port("r")
     diagram.add_input_port("y")
     diagram.connect("input", "r", "controller", "r")
@@ -137,19 +137,19 @@ class TestHybridClosedLoop(unittest.TestCase):
         plant = DiagramSystem()
         plant.add_subsystem(integrator, "integ")
         plant.x0 = np.array([0.7])
-        hybrid = (ProportionalController(0.5) % 0.01) @ plant
+        hybrid = (P(0.5, ports="reference") % 0.01) @ plant
         self.assertEqual((list(plant.inputs), list(plant.outputs)), ([], []))
         self.assertEqual(plant.connections, {"integ": {"u": None}})
         self.assertEqual(list(hybrid.plant.subsystems), ["integ"])
         self.assertIs(hybrid.plant.subsystems["integ"], integrator)
         self.assertEqual(list(hybrid.plant.inputs), ["u"])
         self.assertEqual(list(hybrid.plant.outputs), ["y"])
-        hybrid_closed_loop(ProportionalController(0.5), plant, schedule=0.01)
+        hybrid_closed_loop(P(0.5, ports="reference"), plant, schedule=0.01)
         self.assertEqual((list(plant.inputs), list(plant.outputs)), ([], []))
 
         leaf = Integrator()
         leaf.x0 = np.array([0.7])
-        reference = (ProportionalController(0.5) % 0.01) @ leaf
+        reference = (P(0.5, ports="reference") % 0.01) @ leaf
         runs = [
             loop.compute_forced(
                 np.array([1.0]), t0=0, tf=0.05, input_port_id="r", verbose=False
@@ -160,7 +160,7 @@ class TestHybridClosedLoop(unittest.TestCase):
 
     def test_leaf_system_wrapping(self):
         hybrid = hybrid_closed_loop(
-            ProportionalController(0.3), Integrator(), schedule=0.01
+            P(0.3, ports="reference"), Integrator(), schedule=0.01
         )
         self.assertIn("controller", hybrid.computer.diagram.subsystems)
         self.assertIn("plant", hybrid.plant.subsystems)
@@ -173,7 +173,7 @@ from minilink.simulation.hybrid_simulator import HybridSimulator
 
 def _build_hybrid():
     step_diagram = StepDiagramSystem()
-    step_diagram.add_subsystem(ProportionalController(0.5), "controller")
+    step_diagram.add_subsystem(P(0.5, ports="reference"), "controller")
     step_diagram.add_input_port("r")
     step_diagram.add_input_port("y")
     step_diagram.connect("input", "r", "controller", "r")
@@ -325,12 +325,12 @@ class TestHybridSimulator(unittest.TestCase):
 
     def test_hybrid_animate_refreshes_plant_camera_scale(self):
         from minilink.blocks.basic import Integrator
-        from minilink.control.output import ProportionalController
+        from minilink.control.siso import P
         from minilink.core.hybrid_composition import hybrid_closed_loop
 
         plant = Integrator()
         plant.camera_scale = 3.0
-        hybrid = hybrid_closed_loop(ProportionalController(0.5), plant, schedule=0.01)
+        hybrid = hybrid_closed_loop(P(0.5, ports="reference"), plant, schedule=0.01)
         self.assertEqual(hybrid.plant.camera_scale, 3.0)
         plant.camera_scale = 9.0
         hybrid.animate(show=False)
@@ -367,7 +367,7 @@ class DiscreteLowPass(StepSystem):
 def _build_step_diagram():
     diagram = StepDiagramSystem()
     diagram.add_subsystem(DiscreteLowPass(alpha=0.3), "filter")
-    diagram.add_subsystem(ProportionalController(0.35), "controller")
+    diagram.add_subsystem(P(0.35, ports="reference"), "controller")
     diagram.add_input_port("r")
     diagram.add_input_port("y_meas")
     diagram.connect("input", "r", "controller", "r")

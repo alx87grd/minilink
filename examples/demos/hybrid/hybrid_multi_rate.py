@@ -2,7 +2,7 @@
 
 import numpy as np
 
-from minilink import Integrator, ProportionalController, StepDiagramSystem, StepSystem
+from minilink import Integrator, P, StepDiagramSystem, StepSystem
 from minilink.core.backends import array_module
 from minilink.core.hybrid_composition import hybrid_closed_loop
 from minilink.simulation import StepSchedule
@@ -40,7 +40,7 @@ def reference(t):
 
 step_diagram = StepDiagramSystem()
 step_diagram.add_subsystem(DiscreteLowPass(alpha=0.6), "filter")
-step_diagram.add_subsystem(ProportionalController(10.0), "controller")
+step_diagram.add_subsystem(P(10.0, ports="reference"), "controller")
 step_diagram.add_input_port("r")
 step_diagram.add_input_port("y_meas")
 step_diagram.connect("input", "r", "controller", "r")

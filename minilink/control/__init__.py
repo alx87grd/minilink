@@ -40,10 +40,7 @@ _EXPORTS: dict[str, tuple[str, str]] = {
     ),
     "JointImpedance": ("minilink.control.robotic", "JointImpedance"),
     "ModelJointImpedance": ("minilink.control.robotic", "ModelJointImpedance"),
-    "ProportionalController": (
-        "minilink.control.output",
-        "ProportionalController",
-    ),
+    "P": ("minilink.control.siso", "P"),
     "SlidingModeController": (
         "minilink.control.modelbased",
         "SlidingModeController",

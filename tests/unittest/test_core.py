@@ -93,7 +93,7 @@ from minilink.blocks.basic import Integrator
 from minilink.blocks.nonlinear import Saturation
 from minilink.blocks.sources import Step, WhiteNoise
 from minilink.control.impedance import ImpedanceController
-from minilink.control.output import ProportionalController
+from minilink.control.siso import P
 from minilink.core.composition import closed_loop
 from minilink.core.diagram import DiagramSystem
 from minilink.dynamics.catalog.manipulators.arms import TwoLinkManipulator
@@ -102,13 +102,11 @@ from minilink.dynamics.catalog.pendulum.pendulum import Pendulum
 
 class TestDiagramCompositionShortcuts(unittest.TestCase):
     def test_add_operator_adds_subsystems_without_wiring(self):
-        diagram = Step(final_value=[1.0]) + ProportionalController() + Integrator()
+        diagram = Step(final_value=[1.0]) + P(ports="reference") + Integrator()
         self.assertIsInstance(diagram, DiagramSystem)
-        self.assertEqual(
-            list(diagram.subsystems), ["step", "p_controller", "integrator"]
-        )
-        self.assertEqual(diagram.connections["p_controller"]["r"], None)
-        self.assertEqual(diagram.connections["p_controller"]["y"], None)
+        self.assertEqual(list(diagram.subsystems), ["step", "p", "integrator"])
+        self.assertEqual(diagram.connections["p"]["r"], None)
+        self.assertEqual(diagram.connections["p"]["y"], None)
         self.assertEqual(diagram.connections["integrator"]["u"], None)
 
     def test_add_operator_uniquifies_repeated_subsystem_ids(self):
@@ -239,17 +237,17 @@ class TestDiagramCompositionShortcuts(unittest.TestCase):
         diagram.add_input_port("u", dim=1)
         diagram.connect("input", "u", "plant", "u")
         diagram.connect_new_output_port("plant", "y", "y")
-        diagram.add_subsystem(ProportionalController(), "monitor")  # added last
+        diagram.add_subsystem(P(ports="reference"), "monitor")  # added last
         chain = diagram >> Saturation()
         self.assertEqual(chain.connections["saturation"]["u"], ("plant", "y"))
 
     def test_autowire_connects_unique_matches_without_overwrites(self):
         diagram = (
-            Step(final_value=[1.0], port="r") + ProportionalController() + Integrator()
+            Step(final_value=[1.0], port="r") + P(ports="reference") + Integrator()
         ).autowire(strict=True)
-        self.assertEqual(diagram.connections["p_controller"]["r"], ("step", "r"))
-        self.assertEqual(diagram.connections["p_controller"]["y"], ("integrator", "y"))
-        self.assertEqual(diagram.connections["integrator"]["u"], ("p_controller", "u"))
+        self.assertEqual(diagram.connections["p"]["r"], ("step", "r"))
+        self.assertEqual(diagram.connections["p"]["y"], ("integrator", "y"))
+        self.assertEqual(diagram.connections["integrator"]["u"], ("p", "u"))
         diagram.connect("step", "r", "integrator", "u")
         diagram.autowire(strict=True)
         self.assertEqual(diagram.connections["integrator"]["u"], ("step", "r"))
@@ -271,21 +269,21 @@ class TestDiagramCompositionShortcuts(unittest.TestCase):
     def test_autowire_strict_refuses_ambiguous_matches(self):
         diagram = (
             Step(final_value=[1.0], port="r")
-            + ProportionalController()
-            + ProportionalController()
+            + P(ports="reference")
+            + P(ports="reference")
             + Integrator()
         )
         with self.assertRaisesRegex(
             ValueError, "Ambiguous autowire target integrator:u"
         ):
             diagram.autowire(strict=True)
-        self.assertEqual(diagram.connections["p_controller"]["y"], None)
-        self.assertEqual(diagram.connections["p_controller2"]["y"], None)
+        self.assertEqual(diagram.connections["p"]["y"], None)
+        self.assertEqual(diagram.connections["p2"]["y"], None)
         self.assertEqual(diagram.connections["integrator"]["u"], None)
 
     def test_autowire_follows_renamed_ports_through_an_actuator(self):
         ref = Step(final_value=[1.0], port="r")
-        ctl = ProportionalController(2.0).rename_ports(u="u_cmd")
+        ctl = P(2.0, ports="reference").rename_ports(u="u_cmd")
         sat = Saturation(-1, 1).rename_ports(u="u_cmd", y="u")
         diagram = (ref + ctl + sat + Integrator()).autowire(strict=True)
         ctl_id = diagram.subsystem_id(ctl)
@@ -294,19 +292,19 @@ class TestDiagramCompositionShortcuts(unittest.TestCase):
         self.assertEqual(diagram.connections[ctl_id]["y"], ("integrator", "y"))
         self.assertEqual(list(sat.inputs), ["u_cmd"])
         self.assertEqual(list(sat.outputs), ["u"])
-        measured = ProportionalController().rename_ports(y="y_meas")
+        measured = P(ports="reference").rename_ports(y="y_meas")
         self.assertEqual(measured.outputs["u"].dependencies, ("r", "y_meas"))
 
     def test_rename_ports_refuses_a_silent_mistake(self):
         with self.assertRaisesRegex(ValueError, "has no port 'z'"):
             Integrator().rename_ports(z="u")
         with self.assertRaisesRegex(ValueError, "already a port"):
-            ProportionalController().rename_ports(r="y")
+            P(ports="reference").rename_ports(r="y")
         with self.assertRaisesRegex(ValueError, "same name"):
-            ProportionalController().rename_ports(r="e", y="e")
+            P(ports="reference").rename_ports(r="e", y="e")
         with self.assertRaisesRegex(ValueError, "is a diagram"):
             (Integrator() >> Integrator()).rename_ports(u="w")
-        swapped = ProportionalController().rename_ports(r="y", y="r")
+        swapped = P(ports="reference").rename_ports(r="y", y="r")
         self.assertEqual(list(swapped.inputs), ["y", "r"])
 
     def test_expose_names_the_edge_of_a_box(self):
@@ -355,7 +353,7 @@ from minilink.core.composition import closed_loop, resolve_standard_feedback
 
 class TestStandardFeedback(unittest.TestCase):
     def test_y_loop_ports(self):
-        ctl = ProportionalController(0.5)
+        ctl = P(0.5, ports="reference")
         plant = Integrator()
         wiring = resolve_standard_feedback(ctl, plant)
         self.assertEqual(wiring.control_out, "u")
@@ -364,7 +362,7 @@ class TestStandardFeedback(unittest.TestCase):
         self.assertEqual(wiring.plant_out, "y")
 
     def test_closed_loop_uses_shared_resolver(self):
-        diagram = closed_loop(ProportionalController(0.4), Integrator())
+        diagram = closed_loop(P(0.4, ports="reference"), Integrator())
         self.assertIn("controller", diagram.subsystems)
         self.assertIn("plant", diagram.subsystems)
 
@@ -392,7 +390,7 @@ class TestPortNamesDriveTheLoop(unittest.TestCase):
         from minilink import ImpedanceController
         from minilink.core.feedback import plot_space_of
 
-        self.assertEqual(plot_space_of(ProportionalController(0.5)), "error")
+        self.assertEqual(plot_space_of(P(0.5, ports="reference")), "error")
         self.assertEqual(
             plot_space_of(StateFeedbackController(np.array([[1.0, 1.0]]))), "state"
         )
@@ -453,7 +451,7 @@ class TestDefaultOutput(unittest.TestCase):
         np.testing.assert_array_equal(sys.h(x, np.zeros(1)), x)
 
     def test_custom_plant_composes_with_closed_loop(self):
-        from minilink.control.output import ProportionalController
+        from minilink import Gain
 
         class MassSpringDamper(DynamicSystem):
             def __init__(self):
@@ -463,10 +461,10 @@ class TestDefaultOutput(unittest.TestCase):
                 return np.array([x[1], u[0] - 0.3 * x[1] - 4.0 * x[0]])
 
         plant = MassSpringDamper()
-        diagram = ProportionalController(K=np.array([[1.0, 0.5]])) @ plant
+        diagram = Gain(np.array([[1.0, 0.5]])) @ plant
         x = np.array([1.0, 0.0])
         u_ctl = diagram.compute_subsys_output_port(
-            x, np.zeros(diagram.m), 0.0, "controller", "u"
+            x, np.zeros(diagram.m), 0.0, "controller", "y"
         )
         # r defaults to 0, so u = K (r - y) = -K x = -1.0
         self.assertAlmostEqual(float(u_ctl[0]), -1.0)

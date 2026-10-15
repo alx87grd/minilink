@@ -2,11 +2,11 @@
 
 import numpy as np
 
-from minilink import ProportionalController
+from minilink import P
 from minilink.experimental.c_export import export_system_to_c, load_exported_c
 
 # Static controller: n=0, stacked input u_in = [r, y], output port "u".
-controller = ProportionalController(K=8.7)
+controller = P(Kp=8.7, ports="reference")
 print(f"n={controller.n}, m={controller.m}  (expect n=0, m=2 for [r, y])")
 
 # Trace outputs → jaxpr → C (float32). No plant, no closed loop.

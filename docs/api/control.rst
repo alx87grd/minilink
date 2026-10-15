@@ -1,9 +1,6 @@
 Control
 =======
 
-.. automodule:: minilink.control.output
-   :members:
-
 .. automodule:: minilink.control.impedance
    :members:
 

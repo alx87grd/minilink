@@ -55,7 +55,7 @@ _EXPORTS: dict[str, tuple[str, str]] = {
     "Lead": ("minilink.blocks.transfer_function", "Lead"),
     "Lag": ("minilink.blocks.transfer_function", "Lag"),
     # control
-    "ProportionalController": ("minilink.control.output", "ProportionalController"),
+    "P": ("minilink.control.siso", "P"),
     "StateFeedbackController": ("minilink.control.state", "StateFeedbackController"),
     "OutputReferenceController": (
         "minilink.control.state",

@@ -1,11 +1,73 @@
-"""Decoupled PID loops, compensator or controller form."""
+"""Decoupled classical compensators ``P``, ``PI``, ``PD``, ``PID``, compensator or controller form."""
 
 import numpy as np
 
 from minilink.control.impedance import as_dof_vector
 from minilink.core.backends import array_module
 from minilink.core.feedback import ErrorDriven
-from minilink.core.system import DynamicSystem
+from minilink.core.system import DynamicSystem, System
+
+
+class P(ErrorDriven, System):
+    """Decoupled proportional compensator ``u_i = Kp_i e_i``, the static member of the family.
+
+    ``ports="error"`` (default) is the compensator form: one input ``e``, so
+    ``P(...) @ plant`` inserts the Error block ``e = r - y`` and
+    ``P(...) >> plant`` is the loop gain, with no pole added.
+    ``ports="reference"`` is the controller form with inputs ``r`` and ``y``,
+    the one a hand-wired diagram and the sampled loop (``P(...) % dt``) read.
+    A coupled static gain on an output error is ``Gain(K) @ plant``.
+
+    Parameters
+    ----------
+    Kp : float or vector
+        Per-axis gain (a scalar broadcasts to all axes).
+    dof : int
+        Number of independent scalar loops (default 1).
+    ports : {"error", "reference"}
+        Input layout, see above.
+    u_min, u_max : float or vector
+        Actuator limits per axis.
+    """
+
+    def __init__(
+        self,
+        Kp: float = 1.0,
+        *,
+        dof: int = 1,
+        ports: str = "error",
+        u_min: float = -np.inf,
+        u_max: float = np.inf,
+    ):
+        n = int(dof)
+        if n <= 0:
+            raise ValueError("dof must be positive")
+        super().__init__()
+        self.dof = n
+        self.name = "P"
+        self.params = {
+            "Kp": as_dof_vector(Kp, n),
+            "u_min": as_dof_vector(u_min, n),
+            "u_max": as_dof_vector(u_max, n),
+        }
+
+        self.add_error_ports(ports, n)
+        self.add_output_port(
+            "u", dim=n, function=self.ctl, dependencies=self.error_dependencies
+        )
+
+    def ctl(self, x, u, t=0, params=None):
+        params = self.params if params is None else params
+        xp = array_module(u)
+        Kp = xp.asarray(params["Kp"])
+        u_min, u_max = xp.asarray(params["u_min"]), xp.asarray(params["u_max"])
+        e = self.error(u)
+
+        # u = Kp e, then the actuator limits
+        u_cmd = Kp * e
+        u = xp.clip(u_cmd, u_min, u_max)
+
+        return u
 
 
 class PID(ErrorDriven, DynamicSystem):
@@ -26,9 +88,8 @@ class PID(ErrorDriven, DynamicSystem):
     ``Ki=0`` does **not** remove the integrator: the gain is tunable, so the
     state dimension cannot depend on it, and the dead integrator then shows
     up as an unobservable pole at the origin in every linearization. Use
-    :class:`PI`, :class:`PD` or
-    :class:`~minilink.control.output.ProportionalController` when a term is
-    structurally absent, so poles and zeros match the hand calculation.
+    :class:`PI`, :class:`PD` or :class:`P` when a term is structurally
+    absent, so poles and zeros match the hand calculation.
 
     Parameters
     ----------
@@ -237,8 +298,7 @@ class PD(PID):
     :class:`PID` without the integrator, so a PD loop carries only the
     derivative-filter pole at ``-1/tau`` per axis and no pole at the origin.
     Without integral action the loop keeps a static error; that is the point
-    of the comparison. For an unfiltered proportional law use
-    :class:`~minilink.control.output.ProportionalController`.
+    of the comparison. For the proportional law alone use :class:`P`.
     """
 
     has_integrator = False

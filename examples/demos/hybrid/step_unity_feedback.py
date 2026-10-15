@@ -2,7 +2,7 @@
 
 import numpy as np
 
-from minilink import ProportionalController, StepDiagramSystem, StepSystem
+from minilink import P, StepDiagramSystem, StepSystem
 from minilink.core.backends import array_module
 
 
@@ -24,7 +24,7 @@ class DiscreteAccumulator(StepSystem):
 
 
 diagram = StepDiagramSystem()
-diagram.add_subsystem(ProportionalController(0.3), "controller")
+diagram.add_subsystem(P(0.3, ports="reference"), "controller")
 diagram.add_subsystem(DiscreteAccumulator(), "plant")
 diagram.add_input_port("r")
 diagram.connect("input", "r", "controller", "r")

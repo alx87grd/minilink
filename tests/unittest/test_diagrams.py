@@ -1,7 +1,7 @@
 import unittest
 import pytest
 from minilink.blocks.basic import Integrator
-from minilink.control.output import ProportionalController
+from minilink.control.siso import P
 from minilink.core.diagram import DiagramSystem
 from minilink.graphical.diagrams import (
     build_diagram_topology,
@@ -14,8 +14,8 @@ from minilink.graphical.diagrams import (
 
 class TestDiagrams(unittest.TestCase):
     def test_system_block_html_includes_named_ports(self):
-        html = get_system_block_html(ProportionalController(), "controller")
-        self.assertIn("P Controller::controller", html)
+        html = get_system_block_html(P(ports="reference"), "controller")
+        self.assertIn("P::controller", html)
         self.assertIn('PORT="in_r"', html)
         self.assertIn('PORT="out_u"', html)
 
@@ -201,7 +201,7 @@ class TestDiagrams(unittest.TestCase):
     def test_mermaid_exporter_returns_deterministic_source(self):
         source = export_diagram_topology(self._make_diagram(), backend="mermaid")
         self.assertIn("flowchart LR", source)
-        self.assertIn('controller["P Controller::controller"]', source)
+        self.assertIn('controller["P::controller"]', source)
         self.assertIn('input -- "r -> r" --> controller', source)
         self.assertIn('plant -- "y -> y_meas" --> output', source)
 
@@ -247,7 +247,7 @@ class TestDiagrams(unittest.TestCase):
     def _make_diagram():
         diagram = DiagramSystem()
         diagram.connection_verbose = False
-        diagram.add_subsystem(ProportionalController(), "controller")
+        diagram.add_subsystem(P(ports="reference"), "controller")
         diagram.add_subsystem(Integrator(), "plant")
         diagram.add_input_port("r")
         diagram.connect("input", "r", "controller", "r")
@@ -469,7 +469,7 @@ from minilink.graphical.diagrams import build_diagram_topology
 def _build_closed_loop():
     diagram = DiagramSystem()
     diagram.connection_verbose = False
-    diagram.add_subsystem(ProportionalController(2.5), "controller")
+    diagram.add_subsystem(P(2.5, ports="reference"), "controller")
     diagram.add_subsystem(Integrator(), "plant")
     diagram.add_input_port("r")
     diagram.connect("input", "r", "controller", "r")
@@ -560,7 +560,7 @@ class TestWiringMixin(unittest.TestCase):
 
     def test_connect_dimension_mismatch_raises(self):
         diagram = DiagramSystem()
-        diagram.add_subsystem(ProportionalController(), "controller")
+        diagram.add_subsystem(P(ports="reference"), "controller")
         diagram.add_input_port("r", dim=2)
         with self.assertRaises(ValueError) as ctx:
             diagram.connect("input", "r", "controller", "r")
@@ -618,7 +618,7 @@ class TestWiringMixin(unittest.TestCase):
 
     def test_boundary_output_feedthrough_tracks_later_wiring(self):
         diagram = DiagramSystem()
-        diagram.add_subsystem(ProportionalController(2.5), "controller")
+        diagram.add_subsystem(P(2.5, ports="reference"), "controller")
         diagram.add_input_port("r")
         diagram.connect_new_output_port("controller", "u", "u")
         self.assertEqual(diagram.outputs["u"].dependencies, ())
@@ -721,10 +721,10 @@ class _Counter(StepSystem):
 
 
 def _unity_feedback_diagram():
-    from minilink.control.output import ProportionalController
+    from minilink.control.siso import P
 
     diagram = DiagramSystem()
-    diagram.add_subsystem(ProportionalController(), "controller")
+    diagram.add_subsystem(P(ports="reference"), "controller")
     diagram.add_subsystem(Integrator(), "plant")
     diagram.add_input_port("r")
     diagram.connect("input", "r", "controller", "r")
@@ -813,7 +813,7 @@ class TestFeedbackMissingPortMessage(unittest.TestCase):
     """S04: a plant without a 'y' port gets a message that names the fix."""
 
     def test_missing_plant_output_port_message(self):
-        from minilink.control.output import ProportionalController
+        from minilink.control.siso import P
         from minilink.core.system import DynamicSystem
 
         class NoOutput(DynamicSystem):
@@ -824,7 +824,7 @@ class TestFeedbackMissingPortMessage(unittest.TestCase):
                 return np.array([x[1], u[0] - x[0]])
 
         with self.assertRaises(ValueError) as ctx:
-            ProportionalController() @ NoOutput()
+            P(ports="reference") @ NoOutput()
         message = str(ctx.exception)
         self.assertIn("has no 'y' output port", message)
         self.assertIn("output_dim=", message)

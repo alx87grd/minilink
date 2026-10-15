@@ -84,7 +84,7 @@ or neural network alike):
 | `blocks/` | plant-agnostic wiring: sources, `Integrator`, `TransferFunction`, routing (`Sum`/`Gain`/`Mux`/`Demux`), nonlinear (`Saturation`/`DeadZone`/`Relay`), filters, neural (`NeuralNetwork`) |
 | `dynamics/` | plants: `abstraction/` mother classes, `catalog/` by physical domain |
 | `catalog/` | **teaching alias** of `dynamics/catalog/` — flat re-exports for short imports (`from minilink.catalog import Pendulum`); ownership stays in `dynamics/` |
-| `control/` | control laws and design verbs (`design.py` — `lqr`, `place`, `lqr_finite_horizon`, `lqg`, `trajectory_lqr` on a linear model (`LTISystem`) or any plant linearized about its command port, and their gains `lqr_gain`, `place_gain`, `lqr_gain_schedule` on arrays; `impedance.py`, `output.py`, `state.py`, `siso.py` — `PID` with `ports="error"` (compensator, one input `e`) or `"reference"` (`r`, `y`), `modelbased.py`, `robotic.py`, `geometric.py` — `PurePursuit`, `neural.py` — `NeuralPolicyController`, **`mpc/`** — RH `ModelPredictiveController`) |
+| `control/` | control laws and design verbs (`design.py` — `lqr`, `place`, `lqr_finite_horizon`, `lqg`, `trajectory_lqr` on a linear model (`LTISystem`) or any plant linearized about its command port, and their gains `lqr_gain`, `place_gain`, `lqr_gain_schedule` on arrays; `impedance.py`, `state.py`, `siso.py` — `P`, `PI`, `PD`, `PID` with `ports="error"` (compensator, one input `e`) or `"reference"` (`r`, `y`), `modelbased.py`, `robotic.py`, `geometric.py` — `PurePursuit`, `neural.py` — `NeuralPolicyController`, **`mpc/`** — RH `ModelPredictiveController`) |
 | `estimation/` | state observers and their designs: `observer.py` — `StateObserver`, the innovation form `dx̂ = A (x̂ − x̄) + B (u − ū) + L (y − ŷ)` with ports `u`, `y` → `x` (the estimate, hat labels) and the role id `observer`; `design.py` — `luenberger` (error poles placed on the dual pair) and `kalman` (the stationary Kalman–Bucy gain), each on a linear model or a plant linearized about its command port, with `kalman_gain(A, C, Q_n, R_n)` / `luenberger_gain` on arrays. The LQG box, `observer` + `gain` under one controller, is `control.design.lqg`; `closed_loop(gain, plant, observer=obs)` wires the same loop by role. Later: time-varying and trajectory observers, the EKF, the sampled filters, the estimation problem and its tools ([docs/plans/estimation-and-state-feedback.md](docs/plans/estimation-and-state-feedback.md)) |
 
 **Tools** — verbs on a `System`; they return data or plots and never define
@@ -582,8 +582,7 @@ Visualization: subsystem `"world"` geometry merges into one shared diagram
 **Compensators and the Error block.** Classical laws are
 written once on the tracking error and take a port-layout switch:
 `ports="error"` declares one input `e` and command `u` (the compensator
-form, `PID`, `Lead`, `Lag`, `TransferFunction(ports="error")`,
-`ProportionalController(ports="error")`),
+form, `P`, `PI`, `PD`, `PID`, `Lead`, `Lag`, `TransferFunction(ports="error")`),
 `ports="reference"` declares `r` and `y` (the controller form the generic
 framework uses). A bare `TransferFunction` stays a plant (`u`, `y`). An
 error-driven block (`core.feedback.block_roles`: an input `e`, or a single
@@ -666,11 +665,10 @@ they read and what the zero-argument sweep draws:
 
 | Module | Measurement | `plot_control_law` sweep |
 | --- | --- | --- |
-| `output.py` | `y` with `r` (`u = c(r - y)`) | error `e = r − y` |
 | (a law on `y` used absolutely, `u = c(y, r)`: learned policies) | `y`, `r` of another size or absent | measurement, `r` pinned |
 | `impedance.py` | `y = [pos; rate]` dim `2n`; optional robotic `+ g(q)` via `robotic.py` | `(e, de)` plane (`plot_space = "error_qdq"`) |
 | `state.py` | full state `x`; constant gain `K` (`StateFeedbackController`, what `lqr` returns: `u = ubar - K (x - r)` on a state reference, `r` defaulting to `xbar`; `OutputReferenceController(K, N)`, the textbook output reference `u = ubar - K (x - xbar) + N r`, `r` of the output's dimension) or a gain schedule `K(t)` interpolated between samples and held or replaced past its end (`TimeVaryingStateFeedbackController`, what `lqr_finite_horizon` returns; the schedule itself comes from `lqr_gain_schedule`, the Riccati differential equation propagated exactly through the Hamiltonian system); feedback around a reference trajectory `u = u_d(t) - K(t)(x - x_d(t))` (`TrajectoryFeedbackController`, no reference port — the trajectory is the reference; what `trajectory_lqr` returns: the plant linearized at every sample of the reference, the Riccati equation swept backward interval by interval from the stationary solution at the end point) | `(x0, x1)` |
-| `siso.py` | `y` dim `n` only (decoupled loops) | error per axis |
+| `siso.py` (`P`, `PI`, `PD`, `PID`) | `e` per axis, or `y` with `r` (decoupled loops) | error per axis |
 | `robotic.py` (task laws) | Joint ``[q; dq]`` feedback; internal FK/J; optional ``+ g(q)``; optional task-force arrow | `(q0, dq0)` absolute (`plot_space = "absolute_qdq"`) |
 | `robotic.py` (kinematic laws) | Joint ``q`` only; outputs ``dq`` for speed-controlled plants | measurement (`plot_space = "measurement"`: the task reference is not a joint error) |
 | `modelbased.py` | ``y = [q; dq]``; computed torque; Pyro sliding mode ``τ = ID(q,dq,ddq_r) - K(q) sign(s)`` | `(q0, dq0)` absolute (`plot_space = "absolute_qdq"`) |

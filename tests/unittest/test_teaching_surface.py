@@ -90,7 +90,7 @@ TEACHING_SURFACE: dict[str, tuple[str, ...]] = {
         "MLP",
     ),
     "minilink.control": (
-        "ProportionalController",
+        "P",
         "StateFeedbackController",
         "TimeVaryingStateFeedbackController",
         "TrajectoryFeedbackController",

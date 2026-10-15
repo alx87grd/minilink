@@ -348,7 +348,7 @@ class TestLQR(unittest.TestCase):
 
 
 from minilink.control.impedance import ImpedanceController, ImpedanceIntegralController
-from minilink.control.output import ProportionalController
+from minilink.control.siso import P
 from minilink.control.siso import PD, PI, PID
 from minilink.control.state import (
     StateFeedbackController,
@@ -528,11 +528,23 @@ class TestFiniteHorizonLQR(unittest.TestCase):
         np.testing.assert_allclose(traj.x[:, -1], [0.0, 0.0], atol=0.02)
 
 
-class TestProportionalController(unittest.TestCase):
-    def test_mimo_error_law(self):
-        ctl = ProportionalController([[2.0, 0.0], [0.0, 3.0]])
-        u = ctl.ctl(None, np.array([1.0, 1.0, 0.0, 0.0]))
+class TestP(unittest.TestCase):
+    def test_decoupled_law_per_axis(self):
+        ctl = P([2.0, 3.0], dof=2, ports="reference")
+        u = ctl.ctl(np.zeros(0), np.array([1.0, 1.0, 0.0, 0.0]))
         np.testing.assert_allclose(u, [2.0, 3.0])
+        self.assertEqual(ctl.n, 0)
+
+    def test_limits_clip_the_command(self):
+        ctl = P(10.0, u_max=1.0)
+        np.testing.assert_allclose(ctl.ctl(np.zeros(0), np.array([0.5])), [1.0])
+
+    def test_a_coupled_gain_is_a_gain_block_in_the_loop(self):
+        from minilink import Gain
+
+        K = np.array([[1.0, 0.5]])
+        loop = Gain(K) @ Pendulum()
+        self.assertEqual(list(loop.subsystems), ["controller", "plant", "error"])
 
 
 class TestStateFeedbackController(unittest.TestCase):
@@ -1381,7 +1393,7 @@ class TestDiscretize(unittest.TestCase):
 
     def test_discretize_rejects_static_system(self):
         with self.assertRaises(TypeError):
-            discretize(ProportionalController(1.0), dt=0.01)
+            discretize(P(1.0, ports="reference"), dt=0.01)
 
 
 from minilink.dynamics.abstraction.state_space import LTISystem, StateSpaceSystem
@@ -1498,7 +1510,7 @@ class TestCompensatorStateLayout(unittest.TestCase):
         self.plant.x0 = np.zeros(2)
 
     def test_state_dimensions(self):
-        self.assertEqual(ProportionalController(2.0, ports="error").n, 0)
+        self.assertEqual(P(2.0, ports="error").n, 0)
         self.assertEqual(PI(Kp=2.0, Ki=1.0).n, 1)
         self.assertEqual(PD(Kp=2.0, Kd=1.0).n, 1)
         self.assertEqual(PID(Kp=2.0, Ki=1.0, Kd=1.0).n, 2)
@@ -1508,7 +1520,7 @@ class TestCompensatorStateLayout(unittest.TestCase):
     def test_loop_gain_pole_and_zero_counts(self):
         plant_poles = 2
         for controller, extra_poles, n_zeros in (
-            (ProportionalController(20.0, ports="error"), 0, 0),
+            (P(20.0, ports="error"), 0, 0),
             (PI(Kp=20.0, Ki=10.0), 1, 1),
             (PD(Kp=20.0, Kd=2.0, tau=0.05), 1, 1),
             (PID(Kp=20.0, Ki=10.0, Kd=2.0, tau=0.05), 2, 2),

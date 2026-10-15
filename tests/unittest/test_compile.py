@@ -13,7 +13,7 @@ import warnings
 import numpy as np
 import pytest
 from minilink.blocks.basic import Integrator
-from minilink.control.output import ProportionalController
+from minilink.control.siso import P
 from minilink.core.backends import array_module
 from minilink.core.compile.compiler import (
     build_execution_plan,
@@ -89,10 +89,10 @@ def _build_closed_loop_with_external_output_jax():
 
 
 def _build_small_closed_loop():
-    """Step → ProportionalController → Integrator → feedback to controller."""
+    """Step → P → Integrator → feedback to controller."""
     diag = DiagramSystem()
     diag.connection_verbose = False
-    ctl = ProportionalController(2.5)
+    ctl = P(2.5, ports="reference")
     plant = Integrator()
     diag.add_subsystem(ctl, "controller")
     diag.add_subsystem(plant, "plant")
@@ -236,7 +236,14 @@ class TestNumpyDiagramEvaluator(unittest.TestCase):
         diag = _build_small_closed_loop()
         x = np.array([0.5])
         u = np.array([2.0])
-        params = {"controller": {"K": np.array([[4.0]])}, "plant": {"k": 3.0}}
+        params = {
+            "controller": {
+                "Kp": np.array([4.0]),
+                "u_min": np.array([-np.inf]),
+                "u_max": np.array([np.inf]),
+            },
+            "plant": {"k": 3.0},
+        }
         dx = diag.f(x, u, 0.0, params=params)
         np.testing.assert_allclose(dx, np.array([18.0]), atol=1e-10)
 
@@ -499,7 +506,14 @@ class TestNumpyDiagramParametricTier(unittest.TestCase):
         self.u = np.array([2.0])
 
     def test_f_p_matches_recursive_reference(self):
-        params = {"controller": {"K": np.array([[4.0]])}, "plant": {"k": 3.0}}
+        params = {
+            "controller": {
+                "Kp": np.array([4.0]),
+                "u_min": np.array([-np.inf]),
+                "u_max": np.array([np.inf]),
+            },
+            "plant": {"k": 3.0},
+        }
         for x_val, u_val, t in [(0.3, 1.2, 0.1), (0.0, 0.0, 0.0), (-5.0, 10.0, 0.0)]:
             x, u = (np.array([x_val]), np.array([u_val]))
             np.testing.assert_allclose(
@@ -524,7 +538,13 @@ class TestNumpyDiagramParametricTier(unittest.TestCase):
             self.evaluator.f_p(self.x, self.u, 0.0, {"plnt": {"k": 3.0}})
 
     def test_outputs_p_single_boundary(self):
-        params = {"controller": {"K": np.array([[4.0]])}}
+        params = {
+            "controller": {
+                "Kp": np.array([4.0]),
+                "u_min": np.array([-np.inf]),
+                "u_max": np.array([np.inf]),
+            }
+        }
         out = self.evaluator.outputs_p(self.x, self.u, 0.0, params)
         self.assertEqual(set(out), {"y_meas"})
         np.testing.assert_allclose(out["y_meas"], [0.5], atol=1e-10)

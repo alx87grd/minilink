@@ -1684,7 +1684,7 @@ class TestArrowGeometry(unittest.TestCase):
 from minilink.blocks.nonlinear import Saturation  # noqa: E402
 from minilink.control.impedance import ImpedanceController  # noqa: E402
 from minilink.control.modelbased import ComputedTorqueController  # noqa: E402
-from minilink.control.output import ProportionalController  # noqa: E402
+from minilink.control.siso import P  # noqa: E402
 from minilink.control.siso import PID  # noqa: E402
 from minilink.control.state import StateFeedbackController  # noqa: E402
 from minilink.dynamics.catalog.pendulum.pendulum import Pendulum  # noqa: E402
@@ -1730,7 +1730,7 @@ class TestPlotInputOutputMap(unittest.TestCase):
 
 class TestPlotControlLaw(unittest.TestCase):
     def test_error_space_line_values(self):
-        prop = ProportionalController(K=2.0)
+        prop = P(Kp=2.0, ports="reference")
         res = prop.plot_control_law(bounds=(-1.0, 1.0), show=False)
         line = res.axes.lines[0]
         e = line.get_xdata()
@@ -1811,7 +1811,7 @@ class TestPlotControlLaw(unittest.TestCase):
         plt.close(res.figure)
 
     def test_reference_pin_and_3d(self):
-        prop = ProportionalController(K=2.0)
+        prop = P(Kp=2.0, ports="reference")
         res = prop.plot_control_law(r=np.array([0.5]), bounds=(-1.0, 1.0), show=False)
         line = res.axes.lines[0]
         np.testing.assert_allclose(line.get_ydata(), 2.0 * line.get_xdata())

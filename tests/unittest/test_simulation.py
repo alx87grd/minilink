@@ -419,9 +419,9 @@ class TestStaticSimulator(unittest.TestCase):
         np.testing.assert_allclose(traj.signals["y"], np.zeros((1, 5)))
 
     def test_a_block_whose_output_is_named_u_simulates(self):
-        from minilink import ProportionalController
+        from minilink import P
 
-        ctl = ProportionalController(2.0)
+        ctl = P(2.0, ports="reference")
         traj = ctl.compute_trajectory(t0=0, tf=1, n_steps=5, verbose=False)
         self.assertEqual(traj.u.shape, (2, 5))  # the stacked inputs r, y
         self.assertNotIn("u", traj.signals)
@@ -798,19 +798,19 @@ class TestComputer(unittest.TestCase):
             computer.tick(np.array([1.0]))
 
 
-from minilink.control.output import ProportionalController
+from minilink.control.siso import P
 from minilink.core.hybrid_composition import hybrid_closed_loop
 from minilink.simulation.computer import Computer, StepSchedule, as_computer
 
 
-class ScheduledProportionalController(ProportionalController):
+class ScheduledP(P):
     """A block whose own ``%`` extends the base operator."""
 
     def __mod__(self, schedule):
         return super().__mod__(schedule)
 
 
-class UnscheduledProportionalController(ProportionalController):
+class UnscheduledP(P):
     """A block whose own ``%`` returns something other than a Computer."""
 
     def __mod__(self, schedule):
@@ -819,7 +819,7 @@ class UnscheduledProportionalController(ProportionalController):
 
 def _build_step_diagram():
     diagram = StepDiagramSystem()
-    diagram.add_subsystem(ProportionalController(0.5), "controller")
+    diagram.add_subsystem(P(0.5, ports="reference"), "controller")
     diagram.add_input_port("r")
     diagram.add_input_port("y")
     diagram.connect("input", "r", "controller", "r")
@@ -830,7 +830,7 @@ def _build_step_diagram():
 
 class TestAsComputer(unittest.TestCase):
     def test_leaf_mod_float(self):
-        computer = ProportionalController(0.3) % 0.02
+        computer = P(0.3, ports="reference") % 0.02
         self.assertIsInstance(computer, Computer)
         self.assertAlmostEqual(computer.schedule.dt_base, 0.02)
         self.assertIn("controller", computer.diagram.subsystems)
@@ -846,7 +846,7 @@ class TestAsComputer(unittest.TestCase):
 
     def test_mod_override_calling_super_builds_a_computer(self):
         """``%``, ``as_computer`` and ``hybrid_closed_loop`` reach the plain build."""
-        ctl = ScheduledProportionalController(0.3)
+        ctl = ScheduledP(0.3, ports="reference")
         computers = (
             ctl % 0.02,
             as_computer(ctl, 0.02),
@@ -858,7 +858,7 @@ class TestAsComputer(unittest.TestCase):
 
     def test_as_computer_rejects_a_mod_that_is_not_a_computer(self):
         with self.assertRaises(TypeError):
-            as_computer(UnscheduledProportionalController(0.3), 0.02)
+            as_computer(UnscheduledP(0.3, ports="reference"), 0.02)
 
     def test_mpc_mod_exposes_u_ff(self):
         pytest = __import__("pytest")

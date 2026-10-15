@@ -13,8 +13,8 @@ from minilink import (
     Integrator,
     Lag,
     Lead,
+    P,
     Pendulum,
-    ProportionalController,
     Step,
     TransferFunction,
     feedback,
@@ -195,15 +195,15 @@ class TestSeriesRule(unittest.TestCase):
 
     def test_a_source_into_a_reference_and_measurement_block_is_refused(self):
         with self.assertRaisesRegex(ValueError, "would drive the measurement"):
-            Step() >> ProportionalController()
+            Step() >> P(ports="reference")
         with self.assertRaisesRegex(ValueError, "one output to one input"):
-            ProportionalController() >> ProportionalController()
+            P(ports="reference") >> P(ports="reference")
 
     def test_feedback_closes_on_the_command_input_or_refuses(self):
         T = feedback(PID() >> Integrator())
         self.assertEqual(T.connections["pid"]["e"], ("error", "e"))
         with self.assertRaisesRegex(ValueError, "measurement on 'y' \\(on its edge\\)"):
-            feedback(ProportionalController() >> Integrator())
+            feedback(P(ports="reference") >> Integrator())
         from minilink import DiagramSystem
 
         two_outputs = DiagramSystem()
@@ -220,23 +220,21 @@ class TestLoopNames(unittest.TestCase):
     """``@`` names ``controller`` and ``plant``; the other operators keep the blocks' names."""
 
     def test_only_the_loop_operator_mints_role_names(self):
-        loop = ProportionalController() @ Integrator()
+        loop = P(ports="reference") @ Integrator()
         self.assertEqual(list(loop.subsystems), ["controller", "plant"])
         self.assertEqual(list(feedback(Integrator()).subsystems), ["plant", "error"])
         chain = (
-            Step(final_value=[1.0], port="r")
-            >> ProportionalController()
-            >> Integrator()
+            Step(final_value=[1.0], port="r") >> P(ports="reference") >> Integrator()
         )
-        self.assertEqual(list(chain.subsystems), ["step", "p_controller", "integrator"])
+        self.assertEqual(list(chain.subsystems), ["step", "p", "integrator"])
         self.assertEqual(
             list((Integrator() + Integrator()).subsystems),
             ["integrator", "integrator2"],
         )
 
     def test_two_loops_cannot_sit_side_by_side(self):
-        loop = ProportionalController() @ Integrator()
-        other = ProportionalController() @ Integrator()
+        loop = P(ports="reference") @ Integrator()
+        other = P(ports="reference") @ Integrator()
         for build in (lambda: loop + other, lambda: loop >> other):
             with self.assertRaisesRegex(ValueError, "already has a 'controller'"):
                 build()
@@ -253,14 +251,14 @@ class TestClosedLoopFilter(unittest.TestCase):
         self.assertEqual(T.connections["filter"]["u"], ("plant", "y"))
         self.assertEqual(T.connections["error"]["-"], ("filter", "y"))
         self.assertEqual(T.connections["output"]["y"], ("plant", "y"))
-        T = closed_loop(ProportionalController(), Integrator(), filter=0.5)
+        T = closed_loop(P(ports="reference"), Integrator(), filter=0.5)
         self.assertEqual(T.connections["controller"]["y"], ("filter", "y"))
         np.testing.assert_allclose(T.subsystems["filter"].params["K"], [[0.5]])
 
     def test_a_noise_enters_before_the_filter(self):
         from minilink import LowPassFilter, closed_loop
 
-        for controller in (ProportionalController(), PID()):
+        for controller in (P(ports="reference"), PID()):
             with self.subTest(controller=controller.name):
                 T = closed_loop(
                     controller, Integrator(), filter=LowPassFilter(), noise=True
@@ -311,13 +309,13 @@ class TestPortLayouts(unittest.TestCase):
             reference.f(np.array([0.0]), np.array([1.0, 0.25])), [0.75]
         )
         np.testing.assert_allclose(
-            _poles(ProportionalController(3.0, ports="error") @ plant),
-            _poles(ProportionalController(3.0) @ plant),
+            _poles(P(3.0, ports="error") @ plant),
+            _poles(P(3.0, ports="reference") @ plant),
             atol=1e-9,
         )
 
     def test_unity_feedback_refuses_a_reference_layout(self):
-        for block in (PID(ports="reference"), ProportionalController()):
+        for block in (PID(ports="reference"), P(ports="reference")):
             with self.subTest(block=block.name):
                 with self.assertRaisesRegex(TypeError, "needs a plant on the right"):
                     block @ 1
@@ -535,13 +533,13 @@ class TestDispatchTable(unittest.TestCase):
             ),
             (
                 "Proportional error",
-                ProportionalController(ports="error") @ SingleMass(),
+                P(ports="error") @ SingleMass(),
                 ["controller", "plant", "error"],
                 junction,
             ),
             (
                 "Proportional",
-                ProportionalController() @ SingleMass(),
+                P(ports="reference") @ SingleMass(),
                 ["controller", "plant"],
                 reads_y,
             ),
@@ -622,7 +620,7 @@ class TestResolver(unittest.TestCase):
         self.assertEqual(pid.entry, "e")
         self.assertTrue(pid.error_driven and pid.stateful)
 
-        p = block_roles(ProportionalController())
+        p = block_roles(P(ports="reference"))
         self.assertEqual((p.measurement, p.reference, p.entry), ("y", "r", None))
         self.assertFalse(p.error_driven or p.stateful)
 
@@ -646,7 +644,7 @@ class TestResolver(unittest.TestCase):
         self.assertEqual(command_port(PID() @ Pendulum()), "r")
         self.assertEqual(command_port(Lead()), "e")
         with self.assertRaisesRegex(ValueError, "input port named 'u'"):
-            command_port(ProportionalController())
+            command_port(P(ports="reference"))
         with self.assertRaisesRegex(ValueError, "input port named 'u'"):
             command_port(Step())
 
