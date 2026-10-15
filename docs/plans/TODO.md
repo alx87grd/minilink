@@ -659,6 +659,13 @@ One line each; open a plan doc only when a design needs a writeup.
 - The automatic `d` / `n` plant wrapper of P10, deferred until someone needs it
   ([automation-by-convention.md](automation-by-convention.md) §4.3, §10).
 - Vehicle view ports (`pose` / `bodyvel` on `DynamicBicycle` for impedance / PID).
+- **[ask]** Simon's curve speed scaler in the path-tracking project: `PathTracking` in
+  `examples/projects/pathtracking/bicycle_los_v2/path_tracking.py` holds `vx_ref` constant;
+  Simon's LOS caps it by the heading change ahead along the path (the weighted sum of
+  `|Δψ|` over a look-ahead window, mapped to a speed limit through lookup tables). Source:
+  PR #99, `minilink/control/guidance_los_coupled.py` (`compute_curve_demand_norm`,
+  `speed_limit_from_curve_demand`). Weigh the tables against the one-parameter textbook cap
+  `v ≤ sqrt(a_y_max / κ)` on the sharpest curvature ahead.
 - Scene params / `J(z, p)` bind (DESIGN §4 planning-params pipeline B; moving obstacles
   online without rebuilding the NLP).
 - `SimulationOptions`, one record for the `Simulator` solver presets (DESIGN §5), weighed
