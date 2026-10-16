@@ -1,9 +1,4 @@
-"""
-Hybrid diagrams: scheduled computer side + continuous plant side.
-
-Boundary ports between sides use ZOH (computer → plant) or sample (plant →
-computer). Schedule lives on :class:`~minilink.simulation.computer.Computer`.
-"""
+"""Hybrid diagrams: a scheduled computer side and a continuous plant side."""
 
 from __future__ import annotations
 
@@ -15,6 +10,7 @@ from minilink.core.diagram import DiagramSystem, StepDiagramSystem
 if TYPE_CHECKING:
     from minilink.simulation.computer import Computer
 
+# The older spellings, which name the computer side after its step diagram
 _DIRECTION_ALIASES = {
     "step_to_plant": "computer_to_plant",
     "plant_to_step": "plant_to_computer",
@@ -23,26 +19,19 @@ _DIRECTION_ALIASES = {
 BoundaryDirection = Literal["computer_to_plant", "plant_to_computer"]
 
 
+###############################################################################
 # Public API
-
-
-@dataclass(frozen=True)
-class BoundaryConnection:
-    """One channel across the computer ↔ plant boundary."""
-
-    direction: BoundaryDirection
-    computer_port: str
-    plant_port: str
-
-    def __post_init__(self) -> None:
-        direction = _normalize_direction(self.direction)
-        object.__setattr__(self, "direction", direction)
+###############################################################################
 
 
 @dataclass
 class HybridDiagram:
     """
     Two-side hybrid topology: :class:`Computer` + continuous :class:`DiagramSystem`.
+
+    Boundary ports between the sides use ZOH (computer → plant) or sample
+    (plant → computer). The schedule lives on
+    :class:`~minilink.simulation.computer.Computer`.
 
     Parameters
     ----------
@@ -59,17 +48,10 @@ class HybridDiagram:
     connections: list[BoundaryConnection] = field(default_factory=list)
 
     def __post_init__(self) -> None:
-        from minilink.simulation.computer import Computer
+        # The two sides: a scheduled runtime and a continuous plant diagram
+        require_sides(self.computer, self.plant)
 
-        if not isinstance(self.computer, Computer):
-            raise TypeError(
-                f"HybridDiagram requires Computer, got {type(self.computer).__name__}"
-            )
-        if not isinstance(self.plant, DiagramSystem):
-            raise TypeError(
-                f"HybridDiagram requires DiagramSystem plant, "
-                f"got {type(self.plant).__name__}"
-            )
+        # Memory: the latest simulation, and its plant trajectory
         self.last_result = None
         self.traj = None
 
@@ -78,6 +60,7 @@ class HybridDiagram:
         """Tick-indexed computer view from :attr:`last_result` (``None`` if unset)."""
         if self.last_result is None:
             return None
+
         return self.last_result.computer
 
     @classmethod
@@ -90,38 +73,14 @@ class HybridDiagram:
         connections: list[BoundaryConnection] | None = None,
     ) -> HybridDiagram:
         """Wrap ``step_diagram`` and ``schedule`` in a :class:`Computer`."""
+        # Tools import core (DESIGN §3): the simulation band loads on first use
         from minilink.simulation.computer import Computer, StepSchedule
 
         if not isinstance(schedule, StepSchedule):
             schedule = StepSchedule(dt_base=float(schedule))
         computer = Computer(step_diagram, schedule)
+
         return cls(computer=computer, plant=plant, connections=list(connections or []))
-
-    def _simulator(
-        self,
-        *,
-        t0=0,
-        tf=10,
-        x0_plant=None,
-        x0_computer=None,
-        n_steps=None,
-        plant_dt_inner=None,
-        compile_backend="numpy",
-        verbose=False,
-    ):
-        from minilink.simulation.hybrid_simulator import HybridSimulator
-
-        return HybridSimulator(
-            self,
-            x0_plant=x0_plant,
-            x0_computer=x0_computer,
-            t0=t0,
-            tf=tf,
-            n_steps=n_steps,
-            plant_dt_inner=plant_dt_inner,
-            compile_backend=compile_backend,
-            verbose=verbose,
-        )
 
     def connect_boundary(
         self,
@@ -131,13 +90,13 @@ class HybridDiagram:
         plant_port: str,
     ) -> None:
         """Append and validate one boundary channel."""
-        direction = _normalize_direction(direction)
+        direction = normalize_direction(direction)
         conn = BoundaryConnection(
             direction=direction,
             computer_port=computer_port,
             plant_port=plant_port,
         )
-        _validate_boundary_connection(self, conn)
+        require_boundary_ports(self, conn)
         self.connections.append(conn)
 
     def compute_trajectory(
@@ -165,7 +124,7 @@ class HybridDiagram:
         HybridSimResult
             Stored on :attr:`last_result`; plant view on :attr:`traj`.
         """
-        result = self._simulator(
+        result = self.build_simulator(
             t0=t0,
             tf=tf,
             x0_plant=x0_plant,
@@ -175,9 +134,11 @@ class HybridDiagram:
             compile_backend=compile_backend,
             verbose=verbose,
         ).solve()
-        self._cache_result(result)
+        self.cache_result(result)
+
         if show:
             result.plot()
+
         return result
 
     def compute_forced(
@@ -207,7 +168,7 @@ class HybridDiagram:
         HybridSimResult
             Stored on :attr:`last_result`; plant view on :attr:`traj`.
         """
-        result = self._simulator(
+        result = self.build_simulator(
             t0=t0,
             tf=tf,
             x0_plant=x0_plant,
@@ -217,9 +178,11 @@ class HybridDiagram:
             compile_backend=compile_backend,
             verbose=verbose,
         ).solve_forced(u, input_port_id=input_port_id)
-        self._cache_result(result)
+        self.cache_result(result)
+
         if show:
             result.plot()
+
         return result
 
     def plot_trajectory(
@@ -247,17 +210,18 @@ class HybridDiagram:
         drawn with the same default channels; a plant trajectory raises
         ``ValueError``.
         """
-        if abscissa not in ("t", "k"):
-            raise ValueError(
-                "abscissa must be 't' (plant time) or 'k' (computer ticks), "
-                f"got {abscissa!r}"
-            )
+        require_abscissa(abscissa)
+
+        # The latest result, simulated first when there is none
         if traj is None:
             if self.last_result is None:
                 self.compute_trajectory(show=False, verbose=False)
             traj = self.last_result
+
+        # A real cycle: simulation.hybrid_simulator imports HybridDiagram from this module
         from minilink.simulation.hybrid_simulator import HybridSimResult
 
+        # A hybrid result draws its own plant and computer views
         if isinstance(traj, HybridSimResult):
             plot_view = traj.plot if abscissa == "t" else traj.plot_computer
             return plot_view(
@@ -266,6 +230,8 @@ class HybridDiagram:
                 backend=backend,
                 **kwargs,
             )
+
+        # Rendering stays optional (DESIGN §3): the graphical band loads on first use
         from minilink.graphical.signals.time_signals import (
             STEP_ABSCISSA_LABEL,
             TIME_ABSCISSA_LABEL,
@@ -273,23 +239,24 @@ class HybridDiagram:
             resolve_plot_signals,
         )
 
+        # A plain trajectory: the plant against time, or a computer rollout
+        # against the tick index
         if abscissa == "t":
-            sys, abscissa_label = self.plant, TIME_ABSCISSA_LABEL
+            sys = self.plant
+            abscissa_label = TIME_ABSCISSA_LABEL
         else:
-            sys, abscissa_label = self.computer.diagram, STEP_ABSCISSA_LABEL
-            if traj.x.shape[0] != sys.n or traj.u.shape[0] != sys.m:
-                raise ValueError(
-                    "abscissa='k' plots a computer rollout: pass the HybridSimResult "
-                    "or result.computer.as_trajectory(). This trajectory has "
-                    f"n={traj.x.shape[0]}, m={traj.u.shape[0]}; the computer "
-                    f"diagram has n={sys.n}, m={sys.m}."
-                )
+            sys = self.computer.diagram
+            abscissa_label = STEP_ABSCISSA_LABEL
+            require_computer_rollout(traj, sys)
             if signals is None and traj.signals:
                 signals = tuple(traj.signals)
+
+        # The default channels, with the input when the trajectory carries one
         if signals is None:
             signals = resolve_plot_signals(sys)
             if traj.u.shape[0]:
                 signals = tuple(dict.fromkeys((*signals, "u")))
+
         return plot_time_signals(
             sys,
             traj,
@@ -322,9 +289,13 @@ class HybridDiagram:
         on a flow diagram. Uses :attr:`plant` geometry; ``traj`` defaults to the
         last plant trajectory from :meth:`compute_trajectory` / :meth:`compute_forced`.
         """
+        # Rendering stays optional (DESIGN §3): the graphical band loads on first use
         from minilink.graphical.animation import Animator
+
+        # The notebook check belongs to the same optional band
         from minilink.graphical.common.environment import prefers_inline_animation
 
+        # The cached plant trajectory, else the latest result's, else a fresh run
         if traj is None:
             if self.traj is not None:
                 traj = self.traj
@@ -335,11 +306,15 @@ class HybridDiagram:
                 traj = self.traj
 
         resolved_html = prefers_inline_animation() if html is None else html
+
+        # A real cycle: core.hybrid_composition imports HybridDiagram from this module
         from minilink.core.hybrid_composition import refresh_plant_animation_camera
 
+        # The plant's camera hints, refreshed from its blocks
         refresh_plant_animation_camera(self.plant)
         animator = Animator(self.plant)
         show_plot = show and not resolved_html
+
         return animator.animate_simulation(
             traj,
             time_factor_video=time_factor_video,
@@ -354,11 +329,6 @@ class HybridDiagram:
             camera=camera,
             overlays=overlays,
         )
-
-    def _cache_result(self, result) -> None:
-        """Store full hybrid result and plant trajectory cache."""
-        self.last_result = result
-        self.traj = result.plant
 
     def plot_diagram(
         self,
@@ -378,6 +348,8 @@ class HybridDiagram:
         external Inputs/Outputs routing nodes and anchors hybrid edges on the
         wired subsystem ports.
         """
+        # A real cycle: graphical.diagrams.hybrid_dot imports HybridDiagram through
+        # hybrid_topology
         from minilink.graphical.diagrams.hybrid_dot import plot_hybrid_diagram
 
         return plot_hybrid_diagram(
@@ -391,37 +363,112 @@ class HybridDiagram:
 
     def _repr_svg_(self):
         """Notebook inline SVG for the hybrid topology (IPython / Jupyter)."""
+        # A real cycle: graphical.diagrams.hybrid_dot imports HybridDiagram through
+        # hybrid_topology
         from minilink.graphical.diagrams.hybrid_dot import export_hybrid_graphviz
+
+        # A real cycle: hybrid_topology imports HybridDiagram from this module
         from minilink.graphical.diagrams.hybrid_topology import build_hybrid_topology
 
         graph = export_hybrid_graphviz(build_hybrid_topology(self))
         if graph is None:
             return None
+
         try:
             return graph._repr_image_svg_xml()
         except Exception:
             return None
 
+    ###########################################################################
+    # Internal machinery
+    ###########################################################################
 
+    def build_simulator(
+        self,
+        *,
+        t0=0,
+        tf=10,
+        x0_plant=None,
+        x0_computer=None,
+        n_steps=None,
+        plant_dt_inner=None,
+        compile_backend="numpy",
+        verbose=False,
+    ):
+        """The :class:`~minilink.simulation.hybrid_simulator.HybridSimulator` of one run."""
+        # A real cycle: simulation.hybrid_simulator imports HybridDiagram from this module
+        from minilink.simulation.hybrid_simulator import HybridSimulator
+
+        return HybridSimulator(
+            self,
+            x0_plant=x0_plant,
+            x0_computer=x0_computer,
+            t0=t0,
+            tf=tf,
+            n_steps=n_steps,
+            plant_dt_inner=plant_dt_inner,
+            compile_backend=compile_backend,
+            verbose=verbose,
+        )
+
+    def cache_result(self, result) -> None:
+        """Store full hybrid result and plant trajectory cache."""
+        self.last_result = result
+        self.traj = result.plant
+
+
+@dataclass(frozen=True)
+class BoundaryConnection:
+    """One channel across the computer ↔ plant boundary."""
+
+    direction: BoundaryDirection
+    computer_port: str
+    plant_port: str
+
+    def __post_init__(self) -> None:
+        # The canonical direction, set past the frozen dataclass
+        direction = normalize_direction(self.direction)
+        object.__setattr__(self, "direction", direction)
+
+
+###############################################################################
 # Internal machinery
+###############################################################################
 
 
-def _normalize_direction(direction: str) -> BoundaryDirection:
+def require_sides(computer, plant) -> None:
+    """Refuse a computer that is not a ``Computer``, or a plant not a ``DiagramSystem``."""
+    # Tools import core (DESIGN §3): the simulation band loads on first use
+    from minilink.simulation.computer import Computer
+
+    if not isinstance(computer, Computer):
+        raise TypeError(
+            f"HybridDiagram requires Computer, got {type(computer).__name__}"
+        )
+    if not isinstance(plant, DiagramSystem):
+        raise TypeError(
+            f"HybridDiagram requires DiagramSystem plant, got {type(plant).__name__}"
+        )
+
+
+def normalize_direction(direction: str) -> BoundaryDirection:
+    """The canonical boundary direction, the step-diagram aliases resolved."""
     key = _DIRECTION_ALIASES.get(direction, direction)
     if key not in ("computer_to_plant", "plant_to_computer"):
         raise ValueError(
             f"direction must be 'computer_to_plant' or 'plant_to_computer', "
             f"got {direction!r}"
         )
+
     return key  # type: ignore[return-value]
 
 
-def _validate_boundary_connection(
-    hybrid: HybridDiagram, conn: BoundaryConnection
-) -> None:
+def require_boundary_ports(hybrid: HybridDiagram, conn: BoundaryConnection) -> None:
+    """Refuse a channel whose ports are missing on either side or differ in size."""
     diagram = hybrid.computer.diagram
     plant = hybrid.plant
 
+    # Computer output → plant input
     if conn.direction == "computer_to_plant":
         if conn.computer_port not in diagram.outputs:
             raise ValueError(
@@ -435,6 +482,8 @@ def _validate_boundary_connection(
             )
         c_dim = diagram.outputs[conn.computer_port].dim
         p_dim = plant.inputs[conn.plant_port].dim
+
+    # Plant output → computer input
     else:
         if conn.computer_port not in diagram.inputs:
             raise ValueError(
@@ -453,4 +502,24 @@ def _validate_boundary_connection(
         raise ValueError(
             f"Boundary dimension mismatch on {conn.computer_port!r} ↔ "
             f"{conn.plant_port!r}: {c_dim} vs {p_dim}"
+        )
+
+
+def require_abscissa(abscissa) -> None:
+    """Refuse a view other than plant time ``"t"`` or computer ticks ``"k"``."""
+    if abscissa not in ("t", "k"):
+        raise ValueError(
+            "abscissa must be 't' (plant time) or 'k' (computer ticks), "
+            f"got {abscissa!r}"
+        )
+
+
+def require_computer_rollout(traj, sys) -> None:
+    """Refuse a trajectory whose state and input sizes are not the computer diagram's."""
+    if traj.x.shape[0] != sys.n or traj.u.shape[0] != sys.m:
+        raise ValueError(
+            "abscissa='k' plots a computer rollout: pass the HybridSimResult "
+            "or result.computer.as_trajectory(). This trajectory has "
+            f"n={traj.x.shape[0]}, m={traj.u.shape[0]}; the computer "
+            f"diagram has n={sys.n}, m={sys.m}."
         )
