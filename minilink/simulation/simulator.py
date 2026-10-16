@@ -17,7 +17,10 @@ from minilink.simulation.sim_reporting import (
     print_simulation_preamble,
     print_simulation_report,
 )
-from minilink.simulation.solver_warnings import emit_discontinuous_solver_warnings
+from minilink.simulation.solver_warnings import (
+    DISCONTINUOUS_AUTO_DT_SCALE,
+    emit_discontinuous_solver_warnings,
+)
 from minilink.simulation.solvers.euler import EulerSolverBackend
 from minilink.simulation.solvers.euler_fixed import EulerFixedStepSolverBackend
 from minilink.simulation.solvers.rk4_fixed import RK4SolverBackend
@@ -83,9 +86,10 @@ FIXED_STEP_SOLVERS = tuple(
     label for label, (backend, _) in _USER_SOLVER_MODES.items() if backend != "scipy"
 )
 
-# Default automatic dt scale relative to ``solver_info["smallest_time_constant"]``
+# Default automatic dt scale of a smooth loop, relative to
+# ``solver_info["smallest_time_constant"]`` (DISCONTINUOUS_AUTO_DT_SCALE, its
+# discontinuous twin, is owned by the advisories that quote it)
 SMOOTH_AUTO_DT_SCALE = 0.1
-DISCONTINUOUS_AUTO_DT_SCALE = 0.1
 
 # Steps per sample period of a held signal on a smooth loop with no declared time
 # constant: the period is the resolution the user chose; ``dt`` buys a finer one
