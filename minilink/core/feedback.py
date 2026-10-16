@@ -1,44 +1,31 @@
-"""Who is who in a loop: the roles the port names and the reserved subsystem names declare.
-
-A controller is an ordinary :class:`~minilink.core.system.System` (a
-:class:`~minilink.core.system.DynamicSystem` when it has state). Nothing here changes
-how a block computes; this module only reads names:
-
-- :func:`block_roles` reads a block's **port names**: what it measures (``y`` or ``x``),
-  its reference ``r``, its command ``u``, and whether an ``Error`` block drives it
-  (an input ``e``, or the one input of a plain compensator);
-- :func:`roles` reads a diagram's **subsystem names**: the blocks under the reserved
-  names ``plant``, ``controller`` and ``observer``;
-- :func:`command_port` names the input a decision drives on a plant or a box.
-
-``@``, ``feedback``, the sampled loop, ``plot_control_law`` and the evaluators read
-these; a block with other names is wired by hand. The one explicit hint left is
-``plot_space``, the sweep of ``plot_control_law`` where the ports cannot say it.
-"""
+"""Who is who in a loop: the roles the port names and the reserved subsystem names declare."""
 
 from dataclasses import dataclass
 
 import numpy as np
 
-# Public API
-
 #: The three subsystem names that say what role a block plays in a diagram. One of
 #: each per diagram level; a second one is refused, never suffixed.
 RESERVED_IDS = ("plant", "controller", "observer")
 
+#: Marks an unset ``plot_space`` attribute: the ports then decide.
+_UNSET = object()
 
-@dataclass(frozen=True)
-class Roles:
-    """The plant, the controller and the observer of a diagram, or ``None`` each."""
 
-    plant: object | None
-    controller: object | None
-    observer: object | None
+###############################################################################
+# Public API
+###############################################################################
 
 
 @dataclass(frozen=True)
 class BlockRoles:
     """What a block reads and commands, read from its port names alone.
+
+    A controller is an ordinary :class:`~minilink.core.system.System` (a
+    :class:`~minilink.core.system.DynamicSystem` when it has state): its roles
+    change nothing in how it computes. ``@``, ``feedback``, the sampled loop,
+    ``plot_control_law`` and the evaluators read them; a block with other port
+    names is wired by hand.
 
     Attributes
     ----------
@@ -79,15 +66,20 @@ def block_roles(block) -> BlockRoles:
     inputs = getattr(block, "inputs", {})
     outputs = getattr(block, "outputs", {})
 
+    # The plant signals it reads, its reference and its command
     measurements = tuple(port for port in ("y", "x") if port in inputs)
     reference = "r" if "r" in inputs else None
     command = next((port for port in ("u", "u_ff") if port in outputs), None)
+
+    # The entry an Error block drives: e, else the one free input of a block that
+    # reads no measurement
     entry = None
     if "e" in inputs:
         entry = "e"
     elif not measurements:
-        free = [port for port in inputs if port not in ("d", "n")]
+        free = free_inputs(inputs)
         entry = free[0] if len(free) == 1 else None
+
     stateful = int(getattr(block, "n", 0)) > 0
 
     return BlockRoles(measurements, reference, command, entry, stateful)
@@ -104,13 +96,12 @@ def command_port(sys) -> str:
     inputs = getattr(sys, "inputs", {})
     if "u" in inputs:
         return "u"
-    free = [port for port in inputs if port not in ("d", "n")]
-    if len(free) == 1:
-        return free[0]
-    raise ValueError(
-        f"{getattr(sys, 'name', sys)!r} needs an input port named 'u' or a single "
-        f"input port (besides a disturbance 'd' and a noise 'n'); got {list(inputs)}"
-    )
+
+    # Else the one input that is neither a disturbance nor a noise
+    free = free_inputs(inputs)
+    require_one_free_input(sys, inputs, free)
+
+    return free[0]
 
 
 def require_command(block) -> str | None:
@@ -124,6 +115,9 @@ def require_command(block) -> str | None:
     """
     roles = block_roles(block)
     outputs = getattr(block, "outputs", {})
+
+    # An observer reads a measurement and gives the state back, with nothing to
+    # command through
     if (
         roles.command is None
         and roles.measurements
@@ -138,7 +132,17 @@ def require_command(block) -> str | None:
             "expose('r', 'y', 'u')) and close that box on the plant, or design the "
             "pair with lqg()."
         )
+
     return roles.command
+
+
+@dataclass(frozen=True)
+class Roles:
+    """The plant, the controller and the observer of a diagram, or ``None`` each."""
+
+    plant: object | None
+    controller: object | None
+    observer: object | None
 
 
 def roles(system) -> Roles:
@@ -150,6 +154,7 @@ def roles(system) -> Roles:
     missing name is ``None``: a tool that needs that block raises, and the plots
     and the camera keep their plain defaults.
     """
+    # A sampled loop: the plant from its plant side, the laws from its computer
     if hasattr(system, "computer") and hasattr(system, "plant"):
         plant_side = roles(system.plant)
         computer_side = roles(system.computer.diagram)
@@ -158,14 +163,20 @@ def roles(system) -> Roles:
             computer_side.controller,
             computer_side.observer or plant_side.observer,
         )
+
+    # A leaf is its own plant
     subsystems = getattr(system, "subsystems", None)
     if subsystems is None:
         return Roles(system, None, None)
-    plant = _block_under(subsystems, "plant")
-    controller = _block_under(subsystems, "controller")
-    observer = _block_under(subsystems, "observer")
+
+    # A diagram: the blocks under the reserved names, the observer possibly inside
+    # the controller
+    plant = block_under(subsystems, "plant")
+    controller = block_under(subsystems, "controller")
+    observer = block_under(subsystems, "observer")
     if observer is None and controller is not None:
-        observer = _block_under(getattr(controller, "subsystems", {}), "observer")
+        observer = block_under(getattr(controller, "subsystems", {}), "observer")
+
     return Roles(plant, controller, observer)
 
 
@@ -178,33 +189,33 @@ def check_reserved_id(sys_id, existing) -> None:
         )
 
 
-# The sweep space of a law
-
-#: Marks an unset ``plot_space`` attribute: the ports then decide.
-_UNSET = object()
-
-
 def plot_space_of(block):
     """The sweep space of ``block``'s law for ``plot_control_law``, or ``None``.
 
-    An explicit ``plot_space`` attribute wins (``None`` says the block has no
-    static law to draw, a solver call such as MPC); else the ports decide: a
-    block that reads ``x`` sweeps the state, one that reads ``y`` and a
-    reference of the same size the error ``e = r - y`` with ``r`` pinned, one
-    that reads ``y`` otherwise the measurement, and an error-driven block its
-    entry port.
+    An explicit ``plot_space`` attribute wins, the one hint the ports cannot give
+    (``None`` says the block has no static law to draw, a solver call such as
+    MPC); else the ports decide: a block that reads ``x`` sweeps the state, one
+    that reads ``y`` and a reference of the same size the error ``e = r - y``
+    with ``r`` pinned, one that reads ``y`` otherwise the measurement, and an
+    error-driven block its entry port.
     """
+    # An explicit plot_space wins, None included
     declared = getattr(block, "plot_space", _UNSET)
     if declared is not _UNSET:
         return declared
+
+    # Else the ports decide: the state, the error e = r − y, or the measurement
     roles = block_roles(block)
     if "x" in roles.measurements:
         return "state"
+
     if "y" in roles.measurements:
         inputs = block.inputs
         if roles.reference and inputs["r"].dim == inputs["y"].dim:
             return "error"
         return "measurement"
+
+    # An error-driven block sweeps its entry port
     return "measurement" if roles.error_driven else None
 
 
@@ -222,10 +233,12 @@ class ErrorDriven:
 
     def add_error_ports(self, ports, dim, *, nominal_value=None):
         """Declare the input ports of the chosen layout."""
-        if ports not in self.PORT_LAYOUTS:
-            raise ValueError(f"ports must be one of {self.PORT_LAYOUTS}, got {ports!r}")
+        require_port_layout(ports, self.PORT_LAYOUTS)
+
         self.port_layout = ports
         nominal = np.zeros(dim) if nominal_value is None else nominal_value
+
+        # The compensator form reads e alone; the controller form reads r and y
         if ports == "error":
             self.add_input_port("e", dim=dim, nominal_value=nominal)
             self.error_port = "e"
@@ -242,20 +255,45 @@ class ErrorDriven:
         """The tracking error from the flat input: ``u`` itself, or ``r - y``."""
         if self.port_layout == "error":
             return u
+
         p = self.inputs["r"].dim
-        r, y = u[:p], u[p:]
+
+        r = u[:p]
+        y = u[p:]
 
         e = r - y
 
         return e
 
 
+###############################################################################
 # Internal machinery
+###############################################################################
 
 
-def _block_under(subsystems, *names):
+def free_inputs(inputs):
+    """The input ports that are neither a disturbance ``d`` nor a noise ``n``."""
+    return [port for port in inputs if port not in ("d", "n")]
+
+
+def require_one_free_input(sys, inputs, free):
+    """Refuse a block with no ``u`` and not exactly one other free input."""
+    if len(free) != 1:
+        raise ValueError(
+            f"{getattr(sys, 'name', sys)!r} needs an input port named 'u' or a single "
+            f"input port (besides a disturbance 'd' and a noise 'n'); got {list(inputs)}"
+        )
+
+
+def block_under(subsystems, *names):
     """The block under the first of ``names`` present in ``subsystems``, or ``None``."""
     for name in names:
         if name in subsystems:
             return subsystems[name]
     return None
+
+
+def require_port_layout(ports, layouts):
+    """Refuse a port layout the error-driven law does not know."""
+    if ports not in layouts:
+        raise ValueError(f"ports must be one of {layouts}, got {ports!r}")
