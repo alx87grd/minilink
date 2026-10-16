@@ -1,39 +1,34 @@
-"""Core modeling and data abstractions.
-
-Band facade for short teaching imports::
-
-    from minilink.core import DynamicSystem, DiagramSystem, Trajectory
-    from minilink.core import QuadraticCost, BoxSet
-
-Defining modules stay importable (``minilink.core.system``, ...).
-"""
+"""Core: the systems and the mathematical objects every band builds on."""
 
 from __future__ import annotations
 
 from minilink.core.facade import lazy_facade
 
-# name -> (module path, attribute)
+# The band facade for short teaching imports, e.g.
+# ``from minilink.core import DynamicSystem, DiagramSystem, Trajectory``; the defining
+# modules stay importable (``minilink.core.system``, ...). Each exported name maps to
+# its (module path, attribute).
 _EXPORTS: dict[str, tuple[str, str]] = {
-    # systems
+    # Systems
     "System": ("minilink.core.system", "System"),
     "DynamicSystem": ("minilink.core.system", "DynamicSystem"),
     "StepSystem": ("minilink.core.system", "StepSystem"),
     "DiagramSystem": ("minilink.core.diagram", "DiagramSystem"),
     "StepDiagramSystem": ("minilink.core.diagram", "StepDiagramSystem"),
-    # data
+    # Data
     "Trajectory": ("minilink.core.trajectory", "Trajectory"),
-    # costs
+    # Costs
     "CostFunction": ("minilink.core.costs", "CostFunction"),
     "QuadraticCost": ("minilink.core.costs", "QuadraticCost"),
     "TimeCost": ("minilink.core.costs", "TimeCost"),
-    # sets
+    # Sets
     "Set": ("minilink.core.sets", "Set"),
     "InputSet": ("minilink.core.sets", "InputSet"),
     "BoxSet": ("minilink.core.sets", "BoxSet"),
     "BoxInputSet": ("minilink.core.sets", "BoxInputSet"),
     "BallSet": ("minilink.core.sets", "BallSet"),
     "SingletonSet": ("minilink.core.sets", "SingletonSet"),
-    # distributions
+    # Distributions
     "Distribution": ("minilink.core.distributions", "Distribution"),
     "Gaussian": ("minilink.core.distributions", "Gaussian"),
     "Uniform": ("minilink.core.distributions", "Uniform"),
