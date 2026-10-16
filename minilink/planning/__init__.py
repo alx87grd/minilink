@@ -1,23 +1,21 @@
-"""Planning: problems, trajectory optimization, dynamic programming, reinforcement learning, search.
-
-Band facade for short teaching imports::
-
-    from minilink.planning import PlanningProblem, TrajectoryOptimizationPlanner
-    from minilink.planning import StateSpaceGrid, DynamicProgrammingPlanner, LQRPlanner
-    from minilink.planning import compare
-    from minilink.planning import ReinforcementLearningPlanner, TabularLearningPlanner
-    from minilink.planning import QuadraticFeatures, LinearApproximator
-
-Defining modules stay importable (``minilink.planning.problems``, ...).
-"""
+"""Planning: problems, trajectory optimization, dynamic programming, reinforcement learning, search."""
 
 from __future__ import annotations
 
 from minilink.core.facade import lazy_facade
 
-# name -> (module path, attribute)
+# The band facade for short teaching imports, e.g.
+#
+#     from minilink.planning import PlanningProblem, TrajectoryOptimizationPlanner
+#     from minilink.planning import StateSpaceGrid, DynamicProgrammingPlanner, LQRPlanner
+#     from minilink.planning import compare
+#     from minilink.planning import ReinforcementLearningPlanner, TabularLearningPlanner
+#     from minilink.planning import QuadraticFeatures, LinearApproximator
+#
+# The defining modules stay importable (``minilink.planning.problems``, ...). Each
+# exported name maps to its (module path, attribute).
 _EXPORTS: dict[str, tuple[str, str]] = {
-    # problem and results
+    # Problem and results
     "PlanningProblem": ("minilink.planning.problems", "PlanningProblem"),
     "ProblemParameters": ("minilink.planning.problems", "ProblemParameters"),
     "StochasticPlanningProblem": (
@@ -32,9 +30,9 @@ _EXPORTS: dict[str, tuple[str, str]] = {
     "PlanningSolution": ("minilink.planning.results", "PlanningSolution"),
     "compare": ("minilink.planning.comparison", "compare"),
     "Comparison": ("minilink.planning.comparison", "Comparison"),
-    # linear-quadratic regulator (policy synthesis)
+    # Linear-quadratic regulator (policy synthesis)
     "LQRPlanner": ("minilink.planning.policy_synthesis.lqr", "LQRPlanner"),
-    # trajectory optimization
+    # Trajectory optimization
     "TrajectoryOptimizationPlanner": (
         "minilink.planning.trajectory_optimization.planner",
         "TrajectoryOptimizationPlanner",
@@ -43,7 +41,7 @@ _EXPORTS: dict[str, tuple[str, str]] = {
         "minilink.planning.trajectory_optimization.planner",
         "TrajectoryOptimizationOptions",
     ),
-    # dynamic programming (policy synthesis)
+    # Dynamic programming (policy synthesis)
     "StateSpaceGrid": (
         "minilink.planning.policy_synthesis.discretizer",
         "StateSpaceGrid",
@@ -64,7 +62,7 @@ _EXPORTS: dict[str, tuple[str, str]] = {
         "minilink.planning.policy_synthesis.policy_eval",
         "PolicyEvaluator",
     ),
-    # function approximation (cost-to-go fits, approximate dynamic programming)
+    # Function approximation (cost-to-go fits, approximate dynamic programming)
     "QuadraticFeatures": (
         "minilink.planning.policy_synthesis.approximation",
         "QuadraticFeatures",
@@ -77,7 +75,7 @@ _EXPORTS: dict[str, tuple[str, str]] = {
         "minilink.planning.policy_synthesis.approximation",
         "LinearApproximator",
     ),
-    # reinforcement learning (policy synthesis) and Monte Carlo evaluation
+    # Reinforcement learning (policy synthesis) and Monte Carlo evaluation
     "ReinforcementLearningPlanner": (
         "minilink.planning.reinforcement_learning.planner",
         "ReinforcementLearningPlanner",
@@ -93,7 +91,7 @@ _EXPORTS: dict[str, tuple[str, str]] = {
     "UCB": ("minilink.planning.reinforcement_learning.tabular", "UCB"),
     "MonteCarloEvaluator": ("minilink.planning.evaluation", "MonteCarloEvaluator"),
     "Evaluation": ("minilink.planning.evaluation", "Evaluation"),
-    # spatial scene: tracks, collision geometry, cost shaping
+    # Spatial scene: tracks, collision geometry, cost shaping
     "ReferenceTrack": ("minilink.planning.spatial.track", "ReferenceTrack"),
     "circuit_waypoints": (
         "minilink.planning.spatial.paths",
@@ -113,7 +111,7 @@ _EXPORTS: dict[str, tuple[str, str]] = {
         "TrackCorridorOverlay",
     ),
     "plot_track": ("minilink.planning.spatial.plotting", "plot_track"),
-    # search
+    # Search
     "RRTPlanner": ("minilink.planning.search.rrt", "RRTPlanner"),
     "RRTStarPlanner": ("minilink.planning.search.rrt_star", "RRTStarPlanner"),
     "RRTOptions": ("minilink.planning.search.rrt", "RRTOptions"),
