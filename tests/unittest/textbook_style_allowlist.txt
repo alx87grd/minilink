@@ -6,79 +6,10 @@ banner	minilink/core/composition.py::line 34	1
 banner	minilink/core/composition.py::line 389	1
 banner	minilink/graphical/port_map.py::line 29	1
 banner	minilink/graphical/port_map.py::line 386	1
-banner	minilink/planning/comparison.py::line 23	1
-banner	minilink/planning/comparison.py::line 293	1
-banner	minilink/planning/evaluation.py::line 16	1
-banner	minilink/planning/evaluation.py::line 184	1
-banner	minilink/planning/planner.py::line 121	1
-banner	minilink/planning/policy_synthesis/discretizer.py::line 20	1
-banner	minilink/planning/policy_synthesis/discretizer.py::line 461	1
-banner	minilink/planning/policy_synthesis/dp_jax.py::line 16	1
-banner	minilink/planning/policy_synthesis/dp_jax.py::line 169	1
-banner	minilink/planning/policy_synthesis/lookup_policy.py::line 18	1
-banner	minilink/planning/policy_synthesis/lqr.py::line 224	1
-banner	minilink/planning/policy_synthesis/lqr.py::line 37	1
-banner	minilink/planning/policy_synthesis/plotting.py::line 12	1
-banner	minilink/planning/policy_synthesis/plotting.py::line 345	1
-banner	minilink/planning/policy_synthesis/policy_eval.py::line 100	1
-banner	minilink/planning/policy_synthesis/policy_eval.py::line 22	1
-banner	minilink/planning/policy_synthesis/progress.py::line 10	1
-banner	minilink/planning/reinforcement_learning/algorithms/actor_critic.py::line 8	1
-banner	minilink/planning/reinforcement_learning/algorithms/base.py::line 5	1
-banner	minilink/planning/reinforcement_learning/algorithms/ppo.py::line 8	1
-banner	minilink/planning/reinforcement_learning/algorithms/reinforce.py::line 8	1
-banner	minilink/planning/reinforcement_learning/algorithms/sac.py::line 7	1
-banner	minilink/planning/reinforcement_learning/collect.py::line 124	1
-banner	minilink/planning/reinforcement_learning/collect.py::line 7	1
-banner	minilink/planning/reinforcement_learning/critics.py::line 7	1
-banner	minilink/planning/reinforcement_learning/environment.py::line 13	1
-banner	minilink/planning/reinforcement_learning/environment.py::line 204	1
-banner	minilink/planning/reinforcement_learning/optim.py::line 5	1
-banner	minilink/planning/reinforcement_learning/planner.py::line 325	1
-banner	minilink/planning/reinforcement_learning/planner.py::line 48	1
-banner	minilink/planning/reinforcement_learning/policy.py::line 26	1
-banner	minilink/planning/reinforcement_learning/tabular.py::line 17	1
-banner	minilink/planning/reinforcement_learning/tabular.py::line 325	1
-banner	minilink/planning/results.py::line 14	1
-banner	minilink/planning/search/extenders.py::line 22	1
-banner	minilink/planning/search/live_plot.py::line 11	1
-banner	minilink/planning/search/plotting.py::line 13	1
-banner	minilink/planning/search/plotting.py::line 272	1
-banner	minilink/planning/search/plotting.py::line 360	1
-banner	minilink/planning/search/rrt.py::line 311	1
-banner	minilink/planning/search/rrt.py::line 35	1
-banner	minilink/planning/search/rrt_star.py::line 29	1
-banner	minilink/planning/search/rrt_star.py::line 315	1
-banner	minilink/planning/spatial/grid.py::line 17	1
-banner	minilink/planning/spatial/paths.py::line 18	1
-banner	minilink/planning/spatial/plotting.py::line 17	1
-banner	minilink/planning/spatial/scene.py::line 23	1
-banner	minilink/planning/spatial/shaping.py::line 18	1
-banner	minilink/planning/spatial/state_fields.py::line 25	1
-banner	minilink/planning/spatial/track.py::line 23	1
-banner	minilink/planning/spatial/workspace_fields.py::line 19	1
 bare-jax	minilink/analysis/derivatives.py::from jax.errors	1
-bare-jax	minilink/optimization/evaluators/jax_evaluator.py::import jax	1
-bare-jax	minilink/optimization/evaluators/jax_evaluator.py::import jax.numpy	1
-bare-jax	minilink/planning/policy_synthesis/dp_jax.py::from jax.scipy.ndimage	1
-bare-jax	minilink/planning/trajectory_optimization/parametric_evaluator.py::import jax	1
-bare-jax	minilink/planning/trajectory_optimization/parametric_evaluator.py::import jax.numpy	1
 bare-jax	minilink/simulation/compile_backend.py::import jax	1
 first-screen	minilink/graphical/catalog/shapes.py::<module>	1
 first-screen	minilink/graphical/signals/plotly_backend.py::<module>	1
-first-screen	minilink/planning/search/dubins.py::<module>	1
-grouped-unpack	minilink/planning/policy_synthesis/discretizer.py::StateSpaceGrid._compute_transition_jax	1
-grouped-unpack	minilink/planning/policy_synthesis/discretizer.py::StateSpaceGrid._compute_transition_numpy	1
-grouped-unpack	minilink/planning/policy_synthesis/discretizer.py::StateSpaceGrid._validity_masks	1
-grouped-unpack	minilink/planning/reinforcement_learning/algorithms/actor_critic.py::ActorCritic.loss	2
-grouped-unpack	minilink/planning/reinforcement_learning/algorithms/ppo.py::PPO.loss	2
-grouped-unpack	minilink/planning/reinforcement_learning/algorithms/ppo.py::PPO.update	1
-grouped-unpack	minilink/planning/reinforcement_learning/algorithms/sac.py::SAC.init	1
-grouped-unpack	minilink/planning/reinforcement_learning/algorithms/sac.py::SAC.update	1
-grouped-unpack	minilink/planning/reinforcement_learning/environment.py::RolloutEnvironment.step	1
-grouped-unpack	minilink/planning/reinforcement_learning/optim.py::Adam.update	1
-grouped-unpack	minilink/planning/reinforcement_learning/tabular.py::TabularLearningPlanner.learn	2
-grouped-unpack	minilink/planning/spatial/track.py::ReferenceTrack.corridor_margin	1
 lazy-import	minilink/__init__.py::_package_version: minilink._version	1
 lazy-import	minilink/control/mpc/controller.py::export_mpc_dual_rate_computer: minilink.core.diagram	1
 lazy-import	minilink/control/mpc/controller.py::export_mpc_dual_rate_computer: minilink.simulation.computer	1
@@ -116,76 +47,15 @@ lazy-import	minilink/graphical/signals/time_signals.py::open_time_signal_plot: m
 lazy-import	minilink/graphical/signals/time_signals.py::open_time_signal_plot: minilink.graphical.signals.plotly_backend	1
 lazy-import	minilink/graphical/signals/time_signals.py::plot_time_signals: minilink.graphical.signals.matplotlib_backend	1
 lazy-import	minilink/graphical/signals/time_signals.py::plot_time_signals: minilink.graphical.signals.plotly_backend	1
-lazy-import	minilink/optimization/evaluators/compiler.py::compile_program_evaluator: minilink.optimization.evaluators.jax_evaluator	1
-lazy-import	minilink/optimization/evaluators/compiler.py::compile_program_evaluator: minilink.optimization.evaluators.numpy_evaluator	1
-lazy-import	minilink/optimization/optimizer.py::Optimizer._select_backend: minilink.optimization.optimizers.ipopt	1
-lazy-import	minilink/optimization/optimizer.py::Optimizer._select_backend: minilink.optimization.optimizers.scipy_minimize	1
-lazy-import	minilink/planning/comparison.py::Comparison.plot_trajectory: minilink.graphical.signals.time_signals	1
-lazy-import	minilink/planning/comparison.py::plot_solution_trajectory: minilink.graphical.signals.time_signals	1
-lazy-import	minilink/planning/evaluation.py::MonteCarloEvaluator.auto_backend: minilink.core.backends	1
-lazy-import	minilink/planning/evaluation.py::MonteCarloEvaluator.auto_backend: minilink.core.compile.compiler	1
-lazy-import	minilink/planning/evaluation.py::MonteCarloEvaluator.evaluate_jax: minilink.planning.reinforcement_learning.environment	1
-lazy-import	minilink/planning/evaluation.py::MonteCarloEvaluator.evaluate_numpy: minilink.planning.reinforcement_learning.environment	1
-lazy-import	minilink/planning/evaluation.py::env_action_port: minilink.core.feedback	1
-lazy-import	minilink/planning/evaluation.py::policy_of: minilink.planning.results	1
-lazy-import	minilink/planning/evaluation.py::static_law: minilink.core.feedback	1
-lazy-import	minilink/planning/policy_synthesis/discretizer.py::StateSpaceGrid._compute_transition_jax: minilink.core.backends	1
-lazy-import	minilink/planning/policy_synthesis/discretizer.py::StateSpaceGrid.plot_value: minilink.planning.policy_synthesis	1
-lazy-import	minilink/planning/policy_synthesis/plotting.py::get_controller: minilink.planning.policy_synthesis.lookup_policy	1
-lazy-import	minilink/planning/policy_synthesis/policy_eval.py::PolicyEvaluator.plot_cost2go: minilink.planning.policy_synthesis.plotting	1
-lazy-import	minilink/planning/reinforcement_learning/tabular.py::TabularLearningPlanner.get_controller: minilink.planning.policy_synthesis	1
-lazy-import	minilink/planning/reinforcement_learning/tabular.py::TabularLearningPlanner.plot_cost2go: minilink.planning.policy_synthesis	1
-lazy-import	minilink/planning/reinforcement_learning/tabular.py::TabularLearningPlanner.plot_policy: minilink.planning.policy_synthesis	1
-lazy-import	minilink/planning/results.py::PlanningSolution.plot_control_law: minilink.planning.comparison	1
-lazy-import	minilink/planning/results.py::PlanningSolution.plot_cost_to_go: minilink.planning.comparison	1
-lazy-import	minilink/planning/results.py::PlanningSolution.plot_trajectory: minilink.planning.comparison	1
-lazy-import	minilink/planning/search/live_plot.py::LiveSearchPlotCallback.__call__: minilink.planning.search.plotting	1
-lazy-import	minilink/planning/search/plotting.py::_goal_radius: minilink.core.sets	1
-lazy-import	minilink/planning/search/plotting.py::_maybe_show: minilink.graphical.common.environment	1
-lazy-import	minilink/planning/search/rrt.py::RRTPlanner._on_search_step: minilink.planning.search.live_plot	1
-lazy-import	minilink/planning/search/rrt.py::RRTPlanner._resolve_search_callback: minilink.planning.search.live_plot	1
-lazy-import	minilink/planning/search/rrt.py::RRTPlanner.animate_search: minilink.planning.search.plotting	1
-lazy-import	minilink/planning/search/rrt.py::RRTPlanner.plot_tree: minilink.planning.search.plotting	1
-lazy-import	minilink/planning/search/rrt.py::RRTPlanner.show_live_search: minilink.planning.search.live_plot	1
-lazy-import	minilink/planning/search/rrt_star.py::RRTStarPlanner.__init__: minilink.planning.search.metric	1
-lazy-import	minilink/planning/search/rrt_star.py::RRTStarPlanner.animate_convergence: minilink.planning.search.plotting	1
-lazy-import	minilink/planning/spatial/plotting.py::plot_scene: minilink.core.geometry	1
-lazy-import	minilink/planning/spatial/scene.py::Scene.as_visualizer: minilink.graphical.animation.drawables	1
-lazy-import	minilink/planning/spatial/scene.py::Scene.clearance_field: minilink.planning.spatial.state_fields	1
-lazy-import	minilink/planning/spatial/scene.py::Scene.cost_field: minilink.planning.spatial.state_fields	1
-lazy-import	minilink/planning/spatial/scene.py::Scene.plot: minilink.planning.spatial.plotting	1
-lazy-import	minilink/planning/spatial/track.py::ReferenceTrack.corridor_field: minilink.planning.spatial.state_fields	1
-lazy-import	minilink/planning/spatial/track.py::ReferenceTrack.distance_field: minilink.planning.spatial.state_fields	1
-lazy-import	minilink/planning/spatial/track.py::ReferenceTrack.plot: minilink.planning.spatial.plotting	1
-lazy-import	minilink/planning/trajectory_optimization/direct_collocation.py::DirectCollocationTranscription.transcribe_parametric: minilink.planning.trajectory_optimization.parametric_program	1
-lazy-import	minilink/planning/trajectory_optimization/live_plot.py::LiveTrajectoryPlotCallback.__call__: minilink.graphical.signals	1
-lazy-import	minilink/planning/trajectory_optimization/planner.py::TrajectoryOptimizationPlanner._make_callback: minilink.planning.trajectory_optimization.live_plot	1
-lazy-import	minilink/planning/trajectory_optimization/planner.py::TrajectoryOptimizationPlanner.compile_parametric_program: minilink.planning.trajectory_optimization.parametric_evaluator	1
-lazy-import	minilink/planning/trajectory_optimization/planner.py::_resolve_transcription: minilink.planning.trajectory_optimization.direct_collocation	1
-lazy-import	minilink/planning/trajectory_optimization/planner.py::_resolve_transcription: minilink.planning.trajectory_optimization.multiple_shooting	1
-next-index	minilink/planning/reinforcement_learning/collect.py::line 59	1
-next-index	minilink/planning/reinforcement_learning/environment.py::line 126	1
-next-index	minilink/planning/reinforcement_learning/tabular.py::line 420	1
 np-under-xp	minilink/control/geometric.py::PurePursuit.ctl	1
 np-under-xp	minilink/core/distributions.py::random_bits	2
 quoted-annotation	minilink/control/mpc/controller.py::line 791	1
 quoted-annotation	minilink/control/mpc/controller.py::line 794	1
 quoted-annotation	minilink/control/mpc/controller.py::line 832	1
 quoted-annotation	minilink/graphical/animation/animator.py::line 59	1
-quoted-annotation	minilink/planning/comparison.py::line 26	1
-quoted-annotation	minilink/planning/comparison.py::line 87	1
 return-math	minilink/dynamics/catalog/vehicles/dynamic_bicycle.py::DynamicBicycle.tf	1
 return-math	minilink/dynamics/catalog/vehicles/steering.py::KinematicBicycle.tf	1
 return-math	minilink/dynamics/catalog/vehicles/steering.py::KinematicCar.tf	1
-return-math	minilink/planning/reinforcement_learning/algorithms/reinforce.py::REINFORCE.loss	1
-return-math	minilink/planning/reinforcement_learning/policy.py::GaussianHead.entropy	1
-return-math	minilink/planning/reinforcement_learning/policy.py::GaussianHead.log_prob	1
-return-math	minilink/planning/reinforcement_learning/policy.py::GaussianHead.sample	1
-return-math	minilink/planning/reinforcement_learning/policy.py::SquashedGaussianHead.log_prob	1
-return-math	minilink/planning/spatial/paths.py::PolylinePath.sample	1
-self-in-math	minilink/planning/reinforcement_learning/algorithms/actor_critic.py::ActorCritic.loss	1
-self-in-math	minilink/planning/reinforcement_learning/algorithms/ppo.py::PPO.loss	1
-self-in-math	minilink/planning/reinforcement_learning/environment.py::RolloutEnvironment.step	6
 title	minilink/__init__.py::<module>	1
 title	minilink/catalog/__init__.py::<module>	1
 title	minilink/control/mpc/controller.py::<module>	1
@@ -208,41 +78,6 @@ title	minilink/graphical/control/style.py::<module>	1
 title	minilink/graphical/meshes.py::<module>	1
 title	minilink/graphical/port_map.py::<module>	1
 title	minilink/identification/__init__.py::<module>	1
-title	minilink/optimization/__init__.py::<module>	1
-title	minilink/optimization/evaluators/program_evaluator.py::<module>	1
-title	minilink/optimization/mathematical_program.py::<module>	1
-title	minilink/optimization/optimizer.py::<module>	1
-title	minilink/optimization/optimizers/optimizer_backend.py::<module>	1
-title	minilink/optimization/reporting.py::<module>	1
-title	minilink/planning/__init__.py::<module>	1
-title	minilink/planning/comparison.py::<module>	1
-title	minilink/planning/evaluation.py::<module>	1
-title	minilink/planning/planner.py::<module>	1
-title	minilink/planning/policy_synthesis/approximation.py::<module>	1
-title	minilink/planning/policy_synthesis/lookup_policy.py::<module>	1
-title	minilink/planning/policy_synthesis/lqr.py::<module>	1
-title	minilink/planning/policy_synthesis/plotting.py::<module>	1
-title	minilink/planning/policy_synthesis/policy_eval.py::<module>	1
-title	minilink/planning/problems.py::<module>	1
-title	minilink/planning/search/dubins.py::<module>	1
-title	minilink/planning/search/edge.py::<module>	1
-title	minilink/planning/search/extenders.py::<module>	1
-title	minilink/planning/search/live_plot.py::<module>	1
-title	minilink/planning/search/metric.py::<module>	1
-title	minilink/planning/search/plotting.py::<module>	1
-title	minilink/planning/search/rrt.py::<module>	1
-title	minilink/planning/search/rrt_star.py::<module>	1
-title	minilink/planning/search/steering.py::<module>	1
-title	minilink/planning/search/tree.py::<module>	1
-title	minilink/planning/spatial/collision.py::<module>	1
-title	minilink/planning/spatial/grid.py::<module>	1
-title	minilink/planning/spatial/paths.py::<module>	1
-title	minilink/planning/spatial/plotting.py::<module>	1
-title	minilink/planning/spatial/scene.py::<module>	1
-title	minilink/planning/spatial/shaping.py::<module>	1
-title	minilink/planning/spatial/track.py::<module>	1
-title	minilink/planning/spatial/workspace_fields.py::<module>	1
-title	minilink/planning/trajectory_optimization/transcription.py::<module>	1
 underscore	minilink/__init__.py::_package_version	1
 underscore	minilink/control/mpc/controller.py::MPCBroadcastController._abs_t	1
 underscore	minilink/control/mpc/controller.py::MPCBroadcastController._compute_u_nom	1
@@ -406,142 +241,5 @@ underscore	minilink/graphical/signals/time_signals.py::_labels_and_units_for_ext
 underscore	minilink/graphical/signals/time_signals.py::_labels_for_vector	1
 underscore	minilink/graphical/signals/time_signals.py::_normalize_plot_signals	1
 underscore	minilink/graphical/signals/time_signals.py::_units_for_vector	1
-underscore	minilink/optimization/evaluators/jax_evaluator.py::JaxMathematicalProgramEvaluator._check_derivative_shapes	1
-underscore	minilink/optimization/evaluators/jax_evaluator.py::JaxMathematicalProgramEvaluator._check_traceable	1
-underscore	minilink/optimization/evaluators/jax_evaluator.py::JaxMathematicalProgramEvaluator._compile_vector_derivative	1
-underscore	minilink/optimization/evaluators/jax_evaluator.py::JaxMathematicalProgramEvaluator._jax_decision_vector	1
-underscore	minilink/optimization/evaluators/numpy_evaluator.py::NumpyMathematicalProgramEvaluator._check_derivative_shapes	1
-underscore	minilink/optimization/evaluators/program_evaluator.py::MathematicalProgramEvaluator._decision_vector	1
-underscore	minilink/optimization/evaluators/program_evaluator.py::MathematicalProgramEvaluator._matrix	1
-underscore	minilink/optimization/evaluators/program_evaluator.py::MathematicalProgramEvaluator._scalar	1
-underscore	minilink/optimization/evaluators/program_evaluator.py::MathematicalProgramEvaluator._vector	1
-underscore	minilink/optimization/mathematical_program.py::_as_vector_or_none	1
-underscore	minilink/optimization/optimizer.py::Optimizer._decision_vector	1
-underscore	minilink/optimization/optimizer.py::Optimizer._print_solve_preamble	1
-underscore	minilink/optimization/optimizer.py::Optimizer._print_solve_report	1
-underscore	minilink/optimization/optimizer.py::Optimizer._select_backend	1
-underscore	minilink/optimization/optimizers/scipy_minimize.py::ScipyMinimizeOptimizer._uses_hessian	1
-underscore	minilink/optimization/optimizers/scipy_minimize.py::_z_from_scipy_minimize_callback	1
-underscore	minilink/planning/comparison.py::_maybe_show	1
-underscore	minilink/planning/comparison.py::_panels	1
-underscore	minilink/planning/policy_synthesis/discretizer.py::StateSpaceGrid._build_transition	1
-underscore	minilink/planning/policy_synthesis/discretizer.py::StateSpaceGrid._build_xnext_jax_chunks	1
-underscore	minilink/planning/policy_synthesis/discretizer.py::StateSpaceGrid._coerce_shape	1
-underscore	minilink/planning/policy_synthesis/discretizer.py::StateSpaceGrid._compute_transition_jax	1
-underscore	minilink/planning/policy_synthesis/discretizer.py::StateSpaceGrid._compute_transition_numpy	1
-underscore	minilink/planning/policy_synthesis/discretizer.py::StateSpaceGrid._default_anchor	1
-underscore	minilink/planning/policy_synthesis/discretizer.py::StateSpaceGrid._grid_points	1
-underscore	minilink/planning/policy_synthesis/discretizer.py::StateSpaceGrid._input_bounds	1
-underscore	minilink/planning/policy_synthesis/discretizer.py::StateSpaceGrid._nearest_index	1
-underscore	minilink/planning/policy_synthesis/discretizer.py::StateSpaceGrid._print_mesh_summary	1
-underscore	minilink/planning/policy_synthesis/discretizer.py::StateSpaceGrid._require_finite_box	1
-underscore	minilink/planning/policy_synthesis/discretizer.py::StateSpaceGrid._state_bounds	1
-underscore	minilink/planning/policy_synthesis/discretizer.py::StateSpaceGrid._step_sizes	1
-underscore	minilink/planning/policy_synthesis/discretizer.py::StateSpaceGrid._validity_masks	1
-underscore	minilink/planning/policy_synthesis/plotting.py::_is_batch_axes	1
-underscore	minilink/planning/policy_synthesis/plotting.py::_label_axes	1
-underscore	minilink/planning/policy_synthesis/plotting.py::_maybe_show	1
-underscore	minilink/planning/policy_synthesis/plotting.py::_overlay_trajectory	1
-underscore	minilink/planning/policy_synthesis/plotting.py::_plot_field	1
-underscore	minilink/planning/policy_synthesis/plotting.py::_plot_policy_field	1
-underscore	minilink/planning/policy_synthesis/plotting.py::_require_history	1
-underscore	minilink/planning/policy_synthesis/policy_eval.py::PolicyEvaluator._policy_transition	1
-underscore	minilink/planning/policy_synthesis/policy_eval.py::PolicyEvaluator._terminal_cost	1
-underscore	minilink/planning/policy_synthesis/policy_eval.py::_policy_from_block	1
-underscore	minilink/planning/search/dubins.py::_mod2pi	1
-underscore	minilink/planning/search/dubins.py::_words	1
-underscore	minilink/planning/search/extenders.py::KinodynamicExtender._compiled	1
-underscore	minilink/planning/search/extenders.py::KinodynamicExtender._controls	1
-underscore	minilink/planning/search/extenders.py::KinodynamicExtender._rollout	1
-underscore	minilink/planning/search/plotting.py::_best_path_states	1
-underscore	minilink/planning/search/plotting.py::_clear_search_artists	1
-underscore	minilink/planning/search/plotting.py::_draw_search_state	1
-underscore	minilink/planning/search/plotting.py::_goal_radius	1
-underscore	minilink/planning/search/plotting.py::_label_axes	1
-underscore	minilink/planning/search/plotting.py::_mark_endpoints	1
-underscore	minilink/planning/search/plotting.py::_maybe_show	1
-underscore	minilink/planning/search/plotting.py::_require_tree	1
-underscore	minilink/planning/search/plotting.py::_search_title	1
-underscore	minilink/planning/search/plotting.py::_set_limits	1
-underscore	minilink/planning/search/plotting.py::_solution_waypoints	1
-underscore	minilink/planning/search/rrt.py::RRTPlanner._edge_is_free	1
-underscore	minilink/planning/search/rrt.py::RRTPlanner._edge_states	1
-underscore	minilink/planning/search/rrt.py::RRTPlanner._finish_trajectory	1
-underscore	minilink/planning/search/rrt.py::RRTPlanner._goal_point	1
-underscore	minilink/planning/search/rrt.py::RRTPlanner._goal_region	1
-underscore	minilink/planning/search/rrt.py::RRTPlanner._on_search_step	1
-underscore	minilink/planning/search/rrt.py::RRTPlanner._path_states	1
-underscore	minilink/planning/search/rrt.py::RRTPlanner._resolve_search_callback	1
-underscore	minilink/planning/search/rrt.py::RRTPlanner._sample	1
-underscore	minilink/planning/search/rrt.py::RRTPlanner._sample_free_state	1
-underscore	minilink/planning/search/rrt.py::RRTPlanner._select	1
-underscore	minilink/planning/search/rrt.py::RRTPlanner._try_extend	1
-underscore	minilink/planning/search/rrt.py::RRTPlanner._validate_nearest_backend	1
-underscore	minilink/planning/search/rrt.py::_merge_rrt_options	1
-underscore	minilink/planning/search/rrt_star.py::RRTStarPlanner._choose_parent	1
-underscore	minilink/planning/search/rrt_star.py::RRTStarPlanner._extend_once	1
-underscore	minilink/planning/search/rrt_star.py::RRTStarPlanner._gamma	1
-underscore	minilink/planning/search/rrt_star.py::RRTStarPlanner._record_snapshot	1
-underscore	minilink/planning/search/rrt_star.py::RRTStarPlanner._refresh_best_goal	1
-underscore	minilink/planning/search/rrt_star.py::RRTStarPlanner._rewire_eta	1
-underscore	minilink/planning/search/rrt_star.py::RRTStarPlanner._rewire_near	1
-underscore	minilink/planning/search/rrt_star.py::RRTStarPlanner._rewire_radius	1
-underscore	minilink/planning/search/rrt_star.py::_coerce_rrt_star_options	1
-underscore	minilink/planning/search/steering.py::DubinsSteering._sample	1
-underscore	minilink/planning/search/tree.py::Tree._ensure_kdtree	1
-underscore	minilink/planning/spatial/collision.py::_BoundCollisionBody._resolve_u	1
-underscore	minilink/planning/spatial/collision.py::_normalize_shapes	1
-underscore	minilink/planning/spatial/overlays.py::_line3	1
-underscore	minilink/planning/spatial/overlays.py::_track_boundaries	1
-underscore	minilink/planning/spatial/plotting.py::_coerce_body_states	1
-underscore	minilink/planning/spatial/plotting.py::_cost_field_array	1
-underscore	minilink/planning/spatial/plotting.py::_cost_field_norm	1
-underscore	minilink/planning/spatial/plotting.py::_default_bounds	1
-underscore	minilink/planning/spatial/plotting.py::_draw_body	1
-underscore	minilink/planning/spatial/plotting.py::_draw_field_marker	1
-underscore	minilink/planning/spatial/plotting.py::_draw_shape	1
-underscore	minilink/planning/spatial/plotting.py::_field_bounds	1
-underscore	minilink/planning/spatial/plotting.py::_label_cost_colorbar	1
-underscore	minilink/planning/spatial/plotting.py::_resolve_cost_cmap	1
-underscore	minilink/planning/spatial/plotting.py::_shape_bounds	1
-underscore	minilink/planning/spatial/plotting.py::_workspace_dim	1
-underscore	minilink/planning/trajectory_optimization/direct_collocation.py::DirectCollocationTranscription._add_boundary_constraints	1
-underscore	minilink/planning/trajectory_optimization/direct_collocation.py::DirectCollocationTranscription._add_path_constraints	1
-underscore	minilink/planning/trajectory_optimization/direct_collocation.py::DirectCollocationTranscription._add_point_boundary	1
-underscore	minilink/planning/trajectory_optimization/direct_collocation.py::DirectCollocationTranscription._add_terminal_constraints	1
-underscore	minilink/planning/trajectory_optimization/direct_collocation.py::DirectCollocationTranscription._dynamics_residual	1
-underscore	minilink/planning/trajectory_optimization/direct_collocation.py::DirectCollocationTranscription._objective	1
-underscore	minilink/planning/trajectory_optimization/direct_collocation.py::DirectCollocationTranscription._transcribe_jax	1
-underscore	minilink/planning/trajectory_optimization/live_plot.py::LiveTrajectoryPlotCallback._title	1
-underscore	minilink/planning/trajectory_optimization/multiple_shooting.py::MultipleShootingTranscription._dynamics_residual	1
-underscore	minilink/planning/trajectory_optimization/multiple_shooting.py::MultipleShootingTranscription._make_step	1
-underscore	minilink/planning/trajectory_optimization/multiple_shooting.py::MultipleShootingTranscription._transcribe_jax	1
-underscore	minilink/planning/trajectory_optimization/parametric_evaluator.py::JaxParametricProgramEvaluator._check_traceable	1
-underscore	minilink/planning/trajectory_optimization/parametric_evaluator.py::JaxParametricProgramEvaluator._decision_vector	1
-underscore	minilink/planning/trajectory_optimization/parametric_evaluator.py::JaxParametricProgramEvaluator._jax_decision_vector	1
-underscore	minilink/planning/trajectory_optimization/parametric_evaluator.py::JaxParametricProgramEvaluator._matrix	1
-underscore	minilink/planning/trajectory_optimization/parametric_evaluator.py::JaxParametricProgramEvaluator._scalar	1
-underscore	minilink/planning/trajectory_optimization/parametric_evaluator.py::JaxParametricProgramEvaluator._vector	1
-underscore	minilink/planning/trajectory_optimization/parametric_evaluator.py::JaxParametricProgramEvaluator._warm_start	1
-underscore	minilink/planning/trajectory_optimization/planner.py::TrajectoryOptimizationPlanner._class_name	1
 underscore	minilink/planning/trajectory_optimization/planner.py::TrajectoryOptimizationPlanner._iteration_from_z	1
-underscore	minilink/planning/trajectory_optimization/planner.py::TrajectoryOptimizationPlanner._make_callback	1
-underscore	minilink/planning/trajectory_optimization/planner.py::TrajectoryOptimizationPlanner._make_optimizer	1
-underscore	minilink/planning/trajectory_optimization/planner.py::TrajectoryOptimizationPlanner._make_parametric_optimizer_backend	1
-underscore	minilink/planning/trajectory_optimization/planner.py::TrajectoryOptimizationPlanner._print_solve_preamble	1
-underscore	minilink/planning/trajectory_optimization/planner.py::TrajectoryOptimizationPlanner._print_solve_report	1
-underscore	minilink/planning/trajectory_optimization/planner.py::TrajectoryOptimizationPlanner._resolve_initial_guess	1
-underscore	minilink/planning/trajectory_optimization/planner.py::TrajectoryOptimizationPlanner._solve_trajectory_from_parametric	1
-underscore	minilink/planning/trajectory_optimization/planner.py::TrajectoryOptimizationPlanner._solve_trajectory_from_rebuild	1
-underscore	minilink/planning/trajectory_optimization/planner.py::TrajectoryOptimizationPlanner._transcription_options	1
-underscore	minilink/planning/trajectory_optimization/planner.py::_merge_trajopt_options	1
-underscore	minilink/planning/trajectory_optimization/planner.py::_resolve_transcription	1
-underscore	minilink/planning/trajectory_optimization/planner.py::_within_tolerance	1
-underscore	minilink/planning/trajectory_optimization/shooting.py::ShootingTranscription._add_path_constraints	1
-underscore	minilink/planning/trajectory_optimization/shooting.py::ShootingTranscription._add_terminal_constraints	1
-underscore	minilink/planning/trajectory_optimization/shooting.py::ShootingTranscription._initial_state	1
-underscore	minilink/planning/trajectory_optimization/shooting.py::ShootingTranscription._make_rollout	1
-underscore	minilink/planning/trajectory_optimization/shooting.py::ShootingTranscription._objective	1
-underscore	minilink/planning/trajectory_optimization/shooting.py::ShootingTranscription._rollout_loop	1
-underscore	minilink/planning/trajectory_optimization/shooting.py::ShootingTranscription._transcribe_jax	1
 unnamed-matrix	minilink/dynamics/catalog/pendulum/pendulum.py::Pendulum.H	1
