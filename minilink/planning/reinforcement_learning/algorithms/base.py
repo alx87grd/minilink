@@ -2,7 +2,11 @@
 
 from abc import ABC, abstractmethod
 
+from minilink.planning.reinforcement_learning.optim import Adam
+
+###############################################################################
 # Public API
+###############################################################################
 
 
 class Algorithm(ABC):
@@ -41,6 +45,7 @@ class Algorithm(ABC):
         self.policy = policy
         self.critic = critic
         self.gamma = float(gamma)
+
         return self
 
     @abstractmethod
@@ -57,3 +62,16 @@ class Algorithm(ABC):
     def params(train_state):
         """Current weights pytree ``{"policy", "critic"}`` from a train state."""
         return train_state["params"]
+
+
+###############################################################################
+# Internal machinery
+###############################################################################
+
+
+def optimizer_of(optimizer, learning_rate, max_grad_norm):
+    """The optimizer given, or the built-in :class:`Adam` with the step size and the gradient clip."""
+    if optimizer is None:
+        return Adam(learning_rate, max_grad_norm=max_grad_norm)
+
+    return optimizer

@@ -11,7 +11,9 @@ from minilink.core.trajectory import Trajectory
 from minilink.planning.evaluation import Evaluation
 from minilink.planning.problems import PlanningProblem
 
+###############################################################################
 # Public API
+###############################################################################
 
 
 @dataclass(frozen=True)
@@ -80,30 +82,10 @@ class PlanningSolution:
     @property
     def method(self) -> str:
         """The planning method, read from the solver record (``"value iteration"``, ``"riccati"``, ...)."""
+        # The record's class name without its suffix, one lowercase word per capital
         name = type(self.solver).__name__.removesuffix("Record")
+
         return re.sub(r"(?<!^)(?=[A-Z])", " ", name).lower()
-
-    def __str__(self) -> str:
-        law = "u = pi(t), open loop" if self.open_loop else "u = pi(x), feedback"
-        if self.trajectory is None:
-            trajectory = "not rolled out (solve with evaluate=True)"
-        else:
-            trajectory = (
-                f"{self.trajectory.n_samples} samples over "
-                f"{self.trajectory.time_duration:.3g} s"
-            )
-        evaluation = "none" if self.evaluation is None else str(self.evaluation)
-        return "\n".join(
-            [
-                f"policy: {self.policy.name} ({law})",
-                f"trajectory: {trajectory}",
-                f"evaluation: {evaluation}",
-                f"solver: {self.solver}",
-            ]
-        )
-
-    def _repr_pretty_(self, p, cycle):
-        p.text("..." if cycle else str(self))
 
     # Views of what the planner produced — never a closed-loop simulation
 
@@ -117,13 +99,11 @@ class PlanningSolution:
         laws of one problem share one scale. Every keyword passes through
         (``x_axis``, ``y_axis``, ``u_axis``, ``ax``, ``show``, ...).
         """
+        # A real cycle: comparison imports PlanningSolution from this module
         from minilink.planning.comparison import control_law_kwargs
 
-        if self.open_loop:
-            raise ValueError(
-                "an open-loop policy u = pi(t) has no control law to draw; "
-                "plot_trajectory draws the plan"
-            )
+        self.require_feedback_law()
+
         return self.policy.plot_control_law(**control_law_kwargs(self, kwargs))
 
     def plot_cost_to_go(self, **kwargs):
@@ -134,6 +114,7 @@ class PlanningSolution:
         :func:`~minilink.planning.comparison.plot_cost_to_go` for ``axes``,
         ``anchor``, ``bounds``, ``jmax``, ``ax`` and ``show``.
         """
+        # A real cycle: comparison imports PlanningSolution from this module
         from minilink.planning.comparison import plot_cost_to_go
 
         return plot_cost_to_go(self, **kwargs)
@@ -145,6 +126,7 @@ class PlanningSolution:
         The figure says which. A closed-loop simulation is not this: wire
         ``policy @ plant`` and plot that diagram's trajectory.
         """
+        # A real cycle: comparison imports PlanningSolution from this module
         from minilink.planning.comparison import plot_solution_trajectory
 
         return plot_solution_trajectory(
@@ -160,11 +142,50 @@ class PlanningSolution:
             show=show,
         )
 
+    # Display
+
+    def __str__(self) -> str:
+        # The law's kind, the rollout's extent, the evaluation, the solver's record
+        law = "u = pi(t), open loop" if self.open_loop else "u = pi(x), feedback"
+        if self.trajectory is None:
+            trajectory = "not rolled out (solve with evaluate=True)"
+        else:
+            trajectory = (
+                f"{self.trajectory.n_samples} samples over "
+                f"{self.trajectory.time_duration:.3g} s"
+            )
+        evaluation = "none" if self.evaluation is None else str(self.evaluation)
+
+        return "\n".join(
+            [
+                f"policy: {self.policy.name} ({law})",
+                f"trajectory: {trajectory}",
+                f"evaluation: {evaluation}",
+                f"solver: {self.solver}",
+            ]
+        )
+
+    def _repr_pretty_(self, p, cycle):
+        p.text("..." if cycle else str(self))
+
+    ###########################################################################
+    # Internal machinery
+    ###########################################################################
+
+    def require_feedback_law(self) -> None:
+        """Refuse to draw the control law of an open-loop policy ``u = pi(t)``."""
+        if self.open_loop:
+            raise ValueError(
+                "an open-loop policy u = pi(t) has no control law to draw; "
+                "plot_trajectory draws the plan"
+            )
+
     def require_trajectory(self) -> Trajectory:
-        """``trajectory``, or a clear error naming ``solve(evaluate=True)``."""
+        """Refuse a solution that carries no trajectory, naming ``solve(evaluate=True)``; return it."""
         if self.trajectory is None:
             raise ValueError(
                 f"this {self.method} solution carries no trajectory; "
                 "solve(evaluate=True) rolls the law out from the problem's start"
             )
+
         return self.trajectory

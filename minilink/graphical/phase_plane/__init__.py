@@ -1,4 +1,4 @@
-"""Phase-plane plotting API."""
+"""Phase planes: a system's vector field over two state axes, with its trajectory overlaid."""
 
 from minilink.graphical.phase_plane.phase_plane import (
     PhasePlaneSpec,

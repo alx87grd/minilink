@@ -5,6 +5,10 @@ import numpy as np
 from minilink.core.backends import array_module
 from minilink.core.system import System
 
+###############################################################################
+# Public API
+###############################################################################
+
 
 class Error(System):
     """Tracking-error comparison ``e = r - y`` on ports ``+``, ``-``, ``e``.
@@ -17,8 +21,11 @@ class Error(System):
     def __init__(self, dim=1):
         super().__init__()
         self.name = "Error"
+
+        # Parameters: the dimension the three ports share
         self.dim = int(dim)
 
+        # Ports: the reference r on +, the measurement y on −, the error e out
         self.add_input_port("+", dim=self.dim)
         self.add_input_port("-", dim=self.dim)
         self.add_output_port(
@@ -26,7 +33,9 @@ class Error(System):
         )
 
     def compute(self, x, u, t=0, params=None):
-        r, y = u.reshape(2, self.dim)
+        dim = self.dim
+
+        r, y = u.reshape(2, dim)
 
         e = r - y
 
@@ -48,9 +57,13 @@ class Sum(System):
     def __init__(self, signs=(1.0, -1.0), dim=1):
         super().__init__()
         self.name = "Sum"
+
+        # Parameters: the sign of each input, which sets the port count, and the
+        # dimension the ports share
         self.signs = np.asarray(signs, dtype=float).reshape(-1)
         self.dim = int(dim)
 
+        # Ports: one input per sign, the signed sum out
         for i in range(self.signs.size):
             self.add_input_port(f"in{i}", dim=self.dim)
         self.add_output_port(
@@ -59,10 +72,14 @@ class Sum(System):
 
     def compute(self, x, u, t=0, params=None):
         xp = array_module(u)
-        signs = xp.asarray(self.signs)
 
-        # weighted sum over the stacked input ports
-        stacked = u.reshape(self.signs.size, self.dim)
+        signs = xp.asarray(self.signs)
+        n_in = self.signs.size
+        dim = self.dim
+
+        stacked = u.reshape(n_in, dim)
+
+        # y = Σᵢ signᵢ inᵢ, over the stacked input ports
         y = signs @ stacked
 
         return y
@@ -80,23 +97,18 @@ class Gain(System):
         super().__init__()
         self.name = "Gain"
 
-        K = np.asarray(K, dtype=float)
-        if K.ndim == 0:
-            if dim is None:
-                raise ValueError("scalar gain needs an explicit dim")
-            K = float(K) * np.eye(int(dim))
-        elif K.ndim == 1:
-            K = np.diag(K)
-        elif K.ndim != 2:
-            raise ValueError("K must be scalar, 1-D, or 2-D")
-
+        # Parameters: the gain as a (p, m) matrix
+        K = gain_matrix(K, dim)
         self.params = {"K": K}
+
+        # Ports: u in, y = K u out
         p, m = K.shape
         self.add_input_port("u", dim=m)
         self.add_output_port("y", dim=p, function=self.compute, dependencies="all")
 
     def compute(self, x, u, t=0, params=None):
         params = self.params if params is None else params
+
         K = params["K"]
 
         y = K @ u
@@ -115,8 +127,11 @@ class Mux(System):
     def __init__(self, dims=(1, 1)):
         super().__init__()
         self.name = "Mux"
+
+        # Parameters: the dimension of each input port
         self.dims = [int(d) for d in dims]
 
+        # Ports: one input per entry of dims, their concatenation out
         for i, d in enumerate(self.dims):
             self.add_input_port(f"in{i}", dim=d)
         self.add_output_port(
@@ -140,9 +155,12 @@ class Demux(System):
     def __init__(self, dims=(1, 1), *, port="u"):
         super().__init__()
         self.name = "Demux"
+
+        # Parameters: the dimension of each output slice, and the signal's name
         self.dims = [int(d) for d in dims]
         self.port = str(port)
 
+        # Ports: the whole signal in, one slice of it out per entry of dims
         self.add_input_port(self.port, dim=sum(self.dims))
         start = 0
         for d in self.dims:
@@ -159,6 +177,10 @@ class Demux(System):
             )
             start += d
 
+    ###########################################################################
+    # Internal machinery
+    ###########################################################################
+
     def slice_compute(self, port_slice):
         """Build the compute for one output port: return that slice of ``u``."""
 
@@ -166,6 +188,25 @@ class Demux(System):
             return u[port_slice]
 
         return compute
+
+
+###############################################################################
+# Internal machinery
+###############################################################################
+
+
+def gain_matrix(K, dim):
+    """``K`` as a ``(p, m)`` matrix: a scalar times the ``dim`` identity, a vector on the diagonal."""
+    K = np.asarray(K, dtype=float)
+    if K.ndim == 0:
+        if dim is None:
+            raise ValueError("scalar gain needs an explicit dim")
+        K = float(K) * np.eye(int(dim))
+    elif K.ndim == 1:
+        K = np.diag(K)
+    elif K.ndim != 2:
+        raise ValueError("K must be scalar, 1-D, or 2-D")
+    return K
 
 
 if __name__ == "__main__":

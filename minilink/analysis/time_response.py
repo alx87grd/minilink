@@ -1,11 +1,4 @@
-"""Step response of one input–output channel of the linear model, and its textbook figures.
-
-The band is linear analysis at an operating point: an ``LTISystem`` is read as is and
-any other system is linearized first, the step response included. The figures say
-which: "Linear Step Response" or "Linearized Step Response". The step of the nonlinear
-loop itself is a simulation, ``closed_loop(C, plant, reference=Step(...))`` then
-``compute_trajectory``, and ``step_info`` reads its sampled output the same way.
-"""
+"""Step response of one input–output channel of the linear model, and its textbook figures."""
 
 from __future__ import annotations
 
@@ -27,17 +20,21 @@ from minilink.graphical.control import (
     style,
 )
 
+###############################################################################
+# Public API
+###############################################################################
+
 
 @dataclass(frozen=True)
 class StepInfo:
     """Textbook step-response figures (MATLAB ``stepinfo`` conventions)."""
 
     rise_time: float  # 10 % to 90 % of the final value; nan when there is none
-    settling_time: float  # last time the response leaves the 2 % band
-    overshoot: float  # percent of the final value; nan when there is none
+    settling_time: float  # Last time the response leaves the 2 % band
+    overshoot: float  # Percent of the final value; nan when there is none
     peak: float
     peak_time: float
-    steady_state: float  # the last sample; nan when the response has not settled
+    steady_state: float  # The last sample; nan when the response has not settled
 
 
 def step_response(
@@ -60,8 +57,10 @@ def step_response(
     when it is an ``LTISystem``, else linearized at ``(x_bar, u_bar)``. Same
     channel arguments as :func:`~minilink.analysis.frequency.bode`; ``tf``
     defaults to eight times the slowest stable time constant, and ``n``
-    samples span ``[0, tf]``. For the step of the nonlinear system, simulate
-    it with a ``Step`` source and read the figures with :func:`step_info`.
+    samples span ``[0, tf]``. The step of the nonlinear loop itself is a
+    simulation, ``closed_loop(C, plant, reference=Step(...))`` then
+    ``compute_trajectory``, and :func:`step_info` reads its sampled output the
+    same way.
     """
     A, B, C, D = siso_matrices(
         sys, x_bar, u_bar, t, params, of=of, wrt=wrt, method=method, eps=eps
@@ -166,20 +165,14 @@ def plot_step_response(
     )
     info = step_info(time, y)
 
-    return render_control_figure(
-        step_figure(time, y, info, sys, of, wrt), backend=backend, show=show
-    )
+    figure = step_figure(time, y, info, sys, of, wrt)
+
+    return render_control_figure(figure, backend=backend, show=show)
 
 
-# =============================================================================
+###############################################################################
 # Internal machinery
-# =============================================================================
-
-
-def first_time_reaching(time, progress, level):
-    """The first time ``progress`` reaches ``level``; ``nan`` when it never does."""
-    reached = np.flatnonzero(progress >= level)
-    return time[reached[0]] if reached.size else np.nan
+###############################################################################
 
 
 def first_sample_after(time, outside):
@@ -189,7 +182,15 @@ def first_sample_after(time, outside):
     return float(time[0])
 
 
+def first_time_reaching(time, progress, level):
+    """The first time ``progress`` reaches ``level``; ``nan`` when it never does."""
+    reached = np.flatnonzero(progress >= level)
+    return time[reached[0]] if reached.size else np.nan
+
+
 def step_figure(time, y, info, sys, of, wrt):
+    """The step-response figure: the response and its peak, the steady state and the figures' note."""
+    # The steady-state line once settled, and the note of the finite figures
     lines = () if np.isnan(info.steady_state) else (RefLine("y", info.steady_state),)
     note = "\n".join(
         f"{name} = {value:.3g} {unit}"
@@ -201,37 +202,31 @@ def step_figure(time, y, info, sys, of, wrt):
         if np.isfinite(value)
     )
     span = float(np.ptp(y)) or 1.0
+
+    # The title says whether the model is linear or was linearized here
     linear_model = isinstance(sys, LTISystem)
-    return ControlFigure(
-        title=style.LINEAR_STEP_TITLE if linear_model else style.LINEARIZED_STEP_TITLE,
-        subtitle=channel_subtitle(sys, of, wrt),
-        panels=(
-            Panel(
-                traces=(
-                    Trace(
-                        time,
-                        y,
-                        style.SYSTEM_COLOR,
-                        hover=tuple(
-                            f"t = {tk:.3g} s<br>y = {yk:.3g}" for tk, yk in zip(time, y)
-                        ),
-                    ),
-                    Trace(
-                        np.array([info.peak_time]),
-                        np.array([info.peak]),
-                        style.SYSTEM_COLOR,
-                        mode="markers",
-                        marker="o",
-                    ),
-                ),
-                lines=lines,
-                notes=(Note(note, x=0.55, y=0.04),) if note else (),
-                x_label=style.TIME_LABEL,
-                y_label=style.AMPLITUDE_LABEL,
-                y_lim=(
-                    min(0.0, float(y.min())) - 0.35 * span,
-                    float(y.max()) + 0.1 * span,
-                ),
-            ),
-        ),
+    title = style.LINEAR_STEP_TITLE if linear_model else style.LINEARIZED_STEP_TITLE
+    subtitle = channel_subtitle(sys, of, wrt)
+
+    # The response, hovered sample by sample, and its peak
+    hover = tuple(f"t = {tk:.3g} s<br>y = {yk:.3g}" for tk, yk in zip(time, y))
+    response = Trace(time, y, style.SYSTEM_COLOR, hover=hover)
+    t_peak = np.array([info.peak_time])
+    y_peak = np.array([info.peak])
+    peak = Trace(t_peak, y_peak, style.SYSTEM_COLOR, mode="markers", marker="o")
+
+    # One panel, with room under the response for the note
+    notes = (Note(note, x=0.55, y=0.04),) if note else ()
+    y_lim = (min(0.0, float(y.min())) - 0.35 * span, float(y.max()) + 0.1 * span)
+    panel = Panel(
+        traces=(response, peak),
+        lines=lines,
+        notes=notes,
+        x_label=style.TIME_LABEL,
+        y_label=style.AMPLITUDE_LABEL,
+        y_lim=y_lim,
     )
+
+    figure = ControlFigure(title=title, subtitle=subtitle, panels=(panel,))
+
+    return figure

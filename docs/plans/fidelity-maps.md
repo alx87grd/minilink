@@ -7,7 +7,7 @@ Locked defaults: **bicycle ladder only** (Kin → Acc → Dyn → Rate → TauRa
 Servo → Engine); Holonomic deferred. Maps live in
 `examples/projects/car_trajopt/vehicles/jax_vehicle_maps.py` (to create), beside `ladder.py`. Pointwise functions are the core; trajectory wrappers batch them
 and supply derivatives via finite differences (same spirit as MPC
-`_finite_diff_knots` in
+`finite_diff_knots` in
 [`minilink/control/mpc/utilities.py`](../../minilink/control/mpc/utilities.py)).
 No change to `Trajectory` beyond using `resample` / `with_signal`.
 

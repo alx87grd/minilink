@@ -10,7 +10,9 @@ from minilink.analysis.structural import observability_matrix, rank
 from minilink.control.design import place_gain
 from minilink.estimation.observer import StateObserver
 
+###############################################################################
 # Public API
+###############################################################################
 
 
 def luenberger_gain(A, C, poles):
@@ -65,7 +67,8 @@ def luenberger(
     model = design_model(
         sys, x_bar, u_bar, t, params, method=method, eps=eps, measured=True
     )
-    A, C = model.A(), model.C()
+    A = model.A()
+    C = model.C()
 
     L = luenberger_gain(A, C, poles)
 
@@ -87,28 +90,43 @@ def kalman(
     """Design a stationary Kalman filter for ``sys`` and return a ``StateObserver``.
 
     ``sys`` is a linear model or any plant measured through ``y``, as in
-    :func:`luenberger`. On arrays the gain is :func:`kalman_gain`. ``Q_n`` is the intensity of the white process noise on
-    the state, ``n × n`` (a noise ``w`` entering through ``B_w`` has
-    ``Q_n = B_w W B_wᵀ``), and ``R_n`` the intensity of the white measurement
-    noise, ``p × p``. The gain minimizes the steady-state estimation error
-    covariance, and the block is the stationary Kalman–Bucy filter.
+    :func:`luenberger`. On arrays the gain is :func:`kalman_gain`. ``Q_n`` is
+    the intensity of the white process noise on the state, ``n × n`` (a noise
+    ``w`` entering through ``B_w`` has ``Q_n = B_w W B_wᵀ``), and ``R_n`` the
+    intensity of the white measurement noise, ``p × p``. The gain minimizes the
+    steady-state estimation error covariance, and the block is the stationary
+    Kalman–Bucy filter.
     """
     model = design_model(
         sys, x_bar, u_bar, t, params, method=method, eps=eps, measured=True
     )
-    A, C = model.A(), model.C()
+    A = model.A()
+    C = model.C()
 
     L = kalman_gain(A, C, Q_n, R_n)
 
     return observer_of(model, L, "Kalman Filter")
 
 
-# Internal machinery: the block from the model, the request checked
+###############################################################################
+# Internal machinery
+###############################################################################
+
+
+def require_observable(obsv, n):
+    """Refuse an unobservable pair, naming the rank of the observability matrix."""
+    r = rank(obsv)
+    if r < n:
+        raise ValueError(
+            f"luenberger: (A, C) is not observable (rank 𝒪 = {r} < n = {n}): only "
+            "the observable modes' error poles can be moved."
+        )
 
 
 def observer_of(model, L, name):
     """The ``StateObserver`` called ``name`` running ``model`` with gain ``L`` at the model's operating point, its labels with a hat."""
     labels = [hat(label) for label in model.state.labels]
+
     observer = StateObserver(
         model.A(),
         model.B(),
@@ -121,6 +139,7 @@ def observer_of(model, L, name):
         labels=labels,
     )
     observer.name = name
+
     return observer
 
 
@@ -131,16 +150,6 @@ def hat(label):
     if component:
         return f"{component[1]}̂[{component[2]}]"
     return f"{label}̂" if len(label) == 1 else f"{label}_hat"
-
-
-def require_observable(obsv, n):
-    """Refuse an unobservable pair, naming the rank of the observability matrix."""
-    r = rank(obsv)
-    if r < n:
-        raise ValueError(
-            f"luenberger: (A, C) is not observable (rank 𝒪 = {r} < n = {n}): only "
-            "the observable modes' error poles can be moved."
-        )
 
 
 if __name__ == "__main__":

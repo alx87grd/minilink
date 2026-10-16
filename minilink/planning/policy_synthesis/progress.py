@@ -1,13 +1,18 @@
-"""Terminal progress reports for the value-iteration table builds and sweeps."""
+"""Progress reports: the terminal lines of the value-iteration table builds and sweeps."""
 
 import time
 
 import numpy as np
 
+# The percent step between two progress lines, and the width every line is padded
+# to, so that an in-place line never leaves the tail of a longer one behind
 PROGRESS_PCT_STEP = 2.0
 _PROGRESS_WIDTH = 72
 
+
+###############################################################################
 # Public API
+###############################################################################
 
 
 def progress(items, prefix, verbose, *, unit="nodes", per_item=1):
@@ -24,9 +29,11 @@ def progress(items, prefix, verbose, *, unit="nodes", per_item=1):
     state = {"enabled": verbose}
     done = 0
 
+    # The header: what is built, and how many units
     if verbose:
         print(f"{prefix}.. {total:,} {unit}", flush=True)
 
+    # Each item, then one tick per unit it counts for
     for item in items:
         yield item
 
@@ -37,6 +44,7 @@ def progress(items, prefix, verbose, *, unit="nodes", per_item=1):
                     done, total, start, prefix=prefix, unit=unit, state=state
                 )
 
+    # The completion line, with the time the build took
     if verbose:
         print_build_complete(prefix, time.time() - start, f"({total:,} {unit})")
 
@@ -51,9 +59,12 @@ class SweepLog:
     """
 
     def __init__(self, options, max_sweeps, stop_on_tol):
+        # What to report
         self.verbose = options.verbose
         self.max_sweeps = max_sweeps
         self.stop_on_tol = stop_on_tol
+
+        # Memory: the recorded sweeps, the clock and the progress line's throttle
         self.history = [] if options.record_history else None
         self.clock = time.time()
         self.state = {"enabled": options.verbose}
@@ -61,6 +72,7 @@ class SweepLog:
         if not self.verbose:
             return
 
+        # The banner: sweeps until dJ < tol, or a fixed number of them
         if stop_on_tol:
             print(f"\nComputing backward DP iterations until dJ<{options.tol:.2f}:")
             print("---------------------------------------------------------")
@@ -79,8 +91,10 @@ class SweepLog:
         if not self.verbose:
             return
 
+        # Until convergence: one line per sweep, with the change ΔJ = J − J_next
         if self.stop_on_tol:
-            J, J_next = np.asarray(J), np.asarray(J_next)
+            J = np.asarray(J)
+            J_next = np.asarray(J_next)
             delta = J - J_next
             elapsed = time.time() - self.clock
             print(
@@ -88,6 +102,7 @@ class SweepLog:
                 f"max:{J.max():7.2f} dmax:{delta.max():7.2f} dmin:{delta.min():7.2f}"
             )
         else:
+            # A fixed horizon: the throttled progress line over its sweeps
             maybe_print_build_progress(
                 k,
                 self.max_sweeps,
@@ -111,36 +126,56 @@ class SweepLog:
                 "Computing backward DP", elapsed, f"({k} sweeps, delta={delta:.3f})"
             )
 
+    ###########################################################################
+    # Internal machinery
+    ###########################################################################
+
     def record(self, t, J, pi):
         """Keep a copy of ``(t, J, pi)`` when history is asked for."""
         if self.history is not None:
             self.history.append((t, np.array(J), np.array(pi)))
 
 
-def print_build_progress(done, total, start, *, prefix, unit="pairs"):
-    """Overwrite one terminal line with percent, elapsed time, and ETA."""
-    elapsed = time.time() - start
-    pct = 100.0 * done / total if total else 100.0
-    eta = elapsed / done * (total - done) if 0 < done < total else 0.0
-    msg = f"{prefix}: {pct:5.1f}%  {elapsed:5.0f}s  ETA ~{eta:.0f}s"
-    pad = " " * max(0, _PROGRESS_WIDTH - len(msg))
-    print(f"\r{msg}{pad}", end="", flush=True)
+###############################################################################
+# Internal machinery
+###############################################################################
 
 
 def maybe_print_build_progress(done, total, start, *, prefix, unit, state):
     """Print at most once per ``PROGRESS_PCT_STEP`` percent (plus final 100%)."""
+    # Silent when disabled, or when there is nothing to count
     if not state.get("enabled", True) or total <= 0:
         return state
+
     pct = 100.0 * done / total
+
+    # Before the end, print only once pct reaches the next step (10⁻⁹ absorbs the
+    # rounding of pct), then move the next step past pct
     if done < total:
         next_at = state.get("next_pct", PROGRESS_PCT_STEP)
         if pct + 1e-9 < next_at:
             return state
+
         while next_at <= pct:
             next_at += PROGRESS_PCT_STEP
         state["next_pct"] = next_at
+
     print_build_progress(done, total, start, prefix=prefix, unit=unit)
+
     return state
+
+
+def print_build_progress(done, total, start, *, prefix, unit="pairs"):
+    """Overwrite one terminal line with percent, elapsed time, and ETA."""
+    elapsed = time.time() - start
+
+    # Percent done, and the ETA at the average rate so far
+    pct = 100.0 * done / total if total else 100.0
+    eta = elapsed / done * (total - done) if 0 < done < total else 0.0
+
+    msg = f"{prefix}: {pct:5.1f}%  {elapsed:5.0f}s  ETA ~{eta:.0f}s"
+    pad = " " * max(0, _PROGRESS_WIDTH - len(msg))
+    print(f"\r{msg}{pad}", end="", flush=True)
 
 
 def print_build_complete(prefix, elapsed, detail):

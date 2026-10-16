@@ -1,4 +1,4 @@
-"""Compiler for mathematical-program evaluators."""
+"""The program-evaluator compiler: a mathematical program bound to its NumPy or JAX evaluator."""
 
 import numpy as np
 
@@ -8,6 +8,10 @@ from minilink.core.backends import (
     normalize_backend,
 )
 from minilink.optimization.mathematical_program import MathematicalProgram
+
+###############################################################################
+# Public API
+###############################################################################
 
 
 def compile_program_evaluator(
@@ -38,23 +42,39 @@ def compile_program_evaluator(
         If True, print backend compilation diagnostics where supported.
     """
     key = normalize_backend(backend)
+    require_program_backend(key, backend)
+
+    # NumPy: the program evaluated as given, with the derivatives it supplies
     if key == BACKEND_NUMPY:
+        # Lazy import: an evaluator loads when its backend is chosen, not with
+        # the compiler
         from minilink.optimization.evaluators.numpy_evaluator import (
             NumpyMathematicalProgramEvaluator,
         )
 
         return NumpyMathematicalProgramEvaluator(program, sample_z=sample_z)
 
-    if key == BACKEND_JAX:
-        from minilink.optimization.evaluators.jax_evaluator import (
-            JaxMathematicalProgramEvaluator,
-        )
+    # JAX: the program JIT-compiled, the missing derivatives by autodiff
+    # Lazy import: an evaluator loads when its backend is chosen, not with the
+    # compiler
+    from minilink.optimization.evaluators.jax_evaluator import (
+        JaxMathematicalProgramEvaluator,
+    )
 
-        return JaxMathematicalProgramEvaluator(
-            program,
-            sample_z=sample_z,
-            use_hessian=use_hessian,
-            verbose=verbose,
-        )
+    return JaxMathematicalProgramEvaluator(
+        program,
+        sample_z=sample_z,
+        use_hessian=use_hessian,
+        verbose=verbose,
+    )
 
-    raise ValueError(f"Unknown mathematical-program backend {backend!r}.")
+
+###############################################################################
+# Internal machinery
+###############################################################################
+
+
+def require_program_backend(key, backend):
+    """Refuse a backend that has no program evaluator."""
+    if key not in (BACKEND_NUMPY, BACKEND_JAX):
+        raise ValueError(f"Unknown mathematical-program backend {backend!r}.")

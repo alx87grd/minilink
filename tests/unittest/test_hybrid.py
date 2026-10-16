@@ -316,11 +316,11 @@ class TestHybridSimulator(unittest.TestCase):
         hybrid.animate(show=False)
 
     def test_plant_diagram_inherits_camera_scale(self):
-        from minilink.core.hybrid_composition import _as_plant_diagram
+        from minilink.core.hybrid_composition import as_plant_diagram
         from minilink.dynamics.catalog.pendulum.pendulum import Pendulum
 
         plant = Pendulum(length=1.0, mass=1.0)
-        plant_diagram = _as_plant_diagram(plant)
+        plant_diagram = as_plant_diagram(plant)
         self.assertEqual(plant_diagram.camera_scale, plant.camera_scale)
 
     def test_hybrid_animate_refreshes_plant_camera_scale(self):

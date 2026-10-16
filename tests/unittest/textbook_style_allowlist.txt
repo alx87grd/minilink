@@ -1,0 +1,26 @@
+# The textbook-rule backlog: check, module::where, count.
+# Shrinks only. Regenerate: python tests/unittest/textbook_style.py --write
+bare-jax	minilink/analysis/derivatives.py::from jax.errors	1
+bare-jax	minilink/simulation/compile_backend.py::import jax	1
+np-under-xp	minilink/control/geometric.py::PurePursuit.ctl	1
+np-under-xp	minilink/core/distributions.py::random_bits	2
+return-math	minilink/dynamics/catalog/vehicles/dynamic_bicycle.py::DynamicBicycle.tf	1
+return-math	minilink/dynamics/catalog/vehicles/steering.py::KinematicBicycle.tf	1
+return-math	minilink/dynamics/catalog/vehicles/steering.py::KinematicCar.tf	1
+underscore	minilink/control/mpc/controller.py::MPCBroadcastController._abs_t	1
+underscore	minilink/control/mpc/controller.py::MPCBroadcastController._compute_u_nom	1
+underscore	minilink/control/mpc/controller.py::MPCBroadcastController._compute_x_nom	1
+underscore	minilink/control/mpc/controller.py::MPCStatefulController._compute_u_ff	1
+underscore	minilink/control/mpc/controller.py::MPCStatefulController._compute_x_ff	1
+underscore	minilink/control/mpc/controller.py::MPCStatefulController._compute_z	1
+underscore	minilink/control/mpc/controller.py::MPCStatefulController._measurement	1
+underscore	minilink/control/mpc/controller.py::MPCStatefulController._z_warm_for_command	1
+underscore	minilink/control/mpc/controller.py::MPCStatelessController._compute_u_ff	1
+underscore	minilink/control/mpc/controller.py::MPCStatelessController._compute_x_ff	1
+underscore	minilink/control/mpc/controller.py::MPCStatelessController._compute_z	1
+underscore	minilink/control/mpc/controller.py::MPCStatelessController._measurement	1
+underscore	minilink/control/mpc/controller.py::MPCTickLatch._print_tick	1
+underscore	minilink/control/mpc/controller.py::ModelPredictiveControllerMixin._replan_k	1
+underscore	minilink/control/mpc/controller.py::ModelPredictiveControllerMixin._require_nominal_cache	1
+underscore	minilink/control/mpc/controller.py::ModelPredictiveControllerMixin._z_warm_for_command	1
+unnamed-matrix	minilink/dynamics/catalog/pendulum/pendulum.py::Pendulum.H	1

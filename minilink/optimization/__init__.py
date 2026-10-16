@@ -1,17 +1,13 @@
-"""Generic nonlinear programs: ``MathematicalProgram`` + ``Optimizer``.
-
-Band facade for short teaching imports::
-
-    from minilink.optimization import MathematicalProgram, Optimizer
-
-Defining modules stay importable (``minilink.optimization.optimizer``, ...).
-"""
+"""Optimization: generic nonlinear programs and the optimizer that solves them."""
 
 from __future__ import annotations
 
 from minilink.core.facade import lazy_facade
 
-# name -> (module path, attribute)
+# The band facade for short teaching imports, e.g.
+# ``from minilink.optimization import MathematicalProgram, Optimizer``; the defining
+# modules stay importable (``minilink.optimization.optimizer``, ...). Each exported
+# name maps to its (module path, attribute).
 _EXPORTS: dict[str, tuple[str, str]] = {
     "MathematicalProgram": (
         "minilink.optimization.mathematical_program",

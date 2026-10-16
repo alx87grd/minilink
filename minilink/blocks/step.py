@@ -1,9 +1,13 @@
-"""Discrete-time step wiring blocks."""
+"""Discrete-time wiring blocks: a command latch on the step side of a hybrid loop."""
 
 import numpy as np
 
 from minilink.core.backends import array_module
 from minilink.core.system import StepSystem
+
+###############################################################################
+# Public API
+###############################################################################
 
 
 class ZOHHold(StepSystem):
@@ -16,12 +20,14 @@ class ZOHHold(StepSystem):
     def __init__(self):
         super().__init__(n=1, input_dim=1, output_dim=1, y_dependencies=())
         self.name = "ZOHHold"
+
+        # Initial state: the latch holds zero
         self.x0 = np.zeros(1)
 
     def step(self, x, u, k=0, params=None):
         xp = array_module(u)
 
-        # the latch: x_{k+1} = u_k
+        # The latch: x_{k+1} = u_k
         x_next = xp.asarray(u, dtype=float).reshape(1).copy()
 
         return x_next

@@ -10,7 +10,9 @@ from minilink.core.feedback import command_port
 from minilink.core.sets import is_finite_box
 from minilink.planning.problems import as_stochastic, merge_params
 
+###############################################################################
 # Public API
+###############################################################################
 
 
 class RolloutEnvironment:
@@ -58,6 +60,7 @@ class RolloutEnvironment:
         backend="jax",
         training_zone=None,
     ):
+        # The task: the problem, its plant and its cost, on one control period
         problem = as_stochastic(problem)
         self.problem = problem
         self.sys = problem.sys
@@ -83,8 +86,8 @@ class RolloutEnvironment:
         self.params_distribution = dict(problem.params_distribution)
         self.randomizes_params = bool(self.params_distribution)
 
-        # The constraint X: leaving it is a failure, charged the price of infeasibility
-        # (declared on the problem, else a bound of any feasible cost, announced once)
+        # The constraint X, whose exit is a failure, and the training zone, whose
+        # exit is a truncation
         self.X = problem.X
         self.set_params = problem.params.sets
         self.training_zone = (
@@ -95,18 +98,27 @@ class RolloutEnvironment:
         self.action_port = command_port(self.sys)
         self.m = int(self.sys.inputs[self.action_port].dim)
         self.nominal_inputs = self.nominal_port_values()
+
+        # The price of infeasibility a failure is charged: declared on the problem,
+        # else a bound of any feasible cost, announced once
         self.infeasible_cost = self.price_of_infeasibility()
+
+        # Noise the held-input rollout never sees is announced
         warn_inert_noise(self.sys, problem.disturbances)
 
     def reset(self, key):
         """An initial state drawn from the problem's start distribution."""
         xp = array_module(key)
-        return xp.asarray(self.problem.sample_x0(key), dtype=float)
+
+        x0 = xp.asarray(self.problem.sample_x0(key), dtype=float)
+
+        return x0
 
     def sample_params(self, key):
         """The episode's parameter draws ``{name: array}`` (empty when nothing is randomized)."""
         if not self.randomizes_params:
             return {}
+
         return self.problem.sample_params(key)
 
     def step(self, x, t, u, key, params=None):
@@ -121,15 +133,26 @@ class RolloutEnvironment:
         is reached, or the state left the training zone.
         """
         xp = array_module(x)
-        dt = self.dt
 
-        # Dynamics: x_k+1 = f(x_k, u_k, w_k) over one control period, input held
-        x_next = self.plant_step(x, self.input_vector(u, key), t, params)
+        dt = self.dt
+        tf = self.tf
+        finite_horizon = self.finite_horizon
+        g = self.cost.g
+        h = self.cost.h
+        X = self.X
+        zone = self.training_zone
+        set_params = self.set_params
+
+        # Plant input: the action on its port, the disturbance draws on theirs
+        u_full = self.input_vector(u, key)
+
+        # Dynamics: x_{k+1} = f(x_k, u_k, w_k) over one control period, input held
+        x_next = self.plant_step(x, u_full, t, params)
         t_next = t + dt
 
-        # Reward: r_k = -g(x_k, u_k) dt, the stage cost with its sign flipped; the
+        # Reward: r_k = −g(x_k, u_k) dt, the stage cost with its sign flipped; the
         # discount enters the return once, through the algorithm, never the reward
-        reward = -self.cost.g(x, u, t) * dt
+        reward = -g(x, u, t) * dt
 
         # A step that blew up ends the episode; the last finite state stands in
         # for the next one so rewards, values and the reset stay finite
@@ -137,27 +160,27 @@ class RolloutEnvironment:
         x_next = xp.where(finite, x_next, x)
 
         # Leaving X is a failure; leaving the training zone is not; the horizon ends
-        X, zone, set_params = self.X, self.training_zone, self.set_params
         failed = ~xp.all(X.margin(x_next, t_next, set_params) >= 0.0) | ~finite
         left_zone = ~xp.all(zone.margin(x_next, t_next, set_params) >= 0.0)
-        horizon_reached = xp.asarray(t_next >= self.tf - 0.5 * dt)
+        horizon_reached = xp.asarray(t_next >= tf - 0.5 * dt)
 
         # A failure pays the price of infeasibility; a finite horizon pays h(x_N)
-        reward = reward - xp.where(failed, self.infeasible_penalty(x_next, t_next), 0.0)
-        if self.finite_horizon:
-            reward = reward - horizon_reached * self.cost.h(x_next, t_next)
+        penalty = self.infeasible_penalty(x_next, t_next)
+        reward = reward - xp.where(failed, penalty, 0.0)
+        if finite_horizon:
+            reward = reward - horizon_reached * h(x_next, t_next)
 
         # What is paid is terminal; what is left unpaid is truncated
-        terminated = failed | (horizon_reached & self.finite_horizon)
-        truncated = (left_zone & ~failed) | (
-            horizon_reached & (not self.finite_horizon)
-        )
+        terminated = failed | (horizon_reached & finite_horizon)
+        truncated = (left_zone & ~failed) | (horizon_reached & (not finite_horizon))
+
         return x_next, t_next, reward, terminated, truncated
 
     def plant_step(self, x, u_full, t, params=None):
         """One integration step of the plant, on the nominal or the episode's parameters."""
         if not params:
             return self.step_plant(x, u_full, t, self.dt)
+
         return self.step_plant_p(x, u_full, t, self.dt, self.full_params(params))
 
     def input_vector(self, u, key):
@@ -168,17 +191,26 @@ class RolloutEnvironment:
         saturation. Without a ``key`` the disturbance ports keep their nominal values.
         """
         xp = array_module(u)
+
+        # Every port at its nominal value, the action on its own
         ports = dict(self.nominal_inputs)
         ports[self.action_port] = u
+
+        # Fresh disturbance draws on their ports
         if key is not None:
             ports.update(self.problem.sample_disturbances(key))
-        return xp.concatenate(
+
+        # The ports stacked in port order
+        u_full = xp.concatenate(
             [xp.asarray(ports[port_id], dtype=float) for port_id in ports]
         )
+
+        return u_full
 
     def infeasible_penalty(self, x, t):
         """The price of infeasibility at ``(x, t)``: the problem's, scalar or callable."""
         price = self.infeasible_cost
+
         return price(x, t) if callable(price) else price
 
     def full_params(self, params):
@@ -195,17 +227,22 @@ class RolloutEnvironment:
             if self.randomizes_params
             else ""
         )
+
         return (
             f"{kind}, episodes of {self.tf:g} s at dt={self.dt:g}; a failure (leaving X, "
             f"or a non-finite state) terminates and is charged {charged}; leaving the "
             f"training zone truncates (value bootstrapped){randomized}"
         )
 
+    ###########################################################################
     # Internal machinery
+    ###########################################################################
 
     def integration_step(self, integrator, backend):
         """The compiled one-step integrator, without and with a params argument."""
         ev = self.evaluator
+
+        # The evaluator's steps on the chosen backend
         if backend == BACKEND_JAX:
             steps = {
                 "rk4": (ev.rk4_step_trace, ev.rk4_step_trace_p),
@@ -218,14 +255,30 @@ class RolloutEnvironment:
             }
         else:
             raise ValueError(f"backend must be 'jax' or 'numpy', got {backend!r}")
+
         if integrator not in steps:
             raise ValueError(f"integrator must be 'rk4' or 'euler', got {integrator!r}")
+
         return steps[integrator]
+
+    def nominal_port_values(self):
+        """The nominal value of each input port, in port order."""
+        u_nominal = np.asarray(self.sys.get_u_from_input_ports(), dtype=float)
+
+        # The nominal input vector cut into its ports
+        values = {}
+        i = 0
+        for port_id, port in self.sys.inputs.items():
+            values[port_id] = u_nominal[i : i + port.dim]
+            i += port.dim
+
+        return values
 
     def price_of_infeasibility(self):
         """The problem's ``infeasible_cost``; else a bound of any feasible cost, announced once."""
         if self.problem.infeasible_cost is not None:
             return self.problem.infeasible_cost
+
         bound = feasible_cost_bound(
             self.problem,
             self.training_zone,
@@ -234,44 +287,16 @@ class RolloutEnvironment:
             self.n_steps_per_episode,
             self.discount_rate,
         )
+
+        # Announced only when X is a finite box and the bound is finite
         if is_finite_box(self.X.bounding_box()) and np.isfinite(bound):
             warnings.warn(
                 f"leaving X is charged {bound:.3g}, a bound of any feasible cost over "
                 f"{self.tf:g} s; set infeasible_cost on the problem to choose",
                 stacklevel=3,
             )
+
         return bound
-
-    def nominal_port_values(self):
-        """The nominal value of each input port, in port order."""
-        u_nominal = np.asarray(self.sys.get_u_from_input_ports(), dtype=float)
-        values, i = {}, 0
-        for port_id, port in self.sys.inputs.items():
-            values[port_id] = u_nominal[i : i + port.dim]
-            i += port.dim
-        return values
-
-
-def warn_inert_noise(sys, disturbances):
-    """Warn about noise the held-input rollout never sees: a port only ``h`` reads, a random block inside the plant."""
-    inert = [
-        port
-        for port in disturbances
-        if not np.any(sys.jacobian("f", port, method="fd"))
-    ]
-    if inert:
-        warnings.warn(
-            f"disturbances on {inert} do not reach f at the nominal point: the stepped "
-            "rollout feeds the true state to the law and never calls h, so these draws "
-            "change nothing here",
-            stacklevel=3,
-        )
-    if sys.is_random:
-        warnings.warn(
-            "the plant holds a random block with a fixed seed: every trial and episode "
-            "sees the same noise signal until the tools realize it per trial",
-            stacklevel=3,
-        )
 
 
 def feasible_cost_bound(
@@ -288,16 +313,22 @@ def feasible_cost_bound(
     when no finite box bounds the cost.
     """
     sys = problem.sys
+
+    # The box of the zone, else of X, and of the action port: none finite, no bound
     X_box = zone.bounding_box()
     if not is_finite_box(X_box):
         X_box = problem.X.bounding_box()
     U_box = sys.inputs[action_port].box
     if not (is_finite_box(X_box) and is_finite_box(U_box)):
         return np.inf
+
+    # A Halton set over the box of (x, u)
     lower = np.concatenate([X_box.lower, U_box.lower])
     upper = np.concatenate([X_box.upper, U_box.upper])
     unit = qmc.Halton(d=lower.size, scramble=False).random(int(samples) + 1)[1:]
     points = lower + unit * (upper - lower)
+
+    # The running cost at a point, the other ports at their nominal values
     n = X_box.dim
     g = problem.cost.g
     u_full = np.asarray(sys.get_u_from_input_ports(), dtype=float)
@@ -308,10 +339,44 @@ def feasible_cost_bound(
         u[action] = point[n:]
         return float(g(point[:n], u, 0.0))
 
+    # The largest running cost on that set
     g_max = max(running_cost(p) for p in points)
 
-    # sum_k gamma^k g_max dt over N steps, gamma = exp(-rho dt)
+    # J_max = Σ_{k<N} γᵏ g_max dt, with γ = exp(−ρ dt)
     gamma = float(np.exp(-discount_rate * dt))
     if gamma >= 1.0:
-        return g_max * dt * n_steps
-    return g_max * dt * (1.0 - gamma**n_steps) / (1.0 - gamma)
+        J_max = g_max * dt * n_steps
+    else:
+        J_max = g_max * dt * (1.0 - gamma**n_steps) / (1.0 - gamma)
+
+    return J_max
+
+
+###############################################################################
+# Internal machinery
+###############################################################################
+
+
+def warn_inert_noise(sys, disturbances):
+    """Warn about noise the held-input rollout never sees: a port only ``h`` reads, a random block inside the plant."""
+    # Disturbance ports whose Jacobian on f is zero at the nominal point
+    inert = [
+        port
+        for port in disturbances
+        if not np.any(sys.jacobian("f", port, method="fd"))
+    ]
+    if inert:
+        warnings.warn(
+            f"disturbances on {inert} do not reach f at the nominal point: the stepped "
+            "rollout feeds the true state to the law and never calls h, so these draws "
+            "change nothing here",
+            stacklevel=3,
+        )
+
+    # A random block inside the plant draws the same signal every episode
+    if sys.is_random:
+        warnings.warn(
+            "the plant holds a random block with a fixed seed: every trial and episode "
+            "sees the same noise signal until the tools realize it per trial",
+            stacklevel=3,
+        )

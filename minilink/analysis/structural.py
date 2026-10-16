@@ -1,10 +1,4 @@
-"""Structural analysis: controllability and observability of a system's linear model.
-
-``controllability(sys, …)`` and ``observability(sys, …)`` take any ``System`` (an
-``LTISystem`` as is, a plant linearized about its command port and its measured ``y``)
-and return the rank test; ``controllability_matrix(A, B)`` and
-``observability_matrix(A, C)`` are their arrays twins, as ``lqr_gain`` is ``lqr``'s.
-"""
+"""Structural analysis: the controllability and observability of a system's linear model."""
 
 from dataclasses import dataclass
 
@@ -18,25 +12,16 @@ from minilink.core.system import System
 RANK_TOL = 1e-9
 
 
-@dataclass(frozen=True)
-class StructuralResult:
-    """Result of a controllability or observability test."""
-
-    matrix: np.ndarray  # the stacked Kalman matrix
-    rank: int
-    n: int  # number of states
-
-    @property
-    def is_full_rank(self) -> bool:
-        return self.rank == self.n
-
-    def __str__(self):
-        verdict = "full rank" if self.is_full_rank else "rank deficient"
-        return f"StructuralResult: rank {self.rank} of n = {self.n}, {verdict}"
+###############################################################################
+# Public API
+###############################################################################
 
 
 def controllability_matrix(A, B):
-    """Return the Kalman controllability matrix ``𝒞 = [B, AB, …, Aⁿ⁻¹B]`` of the pair ``(A, B)``."""
+    """Return the Kalman controllability matrix ``𝒞 = [B, AB, …, Aⁿ⁻¹B]`` of the pair ``(A, B)``.
+
+    The arrays twin of :func:`controllability`, as ``lqr_gain`` is ``lqr``'s.
+    """
     A = np.asarray(A, dtype=float)
     B = np.atleast_2d(np.asarray(B, dtype=float))
     n = A.shape[0]
@@ -51,7 +36,10 @@ def controllability_matrix(A, B):
 
 
 def observability_matrix(A, C):
-    """Return the Kalman observability matrix ``𝒪 = [C; CA; …; CAⁿ⁻¹]`` of the pair ``(A, C)``."""
+    """Return the Kalman observability matrix ``𝒪 = [C; CA; …; CAⁿ⁻¹]`` of the pair ``(A, C)``.
+
+    The arrays twin of :func:`observability`.
+    """
     A = np.asarray(A, dtype=float)
     C = np.atleast_2d(np.asarray(C, dtype=float))
     n = A.shape[0]
@@ -87,8 +75,10 @@ def controllability(
     arrays, :func:`controllability_matrix` gives ``𝒞``.
     """
     require_system(sys, "controllability", "controllability_matrix(A, B)")
+
     model = design_model(sys, x_bar, u_bar, t, params, method=method, eps=eps)
-    A, B = model.A(), model.B()
+    A = model.A()
+    B = model.B()
     n = A.shape[0]
 
     # 𝒞 = [B, AB, …, Aⁿ⁻¹B]
@@ -122,10 +112,12 @@ def observability(
     :func:`observability_matrix` gives ``𝒪``.
     """
     require_system(sys, "observability", "observability_matrix(A, C)")
+
     model = design_model(
         sys, x_bar, u_bar, t, params, method=method, eps=eps, measured=True
     )
-    A, C = model.A(), model.C()
+    A = model.A()
+    C = model.C()
     n = A.shape[0]
 
     # 𝒪 = [C; CA; …; CAⁿ⁻¹]
@@ -138,15 +130,28 @@ def observability(
     return StructuralResult(matrix=obsv, rank=r, n=n)
 
 
-# =============================================================================
+@dataclass(frozen=True)
+class StructuralResult:
+    """Result of a controllability or observability test."""
+
+    matrix: np.ndarray  # The stacked Kalman matrix
+    rank: int
+    n: int  # Number of states
+
+    @property
+    def is_full_rank(self) -> bool:
+        """The test passes: the Kalman matrix has rank ``n``."""
+        return self.rank == self.n
+
+    def __str__(self):
+        verdict = "full rank" if self.is_full_rank else "rank deficient"
+
+        return f"StructuralResult: rank {self.rank} of n = {self.n}, {verdict}"
+
+
+###############################################################################
 # Internal machinery
-# =============================================================================
-
-
-def rank(matrix, tol=RANK_TOL):
-    """The rank of ``matrix``, counting the singular values ``σᵢ > tol σ₁``; the designs' precondition."""
-    sigma = np.linalg.svd(matrix, compute_uv=False)
-    return int(np.sum(sigma > tol * sigma.max(initial=0.0)))
+###############################################################################
 
 
 def require_system(sys, verb, twin):
@@ -156,6 +161,14 @@ def require_system(sys, verb, twin):
             f"{verb} takes a system, a linear model LTISystem(A, B, C) or a plant, "
             f"not {type(sys).__name__}; on arrays {twin} gives the Kalman matrix"
         )
+
+
+def rank(matrix, tol=RANK_TOL):
+    """The rank of ``matrix``, counting the singular values ``σᵢ > tol σ₁``; the designs' precondition."""
+    sigma = np.linalg.svd(matrix, compute_uv=False)
+    r = int(np.sum(sigma > tol * sigma.max(initial=0.0)))
+
+    return r
 
 
 if __name__ == "__main__":

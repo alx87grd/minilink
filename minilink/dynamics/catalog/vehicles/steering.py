@@ -15,6 +15,10 @@ from minilink.graphical.animation.primitives import (
 )
 from minilink.graphical.catalog.skins import car_skin_2d
 
+###############################################################################
+# Public API
+###############################################################################
+
 
 class KinematicBicycle(DynamicSystem):
     """Kinematic bicycle model with speed and steering-angle inputs."""
@@ -22,9 +26,13 @@ class KinematicBicycle(DynamicSystem):
     def __init__(self):
         super().__init__(n=3, input_dim=2, output_dim=3, expose_state=True)
         self.name = "Kinematic Bicycle"
-        # CG-centered wheelbase: ``length = a + b`` (same frame convention as
-        # :class:`~minilink.dynamics.catalog.vehicles.dynamic_bicycle.DynamicBicycle`).
+
+        # Parameters: a CG-centered wheelbase, ``length = a + b`` (the frame
+        # convention of
+        # :class:`~minilink.dynamics.catalog.vehicles.dynamic_bicycle.DynamicBicycle`)
         self.params = {"a": 1.0, "b": 1.0, "length": 2.0}
+
+        # Signal labels and units
         self.state.labels = ["x", "y", "theta"]
         self.state.units = ["m", "m", "rad"]
         self.inputs["u"].labels = ["speed", "steering"]
@@ -32,7 +40,7 @@ class KinematicBicycle(DynamicSystem):
         self.outputs["y"].labels = list(self.state.labels)
         self.outputs["y"].units = list(self.state.units)
 
-        # Graphics-only (2-D centerline look shared with :class:`DynamicBicycle`)
+        # Graphics: the 2-D centerline look shared with :class:`DynamicBicycle`
         self.wheel_len = 0.76
         self.wheel_width = 0.27
         self.camera_scale = 10.0
@@ -41,12 +49,16 @@ class KinematicBicycle(DynamicSystem):
 
     def f(self, x, u, t=0.0, params=None):
         params = self.params if params is None else params
-        length = params["a"] + params["b"]
-        speed, steering = u
-        theta = x[2]
         xp = array_module(x, u)
 
-        # kinematic bicycle: heading turns at speed * tan(steering) / wheelbase
+        a = params["a"]
+        b = params["b"]
+
+        length = a + b
+        speed, steering = u
+        theta = x[2]
+
+        # Kinematic bicycle: ẋ = v cos θ, ẏ = v sin θ, θ̇ = v tan δ / L
         dx = xp.array(
             [
                 speed * xp.cos(theta),
@@ -62,9 +74,12 @@ class KinematicBicycle(DynamicSystem):
 
     def tf(self, x, u, t=0, params=None):
         params = self.params if params is None else params
+
         a = params["a"]
+
         steering = u[1]
         T_wb = SE2(x[0], x[1], x[2])
+
         return {
             "body": T_wb,
             "axle_front": T_wb @ SE2(a, 0.0, steering),
@@ -80,51 +95,70 @@ class KinematicCar(KinematicBicycle):
     def __init__(self):
         super().__init__()
         self.name = "Kinematic Car"
+
+        # Parameters: a full-size wheelbase
         self.a = 2.0
         self.b = 3.0
         self.params["a"] = self.a
         self.params["b"] = self.b
         self.params["length"] = self.a + self.b
 
-        # Graphic parameters (display only; the EoM use only ``length``). The skin
-        # is a rectangular body filling the ``length x width`` collision footprint
-        # plus four wheels (the front pair steering) -- replacing the bicycle's
-        # pointed outline and two in-line wheels so it reads as a car.
+        # Graphics (display only; the EoM use only ``length``): a rectangular body
+        # filling the ``length x width`` collision footprint plus four wheels, the
+        # front pair steering, in place of the bicycle's pointed outline and two
+        # in-line wheels, so it reads as a car
         self.width = 2.0
-        self.body_width_ratio = 0.74  # tub narrower than track, so wheels show
-        self.visual_wheelbase_ratio = 0.64  # axle separation as a fraction of length
+        self.body_width_ratio = 0.74  # Tub narrower than track, so wheels show
+        self.visual_wheelbase_ratio = 0.64  # Axle separation as a fraction of length
         self.tire_length = 0.95
         self.tire_width = 0.34
         self.camera_scale = 2.0 * self.params["length"]
 
     def get_kinematic_geometry(self):
         length = self.params["length"]
+        width = self.width
+        body_width_ratio = self.body_width_ratio
+        wheelbase_ratio = self.visual_wheelbase_ratio
+        tire_length = self.tire_length
+        tire_width = self.tire_width
+
+        # The body, its tub narrower than the track
         body = Box(
             length_x=length,
-            length_y=self.body_width_ratio * self.width,
+            length_y=body_width_ratio * width,
             length_z=0.4,
             color="#4c72b0",
             opacity=0.9,
         )
-        axle = 0.5 * self.visual_wheelbase_ratio * length
-        half_track = 0.5 * self.width - 0.5 * self.tire_width
-        wheel_rl = wheel_box(self.tire_length, self.tire_width)
-        wheel_rr = wheel_box(self.tire_length, self.tire_width)
+
+        # The rear wheels ride on the body; the front pair steer on frames of their own
+        axle = 0.5 * wheelbase_ratio * length
+        half_track = 0.5 * width - 0.5 * tire_width
+        wheel_rl = wheel_box(tire_length, tire_width)
+        wheel_rr = wheel_box(tire_length, tire_width)
         wheel_rl.local_transform = SE2(-axle, half_track, 0.0)
         wheel_rr.local_transform = SE2(-axle, -half_track, 0.0)
+
         return {
             "body": [body, wheel_rl, wheel_rr],
-            "wheel_fl": [wheel_box(self.tire_length, self.tire_width)],
-            "wheel_fr": [wheel_box(self.tire_length, self.tire_width)],
+            "wheel_fl": [wheel_box(tire_length, tire_width)],
+            "wheel_fr": [wheel_box(tire_length, tire_width)],
         }
 
     def tf(self, x, u, t=0, params=None):
         length = self.params["length"]
+        wheelbase_ratio = self.visual_wheelbase_ratio
+        width = self.width
+        tire_width = self.tire_width
+
         steering = u[1]
-        axle = 0.5 * self.visual_wheelbase_ratio * length
-        half_track = 0.5 * self.width - 0.5 * self.tire_width
+
+        # The front wheel hubs on the body, each steered about its own vertical axis
+        axle = 0.5 * wheelbase_ratio * length
+        half_track = 0.5 * width - 0.5 * tire_width
         T_body = SE2(x[0], x[1], x[2])
         R_steer = SE2(0.0, 0.0, steering)
+
         return {
             "body": T_body,
             "wheel_fl": T_body @ SE2(axle, half_track, 0.0) @ R_steer,
@@ -138,6 +172,8 @@ class HolonomicMobileRobot(DynamicSystem):
     def __init__(self):
         super().__init__(n=2, input_dim=2, output_dim=2, expose_state=True)
         self.name = "Holonomic Mobile Robot"
+
+        # Signal labels and units
         self.state.labels = ["x", "y"]
         self.state.units = ["m", "m"]
         self.inputs["u"].labels = ["vx", "vy"]
@@ -145,13 +181,16 @@ class HolonomicMobileRobot(DynamicSystem):
         self.outputs["y"].labels = list(self.state.labels)
         self.outputs["y"].units = list(self.state.units)
 
-        # Graphic parameters (not part of the EoM)
+        # Graphics (not part of the EoM)
         self.camera_scale = 10.0
         self.camera_follow_frame = "body"
 
     def f(self, x, u, t=0.0, params=None):
-        # holonomic point: velocity command integrates straight to position
-        dx = array_module(u).asarray(u)
+        xp = array_module(u)
+
+        # Holonomic point: the velocity command integrates straight to the position
+        # ṗ = u
+        dx = xp.asarray(u)
 
         return dx
 

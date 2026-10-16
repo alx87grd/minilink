@@ -5,6 +5,10 @@ from __future__ import annotations
 import numpy as np
 from scipy.optimize import fsolve
 
+###############################################################################
+# Public API
+###############################################################################
+
 
 def find_equilibrium(sys, x_guess=None, u_bar=None, t=0.0, params=None, *, tol=1e-9):
     """Return a state ``x_eq`` near ``x_guess`` with ``f(x_eq, u_bar, t) ≈ 0``.
@@ -23,7 +27,8 @@ def find_equilibrium(sys, x_guess=None, u_bar=None, t=0.0, params=None, *, tol=1
     params : dict, optional
         Parameter set forwarded to ``f``.
     tol : float, optional
-        Tolerance on ``‖f‖`` for the success check.
+        The solver's step tolerance (``xtol``); the root is accepted when
+        ``‖f‖ ≤ 10³ tol``.
 
     Returns
     -------
@@ -33,26 +38,36 @@ def find_equilibrium(sys, x_guess=None, u_bar=None, t=0.0, params=None, *, tol=1
     Raises
     ------
     RuntimeError
-        If the solver does not drive ``‖f‖`` below ``tol``.
+        If the solver does not drive ``‖f‖`` to ``10³ tol`` or below.
     """
+    # The nominal state and inputs by default, and every random block at its mean
     if x_guess is None:
         x_guess = sys.state.nominal_value
     x_guess = np.asarray(x_guess, dtype=float).reshape(-1)
     if u_bar is None:
         u_bar = sys.get_u_from_input_ports()
     u_bar = np.asarray(u_bar, dtype=float).reshape(-1)
-    params = (
-        sys.realize(None) if params is None else params
-    )  # random blocks at their mean
+    params = sys.realize(None) if params is None else params
 
     def residual(x):
         return np.asarray(sys.f(x, u_bar, t, params), dtype=float).reshape(-1)
 
+    # f(x_eq, ū, t) = 0, solved from the guess
     x_eq = fsolve(residual, x_guess, xtol=tol)
+    require_converged(residual(x_eq), tol)
 
-    if np.linalg.norm(residual(x_eq)) > tol * 1e3:
-        raise RuntimeError("find_equilibrium did not converge to f(x) = 0")
     return x_eq
+
+
+###############################################################################
+# Internal machinery
+###############################################################################
+
+
+def require_converged(f_eq, tol):
+    """Refuse a root whose residual ‖f(x_eq)‖ exceeds 10³ tol."""
+    if np.linalg.norm(f_eq) > tol * 1e3:
+        raise RuntimeError("find_equilibrium did not converge to f(x) = 0")
 
 
 if __name__ == "__main__":

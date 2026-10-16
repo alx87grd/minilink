@@ -1,9 +1,4 @@
-"""
-Hybrid simulation: scheduled computer ticks + ZOH continuous plant integration.
-
-Public API mirrors :class:`~minilink.simulation.simulator.Simulator`:
-construct with ``t0`` / ``tf``, then :meth:`solve` or :meth:`solve_forced`.
-"""
+"""Hybrid simulation: a computer ticking on its schedule, the plant held between ticks."""
 
 from __future__ import annotations
 
@@ -15,15 +10,21 @@ import numpy as np
 from minilink.core.backends import BACKEND_NUMPY
 from minilink.core.hybrid_diagram import HybridDiagram
 from minilink.core.step_rollout import StepRollout
+from minilink.core.system import System
 from minilink.core.trajectory import Trajectory
 from minilink.simulation.computer import Computer
 
+###############################################################################
 # Public API
+###############################################################################
 
 
 class HybridSimulator:
     """
     Advance a :class:`HybridDiagram` on the computer base tick grid.
+
+    The API mirrors :class:`~minilink.simulation.simulator.Simulator`:
+    construct with ``t0`` / ``tf``, then :meth:`solve` or :meth:`solve_forced`.
 
     Parameters
     ----------
@@ -57,41 +58,45 @@ class HybridSimulator:
         compile_backend=BACKEND_NUMPY,
         verbose=False,
     ):
-        if not isinstance(hybrid, HybridDiagram):
-            raise TypeError(
-                f"HybridSimulator requires HybridDiagram, got {type(hybrid).__name__}"
-            )
+        require_hybrid_diagram(hybrid)
 
+        # The diagram, its computer and its plant, and the options
         self.verbose = verbose
         self.hybrid = hybrid
         self.computer: Computer = hybrid.computer
         self.plant = hybrid.plant
         self.plant_dt_inner = plant_dt_inner
+
+        # The base tick grid on [t0, tf], at the schedule's base period
         self.t0 = float(t0)
         self.tf = float(tf)
-
-        self.dt_base, self.n_ticks, self.times = _select_tick_grid(
+        self.dt_base, self.n_ticks, self.times = select_tick_grid(
             t0=self.t0,
             tf=self.tf,
             dt_base=self.computer.schedule.dt_base,
             n_steps=n_steps,
         )
 
+        # The compiled computer and plant
         self.computer.compile()
         self.plant_eval = self.plant.compile(backend=compile_backend)
 
-        self.x0_plant = _validate_x0(
+        # The initial states, each diagram's own x0 unless given
+        self.x0_plant = validate_x0(
             self.plant.x0 if x0_plant is None else x0_plant,
             self.plant.n,
             label="x0_plant",
         )
-        self.x0_computer = _validate_x0(
+        self.x0_computer = validate_x0(
             self.computer.diagram.x0 if x0_computer is None else x0_computer,
             self.computer.diagram.n,
             label="x0_computer",
         )
 
-        self.c2p, self.p2c = _index_boundary_connections(hybrid)
+        # The boundary links, computer to plant and plant to computer, as port pairs
+        self.c2p, self.p2c = index_boundary_connections(hybrid)
+
+        # The latest run, filled by solve and solve_forced
         self.last_result = None
 
         if self.verbose:
@@ -102,13 +107,16 @@ class HybridSimulator:
 
     def solve(self):
         """Simulate with nominal computer-boundary inputs."""
-        u_nominal = np.asarray(
-            self.computer.diagram.get_u_from_input_ports(), dtype=float
-        )
-        if self.computer.diagram.m == 0:
-            u_forced = np.zeros((0, self.n_ticks))
+        diagram = self.computer.diagram
+        n_ticks = self.n_ticks
+
+        # The nominal boundary input, held on every tick
+        u_nominal = np.asarray(diagram.get_u_from_input_ports(), dtype=float)
+        if diagram.m == 0:
+            u_forced = np.zeros((0, n_ticks))
         else:
-            u_forced = np.repeat(u_nominal.reshape(-1, 1), self.n_ticks, axis=1)
+            u_forced = np.repeat(u_nominal.reshape(-1, 1), n_ticks, axis=1)
+
         return self.run(u_forced)
 
     def solve_forced(self, u, *, input_port_id=None):
@@ -116,90 +124,105 @@ class HybridSimulator:
         Simulate with prescribed computer-boundary input.
 
         ``u`` may be a callable ``u(t)``, constant vector, or sampled matrix
-        on the tick grid (``m × n_ticks``).
+        on the tick grid (``m × n_ticks``). With ``input_port_id``, ``u``
+        drives that one input port and the other ports hold their nominal
+        values.
         """
-        u_traj = _coerce_forced_input(
+        u_traj = coerce_tick_input(
             u,
             self.computer.diagram,
             self.n_ticks,
             self.times,
             input_port_id=input_port_id,
         )
+
         return self.run(u_traj)
 
     def run(self, u_traj: np.ndarray) -> HybridSimResult:
+        """Tick the computer on ``u_traj`` (``m × n_ticks``), the plant held between ticks."""
         computer = self.computer
         diagram = computer.diagram
-        computer.reset(self.x0_computer)
+        plant = self.plant
+        plant_eval = self.plant_eval
+        c2p = self.c2p
+        p2c = self.p2c
+        t0 = self.t0
+        dt_base = self.dt_base
+        dt_inner = self.plant_dt_inner
+        n_ticks = self.n_ticks
+        n_computer = diagram.n
+        plant_m = plant.m
 
+        # The initial states, and the plant outputs the first tick samples
+        computer.reset(self.x0_computer)
         x_plant = self.x0_plant.copy()
-        u_plant_nominal = np.asarray(self.plant.get_u_from_input_ports(), dtype=float)
+        u_plant_nominal = np.asarray(plant.get_u_from_input_ports(), dtype=float)
         zoh_buffers: dict[str, np.ndarray] = {}
-        sample_buffers = _sample_plant_outputs(
-            self.plant_eval,
+        sample_buffers = sample_plant_outputs(
+            plant_eval,
             x_plant,
             u_plant_nominal,
-            self.t0,
-            self.p2c,
+            t0,
+            p2c,
         )
 
-        n_computer = diagram.n
-        n_ticks = self.n_ticks
-        plant_m = self.plant.m
-
+        # The computer's history, one column per tick
         k_hist = np.zeros(n_ticks, dtype=float)
         x_computer_hist = np.zeros((n_computer, n_ticks))
-        computer_signal_hist = _allocate_signal_hist(
-            diagram, self.p2c, n_ticks, plant_signals=False
-        )
+        computer_signal_hist = allocate_signal_hist(diagram, p2c, n_ticks)
         plant_port_aliases = {
-            plant_port: computer_port for plant_port, computer_port in self.p2c
+            plant_port: computer_port for plant_port, computer_port in p2c
         }
 
-        plant_signal_names = _collect_plant_signal_names(diagram, self.p2c)
+        # The plant's history, one segment of fine samples per tick
+        plant_signal_names = collect_plant_signal_names(diagram, p2c)
         t_plant_parts: list[np.ndarray] = []
         x_plant_parts: list[np.ndarray] = []
         u_plant_parts: list[np.ndarray] = []
         plant_signal_parts = {name: [] for name in plant_signal_names}
 
         for tick_idx in range(n_ticks):
+            # Tick the computer on its forced input and the plant outputs it sampled
             k = computer.k
-            t_k = self.t0 + k * self.dt_base
-            u_computer = _assemble_computer_u(
+            t_k = t0 + k * dt_base
+            u_computer = assemble_computer_u(
                 diagram,
                 u_traj[:, tick_idx],
                 sample_buffers,
-                self.p2c,
+                p2c,
             )
             outs = computer.tick(u_computer)
 
-            for computer_port, plant_port in self.c2p:
+            # Zero-order hold: the commands stay on the plant input until the next tick
+            for computer_port, plant_port in c2p:
                 zoh_buffers[plant_port] = np.asarray(
                     outs[computer_port], dtype=float
                 ).copy()
-
-            u_plant = _assemble_plant_u(
-                self.plant,
+            u_plant = assemble_plant_u(
+                plant,
                 u_plant_nominal,
                 zoh_buffers,
-                self.c2p,
+                c2p,
             )
-            t_seg, x_seg = self.plant_eval.integrate_zoh_rollout(
+
+            # Integrate the plant over [t_k, t_k + Δt], then sample its outputs
+            t_seg, x_seg = plant_eval.integrate_zoh_rollout(
                 x_plant,
                 u_plant,
                 t_k,
-                self.dt_base,
-                dt_inner=self.plant_dt_inner,
+                dt_base,
+                dt_inner=dt_inner,
             )
             x_plant = x_seg[-1]
-            sample_buffers = _sample_plant_outputs(
-                self.plant_eval,
+            sample_buffers = sample_plant_outputs(
+                plant_eval,
                 x_plant,
                 u_plant,
-                t_k + self.dt_base,
-                self.p2c,
+                t_k + dt_base,
+                p2c,
             )
 
+            # A segment opens on the last tick's final sample: the first tick keeps it
             if tick_idx == 0:
                 t_append = t_seg
                 x_append = x_seg
@@ -207,27 +230,23 @@ class HybridSimulator:
                 t_append = t_seg[1:]
                 x_append = x_seg[1:]
 
+            # Record the plant's fine samples, then the computer's tick
             t_plant_parts.append(t_append)
             x_plant_parts.append(x_append)
-            for i in range(x_append.shape[0]):
-                t_i = float(t_append[i])
-                x_i = x_append[i]
-                u_plant_parts.append(np.asarray(u_plant, dtype=float).reshape(plant_m))
-                outs_fine = self.plant_eval.outputs(x_i, u_plant, t_i)
-                for name in plant_signal_names:
-                    if name == "r" and name in diagram.inputs:
-                        sl = diagram.get_input_port_slice(name)
-                        plant_signal_parts[name].append(
-                            np.asarray(u_computer[sl], dtype=float).reshape(-1)
-                        )
-                    elif name in outs_fine:
-                        plant_signal_parts[name].append(
-                            np.asarray(outs_fine[name], dtype=float).reshape(-1)
-                        )
-
+            record_plant_samples(
+                u_plant_parts,
+                plant_signal_parts,
+                plant_eval,
+                diagram,
+                t_append,
+                x_append,
+                u_plant,
+                u_computer,
+                plant_m,
+            )
             k_hist[tick_idx] = k
             x_computer_hist[:, tick_idx] = computer.x
-            _record_tick_signals(
+            record_tick_signals(
                 computer_signal_hist,
                 diagram,
                 u_computer,
@@ -237,6 +256,7 @@ class HybridSimulator:
                 plant_port_aliases=plant_port_aliases,
             )
 
+        # The histories stacked; x and u are channels of their own, never extra signals
         t_plant = np.concatenate(t_plant_parts)
         x_plant_hist = np.vstack(x_plant_parts).T
         u_plant_fine = (
@@ -254,6 +274,7 @@ class HybridSimulator:
             if name not in {"x", "u"}
         }
 
+        # The computer's step rollout and the plant's trajectory
         computer_rollout = StepRollout(
             k=k_hist,
             x=x_computer_hist,
@@ -267,12 +288,14 @@ class HybridSimulator:
             signals=plant_signals,
         )
 
+        # The result, kept as the latest run
         result = HybridSimResult(
             computer=computer_rollout,
             plant=plant_traj,
             hybrid=self.hybrid,
         )
         self.last_result = result
+
         return result
 
 
@@ -297,10 +320,7 @@ class HybridSimResult:
     hybrid: HybridDiagram | None = field(default=None, compare=False, repr=False)
 
     def __post_init__(self) -> None:
-        if not isinstance(self.computer, StepRollout):
-            raise TypeError("computer must be a StepRollout")
-        if not isinstance(self.plant, Trajectory):
-            raise TypeError("plant must be a Trajectory")
+        require_views(self.computer, self.plant)
 
     @property
     def n_samples(self) -> int:
@@ -340,10 +360,12 @@ class HybridSimResult:
         Channels keep their computer port names (a ``u_cmd`` command is drawn as
         ``u_cmd``); ``u`` here is the computer's input vector, not the plant command.
         """
+        # Lazy import: the graphics load on first use, not with the core
         from minilink.graphical.signals.time_signals import STEP_ABSCISSA_LABEL
 
         if signals is None:
             signals = tuple(self.computer.signals.keys())
+
         return self.plot_view(
             self.computer.as_trajectory(),
             sys=self.hybrid.computer.diagram if self.hybrid is not None else None,
@@ -354,6 +376,10 @@ class HybridSimResult:
             control_key=None,
             **kwargs,
         )
+
+    ###########################################################################
+    # Internal machinery
+    ###########################################################################
 
     def plot_view(
         self,
@@ -367,7 +393,8 @@ class HybridSimResult:
         control_key,
         **kwargs,
     ):
-        from minilink.core.system import System
+        """Plot one view, the plant's or the computer's, on its abscissa."""
+        # Lazy import: the graphics load on first use, not with the core
         from minilink.graphical.signals.time_signals import (
             TIME_ABSCISSA_LABEL,
             plot_time_signals,
@@ -377,6 +404,8 @@ class HybridSimResult:
         if sys is None:
             sys = self.hybrid.plant if self.hybrid is not None else self
 
+        # The default channels: the system's own, or the view's x and u; u always
+        # drawn when the view has one
         if signals is None:
             if isinstance(sys, System):
                 signals = resolve_plot_signals(sys)
@@ -392,6 +421,7 @@ class HybridSimResult:
 
         plot_signals = self.plot_signal_names(signals, control_key=control_key)
         label = abscissa_label or TIME_ABSCISSA_LABEL
+
         return plot_time_signals(
             sys,
             traj,
@@ -411,24 +441,40 @@ class HybridSimResult:
         """Map boundary control names routed into ``Trajectory.u`` for plotting."""
         if control_key is None:
             return signals
+
         plot_key = "u"
         if control_key == plot_key:
             return signals
+
         return tuple(plot_key if name == control_key else name for name in signals)
 
     def plant_control_signal_key(self) -> str | None:
+        """The computer port that commands the plant, ``None`` without a diagram."""
         if self.hybrid is None:
             return None
+
         for conn in self.hybrid.connections:
             if conn.direction == "computer_to_plant":
                 return conn.computer_port
+
         return None
 
 
+###############################################################################
 # Internal machinery
+###############################################################################
 
 
-def _select_tick_grid(*, t0, tf, dt_base, n_steps):
+def require_hybrid_diagram(hybrid):
+    """Refuse anything but a :class:`HybridDiagram`."""
+    if not isinstance(hybrid, HybridDiagram):
+        raise TypeError(
+            f"HybridSimulator requires HybridDiagram, got {type(hybrid).__name__}"
+        )
+
+
+def select_tick_grid(*, t0, tf, dt_base, n_steps):
+    """The base period, the tick count (``n_steps`` over ``tf``) and the tick times."""
     t0 = float(t0)
     tf = float(tf)
     if tf <= t0:
@@ -452,19 +498,23 @@ def _select_tick_grid(*, t0, tf, dt_base, n_steps):
         n_ticks = int(n_steps)
 
     times = t0 + np.arange(n_ticks) * dt_base
+
     return dt_base, n_ticks, times
 
 
-def _validate_x0(x0, n, *, label):
+def validate_x0(x0, n, *, label):
+    """``x0`` as a finite float vector ``(n,)``, or a refusal naming ``label``."""
     x0_arr = np.asarray(x0, dtype=float).reshape(-1)
     if x0_arr.shape[0] != n:
         raise ValueError(f"{label} must have shape ({n},)")
     if not np.all(np.isfinite(x0_arr)):
         raise ValueError(f"{label} must contain only finite values")
+
     return x0_arr
 
 
-def _index_boundary_connections(hybrid: HybridDiagram):
+def index_boundary_connections(hybrid: HybridDiagram):
+    """The boundary links as port pairs: computer to plant, then plant to computer."""
     c2p = []
     p2c = []
     for conn in hybrid.connections:
@@ -472,135 +522,44 @@ def _index_boundary_connections(hybrid: HybridDiagram):
             c2p.append((conn.computer_port, conn.plant_port))
         else:
             p2c.append((conn.plant_port, conn.computer_port))
+
     return tuple(c2p), tuple(p2c)
 
 
-def _sample_plant_outputs(plant_eval, x_plant, u_plant, t, p2c):
-    if not p2c:
-        return {}
-    outs = plant_eval.outputs(x_plant, u_plant, t)
-    return {
-        computer_port: np.asarray(outs[plant_port], dtype=float).copy()
-        for plant_port, computer_port in p2c
-    }
-
-
-def _assemble_plant_u(plant, u_nominal, zoh_buffers, c2p):
-    u = np.asarray(u_nominal, dtype=float).copy()
-    for computer_port, plant_port in c2p:
-        sl = plant.get_input_port_slice(plant_port)
-        u[sl] = zoh_buffers[plant_port]
-    return u
-
-
-def _assemble_computer_u(diagram, forced_u, sample_buffers, p2c):
-    u = np.asarray(forced_u, dtype=float).reshape(diagram.m).copy()
-    for plant_port, computer_port in p2c:
-        sl = diagram.get_input_port_slice(computer_port)
-        u[sl] = sample_buffers[computer_port]
-    return u
-
-
-def _collect_computer_signal_names(diagram, p2c):
-    names = set(diagram.outputs)
-    for _plant_port, computer_port in p2c:
-        names.add(computer_port)
-    if "r" in diagram.inputs:
-        names.add("r")
-    return tuple(sorted(names))
-
-
-def _collect_plant_signal_names(diagram, p2c):
-    names = set()
-    if "r" in diagram.inputs:
-        names.add("r")
-    for plant_port, _computer_port in p2c:
-        names.add(plant_port)
-    return tuple(sorted(names))
-
-
-def _collect_signal_names(diagram, p2c):
-    return _collect_computer_signal_names(diagram, p2c)
-
-
-def _signal_dim(name, diagram, p2c):
-    if name in diagram.outputs:
-        return diagram.outputs[name].dim
-    if name in diagram.inputs:
-        return diagram.inputs[name].dim
-    for plant_port, computer_port in p2c:
-        if name == plant_port:
-            return diagram.inputs[computer_port].dim
-        if name == computer_port:
-            return diagram.inputs[computer_port].dim
-    raise KeyError(f"Unknown signal {name!r}")
-
-
-def _allocate_signal_hist(diagram, p2c, n_ticks, *, plant_signals=True):
-    if plant_signals:
-        names = _collect_signal_names(diagram, p2c)
-    else:
-        names = _collect_computer_signal_names(diagram, p2c)
-    return {
-        name: np.zeros((_signal_dim(name, diagram, p2c), n_ticks)) for name in names
-    }
-
-
-def _record_tick_signals(
-    signal_hist,
-    diagram,
-    u_computer,
-    outs,
-    sample_buffers,
-    tick_idx,
-    *,
-    plant_port_aliases,
-):
-    for name in signal_hist:
-        if name in outs:
-            values = np.asarray(outs[name], dtype=float).reshape(-1)
-        elif name in sample_buffers:
-            values = np.asarray(sample_buffers[name], dtype=float).reshape(-1)
-        elif name in plant_port_aliases:
-            computer_port = plant_port_aliases[name]
-            values = np.asarray(sample_buffers[computer_port], dtype=float).reshape(-1)
-        elif name in diagram.inputs:
-            sl = diagram.get_input_port_slice(name)
-            values = np.asarray(u_computer[sl], dtype=float).reshape(-1)
-        else:
-            continue
-
-        signal_hist[name][:, tick_idx] = values
-
-
-def _coerce_forced_input(u, diagram, n_ticks, times, *, input_port_id=None):
+def coerce_tick_input(u, diagram, n_ticks, times, *, input_port_id=None):
+    """The forced input on the tick grid, ``(m, n_ticks)``: the whole vector or one port."""
     m = diagram.m
     if input_port_id is None:
-        return _coerce_full_forced_input(u, m, n_ticks, times)
+        return coerce_full_tick_input(u, m, n_ticks, times)
 
+    # One port forced, the others held at their nominal values
     port = diagram.inputs[input_port_id]
     port_slice = diagram.get_input_port_slice(input_port_id)
     u_nominal = diagram.get_u_from_input_ports().reshape(m, 1)
     u_traj = np.repeat(u_nominal, n_ticks, axis=1)
-    u_traj[port_slice, :] = _coerce_forced_signal(
+    u_traj[port_slice, :] = coerce_tick_signal(
         u,
         port.dim,
         n_ticks,
         times,
         label=f"u for input port '{input_port_id}'",
     )
+
     return u_traj
 
 
-def _coerce_full_forced_input(u, m, n_ticks, times):
+def coerce_full_tick_input(u, m, n_ticks, times):
+    """The whole forced input on the tick grid; empty when the computer has no input."""
     if m == 0:
         return np.zeros((0, n_ticks))
-    return _coerce_forced_signal(u, m, n_ticks, times, label="u")
+
+    return coerce_tick_signal(u, m, n_ticks, times, label="u")
 
 
-def _coerce_forced_signal(data, expected_dim, n_ticks, times, *, label):
+def coerce_tick_signal(data, expected_dim, n_ticks, times, *, label):
+    """A callable, scalar, vector or ``(dim, n_ticks)`` matrix, sampled on the ticks."""
     if callable(data):
-        return _sample_forced_callable(data, expected_dim, times, label=label)
+        return sample_tick_callable(data, expected_dim, times, label=label)
 
     arr = np.asarray(data, dtype=float)
     expected_shape = (expected_dim, n_ticks)
@@ -623,7 +582,8 @@ def _coerce_forced_signal(data, expected_dim, n_ticks, times, *, label):
     raise ValueError(f"{label} must have shape {expected_shape}")
 
 
-def _sample_forced_callable(fn, expected_dim, times, *, label):
+def sample_tick_callable(fn, expected_dim, times, *, label):
+    """``fn(t)`` sampled at every tick time, ``(expected_dim, n_ticks)``."""
     samples = np.zeros((expected_dim, times.size), dtype=float)
     for i, ti in enumerate(times):
         value = np.asarray(fn(float(ti)), dtype=float)
@@ -633,4 +593,146 @@ def _sample_forced_callable(fn, expected_dim, times, *, label):
         if value.reshape(-1).shape[0] != expected_dim:
             raise ValueError(f"{label} callable returned wrong dimension at t={ti}")
         samples[:, i] = value.reshape(expected_dim)
+
     return samples
+
+
+def sample_plant_outputs(plant_eval, x_plant, u_plant, t, p2c):
+    """The plant outputs the computer reads, by computer port, at ``(x, u, t)``."""
+    if not p2c:
+        return {}
+
+    outs = plant_eval.outputs(x_plant, u_plant, t)
+
+    return {
+        computer_port: np.asarray(outs[plant_port], dtype=float).copy()
+        for plant_port, computer_port in p2c
+    }
+
+
+def allocate_signal_hist(diagram, p2c, n_ticks):
+    """A zero ``(dim, n_ticks)`` history for every computer boundary channel."""
+    names = collect_computer_signal_names(diagram, p2c)
+
+    return {name: np.zeros((signal_dim(name, diagram, p2c), n_ticks)) for name in names}
+
+
+def collect_computer_signal_names(diagram, p2c):
+    """The computer's outputs, the ports it samples from the plant, and ``r``."""
+    names = set(diagram.outputs)
+    for _plant_port, computer_port in p2c:
+        names.add(computer_port)
+    if "r" in diagram.inputs:
+        names.add("r")
+
+    return tuple(sorted(names))
+
+
+def signal_dim(name, diagram, p2c):
+    """The dimension of a boundary channel, read on the computer diagram's ports."""
+    if name in diagram.outputs:
+        return diagram.outputs[name].dim
+    if name in diagram.inputs:
+        return diagram.inputs[name].dim
+    for plant_port, computer_port in p2c:
+        if name == plant_port:
+            return diagram.inputs[computer_port].dim
+        if name == computer_port:
+            return diagram.inputs[computer_port].dim
+    raise KeyError(f"Unknown signal {name!r}")
+
+
+def collect_plant_signal_names(diagram, p2c):
+    """The plant's sampled output ports, and ``r`` when the computer has one."""
+    names = set()
+    if "r" in diagram.inputs:
+        names.add("r")
+    for plant_port, _computer_port in p2c:
+        names.add(plant_port)
+
+    return tuple(sorted(names))
+
+
+def assemble_computer_u(diagram, forced_u, sample_buffers, p2c):
+    """The computer input: the forced vector, the sampled plant outputs on their ports."""
+    u = np.asarray(forced_u, dtype=float).reshape(diagram.m).copy()
+    for plant_port, computer_port in p2c:
+        sl = diagram.get_input_port_slice(computer_port)
+        u[sl] = sample_buffers[computer_port]
+
+    return u
+
+
+def assemble_plant_u(plant, u_nominal, zoh_buffers, c2p):
+    """The plant input: the nominal vector, with the held commands on their ports."""
+    u = np.asarray(u_nominal, dtype=float).copy()
+    for computer_port, plant_port in c2p:
+        sl = plant.get_input_port_slice(plant_port)
+        u[sl] = zoh_buffers[plant_port]
+
+    return u
+
+
+def record_plant_samples(
+    u_parts,
+    signal_parts,
+    plant_eval,
+    diagram,
+    t_seg,
+    x_seg,
+    u_plant,
+    u_computer,
+    plant_m,
+):
+    """Append the held input and the channels of each fine plant sample of one tick."""
+    for i in range(x_seg.shape[0]):
+        t_i = float(t_seg[i])
+        x_i = x_seg[i]
+        u_parts.append(np.asarray(u_plant, dtype=float).reshape(plant_m))
+        outs_fine = plant_eval.outputs(x_i, u_plant, t_i)
+        for name in signal_parts:
+            if name == "r" and name in diagram.inputs:
+                sl = diagram.get_input_port_slice(name)
+                signal_parts[name].append(
+                    np.asarray(u_computer[sl], dtype=float).reshape(-1)
+                )
+            elif name in outs_fine:
+                signal_parts[name].append(
+                    np.asarray(outs_fine[name], dtype=float).reshape(-1)
+                )
+
+
+def record_tick_signals(
+    signal_hist,
+    diagram,
+    u_computer,
+    outs,
+    sample_buffers,
+    tick_idx,
+    *,
+    plant_port_aliases,
+):
+    """Write one tick's boundary channels into their histories."""
+    for name in signal_hist:
+        if name in outs:
+            values = np.asarray(outs[name], dtype=float).reshape(-1)
+        elif name in sample_buffers:
+            values = np.asarray(sample_buffers[name], dtype=float).reshape(-1)
+        elif name in plant_port_aliases:
+            computer_port = plant_port_aliases[name]
+            values = np.asarray(sample_buffers[computer_port], dtype=float).reshape(-1)
+        elif name in diagram.inputs:
+            sl = diagram.get_input_port_slice(name)
+            values = np.asarray(u_computer[sl], dtype=float).reshape(-1)
+        else:
+            continue
+
+        signal_hist[name][:, tick_idx] = values
+
+
+def require_views(computer, plant):
+    """Refuse views other than a ``StepRollout`` computer and a ``Trajectory`` plant."""
+    if not isinstance(computer, StepRollout):
+        raise TypeError("computer must be a StepRollout")
+    if not isinstance(plant, Trajectory):
+        raise TypeError("plant must be a Trajectory")

@@ -853,7 +853,7 @@ class TestDiagramRenderWithoutDot(unittest.TestCase):
         ):
             with warnings.catch_warnings(record=True) as caught:
                 warnings.simplefilter("always")
-                dot_module._render_diagram_graph(graph, show=True, show_inline=True)
+                dot_module.render_diagram_graph(graph, show=True, show_inline=True)
         self.assertTrue(any("Graphviz binary" in str(w.message) for w in caught))
 
     def test_plot_diagram_returns_nothing_for_the_cell_to_render(self):

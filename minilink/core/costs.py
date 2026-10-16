@@ -9,6 +9,10 @@ from minilink.core.backends import array_module
 from minilink.core.inspect import inspect_text, repr_pretty
 from minilink.core.trajectory import Trajectory
 
+###############################################################################
+# Public API
+###############################################################################
+
 
 class CostFunction(ABC):
     """
@@ -49,15 +53,15 @@ class CostFunction(ABC):
         """Return the native scalar terminal cost ``h(x, t)``."""
         ...
 
-    def __str__(self):
-        return inspect_text(self)
-
-    def _repr_pretty_(self, p, cycle):
-        repr_pretty(self, p, cycle)
-
     def discount_factor(self, dt) -> float:
         """Per-step factor ``exp(-rho dt)`` for a planner with time step ``dt``."""
-        return float(np.exp(-float(self.discount_rate) * float(dt)))
+        rho = float(self.discount_rate)
+        dt = float(dt)
+
+        # γ = exp(−ρ dt)
+        gamma = np.exp(-rho * dt)
+
+        return float(gamma)
 
     def evaluate_trajectory(
         self,
@@ -73,14 +77,19 @@ class CostFunction(ABC):
         trapezoidal rule and excludes the terminal cost; callers can add
         ``h(x(tf), tf)`` when they need the full objective scalar.
         """
-        dJ = np.zeros(traj.n_samples, dtype=float)
+        g = self.g
         rho = float(self.discount_rate)
-        for i, t in enumerate(traj.t):
-            g = float(self.g(traj.x[:, i], traj.u[:, i], float(t), params=params))
-            dJ[i] = np.exp(-rho * float(t)) * g
+        N = traj.n_samples
 
-        J = np.zeros(traj.n_samples, dtype=float)
-        if traj.n_samples > 1:
+        # dJ_k = exp(−ρ t_k) g(x_k, u_k, t_k), each sample's discounted running cost
+        dJ = np.zeros(N, dtype=float)
+        for i, t in enumerate(traj.t):
+            g_i = float(g(traj.x[:, i], traj.u[:, i], float(t), params=params))
+            dJ[i] = np.exp(-rho * float(t)) * g_i
+
+        # J(t_k) = ∫ dJ dt from t_0 to t_k by the trapezoidal rule, J(t_0) = 0
+        J = np.zeros(N, dtype=float)
+        if N > 1:
             dt = np.diff(traj.t)
             increments = 0.5 * (dJ[:-1] + dJ[1:]) * dt
             J[1:] = np.cumsum(increments)
@@ -107,9 +116,13 @@ class CostFunction(ABC):
     ) -> float:
         """Return the trapezoidal running cost plus terminal cost."""
         evaluated = self.evaluate_trajectory(traj, params=params)
-        return float(
-            evaluated.signals["cost"][0, -1] + self.terminal_cost(traj, params)
-        )
+        running = evaluated.signals["cost"][0, -1]
+        terminal = self.terminal_cost(traj, params)
+
+        # J = ∫ exp(−ρ t) g dt + h(x(t_f), t_f)
+        J = running + terminal
+
+        return float(J)
 
     # Cost algebra
 
@@ -121,6 +134,7 @@ class CostFunction(ABC):
         """Support ``sum([...])``, whose start value is the integer ``0``."""
         if other == 0:
             return self
+
         return SumCost.of(other, self)
 
     def __mul__(self, weight: float) -> "CostFunction":
@@ -128,6 +142,14 @@ class CostFunction(ABC):
         return ScaledCost(self, float(weight))
 
     __rmul__ = __mul__
+
+    # Display
+
+    def __str__(self):
+        return inspect_text(self)
+
+    def _repr_pretty_(self, p, cycle):
+        repr_pretty(self, p, cycle)
 
 
 @dataclass(frozen=True)
@@ -147,20 +169,17 @@ class QuadraticCost(CostFunction):
     ubar: np.ndarray
 
     def __post_init__(self) -> None:
+        # The weights and the targets as float copies, the targets flat
         Q = np.asarray(self.Q, dtype=float).copy()
         R = np.asarray(self.R, dtype=float).copy()
         S = np.asarray(self.S, dtype=float).copy()
         xbar = np.asarray(self.xbar, dtype=float).reshape(-1).copy()
         ubar = np.asarray(self.ubar, dtype=float).reshape(-1).copy()
 
+        # The weights sized by the targets: Q and S are n × n, R is m × m
         n = xbar.size
         m = ubar.size
-        if Q.shape != (n, n):
-            raise ValueError("Q must have shape (n, n)")
-        if S.shape != (n, n):
-            raise ValueError("S must have shape (n, n)")
-        if R.shape != (m, m):
-            raise ValueError("R must have shape (m, m)")
+        check_weights(Q, R, S, n, m)
 
         object.__setattr__(self, "Q", Q)
         object.__setattr__(self, "R", R)
@@ -188,10 +207,13 @@ class QuadraticCost(CostFunction):
         """
         n = int(sys.n)
         m = int(sys.m)
+
+        # The system's operating point as the default target
         if xbar is None:
             xbar = sys.state.nominal_value
         if ubar is None:
             ubar = sys.get_u_from_input_ports()
+
         return cls(
             Q=np.eye(n) if Q is None else Q,
             R=np.eye(m) if R is None else R,
@@ -202,20 +224,27 @@ class QuadraticCost(CostFunction):
 
     def g(self, x, u, t=0.0, params=None):
         """Return the quadratic running cost."""
-        Q, R = self.Q, self.R
-        xbar, ubar = self.xbar, self.ubar
+        Q = self.Q
+        R = self.R
+        xbar = self.xbar
+        ubar = self.ubar
+
         dx = x - xbar
         du = u - ubar
 
+        # g = (x − x̄)ᵀ Q (x − x̄) + (u − ū)ᵀ R (u − ū)
         g = dx.T @ Q @ dx + du.T @ R @ du
 
         return g
 
     def h(self, x, t=0.0, params=None):
         """Return the quadratic terminal cost."""
-        S, xbar = self.S, self.xbar
+        S = self.S
+        xbar = self.xbar
+
         dx = x - xbar
 
+        # h = (x − x̄)ᵀ S (x − x̄)
         h = dx.T @ S @ dx
 
         return h
@@ -244,16 +273,19 @@ class TimeCost(CostFunction):
     def from_system(cls, sys, *, xbar: np.ndarray | None = None, eps: float = 1e-3):
         """Create a time cost targeting ``xbar`` (default the state origin)."""
         xbar = np.zeros(int(sys.n)) if xbar is None else xbar
+
         return cls(xbar=xbar, eps=eps)
 
     def g(self, x, u, t=0.0, params=None):
         """Return unit running cost away from the target, zero on it."""
         xp = array_module(x)
+
         xbar = xp.asarray(self.xbar)
         eps = self.eps
+
         on_target = xp.linalg.norm(x - xbar) < eps
 
-        # g = 0 on the target, 1 elsewhere
+        # g = 0 on the target (‖x − x̄‖ < ε), 1 elsewhere
         g = xp.where(on_target, xp.asarray(0.0), xp.asarray(1.0))
 
         return g
@@ -276,13 +308,9 @@ class SumCost(CostFunction):
     terms: tuple
 
     def __post_init__(self) -> None:
+        # One objective, one discount rate ρ
         rates = sorted({float(cost.discount_rate) for cost in self.terms})
-        if len(rates) > 1:
-            raise ValueError(
-                f"SumCost terms have different discount rates {rates}; "
-                "one objective has one rate rho, so give every term the same "
-                "discount_rate"
-            )
+        require_common_rate(rates)
 
     @property
     def discount_rate(self) -> float:
@@ -299,12 +327,14 @@ class SumCost(CostFunction):
                 terms.extend(cost.terms)
             else:
                 terms.append(cost)
+
         return cls(tuple(terms))
 
     def g(self, x, u, t=0.0, params=None):
         """Return the summed running cost."""
         terms = self.terms
 
+        # g = Σᵢ gᵢ(x, u, t)
         g = sum(cost.g(x, u, t, params) for cost in terms)
 
         return g
@@ -313,6 +343,7 @@ class SumCost(CostFunction):
         """Return the summed terminal cost."""
         terms = self.terms
 
+        # h = Σᵢ hᵢ(x, t)
         h = sum(cost.h(x, t, params) for cost in terms)
 
         return h
@@ -338,16 +369,45 @@ class ScaledCost(CostFunction):
 
     def g(self, x, u, t=0.0, params=None):
         """Return the weighted running cost."""
-        cost, weight = self.cost, self.weight
+        cost = self.cost
+        weight = self.weight
 
+        # g = w g₀(x, u, t)
         g = weight * cost.g(x, u, t, params)
 
         return g
 
     def h(self, x, t=0.0, params=None):
         """Return the weighted terminal cost."""
-        cost, weight = self.cost, self.weight
+        cost = self.cost
+        weight = self.weight
 
+        # h = w h₀(x, t)
         h = weight * cost.h(x, t, params)
 
         return h
+
+
+###############################################################################
+# Internal machinery
+###############################################################################
+
+
+def check_weights(Q, R, S, n, m):
+    """Refuse weights the targets do not size: ``Q``, ``S`` ``(n, n)`` and ``R`` ``(m, m)``."""
+    if Q.shape != (n, n):
+        raise ValueError("Q must have shape (n, n)")
+    if S.shape != (n, n):
+        raise ValueError("S must have shape (n, n)")
+    if R.shape != (m, m):
+        raise ValueError("R must have shape (m, m)")
+
+
+def require_common_rate(rates):
+    """Refuse terms whose discount rates differ."""
+    if len(rates) > 1:
+        raise ValueError(
+            f"SumCost terms have different discount rates {rates}; "
+            "one objective has one rate rho, so give every term the same "
+            "discount_rate"
+        )

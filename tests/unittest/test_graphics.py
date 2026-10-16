@@ -9,7 +9,7 @@ import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import numpy as np
-from minilink.core.composition import _propagate_animation_camera
+from minilink.core.composition import propagate_animation_camera
 from minilink.core.diagram import DiagramSystem
 from minilink.core.kinematics import translation
 from minilink.core.system import DynamicSystem
@@ -129,7 +129,7 @@ class TestPropagateAnimationCamera(unittest.TestCase):
         plant.camera_scale = 6.0
         diagram = DiagramSystem()
         diagram.add_subsystem(plant, "bike")
-        _propagate_animation_camera(diagram, plant)
+        propagate_animation_camera(diagram, plant)
         self.assertEqual(diagram.camera_follow_frame, "bike:body")
         self.assertEqual(diagram.camera_scale, 6.0)
 
@@ -151,7 +151,7 @@ class TestPropagateAnimationCamera(unittest.TestCase):
         diagram = DiagramSystem()
         diagram.add_subsystem(step, "step")
         diagram.add_subsystem(plant, "plant")
-        _propagate_animation_camera(diagram, *diagram.subsystems.values())
+        propagate_animation_camera(diagram, *diagram.subsystems.values())
         self.assertEqual(diagram.camera_scale, 3.0)
 
 
@@ -528,7 +528,7 @@ class TestAnimatorOverlays(unittest.TestCase):
         history = SceneHistory(
             reference=CustomLine([[0.0, 0.0, 0.0], [1.0, 0.0, 0.0]], color="k")
         )
-        frame = Animator(sys)._resolve_frame(
+        frame = Animator(sys).resolve_frame(
             np.array([]),
             np.array([]),
             0.0,
@@ -540,7 +540,7 @@ class TestAnimatorOverlays(unittest.TestCase):
     def test_scene_visualizer_draws_obstacle(self):
         scene = Scene(obstacles=[GeomBox(np.array([1.0, 2.0]), np.array([3.0, 4.0]))])
         sys = DynamicSystem(0)
-        frame = Animator(sys)._resolve_frame(
+        frame = Animator(sys).resolve_frame(
             np.array([]),
             np.array([]),
             0.0,
@@ -1437,7 +1437,7 @@ class TestPlotlyRenderer(unittest.TestCase):
         backend = PlotlyRenderer(animator)
         x = np.array([0.5])
         u = np.array([1.0])
-        frame = animator._resolve_frame(
+        frame = animator.resolve_frame(
             x, u, 0.0, kinematic=sys.get_kinematic_geometry()
         )
         backend.open_scene(
@@ -1474,7 +1474,7 @@ class TestPlotlyRenderer(unittest.TestCase):
         sys.skin = debug_state_skin
         animator = Animator(sys)
         backend = PlotlyRenderer(animator)
-        frame = animator._resolve_frame(
+        frame = animator.resolve_frame(
             np.array([0.5]),
             np.array([1.0]),
             0.0,
@@ -1906,7 +1906,7 @@ class TestAutoFitCamera(unittest.TestCase):
         )
         animator = Animator(sys)
         schedule = trajectory_frame_schedule(traj, 1.0)
-        frames = animator._build_frames(
+        frames = animator.build_frames(
             traj, schedule, kinematic=sys.get_kinematic_geometry(), camera_override=None
         )
         cameras = [frame["camera"] for frame in frames]
@@ -1920,7 +1920,7 @@ class TestAutoFitCamera(unittest.TestCase):
         sys = DynamicSystem(1, output_dim=1, expose_state=True)
         sys.skin = debug_state_skin
         sys.camera_scale = 3.0
-        frame = Animator(sys)._resolve_frame(
+        frame = Animator(sys).resolve_frame(
             np.array([25.0]), np.array([]), 0.0, kinematic=sys.get_kinematic_geometry()
         )
         self.assertEqual(frame["camera"][3, 3], 3.0)

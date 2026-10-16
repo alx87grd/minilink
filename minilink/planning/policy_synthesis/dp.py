@@ -10,6 +10,7 @@ import numpy as np
 from minilink.core.backends import BACKEND_JAX, BACKEND_NUMPY
 from minilink.planning.evaluation import nominal_trajectory
 from minilink.planning.planner import Planner
+from minilink.planning.policy_synthesis import plotting
 from minilink.planning.policy_synthesis.discretizer import StateSpaceGrid
 from minilink.planning.policy_synthesis.lookup_policy import LookupTableController
 from minilink.planning.policy_synthesis.progress import SweepLog, progress
@@ -19,9 +20,12 @@ from minilink.planning.results import PlanningSolution
 #: Per-node Python reference engine (pyro's base ``DynamicProgramming``).
 BACKEND_LOOP = "loop"
 
-_UNSET = object()  # marks a keyword the caller did not pass
+_UNSET = object()  # Marks a keyword the caller did not pass
 
+
+###############################################################################
 # Public API
+###############################################################################
 
 
 class DynamicProgrammingPlanner(Planner):
@@ -98,9 +102,9 @@ class DynamicProgrammingPlanner(Planner):
         )
 
         # Memory
-        self.result: DynamicProgrammingResult | None = None  # latest solve's tables
-        self._G = None  # running-cost table, built once when the grid is precomputed
-        self._jax_cache = {}  # the JAX engine's device tables and compiled loops
+        self.result: DynamicProgrammingResult | None = None  # Latest solve's tables
+        self._G = None  # Running-cost table, built once when the grid is precomputed
+        self._jax_cache = {}  # The JAX engine's device tables and compiled loops
 
         # The JAX engine builds the grid's transition tables with JAX
         if self.options.backend == BACKEND_JAX:
@@ -159,6 +163,7 @@ class DynamicProgrammingPlanner(Planner):
 
         # The JAX engine runs these same sweeps, jitted on device
         if opt.backend == BACKEND_JAX:
+            # A real cycle: dp_jax imports DynamicProgrammingResult from this module
             from minilink.planning.policy_synthesis import dp_jax
 
             return dp_jax.value_iteration(self, max_sweeps, stop_on_tol)
@@ -224,7 +229,7 @@ class DynamicProgrammingPlanner(Planner):
         params = self.problem.params
         dt = grid.dt
         alpha = self.options.alpha
-        INF = self.options.out_of_bound_cost  # a large finite penalty (pyro's cf.INF)
+        INF = self.options.out_of_bound_cost  # A large finite penalty (pyro's cf.INF)
 
         # Interpolation of the cost-to-go one step ahead
         J_interpol = grid.build_interpolator(J_next, self.options.interpolation)
@@ -276,7 +281,9 @@ class DynamicProgrammingPlanner(Planner):
         grid = self.grid
         alpha = self.options.alpha
         method = self.options.interpolation
-        n, N, A = grid.n, grid.nodes_n, grid.actions_n  # state dim, nodes, actions
+        n = grid.n  # State dimension
+        N = grid.nodes_n  # Number of nodes
+        A = grid.actions_n  # Number of actions
 
         # Euler successors x_next = x + f(x, u, t) dt of every (node, action) pair,
         # shape (N, A, n), and which pairs are admissible
@@ -345,8 +352,9 @@ class DynamicProgrammingPlanner(Planner):
         g = self.problem.cost.g
         cost_params = self.problem.params.cost
         dt = grid.dt
-        N, A = grid.nodes_n, grid.actions_n
-        INF = self.options.out_of_bound_cost  # a large finite penalty (pyro's cf.INF)
+        N = grid.nodes_n
+        A = grid.actions_n
+        INF = self.options.out_of_bound_cost  # A large finite penalty (pyro's cf.INF)
 
         # The grid's mask, and its successors when a callable price needs them
         if admissible is None or (x_next is None and callable(INF)):
@@ -418,8 +426,7 @@ class DynamicProgrammingPlanner(Planner):
         level: the tables are then left as solved.
         """
         # The tables, not the solution: a solve cleans them before storing its solution
-        if self.result is None:
-            raise ValueError("No solution has been computed yet")
+        require_tables(self.result)
 
         result = self.result
         INF = self.options.out_of_bound_cost
@@ -441,8 +448,6 @@ class DynamicProgrammingPlanner(Planner):
         return result
 
     def plot_cost2go(self, **kwargs):
-        from minilink.planning.policy_synthesis import plotting
-
         self.require_solution()
         kwargs.setdefault(
             "jmax", plotting.cost_scale_limit(self.options.out_of_bound_cost)
@@ -450,14 +455,10 @@ class DynamicProgrammingPlanner(Planner):
         return plotting.plot_cost2go(self.result, **kwargs)
 
     def plot_policy(self, **kwargs):
-        from minilink.planning.policy_synthesis import plotting
-
         self.require_solution()
         return plotting.plot_policy(self.result, **kwargs)
 
     def animate_cost2go(self, **kwargs):
-        from minilink.planning.policy_synthesis import plotting
-
         self.require_solution()
         kwargs.setdefault(
             "jmax", plotting.cost_scale_limit(self.options.out_of_bound_cost)
@@ -465,12 +466,12 @@ class DynamicProgrammingPlanner(Planner):
         return plotting.animate_cost2go(self.result, **kwargs)
 
     def animate_policy(self, **kwargs):
-        from minilink.planning.policy_synthesis import plotting
-
         self.require_solution()
         return plotting.animate_policy(self.result, **kwargs)
 
+    ###########################################################################
     # Internal machinery
+    ###########################################################################
 
     def dp_result_to_planning_solution(
         self, result: DynamicProgrammingResult, *, fixed_horizon, evaluate, n_trials
@@ -656,7 +657,9 @@ class ValueIterationRecord:
         )
 
 
+###############################################################################
 # Internal machinery
+###############################################################################
 
 
 def grid_of(problem, grid, x_grid, u_grid, dt) -> StateSpaceGrid:
@@ -707,3 +710,9 @@ def options_of(problem, grid, options, **flat) -> DynamicProgrammingOptions:
 def infeasible_penalty(price, x_next, t):
     """The penalty of one inadmissible pair: the scalar ``price``, or ``price(x_next, t)``."""
     return float(price(x_next, t)) if callable(price) else price
+
+
+def require_tables(result):
+    """Refuse a cleanup before any solve has produced the tables."""
+    if result is None:
+        raise ValueError("No solution has been computed yet")

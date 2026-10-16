@@ -1,21 +1,24 @@
-"""
-The shared currency of the RRT family: a trajectory segment.
-
-Both connector styles — forward-integrating controls (kinodynamic) and exact
-two-point steering — produce an :class:`Edge`. Because every minilink system is
-an ODE ``dx = f(x,u,t)``, an edge always carries real states, inputs, and times;
-path extraction concatenates edges into a single :class:`~minilink.core.trajectory.Trajectory`.
-"""
+"""Tree edges: the trajectory segment every RRT connector produces."""
 
 from dataclasses import dataclass
 
 import numpy as np
+
+###############################################################################
+# Public API
+###############################################################################
 
 
 @dataclass(frozen=True)
 class Edge:
     """
     A trajectory segment grown from a tree node.
+
+    Both connector styles, forward-integrated controls (kinodynamic) and exact
+    two-point steering, produce one. Every minilink system is an ODE
+    ``ẋ = f(x, u, t)``, so an edge always carries real states, inputs and
+    times; path extraction concatenates edges into a single
+    :class:`~minilink.core.trajectory.Trajectory`.
 
     Parameters
     ----------

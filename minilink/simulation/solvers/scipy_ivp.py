@@ -1,4 +1,4 @@
-"""SciPy :func:`scipy.integrate.solve_ivp` integrator backend."""
+"""Adaptive SciPy :func:`scipy.integrate.solve_ivp` on the simulation time grid."""
 
 import numpy as np
 from scipy.integrate import solve_ivp
@@ -6,16 +6,92 @@ from scipy.integrate import solve_ivp
 from minilink.simulation.input_interpolation import INPUT_INTERP_KEY, build_u_at_t
 from minilink.simulation.solvers.solver import SolverBackend
 
+###############################################################################
+# Public API
+###############################################################################
+
 
 class SciPySolverBackend(SolverBackend):
-    """SciPy solve_ivp backend."""
+    """Adaptive ``solve_ivp``, its solution reported on the ``times`` grid."""
 
     def __init__(self) -> None:
         self.last_debug = None
         self.last_solve_ivp_solution = None
 
-    def _finalize_solution(self, sol, *, mode, method, extra_debug=None):
+    def integrate(
+        self,
+        evaluator,
+        times: np.ndarray,
+        x0: np.ndarray,
+        args=None,
+    ) -> np.ndarray:
+        t0 = times[0]
+        tf = times[-1]
+        rhs = evaluator.as_scipy_rhs()
+
+        # Solver options: the analytic Jacobian only from a JAX evaluator
+        kw = dict(args or {})
+        use_jac = kw.pop("use_jac", False)
+        method = kw.get("method", "RK45")
+        if use_jac and getattr(evaluator, "backend", None) == "jax":
+            kw["jac"] = evaluator.as_scipy_jac()
+            jac_applied = True
+        else:
+            jac_applied = False
+
+        # x(t) = x₀ + ∫ f(x(s), ū, s) ds, solved adaptively and reported on the grid
+        sol = solve_ivp(rhs, [t0, tf], x0, t_eval=times, **kw)
+
+        # The run's record; a failed solve raises
+        return self.finalize_solution(
+            sol,
+            mode="nominal",
+            method=method,
+            extra_debug={"jac_applied": jac_applied},
+        )
+
+    def integrate_forced(
+        self,
+        evaluator,
+        times: np.ndarray,
+        u: np.ndarray,
+        x0: np.ndarray,
+        args=None,
+    ) -> np.ndarray:
+        # Solver options: the input scheme is ours, not solve_ivp's, and a forced
+        # run takes no analytic Jacobian
+        kw = dict(args or {})
+        scheme = kw.pop(INPUT_INTERP_KEY, "linear")
+        kw.pop("use_jac", None)
+        method = kw.get("method", "RK45")
+
+        t0 = times[0]
+        tf = times[-1]
+
+        # u(t) read between the samples by the scheme
+        u_at_t = build_u_at_t(times, u, scheme)
+        rhs = evaluator.as_scipy_rhs_forced(u_at_t)
+
+        # x(t) = x₀ + ∫ f(x(s), u(s), s) ds, solved adaptively and reported on the grid
+        sol = solve_ivp(rhs, [t0, tf], x0, t_eval=times, **kw)
+
+        # The run's record; a failed solve raises
+        return self.finalize_solution(
+            sol,
+            mode="forced",
+            method=method,
+            extra_debug={"interp": scheme},
+        )
+
+    ###########################################################################
+    # Internal machinery
+    ###########################################################################
+
+    def finalize_solution(self, sol, *, mode, method, extra_debug=None):
+        """Keep ``sol`` and its debug record, raise on a failed solve, return ``sol.y``."""
         self.last_solve_ivp_solution = sol
+
+        # The run's record, kept even when the solve failed
         debug = {
             "solver": "scipy",
             "mode": mode,
@@ -31,81 +107,20 @@ class SciPySolverBackend(SolverBackend):
         if extra_debug:
             debug.update(extra_debug)
         self.last_debug = debug
-        if not sol.success:
-            raise RuntimeError(
-                f"SciPy solver failed in {mode} mode with method "
-                f"{method}: {sol.message}"
-            )
+
+        require_success(sol, mode, method)
+
         return sol.y
 
-    def integrate(
-        self,
-        evaluator,
-        times: np.ndarray,
-        x0: np.ndarray,
-        args=None,
-    ) -> np.ndarray:
 
-        # Get the time interval
-        t0, tf = times[0], times[-1]
+###############################################################################
+# Internal machinery
+###############################################################################
 
-        # Build the right-hand side of the ODE
-        rhs = evaluator.as_scipy_rhs()
 
-        # Get the integration parameters
-        kw = dict(args or {})
-        use_jac = kw.pop("use_jac", False)
-
-        # Build the Jacobian if needed
-        if use_jac and getattr(evaluator, "backend", None) == "jax":
-            kw["jac"] = evaluator.as_scipy_jac()
-            jac_applied = True
-        else:
-            jac_applied = False
-
-        # Integrate the system
-        sol = solve_ivp(rhs, [t0, tf], x0, t_eval=times, **kw)
-
-        # Debug information
-        method = kw.get("method", "RK45")
-        return self._finalize_solution(
-            sol,
-            mode="nominal",
-            method=method,
-            extra_debug={"jac_applied": jac_applied},
-        )
-
-    def integrate_forced(
-        self,
-        evaluator,
-        times: np.ndarray,
-        u: np.ndarray,
-        x0: np.ndarray,
-        args=None,
-    ) -> np.ndarray:
-
-        # Get the integration parameters
-        kw = dict(args or {})
-        scheme = kw.pop(INPUT_INTERP_KEY, "linear")
-        kw.pop("use_jac", None)
-
-        # Debug information
-        method = kw.get("method", "RK45")
-
-        # Get the time interval
-        t0, tf = times[0], times[-1]
-
-        # Build the forced right-hand side of the ODE
-        u_at_t = build_u_at_t(times, u, scheme)
-        rhs = evaluator.as_scipy_rhs_forced(u_at_t)
-
-        # Integrate the system
-        sol = solve_ivp(rhs, [t0, tf], x0, t_eval=times, **kw)
-
-        # Debug information
-        return self._finalize_solution(
-            sol,
-            mode="forced",
-            method=method,
-            extra_debug={"interp": scheme},
+def require_success(sol, mode, method):
+    """Refuse a failed solve, naming the mode, the method and SciPy's message."""
+    if not sol.success:
+        raise RuntimeError(
+            f"SciPy solver failed in {mode} mode with method {method}: {sol.message}"
         )

@@ -131,8 +131,8 @@ The EKF along a trajectory is the middle rung: the same block shape as `Trajecto
 - **A block that reads a measurement and commands nothing is an estimator, not a
   controller**: `require_command(block)` in `core/feedback.py` refuses it with one message
   ("… reads y but gives no u: an estimator; put it in a controller box"), used by
-  `_default_control_out` (`@`, `closed_loop`), `default_computer_boundary_ports` (`%`),
-  `feedback()` and `plot_control_law`'s `_law_roles`. Today all three fall back to the first
+  `default_control_out` (`@`, `closed_loop`), `default_computer_boundary_ports` (`%`),
+  `feedback()` and `plot_control_law`'s `law_roles_of`. Today all three fall back to the first
   output, `x`, and would wire the estimate into the plant's `u`. The two messages that name
   `estimator=` (`composition.py:216`) and `lqg()` are worded for what exists at each commit.
 - **The role name, `estimator` or `observer`** **[ask]**. The 2026-10-11 record rejected
@@ -257,8 +257,8 @@ B1. **`estimation/observer.py`: `StateObserver(A, B, C, L, D=None, xbar=None, ub
 
     `estimate` returns the state (the slice the EKF narrows later). `__str__` adds `L` and
     `eig(A − L C)`. **With it, in the same commit, the guard** (§4): `require_command` in
-    `core/feedback.py`, called by `_default_control_out`, `default_computer_boundary_ports`,
-    `feedback()`'s entry and `_law_roles`, so `observer @ plant`, `observer % dt @ plant` and
+    `core/feedback.py`, called by `default_control_out`, `default_computer_boundary_ports`,
+    `feedback()`'s entry and `law_roles_of`, so `observer @ plant`, `observer % dt @ plant` and
     `plot_control_law(observer)` refuse instead of taking `x` as the command. Tests
     (`tests/unittest/test_estimation.py`, after `TestPolePlacement`): JAX trace of `f`;
     convergence from a wrong x̂₀, with and without an operating point; `block_roles` /
@@ -340,7 +340,7 @@ particle and discrete filters; `EstimationProblem` and the estimator tools; `LQG
 | Time-varying Kalman (continuous) | `TimeVaryingStateObserver`, `L(t)` from the forward Riccati schedule | `u`, `y` -> `x`; x̂ only | `kalman_finite_horizon(model, Q_n, R_n, P0, tf)` | holds: the dual of `lqr_finite_horizon` line for line |
 | Linearized Kalman along a trajectory | `TrajectoryObserver`: schedules `t, x_d, u_d, y_d, A, B, C, L` in `params`; `x̂ = x_d(t) + δx̂` | `u`, `y` -> `x` | `trajectory_kalman(sys, traj, Q_n, R_n, P0)` | holds: the dual of `trajectory_lqr`; needs `riccati_step` forward and `interpolate_schedule` in `core` (A1, A2) |
 | Extended Kalman filter | `ExtendedKalmanFilter(model, Q_n, R_n, x0, P0)`: state `[x̂; vec(P)]`; `A(x̂) = ∂f/∂x`, `C(x̂) = ∂h/∂x` taken **directly on `model.f` / `model.h`** inside `f` (`jax.jacfwd` when tracing, central differences on NumPy), never through `analysis.jacobian`, which compiles an evaluator and coerces to NumPy per call | `u`, `y` -> `x` (a slice), `P` | the block is the algorithm; later `ExtendedKalmanEstimator(problem)` | holds: `estimate` is already a port function, not `compute_state`; the model-based params rule (DESIGN §4) covers `model.params` |
-| Unscented Kalman, discrete Kalman | `StepSystem`s in a hand-built `StepDiagramSystem` (the flow `+` refuses a `StepSystem`, `%` refuses a flow diagram): `computer = StepDiagramSystem(); add_subsystem(ukf, "observer"); add_subsystem(gain, "gain"); connect…; computer % dt @ plant` | `u`, `y` -> `x`, `P`; `k` | `UnscentedKalmanFilter(model, Q_d, R_d, dt)`; `kalman(…, dt=)` or `kalman_discrete` with `c2d` (P6) | strains the sampled seam: `expose_computer_boundary_ports` auto-exposes one block only and `_as_step_diagram` names it `controller` regardless of `id` (AC-8a, S31), and the numbers need P6; P4 keeps `kalman` continuous in name |
+| Unscented Kalman, discrete Kalman | `StepSystem`s in a hand-built `StepDiagramSystem` (the flow `+` refuses a `StepSystem`, `%` refuses a flow diagram): `computer = StepDiagramSystem(); add_subsystem(ukf, "observer"); add_subsystem(gain, "gain"); connect…; computer % dt @ plant` | `u`, `y` -> `x`, `P`; `k` | `UnscentedKalmanFilter(model, Q_d, R_d, dt)`; `kalman(…, dt=)` or `kalman_discrete` with `c2d` (P6) | strains the sampled seam: `expose_computer_boundary_ports` auto-exposes one block only and `as_step_diagram` names it `controller` regardless of `id` (AC-8a, S31), and the numbers need P6; P4 keeps `kalman` continuous in name |
 | Particle filter | `StepSystem(N·n + N)`, counter-based draws from `(seed, k)`, `is_random`, `realize(key)` | `u`, `y` -> `x` (weighted mean) | `ParticleFilter(model, process_noise: Distribution, measurement_noise: Distribution, n_particles, seed)` | holds the port convention; needs RN-2 (`sample(key)`) and the `realize` tree |
 | Moving-horizon estimator | a trajopt over a window of past data | `u`, `y` -> `x` | `MovingHorizonEstimator(problem)` (Layer 3) | holds: the dual of MPC; needs `EstimationProblem.data` |
 | Parameter estimators (RLS, gradient laws) | `u`, `y` -> `theta` | not `x` | `identification/` online, or a new role | the role means a *state* estimate; decide the noun when it lands |

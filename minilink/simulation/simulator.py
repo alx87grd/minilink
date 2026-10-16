@@ -1,8 +1,4 @@
-"""The continuous-time simulator: integrate ``dx = f(x, u, t)`` of a ``DynamicSystem`` or a diagram on a time grid.
-
-``compute_trajectory`` is the facade; use the class directly for repeated runs with the
-same solver, grid and backend.
-"""
+"""The continuous-time simulator: integrate ``dx = f(x, u, t)`` of a ``DynamicSystem`` or a diagram on a time grid."""
 
 import time
 
@@ -13,7 +9,7 @@ from minilink.core.backends import (
     BACKEND_JAX,
     BACKEND_NUMPY,
 )
-from minilink.core.system import DEFAULT_SMALLEST_TIME_CONSTANT
+from minilink.core.system import DEFAULT_SMALLEST_TIME_CONSTANT, DynamicSystem
 from minilink.core.trajectory import Trajectory
 from minilink.simulation.compile_backend import resolve_auto_backend
 from minilink.simulation.input_coercion import coerce_forced_input
@@ -21,15 +17,17 @@ from minilink.simulation.sim_reporting import (
     print_simulation_preamble,
     print_simulation_report,
 )
-from minilink.simulation.solver_warnings import emit_discontinuous_solver_warnings
+from minilink.simulation.solver_warnings import (
+    DISCONTINUOUS_AUTO_DT_SCALE,
+    emit_discontinuous_solver_warnings,
+)
 from minilink.simulation.solvers.euler import EulerSolverBackend
 from minilink.simulation.solvers.euler_fixed import EulerFixedStepSolverBackend
 from minilink.simulation.solvers.rk4_fixed import RK4SolverBackend
 from minilink.simulation.solvers.scipy_ivp import SciPySolverBackend
 from minilink.simulation.time_grid import build_time_grid
 
-# Internal: user-facing solver labels to backend keys and options
-# (solver backend key, options)
+# User-facing solver labels: (solver backend key, options)
 _USER_SOLVER_MODES: dict[str, tuple[str, dict]] = {
     "scipy": (
         "scipy",
@@ -88,9 +86,10 @@ FIXED_STEP_SOLVERS = tuple(
     label for label, (backend, _) in _USER_SOLVER_MODES.items() if backend != "scipy"
 )
 
-# Default automatic dt scale relative to ``solver_info["smallest_time_constant"]``
+# Default automatic dt scale of a smooth loop, relative to
+# ``solver_info["smallest_time_constant"]`` (DISCONTINUOUS_AUTO_DT_SCALE, its
+# discontinuous twin, is owned by the advisories that quote it)
 SMOOTH_AUTO_DT_SCALE = 0.1
-DISCONTINUOUS_AUTO_DT_SCALE = 0.1
 
 # Steps per sample period of a held signal on a smooth loop with no declared time
 # constant: the period is the resolution the user chose; ``dt`` buys a finer one
@@ -102,12 +101,9 @@ HELD_SIGNAL_STEPS_PER_SAMPLE = 1
 COMPILE_BACKEND_AUTO = BACKEND_AUTO
 
 
-def _time_grid_is_uniform(times: np.ndarray) -> bool:
-    """True if ``times`` are evenly spaced (required for :class:`RK4SolverBackend`)."""
-    if times.size < 2:
-        return True
-    d = np.diff(times)
-    return bool(np.allclose(d, d[0]))
+###############################################################################
+# Public API
+###############################################################################
 
 
 class Simulator:
@@ -118,7 +114,8 @@ class Simulator:
     :meth:`solve`; :meth:`solve_forced` accepts callables, constants, or sampled
     input trajectories and converts them to the solver's sampled input matrix.
     The system has state dimension ``n`` and input dimension ``m`` (from
-    ``sys.n`` and ``sys.m``).
+    ``sys.n`` and ``sys.m``). ``compute_trajectory`` is the facade; use the class
+    directly for repeated runs with the same solver, grid and backend.
 
     Parameters
     ----------
@@ -153,7 +150,7 @@ class Simulator:
     def __init__(
         self,
         sys,
-        x0=None,  # initial state, if None, use sys.x0
+        x0=None,  # Initial state; sys.x0 when None
         t0=0,
         tf=10,
         n_steps=None,
@@ -163,19 +160,9 @@ class Simulator:
         compile_backend=BACKEND_NUMPY,
         solver_warnings="warn",
     ):
-        from minilink.core.system import DynamicSystem
+        require_dynamic_system(sys)
 
-        if not isinstance(sys, DynamicSystem):
-            if sys.n == 0:
-                raise TypeError(
-                    "Static System leaves use StaticSimulator via "
-                    "compute_trajectory, or construct StaticSimulator directly."
-                )
-            raise TypeError(
-                f"Cannot simulate {type(sys).__name__} with n={sys.n}; "
-                "use DynamicSystem for state evolution."
-            )
-
+        # The model and the options as given
         self.verbose = verbose
         self.sys = sys
         self.sys.refresh()
@@ -185,10 +172,13 @@ class Simulator:
         self.solver_warnings = solver_warnings
         self.t0 = float(t0)
         self.tf = float(tf)
+
+        # The latest run, filled by solve and solve_forced
         self.last_solve_time_s = None
         self.last_traj = None
         self.last_debug = None
 
+        # The initial state, checked
         self.x0 = self.validate_x0(sys.x0 if x0 is None else x0, sys.n)
 
         # Compile the system
@@ -212,12 +202,16 @@ class Simulator:
             self.t, dt, n_steps = self.select_time_vector(t0, tf, n_steps, dt, sys)
             self.n_pts = len(self.t)
             self.solver_mode = self.select_solver(sys, solver)
+
+        # The solver backend and its options
         solver_backend_key, self.solver_backend_options = self.parse_solver(
             self.solver_mode
         )
         self.solver_backend = self.select_backend(solver_backend_key)
         self.dt = dt
 
+        # Advisories for discontinuous loops and held signals: warned, or listed
+        # in the setup panel when verbose
         setup_notes = emit_discontinuous_solver_warnings(
             solver_mode=self.solver_mode,
             solver_info=sys.solver_info,
@@ -229,23 +223,79 @@ class Simulator:
         )
 
         if self.verbose:
-            print_simulation_preamble(
-                title="===               Time-Domain Simulation                  ===",
-                system_name=sys.name,
-                n=sys.n,
-                m=sys.m,
-                x0=self.x0,
-                t0=self.t0,
-                tf=self.tf,
-                n_pts=self.n_pts,
-                dt=dt,
-                solver_mode=self.solver_mode,
-                user_solver=self.user_solver,
-                compile_backend=self.compile_backend,
-                auto_time_grid=self.auto_time_grid,
-                solver_options=self.solver_backend_options or None,
-                notes=setup_notes or None,
-            )
+            print_setup_panel(self, setup_notes)
+
+    def solve(self):
+        """
+        Run the simulation over ``self.t`` with the **nominal** input.
+
+        The input is the constant :math:`\\bar{u}` of the compiled evaluator.
+
+        Returns
+        -------
+        Trajectory
+            State and input time series, ``(n, n_pts)`` and ``(m, n_pts)``.
+        """
+        # Integrate with the selected solver backend, timed when verbose
+        time_solve = self.verbose
+        if time_solve:
+            t_start = time.perf_counter()
+
+        x_traj = self.solver_backend.integrate(
+            self.evaluator, self.t, self.x0, args=self.solver_backend_options
+        )
+
+        if time_solve:
+            self.last_solve_time_s = time.perf_counter() - t_start
+
+        # The nominal input ū, held over the whole grid
+        m = self.sys.m
+        u_traj = np.zeros((m, self.n_pts))
+        if m > 0:
+            u_bar = self.evaluator._u_nominal
+            u_traj[:, :] = u_bar.reshape(m, 1)
+
+        # The trajectory, kept with the solver's debug record
+        return self.store_trajectory(x_traj, u_traj)
+
+    def solve_forced(self, u, input_port_id=None):
+        """
+        Run simulation with a prescribed input.
+
+        ``u`` may be a full sampled input matrix, a callable ``u(t)``, a constant
+        vector, or a scalar for one-dimensional inputs. If ``input_port_id`` is
+        given, ``u`` describes only that port and the other ports use nominal
+        values.
+
+        Returns
+        -------
+        Trajectory
+            State and input time series.
+        """
+        # The input sampled on the grid
+        u_traj = coerce_forced_input(self.sys, self.t, u, input_port_id=input_port_id)
+        self.require_forced_mode()
+
+        # Integrate with the selected solver backend, timed when verbose
+        time_solve = self.verbose
+        if time_solve:
+            t_start = time.perf_counter()
+
+        x_traj = self.solver_backend.integrate_forced(
+            self.evaluator,
+            self.t,
+            u_traj,
+            self.x0,
+            args=self.solver_backend_options,
+        )
+
+        if time_solve:
+            self.last_solve_time_s = time.perf_counter() - t_start
+
+        # The trajectory, kept with the solver's debug record
+        return self.store_trajectory(x_traj, u_traj)
+
+    # Solver and time-grid selection
 
     def select_time_vector(self, t0, tf, n_steps, dt, sys, solver_mode=None):
         """
@@ -260,7 +310,11 @@ class Simulator:
         their own steps, so the grid is only a reporting resolution with
         :data:`~minilink.simulation.time_grid.DEFAULT_N_STEPS` points.
         """
-        default_dt = None  # -> DEFAULT_N_STEPS reporting grid
+        # An adaptive solver picks its own steps: the DEFAULT_N_STEPS reporting grid
+        default_dt = None
+
+        # A fixed-step solver steps on the grid: Δt = τ_min × scale, the scale of
+        # the smooth or the discontinuous policy
         if solver_mode in FIXED_STEP_SOLVERS:
             discontinuous = sys.solver_info.get("discontinuous_behavior", False)
             scale = (
@@ -270,15 +324,17 @@ class Simulator:
             default_dt = tau * scale
             period = sys.solver_info.get("sample_period")
             if period is not None:
-                # a held signal steps on a divisor of its period, Δ / n, at or under the
-                # policy's step; on a smooth loop with no declared time constant the
-                # period itself is the resolution: HELD_SIGNAL_STEPS_PER_SAMPLE per sample
+                # A held signal steps on a divisor of its period, Δt = T_s / n, at or
+                # under the policy's step; on a smooth loop with no declared time
+                # constant the period itself is the resolution:
+                # HELD_SIGNAL_STEPS_PER_SAMPLE steps per sample
                 undeclared = tau == DEFAULT_SMALLEST_TIME_CONSTANT and not discontinuous
                 if undeclared:
                     n = HELD_SIGNAL_STEPS_PER_SAMPLE
                 else:
                     n = int(np.ceil(period / default_dt))
                 default_dt = period / n
+
         return build_time_grid(t0, tf, n_steps=n_steps, dt=dt, default_dt=default_dt)
 
     def select_solver(self, sys, user_solver=None):
@@ -306,123 +362,17 @@ class Simulator:
             not self.auto_time_grid
             and self.compile_backend == BACKEND_JAX
             and self.n_pts >= RK4_AUTO_MIN_TIME_POINTS
-            and _time_grid_is_uniform(self.t)
+            and time_grid_is_uniform(self.t)
         ):
             return "rk4_fixedsteps"
         return "scipy"
 
-    # Core methods for integration
-
-    def solve(self):
-        """
-        Run simulation with **nominal** input (constant :math:`\\bar{u}` from the
-        compiled evaluator) over ``self.t``.
-
-        Returns
-        -------
-        Trajectory
-            State and input time series, ``(n, n_pts)`` and ``(m, n_pts)``.
-        """
-
-        # Integrate the system using the selected solver backend
-        time_solve = self.verbose
-        if time_solve:
-            t_start = time.perf_counter()
-
-        x_traj = self.solver_backend.integrate(
-            self.evaluator, self.t, self.x0, args=self.solver_backend_options
-        )
-
-        if time_solve:
-            self.last_solve_time_s = time.perf_counter() - t_start
-
-        # Build the input trajectory
-
-        m = self.sys.m
-        u_traj = np.zeros((m, self.n_pts))
-        if m > 0:
-            u_bar = self.evaluator._u_nominal
-            u_traj[:, :] = u_bar.reshape(m, 1)
-
-        # Build the trajectory object
-
-        traj = Trajectory(t=self.t, x=x_traj, u=u_traj)
-
-        self.last_debug = self.solver_backend.last_debug
-        self.last_traj = traj
-
-        if self.verbose:
-            print_simulation_report(
-                elapsed_s=self.last_solve_time_s,
-                n_samples=traj.n_samples,
-                x_final=traj.x[:, -1] if traj.n > 0 else None,
-                last_debug=self.last_debug,
-            )
-
-        return traj
-
-    def solve_forced(self, u, input_port_id=None):
-        """
-        Run simulation with a prescribed input.
-
-        ``u`` may be a full sampled input matrix, a callable ``u(t)``, a constant
-        vector, or a scalar for one-dimensional inputs. If ``input_port_id`` is
-        given, ``u`` describes only that port and the other ports use nominal
-        values.
-
-        Returns
-        -------
-        Trajectory
-            State and input time series.
-        """
-        u_traj = coerce_forced_input(self.sys, self.t, u, input_port_id=input_port_id)
-        if not self.supports_forced_mode():
-            raise ValueError(
-                f"Solver '{self.solver_mode}' does not support forced simulations"
-            )
-        time_solve = self.verbose
-        if time_solve:
-            t_start = time.perf_counter()
-
-        x_traj = self.solver_backend.integrate_forced(
-            self.evaluator,
-            self.t,
-            u_traj,
-            self.x0,
-            args=self.solver_backend_options,
-        )
-
-        if time_solve:
-            self.last_solve_time_s = time.perf_counter() - t_start
-
-        traj = Trajectory(t=self.t, x=x_traj, u=u_traj)
-        self.last_debug = self.solver_backend.last_debug
-        self.last_traj = traj
-
-        if self.verbose:
-            print_simulation_report(
-                elapsed_s=self.last_solve_time_s,
-                n_samples=traj.n_samples,
-                x_final=traj.x[:, -1] if traj.n > 0 else None,
-                last_debug=self.last_debug,
-            )
-
-        return traj
-
+    ###########################################################################
     # Internal machinery
-    def build_evaluator(self, sys, compile_backend):
-        return sys.compile(backend=compile_backend)
-
-    def resolve_and_build_evaluator(self, sys, compile_backend):
-        """
-        Compile with *compile_backend*, or if it is :data:`COMPILE_BACKEND_AUTO`, try JAX
-        then NumPy.
-        """
-        return resolve_auto_backend(
-            lambda backend: self.build_evaluator(sys, backend), compile_backend
-        )
+    ###########################################################################
 
     def validate_x0(self, x0, n):
+        """``x0`` as a finite float vector of shape ``(n,)``, or a ``ValueError``."""
         x0_arr = np.asarray(x0, dtype=float)
         if x0_arr.ndim != 1:
             raise ValueError(f"x0 must be a 1-D array with shape ({n},)")
@@ -432,10 +382,24 @@ class Simulator:
             raise ValueError("x0 must contain only finite values")
         return x0_arr
 
-    def supports_forced_mode(self):
-        return True
+    def resolve_and_build_evaluator(self, sys, compile_backend):
+        """``(backend, evaluator)``: ``sys`` compiled with ``compile_backend``, or JAX then NumPy on :data:`COMPILE_BACKEND_AUTO`."""
+        return resolve_auto_backend(
+            lambda backend: self.build_evaluator(sys, backend), compile_backend
+        )
+
+    def build_evaluator(self, sys, compile_backend):
+        """Compile ``sys`` with ``compile_backend``; subclasses wrap it (timings, caches)."""
+        return sys.compile(backend=compile_backend)
+
+    def parse_solver(self, solver):
+        """``(backend key, options)`` of a solver label."""
+        if solver not in _USER_SOLVER_MODES:
+            raise ValueError(f"Unknown solver '{solver}'")
+        return _USER_SOLVER_MODES[solver]
 
     def select_backend(self, solver_backend_key):
+        """A fresh solver backend for its key."""
         if solver_backend_key == "scipy":
             return SciPySolverBackend()
         if solver_backend_key == "euler":
@@ -446,7 +410,77 @@ class Simulator:
             return RK4SolverBackend()
         raise ValueError(f"Unknown solver '{solver_backend_key}'")
 
-    def parse_solver(self, solver):
-        if solver not in _USER_SOLVER_MODES:
-            raise ValueError(f"Unknown solver '{solver}'")
-        return _USER_SOLVER_MODES[solver]
+    def store_trajectory(self, x_traj, u_traj):
+        """The run's trajectory, kept as ``last_traj`` with the solver's debug record."""
+        traj = Trajectory(t=self.t, x=x_traj, u=u_traj)
+        self.last_debug = self.solver_backend.last_debug
+        self.last_traj = traj
+
+        if self.verbose:
+            print_simulation_report(
+                elapsed_s=self.last_solve_time_s,
+                n_samples=traj.n_samples,
+                x_final=traj.x[:, -1] if traj.n > 0 else None,
+                last_debug=self.last_debug,
+            )
+
+        return traj
+
+    def require_forced_mode(self):
+        """Refuse a forced run on a solver that cannot take a prescribed input."""
+        if not self.supports_forced_mode():
+            raise ValueError(
+                f"Solver '{self.solver_mode}' does not support forced simulations"
+            )
+
+    def supports_forced_mode(self):
+        """Every solver backend integrates a prescribed input."""
+        return True
+
+
+###############################################################################
+# Internal machinery
+###############################################################################
+
+
+def require_dynamic_system(sys) -> None:
+    """Refuse a system without continuous state: a static leaf or a step system."""
+    if not isinstance(sys, DynamicSystem):
+        if sys.n == 0:
+            raise TypeError(
+                "Static System leaves use StaticSimulator via "
+                "compute_trajectory, or construct StaticSimulator directly."
+            )
+        raise TypeError(
+            f"Cannot simulate {type(sys).__name__} with n={sys.n}; "
+            "use DynamicSystem for state evolution."
+        )
+
+
+def time_grid_is_uniform(times: np.ndarray) -> bool:
+    """True if ``times`` are evenly spaced (required for :class:`RK4SolverBackend`)."""
+    if times.size < 2:
+        return True
+    d = np.diff(times)
+    return bool(np.allclose(d, d[0]))
+
+
+def print_setup_panel(sim: Simulator, notes: list[str]) -> None:
+    """The verbose setup panel: model, grid, solver, backend and the advisories."""
+    print_simulation_preamble(
+        title="===               Time-Domain Simulation                  ===",
+        system_name=sim.sys.name,
+        n=sim.sys.n,
+        m=sim.sys.m,
+        x0=sim.x0,
+        t0=sim.t0,
+        tf=sim.tf,
+        n_pts=sim.n_pts,
+        dt=sim.dt,
+        solver_mode=sim.solver_mode,
+        user_solver=sim.user_solver,
+        compile_backend=sim.compile_backend,
+        auto_time_grid=sim.auto_time_grid,
+        solver_options=sim.solver_backend_options or None,
+        notes=notes or None,
+    )

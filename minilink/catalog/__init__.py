@@ -1,18 +1,15 @@
-"""Teaching alias of ``dynamics.catalog`` — short plant imports.
-
-Ownership of plant math stays under ``minilink.dynamics.catalog``. This package
-only re-exports public teaching classes::
-
-    from minilink.catalog import Pendulum, CartPole, Boat2D
-"""
+"""Catalog: the plant models of every domain, for short teaching imports."""
 
 from __future__ import annotations
 
 from minilink.core.facade import lazy_facade
 
-# name -> (module path, attribute)
+# The teaching alias of ``dynamics.catalog``, for short plant imports, e.g.
+# ``from minilink.catalog import Pendulum, CartPole, Boat2D``. The plant math stays
+# under ``minilink.dynamics.catalog``; this package only re-exports the public
+# teaching classes. Each exported name maps to its (module path, attribute).
 _EXPORTS: dict[str, tuple[str, str]] = {
-    # pendulum
+    # Pendulum
     "Acrobot": ("minilink.dynamics.catalog.pendulum", "Acrobot"),
     "CartPole": ("minilink.dynamics.catalog.pendulum", "CartPole"),
     "CartPoleWithNoisePort": (
@@ -35,7 +32,7 @@ _EXPORTS: dict[str, tuple[str, str]] = {
         "minilink.dynamics.catalog.pendulum",
         "UnderactuatedRotatingCartPole",
     ),
-    # mass-spring-damper
+    # Mass-spring-damper
     "FloatingSingleMass": (
         "minilink.dynamics.catalog.mass_spring_damper",
         "FloatingSingleMass",
@@ -51,15 +48,15 @@ _EXPORTS: dict[str, tuple[str, str]] = {
     "SingleMass": ("minilink.dynamics.catalog.mass_spring_damper", "SingleMass"),
     "ThreeMass": ("minilink.dynamics.catalog.mass_spring_damper", "ThreeMass"),
     "TwoMass": ("minilink.dynamics.catalog.mass_spring_damper", "TwoMass"),
-    # equations
+    # Equations
     "DoubleIntegrator": ("minilink.dynamics.catalog.equations", "DoubleIntegrator"),
     "SimpleIntegrator": ("minilink.dynamics.catalog.equations", "SimpleIntegrator"),
     "TripleIntegrator": ("minilink.dynamics.catalog.equations", "TripleIntegrator"),
     "VanderPol": ("minilink.dynamics.catalog.equations", "VanderPol"),
     "Lorenz": ("minilink.dynamics.catalog.equations", "Lorenz"),
-    # astro
+    # Astro
     "ThreeBodyProblem": ("minilink.dynamics.catalog.astro", "ThreeBodyProblem"),
-    # aerial
+    # Aerial
     "ConstantSpeedHelicopterTunnel": (
         "minilink.dynamics.catalog.aerial",
         "ConstantSpeedHelicopterTunnel",
@@ -76,10 +73,10 @@ _EXPORTS: dict[str, tuple[str, str]] = {
         "minilink.dynamics.catalog.aerial",
         "SpeedControlledDrone2D",
     ),
-    # marine
+    # Marine
     "Boat2D": ("minilink.dynamics.catalog.marine", "Boat2D"),
     "Boat2DWithCurrent": ("minilink.dynamics.catalog.marine", "Boat2DWithCurrent"),
-    # vehicles
+    # Vehicles
     "BicycleDynRate": ("minilink.dynamics.catalog.vehicles", "BicycleDynRate"),
     "DynamicBicycle": ("minilink.dynamics.catalog.vehicles", "DynamicBicycle"),
     "DynamicBicycleCar3D": (
@@ -111,7 +108,7 @@ _EXPORTS: dict[str, tuple[str, str]] = {
         "minilink.dynamics.catalog.vehicles",
         "QuarterCarOnRoughTerrain",
     ),
-    # manipulators
+    # Manipulators
     "FiveLinkPlanarManipulator": (
         "minilink.dynamics.catalog.manipulators",
         "FiveLinkPlanarManipulator",

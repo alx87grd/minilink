@@ -1,7 +1,11 @@
-"""Common plotting result container."""
+"""Plot result: the record every plotting backend returns."""
 
 from dataclasses import dataclass
 from typing import Any
+
+###############################################################################
+# Public API
+###############################################################################
 
 
 @dataclass
@@ -12,6 +16,8 @@ class PlotResult:
     payload: Any
     figure: Any = None
     axes: Any = None
+
+    # Display
 
     def _ipython_display_(self):
         """Display nothing in a notebook: the plot call has already drawn the figure.

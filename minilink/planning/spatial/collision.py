@@ -1,17 +1,4 @@
-"""
-Collision bodies for spatial scene queries.
-
-A :class:`CollisionBody` is the moving counterpart of a workspace
-:class:`~minilink.core.geometry.Shape`: it carries body-frame collision
-geometry and places it in the world with one pose transform per rigid part.
-
-Call sites bind frameless geometry to a planner :class:`~minilink.core.system.System`
-via :func:`bind` so world poses come from ``sys.tf`` — one FK pass shared with
-rendering.
-
-Collision probes use :func:`collision_spheres` and
-:func:`~minilink.core.kinematics.apply`.
-"""
+"""Collision bodies: body-frame geometry placed in the world by one pose per rigid part."""
 
 from abc import ABC, abstractmethod
 from collections.abc import Iterator
@@ -32,9 +19,18 @@ __all__ = [
 ]
 
 
+###############################################################################
+# Public API
+###############################################################################
+
+
 class CollisionBody(ABC):
     """
     Collision model: per-part body-frame geometry placed by world poses.
+
+    The moving counterpart of a workspace :class:`~minilink.core.geometry.Shape`:
+    it carries body-frame collision geometry and places it in the world with
+    one pose transform per rigid part.
 
     Subclasses expose :attr:`shapes` (static, one per rigid part) and
     :meth:`body_poses` (one homogeneous transform per part, aligned with
@@ -60,12 +56,6 @@ class CollisionBody(ABC):
             yield transform, shape
 
 
-def _normalize_shapes(geometry) -> tuple[Shape, ...]:
-    if isinstance(geometry, Shape):
-        return (geometry,)
-    return tuple(geometry)
-
-
 def disc(radius: float) -> Sphere:
     """Body-frame disc/sphere probe at the origin (frameless geometry)."""
     return Sphere(np.zeros(2), float(radius))
@@ -85,7 +75,11 @@ def car_outline(
     Each probe is a :class:`Sphere` offset in the body frame. Attach to a
     planner plant with :func:`bind` and ``frame="body"`` (default).
     """
-    hl, hw = 0.5 * length, 0.5 * width
+    # Half length and half width of the footprint
+    hl = 0.5 * length
+    hw = 0.5 * width
+
+    # The four corners, then the midpoints of the four edges
     outline = [
         (hl, hw),
         (hl, -hw),
@@ -96,12 +90,17 @@ def car_outline(
         (0.0, hw),
         (0.0, -hw),
     ]
-    return tuple(Sphere([px, py], margin) for px, py in outline)
+    probes = tuple(Sphere([px, py], margin) for px, py in outline)
+
+    return probes
 
 
 def bind(sys, spec, *, frame: str = "body") -> CollisionBody:
     """
     Bind frameless collision geometry to a planner plant's ``tf`` dict.
+
+    The world poses then come from ``sys.tf``: one forward-kinematics pass,
+    shared with rendering.
 
     Single-frame (default ``frame="body"``)::
 
@@ -119,62 +118,97 @@ def bind(sys, spec, *, frame: str = "body") -> CollisionBody:
         and len(spec[0]) == 2
         and isinstance(spec[0][0], str)
     ):
+        # Several frames: one (frame_key, geometry) pair each
         bindings = tuple(
-            (frame_key, _normalize_shapes(geometry)) for frame_key, geometry in spec
+            (frame_key, normalize_shapes(geometry)) for frame_key, geometry in spec
         )
     else:
-        bindings = ((frame, _normalize_shapes(spec)),)
-    return _BoundCollisionBody(sys, bindings)
+        # One frame carries all the geometry
+        bindings = ((frame, normalize_shapes(spec)),)
 
-
-class _BoundCollisionBody(CollisionBody):
-    """Collision body whose world poses come from ``sys.tf`` frame lookup."""
-
-    def __init__(self, sys, bindings):
-        self._sys = sys
-        self._bindings = bindings
-
-    def _resolve_u(self, u):
-        if u is not None:
-            return u
-        m = getattr(self._sys, "m", 0)
-        if m:
-            return np.zeros(m)
-        return None
-
-    @property
-    def shapes(self) -> tuple[Shape, ...]:
-        return tuple(shape for _, shapes in self._bindings for shape in shapes)
-
-    def body_poses(self, x, u=None, t=0.0, params=None):
-        frames = self._sys.tf(x, self._resolve_u(u), t, params)
-        poses = []
-        for frame_key, shapes in self._bindings:
-            poses.extend([frames[frame_key]] * len(shapes))
-        return tuple(poses)
-
-    def iter_placed_parts(self, x, u=None, t=0.0, params=None):
-        frames = self._sys.tf(x, self._resolve_u(u), t, params)
-        for frame_key, shapes in self._bindings:
-            transform = frames[frame_key]
-            for shape in shapes:
-                yield transform, shape
+    return BoundCollisionBody(sys, bindings)
 
 
 def iter_probes(body, x, u=None, t=0.0, params=None):
-    """Yield ``(world_center, radius)`` for each body-frame collision sphere."""
+    """
+    Yield ``(world_center, radius)`` for each body-frame collision sphere.
+
+    The spheres come from :func:`collision_spheres`, placed in the world by
+    :func:`~minilink.core.kinematics.apply`.
+    """
     for transform, shape in body.iter_placed_parts(x, u, t, params):
         for center, radius in collision_spheres(shape):
-            yield apply(transform, center), radius
+            # c_world = T c_body
+            world_center = apply(transform, center)
+
+            yield world_center, radius
 
 
 def collision_spheres(shape: Shape) -> tuple:
     """
     Return body-frame ``(center, radius)`` probes for a body part.
 
-    This is the only place the sphere/capsule restriction lives. A
-    :class:`Sphere` yields one probe; capsules and unions are added later.
+    This is the only place the sphere restriction lives: a :class:`Sphere`
+    yields one probe, and any other shape is refused.
     """
     if isinstance(shape, Sphere):
         return ((shape.center, shape.radius),)
+
     raise NotImplementedError("Only Sphere body parts are supported for now")
+
+
+###############################################################################
+# Internal machinery
+###############################################################################
+
+
+def normalize_shapes(geometry) -> tuple[Shape, ...]:
+    """One shape, or several, as a tuple of shapes."""
+    if isinstance(geometry, Shape):
+        return (geometry,)
+
+    return tuple(geometry)
+
+
+class BoundCollisionBody(CollisionBody):
+    """Collision body whose world poses come from ``sys.tf`` frame lookup."""
+
+    def __init__(self, sys, bindings):
+        self._sys = sys
+        self._bindings = bindings
+
+    @property
+    def shapes(self) -> tuple[Shape, ...]:
+        return tuple(shape for _, shapes in self._bindings for shape in shapes)
+
+    def body_poses(self, x, u=None, t=0.0, params=None):
+        frames = self._sys.tf(x, self.resolve_u(u), t, params)
+
+        # Each part takes the pose of the frame it is bound to
+        poses = []
+        for frame_key, shapes in self._bindings:
+            poses.extend([frames[frame_key]] * len(shapes))
+
+        return tuple(poses)
+
+    def iter_placed_parts(self, x, u=None, t=0.0, params=None):
+        frames = self._sys.tf(x, self.resolve_u(u), t, params)
+
+        for frame_key, shapes in self._bindings:
+            transform = frames[frame_key]
+            for shape in shapes:
+                yield transform, shape
+
+    ###########################################################################
+    # Internal machinery
+    ###########################################################################
+
+    def resolve_u(self, u):
+        """The input given, else a zero command of the system's size, else ``None``."""
+        if u is not None:
+            return u
+        m = getattr(self._sys, "m", 0)
+        if m:
+            return np.zeros(m)
+
+        return None

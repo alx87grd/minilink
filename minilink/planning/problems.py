@@ -1,11 +1,6 @@
-"""
-Deterministic planning problem definitions.
+"""Planning problems: the deterministic task, its stochastic class, and their parameters."""
 
-A :class:`PlanningProblem` describes the continuous mathematical task:
-the system, admissible sets, boundary sets, continuous horizon ``tf``,
-optional cost, and optional parameter bundle. Knot count and other
-discretization choices belong to solver packages, not the problem object.
-"""
+from __future__ import annotations
 
 from collections.abc import Mapping
 from dataclasses import dataclass, replace
@@ -19,31 +14,9 @@ from minilink.core.inspect import inspect_text, repr_pretty
 from minilink.core.sets import BoxInputSet, BoxSet, InputSet, Set, SingletonSet
 from minilink.core.system import System
 
-
-@dataclass(frozen=True)
-class ProblemParameters:
-    """
-    Optional scenario-level parameter bundle for planning.
-
-    Parameters
-    ----------
-    system : object, optional
-        Parameters for system dynamics. First-pass solvers may freeze these
-        at compile time until parametric evaluator tiers are mature.
-    cost : object, optional
-        Parameters passed to :class:`~minilink.core.costs.CostFunction`.
-    sets : object, optional
-        Parameters passed to allowable set objects.
-    scene : object, optional
-        Reserved for pipeline B spatial overrides (``ObstacleBank`` /
-        ``SceneParameters``). Always ``None`` until bind ``J(z, p)`` lands;
-        online ``params={"scene": …}`` raises ``NotImplementedError``.
-    """
-
-    system: object | None = None
-    cost: object | None = None
-    sets: object | None = None
-    scene: object | None = None
+###############################################################################
+# Public API
+###############################################################################
 
 
 @dataclass(frozen=True)
@@ -55,6 +28,11 @@ class PlanningProblem:
     ``u(t) in U(x(t), t)``, with boundary sets ``X0`` and optional ``Xf``.
     A cost can be attached for optimization and policy-planning solvers,
     but feasibility/search planners may leave it unset.
+
+    The problem is the continuous task: the system, the admissible and boundary
+    sets, the continuous horizon ``tf``, the optional cost and parameter bundle.
+    The knot count and the other discretization choices belong to the solvers,
+    not to the problem.
 
     Parameters
     ----------
@@ -113,19 +91,15 @@ class PlanningProblem:
     metadata: Mapping[str, object] | None = None
     infeasible_cost: object = None
 
-    def __str__(self):
-        return inspect_text(self)
-
-    def _repr_pretty_(self, p, cycle):
-        repr_pretty(self, p, cycle)
-
     def __post_init__(self) -> None:
         n = int(self.sys.n)
 
+        # The horizon, and a scalar price of infeasibility as a float
         tf = self.coerce_tf(self.tf)
         if self.infeasible_cost is not None and not callable(self.infeasible_cost):
             object.__setattr__(self, "infeasible_cost", float(self.infeasible_cost))
 
+        # The representative start and goal
         x_start = self.coerce_state(
             self.default_x_start(),
             label="x_start",
@@ -137,25 +111,30 @@ class PlanningProblem:
             required=False,
         )
 
+        # The sets: X unconstrained and U the input ports' box unless given, the
+        # boundary sets the singletons of the start and the goal
         X = unconstrained(n) if self.X is None else self.X
         U = BoxInputSet.from_system_inputs(self.sys) if self.U is None else self.U
         X0 = SingletonSet(x_start) if self.X0 is None else self.X0
         Xf = SingletonSet(x_goal) if self.Xf is None and x_goal is not None else self.Xf
+
+        # The parameter bundle (a random plant's draw at its mean) and the metadata
         params = self.coerce_params(self.params)
         if params.system is None and self.sys.is_random:
-            params = replace(params, system=self.sys.realize(None))  # noise at its mean
+            params = replace(params, system=self.sys.realize(None))  # Noise at its mean
         metadata = self.coerce_metadata(self.metadata)
 
+        # The sets' types
         self.require_type("X", X, Set)
         self.require_type("U", U, InputSet)
         self.require_type("X0", X0, Set)
         if Xf is not None:
             self.require_type("Xf", Xf, Set)
 
-        if x_start.shape != (n,):
-            raise ValueError(f"x_start must have shape ({n},)")
-        if x_goal is not None and x_goal.shape != (n,):
-            raise ValueError(f"x_goal must have shape ({n},)")
+        # The representative points: states of size n, inside their boundary sets
+        self.check_state_shape("x_start", x_start, n)
+        if x_goal is not None:
+            self.check_state_shape("x_goal", x_goal, n)
         self.require_member(
             X0,
             x_start,
@@ -172,6 +151,7 @@ class PlanningProblem:
                 set_params=params.sets,
             )
 
+        # The coerced fields, frozen
         object.__setattr__(self, "tf", tf)
         object.__setattr__(self, "x_start", x_start)
         object.__setattr__(self, "x_goal", x_goal)
@@ -182,70 +162,15 @@ class PlanningProblem:
         object.__setattr__(self, "params", params)
         object.__setattr__(self, "metadata", metadata)
 
-    def default_x_start(self):
-        if self.x_start is not None:
-            return self.x_start
-        if isinstance(self.X0, SingletonSet):
-            return self.X0.point
-        return self.sys.x0
-
-    def default_x_goal(self):
-        if self.x_goal is not None:
-            return self.x_goal
-        if isinstance(self.Xf, SingletonSet):
-            return self.Xf.point
-        return None
-
-    @staticmethod
-    def coerce_state(
-        x: object,
-        *,
-        label: str,
-        required: bool,
-    ) -> np.ndarray | None:
-        if x is None:
-            if required:
-                raise ValueError(f"{label} is required")
-            return None
-        return np.asarray(x, dtype=float).reshape(-1).copy()
-
-    @staticmethod
-    def coerce_params(params) -> ProblemParameters:
-        if params is None:
-            return ProblemParameters()
-        if isinstance(params, ProblemParameters):
-            return params
-        raise TypeError("params must be a ProblemParameters instance or None")
-
-    @staticmethod
-    def coerce_metadata(metadata) -> Mapping[str, object]:
-        if metadata is None:
-            return MappingProxyType({})
-        if not isinstance(metadata, Mapping):
-            raise TypeError("metadata must be a mapping or None")
-        return MappingProxyType(dict(metadata))
-
-    @staticmethod
-    def require_type(label: str, value: object, expected_type: type) -> None:
-        if not isinstance(value, expected_type):
-            raise TypeError(f"{label} must be a {expected_type.__name__} instance")
-
-    @staticmethod
-    def require_member(
-        set_: Set,
-        point: np.ndarray,
-        *,
-        set_label: str,
-        point_label: str,
-        set_params,
-    ) -> None:
-        if not set_.contains(point, params=set_params):
-            raise ValueError(f"{point_label} must belong to {set_label}")
-
     @property
     def has_goal(self) -> bool:
         """Return ``True`` when a terminal goal or boundary set is available."""
         return self.Xf is not None
+
+    @property
+    def has_cost(self) -> bool:
+        """Return ``True`` when the problem has a cost function."""
+        return self.cost is not None
 
     @property
     def is_stochastic(self) -> bool:
@@ -257,31 +182,29 @@ class PlanningProblem:
         price = self.infeasible_cost
         if price is None:
             return None
+
         return price(x, t) if callable(price) else price
 
     def horizon_kind(self) -> str:
         """``"finite"`` when ``tf`` is a finite length (``h`` is charged there), ``"infinite"`` for ``+inf`` or unset."""
         return "infinite" if self.tf is None or not np.isfinite(self.tf) else "finite"
 
-    @property
-    def has_cost(self) -> bool:
-        """Return ``True`` when the problem has a cost function."""
-        return self.cost is not None
-
     def require_cost(self) -> CostFunction:
-        """Return the cost or raise a clear solver-facing error."""
+        """Refuse a problem without a cost; return the cost."""
         if self.cost is None:
             raise ValueError("This planner requires problem.cost")
+
         return self.cost
 
     def require_goal(self) -> Set:
-        """Return the terminal set or raise a clear solver-facing error."""
+        """Refuse a problem without a terminal set; return it."""
         if self.Xf is None:
             raise ValueError("This planner requires a terminal set or x_goal")
+
         return self.Xf
 
     def require_finite_tf(self) -> float:
-        """Return a finite horizon or raise for solvers that need a time grid."""
+        """Refuse an unset or infinite horizon; return ``tf`` as a float."""
         if self.tf is None:
             raise ValueError("This planner requires a finite problem.tf")
         if not np.isfinite(self.tf):
@@ -289,12 +212,27 @@ class PlanningProblem:
                 "This planner requires a finite problem.tf "
                 "(got +inf for infinite-horizon)"
             )
+
         return float(self.tf)
+
+    # Display
+
+    def __str__(self):
+        return inspect_text(self)
+
+    def _repr_pretty_(self, p, cycle):
+        repr_pretty(self, p, cycle)
+
+    ###########################################################################
+    # Internal machinery
+    ###########################################################################
 
     @staticmethod
     def coerce_tf(tf: object) -> float | None:
+        """The horizon as a float: positive or ``+inf``, ``None`` when unset."""
         if tf is None:
             return None
+
         value = float(tf)
         if np.isnan(value) or value <= 0.0:
             raise ValueError(
@@ -304,7 +242,86 @@ class PlanningProblem:
             raise ValueError(
                 "tf must be positive, None (unset), or +inf (infinite-horizon)"
             )
+
         return value
+
+    def default_x_start(self):
+        """The start given, else the point of a singleton ``X0``, else ``sys.x0``."""
+        if self.x_start is not None:
+            return self.x_start
+        if isinstance(self.X0, SingletonSet):
+            return self.X0.point
+
+        return self.sys.x0
+
+    @staticmethod
+    def coerce_state(
+        x: object,
+        *,
+        label: str,
+        required: bool,
+    ) -> np.ndarray | None:
+        """A flat float copy of the point, ``None`` when it is optional and missing."""
+        if x is None:
+            if required:
+                raise ValueError(f"{label} is required")
+            return None
+
+        return np.asarray(x, dtype=float).reshape(-1).copy()
+
+    def default_x_goal(self):
+        """The goal given, else the point of a singleton ``Xf``, else ``None``."""
+        if self.x_goal is not None:
+            return self.x_goal
+        if isinstance(self.Xf, SingletonSet):
+            return self.Xf.point
+
+        return None
+
+    @staticmethod
+    def coerce_params(params) -> ProblemParameters:
+        """The parameter bundle, empty when unset."""
+        if params is None:
+            return ProblemParameters()
+        if isinstance(params, ProblemParameters):
+            return params
+
+        raise TypeError("params must be a ProblemParameters instance or None")
+
+    @staticmethod
+    def coerce_metadata(metadata) -> Mapping[str, object]:
+        """A read-only copy of the metadata, empty when unset."""
+        if metadata is None:
+            return MappingProxyType({})
+        if not isinstance(metadata, Mapping):
+            raise TypeError("metadata must be a mapping or None")
+
+        return MappingProxyType(dict(metadata))
+
+    @staticmethod
+    def require_type(label: str, value: object, expected_type: type) -> None:
+        """Refuse a value that is not an instance of ``expected_type``."""
+        if not isinstance(value, expected_type):
+            raise TypeError(f"{label} must be a {expected_type.__name__} instance")
+
+    @staticmethod
+    def check_state_shape(label: str, x: np.ndarray, n: int) -> None:
+        """Validate a representative point as a flat state of size ``n``."""
+        if x.shape != (n,):
+            raise ValueError(f"{label} must have shape ({n},)")
+
+    @staticmethod
+    def require_member(
+        set_: Set,
+        point: np.ndarray,
+        *,
+        set_label: str,
+        point_label: str,
+        set_params,
+    ) -> None:
+        """Refuse a representative point outside its boundary set."""
+        if not set_.contains(point, params=set_params):
+            raise ValueError(f"{point_label} must belong to {set_label}")
 
 
 @dataclass(frozen=True)
@@ -350,48 +367,31 @@ class StochasticPlanningProblem(PlanningProblem):
     CRITERIA = ("expectation", "worst_case")
 
     def __post_init__(self) -> None:
-        if self.x0_distribution is None:
-            raise ValueError("StochasticPlanningProblem requires x0_distribution")
+        # The start law: its mean the default start, its support the default X0
+        self.require_start_law(self.x0_distribution)
         if self.x_start is None:
             object.__setattr__(self, "x_start", self.x0_distribution.mean)
         if self.X0 is None and self.x0_distribution.support is not None:
             object.__setattr__(self, "X0", self.x0_distribution.support)
+
+        # The deterministic spine
         super().__post_init__()
-        if self.criterion not in self.CRITERIA:
-            raise ValueError(
-                f"criterion must be one of {self.CRITERIA}, got {self.criterion!r}"
-            )
-        if int(self.x0_distribution.dim) != int(self.sys.n):
-            raise ValueError("x0_distribution.dim must equal sys.n")
-        for name in self.params_distribution or {}:
-            try:
-                leaf = lookup_param(self.sys.params, name)
-            except KeyError:
-                raise ValueError(
-                    f"params_distribution key {name!r} is not in sys.params"
-                ) from None
-            if isinstance(leaf, dict):
-                raise ValueError(
-                    f"params_distribution over {name!r}: distributions apply to "
-                    "array-valued parameters, not to a whole subsystem dict"
-                )
-        inputs = list(self.sys.inputs)
-        command = "u" if "u" in inputs else (inputs[0] if len(inputs) == 1 else None)
-        for port in self.disturbances or {}:
-            if port not in self.sys.inputs:
-                raise ValueError(
-                    f"disturbances key {port!r} is not an input port of sys"
-                )
-            if port == command:
-                raise ValueError(
-                    f"disturbances key {port!r} is the command port of sys: a draw "
-                    "there would replace the policy's command. Give the disturbance "
-                    "its own input port (for example 'd')."
-                )
+
+        # The criterion, and the draws against the system they perturb
+        self.require_criterion(self.criterion, self.CRITERIA)
+        self.require_start_dim(self.x0_distribution, self.sys)
+        self.require_param_names(self.params_distribution, self.sys)
+        self.require_disturbance_ports(self.disturbances, self.sys)
+
+        # The draws as plain dicts, frozen
         object.__setattr__(
             self, "params_distribution", dict(self.params_distribution or {})
         )
         object.__setattr__(self, "disturbances", dict(self.disturbances or {}))
+
+    @property
+    def is_stochastic(self) -> bool:
+        return True
 
     def sample_x0(self, key, n=None):
         """Draw initial states: ``(n,)`` for one, ``(n_samples, n)`` with ``n``."""
@@ -401,26 +401,28 @@ class StochasticPlanningProblem(PlanningProblem):
         """Draw one ``{name: value}`` override of ``sys.params`` (empty if none), nominal shapes."""
         names = list(self.params_distribution)
         keys = split_keys(key, len(names))
+
         draws = {}
         for name, k in zip(names, keys):
+            # One draw, in the nominal entry's shape
             value = self.params_distribution[name].sample(k)
             value = value.reshape(np.shape(lookup_param(self.sys.params, name)))
+
+            # Placed at its dotted path in the nested override
             node = draws
             *path, last = name.split(".")
             for part in path:
                 node = node.setdefault(part, {})
             node[last] = value
+
         return draws
 
     def sample_disturbances(self, key):
         """Draw one ``{port_id: value}`` of held disturbance inputs (empty if none)."""
         ports = list(self.disturbances)
         keys = split_keys(key, len(ports))
-        return {port: self.disturbances[port].sample(k) for port, k in zip(ports, keys)}
 
-    @property
-    def is_stochastic(self) -> bool:
-        return True
+        return {port: self.disturbances[port].sample(k) for port, k in zip(ports, keys)}
 
     def nominal(self) -> PlanningProblem:
         """Certainty-equivalent deterministic problem: mean start, no draws."""
@@ -438,6 +440,89 @@ class StochasticPlanningProblem(PlanningProblem):
             infeasible_cost=self.infeasible_cost,
         )
 
+    ###########################################################################
+    # Internal machinery
+    ###########################################################################
+
+    @staticmethod
+    def require_start_law(x0_distribution) -> None:
+        """Refuse a stochastic problem without the law of its initial state."""
+        if x0_distribution is None:
+            raise ValueError("StochasticPlanningProblem requires x0_distribution")
+
+    @staticmethod
+    def require_criterion(criterion, criteria) -> None:
+        """Refuse a criterion that is not one of ``criteria``."""
+        if criterion not in criteria:
+            raise ValueError(f"criterion must be one of {criteria}, got {criterion!r}")
+
+    @staticmethod
+    def require_start_dim(x0_distribution, sys) -> None:
+        """Refuse a start law whose dimension is not the state's."""
+        if int(x0_distribution.dim) != int(sys.n):
+            raise ValueError("x0_distribution.dim must equal sys.n")
+
+    @staticmethod
+    def require_param_names(params_distribution, sys) -> None:
+        """Refuse a drawn name missing from ``sys.params``, or one naming a whole subsystem dict."""
+        for name in params_distribution or {}:
+            try:
+                leaf = lookup_param(sys.params, name)
+            except KeyError:
+                raise ValueError(
+                    f"params_distribution key {name!r} is not in sys.params"
+                ) from None
+            if isinstance(leaf, dict):
+                raise ValueError(
+                    f"params_distribution over {name!r}: distributions apply to "
+                    "array-valued parameters, not to a whole subsystem dict"
+                )
+
+    @staticmethod
+    def require_disturbance_ports(disturbances, sys) -> None:
+        """Refuse a disturbance on a port ``sys`` lacks, or on its command port."""
+        # The command port: u, else the one input there is
+        inputs = list(sys.inputs)
+        command = "u" if "u" in inputs else (inputs[0] if len(inputs) == 1 else None)
+
+        for port in disturbances or {}:
+            if port not in sys.inputs:
+                raise ValueError(
+                    f"disturbances key {port!r} is not an input port of sys"
+                )
+            if port == command:
+                raise ValueError(
+                    f"disturbances key {port!r} is the command port of sys: a draw "
+                    "there would replace the policy's command. Give the disturbance "
+                    "its own input port (for example 'd')."
+                )
+
+
+@dataclass(frozen=True)
+class ProblemParameters:
+    """
+    Optional scenario-level parameter bundle for planning.
+
+    Parameters
+    ----------
+    system : object, optional
+        Parameters for the system dynamics; a solver may freeze them at compile
+        time.
+    cost : object, optional
+        Parameters passed to :class:`~minilink.core.costs.CostFunction`.
+    sets : object, optional
+        Parameters passed to allowable set objects.
+    scene : object, optional
+        Spatial overrides of the scene bind (``ObstacleBank`` /
+        ``SceneParameters``), not implemented: always ``None``, and an online
+        ``params={"scene": …}`` raises ``NotImplementedError``.
+    """
+
+    system: object | None = None
+    cost: object | None = None
+    sets: object | None = None
+    scene: object | None = None
+
 
 def as_stochastic(problem: PlanningProblem) -> StochasticPlanningProblem:
     """
@@ -450,6 +535,7 @@ def as_stochastic(problem: PlanningProblem) -> StochasticPlanningProblem:
     """
     if isinstance(problem, StochasticPlanningProblem):
         return problem
+
     return StochasticPlanningProblem(
         sys=problem.sys,
         x_start=problem.x_start,
@@ -467,6 +553,11 @@ def as_stochastic(problem: PlanningProblem) -> StochasticPlanningProblem:
     )
 
 
+###############################################################################
+# Internal machinery
+###############################################################################
+
+
 def unconstrained(n):
     """The whole state space as a set: no constraint on ``x``."""
     return BoxSet(np.full(int(n), -np.inf), np.full(int(n), np.inf))
@@ -477,6 +568,7 @@ def lookup_param(params, name):
     node = params
     for part in name.split("."):
         node = node[part]
+
     return node
 
 
@@ -488,4 +580,5 @@ def merge_params(params, draws):
             merged[name] = merge_params(merged[name], value)
         else:
             merged[name] = value
+
     return merged

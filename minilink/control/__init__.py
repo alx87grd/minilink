@@ -1,24 +1,23 @@
-"""Controller and static law blocks (reference/sensor to actuation).
-
-Teaching imports::
-
-    from minilink.control import PID, ImpedanceController, lqr, place
-    from minilink.control.mpc import ModelPredictiveController
-
-The classical family is ``P``, ``PI``, ``PD``, ``PID`` (one measurement per axis, the
-derivative filtered) and ``ImpedanceController``, ``ImpedanceIntegralController`` (a
-measured ``[q; dq]``, the rate read), six blocks in one grammar: per-axis gains, ``dof``
-independent loops, actuator limits that are infinite by default.
-
-The design verbs (``lqr``, ``place``, ``lqg``, ``lqr_finite_horizon``,
-``trajectory_lqr``) take a linear model or a plant; their gains (``lqr_gain``,
-``place_gain``, ``lqr_gain_schedule``) take arrays. Both live in ``control.design``.
-"""
+"""Control: the controller and static law blocks, from reference and sensor to actuation."""
 
 from __future__ import annotations
 
 from minilink.core.facade import lazy_facade
 
+# The band facade for short teaching imports, e.g.
+# ``from minilink.control import PID, ImpedanceController, lqr, place`` and
+# ``from minilink.control.mpc import ModelPredictiveController``.
+#
+# The classical family is ``P``, ``PI``, ``PD``, ``PID`` (one measurement per axis, the
+# derivative filtered) and ``ImpedanceController``, ``ImpedanceIntegralController`` (a
+# measured ``[q; dq]``, the rate read), six blocks in one grammar: per-axis gains, ``dof``
+# independent loops, actuator limits that are infinite by default.
+#
+# The design verbs (``lqr``, ``place``, ``lqg``, ``lqr_finite_horizon``,
+# ``trajectory_lqr``) take a linear model or a plant; their gains (``lqr_gain``,
+# ``place_gain``, ``lqr_gain_schedule``) take arrays. Both live in ``control.design``.
+#
+# Each exported name maps to its (module path, attribute).
 _EXPORTS: dict[str, tuple[str, str]] = {
     "ComputedTorqueController": (
         "minilink.control.modelbased",

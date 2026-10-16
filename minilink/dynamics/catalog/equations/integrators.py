@@ -7,6 +7,10 @@ from minilink.core.kinematics import SE2
 from minilink.core.system import DynamicSystem
 from minilink.graphical.animation.primitives import Point
 
+###############################################################################
+# Public API
+###############################################################################
+
 
 class SimpleIntegrator(DynamicSystem):
     """Single integrator ``dx = u``."""
@@ -14,6 +18,8 @@ class SimpleIntegrator(DynamicSystem):
     def __init__(self):
         super().__init__(n=1, input_dim=1, output_dim=1, expose_state=True)
         self.name = "Simple Integrator"
+
+        # Signal labels, units and bounds
         self.state.labels = ["position"]
         self.state.units = ["m"]
         self.state.lower_bound[:] = [-10.0]
@@ -26,14 +32,18 @@ class SimpleIntegrator(DynamicSystem):
     def f(self, x, u, t=0.0, params=None):
         xp = array_module(x)
 
-        dx = xp.array([u[0]])
+        speed = u[0]
+
+        dx = xp.array([speed])
 
         return dx
 
     def h(self, x, u, t=0.0, params=None):
         xp = array_module(x)
 
-        y = xp.array([x[0]])
+        position = x[0]
+
+        y = xp.array([position])
 
         return y
 
@@ -44,8 +54,10 @@ class SimpleIntegrator(DynamicSystem):
         return {}
 
     def get_dynamic_geometry(self, x, u, t=0, params=None):
+        # A point on the line at the position
         marker = Point(color="blue", marker="o", size=8)
         marker.local_transform = SE2(x[0], 0.0, 0.0)
+
         return {"world": [marker]}
 
 
@@ -55,6 +67,8 @@ class DoubleIntegrator(DynamicSystem):
     def __init__(self):
         super().__init__(n=2, input_dim=1, output_dim=1, expose_state=True)
         self.name = "Double Integrator"
+
+        # Signal labels, units and bounds
         self.state.labels = ["position", "speed"]
         self.state.units = ["m", "m/s"]
         self.state.lower_bound[:] = [-10.0, -10.0]
@@ -67,14 +81,19 @@ class DoubleIntegrator(DynamicSystem):
     def f(self, x, u, t=0.0, params=None):
         xp = array_module(x)
 
-        dx = xp.array([x[1], u[0]])
+        speed = x[1]
+        force = u[0]
+
+        dx = xp.array([speed, force])
 
         return dx
 
     def h(self, x, u, t=0.0, params=None):
         xp = array_module(x)
 
-        y = xp.array([x[0]])
+        position = x[0]
+
+        y = xp.array([position])
 
         return y
 
@@ -85,10 +104,12 @@ class DoubleIntegrator(DynamicSystem):
         return {}
 
     def get_dynamic_geometry(self, x, u, t=0, params=None):
+        # One point per state, the speed's row half a unit above the position's
         p0 = Point(color="blue", marker="o", size=8)
         p0.local_transform = SE2(x[0], 0.0, 0.0)
         p1 = Point(color="blue", marker="o", size=8)
         p1.local_transform = SE2(x[1], 0.5, 0.0)
+
         return {"world": [p0, p1]}
 
 
@@ -98,6 +119,8 @@ class TripleIntegrator(DynamicSystem):
     def __init__(self):
         super().__init__(n=3, input_dim=1, output_dim=1, expose_state=True)
         self.name = "Triple Integrator"
+
+        # Signal labels, units and bounds
         self.state.labels = ["position", "speed", "force"]
         self.state.units = ["m", "m/s", "N"]
         self.state.lower_bound[:] = [-10.0, -10.0, -10.0]
@@ -110,14 +133,20 @@ class TripleIntegrator(DynamicSystem):
     def f(self, x, u, t=0.0, params=None):
         xp = array_module(x)
 
-        dx = xp.array([x[1], x[2], u[0]])
+        speed = x[1]
+        force = x[2]
+        force_rate = u[0]
+
+        dx = xp.array([speed, force, force_rate])
 
         return dx
 
     def h(self, x, u, t=0.0, params=None):
         xp = array_module(x)
 
-        y = xp.array([x[0]])
+        position = x[0]
+
+        y = xp.array([position])
 
         return y
 
@@ -128,12 +157,14 @@ class TripleIntegrator(DynamicSystem):
         return {}
 
     def get_dynamic_geometry(self, x, u, t=0, params=None):
+        # One point per state, each row half a unit above the previous one
         offsets = (0.0, 0.5, 1.0)
         markers = []
         for xi, y_off in zip(x, offsets):
             marker = Point(color="blue", marker="o", size=8)
             marker.local_transform = SE2(xi, y_off, 0.0)
             markers.append(marker)
+
         return {"world": markers}
 
 

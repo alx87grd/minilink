@@ -7,8 +7,11 @@ from dataclasses import dataclass
 import numpy as np
 
 from minilink.core.backends import array_module
+from minilink.core.sets import require_box_bounds, require_nonnegative_radius
 
+###############################################################################
 # Public API
+###############################################################################
 
 
 class Shape(ABC):
@@ -34,7 +37,10 @@ class Shape(ABC):
     def contains(self, p, t: float = 0.0, params=None) -> bool:
         """Return ``True`` when ``p`` lies inside the solid (``sdf < 0``)."""
         p_arr = np.asarray(p, dtype=float).reshape(-1)
-        return bool(np.asarray(self.sdf(p_arr, t, params)) < 0.0)
+        sdf = self.sdf(p_arr, t, params)
+        inside = bool(np.asarray(sdf) < 0.0)
+
+        return inside
 
     def __or__(self, other: "Shape") -> "Union":
         """Return the union of this shape and ``other`` (``sdf = min``)."""
@@ -64,8 +70,8 @@ class Sphere(Shape):
     def __post_init__(self) -> None:
         center = np.asarray(self.center, dtype=float).reshape(-1).copy()
         radius = float(self.radius)
-        if radius < 0.0:
-            raise ValueError("radius must be nonnegative")
+        require_nonnegative_radius(radius)
+
         object.__setattr__(self, "center", center)
         object.__setattr__(self, "radius", radius)
 
@@ -75,6 +81,7 @@ class Sphere(Shape):
 
     def sdf(self, p, t=0.0, params=None):
         xp = array_module(p)
+
         center = self.center
         radius = self.radius
 
@@ -100,10 +107,8 @@ class Box(Shape):
     def __post_init__(self) -> None:
         lower = np.asarray(self.lower, dtype=float).reshape(-1).copy()
         upper = np.asarray(self.upper, dtype=float).reshape(-1).copy()
-        if lower.shape != upper.shape:
-            raise ValueError("lower and upper must have the same shape")
-        if np.any(lower > upper):
-            raise ValueError("lower must be less than or equal to upper")
+        require_box_bounds(lower, upper)
+
         object.__setattr__(self, "lower", lower)
         object.__setattr__(self, "upper", upper)
 
@@ -113,12 +118,17 @@ class Box(Shape):
 
     def sdf(self, p, t=0.0, params=None):
         xp = array_module(p)
+
         lower = self.lower
         upper = self.upper
 
-        # per-axis signed gap, then split exterior distance and interior depth
+        # dᵢ = max(lowerᵢ − pᵢ, pᵢ − upperᵢ), the signed gap to the faces of axis i
         d = xp.maximum(lower - p, p - upper)
-        sdf = xp.linalg.norm(xp.maximum(d, 0.0)) + xp.minimum(xp.max(d), 0.0)
+
+        # sdf = ‖max(d, 0)‖ + min(maxᵢ dᵢ, 0): the exterior distance plus the interior depth
+        outside = xp.linalg.norm(xp.maximum(d, 0.0))
+        inside = xp.minimum(xp.max(d), 0.0)
+        sdf = outside + inside
 
         return sdf
 
@@ -136,8 +146,8 @@ class Union(Shape):
 
     def __post_init__(self) -> None:
         shapes = tuple(self.shapes)
-        if not shapes:
-            raise ValueError("Union requires at least one shape")
+        require_members(shapes)
+
         object.__setattr__(self, "shapes", shapes)
 
     @property
@@ -146,10 +156,11 @@ class Union(Shape):
 
     def sdf(self, p, t=0.0, params=None):
         xp = array_module(p)
+
         shapes = self.shapes
 
-        # nearest surface among members; reduce with xp.minimum so it traces
-        # under JAX (Python min() would compare traced values and break jit)
+        # sdf = minᵢ sdfᵢ(p), the nearest member surface, reduced with xp.minimum so it
+        # traces under JAX (Python min() would compare traced values and break jit)
         sdf = functools.reduce(
             xp.minimum, (shape.sdf(p, t, params) for shape in shapes)
         )
@@ -177,10 +188,21 @@ class Inflated(Shape):
         base = self.base
         radius = self.radius
 
-        # grow the solid by radius: every surface moves outward
+        # sdf = sdf_base(p) − r: every surface moves outward by r
         sdf = base.sdf(p, t, params) - radius
 
         return sdf
+
+
+###############################################################################
+# Internal machinery
+###############################################################################
+
+
+def require_members(shapes):
+    """Refuse a union of no shapes."""
+    if not shapes:
+        raise ValueError("Union requires at least one shape")
 
 
 if __name__ == "__main__":

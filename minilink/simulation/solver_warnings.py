@@ -6,7 +6,64 @@ import warnings
 
 from minilink.core.system import DEFAULT_SMALLEST_TIME_CONSTANT
 
-_DISCONTINUOUS_AUTO_DT_SCALE = 0.1
+# Automatic dt scale of a discontinuous loop, relative to
+# ``solver_info["smallest_time_constant"]``: the simulator's policy, which the
+# advisories quote
+DISCONTINUOUS_AUTO_DT_SCALE = 0.1
+
+
+###############################################################################
+# Public API
+###############################################################################
+
+
+def emit_discontinuous_solver_warnings(
+    *,
+    solver_mode: str,
+    solver_info: dict,
+    dt: float | None,
+    user_solver: str | None,
+    user_specified_dt: bool,
+    solver_warnings: str = "warn",
+    verbose: bool = False,
+) -> list[str]:
+    """
+    Emit :class:`UserWarning` messages for discontinuous closed loops and held signals.
+
+    When ``verbose`` is true, returns notes for the setup panel and does **not**
+    call :func:`warnings.warn` (avoids duplicate output after the preamble).
+    """
+    # The advisories of both kinds
+    notes = collect_discontinuous_solver_notes(
+        solver_mode=solver_mode,
+        solver_info=solver_info,
+        dt=dt,
+        user_solver=user_solver,
+        user_specified_dt=user_specified_dt,
+        verbose=verbose,
+    )
+    notes += collect_held_signal_notes(
+        solver_mode=solver_mode,
+        solver_info=solver_info,
+        dt=dt,
+        user_solver=user_solver,
+        user_specified_dt=user_specified_dt,
+    )
+
+    # Nothing to say, or the notes go to the verbose setup panel
+    if not notes:
+        return notes
+    if solver_warnings == "ignore" or verbose:
+        return notes
+
+    # One warning, or one refusal, carrying every note; stacklevel 3 points the
+    # warning at the code that built the simulator
+    text = " ".join(notes)
+    if solver_warnings == "error":
+        raise UserWarning(text)
+    warnings.warn(text, category=UserWarning, stacklevel=3)
+
+    return notes
 
 
 def collect_discontinuous_solver_notes(
@@ -35,6 +92,7 @@ def collect_discontinuous_solver_notes(
         "an explicit sample time (hybrid_closed_loop)."
     ]
 
+    # The risk of the solver the user forced
     if user_solver == "rk4_fixedsteps":
         notes.append(
             "Forced rk4_fixedsteps: sub-step torques may oscillate and cancel; "
@@ -53,8 +111,12 @@ def collect_discontinuous_solver_notes(
             "substeps near switching surfaces."
         )
 
+    # Δt_rec = τ_min × DISCONTINUOUS_AUTO_DT_SCALE, the automatic step of the loop
     smallest = solver_info.get("smallest_time_constant", DEFAULT_SMALLEST_TIME_CONSTANT)
-    recommended_dt = smallest * _DISCONTINUOUS_AUTO_DT_SCALE
+    recommended_dt = smallest * DISCONTINUOUS_AUTO_DT_SCALE
+
+    # A forced Euler step coarser than Δt_rec; in the verbose panel, the automatic
+    # Euler step
     if user_solver == "euler" and user_specified_dt and dt is not None:
         if dt > recommended_dt:
             notes.append(
@@ -65,7 +127,7 @@ def collect_discontinuous_solver_notes(
     elif user_solver is None and solver_mode == "euler" and verbose and dt is not None:
         notes.append(
             f"Auto-selected Euler with dt={dt:g} (discontinuous default scale "
-            f"{_DISCONTINUOUS_AUTO_DT_SCALE:g} × smallest_time_constant)."
+            f"{DISCONTINUOUS_AUTO_DT_SCALE:g} × smallest_time_constant)."
         )
 
     return notes
@@ -89,6 +151,8 @@ def collect_held_signal_notes(
         return []
 
     notes = []
+
+    # An adaptive solver fights the jump at every sample
     if user_solver is not None and (
         user_solver == "scipy" or user_solver.startswith("scipy_")
     ):
@@ -97,58 +161,18 @@ def collect_held_signal_notes(
             "stepping fights the jump at every sample; rk4_fixedsteps with a dt "
             "that divides the sample period is faster and more accurate."
         )
+
+    # A fixed step must divide the period: T_s / Δt whole, to a relative 10⁻⁹
     if user_specified_dt and dt is not None and not solver_mode.startswith("scipy"):
         steps_per_sample = period / dt
-        if abs(steps_per_sample - round(steps_per_sample)) > 1e-9 * max(
-            1.0, steps_per_sample
-        ):
+        whole = round(steps_per_sample)
+        stray = abs(steps_per_sample - whole) > 1e-9 * max(1.0, steps_per_sample)
+        if stray:
             notes.append(
                 f"dt={dt:g} does not divide the sample period {period:g} s: a step "
                 "straddles a sample boundary, or holds one sample over several, and "
                 "the plant feels an intensity scaled by dt / sample_period; use "
                 "dt = sample_period / n."
             )
-    return notes
 
-
-def emit_discontinuous_solver_warnings(
-    *,
-    solver_mode: str,
-    solver_info: dict,
-    dt: float | None,
-    user_solver: str | None,
-    user_specified_dt: bool,
-    solver_warnings: str = "warn",
-    verbose: bool = False,
-) -> list[str]:
-    """
-    Emit :class:`UserWarning` messages for discontinuous closed loops and held signals.
-
-    When ``verbose`` is true, returns notes for the setup panel and does **not**
-    call :func:`warnings.warn` (avoids duplicate output after the preamble).
-    """
-    notes = collect_discontinuous_solver_notes(
-        solver_mode=solver_mode,
-        solver_info=solver_info,
-        dt=dt,
-        user_solver=user_solver,
-        user_specified_dt=user_specified_dt,
-        verbose=verbose,
-    )
-    notes += collect_held_signal_notes(
-        solver_mode=solver_mode,
-        solver_info=solver_info,
-        dt=dt,
-        user_solver=user_solver,
-        user_specified_dt=user_specified_dt,
-    )
-    if not notes:
-        return notes
-    if solver_warnings == "ignore" or verbose:
-        return notes
-
-    text = " ".join(notes)
-    if solver_warnings == "error":
-        raise UserWarning(text)
-    warnings.warn(text, category=UserWarning, stacklevel=3)
     return notes

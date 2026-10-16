@@ -1,12 +1,16 @@
-"""JAX program evaluator for finite-dimensional mathematical programs."""
+"""The JAX program evaluator: a mathematical program JIT-compiled, its missing derivatives by autodiff."""
 
 import numpy as np
 
-from minilink.core.backends import ensure_jax_x64
+from minilink.core.backends import ensure_jax_x64, require_jax, require_jax_numpy
 from minilink.optimization.evaluators.program_evaluator import (
     MathematicalProgramEvaluator,
 )
 from minilink.optimization.mathematical_program import MathematicalProgram
+
+###############################################################################
+# Public API
+###############################################################################
 
 
 class JaxMathematicalProgramEvaluator(MathematicalProgramEvaluator):
@@ -28,10 +32,11 @@ class JaxMathematicalProgramEvaluator(MathematicalProgramEvaluator):
     ):
         super().__init__(program, sample_z=sample_z)
 
+        # JAX, an optional dependency; the float64 policy is applied at every
+        # construction, not only at the first import
         try:
-            import jax
-            import jax.numpy as jnp
-
+            jax = require_jax()
+            jnp = require_jax_numpy()
             ensure_jax_x64()
         except ImportError as exc:  # pragma: no cover - optional dependency
             raise ImportError(
@@ -43,8 +48,10 @@ class JaxMathematicalProgramEvaluator(MathematicalProgramEvaluator):
         self.jnp = jnp
         self.backend = "jax"
 
+        # The sample point every function is traced and compiled at
         z_sample = jnp.asarray(self.sample_z)
 
+        # The raw functions: J(z), and h(z) and g(z) flattened
         def J_raw(z):
             return program.J(z)
 
@@ -58,26 +65,32 @@ class JaxMathematicalProgramEvaluator(MathematicalProgramEvaluator):
                 return jnp.zeros(0, dtype=z.dtype)
             return jnp.asarray(program.g(z)).reshape(-1)
 
-        self._check_traceable(J_raw, z_sample, "J")
+        # Each one must trace under JAX
+        self.require_traceable(J_raw, z_sample, "J")
         if program.h is not None:
-            self._check_traceable(h_raw, z_sample, "h")
+            self.require_traceable(h_raw, z_sample, "h")
         if program.g is not None:
-            self._check_traceable(g_raw, z_sample, "g")
+            self.require_traceable(g_raw, z_sample, "g")
 
+        # The compiled functions
         self._jit_J = jax.jit(J_raw)
         self._jit_h = jax.jit(h_raw)
         self._jit_g = jax.jit(g_raw)
 
-        self._jit_grad_J = self._compile_vector_derivative(
-            program.grad_J,
-            fallback=jax.grad(J_raw),
-        )
+        # ∇J: the program's own, else by reverse-mode autodiff
+        if program.grad_J is not None:
+            self._jit_grad_J = jax.jit(program.grad_J)
+        else:
+            self._jit_grad_J = jax.jit(jax.grad(J_raw))
+
+        # ∇²J: the program's own, else by autodiff only when use_hessian asks for it
         self._jit_hess_J = None
         if program.hess_J is not None:
             self._jit_hess_J = jax.jit(program.hess_J)
         elif use_hessian:
             self._jit_hess_J = jax.jit(jax.hessian(J_raw))
 
+        # ∂h/∂z and ∂g/∂z: the program's own, else by forward-mode autodiff
         self._jit_jac_h = None
         if program.jac_h is not None:
             self._jit_jac_h = jax.jit(program.jac_h)
@@ -93,22 +106,14 @@ class JaxMathematicalProgramEvaluator(MathematicalProgramEvaluator):
         if verbose:
             print("[compile] Warm-starting JAX mathematical-program evaluator.")
 
+        # The constraint sizes, then every available quantity once at the sample
         self.n_h = int(np.asarray(self._jit_h(z_sample)).reshape(-1).size)
         self.n_g = int(np.asarray(self._jit_g(z_sample)).reshape(-1).size)
-        self._check_derivative_shapes(z_sample)
-
-    def J(self, z):
-        return self._jit_J(self._jax_decision_vector(z))
-
-    def h(self, z):
-        return self._jit_h(self._jax_decision_vector(z))
-
-    def g(self, z):
-        return self._jit_g(self._jax_decision_vector(z))
+        self.check_derivative_shapes(z_sample)
 
     @property
     def has_gradient(self) -> bool:
-        return self._jit_grad_J is not None
+        return True
 
     @property
     def has_hessian(self) -> bool:
@@ -122,46 +127,47 @@ class JaxMathematicalProgramEvaluator(MathematicalProgramEvaluator):
     def has_jacobian_g(self) -> bool:
         return self.n_g == 0 or self._jit_jac_g is not None
 
+    # The compiled functions, on a checked decision vector
+
+    def J(self, z):
+        return self._jit_J(self.jax_decision_vector(z))
+
+    def h(self, z):
+        return self._jit_h(self.jax_decision_vector(z))
+
+    def g(self, z):
+        return self._jit_g(self.jax_decision_vector(z))
+
+    # The compiled derivatives, as flat NumPy arrays
+
     def gradient(self, z) -> np.ndarray:
-        if self._jit_grad_J is None:
-            return super().gradient(z)
-        value = self._jit_grad_J(self._jax_decision_vector(z))
-        return self._vector(value, self.n_z, "objective gradient")
+        value = self._jit_grad_J(self.jax_decision_vector(z))
+        return self.as_vector(value, self.n_z, "objective gradient")
 
     def hessian(self, z) -> np.ndarray:
         if self._jit_hess_J is None:
             return super().hessian(z)
-        value = self._jit_hess_J(self._jax_decision_vector(z))
-        return self._matrix(value, (self.n_z, self.n_z), "objective Hessian")
+        value = self._jit_hess_J(self.jax_decision_vector(z))
+        return self.as_matrix(value, (self.n_z, self.n_z), "objective Hessian")
 
     def jacobian_h(self, z) -> np.ndarray:
-        if self.n_h == 0:
+        if self.n_h == 0 or self._jit_jac_h is None:
             return super().jacobian_h(z)
-        if self._jit_jac_h is None:
-            return super().jacobian_h(z)
-        value = self._jit_jac_h(self._jax_decision_vector(z))
-        return self._matrix(value, (self.n_h, self.n_z), "equality Jacobian")
+        value = self._jit_jac_h(self.jax_decision_vector(z))
+        return self.as_matrix(value, (self.n_h, self.n_z), "equality Jacobian")
 
     def jacobian_g(self, z) -> np.ndarray:
-        if self.n_g == 0:
+        if self.n_g == 0 or self._jit_jac_g is None:
             return super().jacobian_g(z)
-        if self._jit_jac_g is None:
-            return super().jacobian_g(z)
-        value = self._jit_jac_g(self._jax_decision_vector(z))
-        return self._matrix(value, (self.n_g, self.n_z), "inequality Jacobian")
+        value = self._jit_jac_g(self.jax_decision_vector(z))
+        return self.as_matrix(value, (self.n_g, self.n_z), "inequality Jacobian")
 
-    def _jax_decision_vector(self, z):
-        arr = self.jnp.asarray(z).reshape(-1)
-        if arr.shape != (self.n_z,):
-            raise ValueError(f"decision vector must have shape ({self.n_z},)")
-        return arr
+    ###########################################################################
+    # Internal machinery
+    ###########################################################################
 
-    def _compile_vector_derivative(self, provided, *, fallback):
-        if provided is not None:
-            return self.jax.jit(provided)
-        return self.jax.jit(fallback)
-
-    def _check_traceable(self, fn, z_sample, label: str) -> None:
+    def require_traceable(self, fn, z_sample, label: str) -> None:
+        """Refuse a function that does not trace under JAX at ``z_sample`` (a NumPy-only callable)."""
         try:
             self.jax.make_jaxpr(fn)(z_sample)
         except Exception as exc:
@@ -170,7 +176,8 @@ class JaxMathematicalProgramEvaluator(MathematicalProgramEvaluator):
                 "Use backend='numpy' or rewrite the callable with jax.numpy."
             ) from exc
 
-    def _check_derivative_shapes(self, z_sample) -> None:
+    def check_derivative_shapes(self, z_sample) -> None:
+        """Evaluate every available quantity once at ``z_sample``: compiles each and checks its shape."""
         self.objective(z_sample)
         self.equality_residual(z_sample)
         self.inequality_margin(z_sample)
@@ -182,3 +189,10 @@ class JaxMathematicalProgramEvaluator(MathematicalProgramEvaluator):
             self.jacobian_h(z_sample)
         if self.has_jacobian_g:
             self.jacobian_g(z_sample)
+
+    def jax_decision_vector(self, z):
+        """``z`` as a flat JAX array of shape ``(n_z,)``."""
+        arr = self.jnp.asarray(z).reshape(-1)
+        if arr.shape != (self.n_z,):
+            raise ValueError(f"decision vector must have shape ({self.n_z},)")
+        return arr

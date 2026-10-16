@@ -1,10 +1,4 @@
-"""
-Runtime environment detection for :mod:`minilink.graphical`.
-
-Provides a single cached ``detect_env()`` and derived policy predicates so
-every env-sensitive site (animation HTML default, figure blocking, meshcat
-prompt, stacked plot height) reads from the same source of truth.
-"""
+"""Runtime environment: script, IPython, Jupyter or Colab, and the figure policies each one sets."""
 
 import sys
 
@@ -20,7 +14,15 @@ __all__ = [
 
 EnvName = str
 
+# One cached detection, so every environment-sensitive site (the animation HTML
+# default, figure blocking, the meshcat prompt, the stacked plot height) reads the
+# same answer through the policy predicates below.
 _CACHE = None
+
+
+###############################################################################
+# Public API
+###############################################################################
 
 
 def detect_env():
@@ -33,36 +35,29 @@ def detect_env():
     global _CACHE
     if _CACHE is not None:
         return _CACHE
+
+    # Colab, recognized by its loaded module
     if "google.colab" in sys.modules:
         _CACHE = "colab"
         return _CACHE
+
+    # The running IPython shell, if any: IPython is optional
     try:
         from IPython import get_ipython
 
         ip = get_ipython()
     except ImportError:
         ip = None
+
+    # No shell is a script; a ZMQ shell is a notebook kernel; any other a terminal REPL
     if ip is None:
         _CACHE = "script"
     elif type(ip).__name__ == "ZMQInteractiveShell":
         _CACHE = "jupyter"
     else:
         _CACHE = "ipython"
+
     return _CACHE
-
-
-def _mpl_backend_is_non_interactive() -> bool:
-    """
-    True when the currently active matplotlib backend cannot pop up a window.
-
-    Covers the default Jupyter/Colab ``inline`` backend and the bare ``agg``
-    backend. Interactive backends (``qt*``, ``macosx``, ``tkagg``, ``ipympl`` /
-    ``widget``, ``nbagg``) return False.
-    """
-    import matplotlib
-
-    backend = matplotlib.get_backend().lower()
-    return ("inline" in backend) or (backend == "agg")
 
 
 def prefers_inline_animation() -> bool:
@@ -77,7 +72,7 @@ def prefers_inline_animation() -> bool:
     env = detect_env()
     if env == "colab":
         return True
-    if env == "jupyter" and _mpl_backend_is_non_interactive():
+    if env == "jupyter" and mpl_backend_is_non_interactive():
         return True
     return False
 
@@ -122,3 +117,22 @@ def override_env(name) -> None:
     """
     global _CACHE
     _CACHE = name
+
+
+###############################################################################
+# Internal machinery
+###############################################################################
+
+
+def mpl_backend_is_non_interactive() -> bool:
+    """
+    True when the currently active matplotlib backend cannot pop up a window.
+
+    Covers the default Jupyter/Colab ``inline`` backend and the bare ``agg``
+    backend. Interactive backends (``qt*``, ``macosx``, ``tkagg``, ``ipympl`` /
+    ``widget``, ``nbagg``) return False.
+    """
+    import matplotlib
+
+    backend = matplotlib.get_backend().lower()
+    return ("inline" in backend) or (backend == "agg")

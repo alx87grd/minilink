@@ -5,6 +5,10 @@ import numpy as np
 from minilink.core.system import DynamicSystem
 from minilink.dynamics.abstraction.state_space import point_component
 
+###############################################################################
+# Public API
+###############################################################################
+
 
 class StateObserver(DynamicSystem):
     """Linear state observer ``dx̂ = A (x̂ − x̄) + B (u − ū) + L (y − ŷ)``, the estimate on ``x``.
@@ -29,6 +33,8 @@ class StateObserver(DynamicSystem):
     def __init__(
         self, A, B, C, L, D=None, *, xbar=None, ubar=None, ybar=None, labels=None
     ):
+        # The model (A, B, C, D), the gain L and the operating point (x̄, ū, ȳ),
+        # with ȳ = C x̄ + D ū by default: the linear model's own output
         A = np.asarray(A, dtype=float)
         B = np.atleast_2d(np.asarray(B, dtype=float))
         C = np.atleast_2d(np.asarray(C, dtype=float))
@@ -44,6 +50,8 @@ class StateObserver(DynamicSystem):
         super().__init__(n)
         self.name = "State Observer"
         self.id = "observer"
+
+        # Parameters
         self.params = {
             "A": A,
             "B": B,
@@ -54,13 +62,17 @@ class StateObserver(DynamicSystem):
             "ubar": ubar,
             "ybar": ybar,
         }
+
+        # Signal labels: the estimate x̂, each entry with a hat
         self.state.labels = (
             [f"x̂[{i}]" for i in range(n)] if labels is None else list(labels)
         )
-        # the estimate starts at the operating point, where the model holds
+
+        # Initial estimate: the operating point, where the model holds
         self.state.set_nominal_value(xbar)
         self.x0 = xbar.copy()
 
+        # Ports: the command u and the measurement y in, the estimate x̂ out
         self.add_input_port("u", dim=m, nominal_value=ubar)
         self.add_input_port("y", dim=p, nominal_value=ybar)
         self.add_output_port(
@@ -71,15 +83,35 @@ class StateObserver(DynamicSystem):
             labels=self.state.labels,
         )
 
+    @property
+    def poles(self):
+        """Eigenvalues of ``A − L C``: the poles of the estimation error."""
+        A = self.params["A"]
+        C = self.params["C"]
+        L = self.params["L"]
+
+        poles = np.linalg.eigvals(A - L @ C)
+
+        return poles
+
     def f(self, x, u, t=0, params=None):
         params = self.params if params is None else params
-        A, B, C, D, L = params["A"], params["B"], params["C"], params["D"], params["L"]
-        xbar, ubar, ybar = params["xbar"], params["ubar"], params["ybar"]
+
+        A = params["A"]
+        B = params["B"]
+        C = params["C"]
+        D = params["D"]
+        L = params["L"]
+        xbar = params["xbar"]
+        ubar = params["ubar"]
+        ybar = params["ybar"]
+
         m = B.shape[1]
         x_hat = x
-        u_in, y = u[:m], u[m:]
+        u_in = u[:m]
+        y = u[m:]
 
-        # the predicted output, then the model corrected by the innovation y − ŷ
+        # The predicted output ŷ, then the model corrected by the innovation y − ŷ
         y_hat = ybar + C @ (x_hat - xbar) + D @ (u_in - ubar)
         dx_hat = A @ (x_hat - xbar) + B @ (u_in - ubar) + L @ (y - y_hat)
 
@@ -89,22 +121,19 @@ class StateObserver(DynamicSystem):
         """The estimate ``x̂``: the observer's state."""
         return x
 
-    @property
-    def poles(self):
-        """Eigenvalues of ``A − L C``: the poles of the estimation error."""
-        A, C, L = self.params["A"], self.params["C"], self.params["L"]
-        return np.linalg.eigvals(A - L @ C)
-
     def __str__(self):
         prefix = "  L = "
         L = np.array2string(
             self.params["L"], precision=4, suppress_small=True, prefix=prefix
         )
         poles = ", ".join(f"{pole:.3g}" for pole in np.round(self.poles, 4))
+
         return f"{super().__str__()}\n{prefix}{L}\n  poles of A − L C: {poles}"
 
 
+###############################################################################
 # Internal machinery
+###############################################################################
 
 
 def check_dimensions(A, B, C, D, L):

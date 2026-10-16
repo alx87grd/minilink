@@ -1,4 +1,4 @@
-"""Backend-neutral diagram topology views."""
+"""Diagram topology: the backend-neutral nodes, ports, edges and clusters a diagram is drawn from."""
 
 from __future__ import annotations
 
@@ -7,18 +7,181 @@ from dataclasses import dataclass, replace
 from minilink.core.system import StepSystem
 from minilink.core.wiring import WiredDiagramMixin
 
+###############################################################################
+# Public API
+###############################################################################
+
+
+def build_diagram_topology(
+    sys_or_diagram, *, abstract_boundary=False, expand=False
+) -> DiagramTopology:
+    """Build a display/export topology snapshot from a system or diagram.
+
+    ``abstract_boundary=True`` removes external Inputs/Outputs routing nodes and
+    records ``boundary_inputs`` / ``boundary_outputs`` anchors on wired ports.
+    ``expand=True`` replaces every nested diagram by its own blocks, at every
+    depth, and records one :class:`TopologyCluster` per nested diagram.
+    """
+    if isinstance(sys_or_diagram, WiredDiagramMixin):
+        topology = build_diagram_system_topology(sys_or_diagram)
+        if expand:
+            topology = expand_nested_diagrams(topology, sys_or_diagram)
+    else:
+        topology = build_single_system_topology(sys_or_diagram)
+
+    if abstract_boundary:
+        topology = abstract_boundary_ports(topology)
+
+    return topology
+
+
+def expand_nested_diagrams(topology: DiagramTopology, diagram) -> DiagramTopology:
+    """
+    Replace every nested diagram block by its own blocks, grouped in a cluster.
+
+    The blocks of a nested diagram keep their ids behind the diagram's id
+    (``controller__pi``). An edge that reached a boundary port of a nested
+    diagram goes straight to the block ports wired to that port inside: one
+    edge per inner reader of a boundary input, none when nothing is wired
+    behind the port. A boundary port left unconnected outside draws nothing.
+    """
+    # Each nested diagram's own topology, expanded at every depth, its ids prefixed
+    inner = {
+        sys_id: prefix_topology(
+            build_diagram_topology(sys, abstract_boundary=True, expand=True),
+            f"{sys_id}__",
+        )
+        for sys_id, sys in diagram.subsystems.items()
+        if isinstance(sys, WiredDiagramMixin)
+    }
+    if not inner:
+        return topology
+
+    # A nested diagram's node gives way to its blocks, boxed in one cluster
+    nodes = []
+    clusters = []
+    for node in topology.nodes:
+        if node.id not in inner:
+            nodes.append(node)
+            continue
+        sub = inner[node.id]
+        boxed = clustered_node_ids(sub.clusters)
+        nodes.extend(sub.nodes)
+        clusters.append(
+            TopologyCluster(
+                id=node.id,
+                name=node.name,
+                display_id=node.display_id,
+                node_ids=tuple(n.id for n in sub.nodes if n.id not in boxed),
+                clusters=sub.clusters,
+            )
+        )
+
+    # An edge at a nested diagram's boundary port runs to the block ports behind it
+    inner_inputs = {sys_id: sub.boundary_inputs for sys_id, sub in inner.items()}
+    inner_outputs = {sys_id: sub.boundary_outputs for sys_id, sub in inner.items()}
+    edges = []
+    for edge in topology.edges:
+        sources = port_anchors(inner_outputs, edge.source_node, edge.source_port)
+        targets = port_anchors(inner_inputs, edge.target_node, edge.target_port)
+        for source_node, source_port in sources:
+            for target_node, target_port in targets:
+                edges.append(
+                    TopologyEdge(
+                        source_node=source_node,
+                        source_port=source_port,
+                        target_node=target_node,
+                        target_port=target_port,
+                    )
+                )
+
+    # The nested diagrams' own edges
+    for sub in inner.values():
+        edges.extend(sub.edges)
+
+    return DiagramTopology(
+        name=topology.name,
+        nodes=tuple(nodes),
+        edges=tuple(edges),
+        clusters=tuple(clusters),
+    )
+
+
+def abstract_boundary_ports(topology: DiagramTopology) -> DiagramTopology:
+    """
+    Remove external input/output routing nodes and record boundary port anchors.
+
+    Diagram boundary ports that wire straight through ``input`` / ``output`` nodes
+    are mapped to the connected subsystem port. Internal edges between subsystems
+    are unchanged. Unconnected boundary ports are omitted from the snapshot.
+    """
+    input_node = find_node(topology, "input", kind="external_input")
+    output_node = find_node(topology, "output", kind="external_output")
+    if input_node is None and output_node is None:
+        return topology
+
+    boundary_inputs = []
+    boundary_outputs = []
+    skip_nodes = set()
+
+    # Each wire out of the Inputs node anchors a boundary input on the port it reaches
+    if input_node is not None:
+        skip_nodes.add(input_node.id)
+        for edge in topology.edges:
+            if edge.source_node == input_node.id:
+                boundary_inputs.append(
+                    BoundaryPortRef(
+                        diagram_port=edge.source_port,
+                        node_id=edge.target_node,
+                        port_id=edge.target_port,
+                    )
+                )
+
+    # Each wire into the Outputs node anchors a boundary output on the port it leaves
+    if output_node is not None:
+        skip_nodes.add(output_node.id)
+        for edge in topology.edges:
+            if edge.target_node == output_node.id:
+                boundary_outputs.append(
+                    BoundaryPortRef(
+                        diagram_port=edge.target_port,
+                        node_id=edge.source_node,
+                        port_id=edge.source_port,
+                    )
+                )
+
+    # The snapshot without the routing nodes and their wires
+    nodes = tuple(node for node in topology.nodes if node.id not in skip_nodes)
+    edges = tuple(
+        edge
+        for edge in topology.edges
+        if edge.source_node not in skip_nodes and edge.target_node not in skip_nodes
+    )
+
+    return DiagramTopology(
+        name=topology.name,
+        nodes=nodes,
+        edges=edges,
+        boundary_inputs=tuple(boundary_inputs),
+        boundary_outputs=tuple(boundary_outputs),
+        clusters=topology.clusters,
+    )
+
 
 @dataclass(frozen=True)
-class TopologyPort:
-    """One input or output port on a topology node; ``label`` is the text drawn, the id by default."""
+class DiagramTopology:
+    """Read-only topology snapshot for display/export.
 
-    id: str
-    dim: int
-    label: str | None = None
+    ``nodes`` and ``edges`` are always a complete flat diagram. ``clusters``
+    only groups the nodes that came out of an expanded nested diagram.
+    """
 
-    @property
-    def text(self) -> str:
-        return self.id if self.label is None else self.label
+    name: str
+    nodes: tuple[TopologyNode, ...]
+    edges: tuple[TopologyEdge, ...]
+    boundary_inputs: tuple[BoundaryPortRef, ...] = ()
+    boundary_outputs: tuple[BoundaryPortRef, ...] = ()
+    clusters: tuple[TopologyCluster, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -31,6 +194,20 @@ class TopologyNode:
     kind: str
     inputs: tuple[TopologyPort, ...]
     outputs: tuple[TopologyPort, ...]
+
+
+@dataclass(frozen=True)
+class TopologyPort:
+    """One input or output port on a topology node; ``label`` is the text drawn, the id by default."""
+
+    id: str
+    dim: int
+    label: str | None = None
+
+    @property
+    def text(self) -> str:
+        """The text drawn beside the port: its label, else its id."""
+        return self.id if self.label is None else self.label
 
 
 @dataclass(frozen=True)
@@ -63,108 +240,130 @@ class TopologyCluster:
     clusters: tuple[TopologyCluster, ...] = ()
 
 
-@dataclass(frozen=True)
-class DiagramTopology:
-    """Read-only topology snapshot for display/export.
-
-    ``nodes`` and ``edges`` are always a complete flat diagram. ``clusters``
-    only groups the nodes that came out of an expanded nested diagram.
-    """
-
-    name: str
-    nodes: tuple[TopologyNode, ...]
-    edges: tuple[TopologyEdge, ...]
-    boundary_inputs: tuple[BoundaryPortRef, ...] = ()
-    boundary_outputs: tuple[BoundaryPortRef, ...] = ()
-    clusters: tuple[TopologyCluster, ...] = ()
+###############################################################################
+# Internal machinery
+###############################################################################
 
 
-def build_diagram_topology(
-    sys_or_diagram, *, abstract_boundary=False, expand=False
-) -> DiagramTopology:
-    """Build a display/export topology snapshot from a system or diagram.
-
-    ``abstract_boundary=True`` removes external Inputs/Outputs routing nodes and
-    records ``boundary_inputs`` / ``boundary_outputs`` anchors on wired ports.
-    ``expand=True`` replaces every nested diagram by its own blocks, at every
-    depth, and records one :class:`TopologyCluster` per nested diagram.
-    """
-    if isinstance(sys_or_diagram, WiredDiagramMixin):
-        topology = _build_diagram_system_topology(sys_or_diagram)
-        if expand:
-            topology = expand_nested_diagrams(topology, sys_or_diagram)
-    else:
-        topology = _build_single_system_topology(sys_or_diagram)
-    if abstract_boundary:
-        topology = abstract_boundary_ports(topology)
-    return topology
-
-
-def expand_nested_diagrams(topology: DiagramTopology, diagram) -> DiagramTopology:
-    """
-    Replace every nested diagram block by its own blocks, grouped in a cluster.
-
-    The blocks of a nested diagram keep their ids behind the diagram's id
-    (``controller__pi``). An edge that reached a boundary port of a nested
-    diagram goes straight to the block ports wired to that port inside: one
-    edge per inner reader of a boundary input, none when nothing is wired
-    behind the port. A boundary port left unconnected outside draws nothing.
-    """
-    inner = {
-        sys_id: prefix_topology(
-            build_diagram_topology(sys, abstract_boundary=True, expand=True),
-            f"{sys_id}__",
-        )
-        for sys_id, sys in diagram.subsystems.items()
-        if isinstance(sys, WiredDiagramMixin)
-    }
-    if not inner:
-        return topology
-
+def build_diagram_system_topology(diagram) -> DiagramTopology:
+    """The flat topology of one diagram: its routing nodes, its blocks, its wires."""
     nodes = []
-    clusters = []
-    for node in topology.nodes:
-        if node.id not in inner:
-            nodes.append(node)
-            continue
-        sub = inner[node.id]
-        boxed = clustered_node_ids(sub.clusters)
-        nodes.extend(sub.nodes)
-        clusters.append(
-            TopologyCluster(
-                id=node.id,
-                name=node.name,
-                display_id=node.display_id,
-                node_ids=tuple(n.id for n in sub.nodes if n.id not in boxed),
-                clusters=sub.clusters,
+    edges = []
+
+    # The nodes: the Inputs routing node, one per subsystem, the Outputs routing node
+    if len(diagram.inputs) != 0:
+        nodes.append(
+            node_from_ports(
+                "input",
+                name="",
+                display_id="Inputs",
+                kind="external_input",
+                inputs={},
+                outputs=diagram.inputs,
             )
         )
 
-    inner_inputs = {sys_id: sub.boundary_inputs for sys_id, sub in inner.items()}
-    inner_outputs = {sys_id: sub.boundary_outputs for sys_id, sub in inner.items()}
-    edges = []
-    for edge in topology.edges:
-        sources = port_anchors(inner_outputs, edge.source_node, edge.source_port)
-        targets = port_anchors(inner_inputs, edge.target_node, edge.target_port)
-        for source_node, source_port in sources:
-            for target_node, target_port in targets:
+    for sys_id, sys in diagram.subsystems.items():
+        kind = "step_system" if isinstance(sys, StepSystem) else "system"
+        nodes.append(node_from_system(sys_id, sys, display_id=sys_id, kind=kind))
+
+    if len(diagram.outputs) != 0:
+        nodes.append(
+            node_from_ports(
+                "output",
+                name="",
+                display_id="Outputs",
+                kind="external_output",
+                inputs=diagram.outputs,
+                outputs={},
+            )
+        )
+
+    # The edges: each wired subsystem input, then each wired diagram output
+    for sys_id, sys in diagram.subsystems.items():
+        for port_id in sys.inputs:
+            edge = diagram.connections[sys_id][port_id]
+            if edge is not None:
                 edges.append(
                     TopologyEdge(
-                        source_node=source_node,
-                        source_port=source_port,
-                        target_node=target_node,
-                        target_port=target_port,
+                        source_node=edge[0],
+                        source_port=edge[1],
+                        target_node=sys_id,
+                        target_port=port_id,
                     )
                 )
-    for sub in inner.values():
-        edges.extend(sub.edges)
 
-    return DiagramTopology(
-        name=topology.name,
-        nodes=tuple(nodes),
-        edges=tuple(edges),
-        clusters=tuple(clusters),
+    if "output" in diagram.connections:
+        for port_id, edge in diagram.connections["output"].items():
+            if edge is not None:
+                edges.append(
+                    TopologyEdge(
+                        source_node=edge[0],
+                        source_port=edge[1],
+                        target_node="output",
+                        target_port=port_id,
+                    )
+                )
+
+    return DiagramTopology(name=diagram.name, nodes=tuple(nodes), edges=tuple(edges))
+
+
+def node_from_ports(
+    node_id: str,
+    *,
+    name: str,
+    display_id: str,
+    kind: str,
+    inputs,
+    outputs,
+) -> TopologyNode:
+    """A topology node with one port per entry of the ``inputs`` and ``outputs`` port maps."""
+    return TopologyNode(
+        id=node_id,
+        name=name,
+        display_id=display_id,
+        kind=kind,
+        inputs=tuple(
+            TopologyPort(id=port_id, dim=port.dim) for port_id, port in inputs.items()
+        ),
+        outputs=tuple(
+            TopologyPort(id=port_id, dim=port.dim) for port_id, port in outputs.items()
+        ),
     )
+
+
+def node_from_system(node_id: str, sys, *, display_id: str, kind: str):
+    """The topology node of one system, its input ports signed when it is a summing junction."""
+    node = node_from_ports(
+        node_id,
+        name=sys.name,
+        display_id=display_id,
+        kind=kind,
+        inputs=sys.inputs,
+        outputs=sys.outputs,
+    )
+
+    labels = input_sign_labels(sys)
+    if not labels:
+        return node
+
+    inputs = tuple(replace(port, label=labels.get(port.id)) for port in node.inputs)
+
+    return replace(node, inputs=inputs)
+
+
+def input_sign_labels(sys) -> dict[str, str]:
+    """A summing junction draws each input's sign beside its id: ``+ in0``, ``- in1``."""
+    # Lazy import: the blocks load on first use, not with the diagrams
+    from minilink.blocks.routing import Sum
+
+    if not isinstance(sys, Sum):
+        return {}
+    signs = {1.0: "+", -1.0: "-"}
+    return {
+        f"in{i}": f"{signs.get(float(sign), f'{sign:+g}')} in{i}"
+        for i, sign in enumerate(sys.signs)
+    }
 
 
 def prefix_topology(topology: DiagramTopology, prefix: str) -> DiagramTopology:
@@ -213,128 +412,6 @@ def clustered_node_ids(clusters) -> set[str]:
     return node_ids
 
 
-def abstract_boundary_ports(topology: DiagramTopology) -> DiagramTopology:
-    """
-    Remove external input/output routing nodes and record boundary port anchors.
-
-    Diagram boundary ports that wire straight through ``input`` / ``output`` nodes
-    are mapped to the connected subsystem port. Internal edges between subsystems
-    are unchanged. Unconnected boundary ports are omitted from the snapshot.
-    """
-    input_node = _find_node(topology, "input", kind="external_input")
-    output_node = _find_node(topology, "output", kind="external_output")
-    if input_node is None and output_node is None:
-        return topology
-
-    boundary_inputs = []
-    boundary_outputs = []
-    skip_nodes = set()
-
-    if input_node is not None:
-        skip_nodes.add(input_node.id)
-        for edge in topology.edges:
-            if edge.source_node == input_node.id:
-                boundary_inputs.append(
-                    BoundaryPortRef(
-                        diagram_port=edge.source_port,
-                        node_id=edge.target_node,
-                        port_id=edge.target_port,
-                    )
-                )
-
-    if output_node is not None:
-        skip_nodes.add(output_node.id)
-        for edge in topology.edges:
-            if edge.target_node == output_node.id:
-                boundary_outputs.append(
-                    BoundaryPortRef(
-                        diagram_port=edge.target_port,
-                        node_id=edge.source_node,
-                        port_id=edge.source_port,
-                    )
-                )
-
-    nodes = tuple(node for node in topology.nodes if node.id not in skip_nodes)
-    edges = tuple(
-        edge
-        for edge in topology.edges
-        if edge.source_node not in skip_nodes and edge.target_node not in skip_nodes
-    )
-    return DiagramTopology(
-        name=topology.name,
-        nodes=nodes,
-        edges=edges,
-        boundary_inputs=tuple(boundary_inputs),
-        boundary_outputs=tuple(boundary_outputs),
-        clusters=topology.clusters,
-    )
-
-
-def _build_single_system_topology(sys) -> DiagramTopology:
-    node = _node_from_system(sys.name, sys, display_id="sys1", kind="system")
-    return DiagramTopology(name=sys.name, nodes=(node,), edges=())
-
-
-def _build_diagram_system_topology(diagram) -> DiagramTopology:
-    nodes = []
-    edges = []
-
-    if len(diagram.inputs) != 0:
-        nodes.append(
-            _node_from_ports(
-                "input",
-                name="",
-                display_id="Inputs",
-                kind="external_input",
-                inputs={},
-                outputs=diagram.inputs,
-            )
-        )
-
-    for sys_id, sys in diagram.subsystems.items():
-        kind = "step_system" if isinstance(sys, StepSystem) else "system"
-        nodes.append(_node_from_system(sys_id, sys, display_id=sys_id, kind=kind))
-
-    if len(diagram.outputs) != 0:
-        nodes.append(
-            _node_from_ports(
-                "output",
-                name="",
-                display_id="Outputs",
-                kind="external_output",
-                inputs=diagram.outputs,
-                outputs={},
-            )
-        )
-
-    for sys_id, sys in diagram.subsystems.items():
-        for port_id in sys.inputs:
-            edge = diagram.connections[sys_id][port_id]
-            if edge is not None:
-                edges.append(
-                    TopologyEdge(
-                        source_node=edge[0],
-                        source_port=edge[1],
-                        target_node=sys_id,
-                        target_port=port_id,
-                    )
-                )
-
-    if "output" in diagram.connections:
-        for port_id, edge in diagram.connections["output"].items():
-            if edge is not None:
-                edges.append(
-                    TopologyEdge(
-                        source_node=edge[0],
-                        source_port=edge[1],
-                        target_node="output",
-                        target_port=port_id,
-                    )
-                )
-
-    return DiagramTopology(name=diagram.name, nodes=tuple(nodes), edges=tuple(edges))
-
-
 def port_anchors(boundary_refs, node_id: str, port_id: str) -> list[tuple[str, str]]:
     """Return the ``(node_id, port_id)`` ends behind one end of an edge.
 
@@ -350,60 +427,15 @@ def port_anchors(boundary_refs, node_id: str, port_id: str) -> list[tuple[str, s
     ]
 
 
-def _find_node(topology: DiagramTopology, node_id: str, *, kind: str | None = None):
+def build_single_system_topology(sys) -> DiagramTopology:
+    """The topology of a lone system: one node, no edges."""
+    node = node_from_system(sys.name, sys, display_id="sys1", kind="system")
+    return DiagramTopology(name=sys.name, nodes=(node,), edges=())
+
+
+def find_node(topology: DiagramTopology, node_id: str, *, kind: str | None = None):
+    """The node of ``topology`` with this id (and this kind, when given), else ``None``."""
     for node in topology.nodes:
         if node.id == node_id and (kind is None or node.kind == kind):
             return node
     return None
-
-
-def _node_from_system(node_id: str, sys, *, display_id: str, kind: str):
-    node = _node_from_ports(
-        node_id,
-        name=sys.name,
-        display_id=display_id,
-        kind=kind,
-        inputs=sys.inputs,
-        outputs=sys.outputs,
-    )
-    labels = input_sign_labels(sys)
-    if not labels:
-        return node
-    inputs = tuple(replace(port, label=labels.get(port.id)) for port in node.inputs)
-    return replace(node, inputs=inputs)
-
-
-def input_sign_labels(sys) -> dict[str, str]:
-    """A summing junction draws each input's sign beside its id: ``+ in0``, ``- in1``."""
-    from minilink.blocks.routing import Sum
-
-    if not isinstance(sys, Sum):
-        return {}
-    signs = {1.0: "+", -1.0: "-"}
-    return {
-        f"in{i}": f"{signs.get(float(sign), f'{sign:+g}')} in{i}"
-        for i, sign in enumerate(sys.signs)
-    }
-
-
-def _node_from_ports(
-    node_id: str,
-    *,
-    name: str,
-    display_id: str,
-    kind: str,
-    inputs,
-    outputs,
-) -> TopologyNode:
-    return TopologyNode(
-        id=node_id,
-        name=name,
-        display_id=display_id,
-        kind=kind,
-        inputs=tuple(
-            TopologyPort(id=port_id, dim=port.dim) for port_id, port in inputs.items()
-        ),
-        outputs=tuple(
-            TopologyPort(id=port_id, dim=port.dim) for port_id, port in outputs.items()
-        ),
-    )

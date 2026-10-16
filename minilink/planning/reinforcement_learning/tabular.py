@@ -1,11 +1,14 @@
 """Tabular reinforcement learning on a state-space grid: Q-learning, SARSA and Monte Carlo control."""
 
+from __future__ import annotations
+
 from dataclasses import dataclass, replace
 
 import numpy as np
 
 from minilink.planning.evaluation import nominal_trajectory
 from minilink.planning.planner import Planner
+from minilink.planning.policy_synthesis import plotting
 from minilink.planning.policy_synthesis.discretizer import StateSpaceGrid
 from minilink.planning.policy_synthesis.dp import (
     DynamicProgrammingOptions,
@@ -14,7 +17,9 @@ from minilink.planning.policy_synthesis.dp import (
 from minilink.planning.reinforcement_learning.environment import RolloutEnvironment
 from minilink.planning.results import PlanningSolution
 
+###############################################################################
 # Public API
+###############################################################################
 
 
 class TabularLearningPlanner(Planner):
@@ -25,7 +30,7 @@ class TabularLearningPlanner(Planner):
     from node to node, each control period stepping the plant from the
     current node under one of the grid's input levels and rounding the state
     it reaches to a node, so the learner sees only transitions
-    ``(x_k, u_k, c_k, x_k+1)`` between nodes. Every algorithm updates one cell of the table by a
+    ``(x_k, u_k, c_k, x_{k+1})`` between nodes. Every algorithm updates one cell of the table by a
     moving average toward its own sample ``q`` of the cost-to-go,
 
         Q(x, u) <- Q(x, u) + eta (q - Q(x, u)),
@@ -110,15 +115,11 @@ class TabularLearningPlanner(Planner):
     ):
         super().__init__(problem)
         cost = self.require_cost()
-        if grid is None:
-            if x_grid is None or u_grid is None or dt is None:
-                raise ValueError(
-                    "pass grid=StateSpaceGrid(...) or all of x_grid, u_grid, and dt"
-                )
-            grid = StateSpaceGrid(
-                problem, x_grid_shape=x_grid, u_grid_shape=u_grid, dt=dt
-            )
+
+        # Discretized state and input spaces
+        grid = grid_of(problem, grid, x_grid, u_grid, dt)
         self.grid = grid
+
         # The world is the grid: leaving it is infeasible, at the problem's price or
         # value iteration's default, so the learner approaches the same table
         price = problem.infeasible_cost
@@ -132,10 +133,10 @@ class TabularLearningPlanner(Planner):
             backend="numpy",
             training_zone=grid.X,
         )
-        if rounding not in ("stochastic", "nearest"):
-            raise ValueError(
-                f"rounding must be 'stochastic' or 'nearest', got {rounding!r}"
-            )
+
+        # Learning: the rounding to a node, the target, the exploration, the step and
+        # the discount
+        require_rounding(rounding)
         self.rounding = rounding
         self.algorithm = self.build_algorithm(algorithm)
         self.exploration = EpsilonGreedy() if exploration is None else exploration
@@ -144,27 +145,94 @@ class TabularLearningPlanner(Planner):
         self.exploring_starts = bool(exploring_starts)
         self.rng = np.random.default_rng(seed)
 
+        # Memory: the table, its visit counts, one record per episode
         self.Q = np.zeros((grid.nodes_n, grid.actions_n))
         self.visits = np.zeros((grid.nodes_n, grid.actions_n), dtype=int)
         self.history = []
 
-    def learn(self, episodes):
-        """Run ``episodes`` episodes of interaction, learning as they go; returns ``self``."""
-        grid, env, Q, N = self.grid, self.env, self.Q, self.visits
-        algorithm, explore, alpha, rng = (
-            self.algorithm,
-            self.exploration,
-            self.alpha,
-            self.rng,
+    @property
+    def result(self) -> DynamicProgrammingResult:
+        """
+        The table as a cost-to-go field ``J = min_u Q`` and greedy policy ``pi = argmin_u Q``.
+
+        A cell never visited keeps its initial value, zero: the optimistic
+        start that makes untried actions worth trying (``visits`` tells which).
+        """
+        grid = self.grid
+        Q = self.Q
+        episodes = len(self.history)
+
+        # J(x) = min_u Q(x, u) and π(x) = argmin_u Q(x, u)
+        J = Q.min(axis=1)
+        pi = Q.argmin(axis=1)
+
+        return DynamicProgrammingResult(
+            grid=grid, J=J, pi=pi, iterations=episodes, delta=float("nan")
         )
 
+    def solve(self, episodes=1000, *, evaluate=False, n_trials=50) -> PlanningSolution:
+        """
+        Learn for ``episodes`` episodes; return the greedy law and its cost-to-go as a :class:`PlanningSolution`.
+
+        ``evaluate=True`` also rolls the law out from the problem's start and
+        scores it over the problem's draws.
+        """
+        # Episodes of interaction, learning as they go
+        self.learn(episodes)
+
+        # The greedy law of the learned table
+        result = self.result
+        policy = self.get_controller()
+
+        # Optionally, roll the law out from the problem's start and score it over
+        # its draws
+        trajectory = None
+        evaluation = None
+        if evaluate:
+            dt = self.grid.dt
+            tf = self.env.tf
+            trajectory = nominal_trajectory(self.problem, policy, dt=dt, tf=tf)
+            evaluation = self.evaluate(policy, dt=dt, n_trials=n_trials, tf=tf)
+
+        # The solution: the law, the record, the rollout, the interpolated cost-to-go
+        record = self.learning_record()
+        solution = PlanningSolution(
+            self.problem, policy, record, trajectory, evaluation, result.value_at
+        )
+
+        return self.store_solution(solution)
+
+    def solve_policy(
+        self, episodes=1000, *, evaluate=False, n_trials=50
+    ) -> PlanningSolution:
+        """The planner-family name of :meth:`solve`, answered by every policy planner."""
+        return self.solve(episodes, evaluate=evaluate, n_trials=n_trials)
+
+    # Learning
+
+    def learn(self, episodes):
+        """Run ``episodes`` episodes of interaction, learning as they go; returns ``self``."""
+        grid = self.grid
+        env = self.env
+        Q = self.Q
+        N = self.visits
+        algorithm = self.algorithm
+        explore = self.exploration
+        eta = self.eta
+        alpha = self.alpha
+        rng = self.rng
+
         for episode in range(episodes):
+            # The episode's exploration schedule, parameter draw, start node and
+            # first action
             progress = episode / max(episodes - 1, 1)
             params = env.sample_params(rng)
-            s, t = self.node(self.start()), 0.0
+            s = self.node(self.start())
+            t = 0.0
             x = grid.states[s]
             a = explore.choose(Q[s], N[s], rng, progress)
-            visited, episode_cost = [], 0.0
+            visited = []
+            episode_cost = 0.0
 
             for _ in range(env.n_steps_per_episode):
                 # One control period of the plant under the grid input of action a
@@ -178,71 +246,69 @@ class TabularLearningPlanner(Planner):
                 c = -float(reward)
                 s_next = self.node(x_next)
                 a_next = explore.choose(Q[s_next], N[s_next], rng, progress)
-                x_next = grid.states[
-                    s_next
-                ]  # the world is the grid: the plant continues from the node
 
-                # Step size of the moving average: eta, or the sample average 1/N(x, u)
+                # The world is the grid: the plant continues from the node
+                x_next = grid.states[s_next]
+
+                # Step size of the moving average: η, or the sample average 1/N(x, u)
                 N[s, a] += 1
-                eta = 1.0 / N[s, a] if self.eta is None else self.eta
+                eta_k = 1.0 / N[s, a] if eta is None else eta
 
                 # Temporal-difference methods update the cell now, from this transition
                 algorithm.update(
-                    Q, s, a, c, s_next, a_next, bool(terminated), eta, alpha
+                    Q, s, a, c, s_next, a_next, bool(terminated), eta_k, alpha
                 )
 
-                visited.append((s, a, c, eta))
+                # The episode so far, until it terminates or runs out of time
+                visited.append((s, a, c, eta_k))
                 episode_cost += c
                 if terminated or truncated:
                     break
+
+                # The next step starts from the node reached, with the action chosen there
                 x, t, s, a = x_next, t_next, s_next, a_next
 
             # Monte Carlo methods update the visited cells once the episode's cost is known
             algorithm.update_episode(Q, visited, alpha)
-            self.history.append(
-                {
-                    "episode": len(self.history) + 1,
-                    "cost": episode_cost,
-                    "steps": len(visited),
-                    "epsilon": explore.epsilon(progress),
-                }
-            )
+
+            self.record_episode(episode_cost, len(visited), explore.epsilon(progress))
+
         return self
 
-    def solve(self, episodes=1000, *, evaluate=False, n_trials=50) -> PlanningSolution:
-        """
-        Learn for ``episodes`` episodes; return the greedy law and its cost-to-go as a :class:`PlanningSolution`.
+    def learning_record(self) -> TabularLearningRecord:
+        """The solver record: episodes, coverage of the grid, and the cost of the last episodes."""
+        history = self.history
+        visits = self.visits
+        Q = self.Q
+        algorithm = type(self.algorithm).__name__
 
-        ``evaluate=True`` also rolls the law out from the problem's start and
-        scores it over the problem's draws.
-        """
-        self.learn(episodes)
-        result = self.result
-        policy = self.get_controller()
-        trajectory = evaluation = None
-        if evaluate:
-            trajectory = nominal_trajectory(
-                self.problem, policy, dt=self.grid.dt, tf=self.env.tf
-            )
-            evaluation = self.evaluate(
-                policy, dt=self.grid.dt, n_trials=n_trials, tf=self.env.tf
-            )
-        return self.store_solution(
-            PlanningSolution(
-                self.problem,
-                policy,
-                self.learning_record(),
-                trajectory,
-                evaluation,
-                result.value_at,
-            )
+        # Coverage: the fraction of the nodes with at least one visited cell
+        visited_fraction = float(np.mean(visits.sum(axis=1) > 0))
+
+        # The mean cost of the last tenth of the episodes, the last one at least
+        last = [record["cost"] for record in history[-max(len(history) // 10, 1) :]]
+        cost = float(np.mean(last)) if last else float("nan")
+
+        table_finite = bool(np.all(np.isfinite(Q)))
+
+        return TabularLearningRecord(
+            algorithm=algorithm,
+            episodes=len(history),
+            visited_fraction=visited_fraction,
+            cost=cost,
+            table_finite=table_finite,
+            history=list(history),
         )
 
-    def solve_policy(
-        self, episodes=1000, *, evaluate=False, n_trials=50
-    ) -> PlanningSolution:
-        """Policy-family name of :meth:`solve`."""
-        return self.solve(episodes, evaluate=evaluate, n_trials=n_trials)
+    # Controller and plots
+
+    def get_controller(self, **kwargs):
+        """The greedy policy as a :class:`~minilink.planning.policy_synthesis.lookup_policy.LookupTableController`."""
+        return plotting.get_controller(self.result, **kwargs)
+
+    def value_at(self, x) -> float:
+        """Interpolate the learned cost-to-go at a state ``x``."""
+        return self.result.value_at(x)
 
     def nominal_trajectory(self, tf=None):
         """The greedy law from the problem's start on the grid's control period."""
@@ -253,56 +319,11 @@ class TabularLearningPlanner(Planner):
             tf=self.env.tf if tf is None else tf,
         )
 
-    def learning_record(self) -> "TabularLearningRecord":
-        """The solver record: episodes, coverage of the grid, and the cost of the last episodes."""
-        last = [
-            record["cost"]
-            for record in self.history[-max(len(self.history) // 10, 1) :]
-        ]
-        return TabularLearningRecord(
-            algorithm=type(self.algorithm).__name__,
-            episodes=len(self.history),
-            visited_fraction=float(np.mean(self.visits.sum(axis=1) > 0)),
-            cost=float(np.mean(last)) if last else float("nan"),
-            table_finite=bool(np.all(np.isfinite(self.Q))),
-            history=list(self.history),
-        )
-
-    @property
-    def result(self) -> DynamicProgrammingResult:
-        """
-        The table as a cost-to-go field ``J = min_u Q`` and greedy policy ``pi = argmin_u Q``.
-
-        A cell never visited keeps its initial value, zero: the optimistic
-        start that makes untried actions worth trying (``visits`` tells which).
-        """
-        return DynamicProgrammingResult(
-            grid=self.grid,
-            J=self.Q.min(axis=1),
-            pi=self.Q.argmin(axis=1),
-            iterations=len(self.history),
-            delta=float("nan"),
-        )
-
-    def get_controller(self, **kwargs):
-        """The greedy policy as a :class:`~minilink.planning.policy_synthesis.lookup_policy.LookupTableController`."""
-        from minilink.planning.policy_synthesis import plotting
-
-        return plotting.get_controller(self.result, **kwargs)
-
-    def value_at(self, x) -> float:
-        """Interpolate the learned cost-to-go at a state ``x``."""
-        return self.result.value_at(x)
-
     def plot_cost2go(self, **kwargs):
-        from minilink.planning.policy_synthesis import plotting
-
         kwargs.setdefault("jmax", plotting.cost_scale_limit(self.env.infeasible_cost))
         return plotting.plot_cost2go(self.result, **kwargs)
 
     def plot_policy(self, **kwargs):
-        from minilink.planning.policy_synthesis import plotting
-
         return plotting.plot_policy(self.result, **kwargs)
 
     def plot_learning_curve(self, ax=None, window=20):
@@ -311,20 +332,29 @@ class TabularLearningPlanner(Planner):
 
         if ax is None:
             _, ax = plt.subplots(figsize=(8, 3))
+
+        # The episode costs, and the averaging kernel over the window
         cost = np.array([record["cost"] for record in self.history])
         kernel = np.ones(min(window, cost.size)) / min(window, cost.size)
+
+        # The raw costs, then their moving average
         ax.plot(np.arange(1, cost.size + 1), cost, alpha=0.3)
         ax.plot(
             np.arange(kernel.size, cost.size + 1), np.convolve(cost, kernel, "valid")
         )
+
         ax.set_xlabel("episode")
         ax.set_ylabel("episode cost")
         ax.grid(True, alpha=0.3)
+
         return ax
 
+    ###########################################################################
     # Internal machinery
+    ###########################################################################
 
     def build_algorithm(self, algorithm):
+        """The target of the moving average: an instance as given, or one built by name."""
         if isinstance(algorithm, TabularAlgorithm):
             return algorithm
         if algorithm in TABULAR_ALGORITHMS:
@@ -335,27 +365,45 @@ class TabularLearningPlanner(Planner):
 
     def start(self):
         """An episode's first state: anywhere on the grid, or the problem's own draw."""
+        rng = self.rng
+
+        # Exploring starts: anywhere on the grid
         if self.exploring_starts:
-            return self.grid.X.sample(self.rng)  # anywhere on the grid
-        return self.env.reset(self.rng)
+            return self.grid.X.sample(rng)
+
+        return self.env.reset(rng)
 
     def node(self, x):
         """The grid node that stands for a state (see ``rounding``)."""
         grid = self.grid
+        rng = self.rng
         if self.rounding == "nearest":
             return grid.nearest_node(x)
 
-        # Fractional position of x between its two neighbouring levels on each axis
         shape = np.array(grid.x_grid_shape)
-        f = np.clip(
-            (np.asarray(x, dtype=float) - grid.x_lb) / grid.x_step, 0.0, shape - 1
-        )
-        lower = np.floor(f).astype(int)
+        x_lb = grid.x_lb
+        x_step = grid.x_step
+
+        # Position of x in levels on each axis, between its two neighbouring levels
+        level = np.clip((np.asarray(x, dtype=float) - x_lb) / x_step, 0.0, shape - 1)
+        lower = np.floor(level).astype(int)
         upper = np.minimum(lower + 1, shape - 1)
 
         # The upper level with the probability of the fractional part, else the lower
-        index = np.where(self.rng.random(grid.n) < f - lower, upper, lower)
-        return int(np.ravel_multi_index(index, grid.x_grid_shape))
+        index = np.where(rng.random(grid.n) < level - lower, upper, lower)
+        s = int(np.ravel_multi_index(index, grid.x_grid_shape))
+
+        return s
+
+    def record_episode(self, cost, steps, epsilon):
+        """Append one episode's record to ``history``: its number, cost, length and exploration rate."""
+        record = {
+            "episode": len(self.history) + 1,
+            "cost": cost,
+            "steps": steps,
+            "epsilon": epsilon,
+        }
+        self.history.append(record)
 
 
 @dataclass(frozen=True)
@@ -373,6 +421,8 @@ class TabularLearningRecord:
     def success(self) -> bool:
         """The table stayed finite."""
         return bool(self.table_finite)
+
+    # Display
 
     def __str__(self) -> str:
         return (
@@ -395,10 +445,10 @@ class QLearning(TabularAlgorithm):
     """Off-policy temporal-difference control: the target takes the best next action, whatever the agent does next."""
 
     def update(self, Q, s, a, c, s_next, a_next, terminated, eta, alpha):
-        # Target: q = c + alpha min_u' Q(x', u'), nothing beyond a terminal state
+        # Target: q = c + α min_u' Q(x', u'), nothing beyond a terminal state
         q = c + alpha * (1.0 - terminated) * Q[s_next].min()
 
-        # Moving average toward the target: Q(x, u) <- Q(x, u) + eta (q - Q(x, u))
+        # Moving average toward the target: Q(x, u) ← Q(x, u) + η (q − Q(x, u))
         Q[s, a] += eta * (q - Q[s, a])
 
 
@@ -406,10 +456,10 @@ class SARSA(TabularAlgorithm):
     """On-policy temporal-difference control: the target takes the action the agent really takes next."""
 
     def update(self, Q, s, a, c, s_next, a_next, terminated, eta, alpha):
-        # Target: q = c + alpha Q(x', u'), with u' the next action, exploration included
+        # Target: q = c + α Q(x', u'), with u' the next action, exploration included
         q = c + alpha * (1.0 - terminated) * Q[s_next, a_next]
 
-        # Moving average toward the target: Q(x, u) <- Q(x, u) + eta (q - Q(x, u))
+        # Moving average toward the target: Q(x, u) ← Q(x, u) + η (q − Q(x, u))
         Q[s, a] += eta * (q - Q[s, a])
 
 
@@ -417,13 +467,21 @@ class MonteCarloControl(TabularAlgorithm):
     """On-policy Monte Carlo control: the target is the cost actually observed to the end of the episode."""
 
     def update_episode(self, Q, visited, alpha):
-        # Observed cost-to-go of each visited cell, backwards: q_k = c_k + alpha q_k+1
+        # Observed cost-to-go of each visited cell, backwards: q_k = c_k + α q_{k+1}
         q = 0.0
         for s, a, c, eta in reversed(visited):
             q = c + alpha * q
 
-            # Moving average toward the target: Q(x, u) <- Q(x, u) + eta (q - Q(x, u))
+            # Moving average toward the target: Q(x, u) ← Q(x, u) + η (q − Q(x, u))
             Q[s, a] += eta * (q - Q[s, a])
+
+
+# The algorithms ``algorithm=`` names
+TABULAR_ALGORITHMS = {
+    "q_learning": QLearning,
+    "sarsa": SARSA,
+    "monte_carlo": MonteCarloControl,
+}
 
 
 class EpsilonGreedy:
@@ -440,13 +498,24 @@ class EpsilonGreedy:
 
     def epsilon(self, progress):
         """The exploration rate at ``progress`` in ``[0, 1]`` of the run."""
-        return self.epsilon_start + (self.final - self.epsilon_start) * progress
+        epsilon_start = self.epsilon_start
+        epsilon_final = self.final
+
+        # ε = ε_start + (ε_final − ε_start) progress: linear over the run
+        epsilon = epsilon_start + (epsilon_final - epsilon_start) * progress
+
+        return epsilon
 
     def choose(self, Q_s, N_s, rng, progress):
         """Action id at a state with cost-to-go row ``Q_s`` and visit counts ``N_s``."""
+        # Explore: a random action with probability ε
         if rng.random() < self.epsilon(progress):
             return int(rng.integers(Q_s.size))
-        return int(rng.choice(np.flatnonzero(Q_s == Q_s.min())))
+
+        # Exploit: a greedy action, ties broken at random
+        greedy = np.flatnonzero(Q_s == Q_s.min())
+
+        return int(rng.choice(greedy))
 
 
 class UCB:
@@ -467,17 +536,49 @@ class UCB:
 
     def choose(self, Q_s, N_s, rng, progress):
         """Action id at a state with cost-to-go row ``Q_s`` and visit counts ``N_s``."""
+        c = self.c
+
+        # Untried actions first
         untried = np.flatnonzero(N_s == 0)
         if untried.size:
             return int(rng.choice(untried))
 
-        # Lower confidence bound on the cost of each action
-        bound = Q_s - self.c * np.sqrt(np.log(N_s.sum()) / N_s)
-        return int(rng.choice(np.flatnonzero(bound == bound.min())))
+        # Lower confidence bound of each action: Q(x, u) − c √(ln N(x) / N(x, u))
+        bound = Q_s - c * np.sqrt(np.log(N_s.sum()) / N_s)
+
+        # The lowest bound, ties broken at random
+        lowest = np.flatnonzero(bound == bound.min())
+
+        return int(rng.choice(lowest))
 
 
-TABULAR_ALGORITHMS = {
-    "q_learning": QLearning,
-    "sarsa": SARSA,
-    "monte_carlo": MonteCarloControl,
-}
+###############################################################################
+# Internal machinery
+###############################################################################
+
+
+def grid_of(problem, grid, x_grid, u_grid, dt):
+    """
+    The grid passed in, or one built from the levels and ``dt``.
+
+    Unlike value iteration's :func:`~minilink.planning.policy_synthesis.dp.grid_of`,
+    levels passed beside a grid are not refused: the grid is used and they are
+    ignored.
+    """
+    if grid is None:
+        if x_grid is None or u_grid is None or dt is None:
+            raise ValueError(
+                "pass grid=StateSpaceGrid(...) or all of x_grid, u_grid, and dt"
+            )
+
+        return StateSpaceGrid(problem, x_grid_shape=x_grid, u_grid_shape=u_grid, dt=dt)
+
+    return grid
+
+
+def require_rounding(rounding):
+    """Refuse a rounding rule other than ``"stochastic"`` or ``"nearest"``."""
+    if rounding not in ("stochastic", "nearest"):
+        raise ValueError(
+            f"rounding must be 'stochastic' or 'nearest', got {rounding!r}"
+        )
