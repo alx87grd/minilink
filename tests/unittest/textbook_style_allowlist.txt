@@ -27,8 +27,6 @@ banner	minilink/analysis/structural.py::line 142	1
 banner	minilink/analysis/time_response.py::line 175	1
 banner	minilink/blocks/sources.py::line 343	1
 banner	minilink/blocks/transfer_function.py::line 129	1
-banner	minilink/control/design.py::line 24	1
-banner	minilink/control/design.py::line 319	1
 banner	minilink/control/geometric.py::line 12	1
 banner	minilink/control/impedance.py::line 181	1
 banner	minilink/control/mpc/controller.py::line 35	1
@@ -62,9 +60,6 @@ banner	minilink/planning/evaluation.py::line 184	1
 banner	minilink/planning/planner.py::line 121	1
 banner	minilink/planning/policy_synthesis/discretizer.py::line 20	1
 banner	minilink/planning/policy_synthesis/discretizer.py::line 461	1
-banner	minilink/planning/policy_synthesis/dp.py::line 24	1
-banner	minilink/planning/policy_synthesis/dp.py::line 473	1
-banner	minilink/planning/policy_synthesis/dp.py::line 659	1
 banner	minilink/planning/policy_synthesis/dp_jax.py::line 16	1
 banner	minilink/planning/policy_synthesis/dp_jax.py::line 169	1
 banner	minilink/planning/policy_synthesis/lookup_policy.py::line 18	1
@@ -309,11 +304,6 @@ lazy-import	minilink/planning/evaluation.py::policy_of: minilink.planning.result
 lazy-import	minilink/planning/evaluation.py::static_law: minilink.core.feedback	1
 lazy-import	minilink/planning/policy_synthesis/discretizer.py::StateSpaceGrid._compute_transition_jax: minilink.core.backends	1
 lazy-import	minilink/planning/policy_synthesis/discretizer.py::StateSpaceGrid.plot_value: minilink.planning.policy_synthesis	1
-lazy-import	minilink/planning/policy_synthesis/dp.py::DynamicProgrammingPlanner.animate_cost2go: minilink.planning.policy_synthesis	1
-lazy-import	minilink/planning/policy_synthesis/dp.py::DynamicProgrammingPlanner.animate_policy: minilink.planning.policy_synthesis	1
-lazy-import	minilink/planning/policy_synthesis/dp.py::DynamicProgrammingPlanner.plot_cost2go: minilink.planning.policy_synthesis	1
-lazy-import	minilink/planning/policy_synthesis/dp.py::DynamicProgrammingPlanner.plot_policy: minilink.planning.policy_synthesis	1
-lazy-import	minilink/planning/policy_synthesis/dp.py::DynamicProgrammingPlanner.value_iteration: minilink.planning.policy_synthesis	1
 lazy-import	minilink/planning/policy_synthesis/plotting.py::get_controller: minilink.planning.policy_synthesis.lookup_policy	1
 lazy-import	minilink/planning/policy_synthesis/policy_eval.py::PolicyEvaluator.plot_cost2go: minilink.planning.policy_synthesis.plotting	1
 lazy-import	minilink/planning/reinforcement_learning/tabular.py::TabularLearningPlanner.get_controller: minilink.planning.policy_synthesis	1
