@@ -1,49 +1,10 @@
-"""Fiala brush tires with a friction ellipse: pure functions on NumPy or JAX.
-
-Reference: Pacejka, *Tyre and Vehicle Dynamics*, 3rd ed., ch. 3; Fiala, VDI Zeitschrift 96 (1954).
-"""
+"""Fiala brush tires: the axle slips, their saturated forces and the friction ellipse."""
 
 from minilink.core.backends import array_module
 
+###############################################################################
 # Public API
-
-
-def brush_saturation(z):
-    """Saturation factor ``g(z) = phi(z) / z`` applied to the linear tire force.
-
-    The brush model integrates the bristle deflection over the contact patch. While part
-    of the patch still grips, the force is ``phi(z) = 1 - (1 - z/3)^3`` of the friction
-    limit; past ``z = 3`` the whole patch slides and the force stays at the limit, so the
-    factor decays as ``1 / z``.
-
-    Parameters
-    ----------
-    z : float or array
-        Slip demand [-]: the linear-slip force divided by the friction limit ``mu Fz``.
-
-    Returns
-    -------
-    g : float or array
-        Factor in ``(0, 1]``. ``g(0) = 1`` (linear tire) and ``z g(z) <= 1`` always, so
-        the force never exceeds ``mu Fz``. The two branches match in value and slope at
-        ``z = 3`` (both give ``1/3`` and ``-1/9``).
-    """
-    xp = array_module(z)
-
-    # phi(z) / z, expanded so the grip branch stays a polynomial (no 0/0 at z = 0)
-    g = xp.where(z < 3.0, 1.0 - z / 3.0 + z**2 / 27.0, 1.0 / xp.maximum(z, 3.0))
-
-    return g
-
-
-def smooth_sign(v, v_c):
-    """Sign of ``v`` softened over the creep speed ``v_c``, for a resistance at rest."""
-    xp = array_module(v)
-
-    # tanh is the smooth unit step: +-1 beyond a few v_c, and differentiable at v = 0
-    s = xp.tanh(v / v_c)
-
-    return s
+###############################################################################
 
 
 def axle_slips(vx, vy, yaw_rate, w_rear, delta, params):
@@ -74,19 +35,25 @@ def axle_slips(vx, vy, yaw_rate, w_rear, delta, params):
     Every denominator is floored by ``v_min_epsilon``, so the slips stay bounded and
     differentiable at standstill instead of blowing up as ``1 / vx``.
     """
-    a, b = params["a"], params["b"]
-    r_r = params["r_r"]
-    v_eps = params["v_min_epsilon"]
     xp = array_module(vx, vy, yaw_rate, w_rear, delta)
 
-    # contact-point velocities: the front pair is rotated into the steered wheel frame
-    c_d, s_d = xp.cos(delta), xp.sin(delta)
+    a = params["a"]
+    b = params["b"]
+    r_r = params["r_r"]
+    v_eps = params["v_min_epsilon"]
+
+    c_d = xp.cos(delta)
+    s_d = xp.sin(delta)
+
+    # Contact-point velocities, the front pair rotated into the steered wheel frame:
+    # [vx_f; vy_f] = R(δ)ᵀ [vx; vy + a ψ̇]
     vy_axle_f = vy + a * yaw_rate
     vx_f = vx * c_d + vy_axle_f * s_d
     vy_f = -vx * s_d + vy_axle_f * c_d
     vy_r = vy - b * yaw_rate
 
-    # slip velocity over the rolling speed, with a smooth floor near rest
+    # κ = (r ω − vx) / |vx| and α = −arctan(vy / |vx|): the slip velocity over the
+    # rolling speed, with |vx| floored to √(vx² + ε²) near rest
     kappa_r = (r_r * w_rear - vx) / xp.sqrt(vx**2 + v_eps**2)
     alpha_f = -xp.arctan(vy_f / xp.sqrt(vx_f**2 + v_eps**2))
     alpha_r = -xp.arctan(vy_r / xp.sqrt(vx**2 + v_eps**2))
@@ -127,27 +94,42 @@ def brush_tire_forces(kappa_r, alpha_f, alpha_r, vx, params):
     the usual way to write a tire whose stiffness scales with what it carries. The
     understeer gradient of the car is then ``1/c_alpha_f - 1/c_alpha_r`` rad per g,
     independent of the mass split.
+
+    References
+    ----------
+    Pacejka, *Tyre and Vehicle Dynamics*, 3rd ed., ch. 3; Fiala, VDI Zeitschrift 96 (1954).
     """
-    mass, gravity = params["mass"], params["gravity"]
-    a, b, mu = params["a"], params["b"], params["mu"]
-    c_alpha_f, c_alpha_r = params["c_alpha_f"], params["c_alpha_r"]
-    c_kappa, C_rr = params["c_kappa"], params["C_rr"]
-    v_c, z_floor = params["v_c"], params["z_floor"]
     xp = array_module(kappa_r, alpha_f, alpha_r, vx)
 
-    # static axle loads and the stiffnesses they carry
+    mass = params["mass"]
+    gravity = params["gravity"]
+    a = params["a"]
+    b = params["b"]
+    mu = params["mu"]
+    c_alpha_f = params["c_alpha_f"]
+    c_alpha_r = params["c_alpha_r"]
+    c_kappa = params["c_kappa"]
+    C_rr = params["C_rr"]
+    v_c = params["v_c"]
+    z_floor = params["z_floor"]
+
+    # Static axle loads, and the stiffnesses they carry
     Fz_f = mass * gravity * b / (a + b)
     Fz_r = mass * gravity * a / (a + b)
     C_alpha_f = c_alpha_f * Fz_f
     C_alpha_r = c_alpha_r * Fz_r
     C_kappa = c_kappa * Fz_r
 
-    # slip demand z: the linear-slip force over the friction limit, combined at the rear
+    # Slip demand z = √(s_x² + s_y² + z_floor²), with s = C · slip / (μ Fz) the
+    # linear-slip force over the friction limit: traction and cornering share one
+    # ellipse at the rear, and the floor keeps the root differentiable at zero slip
     z_f = xp.sqrt((C_alpha_f * alpha_f / (mu * Fz_f)) ** 2 + z_floor**2)
     s_x = C_kappa * kappa_r / (mu * Fz_r)
     s_y = C_alpha_r * alpha_r / (mu * Fz_r)
     z_r = xp.sqrt(s_x**2 + s_y**2 + z_floor**2)
 
+    # F = C · slip · g(z), the linear tire force saturated by the brush model; the
+    # free-rolling front carries only the rolling resistance −C_rr Fz_f sign(vx)
     Fx_f = -C_rr * Fz_f * smooth_sign(vx, v_c)
     Fy_f = C_alpha_f * alpha_f * brush_saturation(z_f)
     Fx_r = C_kappa * kappa_r * brush_saturation(z_r)
@@ -161,14 +143,64 @@ def friction_use(Fx_f, Fy_f, Fx_r, Fy_r, params):
 
     ``1`` means the axle is sliding: it has no force left for anything else.
     """
-    mass, gravity = params["mass"], params["gravity"]
-    a, b, mu = params["a"], params["b"], params["mu"]
     xp = array_module(Fx_f, Fy_f, Fx_r, Fy_r)
 
-    # radius in the normalized force plane; the front's Fx is rolling resistance only
+    mass = params["mass"]
+    gravity = params["gravity"]
+    a = params["a"]
+    b = params["b"]
+    mu = params["mu"]
+
+    # Static axle loads
     Fz_f = mass * gravity * b / (a + b)
     Fz_r = mass * gravity * a / (a + b)
+
+    # φ = √(Fx² + Fy²) / (μ Fz), the radius in the normalized force plane (the front's
+    # Fx is rolling resistance only)
     phi_f = xp.sqrt(Fx_f**2 + Fy_f**2) / (mu * Fz_f)
     phi_r = xp.sqrt(Fx_r**2 + Fy_r**2) / (mu * Fz_r)
 
     return phi_f, phi_r
+
+
+# The building blocks of the brush law
+
+
+def smooth_sign(v, v_c):
+    """Sign of ``v`` softened over the creep speed ``v_c``, for a resistance at rest."""
+    xp = array_module(v)
+
+    # sign(v) ≈ tanh(v / v_c): ±1 beyond a few v_c, and differentiable at v = 0
+    s = xp.tanh(v / v_c)
+
+    return s
+
+
+def brush_saturation(z):
+    """Saturation factor ``g(z) = phi(z) / z`` applied to the linear tire force.
+
+    The brush model integrates the bristle deflection over the contact patch. While part
+    of the patch still grips, the force is ``phi(z) = 1 - (1 - z/3)^3`` of the friction
+    limit; past ``z = 3`` the whole patch slides and the force stays at the limit, so the
+    factor decays as ``1 / z``.
+
+    Parameters
+    ----------
+    z : float or array
+        Slip demand [-]: the linear-slip force divided by the friction limit ``mu Fz``.
+
+    Returns
+    -------
+    g : float or array
+        Factor in ``(0, 1]``. ``g(0) = 1`` (linear tire) and ``z g(z) <= 1`` always, so
+        the force never exceeds ``mu Fz``. The two branches match in value and slope at
+        ``z = 3`` (both give ``1/3`` and ``-1/9``).
+    """
+    xp = array_module(z)
+
+    # g = φ(z) / z, with φ(z) = 1 − (1 − z/3)³ while the patch grips and 1 once it all
+    # slides; the grip branch is expanded to a polynomial (no 0/0 at z = 0), and the
+    # slide branch floored at z = 3, since both branches are evaluated
+    g = xp.where(z < 3.0, 1.0 - z / 3.0 + z**2 / 27.0, 1.0 / xp.maximum(z, 3.0))
+
+    return g
