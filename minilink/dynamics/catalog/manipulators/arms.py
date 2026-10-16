@@ -926,9 +926,6 @@ def planar_joint_positions(q, lengths):
     return np.asarray(points), angles
 
 
-_planar_joint_positions = planar_joint_positions  # ripple
-
-
 def planar_frames(points, angles, effector=None):
     """World transforms for the planar arm links (and the effector frame)."""
     frames = {}

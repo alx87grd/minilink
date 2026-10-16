@@ -393,9 +393,6 @@ def build_computer(
     return Computer(diagram, step_schedule)
 
 
-_build_computer = build_computer  # ripple
-
-
 def require_computer_side(side) -> None:
     """Refuse what cannot run on a computer: a Computer, a flow diagram, a continuous plant."""
     if isinstance(side, Computer):

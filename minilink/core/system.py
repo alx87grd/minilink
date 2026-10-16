@@ -441,9 +441,9 @@ class System(SharedSystemFacades):
     def __mod__(self, schedule: object):
         """Return a scheduled :class:`~minilink.simulation.computer.Computer`."""
         # A real cycle: the computer imports the diagrams, which import this module
-        from minilink.simulation.computer import _build_computer
+        from minilink.simulation.computer import build_computer
 
-        return _build_computer(self, schedule)
+        return build_computer(self, schedule)
 
     # Display
 

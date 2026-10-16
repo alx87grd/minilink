@@ -222,9 +222,6 @@ def shift_plan_trajectory(
     return Trajectory(t=t_guess, x=x_guess, u=u_guess)
 
 
-_shift_plan_trajectory = shift_plan_trajectory  # ripple
-
-
 def require_plan_samples(tau):
     """Refuse a plan without a knot."""
     if tau.size < 1:

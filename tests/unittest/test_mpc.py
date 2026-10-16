@@ -357,7 +357,7 @@ class TestMPCAlgebraicController(unittest.TestCase):
             ModelPredictiveController(planner, dt_mpc=0.2, warm_start=False)
 
 
-from minilink.control.mpc.utilities import _shift_plan_trajectory, mpc_warm_start_guess
+from minilink.control.mpc.utilities import shift_plan_trajectory, mpc_warm_start_guess
 from minilink.core.system import DynamicSystem, StepSystem
 from minilink.core.trajectory import Trajectory
 
@@ -404,7 +404,7 @@ class TestMPCWarmStartController(unittest.TestCase):
         t = np.linspace(0.0, 1.0, 6)
         plan = Trajectory(t=t, x=np.vstack([t, t**2]), u=np.ones((1, t.size)))
         x_meas = np.array([0.5, 0.25])
-        shifted = _shift_plan_trajectory(
+        shifted = shift_plan_trajectory(
             plan, x_meas, dt_shift=0.2, horizon=1.0, t_anchor=0.4
         )
         self.assertIsNotNone(shifted)
