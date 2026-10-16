@@ -1,12 +1,4 @@
-"""
-Abstract backend for finite-dimensional optimizer adapters.
-
-Concrete subclasses adapt a compiled
-:class:`~minilink.optimization.evaluators.program_evaluator.MathematicalProgramEvaluator`
-to a third-party solver such as SciPy or Ipopt. The user-facing
-:class:`minilink.optimization.optimizer.Optimizer` owns program compilation,
-timing, diagnostics, and default initial guesses.
-"""
+"""Optimizer backends: the contract of an adapter to a third-party solver."""
 
 from abc import ABC, abstractmethod
 from collections.abc import Callable
@@ -22,9 +14,20 @@ from minilink.optimization.mathematical_program import OptimizationResult
 BackendIterateCallback = Callable[[np.ndarray], None]
 
 
+###############################################################################
+# Public API
+###############################################################################
+
+
 class OptimizerBackend(ABC):
     """
     Pure adapter contract for a finite-dimensional optimizer backend.
+
+    Concrete subclasses adapt a compiled
+    :class:`~minilink.optimization.evaluators.program_evaluator.MathematicalProgramEvaluator`
+    to a third-party solver such as SciPy or Ipopt. The user-facing
+    :class:`minilink.optimization.optimizer.Optimizer` owns program compilation,
+    timing, diagnostics, and default initial guesses.
     """
 
     @abstractmethod
