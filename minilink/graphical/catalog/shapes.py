@@ -1,23 +1,11 @@
-"""Public shape primitives — the curated surface students and demos import.
-
-Mirrors how ``dynamics.catalog`` re-exports curated plants: the classes live in
-the internal ``graphical/animation/`` band; this module is the friendly, stable
-re-export. Two things to note:
-
-- ``Line`` is the public name for the internal ``CustomLine``.
-- ``Arrow`` / ``TorqueArrow`` bake full geometry at construction in the
-  primitive's local frame.
-
-Placement helpers (``spring_between``, ``link_pose_3d``, …) live here — not in
-``core/kinematics`` (rigid math only).
-"""
+"""Shape primitives and the placement helpers that pose them in a frame."""
 
 from __future__ import annotations
 
 import numpy as np
 
 from minilink.core.backends import array_module
-from minilink.core.kinematics import SE3
+from minilink.core.kinematics import SE3, Rx
 from minilink.graphical.animation.primitives import (
     Arrow,
     Box,
@@ -32,50 +20,25 @@ from minilink.graphical.animation.primitives import (
     TorqueArrow,
     TrajectoryPolyline,
     ground_line,
+    point3,
     spring_line,
     vehicle_body,
     wheel_box,
 )
 
-Line = CustomLine  # public alias
+# The curated surface students and demos import, as ``dynamics.catalog`` re-exports
+# its plants: the primitives live in the internal ``graphical/animation/`` band, and
+# this module is their friendly, stable re-export.
+Line = CustomLine  # The public name of the internal ``CustomLine``
 
 
-def _as3(point):
-    p = np.asarray(point, dtype=float).reshape(-1)
-    if p.size == 2:
-        return np.array([p[0], p[1], 0.0])
-    return p[:3]
+###############################################################################
+# Public API
+###############################################################################
 
 
-def _spring_coil_template(coils=6, amplitude=0.12):
-    """Normalized coil samples ``(u along span, v lateral)`` in ``u ∈ [0, 1]``."""
-    samples = [(0.0, 0.0), (0.15, 0.0)]
-    xs = np.linspace(0.2, 0.8, 2 * coils + 1)
-    for i, u in enumerate(xs):
-        v = amplitude if i % 2 else -amplitude
-        samples.append((float(u), float(v)))
-    samples.append((0.85, 0.0))
-    samples.append((1.0, 0.0))
-    return samples
-
-
-def _perp_axis(axis):
-    axis = np.asarray(axis, dtype=float)
-    length = np.linalg.norm(axis)
-    if length < 1e-12:
-        return np.array([0.0, 1.0, 0.0])
-    axis = axis / length
-    if axis.size == 2 or abs(axis[2]) < 1e-9:
-        xy = axis[:2]
-        n = np.linalg.norm(xy)
-        if n < 1e-12:
-            return np.array([0.0, 1.0, 0.0])
-        return np.array([-xy[1] / n, xy[0] / n, 0.0])
-    reference = np.array([0.0, 0.0, 1.0])
-    if abs(np.dot(axis, reference)) > 0.95:
-        reference = np.array([0.0, 1.0, 0.0])
-    perp = np.cross(reference, axis)
-    return perp / (np.linalg.norm(perp) + 1e-12)
+# The placement helpers pose a primitive in a frame; they live here, not in
+# ``core/kinematics``, which keeps the rigid-body math only
 
 
 def spring_between(p0, p1, *, coils=6, amplitude=0.12, color="black", linewidth=1):
@@ -84,27 +47,39 @@ def spring_between(p0, p1, *, coils=6, amplitude=0.12, color="black", linewidth=
     Coil count and lateral amplitude stay fixed in world units; only span along
     the axis changes with compression/extension.
     """
-    p0 = _as3(p0)
-    p1 = _as3(p1)
+    p0 = point3(p0)
+    p1 = point3(p1)
+
+    # The spring's axis; a zero-length spring is drawn as a point
     axis = p1 - p0
     length = np.linalg.norm(axis)
     if length < 1e-12:
-        return CustomLine(np.array([p0, p0]), color=color, linewidth=linewidth)
-    perp = _perp_axis(axis)
+        points = np.array([p0, p0])
+        return CustomLine(points, color=color, linewidth=linewidth)
+
+    # p = p0 + u (p1 − p0) + v n, with n ⟂ (p1 − p0): the coil template along the axis
+    perp = perp_axis(axis)
     pts = []
-    for u, v in _spring_coil_template(coils=coils, amplitude=amplitude):
+    for u, v in spring_coil_template(coils=coils, amplitude=amplitude):
         position = p0 + u * axis
         pts.append(position + v * perp)
+
+    # The end points pinned exactly on p0 and p1
     pts[0] = p0
     pts[-1] = p1
-    return CustomLine(np.asarray(pts), color=color, linewidth=linewidth)
+    points = np.asarray(pts)
+
+    return CustomLine(points, color=color, linewidth=linewidth)
 
 
 def line_segment(p0, p1, **style):
     """Honest world-space line segment (dynamic-tier geometry)."""
-    p0 = _as3(p0)
-    p1 = _as3(p1)
-    return CustomLine(np.array([p0, p1]), **style)
+    p0 = point3(p0)
+    p1 = point3(p1)
+
+    points = np.array([p0, p1])
+
+    return CustomLine(points, **style)
 
 
 def segment_pose_2d(p0, p1):
@@ -114,17 +89,29 @@ def segment_pose_2d(p0, p1):
     """
     p0 = np.asarray(p0, dtype=float).reshape(-1)[:2]
     p1 = np.asarray(p1, dtype=float).reshape(-1)[:2]
+
+    # The segment's length ℓ and heading θ
     delta = p1 - p0
     length = np.hypot(delta[0], delta[1])
     theta = np.arctan2(delta[1], delta[0])
-    T = np.eye(4)
-    c, s = np.cos(theta), np.sin(theta)
-    T[0, 0] = length * c
-    T[0, 1] = length * (-s)
-    T[1, 0] = length * s
-    T[1, 1] = length * c
-    T[0, 3] = p0[0]
-    T[1, 3] = p0[1]
+    c = np.cos(theta)
+    s = np.sin(theta)
+
+    # T = [ℓ R(θ), p0; 0, 1]: the unit segment stretched to ℓ, turned by θ, placed at p0
+    T11 = length * c
+    T12 = length * (-s)
+    T21 = length * s
+    T22 = length * c
+
+    # fmt: off
+    T = np.array([
+        [T11, T12, 0.0, p0[0]],
+        [T21, T22, 0.0, p0[1]],
+        [0.0, 0.0, 1.0, 0.0],
+        [0.0, 0.0, 0.0, 1.0],
+    ])
+    # fmt: on
+
     return T
 
 
@@ -135,6 +122,8 @@ def link_pose_3d(p0, p1):
     collapses to a pure translation at *p0*.
     """
     xp = array_module(p0, p1)
+
+    # The end points, planar ones lifted to z = 0
     p0 = xp.asarray(p0, dtype=float).reshape(-1)
     p1 = xp.asarray(p1, dtype=float).reshape(-1)
     if p0.shape[0] == 2:
@@ -142,10 +131,13 @@ def link_pose_3d(p0, p1):
     if p1.shape[0] == 2:
         p1 = xp.concatenate([p1, xp.asarray([0.0])])
 
+    # y = −(p1 − p0) / ℓ: the rod lies along its local −y, from p0 toward p1
     delta = p1 - p0
     length = xp.linalg.norm(delta)
     safe = xp.maximum(length, 1e-12)
     y_axis = -delta / safe
+
+    # x = r × y / ‖r × y‖ and z = x × y, the reference r = ẑ, or x̂ when y is near ẑ
     ref_z = xp.asarray([0.0, 0.0, 1.0])
     ref_x = xp.asarray([1.0, 0.0, 0.0])
     reference = xp.where(xp.abs(xp.dot(y_axis, ref_z)) > 0.95, ref_x, ref_z)
@@ -153,24 +145,34 @@ def link_pose_3d(p0, p1):
     x_axis = x_axis / xp.linalg.norm(x_axis)
     z_axis = xp.cross(x_axis, y_axis)
     R = xp.stack([x_axis, y_axis, z_axis], axis=1)
+
+    # T = (R, p0), or the pure translation (I, p0) when the span collapses
     posed = SE3(R, p0)
     collapsed = SE3(xp.eye(3), p0)
-    return xp.where(length < 1e-12, collapsed, posed)
+    T = xp.where(length < 1e-12, collapsed, posed)
+
+    return T
 
 
 def point_pose(p):
-    """Pure translation placing a primitive at *point*.
+    """Pure translation placing a primitive at *p*.
 
     Native-array: NumPy or JAX depending on the input backend. Length-2 points
     are lifted to the ``z = 0`` plane.
     """
     xp = array_module(p)
+
+    # The point, a planar one lifted to z = 0
     p = xp.asarray(p, dtype=float).reshape(-1)
     if p.shape[0] == 2:
         p = xp.concatenate([p, xp.asarray([0.0])])
     else:
         p = p[:3]
-    return SE3(xp.eye(3), p)
+
+    # T = (I, p)
+    T = SE3(xp.eye(3), p)
+
+    return T
 
 
 def plane_airframe_3d(
@@ -195,8 +197,7 @@ def plane_airframe_3d(
     (local XY = body ``x``–up, extruded along body ``y``); wing / horizontal
     tail / vertical fin are thin :class:`Box` solids.
     """
-    from minilink.core.kinematics import Rx
-
+    # Dimensions, the c.g. and tail arms defaulting to fractions of the length
     length = float(length)
     width = float(width)
     l_cg = 0.6 * length if l_cg is None else float(l_cg)
@@ -207,11 +208,12 @@ def plane_airframe_3d(
     span_t = float(span_t)
     fin_height = float(fin_height)
     l_w = float(l_w)
-    half_h = 0.55 * width
 
+    # Fuselage: its side silhouette in the ExtrudedPolygon's XY plane, +X forward
+    # and +Y toward body −Z (up)
+    half_h = 0.55 * width
     nose = length - l_cg
     tail = -l_cg
-    # Side silhouette in ExtrudedPolygon XY: +X forward, +Y toward body -Z (up).
     fuselage_pts = np.array(
         [
             [nose, 0.0],
@@ -225,9 +227,11 @@ def plane_airframe_3d(
         ]
     )
     fuselage = ExtrudedPolygon(fuselage_pts, height=width, color=color, opacity=1.0)
-    # Map ExtrudedPolygon (X, Y, Z_extrude) → body (X, Y_right, Z_down).
+
+    # The extrusion frame (X, Y, Z_extrude) mapped onto the body (X, Y_right, Z_down)
     fuselage.local_transform = SE3(Rx(-0.5 * np.pi), 0.0)
 
+    # Wing, centered l_w behind the c.g.
     wing = Box(
         length_x=chord_w,
         length_y=span,
@@ -238,6 +242,7 @@ def plane_airframe_3d(
     )
     wing.local_transform = SE3(np.eye(3), np.array([-l_w, 0.0, 0.0]))
 
+    # Horizontal tail, centered l_t behind the c.g.
     h_tail = Box(
         length_x=chord_t,
         length_y=span_t,
@@ -248,6 +253,7 @@ def plane_airframe_3d(
     )
     h_tail.local_transform = SE3(np.eye(3), np.array([-l_t, 0.0, 0.0]))
 
+    # Vertical fin above the boom (body −Z), its box centered at half height
     v_fin = Box(
         length_x=chord_t,
         length_y=0.03 * width,
@@ -256,10 +262,65 @@ def plane_airframe_3d(
         color=tail_color,
         opacity=1.0,
     )
-    # Fin sits above the boom (body -Z); box center at half height.
     v_fin.local_transform = SE3(np.eye(3), np.array([-l_t, 0.0, -0.5 * fin_height]))
 
     return [fuselage, wing, h_tail, v_fin]
+
+
+###############################################################################
+# Internal machinery
+###############################################################################
+
+
+def perp_axis(axis):
+    """A unit vector normal to *axis*, in the XY plane when *axis* lies in it."""
+    axis = np.asarray(axis, dtype=float)
+    length = np.linalg.norm(axis)
+
+    # A zero axis has no direction: ŷ by default
+    if length < 1e-12:
+        perp = np.array([0.0, 1.0, 0.0])
+        return perp
+
+    axis = axis / length
+
+    # An axis in the XY plane: its in-plane normal n = (−a_y, a_x, 0) / ‖(a_x, a_y)‖
+    if axis.size == 2 or abs(axis[2]) < 1e-9:
+        xy = axis[:2]
+        length_xy = np.linalg.norm(xy)
+        if length_xy < 1e-12:
+            perp = np.array([0.0, 1.0, 0.0])
+            return perp
+
+        perp = np.array([-xy[1] / length_xy, xy[0] / length_xy, 0.0])
+        return perp
+
+    # Any other axis: n = r × a / ‖r × a‖, the reference r = ẑ, or ŷ when a is near ẑ
+    reference = np.array([0.0, 0.0, 1.0])
+    if abs(np.dot(axis, reference)) > 0.95:
+        reference = np.array([0.0, 1.0, 0.0])
+    cross = np.cross(reference, axis)
+    perp = cross / (np.linalg.norm(cross) + 1e-12)
+
+    return perp
+
+
+def spring_coil_template(coils=6, amplitude=0.12):
+    """Normalized coil samples ``(u along span, v lateral)`` in ``u ∈ [0, 1]``."""
+    # The lead in
+    samples = [(0.0, 0.0), (0.15, 0.0)]
+
+    # The coils: 2 coils + 1 vertices over u ∈ [0.2, 0.8], alternating −v and +v
+    xs = np.linspace(0.2, 0.8, 2 * coils + 1)
+    for i, u in enumerate(xs):
+        v = amplitude if i % 2 else -amplitude
+        samples.append((float(u), float(v)))
+
+    # The lead out
+    samples.append((0.85, 0.0))
+    samples.append((1.0, 0.0))
+
+    return samples
 
 
 __all__ = [
