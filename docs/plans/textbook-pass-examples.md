@@ -2,7 +2,8 @@
 
 Real modules as they are on `dev` today and as the pass would write them, under the style
 sheet of [textbook-pass.md](textbook-pass.md) §3 (revised with the maintainer's
-preferences of 2026-10-16). Every target computes the same numbers in the same order, with
+preferences of 2026-10-16). Sections 1–5 are equation paths; 6–9 are constructors, public
+verbs, iterative algorithms and class layout. Every target computes the same numbers in the same order, with
 the same backend types.
 
 **The fixed pattern of an equation path.** Each block is separated by a blank line, and a
@@ -183,7 +184,7 @@ on their equation line.
 
         _, _, c2, _, _, _ = self.trig(q)
 
-        # coupled inertia of the two planar links
+        # Coupled inertia of the two planar links
         H11 = m1 * lc1**2 + I1 + m2 * (l1**2 + lc2**2 + 2.0 * l1 * lc2 * c2) + I2
         H12 = m2 * lc2**2 + m2 * l1 * lc2 * c2 + I2
         H22 = m2 * lc2**2 + I2
@@ -238,7 +239,7 @@ on their equation line.
         g1 = (m1 * lc1 + m2 * l1) * gravity
         g2 = m2 * lc2 * gravity
 
-        # gravity torque on each joint
+        # Gravity torque on each joint
         g = xp.array([-g1 * s1 - g2 * s12, -g2 * s12])
 
         return g
@@ -250,7 +251,7 @@ on their equation line.
         d1 = params["d1"]
         d2 = params["d2"]
 
-        # linear viscous joint damping
+        # Linear viscous joint damping
         tau_d = xp.array([d1 * dq[0], d2 * dq[1]])
 
         return tau_d
@@ -363,7 +364,7 @@ comments, and `rho` dropped for the ratio, since `rho` is the discount rate.
         # L = L_clip + c_v L_V − c_e H
         L = L_clip + c_v * L_V - c_e * entropy
 
-        # monitoring only: an estimate of how far the update moved the policy
+        # Monitoring only: an estimate of how far the update moved the policy
         approx_kl = jnp.mean((ratio - 1.0) - jnp.log(ratio))
         stats = {
             "policy_loss": L_clip,
@@ -447,7 +448,7 @@ building blocks (`filtered_rate`, `held_integral`, `clipped`) stay helpers.
         if has_filter:
             u_cmd = u_cmd - Kd * dm_filt
 
-        # the actuator limits u_min ≤ u ≤ u_max
+        # Actuator limits: u_min ≤ u ≤ u_max
         u = clipped(u_cmd, params, xp)
 
         return u
@@ -505,7 +506,7 @@ def shortest_path(q0, q1, radius):
     ``segments`` lists ``(curvature_sign, arc_length)``, the sign in ``{+1, 0, -1}``
     (left, straight, right); ``length`` is the total arc length. ``None`` if degenerate.
     """
-    # the normalised frame: the start-to-goal line as the x axis, a unit radius
+    # The normalised frame: the start-to-goal line as the x axis, a unit radius
     dx = q1[0] - q0[0]
     dy = q1[1] - q0[1]
     d = math.hypot(dx, dy) / radius
@@ -513,7 +514,7 @@ def shortest_path(q0, q1, radius):
     a = mod2pi(q0[2] - theta)
     b = mod2pi(q1[2] - theta)
 
-    # the shortest of the feasible words
+    # The shortest of the feasible words
     ...
 
     return best_word, segments, length
@@ -535,3 +536,300 @@ def mod2pi(angle):
 ```
 
 The private module constants keep their underscore (RULES 5.8).
+
+---
+
+## 6. A constructor: `TwoLinkManipulator.__init__`
+
+**Before (`dev`):** a single block, and a module helper that sets two attributes on the
+object from outside `__init__` (RULES 5.7, shadow state).
+
+```python
+    def __init__(self):
+        super().__init__(dof=2, actuators=2, task_dim=2)
+        self.name = "Two Link Manipulator"
+        self.params = {
+            "l1": 0.5,
+            "l2": 0.3,
+            ...
+        }
+        self.state.labels = ["theta1", "theta2", "dtheta1", "dtheta2"]
+        self.state.units = ["rad", "rad", "rad/s", "rad/s"]
+        self.inputs["u"].labels = ["tau1", "tau2"]
+        self.inputs["u"].units = ["Nm", "Nm"]
+        self.outputs["y"].labels = list(self.state.labels)
+        self.outputs["y"].units = list(self.state.units)
+        _set_planar_reach_camera(self, self.params["l1"] + self.params["l2"])
+
+
+def _set_planar_reach_camera(manipulator, reach):
+    """Match orthographic zoom to planar arm reach (``System.camera_scale``)."""
+    reach = float(reach)
+    manipulator.camera_scale = max(1.5 * reach, 0.35)
+    manipulator.camera_target = np.array([0.0, 0.5 * reach, 0.0])
+```
+
+**After:** named blocks, each opened by a short comment. The helper returns the camera, and
+`__init__` assigns it, so every attribute is visibly set in the constructor.
+
+```python
+    def __init__(self):
+        super().__init__(dof=2, actuators=2, task_dim=2)
+        self.name = "Two Link Manipulator"
+
+        # Parameters
+        self.params = {
+            "l1": 0.5,
+            "l2": 0.3,
+            ...
+        }
+
+        # Signal labels and units
+        self.state.labels = ["theta1", "theta2", "dtheta1", "dtheta2"]
+        self.state.units = ["rad", "rad", "rad/s", "rad/s"]
+        self.inputs["u"].labels = ["tau1", "tau2"]
+        self.inputs["u"].units = ["Nm", "Nm"]
+        self.outputs["y"].labels = list(self.state.labels)
+        self.outputs["y"].units = list(self.state.units)
+
+        # Graphics: the camera frames the arm's full reach
+        reach = self.params["l1"] + self.params["l2"]
+        self.camera_scale, self.camera_target = planar_reach_camera(reach)
+
+
+def planar_reach_camera(reach):
+    """The orthographic zoom and target that frame a planar arm of the given reach."""
+    reach = float(reach)
+    camera_scale = max(1.5 * reach, 0.35)
+    camera_target = np.array([0.0, 0.5 * reach, 0.0])
+    return camera_scale, camera_target
+```
+
+---
+
+## 7. A public verb: `linearize_matrices` (`analysis/linearization.py`)
+
+**Before (`dev`):** close to the target already. The input checks and the setup are mixed
+together, an inline `raise` sits between them, and the module ends with a `# ====` banner.
+
+```python
+    require_own_point(sys, x_bar, u_bar)
+    at = dict(method=method, eps=eps)
+    point = (x_bar, u_bar, t, params)
+    n = sys.n
+    inputs = input_selectors(sys, wrt)
+    outputs = output_selectors(sys, of)
+    if n == 0 and outputs is None:
+        raise ValueError(f"{sys.name!r} has neither a state nor an output port")
+
+    # A = ∂f/∂x and B = ∂f/∂u at the operating point; a static block has no state
+    A = jacobian(sys, "f", "x", *point, **at) if n > 0 else np.zeros((0, 0))
+    ...
+```
+
+**After:** the checks first, then the setup, then the math blocks. The inline `raise`
+becomes a `require_*` helper with the same type and message.
+
+```python
+    n = sys.n
+    inputs = input_selectors(sys, wrt)
+    outputs = output_selectors(sys, of)
+    require_own_point(sys, x_bar, u_bar)
+    require_state_or_output(sys, outputs)
+
+    point = (x_bar, u_bar, t, params)
+    at = dict(method=method, eps=eps)
+
+    # A = ∂f/∂x and B = ∂f/∂u at the operating point; a static block has no state
+    A = jacobian(sys, "f", "x", *point, **at) if n > 0 else np.zeros((0, 0))
+    B = jacobian_block(sys, [("f", None)], inputs, point, at) if n > 0 else None
+
+    # C = ∂h/∂x and D = ∂h/∂u; with no output port the output is the state: C = I, D = 0
+    if outputs is None:
+        C = np.eye(n)
+        D = np.zeros((n, B.shape[1]))
+    else:
+        C = jacobian_block(sys, outputs, [("x", None)], point, at) if n > 0 else None
+        D = jacobian_block(sys, outputs, inputs, point, at)
+
+    # A static block's channel is its feedthrough D alone
+    if n == 0:
+        B = np.zeros((0, D.shape[1]))
+        C = np.zeros((D.shape[0], 0))
+
+    return A, B, C, D
+```
+
+The order change is safe only because each step is pure (the selectors raise the same
+errors either way). The writer proves it with the probes, and keeps dev's order otherwise.
+
+---
+
+## 8. An iterative algorithm: `RRTPlanner.solve_trajectory` (`planning/search/rrt.py`)
+
+**Before (`dev`):** the loop's steps carry no comments; four `_` helpers; `_search_callback`
+is first set here rather than in `__init__`.
+
+```python
+    def solve_trajectory(self, *, evaluate=False, n_trials=50) -> PlanningSolution:
+        """Grow the tree until the goal region is reached or the budget is spent."""
+        options = self.options
+        self._validate_nearest_backend()
+        rng = np.random.default_rng(options.seed)
+        goal_region = self._goal_region()
+
+        x_start = np.asarray(self.problem.x_start, dtype=float)
+        self.tree = Tree(
+            Node(x=x_start, parent=None, edge=None, cost=0.0),
+            nearest_backend=options.nearest_backend,
+        )
+        self.reached_goal = False
+        self.solution_node = None
+        self.iterations = 0
+        self._search_callback = self._resolve_search_callback()
+
+        for _ in range(options.max_nodes):
+            x_rand = self._sample(rng)
+            near = self.tree.nearest(x_rand, self.metric)
+            edge = self._try_extend(near, x_rand, rng)
+            if edge is None:
+                continue
+
+            node = self.tree.add(
+                Node(x=edge.x_end, parent=near, edge=edge, cost=near.cost + edge.cost)
+            )
+            self.iterations += 1
+            if goal_region.contains(node.x):
+                ...
+```
+
+**After:** the setup in blocks, the algorithm's steps as commented blocks inside the loop,
+the bookkeeping as one helper call per iteration, and plain helper names.
+
+```python
+    def solve_trajectory(self, *, evaluate=False, n_trials=50) -> PlanningSolution:
+        """Grow the tree until the goal region is reached or the budget is spent."""
+        options = self.options
+        metric = self.metric
+        self.require_nearest_backend()
+
+        rng = np.random.default_rng(options.seed)
+        goal_region = self.goal_region()
+        x_start = np.asarray(self.problem.x_start, dtype=float)
+
+        # The tree, rooted at the start
+        self.tree = Tree(
+            Node(x=x_start, parent=None, edge=None, cost=0.0),
+            nearest_backend=options.nearest_backend,
+        )
+        self.reached_goal = False
+        self.solution_node = None
+        self.iterations = 0
+        self.search_callback = self.resolve_search_callback()
+
+        for _ in range(options.max_nodes):
+            # Sample a state, and extend the nearest node toward it
+            x_rand = self.sample_state(rng)
+            near = self.tree.nearest(x_rand, metric)
+            edge = self.try_extend(near, x_rand, rng)
+            if edge is None:
+                continue
+
+            # The new node, with its cost-to-come
+            cost = near.cost + edge.cost
+            node = self.tree.add(Node(x=edge.x_end, parent=near, edge=edge, cost=cost))
+            self.iterations += 1
+
+            # Stop at the first node inside the goal region
+            if goal_region.contains(node.x):
+                self.reached_goal = True
+                self.solution_node = node
+                self.on_search_step(phase="explore")
+                return self.finish_trajectory(
+                    self.tree.extract_trajectory(node), evaluate, n_trials
+                )
+
+            self.on_search_step(phase="explore")
+
+        # The budget is spent: the node closest to the goal, when best effort is allowed
+        goal_point = self.goal_point(goal_region)
+        closest = self.tree.nearest(goal_point, metric)
+        self.solution_node = closest
+        if not options.return_best_effort:
+            raise RuntimeError("RRT failed to reach goal within max_nodes")
+
+        return self.finish_trajectory(
+            self.tree.extract_trajectory(closest), evaluate, n_trials
+        )
+```
+
+`__init__` gains `self.search_callback = None` (RULES 5.7). The renames `_sample` →
+`sample_state`, `_validate_nearest_backend` → `require_nearest_backend` and the others go
+into the run's rename table, and the tests that call them follow.
+
+---
+
+## 9. A class's layout: `RRTPlanner`
+
+**Before (`dev`):** the public verbs, then ten `_` methods in no particular order.
+
+**After:** the docstring, `__init__`, the public methods with the primary verb first, then
+the indented banner and the helpers in the order the public methods call them.
+
+```python
+class RRTPlanner(Planner):
+    """
+    Rapidly-exploring random tree over a ``PlanningProblem``.
+
+    Parameters
+    ----------
+    ...
+    """
+
+    def __init__(self, problem, extender=None, *, metric=euclidean, options=None, ...):
+        ...
+
+    def solve(self, *, evaluate=False, n_trials=50) -> PlanningSolution:
+        ...
+
+    def solve_trajectory(self, *, evaluate=False, n_trials=50) -> PlanningSolution:
+        ...
+
+    def search_record(self) -> TreeSearchRecord:
+        ...
+
+    def plot_tree(self, **kwargs):
+        ...
+
+    def animate_search(self, **kwargs):
+        ...
+
+    def show_live_search(self, **kwargs):
+        ...
+
+    ###########################################################################
+    # Internal machinery
+    ###########################################################################
+
+    def require_nearest_backend(self) -> None:
+        ...
+
+    def goal_region(self):
+        ...
+
+    def resolve_search_callback(self):
+        ...
+
+    def sample_state(self, rng):
+        ...
+
+    def try_extend(self, from_node, toward, rng):
+        ...
+
+    def on_search_step(self, *, phase: str) -> None:
+        ...
+
+    def finish_trajectory(self, trajectory, evaluate, n_trials) -> PlanningSolution:
+        ...
+```
+

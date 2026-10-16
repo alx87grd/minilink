@@ -115,6 +115,15 @@ Writers receive this section verbatim.
 - No `self.` in a math line. Linear algebra is part of the story and stays in the body.
   Plumbing goes to helpers: coercion, shapes, defaults, validation, dispatch, caching,
   wrapping.
+- **Checks.** An input check (`require_*`) comes right after the parameter block. A check on
+  a computed quantity sits right after the line computing it (`ctrb = …` then
+  `require_controllable(ctrb, n)`). An inline `raise` in a body becomes a `require_*`
+  helper, with the same exception type and message.
+- **Numbers.** A numeric constant stays inline where the textbook writes it, with its meaning
+  in the equation comment (`+ 1e-8`, `10⁻⁸`). It becomes a named module constant only when
+  two places share it or it is a tuning knob (`RANK_TOL`).
+- **Return.** Never an equation or an array on the `return` line. A result object built from
+  named results may be (`return DynamicProgrammingResult(grid=..., J=J, ...)`).
 
   ```python
   def g(self, q, params=None):
@@ -168,7 +177,29 @@ Writers receive this section verbatim.
   `σᵢ`, `≤`, `√`, `∏`, `𝒞`, `𝒪`. Identifiers stay ASCII (`x_next`, `theta`, `sigma`). A
   comment states the equation; it never copies the code line.
 
-### 3.3 Names
+### 3.3 Constructors, verbs, loops and classes
+- **A constructor** reads as named blocks, each opened by a short capitalized comment:
+  `super().__init__` and the name, then `# Parameters`, `# Ports`, `# Signal labels and
+  units`, `# Graphics`. A value worked out by a helper is returned by that helper and
+  assigned in `__init__`; no helper sets attributes on the object (5.7). Every attribute
+  starts in `__init__`, `None` when only one branch fills it.
+- **A public verb** (`linearize`, `bode`, `lqr`, `simulate`) reads, in order:
+  1. its input checks;
+  2. its setup (selectors, the point, the options);
+  3. its math blocks, each with its equation comment;
+  4. its result.
+
+  The option plumbing goes to `*_of` and `require_*` helpers. A public verb keeps its NumPy
+  docstring sections.
+- **An iterative algorithm** (an RRT search, a DP sweep, a training loop) shows its steps
+  as commented blocks inside the loop: sample, extend, add, test the goal. Logging,
+  recording, callbacks and live plots are one call per iteration to a helper (`log.sweep(…)`,
+  `self.on_search_step(…)`), never inline in the loop body.
+- **A class** reads: the docstring, `__init__`, the properties, the public methods (the
+  primary verb first), then the indented `Internal machinery` banner and the helpers, in the
+  order the public methods call them.
+
+### 3.4 Names
 - Plain names everywhere (5.8, module functions included). Underscores only for private
   module constants and local closures.
 - One verb family per role:
@@ -185,25 +216,27 @@ Writers receive this section verbatim.
   - `eta` is a step size, `eta_k` its value per update.
   - Losses are written `L_pi`, `L_V`.
 
-### 3.4 Comments and docstrings
+### 3.5 Comments and docstrings
 - Timeless (5.24): no "now", "was", dates or step ids in the code.
+- A prose comment starts with a capital letter, as in `dp.py` (`# Coupled inertia of the two
+  planar links`). A math comment starts with the equation itself (`# L_clip = −E[…]`).
 - No comment restates the line below it. A comment says why, or states the equation.
 - A public function's docstring opens with one summary line. NumPy sections appear only
   where the parameters need them. A note on a contract lives on the object that owns it.
 
-### 3.5 Types and imports
+### 3.6 Types and imports
 - Under `from __future__ import annotations`, forward references are unquoted.
 - No type hints in equation paths (5.1). Hints go on constructors, public methods and
   orchestrators.
 - `require_jax()` / `require_jax_numpy()`, never a bare `import jax` (5.12).
 
-### 3.6 Backends
+### 3.7 Backends
 - `xp = array_module(...)` is the second line (§3.2), and every array operation after it
   uses `xp` (5.2), **unless the change would alter a result's backend type**. No
   backend changes (§1): an `np.` call under `xp` that decides the returned type stays,
   recorded and allowlisted.
 
-### 3.7 One owner
+### 3.8 One owner
 - Logic written twice (identical once named alike) gets one owner. The owner is either a
   shared module helper, or a base class when one class truly is the other (the parametric
   evaluator is a `MathematicalProgramEvaluator`).
@@ -215,15 +248,19 @@ Writers receive this section verbatim.
 - Plant equations stay on each plant's own page, even when two plants share them.
 - Copies that differ in behaviour stay as they are, and the record names the difference.
 
-### 3.8 What does not change
+### 3.9 What does not change
 - Results, the backend type of every result, refusals (exception type and message),
   warnings, the order of side effects, defaults, public names and signatures. Removals are
   allowed only under §1, each one listed.
 - The maintainer's manual edits in `examples/`, notebooks and scratch files. A research-lane
   script takes renames, markers and titles only.
 
-### 3.9 The reference pages
-- Algorithm: `planning/policy_synthesis/dp.py`. Design verb: `control/design.py`.
+### 3.10 The reference pages
+- Algorithm: `planning/policy_synthesis/dp.py`. Design verb: `control/design.py`. Both are
+  brought to this sheet first (wave 0), so that no writer reads a reference that contradicts
+  it.
+- The worked before/after examples: [textbook-pass-examples.md](textbook-pass-examples.md),
+  given to every writer with this section.
 - From the dry run, one example per kind (paths on `claude/vigilant-hopper-poekls`):
   - a plant: `dynamics/catalog/pendulum/pendulum.py`;
   - an evaluator: `planning/policy_synthesis/policy_eval.py`;
