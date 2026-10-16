@@ -243,7 +243,7 @@ Module: `minilink/dynamics/mechanism/spatial.py` (pure functions, `xp = array_mo
 
 Extract from [`ur5.py`](../../minilink/dynamics/catalog/manipulators/ur5.py):
 
-- `_skew`, `_motion_cross`, `_spatial_inertia`
+- `skew`, `motion_cross`, `spatial_inertia`
 - `configure(spec, q) → MechanismConfiguration` (alias: `forward_kinematics`)
 - `rnea`, `aba`, `bias_force`, `inertia_matrix`
 

@@ -55,8 +55,8 @@ transcribe or a parametric compile.
 | Path | Entry | Solver wiring | IPOPT (`cyipopt`) |
 | --- | --- | --- | --- |
 | Offline / rebuild | `solve()` / `solve_trajectory_from` without parametric compile | `Optimizer(program, method=…)` | **Yes** — see `examples/demos/trajopt/trajopt_cartpole_collocation_jax.py` |
-| NumPy MPC rebuild | `compile_backend='numpy'`, no parametric compile | Same `Optimizer` via `_make_optimizer` | **Yes** (if optional dep installed) |
-| JAX MPC fast path | `compile_parametric_program()` + `solve_trajectory_from` | **Custom** `_make_parametric_optimizer_backend` | **No** — SciPy only |
+| NumPy MPC rebuild | `compile_backend='numpy'`, no parametric compile | Same `Optimizer` via `build_optimizer` | **Yes** (if optional dep installed) |
+| JAX MPC fast path | `compile_parametric_program()` + `solve_trajectory_from` | **Custom** `build_parametric_optimizer_backend` | **No** — SciPy only |
 
 The generic `Optimizer` registry (`optimization/optimizer.py`) already lists
 `scipy_slsqp`, `scipy_trust_constr`, and `ipopt` and constructs the matching
@@ -72,12 +72,12 @@ reimplements a narrow slice:
 1. **Duplicate method registry** — planner-local `_USER_OPTIMIZER_METHODS`
    contains only `scipy_slsqp` (subset of `Optimizer`'s full registry).
 
-2. **Hardcoded backend** — `_make_parametric_optimizer_backend()` always
+2. **Hardcoded backend** — `build_parametric_optimizer_backend()` always
    returns `ScipyMinimizeOptimizer`, regardless of `optimizer_method`.
 
-3. **Direct backend call** — `_solve_trajectory_from_parametric()` calls
+3. **Direct backend call** — `solve_trajectory_from_parametric()` calls
    `self.optimizer_backend.solve(evaluator, z0)` instead of sharing the same
-   factory used by `_make_optimizer()`.
+   factory used by `build_optimizer()`.
 
 Symptom when setting `optimizer_method="ipopt"` on JAX MPC:
 
@@ -145,7 +145,7 @@ def make_optimizer_backend(
 ```
 
 - Single registry: same `_USER_OPTIMIZER_METHODS` as `Optimizer`.
-- `TrajectoryOptimizationPlanner._make_parametric_optimizer_backend` calls this
+- `TrajectoryOptimizationPlanner.build_parametric_optimizer_backend` calls this
   factory instead of constructing `ScipyMinimizeOptimizer` directly.
 - **Delete** planner-local `_USER_OPTIMIZER_METHODS`.
 

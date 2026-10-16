@@ -131,8 +131,8 @@ The EKF along a trajectory is the middle rung: the same block shape as `Trajecto
 - **A block that reads a measurement and commands nothing is an estimator, not a
   controller**: `require_command(block)` in `core/feedback.py` refuses it with one message
   ("… reads y but gives no u: an estimator; put it in a controller box"), used by
-  `_default_control_out` (`@`, `closed_loop`), `default_computer_boundary_ports` (`%`),
-  `feedback()` and `plot_control_law`'s `_law_roles`. Today all three fall back to the first
+  `default_control_out` (`@`, `closed_loop`), `default_computer_boundary_ports` (`%`),
+  `feedback()` and `plot_control_law`'s `law_roles_of`. Today all three fall back to the first
   output, `x`, and would wire the estimate into the plant's `u`. The two messages that name
   `estimator=` (`composition.py:216`) and `lqg()` are worded for what exists at each commit.
 - **The role name, `estimator` or `observer`** **[ask]**. The 2026-10-11 record rejected
@@ -257,8 +257,8 @@ B1. **`estimation/observer.py`: `StateObserver(A, B, C, L, D=None, xbar=None, ub
 
     `estimate` returns the state (the slice the EKF narrows later). `__str__` adds `L` and
     `eig(A − L C)`. **With it, in the same commit, the guard** (§4): `require_command` in
-    `core/feedback.py`, called by `_default_control_out`, `default_computer_boundary_ports`,
-    `feedback()`'s entry and `_law_roles`, so `observer @ plant`, `observer % dt @ plant` and
+    `core/feedback.py`, called by `default_control_out`, `default_computer_boundary_ports`,
+    `feedback()`'s entry and `law_roles_of`, so `observer @ plant`, `observer % dt @ plant` and
     `plot_control_law(observer)` refuse instead of taking `x` as the command. Tests
     (`tests/unittest/test_estimation.py`, after `TestPolePlacement`): JAX trace of `f`;
     convergence from a wrong x̂₀, with and without an operating point; `block_roles` /
