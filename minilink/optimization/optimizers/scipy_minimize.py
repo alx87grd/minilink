@@ -1,4 +1,4 @@
-"""SciPy :func:`scipy.optimize.minimize` optimizer adapter."""
+"""The SciPy backend: a compiled program solved by :func:`scipy.optimize.minimize`."""
 
 import numpy as np
 from scipy.optimize import minimize
@@ -12,27 +12,9 @@ from minilink.optimization.optimizers.optimizer_backend import (
     OptimizerBackend,
 )
 
-
-def _z_from_scipy_minimize_callback(
-    xk=None,
-    state=None,
-    *,
-    intermediate_result=None,
-) -> np.ndarray:
-    """Recover decision ``z`` from :func:`scipy.optimize.minimize` callback variants."""
-    for obj in (intermediate_result, state, xk):
-        if obj is None:
-            continue
-        if isinstance(obj, np.ndarray):
-            return np.asarray(obj, dtype=float).reshape(-1).copy()
-        x = getattr(obj, "x", None)
-        if x is not None:
-            return np.asarray(x, dtype=float).reshape(-1).copy()
-    msg = (
-        "SciPy minimize callback did not provide a usable decision vector "
-        "(expected an ndarray or an object with attribute ``x``)."
-    )
-    raise RuntimeError(msg)
+###############################################################################
+# Public API
+###############################################################################
 
 
 class ScipyMinimizeOptimizer(OptimizerBackend):
@@ -45,6 +27,7 @@ class ScipyMinimizeOptimizer(OptimizerBackend):
     """
 
     def __init__(self, scipy_method="SLSQP", options=None):
+        # The SciPy method, and its solver options, copied
         self.scipy_method = scipy_method
         self.options = {} if options is None else dict(options)
 
@@ -56,7 +39,8 @@ class ScipyMinimizeOptimizer(OptimizerBackend):
         callback: BackendIterateCallback | None = None,
     ) -> OptimizationResult:
         """Solve ``program_evaluator`` with SciPy and return a backend-neutral result."""
-
+        # Equalities h(z) = 0 and inequalities g(z) ≥ 0, each with its Jacobian when
+        # the evaluator has one
         constraints = []
 
         if program_evaluator.n_h > 0:
@@ -71,15 +55,18 @@ class ScipyMinimizeOptimizer(OptimizerBackend):
                 entry["jac"] = program_evaluator.jacobian_g
             constraints.append(entry)
 
+        # The user's hook, fed the iterate z in whichever form the method passes it
         scipy_callback = None
         if callback is not None:
 
             def scipy_callback(xk=None, state=None, *, intermediate_result=None):
-                z_step = _z_from_scipy_minimize_callback(
+                z_step = z_from_scipy_minimize_callback(
                     xk, state, intermediate_result=intermediate_result
                 )
                 callback(z_step)
 
+        # The solve from z0, inside the box bounds; the Hessian only for a method
+        # that uses it
         raw_result = minimize(
             program_evaluator.objective,
             np.asarray(z0, dtype=float).reshape(program_evaluator.n_z),
@@ -87,7 +74,7 @@ class ScipyMinimizeOptimizer(OptimizerBackend):
             jac=program_evaluator.gradient if program_evaluator.has_gradient else None,
             hess=(
                 program_evaluator.hessian
-                if self._uses_hessian() and program_evaluator.has_hessian
+                if self.uses_hessian() and program_evaluator.has_hessian
                 else None
             ),
             bounds=program_evaluator.scipy_bounds(),
@@ -96,6 +83,7 @@ class ScipyMinimizeOptimizer(OptimizerBackend):
             options=dict(self.options),
         )
 
+        # The counters and the status the solver reports
         stats = {}
         for name in ("nit", "nfev", "njev", "status"):
             if hasattr(raw_result, name):
@@ -110,7 +98,11 @@ class ScipyMinimizeOptimizer(OptimizerBackend):
             raw_result=raw_result,
         )
 
-    def _uses_hessian(self) -> bool:
+    ###########################################################################
+    # Internal machinery
+    ###########################################################################
+
+    def uses_hessian(self) -> bool:
         """Check if the SciPy method uses the Hessian."""
         method = self.scipy_method.lower()
         return method in {
@@ -120,3 +112,34 @@ class ScipyMinimizeOptimizer(OptimizerBackend):
             "trust-krylov",
             "trust-constr",
         }
+
+
+###############################################################################
+# Internal machinery
+###############################################################################
+
+
+def z_from_scipy_minimize_callback(
+    xk=None,
+    state=None,
+    *,
+    intermediate_result=None,
+) -> np.ndarray:
+    """Recover decision ``z`` from :func:`scipy.optimize.minimize` callback variants."""
+    # The first form given: the method's intermediate result, its state, or xk
+    for obj in (intermediate_result, state, xk):
+        if obj is None:
+            continue
+        if isinstance(obj, np.ndarray):
+            z = np.asarray(obj, dtype=float).reshape(-1).copy()
+            return z
+        x = getattr(obj, "x", None)
+        if x is not None:
+            z = np.asarray(x, dtype=float).reshape(-1).copy()
+            return z
+
+    msg = (
+        "SciPy minimize callback did not provide a usable decision vector "
+        "(expected an ndarray or an object with attribute ``x``)."
+    )
+    raise RuntimeError(msg)
