@@ -627,14 +627,14 @@ together, an inline `raise` sits between them, and the module ends with a `# ===
     ...
 ```
 
-**After:** the checks first, then the setup, then the math blocks. The inline `raise`
-becomes a `require_*` helper with the same type and message.
+**After:** the checks and the selectors, then the setup, then the math blocks. The inline
+`raise` becomes a `require_*` helper with the same type and message.
 
 ```python
+    require_own_point(sys, x_bar, u_bar)
     n = sys.n
     inputs = input_selectors(sys, wrt)
     outputs = output_selectors(sys, of)
-    require_own_point(sys, x_bar, u_bar)
     require_state_or_output(sys, outputs)
 
     point = (x_bar, u_bar, t, params)
@@ -660,8 +660,9 @@ becomes a `require_*` helper with the same type and message.
     return A, B, C, D
 ```
 
-The order change is safe only because each step is pure (the selectors raise the same
-errors either way). The writer proves it with the probes, and keeps dev's order otherwise.
+The calls that can raise keep dev's order; only pure setup lines (`point`, `at`) move. A
+reordering that could change which error a bad input meets is a behaviour change, so it
+is not made.
 
 ---
 
