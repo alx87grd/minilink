@@ -1,4 +1,4 @@
-"""Time-signal plotting API."""
+"""Time-signal plots: the spec of a trajectory's signals, drawn once or live, on matplotlib or plotly."""
 
 from minilink.graphical.common import PlotResult
 from minilink.graphical.signals.time_signals import (
