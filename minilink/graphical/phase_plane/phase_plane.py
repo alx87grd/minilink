@@ -1,4 +1,4 @@
-"""Phase-plane vector-field plotting."""
+"""Phase plane: a system's vector field over two state coordinates, with an optional trajectory."""
 
 from __future__ import annotations
 
@@ -8,113 +8,9 @@ import numpy as np
 
 from minilink.graphical.common import PlotResult
 
-
-@dataclass(frozen=True)
-class PhasePlaneTrajectoryOverlay:
-    """Trajectory data projected onto two phase-plane axes."""
-
-    x: np.ndarray
-    y: np.ndarray
-
-
-@dataclass(frozen=True)
-class PhasePlaneSpec:
-    """Backend-neutral phase-plane plot request."""
-
-    title: str
-    X: np.ndarray
-    Y: np.ndarray
-    V: np.ndarray
-    W: np.ndarray
-    x_axis: int
-    y_axis: int
-    x_label: str
-    y_label: str
-    x_unit: str
-    y_unit: str
-    x_bounds: tuple[float, float]
-    y_bounds: tuple[float, float]
-    trajectory: PhasePlaneTrajectoryOverlay | None = None
-
-
-def build_phase_plane_spec(
-    sys,
-    traj=None,
-    *,
-    x_axis: int = 0,
-    y_axis: int | None = None,
-    u=None,
-    x_ref=None,
-    t: float = 0.0,
-    bounds=None,
-    grid_shape: tuple[int, int] = (21, 21),
-    params=None,
-    title: str | None = None,
-) -> PhasePlaneSpec:
-    """
-    Build a phase-plane vector-field specification.
-
-    The selected state coordinates vary over the plot grid. All other state
-    components are held at ``x_ref`` and the input is held at ``u``.
-    """
-    if sys.n < 1:
-        raise ValueError("Phase-plane plots require a system with at least one state")
-
-    x_axis = _normalize_axis(x_axis, sys.n, "x_axis")
-    y_axis = _default_y_axis(sys.n) if y_axis is None else y_axis
-    y_axis = _normalize_axis(y_axis, sys.n, "y_axis")
-    n_x, n_y = _normalize_grid_shape(grid_shape)
-
-    x_ref_arr = _default_x_ref(sys, x_ref)
-    u_arr = _default_u(sys, u)
-    t_float = float(t)
-
-    overlay = _trajectory_overlay(traj, x_axis, y_axis) if traj is not None else None
-    x_bounds, y_bounds = _resolve_phase_bounds(
-        sys,
-        x_axis=x_axis,
-        y_axis=y_axis,
-        bounds=bounds,
-        overlay=overlay,
-    )
-
-    x_values = np.linspace(x_bounds[0], x_bounds[1], n_x)
-    y_values = np.linspace(y_bounds[0], y_bounds[1], n_y)
-    X, Y = np.meshgrid(x_values, y_values)
-    V = np.zeros_like(X, dtype=float)
-    W = np.zeros_like(Y, dtype=float)
-
-    for row in range(n_y):
-        for col in range(n_x):
-            x = x_ref_arr.copy()
-            x[x_axis] = X[row, col]
-            if y_axis != x_axis:
-                x[y_axis] = Y[row, col]
-            dx = np.asarray(
-                sys.f(x, u_arr, t_float, params=params),
-                dtype=float,
-            ).reshape(-1)
-            if dx.shape != (sys.n,):
-                raise ValueError(f"sys.f must return shape ({sys.n},), got {dx.shape}")
-            V[row, col] = dx[x_axis]
-            W[row, col] = dx[y_axis]
-
-    return PhasePlaneSpec(
-        title=title or f"Phase plane for {sys.name}",
-        X=X,
-        Y=Y,
-        V=V,
-        W=W,
-        x_axis=x_axis,
-        y_axis=y_axis,
-        x_label=_label_for_axis(sys, x_axis),
-        y_label=_label_for_axis(sys, y_axis),
-        x_unit=_unit_for_axis(sys, x_axis),
-        y_unit=_unit_for_axis(sys, y_axis),
-        x_bounds=x_bounds,
-        y_bounds=y_bounds,
-        trajectory=overlay,
-    )
+###############################################################################
+# Public API
+###############################################################################
 
 
 def plot_phase_plane(
@@ -143,12 +39,10 @@ def plot_phase_plane(
         Continuous-time model whose ``f`` defines the vector field (leaf
         subclass or wired diagram with stacked ``f``).
     """
-    backend_key = _normalize_backend(backend)
-    if backend_key not in ("matplotlib", "plotly"):
-        raise ValueError(
-            f"Unknown plot backend {backend!r}. Expected 'matplotlib' or 'plotly'."
-        )
+    backend_key = normalize_plot_backend(backend)
+    require_plot_backend(backend_key, backend)
 
+    # The field on its grid, then the figure on the chosen backend
     spec = build_phase_plane_spec(
         sys,
         traj,
@@ -162,14 +56,134 @@ def plot_phase_plane(
         params=params,
         title=title,
     )
+
     if backend_key == "plotly":
         return render_phase_plane_plotly(spec, streamplot=streamplot, show=show)
+
     return render_phase_plane_matplotlib(
-        spec,
-        streamplot=streamplot,
-        show=show,
-        **kwargs,
+        spec, streamplot=streamplot, show=show, **kwargs
     )
+
+
+def build_phase_plane_spec(
+    sys,
+    traj=None,
+    *,
+    x_axis: int = 0,
+    y_axis: int | None = None,
+    u=None,
+    x_ref=None,
+    t: float = 0.0,
+    bounds=None,
+    grid_shape: tuple[int, int] = (21, 21),
+    params=None,
+    title: str | None = None,
+) -> PhasePlaneSpec:
+    """
+    Build a phase-plane vector-field specification.
+
+    The selected state coordinates vary over the plot grid. All other state
+    components are held at ``x_ref`` and the input is held at ``u``.
+    """
+    n = sys.n
+    require_state(n)
+
+    # The two plotted coordinates, and the grid's size
+    x_axis = normalize_axis(x_axis, n, "x_axis")
+    y_axis = default_y_axis(n) if y_axis is None else y_axis
+    y_axis = normalize_axis(y_axis, n, "y_axis")
+    n_x, n_y = normalize_grid_shape(grid_shape)
+
+    # The slice: the other states held at x_ref, the input at u, the time at t
+    x_ref_arr = default_x_ref(sys, x_ref)
+    u_arr = default_u(sys, u)
+    t_float = float(t)
+
+    # The trajectory on the two coordinates, and the plotted window
+    overlay = trajectory_overlay(traj, x_axis, y_axis) if traj is not None else None
+    x_bounds, y_bounds = resolve_phase_bounds(
+        sys,
+        x_axis=x_axis,
+        y_axis=y_axis,
+        bounds=bounds,
+        overlay=overlay,
+    )
+
+    # The grid over the two plotted coordinates
+    x_values = np.linspace(x_bounds[0], x_bounds[1], n_x)
+    y_values = np.linspace(y_bounds[0], y_bounds[1], n_y)
+    X, Y = np.meshgrid(x_values, y_values)
+    V = np.zeros_like(X, dtype=float)
+    W = np.zeros_like(Y, dtype=float)
+
+    for row in range(n_y):
+        for col in range(n_x):
+            # The node's state: x_ref with the two plotted coordinates set to the node
+            x = x_ref_arr.copy()
+            x[x_axis] = X[row, col]
+            if y_axis != x_axis:
+                x[y_axis] = Y[row, col]
+
+            # ẋ = f(x, u, t), as a flat vector of the n state rates
+            f_x = sys.f(x, u_arr, t_float, params=params)
+            dx = np.asarray(f_x, dtype=float).reshape(-1)
+            require_field_shape(dx, n)
+
+            # The node's arrow: (ẋᵢ, ẋⱼ) on the two plotted coordinates
+            V[row, col] = dx[x_axis]
+            W[row, col] = dx[y_axis]
+
+    # The title, and the axis labels: the state's own, else x[i]
+    title = title or f"Phase plane for {sys.name}"
+    x_label = label_for_axis(sys, x_axis)
+    y_label = label_for_axis(sys, y_axis)
+    x_unit = unit_for_axis(sys, x_axis)
+    y_unit = unit_for_axis(sys, y_axis)
+
+    return PhasePlaneSpec(
+        title=title,
+        X=X,
+        Y=Y,
+        V=V,
+        W=W,
+        x_axis=x_axis,
+        y_axis=y_axis,
+        x_label=x_label,
+        y_label=y_label,
+        x_unit=x_unit,
+        y_unit=y_unit,
+        x_bounds=x_bounds,
+        y_bounds=y_bounds,
+        trajectory=overlay,
+    )
+
+
+@dataclass(frozen=True)
+class PhasePlaneSpec:
+    """Backend-neutral phase-plane plot request."""
+
+    title: str
+    X: np.ndarray
+    Y: np.ndarray
+    V: np.ndarray
+    W: np.ndarray
+    x_axis: int
+    y_axis: int
+    x_label: str
+    y_label: str
+    x_unit: str
+    y_unit: str
+    x_bounds: tuple[float, float]
+    y_bounds: tuple[float, float]
+    trajectory: PhasePlaneTrajectoryOverlay | None = None
+
+
+@dataclass(frozen=True)
+class PhasePlaneTrajectoryOverlay:
+    """Trajectory data projected onto two phase-plane axes."""
+
+    x: np.ndarray
+    y: np.ndarray
 
 
 def render_phase_plane_matplotlib(
@@ -193,6 +207,7 @@ def render_phase_plane_matplotlib(
     import matplotlib
     import matplotlib.pyplot as plt
 
+    # Lazy import: the graphics load on first use, not with the core
     from minilink.graphical.common.environment import is_blocking_needed
     from minilink.graphical.common.matplotlib_style import (
         DPI_FIGURE,
@@ -201,9 +216,11 @@ def render_phase_plane_matplotlib(
         style_trajectory_subplot,
     )
 
+    # TrueType (Type 42) fonts in PDF and PostScript exports: their text stays editable
     matplotlib.rcParams["pdf.fonttype"] = 42
     matplotlib.rcParams["ps.fonttype"] = 42
 
+    # A new figure, or the one that holds the given axes
     if ax is None:
         fig, ax = plt.subplots(
             figsize=FIGSIZE_BASE if figsize is None else figsize,
@@ -213,31 +230,22 @@ def render_phase_plane_matplotlib(
     else:
         fig = ax.figure
 
+    # The window's title, when the canvas has a window
     manager = getattr(fig.canvas, "manager", None)
     set_window_title = getattr(manager, "set_window_title", None)
     if callable(set_window_title):
         set_window_title(spec.title)
 
+    # The vector field: streamlines, or one arrow per grid node
     vector_kwargs = {} if vector_kwargs is None else dict(vector_kwargs)
     if streamplot:
         ax.streamplot(
-            spec.X,
-            spec.Y,
-            spec.V,
-            spec.W,
-            color=vector_color,
-            **vector_kwargs,
+            spec.X, spec.Y, spec.V, spec.W, color=vector_color, **vector_kwargs
         )
     else:
-        ax.quiver(
-            spec.X,
-            spec.Y,
-            spec.V,
-            spec.W,
-            color=vector_color,
-            **vector_kwargs,
-        )
+        ax.quiver(spec.X, spec.Y, spec.V, spec.W, color=vector_color, **vector_kwargs)
 
+    # The trajectory, its start (a dot) and its end (a cross)
     if spec.trajectory is not None:
         trajectory_kwargs = (
             {"linewidth": 1.5, "alpha": 0.85}
@@ -254,6 +262,7 @@ def render_phase_plane_matplotlib(
             if end_kwargs is None
             else dict(end_kwargs)
         )
+
         (path_line,) = ax.plot(
             spec.trajectory.x,
             spec.trajectory.y,
@@ -275,14 +284,16 @@ def render_phase_plane_matplotlib(
         )
         ax.legend(handles=[path_line, start_line, end_line], loc="best")
 
+    # The title, the axis labels with their units, and the plotted window
     ax.set_title(spec.title, fontsize=FONT_SIZE)
-    ax.set_xlabel(_format_axis_label(spec.x_label, spec.x_unit), fontsize=FONT_SIZE)
-    ax.set_ylabel(_format_axis_label(spec.y_label, spec.y_unit), fontsize=FONT_SIZE)
+    ax.set_xlabel(format_axis_label(spec.x_label, spec.x_unit), fontsize=FONT_SIZE)
+    ax.set_ylabel(format_axis_label(spec.y_label, spec.y_unit), fontsize=FONT_SIZE)
     ax.set_xlim(spec.x_bounds)
     ax.set_ylim(spec.y_bounds)
     style_trajectory_subplot(ax)
     fig.tight_layout()
 
+    # A window, unless the backend draws off screen
     if show and plt.get_backend().lower() != "agg":
         if block is None:
             block = is_blocking_needed()
@@ -290,12 +301,7 @@ def render_phase_plane_matplotlib(
         if pause > 0.0:
             plt.pause(pause)
 
-    return PlotResult(
-        backend="matplotlib",
-        payload=(fig, ax),
-        figure=fig,
-        axes=ax,
-    )
+    return PlotResult(backend="matplotlib", payload=(fig, ax), figure=fig, axes=ax)
 
 
 def render_phase_plane_plotly(
@@ -305,22 +311,19 @@ def render_phase_plane_plotly(
     show: bool = True,
 ) -> PlotResult:
     """Render a phase-plane specification with Plotly (quiver or streamlines)."""
-    try:
-        import plotly.figure_factory as ff
-        import plotly.graph_objects as go
-    except ImportError as exc:
-        raise ImportError(
-            "Plotly phase-plane plots require Plotly. Install with: "
-            "pip install 'minilink[plotting]'"
-        ) from exc
+    ff, go = require_plotly()
 
+    # Lazy import: the graphics load on first use, not with the core
     from minilink.graphical.common.plotly_style import (
         PLOTLY_2D_MARGIN,
         PLOTLY_FIG_WIDTH,
         PLOTLY_TEMPLATE,
     )
 
-    x_values, y_values = spec.X[0, :], spec.Y[:, 0]
+    # The vector field: streamlines, or arrows whose longest spans 0.9 of the finest
+    # grid cell (its length floored at 10⁻¹²)
+    x_values = spec.X[0, :]
+    y_values = spec.Y[:, 0]
     if streamplot:
         fig = ff.create_streamline(
             x_values,
@@ -344,6 +347,7 @@ def render_phase_plane_plotly(
         )
     fig.data[0].name = "vector field"
 
+    # The trajectory, its start (a dot) and its end (a cross)
     if spec.trajectory is not None:
         path = spec.trajectory
         fig.add_trace(
@@ -374,14 +378,15 @@ def render_phase_plane_plotly(
             )
         )
 
+    # The title, the axis labels with their units, and the plotted window
     fig.update_layout(
         title=spec.title,
         xaxis={
-            "title_text": _format_axis_label(spec.x_label, spec.x_unit),
+            "title_text": format_axis_label(spec.x_label, spec.x_unit),
             "range": list(spec.x_bounds),
         },
         yaxis={
-            "title_text": _format_axis_label(spec.y_label, spec.y_unit),
+            "title_text": format_axis_label(spec.y_label, spec.y_unit),
             "range": list(spec.y_bounds),
         },
         width=PLOTLY_FIG_WIDTH,
@@ -390,23 +395,42 @@ def render_phase_plane_plotly(
         margin=dict(PLOTLY_2D_MARGIN),
         template=PLOTLY_TEMPLATE,
     )
+
     if show:
         fig.show()
+
     return PlotResult(backend="plotly", payload=fig, figure=fig)
 
 
-def _normalize_backend(backend: str) -> str:
+###############################################################################
+# Internal machinery
+###############################################################################
+
+
+def normalize_plot_backend(backend: str) -> str:
+    """The backend's key, lowercase; ``"mpl"`` is matplotlib."""
     key = str(backend).lower()
     if key in {"matplotlib", "mpl"}:
         return "matplotlib"
     return key
 
 
-def _default_y_axis(n: int) -> int:
-    return 1 if n > 1 else 0
+def require_plot_backend(key, backend):
+    """Refuse a backend other than matplotlib and plotly."""
+    if key not in ("matplotlib", "plotly"):
+        raise ValueError(
+            f"Unknown plot backend {backend!r}. Expected 'matplotlib' or 'plotly'."
+        )
 
 
-def _normalize_axis(axis, n: int, name: str) -> int:
+def require_state(n):
+    """Refuse a system without a state to plot."""
+    if n < 1:
+        raise ValueError("Phase-plane plots require a system with at least one state")
+
+
+def normalize_axis(axis, n: int, name: str) -> int:
+    """The state index ``axis`` as an int in ``[0, n - 1]``; a bool is refused."""
     if isinstance(axis, bool):
         raise ValueError(f"{name} must be an integer state index")
     axis_int = int(axis)
@@ -415,7 +439,13 @@ def _normalize_axis(axis, n: int, name: str) -> int:
     return axis_int
 
 
-def _normalize_grid_shape(grid_shape) -> tuple[int, int]:
+def default_y_axis(n: int) -> int:
+    """The second state, or the first when there is only one."""
+    return 1 if n > 1 else 0
+
+
+def normalize_grid_shape(grid_shape) -> tuple[int, int]:
+    """The grid's ``(n_x, n_y)`` as two ints, each at least 2."""
     try:
         n_x, n_y = tuple(grid_shape)
     except TypeError as exc:
@@ -429,7 +459,8 @@ def _normalize_grid_shape(grid_shape) -> tuple[int, int]:
     return n_x, n_y
 
 
-def _default_x_ref(sys, x_ref) -> np.ndarray:
+def default_x_ref(sys, x_ref) -> np.ndarray:
+    """The held state: ``x_ref``, else the state's nominal value, else zero."""
     if x_ref is None:
         value = getattr(getattr(sys, "state", None), "nominal_value", None)
         if value is None:
@@ -442,7 +473,8 @@ def _default_x_ref(sys, x_ref) -> np.ndarray:
     return arr.copy()
 
 
-def _default_u(sys, u) -> np.ndarray:
+def default_u(sys, u) -> np.ndarray:
+    """The held input: ``u``, else the input ports' values."""
     if u is None:
         value = sys.get_u_from_input_ports()
     else:
@@ -453,7 +485,8 @@ def _default_u(sys, u) -> np.ndarray:
     return arr.copy()
 
 
-def _trajectory_overlay(traj, x_axis: int, y_axis: int) -> PhasePlaneTrajectoryOverlay:
+def trajectory_overlay(traj, x_axis: int, y_axis: int) -> PhasePlaneTrajectoryOverlay:
+    """The rows ``x_axis`` and ``y_axis`` of ``traj.x``, copied."""
     x = np.asarray(traj.x, dtype=float)
     if x.ndim != 2:
         raise ValueError("traj.x must have shape (n, N)")
@@ -470,7 +503,7 @@ def _trajectory_overlay(traj, x_axis: int, y_axis: int) -> PhasePlaneTrajectoryO
     )
 
 
-def _resolve_phase_bounds(
+def resolve_phase_bounds(
     sys,
     *,
     x_axis: int,
@@ -478,26 +511,26 @@ def _resolve_phase_bounds(
     bounds,
     overlay: PhasePlaneTrajectoryOverlay | None,
 ) -> tuple[tuple[float, float], tuple[float, float]]:
+    """The plotted window: ``bounds``, else each axis's own (see ``bounds_from_state_or_overlay``)."""
     if bounds is not None:
         arr = np.asarray(bounds, dtype=float)
         if arr.shape != (2, 2):
             raise ValueError("bounds must have shape ((xmin, xmax), (ymin, ymax))")
-        return _validate_bounds(arr[0], "x bounds"), _validate_bounds(
-            arr[1],
-            "y bounds",
-        )
+        x_bounds = validate_bounds(arr[0], "x bounds")
+        y_bounds = validate_bounds(arr[1], "y bounds")
+        return x_bounds, y_bounds
 
     state = getattr(sys, "state", None)
     lower = getattr(state, "lower_bound", None)
     upper = getattr(state, "upper_bound", None)
 
-    x_bounds = _bounds_from_state_or_overlay(
+    x_bounds = bounds_from_state_or_overlay(
         lower,
         upper,
         axis=x_axis,
         values=None if overlay is None else overlay.x,
     )
-    y_bounds = _bounds_from_state_or_overlay(
+    y_bounds = bounds_from_state_or_overlay(
         lower,
         upper,
         axis=y_axis,
@@ -506,42 +539,10 @@ def _resolve_phase_bounds(
     return x_bounds, y_bounds
 
 
-def _bounds_from_state_or_overlay(
-    lower,
-    upper,
-    *,
-    axis: int,
-    values,
-) -> tuple[float, float]:
-    if lower is not None and upper is not None:
-        lo = float(np.asarray(lower, dtype=float).reshape(-1)[axis])
-        hi = float(np.asarray(upper, dtype=float).reshape(-1)[axis])
-        if np.isfinite(lo) and np.isfinite(hi) and lo < hi:
-            return lo, hi
-
-    if values is not None:
-        return _bounds_from_values(values)
-
-    return -10.0, 10.0
-
-
-def _bounds_from_values(values) -> tuple[float, float]:
-    arr = np.asarray(values, dtype=float).reshape(-1)
-    finite = arr[np.isfinite(arr)]
-    if finite.size == 0:
-        return -10.0, 10.0
-    lo = float(np.min(finite))
-    hi = float(np.max(finite))
-    span = hi - lo
-    if not np.isfinite(span) or span <= 0.0:
-        pad = max(1.0, abs(lo) * 0.1)
-    else:
-        pad = 0.05 * span
-    return lo - pad, hi + pad
-
-
-def _validate_bounds(values, name: str) -> tuple[float, float]:
-    lo, hi = (float(values[0]), float(values[1]))
+def validate_bounds(values, name: str) -> tuple[float, float]:
+    """The pair ``(lo, hi)`` as floats, refused unless finite with ``lo < hi``."""
+    lo = float(values[0])
+    hi = float(values[1])
     if not (np.isfinite(lo) and np.isfinite(hi)):
         raise ValueError(f"{name} must be finite")
     if lo >= hi:
@@ -549,23 +550,84 @@ def _validate_bounds(values, name: str) -> tuple[float, float]:
     return lo, hi
 
 
-def _label_for_axis(sys, axis: int) -> str:
+def bounds_from_state_or_overlay(
+    lower,
+    upper,
+    *,
+    axis: int,
+    values,
+) -> tuple[float, float]:
+    """The state's bounds on ``axis`` when finite, else the overlay's span, else ±10."""
+    if lower is not None and upper is not None:
+        lo = float(np.asarray(lower, dtype=float).reshape(-1)[axis])
+        hi = float(np.asarray(upper, dtype=float).reshape(-1)[axis])
+        if np.isfinite(lo) and np.isfinite(hi) and lo < hi:
+            return lo, hi
+
+    if values is not None:
+        return bounds_from_values(values)
+
+    return -10.0, 10.0
+
+
+def bounds_from_values(values) -> tuple[float, float]:
+    """The finite values' span, padded by 5 % (by max(1, 0.1 |lo|) when flat); ±10 when none."""
+    arr = np.asarray(values, dtype=float).reshape(-1)
+    finite = arr[np.isfinite(arr)]
+    if finite.size == 0:
+        return -10.0, 10.0
+
+    lo = float(np.min(finite))
+    hi = float(np.max(finite))
+    span = hi - lo
+    if not np.isfinite(span) or span <= 0.0:
+        pad = max(1.0, abs(lo) * 0.1)
+    else:
+        pad = 0.05 * span
+
+    return lo - pad, hi + pad
+
+
+def require_field_shape(dx, n):
+    """Refuse a vector field ``f`` that does not return ``n`` state rates."""
+    if dx.shape != (n,):
+        raise ValueError(f"sys.f must return shape ({n},), got {dx.shape}")
+
+
+def label_for_axis(sys, axis: int) -> str:
+    """The state's label of ``axis``, else ``x[axis]``."""
     labels = list(getattr(getattr(sys, "state", None), "labels", []))
     if len(labels) > axis:
         return str(labels[axis])
     return f"x[{axis}]"
 
 
-def _unit_for_axis(sys, axis: int) -> str:
+def unit_for_axis(sys, axis: int) -> str:
+    """The state's unit of ``axis``, else none."""
     units = list(getattr(getattr(sys, "state", None), "units", []))
     if len(units) > axis:
         return str(units[axis])
     return ""
 
 
-def _format_axis_label(label: str, unit: str) -> str:
+def format_axis_label(label: str, unit: str) -> str:
+    """The label with its unit in brackets: ``[m]`` stays ``[m]``."""
     if unit:
         if unit.startswith("[") and unit.endswith("]"):
             return f"{label} {unit}"
         return f"{label} [{unit}]"
     return label
+
+
+def require_plotly():
+    """Refuse to draw without Plotly; return ``(ff, go)``."""
+    try:
+        import plotly.figure_factory as ff
+        import plotly.graph_objects as go
+    except ImportError as exc:
+        raise ImportError(
+            "Plotly phase-plane plots require Plotly. Install with: "
+            "pip install 'minilink[plotting]'"
+        ) from exc
+
+    return ff, go
