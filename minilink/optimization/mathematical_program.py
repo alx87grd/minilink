@@ -1,15 +1,4 @@
-"""
-Generic finite-dimensional mathematical programs.
-
-The optimization layer represents problems in the textbook NLP form
-
-``minimize J(z) subject to h(z) = 0, g(z) >= 0, lower <= z <= upper``.
-
-The :class:`MathematicalProgram` itself stays close to that math: it stores
-pure callables of the decision vector ``z`` and no solver state such as an
-initial guess. Backend-specific casting, JAX compilation, and SciPy-friendly
-wrappers live outside this object on program evaluators owned by optimizers.
-"""
+"""Mathematical programs: the finite-dimensional NLP, and the result an optimizer returns."""
 
 from collections.abc import Callable
 from dataclasses import dataclass, field
@@ -28,14 +17,22 @@ ObjectiveFunction: TypeAlias = Callable[[NativeArray], NativeScalarExpression]
 ArrayFunction: TypeAlias = Callable[[NativeArray], NativeArray]
 
 
+###############################################################################
+# Public API
+###############################################################################
+
+
 @dataclass(frozen=True)
 class MathematicalProgram:
     """
     Pure finite-dimensional nonlinear program description.
 
-    The generic form is
+    The generic form is the textbook NLP
     ``minimize J(z)`` subject to ``h(z) = 0``, ``g(z) >= 0``, and optional
-    box bounds on ``z``.
+    box bounds ``lower <= z <= upper``. The program stores pure callables of
+    the decision vector ``z`` and no solver state such as an initial guess;
+    backend casting, JAX compilation and SciPy-friendly wrappers live on the
+    program evaluators the optimizers own.
 
     Native function contract
     ------------------------
@@ -99,31 +96,26 @@ class MathematicalProgram:
 
     def __post_init__(self) -> None:
         n_z = int(self.n_z)
-        if n_z <= 0:
-            raise ValueError("n_z must be a positive integer")
-        lower = _as_vector_or_none("lower", self.lower, n_z)
-        upper = _as_vector_or_none("upper", self.upper, n_z)
-        if lower is not None and upper is not None and np.any(lower > upper):
-            raise ValueError("lower bounds must be less than or equal to upper bounds")
+        require_positive_size(n_z)
+
+        # The box bounds as flat float copies of shape (n_z,), with lower ≤ upper
+        lower = as_vector_or_none("lower", self.lower, n_z)
+        upper = as_vector_or_none("upper", self.upper, n_z)
+        require_ordered_bounds(lower, upper)
+
+        # The frozen fields take their checked values, the metadata its own copy
         object.__setattr__(self, "n_z", n_z)
         object.__setattr__(self, "lower", lower)
         object.__setattr__(self, "upper", upper)
         object.__setattr__(self, "metadata", dict(self.metadata))
+
+    # Display
 
     def __str__(self):
         return inspect_text(self)
 
     def _repr_pretty_(self, p, cycle):
         repr_pretty(self, p, cycle)
-
-
-def _as_vector_or_none(name: str, value, n_z: int) -> np.ndarray | None:
-    if value is None:
-        return None
-    arr = np.asarray(value, dtype=float).reshape(-1).copy()
-    if arr.shape != (n_z,):
-        raise ValueError(f"{name} bounds must have shape ({n_z},)")
-    return arr
 
 
 @dataclass(frozen=True)
@@ -149,8 +141,38 @@ class OptimizationResult:
     solve_time_s: float | None = None
 
     def __post_init__(self) -> None:
+        # The solution as a flat float copy, the statistics as their own dict
         z = np.asarray(self.z, dtype=float).reshape(-1).copy()
         object.__setattr__(self, "z", z)
         object.__setattr__(self, "stats", dict(self.stats))
+
+        # The measured time as a float, when one was measured
         if self.solve_time_s is not None:
             object.__setattr__(self, "solve_time_s", float(self.solve_time_s))
+
+
+###############################################################################
+# Internal machinery
+###############################################################################
+
+
+def require_positive_size(n_z):
+    """Refuse a program without a decision variable."""
+    if n_z <= 0:
+        raise ValueError("n_z must be a positive integer")
+
+
+def as_vector_or_none(name: str, value, n_z: int) -> np.ndarray | None:
+    """A bound as a flat float copy of shape ``(n_z,)``, or ``None`` when absent."""
+    if value is None:
+        return None
+    arr = np.asarray(value, dtype=float).reshape(-1).copy()
+    if arr.shape != (n_z,):
+        raise ValueError(f"{name} bounds must have shape ({n_z},)")
+    return arr
+
+
+def require_ordered_bounds(lower, upper):
+    """Refuse a lower bound above its upper bound."""
+    if lower is not None and upper is not None and np.any(lower > upper):
+        raise ValueError("lower bounds must be less than or equal to upper bounds")
