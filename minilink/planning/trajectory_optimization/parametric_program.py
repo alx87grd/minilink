@@ -1,4 +1,4 @@
-"""Parametric finite-dimensional programs for compile-once trajopt / MPC."""
+"""Parametric programs: a nonlinear program whose equalities read a runtime initial state."""
 
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass, field
@@ -6,6 +6,7 @@ from typing import Any, TypeAlias
 
 from minilink.core.backends import BACKEND_JAX
 
+# Loose on purpose, as for the plain program: native NumPy or JAX arrays in and out
 NativeArray: TypeAlias = Any
 NativeScalarExpression: TypeAlias = Any
 ObjectiveFunction: TypeAlias = Callable[[NativeArray], NativeScalarExpression]
@@ -13,6 +14,11 @@ ParametricEqualityFunction: TypeAlias = Callable[
     [NativeArray, NativeArray], NativeArray
 ]
 InequalityFunction: TypeAlias = Callable[[NativeArray], NativeArray]
+
+
+###############################################################################
+# Public API
+###############################################################################
 
 
 @dataclass(frozen=True)
