@@ -4,7 +4,6 @@ banner	minilink/control/mpc/controller.py::line 35	1
 banner	minilink/control/mpc/controller.py::line 61	1
 bare-jax	minilink/analysis/derivatives.py::from jax.errors	1
 bare-jax	minilink/simulation/compile_backend.py::import jax	1
-lazy-import	minilink/__init__.py::_package_version: minilink._version	1
 lazy-import	minilink/control/mpc/controller.py::export_mpc_dual_rate_computer: minilink.core.diagram	1
 lazy-import	minilink/control/mpc/controller.py::export_mpc_dual_rate_computer: minilink.simulation.computer	1
 lazy-import	minilink/control/mpc/controller.py::export_mpc_to_computer: minilink.simulation.computer	1
@@ -16,11 +15,7 @@ quoted-annotation	minilink/control/mpc/controller.py::line 832	1
 return-math	minilink/dynamics/catalog/vehicles/dynamic_bicycle.py::DynamicBicycle.tf	1
 return-math	minilink/dynamics/catalog/vehicles/steering.py::KinematicBicycle.tf	1
 return-math	minilink/dynamics/catalog/vehicles/steering.py::KinematicCar.tf	1
-title	minilink/__init__.py::<module>	1
-title	minilink/catalog/__init__.py::<module>	1
 title	minilink/control/mpc/controller.py::<module>	1
-title	minilink/identification/__init__.py::<module>	1
-underscore	minilink/__init__.py::_package_version	1
 underscore	minilink/control/mpc/controller.py::MPCBroadcastController._abs_t	1
 underscore	minilink/control/mpc/controller.py::MPCBroadcastController._compute_u_nom	1
 underscore	minilink/control/mpc/controller.py::MPCBroadcastController._compute_x_nom	1
