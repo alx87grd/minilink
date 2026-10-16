@@ -1,4 +1,4 @@
-"""Cyipopt :func:`cyipopt.minimize_ipopt` optimizer adapter."""
+"""The Ipopt backend: a compiled program solved by cyipopt's interior-point method."""
 
 import numpy as np
 
@@ -11,6 +11,10 @@ from minilink.optimization.optimizers.optimizer_backend import (
     OptimizerBackend,
 )
 
+###############################################################################
+# Public API
+###############################################################################
+
 
 class IpoptOptimizer(OptimizerBackend):
     """
@@ -22,6 +26,7 @@ class IpoptOptimizer(OptimizerBackend):
     """
 
     def __init__(self, options: dict | None = None, tol: float | None = None):
+        # Solver options, copied, and the convergence tolerance
         self.options = {} if options is None else dict(options)
         self.tol = tol
 
@@ -33,20 +38,11 @@ class IpoptOptimizer(OptimizerBackend):
         callback: BackendIterateCallback | None = None,
     ) -> OptimizationResult:
         """Solve ``program_evaluator`` with Ipopt and return a backend-neutral result."""
-        if callback is not None:
-            raise NotImplementedError(
-                "IpoptOptimizer does not support solve(callback=...): cyipopt's "
-                "native Ipopt path does not run a Python callback each iteration. "
-                "Use a SciPy optimizer method (e.g. 'scipy_slsqp') or omit callback."
-            )
-        try:
-            from cyipopt import minimize_ipopt
-        except ImportError as exc:  # pragma: no cover - optional dep
-            raise ImportError(
-                "IpoptOptimizer requires the optional 'cyipopt' package; "
-                "install with `pip install cyipopt`."
-            ) from exc
+        require_no_callback(callback)
+        minimize_ipopt = require_cyipopt()
 
+        # Equalities h(z) = 0 and inequalities g(z) ≥ 0, each with its Jacobian when
+        # the evaluator has one
         constraints = []
 
         if program_evaluator.n_h > 0:
@@ -61,6 +57,7 @@ class IpoptOptimizer(OptimizerBackend):
                 entry["jac"] = program_evaluator.jacobian_g
             constraints.append(entry)
 
+        # The interior-point solve from z0, inside the box bounds
         raw_result = minimize_ipopt(
             program_evaluator.objective,
             np.asarray(z0, dtype=float).reshape(program_evaluator.n_z),
@@ -72,6 +69,7 @@ class IpoptOptimizer(OptimizerBackend):
             options=dict(self.options),
         )
 
+        # The counters and the status the solver reports, and the final cost
         stats = {}
         for name in ("nit", "nfev", "njev", "status"):
             if hasattr(raw_result, name):
@@ -89,3 +87,31 @@ class IpoptOptimizer(OptimizerBackend):
             stats=stats,
             raw_result=raw_result,
         )
+
+
+###############################################################################
+# Internal machinery
+###############################################################################
+
+
+def require_no_callback(callback):
+    """Refuse a per-iterate callback: cyipopt's native path runs none."""
+    if callback is not None:
+        raise NotImplementedError(
+            "IpoptOptimizer does not support solve(callback=...): cyipopt's "
+            "native Ipopt path does not run a Python callback each iteration. "
+            "Use a SciPy optimizer method (e.g. 'scipy_slsqp') or omit callback."
+        )
+
+
+def require_cyipopt():
+    """Refuse a solve without the optional cyipopt package; return its ``minimize_ipopt``."""
+    try:
+        from cyipopt import minimize_ipopt
+    except ImportError as exc:  # pragma: no cover - optional dep
+        raise ImportError(
+            "IpoptOptimizer requires the optional 'cyipopt' package; "
+            "install with `pip install cyipopt`."
+        ) from exc
+
+    return minimize_ipopt
