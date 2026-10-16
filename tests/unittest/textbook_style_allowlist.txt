@@ -87,14 +87,6 @@ lazy-import	minilink/core/composition.py::_close_on: minilink.blocks.routing	1
 lazy-import	minilink/core/composition.py::_insert_filter: minilink.blocks.routing	1
 lazy-import	minilink/core/composition.py::_return_signal: minilink.blocks.routing	1
 lazy-import	minilink/core/composition.py::sum_into: minilink.blocks.routing	1
-lazy-import	minilink/core/facades.py::SharedSystemFacades.animate: minilink.graphical.common.environment	1
-lazy-import	minilink/core/inspect.py::inspect_text: minilink.core.distributions	1
-lazy-import	minilink/core/inspect.py::inspect_text: minilink.core.sets	1
-lazy-import	minilink/core/inspect.py::inspect_text: minilink.core.system	1
-lazy-import	minilink/core/inspect.py::inspect_text: minilink.core.trajectory	1
-lazy-import	minilink/core/inspect.py::inspect_text: minilink.optimization.mathematical_program	1
-lazy-import	minilink/core/inspect.py::inspect_text: minilink.planning.problems	1
-lazy-import	minilink/core/inspect.py::inspect_text: minilink.planning.spatial.state_fields	1
 lazy-import	minilink/graphical/animation/__init__.py::__getattr__: minilink.graphical.animation	1
 lazy-import	minilink/graphical/animation/drawables.py::_shape_to_primitives: minilink.core.geometry	3
 lazy-import	minilink/graphical/animation/drawables.py::validate_overlay: minilink.core.system	1

@@ -258,18 +258,36 @@ def class_aliases(tree):
 
 
 def lazy_imports(tree, lines):
+    """A minilink import inside a function needs a reason: a comment on its line or above.
+
+    One comment covers a block of consecutive imports: an import right below a
+    commented one inherits its reason.
+    """
     for qualname, fn in functions(tree):
-        for node in ast.walk(fn):
-            if not isinstance(node, (ast.Import, ast.ImportFrom)):
-                continue
+        imports = sorted(
+            (
+                node
+                for node in ast.walk(fn)
+                if isinstance(node, (ast.Import, ast.ImportFrom))
+            ),
+            key=lambda node: node.lineno,
+        )
+        reasoned_until = -1
+        for node in imports:
+            here = lines[node.lineno - 1]
+            above = lines[node.lineno - 2] if node.lineno > 1 else ""
+            reasoned = (
+                "#" in here
+                or above.strip().startswith("#")
+                or reasoned_until == node.lineno - 1
+            )
+            if reasoned:
+                reasoned_until = node.end_lineno
+
             module = (
                 node.module if isinstance(node, ast.ImportFrom) else node.names[0].name
             )
-            if not (module or "").startswith("minilink"):
-                continue
-            here = lines[node.lineno - 1]
-            above = lines[node.lineno - 2] if node.lineno > 1 else ""
-            if "#" not in here and not above.strip().startswith("#"):
+            if (module or "").startswith("minilink") and not reasoned:
                 yield "lazy-import", f"{qualname}: {module}"
 
 
