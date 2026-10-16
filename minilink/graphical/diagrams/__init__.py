@@ -1,4 +1,4 @@
-"""Diagram topology export and display API."""
+"""Block diagrams: a system's topology, flat or hybrid, exported to Graphviz or Mermaid and drawn."""
 
 from minilink.graphical.diagrams.dot import (
     get_diagram,
