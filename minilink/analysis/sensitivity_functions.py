@@ -7,6 +7,10 @@ import numpy as np
 from minilink.analysis.frequency import transfer_function
 from minilink.analysis.linearization import output_selectors
 
+###############################################################################
+# Public API
+###############################################################################
+
 
 def sensitivity(
     *,
@@ -51,6 +55,7 @@ def sensitivity(
         ``plot_bode`` or a simulation; its ports are labelled ``r`` and ``e``
         (``T``: ``r`` to ``y``, ``PS``: ``w`` to ``y``, ``CS``: ``v`` to ``u``).
     """
+    # The loop's pieces, each a SISO transfer function
     H, C, F = loop_pieces(
         plant, controller, filter, x_bar, u_bar, t, params, method, eps
     )
@@ -82,6 +87,7 @@ def complementary_sensitivity(
 
     Same arguments as :func:`sensitivity`; without a filter, ``S + T = 1``.
     """
+    # The loop's pieces, each a SISO transfer function
     H, C, F = loop_pieces(
         plant, controller, filter, x_bar, u_bar, t, params, method, eps
     )
@@ -113,6 +119,7 @@ def load_sensitivity(
 
     Same arguments as :func:`sensitivity`.
     """
+    # The loop's pieces, each a SISO transfer function
     H, C, F = loop_pieces(
         plant, controller, filter, x_bar, u_bar, t, params, method, eps
     )
@@ -145,6 +152,7 @@ def noise_sensitivity(
     Same arguments as :func:`sensitivity`. In the loop, ``n`` reaches ``u``
     as ``-CS``: the sign of the negative feedback is left out.
     """
+    # The loop's pieces, each a SISO transfer function
     H, C, F = loop_pieces(
         plant, controller, filter, x_bar, u_bar, t, params, method, eps
     )
@@ -160,42 +168,53 @@ def noise_sensitivity(
     return loop_function(CS_num, CS_den, "Noise sensitivity CS", "n", "u")
 
 
-# =============================================================================
+###############################################################################
 # Internal machinery
-# =============================================================================
+###############################################################################
 
 
 def loop_pieces(plant, controller, filter, x_bar, u_bar, t, params, method, eps):
     """``H``, ``C`` and ``F`` as SISO transfer functions; ``F = 1`` without a filter."""
+    # Lazy import: the block and its graphics load on first use, not with the analysis
     from minilink.blocks.transfer_function import TransferFunction
 
+    # The plant at its operating point; the controller and filter at their nominal one
     H = siso_piece(plant, "plant", x_bar, u_bar, t, params, method, eps)
     C = siso_piece(controller, "controller", None, None, 0.0, None, method, eps)
     if filter is None:
         F = TransferFunction([1.0], [1.0], name="F")
     else:
         F = siso_piece(filter, "filter", None, None, 0.0, None, method, eps)
+
     return H, C, F
 
 
 def siso_piece(sys, role, x_bar, u_bar, t, params, method, eps):
     """The transfer function of one loop piece; a piece with several channels is refused."""
+    # p outputs (the state, without an output port) and m inputs (the first port)
     outputs = output_selectors(sys, None)
     p = sys.n if outputs is None else sum(sys.outputs[name].dim for name, _ in outputs)
     m = next(iter(sys.inputs.values())).dim if sys.inputs else 0
+    require_siso(sys, role, m, p)
+
+    return transfer_function(
+        sys, x_bar, u_bar, t, params, method=method, eps=eps, minimal=True
+    )
+
+
+def require_siso(sys, role, m, p):
+    """Refuse a loop piece that is not single-input, single-output."""
     if m != 1 or p != 1:
         raise ValueError(
             f"The {role} {sys.name!r} must be SISO, got {m} input(s) and {p} "
             f"output(s). Select one channel first: "
             f"{role}=transfer_function({role}, of=..., wrt=...)."
         )
-    return transfer_function(
-        sys, x_bar, u_bar, t, params, method=method, eps=eps, minimal=True
-    )
 
 
 def loop_function(numerator, denominator, name, wrt, of):
     """The closed-loop function as a ``TransferFunction`` block, its ports labelled by the loop signals."""
+    # Lazy import: the block and its graphics load on first use, not with the analysis
     from minilink.blocks.transfer_function import TransferFunction
 
     G = TransferFunction(
@@ -203,4 +222,5 @@ def loop_function(numerator, denominator, name, wrt, of):
     )
     G.inputs["u"].labels = [wrt]
     G.outputs["y"].labels = [of]
+
     return G
