@@ -1,0 +1,929 @@
+# The textbook-rule backlog: check, module::where, count.
+# Shrinks only. Regenerate: python tests/unittest/textbook_style.py --write
+array-on-return	minilink/core/diagram.py::DiagramSystem.f	1
+array-on-return	minilink/dynamics/catalog/mass_spring_damper/linear.py::SingleMass.D	1
+array-on-return	minilink/dynamics/catalog/mass_spring_damper/linear.py::ThreeMass.D	1
+array-on-return	minilink/dynamics/catalog/mass_spring_damper/linear.py::TwoMass.D	1
+array-on-return	minilink/dynamics/catalog/pendulum/double_pendulum.py::Acrobot.B	1
+array-on-return	minilink/dynamics/catalog/pendulum/pendulum.py::PendulumWithNoisePort.B	1
+banner	minilink/analysis/discretization.py::line 154	1
+banner	minilink/analysis/discretization.py::line 200	1
+banner	minilink/analysis/frequency.py::line 294	1
+banner	minilink/analysis/frequency.py::line 454	1
+banner	minilink/analysis/linear.py::line 120	1
+banner	minilink/analysis/linear.py::line 161	1
+banner	minilink/analysis/linear.py::line 18	1
+banner	minilink/analysis/linear.py::line 208	1
+banner	minilink/analysis/linear.py::line 253	1
+banner	minilink/analysis/linear.py::line 298	1
+banner	minilink/analysis/linearization.py::line 183	1
+banner	minilink/analysis/lyapunov.py::line 21	1
+banner	minilink/analysis/lyapunov.py::line 440	1
+banner	minilink/analysis/modal.py::line 140	1
+banner	minilink/analysis/riccati.py::line 78	1
+banner	minilink/analysis/riccati.py::line 8	1
+banner	minilink/analysis/sensitivity_functions.py::line 164	1
+banner	minilink/analysis/structural.py::line 142	1
+banner	minilink/analysis/time_response.py::line 175	1
+banner	minilink/blocks/sources.py::line 343	1
+banner	minilink/blocks/transfer_function.py::line 129	1
+banner	minilink/control/design.py::line 24	1
+banner	minilink/control/design.py::line 319	1
+banner	minilink/control/geometric.py::line 12	1
+banner	minilink/control/impedance.py::line 181	1
+banner	minilink/control/mpc/controller.py::line 35	1
+banner	minilink/control/mpc/controller.py::line 61	1
+banner	minilink/control/neural.py::line 10	1
+banner	minilink/control/robotic.py::line 422	1
+banner	minilink/control/siso.py::line 306	1
+banner	minilink/control/state.py::line 238	1
+banner	minilink/core/composition.py::line 34	1
+banner	minilink/core/composition.py::line 389	1
+banner	minilink/core/distributions.py::line 151	1
+banner	minilink/core/distributions.py::line 24	1
+banner	minilink/core/facades.py::line 1106	1
+banner	minilink/core/feedback.py::line 23	1
+banner	minilink/core/feedback.py::line 253	1
+banner	minilink/core/geometry.py::line 11	1
+banner	minilink/core/hybrid_composition.py::line 195	1
+banner	minilink/core/hybrid_composition.py::line 22	1
+banner	minilink/core/hybrid_diagram.py::line 26	1
+banner	minilink/core/hybrid_diagram.py::line 406	1
+banner	minilink/dynamics/catalog/vehicles/tires.py::line 8	1
+banner	minilink/estimation/design.py::line 106	1
+banner	minilink/estimation/design.py::line 13	1
+banner	minilink/estimation/observer.py::line 107	1
+banner	minilink/graphical/port_map.py::line 29	1
+banner	minilink/graphical/port_map.py::line 386	1
+banner	minilink/planning/comparison.py::line 23	1
+banner	minilink/planning/comparison.py::line 293	1
+banner	minilink/planning/evaluation.py::line 16	1
+banner	minilink/planning/evaluation.py::line 184	1
+banner	minilink/planning/planner.py::line 121	1
+banner	minilink/planning/policy_synthesis/discretizer.py::line 20	1
+banner	minilink/planning/policy_synthesis/discretizer.py::line 461	1
+banner	minilink/planning/policy_synthesis/dp.py::line 24	1
+banner	minilink/planning/policy_synthesis/dp.py::line 473	1
+banner	minilink/planning/policy_synthesis/dp.py::line 659	1
+banner	minilink/planning/policy_synthesis/dp_jax.py::line 16	1
+banner	minilink/planning/policy_synthesis/dp_jax.py::line 169	1
+banner	minilink/planning/policy_synthesis/lookup_policy.py::line 18	1
+banner	minilink/planning/policy_synthesis/lqr.py::line 224	1
+banner	minilink/planning/policy_synthesis/lqr.py::line 37	1
+banner	minilink/planning/policy_synthesis/plotting.py::line 12	1
+banner	minilink/planning/policy_synthesis/plotting.py::line 345	1
+banner	minilink/planning/policy_synthesis/policy_eval.py::line 100	1
+banner	minilink/planning/policy_synthesis/policy_eval.py::line 22	1
+banner	minilink/planning/policy_synthesis/progress.py::line 10	1
+banner	minilink/planning/reinforcement_learning/algorithms/actor_critic.py::line 8	1
+banner	minilink/planning/reinforcement_learning/algorithms/base.py::line 5	1
+banner	minilink/planning/reinforcement_learning/algorithms/ppo.py::line 8	1
+banner	minilink/planning/reinforcement_learning/algorithms/reinforce.py::line 8	1
+banner	minilink/planning/reinforcement_learning/algorithms/sac.py::line 7	1
+banner	minilink/planning/reinforcement_learning/collect.py::line 124	1
+banner	minilink/planning/reinforcement_learning/collect.py::line 7	1
+banner	minilink/planning/reinforcement_learning/critics.py::line 7	1
+banner	minilink/planning/reinforcement_learning/environment.py::line 13	1
+banner	minilink/planning/reinforcement_learning/environment.py::line 204	1
+banner	minilink/planning/reinforcement_learning/optim.py::line 5	1
+banner	minilink/planning/reinforcement_learning/planner.py::line 325	1
+banner	minilink/planning/reinforcement_learning/planner.py::line 48	1
+banner	minilink/planning/reinforcement_learning/policy.py::line 26	1
+banner	minilink/planning/reinforcement_learning/tabular.py::line 17	1
+banner	minilink/planning/reinforcement_learning/tabular.py::line 325	1
+banner	minilink/planning/results.py::line 14	1
+banner	minilink/planning/search/extenders.py::line 22	1
+banner	minilink/planning/search/live_plot.py::line 11	1
+banner	minilink/planning/search/plotting.py::line 13	1
+banner	minilink/planning/search/plotting.py::line 272	1
+banner	minilink/planning/search/plotting.py::line 360	1
+banner	minilink/planning/search/rrt.py::line 311	1
+banner	minilink/planning/search/rrt.py::line 35	1
+banner	minilink/planning/search/rrt_star.py::line 29	1
+banner	minilink/planning/search/rrt_star.py::line 315	1
+banner	minilink/planning/spatial/grid.py::line 17	1
+banner	minilink/planning/spatial/paths.py::line 18	1
+banner	minilink/planning/spatial/plotting.py::line 17	1
+banner	minilink/planning/spatial/scene.py::line 23	1
+banner	minilink/planning/spatial/shaping.py::line 18	1
+banner	minilink/planning/spatial/state_fields.py::line 25	1
+banner	minilink/planning/spatial/track.py::line 23	1
+banner	minilink/planning/spatial/workspace_fields.py::line 19	1
+banner	minilink/simulation/computer.py::line 259	1
+banner	minilink/simulation/computer.py::line 27	1
+banner	minilink/simulation/hybrid_simulator.py::line 21	1
+banner	minilink/simulation/hybrid_simulator.py::line 428	1
+banner	minilink/simulation/simulator.py::line 412	1
+banner	minilink/simulation/static_simulator.py::line 76	1
+bare-jax	minilink/analysis/derivatives.py::from jax.errors	1
+bare-jax	minilink/analysis/lyapunov.py::import jax	2
+bare-jax	minilink/analysis/lyapunov.py::import jax.numpy	2
+bare-jax	minilink/optimization/evaluators/jax_evaluator.py::import jax	1
+bare-jax	minilink/optimization/evaluators/jax_evaluator.py::import jax.numpy	1
+bare-jax	minilink/planning/policy_synthesis/dp_jax.py::from jax.scipy.ndimage	1
+bare-jax	minilink/planning/trajectory_optimization/parametric_evaluator.py::import jax	1
+bare-jax	minilink/planning/trajectory_optimization/parametric_evaluator.py::import jax.numpy	1
+bare-jax	minilink/simulation/compile_backend.py::import jax	1
+first-screen	minilink/core/signals.py::<module>	1
+first-screen	minilink/dynamics/catalog/manipulators/arms.py::<module>	1
+first-screen	minilink/dynamics/catalog/manipulators/ur5.py::<module>	1
+first-screen	minilink/graphical/catalog/shapes.py::<module>	1
+first-screen	minilink/graphical/signals/plotly_backend.py::<module>	1
+first-screen	minilink/planning/search/dubins.py::<module>	1
+grouped-unpack	minilink/analysis/lyapunov.py::LyapunovCertificate.V	1
+grouped-unpack	minilink/analysis/lyapunov.py::LyapunovCertificate.V_dot	1
+grouped-unpack	minilink/analysis/lyapunov.py::LyapunovCertificate.extent	1
+grouped-unpack	minilink/analysis/lyapunov.py::LyapunovCertificate.slice_extent	1
+grouped-unpack	minilink/blocks/neural.py::MLP.compute	1
+grouped-unpack	minilink/blocks/nonlinear.py::RateLimiter.f	2
+grouped-unpack	minilink/blocks/sources.py::Sine.h	2
+grouped-unpack	minilink/blocks/sources.py::Step.h	1
+grouped-unpack	minilink/blocks/sources.py::TrajectorySource.h	1
+grouped-unpack	minilink/blocks/sources.py::WhiteNoise.h	2
+grouped-unpack	minilink/control/geometric.py::PurePursuit.ctl	2
+grouped-unpack	minilink/control/neural.py::NeuralPolicyController.action	1
+grouped-unpack	minilink/control/neural.py::NeuralPolicyController.observe	2
+grouped-unpack	minilink/control/robotic.py::ModelJointImpedance.ctl	1
+grouped-unpack	minilink/control/robotic.py::TaskImpedance.ctl	1
+grouped-unpack	minilink/control/siso.py::PID.command	1
+grouped-unpack	minilink/control/siso.py::PID.f	1
+grouped-unpack	minilink/control/state.py::OutputReferenceController.ctl	1
+grouped-unpack	minilink/control/state.py::StateFeedbackController.ctl	1
+grouped-unpack	minilink/core/costs.py::QuadraticCost.g	2
+grouped-unpack	minilink/core/costs.py::QuadraticCost.h	1
+grouped-unpack	minilink/core/costs.py::ScaledCost.g	1
+grouped-unpack	minilink/core/costs.py::ScaledCost.h	1
+grouped-unpack	minilink/core/distributions.py::Gaussian.sample	1
+grouped-unpack	minilink/core/sets.py::BallSet.bounding_box	1
+grouped-unpack	minilink/core/sets.py::BallSet.margin	1
+grouped-unpack	minilink/core/sets.py::BoxSet.margin	1
+grouped-unpack	minilink/core/sets.py::BoxSet.sample	1
+grouped-unpack	minilink/dynamics/catalog/mass_spring_damper/linear.py::SingleMass.A	1
+grouped-unpack	minilink/dynamics/catalog/mass_spring_damper/linear.py::ThreeMass.A	3
+grouped-unpack	minilink/dynamics/catalog/mass_spring_damper/linear.py::TwoMass.A	3
+grouped-unpack	minilink/dynamics/catalog/vehicles/racecar.py::UdeSRacecarDyn.f	5
+grouped-unpack	minilink/dynamics/catalog/vehicles/racecar.py::UdeSRacecarDyn.imu	1
+grouped-unpack	minilink/dynamics/catalog/vehicles/racecar.py::UdeSRacecarDyn.power	1
+grouped-unpack	minilink/dynamics/catalog/vehicles/racecar.py::UdeSRacecarDyn.refresh	5
+grouped-unpack	minilink/dynamics/catalog/vehicles/racecar.py::UdeSRacecarDyn3D.f	1
+grouped-unpack	minilink/dynamics/catalog/vehicles/tires.py::axle_slips	1
+grouped-unpack	minilink/dynamics/catalog/vehicles/tires.py::brush_tire_forces	5
+grouped-unpack	minilink/dynamics/catalog/vehicles/tires.py::friction_use	2
+grouped-unpack	minilink/estimation/observer.py::StateObserver.f	2
+grouped-unpack	minilink/planning/policy_synthesis/discretizer.py::StateSpaceGrid._compute_transition_jax	1
+grouped-unpack	minilink/planning/policy_synthesis/discretizer.py::StateSpaceGrid._compute_transition_numpy	1
+grouped-unpack	minilink/planning/policy_synthesis/discretizer.py::StateSpaceGrid._validity_masks	1
+grouped-unpack	minilink/planning/reinforcement_learning/algorithms/actor_critic.py::ActorCritic.loss	2
+grouped-unpack	minilink/planning/reinforcement_learning/algorithms/ppo.py::PPO.loss	2
+grouped-unpack	minilink/planning/reinforcement_learning/algorithms/ppo.py::PPO.update	1
+grouped-unpack	minilink/planning/reinforcement_learning/algorithms/sac.py::SAC.init	1
+grouped-unpack	minilink/planning/reinforcement_learning/algorithms/sac.py::SAC.update	1
+grouped-unpack	minilink/planning/reinforcement_learning/environment.py::RolloutEnvironment.step	1
+grouped-unpack	minilink/planning/reinforcement_learning/optim.py::Adam.update	1
+grouped-unpack	minilink/planning/reinforcement_learning/tabular.py::TabularLearningPlanner.learn	2
+grouped-unpack	minilink/planning/spatial/track.py::ReferenceTrack.corridor_margin	1
+lazy-import	minilink/__init__.py::_package_version: minilink._version	1
+lazy-import	minilink/analysis/derivatives.py::compiled: minilink.core.compile.compiler	2
+lazy-import	minilink/analysis/frequency.py::transfer_function: minilink.blocks.transfer_function	1
+lazy-import	minilink/analysis/lyapunov.py::compiled: minilink.core.compile.compiler	1
+lazy-import	minilink/analysis/lyapunov.py::dynamics_on: minilink.core.backends	1
+lazy-import	minilink/analysis/lyapunov.py::rollout_on: minilink.core.backends	1
+lazy-import	minilink/analysis/sensitivity_functions.py::loop_function: minilink.blocks.transfer_function	1
+lazy-import	minilink/analysis/sensitivity_functions.py::loop_pieces: minilink.blocks.transfer_function	1
+lazy-import	minilink/blocks/sources.py::Source.show_signal: minilink.graphical.common.environment	1
+lazy-import	minilink/blocks/sources.py::Source.show_signal: minilink.graphical.common.matplotlib_style	1
+lazy-import	minilink/control/mpc/controller.py::export_mpc_dual_rate_computer: minilink.core.diagram	1
+lazy-import	minilink/control/mpc/controller.py::export_mpc_dual_rate_computer: minilink.simulation.computer	1
+lazy-import	minilink/control/mpc/controller.py::export_mpc_to_computer: minilink.simulation.computer	1
+lazy-import	minilink/control/mpc/viz.py::mpc_animation_overlays: minilink.planning.spatial.overlays	1
+lazy-import	minilink/control/neural.py::NeuralPolicyController.get_dynamic_geometry: minilink.graphical.animation.primitives	1
+lazy-import	minilink/control/neural.py::NeuralPolicyController.tf: minilink.graphical.catalog.shapes	1
+lazy-import	minilink/control/robotic.py::TaskImpedance.get_dynamic_geometry: minilink.graphical.animation.primitives	1
+lazy-import	minilink/control/robotic.py::TaskImpedance.tf: minilink.graphical.catalog.shapes	1
+lazy-import	minilink/core/composition.py::_close_on: minilink.blocks.routing	1
+lazy-import	minilink/core/composition.py::_insert_filter: minilink.blocks.routing	1
+lazy-import	minilink/core/composition.py::_return_signal: minilink.blocks.routing	1
+lazy-import	minilink/core/composition.py::sum_into: minilink.blocks.routing	1
+lazy-import	minilink/core/diagram.py::DiagramSystem.compile: minilink.core.compile.compiler	1
+lazy-import	minilink/core/diagram.py::StepDiagramSystem.compile: minilink.core.compile.step_compiler	1
+lazy-import	minilink/core/facades.py::DynamicSystemFacades.animate_modal: minilink.analysis.modal	1
+lazy-import	minilink/core/facades.py::DynamicSystemFacades.compute_forced: minilink.graphical.signals	1
+lazy-import	minilink/core/facades.py::DynamicSystemFacades.compute_forced: minilink.simulation.simulator	1
+lazy-import	minilink/core/facades.py::DynamicSystemFacades.compute_trajectory: minilink.graphical.signals	1
+lazy-import	minilink/core/facades.py::DynamicSystemFacades.compute_trajectory: minilink.simulation.simulator	1
+lazy-import	minilink/core/facades.py::DynamicSystemFacades.find_equilibrium: minilink.analysis.equilibria	1
+lazy-import	minilink/core/facades.py::DynamicSystemFacades.game: minilink.simulation.realtime	1
+lazy-import	minilink/core/facades.py::DynamicSystemFacades.linearize: minilink.analysis.linearization	1
+lazy-import	minilink/core/facades.py::DynamicSystemFacades.plot_bode: minilink.analysis.frequency	1
+lazy-import	minilink/core/facades.py::DynamicSystemFacades.plot_phase_plane: minilink.graphical.phase_plane	1
+lazy-import	minilink/core/facades.py::DynamicSystemFacades.plot_pzmap: minilink.analysis.frequency	1
+lazy-import	minilink/core/facades.py::DynamicSystemFacades.plot_root_locus: minilink.analysis.frequency	1
+lazy-import	minilink/core/facades.py::DynamicSystemFacades.plot_step_response: minilink.analysis.time_response	1
+lazy-import	minilink/core/facades.py::DynamicSystemFacades.transfer_function: minilink.analysis.frequency	1
+lazy-import	minilink/core/facades.py::SharedSystemFacades.animate: minilink.graphical.animation	1
+lazy-import	minilink/core/facades.py::SharedSystemFacades.animate: minilink.graphical.common.environment	1
+lazy-import	minilink/core/facades.py::SharedSystemFacades.compile: minilink.core.compile.compiler	1
+lazy-import	minilink/core/facades.py::SharedSystemFacades.compute_forced: minilink.graphical.signals	1
+lazy-import	minilink/core/facades.py::SharedSystemFacades.compute_forced: minilink.simulation.static_simulator	1
+lazy-import	minilink/core/facades.py::SharedSystemFacades.compute_trajectory: minilink.graphical.signals	1
+lazy-import	minilink/core/facades.py::SharedSystemFacades.compute_trajectory: minilink.simulation.static_simulator	1
+lazy-import	minilink/core/facades.py::SharedSystemFacades.get_diagram: minilink.graphical.diagrams	1
+lazy-import	minilink/core/facades.py::SharedSystemFacades.jacobian: minilink.analysis.derivatives	1
+lazy-import	minilink/core/facades.py::SharedSystemFacades.plot_control_law: minilink.graphical.port_map	1
+lazy-import	minilink/core/facades.py::SharedSystemFacades.plot_diagram: minilink.graphical.diagrams	1
+lazy-import	minilink/core/facades.py::SharedSystemFacades.plot_input_output_map: minilink.graphical.port_map	1
+lazy-import	minilink/core/facades.py::SharedSystemFacades.plot_trajectory: minilink.graphical.signals	1
+lazy-import	minilink/core/facades.py::SharedSystemFacades.render: minilink.graphical.animation	1
+lazy-import	minilink/core/facades.py::StepSystemFacades.jacobian: minilink.analysis.derivatives	1
+lazy-import	minilink/core/facades.py::StepSystemFacades.plot_rollout: minilink.graphical.signals	1
+lazy-import	minilink/core/facades.py::_scored_trajectory: minilink.core.diagram	1
+lazy-import	minilink/core/hybrid_diagram.py::HybridDiagram.__post_init__: minilink.simulation.computer	1
+lazy-import	minilink/core/hybrid_diagram.py::HybridDiagram._repr_svg_: minilink.graphical.diagrams.hybrid_dot	1
+lazy-import	minilink/core/hybrid_diagram.py::HybridDiagram._repr_svg_: minilink.graphical.diagrams.hybrid_topology	1
+lazy-import	minilink/core/hybrid_diagram.py::HybridDiagram._simulator: minilink.simulation.hybrid_simulator	1
+lazy-import	minilink/core/hybrid_diagram.py::HybridDiagram.animate: minilink.core.hybrid_composition	1
+lazy-import	minilink/core/hybrid_diagram.py::HybridDiagram.animate: minilink.graphical.animation	1
+lazy-import	minilink/core/hybrid_diagram.py::HybridDiagram.animate: minilink.graphical.common.environment	1
+lazy-import	minilink/core/hybrid_diagram.py::HybridDiagram.from_diagrams: minilink.simulation.computer	1
+lazy-import	minilink/core/hybrid_diagram.py::HybridDiagram.plot_diagram: minilink.graphical.diagrams.hybrid_dot	1
+lazy-import	minilink/core/hybrid_diagram.py::HybridDiagram.plot_trajectory: minilink.graphical.signals.time_signals	1
+lazy-import	minilink/core/hybrid_diagram.py::HybridDiagram.plot_trajectory: minilink.simulation.hybrid_simulator	1
+lazy-import	minilink/core/inspect.py::inspect_text: minilink.core.costs	1
+lazy-import	minilink/core/inspect.py::inspect_text: minilink.core.distributions	1
+lazy-import	minilink/core/inspect.py::inspect_text: minilink.core.sets	1
+lazy-import	minilink/core/inspect.py::inspect_text: minilink.core.system	1
+lazy-import	minilink/core/inspect.py::inspect_text: minilink.core.trajectory	1
+lazy-import	minilink/core/inspect.py::inspect_text: minilink.optimization.mathematical_program	1
+lazy-import	minilink/core/inspect.py::inspect_text: minilink.planning.problems	1
+lazy-import	minilink/core/inspect.py::inspect_text: minilink.planning.spatial.state_fields	1
+lazy-import	minilink/core/system.py::System.__add__: minilink.core.composition	1
+lazy-import	minilink/core/system.py::System.__matmul__: minilink.core.composition	1
+lazy-import	minilink/core/system.py::System.__mod__: minilink.simulation.computer	1
+lazy-import	minilink/core/system.py::System.__rshift__: minilink.core.composition	1
+lazy-import	minilink/core/wiring.py::WiredDiagramMixin.autowire: minilink.core.composition	1
+lazy-import	minilink/core/wiring.py::WiredDiagramMixin.get_dynamic_geometry: minilink.graphical.animation.visualization	1
+lazy-import	minilink/core/wiring.py::WiredDiagramMixin.tf: minilink.graphical.animation.visualization	1
+lazy-import	minilink/dynamics/abstraction/manipulator.py::Manipulator.get_dynamic_geometry: minilink.graphical.animation.primitives	1
+lazy-import	minilink/dynamics/catalog/vehicles/racecar.py::_frames: minilink.graphical.catalog.racecar_skin	1
+lazy-import	minilink/graphical/animation/__init__.py::__getattr__: minilink.graphical.animation	1
+lazy-import	minilink/graphical/animation/drawables.py::_shape_to_primitives: minilink.core.geometry	3
+lazy-import	minilink/graphical/animation/drawables.py::validate_overlay: minilink.core.system	1
+lazy-import	minilink/graphical/animation/drawables.py::validate_overlay: minilink.planning.spatial.scene	1
+lazy-import	minilink/graphical/animation/primitives.py::empty_transform: minilink.core.kinematics	1
+lazy-import	minilink/graphical/catalog/shapes.py::plane_airframe_3d: minilink.core.kinematics	1
+lazy-import	minilink/graphical/control/__init__.py::render_control_figure: minilink.graphical.control.matplotlib_backend	1
+lazy-import	minilink/graphical/control/__init__.py::render_control_figure: minilink.graphical.control.plotly_backend	1
+lazy-import	minilink/graphical/control/matplotlib_backend.py::render_matplotlib: minilink.graphical.common.environment	1
+lazy-import	minilink/graphical/control/matplotlib_backend.py::render_matplotlib: minilink.graphical.common.matplotlib_style	1
+lazy-import	minilink/graphical/diagrams/dot.py::_render_diagram_graph: minilink.graphical.common.environment	1
+lazy-import	minilink/graphical/diagrams/dot.py::get_diagram: minilink.graphical.diagrams.export	1
+lazy-import	minilink/graphical/diagrams/export.py::_resolve_topology_exporter: minilink.graphical.diagrams.dot	1
+lazy-import	minilink/graphical/diagrams/export.py::_resolve_topology_exporter: minilink.graphical.diagrams.mermaid	1
+lazy-import	minilink/graphical/diagrams/hybrid_dot.py::plot_hybrid_diagram: minilink.graphical.diagrams.hybrid_topology	1
+lazy-import	minilink/graphical/diagrams/hybrid_topology.py::export_hybrid_topology: minilink.graphical.diagrams.hybrid_dot	1
+lazy-import	minilink/graphical/diagrams/hybrid_topology.py::export_hybrid_topology: minilink.graphical.diagrams.hybrid_mermaid	1
+lazy-import	minilink/graphical/diagrams/topology.py::input_sign_labels: minilink.blocks.routing	1
+lazy-import	minilink/graphical/phase_plane/phase_plane.py::render_phase_plane_matplotlib: minilink.graphical.common.environment	1
+lazy-import	minilink/graphical/phase_plane/phase_plane.py::render_phase_plane_matplotlib: minilink.graphical.common.matplotlib_style	1
+lazy-import	minilink/graphical/phase_plane/phase_plane.py::render_phase_plane_plotly: minilink.graphical.common.plotly_style	1
+lazy-import	minilink/graphical/port_map.py::render_port_map_matplotlib: minilink.graphical.common.environment	1
+lazy-import	minilink/graphical/port_map.py::render_port_map_matplotlib: minilink.graphical.common.matplotlib_style	1
+lazy-import	minilink/graphical/signals/matplotlib_backend.py::_create_figure: minilink.graphical.common.environment	1
+lazy-import	minilink/graphical/signals/matplotlib_backend.py::_create_figure: minilink.graphical.common.matplotlib_style	1
+lazy-import	minilink/graphical/signals/time_signals.py::open_time_signal_plot: minilink.graphical.signals.matplotlib_backend	1
+lazy-import	minilink/graphical/signals/time_signals.py::open_time_signal_plot: minilink.graphical.signals.plotly_backend	1
+lazy-import	minilink/graphical/signals/time_signals.py::plot_time_signals: minilink.graphical.signals.matplotlib_backend	1
+lazy-import	minilink/graphical/signals/time_signals.py::plot_time_signals: minilink.graphical.signals.plotly_backend	1
+lazy-import	minilink/optimization/evaluators/compiler.py::compile_program_evaluator: minilink.optimization.evaluators.jax_evaluator	1
+lazy-import	minilink/optimization/evaluators/compiler.py::compile_program_evaluator: minilink.optimization.evaluators.numpy_evaluator	1
+lazy-import	minilink/optimization/optimizer.py::Optimizer._select_backend: minilink.optimization.optimizers.ipopt	1
+lazy-import	minilink/optimization/optimizer.py::Optimizer._select_backend: minilink.optimization.optimizers.scipy_minimize	1
+lazy-import	minilink/planning/comparison.py::Comparison.plot_trajectory: minilink.graphical.signals.time_signals	1
+lazy-import	minilink/planning/comparison.py::plot_solution_trajectory: minilink.graphical.signals.time_signals	1
+lazy-import	minilink/planning/evaluation.py::MonteCarloEvaluator.auto_backend: minilink.core.backends	1
+lazy-import	minilink/planning/evaluation.py::MonteCarloEvaluator.auto_backend: minilink.core.compile.compiler	1
+lazy-import	minilink/planning/evaluation.py::MonteCarloEvaluator.evaluate_jax: minilink.planning.reinforcement_learning.environment	1
+lazy-import	minilink/planning/evaluation.py::MonteCarloEvaluator.evaluate_numpy: minilink.planning.reinforcement_learning.environment	1
+lazy-import	minilink/planning/evaluation.py::env_action_port: minilink.core.feedback	1
+lazy-import	minilink/planning/evaluation.py::policy_of: minilink.planning.results	1
+lazy-import	minilink/planning/evaluation.py::static_law: minilink.core.feedback	1
+lazy-import	minilink/planning/policy_synthesis/discretizer.py::StateSpaceGrid._compute_transition_jax: minilink.core.backends	1
+lazy-import	minilink/planning/policy_synthesis/discretizer.py::StateSpaceGrid.plot_value: minilink.planning.policy_synthesis	1
+lazy-import	minilink/planning/policy_synthesis/dp.py::DynamicProgrammingPlanner.animate_cost2go: minilink.planning.policy_synthesis	1
+lazy-import	minilink/planning/policy_synthesis/dp.py::DynamicProgrammingPlanner.animate_policy: minilink.planning.policy_synthesis	1
+lazy-import	minilink/planning/policy_synthesis/dp.py::DynamicProgrammingPlanner.plot_cost2go: minilink.planning.policy_synthesis	1
+lazy-import	minilink/planning/policy_synthesis/dp.py::DynamicProgrammingPlanner.plot_policy: minilink.planning.policy_synthesis	1
+lazy-import	minilink/planning/policy_synthesis/dp.py::DynamicProgrammingPlanner.value_iteration: minilink.planning.policy_synthesis	1
+lazy-import	minilink/planning/policy_synthesis/plotting.py::get_controller: minilink.planning.policy_synthesis.lookup_policy	1
+lazy-import	minilink/planning/policy_synthesis/policy_eval.py::PolicyEvaluator.plot_cost2go: minilink.planning.policy_synthesis.plotting	1
+lazy-import	minilink/planning/reinforcement_learning/tabular.py::TabularLearningPlanner.get_controller: minilink.planning.policy_synthesis	1
+lazy-import	minilink/planning/reinforcement_learning/tabular.py::TabularLearningPlanner.plot_cost2go: minilink.planning.policy_synthesis	1
+lazy-import	minilink/planning/reinforcement_learning/tabular.py::TabularLearningPlanner.plot_policy: minilink.planning.policy_synthesis	1
+lazy-import	minilink/planning/results.py::PlanningSolution.plot_control_law: minilink.planning.comparison	1
+lazy-import	minilink/planning/results.py::PlanningSolution.plot_cost_to_go: minilink.planning.comparison	1
+lazy-import	minilink/planning/results.py::PlanningSolution.plot_trajectory: minilink.planning.comparison	1
+lazy-import	minilink/planning/search/live_plot.py::LiveSearchPlotCallback.__call__: minilink.planning.search.plotting	1
+lazy-import	minilink/planning/search/plotting.py::_goal_radius: minilink.core.sets	1
+lazy-import	minilink/planning/search/plotting.py::_maybe_show: minilink.graphical.common.environment	1
+lazy-import	minilink/planning/search/rrt.py::RRTPlanner._on_search_step: minilink.planning.search.live_plot	1
+lazy-import	minilink/planning/search/rrt.py::RRTPlanner._resolve_search_callback: minilink.planning.search.live_plot	1
+lazy-import	minilink/planning/search/rrt.py::RRTPlanner.animate_search: minilink.planning.search.plotting	1
+lazy-import	minilink/planning/search/rrt.py::RRTPlanner.plot_tree: minilink.planning.search.plotting	1
+lazy-import	minilink/planning/search/rrt.py::RRTPlanner.show_live_search: minilink.planning.search.live_plot	1
+lazy-import	minilink/planning/search/rrt_star.py::RRTStarPlanner.__init__: minilink.planning.search.metric	1
+lazy-import	minilink/planning/search/rrt_star.py::RRTStarPlanner.animate_convergence: minilink.planning.search.plotting	1
+lazy-import	minilink/planning/spatial/plotting.py::plot_scene: minilink.core.geometry	1
+lazy-import	minilink/planning/spatial/scene.py::Scene.as_visualizer: minilink.graphical.animation.drawables	1
+lazy-import	minilink/planning/spatial/scene.py::Scene.clearance_field: minilink.planning.spatial.state_fields	1
+lazy-import	minilink/planning/spatial/scene.py::Scene.cost_field: minilink.planning.spatial.state_fields	1
+lazy-import	minilink/planning/spatial/scene.py::Scene.plot: minilink.planning.spatial.plotting	1
+lazy-import	minilink/planning/spatial/track.py::ReferenceTrack.corridor_field: minilink.planning.spatial.state_fields	1
+lazy-import	minilink/planning/spatial/track.py::ReferenceTrack.distance_field: minilink.planning.spatial.state_fields	1
+lazy-import	minilink/planning/spatial/track.py::ReferenceTrack.plot: minilink.planning.spatial.plotting	1
+lazy-import	minilink/planning/trajectory_optimization/direct_collocation.py::DirectCollocationTranscription.transcribe_parametric: minilink.planning.trajectory_optimization.parametric_program	1
+lazy-import	minilink/planning/trajectory_optimization/live_plot.py::LiveTrajectoryPlotCallback.__call__: minilink.graphical.signals	1
+lazy-import	minilink/planning/trajectory_optimization/planner.py::TrajectoryOptimizationPlanner._make_callback: minilink.planning.trajectory_optimization.live_plot	1
+lazy-import	minilink/planning/trajectory_optimization/planner.py::TrajectoryOptimizationPlanner.compile_parametric_program: minilink.planning.trajectory_optimization.parametric_evaluator	1
+lazy-import	minilink/planning/trajectory_optimization/planner.py::_resolve_transcription: minilink.planning.trajectory_optimization.direct_collocation	1
+lazy-import	minilink/planning/trajectory_optimization/planner.py::_resolve_transcription: minilink.planning.trajectory_optimization.multiple_shooting	1
+lazy-import	minilink/simulation/computer.py::Computer.__matmul__: minilink.core.hybrid_composition	1
+lazy-import	minilink/simulation/computer.py::Computer.__matmul__: minilink.core.system	1
+lazy-import	minilink/simulation/computer.py::_build_computer: minilink.core.hybrid_composition	1
+lazy-import	minilink/simulation/computer.py::_build_computer: minilink.core.system	1
+lazy-import	minilink/simulation/computer.py::as_computer: minilink.core.hybrid_composition	1
+lazy-import	minilink/simulation/hybrid_simulator.py::HybridSimResult.plot_computer: minilink.graphical.signals.time_signals	1
+lazy-import	minilink/simulation/hybrid_simulator.py::HybridSimResult.plot_view: minilink.core.system	1
+lazy-import	minilink/simulation/hybrid_simulator.py::HybridSimResult.plot_view: minilink.graphical.signals.time_signals	1
+lazy-import	minilink/simulation/simulator.py::Simulator.__init__: minilink.core.system	1
+markers	minilink/analysis/linearization.py::<module>	1
+markers	minilink/analysis/modal.py::<module>	1
+markers	minilink/analysis/sensitivity_functions.py::<module>	1
+markers	minilink/analysis/structural.py::<module>	1
+markers	minilink/analysis/time_response.py::<module>	1
+markers	minilink/blocks/sources.py::<module>	1
+markers	minilink/blocks/transfer_function.py::<module>	1
+markers	minilink/control/impedance.py::<module>	1
+markers	minilink/control/robotic.py::<module>	1
+markers	minilink/control/siso.py::<module>	1
+markers	minilink/control/state.py::<module>	1
+markers	minilink/core/facades.py::<module>	1
+markers	minilink/estimation/observer.py::<module>	1
+next-index	minilink/blocks/sources.py::line 270	1
+next-index	minilink/planning/reinforcement_learning/collect.py::line 59	1
+next-index	minilink/planning/reinforcement_learning/environment.py::line 126	1
+next-index	minilink/planning/reinforcement_learning/tabular.py::line 420	1
+np-under-xp	minilink/control/geometric.py::PurePursuit.ctl	1
+np-under-xp	minilink/core/distributions.py::random_bits	2
+old-banner	minilink/analysis/frequency.py::line 293	1
+old-banner	minilink/analysis/frequency.py::line 295	1
+old-banner	minilink/analysis/frequency.py::line 453	1
+old-banner	minilink/analysis/frequency.py::line 455	1
+old-banner	minilink/analysis/linear.py::line 119	1
+old-banner	minilink/analysis/linear.py::line 121	1
+old-banner	minilink/analysis/linear.py::line 160	1
+old-banner	minilink/analysis/linear.py::line 162	1
+old-banner	minilink/analysis/linear.py::line 17	1
+old-banner	minilink/analysis/linear.py::line 19	1
+old-banner	minilink/analysis/linear.py::line 207	1
+old-banner	minilink/analysis/linear.py::line 209	1
+old-banner	minilink/analysis/linear.py::line 252	1
+old-banner	minilink/analysis/linear.py::line 254	1
+old-banner	minilink/analysis/linear.py::line 297	1
+old-banner	minilink/analysis/linear.py::line 299	1
+old-banner	minilink/analysis/linearization.py::line 182	1
+old-banner	minilink/analysis/linearization.py::line 184	1
+old-banner	minilink/analysis/modal.py::line 139	1
+old-banner	minilink/analysis/modal.py::line 141	1
+old-banner	minilink/analysis/sensitivity_functions.py::line 163	1
+old-banner	minilink/analysis/sensitivity_functions.py::line 165	1
+old-banner	minilink/analysis/structural.py::line 141	1
+old-banner	minilink/analysis/structural.py::line 143	1
+old-banner	minilink/analysis/time_response.py::line 174	1
+old-banner	minilink/analysis/time_response.py::line 176	1
+old-banner	minilink/blocks/transfer_function.py::line 128	1
+old-banner	minilink/blocks/transfer_function.py::line 130	1
+old-banner	minilink/control/impedance.py::line 180	1
+old-banner	minilink/control/impedance.py::line 182	1
+old-banner	minilink/control/siso.py::line 305	1
+old-banner	minilink/control/siso.py::line 307	1
+old-banner	minilink/control/state.py::line 237	1
+old-banner	minilink/control/state.py::line 239	1
+quoted-annotation	minilink/control/mpc/controller.py::line 791	1
+quoted-annotation	minilink/control/mpc/controller.py::line 794	1
+quoted-annotation	minilink/control/mpc/controller.py::line 832	1
+quoted-annotation	minilink/core/wiring.py::line 518	1
+quoted-annotation	minilink/graphical/animation/animator.py::line 59	1
+quoted-annotation	minilink/planning/comparison.py::line 26	1
+quoted-annotation	minilink/planning/comparison.py::line 87	1
+quoted-annotation	minilink/simulation/computer.py::line 263	1
+quoted-annotation	minilink/simulation/computer.py::line 31	1
+return-math	minilink/dynamics/catalog/aerial/plane.py::Plane2D.tf	1
+return-math	minilink/dynamics/catalog/marine/boat.py::Boat2D.tf	1
+return-math	minilink/dynamics/catalog/vehicles/dynamic_bicycle.py::DynamicBicycle.tf	1
+return-math	minilink/dynamics/catalog/vehicles/steering.py::KinematicBicycle.tf	1
+return-math	minilink/dynamics/catalog/vehicles/steering.py::KinematicCar.tf	1
+return-math	minilink/planning/reinforcement_learning/algorithms/reinforce.py::REINFORCE.loss	1
+return-math	minilink/planning/reinforcement_learning/policy.py::GaussianHead.entropy	1
+return-math	minilink/planning/reinforcement_learning/policy.py::GaussianHead.log_prob	1
+return-math	minilink/planning/reinforcement_learning/policy.py::GaussianHead.sample	1
+return-math	minilink/planning/reinforcement_learning/policy.py::SquashedGaussianHead.log_prob	1
+return-math	minilink/planning/spatial/paths.py::PolylinePath.sample	1
+self-in-math	minilink/dynamics/catalog/manipulators/arms.py::FiveLinkPlanarManipulator.J	1
+self-in-math	minilink/dynamics/catalog/manipulators/ur5.py::UR5Manipulator.J	1
+self-in-math	minilink/dynamics/catalog/manipulators/ur5.py::UR5Manipulator.forward_dynamics	1
+self-in-math	minilink/dynamics/catalog/manipulators/ur5.py::UR5Manipulator.inverse_dynamics	1
+self-in-math	minilink/dynamics/catalog/marine/boat.py::Boat2DWithCurrent.d	1
+self-in-math	minilink/dynamics/catalog/vehicles/steering.py::KinematicCar.tf	2
+self-in-math	minilink/planning/reinforcement_learning/algorithms/actor_critic.py::ActorCritic.loss	1
+self-in-math	minilink/planning/reinforcement_learning/algorithms/ppo.py::PPO.loss	1
+self-in-math	minilink/planning/reinforcement_learning/environment.py::RolloutEnvironment.step	6
+title	minilink/__init__.py::<module>	1
+title	minilink/analysis/__init__.py::<module>	1
+title	minilink/analysis/derivatives.py::<module>	1
+title	minilink/analysis/lyapunov.py::<module>	1
+title	minilink/analysis/structural.py::<module>	1
+title	minilink/analysis/time_response.py::<module>	1
+title	minilink/blocks/__init__.py::<module>	1
+title	minilink/blocks/filters.py::<module>	1
+title	minilink/catalog/__init__.py::<module>	1
+title	minilink/control/__init__.py::<module>	1
+title	minilink/control/impedance.py::<module>	1
+title	minilink/control/mpc/__init__.py::<module>	1
+title	minilink/control/mpc/controller.py::<module>	1
+title	minilink/control/siso.py::<module>	1
+title	minilink/core/__init__.py::<module>	1
+title	minilink/core/backends.py::<module>	1
+title	minilink/core/composition.py::<module>	1
+title	minilink/core/diagram.py::<module>	1
+title	minilink/core/distributions.py::<module>	1
+title	minilink/core/facades.py::<module>	1
+title	minilink/core/feedback.py::<module>	1
+title	minilink/core/hybrid_composition.py::<module>	1
+title	minilink/core/hybrid_diagram.py::<module>	1
+title	minilink/core/kinematics.py::<module>	1
+title	minilink/core/sets.py::<module>	1
+title	minilink/core/signals.py::<module>	1
+title	minilink/core/step_rollout.py::<module>	1
+title	minilink/core/system.py::<module>	1
+title	minilink/core/trajectory.py::<module>	1
+title	minilink/core/wiring.py::<module>	1
+title	minilink/dynamics/abstraction/__init__.py::<module>	1
+title	minilink/dynamics/catalog/manipulators/ur5.py::<module>	1
+title	minilink/dynamics/catalog/vehicles/dynamic_bicycle.py::<module>	1
+title	minilink/dynamics/catalog/vehicles/racecar.py::<module>	1
+title	minilink/dynamics/catalog/vehicles/tires.py::<module>	1
+title	minilink/estimation/__init__.py::<module>	1
+title	minilink/graphical/animation/__init__.py::<module>	1
+title	minilink/graphical/animation/animator.py::<module>	1
+title	minilink/graphical/animation/camera.py::<module>	1
+title	minilink/graphical/animation/drawables.py::<module>	1
+title	minilink/graphical/animation/primitives.py::<module>	1
+title	minilink/graphical/animation/visualization.py::<module>	1
+title	minilink/graphical/catalog/__init__.py::<module>	1
+title	minilink/graphical/catalog/boat_skin.py::<module>	1
+title	minilink/graphical/catalog/racecar_skin.py::<module>	1
+title	minilink/graphical/catalog/shapes.py::<module>	1
+title	minilink/graphical/catalog/skins.py::<module>	1
+title	minilink/graphical/common/environment.py::<module>	1
+title	minilink/graphical/common/matplotlib_style.py::<module>	1
+title	minilink/graphical/control/figure_spec.py::<module>	1
+title	minilink/graphical/control/style.py::<module>	1
+title	minilink/graphical/meshes.py::<module>	1
+title	minilink/graphical/port_map.py::<module>	1
+title	minilink/identification/__init__.py::<module>	1
+title	minilink/optimization/__init__.py::<module>	1
+title	minilink/optimization/evaluators/program_evaluator.py::<module>	1
+title	minilink/optimization/mathematical_program.py::<module>	1
+title	minilink/optimization/optimizer.py::<module>	1
+title	minilink/optimization/optimizers/optimizer_backend.py::<module>	1
+title	minilink/optimization/reporting.py::<module>	1
+title	minilink/planning/__init__.py::<module>	1
+title	minilink/planning/comparison.py::<module>	1
+title	minilink/planning/evaluation.py::<module>	1
+title	minilink/planning/planner.py::<module>	1
+title	minilink/planning/policy_synthesis/approximation.py::<module>	1
+title	minilink/planning/policy_synthesis/lookup_policy.py::<module>	1
+title	minilink/planning/policy_synthesis/lqr.py::<module>	1
+title	minilink/planning/policy_synthesis/plotting.py::<module>	1
+title	minilink/planning/policy_synthesis/policy_eval.py::<module>	1
+title	minilink/planning/problems.py::<module>	1
+title	minilink/planning/search/dubins.py::<module>	1
+title	minilink/planning/search/edge.py::<module>	1
+title	minilink/planning/search/extenders.py::<module>	1
+title	minilink/planning/search/live_plot.py::<module>	1
+title	minilink/planning/search/metric.py::<module>	1
+title	minilink/planning/search/plotting.py::<module>	1
+title	minilink/planning/search/rrt.py::<module>	1
+title	minilink/planning/search/rrt_star.py::<module>	1
+title	minilink/planning/search/steering.py::<module>	1
+title	minilink/planning/search/tree.py::<module>	1
+title	minilink/planning/spatial/collision.py::<module>	1
+title	minilink/planning/spatial/grid.py::<module>	1
+title	minilink/planning/spatial/paths.py::<module>	1
+title	minilink/planning/spatial/plotting.py::<module>	1
+title	minilink/planning/spatial/scene.py::<module>	1
+title	minilink/planning/spatial/shaping.py::<module>	1
+title	minilink/planning/spatial/track.py::<module>	1
+title	minilink/planning/spatial/workspace_fields.py::<module>	1
+title	minilink/planning/trajectory_optimization/transcription.py::<module>	1
+title	minilink/simulation/computer.py::<module>	1
+title	minilink/simulation/hybrid_simulator.py::<module>	1
+title	minilink/simulation/input_coercion.py::<module>	1
+title	minilink/simulation/simulator.py::<module>	1
+underscore	minilink/__init__.py::_package_version	1
+underscore	minilink/analysis/derivatives.py::_is_tracing_error	1
+underscore	minilink/analysis/discretization.py::_hold_interval	1
+underscore	minilink/analysis/discretization.py::_model_params	1
+underscore	minilink/analysis/discretization.py::_positive_dt	1
+underscore	minilink/control/mpc/controller.py::MPCBroadcastController._abs_t	1
+underscore	minilink/control/mpc/controller.py::MPCBroadcastController._compute_u_nom	1
+underscore	minilink/control/mpc/controller.py::MPCBroadcastController._compute_x_nom	1
+underscore	minilink/control/mpc/controller.py::MPCStatefulController._compute_u_ff	1
+underscore	minilink/control/mpc/controller.py::MPCStatefulController._compute_x_ff	1
+underscore	minilink/control/mpc/controller.py::MPCStatefulController._compute_z	1
+underscore	minilink/control/mpc/controller.py::MPCStatefulController._measurement	1
+underscore	minilink/control/mpc/controller.py::MPCStatefulController._z_warm_for_command	1
+underscore	minilink/control/mpc/controller.py::MPCStatelessController._compute_u_ff	1
+underscore	minilink/control/mpc/controller.py::MPCStatelessController._compute_x_ff	1
+underscore	minilink/control/mpc/controller.py::MPCStatelessController._compute_z	1
+underscore	minilink/control/mpc/controller.py::MPCStatelessController._measurement	1
+underscore	minilink/control/mpc/controller.py::MPCTickLatch._print_tick	1
+underscore	minilink/control/mpc/controller.py::ModelPredictiveControllerMixin._replan_k	1
+underscore	minilink/control/mpc/controller.py::ModelPredictiveControllerMixin._require_nominal_cache	1
+underscore	minilink/control/mpc/controller.py::ModelPredictiveControllerMixin._z_warm_for_command	1
+underscore	minilink/control/mpc/utilities.py::_clamp_tau	1
+underscore	minilink/control/mpc/utilities.py::_finite_diff_knots	1
+underscore	minilink/control/mpc/utilities.py::_shift_plan_trajectory	1
+underscore	minilink/core/composition.py::_add_input_port_like	1
+underscore	minilink/core/composition.py::_add_system_to_diagram	1
+underscore	minilink/core/composition.py::_animated_geometry_source	1
+underscore	minilink/core/composition.py::_as_composition_diagram	1
+underscore	minilink/core/composition.py::_base_system_id	1
+underscore	minilink/core/composition.py::_carry_left_operand	1
+underscore	minilink/core/composition.py::_check_measurement	1
+underscore	minilink/core/composition.py::_close_on	1
+underscore	minilink/core/composition.py::_command_entry	1
+underscore	minilink/core/composition.py::_connect_new_output_port_like	1
+underscore	minilink/core/composition.py::_copy_animation_camera_hints	1
+underscore	minilink/core/composition.py::_copy_diagram	1
+underscore	minilink/core/composition.py::_default_control_out	1
+underscore	minilink/core/composition.py::_default_input_port	1
+underscore	minilink/core/composition.py::_default_output_port	1
+underscore	minilink/core/composition.py::_default_subsystem_id	1
+underscore	minilink/core/composition.py::_drop_input	1
+underscore	minilink/core/composition.py::_edge_outputs	1
+underscore	minilink/core/composition.py::_expose_free_inputs	1
+underscore	minilink/core/composition.py::_feedback_path	1
+underscore	minilink/core/composition.py::_filter_into	1
+underscore	minilink/core/composition.py::_inline_diagram	1
+underscore	minilink/core/composition.py::_insert_filter	1
+underscore	minilink/core/composition.py::_namespaced_camera_follow_frame	1
+underscore	minilink/core/composition.py::_new_diagram_like	1
+underscore	minilink/core/composition.py::_no_measurement_message	1
+underscore	minilink/core/composition.py::_normalize_identifier	1
+underscore	minilink/core/composition.py::_open_loop	1
+underscore	minilink/core/composition.py::_output_port_id	1
+underscore	minilink/core/composition.py::_plant_box_with_state	1
+underscore	minilink/core/composition.py::_propagate_animation_camera	1
+underscore	minilink/core/composition.py::_return_signal	1
+underscore	minilink/core/composition.py::_series_connection	1
+underscore	minilink/core/composition.py::_series_pair	1
+underscore	minilink/core/composition.py::_subsystem_id_for_leaf	1
+underscore	minilink/core/composition.py::_unique_id	1
+underscore	minilink/core/facades.py::_scored_trajectory	1
+underscore	minilink/core/feedback.py::_block_under	1
+underscore	minilink/core/hybrid_composition.py::_as_plant_diagram	1
+underscore	minilink/core/hybrid_composition.py::_as_step_diagram	1
+underscore	minilink/core/hybrid_composition.py::_builds_own_computer	1
+underscore	minilink/core/hybrid_composition.py::_computer_leaf	1
+underscore	minilink/core/hybrid_composition.py::_ensure_computer_boundary_ports	1
+underscore	minilink/core/hybrid_composition.py::_ensure_plant_boundary_ports	1
+underscore	minilink/core/hybrid_composition.py::_leaf_sys_id	1
+underscore	minilink/core/hybrid_composition.py::_plant_leaf	1
+underscore	minilink/core/hybrid_diagram.py::HybridDiagram._cache_result	1
+underscore	minilink/core/hybrid_diagram.py::HybridDiagram._simulator	1
+underscore	minilink/core/hybrid_diagram.py::_normalize_direction	1
+underscore	minilink/core/hybrid_diagram.py::_validate_boundary_connection	1
+underscore	minilink/core/inspect.py::_arr	1
+underscore	minilink/core/inspect.py::_problem_text	1
+underscore	minilink/core/inspect.py::_program_text	1
+underscore	minilink/core/inspect.py::_system_text	1
+underscore	minilink/core/inspect.py::_trajectory_text	1
+underscore	minilink/core/signals.py::_as_optional_string_list	1
+underscore	minilink/core/signals.py::_as_optional_vector	1
+underscore	minilink/core/signals.py::_infer_signal_dim	1
+underscore	minilink/core/signals.py::_length_or_none	1
+underscore	minilink/core/trajectory.py::Trajectory._nearest_index	1
+underscore	minilink/dynamics/abstraction/state_space.py::_check_dimensions	1
+underscore	minilink/dynamics/abstraction/state_space.py::_identity_like	1
+underscore	minilink/dynamics/abstraction/state_space.py::_shape	1
+underscore	minilink/dynamics/abstraction/state_space.py::_zeros_like	1
+underscore	minilink/dynamics/catalog/aerial/drone.py::_drone_body	1
+underscore	minilink/dynamics/catalog/manipulators/arms.py::_planar_frames	1
+underscore	minilink/dynamics/catalog/manipulators/arms.py::_planar_joint_positions	1
+underscore	minilink/dynamics/catalog/manipulators/arms.py::_planar_kinematic_geometry	1
+underscore	minilink/dynamics/catalog/manipulators/arms.py::_planar_torque_geometry	1
+underscore	minilink/dynamics/catalog/manipulators/arms.py::_planar_velocity_geometry	1
+underscore	minilink/dynamics/catalog/manipulators/arms.py::_set_planar_reach_camera	1
+underscore	minilink/dynamics/catalog/manipulators/ur5.py::_as_params	1
+underscore	minilink/dynamics/catalog/manipulators/ur5.py::_cylinder_inertia	1
+underscore	minilink/dynamics/catalog/manipulators/ur5.py::_dh_transform	1
+underscore	minilink/dynamics/catalog/manipulators/ur5.py::_motion_cross	1
+underscore	minilink/dynamics/catalog/manipulators/ur5.py::_skew	1
+underscore	minilink/dynamics/catalog/manipulators/ur5.py::_spatial_inertia	1
+underscore	minilink/dynamics/catalog/mass_spring_damper/linear.py::_force_arrow	1
+underscore	minilink/dynamics/catalog/mass_spring_damper/linear.py::_mass_box	1
+underscore	minilink/dynamics/catalog/mass_spring_damper/linear.py::_mass_output_matrix	1
+underscore	minilink/dynamics/catalog/pendulum/cartpole.py::_configure_cartpole	1
+underscore	minilink/dynamics/catalog/vehicles/dynamic_bicycle.py::BicycleDynRate._u_in	1
+underscore	minilink/dynamics/catalog/vehicles/dynamic_bicycle.py::DynamicBicycle._contact_fields	1
+underscore	minilink/dynamics/catalog/vehicles/dynamic_bicycle.py::DynamicBicycle._u_in	1
+underscore	minilink/dynamics/catalog/vehicles/dynamic_bicycle.py::_wheel_rectangle_pts	1
+underscore	minilink/dynamics/catalog/vehicles/racecar.py::UdeSRacecarDyn._u_in	1
+underscore	minilink/dynamics/catalog/vehicles/racecar.py::_frames	1
+underscore	minilink/graphical/animation/animator.py::Animator._build_frames	1
+underscore	minilink/graphical/animation/animator.py::Animator._coerce_overlays	1
+underscore	minilink/graphical/animation/animator.py::Animator._merge_overlays	1
+underscore	minilink/graphical/animation/animator.py::Animator._resolve_frame	1
+underscore	minilink/graphical/animation/animator.py::Animator._resolve_overlay_draw_list	1
+underscore	minilink/graphical/animation/drawables.py::Replay._sample	1
+underscore	minilink/graphical/animation/drawables.py::_shape_to_primitives	1
+underscore	minilink/graphical/animation/primitives.py::_arrow_perp	1
+underscore	minilink/graphical/catalog/racecar_skin.py::_aligned	1
+underscore	minilink/graphical/catalog/racecar_skin.py::_axis_rotation	1
+underscore	minilink/graphical/catalog/racecar_skin.py::_box	1
+underscore	minilink/graphical/catalog/racecar_skin.py::_chassis_equipment	1
+underscore	minilink/graphical/catalog/racecar_skin.py::_closed	1
+underscore	minilink/graphical/catalog/racecar_skin.py::_hatch	1
+underscore	minilink/graphical/catalog/racecar_skin.py::_join	1
+underscore	minilink/graphical/catalog/racecar_skin.py::_knuckle	1
+underscore	minilink/graphical/catalog/racecar_skin.py::_mesh	1
+underscore	minilink/graphical/catalog/racecar_skin.py::_mesh_primitive	1
+underscore	minilink/graphical/catalog/racecar_skin.py::_origin	1
+underscore	minilink/graphical/catalog/racecar_skin.py::_outline_xy	1
+underscore	minilink/graphical/catalog/racecar_skin.py::_painted_line	1
+underscore	minilink/graphical/catalog/racecar_skin.py::_palette	1
+underscore	minilink/graphical/catalog/racecar_skin.py::_polyline_rods	1
+underscore	minilink/graphical/catalog/racecar_skin.py::_raspicam	1
+underscore	minilink/graphical/catalog/racecar_skin.py::_rectangle	1
+underscore	minilink/graphical/catalog/racecar_skin.py::_rod	1
+underscore	minilink/graphical/catalog/racecar_skin.py::_rounded_rectangle	1
+underscore	minilink/graphical/catalog/racecar_skin.py::_rplidar	1
+underscore	minilink/graphical/catalog/racecar_skin.py::_rpy_matrix	1
+underscore	minilink/graphical/catalog/racecar_skin.py::_scene_from	1
+underscore	minilink/graphical/catalog/racecar_skin.py::_scene_lines_from	1
+underscore	minilink/graphical/catalog/racecar_skin.py::_shadow	1
+underscore	minilink/graphical/catalog/racecar_skin.py::_side	1
+underscore	minilink/graphical/catalog/racecar_skin.py::_tiles	1
+underscore	minilink/graphical/catalog/racecar_skin.py::_wall	1
+underscore	minilink/graphical/catalog/racecar_skin.py::_wheel_2d	1
+underscore	minilink/graphical/catalog/racecar_skin.py::_wheel_details	1
+underscore	minilink/graphical/catalog/racecar_skin.py::_wheel_radius	1
+underscore	minilink/graphical/catalog/shapes.py::_as3	1
+underscore	minilink/graphical/catalog/shapes.py::_perp_axis	1
+underscore	minilink/graphical/catalog/shapes.py::_spring_coil_template	1
+underscore	minilink/graphical/catalog/skins.py::_axle_offsets	1
+underscore	minilink/graphical/catalog/skins.py::_wheel_rectangle	1
+underscore	minilink/graphical/common/environment.py::_mpl_backend_is_non_interactive	1
+underscore	minilink/graphical/control/matplotlib_backend.py::_arrows	1
+underscore	minilink/graphical/control/matplotlib_backend.py::_draw_panel	1
+underscore	minilink/graphical/control/plotly_backend.py::_arrows	1
+underscore	minilink/graphical/control/plotly_backend.py::_draw_panel	1
+underscore	minilink/graphical/control/plotly_backend.py::_import_plotly	1
+underscore	minilink/graphical/diagrams/dot.py::_render_diagram_graph	1
+underscore	minilink/graphical/diagrams/export.py::_resolve_topology_exporter	1
+underscore	minilink/graphical/diagrams/hybrid_dot.py::_render_boundary_edges	1
+underscore	minilink/graphical/diagrams/hybrid_dot.py::_render_diagram_cluster	1
+underscore	minilink/graphical/diagrams/hybrid_mermaid.py::_diagram_subgraph_lines	1
+underscore	minilink/graphical/diagrams/hybrid_mermaid.py::_mermaid_id	1
+underscore	minilink/graphical/diagrams/hybrid_topology.py::_boundary_edge	1
+underscore	minilink/graphical/diagrams/hybrid_topology.py::_format_schedule_label	1
+underscore	minilink/graphical/diagrams/hybrid_topology.py::_resolve_boundary_port	1
+underscore	minilink/graphical/diagrams/mermaid.py::_escape_label	1
+underscore	minilink/graphical/diagrams/mermaid.py::_mermaid_id	1
+underscore	minilink/graphical/diagrams/mermaid.py::_node_label	1
+underscore	minilink/graphical/diagrams/topology.py::_build_diagram_system_topology	1
+underscore	minilink/graphical/diagrams/topology.py::_build_single_system_topology	1
+underscore	minilink/graphical/diagrams/topology.py::_find_node	1
+underscore	minilink/graphical/diagrams/topology.py::_node_from_ports	1
+underscore	minilink/graphical/diagrams/topology.py::_node_from_system	1
+underscore	minilink/graphical/meshes.py::_axis_angle	1
+underscore	minilink/graphical/meshes.py::_collada_mesh	1
+underscore	minilink/graphical/meshes.py::_translation	1
+underscore	minilink/graphical/phase_plane/phase_plane.py::_bounds_from_state_or_overlay	1
+underscore	minilink/graphical/phase_plane/phase_plane.py::_bounds_from_values	1
+underscore	minilink/graphical/phase_plane/phase_plane.py::_default_u	1
+underscore	minilink/graphical/phase_plane/phase_plane.py::_default_x_ref	1
+underscore	minilink/graphical/phase_plane/phase_plane.py::_default_y_axis	1
+underscore	minilink/graphical/phase_plane/phase_plane.py::_format_axis_label	1
+underscore	minilink/graphical/phase_plane/phase_plane.py::_label_for_axis	1
+underscore	minilink/graphical/phase_plane/phase_plane.py::_normalize_axis	1
+underscore	minilink/graphical/phase_plane/phase_plane.py::_normalize_backend	1
+underscore	minilink/graphical/phase_plane/phase_plane.py::_normalize_grid_shape	1
+underscore	minilink/graphical/phase_plane/phase_plane.py::_resolve_phase_bounds	1
+underscore	minilink/graphical/phase_plane/phase_plane.py::_trajectory_overlay	1
+underscore	minilink/graphical/phase_plane/phase_plane.py::_unit_for_axis	1
+underscore	minilink/graphical/phase_plane/phase_plane.py::_validate_bounds	1
+underscore	minilink/graphical/port_map.py::_apply_bounds_override	1
+underscore	minilink/graphical/port_map.py::_build_spec	1
+underscore	minilink/graphical/port_map.py::_component_bounds	1
+underscore	minilink/graphical/port_map.py::_default_law_axes	1
+underscore	minilink/graphical/port_map.py::_error_bounds	1
+underscore	minilink/graphical/port_map.py::_evaluate_axes	1
+underscore	minilink/graphical/port_map.py::_format_axis_label	1
+underscore	minilink/graphical/port_map.py::_indexed_label	1
+underscore	minilink/graphical/port_map.py::_law_roles	1
+underscore	minilink/graphical/port_map.py::_measurement_axes	1
+underscore	minilink/graphical/port_map.py::_normalize_axis	1
+underscore	minilink/graphical/port_map.py::_normalize_grid_shape	1
+underscore	minilink/graphical/port_map.py::_resolve_reference	1
+underscore	minilink/graphical/port_map.py::_state_axes	1
+underscore	minilink/graphical/signals/matplotlib_backend.py::_create_figure	1
+underscore	minilink/graphical/signals/matplotlib_backend.py::_ylabel_with_unit	1
+underscore	minilink/graphical/signals/plotly_backend.py::_create_figure	1
+underscore	minilink/graphical/signals/plotly_backend.py::_import_plotly	1
+underscore	minilink/graphical/signals/plotly_backend.py::_ylabel_with_unit	1
+underscore	minilink/graphical/signals/signal_colors.py::_component_alpha	1
+underscore	minilink/graphical/signals/time_signals.py::_available_signal_names	1
+underscore	minilink/graphical/signals/time_signals.py::_coerce_signal_plot_spec	1
+underscore	minilink/graphical/signals/time_signals.py::_is_subsystem_port_pair	1
+underscore	minilink/graphical/signals/time_signals.py::_labels_and_units_for_extra_signal	1
+underscore	minilink/graphical/signals/time_signals.py::_labels_for_vector	1
+underscore	minilink/graphical/signals/time_signals.py::_normalize_plot_signals	1
+underscore	minilink/graphical/signals/time_signals.py::_units_for_vector	1
+underscore	minilink/optimization/evaluators/jax_evaluator.py::JaxMathematicalProgramEvaluator._check_derivative_shapes	1
+underscore	minilink/optimization/evaluators/jax_evaluator.py::JaxMathematicalProgramEvaluator._check_traceable	1
+underscore	minilink/optimization/evaluators/jax_evaluator.py::JaxMathematicalProgramEvaluator._compile_vector_derivative	1
+underscore	minilink/optimization/evaluators/jax_evaluator.py::JaxMathematicalProgramEvaluator._jax_decision_vector	1
+underscore	minilink/optimization/evaluators/numpy_evaluator.py::NumpyMathematicalProgramEvaluator._check_derivative_shapes	1
+underscore	minilink/optimization/evaluators/program_evaluator.py::MathematicalProgramEvaluator._decision_vector	1
+underscore	minilink/optimization/evaluators/program_evaluator.py::MathematicalProgramEvaluator._matrix	1
+underscore	minilink/optimization/evaluators/program_evaluator.py::MathematicalProgramEvaluator._scalar	1
+underscore	minilink/optimization/evaluators/program_evaluator.py::MathematicalProgramEvaluator._vector	1
+underscore	minilink/optimization/mathematical_program.py::_as_vector_or_none	1
+underscore	minilink/optimization/optimizer.py::Optimizer._decision_vector	1
+underscore	minilink/optimization/optimizer.py::Optimizer._print_solve_preamble	1
+underscore	minilink/optimization/optimizer.py::Optimizer._print_solve_report	1
+underscore	minilink/optimization/optimizer.py::Optimizer._select_backend	1
+underscore	minilink/optimization/optimizers/scipy_minimize.py::ScipyMinimizeOptimizer._uses_hessian	1
+underscore	minilink/optimization/optimizers/scipy_minimize.py::_z_from_scipy_minimize_callback	1
+underscore	minilink/planning/comparison.py::_maybe_show	1
+underscore	minilink/planning/comparison.py::_panels	1
+underscore	minilink/planning/policy_synthesis/discretizer.py::StateSpaceGrid._build_transition	1
+underscore	minilink/planning/policy_synthesis/discretizer.py::StateSpaceGrid._build_xnext_jax_chunks	1
+underscore	minilink/planning/policy_synthesis/discretizer.py::StateSpaceGrid._coerce_shape	1
+underscore	minilink/planning/policy_synthesis/discretizer.py::StateSpaceGrid._compute_transition_jax	1
+underscore	minilink/planning/policy_synthesis/discretizer.py::StateSpaceGrid._compute_transition_numpy	1
+underscore	minilink/planning/policy_synthesis/discretizer.py::StateSpaceGrid._default_anchor	1
+underscore	minilink/planning/policy_synthesis/discretizer.py::StateSpaceGrid._grid_points	1
+underscore	minilink/planning/policy_synthesis/discretizer.py::StateSpaceGrid._input_bounds	1
+underscore	minilink/planning/policy_synthesis/discretizer.py::StateSpaceGrid._nearest_index	1
+underscore	minilink/planning/policy_synthesis/discretizer.py::StateSpaceGrid._print_mesh_summary	1
+underscore	minilink/planning/policy_synthesis/discretizer.py::StateSpaceGrid._require_finite_box	1
+underscore	minilink/planning/policy_synthesis/discretizer.py::StateSpaceGrid._state_bounds	1
+underscore	minilink/planning/policy_synthesis/discretizer.py::StateSpaceGrid._step_sizes	1
+underscore	minilink/planning/policy_synthesis/discretizer.py::StateSpaceGrid._validity_masks	1
+underscore	minilink/planning/policy_synthesis/plotting.py::_is_batch_axes	1
+underscore	minilink/planning/policy_synthesis/plotting.py::_label_axes	1
+underscore	minilink/planning/policy_synthesis/plotting.py::_maybe_show	1
+underscore	minilink/planning/policy_synthesis/plotting.py::_overlay_trajectory	1
+underscore	minilink/planning/policy_synthesis/plotting.py::_plot_field	1
+underscore	minilink/planning/policy_synthesis/plotting.py::_plot_policy_field	1
+underscore	minilink/planning/policy_synthesis/plotting.py::_require_history	1
+underscore	minilink/planning/policy_synthesis/policy_eval.py::PolicyEvaluator._policy_transition	1
+underscore	minilink/planning/policy_synthesis/policy_eval.py::PolicyEvaluator._terminal_cost	1
+underscore	minilink/planning/policy_synthesis/policy_eval.py::_policy_from_block	1
+underscore	minilink/planning/search/dubins.py::_mod2pi	1
+underscore	minilink/planning/search/dubins.py::_words	1
+underscore	minilink/planning/search/extenders.py::KinodynamicExtender._compiled	1
+underscore	minilink/planning/search/extenders.py::KinodynamicExtender._controls	1
+underscore	minilink/planning/search/extenders.py::KinodynamicExtender._rollout	1
+underscore	minilink/planning/search/plotting.py::_best_path_states	1
+underscore	minilink/planning/search/plotting.py::_clear_search_artists	1
+underscore	minilink/planning/search/plotting.py::_draw_search_state	1
+underscore	minilink/planning/search/plotting.py::_goal_radius	1
+underscore	minilink/planning/search/plotting.py::_label_axes	1
+underscore	minilink/planning/search/plotting.py::_mark_endpoints	1
+underscore	minilink/planning/search/plotting.py::_maybe_show	1
+underscore	minilink/planning/search/plotting.py::_require_tree	1
+underscore	minilink/planning/search/plotting.py::_search_title	1
+underscore	minilink/planning/search/plotting.py::_set_limits	1
+underscore	minilink/planning/search/plotting.py::_solution_waypoints	1
+underscore	minilink/planning/search/rrt.py::RRTPlanner._edge_is_free	1
+underscore	minilink/planning/search/rrt.py::RRTPlanner._edge_states	1
+underscore	minilink/planning/search/rrt.py::RRTPlanner._finish_trajectory	1
+underscore	minilink/planning/search/rrt.py::RRTPlanner._goal_point	1
+underscore	minilink/planning/search/rrt.py::RRTPlanner._goal_region	1
+underscore	minilink/planning/search/rrt.py::RRTPlanner._on_search_step	1
+underscore	minilink/planning/search/rrt.py::RRTPlanner._path_states	1
+underscore	minilink/planning/search/rrt.py::RRTPlanner._resolve_search_callback	1
+underscore	minilink/planning/search/rrt.py::RRTPlanner._sample	1
+underscore	minilink/planning/search/rrt.py::RRTPlanner._sample_free_state	1
+underscore	minilink/planning/search/rrt.py::RRTPlanner._select	1
+underscore	minilink/planning/search/rrt.py::RRTPlanner._try_extend	1
+underscore	minilink/planning/search/rrt.py::RRTPlanner._validate_nearest_backend	1
+underscore	minilink/planning/search/rrt.py::_merge_rrt_options	1
+underscore	minilink/planning/search/rrt_star.py::RRTStarPlanner._choose_parent	1
+underscore	minilink/planning/search/rrt_star.py::RRTStarPlanner._extend_once	1
+underscore	minilink/planning/search/rrt_star.py::RRTStarPlanner._gamma	1
+underscore	minilink/planning/search/rrt_star.py::RRTStarPlanner._record_snapshot	1
+underscore	minilink/planning/search/rrt_star.py::RRTStarPlanner._refresh_best_goal	1
+underscore	minilink/planning/search/rrt_star.py::RRTStarPlanner._rewire_eta	1
+underscore	minilink/planning/search/rrt_star.py::RRTStarPlanner._rewire_near	1
+underscore	minilink/planning/search/rrt_star.py::RRTStarPlanner._rewire_radius	1
+underscore	minilink/planning/search/rrt_star.py::_coerce_rrt_star_options	1
+underscore	minilink/planning/search/steering.py::DubinsSteering._sample	1
+underscore	minilink/planning/search/tree.py::Tree._ensure_kdtree	1
+underscore	minilink/planning/spatial/collision.py::_BoundCollisionBody._resolve_u	1
+underscore	minilink/planning/spatial/collision.py::_normalize_shapes	1
+underscore	minilink/planning/spatial/overlays.py::_line3	1
+underscore	minilink/planning/spatial/overlays.py::_track_boundaries	1
+underscore	minilink/planning/spatial/plotting.py::_coerce_body_states	1
+underscore	minilink/planning/spatial/plotting.py::_cost_field_array	1
+underscore	minilink/planning/spatial/plotting.py::_cost_field_norm	1
+underscore	minilink/planning/spatial/plotting.py::_default_bounds	1
+underscore	minilink/planning/spatial/plotting.py::_draw_body	1
+underscore	minilink/planning/spatial/plotting.py::_draw_field_marker	1
+underscore	minilink/planning/spatial/plotting.py::_draw_shape	1
+underscore	minilink/planning/spatial/plotting.py::_field_bounds	1
+underscore	minilink/planning/spatial/plotting.py::_label_cost_colorbar	1
+underscore	minilink/planning/spatial/plotting.py::_resolve_cost_cmap	1
+underscore	minilink/planning/spatial/plotting.py::_shape_bounds	1
+underscore	minilink/planning/spatial/plotting.py::_workspace_dim	1
+underscore	minilink/planning/trajectory_optimization/direct_collocation.py::DirectCollocationTranscription._add_boundary_constraints	1
+underscore	minilink/planning/trajectory_optimization/direct_collocation.py::DirectCollocationTranscription._add_path_constraints	1
+underscore	minilink/planning/trajectory_optimization/direct_collocation.py::DirectCollocationTranscription._add_point_boundary	1
+underscore	minilink/planning/trajectory_optimization/direct_collocation.py::DirectCollocationTranscription._add_terminal_constraints	1
+underscore	minilink/planning/trajectory_optimization/direct_collocation.py::DirectCollocationTranscription._dynamics_residual	1
+underscore	minilink/planning/trajectory_optimization/direct_collocation.py::DirectCollocationTranscription._objective	1
+underscore	minilink/planning/trajectory_optimization/direct_collocation.py::DirectCollocationTranscription._transcribe_jax	1
+underscore	minilink/planning/trajectory_optimization/live_plot.py::LiveTrajectoryPlotCallback._title	1
+underscore	minilink/planning/trajectory_optimization/multiple_shooting.py::MultipleShootingTranscription._dynamics_residual	1
+underscore	minilink/planning/trajectory_optimization/multiple_shooting.py::MultipleShootingTranscription._make_step	1
+underscore	minilink/planning/trajectory_optimization/multiple_shooting.py::MultipleShootingTranscription._transcribe_jax	1
+underscore	minilink/planning/trajectory_optimization/parametric_evaluator.py::JaxParametricProgramEvaluator._check_traceable	1
+underscore	minilink/planning/trajectory_optimization/parametric_evaluator.py::JaxParametricProgramEvaluator._decision_vector	1
+underscore	minilink/planning/trajectory_optimization/parametric_evaluator.py::JaxParametricProgramEvaluator._jax_decision_vector	1
+underscore	minilink/planning/trajectory_optimization/parametric_evaluator.py::JaxParametricProgramEvaluator._matrix	1
+underscore	minilink/planning/trajectory_optimization/parametric_evaluator.py::JaxParametricProgramEvaluator._scalar	1
+underscore	minilink/planning/trajectory_optimization/parametric_evaluator.py::JaxParametricProgramEvaluator._vector	1
+underscore	minilink/planning/trajectory_optimization/parametric_evaluator.py::JaxParametricProgramEvaluator._warm_start	1
+underscore	minilink/planning/trajectory_optimization/planner.py::TrajectoryOptimizationPlanner._class_name	1
+underscore	minilink/planning/trajectory_optimization/planner.py::TrajectoryOptimizationPlanner._iteration_from_z	1
+underscore	minilink/planning/trajectory_optimization/planner.py::TrajectoryOptimizationPlanner._make_callback	1
+underscore	minilink/planning/trajectory_optimization/planner.py::TrajectoryOptimizationPlanner._make_optimizer	1
+underscore	minilink/planning/trajectory_optimization/planner.py::TrajectoryOptimizationPlanner._make_parametric_optimizer_backend	1
+underscore	minilink/planning/trajectory_optimization/planner.py::TrajectoryOptimizationPlanner._print_solve_preamble	1
+underscore	minilink/planning/trajectory_optimization/planner.py::TrajectoryOptimizationPlanner._print_solve_report	1
+underscore	minilink/planning/trajectory_optimization/planner.py::TrajectoryOptimizationPlanner._resolve_initial_guess	1
+underscore	minilink/planning/trajectory_optimization/planner.py::TrajectoryOptimizationPlanner._solve_trajectory_from_parametric	1
+underscore	minilink/planning/trajectory_optimization/planner.py::TrajectoryOptimizationPlanner._solve_trajectory_from_rebuild	1
+underscore	minilink/planning/trajectory_optimization/planner.py::TrajectoryOptimizationPlanner._transcription_options	1
+underscore	minilink/planning/trajectory_optimization/planner.py::_merge_trajopt_options	1
+underscore	minilink/planning/trajectory_optimization/planner.py::_resolve_transcription	1
+underscore	minilink/planning/trajectory_optimization/planner.py::_within_tolerance	1
+underscore	minilink/planning/trajectory_optimization/shooting.py::ShootingTranscription._add_path_constraints	1
+underscore	minilink/planning/trajectory_optimization/shooting.py::ShootingTranscription._add_terminal_constraints	1
+underscore	minilink/planning/trajectory_optimization/shooting.py::ShootingTranscription._initial_state	1
+underscore	minilink/planning/trajectory_optimization/shooting.py::ShootingTranscription._make_rollout	1
+underscore	minilink/planning/trajectory_optimization/shooting.py::ShootingTranscription._objective	1
+underscore	minilink/planning/trajectory_optimization/shooting.py::ShootingTranscription._rollout_loop	1
+underscore	minilink/planning/trajectory_optimization/shooting.py::ShootingTranscription._transcribe_jax	1
+underscore	minilink/simulation/computer.py::_base_hz	1
+underscore	minilink/simulation/computer.py::_build_computer	1
+underscore	minilink/simulation/computer.py::_group_port_ops_by_sys	1
+underscore	minilink/simulation/computer.py::_rate_to_divisor	1
+underscore	minilink/simulation/computer.py::_validate_dt_base	1
+underscore	minilink/simulation/hybrid_simulator.py::_allocate_signal_hist	1
+underscore	minilink/simulation/hybrid_simulator.py::_assemble_computer_u	1
+underscore	minilink/simulation/hybrid_simulator.py::_assemble_plant_u	1
+underscore	minilink/simulation/hybrid_simulator.py::_coerce_forced_input	1
+underscore	minilink/simulation/hybrid_simulator.py::_coerce_forced_signal	1
+underscore	minilink/simulation/hybrid_simulator.py::_coerce_full_forced_input	1
+underscore	minilink/simulation/hybrid_simulator.py::_collect_computer_signal_names	1
+underscore	minilink/simulation/hybrid_simulator.py::_collect_plant_signal_names	1
+underscore	minilink/simulation/hybrid_simulator.py::_collect_signal_names	1
+underscore	minilink/simulation/hybrid_simulator.py::_index_boundary_connections	1
+underscore	minilink/simulation/hybrid_simulator.py::_record_tick_signals	1
+underscore	minilink/simulation/hybrid_simulator.py::_sample_forced_callable	1
+underscore	minilink/simulation/hybrid_simulator.py::_sample_plant_outputs	1
+underscore	minilink/simulation/hybrid_simulator.py::_select_tick_grid	1
+underscore	minilink/simulation/hybrid_simulator.py::_signal_dim	1
+underscore	minilink/simulation/hybrid_simulator.py::_validate_x0	1
+underscore	minilink/simulation/input_coercion.py::_coerce_forced_array	1
+underscore	minilink/simulation/input_coercion.py::_coerce_forced_signal	1
+underscore	minilink/simulation/input_coercion.py::_sample_forced_callable	1
+underscore	minilink/simulation/simulator.py::_time_grid_is_uniform	1
+underscore	minilink/simulation/solvers/euler_fixed.py::_require_uniform_times	1
+underscore	minilink/simulation/solvers/scipy_ivp.py::SciPySolverBackend._finalize_solution	1
+underscore	minilink/simulation/time_grid.py::_dt_grid	1
+underscore	minilink/simulation/time_grid.py::_validate_dt	1
+underscore	minilink/simulation/time_grid.py::_validate_n_steps	1
+unnamed-matrix	minilink/dynamics/catalog/manipulators/arms.py::OneLinkManipulator.J	1
+unnamed-matrix	minilink/dynamics/catalog/mass_spring_damper/linear.py::ThreeMass.A	1
+unnamed-matrix	minilink/dynamics/catalog/mass_spring_damper/linear.py::TwoMass.A	1
+unnamed-matrix	minilink/dynamics/catalog/pendulum/cartpole.py::CartPole.H	1
+unnamed-matrix	minilink/dynamics/catalog/pendulum/cartpole.py::RotatingCartPole.H	1
+unnamed-matrix	minilink/dynamics/catalog/pendulum/double_pendulum.py::DoublePendulum.C	1
+unnamed-matrix	minilink/dynamics/catalog/pendulum/pendulum.py::Pendulum.H	1
+unnamed-matrix	minilink/dynamics/catalog/vehicles/mountain_car.py::MountainCar.B	1
