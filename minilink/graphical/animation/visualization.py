@@ -1,21 +1,73 @@
-"""Frame-keyed geometry → flat draw-list adapter (animator internals).
+"""Draw lists: frame-keyed geometry posed in the world, as the renderers draw it."""
 
-The drawable contract returns **frame-keyed dicts**: ``tf`` gives
-``dict[key, 4x4 world]`` and the geometry hooks give ``dict[key, list[prim]]``.
-Renderers consume a **flat** ``(primitive, world 4x4)`` list
-("draw this shape at this pose"). :func:`flatten_draw_list` is the adapter that
-bridges the two, plus the ``local_transform`` compose and the static/dynamic merge.
-
-It is **signature-agnostic** (it never sees ``x, u, t``): the animator resolves
-each drawable's hooks — primary with ``(x, u, t)``, overlays with ``t`` only —
-and hands the three already-resolved dicts here, so the primary and the overlays
-share one flattening path. This module is animator-only (not public).
-"""
+# Animator internals, not a public API: the animator and the diagrams' frame and
+# geometry hooks call them.
 
 import numpy as np
 
 # Frame key for world-fixed geometry; always present even when ``tf`` is empty.
 WORLD = "world"
+
+
+###############################################################################
+# Public API
+###############################################################################
+
+
+def flatten_draw_list(frames, kinematic, dynamic=None):
+    """Flatten frame-keyed geometry into a ``[(primitive, world 4x4), …]`` list.
+
+    The drawable contract returns **frame-keyed dicts**: ``tf`` gives
+    ``dict[key, 4x4 world]`` and the geometry hooks give ``dict[key, list[prim]]``.
+    Renderers consume a **flat** ``(primitive, world 4x4)`` list ("draw this shape
+    at this pose"). This is the adapter that bridges the two, plus the
+    ``local_transform`` compose and the static/dynamic merge.
+
+    It is **signature-agnostic** (it never sees ``x, u, t``): the animator
+    resolves each drawable's hooks, the primary with ``(x, u, t)`` and the
+    overlays with ``t`` only, and hands the three already-resolved dicts here,
+    so the primary and the overlays share one flattening path.
+
+    Parameters
+    ----------
+    frames : dict[str, 4x4]
+        World pose per frame key (a resolved ``tf``). ``"world"`` is injected as
+        the identity if absent, so world-fixed geometry always has a frame.
+    kinematic : dict[str, list[primitive]]
+        Static skin (cached once across frames).
+    dynamic : dict[str, list[primitive]], optional
+        Per-frame geometry (rebuilt each frame); merged onto *kinematic*.
+
+    Returns
+    -------
+    list[tuple[primitive, np.ndarray]]
+        For each primitive at key ``k``: ``(prim, frames[k] @ prim.local_transform)``.
+
+    Raises
+    ------
+    KeyError
+        If geometry is keyed to a frame ``tf`` did not provide (fail loudly —
+        ``"world"`` is always treated as present).
+    """
+    frames = ensure_world_frame(frames)
+
+    geometry = merge_geometry(kinematic or {}, dynamic or {})
+
+    # Each primitive at its frame's world pose, composed with its local offset:
+    # ʷT_prim = ʷT_key · T_local
+    draw_list = []
+    for key, primitives in geometry.items():
+        require_known_frame(key, frames)
+        W_T_key = frames[key]
+        for primitive in primitives:
+            local = getattr(primitive, "local_transform", None)
+            W_T_prim = W_T_key if local is None else W_T_key @ local
+            draw_list.append((primitive, W_T_prim))
+
+    return draw_list
+
+
+# The frame-keyed dicts the draw list reads
 
 
 def ensure_world_frame(frames):
@@ -37,6 +89,9 @@ def merge_geometry(*geometries):
         for key, primitives in geometry.items():
             merged.setdefault(key, []).extend(primitives)
     return merged
+
+
+# A diagram's subsystems, namespaced under their ids
 
 
 def prefix_keys(mapping, prefix, sep=":"):
@@ -67,44 +122,15 @@ def merge_subsystem_geometry(merged, subsystem_geometry, sys_id, sep=":"):
     return merged
 
 
-def flatten_draw_list(frames, kinematic, dynamic=None):
-    """Flatten frame-keyed geometry into a ``[(primitive, world 4x4), …]`` list.
+###############################################################################
+# Internal machinery
+###############################################################################
 
-    Parameters
-    ----------
-    frames : dict[str, 4x4]
-        World pose per frame key (a resolved ``tf``). ``"world"`` is injected as
-        the identity if absent, so world-fixed geometry always has a frame.
-    kinematic : dict[str, list[primitive]]
-        Static skin (cached once across frames).
-    dynamic : dict[str, list[primitive]], optional
-        Per-frame geometry (rebuilt each frame); merged onto *kinematic*.
 
-    Returns
-    -------
-    list[tuple[primitive, np.ndarray]]
-        For each primitive at key ``k``: ``(prim, frames[k] @ prim.local_transform)``.
-
-    Raises
-    ------
-    KeyError
-        If geometry is keyed to a frame ``tf`` did not provide (fail loudly —
-        ``"world"`` is always treated as present).
-    """
-    frames = ensure_world_frame(frames)
-
-    geometry = merge_geometry(kinematic or {}, dynamic or {})
-
-    draw_list = []
-    for key, primitives in geometry.items():
-        if key not in frames:
-            raise KeyError(
-                f"geometry keyed to unknown frame {key!r}; "
-                f"tf provides {sorted(frames)} (and implicit 'world')."
-            )
-        W_T_key = frames[key]
-        for primitive in primitives:
-            local = getattr(primitive, "local_transform", None)
-            W_T_prim = W_T_key if local is None else W_T_key @ local
-            draw_list.append((primitive, W_T_prim))
-    return draw_list
+def require_known_frame(key, frames):
+    """Refuse geometry keyed to a frame ``tf`` did not provide (``world`` always is)."""
+    if key not in frames:
+        raise KeyError(
+            f"geometry keyed to unknown frame {key!r}; "
+            f"tf provides {sorted(frames)} (and implicit 'world')."
+        )
