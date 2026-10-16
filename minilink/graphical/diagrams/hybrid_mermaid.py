@@ -2,13 +2,11 @@
 
 from __future__ import annotations
 
-import re
-
 from minilink.graphical.diagrams.hybrid_topology import (
     resolve_computer_boundary_anchor,
     resolve_plant_boundary_anchor,
 )
-from minilink.graphical.diagrams.mermaid import escape_label, node_label
+from minilink.graphical.diagrams.mermaid import escape_label, mermaid_id, node_label
 
 ###############################################################################
 # Public API
@@ -84,15 +82,3 @@ def diagram_subgraph_lines(topology, *, indent: str) -> list[str]:
         lines.append(f'{indent}{source} -- "{label}" --> {target}')
 
     return lines
-
-
-def mermaid_id(value: str) -> str:
-    """A Mermaid node id: each character outside ``[0-9A-Za-z_]`` as ``_``, ``node`` when empty, ``n_`` before a digit."""
-    text = re.sub(r"[^0-9A-Za-z_]", "_", value)
-    if not text:
-        text = "node"
-
-    if text[0].isdigit():
-        text = "n_" + text
-
-    return text

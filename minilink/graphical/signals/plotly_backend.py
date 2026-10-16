@@ -122,6 +122,7 @@ class PlotlyLivePlotHandle(LivePlotHandle):
         self._polling_server = polling_server
 
     def update(self, traj_or_spec, *, title: str | None = None) -> None:
+        """Redraw each trace from a new trajectory or plot spec, with the same traces."""
         spec = coerce_signal_plot_spec(
             traj_or_spec,
             self.spec_builder,
@@ -137,7 +138,7 @@ class PlotlyLivePlotHandle(LivePlotHandle):
 
         # In place: the same traces take the new samples, in one batched redraw
         # when the figure has one (a FigureWidget)
-        require_same_traces(spec.traces, self.fig.data)
+        require_same_trace_count(spec, self.fig.data)
         batch = getattr(self.fig, "batch_update", None)
         if callable(batch):
             with self.fig.batch_update():
@@ -146,6 +147,7 @@ class PlotlyLivePlotHandle(LivePlotHandle):
             redraw_traces(self.fig, spec, title)
 
     def close(self) -> None:
+        """Stop the polling server, when there is one."""
         if self._polling_server is not None:
             self._polling_server.shutdown()
             self._polling_server = None
@@ -365,9 +367,9 @@ class PlotlyPollHandler(BaseHTTPRequestHandler):
         return
 
 
-def require_same_traces(traces, drawn):
-    """Refuse a live update that changes the number of traces."""
-    if len(traces) != len(drawn):
+def require_same_trace_count(spec, lines):
+    """Refuse an update whose spec has another number of traces than the plot."""
+    if len(spec.traces) != len(lines):
         raise ValueError(
             "Live plot update changed the number of traces; open a new plot.",
         )

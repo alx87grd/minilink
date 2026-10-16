@@ -1,4 +1,4 @@
-"""Mermaid exporter for diagram topology snapshots."""
+"""Mermaid diagrams: a system's blocks and wires as Mermaid flowchart source."""
 
 from __future__ import annotations
 

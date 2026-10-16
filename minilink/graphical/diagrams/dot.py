@@ -267,7 +267,7 @@ def render_diagram_graph(
     if graph is None:
         return False
 
-    # Lazy import: the display environment loads on first use, not with the exporter
+    # Lazy import: the graphics load on first use, not with the core
     from minilink.graphical.common.environment import (
         is_blocking_needed,
         is_inline_capable,

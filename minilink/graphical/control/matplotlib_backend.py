@@ -22,7 +22,7 @@ def render_matplotlib(spec: ControlFigure, *, show: bool = True) -> PlotResult:
     import matplotlib
     import matplotlib.pyplot as plt
 
-    # Lazy import: the matplotlib settings load on first use, not with the renderer
+    # Lazy import: the graphics load on first use, not with the core
     from minilink.graphical.common.environment import is_blocking_needed
     from minilink.graphical.common.matplotlib_style import (
         DPI_FIGURE,

@@ -17,14 +17,6 @@ from minilink.core.feedback import (
 )
 from minilink.core.system import System
 
-# No operator modifies its operands: each returns a new diagram that shares the
-# operands' blocks. ``+`` and ``>>`` lay a diagram operand out flat, with its ids,
-# wiring, boundary ports, ``x0`` and camera settings, and keep the left operand's
-# name. ``a >> b`` connects one output of ``a`` to one input of ``b`` by a fixed
-# rule on their edges, with no memory of how either was built. Only ``@`` nests:
-# a box on either side sits under its role name as one block. Explicit
-# ``add_subsystem`` / ``connect`` remains the canonical way to build any topology.
-
 #: Inputs that read their nominal value when left open, without a word from
 #: autowire: a plant's disturbance and measurement noise.
 _NOMINAL_WHEN_OPEN = frozenset({"d", "n"})
@@ -33,6 +25,14 @@ _NOMINAL_WHEN_OPEN = frozenset({"d", "n"})
 ###############################################################################
 # Public API
 ###############################################################################
+
+# No operator modifies its operands: each returns a new diagram that shares the
+# operands' blocks. ``+`` and ``>>`` lay a diagram operand out flat, with its ids,
+# wiring, boundary ports, ``x0`` and camera settings, and keep the left operand's
+# name. ``a >> b`` connects one output of ``a`` to one input of ``b`` by a fixed
+# rule on their edges, with no memory of how either was built. Only ``@`` nests:
+# a box on either side sits under its role name as one block. Explicit
+# ``add_subsystem`` / ``connect`` remains the canonical way to build any topology.
 
 
 def add_systems(*systems: System | DiagramSystem) -> DiagramSystem:

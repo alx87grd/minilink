@@ -516,8 +516,8 @@ def resolve_phase_bounds(
         arr = np.asarray(bounds, dtype=float)
         if arr.shape != (2, 2):
             raise ValueError("bounds must have shape ((xmin, xmax), (ymin, ymax))")
-        x_bounds = validate_bounds(arr[0], "x bounds")
-        y_bounds = validate_bounds(arr[1], "y bounds")
+        x_bounds = require_ordered_bounds(arr[0], "x bounds")
+        y_bounds = require_ordered_bounds(arr[1], "y bounds")
         return x_bounds, y_bounds
 
     state = getattr(sys, "state", None)
@@ -539,8 +539,8 @@ def resolve_phase_bounds(
     return x_bounds, y_bounds
 
 
-def validate_bounds(values, name: str) -> tuple[float, float]:
-    """The pair ``(lo, hi)`` as floats, refused unless finite with ``lo < hi``."""
+def require_ordered_bounds(values, name: str) -> tuple[float, float]:
+    """Refuse a pair that is not finite with ``lo < hi``; return it as floats."""
     lo = float(values[0])
     hi = float(values[1])
     if not (np.isfinite(lo) and np.isfinite(hi)):

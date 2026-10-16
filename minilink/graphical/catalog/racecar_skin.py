@@ -1,4 +1,4 @@
-"""Looks and link frames for the 1/10 racecar."""
+"""Racecar skins: the 1/10 racecar's link frames and its looks, in 3-D and from the top."""
 
 from __future__ import annotations
 
