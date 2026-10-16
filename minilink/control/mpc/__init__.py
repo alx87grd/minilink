@@ -1,16 +1,11 @@
-"""
-Receding-horizon MPC control blocks on trajectory optimization.
+"""Model predictive control: receding-horizon control blocks on trajectory optimization."""
 
-Product entry:
-:func:`~minilink.control.mpc.controller.ModelPredictiveController`
-with a
-:class:`~minilink.planning.trajectory_optimization.planner.TrajectoryOptimizationPlanner`.
-``compile_backend='jax'`` auto-compiles a parametric NLP once (bind + solve per
-tick). ``compile_backend='numpy'`` or ``'direct'`` rebuilds the NLP each replan
-tick (no JAX required). Terminal boundaries, non-singleton ``X0``, and shooting
-transcriptions are not yet supported.
-"""
-
+# The product entry is :func:`~minilink.control.mpc.controller.ModelPredictiveController`
+# with a :class:`~minilink.planning.trajectory_optimization.planner.TrajectoryOptimizationPlanner`.
+# ``compile_backend='jax'`` auto-compiles a parametric NLP once (bind + solve per tick);
+# ``compile_backend='numpy'`` or ``'direct'`` rebuilds the NLP each replan tick (no JAX
+# required). Terminal boundaries, non-singleton ``X0`` and shooting transcriptions are
+# not supported.
 from minilink.control.mpc.controller import Command, ModelPredictiveController
 from minilink.control.mpc.utilities import (
     mpc_default_computer_x0,
