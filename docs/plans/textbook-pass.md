@@ -42,7 +42,7 @@ public surface stays intact.
 | Consolidation came last. | The duplicates were found only by a separate simplicity round. | The duplicate scanners run before each wave. Each lane's queue says which modules share logic, and the consolidation happens in that module's commit. |
 | Rulings came mid-way. | The array-kind and dead-code rulings arrived after the work had started. | All choices are in §1 before the start. |
 | A dead-code call depends on the base. | `riccati_transition` was unused on `main`; on `dev`, `control/design.py` calls it. | No removal is carried over from the dry run without a fresh count on `dev`. |
-| Array conversion crept onto the math lines. | The dry run's `Pendulum.g` read `g = xp.array([m * gravity * l * xp.sin(theta)])`: the student meets a float-to-array conversion on the line that should be `m g l sin θ`. The catalog's gravity vectors and `H` / `C` / `J` matrices had the same shape. | Every entry is a named math line; only the last beat assembles them (§3.2), and the ratchet flags an array constructor with math inside (§4.1). |
+| The equation paths had no fixed shape. | The dry run packed six unpack lines together, grouped some and not others, built arrays on the `return` line, and moved `xp` around. | One fixed pattern of blank-line-separated blocks (§3.2), one parameter per line, simple arrays on their equation line, complex ones by named entries; the ratchet flags arrays built on `return` and unnamed complex matrices (§4.1). |
 | Several commits per module. | T, TR and TS commits on the same module. | One commit per module, at the full bar. A later commit only for a cross-lane ripple (§7.4). |
 | Tools must refuse, not tidy. | The commit script regenerated the allowlist. | The commit script refuses an allowlist that grows. |
 | Sessions get interrupted. | Usage limits stopped the work twice; the worker restarted twice. | The ledger (§7.5) is the run's memory, every commit is pushed, and an hourly check-in resumes a stalled run. |
@@ -60,60 +60,108 @@ Writers receive this section verbatim.
 - The order: imports; the module constants the primary code reads, next to their owner's
   section; `# Public API`; the primary class or function first, within the first 60 lines
   (5.9); then `# Internal machinery`, with the helpers in the order the body calls them
-  (5.10). A class with helpers takes its own `# Internal machinery` line after its public
+  (5.10). A class with helpers takes its own `# Internal machinery` title after its public
   methods.
-- Section comments are plain sentence-case lines (`# Frequency grid`), never banners.
+- **The two section titles stand out.** `Public API` and `Internal machinery` sit between
+  two full lines of `#`, with two blank lines around them. Inside a class, the banner is
+  indented with the class body. Smaller sub-sections are plain sentence-case comments
+  (`# Frequency grid`).
+
+  ```python
+  _2PI = 2.0 * math.pi
+
+
+  ###############################################################################
+  # Public API
+  ###############################################################################
+
+
+  def shortest_path(q0, q1, radius):
+      ...
+
+
+  ###############################################################################
+  # Internal machinery
+  ###############################################################################
+
+
+  def word_segments(a, b, d):
+      ...
+  ```
+- **Air:** blocks are separated by blank lines, never packed together.
 - A constant has one owner; the other modules import it. There is no lazy import of a
   minilink module, except to break a real cycle or for an optional dependency, with a
   comment saying which.
 
 ### 3.2 Equation paths and algorithms (5.3)
-- Three beats, separated by blank lines:
-  1. Unpack. Related names go on one line when the line fits (`Kp, Ki, Kd = params["Kp"],
-     params["Ki"], params["Kd"]`; `r, y = u[:n], u[n:]`). The object's fields first, then
-     `xp = array_module(...)`.
-  2. The math: one named line per textbook step, each with its equation comment above.
-  3. A `return` of a name, never an expression.
+- **One pattern for every equation path and algorithm body.** The blocks below appear in
+  this order, each separated by a blank line, and any block with nothing to say is left out:
+  1. `params = self.params if params is None else params`, then on the next line the
+     backend: `xp = array_module(...)` (or `jnp = require_jax_numpy()` in a JAX-only
+     algorithm).
+  2. The parameters and the object's fields, **one per line**.
+  3. The pre-computation: the state and input unpacked (`theta = q[0]`), trigonometric
+     shorthands, intermediate quantities.
+  4. The core equation(s), each a named line, with its equation comment above when the
+     code cannot write the textbook form (5.22).
+  5. The matrix assembly, when the result is a complex array (below).
+  6. `return` of a name.
+- **Assembly.**
+  - A simple array (a vector or a matrix with short entries) is built on its own equation
+    line: `g = xp.array([m * gravity * l * xp.sin(theta)])`.
+  - A complex array gets one named line per entry (`J11`, `J12`, …) in block 4, then its own
+    assembly block, a matrix row by row (5.5).
+  - The array is never built on the `return` line.
 - No `self.` in a math line. Linear algebra is part of the story and stays in the body.
   Plumbing goes to helpers: coercion, shapes, defaults, validation, dispatch, caching,
   wrapping.
-- **Assemble once, at the end.** Array construction is plumbing, never part of a math line.
-  - Each entry of a vector or matrix is a named math line, without `xp.array`.
-  - The last beat assembles the named entries, a matrix row by row (5.5).
-  - An entry may stay inline only when it is a number, a name, or one operator between them
-    (`0.0`, `x[1]`, `-k / m`).
 
   ```python
   def g(self, q, params=None):
       params = self.params if params is None else params
-      m, l, gravity = params["m"], params["l"], params["gravity"]
-      theta = q[0]
       xp = array_module(q)
 
-      g_theta = m * gravity * l * xp.sin(theta)
+      m = params["m"]
+      l = params["l"]
+      gravity = params["gravity"]
 
-      return xp.array([g_theta])
+      theta = q[0]
+
+      g = xp.array([m * gravity * l * xp.sin(theta)])
+
+      return g
 
 
-  def H(self, q, params=None):
-      ...
-      H11 = m1 * lc1**2 + I1 + m2 * (l1**2 + lc2**2 + 2 * l1 * lc2 * c2) + I2
-      H12 = m2 * (lc2**2 + l1 * lc2 * c2) + I2
-      H22 = m2 * lc2**2 + I2
+  def C(self, q, dq, params=None):
+      params = self.params if params is None else params
+      xp = array_module(q, dq)
+
+      m2 = params["m2"]
+      l1 = params["l1"]
+      lc2 = params["lc2"]
+
+      _, _, _, s2, _, _ = self.trig(q)
+      h = m2 * l1 * lc2 * s2
+
+      # Coriolis and centrifugal coupling, driven by the second joint's rate
+      C11 = -h * dq[1]
+      C12 = -h * (dq[0] + dq[1])
+      C21 = h * dq[0]
+      C22 = 0.0
 
       # fmt: off
-      H = xp.array([
-          [H11, H12],
-          [H12, H22],
+      C = xp.array([
+          [C11, C12],
+          [C21, C22],
       ])
       # fmt: on
 
-      return H
+      return C
   ```
 
   The constructor keeps the array module it has on `dev` (`np` or `xp`): no backend change
-  (§1). A later step may let the base classes do this conversion; it is a core contract and
-  not part of this pass.
+  (§1). On `dev` the arms' `J` reads `self.params` instead of its argument; that is a
+  recorded bug, so the pass keeps the `self.params` reads exactly as they are.
 - A delegation, a constant, a dict literal or a frame composition stays the one line it
   is; the beats are for equations. `tf` returns its frames as one dict literal.
 - Equation comments use Unicode math in the textbook's symbols: `ẋ`, `x_{k+1}`, `Aᵀ`, `R⁻¹`,
@@ -150,8 +198,8 @@ Writers receive this section verbatim.
 - `require_jax()` / `require_jax_numpy()`, never a bare `import jax` (5.12).
 
 ### 3.6 Backends
-- `xp = array_module(...)` is bound once the fields are unpacked, and every array operation
-  after it uses `xp` (5.2), **unless the change would alter a result's backend type**. No
+- `xp = array_module(...)` is the second line (§3.2), and every array operation after it
+  uses `xp` (5.2), **unless the change would alter a result's backend type**. No
   backend changes (§1): an `np.` call under `xp` that decides the returned type stays,
   recorded and allowlisted.
 
@@ -159,6 +207,10 @@ Writers receive this section verbatim.
 - Logic written twice (identical once named alike) gets one owner. The owner is either a
   shared module helper, or a base class when one class truly is the other (the parametric
   evaluator is a `MathematicalProgramEvaluator`).
+- **A textbook law is not a helper.** The law stays in the body of every method that uses
+  it, even when two methods share it (the PID's `f` and `ctl`). A helper holds math only
+  when it is a generic building block reused across the family or the library (the
+  classical family's `filtered_rate`, `held_integral`, `clipped`).
 - No class-attribute aliases (`Cl = Plane2D.Cl`).
 - Plant equations stay on each plant's own page, even when two plants share them.
 - Copies that differ in behaviour stay as they are, and the record names the difference.
@@ -184,15 +236,16 @@ Writers receive this section verbatim.
 - **The dry run's six AST checks:** underscore, return-math, self-in-math, np-under-xp,
   first-screen, bare-jax.
 - **New, from the review round's hand fixes:**
-  - a banner section comment;
+  - a module-level `Public API` or `Internal machinery` title without its `#` banners;
   - a multi-line module title;
   - a quoted forward reference under postponed annotations;
   - `x_k+1` / `x[k+1]` spellings in comments;
   - `# Internal machinery` without `# Public API`;
   - a lazy `import minilink…` without a reason comment;
   - a class-attribute alias to another class's method;
-  - an array constructor in an equation path with math inside: an entry that holds a
-    function call, or more than one operator (§3.2, "Assemble once, at the end").
+  - an array built on a `return` line in an equation path;
+  - a matrix literal in an equation path with an entry holding more than one operator,
+    instead of named entries (§3.2, "Assembly").
 - **Tiers:** `estimation/`, `control/design.py`, `analysis/riccati.py` and `planning/spatial/`
   join the textbook tier.
 - **The `dev` census today, six checks:** 435 offences in 91 files.
