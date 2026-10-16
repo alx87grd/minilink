@@ -1,6 +1,5 @@
 # The textbook-rule backlog: check, module::where, count.
 # Shrinks only. Regenerate: python tests/unittest/textbook_style.py --write
-array-on-return	minilink/core/diagram.py::DiagramSystem.f	1
 array-on-return	minilink/dynamics/catalog/mass_spring_damper/linear.py::SingleMass.D	1
 array-on-return	minilink/dynamics/catalog/mass_spring_damper/linear.py::ThreeMass.D	1
 array-on-return	minilink/dynamics/catalog/mass_spring_damper/linear.py::TwoMass.D	1
@@ -26,27 +25,14 @@ banner	minilink/analysis/sensitivity_functions.py::line 164	1
 banner	minilink/analysis/structural.py::line 142	1
 banner	minilink/analysis/time_response.py::line 175	1
 banner	minilink/blocks/sources.py::line 343	1
-banner	minilink/blocks/transfer_function.py::line 129	1
 banner	minilink/control/geometric.py::line 12	1
 banner	minilink/control/impedance.py::line 181	1
 banner	minilink/control/mpc/controller.py::line 35	1
 banner	minilink/control/mpc/controller.py::line 61	1
 banner	minilink/control/neural.py::line 10	1
 banner	minilink/control/robotic.py::line 422	1
-banner	minilink/control/siso.py::line 306	1
-banner	minilink/control/state.py::line 238	1
 banner	minilink/core/composition.py::line 34	1
 banner	minilink/core/composition.py::line 389	1
-banner	minilink/core/distributions.py::line 151	1
-banner	minilink/core/distributions.py::line 24	1
-banner	minilink/core/facades.py::line 1106	1
-banner	minilink/core/feedback.py::line 23	1
-banner	minilink/core/feedback.py::line 253	1
-banner	minilink/core/geometry.py::line 11	1
-banner	minilink/core/hybrid_composition.py::line 195	1
-banner	minilink/core/hybrid_composition.py::line 22	1
-banner	minilink/core/hybrid_diagram.py::line 26	1
-banner	minilink/core/hybrid_diagram.py::line 406	1
 banner	minilink/dynamics/catalog/vehicles/tires.py::line 8	1
 banner	minilink/estimation/design.py::line 106	1
 banner	minilink/estimation/design.py::line 13	1
@@ -119,7 +105,6 @@ bare-jax	minilink/planning/policy_synthesis/dp_jax.py::from jax.scipy.ndimage	1
 bare-jax	minilink/planning/trajectory_optimization/parametric_evaluator.py::import jax	1
 bare-jax	minilink/planning/trajectory_optimization/parametric_evaluator.py::import jax.numpy	1
 bare-jax	minilink/simulation/compile_backend.py::import jax	1
-first-screen	minilink/core/signals.py::<module>	1
 first-screen	minilink/dynamics/catalog/manipulators/arms.py::<module>	1
 first-screen	minilink/dynamics/catalog/manipulators/ur5.py::<module>	1
 first-screen	minilink/graphical/catalog/shapes.py::<module>	1
@@ -140,19 +125,6 @@ grouped-unpack	minilink/control/neural.py::NeuralPolicyController.action	1
 grouped-unpack	minilink/control/neural.py::NeuralPolicyController.observe	2
 grouped-unpack	minilink/control/robotic.py::ModelJointImpedance.ctl	1
 grouped-unpack	minilink/control/robotic.py::TaskImpedance.ctl	1
-grouped-unpack	minilink/control/siso.py::PID.command	1
-grouped-unpack	minilink/control/siso.py::PID.f	1
-grouped-unpack	minilink/control/state.py::OutputReferenceController.ctl	1
-grouped-unpack	minilink/control/state.py::StateFeedbackController.ctl	1
-grouped-unpack	minilink/core/costs.py::QuadraticCost.g	2
-grouped-unpack	minilink/core/costs.py::QuadraticCost.h	1
-grouped-unpack	minilink/core/costs.py::ScaledCost.g	1
-grouped-unpack	minilink/core/costs.py::ScaledCost.h	1
-grouped-unpack	minilink/core/distributions.py::Gaussian.sample	1
-grouped-unpack	minilink/core/sets.py::BallSet.bounding_box	1
-grouped-unpack	minilink/core/sets.py::BallSet.margin	1
-grouped-unpack	minilink/core/sets.py::BoxSet.margin	1
-grouped-unpack	minilink/core/sets.py::BoxSet.sample	1
 grouped-unpack	minilink/dynamics/catalog/mass_spring_damper/linear.py::SingleMass.A	1
 grouped-unpack	minilink/dynamics/catalog/mass_spring_damper/linear.py::ThreeMass.A	3
 grouped-unpack	minilink/dynamics/catalog/mass_spring_damper/linear.py::TwoMass.A	3
@@ -199,51 +171,7 @@ lazy-import	minilink/core/composition.py::_close_on: minilink.blocks.routing	1
 lazy-import	minilink/core/composition.py::_insert_filter: minilink.blocks.routing	1
 lazy-import	minilink/core/composition.py::_return_signal: minilink.blocks.routing	1
 lazy-import	minilink/core/composition.py::sum_into: minilink.blocks.routing	1
-lazy-import	minilink/core/diagram.py::DiagramSystem.compile: minilink.core.compile.compiler	1
-lazy-import	minilink/core/diagram.py::StepDiagramSystem.compile: minilink.core.compile.step_compiler	1
-lazy-import	minilink/core/facades.py::DynamicSystemFacades.animate_modal: minilink.analysis.modal	1
-lazy-import	minilink/core/facades.py::DynamicSystemFacades.compute_forced: minilink.graphical.signals	1
-lazy-import	minilink/core/facades.py::DynamicSystemFacades.compute_forced: minilink.simulation.simulator	1
-lazy-import	minilink/core/facades.py::DynamicSystemFacades.compute_trajectory: minilink.graphical.signals	1
-lazy-import	minilink/core/facades.py::DynamicSystemFacades.compute_trajectory: minilink.simulation.simulator	1
-lazy-import	minilink/core/facades.py::DynamicSystemFacades.find_equilibrium: minilink.analysis.equilibria	1
-lazy-import	minilink/core/facades.py::DynamicSystemFacades.game: minilink.simulation.realtime	1
-lazy-import	minilink/core/facades.py::DynamicSystemFacades.linearize: minilink.analysis.linearization	1
-lazy-import	minilink/core/facades.py::DynamicSystemFacades.plot_bode: minilink.analysis.frequency	1
-lazy-import	minilink/core/facades.py::DynamicSystemFacades.plot_phase_plane: minilink.graphical.phase_plane	1
-lazy-import	minilink/core/facades.py::DynamicSystemFacades.plot_pzmap: minilink.analysis.frequency	1
-lazy-import	minilink/core/facades.py::DynamicSystemFacades.plot_root_locus: minilink.analysis.frequency	1
-lazy-import	minilink/core/facades.py::DynamicSystemFacades.plot_step_response: minilink.analysis.time_response	1
-lazy-import	minilink/core/facades.py::DynamicSystemFacades.transfer_function: minilink.analysis.frequency	1
-lazy-import	minilink/core/facades.py::SharedSystemFacades.animate: minilink.graphical.animation	1
 lazy-import	minilink/core/facades.py::SharedSystemFacades.animate: minilink.graphical.common.environment	1
-lazy-import	minilink/core/facades.py::SharedSystemFacades.compile: minilink.core.compile.compiler	1
-lazy-import	minilink/core/facades.py::SharedSystemFacades.compute_forced: minilink.graphical.signals	1
-lazy-import	minilink/core/facades.py::SharedSystemFacades.compute_forced: minilink.simulation.static_simulator	1
-lazy-import	minilink/core/facades.py::SharedSystemFacades.compute_trajectory: minilink.graphical.signals	1
-lazy-import	minilink/core/facades.py::SharedSystemFacades.compute_trajectory: minilink.simulation.static_simulator	1
-lazy-import	minilink/core/facades.py::SharedSystemFacades.get_diagram: minilink.graphical.diagrams	1
-lazy-import	minilink/core/facades.py::SharedSystemFacades.jacobian: minilink.analysis.derivatives	1
-lazy-import	minilink/core/facades.py::SharedSystemFacades.plot_control_law: minilink.graphical.port_map	1
-lazy-import	minilink/core/facades.py::SharedSystemFacades.plot_diagram: minilink.graphical.diagrams	1
-lazy-import	minilink/core/facades.py::SharedSystemFacades.plot_input_output_map: minilink.graphical.port_map	1
-lazy-import	minilink/core/facades.py::SharedSystemFacades.plot_trajectory: minilink.graphical.signals	1
-lazy-import	minilink/core/facades.py::SharedSystemFacades.render: minilink.graphical.animation	1
-lazy-import	minilink/core/facades.py::StepSystemFacades.jacobian: minilink.analysis.derivatives	1
-lazy-import	minilink/core/facades.py::StepSystemFacades.plot_rollout: minilink.graphical.signals	1
-lazy-import	minilink/core/facades.py::_scored_trajectory: minilink.core.diagram	1
-lazy-import	minilink/core/hybrid_diagram.py::HybridDiagram.__post_init__: minilink.simulation.computer	1
-lazy-import	minilink/core/hybrid_diagram.py::HybridDiagram._repr_svg_: minilink.graphical.diagrams.hybrid_dot	1
-lazy-import	minilink/core/hybrid_diagram.py::HybridDiagram._repr_svg_: minilink.graphical.diagrams.hybrid_topology	1
-lazy-import	minilink/core/hybrid_diagram.py::HybridDiagram._simulator: minilink.simulation.hybrid_simulator	1
-lazy-import	minilink/core/hybrid_diagram.py::HybridDiagram.animate: minilink.core.hybrid_composition	1
-lazy-import	minilink/core/hybrid_diagram.py::HybridDiagram.animate: minilink.graphical.animation	1
-lazy-import	minilink/core/hybrid_diagram.py::HybridDiagram.animate: minilink.graphical.common.environment	1
-lazy-import	minilink/core/hybrid_diagram.py::HybridDiagram.from_diagrams: minilink.simulation.computer	1
-lazy-import	minilink/core/hybrid_diagram.py::HybridDiagram.plot_diagram: minilink.graphical.diagrams.hybrid_dot	1
-lazy-import	minilink/core/hybrid_diagram.py::HybridDiagram.plot_trajectory: minilink.graphical.signals.time_signals	1
-lazy-import	minilink/core/hybrid_diagram.py::HybridDiagram.plot_trajectory: minilink.simulation.hybrid_simulator	1
-lazy-import	minilink/core/inspect.py::inspect_text: minilink.core.costs	1
 lazy-import	minilink/core/inspect.py::inspect_text: minilink.core.distributions	1
 lazy-import	minilink/core/inspect.py::inspect_text: minilink.core.sets	1
 lazy-import	minilink/core/inspect.py::inspect_text: minilink.core.system	1
@@ -251,13 +179,6 @@ lazy-import	minilink/core/inspect.py::inspect_text: minilink.core.trajectory	1
 lazy-import	minilink/core/inspect.py::inspect_text: minilink.optimization.mathematical_program	1
 lazy-import	minilink/core/inspect.py::inspect_text: minilink.planning.problems	1
 lazy-import	minilink/core/inspect.py::inspect_text: minilink.planning.spatial.state_fields	1
-lazy-import	minilink/core/system.py::System.__add__: minilink.core.composition	1
-lazy-import	minilink/core/system.py::System.__matmul__: minilink.core.composition	1
-lazy-import	minilink/core/system.py::System.__mod__: minilink.simulation.computer	1
-lazy-import	minilink/core/system.py::System.__rshift__: minilink.core.composition	1
-lazy-import	minilink/core/wiring.py::WiredDiagramMixin.autowire: minilink.core.composition	1
-lazy-import	minilink/core/wiring.py::WiredDiagramMixin.get_dynamic_geometry: minilink.graphical.animation.visualization	1
-lazy-import	minilink/core/wiring.py::WiredDiagramMixin.tf: minilink.graphical.animation.visualization	1
 lazy-import	minilink/dynamics/abstraction/manipulator.py::Manipulator.get_dynamic_geometry: minilink.graphical.animation.primitives	1
 lazy-import	minilink/dynamics/catalog/vehicles/racecar.py::_frames: minilink.graphical.catalog.racecar_skin	1
 lazy-import	minilink/graphical/animation/__init__.py::__getattr__: minilink.graphical.animation	1
@@ -351,12 +272,8 @@ markers	minilink/analysis/sensitivity_functions.py::<module>	1
 markers	minilink/analysis/structural.py::<module>	1
 markers	minilink/analysis/time_response.py::<module>	1
 markers	minilink/blocks/sources.py::<module>	1
-markers	minilink/blocks/transfer_function.py::<module>	1
 markers	minilink/control/impedance.py::<module>	1
 markers	minilink/control/robotic.py::<module>	1
-markers	minilink/control/siso.py::<module>	1
-markers	minilink/control/state.py::<module>	1
-markers	minilink/core/facades.py::<module>	1
 markers	minilink/estimation/observer.py::<module>	1
 next-index	minilink/blocks/sources.py::line 270	1
 next-index	minilink/planning/reinforcement_learning/collect.py::line 59	1
@@ -390,18 +307,11 @@ old-banner	minilink/analysis/structural.py::line 141	1
 old-banner	minilink/analysis/structural.py::line 143	1
 old-banner	minilink/analysis/time_response.py::line 174	1
 old-banner	minilink/analysis/time_response.py::line 176	1
-old-banner	minilink/blocks/transfer_function.py::line 128	1
-old-banner	minilink/blocks/transfer_function.py::line 130	1
 old-banner	minilink/control/impedance.py::line 180	1
 old-banner	minilink/control/impedance.py::line 182	1
-old-banner	minilink/control/siso.py::line 305	1
-old-banner	minilink/control/siso.py::line 307	1
-old-banner	minilink/control/state.py::line 237	1
-old-banner	minilink/control/state.py::line 239	1
 quoted-annotation	minilink/control/mpc/controller.py::line 791	1
 quoted-annotation	minilink/control/mpc/controller.py::line 794	1
 quoted-annotation	minilink/control/mpc/controller.py::line 832	1
-quoted-annotation	minilink/core/wiring.py::line 518	1
 quoted-annotation	minilink/graphical/animation/animator.py::line 59	1
 quoted-annotation	minilink/planning/comparison.py::line 26	1
 quoted-annotation	minilink/planning/comparison.py::line 87	1
@@ -440,23 +350,7 @@ title	minilink/control/__init__.py::<module>	1
 title	minilink/control/impedance.py::<module>	1
 title	minilink/control/mpc/__init__.py::<module>	1
 title	minilink/control/mpc/controller.py::<module>	1
-title	minilink/control/siso.py::<module>	1
-title	minilink/core/__init__.py::<module>	1
-title	minilink/core/backends.py::<module>	1
 title	minilink/core/composition.py::<module>	1
-title	minilink/core/diagram.py::<module>	1
-title	minilink/core/distributions.py::<module>	1
-title	minilink/core/facades.py::<module>	1
-title	minilink/core/feedback.py::<module>	1
-title	minilink/core/hybrid_composition.py::<module>	1
-title	minilink/core/hybrid_diagram.py::<module>	1
-title	minilink/core/kinematics.py::<module>	1
-title	minilink/core/sets.py::<module>	1
-title	minilink/core/signals.py::<module>	1
-title	minilink/core/step_rollout.py::<module>	1
-title	minilink/core/system.py::<module>	1
-title	minilink/core/trajectory.py::<module>	1
-title	minilink/core/wiring.py::<module>	1
 title	minilink/dynamics/abstraction/__init__.py::<module>	1
 title	minilink/dynamics/catalog/manipulators/ur5.py::<module>	1
 title	minilink/dynamics/catalog/vehicles/dynamic_bicycle.py::<module>	1
@@ -580,34 +474,6 @@ underscore	minilink/core/composition.py::_series_connection	1
 underscore	minilink/core/composition.py::_series_pair	1
 underscore	minilink/core/composition.py::_subsystem_id_for_leaf	1
 underscore	minilink/core/composition.py::_unique_id	1
-underscore	minilink/core/facades.py::_scored_trajectory	1
-underscore	minilink/core/feedback.py::_block_under	1
-underscore	minilink/core/hybrid_composition.py::_as_plant_diagram	1
-underscore	minilink/core/hybrid_composition.py::_as_step_diagram	1
-underscore	minilink/core/hybrid_composition.py::_builds_own_computer	1
-underscore	minilink/core/hybrid_composition.py::_computer_leaf	1
-underscore	minilink/core/hybrid_composition.py::_ensure_computer_boundary_ports	1
-underscore	minilink/core/hybrid_composition.py::_ensure_plant_boundary_ports	1
-underscore	minilink/core/hybrid_composition.py::_leaf_sys_id	1
-underscore	minilink/core/hybrid_composition.py::_plant_leaf	1
-underscore	minilink/core/hybrid_diagram.py::HybridDiagram._cache_result	1
-underscore	minilink/core/hybrid_diagram.py::HybridDiagram._simulator	1
-underscore	minilink/core/hybrid_diagram.py::_normalize_direction	1
-underscore	minilink/core/hybrid_diagram.py::_validate_boundary_connection	1
-underscore	minilink/core/inspect.py::_arr	1
-underscore	minilink/core/inspect.py::_problem_text	1
-underscore	minilink/core/inspect.py::_program_text	1
-underscore	minilink/core/inspect.py::_system_text	1
-underscore	minilink/core/inspect.py::_trajectory_text	1
-underscore	minilink/core/signals.py::_as_optional_string_list	1
-underscore	minilink/core/signals.py::_as_optional_vector	1
-underscore	minilink/core/signals.py::_infer_signal_dim	1
-underscore	minilink/core/signals.py::_length_or_none	1
-underscore	minilink/core/trajectory.py::Trajectory._nearest_index	1
-underscore	minilink/dynamics/abstraction/state_space.py::_check_dimensions	1
-underscore	minilink/dynamics/abstraction/state_space.py::_identity_like	1
-underscore	minilink/dynamics/abstraction/state_space.py::_shape	1
-underscore	minilink/dynamics/abstraction/state_space.py::_zeros_like	1
 underscore	minilink/dynamics/catalog/aerial/drone.py::_drone_body	1
 underscore	minilink/dynamics/catalog/manipulators/arms.py::_planar_frames	1
 underscore	minilink/dynamics/catalog/manipulators/arms.py::_planar_joint_positions	1
