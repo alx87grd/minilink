@@ -1,9 +1,4 @@
-"""Allowable sets: ``x(t) in X(t)``, ``u(t) in U(x, t)`` and boundary sets ``x(tf) in Xf``.
-
-Membership is ``margin >= 0`` componentwise; ``margin`` is a native-array
-equation path (NumPy in, NumPy out; JAX in, JAX out), ``contains`` and
-``sample`` are NumPy boundary utilities.
-"""
+"""Allowable sets: ``x(t) in X(t)``, ``u(t) in U(x, t)`` and boundary sets ``x(tf) in Xf``."""
 
 from abc import ABC, abstractmethod
 from collections.abc import Callable
@@ -19,6 +14,10 @@ from minilink.core.backends import (
 )
 from minilink.core.inspect import inspect_text, repr_pretty
 
+###############################################################################
+# Public API
+###############################################################################
+
 
 class Set(ABC):
     """
@@ -26,19 +25,16 @@ class Set(ABC):
 
     A point is feasible when all components of :meth:`margin` are
     nonnegative. The set may depend on time and optional parameters, so
-    the generic notation is ``z in Z(t)``.
+    the generic notation is ``z in Z(t)``. :meth:`margin` is a native-array
+    equation path (NumPy in, NumPy out; JAX in, JAX out); :meth:`contains` is
+    a NumPy boundary utility, and :meth:`sample` follows the draw convention
+    of :class:`~minilink.core.distributions.Distribution`.
     """
 
     @abstractmethod
     def margin(self, z, t=0.0, params=None):
         """Return nonnegative feasibility margins for ``z``, shape ``(k,)``."""
         ...
-
-    def __str__(self):
-        return inspect_text(self)
-
-    def _repr_pretty_(self, p, cycle):
-        repr_pretty(self, p, cycle)
 
     def contains(
         self,
@@ -49,7 +45,11 @@ class Set(ABC):
         """Return ``True`` when ``z`` belongs to the set."""
         z_arr = np.asarray(z, dtype=float).reshape(-1)
         margin = np.asarray(self.margin(z_arr, t=t, params=params), dtype=float)
-        return bool(np.all(margin >= 0.0))
+
+        # z ∈ Z(t) ⇔ every margin ≥ 0
+        inside = bool(np.all(margin >= 0.0))
+
+        return inside
 
     def sample(self, key=None, n=None, params=None):
         """
@@ -71,6 +71,12 @@ class Set(ABC):
         """Return the intersection ``self & other`` of two sets."""
         return IntersectionSet.of(self, other)
 
+    def __str__(self):
+        return inspect_text(self)
+
+    def _repr_pretty_(self, p, cycle):
+        repr_pretty(self, p, cycle)
+
 
 class InputSet(ABC):
     """
@@ -78,19 +84,14 @@ class InputSet(ABC):
 
     Input feasibility often depends on the current state, for example
     actuator envelopes or contact-dependent controls. The state argument
-    is optional so constant input boxes stay simple.
+    is optional so constant input boxes stay simple. :meth:`margin` and
+    :meth:`contains` follow the conventions of :class:`Set`.
     """
 
     @abstractmethod
     def margin(self, u, x=None, t=0.0, params=None):
         """Return nonnegative feasibility margins for ``u``, shape ``(k,)``."""
         ...
-
-    def __str__(self):
-        return inspect_text(self)
-
-    def _repr_pretty_(self, p, cycle):
-        repr_pretty(self, p, cycle)
 
     def contains(
         self,
@@ -106,7 +107,11 @@ class InputSet(ABC):
             self.margin(u_arr, x=x_arr, t=t, params=params),
             dtype=float,
         )
-        return bool(np.all(margin >= 0.0))
+
+        # u ∈ U(x, t) ⇔ every margin ≥ 0
+        admissible = bool(np.all(margin >= 0.0))
+
+        return admissible
 
     def sample(self, key=None, n=None, x=None, t=0.0, params=None):
         """Draw one input ``(m,)`` or ``n`` inputs ``(n, m)`` when supported (same convention as :meth:`Set.sample`)."""
@@ -115,6 +120,12 @@ class InputSet(ABC):
     def bounding_box(self):
         """The tightest :class:`BoxSet` of inputs containing the set, or ``None`` when it has none."""
         return None
+
+    def __str__(self):
+        return inspect_text(self)
+
+    def _repr_pretty_(self, p, cycle):
+        repr_pretty(self, p, cycle)
 
 
 @dataclass(frozen=True)
@@ -132,12 +143,11 @@ class BoxSet(Set):
     upper: np.ndarray
 
     def __post_init__(self) -> None:
+        # The bounds as flat float copies, checked before they are stored
         lower = np.asarray(self.lower, dtype=float).reshape(-1).copy()
         upper = np.asarray(self.upper, dtype=float).reshape(-1).copy()
-        if lower.shape != upper.shape:
-            raise ValueError("lower and upper must have the same shape")
-        if np.any(lower > upper):
-            raise ValueError("lower must be less than or equal to upper")
+        require_box_bounds(lower, upper)
+
         object.__setattr__(self, "lower", lower)
         object.__setattr__(self, "upper", upper)
 
@@ -151,31 +161,41 @@ class BoxSet(Set):
         """The state box of ``sys``: its state bounds (``sys.state.box``)."""
         return sys.state.box
 
-    def bounding_box(self):
-        """A box is its own bounding box."""
-        return self
-
     def margin(self, z, t=0.0, params=None):
         """Return the margins to the lower and upper faces, shape ``(2n,)``."""
         xp = array_module(z)
-        lower, upper = self.lower, self.upper
 
+        lower = self.lower
+        upper = self.upper
+
+        # lower ≤ z ≤ upper ⇔ [z − lower; upper − z] ≥ 0
         margin = xp.concatenate((z - lower, upper - z))
 
         return margin
 
     def sample(self, key=None, n=None, params=None):
         """Draw uniformly from a finite box: ``(dim,)`` for one point, ``(n, dim)`` with ``n``."""
-        lower, upper = self.lower, self.upper
-        if not (np.all(np.isfinite(lower)) and np.all(np.isfinite(upper))):
-            raise ValueError("Cannot sample from a box with infinite bounds")
-        if n is not None and int(n) < 1:
-            raise ValueError("n must be greater than or equal to 1")
-        shape = (self.dim,) if n is None else (int(n), self.dim)
+        lower = self.lower
+        upper = self.upper
+        dim = self.dim
+
+        require_finite_box(self)
+        require_sample_count(n)
+
+        shape = (dim,) if n is None else (int(n), dim)
+
+        # z ~ U(lower, upper), drawn on the key's backend
         if is_jax_key(key):
             jax = require_jax()
-            return jax.random.uniform(key, shape, minval=lower, maxval=upper)
-        return numpy_generator(key).uniform(lower, upper, size=shape)
+            z = jax.random.uniform(key, shape, minval=lower, maxval=upper)
+        else:
+            z = numpy_generator(key).uniform(lower, upper, size=shape)
+
+        return z
+
+    def bounding_box(self):
+        """A box is its own bounding box."""
+        return self
 
 
 @dataclass(frozen=True)
@@ -197,20 +217,20 @@ class BoxInputSet(InputSet):
         boxes = [port.box for port in sys.inputs.values()]
         lower = np.concatenate([box.lower for box in boxes]) if boxes else np.zeros(0)
         upper = np.concatenate([box.upper for box in boxes]) if boxes else np.zeros(0)
-        return cls(BoxSet(lower, upper))
 
-    def bounding_box(self):
-        """The input box itself."""
-        return self.box
+        return cls(BoxSet(lower, upper))
 
     def margin(self, u, x=None, t=0.0, params=None):
         """Return the margins to the input box faces, shape ``(2m,)``."""
-        box = self.box
-        return box.margin(u, t=t, params=params)
+        return self.box.margin(u, t=t, params=params)
 
     def sample(self, key=None, n=None, x=None, t=0.0, params=None):
         """Draw uniformly from the input box: ``(m,)`` for one input, ``(n, m)`` with ``n``."""
         return self.box.sample(key, n, params)
+
+    def bounding_box(self):
+        """The input box itself."""
+        return self.box
 
 
 @dataclass(frozen=True)
@@ -234,9 +254,16 @@ class SingletonSet(Set):
         """Dimension of the singleton point."""
         return int(self.point.size)
 
-    def bounding_box(self):
-        """The degenerate box ``point <= z <= point``."""
-        return BoxSet(self.point, self.point)
+    def margin(self, z, t=0.0, params=None):
+        """Return zero only when ``z`` equals the singleton point."""
+        xp = array_module(z)
+
+        residual = self.residual(z)
+
+        # −|z − p| ≥ 0 only at z = p: the equality as a degenerate inequality
+        margin = -xp.abs(residual)
+
+        return margin
 
     def residual(self, z):
         """Return the equality residual ``z - point``, shape ``(n,)``."""
@@ -246,15 +273,9 @@ class SingletonSet(Set):
 
         return residual
 
-    def margin(self, z, t=0.0, params=None):
-        """Return zero only when ``z`` equals the singleton point."""
-        xp = array_module(z)
-        residual = self.residual(z)
-
-        # equality as a degenerate inequality: -|z - p| >= 0 holds only at p
-        margin = -xp.abs(residual)
-
-        return margin
+    def bounding_box(self):
+        """The degenerate box ``point <= z <= point``."""
+        return BoxSet(self.point, self.point)
 
 
 @dataclass(frozen=True)
@@ -267,10 +288,11 @@ class BallSet(Set):
     radius: float
 
     def __post_init__(self) -> None:
+        # The center and the radius as floats, checked before they are stored
         center = np.asarray(self.center, dtype=float).reshape(-1).copy()
         radius = float(self.radius)
-        if radius < 0.0:
-            raise ValueError("radius must be nonnegative")
+        require_nonnegative_radius(radius)
+
         object.__setattr__(self, "center", center)
         object.__setattr__(self, "radius", radius)
 
@@ -279,19 +301,29 @@ class BallSet(Set):
         """Dimension of the ball center."""
         return int(self.center.size)
 
-    def bounding_box(self):
-        """The box of half-width ``radius`` about the center."""
-        center, radius = self.center, self.radius
-        return BoxSet(center - radius, center + radius)
-
     def margin(self, z, t=0.0, params=None):
         """Return the signed distance to the ball boundary, shape ``(1,)``."""
         xp = array_module(z)
-        center, radius = self.center, self.radius
 
-        margin = xp.reshape(radius - xp.linalg.norm(z - center), (1,))
+        center = self.center
+        radius = self.radius
+
+        # r − ‖z − c‖ ≥ 0 inside the ball, as a margin vector of one entry
+        signed_distance = radius - xp.linalg.norm(z - center)
+        margin = xp.reshape(signed_distance, (1,))
 
         return margin
+
+    def bounding_box(self):
+        """The box of half-width ``radius`` about the center."""
+        center = self.center
+        radius = self.radius
+
+        # c − r ≤ z ≤ c + r
+        lower = center - radius
+        upper = center + radius
+
+        return BoxSet(lower, upper)
 
 
 @dataclass(frozen=True)
@@ -311,15 +343,16 @@ class CallableSet(Set):
     contains_fn: Callable | None = None
 
     def __post_init__(self) -> None:
-        if self.margin_fn is None and self.contains_fn is None:
-            raise ValueError("Provide at least one of margin_fn or contains_fn")
+        require_margin_or_contains(self.margin_fn, self.contains_fn)
 
     def margin(self, z, t=0.0, params=None):
         """Evaluate the user-supplied margin function."""
         margin_fn = self.margin_fn
-        if margin_fn is None:
-            raise NotImplementedError("This CallableSet has no margin function")
-        return margin_fn(z, t, params)
+        require_margin_fn(margin_fn)
+
+        margin = margin_fn(z, t, params)
+
+        return margin
 
     def contains(
         self,
@@ -328,8 +361,10 @@ class CallableSet(Set):
         params=None,
     ) -> bool:
         """Evaluate membership through the supplied callable when present."""
-        if self.contains_fn is not None:
-            return bool(self.contains_fn(np.asarray(z, dtype=float), t, params))
+        contains_fn = self.contains_fn
+        if contains_fn is not None:
+            return bool(contains_fn(np.asarray(z, dtype=float), t, params))
+
         return super().contains(z, t=t, params=params)
 
 
@@ -346,8 +381,8 @@ class IntersectionSet(Set):
 
     def __post_init__(self) -> None:
         sets = tuple(self.sets)
-        if not sets:
-            raise ValueError("IntersectionSet requires at least one set")
+        require_members(sets)
+
         object.__setattr__(self, "sets", sets)
 
     @classmethod
@@ -359,7 +394,25 @@ class IntersectionSet(Set):
                 members.extend(set_.sets)
             else:
                 members.append(set_)
+
         return cls(tuple(members))
+
+    def margin(self, z, t=0.0, params=None):
+        """Concatenate the margins of all member sets (a scalar margin counts as one)."""
+        xp = array_module(z)
+
+        sets = self.sets
+
+        # Each member's margins as a vector, a scalar margin as one entry
+        margins = [
+            xp.reshape(xp.asarray(set_.margin(z, t=t, params=params)), (-1,))
+            for set_ in sets
+        ]
+
+        # z ∈ Z₁ ∩ Z₂ ∩ … ⇔ every member's margins ≥ 0
+        margin = xp.concatenate(margins)
+
+        return margin
 
     def bounding_box(self):
         """The intersection of the members' boxes; ``None`` when no member has one."""
@@ -370,23 +423,12 @@ class IntersectionSet(Set):
         ]
         if not boxes:
             return None
+
+        # The boxes meet in max lowerᵢ ≤ z ≤ min upperᵢ
         lower = np.max([box.lower for box in boxes], axis=0)
         upper = np.min([box.upper for box in boxes], axis=0)
+
         return BoxSet(lower, upper)
-
-    def margin(self, z, t=0.0, params=None):
-        """Concatenate the margins of all member sets (a scalar margin counts as one)."""
-        xp = array_module(z)
-        sets = self.sets
-
-        margin = xp.concatenate(
-            [
-                xp.reshape(xp.asarray(set_.margin(z, t=t, params=params)), (-1,))
-                for set_ in sets
-            ]
-        )
-
-        return margin
 
 
 def is_finite_box(box) -> bool:
@@ -394,3 +436,52 @@ def is_finite_box(box) -> bool:
     return box is not None and bool(
         np.all(np.isfinite(box.lower)) and np.all(np.isfinite(box.upper))
     )
+
+
+###############################################################################
+# Internal machinery
+###############################################################################
+
+
+def require_box_bounds(lower, upper):
+    """Refuse bounds of different shapes, or a lower bound above its upper bound."""
+    if lower.shape != upper.shape:
+        raise ValueError("lower and upper must have the same shape")
+    if np.any(lower > upper):
+        raise ValueError("lower must be less than or equal to upper")
+
+
+def require_finite_box(box):
+    """Refuse to sample a box with an infinite bound."""
+    if not is_finite_box(box):
+        raise ValueError("Cannot sample from a box with infinite bounds")
+
+
+def require_sample_count(n):
+    """Refuse a sample count below one (``None`` draws a single point)."""
+    if n is not None and int(n) < 1:
+        raise ValueError("n must be greater than or equal to 1")
+
+
+def require_nonnegative_radius(radius):
+    """Refuse a negative ball radius."""
+    if radius < 0.0:
+        raise ValueError("radius must be nonnegative")
+
+
+def require_margin_or_contains(margin_fn, contains_fn):
+    """Refuse a callable set given neither a margin nor a membership function."""
+    if margin_fn is None and contains_fn is None:
+        raise ValueError("Provide at least one of margin_fn or contains_fn")
+
+
+def require_margin_fn(margin_fn):
+    """Refuse a margin query on a callable set built from a membership function only."""
+    if margin_fn is None:
+        raise NotImplementedError("This CallableSet has no margin function")
+
+
+def require_members(sets):
+    """Refuse an intersection of no sets."""
+    if not sets:
+        raise ValueError("IntersectionSet requires at least one set")
