@@ -366,6 +366,3 @@ def render_diagram_graph(
         )
 
     return drawn
-
-
-_render_diagram_graph = render_diagram_graph  # ripple

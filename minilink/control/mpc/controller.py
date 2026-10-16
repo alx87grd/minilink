@@ -916,8 +916,6 @@ class MPCBroadcastController(System):
 
         return t
 
-    _abs_t = abs_t  # ripple
-
     def compute_u_nom(self, x, u, t=0, params=None):
         """The latched plan's input at the base tick ``t``."""
         del x, u, params

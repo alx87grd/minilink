@@ -626,9 +626,6 @@ def new_diagram_like(sys):
     return copy_diagram(sys) if isinstance(sys, DiagramSystem) else sys
 
 
-_new_diagram_like = new_diagram_like  # ripple
-
-
 def expose_free_inputs(diagram, sys_id: str) -> None:
     """Put every input of a leaf on the diagram's edge, under the same name."""
     sys = diagram.subsystems[sys_id]
@@ -1259,9 +1256,6 @@ def propagate_animation_camera(diagram, *sources):
 
     if fallback is not None:
         copy_animation_camera_hints(diagram, fallback)
-
-
-_propagate_animation_camera = propagate_animation_camera  # ripple
 
 
 def animated_geometry_source(obj):

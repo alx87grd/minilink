@@ -342,8 +342,6 @@ class Animator:
 
         return frames
 
-    _build_frames = build_frames  # ripple
-
     def resolve_frame(self, x, u, t, *, kinematic, camera_override=None, overlays=()):
         """Resolve one frame to a per-frame ``(primitives, transforms, camera)`` dict."""
         # The system's frames, its draw list, and its camera from the hints
@@ -374,8 +372,6 @@ class Animator:
             frame["camera"] = self._auto_camera
 
         return frame
-
-    _resolve_frame = resolve_frame  # ripple
 
     def merge_overlays(self, frame, overlays, t):
         """The frame with every overlay's primitives and transforms after the system's own."""

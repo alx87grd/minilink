@@ -6,7 +6,7 @@ from minilink.graphical.signals.time_signals import (
     LivePlotHandle,
     PlotResult,
     SignalPlotSpec,
-    _coerce_signal_plot_spec,
+    coerce_signal_plot_spec,
 )
 
 ###############################################################################
@@ -53,7 +53,7 @@ class MatplotlibLivePlotHandle(LivePlotHandle):
 
     def update(self, traj_or_spec, *, title: str | None = None) -> None:
         """Redraw each line from a new trajectory or plot spec, with the same traces."""
-        spec = _coerce_signal_plot_spec(traj_or_spec, self.spec_builder, title=title)
+        spec = coerce_signal_plot_spec(traj_or_spec, self.spec_builder, title=title)
         require_same_trace_count(spec, self.lines)
 
         # Each line takes its trace's new samples, and its axes rescale to them

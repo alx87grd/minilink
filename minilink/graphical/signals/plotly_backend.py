@@ -20,7 +20,7 @@ from minilink.graphical.signals.time_signals import (
     LivePlotHandle,
     PlotResult,
     SignalPlotSpec,
-    _coerce_signal_plot_spec,
+    coerce_signal_plot_spec,
 )
 
 ###############################################################################
@@ -122,7 +122,7 @@ class PlotlyLivePlotHandle(LivePlotHandle):
         self._polling_server = polling_server
 
     def update(self, traj_or_spec, *, title: str | None = None) -> None:
-        spec = _coerce_signal_plot_spec(
+        spec = coerce_signal_plot_spec(
             traj_or_spec,
             self.spec_builder,
             title=title,

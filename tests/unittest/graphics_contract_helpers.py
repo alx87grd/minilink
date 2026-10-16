@@ -14,7 +14,7 @@ def resolve_draw_frame(system, x=None, u=None, t=0.0):
     u = system.get_u_from_input_ports() if u is None else np.asarray(u, dtype=float)
     animator = Animator(system)
     kinematic = system.get_kinematic_geometry()
-    return animator._resolve_frame(x, u, t, kinematic=kinematic)
+    return animator.resolve_frame(x, u, t, kinematic=kinematic)
 
 
 def geometry_smoke(system, x=None, u=None, t=0.0):

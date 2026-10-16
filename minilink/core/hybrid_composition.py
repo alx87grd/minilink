@@ -3,9 +3,9 @@
 from __future__ import annotations
 
 from minilink.core.composition import (
-    _new_diagram_like,
-    _propagate_animation_camera,
     default_computer_boundary_ports,
+    new_diagram_like,
+    propagate_animation_camera,
     resolve_standard_feedback,
 )
 from minilink.core.diagram import DiagramSystem, StepDiagramSystem
@@ -143,7 +143,7 @@ def hybrid_closed_loop(
 def refresh_plant_animation_camera(plant_diagram: DiagramSystem) -> None:
     """Sync plant diagram camera hints from its plant subsystem(s)."""
     if plant_diagram.subsystems:
-        _propagate_animation_camera(plant_diagram, *plant_diagram.subsystems.values())
+        propagate_animation_camera(plant_diagram, *plant_diagram.subsystems.values())
 
 
 def resolve_hybrid_feedback_ports(
@@ -248,7 +248,7 @@ def as_plant_diagram(plant: System | DiagramSystem) -> DiagramSystem:
     if isinstance(plant, System):
         diagram = DiagramSystem()
         diagram.add_subsystem(plant, "plant")
-        _propagate_animation_camera(diagram, plant)
+        propagate_animation_camera(diagram, plant)
         return diagram
 
     raise TypeError(
@@ -319,7 +319,7 @@ def ensure_plant_boundary_ports(
 
     # A user's diagram is copied before any port is added
     if not in_place and (add_input or add_outputs):
-        diagram = _new_diagram_like(diagram)
+        diagram = new_diagram_like(diagram)
 
     if add_input:
         add_boundary_input(diagram, sys_id, subsystem, plant_in)

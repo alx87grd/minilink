@@ -8,7 +8,7 @@ from minilink.graphical.diagrams.hybrid_topology import (
     resolve_computer_boundary_anchor,
     resolve_plant_boundary_anchor,
 )
-from minilink.graphical.diagrams.mermaid import _escape_label, _node_label
+from minilink.graphical.diagrams.mermaid import escape_label, node_label
 
 ###############################################################################
 # Public API
@@ -26,7 +26,7 @@ def export_hybrid_mermaid(topology, **kwargs) -> str:
     lines.append("  end")
 
     # The computer's subgraph, labelled with its schedule, around its step diagram
-    schedule = _escape_label(topology.computer.schedule_label)
+    schedule = escape_label(topology.computer.schedule_label)
     lines.append(f'  subgraph Computer["{schedule}"]')
     lines.append('    subgraph StepDiagram["StepDiagram"]')
     lines.extend(diagram_subgraph_lines(topology.step_diagram, indent="      "))
@@ -48,7 +48,7 @@ def export_hybrid_mermaid(topology, **kwargs) -> str:
         )
         c_id = mermaid_id(c_node)
         p_id = mermaid_id(p_node)
-        label = _escape_label(f"{edge.label}: {c_port} -> {p_port}")
+        label = escape_label(f"{edge.label}: {c_port} -> {p_port}")
 
         # A ZOH runs from the computer to the plant, a sample back from the plant
         if edge.direction == "computer_to_plant":
@@ -71,16 +71,16 @@ def diagram_subgraph_lines(topology, *, indent: str) -> list[str]:
     # The blocks, a step system marked as such
     for node in topology.nodes:
         node_id = mermaid_id(node.id)
-        label = _escape_label(_node_label(node))
+        label = escape_label(node_label(node))
         if node.kind == "step_system":
-            label = _escape_label(f"Step: {_node_label(node)}")
+            label = escape_label(f"Step: {node_label(node)}")
         lines.append(f'{indent}{node_id}["{label}"]')
 
     # One labelled arrow per wire, from its source port to its target port
     for edge in topology.edges:
         source = mermaid_id(edge.source_node)
         target = mermaid_id(edge.target_node)
-        label = _escape_label(f"{edge.source_port} -> {edge.target_port}")
+        label = escape_label(f"{edge.source_port} -> {edge.target_port}")
         lines.append(f'{indent}{source} -- "{label}" --> {target}')
 
     return lines

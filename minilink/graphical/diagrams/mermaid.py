@@ -81,9 +81,6 @@ def node_label(node) -> str:
     return f"{node.name}::{node.display_id}"
 
 
-_node_label = node_label  # ripple
-
-
 def mermaid_id(value: str) -> str:
     """A Mermaid node id: each character outside ``[0-9A-Za-z_]`` as ``_``, ``node`` when empty, ``n_`` before a digit."""
     text = re.sub(r"[^0-9A-Za-z_]", "_", value)
@@ -99,6 +96,3 @@ def mermaid_id(value: str) -> str:
 def escape_label(value: str) -> str:
     """The label with its backslashes and double quotes escaped for Mermaid."""
     return value.replace("\\", "\\\\").replace('"', '\\"')
-
-
-_escape_label = escape_label  # ripple

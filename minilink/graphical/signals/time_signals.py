@@ -481,6 +481,3 @@ def coerce_signal_plot_spec(traj_or_spec, spec_builder, *, title=None):
         raise TypeError("Updating from a trajectory requires a spec builder.")
 
     return spec_builder(traj_or_spec, title=title)
-
-
-_coerce_signal_plot_spec = coerce_signal_plot_spec  # ripple

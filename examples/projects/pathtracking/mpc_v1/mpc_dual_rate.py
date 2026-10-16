@@ -19,7 +19,7 @@ class MpcBroadcastAhead(MPCBroadcastController):
 
     def compute_x_nom(self, x, u, t=0, params=None):
         del x, u, params
-        return self._mpc.get_nominal_x(self._abs_t(t) + self._dt_project)
+        return self._mpc.get_nominal_x(self.abs_t(t) + self._dt_project)
 
 
 def dual_rate_computer_ahead(block, *, dt_broadcast, dt_project=0.2):
