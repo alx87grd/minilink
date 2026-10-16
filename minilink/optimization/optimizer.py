@@ -1,21 +1,4 @@
-"""
-Orchestrator for finite-dimensional mathematical-program solvers.
-
-:class:`Optimizer` is a bound solver object: it owns one
-:class:`~minilink.optimization.mathematical_program.MathematicalProgram`, a
-compiled program evaluator, a default initial guess ``z0``, and a
-solver method preset. Calling :meth:`solve` runs the already-compiled program
-from either the default ``z0`` or a one-off override.
-
-Typical use::
-
-    program = MathematicalProgram(n_z=2, J=J, grad_J=grad_J)
-    opt = Optimizer(program, z0=[0.0, 0.0], method="scipy_slsqp")
-    result = opt.solve(verbose=True)
-
-Optional progress hook: ``callback(z, J, t)`` on :meth:`Optimizer.solve` with
-``t`` = elapsed wall seconds; see :data:`OptimizationProgressCallback`.
-"""
+"""The optimizer: one mathematical program, compiled once, solved by a method preset."""
 
 import time
 from collections.abc import Callable
@@ -55,9 +38,25 @@ _USER_OPTIMIZER_METHODS: dict[str, tuple[str, dict]] = {
 }
 
 
+###############################################################################
+# Public API
+###############################################################################
+
+
 class Optimizer:
     """
     Bound optimizer for one mathematical program.
+
+    It owns the program, its compiled evaluator, a default initial guess
+    ``z0`` and a solver method preset; :meth:`solve` runs the compiled
+    program from ``z0`` or a one-off override::
+
+        program = MathematicalProgram(n_z=2, J=J, grad_J=grad_J)
+        opt = Optimizer(program, z0=[0.0, 0.0], method="scipy_slsqp")
+        result = opt.solve(verbose=True)
+
+    An optional progress hook ``callback(z, J, t)`` on :meth:`solve` receives
+    ``t``, the elapsed wall seconds; see :data:`OptimizationProgressCallback`.
 
     Parameters
     ----------
@@ -93,14 +92,11 @@ class Optimizer:
         options: dict | None = None,
         **method_kwargs,
     ):
-        if method not in _USER_OPTIMIZER_METHODS:
-            valid = ", ".join(sorted(_USER_OPTIMIZER_METHODS))
-            raise ValueError(
-                f"Unknown optimizer method {method!r}. Expected one of: {valid}."
-            )
+        require_method(method)
 
+        # The program, compiled once at the default start
         self.program = program
-        self.z0 = self._decision_vector(z0, program.n_z)
+        self.z0 = self.decision_vector(z0, program.n_z)
         self.method = method
         self.compile_backend = (
             program.backend if compile_backend is None else compile_backend
@@ -112,41 +108,10 @@ class Optimizer:
             use_hessian=use_hessian,
         )
 
+        # The solver backend: the method's preset, the caller's keywords and options over it
         backend_key, preset = _USER_OPTIMIZER_METHODS[method]
-        kwargs = {}
-        for key, value in preset.items():
-            kwargs[key] = dict(value) if isinstance(value, dict) else value
-        kwargs.update(method_kwargs)
-
-        if options is not None:
-            existing = kwargs.get("options", {})
-            kwargs["options"] = {**existing, **options}
-
-        self.backend = self._select_backend(backend_key, kwargs)
-
-    @staticmethod
-    def _select_backend(backend_key: str, kwargs: dict) -> OptimizerBackend:
-
-        if backend_key == "scipy_minimize":
-            from minilink.optimization.optimizers.scipy_minimize import (
-                ScipyMinimizeOptimizer,
-            )
-
-            return ScipyMinimizeOptimizer(**kwargs)
-
-        if backend_key == "ipopt":
-            try:
-                import cyipopt  # noqa: F401
-            except ImportError:
-                raise ImportError(
-                    "IpoptOptimizer requires the optional 'cyipopt' package."
-                )
-
-            from minilink.optimization.optimizers.ipopt import IpoptOptimizer
-
-            return IpoptOptimizer(**kwargs)
-
-        raise ValueError(f"Unknown optimizer backend key {backend_key!r}.")
+        kwargs = backend_kwargs_of(preset, method_kwargs, options)
+        self.backend = self.select_backend(backend_key, kwargs)
 
     def solve(
         self,
@@ -179,50 +144,83 @@ class Optimizer:
         verbose : bool, optional
             If True, print the framed solve panel (preamble and report).
         """
-        z_start = self.z0 if z0 is None else self._decision_vector(z0, self.program.n_z)
+        z_start = self.z0 if z0 is None else self.decision_vector(z0, self.program.n_z)
         time_solve = record_solve_time or verbose
 
         if verbose:
-            self._print_solve_preamble(z_start)
+            self.print_solve_preamble(z_start)
         if time_solve:
             t0 = time.perf_counter()
 
+        # The user's hook, fed (z, J(z), elapsed time) at each iterate of the backend
         backend_cb: BackendIterateCallback | None = None
         if callback is not None:
             t_cb0 = time.perf_counter()
 
             def backend_cb(z: np.ndarray) -> None:
-                z_arr = self._decision_vector(z, self.program.n_z)
+                z_arr = self.decision_vector(z, self.program.n_z)
                 J = self.program_evaluator.objective(z_arr)
                 t_elapsed = time.perf_counter() - t_cb0
                 callback(z_arr.copy(), J, t_elapsed)
 
-        ##############################################################
-        # --- Backend solve ---
+        # The backend solve
         result = self.backend.solve(
             self.program_evaluator,
             z_start,
             callback=backend_cb,
         )
-        ##############################################################
 
+        # The wall-clock time of the backend solve alone
         if time_solve:
             elapsed = time.perf_counter() - t0
             result = replace(result, solve_time_s=elapsed)
 
         if verbose:
-            self._print_solve_report(result)
+            self.print_solve_report(result)
 
         return result
 
+    ###########################################################################
+    # Internal machinery
+    ###########################################################################
+
     @staticmethod
-    def _decision_vector(z, n_z: int) -> np.ndarray:
+    def decision_vector(z, n_z: int) -> np.ndarray:
+        """``z`` as a flat float array of shape ``(n_z,)``."""
         arr = np.asarray(z, dtype=float).reshape(-1)
         if arr.shape != (int(n_z),):
             raise ValueError(f"decision vector must have shape ({int(n_z)},)")
         return arr
 
-    def _print_solve_preamble(self, z0: np.ndarray) -> None:
+    @staticmethod
+    def select_backend(backend_key: str, kwargs: dict) -> OptimizerBackend:
+        """The optimizer backend of a preset's key, built from its keyword arguments."""
+        if backend_key == "scipy_minimize":
+            # Lazy import: SciPy's solvers load on first use, not with the optimizer
+            from minilink.optimization.optimizers.scipy_minimize import (
+                ScipyMinimizeOptimizer,
+            )
+
+            return ScipyMinimizeOptimizer(**kwargs)
+
+        if backend_key == "ipopt":
+            # Ipopt is an optional dependency: refuse early when cyipopt is missing
+            try:
+                import cyipopt  # noqa: F401
+            except ImportError:
+                raise ImportError(
+                    "IpoptOptimizer requires the optional 'cyipopt' package."
+                )
+
+            # Lazy import: the Ipopt adapter loads on first use, not with the optimizer
+            from minilink.optimization.optimizers.ipopt import IpoptOptimizer
+
+            return IpoptOptimizer(**kwargs)
+
+        raise ValueError(f"Unknown optimizer backend key {backend_key!r}.")
+
+    def print_solve_preamble(self, z0: np.ndarray) -> None:
+        """Open the solve panel: the program, the start and the method."""
         print()
         print(DISP_RULE_MAIN)
         print("===               Optimization Program                   ===")
@@ -235,7 +233,7 @@ class Optimizer:
         print(DISP_RULE_DIV)
         print("Running solver...")
 
-    def _print_solve_report(
+    def print_solve_report(
         self,
         result: OptimizationResult,
     ) -> None:
@@ -247,6 +245,36 @@ class Optimizer:
         print("J*:", result.cost)
         print("stats:", result.stats)
         print(DISP_RULE_MAIN)
+
+
+###############################################################################
+# Internal machinery
+###############################################################################
+
+
+def require_method(method):
+    """Refuse a method that names no preset."""
+    if method not in _USER_OPTIMIZER_METHODS:
+        valid = ", ".join(sorted(_USER_OPTIMIZER_METHODS))
+        raise ValueError(
+            f"Unknown optimizer method {method!r}. Expected one of: {valid}."
+        )
+
+
+def backend_kwargs_of(preset, method_kwargs, options):
+    """The backend's constructor keywords: the preset's, then the caller's keywords, then the merged options."""
+    # A copy of each preset dict, so a backend never edits the shared preset
+    kwargs = {}
+    for key, value in preset.items():
+        kwargs[key] = dict(value) if isinstance(value, dict) else value
+    kwargs.update(method_kwargs)
+
+    # The caller's options win over the preset's
+    if options is not None:
+        existing = kwargs.get("options", {})
+        kwargs["options"] = {**existing, **options}
+
+    return kwargs
 
 
 if __name__ == "__main__":
