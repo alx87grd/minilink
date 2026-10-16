@@ -7,6 +7,10 @@ from minilink.core.system import System
 from minilink.core.trajectory import interpolate_schedule
 from minilink.dynamics.abstraction.state_space import point_component
 
+###############################################################################
+# Public API
+###############################################################################
+
 
 class StateFeedbackController(System):
     """Full-state feedback ``u = ubar - K (x - r)`` on a state reference.
@@ -27,21 +31,27 @@ class StateFeedbackController(System):
         super().__init__()
         self.name = "State Feedback Controller"
 
+        # Parameters: the gain and the operating point
         K = np.atleast_2d(np.asarray(K, dtype=float))
         m, n = K.shape
         xbar = point_component(xbar, n, "xbar")
         ubar = point_component(ubar, m, "ubar")
         self.params = {"K": K, "ubar": ubar}
 
+        # Ports: the state x, and the reference r, which holds x̄ when unconnected
         self.add_input_port("x", dim=n)
         self.add_input_port("r", dim=n, nominal_value=xbar)
         self.add_output_port("u", dim=m, function=self.ctl, dependencies=("x", "r"))
 
     def ctl(self, x, u, t=0, params=None):
         params = self.params if params is None else params
-        K, ubar = params["K"], params["ubar"]
+
+        K = params["K"]
+        ubar = params["ubar"]
+
         n = K.shape[1]
-        x_meas, r = u[:n], u[n:]
+        x_meas = u[:n]
+        r = u[n:]
 
         u_cmd = ubar - K @ (x_meas - r)
 
@@ -65,6 +75,7 @@ class OutputReferenceController(System):
         super().__init__()
         self.name = "Output Reference Controller"
 
+        # Parameters: the gain, the operating point and the reference gain
         K = np.atleast_2d(np.asarray(K, dtype=float))
         m, n = K.shape
         xbar = point_component(xbar, n, "xbar")
@@ -72,15 +83,22 @@ class OutputReferenceController(System):
         N = reference_gain(N, m)
         self.params = {"K": K, "ubar": ubar, "xbar": xbar, "N": N}
 
+        # Ports: the state x, and the output reference r, zero when unconnected
         self.add_input_port("x", dim=n)
         self.add_input_port("r", dim=N.shape[1])
         self.add_output_port("u", dim=m, function=self.ctl, dependencies=("x", "r"))
 
     def ctl(self, x, u, t=0, params=None):
         params = self.params if params is None else params
-        K, N, xbar, ubar = params["K"], params["N"], params["xbar"], params["ubar"]
+
+        K = params["K"]
+        N = params["N"]
+        xbar = params["xbar"]
+        ubar = params["ubar"]
+
         n = K.shape[1]
-        x_meas, r = u[:n], u[n:]
+        x_meas = u[:n]
+        r = u[n:]
 
         u_cmd = ubar - K @ (x_meas - xbar) + N @ r
 
@@ -103,12 +121,11 @@ class TimeVaryingStateFeedbackController(System):
         super().__init__()
         self.name = "Time-Varying State Feedback Controller"
 
+        # Parameters: the schedule (t, K(t)), the operating point and the gain past
+        # the schedule's end
         t = np.asarray(t, dtype=float).reshape(-1)
         K = np.asarray(K, dtype=float)
-        if K.ndim != 3 or K.shape[0] != t.size or t.size < 2:
-            raise ValueError("K must have shape (N, m, n) with N = len(t) >= 2")
-        if np.any(np.diff(t) <= 0.0):
-            raise ValueError("t must be strictly increasing")
+        require_gain_schedule(t, K)
         _, m, n = K.shape
         xbar = point_component(xbar, n, "xbar")
         ubar = point_component(ubar, m, "ubar")
@@ -119,26 +136,29 @@ class TimeVaryingStateFeedbackController(System):
         )
         self.params = {"t": t, "K": K, "K_after": K_after, "ubar": ubar}
 
+        # Ports: the state x, and the reference r, which holds x̄ when unconnected
         self.add_input_port("x", dim=n)
         self.add_input_port("r", dim=n, nominal_value=xbar)
         self.add_output_port("u", dim=m, function=self.ctl, dependencies=("x", "r"))
 
     def ctl(self, x, u, t=0, params=None):
         params = self.params if params is None else params
+        xp = array_module(u)
+
         t_schedule = params["t"]
         K_schedule = params["K"]
         K_after = params["K_after"]
         ubar = params["ubar"]
-        xp = array_module(u)
 
         n = K_schedule.shape[2]
         x_meas = u[:n]
         r = u[n:]
 
-        # gain at time t: interpolated on the schedule, K_after past its end
+        # The gain K(t): interpolated on the schedule, K_after past its end
         K = interpolate_schedule(xp, t_schedule, K_schedule, t)
         K = xp.where(t > t_schedule[-1], xp.asarray(K_after), K)
 
+        # u = ū − K(t) (x − r)
         u_cmd = ubar - K @ (x_meas - r)
 
         return u_cmd
@@ -167,39 +187,37 @@ class TrajectoryFeedbackController(System):
         super().__init__()
         self.name = "Trajectory Feedback Controller"
 
+        # Parameters: the reference samples (t, x_d, u_d) and the gains K(t)
         t = np.asarray(trajectory.t, dtype=float).reshape(-1)
         x_d = np.asarray(trajectory.x, dtype=float).T  # (N, n)
         u_d = np.asarray(trajectory.u, dtype=float).T  # (N, m)
         K = np.asarray(K, dtype=float)
         N, n = x_d.shape
         m = u_d.shape[1]
-        if K.shape != (N, m, n):
-            raise ValueError(
-                f"K must have shape (N, m, n) = {(N, m, n)}, got {K.shape}"
-            )
-        if N < 2 or np.any(np.diff(t) <= 0.0):
-            raise ValueError(
-                "the trajectory needs at least two strictly increasing samples"
-            )
+        require_trajectory_gains(t, K, N, m, n)
         self.params = {"t": t, "x_d": x_d, "u_d": u_d, "K": K}
 
+        # Ports: the state x alone, the reference being the trajectory itself
         self.add_input_port("x", dim=n)
         self.add_output_port("u", dim=m, function=self.ctl, dependencies="all")
 
     def ctl(self, x, u, t=0, params=None):
         params = self.params if params is None else params
+        xp = array_module(u)
+
         t_schedule = params["t"]
         x_d = params["x_d"]
         u_d = params["u_d"]
         K_schedule = params["K"]
-        xp = array_module(u)
+
         x_meas = u
 
-        # reference point and gain at time t, held at the trajectory's end
+        # The reference point and the gain at time t, held at the trajectory's end
         x_ref = interpolate_schedule(xp, t_schedule, x_d, t)
         u_ref = interpolate_schedule(xp, t_schedule, u_d, t)
         K = interpolate_schedule(xp, t_schedule, K_schedule, t)
 
+        # u = u_d(t) − K(t) (x − x_d(t))
         u_cmd = u_ref - K @ (x_meas - x_ref)
 
         return u_cmd
@@ -211,7 +229,7 @@ class TrajectoryFeedbackController(System):
         )
 
 
-# Public functions
+# Plots
 
 
 def plot_gain_schedule(t, K, *, title="Gain schedule", ax=None, show=True):
@@ -221,22 +239,27 @@ def plot_gain_schedule(t, K, *, title="Gain schedule", ax=None, show=True):
     _, m, n = K.shape
     if ax is None:
         _, ax = plt.subplots(figsize=(8, 3))
+
+    # One line per gain entry K_ij(t)
     for i in range(m):
         for j in range(n):
             ax.plot(t, K[:, i, j], label=f"$K_{{{i + 1},{j + 1}}}$")
+
     ax.set_xlabel("t [s]")
     ax.set_ylabel("K(t)")
     ax.set_title(title)
     ax.legend(ncol=max(1, m * n // 2), fontsize=8)
     ax.grid(True, alpha=0.3)
+
     if show and plt.get_backend().lower() != "agg":
         plt.show()
+
     return ax
 
 
-# =============================================================================
+###############################################################################
 # Internal machinery
-# =============================================================================
+###############################################################################
 
 
 def reference_gain(N, m):
@@ -248,3 +271,21 @@ def reference_gain(N, m):
             f"row(s), got shape {N.shape}"
         )
     return N
+
+
+def require_gain_schedule(t, K):
+    """Refuse a schedule that is not ``(N, m, n)`` gains on ``N >= 2`` increasing times."""
+    if K.ndim != 3 or K.shape[0] != t.size or t.size < 2:
+        raise ValueError("K must have shape (N, m, n) with N = len(t) >= 2")
+    if np.any(np.diff(t) <= 0.0):
+        raise ValueError("t must be strictly increasing")
+
+
+def require_trajectory_gains(t, K, N, m, n):
+    """Refuse gains that miss the trajectory's ``N`` samples, or fewer than two increasing samples."""
+    if K.shape != (N, m, n):
+        raise ValueError(f"K must have shape (N, m, n) = {(N, m, n)}, got {K.shape}")
+    if N < 2 or np.any(np.diff(t) <= 0.0):
+        raise ValueError(
+            "the trajectory needs at least two strictly increasing samples"
+        )
