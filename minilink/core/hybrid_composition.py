@@ -227,9 +227,6 @@ def as_step_diagram(computer_side: System | StepDiagramSystem) -> StepDiagramSys
     )
 
 
-_as_step_diagram = as_step_diagram  # ripple
-
-
 ###############################################################################
 # Internal machinery
 ###############################################################################
@@ -241,9 +238,6 @@ def builds_own_computer(computer_side: System | StepDiagramSystem) -> bool:
         isinstance(computer_side, System)
         and type(computer_side).__mod__ is not System.__mod__
     )
-
-
-_builds_own_computer = builds_own_computer  # ripple
 
 
 def as_plant_diagram(plant: System | DiagramSystem) -> DiagramSystem:
@@ -260,9 +254,6 @@ def as_plant_diagram(plant: System | DiagramSystem) -> DiagramSystem:
     raise TypeError(
         f"plant must be DiagramSystem or System, got {type(plant).__name__}"
     )
-
-
-_as_plant_diagram = as_plant_diagram  # ripple
 
 
 def leaf_sys_id(

@@ -39,9 +39,9 @@ def as_computer(
     A block whose class defines its own ``%`` builds the Computer there (an MPC
     block checks ``schedule`` against its ``dt_mpc``).
     """
-    from minilink.core.hybrid_composition import _builds_own_computer
+    from minilink.core.hybrid_composition import builds_own_computer
 
-    if not _builds_own_computer(side):
+    if not builds_own_computer(side):
         return _build_computer(side, schedule)
 
     computer = side % schedule
@@ -265,7 +265,7 @@ def _build_computer(
 ) -> Computer:
     """Plain build behind ``block % schedule``: never defers to the block's own ``%``."""
     from minilink.core.hybrid_composition import (
-        _as_step_diagram,
+        as_step_diagram,
         expose_computer_boundary_ports,
     )
     from minilink.core.system import DynamicSystem, System
@@ -292,7 +292,7 @@ def _build_computer(
     else:
         step_schedule = StepSchedule(dt_base=float(schedule))
 
-    diagram = _as_step_diagram(side)
+    diagram = as_step_diagram(side)
     expose_computer_boundary_ports(diagram)
     return Computer(diagram, step_schedule)
 
