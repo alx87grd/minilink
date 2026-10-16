@@ -1,11 +1,15 @@
 """Proximal Policy Optimization: the clipped surrogate on an on-policy batch, several epochs of minibatches."""
 
 from minilink.core.backends import require_jax, require_jax_numpy
-from minilink.planning.reinforcement_learning.algorithms.base import Algorithm
+from minilink.planning.reinforcement_learning.algorithms.base import (
+    Algorithm,
+    optimizer_of,
+)
 from minilink.planning.reinforcement_learning.collect import advantages, flatten
-from minilink.planning.reinforcement_learning.optim import Adam
 
+###############################################################################
 # Public API
+###############################################################################
 
 
 class PPO(Algorithm):
@@ -13,10 +17,10 @@ class PPO(Algorithm):
     Clipped-surrogate policy gradient with a learned value baseline.
 
     The update of :class:`ActorCritic` with two safeguards: the probability
-    ratio ``rho = pi_theta(a|x) / pi_old(a|x)`` is clipped to
-    ``[1 - eps, 1 + eps]``, so no minibatch step moves the policy far from
-    the one that collected the batch (a trust region), and the batch is reused
-    for ``n_epochs`` passes of shuffled minibatches.
+    ratio ``π_θ(a|x) / π_old(a|x)`` is clipped to ``[1 − ε, 1 + ε]``, so no
+    minibatch step moves the policy far from the one that collected the batch
+    (a trust region), and the batch is reused for ``n_epochs`` passes of
+    shuffled minibatches.
 
     Parameters
     ----------
@@ -28,7 +32,9 @@ class PPO(Algorithm):
         Optax-style ``init`` / ``update``; default the built-in :class:`Adam`.
     """
 
-    on_policy, head_kind, critic_kind = True, "gaussian", "V"
+    on_policy = True
+    head_kind = "gaussian"
+    critic_kind = "V"
 
     def __init__(
         self,
@@ -44,89 +50,118 @@ class PPO(Algorithm):
         batch_size=64,
         optimizer=None,
     ):
+        # Hyperparameters
         self.gamma = None if gamma is None else float(gamma)
         self.gae_lambda = float(gae_lambda)
         self.clip_range = float(clip_range)
         self.ent_coef = float(ent_coef)
         self.vf_coef = float(vf_coef)
+
+        # Passes over the batch: n_epochs of shuffled minibatches of batch_size samples
         self.n_epochs = int(n_epochs)
         self.batch_size = int(batch_size)
-        self.optimizer = (
-            Adam(learning_rate, max_grad_norm=max_grad_norm)
-            if optimizer is None
-            else optimizer
-        )
+
+        # Optimizer: the one given, or the built-in Adam
+        self.optimizer = optimizer_of(optimizer, learning_rate, max_grad_norm)
 
     def init(self, key):
         """Train state: the weights and the optimizer's moments."""
         params = {"policy": self.policy.init(), "critic": self.critic.init()}
-        return {"params": params, "opt": self.optimizer.init(params)}
+        opt_state = self.optimizer.init(params)
+
+        return {"params": params, "opt": opt_state}
 
     def loss(self, params, minibatch):
         """Clipped surrogate, plus the weighted value loss, minus the entropy bonus, on one minibatch."""
         jnp = require_jax_numpy()
-        pi, V = self.policy, self.critic
-        theta, w = params["policy"], params["critic"]
-        x, a = minibatch["x"], minibatch["a"]
 
-        # Probability ratio rho = pi_theta(a|x) / pi_old(a|x) of the stored actions
-        ratio = jnp.exp(pi.log_prob(theta, x, a) - minibatch["logp"])
+        pi = self.policy
+        V = self.critic
+        eps = self.clip_range
+        c_v = self.vf_coef
+        c_e = self.ent_coef
+        theta = params["policy"]
+        w = params["critic"]
 
-        # Normalized advantage
+        x = minibatch["x"]
+        a = minibatch["a"]
+        logp_old = minibatch["logp"]
         advantage = minibatch["advantage"]
+        returns = minibatch["return"]
+
+        # ratio = π_θ(a|x) / π_old(a|x), on the stored actions
+        ratio = jnp.exp(pi.log_prob(theta, x, a) - logp_old)
+
+        # Â = (A − mean A) / (std A + 10⁻⁸)
         advantage = (advantage - advantage.mean()) / (advantage.std() + 1e-8)
 
-        # Clipped surrogate: L_clip = E[min(rho A, clip(rho, 1 - eps, 1 + eps) A)]
-        eps = self.clip_range
+        # L_clip = −E[min(ratio Â, clip(ratio, 1 − ε, 1 + ε) Â)]
         clipped = jnp.clip(ratio, 1.0 - eps, 1.0 + eps)
-        policy_loss = -jnp.mean(jnp.minimum(ratio * advantage, clipped * advantage))
+        L_clip = -jnp.mean(jnp.minimum(ratio * advantage, clipped * advantage))
 
-        # Value regression E[(R - V_w(x))^2], and the entropy bonus H(pi)
-        value_loss = jnp.mean((minibatch["return"] - V.value(w, x)) ** 2)
+        # L_V = E[(R − V_w(x))²], and the entropy bonus H(π_θ)
+        L_V = jnp.mean((returns - V.value(w, x)) ** 2)
         entropy = jnp.mean(pi.entropy(theta, x))
 
-        total = policy_loss + self.vf_coef * value_loss - self.ent_coef * entropy
+        # L = L_clip + c_v L_V − c_e H
+        L = L_clip + c_v * L_V - c_e * entropy
 
         # Monitoring only: an estimate of how far the update moved the policy
+        approx_kl = jnp.mean((ratio - 1.0) - jnp.log(ratio))
         stats = {
-            "policy_loss": policy_loss,
-            "value_loss": value_loss,
+            "policy_loss": L_clip,
+            "value_loss": L_V,
             "entropy": entropy,
-            "approx_kl": jnp.mean((ratio - 1.0) - jnp.log(ratio)),
+            "approx_kl": approx_kl,
         }
-        return total, stats
+
+        return L, stats
 
     def update(self, train_state, batch, key):
         """Advantages of the batch, then ``n_epochs`` passes of minibatch gradient steps."""
-        jax, jnp = require_jax(), require_jax_numpy()
-        params, opt_state = train_state["params"], train_state["opt"]
-        theta, w = params["policy"], params["critic"]
+        jax = require_jax()
+        jnp = require_jax_numpy()
 
-        # The batch as the collecting policy saw it: ln pi_old(a|x), advantages and returns
-        advantage, returns = advantages(
-            self.critic, w, batch, self.gamma, self.gae_lambda
-        )
+        pi = self.policy
+        V = self.critic
+        optimizer = self.optimizer
+        gamma = self.gamma
+        lam = self.gae_lambda
+        n_epochs = self.n_epochs
+        batch_size = self.batch_size
+        params = train_state["params"]
+        opt_state = train_state["opt"]
+        theta = params["policy"]
+        w = params["critic"]
+
+        # The batch as the collecting policy saw it: advantages, returns and ln π_old(a|x)
+        advantage, returns = advantages(V, w, batch, gamma, lam)
+        x = batch["x"]
+        a = batch["a"]
+        logp_old = pi.log_prob(theta, x, a)
         samples = flatten(
             {
-                "x": batch["x"],
-                "a": batch["a"],
-                "logp": self.policy.log_prob(theta, batch["x"], batch["a"]),
+                "x": x,
+                "a": a,
+                "logp": logp_old,
                 "advantage": advantage,
                 "return": returns,
             }
         )
+
+        # The samples split into whole minibatches
         size = samples["x"].shape[0]
-        if size % self.batch_size != 0:
-            raise ValueError("n_steps * n_envs must be a multiple of batch_size")
-        n_minibatches = size // self.batch_size
+        require_whole_minibatches(size, batch_size)
+        n_minibatches = size // batch_size
 
         # Gradient steps on shuffled minibatches, n_epochs passes over the batch
         grad_fn = jax.value_and_grad(self.loss, has_aux=True)
 
         def minibatch_step(carry, idx):
             params, opt_state = carry
-            (_, stats), grads = grad_fn(params, {k: v[idx] for k, v in samples.items()})
-            params, opt_state = self.optimizer.update(grads, opt_state, params)
+            minibatch = {k: v[idx] for k, v in samples.items()}
+            (_, stats), grads = grad_fn(params, minibatch)
+            params, opt_state = optimizer.update(grads, opt_state, params)
             return (params, opt_state), stats
 
         def epoch(carry, key):
@@ -134,7 +169,21 @@ class PPO(Algorithm):
             return jax.lax.scan(minibatch_step, carry, perm)
 
         (params, opt_state), stats = jax.lax.scan(
-            epoch, (params, opt_state), jax.random.split(key, self.n_epochs)
+            epoch, (params, opt_state), jax.random.split(key, n_epochs)
         )
+
+        # Each statistic averaged over every minibatch step
         stats = {k: jnp.mean(v) for k, v in stats.items()}
+
         return {"params": params, "opt": opt_state}, stats
+
+
+###############################################################################
+# Internal machinery
+###############################################################################
+
+
+def require_whole_minibatches(size, batch_size):
+    """Refuse a batch that does not split into whole minibatches."""
+    if size % batch_size != 0:
+        raise ValueError("n_steps * n_envs must be a multiple of batch_size")
