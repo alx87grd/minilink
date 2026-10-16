@@ -373,7 +373,7 @@ class BicycleDynTauRate(BicycleDynRate, _CommandPorts):
 
         return jnp.concatenate([dq, dv, jnp.array([w_rear_dot, delta_dot])])
 
-    def _u_in(self, x, u):
+    def wheel_rate_and_steer(self, x, u):
         return x[6:8]
 
 
@@ -472,7 +472,7 @@ class BicycleDynServo(BicycleDynRate, _CommandPorts):
 
         return jnp.concatenate([dq, dv, jnp.array([w_rear_dot, delta_dot, tau_dot])])
 
-    def _u_in(self, x, u):
+    def wheel_rate_and_steer(self, x, u):
         return x[6:8]
 
 
@@ -597,5 +597,5 @@ class BicycleDynEngine(BicycleDynRate, _CommandPorts):
 
         return jnp.concatenate([dq, dv, jnp.array([w_rear_dot, delta_dot, P_dot])])
 
-    def _u_in(self, x, u):
+    def wheel_rate_and_steer(self, x, u):
         return x[6:8]

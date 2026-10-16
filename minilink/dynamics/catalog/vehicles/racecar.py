@@ -401,7 +401,7 @@ class UdeSRacecarDyn(DynamicBicycle):
 
         return Fx_f, Fy_f, Fx_r, Fy_r
 
-    def _u_in(self, x, u):
+    def wheel_rate_and_steer(self, x, u):
         """The base class reads ``[w_rear, delta]`` here; both are states now."""
         return x[6:8]
 

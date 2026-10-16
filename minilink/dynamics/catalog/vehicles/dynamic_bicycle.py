@@ -1,9 +1,4 @@
-"""Dynamic bicycle: a planar rigid body on linear tires, and its wheel-rate / steer-rate rung.
-
-State ``x = [x, y, theta, vx, vy, yaw_rate]``, inputs ``w_rear`` (rear wheel rate [rad/s]) and
-``delta`` (steer angle [rad]) as two named ports. The research rungs live in
-``examples/projects/car_trajopt/vehicles/ladder.py``.
-"""
+"""Dynamic bicycle: a planar rigid body on linear tires, and its wheel-rate / steer-rate rung."""
 
 from functools import partial
 
@@ -13,59 +8,22 @@ from minilink.core.backends import array_module
 from minilink.core.kinematics import SE2, translation
 from minilink.core.signals import VectorSignal
 from minilink.core.system import DynamicSystem
-from minilink.graphical.animation.primitives import (
-    Arrow,
-)
+from minilink.graphical.animation.primitives import Arrow
 from minilink.graphical.catalog.skins import car_skin_2d, car_skin_3d
 
-# Tire model — pure functions; coefficients live in the plant ``params``.
-
-
-def tire_slip(vx, vy, w, R, v_min_epsilon):
-    """Slip angle ``alpha`` [rad] and slip ratio ``kappa`` [-] at one contact."""
-    xp = array_module(vx, vy, w)
-    vx_adj = xp.abs(vx) + v_min_epsilon
-    alpha = -xp.arctan(vy / vx_adj)
-    kappa = (w * R - vx) / vx_adj
-    return alpha, kappa
-
-
-def linear_tire_forces(vx, vy, w, R, Fz, Ca, Ck, mu, v_min_epsilon):
-    """Linear-slip tire forces with friction-circle saturation (pyro ``LinearTire``).
-
-    ``Fx = Ck kappa`` and ``Fy = Ca alpha``, scaled back onto ``|F| <= mu Fz``.
-    """
-    xp = array_module(vx, vy, w)
-    alpha, kappa = tire_slip(vx, vy, w, R, v_min_epsilon)
-
-    # linear slip forces, scaled back onto the friction circle |F| ≤ μ Fz
-    Fx = Ck * kappa
-    Fy = Ca * alpha
-    F_max = mu * Fz
-    F_total = xp.sqrt(Fx**2 + Fy**2)
-    ratio = xp.where(F_total > F_max, F_max / xp.maximum(F_total, 1e-12), 1.0)
-    Fx_sat, Fy_sat = Fx * ratio, Fy * ratio
-
-    return Fx_sat, Fy_sat
-
-
-def _wheel_rectangle_pts(wl, ww):
-    """Closed polyline in wheel frame (x forward, y lateral)."""
-    h, w = wl / 2, ww / 2
-    return np.array(
-        [
-            [h, w, 0.0],
-            [h, -w, 0.0],
-            [-h, -w, 0.0],
-            [-h, w, 0.0],
-            [h, w, 0.0],
-        ]
-    )
+###############################################################################
+# Public API
+###############################################################################
 
 
 class DynamicBicycle(DynamicSystem):
     """
     Dynamic bicycle with rear wheel speed and steer inputs.
+
+    State ``x = [x, y, theta, vx, vy, yaw_rate]``: the world pose and the body-frame
+    velocities. The two inputs come as two named ports, or as one stacked ``u`` port
+    with ``named_ports=False``. The research rungs live in
+    ``examples/projects/car_trajopt/vehicles/ladder.py``.
 
     Inputs
     ------
@@ -75,32 +33,10 @@ class DynamicBicycle(DynamicSystem):
 
     def __init__(self, named_ports=True):
         super().__init__(n=6)
-
         self.name = "Dynamic Bicycle"
         self.named_ports = bool(named_ports)
 
-        self.state.labels = ["x", "y", "theta", "vx", "vy", "yaw_rate"]
-        self.state.units = ["m", "m", "rad", "m/s", "m/s", "rad/s"]
-
-        if self.named_ports:
-            self.add_input_port(
-                "w_rear", nominal_value=0.0, labels=["w_rear"], units=["rad/s"]
-            )
-            self.add_input_port(
-                "delta", nominal_value=0.0, labels=["delta"], units=["rad"]
-            )
-        else:  # one stacked command port (planning / trajopt convention)
-            self.add_input_port(
-                "u",
-                dim=2,
-                nominal_value=np.zeros(2),
-                labels=["w_rear", "delta"],
-                units=["rad/s", "rad"],
-            )
-
-        self.add_output_port("y", dim=6, function=self.h, dependencies=())
-
-        # EoM parameters: CG-to-axle distances a/b [m], wheel radii r_f/r_r [m],
+        # Parameters: CG-to-axle distances a/b [m], wheel radii r_f/r_r [m],
         # mass [kg], yaw inertia [kg m^2], gravity [m/s^2], air density rho
         # [kg/m^3], drag area CdA = Cd * A [m^2], and linear-slip tire
         # coefficients shared by both axles: cornering stiffness Ca [N/rad],
@@ -123,14 +59,38 @@ class DynamicBicycle(DynamicSystem):
             "v_min_epsilon": 0.1,
         }
 
-        # Graphics-only attributes (2-D centerline look)
+        # Ports: two named commands, or one stacked command port (the planning and
+        # trajectory-optimization convention)
+        if self.named_ports:
+            self.add_input_port(
+                "w_rear", nominal_value=0.0, labels=["w_rear"], units=["rad/s"]
+            )
+            self.add_input_port(
+                "delta", nominal_value=0.0, labels=["delta"], units=["rad"]
+            )
+        else:
+            self.add_input_port(
+                "u",
+                dim=2,
+                nominal_value=np.zeros(2),
+                labels=["w_rear", "delta"],
+                units=["rad/s", "rad"],
+            )
+        self.add_output_port("y", dim=6, function=self.h, dependencies=())
+
+        # Signal labels and units
+        self.state.labels = ["x", "y", "theta", "vx", "vy", "yaw_rate"]
+        self.state.units = ["m", "m", "rad", "m/s", "m/s", "rad/s"]
+
+        # Graphics: the 2-D centerline look
         self.wheel_len = 0.76
         self.wheel_width = 0.27
 
-        # Graphics-only attributes for the 3-D four-wheel look (read by
-        # ``car_skin_3d`` / ``tf``). They live on the base plant so the 3-D
-        # look is just ``skin = car_skin_3d`` — no bespoke subclass needed. They
-        # do not affect the default 2-D centerline skin.
+        # Graphics: the 3-D four-wheel look (read by ``car_skin_3d`` / ``tf``). It
+        # lives on the base plant, so the 3-D look is just ``skin = car_skin_3d``,
+        # and it does not affect the default 2-D centerline skin. A wide stance, a
+        # low body and a wide tub, a small gap between the body's underside and the
+        # tire crown, and larger tires (display only: the wheel centers use r_f / r_r)
         self.track = 1.92
         self.body_height = 0.22
         self.body_width_ratio = 0.72
@@ -140,8 +100,8 @@ class DynamicBicycle(DynamicSystem):
         self._visual_wheel_width = 0.2
         self._visual_tire_radius_ratio = 0.58
 
-        # Default 2-D skin (black centerline chassis) and a camera that tracks
-        # the body frame. A numeric scale keeps auto-fit from taking over
+        # Graphics: the default 2-D skin (black centerline chassis) and a camera that
+        # tracks the body frame. A numeric scale keeps auto-fit from taking over
         # (``camera_scale=None`` would frame the whole trail / overlays).
         self.skin = partial(car_skin_2d, color="#1a1a1a")
         self.camera_follow_frame = "body"
@@ -149,52 +109,57 @@ class DynamicBicycle(DynamicSystem):
 
     def M(self, q, params=None):
         params = self.params if params is None else params
-        mass = params["mass"]
-        inertia = params["inertia"]
         xp = array_module(q)
 
+        mass = params["mass"]
+        inertia = params["inertia"]
+
+        # Mass matrix of the planar rigid body: diag(m, m, I_z)
         M = xp.diag(xp.array([mass, mass, inertia], dtype=float))
 
         return M
 
     def C(self, q, v, params=None):
         params = self.params if params is None else params
-        mass = params["mass"]
         xp = array_module(q, v)
 
-        w = v[2]
+        mass = params["mass"]
+
+        r = v[2]
+
+        # Coriolis coupling of the body-frame velocities by the yaw rate r
         # fmt: off
-        C = xp.array(
-            [
-                [     0.0, -mass * w, 0.0],
-                [mass * w,       0.0, 0.0],
-                [     0.0,       0.0, 0.0],
-            ]
-        )
+        C = xp.array([
+            [    0.0, -mass * r, 0.0],
+            [mass * r,      0.0, 0.0],
+            [    0.0,       0.0, 0.0],
+        ])
         # fmt: on
 
         return C
 
     def N(self, q, params=None):
-        theta = q[2]
         xp = array_module(q)
-        c, s = xp.cos(theta), xp.sin(theta)
 
-        # World-frame velocity kinematics: dq = N(q) v
+        theta = q[2]
+        c = xp.cos(theta)
+        s = xp.sin(theta)
+
+        # World-frame velocity kinematics: q̇ = N(q) v
         # fmt: off
-        N = xp.array(
-            [
-                [c, -s, 0.0],
-                [s,  c, 0.0],
-                [0.0, 0.0, 1.0],
-            ]
-        )
+        N = xp.array([
+            [  c,  -s, 0.0],
+            [  s,   c, 0.0],
+            [0.0, 0.0, 1.0],
+        ])
         # fmt: on
 
         return N
 
     def compute_wheel_velocities(self, v_body, u_inputs, params=None):
         params = self.params if params is None else params
+        xp = array_module(v_body, u_inputs)
+
         a = params["a"]
         b = params["b"]
         r_f = params["r_f"]
@@ -204,20 +169,21 @@ class DynamicBicycle(DynamicSystem):
         r = v_body[2]
         delta = u_inputs[1]
 
-        # Contact-point velocities in the body frame, then in each wheel frame.
+        # Contact-point velocities in the body frame
         vx_f_b = vx
         vy_f_b = vy + a * r
         vx_r_b = vx
         vy_r_b = vy - b * r
 
-        xp = array_module(v_body, u_inputs)
-        c_d, s_d = xp.cos(delta), xp.sin(delta)
+        # The same velocities in each wheel frame: the front one turned by the steer δ
+        c_d = xp.cos(delta)
+        s_d = xp.sin(delta)
         vx_f = c_d * vx_f_b + s_d * vy_f_b
         vy_f = -s_d * vx_f_b + c_d * vy_f_b
         vx_r = vx_r_b
         vy_r = vy_r_b
 
-        # Rear wheel rate is the input; the front wheel rolls freely.
+        # The rear wheel rate is the input; the front wheel rolls: ω_f = vx_f / r_f
         w_r = u_inputs[0]
         w_f = vx_f / r_f
 
@@ -225,6 +191,7 @@ class DynamicBicycle(DynamicSystem):
 
     def compute_tire_physics(self, v_body, u_inputs, params=None):
         params = self.params if params is None else params
+
         a = params["a"]
         b = params["b"]
         r_f = params["r_f"]
@@ -235,26 +202,30 @@ class DynamicBicycle(DynamicSystem):
         Ck = params["Ck"]
         mu = params["mu"]
         v_min_epsilon = params["v_min_epsilon"]
-        L = a + b
 
+        L = a + b
         vx_f, vy_f, w_f, vx_r, vy_r, w_r = self.compute_wheel_velocities(
             v_body, u_inputs, params
         )
 
-        # Static normal-load split between front and rear axles.
+        # Static normal-load split between the axles: F_zf = m g b / L, F_zr = m g a / L
         Fz_f = mass * gravity * (b / L)
         Fz_r = mass * gravity * (a / L)
 
+        # Linear-slip forces at each contact, saturated on its friction circle
         Fx_f, Fy_f = linear_tire_forces(
             vx_f, vy_f, w_f, r_f, Fz_f, Ca, Ck, mu, v_min_epsilon
         )
         Fx_r, Fy_r = linear_tire_forces(
             vx_r, vy_r, w_r, r_r, Fz_r, Ca, Ck, mu, v_min_epsilon
         )
+
         return Fx_f, Fy_f, Fx_r, Fy_r
 
     def generalized_d(self, q, v, u_in, params=None):
         params = self.params if params is None else params
+        xp = array_module(v, u_in)
+
         a = params["a"]
         b = params["b"]
         rho = params["rho"]
@@ -262,39 +233,43 @@ class DynamicBicycle(DynamicSystem):
 
         Fx_f, Fy_f, Fx_r, Fy_r = self.compute_tire_physics(v, u_in, params)
         delta = u_in[1]
-        xp = array_module(v, u_in)
-        c_d, s_d = xp.cos(delta), xp.sin(delta)
+        c_d = xp.cos(delta)
+        s_d = xp.sin(delta)
+        vx = v[0]
 
-        # Tire forces rotated into the body frame, summed with aero drag.
+        # Tire forces in the body frame: the front pair turned by the steer δ
         Fx_f_b = Fx_f * c_d - Fy_f * s_d
         Fy_f_b = Fx_f * s_d + Fy_f * c_d
         Fx_r_b = Fx_r
         Fy_r_b = Fy_r
+
+        # Resultant wrench: ΣF_x less the drag ½ ρ CdA vx |vx|, ΣF_y and the yaw
+        # moment ΣM_z = a F_yf − b F_yr
         Sum_Fx = Fx_f_b + Fx_r_b
         Sum_Fy = Fy_f_b + Fy_r_b
         Sum_Mz = a * Fy_f_b - b * Fy_r_b
-        F_aero = 0.5 * rho * CdA * v[0] * xp.abs(v[0])
+        F_aero = 0.5 * rho * CdA * vx * xp.abs(vx)
         Sum_Fx = Sum_Fx - F_aero
 
-        # the generalized damping is minus the resultant tire and drag wrench
+        # The generalized damping is minus the resultant tire and drag wrench
         d = -xp.array([Sum_Fx, Sum_Fy, Sum_Mz])
 
         return d
 
     def f(self, x, u, t=0.0, params=None):
         params = self.params if params is None else params
+        xp = array_module(x, u)
 
         q = x[0:3]
         v = x[3:6]
-        xp = array_module(x, u)
-        u_in = self._u_in(x, u)
+        u_in = self.wheel_rate_and_steer(x, u)
 
         M = self.M(q, params)
         C = self.C(q, v, params)
         N = self.N(q, params)
         d = self.generalized_d(q, v, u_in, params)
 
-        # Rigid-body EoM in body frame: M dv + C v + d = 0; dq = N v
+        # Rigid-body EoM in the body frame: M v̇ + C v + d = 0, and q̇ = N v
         dv = xp.linalg.solve(M, -C @ v - d)
         dq = N @ v
         dx = xp.concatenate([dq, dv])
@@ -311,75 +286,49 @@ class DynamicBicycle(DynamicSystem):
         torque, servo, and engine variants built on this model.
         """
         params = self.params if params is None else params
+        xp = array_module(v_body, w_rear, delta)
+
         r_r = params["r_r"]
         bw = params.get("bw_rear", 0.0)
-        xp = array_module(v_body, w_rear, delta)
+
         u_in = xp.array([w_rear, delta])
         _, _, Fx_r, _ = self.compute_tire_physics(v_body, u_in, params)
 
-        # the road reaction through the rear tire plus the viscous bearing torque
+        # τ_ground = r_r F_xr + b_w ω_rear: the road reaction through the rear tire,
+        # plus the viscous bearing torque
         tau_ground = r_r * Fx_r + bw * w_rear
 
         return tau_ground
 
-    def _u_in(self, x, u):
-        """``[w_rear, delta]`` from the port vector (overridden by the rate variant).
-
-        The two named ports stack in that order, so the port vector is the pair.
-        """
-        xp = array_module(x, u)
-        return xp.asarray(u)
-
     def tf(self, x, u, t=0, params=None):
         params = self.params if params is None else params
+
         a = params["a"]
         r_f = params["r_f"]
         tr = self.track
 
-        delta = self._u_in(x, u)[1]
+        delta = self.wheel_rate_and_steer(x, u)[1]
         T_wb = SE2(x[0], x[1], x[2])
         R_steer = SE2(0.0, 0.0, delta)
+
         return {
-            # body frame: 2-D chassis, 3-D body box, rear wheels, and contact arrows.
+            # The body frame: 2-D chassis, 3-D body box, rear wheels, contact arrows
             "body": T_wb,
-            # 2-D front axle (steered); rear axle wheels ride on ``body`` via
-            # ``local_transform`` in the skin.
+            # The 2-D front axle, steered; the rear axle's wheels ride on ``body``
+            # through ``local_transform`` in the skin
             "axle_front": T_wb @ SE2(a, 0.0, delta),
-            # 3-D steered front wheels (lift + steer still need per-frame frames).
+            # The 3-D steered front wheels (lift and steer need frames of their own)
             "wheel_fl": T_wb @ translation(a, 0.5 * tr, r_f) @ R_steer,
             "wheel_fr": T_wb @ translation(a, -0.5 * tr, r_f) @ R_steer,
         }
-
-    def _contact_fields(self, x, u):
-        """Body-frame per-axle velocities and tire forces for the arrow geometry.
-
-        Returns ``(v_r_loc, v_f_loc, F_r_loc, F_f_loc)`` — the rear/front contact
-        velocity and tire force in the body frame. The ``body`` ``tf`` rotates them
-        to world, so no manual ``cos``/``sin`` here.
-        """
-        params = self.params
-        a = params["a"]
-        b = params["b"]
-        vb = x[3:6]
-        u_in = self._u_in(x, u)
-        delta = u_in[1]
-
-        uu, vv, wr = vb[0], vb[1], vb[2]
-        v_f_loc = np.array([uu, vv + a * wr])
-        v_r_loc = np.array([uu, vv - b * wr])
-
-        Fx_f, Fy_f, Fx_r, Fy_r = self.compute_tire_physics(vb, u_in)
-        cd, sd = np.cos(delta), np.sin(delta)
-        # Front tire force rotated steer->body; rear is already body-frame.
-        F_f_loc = np.array([Fx_f * cd - Fy_f * sd, Fx_f * sd + Fy_f * cd])
-        F_r_loc = np.array([Fx_r, Fy_r])
-        return v_r_loc, v_f_loc, F_r_loc, F_f_loc
 
     def get_dynamic_geometry(self, x, u, t=0, params=None):
         """2-D centerline look: one velocity and one force arrow per axle."""
         b = self.params["b"]
         a = self.params["a"]
-        v_r_loc, v_f_loc, F_r_loc, F_f_loc = self._contact_fields(x, u)
+
+        v_r_loc, v_f_loc, F_r_loc, F_f_loc = self.contact_fields(x, u)
+
         return {
             "body": [
                 Arrow(
@@ -413,6 +362,56 @@ class DynamicBicycle(DynamicSystem):
             ]
         }
 
+    ###########################################################################
+    # Internal machinery
+    ###########################################################################
+
+    def wheel_rate_and_steer(self, x, u):
+        """``[w_rear, delta]`` from the port vector (overridden by the rate variant).
+
+        The two named ports stack in that order, so the port vector is the pair.
+        """
+        xp = array_module(x, u)
+
+        u_in = xp.asarray(u)
+
+        return u_in
+
+    def contact_fields(self, x, u):
+        """Body-frame per-axle velocities and tire forces for the arrow geometry.
+
+        Returns ``(v_r_loc, v_f_loc, F_r_loc, F_f_loc)`` — the rear/front contact
+        velocity and tire force in the body frame. The ``body`` ``tf`` rotates them
+        to world, so no manual ``cos``/``sin`` here.
+        """
+        params = self.params
+
+        a = params["a"]
+        b = params["b"]
+
+        v_body = x[3:6]
+        u_in = self.wheel_rate_and_steer(x, u)
+        delta = u_in[1]
+        vx = v_body[0]
+        vy = v_body[1]
+        r = v_body[2]
+
+        # Contact velocities at the front and rear axles
+        v_f_loc = np.array([vx, vy + a * r])
+        v_r_loc = np.array([vx, vy - b * r])
+
+        # Tire forces: the front pair turned from the steered wheel to the body; the
+        # rear pair is already in the body frame
+        Fx_f, Fy_f, Fx_r, Fy_r = self.compute_tire_physics(v_body, u_in)
+        cd = np.cos(delta)
+        sd = np.sin(delta)
+        Fx_f_b = Fx_f * cd - Fy_f * sd
+        Fy_f_b = Fx_f * sd + Fy_f * cd
+        F_f_loc = np.array([Fx_f_b, Fy_f_b])
+        F_r_loc = np.array([Fx_r, Fy_r])
+
+        return v_r_loc, v_f_loc, F_r_loc, F_f_loc
+
 
 class DynamicBicycleCar3D(DynamicBicycle):
     """
@@ -425,21 +424,9 @@ class DynamicBicycleCar3D(DynamicBicycle):
     def __init__(self):
         super().__init__()
         self.name = "Dynamic Bicycle (3D car)"
-        # Visual-only: wide stance, low body, narrow tub between exposed wheels (racecar-like).
-        self.track = 1.92
-        self.body_height = 0.22
-        # Wider tub → less lateral gap between body sides and tires.
-        self.body_width_ratio = 0.72
-        self.body_length_overhang = 0.26
-        # Smaller vertical gap between body underside and tire crown (display).
-        self.body_ground_clearance = 0.003
-        self.ground_plane_size = 120.0
-        # Larger tires (display only; wheel centers still use r_f / r_r).
-        self._visual_wheel_width = 0.2
-        self._visual_tire_radius_ratio = 0.58
 
-        # This subclass's look is the 3-D skin; dynamic arrows stay a per-class
-        # override because four corner force/velocity arrows are not skin-driven.
+        # Graphics: the 3-D skin over the base plant's 3-D look; the dynamic arrows
+        # stay a per-class override, since four corner arrows are not skin-driven
         self.skin = car_skin_3d
 
     def get_dynamic_geometry(self, x, u, t=0, params=None):
@@ -455,7 +442,8 @@ class DynamicBicycleCar3D(DynamicBicycle):
         r_f = self.params["r_f"]
         r_r = self.params["r_r"]
         tr = self.track
-        v_r_loc, v_f_loc, F_r_loc, F_f_loc = self._contact_fields(x, u)
+
+        v_r_loc, v_f_loc, F_r_loc, F_f_loc = self.contact_fields(x, u)
 
         def _arrow(vec, scale, color, bx, by, bz):
             arr = Arrow(
@@ -492,23 +480,17 @@ class BicycleDynRate(DynamicBicycle):
         super().__init__(named_ports=False)
         self.name = "BicycleDynRate"
         self.named_ports = bool(named_ports)
+
+        # State: the body's six, then the rear wheel rate and the steer angle
         self.n = 8
         self.state = VectorSignal("x", dim=self.n)
-        self.state.labels = [
-            "x",
-            "y",
-            "theta",
-            "vx",
-            "vy",
-            "yaw_rate",
-            "w_rear",
-            "delta",
-        ]
-        self.state.units = ["m", "m", "rad", "m/s", "m/s", "rad/s", "rad/s", "rad"]
         self.x0 = np.zeros(self.n)
+
+        # Parameters: the rear wheel's inertia and viscous drag
         self.params["Jw_rear"] = 1.6
         self.params["bw_rear"] = 0.0
 
+        # Ports: two named rate commands, or one stacked port
         self.inputs = {}
         if self.named_ports:
             self.add_input_port(
@@ -530,36 +512,44 @@ class BicycleDynRate(DynamicBicycle):
             )
         self.outputs = {}
         self.add_output_port("y", dim=self.n, function=self.h, dependencies=())
-        self.outputs["y"].labels = list(self.state.labels)
-        self.outputs["y"].units = list(self.state.units)
         self.add_output_port("x", dim=self.n, function=self.compute_state)
 
-    def rates(self, x, u):
-        """``[w_rear_dot, delta_dot]`` from the port vector: the two named ports in order."""
-        xp = array_module(x, u)
-        return xp.asarray(u)
+        # Signal labels and units
+        self.state.labels = [
+            "x",
+            "y",
+            "theta",
+            "vx",
+            "vy",
+            "yaw_rate",
+            "w_rear",
+            "delta",
+        ]
+        self.state.units = ["m", "m", "rad", "m/s", "m/s", "rad/s", "rad/s", "rad"]
+        self.outputs["y"].labels = list(self.state.labels)
+        self.outputs["y"].units = list(self.state.units)
 
     def f(self, x, u, t=0.0, params=None):
         params = self.params if params is None else params
         xp = array_module(x, u)
-        q, v, u_in = x[0:3], x[3:6], x[6:8]
+
+        q = x[0:3]
+        v = x[3:6]
+        u_in = x[6:8]
 
         M = self.M(q, params)
         C = self.C(q, v, params)
         N = self.N(q, params)
         d = self.generalized_d(q, v, u_in, params)
-
         rates = self.rates(x, u)
 
-        # Body follows the rigid-body EoM; wheel rate and steer integrate the inputs
+        # The body follows the rigid-body EoM M v̇ + C v + d = 0, q̇ = N v; the wheel
+        # rate and the steer angle integrate the rate commands
         dv = xp.linalg.solve(M, -C @ v - d)
         dq = N @ v
         dx = xp.concatenate([dq, dv, rates])
 
         return dx
-
-    def _u_in(self, x, u):
-        return x[6:8]
 
     def inverse_propulsion_dynamics(self, x, u, t=0.0, params=None):
         """Rear motor torque [Nm] that produces the commanded ``w_rear_dot``.
@@ -567,8 +557,12 @@ class BicycleDynRate(DynamicBicycle):
         Inverts ``Jw_rear * w_rear_dot = tau_rear - rear_wheel_ground_torque(...)``.
         """
         params = self.params if params is None else params
+
         Jw_rear = params["Jw_rear"]
-        v_body, w_rear, delta = x[3:6], x[6], x[7]
+
+        v_body = x[3:6]
+        w_rear = x[6]
+        delta = x[7]
         w_rear_dot = self.rates(x, u)[0]
         tau_ground = self.rear_wheel_ground_torque(v_body, w_rear, delta, params)
 
@@ -576,6 +570,85 @@ class BicycleDynRate(DynamicBicycle):
         tau_rear = Jw_rear * w_rear_dot + tau_ground
 
         return tau_rear
+
+    ###########################################################################
+    # Internal machinery
+    ###########################################################################
+
+    def rates(self, x, u):
+        """``[w_rear_dot, delta_dot]`` from the port vector: the two named ports in order."""
+        xp = array_module(x, u)
+
+        rates = xp.asarray(u)
+
+        return rates
+
+    def wheel_rate_and_steer(self, x, u):
+        """``[w_rear, delta]``: both are states on this rung."""
+        return x[6:8]
+
+
+# Tire model: pure functions, the coefficients live in the plant's ``params``
+
+
+def linear_tire_forces(vx, vy, w, R, Fz, Ca, Ck, mu, v_min_epsilon):
+    """Linear-slip tire forces with friction-circle saturation (pyro ``LinearTire``).
+
+    ``Fx = Ck kappa`` and ``Fy = Ca alpha``, scaled back onto ``|F| <= mu Fz``.
+    """
+    xp = array_module(vx, vy, w)
+
+    alpha, kappa = tire_slip(vx, vy, w, R, v_min_epsilon)
+
+    # Linear slip forces: F_x = C_κ κ and F_y = C_α α
+    Fx = Ck * kappa
+    Fy = Ca * alpha
+
+    # Scaled back onto the friction circle |F| ≤ μ F_z (10⁻¹² guards the division)
+    F_max = mu * Fz
+    F_total = xp.sqrt(Fx**2 + Fy**2)
+    ratio = xp.where(F_total > F_max, F_max / xp.maximum(F_total, 1e-12), 1.0)
+    Fx_sat = Fx * ratio
+    Fy_sat = Fy * ratio
+
+    return Fx_sat, Fy_sat
+
+
+def tire_slip(vx, vy, w, R, v_min_epsilon):
+    """Slip angle ``alpha`` [rad] and slip ratio ``kappa`` [-] at one contact."""
+    xp = array_module(vx, vy, w)
+
+    # The regularized speed |vx| + ε keeps both slips finite at rest
+    vx_adj = xp.abs(vx) + v_min_epsilon
+
+    # α = −atan(vy / (|vx| + ε)) and κ = (ω R − vx) / (|vx| + ε)
+    alpha = -xp.arctan(vy / vx_adj)
+    kappa = (w * R - vx) / vx_adj
+
+    return alpha, kappa
+
+
+###############################################################################
+# Internal machinery
+###############################################################################
+
+
+def wheel_rectangle_pts(wl, ww):
+    """Closed polyline in wheel frame (x forward, y lateral)."""
+    h = wl / 2
+    w = ww / 2
+
+    # fmt: off
+    pts = np.array([
+        [ h,  w, 0.0],
+        [ h, -w, 0.0],
+        [-h, -w, 0.0],
+        [-h,  w, 0.0],
+        [ h,  w, 0.0],
+    ])
+    # fmt: on
+
+    return pts
 
 
 if __name__ == "__main__":
