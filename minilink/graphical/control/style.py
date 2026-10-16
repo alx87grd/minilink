@@ -1,13 +1,11 @@
-"""The look of the control-analysis figures, shared by both backends.
-
-Titles, axis labels and colours follow the MATLAB Control System Toolbox so
-the figures read like the ones in the course notes.
-"""
+"""Control-analysis figure style: the titles, labels, colors and axes both backends share."""
 
 from __future__ import annotations
 
 import numpy as np
 
+# Titles, axis labels and colours follow the MATLAB Control System Toolbox, so
+# the figures read like the ones in the course notes.
 SYSTEM_COLOR = "#0072BD"  # MATLAB blue
 SECOND_COLOR = "#D95319"  # MATLAB orange
 CRITICAL_COLOR = "#A2142F"  # MATLAB red, the -1 point
@@ -17,8 +15,8 @@ BODE_TITLE = "Bode Diagram"
 PZMAP_TITLE = "Pole-Zero Map"
 ROOT_LOCUS_TITLE = "Root Locus"
 NYQUIST_TITLE = "Nyquist Diagram"
-LINEAR_STEP_TITLE = "Linear Step Response"  # the system is a linear model
-LINEARIZED_STEP_TITLE = "Linearized Step Response"  # it was linearized first
+LINEAR_STEP_TITLE = "Linear Step Response"  # The system is a linear model
+LINEARIZED_STEP_TITLE = "Linearized Step Response"  # It was linearized first
 
 MAGNITUDE_LABEL = "Magnitude (dB)"
 PHASE_LABEL = "Phase (deg)"
@@ -29,6 +27,11 @@ TIME_LABEL = "Time (seconds)"
 AMPLITUDE_LABEL = "Amplitude"
 
 
+###############################################################################
+# Public API
+###############################################################################
+
+
 def channel_subtitle(of_label: str, wrt_label: str) -> str:
     """``"From: u[0]  To: y[1]"``, or the components' declared labels."""
     return f"From: {wrt_label}  To: {of_label}"
@@ -36,11 +39,18 @@ def channel_subtitle(of_label: str, wrt_label: str) -> str:
 
 def phase_ticks(phase_deg) -> tuple[float, ...]:
     """Ticks at multiples of 45 or 90 degrees covering the phase range."""
-    lo, hi = float(np.min(phase_deg)), float(np.max(phase_deg))
+    lo = float(np.min(phase_deg))
+    hi = float(np.max(phase_deg))
+
+    # A 45° step over a range of at most 270°, a 90° step beyond
     step = 45.0 if hi - lo <= 270.0 else 90.0
-    return tuple(
-        np.arange(np.floor(lo / step) * step, np.ceil(hi / step) * step + step, step)
-    )
+
+    # The multiples of the step from the one below lo to the one above hi
+    first = np.floor(lo / step) * step
+    last = np.ceil(hi / step) * step
+    ticks = np.arange(first, last + step, step)
+
+    return tuple(ticks)
 
 
 def padded_limits(
@@ -51,6 +61,13 @@ def padded_limits(
     values = values[np.isfinite(values)]
     if values.size == 0:
         return -minimum, minimum
-    lo, hi = float(values.min()), float(values.max())
+
+    lo = float(values.min())
+    hi = float(values.max())
+
+    # A fraction of the span on each side, never less than half the minimum width
     pad = max(fraction * (hi - lo), 0.5 * minimum)
-    return lo - pad, hi + pad
+    lower = lo - pad
+    upper = hi + pad
+
+    return lower, upper
