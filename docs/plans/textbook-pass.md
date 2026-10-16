@@ -42,6 +42,7 @@ public surface stays intact.
 | Consolidation came last. | The duplicates were found only by a separate simplicity round. | The duplicate scanners run before each wave. Each lane's queue says which modules share logic, and the consolidation happens in that module's commit. |
 | Rulings came mid-way. | The array-kind and dead-code rulings arrived after the work had started. | All choices are in §1 before the start. |
 | A dead-code call depends on the base. | `riccati_transition` was unused on `main`; on `dev`, `control/design.py` calls it. | No removal is carried over from the dry run without a fresh count on `dev`. |
+| Array conversion crept onto the math lines. | The dry run's `Pendulum.g` read `g = xp.array([m * gravity * l * xp.sin(theta)])`: the student meets a float-to-array conversion on the line that should be `m g l sin θ`. The catalog's gravity vectors and `H` / `C` / `J` matrices had the same shape. | Every entry is a named math line; only the last beat assembles them (§3.2), and the ratchet flags an array constructor with math inside (§4.1). |
 | Several commits per module. | T, TR and TS commits on the same module. | One commit per module, at the full bar. A later commit only for a cross-lane ripple (§7.4). |
 | Tools must refuse, not tidy. | The commit script regenerated the allowlist. | The commit script refuses an allowlist that grows. |
 | Sessions get interrupted. | Usage limits stopped the work twice; the worker restarted twice. | The ledger (§7.5) is the run's memory, every commit is pushed, and an hourly check-in resumes a stalled run. |
@@ -76,6 +77,43 @@ Writers receive this section verbatim.
 - No `self.` in a math line. Linear algebra is part of the story and stays in the body.
   Plumbing goes to helpers: coercion, shapes, defaults, validation, dispatch, caching,
   wrapping.
+- **Assemble once, at the end.** Array construction is plumbing, never part of a math line.
+  - Each entry of a vector or matrix is a named math line, without `xp.array`.
+  - The last beat assembles the named entries, a matrix row by row (5.5).
+  - An entry may stay inline only when it is a number, a name, or one operator between them
+    (`0.0`, `x[1]`, `-k / m`).
+
+  ```python
+  def g(self, q, params=None):
+      params = self.params if params is None else params
+      m, l, gravity = params["m"], params["l"], params["gravity"]
+      theta = q[0]
+      xp = array_module(q)
+
+      g_theta = m * gravity * l * xp.sin(theta)
+
+      return xp.array([g_theta])
+
+
+  def H(self, q, params=None):
+      ...
+      H11 = m1 * lc1**2 + I1 + m2 * (l1**2 + lc2**2 + 2 * l1 * lc2 * c2) + I2
+      H12 = m2 * (lc2**2 + l1 * lc2 * c2) + I2
+      H22 = m2 * lc2**2 + I2
+
+      # fmt: off
+      H = xp.array([
+          [H11, H12],
+          [H12, H22],
+      ])
+      # fmt: on
+
+      return H
+  ```
+
+  The constructor keeps the array module it has on `dev` (`np` or `xp`): no backend change
+  (§1). A later step may let the base classes do this conversion; it is a core contract and
+  not part of this pass.
 - A delegation, a constant, a dict literal or a frame composition stays the one line it
   is; the beats are for equations. `tf` returns its frames as one dict literal.
 - Equation comments use Unicode math in the textbook's symbols: `ẋ`, `x_{k+1}`, `Aᵀ`, `R⁻¹`,
@@ -152,7 +190,9 @@ Writers receive this section verbatim.
   - `x_k+1` / `x[k+1]` spellings in comments;
   - `# Internal machinery` without `# Public API`;
   - a lazy `import minilink…` without a reason comment;
-  - a class-attribute alias to another class's method.
+  - a class-attribute alias to another class's method;
+  - an array constructor in an equation path with math inside: an entry that holds a
+    function call, or more than one operator (§3.2, "Assemble once, at the end").
 - **Tiers:** `estimation/`, `control/design.py`, `analysis/riccati.py` and `planning/spatial/`
   join the textbook tier.
 - **The `dev` census today, six checks:** 435 offences in 91 files.
