@@ -1,4 +1,4 @@
-"""Time-signal plot specifications and backend dispatch."""
+"""Time-signal plots: a trajectory's signals, one row per component, on a chosen backend."""
 
 from __future__ import annotations
 
@@ -19,6 +19,11 @@ STEP_ABSCISSA_LABEL = "Step [k]"
 
 # The channels CostFunction.evaluate_trajectory adds, labeled as in the textbook
 _COST_SIGNAL_LABELS = {"cost_rate": "dJ/dt", "cost": "J"}
+
+
+###############################################################################
+# Public API
+###############################################################################
 
 
 @dataclass(frozen=True)
@@ -62,7 +67,7 @@ class LivePlotHandle:
 def resolve_plot_signals(sys) -> tuple[str, ...]:
     """Return default time-signal names for ``sys`` (leaf or diagram).
 
-    Leaf systems keep the historical ``x`` + boundary ``u`` convention.
+    Leaf systems plot the state ``x``, and the input ``u`` when they have one.
     Diagrams plot flattened states plus controller control outputs
     (``{id}:u`` for static or dynamic controllers) and source outputs
     (``{id}:y``) without requiring explicit ``sys_id:port`` names from the
@@ -71,10 +76,12 @@ def resolve_plot_signals(sys) -> tuple[str, ...]:
     if not isinstance(sys, DiagramSystem):
         return ("x", "u") if sys.m else ("x",)
 
+    # The flattened state
     signals = []
     if sys.n:
         signals.append("x")
 
+    # Each controller's command, and each source's output
     for sys_id, sub in sys.subsystems.items():
         if "u" in sub.outputs:
             signals.append(f"{sys_id}:u")
@@ -97,9 +104,9 @@ def build_signal_plot_spec(
     abscissa_label: str = TIME_ABSCISSA_LABEL,
 ) -> SignalPlotSpec:
     """Build a one-component-per-row plot specification."""
-    requested = _normalize_plot_signals(sys, signals)
+    requested = normalize_plot_signals(sys, signals)
 
-    # a block nested in a sub-diagram ("loop/plant:x"), sampled level by level
+    # A block nested in a sub-diagram ("loop/plant:x"), sampled level by level
     nested = {}
     for name in requested:
         if "/" in name.split(":", 1)[0] and not traj.has_signal(name):
@@ -107,10 +114,12 @@ def build_signal_plot_spec(
             traj = traj.with_signal(name, values)
             nested[name] = (labels, units)
 
+    # A block of this diagram: its internal signals, rebuilt once for all of them
     if isinstance(sys, DiagramSystem):
         for name in requested:
             if ":" not in name or traj.has_signal(name):
                 continue
+
             sys_id, port_id = name.split(":", 1)
             subsystem = sys.subsystems.get(sys_id)
             if subsystem is not None and port_id in subsystem.outputs:
@@ -120,35 +129,35 @@ def build_signal_plot_spec(
     traces = []
     internal_index = 0
     for signal_name in requested:
+        require_known_signal(sys, traj, signal_name, nested)
+
+        # The signal's samples, one row per component, with their labels and units
         if signal_name == "x":
             values = np.asarray(traj.x, dtype=float)
-            labels = _labels_for_vector(sys.state.labels, values.shape[0], "x")
-            units = _units_for_vector(sys.state.units, values.shape[0])
+            labels = labels_for_vector(sys.state.labels, values.shape[0], "x")
+            units = units_for_vector(sys.state.units, values.shape[0])
         elif signal_name == "u":
             values = np.asarray(traj.u, dtype=float)
             input_labels, input_units = sys.get_all_input_labels_and_units()
-            labels = _labels_for_vector(input_labels, values.shape[0], "u")
-            units = _units_for_vector(input_units, values.shape[0])
+            labels = labels_for_vector(input_labels, values.shape[0], "u")
+            units = units_for_vector(input_units, values.shape[0])
         elif signal_name in nested:
             values = np.asarray(traj.get_signal(signal_name), dtype=float)
             labels, units = nested[signal_name]
-        elif traj.has_signal(signal_name):
+        else:
             values = np.asarray(traj.get_signal(signal_name), dtype=float)
-            labels, units = _labels_and_units_for_extra_signal(
+            labels, units = labels_and_units_for_extra_signal(
                 sys,
                 signal_name,
                 values.shape[0],
             )
-        else:
-            available = ", ".join(_available_signal_names(sys, traj))
-            raise ValueError(
-                f"Unknown signal(s): {signal_name}. Available signals: {available}"
-            )
 
+        # An internal signal takes the next color of the internal palette
         idx = internal_index if is_internal_signal(signal_name) else None
         if is_internal_signal(signal_name):
             internal_index += 1
 
+        # One trace per component, styled by its signal
         n_components = values.shape[0]
         for i in range(n_components):
             style = color_for_signal(
@@ -170,8 +179,7 @@ def build_signal_plot_spec(
                 )
             )
 
-    if not traces:
-        raise ValueError("No signal components were selected for plotting.")
+    require_traces(traces)
 
     return SignalPlotSpec(
         title=title or f"Time signals for {sys.name}",
@@ -198,24 +206,23 @@ def plot_time_signals(
         signals=signals,
         abscissa_label=abscissa_label,
     )
-    if not isinstance(backend, str):
-        raise TypeError("Signal plotting backend must be a string.")
-    key = backend.strip().lower()
+
+    key = require_signal_backend(backend)
+
     if key == "matplotlib":
+        # A real cycle: matplotlib_backend imports from this module
         from minilink.graphical.signals.matplotlib_backend import (
             render_matplotlib_signal_plot,
         )
 
         return render_matplotlib_signal_plot(spec, show=show, **kwargs)
-    if key == "plotly":
-        from minilink.graphical.signals.plotly_backend import (
-            render_plotly_signal_plot,
-        )
 
-        return render_plotly_signal_plot(spec, show=show, **kwargs)
-    raise ValueError(
-        f"Unknown signal backend {backend!r}. Expected 'matplotlib' or 'plotly'."
+    # A real cycle: plotly_backend imports from this module
+    from minilink.graphical.signals.plotly_backend import (
+        render_plotly_signal_plot,
     )
+
+    return render_plotly_signal_plot(spec, show=show, **kwargs)
 
 
 def open_time_signal_plot(
@@ -229,8 +236,9 @@ def open_time_signal_plot(
     **kwargs,
 ) -> LivePlotHandle:
     """Open a live time-signal plot with an update handle."""
-    signal_names = _normalize_plot_signals(sys, signals)
+    signal_names = normalize_plot_signals(sys, signals)
 
+    # The spec of any later trajectory, on the same signals
     def spec_builder(next_traj, *, title=None):
         return build_signal_plot_spec(
             sys,
@@ -241,10 +249,11 @@ def open_time_signal_plot(
         )
 
     spec = spec_builder(traj)
-    if not isinstance(backend, str):
-        raise TypeError("Signal plotting backend must be a string.")
-    key = backend.strip().lower()
+
+    key = require_signal_backend(backend)
+
     if key == "matplotlib":
+        # A real cycle: matplotlib_backend imports from this module
         from minilink.graphical.signals.matplotlib_backend import (
             open_matplotlib_signal_plot,
         )
@@ -255,27 +264,31 @@ def open_time_signal_plot(
             show=show,
             **kwargs,
         )
-    if key == "plotly":
-        from minilink.graphical.signals.plotly_backend import (
-            open_plotly_signal_plot,
-        )
 
-        return open_plotly_signal_plot(
-            spec,
-            spec_builder=spec_builder,
-            show=show,
-            **kwargs,
-        )
-    raise ValueError(
-        f"Unknown signal backend {backend!r}. Expected 'matplotlib' or 'plotly'."
+    # A real cycle: plotly_backend imports from this module
+    from minilink.graphical.signals.plotly_backend import (
+        open_plotly_signal_plot,
+    )
+
+    return open_plotly_signal_plot(
+        spec,
+        spec_builder=spec_builder,
+        show=show,
+        **kwargs,
     )
 
 
-def _normalize_plot_signals(sys, signals) -> tuple[str, ...]:
+###############################################################################
+# Internal machinery
+###############################################################################
+
+
+def normalize_plot_signals(sys, signals) -> tuple[str, ...]:
     """Expand plot signal specs to ``'sys_id:port'`` / boundary names."""
+    # One name, one (subsystem, port) pair, or a sequence of them
     if isinstance(signals, str):
         items = (signals,)
-    elif _is_subsystem_port_pair(signals):
+    elif is_subsystem_port_pair(signals):
         items = (signals,)
     else:
         items = tuple(signals)
@@ -283,24 +296,38 @@ def _normalize_plot_signals(sys, signals) -> tuple[str, ...]:
     if not isinstance(sys, DiagramSystem):
         return items
 
+    # Each pair as the name of its signal: a nested block by its path
     resolved = []
     for item in items:
-        if _is_subsystem_port_pair(item):
+        if is_subsystem_port_pair(item):
             subsystem, port_id = item
             path = subsystem_path(sys, subsystem)
             if path is None or "/" not in path or port_id not in subsystem.outputs:
-                # a block of this diagram, or the reason it cannot be plotted
+                # A block of this diagram, or the reason it cannot be plotted
                 resolved.append(sys.subsystem_signal(subsystem, port_id))
             else:
                 resolved.append(f"{path}:{port_id}")
             continue
+
         if not isinstance(item, str):
             raise TypeError(
                 "Diagram plot signals must be strings or (subsystem, port) "
                 f"tuples; got {type(item).__name__}"
             )
+
         resolved.append(item)
+
     return tuple(resolved)
+
+
+def is_subsystem_port_pair(item) -> bool:
+    """Whether ``item`` is a ``(subsystem, port_id)`` pair."""
+    return (
+        isinstance(item, tuple)
+        and len(item) == 2
+        and isinstance(item[0], System)
+        and isinstance(item[1], str)
+    )
 
 
 def subsystem_path(diagram, subsystem):
@@ -311,11 +338,13 @@ def subsystem_path(diagram, subsystem):
     for sys_id, block in diagram.subsystems.items():
         if block is subsystem:
             return sys_id
+
     for sys_id, block in diagram.subsystems.items():
         if isinstance(block, DiagramSystem):
             inner = subsystem_path(block, subsystem)
             if inner is not None:
                 return f"{sys_id}/{inner}"
+
     return None
 
 
@@ -327,69 +356,91 @@ def nested_signal(sys, traj, name):
     """
     path, port_id = name.rsplit(":", 1)
     *outer, block_id = path.split("/")
-    diagram, diagram_traj = sys, traj
+
+    # Down the path, one diagram level at a time
+    diagram = sys
+    diagram_traj = traj
     for sys_id in outer:
         inner = diagram.subsystems[sys_id]
         diagram_traj = diagram.trajectory_of(inner, diagram_traj)
         diagram = inner
+
+    # The port among the internal signals of the diagram holding the block
     diagram_traj = diagram.reconstruct_internal_signals(diagram_traj)
     key = f"{block_id}:{port_id}"
     values = np.asarray(diagram_traj.get_signal(key), dtype=float)
-    labels, units = _labels_and_units_for_extra_signal(diagram, key, values.shape[0])
+    labels, units = labels_and_units_for_extra_signal(diagram, key, values.shape[0])
+
     return values, labels, units
 
 
-def _is_subsystem_port_pair(item) -> bool:
-    return (
-        isinstance(item, tuple)
-        and len(item) == 2
-        and isinstance(item[0], System)
-        and isinstance(item[1], str)
-    )
+def require_known_signal(sys, traj, signal_name, nested):
+    """Refuse a signal that is neither ``x``, ``u``, a nested block's nor the trajectory's."""
+    if signal_name in ("x", "u") or signal_name in nested:
+        return
+
+    if not traj.has_signal(signal_name):
+        available = ", ".join(available_signal_names(sys, traj))
+        raise ValueError(
+            f"Unknown signal(s): {signal_name}. Available signals: {available}"
+        )
 
 
-def _labels_for_vector(labels, dim: int, name: str) -> tuple[str, ...]:
+def labels_for_vector(labels, dim: int, name: str) -> tuple[str, ...]:
+    """The first ``dim`` labels, or ``name[i]`` for each component when too few are given."""
     labels = list(labels)
     if len(labels) >= dim:
         return tuple(str(label) for label in labels[:dim])
+
     return tuple(f"{name}[{i}]" for i in range(dim))
 
 
-def _units_for_vector(units, dim: int) -> tuple[str, ...]:
+def units_for_vector(units, dim: int) -> tuple[str, ...]:
+    """The first ``dim`` units, or no unit for each component when too few are given."""
     units = list(units)
     if len(units) >= dim:
         return tuple(str(unit) for unit in units[:dim])
+
     return tuple("" for _ in range(dim))
 
 
-def _labels_and_units_for_extra_signal(sys, name: str, dim: int):
+def labels_and_units_for_extra_signal(sys, name: str, dim: int):
+    """The labels and units of a trajectory signal other than ``x`` and ``u``."""
+    # A cost channel, labeled as in the textbook
     if name in _COST_SIGNAL_LABELS and dim == 1:
         return (_COST_SIGNAL_LABELS[name],), ("",)
+
+    # A block's output port in a diagram
     if ":" in name and isinstance(sys, DiagramSystem):
         sys_id, port_id = name.split(":", 1)
         subsystem = sys.subsystems.get(sys_id)
         if subsystem is not None and port_id in subsystem.outputs:
             port = subsystem.outputs[port_id]
-            # the labels the port declares, else the state's on the state port,
+
+            # The labels the port declares, else the state's on the state port,
             # else the signal's own name
             declared = list(port.labels) != [f"{port_id}[{i}]" for i in range(dim)]
             if declared and len(port.labels) >= dim:
                 labels = tuple(str(label) for label in port.labels[:dim])
             elif port_id == "x" and len(subsystem.state.labels) == dim:
                 labels = tuple(str(label) for label in subsystem.state.labels)
-                return labels, _units_for_vector(subsystem.state.units, dim)
+                return labels, units_for_vector(subsystem.state.units, dim)
             else:
                 labels = tuple(
                     f"{name}" if dim == 1 else f"{name}[{i}]" for i in range(dim)
                 )
-            return labels, _units_for_vector(port.units, dim)
 
+            return labels, units_for_vector(port.units, dim)
+
+    # Any other signal: its own name, without a unit
     labels = tuple(f"{name}" if dim == 1 else f"{name}[{i}]" for i in range(dim))
     units = tuple("" for _ in range(dim))
+
     return labels, units
 
 
-def _available_signal_names(sys, traj) -> tuple[str, ...]:
+def available_signal_names(sys, traj) -> tuple[str, ...]:
+    """The trajectory's signals, then every block output of a diagram not among them."""
     names = list(traj.signal_names)
     if isinstance(sys, DiagramSystem):
         for sys_id, subsystem in sys.subsystems.items():
@@ -397,13 +448,39 @@ def _available_signal_names(sys, traj) -> tuple[str, ...]:
                 name = f"{sys_id}:{port_id}"
                 if name not in names:
                     names.append(name)
+
     return tuple(names)
 
 
-def _coerce_signal_plot_spec(traj_or_spec, spec_builder, *, title=None):
+def require_traces(traces):
+    """Refuse a plot without a single signal component."""
+    if not traces:
+        raise ValueError("No signal components were selected for plotting.")
+
+
+def require_signal_backend(backend):
+    """Refuse a backend other than ``"matplotlib"`` or ``"plotly"``; return its key."""
+    if not isinstance(backend, str):
+        raise TypeError("Signal plotting backend must be a string.")
+
+    key = backend.strip().lower()
+    if key not in ("matplotlib", "plotly"):
+        raise ValueError(
+            f"Unknown signal backend {backend!r}. Expected 'matplotlib' or 'plotly'."
+        )
+
+    return key
+
+
+def coerce_signal_plot_spec(traj_or_spec, spec_builder, *, title=None):
     """Return a plot spec directly or rebuild one from a trajectory."""
     if isinstance(traj_or_spec, SignalPlotSpec):
         return traj_or_spec
+
     if spec_builder is None:
         raise TypeError("Updating from a trajectory requires a spec builder.")
+
     return spec_builder(traj_or_spec, title=title)
+
+
+_coerce_signal_plot_spec = coerce_signal_plot_spec  # ripple
