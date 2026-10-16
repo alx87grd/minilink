@@ -5,6 +5,10 @@ import numpy as np
 from minilink.core.backends import array_module
 from minilink.core.system import DynamicSystem
 
+###############################################################################
+# Public API
+###############################################################################
+
 
 class VanderPol(DynamicSystem):
     """Van der Pol oscillator."""
@@ -12,7 +16,11 @@ class VanderPol(DynamicSystem):
     def __init__(self, mu=0.5):
         super().__init__(n=2, input_dim=1, output_dim=2, expose_state=True)
         self.name = "Van der Pol Oscillator"
+
+        # Parameters
         self.params = {"mu": float(mu)}
+
+        # Signal labels, units and bounds
         self.state.labels = ["y", "dy"]
         self.state.units = ["", "1/s"]
         self.state.lower_bound[:] = [-3.0, -3.0]
@@ -23,11 +31,13 @@ class VanderPol(DynamicSystem):
 
     def f(self, x, u, t=0.0, params=None):
         params = self.params if params is None else params
-        mu = params["mu"]
         xp = array_module(x)
+
+        mu = params["mu"]
+
         y, dy = x
 
-        # Van der Pol oscillator: damping is negative (pumps energy) for |y| < 1
+        # ÿ − μ (1 − y²) ẏ + y = 0: negative damping, pumping energy, for |y| < 1
         ddy = -y + mu * dy * (1.0 - y**2)
         dx = xp.array([dy, ddy])
 
@@ -43,15 +53,21 @@ class Lorenz(DynamicSystem):
     def __init__(self, sigma=10.0, rho=28.0, beta=8.0 / 3.0):
         super().__init__(n=3, output_dim=3, expose_state=True)
         self.name = "Lorenz Attractor"
+
+        # Parameters
         self.params = {
             "sigma": float(sigma),
             "rho": float(rho),
             "beta": float(beta),
         }
+
+        # Signal labels and units
         self.state.labels = ["x", "y", "z"]
         self.state.units = ["", "", ""]
         self.outputs["y"].labels = list(self.state.labels)
         self.outputs["y"].units = list(self.state.units)
+
+        # Solver hints: the fastest time scale, and smooth dynamics
         self.solver_info = {
             "smallest_time_constant": 0.01,
             "discontinuous_behavior": False,
@@ -59,13 +75,15 @@ class Lorenz(DynamicSystem):
 
     def f(self, x, u, t=0.0, params=None):
         params = self.params if params is None else params
+        xp = array_module(x)
+
         sigma = params["sigma"]
         rho = params["rho"]
         beta = params["beta"]
-        xp = array_module(x)
+
         x_val, y, z = x
 
-        # Lorenz equations
+        # The Lorenz equations, with x_val the first coordinate (x names the state)
         dx = sigma * (y - x_val)
         dy = x_val * (rho - z) - y
         dz = x_val * y - beta * z
