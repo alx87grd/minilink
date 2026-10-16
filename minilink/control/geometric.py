@@ -9,7 +9,10 @@ from minilink.core.system import System
 #: lands on the axle itself (a path shorter than one lookahead, driven to its end).
 MIN_REACH = 1.0e-6
 
+
+###############################################################################
 # Public API
+###############################################################################
 
 
 class PurePursuit(System):
@@ -72,13 +75,12 @@ class PurePursuit(System):
         super().__init__()
         self.name = "Pure Pursuit"
 
+        # Parameters. ``waypoints`` and ``closed`` are not gains: they say what the
+        # block tracks. They live in ``params`` all the same, because the search reads
+        # them the way it reads the lookahead, and a swept path is then one params dict
+        # away.
         path = np.asarray(waypoints, dtype=float)
-        if path.ndim != 2 or path.shape[1] != 2 or path.shape[0] < 2:
-            raise ValueError("waypoints must be an (N, 2) array with N >= 2")
-
-        # ``waypoints`` and ``closed`` are not gains: they say what the block tracks.
-        # They live in ``params`` all the same, because the search below reads them the
-        # way it reads the lookahead, and a swept path is then one params dict away.
+        require_waypoints(path)
         self.params = {
             "waypoints": path,
             "closed": is_closed(path) if closed is None else bool(closed),
@@ -89,6 +91,7 @@ class PurePursuit(System):
             "rear_offset": float(rear_offset),
         }
 
+        # Ports: the vehicle state y in, the steer command u out
         self.add_input_port("y", dim=int(state_dim), nominal_value=np.zeros(state_dim))
         self.add_output_port(
             "u",
@@ -101,40 +104,53 @@ class PurePursuit(System):
 
     def ctl(self, x, u, t=0.0, params=None):
         params = self.params if params is None else params
-        wheelbase, delta_max = params["wheelbase"], params["delta_max"]
-        lookahead, lookahead_gain = params["lookahead"], params["lookahead_gain"]
-        rear_offset = params["rear_offset"]
         xp = array_module(u)
+
+        wheelbase = params["wheelbase"]
+        delta_max = params["delta_max"]
+        lookahead = params["lookahead"]
+        lookahead_gain = params["lookahead_gain"]
+        rear_offset = params["rear_offset"]
         path = xp.asarray(params["waypoints"])
+        # The point count stays a static Python int under JAX tracing
         n_points = np.shape(params["waypoints"])[0]
 
-        X, Y, theta, vx = u[0], u[1], u[2], u[3]
-        c_t, s_t = xp.cos(theta), xp.sin(theta)
-        X_r, Y_r = X - rear_offset * c_t, Y - rear_offset * s_t
+        # The pose, moved back from the state's point to the rear axle
+        X = u[0]
+        Y = u[1]
+        theta = u[2]
+        vx = u[3]
+        c_t = xp.cos(theta)
+        s_t = xp.sin(theta)
+        X_r = X - rear_offset * c_t
+        Y_r = Y - rear_offset * s_t
 
-        # target: the first waypoint at least one lookahead ahead of the closest one,
-        # counted along the path — so the search steps over the seam of a closed loop
+        # The target: the first waypoint at least one lookahead L_d = L₀ + k_v |vx| ahead
+        # of the closest one, counted along the path, so the search steps over the seam
+        # of a closed loop
         L_d = lookahead + lookahead_gain * xp.abs(vx)
         reach = xp.sqrt((path[:, 0] - X_r) ** 2 + (path[:, 1] - Y_r) ** 2)
         index = xp.arange(n_points)
         closest = xp.argmin(reach)
         if params["closed"]:
             forward = (index - closest) % n_points
-        else:  # an open path stops at its end: nothing wraps back round to the start
+        else:  # An open path stops at its end: nothing wraps back round to the start
             forward = xp.where(index >= closest, index - closest, n_points)
         ahead = (reach >= L_d) & (forward < n_points)
         rank = xp.where(ahead, forward, n_points)
-        # nothing a lookahead away — a path shorter than L_d — means aim at its far end
+        # Nothing a lookahead away (a path shorter than L_d) means aim at its far end
         chosen = xp.where(xp.any(ahead), xp.argmin(rank), xp.argmax(reach))
         target = path[chosen]
 
-        # arc through the target: curvature 2 y_t / d^2 in the body frame
+        # The target in the body frame at the rear axle, (x_t, y_t)
         x_t = c_t * (target[0] - X_r) + s_t * (target[1] - Y_r)
         y_t = -s_t * (target[0] - X_r) + c_t * (target[1] - Y_r)
+
+        # κ = 2 y_t / d², with d² floored at MIN_REACH², and the bicycle's δ = arctan(L κ)
         curvature = 2.0 * y_t / xp.maximum(x_t**2 + y_t**2, MIN_REACH**2)
         delta = xp.arctan(wheelbase * curvature)
 
-        # the steer command, held within the servo end stops
+        # The steer command, held within the servo end stops: |δ| ≤ δ_max
         delta_cmd = xp.clip(xp.array([delta]), -delta_max, delta_max)
 
         return delta_cmd
@@ -148,7 +164,23 @@ def is_closed(waypoints):
     last-to-first gap no wider than the other steps.
     """
     path = np.asarray(waypoints, dtype=float)
+
+    # The steps between neighbours, and the gap from the last point back to the first
     steps = np.linalg.norm(np.diff(path, axis=0), axis=1)
     gap = float(np.linalg.norm(path[0] - path[-1]))
 
-    return bool(gap <= 1.5 * float(np.median(steps)))
+    # Closed when the gap is no wider than one and a half median steps
+    closed = bool(gap <= 1.5 * float(np.median(steps)))
+
+    return closed
+
+
+###############################################################################
+# Internal machinery
+###############################################################################
+
+
+def require_waypoints(path):
+    """Refuse a path that is not an ``(N, 2)`` array of at least two points."""
+    if path.ndim != 2 or path.shape[1] != 2 or path.shape[0] < 2:
+        raise ValueError("waypoints must be an (N, 2) array with N >= 2")
