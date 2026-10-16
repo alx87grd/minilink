@@ -21,7 +21,9 @@ from minilink.control.state import (
 )
 from minilink.core.diagram import DiagramSystem
 
+###############################################################################
 # Public API
+###############################################################################
 
 
 def lqr_gain(A, B, Q, R):
@@ -44,6 +46,7 @@ def place_gain(A, B, poles):
     """Return the gain ``K`` of the law ``u = -K x`` that puts the eigenvalues of ``A − B K`` at ``poles``."""
     A = np.asarray(A, dtype=float)
     B = np.atleast_2d(np.asarray(B, dtype=float))
+
     n, m = B.shape
     poles = requested_poles(poles, n)
 
@@ -101,7 +104,8 @@ def lqr(
         central-difference step, as in :func:`~minilink.analysis.linearize`.
     """
     model = design_model(sys, x_bar, u_bar, t, params, method=method, eps=eps)
-    A, B = model.A(), model.B()
+    A = model.A()
+    B = model.B()
 
     K = lqr_gain(A, B, Q, R)
 
@@ -120,7 +124,8 @@ def place(
     arrays the gain is :func:`place_gain`.
     """
     model = design_model(sys, x_bar, u_bar, t, params, method=method, eps=eps)
-    A, B = model.A(), model.B()
+    A = model.A()
+    B = model.B()
 
     K = place_gain(A, B, poles)
 
@@ -154,7 +159,8 @@ def lqg(
     the closed-loop poles are the gain's and the observer's together (the
     separation principle).
     """
-    from minilink.estimation.design import kalman  # the dual design, for this verb only
+    # A real cycle: estimation.design imports place_gain from this module
+    from minilink.estimation.design import kalman
 
     model = design_model(
         sys, x_bar, u_bar, t, params, method=method, eps=eps, measured=True
@@ -163,7 +169,7 @@ def lqg(
     gain = lqr(model, Q, R)
     observer = kalman(model, Q_n, R_n)
 
-    # the estimate feeds the gain, the command feeds the observer; r, y in and u out
+    # The estimate feeds the gain, the command feeds the observer; r, y in and u out
     box = DiagramSystem()
     box.name = "LQG Controller"
     box.add_subsystem(observer, "observer")
@@ -192,8 +198,9 @@ def lqr_gain_schedule(A, B, Q, R, S_f, tf, *, n_steps=1001):
     S_f = np.asarray(S_f, dtype=float)
     n = A.shape[0]
     n_steps = int(n_steps)
-    if n_steps < 2 or tf <= 0.0:
-        raise ValueError("lqr_gain_schedule needs tf > 0 and n_steps >= 2")
+
+    require_horizon(n_steps, tf)
+
     R_inv = np.linalg.inv(R)
     t = np.linspace(0.0, float(tf), n_steps)
     dt = float(tf) / (n_steps - 1)
@@ -203,6 +210,7 @@ def lqr_gain_schedule(A, B, Q, R, S_f, tf, *, n_steps=1001):
     H = hamiltonian_matrix(A, B, Q, R_inv)
     n_sub = substeps(H, dt)
     E = riccati_transition(A, B, Q, R_inv, dt / n_sub)
+
     S = np.empty((n_steps, n, n))
     S[-1] = S_f
     for k in range(n_steps - 1, 0, -1):
@@ -242,14 +250,15 @@ def lqr_finite_horizon(
     horizon the block keeps ``K(tf)`` (``after="hold"``) or switches to the
     infinite-horizon gain of :func:`lqr_gain` (``after="stationary"``).
     """
-    if after not in ("hold", "stationary"):
-        raise ValueError("after must be 'hold' or 'stationary'")
+    require_after(after)
+
     model = design_model(sys, x_bar, u_bar, t, params, method=method, eps=eps)
-    A, B = model.A(), model.B()
+    A = model.A()
+    B = model.B()
 
     t_schedule, K, _ = lqr_gain_schedule(A, B, Q, R, S_f, tf, n_steps=n_steps)
 
-    # past the horizon: K(t_f) held, or the stationary gain
+    # Past the horizon: K(t_f) held, or the stationary gain
     K_after = lqr_gain(A, B, Q, R) if after == "stationary" else None
 
     return TimeVaryingStateFeedbackController(
@@ -292,6 +301,7 @@ def trajectory_lqr(
     U = np.asarray(trajectory.u, dtype=float).T
     Q = np.asarray(Q, dtype=float)
     R = np.atleast_2d(np.asarray(R, dtype=float))
+
     N, n = X.shape
     m = U.shape[1]
     R_inv = np.linalg.inv(R)
@@ -316,7 +326,9 @@ def trajectory_lqr(
     return TrajectoryFeedbackController(trajectory, K)
 
 
-# Internal machinery: the request checked, the result checked
+###############################################################################
+# Internal machinery
+###############################################################################
 
 
 def requested_poles(poles, n):
@@ -369,6 +381,18 @@ def require_placed(A, B, K, poles):
             f"place: the closed loop landed at {np.linalg.eigvals(A - B @ K)}, not at "
             f"the requested {poles}; the design is badly conditioned."
         )
+
+
+def require_horizon(n_steps, tf):
+    """Refuse a schedule without a positive horizon or without two samples."""
+    if n_steps < 2 or tf <= 0.0:
+        raise ValueError("lqr_gain_schedule needs tf > 0 and n_steps >= 2")
+
+
+def require_after(after):
+    """Refuse an unknown rule for the gain past the horizon."""
+    if after not in ("hold", "stationary"):
+        raise ValueError("after must be 'hold' or 'stationary'")
 
 
 if __name__ == "__main__":
