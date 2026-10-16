@@ -11,23 +11,32 @@ from minilink.graphical.animation.primitives import (
     CustomLine,
 )
 
+###############################################################################
+# Public API
+###############################################################################
+
 
 class MountainCar(MechanicalSystem):
     """Mountain car as a one-coordinate constrained mechanical system.
 
     Dynamics match SherbyRobotics/pyro ``MountainCar`` in
     ``pyro/dynamic/mountaincar.py``: a bead of mass ``mass`` slides along the
-    fixed relief curve ``z(x) = a * cos(w * x)`` under gravity."""
+    fixed relief curve ``z(x) = a * cos(w * x)`` under gravity.
+    """
 
     def __init__(self):
         super().__init__(dof=1, actuators=1)
         self.name = "Mountain Car"
+
+        # Parameters: the bead's mass, gravity, and the hill z(x) = a cos(w x)
         self.params = {
             "mass": 1.0,
             "gravity": 1.0,
             "a": 0.5,
             "w": np.pi,
         }
+
+        # Signal labels and units
         self.state.labels = ["x", "dx"]
         self.state.units = ["m", "m/s"]
         self.inputs["u"].labels = ["throttle"]
@@ -37,88 +46,120 @@ class MountainCar(MechanicalSystem):
 
     def z(self, x, params=None):
         params = self.params if params is None else params
-        a = params["a"]
-        w = params["w"]
         xp = array_module(x)
 
-        # the hill profile
+        a = params["a"]
+        w = params["w"]
+
+        # The hill profile
         z = a * xp.cos(w * x)
 
         return z
 
     def dz_dx(self, x, params=None):
         params = self.params if params is None else params
-        a = params["a"]
-        w = params["w"]
         xp = array_module(x)
 
-        # its slope
+        a = params["a"]
+        w = params["w"]
+
+        # The slope of the hill
         dz_dx = -a * w * xp.sin(w * x)
 
         return dz_dx
 
     def d2z_dx2(self, x, params=None):
         params = self.params if params is None else params
-        a = params["a"]
-        w = params["w"]
         xp = array_module(x)
 
-        # and its curvature
+        a = params["a"]
+        w = params["w"]
+
+        # The curvature of the hill
         d2z_dx2 = -a * w**2 * xp.cos(w * x)
 
         return d2z_dx2
 
     def H(self, q, params=None):
         params = self.params if params is None else params
+        xp = array_module(q)
+
         mass = params["mass"]
+
         slope = self.dz_dx(q[0], params)
 
-        # effective inertia of the bead sliding along the curve z(x)
-        H = array_module(q).array([[mass * (1.0 + slope**2)]])
+        # Effective inertia of the bead sliding along the curve z(x)
+        H11 = mass * (1.0 + slope**2)
+
+        H = xp.array([[H11]])
 
         return H
 
     def C(self, q, dq, params=None):
         params = self.params if params is None else params
+        xp = array_module(q, dq)
+
         mass = params["mass"]
+
         slope = self.dz_dx(q[0], params)
         curvature = self.d2z_dx2(q[0], params)
 
         # Coriolis term from the slope changing along the path
-        C = array_module(q, dq).array([[mass * slope * curvature * dq[0]]])
+        C11 = mass * slope * curvature * dq[0]
+
+        C = xp.array([[C11]])
 
         return C
 
     def B(self, q, params=None):
         params = self.params if params is None else params
-        slope = self.dz_dx(q[0], params)
         xp = array_module(q)
 
-        # throttle acts tangent to the curve; this projects it onto x
-        B = xp.array([[xp.sqrt(1.0 + slope**2)]])
+        slope = self.dz_dx(q[0], params)
+
+        # The throttle acts tangent to the curve; this projects it onto x
+        B11 = xp.sqrt(1.0 + slope**2)
+
+        B = xp.array([[B11]])
 
         return B
 
     def g(self, q, params=None):
         params = self.params if params is None else params
+        xp = array_module(q)
+
         mass = params["mass"]
         gravity = params["gravity"]
+
         slope = self.dz_dx(q[0], params)
 
-        # gravity pulls the bead back down along the slope
-        g = array_module(q).array([mass * gravity * slope])
+        # Gravity pulls the bead back down along the slope
+        g = xp.array([mass * gravity * slope])
 
         return g
 
     def d(self, q, dq, u=None, t=0.0, params=None):
-        return array_module(q).zeros(1)
+        xp = array_module(q)
+
+        # No damping: τ_d = 0
+        tau_d = xp.zeros(1)
+
+        return tau_d
 
     def forward_kinematic_effector(self, q):
-        return np.array([q[0], self.z(q[0])])
+        """The bead's position ``(x, z(x))`` on the hill."""
+        x = q[0]
+        z = self.z(x)
+
+        p = np.array([x, z])
+
+        return p
 
     def get_kinematic_geometry(self):
+        # The terrain, sampled over the course
         xs = np.linspace(-1.7, 0.3, 240)
         terrain = np.column_stack([xs, [self.z(x) for x in xs], np.zeros_like(xs)])
+
         return {
             "world": [CustomLine(terrain, color="black", linewidth=2)],
             "body": [
@@ -130,18 +171,21 @@ class MountainCar(MechanicalSystem):
         q = x[:1]
         p = self.forward_kinematic_effector(q)
 
-        # body frame rides the curve, x-axis along the terrain tangent
+        # The body frame rides the curve, its x axis along the terrain tangent
         slope = self.dz_dx(q[0], params)
         theta = np.arctan(slope)
+
         return {"body": SE2(p[0], p[1], theta)}
 
     def get_dynamic_geometry(self, x, u, t=0, params=None):
-        # throttle arrow along the body x-axis (the terrain tangent; see tf)
+        throttle = u[0]
+
+        # The throttle arrow along the body x axis (the terrain tangent; see tf)
         return {
             "body": [
                 Arrow(
                     base=(0.0, 0.0),
-                    vector=(u[0], 0.0),
+                    vector=(throttle, 0.0),
                     scale=0.3,
                     color="red",
                     linewidth=2,
