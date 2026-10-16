@@ -228,7 +228,7 @@ class RRTStarPlanner(RRTPlanner):
 
     def animate_convergence(self, **kwargs):
         """Animate recorded RRT* history (requires ``record_history=True``)."""
-        # Lazy import: the plots load on first use, not with the planner
+        # Lazy import: the graphics load on first use, not with the core
         from minilink.planning.search.plotting import animate_convergence
 
         return animate_convergence(self, **kwargs)

@@ -215,21 +215,21 @@ class RRTPlanner(Planner):
         ``x_axis`` / ``y_axis`` choose the state projection; pass ``ax`` to
         overlay on a ``scene.plot`` heatmap.
         """
-        # Lazy import: the plots load on first use, not with the planner
+        # Lazy import: the graphics load on first use, not with the core
         from minilink.planning.search.plotting import plot_tree
 
         return plot_tree(self, **kwargs)
 
     def animate_search(self, **kwargs):
         """Animate the tree growth in a state projection (lazy matplotlib import)."""
-        # Lazy import: the plots load on first use, not with the planner
+        # Lazy import: the graphics load on first use, not with the core
         from minilink.planning.search.plotting import animate_search
 
         return animate_search(self, **kwargs)
 
     def show_live_search(self, **kwargs):
         """Build a :class:`~minilink.planning.search.live_plot.LiveSearchPlotCallback`."""
-        # Lazy import: the live plot loads on first use, not with the planner
+        # Lazy import: the graphics load on first use, not with the core
         from minilink.planning.search.live_plot import LiveSearchPlotCallback
 
         return LiveSearchPlotCallback(self, **kwargs)
@@ -267,7 +267,7 @@ class RRTPlanner(Planner):
         if not self.options.live_plot:
             return None
 
-        # Lazy import: the live plot loads on first use, not with the planner
+        # Lazy import: the graphics load on first use, not with the core
         from minilink.planning.search.live_plot import LiveSearchPlotCallback
 
         return LiveSearchPlotCallback(
@@ -389,7 +389,7 @@ class RRTPlanner(Planner):
         if self.iterations % max(1, self.options.live_plot_every) != 0:
             return
 
-        # Lazy import: the live plot's record loads on first use, not with the planner
+        # Lazy import: the graphics load on first use, not with the core
         from minilink.planning.search.live_plot import RRSearchIteration
 
         best_cost = None
@@ -512,6 +512,8 @@ class TreeSearchRecord:
     def success(self) -> bool:
         """The search reached the goal region."""
         return bool(self.reached_goal)
+
+    # Display
 
     def __str__(self) -> str:
         outcome = "goal reached" if self.reached_goal else "goal not reached"

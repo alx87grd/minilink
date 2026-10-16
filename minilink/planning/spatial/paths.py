@@ -192,9 +192,9 @@ def from_waypoints(waypoints, *, kind: str = "polyline") -> ReferencePath:
     kind : {"polyline"}
         Path primitive; default is the robust piecewise-linear polyline.
     """
-    if kind == "polyline":
-        return PolylinePath(np.asarray(waypoints, dtype=float))
-    raise ValueError(f"unknown path kind {kind!r}; supported: 'polyline'")
+    require_path_kind(kind)
+
+    return PolylinePath(np.asarray(waypoints, dtype=float))
 
 
 def circuit_waypoints(length=14.0, width=9.0, radius=2.5, spacing=0.25):
@@ -256,6 +256,12 @@ def circuit_waypoints(length=14.0, width=9.0, radius=2.5, spacing=0.25):
 ###############################################################################
 # Internal machinery
 ###############################################################################
+
+
+def require_path_kind(kind):
+    """Refuse a path kind other than the polyline."""
+    if kind != "polyline":
+        raise ValueError(f"unknown path kind {kind!r}; supported: 'polyline'")
 
 
 def require_polyline(wp):

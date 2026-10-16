@@ -190,21 +190,21 @@ class PlanningProblem:
         return "infinite" if self.tf is None or not np.isfinite(self.tf) else "finite"
 
     def require_cost(self) -> CostFunction:
-        """Return the cost or raise a clear solver-facing error."""
+        """Refuse a problem without a cost; return the cost."""
         if self.cost is None:
             raise ValueError("This planner requires problem.cost")
 
         return self.cost
 
     def require_goal(self) -> Set:
-        """Return the terminal set or raise a clear solver-facing error."""
+        """Refuse a problem without a terminal set; return it."""
         if self.Xf is None:
             raise ValueError("This planner requires a terminal set or x_goal")
 
         return self.Xf
 
     def require_finite_tf(self) -> float:
-        """Return a finite horizon or raise for solvers that need a time grid."""
+        """Refuse an unset or infinite horizon; return ``tf`` as a float."""
         if self.tf is None:
             raise ValueError("This planner requires a finite problem.tf")
         if not np.isfinite(self.tf):

@@ -161,8 +161,7 @@ class ShootingTranscription(Transcription):
         guess: np.ndarray | Trajectory | None,
     ) -> np.ndarray:
         """Return a packed input-knot guess for the mathematical program."""
-        if guess is None:
-            raise ValueError("Shooting requires an initial input guess")
+        require_initial_guess(guess)
 
         # A trajectory gives its inputs, resampled on the knots
         if isinstance(guess, Trajectory):
@@ -406,3 +405,14 @@ class ShootingTranscription(Transcription):
         J = trajectory_cost(cost, x, u, t, dt, cost_params)
 
         return J
+
+
+###############################################################################
+# Internal machinery
+###############################################################################
+
+
+def require_initial_guess(guess):
+    """Refuse a shooting solve without an initial input guess."""
+    if guess is None:
+        raise ValueError("Shooting requires an initial input guess")

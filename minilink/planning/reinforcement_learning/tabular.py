@@ -205,7 +205,7 @@ class TabularLearningPlanner(Planner):
     def solve_policy(
         self, episodes=1000, *, evaluate=False, n_trials=50
     ) -> PlanningSolution:
-        """Policy-family name of :meth:`solve`."""
+        """The planner-family name of :meth:`solve`, answered by every policy planner."""
         return self.solve(episodes, evaluate=evaluate, n_trials=n_trials)
 
     # Learning

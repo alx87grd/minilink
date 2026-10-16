@@ -2104,7 +2104,7 @@ class TestTextbookOptions(unittest.TestCase):
             return_value=live,
         ):
             progress = planner.build_callback(mock.MagicMock(), "numpy")
-            planner._iteration_from_z = lambda *a, **k: "iteration"
+            planner.iteration_from_z = lambda *a, **k: "iteration"
             progress(np.zeros(3), 0.0, 0.0)
         self.assertEqual(seen, ["iteration"])
         live.assert_called_once_with("iteration")

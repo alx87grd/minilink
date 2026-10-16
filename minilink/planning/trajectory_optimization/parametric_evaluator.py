@@ -75,14 +75,14 @@ class JaxParametricProgramEvaluator:
             return jnp.asarray(program.g(z)).reshape(-1)
 
         # Each one must trace under JAX
-        self.check_traceable(J_raw, z_sample, "J")
-        self.check_traceable(
+        self.require_traceable(J_raw, z_sample, "J")
+        self.require_traceable(
             lambda z: h_raw(z, x0_sample),
             z_sample,
             "h",
         )
         if program.g is not None:
-            self.check_traceable(g_raw, z_sample, "g")
+            self.require_traceable(g_raw, z_sample, "g")
 
         # The compiled functions and their derivatives ∇J, ∂h/∂z and ∂g/∂z
         self._jit_J = jax.jit(J_raw)
@@ -218,8 +218,8 @@ class JaxParametricProgramEvaluator:
             raise ValueError(f"decision vector must have shape ({self.n_z},)")
         return arr
 
-    def check_traceable(self, fn, z_sample, label: str) -> None:
-        """Trace ``fn`` once at ``z_sample``; a NumPy-only callable raises here."""
+    def require_traceable(self, fn, z_sample, label: str) -> None:
+        """Refuse a function that does not trace under JAX at ``z_sample`` (a NumPy-only callable)."""
         try:
             self.jax.make_jaxpr(fn)(z_sample)
         except Exception as exc:

@@ -498,7 +498,7 @@ class TrajectoryOptimizationPlanner(Planner):
 
         # The live figure, beside the user's callback when there is one
         if self.options.live_plot:
-            # Lazy import: the live figure loads on first use, not with the planner
+            # Lazy import: the graphics load on first use, not with the core
             from minilink.planning.trajectory_optimization.live_plot import (
                 LiveTrajectoryPlotCallback,
             )
@@ -509,7 +509,7 @@ class TrajectoryOptimizationPlanner(Planner):
             else:
                 user_callback = callback
 
-                def callback(iteration):  # both the live figure and the user's hook
+                def callback(iteration):  # Both the live figure and the user's hook
                     live_callback(iteration)
                     user_callback(iteration)
 
@@ -524,7 +524,7 @@ class TrajectoryOptimizationPlanner(Planner):
         def planner_progress(z: np.ndarray, J: float, _t: float) -> None:
             nonlocal iteration_index
             z_arr = np.asarray(z, dtype=float).reshape(-1)
-            iteration = self._iteration_from_z(
+            iteration = self.iteration_from_z(
                 optimizer,
                 z_arr,
                 compile_backend,
@@ -540,7 +540,7 @@ class TrajectoryOptimizationPlanner(Planner):
 
         return planner_progress
 
-    def _iteration_from_z(
+    def iteration_from_z(
         self,
         optimizer: Optimizer,
         z: np.ndarray,
@@ -855,6 +855,8 @@ class TrajectoryOptimizationRecord:
             return bool(self.solver_success)
 
         return bool(self.feasible)
+
+    # Display
 
     def __str__(self) -> str:
         cost = "n/a" if self.cost is None else f"{float(self.cost):.6g}"

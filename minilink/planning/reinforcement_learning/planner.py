@@ -243,7 +243,7 @@ class ReinforcementLearningPlanner(Planner):
     def solve_policy(
         self, timesteps=100_000, *, evaluate=False, n_trials=50, verbose=None
     ) -> PlanningSolution:
-        """Policy-family name of :meth:`solve`."""
+        """The planner-family name of :meth:`solve`, answered by every policy planner."""
         return self.solve(
             timesteps, evaluate=evaluate, n_trials=n_trials, verbose=verbose
         )

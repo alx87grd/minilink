@@ -66,11 +66,11 @@ class JaxMathematicalProgramEvaluator(MathematicalProgramEvaluator):
             return jnp.asarray(program.g(z)).reshape(-1)
 
         # Each one must trace under JAX
-        self.check_traceable(J_raw, z_sample, "J")
+        self.require_traceable(J_raw, z_sample, "J")
         if program.h is not None:
-            self.check_traceable(h_raw, z_sample, "h")
+            self.require_traceable(h_raw, z_sample, "h")
         if program.g is not None:
-            self.check_traceable(g_raw, z_sample, "g")
+            self.require_traceable(g_raw, z_sample, "g")
 
         # The compiled functions
         self._jit_J = jax.jit(J_raw)
@@ -166,8 +166,8 @@ class JaxMathematicalProgramEvaluator(MathematicalProgramEvaluator):
     # Internal machinery
     ###########################################################################
 
-    def check_traceable(self, fn, z_sample, label: str) -> None:
-        """Trace ``fn`` once at ``z_sample``; a NumPy-only callable raises here."""
+    def require_traceable(self, fn, z_sample, label: str) -> None:
+        """Refuse a function that does not trace under JAX at ``z_sample`` (a NumPy-only callable)."""
         try:
             self.jax.make_jaxpr(fn)(z_sample)
         except Exception as exc:

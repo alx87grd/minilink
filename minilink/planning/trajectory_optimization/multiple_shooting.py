@@ -43,7 +43,7 @@ class MultipleShootingTranscription(DirectCollocationTranscription):
     """
 
     # The collocation parametric build assumes collocation defects; multiple
-    # shooting has no parametric (MPC) form yet.
+    # shooting has no parametric (MPC) form.
     supports_parametric = False
 
     def __init__(self, options: MultipleShootingOptions):

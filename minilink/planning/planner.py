@@ -88,7 +88,7 @@ class Planner(ABC):
     # The latest solution, and the parts of the problem a solver needs
 
     def require_solution(self) -> PlanningSolution:
-        """Return the latest solution or raise a clear error."""
+        """Refuse a planner with no solution yet; return the latest one."""
         if self.last_solution is None:
             raise ValueError("No solution has been computed yet")
 
@@ -103,11 +103,11 @@ class Planner(ABC):
         raise NotImplementedError(f"{type(self).__name__} has no nominal_trajectory")
 
     def require_cost(self) -> CostFunction:
-        """Return ``problem.cost`` or raise a solver-facing error."""
+        """Refuse a problem without a cost; return ``problem.cost``."""
         return self.problem.require_cost()
 
     def require_goal(self) -> Set:
-        """Return ``problem.Xf`` or raise a solver-facing error."""
+        """Refuse a problem without a goal set; return ``problem.Xf``."""
         return self.problem.require_goal()
 
     # Views of the latest solution

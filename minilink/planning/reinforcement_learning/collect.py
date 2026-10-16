@@ -59,7 +59,7 @@ def rollout(env, policy, theta, carry, key, *, n_steps, n_envs):
     def scan_step(carry, key):
         return jax.vmap(env_step)(carry, jax.random.split(key, n_envs))
 
-    # n_steps control periods of the n_envs plants
+    # The n_steps control periods of the n_envs plants
     carry, batch = jax.lax.scan(scan_step, carry, jax.random.split(key, n_steps))
 
     return batch, carry

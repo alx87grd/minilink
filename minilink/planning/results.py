@@ -181,7 +181,7 @@ class PlanningSolution:
             )
 
     def require_trajectory(self) -> Trajectory:
-        """``trajectory``, or a clear error naming ``solve(evaluate=True)``."""
+        """Refuse a solution that carries no trajectory, naming ``solve(evaluate=True)``; return it."""
         if self.trajectory is None:
             raise ValueError(
                 f"this {self.method} solution carries no trajectory; "
