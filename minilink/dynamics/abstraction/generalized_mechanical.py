@@ -1,7 +1,11 @@
-"""Second-order mechanical systems with generalized velocities."""
+"""Mechanical systems with generalized velocities: ``M(q) v̇ + C(q, v) v + d + g(q) = τ``, ``q̇ = N(q) v``."""
 
 from minilink.core.backends import array_module
 from minilink.core.system import DynamicSystem
+
+###############################################################################
+# Public API
+###############################################################################
 
 
 class GeneralizedMechanicalSystem(DynamicSystem):
@@ -26,9 +30,11 @@ class GeneralizedMechanicalSystem(DynamicSystem):
         if actuators is None:
             actuators = self.dof
 
+        # Dimensions: the state x = [q; v] and the output y = x
         n = self.pos + self.dof
         m = int(actuators)
         p = n
+
         super().__init__(
             n=n,
             input_dim=m,
@@ -36,9 +42,9 @@ class GeneralizedMechanicalSystem(DynamicSystem):
             expose_state=True,
             y_dependencies=(),
         )
-
         self.name = f"{self.dof}DoF Generalized Mechanical System"
 
+        # Signal labels, units and bounds: the positions q, then the velocities v
         for i in range(self.pos):
             self.state.labels[i] = f"Position {i}"
             self.state.units[i] = "[m]"
@@ -52,6 +58,7 @@ class GeneralizedMechanicalSystem(DynamicSystem):
             self.state.upper_bound[j] = 10.0
             self.state.lower_bound[j] = -10.0
 
+        # A force per input, and the output named after the state
         uport = self.inputs["u"]
         for i in range(self.m):
             uport.labels[i] = f"Force input {i}"
@@ -65,32 +72,70 @@ class GeneralizedMechanicalSystem(DynamicSystem):
     def M(self, q, params=None):
         """Inertia matrix, shape ``(dof, dof)``."""
         xp = array_module(q)
-        return xp.eye(self.dof)
+
+        dof = self.dof
+
+        # M = I: a unit inertia on every velocity until a subclass writes its own
+        M = xp.eye(dof)
+
+        return M
 
     def C(self, q, v, params=None):
         """Coriolis and centrifugal matrix, shape ``(dof, dof)``."""
         xp = array_module(q)
-        return xp.zeros((self.dof, self.dof))
+
+        dof = self.dof
+
+        # C = 0: no velocity coupling until a subclass writes its own
+        C = xp.zeros((dof, dof))
+
+        return C
 
     def N(self, q, params=None):
         """Kinematic map from generalized velocities to configuration rates."""
         xp = array_module(q)
-        return xp.eye(self.pos, self.dof)
+
+        pos = self.pos
+        dof = self.dof
+
+        # N = I: velocity i is the rate of position i
+        N = xp.eye(pos, dof)
+
+        return N
 
     def B(self, q, params=None):
         """Actuator matrix used by the default :meth:`generalized_force` hook."""
         xp = array_module(q)
-        return xp.eye(self.dof, self.m)
+
+        dof = self.dof
+        m = self.m
+
+        # B = I: input i drives velocity i
+        B = xp.eye(dof, m)
+
+        return B
 
     def g(self, q, params=None):
         """Conservative generalized forces, shape ``(dof,)``."""
         xp = array_module(q)
-        return xp.zeros(self.dof)
+
+        dof = self.dof
+
+        # g = 0: no conservative force until a subclass writes its own
+        g = xp.zeros(dof)
+
+        return g
 
     def d(self, q, v, u=None, t=0.0, params=None):
         """Left-side generalized load/dissipation vector, shape ``(dof,)``."""
         xp = array_module(q)
-        return xp.zeros(self.dof)
+
+        dof = self.dof
+
+        # d = 0: no load or dissipation until a subclass writes its own
+        d = xp.zeros(dof)
+
+        return d
 
     def generalized_force(self, q, v, u, t=0.0, params=None):
         """Right-side generalized force vector.
@@ -107,18 +152,27 @@ class GeneralizedMechanicalSystem(DynamicSystem):
 
     def x2qv(self, x):
         """Split state ``x`` into configuration ``q`` and velocity ``v``."""
-        q = x[0 : self.pos]
-        v = x[self.pos : self.n]
+        pos = self.pos
+        n = self.n
+
+        q = x[0:pos]
+        v = x[pos:n]
+
         return [q, v]
 
     def qv2x(self, q, v):
         """Stack configuration ``q`` and velocity ``v`` into state ``x``."""
         xp = array_module(q)
-        return xp.concatenate([q, v])
+
+        # x = [q; v]
+        x = xp.concatenate([q, v])
+
+        return x
 
     def qdot(self, q, v, params=None):
         """Configuration derivative ``qdot = N(q) @ v``."""
         params = self.params if params is None else params
+
         N = self.N(q, params)
 
         qdot = N @ v
@@ -128,6 +182,7 @@ class GeneralizedMechanicalSystem(DynamicSystem):
     def inverse_dynamics(self, q, v, acceleration, u=None, t=0.0, params=None):
         """Generalized RHS force required by a trajectory."""
         params = self.params if params is None else params
+
         M = self.M(q, params)
         C = self.C(q, v, params)
         g = self.g(q, params)
@@ -140,11 +195,14 @@ class GeneralizedMechanicalSystem(DynamicSystem):
     def forward_dynamics(self, q, v, u, t=0.0, params=None):
         """Velocity derivative from forward dynamics."""
         params = self.params if params is None else params
+
         M = self.M(q, params)
         C = self.C(q, v, params)
         g = self.g(q, params)
         d = self.d(q, v, u, t, params)
         tau = self.generalized_force(q, v, u, t, params)
+
+        # The backend follows the force terms, so it is read once they are computed
         xp = array_module(tau, C, v, g, d)
 
         # M v̇ = τ − C v − g − d
@@ -155,6 +213,7 @@ class GeneralizedMechanicalSystem(DynamicSystem):
 
     def f(self, x, u, t=0.0, params=None):
         params = self.params if params is None else params
+
         q, v = self.x2qv(x)
         qdot = self.qdot(q, v, params)
         vdot = self.forward_dynamics(q, v, u, t, params)
@@ -169,8 +228,10 @@ class GeneralizedMechanicalSystem(DynamicSystem):
 
     def kinetic_energy(self, q, v, params=None):
         params = self.params if params is None else params
+
         M = self.M(q, params)
 
+        # T = ½ vᵀ M(q) v
         T = 0.5 * (v @ (M @ v))
 
         return T
