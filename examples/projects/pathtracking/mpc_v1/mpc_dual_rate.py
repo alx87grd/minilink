@@ -17,7 +17,7 @@ class MpcBroadcastAhead(MPCBroadcastController):
         self.name = "MPC Broadcast Ahead"
         self._dt_project = float(dt_project)
 
-    def _compute_x_nom(self, x, u, t=0, params=None):
+    def compute_x_nom(self, x, u, t=0, params=None):
         del x, u, params
         return self._mpc.get_nominal_x(self._abs_t(t) + self._dt_project)
 
