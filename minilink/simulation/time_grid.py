@@ -90,7 +90,7 @@ _WHOLE_STEPS_RTOL = 1e-9
 
 
 def require_time_span(t0, tf):
-    """``t0`` and ``tf`` as floats, refused unless real, finite and ``t0 < tf``."""
+    """Refuse a span unless real, finite and ``t0 < tf``; return ``t0`` and ``tf`` as floats."""
     try:
         t0, tf = float(t0), float(tf)
     except (TypeError, ValueError) as exc:
@@ -103,7 +103,7 @@ def require_time_span(t0, tf):
 
 
 def require_dt(dt, *, label="dt"):
-    """``dt`` as a float, refused unless a positive finite scalar."""
+    """Refuse a ``dt`` that is not a positive finite scalar; return it as a float."""
     if not np.isscalar(dt):
         raise ValueError(f"{label} must be a positive finite scalar")
     dt_value = float(dt)

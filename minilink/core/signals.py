@@ -273,7 +273,7 @@ def length_or_none(value, *, field_name, signal_id):
 
 
 def require_nominal_shape(value, dim):
-    """Raise unless the flattened nominal value has exactly ``dim`` entries."""
+    """Refuse a nominal value that does not flatten to exactly ``dim`` entries."""
     if value.shape != (dim,):
         raise ValueError(f"nominal_value must have shape ({dim},), got {value.shape}")
 

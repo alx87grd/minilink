@@ -71,8 +71,6 @@ class Source(System):
             allow_tall_stacked_figures,
             is_blocking_needed,
         )
-
-        # Lazy import: the graphics load on first use, not with the core
         from minilink.graphical.common.matplotlib_style import (
             DPI_FIGURE,
             FONT_SIZE,

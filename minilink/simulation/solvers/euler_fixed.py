@@ -81,7 +81,7 @@ class EulerFixedStepSolverBackend(SolverBackend):
 
 
 def require_uniform_times(times: np.ndarray) -> float:
-    """Return the common step size; raise when knot spacing is not uniform."""
+    """Refuse knots that are not evenly spaced; return the common step."""
     n_pts = times.shape[0]
     if n_pts < 2:
         return 0.0

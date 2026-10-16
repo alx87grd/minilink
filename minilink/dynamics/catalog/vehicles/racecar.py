@@ -17,7 +17,7 @@ from minilink.graphical.catalog.skins import car_skin_2d
 
 # Geometry and actuators of the 1/10 car.
 PUBLIC_RACECAR_PARAMS = {
-    # chassis
+    # Chassis
     "mass": 5.0,  # [kg]
     "inertia": 0.06,  # [kg m^2]
     "a": 0.17,  # [m]    CG to front axle (wheelbase 0.34 m, mass centred)
@@ -25,16 +25,16 @@ PUBLIC_RACECAR_PARAMS = {
     "r_f": 0.05,  # [m]    front tire radius
     "r_r": 0.05,  # [m]    rear tire radius
     "gravity": 9.81,  # [m/s^2]
-    # aero and rolling resistance
+    # Aero and rolling resistance
     "rho": 1.2,  # [kg/m^3] air at room temperature
     "CdA": 0.03,  # [m^2]  frontal area at Cd ~ 1 for an open 1/10 body
     "C_rr": 0.02,  # [-]   rolling resistance of a rubber tire on a hard floor
-    # tires (stiffnesses per unit load)
+    # Tires (stiffnesses per unit load)
     "mu": 1.0,  # [-]      soft rubber on a smooth hard floor
     "c_alpha_f": 4.0,  # [1/rad] front cornering stiffness per unit load
     "c_alpha_r": 5.0,  # [1/rad] rear: stiffer, so the car understeers at the limit
     "c_kappa": 10.0,  # [-]  longitudinal stiffness per unit load
-    # propulsion (what the drive can deliver, not how it is built)
+    # Propulsion (what the drive can deliver, not how it is built)
     "P_max": 80.0,  # [W]
     "tau_sat": 1.5,  # [N m] torque the drivetrain holds at the rear axle at rest
     "engine_tau": 0.1,  # [s] lag from the command to the power on the ground
@@ -42,11 +42,11 @@ PUBLIC_RACECAR_PARAMS = {
     "bw_drive": 0.001,  # [N m s] viscous drag of the drivetrain
     "bw_rear": 0.0,  # [N m s] the base class's own wheel drag: f() adds bw_drive instead
     "tau_fric": 0.02,  # [N m] dry friction of the drivetrain
-    # steering
+    # Steering
     "delta_max": 0.52,  # [rad] 30 deg
     "steering_tau": 0.08,  # [s] hobby servo closing its own position loop
     "steer_rate_max": 5.0,  # [rad/s] ~0.2 s per 60 deg
-    # smoothing scales: they keep the equations finite and differentiable near rest
+    # Smoothing scales: they keep the equations finite and differentiable near rest
     "v_min_epsilon": 0.2,  # [m/s]   floor of the slip denominators
     "w_min_epsilon": 1.0,  # [rad/s] floor of the power-to-torque denominator
     "v_c": 0.05,  # [m/s]   creep speed of the rolling resistance
@@ -481,8 +481,7 @@ class UdeSRacecarDyn3D(UdeSRacecarDyn):
     def __init__(self):
         super().__init__()
 
-        # Lazy import: the skin lives beside this module, and importing it here keeps
-        # ``f`` mesh-free
+        # Lazy import: the graphics load on first use, not with the core
         from minilink.graphical.catalog.racecar_skin import racecar_skin_3d
 
         self.name = "UdeS Racecar (3D)"
@@ -587,7 +586,7 @@ def stiff_tires(params):
 
 def link_frames(X, Y, psi, delta, params, phi_rear=0.0, phi_front=None):
     """Link poses for either racecar plant."""
-    # Lazy import: the racecar meshes load on first use, so ``f`` stays mesh-free
+    # Lazy import: the graphics load on first use, not with the core
     from minilink.graphical.catalog.racecar_skin import racecar_frames
 
     b = params["b"]

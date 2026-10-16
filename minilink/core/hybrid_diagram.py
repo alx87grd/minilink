@@ -291,8 +291,6 @@ class HybridDiagram:
         """
         # Lazy import: the graphics load on first use, not with the core
         from minilink.graphical.animation import Animator
-
-        # The notebook check belongs to the same optional band
         from minilink.graphical.common.environment import prefers_inline_animation
 
         # The cached plant trajectory, else the latest result's, else a fresh run

@@ -128,7 +128,7 @@ class LTISystem(StateSpaceSystem):
         # The dimensions and the ports. Structural feedthrough only when D has a
         # nonzero entry: an explicit zero D must not create an algebraic y <- u
         # dependency
-        n, m, p = check_dimensions(self._A, self._B, self._C, self._D)
+        n, m, p = dimensions_of(self._A, self._B, self._C, self._D)
         feedthrough = bool(np.any(np.asarray(self._D)))
         super().__init__(
             n=n,
@@ -200,7 +200,7 @@ def matrix_shape(name, matrix):
     return tuple(shape)
 
 
-def check_dimensions(A, B, C, D):
+def dimensions_of(A, B, C, D):
     """``(n, m, p)`` of a consistent ``(A, B, C, D)``; a mismatched pair raises."""
     A_shape = matrix_shape("A", A)
     B_shape = matrix_shape("B", B)

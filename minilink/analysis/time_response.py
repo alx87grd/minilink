@@ -30,11 +30,11 @@ class StepInfo:
     """Textbook step-response figures (MATLAB ``stepinfo`` conventions)."""
 
     rise_time: float  # 10 % to 90 % of the final value; nan when there is none
-    settling_time: float  # last time the response leaves the 2 % band
-    overshoot: float  # percent of the final value; nan when there is none
+    settling_time: float  # Last time the response leaves the 2 % band
+    overshoot: float  # Percent of the final value; nan when there is none
     peak: float
     peak_time: float
-    steady_state: float  # the last sample; nan when the response has not settled
+    steady_state: float  # The last sample; nan when the response has not settled
 
 
 def step_response(

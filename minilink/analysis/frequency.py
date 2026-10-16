@@ -274,8 +274,7 @@ def transfer_function(
     ``numerator``, ``denominator``, ``poles`` and ``zeros``, so it can be
     plotted, simulated, or wired like any other block.
     """
-    # Lazy import: the blocks and their drawing primitives load on first use, not
-    # with the analysis
+    # Lazy import: the block and its graphics load on first use, not with the analysis
     from minilink.blocks.transfer_function import TransferFunction
 
     z, p, k = pzmap(

@@ -295,6 +295,8 @@ class LyapunovCertificate:
 
         return rate
 
+    # Display
+
     def __str__(self) -> str:
         extent = np.array2string(self.extent, precision=3, suppress_small=True)
         caveat = (
@@ -508,7 +510,7 @@ def require_hurwitz(poles):
 
 def compiled(sys):
     """Compile once for the whole certificate: ``(backend, evaluator)``."""
-    # Lazy import: the compiler loads on first use, not with the analysis
+    # Lazy import: the compiler loads on first use, not with the analysis verbs
     from minilink.core.compile.compiler import compile_auto
 
     return compile_auto(sys)

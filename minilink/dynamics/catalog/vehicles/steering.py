@@ -108,8 +108,8 @@ class KinematicCar(KinematicBicycle):
         # front pair steering, in place of the bicycle's pointed outline and two
         # in-line wheels, so it reads as a car
         self.width = 2.0
-        self.body_width_ratio = 0.74  # tub narrower than track, so wheels show
-        self.visual_wheelbase_ratio = 0.64  # axle separation as a fraction of length
+        self.body_width_ratio = 0.74  # Tub narrower than track, so wheels show
+        self.visual_wheelbase_ratio = 0.64  # Axle separation as a fraction of length
         self.tire_length = 0.95
         self.tire_width = 0.34
         self.camera_scale = 2.0 * self.params["length"]
