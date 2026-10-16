@@ -71,6 +71,8 @@ class Set(ABC):
         """Return the intersection ``self & other`` of two sets."""
         return IntersectionSet.of(self, other)
 
+    # Display
+
     def __str__(self):
         return inspect_text(self)
 
@@ -120,6 +122,8 @@ class InputSet(ABC):
     def bounding_box(self):
         """The tightest :class:`BoxSet` of inputs containing the set, or ``None`` when it has none."""
         return None
+
+    # Display
 
     def __str__(self):
         return inspect_text(self)
@@ -464,7 +468,7 @@ def require_sample_count(n):
 
 
 def require_nonnegative_radius(radius):
-    """Refuse a negative ball radius."""
+    """Refuse a negative radius."""
     if radius < 0.0:
         raise ValueError("radius must be nonnegative")
 

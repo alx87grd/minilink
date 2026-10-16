@@ -231,7 +231,7 @@ class HybridDiagram:
                 **kwargs,
             )
 
-        # Rendering stays optional (DESIGN §3): the graphical band loads on first use
+        # Lazy import: the graphics load on first use, not with the core
         from minilink.graphical.signals.time_signals import (
             STEP_ABSCISSA_LABEL,
             TIME_ABSCISSA_LABEL,
@@ -289,7 +289,7 @@ class HybridDiagram:
         on a flow diagram. Uses :attr:`plant` geometry; ``traj`` defaults to the
         last plant trajectory from :meth:`compute_trajectory` / :meth:`compute_forced`.
         """
-        # Rendering stays optional (DESIGN §3): the graphical band loads on first use
+        # Lazy import: the graphics load on first use, not with the core
         from minilink.graphical.animation import Animator
 
         # The notebook check belongs to the same optional band

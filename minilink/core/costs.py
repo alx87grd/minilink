@@ -78,11 +78,11 @@ class CostFunction(ABC):
         ``h(x(tf), tf)`` when they need the full objective scalar.
         """
         g = self.g
+        rho = float(self.discount_rate)
         N = traj.n_samples
 
         # dJ_k = exp(−ρ t_k) g(x_k, u_k, t_k), each sample's discounted running cost
         dJ = np.zeros(N, dtype=float)
-        rho = float(self.discount_rate)
         for i, t in enumerate(traj.t):
             g_i = float(g(traj.x[:, i], traj.u[:, i], float(t), params=params))
             dJ[i] = np.exp(-rho * float(t)) * g_i

@@ -7,6 +7,7 @@ from dataclasses import dataclass
 import numpy as np
 
 from minilink.core.backends import array_module
+from minilink.core.sets import require_box_bounds, require_nonnegative_radius
 
 ###############################################################################
 # Public API
@@ -106,7 +107,7 @@ class Box(Shape):
     def __post_init__(self) -> None:
         lower = np.asarray(self.lower, dtype=float).reshape(-1).copy()
         upper = np.asarray(self.upper, dtype=float).reshape(-1).copy()
-        require_box_corners(lower, upper)
+        require_box_bounds(lower, upper)
 
         object.__setattr__(self, "lower", lower)
         object.__setattr__(self, "upper", upper)
@@ -196,20 +197,6 @@ class Inflated(Shape):
 ###############################################################################
 # Internal machinery
 ###############################################################################
-
-
-def require_nonnegative_radius(radius):
-    """Refuse a negative radius."""
-    if radius < 0.0:
-        raise ValueError("radius must be nonnegative")
-
-
-def require_box_corners(lower, upper):
-    """Refuse corners of different shapes, or a lower corner above the upper one."""
-    if lower.shape != upper.shape:
-        raise ValueError("lower and upper must have the same shape")
-    if np.any(lower > upper):
-        raise ValueError("lower must be less than or equal to upper")
 
 
 def require_members(shapes):

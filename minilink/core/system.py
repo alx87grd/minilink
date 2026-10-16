@@ -445,7 +445,7 @@ class System(SharedSystemFacades):
 
         return _build_computer(self, schedule)
 
-    # Inspect
+    # Display
 
     def __str__(self):
         return inspect_text(self)

@@ -254,7 +254,7 @@ class WiredDiagramMixin:
         """Refresh all subsystems and rebuild the flattened state metadata.
 
         The solver hints are then bubbled again from the refreshed subsystems
-        (:meth:`refresh_solver_info`). Compiled evaluators are snapshots:
+        (``refresh_solver_info``). Compiled evaluators are snapshots:
         recompile after structural changes. An ``x0`` set on the diagram itself
         is kept; otherwise the subsystems' current ``x0`` are stacked again.
         """
@@ -645,7 +645,7 @@ class DiagramOutputPort(OutputPort):
     A diagram boundary output: one subsystem output port exposed on the diagram.
 
     Its direct feedthrough is derived from the current wiring
-    (:func:`feedthrough_inputs`) unless declared explicitly, so a nested
+    (``feedthrough_inputs``) unless declared explicitly, so a nested
     diagram reports exactly the dependencies a leaf would, and wiring done
     after the port was exposed is still accounted for.
     """

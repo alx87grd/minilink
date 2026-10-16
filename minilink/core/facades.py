@@ -33,7 +33,7 @@ class SharedSystemFacades:
 
         This delegates to :func:`minilink.core.compile.compile`.
         """
-        # Lazy import: a cycle through minilink.core.system
+        # A real cycle through minilink.core.system
         from minilink.core.compile.compiler import compile as compile_system
 
         return compile_system(self, backend=backend, verbose=verbose)
@@ -58,7 +58,7 @@ class SharedSystemFacades:
         is ``"x"``, ``"u"``, an input port id, ``"t"``, ``"params"`` (dict
         result), or a wire. See :func:`minilink.analysis.derivatives.jacobian`.
         """
-        # Lazy import: a cycle through minilink.core.system
+        # Tools import core (DESIGN §3): the analysis band loads on first use
         from minilink.analysis.derivatives import jacobian
 
         return jacobian(self, of, wrt, x_bar, u_bar, t, params, method=method, eps=eps)
@@ -101,7 +101,7 @@ class SharedSystemFacades:
         Trajectory
             The sampled trajectory, also stored in :attr:`traj`.
         """
-        # Lazy import: a cycle through minilink.core.system
+        # A real cycle through minilink.core.system
         from minilink.simulation.static_simulator import StaticSimulator
 
         sim = StaticSimulator(
@@ -118,7 +118,7 @@ class SharedSystemFacades:
         traj = sim.solve()
 
         if show:
-            # Lazy import: a cycle through minilink.core.system
+            # A real cycle through minilink.core.system
             from minilink.graphical.signals import plot_time_signals
 
             plot_time_signals(self, traj)
@@ -170,7 +170,7 @@ class SharedSystemFacades:
         Trajectory
             Sampled state-input trajectory.
         """
-        # Lazy import: a cycle through minilink.core.system
+        # A real cycle through minilink.core.system
         from minilink.simulation.static_simulator import StaticSimulator
 
         sim = StaticSimulator(
@@ -187,7 +187,7 @@ class SharedSystemFacades:
         traj = sim.solve_forced(u, input_port_id=input_port_id)
 
         if show:
-            # Lazy import: a cycle through minilink.core.system
+            # A real cycle through minilink.core.system
             from minilink.graphical.signals import plot_time_signals
 
             plot_time_signals(self, traj)
@@ -229,7 +229,7 @@ class SharedSystemFacades:
             The plot result from
             :func:`minilink.graphical.signals.plot_time_signals`.
         """
-        # Lazy import: a cycle through minilink.core.system
+        # A real cycle through minilink.core.system
         from minilink.graphical.signals import plot_time_signals, resolve_plot_signals
 
         if signals is None:
@@ -342,7 +342,7 @@ class SharedSystemFacades:
         ``expand=False`` draws a nested diagram as one block instead of a
         labelled box around its own blocks.
         """
-        # Lazy import: a cycle through minilink.core.system
+        # A real cycle through minilink.core.system
         from minilink.graphical.diagrams import get_diagram
 
         return get_diagram(self, expand=expand)
@@ -386,7 +386,7 @@ class SharedSystemFacades:
         Without the Graphviz binary the figure is skipped with a warning and
         ``None`` is returned, so a notebook cell does not fail.
         """
-        # Lazy import: a cycle through minilink.core.system
+        # A real cycle through minilink.core.system
         from minilink.graphical.diagrams import plot_diagram
 
         return plot_diagram(
@@ -468,8 +468,6 @@ class SharedSystemFacades:
         """
         # Lazy import: the graphics load on first use, not with the core
         from minilink.graphical.animation import Animator
-
-        # Lazy import: the graphics load on first use, not with the core
         from minilink.graphical.common.environment import prefers_inline_animation
 
         # The trajectory passed, else the last one computed, else a fresh one
@@ -553,7 +551,7 @@ class DynamicSystemFacades:
         Trajectory
             The simulated trajectory, also stored in :attr:`traj`.
         """
-        # Lazy import: a cycle through minilink.core.system
+        # A real cycle through minilink.core.system
         from minilink.simulation.simulator import Simulator
 
         sim = Simulator(
@@ -571,7 +569,7 @@ class DynamicSystemFacades:
         traj = sim.solve()
 
         if show:
-            # Lazy import: a cycle through minilink.core.system
+            # A real cycle through minilink.core.system
             from minilink.graphical.signals import plot_time_signals
 
             plot_time_signals(self, traj)
@@ -626,7 +624,7 @@ class DynamicSystemFacades:
         Trajectory
             Simulated state-input trajectory.
         """
-        # Lazy import: a cycle through minilink.core.system
+        # A real cycle through minilink.core.system
         from minilink.simulation.simulator import Simulator
 
         sim = Simulator(
@@ -644,7 +642,7 @@ class DynamicSystemFacades:
         traj = sim.solve_forced(u, input_port_id=input_port_id)
 
         if show:
-            # Lazy import: a cycle through minilink.core.system
+            # A real cycle through minilink.core.system
             from minilink.graphical.signals import plot_time_signals
 
             plot_time_signals(self, traj)
@@ -706,7 +704,7 @@ class DynamicSystemFacades:
         ``lin = plant.linearize(x_bar)`` gives ``lin.A()``, ``lin.B()``,
         ``lin.C()``, ``lin.D()``. See :func:`minilink.analysis.linearization.linearize`.
         """
-        # Lazy import: a cycle through minilink.core.system
+        # A real cycle through minilink.core.system
         from minilink.analysis.linearization import linearize
 
         return linearize(
@@ -730,7 +728,7 @@ class DynamicSystemFacades:
 
         See :func:`minilink.analysis.frequency.transfer_function`.
         """
-        # Lazy import: a cycle through minilink.core.system
+        # A real cycle through minilink.core.system
         from minilink.analysis.frequency import transfer_function
 
         return transfer_function(
@@ -768,7 +766,7 @@ class DynamicSystemFacades:
 
         See :func:`minilink.analysis.frequency.plot_bode`.
         """
-        # Lazy import: a cycle through minilink.core.system
+        # A real cycle through minilink.core.system
         from minilink.analysis.frequency import plot_bode
 
         return plot_bode(
@@ -810,7 +808,7 @@ class DynamicSystemFacades:
 
         See :func:`minilink.analysis.frequency.plot_root_locus`.
         """
-        # Lazy import: a cycle through minilink.core.system
+        # A real cycle through minilink.core.system
         from minilink.analysis.frequency import plot_root_locus
 
         return plot_root_locus(
@@ -850,7 +848,7 @@ class DynamicSystemFacades:
 
         See :func:`minilink.analysis.frequency.plot_pzmap`.
         """
-        # Lazy import: a cycle through minilink.core.system
+        # A real cycle through minilink.core.system
         from minilink.analysis.frequency import plot_pzmap
 
         return plot_pzmap(
@@ -889,7 +887,7 @@ class DynamicSystemFacades:
 
         See :func:`minilink.analysis.time_response.plot_step_response`.
         """
-        # Lazy import: a cycle through minilink.core.system
+        # A real cycle through minilink.core.system
         from minilink.analysis.time_response import plot_step_response
 
         return plot_step_response(
@@ -932,7 +930,7 @@ class DynamicSystemFacades:
 
         See :func:`minilink.analysis.modal.animate_modal`.
         """
-        # Lazy import: a cycle through minilink.core.system
+        # A real cycle through minilink.core.system
         from minilink.analysis.modal import animate_modal
 
         return animate_modal(
@@ -962,7 +960,7 @@ class DynamicSystemFacades:
 
         See :func:`minilink.analysis.equilibria.find_equilibrium`.
         """
-        # Lazy import: a cycle through minilink.core.system
+        # Tools import core (DESIGN §3): the analysis band loads on first use
         from minilink.analysis.equilibria import find_equilibrium
 
         return find_equilibrium(self, x_guess, u_bar, t, params, tol=tol)
@@ -1001,7 +999,7 @@ class DynamicSystemFacades:
         compatible, otherwise NumPy — preferred for live sessions where speed
         matters.
         """
-        # Lazy import: a cycle through minilink.core.system
+        # A real cycle through minilink.core.system
         from minilink.simulation.realtime import PygameInput, RealtimeSimulator
 
         rt_sim = RealtimeSimulator(
@@ -1053,7 +1051,7 @@ class StepSystemFacades:
 
         See :func:`minilink.analysis.derivatives.jacobian`.
         """
-        # Lazy import: a cycle through minilink.core.system
+        # Tools import core (DESIGN §3): the analysis band loads on first use
         from minilink.analysis.derivatives import jacobian
 
         return jacobian(self, of, wrt, x_bar, u_bar, k, params, method=method, eps=eps)
@@ -1138,7 +1136,7 @@ class StepSystemFacades:
         If the rollout is not computed yet, it must be provided or available on
         :attr:`rollout`.
         """
-        # Lazy import: a cycle through minilink.core.system
+        # A real cycle through minilink.core.system
         from minilink.graphical.signals import (
             STEP_ABSCISSA_LABEL,
             plot_time_signals,
@@ -1170,7 +1168,7 @@ class StepSystemFacades:
 
 def scored_trajectory(system, of, traj):
     """The trajectory a cost shortcut scores: the system's own, or one block's inside it."""
-    # Lazy import: a cycle through minilink.core.system
+    # A real cycle through minilink.core.system
     from minilink.core.diagram import DiagramSystem
 
     traj = system.traj if traj is None else traj
@@ -1188,7 +1186,7 @@ def scored_trajectory(system, of, traj):
 
 
 def require_rollout(rollout):
-    """Raise when no rollout was passed and none was computed."""
+    """Refuse a missing rollout: none was passed and none was computed."""
     if rollout is None:
         raise ValueError(
             "No rollout available; pass rollout=... or call compute_rollout first."

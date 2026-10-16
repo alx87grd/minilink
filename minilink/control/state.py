@@ -53,6 +53,7 @@ class StateFeedbackController(System):
         x_meas = u[:n]
         r = u[n:]
 
+        # u = ū − K (x − r)
         u_cmd = ubar - K @ (x_meas - r)
 
         return u_cmd
@@ -100,6 +101,7 @@ class OutputReferenceController(System):
         x_meas = u[:n]
         r = u[n:]
 
+        # u = ū − K (x − x̄) + N r
         u_cmd = ubar - K @ (x_meas - xbar) + N @ r
 
         return u_cmd

@@ -8,6 +8,7 @@ from minilink.core.backends import array_module
 # Public API
 ###############################################################################
 
+
 # Pure functions over native arrays, assembled with ``xp.concatenate`` so a ``tf`` built
 # on them traces under JAX. Composition is the matrix product, ``W_T_C = W_T_B @ B_T_C``;
 # tag locals with frame keys so the algebra reads like the notes.
