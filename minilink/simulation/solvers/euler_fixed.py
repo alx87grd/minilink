@@ -4,19 +4,9 @@ import numpy as np
 
 from minilink.simulation.solvers.solver import SolverBackend
 
-
-def _require_uniform_times(times: np.ndarray) -> float:
-    """Return the common step size; raise when knot spacing is not uniform."""
-    n_pts = times.shape[0]
-    if n_pts < 2:
-        return 0.0
-    dt = float(times[1] - times[0])
-    if not np.allclose(np.diff(times), dt):
-        raise ValueError(
-            "euler_fixedsteps requires a uniform time grid; use solver='euler' "
-            "for variable dt between knots"
-        )
-    return dt
+###############################################################################
+# Public API
+###############################################################################
 
 
 class EulerFixedStepSolverBackend(SolverBackend):
@@ -34,11 +24,14 @@ class EulerFixedStepSolverBackend(SolverBackend):
     ) -> np.ndarray:
         n_pts = times.shape[0]
         t0 = times[0]
-        dt = _require_uniform_times(times)
+        dt = require_uniform_times(times)
         n_steps = n_pts - 1
-        x_seq = evaluator.euler_integrate_ivp(x0, t0, dt, n_steps)
-        x_traj = np.asarray(x_seq).T
 
+        # x_{k+1} = x_k + Δt f(x_k, ū, t_k), n_steps steps from x₀ in one compiled rollout
+        x_seq = evaluator.euler_integrate_ivp(x0, t0, dt, n_steps)  # (n_pts, n)
+        x_traj = np.asarray(x_seq).T  # (n, n_pts)
+
+        # The run's record: one evaluation of f per step
         self.last_debug = {
             "solver": "euler_fixedsteps",
             "mode": "nominal",
@@ -47,6 +40,7 @@ class EulerFixedStepSolverBackend(SolverBackend):
             "nlu": 0,
             "n_t": n_pts,
         }
+
         return x_traj
 
     def integrate_forced(
@@ -59,11 +53,16 @@ class EulerFixedStepSolverBackend(SolverBackend):
     ) -> np.ndarray:
         n_pts = times.shape[0]
         t0 = times[0]
-        dt = _require_uniform_times(times)
+        dt = require_uniform_times(times)
+
+        # The samples that drive a step: the last one starts none
         u_sequence = np.asarray(u[:, : n_pts - 1].T)
+
+        # x_{k+1} = x_k + Δt f(x_k, u_k, t_k), each u_k held, in one compiled rollout
         x_seq = evaluator.euler_integrate_zoh(x0, u_sequence, t0, dt)
         x_traj = np.asarray(x_seq).T
 
+        # The run's record: one evaluation of f per step
         self.last_debug = {
             "solver": "euler_fixedsteps",
             "mode": "forced",
@@ -72,4 +71,24 @@ class EulerFixedStepSolverBackend(SolverBackend):
             "nlu": 0,
             "n_t": n_pts,
         }
+
         return x_traj
+
+
+###############################################################################
+# Internal machinery
+###############################################################################
+
+
+def require_uniform_times(times: np.ndarray) -> float:
+    """Return the common step size; raise when knot spacing is not uniform."""
+    n_pts = times.shape[0]
+    if n_pts < 2:
+        return 0.0
+    dt = float(times[1] - times[0])
+    if not np.allclose(np.diff(times), dt):
+        raise ValueError(
+            "euler_fixedsteps requires a uniform time grid; use solver='euler' "
+            "for variable dt between knots"
+        )
+    return dt
