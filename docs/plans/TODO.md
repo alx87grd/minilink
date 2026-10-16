@@ -119,9 +119,9 @@ byte-identical after; ruff and the module's tests). The findings, file by file, 
 [docs/reviews/2026-09-22-consolidation-review.md](../reviews/2026-09-22-consolidation-review.md);
 `planning/policy_synthesis/dp.py` is the reference.
 **Status (2026-10-16):** the textbook layout of TB-b and T1–T7 landed in the second-run pass
-(PR #125, [record](../reviews/2026-10-16-textbook-pass.md)), except `control/mpc/controller.py`
-(T6), which waits on the MPC mixin's subclass contract. The pass changed no behaviour and no
-backend. What remains in the rows below are their behaviour, backend and API items, each
+(PR #125, [record](../reviews/2026-10-16-textbook-pass.md)). The MPC mixin's documented
+extension hooks keep their underscore names until the maintainer rules on that contract. The
+pass changed no behaviour and no backend. What remains in the rows below are their behaviour, backend and API items, each
 recorded in the PR with its question or bug.
 
 - [ ] **T1 core**: `system.py` default stubs on `xp` (a returned-type decision under JAX) and

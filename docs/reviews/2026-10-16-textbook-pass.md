@@ -15,11 +15,11 @@ lists live on in the PR and in `docs/plans/TODO.md`.
 | 1 | `core/` (T1), the state-feedback lane (TB-b) | 23 | 23 | 0 | three modules re-committed after a tool fix |
 | 2 | `blocks/`, `control/`, `estimation/` (T2); `dynamics/` (T3); `analysis/`, `simulation/` (T4) | 84 | 73 | 11 | |
 | 3 | `optimization/`, `planning/` (T5) | 74 | 66 | 8 | |
-| 4 | `core/composition.py` and the MPC controller (T6); `graphical/` (T7) | 41 | 39 | 1 | the MPC controller reverted at review (below) |
+| 4 | `core/composition.py` and the MPC controller (T6); `graphical/` (T7) | 41 | 40 | 1 | the MPC controller reverted at review, then passed on a retry (below) |
 | 5 | the library-like modules of `examples/projects/`, the package `__init__` modules | 18 | 17 | 0 | `_version.py` is generated at build time and untracked |
 
 The ratchet's allowlist (`tests/unittest/textbook_style_allowlist.txt`) shrank from 927 rows
-on `dev` to the deliberate few the sheet keeps, plus the rows of the reverted MPC controller.
+on `dev` to 24 deliberate rows. Eight are the cases the sheet keeps. The other sixteen are the MPC controller's documented extension hooks, which keep their underscore.
 
 ## How it was checked
 
@@ -51,7 +51,7 @@ These were taken under the plan's latitude. Each can be reverted or revisited.
   - Ruff saw non-Python files.
   - The ratchet now lets one comment give its reason to a block of consecutive lazy imports. A writer asked for this in wave 1, and the wave-2 review merged repeated comments.
 - **The probes call the dry run's final names.** `renames.tsv` maps each one to the name the code has, so a writer's rename keeps the probes running.
-- **`control/mpc/controller.py` was reverted at the wave-4 review.** The pass had given the public `ModelPredictiveControllerMixin` an `__init__` and renamed its documented subclass hooks (`_z_warm_for_command`, `_replan_k`, `_compute_*`). A subclass written to `dev`'s docstring would have broken; the example `mpc_dual_rate.py` did, and the probes caught it. The module stays as on `dev` until you decide on the mixin's contract. A retry that keeps the contract fixed is reported in the PR.
+- **`control/mpc/controller.py` was reverted at the wave-4 review.** The pass had given the public `ModelPredictiveControllerMixin` an `__init__` and renamed its documented subclass hooks (`_z_warm_for_command`, `_replan_k`, `_compute_*`). A subclass written to `dev`'s docstring would have broken; the example `mpc_dual_rate.py` did, and the probes caught it. The module was reverted, then passed again with the contract frozen: the mixin has no `__init__`, and the extension surface (the hooks and the attributes a subclass provides) keeps its names. Whether that surface should move to plain names is left to you.
 - **One wording per kind of lazy import, and one docstring form for refusals:**
   - `# A real cycle: …`
   - `# Lazy import: the graphics load on first use, not with the core`
