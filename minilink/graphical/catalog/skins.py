@@ -1,17 +1,4 @@
-"""Skin factory functions: ``(plant) -> dict[str, list[primitive]]``.
-
-A *skin* is the swappable visual look of a plant — pure point geometry keyed to
-the plant's ``tf`` frame vocabulary, with **no** state math (placement comes from
-``tf``). Plants opt in via ``skin = car_skin_2d`` and swap a look with one
-assignment (``car.skin = car_skin_3d``); same ``f``, same ``tf``. These are plain
-functions (no dataclasses) so a custom skin is just another ``(plant) -> dict``.
-
-Authored against the target frame vocabulary (vehicles: ``body`` and
-``axle_front`` for the 2-D centerline; ``body`` plus steered ``wheel_fl`` /
-``wheel_fr`` for the 3-D four-wheel look). They read axle offsets from
-``plant.a`` / ``plant.b`` when present, else ``plant.params``, so a bare plant
-still skins.
-"""
+"""Skins: a plant's swappable look, as primitives keyed to the frames of its ``tf``."""
 
 import numpy as np
 
@@ -27,53 +14,45 @@ from minilink.graphical.catalog.shapes import (
     plane_airframe_3d,
 )
 
-
-def _wheel_rectangle(wl, ww, color="black", linewidth=1):
-    """Closed wheel-outline polyline (x forward, y lateral) as a :class:`Line`."""
-    h, w = 0.5 * wl, 0.5 * ww
-    pts = np.array(
-        [
-            [h, w, 0.0],
-            [h, -w, 0.0],
-            [-h, -w, 0.0],
-            [-h, w, 0.0],
-            [h, w, 0.0],
-        ]
-    )
-    return Line(pts, color=color, linewidth=linewidth)
-
-
-def _axle_offsets(plant):
-    """Front/rear CG→axle distances for skins (attrs preferred over params)."""
-    if hasattr(plant, "a") and hasattr(plant, "b"):
-        return float(plant.a), float(plant.b)
-    params = getattr(plant, "params", {}) or {}
-    if "a" in params and "b" in params:
-        return float(params["a"]), float(params["b"])
-    length = float(params.get("length", 2.0))
-    return 0.5 * length, 0.5 * length
+###############################################################################
+# Public API
+###############################################################################
 
 
 def car_skin_2d(plant, color="#1a1a1a"):
     """2-D centerline car look: chassis line + two axle wheels.
+
+    A skin is a plant's swappable look, ``(plant) -> dict[frame, list[primitive]]``:
+    point geometry keyed to the frames of the plant's ``tf``, with no state math
+    (``tf`` places every frame). A plant opts in with ``skin = car_skin_2d`` and
+    swaps its look with one assignment (``car.skin = car_skin_3d``), keeping the
+    same ``f`` and the same ``tf``. Skins are plain functions, so a custom skin is
+    just another ``(plant) -> dict``.
 
     Frame keys: ``body`` (chassis along the wheelbase plus the rear wheel outline;
     the rear axle offset is baked into the wheel ``local_transform``), and
     ``axle_front`` (steered front wheel). The placing ``tf`` supplies world pose
     and the front steer angle.
     """
-    a, b = _axle_offsets(plant)
+    # The axle offsets, and the wheel outline's length and width
+    a, b = axle_offsets(plant)
     wl = getattr(plant, "wheel_len", 0.6)
     ww = getattr(plant, "wheel_width", 0.2)
 
-    chassis = Line(
-        np.array([[-b, 0.0, 0.0], [a, 0.0, 0.0]]), color=color, linewidth=2.5
-    )
-    rear_wheel = _wheel_rectangle(wl, ww)
+    # The chassis, from the rear axle at x = −b to the front axle at x = a
+    chassis_points = np.array([[-b, 0.0, 0.0], [a, 0.0, 0.0]])
+    chassis = Line(chassis_points, color=color, linewidth=2.5)
+
+    # The rear wheel, fixed on the rear axle in the body frame
+    rear_wheel = wheel_rectangle(wl, ww)
     rear_wheel.local_transform = translation(-b, 0.0, 0.0)
+
+    # The front wheel, placed and steered by its own frame
+    front_wheel = wheel_rectangle(wl, ww)
+
     return {
         "body": [chassis, rear_wheel],
-        "axle_front": [_wheel_rectangle(wl, ww)],
+        "axle_front": [front_wheel],
     }
 
 
@@ -84,10 +63,12 @@ def car_skin_3d(plant, color="#151922"):
     rods; fixed hub offsets are baked into each rod ``local_transform``), and
     ``wheel_fl`` / ``wheel_fr`` (steered front rods placed by ``tf``).
     """
-    a, b = _axle_offsets(plant)
+    # The axle offsets and the tire radii
+    a, b = axle_offsets(plant)
     r_f = plant.params["r_f"]
     r_r = plant.params["r_r"]
 
+    # The drawing attributes, with the defaults of a bare plant
     track = getattr(plant, "track", 1.6)
     body_height = getattr(plant, "body_height", 0.22)
     body_width_ratio = getattr(plant, "body_width_ratio", 0.72)
@@ -97,18 +78,17 @@ def car_skin_3d(plant, color="#151922"):
     tire_radius_ratio = getattr(plant, "_visual_tire_radius_ratio", 0.58)
     wheel_width = getattr(plant, "_visual_wheel_width", 0.2)
 
+    # The body spans the wheelbase plus an overhang; the drawn tire is a fraction
+    # of the smaller tire radius, never under 4.5 cm
     body_width = body_width_ratio * track
     body_length = (a + b) + body_length_overhang
     tire_radius = max(0.045, tire_radius_ratio * min(r_f, r_r))
 
-    ground = Plane(
-        normal=[0.0, 0.0, 1.0],
-        offset=0.0,
-        size=ground_size,
-        thickness=0.04,
-        color=[0.72, 0.74, 0.78],
-        opacity=0.5,
-    )
+    # The ground, in the world frame
+    ground = ground_plane(ground_size)
+
+    # The body box, at a fixed offset within the body frame (the c.g. sits at its
+    # origin): lifted to ride height and shifted to the wheelbase's geometric center
     body = Box(
         length_x=body_length,
         length_y=body_width,
@@ -117,25 +97,29 @@ def car_skin_3d(plant, color="#151922"):
         color=color,
         opacity=1.0,
     )
-    # Fixed offset within the body frame: lift to ride height and shift to the
-    # geometric center of the wheelbase (CG sits at the origin of ``body``).
     cx_body = 0.5 * (a - b)
     z_body = r_r + body_ground_clearance + 0.5 * body_height
     body.local_transform = translation(cx_body, 0.0, z_body)
 
+    # Every wheel: a dark cylinder of the drawn tire radius, as long as the wheel is wide
     def wheel():
         return Rod(length=wheel_width, radius=tire_radius, color="#0a0a0a", opacity=1.0)
 
+    # The rear wheels, fixed at their hubs in the body frame
     wheel_rl = wheel()
     wheel_rr = wheel()
     wheel_rl.local_transform = translation(-b, 0.5 * track, r_r)
     wheel_rr.local_transform = translation(-b, -0.5 * track, r_r)
 
+    # The front wheels, placed and steered by their own frames
+    wheel_fl = wheel()
+    wheel_fr = wheel()
+
     return {
         "world": [ground],
         "body": [body, wheel_rl, wheel_rr],
-        "wheel_fl": [wheel()],
-        "wheel_fr": [wheel()],
+        "wheel_fl": [wheel_fl],
+        "wheel_fr": [wheel_fr],
     }
 
 
@@ -146,6 +130,8 @@ def plane_skin_3d(plant, color="#2f6fed"):
     at the body-frame origin). Reads length / span / lever arms from plant
     graphic attrs and ``params`` when present.
     """
+    # The drawing attributes, then the aerodynamic parameters, with the defaults
+    # of a bare plant
     params = getattr(plant, "params", {}) or {}
     length = float(getattr(plant, "length", params.get("length", 2.0)))
     width = float(getattr(plant, "width", length / 10.0))
@@ -156,21 +142,20 @@ def plane_skin_3d(plant, color="#2f6fed"):
     s_w = float(params.get("S_w", 0.2))
     s_t = float(params.get("S_t", 0.05))
     ar = float(params.get("AR", 5.0))
-    chord_w = float(np.sqrt(max(s_w / max(ar, 1e-6), 1e-6)))
-    chord_t = float(np.sqrt(max(s_t / max(ar, 1e-6), 1e-6)))
-    # Visual chord a bit larger than aero chord so the wing reads clearly.
-    chord_w = max(chord_w, 0.12 * length)
-    chord_t = max(chord_t, 0.08 * length)
-    ground_size = float(getattr(plant, "ground_plane_size", 200.0))
 
-    ground = Plane(
-        normal=[0.0, 0.0, 1.0],
-        offset=0.0,
-        size=ground_size,
-        thickness=0.04,
-        color=[0.72, 0.74, 0.78],
-        opacity=0.5,
-    )
+    # The aerodynamic chords c = √(S / AR), with AR and c² floored at 10⁻⁶
+    chord_w_aero = float(np.sqrt(max(s_w / max(ar, 1e-6), 1e-6)))
+    chord_t_aero = float(np.sqrt(max(s_t / max(ar, 1e-6), 1e-6)))
+
+    # The drawn chords, a bit larger than the aerodynamic ones so the wing reads clearly
+    chord_w = max(chord_w_aero, 0.12 * length)
+    chord_t = max(chord_t_aero, 0.08 * length)
+
+    # The ground, in the world frame
+    ground_size = float(getattr(plant, "ground_plane_size", 200.0))
+    ground = ground_plane(ground_size)
+
+    # The airframe solids, and a dot at the c.g.
     airframe = plane_airframe_3d(
         length=length,
         width=width,
@@ -185,6 +170,7 @@ def plane_skin_3d(plant, color="#2f6fed"):
         color=color,
     )
     center = Sphere(radius=0.04 * length, color="black", opacity=1.0)
+
     return {
         "world": [ground],
         "body": airframe + [center],
@@ -197,30 +183,35 @@ def ur5_skin(plant):
     Frame keys are ``base``, ``link0`` … ``link5``, ``joint0`` …
     ``joint6``, and ``tool``. The plant's ``tf`` places every moving part.
     """
+    # The DH lengths a and offsets d of each joint
     a = np.asarray(plant.params["a"], dtype=float)
     d = np.asarray(plant.params["d"], dtype=float)
+
+    # Link i spans its joint's offsets: ℓᵢ = √(aᵢ² + dᵢ²)
     lengths = np.hypot(a, d)
 
+    # The base, a pedestal below the first joint
     base = Rod(length=0.12, radius=0.09, color="#a6a8ab")
     base.local_transform = link_pose_3d([0.0, 0.0, -0.12], [0.0, 0.0, 0.0])
-
     geometry = {"base": [base]}
+
+    # The links, the first three thicker than the wrist's
     for i, length in enumerate(lengths):
         radius = 0.055 if i < 3 else 0.04
-        geometry[f"link{i}"] = [
-            Rod(length=length, radius=radius, color="#c7c9cb", linewidth=3)
-        ]
+        link = Rod(length=length, radius=radius, color="#c7c9cb", linewidth=3)
+        geometry[f"link{i}"] = [link]
 
+    # The joints, the first four larger: a housing centered on the joint, and a hub
     for i in range(7):
         radius = 0.075 if i < 4 else 0.055
         housing = Rod(length=2.0 * radius, radius=0.8 * radius, color="#2b73b6")
         housing.local_transform = link_pose_3d([0.0, 0.0, radius], [0.0, 0.0, -radius])
-        geometry[f"joint{i}"] = [
-            housing,
-            Sphere(radius=0.72 * radius, color="#d5d7d8", opacity=1.0),
-        ]
+        hub = Sphere(radius=0.72 * radius, color="#d5d7d8", opacity=1.0)
+        geometry[f"joint{i}"] = [housing, hub]
 
+    # The tool tip
     geometry["tool"] = [Sphere(radius=0.035, color="#3f4245", opacity=1.0)]
+
     return geometry
 
 
@@ -249,18 +240,76 @@ def debug_state_skin(plant):
     ``local_transform`` (blue dots for states, red crosses for inputs).
     """
 
+    # A marker's offset: ``row`` units along the world y axis
     def column_offset(row):
         T = np.eye(4)
         T[1, 3] = float(row)
         return T
 
+    # The states, one blue dot per row from 0 upward
     markers = []
     for i in range(plant.n):
         marker = Point(color="blue", marker="o")
         marker.local_transform = column_offset(i)
         markers.append(marker)
+
+    # The inputs, one red cross per row from −1 downward
     for i in range(getattr(plant, "m", 0)):
         marker = Point(color="red", marker="x")
         marker.local_transform = column_offset(-i - 1)
         markers.append(marker)
+
     return {"world": markers}
+
+
+###############################################################################
+# Internal machinery
+###############################################################################
+
+
+def axle_offsets(plant):
+    """Front/rear CG→axle distances ``(a, b)`` of the car skins.
+
+    ``plant.a`` / ``plant.b`` when the plant has both, else ``params["a"]`` /
+    ``params["b"]`` when its ``params`` hold both, else half of
+    ``params["length"]`` each (2 m by default), so a bare plant still skins.
+    """
+    if hasattr(plant, "a") and hasattr(plant, "b"):
+        return float(plant.a), float(plant.b)
+    params = getattr(plant, "params", {}) or {}
+    if "a" in params and "b" in params:
+        return float(params["a"]), float(params["b"])
+    length = float(params.get("length", 2.0))
+    return 0.5 * length, 0.5 * length
+
+
+def wheel_rectangle(wl, ww, color="black", linewidth=1):
+    """Closed wheel-outline polyline (x forward, y lateral) as a :class:`Line`."""
+    # Half the wheel's length along x and half its width along y
+    h = 0.5 * wl
+    w = 0.5 * ww
+
+    # The four corners, closed on the first
+    # fmt: off
+    corners = np.array([
+        [ h,  w, 0.0],
+        [ h, -w, 0.0],
+        [-h, -w, 0.0],
+        [-h,  w, 0.0],
+        [ h,  w, 0.0],
+    ])
+    # fmt: on
+
+    return Line(corners, color=color, linewidth=linewidth)
+
+
+def ground_plane(size):
+    """The ground of the 3-D skins: the plane z = 0 as a grey ``size × size`` patch."""
+    return Plane(
+        normal=[0.0, 0.0, 1.0],
+        offset=0.0,
+        size=size,
+        thickness=0.04,
+        color=[0.72, 0.74, 0.78],
+        opacity=0.5,
+    )
