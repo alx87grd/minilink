@@ -321,8 +321,6 @@ class RRTStarPlanner(RRTPlanner):
             "max_distance or horizon attribute"
         )
 
-    _rewire_eta = max_connection  # ripple
-
     def choose_parent(self, near_nodes, x_new, rng):
         """The near node, edge and cost-to-come that reach ``x_new`` cheapest."""
         best_parent = None

@@ -437,8 +437,6 @@ class TrajectoryOptimizationPlanner(Planner):
             options=dict(self.options.optimizer_options),
         )
 
-    _make_optimizer = build_optimizer  # ripple
-
     def print_solve_preamble(
         self,
         *,
@@ -541,8 +539,6 @@ class TrajectoryOptimizationPlanner(Planner):
             iteration_index += 1
 
         return planner_progress
-
-    _make_callback = build_callback  # ripple
 
     def _iteration_from_z(
         self,

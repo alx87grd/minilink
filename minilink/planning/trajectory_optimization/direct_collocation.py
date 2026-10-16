@@ -411,8 +411,6 @@ class DirectCollocationTranscription(Transcription):
             inequalities=inequalities,
         )
 
-    _add_boundary_constraints = add_boundary_constraints  # ripple
-
     def add_point_boundary(
         self,
         problem: PlanningProblem,
@@ -505,8 +503,6 @@ class DirectCollocationTranscription(Transcription):
 
             inequalities.append(input_margins)
 
-    _add_path_constraints = add_path_constraints  # ripple
-
     def objective(self, z: np.ndarray, problem: PlanningProblem):
         """Bolza objective ``J(z)`` of the packed knots."""
         cost = problem.require_cost()
@@ -519,8 +515,6 @@ class DirectCollocationTranscription(Transcription):
         J = trajectory_cost(cost, x, u, t, dt, cost_params)
 
         return J
-
-    _objective = objective  # ripple
 
 
 ###############################################################################

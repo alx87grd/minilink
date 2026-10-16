@@ -123,8 +123,6 @@ class KinodynamicExtender(TrajectoryExtender):
 
         return list(controls)
 
-    _controls = candidate_controls  # ripple
-
 
 class SteeringExtender(TrajectoryExtender):
     """

@@ -186,8 +186,6 @@ class MathematicalProgramEvaluator(ABC):
             raise ValueError(f"decision vector must have shape ({self.n_z},)")
         return arr
 
-    _decision_vector = decision_vector  # ripple
-
     def as_scalar(self, value, label: str) -> float:
         """A native one-element expression as a Python ``float``."""
         arr = np.asarray(value, dtype=float)
@@ -202,13 +200,9 @@ class MathematicalProgramEvaluator(ABC):
             raise ValueError(f"{label} must have shape ({n_expected},)")
         return arr
 
-    _vector = as_vector  # ripple
-
     def as_matrix(self, value, shape: tuple[int, int], label: str) -> np.ndarray:
         """A native array as a float NumPy matrix of the given ``shape``."""
         arr = np.asarray(value, dtype=float)
         if arr.shape != shape:
             raise ValueError(f"{label} must have shape {shape}")
         return arr
-
-    _matrix = as_matrix  # ripple

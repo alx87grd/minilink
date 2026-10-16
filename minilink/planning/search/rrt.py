@@ -278,8 +278,6 @@ class RRTPlanner(Planner):
             after_goal_only=self.options.live_plot_after_goal_only,
         )
 
-    _resolve_search_callback = resolve_search_callback  # ripple
-
     def goal_biased_sample(self, rng):
         """The goal with probability ``goal_bias``, otherwise a free state."""
         x_goal = self.problem.x_goal
@@ -315,8 +313,6 @@ class RRTPlanner(Planner):
             f"{self.options.max_sample_attempts} attempts"
         )
 
-    _sample_free_state = sample_free_state  # ripple
-
     def try_extend(self, from_node, toward, rng):
         """The best collision-free edge the extender proposes from ``from_node`` toward ``toward``."""
         candidates = self.extender.propose(from_node.x, toward, self.problem, rng)
@@ -340,8 +336,6 @@ class RRTPlanner(Planner):
 
         return best
 
-    _select = nearest_free_edge  # ripple
-
     def edge_is_free(self, edge) -> bool:
         """Every state of the edge in ``X`` and every input in ``U``."""
         problem = self.problem
@@ -359,8 +353,6 @@ class RRTPlanner(Planner):
                 return False
 
         return True
-
-    _edge_is_free = edge_is_free  # ripple
 
     def edge_states(self, edge) -> np.ndarray:
         """The edge's states, densified to ``edge_resolution`` when it is set."""
@@ -464,8 +456,6 @@ class RRTPlanner(Planner):
                 states.append(np.asarray(edge.states[k], dtype=float))
 
         return np.asarray(states)
-
-    _path_states = path_states  # ripple
 
 
 @dataclass

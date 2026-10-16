@@ -142,25 +142,25 @@ class JaxMathematicalProgramEvaluator(MathematicalProgramEvaluator):
 
     def gradient(self, z) -> np.ndarray:
         value = self._jit_grad_J(self.jax_decision_vector(z))
-        return self._vector(value, self.n_z, "objective gradient")
+        return self.as_vector(value, self.n_z, "objective gradient")
 
     def hessian(self, z) -> np.ndarray:
         if self._jit_hess_J is None:
             return super().hessian(z)
         value = self._jit_hess_J(self.jax_decision_vector(z))
-        return self._matrix(value, (self.n_z, self.n_z), "objective Hessian")
+        return self.as_matrix(value, (self.n_z, self.n_z), "objective Hessian")
 
     def jacobian_h(self, z) -> np.ndarray:
         if self.n_h == 0 or self._jit_jac_h is None:
             return super().jacobian_h(z)
         value = self._jit_jac_h(self.jax_decision_vector(z))
-        return self._matrix(value, (self.n_h, self.n_z), "equality Jacobian")
+        return self.as_matrix(value, (self.n_h, self.n_z), "equality Jacobian")
 
     def jacobian_g(self, z) -> np.ndarray:
         if self.n_g == 0 or self._jit_jac_g is None:
             return super().jacobian_g(z)
         value = self._jit_jac_g(self.jax_decision_vector(z))
-        return self._matrix(value, (self.n_g, self.n_z), "inequality Jacobian")
+        return self.as_matrix(value, (self.n_g, self.n_z), "inequality Jacobian")
 
     ###########################################################################
     # Internal machinery

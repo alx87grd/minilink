@@ -307,9 +307,6 @@ def draw_search_state(
     return tree_lines, path_line
 
 
-_draw_search_state = draw_search_state  # ripple
-
-
 ###############################################################################
 # Internal machinery
 ###############################################################################
@@ -375,9 +372,6 @@ def mark_endpoints(ax, planner, x_axis, y_axis):
             )
 
 
-_mark_endpoints = mark_endpoints  # ripple
-
-
 def goal_radius(planner):
     """The radius of a ball goal region, else the goal tolerance around a goal state, else ``None``."""
     # Lazy import: the core sets load on first use, not with the plots
@@ -407,9 +401,6 @@ def label_axes(ax, sys, x_axis, y_axis):
     ax.set_ylabel(axis_label(y_axis))
 
 
-_label_axes = label_axes  # ripple
-
-
 def maybe_show(plt, show):
     """Show the figure when asked and the backend can (never under Agg)."""
     if show and plt.get_backend().lower() != "agg":
@@ -430,9 +421,6 @@ def set_limits(ax, planner, x_axis, y_axis):
         hi = float(pts[:, axis].max())
         pad = 0.05 * (hi - lo or 1.0)
         setter(lo - pad, hi + pad)
-
-
-_set_limits = set_limits  # ripple
 
 
 def require_history(planner):
@@ -456,17 +444,14 @@ def clear_search_artists(tree_lines, path_line):
         path_line.remove()
 
 
-_clear_search_artists = clear_search_artists  # ripple
-
-
 def best_path_states(planner):
     """The states along the path to the planner's goal node, or ``None`` before the goal."""
     node = getattr(planner, "solution_node", None)
     if node is None or not getattr(planner, "reached_goal", False):
         return None
 
-    if hasattr(planner, "_path_states"):
-        return planner._path_states(node)
+    if hasattr(planner, "path_states"):
+        return planner.path_states(node)
 
     return None
 
@@ -483,6 +468,3 @@ def search_title(step):
         f"RRT search  phase={step.phase}  iter={step.iteration}  "
         f"nodes={step.tree_nodes}  searching..."
     )
-
-
-_search_title = search_title  # ripple

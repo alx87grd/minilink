@@ -1026,7 +1026,7 @@ def test_select_rejects_colliding_candidate_for_free_one():
         times=np.array([0.0, 0.1]),
         cost=0.1,
     )
-    assert planner._select([colliding, free], x_rand) is free
+    assert planner.nearest_free_edge([colliding, free], x_rand) is free
 
 
 def test_reached_goal_false_on_budget_exhaustion():
@@ -1062,7 +1062,7 @@ def test_free_state_sampling_stays_in_X():
         options=RRTOptions(goal_bias=0.0),
     )
     rng = np.random.default_rng(42)
-    samples = [planner._sample_free_state(rng) for _ in range(40)]
+    samples = [planner.sample_free_state(rng) for _ in range(40)]
     assert all((X.contains(sample) for sample in samples))
     assert all((np.linalg.norm(sample) > 1.0 for sample in samples))
 
@@ -1085,8 +1085,8 @@ def test_edge_resolution_rejects_segment_through_obstacle():
         times=np.array([0.0, 4.0]),
         cost=4.0,
     )
-    assert not planner_fine._edge_is_free(edge)
-    assert planner_coarse._edge_is_free(edge)
+    assert not planner_fine.edge_is_free(edge)
+    assert planner_coarse.edge_is_free(edge)
 
 
 def test_tree_rewire_and_propagate_cost():
@@ -1242,7 +1242,7 @@ def test_rrt_star_infers_rewire_eta_from_extender():
         extender=make_steering_extender(),
         options=RRTStarOptions(seed=0, max_nodes=10),
     )
-    assert planner._rewire_eta() == pytest.approx(0.6)
+    assert planner.max_connection() == pytest.approx(0.6)
 
 
 def test_rrt_star_requires_rewire_eta_for_unknown_extender():
@@ -1256,7 +1256,7 @@ def test_rrt_star_requires_rewire_eta_for_unknown_extender():
         problem, extender=DummyExtender(), options=RRTStarOptions(seed=0)
     )
     with pytest.raises(ValueError, match="rewire_eta"):
-        planner._rewire_eta()
+        planner.max_connection()
 
 
 def test_search_callback_invoked_on_rrt():
@@ -1319,7 +1319,7 @@ def test_live_plot_option_builds_callback():
         extender=make_steering_extender(),
         options=RRTOptions(seed=0, max_nodes=10, live_plot=True, live_plot_every=1),
     )
-    callback = planner._resolve_search_callback()
+    callback = planner.resolve_search_callback()
     from minilink.planning.search.live_plot import LiveSearchPlotCallback
 
     assert isinstance(callback, LiveSearchPlotCallback)
@@ -2070,9 +2070,9 @@ class TestTextbookOptions(unittest.TestCase):
             problem, n_steps=5, transcription="direct_collocation", live_plot=True
         )
         self.assertTrue(planner.options.live_plot)
-        self.assertIsNotNone(planner._make_callback(None, "numpy"))
+        self.assertIsNotNone(planner.build_callback(None, "numpy"))
         planner.options.live_plot = False
-        self.assertIsNone(planner._make_callback(None, "numpy"))
+        self.assertIsNone(planner.build_callback(None, "numpy"))
         self.assertTrue(callable(LiveTrajectoryPlotCallback))
 
     def test_trajopt_live_plot_composes_with_a_user_callback(self):
@@ -2103,7 +2103,7 @@ class TestTextbookOptions(unittest.TestCase):
             "LiveTrajectoryPlotCallback",
             return_value=live,
         ):
-            progress = planner._make_callback(mock.MagicMock(), "numpy")
+            progress = planner.build_callback(mock.MagicMock(), "numpy")
             planner._iteration_from_z = lambda *a, **k: "iteration"
             progress(np.zeros(3), 0.0, 0.0)
         self.assertEqual(seen, ["iteration"])
@@ -2117,7 +2117,7 @@ def test_rrt_default_extender_is_bang_bang_from_input_bounds():
     problem, X = make_holonomic_obstacle_problem()
     planner = RRTPlanner(problem, options=RRTOptions(seed=0, max_nodes=50))
     assert isinstance(planner.extender, KinodynamicExtender)
-    controls = planner.extender._controls(problem, np.random.default_rng(0))
+    controls = planner.extender.candidate_controls(problem, np.random.default_rng(0))
     lower, upper = problem.U.box.lower, problem.U.box.upper
     assert len(controls) == 1 + 2**lower.size
     assert any(np.allclose(u, 0.5 * (lower + upper)) for u in controls)

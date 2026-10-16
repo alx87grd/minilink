@@ -70,17 +70,17 @@ class MultipleShootingTranscription(DirectCollocationTranscription):
         inequalities: list[ConstraintFunction] = []
 
         # The boundary and path constraints, and the box bounds on the knots
-        self._add_boundary_constraints(
+        self.add_boundary_constraints(
             problem,
             equalities=equalities,
             inequalities=inequalities,
         )
-        self._add_path_constraints(problem, inequalities=inequalities)
+        self.add_path_constraints(problem, inequalities=inequalities)
         lower, upper = self.decision_bounds(problem)
 
         return MathematicalProgram(
             n_z=self.decision_dimension(problem),
-            J=lambda z: self._objective(z, problem),
+            J=lambda z: self.objective(z, problem),
             h=stack_constraints(equalities),
             g=stack_constraints(inequalities),
             lower=lower,
@@ -157,12 +157,12 @@ class MultipleShootingTranscription(DirectCollocationTranscription):
         inequalities: list[ConstraintFunction] = []
 
         # The boundary and path constraints, and the box bounds on the knots
-        self._add_boundary_constraints(
+        self.add_boundary_constraints(
             problem,
             equalities=equalities,
             inequalities=inequalities,
         )
-        self._add_path_constraints(problem, inequalities=inequalities)
+        self.add_path_constraints(problem, inequalities=inequalities)
         lower, upper = self.decision_bounds(problem)
 
         return MathematicalProgram(
