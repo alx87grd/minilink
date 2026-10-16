@@ -183,26 +183,48 @@ Systems-as-descriptions: CONSTITUTION.md §4.*
   names ('One signature') or one of DESIGN §4's additions ('Native-array equation rule').
   Do not put type hints inside one. Document expected array shapes and physical units clearly
   in the NumPy-style docstring. Type hints belong on class constructors, public methods, and
-  tool orchestrators.
-- **5.2 The `xp` idiom for hybrid NumPy/JAX:** Immediately after unpacking parameters in any
-  equation path (5.1), bind the array module:
+  tool orchestrators. Under `from __future__ import annotations`, forward references are
+  unquoted.
+- **5.2 The `xp` idiom for hybrid NumPy/JAX:** On the line right after the `params` binding of
+  any equation path (5.1), bind the array module (block 1 of rule 5.3):
   ```python
+  params = self.params if params is None else params
   xp = array_module(x)
   ```
   Write the subsequent mathematical algebra using `xp` so the exact same equation path executes
   on both NumPy and JAX arrays without branching.
 - **5.3 Three beats in an equation path; no `self.` in math lines:** Every equation path
   (5.1), the model hooks it calls (`forward_dynamics`, …), and every algorithm body
-  (analysis tools, design functions, planners, solvers, learning updates) is three beats,
-  with a blank line between them so the core equation is the thing the eye lands on:
+  (analysis tools, design functions, planners, solvers, learning updates) is three beats:
+  **unpack**, **core math**, **output machinery**. They are laid out as the same six blocks,
+  always in this order, with a blank line between blocks so the core equation is the thing
+  the eye lands on. A block with nothing to say is left out.
 
-  1. **Unpack.** Bind `params`, split `x`, and copy `self.` fields into short textbook
-     names. No `self.` remains in the algebra.
-  2. **Core math.** The equation as a **named assignment**. A short textbook
-     comment belongs here only when it is not a copy of the code (rule 5.22).
-     The equation is never on the `return` line.
-  3. **Output machinery.** Stack, wrap, or `return` the named result. This beat is
-     plumbing, not the lesson.
+  1. **Bindings** (unpack). `params = self.params if params is None else params`, then on
+     the next line the backend: `xp = array_module(...)` (5.2), or
+     `jnp = require_jax_numpy()` in a JAX-only algorithm.
+  2. **Parameters** (unpack). The parameters and the object's fields, **one per line**, in
+     short textbook names (`m = params["m"]`). No `self.` remains in the algebra. An input
+     check (`require_*`) comes right after this block.
+  3. **Pre-computation** (unpack). The state and input unpacked (`theta = q[0]`),
+     trigonometric shorthands, intermediate quantities.
+  4. **Core math.** Each equation a **named assignment**, with a short textbook comment
+     above it only when that comment is not a copy of the code (rule 5.22). A check on a
+     computed quantity sits right after the line computing it (`ctrb = …`, then
+     `require_controllable(ctrb, n)`). A simple array (a vector, or a matrix with short
+     entries) is built here, on its own equation line, the last of the block.
+  5. **Assembly** (output). Only for a complex array: its entries are named lines in
+     block 4 (`J11`, `J12`, …), and the matrix is assembled here, row by row (5.5).
+  6. **Return** (output). `return` of a name. Never an equation or an array on the
+     `return` line; a result object built from named results may be
+     (`return DynamicProgrammingResult(grid=grid, J=J, …)`).
+
+  A delegation, a constant, a dict literal or a frame composition stays the one line it is:
+  the blocks are for equations (`tf` returns its frames as one dict literal). A numeric
+  constant stays inline where the textbook writes it, with its meaning in the equation
+  comment (`+ 1e-8`, `10⁻⁸`); it becomes a named module constant only when two places share
+  it or it is a tuning knob (`RANK_TOL`). Spacing inside a line is `ruff format`'s
+  (`m * l**2`); the blank lines between the blocks are this rule's.
 
   **The math is the story.** The body shows every step of the algorithm in the order the
   textbook derives it, with the textbook's symbols (`A, B, C, D`, `𝒞`, `𝒪`, `K`, `P`, `J`,
@@ -214,23 +236,63 @@ Systems-as-descriptions: CONSTITUTION.md §4.*
   If a helper contains an equation from the textbook page, it is in the wrong place.
 
   ```python
-  # Good — the comment is the implicit form; the code is the solved assignment:
-  params = self.params if params is None else params
-  m, l, g, d = params["m"], params["l"], params["g"], params["d"]
-  xp = array_module(x)
-  theta, omega = x
-  tau = u[0]
+  # Good — the six blocks; the comment is the implicit form, the code the solved
+  # assignment, and the simple array is the last line of the equations:
+  def f(self, x, u, t=0.0, params=None):
+      params = self.params if params is None else params
+      xp = array_module(x)
 
-  # (m l²) ω̇ = τ − m g l sin(θ) − d ω
-  dtheta = omega
-  domega = (tau - m * g * l * xp.sin(theta) - d * omega) / (m * l**2)
+      m = params["m"]
+      l = params["l"]
+      g = params["g"]
+      d = params["d"]
 
-  return xp.array([dtheta, domega])
+      theta = x[0]
+      omega = x[1]
+      tau = u[0]
+
+      # (m l²) ω̇ = τ − m g l sin(θ) − d ω
+      dtheta = omega
+      domega = (tau - m * g * l * xp.sin(theta) - d * omega) / (m * l**2)
+      dx = xp.array([dtheta, domega])
+
+      return dx
+
+  # Good — a complex matrix: named entries in the core math, then their assembly:
+  def C(self, q, dq, params=None):
+      params = self.params if params is None else params
+      xp = array_module(q)
+
+      m2 = params["m2"]
+      l1 = params["l1"]
+      lc2 = params["lc2"]
+
+      s2 = xp.sin(q[1])
+      h = m2 * l1 * lc2 * s2
+
+      # Coriolis and centrifugal coupling, driven by the second joint's rate
+      C11 = -h * dq[1]
+      C12 = -h * (dq[0] + dq[1])
+      C21 = h * dq[0]
+      C22 = 0.0
+
+      # fmt: off
+      C = xp.array([
+          [C11, C12],
+          [C21, C22],
+      ])
+      # fmt: on
+
+      return C
 
   # Good — the assignment is already the textbook; no copy-comment:
   dx = A @ x + B @ u
 
   return dx
+
+  # Bad — the parameters packed on one line, and the array built on the return line:
+  m, l, g, d = params["m"], params["l"], params["g"], params["d"]
+  return xp.array([omega, (tau - m * g * l * xp.sin(theta) - d * omega) / (m * l**2)])
 
   # Bad — self. in the algebra, and the equation lives on the return line:
   return (u - self.m * self.g * self.l * xp.sin(x[0])) / (self.m * self.l**2)
@@ -278,7 +340,17 @@ Systems-as-descriptions: CONSTITUTION.md §4.*
   a leading underscore (`_`): not on the `System`, facade and simulator classes, not on
   planners and tools, not on module-level helpers (`check_poles`, never `_check_poles`).
   Separate public interfaces from internal machinery using standard file section comments
-  (`# Public API` and `# Internal machinery`). Reserve leading underscores for module-level
+  (`# Public API` and `# Internal machinery`). These two titles stand out: each sits between
+  two full lines of `#`, with two blank lines around the banner; inside a class the banner is
+  indented with the class body, after the public methods. Smaller sub-sections are plain
+  sentence-case comments (`# Frequency grid`), never `# ====` or `# ----` rules; display hooks
+  (`__str__`, `_repr_pretty_`) sit under `# Display`.
+  ```python
+  ###############################################################################
+  # Internal machinery
+  ###############################################################################
+  ```
+  Reserve leading underscores for module-level
   private constants and purely local closures. Existing underscore helpers migrate under
   workboard step S68, which widens the check to the whole repo with a shrinking allowlist.
 - **5.9 The first-screen rule:** The module docstring and primary class definition must appear within
@@ -288,7 +360,13 @@ Systems-as-descriptions: CONSTITUTION.md §4.*
   2. Primary class / public contract
   3. Subclasses & specialized variants
   4. Public functions & convenience facades
-  5. `# Internal machinery` (helpers, evaluators, validation)
+  5. `# Internal machinery` (helpers, evaluators, validation), the helpers in the order the
+     body calls them
+
+  The module constants the primary code reads sit next to their owner's section. A class
+  reads the same way: its docstring, `__init__`, the properties, the public methods (the
+  primary verb first), then its indented `Internal machinery` banner and its helpers, in
+  the order the public methods call them.
 - **5.11 Selector-orchestrator split:** Public math tools follow a clear pattern: inspect inputs
   $\to$ select algorithm backend $\to$ extract $f/h$ callables $\to$ execute core math in place.
   Heavy ceremony and validation belong in helper functions below.
@@ -297,7 +375,7 @@ Systems-as-descriptions: CONSTITUTION.md §4.*
   `require_jax_numpy()` and `array_module()` from `core.backends`. Tools that
   compile a system for a living (`simulation/`, `analysis/`) import the compiler directly. A
   JAX-only function opens with one binding line, `jax, jnp = require_jax(), require_jax_numpy()`,
-  never a bare `import jax`; the lazy-import rule (5.20) keeps that line inside the function.
+  never a bare `import jax`; the lazy-import rule (5.27) keeps that line inside the function.
 - **5.13 Familiar patterns first:** Do not introduce programming concepts or advanced Python
   styles absent from the repo and the maintainer's prior choices (e.g. `typing.Protocol`,
   metaclasses) unless there is a strong runtime or maintainability reason. Static-typing-only
@@ -327,7 +405,7 @@ Systems-as-descriptions: CONSTITUTION.md §4.*
 - **5.19 JAX float64 by default:** Does a tool require the caller to call `configure_jax`
   first? Policy: DESIGN §1, 'Precision policy'.
 - **5.20 Match the neighborhood:** Change only what the task requires. Public APIs use type hints
-  and NumPy docstrings except in equation paths (rule 5.1). Lazy optional imports. Prefer a low
+  and NumPy docstrings except in equation paths (rule 5.1). Lazy imports follow 5.27. Prefer a low
   helper count in math tools; inline single-use helpers.
 - **5.21 Validation in proportion:** Validate at boundaries, not in every helper. Frozen dataclasses
   for value objects — a `Trajectory`, a set, a shape, a certificate, a solver record; plain
@@ -346,6 +424,11 @@ Systems-as-descriptions: CONSTITUTION.md §4.*
   docstring. Apply this to new math and to every math line you edit, without being
   asked; restyling a whole function or module you did not otherwise touch waits for a
   picked step, and then uses the three beats of rule 5.3.
+  Equation comments use Unicode math in the textbook's symbols (`ẋ`, `x_{k+1}`, `Aᵀ`, `R⁻¹`,
+  `σᵢ`, `≤`, `√`, `𝒞`); identifiers stay ASCII (`x_next`, `theta`, `sigma`). A math
+  comment starts with the equation itself (`# L_clip = −E[…]`); a prose comment starts with
+  a capital letter, inline and dict group comments included (`# Coupled inertia of the two
+  planar links`). No comment restates the line below it.
 - **5.23 No preamble walls.** A module or demo opens with a one-line title docstring. Do not
   add a long introduction, section map, run recipe, or flag explanation at the top — the
   code plus inline comments must tell the story. Notebooks are course material: do not
@@ -355,6 +438,38 @@ Systems-as-descriptions: CONSTITUTION.md §4.*
   "landed"), the course or its exercises, or what another library refuses; that history
   lives in `docs/plans/`, `docs/reviews/` and the git log. The same holds for test
   docstrings and comments.
+- **5.25 One verb family per role:** A helper's name says its role.
+  - `require_*` raises when a precondition fails; its docstring opens with "Refuse".
+  - `check_*` validates and returns nothing.
+  - `build_*` constructs a runtime object (an evaluator, a simulator, a computer).
+  - `*_of` resolves an object's options or attributes (`trajopt_options_of`).
+  - `plot_*` draws.
+
+  A check that returns a value is a `require_*` when it refuses, or an `*_of` when it
+  resolves. Twin helpers in sibling modules share one name; before naming a new
+  `require_*` or `check_*`, look for an existing one doing the same check.
+- **5.26 The bodies that are not equations:** They keep the air of rule 5.3: named blocks, a
+  blank line between them.
+  - **A constructor** reads as named blocks, each opened by a short capitalized comment:
+    `super().__init__` and the name, then `# Parameters`, `# Ports`, `# Signal labels and
+    units`, `# Graphics`. A value a helper works out is returned by that helper and assigned
+    in `__init__` (5.7).
+  - **A public verb** (`linearize`, `bode`, `lqr`, `simulate`) reads, in order: its input
+    checks; its setup (selectors, the point, the options); its math blocks, each with its
+    equation comment; its result. The option plumbing goes to `*_of` and `require_*`
+    helpers (5.25).
+  - **An iterative algorithm** (an RRT search, a DP sweep, a training loop) shows its steps
+    as commented blocks inside the loop: sample, extend, add, test the goal. Logging,
+    recording, callbacks and live plots are one call per iteration to a helper, never
+    inline in the loop body.
+- **5.27 Lazy imports say why:** A minilink module is imported at the top of the file. A lazy
+  import of one is allowed to break a real cycle, for an optional dependency, or where
+  hoisting it would change what a lighter module loads; it carries a comment naming the
+  reason, one comment for a block of consecutive lazy imports:
+  - `# A real cycle: <who imports whom>`
+  - `# Lazy import: the graphics load on first use, not with the core`
+  - `# Tools import core (DESIGN §3): the <band> loads on first use`
+  - `# Lazy import: the compiler loads on first use, not with the analysis verbs`
 
 ---
 
@@ -480,3 +595,11 @@ Systems-as-descriptions: CONSTITUTION.md §4.*
   structure or leaf order (a sum over leaves), changing PRNG key splits, or reordering seeded
   construction all change floating-point results even when the mathematics is equal. A
   behavior-preserving refactor proves itself with a seeded baseline (AGENTS.md).
+- **7.8 One owner, but a textbook law is not a helper.** Logic written twice (identical once
+  named alike) gets one owner: a shared module helper, or a base class when one class truly
+  is the other. A textbook law is the exception: it stays in the body of every method that
+  uses it, even when two methods share it (the PID's `f` and `ctl`), and plant equations
+  stay on each plant's own page. A helper holds math only when it is a generic building
+  block reused across the family or the library (`filtered_rate`, `held_integral`,
+  `clipped`). No class-attribute aliases (`Cl = Plane2D.Cl`). Copies that differ in behavior
+  are not merged by a refactor; name the difference and ask.
