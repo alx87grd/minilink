@@ -1,9 +1,4 @@
-"""
-Block diagrams: systems built by connecting other systems.
-
-A :class:`DiagramSystem` is a :class:`~minilink.core.system.DynamicSystem`,
-so diagrams nest, simulate, and compile like any other continuous system.
-"""
+"""Block diagrams: systems built by connecting other systems."""
 
 import numpy as np
 
@@ -15,11 +10,18 @@ from minilink.core.wiring import WiredDiagramMixin, validate_diagram_params
 __all__ = ["DiagramSystem", "StepDiagramSystem", "validate_diagram_params"]
 
 
+###############################################################################
+# Public API
+###############################################################################
+
+
 class DiagramSystem(WiredDiagramMixin, DynamicSystem):
     """
     A system composed of subsystems connected through their named ports.
 
-    The diagram state stacks the subsystem states in insertion order,
+    A diagram is a :class:`~minilink.core.system.DynamicSystem`, so diagrams
+    nest, simulate, and compile like any other continuous system. The diagram
+    state stacks the subsystem states in insertion order,
 
         x = [x_1; x_2; ...; x_k],        dx_i = f_i(x_i, u_i, t; p_i),
 
@@ -41,10 +43,15 @@ class DiagramSystem(WiredDiagramMixin, DynamicSystem):
     """
 
     def __init__(self):
-        # Registry before System.__init__: its params setter runs during shell init.
+        # The registry first: the params setter reads it while System.__init__ runs
         self.subsystems = {}
         self.connections = {}
+
+        # The System shell alone: a diagram's ports are the ones it exposes, not
+        # DynamicSystem's standard u and y
         System.__init__(self, 0)
+
+        # Wiring tables, the name and the stacked-state layout
         self.init_wiring(name="Diagram")
 
     def add_subsystem(self, sys, sys_id):
@@ -53,12 +60,8 @@ class DiagramSystem(WiredDiagramMixin, DynamicSystem):
         A :class:`StepSystem` has no ``f`` to stack, so it is refused here
         rather than left out of the state derivative.
         """
-        if isinstance(sys, StepSystem):
-            raise TypeError(
-                f"{type(sys).__name__} {sys_id!r} is a StepSystem and cannot join "
-                "a flow DiagramSystem: a StepSystem belongs in a StepDiagramSystem "
-                "or a Computer: block % dt @ plant"
-            )
+        require_flow_subsystem(sys, sys_id)
+
         super().add_subsystem(sys, sys_id)
 
     def f(self, x, u, t=0, params=None):
@@ -72,20 +75,26 @@ class DiagramSystem(WiredDiagramMixin, DynamicSystem):
 
         dx_pieces = []
         for sys_id, subsystem in self.subsystems.items():
+            # A static block has no f to stack
             if not isinstance(subsystem, DynamicSystem):
                 continue
+
+            # x_i, u_i and p_i of block i, gathered through the wiring
             local_x = self.get_local_state(x, sys_id)
             local_u = self.get_local_input(x, u, t, sys_id, params=params)
             local_params = self.subsystem_params(params, sys_id)
 
+            # ẋ_i = f_i(x_i, u_i, t; p_i)
             dx_pieces.append(subsystem.f(local_x, local_u, t, local_params))
 
         xp = array_module(x, u, *dx_pieces)
-        if not dx_pieces:
-            return xp.array([])
 
-        # dx = [f_1(x_1, u_1, t); f_2(x_2, u_2, t); ...], one block per subsystem
-        dx = xp.concatenate([xp.asarray(dx).reshape(-1) for dx in dx_pieces])
+        # ẋ = [f_1(x_1, u_1, t); f_2(x_2, u_2, t); …], one block per subsystem,
+        # and empty when no block carries an f
+        if not dx_pieces:
+            dx = xp.array([])
+        else:
+            dx = xp.concatenate([xp.asarray(dx_i).reshape(-1) for dx_i in dx_pieces])
 
         return dx
 
@@ -110,6 +119,7 @@ class DiagramSystem(WiredDiagramMixin, DynamicSystem):
         -------
         NumpyDiagramEvaluator or JaxDiagramEvaluator
         """
+        # Lazy import: a cycle, the compiler reads DiagramSystem from this module
         from minilink.core.compile.compiler import compile_diagram
 
         return compile_diagram(
@@ -132,6 +142,8 @@ class DiagramSystem(WiredDiagramMixin, DynamicSystem):
             output port, keyed as ``"sys_id:port_id"``.
         """
         evaluator = self.compile(backend="numpy")
+
+        # One table per subsystem output port, keyed "sys_id:port_id"
         internal_signals = {}
         for sys_id, subsystem in self.subsystems.items():
             for port_id, port in subsystem.outputs.items():
@@ -139,6 +151,7 @@ class DiagramSystem(WiredDiagramMixin, DynamicSystem):
                     (port.dim, traj.n_samples)
                 )
 
+        # Every port's value at each sample, from the compiled evaluator
         for i, t in enumerate(traj.t):
             step_signals = evaluator.compute_internal_signals_dict(
                 traj.x[:, i], traj.u[:, i], t
@@ -175,10 +188,10 @@ class DiagramSystem(WiredDiagramMixin, DynamicSystem):
             with shape ``(subsystem.m, N)``.
         """
         traj = self.traj if traj is None else traj
-        if traj is None:
-            raise ValueError("no trajectory: pass traj or call compute_trajectory()")
+        require_trajectory(traj)
         sys_id = self.subsystem_id(subsystem)
 
+        # The block's own state, and the input the diagram fed it, at each sample
         x = np.zeros((subsystem.n, traj.n_samples))
         u = np.zeros((subsystem.m, traj.n_samples))
         for k, t in enumerate(traj.t):
@@ -205,10 +218,18 @@ class StepDiagramSystem(WiredDiagramMixin, StepSystem):
     """
 
     def __init__(self):
+        # The registry first: the params setter reads it while System.__init__ runs
         self.subsystems = {}
         self.connections = {}
+
+        # The System shell alone: a step diagram may hold no state yet (StepSystem
+        # requires n ≥ 1), and its ports are the ones it exposes
         System.__init__(self, 0)
+
+        # Memory: the last rollout ``compute_rollout`` produced
         self.rollout = None
+
+        # Wiring tables, the name and the stacked-state layout
         self.init_wiring(name="StepDiagram")
 
     def add_subsystem(self, sys, sys_id):
@@ -217,37 +238,42 @@ class StepDiagramSystem(WiredDiagramMixin, StepSystem):
         A :class:`DynamicSystem` with states has no ``step`` to stack, so it is
         refused here rather than left frozen by :meth:`step`.
         """
-        if isinstance(sys, DynamicSystem) and sys.n > 0:
-            raise TypeError(
-                f"{type(sys).__name__} {sys_id!r} has continuous states and cannot "
-                "join a StepDiagramSystem: keep it in a DiagramSystem and close the "
-                "sampled loop with block % dt @ plant, or step it with "
-                "discretize(plant, dt)"
-            )
+        require_step_subsystem(sys, sys_id)
+
         super().add_subsystem(sys, sys_id)
 
     def step(self, x, u, k=0, params=None):
         """
-        Stacked discrete update ``x_new = [step_1(...); step_2(...); ...]``.
+        Stacked discrete update ``x_{k+1} = [step_1(...); step_2(...); ...]``.
 
         Interpreted reference; :meth:`compile` produces the fast equivalent.
         """
         validate_diagram_params(params, self.subsystems)
 
         xp = array_module(x, u)
-        x_arr = xp.asarray(x, dtype=float).reshape(self.n)
-        x_new = xp.array(x_arr, copy=True)
+
+        n = self.n
+
+        # x_{k+1} starts as a copy of x_k; each step block then writes its own slots
+        x_arr = xp.asarray(x, dtype=float).reshape(n)
+        x_next = xp.array(x_arr, copy=True)
+
         for sys_id, subsystem in self.subsystems.items():
+            # A static block has no step to stack
             if not isinstance(subsystem, StepSystem):
                 continue
+
+            # x_i, u_i and p_i of block i, gathered through the wiring
             local_x = self.get_local_state(x_arr, sys_id)
             local_u = self.get_local_input(x, u, k, sys_id, params=params)
             local_params = self.subsystem_params(params, sys_id)
+
+            # Block i's slots of x_{k+1} = step_i(x_i, u_i, k; p_i)
             piece = subsystem.step(local_x, local_u, k, local_params)
             start, end = self.state_index[sys_id]
-            x_new[start:end] = xp.asarray(piece, dtype=float).reshape(end - start)
+            x_next[start:end] = xp.asarray(piece, dtype=float).reshape(end - start)
 
-        return x_new
+        return x_next
 
     def compile(self, backend="numpy", bind_params=False, verbose=False):
         """
@@ -266,10 +292,43 @@ class StepDiagramSystem(WiredDiagramMixin, StepSystem):
         -------
         NumpyStepDiagramEvaluator or JaxStepDiagramEvaluator
         """
+        # Lazy import: a cycle, the step compiler reads StepDiagramSystem from here
         from minilink.core.compile.step_compiler import compile_step_diagram
 
         return compile_step_diagram(
             self, backend=backend, bind_params=bind_params, verbose=verbose
+        )
+
+
+###############################################################################
+# Internal machinery
+###############################################################################
+
+
+def require_flow_subsystem(sys, sys_id):
+    """Refuse a :class:`StepSystem` in a flow diagram: it has no ``f`` to stack."""
+    if isinstance(sys, StepSystem):
+        raise TypeError(
+            f"{type(sys).__name__} {sys_id!r} is a StepSystem and cannot join "
+            "a flow DiagramSystem: a StepSystem belongs in a StepDiagramSystem "
+            "or a Computer: block % dt @ plant"
+        )
+
+
+def require_trajectory(traj):
+    """Refuse a missing trajectory: none was passed and none was computed."""
+    if traj is None:
+        raise ValueError("no trajectory: pass traj or call compute_trajectory()")
+
+
+def require_step_subsystem(sys, sys_id):
+    """Refuse a :class:`DynamicSystem` with states: it has no ``step`` to stack."""
+    if isinstance(sys, DynamicSystem) and sys.n > 0:
+        raise TypeError(
+            f"{type(sys).__name__} {sys_id!r} has continuous states and cannot "
+            "join a StepDiagramSystem: keep it in a DiagramSystem and close the "
+            "sampled loop with block % dt @ plant, or step it with "
+            "discretize(plant, dt)"
         )
 
 
