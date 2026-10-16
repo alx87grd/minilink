@@ -1,10 +1,13 @@
-"""Time integration, static forcing, and scheduled step simulation."""
+"""Simulation: the simulators that run a ``System`` through time, continuous, hybrid, static or stepped."""
 
 from __future__ import annotations
 
 from minilink.core.facade import lazy_facade
 
-# name -> (module path, attribute)
+# The band facade for short teaching imports, e.g.
+# ``from minilink.simulation import Simulator``; the defining modules stay importable
+# (``minilink.simulation.simulator``, ...). Each exported name maps to its
+# (module path, attribute).
 _EXPORTS: dict[str, tuple[str, str]] = {
     "Computer": ("minilink.simulation.computer", "Computer"),
     "HybridSimResult": ("minilink.simulation.hybrid_simulator", "HybridSimResult"),
