@@ -1,6 +1,6 @@
 # The textbook pass, second run
 
-**Status:** draft for the maintainer, 2026-10-16. The run starts once §10 is approved.
+**Status:** approved by the maintainer, 2026-10-16; the overnight run is under way.
 **Serves:** workboard steps TB-b, T1–T7 and the rename remainder ([TODO.md](TODO.md) §2–§3),
 and the style half of S68 (the ratchet over the whole library).
 **Base:** `dev`, pinned at the run's start (today `8b4c4d5`). **Run branch:**
@@ -519,9 +519,9 @@ verification.
 | `dev` moves during the night | The base is pinned; `dev` is merged in the morning, and conflicts wait for the maintainer. |
 
 ## 10. Approval checklist
-- [ ] §1 matches the choices
-- [ ] §3 is the style wanted
-- [ ] §6 waves and lanes
-- [ ] §7.6 limits (3 writers, hourly check-in)
-- [ ] The run may push to `claude/textbook-pass-dev` and `claude/textbook-pass-probes`, and
+- [x] §1 matches the choices
+- [x] §3 is the style wanted
+- [x] §6 waves and lanes
+- [x] §7.6 limits (3 writers, hourly check-in)
+- [x] The run may push to `claude/textbook-pass-dev` and `claude/textbook-pass-probes`, and
       open one PR into `dev`
