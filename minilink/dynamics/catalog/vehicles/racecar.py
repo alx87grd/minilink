@@ -1,8 +1,4 @@
-"""1/10-scale racecar: power-limited rear drive, brush tires, servo steering.
-
-State ``x = [x, y, theta, vx, vy, yaw_rate, w_rear, delta, P]``, inputs ``P_cmd`` [W] and
-``delta_cmd`` [rad]; both equation paths use the ``xp`` idiom and trace under JAX.
-"""
+"""1/10-scale racecar: power-limited rear drive, brush tires, servo steering."""
 
 from functools import partial
 
@@ -59,22 +55,9 @@ PUBLIC_RACECAR_PARAMS = {
 }
 
 
-def _frames(X, Y, psi, delta, params, phi_rear=0.0, phi_front=None):
-    """Link poses for either racecar plant. Import is lazy so ``f`` stays mesh-free."""
-    from minilink.graphical.catalog.racecar_skin import racecar_frames
-
-    b = params["b"]
-    return racecar_frames(
-        X,
-        Y,
-        psi,
-        delta,
-        phi_rear=phi_rear,
-        phi_front=phi_front,
-        ref_to_rear_axle=b,
-        wheelbase=params["a"] + b,
-        wheel_radius=params["r_r"],
-    )
+###############################################################################
+# Public API
+###############################################################################
 
 
 class UdeSRacecar(KinematicBicycle):
@@ -89,6 +72,8 @@ class UdeSRacecar(KinematicBicycle):
     def __init__(self):
         super().__init__()
         self.name = "UdeS Racecar"
+
+        # Parameters: the 1/10 car's wheelbase and rear wheel radius
         a = PUBLIC_RACECAR_PARAMS["a"]
         b = PUBLIC_RACECAR_PARAMS["b"]
         r = PUBLIC_RACECAR_PARAMS["r_r"]
@@ -98,6 +83,8 @@ class UdeSRacecar(KinematicBicycle):
         self.params["b"] = b
         self.params["length"] = a + b
         self.params["r_r"] = r
+
+        # Graphics: 1/10-scale wheels, and a camera that follows the body
         self.wheel_len = 2.0 * r
         self.wheel_width = 0.045
         self.wheel_radius = r
@@ -106,7 +93,8 @@ class UdeSRacecar(KinematicBicycle):
 
     def tf(self, x, u, t=0, params=None):
         params = self.params if params is None else params
-        return _frames(x[0], x[1], x[2], u[1], params)
+
+        return link_frames(x[0], x[1], x[2], u[1], params)
 
 
 class UdeSRacecarDyn(DynamicBicycle):
@@ -114,7 +102,7 @@ class UdeSRacecarDyn(DynamicBicycle):
 
     State ``x = [x, y, theta, vx, vy, yaw_rate, w_rear, delta, P]``: world pose, body
     velocities, rear wheel rate [rad/s], steer angle [rad] and the power on its way to
-    the ground [W].
+    the ground [W]. The equation paths use the ``xp`` idiom and trace under JAX.
 
     Inputs
     ------
@@ -153,27 +141,22 @@ class UdeSRacecarDyn(DynamicBicycle):
 
     def __init__(self, named_ports=True):
         super().__init__(named_ports=True)
-
         self.name = "UdeS Racecar"
         self.named_ports = bool(named_ports)
+
+        # State: the body's six, the rear wheel rate, the steer angle and the power
         self.n = 9
         self.state = VectorSignal("x", dim=self.n)
-        self.state.labels = [
-            "x",
-            "y",
-            "theta",
-            "vx",
-            "vy",
-            "yaw_rate",
-            "w_rear",
-            "delta",
-            "P",
-        ]
-        self.state.units = ["m", "m", "rad", "m/s", "m/s", "rad/s", "rad/s", "rad", "W"]
         self.x0 = np.zeros(self.n)
+
+        # Parameters
         self.params = dict(PUBLIC_RACECAR_PARAMS)
 
-        P_max, delta_max = self.params["P_max"], self.params["delta_max"]
+        # Ports: the two commands within their limits, as two named ports or one
+        # stacked port (the planning / trajectory-optimization convention); the state
+        # and the sensors as outputs
+        P_max = self.params["P_max"]
+        delta_max = self.params["delta_max"]
         self.inputs = {}
         if self.named_ports:
             self.add_input_port(
@@ -192,7 +175,7 @@ class UdeSRacecarDyn(DynamicBicycle):
                 lower_bound=-delta_max,
                 upper_bound=delta_max,
             )
-        else:  # one stacked command port (planning / trajectory-optimization convention)
+        else:
             self.add_input_port(
                 "u",
                 dim=2,
@@ -202,11 +185,8 @@ class UdeSRacecarDyn(DynamicBicycle):
                 lower_bound=np.array([-P_max, -delta_max]),
                 upper_bound=np.array([P_max, delta_max]),
             )
-
         self.outputs = {}
         self.add_output_port("y", dim=self.n, function=self.h, dependencies=())
-        self.outputs["y"].labels = list(self.state.labels)
-        self.outputs["y"].units = list(self.state.units)
         self.add_output_port("speed", function=self.speed, labels=["vx"], units=["m/s"])
         self.add_output_port(
             "slip",
@@ -237,9 +217,25 @@ class UdeSRacecarDyn(DynamicBicycle):
             units=["W", "W"],
         )
 
-        # graphics: 1/10-scale car; ``tf`` publishes the link frames so
-        # ``car.skin = racecar_skin_3d`` attaches the 3-D look (wheels spin
-        # only on :class:`UdeSRacecarDyn3D`, which carries the rolling angles)
+        # Signal labels and units
+        self.state.labels = [
+            "x",
+            "y",
+            "theta",
+            "vx",
+            "vy",
+            "yaw_rate",
+            "w_rear",
+            "delta",
+            "P",
+        ]
+        self.state.units = ["m", "m", "rad", "m/s", "m/s", "rad/s", "rad/s", "rad", "W"]
+        self.outputs["y"].labels = list(self.state.labels)
+        self.outputs["y"].units = list(self.state.units)
+
+        # Graphics: a 1/10-scale car; ``tf`` publishes the link frames, so
+        # ``car.skin = racecar_skin_3d`` attaches the 3-D look (the wheels spin only on
+        # :class:`UdeSRacecarDyn3D`, which carries the rolling angles)
         self.wheel_len = 2.0 * self.params["r_r"]
         self.wheel_width = 0.045
         self.wheel_radius = self.params["r_r"]
@@ -248,6 +244,7 @@ class UdeSRacecarDyn(DynamicBicycle):
         self.camera_follow_frame = "body"
         self.camera_scale = 1.5
 
+        # Solver hint: the plant's fastest mode
         self.refresh()
 
     def refresh(self):
@@ -261,54 +258,75 @@ class UdeSRacecarDyn(DynamicBicycle):
         is some 16 % faster than an uncoupled wheel would be).
         """
         params = self.params
-        r_r, Jw_rear = params["r_r"], params["Jw_rear"]
-        c_kappa, v_eps = params["c_kappa"], params["v_min_epsilon"]
-        c_alpha_f, c_alpha_r = params["c_alpha_f"], params["c_alpha_r"]
-        mass, gravity = params["mass"], params["gravity"]
-        inertia, a, b = params["inertia"], params["a"], params["b"]
 
+        r_r = params["r_r"]
+        Jw_rear = params["Jw_rear"]
+        c_kappa = params["c_kappa"]
+        v_eps = params["v_min_epsilon"]
+        c_alpha_f = params["c_alpha_f"]
+        c_alpha_r = params["c_alpha_r"]
+        mass = params["mass"]
+        gravity = params["gravity"]
+        inertia = params["inertia"]
+        a = params["a"]
+        b = params["b"]
+        engine_tau = params["engine_tau"]
+        steering_tau = params["steering_tau"]
+
+        # Static axle loads, and the slip stiffnesses per unit load they scale
         Fz_f = mass * gravity * b / (a + b)
         Fz_r = mass * gravity * a / (a + b)
-        C_kappa, C_alpha_f, C_alpha_r = (
-            c_kappa * Fz_r,
-            c_alpha_f * Fz_f,
-            c_alpha_r * Fz_r,
-        )
+        C_kappa = c_kappa * Fz_r
+        C_alpha_f = c_alpha_f * Fz_f
+        C_alpha_r = c_alpha_r * Fz_r
 
-        # wheel and car exchanging momentum through the rear contact; yaw and sideslip
-        # against the two cornering stiffnesses
-        tau_long = v_eps / (C_kappa * (r_r**2 / Jw_rear + 1.0 / mass))
-        tau_yaw = inertia * v_eps / (C_alpha_f * a**2 + C_alpha_r * b**2)
-        tau_lat = mass * v_eps / (C_alpha_f + C_alpha_r)
+        # The wheel and the car exchanging momentum through the rear contact; the yaw
+        # and the sideslip against the two cornering stiffnesses
+        T_long = v_eps / (C_kappa * (r_r**2 / Jw_rear + 1.0 / mass))
+        T_yaw = inertia * v_eps / (C_alpha_f * a**2 + C_alpha_r * b**2)
+        T_lat = mass * v_eps / (C_alpha_f + C_alpha_r)
 
-        self.solver_info["smallest_time_constant"] = 0.5 * min(
-            tau_long, tau_yaw, tau_lat, params["engine_tau"], params["steering_tau"]
-        )
+        # Half the smallest of the three estimates and the two actuator lags
+        T_min = 0.5 * min(T_long, T_yaw, T_lat, engine_tau, steering_tau)
+        self.solver_info["smallest_time_constant"] = T_min
 
     def f(self, x, u, t=0.0, params=None):
         params = self.params if params is None else params
-        P_max, engine_tau = params["P_max"], params["engine_tau"]
-        tau_sat, w_eps = params["tau_sat"], params["w_min_epsilon"]
-        Jw_rear, bw_drive = params["Jw_rear"], params["bw_drive"]
-        tau_fric, w_c = params["tau_fric"], params["w_c"]
-        delta_max, steering_tau = params["delta_max"], params["steering_tau"]
-        rate_max = params["steer_rate_max"]
         xp = array_module(x, u)
-        q, v, u_in = x[0:3], x[3:6], x[6:8]
-        w_rear, delta, P = x[6], x[7], x[8]
+
+        P_max = params["P_max"]
+        engine_tau = params["engine_tau"]
+        tau_sat = params["tau_sat"]
+        w_eps = params["w_min_epsilon"]
+        Jw_rear = params["Jw_rear"]
+        bw_drive = params["bw_drive"]
+        tau_fric = params["tau_fric"]
+        w_c = params["w_c"]
+        delta_max = params["delta_max"]
+        steering_tau = params["steering_tau"]
+        rate_max = params["steer_rate_max"]
+
+        q = x[0:3]
+        v = x[3:6]
+        u_in = x[6:8]
+        w_rear = x[6]
+        delta = x[7]
+        P = x[8]
         P_cmd, delta_cmd = self.commands(x, u)
 
-        # chassis: the inherited rigid-body equations, fed by the brush tires
+        # The chassis terms: the inherited rigid-body equations, fed by the brush tires
         M = self.M(q, params)
         C = self.C(q, v, params)
         N = self.N(q, params)
         d = self.generalized_d(q, v, u_in, params)
+
+        # Chassis: M v̇ + C v + d = 0, and q̇ = N v
         dv = xp.linalg.solve(M, -C @ v - d)
         dq = N @ v
 
-        # drive: lagged power, a torque limit at low speed, and the drivetrain brake
+        # Drive: lagged power, a torque limit at low speed, and the drivetrain brake
         #   Ṗ = (clip(P_cmd, ±P_max) − P) / engine_tau
-        #   τ = clip(P / sqrt(w_rear² + w_eps²), ±τ_sat)
+        #   τ = clip(P / √(w_rear² + w_eps²), ±τ_sat)
         #   Jw ẇ_rear = τ − τ_ground(v, w_rear, δ) − τ_brake(w_rear)
         P_dot = (xp.clip(P_cmd, -P_max, P_max) - P) / engine_tau
         tau = xp.clip(P / xp.sqrt(w_rear**2 + w_eps**2), -tau_sat, tau_sat)
@@ -316,24 +334,20 @@ class UdeSRacecarDyn(DynamicBicycle):
         tau_brake = bw_drive * w_rear + tau_fric * xp.tanh(w_rear / w_c)
         w_rear_dot = (tau - tau_ground - tau_brake) / Jw_rear
 
-        # servo: first-order lag with a smooth rate limit, held by the end stops
+        # Servo: a first-order lag with a smooth rate limit, held by the end stops
         #   δ̇ = rate_max tanh((δ_ref − δ) / (steering_tau rate_max))
         delta_ref = xp.clip(delta_cmd, -delta_max, delta_max)
         delta_dot = rate_max * xp.tanh((delta_ref - delta) / (steering_tau * rate_max))
         delta_dot = xp.where(delta > delta_max, xp.minimum(delta_dot, 0.0), delta_dot)
         delta_dot = xp.where(delta < -delta_max, xp.maximum(delta_dot, 0.0), delta_dot)
 
+        # ẋ = [q̇; v̇; ẇ_rear; δ̇; Ṗ]
         dx = xp.concatenate([dq, dv, xp.array([w_rear_dot, delta_dot, P_dot])])
 
         return dx
 
     def h(self, x, u, t=0.0, params=None):
         return x
-
-    def commands(self, x, u):
-        """``[P_cmd, delta_cmd]`` from the port vector: the two named ports in order."""
-        xp = array_module(x, u)
-        return xp.asarray(u)
 
     # Sensor outputs
 
@@ -343,57 +357,90 @@ class UdeSRacecarDyn(DynamicBicycle):
     def slips(self, x, u, t=0.0, params=None):
         params = self.params if params is None else params
         xp = array_module(x)
-        vx, vy, yaw_rate = x[3], x[4], x[5]
-        w_rear, delta = x[6], x[7]
 
+        vx = x[3]
+        vy = x[4]
+        yaw_rate = x[5]
+        w_rear = x[6]
+        delta = x[7]
+
+        # The rear slip ratio and the two slip angles
         kappa_r, alpha_f, alpha_r = axle_slips(vx, vy, yaw_rate, w_rear, delta, params)
+        slip = xp.array([kappa_r, alpha_f, alpha_r])
 
-        return xp.array([kappa_r, alpha_f, alpha_r])
+        return slip
 
     def grip(self, x, u, t=0.0, params=None):
         params = self.params if params is None else params
         xp = array_module(x)
-        Fx_f, Fy_f, Fx_r, Fy_r = self.compute_tire_physics(x[3:6], x[6:8], params)
 
+        v_body = x[3:6]
+        u_in = x[6:8]
+        Fx_f, Fy_f, Fx_r, Fy_r = self.compute_tire_physics(v_body, u_in, params)
+
+        # The used fraction of each axle's friction ellipse
         phi_f, phi_r = friction_use(Fx_f, Fy_f, Fx_r, Fy_r, params)
+        grip = xp.array([phi_f, phi_r])
 
-        return xp.array([phi_f, phi_r])
+        return grip
 
     def imu(self, x, u, t=0.0, params=None):
         params = self.params if params is None else params
-        mass, rho, CdA = params["mass"], params["rho"], params["CdA"]
         xp = array_module(x)
-        vx, yaw_rate, delta = x[3], x[5], x[7]
-        Fx_f, Fy_f, Fx_r, Fy_r = self.compute_tire_physics(x[3:6], x[6:8], params)
 
-        # specific force at the centre of gravity: contact and aero forces over the mass
-        c_d, s_d = xp.cos(delta), xp.sin(delta)
+        mass = params["mass"]
+        rho = params["rho"]
+        CdA = params["CdA"]
+
+        vx = x[3]
+        yaw_rate = x[5]
+        delta = x[7]
+        v_body = x[3:6]
+        u_in = x[6:8]
+        Fx_f, Fy_f, Fx_r, Fy_r = self.compute_tire_physics(v_body, u_in, params)
+        c_d = xp.cos(delta)
+        s_d = xp.sin(delta)
+
+        # Specific force at the centre of gravity: the contact and aero forces over the
+        # mass, with the drag ½ ρ CdA vx |vx|
         F_aero = 0.5 * rho * CdA * vx * xp.abs(vx)
         a_x = (Fx_r + Fx_f * c_d - Fy_f * s_d - F_aero) / mass
         a_y = (Fy_r + Fx_f * s_d + Fy_f * c_d) / mass
+        imu = xp.array([a_x, a_y, yaw_rate])
 
-        return xp.array([a_x, a_y, yaw_rate])
+        return imu
 
     def power(self, x, u, t=0.0, params=None):
         params = self.params if params is None else params
-        tau_sat, w_eps = params["tau_sat"], params["w_min_epsilon"]
         xp = array_module(x)
-        w_rear, P = x[6], x[8]
 
-        # under the torque limit the wheel receives less than the lagged command power
+        tau_sat = params["tau_sat"]
+        w_eps = params["w_min_epsilon"]
+
+        w_rear = x[6]
+        P = x[8]
+
+        # Under the torque limit the wheel receives less than the lagged command power:
+        # τ = clip(P / √(w_rear² + w_eps²), ±τ_sat), and P_wheel = τ w_rear
         tau = xp.clip(P / xp.sqrt(w_rear**2 + w_eps**2), -tau_sat, tau_sat)
         P_wheel = tau * w_rear
+        power = xp.array([P, P_wheel])
 
-        return xp.array([P, P_wheel])
+        return power
 
     # Tires (the only physics overridden from DynamicBicycle)
 
     def compute_tire_physics(self, v_body, u_inputs, params=None):
         """Brush-tire axle forces, replacing the linear-slip pair of the base class."""
         params = self.params if params is None else params
-        vx, vy, yaw_rate = v_body[0], v_body[1], v_body[2]
-        w_rear, delta = u_inputs[0], u_inputs[1]
 
+        vx = v_body[0]
+        vy = v_body[1]
+        yaw_rate = v_body[2]
+        w_rear = u_inputs[0]
+        delta = u_inputs[1]
+
+        # The axle slips, then the brush-tire forces they produce
         kappa_r, alpha_f, alpha_r = axle_slips(vx, vy, yaw_rate, w_rear, delta, params)
         Fx_f, Fy_f, Fx_r, Fy_r = brush_tire_forces(
             kappa_r, alpha_f, alpha_r, vx, params
@@ -401,13 +448,26 @@ class UdeSRacecarDyn(DynamicBicycle):
 
         return Fx_f, Fy_f, Fx_r, Fy_r
 
+    def tf(self, x, u, t=0, params=None):
+        params = self.params if params is None else params
+
+        return link_frames(x[0], x[1], x[2], x[7], params)
+
+    ###########################################################################
+    # Internal machinery
+    ###########################################################################
+
+    def commands(self, x, u):
+        """``[P_cmd, delta_cmd]`` from the port vector: the two named ports in order."""
+        xp = array_module(x, u)
+
+        commands = xp.asarray(u)
+
+        return commands
+
     def wheel_rate_and_steer(self, x, u):
         """The base class reads ``[w_rear, delta]`` here; both are states now."""
         return x[6:8]
-
-    def tf(self, x, u, t=0, params=None):
-        params = self.params if params is None else params
-        return _frames(x[0], x[1], x[2], x[7], params)
 
 
 class UdeSRacecarDyn3D(UdeSRacecarDyn):
@@ -421,12 +481,21 @@ class UdeSRacecarDyn3D(UdeSRacecarDyn):
     def __init__(self):
         super().__init__()
 
-        # the skin lives beside this module; importing it here keeps ``f`` mesh-free
+        # Lazy import: the skin lives beside this module, and importing it here keeps
+        # ``f`` mesh-free
         from minilink.graphical.catalog.racecar_skin import racecar_skin_3d
 
         self.name = "UdeS Racecar (3D)"
+
+        # State: the car's nine, then the rear and front rolling angles
         self.n = 11
         self.state = VectorSignal("x", dim=self.n)
+        self.x0 = np.zeros(self.n)
+
+        # Ports: the state output grows with the state
+        self.outputs["y"].dim = self.n
+
+        # Signal labels and units
         self.state.labels = [
             "x",
             "y",
@@ -453,26 +522,31 @@ class UdeSRacecarDyn3D(UdeSRacecarDyn):
             "rad",
             "rad",
         ]
-        self.x0 = np.zeros(self.n)
-
-        self.outputs["y"].dim = self.n
         self.outputs["y"].labels = list(self.state.labels)
         self.outputs["y"].units = list(self.state.units)
 
+        # Graphics: the 3-D skin, its wheels turned by the rolling angles
         self.skin = racecar_skin_3d
         self.wheel_radius = self.params["r_r"]
 
     def f(self, x, u, t=0.0, params=None):
         params = self.params if params is None else params
-        a, r_f = params["a"], params["r_f"]
         xp = array_module(x, u)
-        vx, vy, yaw_rate = x[3], x[4], x[5]
-        w_rear, delta = x[6], x[7]
 
+        a = params["a"]
+        r_f = params["r_f"]
+
+        vx = x[3]
+        vy = x[4]
+        yaw_rate = x[5]
+        w_rear = x[6]
+        delta = x[7]
         dx_car = super().f(x[0:9], u, t, params)
+        c_d = xp.cos(delta)
+        s_d = xp.sin(delta)
 
-        # wheel angles: the rear turns at its own rate, the front rolls with its contact
-        c_d, s_d = xp.cos(delta), xp.sin(delta)
+        # Wheel angles: the rear turns at its own rate, the front rolls with its
+        # contact, φ̇_rear = w_rear and φ̇_front = vx_f / r_f
         vx_f = vx * c_d + (vy + a * yaw_rate) * s_d
         dphi_rear = w_rear
         dphi_front = vx_f / r_f
@@ -483,13 +557,11 @@ class UdeSRacecarDyn3D(UdeSRacecarDyn):
 
     def tf(self, x, u, t=0, params=None):
         params = self.params if params is None else params
-        return _frames(x[0], x[1], x[2], x[7], params, x[9], x[10])
+
+        return link_frames(x[0], x[1], x[2], x[7], params, x[9], x[10])
 
     def get_dynamic_geometry(self, x, u, t=0, params=None):
         return {}
-
-
-# Public functions
 
 
 def stiff_tires(params):
@@ -506,6 +578,35 @@ def stiff_tires(params):
     rigid["C_rr"] = 0.0
 
     return rigid
+
+
+###############################################################################
+# Internal machinery
+###############################################################################
+
+
+def link_frames(X, Y, psi, delta, params, phi_rear=0.0, phi_front=None):
+    """Link poses for either racecar plant."""
+    # Lazy import: the racecar meshes load on first use, so ``f`` stays mesh-free
+    from minilink.graphical.catalog.racecar_skin import racecar_frames
+
+    b = params["b"]
+    a = params["a"]
+    r_r = params["r_r"]
+
+    wheelbase = a + b
+
+    return racecar_frames(
+        X,
+        Y,
+        psi,
+        delta,
+        phi_rear=phi_rear,
+        phi_front=phi_front,
+        ref_to_rear_axle=b,
+        wheelbase=wheelbase,
+        wheel_radius=r_r,
+    )
 
 
 if __name__ == "__main__":
