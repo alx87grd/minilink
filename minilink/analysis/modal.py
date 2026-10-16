@@ -1,10 +1,14 @@
-"""Modal analysis: linearize, eig(A), optional mode animation."""
+"""Modal analysis: the poles and mode shapes of the linearized dynamics, and their animation."""
 
 import numpy as np
 
 from minilink.analysis.derivatives import jacobian, operating_point
 from minilink.analysis.linearization import require_own_point
 from minilink.core.trajectory import Trajectory
+
+###############################################################################
+# Public API
+###############################################################################
 
 
 def modal_analysis(
@@ -99,11 +103,13 @@ def animate_modal(
     poles, modes
         Same as :func:`modal_analysis`.
     """
+    # The operating point: the one given, else the nominal
     x_bar, u_bar, params = operating_point(sys, x_bar, u_bar, params)
 
     # The poles and mode shapes of A = ∂f/∂x at the operating point
     poles, modes = modal_analysis(sys, x_bar, u_bar, t, params, method=method, eps=eps)
 
+    # The modes to animate: the one asked for, or every one
     indices = range(len(poles)) if mode == "all" else [int(mode)]
     for index in indices:
         # Mode i: its pole λᵢ and its shape vᵢ
@@ -116,10 +122,12 @@ def animate_modal(
         # Δx(t) = amp · Re{ v e^{λ t} }
         delta_x = amplitude * np.real(vector[:, None] * np.exp(pole * time))
 
-        # x(t) = x_bar + Δx(t)
+        # x(t) = x_bar + Δx(t), under the input held at u_bar
         x = x_bar[:, None] + delta_x
+        u = np.tile(u_bar[:, None], (1, n_steps))
 
-        traj = Trajectory(t=time, x=x, u=np.tile(u_bar[:, None], (1, n_steps)))
+        # The mode as an absolute trajectory, drawn by the system's own kinematics
+        traj = Trajectory(t=time, x=x, u=u)
         title = f"Mode {index}: {pole.real:.1f}{pole.imag:+.1f}j"
         inline = sys.animate(
             traj,
@@ -136,28 +144,34 @@ def animate_modal(
     return poles, modes
 
 
-# =============================================================================
+###############################################################################
 # Internal machinery
-# =============================================================================
-
-
-def display_inline(animation):
-    """Show the inline animation a notebook renderer returned (``html=True``); nothing otherwise."""
-    if animation is None:
-        return
-    from IPython.display import display
-
-    display(animation)
+###############################################################################
 
 
 def mode_horizon(pole, tf):
     """``tf``, or about two periods of the mode (clipped to 1–30 s), 5 s for a pole near 0."""
     if tf is not None:
         return tf
+
+    # Two periods 2 · 2π/|λ| and a second, within 1–30 s; 5 s when |λ| ≈ 0
     norm = abs(pole)
+    horizon = 5.0
     if norm > 0.001:
-        return float(np.clip(4.0 * np.pi / norm + 1.0, 1.0, 30.0))
-    return 5.0
+        horizon = float(np.clip(4.0 * np.pi / norm + 1.0, 1.0, 30.0))
+
+    return horizon
+
+
+def display_inline(animation):
+    """Show the inline animation a notebook renderer returned (``html=True``); nothing otherwise."""
+    if animation is None:
+        return
+
+    # IPython is optional: it loads only to show a notebook's inline animation
+    from IPython.display import display
+
+    display(animation)
 
 
 if __name__ == "__main__":
