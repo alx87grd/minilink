@@ -22,7 +22,7 @@ from minilink.planning.search.rrt import (
     _UNSET,
     RRTOptions,
     RRTPlanner,
-    _merge_rrt_options,
+    rrt_options_of,
 )
 from minilink.planning.search.tree import Node, Tree
 
@@ -173,7 +173,7 @@ class RRTStarPlanner(RRTPlanner):
 
         if metric is None:
             metric = euclidean
-        star_options = _merge_rrt_options(
+        star_options = rrt_options_of(
             _coerce_rrt_star_options(options),
             default_factory=RRTStarOptions,
             allowed_keys=_RRT_STAR_OPTION_KEYS,
@@ -213,9 +213,9 @@ class RRTStarPlanner(RRTPlanner):
     def solve_trajectory(self, *, evaluate=False, n_trials=50) -> PlanningSolution:
         """Grow an RRT* until goal convergence, patience, or ``max_nodes``."""
         options = self.options
-        self._validate_nearest_backend()
+        self.require_nearest_backend()
         rng = np.random.default_rng(options.seed)
-        goal_region = self._goal_region()
+        goal_region = self.goal_region()
         star_options = options if isinstance(options, RRTStarOptions) else None
         optimize_after_goal = (
             star_options.optimize_after_goal if star_options else False
@@ -236,7 +236,7 @@ class RRTStarPlanner(RRTPlanner):
         self.iterations = 0
         self.best_goal_cost = None
         self.history = []
-        self._search_callback = self._resolve_search_callback()
+        self.search_callback = self.resolve_search_callback()
 
         best_goal_node = None
         stale_extensions = 0
@@ -258,7 +258,7 @@ class RRTStarPlanner(RRTPlanner):
             phase = (
                 "optimize" if self.reached_goal and optimize_after_goal else "explore"
             )
-            self._on_search_step(phase=phase)
+            self.on_search_step(phase=phase)
 
             if record_history and (
                 self.iterations == 1 or self.iterations % history_stride == 0
@@ -283,13 +283,13 @@ class RRTStarPlanner(RRTPlanner):
             self._record_snapshot(best_goal_node)
 
         if self.solution_node is None:
-            goal_point = self._goal_point(goal_region)
+            goal_point = self.goal_point(goal_region)
             closest = self.tree.nearest(goal_point, self.metric)
             self.solution_node = closest
             if not options.return_best_effort:
                 raise RuntimeError("RRT* failed to reach goal within max_nodes")
 
-        return self._finish_trajectory(
+        return self.finish_trajectory(
             self.tree.extract_trajectory(self.solution_node), evaluate, n_trials
         )
 
@@ -315,9 +315,9 @@ class RRTStarPlanner(RRTPlanner):
     # Internal machinery
 
     def _extend_once(self, rng) -> bool:
-        x_rand = self._sample(rng)
+        x_rand = self.goal_biased_sample(rng)
         near = self.tree.nearest(x_rand, self.metric)
-        edge = self._try_extend(near, x_rand, rng)
+        edge = self.try_extend(near, x_rand, rng)
         if edge is None:
             return False
 
@@ -369,7 +369,7 @@ class RRTStarPlanner(RRTPlanner):
         ]
         path_states = None
         if best_goal_node is not None:
-            path_states = self._path_states(best_goal_node)
+            path_states = self.path_states(best_goal_node)
 
         self.history.append(
             RRTStarSnapshot(
@@ -389,7 +389,7 @@ class RRTStarPlanner(RRTPlanner):
         best_cost = np.inf
 
         for node in near_nodes:
-            edge = self._try_extend(node, x_new, rng)
+            edge = self.try_extend(node, x_new, rng)
             if edge is None:
                 continue
             cost = node.cost + edge.cost
@@ -404,7 +404,7 @@ class RRTStarPlanner(RRTPlanner):
         for candidate in near_nodes:
             if candidate is new_node.parent:
                 continue
-            edge = self._try_extend(new_node, candidate.x, rng)
+            edge = self.try_extend(new_node, candidate.x, rng)
             if edge is None:
                 continue
             new_cost = new_node.cost + edge.cost
@@ -426,7 +426,7 @@ class RRTStarPlanner(RRTPlanner):
             return float(gamma)
 
         d = int(self.problem.sys.n)
-        span = self._sample_box.upper - self._sample_box.lower
+        span = self.sample_box.upper - self.sample_box.lower
         volume = float(np.prod(np.maximum(span, 1e-12)))
         return 2.0 * (1.0 + 1.0 / d) ** (1.0 / d) * (volume ** (1.0 / d))
 
