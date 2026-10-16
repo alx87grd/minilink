@@ -1,4 +1,4 @@
-"""Linear analysis on the matrices ``(A, B, C, D)`` of one channel: poles, zeros, gain, minimal realization, frequency response, margins, root locus, step response."""
+"""Linear analysis of one channel's matrices ``(A, B, C, D)``: poles, zeros, gain, minimal realization, responses, margins, root locus."""
 
 from __future__ import annotations
 
@@ -6,7 +6,7 @@ from dataclasses import dataclass
 
 import numpy as np
 from scipy import linalg
-from scipy.optimize import brentq
+from scipy.optimize import brentq, linear_sum_assignment
 
 from minilink.analysis.structural import (
     RANK_TOL,
@@ -14,18 +14,27 @@ from minilink.analysis.structural import (
     observability_matrix,
 )
 
-# =============================================================================
-# Public API — poles, zeros, response
-# =============================================================================
+# A pencil eigenvalue with |β| below this fraction of |α| is infinite, not a zero:
+# rounding turns the pencil's infinite eigenvalues into finite ones near 1e15
+_INFINITE_ZERO_RATIO = 1e-8
+
+
+###############################################################################
+# Public API
+###############################################################################
+
+
+# Poles, zeros, gain and frequency response
 
 
 def poles(A):
     """Eigenvalues of ``A``."""
     A = np.asarray(A, dtype=float)
+
+    # A static channel has no pole
     if A.size == 0:
         return np.array([], dtype=complex)
 
-    # p = eig(A)
     p = np.linalg.eigvals(A)
 
     return p
@@ -35,13 +44,17 @@ def zeros(A, B, C, D):
     """Transmission zeros of the square channel ``(A, B, C, D)``: the finite eigenvalues of its Rosenbrock pencil."""
     A, B, C, D = as_matrices(A, B, C, D)
     n, m = B.shape
+
+    # The pencil below is square only for a square channel with a state
     if n == 0 or m != C.shape[0]:
         return np.array([], dtype=complex)
 
-    # z = α / β over the eigenpairs of  [[A, B], [C, D]] − s [[I, 0], [0, 0]]  with β ≠ 0
+    # The Rosenbrock pencil [[A, B], [C, D]] − s [[I, 0], [0, 0]]
     P = np.block([[A, B], [C, D]])
     E = np.zeros_like(P)
     E[:n, :n] = np.eye(n)
+
+    # z = α / β over its eigenpairs, the infinite ones (β ≈ 0) dropped
     alpha, beta = linalg.eigvals(P, E, homogeneous_eigvals=True)
     finite = np.abs(beta) > _INFINITE_ZERO_RATIO * np.abs(alpha)
     z = alpha[finite] / beta[finite]
@@ -101,10 +114,14 @@ def frequency_range(A, B, C, D):
     cases a band read from the roots alone misses the crossover and
     :func:`margins` would report an infinite margin.
     """
+    # The rates |λ| of the poles and zeros; a root at the origin (|λ| ≤ 10⁻⁹) has none
     rates = np.abs(np.concatenate([poles(A), zeros(A, B, C, D)]))
     rates = rates[rates > 1e-9]
+
     if rates.size == 0:
-        w_min, w_max = 1e-2, 1e2
+        # No rate to read: two decades on each side of 1 rad/s
+        w_min = 1e-2
+        w_max = 1e2
     else:
         # One decade past min |λ| and max |λ|
         w_min = 10.0 ** np.floor(np.log10(rates.min()) - 1.0)
@@ -116,9 +133,7 @@ def frequency_range(A, B, C, D):
     return w_min, w_max
 
 
-# =============================================================================
-# Public API — minimal realization
-# =============================================================================
+# Minimal realization
 
 
 def minreal(A, B, C, D, *, tol=RANK_TOL):
@@ -134,8 +149,11 @@ def minreal(A, B, C, D, *, tol=RANK_TOL):
     A, B, C, D = as_matrices(A, B, C, D)
     n = A.shape[0]
 
+    # 𝒞 = [B, AB, …, Aⁿ⁻¹B]
+    ctrb = controllability_matrix(A, B)
+
     # Controllable subspace: 𝒞 = U Σ Vᵀ, keep the r directions with σᵢ > tol σ₁
-    U, sigma, _ = np.linalg.svd(controllability_matrix(A, B))
+    U, sigma, _ = np.linalg.svd(ctrb)
     r = int(np.sum(sigma > tol * sigma.max(initial=0.0)))
     T_c = U[:, :r] if r < n else np.eye(n)
 
@@ -144,8 +162,11 @@ def minreal(A, B, C, D, *, tol=RANK_TOL):
     B_c = T_c.T @ B
     C_c = C @ T_c
 
+    # 𝒪 = [C_c; C_c A_c; …; C_c A_cʳ⁻¹] of the restricted pair
+    obsv = observability_matrix(A_c, C_c)
+
     # Observable part of it: 𝒪ᵀ = U Σ Vᵀ, keep the q directions with σᵢ > tol σ₁
-    U, sigma, _ = np.linalg.svd(observability_matrix(A_c, C_c).T)
+    U, sigma, _ = np.linalg.svd(obsv.T)
     q = int(np.sum(sigma > tol * sigma.max(initial=0.0)))
     T_o = U[:, :q] if q < r else np.eye(r)
 
@@ -157,19 +178,17 @@ def minreal(A, B, C, D, *, tol=RANK_TOL):
     return A_min, B_min, C_min, D
 
 
-# =============================================================================
-# Public API — margins
-# =============================================================================
+# Margins
 
 
 @dataclass(frozen=True)
 class Margins:
     """Gain and phase margins of a loop transfer function ``L(jw)``."""
 
-    gain_margin_db: float  # inf when the phase never crosses -180 deg
-    phase_margin_deg: float  # inf when the magnitude never crosses 0 dB
-    w_gain_crossover: float  # rad/s where |L| = 1 (phase margin is read here)
-    w_phase_crossover: float  # rad/s where arg L = -180 deg (gain margin is read here)
+    gain_margin_db: float  # Infinite when the phase never crosses −180°
+    phase_margin_deg: float  # Infinite when the magnitude never crosses 0 dB
+    w_gain_crossover: float  # Where |L| = 1 (rad/s): the phase margin is read here
+    w_phase_crossover: float  # Where ∠L = −180° (rad/s): the gain margin is read here
 
 
 def margins(w, G, response=None):
@@ -204,17 +223,16 @@ def margins(w, G, response=None):
     return Margins(float(gm), float(pm), float(w_gc), float(w_pc))
 
 
-# =============================================================================
-# Public API — root locus
-# =============================================================================
+# Root locus
 
 
 def closed_loop_poles(A, B, C, D, K):
     """Poles of the SISO loop closed with ``u = -K y``."""
     A, B, C, D = as_siso_matrices(A, B, C, D)
+    d = D[0, 0]
 
     # The algebraic loop 1 + K d; at K = −1/d it is singular and no pole is finite
-    loop = 1.0 + K * D[0, 0]
+    loop = 1.0 + K * d
     if loop == 0.0:
         return np.full(A.shape[0], np.inf, dtype=complex)
 
@@ -246,12 +264,13 @@ def root_locus(A, B, C, D, gains=None, *, n_gains=400):
     # Refine the gains wherever a branch jumps
     gains, roots = refine_jumps(A, B, C, D, list(gains), roots)
 
-    return np.asarray(gains), np.asarray(roots)
+    gains = np.asarray(gains)
+    roots = np.asarray(roots)
+
+    return gains, roots
 
 
-# =============================================================================
-# Public API — time response
-# =============================================================================
+# Time response
 
 
 def step_response(A, B, C, D, t):
@@ -263,6 +282,7 @@ def step_response(A, B, C, D, t):
     A, B, C, D = as_siso_matrices(A, B, C, D)
     t = np.asarray(t, dtype=float).reshape(-1)
     dt = uniform_step(t)
+
     n, m = B.shape
 
     # expm([[A, B], [0, 0]] Δt) = [[A_d, B_d], [0, I]]
@@ -283,24 +303,56 @@ def step_response(A, B, C, D, t):
 
 def settling_horizon(A):
     """Default step-response horizon: eight times the slowest stable time constant."""
+    # The decay rates σ = −Re p of the stable poles (σ > 10⁻⁹)
     decay = -np.real(poles(A))
     decay = decay[decay > 1e-9]
+
+    # No stable pole: a ten-second horizon
     if decay.size == 0:
         return 10.0
 
-    # Eight times the slowest time constant 1/σ, σ = −Re p of the stable poles
+    # Eight times the slowest time constant 1/σ
     horizon = float(8.0 / decay.min())
 
     return horizon
 
 
-# =============================================================================
+###############################################################################
 # Internal machinery
-# =============================================================================
+###############################################################################
 
-# A pencil eigenvalue with |β| below this fraction of |α| is infinite, not a zero:
-# rounding turns the pencil's infinite eigenvalues into finite ones near 1e15
-_INFINITE_ZERO_RATIO = 1e-8
+
+def as_matrices(A, B, C, D):
+    """The four matrices as 2-D float arrays; a static channel's empty ``B`` and ``C`` take their shapes from ``D``."""
+    A = np.atleast_2d(np.asarray(A, dtype=float))
+    B = np.atleast_2d(np.asarray(B, dtype=float))
+    C = np.atleast_2d(np.asarray(C, dtype=float))
+    D = np.atleast_2d(np.asarray(D, dtype=float))
+    if A.size == 0:
+        A = np.zeros((0, 0))
+        B = np.zeros((0, D.shape[1]))
+        C = np.zeros((D.shape[0], 0))
+
+    return A, B, C, D
+
+
+def as_siso_matrices(A, B, C, D):
+    """``as_matrices`` for a channel with one input and one output, which it checks."""
+    A, B, C, D = as_matrices(A, B, C, D)
+    if B.shape[1] != 1 or C.shape[0] != 1:
+        raise ValueError(
+            "this function takes one input and one output (a SISO channel); got "
+            f"{B.shape[1]} inputs and {C.shape[0]} outputs"
+        )
+
+    return A, B, C, D
+
+
+def open_loop_radius(p, z):
+    """Radius of the open-loop poles and zeros, at least 1."""
+    radius = max(np.max(np.abs(np.concatenate([p, z])), initial=0.0), 1.0)
+
+    return radius
 
 
 def bracket_unit_gain(A, B, C, D, w_min, w_max, *, decades=8):
@@ -317,62 +369,27 @@ def bracket_unit_gain(A, B, C, D, w_min, w_max, *, decades=8):
     def magnitude(w):
         return abs(frequency_response(A, B, C, D, [w])[0])
 
+    # Downward, a decade at a time
     low = magnitude(w_min)
     for _ in range(decades):
         if low >= 1.0:
             break
         lower = magnitude(0.1 * w_min)
-        if lower <= 2.0 * low:  # approaching the DC plateau, not integrating
+        if lower <= 2.0 * low:  # Approaching the DC plateau, not integrating
             break
         w_min, low = 0.1 * w_min, lower
 
+    # Upward, a decade at a time
     high = magnitude(w_max)
     for _ in range(decades):
         if high <= 1.0:
             break
         higher = magnitude(10.0 * w_max)
-        if higher >= 0.5 * high:  # approaching the high-frequency plateau
+        if higher >= 0.5 * high:  # Approaching the high-frequency plateau
             break
         w_max, high = 10.0 * w_max, higher
 
     return w_min, w_max
-
-
-def as_matrices(A, B, C, D):
-    A = np.atleast_2d(np.asarray(A, dtype=float))
-    B = np.atleast_2d(np.asarray(B, dtype=float))
-    C = np.atleast_2d(np.asarray(C, dtype=float))
-    D = np.atleast_2d(np.asarray(D, dtype=float))
-    if A.size == 0:
-        A = np.zeros((0, 0))
-        B = np.zeros((0, D.shape[1]))
-        C = np.zeros((D.shape[0], 0))
-    return A, B, C, D
-
-
-def as_siso_matrices(A, B, C, D):
-    """``as_matrices`` for a channel with one input and one output, which it checks."""
-    A, B, C, D = as_matrices(A, B, C, D)
-    if B.shape[1] != 1 or C.shape[0] != 1:
-        raise ValueError(
-            "this function takes one input and one output (a SISO channel); got "
-            f"{B.shape[1]} inputs and {C.shape[0]} outputs"
-        )
-    return A, B, C, D
-
-
-def sign_changes(values):
-    """Indices ``k`` where ``values`` crosses zero between ``k`` and ``k + 1``, a sample sitting on zero included."""
-    signs = np.sign(values)
-    crosses = signs[:-1] * signs[1:] < 0
-    on_zero = (signs[:-1] == 0) & (signs[1:] != 0)
-    return np.flatnonzero(crosses | on_zero)
-
-
-def interpolate_crossing(w_pair, values_pair, target):
-    """Frequency where a linearly interpolated segment crosses ``target``."""
-    (w0, w1), (v0, v1) = w_pair, values_pair
-    return w0 + (target - v0) * (w1 - w0) / (v1 - v0)
 
 
 def gain_crossovers(w, magnitude_db, phase_deg, response=None):
@@ -391,7 +408,50 @@ def gain_crossovers(w, magnitude_db, phase_deg, response=None):
             )
         w_c.append(w_k)
         phase_c.append(phase_k)
-    return np.array(w_c, dtype=float), np.array(phase_c, dtype=float)
+
+    w_c = np.array(w_c, dtype=float)
+    phase_c = np.array(phase_c, dtype=float)
+
+    return w_c, phase_c
+
+
+def sign_changes(values):
+    """Indices ``k`` where ``values`` crosses zero between ``k`` and ``k + 1``, a sample sitting on zero included."""
+    signs = np.sign(values)
+    crosses = signs[:-1] * signs[1:] < 0
+    on_zero = (signs[:-1] == 0) & (signs[1:] != 0)
+    indices = np.flatnonzero(crosses | on_zero)
+
+    return indices
+
+
+def interpolate_crossing(w_pair, values_pair, target):
+    """Frequency where a linearly interpolated segment crosses ``target``."""
+    (w0, w1), (v0, v1) = w_pair, values_pair
+
+    w_cross = w0 + (target - v0) * (w1 - w0) / (v1 - v0)
+
+    return w_cross
+
+
+def solve_crossing(residual, w0, w1, w_guess):
+    """The root of ``residual`` in ``[w0, w1]`` by Brent's method; the interpolated guess when the ends do not bracket it."""
+    r0, r1 = residual(w0), residual(w1)
+    if r0 == 0.0:
+        return float(w0)
+    if r1 == 0.0:
+        return float(w1)
+    if r0 * r1 > 0.0:
+        return float(w_guess)
+
+    return float(brentq(residual, w0, w1, xtol=1e-12, rtol=1e-12))
+
+
+def wrap_degrees(angle):
+    """``angle`` folded into ``[-180, 180)``."""
+    wrapped = (angle + 180.0) % 360.0 - 180.0
+
+    return wrapped
 
 
 def phase_crossovers(w, magnitude_db, phase_deg, response=None):
@@ -417,24 +477,11 @@ def phase_crossovers(w, magnitude_db, phase_deg, response=None):
                 magnitude_k = 20.0 * np.log10(np.abs(response(w_k)))
             w_c.append(w_k)
             magnitude_c.append(magnitude_k)
-    return np.array(w_c, dtype=float), np.array(magnitude_c, dtype=float)
 
+    w_c = np.array(w_c, dtype=float)
+    magnitude_c = np.array(magnitude_c, dtype=float)
 
-def solve_crossing(residual, w0, w1, w_guess):
-    """The root of ``residual`` in ``[w0, w1]`` by Brent's method; the interpolated guess when the ends do not bracket it."""
-    r0, r1 = residual(w0), residual(w1)
-    if r0 == 0.0:
-        return float(w0)
-    if r1 == 0.0:
-        return float(w1)
-    if r0 * r1 > 0.0:
-        return float(w_guess)
-    return float(brentq(residual, w0, w1, xtol=1e-12, rtol=1e-12))
-
-
-def wrap_degrees(angle):
-    """``angle`` folded into ``[-180, 180)``."""
-    return (angle + 180.0) % 360.0 - 180.0
+    return w_c, magnitude_c
 
 
 def smallest_margin(margins, frequencies):
@@ -443,31 +490,56 @@ def smallest_margin(margins, frequencies):
     for margin, w_c in zip(margins, frequencies):
         if abs(margin) < abs(best):
             best, w_best = margin, w_c
+
     return best, w_best
-
-
-def uniform_step(t):
-    """The step ``dt`` of a uniform time grid of at least two samples."""
-    if t.size < 2:
-        raise ValueError("step_response needs at least two time samples")
-    dt = t[1] - t[0]
-    if not np.allclose(np.diff(t), dt):
-        raise ValueError("step_response needs a uniform time grid")
-    return dt
-
-
-def open_loop_radius(p, z):
-    """Radius of the open-loop poles and zeros, at least 1."""
-    return max(np.max(np.abs(np.concatenate([p, z])), initial=0.0), 1.0)
 
 
 def default_gains(A, B, C, D, n_gains):
     """``0`` then six log decades ending where the far branches leave the picture."""
     radius = open_loop_radius(poles(A), zeros(A, B, C, D))
     k_max = gain_reaching(A, B, C, D, 10.0 * radius)
-    return np.concatenate(
+    gains = np.concatenate(
         [[0.0], np.logspace(np.log10(k_max) - 6.0, np.log10(k_max), n_gains)]
     )
+
+    return gains
+
+
+def gain_reaching(A, B, C, D, radius):
+    """Gain at which the farthest closed-loop pole reaches ``radius``.
+
+    Stops early when doubling the gain no longer moves the poles (every
+    branch has arrived at a finite zero).
+    """
+    K = 1.0
+    previous = closed_loop_poles(A, B, C, D, K)
+    for _ in range(60):
+        if np.max(np.abs(previous), initial=0.0) >= radius:
+            return K
+        current = matched_branches(previous, closed_loop_poles(A, B, C, D, 2.0 * K))
+        if np.max(np.abs(current - previous), initial=0.0) < 1e-4 * radius:
+            return 2.0 * K
+        K, previous = 2.0 * K, current
+
+    return K
+
+
+def matched_branches(previous, current):
+    """Reorder ``current`` so each entry continues the nearest ``previous`` branch.
+
+    Across the singular gain ``K = -1/d`` no pole is finite and there is nothing to
+    match: ``current`` comes back in its own order.
+    """
+    if not (np.all(np.isfinite(previous)) and np.all(np.isfinite(current))):
+        return current
+
+    # The assignment of least total distance between the two sets of poles
+    cost = np.abs(previous[:, None] - current[None, :])
+    rows, cols = linear_sum_assignment(cost)
+    ordered = np.empty_like(current)
+    ordered[rows] = current[cols]
+
+    return ordered
 
 
 def refine_jumps(A, B, C, D, gains, roots):
@@ -494,39 +566,16 @@ def refine_jumps(A, B, C, D, gains, roots):
             roots[k + 2] = matched_branches(roots[k + 1], roots[k + 2])
         else:
             k += 1
+
     return gains, roots
 
 
-def gain_reaching(A, B, C, D, radius):
-    """Gain at which the farthest closed-loop pole reaches ``radius``.
+def uniform_step(t):
+    """The step ``dt`` of a uniform time grid of at least two samples."""
+    if t.size < 2:
+        raise ValueError("step_response needs at least two time samples")
+    dt = t[1] - t[0]
+    if not np.allclose(np.diff(t), dt):
+        raise ValueError("step_response needs a uniform time grid")
 
-    Stops early when doubling the gain no longer moves the poles (every
-    branch has arrived at a finite zero).
-    """
-    K = 1.0
-    previous = closed_loop_poles(A, B, C, D, K)
-    for _ in range(60):
-        if np.max(np.abs(previous), initial=0.0) >= radius:
-            return K
-        current = matched_branches(previous, closed_loop_poles(A, B, C, D, 2.0 * K))
-        if np.max(np.abs(current - previous), initial=0.0) < 1e-4 * radius:
-            return 2.0 * K
-        K, previous = 2.0 * K, current
-    return K
-
-
-def matched_branches(previous, current):
-    """Reorder ``current`` so each entry continues the nearest ``previous`` branch.
-
-    Across the singular gain ``K = -1/d`` no pole is finite and there is nothing to
-    match: ``current`` comes back in its own order.
-    """
-    from scipy.optimize import linear_sum_assignment
-
-    if not (np.all(np.isfinite(previous)) and np.all(np.isfinite(current))):
-        return current
-    cost = np.abs(previous[:, None] - current[None, :])
-    rows, cols = linear_sum_assignment(cost)
-    ordered = np.empty_like(current)
-    ordered[rows] = current[cols]
-    return ordered
+    return dt
