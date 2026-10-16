@@ -1,8 +1,12 @@
-"""Automatic compile-backend resolution shared by simulators."""
+"""The automatic compile backend: JAX when the system traces, NumPy otherwise."""
 
 import logging
 
 from minilink.core.backends import BACKEND_AUTO, BACKEND_JAX, BACKEND_NUMPY
+
+###############################################################################
+# Public API
+###############################################################################
 
 
 def resolve_auto_backend(build, compile_backend):
@@ -12,13 +16,17 @@ def resolve_auto_backend(build, compile_backend):
     falls back to NumPy on import or compile failure; any other value compiles
     exactly as requested.
     """
+    # A named backend compiles as requested
     if compile_backend != BACKEND_AUTO:
         return compile_backend, build(compile_backend)
 
+    # NumPy when JAX does not import (a bare probe: the evaluators apply the x64 policy)
     try:
         import jax  # noqa: F401
     except ImportError:
         return BACKEND_NUMPY, build(BACKEND_NUMPY)
+
+    # JAX first, NumPy when the system does not compile under JAX
     try:
         return BACKEND_JAX, build(BACKEND_JAX)
     except Exception:
