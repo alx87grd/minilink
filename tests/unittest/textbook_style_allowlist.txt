@@ -241,5 +241,4 @@ underscore	minilink/graphical/signals/time_signals.py::_labels_and_units_for_ext
 underscore	minilink/graphical/signals/time_signals.py::_labels_for_vector	1
 underscore	minilink/graphical/signals/time_signals.py::_normalize_plot_signals	1
 underscore	minilink/graphical/signals/time_signals.py::_units_for_vector	1
-underscore	minilink/planning/trajectory_optimization/planner.py::TrajectoryOptimizationPlanner._iteration_from_z	1
 unnamed-matrix	minilink/dynamics/catalog/pendulum/pendulum.py::Pendulum.H	1
