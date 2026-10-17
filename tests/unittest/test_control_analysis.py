@@ -2106,3 +2106,20 @@ class TestSensitivity(unittest.TestCase):
             sensitivity(plant=plant, controller=C)
         H = transfer_function(plant, of=("y", 0))
         self.assertEqual(sensitivity(plant=H, controller=C).n, 4)
+
+    def test_a_reference_form_controller_is_refused_with_its_fix(self):
+        from minilink.analysis import sensitivity, transfer_function
+        from minilink.blocks.transfer_function import TransferFunction
+
+        H = TransferFunction([1.0], [1.0, 3.0, 2.0])
+        C = PI(2.0, 1.0, ports="reference")
+        fix = r'controller=transfer_function\(controller, wrt="r"\)'
+        with self.assertRaisesRegex(ValueError, r"2 input\(s\).*" + fix):
+            sensitivity(plant=H, controller=C)
+        np.testing.assert_allclose(
+            self.response(
+                sensitivity(plant=H, controller=transfer_function(C, wrt="r"))
+            ),
+            self.response(sensitivity(plant=H, controller=PI(2.0, 1.0))),
+            atol=1e-9,
+        )
