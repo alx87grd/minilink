@@ -433,11 +433,13 @@ Systems-as-descriptions: CONSTITUTION.md §4.*
   add a long introduction, section map, run recipe, or flag explanation at the top — the
   code plus inline comments must tell the story. Notebooks are course material: do not
   trim their markdown unless asked.
-- **5.24 Docstrings and comments are timeless.** They state the math and the contract as a
-  textbook would. They never name the design process (step ids, audits, dates, "decided",
-  "landed"), the course or its exercises, or what another library refuses; that history
+- **5.24 Docstrings, comments and messages are timeless.** They state the math and the
+  contract as a textbook would. They never name the design process (step ids, audits, dates,
+  "decided", "landed", "for now", "currently", "until pipeline B", a ROADMAP or TODO
+  section), the course or its exercises, or what another library refuses; that history
   lives in `docs/plans/`, `docs/reviews/` and the git log. The same holds for test
-  docstrings and comments.
+  docstrings and comments, and for refusal and warning messages: a refusal says what is
+  supported and what to pass instead.
 - **5.25 One verb family per role:** A helper's name says its role.
   - `require_*` raises when a precondition fails; its docstring opens with "Refuse".
   - `check_*` validates and returns nothing.
