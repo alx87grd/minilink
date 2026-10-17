@@ -605,8 +605,8 @@ def field_bounds(field):
     raise TypeError(f"unsupported field type for plotting: {type(field).__name__}")
 
 
-def draw_shape(ax, shape, color, alpha):
-    """Draw a sphere, box, inflated shape or union as filled patches."""
+def draw_shape(ax, shape, color, alpha, pad=0.0):
+    """Draw a sphere, box, inflated shape or union as filled patches, grown by ``pad``."""
     import matplotlib.patches as mpatches
 
     if isinstance(shape, Sphere):
@@ -614,7 +614,7 @@ def draw_shape(ax, shape, color, alpha):
         ax.add_patch(
             mpatches.Circle(
                 (float(center[0]), float(center[1])),
-                float(shape.radius),
+                float(shape.radius) + pad,
                 facecolor=color,
                 edgecolor="k",
                 linewidth=0.8,
@@ -626,41 +626,42 @@ def draw_shape(ax, shape, color, alpha):
     if isinstance(shape, Box):
         lower = np.asarray(shape.lower, dtype=float)
         upper = np.asarray(shape.upper, dtype=float)
-        ax.add_patch(
-            mpatches.Rectangle(
-                (float(lower[0]), float(lower[1])),
-                float(upper[0] - lower[0]),
-                float(upper[1] - lower[1]),
+        corner = (float(lower[0]), float(lower[1]))
+        width = float(upper[0] - lower[0])
+        height = float(upper[1] - lower[1])
+        # A box grown by pad: the same box with its corners rounded at radius pad
+        if pad > 0.0:
+            patch = mpatches.FancyBboxPatch(
+                corner,
+                width,
+                height,
+                boxstyle=f"round,pad={pad}",
                 facecolor=color,
                 edgecolor="k",
                 linewidth=0.8,
                 alpha=alpha,
                 zorder=4,
             )
-        )
+        else:
+            patch = mpatches.Rectangle(
+                corner,
+                width,
+                height,
+                facecolor=color,
+                edgecolor="k",
+                linewidth=0.8,
+                alpha=alpha,
+                zorder=4,
+            )
+        ax.add_patch(patch)
         return
     if isinstance(shape, Inflated):
-        # An inflated sphere is the larger disc; any other base is drawn as it is
-        if isinstance(shape.base, Sphere):
-            center = np.asarray(shape.base.center, dtype=float)
-            radius = float(shape.base.radius) + float(shape.radius)
-            ax.add_patch(
-                mpatches.Circle(
-                    (float(center[0]), float(center[1])),
-                    radius,
-                    facecolor=color,
-                    edgecolor="k",
-                    linewidth=0.8,
-                    alpha=alpha,
-                    zorder=4,
-                )
-            )
-            return
-        draw_shape(ax, shape.base, color, alpha)
+        # An inflated shape is its base grown by the inflation radius
+        draw_shape(ax, shape.base, color, alpha, pad + float(shape.radius))
         return
     if isinstance(shape, Union):
         for member in shape.shapes:
-            draw_shape(ax, member, color, alpha)
+            draw_shape(ax, member, color, alpha, pad)
         return
     raise TypeError(f"unsupported shape type for plotting: {type(shape).__name__}")
 

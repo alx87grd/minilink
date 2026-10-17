@@ -1731,6 +1731,42 @@ def test_scene_plot_smoke():
     assert len(ax.lines) >= 1
 
 
+def test_drawn_shapes_span_their_bounds():
+    """Each shape's patches span shape_bounds: an inflated box grows, rounded."""
+    import matplotlib
+
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
+
+    from minilink.core.geometry import Box, Inflated, Union
+    from minilink.planning.spatial.plotting import draw_shape, shape_bounds
+
+    box = Box([0.0, 0.0], [2.0, 1.0])
+    shapes = [
+        Sphere([1.0, 2.0], 0.5),
+        box,
+        Inflated(box, 0.3),
+        Inflated(Sphere([1.0, 2.0], 0.5), 0.2),
+        Union((Inflated(box, 0.4), Sphere([4.0, 0.0], 0.5))),
+    ]
+    for shape in shapes:
+        fig, ax = plt.subplots()
+        draw_shape(ax, shape, "gray", 0.5)
+        boxes = [
+            patch.get_patch_transform().transform_path(patch.get_path()).get_extents()
+            for patch in ax.patches
+        ]
+        drawn = [
+            min(b.x0 for b in boxes),
+            max(b.x1 for b in boxes),
+            min(b.y0 for b in boxes),
+            max(b.y1 for b in boxes),
+        ]
+        (x_lo, x_hi), (y_lo, y_hi) = shape_bounds(shape)
+        np.testing.assert_allclose(drawn, [x_lo, x_hi, y_lo, y_hi], atol=1e-9)
+        plt.close(fig)
+
+
 def test_sample_field_costs_matches_point_probe_cost():
     scene = Scene(obstacles=(Sphere([2.0, 0.0], 0.5),))
     body = _holonomic_point()
