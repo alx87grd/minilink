@@ -138,8 +138,10 @@ class Drone2D(MechanicalSystem):
         }
 
     def get_dynamic_geometry(self, x, u, t=0, params=None):
+        params = self.params if params is None else params
+
         # The thrust arrows, 0.08 m per newton, at each thruster along the body vertical
-        offset = self.params["thruster_offset"]
+        offset = params["thruster_offset"]
         scale = 0.08
         thrust_1 = Arrow(
             base=(-offset, 0.0),
@@ -191,7 +193,7 @@ class Drone2DWithSideThruster(Drone2D):
 
     def get_dynamic_geometry(self, x, u, t=0, params=None):
         # The two vertical thrust arrows, then the lateral one at the c.g.
-        dynamic = super().get_dynamic_geometry(x, u[:2], t)
+        dynamic = super().get_dynamic_geometry(x, u[:2], t, params)
         lateral = Arrow(
             base=(0.0, 0.0),
             vector=(1.0, 0.0),

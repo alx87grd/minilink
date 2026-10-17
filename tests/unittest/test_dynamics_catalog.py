@@ -1036,6 +1036,9 @@ PARAMS_CASES = [
         "current_velocity",
         np.array([1.0, -0.5]),
     ),
+    # The planar drones: the thrust arrows at the thrusters
+    (stored(Drone2D), "get_dynamic_geometry", "thruster_offset", 0.7),
+    (stored(Drone2DWithSideThruster), "get_dynamic_geometry", "thruster_offset", 0.7),
 ]
 
 
