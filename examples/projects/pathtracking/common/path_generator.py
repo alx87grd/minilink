@@ -17,8 +17,10 @@ def rounded_rectangle_path(
     Counter-clockwise from the right end of the top edge, as an ``(N, 2)`` array:
     ``nseg`` points per edge and ``narc`` per corner arc (at least 2 each), a
     waypoint closer than ``min_ds`` to the previous one dropped. The last arc ends
-    where the top edge starts; ``closed=False`` drops the last waypoint when it lies
-    within ``min_ds`` of the first.
+    where the top edge starts: ``closed=True`` drops that last waypoint when it lies
+    within ``min_ds`` of the first, since the closing segment (``iter_segments(...,
+    closed=True)``) returns there; ``closed=False`` keeps it, so the open path runs
+    the whole loop.
     """
     nseg = max(2, int(nseg))
     narc = max(2, int(narc))
@@ -55,8 +57,9 @@ def rounded_rectangle_path(
     append_spaced(path, [(Lx, y) for y in ys], spacing)
     append_spaced(path, arc_points(c_TR, R, 0, 90, narc), spacing)
 
-    # An open path drops its last waypoint when it lands back on the first
-    if path and not closed:
+    # A closed path drops its last waypoint when it lands back on the first: the
+    # closing segment returns there
+    if path and closed:
         x0, y0 = path[0]
         xN, yN = path[-1]
         if math.hypot(xN - x0, yN - y0) < spacing:

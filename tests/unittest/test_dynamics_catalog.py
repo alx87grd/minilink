@@ -1203,3 +1203,17 @@ def test_an_open_path_stops_at_its_end_with_its_last_heading(module):
         ahead(square, 1, 0.2, -1.0, closed=False)
     wrapped = ahead(square, 0, 0.5, -1.0, closed=True)  # A loop wraps a negative ds
     assert [type(value) for value in wrapped] == [float, float, int, float, float]
+
+
+def test_a_closed_rounded_rectangle_does_not_repeat_its_first_waypoint():
+    from examples.projects.pathtracking.common.path_generator import (
+        rounded_rectangle_path,
+    )
+
+    closed = rounded_rectangle_path(40.0, 20.0, 7.0, nseg=2, narc=4, closed=True)
+    open_loop = rounded_rectangle_path(40.0, 20.0, 7.0, nseg=2, narc=4, closed=False)
+    # The closing segment returns to the first waypoint: no zero-length segment
+    assert np.hypot(*(closed[-1] - closed[0])) > 0.1
+    # The open path runs the whole loop, back onto its first waypoint
+    np.testing.assert_array_equal(open_loop[-1], open_loop[0])
+    np.testing.assert_array_equal(open_loop[:-1], closed)
