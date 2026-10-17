@@ -524,6 +524,41 @@ class TestDynamicProgrammingPlotting(unittest.TestCase):
             ax.collections[0].get_clim()[1], float(np.max(planner.result.J))
         )
 
+    def test_animate_cost2go_colours_up_to_jmax(self):
+        import matplotlib
+
+        matplotlib.use("Agg")
+        import matplotlib.pyplot as plt
+
+        _, result = solve(make_problem(), record_history=True)
+        for jmax, top in ((7.0, 7.0), (None, float(np.max(result.history[-1][1])))):
+            with self.subTest(jmax=jmax):
+                plt.close("all")
+                animation = plotting.animate_cost2go(result, jmax=jmax, show=False)
+                fig = plt.gcf()
+                self.assertEqual(fig.axes[0].collections[0].get_clim(), (0.0, top))
+                fig.canvas.draw()  # the first frame: the animation has rendered
+                del animation
+                plt.close(fig)
+
+    def test_batch_cost2go_draws_the_surfaces(self):
+        import matplotlib
+
+        matplotlib.use("Agg")
+        import matplotlib.pyplot as plt
+
+        _, result = solve(make_problem())
+        plt.close("all")
+        plotting.plot_cost2go(result, axes=[(0, 1), (1, 0)], show_3d=True, show=False)
+        surfaces = [
+            ax
+            for num in plt.get_fignums()
+            for ax in plt.figure(num).axes
+            if ax.name == "3d"
+        ]
+        self.assertEqual(len(surfaces), 2)
+        plt.close("all")
+
     def test_cost2go_colour_scale_has_no_default_for_a_priced_exit(self):
         self.assertIsNone(plotting.cost_scale_limit(exit_price))
         self.assertIsNone(plotting.cost_scale_limit(np.inf))
