@@ -647,19 +647,6 @@ def world_to_camera(camera):
     return W
 
 
-def identity_matrix():
-    """4x4 identity transform (primitive drawn at the world origin)."""
-    return np.eye(4)
-
-
-def empty_transform():
-    """Transform that parks a primitive far off-screen (used to hide it)."""
-    # Lazy import: the core kinematics load on first use, not with the primitives
-    from minilink.core.kinematics import translation
-
-    return translation(0.0, 0.0, -1000.0)
-
-
 # Ready-made shapes and poses
 
 
