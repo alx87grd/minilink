@@ -82,7 +82,7 @@ stays held for GRO501; its row is in §5 (v0.9).
     plots and AC-6 animation, in the plotting lane; AC-7 the cost on the plant, v0.3; AC-8a
     the sampled loop keeps in step, alongside; AC-8b with S31, v0.9.
 
-  Related rows: TB-b's loop part and T6's composition half follow AC-3; S66 lands after
+  Related rows: TB-b's loop part follows AC-3; S66 lands after
   AC-4; RN-4 and RN-5 build on AC-2, AC-4 and AC-7; S70 turns P10's refusals into
   `WiringError`; S31 brings AC-8b. The automatic `dt` and input-hold findings stay with S65.
 - Later, not v0.2: `sensitivity(T)` reading the roles of one loop diagram instead of
@@ -111,87 +111,62 @@ stays held for GRO501; its row is in §5 (v0.9).
 
 Standing work through v0.2 and into v0.3, behaviour-preserving, one module per step.
 
-**Order:** the S69 follow-up now; T1–T7 in order, with T6 after P10's AC-3; D1.1, D1.2, then D1.3
+**Order:** the S69 follow-up now; the T rows' leftovers as picked; D1.1, D1.2, then D1.3
 file by file; D2, D3 and S65–S68 as picked.
 
-**T — the textbook pass.** The AGENTS recipe (seeded baseline in the scratchpad,
-byte-identical after; ruff and the module's tests). The findings, file by file, are in
-[docs/reviews/2026-09-22-consolidation-review.md](../reviews/2026-09-22-consolidation-review.md);
-`planning/policy_synthesis/dp.py` is the reference.
-**Status (2026-10-16):** the textbook layout of TB-b and T1–T7 landed in the second-run pass
-(PR #125, [record](../reviews/2026-10-16-textbook-pass.md)); its style sheet now lives in
-RULES §5 (5.3's six blocks, 5.8, 5.10, 5.22, 5.25–5.27) and §7.8. The MPC mixin's documented
-extension hooks keep their underscore names until the maintainer rules on that contract. The
-pass changed no behaviour and no backend. What remains in the rows below are their behaviour, backend and API items, each
-recorded in the PR with its question or bug.
+**T — the textbook pass.** Landed: the textbook layout of TB-b and T1–T7 in the second-run
+pass (PR #125, 2026-10-16, [record](../reviews/2026-10-16-textbook-pass.md)), behaviour- and
+backend-preserving; its style sheet lives in RULES §5 (5.3's six blocks, 5.8, 5.10, 5.22,
+5.25–5.27) and §7.8. The pass's recorded bugs and open questions were ruled the next day and
+fixed one commit each with a regression test (PR #126, 2026-10-17,
+[rulings](../reviews/2026-10-17-textbook-pass-follow-up-rulings.md)): the plants' `tf` and
+geometry read their `params`, the MPC blocks take plain hook names and one mixin
+constructor, the wiring core keeps no shadow state, every helper name says its role. The
+rows below hold what neither PR touched, each a behaviour, backend or API item verified open
+on `dev` at 638215e; the recipe is the AGENTS one (seeded baseline, byte-identical after)
+and `planning/policy_synthesis/dp.py` the reference.
 
-- [ ] **T1 core**: `system.py` default stubs on `xp` (a returned-type decision under JAX) and
-  section comments; `feedback.py`'s `ErrorDriven` shadow state and order **[ask — core]**
-  (`ErrorDriven` stays a port-layout mixin when the controller classes go, P10 AC-0);
-  `wiring.py`'s hasattr-and-create, attribute-assigning helpers and the `_composition_*`
-  writes; `signals.py` helpers below the class; `hybrid_diagram.py` /
-  `hybrid_composition.py` names and sections. Bug found by the audit, its own test first:
-  `StepDiagramSystem.step` assigns in place on a JAX array.
-- [ ] **T2 blocks and control**: `control/mpc/utilities.py` order and names
-  (`_shift_plan_trajectory` is imported by `test_mpc.py`), the MPC package docstring;
-  `blocks/transfer_function.py`'s `tf` on `np` without `params`; `TrajectorySource.h`
-  cannot trace (`interp1d`); `action_port_of` above the class; the joint-impedance law
-  still in a helper.
+- [ ] **T1 core**: `system.py`'s default `h` stub builds `np.zeros(p)` (a returned-type
+  decision under JAX) **[ask — core]**; `wiring.py`'s `refresh` still guards with
+  `hasattr(self, "solver_info")`. Bug found by the audit, its own test first:
+  `StepDiagramSystem.step` (`core/diagram.py`) writes `x_next[start:end] = …` in place, which
+  a JAX array refuses.
+- [ ] **T2 blocks and control**: `blocks/transfer_function.py`'s `tf` calls `self.h(x, u, t)`
+  on `np` and drops `params`; `TrajectorySource.h` cannot trace (`interp1d`); `mpc/viz.py`
+  imports `HybridSimResult` at module level instead of under `TYPE_CHECKING` (RULES 3.2;
+  scan: control#12).
   Also (scan: control#2, control#5, control#7): one time-interpolation for trajectories and
   gain schedules; one warm-start helper on the plan `Trajectory`; the impedance and robotic
-  law bodies consolidated; `mpc/viz.py`'s `HybridSimResult` import under `TYPE_CHECKING`
-  (RULES 3.2; scan: control#12).
-- [ ] **T3 dynamics catalog**: `manipulators/arms.py` (helpers below,
-  `_set_planar_reach_camera` and `from_manipulator` setting attributes from outside
-  `__init__`, `link_lengths` probing with `hasattr`, FK / J reading `params` — a fix with a
-  test), `pendulum/cartpole.py` (`_configure_cartpole` inlined into `CartPole.__init__`,
-  `RotatingCartPole.tf` on `xp`), `mass_spring_damper/linear.py` (`A` / `B` / `C` / `D` on
-  `xp` — a JAX-safety fix; extend the both-backends test), `vehicles/dynamic_bicycle.py`
-  (`_u_in` / `_contact_fields` renames ripple to `racecar.py`, two project files and
-  `graphical/catalog/skins.py`), `manipulators/ur5.py` (helpers
-  and the two algorithms below the public API), `aerial/plane.py` (`tf` on `xp` reading
-  `params`; the 55-line pygame `__main__`), `abstraction/state_space.py` (helpers below), the
-  37 inline `array_module(q).array(...)` calls.
-  Also: `Manipulator` kinematics defaults raise instead of returning zeros, with
-  `link_lengths` the base contract (scan: dynamics#7).
-- [ ] **T4 analysis and simulation**: `analysis/lyapunov.py` (primary function first,
-  ceremony in a helper, `verify` / rollout unpacked, `EVEN` / `ODD` beside `METHODS`,
-  `require_jax`, `sample_in_ellipsoid` named), `simulation/simulator.py` (solver table and
-  helper below the class, `solve` before its helpers, the detached comments, a constructor of
-  named steps), `simulation/computer.py` (`as_computer` below the classes, its coercion in a
-  helper), the solver backends' comments and `_finalize_solution`.
-- [ ] **T5 planning**: `trajectory_optimization/planner.py` (primary class first, eleven `_`
-  methods — `_make_callback` in three test lines —, the `getattr` probes
-  `Transcription.supports_parametric` makes redundant, the duplicated optimizer-method
-  tuple), `transcription.py` (`trajectory_cost` named, primary class first),
-  `direct_collocation.py` / `shooting.py` / `multiple_shooting.py` (17 `_` methods,
-  `self.options.*` out of the math, the duplicated JAX closures),
-  `policy_synthesis/discretizer.py` (fourteen `_` methods, dead `_validity_masks`,
-  branch-only attributes start as `None`), `policy_eval.py`, `lookup_policy.py`,
-  `approximation.py`, `search/rrt.py` and `rrt_star.py` (21 `_` methods, five in tests;
-  `_search_callback` set in `__init__`; the dead option probes; `extenders.py` asking
-  `U.bounding_box()`), `evaluation.py` (primary class first, the scoring contract as step
-  comments), `problems.py` and `comparison.py` order, `reinforcement_learning/policy.py`,
-  `environment.py`, `critics.py`, `optim.py`, `algorithms/*` (`self.` out of the loss and
-  update math; `base.py` shadow state), `spatial/paths.py` (undeclared cached fields),
-  `collision.py`, `plotting.py`. `ReinforcementLearningPlanner(verbose=True)` keeps printing
-  by default (ruled). The parametric optimizer's backend table (OPW-1–OPW-5) changes
-  behaviour, so it is a D3 row of its own.
-- [ ] **T6 the two big ones** **[ask first]**: `core/composition.py` (after P10's AC-3: the
-  section-map docstring, the `_` helpers, the public API buried under `# Internal
-  machinery`) and `control/mpc/controller.py` (seventeen `_` methods, hasattr-and-set from
-  `export_mpc_dual_rate_computer`, the factory at line 340). Each is a conversation, then a
-  step ladder of its own.
+  law bodies consolidated.
+- [ ] **T3 dynamics catalog**: `manipulators/arms.py` (`from_manipulator` sets `_kin_arm`,
+  `name`, `camera_scale` and `camera_target` on the instance from outside `__init__`;
+  `link_lengths` probes with `hasattr`), `mass_spring_damper/linear.py` (`A` / `B` / `C` / `D`
+  on `np`, so they do not trace — a JAX-safety fix; extend the both-backends test),
+  `aerial/plane.py` (the 55-line pygame `__main__`, a demo in disguise, RULES 5.18).
+  Also: `Manipulator` kinematics defaults (`forward_kinematic_effector`, `J`) return zeros
+  instead of raising, with `link_lengths` the base contract (scan: dynamics#7).
+- [ ] **T4 analysis**: `analysis/lyapunov.py`'s `EVEN` / `ODD` slices sit under Internal
+  machinery, apart from `METHODS` at the top.
+- [ ] **T5 planning**: `trajectory_optimization/planner.py` probes
+  `getattr(transcription, "supports_parametric", False)` and keeps the optimizer-method
+  table as a `_USER_OPTIMIZER_METHODS` class attribute; `direct_collocation.py` /
+  `shooting.py` / `multiple_shooting.py` read `self.options.*` inside their bodies;
+  `search/extenders.py` asks `getattr(U, "box", None)` instead of `U.bounding_box()` (also a
+  D3 row); `spatial/paths.py`'s `PolylinePath` sets `_seg_lengths`, `_s_knots` and
+  `_total_length` through `object.__setattr__` without declaring them as fields.
+  `ReinforcementLearningPlanner(verbose=True)` keeps printing by default (ruled). The
+  parametric optimizer's backend table (OPW-1–OPW-5) changes behaviour, so it is a D3 row of
+  its own.
+- [ ] **T6 the MPC block's contract** **[ask first]**: `export_mpc_dual_rate_computer`'s
+  single-rate path still undoes the dual-rate hooks with `hasattr(block, "replan_divisor")`
+  and `hasattr(latch, "set_after_solve")`; `validate_mpc_planner` probes the planner's
+  verbs with `hasattr`.
   Also: one record per MPC tick, `Command` and `MPCTickSolve` folded into the
   `PlanningSolution` (scan: control#4). The MPC port rename (`x` + `r` → `u`, extras `x_ff`
   and `z`) and the dual-rate composite's `u` are P10's AC-3 and AC-8a. The shape proposed for
   the planner contract (three `Planner` verbs, `z` on the tick's record,
   `validate_mpc_planner` reading them) is [mppi.md](mppi.md) §6; MP-4 there is this step's
   second consumer, and the trajopt MPC baselines are its safety net.
-- [ ] **T7 graphical** (scan: graphics#13): the graphical band joins the textbook pass
-  (renderers, catalog skins, signal plots), same recipe.
-- [ ] **Rename pass, the rest**: the remaining `_method` names on `System` subclasses not
-  covered by T1–T6 → plain names (maintainer style rule). **[ask per module]**
 
 **D1 — demos to the rule** (RULES 6.1 / 6.10 / 6.11; the census is comment FD-C14 of the
 foundations review, docs/reviews/2026-09-15-foundations-review.md).
@@ -287,8 +262,9 @@ pick):
   assigning into `q.labels[i]` in place no longer sticks; the gravity hook's signature is
   read on every call; the collocation demo's SLSQP fallback is not run in CI (its manifest
   entry still requires Ipopt).
-- [ ] Bare `import jax` in `analysis/lyapunov.py` and
-  `trajectory_optimization/parametric_evaluator.py` → `require_jax()` (RULES 5.12).
+- [ ] Bare `import jax` in `simulation/compile_backend.py` and `from jax.errors` in
+  `analysis/derivatives.py` → `require_jax()` (RULES 5.12); the two rows the textbook-style
+  allowlist still carries.
 
 **S65–S69 — one owner per rule, contracts as tests, students' laptops:**
 
@@ -321,8 +297,8 @@ pick):
   touching `sys.x0`.
 - [ ] **S68 Contracts as tests** (RULES 6.12; scan: tests-ci#3, tests-ci#5, tests-ci#9,
   tests-ci#10, tests-ci#11, tests-ci#14, docs-gov#1, docs-gov#2, examples#8, control#11,
-  planning#10, dynamics#11): the RULES 5.8 underscore check a repo-wide ratchet with a
-  shrinking allowlist; ROADMAP §5 step ids and TODO rows agree, and no plan doc numbers its
+  planning#10, dynamics#11; the RULES 5.8 ratchet landed as
+  `tests/unittest/textbook_style.py` with its allowlist): ROADMAP §5 step ids and TODO rows agree, and no plan doc numbers its
   steps with a bare workboard-style id (scan: docs-gov#3); the CI regression flags agree
   across `test.yml`, `tests/run/_common.py` and the tests/README Agent table (scan:
   tests-ci#4); the subprocess demo-check tests behind a marker; wall-clock claims out of

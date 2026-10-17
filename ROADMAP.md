@@ -70,15 +70,15 @@ a release process by themselves.
 | **TRL 8** | Demo Released | Demo script is created and validated |
 | **TRL 9** | Mission Complete | Tests, demo, and user approval are all complete |
 
-State as of 2026-10-12. Step ids (`S29`, `P4`, `T2`, …) are the rows of
+State as of 2026-10-17. Step ids (`S29`, `P4`, `T2`, …) are the rows of
 [docs/plans/TODO.md](docs/plans/TODO.md).
 
 | Area | Lane | TRL | State | Next |
 | --- | --- | --- | --- | --- |
 | Core + diagrams | teaching | 7 | Public API and diagram API stable; compile-vs-reference parity tested; wrong-shape `f` / `h` fails at `compile()`. | Automation by convention (P10, v0.2); derived `x0` (S29, v0.9). |
 | Compile (`core/compile/`) | teaching (frozen subset) | 4 | Integrated; the frozen evaluator subset is named in DESIGN §5, the stable-internal helper grid kept by ruling. Speed lives in batches (1000 rollouts × 1000 RK4 steps in 27 ms); float64 on JAX by default. | `rollout_batch` with a `params` family (S53); the differentiable closed-loop cost (V1, v0.3); evaluator/solver re-layering (S37, v0.9). |
-| Simulation | teaching | 7 | Mature; fixed 10 001-point default grid; `verbose` names unified. | Textbook pass (T4). |
-| Dynamics (abstraction + catalog) | teaching | 7 | Plants QA'd; `MechanicalSystem` / `Manipulator`; UR5 ABA/RNEA; **every catalog plant compiles on both backends** (contract test); four-rung vehicle ladder; UdeS racecar (kinematic, dynamic, 3-D). | Textbook pass (T3); catalog hygiene (S64); mechanical-base unification (S32, after v1.0). |
+| Simulation | teaching | 7 | Mature; fixed 10 001-point default grid; `verbose` names unified; the textbook pass's layout landed (2026-10-16). | One owner per rule (S65). |
+| Dynamics (abstraction + catalog) | teaching | 7 | Plants QA'd; `MechanicalSystem` / `Manipulator`; UR5 ABA/RNEA; **every catalog plant compiles on both backends** (contract test); four-rung vehicle ladder; UdeS racecar (kinematic, dynamic, 3-D); the textbook pass's layout landed and every `tf` reads its `params` (2026-10-17). | Catalog hygiene (S64); mechanical-base unification (S32, after v1.0). |
 | Control | teaching | 6 | Linear, LQR (infinite horizon, finite horizon, along a trajectory), pole placement, reference scaling (`N`), `P` / `PI` / `PD` / `PID` and the rate-measured `ImpedanceController` / `ImpedanceIntegralController` as one family (what is measured decides the derivative; limits with infinite defaults, anti-windup once a limit is declared; the shared pieces three pure functions), model-based SMC and computed torque, robotic impedance and kinematic laws, neural policy block; a controller is a plain `System`. | P10's resolver and composition steps; the textbook pass's layout landed (2026-10-16). |
 | Analysis | teaching | 6 | Jacobians, linearize, structural, equilibria, modal; one-channel Bode with grid-free margins, pole-zero, root locus, Nyquist, the linear step response on matplotlib and plotly; the sensitivity functions `S` / `T` / `PS` / `CS`. Every verb takes any `System`, the linear model as is, the rest linearized at the operating point (2026-10-15). | z tier held (P6); Nichols and overlays later; the textbook pass's layout landed (2026-10-16). |
 | Blocks | teaching | 5 | Routing, nonlinear, filters, sources (with `Sine`), TF, 1-layer NN. | `Ramp` / `Chirp` / `Delay` / `Switch` (C3, v0.3); the textbook pass's layout landed (2026-10-16). |
@@ -92,7 +92,7 @@ State as of 2026-10-12. Step ids (`S29`, `P4`, `T2`, …) are the rows of
 | Planning / path integral (MPPI) | research lane (planned) | 1 | Two standalone scripts (`examples/experimental/mppi/`): the pendulum swings up; the kinematic racecar laps the cone circuit at a lower closed-loop cost than the collocation MPC. Design: [mppi.md](docs/plans/mppi.md). | The planner (S72), after RN-4 / RN-5. |
 | Geometry / spatial | provisional (teaching) | 4 | SDF + `Scene` / fields / bodies under `planning/spatial/`, JAX twins tested; the planning facade's spatial names are provisional teaching names (§2). Home designed: `core/geometry/`. | Package move and course catalog (A3); bicubic SDF and CBF filter (research). |
 | Graphics / animation | teaching | 5 | Frame-keyed `tf` / geometry / overlays; four renderers; auto-fit camera. | Camera and plot defaults from roles (P10); constructor-derived camera hints (S43); glyph/solid rename (S30, v0.9). |
-| Hybrid / step / MPC | provisional (research) | 4 | `StepSystem`, `Computer`, `HybridDiagram`, `HybridSimulator`, MPC with parametric JAX. A side helper for MPC simulation; the sampled loop is the one thing that is not a `System`. | Keeps in step with the core rules (P10); no new hybrid features before S31 (v0.9); the textbook pass's layout landed (2026-10-16); the MPC mixin's extension-hook names wait on a ruling. |
+| Hybrid / step / MPC | provisional (research) | 4 | `StepSystem`, `Computer`, `HybridDiagram`, `HybridSimulator`, MPC with parametric JAX. A side helper for MPC simulation; the sampled loop is the one thing that is not a `System`. | Keeps in step with the core rules (P10); no new hybrid features before S31 (v0.9); the textbook pass's layout landed (2026-10-16) and the MPC blocks read plain hook names from one mixin constructor (2026-10-17). |
 | Realtime simulation | provisional | 2 | `RealtimeSimulator` + pygame I/O. | Architectural review (v1.0); later the human-demonstration recorder of the behavior-cloning pipeline (after v1.0). |
 | Estimation | teaching (GRO501) | 6 | `StateObserver` (innovation form, operating point on the block, hat labels), `luenberger` and `kalman` on arrays, a linear model or the plant (the duals of `place` and `lqr`, 2026-10-14); `lqg` returns the observer + gain box; an observer is refused as a controller; `closed_loop(gain, plant, observer=obs)` wires the LQG loop by role (AC-4, 2026-10-14). | the trajectory observer and the finite-horizon filter, the EKF, the estimation problem and its tools (v0.9, [the plan](docs/plans/estimation-and-state-feedback.md)). |
 | Identification | planned | 2 | Parametric-tier prototype only. | `fitting.py` (C4, v0.3). |
@@ -255,11 +255,11 @@ TB-a, P7, P5, P8, P9.
 
 **Wave D — the code reads like the textbook, and the demos like the API.** Standing work,
 behaviour-preserving, one module per step.
-- **T1–T6** The textbook pass, module by module, in the order of the
-  [2026-09-22 audit](docs/reviews/2026-09-22-consolidation-review.md): core (T1), blocks
-  and control (T2), the dynamics catalog (T3), analysis and simulation (T4), planning (T5),
-  then `composition.py` and `mpc/controller.py` (T6, each a maintainer conversation
-  first). **T7** The graphical band.
+- **T1–T7** The textbook pass landed in one run (PR #125, 2026-10-16, [the
+  record](docs/reviews/2026-10-16-textbook-pass.md)) and its recorded bugs and open questions
+  were ruled and fixed the next day (PR #126, [the
+  rulings](docs/reviews/2026-10-17-textbook-pass-follow-up-rulings.md)); its style sheet is
+  RULES §5. What is left of each row is a behaviour, backend or API item, listed in TODO §3.
 - **D1** Demos and notebooks to the minimal rule (RULES 6.1 / 6.10 / 6.11). **[ask per
   file]**
 - **D2** Consolidation picks still open from the 2026-09-05 inventory.

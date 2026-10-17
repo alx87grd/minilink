@@ -352,7 +352,7 @@ Systems-as-descriptions: CONSTITUTION.md §4.*
   ```
   Reserve leading underscores for module-level
   private constants and purely local closures. Existing underscore helpers migrate under
-  workboard step S68, which widens the check to the whole repo with a shrinking allowlist.
+  the repo-wide ratchet `tests/unittest/textbook_style.py`, whose allowlist only shrinks.
 - **5.9 The first-screen rule:** The module docstring and primary class definition must appear within
   the first screen (~50 lines). Place complex validation and helper machinery below.
 - **5.10 Standard module section order:**
