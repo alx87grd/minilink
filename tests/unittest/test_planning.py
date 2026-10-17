@@ -1089,6 +1089,54 @@ def test_edge_resolution_rejects_segment_through_obstacle():
     assert planner_coarse.edge_is_free(edge)
 
 
+class ShrinkingInputs(InputSet):
+    """|uᵢ| ≤ 1 − |x₀| / 2, or ≤ ``u_max`` when the set parameters give one."""
+
+    def margin(self, u, x=None, t=0.0, params=None):
+        limit = 1.0 - 0.5 * abs(x[0]) if params is None else params["u_max"]
+        return limit - np.abs(u)
+
+
+def edge_inputs_problem(params=None):
+    from minilink.dynamics.catalog.vehicles.steering import HolonomicMobileRobot
+
+    sys = HolonomicMobileRobot()
+    sys.state.lower_bound = np.array([-6.0, -6.0])
+    sys.state.upper_bound = np.array([6.0, 6.0])
+    kwargs = {} if params is None else {"params": params}
+    return PlanningProblem(
+        sys=sys,
+        x_start=np.zeros(2),
+        x_goal=np.ones(2),
+        U=ShrinkingInputs(),
+        **kwargs,
+    )
+
+
+def straight_edge(x0, u0):
+    return Edge(
+        states=np.array([[x0, 0.0], [x0 + 0.1 * u0, 0.0]]),
+        inputs=np.array([[u0, 0.0]]),
+        times=np.array([0.0, 0.1]),
+        cost=0.1,
+    )
+
+
+def test_edge_inputs_are_checked_at_their_states():
+    planner = RRTPlanner(
+        edge_inputs_problem(), extender=KinodynamicExtender(controls=COMPASS)
+    )
+    assert planner.edge_is_free(straight_edge(0.0, 0.6))  # |u| ≤ 1 at x₀ = 0
+    assert not planner.edge_is_free(straight_edge(1.6, 0.6))  # |u| ≤ 0.2 at x₀ = 1.6
+
+
+def test_edge_inputs_read_the_set_parameters():
+    problem = edge_inputs_problem(ProblemParameters(sets={"u_max": 0.3}))
+    planner = RRTPlanner(problem, extender=KinodynamicExtender(controls=COMPASS))
+    assert planner.edge_is_free(straight_edge(0.0, 0.2))
+    assert not planner.edge_is_free(straight_edge(0.0, 0.6))
+
+
 def test_tree_rewire_and_propagate_cost():
     edge_ab = Edge(
         states=np.array([[0.0, 0.0], [1.0, 0.0]]),

@@ -348,8 +348,12 @@ class RRTPlanner(Planner):
             ):
                 return False
 
+        # Each input at the state it is applied from: u_k ∈ U(x_k)
         if problem.U is not None:
-            if not all(problem.U.contains(u) for u in edge.inputs):
+            if not all(
+                problem.U.contains(u, x, params=set_params)
+                for x, u in zip(edge.states[:-1], edge.inputs)
+            ):
                 return False
 
         return True
