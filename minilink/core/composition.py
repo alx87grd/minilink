@@ -62,9 +62,12 @@ def add_systems(*systems: System | DiagramSystem) -> DiagramSystem:
         else:
             add_system_to_diagram(diagram, sys)
 
-    # The first operand's name, x0 and camera, when it is a diagram
+    # The first operand's name, x0 and camera, when it is a diagram; else the
+    # sum as written
     if systems:
         carry_left_operand(diagram, systems[0])
+        if not isinstance(systems[0], DiagramSystem):
+            diagram.name = " + ".join(sys.name for sys in systems)
 
     return diagram
 
@@ -108,8 +111,11 @@ def series(
     for next_sys in rest:
         series_pair(diagram, next_sys)
 
-    # The left operand's name, x0 and camera, when it is a diagram
+    # The left operand's name, x0 and camera, when it is a diagram; else the
+    # chain as written
     carry_left_operand(diagram, left)
+    if not isinstance(left, DiagramSystem):
+        diagram.name = " >> ".join(sys.name for sys in (left, right, *rest))
 
     return diagram
 
@@ -153,7 +159,7 @@ def feedback(sys, filter=1, *, of=None, sign=-1.0, validate=True) -> DiagramSyst
     # The junction on the entry: e = r − H y, a signed Sum for any other sign
     close_on(diagram, entries, filter, of=of, sign=sign)
 
-    diagram.name = f"Closed loop of {sys.name}"
+    diagram.name = f"feedback({sys.name})"
     if validate:
         diagram.check_algebraic_loops()
 
@@ -314,7 +320,7 @@ def closed_loop(
         drive(diagram, target, "n", noise, "noise")
 
     # The loop's name and camera, then the algebraic-loop check
-    diagram.name = f"Closed loop {plant.name} with {controller.name}"
+    diagram.name = f"{controller.name} @ {plant.name}"
     propagate_animation_camera(diagram, plant_box)
     if validate:
         diagram.check_algebraic_loops()
@@ -1192,10 +1198,8 @@ def default_subsystem_id(sys, *, role=None) -> str:
 
 
 def base_system_id(sys) -> str:
-    """The block's name as an id; its class name when the name is empty or a generic ``System`` / ``DynamicSystem``."""
+    """The block's name as an id; its class name when the name is empty."""
     raw = getattr(sys, "name", "") or sys.__class__.__name__
-    if raw in {"System", "DynamicSystem"}:
-        raw = sys.__class__.__name__
 
     return normalize_identifier(raw)
 

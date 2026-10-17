@@ -224,8 +224,9 @@ The GRO860 path is green (§4.1) and `0.1.1` is published. One standing rule rem
 Three waves: A and B in parallel, D throughout.
 
 **Wave A — the textbook objects finish speaking.**
-- **A4** Naming quick wins of [naming.md](docs/plans/naming.md): the class name as the
-  default `name`, informative shortcut names, `id` documented.
+- **A4** The naming quick wins of [naming.md](docs/plans/naming.md) landed 2026-10-17 (the
+  class name as the default `name`, a shortcut named as the expression it builds, `id`
+  documented); its `jmax` and operator-export items stay.
 - **A5** The later nouns, each with its first consumer: `log_prob`, sets and distributions
   over parameter dictionaries, `UnionSet`, `PlanningProblem.hamiltonian()` only if a course
   teaches Pontryagin.

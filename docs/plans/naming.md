@@ -1,8 +1,9 @@
 # Names of blocks and signals: one rule
 
 Status: core contract, audit done 2026-09-13. Quick win 5 (`print(sys)`) landed
-2026-09-17; wins 1, 3 and 6 are step A4 of [TODO.md](TODO.md) (v0.2 wave A); wins 2 and 4
-moved to P10. The "not quick" alignments are open decisions in ROADMAP §6.
+2026-09-17; wins 1, 3 and 6 (step A4) landed 2026-10-17, with one rule for the composite
+names: a shortcut is named as the expression it builds (`PID @ Pendulum`,
+`Step >> Integrator`, `A + B`, `feedback(G)`); wins 2 and 4 moved to P10. The "not quick" alignments are open decisions in ROADMAP §6.
 
 **Since 2026-10-11** ([automation-by-convention.md](automation-by-convention.md) §2.2): the
 role names `plant`, `controller` and `estimator` are reserved keys. In a shortcut a role name
@@ -49,19 +50,19 @@ in `arm`.
 Each is a few lines plus a test, no test asserts the current behavior, and none restructures
 anything.
 
-1. The default `name` is the class name. A user's `MyPlant` shows as `MyPlant` in block labels,
-   plot titles and loop names; classes that set a name keep it, and the id code no longer needs
-   its special case.
+1. ~~The default `name` is the class name.~~ Landed 2026-10-17: `System.__init__` sets
+   `type(self).__name__`, the id code's special case is gone.
 2. One closed-loop name. The error-driven path (`PID() @ plant`) names the loop
    "Closed loop {plant} with {controller}", as the other path does.
-3. Informative default names where a shortcut would say `Diagram`: `P Controller >> Integrator`
-   for a series, and the plant's own name for the sampled loop's plant wrapper. Only a default
-   name is replaced.
+3. ~~Informative default names where a shortcut would say `Diagram`.~~ Landed 2026-10-17 as
+   the expression rule: `A >> B`, `A + B`, `C @ G`, `feedback(G)`; the sampled loop's plant
+   wrapper takes the plant's name. A diagram operand still carries its own name, so
+   `a >> b >> c` built with operators reads `A >> B`.
 4. ~~The sampled loop's plant wrapper honors `plant.id`.~~ Replaced by the role names
    (P10): the sampled loop's plant is `plant`, as in every loop kind.
 5. ~~`print(sys)` gives a short text summary: name, class, `n`, and the ports with their
    dimensions; a diagram adds its keys.~~ Landed 2026-09-17 (`System.__str__`).
-6. The `System` docstring documents `id` as the key override.
+6. ~~The `System` docstring documents `id` as the key override.~~ Landed 2026-10-17.
 
 ## Not quick
 

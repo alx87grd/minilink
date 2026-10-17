@@ -35,12 +35,9 @@ the triage in [2026-09-22-improvement-suggestions.md](../reviews/2026-09-22-impr
 
 Design: [naming.md](naming.md). Runs in parallel with wave B.
 
-- [ ] **A4 Naming quick wins** of [naming.md](naming.md), each a few lines plus a test: the
-  class name as the default `name`; informative default names where a shortcut says
-  `Diagram`; `id` documented on `System`. (The closed-loop name and the role names are P10's
-  AC-3 and AC-2.) Done when composed diagrams' keys, params dictionaries and trajectories are
-  byte-identical before and after.
-  Also: one colour keyword, `jmax`, across DP, tabular RL, `PolicyEvaluator` and
+- [ ] **A4 Naming, the rest** (wins 1, 3 and 6 of [naming.md](naming.md) landed 2026-10-17:
+  the class name as the default `name`, shortcuts named as the expression they build, `id`
+  documented): one colour keyword, `jmax`, across DP, tabular RL, `PolicyEvaluator` and
   `Comparison`, with S54's clipping (scan: planning#3, examples#5); `plot_cost2go` keeps its
   name to v1.0 and its rename to `plot_cost_to_go` (the name the solution and `Comparison`
   already use) is on V4's list; the operators' named forms exported together (scan: core#9).

@@ -610,3 +610,44 @@ def test_signal_dim_is_a_whole_nonnegative_number():
     ):
         with pytest.raises(ValueError, match=message):
             infer_signal_dim("r", dim=dim)
+
+
+class TestDefaultNames(unittest.TestCase):
+    """A block's default name is its class name; a shortcut's name is the expression."""
+
+    def test_default_name_is_the_class_name(self):
+        from minilink import DynamicSystem, Pendulum, StepSystem, System
+
+        class MyPlant(DynamicSystem):
+            def __init__(self):
+                super().__init__(n=1, input_dim=1, output_dim=1)
+
+        class MyStep(StepSystem):
+            def __init__(self):
+                super().__init__(n=1, input_dim=1, output_dim=1)
+
+        self.assertEqual(MyPlant().name, "MyPlant")
+        self.assertEqual(MyStep().name, "MyStep")
+        self.assertEqual(System().name, "System")
+        self.assertEqual(Pendulum().name, "Pendulum")
+
+        # The diagram key follows the name, so a user's class keys itself
+        diagram = MyPlant() + Integrator()
+        self.assertEqual(list(diagram.subsystems), ["my_plant", "integrator"])
+
+    def test_shortcut_names_read_as_the_expression(self):
+        from minilink import PID, Pendulum, feedback
+
+        source = Step(final_value=[1.0], step_time=0.0)
+        self.assertEqual((source >> Integrator()).name, "Step >> Integrator")
+        self.assertEqual(
+            (source >> Integrator() >> Integrator()).name, "Step >> Integrator"
+        )  # the second >> sees a diagram on its left and carries its name
+        self.assertEqual((Integrator() + Pendulum()).name, "Integrator + Pendulum")
+        self.assertEqual((PID() @ Pendulum()).name, "PID @ Pendulum")
+        self.assertEqual(feedback(Integrator()).name, "feedback(Integrator)")
+
+        # A diagram operand carries its own name instead
+        chain = source >> Integrator()
+        chain.name = "chain"
+        self.assertEqual((chain >> Integrator()).name, "chain")

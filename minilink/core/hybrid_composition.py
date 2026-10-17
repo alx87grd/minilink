@@ -251,6 +251,7 @@ def as_plant_diagram(plant: System | DiagramSystem) -> DiagramSystem:
 
     if isinstance(plant, System):
         diagram = DiagramSystem()
+        diagram.name = plant.name
         diagram.add_subsystem(plant, "plant")
         propagate_animation_camera(diagram, plant)
         return diagram
