@@ -40,7 +40,7 @@ def plot_phase_plane(
         Continuous-time model whose ``f`` defines the vector field (leaf
         subclass or wired diagram with stacked ``f``).
     """
-    backend_key = normalize_plot_backend(backend)
+    backend_key = plot_backend_of(backend)
     require_plot_backend(backend_key, backend)
     require_renderer_keywords(backend_key, kwargs)
 
@@ -409,7 +409,7 @@ def render_phase_plane_plotly(
 ###############################################################################
 
 
-def normalize_plot_backend(backend: str) -> str:
+def plot_backend_of(backend: str) -> str:
     """The backend's key, lowercase; ``"mpl"`` is matplotlib."""
     key = str(backend).lower()
     if key in {"matplotlib", "mpl"}:
