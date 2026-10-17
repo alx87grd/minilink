@@ -112,8 +112,8 @@ def step_info(time, y) -> StepInfo:
     t_s = first_sample_after(time, outside) if settled else float(np.nan)
 
     # Rise time and overshoot are relative to a final value: none when the response
-    # has not settled, or settles at zero
-    if not settled or y_final == 0.0:
+    # has not settled, or settles at zero (its final value inside the band)
+    if not settled or abs(y_final) <= band:
         return StepInfo(
             rise_time=float(np.nan),
             settling_time=t_s,

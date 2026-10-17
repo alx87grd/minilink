@@ -173,6 +173,11 @@ class TestLinearCore(unittest.TestCase):
         self.assertAlmostEqual(info.settling_time, 6.834, places=2)
         self.assertAlmostEqual(info.steady_state, 0.0)
 
+        # Its last sample is 4·10⁻⁸, inside the band: it settles at zero, so it has
+        # no rise time or overshoot relative to that final value
+        self.assertTrue(np.isnan(info.rise_time))
+        self.assertTrue(np.isnan(info.overshoot))
+
         # From rest the peak deviation is |y_f|: y = 1 − e^(-t) settles at ln 50
         info = step_info(t, 1.0 - np.exp(-t))
         self.assertAlmostEqual(info.settling_time, np.log(50.0), places=2)
