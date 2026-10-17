@@ -1845,6 +1845,17 @@ def test_polyline_project_and_sample_roundtrip():
     assert path.total_length == pytest.approx(10.0)
 
 
+def test_polyline_sample_and_tangent_take_a_vector_of_arc_lengths():
+    path = PolylinePath([[0.0, 0.0], [3.0, 4.0], [3.0, 9.0], [3.0, 9.0]])
+    s = np.array([-1.0, 0.0, 2.5, 5.0, 7.0, 10.0, 12.0])
+    points = path.sample(s)
+    tangents = path.tangent(s)
+    assert points.shape == tangents.shape == (s.size, 2)
+    for k, s_k in enumerate(s):
+        np.testing.assert_allclose(points[k], path.sample(s_k), rtol=0, atol=1e-15)
+        np.testing.assert_allclose(tangents[k], path.tangent(s_k), rtol=0, atol=1e-15)
+
+
 def test_from_waypoints_default_is_polyline():
     path = from_waypoints([[0, 0], [1, 0], [1, 1]])
     assert isinstance(path, PolylinePath)

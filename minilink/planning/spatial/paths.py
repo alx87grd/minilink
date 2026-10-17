@@ -153,8 +153,8 @@ class PolylinePath(ReferencePath):
         idx = xp.clip(xp.searchsorted(s_knots, s, side="right") - 1, 0, n_seg - 1)
         tau = (s - s_knots[idx]) / xp.maximum(seg[idx], 1e-12)
 
-        # w(s) = wᵢ + τ (w_{i+1} − wᵢ)
-        w = verts[idx] + tau * (verts[idx + 1] - verts[idx])
+        # w(s) = wᵢ + τ (w_{i+1} − wᵢ), for one arc length or a vector of them
+        w = verts[idx] + tau[..., xp.newaxis] * (verts[idx + 1] - verts[idx])
 
         return w
 
@@ -174,7 +174,7 @@ class PolylinePath(ReferencePath):
 
         # T = (w_{i+1} − wᵢ) / |w_{i+1} − wᵢ|, or 1/√d on each axis when ℓᵢ = 0
         direction = verts[idx + 1] - verts[idx]
-        length = xp.linalg.norm(direction)
+        length = xp.linalg.norm(direction, axis=-1, keepdims=True)
         fallback = xp.ones(direction.shape) / xp.sqrt(xp.asarray(dim))
         T = xp.where(length > 0.0, direction / xp.maximum(length, 1e-12), fallback)
 
