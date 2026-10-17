@@ -205,6 +205,19 @@ class TestDiagrams(unittest.TestCase):
         self.assertIn('input -- "r -> r" --> controller', source)
         self.assertIn('plant -- "y -> y_meas" --> output', source)
 
+    def test_exporters_refuse_keywords_they_do_not_take(self):
+        diagram = self._make_diagram()
+        with self.assertRaisesRegex(TypeError, "direction"):
+            export_diagram_topology(diagram, backend="mermaid", direction="TB")
+        pytest.importorskip("graphviz")
+        with self.assertRaisesRegex(TypeError, "rank_dir"):
+            export_diagram_topology(diagram, backend="graphviz", rank_dir="TB")
+        graph = export_diagram_topology(
+            diagram, backend="graphviz", rankdir="TB", engine="neato"
+        )
+        self.assertEqual(graph.engine, "neato")
+        self.assertIn("rankdir=TB", graph.source)
+
     def test_print_system_is_a_short_summary(self):
         from minilink.dynamics.catalog.pendulum.pendulum import Pendulum
 
