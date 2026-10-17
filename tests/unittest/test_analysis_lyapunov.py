@@ -251,3 +251,19 @@ def test_plot_draws_the_slice_and_the_basin():
 
     fig_band, _ = plot_region_of_attraction(roa, n=21, show=False)
     assert fig_band is not None
+
+
+@pytest.mark.plotting
+def test_plot_overlays_leave_the_system_run_and_start_untouched():
+    import matplotlib
+
+    matplotlib.use("Agg")
+    sys = StableLinear()
+    sys.x0 = np.array([1.0, -1.0])
+    roa = region_of_attraction(sys)
+    traj = sys.compute_trajectory(tf=0.5, verbose=False)
+
+    _, ax = roa.plot(trajectories=[[2.0, 1.0], [-3.0, 0.5]], n=11, show=False)
+    assert len(ax.lines) >= 4  # each overlay: its path and its start
+    assert sys.traj is traj
+    np.testing.assert_array_equal(sys.x0, [1.0, -1.0])
