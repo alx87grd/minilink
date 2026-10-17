@@ -20,7 +20,7 @@ from minilink.core.trajectory import Trajectory
 from minilink.planning.results import PlanningSolution
 from minilink.planning.trajectory_optimization.planner import (
     TrajectoryOptimizationPlanner,
-    reject_unknown_online_params,
+    require_online_params,
 )
 
 if TYPE_CHECKING:
@@ -226,7 +226,7 @@ class ModelPredictiveControllerMixin:
             t_solve = float(t)
 
         # Gate early for clear deploy errors; the latch also forwards to the planner
-        reject_unknown_online_params(params)
+        require_online_params(params)
         y_arr = np.asarray(y, dtype=float).reshape(-1)
         z_warm = self.z_warm_for_command()
 

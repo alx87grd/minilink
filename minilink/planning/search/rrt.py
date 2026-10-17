@@ -163,7 +163,7 @@ class RRTPlanner(Planner):
 
         for _ in range(options.max_nodes):
             # Sample a state, and extend the nearest node toward it
-            x_rand = self.goal_biased_sample(rng)
+            x_rand = self.sample_state(rng)
             near = self.tree.nearest(x_rand, metric)
             edge = self.try_extend(near, x_rand, rng)
             if edge is None:
@@ -278,7 +278,7 @@ class RRTPlanner(Planner):
             after_goal_only=self.options.live_plot_after_goal_only,
         )
 
-    def goal_biased_sample(self, rng):
+    def sample_state(self, rng):
         """The goal with probability ``goal_bias``, otherwise a free state."""
         x_goal = self.problem.x_goal
         goal_bias = self.options.goal_bias

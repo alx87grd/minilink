@@ -240,7 +240,7 @@ class RRTStarPlanner(RRTPlanner):
         metric = self.metric
 
         # Steer from the nearest node toward a random sample
-        x_rand = self.goal_biased_sample(rng)
+        x_rand = self.sample_state(rng)
         near = tree.nearest(x_rand, metric)
         edge = self.try_extend(near, x_rand, rng)
         if edge is None:

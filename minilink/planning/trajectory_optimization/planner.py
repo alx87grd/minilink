@@ -381,7 +381,7 @@ class TrajectoryOptimizationPlanner(Planner):
         the NLP with ``x_start`` replaced (one-time warning suggesting
         :meth:`compile_parametric_program`).
         """
-        reject_unknown_online_params(params)
+        require_online_params(params)
 
         # The fast bind path on a compiled program, else a rebuild from x0
         if self.has_parametric_program:
@@ -895,9 +895,9 @@ class TrajectoryOptimizationIteration:
 _DEFERRED_ONLINE_PARAM_KEYS = frozenset({"scene"})
 
 
-def reject_unknown_online_params(params) -> None:
+def require_online_params(params) -> None:
     """
-    Validate online ``params`` for ``solve_trajectory_from`` / MPC.
+    Refuse online ``params`` that ``solve_trajectory_from`` / MPC cannot bind.
 
     ``None`` or ``{}`` → bind ``x0`` only. The reserved key ``scene`` raises
     :class:`NotImplementedError`. Any other key raises :class:`ValueError`.
