@@ -169,8 +169,12 @@ def ensure_jax_x64() -> types.ModuleType:
 
     Called by every JAX evaluator constructor and by :func:`require_jax_numpy`,
     so tools built on JAX evaluators never need the caller to enable x64.
+    Without JAX it raises :func:`require_jax`'s error, with the install hint.
     """
-    import jax
+    try:
+        import jax
+    except ImportError as e:
+        raise ImportError(_JAX_REQUIRED) from e
 
     if jax_x64_policy():
         jax.config.update("jax_enable_x64", True)

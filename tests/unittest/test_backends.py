@@ -174,6 +174,16 @@ def test_quadratic_cost_is_jax_jittable():
 # JAX 64-bit precision policy (S05)
 
 
+def test_ensure_jax_x64_without_jax_gives_the_install_hint(monkeypatch):
+    import sys
+
+    from minilink.core.backends import ensure_jax_x64
+
+    monkeypatch.setitem(sys.modules, "jax", None)  # import jax now fails
+    with pytest.raises(ImportError, match=r"pip install minilink\[jax\]"):
+        ensure_jax_x64()
+
+
 def test_jax_x64_policy_env_var(monkeypatch):
     from minilink.core.backends import jax_x64_policy
 
