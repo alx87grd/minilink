@@ -13,6 +13,13 @@ from minilink.core.compile.execution_plan import PortOperation
 from minilink.core.compile.step_compiler import build_step_execution_plan
 from minilink.core.compile.step_execution_plan import StepExecutionPlan, StepOperation
 from minilink.core.diagram import DiagramSystem, StepDiagramSystem
+from minilink.core.hybrid_composition import (
+    as_step_diagram,
+    builds_own_computer,
+    expose_computer_boundary_ports,
+    hybrid_closed_loop,
+    resolve_hybrid_feedback_ports,
+)
 from minilink.core.system import DynamicSystem, System
 
 ###############################################################################
@@ -168,12 +175,6 @@ class Computer:
         with the same port-resolution rules as continuous ``ctl @ plant``.
         Like the continuous ``@``, it leaves a plant diagram unchanged.
         """
-        # A real cycle: core.hybrid_composition imports Computer from this module
-        from minilink.core.hybrid_composition import (
-            hybrid_closed_loop,
-            resolve_hybrid_feedback_ports,
-        )
-
         require_plant_side(plant)
 
         # The boundary ports, resolved as for the continuous ``ctl @ plant``
@@ -264,9 +265,6 @@ def as_computer(
     A block whose class defines its own ``%`` builds the Computer there (an MPC
     block checks ``schedule`` against its ``dt_mpc``).
     """
-    # A real cycle: core.hybrid_composition imports Computer from this module
-    from minilink.core.hybrid_composition import builds_own_computer
-
     # A plain block: wrapped in a step diagram, its boundary ports exposed
     if not builds_own_computer(side):
         return build_computer(side, schedule)
@@ -381,12 +379,6 @@ def build_computer(
     schedule: StepSchedule | float,
 ) -> Computer:
     """Plain build behind ``block % schedule``: never defers to the block's own ``%``."""
-    # A real cycle: core.hybrid_composition imports Computer from this module
-    from minilink.core.hybrid_composition import (
-        as_step_diagram,
-        expose_computer_boundary_ports,
-    )
-
     require_computer_side(side)
     step_schedule = as_schedule(schedule)
 

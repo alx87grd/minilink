@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+
 from minilink.core.composition import (
     default_computer_boundary_ports,
     new_diagram_like,
@@ -11,7 +13,9 @@ from minilink.core.composition import (
 from minilink.core.diagram import DiagramSystem, StepDiagramSystem
 from minilink.core.hybrid_diagram import BoundaryConnection, HybridDiagram
 from minilink.core.system import StepSystem, System
-from minilink.simulation.computer import Computer, StepSchedule, as_computer
+
+if TYPE_CHECKING:
+    from minilink.simulation.computer import Computer, StepSchedule
 
 ###############################################################################
 # Public API
@@ -62,6 +66,9 @@ def hybrid_closed_loop(
     extra_boundaries : list of BoundaryConnection, optional
         Additional multi-channel boundary edges.
     """
+    # Tools import core (DESIGN §3): the simulation band loads on first use
+    from minilink.simulation.computer import Computer, StepSchedule, as_computer
+
     # A leaf whose class defines its own ``%`` builds its runtime there
     if computer is None and builds_own_computer(computer_side):
         # The block's own ``%`` may reset block state (an MPC block's dual-rate
