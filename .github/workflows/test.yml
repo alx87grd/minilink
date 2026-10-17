@@ -29,10 +29,12 @@ jobs:
       with:
         python-version: ${{ matrix.python-version }}
 
+    # The merge gate runs without JAX; gymnasium and the graphviz wrapper ride along
     - name: Install dependencies
       run: |
         python -m pip install --upgrade pip
-        pip install -e ".[dev,rl,diagrams]"
+        pip install -e ".[dev]"
+        pip install gymnasium graphviz
 
     - name: Lint with Ruff
       run: ruff check .
@@ -144,10 +146,11 @@ jobs:
     - name: Install system dependencies
       run: sudo apt-get update && sudo apt-get install -y graphviz
 
-    - name: Install dependencies (with JAX + viz + symbolic)
+    - name: Install dependencies (the full optional stack)
       run: |
         python -m pip install --upgrade pip
-        pip install -e ".[dev,jax,visualization,plotting,diagrams,rl,symbolic]"
+        pip install -e ".[dev,full]"
+        pip install graphviz
 
     # JAX and symbolic tests skip in the ``test`` job (no extra); gate them here.
     - name: Test with pytest (incl. JAX and symbolic)
