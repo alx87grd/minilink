@@ -526,8 +526,7 @@ def require_jax_compile_backend(compile_backend):
     """Refuse a parametric collocation program on any compile backend but JAX."""
     if normalize_backend(compile_backend, allow_direct=True) != BACKEND_JAX:
         raise ValueError(
-            "Parametric direct collocation currently supports "
-            "compile_backend='jax' only."
+            "Parametric direct collocation requires compile_backend='jax'."
         )
 
 

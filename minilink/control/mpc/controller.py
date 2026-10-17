@@ -200,8 +200,8 @@ class ModelPredictiveControllerMixin:
         params : mapping, optional
             Forwarded to
             :meth:`~minilink.planning.trajectory_optimization.planner.TrajectoryOptimizationPlanner.solve_trajectory_from`
-            via the tick latch (``None``/``{}`` = x0-only; ``scene`` reserved /
-            NotImplemented until pipeline B).
+            via the tick latch (``None``/``{}`` = x0-only; the key ``scene``
+            raises ``NotImplementedError``).
         k : int, optional
             Tick index. Default: increment internal deploy counter.
         t : float, optional

@@ -919,15 +919,12 @@ def require_online_params(params) -> None:
     if unknown:
         raise ValueError(
             "solve_trajectory_from got unknown params keys "
-            f"{unknown!r}. Pass params=None or {{}} for x0-only bind, "
-            "or reserved key 'scene' (NotImplemented until pipeline B)."
+            f"{unknown!r}; pass params=None or {{}} (x0-only bind)."
         )
     if deferred:
         raise NotImplementedError(
-            f"Online params key(s) {deferred} are reserved for pipeline B "
-            "(ObstacleBank / ParametricMathematicalProgram J(z, p) bind). "
-            "Pass params=None or {} for x0-only bind. See "
-            "docs/plans/TODO.md (Later: scene params / J(z, p) bind)."
+            f"Online params key(s) {deferred} are not supported; "
+            "pass params=None or {} (x0-only bind)."
         )
 
 

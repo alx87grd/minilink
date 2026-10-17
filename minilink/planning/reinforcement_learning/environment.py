@@ -387,6 +387,6 @@ def warn_inert_noise(sys, disturbances):
     if sys.is_random:
         warnings.warn(
             "the plant holds a random block with a fixed seed: every trial and episode "
-            "sees the same noise signal until the tools realize it per trial",
+            "sees the same noise signal",
             stacklevel=3,
         )
