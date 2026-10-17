@@ -50,13 +50,6 @@ amendments (`RD-R5`, `RD-D13`, `RD-A2`), the 2026-09-07 GRO501 audit's findings 
 | --- | --- | --- |
 | [rl-reward-scaling.md](rl-reward-scaling.md) | Automatic reward scaling for `ReinforcementLearningPlanner`: raw costs throttle PPO through the joint policy / critic gradient clip; `reward_scale="auto"` = `1 / (g_max dt)` from the failure-price sampling; evidence, options, steps RS-1–RS-4 | proposal 2026-09-27; rung for the maintainer (moves every RL demo's numbers once: between cohorts) |
 | [cbf-safety-filter.md](cbf-safety-filter.md) | Control Barrier Functions: bicubic SDF interpolation in JAX, DCBF with slacks, HOCBF relative degree, `CBFSafetyFilter` block; the barrier becomes a `Field` once A1 lands | design draft 2026-09-11 |
-| [fidelity-maps.md](fidelity-maps.md) | `lift` / `project` maps across the car fidelity ladder, MPC broadcast at high fidelity | draft, July 2026 |
-| [articulated-mechanism.md](articulated-mechanism.md) | One mechanism description (geometry, inertia, topology) feeding spatial RNEA/ABA and the symbolic path | draft, July 2026; the general serial chain of [TODO.md](TODO.md) §5 (after v1.0) |
 
-Deleted (landed; decision records folded into DESIGN / ROADMAP / tests README / reviews):
-- 2026-09-05: `control-block-contract.md`, `test-benchmark-consolidation.md`.
-- 2026-09-11: `control-plots.md`, `derivatives-facade.md`, `planning-pipeline-architecture.md`, `neural-blocks-collection.md`, `mpc-tuning.md`.
-- 2026-09-12: `constitution-integration.md` (rulings in [2026-09-12-governance-stack-audit.md](../reviews/2026-09-12-governance-stack-audit.md)), `v01-scope-alignment.md` (rulings in ROADMAP §6), `vehicle-abstraction.md` (teaching ladder S25; view ports → TODO Later).
-- 2026-09-15: `core-objects-1-governance.md`, `core-objects-2-sets-distributions.md`, `core-objects-3-exit-rule.md` (contracts in CONSTITUTION / RULES / DESIGN), `rl-planner-vision.md` (R1–R7 landed; planner is DESIGN / ROADMAP TRL).
-- 2026-09-22: `lyapunov-certificates.md` (implemented 2026-09-11; contract in DESIGN §3, open rulings in ROADMAP §6), `planning-solution-comparison.md` (landed 2026-09-17; contract in DESIGN §6, the demo rewrites are TODO D1.4), `standard-planning-problems.md` (the deterministic / stochastic pair shipped; the robust class is a Later idea), `core-objects-5-later-nouns.md` and `core-objects-6-demos.md` (folded into TODO A5 and D1); `core-objects-4-fields.md` renamed `fields.md`, `phase4-fidelity-maps.md` renamed `fidelity-maps.md`.
-- 2026-10-17: `naming.md` (wins 1, 3, 6 landed, the display-name sweep is TODO's A6, the larger alignments are ROADMAP §6), `gro501-classical-control.md` (P2–P10 landed, P6 and P11 dropped, TB-b stays a TODO §2 row; the audit is [2026-09-07-gro501-coverage.md](../reviews/2026-09-07-gro501-coverage.md)).
+Landed or superseded plan docs are deleted; their history is git, and the rulings they carried
+are in the dated records (for example [P11 dropped](../reviews/2026-10-15-gro501-app-notebooks-dropped.md)).

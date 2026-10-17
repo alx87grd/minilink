@@ -1,6 +1,6 @@
 # State feedback and state estimation as one pattern: the design for P4 and beyond
 
-**Status:** decided 2026-10-13; §6 (the control sweep, the observer, the designs, `lqg`, the demos) landed 2026-10-14 in nine commits, and the review that followed made the verbs system-only, split the output reference out of `StateFeedbackController` and put `LQRPlanner` on the command port (rulings R14–R17), the open follow-ups are TODO rows (P4 follow-ups, `LQGPlanner`, the estimation follow-ups); §3, §5 and §7 are the live design for what comes next. The rulings and their reasons are in
+**Status:** decided 2026-10-13; P4 (the control sweep, the observer, the designs, `lqg`, the demos) landed 2026-10-14, and the review that followed made the verbs system-only, split the output reference out of `StateFeedbackController` and put `LQRPlanner` on the command port (rulings R14–R17), the open follow-ups are TODO rows (P4 follow-ups, `LQGPlanner`, the estimation follow-ups); §3, §5 and §6 are the live design for what comes next. The rulings and their reasons are in
 [2026-10-14-state-space-design-rulings.md](../reviews/2026-10-14-state-space-design-rulings.md).
 Workboard row P4 (v0.2 wave B). Items marked **[ruled]** were decided in the design
 conversation; the role name was ruled `observer` (R11) and `analysis/riccati.py` taken (R5).
@@ -165,175 +165,7 @@ past data). The evaluator's dual scores estimation error, consistency (NEES) and
 whiteness. Where the pieces come from today: `Planner` base (`planning/planner.py`),
 `PlanningSolution` (`planning/results.py`), `MonteCarloEvaluator`, `nominal_trajectory`.
 
-## 6. What changed on 2026-10-14 (P4 + the control sweep), in the order it landed
-
-Behaviour-preserving steps follow the AGENTS recipe: a seeded baseline of every gain and
-closed-loop rollout the tests and demos build, `cmp` byte-identical after.
-
-### Part A: the operating point and the control band (4 commits)
-
-A0. **The nominal state is x̄** (core). `operating_point()` in `analysis/derivatives.py`
-    defaults `x_bar` to `sys.state.nominal_value` (ū already comes from the ports). Every
-    verb that linearizes keeps its `x_bar=` / `u_bar=` keywords: `jacobian`, `linearize`,
-    `linearize_matrices`, `transfer_function`, `bode`/`pzmap`/… , `modal_analysis`,
-    `find_equilibrium`'s guess, `region_of_attraction`, `plot_control_law`'s pins; their
-    docstrings say "the nominal state" instead of "`sys.x0`". `x0` is the start of
-    `compute_trajectory` only. Diagrams already stack both (`wiring.py`). DESIGN §4: one
-    paragraph, two quantities with one owner each. S29 / scan core#11 reworded (no folding of
-    `nominal_value` into `x0`). Catalog plants whose natural operating point is not zero may
-    declare `state.nominal_value` (none needs it for the courses today). Impact: every bare
-    `linearize()` in examples and tests is on a loop whose `x0` is zero; plant linearizations
-    pass `x_bar`; `test_derivatives.py:326` (`plant.linearize()`) is checked. Tests:
-    `operating_point` reads the nominal state; a plant with `x0 ≠ nominal` linearizes at the
-    nominal. **Found by review**: `test_derivatives.py:128-136` (`test_defaults_are_the_nominal_point`
-    sets `plant.x0` and expects the Jacobian there) is rewritten to set
-    `state.nominal_value`; `plot_control_law` keeps pinning internal states at `x0`
-    (`graphical/port_map.py`), unchanged; the comments "the operating point every tool
-    defaults to" in `demos/analysis/analysis_frequency.py:10-12`, `analysis_root_locus.py:9`,
-    `frequency_response.ipynb` cells 4 and 23 and `showcase_minilink.ipynb` cells 18/20 are
-    true only because those `x0` are zero: reworded in the two demos (agent lane), flagged
-    for the maintainer in the two notebooks. Catalog plants with a nonzero default `x0`
-    (`vehicles/propulsion.py:161`, `astro/three_body.py:96`) are never linearized bare.
-A1. **The model carries its operating point.** `LTISystem(A, B, C, D, *, xbar=None,
-    ubar=None, ybar=None)` as plain attributes, block spelling (zeros when `None`; `ybar = C
-    x̄ + D ū` by default). `linearize()` fills them from the point it used and `ybar = h(x̄,
-    ū)`. The linearized model's own state is `Δx`, so its `state.nominal_value` stays zero
-    and no tool reads it for the point: `design_model` reads `model.xbar`. `interpolate_schedule`
-    moves from `control/state.py` to `core/trajectory.py` (old import kept until A3).
-A2. **`analysis/riccati.py`** **[ask: new module]**: `care(A, B, Q, R) -> P` (one
-    `solve_continuous_are`, the equation as a comment), `hamiltonian_matrix`,
-    `riccati_transition(…, direction=-1)` (the sign of `expm(±H dt)` a parameter, not a flip
-    inside), `riccati_step`, `riccati_map`, moved from `control/lqr.py` with their tests.
-    `LQRPlanner` imports `care` from here instead of calling SciPy itself. Baseline
-    byte-identical (`lqr_gain_schedule`, `trajectory_lqr`, `LQRPlanner`). And
-    `analysis/linearization.py` gains `design_model` (§4), tested on an `LTISystem`, a plant,
-    and a plant with `d` / `n` ports (`B` has the command's width only).
-A3. **`control/design.py` replaces `control/lqr.py` and `control/place.py`.** `lqr_gain`,
-    `place_gain`, `lqr`, `place`, `lqr_gain_schedule`, `lqr_finite_horizon`, `trajectory_lqr`,
-    `requested_poles` / `require_controllable` / `robust_gain` / `require_placed`. The two
-    signatures of §3 behind `isinstance(first, System)`; arrays never enter `design_model`;
-    the legacy order `lqr(plant, x_bar, Q, R)` is caught by the type test and refused with the
-    new signature in the message. `lqr_at_operating_point` and `place_at_operating_point`
-    are deleted, no alias; every call site migrates in this commit (freeze paused; course
-    notebooks in the same commit): library `minilink/__init__.py`, `control/__init__.py`
-    (exports `lqr`, `place` directly: S62 closes), `control/state.py` Sphinx refs
-    (`:func:minilink.control.lqr.lqr` and three more), `analysis/lyapunov.py`,
-    `planning/policy_synthesis/lqr.py`; demos `cartpole_lqr.py`,
-    `pole_placement_pendulum.py`, `trajectory_lqr_cartpole.py`,
-    `analysis_region_of_attraction.py`; notebooks `03_control` (code and its markdown cell
-    4), `showcase_minilink` (code and markdown cell 22), `udes_gro860/cartpole_lqr`,
-    `pendulum_value_iteration_vs_lqr_vs_ppo_sb3`
-    (`lqr_at_operating_point(plant, x_bar, Q, R)` -> `lqr(plant, Q, R, x_bar=x_bar)`, the
-    sentence naming the function adjusted, nothing else in the cell). **Not touched, by
-    ruling**: the GRO501 notebooks `udes_gro501/numpy_state_space.ipynb` and
-    `cartpole_dynamic_controller.ipynb` hand-write LQR, Kalman and LQG from scratch on
-    purpose; `numpy_state_space` imports only the array form `lqr(A, B, Q, R)`, which keeps
-    working, and its prose stays as it is. Tests
-    `test_control_analysis`, `test_lqr_planner`, `test_analysis_lyapunov`, `test_core`,
-    `test_graphics`, `test_random`, `test_derivatives` (`:18`, `:450-454` the `method=` /
-    `eps=` test moves to `lqr(plant, …, method=, eps=)`), `test_public_imports`,
-    `test_teaching_imports`, `test_teaching_surface` (registry rows and the
-    `TEACHING_MODULE_FUNCTIONS` rows for `control.lqr` / `control.place` go); docs README
-    verb table (`:143`), ROADMAP §4 rows `:116`, `:170`, `:171` (maintainer-owned prose:
-    the function name only), DESIGN `:35` (facade example), `:44-46` (the "module name
-    matches a factory" rule loses its only example: the rule is deleted or re-exampled),
-    `:89`, `:142`, `:637`, `:944`, `docs/api/control.rst`, TODO (S62 closes), the gro501
-    plan (P3 row), `fields.md`, `randomness.md`, `pyro-port-remaining.md` (`:44`, `:359`,
-    `:360` and the name map). Review files are history and stay. Baseline: every `K`
-    byte-identical.
-
-### Part B: estimation (5 commits)
-
-B1. **`estimation/observer.py`: `StateObserver(A, B, C, L, D=None, xbar=None, ubar=None,
-    ybar=None, labels=None)`.** `DynamicSystem(n)`; ports `u` (m), `y` (p) ->
-    `add_output_port("x", n, function=self.estimate, labels=hats, dependencies=())`;
-    `self.id = "estimator"` (or `"observer"`, §4); `name = "State Observer"`; `x0` = x̂₀.
-    Params `A, B, C, D, L, xbar, ubar, ybar`. `f`, three beats on `xp`, `u` by position:
-
-        # dx̂ = A (x̂ − x̄) + B (u − ū) + L (y − ŷ),   ŷ = ȳ + C (x̂ − x̄) + D (u − ū)
-        e_x, e_u = x_hat - xbar, u_in - ubar
-        y_hat = ybar + C @ e_x + D @ e_u
-        dx_hat = A @ e_x + B @ e_u + L @ (y - y_hat)
-
-    `estimate` returns the state (the slice the EKF narrows later). `__str__` adds `L` and
-    `eig(A − L C)`. **With it, in the same commit, the guard** (§4): `require_command` in
-    `core/feedback.py`, called by `default_control_out`, `default_computer_boundary_ports`,
-    `feedback()`'s entry and `law_roles_of`, so `observer @ plant`, `observer % dt @ plant` and
-    `plot_control_law(observer)` refuse instead of taking `x` as the command. Tests
-    (`tests/unittest/test_estimation.py`, after `TestPolePlacement`): JAX trace of `f`;
-    convergence from a wrong x̂₀, with and without an operating point; `block_roles` /
-    `roles`; `print`; the three refusals.
-B2. **`estimation/design.py`: the gains and `luenberger`.** `luenberger_gain(A, C, poles)`:
-    `observability_matrix(A, C)` with its own refusal, then `L = place_gain(Aᵀ, Cᵀ, poles)ᵀ` under the
-    duality comment. `kalman_gain(A, C, Q_n, R_n)`: `P = care(Aᵀ, Cᵀ, Q_n, R_n)` under
-    `# A P + P Aᵀ − P Cᵀ R_n⁻¹ C P + Q_n = 0`, then `# L = P Cᵀ R_n⁻¹`. `luenberger(A, B, C,
-    poles, *, xbar, ubar, ybar)` and `luenberger(sys, poles, *, x_bar, u_bar, t, params, method,
-    eps)` behind `isinstance(first, System)`, the `System` form through `design_model`
-    (`analysis.linearization`), returning a `StateObserver` with the model's point and hat
-    labels copied from the plant's state labels. Dependency law: the two lines of §4. Tests:
-    `np.poly(A − L C)` equals the request; duality with `place_gain`; the unobservable
-    refusal; `kalman_gain(A, C, Q_n, R_n) == lqr_gain(Aᵀ, Cᵀ, Q_n, R_n)ᵀ`; the GRO501
-    `numpy_state_space` hand numbers reproduced.
-B3. **`kalman(A, B, C, Q_n, R_n, *, …)` / `kalman(sys, Q_n, R_n, *, …)`**, same two forms,
-    a `StateObserver` named "Kalman Filter".
-B4. **`lqg(A, B, C, Q, R, Q_n, R_n, *, …)` / `lqg(sys, Q, R, Q_n, R_n, *, …)` in
-    `control/design.py`**: `gain = lqr(...)`, `observer =
-    kalman(...)` (lazy import), the box built explicitly and silently (RULES 4.6:
-    `autowire` would warn about the open `y` and `r`): `DiagramSystem`, `add_subsystem(observer,
-    "estimator")`, `add_subsystem(gain, "gain")`, two `connect`s, `expose("r", "y", "u")`,
-    `name = "LQG Controller"`. The recipe stays what a student writes by hand. Dependency
-    law: "`control.design` imports `estimation.design` inside `lqg`: an LQR gain on a Kalman
-    estimate" (no cycle). Tests:
-    keys `estimator`/`gain`, edge `r`, `y` -> `u`; `roles(box @ plant)`; the separation
-    principle on the double integrator (`eig(linearize(box @ plant).A()) = eig(A − B K) ∪
-    eig(A − L C)`); `lqg(CartPole(), …, x_bar=x_up) @ CartPole()` converges from a disturbed
-    start.
-B5. **Facades and contracts.** `estimation/__init__.py` as a `lazy_facade`; root prelude adds
-    `StateObserver`, `luenberger`, `kalman`, `lqg`; `test_teaching_surface.py` registry;
-    `docs/api/estimation.rst` (the API-page test `test_every_exported_name_has_an_api_page`
-    requires it); DESIGN §3 estimation row and §4 observer contract; ROADMAP §4.2
-    "`KalmanFilter`" -> "`kalman()`"; the gro501 plan's P4 section rewritten to this plan's
-    names (it still specifies `LuenbergerObserver` and `kalman(A, B, C, Q, R)`); the
-    `composition.py:216` message ("use estimator=") reworded until AC-4 lands.
-
-### Part C: evidence and housekeeping (2 commits)
-
-C1. **Demos, the library's evidence** (the GRO501 from-scratch notebooks are not the place for
-    it). Two new scripts beside the updated LQR demos of A3:
-    - `examples/demos/control/kalman_observer_pendulum.py`: `plant = Pendulum()` measuring
-      the angle only (`Pendulum() >> Gain([[1, 0]])` as the plant box, or the catalog's
-      position-output variant if one exists), `observer = kalman(plant, Q_n, R_n)`, the
-      observer driven by the plant in one diagram (hand-wired `u`, `y`), a wrong x̂₀, then
-      `plot_trajectory(signals=("plant:x", "estimator:x"))`: the estimate converging on the
-      truth, and `print(observer)` for `L` and the observer poles.
-    - `examples/demos/control/lqg_cartpole.py`: `plant = CartPoleWithNoisePort()`,
-      `ctl = lqg(plant, Q, R, Q_n, R_n, x_bar=x_up)`, `loop = closed_loop(ctl, plant)`, noise by
-      port `(WhiteNoise(1, psd=…, port="d") + WhiteNoise(4, psd=…, port="n") + loop).autowire()`
-      (since AC-4: `closed_loop(lqr(...), plant, observer=kalman(...), disturbance=WhiteNoise(...),
-      noise=WhiteNoise(...))`),
-      disturbed start, `plot_trajectory`, `plot_diagram` (the guide's Figure 12; pyro's twin
-      is `cartpole_LQG.py`).
-    RULES 6.1 / 6.10 / 6.13; both join `examples/README.md` and the nightly sweep.
-C2. **Docs**: TODO P4 row leaves; new rows: `LQGPlanner` (v0.3, with RN-4), the plant-taking
-    `kalman(…, disturbance=, noise=)` reading `psd` (RN-4; dropped by R20), `trajectory_kalman` +
-    `TrajectoryObserver` and `kalman_finite_horizon` (estimation follow-ups), the EKF, the
-    `EstimationProblem` / `EstimationSolution` / estimator tools (v0.9 estimation follow-ups,
-    §5 of this plan as their design note); ROADMAP §3 estimation TRL 1 -> 6, control row
-    names the model-taking verbs; ROADMAP §6: "compensator helper or recipe" closed as the
-    recipe + `lqg()`, the role-name question added if (b) is not taken now; the 2026-10-13
-    decision record gains the rulings of this plan (nominal state, model-taking verbs,
-    `StateObserver`, both arities, `Q` n×n, `lqg`, Layer 3 shape); gro501 plan P3/P4 marked
-    landed; `pyro-port-remaining.md` rows `StateObserver`, `ObservedSystem`, `kalman(G=)`;
-    automation plan §10 note stays for the EKF review. The GRO501 from-scratch notebooks
-    (`numpy_state_space.ipynb`, `cartpole_dynamic_controller.ipynb`) stay as they are, by
-    ruling: their hand-written Riccati solve and `LQG_Controller` are the lesson; the
-    library's own evidence is the demos of C1.
-
-**Not in this plan**: `closed_loop(observer=)` (AC-4, landed 2026-10-14); `trajectory_kalman`, the EKF, UKF,
-particle and discrete filters; `EstimationProblem` and the estimator tools; `LQGPlanner`;
-`sys.xbar` as a property (the nominal state is reached as `state.nominal_value`).
-
-## 7. Stress test: the slots the later estimators take
+## 6. Stress test: the slots the later estimators take
 
 | Estimator | Shape | Ports / state | Entry | Verdict |
 | --- | --- | --- | --- | --- |
@@ -354,7 +186,7 @@ exposes `x` and an observer gives `x` in one diagram, `autowire` finds two candi
 `x` input and `expose("x")` refuses; the `observer=` keyword wires by role, not by name
 (landed 2026-10-14).
 
-## 7b. Ask-first items, by name (AGENTS "Ask first")
+## 6b. Ask-first items, by name (AGENTS "Ask first")
 
 Core: `operating_point()`'s default (A0); the `LTISystem` constructor (A1); `require_command`
 in `core/feedback.py` and its callers in `composition.py` (B1); `interpolate_schedule` to
@@ -368,7 +200,7 @@ ROADMAP §2 `:33` ("names change only with a deprecation note") is read with tha
 Role rename (b), if taken: reverses the 2026-10-11 ruling at `2026-10-11-automation-by-convention.md:499`
 and needs its own dated record.
 
-## 8. Verification
+## 7. Verification
 
 - Before A0: seeded baseline in the scratchpad of every `K` (`lqr`, `place`,
   `lqr_finite_horizon`, `trajectory_lqr`, `LQRPlanner`), every `linearize` matrix the tests
@@ -386,22 +218,3 @@ and needs its own dated record.
   `plot_diagram` shows controller{estimator, gain} and plant.
 - Before every push: fetch and compare with origin; the "Always before push" row.
 
-## 9. Waves and open items
-
-Eleven commits over core, analysis, control, planning, a new package, five notebooks and the
-docs is more than one wave. Four waves, each green on its own:
-
-1. **A0 + A1 + A2** (behaviour-preserving, baseline-checked; no public name moves).
-2. **A3**, one commit, after the names are signed off: the twins deleted, the modules folded,
-   the five notebooks, README, ROADMAP §4 rows, DESIGN lines, `control.rst`, nine tests.
-3. **The role record + B1 + B2 + B3** (additive; the guard with B1).
-4. **B4 + B5 + C1 + C2** (`lqg` with its facade page and the demo).
-
-Open for the maintainer:
-
-1. The role name: `estimator` (a) or `observer` (b), §4. Recommended (b), ruled before wave 3
-   with its own dated record. Under (b) the tool `Estimator` and the retired role differ
-   only in case in prose; under (a) `*Design` tools share a word with `design.py`; name the
-   collision accepted.
-2. `analysis/riccati.py` as the shared home of the Riccati machinery (A2), or keep it in
-   `control/design.py` and let estimation import control for it. Recommended: the new module.

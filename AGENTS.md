@@ -33,19 +33,12 @@ git status -sb
 The SessionStart hook in `.claude/settings.json` runs the fetch and prints a warning when
 the branch is behind its upstream; act on it.
 
-## The textbook rule: every piece of math, every time
+## The textbook rule is the acceptance bar
 
-Minilink is read by students next to the textbook. This rule applies to every line of
-math an agent writes or touches, in new code and in edits alike: equation methods (`f`,
-`h`, `g`, …) and every algorithm (analysis tools, controller and observer design,
-planners, solvers, learning updates). It is the acceptance bar, not a refactor-pass
-nicety; the maintainer should never have to ask for it.
-
-The rules are in RULES.md §5: 5.3 (three beats, every step in the body), 5.8 (plain
-helper names), 5.22 (equation comments), 5.24 (timeless docstrings and comments). The
-reference is `planning/policy_synthesis/dp.py`: before committing any math, read the diff
-next to it, and say in the report that you did. A change that breaks this rule is not
-done, even when the tests pass.
+Every line of math an agent writes or touches follows RULES §5 (5.3, 5.8, 5.22, 5.24), in
+new code and in edits alike. Before committing any math, read the diff next to
+`planning/policy_synthesis/dp.py`, the reference, and say in the report that you did. A change
+that breaks this rule is not done, even when the tests pass.
 
 ## Non-negotiables
 
@@ -64,14 +57,12 @@ done, even when the tests pass.
 | docs/dev/DESIGN.md | Public contracts, package layout, evaluator behavior |
 | docs/dev/ROADMAP.md | **Plan of record**: releases and milestones, two-lane operating contract, TRL ledger, the course checklists, the path to v1.0 (rungs and waves), open decisions, out-of-scope |
 | AGENTS.md | Agent workflow, doc map, local CI gate |
-| CLAUDE.md | Entry stub that points here; update only if this reading order changes |
+| CLAUDE.md | The `@AGENTS.md` import, nothing else |
 | .claude/settings.json | The project hooks: SessionStart warns when the branch is behind its upstream |
-| docs/plans/TODO.md | The workboard: every open step of ROADMAP §5, by rung, with files and "done when"; Later ideas at the end |
-| docs/plans/ | Design writeups for steps that need one (delete a plan doc once it lands; the index there says which rung each serves) |
-| docs/plans/pyro-port-remaining.md | Pyro parity rows when library or demos land |
-| docs/ | Sphinx autodoc of the teaching-lane API (`docs/api/`, `docs/index.rst`); `experimental/` is repo-only and not on the site. The user guide is `examples/tutorial/`. Every README figure (the showcase GIFs, their interactive 3-D pages in `docs/_static/showcase/`, the diagram PNG, `bridges.svg`) is built by `docs/make_assets.py`; the 3-D GIFs are screenshots of those pages and need Playwright with Chromium, a build-only tool |
+| docs/plans/ | The workboard (TODO.md), the design writeups and the parity table; the index there says which rung each serves and holds the "one fact, one home" rule |
+| docs/ | Sphinx autodoc of the teaching-lane API; the README figures are built by `docs/make_assets.py` (its docstring says how) |
 | tests/README.md | Marker policy, test philosophy, **entry points (human · agent · CI)**, the once-per-clone setup (hooks, notebook filter) |
-| docs/reviews/ | Dated architecture audits and the interview decision records; read-only history, never a backlog |
+| docs/reviews/ | Dated rulings records (and the audits a live plan builds on); read-only history, never a backlog. Other audits live in git history |
 
 Keep DESIGN.md call chains minimal.
 

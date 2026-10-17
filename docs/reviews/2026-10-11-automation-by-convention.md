@@ -61,7 +61,7 @@ ruled as of 2026-10-11, and the operator review is closed (§3.10).
   - a census of port names and override attributes;
   - an adversarial review of the v2 design.
 
-The defects marked *reproduced* were re-run by hand. The loop-building defects D1–D8 come from [2026-10-10-feedback-loop-review.md](../reviews/2026-10-10-feedback-loop-review.md).
+The defects marked *reproduced* were re-run by hand. The loop-building defects D1–D8 come from the 2026-10-10 feedback-loop review (in git history).
 
 The question this plan answers is: *what is the minimum the library must know about a plant
 and a controller to build a loop in one line, pick the signals worth plotting, frame the

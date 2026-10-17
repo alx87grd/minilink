@@ -15,7 +15,7 @@ The conda environment, then the dev tools and the two git hooks:
 
 ```bash
 pip install -e ".[dev]"      # conda env: already installed
-pre-commit install
+pre-commit install            # non-interactive runs: conda run -n minilink python -m pytest
 nbstripout --install
 git config filter.nbstripout.extrakeys "metadata.kernelspec metadata.language_info metadata.colab metadata.accelerator cell.metadata.colab cell.metadata.id cell.metadata.outputId cell.metadata.executionInfo"
 ```
@@ -122,27 +122,13 @@ in `notebook_overrides.json` too, except those marked `nightly: false`, run only
 | **Pre-push** | Lint and format, then the contract tests | `run_pre_push.py` | ruff + `pytest` | `test` |
 | **Packaging** | Wheel/sdist ship the library (teaching surface and provisional bands), not `experimental/` | — | `python -m build` + `tests/demo_checks/check_wheel.py` | `packaging` |
 
-### Performance — regression gates vs benchmark study vs host context
+### Performance
 
-| | **Regression gates** | **Benchmark study** `run_study.py` | **Host profiles** |
-| --- | --- | --- | --- |
-| **Role** | Pass/fail vs `benchmarks/baselines/` | Backend tables on your machine | **Context only** — timings from other hosts |
-| **Location** | `benchmarks/` | `benchmarks/` | `benchmarks/host_profiles/*.json` |
-| **CI** | ✅ | ❌ | printed on regression runs (informational) |
-
-Regression gates print a **host speed context** table after each suite (compare current
-run to recorded profiles; gates unchanged). Recording your machine's profile and the
-detail: [benchmarks/README.md](../benchmarks/README.md).
+Regression gates (pass/fail against `benchmarks/baselines/`, run by CI), the benchmark study
+(`run_study.py`, backend tables on your machine) and the recorded host profiles are
+[benchmarks/README.md](../benchmarks/README.md)'s.
 
 ---
-
-## Local environment
-
-Setup: [once per clone](#setup-once-per-clone). Non-interactive:
-
-```bash
-conda run -n minilink python -m pytest
-```
 
 ## Philosophy
 
@@ -178,23 +164,13 @@ only sets headless display knobs. A contract test scans ``examples/tutorial/``, 
 and ``examples/demos/`` for forbidden harness names (see
 ``test_examples_have_no_smoke_env_hooks``).
 
-```bash
-python tests/demo_checks/run_catalog_checks.py --fast
-# Flagship whitelist: subprocess each demo's __main__ (no demo source changes):
-python tests/demo_checks/run_flagship_demos.py
-# Teaching notebooks under examples/tutorial/ and examples/teaching/ (auto-discovered; overrides for deps/timeouts):
-MPLBACKEND=Agg python tests/demo_checks/run_notebook_checks.py
-# Nightly: the long notebooks marked "smoke": false as well:
-MPLBACKEND=Agg python tests/demo_checks/run_notebook_checks.py --all
-# Nightly / local: every example script (live Meshcat viewers skip the browser wait, see demo_checks/headless/):
-python tests/demo_checks/run_all_demos.py --continue-on-error
-```
+The demo and notebook runners are the "Demo-check change" and "Notebook change" rows of the
+Agent table above.
 
 Opt-in pytest bridge for notebooks: `MINILINK_NOTEBOOK_CHECKS=1 pytest tests/unittest/test_demo_check_runners.py`.
 
 IDE launchers: [`tests/run/`](run/). Headless PNG check: `tests/demo_checks/run_flagship_graphics.py`.
 
-Demos live in `examples/demos/`; contracts live in `tests/unittest/`.
 
 ## Core behavior without optional extras
 

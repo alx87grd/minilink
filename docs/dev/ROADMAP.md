@@ -1,11 +1,7 @@
 # Minilink Roadmap
 
-Maturity and priorities — the **plan of record**. Identity:
-[CONSTITUTION.md](CONSTITUTION.md). Contracts: [DESIGN.md](DESIGN.md).
-Code rules: [RULES.md](RULES.md). Agent workflow: [AGENTS.md](../../AGENTS.md).
-Workboard (every open step, by rung, in order): [docs/plans/TODO.md](../plans/TODO.md).
-Design writeups: [docs/plans/](../plans/README.md). Dated audits and decision records:
-[docs/reviews/](../reviews/).
+Maturity and priorities, the **plan of record**; the steps themselves are the workboard,
+[docs/plans/TODO.md](../plans/TODO.md), and the doc map is [AGENTS.md](../../AGENTS.md).
 
 ## 1. Releases
 
@@ -70,29 +66,29 @@ a release process by themselves.
 | **TRL 8** | Demo Released | Demo script is created and validated |
 | **TRL 9** | Mission Complete | Tests, demo, and user approval are all complete |
 
-State as of 2026-10-17. Step ids (`S29`, `P4`, `T2`, …) are the rows of
+Step ids (`S29`, `P4`, `T2`, …) are the rows of
 [docs/plans/TODO.md](../plans/TODO.md).
 
 | Area | Lane | TRL | State | Next |
 | --- | --- | --- | --- | --- |
 | Core + diagrams | teaching | 7 | Public API and diagram API stable; compile-vs-reference parity tested; wrong-shape `f` / `h` fails at `compile()`. | Automation by convention (P10, v0.2); derived `x0` (S29, v0.9). |
 | Compile (`core/compile/`) | teaching (frozen subset) | 4 | Integrated; the frozen evaluator subset is named in DESIGN §5, the stable-internal helper grid kept by ruling. Speed lives in batches (1000 rollouts × 1000 RK4 steps in 27 ms); float64 on JAX by default. | `rollout_batch` with a `params` family (S53); the differentiable closed-loop cost (V1, v0.3); evaluator/solver re-layering (S37, v0.9). |
-| Simulation | teaching | 7 | Mature; fixed 10 001-point default grid; `verbose` names unified; the textbook pass's layout landed (2026-10-16). | One owner per rule (S65). |
-| Dynamics (abstraction + catalog) | teaching | 7 | Plants QA'd; `MechanicalSystem` / `Manipulator`; UR5 ABA/RNEA; **every catalog plant compiles on both backends** (contract test); four-rung vehicle ladder; UdeS racecar (kinematic, dynamic, 3-D); the textbook pass's layout landed and every `tf` reads its `params` (2026-10-17). | Catalog hygiene (S64); mechanical-base unification (S32, after v1.0). |
-| Control | teaching | 6 | Linear, LQR (infinite horizon, finite horizon, along a trajectory), pole placement, reference scaling (`N`), `P` / `PI` / `PD` / `PID` and the rate-measured `ImpedanceController` / `ImpedanceIntegralController` as one family (what is measured decides the derivative; limits with infinite defaults, anti-windup once a limit is declared; the shared pieces three pure functions), model-based SMC and computed torque, robotic impedance and kinematic laws, neural policy block; a controller is a plain `System`. | P10's resolver and composition steps; the textbook pass's layout landed (2026-10-16). |
-| Analysis | teaching | 6 | Jacobians, linearize, structural, equilibria, modal; one-channel Bode with grid-free margins, pole-zero, root locus, Nyquist, the linear step response on matplotlib and plotly; the sensitivity functions `S` / `T` / `PS` / `CS`. Every verb takes any `System`, the linear model as is, the rest linearized at the operating point (2026-10-15). | Nichols and overlays later; the textbook pass's layout landed (2026-10-16). |
-| Blocks | teaching | 5 | Routing, nonlinear, filters, sources (with `Sine`), TF, 1-layer NN. | `Ramp` / `Chirp` / `Delay` / `Switch` (C3, v0.3); the textbook pass's layout landed (2026-10-16). |
+| Simulation | teaching | 7 | Mature; fixed 10 001-point default grid; `verbose` names unified. | One owner per rule (S65). |
+| Dynamics (abstraction + catalog) | teaching | 7 | Plants QA'd; `MechanicalSystem` / `Manipulator`; UR5 ABA/RNEA; **every catalog plant compiles on both backends** (contract test); four-rung vehicle ladder; UdeS racecar (kinematic, dynamic, 3-D). | Catalog hygiene (S64); the general serial chain (C6, v0.3); mechanical-base unification (S32, after v1.0). |
+| Control | teaching | 6 | Linear, LQR (infinite horizon, finite horizon, along a trajectory), pole placement, reference scaling (`N`), `P` / `PI` / `PD` / `PID` and the rate-measured `ImpedanceController` / `ImpedanceIntegralController` as one family (what is measured decides the derivative; limits with infinite defaults, anti-windup once a limit is declared; the shared pieces three pure functions), model-based SMC and computed torque, robotic impedance and kinematic laws, neural policy block; a controller is a plain `System`. | P10's resolver and composition steps. |
+| Analysis | teaching | 6 | Jacobians, linearize, structural, equilibria, modal; one-channel Bode with grid-free margins, pole-zero, root locus, Nyquist, the linear step response on matplotlib and plotly; the sensitivity functions `S` / `T` / `PS` / `CS`. Every verb takes any `System`, the linear model as is, the rest linearized at the operating point (2026-10-15). | Nichols and overlays later. |
+| Blocks | teaching | 5 | Routing, nonlinear, filters, sources (with `Sine`), TF, 1-layer NN. | `Ramp` / `Chirp` / `Delay` / `Switch` (C3, v0.3). |
 | Planning / policy synthesis (DP) | teaching (GRO860) | 6 | Grid + value iteration (`loop` / `numpy` / `jax`), lookup controller, `PolicyEvaluator`, `LQRPlanner`; every planner returns a `PlanningSolution`; `compare()` reads solutions side by side; `dp.py` is the textbook reference of the style. | cost-to-go as a `Field` (A1); policy iteration (S51). |
-| Planning / trajopt | teaching (GRO860) | 5 | Collocation, shooting, multiple shooting; live plot; `success` means defects satisfied to `feasibility_tol`; float64 by default on JAX. | Harden SciPy/Ipopt before TRL 6; the textbook pass's layout landed (2026-10-16). |
+| Planning / trajopt | teaching (GRO860) | 5 | Collocation, shooting, multiple shooting; live plot; `success` means defects satisfied to `feasibility_tol`; float64 by default on JAX. | Harden SciPy/Ipopt before TRL 6. |
 | Optimization | teaching (via trajopt) | 5 | `MathematicalProgram` + `Optimizer`, SciPy/Ipopt. | Harden SciPy/Ipopt before TRL 6. |
 | Interfaces / RL bridge | research lane (bridge) | 4 | `Sys2Gym` + `SB3Controller`; the env step is one compiled RK4 call. | Keep for external interop; courses solve with the native planner. |
 | Analysis / Lyapunov certificates | provisional (research) | 4 | `region_of_attraction` → `LyapunovCertificate` (quadratic `V`, sampled level, `verify`, `plot`, `contains`); demo and showcase §11. | Cohort validation; `V` as a `QuadraticField` (A1); SOS and discrete time later. |
-| Planning / RL planner | teaching (GRO860) | 6 | `ReinforcementLearningPlanner` (REINFORCE, actor-critic, PPO, SAC in pure JAX), `TabularLearningPlanner` (Q-learning, SARSA, Monte Carlo control), `StochasticPlanningProblem`, `MonteCarloEvaluator`; on the root prelude; canonical demos in `examples/demos/rl/`, chapter 11 and the native teaching notebooks. | SAC actor step (S50); deep Q-learning (S52); automatic reward scaling ([rl-reward-scaling.md](../plans/rl-reward-scaling.md)); the textbook pass's layout landed (2026-10-16). |
-| Planning / search (RRT) | provisional | 5 | RRT / RRT*; `RRTPlanner(problem)` works from the input bounds alone (bang-bang extender); returns a `PlanningSolution`. | RRT-Connect later; the textbook pass's layout landed (2026-10-16). |
+| Planning / RL planner | teaching (GRO860) | 6 | `ReinforcementLearningPlanner` (REINFORCE, actor-critic, PPO, SAC in pure JAX), `TabularLearningPlanner` (Q-learning, SARSA, Monte Carlo control), `StochasticPlanningProblem`, `MonteCarloEvaluator`; on the root prelude; canonical demos in `examples/demos/rl/`, chapter 11 and the native teaching notebooks. | SAC actor step (S50); deep Q-learning (S52); automatic reward scaling ([rl-reward-scaling.md](../plans/rl-reward-scaling.md)). |
+| Planning / search (RRT) | provisional | 5 | RRT / RRT*; `RRTPlanner(problem)` works from the input bounds alone (bang-bang extender); returns a `PlanningSolution`. | RRT-Connect later. |
 | Planning / path integral (MPPI) | research lane (planned) | 1 | Two standalone scripts (`examples/experimental/mppi/`): the pendulum swings up; the kinematic racecar laps the cone circuit at a lower closed-loop cost than the collocation MPC. Design: [mppi.md](../plans/mppi.md). | The planner (S72), after RN-4 / RN-5. |
 | Geometry / spatial | provisional (teaching) | 4 | SDF + `Scene` / fields / bodies under `planning/spatial/`, JAX twins tested; the planning facade's spatial names are provisional teaching names (§2). Home designed: `core/geometry/`. | Package move and course catalog (A3); bicubic SDF and CBF filter (research). |
 | Graphics / animation | teaching | 5 | Frame-keyed `tf` / geometry / overlays; four renderers; auto-fit camera. | Camera and plot defaults from roles (P10); constructor-derived camera hints (S43); glyph/solid rename (S30, v0.9). |
-| Hybrid / step / MPC | provisional (research) | 4 | `StepSystem`, `Computer`, `HybridDiagram`, `HybridSimulator`, MPC with parametric JAX. A side helper for MPC simulation; the sampled loop is the one thing that is not a `System`. | Keeps in step with the core rules (P10); no new hybrid features before S31 (v0.9); the textbook pass's layout landed (2026-10-16) and the MPC blocks read plain hook names from one mixin constructor (2026-10-17). |
+| Hybrid / step / MPC | provisional (research) | 4 | `StepSystem`, `Computer`, `HybridDiagram`, `HybridSimulator`, MPC with parametric JAX. A side helper for MPC simulation; the sampled loop is the one thing that is not a `System`. | Keeps in step with the core rules (P10); no new hybrid features before S31 (v0.9). |
 | Realtime simulation | provisional | 2 | `RealtimeSimulator` + pygame I/O. | Architectural review (v1.0); later the human-demonstration recorder of the behavior-cloning pipeline (after v1.0). |
 | Estimation | teaching (GRO501) | 6 | `StateObserver` (innovation form, operating point on the block, hat labels), `luenberger` and `kalman` on arrays, a linear model or the plant (the duals of `place` and `lqr`, 2026-10-14); `lqg` returns the observer + gain box; an observer is refused as a controller; `closed_loop(gain, plant, observer=obs)` wires the LQG loop by role (AC-4, 2026-10-14). | the trajectory observer and the finite-horizon filter, the EKF, the estimation problem and its tools (v0.9, [the plan](../plans/estimation-and-state-feedback.md)). |
 | Identification | planned | 2 | Parametric-tier prototype only. | `fitting.py` (C4, v0.3). |
@@ -157,7 +153,8 @@ placement and a Kalman observer. Student guide: `GRO501_Guide.pdf`
 Baseline audit:
 [docs/reviews/2026-09-07-gro501-coverage.md](../reviews/2026-09-07-gro501-coverage.md).
 Step-level work:
-TB-b in [docs/plans/TODO.md](../plans/TODO.md) §2; the plan doc retired 2026-10-17.
+the plan doc retired 2026-10-17, its steps landed; the baseline audit is
+[docs/reviews/2026-09-07-gro501-coverage.md](../reviews/2026-09-07-gro501-coverage.md).
 
 | Topic | Surface | Status | Gate |
 | --- | --- | --- | --- |
@@ -215,18 +212,13 @@ section; its history is in git and in [docs/reviews/](../reviews/).
 
 ### 5.1 v0.1 — close-out
 
-The GRO860 path is green (§4.1) and `0.1.1` is published. One standing rule remains:
-- **R3** `ruff check .` and `ruff format --check .` stay green on every push (the
-  pre-commit hooks run both).
+The GRO860 path is green (§4.1) and `0.1.1` is published; nothing is open.
 
 ### 5.2 v0.2 — GRO501 (October 2026)
 
 Three waves: A and B in parallel, D throughout.
 
 **Wave A — the textbook objects finish speaking.**
-- **A4** The naming quick wins landed 2026-10-17 (the
-  class name as the default `name`, a shortcut named as the expression it builds, `id`
-  documented); its `jmax` and operator-export items stay.
 - **A6** Short catalog names (RULES 2.6): compact public class names, the long explicit display
   names dropped, one ruled table of renames migrating the notebooks in the same commit. **[ask
   — public names]**
@@ -237,31 +229,18 @@ Three waves: A and B in parallel, D throughout.
   `Gaussian(cov=)`, every `sample` takes a key.
 
 **Wave B — GRO501 end to end** (§4.2; plan
-TB-b in TODO §2; the plan doc retired 2026-10-17). Landed: P2, P3,
-TB-a, P7, P5, P8, P9.
+the plan doc retired 2026-10-17, its steps landed).
 - **P10** Automation by convention ([automation-by-convention.md](../plans/automation-by-convention.md),
   decided 2026-10-11): standard port names drive the wiring, three reserved names (`plant`,
   `controller`, `observer`) are the roles every tool reads, and the cost is scored on the
   plant. Its composition steps land in this wave; the order is in TODO §2 and the plan's
   §7.
-- **TB-b** The control objects and the loop (`siso`, `state`, `lqr`, `place`,
-  `TransferFunction`, `LTISystem`, `feedback` / `@`) read like the textbook; its loop part
-  after P10's AC-3.
-- **P4** `estimation/` landed 2026-10-14 (`StateObserver`, `luenberger`, `kalman`, `lqg`;
-  the control band reshaped with it: `control/design.py`, the model-taking verbs, the
-  nominal state as the operating point). `closed_loop(observer=)` followed with AC-4
-  (2026-10-14).
-- S61 (every analysis verb takes a `System`), S62 (`P` joins the classical family) and
-  S73 (one classical family: the impedance pair in the family's grammar, the integrator
-  hold, the filtered rate and the clip as pure functions) landed 2026-10-15.
 
 **Wave D — the code reads like the textbook, and the demos like the API.** Standing work,
 behaviour-preserving, one module per step.
-- **T1–T7** The textbook pass landed in one run (PR #125, 2026-10-16, [the
-  record](../reviews/2026-10-16-textbook-pass.md)) and its recorded bugs and open questions
-  were ruled and fixed the next day (PR #126, [the
-  rulings](../reviews/2026-10-17-textbook-pass-follow-up-rulings.md)); its style sheet is
-  RULES §5. What is left of each row is a behaviour, backend or API item, listed in TODO §3.
+- The textbook pass landed 2026-10-16/17 ([record](../reviews/2026-10-16-textbook-pass.md),
+  [rulings](../reviews/2026-10-17-textbook-pass-follow-up-rulings.md)); its behaviour and API
+  leftovers are TODO §3's T rows.
 - **D1** Demos and notebooks to the minimal rule (RULES 6.1 / 6.10 / 6.11). **[ask per
   file]**
 - **D2** Consolidation picks still open from the 2026-09-05 inventory.
@@ -300,6 +279,8 @@ the new core objects land in a smaller library; plan in TODO §4):
   SMC trajectory-following demo.
 - **C5** RL follow-ups: **S50** SAC actor step, **S51** policy iteration on the grid,
   **S52** deep Q-learning.
+- **C6** General serial chain: one mechanism description (DH or URDF) feeding RNEA / ABA, the
+  GMC714 arm topic's modelling rung; design first. **[ask — core]**
 - **S63** DP reads a finite horizon from `problem.tf`; **S64** catalog hygiene. **[ask]**
 - **RN-4 / RN-5** of [randomness.md](../plans/randomness.md), together, between cohorts:
   `realize(key)` and signals on `disturbances=`, then the Monte Carlo test set. **RN-3**
@@ -385,7 +366,7 @@ After two cohorts have run on v0.2 and the freeze candidate has held a term:
 
 **After v1.0 (1.x features, additive by construction):** **S32** one mechanical base, if it
 lands without breaking a name **[ask — core]**; **S36** iLQR from parts (research lane); a
-general serial chain (DH or URDF to RNEA / ABA); a **behavior-cloning pipeline** end to end:
+**behavior-cloning pipeline** end to end:
 a game mode on `RealtimeSimulator` that records human demonstrations (keyboard or joystick
 driving the plant live) as trajectory datasets, a planner that fits a policy to them
 (imitation beside the RL planner, the neural policy block as its output), and the cloned
@@ -432,7 +413,6 @@ stiffness and damping, the shared pure functions) in
   `MechanicalSystem`, or each plant states its own and `StateSpaceGrid` refuses infinite
   bounds.
 - **`PlanningProblem.metadata`**: document it or retire it.
-- **Optional `KinematicModel` delegate** — adopt or drop.
 - **Pyro game demos** — port the rest to `simulation/realtime/` or drop (the
   behavior-cloning game mode after v1.0 would reuse them).
 - **Which pyro demos the courses still need** (drives the parity rows).
@@ -445,7 +425,10 @@ stiffness and damping, the shared pure functions) in
 - **CBF safety filter** ([cbf-safety-filter.md](../plans/cbf-safety-filter.md)): research
   lane until a course asks; the barrier is a `Field` once A1 lands.
 
-**Before v0.3 wave C (S72, the path-integral planner)**
+**Before v0.3 wave C (S72, the path-integral planner; C6, the serial chain)**
+
+- **The optional `KinematicModel` delegate**: adopt or drop, decided with C6's mechanism
+  description.
 
 - **MPPI** ([mppi.md](../plans/mppi.md) §10): the planner's name (`PathIntegralPlanner`
   or `MPPIPlanner`); the three planner verbs the MPC block reads instead of trajopt
@@ -486,12 +469,6 @@ Full Simulink parity (GUI, DAE, arbitrary multi-clock scheduling,
 event-driven switching as a framework feature); becoming a multibody/contact
 OS or a batched RL physics engine.
 
-What *is* in scope but subsidiary: the step/hybrid path (`StepSystem`,
-`StepDiagramSystem`, `Computer` with integer-divisor multi-rate schedules,
-`HybridDiagram`, `HybridSimulator`) exists so discrete control laws can close
-the loop on continuous plants. It is provisional, and the seam is narrower than
-"outside the hierarchy": `StepSystem` and `StepDiagramSystem` subclass
-`System`, while `Computer` and `HybridDiagram` do not. No v0.1 course row
-depends on it, but MPC is the intro surface's hybrid exemplar (RULES 3.7), so
-README, the showcases and the tutorial do present it. Live interaction is
-`simulation/realtime/`.
+What *is* in scope but subsidiary: the sampled loop (`StepSystem`, `Computer`,
+`HybridDiagram`, `HybridSimulator`), so discrete control laws can close the loop on
+continuous plants; it is provisional, and MPC is its exemplar in the tutorials (RULES 3.7).

@@ -2,23 +2,18 @@
 
 Every open step of the path to v1.0 in [ROADMAP.md §5](../dev/ROADMAP.md#5-the-path-to-v10),
 by rung, in order. Strategy, milestones and maturity stay in ROADMAP; design writeups in this
-folder; rulings and audits in [docs/reviews/](../reviews/); pyro parity rows in
+folder; rulings in [docs/reviews/](../reviews/); pyro parity rows in
 [pyro-port-remaining.md](pyro-port-remaining.md). **Landed rows leave this file**: the
 history is the git log and the dated reviews.
 
 Each step is sized for roughly one agent-hour to one agent-day and ends with a "done when"
-gate. **[ask]** marks maintainer-owned territory (student-facing material, core
-architecture, main-tool APIs, any feature or public-name removal): propose, get a yes, then
-land. Unmarked steps are agent-managed: land, then report. Every step runs
-`ruff check . && ruff format --check .` and the relevant `pytest
-tests/unittest/test_<domain>.py`, and updates DESIGN / README only where a public contract
-changes. Behaviour-preserving steps follow the AGENTS refactor recipe (seeded baseline,
-byte-identical after). A rename migrates every course notebook in the same commit, with no
-alias, while the name freeze is paused between terms (ROADMAP §4.1 gate 7).
+gate. **[ask]** marks maintainer-owned territory (AGENTS "Ask first"); unmarked steps are
+agent-managed: land, then report. The gates and the behaviour-preserving recipe are AGENTS'.
+A rename migrates every course notebook in the same commit, with no alias, while the name
+freeze is paused between terms (ROADMAP §4.1 gate 7).
 
-`scan: band#n` cites an entry of the 2026-09-22 improvement scan: the evidence is in
-[docs/reviews/2026-09-22-improvement-scan-ledger.md](../reviews/2026-09-22-improvement-scan-ledger.md),
-the triage in [2026-09-22-improvement-suggestions.md](../reviews/2026-09-22-improvement-suggestions.md).
+`scan: band#n` cites an entry of the 2026-09-22 improvement scan; its ledger and triage are in
+git history (`docs/reviews/2026-09-22-improvement-*.md`, before 2026-10-17).
 
 | Section | Rung |
 | --- | --- |
@@ -70,11 +65,9 @@ Runs in parallel with wave B.
 Baseline audit: [the 2026-09-07 coverage record](../reviews/2026-09-07-gro501-coverage.md). Release contract:
 [ROADMAP §4.2](../dev/ROADMAP.md#42-v02--gro501-end-to-end).
 
-**Order:** TB-b next (S61, S62 and S73 landed 2026-10-15); P10's AC-0, AC-2a, AC-OP, AC-3,
-AC-2b/c and AC-4 have landed, P4 with them; TB-b (its loop part after AC-3). P11, the two
-GRO501 notebooks, was dropped on 2026-10-15: the students write the APP work themselves. P6,
-the z tier, was dropped on 2026-10-17: GRO501 teaches the digital law with `discretize` +
-simulation ([record](../reviews/2026-10-17-z-tier-dropped.md)).
+**Order:** P10's remaining steps (AC-5, AC-6 in the plotting lane; AC-7 v0.3; AC-8 with S31),
+then the P4 follow-ups. P11 and P6 were dropped (2026-10-15, 2026-10-17); TB-b landed with the
+textbook pass.
 
 - [ ] **P10 Automation by convention** ([automation-by-convention.md](automation-by-convention.md),
   decided 2026-10-11, amended 2026-10-13 by
@@ -90,26 +83,16 @@ simulation ([record](../reviews/2026-10-17-z-tier-dropped.md)).
     plots and AC-6 animation, in the plotting lane; AC-7 the cost on the plant, v0.3; AC-8a
     the sampled loop keeps in step, alongside; AC-8b with S31, v0.9.
 
-  Related rows: TB-b's loop part follows AC-3; S66 lands after
+  Related rows: S66 lands after
   AC-4; RN-4 and RN-5 build on AC-2, AC-4 and AC-7; S70 turns P10's refusals into
   `WiringError`; S31 brings AC-8b. The automatic `dt` and input-hold findings stay with S65.
 - Later, not v0.2: `sensitivity(T)` reading the roles of one loop diagram instead of
   `plant=, controller=` ([the 2026-10-15 analysis record](../reviews/2026-10-15-linear-analysis-rulings.md),
   last note).
-- [ ] **TB-b The control objects and the loop read like the textbook.** The audit, review
-  and pass of TB-a on `control/siso.py` (P / PI / PD / PID / Lead / Lag), `control/state.py`,
-  `control/design.py`, `blocks/transfer_function.py`,
-  `dynamics/abstraction/state_space.py` (`LTISystem`) and the loop-building path students use
-  (`feedback`, `closed_loop`, `@`; after AC-3). Before v0.2 ships. Done when every module in
-  scope reads like `dp.py` and the baseline `cmp`s.
-- [ ] **P4 follow-ups** (P4 landed 2026-10-14; design and rulings in
-  [estimation-and-state-feedback.md](estimation-and-state-feedback.md)): named input ports
-  on the state-space base so observers and sensitivity blocks share one `f` (scan:
-  analysis#13); the review of the `observer` role against the real blocks when the EKF
-  lands ([automation-by-convention.md](automation-by-convention.md) §10). `closed_loop(observer=)`
-  landed with AC-4 (2026-10-14). Dropped, by decision (rulings R20): a `kalman(...,
-  disturbance=, noise=)` reading `B_w`, `D_v` and the noise blocks' `psd`; the design verb
-  takes the textbook `Q_n`, `R_n`.
+- [ ] **P4 follow-ups** (design: [estimation-and-state-feedback.md](estimation-and-state-feedback.md)):
+  named input ports on the state-space base so observers and sensitivity blocks share one
+  `f` (scan: analysis#13); the review of the `observer` role against the real blocks when
+  the EKF lands ([automation-by-convention.md](automation-by-convention.md) §10).
 
 ---
 
@@ -129,8 +112,7 @@ fixed one commit each with a regression test (PR #126, 2026-10-17,
 geometry read their `params`, the MPC blocks take plain hook names and one mixin
 constructor, the wiring core keeps no shadow state, every helper name says its role. The
 rows below hold what neither PR touched, each a behaviour, backend or API item verified open
-on `dev` at 638215e; the recipe is the AGENTS one (seeded baseline, byte-identical after)
-and `planning/policy_synthesis/dp.py` the reference.
+on `dev` at 638215e; the recipe and the reference are AGENTS'.
 
 - [ ] **T1 core**: `system.py`'s default `h` stub builds `np.zeros(p)` (a returned-type
   decision under JAX) **[ask — core]**; `wiring.py`'s `refresh` still guards with
@@ -206,7 +188,7 @@ foundations review, docs/reviews/2026-09-15-foundations-review.md).
   Also: `Planner.plot_solution` is the solution's own `plot_trajectory` (scan: planning#7).
 
 **D2 — consolidation picks** still open from
-docs/reviews/2026-09-05-consolidation-inventory.md (nothing removed without the maintainer's
+the 2026-09-05 consolidation inventory, in git history (nothing removed without the maintainer's
 pick):
 
 - [ ] `Source.show_signal` (80 lines of bespoke matplotlib; the same picture is
@@ -218,8 +200,7 @@ pick):
 - [ ] `HybridDiagram` hand-copied facades (with S31).
 - [ ] Plotting in eight homes: write the placement rule in DESIGN first, then move
   `graphical/port_map.py` next to `control/` if agreed.
-- [ ] DESIGN §8's package-roles table (a stale copy of §3) and the DESIGN research-lane trim
-  (scan: docs-gov#6, docs-gov#10).
+- [ ] The DESIGN research-lane trim (scan: docs-gov#10).
 - [ ] The three catalog rows the dynamics scan names (scan: dynamics#13).
 - [ ] `JaxMechanicalSystem` retired, the `xp` base already traces (scan: dynamics#14)
   **[ask — importable name]**: the name stays to v1.0 and leaves on V4's list, with no alias
@@ -256,7 +237,7 @@ pick):
 - [ ] RRT* tracks goal nodes incrementally; the transcriptions lower the state set
   member-wise (scan: planning#6, planning#12).
 - [ ] **Third-round notes from the 2026-09-23 fix reviews** (small, or design questions;
-  details in docs/reviews/2026-09-22-improvement-suggestions.md §2.4): `step_diagram % dt`
+  details in the 2026-09-22 improvement suggestions §2.4, in git history): `step_diagram % dt`
   adds boundary ports to a user `StepDiagramSystem`; the sampled `@` copy of a one-block
   plant diagram drops a diagram-level function output port; a `%` override that ends in
   `as_computer(self, schedule)` would recurse, and `System.__mod__` calls a private helper;
@@ -420,6 +401,12 @@ the demo sweep touches fewer files. Nothing leaves without the maintainer's ruli
     value iteration); design first, it touches the planner API. **[ask]**
   - [ ] `Sys2Gym` takes a `Distribution` for the start state (scan: graphics#1;
     randomness.md RD-R5, step RN-5).
+- [ ] **C6 General serial chain** **[ask — core]**: one mechanism description (DH table or
+  URDF: geometry, inertia, topology) feeding RNEA / ABA beyond the UR5, the shared serial-chain
+  stack, ABA on the other RNEA arms, the symbolic path reading the same description; the GMC714
+  arm topic's modelling rung. Design first (the July 2026 articulated-mechanism draft is in git
+  history; it is re-planned here, the optional `KinematicModel` delegate decided with it, ROADMAP
+  §6). Done when a second arm runs on the shared stack with the catalog both-backends test.
 - [ ] **S63 DP reads the horizon** **[ask — planner API]** (scan: planning#1): a finite
   `problem.tf` runs `round(tf / dt)` backward sweeps as `solve_steps` does, the way
   `LQRPlanner` picks the Riccati ODE, or warns once. Done when LQR and DP agree on the
@@ -582,7 +569,7 @@ in December 2026 after the v0.3 tag; the v1.0 rows after two cohorts.
   discretization method (Euler, Tustin, RK4) and whether `%` discretizes or the user calls
   `discretize` first. It needs `discretize` to keep the controller's ports first.
 - [ ] **Estimation follow-ups** after P4, each in the slot
-  [estimation-and-state-feedback.md](estimation-and-state-feedback.md) §7 names: the
+  [estimation-and-state-feedback.md](estimation-and-state-feedback.md) §6 names: the
   finite-horizon filter (`kalman_finite_horizon` → a time-varying observer, the dual of
   `lqr_finite_horizon`, the forward sweep on the dual pair with `riccati_step`); the
   linearized Kalman filter along a trajectory (`trajectory_kalman` → `TrajectoryObserver`,
@@ -639,9 +626,6 @@ in December 2026 after the v0.3 tag; the v1.0 rows after two cohorts.
   plant (no `q` / `dq` ports); `DynamicBicycle` on `GeneralizedMechanicalSystem` (scan:
   dynamics#5).
 - [ ] **S36** iLQR planner from parts (`jacfwd` of `f_trace`; idea, research lane).
-- [ ] **General serial chain**: one mechanism description (DH or URDF) feeding RNEA / ABA
-  beyond the UR5 and the symbolic path, the shared serial-chain stack and ABA on the other
-  RNEA arms included — [articulated-mechanism.md](articulated-mechanism.md).
 - [ ] **Behavior-cloning pipeline** **[ask]**: a game mode on `RealtimeSimulator` that records
   human demonstrations (keyboard or joystick driving the plant live) as trajectory datasets; a
   planner that fits a policy to them (imitation beside the RL planner, `NeuralPolicyController`
@@ -680,8 +664,7 @@ One line each; open a plan doc only when a design needs a writeup.
   steps per stored sample, the scan keeping only the samples): a stiff model stepped at
   0.5 ms over 40 s stores 80k states today, which is what pushed jaxnet to keep its own
   decimated `lax.scan` rollout beside `Simulator`.
-- Cross-fidelity `lift` / `project` maps on the car ladder —
-  [fidelity-maps.md](fidelity-maps.md).
+- Cross-fidelity `lift` / `project` maps on the car ladder (a July 2026 draft, in git history).
 - `RobustPlanningProblem` (set-bounded uncertainty, minimax criterion) only when a minimax
   consumer exists; the path-integral planner's `"worst_case"` branch (CVaR over plant draws,
   [mppi.md](mppi.md) §4) would be that consumer; the two decisions go together.

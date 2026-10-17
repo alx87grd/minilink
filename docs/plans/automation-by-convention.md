@@ -481,12 +481,12 @@ roles and control-law sweeps) is captured before and after each step and compare
 
 | Step | What | When |
 |---|---|---|
-| AC-1 | Safe bug fixes and pinning tests. **Landed 2026-10-10.** | — |
-| AC-0 | No controller classes; `plot_control_law` on `System`; the four course notebooks migrated (the import line and the base class; their profile line goes in AC-3). **Landed 2026-10-13.** | — |
-| AC-2 | The resolver (§3), with every reader switched; reserved names raise on a clash. (a) Byte-identical census. **(a) landed 2026-10-13.** (b) The one-time rename of the subsystem names, in flow and sampled loops; shortcuts stop naming blocks from their shape. (c) The ports `d` and `n` in the same pass. **(b) and (c) landed 2026-10-13** as one sweep (the rule is in DESIGN; rollouts identical). | — |
-| AC-OP | The operators (§4.1–§4.4), one commit each: no operator modifies its operands; the plain `>>` and its one guard; `+`, `autowire`, `rename_ports`, `port=` and the 8 positional lines; `expose`; `@` needs a plant, `feedback`'s entry, return and `filter=`, one junction helper. **Landed 2026-10-13** (five commits; `autowire` by name reverses AC-1's fan-out guard, by decision). | — |
-| AC-3 | Composition on standard names: the removals §6 assigns to AC-3; boxes nested by `@`, with the edge check and the box's state read for an `x` controller; `x` only where needed and its leaf refusal; the mechanical plant's `y` and `x`; MPC renamed; `filter=`. **Landed 2026-10-13** (five commits), except the MPC rename, which trails with AC-8a (§10). | — |
-| AC-4 | Loop inputs: plants that declare `d` and `n` own them; sources as values, named `reference`, `disturbance`, `noise`; `observer=` with P4; the randomness plan's loop-input rulings reconciled. **Landed 2026-10-14** (rulings R18–R20 of the [state-space record](../reviews/2026-10-14-state-space-design-rulings.md)). | — |
+| AC-1 | Landed 2026-10-10. | — |
+| AC-0 | Landed 2026-10-13. | — |
+| AC-2 | Landed 2026-10-13 (a, b, c). | — |
+| AC-OP | Landed 2026-10-13. | — |
+| AC-3 | Landed 2026-10-13. | — |
+| AC-4 | Landed 2026-10-14. | — |
 | AC-5 | Plots (§5): the auto mode, role selectors, paths into boxes, labels, units and colours by role, one default | plotting lane, v0.2 wave D |
 | AC-6 | Animation (§5): the camera chosen when animating, looking inside `plant`; no compensator skin in a loop; the camera copy goes | plotting lane |
 | AC-7 | Cost and tools (§5): one compiled loop for the three Monte Carlo backends, `command_port`, controllers with state, time, cost params, one price; Gym and the rollout environment aligned | v0.3, with RN-4 and RN-5 |

@@ -58,7 +58,7 @@ one of these quantities takes or returns the object, never its arrays:
   goal ball, free space, a level set.
 - `Distribution` — a probability law over a vector, `sample(key)` and `mean`. Sets are
   support, distributions are probability; never one for the other.
-- `Field` — a scalar function on the model's `(x, u, t)`, the signature of `f` and `g`: a
+- `Field` (planned) — a scalar function on the model's `(x, u, t)`, the signature of `f` and `g`: a
   Lyapunov function `V(x)`, a cost-to-go `J(x, t)`, a Q-function `Q(x, u)`, a barrier `h(x)`,
   a clearance `d(x)`. Its sublevel and superlevel sets are `Set`s over `x`, or `InputSet`s
   over `u` at a given `x`; its shaping is a `CostFunction`.
@@ -84,8 +84,8 @@ parameter family reach any object the way they reach `f`. An object that does no
 1. **Everything that can be viewed as a system is a System.** Plants, controllers, observers,
    filters, neural policies, and flow diagrams share the identical object model. One seam
    stands open: the sampled-loop containers `Computer` and `HybridDiagram` are not Systems,
-   though `StepSystem` and `StepDiagramSystem` are. Closing it is an open ROADMAP §6
-   decision, not a licence to open a second one.
+   though `StepSystem` and `StepDiagramSystem` are. Closing it is an open
+   decision of the roadmap, not a licence to open a second one.
 2. **Functional purity in equation paths.** Arrays in, arrays out. Equation paths — $f$, $h$,
    and the equation methods of sets, costs, fields, shapes and distributions (`margin`, `g`,
    `h`, `value`, `sdf`, `sample`) — have no internal mutable state, no cached side effects,

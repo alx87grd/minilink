@@ -25,9 +25,6 @@ concrete formatting, ordered by the cost of being wrong:
 
 ## 1. Should It Exist in Minilink?
 
-*An early "no" prevents expensive architectural mistakes. Identity and
-boundaries: CONSTITUTION.md §1.*
-
 - **1.1 Stay inside the product scope.** Would it make Minilink one of the things it is not?
   Law: CONSTITUTION §1.4, 'Product Boundaries'.
 - **1.2 Continuous-time core is primary.** Does it complicate `DynamicSystem`,
@@ -44,9 +41,6 @@ boundaries: CONSTITUTION.md §1.*
 
 ## 2. What Is It in Domain Terms?
 
-*Map every concept to the physics and control domain. Tools-as-verbs and
-Systems-as-descriptions: CONSTITUTION.md §4.*
-
 - **2.1 Name by diagram role, never by implementation technology.** Class and variable names reflect
   their functional role in the block diagram (e.g., `Plant`, `ImpedanceController`, `ErrorBlock`),
   not their software mechanism (e.g., avoid names like `JittedVectorizedEvaluatorLeaf`).
@@ -59,20 +53,19 @@ Systems-as-descriptions: CONSTITUTION.md §4.*
   ($\partial f / \partial p$) and system identification. However, the core framework remains forgiving:
   models where a student hard-codes constants directly into equations must simulate without friction.
   Costs, sets, fields and shapes owe the same signature; the library ones do not read
-  `params` yet (costs: workboard step A2; sets, shapes and fields: A5). Override rule and
-  gap: DESIGN §4, 'Parameters'.
+  `params` yet. Override rule and gap: DESIGN §4, 'Parameters'.
 - **2.4 No run state on a System.** A `System` does not store simulation trajectories, solver state,
   or run history. Exception: `self.traj` is the one daily-use shortcut; a new exception needs a
   reason of that weight. `StepSystem.rollout` and `HybridDiagram.last_result` are an open
-  question of S31 (ROADMAP §6).
+  question (ROADMAP §6).
 - **2.5 Prefer arrays and existing core objects.** New APIs take and return arrays or types
   students already know (`System`, `Trajectory`, `PlanningProblem`, sets, costs). Do not add
   request/response dataclasses, option bags, or adapter layers that only wrap those. A new
   named record is justified when it is a domain noun (a trajectory, a certificate, a plan) —
   not when it is a programming convenience. Before adding a record, name the object it already
   is: a `(lower, upper)` pair is a `BoxSet`, a reset rule is a `Distribution`, a sublevel set
-  is a `Set`, a scalar function of the state is a `Field` (planned, workboard step A1; today
-  `StateField` and `WorkspaceField` in `planning/spatial`), a sampled run is a `Trajectory`.
+  is a `Set`, a scalar function of the state is a `Field` (a planned core object; today
+  `StateField` in `planning/spatial`), a sampled run is a `Trajectory`.
 - **2.6 Names are short, and the class name is the name.** A block's display `name` is its
   class name unless the class sets its own, and a composite is named as the expression that
   built it (`PID @ Pendulum`, `Step >> Integrator`, `A + B`, `feedback(G)`). Those names
@@ -80,7 +73,7 @@ Systems-as-descriptions: CONSTITUTION.md §4.*
   `KinematicBicycle`, `PID`), and a class sets an explicit `name` only when the class name
   would mislead, two or three words at most. A long name is a name to shorten, never one to
   restate at length in `name`. Renaming a public class or its display name changes the
-  diagram key derived from it, so it waits for a picked step (A6) and migrates every course
+  diagram key derived from it, so it waits for a picked step and migrates every course
   notebook in the same commit.
 
 ---
@@ -115,21 +108,9 @@ Systems-as-descriptions: CONSTITUTION.md §4.*
   Do not update them to track every new demo, compare script, or research-lane
   experiment. New demos land under `examples/`, whose map is `examples/README.md`. Add a
   row to README's verb table only when a core tool gains its canonical call.
-- **3.8 Notebooks are not a second map.** The catalog is `examples/README.md` (plus
-  root README entry points). Do not duplicate it with See also / Where next /
-  Scripts for depth / peer hrefs.
-  - **Tutorial (`00`–`11`):** at most one same-folder **Next** link, numbered
-    successor. No previous, no skip-ahead, no teaching/demo/project/benchmark/doc
-    hrefs.
-  - **Showcases:** self-contained. No Where next / See also hubs. Chapter names may
-    stay as unlinked backticks (`00_core`).
-  - **Teaching:** standalone. Zero hrefs to other notebooks, demos, tutorials, or
-    library source. Keep Colab self-badge, `git clone`, and external library docs
-    (Gymnasium, SB3). A repo-root `[minilink](https://github.com/alx87grd/minilink)`
-    link may stay. `teaching/topics/` is the textbook; `teaching/courses/<id>/`
-    is a live homework pin (names in `examples/README.md`).
-  - **Demos / projects:** no markdown links to notebooks. Comment twins
-    (`# Teaching twin: …`) stay unless the maintainer asks to drop them.
+- **3.8 Notebooks are not a second map.** The catalog is `examples/README.md`, whose Layout
+  section holds the link policy per notebook kind; a notebook does not duplicate it with See
+  also / Where next hubs or peer links.
 
 ---
 
@@ -167,10 +148,8 @@ Systems-as-descriptions: CONSTITUTION.md §4.*
   diagram beside `>>`, `+`, `@`, `DiagramSystem.connect()` and `feedback()`, or a hybrid
   operator beside `%`? Law: CONSTITUTION §6, 'Composition grammar is frozen early'; operator
   semantics: DESIGN §4, `DiagramSystem`.
-- **4.9 Canonical port terminology:** Prefer these names when they fit; this is not a rename sweep.
-  Custom and multi-channel port names remain fully valid.
-  - Inputs: `u` (control action / actuation), `r` (reference / setpoint), `d` (disturbance / exogenous input), `n` (measurement noise).
-  - Outputs: `y` (measured output / sensor signal).
+- **4.9 Port names are the wiring contract.** `u`, `r`, `d`, `n` in, `y` and `x` out: the
+  names drive the operators. Contract: DESIGN §4, 'Control laws'.
 - **4.10 Early structural validation:** Diagram connection utilities (`@`, `>>`, `DiagramSystem.connect`)
   validate port existence and dimensional compatibility at wiring time, failing with explicit
   error messages naming the mismatched ports and blocks. This rule covers wiring, not `f`/`h`
@@ -268,46 +247,18 @@ Systems-as-descriptions: CONSTITUTION.md §4.*
       return dx
 
   # Good — a complex matrix: named entries in the core math, then their assembly:
-  def C(self, q, dq, params=None):
-      params = self.params if params is None else params
-      xp = array_module(q)
+  # fmt: off
+  C = xp.array([
+      [C11, C12],
+      [C21, C22],
+  ])
+  # fmt: on
 
-      m2 = params["m2"]
-      l1 = params["l1"]
-      lc2 = params["lc2"]
-
-      s2 = xp.sin(q[1])
-      h = m2 * l1 * lc2 * s2
-
-      # Coriolis and centrifugal coupling, driven by the second joint's rate
-      C11 = -h * dq[1]
-      C12 = -h * (dq[0] + dq[1])
-      C21 = h * dq[0]
-      C22 = 0.0
-
-      # fmt: off
-      C = xp.array([
-          [C11, C12],
-          [C21, C22],
-      ])
-      # fmt: on
-
-      return C
-
-  # Good — the assignment is already the textbook; no copy-comment:
-  dx = A @ x + B @ u
-
-  return dx
-
-  # Bad — the parameters packed on one line, and the array built on the return line:
+  # Bad — the parameters packed on one line, the array built on the return line:
   m, l, g, d = params["m"], params["l"], params["g"], params["d"]
   return xp.array([omega, (tau - m * g * l * xp.sin(theta) - d * omega) / (m * l**2)])
 
-  # Bad — self. in the algebra, and the equation lives on the return line:
-  return (u - self.m * self.g * self.l * xp.sin(x[0])) / (self.m * self.l**2)
-
-  # Bad — a textbook step hidden in a helper: the SVD, rank and basis of the
-  # Kalman decomposition are the lesson, so they belong in the body:
+  # Bad — a textbook step hidden in a helper; the SVD, rank and basis are the lesson:
   T_c = orthonormal_range(ctrb, tol)
 
   # Good — each step a named line, the tolerance included:
@@ -549,18 +500,11 @@ Systems-as-descriptions: CONSTITUTION.md §4.*
   job is a diagnostic dump. Never bury arithmetic, formatting, or a second construction
   inside `print` — that line is what the student reads, and it must stay a library verb.
   ```python
-  # Bad — unreadable; the cell is a log, not the API:
+  # Bad — the cell is a log, not the API:
   print(f"planner.gamma = {planner.gamma}: a horizon of {DT / -np.log(planner.gamma):.1f} s")
-  default = ReinforcementLearningPlanner(problem, dt=DT, hidden=(8,), verbose=False)
-  print(f"default gamma = {default.gamma}: a horizon of {DT / -np.log(default.gamma):.1f} s")
 
-  # Bad — a plot or __str__ already said this:
-  print("the five worst of", report.J.size, "trials:", np.round(np.sort(report.J)[-5:], 2))
-  print("open-loop poles:", np.round(np.linalg.eigvals(plant.linearize(xbar).A()), 2))
-
-  # Good — native object, or the last expression:
+  # Good — the native object, or the last expression:
   print(solution)
-  print(report)
   np.linalg.eigvals(lin.A())
   ```
 - **6.14 One figure per notebook cell.** In a teaching or tutorial notebook, a call that
