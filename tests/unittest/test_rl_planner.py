@@ -345,6 +345,15 @@ def test_monte_carlo_backends_agree_on_a_fixed_law():
     assert "trials" in str(report_jax)
 
 
+def test_monte_carlo_refuses_a_trial_shorter_than_half_a_period():
+    prob = problem(tf=0.04)
+    ctl = NeuralPolicyController(prob.sys, hidden=(8,), seed=3)
+    for backend in ("numpy", "jax"):
+        evaluator = MonteCarloEvaluator(prob, dt=0.1, n_trials=2, backend=backend)
+        with pytest.raises(ValueError, match="shorter than half the control period"):
+            evaluator.evaluate(ctl)
+
+
 # --- the off-policy family through the same planner ---
 
 
