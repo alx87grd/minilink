@@ -462,7 +462,7 @@ def time_grid_is_uniform(times: np.ndarray) -> bool:
     if times.size < 2:
         return True
     d = np.diff(times)
-    return bool(np.allclose(d, d[0]))
+    return bool(np.allclose(d, d[0], atol=0.0))
 
 
 def print_setup_panel(sim: Simulator, notes: list[str]) -> None:

@@ -2,7 +2,7 @@
 
 import numpy as np
 
-from minilink.simulation.solvers.solver import SolverBackend
+from minilink.simulation.solvers.solver import SolverBackend, require_uniform_times
 
 ###############################################################################
 # Public API
@@ -24,7 +24,7 @@ class RK4SolverBackend(SolverBackend):
     ) -> np.ndarray:
         n_pts = times.shape[0]
         t0 = times[0]
-        dt = times[1] - times[0]
+        dt = require_uniform_times(times, "rk4_fixedsteps")
         n_steps = n_pts - 1
 
         # x_{k+1} = x_k + Δt/6 (k₁ + 2k₂ + 2k₃ + k₄), n_steps steps from x₀ in one
@@ -54,7 +54,7 @@ class RK4SolverBackend(SolverBackend):
     ) -> np.ndarray:
         n_pts = times.shape[0]
         t0 = times[0]
-        dt = times[1] - times[0]
+        dt = require_uniform_times(times, "rk4_fixedsteps")
 
         # The same RK4 step, u linear between the samples: k₁ at u_k, k₂ and k₃ at
         # (u_k + u_{k+1}) / 2, k₄ at u_{k+1}; one compiled rollout

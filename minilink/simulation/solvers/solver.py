@@ -77,3 +77,25 @@ class SolverBackend(ABC):
             The states ``x``, shape ``(n, n_pts)``.
         """
         ...
+
+
+###############################################################################
+# Internal machinery
+###############################################################################
+
+
+def require_uniform_times(times: np.ndarray, solver: str) -> float:
+    """Refuse knots that are not evenly spaced, to a relative tolerance; return the common step.
+
+    ``solver`` names the fixed-step solver in the refusal.
+    """
+    n_pts = times.shape[0]
+    if n_pts < 2:
+        return 0.0
+    dt = float(times[1] - times[0])
+    if not np.allclose(np.diff(times), dt, atol=0.0):
+        raise ValueError(
+            f"{solver} requires a uniform time grid; use solver='euler' "
+            "for variable dt between knots"
+        )
+    return dt

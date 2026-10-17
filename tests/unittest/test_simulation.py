@@ -383,6 +383,37 @@ class TestEulerSolverModes(unittest.TestCase):
         with self.assertRaises(ValueError):
             backend.integrate(self.ev, times, self.plant.x0)
 
+    def test_rk4_fixedsteps_rejects_nonuniform_grid(self):
+        from minilink.simulation.solvers.rk4_fixed import RK4SolverBackend
+
+        times = np.array([0.0, 0.05, 0.2, 0.25])
+        u = np.zeros((1, times.size))
+        backend = RK4SolverBackend()
+        message = "rk4_fixedsteps requires a uniform time grid"
+        with self.assertRaisesRegex(ValueError, message):
+            backend.integrate(self.ev, times, self.plant.x0)
+        with self.assertRaisesRegex(ValueError, message):
+            backend.integrate_forced(self.ev, times, u, self.plant.x0)
+
+    def test_an_uneven_grid_at_the_nanosecond_scale_is_not_uniform(self):
+        from minilink.analysis.linear import uniform_step
+        from minilink.simulation.simulator import time_grid_is_uniform
+        from minilink.simulation.solvers.euler_fixed import EulerFixedStepSolverBackend
+        from minilink.simulation.solvers.rk4_fixed import RK4SolverBackend
+
+        times = np.array([0.0, 1e-9, 3e-9, 4e-9])
+        for backend in (EulerFixedStepSolverBackend(), RK4SolverBackend()):
+            with self.assertRaisesRegex(ValueError, "requires a uniform time grid"):
+                backend.integrate(self.ev, times, self.plant.x0)
+        self.assertFalse(time_grid_is_uniform(times))
+        with self.assertRaisesRegex(ValueError, "uniform time grid"):
+            uniform_step(times)
+
+        # An even grid at the same scale is uniform
+        even = 1e-9 * np.arange(4)
+        self.assertTrue(time_grid_is_uniform(even))
+        self.assertEqual(uniform_step(even), even[1])
+
     def test_simulator_accepts_euler_fixedsteps(self):
         sim = Simulator(
             StableLinearSystem(),
