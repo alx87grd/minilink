@@ -78,6 +78,7 @@ TRACED_TF = (
     "UnderactuatedRotatingCartPole",
     "InvertedPendulum",
     "TwoIndependentPendulums",
+    "MountainCar",
 )
 
 

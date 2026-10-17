@@ -975,6 +975,9 @@ PARAMS_CASES = [
     (stored(TwoMass), "get_dynamic_geometry", "k1", 0.0),
     (stored(ThreeMass), "get_dynamic_geometry", "k1", 0.0),
     (stored(FloatingTwoMass), "get_dynamic_geometry", "k1", 1.0),
+    # The mountain car: the bead on the hill
+    (stored(MountainCar), "tf", "a", 0.7),
+    (stored(MountainCar), "forward_kinematic_effector", "a", 0.7),
 ]
 
 
@@ -996,7 +999,7 @@ def method_args(plant, method):
     u0 = np.asarray(plant.get_u_from_input_ports(), dtype=float)
     x = x0 + 0.3 * rng.standard_normal(x0.shape)
     u = u0 + 0.5 + 0.3 * rng.standard_normal(u0.shape)
-    if method in ("forward_kinematics", "J"):
+    if method in ("forward_kinematics", "J", "forward_kinematic_effector"):
         return (x[: plant.dof],)
     return (x, u, 0.0)
 
