@@ -165,6 +165,18 @@ class TestLinearCore(unittest.TestCase):
             self.assertTrue(np.isnan(info.steady_state))
             self.assertAlmostEqual(info.peak_time, 5.0)
 
+    def test_step_info_band_is_two_percent_of_the_peak_deviation(self):
+        # y = t e^(-t) peaks at 1/e and returns to 0: the band is 2 % of that peak
+        # deviation, and y leaves it for the last time at t = 6.834 s
+        t = np.linspace(0.0, 20.0, 20001)
+        info = step_info(t, t * np.exp(-t))
+        self.assertAlmostEqual(info.settling_time, 6.834, places=2)
+        self.assertAlmostEqual(info.steady_state, 0.0)
+
+        # From rest the peak deviation is |y_f|: y = 1 − e^(-t) settles at ln 50
+        info = step_info(t, 1.0 - np.exp(-t))
+        self.assertAlmostEqual(info.settling_time, np.log(50.0), places=2)
+
 
 class TestChannelTools(unittest.TestCase):
     """The system-level verbs share the family signature and the channel selectors."""
