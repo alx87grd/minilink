@@ -948,27 +948,28 @@ class MPCBroadcastController(System):
         return t
 
 
-###############################################################################
-# Internal machinery
-###############################################################################
-
-
 def validate_mpc_planner(planner) -> tuple[int, int, int]:
-    """Validate a plan-producing planner and return ``(n, m, n_z)``.
+    """
+    Validate a plan-producing planner and return ``(n, m, n_z)``.
 
-    Accepts a duck-typed
+    The contract an MPC planner meets: a duck-typed
     :class:`~minilink.planning.trajectory_optimization.planner.TrajectoryOptimizationPlanner`
-    (or compatible) with ``compile_parametric_program``,
-    ``has_parametric_program``, and ``solve_trajectory_from``.
+    (or compatible) with a ``problem``, a ``transcription`` and ``options``, and
+    the verbs ``compile_parametric_program``, ``has_parametric_program`` and
+    ``solve_trajectory_from``. A planner missing any of them is a ``TypeError``.
 
     ``compile_backend='jax'`` auto-compiles a parametric NLP once (bind + solve
     each tick). ``compile_backend='numpy'`` or ``'direct'`` skips parametric
     compile; each tick rebuilds via :meth:`~TrajectoryOptimizationPlanner.solve_trajectory_from`.
     """
-    # The planner's interface: a parametric compile and a solve from a measured state
+    # The planner's interface: its problem, transcription and options, a parametric
+    # compile and a solve from a measured state
     missing = [
         name
         for name in (
+            "problem",
+            "transcription",
+            "options",
             "compile_parametric_program",
             "has_parametric_program",
             "solve_trajectory_from",
@@ -1009,6 +1010,11 @@ def validate_mpc_planner(planner) -> tuple[int, int, int]:
     n_z = int(planner.transcription.decision_dimension(planner.problem))
 
     return n, m, n_z
+
+
+###############################################################################
+# Internal machinery
+###############################################################################
 
 
 def declare_mpc_ports(block, n, m, n_z):

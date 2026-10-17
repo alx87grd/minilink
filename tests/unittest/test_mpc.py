@@ -787,6 +787,23 @@ class TestMPCNumPyRebuild(unittest.TestCase):
         self.assertNotIsInstance(mpc, StepSystem)
         self.assertFalse(planner.has_parametric_program)
 
+    def test_planner_without_transcription_is_refused(self):
+        """A duck planner lacking the transcription the block reads is a TypeError."""
+        from types import SimpleNamespace
+
+        from minilink.control.mpc.controller import validate_mpc_planner
+
+        planner = _make_numpy_planner()
+        duck = SimpleNamespace(
+            problem=planner.problem,
+            options=planner.options,
+            compile_parametric_program=planner.compile_parametric_program,
+            has_parametric_program=False,
+            solve_trajectory_from=planner.solve_trajectory_from,
+        )
+        with self.assertRaisesRegex(TypeError, "transcription"):
+            validate_mpc_planner(duck)
+
     def test_compute_command_rebuilds_plan(self):
         planner = _make_numpy_planner(0.1)
         mpc = ModelPredictiveController(planner, dt_mpc=0.2, warm_start=True)
