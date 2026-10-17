@@ -13,6 +13,7 @@ import numpy as np
 import pytest
 
 import minilink.catalog as catalog
+from minilink.core.backends import configure_jax
 
 # Plants that need constructor arguments.
 FACTORIES = {
@@ -62,6 +63,31 @@ def test_plant_compiles_on_both_backends_and_agrees(name):
             np.testing.assert_allclose(
                 np.asarray(outs_jax[port]), value, rtol=1e-9, atol=1e-11
             )
+
+
+# The tf of these plants reads its params and is one xp body: it traces under jax.jit.
+TRACED_TF = (
+    "OneLinkManipulator",
+    "TwoLinkManipulator",
+    "ThreeLinkManipulator3D",
+    "FiveLinkPlanarManipulator",
+    "SpeedControlledManipulator",
+)
+
+
+@pytest.mark.optional
+@pytest.mark.jax
+@pytest.mark.parametrize("name", TRACED_TF)
+def test_tf_traces_under_jit_and_agrees(name):
+    jax = pytest.importorskip("jax")
+    configure_jax(enable_x64=True)
+    sys = FACTORIES.get(name, getattr(catalog, name))()
+    x, u, t = next(_random_points(sys))
+    frames = sys.tf(x, u, t)
+    traced = jax.jit(lambda x: sys.tf(x, u, t))(x)
+    assert set(traced) == set(frames)
+    for key, T in frames.items():
+        np.testing.assert_allclose(np.asarray(traced[key]), T, rtol=1e-9, atol=1e-11)
 
 
 def test_catalog_check_registry_covers_every_catalog_plant():

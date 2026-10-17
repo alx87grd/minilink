@@ -891,3 +891,106 @@ class TestCarProfile(unittest.TestCase):
         self.assertAlmostEqual(sys.inputs["u"].upper_bound[1], profile.limits.delta_max)
         self.assertAlmostEqual(sys.state.upper_bound[8], profile.engine_power_peak)
         self.assertAlmostEqual(sys.state.lower_bound[8], -profile.engine_power_peak)
+
+
+# The params family: a method reads the params it is given
+
+from minilink.dynamics.catalog.manipulators.arms import ThreeLinkManipulator3D
+
+
+def stored(cls, **attributes):
+    """A factory of ``cls`` whose stored params are the ones given (the defaults for None)."""
+
+    def make(params=None):
+        plant = cls()
+        for name, value in attributes.items():
+            setattr(plant, name, value)
+        if params is not None:
+            plant.params = params
+        return plant
+
+    make.__name__ = cls.__name__
+    make.defaults = lambda: cls().params
+    return make
+
+
+def speed_two_link(params=None):
+    """A velocity-controlled two-link arm; ``params`` are the arm's."""
+    arm = TwoLinkManipulator()
+    if params is not None:
+        arm.params = params
+    return SpeedControlledManipulator.from_manipulator(arm)
+
+
+speed_two_link.defaults = lambda: TwoLinkManipulator().params
+
+
+PARAMS_CASES = [
+    # The arms: kinematics, effector ports, frames and torque arcs
+    (stored(OneLinkManipulator), "forward_kinematics", "l1", 3.0),
+    (stored(OneLinkManipulator), "J", "l1", 3.0),
+    (stored(OneLinkManipulator), "h_p", "l1", 3.0),
+    (stored(OneLinkManipulator), "h_pdot", "l1", 3.0),
+    (stored(OneLinkManipulator), "get_dynamic_geometry", "l1", 3.0),
+    (stored(TwoLinkManipulator), "forward_kinematics", "l1", 0.7),
+    (stored(TwoLinkManipulator), "J", "l2", 0.4),
+    (stored(TwoLinkManipulator), "h_p", "l1", 0.7),
+    (stored(TwoLinkManipulator), "h_pdot", "l2", 0.4),
+    (stored(TwoLinkManipulator), "tf", "l1", 0.7),
+    (stored(TwoLinkManipulator), "get_dynamic_geometry", "l1", 0.7),
+    (stored(ThreeLinkManipulator3D), "forward_kinematics", "l1", 1.4),
+    (stored(ThreeLinkManipulator3D), "J", "l3", 1.4),
+    (stored(ThreeLinkManipulator3D), "h_p", "l2", 1.4),
+    (stored(ThreeLinkManipulator3D), "h_pdot", "l3", 1.4),
+    (stored(ThreeLinkManipulator3D), "tf", "l2", 1.4),
+    (stored(FiveLinkPlanarManipulator), "forward_kinematics", "l", np.full(5, 0.6)),
+    (stored(FiveLinkPlanarManipulator), "J", "l", np.full(5, 0.6)),
+    (stored(FiveLinkPlanarManipulator), "h_p", "l", np.full(5, 0.6)),
+    (stored(FiveLinkPlanarManipulator), "h_pdot", "l", np.full(5, 0.6)),
+    (stored(FiveLinkPlanarManipulator), "tf", "l", np.full(5, 0.6)),
+    (stored(FiveLinkPlanarManipulator), "get_dynamic_geometry", "l", np.full(5, 0.6)),
+    (speed_two_link, "tf", "l1", 0.7),
+    (speed_two_link, "get_dynamic_geometry", "l2", 0.4),
+]
+
+
+def opened(value):
+    """A drawing opened into nested values: each primitive into its fields."""
+    if isinstance(value, dict):
+        return {key: opened(item) for key, item in value.items()}
+    if isinstance(value, (list, tuple)):
+        return [opened(item) for item in value]
+    if hasattr(value, "__dict__"):
+        return {key: opened(item) for key, item in vars(value).items()}
+    return np.asarray(value)
+
+
+def method_args(plant, method):
+    """A state and input off the nominal ones; the joint angles for the kinematics."""
+    rng = np.random.default_rng(0)
+    x0 = np.asarray(plant.x0, dtype=float)
+    u0 = np.asarray(plant.get_u_from_input_ports(), dtype=float)
+    x = x0 + 0.3 * rng.standard_normal(x0.shape)
+    u = u0 + 0.5 + 0.3 * rng.standard_normal(u0.shape)
+    if method in ("forward_kinematics", "J"):
+        return (x[: plant.dof],)
+    return (x, u, 0.0)
+
+
+def case_id(value):
+    return getattr(value, "__name__", None)
+
+
+@pytest.mark.parametrize("make, method, key, value", PARAMS_CASES, ids=case_id)
+def test_a_method_reads_the_params_it_is_given(make, method, key, value):
+    plant = make()
+    params = {**make.defaults(), key: value}
+    args = method_args(plant, method)
+
+    given = opened(getattr(plant, method)(*args, params=params))
+    from_stored = opened(getattr(make(params), method)(*args))
+    default = opened(getattr(plant, method)(*args))
+
+    np.testing.assert_equal(given, from_stored)
+    with pytest.raises(AssertionError):
+        np.testing.assert_equal(given, default)
