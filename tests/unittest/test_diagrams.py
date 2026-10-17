@@ -154,6 +154,26 @@ class TestDiagrams(unittest.TestCase):
         self.assertIsNotNone(graph)
         self.assertIn("Integrator", graph.source)
 
+    def test_a_hidden_graph_is_written_only_to_a_requested_file(self):
+        from minilink.graphical.diagrams.dot import render_diagram_graph
+
+        class RecordedGraph:
+            name = "recorded"
+
+            def __init__(self):
+                self.renders = []
+
+            def render(self, filename=None, view=False):
+                self.renders.append((filename, view))
+
+        graph = RecordedGraph()
+        render_diagram_graph(graph, show=False, show_inline=False, show_pdf=True)
+        self.assertEqual(graph.renders, [])
+        render_diagram_graph(
+            graph, show=False, show_inline=False, show_pdf=True, filename="out.gv"
+        )
+        self.assertEqual(graph.renders, [("out.gv", False)])
+
     def test_plot_diagram_without_graphviz_warns_once_and_skips(self):
         import sys
         from unittest import mock

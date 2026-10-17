@@ -347,8 +347,8 @@ def render_diagram_graph(
                 stacklevel=2,
             )
 
-    # To disk: the requested file, or a temporary one for the PDF viewer
-    need_disk = show_pdf or filename is not None
+    # To disk: the requested file, or a temporary one for the PDF viewer when shown
+    need_disk = (show and show_pdf) or filename is not None
     if not need_disk:
         return drawn
 
