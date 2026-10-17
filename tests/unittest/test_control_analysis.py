@@ -1248,6 +1248,19 @@ class TestDiscretize(unittest.TestCase):
         step_leaf = discretize(plant, 0.1)
         self.assertEqual(step_leaf.outputs["y"].dependencies, "all")
 
+    def test_discretize_reads_a_partial_feedthrough_on_its_one_input(self):
+        from minilink.dynamics.catalog.pendulum.pendulum import PendulumWithNoisePort
+
+        plant = PendulumWithNoisePort()  # y reads the noise port n alone
+        step_leaf = discretize(plant, 0.05)
+        self.assertEqual(step_leaf.outputs["y"].dependencies, ("u",))
+        x = np.array([0.3, 0.1])
+        u = np.array([0.2, 0.0, 0.5])  # torque, disturbance, noise
+        x1 = step_leaf.step(x, u, k=0)
+        np.testing.assert_allclose(x1, _rk4_step(plant.f, x, u, 0.0, 0.05, None))
+        np.testing.assert_allclose(step_leaf.h(x, u, k=0), [0.3, 0.6])
+        self.assertEqual(discretize(Pendulum(), 0.05).outputs["y"].dependencies, ())
+
     def test_discretize_accepts_dt_in_params_only(self):
         step_leaf = discretize(_GainIntegrator(), params={"gain": 2.0, "dt": 0.02})
         self.assertEqual(step_leaf.dt, 0.02)
