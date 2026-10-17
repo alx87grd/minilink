@@ -319,6 +319,7 @@ def build_execution_plan(
     """Build an immutable ExecutionPlan from a DiagramSystem.
 
     This is the core compilation step.  It:
+
     1. Orders the output ports, refusing an algebraic loop, via
        :func:`~minilink.core.wiring.evaluation_order_of`.
     2. Assigns each output port a slice in the flat signal buffer.
