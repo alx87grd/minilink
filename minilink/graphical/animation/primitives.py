@@ -52,17 +52,22 @@ class GraphicPrimitive:
 class CustomLine(GraphicPrimitive):
     """A generic sequence of connected line segments."""
 
-    def __init__(self, pts, color="blue", linewidth=1, style="-"):
+    def __init__(self, pts, color="blue", linewidth=1, style="-", opacity=1.0):
         """
         Parameters
         ----------
         pts : list or np.ndarray
             Nx2 or Nx3 array of points connected sequentially.
+        opacity : float
+            From 0 (invisible) to 1 (opaque).
         """
         super().__init__(color, linewidth, style)
 
         # Shape
         self.pts = np.array(pts)
+
+        # Style
+        self.opacity = float(opacity)
 
     def points_at(self, t):
         """Nx3 polyline points at playback time *t* (static: time-independent)."""
@@ -714,7 +719,7 @@ def vehicle_body(length=1.0, width=0.5, color="blue", opacity=0.85):
         ]
     )
 
-    return CustomLine(pts, color=color, linewidth=2)
+    return CustomLine(pts, color=color, linewidth=2, opacity=opacity)
 
 
 # Extents (used by the auto-fit camera)

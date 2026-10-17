@@ -1641,6 +1641,53 @@ class TestPlotlySignalPlot(unittest.TestCase):
         self.assertEqual(h_sig_cap, SIGNAL_PLOT_MAX_FIG_HEIGHT_POPUP)
 
 
+class TestLineOpacity(unittest.TestCase):
+    """A line primitive carries its opacity to the matplotlib, plotly and meshcat renderers."""
+
+    def setUp(self):
+        self.line = CustomLine(
+            [[0.0, 0.0, 0.0], [1.0, 0.0, 0.0]], color="#1f77b4", opacity=0.4
+        )
+        self.camera = camera_matrix(scale=2.0)
+
+    def test_a_line_is_opaque_unless_told_and_the_vehicle_body_keeps_its_opacity(self):
+        from minilink.graphical.animation.primitives import vehicle_body
+
+        self.assertEqual(CustomLine([[0.0, 0.0], [1.0, 1.0]]).opacity, 1.0)
+        self.assertEqual(vehicle_body().opacity, 0.85)
+        self.assertEqual(vehicle_body(opacity=0.5).opacity, 0.5)
+
+    def test_matplotlib_draws_the_line_with_its_opacity(self):
+        from minilink.graphical.animation.renderers.matplotlib_renderer import (
+            MatplotlibRenderer,
+        )
+
+        backend = MatplotlibRenderer(Animator(DynamicSystem(0)))
+        backend.open_scene(is_3d=False, show=False, camera=self.camera)
+        backend.draw_frame([self.line], [np.eye(4)], 0.0, self.camera)
+        self.assertAlmostEqual(backend.canvas.drawn_objects[0].get_alpha(), 0.4)
+        plt.close(backend.fig)
+
+    def test_plotly_draws_the_line_with_its_opacity(self):
+        pytest.importorskip("plotly")
+        backend = PlotlyRenderer(Animator(DynamicSystem(0)))
+        backend.open_scene(is_3d=False, show=False, camera=self.camera, title="line")
+        backend.draw_frame([self.line], [np.eye(4)], 0.0, self.camera)
+        fig = backend.present(block=False)
+        self.assertAlmostEqual(fig.data[0].opacity, 0.4)
+
+    @pytest.mark.skipif(not _has_meshcat(), reason="meshcat not installed")
+    def test_meshcat_draws_the_line_with_its_opacity(self):
+        for is_3d in (False, True):
+            with self.subTest(is_3d=is_3d):
+                canvas = MeshcatCanvas(_FakeMeshcatNode(), is_3d=is_3d)
+                canvas.ensure_objects([self.line])
+                material = canvas.scene["p0"].object.material
+                self.assertAlmostEqual(material.opacity, 0.4)
+                self.assertTrue(material.transparent)
+                canvas.clear()
+
+
 class TestArrowGeometry(unittest.TestCase):
     def test_planar_arrow_matches_historical_xy_geometry(self):
         pts = arrow_pts((0.0, 0.0), (1.0, 0.0), scale=2.0, head_ratio=0.15)
