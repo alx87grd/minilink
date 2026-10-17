@@ -1164,3 +1164,42 @@ class TestPathtrackingVehicle(unittest.TestCase):
                 self.assertLessEqual(
                     np.hypot(Fx[1], Fy[1]), tire.mu * Fz[1] * (1 + 1e-12)
                 )
+
+
+# The pathtracking project's path helpers: the point ahead along the path, both copies
+
+PATH_MODULES = (
+    "examples.projects.pathtracking.bicycle_los.los",
+    "examples.projects.pathtracking.bicycle_los_v2.path_tracking",
+)
+
+
+@pytest.mark.parametrize("module", PATH_MODULES)
+def test_the_point_ahead_starts_on_the_next_segment_after_a_degenerate_one(module):
+    import importlib
+
+    ahead = importlib.import_module(module).point_ahead_along_path
+    for path in (
+        [(0.0, 0.0), (0.0, 0.0), (4.0, 0.0), (4.0, 3.0)],
+        [(0.0, 0.0), (0.0, 0.0), (0.0, 0.0), (4.0, 0.0), (4.0, 3.0)],
+    ):
+        ax, ay, i, lam, heading = ahead(path, 0, 0.7, 1.0, closed=False)
+        assert (ax, ay, heading) == (1.0, 0.0, 0.0)
+        assert i == len(path) - 3
+
+
+@pytest.mark.parametrize("module", PATH_MODULES)
+def test_an_open_path_stops_at_its_end_with_its_last_heading(module):
+    import importlib
+
+    ahead = importlib.import_module(module).point_ahead_along_path
+    square = [(0.0, 0.0), (4.0, 0.0), (4.0, 3.0), (0.0, 3.0)]
+    reached = ahead(square, 1, 0.2, 9.0, closed=False)
+    assert reached == (0.0, 3.0, 2, 1.0, np.pi)
+    assert [type(value) for value in reached] == [float, float, int, float, float]
+    clamped = ahead(square, 3, 0.5, 1.0, closed=False)  # No closing segment
+    assert clamped[:3] == (1.0, 3.0, 2)
+    with pytest.raises(ValueError, match="non-negative"):
+        ahead(square, 1, 0.2, -1.0, closed=False)
+    wrapped = ahead(square, 0, 0.5, -1.0, closed=True)  # A loop wraps a negative ds
+    assert [type(value) for value in wrapped] == [float, float, int, float, float]
