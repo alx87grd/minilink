@@ -229,10 +229,14 @@ class StepSchedule:
 
     def __post_init__(self) -> None:
         self.dt_base = validate_dt_base(self.dt_base)
+
+        # The divisors as whole numbers, in a dict of the schedule's own
+        fire = {}
         for sys_id, divisor in self.fire.items():
             d = int(divisor)
             require_fire_divisor(sys_id, d, divisor)
-            self.fire[sys_id] = d
+            fire[sys_id] = d
+        self.fire = fire
 
     @classmethod
     def from_rates(cls, dt_base: float, rates_hz: dict[str, float]) -> StepSchedule:

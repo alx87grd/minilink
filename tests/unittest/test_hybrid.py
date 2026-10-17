@@ -531,6 +531,15 @@ def _reference(k):
 
 
 class TestHybridMultiRate(unittest.TestCase):
+    def test_schedule_keeps_its_own_divisors(self):
+        fire = {"controller": 2.0}
+        schedule = StepSchedule(dt_base=0.01, fire=fire)
+        self.assertEqual(schedule.fire, {"controller": 2})
+        self.assertIs(type(schedule.fire["controller"]), int)
+        self.assertIs(type(fire["controller"]), float)  # the caller's dict untouched
+        fire["controller"] = 5
+        self.assertEqual(schedule.fire, {"controller": 2})
+
     def test_scheduled_hybrid_runs(self):
         hybrid = _build_hybrid_hybrid_topology()
         sim = HybridSimulator(hybrid, t0=0, tf=1.6)
