@@ -1018,6 +1018,9 @@ PARAMS_CASES = [
     ),
     # The quarter car: the spring down to the road
     (stored(QuarterCarOnRoughTerrain), "get_dynamic_geometry", "a", np.full(6, 0.4)),
+    # The planar aircraft: its chords and its lift and drag arrows
+    (stored(Plane2D), "tf", "l_t", 1.3),
+    (stored(Plane2D), "get_dynamic_geometry", "rho", 1.5),
 ]
 
 

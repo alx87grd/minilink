@@ -251,7 +251,8 @@ class Plane2D(MechanicalSystem):
         }
 
     def tf(self, x, u, t=0, params=None):
-        params = self.params
+        params = self.params if params is None else params
+        xp = array_module(x)
 
         S_w = params["S_w"]
         AR = params["AR"]
@@ -262,19 +263,19 @@ class Plane2D(MechanicalSystem):
         q = x[:3]
         theta = q[2]
         delta = u[1]
-        chord_w = np.sqrt(S_w / AR)
-        chord_t = np.sqrt(S_t / AR)
-        c = np.cos(theta)
-        s = np.sin(theta)
+        chord_w = xp.sqrt(S_w / AR)
+        chord_t = xp.sqrt(S_t / AR)
+        c = xp.cos(theta)
+        s = xp.sin(theta)
 
         # The wing and tail stations on the body axis
-        wing = np.array([q[0] - l_w * c, q[1] - l_w * s])
-        tail = np.array([q[0] - l_t * c, q[1] - l_t * s])
+        wing = xp.array([q[0] - l_w * c, q[1] - l_w * s])
+        tail = xp.array([q[0] - l_t * c, q[1] - l_t * s])
 
         # Each chord along its surface: the wing's on the body axis, the tail's
         # deflected by δ
-        dir_w = np.array([c, s])
-        dir_t = np.array([np.cos(theta + delta), np.sin(theta + delta)])
+        dir_w = xp.array([c, s])
+        dir_t = xp.array([xp.cos(theta + delta), xp.sin(theta + delta)])
         wing_aft = wing - chord_w * dir_w
         wing_fore = wing + chord_w * dir_w
         tail_aft = tail - chord_t * dir_t
@@ -291,6 +292,8 @@ class Plane2D(MechanicalSystem):
         }
 
     def get_dynamic_geometry(self, x, u, t=0, params=None):
+        params = self.params if params is None else params
+
         length = self.length
         l_cg = self.l_cg
 
@@ -298,7 +301,7 @@ class Plane2D(MechanicalSystem):
         dq = x[3:]
         speed, gamma, alpha = self.velocity_vector(q, dq)
         delta = u[1]
-        L_w, D_w, _, L_t, D_t, _ = self.aerodynamic_forces(speed, alpha, delta)
+        L_w, D_w, _, L_t, D_t, _ = self.aerodynamic_forces(speed, alpha, delta, params)
 
         # Arrow lengths: a tenth of the body length per newton, and the speed capped
         # at the body length
