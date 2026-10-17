@@ -237,10 +237,12 @@ def finite_diff_knots(tau: np.ndarray, y: np.ndarray) -> np.ndarray:
     if n_t == 1:
         return y_dot
 
-    # Knot spacings Δτ, any |Δτ| < 10⁻¹⁵ set to 10⁻¹⁵ so a repeated knot never
-    # divides by zero
+    # Knot spacings Δτ and central spans τ_{i+1} − τ_{i−1}, any magnitude under
+    # 10⁻¹⁵ set to 10⁻¹⁵ so a repeated knot never divides by zero
     dtau = np.diff(tau)
     dtau = np.where(np.abs(dtau) < 1e-15, 1e-15, dtau)
+    span = tau[2:] - tau[:-2]
+    span = np.where(np.abs(span) < 1e-15, 1e-15, span)
 
     # One-sided at the ends: ẏ₀ = (y₁ − y₀) / Δτ₀, and backward at the last knot
     y_dot[:, 0] = (y[:, 1] - y[:, 0]) / dtau[0]
@@ -249,7 +251,7 @@ def finite_diff_knots(tau: np.ndarray, y: np.ndarray) -> np.ndarray:
     # Central inside: ẏᵢ = (y_{i+1} − y_{i−1}) / (τ_{i+1} − τ_{i−1})
     if n_t > 2:
         for i in range(1, n_t - 1):
-            y_dot[:, i] = (y[:, i + 1] - y[:, i - 1]) / (tau[i + 1] - tau[i - 1])
+            y_dot[:, i] = (y[:, i + 1] - y[:, i - 1]) / span[i - 1]
 
     return y_dot
 

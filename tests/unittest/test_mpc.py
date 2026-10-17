@@ -1063,6 +1063,18 @@ class TestMpcSubclassHooks(unittest.TestCase):
         self.assertAlmostEqual(mpc.latch.last_t_solve, 1.0)
 
 
+from minilink.control.mpc.utilities import finite_diff_knots
+
+
+class TestMpcKnotRates(unittest.TestCase):
+    def test_coincident_knots_give_finite_rates(self):
+        """Three knots at one instant: the central span is floored like the ends."""
+        tau = np.zeros(3)
+        y = np.array([[0.0, 1.0, 2.0]])
+        y_dot = finite_diff_knots(tau, y)
+        self.assertTrue(np.all(np.isfinite(y_dot)))
+
+
 from minilink.control.mpc import (
     ModelPredictiveController,
     mpc_animation_overlays,
