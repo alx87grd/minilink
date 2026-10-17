@@ -58,35 +58,18 @@ dev = [
     "nbclient",
     "nbformat",
     "ipykernel",
-]
-full = [
-    "minilink[diagrams,visualization,plotting,symbolic,jax,rl]",
-]
-docs = [
     "sphinx>=7",
     "furo>=2024.8.6",
 ]
-diagrams = [
-    "graphviz",
-]
-visualization = [
-    "meshcat",
-    "pygame",
-]
-plotting = [
-    "plotly",
-]
-symbolic = [
-    "sympy>=1.12",
-]
-jax = [
+# Every optional library that works once pip installs it. Graphviz (plot_diagram)
+# and Ipopt need a system install: the conda environment has both.
+full = [
     "jax>=0.4.28",
     "jaxlib>=0.4.28",
-]
-ipopt = [
-    "cyipopt>=1.3",
-]
-rl = [
+    "plotly",
+    "meshcat",
+    "pygame",
+    "sympy>=1.12",
     "gymnasium",
 ]
 
@@ -137,13 +120,13 @@ testpaths = [
 ]
 pythonpath = "."
 markers = [
-    "optional: tests that require optional dependency extras",
-    "jax: tests that require the jax extra",
-    "symbolic: tests that require the symbolic extra",
-    "visualization: tests that require the visualization extra",
-    "plotting: tests that require the plotting extra",
-    "ipopt: tests that require the ipopt extra",
-    "rl: tests that require the rl extra (gymnasium)",
+    "optional: tests that require an optional library",
+    "jax: tests that require JAX",
+    "symbolic: tests that require SymPy",
+    "visualization: tests that require meshcat or pygame",
+    "plotting: tests that require Plotly",
+    "ipopt: tests that require cyipopt",
+    "rl: tests that require Gymnasium",
 ]
 
 [tool.hatch.version]
