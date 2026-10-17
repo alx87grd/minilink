@@ -104,10 +104,13 @@ class PolicyEvaluator:
         return J
 
     def value_at(self, x) -> float:
-        """Interpolate the policy's cost-to-go at an arbitrary state ``x``."""
+        """Interpolate the policy's cost-to-go at an arbitrary state ``x``, by the options' interpolation."""
         require_solved(self.last_J, "value_at")
 
-        return float(self.grid.interpolate(self.last_J, np.atleast_2d(x))[0])
+        method = self.options.interpolation
+        J = self.grid.interpolate(self.last_J, np.atleast_2d(x), method)
+
+        return float(J[0])
 
     def plot_cost2go(self, **kwargs):
         """Draw the policy's cost-to-go field; options as in :meth:`StateSpaceGrid.plot_value`."""

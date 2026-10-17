@@ -726,6 +726,34 @@ class TestPolicyEvaluatorPlots(unittest.TestCase):
         self.assertIsNotNone(fig)
 
 
+class TestValueAtInterpolation(unittest.TestCase):
+    """value_at reads the cost-to-go by the options' interpolation, linear by default."""
+
+    def test_planner_solution_and_evaluator_follow_the_option(self):
+        problem = make_problem()
+        planner, result = solve(problem, interpolation="nearest")
+        x = np.array([[0.13, -0.41]])
+        nearest = float(result.grid.interpolate(result.J, x, "nearest")[0])
+        linear = float(result.grid.interpolate(result.J, x, "linear")[0])
+        self.assertNotEqual(nearest, linear)
+        self.assertEqual(planner.value_at(x[0]), nearest)
+        self.assertEqual(planner.last_solution.cost_to_go(x[0]), nearest)
+        self.assertEqual(result.value_at(x[0]), linear)
+        self.assertEqual(result.value_at(x[0], "nearest"), nearest)
+
+        evaluator = PolicyEvaluator(
+            problem,
+            grid=result.grid,
+            policy=planner.get_controller(),
+            options=planner.options,
+        )
+        evaluator.solve()
+        J = evaluator.last_J
+        self.assertEqual(
+            evaluator.value_at(x[0]), float(result.grid.interpolate(J, x, "nearest")[0])
+        )
+
+
 class TestDpOneObjectSetup(unittest.TestCase):
     """DynamicProgrammingPlanner builds its grid from x_grid / u_grid / dt."""
 
