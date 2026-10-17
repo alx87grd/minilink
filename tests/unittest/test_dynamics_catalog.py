@@ -900,6 +900,7 @@ from minilink.dynamics.catalog.pendulum.cartpole import (
     RotatingCartPole,
     UnderactuatedRotatingCartPole,
 )
+from minilink.dynamics.catalog.mass_spring_damper.linear import FloatingTwoMass
 from minilink.dynamics.catalog.pendulum.pendulum import InvertedPendulum
 
 
@@ -969,6 +970,11 @@ PARAMS_CASES = [
     (stored(InvertedPendulum), "get_dynamic_geometry", "l", 1.5),
     (stored(TwoIndependentPendulums), "tf", "l", 1.5),
     (stored(TwoIndependentPendulums), "get_dynamic_geometry", "l", 1.5),
+    # The mass-spring-damper chains: the ground spring drawn only when k ≠ 0
+    (stored(SingleMass), "get_dynamic_geometry", "k", 0.0),
+    (stored(TwoMass), "get_dynamic_geometry", "k1", 0.0),
+    (stored(ThreeMass), "get_dynamic_geometry", "k1", 0.0),
+    (stored(FloatingTwoMass), "get_dynamic_geometry", "k1", 1.0),
 ]
 
 
