@@ -592,3 +592,21 @@ def test_se3_takes_a_vector_translation_or_the_literal_origin():
     for p in (1.0, 2, True, np.array(0.0), np.float64(1.0)):
         with pytest.raises(ValueError, match="3-vector"):
             SE3(R, p)
+
+
+def test_signal_dim_is_a_whole_nonnegative_number():
+    from minilink.core.signals import infer_signal_dim
+
+    assert infer_signal_dim("r", dim=2) == 2
+    assert infer_signal_dim("r", dim=2.0) == 2
+    assert infer_signal_dim("r", dim=np.int64(3)) == 3
+    assert infer_signal_dim("r", dim=0) == 0
+    for dim, message in (
+        (True, "whole number"),
+        (np.bool_(False), "whole number"),
+        (2.5, "whole number"),
+        (-1, "nonnegative"),
+        (-2.0, "nonnegative"),
+    ):
+        with pytest.raises(ValueError, match=message):
+            infer_signal_dim("r", dim=dim)
