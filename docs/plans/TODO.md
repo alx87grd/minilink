@@ -148,7 +148,7 @@ recorded in the PR with its question or bug.
   `RotatingCartPole.tf` on `xp`), `mass_spring_damper/linear.py` (`A` / `B` / `C` / `D` on
   `xp` — a JAX-safety fix; extend the both-backends test), `vehicles/dynamic_bicycle.py`
   (`_u_in` / `_contact_fields` renames ripple to `racecar.py`, two project files and
-  `graphical/catalog/skins.py`; dead `_wheel_rectangle_pts`), `manipulators/ur5.py` (helpers
+  `graphical/catalog/skins.py`), `manipulators/ur5.py` (helpers
   and the two algorithms below the public API), `aerial/plane.py` (`tf` on `xp` reading
   `params`; the 55-line pygame `__main__`), `abstraction/state_space.py` (helpers below), the
   37 inline `array_module(q).array(...)` calls.
@@ -159,10 +159,7 @@ recorded in the PR with its question or bug.
   `require_jax`, `sample_in_ellipsoid` named), `simulation/simulator.py` (solver table and
   helper below the class, `solve` before its helpers, the detached comments, a constructor of
   named steps), `simulation/computer.py` (`as_computer` below the classes, its coercion in a
-  helper), the solver backends' comments and `_finalize_solution`, the duplicated
-  `DISCONTINUOUS_AUTO_DT_SCALE`.
-  Also: one uniform-grid check shared by the fixed-step backends and the simulator (scan:
-  compile-sim#14).
+  helper), the solver backends' comments and `_finalize_solution`.
 - [ ] **T5 planning**: `trajectory_optimization/planner.py` (primary class first, eleven `_`
   methods — `_make_callback` in three test lines —, the `getattr` probes
   `Transcription.supports_parametric` makes redundant, the duplicated optimizer-method
@@ -365,7 +362,7 @@ after RN-5.
   `problem.params.cost` through. Done when every planner baseline `cmp`s and `jax.grad` of a
   trajopt objective with respect to `Q` runs.
   Also (scan: core#3, core#4): `discount_rate` a constructor field (or a `params` entry)
-  that `ScaledCost` forwards and `SumCost` reconciles; `validate_diagram_params` checks each
+  that `ScaledCost` forwards and `SumCost` reconciles; `check_diagram_params` checks each
   per-block dict against the block's keys, so a partial dict fails at the setter instead of
   inside `f`. The Monte Carlo evaluator and the gym reward never apply `problem.params.cost`
   while the DP table does, so the two disagree on a parametric cost.

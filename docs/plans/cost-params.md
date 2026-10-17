@@ -79,7 +79,7 @@ The diagram's rules, so there is one mental model for both:
 | `diagram.subsystems`: `{sys_id: block}` | `SumCost.terms`: `{term_id: cost}` |
 | `diagram.params`: live view `{sys_id: block.params}`, setter distributes | `SumCost.params`: live view `{term_id: cost.params}`, setter distributes |
 | `f` routes `params.get(sys_id)` to each block, `None` falls back to the block's own | `g` and `h` route `params.get(term_id)` the same way |
-| partial dictionaries allowed, unknown ids raise (`validate_diagram_params`) | same (`validate_cost_params`) |
+| partial dictionaries allowed, unknown ids raise (`check_diagram_params`) | same (`validate_cost_params`) |
 | the role names `plant`, `controller`, `estimator` (a clash raises), plain names elsewhere with a numeric suffix for repeats, `System.id` naming a block placed by `+` or `>>` | ids from class names, numeric suffix for repeats, `cost.id` overrides |
 | nested diagrams nest the dictionary | named sums nest the dictionary |
 
