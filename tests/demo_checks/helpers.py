@@ -36,7 +36,7 @@ def check_geometry_frame(system, x=None, u=None, t=0.0) -> None:
     u = system.get_u_from_input_ports() if u is None else np.asarray(u, dtype=float)
     animator = Animator(system)
     kinematic = system.get_kinematic_geometry()
-    frame = animator._resolve_frame(x, u, t, kinematic=kinematic)
+    frame = animator.resolve_frame(x, u, t, kinematic=kinematic)
     if len(frame["primitives"]) != len(frame["transforms"]):
         raise ValueError(f"{system.name}: primitive/transform count mismatch")
     for transform in frame["transforms"]:

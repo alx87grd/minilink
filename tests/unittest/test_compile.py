@@ -4,7 +4,7 @@ Validates that:
 - ``compile_diagram()`` produces a working ``NumpyDiagramEvaluator``
 - ``f()`` matches ``diagram.f()`` (the slow recursive reference)
 - ``compute_internal_signals()`` / ``compute_internal_signals_dict()`` expose the buffer
-- ``check_algebraic_loops()`` detects loops and returns valid order
+- ``check_algebraic_loops()`` detects loops and ``evaluation_order_of()`` returns a valid order
 - ``build_execution_plan()`` produces a valid ``ExecutionPlan``
 """
 
@@ -13,17 +13,14 @@ import warnings
 import numpy as np
 import pytest
 from minilink.blocks.basic import Integrator
-from minilink.control.output import ProportionalController
+from minilink.control.siso import P
 from minilink.core.backends import array_module
-from minilink.core.compile.compiler import (
-    build_execution_plan,
-    check_algebraic_loops,
-    compile_diagram,
-)
+from minilink.core.compile.compiler import build_execution_plan, compile_diagram
 from minilink.core.compile.evaluators.numpy_evaluators import NumpyDiagramEvaluator
 from minilink.core.compile.execution_plan import ExecutionPlan
 from minilink.core.diagram import DiagramSystem
 from minilink.core.system import DynamicSystem, System
+from minilink.core.wiring import check_algebraic_loops, evaluation_order_of
 
 
 class _JAXFriendlyPController(System):
@@ -73,12 +70,12 @@ def _build_small_closed_loop_jax():
     ctl = _JAXFriendlyPController()
     plant = _JAXFriendlyIntegrator()
     ctl.params["Kp"] = 2.5
-    diag.add_subsystem(ctl, "ctl")
+    diag.add_subsystem(ctl, "controller")
     diag.add_subsystem(plant, "plant")
     diag.add_input_port("r")
-    diag.connect("input", "r", "ctl", "r")
-    diag.connect("plant", "y", "ctl", "y")
-    diag.connect("ctl", "u", "plant", "u")
+    diag.connect("input", "r", "controller", "r")
+    diag.connect("plant", "y", "controller", "y")
+    diag.connect("controller", "u", "plant", "u")
     return diag
 
 
@@ -89,17 +86,17 @@ def _build_closed_loop_with_external_output_jax():
 
 
 def _build_small_closed_loop():
-    """Step → ProportionalController → Integrator → feedback to controller."""
+    """Step → P → Integrator → feedback to controller."""
     diag = DiagramSystem()
     diag.connection_verbose = False
-    ctl = ProportionalController(2.5)
+    ctl = P(2.5, ports="reference")
     plant = Integrator()
-    diag.add_subsystem(ctl, "ctl")
+    diag.add_subsystem(ctl, "controller")
     diag.add_subsystem(plant, "plant")
     diag.add_input_port("r")
-    diag.connect("input", "r", "ctl", "r")
-    diag.connect("plant", "y", "ctl", "y")
-    diag.connect("ctl", "u", "plant", "u")
+    diag.connect("input", "r", "controller", "r")
+    diag.connect("plant", "y", "controller", "y")
+    diag.connect("controller", "u", "plant", "u")
     return diag
 
 
@@ -139,7 +136,8 @@ class TestCheckAlgebraicLoops(unittest.TestCase):
 
     def test_no_loop_returns_order(self):
         diag = _build_small_closed_loop()
-        order = check_algebraic_loops(diag)
+        self.assertIsNone(check_algebraic_loops(diag))
+        order = evaluation_order_of(diag)
         self.assertIsInstance(order, list)
         self.assertGreaterEqual(len(order), 1)
         for sys_id, port_id in order:
@@ -147,15 +145,16 @@ class TestCheckAlgebraicLoops(unittest.TestCase):
 
     def test_loop_raises(self):
         diag = _build_feedthrough_loop()
-        with self.assertRaises(RuntimeError) as ctx:
-            check_algebraic_loops(diag)
-        self.assertIn("Algebraic loop detected", str(ctx.exception))
+        for check in (check_algebraic_loops, evaluation_order_of):
+            with self.assertRaises(RuntimeError) as ctx:
+                check(diag)
+            self.assertIn("Algebraic loop detected", str(ctx.exception))
 
     def test_chain_no_loop(self):
         """A → B → C (no loop) should succeed."""
         diag = _build_feedthrough_loop()
         diag.connections["A"]["u"] = None
-        order = check_algebraic_loops(diag)
+        order = evaluation_order_of(diag)
         self.assertGreaterEqual(len(order), 3)
 
 
@@ -236,7 +235,14 @@ class TestNumpyDiagramEvaluator(unittest.TestCase):
         diag = _build_small_closed_loop()
         x = np.array([0.5])
         u = np.array([2.0])
-        params = {"ctl": {"K": np.array([[4.0]])}, "plant": {"k": 3.0}}
+        params = {
+            "controller": {
+                "Kp": np.array([4.0]),
+                "u_min": np.array([-np.inf]),
+                "u_max": np.array([np.inf]),
+            },
+            "plant": {"k": 3.0},
+        }
         dx = diag.f(x, u, 0.0, params=params)
         np.testing.assert_allclose(dx, np.array([18.0]), atol=1e-10)
 
@@ -456,7 +462,7 @@ class TestDiagramParamsContract(unittest.TestCase):
 
     def test_params_property_is_nested_live_view(self):
         params = self.diag.params
-        self.assertEqual(set(params), {"ctl", "plant"})
+        self.assertEqual(set(params), {"controller", "plant"})
         self.assertIs(params["plant"], self.diag.subsystems["plant"].params)
 
     def test_params_setter_distributes_by_sys_id(self):
@@ -485,8 +491,11 @@ class TestDiagramParamsContract(unittest.TestCase):
             self.diag.f(self.x, self.u, 0.0, params={"Kp": 4.0})
 
     def test_non_mapping_params_raises_typeerror(self):
-        with self.assertRaises(TypeError):
+        message = r"Diagram params must be a mapping keyed by subsystem id .* got list"
+        with self.assertRaisesRegex(TypeError, message):
             self.diag.f(self.x, self.u, 0.0, params=[1.0, 2.0])
+        with self.assertRaisesRegex(TypeError, message):
+            self.diag.subsystem_params([1.0, 2.0], "plant")
 
 
 class TestNumpyDiagramParametricTier(unittest.TestCase):
@@ -499,7 +508,14 @@ class TestNumpyDiagramParametricTier(unittest.TestCase):
         self.u = np.array([2.0])
 
     def test_f_p_matches_recursive_reference(self):
-        params = {"ctl": {"K": np.array([[4.0]])}, "plant": {"k": 3.0}}
+        params = {
+            "controller": {
+                "Kp": np.array([4.0]),
+                "u_min": np.array([-np.inf]),
+                "u_max": np.array([np.inf]),
+            },
+            "plant": {"k": 3.0},
+        }
         for x_val, u_val, t in [(0.3, 1.2, 0.1), (0.0, 0.0, 0.0), (-5.0, 10.0, 0.0)]:
             x, u = (np.array([x_val]), np.array([u_val]))
             np.testing.assert_allclose(
@@ -524,7 +540,13 @@ class TestNumpyDiagramParametricTier(unittest.TestCase):
             self.evaluator.f_p(self.x, self.u, 0.0, {"plnt": {"k": 3.0}})
 
     def test_outputs_p_single_boundary(self):
-        params = {"ctl": {"K": np.array([[4.0]])}}
+        params = {
+            "controller": {
+                "Kp": np.array([4.0]),
+                "u_min": np.array([-np.inf]),
+                "u_max": np.array([np.inf]),
+            }
+        }
         out = self.evaluator.outputs_p(self.x, self.u, 0.0, params)
         self.assertEqual(set(out), {"y_meas"})
         np.testing.assert_allclose(out["y_meas"], [0.5], atol=1e-10)
@@ -546,7 +568,7 @@ class TestJaxDiagramParametricTier(unittest.TestCase):
         self.u_np = np.array([2.0])
 
     def test_f_p_matches_numpy(self):
-        params = {"ctl": {"Kp": 4.0}, "plant": {"k": 3.0}}
+        params = {"controller": {"Kp": 4.0}, "plant": {"k": 3.0}}
         np.testing.assert_allclose(
             np.asarray(self.ev.f_p(self.x_j, self.u_j, 0.0, params)),
             self.ev_np.f_p(self.x_np, self.u_np, 0.0, params),
@@ -562,12 +584,14 @@ class TestJaxDiagramParametricTier(unittest.TestCase):
             np.testing.assert_allclose(np.asarray(out_j[key]), out_n[key], atol=1e-05)
 
     def test_jacobian_wrt_params_analytic(self):
-        params = {"ctl": {"Kp": 2.5}, "plant": {"k": 1.0}}
+        params = {"controller": {"Kp": 2.5}, "plant": {"k": 1.0}}
         jac = self.ev.jacobian("f", "params")(self.x_j, self.u_j, 0.0, params)
         np.testing.assert_allclose(
             np.asarray(jac["plant"]["k"]), [2.5 * 1.5], atol=1e-05
         )
-        np.testing.assert_allclose(np.asarray(jac["ctl"]["Kp"]), [1.5], atol=1e-05)
+        np.testing.assert_allclose(
+            np.asarray(jac["controller"]["Kp"]), [1.5], atol=1e-05
+        )
 
     def test_grad_flows_through_f_p(self):
         f_p = self.ev.f_p

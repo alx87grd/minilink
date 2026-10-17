@@ -1,8 +1,8 @@
 # The field object
 
-Status: core contract — agreed 2026-09-15 (C12, time and action arguments included), not started.
-Rung: v0.2 wave A, step A1 of [TODO.md](TODO.md). Depends on the sets-and-distributions pass (landed 2026-09-15: `bounding_box`, `.box`, the draw convention); the Lyapunov rulings it cites are the open items in ROADMAP §6.
-Name-preserving (`V(x)`, `value_at`, `cost_to_go` keep working). Finding F12: docs/reviews/2026-09-15-foundations-review.md.
+Status: core contract — agreed 2026-09-15 (FD-C12, time and action arguments included), not started.
+Rung: v0.3, step A1 of [TODO.md](TODO.md). Depends on the sets-and-distributions pass (landed 2026-09-15: `bounding_box`, `.box`, the draw convention); the Lyapunov rulings it cites are the open items in ROADMAP §6.
+Name-preserving (`V(x)`, `value_at`, `cost_to_go` keep working). Finding FD-F12 of the foundations review, docs/reviews/2026-09-15-foundations-review.md (`FD-` marks that review's findings and comments: its F12, C6, C12).
 
 The scalar function on `(x, u, t)` becomes a core noun, `Field`, with the same verbs
 everywhere: `value(x, u=None, t=0.0, params=None)` (native-array, bare signature, RULES 5.1 as
@@ -14,8 +14,8 @@ amended; a field reads the arguments it depends on and ignores the rest, as `f` 
 per-step DP tables) is held on the concrete field and interpolated in `t`.
 Baseline first: the region-of-attraction level, extent and
 `verify` report of `analysis_region_of_attraction.py`; the DP `J` table and
-`PolicyEvaluator.value_at` on a grid of points; `cost_to_go_function_approximation.ipynb`
-outputs (the fitted weights); run twice, `cmp`.
+`PolicyEvaluator.value_at` on a grid of points; the `LinearApproximator` fitted weights of
+`tests/unittest/test_dynamic_programming.py`; run twice, `cmp`.
 
 - [ ] **4.1 Promote the noun** **[ask — file move, rename].** `StateField` → `Field`, with
   `FieldSet` and `FieldCost`, moves from `planning/spatial/state_fields.py` to
@@ -32,7 +32,7 @@ outputs (the fitted weights); run twice, `cmp`.
   (the one place finite differences already live). Done when the corridor and RRT demos and
   `test_planning.py` are byte-identical.
 - [ ] **4.2 `QuadraticField(center, P)`** — `value = (x − c)ᵀ P (x − c)`, `gradient = 2 P (x − c)`,
-  written once with `xp`; frozen dataclass (C6). `P` is a matrix, or a schedule `(t, S)` as
+  written once with `xp`; frozen dataclass (FD-C6). `P` is a matrix, or a schedule `(t, S)` as
   `lqr_gain_schedule` returns it, interpolated in `t` the way `TimeVaryingStateFeedbackController`
   interpolates `K(t)`: then `value(x, t)` is the finite-horizon LQR value `xᵀ S(t) x`, and
   `lqr_finite_horizon` can hand it out beside the controller (additive; the cart-pole LQR
@@ -61,15 +61,15 @@ outputs (the fitted weights); run twice, `cmp`.
   `plot_cost2go` / `StateSpaceGrid.plot_value` accept a field or a table. Done when the DP
   baseline `cmp`s and `test_rl_tabular.py`, `test_planning_solution.py` pass.
 - [ ] **4.5 The approximator is a field.** `LinearApproximator(StateField)`: `value(x) = w @ φ(x)`,
-  `fit` and `sgd_step` update `w` in place (it is a learner, so a plain class, not frozen — C6);
+  `fit` and `sgd_step` update `w` in place (it is a learner, so a plain class, not frozen — FD-C6);
   `QuadraticFeatures.quadratic_form(w)` returns a `QuadraticField` beside the `(c, b, S)`
-  triple it returns today (additive). Done when
-  `cost_to_go_function_approximation.ipynb` smoke-checks with identical fitted weights.
+  triple it returns today (additive). Done when the approximator tests of
+  `test_dynamic_programming.py` pass with identical fitted weights.
 - [ ] **4.6 `CallableField(fn)`** — the escape hatch, mirror of `CallableSet` and `Sampler`; the RL
   planner's `critic_cost_to_go()` returns one (`V_w(x)`, and `Q_w(x, a)` for the SAC family), so
   `PlanningSolution.cost_to_go` is typed `Field | None` on every planner. Done when
   `test_rl_planner.py` passes.
-- [ ] **4.7 CBF plan amendment** (`cbf-safety-filter.md` §3): the barrier is a `Field`
+- [x] **4.7 CBF plan amendment** (done 2026-10-12, `cbf-safety-filter.md` §3 and CBF-2): the barrier is a `Field`
   (`scene.clearance_field(body)`), its safe set `h.as_constraint(lower=0)` a `Set`; the barrier
   condition `∇h · f(x, u) + α h(x)` is a second `Field` on `(x, u)` built from `h.gradient` and
   `sys.f`, and its superlevel set `.as_input_constraint(lower=0)` is the `InputSet` `U(x)` the
@@ -80,4 +80,4 @@ outputs (the fitted weights); run twice, `cmp`.
 
 ## Verification
 
-The tests and demos each step's "done when" names, plus `tests/unittest/test_analysis_lyapunov.py`, `tests/unittest/test_planning_solution.py`, the demo `analysis_region_of_attraction.py`, and the notebooks `double_integrator_policy_evaluation.ipynb` and `cost_to_go_function_approximation.ipynb` through the notebook checks; the baseline captured before step 4.1 (RoA level and `verify` report, DP table, fitted weights) `cmp`s after every step.
+The tests and demos each step's "done when" names, plus `tests/unittest/test_analysis_lyapunov.py`, `tests/unittest/test_planning_solution.py`, the demo `analysis_region_of_attraction.py`, the approximator tests of `tests/unittest/test_dynamic_programming.py`, and the notebook `double_integrator_policy_evaluation.ipynb` through the notebook checks; the baseline captured before step 4.1 (RoA level and `verify` report, DP table, fitted weights) `cmp`s after every step.

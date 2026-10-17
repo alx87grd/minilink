@@ -5,6 +5,10 @@ from __future__ import annotations
 from importlib import import_module
 from typing import Any, Callable
 
+###############################################################################
+# Public API
+###############################################################################
+
 
 def lazy_facade(
     module_globals: dict[str, Any],
@@ -24,6 +28,7 @@ def lazy_facade(
     module_name = module_globals["__name__"]
     modules = dict(modules or {})
 
+    # The module hook: a subpackage, or one export of its module, imported on first use
     def __getattr__(name: str) -> Any:
         if name in modules:
             value = import_module(modules[name])
@@ -35,9 +40,13 @@ def lazy_facade(
                     f"module {module_name!r} has no attribute {name!r}"
                 ) from None
             value = getattr(import_module(module_path), attr)
+
+        # Bound in the package, so the next lookup never reaches the hook
         module_globals[name] = value
+
         return value
 
+    # The names a listing shows: the bound ones, the exports and the subpackages
     def __dir__() -> list[str]:
         return sorted(set(module_globals) | set(exports) | set(modules))
 

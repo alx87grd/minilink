@@ -11,6 +11,10 @@ from minilink.graphical.animation.primitives import (
     TorqueArrow,
 )
 
+###############################################################################
+# Public API
+###############################################################################
+
 
 class Pendulum(MechanicalSystem):
     """Single actuated pendulum."""
@@ -18,6 +22,8 @@ class Pendulum(MechanicalSystem):
     def __init__(self, length=1.0, mass=1.0):
         super().__init__(dof=1, actuators=1)
         self.name = "Pendulum"
+
+        # Parameters
         self.params = {
             "m": mass,
             "l": length,
@@ -25,6 +31,8 @@ class Pendulum(MechanicalSystem):
             "gravity": 9.81,
             "d": 0.0,
         }
+
+        # Signal labels and units
         self.state.labels = ["theta", "dtheta"]
         self.state.units = ["rad", "rad/s"]
         self.inputs["u"].labels = ["tau"]
@@ -32,16 +40,17 @@ class Pendulum(MechanicalSystem):
         self.outputs["y"].labels = list(self.state.labels)
         self.outputs["y"].units = list(self.state.units)
 
-        # Graphic parameters: no camera_scale, so the view follows params["l"]
+        # Graphics: no camera_scale, so the view follows params["l"]
         self.camera_target = np.array([0.0, 0.0, 0.0])
         self.camera_plot_axes = (0, 1)
 
     def H(self, q, params=None):
         params = self.params if params is None else params
+        xp = array_module(q)
+
         m = params["m"]
         l = params["l"]
         I = params["I"]
-        xp = array_module(q)
 
         H = xp.array([[m * l**2 + I]])
 
@@ -49,14 +58,20 @@ class Pendulum(MechanicalSystem):
 
     def C(self, q, dq, params=None):
         xp = array_module(q)
-        return xp.zeros((1, 1))
+
+        # A single joint has no Coriolis or centrifugal coupling: C = 0
+        C = xp.zeros((1, 1))
+
+        return C
 
     def g(self, q, params=None):
         params = self.params if params is None else params
+        xp = array_module(q)
+
         m = params["m"]
         l = params["l"]
         gravity = params["gravity"]
-        xp = array_module(q)
+
         theta = q[0]
 
         g = xp.array([m * gravity * l * xp.sin(theta)])
@@ -65,8 +80,10 @@ class Pendulum(MechanicalSystem):
 
     def d(self, q, dq, u=None, t=0.0, params=None):
         params = self.params if params is None else params
-        d = params["d"]
         xp = array_module(q)
+
+        d = params["d"]
+
         omega = dq[0]
 
         tau_d = xp.array([d * omega])
@@ -75,39 +92,30 @@ class Pendulum(MechanicalSystem):
 
     def get_kinematic_geometry(self):
         length = self.params["l"]
-        radius = 0.08 * length
-        pivot = Circle(radius=radius, center=[0.0, 0.0], color="blue", fill=True)
-        return {
-            "link": [
-                pivot,
-                Rod(length=length, radius=0.03 * length, color="blue", linewidth=2),
-                Circle(radius=radius, center=[0.0, -length], color="blue", fill=True),
-            ],
-        }
+
+        return {"link": link_geometry(length)}
 
     def tf(self, x, u, t=0, params=None):
         return {"link": SE2(0.0, 0.0, x[0])}
 
     def get_dynamic_geometry(self, x, u, t=0, params=None):
-        length = self.params["l"]
+        params = self.params if params is None else params
+
+        length = params["l"]
         torque = u[0]
         max_torque = self.inputs["u"].upper_bound[0]
+
+        # A third of a turn at the torque limit
         sweep = torque * (2.0 * np.pi / 3.0) / max_torque
-        arc = TorqueArrow(
-            sweep=sweep,
-            radius=length / 5.0,
-            head_ratio=0.4,
-            color="red",
-            linewidth=2,
-        )
-        arc.local_transform = SE2(0.0, 0.0, -np.pi / 2.0)
+        arc = torque_arc(sweep, length / 5.0)
+
         return {"link": [arc]}
 
 
 class PendulumWithNoisePort(Pendulum):
     """Single actuated pendulum with process and measurement noise ports.
 
-    ``w`` injects disturbance torque into the dynamics; ``v`` corrupts the
+    ``d`` injects disturbance torque into the dynamics; ``n`` corrupts the
     measured angular velocity in ``y``.
     """
 
@@ -115,33 +123,50 @@ class PendulumWithNoisePort(Pendulum):
         super().__init__()
         self.name = "Pendulum"
 
-        self.add_input_port("w", dim=1, nominal_value=np.array([0.0]))
-        self.add_input_port("v", dim=1, nominal_value=np.array([0.0]))
-        self.inputs["w"].labels = ["disturbance"]
-        self.inputs["w"].units = ["Nm"]
-        self.inputs["v"].labels = ["noise"]
-        self.inputs["v"].units = ["rad/s"]
+        # Ports: the disturbance torque d and the measurement noise n
+        self.add_input_port("d", dim=1, nominal_value=np.array([0.0]))
+        self.add_input_port("n", dim=1, nominal_value=np.array([0.0]))
 
-        self.outputs["y"].dependencies = ("v",)
+        # Signal labels and units
+        self.inputs["d"].labels = ["disturbance"]
+        self.inputs["d"].units = ["Nm"]
+        self.inputs["n"].labels = ["noise"]
+        self.inputs["n"].units = ["rad/s"]
+
+        # The measurement reads the noise port
+        self.outputs["y"].dependencies = ("n",)
 
     def B(self, q, params=None):
         xp = array_module(q)
-        return xp.array([[1.0]])
+
+        # The torque acts on the joint
+        B = xp.array([[1.0]])
+
+        return B
 
     def generalized_force(self, q, v, u, t=0.0, params=None):
-        tau, w = self.get_port_values_from_u(u, "u", "w")
+        # The ports in order: the torque, then the disturbance
+        tau = u[:1]
+        d = u[1:2]
+
         B = self.B(q, params)
 
-        # the disturbance enters with the actuator torque
-        force = B @ (tau + w)
+        # The disturbance enters with the actuator torque: B (τ + d)
+        force = B @ (tau + d)
 
         return force
 
     def h(self, x, u, t=0.0, params=None):
-        v_noise = self.get_port_values_from_u(u, "v")
         xp = array_module(x, u)
+
         k = self.dof
-        y = xp.concatenate([x[:k], x[k : k + 1] + v_noise[0], x[k + 1 :]])
+
+        # The third port: the measurement noise
+        n = u[2:]
+
+        # y = [θ; θ̇ + n]: the noise corrupts the measured angular velocity
+        y = xp.concatenate([x[:k], x[k : k + 1] + n[0], x[k + 1 :]])
+
         return y
 
 
@@ -153,16 +178,19 @@ class InvertedPendulum(Pendulum):
         self.name = "Inverted Pendulum"
 
     def g(self, q, params=None):
-        # the upright zero angle flips the sign of the hanging pendulum's gravity term
+        # The upright zero angle flips the sign of the hanging pendulum's gravity term
         g = -super().g(q, params)
 
         return g
 
     def tf(self, x, u, t=0, params=None):
-        # theta is measured from the upward vertical (zero-angle = upright); the
-        # shared geometry draws angles from the downward vertical, so add pi.
-        upright = np.array([x[0] + np.pi, x[1]])
-        return super().tf(upright, u, t)
+        xp = array_module(x)
+
+        # θ is measured from the upward vertical (zero angle = upright); the shared
+        # geometry draws angles from the downward vertical, so add π
+        upright = xp.array([x[0] + xp.pi, x[1]])
+
+        return super().tf(upright, u, t, params)
 
 
 class TwoIndependentPendulums(MechanicalSystem):
@@ -171,6 +199,8 @@ class TwoIndependentPendulums(MechanicalSystem):
     def __init__(self):
         super().__init__(dof=2, actuators=2)
         self.name = "Two Independent Pendulums"
+
+        # Parameters
         self.params = {
             "m": 1.0,
             "l": 1.0,
@@ -178,6 +208,8 @@ class TwoIndependentPendulums(MechanicalSystem):
             "gravity": 9.81,
             "d": 0.0,
         }
+
+        # Signal labels and units
         self.state.labels = ["theta1", "theta2", "dtheta1", "dtheta2"]
         self.state.units = ["rad", "rad", "rad/s", "rad/s"]
         self.inputs["u"].labels = ["tau1", "tau2"]
@@ -185,18 +217,20 @@ class TwoIndependentPendulums(MechanicalSystem):
         self.outputs["y"].labels = list(self.state.labels)
         self.outputs["y"].units = list(self.state.units)
 
-        # Graphic parameters
+        # Graphics
         self.camera_target = np.array([0.0, 0.0, 0.0])
         self.camera_plot_axes = (0, 1)
         self.camera_scale = 2.0
 
     def H(self, q, params=None):
         params = self.params if params is None else params
+        xp = array_module(q)
+
         m = params["m"]
         l = params["l"]
         I = params["I"]
-        xp = array_module(q)
 
+        # Each pendulum's inertia about its own pivot, uncoupled
         inertia = m * l**2 + I
         H = xp.diag(xp.array([inertia, inertia]))
 
@@ -204,14 +238,19 @@ class TwoIndependentPendulums(MechanicalSystem):
 
     def C(self, q, dq, params=None):
         xp = array_module(q)
-        return xp.zeros((2, 2))
+
+        # Uncoupled single joints: C = 0
+        C = xp.zeros((2, 2))
+
+        return C
 
     def g(self, q, params=None):
         params = self.params if params is None else params
+        xp = array_module(q)
+
         m = params["m"]
         l = params["l"]
         gravity = params["gravity"]
-        xp = array_module(q)
 
         g = m * gravity * l * xp.sin(q)
 
@@ -219,8 +258,9 @@ class TwoIndependentPendulums(MechanicalSystem):
 
     def d(self, q, dq, u=None, t=0.0, params=None):
         params = self.params if params is None else params
-        d = params["d"]
         xp = array_module(q)
+
+        d = params["d"]
 
         tau_d = d * xp.asarray(dq)
 
@@ -228,41 +268,71 @@ class TwoIndependentPendulums(MechanicalSystem):
 
     def get_kinematic_geometry(self):
         length = self.params["l"]
-        radius = 0.08 * length
+
         geo = {}
         for i in (0, 1):
-            pivot = Circle(radius=radius, center=[0.0, 0.0], color="blue", fill=True)
-            geo[f"link{i}"] = [
-                pivot,
-                Rod(length=length, radius=0.03 * length, color="blue", linewidth=2),
-                Circle(radius=radius, center=[0.0, -length], color="blue", fill=True),
-            ]
+            geo[f"link{i}"] = link_geometry(length)
+
         return geo
 
     def tf(self, x, u, t=0, params=None):
-        length = self.params["l"]
+        params = self.params if params is None else params
+
+        length = params["l"]
+
+        # The two pivots, 0.6 l either side of the origin
         anchors = [-0.6 * length, 0.6 * length]
+
         return {
             f"link{i}": SE2(anchor_x, 0.0, x[i]) for i, anchor_x in enumerate(anchors)
         }
 
     def get_dynamic_geometry(self, x, u, t=0, params=None):
-        length = self.params["l"]
+        params = self.params if params is None else params
+
+        length = params["l"]
         torque_radius = length / 5.0
         max_torque = self.inputs["u"].upper_bound[0]
+
+        # A third of a turn at the torque limit
         sweep_scale = 2.0 * np.pi / 3.0 / max_torque
+
         dyn = {}
         for i in (0, 1):
-            arc = TorqueArrow(
-                sweep=u[i] * sweep_scale,
-                radius=torque_radius,
-                head_ratio=0.4,
-                color="red",
-                linewidth=2,
-            )
-            arc.local_transform = SE2(0.0, 0.0, -np.pi / 2.0)
+            arc = torque_arc(u[i] * sweep_scale, torque_radius)
             dyn[f"link{i}"] = [arc]
+
         return dyn
+
+
+###############################################################################
+# Internal machinery
+###############################################################################
+
+
+def link_geometry(length):
+    """A hanging link: the pivot, the rod along −y, and the bob at its end."""
+    radius = 0.08 * length
+    pivot = Circle(radius=radius, center=[0.0, 0.0], color="blue", fill=True)
+    rod = Rod(length=length, radius=0.03 * length, color="blue", linewidth=2)
+    bob = Circle(radius=radius, center=[0.0, -length], color="blue", fill=True)
+    link = [pivot, rod, bob]
+
+    return link
+
+
+def torque_arc(sweep, radius):
+    """A torque arc about the pivot, starting along the hanging link."""
+    arc = TorqueArrow(
+        sweep=sweep,
+        radius=radius,
+        head_ratio=0.4,
+        color="red",
+        linewidth=2,
+    )
+    arc.local_transform = SE2(0.0, 0.0, -np.pi / 2.0)
+
+    return arc
 
 
 if __name__ == "__main__":

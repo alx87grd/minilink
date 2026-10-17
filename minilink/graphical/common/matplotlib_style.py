@@ -1,20 +1,4 @@
-"""
-Shared matplotlib layout and typography defaults (Pyro-aligned where sensible).
-
-**Figure size vs Pyro**
-
-- Pyro's ``TrajectoryPlotter`` uses one small ``figsize`` (e.g. ``(4, 3)`` inches)
-  for the *entire* stack of subplots, so the canvas does not grow with signal count
-  (subplots become cramped instead).
-- Minilink grows stacked plot height with the number of rows so traces stay readable.
-  In Jupyter/Colab that height is uncapped (scrollable output); in scripts and terminal
-  IPython it is capped by :data:`TRAJECTORY_MAX_FIG_HEIGHT_POPUP` /
-  :data:`SIGNAL_PLOT_MAX_FIG_HEIGHT_POPUP` (see :func:`minilink.graphical.common.environment.allow_tall_stacked_figures`).
-  Tune widths, row heights, and those caps as needed.
-
-Pyro uses ``default_fontsize = 5`` for dense print figures; Minilink uses a larger
-default for notebook readability. Adjust :data:`FONT_SIZE` if you need print density.
-"""
+"""Shared matplotlib layout and typography defaults, Pyro-aligned where sensible."""
 
 # 4:3 animation canvas (1.5× Pyro's (4, 3) inches); smaller than (8, 6) for laptops.
 FIGSIZE_ANIMATION = (6, 4.5)
@@ -23,7 +7,19 @@ FIGSIZE_BASE = (4, 3)
 
 DPI_FIGURE = 150
 DPI_EXPORT = 250
+
+# Larger than Pyro's ``default_fontsize = 5`` for dense print figures, for notebook
+# readability; lower it when print density matters.
 FONT_SIZE = 10
+
+# Pyro's ``TrajectoryPlotter`` keeps one small ``figsize`` (e.g. ``(4, 3)`` inches)
+# for the entire stack of subplots, so the canvas does not grow with the signal count
+# and the subplots get cramped. Here the stacked plot height grows with the number of
+# rows so the traces stay readable. In Jupyter and Colab that height is uncapped
+# (scrollable output); in scripts and terminal IPython it is capped by the
+# ``*_MAX_FIG_HEIGHT_POPUP`` constants (see
+# :func:`minilink.graphical.common.environment.allow_tall_stacked_figures`). Tune the
+# widths, row heights and caps as needed.
 
 # Stacked time-signal plots: width × (row height × number of subplots).
 TRAJECTORY_FIG_WIDTH = 6.0
@@ -35,6 +31,11 @@ TRAJECTORY_MAX_FIG_HEIGHT_POPUP = 8.0
 SIGNAL_PLOT_FIG_WIDTH = 6.0
 SIGNAL_PLOT_ROW_HEIGHT = 1.5
 SIGNAL_PLOT_MAX_FIG_HEIGHT_POPUP = 8.0
+
+
+###############################################################################
+# Public API
+###############################################################################
 
 
 def trajectory_stack_figsize(

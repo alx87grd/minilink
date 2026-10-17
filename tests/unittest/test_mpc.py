@@ -357,7 +357,7 @@ class TestMPCAlgebraicController(unittest.TestCase):
             ModelPredictiveController(planner, dt_mpc=0.2, warm_start=False)
 
 
-from minilink.control.mpc.utilities import _shift_plan_trajectory, mpc_warm_start_guess
+from minilink.control.mpc.utilities import shift_plan_trajectory, mpc_warm_start_guess
 from minilink.core.system import DynamicSystem, StepSystem
 from minilink.core.trajectory import Trajectory
 
@@ -404,7 +404,7 @@ class TestMPCWarmStartController(unittest.TestCase):
         t = np.linspace(0.0, 1.0, 6)
         plan = Trajectory(t=t, x=np.vstack([t, t**2]), u=np.ones((1, t.size)))
         x_meas = np.array([0.5, 0.25])
-        shifted = _shift_plan_trajectory(
+        shifted = shift_plan_trajectory(
             plan, x_meas, dt_shift=0.2, horizon=1.0, t_anchor=0.4
         )
         self.assertIsNotNone(shifted)
@@ -787,6 +787,23 @@ class TestMPCNumPyRebuild(unittest.TestCase):
         self.assertNotIsInstance(mpc, StepSystem)
         self.assertFalse(planner.has_parametric_program)
 
+    def test_planner_without_transcription_is_refused(self):
+        """A duck planner lacking the transcription the block reads is a TypeError."""
+        from types import SimpleNamespace
+
+        from minilink.control.mpc.controller import validate_mpc_planner
+
+        planner = _make_numpy_planner()
+        duck = SimpleNamespace(
+            problem=planner.problem,
+            options=planner.options,
+            compile_parametric_program=planner.compile_parametric_program,
+            has_parametric_program=False,
+            solve_trajectory_from=planner.solve_trajectory_from,
+        )
+        with self.assertRaisesRegex(TypeError, "transcription"):
+            validate_mpc_planner(duck)
+
     def test_compute_command_rebuilds_plan(self):
         planner = _make_numpy_planner(0.1)
         mpc = ModelPredictiveController(planner, dt_mpc=0.2, warm_start=True)
@@ -843,6 +860,30 @@ class TestMPCNumPyRebuild(unittest.TestCase):
                 np.testing.assert_allclose(x_start_pos, y_pos, atol=1e-05)
                 np.testing.assert_allclose(x_start_neg, y_neg, atol=1e-05)
                 np.testing.assert_allclose(x_ff, cmd_neg.x_ff)
+
+    def test_explicit_initial_guess_bypasses_the_latch(self):
+        """An explicit initial_guess at a latched (k, y) solves anew and re-latches."""
+        from minilink.control.mpc.controller import MPCTickLatch
+
+        planner = _make_numpy_planner(0.0)
+        latch = MPCTickLatch(planner, dt_mpc=0.2)
+        y = np.array([0.5])
+        problem = planner.problem
+        guess = default_initial_trajectory(
+            problem, planner.transcription.initial_guess_time_grid(problem)
+        )
+        first = latch.solve_for_tick(0, y)
+        with patch.object(
+            planner, "solve_trajectory_from", wraps=planner.solve_trajectory_from
+        ) as solve:
+            memo = latch.solve_for_tick(0, y)
+            seeded = latch.solve_for_tick(0, y, initial_guess=guess)
+            again = latch.solve_for_tick(0, y)
+        self.assertIs(memo, first)
+        self.assertEqual(solve.call_count, 1)
+        self.assertIs(solve.call_args.kwargs["initial_guess"], guess)
+        self.assertIsNot(seeded, first)
+        self.assertIs(again, seeded)
 
     def test_hybrid_algebraic_one_solve_per_tick(self):
         """``mpc % dt @ plant``: the u_ff, x_ff and z ports share one solve per tick."""
@@ -957,6 +998,81 @@ class TestMpcComputerScheduleCheck(unittest.TestCase):
                 # t_solve = dt_mpc.
                 self.assertTrue(np.all(np.isfinite(out["u_nom"])))
                 self.assertAlmostEqual(mpc.latch.last_t_solve, 0.2)
+
+    def test_computer_reset_clears_the_tick_latch(self):
+        """``Computer.reset`` makes the block's latch forget its last tick."""
+        for warm_start in (True, False):
+            with self.subTest(warm_start=warm_start):
+                mpc = ModelPredictiveController(
+                    _make_numpy_planner(0.5), dt_mpc=0.2, warm_start=warm_start
+                )
+                computer = mpc.export_to_computer()
+                computer.compile()
+                computer.reset()
+                computer.tick(np.array([0.5]))
+                self.assertAlmostEqual(mpc.latch.last_t_solve, 0.0)
+                computer.reset()
+                self.assertIsNone(mpc.latch.last_t_solve)
+
+
+from minilink.control.mpc.controller import (
+    MPCBroadcastController,
+    MPCStatelessController,
+)
+
+
+class TestMpcSubclassHooks(unittest.TestCase):
+    """A port reaches its hook through the block, so a subclass override is honoured."""
+
+    def test_broadcast_compute_x_nom_override_changes_x_nom(self):
+        class ShiftedBroadcast(MPCBroadcastController):
+            def compute_x_nom(self, x, u, t=0, params=None):
+                return super().compute_x_nom(x, u, t, params) + 1.0
+
+        mpc = ModelPredictiveController(
+            _make_numpy_planner(0.5), dt_mpc=0.2, warm_start=True
+        )
+        mpc.compute_command(np.array([0.5]), k=0)
+        mpc.generate_nominal_interpolator()
+        leaf = MPCBroadcastController(mpc, dt_broadcast=0.05)
+        shifted = ShiftedBroadcast(mpc, dt_broadcast=0.05)
+        x_nom = leaf.outputs["x_nom"].compute(None, None, t=2)
+        x_nom_shifted = shifted.outputs["x_nom"].compute(None, None, t=2)
+        np.testing.assert_allclose(x_nom_shifted, x_nom + 1.0)
+
+    def test_block_hook_override_changes_u_ff(self):
+        class OffsetController(MPCStatelessController):
+            def compute_u_ff(self, x, u, t=0, params=None):
+                return super().compute_u_ff(x, u, t, params) + 1.0
+
+        y = np.array([0.5])
+        mpc = MPCStatelessController(_make_numpy_planner(0.5), dt_mpc=0.2)
+        offset = OffsetController(_make_numpy_planner(0.5), dt_mpc=0.2)
+        u_ff = mpc.outputs["u_ff"].compute(None, y, t=0)
+        u_ff_offset = offset.outputs["u_ff"].compute(None, y, t=0)
+        np.testing.assert_allclose(u_ff_offset, u_ff + 1.0)
+
+    def test_mixin_replan_k_override_changes_the_solved_tick(self):
+        class LateTicks(MPCStatelessController):
+            def replan_k(self, k_tick):
+                return super().replan_k(k_tick) + 5
+
+        mpc = LateTicks(_make_numpy_planner(0.5), dt_mpc=0.2)
+        mpc.outputs["u_ff"].compute(None, np.array([0.5]), t=0)
+        # Base tick 0 maps to replan tick 5: t_solve = 5 Δt_mpc
+        self.assertAlmostEqual(mpc.latch.last_t_solve, 1.0)
+
+
+from minilink.control.mpc.utilities import finite_diff_knots
+
+
+class TestMpcKnotRates(unittest.TestCase):
+    def test_coincident_knots_give_finite_rates(self):
+        """Three knots at one instant: the central span is floored like the ends."""
+        tau = np.zeros(3)
+        y = np.array([[0.0, 1.0, 2.0]])
+        y_dot = finite_diff_knots(tau, y)
+        self.assertTrue(np.all(np.isfinite(y_dot)))
 
 
 from minilink.control.mpc import (

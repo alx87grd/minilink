@@ -162,6 +162,23 @@ def test_planner_learns_returns_a_policy_plan_and_a_controller():
     assert u.shape == (3, 1)
 
 
+def test_predict_draws_unless_deterministic():
+    planner = ReinforcementLearningPlanner(
+        problem(tf=np.inf), dt=0.1, hidden=(8, 8), n_envs=4, n_steps=8, verbose=0
+    )
+    x = np.array([[0.1, 0.0], [-0.2, 0.3], [0.4, -0.1], [0.0, 0.2]])
+    mean_1, _ = planner.predict(x)
+    mean_2, _ = planner.predict(x)
+    draw_1, _ = planner.predict(x, deterministic=False)
+    draw_2, _ = planner.predict(x, deterministic=False)
+    np.testing.assert_array_equal(mean_1, mean_2)
+    assert draw_1.shape == mean_1.shape == (4, 1)
+    assert not np.array_equal(draw_1, draw_2)
+    assert np.all(np.abs(draw_1) <= 4.0)  # mapped onto the input port's bounds
+    one, _ = planner.predict(x[0], deterministic=False)
+    assert one.shape == (1,)
+
+
 def test_learn_and_solve_verbose_override_the_constructor(capsys):
     planner = ReinforcementLearningPlanner(
         problem(tf=np.inf),
@@ -259,7 +276,7 @@ def test_nominal_trajectory_is_the_undisturbed_rollout_from_the_start():
         bounded_pendulum(PendulumWithNoisePort()),
         cost=HangCost(),
         x0_distribution=Uniform([-0.5, -0.5], [0.5, 0.5]),
-        disturbances={"w": Gaussian([0.0], [1.0])},
+        disturbances={"d": Gaussian([0.0], [1.0])},
     )
     planner = ReinforcementLearningPlanner(noisy, **small)
     first, second = (
@@ -328,6 +345,15 @@ def test_monte_carlo_backends_agree_on_a_fixed_law():
     assert "trials" in str(report_jax)
 
 
+def test_monte_carlo_refuses_a_trial_shorter_than_half_a_period():
+    prob = problem(tf=0.04)
+    ctl = NeuralPolicyController(prob.sys, hidden=(8,), seed=3)
+    for backend in ("numpy", "jax"):
+        evaluator = MonteCarloEvaluator(prob, dt=0.1, n_trials=2, backend=backend)
+        with pytest.raises(ValueError, match="shorter than half the control period"):
+            evaluator.evaluate(ctl)
+
+
 # --- the off-policy family through the same planner ---
 
 
@@ -359,6 +385,89 @@ def test_sac_trains_through_the_same_planner_loop():
     assert isinstance(rollout, PlanningSolution) and rollout.evaluation is None
 
 
+def test_squashed_head_log_density_is_finite_outside_the_square():
+    from minilink.planning.reinforcement_learning.policy import SquashedGaussianHead
+
+    head = SquashedGaussianHead(n_features=2, m=2, hidden=(4,))
+    params = head.init()
+    mu = jnp.zeros(2)
+    z = jnp.zeros(2)
+    for a in ([1.5, 0.0], [-2.0, 0.3], [0.2, -0.4]):
+        logp = head.log_prob(params, mu, z, jnp.asarray(a))
+        assert bool(jnp.isfinite(logp)), a
+
+
+def test_sac_reused_across_plants_targets_each_plant_input_dimension():
+    from minilink.core.costs import QuadraticCost
+    from minilink.core.system import DynamicSystem
+    from minilink.planning.reinforcement_learning import SAC
+
+    class ThreeAxisPoint(DynamicSystem):
+        """A point driven in velocity on three axes: dx = u."""
+
+        def __init__(self):
+            super().__init__(n=3, input_dim=3, output_dim=3)
+            self.state.lower_bound = -2.0 * np.ones(3)
+            self.state.upper_bound = 2.0 * np.ones(3)
+            self.inputs["u"].lower_bound = -np.ones(3)
+            self.inputs["u"].upper_bound = np.ones(3)
+
+        def f(self, x, u, t=0.0, params=None):
+            return 1.0 * u
+
+    point = ThreeAxisPoint()
+    three_inputs = StochasticPlanningProblem(
+        point,
+        cost=QuadraticCost.from_system(point),
+        X=point.state.box,
+        x0_distribution=Uniform(-0.5 * np.ones(3), 0.5 * np.ones(3)),
+    )
+
+    def sac_planner(prob, sac):
+        return ReinforcementLearningPlanner(
+            prob,
+            dt=0.1,
+            hidden=(8,),
+            algorithm=sac,
+            gamma=0.99,
+            n_envs=2,
+            n_steps=8,
+            verbose=0,
+        )
+
+    def sac():
+        return SAC(batch_size=16, learning_starts=16, buffer_size=64, gradient_steps=2)
+
+    reused = sac()
+    sac_planner(problem(tf=np.inf), reused)  # bound first to a one-input pendulum
+    assert reused.target_entropy is None  # the user's choice, kept
+    planner = sac_planner(three_inputs, reused)
+    fresh = sac_planner(three_inputs, sac())
+    planner.learn(32)
+    fresh.learn(32)
+    np.testing.assert_allclose(
+        np.asarray(planner.train_state["log_alpha"]),
+        np.asarray(fresh.train_state["log_alpha"]),
+    )
+
+
+def test_replay_buffer_refuses_a_draw_before_any_transition():
+    from minilink.planning.reinforcement_learning.collect import ReplayBuffer
+
+    buffer = ReplayBuffer(8, n=2, m=1)
+    with pytest.raises(ValueError, match="replay buffer is empty"):
+        buffer.sample(jax.random.PRNGKey(0), 4)
+    one = {
+        "x": jnp.zeros((1, 2)),
+        "a": jnp.zeros((1, 1)),
+        "reward": jnp.ones(1),
+        "x_next": jnp.zeros((1, 2)),
+        "terminated": jnp.zeros(1),
+    }
+    buffer.add(one)
+    assert buffer.sample(jax.random.PRNGKey(0), 4)["reward"].shape == (4,)
+
+
 # --- the learned law is a System: compile, differentiate, linearize ---
 
 
@@ -378,7 +487,7 @@ def test_neural_closed_loop_compiles_and_differentiates_under_jax():
         x_next = evaluator.rk4_step_trace_p(x, jnp.zeros(0), 0.0, 0.05, params)
         return jnp.sum(x_next**2)
 
-    grads = jax.grad(J)({"ctl": ctl.params, "sys": plant.params})
+    grads = jax.grad(J)({"controller": ctl.params, "plant": plant.params})
     assert all(bool(jnp.all(jnp.isfinite(g))) for g in jax.tree_util.tree_leaves(grads))
 
 
@@ -446,14 +555,16 @@ def test_outer_loop_on_an_inner_loop_with_nested_params():
         inner,
         cost=HangCost(),
         x0_distribution=Uniform([-0.3, -0.3], [0.3, 0.3]),
-        params_distribution={"sys.m": Particles([[0.5], [2.0]])},  # the plant inside
+        params_distribution={"plant.m": Particles([[0.5], [2.0]])},  # the plant inside
     )
-    assert lookup_param(inner.params, "sys.m") == 1.0
+    assert lookup_param(inner.params, "plant.m") == 1.0
     draw = prob.sample_params(0)
-    assert set(draw) == {"sys"} and float(draw["sys"]["m"]) in (0.5, 2.0)
+    assert set(draw) == {"plant"} and float(draw["plant"]["m"]) in (0.5, 2.0)
     merged = merge_params(inner.params, draw)
-    assert merged["ctl"] is not None and merged["sys"]["m"] == float(draw["sys"]["m"])
-    assert inner.params["sys"]["m"] == 1.0  # untouched
+    assert merged["controller"] is not None and merged["plant"]["m"] == float(
+        draw["plant"]["m"]
+    )
+    assert inner.params["plant"]["m"] == 1.0  # untouched
 
     planner = ReinforcementLearningPlanner(
         prob, dt=0.1, hidden=(8, 8), n_envs=4, n_steps=16, batch_size=32, verbose=0

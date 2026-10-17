@@ -6,7 +6,7 @@ from minilink import InvertedPendulum, Lead
 from minilink.analysis import root_locus
 
 plant = InvertedPendulum()
-plant.x0 = np.array([0.0, 0.0])  # upright: the operating point every tool defaults to
+plant.x0 = np.array([0.0, 0.0])  # start upright, at the nominal state
 
 # u = -K theta: the two real poles meet at the origin and leave along the
 # imaginary axis, so no gain on the angle alone stabilizes the upright pole.

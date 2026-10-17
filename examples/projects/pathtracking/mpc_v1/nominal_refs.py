@@ -1,16 +1,27 @@
-"""Slice MPC nominal state into cascade references."""
+"""Nominal references: the MPC's nominal state as the servo cascade's references."""
 
 import numpy as np
 
+from minilink.core.backends import array_module
 from minilink.core.system import System
+
+###############################################################################
+# Public API
+###############################################################################
 
 
 class NominalRefs(System):
-    """``x_nom`` (8-D MPC state) → ``heading_ref``, ``vx_ref``, ``delta_ff``."""
+    """``x_nom`` (8-D MPC state) → ``heading_ref``, ``vx_ref``, ``delta_ff``.
+
+    ``x_nom = [x, y, theta, vx, vy, yaw_rate, w_rear, delta]``: the heading, the
+    forward speed and the steer angle are read off it.
+    """
 
     def __init__(self, name: str = "Nominal refs"):
         super().__init__(0)
         self.name = name
+
+        # Ports: the MPC's nominal state in, one reference per cascade loop out
         self.add_input_port("x_nom", nominal_value=np.zeros(8))
         self.add_output_port(
             "heading_ref",
@@ -32,10 +43,28 @@ class NominalRefs(System):
         )
 
     def h_heading_ref(self, x, u, t=0.0, params=None):
-        return np.array([u[2]], dtype=float)
+        xp = array_module(u)
+
+        theta_nom = u[2:3]
+
+        heading_ref = xp.array(theta_nom)
+
+        return heading_ref
 
     def h_vx_ref(self, x, u, t=0.0, params=None):
-        return np.array([u[3]], dtype=float)
+        xp = array_module(u)
+
+        vx_nom = u[3:4]
+
+        vx_ref = xp.array(vx_nom)
+
+        return vx_ref
 
     def h_delta_ff(self, x, u, t=0.0, params=None):
-        return np.array([u[7]], dtype=float)
+        xp = array_module(u)
+
+        delta_nom = u[7:8]
+
+        delta_ff = xp.array(delta_nom)
+
+        return delta_ff

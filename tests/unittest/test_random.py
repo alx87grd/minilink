@@ -169,8 +169,8 @@ def noisy_loop(seed_w=1, seed_v=2):
     loop.connect("step", "y", "controller", "r")
     loop.connect("controller", "u", "plant", "u")
     loop.connect("plant", "y", "controller", "y")
-    loop.connect("process_noise", "y", "plant", "w")
-    loop.connect("measurement_noise", "y", "plant", "v")
+    loop.connect("process_noise", "y", "plant", "d")
+    loop.connect("measurement_noise", "y", "plant", "n")
     return loop
 
 
@@ -181,7 +181,7 @@ def noisy_plant():
     plant = DiagramSystem()
     plant.add_subsystem(PendulumWithNoisePort(), "plant")
     plant.add_subsystem(WhiteNoise(seed=5), "sensor_noise")
-    plant.connect("sensor_noise", "y", "plant", "v")
+    plant.connect("sensor_noise", "y", "plant", "n")
     plant.add_input_port("u", dim=1)
     plant.connect("input", "u", "plant", "u")
     return plant
@@ -224,7 +224,7 @@ def test_realize_key_names_each_stream_so_an_added_block_moves_no_other():
 
 def test_analysis_verbs_see_the_noise_at_its_mean():
     from minilink.analysis import find_equilibrium, jacobian
-    from minilink.control.lqr import lqr_at_operating_point
+    from minilink.control.design import lqr
 
     noisy, quiet = noisy_loop(), noisy_loop(None, None)
     A = jacobian(noisy, "f", "x", method="fd")
@@ -236,7 +236,7 @@ def test_analysis_verbs_see_the_noise_at_its_mean():
 
     plant = noisy_plant()
     assert plant.is_random
-    K = lqr_at_operating_point(plant, np.zeros(2), np.eye(2), np.eye(1), method="fd")
+    K = lqr(plant, np.eye(2), np.eye(1), x_bar=np.zeros(2), method="fd")
     assert np.all(np.isfinite(K.params["K"]))
 
 
@@ -289,8 +289,8 @@ def test_the_rollout_environment_warns_about_noise_it_never_sees():
         )
 
     cases = [
-        (problem(PendulumWithNoisePort(), w=Gaussian(0.0, 0.1)), None),
-        (problem(PendulumWithNoisePort(), v=Gaussian(0.0, 0.1)), "never calls h"),
+        (problem(PendulumWithNoisePort(), d=Gaussian(0.0, 0.1)), None),
+        (problem(PendulumWithNoisePort(), n=Gaussian(0.0, 0.1)), "never calls h"),
         (problem(noisy_plant()), "fixed seed"),
     ]
     for prob, expected in cases:
@@ -302,3 +302,12 @@ def test_the_rollout_environment_warns_about_noise_it_never_sees():
             assert not any("never calls h" in m or "fixed seed" in m for m in messages)
         else:
             assert any(expected in m for m in messages), messages
+
+
+def test_a_renamed_noise_source_keeps_its_dimension():
+    from minilink.blocks.sources import WhiteNoise
+
+    noise = WhiteNoise(4, psd=1e-4, port="n")
+    assert list(noise.outputs) == ["n"] and noise.dim == 4
+    assert noise.h(np.array([]), np.array([]), 0.3).shape == (4,)
+    assert noise.compile().outputs(np.array([]), np.array([]), 0.3)["n"].shape == (4,)

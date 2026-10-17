@@ -22,10 +22,16 @@ Analysis
 .. automodule:: minilink.analysis.linear
    :members:
 
+.. automodule:: minilink.analysis.riccati
+   :members:
+
 .. automodule:: minilink.analysis.time_response
    :members:
 
 .. automodule:: minilink.analysis.frequency
+   :members:
+
+.. automodule:: minilink.analysis.sensitivity_functions
    :members:
 
 .. automodule:: minilink.analysis.lyapunov

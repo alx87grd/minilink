@@ -2,9 +2,8 @@
 
 import numpy as np
 
-from minilink import DiagramSystem, Pendulum, Saturation
+from minilink import DiagramSystem, Pendulum, Saturation, lqr
 from minilink.analysis import region_of_attraction
-from minilink.control.lqr import lqr_at_operating_point
 
 TORQUE = 8.0  # Nm, against m g l = 9.81 Nm: too weak to hold the pendulum far over
 Q = np.diag([1.0, 0.01])  # try diag([1000, 10]): faster poles, a smaller certificate
@@ -20,11 +19,11 @@ plant.state.upper_bound = -plant.state.lower_bound
 # saturation the real loop has, not the linear law the designer wrote.
 loop = DiagramSystem()
 loop.name = "Pendulum under LQR"
-loop.add_subsystem(lqr_at_operating_point(plant, X_UP, Q=Q, R=np.eye(1)), "ctl")
+loop.add_subsystem(lqr(plant, Q=Q, R=np.eye(1), x_bar=X_UP), "controller")
 loop.add_subsystem(Saturation(-TORQUE, TORQUE), "limit")
 loop.add_subsystem(plant, "plant")
-loop.connect("plant", "y", "ctl", "x")
-loop.connect("ctl", "u", "limit", "u")
+loop.connect("plant", "y", "controller", "x")
+loop.connect("controller", "u", "limit", "u")
 loop.connect("limit", "y", "plant", "u")
 loop.plot_diagram()
 

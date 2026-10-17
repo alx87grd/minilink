@@ -218,7 +218,8 @@ PathIntegralPlanner(
   deterministic problem is the textbook algorithm. A deterministic planner's warning
   is not raised.
 - **Returned `trajectory`** has `N + 1` samples, so the MPC block's `x_ff = plan.x[:, 1]`
-  and `u_ff = plan.u[:, 0]` read as they do for trajopt.
+  and its command `u = plan.u[:, 0]` (named `u_ff` until P10 renames the MPC port) read as
+  they do for trajopt.
 - **The picture.** The fan of sampled futures is the MPPI figure, so the record keeps
   the `n_shown` heaviest sampled rollouts of the tick with their weights (a bounded
   array, not the `K` paths), and `solution.plot_samples(signal=)` draws them shaded by
@@ -404,7 +405,7 @@ any diagram and any output. Then the path-integral planner lands on that contrac
 one rollout path with the evaluator and the RL collectors instead of a scan of their own,
 and MP-3 is written once. Two things RN-4 and RN-5 should settle with this consumer in
 view: a realization carries seeds per sample, never drawn noise arrays, so `K × M`
-realizations vmap like a family of masses (D13 already says so); and the batch takes an
+realizations vmap like a family of masses (randomness.md's RD-D13 already says so); and the batch takes an
 input *sequence* per member as `rollout_batch` does today, not only a closed loop, since
 a sampling planner rolls out the open-loop plant. Until then the standalone script is the
 prototype.

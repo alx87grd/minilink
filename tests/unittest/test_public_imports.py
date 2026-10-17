@@ -24,8 +24,7 @@ class TestPublicImports(unittest.TestCase):
 
     def test_control_and_analysis_band_exports(self):
         from minilink.analysis import bode, discretize, linearize, modal_analysis
-        from minilink.control import ImpedanceController
-        from minilink.control.lqr import lqr
+        from minilink.control import ImpedanceController, lqr
 
         self.assertTrue(callable(lqr))
         self.assertTrue(callable(linearize))  # the function, not a module of that name
@@ -50,6 +49,11 @@ class TestPublicImports(unittest.TestCase):
 
         self.assertTrue(minilink.__version__)
         self.assertRegex(minilink.__version__, r"^0\.")
+
+        # The version is assigned in place: no helper or import shows in the package
+        listing = dir(minilink)
+        self.assertNotIn("package_version", listing)
+        self.assertNotIn("metadata", listing)
 
     def test_simulation_band_exports_simulators(self):
         from minilink.simulation import Simulator, StaticSimulator
@@ -154,13 +158,17 @@ class TestPublicImports(unittest.TestCase):
 # its reason; the list can only shrink.
 BAND_PATTERN_DEVIATIONS = {
     "jacobian": "names the function and the variable first: jacobian(sys, of, wrt, ...)",
-    "find_equilibrium": "requires the guess x_guess where the others take x_bar",
+    "find_equilibrium": "names its guess x_guess where the others take x_bar",
     "step_info": "reads a sampled response: step_info(time, y)",
-    "controllability": "takes the matrices (A, B) or one LTISystem",
-    "observability": "takes the matrices (A, C) or one LTISystem",
+    "controllability_matrix": "the arrays twin of controllability, as lqr_gain: (A, B)",
+    "observability_matrix": "the arrays twin of observability, as lqr_gain: (A, C)",
     "plot_region_of_attraction": "draws a certificate: plot_region_of_attraction(certificate)",
     "region_of_attraction": 'method names the Lyapunov construction ("quadratic")',
     "discretize": "wraps a continuous system in a step model: discretize(sys, dt, ...)",
+    "sensitivity": "takes the loop's pieces, keyword-only: (plant=, controller=, filter=)",
+    "complementary_sensitivity": "takes the loop's pieces, as sensitivity",
+    "load_sensitivity": "takes the loop's pieces, as sensitivity",
+    "noise_sensitivity": "takes the loop's pieces, as sensitivity",
 }
 
 

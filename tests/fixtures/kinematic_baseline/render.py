@@ -32,7 +32,7 @@ def render_baseline_png(sys, x, u, t, path, *, dpi=BASELINE_DPI):
     animator = Animator(sys)
     renderer = MatplotlibRenderer(animator)
     kinematic = sys.get_kinematic_geometry()
-    frame = animator._resolve_frame(x, u, t, kinematic=kinematic)
+    frame = animator.resolve_frame(x, u, t, kinematic=kinematic)
 
     renderer.open_scene(is_3d=False, show=False, camera=frame["camera"], title=sys.name)
     renderer.draw_frame(frame["primitives"], frame["transforms"], t, frame["camera"])

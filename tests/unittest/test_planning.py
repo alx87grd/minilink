@@ -1026,7 +1026,7 @@ def test_select_rejects_colliding_candidate_for_free_one():
         times=np.array([0.0, 0.1]),
         cost=0.1,
     )
-    assert planner._select([colliding, free], x_rand) is free
+    assert planner.nearest_free_edge([colliding, free], x_rand) is free
 
 
 def test_reached_goal_false_on_budget_exhaustion():
@@ -1062,7 +1062,7 @@ def test_free_state_sampling_stays_in_X():
         options=RRTOptions(goal_bias=0.0),
     )
     rng = np.random.default_rng(42)
-    samples = [planner._sample_free_state(rng) for _ in range(40)]
+    samples = [planner.sample_free_state(rng) for _ in range(40)]
     assert all((X.contains(sample) for sample in samples))
     assert all((np.linalg.norm(sample) > 1.0 for sample in samples))
 
@@ -1085,8 +1085,56 @@ def test_edge_resolution_rejects_segment_through_obstacle():
         times=np.array([0.0, 4.0]),
         cost=4.0,
     )
-    assert not planner_fine._edge_is_free(edge)
-    assert planner_coarse._edge_is_free(edge)
+    assert not planner_fine.edge_is_free(edge)
+    assert planner_coarse.edge_is_free(edge)
+
+
+class ShrinkingInputs(InputSet):
+    """|uᵢ| ≤ 1 − |x₀| / 2, or ≤ ``u_max`` when the set parameters give one."""
+
+    def margin(self, u, x=None, t=0.0, params=None):
+        limit = 1.0 - 0.5 * abs(x[0]) if params is None else params["u_max"]
+        return limit - np.abs(u)
+
+
+def edge_inputs_problem(params=None):
+    from minilink.dynamics.catalog.vehicles.steering import HolonomicMobileRobot
+
+    sys = HolonomicMobileRobot()
+    sys.state.lower_bound = np.array([-6.0, -6.0])
+    sys.state.upper_bound = np.array([6.0, 6.0])
+    kwargs = {} if params is None else {"params": params}
+    return PlanningProblem(
+        sys=sys,
+        x_start=np.zeros(2),
+        x_goal=np.ones(2),
+        U=ShrinkingInputs(),
+        **kwargs,
+    )
+
+
+def straight_edge(x0, u0):
+    return Edge(
+        states=np.array([[x0, 0.0], [x0 + 0.1 * u0, 0.0]]),
+        inputs=np.array([[u0, 0.0]]),
+        times=np.array([0.0, 0.1]),
+        cost=0.1,
+    )
+
+
+def test_edge_inputs_are_checked_at_their_states():
+    planner = RRTPlanner(
+        edge_inputs_problem(), extender=KinodynamicExtender(controls=COMPASS)
+    )
+    assert planner.edge_is_free(straight_edge(0.0, 0.6))  # |u| ≤ 1 at x₀ = 0
+    assert not planner.edge_is_free(straight_edge(1.6, 0.6))  # |u| ≤ 0.2 at x₀ = 1.6
+
+
+def test_edge_inputs_read_the_set_parameters():
+    problem = edge_inputs_problem(ProblemParameters(sets={"u_max": 0.3}))
+    planner = RRTPlanner(problem, extender=KinodynamicExtender(controls=COMPASS))
+    assert planner.edge_is_free(straight_edge(0.0, 0.2))
+    assert not planner.edge_is_free(straight_edge(0.0, 0.6))
 
 
 def test_tree_rewire_and_propagate_cost():
@@ -1242,7 +1290,7 @@ def test_rrt_star_infers_rewire_eta_from_extender():
         extender=make_steering_extender(),
         options=RRTStarOptions(seed=0, max_nodes=10),
     )
-    assert planner._rewire_eta() == pytest.approx(0.6)
+    assert planner.max_connection() == pytest.approx(0.6)
 
 
 def test_rrt_star_requires_rewire_eta_for_unknown_extender():
@@ -1256,7 +1304,7 @@ def test_rrt_star_requires_rewire_eta_for_unknown_extender():
         problem, extender=DummyExtender(), options=RRTStarOptions(seed=0)
     )
     with pytest.raises(ValueError, match="rewire_eta"):
-        planner._rewire_eta()
+        planner.max_connection()
 
 
 def test_search_callback_invoked_on_rrt():
@@ -1319,7 +1367,7 @@ def test_live_plot_option_builds_callback():
         extender=make_steering_extender(),
         options=RRTOptions(seed=0, max_nodes=10, live_plot=True, live_plot_every=1),
     )
-    callback = planner._resolve_search_callback()
+    callback = planner.resolve_search_callback()
     from minilink.planning.search.live_plot import LiveSearchPlotCallback
 
     assert isinstance(callback, LiveSearchPlotCallback)
@@ -1731,6 +1779,42 @@ def test_scene_plot_smoke():
     assert len(ax.lines) >= 1
 
 
+def test_drawn_shapes_span_their_bounds():
+    """Each shape's patches span shape_bounds: an inflated box grows, rounded."""
+    import matplotlib
+
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
+
+    from minilink.core.geometry import Box, Inflated, Union
+    from minilink.planning.spatial.plotting import draw_shape, shape_bounds
+
+    box = Box([0.0, 0.0], [2.0, 1.0])
+    shapes = [
+        Sphere([1.0, 2.0], 0.5),
+        box,
+        Inflated(box, 0.3),
+        Inflated(Sphere([1.0, 2.0], 0.5), 0.2),
+        Union((Inflated(box, 0.4), Sphere([4.0, 0.0], 0.5))),
+    ]
+    for shape in shapes:
+        fig, ax = plt.subplots()
+        draw_shape(ax, shape, "gray", 0.5)
+        boxes = [
+            patch.get_patch_transform().transform_path(patch.get_path()).get_extents()
+            for patch in ax.patches
+        ]
+        drawn = [
+            min(b.x0 for b in boxes),
+            max(b.x1 for b in boxes),
+            min(b.y0 for b in boxes),
+            max(b.y1 for b in boxes),
+        ]
+        (x_lo, x_hi), (y_lo, y_hi) = shape_bounds(shape)
+        np.testing.assert_allclose(drawn, [x_lo, x_hi, y_lo, y_hi], atol=1e-9)
+        plt.close(fig)
+
+
 def test_sample_field_costs_matches_point_probe_cost():
     scene = Scene(obstacles=(Sphere([2.0, 0.0], 0.5),))
     body = _holonomic_point()
@@ -1843,6 +1927,17 @@ def test_polyline_project_and_sample_roundtrip():
     assert closest == pytest.approx([3.0, 4.0])
     assert path.sample(5.0) == pytest.approx([3.0, 4.0])
     assert path.total_length == pytest.approx(10.0)
+
+
+def test_polyline_sample_and_tangent_take_a_vector_of_arc_lengths():
+    path = PolylinePath([[0.0, 0.0], [3.0, 4.0], [3.0, 9.0], [3.0, 9.0]])
+    s = np.array([-1.0, 0.0, 2.5, 5.0, 7.0, 10.0, 12.0])
+    points = path.sample(s)
+    tangents = path.tangent(s)
+    assert points.shape == tangents.shape == (s.size, 2)
+    for k, s_k in enumerate(s):
+        np.testing.assert_allclose(points[k], path.sample(s_k), rtol=0, atol=1e-15)
+        np.testing.assert_allclose(tangents[k], path.tangent(s_k), rtol=0, atol=1e-15)
 
 
 def test_from_waypoints_default_is_polyline():
@@ -2070,9 +2165,9 @@ class TestTextbookOptions(unittest.TestCase):
             problem, n_steps=5, transcription="direct_collocation", live_plot=True
         )
         self.assertTrue(planner.options.live_plot)
-        self.assertIsNotNone(planner._make_callback(None, "numpy"))
+        self.assertIsNotNone(planner.build_callback(None, "numpy"))
         planner.options.live_plot = False
-        self.assertIsNone(planner._make_callback(None, "numpy"))
+        self.assertIsNone(planner.build_callback(None, "numpy"))
         self.assertTrue(callable(LiveTrajectoryPlotCallback))
 
     def test_trajopt_live_plot_composes_with_a_user_callback(self):
@@ -2103,8 +2198,8 @@ class TestTextbookOptions(unittest.TestCase):
             "LiveTrajectoryPlotCallback",
             return_value=live,
         ):
-            progress = planner._make_callback(mock.MagicMock(), "numpy")
-            planner._iteration_from_z = lambda *a, **k: "iteration"
+            progress = planner.build_callback(mock.MagicMock(), "numpy")
+            planner.iteration_from_z = lambda *a, **k: "iteration"
             progress(np.zeros(3), 0.0, 0.0)
         self.assertEqual(seen, ["iteration"])
         live.assert_called_once_with("iteration")
@@ -2117,13 +2212,28 @@ def test_rrt_default_extender_is_bang_bang_from_input_bounds():
     problem, X = make_holonomic_obstacle_problem()
     planner = RRTPlanner(problem, options=RRTOptions(seed=0, max_nodes=50))
     assert isinstance(planner.extender, KinodynamicExtender)
-    controls = planner.extender._controls(problem, np.random.default_rng(0))
+    controls = planner.extender.candidate_controls(problem, np.random.default_rng(0))
     lower, upper = problem.U.box.lower, problem.U.box.upper
     assert len(controls) == 1 + 2**lower.size
     assert any(np.allclose(u, 0.5 * (lower + upper)) for u in controls)
     assert any(np.allclose(u, lower) for u in controls)
     assert any(np.allclose(u, upper) for u in controls)
     assert bang_bang_controls(problem.U)[0].shape == lower.shape
+
+
+def test_rrt_star_defaults_its_extender_and_metric_like_rrt():
+    """``RRTStarPlanner(problem)`` takes RRTPlanner's defaults: the bang-bang extender, euclidean."""
+    from minilink.planning.search.metric import euclidean
+
+    problem, _ = make_holonomic_obstacle_problem()
+    star = RRTStarPlanner(problem, options=RRTStarOptions(seed=0, max_nodes=50))
+    plain = RRTPlanner(problem, options=RRTOptions(seed=0, max_nodes=50))
+    assert isinstance(star.extender, KinodynamicExtender)
+    assert star.metric is euclidean and plain.metric is euclidean
+    rng = np.random.default_rng(0)
+    star_controls = star.extender.candidate_controls(problem, rng)
+    plain_controls = plain.extender.candidate_controls(problem, rng)
+    np.testing.assert_array_equal(star_controls, plain_controls)
 
 
 def test_collocation_bounds_survive_an_intersection():

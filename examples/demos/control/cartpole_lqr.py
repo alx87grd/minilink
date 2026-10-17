@@ -2,17 +2,12 @@
 
 import numpy as np
 
-from minilink import CartPole, lqr_at_operating_point
+from minilink import CartPole, lqr
 
 plant = CartPole()
 x_bar = np.array([0.0, np.pi, 0.0, 0.0])  # pole inverted, cart at origin
 
-lqr_ctl = lqr_at_operating_point(
-    plant,
-    x_bar,
-    Q=np.diag([1.0, 10.0, 1.0, 1.0]),
-    R=np.array([[0.1]]),
-)
+lqr_ctl = lqr(plant, Q=np.diag([1.0, 10.0, 1.0, 1.0]), R=np.array([[0.1]]), x_bar=x_bar)
 
 
 diagram = lqr_ctl @ plant

@@ -1,16 +1,47 @@
-"""Backend-neutral specification of a control-analysis figure.
-
-One or two panels of line traces, markers, dashed reference lines and text
-notes — enough for Bode, pole-zero, root locus, Nyquist and step-response
-plots. :mod:`matplotlib_backend` and :mod:`plotly_backend` render the same
-spec.
-"""
+"""Backend-neutral specification of a control-analysis figure."""
 
 from __future__ import annotations
 
 from dataclasses import dataclass, field
 
 import numpy as np
+
+###############################################################################
+# Public API
+###############################################################################
+
+
+@dataclass(frozen=True)
+class ControlFigure:
+    """A titled stack of panels; ``subtitle`` names the channel (From / To).
+
+    One or two panels of line traces, markers, dashed reference lines and text
+    notes: enough for Bode, pole-zero, root locus, Nyquist and step-response
+    plots. :mod:`matplotlib_backend` and :mod:`plotly_backend` render the same
+    spec.
+    """
+
+    title: str
+    panels: tuple[Panel, ...]
+    subtitle: str = ""
+    share_x: bool = False
+    extra: dict = field(default_factory=dict)
+
+
+@dataclass(frozen=True)
+class Panel:
+    """One axes: traces, references, notes, and how the axes are drawn."""
+
+    traces: tuple[Trace, ...]
+    x_label: str
+    y_label: str
+    lines: tuple[RefLine, ...] = ()
+    notes: tuple[Note, ...] = ()
+    x_log: bool = False
+    zero_lines: bool = False  # Draw the real and imaginary axes (s-plane plots)
+    x_lim: tuple[float, float] | None = None
+    y_lim: tuple[float, float] | None = None
+    y_ticks: tuple[float, ...] | None = None
 
 
 @dataclass(frozen=True)
@@ -27,7 +58,7 @@ class Trace:
     dash: str = "solid"  # "solid" | "dash"
     label: str = ""
     hover: tuple[str, ...] = ()
-    arrows: bool = False  # direction arrows along a line (Nyquist)
+    arrows: bool = False  # Direction arrows along a line (Nyquist)
 
 
 @dataclass(frozen=True)
@@ -47,30 +78,3 @@ class Note:
     text: str
     x: float = 0.02
     y: float = 0.05
-
-
-@dataclass(frozen=True)
-class Panel:
-    """One axes: traces, references, notes, and how the axes are drawn."""
-
-    traces: tuple[Trace, ...]
-    x_label: str
-    y_label: str
-    lines: tuple[RefLine, ...] = ()
-    notes: tuple[Note, ...] = ()
-    x_log: bool = False
-    zero_lines: bool = False  # draw the real and imaginary axes (s-plane plots)
-    x_lim: tuple[float, float] | None = None
-    y_lim: tuple[float, float] | None = None
-    y_ticks: tuple[float, ...] | None = None
-
-
-@dataclass(frozen=True)
-class ControlFigure:
-    """A titled stack of panels; ``subtitle`` names the channel (From / To)."""
-
-    title: str
-    panels: tuple[Panel, ...]
-    subtitle: str = ""
-    share_x: bool = False
-    extra: dict = field(default_factory=dict)

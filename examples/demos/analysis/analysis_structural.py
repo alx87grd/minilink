@@ -1,15 +1,15 @@
-"""Controllability and observability of a linearized plant."""
+"""Controllability and observability of a plant, linearized at an operating point."""
 
 import numpy as np
 
 from minilink import InvertedPendulum, controllability, observability
 
 plant = InvertedPendulum()
-lin = plant.linearize([0.0, 0.0])
+x_bar = [0.0, 0.0]
 
-ctrl = controllability(lin)
-obs = observability(lin)
+ctrl = controllability(plant, x_bar)  # the plant is linearized about its command port
+obs = observability(plant, x_bar)  # and its measured output
 
-print("A =\n", np.round(lin.A(), 4))
-print("controllable:", ctrl.is_full_rank, f"(rank {ctrl.rank}/{ctrl.n})")
-print("observable:  ", obs.is_full_rank, f"(rank {obs.rank}/{obs.n})")
+print("A =\n", np.round(plant.linearize(x_bar).A(), 4))
+print(ctrl)
+print(obs)

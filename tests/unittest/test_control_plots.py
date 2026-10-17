@@ -165,6 +165,23 @@ class TestLinearCore(unittest.TestCase):
             self.assertTrue(np.isnan(info.steady_state))
             self.assertAlmostEqual(info.peak_time, 5.0)
 
+    def test_step_info_band_is_two_percent_of_the_peak_deviation(self):
+        # y = t e^(-t) peaks at 1/e and returns to 0: the band is 2 % of that peak
+        # deviation, and y leaves it for the last time at t = 6.834 s
+        t = np.linspace(0.0, 20.0, 20001)
+        info = step_info(t, t * np.exp(-t))
+        self.assertAlmostEqual(info.settling_time, 6.834, places=2)
+        self.assertAlmostEqual(info.steady_state, 0.0)
+
+        # Its last sample is 4·10⁻⁸, inside the band: it settles at zero, so it has
+        # no rise time or overshoot relative to that final value
+        self.assertTrue(np.isnan(info.rise_time))
+        self.assertTrue(np.isnan(info.overshoot))
+
+        # From rest the peak deviation is |y_f|: y = 1 − e^(-t) settles at ln 50
+        info = step_info(t, 1.0 - np.exp(-t))
+        self.assertAlmostEqual(info.settling_time, np.log(50.0), places=2)
+
 
 class TestChannelTools(unittest.TestCase):
     """The system-level verbs share the family signature and the channel selectors."""
@@ -195,6 +212,32 @@ class TestChannelTools(unittest.TestCase):
             G_tf.denominator, [1.0, -np.trace(A), np.linalg.det(A)], atol=1e-9
         )
         np.testing.assert_allclose(G_tf.numerator, [0.5], atol=1e-9)
+
+    def test_margins_are_solved_on_the_exact_response_not_read_off_the_grid(self):
+        from minilink.analysis.frequency import margins_text
+
+        L = TransferFunction([1.0], [1.0, 3.0, 2.0, 0.0])
+        coarse, fine = margins(L, n=60), margins(L, n=4000)
+        # L(s) = 1 / (s (s + 1)(s + 2)): Gm = 20 log10(6) at sqrt(2) rad/s, exactly
+        self.assertAlmostEqual(coarse.gain_margin_db, 20 * np.log10(6.0), places=9)
+        self.assertAlmostEqual(coarse.w_phase_crossover, np.sqrt(2.0), places=9)
+        self.assertAlmostEqual(coarse.phase_margin_deg, fine.phase_margin_deg, places=8)
+        self.assertAlmostEqual(coarse.w_gain_crossover, fine.w_gain_crossover, places=8)
+        # the Bode note and margins() print one number
+        self.assertEqual(margins_text(coarse), margins_text(fine))
+
+    def test_the_default_channel_is_the_command_port(self):
+        from minilink import PendulumWithNoisePort
+
+        plant = PendulumWithNoisePort()
+        _, mag_default, _ = bode(plant, w=[1.0])
+        _, mag_command, _ = bode(plant, wrt="u", w=[1.0])
+        np.testing.assert_allclose(mag_default, mag_command)
+        with self.assertRaisesRegex(ValueError, "input port named 'u'"):
+            bode(
+                TransferFunction([1.0], [1.0, 1.0])
+                + TransferFunction([1.0], [1.0, 2.0])
+            )
 
     def test_transfer_function_blocks_go_through_unchanged(self):
         L = TransferFunction([1.0], [1.0, 3.0, 2.0, 0.0])
@@ -235,12 +278,22 @@ class TestPlots(unittest.TestCase):
 
         plt.close("all")
 
+    def test_the_subtitle_reads_declared_labels_else_the_port_id(self):
+        from minilink.analysis.linearization import channel_subtitle
+
+        self.assertEqual(
+            channel_subtitle(self.loop, None, None), "From: u[0]  To: y[0]"
+        )
+        self.assertEqual(
+            channel_subtitle(self.plant, ("y", 1), None), "From: tau  To: dtheta"
+        )
+
     def test_matplotlib_titles_labels_and_axes(self):
         r = plot_bode(self.plant, self.x_bar, of=("y", 1), show=False)
         self.assertIsInstance(r, PlotResult)
         self.assertEqual(len(r.axes), 2)
         self.assertEqual(r.figure._suptitle.get_text(), "Bode Diagram")
-        self.assertEqual(r.axes[0].get_title(), "From: u[0]  To: y[1]")
+        self.assertEqual(r.axes[0].get_title(), "From: tau  To: dtheta")
         self.assertEqual(r.axes[0].get_ylabel(), "Magnitude (dB)")
         self.assertEqual(r.axes[1].get_xlabel(), "Frequency (rad/s)")
         self.assertEqual(r.axes[0].get_xscale(), "log")
@@ -252,8 +305,10 @@ class TestPlots(unittest.TestCase):
         r = plot_nyquist(self.loop, show=False)
         self.assertEqual(r.figure._suptitle.get_text(), "Nyquist Diagram")
         r = plot_step_response(self.loop, show=False)
-        self.assertEqual(r.figure._suptitle.get_text(), "Step Response")
+        self.assertEqual(r.figure._suptitle.get_text(), "Linear Step Response")
         self.assertEqual(r.axes.get_xlabel(), "Time (seconds)")
+        r = self.plant.plot_step_response(self.x_bar, show=False)
+        self.assertEqual(r.figure._suptitle.get_text(), "Linearized Step Response")
 
     def test_radius_frames_the_slow_roots_of_a_stiff_channel(self):
         stiff = TransferFunction([1.0], [1.0, 101.0, 100.0])  # poles at -1 and -100
@@ -304,7 +359,7 @@ class TestPlots(unittest.TestCase):
         r = plot_bode(self.plant, backend="plotly", show=False)
         self.assertEqual(r.figure.layout.xaxis.type, "log")
         self.assertIn("Bode Diagram", r.figure.layout.title.text)
-        self.assertIn("From: u[0]", r.figure.layout.title.text)
+        self.assertIn("From: tau", r.figure.layout.title.text)
         self.assertTrue(r.figure.data[0].hovertext[0].startswith("ω ="))
         r = plot_root_locus(self.plant, backend="plotly", show=False)
         self.assertIn("K =", r.figure.data[0].hovertext[1])
@@ -312,6 +367,35 @@ class TestPlots(unittest.TestCase):
     def test_unknown_backend_is_refused(self):
         with self.assertRaisesRegex(ValueError, "Unknown plot backend"):
             plot_bode(self.plant, backend="bokeh", show=False)
+
+    def test_a_short_trace_draws_its_three_arrows_on_both_backends(self):
+        from minilink.graphical.control import (
+            ControlFigure,
+            Panel,
+            Trace,
+            render_control_figure,
+        )
+
+        backends = ["matplotlib"]
+        try:
+            import plotly  # noqa: F401
+
+            backends.append("plotly")
+        except ImportError:
+            pass
+        for n in (3, 4, 5, 6):
+            x = np.linspace(0.0, 1.0, n)
+            trace = Trace(x=x, y=x**2, color="#1f77b4", arrows=True)
+            panel = Panel(traces=(trace,), x_label="x", y_label="y")
+            spec = ControlFigure(title="arrows", panels=(panel,))
+            for backend in backends:
+                with self.subTest(n=n, backend=backend):
+                    r = render_control_figure(spec, backend=backend, show=False)
+                    if backend == "plotly":
+                        arrows = r.figure.layout.annotations
+                    else:
+                        arrows = r.axes.texts
+                    self.assertEqual(len(arrows), 3)
 
     def test_phase_plane_on_plotly(self):
         pytest.importorskip("plotly")

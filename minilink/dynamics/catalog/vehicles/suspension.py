@@ -12,6 +12,10 @@ from minilink.graphical.animation.primitives import (
 )
 from minilink.graphical.catalog.shapes import spring_between
 
+###############################################################################
+# Public API
+###############################################################################
+
 
 class QuarterCarOnRoughTerrain(DynamicSystem):
     """Quarter-car suspension moving over prescribed rough terrain."""
@@ -19,6 +23,8 @@ class QuarterCarOnRoughTerrain(DynamicSystem):
     def __init__(self):
         super().__init__(n=3, input_dim=1, output_dim=3, expose_state=True)
         self.name = "Quarter Car On Rough Terrain"
+
+        # Parameters
         self.params = {
             "mass": 1.0,
             "b": 1.0,
@@ -30,6 +36,8 @@ class QuarterCarOnRoughTerrain(DynamicSystem):
             "w": np.array([0.2, 0.4, 0.5, 1.0, 2.0, 3.0]),
             "phi": np.array([3.0, 2.0, 0.0, 0.0, 0.0, 0.0]),
         }
+
+        # Signal labels and units
         self.state.labels = ["dy", "y", "x"]
         self.state.units = ["m/s", "m", "m"]
         self.inputs["u"].labels = ["force"]
@@ -37,38 +45,42 @@ class QuarterCarOnRoughTerrain(DynamicSystem):
         self.outputs["y"].labels = list(self.state.labels)
         self.outputs["y"].units = list(self.state.units)
 
-        # Graphic parameters
+        # Graphics
         self.camera_scale = 10.0
         self.camera_follow_frame = "body"
 
     def z(self, x, params=None):
         params = self.params if params is None else params
+        xp = array_module(x)
+
         a = params["a"]
         w = params["w"]
         phi = params["phi"]
 
-        xp = array_module(x)
-
-        # ground height: superposed sinusoidal road profile
+        # Ground height, the superposed sinusoidal road profile:
+        # z = Σᵢ aᵢ sin(wᵢ (x − φᵢ))
         z = xp.sum(a * xp.sin(w * (x - phi)))
 
         return z
 
     def dz(self, x, params=None):
         params = self.params if params is None else params
+        xp = array_module(x)
+
         a = params["a"]
         w = params["w"]
         phi = params["phi"]
 
-        xp = array_module(x)
-
-        # ground slope: spatial derivative of the road profile
+        # Ground slope, the road profile's spatial derivative:
+        # dz/dx = Σᵢ aᵢ wᵢ cos(wᵢ (x − φᵢ))
         dz = xp.sum(a * w * xp.cos(w * (x - phi)))
 
         return dz
 
     def f(self, x, u, t=0.0, params=None):
         params = self.params if params is None else params
+        xp = array_module(x, u)
+
         mass = params["mass"]
         b = params["b"]
         k = params["k"]
@@ -77,12 +89,16 @@ class QuarterCarOnRoughTerrain(DynamicSystem):
         dy, y, x_pos = x
         ground = self.z(x_pos, params)
         ground_slope = self.dz(x_pos, params)
+        force = u[0]
 
-        # the road rises under the wheel at z' = (dz/dx) x', with x' = vx
+        # The road rises under the wheel at ż = (dz/dx) ẋ, with ẋ = vx
         ground_velocity = ground_slope * vx
-        # mass y'' = u - k (y - z) - b (y' - z'): sprung mass over the road
-        acceleration = (u[0] - k * (y - ground) - b * (dy - ground_velocity)) / mass
-        dx = array_module(x, u).array([acceleration, dy, vx])
+
+        # The sprung mass over the road: m ÿ = u − k (y − z) − b (ẏ − ż)
+        acceleration = (force - k * (y - ground) - b * (dy - ground_velocity)) / mass
+
+        # The state [ẏ, y, x] moves at [ÿ, ẏ, vx]
+        dx = xp.array([acceleration, dy, vx])
 
         return dx
 
@@ -90,8 +106,10 @@ class QuarterCarOnRoughTerrain(DynamicSystem):
         return x
 
     def get_kinematic_geometry(self):
+        # The terrain line over the drawn stretch of road
         xs = np.linspace(-5.0, 15.0, 240)
         terrain = np.column_stack([xs, [self.z(x) for x in xs], np.zeros_like(xs)])
+
         return {
             "world": [CustomLine(terrain, color="black", linewidth=1)],
             "body": [
@@ -103,11 +121,15 @@ class QuarterCarOnRoughTerrain(DynamicSystem):
 
     def tf(self, x, u, t=0, params=None):
         mass_y = x[1]
+
         return {"body": translation(x[2], mass_y, 0.0)}
 
     def get_dynamic_geometry(self, x, u, t=0, params=None):
-        ground = self.z(x[2])
+        params = self.params if params is None else params
+
+        ground = self.z(x[2], params)
         mass_y = x[1]
+
         return {
             "world": [
                 spring_between([x[2], ground], [x[2], mass_y - 0.2]),

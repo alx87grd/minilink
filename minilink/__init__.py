@@ -1,41 +1,39 @@
-"""minilink — Python/JAX block-diagram toolbox for dynamical systems.
-
-The root package exports the **teaching surface** (ROADMAP §2): every name a
-student meets, so a script or notebook needs one import line::
-
-    from minilink import Pendulum, ImpedanceController, lqr
-    from minilink import QuadraticCost, PlanningProblem, DynamicProgrammingPlanner
-    from minilink import ReinforcementLearningPlanner, StochasticPlanningProblem
-
-Band facades organise the same names by role (``minilink.catalog``,
-``minilink.blocks``, ``minilink.control``, ``minilink.analysis``,
-``minilink.simulation``, ``minilink.planning``, ``minilink.optimization``,
-``minilink.core``); defining modules stay importable. The surface is tested as
-a set in ``tests/unittest/test_teaching_surface.py``; research-lane names never
-appear here.
-"""
+"""Minilink: a Python/JAX block-diagram toolbox for dynamical systems."""
 
 from __future__ import annotations
 
 from minilink.catalog import __all__ as _CATALOG_NAMES
 from minilink.core.facade import lazy_facade
 
-# name -> (module path, attribute); catalog plants resolve through minilink.catalog
+# The root package exports the teaching surface (ROADMAP §2): every name a student
+# meets, so a script or notebook needs one import line, e.g.
+#
+#     from minilink import Pendulum, ImpedanceController, lqr
+#     from minilink import QuadraticCost, PlanningProblem, DynamicProgrammingPlanner
+#     from minilink import ReinforcementLearningPlanner, StochasticPlanningProblem
+#
+# The band facades organise the same names by role (``minilink.catalog``,
+# ``minilink.blocks``, ``minilink.control``, ``minilink.analysis``,
+# ``minilink.simulation``, ``minilink.planning``, ``minilink.optimization``,
+# ``minilink.core``); the defining modules stay importable. The surface is tested as a
+# set in ``tests/unittest/test_teaching_surface.py``; research-lane names never appear
+# here. Each exported name maps to its (module path, attribute); the catalog plants
+# resolve through ``minilink.catalog``.
 _EXPORTS: dict[str, tuple[str, str]] = {
-    # core
+    # Core
     "System": ("minilink.core.system", "System"),
     "DynamicSystem": ("minilink.core.system", "DynamicSystem"),
     "StepSystem": ("minilink.core.system", "StepSystem"),
     "DiagramSystem": ("minilink.core.diagram", "DiagramSystem"),
-    "Controller": ("minilink.core.feedback", "Controller"),
     "Trajectory": ("minilink.core.trajectory", "Trajectory"),
     "CostFunction": ("minilink.core.costs", "CostFunction"),
     "QuadraticCost": ("minilink.core.costs", "QuadraticCost"),
     "BoxSet": ("minilink.core.sets", "BoxSet"),
     "BoxInputSet": ("minilink.core.sets", "BoxInputSet"),
-    # blocks
+    # Blocks
     "Integrator": ("minilink.blocks.basic", "Integrator"),
     "Step": ("minilink.blocks.sources", "Step"),
+    "Sine": ("minilink.blocks.sources", "Sine"),
     "WhiteNoise": ("minilink.blocks.sources", "WhiteNoise"),
     "TrajectorySource": ("minilink.blocks.sources", "TrajectorySource"),
     "Error": ("minilink.blocks.routing", "Error"),
@@ -54,9 +52,13 @@ _EXPORTS: dict[str, tuple[str, str]] = {
     "TransferFunction": ("minilink.blocks.transfer_function", "TransferFunction"),
     "Lead": ("minilink.blocks.transfer_function", "Lead"),
     "Lag": ("minilink.blocks.transfer_function", "Lag"),
-    # control
-    "ProportionalController": ("minilink.control.output", "ProportionalController"),
+    # Control
+    "P": ("minilink.control.siso", "P"),
     "StateFeedbackController": ("minilink.control.state", "StateFeedbackController"),
+    "OutputReferenceController": (
+        "minilink.control.state",
+        "OutputReferenceController",
+    ),
     "PID": ("minilink.control.siso", "PID"),
     "PurePursuit": ("minilink.control.geometric", "PurePursuit"),
     "PI": ("minilink.control.siso", "PI"),
@@ -69,12 +71,19 @@ _EXPORTS: dict[str, tuple[str, str]] = {
         "ComputedTorqueController",
     ),
     "SlidingModeController": ("minilink.control.modelbased", "SlidingModeController"),
-    "lqr": ("minilink.control.lqr", "lqr"),
-    "lqr_at_operating_point": ("minilink.control.lqr", "lqr_at_operating_point"),
-    "lqr_finite_horizon": ("minilink.control.lqr", "lqr_finite_horizon"),
-    "trajectory_lqr": ("minilink.control.lqr", "trajectory_lqr"),
-    "place": ("minilink.control.place", "place"),
-    "place_at_operating_point": ("minilink.control.place", "place_at_operating_point"),
+    "lqr": ("minilink.control.design", "lqr"),
+    "lqr_gain": ("minilink.control.design", "lqr_gain"),
+    "lqr_finite_horizon": ("minilink.control.design", "lqr_finite_horizon"),
+    "trajectory_lqr": ("minilink.control.design", "trajectory_lqr"),
+    "place": ("minilink.control.design", "place"),
+    "place_gain": ("minilink.control.design", "place_gain"),
+    "lqg": ("minilink.control.design", "lqg"),
+    # Estimation
+    "StateObserver": ("minilink.estimation.observer", "StateObserver"),
+    "kalman": ("minilink.estimation.design", "kalman"),
+    "kalman_gain": ("minilink.estimation.design", "kalman_gain"),
+    "luenberger": ("minilink.estimation.design", "luenberger"),
+    "luenberger_gain": ("minilink.estimation.design", "luenberger_gain"),
     "TimeVaryingStateFeedbackController": (
         "minilink.control.state",
         "TimeVaryingStateFeedbackController",
@@ -84,7 +93,7 @@ _EXPORTS: dict[str, tuple[str, str]] = {
         "TrajectoryFeedbackController",
     ),
     "NeuralPolicyController": ("minilink.control.neural", "NeuralPolicyController"),
-    # analysis
+    # Analysis
     "jacobian": ("minilink.analysis.derivatives", "jacobian"),
     "linearize": ("minilink.analysis.linearization", "linearize"),
     "transfer_function": ("minilink.analysis.frequency", "transfer_function"),
@@ -103,10 +112,10 @@ _EXPORTS: dict[str, tuple[str, str]] = {
     "controllability": ("minilink.analysis.structural", "controllability"),
     "observability": ("minilink.analysis.structural", "observability"),
     "find_equilibrium": ("minilink.analysis.equilibria", "find_equilibrium"),
-    # simulation
+    # Simulation
     "Simulator": ("minilink.simulation.simulator", "Simulator"),
     "StaticSimulator": ("minilink.simulation.static_simulator", "StaticSimulator"),
-    # planning
+    # Planning
     "PlanningProblem": ("minilink.planning.problems", "PlanningProblem"),
     "PlanningSolution": ("minilink.planning.results", "PlanningSolution"),
     "LQRPlanner": ("minilink.planning.policy_synthesis.lqr", "LQRPlanner"),
@@ -166,16 +175,16 @@ _EXPORTS: dict[str, tuple[str, str]] = {
         "KinodynamicExtender",
     ),
     "SteeringExtender": ("minilink.planning.search.extenders", "SteeringExtender"),
-    # optimization
+    # Optimization
     "MathematicalProgram": (
         "minilink.optimization.mathematical_program",
         "MathematicalProgram",
     ),
-    # band names the teaching demos use
+    # Band names the teaching demos use
     "TimeCost": ("minilink.core.costs", "TimeCost"),
     "StepDiagramSystem": ("minilink.core.diagram", "StepDiagramSystem"),
     "BallSet": ("minilink.core.sets", "BallSet"),
-    "closed_loop_qdq": ("minilink.core.composition", "closed_loop_qdq"),
+    "closed_loop": ("minilink.core.composition", "closed_loop"),
     "feedback": ("minilink.core.composition", "feedback"),
     "ZOHHold": ("minilink.blocks.step", "ZOHHold"),
     "Source": ("minilink.blocks.sources", "Source"),
@@ -193,19 +202,16 @@ _EXPORTS.update({name: ("minilink.catalog", name) for name in _CATALOG_NAMES})
 __all__, __getattr__, __dir__ = lazy_facade(globals(), _EXPORTS)
 
 
-def _package_version():
-    try:
-        from minilink._version import __version__ as ver
+# Package version: the build's ``_version`` module, else the installed metadata, else
+# 0.0.0; the metadata module is released so the package listing stays the surface
+try:
+    # The build writes _version.py; a source checkout has none
+    from minilink._version import __version__
+except ImportError:
+    from importlib import metadata
 
-        return ver
-    except ImportError:
-        pass
     try:
-        from importlib.metadata import version as package_version
-
-        return package_version("minilink")
+        __version__ = metadata.version("minilink")
     except Exception:
-        return "0.0.0"
-
-
-__version__ = _package_version()
+        __version__ = "0.0.0"
+    del metadata

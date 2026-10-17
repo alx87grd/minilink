@@ -2,10 +2,10 @@
 
 **Status:** core contract — design agreed 2026-09-21, not started.  
 **Lane:** core (`minilink.core.geometry`), then a teaching catalog of courses.  
-**Rung:** v0.2 wave A, step A3 of [TODO.md](TODO.md).  
+**Rung:** v0.3, step A3 of [TODO.md](TODO.md).  
 **Depends on:** [fields.md](fields.md) for the `Field` ABC (can move spatial files first and rename `StateField` → `Field` in the same pass or after).
 
-Workspace math is split today: SDF solids in [`core/geometry.py`](../../minilink/core/geometry.py), everything else under [`planning/spatial/`](../../minilink/planning/spatial/). That home is an accident of first consumer (trajopt). Control cannot import planning ([RULES.md](../../RULES.md) 3.2), so [`PurePursuit`](../../minilink/control/geometric.py) takes a raw waypoint array. Demos rebuild the same oval and cones by hand.
+Workspace math is split today: SDF solids in [`core/geometry.py`](../../minilink/core/geometry.py), everything else under [`planning/spatial/`](../../minilink/planning/spatial/). That home is an accident of first consumer (trajopt). Control cannot import planning ([RULES.md](../dev/RULES.md) 3.2), so [`PurePursuit`](../../minilink/control/geometric.py) takes a raw waypoint array. Demos rebuild the same oval and cones by hand.
 
 **Placement test:** if you would still import it to score a controller with no `PlanningProblem`, it is not `planning/`.
 
@@ -17,7 +17,7 @@ loop = PurePursuit(track) @ car
 J = cost.total_cost(loop.compute_trajectory(tf=10))
 ```
 
-Graphics stay a second vocabulary on purpose ([architecture review §4.6](../reviews/2026-09-05-architecture-review.md)): glyphs, skins, S30, S44 are not this module. Constitution still holds: a few textbook objects (`Shape`, `Path`, `Track`, `Scene`, posed probes), not a computational-geometry library.
+Graphics stay a second vocabulary on purpose (the 2026-09-05 architecture review §4.6, in git history): glyphs, skins, S30, S44 are not this module. Constitution still holds: a few textbook objects (`Shape`, `Path`, `Track`, `Scene`, posed probes), not a computational-geometry library.
 
 ## Before and after
 
@@ -41,7 +41,7 @@ Graphics stay a second vocabulary on purpose ([architecture review §4.6](../rev
 | named courses | copy-pasted in demos | `core/geometry/catalog.py` |
 | `planning.spatial` | owner | re-export, then **delete** |
 
-Student import after the move: `from minilink.core.geometry import Scene, bind, racecar_circuit`. Band facades may keep `minilink.planning` names for one migration commit ([RULES.md](../../RULES.md) 3.4), then drop them.
+Student import after the move: `from minilink.core.geometry import Scene, bind, racecar_circuit`. Band facades may keep `minilink.planning` names for one migration commit ([RULES.md](../dev/RULES.md) 3.4), then drop them.
 
 **Stay put**
 
@@ -109,10 +109,10 @@ minilink/graphical/          # drawing only
 
 1. `geometry.py` → `core/geometry/shapes.py`.
 2. Move Path, Track, Scene, probes, `bind`, spatial Fields, grid; shaping next to `Field.as_cost`; plots/overlays under `graphical/` with lazy methods on Scene/Track.
-3. `planning.spatial` re-exports, then delete in the same change as call-site updates ([RULES.md](../../RULES.md) 3.4).
+3. `planning.spatial` re-exports, then delete in the same change as call-site updates ([RULES.md](../dev/RULES.md) 3.4).
 4. Catalog factories; switch the three UdeS racecar demos and the RRT forest demo.
 5. PurePursuit accepts a `Path` / `Track`.
-6. [fields.md](fields.md) §4.1: spatial subclasses already live in geometry when `Field` lands.
+6. Step 4.1 of [fields.md](fields.md): spatial subclasses already live in geometry when `Field` lands.
 
 ## Out of scope
 

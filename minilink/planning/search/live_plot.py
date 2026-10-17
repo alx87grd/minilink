@@ -1,14 +1,10 @@
-"""
-Live search-tree visualization during RRT / RRT* planning.
-
-:class:`LiveSearchPlotCallback` redraws the current tree (including RRT*
-rewiring) on each successful extension, mirroring pyro's live RRT display and
-:class:`~minilink.planning.trajectory_optimization.live_plot.LiveTrajectoryPlotCallback`.
-"""
+"""Live search-tree plot: the RRT family's tree and best path, redrawn as the search grows."""
 
 from dataclasses import dataclass
 
+###############################################################################
 # Public API
+###############################################################################
 
 
 @dataclass
@@ -45,6 +41,10 @@ class LiveSearchPlotCallback:
     """
     Matplotlib live updater for the RRT family search loop.
 
+    Redraws the current tree (including RRT* rewiring) on each successful
+    extension, mirroring pyro's live RRT display and
+    :class:`~minilink.planning.trajectory_optimization.live_plot.LiveTrajectoryPlotCallback`.
+
     Parameters
     ----------
     planner : RRTPlanner
@@ -77,15 +77,24 @@ class LiveSearchPlotCallback:
         tree_color="0.75",
         path_color="tab:blue",
     ) -> None:
+        # The planner, and the axes to draw on
         self.planner = planner
         self.ax = ax
+
+        # The state projection
         self.x_axis = int(x_axis)
         self.y_axis = int(y_axis)
+
+        # When to redraw
         self.every = max(1, int(every))
         self.pause = float(pause)
         self.after_goal_only = bool(after_goal_only)
+
+        # Graphics
         self.tree_color = tree_color
         self.path_color = path_color
+
+        # Memory: the figure, and the artists of the latest redraw
         self.fig = None
         self._tree_lines: list = []
         self._path_line = None
@@ -98,6 +107,7 @@ class LiveSearchPlotCallback:
         return list(self._tree_lines)
 
     def __call__(self, step: RRSearchIteration) -> None:
+        # One redraw every few extensions, and none before the goal when asked
         if step.iteration % self.every != 0:
             return
         if self.after_goal_only and not step.reached_goal:
@@ -105,29 +115,33 @@ class LiveSearchPlotCallback:
 
         import matplotlib.pyplot as plt
 
+        # Lazy import: the graphics load on first use, not with the core
         from minilink.planning.search.plotting import (
-            _clear_search_artists,
-            _draw_search_state,
-            _label_axes,
-            _mark_endpoints,
-            _search_title,
-            _set_limits,
+            clear_search_artists,
+            draw_search_state,
+            label_axes,
+            mark_endpoints,
+            search_title,
+            set_limits,
         )
 
+        # A new figure on the first update, or the one that holds the given axes
         if self.ax is None:
             self.fig, self.ax = plt.subplots(figsize=(7.0, 6.0), frameon=True)
         else:
             self.fig = self.ax.figure
 
+        # The frame, set once: the limits, labels and endpoints stay fixed
         if not self._limits_set:
-            _set_limits(self.ax, self.planner, self.x_axis, self.y_axis)
-            _label_axes(self.ax, self.planner.problem.sys, self.x_axis, self.y_axis)
-            _mark_endpoints(self.ax, self.planner, self.x_axis, self.y_axis)
+            set_limits(self.ax, self.planner, self.x_axis, self.y_axis)
+            label_axes(self.ax, self.planner.problem.sys, self.x_axis, self.y_axis)
+            mark_endpoints(self.ax, self.planner, self.x_axis, self.y_axis)
             self._limits_set = True
 
-        _clear_search_artists(self._tree_lines, self._path_line)
+        # The tree and the best path, redrawn in place of the previous ones
+        clear_search_artists(self._tree_lines, self._path_line)
         self._path_line = None
-        self._tree_lines, self._path_line = _draw_search_state(
+        self._tree_lines, self._path_line = draw_search_state(
             self.ax,
             self.planner,
             x_axis=self.x_axis,
@@ -136,11 +150,13 @@ class LiveSearchPlotCallback:
             path_color=self.path_color,
         )
 
-        title = _search_title(step)
+        # The title reports the search's progress
+        title = search_title(step)
         if self._title is None:
             self._title = self.ax.set_title(title)
         else:
             self._title.set_text(title)
 
+        # A short pause lets the figure redraw
         if self.pause > 0.0:
             plt.pause(self.pause)

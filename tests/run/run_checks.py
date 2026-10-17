@@ -1,20 +1,4 @@
-"""Check launcher — pick a check, click **Run**.
-
-**Human (IDE):** change ``CHECK`` below, then Run this file.
-
-| CHECK | What |
-| --- | --- |
-| ``contract_tests`` | Contract tests via pytest (daily default) |
-| ``contract_tests_minimal`` | Contract tests without optional extras |
-| ``contract_tests_headless`` | Contract tests with headless pygame |
-| ``pre_push`` | ruff + pytest (CI test job) |
-| ``regression_gates`` | Regression gates (full local) |
-| ``regression_gates_ci`` | Regression gates (CI flags) |
-| ``demo_checks`` | Catalog + flagship demo checks |
-| ``notebook_checks`` | Teaching notebook smoke (execute code cells) |
-| ``benchmark_study_list`` | Benchmark study preset list |
-| ``benchmark_study_f_eval`` | Benchmark study: native/NumPy/JAX f() on pendulum |
-"""
+"""Check launcher — set ``CHECK`` below and click **Run**; the checks are the Human table of tests/README.md."""
 
 from __future__ import annotations
 

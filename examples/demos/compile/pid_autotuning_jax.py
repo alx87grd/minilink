@@ -23,16 +23,16 @@ PLOT_PAUSE = 0.05
 PLOT_BACKEND = "matplotlib"  # use "plotly" if matplotlib live updates stall
 
 plant = Pendulum()
-ctl = ImpedanceIntegralController()
-ctl.params = {"Kp": 1.0, "Ki": 0.0, "Kd": 1.0}
+ctl = ImpedanceIntegralController(Kp=1.0, Ki=0.0, Kd=1.0)
+I = jnp.eye(1)  # the gains are 1×1 matrices, the integral gain a 1-vector
 
 diagram = DiagramSystem()
 diagram.add_subsystem(plant, "plant")
-diagram.add_subsystem(ctl, "ctl")
+diagram.add_subsystem(ctl, "controller")
 diagram.add_input_port("r", dim=1)
-diagram.connect("input", "r", "ctl", "r")
-diagram.connect("plant", "y", "ctl", "y")
-diagram.connect("ctl", "u", "plant", "u")
+diagram.connect("input", "r", "controller", "r")
+diagram.connect("plant", "y", "controller", "y")
+diagram.connect("controller", "u", "plant", "u")
 diagram.inputs["r"].nominal_value = np.array([1.0])
 
 evaluator = diagram.compile(backend="jax")
@@ -51,10 +51,11 @@ plot_signals = resolve_plot_signals(diagram)
 
 def apply_pid_params(pid):
     diagram.params = {
-        "ctl": {
-            "Kp": float(pid[0]),
-            "Ki": float(pid[1]),
-            "Kd": float(pid[2]),
+        "controller": {
+            **ctl.params,
+            "Kp": float(pid[0]) * np.eye(1),
+            "Ki": np.array([float(pid[1])]),
+            "Kd": float(pid[2]) * np.eye(1),
         }
     }
 
@@ -67,7 +68,12 @@ def simulate_traj(pid):
 
 def rollout_loss(pid):
     params = {
-        "ctl": {"Kp": pid[0], "Ki": pid[1], "Kd": pid[2]},
+        "controller": {
+            **ctl.params,
+            "Kp": pid[0] * I,
+            "Ki": pid[1:2],
+            "Kd": pid[2] * I,
+        },
         "plant": plant_params,
     }
 

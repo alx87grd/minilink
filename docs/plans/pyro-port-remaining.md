@@ -17,7 +17,7 @@ gap noted · **TODO** = planned/in-scope · **Drop** = explicit non-goal.
 | Library symbols | 105 | 80 | 11 | 8 | 6 |
 | Example scripts | 195 | 28 | 45 | 87 | 35 |
 
-Parity is the **v0.2** milestone ([ROADMAP.md §1](../../ROADMAP.md#1-releases)); v0.1 is GRO860 end to end.
+Parity is part of the **v0.3** milestone ([ROADMAP.md §1](../dev/ROADMAP.md#1-releases)); v0.1 is GRO860 end to end.
 Release criterion carried over: every **in-scope** pyro library module has a minilink home or a documented drop; representative closed-loop demo per major plant family; README pyro → minilink migration guide (built from the name map below).
 
 ## 1. Library modules — pyro → minilink
@@ -27,8 +27,8 @@ Release criterion carried over: every **in-scope** pyro library module has a min
 | Framework | `pyro/dynamic/mechanical.py` | MechanicalSystemWithPositionInputs | `—` | — | **Drop** | No such class in minilink; DESIGN rejects `WithPositionInputs` inheritance branches — mixed inputs use named ports + `generalized_force` |
 | Framework | `pyro/dynamic/rigidbody.py` | GeneralizedMechanicalSystemWithPositionInputs | `—` | — | **Drop** | No such class in minilink; DESIGN rejects `WithPositionInputs` inheritance branches — mixed inputs use named ports + `generalized_force` |
 | Framework | `pyro/dynamic/rigidbody.py` | RigidBody2D | `—` | — | **Drop** | Use GeneralizedMechanicalSystem or catalog plant |
-| Framework | `pyro/dynamic/statespace.py` | StateObserver | `minilink/estimation/` | — | **TODO** | estimation/luenberger.py |
-| Framework | `pyro/dynamic/statespace.py` | ObservedSystem | `minilink/estimation/` | — | **TODO** | LQG blocked on observers |
+| Framework | `pyro/dynamic/statespace.py` | StateObserver | `minilink/estimation/observer.py` | StateObserver | **Done** | 2026-10-14; `kalman()` / `luenberger()` in `estimation/design.py` replace the `kalman` / `kalman_from_ss` classmethods; pyro's `G=` (noise on the input) is the caller's `Q_n = B W Bᵀ`; the covariance is not stored on the block |
+| Framework | `pyro/dynamic/statespace.py` | ObservedSystem | `minilink/control/design.py` | lqg | **Done** | 2026-10-14; the observer + gain box, `lqg(...) @ plant` |
 | Framework | `pyro/dynamic/stochastic.py` | NoiseSignal | `minilink/blocks/sources.py` | noise ports in diagrams | **Partial** | No StochasticSystemWrapper |
 | Framework | `pyro/dynamic/stochastic.py` | StochasticSystemWrapper | `—` | — | **Drop** | Explicit non-goal unless reversed ([TODO.md](TODO.md) Later) |
 | Framework | `pyro/dynamic/tranferfunction.py` | ss2tf() | `minilink/analysis/frequency.py` | transfer_function | **Done** | Landed 2026-09-07 with the frequency tools |
@@ -41,7 +41,7 @@ Release criterion carried over: every **in-scope** pyro library module has a min
 | Catalog | `pyro/dynamic/manipulator.py` | FiveLinkPlanarManipulatorwithObstacles | `minilink/planning/spatial/` | Scene | **Partial** |  |
 | Control | `pyro/control/controller.py` | DynamicClosedLoopSystem | `minilink/core/diagram.py` | DiagramSystem | **Partial** |  |
 | Control | `pyro/control/linear.py` | PIDController | `minilink/control/siso.py` | PID (filtered PID), PI, PD | **Done** | PI / PD landed 2026-09-07 (P1); robotic PID wrappers are C2 |
-| Control | `pyro/control/lqr.py` | TrajectoryLQRController | `minilink/control/lqr.py`, `minilink/control/state.py` | trajectory_lqr, TrajectoryFeedbackController | **Done** | Demo: `examples/demos/control/trajectory_lqr_cartpole.py` |
+| Control | `pyro/control/lqr.py` | TrajectoryLQRController | `minilink/control/design.py`, `minilink/control/state.py` | trajectory_lqr, TrajectoryFeedbackController | **Done** | Demo: `examples/demos/control/trajectory_lqr_cartpole.py` |
 | Control | `pyro/control/robotcontrollers.py` | JointPD, EndEffectorPD, … | `minilink/control/robotic.py` | JointImpedance, TaskImpedance, TaskKinematic, TaskKinematicNullspace | **Partial** | Dynamic joint/effector PID wrappers TODO |
 | Planning | `pyro/planning/dynamicprogramming.py` | DynamicProgramming2DRectBivariateSpline | `minilink/planning/policy_synthesis/dp.py` | — | **Drop** | Not needed; grid backends cover use cases |
 | Planning | `pyro/planning/filters.py` | TrajectoryFilter | `minilink/planning/` | — | **TODO** | Butterworth filtfilt post-filter |
@@ -57,7 +57,7 @@ Release criterion carried over: every **in-scope** pyro library module has a min
 | `minilink/core/compile/` | ExecutionPlan, NumPy/JAX evaluators | Compile band; pyro has no separate compile layer |
 | `minilink/core/geometry.py` | SDF shapes, cost algebra | Spatial primitives (planned package `core/geometry/`, [geometry-module.md](geometry-module.md)) |
 | `minilink/optimization/` | MathematicalProgram, Optimizer | General NLP; pyro trajopt is narrower |
-| `minilink/planning/spatial/` | Scene, WorkspaceField, RobotBody | Obstacle/clearance layer replaces *withObstacles plants (retires into `core/geometry/`) |
+| `minilink/planning/spatial/` | Scene, WorkspaceField, CollisionBody (`bind()`) | Obstacle/clearance layer replaces *withObstacles plants (retires into `core/geometry/`) |
 | `minilink/planning/search/dubins.py` | Dubins steering | Extra beyond pyro RRT |
 | `minilink/blocks/neural.py` | MLP block (JAX) | Prototype; pyro RL is SB3-only |
 | `minilink/experimental/symbolic/` | Symbolic derivation | Quarantine; no pyro equivalent |
@@ -103,8 +103,8 @@ All 195 pyro scripts under `examples/`, grouped by top-level folder.
 | --- | --- | --- |
 | `demos_by_system/acrobot/acrobot_with_lqr.py` | **Partial** | Controller exists; plant demo TODO |
 | `demos_by_system/acrobot/acrobot_with_trajectory_optimization.py` | **Partial** | Trajopt done; plant-specific demo TODO |
-| `demos_by_system/boat/boat_position_controller.py` | **TODO** | Representative closed-loop for boat |
-| `demos_by_system/boat/boat_with_ppo_demo.py` | **TODO** | Representative closed-loop for boat |
+| `demos_by_system/boat/boat_position_controller.py` | **Partial** | Research-lane prototype `examples/experimental/boat/parking_cascade.py` (cascade with a heading switch, in a current); no `demos/` twin yet |
+| `demos_by_system/boat/boat_with_ppo_demo.py` | **Partial** | Research-lane prototype `examples/experimental/boat/parking_ppo.py` (native PPO planner, in a current); no `demos/` twin yet |
 | `demos_by_system/car_dynamic/demo_oversteer.py` | **TODO** | Representative closed-loop for car_dynamic |
 | `demos_by_system/car_dynamic/demo_understeer.py` | **TODO** | Representative closed-loop for car_dynamic |
 | `demos_by_system/car_propulsion/longitudinal_car_braking_value_iteration.py` | **Partial** | DP done; plant-specific demo TODO |
@@ -212,7 +212,7 @@ All 195 pyro scripts under `examples/`, grouped by top-level folder.
 | `demos_by_tool/dynamicprogramming/double_pendulum_optimal_swingup_load.py` | **Partial** | examples/demos/value_iteration/vi_double_pendulum_jax.py |
 | `demos_by_tool/dynamicprogramming/helicopter_tunnel.py` | **TODO** | DP specialty demo not ported |
 | `demos_by_tool/dynamicprogramming/pendulum_optimal_swingup_low_def_fast_computation.py` | **Partial** | examples/demos/value_iteration/vi_pendulum_swingup.py (grid tuning differs) |
-| `demos_by_tool/dynamicprogramming/pendulum_reachability.py` | **Partial** | ReachabilityCost exists; demo TODO |
+| `demos_by_tool/dynamicprogramming/pendulum_reachability.py` | **Partial** | `ReachabilityCost` not in minilink (check at C1); demo TODO |
 | `demos_by_tool/dynamicprogramming/policy_evaluator_with_computed_torque.py` | **TODO** | control/modelbased.py |
 | `demos_by_tool/optimal_control_demo.py` | **TODO** | Not yet audited |
 | `demos_by_tool/rl_with_stable_baseline3/double_pendulum_with_ppo.py` | **Drop** | External SB3 training |
@@ -263,7 +263,7 @@ All 195 pyro scripts under `examples/`, grouped by top-level folder.
 
 | Item | Decision | Replacement |
 | --- | --- | --- |
-| Discrete-time / ZOH library | **Drop** | Continuous-time only (DESIGN §3) |
+| Discrete-time / ZOH library | **TODO (v0.9)** | The z tier, P6 ([TODO.md](TODO.md) §5, v0.9): exact ZOH and Tustin `c2d`, z-plane tools |
 | RNN / recurrent blocks | **Drop** | — |
 | Hybrid events / mixed-rate sim | **Drop** | — |
 | Pyro `sys2game` framework | **Drop** | superseded by `simulation/realtime/` (`RealtimeSimulator`) |
@@ -297,7 +297,7 @@ Ordered by unblock count:
 
 ## Appendix — pyro → minilink name map (landed)
 
-Two-column record of every symbol marked Done before the shrink; the source for the v0.2 migration guide.
+Two-column record of every symbol marked Done before the shrink; the source for the v0.3 migration guide.
 
 | Pyro symbol | Minilink symbol | Minilink module |
 | --- | --- | --- |
@@ -318,7 +318,7 @@ Two-column record of every symbol marked Done before the shrink; the source for 
 | TwoIndependentSinglePendulum | TwoIndependentPendulums | `minilink/dynamics/catalog/pendulum/pendulum.py` |
 | CartPole | CartPole | `minilink/dynamics/catalog/pendulum/cartpole.py` |
 | RotatingCartPole | RotatingCartPole | `minilink/dynamics/catalog/pendulum/cartpole.py` |
-| UnderActuatedRotatingCartPole | UnderActuatedRotatingCartPole | `minilink/dynamics/catalog/pendulum/cartpole.py` |
+| UnderActuatedRotatingCartPole | UnderactuatedRotatingCartPole | `minilink/dynamics/catalog/pendulum/cartpole.py` |
 | SingleMass | SingleMass | `minilink/dynamics/catalog/mass_spring_damper/linear.py` |
 | TwoMass | TwoMass | `minilink/dynamics/catalog/mass_spring_damper/linear.py` |
 | ThreeMass | ThreeMass | `minilink/dynamics/catalog/mass_spring_damper/linear.py` |
@@ -341,9 +341,9 @@ Two-column record of every symbol marked Done before the shrink; the source for 
 | LongitudinalFrontWheelDriveCarWithTorqueInput | same | `minilink/dynamics/catalog/vehicles/propulsion.py` |
 | KinematicBicyleModel | KinematicBicycle | `minilink/dynamics/catalog/vehicles/steering.py` |
 | HolonomicMobileRobot | HolonomicMobileRobot | `minilink/dynamics/catalog/vehicles/steering.py` |
-| Holonomic3DMobileRobot | HolonomicMobileRobot3D | `minilink/dynamics/catalog/vehicles/steering.py` |
+| Holonomic3DMobileRobot | not in minilink (check at C1) | project only: `examples/projects/car_trajopt/vehicles/extras.py` |
 | KinematicCarModel | KinematicCar | `minilink/dynamics/catalog/vehicles/steering.py` |
-| ConstantSpeedKinematicCarModel | ConstantSpeedKinematicCar | `minilink/dynamics/catalog/vehicles/steering.py` |
+| ConstantSpeedKinematicCarModel | not in minilink (check at C1) | project only: `examples/projects/car_trajopt/vehicles/extras.py` |
 | UdeSRacecar | UdeSRacecar | `minilink/dynamics/catalog/vehicles/racecar.py` |
 | Manipulator | Manipulator | `minilink/dynamics/abstraction/manipulator.py` |
 | SpeedControlledManipulator | SpeedControlledManipulator | `minilink/dynamics/catalog/manipulators/arms.py` |
@@ -354,10 +354,10 @@ Two-column record of every symbol marked Done before the shrink; the source for 
 | StaticController | DiagramSystem wiring | `minilink/core/diagram.py` |
 | StaticController.plot_control_law | plot_control_law(), plot_input_output_map() | `minilink/graphical/port_map.py` |
 | ClosedLoopSystem | `@`, `>>`, `+` composition | `minilink/core/diagram.py` |
-| DynamicController | DynamicController marker (PID, ImpedanceIntegralController) | `minilink/core/feedback.py` |
+| DynamicController | a `DynamicSystem` with the standard ports (the controller classes are removed by P10's AC-0) | `minilink/core/system.py` |
 | ProportionalController | ProportionalController | `minilink/control/output.py` |
-| synthesize_lqr_controller | synthesize_lqr | `minilink/control/lqr.py` |
-| linearize_and_synthesize_lqr_controller | linearize + synthesize_lqr | `minilink/control/lqr.py` |
+| synthesize_lqr_controller | not in minilink (check at C1) | `minilink/control/design.py` |
+| linearize_and_synthesize_lqr_controller | not in minilink (check at C1) | `minilink/control/design.py` |
 | ComputedTorqueController | ComputedTorqueController | `minilink/control/modelbased.py` |
 | SlidingModeController | SlidingModeController | `minilink/control/modelbased.py` |
 | stable_baseline3_controller | SB3Controller | `minilink/interfaces/gymnasium.py` |
@@ -366,7 +366,7 @@ Two-column record of every symbol marked Done before the shrink; the source for 
 | CLosedLoopSimulator | compute_trajectory() | `minilink/core/facades.py` |
 | DynamicCLosedLoopSimulator | Simulator | `minilink/simulation/simulator.py` |
 | CostFunction, QuadraticCostFunction, … | CostFunction, QuadraticCost, … | `minilink/core/costs.py` |
-| Reachability | ReachabilityCost | `minilink/core/costs.py` |
+| Reachability | not in minilink (check at C1) | — |
 | TrajectoryPlotter | plot_trajectory() | `minilink/graphical/` |
 | Animator | animate() | `minilink/graphical/animation/` |
 | PhasePlot, PhasePlot3 | plot_phase_plane() | `minilink/graphical/phase_plane/` |
@@ -377,7 +377,7 @@ Two-column record of every symbol marked Done before the shrink; the source for 
 | PolicyEvaluator | PolicyEvaluator | `minilink/planning/policy_synthesis/policy_eval.py` |
 | Planner | Planner | `minilink/planning/planner.py` |
 | RRT | RRTPlanner, RRTStarPlanner | `minilink/planning/search/` |
-| DirectCollocationTrajectoryOptimisation | DirectCollocation, Shooting, MS | `minilink/planning/trajectory_optimization/` |
+| DirectCollocationTrajectoryOptimisation | TrajectoryOptimizationPlanner (DirectCollocationTranscription, ShootingTranscription, MultipleShootingTranscription) | `minilink/planning/trajectory_optimization/` |
 | transformation_matrix_2D | frame tf helpers | `minilink/core/kinematics.py` |
 | transform_points_2D, arrows | primitives, drawables | `minilink/graphical/animation/` |
 | Sys2Gym | Sys2Gym | `minilink/interfaces/gymnasium.py` |

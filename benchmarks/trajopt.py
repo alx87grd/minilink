@@ -490,7 +490,7 @@ def _run_trajopt_variant(
     transcribe_s = time.perf_counter() - transcribe_t0
 
     solve_t0 = time.perf_counter()
-    optimizer = planner._make_optimizer(program, z0)
+    optimizer = planner.build_optimizer(program, z0)
     if program_detail_keys is not None:
         key = _mathematical_program_detail_key(variant, config)
         if key not in program_detail_keys:

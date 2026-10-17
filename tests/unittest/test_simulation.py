@@ -8,11 +8,8 @@ import numpy as np
 import pytest
 from minilink.core.backends import array_module
 from minilink.core.system import DEFAULT_SMALLEST_TIME_CONSTANT, DynamicSystem
-from minilink.simulation.simulator import (
-    COMPILE_BACKEND_AUTO,
-    DISCONTINUOUS_AUTO_DT_SCALE,
-    Simulator,
-)
+from minilink.simulation.simulator import COMPILE_BACKEND_AUTO, Simulator
+from minilink.simulation.time_grid import AUTO_DT_SCALE
 
 
 def _have_jax() -> bool:
@@ -63,6 +60,22 @@ class DiscontinuousLinearSystem(StableLinearSystem):
 
 
 class TestNewSimulator(unittest.TestCase):
+    def test_a_diagram_x0_set_by_the_user_is_kept(self):
+        from minilink import Pendulum, StateFeedbackController
+
+        K = np.array([[10.0, 2.0]])
+        loop = StateFeedbackController(K) @ Pendulum()
+        loop.x0 = np.array([0.5, -0.2])
+        traj = loop.compute_trajectory(tf=0.05, verbose=False)
+        np.testing.assert_allclose(traj.x[:, 0], [0.5, -0.2])
+        np.testing.assert_allclose(loop.x0, [0.5, -0.2])
+
+        plant = Pendulum()
+        loop = StateFeedbackController(K) @ plant
+        plant.x0 = np.array([0.7, 0.0])  # set on the block after composition
+        traj = loop.compute_trajectory(tf=0.05, verbose=False)
+        np.testing.assert_allclose(traj.x[:, 0], [0.7, 0.0])
+
     def test_default_solver_auto_selects_euler_for_discontinuous_system(self):
         sim = Simulator(
             DiscontinuousLinearSystem(),
@@ -140,14 +153,14 @@ class TestNewSimulator(unittest.TestCase):
         )
         self.assertEqual(sim.solver_mode, "euler")
 
-    def test_discontinuous_auto_dt_is_finer(self):
+    def test_discontinuous_auto_dt_is_the_scaled_time_constant(self):
         sim = Simulator(
             DiscontinuousLinearSystem(),
             tf=0.01,
             solver_warnings="ignore",
             verbose=False,
         )
-        expected_dt = DEFAULT_SMALLEST_TIME_CONSTANT * DISCONTINUOUS_AUTO_DT_SCALE
+        expected_dt = DEFAULT_SMALLEST_TIME_CONSTANT * AUTO_DT_SCALE
         self.assertAlmostEqual(sim.t[1] - sim.t[0], expected_dt)
 
     def test_discontinuous_auto_solver_emits_warning(self):
@@ -367,6 +380,42 @@ class TestEulerSolverModes(unittest.TestCase):
         with self.assertRaises(ValueError):
             backend.integrate(self.ev, times, self.plant.x0)
 
+    def test_forced_callable_of_another_size_is_named(self):
+        sim = Simulator(StableLinearSystem(), tf=0.2, n_steps=3, verbose=False)
+        with self.assertRaisesRegex(ValueError, "u callable returned wrong dimension"):
+            sim.solve_forced(lambda t: [t, t])
+
+    def test_rk4_fixedsteps_rejects_nonuniform_grid(self):
+        from minilink.simulation.solvers.rk4_fixed import RK4SolverBackend
+
+        times = np.array([0.0, 0.05, 0.2, 0.25])
+        u = np.zeros((1, times.size))
+        backend = RK4SolverBackend()
+        message = "rk4_fixedsteps requires a uniform time grid"
+        with self.assertRaisesRegex(ValueError, message):
+            backend.integrate(self.ev, times, self.plant.x0)
+        with self.assertRaisesRegex(ValueError, message):
+            backend.integrate_forced(self.ev, times, u, self.plant.x0)
+
+    def test_an_uneven_grid_at_the_nanosecond_scale_is_not_uniform(self):
+        from minilink.analysis.linear import uniform_step
+        from minilink.simulation.simulator import time_grid_is_uniform
+        from minilink.simulation.solvers.euler_fixed import EulerFixedStepSolverBackend
+        from minilink.simulation.solvers.rk4_fixed import RK4SolverBackend
+
+        times = np.array([0.0, 1e-9, 3e-9, 4e-9])
+        for backend in (EulerFixedStepSolverBackend(), RK4SolverBackend()):
+            with self.assertRaisesRegex(ValueError, "requires a uniform time grid"):
+                backend.integrate(self.ev, times, self.plant.x0)
+        self.assertFalse(time_grid_is_uniform(times))
+        with self.assertRaisesRegex(ValueError, "uniform time grid"):
+            uniform_step(times)
+
+        # An even grid at the same scale is uniform
+        even = 1e-9 * np.arange(4)
+        self.assertTrue(time_grid_is_uniform(even))
+        self.assertEqual(uniform_step(even), even[1])
+
     def test_simulator_accepts_euler_fixedsteps(self):
         sim = Simulator(
             StableLinearSystem(),
@@ -402,6 +451,14 @@ class TestStaticSimulator(unittest.TestCase):
         self.assertIn("y", traj.signals)
         np.testing.assert_allclose(traj.signals["y"], np.zeros((1, 5)))
 
+    def test_a_block_whose_output_is_named_u_simulates(self):
+        from minilink import P
+
+        ctl = P(2.0, ports="reference")
+        traj = ctl.compute_trajectory(t0=0, tf=1, n_steps=5, verbose=False)
+        self.assertEqual(traj.u.shape, (2, 5))  # the stacked inputs r, y
+        self.assertNotIn("u", traj.signals)
+
     def test_step_source_signals_on_grid(self):
         step = Step(
             initial_value=np.array([0.0]), final_value=np.array([1.0]), step_time=0.5
@@ -434,9 +491,9 @@ class TestStaticSimulatorJax(unittest.TestCase):
 
 
 from minilink.control.modelbased import SlidingModeController
-from minilink.core.composition import closed_loop_qdq
+from minilink.core.composition import closed_loop
 from minilink.dynamics.catalog.pendulum.pendulum import Pendulum
-from minilink.simulation.simulator import DISCONTINUOUS_AUTO_DT_SCALE, Simulator
+from minilink.simulation.simulator import Simulator
 
 TF = 1.0
 DT_COARSE = 0.1
@@ -453,7 +510,7 @@ def _build_smc_diagram():
         step_time=0.5,
     )
     smc = SlidingModeController(model, lam=20.0, gain=8.0, nab=0.15)
-    return ref >> closed_loop_qdq(smc, plant)
+    return ref >> closed_loop(smc, plant)
 
 
 def _max_ddq_consistency_error(diagram, traj):
@@ -489,7 +546,7 @@ class TestDiscontinuousSolvers(unittest.TestCase):
 
     def test_auto_dt_uses_discontinuous_scale(self):
         sim = Simulator(self.diagram, tf=0.01, solver_warnings="ignore", verbose=False)
-        expected_dt = DEFAULT_SMALLEST_TIME_CONSTANT * DISCONTINUOUS_AUTO_DT_SCALE
+        expected_dt = DEFAULT_SMALLEST_TIME_CONSTANT * AUTO_DT_SCALE
         self.assertAlmostEqual(sim.t[1] - sim.t[0], expected_dt)
 
     def test_euler_matches_f_based_ddq_better_than_rk4_on_coarse_dt(self):
@@ -774,19 +831,19 @@ class TestComputer(unittest.TestCase):
             computer.tick(np.array([1.0]))
 
 
-from minilink.control.output import ProportionalController
+from minilink.control.siso import P
 from minilink.core.hybrid_composition import hybrid_closed_loop
 from minilink.simulation.computer import Computer, StepSchedule, as_computer
 
 
-class ScheduledProportionalController(ProportionalController):
+class ScheduledP(P):
     """A block whose own ``%`` extends the base operator."""
 
     def __mod__(self, schedule):
         return super().__mod__(schedule)
 
 
-class UnscheduledProportionalController(ProportionalController):
+class UnscheduledP(P):
     """A block whose own ``%`` returns something other than a Computer."""
 
     def __mod__(self, schedule):
@@ -795,21 +852,21 @@ class UnscheduledProportionalController(ProportionalController):
 
 def _build_step_diagram():
     diagram = StepDiagramSystem()
-    diagram.add_subsystem(ProportionalController(0.5), "ctl")
+    diagram.add_subsystem(P(0.5, ports="reference"), "controller")
     diagram.add_input_port("r")
     diagram.add_input_port("y")
-    diagram.connect("input", "r", "ctl", "r")
-    diagram.connect("input", "y", "ctl", "y")
-    diagram.connect_new_output_port("ctl", "u", "u")
+    diagram.connect("input", "r", "controller", "r")
+    diagram.connect("input", "y", "controller", "y")
+    diagram.connect_new_output_port("controller", "u", "u")
     return diagram
 
 
 class TestAsComputer(unittest.TestCase):
     def test_leaf_mod_float(self):
-        computer = ProportionalController(0.3) % 0.02
+        computer = P(0.3, ports="reference") % 0.02
         self.assertIsInstance(computer, Computer)
         self.assertAlmostEqual(computer.schedule.dt_base, 0.02)
-        self.assertIn("ctl", computer.diagram.subsystems)
+        self.assertIn("controller", computer.diagram.subsystems)
 
     def test_step_diagram_as_computer(self):
         diagram = _build_step_diagram()
@@ -822,7 +879,7 @@ class TestAsComputer(unittest.TestCase):
 
     def test_mod_override_calling_super_builds_a_computer(self):
         """``%``, ``as_computer`` and ``hybrid_closed_loop`` reach the plain build."""
-        ctl = ScheduledProportionalController(0.3)
+        ctl = ScheduledP(0.3, ports="reference")
         computers = (
             ctl % 0.02,
             as_computer(ctl, 0.02),
@@ -834,7 +891,7 @@ class TestAsComputer(unittest.TestCase):
 
     def test_as_computer_rejects_a_mod_that_is_not_a_computer(self):
         with self.assertRaises(TypeError):
-            as_computer(UnscheduledProportionalController(0.3), 0.02)
+            as_computer(UnscheduledP(0.3, ports="reference"), 0.02)
 
     def test_mpc_mod_exposes_u_ff(self):
         pytest = __import__("pytest")
@@ -1080,7 +1137,7 @@ class TestAutomaticTimeGrid(unittest.TestCase):
         sys = StableLinearSystem()
         sys.solver_info["smallest_time_constant"] = 0.1
         sim = Simulator(sys, tf=1.0, solver="rk4_fixedsteps", verbose=False)
-        self.assertAlmostEqual(sim.dt, 0.01)  # 0.1 * SMOOTH_AUTO_DT_SCALE
+        self.assertAlmostEqual(sim.dt, 0.01)  # 0.1 * AUTO_DT_SCALE
         self.assertEqual(sim.n_pts, 101)
 
     def test_discontinuous_plant_defaults_to_euler_with_time_constant_dt(self):
@@ -1131,7 +1188,13 @@ class TestAutomaticTimeGrid(unittest.TestCase):
         self.assertEqual(closed.solver_mode, "euler")
 
     def test_loop_takes_the_hint_a_block_sets_for_itself(self):
-        from minilink import Pendulum, RateLimiter, Saturation, StateFeedbackController
+        from minilink import (
+            DiagramSystem,
+            Pendulum,
+            RateLimiter,
+            Saturation,
+            StateFeedbackController,
+        )
 
         plant = Pendulum()
         plant.solver_info["smallest_time_constant"] = 0.5
@@ -1143,9 +1206,15 @@ class TestAutomaticTimeGrid(unittest.TestCase):
         limiter = RateLimiter(rate_max=5.0, tau=0.02)
         for block in (saturation, limiter):
             with self.subTest(block=block.name):
-                loop = (controller >> block) @ plant
+                loop = DiagramSystem()
+                loop.add_subsystem(controller, "controller")
+                loop.add_subsystem(block, "actuator")
+                loop.add_subsystem(plant, "plant")
+                loop.connect("plant", "x", "controller", "x")
+                loop.connect("controller", "u", "actuator", "u")
+                loop.connect("actuator", "y", "plant", "u")
                 sim = Simulator(loop, tf=1.0, solver="euler", verbose=False)
-                self.assertAlmostEqual(sim.dt, 0.002)  # 0.02 * SMOOTH_AUTO_DT_SCALE
+                self.assertAlmostEqual(sim.dt, 0.002)  # 0.02 * AUTO_DT_SCALE
 
     def test_a_held_signal_selects_rk4_on_a_divisor_of_its_period(self):
         from minilink import Pendulum, WhiteNoise
@@ -1281,3 +1350,18 @@ class TestDtTimeGrid(unittest.TestCase):
         self.assertEqual(n_pts, 5)
         self.assertAlmostEqual(dt, 0.3)
         np.testing.assert_allclose(t, [0.0, 0.3, 0.6, 0.9, 1.2])
+
+    def test_dt_is_any_positive_finite_scalar_and_always_checked(self):
+        from minilink.simulation.time_grid import build_time_grid
+
+        # A 0-d array is a scalar
+        t, dt, n_pts = build_time_grid(0.0, 1.0, dt=np.array(0.25))
+        self.assertEqual((dt, n_pts), (0.25, 5))
+
+        # Anything else is refused with one message, n_steps given or not
+        message = "dt must be a positive finite scalar"
+        for bad in (np.array([0.1]), "fast", -0.1, np.inf):
+            with self.subTest(dt=bad), self.assertRaisesRegex(ValueError, message):
+                build_time_grid(0.0, 1.0, dt=bad)
+            with self.subTest(dt=bad), self.assertRaisesRegex(ValueError, message):
+                build_time_grid(0.0, 1.0, n_steps=11, dt=bad)

@@ -6,10 +6,14 @@ import numpy as np
 import pytest
 from minilink.analysis.equilibria import find_equilibrium
 from minilink.analysis.linearization import linearize, linearize_matrices
-from minilink.analysis.structural import controllability, observability
-from minilink.control.lqr import (
+from minilink.analysis.structural import (
+    controllability,
+    controllability_matrix,
+    observability,
+    observability_matrix,
+)
+from minilink.control.design import (
     lqr,
-    lqr_at_operating_point,
     lqr_finite_horizon,
     lqr_gain,
     lqr_gain_schedule,
@@ -21,6 +25,7 @@ from minilink.core.compile.compiler import compile_auto
 from minilink.core.diagram import DiagramSystem
 from minilink.core.system import DynamicSystem
 from minilink.dynamics.catalog.mass_spring_damper.linear import SingleMass
+from minilink.dynamics.abstraction.state_space import LTISystem
 from minilink.dynamics.catalog.pendulum.pendulum import InvertedPendulum, Pendulum
 
 
@@ -198,15 +203,38 @@ class TestStructural(unittest.TestCase):
         A = np.array([[0.0, 1.0], [0.0, 0.0]])
         B = np.array([[0.0], [1.0]])
         C = np.array([[1.0, 0.0]])
-        self.assertTrue(controllability(A, B).is_full_rank)
-        self.assertTrue(observability(A, C).is_full_rank)
+        model = LTISystem(A, B, C)
+        self.assertTrue(controllability(model).is_full_rank)
+        self.assertTrue(observability(model).is_full_rank)
+        # the arrays twins give the Kalman matrices themselves
+        np.testing.assert_allclose(
+            controllability_matrix(A, B), [[0.0, 1.0], [1.0, 0.0]]
+        )
+        np.testing.assert_allclose(observability_matrix(A, C), [[1.0, 0.0], [0.0, 1.0]])
 
     def test_uncontrollable_pair_detected(self):
         A = np.array([[1.0, 0.0], [0.0, 2.0]])
         B = np.array([[1.0], [0.0]])
-        result = controllability(A, B)
+        result = controllability(LTISystem(A, B))
         self.assertFalse(result.is_full_rank)
         self.assertEqual(result.rank, 1)
+
+    def test_structural_verbs_linearize_a_plant_like_the_designs(self):
+        plant = Pendulum()
+        x_bar = [0.0, 0.0]
+        model = plant.linearize(x_bar)
+        self.assertTrue(controllability(plant, x_bar).is_full_rank)
+        np.testing.assert_allclose(
+            controllability(plant, x_bar).matrix,
+            controllability_matrix(model.A(), model.B()),
+        )
+        self.assertTrue(observability(plant, x_bar).is_full_rank)
+        np.testing.assert_allclose(
+            observability(plant, x_bar).matrix,
+            observability_matrix(model.A(), model.C()),
+        )
+        with self.assertRaisesRegex(TypeError, "controllability_matrix"):
+            controllability(np.eye(2), np.eye(2))
 
     def test_one_rank_rule_for_the_structural_tests_and_the_cancellation(self):
         # The second mode is reached through 1e-11: "controllable" and "cancels in
@@ -216,16 +244,25 @@ class TestStructural(unittest.TestCase):
         C = np.array([[1.0, 1.0]])
         from minilink.analysis import linear
 
-        self.assertEqual(controllability(A, B).rank, 1)
+        model = LTISystem(A, B, C)
+        self.assertEqual(controllability(model).rank, 1)
         self.assertEqual(linear.minreal(A, B, C, np.zeros((1, 1)))[0].shape[0], 1)
-        self.assertEqual(observability(A.T, B.T).rank, 1)
-        self.assertEqual(controllability(A, B, tol=1e-13).rank, 2)
+        self.assertEqual(observability(LTISystem(A.T, B, B.T)).rank, 1)
+        self.assertEqual(controllability(model, tol=1e-13).rank, 2)
 
 
 class TestEquilibria(unittest.TestCase):
     def test_pendulum_hanging_equilibrium(self):
         x_eq = find_equilibrium(Pendulum(), x_guess=[0.3, 0.0])
         np.testing.assert_allclose(x_eq, [0.0, 0.0], atol=1e-06)
+
+    def test_the_guess_defaults_to_the_nominal_state_not_x0(self):
+        pendulum = Pendulum()
+        pendulum.x0 = np.array([3.0, 0.0])
+        np.testing.assert_allclose(pendulum.find_equilibrium(), [0.0, 0.0], atol=1e-6)
+
+        pendulum.state.nominal_value = np.array([3.0, 0.0])
+        np.testing.assert_allclose(pendulum.find_equilibrium(), [np.pi, 0.0], atol=1e-6)
 
 
 class TestLQR(unittest.TestCase):
@@ -236,37 +273,82 @@ class TestLQR(unittest.TestCase):
         closed_poles = np.linalg.eigvals(A - B @ K)
         self.assertTrue(np.all(closed_poles.real < 0.0))
 
-    def test_lqr_at_operating_point_matches_two_step_design(self):
+    def test_the_model_and_the_plant_give_one_design(self):
         plant = InvertedPendulum()
-        x_bar = [0.0, 0.0]
+        x_bar = [0.3, 0.0]
         Q = np.diag([10.0, 1.0])
         R = np.array([[1.0]])
         lti = linearize(plant, x_bar=x_bar)
-        expected = lqr(lti.A(), lti.B(), Q, R, xbar=x_bar, ubar=[0.0])
-        controller = lqr_at_operating_point(plant, x_bar, Q, R)
-        np.testing.assert_allclose(controller.params["K"], expected.params["K"])
+        on_model = lqr(lti, Q, R)
+        on_plant = lqr(plant, Q, R, x_bar=x_bar)
+        for controller in (on_model, on_plant):
+            np.testing.assert_allclose(
+                controller.params["K"], lqr_gain(lti.A(), lti.B(), Q, R)
+            )
+            np.testing.assert_allclose(controller.inputs["r"].nominal_value, x_bar)
+            np.testing.assert_allclose(controller.params["ubar"], lti.ubar)
+        # keywords for the weights, and the nominal state when x_bar is omitted
         np.testing.assert_allclose(
-            controller.inputs["r"].nominal_value, expected.inputs["r"].nominal_value
+            lqr(plant, Q=Q, R=R, x_bar=x_bar).params["K"], on_plant.params["K"]
         )
+        plant.state.set_nominal_value(x_bar)
+        np.testing.assert_allclose(lqr(plant, Q, R).params["K"], on_plant.params["K"])
+
+    def test_a_plant_with_noise_ports_is_designed_about_its_command(self):
+        from minilink.analysis.linearization import design_model
+        from minilink.dynamics.catalog.pendulum.cartpole import (
+            CartPole,
+            CartPoleWithNoisePort,
+        )
+
+        x_up = np.array([0.0, np.pi, 0.0, 0.0])
+        model = design_model(CartPoleWithNoisePort(), x_up)
+        self.assertEqual(model.B().shape, (4, 1))
+        self.assertEqual(model.D().shape, (4, 1))
+        np.testing.assert_allclose(model.ubar, [0.0])
+        quiet = design_model(CartPole(), x_up)
+        np.testing.assert_allclose(model.A(), quiet.A())
+        np.testing.assert_allclose(model.B(), quiet.B())
+        from minilink.blocks.routing import Gain
+
+        box = (CartPole() >> Gain(np.eye(4)[:2])).expose(
+            "x"
+        )  # positions measured, state on the edge
+        sensed = design_model(box, x_up)
+        self.assertEqual(sensed.C().shape, (2, 4))
+        np.testing.assert_allclose(sensed.ybar, x_up[:2])
+        Q, R = np.diag([1.0, 10.0, 1.0, 1.0]), np.array([[0.1]])
+        K_noisy = lqr(CartPoleWithNoisePort(), Q, R, x_bar=x_up).params["K"]
+        K_quiet = lqr(CartPole(), Q, R, x_bar=x_up).params["K"]
+        self.assertEqual(K_noisy.shape, (1, 4))
+        np.testing.assert_allclose(K_noisy, K_quiet)
+
+    def test_a_design_takes_a_system(self):
+        lti = linearize(InvertedPendulum(), [0.0, 0.0])
+        Q, R = np.eye(2), np.eye(1)
+        with self.assertRaisesRegex(TypeError, r"lqr_gain\(A, B, Q, R\)"):
+            lqr(lti.A(), Q, R)  # arrays go to the gain
+        with self.assertRaisesRegex(ValueError, "carries its operating point"):
+            lqr(lti, Q, R, x_bar=[0.1, 0.0])
 
     def test_lqr_closed_loop_stabilizes_inverted_pendulum(self):
         plant = InvertedPendulum()
-        controller = lqr_at_operating_point(
-            plant, x_bar=[0.0, 0.0], Q=np.diag([10.0, 1.0]), R=np.array([[1.0]])
+        controller = lqr(
+            plant, Q=np.diag([10.0, 1.0]), R=np.array([[1.0]]), x_bar=[0.0, 0.0]
         )
         diagram = DiagramSystem()
         diagram.connection_verbose = False
-        diagram.add_subsystem(controller, "ctl")
+        diagram.add_subsystem(controller, "controller")
         diagram.add_subsystem(plant, "plant")
-        diagram.connect("plant", "x", "ctl", "x")
-        diagram.connect("ctl", "u", "plant", "u")
+        diagram.connect("plant", "x", "controller", "x")
+        diagram.connect("controller", "u", "plant", "u")
         plant.x0 = np.array([0.2, 0.0])
         traj = diagram.compute_trajectory(tf=10.0, n_steps=1001, verbose=False)
         np.testing.assert_allclose(traj.x[:, -1], [0.0, 0.0], atol=0.01)
 
 
 from minilink.control.impedance import ImpedanceController, ImpedanceIntegralController
-from minilink.control.output import ProportionalController
+from minilink.control.siso import P
 from minilink.control.siso import PD, PI, PID
 from minilink.control.state import (
     StateFeedbackController,
@@ -409,20 +491,26 @@ class TestFiniteHorizonLQR(unittest.TestCase):
         np.testing.assert_allclose(stationary.ctl(None, z, t=2.0), [-3.0])
         np.testing.assert_allclose(stationary.ctl(None, z, t=2.5), [-7.0])
 
+    def test_scheduled_gain_refuses_a_gain_after_of_another_shape(self):
+        t = np.array([0.0, 1.0, 2.0])
+        K = np.array([[[1.0, 0.0]], [[2.0, 0.0]], [[3.0, 0.0]]])
+        for K_after in ([[7.0]], [[7.0, 0.0], [0.0, 7.0]], 7.0):
+            with self.assertRaisesRegex(ValueError, r"K_after must have shape"):
+                TimeVaryingStateFeedbackController(t, K, K_after=K_after)
+
     def test_gain_schedule_plot_draws_every_entry(self):
         import matplotlib
 
         matplotlib.use("Agg")
         ctl = lqr_finite_horizon(
-            self.A, self.B, self.Q, self.R, S_f=np.zeros((2, 2)), tf=1.0
+            LTISystem(self.A, self.B), self.Q, self.R, S_f=np.zeros((2, 2)), tf=1.0
         )
         ax = ctl.plot_gain_schedule(show=False)
         self.assertEqual(len(ax.lines), 2)  # one line per entry of the 1 x 2 gain
 
     def test_finite_horizon_after_stationary_keeps_regulating(self):
         ctl = lqr_finite_horizon(
-            self.A,
-            self.B,
+            LTISystem(self.A, self.B),
             self.Q,
             self.R,
             S_f=np.zeros((2, 2)),
@@ -438,7 +526,7 @@ class TestFiniteHorizonLQR(unittest.TestCase):
 
     def test_finite_horizon_loop_reaches_the_target(self):
         ctl = lqr_finite_horizon(
-            self.A, self.B, self.Q, self.R, S_f=20.0 * np.eye(2), tf=5.0
+            LTISystem(self.A, self.B), self.Q, self.R, S_f=20.0 * np.eye(2), tf=5.0
         )
         plant = DoubleIntegrator()
         plant.x0 = np.array([1.0, 0.0])
@@ -447,11 +535,27 @@ class TestFiniteHorizonLQR(unittest.TestCase):
         np.testing.assert_allclose(traj.x[:, -1], [0.0, 0.0], atol=0.02)
 
 
-class TestProportionalController(unittest.TestCase):
-    def test_mimo_error_law(self):
-        ctl = ProportionalController([[2.0, 0.0], [0.0, 3.0]])
-        u = ctl.ctl(None, np.array([1.0, 1.0, 0.0, 0.0]))
+class TestP(unittest.TestCase):
+    def test_decoupled_law_per_axis(self):
+        ctl = P([2.0, 3.0], dof=2, ports="reference")
+        u = ctl.ctl(np.zeros(0), np.array([1.0, 1.0, 0.0, 0.0]))
         np.testing.assert_allclose(u, [2.0, 3.0])
+        self.assertEqual(ctl.n, 0)
+
+    def test_limits_clip_the_command(self):
+        ctl = P(10.0, u_max=1.0)
+        np.testing.assert_allclose(ctl.ctl(np.zeros(0), np.array([0.5])), [1.0])
+
+    def test_a_gain_of_another_size_is_reported_with_its_own_shape(self):
+        with self.assertRaisesRegex(ValueError, r"length-2 vector, got shape \(3, 1\)"):
+            P(np.ones((3, 1)), dof=2)
+
+    def test_a_coupled_gain_is_a_gain_block_in_the_loop(self):
+        from minilink import Gain
+
+        K = np.array([[1.0, 0.5]])
+        loop = Gain(K) @ Pendulum()
+        self.assertEqual(list(loop.subsystems), ["controller", "plant", "error"])
 
 
 class TestStateFeedbackController(unittest.TestCase):
@@ -460,6 +564,13 @@ class TestStateFeedbackController(unittest.TestCase):
             np.array([[1.0, 2.0]]), xbar=[0.5, 0.0], ubar=[0.1]
         )
         np.testing.assert_allclose(ctl.inputs["r"].nominal_value, [0.5, 0.0])
+
+    def test_an_operating_point_of_the_wrong_size_is_refused(self):
+        K = np.array([[1.0, 2.0]])
+        with self.assertRaisesRegex(ValueError, r"ubar must have shape \(1,\)"):
+            StateFeedbackController(K, ubar=[0.5, 0.5])
+        with self.assertRaisesRegex(ValueError, r"xbar must have shape \(2,\)"):
+            TimeVaryingStateFeedbackController([0.0, 1.0], [K, K], xbar=[0.0])
 
     def test_state_feedback_law(self):
         K = np.array([[1.0, 2.0]])
@@ -480,8 +591,7 @@ class TestImpedanceIntegralController(unittest.TestCase):
 
     def test_closed_loop_removes_steady_state_error(self):
         plant = DoubleIntegrator()
-        pid = ImpedanceIntegralController()
-        pid.params.update({"Kp": 5.0, "Ki": 1.0, "Kd": 4.0})
+        pid = ImpedanceIntegralController(Kp=5.0, Ki=1.0, Kd=4.0)
         setpoint = 1.0
         pid.inputs["r"].nominal_value = np.array([setpoint])
         diagram = DiagramSystem()
@@ -548,18 +658,40 @@ class TestPID(unittest.TestCase):
 class TestImpedanceController(unittest.TestCase):
     def test_gain_init_kwargs(self):
         ctl = ImpedanceController(Kp=100.0, Kd=10.0)
-        np.testing.assert_allclose(ctl.params["Kp"], [100.0])
-        np.testing.assert_allclose(ctl.params["Kd"], [10.0])
+        np.testing.assert_allclose(ctl.params["Kp"], [[100.0]])
+        np.testing.assert_allclose(ctl.params["Kd"], [[10.0]])
 
     def test_vector_regulation(self):
-        ctl = ImpedanceController(dof=2)
-        ctl.params.update({"Kp": [2.0, 3.0], "Kd": [0.5, 0.5]})
+        ctl = ImpedanceController(dof=2, Kp=[2.0, 3.0], Kd=[0.5, 0.5])
         u = ctl.ctl(None, np.array([1.0, 2.0, 0.1, 0.2, 0.3, 0.4]))
         np.testing.assert_allclose(u, [2.0 * 0.9 - 0.5 * 0.3, 3.0 * 1.8 - 0.5 * 0.4])
 
+    def test_a_full_stiffness_matrix_couples_the_axes(self):
+        Kp = np.array([[2.0, 1.0], [0.0, 3.0]])
+        ctl = ImpedanceController(dof=2, Kp=Kp, Kd=0.0)
+        e = np.array([0.9, 1.8])
+        u = ctl.ctl(None, np.array([1.0, 2.0, 0.1, 0.2, 0.0, 0.0]))
+        np.testing.assert_allclose(u, Kp @ e)
+        with self.assertRaisesRegex(ValueError, r"\(2, 2\) matrix"):
+            ImpedanceController(dof=2, Kp=np.ones((3, 3)))
+
+    def test_the_limits_clip_the_command_and_hold_the_integrator(self):
+        ctl = ImpedanceController(Kp=10.0, Kd=0.0, u_max=1.0)
+        np.testing.assert_allclose(ctl.ctl(None, np.array([1.0, 0.0, 0.0])), [1.0])
+        pid = ImpedanceIntegralController(Kp=10.0, Ki=1.0, Kd=0.0, u_max=1.0)
+        # the command sits on u_max with the error pushing further: the integrator is held
+        np.testing.assert_allclose(
+            pid.f(np.array([0.0]), np.array([1.0, 0.0, 0.0])), [0.0]
+        )
+        # a small error, no saturation: ė_int = e
+        np.testing.assert_allclose(
+            pid.f(np.array([0.0]), np.array([0.05, 0.0, 0.0])), [0.05]
+        )
+
     def test_vector_tracking_ref(self):
-        ctl = ImpedanceController(dof=2, tracking_ref=True)
-        ctl.params.update({"Kp": [1.0, 1.0], "Kd": [1.0, 1.0]})
+        ctl = ImpedanceController(
+            dof=2, tracking_ref=True, Kp=[1.0, 1.0], Kd=[1.0, 1.0]
+        )
         u = ctl.ctl(None, np.array([1.0, 2.0, 0.0, 0.0, 0.5, 0.1, 0.2, 0.3]))
         np.testing.assert_allclose(
             u,
@@ -611,7 +743,7 @@ class TestModalAnalysis(unittest.TestCase):
     def test_oscillator_poles(self):
         w = 2.0
         A = np.array([[0.0, 1.0], [-(w**2), 0.0]])
-        poles, modes = modal_analysis(LTISystem(A, np.zeros((2, 1))), x_bar=[0.0, 0.0])
+        poles, modes = modal_analysis(LTISystem(A, np.zeros((2, 1))))
         np.testing.assert_allclose(
             np.sort(poles), np.sort([1j * w, -1j * w]), atol=1e-10
         )
@@ -907,7 +1039,7 @@ def test_plot_bode_facade_returns_plot_result():
     )
     assert isinstance(result, PlotResult)
     assert len(result.axes) == 2
-    assert "From: force[1]  To: y[1]" in result.axes[0].get_title()
+    assert "From: right_force  To: speed" in result.axes[0].get_title()
     plt.close(result.figure)
 
 
@@ -924,7 +1056,7 @@ def test_plot_pzmap_facade_returns_plot_result():
     )
     assert isinstance(result, PlotResult)
     assert result.axes is not None
-    assert "From: force[1]  To: y[1]" in result.axes.get_title()
+    assert "From: right_force  To: speed" in result.axes.get_title()
     plt.close(result.figure)
 
 
@@ -1048,6 +1180,26 @@ class TestPhasePlane(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "Unknown plot backend"):
             plot_phase_plane(sys, backend="bokeh", show=False)
 
+    def test_axes_and_grid_refuse_booleans_and_floats(self):
+        sys = PhasePlaneTestSystem()
+        for axis in (np.bool_(True), 1.0, np.float64(1.0), 0.5):
+            with self.subTest(axis=axis):
+                with self.assertRaisesRegex(ValueError, "integer state index"):
+                    build_phase_plane_spec(sys, x_axis=axis, grid_shape=(2, 2))
+        for grid_shape in ((np.bool_(True), 3), (2.5, 3), (3.0, 3)):
+            with self.subTest(grid_shape=grid_shape):
+                with self.assertRaisesRegex(ValueError, "must be integers"):
+                    build_phase_plane_spec(sys, grid_shape=grid_shape)
+        spec = build_phase_plane_spec(
+            sys, x_axis=np.int64(1), y_axis=0, grid_shape=(np.int64(2), 3)
+        )
+        self.assertEqual((spec.x_axis, spec.X.shape), (1, (3, 2)))
+
+    def test_plotly_refuses_the_keywords_it_does_not_take(self):
+        sys = PhasePlaneTestSystem()
+        with self.assertRaisesRegex(TypeError, "dpi, figsize"):
+            plot_phase_plane(sys, backend="plotly", figsize=(4, 3), dpi=80, show=False)
+
 
 from minilink.analysis.discretization import DiscretizedRK4DynamicSystem, discretize
 
@@ -1115,6 +1267,19 @@ class TestDiscretize(unittest.TestCase):
         plant.outputs["y"].dependencies = "all"
         step_leaf = discretize(plant, 0.1)
         self.assertEqual(step_leaf.outputs["y"].dependencies, "all")
+
+    def test_discretize_reads_a_partial_feedthrough_on_its_one_input(self):
+        from minilink.dynamics.catalog.pendulum.pendulum import PendulumWithNoisePort
+
+        plant = PendulumWithNoisePort()  # y reads the noise port n alone
+        step_leaf = discretize(plant, 0.05)
+        self.assertEqual(step_leaf.outputs["y"].dependencies, ("u",))
+        x = np.array([0.3, 0.1])
+        u = np.array([0.2, 0.0, 0.5])  # torque, disturbance, noise
+        x1 = step_leaf.step(x, u, k=0)
+        np.testing.assert_allclose(x1, _rk4_step(plant.f, x, u, 0.0, 0.05, None))
+        np.testing.assert_allclose(step_leaf.h(x, u, k=0), [0.3, 0.6])
+        self.assertEqual(discretize(Pendulum(), 0.05).outputs["y"].dependencies, ())
 
     def test_discretize_accepts_dt_in_params_only(self):
         step_leaf = discretize(_GainIntegrator(), params={"gain": 2.0, "dt": 0.02})
@@ -1293,7 +1458,7 @@ class TestDiscretize(unittest.TestCase):
 
     def test_discretize_rejects_static_system(self):
         with self.assertRaises(TypeError):
-            discretize(ProportionalController(1.0), dt=0.01)
+            discretize(P(1.0, ports="reference"), dt=0.01)
 
 
 from minilink.dynamics.abstraction.state_space import LTISystem, StateSpaceSystem
@@ -1410,7 +1575,7 @@ class TestCompensatorStateLayout(unittest.TestCase):
         self.plant.x0 = np.zeros(2)
 
     def test_state_dimensions(self):
-        self.assertEqual(ProportionalController(2.0, ports="error").n, 0)
+        self.assertEqual(P(2.0).n, 0)
         self.assertEqual(PI(Kp=2.0, Ki=1.0).n, 1)
         self.assertEqual(PD(Kp=2.0, Kd=1.0).n, 1)
         self.assertEqual(PID(Kp=2.0, Ki=1.0, Kd=1.0).n, 2)
@@ -1420,7 +1585,7 @@ class TestCompensatorStateLayout(unittest.TestCase):
     def test_loop_gain_pole_and_zero_counts(self):
         plant_poles = 2
         for controller, extra_poles, n_zeros in (
-            (ProportionalController(20.0, ports="error"), 0, 0),
+            (P(20.0), 0, 0),
             (PI(Kp=20.0, Ki=10.0), 1, 1),
             (PD(Kp=20.0, Kd=2.0, tau=0.05), 1, 1),
             (PID(Kp=20.0, Ki=10.0, Kd=2.0, tau=0.05), 2, 2),
@@ -1429,6 +1594,17 @@ class TestCompensatorStateLayout(unittest.TestCase):
                 zeros, poles, _ = pzmap(controller >> self.plant)
                 self.assertEqual(len(poles), plant_poles + extra_poles)
                 self.assertEqual(len(zeros), n_zeros)
+
+    def test_the_rate_measured_pair_adds_no_filter_pole(self):
+        plant_poles = 2
+        for controller, extra_poles in (
+            (ImpedanceController(Kp=20.0, Kd=2.0), 0),
+            (ImpedanceIntegralController(Kp=20.0, Ki=10.0, Kd=2.0), 1),
+        ):
+            with self.subTest(controller=type(controller).__name__):
+                _, poles, _ = pzmap(controller @ self.plant)
+                self.assertEqual(len(poles), plant_poles + extra_poles)
+                self.assertFalse(np.any(np.abs(poles + 20.0) < 1e-9))  # no -1/tau
 
     def test_pi_has_the_integrator_pole_and_pd_the_filter_pole(self):
         _, pi_poles, _ = pzmap(PI(Kp=20.0, Ki=10.0) >> self.plant)
@@ -1616,7 +1792,7 @@ class TestPolePlacement(unittest.TestCase):
     )
 
     def test_single_input_matches_the_hand_calculation(self):
-        from minilink.control.place import place_gain
+        from minilink.control.design import place_gain
 
         # s² + k₂ s + k₁ = (s + 1)(s + 2) = s² + 3 s + 2
         np.testing.assert_allclose(
@@ -1629,7 +1805,7 @@ class TestPolePlacement(unittest.TestCase):
         )
 
     def test_a_complex_pair_and_a_real_pole(self):
-        from minilink.control.place import place_gain
+        from minilink.control.design import place_gain
 
         A, B = self.TRIPLE
         poles = [-1.0 + 0.5j, -1.0 - 0.5j, -1.0]
@@ -1640,7 +1816,7 @@ class TestPolePlacement(unittest.TestCase):
         )
 
     def test_several_inputs_take_the_robust_gain(self):
-        from minilink.control.place import place_gain
+        from minilink.control.design import place_gain
 
         A = np.diag([1.0, 2.0, 3.0])
         B = np.array([[1.0, 0.0], [0.0, 1.0], [1.0, 1.0]])
@@ -1651,7 +1827,7 @@ class TestPolePlacement(unittest.TestCase):
         )
 
     def test_honest_errors(self):
-        from minilink.control.place import place_gain
+        from minilink.control.design import place_gain
 
         A, B = self.DOUBLE
         B_mimo = np.array([[1.0, 0.0], [0.0, 1.0], [1.0, 1.0]])
@@ -1668,19 +1844,302 @@ class TestPolePlacement(unittest.TestCase):
                 place_gain(*args)
 
     def test_operating_point_design_closes_the_loop(self):
-        from minilink import place, place_at_operating_point
+        from minilink import place, place_gain
 
         plant = InvertedPendulum()
         x_bar = np.zeros(2)
         poles = [-3.0, -3.0]
 
-        ctl = place_at_operating_point(plant, x_bar, poles)
+        ctl = place(plant, poles, x_bar=x_bar)
         lin = linearize(plant, x_bar)
-        np.testing.assert_allclose(
-            ctl.params["K"], place(lin.A(), lin.B(), poles).params["K"]
-        )
+        np.testing.assert_allclose(ctl.params["K"], place_gain(lin.A(), lin.B(), poles))
+        np.testing.assert_allclose(ctl.params["K"], place(lin, poles).params["K"])
         np.testing.assert_allclose(ctl.inputs["r"].nominal_value, x_bar)
 
         plant.x0 = np.array([0.4, 0.0])
         trajectory = (ctl @ plant).compute_trajectory(tf=6.0)
         self.assertLess(np.max(np.abs(trajectory.x[:, -1])), 1e-3)
+
+
+class TestOutputReference(unittest.TestCase):
+    """``OutputReferenceController(K, N)``: the textbook output reference."""
+
+    def setUp(self):
+        from minilink.control.design import place_gain
+
+        self.plant = SingleMass()
+        self.plant.params["b"] = 0.5
+        lin = linearize(self.plant, np.zeros(2))
+        self.A, self.B, self.C = lin.A(), lin.B(), lin.C()
+        self.K = place_gain(self.A, self.B, [-2.0, -3.0])
+
+    def test_y_tracks_r_at_steady_state(self):
+        from minilink.control.state import OutputReferenceController
+
+        A, B, C, K = self.A, self.B, self.C, self.K
+        N = -np.linalg.inv(C @ np.linalg.inv(A - B @ K) @ B)
+        ctl = OutputReferenceController(K, N)
+        self.assertEqual(ctl.inputs["r"].dim, 1)
+
+        loop = ctl @ self.plant
+        loop.inputs["r"].set_nominal_value(np.array([0.5]))
+        self.plant.x0 = np.zeros(2)
+        trajectory = loop.compute_trajectory(tf=8.0, verbose=False)
+        np.testing.assert_allclose(C @ trajectory.x[:, -1], [0.5], atol=1e-4)
+
+    def test_the_state_reference_is_the_other_block(self):
+        from minilink.control.state import StateFeedbackController
+
+        ctl = StateFeedbackController(self.K, xbar=[0.1, 0.0])
+        self.assertEqual(ctl.inputs["r"].dim, 2)
+        np.testing.assert_allclose(ctl.inputs["r"].nominal_value, [0.1, 0.0])
+        self.assertEqual(set(ctl.params), {"K", "ubar"})
+        x, r = np.array([0.3, -0.2]), np.array([0.1, 0.0])
+        np.testing.assert_allclose(
+            ctl.ctl(None, np.concatenate([x, r])), -self.K @ (x - r)
+        )
+        with self.assertRaises(TypeError):
+            StateFeedbackController(self.K, N=np.ones((1, 1)))
+
+    def test_n_needs_one_row_per_command(self):
+        from minilink.control.state import OutputReferenceController
+
+        with self.assertRaisesRegex(ValueError, "needs 1 row"):
+            OutputReferenceController(self.K, np.ones((2, 1)))
+
+
+class TestPrint(unittest.TestCase):
+    """``print`` shows the mathematics under the system's summary."""
+
+    def test_transfer_function_prints_g_of_s(self):
+        from minilink.blocks.transfer_function import Lead, TransferFunction
+
+        self.assertIn(
+            "G(s) = (s + 2) / (s² + 3 s + 2)",
+            str(TransferFunction([1.0, 2.0], [1.0, 3.0, 2.0])),
+        )
+        self.assertIn("G(s) = (5 s + 5) / (s + 10)", str(Lead(5.0, 1.0, 10.0)))
+        self.assertIn(
+            "G(s) = (-2 s² + 1) / s²",
+            str(TransferFunction([-2.0, 0.0, 1.0], [1.0, 0.0, 0.0])),
+        )
+
+    def test_lti_system_prints_its_matrices(self):
+        text = str(linearize(Pendulum(), np.zeros(2)))
+        self.assertIn("inputs: u (1)", text)
+        for name in ("A = ", "B = ", "C = ", "D = "):
+            self.assertIn(name, text)
+        self.assertNotIn("-0. ", text)
+
+    def test_structural_result_prints_its_verdict(self):
+        A = np.array([[0.0, 1.0], [0.0, 0.0]])
+        self.assertEqual(
+            str(controllability(LTISystem(A, np.array([[0.0], [1.0]])))),
+            "StructuralResult: rank 2 of n = 2, full rank",
+        )
+        self.assertEqual(
+            str(controllability(LTISystem(A, np.array([[1.0], [0.0]])))),
+            "StructuralResult: rank 1 of n = 2, rank deficient",
+        )
+
+
+class _NonlinearTank(DynamicSystem):
+    """A SISO plant whose linearization depends on the operating point."""
+
+    def __init__(self):
+        super().__init__(n=1)
+        self.name = "Nonlinear Tank"
+        self.add_input_port("u")
+        self.add_output_port("y", dim=1, function=self.h)
+
+    def f(self, x, u, t=0, params=None):
+        xp = array_module(x, u)
+        return xp.array([-xp.sqrt(1.0 + x[0] ** 2) + u[0]])
+
+    def h(self, x, u, t=0, params=None):
+        return x
+
+
+class TestSensitivity(unittest.TestCase):
+    """S, T, PS and CS built from the pieces agree with the loop they describe."""
+
+    w = np.logspace(-2, 3, 300)
+
+    def response(self, sys, **channel):
+        from minilink.analysis.frequency import frequency_response
+
+        return frequency_response(sys, w=self.w, **channel)[1]
+
+    def pieces(self):
+        from minilink.blocks.transfer_function import Lead, TransferFunction
+
+        H = TransferFunction([1.0], [1.0, 3.0, 2.0])
+        return (
+            ("PID", H, PID(4.0, 2.0, 0.5)),
+            ("PI", H, PI(2.0, 1.0)),
+            ("Lead", TransferFunction([2.0], [1.0, 1.0, 0.0]), Lead(5.0, 1.0, 10.0)),
+        )
+
+    def test_s_plus_t_is_one(self):
+        from minilink.analysis import complementary_sensitivity, sensitivity
+
+        for label, H, C in self.pieces():
+            with self.subTest(controller=label):
+                S = sensitivity(plant=H, controller=C)
+                T = complementary_sensitivity(plant=H, controller=C)
+                np.testing.assert_allclose(
+                    self.response(S) + self.response(T), 1.0, atol=1e-12
+                )
+
+    def test_each_function_matches_the_loop_wire(self):
+        from minilink.analysis import (
+            complementary_sensitivity,
+            load_sensitivity,
+            noise_sensitivity,
+            sensitivity,
+        )
+
+        for label, H, C in self.pieces():
+            with self.subTest(controller=label):
+                loop = C @ H
+                S = self.response(sensitivity(plant=H, controller=C))
+                T = self.response(complementary_sensitivity(plant=H, controller=C))
+                PS = self.response(load_sensitivity(plant=H, controller=C))
+                CS = self.response(noise_sensitivity(plant=H, controller=C))
+
+                np.testing.assert_allclose(
+                    S, self.response(loop, of="error:e", wrt="r"), atol=1e-9
+                )
+                np.testing.assert_allclose(
+                    T, self.response(loop, of="plant:y", wrt="r"), atol=1e-9
+                )
+                np.testing.assert_allclose(
+                    CS, self.response(loop, of="controller:u", wrt="r"), atol=1e-9
+                )
+                np.testing.assert_allclose(PS, self.response(H) * S, atol=1e-9)
+
+    def test_a_filter_on_the_measurement(self):
+        from minilink.analysis import complementary_sensitivity, sensitivity
+        from minilink.blocks.transfer_function import TransferFunction
+        from minilink.core.composition import feedback
+
+        H = TransferFunction([1.0], [1.0, 3.0, 2.0])
+        C = PID(4.0, 2.0, 0.5)
+        F = TransferFunction([1.0], [0.05, 1.0])
+        loop = feedback(C >> H, F)
+
+        S = sensitivity(plant=H, controller=C, filter=F)
+        T = complementary_sensitivity(plant=H, controller=C, filter=F)
+        np.testing.assert_allclose(
+            self.response(S), self.response(loop, of="error:e", wrt="r"), atol=1e-9
+        )
+        np.testing.assert_allclose(
+            self.response(T),
+            self.response(loop, of="transfer_function:y", wrt="r"),
+            atol=1e-9,
+        )
+
+    def test_a_spec_is_one_bode_call(self):
+        from minilink.analysis import (
+            bode,
+            complementary_sensitivity,
+            load_sensitivity,
+            noise_sensitivity,
+            sensitivity,
+        )
+        from minilink.blocks.transfer_function import TransferFunction
+
+        H = TransferFunction([1.0], [1.0, 3.0, 2.0])
+        C = PID(4.0, 2.0, 0.5)
+        for function in (
+            sensitivity,
+            complementary_sensitivity,
+            load_sensitivity,
+            noise_sensitivity,
+        ):
+            with self.subTest(function=function.__name__):
+                G = function(plant=H, controller=C)
+                _, G_db, _ = bode(G, w=2 * np.pi * 0.015)
+                self.assertEqual(G_db.shape, (1,))
+                s = 2j * np.pi * 0.015
+                G_s = np.polyval(G.numerator, s) / np.polyval(G.denominator, s)
+                expected = 20 * np.log10(np.abs(G_s))
+                self.assertAlmostEqual(G_db[0], expected, places=9)
+
+    def test_the_automatic_grid_stops_at_the_high_frequency_plateau(self):
+        from minilink.analysis import bode, noise_sensitivity, sensitivity
+        from minilink.blocks.transfer_function import TransferFunction
+
+        H = TransferFunction([1.0], [1.0, 3.0, 2.0])
+        C = PID(4.0, 2.0, 0.5)
+        for G in (
+            sensitivity(plant=H, controller=C),
+            noise_sensitivity(plant=H, controller=C),
+            C,
+        ):
+            with self.subTest(G=G.name):
+                w, _, _ = bode(G)
+                self.assertLessEqual(w.max(), 1e4)
+
+    def test_each_function_names_its_channel(self):
+        from minilink.analysis import (
+            complementary_sensitivity,
+            load_sensitivity,
+            noise_sensitivity,
+            plot_bode,
+            sensitivity,
+        )
+        from minilink.blocks.transfer_function import TransferFunction
+
+        H = TransferFunction([1.0], [1.0, 3.0, 2.0])
+        C = PID(4.0, 2.0, 0.5)
+        for function, subtitle in (
+            (sensitivity, "From: r  To: e"),
+            (complementary_sensitivity, "From: r  To: y"),
+            (load_sensitivity, "From: d  To: y"),
+            (noise_sensitivity, "From: n  To: u"),
+        ):
+            with self.subTest(function=function.__name__):
+                result = plot_bode(function(plant=H, controller=C), show=False)
+                self.assertEqual(result.axes[0].get_title(), subtitle)
+                result.figure.clf()
+
+    def test_the_operating_point_reaches_the_plant(self):
+        from minilink.analysis import sensitivity, transfer_function
+
+        plant, C = _NonlinearTank(), PI(2.0, 1.0)
+        for x_bar in ([0.0], [2.0]):
+            with self.subTest(x_bar=x_bar):
+                S = sensitivity(plant=plant, controller=C, x_bar=x_bar, u_bar=[1.0])
+                H = transfer_function(plant, x_bar, [1.0])
+                np.testing.assert_allclose(
+                    self.response(S),
+                    self.response(sensitivity(plant=H, controller=C)),
+                    atol=1e-9,
+                )
+
+    def test_a_piece_with_several_channels_is_refused(self):
+        from minilink.analysis import sensitivity, transfer_function
+
+        plant, C = Pendulum(), PID(4.0, 2.0, 0.5)
+        with self.assertRaisesRegex(ValueError, "plant 'Pendulum' must be SISO"):
+            sensitivity(plant=plant, controller=C)
+        H = transfer_function(plant, of=("y", 0))
+        self.assertEqual(sensitivity(plant=H, controller=C).n, 4)
+
+    def test_a_reference_form_controller_is_refused_with_its_fix(self):
+        from minilink.analysis import sensitivity, transfer_function
+        from minilink.blocks.transfer_function import TransferFunction
+
+        H = TransferFunction([1.0], [1.0, 3.0, 2.0])
+        C = PI(2.0, 1.0, ports="reference")
+        fix = r'controller=transfer_function\(controller, wrt="r"\)'
+        with self.assertRaisesRegex(ValueError, r"2 input\(s\).*" + fix):
+            sensitivity(plant=H, controller=C)
+        np.testing.assert_allclose(
+            self.response(
+                sensitivity(plant=H, controller=transfer_function(C, wrt="r"))
+            ),
+            self.response(sensitivity(plant=H, controller=PI(2.0, 1.0))),
+            atol=1e-9,
+        )

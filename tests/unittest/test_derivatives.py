@@ -15,11 +15,12 @@ from minilink import (
     Pendulum,
     controllability,
     discretize,
-    lqr_at_operating_point,
+    lqr,
     observability,
 )
 from minilink.analysis.frequency import bode, pzmap, transfer_function
 from minilink.analysis.linearization import linearize, linearize_matrices
+from minilink.analysis.structural import controllability_matrix
 from minilink.blocks.transfer_function import TransferFunction
 from minilink.control.state import StateFeedbackController
 from minilink.core.backends import array_module, jax_installed
@@ -127,13 +128,19 @@ class TestJacobianValues(unittest.TestCase):
 
     def test_defaults_are_the_nominal_point(self):
         plant = self.plant
-        plant.x0 = np.array([1.0, 2.0])
+        plant.state.set_nominal_value(np.array([1.0, 2.0]))
+        plant.x0 = np.array([-3.0, 4.0])  # the simulation start plays no part
         plant.inputs["bias"].set_nominal_value(np.array([0.7]))
         expected = plant.jacobian(
-            "f", "params", plant.x0, plant.get_u_from_input_ports()
+            "f", "params", plant.state.nominal_value, plant.get_u_from_input_ports()
         )
         np.testing.assert_allclose(
             plant.jacobian("f", "params")["gain"], expected["gain"]
+        )
+        self.assertFalse(
+            np.allclose(
+                plant.jacobian("f", "params", plant.x0)["gain"], expected["gain"]
+            )
         )
 
     def test_returns_numpy_float_arrays(self):
@@ -222,16 +229,18 @@ class TestJacobianDiagram(unittest.TestCase):
             loop.jacobian(f"{plant}:y", "x", method="fd"), np.eye(2), atol=1e-6
         )
         # a disturbance added to the controller command enters f like u does
-        B_dist = loop.jacobian("f", "ctl:u", method="fd")
+        B_dist = loop.jacobian("f", "controller:u", method="fd")
         np.testing.assert_allclose(
             B_dist, Pendulum().jacobian("f", "u", method="fd"), atol=1e-6
         )
         np.testing.assert_allclose(
-            loop.jacobian("ctl:u", "ctl:u", method="fd"), [[1.0]], atol=1e-6
+            loop.jacobian("controller:u", "controller:u", method="fd"),
+            [[1.0]],
+            atol=1e-6,
         )
         if JAX:
             np.testing.assert_allclose(
-                loop.jacobian("f", "ctl:u", method="jax"), B_dist, atol=1e-6
+                loop.jacobian("f", "controller:u", method="jax"), B_dist, atol=1e-6
             )
         with self.assertRaisesRegex(ValueError, "Unknown wire"):
             loop.jacobian("f", "nowhere:u")
@@ -244,7 +253,9 @@ class TestJacobianDiagram(unittest.TestCase):
                 self.assertEqual(value.shape[0], 2, (block, key))
         if JAX:
             S_jax = self.loop.jacobian("f", "params", method="jax")
-            np.testing.assert_allclose(S_jax["ctl"]["Kp"], S["ctl"]["Kp"], atol=1e-5)
+            np.testing.assert_allclose(
+                S_jax["controller"]["Kp"], S["controller"]["Kp"], atol=1e-5
+            )
 
 
 class TestCatalogAgreement(unittest.TestCase):
@@ -300,7 +311,7 @@ class TestMethod(unittest.TestCase):
         # a port added to a block already inside a diagram is seen by the diagram
         loop = _closed_loop()
         loop.jacobian("f", "x")
-        ctl = loop.subsystems["ctl"]
+        ctl = loop.subsystems["controller"]
         ctl.add_output_port(
             "twice",
             dim=1,
@@ -308,8 +319,8 @@ class TestMethod(unittest.TestCase):
             dependencies="all",
         )
         np.testing.assert_allclose(
-            loop.jacobian("ctl:twice", "r")[0, 0],
-            2.0 * loop.jacobian("ctl:u", "r")[0, 0],
+            loop.jacobian("controller:twice", "r")[0, 0],
+            2.0 * loop.jacobian("controller:u", "r")[0, 0],
         )
 
     def test_nothing_is_stored_on_the_system(self):
@@ -371,6 +382,27 @@ class TestFamilyPattern(unittest.TestCase):
         lti = plant.linearize([0.1, 0.2], [0.3, 0.4])
         np.testing.assert_allclose(lti.A(), A)
         self.assertEqual(lti.state.labels[0], "Delta x[0]")
+
+    def test_the_linear_model_carries_its_operating_point(self):
+        plant = _Affine()
+        x_bar, u_bar = np.array([0.1, 0.2]), np.array([0.3, 0.4])
+        lti = plant.linearize(x_bar, u_bar)
+        np.testing.assert_allclose(lti.xbar, x_bar)
+        np.testing.assert_allclose(lti.ubar, u_bar)
+        np.testing.assert_allclose(lti.ybar, plant.h(x_bar, u_bar))
+        # the selected columns and rows: ubar and ybar follow B and C
+        part = linearize(plant, x_bar, u_bar, of=["z", ("y", 0)], wrt=("bias", 0))
+        np.testing.assert_allclose(part.ubar, [0.4])
+        np.testing.assert_allclose(part.ybar, [x_bar[0], plant.h(x_bar, u_bar)[0]])
+        # the nominal state is the default point; a model from arrays sits at the origin
+        plant.state.set_nominal_value(x_bar)
+        np.testing.assert_allclose(plant.linearize().xbar, x_bar)
+        from minilink.dynamics.abstraction.state_space import LTISystem
+
+        origin = LTISystem(_Affine.A, _Affine.B, _Affine.C, _Affine.D)
+        np.testing.assert_allclose(origin.xbar, 0.0)
+        np.testing.assert_allclose(origin.ubar, 0.0)
+        np.testing.assert_allclose(origin.ybar, 0.0)
 
     def test_linearize_selects_rows_and_columns(self):
         plant = _Affine()
@@ -435,19 +467,45 @@ class TestFamilyPattern(unittest.TestCase):
             plant.find_equilibrium([0.3, 0.0]), [0.0, 0.0], atol=1e-6
         )
 
+    def test_a_point_given_with_a_linear_model_is_refused(self):
+        from minilink.analysis.derivatives import jacobian
+        from minilink.analysis.modal import modal_analysis
+
+        lti = InvertedPendulum().linearize([0.0, 0.0])
+        for name, call in (
+            ("linearize", lambda: linearize(lti, [0.0, 0.0])),
+            ("bode", lambda: bode(lti, u_bar=[0.0], w=[1.0])),
+            ("modal_analysis", lambda: modal_analysis(lti, [0.0, 0.0])),
+            ("lqr", lambda: lqr(lti, np.eye(2), [[1.0]], x_bar=[0.0, 0.0])),
+            ("shortcut", lambda: lti.linearize([0.0, 0.0])),
+        ):
+            with self.subTest(name):
+                with self.assertRaisesRegex(ValueError, "carries its operating point"):
+                    call()
+        # the raw derivative evaluates where it is told: trajectory_lqr reads it along x(t)
+        np.testing.assert_allclose(jacobian(lti, "f", "x", [0.1, 0.0]), lti.A())
+
+    def test_the_operating_point_size_is_checked_by_name(self):
+        plant = Pendulum()
+        with self.assertRaisesRegex(ValueError, "x_bar has 3 entries"):
+            bode(plant, [0.0, 0.0, 0.0], w=[1.0])
+        with self.assertRaisesRegex(ValueError, "u_bar has 2 entries"):
+            pzmap(plant, u_bar=[0.0, 0.0])
+
     def test_structural_tests_accept_an_lti_system(self):
         lti = InvertedPendulum().linearize([0.0, 0.0])
         self.assertTrue(controllability(lti).is_full_rank)
         self.assertTrue(observability(lti).is_full_rank)
         self.assertEqual(
-            controllability(lti).rank, controllability(lti.A(), lti.B()).rank
+            controllability(lti).rank,
+            np.linalg.matrix_rank(controllability_matrix(lti.A(), lti.B())),
         )
 
-    def test_lqr_at_operating_point_takes_method_and_eps(self):
+    def test_lqr_on_a_plant_takes_method_and_eps(self):
         plant = InvertedPendulum()
         Q, R = np.diag([10.0, 1.0]), [[1.0]]
-        fd = lqr_at_operating_point(plant, [0.0, 0.0], Q, R, method="fd", eps=1e-5)
-        auto = lqr_at_operating_point(plant, [0.0, 0.0], Q, R)
+        fd = lqr(plant, Q, R, x_bar=[0.0, 0.0], method="fd", eps=1e-5)
+        auto = lqr(plant, Q, R, x_bar=[0.0, 0.0])
         np.testing.assert_allclose(fd.params["K"], auto.params["K"], atol=1e-4)
 
     def test_discretize_names_its_integrator(self):
@@ -468,7 +526,9 @@ class TestFamilyPattern(unittest.TestCase):
             linearize_matrices(Pendulum(), epsilon=1e-6)
         loop = _closed_loop()
         with self.assertRaisesRegex(TypeError, "integer index"):
-            linearize_matrices(loop, of=("ctl", "u"))  # the old (sys_id, port_id) form
+            linearize_matrices(
+                loop, of=("controller", "u")
+            )  # the old (sys_id, port_id) form
         with self.assertRaisesRegex(TypeError, "one channel"):
             bode(loop, of=["y", "y"])
         with self.assertRaisesRegex(TypeError, "LTISystem"):

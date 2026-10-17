@@ -1,6 +1,6 @@
 """Cascade control wired by hand: an inner velocity loop inside an outer position loop."""
 
-from minilink import DiagramSystem, Integrator, ProportionalController, Step
+from minilink import DiagramSystem, Integrator, P, Step
 
 # Plant: force -> velocity -> position, two integrators in series
 velocity = Integrator()
@@ -11,8 +11,8 @@ position.state.labels = ["x"]
 position.x0[0] = 20.0
 
 # One proportional controller per loop
-outer = ProportionalController(1.0)  # position error -> velocity reference
-inner = ProportionalController(1.0)  # velocity error -> force
+outer = P(1.0, ports="reference")  # position error -> velocity reference
+inner = P(1.0, ports="reference")  # velocity error -> force
 
 step = Step(final_value=20.0, step_time=10.0)
 

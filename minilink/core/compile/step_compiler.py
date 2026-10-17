@@ -16,7 +16,7 @@ from minilink.core.compile.compiler import (
 from minilink.core.compile.execution_plan import PortOperation
 from minilink.core.compile.step_execution_plan import StepExecutionPlan, StepOperation
 from minilink.core.system import DynamicSystem, StepSystem
-from minilink.core.wiring import check_algebraic_loops
+from minilink.core.wiring import evaluation_order_of
 
 if TYPE_CHECKING:
     from minilink.core.diagram import StepDiagramSystem
@@ -26,7 +26,7 @@ def build_step_execution_plan(
     diagram: StepDiagramSystem, *, bind_params: bool = False
 ) -> StepExecutionPlan:
     """Build an immutable :class:`StepExecutionPlan` from a step diagram."""
-    port_execution_order = check_algebraic_loops(diagram)
+    port_execution_order = evaluation_order_of(diagram)
     return _build_step_execution_plan_from_order(
         diagram, port_execution_order, bind_params=bind_params
     )
@@ -61,7 +61,7 @@ def compile_step_diagram(
         t0 = time.perf_counter()
         print("[compile] Step 1: Checking for algebraic loops...", end="", flush=True)
 
-    port_execution_order = check_algebraic_loops(diagram)
+    port_execution_order = evaluation_order_of(diagram)
 
     if verbose:
         print(f"  ({time.perf_counter() - t0:.3f}s)")

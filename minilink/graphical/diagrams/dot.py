@@ -1,10 +1,14 @@
-"""Graphviz exporter for diagram topology snapshots."""
+"""Graphviz diagrams: a system's blocks and wires as a Graphviz graph."""
 
 from __future__ import annotations
 
 import warnings
+from dataclasses import replace
 
-from minilink.graphical.diagrams.export import TopologyExporter
+from minilink.graphical.diagrams.export import (
+    TopologyExporter,
+    export_diagram_topology,
+)
 from minilink.graphical.diagrams.topology import (
     build_diagram_topology,
     clustered_node_ids,
@@ -13,9 +17,174 @@ from minilink.graphical.diagrams.topology import (
 # One warning when the graphviz Python wrapper is missing: diagrams are
 # optional, so plot_diagram skips the figure and the notebook keeps running.
 MISSING_GRAPHVIZ_MESSAGE = (
-    "Diagram skipped: the graphviz Python package is not installed "
-    "(pip install graphviz, or pip install minilink[diagrams])."
+    "Diagram skipped: Graphviz is not installed. It needs a system install: "
+    "`conda install -c conda-forge python-graphviz` (the conda environment has it), "
+    "or install Graphviz from graphviz.org then `pip install graphviz`."
 )
+
+
+###############################################################################
+# Public API
+###############################################################################
+
+
+class GraphvizTopologyExporter(TopologyExporter):
+    """Export topology snapshots to ``graphviz.Digraph``."""
+
+    name = "graphviz"
+
+    def export(self, topology, *, engine="dot", rankdir="LR"):
+        """Build the snapshot's ``graphviz.Digraph``: its blocks, then its wires.
+
+        ``engine`` is the Graphviz layout program and ``rankdir`` the flow
+        direction; any other keyword is refused.
+        """
+        graphviz = require_graphviz()
+
+        graph = graphviz.Digraph(topology.name, engine=engine)
+        graph.attr(rankdir=rankdir, nodesep="0.4", ranksep="0.7", fontname=FONT)
+        graph.node_attr.update(fontname=FONT, fontsize="11")
+        graph.edge_attr.update(arrowsize="0.7")
+
+        # The blocks, each nested diagram inside its box
+        render_blocks(graph, topology)
+
+        # One wire per edge, from the east side of an output port to the west side
+        # of an input port
+        for edge in topology.edges:
+            graph.edge(
+                f"{edge.source_node}:{graphviz_port_id(edge.source_port, 'out')}:e",
+                f"{edge.target_node}:{graphviz_port_id(edge.target_port, 'in')}:w",
+            )
+
+        return graph
+
+
+# A system's diagram, drawn or returned
+
+
+def plot_diagram(
+    sys_or_diagram,
+    filename=None,
+    show=True,
+    show_inline=None,
+    show_pdf=None,
+    *,
+    expand=True,
+):
+    """Render a system or assembled diagram.
+
+    ``expand=True`` draws the blocks of every nested diagram inside a labelled
+    box; ``expand=False`` draws a nested diagram as one block. Returns the
+    Graphviz object, or ``None`` when the figure cannot be drawn, so that a
+    notebook cell without the Graphviz binary shows the warning and no error.
+    """
+    graph = get_diagram(sys_or_diagram, expand=expand)
+    drawn = render_diagram_graph(
+        graph,
+        show=show,
+        show_inline=show_inline,
+        show_pdf=show_pdf,
+        filename=filename,
+    )
+
+    # Nothing for the notebook cell to render when the figure could not be drawn
+    return graph if drawn else None
+
+
+def get_diagram(sys_or_diagram, *, expand=True):
+    """Return the renderable diagram object for a system or assembled diagram.
+
+    ``expand=True`` draws the blocks of every nested diagram inside a labelled
+    box; ``expand=False`` draws a nested diagram as one block.
+    """
+    try:
+        return export_diagram_topology(
+            sys_or_diagram, backend="graphviz", expand=expand
+        )
+    except ImportError:
+        warnings.warn(MISSING_GRAPHVIZ_MESSAGE, stacklevel=2)
+        return None
+
+
+def get_system_block_html(sys, html_id="sys1"):
+    """Return the Graphviz HTML-like block label for a system."""
+    topology = build_diagram_topology(sys)
+    node = topology.nodes[0]
+
+    # The label shows the requested id in place of the block's own
+    if html_id != node.display_id:
+        node = replace(node, display_id=html_id)
+
+    return block_html(node)
+
+
+# The HTML-like block labels and their port identifiers
+
+FONT = "Helvetica"
+TITLE_FILL = "#e5e7eb"
+BOUNDARY_COLOR = "#71717a"
+
+
+def block_html(node):
+    """Return the Graphviz HTML-like label for one topology node."""
+    # The diagram's edge: its inputs and outputs as plain port cells, no title
+    if node.kind in ("external_input", "external_output"):
+        return boundary_html(node)
+
+    # The title row: the block's name and id, a step system marked as such
+    title = f"{node.name}::{node.display_id}"
+    if node.kind == "step_system":
+        title = f"Step: {title}"
+    html = (
+        f'<TABLE BORDER="0" CELLBORDER="1" CELLSPACING="0" CELLPADDING="4">\n'
+        f"<TR>\n"
+        f'<TD align="left" COLSPAN="2" BGCOLOR="{TITLE_FILL}"><B>{title}</B></TD>\n'
+        f"</TR>\n"
+    )
+
+    # One row per port pair: the inputs in the left column, the outputs in the
+    # right one, an empty cell where a side has run out of ports
+    n_rows = max(len(node.inputs), len(node.outputs))
+    for j in range(n_rows):
+        html += "<TR>\n"
+        if j < len(node.inputs):
+            port = node.inputs[j]
+            html += (
+                f'<TD PORT="{graphviz_port_id(port.id, "in")}" align="left">'
+                f"{port.text}</TD>\n"
+            )
+        else:
+            html += "<TD> </TD>\n"
+
+        if j < len(node.outputs):
+            port = node.outputs[j]
+            html += (
+                f'<TD PORT="{graphviz_port_id(port.id, "out")}" align="right">'
+                f"{port.text}</TD>\n"
+            )
+        else:
+            html += "<TD> </TD>\n"
+        html += "</TR>\n"
+
+    html += "</TABLE>"
+
+    return html
+
+
+def boundary_html(node):
+    """Return the label of the diagram's edge: one grey cell per boundary port."""
+    role = "out" if node.kind == "external_input" else "in"
+    ports = node.outputs if node.kind == "external_input" else node.inputs
+    html = '<TABLE BORDER="0" CELLBORDER="0" CELLSPACING="0" CELLPADDING="3">\n'
+    for port in ports:
+        html += (
+            f'<TR><TD PORT="{graphviz_port_id(port.id, role)}">'
+            f'<FONT COLOR="{BOUNDARY_COLOR}">{port.text}</FONT></TD></TR>\n'
+        )
+    html += "</TABLE>"
+
+    return html
 
 
 def graphviz_port_id(port_id, role):
@@ -29,15 +198,73 @@ def graphviz_port_id(port_id, role):
     and any other character outside ``[0-9a-z]`` (the brackets of a ``y[0]``
     Demux id) becomes ``_``. The cell still displays the original port id.
     """
-    if role not in ("in", "out"):
-        raise ValueError(f"port role must be 'in' or 'out', got {role!r}")
+    require_port_role(role)
+
+    # The signs spelled out, every other id escaped one character at a time
     if port_id == "+":
         text = "plus"
     elif port_id == "-":
         text = "minus"
     else:
         text = "".join(escape_port_char(char) for char in port_id)
+
     return f"{role}_{text}"
+
+
+###############################################################################
+# Internal machinery
+###############################################################################
+
+
+def require_graphviz():
+    """Refuse to export without the graphviz Python package; return the package."""
+    try:
+        import graphviz
+    except ImportError as exc:
+        raise ImportError(
+            "Graphviz topology export requires the graphviz Python package."
+        ) from exc
+
+    return graphviz
+
+
+def render_blocks(graph, topology):
+    """Declare the blocks of a topology, each nested diagram inside its box."""
+    nodes = {node.id: node for node in topology.nodes}
+    boxed = clustered_node_ids(topology.clusters)
+
+    # The blocks outside every box
+    for node in topology.nodes:
+        if node.id not in boxed:
+            render_block(graph, node)
+
+    # Each nested diagram, boxed with its own blocks
+    for cluster in topology.clusters:
+        render_cluster(graph, cluster, nodes)
+
+
+def render_block(graph, node):
+    """Declare one block, drawn as its HTML-like port table."""
+    graph.node(node.id, shape="none", label=f"<{block_html(node)}>")
+
+
+def render_cluster(graph, cluster, nodes):
+    """Draw one nested diagram as a labelled Graphviz cluster around its blocks."""
+    with graph.subgraph(name=f"cluster_{cluster.id}") as box:
+        box.attr(label=f"{cluster.name}::{cluster.display_id}")
+
+        # Its own blocks, then the diagrams nested inside it, each in a box of its own
+        for node_id in cluster.node_ids:
+            node = nodes[node_id]
+            render_block(box, node)
+        for child in cluster.clusters:
+            render_cluster(box, child, nodes)
+
+
+def require_port_role(role):
+    """Refuse a port role other than ``"in"`` or ``"out"``."""
+    if role not in ("in", "out"):
+        raise ValueError(f"port role must be 'in' or 'out', got {role!r}")
 
 
 def escape_port_char(char):
@@ -51,94 +278,7 @@ def escape_port_char(char):
     return "_"
 
 
-class GraphvizTopologyExporter(TopologyExporter):
-    """Export topology snapshots to ``graphviz.Digraph``."""
-
-    name = "graphviz"
-
-    def export(self, topology, **kwargs):
-        try:
-            import graphviz
-        except ImportError as exc:
-            raise ImportError(
-                "Graphviz topology export requires the graphviz Python package."
-            ) from exc
-
-        graph = graphviz.Digraph(topology.name, engine=kwargs.pop("engine", "dot"))
-        graph.attr(rankdir=kwargs.pop("rankdir", "LR"))
-
-        render_blocks(graph, topology)
-
-        for edge in topology.edges:
-            graph.edge(
-                f"{edge.source_node}:{graphviz_port_id(edge.source_port, 'out')}:e",
-                f"{edge.target_node}:{graphviz_port_id(edge.target_port, 'in')}:w",
-            )
-
-        return graph
-
-
-def block_html(node):
-    """Return the Graphviz HTML-like label for one topology node."""
-    title = f"{node.name}::{node.display_id}"
-    if node.kind == "step_system":
-        title = f"Step: {title}"
-    html = (
-        f'<TABLE BORDER="0" CELLSPACING="0">\n'
-        f"<TR>\n"
-        f'<TD align="left" BORDER="1" COLSPAN="2">{title}</TD>\n'
-        f"</TR>\n"
-    )
-
-    n_rows = max(len(node.inputs), len(node.outputs))
-    for j in range(n_rows):
-        html += "<TR>\n"
-        if j < len(node.inputs):
-            port_id = node.inputs[j].id
-            html += (
-                f'<TD PORT="{graphviz_port_id(port_id, "in")}" align="left" '
-                f'BORDER="1">{port_id}</TD>\n'
-            )
-        else:
-            html += '<TD BORDER="1"> </TD>\n'
-
-        if j < len(node.outputs):
-            port_id = node.outputs[j].id
-            html += (
-                f'<TD PORT="{graphviz_port_id(port_id, "out")}" '
-                f'BORDER="1">{port_id}</TD>\n'
-            )
-        else:
-            html += '<TD BORDER="1"> </TD>\n'
-        html += "</TR>\n"
-
-    html += "</TABLE>"
-    return html
-
-
-def render_blocks(graph, topology):
-    """Declare the blocks of a topology, each nested diagram inside its box."""
-    nodes = {node.id: node for node in topology.nodes}
-    boxed = clustered_node_ids(topology.clusters)
-    for node in topology.nodes:
-        if node.id not in boxed:
-            graph.node(node.id, shape="none", label=f"<{block_html(node)}>")
-    for cluster in topology.clusters:
-        render_cluster(graph, cluster, nodes)
-
-
-def render_cluster(graph, cluster, nodes):
-    """Draw one nested diagram as a labelled Graphviz cluster around its blocks."""
-    with graph.subgraph(name=f"cluster_{cluster.id}") as box:
-        box.attr(label=f"{cluster.name}::{cluster.display_id}")
-        for node_id in cluster.node_ids:
-            node = nodes[node_id]
-            box.node(node.id, shape="none", label=f"<{block_html(node)}>")
-        for child in cluster.clusters:
-            render_cluster(box, child, nodes)
-
-
-def _render_diagram_graph(
+def render_diagram_graph(
     graph, show=True, show_inline=None, show_pdf=None, filename=None
 ):
     """
@@ -149,22 +289,29 @@ def _render_diagram_graph(
     Graphviz PNG (same blocking policy as trajectory plots). Pass
     ``show_pdf=True`` for the legacy OS PDF viewer; pass ``filename`` to
     write Graphviz output to disk. ``show=False`` builds/returns only.
-    """
-    if graph is None:
-        # get_diagram already warned that graphviz is missing.
-        return
 
+    Returns ``False`` when the figure cannot be drawn (no graphviz wrapper, or
+    no ``dot`` binary for the inline SVG), ``True`` otherwise.
+    """
+    # No graph: get_diagram already warned that graphviz is missing
+    if graph is None:
+        return False
+
+    # Lazy import: the graphics load on first use, not with the core
     from minilink.graphical.common.environment import (
         is_blocking_needed,
         is_inline_capable,
     )
 
+    # The channel: inline SVG in a notebook, else a Matplotlib window or the PDF viewer
     inline_env = is_inline_capable()
     if show_inline is None:
         show_inline = inline_env
     if show_pdf is None:
         show_pdf = False
 
+    # Inline SVG in a notebook
+    drawn = True
     if show and show_inline:
         # Probe Graphviz here so a missing ``dot`` binary warns instead of
         # raising. Do not IPython.display the graph: plot_diagram returns it,
@@ -174,10 +321,11 @@ def _render_diagram_graph(
         try:
             graph.pipe(format="svg")
         except Exception as exc:
-            # graphviz raises ExecutableNotFound when the ``dot`` binary is
-            # missing (a bare Colab runtime, or a pip install without the
-            # system package). The notebook keeps running; the diagram is
-            # simply not drawn.
+            # The graphviz wrapper raises ExecutableNotFound when the ``dot``
+            # binary is missing (a bare Colab runtime, or a pip install without
+            # the system package). The notebook keeps running; the diagram is
+            # simply not drawn, and nothing is returned for the cell to render.
+            drawn = False
             warnings.warn(
                 "Could not render the diagram inline. Is the Graphviz binary "
                 "installed? (conda install graphviz / apt install graphviz / "
@@ -185,6 +333,7 @@ def _render_diagram_graph(
                 stacklevel=2,
             )
 
+    # A Matplotlib window showing the Graphviz PNG
     show_mpl = show and (not show_inline) and (not show_pdf)
     if show_mpl:
         try:
@@ -224,9 +373,10 @@ def _render_diagram_graph(
                 stacklevel=2,
             )
 
-    need_disk = show_pdf or filename is not None
+    # To disk: the requested file, or a temporary one for the PDF viewer when shown
+    need_disk = (show and show_pdf) or filename is not None
     if not need_disk:
-        return
+        return drawn
 
     if filename is None:
         import tempfile
@@ -245,55 +395,4 @@ def _render_diagram_graph(
             stacklevel=2,
         )
 
-
-def get_system_block_html(sys, html_id="sys1"):
-    """Return the Graphviz HTML-like block label for a system."""
-    topology = build_diagram_topology(sys)
-    node = topology.nodes[0]
-    if html_id != node.display_id:
-        from dataclasses import replace
-
-        node = replace(node, display_id=html_id)
-    return block_html(node)
-
-
-def get_diagram(sys_or_diagram, *, expand=True):
-    """Return the renderable diagram object for a system or assembled diagram.
-
-    ``expand=True`` draws the blocks of every nested diagram inside a labelled
-    box; ``expand=False`` draws a nested diagram as one block.
-    """
-    from minilink.graphical.diagrams.export import export_diagram_topology
-
-    try:
-        return export_diagram_topology(
-            sys_or_diagram, backend="graphviz", expand=expand
-        )
-    except ImportError:
-        warnings.warn(MISSING_GRAPHVIZ_MESSAGE, stacklevel=2)
-        return None
-
-
-def plot_diagram(
-    sys_or_diagram,
-    filename=None,
-    show=True,
-    show_inline=None,
-    show_pdf=None,
-    *,
-    expand=True,
-):
-    """Render a system or assembled diagram.
-
-    ``expand=True`` draws the blocks of every nested diagram inside a labelled
-    box; ``expand=False`` draws a nested diagram as one block.
-    """
-    graph = get_diagram(sys_or_diagram, expand=expand)
-    _render_diagram_graph(
-        graph,
-        show=show,
-        show_inline=show_inline,
-        show_pdf=show_pdf,
-        filename=filename,
-    )
-    return graph
+    return drawn

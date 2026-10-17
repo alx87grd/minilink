@@ -4,32 +4,23 @@ import numpy as np
 
 from minilink.blocks.neural import MLP
 from minilink.core.backends import array_module
-from minilink.core.feedback import Controller
+from minilink.core.feedback import command_port
+from minilink.core.system import System
 
+###############################################################################
 # Public API
+###############################################################################
 
 
-def action_port_of(sys) -> str:
-    """The input port a learned law drives: ``"u"`` when it exists, else the plant's single input."""
-    if "u" in sys.inputs:
-        return "u"
-    if len(sys.inputs) == 1:
-        return next(iter(sys.inputs))
-    raise ValueError(
-        "the plant needs an input port named 'u' or a single input port; "
-        f"got {list(sys.inputs)}"
-    )
-
-
-class NeuralPolicyController(Controller):
+class NeuralPolicyController(System):
     """
     State feedback ``u = u_mid + u_half * clip(MLP(z(x)), -1, 1)``.
 
     The law reinforcement learning, or any policy search, trains: features of
     the state, a multilayer perceptron, and a map from the network's normalized
-    output to the input-port bounds. It is a
-    :class:`~minilink.core.feedback.Controller`, so ``ctl @ plant`` closes the
-    loop, ``plot_control_law`` draws the law, and the weights are ordinary
+    output to the input-port bounds. Its input port is named ``x``, so
+    ``ctl @ plant`` closes the loop on the plant state,
+    ``plot_control_law`` draws the law, and the weights are ordinary
     ``params`` entries that a planner updates in place.
 
     Parameters
@@ -77,12 +68,6 @@ class NeuralPolicyController(Controller):
     ``task_target`` draws a second, fixed ball at the task point.
     """
 
-    # Explicit port roles: state measurement, no boundary reference.
-    measurement_port = "x"
-    ref_port = None
-    control_port = "u"
-    plot_space = "state"
-
     def __init__(
         self,
         sys,
@@ -103,6 +88,8 @@ class NeuralPolicyController(Controller):
         super().__init__()
         self.name = name
         self.sys = sys
+
+        # Graphics: the set-point ball and the fixed task ball
         self.show_setpoint = bool(show_setpoint)
         self.setpoint_plant = setpoint_plant
         self.setpoint_radius = float(setpoint_radius)
@@ -110,20 +97,24 @@ class NeuralPolicyController(Controller):
             None if task_target is None else np.asarray(task_target, dtype=float)
         )
         self.task_target_radius = float(task_target_radius)
-        if squash not in ("clip", "tanh"):
-            raise ValueError(f"squash must be 'clip' or 'tanh', got {squash!r}")
-        self.squash = squash
-        port = sys.inputs[action_port_of(sys)]
-        n, m = int(sys.n), int(port.dim)
-        x_box, u_box = sys.state.box, port.box
-        x_lb, x_ub = x_box.lower, x_box.upper
-        u_lb, u_ub = u_box.lower, u_box.upper
-        if not (np.all(np.isfinite(u_lb)) and np.all(np.isfinite(u_ub))):
-            raise ValueError(
-                "NeuralPolicyController needs finite bounds on the plant's action port"
-            )
 
-        # Features: user map, or the state scaled to the box [-1, 1]
+        # Squash: clipped (PPO family) or tanh (SAC family)
+        require_squash(squash)
+        self.squash = squash
+
+        # The plant's state box, and the box of the input port the law drives
+        port = sys.inputs[command_port(sys)]
+        n = int(sys.n)
+        m = int(port.dim)
+        x_box = sys.state.box
+        u_box = port.box
+        x_lb = x_box.lower
+        x_ub = x_box.upper
+        u_lb = u_box.lower
+        u_ub = u_box.upper
+        require_finite_action_bounds(u_lb, u_ub)
+
+        # Features: the user's map, or the state scaled to the box [-1, 1]
         self.features = features
         finite_box = bool(np.all(np.isfinite(x_lb)) and np.all(np.isfinite(x_ub)))
         self.normalize = bool(normalize) and features is None and finite_box
@@ -131,16 +122,17 @@ class NeuralPolicyController(Controller):
         self.x_mid = 0.5 * (x_ub + x_lb)
         self.x_half = np.where(width > 0, 0.5 * width, 1.0)
 
-        # Normalized action a in [-1, 1] spans the input-port bounds
+        # Normalized action a ∈ [-1, 1] spans the input-port bounds
         self.u_mid = 0.5 * (u_ub + u_lb)
         self.u_half = 0.5 * (u_ub - u_lb)
 
-        n_features = int(
-            np.asarray(self.observe(np.asarray(sys.x0, dtype=float))).shape[0]
-        )
+        # Parameters: the policy network, sized on the features of the plant's x0
+        z0 = self.observe(np.asarray(sys.x0, dtype=float))
+        n_features = int(np.asarray(z0).shape[0])
         self.mlp = MLP(n_features, m, hidden, activation, seed=seed, output_gain=0.01)
         self.params = {"mlp": self.mlp.params}
 
+        # Ports: the plant state in, the bounded command out
         self.add_input_port(
             "x",
             dim=n,
@@ -162,14 +154,18 @@ class NeuralPolicyController(Controller):
 
     def observe(self, x):
         """Features ``z(x)`` fed to the network."""
-        features, normalize = self.features, self.normalize
-        x_mid, x_half = self.x_mid, self.x_half
+        features = self.features
+        normalize = self.normalize
+        x_mid = self.x_mid
+        x_half = self.x_half
+
+        # The user's map, or the raw state when the box does not scale it
         if features is not None:
             return features(x)
         if not normalize:
             return x
 
-        # the state scaled by its box: z = (x − x_mid) / x_half
+        # The state scaled by its box: z = (x − x_mid) / x_half
         z = (x - x_mid) / x_half
 
         return z
@@ -177,19 +173,29 @@ class NeuralPolicyController(Controller):
     def mean_action(self, x, params=None):
         """Normalized network output ``a = MLP(z(x))`` (unclipped)."""
         params = self.params if params is None else params
-        return self.mlp.compute(None, self.observe(x), params=params["mlp"])
+
+        mlp = self.mlp
+
+        z = self.observe(x)
+
+        # a = MLP(z), on the weights params["mlp"]
+        a = mlp.compute(None, z, params=params["mlp"])
+
+        return a
 
     def action(self, x, params=None):
         """Plant input ``u = u_mid + u_half * squash(a)`` with ``squash`` clip or tanh."""
         xp = array_module(x)
+
         squash = self.squash
-        u_mid, u_half = self.u_mid, self.u_half
+        u_mid = self.u_mid
+        u_half = self.u_half
 
         # Normalized action a = MLP(z(x)), kept in [-1, 1] by the family's squash
         a = self.mean_action(x, params)
         a = xp.tanh(a) if squash == "tanh" else xp.clip(a, -1.0, 1.0)
 
-        # Affine map onto the input-port bounds
+        # u = u_mid + u_half a: the affine map onto the input-port bounds
         u = u_mid + u_half * a
 
         return u
@@ -201,37 +207,44 @@ class NeuralPolicyController(Controller):
     def setpoint_position(self, x, params=None):
         """Cartesian point for the commanded set-point, or ``None``."""
         r = self.action(x, params)
-        plant = self.setpoint_plant
-        if plant is None:
-            plant = self.sys
-            for leaf in getattr(plant, "subsystems", {}).values():
-                if hasattr(leaf, "forward_kinematics") and hasattr(leaf, "dof"):
-                    plant = leaf
-                    break
-        if hasattr(plant, "forward_kinematics") and int(r.shape[0]) == int(
-            getattr(plant, "dof", -1)
-        ):
+        plant = setpoint_plant_of(self)
+
+        # A joint reference, mapped through the arm's forward kinematics
+        has_kinematics = hasattr(plant, "forward_kinematics")
+        if has_kinematics and int(r.shape[0]) == int(getattr(plant, "dof", -1)):
             return plant.forward_kinematics(r)
+
+        # An action of two or three components is already a task point
         if int(r.shape[0]) in (2, 3):
             return r
+
         return None
 
     def tf(self, x, u, t=0, params=None):
+        # Lazy import: the graphics load on first use, not with the core
         from minilink.graphical.catalog.shapes import point_pose
 
         frames = {}
+
+        # The commanded set-point, when it maps to a point
         if self.show_setpoint:
             p = self.setpoint_position(u, params)
             if p is not None:
                 frames["setpoint"] = point_pose(p)
+
+        # The fixed task point
         if self.task_target is not None:
             frames["task"] = point_pose(np.asarray(self.task_target, dtype=float))
+
         return frames
 
     def get_dynamic_geometry(self, x, u, t=0, params=None):
+        # Lazy import: the graphics load on first use, not with the core
         from minilink.graphical.animation.primitives import Sphere
 
         geom = {}
+
+        # A green ball at the commanded set-point, when it maps to a point
         if self.show_setpoint and self.setpoint_position(u, params) is not None:
             geom["setpoint"] = [
                 Sphere(
@@ -241,6 +254,8 @@ class NeuralPolicyController(Controller):
                     opacity=0.85,
                 )
             ]
+
+        # A gold ball at the fixed task point
         if self.task_target is not None:
             geom["task"] = [
                 Sphere(
@@ -250,6 +265,7 @@ class NeuralPolicyController(Controller):
                     opacity=0.9,
                 )
             ]
+
         return geom
 
 
@@ -266,12 +282,48 @@ def angle_features(angles, scales=None):
 
     def features(x):
         xp = array_module(x)
+
+        # z = [cos θᵢ, sin θᵢ for an angle, sᵢ xᵢ for any other component]
         parts = []
         for i in range(int(x.shape[0])):
             if i in angles:
                 parts += [xp.cos(x[i]), xp.sin(x[i])]
             else:
                 parts.append(scales.get(i, 1.0) * x[i])
-        return xp.stack(parts)
+        z = xp.stack(parts)
+
+        return z
 
     return features
+
+
+###############################################################################
+# Internal machinery
+###############################################################################
+
+
+def require_squash(squash):
+    """Refuse a squash other than ``"clip"`` and ``"tanh"``."""
+    if squash not in ("clip", "tanh"):
+        raise ValueError(f"squash must be 'clip' or 'tanh', got {squash!r}")
+
+
+def require_finite_action_bounds(u_lb, u_ub):
+    """Refuse an action port without finite bounds: the normalized action spans them."""
+    if not (np.all(np.isfinite(u_lb)) and np.all(np.isfinite(u_ub))):
+        raise ValueError(
+            "NeuralPolicyController needs finite bounds on the plant's action port"
+        )
+
+
+def setpoint_plant_of(ctl):
+    """The plant that maps an action to a point: the given one, else ``sys`` or its first arm leaf."""
+    plant = ctl.setpoint_plant
+    if plant is None:
+        plant = ctl.sys
+        for leaf in getattr(plant, "subsystems", {}).values():
+            if hasattr(leaf, "forward_kinematics") and hasattr(leaf, "dof"):
+                plant = leaf
+                break
+
+    return plant

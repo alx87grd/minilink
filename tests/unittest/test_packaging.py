@@ -22,8 +22,19 @@ class TestWheelConfig(unittest.TestCase):
 
     def test_full_extra_is_declared(self):
         text = (REPO / "pyproject.toml").read_text(encoding="utf-8")
-        self.assertIn("full = [", text)
-        self.assertIn("minilink[diagrams,visualization,plotting,symbolic,jax,rl]", text)
+        full = text.split("full = [", 1)[1].split("]", 1)[0]
+        for package in (
+            "jax",
+            "jaxlib",
+            "plotly",
+            "meshcat",
+            "pygame",
+            "sympy",
+            "gymnasium",
+        ):
+            self.assertIn(f'"{package}', full)
+        for retired in ("graphviz", "cyipopt"):
+            self.assertNotIn(retired, full)
 
 
 class TestBuiltWheel(unittest.TestCase):

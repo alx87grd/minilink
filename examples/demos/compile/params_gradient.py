@@ -80,12 +80,12 @@ print("Finite-difference check passed.")
 
 diagram = DiagramSystem()
 diagram.connection_verbose = False
-diagram.add_subsystem(TraceableImpedanceController(), "ctl")
+diagram.add_subsystem(TraceableImpedanceController(), "controller")
 diagram.add_subsystem(TraceablePendulum(), "plant")
 diagram.add_input_port("r", dim=1)
-diagram.connect("input", "r", "ctl", "r")
-diagram.connect("plant", "y", "ctl", "y")
-diagram.connect("ctl", "u", "plant", "u")
+diagram.connect("input", "r", "controller", "r")
+diagram.connect("plant", "y", "controller", "y")
+diagram.connect("controller", "u", "plant", "u")
 
 true_evaluator = diagram.compile(backend="jax")
 

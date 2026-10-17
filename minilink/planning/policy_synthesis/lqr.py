@@ -1,48 +1,54 @@
-"""
-The linear-quadratic regulator as a planner: the Riccati solution of a quadratic problem at its goal.
-
-:class:`LQRPlanner` lowers a :class:`~minilink.planning.problems.PlanningProblem`
-whose cost is a :class:`~minilink.core.costs.QuadraticCost` to the matrices
-``(A, B, Q, R)`` of the plant linearized at ``(x̄, ū)`` and solves the Riccati
-equation with the factories of :mod:`minilink.control.lqr`. Its solution
-carries the law, ``u = ū − K (x − x̄)``, and what the method itself knows
-about it: the cost-to-go ``J(x) = (x − x̄)ᵀ P (x − x̄)`` of the linear model and
-the closed-loop poles. The problem's horizon picks the equation: infinite,
-the algebraic one; finite, the differential one swept backward from the
-terminal weight ``S``, and the law is then ``u = ū − K(t) (x − x̄)``.
-"""
+"""The linear-quadratic regulator as a planner: the Riccati solution of a quadratic problem at its goal."""
 
 from __future__ import annotations
 
 from dataclasses import dataclass
 
 import numpy as np
-from scipy.linalg import solve_continuous_are
 
-from minilink.control.lqr import lqr_gain_schedule
+from minilink.analysis.linearization import design_model
+from minilink.analysis.riccati import care
+from minilink.control.design import lqr_gain_schedule
 from minilink.control.state import (
     StateFeedbackController,
     TimeVaryingStateFeedbackController,
-    interpolate_schedule,
 )
 from minilink.core.costs import QuadraticCost
+from minilink.core.feedback import command_port
+from minilink.core.trajectory import interpolate_schedule
 from minilink.planning.evaluation import nominal_trajectory
 from minilink.planning.planner import Planner
 from minilink.planning.problems import PlanningProblem
 from minilink.planning.results import PlanningSolution
 
+###############################################################################
 # Public API
+###############################################################################
 
 
 class LQRPlanner(Planner):
     """
     Linear-quadratic regulator design as a planner.
 
+    Lowers a :class:`~minilink.planning.problems.PlanningProblem` whose cost is
+    a :class:`~minilink.core.costs.QuadraticCost` to the matrices
+    ``(A, B, Q, R)`` of the plant linearized at ``(x̄, ū)`` about its command
+    port (a disturbance ``d`` or a noise ``n`` is never decided) and solves the
+    Riccati equation with the factories of :mod:`minilink.control.design`. Its
+    solution carries the law, ``u = ū − K (x − x̄)``, and what the method itself
+    knows about it: the cost-to-go ``J(x) = (x − x̄)ᵀ P (x − x̄)`` of the linear
+    model and the closed-loop poles. The problem's horizon picks the equation:
+    infinite, the algebraic one; finite, the differential one swept backward
+    from the terminal weight ``S``, and the law is then
+    ``u = ū − K(t) (x − x̄)``.
+
     Parameters
     ----------
     problem : PlanningProblem
         Its cost must be a :class:`~minilink.core.costs.QuadraticCost`; the
-        operating point is the cost's ``(xbar, ubar)`` unless given here.
+        operating point is the cost's ``(xbar, ubar)`` unless given here. A
+        cost over every input stacked weighs the command by its block of
+        ``R``.
         A finite ``tf`` selects the finite-horizon design with the cost's
         terminal weight ``S``; an infinite or unset ``tf`` the stationary one.
     x_bar, u_bar : array-like, optional
@@ -73,16 +79,17 @@ class LQRPlanner(Planner):
         eps: float = 1e-6,
     ) -> None:
         super().__init__(problem)
+
+        # The quadratic cost: its weights and its target
         cost = self.require_cost()
-        if not isinstance(cost, QuadraticCost):
-            raise TypeError(
-                "LQRPlanner needs a QuadraticCost, "
-                "g = (x - xbar)ᵀ Q (x - xbar) + (u - ubar)ᵀ R (u - ubar); "
-                f"got {type(cost).__name__}"
-            )
+        require_quadratic_cost(cost)
         self.cost = cost
+
+        # Operating point of the linearization, the cost's target by default
         self.x_bar = np.asarray(cost.xbar if x_bar is None else x_bar, dtype=float)
         self.u_bar = np.asarray(cost.ubar if u_bar is None else u_bar, dtype=float)
+
+        # The rollout's period, the schedule's samples, the linearization options
         self.dt = float(dt)
         self.n_steps = int(n_steps)
         self.t = float(t)
@@ -98,44 +105,74 @@ class LQRPlanner(Planner):
         the law out from the problem's start on the nonlinear plant and scores
         it over the problem's draws.
         """
-        return self.solve_policy(evaluate=evaluate, n_trials=n_trials)
+        problem = self.problem
+        sys = problem.sys
+        n_steps = self.n_steps
+        dt = self.dt
 
-    def solve_policy(self, *, evaluate=False, n_trials=50) -> PlanningSolution:
-        """Policy-family name of :meth:`solve`."""
+        # The plant linearized at the operating point: A = ∂f/∂x, B = ∂f/∂u
         A, B = self.linear_model()
-        Q, R, S_f = self.cost.Q, self.cost.R, self.cost.S
-        x_bar, u_bar = self.x_bar, self.u_bar
 
-        if self.problem.horizon_kind() == "finite":
-            tf = self.problem.require_finite_tf()
-            t, K, S = lqr_gain_schedule(A, B, Q, R, S_f, tf, n_steps=self.n_steps)
+        # The weights and the operating point over the command port: R[c, c], ū[c]
+        Q = self.cost.Q
+        R = command_block(sys, self.cost.R)
+        S_f = self.cost.S
+        x_bar = self.x_bar
+        u_bar = command_block(sys, self.u_bar)
+
+        if problem.horizon_kind() == "finite":
+            tf = problem.require_finite_tf()
+
+            # −Ṡ = Aᵀ S + S A − S B R⁻¹ Bᵀ S + Q, swept backward from S(t_f) = S_f,
+            # and K(t) = R⁻¹ Bᵀ S(t)
+            t, K, S = lqr_gain_schedule(A, B, Q, R, S_f, tf, n_steps=n_steps)
+
+            # The law u = ū − K(t) (x − x̄)
             policy = TimeVaryingStateFeedbackController(t, K, xbar=x_bar, ubar=u_bar)
+
+            # Closed-loop poles at t = 0: eig(A − B K(0))
+            poles = np.linalg.eigvals(A - B @ K[0])
+
+            # The record, and the cost-to-go J(x, t) = (x − x̄)ᵀ S(t) (x − x̄)
             record = RiccatiRecord(
-                K=K[0],
-                P=S[0],
-                poles=np.linalg.eigvals(A - B @ K[0]),
-                horizon=tf,
-                schedule=(t, K, S),
+                K=K[0], P=S[0], poles=poles, horizon=tf, schedule=(t, K, S)
             )
             cost_to_go = quadratic_cost_to_go(x_bar, S, t)
         else:
-            P = solve_continuous_are(A, B, Q, R)
+            # Aᵀ P + P A − P B R⁻¹ Bᵀ P + Q = 0
+            P = care(A, B, Q, R)
+
+            # K = R⁻¹ Bᵀ P
             K = np.linalg.solve(R, B.T @ P)
+
+            # The law u = ū − K (x − x̄)
             policy = StateFeedbackController(K, xbar=x_bar, ubar=u_bar)
-            record = RiccatiRecord(
-                K=K, P=P, poles=np.linalg.eigvals(A - B @ K), horizon=np.inf
-            )
+
+            # Closed-loop poles: eig(A − B K)
+            poles = np.linalg.eigvals(A - B @ K)
+
+            # The record, and the cost-to-go J(x) = (x − x̄)ᵀ P (x − x̄)
+            record = RiccatiRecord(K=K, P=P, poles=poles, horizon=np.inf)
             cost_to_go = quadratic_cost_to_go(x_bar, P)
 
-        trajectory = evaluation = None
+        # Optionally, roll the law out from the problem's start and score it over
+        # its draws
+        trajectory = None
+        evaluation = None
         if evaluate:
-            trajectory = nominal_trajectory(self.problem, policy, dt=self.dt)
-            evaluation = self.evaluate(policy, dt=self.dt, n_trials=n_trials)
-        return self.store_solution(
-            PlanningSolution(
-                self.problem, policy, record, trajectory, evaluation, cost_to_go
-            )
+            trajectory = nominal_trajectory(problem, policy, dt=dt)
+            evaluation = self.evaluate(policy, dt=dt, n_trials=n_trials)
+
+        # The solution: the law, the record, the rollout, the quadratic cost-to-go
+        solution = PlanningSolution(
+            problem, policy, record, trajectory, evaluation, cost_to_go
         )
+
+        return self.store_solution(solution)
+
+    def solve_policy(self, *, evaluate=False, n_trials=50) -> PlanningSolution:
+        """The planner-family name of :meth:`solve`, answered by every policy planner."""
+        return self.solve(evaluate=evaluate, n_trials=n_trials)
 
     def nominal_trajectory(self, tf=None):
         """The law from the problem's start on the nonlinear plant, sampled every ``dt``."""
@@ -144,14 +181,20 @@ class LQRPlanner(Planner):
         )
 
     def linear_model(self):
-        """``(A, B)``: the plant's Jacobians at the operating point."""
-        from minilink.analysis.derivatives import jacobian
-
-        sys, x_bar, u_bar, t = self.problem.sys, self.x_bar, self.u_bar, self.t
+        """``(A, B)``: the plant's Jacobians at the operating point, ``B`` over its command port."""
+        sys = self.problem.sys
+        x_bar = self.x_bar
+        u_bar = self.u_bar
+        t = self.t
         params = self.problem.params.system
-        method, eps = self.method, self.eps
-        A = jacobian(sys, "f", "x", x_bar, u_bar, t, params, method=method, eps=eps)
-        B = jacobian(sys, "f", "u", x_bar, u_bar, t, params, method=method, eps=eps)
+        method = self.method
+        eps = self.eps
+
+        # A = ∂f/∂x and B = ∂f/∂u at (x̄, ū, t), B over the command port alone
+        model = design_model(sys, x_bar, u_bar, t, params, method=method, eps=eps)
+        A = model.A()
+        B = model.B()
+
         return A, B
 
 
@@ -174,21 +217,27 @@ class RiccatiRecord:
 
     @property
     def success(self) -> bool:
+        """A finite sweep on a finite horizon; a stable linear closed loop otherwise."""
         if np.isfinite(self.horizon):
             return bool(np.all(np.isfinite(self.schedule[2])))
+
         return bool(np.all(np.real(self.poles) < 0.0))
+
+    # Display
 
     def __str__(self) -> str:
         K = np.array2string(np.round(self.K, 3), separator=", ").replace("\n", "")
         poles = ", ".join(f"{p:.3g}" for p in np.round(self.poles, 3))
         if np.isfinite(self.horizon):
             return f"K(0) = {K} over {self.horizon:g} s, poles at t = 0: {poles}"
+
         return f"K = {K}, closed-loop poles {poles}"
 
 
 def quadratic_cost_to_go(x_bar, P, t_samples=None):
     """``J(x) = (x − x̄)ᵀ P (x − x̄)``; with a schedule ``P = S(t)`` on ``t_samples``, ``J(x, t)``."""
     x_bar = np.asarray(x_bar, dtype=float)
+
     if t_samples is None:
 
         def J(x, t=0.0):
@@ -213,11 +262,41 @@ def quadratic_cost_to_go(x_bar, P, t_samples=None):
     return J
 
 
+###############################################################################
+# Internal machinery
+###############################################################################
+
+
+def require_quadratic_cost(cost):
+    """Refuse a cost that is not a ``QuadraticCost``, the only one the Riccati equation solves."""
+    if not isinstance(cost, QuadraticCost):
+        raise TypeError(
+            "LQRPlanner needs a QuadraticCost, "
+            "g = (x - xbar)ᵀ Q (x - xbar) + (u - ubar)ᵀ R (u - ubar); "
+            f"got {type(cost).__name__}"
+        )
+
+
+def command_block(sys, value):
+    """The command port's block of a weight ``R`` or a point ``ubar`` that spans every input of ``sys``.
+
+    ``R[c, c]`` and ``ubar[c]`` with ``c`` the command's components; a value
+    already of the command's size is returned as is.
+    """
+    value = np.asarray(value, dtype=float)
+    if value.shape[0] != sys.m:
+        return value
+
+    c = sys.get_input_port_slice(command_port(sys))
+
+    return value[c, c] if value.ndim == 2 else value[c]
+
+
 if __name__ == "__main__":
     from minilink.dynamics.catalog.pendulum.cartpole import CartPole
 
     plant = CartPole()
-    x_bar = np.array([0.0, np.pi, 0.0, 0.0])  # pole inverted, cart at origin
+    x_bar = np.array([0.0, np.pi, 0.0, 0.0])  # Pole inverted, cart at origin
     x0 = np.array([-1.0, np.pi + 0.3, 0.0, 0.0])
     cost = QuadraticCost.from_system(
         plant, Q=np.diag([1.0, 10.0, 1.0, 1.0]), R=np.array([[0.1]]), xbar=x_bar

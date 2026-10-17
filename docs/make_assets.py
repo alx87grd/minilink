@@ -1,4 +1,4 @@
-"""Build every README figure: showcase GIFs, their 3-D pages, the diagram PNG, the bridges SVG."""
+"""Build every README figure: the showcase GIFs and their 3-D pages, the diagram PNG, the tool montage."""
 
 from __future__ import annotations
 
@@ -14,28 +14,9 @@ STATIC = ROOT / "docs" / "_static"
 SHOWCASE = STATIC / "showcase"  # interactive 3-D pages, served by the docs site
 
 import numpy as np  # noqa: E402
-from asset_export import (  # noqa: E402
-    bridges_svg,
-    html_to_gif,
-    shrink_gif,
-    write_text_asset,
-)
+from asset_export import html_to_gif, montage_png, shrink_gif  # noqa: E402
 
-# The "one model, every tool" figure, in reading order: the top row left to
-# right, the middle row's two ends, the bottom row left to right.
-BRIDGES_TILES = [
-    ("Simulation", "trajectories"),
-    ("Analysis", "phase plane"),
-    ("Classical control", "PID, Bode"),
-    ("Nonlinear control", "impedance, SMC"),
-    ("Linearization", "Jacobian"),
-    ("Optimal control", "LQR, MPC"),
-    ("Optimization", "collocation"),
-    ("Animation", "2D and 3D"),
-    ("Reinforcement\nlearning", ""),
-    ("Planning", "RRT, DP"),
-]
-BRIDGES_CORE = ("System", "f, h, tf")
+from minilink import DynamicSystem  # noqa: E402
 
 
 def save_gif(
@@ -86,19 +67,112 @@ def save_meshcat(sys_or_diagram, traj, page: str, gif: str, **animate_kwargs) ->
     html_to_gif(html, STATIC / gif)
 
 
-def svg_bridges() -> None:
-    write_text_asset(STATIC / "bridges.svg", bridges_svg(BRIDGES_TILES, BRIDGES_CORE))
-
-
 def diagram_png() -> None:
-    from minilink import ImpedanceController, Pendulum
+    """The README's loop: the custom plant of its "Write a model" section, closed by a PID."""
+    from minilink import PID
     from minilink.graphical.diagrams.dot import get_diagram
 
-    diagram = ImpedanceController() @ Pendulum()
+    plant = MassSpringDamper()
+    diagram = PID(2.0, 0.5, 1.0) @ plant
     get_diagram(diagram).render(
         filename=str(STATIC / "diagram_closed_loop"), format="png", cleanup=True
     )
     print("diagram_closed_loop.png")
+
+
+class MassSpringDamper(DynamicSystem):
+    """The README's model, kept in step with its "Write a model" section."""
+
+    def __init__(self):
+        super().__init__(n=2, input_dim=1, output_dim=1)
+
+    def f(self, x, u, t=0, params=None):
+        m, k, b = 1.0, 4.0, 0.3
+        p, v = x
+
+        # m p̈ + b ṗ + k p = u
+        a = (u[0] - b * v - k * p) / m
+
+        return np.array([v, a])
+
+    def h(self, x, u, t=0, params=None):
+        p, v = x
+
+        return np.array([p])  # the sensor reads the position only
+
+
+def tool_montage() -> None:
+    """One plant, six tools: the README's "One toolbox" figure, each panel a library verb."""
+    import matplotlib.pyplot as plt
+
+    from minilink import (
+        BallSet,
+        DynamicProgrammingPlanner,
+        Pendulum,
+        PlanningProblem,
+        QuadraticCost,
+        RRTPlanner,
+        TrajectoryOptimizationPlanner,
+        lqr,
+    )
+
+    plant = Pendulum()
+    x_up = np.array([np.pi, 0.0])
+    problem = PlanningProblem(
+        sys=plant,
+        x_start=np.zeros(2),
+        x_goal=x_up,
+        Xf=BallSet(x_up, 0.2),
+        tf=4.0,
+        cost=QuadraticCost.from_system(plant, Q=np.eye(2), R=np.eye(1), xbar=x_up),
+        X=plant.state.box,
+    )
+
+    # Each verb draws its own figure; the montage pastes the six side by side
+    def panel(title, draw):
+        plt.close("all")
+        draw()
+        figure = plt.gcf()
+        figure.suptitle(title, fontsize=14, fontweight="bold")
+        figure.set_size_inches(5.2, 4.0)
+        figure.tight_layout()
+        return figure
+
+    swing = Pendulum()
+    swing.x0[0] = 2.0
+    swing.compute_trajectory(tf=10.0)
+    loop = lqr(plant, np.eye(2), np.eye(1), x_bar=x_up) @ plant
+    vi = DynamicProgrammingPlanner(problem, x_grid=(101, 101), u_grid=(11,), dt=0.05)
+    vi.solve()
+    rrt = RRTPlanner(problem, seed=0)
+    rrt.solve()
+    opt = TrajectoryOptimizationPlanner(
+        problem, n_steps=40, transcription="direct_collocation"
+    )
+    solution = opt.solve()
+
+    figures = [
+        panel(
+            "plot_phase_plane", lambda: swing.plot_phase_plane(swing.traj, show=False)
+        ),
+        panel("plot_bode", lambda: plant.plot_bode(show=False)),
+        panel(
+            "lqr @ plant: plot_step_response",
+            lambda: loop.plot_step_response(x_up, show=False),
+        ),
+        panel(
+            "DynamicProgrammingPlanner: plot_cost2go",
+            lambda: vi.plot_cost2go(jmax=60.0, show=False),
+        ),
+        panel("RRTPlanner: plot_tree", lambda: rrt.plot_tree(show=False)),
+        panel(
+            "TrajectoryOptimizationPlanner: plot_trajectory",
+            lambda: solution.plot_trajectory(show=False),
+        ),
+    ]
+    montage_png(figures, STATIC / "tool_montage.png", columns=3)
+    plt.close("all")
+    print("tool_montage.png")
 
 
 def gif_cartpole() -> None:
@@ -391,8 +465,8 @@ def gif_rocket() -> None:
 
 # name: (builder, the files it writes under docs/_static)
 ASSETS = {
-    "bridges": (svg_bridges, ["bridges.svg"]),
     "diagram": (diagram_png, ["diagram_closed_loop.png"]),
+    "montage": (tool_montage, ["tool_montage.png"]),
     "cartpole": (gif_cartpole, ["cartpole_swingup.gif"]),
     "ur5": (ur5_impedance, ["ur5_meshcat.gif", "showcase/ur5_impedance.html"]),
     "racecar": (racecar_mpc, ["racecar_mpc.gif", "showcase/racecar_mpc.html"]),

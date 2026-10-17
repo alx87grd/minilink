@@ -3,6 +3,10 @@
 from minilink.core.backends import array_module
 from minilink.core.system import DynamicSystem
 
+###############################################################################
+# Public API
+###############################################################################
+
 
 class Integrator(DynamicSystem):
     """Single integrator block: ``dx = k * u``, ``y = x``.
@@ -13,15 +17,16 @@ class Integrator(DynamicSystem):
 
     def __init__(self):
         super().__init__(n=1, input_dim=1, output_dim=1, y_dependencies=())
-
-        self.params = {"k": 1.0}
-
         self.name = "Integrator"
+
+        # Parameters: the integrator gain
+        self.params = {"k": 1.0}
 
     def f(self, x, u, t=0, params=None):
         params = self.params if params is None else params
-        k = params["k"]
         xp = array_module(u)
+
+        k = params["k"]
 
         dx = xp.array([k * u[0]])
 

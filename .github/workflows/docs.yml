@@ -2,7 +2,7 @@ name: Docs
 
 on:
   push:
-    branches: [main, dev-doc, dev-alex, dev]
+    branches: [main, dev-alex, dev]
   pull_request:
     branches: [main]
   workflow_dispatch:
@@ -34,7 +34,7 @@ jobs:
       - name: Install docs dependencies
         run: |
           python -m pip install --upgrade pip
-          python -m pip install -e ".[docs]"
+          python -m pip install -e ".[dev]"
 
       - name: Build docs
         env:

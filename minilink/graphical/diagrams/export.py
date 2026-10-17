@@ -1,8 +1,12 @@
-"""Diagram topology exporter dispatch."""
+"""Diagram export: a system's block topology in Graphviz or Mermaid form."""
 
 from __future__ import annotations
 
 from minilink.graphical.diagrams.topology import build_diagram_topology
+
+###############################################################################
+# Public API
+###############################################################################
 
 
 class TopologyExporter:
@@ -24,28 +28,47 @@ def export_diagram_topology(
     labelled box; ``expand=False`` exports a nested diagram as one block.
     """
     topology = build_diagram_topology(sys_or_diagram, expand=expand)
-    return _resolve_topology_exporter(backend).export(topology, **kwargs)
+    exporter = resolve_topology_exporter(backend)
+
+    return exporter.export(topology, **kwargs)
 
 
-def _resolve_topology_exporter(backend):
+###############################################################################
+# Internal machinery
+###############################################################################
+
+
+def resolve_topology_exporter(backend):
+    """The exporter ``backend`` names: an exporter passed as is, or ``"graphviz"`` or ``"mermaid"``."""
+    # An exporter, or any other object with an export method, is used as given
     if isinstance(backend, TopologyExporter):
         return backend
     if not isinstance(backend, str):
+        require_exporter(backend)
         return backend
 
+    # A name, read without case or surrounding spaces
     key = backend.strip().lower()
     if key == "graphviz":
-        from minilink.graphical.diagrams.dot import (
-            GraphvizTopologyExporter,
-        )
+        # A real cycle: dot imports TopologyExporter from this module
+        from minilink.graphical.diagrams.dot import GraphvizTopologyExporter
 
         return GraphvizTopologyExporter()
     if key == "mermaid":
-        from minilink.graphical.diagrams.mermaid import (
-            MermaidTopologyExporter,
-        )
+        # A real cycle: mermaid imports TopologyExporter from this module
+        from minilink.graphical.diagrams.mermaid import MermaidTopologyExporter
 
         return MermaidTopologyExporter()
+
     raise ValueError(
         f"Unknown topology backend {backend!r}. Expected 'graphviz' or 'mermaid'."
     )
+
+
+def require_exporter(backend):
+    """Refuse an object that is neither a backend name nor an exporter with an ``export`` method."""
+    if not callable(getattr(backend, "export", None)):
+        raise TypeError(
+            "backend must be 'graphviz', 'mermaid' or an exporter with an "
+            f"export(topology) method, got {type(backend).__name__}"
+        )

@@ -382,6 +382,36 @@ def test_monte_carlo_applies_the_law_beyond_the_port_bounds():
     np.testing.assert_allclose(reports["simulator"].J, reports["numpy"].J, rtol=0.1)
 
 
+def test_an_exiting_trial_scores_alike_on_numpy_and_the_simulator():
+    """An exit is charged the trial environment's price on both backends."""
+    import warnings
+
+    from minilink.control import StateFeedbackController
+    from minilink.planning.evaluation import MonteCarloEvaluator
+
+    plant = pendulum()
+    plant.inputs["u"].lower_bound = np.array([-1.0])
+    plant.inputs["u"].upper_bound = np.array([1.0])
+    problem = StochasticPlanningProblem(
+        plant,
+        cost=quadratic(plant),
+        tf=np.inf,
+        X=plant.state.box,
+        x0_distribution=Particles([[6.0, 5.0]]),  # leaves θ ≤ 2π within 0.1 s
+    )
+    ctl = StateFeedbackController(K=[[0.0, 0.0]])
+    reports = {}
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")  # the announced price of leaving X
+        for backend in ("numpy", "simulator"):
+            reports[backend] = MonteCarloEvaluator(
+                problem, dt=0.01, n_trials=1, episode_length=1.0, backend=backend
+            ).evaluate(ctl)
+    assert reports["numpy"].failed[0] and reports["simulator"].failed[0]
+    assert np.isfinite(reports["numpy"].J[0])
+    np.testing.assert_allclose(reports["simulator"].J, reports["numpy"].J, rtol=0.05)
+
+
 def test_simulator_backend_scores_a_controller_with_internal_state():
     """The controller state is stacked first; the score reads the plant's own trajectory."""
     from minilink import PID, SingleMass
@@ -577,10 +607,30 @@ def test_deterministic_planner_warns_on_a_stochastic_problem():
         tf=2.0,
         x0_distribution=Uniform([-0.1, -0.1], [0.1, 0.1]),
     )
-    with pytest.warns(UserWarning, match="deterministic planner"):
+    with pytest.warns(
+        UserWarning, match="deterministic planner: it reads the start set X0"
+    ):
         TrajectoryOptimizationPlanner(
             problem, n_steps=5, transcription="direct_collocation"
         )
+
+
+def test_nominal_keeps_the_mean_start_and_drops_the_support_and_x_start():
+    from minilink.core.sets import SingletonSet
+
+    plant = pendulum()
+    problem = StochasticPlanningProblem(
+        plant,
+        cost=quadratic(plant),
+        tf=2.0,
+        x_start=[0.05, 0.0],
+        x0_distribution=Uniform([-0.1, -0.1], [0.1, 0.1]),
+    )
+    assert problem.X0.contains(np.array([0.08, -0.08]))  # the support
+    nominal = problem.nominal()
+    np.testing.assert_allclose(nominal.x_start, [0.0, 0.0])  # the mean
+    assert isinstance(nominal.X0, SingletonSet)
+    np.testing.assert_allclose(nominal.X0.point, [0.0, 0.0])
 
 
 def test_gymnasium_view_of_a_stochastic_problem():
@@ -685,3 +735,50 @@ def jax_available():
     import importlib.util
 
     return importlib.util.find_spec("jax") is not None
+
+
+def test_monte_carlo_scores_a_time_varying_law_at_each_instant():
+    pytest.importorskip("jax")
+    import jax
+
+    from minilink.control.state import TimeVaryingStateFeedbackController
+    from minilink.planning.evaluation import MonteCarloEvaluator, control_law
+
+    t = np.linspace(0.0, 1.0, 5)
+    K = np.stack([np.array([[1.0 + 10.0 * k, 0.5]]) for k in range(5)])
+    ctl = TimeVaryingStateFeedbackController(t, K)
+    x = np.array([0.3, -0.1])
+    grid = np.linspace(0.0, 1.0, 21)
+    for backend in ("numpy", "jax"):
+        law = control_law(ctl, grid, backend)
+        if backend == "jax":
+            law = jax.jit(law)
+        for t_k in (0.0, 0.5, 0.95):
+            expected = ctl.ctl(None, np.concatenate([x, np.zeros(2)]), t_k)
+            np.testing.assert_allclose(np.asarray(law(x, t_k)), expected, rtol=1e-12)
+
+    problem = StochasticPlanningProblem(
+        pendulum(),
+        cost=QuadraticCost.from_system(pendulum()),
+        x0_distribution=Particles([[0.5, 0.0]]),
+        tf=1.0,
+    )
+    reports = {
+        backend: MonteCarloEvaluator(
+            problem, dt=0.01, n_trials=1, episode_length=1.0, backend=backend
+        ).evaluate(ctl)
+        for backend in ("jax", "numpy", "simulator")
+    }
+    np.testing.assert_allclose(reports["jax"].J, reports["numpy"].J, rtol=1e-6)
+    # O(dt) apart; the law frozen at t = 0 scored 0.97 against 45 here
+    np.testing.assert_allclose(reports["simulator"].J, reports["numpy"].J, rtol=0.05)
+
+
+def test_a_disturbance_on_the_command_port_is_refused():
+    with pytest.raises(ValueError, match="command port of sys"):
+        StochasticPlanningProblem(
+            pendulum(),
+            cost=QuadraticCost.from_system(pendulum()),
+            x0_distribution=Particles([[0.5, 0.0]]),
+            disturbances={"u": Gaussian([0.0], 0.1)},
+        )

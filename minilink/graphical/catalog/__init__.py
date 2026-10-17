@@ -1,14 +1,4 @@
-"""Public graphical catalog: curated shapes, skins, and camera factories.
-
-The one-stop import surface for demos and student plants, mirroring
-``dynamics.catalog`` for plants:
-
-    from minilink.graphical.catalog import Box, Circle, Arrow, car_skin_3d
-    from minilink.graphical.catalog import follow_frame_camera, fixed_camera
-
-Classes and functions live in the internal ``graphical/animation/`` band; this
-package is the friendly re-export, resolved on first use.
-"""
+"""Graphical catalog: the shapes, skins, overlays and cameras systems are drawn with."""
 
 from __future__ import annotations
 
@@ -19,9 +9,17 @@ _SKINS = "minilink.graphical.catalog.skins"
 _CAMERA = "minilink.graphical.animation.camera"
 _DRAWABLES = "minilink.graphical.animation.drawables"
 
-# name -> (module path, attribute)
+# The one-stop import surface for demos and student plants, mirroring
+# ``dynamics.catalog`` for plants, e.g.
+#
+#     from minilink.graphical.catalog import Box, Circle, Arrow, car_skin_3d
+#     from minilink.graphical.catalog import follow_frame_camera, fixed_camera
+#
+# The classes and functions live in the internal ``graphical/animation/`` band; this
+# package is the friendly re-export, resolved on first use. Each exported name maps to
+# its (module path, attribute).
 _EXPORTS: dict[str, tuple[str, str]] = {
-    # shapes
+    # Shapes
     "Arrow": (_SHAPES, "Arrow"),
     "Box": (_SHAPES, "Box"),
     "Circle": (_SHAPES, "Circle"),
@@ -44,17 +42,17 @@ _EXPORTS: dict[str, tuple[str, str]] = {
     "point_pose": (_SHAPES, "point_pose"),
     "vehicle_body": (_SHAPES, "vehicle_body"),
     "wheel_box": (_SHAPES, "wheel_box"),
-    # overlays
+    # Overlays
     "Replay": (_DRAWABLES, "Replay"),
     "SceneHistory": (_DRAWABLES, "SceneHistory"),
-    # skins
+    # Skins
     "car_skin_2d": (_SKINS, "car_skin_2d"),
     "car_skin_3d": (_SKINS, "car_skin_3d"),
     "debug_state_skin": (_SKINS, "debug_state_skin"),
     "merge_skins": (_SKINS, "merge_skins"),
     "plane_skin_3d": (_SKINS, "plane_skin_3d"),
     "ur5_skin": (_SKINS, "ur5_skin"),
-    # camera
+    # Camera
     "camera_matrix": (_CAMERA, "camera_matrix"),
     "fixed_camera": (_CAMERA, "fixed_camera"),
     "follow_frame_camera": (_CAMERA, "follow_frame_camera"),

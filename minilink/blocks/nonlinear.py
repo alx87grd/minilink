@@ -5,16 +5,25 @@ import numpy as np
 from minilink.core.backends import array_module
 from minilink.core.system import DynamicSystem, System
 
+###############################################################################
+# Public API
+###############################################################################
+
 
 class Saturation(System):
     """Symmetric or asymmetric clip ``y = clip(u, lower, upper)``."""
 
     def __init__(self, lower=-1.0, upper=1.0, dim=1):
+        require_ordered_end_stops(lower, upper)
+
         super().__init__()
         self.name = "Saturation"
+
+        # Parameters: the number of channels and the clip limits
         self.dim = int(dim)
         self.params = {"lower": float(lower), "upper": float(upper)}
 
+        # Ports
         self.add_input_port("u", dim=self.dim)
         self.add_output_port(
             "y", dim=self.dim, function=self.compute, dependencies="all"
@@ -22,10 +31,10 @@ class Saturation(System):
 
     def compute(self, x, u, t=0, params=None):
         params = self.params if params is None else params
+        xp = array_module(u)
+
         lower = params["lower"]
         upper = params["upper"]
-
-        xp = array_module(u)
 
         y = xp.clip(u, lower, upper)
 
@@ -42,9 +51,12 @@ class DeadZone(System):
     def __init__(self, width=1.0, dim=1):
         super().__init__()
         self.name = "DeadZone"
+
+        # Parameters: the number of channels and the half-width of the zone
         self.dim = int(dim)
         self.params = {"width": float(width)}
 
+        # Ports
         self.add_input_port("u", dim=self.dim)
         self.add_output_port(
             "y", dim=self.dim, function=self.compute, dependencies="all"
@@ -52,9 +64,11 @@ class DeadZone(System):
 
     def compute(self, x, u, t=0, params=None):
         params = self.params if params is None else params
+        xp = array_module(u)
+
         width = params["width"]
 
-        xp = array_module(u)
+        # y = u − width above the zone, u + width below it, zero inside
         above = xp.where(u > width, u - width, 0.0)
         below = xp.where(u < -width, u + width, 0.0)
         y = above + below
@@ -68,9 +82,12 @@ class Relay(System):
     def __init__(self, amplitude=1.0, dim=1):
         super().__init__()
         self.name = "Relay"
+
+        # Parameters: the number of channels and the output amplitude
         self.dim = int(dim)
         self.params = {"amplitude": float(amplitude)}
 
+        # Ports
         self.add_input_port("u", dim=self.dim)
         self.add_output_port(
             "y", dim=self.dim, function=self.compute, dependencies="all"
@@ -78,9 +95,9 @@ class Relay(System):
 
     def compute(self, x, u, t=0, params=None):
         params = self.params if params is None else params
-        amplitude = params["amplitude"]
-
         xp = array_module(u)
+
+        amplitude = params["amplitude"]
 
         y = amplitude * xp.sign(u)
 
@@ -114,37 +131,42 @@ class RateLimiter(DynamicSystem):
         dim: int = 1,
         x0=0.0,
     ):
-        if rate_max <= 0.0:
-            raise ValueError("rate_max must be positive (it scales the tanh)")
-        if tau <= 0.0:
-            raise ValueError("tau must be positive (it divides the lag rate)")
-        if upper < lower:
-            raise ValueError("the upper end stop must sit above the lower one")
+        require_rate_limiter(rate_max, tau, lower, upper)
 
         super().__init__(n=int(dim), input_dim=int(dim), output_dim=int(dim))
-
         self.name = "Rate Limiter"
+
+        # Parameters
         self.params = {
             "rate_max": float(rate_max),
             "tau": float(tau),
             "lower": float(lower),
             "upper": float(upper),
         }
+
+        # Signal labels: the limited command of each channel
         self.state.labels = [f"u_lim{i}" for i in range(self.n)]
+
+        # Initial output: x0 on every channel, held inside the end stops
         self.x0 = np.clip(
             np.broadcast_to(np.asarray(x0, dtype=float), (self.n,)).astype(float),
             lower,
             upper,
         )
+
+        # Solver hint: the lag's time constant is the block's fastest scale
         self.solver_info["smallest_time_constant"] = float(tau)
 
     def f(self, x, u, t=0.0, params=None):
         params = self.params if params is None else params
-        rate_max, tau = params["rate_max"], params["tau"]
-        lower, upper = params["lower"], params["upper"]
         xp = array_module(x, u)
 
-        # a first-order lag toward the clipped command, its slope limited to rate_max
+        rate_max = params["rate_max"]
+        tau = params["tau"]
+        lower = params["lower"]
+        upper = params["upper"]
+
+        # A first-order lag toward the clipped command, its slope limited to rate_max
         x_ref = xp.clip(u, lower, upper)
         dx = rate_max * xp.tanh((x_ref - x) / (tau * rate_max))
 
@@ -152,6 +174,26 @@ class RateLimiter(DynamicSystem):
 
     def h(self, x, u, t=0.0, params=None):
         return x
+
+
+###############################################################################
+# Internal machinery
+###############################################################################
+
+
+def require_rate_limiter(rate_max, tau, lower, upper):
+    """Refuse a rate or a lag that is not positive, or end stops in the wrong order."""
+    if rate_max <= 0.0:
+        raise ValueError("rate_max must be positive (it scales the tanh)")
+    if tau <= 0.0:
+        raise ValueError("tau must be positive (it divides the lag rate)")
+    require_ordered_end_stops(lower, upper)
+
+
+def require_ordered_end_stops(lower, upper):
+    """Refuse an upper end stop below the lower one."""
+    if upper < lower:
+        raise ValueError("the upper end stop must sit above the lower one")
 
 
 if __name__ == "__main__":

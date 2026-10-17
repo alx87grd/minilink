@@ -59,7 +59,8 @@
     "smoke": false
   },
   "examples/teaching/topics/robotics/manipulator_eom.ipynb": {
-    "smoke": false
+    "smoke": false,
+    "nightly": false
   },
   "examples/teaching/courses/udes_gro860/pendulum_value_iteration.ipynb": {
     "smoke": false
@@ -108,7 +109,8 @@
       "pygame",
       "stable_baselines3"
     ],
-    "smoke": false
+    "smoke": false,
+    "nightly": false
   },
   "examples/teaching/topics/reinforcement_learning/pendulum_value_iteration_vs_lqr_vs_rl.ipynb": {
     "requires": [

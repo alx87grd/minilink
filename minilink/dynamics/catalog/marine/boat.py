@@ -7,12 +7,12 @@ from minilink.core.kinematics import SE2, translation
 from minilink.dynamics.abstraction.generalized_mechanical import (
     GeneralizedMechanicalSystem,
 )
-from minilink.graphical.animation.primitives import (
-    Arrow,
-    CustomLine,
-    Point,
-    TorqueArrow,
-)
+from minilink.graphical.animation.primitives import Arrow, CustomLine, TorqueArrow
+from minilink.graphical.catalog.boat_skin import boat_skin_2d
+
+###############################################################################
+# Public API
+###############################################################################
 
 
 class Boat2D(GeneralizedMechanicalSystem):
@@ -25,13 +25,8 @@ class Boat2D(GeneralizedMechanicalSystem):
     def __init__(self):
         super().__init__(dof=3, pos=3, actuators=2)
         self.name = "Planar Boat"
-        self.state.labels = ["x", "y", "theta", "surge", "sway", "yaw_rate"]
-        self.state.units = ["m", "m", "rad", "m/s", "m/s", "rad/s"]
-        self.inputs["u"].labels = ["Tx", "Ty"]
-        self.inputs["u"].units = ["N", "N"]
-        self.outputs["y"].labels = list(self.state.labels)
-        self.outputs["y"].units = list(self.state.units)
 
+        # Parameters: the hull's areas and length scale with the thruster lever arm
         l_t = 3.0
         self.params = {
             "mass": 10000.0,
@@ -48,31 +43,45 @@ class Boat2D(GeneralizedMechanicalSystem):
             "loa": 2.0 * l_t,
         }
 
-        # Graphic parameters (not part of the EoM)
+        # Signal labels and units
+        self.state.labels = ["x", "y", "theta", "surge", "sway", "yaw_rate"]
+        self.state.units = ["m", "m", "rad", "m/s", "m/s", "rad/s"]
+        self.inputs["u"].labels = ["Tx", "Ty"]
+        self.inputs["u"].units = ["N", "N"]
+        self.outputs["y"].labels = list(self.state.labels)
+        self.outputs["y"].units = list(self.state.units)
+
+        # Graphics (not part of the equations of motion): the hull's size, a camera
+        # that follows it, and the top-view skin (``boat_skin_3d`` is the hull on the
+        # water)
         self.body_length = 2.0 * l_t
         self.body_width = self.params["Afc"]
         self.camera_scale = 3.0 * self.params["loa"]
         self.camera_follow_frame = "body"
         self.show_hydrodynamic_forces = False
+        self.skin = boat_skin_2d
 
     def M(self, q, params=None):
         params = self.params if params is None else params
-        mass = params["mass"]
-        inertia = params["inertia"]
         xp = array_module(q)
 
-        # rigid-body inertia: equal surge/sway mass, separate yaw inertia
-        H = xp.diag(xp.array([mass, mass, inertia]))
+        mass = params["mass"]
+        inertia = params["inertia"]
 
-        return H
+        # Rigid-body inertia M = diag(m, m, I_z): equal surge and sway mass
+        M = xp.diag(xp.array([mass, mass, inertia]))
+
+        return M
 
     def C(self, q, v, params=None):
         params = self.params if params is None else params
-        mass = params["mass"]
-        yaw_rate = v[2]
         xp = array_module(q, v)
 
-        # Coriolis coupling induced by the body-frame yaw rate
+        mass = params["mass"]
+
+        yaw_rate = v[2]
+
+        # Coriolis coupling of the body-frame yaw rate r: C = [0 −m r 0; m r 0 0; 0 0 0]
         # fmt: off
         C = xp.array([
             [            0.0, -mass * yaw_rate, 0.0],
@@ -84,11 +93,13 @@ class Boat2D(GeneralizedMechanicalSystem):
         return C
 
     def N(self, q, params=None):
-        theta = q[2]
         xp = array_module(q)
-        c, s = xp.cos(theta), xp.sin(theta)
 
-        # body-to-world rotation mapping body velocities to world rates
+        theta = q[2]
+        c = xp.cos(theta)
+        s = xp.sin(theta)
+
+        # The body-to-world rotation R(θ), mapping body velocities to world rates
         # fmt: off
         N = xp.array([
             [  c,  -s, 0.0],
@@ -101,11 +112,13 @@ class Boat2D(GeneralizedMechanicalSystem):
 
     def B(self, q, params=None):
         params = self.params if params is None else params
+        xp = array_module(q)
+
         l_t = params["l_t"]
 
-        # thrust acts a distance l_t aft of the c.g., adding a yaw moment
+        # The thrust acts l_t aft of the c.g., adding the yaw moment −l_t T_y
         # fmt: off
-        B = array_module(q).array([
+        B = xp.array([
             [1.0,  0.0],
             [0.0,  1.0],
             [0.0, -l_t],
@@ -114,21 +127,19 @@ class Boat2D(GeneralizedMechanicalSystem):
 
         return B
 
-    def current_coefficients(self, alpha, params=None):
+    def d(self, q, v, u=None, t=0.0, params=None):
         params = self.params if params is None else params
-        Cx_max = params["Cx_max"]
-        Cy_max = params["Cy_max"]
-        Cm_max = params["Cm_max"]
 
-        # quadratic hydrodynamic coefficients vs. attack angle (Fossen Fig. 6.11)
-        xp = array_module(alpha)
-        Cx = -Cx_max * xp.cos(alpha) * xp.abs(xp.cos(alpha))
-        Cy = Cy_max * xp.sin(alpha) * xp.abs(xp.sin(alpha))
-        Cm = Cm_max * xp.sin(2.0 * alpha)
-        return Cx, Cy, Cm
+        # In still water the flow sees the body velocity itself
+        d = self.damping(v, params)
+
+        return d
 
     def damping(self, relative_velocity, params=None):
+        """Hydrodynamic damping of a water-relative body velocity ``[u_r, v_r, r]``."""
         params = self.params if params is None else params
+        xp = array_module(relative_velocity)
+
         damping_coef = params["damping_coef"]
         rho = params["rho"]
         Afc = params["Afc"]
@@ -136,13 +147,15 @@ class Boat2D(GeneralizedMechanicalSystem):
         loa = params["loa"]
         N_max = params["N_max"]
 
+        # The relative flow: its squared speed V² and attack angle α
         vr = relative_velocity
-        xp = array_module(vr)
         speed_squared = vr[0] ** 2 + vr[1] ** 2
-        alpha = -xp.arctan2(vr[1], vr[0])  # attack angle of the relative flow
+        alpha = -xp.arctan2(vr[1], vr[0])
         Cx, Cy, Cm = self.current_coefficients(alpha, params)
 
-        # linear plus quadratic hydrodynamic damping (Fossen 6.7)
+        # Linear damping D ν_r, plus the quadratic current loads (Fossen 6.7):
+        # X = −½ ρ A_FC C_X V², Y = −½ ρ A_LC C_Y V², and
+        # N = −½ ρ A_LC L_oa C_N V² + N_max ρ A_LC L_oa |r| r
         d_linear = damping_coef * vr
         fx = -0.5 * rho * Afc * Cx * speed_squared
         fy = -0.5 * rho * Alc * Cy * speed_squared
@@ -152,9 +165,23 @@ class Boat2D(GeneralizedMechanicalSystem):
 
         return d
 
-    def d(self, q, v, u=None, t=0.0, params=None):
+    def current_coefficients(self, alpha, params=None):
+        """The current coefficients ``(Cx, Cy, Cm)`` at the attack angle ``alpha``."""
         params = self.params if params is None else params
-        return self.damping(v, params)
+        xp = array_module(alpha)
+
+        Cx_max = params["Cx_max"]
+        Cy_max = params["Cy_max"]
+        Cm_max = params["Cm_max"]
+
+        # Quadratic hydrodynamic coefficients against the attack angle (Fossen
+        # Fig. 6.11): C_X = −C_X,max cos α |cos α|, C_Y = C_Y,max sin α |sin α|,
+        # C_N = C_N,max sin 2α
+        Cx = -Cx_max * xp.cos(alpha) * xp.abs(xp.cos(alpha))
+        Cy = Cy_max * xp.sin(alpha) * xp.abs(xp.sin(alpha))
+        Cm = Cm_max * xp.sin(2.0 * alpha)
+
+        return Cx, Cy, Cm
 
     def body_shape(self):
         """Top-view hull silhouette with the c.g. at the local origin.
@@ -164,6 +191,7 @@ class Boat2D(GeneralizedMechanicalSystem):
         """
         l = self.body_length
         w = self.body_width
+
         pts = np.array(
             [
                 [-0.5 * l, -0.5 * w, 0.0],
@@ -174,45 +202,56 @@ class Boat2D(GeneralizedMechanicalSystem):
                 [-0.5 * l, -0.5 * w, 0.0],
             ]
         )
-        return CustomLine(pts, color="blue", linewidth=2)
 
-    def get_kinematic_geometry(self):
-        return {
-            "body": [self.body_shape()],
-            "center": [Point(color="blue", marker="o", size=5)],
-        }
+        return CustomLine(pts, color="blue", linewidth=2)
 
     def tf(self, x, u, t=0, params=None):
         q = x[:3]
-        T_body = SE2(q[0], q[1], q[2])
+
+        # The yaw-moment arrow turns from the body's lateral axis: θ − π/2
+        theta_torque = q[2] - np.pi / 2.0
+
         return {
-            "body": T_body,
+            "body": SE2(q[0], q[1], q[2]),
             "center": SE2(q[0], q[1], 0.0),
-            "hydrotorque": SE2(q[0], q[1], q[2] - np.pi / 2.0),
+            "hydrotorque": SE2(q[0], q[1], theta_torque),
         }
 
     def get_dynamic_geometry(self, x, u, t=0, params=None):
+        params = self.params if params is None else params
+
+        # Arrow lengths: 2·10⁻⁴ m per newton
         force_scale = 0.0002
+
+        # The thrust arrow along the thrust, ending at the thruster l_t aft of the c.g.
         thrust_len = force_scale * np.hypot(u[0], u[1])
         a = np.arctan2(u[1], u[0])
-        d = np.array([np.cos(a), np.sin(a)])
-        l_t = self.params["l_t"]
+        thrust_dir = np.array([np.cos(a), np.sin(a)])
+        l_t = params["l_t"]
         thrust = Arrow(
-            base=-thrust_len * d,
-            vector=d,
+            base=-thrust_len * thrust_dir,
+            vector=thrust_dir,
             scale=thrust_len,
             color="red",
             linewidth=2,
         )
         thrust.local_transform = translation(-l_t, 0.0, 0.0)
         dynamic = {"body": [thrust]}
+
+        # On request, the hydrodynamic force at the c.g. and its yaw moment
         if self.show_hydrodynamic_forces:
             q = x[:3]
-            rho = self.params["rho"]
-            Alc = self.params["Alc"]
-            loa = self.params["loa"]
-            Cm_max = self.params["Cm_max"]
-            hydro_force = -self.d(q, x[3:], u, t)
+            rho = params["rho"]
+            Alc = params["Alc"]
+            loa = params["loa"]
+            Cm_max = params["Cm_max"]
+
+            # The force the water applies: −d, since d sits on the left side
+            d = self.d(q, x[3:], u, t, params)
+            hydro_force = -d
+
+            # A full turn of the torque arrow is the current moment at V² = 12 m²/s²,
+            # ½ ρ A_LC L_oa C_N,max 12
             torque_max = abs(0.5 * rho * Alc * loa * Cm_max * 12.0)
             hf_len = force_scale * np.hypot(hydro_force[0], hydro_force[1])
             hf_a = np.arctan2(hydro_force[1], hydro_force[0])
@@ -237,6 +276,7 @@ class Boat2D(GeneralizedMechanicalSystem):
                     style="--",
                 )
             ]
+
         return dynamic
 
 
@@ -246,44 +286,60 @@ class Boat2DWithCurrent(Boat2D):
     def __init__(self):
         super().__init__()
         self.name = "Planar Boat With Current"
+
+        # Parameters: the current's velocity in the world frame
         self.params["current_velocity"] = np.array([-1.0, -1.0])
 
     def d(self, q, v, u=None, t=0.0, params=None):
         params = self.params if params is None else params
+        xp = array_module(q, v)
+
         current_velocity = params["current_velocity"]
 
-        xp = array_module(q, v)
         N = self.N(q, params)
 
-        # damp the water-relative velocity (current subtracted in body frame)
+        # The current in body axes: ν_c = Nᵀ [V_x, V_y, 0]
         world_current = xp.array([current_velocity[0], current_velocity[1], 0.0])
         body_current = N.T @ world_current
-        d = self.damping(v - body_current, params)
+
+        # The damping acts on the water-relative velocity ν_r = ν − ν_c
+        relative_velocity = v - body_current
+        d = self.damping(relative_velocity, params)
 
         return d
 
     def tf(self, x, u, t=0, params=None):
-        frames = super().tf(x, u, t)
-        loa = self.params["loa"]
+        params = self.params if params is None else params
+
+        frames = super().tf(x, u, t, params)
+        loa = params["loa"]
+
+        # The current arrow, one hull length up and to the left of the boat
         frames["current"] = translation(x[0] - loa, x[1] + loa, 0.0)
+
         return frames
 
     def get_dynamic_geometry(self, x, u, t=0, params=None):
-        dynamic = super().get_dynamic_geometry(x, u, t)
-        current_velocity = self.params["current_velocity"]
-        loa = self.params["loa"]
+        params = self.params if params is None else params
+
+        dynamic = super().get_dynamic_geometry(x, u, t, params)
+        current_velocity = params["current_velocity"]
+        loa = params["loa"]
+
+        # The current arrow along the current, half a hull length per m/s
         length = 0.5 * loa * np.hypot(current_velocity[0], current_velocity[1])
         a = np.arctan2(current_velocity[1], current_velocity[0])
-        d = np.array([np.cos(a), np.sin(a)])
+        current_dir = np.array([np.cos(a), np.sin(a)])
         dynamic["current"] = [
             Arrow(
-                base=-length * d,
-                vector=d,
+                base=-length * current_dir,
+                vector=current_dir,
                 scale=length,
                 color="green",
                 linewidth=2,
             )
         ]
+
         return dynamic
 
 

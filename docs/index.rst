@@ -20,6 +20,7 @@ The user guide is the tutorial notebooks; this site is the API reference.
    api/dynamics
    api/blocks
    api/control
+   api/estimation
    api/analysis
    api/optimization
    api/planning

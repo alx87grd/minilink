@@ -2,7 +2,12 @@
 
 import numpy as np
 
+from minilink.core.backends import array_module
 from minilink.core.system import System
+
+###############################################################################
+# Public API
+###############################################################################
 
 
 class Allocation(System):
@@ -28,10 +33,13 @@ class Allocation(System):
     ):
         super().__init__(0)
         self.name = name
+
+        # Parameters: the rear wheel radius, the engine's peak power, the gear ratio
         self.r_r = float(r_r)
         self.engine_power_peak = float(engine_power_peak)
         self.transmission_ratio = float(transmission_ratio)
 
+        # Ports: the servo commands and the plant output in, the plant's inputs out
         self.add_input_port("F_rear", nominal_value=np.array([0.0]))
         self.add_input_port("delta", nominal_value=np.array([0.0]))
         self.add_input_port("y", nominal_value=np.zeros(10))
@@ -49,16 +57,33 @@ class Allocation(System):
         )
 
     def h_throttle(self, x, u, t=0.0, params=None):
-        F_rear = float(u[0])
-        w_rear = float(u[8])  # y[6] after F_rear(1) + delta(1)
+        xp = array_module(u)
 
-        tau_rear_required = F_rear * self.r_r
-        w_engine = max(w_rear * self.transmission_ratio, 1.0)
-        tau_max = self.engine_power_peak / w_engine
-        throttle = tau_rear_required / tau_max
-        throttle = float(np.clip(throttle, 0.0, 1.0))
-        return np.array([throttle], dtype=float)
+        r_r = self.r_r
+        engine_power_peak = self.engine_power_peak
+        transmission_ratio = self.transmission_ratio
+
+        F_rear = u[0:1]
+        w_rear = u[8:9]  # The plant's y[6]: u stacks F_rear, delta, then y
+
+        # τ_required = F_rear r_r, the rear torque the force asks for
+        tau_rear_required = F_rear * r_r
+
+        # τ_max = P_peak / ω_engine, the power-limited torque, ω_engine = max(N ω_r, 1)
+        w_engine = xp.maximum(w_rear * transmission_ratio, 1.0)
+        tau_max = engine_power_peak / w_engine
+
+        # throttle = clip(τ_required / τ_max, 0, 1)
+        throttle_out = xp.clip(tau_rear_required / tau_max, 0.0, 1.0)
+
+        return throttle_out
 
     def h_delta(self, x, u, t=0.0, params=None):
-        delta = float(u[1])
-        return np.array([delta], dtype=float)
+        xp = array_module(u)
+
+        delta = u[1:2]
+
+        # The steer passes through: δ_out = δ
+        delta_out = xp.array(delta)
+
+        return delta_out

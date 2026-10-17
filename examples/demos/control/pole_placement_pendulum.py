@@ -2,7 +2,7 @@
 
 import numpy as np
 
-from minilink import InvertedPendulum, place_at_operating_point
+from minilink import InvertedPendulum, place
 
 plant = InvertedPendulum()
 x_bar = np.array([0.0, 0.0])  # upright
@@ -11,7 +11,7 @@ poles = [-3.0 - 3j, -3.0 + 3j]
 # poles=[-3.0, -3.0]
 # poles = [-10, -1]
 
-ctl = place_at_operating_point(plant, x_bar, poles=poles)
+ctl = place(plant, poles, x_bar=x_bar)
 
 lin = plant.linearize(x_bar)
 K = ctl.params["K"]

@@ -13,7 +13,9 @@ from minilink.planning.policy_synthesis.progress import (
     print_build_complete,
 )
 
+###############################################################################
 # Public API
+###############################################################################
 
 
 def value_iteration(planner, max_sweeps, stop_on_tol=True) -> DynamicProgrammingResult:
@@ -32,12 +34,14 @@ def value_iteration(planner, max_sweeps, stop_on_tol=True) -> DynamicProgramming
     a grid with ``precompute=False`` for a time-varying problem.
     """
     jax = ensure_jax_x64()
+
     opt = planner.options
 
     # Device tables and the cost-to-go at the final time
     G, coords, in_bounds = device_tables(planner)
     J0 = jax.numpy.asarray(terminal_cost(planner, opt.final_time))
 
+    # Reported or recorded: one jitted step at a time, driven from Python
     if opt.verbose or opt.record_history:
         return sweep_by_sweep(
             planner, J0, G, coords, in_bounds, max_sweeps, stop_on_tol
@@ -62,6 +66,7 @@ def terminal_cost(planner, t) -> np.ndarray:
     """Terminal cost at every grid node (JAX vmap over N nodes)."""
     jax = ensure_jax_x64()
     jnp = jax.numpy
+
     grid = planner.grid
     h = planner.problem.cost.h
     cost_params = planner.problem.params.cost
@@ -99,12 +104,15 @@ def running_cost_table(planner, t) -> np.ndarray:
     """Running cost of every (node, action) pair over one step, with the out-of-bound penalty (JAX vmap)."""
     jax = ensure_jax_x64()
     jnp = jax.numpy
+
     grid = planner.grid
     g = planner.problem.cost.g
     cost_params = planner.problem.params.cost
     dt = grid.dt
-    N, A = grid.nodes_n, grid.actions_n
+    N = grid.nodes_n
+    A = grid.actions_n
     verbose = planner.options.verbose
+    price = planner.options.out_of_bound_cost
 
     states = jnp.asarray(grid.states)
     inputs = jnp.asarray(grid.inputs)
@@ -112,7 +120,7 @@ def running_cost_table(planner, t) -> np.ndarray:
     if verbose:
         print(f"Computing g(x,u,t) look-up table.. {N * A:,} pairs", flush=True)
 
-    # Running cost of one pair over one step
+    # Running cost of one pair over one step: g(x, u, t) dt
     def pair(s, a):
         return g(states[s], inputs[a], t, cost_params) * dt
 
@@ -137,7 +145,6 @@ def running_cost_table(planner, t) -> np.ndarray:
     # the price of each pair's successor
     x_next, action_ok, x_next_ok = grid.transition(t)
     inadmissible = ~(action_ok & x_next_ok)
-    price = planner.options.out_of_bound_cost
     if callable(price):
         exits = jnp.asarray(x_next[inadmissible])
 
@@ -166,28 +173,32 @@ def running_cost_table(planner, t) -> np.ndarray:
     return G
 
 
+###############################################################################
 # Internal machinery
+###############################################################################
 
 
 def device_tables(planner):
     """Device copies of the running-cost table and of the successors as fractional grid indices."""
+    # Built once per planner, at the final time
     cached = planner._jax_cache.get("tables")
     if cached is not None:
         return cached
 
     jnp = ensure_jax_x64().numpy
+
     grid = planner.grid
     tf = planner.options.final_time
+    interpolation = planner.options.interpolation
     n = grid.n
 
-    if planner.options.interpolation not in ("linear", "nearest"):
-        raise ValueError("JAX backend supports 'linear' or 'nearest' interpolation")
+    require_device_interpolation(interpolation)
 
     # Successors of every pair, and the running-cost table on device
     x_next, _, _ = grid.transition(tf)
     G = jnp.asarray(running_cost_table(planner, tf))
 
-    # Successors as fractional grid indices, shape (n, N*A)
+    # Successors as fractional grid indices, (x_next − x_lb) / Δx, shape (n, N*A)
     x_lb = jnp.asarray(grid.x_lb)
     x_step = jnp.asarray(grid.x_step)
     coords = ((jnp.asarray(x_next.reshape(-1, n)) - x_lb) / x_step).T
@@ -202,98 +213,47 @@ def device_tables(planner):
     return G, coords, in_bounds
 
 
-def jitted_step(planner):
-    """Return (and cache) the jitted single Bellman backup."""
-    cached = planner._jax_cache.get("step")
-    if cached is not None:
-        return cached
-
-    jax = ensure_jax_x64()
-    jnp = jax.numpy
-    from jax.scipy.ndimage import map_coordinates
-
-    shape = tuple(int(s) for s in planner.grid.x_grid_shape)
-    N, A = planner.grid.nodes_n, planner.grid.actions_n
-    alpha = float(planner.options.alpha)
-    order = 0 if planner.options.interpolation == "nearest" else 1
-
-    def step(J, G, coords, in_bounds):
-        # Estimated cost-to-go of all the arrival states
-        J_arrival = map_coordinates(
-            J.reshape(shape), coords, order=order, mode="constant", cval=0.0
-        )
-        J_arrival = jnp.where(in_bounds, J_arrival, 0.0)
-
-        # Matrix version of all the Q values, best action at every node
-        Q = G + alpha * J_arrival.reshape(N, A)
-
-        return Q.min(axis=1), Q.argmin(axis=1).astype(jnp.int32)
-
-    planner._jax_cache["step"] = jax.jit(step)
-
-    return planner._jax_cache["step"]
-
-
-def compiled_loop(planner, stop_on_tol, max_sweeps):
-    """Return (and cache) the jitted whole value-iteration loop."""
-    key = (bool(stop_on_tol), int(max_sweeps))
-    cached = planner._jax_cache.get(key)
-    if cached is not None:
-        return cached
-
-    jax = ensure_jax_x64()
-    jnp = jax.numpy
-    step = jitted_step(planner)
-    N = planner.grid.nodes_n
-    tol = float(planner.options.tol)
-
-    def run(J0, G, coords, in_bounds):
-        def keep_going(carry):
-            _, _, k, delta = carry
-            return (k < max_sweeps) & ((delta > tol) | (not stop_on_tol))
-
-        def sweep(carry):
-            J_next, _, k, _ = carry
-            J, pi = step(J_next, G, coords, in_bounds)
-            delta = jnp.max(jnp.abs(J - J_next))
-            return J, pi, k + 1, delta
-
-        init = (J0, jnp.zeros(N, dtype=jnp.int32), jnp.array(0), jnp.array(np.inf))
-
-        return jax.lax.while_loop(keep_going, sweep, init)
-
-    planner._jax_cache[key] = jax.jit(run)
-
-    return planner._jax_cache[key]
+def require_device_interpolation(interpolation):
+    """Refuse an interpolation the device step cannot run (spline methods)."""
+    if interpolation not in ("linear", "nearest"):
+        raise ValueError("JAX backend supports 'linear' or 'nearest' interpolation")
 
 
 def sweep_by_sweep(planner, J0, G, coords, in_bounds, max_sweeps, stop_on_tol):
     """The backward sweeps one jitted step at a time, so each can be reported or recorded."""
     jax = ensure_jax_x64()
     jnp = jax.numpy
+
     opt = planner.options
     tf = opt.final_time
     dt = planner.grid.dt
+    N = planner.grid.nodes_n
     tol = float(opt.tol)
     step = jitted_step(planner)
 
     log = SweepLog(opt, max_sweeps, stop_on_tol)
 
+    # Cost-to-go at the final time
     J = J0
-    pi = jnp.zeros(planner.grid.nodes_n, dtype=jnp.int32)
+    pi = jnp.zeros(N, dtype=jnp.int32)
     log.start(tf, J, pi)
 
+    # Backward sweeps: at most max_sweeps of them, and with stop_on_tol
+    # only until the largest change of the cost-to-go falls under tol
     k = 0
     delta = np.inf
 
     while k < max_sweeps and (not stop_on_tol or delta > tol):
+        # One step back in time
         k = k + 1
         t = tf - k * dt
 
+        # Bellman backup from the cost-to-go one step ahead, on device
         J_next = J
         J, pi = step(J_next, G, coords, in_bounds)
         jax.block_until_ready(J)
 
+        # Largest change of the cost-to-go: the convergence measure
         delta = float(jnp.max(jnp.abs(J - J_next)))
 
         log.sweep(k, t, J, J_next, pi)
@@ -310,11 +270,96 @@ def sweep_by_sweep(planner, J0, G, coords, in_bounds, max_sweeps, stop_on_tol):
     )
 
 
+def compiled_loop(planner, stop_on_tol, max_sweeps):
+    """Return (and cache) the jitted whole value-iteration loop."""
+    # Compiled once per (stop_on_tol, max_sweeps)
+    key = (bool(stop_on_tol), int(max_sweeps))
+    cached = planner._jax_cache.get(key)
+    if cached is not None:
+        return cached
+
+    jax = ensure_jax_x64()
+    jnp = jax.numpy
+
+    N = planner.grid.nodes_n
+    tol = float(planner.options.tol)
+    step = jitted_step(planner)
+
+    def run(J0, G, coords, in_bounds):
+        # At most max_sweeps sweeps, and with stop_on_tol only until delta ≤ tol
+        def keep_going(carry):
+            _, _, k, delta = carry
+            return (k < max_sweeps) & ((delta > tol) | (not stop_on_tol))
+
+        def sweep(carry):
+            J_next, _, k, _ = carry
+
+            # One step back in time
+            k = k + 1
+
+            # Bellman backup from the cost-to-go one step ahead
+            J, pi = step(J_next, G, coords, in_bounds)
+
+            # Largest change of the cost-to-go: the convergence measure
+            delta = jnp.max(jnp.abs(J - J_next))
+
+            return J, pi, k, delta
+
+        # The cost-to-go at the final time, no sweep yet, an infinite change
+        init = (J0, jnp.zeros(N, dtype=jnp.int32), jnp.array(0), jnp.array(np.inf))
+
+        return jax.lax.while_loop(keep_going, sweep, init)
+
+    planner._jax_cache[key] = jax.jit(run)
+
+    return planner._jax_cache[key]
+
+
+def jitted_step(planner):
+    """Return (and cache) the jitted single Bellman backup."""
+    # Compiled once per planner
+    cached = planner._jax_cache.get("step")
+    if cached is not None:
+        return cached
+
+    jax = ensure_jax_x64()
+    jnp = jax.numpy
+    map_coordinates = jax.scipy.ndimage.map_coordinates
+
+    shape = tuple(int(s) for s in planner.grid.x_grid_shape)
+    N = planner.grid.nodes_n
+    A = planner.grid.actions_n
+    alpha = float(planner.options.alpha)
+    order = 0 if planner.options.interpolation == "nearest" else 1
+
+    def step(J_next, G, coords, in_bounds):
+        # Estimated (interpolation) cost-to-go of all the arrival states, zero off
+        # the grid
+        J_arrival = map_coordinates(
+            J_next.reshape(shape), coords, order=order, mode="constant", cval=0.0
+        )
+        J_arrival = jnp.where(in_bounds, J_arrival, 0.0)
+
+        # Q(x, u) = g(x, u) dt + α J_next(x_next), for every pair at once
+        Q = G + alpha * J_arrival.reshape(N, A)
+
+        # Best action at every node
+        J = Q.min(axis=1)
+        pi = Q.argmin(axis=1).astype(jnp.int32)
+
+        return J, pi
+
+    planner._jax_cache["step"] = jax.jit(step)
+
+    return planner._jax_cache["step"]
+
+
 def build_jax_sa_chunks(pair_fn, N, A, jax, jnp, *, interval, verbose, prefix):
     """Fill an ``(N, A)`` table by JAX ``vmap`` over flat state–action indices."""
     total = N * A
     out = np.empty((N, A), dtype=float)
 
+    # A full chunk, compiled once for its shape
     @jax.jit
     def eval_chunk(sa):
         s = sa // A
@@ -326,15 +371,17 @@ def build_jax_sa_chunks(pair_fn, N, A, jax, jnp, *, interval, verbose, prefix):
     for begin in range(0, total, interval):
         end = min(begin + interval, total)
         count = end - begin
+
+        # The full chunks run compiled; the shorter last one runs eagerly
+        sa = jnp.arange(begin, end)
         if count == interval:
-            sa = jnp.arange(begin, end)
             chunk = eval_chunk(sa)
         else:
-            sa = jnp.arange(begin, end)
             s = sa // A
             a = sa % A
             chunk = jax.vmap(pair_fn)(s, a)
 
+        # Flat index sa = s A + a, back to its (s, a) cell
         chunk = np.asarray(chunk)
         idx = np.arange(begin, end)
         out[idx // A, idx % A] = chunk
@@ -352,6 +399,7 @@ def build_jax_node_chunks(node_fn, N, jax, jnp, *, interval, verbose, prefix):
     """Fill a length-``N`` vector by JAX ``vmap`` over node indices."""
     out = np.empty(N, dtype=float)
 
+    # A full chunk, compiled once for its shape
     @jax.jit
     def eval_chunk(idx):
         return jax.vmap(node_fn)(idx)
@@ -361,11 +409,12 @@ def build_jax_node_chunks(node_fn, N, jax, jnp, *, interval, verbose, prefix):
     for begin in range(0, N, interval):
         end = min(begin + interval, N)
         count = end - begin
+
+        # The full chunks run compiled; the shorter last one runs eagerly
+        idx = jnp.arange(begin, end)
         if count == interval:
-            idx = jnp.arange(begin, end)
             chunk = eval_chunk(idx)
         else:
-            idx = jnp.arange(begin, end)
             chunk = jax.vmap(node_fn)(idx)
 
         out[begin:end] = np.asarray(chunk)

@@ -2,7 +2,7 @@
 
 import numpy as np
 
-from minilink import Pendulum, SlidingModeController, Step, closed_loop_qdq
+from minilink import Pendulum, SlidingModeController, Step
 
 plant = Pendulum(length=1.0, mass=1.0)
 model = Pendulum(length=1.0, mass=0.5)
@@ -17,7 +17,7 @@ ref = Step(
 smc = SlidingModeController(model, lam=20.0, gain=8.0, nab=0.15)
 smc.plot_control_law()  # switching surface over (q, dq)
 
-diagram = ref >> closed_loop_qdq(smc, plant)
+diagram = ref >> smc @ plant  # the plant's y is its state [q; dq]
 
 diagram.plot_diagram()
 # discontinuous loop: the automatic grid uses Euler with a small dt (see DESIGN)

@@ -13,5 +13,5 @@ diagram = ref >> ctl @ plant
 diagram.plot_diagram()
 diagram.compute_trajectory(tf=20)
 
-diagram.plot_trajectory(signals=("ref:y", "x", "sys:y", "ctl:u"))  # chosen
+diagram.plot_trajectory(signals=("step:y", "x", "plant:y", "controller:u"))  # chosen
 diagram.plot_trajectory()  # automatic selection

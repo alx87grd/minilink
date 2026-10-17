@@ -1,66 +1,57 @@
-"""The README examples, runnable."""
+"""The README examples, runnable, in the README's order."""
 
 import numpy as np
 
-from minilink import ImpedanceController, Pendulum
-
-controller = ImpedanceController()  # u = Kp * (r - theta) - Kd * theta_dot
-plant = Pendulum()  # theta_ddot = -(g / l) * sin(theta) + tau / (m * l**2)
-
-plant.x0[0] = 2.0
-plant.params["l"] = 5.0
-plant.params["m"] = 1.0
-
-diagram = controller @ plant
-diagram.compute_trajectory(tf=10.0)
-diagram.plot_diagram()
-diagram.plot_trajectory()
-diagram.animate()
-
+from minilink import DynamicSystem
 
 ########################################################
-# What is a System: f for the dynamics, tf and a skin for the animation
-from minilink import DynamicSystem, Step  # noqa: E402
-from minilink.core.kinematics import translation  # noqa: E402
-from minilink.graphical.animation.primitives import Box, ground_line  # noqa: E402
+# Write a model: f, and h to choose what the sensor measures
 
 
 class MassSpringDamper(DynamicSystem):
-    # m p'' + c p' + k p = u
-
     def __init__(self):
-        super().__init__(n=2, input_dim=1, output_dim=2)
-        self.params = {"m": 1.0, "k": 4.0, "c": 0.3}
-        self.skin = lambda sys: {
-            "world": [ground_line(length=8.0)],
-            "body": [Box(length_x=0.6, length_y=0.6, length_z=0.1)],
-        }
-        self.camera_scale = 4.0
+        super().__init__(n=2, input_dim=1, output_dim=1)
 
     def f(self, x, u, t=0, params=None):
-        params = self.params if params is None else params
-        m, k, c = params["m"], params["k"], params["c"]
+        m, k, b = 1.0, 4.0, 0.3
         p, v = x
 
-        # m p̈ + c ṗ + k p = u
-        a = (u[0] - c * v - k * p) / m
+        # m p̈ + b ṗ + k p = u
+        a = (u[0] - b * v - k * p) / m
 
         return np.array([v, a])
 
-    def tf(self, x, u, t=0, params=None):
-        return {"body": translation(x[0], 0.0, 0.0)}
+    def h(self, x, u, t=0, params=None):
+        p, v = x
+
+        return np.array([p])  # the sensor reads the position only
 
 
-msd = MassSpringDamper()
-msd.x0[0] = 1.0
-loop = Step(final_value=np.array([10.0]), step_time=2.0) >> msd
-loop.compute_trajectory(tf=20.0)
-loop.animate()  # renderer="plotly" | "meshcat" | "pygame"
-# msd.game()    # keyboard drives u, live (opens a window)
+plant = MassSpringDamper()
+plant.x0[0] = 1.0
+plant.compute_trajectory(tf=10.0)
+plant.plot_trajectory()
 
 
 ########################################################
-# One problem, three planners
+# Compose into a diagram: a catalog controller on the model above
+from minilink import PID, Pendulum  # noqa: E402
+
+loop = PID(2.0, 0.5, 1.0) @ plant
+loop.compute_trajectory(tf=10.0)
+loop.plot_diagram()
+loop.plot_trajectory()
+
+# A catalog plant: its parameters and start are data
+pendulum = Pendulum()
+pendulum.params["l"] = 2.0
+pendulum.x0[0] = 2.0
+pendulum.compute_trajectory(tf=10.0)
+pendulum.animate()
+
+
+########################################################
+# One problem, every planner
 from minilink import (  # noqa: E402
     BallSet,
     DynamicProgrammingPlanner,
@@ -71,11 +62,6 @@ from minilink import (  # noqa: E402
 )
 
 plant = Pendulum()
-plant.inputs["u"].lower_bound[:] = -5.0
-plant.inputs["u"].upper_bound[:] = 5.0
-plant.state.lower_bound = np.array([-2.0 * np.pi, -12.0])
-plant.state.upper_bound = np.array([2.0 * np.pi, 12.0])
-
 x_down, x_up = np.array([0.0, 0.0]), np.array([np.pi, 0.0])
 problem = PlanningProblem(
     sys=plant,
@@ -88,17 +74,36 @@ problem = PlanningProblem(
 )
 
 vi = DynamicProgrammingPlanner(problem, x_grid=(101, 101), u_grid=(11,), dt=0.05)
-vi.solve()  # value iteration on a grid
-loop = vi.get_controller() @ plant  # the policy is a controller
-loop.compute_trajectory(tf=10.0)
-loop.plot_trajectory()
-
 rrt = RRTPlanner(problem, seed=0)
-tree_traj = rrt.solve().trajectory  # kinodynamic tree search, bang-bang inputs
-rrt.plot_tree(x_axis=0, y_axis=1)
-
 opt = TrajectoryOptimizationPlanner(
     problem, n_steps=40, transcription="direct_collocation"
 )
-opt_traj = opt.solve().trajectory  # direct collocation
+
+policy = vi.solve().policy  # value iteration: the policy is a controller
+tree_traj = rrt.solve().trajectory  # kinodynamic tree search, bang-bang inputs
+plan = opt.solve().trajectory  # direct collocation
+
+loop = policy @ plant  # the script closes the loop
+loop.compute_trajectory(tf=10.0)
+loop.plot_trajectory()
+rrt.plot_tree(x_axis=0, y_axis=1)
 opt.plot_solution(signals=("x", "u"))
+
+
+########################################################
+# Fast and differentiable with JAX, optional
+from importlib.util import find_spec  # noqa: E402
+
+if find_spec("jax") is None:
+    print("JAX is not installed: the differentiable block is skipped")
+else:
+    plant = Pendulum()
+    ev = plant.compile(backend="jax")
+    x0s = np.tile([1.0, 0.0], (1000, 1))  # 1000 rollouts released at 1 rad
+    lengths = np.linspace(0.5, 2.0, 1000)  # one rod length per rollout
+
+    A = plant.jacobian("f", "x", x_up)  # exact linearization
+    S = plant.jacobian("f", "params", x_up)  # sensitivity to each physical parameter
+    xs = ev.rollout_batch(
+        x0s, n_steps=1000, dt=0.005, params=dict(plant.params, l=lengths)
+    )  # a family of rod lengths, one call

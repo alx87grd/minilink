@@ -1,55 +1,48 @@
 # Minilink AI Agent Instructions
 
-**Always read CONSTITUTION.md before any interaction** — including questions,
+**Always read docs/dev/CONSTITUTION.md before any interaction** — including questions,
 reviews, and plans that do not touch code.
 
-**Also read RULES.md before editing code** under `minilink/` (or tests, examples,
+**Also read docs/dev/RULES.md before editing code** under `minilink/` (or tests, examples,
 and other Python that implements or exercises that code).
 
 This file is workflow: what to read, when to ask, and the local CI gate.
-User API: README.md. Contracts: DESIGN.md. Maturity: ROADMAP.md.
+User API: README.md. Contracts: docs/dev/DESIGN.md. Maturity: docs/dev/ROADMAP.md.
 Pytest policy: tests/README.md. Examples map: examples/README.md.
 
-## The textbook rule: every piece of math, every time
+## Before you start: check the remote
 
-Minilink is read by students next to the textbook. This rule applies to every line of
-math an agent writes or touches, in new code and in edits alike. That means equation
-methods (`f`, `h`, `g`, …) and also every algorithm: analysis tools, controller and
-observer design, planners, solvers, learning updates. It is not a refactor-pass nicety;
-it is the acceptance bar. The maintainer should never have to ask for it.
+A local checkout goes stale: cloud sessions push to `origin` while a local branch sits
+behind, and work done on a stale branch has been lost several times, a full docs pass
+included. Before any review, plan or edit:
 
-- **The math is the story.** The function body shows every step of the algorithm in the
-  order the textbook derives it, with the textbook's symbols (`A, B, C, D`, `𝒞`, `𝒪`,
-  `K`, `P`, `J`, `π`, `n, m, p`). This includes the linear algebra: a Kalman matrix, an
-  SVD and its rank, a basis and a projection, a Riccati solve, a Bellman backup. Each is
-  a named line in the body, never hidden in a helper.
-- **The plumbing is not the story.** Array coercion, shape normalization, default
-  filling, validation, backend dispatch, caching and result wrapping go to helpers under
-  `# Internal machinery`, or to the unpack and output beats. If a helper contains an
-  equation from the textbook page, it is in the wrong place.
-- **Three beats, one equation per named line** (RULES 5.3): unpack, then the math, then
-  return a named result. No `self.` in math lines, and no equation on a `return` line.
-- **Equation comments** (RULES 5.22): a one-line comment carries the textbook form when
-  the code cannot. Equations never sit in docstrings.
-- **Helpers carry plain names** (RULES 5.8): a module-level helper is `check_poles`, never
-  `_check_poles`; the `# Internal machinery` section comment is what marks it internal. A
-  leading underscore is only for module-level constants and local closures.
-- **Docstrings and comments are timeless.** They state the math and the contract as a
-  textbook would. They never name the design process (step ids such as `P2`, audits,
-  dates, "decided", "landed"), the course or its exercises, or what another library
-  refuses. That history lives in `docs/plans/`, `docs/reviews/` and the git log. The same
-  holds for test docstrings and comments.
-- **The reference is `planning/policy_synthesis/dp.py`.** Before committing any math,
-  read the diff next to it, and say in the report that you did.
+```bash
+git fetch --all --prune
+git status -sb
+```
 
-A change that breaks this rule is not done, even when the tests pass.
+- **Behind** (`[behind N]`): with a clean tree, `git pull --ff-only`; with local changes,
+  stop and ask the maintainer.
+- **Diverged** (`[ahead N, behind M]`): stop and ask; never rebase, reset or merge on your
+  own.
+- Fetch again before every commit and every push; if the remote moved, say so first.
+- Never force-push a shared branch.
+- Never delete the `main`, `dev` or `dev-alex` branches, even when one is fully merged:
+  they are the maintainer's long-lived branches.
+
+The SessionStart hook in `.claude/settings.json` runs the fetch and prints a warning when
+the branch is behind its upstream; act on it.
+
+## The textbook rule is the acceptance bar
+
+Every line of math an agent writes or touches follows RULES §5 (5.3, 5.8, 5.22, 5.24), in
+new code and in edits alike. Before committing any math, read the diff next to
+`planning/policy_synthesis/dp.py`, the reference, and say in the report that you did. A change
+that breaks this rule is not done, even when the tests pass.
 
 ## Non-negotiables
 
-- **Preserve user edits:** never revert or "clean up" manual changes the user made in
-  demos, notebooks, examples, or scratch code — commented-out plots, tuning constants
-  (`TF`, gains, step times), disabled sections, exploratory variables — unless they
-  explicitly ask. Commit/review passes must not overwrite user-tuned script state.
+- **Preserve user edits:** never revert or "clean up" the user's manual changes (see Workflow).
 - **Docs are contract:** update DESIGN / ROADMAP / README when public behavior or
   maturity claims change; CONSTITUTION / RULES when identity or review law changes.
 - **Coach the architecture:** name tradeoffs; steer toward the simplest clear interface.
@@ -58,19 +51,18 @@ A change that breaks this rule is not done, even when the tests pass.
 
 | Doc | When to update |
 | --- | --- |
-| CONSTITUTION.md | Vision, contract invariants, conflict precedence — maintainer-owned |
-| RULES.md | Universal code and review ladder (humans and agents) |
-| README.md | User workflows, install, examples table |
-| DESIGN.md | Public contracts, package layout, evaluator behavior |
-| ROADMAP.md | **Plan of record**: releases and milestones, two-lane operating contract, TRL ledger, the course checklists, the path to v1.0 (rungs and waves), open decisions, out-of-scope |
+| docs/dev/CONSTITUTION.md | Vision, contract invariants, conflict precedence — maintainer-owned |
+| docs/dev/RULES.md | Universal code and review ladder (humans and agents) |
+| README.md | User workflows, install (conda, Colab, pip), links |
+| docs/dev/DESIGN.md | Public contracts, package layout, evaluator behavior |
+| docs/dev/ROADMAP.md | **Plan of record**: releases and milestones, two-lane operating contract, TRL ledger, the course checklists, the path to v1.0 (rungs and waves), open decisions, out-of-scope |
 | AGENTS.md | Agent workflow, doc map, local CI gate |
-| CLAUDE.md | Entry stub that points here; update only if this reading order changes |
-| docs/plans/TODO.md | The workboard: every open step of ROADMAP §5, by rung, with files and "done when"; Later ideas at the end |
-| docs/plans/ | Design writeups for steps that need one (delete a plan doc once it lands; the index there says which rung each serves) |
-| docs/plans/pyro-port-remaining.md | Pyro parity rows when library or demos land |
-| docs/ | Sphinx autodoc of the teaching-lane API (`docs/api/`, `docs/index.rst`); `experimental/` is repo-only and not on the site. The user guide is `examples/tutorial/`. Every README figure (the showcase GIFs, their interactive 3-D pages in `docs/_static/showcase/`, the diagram PNG, `bridges.svg`) is built by `docs/make_assets.py`; the 3-D GIFs are screenshots of those pages and need Playwright with Chromium, a build-only tool |
-| tests/README.md | Marker policy, test philosophy, **entry points (human · agent · CI)** |
-| docs/reviews/ | Dated architecture audits and the interview decision records; read-only history, never a backlog |
+| CLAUDE.md | The `@AGENTS.md` import, nothing else |
+| .claude/settings.json | The project hooks: SessionStart warns when the branch is behind its upstream |
+| docs/plans/ | The workboard (TODO.md), the design writeups and the parity table; the index there says which rung each serves and holds the "one fact, one home" rule |
+| docs/ | Sphinx autodoc of the teaching-lane API; the README figures are built by `docs/make_assets.py` (its docstring says how) |
+| tests/README.md | Marker policy, test philosophy, **entry points (human · agent · CI)**, the once-per-clone setup (hooks, notebook filter) |
+| docs/reviews/ | Dated rulings records (and the audits a live plan builds on); read-only history, never a backlog. Other audits live in git history |
 
 Keep DESIGN.md call chains minimal.
 
@@ -78,7 +70,7 @@ Keep DESIGN.md call chains minimal.
 
 **Do directly:** typos and stale docs; docstrings/types in files you are already changing for the task; small cleanups that directly support the requested change.
 
-**Never without explicit ask:** revert, uncomment, rename, or "polish" user manual edits in `examples/`, notebooks, or scratch files (tuning params, commented plot/animate calls, exploratory locals). Do not rename or move anything under `examples/teaching/courses/` without the citing documents in the same change: GRO860 is notes + webpage; GRO501 for now is only the Notes-Commande `\colab{}` (no course webpage).
+**Never without explicit ask:** revert, uncomment, rename, or "polish" the user's manual edits in demos, `examples/`, notebooks, or scratch files: tuning constants (`TF`, gains, step times), commented-out plot/animate calls, disabled sections, exploratory locals. Commit and review passes must not overwrite user-tuned script state. Do not rename or move anything under `examples/teaching/courses/` without the citing documents in the same change: GRO860 is notes + webpage; GRO501 for now is only the Notes-Commande `\colab{}` (no course webpage).
 
 **Ask first (maintainer-owned):** anything student-facing (`README.md`,
 `examples/`, notebooks, ROADMAP §1, §2 and §4, public names); **core
@@ -86,15 +78,23 @@ architecture and the API of the main tools** (`System` family, the core
 mathematical objects — `Trajectory`, sets, distributions, costs, fields,
 `PlanningProblem`, `PlanningSolution` — diagrams, compile, `Simulator`,
 planners, `Optimizer`, controllers); any feature or
-user-importable-name removal; delete/rename files; new dependencies; removing
-user scratch code; `CONSTITUTION.md` amendments; dropping a step from ROADMAP §5
+user-importable-name removal; delete/rename files; new dependencies; user
+scratch code (above); `CONSTITUTION.md` amendments; dropping a step from ROADMAP §5
 (a rung is done when its steps land or the maintainer drops them) and closing an
 open decision in ROADMAP §6 (each open item there needs the maintainer).
 
+**Course notebooks are teaching designs, not roadmap items.** The roadmap creates library
+features; whether a course notebook uses one, and how it teaches, is the maintainer's
+pedagogical call. Never add a ROADMAP or TODO row that changes what a course notebook
+does, and never report "notebook X should use feature Y" as a gap; a library gap a
+notebook reveals is still a feature row.
+
 **Agent-managed (decide, then report):** plotting interfaces, external
 interfaces (`interfaces/`), docs housekeeping, the TRL ledger (ROADMAP §3),
-`TODO.md`, recording in ROADMAP §5 and §6 a step that landed or a decision the
-maintainer took, plan-doc housekeeping, tests, `RULES.md` wording that does not
+`TODO.md`, recording a decision the maintainer took (in the plan doc it shapes and a
+dated record under `docs/reviews/`; it then leaves ROADMAP §6), removing a landed step
+from ROADMAP §5 and TODO (one fact, one home:
+[docs/plans/README.md](docs/plans/README.md)), plan-doc housekeeping, tests, `RULES.md` wording that does not
 change a public contract, and internal code structure that does not change a
 public contract. When you spot an opportunity outside your lane, ask — do not act.
 
@@ -111,32 +111,33 @@ public contract. When you spot an opportunity outside your lane, ask — do not 
 5. Never edit modules while a background sweep imports them; write the next edit as a script in the scratchpad and apply it once the sweep reports.
 6. Finish with lint, full `pytest`, the affected demos, and the notebook checks.
 
-**Notebooks:** skip review unless updating renamed imports or user asks; outputs
-stripped by pre-commit (`nbstripout`). After notebook edits, run the notebook smoke check
-(tests/README.md, Agent table, "Notebook change"; the CI `regression` job runs the same).
+**Notebooks:** skip review unless updating renamed imports or user asks; outputs and
+volatile metadata are stripped by the `nbstripout` git filter and pre-commit hook (one
+key list, in `.pre-commit-config.yaml`; set up once per clone, tests/README.md "Setup"),
+and CI fails a notebook committed without them. A clone without the filter (a
+cloud clone, a new machine) runs `pre-commit run nbstripout --all-files` before committing
+a notebook, or sets the filter up first. After notebook edits, run the notebook smoke check
+(tests/README.md, Agent table, "Notebook change"; CI runs it too).
 
 ## Before push or PR (local CI gate)
 
 **Entry points:** tests/README.md (section "entry points") is the one written copy of the
-commands — humans use **`tests/run/`** (IDE Run); agents use its Agent table, and its CI
-table says what each job runs. This section says *when*, by the Agent table's row names.
+commands — humans use **`tests/run/`** (IDE Run); agents use its Agent table. This section
+says *when*, by the Agent table's row names. Run them from the repo root in the conda env
+**`minilink`** (README, Install).
 
-GitHub **CI** (`.github/workflows/test.yml`) is the merge gate. It has four jobs: **`test`** (ruff and `pytest` on Python 3.10–3.13, with a coverage report and no gate on 3.12), **`laptops`** (the Basic tier's `pytest` and the notebook smoke on Windows and macOS, Python 3.12), **`packaging`** (build the sdist and wheel, check them, import the installed wheel), and **`regression`** (`pytest` with JAX, the regression gates, the flagship demos, the notebook smoke). Run the same checks **locally before push or PR** so CI does not fail on lint/format — do **not** poll GitHub Actions after every small commit unless the user asked you to push or verify remote CI.
+GitHub **CI** (`.github/workflows/test.yml`) is the merge gate; tests/README.md's CI table
+lists its jobs and what each runs, and the nightly, publish and docs workflows, which are
+not gates. Run the same checks **locally before push or PR** so CI does not fail on
+lint/format — do **not** poll GitHub Actions after every small commit unless the user asked
+you to push or verify remote CI. A demo that only the nightly sweep exercises still has to
+run — check it locally when you land one.
 
-Three workflows are **not** merge gates: `publish.yml` uploads a `0.*` tag to PyPI once its **`check`** job (ruff and `pytest`) and **`build`** job pass; `nightly.yml` runs every script under `examples/demos/` and every teaching notebook with the full optional stack; `docs.yml` builds the Sphinx site. A demo that only the nightly sweep exercises still has to run — check it locally when you land one.
+**Always before push:** the "Always before push" row, every time. CI runs it on the
+**whole repo**, not only touched files; the pre-commit hooks run the same once the clone
+is set up (tests/README.md, "Setup").
 
-**Always before push** (fast; mirrors CI `test` job; the pre-commit hooks run the same two
-once `pre-commit install` has run in the clone):
-
-```bash
-conda activate minilink
-ruff check .
-ruff format --check .
-```
-
-Fix with `ruff check --fix .` and `ruff format .` when either fails. CI runs these on the **whole repo**, not only touched files.
-
-**Pytest and the gates — proportionate** (the command of each row is in the tests/README.md Agent table):
+**Pytest and the gates — proportionate:**
 
 | Change | Agent-table row |
 | --- | --- |
@@ -148,10 +149,10 @@ Fix with `ruff check --fix .` and `ruff format .` when either fails. CI runs the
 | Big review pass (compile backend, `Simulator`, trajectory optimization, or cross-cutting dynamics changes) | "Regression gates, full local" (its `--update` rule included) |
 | Teaching notebooks | "Notebook change" |
 
-Optional extras (not required every push): `SDL_VIDEODRIVER=dummy pytest` for headless pygame; graphics visual checklist and demo-check runners in tests/README.md when graphical or user-facing demos changed; `sphinx-build -W --keep-going -b html docs docs/_build/html` only when editing `docs/` or docstrings (separate Docs workflow; warnings fail it).
+Optional extras (not required every push): "Headless pygame"; the graphics visual
+checklist and "Demo-check change" when graphical or user-facing demos changed; "Docs
+build" only when editing `docs/` or docstrings (separate Docs workflow; warnings fail it).
 
 **After push:** only check GitHub CI when the user asked to push, open a PR, or debug a reported failure — not as a routine step on every edit.
 
-Use conda env **`minilink`** from environment.yml; setup in README.md (install) (`PYTHONPATH` = repo root).
-
-**Handoff:** re-read the diff for scope creep; preserve user manual edits in demos/notebooks; clean `git status`; short summary of changes and verification.
+**Handoff:** re-read the diff for scope creep; user manual edits intact (see Workflow); clean `git status`; short summary of changes and verification.

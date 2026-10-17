@@ -1,5 +1,13 @@
-# Publish minilink to PyPI from a 0.* git tag (hatch-vcs; not v0.1.0).
-# One-time: GitHub Environment `pypi` + PyPI trusted publisher for this workflow.
+# Publish minilink to PyPI from a 0.* git tag. hatch-vcs reads the version from
+# the tag (0.1.1, not v0.1.1). The wheel ships the teaching surface and the
+# provisional bands; minilink/experimental/ stays repo-only.
+#
+# Release: git tag 0.x.y && git push origin 0.x.y. The `check` job (ruff,
+# pytest) and the `build` job (sdist and wheel, checked, version = tag) must
+# pass; then `publish` uploads with PyPI Trusted Publishing.
+# One-time setup (done): GitHub Environment `pypi` on alx87grd/minilink, and a
+# PyPI trusted publisher (owner alx87grd, repo minilink, workflow publish.yml,
+# environment pypi).
 # workflow_dispatch without a tag only builds; it does not upload.
 name: Publish
 
@@ -30,7 +38,8 @@ jobs:
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install -e ".[dev,rl,diagrams]"
+          pip install -e ".[dev]"
+          pip install gymnasium graphviz
 
       - name: Lint with Ruff
         run: ruff check .

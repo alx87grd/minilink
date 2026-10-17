@@ -19,8 +19,8 @@ import gymnasium as gym
 import numpy as np
 from gymnasium import spaces
 
-from minilink.core.feedback import Controller
 from minilink.core.sets import BoxInputSet
+from minilink.core.system import System
 
 # Public API
 
@@ -162,7 +162,7 @@ class Sys2Gym(gym.Env):
         deterministic :class:`~minilink.planning.problems.PlanningProblem`
         starts every episode at its ``x_start``.
         """
-        from minilink.control.neural import action_port_of
+        from minilink.core.feedback import command_port
         from minilink.planning.problems import as_stochastic
         from minilink.planning.reinforcement_learning.environment import (
             feasible_cost_bound,
@@ -180,7 +180,7 @@ class Sys2Gym(gym.Env):
             env.infeasible_cost = feasible_cost_bound(
                 problem,
                 problem.sys.state.box,
-                action_port_of(problem.sys),
+                command_port(problem.sys),
                 dt,
                 int(round(tf / dt)),
                 float(problem.require_cost().discount_rate),
@@ -281,15 +281,15 @@ class Sys2Gym(gym.Env):
         self._animator.open_live_scene(self._render_backend, self.x, self.u, self.t)
 
 
-class SB3Controller(Controller):
+class SB3Controller(System):
     """
     State-feedback controller wrapping a trained RL policy.
 
     Wraps any model exposing ``predict(obs, deterministic=True)`` (the
     stable-baselines3 API) as a static feedback block ``u = pi(x)``, so a
     learned policy composes with a plant exactly like the other minilink
-    controllers. It is a :class:`~minilink.core.feedback.Controller`, so
-    ``plot_control_law()`` draws the same textbook slice as LQR / VI::
+    controllers. Its input port is named ``x``, so ``plot_control_law()``
+    draws the same textbook slice as LQR / VI::
 
         ctl = SB3Controller(model, sys=plant)
         ctl.plot_control_law(x_axis=2, y_axis=5)
@@ -298,12 +298,6 @@ class SB3Controller(Controller):
     Pass ``sys`` to copy state/input labels, units, and bounds onto the
     ports (sweep domain and axis names for ``plot_control_law``).
     """
-
-    # Explicit port roles: state measurement, no boundary reference.
-    measurement_port = "x"
-    ref_port = None
-    control_port = "u"
-    plot_space = "state"
 
     def __init__(self, model, sys=None, name="RL Policy Controller"):
         super().__init__()

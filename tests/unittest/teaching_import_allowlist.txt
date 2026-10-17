@@ -4,8 +4,6 @@ examples/demos/compile/neural_controller_jax.py minilink.graphical.common.enviro
 examples/demos/compile/neural_controller_jax.py minilink.graphical.common.matplotlib_style
 examples/demos/compile/params_gradient.py minilink.core.backends
 examples/demos/compile/pid_autotuning_jax.py minilink.graphical.signals
-examples/demos/core/readme_examples.py minilink.core.kinematics
-examples/demos/core/readme_examples.py minilink.graphical.animation.primitives
 examples/demos/hybrid/hybrid_multi_rate.py minilink.core.backends
 examples/demos/hybrid/hybrid_multi_rate.py minilink.core.hybrid_composition
 examples/demos/hybrid/sampled_smc_pendulum.py minilink.core.hybrid_composition

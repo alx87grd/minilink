@@ -1,19 +1,7 @@
-# Full tier — notebooks, JAX, animators, symbolic, PPO, plus dev tools and Ipopt.
-# Pip mirror: requirements-full.txt (minus dev tools and Ipopt).
-# Basic tier: environment-basic.yml. Tiers: install.md.
-#
-# Conda-forge package names differ from PyPI where noted in comments.
-#
-# Create:
-#   conda env create -f environment.yml
-#   conda activate minilink
-#
-# Repo-root import (matches README). Inside this env, `pip install -e ".[dev]"`
-# is an alternative to PYTHONPATH (dev tools are already in the yml):
-#   conda env config vars set PYTHONPATH="$PWD"
-#   conda deactivate && conda activate minilink
-#
-# CI tests Python 3.10–3.13; pin below to match your local conda env.
+# The minilink environment: everything the courses use, the dev tools included.
+#   conda env create -f environment.yml && conda activate minilink
+#   conda env config vars set PYTHONPATH="$PWD" && conda deactivate && conda activate minilink
+# CI tests Python 3.10–3.13. Conda-forge names differ from PyPI where noted.
 
 name: minilink
 channels:
@@ -22,44 +10,48 @@ dependencies:
   - python=3.13
   - pip
 
-  # --- core (pyproject [project].dependencies + scipy/matplotlib usage) ---
+  # Core
   - numpy
   - scipy
   - matplotlib
   - graphviz          # Graphviz binaries (dot)
   - python-graphviz   # `import graphviz` in graphical/diagrams/dot.py
 
-  # --- optional: jax ([jax]) ---
+  # JAX
   - jax
   - jaxlib
 
-  # --- optional: symbolic ([symbolic]) ---
+  # Symbolic
   - sympy
 
-  # --- optional: visualization ([visualization]) ---
+  # Animation
   - meshcat-python    # PyPI name: meshcat
   - pygame
 
-  # --- optional: plotting ([plotting]) ---
+  # Plotly
   - plotly
 
-  # --- optional: ipopt ([ipopt]) ---
+  # Ipopt
   - ipopt             # native solver library
   - cyipopt           # `from cyipopt import minimize_ipopt`
 
-  # --- optional: rl ([rl] = gymnasium; SB3/torch for PPO teaching notebooks) ---
+  # Reinforcement learning (Stable-Baselines3 and torch for its teaching notebooks)
   - gymnasium
   - pytorch
   - stable-baselines3
 
-  # --- dev ([dev] + docs) ---
+  # Dev tools
   - pytest
   - pytest-cov
   - ruff
   - pre-commit
+  - nbstripout
+  - python-build      # PyPI name: build
+  - twine
   - sphinx
+  - furo
 
-  # --- notebooks / inline display (IPython in diagrams, meshcat, plotly) ---
+  # Notebooks
   - ipython
   - ipykernel
   - jupyter

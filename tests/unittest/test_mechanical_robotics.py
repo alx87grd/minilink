@@ -410,28 +410,15 @@ class TestMechanicalSystemJax(unittest.TestCase):
 from minilink.dynamics.abstraction.manipulator import Manipulator
 
 
-class TestMechanicalJointPorts(unittest.TestCase):
-    def test_q_and_dq_ports_match_state(self):
+class TestMechanicalPorts(unittest.TestCase):
+    def test_y_is_the_state_and_there_are_no_joint_slices(self):
         sys = MechanicalSystem(dof=2)
         x = np.array([0.1, -0.2, 0.3, 0.4])
-        q = sys.h_q(x, np.zeros(sys.m))
-        dq = sys.h_dq(x, np.zeros(sys.m))
+        np.testing.assert_allclose(sys.h(x, np.zeros(sys.m), 0.0), x)
+        self.assertEqual(list(sys.outputs), ["y", "x"])
+        q, dq = sys.x2q(x)
         np.testing.assert_allclose(q, x[:2])
         np.testing.assert_allclose(dq, x[2:])
-        self.assertEqual(sys.outputs["q"].dim, 2)
-        self.assertEqual(sys.outputs["dq"].dim, 2)
-
-    def test_q_and_dq_labels_follow_the_state_until_declared(self):
-        sys = MechanicalSystem(dof=2)
-        sys.state.labels = ["a", "b", "da", "db"]
-        sys.state.units = ["rad", "m", "rad/s", "m/s"]
-        self.assertEqual(sys.outputs["q"].labels, ["a", "b"])
-        self.assertEqual(sys.outputs["dq"].units, ["rad/s", "m/s"])
-
-        sys.outputs["q"].labels = ["shoulder", "elbow"]
-        sys.state.labels = ["c", "d", "dc", "dd"]
-        self.assertEqual(sys.outputs["q"].labels, ["shoulder", "elbow"])
-        self.assertEqual(sys.outputs["dq"].labels, ["dc", "dd"])
 
 
 class TestManipulator(unittest.TestCase):
@@ -470,7 +457,7 @@ from minilink.control.robotic import (
     TaskKinematic,
     TaskKinematicNullspace,
 )
-from minilink.core.composition import closed_loop, closed_loop_qdq
+from minilink.core.composition import closed_loop
 from minilink.dynamics.catalog.manipulators.arms import (
     FiveLinkPlanarManipulator,
     OneLinkManipulator,
@@ -498,10 +485,10 @@ class TestManipulatorPorts(unittest.TestCase):
 
 
 class TestRoboticWrappers(unittest.TestCase):
-    def test_joint_impedance_closed_loop_qdq(self):
-        diagram = closed_loop_qdq(JointImpedance(dof=2), TwoLinkManipulator())
-        self.assertIn("mux", diagram.subsystems)
-        self.assertEqual(diagram.connections["ctl"]["y"], ("mux", "y"))
+    def test_joint_impedance_closed_loop(self):
+        diagram = closed_loop(JointImpedance(dof=2), TwoLinkManipulator())
+        self.assertNotIn("mux", diagram.subsystems)
+        self.assertEqual(diagram.connections["controller"]["y"], ("plant", "y"))
 
     def test_model_joint_impedance_gravity_at_setpoint(self):
         arm = TwoLinkManipulator()
@@ -588,12 +575,10 @@ class TestRoboticWrappers(unittest.TestCase):
         u = ctl.ctl(None, np.concatenate([p_d, q, np.zeros(2)]))
         np.testing.assert_allclose(u, arm.g(q))
 
-    def test_task_impedance_closed_loop_qdq(self):
-        diagram = closed_loop_qdq(
-            TaskImpedance(TwoLinkManipulator()), TwoLinkManipulator()
-        )
-        self.assertIn("mux", diagram.subsystems)
-        self.assertEqual(diagram.connections["ctl"]["y"], ("mux", "y"))
+    def test_task_impedance_closed_loop(self):
+        diagram = closed_loop(TaskImpedance(TwoLinkManipulator()), TwoLinkManipulator())
+        self.assertNotIn("mux", diagram.subsystems)
+        self.assertEqual(diagram.connections["controller"]["y"], ("plant", "y"))
 
     def test_task_impedance_force_arrow_off_by_default(self):
         arm = TwoLinkManipulator()
@@ -638,21 +623,21 @@ class TestRoboticWrappers(unittest.TestCase):
     def test_task_impedance_force_arrow_in_diagram_and_ur5(self):
         arm = TwoLinkManipulator()
         ctl = TaskImpedance(arm, show_task_force=True)
-        diagram = closed_loop_qdq(ctl, arm)
+        diagram = closed_loop(ctl, arm)
         q = np.array([0.3, -0.15])
         p_d = arm.forward_kinematics(np.zeros(2))
         x = arm.q2x(q, np.zeros(2))
         # Diagram external input is controller reference ``r``.
         frames = diagram.tf(x, p_d)
         geom = diagram.get_dynamic_geometry(x, p_d)
-        self.assertIn("ctl:task_force", frames)
-        self.assertIn("ctl:task_force", geom)
-        self.assertIn("ctl:task_target", frames)
-        self.assertIn("ctl:task_target", geom)
+        self.assertIn("controller:task_force", frames)
+        self.assertIn("controller:task_force", geom)
+        self.assertIn("controller:task_target", frames)
+        self.assertIn("controller:task_target", geom)
         np.testing.assert_allclose(
-            frames["ctl:task_force"][:2, 3], arm.forward_kinematics(q)
+            frames["controller:task_force"][:2, 3], arm.forward_kinematics(q)
         )
-        np.testing.assert_allclose(frames["ctl:task_target"][:2, 3], p_d)
+        np.testing.assert_allclose(frames["controller:task_target"][:2, 3], p_d)
         resolve_draw_frame(diagram, x, p_d)
 
         ur5 = UR5Manipulator()
@@ -730,10 +715,18 @@ class TestRoboticWrappers(unittest.TestCase):
         expected = np.linalg.solve(J, p_d - p)
         np.testing.assert_allclose(dq, expected)
 
+    def test_task_kinematic_builds_from_a_plant_with_a_task_dim(self):
+        arm = TwoLinkManipulator()  # task_dim, no effector_dim
+        for law in (TaskKinematic, TaskKinematicNullspace):
+            with self.subTest(law=law.__name__):
+                ctl = law(arm)
+                self.assertEqual(ctl.outputs["u"].dim, arm.dof)
+                self.assertEqual(ctl.inputs["r"].dim, arm.task_dim)
+
     def test_task_kinematic_closed_loop_y(self):
         arm = SpeedControlledManipulator.from_manipulator(TwoLinkManipulator())
         diagram = closed_loop(TaskKinematic(arm), arm)
-        self.assertEqual(diagram.connections["ctl"]["y"], ("sys", "y"))
+        self.assertEqual(diagram.connections["controller"]["y"], ("plant", "y"))
         self.assertNotIn("mux", diagram.subsystems)
 
     def test_task_kinematic_nullspace_projection(self):
@@ -756,14 +749,15 @@ class TestRoboticWrappers(unittest.TestCase):
         arm = SpeedControlledManipulator.from_manipulator(FiveLinkPlanarManipulator())
         ref_p = Source(2)
         ref_p.params["value"] = np.array([1.0, 1.0])
-        ref_q = Source(5)
+        ref_q = Source(5, port="r_null")
         ref_q.params["value"] = np.array([-1.0] * 5)
         ctl = TaskKinematicNullspace(arm, Kp=[1.0, 1.0], K_null=[10.0] * 5)
         diagram = (ref_q + (ref_p >> ctl @ arm)).autowire(strict=True)
-        self.assertEqual(diagram.connections["ctl"]["r"][1], "y")
-        self.assertEqual(diagram.connections["ctl"]["r_null"][1], "y")
+        self.assertEqual(diagram.connections["controller"]["r"][1], "y")
+        self.assertEqual(diagram.connections["controller"]["r_null"][1], "r_null")
         self.assertNotEqual(
-            diagram.connections["ctl"]["r"][0], diagram.connections["ctl"]["r_null"][0]
+            diagram.connections["controller"]["r"][0],
+            diagram.connections["controller"]["r_null"][0],
         )
 
 
@@ -809,7 +803,6 @@ class TestInverseKinematics(unittest.TestCase):
 
 from minilink.blocks.sources import Step
 from minilink.control.modelbased import ComputedTorqueController, SlidingModeController
-from minilink.core.composition import closed_loop_qdq
 from minilink.dynamics.catalog.pendulum.pendulum import Pendulum
 
 
@@ -857,9 +850,9 @@ class TestModelBasedControllers(unittest.TestCase):
         ctl = SlidingModeController(Pendulum())
         self.assertTrue(ctl.solver_info["discontinuous_behavior"])
 
-    def test_closed_loop_qdq_aggregates_discontinuous_behavior(self):
+    def test_closed_loop_aggregates_discontinuous_behavior(self):
         plant = Pendulum()
         smc = SlidingModeController(plant)
         ref = Step(initial_value=np.zeros(2), final_value=np.zeros(2), step_time=1.0)
-        diagram = ref >> closed_loop_qdq(smc, plant)
+        diagram = ref >> closed_loop(smc, plant)
         self.assertTrue(diagram.solver_info["discontinuous_behavior"])

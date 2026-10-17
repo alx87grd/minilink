@@ -45,6 +45,7 @@ from minilink.dynamics.catalog.vehicles.propulsion import (
     LongitudinalFrontWheelDriveCarWithWheelSlipInput,
 )
 from examples.projects.car_trajopt.vehicles.extras import (
+    ConstantSpeedKinematicCar,
     DynamicHolonomicMobileRobot,
     HolonomicMobileRobot3D,
 )
@@ -111,6 +112,16 @@ class TestCatalogSmoke(unittest.TestCase):
                 with self.assertRaisesRegex(ValueError, f"between 1 and {count}"):
                     plant_class(output_mass=output_mass)
 
+    def test_the_3d_car_skin_dresses_a_plant_without_wheel_radii(self):
+        from minilink.dynamics.catalog.vehicles.steering import KinematicCar
+        from minilink.graphical.catalog.skins import car_skin_3d
+
+        car = KinematicCar()
+        self.assertNotIn("r_f", car.params)
+        geometry = car_skin_3d(car)
+        wheel_rl = geometry["body"][1]
+        np.testing.assert_allclose(wheel_rl.local_transform[:3, 3], [-3.0, 0.8, 0.3])
+
     def test_vehicle_reference_values(self):
         bicycle = KinematicBicycle()
         np.testing.assert_allclose(
@@ -141,6 +152,15 @@ class TestCatalogSmoke(unittest.TestCase):
         a0, a3 = (car.f(x, u, params=dict(car.params, vx=vx))[0] for vx in (0.0, 3.0))
         np.testing.assert_allclose(a3 - a0, 3.0 * b * car.dz(2.0) / mass)
         np.testing.assert_allclose(a3, 1.5436826659862837, rtol=1e-12)
+
+    def test_drone_body_is_drawn_with_its_width_and_height(self):
+        drone = Drone2D()
+        drone.width = 2.0
+        drone.height = 0.3
+        body = drone.get_kinematic_geometry()["body"][0]
+        self.assertEqual((body.length_x, body.length_y), (2.0, 0.3))
+        default = Drone2D().get_kinematic_geometry()["body"][0]
+        self.assertEqual((default.length_x, default.length_y), (1.2, 0.18))
 
     def test_aerial_and_marine_force_split_reference_values(self):
         drone = Drone2D()
@@ -286,8 +306,9 @@ class TestCartPole(unittest.TestCase):
 
     def test_noise_ports_add_disturbance_and_sensor_noise(self):
         sys = CartPoleWithNoisePort()
-        self.assertEqual(sys.inputs["w"].dim, 1)
-        self.assertEqual(sys.inputs["v"].dim, 4)
+        self.assertEqual(sys.name, "Cart Pole with noise ports")
+        self.assertEqual(sys.inputs["d"].dim, 1)
+        self.assertEqual(sys.inputs["n"].dim, 4)
         x = np.array([0.1, 0.2, 0.3, 0.4])
         F = np.array([1.0])
         w = np.array([0.5])
@@ -361,7 +382,7 @@ from minilink.dynamics.catalog.manipulators.arms import (
     SpeedControlledManipulator,
     ThreeLinkManipulator3D,
     TwoLinkManipulator,
-    _planar_joint_positions,
+    planar_joint_positions,
 )
 from minilink.dynamics.catalog.manipulators.ur5 import UR5Manipulator
 
@@ -380,7 +401,7 @@ class TestManipulatorCatalog(unittest.TestCase):
             with self.subTest(cls=cls.__name__):
                 arm = cls()
                 self.assertIsInstance(arm, Manipulator)
-                for port in ("q", "dq", "p", "pdot", "y"):
+                for port in ("p", "pdot", "y"):
                     self.assertIn(port, arm.outputs)
 
     def test_camera_scale_matches_reach_not_default(self):
@@ -427,7 +448,7 @@ class TestManipulatorCatalog(unittest.TestCase):
     def test_two_link_fk_matches_planar_geometry_tip(self):
         arm = TwoLinkManipulator()
         q = np.array([0.2, -0.1])
-        tip, _ = _planar_joint_positions(q, arm.lengths())
+        tip, _ = planar_joint_positions(q, arm.lengths())
         np.testing.assert_allclose(arm.forward_kinematics(q), tip[-1])
 
     def test_three_link_fk_matches_tf_end_effector(self):
@@ -567,7 +588,7 @@ from minilink.dynamics.abstraction.mechanical import MechanicalSystem
 
 
 class TestMechanicalJointPortLabels(unittest.TestCase):
-    def test_q_and_dq_ports_carry_the_plant_state_labels_and_units(self):
+    def test_a_mechanical_plant_has_no_joint_slice_ports(self):
         checked = []
         for name in catalog.__all__:
             cls = getattr(catalog, name)
@@ -575,12 +596,15 @@ class TestMechanicalJointPortLabels(unittest.TestCase):
                 continue
             with self.subTest(plant=name):
                 plant = cls()
-                dof = plant.dof
-                q_port, dq_port = plant.outputs["q"], plant.outputs["dq"]
-                self.assertEqual(q_port.labels, plant.state.labels[:dof])
-                self.assertEqual(dq_port.labels, plant.state.labels[dof:])
-                self.assertEqual(q_port.units, plant.state.units[:dof])
-                self.assertEqual(dq_port.units, plant.state.units[dof:])
+                self.assertNotIn("q", plant.outputs)
+                self.assertNotIn("dq", plant.outputs)
+                self.assertEqual(plant.outputs["y"].dim, 2 * plant.dof)
+                self.assertEqual(
+                    list(plant.outputs["y"].labels), list(plant.state.labels)
+                )
+                self.assertEqual(
+                    list(plant.outputs["y"].units), list(plant.state.units)
+                )
             checked.append(name)
         self.assertIn("Pendulum", checked)
         self.assertIn("TwoLinkManipulator", checked)
@@ -888,3 +912,352 @@ class TestCarProfile(unittest.TestCase):
         self.assertAlmostEqual(sys.inputs["u"].upper_bound[1], profile.limits.delta_max)
         self.assertAlmostEqual(sys.state.upper_bound[8], profile.engine_power_peak)
         self.assertAlmostEqual(sys.state.lower_bound[8], -profile.engine_power_peak)
+
+
+# The params family: a method reads the params it is given
+
+from minilink.dynamics.catalog.manipulators.arms import ThreeLinkManipulator3D
+from minilink.dynamics.catalog.pendulum.cartpole import (
+    RotatingCartPole,
+    UnderactuatedRotatingCartPole,
+)
+from minilink.dynamics.catalog.mass_spring_damper.linear import FloatingTwoMass
+from minilink.dynamics.catalog.pendulum.pendulum import InvertedPendulum
+from minilink.dynamics.catalog.vehicles.dynamic_bicycle import DynamicBicycleCar3D
+from minilink.dynamics.catalog.vehicles.steering import KinematicCar
+
+
+def stored(cls, **attributes):
+    """A factory of ``cls`` whose stored params are the ones given (the defaults for None)."""
+
+    def make(params=None):
+        plant = cls()
+        for name, value in attributes.items():
+            setattr(plant, name, value)
+        if params is not None:
+            plant.params = params
+        return plant
+
+    make.__name__ = cls.__name__
+    make.defaults = lambda: cls().params
+    return make
+
+
+def speed_two_link(params=None):
+    """A velocity-controlled two-link arm; ``params`` are the arm's."""
+    arm = TwoLinkManipulator()
+    if params is not None:
+        arm.params = params
+    return SpeedControlledManipulator.from_manipulator(arm)
+
+
+speed_two_link.defaults = lambda: TwoLinkManipulator().params
+
+
+PARAMS_CASES = [
+    # The arms: kinematics, effector ports, frames and torque arcs
+    (stored(OneLinkManipulator), "forward_kinematics", "l1", 3.0),
+    (stored(OneLinkManipulator), "J", "l1", 3.0),
+    (stored(OneLinkManipulator), "h_p", "l1", 3.0),
+    (stored(OneLinkManipulator), "h_pdot", "l1", 3.0),
+    (stored(OneLinkManipulator), "get_dynamic_geometry", "l1", 3.0),
+    (stored(TwoLinkManipulator), "forward_kinematics", "l1", 0.7),
+    (stored(TwoLinkManipulator), "J", "l2", 0.4),
+    (stored(TwoLinkManipulator), "h_p", "l1", 0.7),
+    (stored(TwoLinkManipulator), "h_pdot", "l2", 0.4),
+    (stored(TwoLinkManipulator), "tf", "l1", 0.7),
+    (stored(TwoLinkManipulator), "get_dynamic_geometry", "l1", 0.7),
+    (stored(ThreeLinkManipulator3D), "forward_kinematics", "l1", 1.4),
+    (stored(ThreeLinkManipulator3D), "J", "l3", 1.4),
+    (stored(ThreeLinkManipulator3D), "h_p", "l2", 1.4),
+    (stored(ThreeLinkManipulator3D), "h_pdot", "l3", 1.4),
+    (stored(ThreeLinkManipulator3D), "tf", "l2", 1.4),
+    (stored(FiveLinkPlanarManipulator), "forward_kinematics", "l", np.full(5, 0.6)),
+    (stored(FiveLinkPlanarManipulator), "J", "l", np.full(5, 0.6)),
+    (stored(FiveLinkPlanarManipulator), "h_p", "l", np.full(5, 0.6)),
+    (stored(FiveLinkPlanarManipulator), "h_pdot", "l", np.full(5, 0.6)),
+    (stored(FiveLinkPlanarManipulator), "tf", "l", np.full(5, 0.6)),
+    (stored(FiveLinkPlanarManipulator), "get_dynamic_geometry", "l", np.full(5, 0.6)),
+    (speed_two_link, "tf", "l1", 0.7),
+    (speed_two_link, "get_dynamic_geometry", "l2", 0.4),
+    # The double pendulum and the acrobot: frames and torque arcs
+    (stored(DoublePendulum), "tf", "l1", 1.5),
+    (stored(DoublePendulum), "get_dynamic_geometry", "l1", 1.5),
+    (stored(Acrobot), "tf", "l1", 1.5),
+    (stored(Acrobot), "get_dynamic_geometry", "l1", 1.5),
+    # The rotating cart-poles: frames
+    (stored(RotatingCartPole), "tf", "l1", 1.4),
+    (stored(UnderactuatedRotatingCartPole), "tf", "l2", 1.4),
+    # The single pendulums: frames and torque arcs
+    (stored(Pendulum), "get_dynamic_geometry", "l", 1.5),
+    (stored(InvertedPendulum), "get_dynamic_geometry", "l", 1.5),
+    (stored(TwoIndependentPendulums), "tf", "l", 1.5),
+    (stored(TwoIndependentPendulums), "get_dynamic_geometry", "l", 1.5),
+    # The mass-spring-damper chains: the ground spring drawn only when k ≠ 0
+    (stored(SingleMass), "get_dynamic_geometry", "k", 0.0),
+    (stored(TwoMass), "get_dynamic_geometry", "k1", 0.0),
+    (stored(ThreeMass), "get_dynamic_geometry", "k1", 0.0),
+    (stored(FloatingTwoMass), "get_dynamic_geometry", "k1", 1.0),
+    # The mountain car: the bead on the hill
+    (stored(MountainCar), "tf", "a", 0.7),
+    (stored(MountainCar), "forward_kinematic_effector", "a", 0.7),
+    # The dynamic bicycles: contact velocity and tire force arrows
+    (stored(DynamicBicycle), "get_dynamic_geometry", "a", 1.3),
+    (stored(DynamicBicycle), "get_dynamic_geometry", "Ca", 80000.0),
+    (stored(DynamicBicycleCar3D), "get_dynamic_geometry", "r_f", 0.4),
+    (stored(DynamicBicycleCar3D), "get_dynamic_geometry", "Ca", 80000.0),
+    # The kinematic car: its steered front wheels
+    (stored(KinematicCar), "tf", "length", 6.0),
+    # The longitudinal cars: the traction arrow
+    (
+        stored(LongitudinalFrontWheelDriveCarWithWheelSlipInput),
+        "get_dynamic_geometry",
+        "length",
+        3.0,
+    ),
+    (
+        stored(LongitudinalFrontWheelDriveCarWithWheelSlipInput),
+        "get_dynamic_geometry",
+        "mu_max",
+        1.2,
+    ),
+    (
+        stored(LongitudinalFrontWheelDriveCarWithTorqueInput),
+        "get_dynamic_geometry",
+        "mu_max",
+        1.2,
+    ),
+    (
+        # Rolling at 10 m/s with the wheel near its rolling speed: the slip is not clipped
+        stored(
+            LongitudinalFrontWheelDriveCarWithTorqueInput,
+            x0=np.array([0.0, 10.0, 33.0, 0.0]),
+        ),
+        "get_dynamic_geometry",
+        "wheel_radius",
+        0.4,
+    ),
+    # The quarter car: the spring down to the road
+    (stored(QuarterCarOnRoughTerrain), "get_dynamic_geometry", "a", np.full(6, 0.4)),
+    # The planar aircraft: its chords and its lift and drag arrows
+    (stored(Plane2D), "tf", "l_t", 1.3),
+    (stored(Plane2D), "get_dynamic_geometry", "rho", 1.5),
+    # The boats: the thrust, hydrodynamic and current arrows
+    (stored(Boat2D), "get_dynamic_geometry", "l_t", 4.0),
+    (
+        stored(Boat2D, show_hydrodynamic_forces=True),
+        "get_dynamic_geometry",
+        "damping_coef",
+        np.array([20.0, 20.0, 200.0]),
+    ),
+    (stored(Boat2DWithCurrent), "tf", "loa", 7.0),
+    (
+        stored(Boat2DWithCurrent),
+        "get_dynamic_geometry",
+        "current_velocity",
+        np.array([1.0, -0.5]),
+    ),
+    # The planar drones: the thrust arrows at the thrusters
+    (stored(Drone2D), "get_dynamic_geometry", "thruster_offset", 0.7),
+    (stored(Drone2DWithSideThruster), "get_dynamic_geometry", "thruster_offset", 0.7),
+    # The constant-speed car of the car_trajopt project: its front axle
+    (stored(ConstantSpeedKinematicCar), "tf", "a", 2.5),
+]
+
+
+def opened(value):
+    """A drawing opened into nested values: each primitive into its fields."""
+    if isinstance(value, dict):
+        return {key: opened(item) for key, item in value.items()}
+    if isinstance(value, (list, tuple)):
+        return [opened(item) for item in value]
+    if hasattr(value, "__dict__"):
+        return {key: opened(item) for key, item in vars(value).items()}
+    return np.asarray(value)
+
+
+def method_args(plant, method):
+    """A state and input off the nominal ones; the joint angles for the kinematics."""
+    rng = np.random.default_rng(0)
+    x0 = np.asarray(plant.x0, dtype=float)
+    u0 = np.asarray(plant.get_u_from_input_ports(), dtype=float)
+    x = x0 + 0.3 * rng.standard_normal(x0.shape)
+    u = u0 + 0.5 + 0.3 * rng.standard_normal(u0.shape)
+    if method in ("forward_kinematics", "J", "forward_kinematic_effector"):
+        return (x[: plant.dof],)
+    return (x, u, 0.0)
+
+
+def case_id(value):
+    return getattr(value, "__name__", None)
+
+
+def test_the_constant_speed_car_drives_the_bicycle_at_the_speed_given():
+    car = ConstantSpeedKinematicCar()
+    u = np.array([0.2])
+    np.testing.assert_array_equal(car.bicycle_input(u), [2.0, 0.2])
+    fast = {**car.params, "speed": 5.0}
+    np.testing.assert_array_equal(car.bicycle_input(u, fast), [5.0, 0.2])
+
+
+@pytest.mark.parametrize("make, method, key, value", PARAMS_CASES, ids=case_id)
+def test_a_method_reads_the_params_it_is_given(make, method, key, value):
+    plant = make()
+    params = {**make.defaults(), key: value}
+    args = method_args(plant, method)
+
+    given = opened(getattr(plant, method)(*args, params=params))
+    from_stored = opened(getattr(make(params), method)(*args))
+    default = opened(getattr(plant, method)(*args))
+
+    np.testing.assert_equal(given, from_stored)
+    with pytest.raises(AssertionError):
+        np.testing.assert_equal(given, default)
+
+
+# The pathtracking project's vehicle: the rolling resistance, the tires, the inputs
+
+from examples.projects.pathtracking.common.vehicle import (
+    LinearTire,
+    Pacejka,
+    RearDriveBicycle,
+    create_vehicle,
+)
+
+
+class TestPathtrackingVehicle(unittest.TestCase):
+    def test_the_front_rolling_resistance_opposes_the_front_wheel_spin(self):
+        vehicle = create_vehicle()
+        vehicle.rolling_friction_constant = 0.015
+        v = np.array(
+            [0.0, 0.0, 0.0, 2.0, -2.0]
+        )  # The rear spins forward, the front back
+        u_in = np.array([0.0, 0.0])
+        Fx_front, _, _, _ = vehicle.compute_tire_physics(v, u_in)
+        Fz_f = vehicle.mass * vehicle.gravity * vehicle.b / vehicle.L
+        d = vehicle.generalized_d(np.zeros(3), v, u_in)
+        tau_front = vehicle.r_f * Fx_front + vehicle.bw_front * v[4] - 0.015 * Fz_f
+        self.assertAlmostEqual(d[4], tau_front, places=9)
+
+    def test_the_lateral_weight_is_one_without_longitudinal_slip(self):
+        # G_yκ(κ = 0) = 1 whatever the curvature E (Pacejka 2006, §4.3.2)
+        tire = Pacejka()
+        tire.r_Ey1 = 0.5  # E = r_Ey1 + r_Ey2 d_fz = −0.5
+        for alpha in (0.0, 0.1, -0.2):
+            self.assertEqual(tire.Gyk(0.0, alpha), 1.0)
+        self.assertLess(tire.Gyk(0.3, 0.1), 1.0)
+
+    def test_the_rear_drive_bicycle_leaves_the_callers_input_alone(self):
+        vehicle = RearDriveBicycle()
+        vehicle.tire_model_f = LinearTire()
+        vehicle.tire_model_r = LinearTire()
+        x = np.zeros(8)
+        x[3] = 5.0
+        x[6] = 5.0 / vehicle.r_r
+        x[7] = 5.0 / vehicle.r_f
+        u = np.array([10.0, 2.0])  # A steer command past the limit
+        dx = vehicle.f(x, u)
+        np.testing.assert_array_equal(u, [10.0, 2.0])
+        clipped = np.array([10.0, vehicle.max_steer])
+        np.testing.assert_array_equal(dx, vehicle.f(x, clipped))
+
+    def test_the_friction_circle_caps_each_contact_of_an_array(self):
+        # One contact inside the circle, one beyond it: each as its own scalar call
+        alpha = np.array([0.01, 0.5])
+        kappa = np.array([0.005, 0.9])
+        Fz = np.array([3000.0, 3000.0])
+        for tire in (LinearTire(), Pacejka(combined_slip_mode="c")):
+            with self.subTest(tire=type(tire).__name__):
+                Fx, Fy = tire.slip2forces(alpha, kappa, Fz)
+                for i in range(2):
+                    Fx_i, Fy_i = tire.slip2forces(alpha[i], kappa[i], Fz[i])
+                    self.assertEqual((Fx[i], Fy[i]), (Fx_i, Fy_i))
+                self.assertLessEqual(
+                    np.hypot(Fx[1], Fy[1]), tire.mu * Fz[1] * (1 + 1e-12)
+                )
+
+
+# The pathtracking project's path helpers: the point ahead along the path, both copies
+
+PATH_MODULES = (
+    "examples.projects.pathtracking.bicycle_los.los",
+    "examples.projects.pathtracking.bicycle_los_v2.path_tracking",
+)
+
+
+@pytest.mark.parametrize("module", PATH_MODULES)
+def test_the_point_ahead_starts_on_the_next_segment_after_a_degenerate_one(module):
+    import importlib
+
+    ahead = importlib.import_module(module).point_ahead_along_path
+    for path in (
+        [(0.0, 0.0), (0.0, 0.0), (4.0, 0.0), (4.0, 3.0)],
+        [(0.0, 0.0), (0.0, 0.0), (0.0, 0.0), (4.0, 0.0), (4.0, 3.0)],
+    ):
+        ax, ay, i, lam, heading = ahead(path, 0, 0.7, 1.0, closed=False)
+        assert (ax, ay, heading) == (1.0, 0.0, 0.0)
+        assert i == len(path) - 3
+
+
+@pytest.mark.parametrize("module", PATH_MODULES)
+def test_an_open_path_stops_at_its_end_with_its_last_heading(module):
+    import importlib
+
+    ahead = importlib.import_module(module).point_ahead_along_path
+    square = [(0.0, 0.0), (4.0, 0.0), (4.0, 3.0), (0.0, 3.0)]
+    reached = ahead(square, 1, 0.2, 9.0, closed=False)
+    assert reached == (0.0, 3.0, 2, 1.0, np.pi)
+    assert [type(value) for value in reached] == [float, float, int, float, float]
+    clamped = ahead(square, 3, 0.5, 1.0, closed=False)  # No closing segment
+    assert clamped[:3] == (1.0, 3.0, 2)
+    with pytest.raises(ValueError, match="non-negative"):
+        ahead(square, 1, 0.2, -1.0, closed=False)
+    wrapped = ahead(square, 0, 0.5, -1.0, closed=True)  # A loop wraps a negative ds
+    assert [type(value) for value in wrapped] == [float, float, int, float, float]
+
+
+def test_a_closed_rounded_rectangle_does_not_repeat_its_first_waypoint():
+    from examples.projects.pathtracking.common.path_generator import (
+        rounded_rectangle_path,
+    )
+
+    closed = rounded_rectangle_path(40.0, 20.0, 7.0, nseg=2, narc=4, closed=True)
+    open_loop = rounded_rectangle_path(40.0, 20.0, 7.0, nseg=2, narc=4, closed=False)
+    # The closing segment returns to the first waypoint: no zero-length segment
+    assert np.hypot(*(closed[-1] - closed[0])) > 0.1
+    # The open path runs the whole loop, back onto its first waypoint
+    np.testing.assert_array_equal(open_loop[-1], open_loop[0])
+    np.testing.assert_array_equal(open_loop[:-1], closed)
+
+
+# The pathtracking project's signal blocks: one xp body each, so they trace under jit
+
+
+@pytest.mark.jax
+def test_the_pathtracking_signal_blocks_trace_under_jit():
+    jax = pytest.importorskip("jax")
+    configure_jax(enable_x64=True)
+    from examples.projects.pathtracking.common.allocation import Allocation
+    from examples.projects.pathtracking.mpc_v1.nominal_refs import NominalRefs
+    from examples.projects.pathtracking.mpc_v1.plant_to_mpc import PlantToMpcState
+
+    rng = np.random.default_rng(0)
+    allocation = Allocation(0.34, 40000.0, transmission_ratio=2.0)
+    nominal = NominalRefs()
+    to_mpc = PlantToMpcState()
+    cases = [
+        (allocation.h_throttle, np.concatenate([[3000.0, 0.1], rng.normal(size=10)])),
+        (
+            allocation.h_throttle,
+            np.concatenate([[-50.0, 0.1], 40.0 + rng.normal(size=10)]),
+        ),
+        (allocation.h_delta, np.concatenate([[3000.0, 0.1], rng.normal(size=10)])),
+        (nominal.h_heading_ref, rng.normal(size=8)),
+        (nominal.h_vx_ref, rng.normal(size=8)),
+        (nominal.h_delta_ff, rng.normal(size=8)),
+        (to_mpc.h_y_mpc, rng.normal(size=10)),
+    ]
+    for h, u in cases:
+        expected = h(None, u)
+        traced = jax.jit(lambda u, h=h: h(None, u))(u)
+        np.testing.assert_array_equal(np.asarray(traced), expected)

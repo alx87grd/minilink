@@ -9,7 +9,7 @@ import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import numpy as np
-from minilink.core.composition import _propagate_animation_camera
+from minilink.core.composition import propagate_animation_camera
 from minilink.core.diagram import DiagramSystem
 from minilink.core.kinematics import translation
 from minilink.core.system import DynamicSystem
@@ -129,7 +129,7 @@ class TestPropagateAnimationCamera(unittest.TestCase):
         plant.camera_scale = 6.0
         diagram = DiagramSystem()
         diagram.add_subsystem(plant, "bike")
-        _propagate_animation_camera(diagram, plant)
+        propagate_animation_camera(diagram, plant)
         self.assertEqual(diagram.camera_follow_frame, "bike:body")
         self.assertEqual(diagram.camera_scale, 6.0)
 
@@ -151,7 +151,7 @@ class TestPropagateAnimationCamera(unittest.TestCase):
         diagram = DiagramSystem()
         diagram.add_subsystem(step, "step")
         diagram.add_subsystem(plant, "plant")
-        _propagate_animation_camera(diagram, *diagram.subsystems.values())
+        propagate_animation_camera(diagram, *diagram.subsystems.values())
         self.assertEqual(diagram.camera_scale, 3.0)
 
 
@@ -433,7 +433,7 @@ from minilink.core.trajectory import Trajectory
 from minilink.graphical.animation.drawables import (
     Replay,
     SceneHistory,
-    validate_overlay,
+    require_overlay,
 )
 from minilink.graphical.animation.primitives import (
     CustomLine,
@@ -447,12 +447,12 @@ class TestOverlayValidation(unittest.TestCase):
     def test_rejects_raw_scene(self):
         scene = Scene(obstacles=[GeomBox(np.array([0.0, 0.0]), np.array([1.0, 1.0]))])
         with self.assertRaisesRegex(TypeError, "as_visualizer"):
-            validate_overlay(scene)
+            require_overlay(scene)
 
     def test_rejects_bare_system(self):
         sys = DynamicSystem(1, output_dim=1, expose_state=True)
         with self.assertRaisesRegex(TypeError, "Replay"):
-            validate_overlay(sys)
+            require_overlay(sys)
 
 
 class TestSceneHistory(unittest.TestCase):
@@ -528,7 +528,7 @@ class TestAnimatorOverlays(unittest.TestCase):
         history = SceneHistory(
             reference=CustomLine([[0.0, 0.0, 0.0], [1.0, 0.0, 0.0]], color="k")
         )
-        frame = Animator(sys)._resolve_frame(
+        frame = Animator(sys).resolve_frame(
             np.array([]),
             np.array([]),
             0.0,
@@ -540,7 +540,7 @@ class TestAnimatorOverlays(unittest.TestCase):
     def test_scene_visualizer_draws_obstacle(self):
         scene = Scene(obstacles=[GeomBox(np.array([1.0, 2.0]), np.array([3.0, 4.0]))])
         sys = DynamicSystem(0)
-        frame = Animator(sys)._resolve_frame(
+        frame = Animator(sys).resolve_frame(
             np.array([]),
             np.array([]),
             0.0,
@@ -769,7 +769,7 @@ class TestVisualizationOptionalImports(unittest.TestCase):
         try:
             meshcat = _import_meshcat()
         except ImportError as exc:
-            self.assertIn("minilink[visualization]", str(exc))
+            self.assertIn("pip install meshcat", str(exc))
         else:
             self.assertTrue(hasattr(meshcat, "Visualizer"))
 
@@ -777,7 +777,7 @@ class TestVisualizationOptionalImports(unittest.TestCase):
         try:
             pygame = _import_pygame()
         except ImportError as exc:
-            self.assertIn("minilink[visualization]", str(exc))
+            self.assertIn("pip install pygame", str(exc))
         else:
             self.assertTrue(hasattr(pygame, "init"))
 
@@ -1159,11 +1159,11 @@ class TestAdvancedPlotting(unittest.TestCase):
         self.step = Step()
         self.diagram = DiagramSystem()
         self.diagram.add_subsystem(self.step, "step")
-        self.diagram.add_subsystem(self.ctl, "ctl")
+        self.diagram.add_subsystem(self.ctl, "controller")
         self.diagram.add_subsystem(self.sys, "plant")
-        self.diagram.connect("step", "y", "ctl", "r")
-        self.diagram.connect("ctl", "u", "plant", "u")
-        self.diagram.connect("plant", "y", "ctl", "y")
+        self.diagram.connect("step", "y", "controller", "r")
+        self.diagram.connect("controller", "u", "plant", "u")
+        self.diagram.connect("plant", "y", "controller", "y")
         self.sim = Simulator(self.diagram, t0=0, tf=2.0, dt=0.1, verbose=False)
         self.traj = self.sim.solve()
 
@@ -1181,10 +1181,10 @@ class TestAdvancedPlotting(unittest.TestCase):
         self.assertFalse(self.traj.has_signal("step:y"))
         traj_plus = self.diagram.reconstruct_internal_signals(self.traj)
         self.assertTrue(traj_plus.has_signal("step:y"))
-        self.assertTrue(traj_plus.has_signal("ctl:u"))
+        self.assertTrue(traj_plus.has_signal("controller:u"))
         self.assertTrue(traj_plus.has_signal("plant:y"))
         n_pts = len(self.traj.t)
-        self.assertEqual(traj_plus.get_signal("ctl:u").shape, (1, n_pts))
+        self.assertEqual(traj_plus.get_signal("controller:u").shape, (1, n_pts))
 
     def test_plot_time_signals_does_not_crash(self):
         from minilink.graphical.common.environment import override_env
@@ -1192,7 +1192,10 @@ class TestAdvancedPlotting(unittest.TestCase):
         override_env("jupyter")
         self.addCleanup(override_env, None)
         result = plot_time_signals(
-            self.diagram, self.traj, signals=("x", "ctl:u", "plant:y"), show=False
+            self.diagram,
+            self.traj,
+            signals=("x", "controller:u", "plant:y"),
+            show=False,
         )
         self.assertIsNotNone(result.figure)
         plt.close(result.figure)
@@ -1222,9 +1225,41 @@ class TestAdvancedPlotting(unittest.TestCase):
         self.assertIsNotNone(result.figure)
         plt.close(result.figure)
 
+    def test_a_block_nested_in_a_sub_diagram_is_plotted_by_identity(self):
+        from minilink.control.impedance import ImpedanceController
+        from minilink.dynamics.catalog.pendulum.pendulum import Pendulum
+
+        pendulum = Pendulum()
+        pendulum.x0 = np.array([0.3, 0.0])
+        outer = DiagramSystem()
+        outer.add_subsystem(ImpedanceController() @ pendulum, "loop")
+        traj = outer.compute_trajectory(tf=0.5, verbose=False)
+
+        spec = build_signal_plot_spec(outer, traj, signals=((pendulum, "y"),))
+        self.assertEqual({trace.signal for trace in spec.traces}, {"loop/plant:y"})
+        values = np.vstack([trace.values for trace in spec.traces])
+        np.testing.assert_allclose(
+            values, traj.x
+        )  # the static controller adds no state
+        with self.assertRaisesRegex(ValueError, "not part of this diagram"):
+            build_signal_plot_spec(outer, traj, signals=((Pendulum(), "y"),))
+
+    def test_the_state_port_reads_the_state_labels(self):
+        from minilink.control.impedance import ImpedanceController
+        from minilink.dynamics.catalog.pendulum.pendulum import Pendulum
+
+        pendulum = Pendulum()
+        outer = DiagramSystem()
+        outer.add_subsystem(ImpedanceController() @ pendulum, "loop")
+        traj = outer.compute_trajectory(tf=0.2, verbose=False)
+        spec = build_signal_plot_spec(outer, traj, signals=((pendulum, "x"),))
+        self.assertEqual(
+            [trace.label for trace in spec.traces], list(pendulum.state.labels)
+        )
+
     def test_subsystem_signal_resolves_diagram_id(self):
         self.assertEqual(self.diagram.subsystem_signal(self.sys, "y"), "plant:y")
-        self.assertEqual(self.diagram.subsystem_signal(self.ctl, "u"), "ctl:u")
+        self.assertEqual(self.diagram.subsystem_signal(self.ctl, "u"), "controller:u")
 
     def test_plot_trajectory_computes_missing_trajectory_then_plots(self):
         sys = Integrator()
@@ -1238,18 +1273,20 @@ class TestAdvancedPlotting(unittest.TestCase):
         self.assertEqual(resolve_plot_signals(self.sys), ("x", "u"))
 
     def test_resolve_plot_signals_closed_loop_diagram(self):
-        self.assertEqual(resolve_plot_signals(self.diagram), ("x", "step:y", "ctl:u"))
+        self.assertEqual(
+            resolve_plot_signals(self.diagram), ("x", "step:y", "controller:u")
+        )
 
     def test_resolve_plot_signals_lqr_at_cartpole(self):
-        from minilink.control.lqr import lqr_at_operating_point
+        from minilink.control.design import lqr
         from minilink.dynamics.catalog.pendulum.cartpole import CartPole
 
         plant = CartPole()
-        controller = lqr_at_operating_point(
+        controller = lqr(
             plant,
-            [0.0, np.pi, 0.0, 0.0],
             np.diag([1.0, 10.0, 1.0, 1.0]),
             np.array([[0.1]]),
+            x_bar=[0.0, np.pi, 0.0, 0.0],
         )
         diagram = controller @ plant
         signals = resolve_plot_signals(diagram)
@@ -1264,7 +1301,7 @@ class TestAdvancedPlotting(unittest.TestCase):
         diagram = (
             Step(final_value=[1.0], step_time=0.0) >> ImpedanceController() @ Pendulum()
         )
-        self.assertEqual(resolve_plot_signals(diagram), ("x", "ref:y", "ctl:u"))
+        self.assertEqual(resolve_plot_signals(diagram), ("x", "step:y", "controller:u"))
 
     def test_resolve_plot_signals_dynamic_controller(self):
         from minilink.blocks.sources import Step
@@ -1275,7 +1312,7 @@ class TestAdvancedPlotting(unittest.TestCase):
             Step(final_value=[1.0], step_time=0.0)
             >> PID(ports="reference") @ DoubleIntegrator()
         )
-        self.assertEqual(resolve_plot_signals(diagram), ("x", "ref:y", "ctl:u"))
+        self.assertEqual(resolve_plot_signals(diagram), ("x", "step:y", "controller:u"))
 
     def test_plot_trajectory_uses_default_signals_for_closed_loop(self):
         from minilink.graphical.common.environment import override_env
@@ -1303,15 +1340,15 @@ class TestAdvancedPlotting(unittest.TestCase):
     def test_signal_spec_assigns_distinct_tier_colors(self):
         traj_plus = self.diagram.reconstruct_internal_signals(self.traj)
         spec = build_signal_plot_spec(
-            self.diagram, traj_plus, signals=("x", "step:y", "ctl:u")
+            self.diagram, traj_plus, signals=("x", "step:y", "controller:u")
         )
         colors = {trace.signal: trace.color for trace in spec.traces}
         self.assertNotEqual(colors["x"], colors["step:y"])
-        self.assertNotEqual(colors["step:y"], colors["ctl:u"])
-        self.assertNotEqual(colors["x"], colors["ctl:u"])
+        self.assertNotEqual(colors["step:y"], colors["controller:u"])
+        self.assertNotEqual(colors["x"], colors["controller:u"])
 
     def test_unknown_signal_reports_available_names(self):
-        with self.assertRaisesRegex(ValueError, "ctl:u"):
+        with self.assertRaisesRegex(ValueError, "controller:u"):
             build_signal_plot_spec(self.diagram, self.traj, signals=("missing",))
 
     def test_live_time_signal_plot_reuses_artists(self):
@@ -1369,7 +1406,7 @@ class TestPlotlyRendererOptionalImport(unittest.TestCase):
         try:
             go = _import_plotly()
         except ImportError as exc:
-            self.assertIn("minilink[plotting]", str(exc))
+            self.assertIn("pip install plotly", str(exc))
         else:
             self.assertTrue(hasattr(go, "Figure"))
 
@@ -1400,7 +1437,7 @@ class TestPlotlyRenderer(unittest.TestCase):
         backend = PlotlyRenderer(animator)
         x = np.array([0.5])
         u = np.array([1.0])
-        frame = animator._resolve_frame(
+        frame = animator.resolve_frame(
             x, u, 0.0, kinematic=sys.get_kinematic_geometry()
         )
         backend.open_scene(
@@ -1437,7 +1474,7 @@ class TestPlotlyRenderer(unittest.TestCase):
         sys.skin = debug_state_skin
         animator = Animator(sys)
         backend = PlotlyRenderer(animator)
-        frame = animator._resolve_frame(
+        frame = animator.resolve_frame(
             np.array([0.5]),
             np.array([1.0]),
             0.0,
@@ -1604,6 +1641,53 @@ class TestPlotlySignalPlot(unittest.TestCase):
         self.assertEqual(h_sig_cap, SIGNAL_PLOT_MAX_FIG_HEIGHT_POPUP)
 
 
+class TestLineOpacity(unittest.TestCase):
+    """A line primitive carries its opacity to the matplotlib, plotly and meshcat renderers."""
+
+    def setUp(self):
+        self.line = CustomLine(
+            [[0.0, 0.0, 0.0], [1.0, 0.0, 0.0]], color="#1f77b4", opacity=0.4
+        )
+        self.camera = camera_matrix(scale=2.0)
+
+    def test_a_line_is_opaque_unless_told_and_the_vehicle_body_keeps_its_opacity(self):
+        from minilink.graphical.animation.primitives import vehicle_body
+
+        self.assertEqual(CustomLine([[0.0, 0.0], [1.0, 1.0]]).opacity, 1.0)
+        self.assertEqual(vehicle_body().opacity, 0.85)
+        self.assertEqual(vehicle_body(opacity=0.5).opacity, 0.5)
+
+    def test_matplotlib_draws_the_line_with_its_opacity(self):
+        from minilink.graphical.animation.renderers.matplotlib_renderer import (
+            MatplotlibRenderer,
+        )
+
+        backend = MatplotlibRenderer(Animator(DynamicSystem(0)))
+        backend.open_scene(is_3d=False, show=False, camera=self.camera)
+        backend.draw_frame([self.line], [np.eye(4)], 0.0, self.camera)
+        self.assertAlmostEqual(backend.canvas.drawn_objects[0].get_alpha(), 0.4)
+        plt.close(backend.fig)
+
+    def test_plotly_draws_the_line_with_its_opacity(self):
+        pytest.importorskip("plotly")
+        backend = PlotlyRenderer(Animator(DynamicSystem(0)))
+        backend.open_scene(is_3d=False, show=False, camera=self.camera, title="line")
+        backend.draw_frame([self.line], [np.eye(4)], 0.0, self.camera)
+        fig = backend.present(block=False)
+        self.assertAlmostEqual(fig.data[0].opacity, 0.4)
+
+    @pytest.mark.skipif(not _has_meshcat(), reason="meshcat not installed")
+    def test_meshcat_draws_the_line_with_its_opacity(self):
+        for is_3d in (False, True):
+            with self.subTest(is_3d=is_3d):
+                canvas = MeshcatCanvas(_FakeMeshcatNode(), is_3d=is_3d)
+                canvas.ensure_objects([self.line])
+                material = canvas.scene["p0"].object.material
+                self.assertAlmostEqual(material.opacity, 0.4)
+                self.assertTrue(material.transparent)
+                canvas.clear()
+
+
 class TestArrowGeometry(unittest.TestCase):
     def test_planar_arrow_matches_historical_xy_geometry(self):
         pts = arrow_pts((0.0, 0.0), (1.0, 0.0), scale=2.0, head_ratio=0.15)
@@ -1647,7 +1731,7 @@ class TestArrowGeometry(unittest.TestCase):
 from minilink.blocks.nonlinear import Saturation  # noqa: E402
 from minilink.control.impedance import ImpedanceController  # noqa: E402
 from minilink.control.modelbased import ComputedTorqueController  # noqa: E402
-from minilink.control.output import ProportionalController  # noqa: E402
+from minilink.control.siso import P  # noqa: E402
 from minilink.control.siso import PID  # noqa: E402
 from minilink.control.state import StateFeedbackController  # noqa: E402
 from minilink.dynamics.catalog.pendulum.pendulum import Pendulum  # noqa: E402
@@ -1692,8 +1776,8 @@ class TestPlotInputOutputMap(unittest.TestCase):
 
 
 class TestPlotControlLaw(unittest.TestCase):
-    def test_error_profile_line_values(self):
-        prop = ProportionalController(K=2.0)
+    def test_error_space_line_values(self):
+        prop = P(Kp=2.0, ports="reference")
         res = prop.plot_control_law(bounds=(-1.0, 1.0), show=False)
         line = res.axes.lines[0]
         e = line.get_xdata()
@@ -1701,7 +1785,7 @@ class TestPlotControlLaw(unittest.TestCase):
         self.assertEqual(res.axes.get_xlabel(), "e")
         plt.close(res.figure)
 
-    def test_state_profile_surface_values(self):
+    def test_state_space_surface_values(self):
         K = np.array([[3.0, 1.0]])
         xbar = np.array([np.pi, 0.0])
         ubar = np.array([0.5])
@@ -1774,7 +1858,7 @@ class TestPlotControlLaw(unittest.TestCase):
         plt.close(res.figure)
 
     def test_reference_pin_and_3d(self):
-        prop = ProportionalController(K=2.0)
+        prop = P(Kp=2.0, ports="reference")
         res = prop.plot_control_law(r=np.array([0.5]), bounds=(-1.0, 1.0), show=False)
         line = res.axes.lines[0]
         np.testing.assert_allclose(line.get_ydata(), 2.0 * line.get_xdata())
@@ -1803,20 +1887,18 @@ class TestPlotControlLaw(unittest.TestCase):
                     dependencies=("v", "w_in"),
                 )
 
-        with self.assertRaisesRegex(ValueError, "feedback_profile"):
+        with self.assertRaisesRegex(ValueError, "plot_input_output_map"):
             port_map.plot_control_law(Bare(), show=False)
 
     def test_solver_block_without_plot_space_refuses(self):
         class SolverLike(System):
-            measurement_port = "y"
-            ref_port = None
-            control_port = "u_ff"
+            plot_space = None  # a solve call, not a static law
 
             def __init__(self):
                 super().__init__()
                 self.add_input_port("y", dim=1)
                 self.add_output_port(
-                    "u_ff",
+                    "u",
                     dim=1,
                     function=lambda x, u, t, params=None: u,
                     dependencies=("y",),
@@ -1824,6 +1906,29 @@ class TestPlotControlLaw(unittest.TestCase):
 
         with self.assertRaisesRegex(ValueError, "not a static map"):
             port_map.plot_control_law(SolverLike(), show=False)
+
+    def test_a_boolean_or_float_axis_is_refused(self):
+        sat = Saturation(-1.0, 1.0)
+        for axis in (np.bool_(True), 0.0, np.float64(0.0), 0.5):
+            with self.subTest(axis=axis):
+                with self.assertRaisesRegex(ValueError, "integer component index"):
+                    sat.plot_input_output_map(x_axis=axis, show=False)
+        res = sat.plot_input_output_map(x_axis=np.int64(0), show=False)
+        self.assertEqual(len(res.axes.lines), 1)
+
+    def test_a_boolean_or_float_grid_entry_is_refused(self):
+        from minilink.blocks.routing import Mux
+
+        mux = Mux(dims=(1, 1))
+        for grid_shape in ((5.5, 5), (5, np.bool_(True)), (True, 5)):
+            with self.subTest(grid_shape=grid_shape):
+                with self.assertRaisesRegex(ValueError, "entries must be integers"):
+                    mux.plot_input_output_map(
+                        in_port="in0",
+                        bounds=(-1.0, 1.0),
+                        grid_shape=grid_shape,
+                        show=False,
+                    )
 
 
 class TestAutoFitCamera(unittest.TestCase):
@@ -1871,7 +1976,7 @@ class TestAutoFitCamera(unittest.TestCase):
         )
         animator = Animator(sys)
         schedule = trajectory_frame_schedule(traj, 1.0)
-        frames = animator._build_frames(
+        frames = animator.build_frames(
             traj, schedule, kinematic=sys.get_kinematic_geometry(), camera_override=None
         )
         cameras = [frame["camera"] for frame in frames]
@@ -1885,7 +1990,7 @@ class TestAutoFitCamera(unittest.TestCase):
         sys = DynamicSystem(1, output_dim=1, expose_state=True)
         sys.skin = debug_state_skin
         sys.camera_scale = 3.0
-        frame = Animator(sys)._resolve_frame(
+        frame = Animator(sys).resolve_frame(
             np.array([25.0]), np.array([]), 0.0, kinematic=sys.get_kinematic_geometry()
         )
         self.assertEqual(frame["camera"][3, 3], 3.0)

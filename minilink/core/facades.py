@@ -1,15 +1,8 @@
-"""
-System convenience facades.
+"""System facades: the one-call shortcuts a system inherits, by kind of evolution."""
 
-Evolution-aware mixin shortcuts for :class:`~minilink.core.system.System`
-subclasses: :class:`SharedSystemFacades` (all kinds), :class:`DynamicSystemFacades`
-(continuous evolution), :class:`StepSystemFacades` (discrete rollout), and
-:class:`LTISystemFacades` (linear models only).
-
-The mixins are shortcuts only: mathematical, structural, and visualization
-contracts stay in :mod:`minilink.core.system`. Heavy dependencies
-(simulation, graphics) are imported lazily inside each method.
-"""
+###############################################################################
+# Public API
+###############################################################################
 
 
 class SharedSystemFacades:
@@ -26,9 +19,13 @@ class SharedSystemFacades:
     :class:`DynamicSystem` subclasses override those methods via
     :class:`DynamicSystemFacades`. :class:`StepSystem` overrides them to raise
     and point at :meth:`~minilink.core.facades.StepSystemFacades.compute_rollout`.
+
+    The mixins are shortcuts only: the mathematical, structural and
+    visualization contracts stay in :mod:`minilink.core.system`, and heavy
+    dependencies (simulation, graphics) are imported lazily inside each method.
     """
 
-    # User Shortcut / Facade API
+    # Compile and differentiate
 
     def compile(self, backend="numpy", verbose=False):
         """
@@ -36,6 +33,7 @@ class SharedSystemFacades:
 
         This delegates to :func:`minilink.core.compile.compile`.
         """
+        # A real cycle through minilink.core.system
         from minilink.core.compile.compiler import compile as compile_system
 
         return compile_system(self, backend=backend, verbose=verbose)
@@ -60,9 +58,12 @@ class SharedSystemFacades:
         is ``"x"``, ``"u"``, an input port id, ``"t"``, ``"params"`` (dict
         result), or a wire. See :func:`minilink.analysis.derivatives.jacobian`.
         """
+        # Tools import core (DESIGN §3): the analysis band loads on first use
         from minilink.analysis.derivatives import jacobian
 
         return jacobian(self, of, wrt, x_bar, u_bar, t, params, method=method, eps=eps)
+
+    # Simulate and plot
 
     def compute_trajectory(
         self,
@@ -87,8 +88,8 @@ class SharedSystemFacades:
         Parameters
         ----------
         compile_backend : str
-            Passed to the simulator (default ``\"numpy\"``).
-            Use ``compile_backend=\"auto\"`` (see :data:`~minilink.simulation.COMPILE_BACKEND_AUTO`)
+            Passed to the simulator (default ``"numpy"``).
+            Use ``compile_backend="auto"`` (see :data:`~minilink.simulation.COMPILE_BACKEND_AUTO`)
             to try JAX then fall back to NumPy.
         verbose : bool
             Print simulator setup (solver, ``dt``, compile backend). Default
@@ -100,6 +101,7 @@ class SharedSystemFacades:
         Trajectory
             The sampled trajectory, also stored in :attr:`traj`.
         """
+        # A real cycle through minilink.core.system
         from minilink.simulation.static_simulator import StaticSimulator
 
         sim = StaticSimulator(
@@ -116,6 +118,7 @@ class SharedSystemFacades:
         traj = sim.solve()
 
         if show:
+            # A real cycle through minilink.core.system
             from minilink.graphical.signals import plot_time_signals
 
             plot_time_signals(self, traj)
@@ -167,6 +170,7 @@ class SharedSystemFacades:
         Trajectory
             Sampled state-input trajectory.
         """
+        # A real cycle through minilink.core.system
         from minilink.simulation.static_simulator import StaticSimulator
 
         sim = StaticSimulator(
@@ -180,10 +184,10 @@ class SharedSystemFacades:
             compile_backend=compile_backend,
             verbose=verbose,
         )
-
         traj = sim.solve_forced(u, input_port_id=input_port_id)
 
         if show:
+            # A real cycle through minilink.core.system
             from minilink.graphical.signals import plot_time_signals
 
             plot_time_signals(self, traj)
@@ -214,7 +218,8 @@ class SharedSystemFacades:
             :func:`minilink.graphical.signals.plot_time_signals`.
             For diagrams, each entry may be a boundary name (``"x"``),
             an internal port (``"plant:p"``), or a ``(subsystem, port)``
-            pair resolved via :meth:`~minilink.core.diagram.DiagramSystem.subsystem_signal`.
+            pair resolved via :meth:`~minilink.core.diagram.DiagramSystem.subsystem_signal`;
+            the pair may name a block nested in a sub-diagram (``"loop/plant:x"``).
             When ``None``, defaults are chosen via
             :func:`minilink.graphical.signals.resolve_plot_signals`.
 
@@ -224,11 +229,13 @@ class SharedSystemFacades:
             The plot result from
             :func:`minilink.graphical.signals.plot_time_signals`.
         """
+        # A real cycle through minilink.core.system
         from minilink.graphical.signals import plot_time_signals, resolve_plot_signals
 
         if signals is None:
             signals = resolve_plot_signals(self)
 
+        # The trajectory passed, else the last one computed, else a fresh one
         if traj is None:
             traj = self.traj
         if traj is None:
@@ -241,6 +248,8 @@ class SharedSystemFacades:
             backend=backend,
             show=show,
         )
+
+    # Score
 
     def compute_cost(self, cost, *, of=None, traj=None):
         """
@@ -266,7 +275,7 @@ class SharedSystemFacades:
         float
             The cost ``J``.
         """
-        return cost.total_cost(_scored_trajectory(self, of, traj))
+        return cost.total_cost(scored_trajectory(self, of, traj))
 
     def plot_cost(self, cost, *, of=None, traj=None, backend="matplotlib", show=True):
         """
@@ -284,10 +293,13 @@ class SharedSystemFacades:
             :func:`minilink.graphical.signals.plot_time_signals`.
         """
         scored_system = self if of is None else of
-        scored = cost.evaluate_trajectory(_scored_trajectory(self, of, traj))
+        scored = cost.evaluate_trajectory(scored_trajectory(self, of, traj))
+
         return scored_system.plot_trajectory(
             scored, signals=("cost_rate", "cost"), backend=backend, show=show
         )
+
+    # Input-output maps
 
     def plot_input_output_map(self, **kwargs):
         """
@@ -298,9 +310,30 @@ class SharedSystemFacades:
         nominal value. See
         :func:`minilink.graphical.port_map.plot_input_output_map`.
         """
+        # Lazy import: the graphics load on first use, not with the core
         from minilink.graphical.port_map import plot_input_output_map
 
         return plot_input_output_map(self, **kwargs)
+
+    def plot_control_law(self, **kwargs):
+        """
+        Convenience shortcut plotting the textbook slice of this block's control law.
+
+        The zero-argument call sweeps the coordinates the block's feedback
+        declaration names (the error for an error-driven law, the measurement
+        or the state otherwise) and pins the reference, every other coordinate
+        and any internal state at nominal; ``x_axis`` / ``y_axis`` index the
+        workspace ``z = [measurement-space; x_ctrl]`` for teaching slices such
+        as windup. A block that reads no measurement has no control law to
+        draw; :meth:`plot_input_output_map` sweeps any input of any block. See
+        :func:`minilink.graphical.port_map.plot_control_law`.
+        """
+        # Lazy import: the graphics load on first use, not with the core
+        from minilink.graphical.port_map import plot_control_law
+
+        return plot_control_law(self, **kwargs)
+
+    # Block diagram
 
     def get_diagram(self, *, expand=True):
         """
@@ -309,6 +342,7 @@ class SharedSystemFacades:
         ``expand=False`` draws a nested diagram as one block instead of a
         labelled box around its own blocks.
         """
+        # A real cycle through minilink.core.system
         from minilink.graphical.diagrams import get_diagram
 
         return get_diagram(self, expand=expand)
@@ -349,7 +383,10 @@ class SharedSystemFacades:
         (same blocking policy as trajectory plots). Pass ``show_pdf=True``
         for the legacy OS PDF viewer; pass ``filename`` to write Graphviz
         output to disk; pass ``show=False`` to build the Digraph only.
+        Without the Graphviz binary the figure is skipped with a warning and
+        ``None`` is returned, so a notebook cell does not fail.
         """
+        # A real cycle through minilink.core.system
         from minilink.graphical.diagrams import plot_diagram
 
         return plot_diagram(
@@ -360,6 +397,8 @@ class SharedSystemFacades:
             filename=filename,
             expand=expand,
         )
+
+    # Rendering and animation
 
     def render(
         self,
@@ -377,9 +416,11 @@ class SharedSystemFacades:
         ``camera`` accepts an optional override: a constant 4x4 or a
         ``camera(frames, x, u, t)`` callable.
         """
+        # Lazy import: the graphics load on first use, not with the core
         from minilink.graphical.animation import Animator
 
         animator = Animator(self)
+
         return animator.show(
             x,
             u,
@@ -425,9 +466,11 @@ class SharedSystemFacades:
         Meshcat animation for ``renderer="meshcat"`` (``{file_name}.html``
         when the name has no suffix).
         """
+        # Lazy import: the graphics load on first use, not with the core
         from minilink.graphical.animation import Animator
         from minilink.graphical.common.environment import prefers_inline_animation
 
+        # The trajectory passed, else the last one computed, else a fresh one
         if traj is None:
             if self.traj is not None:
                 traj = self.traj
@@ -468,6 +511,8 @@ class DynamicSystemFacades:
     :class:`~minilink.core.diagram.DiagramSystem`.
     """
 
+    # Simulate and plot
+
     def compute_trajectory(
         self,
         t0=0,
@@ -491,14 +536,14 @@ class DynamicSystemFacades:
         Parameters
         ----------
         compile_backend : str
-            Passed to :class:`~minilink.simulation.simulator.Simulator` (default ``\"numpy\"``).
-            Use ``compile_backend=\"auto\"`` (see :data:`~minilink.simulation.COMPILE_BACKEND_AUTO`)
+            Passed to :class:`~minilink.simulation.simulator.Simulator` (default ``"numpy"``).
+            Use ``compile_backend="auto"`` (see :data:`~minilink.simulation.COMPILE_BACKEND_AUTO`)
             to try JAX then fall back to NumPy.
         verbose : bool
             Print solver selection, time grid, and compile backend (default
             ``True`` for interactive use).
         solver_warnings : str
-            ``\"warn\"`` (default), ``\"error\"``, or ``\"ignore\"`` for discontinuous-loop
+            ``"warn"`` (default), ``"error"``, or ``"ignore"`` for discontinuous-loop
             warnings (see :mod:`minilink.simulation.solver_warnings`).
 
         Returns
@@ -506,6 +551,7 @@ class DynamicSystemFacades:
         Trajectory
             The simulated trajectory, also stored in :attr:`traj`.
         """
+        # A real cycle through minilink.core.system
         from minilink.simulation.simulator import Simulator
 
         sim = Simulator(
@@ -523,6 +569,7 @@ class DynamicSystemFacades:
         traj = sim.solve()
 
         if show:
+            # A real cycle through minilink.core.system
             from minilink.graphical.signals import plot_time_signals
 
             plot_time_signals(self, traj)
@@ -569,7 +616,7 @@ class DynamicSystemFacades:
         verbose : bool
             Print solver selection and time grid (default ``True``).
         solver_warnings : str
-            ``\"warn\"`` (default), ``\"error\"``, or ``\"ignore\"`` for discontinuous-loop
+            ``"warn"`` (default), ``"error"``, or ``"ignore"`` for discontinuous-loop
             warnings (see :mod:`minilink.simulation.solver_warnings`).
 
         Returns
@@ -577,6 +624,7 @@ class DynamicSystemFacades:
         Trajectory
             Simulated state-input trajectory.
         """
+        # A real cycle through minilink.core.system
         from minilink.simulation.simulator import Simulator
 
         sim = Simulator(
@@ -591,10 +639,10 @@ class DynamicSystemFacades:
             verbose=verbose,
             solver_warnings=solver_warnings,
         )
-
         traj = sim.solve_forced(u, input_port_id=input_port_id)
 
         if show:
+            # A real cycle through minilink.core.system
             from minilink.graphical.signals import plot_time_signals
 
             plot_time_signals(self, traj)
@@ -621,10 +669,12 @@ class DynamicSystemFacades:
         field. Otherwise only the vector field is plotted. See
         :func:`minilink.graphical.phase_plane.plot_phase_plane`.
         """
+        # Lazy import: the graphics load on first use, not with the core
         from minilink.graphical.phase_plane import plot_phase_plane
 
         if traj is None:
             traj = self.traj
+
         return plot_phase_plane(
             self,
             traj,
@@ -634,6 +684,8 @@ class DynamicSystemFacades:
             show=show,
             **kwargs,
         )
+
+    # Linear analysis about an operating point
 
     def linearize(
         self,
@@ -652,6 +704,7 @@ class DynamicSystemFacades:
         ``lin = plant.linearize(x_bar)`` gives ``lin.A()``, ``lin.B()``,
         ``lin.C()``, ``lin.D()``. See :func:`minilink.analysis.linearization.linearize`.
         """
+        # A real cycle through minilink.core.system
         from minilink.analysis.linearization import linearize
 
         return linearize(
@@ -675,6 +728,7 @@ class DynamicSystemFacades:
 
         See :func:`minilink.analysis.frequency.transfer_function`.
         """
+        # A real cycle through minilink.core.system
         from minilink.analysis.frequency import transfer_function
 
         return transfer_function(
@@ -712,6 +766,7 @@ class DynamicSystemFacades:
 
         See :func:`minilink.analysis.frequency.plot_bode`.
         """
+        # A real cycle through minilink.core.system
         from minilink.analysis.frequency import plot_bode
 
         return plot_bode(
@@ -753,6 +808,7 @@ class DynamicSystemFacades:
 
         See :func:`minilink.analysis.frequency.plot_root_locus`.
         """
+        # A real cycle through minilink.core.system
         from minilink.analysis.frequency import plot_root_locus
 
         return plot_root_locus(
@@ -792,6 +848,7 @@ class DynamicSystemFacades:
 
         See :func:`minilink.analysis.frequency.plot_pzmap`.
         """
+        # A real cycle through minilink.core.system
         from minilink.analysis.frequency import plot_pzmap
 
         return plot_pzmap(
@@ -806,6 +863,45 @@ class DynamicSystemFacades:
             eps=eps,
             minimal=minimal,
             radius=radius,
+            backend=backend,
+            show=show,
+        )
+
+    def plot_step_response(
+        self,
+        x_bar=None,
+        u_bar=None,
+        t=0.0,
+        params=None,
+        *,
+        of=None,
+        wrt=None,
+        tf=None,
+        n=500,
+        method="auto",
+        eps=1e-6,
+        backend="matplotlib",
+        show=True,
+    ):
+        """Step response of one SISO channel of the linear model, with rise time, settling time and overshoot.
+
+        See :func:`minilink.analysis.time_response.plot_step_response`.
+        """
+        # A real cycle through minilink.core.system
+        from minilink.analysis.time_response import plot_step_response
+
+        return plot_step_response(
+            self,
+            x_bar,
+            u_bar,
+            t,
+            params,
+            of=of,
+            wrt=wrt,
+            tf=tf,
+            n=n,
+            method=method,
+            eps=eps,
             backend=backend,
             show=show,
         )
@@ -834,6 +930,7 @@ class DynamicSystemFacades:
 
         See :func:`minilink.analysis.modal.animate_modal`.
         """
+        # A real cycle through minilink.core.system
         from minilink.analysis.modal import animate_modal
 
         return animate_modal(
@@ -856,14 +953,19 @@ class DynamicSystemFacades:
             native=native,
         )
 
-    def find_equilibrium(self, x_guess, u_bar=None, t=0.0, params=None, *, tol=1e-9):
+    def find_equilibrium(
+        self, x_guess=None, u_bar=None, t=0.0, params=None, *, tol=1e-9
+    ):
         """Return a state near ``x_guess`` where ``f`` vanishes.
 
         See :func:`minilink.analysis.equilibria.find_equilibrium`.
         """
+        # Tools import core (DESIGN §3): the analysis band loads on first use
         from minilink.analysis.equilibria import find_equilibrium
 
         return find_equilibrium(self, x_guess, u_bar, t, params, tol=tol)
+
+    # Live session
 
     def game(
         self,
@@ -897,6 +999,7 @@ class DynamicSystemFacades:
         compatible, otherwise NumPy — preferred for live sessions where speed
         matters.
         """
+        # A real cycle through minilink.core.system
         from minilink.simulation.realtime import PygameInput, RealtimeSimulator
 
         rt_sim = RealtimeSimulator(
@@ -912,38 +1015,10 @@ class DynamicSystemFacades:
             tf=tf,
         )
         traj = rt_sim.run(x0=x0, t0=t0)
+
         self.traj = traj
+
         return traj
-
-
-class LTISystemFacades:
-    """
-    Shortcuts that only make sense on a linear model, for :class:`~minilink.dynamics.abstraction.state_space.LTISystem`.
-
-    A time response read off a nonlinear plant would look like a simulation of
-    that plant; on a diagram or a nonlinear system, call ``linearize()`` or
-    ``transfer_function()`` first.
-    """
-
-    def plot_step_response(
-        self,
-        *,
-        of=None,
-        wrt=None,
-        tf=None,
-        n=500,
-        backend="matplotlib",
-        show=True,
-    ):
-        """Step response of one SISO channel with rise time, settling time and overshoot.
-
-        See :func:`minilink.analysis.time_response.plot_step_response`.
-        """
-        from minilink.analysis.time_response import plot_step_response
-
-        return plot_step_response(
-            self, of=of, wrt=wrt, tf=tf, n=n, backend=backend, show=show
-        )
 
 
 class StepSystemFacades:
@@ -957,6 +1032,8 @@ class StepSystemFacades:
     (:meth:`compute_trajectory`, :meth:`compute_forced`) raise here with a
     pointer to the rollout API.
     """
+
+    # Differentiate
 
     def jacobian(
         self,
@@ -974,11 +1051,15 @@ class StepSystemFacades:
 
         See :func:`minilink.analysis.derivatives.jacobian`.
         """
+        # Tools import core (DESIGN §3): the analysis band loads on first use
         from minilink.analysis.derivatives import jacobian
 
         return jacobian(self, of, wrt, x_bar, u_bar, k, params, method=method, eps=eps)
 
+    # The continuous-time shortcuts refuse
+
     def compute_trajectory(self, *args, **kwargs):
+        """Refuse: a step system rolls out with :meth:`compute_rollout`."""
         raise TypeError(
             f"{type(self).__name__} is a StepSystem — use compute_rollout(...), "
             "not compute_trajectory. Continuous-time simulation belongs on "
@@ -986,11 +1067,14 @@ class StepSystemFacades:
         )
 
     def compute_forced(self, *args, **kwargs):
+        """Refuse: a step system rolls out with :meth:`compute_rollout`."""
         raise TypeError(
             f"{type(self).__name__} is a StepSystem — use compute_rollout(...), "
             "not compute_forced. Continuous-time simulation belongs on "
             "DynamicSystem; hybrid closed loops use HybridSimulator."
         )
+
+    # Roll out and plot
 
     def compute_rollout(
         self,
@@ -1028,10 +1112,14 @@ class StepSystemFacades:
             The rollout, also stored in :attr:`rollout`.
         """
         ev = self.compile(backend=compile_backend, verbose=verbose)
-        rollout = ev.rollout(x0 if x0 is not None else self.x0, n_steps=n_steps, u=u)
+        x0 = x0 if x0 is not None else self.x0
+        rollout = ev.rollout(x0, n_steps=n_steps, u=u)
+
         self.rollout = rollout
+
         if show:
             self.plot_rollout(rollout)
+
         return rollout
 
     def plot_rollout(
@@ -1048,6 +1136,7 @@ class StepSystemFacades:
         If the rollout is not computed yet, it must be provided or available on
         :attr:`rollout`.
         """
+        # A real cycle through minilink.core.system
         from minilink.graphical.signals import (
             STEP_ABSCISSA_LABEL,
             plot_time_signals,
@@ -1057,12 +1146,10 @@ class StepSystemFacades:
         if signals is None:
             signals = resolve_plot_signals(self)
 
+        # The rollout passed, else the last one computed
         if rollout is None:
             rollout = self.rollout
-        if rollout is None:
-            raise ValueError(
-                "No rollout available; pass rollout=... or call compute_rollout first."
-            )
+        require_rollout(rollout)
 
         return plot_time_signals(
             self,
@@ -1074,11 +1161,14 @@ class StepSystemFacades:
         )
 
 
+###############################################################################
 # Internal machinery
+###############################################################################
 
 
-def _scored_trajectory(system, of, traj):
+def scored_trajectory(system, of, traj):
     """The trajectory a cost shortcut scores: the system's own, or one block's inside it."""
+    # A real cycle through minilink.core.system
     from minilink.core.diagram import DiagramSystem
 
     traj = system.traj if traj is None else traj
@@ -1093,3 +1183,11 @@ def _scored_trajectory(system, of, traj):
             f"of= names a block inside a diagram; {system.name!r} is not a diagram"
         )
     return system.trajectory_of(of, traj)
+
+
+def require_rollout(rollout):
+    """Refuse a missing rollout: none was passed and none was computed."""
+    if rollout is None:
+        raise ValueError(
+            "No rollout available; pass rollout=... or call compute_rollout first."
+        )

@@ -1,11 +1,12 @@
 # Optimizer wiring for parametric trajopt / MPC
 
 Status: **draft plan** (July 2026). Rung: v0.2 wave D of [TODO.md](TODO.md) — OPW-1 to
-OPW-5 are step T5's parametric-optimizer item, and the parametric evaluator's placement
-is a D3 hardening row. Lane: research (ROADMAP §2). Analysis + proposed fix for swapping
+OPW-5 are a D3 hardening row of their own (moved out of T5 on 2026-10-12: they change
+behaviour, and T5 is byte-identical), and the parametric evaluator's placement is another
+D3 row. Lane: research (ROADMAP §2). Analysis + proposed fix for swapping
 `optimizer_method` (e.g. SciPy SLSQP → IPOPT) on the parametric MPC path.
 
-Contracts in code: [DESIGN.md](../../DESIGN.md) §6 (Planning / NLP).
+Contracts in code: [DESIGN.md](../dev/DESIGN.md) §6 (Planning / NLP).
 
 Related: DESIGN §4 planning-params pipeline B (parametric `x0` / reserved `scene` bind).
 
@@ -54,8 +55,8 @@ transcribe or a parametric compile.
 | Path | Entry | Solver wiring | IPOPT (`cyipopt`) |
 | --- | --- | --- | --- |
 | Offline / rebuild | `solve()` / `solve_trajectory_from` without parametric compile | `Optimizer(program, method=…)` | **Yes** — see `examples/demos/trajopt/trajopt_cartpole_collocation_jax.py` |
-| NumPy MPC rebuild | `compile_backend='numpy'`, no parametric compile | Same `Optimizer` via `_make_optimizer` | **Yes** (if optional dep installed) |
-| JAX MPC fast path | `compile_parametric_program()` + `solve_trajectory_from` | **Custom** `_make_parametric_optimizer_backend` | **No** — SciPy only |
+| NumPy MPC rebuild | `compile_backend='numpy'`, no parametric compile | Same `Optimizer` via `build_optimizer` | **Yes** (if optional dep installed) |
+| JAX MPC fast path | `compile_parametric_program()` + `solve_trajectory_from` | **Custom** `build_parametric_optimizer_backend` | **No** — SciPy only |
 
 The generic `Optimizer` registry (`optimization/optimizer.py`) already lists
 `scipy_slsqp`, `scipy_trust_constr`, and `ipopt` and constructs the matching
@@ -71,12 +72,12 @@ reimplements a narrow slice:
 1. **Duplicate method registry** — planner-local `_USER_OPTIMIZER_METHODS`
    contains only `scipy_slsqp` (subset of `Optimizer`'s full registry).
 
-2. **Hardcoded backend** — `_make_parametric_optimizer_backend()` always
+2. **Hardcoded backend** — `build_parametric_optimizer_backend()` always
    returns `ScipyMinimizeOptimizer`, regardless of `optimizer_method`.
 
-3. **Direct backend call** — `_solve_trajectory_from_parametric()` calls
+3. **Direct backend call** — `solve_trajectory_from_parametric()` calls
    `self.optimizer_backend.solve(evaluator, z0)` instead of sharing the same
-   factory used by `_make_optimizer()`.
+   factory used by `build_optimizer()`.
 
 Symptom when setting `optimizer_method="ipopt"` on JAX MPC:
 
@@ -108,7 +109,7 @@ must be unified.
 | --- | --- |
 | Per-iterate `callback` / `record_history` | Not supported (`IpoptOptimizer` raises) |
 | `use_hessian=True` on parametric evaluator | Evaluator reports `has_hessian=False`; IPOPT uses its own quasi-Newton |
-| Optional dependency | Requires `cyipopt` (`minilink[ipopt]` / conda extra) |
+| Optional dependency | Requires `cyipopt` (conda-forge, or pip after a system Ipopt) |
 
 ---
 
@@ -144,7 +145,7 @@ def make_optimizer_backend(
 ```
 
 - Single registry: same `_USER_OPTIMIZER_METHODS` as `Optimizer`.
-- `TrajectoryOptimizationPlanner._make_parametric_optimizer_backend` calls this
+- `TrajectoryOptimizationPlanner.build_parametric_optimizer_backend` calls this
   factory instead of constructing `ScipyMinimizeOptimizer` directly.
 - **Delete** planner-local `_USER_OPTIMIZER_METHODS`.
 

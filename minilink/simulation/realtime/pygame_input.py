@@ -38,8 +38,7 @@ def _import_pygame():
         import pygame
     except ImportError as e:
         raise ImportError(
-            "pygame is required for PygameInput. Install with: "
-            "pip install 'minilink[visualization]'"
+            "pygame is required for PygameInput. Install with: pip install pygame"
         ) from e
     return pygame
 

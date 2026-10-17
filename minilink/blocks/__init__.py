@@ -1,45 +1,44 @@
-"""Plant-agnostic wiring blocks — sources, routing, filters, nonlinearities.
-
-Band facade for short teaching imports::
-
-    from minilink.blocks import Step, Integrator, Error, Sum, Saturation
-"""
+"""Blocks: the plant-agnostic wiring blocks, sources, routing, filters and nonlinearities."""
 
 from __future__ import annotations
 
 from minilink.core.facade import lazy_facade
 
-# name -> (module path, attribute)
+# The band facade for short teaching imports, e.g.
+# ``from minilink.blocks import Step, Integrator, Error, Sum, Saturation``; the defining
+# modules stay importable (``minilink.blocks.sources``, ...). Each exported name maps to
+# its (module path, attribute).
 _EXPORTS: dict[str, tuple[str, str]] = {
-    # basic
+    # Basic
     "Integrator": ("minilink.blocks.basic", "Integrator"),
-    # sources
+    # Sources
     "Source": ("minilink.blocks.sources", "Source"),
     "Step": ("minilink.blocks.sources", "Step"),
+    "Sine": ("minilink.blocks.sources", "Sine"),
     "TrajectorySource": ("minilink.blocks.sources", "TrajectorySource"),
     "WhiteNoise": ("minilink.blocks.sources", "WhiteNoise"),
-    # routing
+    # Routing
     "Demux": ("minilink.blocks.routing", "Demux"),
     "Error": ("minilink.blocks.routing", "Error"),
     "Gain": ("minilink.blocks.routing", "Gain"),
     "Mux": ("minilink.blocks.routing", "Mux"),
     "Sum": ("minilink.blocks.routing", "Sum"),
-    # nonlinear
+    # Nonlinear
     "DeadZone": ("minilink.blocks.nonlinear", "DeadZone"),
     "RateLimiter": ("minilink.blocks.nonlinear", "RateLimiter"),
     "Relay": ("minilink.blocks.nonlinear", "Relay"),
     "Saturation": ("minilink.blocks.nonlinear", "Saturation"),
-    # transfer functions and filters
+    # Transfer functions and filters
     "LowPassFilter": ("minilink.blocks.filters", "LowPassFilter"),
     "NotchFilter": ("minilink.blocks.filters", "NotchFilter"),
     "TransferFunction": ("minilink.blocks.transfer_function", "TransferFunction"),
     "Lead": ("minilink.blocks.transfer_function", "Lead"),
     "Lag": ("minilink.blocks.transfer_function", "Lag"),
     "Washout": ("minilink.blocks.filters", "Washout"),
-    # neural
+    # Neural
     "NeuralNetwork": ("minilink.blocks.neural", "NeuralNetwork"),
     "MLP": ("minilink.blocks.neural", "MLP"),
-    # discrete
+    # Discrete
     "ZOHHold": ("minilink.blocks.step", "ZOHHold"),
 }
 

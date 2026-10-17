@@ -6,7 +6,7 @@ from importlib import import_module
 from unittest import mock
 
 from minilink import InvertedPendulum, TransferFunction
-from minilink.core.facades import DynamicSystemFacades, LTISystemFacades
+from minilink.core.facades import DynamicSystemFacades
 
 # name -> (owner class, band function "module:attr", kind)
 #   forward: the shortcut's parameters are the band function's after its first one
@@ -53,16 +53,14 @@ SHORTCUTS = {
         "minilink.graphical.phase_plane:plot_phase_plane",
         "narrowed",
     ),
-    # a linear model needs no operating point: the linearization arguments are gone
     "plot_step_response": (
-        LTISystemFacades,
+        DynamicSystemFacades,
         "minilink.analysis.time_response:plot_step_response",
-        "narrowed",
+        "forward",
     ),
 }
 
-# The data verbs stay band functions; the time response of a linearized model
-# lives on LTISystem alone
+# The data verbs stay band functions
 REMOVED = (
     "bode",
     "pzmap",
@@ -74,7 +72,6 @@ REMOVED = (
     "region_of_attraction",
     "plot_region_of_attraction",
     "modal_analysis",
-    "plot_step_response",
 )
 
 
@@ -99,7 +96,7 @@ class TestSystemShortcuts(unittest.TestCase):
                 self.assertTrue(callable(getattr(plant, name)), name)
         for name in REMOVED:
             self.assertFalse(hasattr(plant, name), name)
-        self.assertTrue(callable(plant.linearize([0.0, 0.0]).plot_step_response))
+        self.assertTrue(callable(plant.plot_step_response))
         self.assertTrue(
             callable(TransferFunction([1.0], [1.0, 1.0]).plot_step_response)
         )

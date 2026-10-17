@@ -30,6 +30,11 @@ from minilink.graphical.control import (
 _MARGIN_GRID_POINTS = 2000
 
 
+###############################################################################
+# Public API
+###############################################################################
+
+
 def frequency_response(
     sys,
     x_bar=None,
@@ -51,7 +56,7 @@ def frequency_response(
     sys : System
         System or diagram to linearize before computing the frequency response.
     x_bar, u_bar : array-like, optional
-        Operating point; default ``sys.x0`` and the nominal port values.
+        Operating point; default the nominal state and the nominal port values.
     t : float, optional
         Time at which the Jacobians are evaluated.
     params : dict, optional
@@ -135,12 +140,14 @@ def margins(
     :class:`~minilink.analysis.linear.Margins` (``inf`` where a crossover
     does not exist).
     """
-    w, G = frequency_response(
-        sys, x_bar, u_bar, t, params, of=of, wrt=wrt, w=w, n=n, method=method, eps=eps
+    A, B, C, D = siso_matrices(
+        sys, x_bar, u_bar, t, params, of=of, wrt=wrt, method=method, eps=eps
     )
+    w = frequency_grid(A, B, C, D, w, n)
 
-    # Crossovers of L(jω) and the margins read there
-    loop_margins = linear.margins(w, G)
+    # L(jω) on the grid brackets the crossovers; each is then solved on the exact L(jω)
+    G = linear.frequency_response(A, B, C, D, w)
+    loop_margins = linear.margins(w, G, loop_response(A, B, C, D))
 
     return loop_margins
 
@@ -267,6 +274,7 @@ def transfer_function(
     ``numerator``, ``denominator``, ``poles`` and ``zeros``, so it can be
     plotted, simulated, or wired like any other block.
     """
+    # Lazy import: the block and its graphics load on first use, not with the analysis
     from minilink.blocks.transfer_function import TransferFunction
 
     z, p, k = pzmap(
@@ -285,12 +293,11 @@ def transfer_function(
     # num(s) = k ∏(s − z),   den(s) = ∏(s − p)
     num = np.real_if_close(k * np.poly(z)).astype(float)
     den = np.real_if_close(np.poly(p)).astype(float)
+
     return TransferFunction(num, den, name=f"{sys.name} {channel_label(sys, of, wrt)}")
 
 
-# =============================================================================
-# Public API — plots
-# =============================================================================
+# Plots
 
 
 def plot_bode(
@@ -328,20 +335,18 @@ def plot_bode(
         magnitude_db = 20.0 * np.log10(np.abs(G))
     phase_deg = np.degrees(np.unwrap(np.angle(G)))
 
-    # The margins, read on the grid of margins()
+    # The margins, bracketed on the grid of margins() and solved on the exact L(jω)
     loop_margins = None
     if margins:
         w_margins = frequency_grid(A, B, C, D, w, _MARGIN_GRID_POINTS)
         G_margins = linear.frequency_response(A, B, C, D, w_margins)
-        loop_margins = linear.margins(w_margins, G_margins)
+        loop_margins = linear.margins(w_margins, G_margins, loop_response(A, B, C, D))
 
-    return render_control_figure(
-        bode_figure(
-            w_plot, magnitude_db, phase_deg, sys, of, wrt, loop_margins, title=title
-        ),
-        backend=backend,
-        show=show,
+    figure = bode_figure(
+        w_plot, magnitude_db, phase_deg, sys, of, wrt, loop_margins, title=title
     )
+
+    return render_control_figure(figure, backend=backend, show=show)
 
 
 def plot_pzmap(
@@ -379,9 +384,9 @@ def plot_pzmap(
         minimal=minimal,
     )
 
-    return render_control_figure(
-        pzmap_figure(z, p, sys, of, wrt, radius), backend=backend, show=show
-    )
+    figure = pzmap_figure(z, p, sys, of, wrt, radius)
+
+    return render_control_figure(figure, backend=backend, show=show)
 
 
 def plot_root_locus(
@@ -413,13 +418,13 @@ def plot_root_locus(
 
     # Minimal realization: the uncontrollable and unobservable modes cancel
     A, B, C, D = minimal_channel(A, B, C, D, minimal)
+
+    # p(K) = eig(A − B K (1 + K d)⁻¹ C) over the gain sweep
     gains, roots = linear.root_locus(A, B, C, D, gains)
 
-    return render_control_figure(
-        root_locus_figure(A, B, C, D, gains, roots, sys, of, wrt, radius),
-        backend=backend,
-        show=show,
-    )
+    figure = root_locus_figure(A, B, C, D, gains, roots, sys, of, wrt, radius)
+
+    return render_control_figure(figure, backend=backend, show=show)
 
 
 def plot_nyquist(
@@ -443,101 +448,83 @@ def plot_nyquist(
         sys, x_bar, u_bar, t, params, of=of, wrt=wrt, w=w, n=n, method=method, eps=eps
     )
 
-    return render_control_figure(
-        nyquist_figure(w, G, sys, of, wrt), backend=backend, show=show
-    )
+    figure = nyquist_figure(w, G, sys, of, wrt)
+
+    return render_control_figure(figure, backend=backend, show=show)
 
 
-# =============================================================================
+###############################################################################
 # Internal machinery
-# =============================================================================
+###############################################################################
+
+
+def frequency_grid(A, B, C, D, w, n):
+    """The frequencies to evaluate: the user's, or a log grid from the poles and zeros."""
+    # By default, n frequencies evenly spaced in log ω across the poles and zeros
+    if w is None:
+        w_min, w_max = linear.frequency_range(A, B, C, D)
+        w = np.logspace(np.log10(w_min), np.log10(w_max), int(n))
+
+    w = np.asarray(w, dtype=float).reshape(-1)
+    if w.size == 0 or np.any(w <= 0.0):
+        raise ValueError("Frequencies must be positive.")
+
+    return w
+
+
+def loop_response(A, B, C, D):
+    """``w -> L(jw)``, one complex value, for the root solve of the crossovers."""
+
+    def response(w):
+        return linear.frequency_response(A, B, C, D, np.atleast_1d(w))[0]
+
+    return response
 
 
 def minimal_channel(A, B, C, D, minimal):
     """The channel's minimal realization unless ``minimal=False``; the default reports what it drops once."""
     if minimal is False:
         return A, B, C, D
+
     A_min, B_min, C_min, D_min = linear.minreal(A, B, C, D)
     dropped = A.shape[0] - A_min.shape[0]
+
+    # The default cancels and says how many pairs; minimal=True cancels silently
     if minimal is None and dropped > 0:
         warnings.warn(
             f"Cancelled {dropped} pole/zero pair(s): modes that are uncontrollable or "
             "unobservable on this channel. Pass minimal=False to keep them.",
             stacklevel=caller_stacklevel(),
         )
+
     return A_min, B_min, C_min, D_min
 
 
 def caller_stacklevel():
     """``stacklevel`` of the first frame outside minilink, so a warning names the user's line."""
     package = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+
+    # One level per frame inside minilink, from this function's caller outward
     frame, level = inspect.currentframe().f_back, 1
     while frame is not None and os.path.abspath(frame.f_code.co_filename).startswith(
         package
     ):
         frame, level = frame.f_back, level + 1
+
     return level
 
 
-def frequency_grid(A, B, C, D, w, n):
-    """The frequencies to evaluate: the user's, or a log grid from the poles and zeros."""
-    if w is None:
-        w_min, w_max = linear.frequency_range(A, B, C, D)
-        w = np.logspace(np.log10(w_min), np.log10(w_max), int(n))
-    w = np.asarray(w, dtype=float).reshape(-1)
-    if w.size == 0 or np.any(w <= 0.0):
-        raise ValueError("Frequencies must be positive.")
-    return w
-
-
-def margins_text(m: Margins) -> str:
-    gm = (
-        "inf"
-        if not np.isfinite(m.gain_margin_db)
-        else f"{m.gain_margin_db:.1f} dB (at {m.w_phase_crossover:.3g} rad/s)"
-    )
-    pm = (
-        "inf"
-        if not np.isfinite(m.phase_margin_deg)
-        else f"{m.phase_margin_deg:.1f} deg (at {m.w_gain_crossover:.3g} rad/s)"
-    )
-    return f"Gm = {gm}\nPm = {pm}"
-
-
-def root_text(s) -> str:
-    # ζ = −Re s / |s| (1 at the origin by convention), ω_n = |s|
-    zeta = float(-s.real / abs(s)) if abs(s) > 0.0 else 1.0
-    wn = abs(s)
-    return f"s = {s.real:.3g} {s.imag:+.3g}j<br>ζ = {zeta:.3f}, ωn = {wn:.3g} rad/s"
-
-
-def root_markers(p, z):
-    """Poles as ``x`` and zeros as ``o`` in the system colour."""
-    return (
-        Trace(
-            p.real,
-            p.imag,
-            style.SYSTEM_COLOR,
-            mode="markers",
-            marker="x",
-            hover=tuple(root_text(s) for s in p),
-        ),
-        Trace(
-            z.real,
-            z.imag,
-            style.SYSTEM_COLOR,
-            mode="markers",
-            marker="o",
-            hover=tuple(root_text(s) for s in z),
-        ),
-    )
+# Figures
 
 
 def bode_figure(w, magnitude_db, phase_deg, sys, of, wrt, m, title=None):
+    """The Bode figure: magnitude over phase on one log-frequency axis, the margins ``m`` marked when given."""
     hover = tuple(
         f"ω = {wk:.3g} rad/s<br>|G| = {mk:.1f} dB<br>∠G = {pk:.1f}°"
         for wk, mk, pk in zip(w, magnitude_db, phase_deg)
     )
+
+    # With margins: the crossover lines, the margins note, the 0 dB and −180° references
     crossovers, notes, references = (), (), ()
     if m is not None:
         crossovers = tuple(
@@ -549,6 +536,7 @@ def bode_figure(w, magnitude_db, phase_deg, sys, of, wrt, m, title=None):
         references = (RefLine("y", 0.0),), (RefLine("y", -180.0),)
     else:
         references = (), ()
+
     return ControlFigure(
         title=style.BODE_TITLE if title is None else title,
         subtitle=channel_subtitle(sys, of, wrt),
@@ -574,11 +562,29 @@ def bode_figure(w, magnitude_db, phase_deg, sys, of, wrt, m, title=None):
     )
 
 
+def margins_text(m: Margins) -> str:
+    """The margins note: ``Gm`` and ``Pm`` at their crossover frequencies, ``inf`` where none exists."""
+    gm = (
+        "inf"
+        if not np.isfinite(m.gain_margin_db)
+        else f"{m.gain_margin_db:.1f} dB (at {m.w_phase_crossover:.3g} rad/s)"
+    )
+    pm = (
+        "inf"
+        if not np.isfinite(m.phase_margin_deg)
+        else f"{m.phase_margin_deg:.1f} deg (at {m.w_gain_crossover:.3g} rad/s)"
+    )
+
+    return f"Gm = {gm}\nPm = {pm}"
+
+
 def pzmap_figure(z, p, sys, of, wrt, radius=None):
+    """The pole-zero map figure: poles as ``x``, zeros as ``o``."""
     # The view frames every root, or those within radius of the origin
     points = np.concatenate([z, p])
     if radius is not None:
         points = points[np.abs(points) <= radius]
+
     return ControlFigure(
         title=style.PZMAP_TITLE,
         subtitle=channel_subtitle(sys, of, wrt),
@@ -595,7 +601,39 @@ def pzmap_figure(z, p, sys, of, wrt, radius=None):
     )
 
 
+def root_markers(p, z):
+    """Poles as ``x`` and zeros as ``o`` in the system colour."""
+    return (
+        Trace(
+            p.real,
+            p.imag,
+            style.SYSTEM_COLOR,
+            mode="markers",
+            marker="x",
+            hover=tuple(root_text(s) for s in p),
+        ),
+        Trace(
+            z.real,
+            z.imag,
+            style.SYSTEM_COLOR,
+            mode="markers",
+            marker="o",
+            hover=tuple(root_text(s) for s in z),
+        ),
+    )
+
+
+def root_text(s) -> str:
+    """The hover text of a root ``s``: its value, damping ratio and natural frequency."""
+    # ζ = −Re s / |s| (1 at the origin by convention), ω_n = |s|
+    zeta = float(-s.real / abs(s)) if abs(s) > 0.0 else 1.0
+    wn = abs(s)
+
+    return f"s = {s.real:.3g} {s.imag:+.3g}j<br>ζ = {zeta:.3f}, ωn = {wn:.3g} rad/s"
+
+
 def root_locus_figure(A, B, C, D, gains, roots, sys, of, wrt, radius=None):
+    """The root-locus figure: one trace per branch, with the open-loop poles and zeros."""
     # The view keeps the poles, zeros and the branches near them; the far tails
     # of the asymptotes leave the frame as they do in MATLAB, or the window
     # within radius of the origin when one is given.
@@ -605,6 +643,8 @@ def root_locus_figure(A, B, C, D, gains, roots, sys, of, wrt, radius=None):
         )
     reach = float(radius)
     near = roots[np.abs(roots) <= reach]
+
+    # One trace per branch, its gain and root in the hover
     branches = tuple(
         Trace(
             roots[:, j].real,
@@ -616,6 +656,7 @@ def root_locus_figure(A, B, C, D, gains, roots, sys, of, wrt, radius=None):
         )
         for j in range(roots.shape[1])
     )
+
     return ControlFigure(
         title=style.ROOT_LOCUS_TITLE,
         subtitle=channel_subtitle(sys, of, wrt),
@@ -634,13 +675,17 @@ def root_locus_figure(A, B, C, D, gains, roots, sys, of, wrt, radius=None):
 
 
 def nyquist_figure(w, G, sys, of, wrt):
+    """The Nyquist figure: the contour, its mirror for negative frequencies, and the critical point ``-1``."""
     hover = tuple(
         f"ω = {wk:.3g} rad/s<br>G = {g.real:.3g} {g.imag:+.3g}j" for wk, g in zip(w, G)
     )
+
     # Zoom on the part of the contour that matters: poles at the origin send
     # |G| to infinity at low frequency, so the limits ignore the far points.
     visible = G[np.abs(G) <= 10.0 * np.median(np.abs(G))]
     points = np.concatenate([visible, np.conj(visible), [-1.0 + 0j]])
+
+    # The critical point −1
     critical = Trace(
         np.array([-1.0]),
         np.array([0.0]),
@@ -649,6 +694,7 @@ def nyquist_figure(w, G, sys, of, wrt):
         marker="+",
         size=10.0,
     )
+
     return ControlFigure(
         title=style.NYQUIST_TITLE,
         subtitle=channel_subtitle(sys, of, wrt),

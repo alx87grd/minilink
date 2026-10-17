@@ -42,7 +42,7 @@ def _import_meshcat():
     except ImportError as e:
         raise ImportError(
             "meshcat is required for renderer='meshcat'. "
-            "Install with: pip install 'minilink[visualization]'"
+            "Install with: pip install meshcat"
         ) from e
     return meshcat
 
@@ -345,8 +345,18 @@ def extends_polyline(page, later) -> bool:
     start, _, after = later
     if stop != start or type(before) is not CustomLine or type(after) is not CustomLine:
         return False
-    look = (str(before.color), float(before.linewidth), repr(before.style))
-    if look != (str(after.color), float(after.linewidth), repr(after.style)):
+    look = (
+        str(before.color),
+        float(before.linewidth),
+        repr(before.style),
+        float(before.opacity),
+    )
+    if look != (
+        str(after.color),
+        float(after.linewidth),
+        repr(after.style),
+        float(after.opacity),
+    ):
         return False
     n = len(before.pts)
     return 2 <= n < len(after.pts) and np.array_equal(after.pts[:n], before.pts)
@@ -365,7 +375,11 @@ def polyline_tail(before, after) -> CustomLine:
         )
         style = (offset + length / unit, dashes)
     return CustomLine(
-        after.pts[n - 1 :], color=after.color, linewidth=after.linewidth, style=style
+        after.pts[n - 1 :],
+        color=after.color,
+        linewidth=after.linewidth,
+        style=style,
+        opacity=after.opacity,
     )
 
 
@@ -444,6 +458,7 @@ class MeshcatCanvas:
                 str(primitive.color),
                 float(primitive.linewidth),
                 repr(primitive.style),
+                float(primitive.opacity),
                 bool(self.is_3d),
             )
         if isinstance(primitive, (Arrow, TorqueArrow)):
@@ -624,6 +639,7 @@ class MeshcatCanvas:
 
         if isinstance(primitive, (CustomLine, Arrow, TorqueArrow)):
             style = getattr(primitive, "style", "-")
+            opacity = float(np.clip(getattr(primitive, "opacity", 1.0), 0.0, 1.0))
             if self.is_3d:
                 mesh = polyline_strip_mesh(
                     primitive.pts,
@@ -639,7 +655,11 @@ class MeshcatCanvas:
                             np.asarray(vertices, dtype=np.float32),
                             np.asarray(faces, dtype=np.uint32),
                         ),
-                        g.MeshLambertMaterial(color=hex_color),
+                        g.MeshLambertMaterial(
+                            color=hex_color,
+                            transparent=opacity < 0.999,
+                            opacity=opacity,
+                        ),
                     )
                 )
                 return True
@@ -651,7 +671,10 @@ class MeshcatCanvas:
                 g.Line(
                     g.PointsGeometry(vertices),
                     g.LineBasicMaterial(
-                        color=hex_color, linewidth=float(primitive.linewidth)
+                        color=hex_color,
+                        linewidth=float(primitive.linewidth),
+                        transparent=opacity < 0.999,
+                        opacity=opacity,
                     ),
                 )
             )

@@ -1,8 +1,4 @@
-"""The System contract: the base class every block, plant and controller extends.
-
-A static block is its output maps on its ports; continuous evolution
-``dx = f(x, u, t; p)`` lives on :class:`DynamicSystem`, a discrete step on :class:`StepSystem`.
-"""
+"""The System contract: the base class every block, plant and controller extends."""
 
 from typing import TYPE_CHECKING
 
@@ -13,14 +9,19 @@ from minilink.core.facades import (
     SharedSystemFacades,
     StepSystemFacades,
 )
-from minilink.core.inspect import inspect_text, repr_pretty
+from minilink.core.inspect import inspect_text
 from minilink.core.signals import InputPort, OutputPort, VectorSignal
 
 if TYPE_CHECKING:
     from minilink.core.diagram import DiagramSystem
 
-# Solver hint of a system that declares no time constant of its own (seconds).
+# Solver hint of a system that declares no time constant of its own (seconds)
 DEFAULT_SMALLEST_TIME_CONSTANT = 0.001
+
+
+###############################################################################
+# Public API
+###############################################################################
 
 
 class System(SharedSystemFacades):
@@ -28,10 +29,11 @@ class System(SharedSystemFacades):
 
     ``y = h(x, u, t; p)`` (via port ``compute`` / :meth:`h`).
 
-    Default ``n = 0`` (no states). State dimension :attr:`n` is the number of
-    state slots this block contributes when stacked in a diagram (zero for
-    static blocks). Continuous evolution ``dx = f(x, u, t; p)`` is defined on
-    :class:`DynamicSystem` only.
+    A static block is its output maps on its ports. Default ``n = 0`` (no
+    states). State dimension :attr:`n` is the number of state slots this block
+    contributes when stacked in a diagram (zero for static blocks). Continuous
+    evolution ``dx = f(x, u, t; p)`` is defined on :class:`DynamicSystem` only,
+    and a discrete step ``x_{k+1} = step(x, u, k; p)`` on :class:`StepSystem`.
 
     A :class:`System` serves several roles at once:
 
@@ -51,6 +53,10 @@ class System(SharedSystemFacades):
     - **Inspect**: :meth:`__str__` is a short summary (name, class, ``n``,
       ports with dimensions; a diagram adds its keys). A notebook last
       expression still draws the Graphviz block.
+    - **Names**: :attr:`name` is the display name, the class name unless the
+      block sets its own; :attr:`id` is the key the block takes in a diagram
+      built by ``+``, ``>>`` or a loop (``None``: its name in snake case; in
+      ``@`` the role names ``plant``, ``controller`` and ``observer`` win).
 
     Overridden :meth:`h` and port ``compute`` functions are functions of
     ``(x, u, t, params)`` alone: no memory between calls, no cached side
@@ -66,6 +72,9 @@ class System(SharedSystemFacades):
     #: ``params`` is to ``f``).
     skin = None
 
+    #: Whether the block draws random numbers from a seed in its ``params``.
+    is_random = False
+
     def __init__(self, n=0):
         """
         Initialize the system with ``n`` continuous states (default 0).
@@ -76,59 +85,62 @@ class System(SharedSystemFacades):
         """
         # Structural model description
         self.n = int(n)
-        if self.n < 0:
-            raise ValueError("System dimension n must be nonnegative")
+        require_nonnegative_dimension(self.n)
 
-        # Human-readable identifier
-        self.name = "System"
-
-        # Optional diagram subsystem key override (see composition shortcuts).
+        # The display name, the class name unless a subclass sets its own, and
+        # the optional diagram key override (see the composition shortcuts)
+        self.name = type(self).__name__
         self.id = None
 
         # State metadata
         self.state = VectorSignal("x", dim=n)
 
-        # Port structure
+        # Ports
         self.inputs = {}
         self.outputs = {}
 
-        # Model defaults and metadata
-        # Default initial condition used by convenience simulation paths.
+        # Model defaults: the initial condition of a simulation (the operating
+        # point the analysis tools read is the nominal state,
+        # ``self.state.nominal_value``), and the parameter set, which an explicit
+        # ``params=...`` passed to ``f`` / ``h`` overrides
         self.x0 = np.zeros(self.n)
-
-        # Default model parameter set. Explicit ``params=...`` arguments
-        # passed to ``f`` / ``h`` override this default.
         self.params = {}
 
-        # Solver hints used by high-level simulation shortcuts.
+        # Solver hints used by the high-level simulation shortcuts
         self.solver_info = {
             "smallest_time_constant": DEFAULT_SMALLEST_TIME_CONSTANT,
             "discontinuous_behavior": False,
         }
 
-        # Runtime convenience cache for the last trajectory produced by
-        # ``compute_trajectory``.
+        # Memory: the last trajectory ``compute_trajectory`` produced
         self.traj = None
 
-        # Camera hints, resolved by the Animator. ``camera_scale=None`` (default)
-        # fits the view to the drawn geometry; a half-width in metres frames the
-        # scene yourself. ``camera_follow_frame`` is a ``tf`` key to track (``None``
-        # for a fixed view); ``camera_priority`` tie-breaks between drawables.
+        # Graphics: camera hints, resolved by the Animator. ``camera_scale=None``
+        # (default) fits the view to the drawn geometry; a half-width in metres
+        # frames the scene yourself. ``camera_follow_frame`` is a ``tf`` key to
+        # track (``None`` for a fixed view); ``camera_priority`` tie-breaks between
+        # drawables.
         self.camera_target = np.zeros(3, dtype=float)
         self.camera_plot_axes = (0, 1)
         self.camera_scale = None
         self.camera_follow_frame = None
         self.camera_priority = 0.0
 
-        # Backdrop hint, read by the meshcat viewer: ``scene_grid`` whether its
-        # ground grid and axes are drawn (``False`` for an underwater scene).
+        # Graphics: the backdrop hint read by the meshcat viewer, whether its
+        # ground grid and axes are drawn (``False`` for an underwater scene)
         self.scene_grid = True
 
-    def __str__(self):
-        return inspect_text(self)
+    # Structural model: the dimensions the ports define
 
-    def _repr_pretty_(self, p, cycle):
-        repr_pretty(self, p, cycle)
+    @property
+    def m(self):
+        """Total input dimension: the sum of all input-port dimensions."""
+        return sum(port.dim for port in self.inputs.values())
+
+    @property
+    def p(self):
+        """Primary output dimension: the dimension of the ``"y"`` port, or 0."""
+        return self.outputs["y"].dim if "y" in self.outputs else 0
 
     # Core output contract (static IO)
 
@@ -149,7 +161,11 @@ class System(SharedSystemFacades):
         -------
         y : array of shape (p,)
         """
-        y = np.zeros(self.p)
+        p = self.p
+
+        # y = 0 ∈ ℝᵖ: the static shell writes no output map of its own
+        y = np.zeros(p)
+
         return y
 
     def compute_state(self, x, u, t=0, params=None):
@@ -164,9 +180,6 @@ class System(SharedSystemFacades):
         """
         return
 
-    #: Whether the block draws random numbers from a seed in its ``params``.
-    is_random = False
-
     def realize(self, key):
         """
         The params of one realization of the block's randomness under ``key``.
@@ -179,17 +192,7 @@ class System(SharedSystemFacades):
         """
         return self.params
 
-    # Structural Model API
-
-    @property
-    def m(self):
-        """Total input dimension: the sum of all input-port dimensions."""
-        return sum(port.dim for port in self.inputs.values())
-
-    @property
-    def p(self):
-        """Primary output dimension: the dimension of the ``"y"`` port, or 0."""
-        return self.outputs["y"].dim if "y" in self.outputs else 0
+    # Ports
 
     def add_input_port(
         self,
@@ -256,7 +259,8 @@ class System(SharedSystemFacades):
             The input-port ids this output directly feeds through from
             (default: no direct feedthrough).
         """
-        self.validate_output_dependencies(id, dependencies)
+        self.check_output_dependencies(id, dependencies)
+
         self.outputs[id] = OutputPort(
             id,
             dim=dim,
@@ -269,6 +273,41 @@ class System(SharedSystemFacades):
             upper_bound=upper_bound,
         )
 
+    def rename_ports(self, **names):
+        """
+        Rename ports at creation: ``Saturation(-1, 1).rename_ports(u="u_cmd", y="u")``.
+
+        A port name is the block's outside: wiring, ``autowire``, plot signals,
+        drawings. The equations read the stacked ``u`` by position, so a rename
+        changes nothing inside. The renames of one call apply at once (a chain
+        such as ``u="u_cmd", y="u"`` is one step), the port order is kept, and
+        the output dependency lists follow. Refused: a name that is not a port,
+        a new name that is a port not renamed in the same call, two equal new
+        names, and a diagram, whose edge is named with ``expose``. Rename a
+        block before placing it in a diagram, whose wiring refers to the names.
+
+        Returns the block, for chaining.
+        """
+        require_port_renames(self, names)
+
+        def renamed(table):
+            renamed_table = {}
+            for old, port in table.items():
+                port.id = names.get(old, old)
+                renamed_table[port.id] = port
+            return renamed_table
+
+        # The port tables under their new names, in the same order
+        self.inputs = renamed(self.inputs)
+        self.outputs = renamed(self.outputs)
+
+        # The output dependency lists follow the renames
+        for port in self.outputs.values():
+            if port.dependencies != "all":
+                port.dependencies = tuple(names.get(d, d) for d in port.dependencies)
+
+        return self
+
     def get_u_from_input_ports(self):
         """
         Concatenated default values of all input ports.
@@ -277,11 +316,14 @@ class System(SharedSystemFacades):
         systems and for the evaluator IVP tier.
         """
         u = np.zeros(self.m)
+
+        # Each port's slice of u holds its constant default value, what an
+        # unconnected port contributes
         i = 0
         for port in self.inputs.values():
-            # Unconnected input ports contribute their constant default value.
             u[i : i + port.dim] = port.get_default_value()
             i += port.dim
+
         return u
 
     def get_port_values_from_u(self, u, *port_ids):
@@ -292,15 +334,19 @@ class System(SharedSystemFacades):
         * One port id: return that port's value.
         * Several port ids: return a tuple in the requested order.
         """
+        # Each port's slice of u, in port order
         input_signals = {}
         i = 0
         for port_id, port in self.inputs.items():
             input_signals[port_id] = u[i : i + port.dim]
             i += port.dim
+
+        # Every port, the one asked for, or several in the requested order
         if not port_ids:
             return input_signals
         if len(port_ids) == 1:
             return input_signals[port_ids[0]]
+
         return tuple(input_signals[port_id] for port_id in port_ids)
 
     def get_input_port_slice(self, port_id):
@@ -325,30 +371,7 @@ class System(SharedSystemFacades):
 
         return input_labels, input_units
 
-    def validate_output_dependencies(self, output_id, dependencies):
-        """Internal machinery: check the declared dependencies of an output port."""
-        if dependencies == "all":
-            return
-        if dependencies in ("", None):
-            raise ValueError(
-                f"dependencies for output port '{output_id}' must be (), "
-                "a sequence of input-port ids, or 'all'"
-            )
-        if isinstance(dependencies, str):
-            raise ValueError(
-                f"dependencies for output port '{output_id}' must be a sequence "
-                "of input-port ids or 'all', not a bare string"
-            )
-        unknown = [
-            port_id for port_id in tuple(dependencies) if port_id not in self.inputs
-        ]
-        if unknown:
-            names = ", ".join(repr(port_id) for port_id in unknown)
-            raise ValueError(
-                f"Unknown input dependencies for output port '{output_id}': {names}"
-            )
-
-    # Visualization / Kinematic Contract (frame-keyed)
+    # Visualization and kinematic contract (frame-keyed)
     #
     # The three drawable hooks return **frame-keyed dicts**: ``tf`` gives world
     # poses per named frame (forward kinematics), ``get_kinematic_geometry``
@@ -374,45 +397,30 @@ class System(SharedSystemFacades):
         """Per-frame geometry as ``dict[str, list[primitive]]`` (rebuilt each frame)."""
         return {}
 
-    # Contract guard
-
-    def __getattr__(self, name):
-        # Reached only when normal lookup fails. On a System the usual cause
-        # is a subclass whose __init__ never called super().__init__(...).
-        if "inputs" not in vars(self):
-            raise AttributeError(
-                f"{type(self).__name__}.__init__() must call "
-                f"super().__init__(n=...) before the system is used "
-                f"(missing attribute {name!r})"
-            )
-        descriptor = getattr(type(self), name, None)
-        if isinstance(descriptor, property):
-            # The getter raised AttributeError and Python discarded it; run it
-            # again so the real missing name reaches the user.
-            return descriptor.__get__(self, type(self))
-        raise AttributeError(
-            f"{type(self).__name__!r} object has no attribute {name!r}"
-        )
-
-    # Composition Operators
+    # Composition operators
 
     def __add__(self, other: object) -> "DiagramSystem":
-        """Return a diagram containing ``self`` and ``other`` as subsystems.
+        """Return a new diagram containing ``self`` and ``other`` side by side.
 
-        If ``self`` is already a :class:`~minilink.core.diagram.DiagramSystem`,
-        it is extended **in place** and returned (subsystems are shared
-        references, never copied) — see DESIGN §4 operator mutation semantics.
+        Neither operand is modified: a diagram operand is laid out flat in the
+        result, which shares its blocks and carries the left operand's name,
+        ``x0`` and camera settings. See
+        :func:`~minilink.core.composition.add_systems`.
         """
+        # A real cycle: composition imports System from this module
         from minilink.core.composition import add_systems
 
         return add_systems(self, other)
 
     def __rshift__(self, other: object) -> "DiagramSystem":
-        """Return a diagram with ``self`` connected in series to ``other``.
+        """Return a new diagram with ``self`` connected in series to ``other``.
 
-        A diagram left operand is extended **in place** and returned — see
-        DESIGN §4 operator mutation semantics.
+        Neither operand is modified: a diagram operand is laid out flat in the
+        result, which shares its blocks and carries the left operand's name,
+        ``x0`` and camera settings. See
+        :func:`~minilink.core.composition.series`.
         """
+        # A real cycle: composition imports System from this module
         from minilink.core.composition import series
 
         return series(self, other)
@@ -423,23 +431,79 @@ class System(SharedSystemFacades):
         ``controller @ plant`` wires the standard feedback ports; an
         error-driven left operand (a compensator, a transfer function, a
         series diagram ``C >> G``) gets an Error block ``e = r - y``
-        inserted; ``sys @ 1`` closes ``sys`` on itself with unity feedback.
-        Unlike ``+`` and ``>>``, neither operand is modified: the loop is a
-        new diagram. See :func:`~minilink.core.composition.closed_loop` and
+        inserted. A number on the right is refused: ``feedback(L)`` and
+        ``feedback(L, K)`` close an open loop on itself. Neither operand is
+        modified: the loop is a new diagram. See
+        :func:`~minilink.core.composition.closed_loop` and
         :func:`~minilink.core.composition.feedback`.
         """
+        # A real cycle: composition imports System from this module
         from minilink.core.composition import closed_loop
 
         return closed_loop(self, other)
 
     def __mod__(self, schedule: object):
         """Return a scheduled :class:`~minilink.simulation.computer.Computer`."""
-        from minilink.simulation.computer import _build_computer
+        # A real cycle: the computer imports the diagrams, which import this module
+        from minilink.simulation.computer import build_computer
 
-        return _build_computer(self, schedule)
+        return build_computer(self, schedule)
+
+    # Display
+
+    def __str__(self):
+        return inspect_text(self)
+
+    def _repr_pretty_(self, p, cycle):
+        p.text("..." if cycle else str(self))
+
+    # Contract guard
+
+    def __getattr__(self, name):
+        # Reached only when normal lookup fails; on a System the usual cause is a
+        # subclass whose __init__ never called super().__init__(...)
+        require_initialized(self, name)
+
+        # A property whose getter raised AttributeError, which Python discarded:
+        # run it again so the real missing name reaches the user
+        descriptor = getattr(type(self), name, None)
+        if isinstance(descriptor, property):
+            return descriptor.__get__(self, type(self))
+
+        raise AttributeError(
+            f"{type(self).__name__!r} object has no attribute {name!r}"
+        )
+
+    ###########################################################################
+    # Internal machinery
+    ###########################################################################
+
+    def check_output_dependencies(self, output_id, dependencies):
+        """Check the declared dependencies of an output port."""
+        if dependencies == "all":
+            return
+        if dependencies in ("", None):
+            raise ValueError(
+                f"dependencies for output port '{output_id}' must be (), "
+                "a sequence of input-port ids, or 'all'"
+            )
+        if isinstance(dependencies, str):
+            raise ValueError(
+                f"dependencies for output port '{output_id}' must be a sequence "
+                "of input-port ids or 'all', not a bare string"
+            )
+
+        unknown = [
+            port_id for port_id in tuple(dependencies) if port_id not in self.inputs
+        ]
+        if unknown:
+            names = ", ".join(repr(port_id) for port_id in unknown)
+            raise ValueError(
+                f"Unknown input dependencies for output port '{output_id}': {names}"
+            )
 
 
-# Specialized System Types
+# Specialized system types
 
 
 class DynamicSystem(DynamicSystemFacades, System):
@@ -486,16 +550,8 @@ class DynamicSystem(DynamicSystemFacades, System):
         """
         System.__init__(self, n)
 
-        self.name = "DynamicSystem"
-
-        if input_dim is not None:
-            self.add_input_port("u", dim=input_dim)
-        if output_dim is not None:
-            self.add_output_port(
-                "y", dim=output_dim, function=self.h, dependencies=y_dependencies
-            )
-        if expose_state:
-            self.add_output_port("x", dim=self.n, function=self.compute_state)
+        # Ports, each when asked: the input u, the output y = h(x, u), the state x
+        add_standard_ports(self, input_dim, output_dim, expose_state, y_dependencies)
 
     def f(self, x, u, t=0, params=None):
         """
@@ -516,7 +572,11 @@ class DynamicSystem(DynamicSystemFacades, System):
         -------
         dx : array of shape (n,)
         """
-        dx = np.zeros(self.n)
+        n = self.n
+
+        # ẋ = 0: a plant that writes no dynamics holds its state
+        dx = np.zeros(n)
+
         return dx
 
     def h(self, x, u, t=0, params=None):
@@ -538,9 +598,15 @@ class DynamicSystem(DynamicSystemFacades, System):
         -------
         y : array of shape (p,)
         """
-        if self.p == self.n:
+        p = self.p
+        n = self.n
+
+        # y = x when the output carries the full state (p = n), y = 0 otherwise
+        if p == n:
             return x
-        y = np.zeros(self.p)
+
+        y = np.zeros(p)
+
         return y
 
 
@@ -581,21 +647,14 @@ class StepSystem(StepSystemFacades, System):
         y_dependencies : tuple or "all", optional
             Direct-feedthrough dependencies for the standard ``y`` output.
         """
-        if int(n) < 1:
-            raise ValueError("StepSystem requires n >= 1")
+        require_step_state(n)
         System.__init__(self, n)
 
-        self.name = "StepSystem"
+        # Memory: the last rollout ``compute_rollout`` produced
         self.rollout = None
 
-        if input_dim is not None:
-            self.add_input_port("u", dim=input_dim)
-        if output_dim is not None:
-            self.add_output_port(
-                "y", dim=output_dim, function=self.h, dependencies=y_dependencies
-            )
-        if expose_state:
-            self.add_output_port("x", dim=self.n, function=self.compute_state)
+        # Ports, each when asked: the input u, the output y_k = h(x, u), the state x
+        add_standard_ports(self, input_dim, output_dim, expose_state, y_dependencies)
 
     def step(self, x, u, k=0, params=None):
         """
@@ -611,9 +670,14 @@ class StepSystem(StepSystemFacades, System):
 
         Returns
         -------
-        x_new : array of shape (n,)
+        x_next : array of shape (n,)
         """
-        return np.asarray(x).reshape(self.n).copy()
+        n = self.n
+
+        # x_{k+1} = x_k, as a fresh copy of the state
+        x_next = np.asarray(x).reshape(n).copy()
+
+        return x_next
 
     def h(self, x, u, k=0, params=None):
         """
@@ -632,10 +696,84 @@ class StepSystem(StepSystemFacades, System):
         -------
         y : array of shape (p,)
         """
-        if self.p == self.n:
+        p = self.p
+        n = self.n
+
+        # y_k = x_k when the output carries the full state (p = n), y_k = 0 otherwise
+        if p == n:
             return x
-        y = np.zeros(self.p)
+
+        y = np.zeros(p)
+
         return y
+
+
+###############################################################################
+# Internal machinery
+###############################################################################
+
+
+def require_nonnegative_dimension(n):
+    """Refuse a negative state dimension."""
+    if n < 0:
+        raise ValueError("System dimension n must be nonnegative")
+
+
+def require_port_renames(system, names):
+    """Refuse a rename of a diagram's ports, of an unknown port, to two equal names, or onto a kept port."""
+    if hasattr(system, "subsystems"):
+        raise ValueError(
+            f"rename_ports renames the ports of a block; {system.name!r} is a "
+            "diagram, whose edge is named with expose(...)"
+        )
+
+    ports = {**system.inputs, **system.outputs}
+    unknown = [old for old in names if old not in ports]
+    if unknown:
+        raise ValueError(
+            f"{system.name!r} has no port {', '.join(map(repr, unknown))}; "
+            f"its ports are {', '.join(ports)}"
+        )
+
+    new_names = list(names.values())
+    if len(set(new_names)) != len(new_names):
+        raise ValueError(f"two ports cannot take the same name: {new_names}")
+
+    untouched = set(ports) - set(names)
+    taken = [new for new in new_names if new in untouched]
+    if taken:
+        raise ValueError(
+            f"{', '.join(map(repr, taken))} is already a port of {system.name!r}; "
+            "rename that port in the same call, or pick another name"
+        )
+
+
+def require_initialized(system, name):
+    """Refuse an attribute lookup on a system whose ``__init__`` skipped ``System.__init__``."""
+    if "inputs" not in vars(system):
+        raise AttributeError(
+            f"{type(system).__name__}.__init__() must call "
+            f"super().__init__(n=...) before the system is used "
+            f"(missing attribute {name!r})"
+        )
+
+
+def add_standard_ports(system, input_dim, output_dim, expose_state, y_dependencies):
+    """Add the standard ports a constructor asks for: the input ``u``, the output ``y`` wired to ``h``, the state output ``x``."""
+    if input_dim is not None:
+        system.add_input_port("u", dim=input_dim)
+    if output_dim is not None:
+        system.add_output_port(
+            "y", dim=output_dim, function=system.h, dependencies=y_dependencies
+        )
+    if expose_state:
+        system.add_output_port("x", dim=system.n, function=system.compute_state)
+
+
+def require_step_state(n):
+    """Refuse a step system with no state to update."""
+    if int(n) < 1:
+        raise ValueError("StepSystem requires n >= 1")
 
 
 if __name__ == "__main__":
@@ -648,9 +786,11 @@ if __name__ == "__main__":
 
         def f(self, x, u, t=0, params=None):
             xp = array_module(x)
+
             position, velocity = x
             force = u[0]
 
+            # ẋ = [v, F]
             dx = xp.array([velocity, force])
 
             return dx

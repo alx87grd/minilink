@@ -3,8 +3,11 @@
 import numpy as np
 
 from minilink.core.backends import array_module, require_jax_numpy
-from minilink.core.signals import OutputPort
 from minilink.core.system import DynamicSystem
+
+###############################################################################
+# Public API
+###############################################################################
 
 
 class MechanicalSystem(DynamicSystem):
@@ -28,6 +31,7 @@ class MechanicalSystem(DynamicSystem):
         if actuators is None:
             actuators = dof
 
+        # Dimensions: the state x = [q; v] and the output y = x
         n = dof * 2
         m = actuators
         p = dof * 2
@@ -39,9 +43,9 @@ class MechanicalSystem(DynamicSystem):
             expose_state=True,
             y_dependencies=(),
         )
-
         self.name = f"{dof}DoF Mechanical System"
 
+        # Signal labels, units and bounds: an angle and a velocity per coordinate
         lim = 2 * np.pi
         for i in range(dof):
             self.state.labels[i] = f"Angle {i}"
@@ -54,6 +58,7 @@ class MechanicalSystem(DynamicSystem):
             self.state.upper_bound[j] = lim
             self.state.lower_bound[j] = -lim
 
+        # A torque per actuator, and the output named after the state
         uport = self.inputs["u"]
         for i in range(actuators):
             uport.labels[i] = f"Torque {i}"
@@ -64,47 +69,61 @@ class MechanicalSystem(DynamicSystem):
         self.outputs["y"].labels = list(self.state.labels)
         self.outputs["y"].units = list(self.state.units)
 
-        # q and dq name their entries from the state on each read, so a plant
-        # that relabels its state after this constructor still names its joints.
-        self.outputs["q"] = StateSliceOutputPort(
-            self, "q", start=0, dim=dof, function=self.h_q
-        )
-        self.outputs["dq"] = StateSliceOutputPort(
-            self, "dq", start=dof, dim=dof, function=self.h_dq
-        )
-
-    def h_q(self, x, u, t=0, params=None):
-        q, _ = self.x2q(x)
-        return q
-
-    def h_dq(self, x, u, t=0, params=None):
-        _, dq = self.x2q(x)
-        return dq
-
     def H(self, q, params=None):
         """Inertia matrix, shape (dof, dof). Kinetic energy = 0.5 * dq^T H(q) dq."""
         xp = array_module(q)
-        return xp.eye(self.dof)
+
+        dof = self.dof
+
+        # H = I: a unit inertia on every coordinate until a subclass writes its own
+        H = xp.eye(dof)
+
+        return H
 
     def C(self, q, v, params=None):
         """Coriolis and centrifugal matrix, shape (dof, dof)."""
         xp = array_module(q)
-        return xp.zeros((self.dof, self.dof))
+
+        dof = self.dof
+
+        # C = 0: no velocity coupling until a subclass writes its own
+        C = xp.zeros((dof, dof))
+
+        return C
 
     def B(self, q, params=None):
         """Actuator matrix, shape (dof, m)."""
         xp = array_module(q)
-        return xp.eye(self.dof, self.m)
+
+        dof = self.dof
+        m = self.m
+
+        # B = I: actuator i drives coordinate i
+        B = xp.eye(dof, m)
+
+        return B
 
     def g(self, q, params=None):
         """Gravitational / conservative forces, shape (dof,)."""
         xp = array_module(q)
-        return xp.zeros(self.dof)
+
+        dof = self.dof
+
+        # g = 0: no conservative force until a subclass writes its own
+        g = xp.zeros(dof)
+
+        return g
 
     def d(self, q, v, u=None, t=0.0, params=None):
         """Left-side load/dissipation vector, shape ``(dof,)``."""
         xp = array_module(q)
-        return xp.zeros(self.dof)
+
+        dof = self.dof
+
+        # d = 0: no load or dissipation until a subclass writes its own
+        d = xp.zeros(dof)
+
+        return d
 
     def generalized_force(self, q, v, u, t=0.0, params=None):
         """Right-side generalized force vector.
@@ -121,18 +140,27 @@ class MechanicalSystem(DynamicSystem):
 
     def x2q(self, x):
         """Split state ``x`` into ``q`` and ``v``."""
-        q = x[0 : self.dof]
-        v = x[self.dof : self.n]
+        dof = self.dof
+        n = self.n
+
+        q = x[0:dof]
+        v = x[dof:n]
+
         return [q, v]
 
     def q2x(self, q, v):
         """Stack ``q`` and ``v`` into state ``x``."""
         xp = array_module(q)
-        return xp.concatenate([q, v])
+
+        # x = [q; v]
+        x = xp.concatenate([q, v])
+
+        return x
 
     def inverse_dynamics(self, q, v, acceleration, u=None, t=0.0, params=None):
         """Generalized RHS force required by a trajectory."""
         params = self.params if params is None else params
+
         H = self.H(q, params)
         C = self.C(q, v, params)
         g = self.g(q, params)
@@ -146,6 +174,7 @@ class MechanicalSystem(DynamicSystem):
         """Forward dynamics: generalized acceleration given ``u``."""
         params = self.params if params is None else params
         xp = array_module(q, v)
+
         H = self.H(q, params)
         C = self.C(q, v, params)
         g = self.g(q, params)
@@ -159,6 +188,7 @@ class MechanicalSystem(DynamicSystem):
 
     def f(self, x, u, t=0.0, params=None):
         params = self.params if params is None else params
+
         q, v = self.x2q(x)
         vdot = self.forward_dynamics(q, v, u, t, params)
 
@@ -172,8 +202,10 @@ class MechanicalSystem(DynamicSystem):
 
     def kinetic_energy(self, q, v, params=None):
         params = self.params if params is None else params
+
         H = self.H(q, params)
 
+        # T = ½ vᵀ H(q) v
         T = 0.5 * (v @ (H @ v))
 
         return T
@@ -191,47 +223,88 @@ class JaxMechanicalSystem(MechanicalSystem):
 
     JAX is loaded lazily inside each method via
     :func:`~minilink.core.backends.require_jax_numpy`, so importing this
-    module stays free without the ``minilink[jax]`` extra.
+    module stays free without JAX.
     """
 
     def H(self, q, params=None):
         jnp = require_jax_numpy()
-        dt = getattr(q, "dtype", None) or jnp.float32
-        return jnp.diag(jnp.ones(self.dof, dtype=dt))
+
+        dof = self.dof
+
+        dtype = dtype_of(q, jnp)
+
+        # H = I, in the dtype of q
+        H = jnp.diag(jnp.ones(dof, dtype=dtype))
+
+        return H
 
     def C(self, q, v, params=None):
         jnp = require_jax_numpy()
-        dt = getattr(q, "dtype", None) or jnp.float32
-        return jnp.zeros((self.dof, self.dof), dtype=dt)
+
+        dof = self.dof
+
+        dtype = dtype_of(q, jnp)
+
+        # C = 0, in the dtype of q
+        C = jnp.zeros((dof, dof), dtype=dtype)
+
+        return C
 
     def B(self, q, params=None):
         jnp = require_jax_numpy()
-        dt = getattr(q, "dtype", None) or jnp.float32
-        B = jnp.zeros((self.dof, self.m), dtype=dt)
-        for i in range(min(self.m, self.dof)):
-            B = B.at[i, i].set(jnp.asarray(1.0, dtype=dt))
+
+        dof = self.dof
+        m = self.m
+
+        dtype = dtype_of(q, jnp)
+
+        # B = I, set entry by entry on the diagonal of a traced array
+        B = jnp.zeros((dof, m), dtype=dtype)
+        for i in range(min(m, dof)):
+            B = B.at[i, i].set(jnp.asarray(1.0, dtype=dtype))
+
         return B
 
     def g(self, q, params=None):
         jnp = require_jax_numpy()
-        dt = getattr(q, "dtype", None) or jnp.float32
-        return jnp.zeros(self.dof, dtype=dt)
+
+        dof = self.dof
+
+        dtype = dtype_of(q, jnp)
+
+        # g = 0, in the dtype of q
+        g = jnp.zeros(dof, dtype=dtype)
+
+        return g
 
     def d(self, q, v, u=None, t=0.0, params=None):
         jnp = require_jax_numpy()
-        dt = getattr(q, "dtype", None) or jnp.float32
-        return jnp.zeros(self.dof, dtype=dt)
+
+        dof = self.dof
+
+        dtype = dtype_of(q, jnp)
+
+        # d = 0, in the dtype of q
+        d = jnp.zeros(dof, dtype=dtype)
+
+        return d
 
     def q2x(self, q, v):
         jnp = require_jax_numpy()
-        dt = getattr(q, "dtype", None) or jnp.float32
-        return jnp.concatenate(
-            [jnp.asarray(q, dtype=dt).ravel(), jnp.asarray(v, dtype=dt).ravel()]
-        )
+
+        dtype = dtype_of(q, jnp)
+        q_flat = jnp.asarray(q, dtype=dtype).ravel()
+        v_flat = jnp.asarray(v, dtype=dtype).ravel()
+
+        # x = [q; v], both in the dtype of q
+        x = jnp.concatenate([q_flat, v_flat])
+
+        return x
 
     def forward_dynamics(self, q, v, u, t=0.0, params=None):
         params = self.params if params is None else params
         jnp = require_jax_numpy()
+
         u = jnp.asarray(u)
         H = self.H(q, params)
         C = self.C(q, v, params)
@@ -247,6 +320,7 @@ class JaxMechanicalSystem(MechanicalSystem):
     def f(self, x, u, t=0.0, params=None):
         params = self.params if params is None else params
         jnp = require_jax_numpy()
+
         u = jnp.asarray(u)
         q, v = self.x2q(x)
         vdot = self.forward_dynamics(q, v, u, t, params)
@@ -257,46 +331,11 @@ class JaxMechanicalSystem(MechanicalSystem):
         return dx
 
 
+###############################################################################
 # Internal machinery
+###############################################################################
 
 
-class StateSliceOutputPort(OutputPort):
-    """
-    An output port carrying ``dim`` consecutive state entries, such as ``q`` or ``dq``.
-
-    Its labels and units are read from the matching entries of
-    ``system.state`` on each access unless declared explicitly, so a plant
-    that relabels its state after the port was built still names its joints.
-    Declare them by assigning a new list (``port.labels = [...]``); assigning
-    ``None`` returns to the state's names.
-    """
-
-    def __init__(self, system, id, *, start, dim, function):
-        self.system = system
-        self.state_slice = slice(start, start + dim)
-        OutputPort.__init__(self, id, dim=dim, function=function, dependencies=())
-        # Drop the placeholder names OutputPort just set: follow the state.
-        self.declared_labels = None
-        self.declared_units = None
-
-    @property
-    def labels(self):
-        """Declared labels, else the labels of this slice of the state."""
-        if self.declared_labels is not None:
-            return self.declared_labels
-        return self.system.state.labels[self.state_slice]
-
-    @labels.setter
-    def labels(self, value):
-        self.declared_labels = value
-
-    @property
-    def units(self):
-        """Declared units, else the units of this slice of the state."""
-        if self.declared_units is not None:
-            return self.declared_units
-        return self.system.state.units[self.state_slice]
-
-    @units.setter
-    def units(self, value):
-        self.declared_units = value
+def dtype_of(q, jnp):
+    """The dtype of ``q``, or float32 when ``q`` carries none (a list, a scalar)."""
+    return getattr(q, "dtype", None) or jnp.float32

@@ -1,12 +1,4 @@
-"""
-Abstract backend for finite-dimensional optimizer adapters.
-
-Concrete subclasses adapt a compiled
-:class:`~minilink.optimization.evaluators.program_evaluator.MathematicalProgramEvaluator`
-to a third-party solver such as SciPy or Ipopt. The user-facing
-:class:`minilink.optimization.optimizer.Optimizer` owns program compilation,
-timing, diagnostics, and default initial guesses.
-"""
+"""Optimizer backends: the contract of an adapter to a third-party solver."""
 
 from abc import ABC, abstractmethod
 from collections.abc import Callable
@@ -22,9 +14,20 @@ from minilink.optimization.mathematical_program import OptimizationResult
 BackendIterateCallback = Callable[[np.ndarray], None]
 
 
+###############################################################################
+# Public API
+###############################################################################
+
+
 class OptimizerBackend(ABC):
     """
     Pure adapter contract for a finite-dimensional optimizer backend.
+
+    Concrete subclasses adapt a compiled
+    :class:`~minilink.optimization.evaluators.program_evaluator.MathematicalProgramEvaluator`
+    to a third-party solver such as SciPy or Ipopt. The user-facing
+    :class:`minilink.optimization.optimizer.Optimizer` owns program compilation,
+    timing, diagnostics, and default initial guesses.
     """
 
     @abstractmethod
@@ -37,3 +40,28 @@ class OptimizerBackend(ABC):
     ) -> OptimizationResult:
         """Run the backend solver from ``z0``."""
         ...
+
+
+def scipy_constraints_of(program_evaluator: MathematicalProgramEvaluator) -> list:
+    """
+    The program's constraints in SciPy's dict form, as SciPy and Ipopt take them.
+
+    Equalities ``h(z) = 0`` as one ``"eq"`` entry and inequalities ``g(z) ≥ 0``
+    as one ``"ineq"`` entry, each with its Jacobian when the evaluator has one;
+    an empty kind is left out.
+    """
+    constraints = []
+
+    if program_evaluator.n_h > 0:
+        entry = {"type": "eq", "fun": program_evaluator.equality_residual}
+        if program_evaluator.has_jacobian_h:
+            entry["jac"] = program_evaluator.jacobian_h
+        constraints.append(entry)
+
+    if program_evaluator.n_g > 0:
+        entry = {"type": "ineq", "fun": program_evaluator.inequality_margin}
+        if program_evaluator.has_jacobian_g:
+            entry["jac"] = program_evaluator.jacobian_g
+        constraints.append(entry)
+
+    return constraints

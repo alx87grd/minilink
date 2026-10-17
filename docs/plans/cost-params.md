@@ -2,7 +2,7 @@
 
 Status: core contract, design agreed with the maintainer 2026-09-13 (composite costs nest
 their parameters the way a diagram nests its subsystems'); implementation not started.
-Rung: v0.2 wave A, step A2 of [TODO.md](TODO.md).
+Rung: v0.3, step A2 of [TODO.md](TODO.md).
 
 ## Problem
 
@@ -16,7 +16,7 @@ nothing uses it.
   `jax.grad` with respect to `Q` raises `TracerArrayConversionError`.
 - `SumCost` hands the same dictionary to every term: two quadratic terms would both read
   `"Q"`, so their weights cannot be set or differentiated separately.
-- The differentiable closed-loop cost (V1 in [TODO.md](TODO.md) §6) needs cost weights and
+- The differentiable closed-loop cost (V1 in [TODO.md](TODO.md) §4, v0.3) needs cost weights and
   targets as inputs, next to plant and controller parameters.
 
 ## What is already in place
@@ -79,8 +79,8 @@ The diagram's rules, so there is one mental model for both:
 | `diagram.subsystems`: `{sys_id: block}` | `SumCost.terms`: `{term_id: cost}` |
 | `diagram.params`: live view `{sys_id: block.params}`, setter distributes | `SumCost.params`: live view `{term_id: cost.params}`, setter distributes |
 | `f` routes `params.get(sys_id)` to each block, `None` falls back to the block's own | `g` and `h` route `params.get(term_id)` the same way |
-| partial dictionaries allowed, unknown ids raise (`validate_diagram_params`) | same (`validate_cost_params`) |
-| ids from roles and class names, numeric suffix for repeats, `System.id` overrides | ids from class names, numeric suffix for repeats, `cost.id` overrides |
+| partial dictionaries allowed, unknown ids raise (`check_diagram_params`) | same (`validate_cost_params`) |
+| the role names `plant`, `controller`, `estimator` (a clash raises), plain names elsewhere with a numeric suffix for repeats, `System.id` naming a block placed by `+` or `>>` | ids from class names, numeric suffix for repeats, `cost.id` overrides |
 | nested diagrams nest the dictionary | named sums nest the dictionary |
 
 Rules proposed for the questions below:
@@ -127,7 +127,7 @@ already reserved for them. Nothing changes numerically today.
 
 A prototype `CostIntegrator(cost)` is a `DynamicSystem` with state `J` and
 `dJ/dt = exp(-rho t) g(x, u, t; p)`, wired to the plant state and the controller output. The
-closed loop then holds one nested dictionary, `{"ctl": ..., "sys": ..., "cost": ...}`, and
+closed loop then holds one nested dictionary, `{"controller": ..., "plant": ..., "cost": ...}`, and
 `jax.grad` through the compiled loop returned `dJ/dK`, `dJ/dQ`, `dJ/dR` and `dJ/dm` in one
 call. Its `J` matched the post-hoc `compute_cost` to 0.02 % on a pendulum loop. This is the
 route to the differentiable closed-loop cost; it depends on the cost dictionary above.

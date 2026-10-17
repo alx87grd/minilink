@@ -31,12 +31,12 @@ napoleon_numpy_docstring = True
 
 # Docstring types such as ``u : array of shape (m,)`` turn the dimension name
 # into a cross-reference, and ``m`` matches both ``System.m`` and
-# ``Trajectory.m``. The build runs with ``-W``, so silence only that ambiguity;
+# ``SampledSignals.m`` (the base of ``Trajectory`` and ``StepRollout``). The build runs with ``-W``, so silence only that ambiguity;
 # a duplicate object description still fails it.
 suppress_warnings = ["ref.python"]
 
 templates_path = ["_templates"]
-exclude_patterns = ["_build", "Thumbs.db", ".DS_Store", "plans", "reviews"]
+exclude_patterns = ["_build", "Thumbs.db", ".DS_Store", "dev", "plans", "reviews"]
 
 # GitHub Pages project site (repo name = minilink).
 html_baseurl = "https://alx87grd.github.io/minilink/"
@@ -65,3 +65,47 @@ html_theme_options = {
 }
 
 html_show_sourcelink = True
+
+
+# RULES 5.8: helpers carry plain names and sit under a `# Internal machinery`
+# section comment, which is what marks them internal. The API pages show what
+# sits above that comment, as they showed only the names without an underscore.
+
+
+def under_internal_machinery(path: str, line: int, indent: int) -> bool:
+    """Whether the definition at ``line`` sits under an `# Internal machinery` comment of its block."""
+    lines = Path(path).read_text(encoding="utf-8").splitlines()
+    for text in reversed(lines[: line - 1]):
+        stripped = text.strip()
+        if not stripped:
+            continue
+        depth = len(text) - len(text.lstrip())
+        if stripped.startswith("# Internal machinery") and depth == indent:
+            return True
+        if not stripped.startswith(("#", "@")) and depth < indent:
+            return False
+
+    return False
+
+
+def skip_internal_machinery(app, what, name, obj, skip, options):
+    import inspect
+
+    if skip:
+        return skip
+
+    target = inspect.unwrap(getattr(obj, "fget", None) or getattr(obj, "__func__", obj))
+    try:
+        path = inspect.getsourcefile(target)
+        source, line = inspect.getsourcelines(target)
+    except (TypeError, OSError):
+        return None
+    if not path or not path.startswith(str(ROOT / "minilink")):
+        return None
+
+    indent = len(source[0]) - len(source[0].lstrip())
+    return True if under_internal_machinery(path, line, indent) else None
+
+
+def setup(app):
+    app.connect("autodoc-skip-member", skip_internal_machinery)

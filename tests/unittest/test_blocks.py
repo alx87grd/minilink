@@ -2,9 +2,9 @@ import unittest
 import numpy as np
 import pytest
 from minilink.blocks.basic import Integrator
-from minilink.blocks.sources import Source, Step
+from minilink.blocks.sources import Sine, Source, Step
 from minilink.blocks.transfer_function import TransferFunction
-from minilink.control.output import ProportionalController
+from minilink.control.siso import P
 
 
 class TestBlocks(unittest.TestCase):
@@ -22,6 +22,31 @@ class TestBlocks(unittest.TestCase):
         y_after = step.h(x=[], u=[], t=3.0)
         np.testing.assert_array_equal(y_before, np.array([0.0]))
         np.testing.assert_array_equal(y_after, np.array([1.0]))
+
+    def test_sine_source(self):
+        sine = Sine(amplitude=[2.0, 1.0], omega=3.0, phase=[0.0, np.pi / 2], offset=1.0)
+        t = 0.4
+        np.testing.assert_allclose(
+            sine.h(x=[], u=[], t=t),
+            [1.0 + 2.0 * np.sin(3.0 * t), 1.0 + np.sin(3.0 * t + np.pi / 2)],
+        )
+        self.assertEqual(sine.p, 2)
+
+    def test_sine_source_traces_under_jax(self):
+        jnp = pytest.importorskip("jax.numpy")
+        sine = Sine(amplitude=0.5, omega=2.0)
+        np.testing.assert_allclose(
+            sine.h(x=None, u=None, t=jnp.asarray(0.3)), sine.h(x=[], u=[], t=0.3)
+        )
+
+    def test_a_compensator_transfer_function_declares_only_its_own_ports(self):
+        from minilink.dynamics.abstraction.state_space import LTISystem
+
+        bare = LTISystem([[-1.0]], [[1.0]], declare_ports=False)
+        self.assertEqual((dict(bare.inputs), dict(bare.outputs)), ({}, {}))
+        lead = TransferFunction([5.0, 5.0], [1.0, 10.0], ports="error")
+        self.assertEqual((list(lead.inputs), list(lead.outputs)), (["e"], ["u"]))
+        self.assertEqual(lead.outputs["u"].dependencies, ("e",))
 
     def test_integrator_dynamics_and_output(self):
         plant = Integrator()
@@ -61,7 +86,7 @@ class TestBlocks(unittest.TestCase):
         np.testing.assert_allclose(plant.compile("numpy").f(x, u, 0.0), np.array([1.0]))
 
     def test_prop_controller_scales_tracking_error(self):
-        controller = ProportionalController(2.5)
+        controller = P(2.5, ports="reference")
         np.testing.assert_array_equal(
             controller.ctl(np.array([]), np.array([3.0, 1.0])), np.array([5.0])
         )
@@ -72,7 +97,7 @@ class TestBlocks(unittest.TestCase):
 
         plant = Integrator()
         plant.params["k"] = 2.0
-        controller = ProportionalController(2.5)
+        controller = P(2.5, ports="reference")
         dx = jax.jit(plant.f)(jnp.asarray([3.0]), jnp.asarray([4.0]))
         y = jax.jit(plant.h)(jnp.asarray([3.0]), jnp.asarray([4.0]))
         u_cmd = jax.jit(controller.ctl)(jnp.asarray([]), jnp.asarray([3.0, 1.0]))
@@ -165,6 +190,12 @@ class TestNonlinearBlocks(unittest.TestCase):
         out = [sat.compute(None, np.array([v]))[0] for v in (-3.0, 0.5, 5.0)]
         np.testing.assert_allclose(out, [-1.0, 0.5, 2.0])
 
+    def test_saturation_refuses_crossed_limits(self):
+        with self.assertRaisesRegex(ValueError, "upper end stop must sit above"):
+            Saturation(lower=1.0, upper=-1.0)
+        flat = Saturation(lower=0.5, upper=0.5)  # equal limits: a constant output
+        np.testing.assert_allclose(flat.compute(None, np.array([3.0])), [0.5])
+
     def test_dead_zone(self):
         dz = DeadZone(width=1.0)
         out = [dz.compute(None, np.array([v]))[0] for v in (-2.0, -0.5, 0.0, 0.5, 2.0)]
@@ -185,6 +216,12 @@ class TestFilterBlocks(unittest.TestCase):
         lpf = LowPassFilter(cutoff_hz=0.5)
         np.testing.assert_allclose(lpf.poles, [-2.0 * np.pi * 0.5])
         self.assertAlmostEqual(self._dc_gain(lpf), 1.0, places=6)
+
+    def test_a_filter_is_not_a_plant_and_exposes_no_state(self):
+        for block in (LowPassFilter(), NotchFilter(), Washout()):
+            with self.subTest(block=block.name):
+                self.assertEqual(list(block.inputs), ["u"])
+                self.assertEqual(list(block.outputs), ["y"])
 
     def test_washout_blocks_dc(self):
         self.assertAlmostEqual(self._dc_gain(Washout(cutoff_hz=1.0)), 0.0, places=6)
@@ -241,7 +278,7 @@ class TestSignalColors(unittest.TestCase):
             self.assertEqual(style.linewidth, 2.0)
 
     def test_internal_signals_are_not_red(self):
-        for name in ("ctl:u", "y", "r", "plant:dq"):
+        for name in ("controller:u", "y", "r", "plant:dq"):
             style = color_for_signal(name, internal_index=0)
             self.assertNotEqual(style.color, INPUT_COLOR)
 
@@ -267,8 +304,8 @@ class TestSignalColors(unittest.TestCase):
         self.assertFalse(is_core_state("u"))
         self.assertTrue(is_core_input("u"))
         self.assertTrue(is_core_input("u_cmd"))
-        self.assertFalse(is_core_input("ctl:u"))
-        self.assertTrue(is_internal_signal("ctl:u"))
+        self.assertFalse(is_core_input("controller:u"))
+        self.assertTrue(is_internal_signal("controller:u"))
         self.assertFalse(is_internal_signal("x"))
 
     def test_plotly_color_maps_tab_names(self):

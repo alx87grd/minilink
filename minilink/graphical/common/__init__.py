@@ -1,4 +1,4 @@
-"""Shared graphical environment, style, and result helpers."""
+"""Graphical common: the runtime environment, the figure styles and the plot result every figure shares."""
 
 from minilink.graphical.common.plot_result import PlotResult
 
