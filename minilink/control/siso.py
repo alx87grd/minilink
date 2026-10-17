@@ -407,12 +407,13 @@ def require_positive_tau(tau, n):
 
 def as_dof_vector(value, dof: int):
     """A scalar broadcast to ``dof`` axes, or a length-``dof`` vector as given."""
-    arr = np.asarray(value, dtype=float).reshape(-1)
+    given = np.asarray(value, dtype=float)
+    arr = given.reshape(-1)
     if arr.size == 1:
         return np.full(dof, float(arr[0]))
     if arr.size != dof:
         raise ValueError(
-            f"expected scalar or length-{dof} vector, got shape {arr.shape}"
+            f"expected scalar or length-{dof} vector, got shape {given.shape}"
         )
     return arr
 

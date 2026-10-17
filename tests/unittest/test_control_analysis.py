@@ -546,6 +546,10 @@ class TestP(unittest.TestCase):
         ctl = P(10.0, u_max=1.0)
         np.testing.assert_allclose(ctl.ctl(np.zeros(0), np.array([0.5])), [1.0])
 
+    def test_a_gain_of_another_size_is_reported_with_its_own_shape(self):
+        with self.assertRaisesRegex(ValueError, r"length-2 vector, got shape \(3, 1\)"):
+            P(np.ones((3, 1)), dof=2)
+
     def test_a_coupled_gain_is_a_gain_block_in_the_loop(self):
         from minilink import Gain
 
