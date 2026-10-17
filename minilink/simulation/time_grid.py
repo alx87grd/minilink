@@ -64,8 +64,9 @@ def build_time_grid(
         time_vector = dt_grid(t0, tf, dt)
 
     else:
-        # Both given: n_steps wins
+        # Both given: n_steps wins, once both are valid
         require_n_steps(n_steps)
+        require_dt(dt)
         logging.warning(
             "You must choose between n_steps and dt: using the specified n_steps"
         )
@@ -103,10 +104,13 @@ def require_time_span(t0, tf):
 
 
 def require_dt(dt, *, label="dt"):
-    """Refuse a ``dt`` that is not a positive finite scalar; return it as a float."""
-    if not np.isscalar(dt):
+    """Refuse a ``dt`` that is not a positive finite scalar (a 0-d array is one); return it as a float."""
+    if np.ndim(dt) != 0:
         raise ValueError(f"{label} must be a positive finite scalar")
-    dt_value = float(dt)
+    try:
+        dt_value = float(dt)
+    except (TypeError, ValueError) as exc:
+        raise ValueError(f"{label} must be a positive finite scalar") from exc
     if not np.isfinite(dt_value) or dt_value <= 0.0:
         raise ValueError(f"{label} must be a positive finite scalar")
     return dt_value

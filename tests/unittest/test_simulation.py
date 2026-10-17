@@ -1348,3 +1348,18 @@ class TestDtTimeGrid(unittest.TestCase):
         self.assertEqual(n_pts, 5)
         self.assertAlmostEqual(dt, 0.3)
         np.testing.assert_allclose(t, [0.0, 0.3, 0.6, 0.9, 1.2])
+
+    def test_dt_is_any_positive_finite_scalar_and_always_checked(self):
+        from minilink.simulation.time_grid import build_time_grid
+
+        # A 0-d array is a scalar
+        t, dt, n_pts = build_time_grid(0.0, 1.0, dt=np.array(0.25))
+        self.assertEqual((dt, n_pts), (0.25, 5))
+
+        # Anything else is refused with one message, n_steps given or not
+        message = "dt must be a positive finite scalar"
+        for bad in (np.array([0.1]), "fast", -0.1, np.inf):
+            with self.subTest(dt=bad), self.assertRaisesRegex(ValueError, message):
+                build_time_grid(0.0, 1.0, dt=bad)
+            with self.subTest(dt=bad), self.assertRaisesRegex(ValueError, message):
+                build_time_grid(0.0, 1.0, n_steps=11, dt=bad)
