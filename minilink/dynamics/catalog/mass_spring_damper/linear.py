@@ -105,7 +105,13 @@ class SingleMass(StateSpaceSystem):
 
 
 class TwoMass(StateSpaceSystem):
-    """Two-mass linear spring-damper chain with force on the second mass."""
+    """Two-mass linear spring-damper chain with force on the second mass.
+
+    The springs couple neighbours: ``k1`` ties the first mass to the wall and ``k2``
+    ties the two masses together. Each damper acts on its own mass's absolute
+    velocity (``b1`` on the first mass, ``b2`` on the second), not on the relative
+    velocity across a spring.
+    """
 
     def __init__(self, m=1.0, k=2.0, b=0.2, output_mass=2):
         super().__init__(n=4, m=1, p=1, name="Two Mass Spring Damper")
@@ -226,7 +232,13 @@ class TwoMass(StateSpaceSystem):
 
 
 class ThreeMass(StateSpaceSystem):
-    """Three-mass linear spring-damper chain with force on the third mass."""
+    """Three-mass linear spring-damper chain with force on the third mass.
+
+    The springs couple neighbours: ``k1`` ties the first mass to the wall, ``k2``
+    and ``k3`` tie each mass to the next. Each damper acts on its own mass's
+    absolute velocity (``b1``, ``b2``, ``b3`` on the first, second and third
+    mass), not on the relative velocity across a spring.
+    """
 
     def __init__(self, m=1.0, k=2.0, b=0.2, output_mass=2):
         super().__init__(n=6, m=1, p=1, name="Three Mass Spring Damper")
