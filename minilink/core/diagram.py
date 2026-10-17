@@ -5,9 +5,9 @@ import numpy as np
 from minilink.core.backends import array_module
 from minilink.core.system import DynamicSystem, StepSystem, System
 from minilink.core.trajectory import Trajectory
-from minilink.core.wiring import WiredDiagramMixin, validate_diagram_params
+from minilink.core.wiring import WiredDiagramMixin, check_diagram_params
 
-__all__ = ["DiagramSystem", "StepDiagramSystem", "validate_diagram_params"]
+__all__ = ["DiagramSystem", "StepDiagramSystem", "check_diagram_params"]
 
 
 ###############################################################################
@@ -71,7 +71,7 @@ class DiagramSystem(WiredDiagramMixin, DynamicSystem):
         This is the interpreted reference implementation; :meth:`compile`
         produces the fast equivalent used by simulation and optimization.
         """
-        validate_diagram_params(params, self.subsystems)
+        check_diagram_params(params, self.subsystems)
 
         dx_pieces = []
         for sys_id, subsystem in self.subsystems.items():
@@ -248,7 +248,7 @@ class StepDiagramSystem(WiredDiagramMixin, StepSystem):
 
         Interpreted reference; :meth:`compile` produces the fast equivalent.
         """
-        validate_diagram_params(params, self.subsystems)
+        check_diagram_params(params, self.subsystems)
 
         xp = array_module(x, u)
 

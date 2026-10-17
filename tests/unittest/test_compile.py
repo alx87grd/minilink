@@ -4,7 +4,7 @@ Validates that:
 - ``compile_diagram()`` produces a working ``NumpyDiagramEvaluator``
 - ``f()`` matches ``diagram.f()`` (the slow recursive reference)
 - ``compute_internal_signals()`` / ``compute_internal_signals_dict()`` expose the buffer
-- ``check_algebraic_loops()`` detects loops and returns valid order
+- ``check_algebraic_loops()`` detects loops and ``evaluation_order_of()`` returns a valid order
 - ``build_execution_plan()`` produces a valid ``ExecutionPlan``
 """
 
@@ -15,15 +15,12 @@ import pytest
 from minilink.blocks.basic import Integrator
 from minilink.control.siso import P
 from minilink.core.backends import array_module
-from minilink.core.compile.compiler import (
-    build_execution_plan,
-    check_algebraic_loops,
-    compile_diagram,
-)
+from minilink.core.compile.compiler import build_execution_plan, compile_diagram
 from minilink.core.compile.evaluators.numpy_evaluators import NumpyDiagramEvaluator
 from minilink.core.compile.execution_plan import ExecutionPlan
 from minilink.core.diagram import DiagramSystem
 from minilink.core.system import DynamicSystem, System
+from minilink.core.wiring import check_algebraic_loops, evaluation_order_of
 
 
 class _JAXFriendlyPController(System):
@@ -139,7 +136,8 @@ class TestCheckAlgebraicLoops(unittest.TestCase):
 
     def test_no_loop_returns_order(self):
         diag = _build_small_closed_loop()
-        order = check_algebraic_loops(diag)
+        self.assertIsNone(check_algebraic_loops(diag))
+        order = evaluation_order_of(diag)
         self.assertIsInstance(order, list)
         self.assertGreaterEqual(len(order), 1)
         for sys_id, port_id in order:
@@ -147,15 +145,16 @@ class TestCheckAlgebraicLoops(unittest.TestCase):
 
     def test_loop_raises(self):
         diag = _build_feedthrough_loop()
-        with self.assertRaises(RuntimeError) as ctx:
-            check_algebraic_loops(diag)
-        self.assertIn("Algebraic loop detected", str(ctx.exception))
+        for check in (check_algebraic_loops, evaluation_order_of):
+            with self.assertRaises(RuntimeError) as ctx:
+                check(diag)
+            self.assertIn("Algebraic loop detected", str(ctx.exception))
 
     def test_chain_no_loop(self):
         """A → B → C (no loop) should succeed."""
         diag = _build_feedthrough_loop()
         diag.connections["A"]["u"] = None
-        order = check_algebraic_loops(diag)
+        order = evaluation_order_of(diag)
         self.assertGreaterEqual(len(order), 3)
 
 

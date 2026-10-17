@@ -460,9 +460,13 @@ class TestNestedDiagramPlot(unittest.TestCase):
 
 
 import numpy as np
-from minilink.core.compile.compiler import check_algebraic_loops
 from minilink.core.system import System
-from minilink.core.wiring import WiredDiagramMixin, validate_diagram_params
+from minilink.core.wiring import (
+    WiredDiagramMixin,
+    check_algebraic_loops,
+    check_diagram_params,
+    evaluation_order_of,
+)
 from minilink.graphical.diagrams import build_diagram_topology
 
 
@@ -578,17 +582,22 @@ class TestWiringMixin(unittest.TestCase):
         local_u = diagram.get_local_input(x, u, t, "controller")
         self.assertEqual(local_u.shape, (2,))
 
-    def test_check_algebraic_loops_valid_order(self):
+    def test_loop_free_diagram_passes_the_check_and_has_an_order(self):
         diagram = _build_closed_loop()
-        order = diagram.check_algebraic_loops()
-        self.assertEqual(order, check_algebraic_loops(diagram))
+        self.assertIsNone(diagram.check_algebraic_loops())
+        self.assertIsNone(check_algebraic_loops(diagram))
+        order = evaluation_order_of(diagram)
         self.assertGreaterEqual(len(order), 1)
 
     def test_check_algebraic_loops_detects_cycle(self):
         diagram = _build_feedthrough_loop()
-        with self.assertRaises(RuntimeError) as ctx:
-            diagram.check_algebraic_loops()
-        self.assertIn("Algebraic loop detected", str(ctx.exception))
+        for call in (
+            diagram.check_algebraic_loops,
+            lambda: evaluation_order_of(diagram),
+        ):
+            with self.assertRaises(RuntimeError) as ctx:
+                call()
+            self.assertIn("Algebraic loop detected", str(ctx.exception))
 
     def test_state_index_after_multi_subsystem_add(self):
         diagram = _build_closed_loop()
@@ -596,10 +605,10 @@ class TestWiringMixin(unittest.TestCase):
         self.assertEqual(diagram.state_index["controller"], (0, 0))
         self.assertEqual(diagram.state_index["plant"], (0, 1))
 
-    def test_validate_diagram_params_unknown_sys_id(self):
+    def test_check_diagram_params_unknown_sys_id(self):
         diagram = _build_closed_loop()
         with self.assertRaises(ValueError) as ctx:
-            validate_diagram_params({"unknown": {"Kp": 1.0}}, diagram.subsystems)
+            check_diagram_params({"unknown": {"Kp": 1.0}}, diagram.subsystems)
         self.assertIn("Unknown subsystem ids", str(ctx.exception))
 
     def test_params_setter_unknown_sys_id(self):

@@ -72,7 +72,7 @@ def luenberger(
 
     L = luenberger_gain(A, C, poles)
 
-    return observer_of(model, L, "Luenberger Observer")
+    return build_observer(model, L, "Luenberger Observer")
 
 
 def kalman(
@@ -105,7 +105,7 @@ def kalman(
 
     L = kalman_gain(A, C, Q_n, R_n)
 
-    return observer_of(model, L, "Kalman Filter")
+    return build_observer(model, L, "Kalman Filter")
 
 
 ###############################################################################
@@ -123,7 +123,7 @@ def require_observable(obsv, n):
         )
 
 
-def observer_of(model, L, name):
+def build_observer(model, L, name):
     """The ``StateObserver`` called ``name`` running ``model`` with gain ``L`` at the model's operating point, its labels with a hat."""
     labels = [hat(label) for label in model.state.labels]
 

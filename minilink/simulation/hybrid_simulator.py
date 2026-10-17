@@ -13,6 +13,7 @@ from minilink.core.step_rollout import StepRollout
 from minilink.core.system import System
 from minilink.core.trajectory import Trajectory
 from minilink.simulation.computer import Computer
+from minilink.simulation.input_coercion import require_x0
 
 ###############################################################################
 # Public API
@@ -82,12 +83,12 @@ class HybridSimulator:
         self.plant_eval = self.plant.compile(backend=compile_backend)
 
         # The initial states, each diagram's own x0 unless given
-        self.x0_plant = validate_x0(
+        self.x0_plant = require_x0(
             self.plant.x0 if x0_plant is None else x0_plant,
             self.plant.n,
             label="x0_plant",
         )
-        self.x0_computer = validate_x0(
+        self.x0_computer = require_x0(
             self.computer.diagram.x0 if x0_computer is None else x0_computer,
             self.computer.diagram.n,
             label="x0_computer",
@@ -500,17 +501,6 @@ def select_tick_grid(*, t0, tf, dt_base, n_steps):
     times = t0 + np.arange(n_ticks) * dt_base
 
     return dt_base, n_ticks, times
-
-
-def validate_x0(x0, n, *, label):
-    """``x0`` as a finite float vector ``(n,)``, or a refusal naming ``label``."""
-    x0_arr = np.asarray(x0, dtype=float).reshape(-1)
-    if x0_arr.shape[0] != n:
-        raise ValueError(f"{label} must have shape ({n},)")
-    if not np.all(np.isfinite(x0_arr)):
-        raise ValueError(f"{label} must contain only finite values")
-
-    return x0_arr
 
 
 def index_boundary_connections(hybrid: HybridDiagram):

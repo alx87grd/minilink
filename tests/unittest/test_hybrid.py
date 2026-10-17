@@ -200,6 +200,17 @@ class TestHybridSimulator(unittest.TestCase):
         self.assertIsInstance(result.plant, Trajectory)
         self.assertIn("u_cmd", result.computer.signals)
 
+    def test_initial_states_are_finite_flat_vectors(self):
+        hybrid = _build_hybrid()
+        with self.assertRaisesRegex(ValueError, r"x0_plant must be a 1-D array"):
+            HybridSimulator(hybrid, t0=0, tf=0.1, x0_plant=np.zeros((1, 1)))
+        with self.assertRaisesRegex(ValueError, r"x0_plant must have shape \(1,\)"):
+            HybridSimulator(hybrid, t0=0, tf=0.1, x0_plant=np.zeros(2))
+        with self.assertRaisesRegex(ValueError, "x0_plant must contain only finite"):
+            HybridSimulator(hybrid, t0=0, tf=0.1, x0_plant=np.array([np.nan]))
+        sim = HybridSimulator(hybrid, t0=0, tf=0.1, x0_plant=[0.5])
+        np.testing.assert_array_equal(sim.x0_plant, [0.5])
+
     def test_one_tick_measurement_delay(self):
         hybrid = _build_hybrid()
         sim = HybridSimulator(hybrid, t0=0, tf=0.05, n_steps=5)

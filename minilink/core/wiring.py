@@ -62,7 +62,7 @@ class WiredDiagramMixin:
 
     @params.setter
     def params(self, value):
-        validate_diagram_params(value, self.subsystems)
+        check_diagram_params(value, self.subsystems)
         if value is None:
             return
 
@@ -142,7 +142,7 @@ class WiredDiagramMixin:
         """
         port = self.subsystems[source_sys_id].outputs[source_port_id]
         if dependencies is not None:
-            self.validate_output_dependencies(output_port_id, dependencies)
+            self.check_output_dependencies(output_port_id, dependencies)
 
         # The boundary output, evaluated through the diagram
         self.outputs[output_port_id] = DiagramOutputPort(
@@ -288,19 +288,14 @@ class WiredDiagramMixin:
 
     def check_algebraic_loops(self):
         """
-        Detect algebraic loops and return the topological port execution order.
+        Check the wiring for algebraic loops; the port order is :func:`evaluation_order_of`.
 
         Raises
         ------
         RuntimeError
             If an algebraic loop is found (with full cycle path in the message).
-
-        Returns
-        -------
-        list of (sys_id, port_id)
-            Topologically sorted output-port schedule.
         """
-        return check_algebraic_loops(self)
+        check_algebraic_loops(self)
 
     # Gather: one block's state, input and params from the diagram's
 
@@ -381,7 +376,7 @@ class WiredDiagramMixin:
             namespace_subsystem_frames,
         )
 
-        validate_diagram_params(params, self.subsystems)
+        check_diagram_params(params, self.subsystems)
 
         frames = {}
         for sys_id, subsystem in self.subsystems.items():
@@ -401,7 +396,7 @@ class WiredDiagramMixin:
             merge_subsystem_geometry,
         )
 
-        validate_diagram_params(params, self.subsystems)
+        check_diagram_params(params, self.subsystems)
 
         merged: dict[str, list] = {}
         for sys_id, subsystem in self.subsystems.items():
@@ -657,16 +652,17 @@ class DiagramOutputPort(OutputPort):
         )
 
 
-def validate_diagram_params(params, subsystem_ids):
-    """Validate the nested diagram params contract.
+def check_diagram_params(params, subsystem_ids):
+    """Check the nested diagram params contract.
 
     ``params`` must be ``None`` or a mapping keyed by subsystem id whose values
     are per-subsystem params dicts. Missing subsystem ids are allowed (those
     subsystems fall back to their live ``self.params``); unknown ids raise so
     sys-id typos fail loudly instead of silently using defaults.
 
-    Called once at public entry points (``DiagramSystem.f``, the evaluators'
-    parametric tier, the ``params`` setter), not inside the recursion.
+    Called once at public entry points (``DiagramSystem.f``, ``tf``,
+    ``get_dynamic_geometry``, the evaluators' parametric tier, the ``params``
+    setter), not inside the recursion.
 
     Parameters
     ----------
@@ -689,17 +685,34 @@ def validate_diagram_params(params, subsystem_ids):
         )
 
 
-def check_algebraic_loops(diagram: DiagramSystem) -> list[tuple[str, str]]:
-    """Detect algebraic loops and return the topological port execution order.
+def check_algebraic_loops(diagram: DiagramSystem) -> None:
+    """Check a wired diagram for algebraic loops.
 
-    Uses depth-first search over output-port dependency edges.  An algebraic
-    loop exists when a cycle contains only direct-feedthrough paths (i.e.,
-    output ports whose ``dependencies`` include the input ports that close
-    the cycle).
+    An algebraic loop exists when a cycle contains only direct-feedthrough
+    paths (i.e., output ports whose ``dependencies`` include the input ports
+    that close the cycle). This check is **standalone**: call it right after
+    wiring a diagram to validate its topology before simulation; the order
+    the compiler evaluates the ports in is :func:`evaluation_order_of`.
 
-    This function is **standalone** and can be called independently of
-    :func:`~minilink.core.compile.compiler.build_execution_plan` — for example,
-    right after wiring a diagram to validate its topology before simulation.
+    Parameters
+    ----------
+    diagram : DiagramSystem
+        The wired diagram to analyse.
+
+    Raises
+    ------
+    RuntimeError
+        If an algebraic loop is detected, with the full cycle path in the
+        error message.
+    """
+    evaluation_order_of(diagram)
+
+
+def evaluation_order_of(diagram: DiagramSystem) -> list[tuple[str, str]]:
+    """The topological evaluation order of a diagram's output ports.
+
+    Uses depth-first search over output-port dependency edges; a cycle of
+    direct-feedthrough paths (an algebraic loop) is refused.
 
     Parameters
     ----------

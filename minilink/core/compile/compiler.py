@@ -3,15 +3,15 @@ Diagram compiler: topology analysis and execution plan construction.
 
 This module provides the complete compilation pipeline:
 
-1. :func:`~minilink.core.wiring.check_algebraic_loops` — Standalone depth-first
-   search-based algebraic loop detection (implemented in ``wiring.py``,
-   re-exported here). Returns the topological execution order of output ports.
-   Can be imported independently by :class:`~minilink.core.diagram.DiagramSystem`
-   for use after manual wiring.
+1. :func:`~minilink.core.wiring.evaluation_order_of` — Depth-first search over
+   the port dependencies (implemented in ``wiring.py``): the topological
+   execution order of the output ports, an algebraic loop refused. The
+   standalone check after manual wiring is
+   :func:`~minilink.core.wiring.check_algebraic_loops`.
 
 2. :func:`build_execution_plan` — Constructs an immutable
    :class:`~minilink.core.compile.execution_plan.ExecutionPlan` from a diagram.
-   Calls :func:`check_algebraic_loops` internally.
+   Calls :func:`~minilink.core.wiring.evaluation_order_of` internally.
 
 3. :func:`compile_diagram` — Top-level entry point that builds the plan and
    wraps it in a backend evaluator.
@@ -40,7 +40,7 @@ from minilink.core.compile.execution_plan import (
     StateOperation,
 )
 from minilink.core.system import DynamicSystem
-from minilink.core.wiring import check_algebraic_loops, iter_subsystems
+from minilink.core.wiring import evaluation_order_of, iter_subsystems
 
 if TYPE_CHECKING:
     from minilink.core.diagram import DiagramSystem
@@ -266,7 +266,7 @@ def compile_diagram(
     for sys_id, subsystem in diagram.subsystems.items():
         validate_equation_shapes(subsystem, label=f"{subsystem.name} ({sys_id})")
     warn_shared_seeds(diagram)
-    port_execution_order = check_algebraic_loops(diagram)
+    port_execution_order = evaluation_order_of(diagram)
 
     if verbose:
         print(f"  ({time.perf_counter() - t0:.3f}s)")
@@ -319,7 +319,8 @@ def build_execution_plan(
     """Build an immutable ExecutionPlan from a DiagramSystem.
 
     This is the core compilation step.  It:
-    1. Runs algebraic loop detection via :func:`check_algebraic_loops`.
+    1. Orders the output ports, refusing an algebraic loop, via
+       :func:`~minilink.core.wiring.evaluation_order_of`.
     2. Assigns each output port a slice in the flat signal buffer.
     3. Builds the gather-source recipes for each port and state operation.
     4. Returns a frozen :class:`ExecutionPlan`.
@@ -337,7 +338,7 @@ def build_execution_plan(
     -------
     ExecutionPlan
     """
-    port_execution_order = check_algebraic_loops(diagram)
+    port_execution_order = evaluation_order_of(diagram)
     return _build_execution_plan_from_order(
         diagram, port_execution_order, bind_params=bind_params
     )

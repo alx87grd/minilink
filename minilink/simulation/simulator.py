@@ -12,7 +12,7 @@ from minilink.core.backends import (
 from minilink.core.system import DEFAULT_SMALLEST_TIME_CONSTANT, DynamicSystem
 from minilink.core.trajectory import Trajectory
 from minilink.simulation.compile_backend import resolve_auto_backend
-from minilink.simulation.input_coercion import coerce_forced_input
+from minilink.simulation.input_coercion import coerce_forced_input, require_x0
 from minilink.simulation.sim_reporting import (
     print_simulation_preamble,
     print_simulation_report,
@@ -171,7 +171,7 @@ class Simulator:
         self.last_debug = None
 
         # The initial state, checked
-        self.x0 = self.validate_x0(sys.x0 if x0 is None else x0, sys.n)
+        self.x0 = require_x0(sys.x0 if x0 is None else x0, sys.n)
 
         # Compile the system
         self.compile_backend, self.evaluator = self.resolve_and_build_evaluator(
@@ -358,17 +358,6 @@ class Simulator:
     ###########################################################################
     # Internal machinery
     ###########################################################################
-
-    def validate_x0(self, x0, n):
-        """``x0`` as a finite float vector of shape ``(n,)``, or a ``ValueError``."""
-        x0_arr = np.asarray(x0, dtype=float)
-        if x0_arr.ndim != 1:
-            raise ValueError(f"x0 must be a 1-D array with shape ({n},)")
-        if x0_arr.shape[0] != n:
-            raise ValueError(f"x0 must have shape ({n},)")
-        if not np.all(np.isfinite(x0_arr)):
-            raise ValueError("x0 must contain only finite values")
-        return x0_arr
 
     def resolve_and_build_evaluator(self, sys, compile_backend):
         """``(backend, evaluator)``: ``sys`` compiled with ``compile_backend``, or JAX then NumPy on :data:`COMPILE_BACKEND_AUTO`."""

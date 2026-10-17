@@ -1,4 +1,4 @@
-"""Forced inputs: a callable, constant or sampled ``u`` as the solver's ``(m, n_pts)`` matrix."""
+"""Simulation inputs: the initial state ``x0``, and a forced ``u`` as the solver's ``(m, n_pts)`` matrix."""
 
 import numpy as np
 
@@ -60,6 +60,21 @@ def validate_forced_u_traj(u_traj, m, n_pts):
         raise ValueError("u_traj must contain only finite values")
 
     return u
+
+
+def require_x0(x0, n, *, label="x0"):
+    """Refuse an initial state that is not a finite 1-D vector ``(n,)``; return it as floats.
+
+    ``label`` names the state in the refusal (``x0_plant``, ``x0_computer``).
+    """
+    x0_arr = np.asarray(x0, dtype=float)
+    if x0_arr.ndim != 1:
+        raise ValueError(f"{label} must be a 1-D array with shape ({n},)")
+    if x0_arr.shape[0] != n:
+        raise ValueError(f"{label} must have shape ({n},)")
+    if not np.all(np.isfinite(x0_arr)):
+        raise ValueError(f"{label} must contain only finite values")
+    return x0_arr
 
 
 ###############################################################################
