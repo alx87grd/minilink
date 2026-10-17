@@ -63,10 +63,10 @@ def car_skin_3d(plant, color="#151922"):
     rods; fixed hub offsets are baked into each rod ``local_transform``), and
     ``wheel_fl`` / ``wheel_fr`` (steered front rods placed by ``tf``).
     """
-    # The axle offsets and the tire radii
+    # The axle offsets and the tire radii: the params', else the plant's, else 0.3 m
     a, b = axle_offsets(plant)
-    r_f = plant.params["r_f"]
-    r_r = plant.params["r_r"]
+    r_f = plant.params.get("r_f", getattr(plant, "r_f", 0.3))
+    r_r = plant.params.get("r_r", getattr(plant, "r_r", 0.3))
 
     # The drawing attributes, with the defaults of a bare plant
     track = getattr(plant, "track", 1.6)

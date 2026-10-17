@@ -111,6 +111,16 @@ class TestCatalogSmoke(unittest.TestCase):
                 with self.assertRaisesRegex(ValueError, f"between 1 and {count}"):
                     plant_class(output_mass=output_mass)
 
+    def test_the_3d_car_skin_dresses_a_plant_without_wheel_radii(self):
+        from minilink.dynamics.catalog.vehicles.steering import KinematicCar
+        from minilink.graphical.catalog.skins import car_skin_3d
+
+        car = KinematicCar()
+        self.assertNotIn("r_f", car.params)
+        geometry = car_skin_3d(car)
+        wheel_rl = geometry["body"][1]
+        np.testing.assert_allclose(wheel_rl.local_transform[:3, 3], [-3.0, 0.8, 0.3])
+
     def test_vehicle_reference_values(self):
         bicycle = KinematicBicycle()
         np.testing.assert_allclose(
