@@ -83,11 +83,13 @@ def Rz(theta):
 def SE3(R, p=0.0):
     """4×4 pose ``[[R, p], [0, 1]]`` from a 3×3 rotation ``R`` and translation ``p``.
 
-    ``p`` defaults to the origin; pass a length-3 vector to place the frame.
+    ``p`` defaults to the origin, the literal ``0`` or ``0.0``; pass a length-3
+    vector to place the frame. Any other scalar is refused.
     """
     xp = array_module(R, p)
 
     R = xp.asarray(R)
+    require_translation_vector(p)
     p = xp.zeros(3) if xp.ndim(p) == 0 else xp.asarray(p)
 
     # T = [[R, p], [0, 1]]
@@ -203,6 +205,24 @@ def apply(T, pts):
     pts_ref = pts @ R.T + p
 
     return pts_ref
+
+
+###############################################################################
+# Internal machinery
+###############################################################################
+
+
+def require_translation_vector(p):
+    """Refuse a scalar translation other than the literal origin ``0`` or ``0.0``.
+
+    A traced or array scalar is refused by its shape alone, never by its value.
+    """
+    origin = type(p) in (int, float) and p == 0
+    if np.ndim(p) == 0 and not origin:
+        raise ValueError(
+            "SE3 takes the translation p as a 3-vector (or the literal 0.0 for "
+            f"the origin), got a scalar of type {type(p).__name__}"
+        )
 
 
 if __name__ == "__main__":

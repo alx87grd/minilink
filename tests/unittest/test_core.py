@@ -577,3 +577,18 @@ def test_interpolate_schedule_holds_one_sample_and_a_repeated_time_on_jax():
         read = jax.jit(lambda t: interpolate_schedule(jnp, t_samples, values, t))
         for t in times:
             np.testing.assert_allclose(read(t), np.interp(t, t_samples, values))
+
+
+def test_se3_takes_a_vector_translation_or_the_literal_origin():
+    from minilink.core.kinematics import SE3, Rz
+
+    R = Rz(0.3)
+    np.testing.assert_array_equal(SE3(R)[:3, 3], np.zeros(3))
+    np.testing.assert_array_equal(SE3(R, 0.0)[:3, 3], np.zeros(3))
+    np.testing.assert_array_equal(SE3(R, 0)[:3, 3], np.zeros(3))
+    np.testing.assert_array_equal(SE3(R, [1.0, 2.0, 3.0])[:3, 3], [1.0, 2.0, 3.0])
+
+    # Any other scalar is refused by its shape, never read as a translation
+    for p in (1.0, 2, True, np.array(0.0), np.float64(1.0)):
+        with pytest.raises(ValueError, match="3-vector"):
+            SE3(R, p)
