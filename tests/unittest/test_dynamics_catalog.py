@@ -896,6 +896,10 @@ class TestCarProfile(unittest.TestCase):
 # The params family: a method reads the params it is given
 
 from minilink.dynamics.catalog.manipulators.arms import ThreeLinkManipulator3D
+from minilink.dynamics.catalog.pendulum.cartpole import (
+    RotatingCartPole,
+    UnderactuatedRotatingCartPole,
+)
 
 
 def stored(cls, **attributes):
@@ -956,6 +960,9 @@ PARAMS_CASES = [
     (stored(DoublePendulum), "get_dynamic_geometry", "l1", 1.5),
     (stored(Acrobot), "tf", "l1", 1.5),
     (stored(Acrobot), "get_dynamic_geometry", "l1", 1.5),
+    # The rotating cart-poles: frames
+    (stored(RotatingCartPole), "tf", "l1", 1.4),
+    (stored(UnderactuatedRotatingCartPole), "tf", "l2", 1.4),
 ]
 
 

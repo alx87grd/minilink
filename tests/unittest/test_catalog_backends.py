@@ -74,6 +74,8 @@ TRACED_TF = (
     "SpeedControlledManipulator",
     "DoublePendulum",
     "Acrobot",
+    "RotatingCartPole",
+    "UnderactuatedRotatingCartPole",
 )
 
 
