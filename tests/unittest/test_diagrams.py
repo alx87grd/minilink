@@ -607,6 +607,41 @@ class TestWiringMixin(unittest.TestCase):
         with self.assertRaises(ValueError):
             diagram.params = {"typo": {"Kp": 1.0}}
 
+    def test_tf_and_geometry_route_params_to_each_block(self):
+        """A diagram's frames and geometry read each block's params, as its f does."""
+
+        class Arm(DynamicSystem):
+            def __init__(self):
+                super().__init__(1)
+                self.params = {"l": 1.0}
+
+            def f(self, x, u, t=0, params=None):
+                return u
+
+            def tf(self, x, u, t=0, params=None):
+                params = self.params if params is None else params
+                return {"tip": np.array([params["l"] * x[0]])}
+
+            def get_dynamic_geometry(self, x, u, t=0, params=None):
+                params = self.params if params is None else params
+                return {"tip": [params["l"]]}
+
+        plant = Arm()
+        diagram = DiagramSystem()
+        diagram.add_subsystem(plant, "plant")
+        x, u, p = np.array([0.5]), np.zeros(0), {"l": 3.0}
+
+        frames = diagram.tf(x, u, 0.0, {"plant": p})
+        geometry = diagram.get_dynamic_geometry(x, u, 0.0, {"plant": p})
+        np.testing.assert_allclose(
+            frames["plant:tip"], plant.tf(x, np.zeros(1), 0.0, p)["tip"]
+        )
+        self.assertEqual(geometry["plant:tip"], [3.0])
+        with self.assertRaises(ValueError):
+            diagram.tf(x, u, 0.0, {"typo": p})
+        with self.assertRaises(ValueError):
+            diagram.get_dynamic_geometry(x, u, 0.0, {"typo": p})
+
     def test_boundary_output_feedthrough_is_derived_from_wiring(self):
         diagram = _build_closed_loop()
         diagram.connect_new_output_port("plant", "y", "y_meas")

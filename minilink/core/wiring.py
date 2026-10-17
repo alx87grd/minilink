@@ -381,11 +381,14 @@ class WiredDiagramMixin:
             namespace_subsystem_frames,
         )
 
+        validate_diagram_params(params, self.subsystems)
+
         frames = {}
         for sys_id, subsystem in self.subsystems.items():
             local_x = self.get_local_state(x, sys_id)
-            local_u = self.get_local_input(x, u, t, sys_id)
-            sub_frames = dict(subsystem.tf(local_x, local_u, t))
+            local_u = self.get_local_input(x, u, t, sys_id, params=params)
+            local_params = self.subsystem_params(params, sys_id)
+            sub_frames = dict(subsystem.tf(local_x, local_u, t, local_params))
             frames.update(namespace_subsystem_frames(sub_frames, sys_id))
 
         return frames
@@ -398,10 +401,13 @@ class WiredDiagramMixin:
             merge_subsystem_geometry,
         )
 
+        validate_diagram_params(params, self.subsystems)
+
         merged: dict[str, list] = {}
         for sys_id, subsystem in self.subsystems.items():
             local_x = self.get_local_state(x, sys_id)
-            local_u = self.get_local_input(x, u, t, sys_id)
+            local_u = self.get_local_input(x, u, t, sys_id, params=params)
+            local_params = self.subsystem_params(params, sys_id)
             sub_kin: dict[str, list] = {}
             sub_dyn: dict[str, list] = {}
             merge_subsystem_geometry(
@@ -409,7 +415,7 @@ class WiredDiagramMixin:
             )
             merge_subsystem_geometry(
                 sub_dyn,
-                subsystem.get_dynamic_geometry(local_x, local_u, t),
+                subsystem.get_dynamic_geometry(local_x, local_u, t, local_params),
                 sys_id,
             )
             merged = merge_geometry(merged, sub_kin, sub_dyn)
