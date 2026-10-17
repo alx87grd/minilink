@@ -142,6 +142,15 @@ class TestCatalogSmoke(unittest.TestCase):
         np.testing.assert_allclose(a3 - a0, 3.0 * b * car.dz(2.0) / mass)
         np.testing.assert_allclose(a3, 1.5436826659862837, rtol=1e-12)
 
+    def test_drone_body_is_drawn_with_its_width_and_height(self):
+        drone = Drone2D()
+        drone.width = 2.0
+        drone.height = 0.3
+        body = drone.get_kinematic_geometry()["body"][0]
+        self.assertEqual((body.length_x, body.length_y), (2.0, 0.3))
+        default = Drone2D().get_kinematic_geometry()["body"][0]
+        self.assertEqual((default.length_x, default.length_y), (1.2, 0.18))
+
     def test_aerial_and_marine_force_split_reference_values(self):
         drone = Drone2D()
         q = np.zeros(3)

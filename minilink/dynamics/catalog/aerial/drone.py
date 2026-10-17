@@ -41,9 +41,9 @@ class Drone2D(MechanicalSystem):
         self.outputs["y"].labels = list(self.state.labels)
         self.outputs["y"].units = list(self.state.units)
 
-        # Graphics: a nominal body size, and a camera that follows the body
-        self.width = 1.0
-        self.height = 0.2
+        # Graphics: the drawn body's size, and a camera that follows the body
+        self.width = 1.2
+        self.height = 0.18
         self.camera_scale = 3.0
         self.camera_follow_frame = "body"
 
@@ -123,9 +123,12 @@ class Drone2D(MechanicalSystem):
         return tau_d
 
     def get_kinematic_geometry(self):
+        width = self.width
+        height = self.height
+
         return {
             "world": [ground_line(length=20.0)],
-            "body": [drone_body(width=1.2, height=0.18)],
+            "body": [drone_body(width=width, height=height)],
             "center": [Point(color="blue", marker="o", size=5)],
         }
 
