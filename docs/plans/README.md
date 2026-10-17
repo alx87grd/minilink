@@ -4,7 +4,7 @@ Three backlog homes (do not invent a fourth); audits live separately:
 
 | Home | Use for |
 | --- | --- |
-| [ROADMAP.md](../../ROADMAP.md) | Plan of record: releases, two lanes, TRL ledger, course checklists, the path to v1.0, open decisions, out-of-scope |
+| [ROADMAP.md](../dev/ROADMAP.md) | Plan of record: releases, two lanes, TRL ledger, course checklists, the path to v1.0, open decisions, out-of-scope |
 | [TODO.md](TODO.md) | The workboard: every open step, by rung, with files and "done when" |
 | **This folder** (other docs) | Design writeups for steps that need one — multi-step architecture / tradeoff docs |
 | [../reviews/](../reviews/) | Dated architecture audits and decision records (read-only history) |
@@ -17,7 +17,7 @@ the plan doc it shapes and to its dated record; it leaves ROADMAP §6 when it is
 
 Pyro parity rows stay in [pyro-port-remaining.md](pyro-port-remaining.md)
 (v0.3; open rows plus the landed name map). Landed contracts move into
-[DESIGN.md](../../DESIGN.md) and the plan doc is deleted; one-line ideas go
+[DESIGN.md](../dev/DESIGN.md) and the plan doc is deleted; one-line ideas go
 to a Later bullet in [TODO.md](TODO.md) first — open a plan doc only when the
 design needs a writeup.
 
@@ -36,9 +36,7 @@ amendments (`RD-R5`, `RD-D13`, `RD-A2`), the 2026-09-07 GRO501 audit's findings 
 | --- | --- | --- | --- |
 | [automation-by-convention.md](automation-by-convention.md) | Port names drive the wiring; three reserved names (`plant`, `controller`, `observer`) are the roles every tool reads; the operators; the cost scored on the plant; steps AC-0–AC-8 in build order. History: [the decision record](../reviews/2026-10-11-automation-by-convention.md) and [the 2026-10-13 second opinion](../reviews/2026-10-13-automation-by-convention-second-opinion.md) | v0.2 B (P10), later steps to v0.3 and v0.9 | decided 2026-10-11, amended 2026-10-13, ready to build |
 | [estimation-and-state-feedback.md](estimation-and-state-feedback.md) | State feedback and state estimation as duals: gains on arrays, blocks, designs on a model or a plant (`lqr`, `place`, `kalman`, `luenberger`, `lqg`), the estimation problem and tools to come, where the EKF fits. History: [the rulings](../reviews/2026-10-14-state-space-design-rulings.md) | v0.2 B (P4, landed 2026-10-14), later rows to v0.3 and v0.9 | decided 2026-10-13; P4 landed, the long view open |
-| [gro501-classical-control.md](gro501-classical-control.md) | The GRO501 stack: `minreal`, `place`, sensitivity verbs, observers, facades, the z question | v0.2 B (P2–P10) | mostly landed; open: TB-b; P6 and P11 dropped |
 | [randomness.md](randomness.md) | One convention for randomness: a `Distribution` has no time, a noise signal is a law held over a period, spectral density is the dt-free number; `NoiseSource` / `WhiteNoise`, counter-based draws, one key per experiment (`realize`) | v0.2 A (RN-2), v0.3 (RN-3 to RN-5) | decided (RD-D1–RD-D24); RN-1 landed, RN-2 to RN-6 open |
-| [naming.md](naming.md) | One naming rule for blocks and signals: the audit, the quick wins, the larger alignments | v0.2 A (A4) | quick wins 1, 3, 6 open |
 | [fields.md](fields.md) | The `Field` object on `(x, u, t)`: `QuadraticField`, `GridField`, `CallableField`; the Lyapunov certificate, DP and the approximator speaking it | v0.3 (A1) | agreed, not started |
 | [cost-params.md](cost-params.md) | Cost parameters as a dictionary like a system's; composite costs nested like diagram params | v0.3 (A2) | agreed, not started |
 | [geometry-module.md](geometry-module.md) | Workspace geometry home `core/geometry/` (Shape, Path, Track, Scene, bind, spatial Fields, course catalog); `planning.spatial` retires | v0.3 (A3) | agreed, not started |
@@ -61,3 +59,4 @@ Deleted (landed; decision records folded into DESIGN / ROADMAP / tests README / 
 - 2026-09-12: `constitution-integration.md` (rulings in [2026-09-12-governance-stack-audit.md](../reviews/2026-09-12-governance-stack-audit.md)), `v01-scope-alignment.md` (rulings in ROADMAP §6), `vehicle-abstraction.md` (teaching ladder S25; view ports → TODO Later).
 - 2026-09-15: `core-objects-1-governance.md`, `core-objects-2-sets-distributions.md`, `core-objects-3-exit-rule.md` (contracts in CONSTITUTION / RULES / DESIGN), `rl-planner-vision.md` (R1–R7 landed; planner is DESIGN / ROADMAP TRL).
 - 2026-09-22: `lyapunov-certificates.md` (implemented 2026-09-11; contract in DESIGN §3, open rulings in ROADMAP §6), `planning-solution-comparison.md` (landed 2026-09-17; contract in DESIGN §6, the demo rewrites are TODO D1.4), `standard-planning-problems.md` (the deterministic / stochastic pair shipped; the robust class is a Later idea), `core-objects-5-later-nouns.md` and `core-objects-6-demos.md` (folded into TODO A5 and D1); `core-objects-4-fields.md` renamed `fields.md`, `phase4-fidelity-maps.md` renamed `fidelity-maps.md`.
+- 2026-10-17: `naming.md` (wins 1, 3, 6 landed, the display-name sweep is TODO's A6, the larger alignments are ROADMAP §6), `gro501-classical-control.md` (P2–P10 landed, P6 and P11 dropped, TB-b stays a TODO §2 row; the audit is [2026-09-07-gro501-coverage.md](../reviews/2026-09-07-gro501-coverage.md)).

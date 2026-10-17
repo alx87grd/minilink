@@ -22,7 +22,7 @@ such notebook per APP. Reviewing the next steps, the maintainer dropped the step
   Colab-first rule kept for the topic demos and notebooks); the P11 line leaves §5.2.
 - TODO §2: the P11 row removed; S61, S62 and TB-b now land before v0.2 ships instead of
   before P11; RN-3 waits for its first consumer alone.
-- [gro501-classical-control.md](../plans/gro501-classical-control.md): step map and §P11
+- `gro501-classical-control.md` (plan doc retired 2026-10-17): step map and §P11
   marked dropped, sequencing updated; the plans index row, `randomness.md`,
   `automation-by-convention.md` and `estimation-and-state-feedback.md` no longer cite P11.
 - Earlier records that mention P11 (2026-09-22, 2026-10-11, 2026-10-13) stay as written.

@@ -85,7 +85,7 @@ Change them with this row, in the same commit. Add `--update` only after an inte
 perf or trajectory change, and review the JSON diff before committing; what each flag
 means is in [benchmarks/README.md](../benchmarks/README.md).
 
-Agent workflow: [AGENTS.md](../AGENTS.md). Code and review rules: [RULES.md](../RULES.md).
+Agent workflow: [AGENTS.md](../AGENTS.md). Code and review rules: [RULES.md](../docs/dev/RULES.md).
 
 ### CI (GitHub Actions)
 

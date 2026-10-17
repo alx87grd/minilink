@@ -1,6 +1,6 @@
 # Minilink workboard
 
-Every open step of the path to v1.0 in [ROADMAP.md §5](../../ROADMAP.md#5-the-path-to-v10),
+Every open step of the path to v1.0 in [ROADMAP.md §5](../dev/ROADMAP.md#5-the-path-to-v10),
 by rung, in order. Strategy, milestones and maturity stay in ROADMAP; design writeups in this
 folder; rulings and audits in [docs/reviews/](../reviews/); pyro parity rows in
 [pyro-port-remaining.md](pyro-port-remaining.md). **Landed rows leave this file**: the
@@ -33,9 +33,9 @@ the triage in [2026-09-22-improvement-suggestions.md](../reviews/2026-09-22-impr
 
 ## 1. v0.2 wave A — the textbook objects
 
-Design: [naming.md](naming.md). Runs in parallel with wave B.
+Runs in parallel with wave B.
 
-- [ ] **A4 Naming, the rest** (wins 1, 3 and 6 of [naming.md](naming.md) landed 2026-10-17:
+- [ ] **A4 Naming, the rest** (the naming quick wins landed 2026-10-17:
   the class name as the default `name`, shortcuts named as the expression they build, `id`
   documented): one colour keyword, `jmax`, across DP, tabular RL, `PolicyEvaluator` and
   `Comparison`, with S54's clipping (scan: planning#3, examples#5); `plot_cost2go` keeps its
@@ -67,8 +67,8 @@ Design: [naming.md](naming.md). Runs in parallel with wave B.
 
 ## 2. v0.2 wave B — GRO501
 
-Plan: [gro501-classical-control.md](gro501-classical-control.md). Release contract:
-[ROADMAP §4.2](../../ROADMAP.md#42-v02--gro501-end-to-end).
+Baseline audit: [the 2026-09-07 coverage record](../reviews/2026-09-07-gro501-coverage.md). Release contract:
+[ROADMAP §4.2](../dev/ROADMAP.md#42-v02--gro501-end-to-end).
 
 **Order:** TB-b next (S61, S62 and S73 landed 2026-10-15); P10's AC-0, AC-2a, AC-OP, AC-3,
 AC-2b/c and AC-4 have landed, P4 with them; TB-b (its loop part after AC-3). P11, the two
@@ -617,9 +617,8 @@ in December 2026 after the v0.3 tag; the v1.0 rows after two cohorts.
   and robotics first; a "For instructors" page (pin a version, Colab, adapt a lab, report a
   bug).
 - [ ] **V10 The public face** **[ask]**: the README opens on a teaching quickstart; TRL,
-  lanes, wave and step ids leave README and `examples/README.md`; the agent and governance
-  files stay at the root or move under `docs/dev/` (ROADMAP §6); `CONTRIBUTING.md`, issue
-  templates, a code of conduct.
+  lanes, wave and step ids leave README and `examples/README.md`; `CONTRIBUTING.md`, issue
+  templates, a code of conduct (the governance docs moved under `docs/dev/` on 2026-10-17).
 - [ ] **V2** Zenodo archive and a citable DOI (`CITATION.cff`) after PyPI; the JOSS entry
   and the RULES 6.9 carve-out for its state-of-the-field section, decided then.
 - [ ] **S49 The Stable-Baselines3 teaching notebooks** **[ask]**, at the end of the term.

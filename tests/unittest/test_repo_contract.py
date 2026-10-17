@@ -45,11 +45,11 @@ PROSE_NOTEBOOKS = (
 # docs/reviews/ are history and are deliberately excluded.
 LINKED_DOCS = (
     "CLAUDE.md",
-    "CONSTITUTION.md",
-    "RULES.md",
     "AGENTS.md",
-    "DESIGN.md",
-    "ROADMAP.md",
+    "docs/dev/CONSTITUTION.md",
+    "docs/dev/RULES.md",
+    "docs/dev/DESIGN.md",
+    "docs/dev/ROADMAP.md",
     "README.md",
     "examples/README.md",
     "tests/README.md",

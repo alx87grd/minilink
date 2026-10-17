@@ -36,7 +36,7 @@ napoleon_numpy_docstring = True
 suppress_warnings = ["ref.python"]
 
 templates_path = ["_templates"]
-exclude_patterns = ["_build", "Thumbs.db", ".DS_Store", "plans", "reviews"]
+exclude_patterns = ["_build", "Thumbs.db", ".DS_Store", "dev", "plans", "reviews"]
 
 # GitHub Pages project site (repo name = minilink).
 html_baseurl = "https://alx87grd.github.io/minilink/"

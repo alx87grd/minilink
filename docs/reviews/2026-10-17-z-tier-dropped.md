@@ -28,6 +28,6 @@ maintainer ruled.
   place; the z tier leaves §6.
 - TODO §2 notes the drop; the P6 row of §5 becomes the `discretize` follow-ups row; the
   estimation follow-ups no longer wait on P6.
-- [gro501-classical-control.md](../plans/gro501-classical-control.md): step map and §P6
+- `gro501-classical-control.md` (plan doc retired 2026-10-17): step map and §P6
   marked dropped, with Option A recorded as the ruling.
 - Earlier records that mention P6 (2026-09-07, 2026-09-22) stay as written.

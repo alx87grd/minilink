@@ -4,7 +4,7 @@ Point-in-time external audit ahead of the v0.1 teaching release.
 Branch `dev-alex` @ `5c41f83`. Reviewed 2026-09-05.
 
 This is an **audit record**, not a fourth backlog home. Items worth acting on
-should be moved by the maintainer into [ROADMAP.md](../../ROADMAP.md) (maturity
+should be moved by the maintainer into [ROADMAP.md](../dev/ROADMAP.md) (maturity
 and milestone decisions) or [docs/plans/TODO.md](../plans/TODO.md) (operational
 work). Nothing here was applied to the code.
 

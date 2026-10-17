@@ -237,7 +237,7 @@ Developers: hooks and test commands in
 - [Tutorial series 00–11](https://github.com/alx87grd/minilink/tree/main/examples/tutorial), one notebook per package (core dynamics to reinforcement learning)
 - [Teaching notebooks](https://github.com/alx87grd/minilink/tree/main/examples/teaching), swing-up, DP, PPO, robot equations of motion
 - [Examples index](https://github.com/alx87grd/minilink/blob/main/examples/README.md), demos and projects by chapter
-- [API reference](https://alx87grd.github.io/minilink/), [DESIGN.md](https://github.com/alx87grd/minilink/blob/main/DESIGN.md), [ROADMAP.md](https://github.com/alx87grd/minilink/blob/main/ROADMAP.md), [tests](https://github.com/alx87grd/minilink/blob/main/tests/README.md)
-- [CONSTITUTION.md](https://github.com/alx87grd/minilink/blob/main/CONSTITUTION.md) and [RULES.md](https://github.com/alx87grd/minilink/blob/main/RULES.md), the design law and the code rules every contributor and agent follows
+- [API reference](https://alx87grd.github.io/minilink/), [DESIGN.md](https://github.com/alx87grd/minilink/blob/main/docs/dev/DESIGN.md), [ROADMAP.md](https://github.com/alx87grd/minilink/blob/main/docs/dev/ROADMAP.md), [tests](https://github.com/alx87grd/minilink/blob/main/tests/README.md)
+- [CONSTITUTION.md](https://github.com/alx87grd/minilink/blob/main/docs/dev/CONSTITUTION.md) and [RULES.md](https://github.com/alx87grd/minilink/blob/main/docs/dev/RULES.md), the design law and the code rules every contributor and agent follows
 
 Minilink is the successor of [pyro](https://github.com/SherbyRobotics/pyro).

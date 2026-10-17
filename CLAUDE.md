@@ -9,8 +9,8 @@ Read [AGENTS.md](AGENTS.md) now: it is the workflow contract (what to read,
 what needs the maintainer, the local CI gate). It applies to every agent,
 whichever tool loads this file.
 
-Then, as AGENTS.md directs: [CONSTITUTION.md](CONSTITUTION.md) before any
-interaction (questions and reviews included), [RULES.md](RULES.md) before editing
+Then, as AGENTS.md directs: [CONSTITUTION.md](docs/dev/CONSTITUTION.md) before any
+interaction (questions and reviews included), [RULES.md](docs/dev/RULES.md) before editing
 Python.
 
 Until you have read those, four things hold:

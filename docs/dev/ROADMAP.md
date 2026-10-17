@@ -2,10 +2,10 @@
 
 Maturity and priorities — the **plan of record**. Identity:
 [CONSTITUTION.md](CONSTITUTION.md). Contracts: [DESIGN.md](DESIGN.md).
-Code rules: [RULES.md](RULES.md). Agent workflow: [AGENTS.md](AGENTS.md).
-Workboard (every open step, by rung, in order): [docs/plans/TODO.md](docs/plans/TODO.md).
-Design writeups: [docs/plans/](docs/plans/README.md). Dated audits and decision records:
-[docs/reviews/](docs/reviews/).
+Code rules: [RULES.md](RULES.md). Agent workflow: [AGENTS.md](../../AGENTS.md).
+Workboard (every open step, by rung, in order): [docs/plans/TODO.md](../plans/TODO.md).
+Design writeups: [docs/plans/](../plans/README.md). Dated audits and decision records:
+[docs/reviews/](../reviews/).
 
 ## 1. Releases
 
@@ -71,7 +71,7 @@ a release process by themselves.
 | **TRL 9** | Mission Complete | Tests, demo, and user approval are all complete |
 
 State as of 2026-10-17. Step ids (`S29`, `P4`, `T2`, …) are the rows of
-[docs/plans/TODO.md](docs/plans/TODO.md).
+[docs/plans/TODO.md](../plans/TODO.md).
 
 | Area | Lane | TRL | State | Next |
 | --- | --- | --- | --- | --- |
@@ -87,19 +87,19 @@ State as of 2026-10-17. Step ids (`S29`, `P4`, `T2`, …) are the rows of
 | Optimization | teaching (via trajopt) | 5 | `MathematicalProgram` + `Optimizer`, SciPy/Ipopt. | Harden SciPy/Ipopt before TRL 6. |
 | Interfaces / RL bridge | research lane (bridge) | 4 | `Sys2Gym` + `SB3Controller`; the env step is one compiled RK4 call. | Keep for external interop; courses solve with the native planner. |
 | Analysis / Lyapunov certificates | provisional (research) | 4 | `region_of_attraction` → `LyapunovCertificate` (quadratic `V`, sampled level, `verify`, `plot`, `contains`); demo and showcase §11. | Cohort validation; `V` as a `QuadraticField` (A1); SOS and discrete time later. |
-| Planning / RL planner | teaching (GRO860) | 6 | `ReinforcementLearningPlanner` (REINFORCE, actor-critic, PPO, SAC in pure JAX), `TabularLearningPlanner` (Q-learning, SARSA, Monte Carlo control), `StochasticPlanningProblem`, `MonteCarloEvaluator`; on the root prelude; canonical demos in `examples/demos/rl/`, chapter 11 and the native teaching notebooks. | SAC actor step (S50); deep Q-learning (S52); automatic reward scaling ([rl-reward-scaling.md](docs/plans/rl-reward-scaling.md)); the textbook pass's layout landed (2026-10-16). |
+| Planning / RL planner | teaching (GRO860) | 6 | `ReinforcementLearningPlanner` (REINFORCE, actor-critic, PPO, SAC in pure JAX), `TabularLearningPlanner` (Q-learning, SARSA, Monte Carlo control), `StochasticPlanningProblem`, `MonteCarloEvaluator`; on the root prelude; canonical demos in `examples/demos/rl/`, chapter 11 and the native teaching notebooks. | SAC actor step (S50); deep Q-learning (S52); automatic reward scaling ([rl-reward-scaling.md](../plans/rl-reward-scaling.md)); the textbook pass's layout landed (2026-10-16). |
 | Planning / search (RRT) | provisional | 5 | RRT / RRT*; `RRTPlanner(problem)` works from the input bounds alone (bang-bang extender); returns a `PlanningSolution`. | RRT-Connect later; the textbook pass's layout landed (2026-10-16). |
-| Planning / path integral (MPPI) | research lane (planned) | 1 | Two standalone scripts (`examples/experimental/mppi/`): the pendulum swings up; the kinematic racecar laps the cone circuit at a lower closed-loop cost than the collocation MPC. Design: [mppi.md](docs/plans/mppi.md). | The planner (S72), after RN-4 / RN-5. |
+| Planning / path integral (MPPI) | research lane (planned) | 1 | Two standalone scripts (`examples/experimental/mppi/`): the pendulum swings up; the kinematic racecar laps the cone circuit at a lower closed-loop cost than the collocation MPC. Design: [mppi.md](../plans/mppi.md). | The planner (S72), after RN-4 / RN-5. |
 | Geometry / spatial | provisional (teaching) | 4 | SDF + `Scene` / fields / bodies under `planning/spatial/`, JAX twins tested; the planning facade's spatial names are provisional teaching names (§2). Home designed: `core/geometry/`. | Package move and course catalog (A3); bicubic SDF and CBF filter (research). |
 | Graphics / animation | teaching | 5 | Frame-keyed `tf` / geometry / overlays; four renderers; auto-fit camera. | Camera and plot defaults from roles (P10); constructor-derived camera hints (S43); glyph/solid rename (S30, v0.9). |
 | Hybrid / step / MPC | provisional (research) | 4 | `StepSystem`, `Computer`, `HybridDiagram`, `HybridSimulator`, MPC with parametric JAX. A side helper for MPC simulation; the sampled loop is the one thing that is not a `System`. | Keeps in step with the core rules (P10); no new hybrid features before S31 (v0.9); the textbook pass's layout landed (2026-10-16) and the MPC blocks read plain hook names from one mixin constructor (2026-10-17). |
 | Realtime simulation | provisional | 2 | `RealtimeSimulator` + pygame I/O. | Architectural review (v1.0); later the human-demonstration recorder of the behavior-cloning pipeline (after v1.0). |
-| Estimation | teaching (GRO501) | 6 | `StateObserver` (innovation form, operating point on the block, hat labels), `luenberger` and `kalman` on arrays, a linear model or the plant (the duals of `place` and `lqr`, 2026-10-14); `lqg` returns the observer + gain box; an observer is refused as a controller; `closed_loop(gain, plant, observer=obs)` wires the LQG loop by role (AC-4, 2026-10-14). | the trajectory observer and the finite-horizon filter, the EKF, the estimation problem and its tools (v0.9, [the plan](docs/plans/estimation-and-state-feedback.md)). |
+| Estimation | teaching (GRO501) | 6 | `StateObserver` (innovation form, operating point on the block, hat labels), `luenberger` and `kalman` on arrays, a linear model or the plant (the duals of `place` and `lqr`, 2026-10-14); `lqg` returns the observer + gain box; an observer is refused as a controller; `closed_loop(gain, plant, observer=obs)` wires the LQG loop by role (AC-4, 2026-10-14). | the trajectory observer and the finite-horizon filter, the EKF, the estimation problem and its tools (v0.9, [the plan](../plans/estimation-and-state-feedback.md)). |
 | Identification | planned | 2 | Parametric-tier prototype only. | `fitting.py` (C4, v0.3). |
 | C export (`experimental/c_export`) | research | 1 | JAX→C transpiler; two demos; flagship smoke in the JAX regression job. | Keep isolated; repo-only. |
 | Experimental tier (`experimental/symbolic`, `experimental/engines`) | research | 1 | Not on the teaching path nor the API site. | Keep isolated; repo-only. |
 | External multibody leaf (MJX) | research | 0 | Not started. | Spike later. |
-| Pyro 2.0 overall | v0.3 | 3 | Catalog + core + search/DP/trajopt done; many demos unported. | Remaining rows in [pyro-port-remaining.md](docs/plans/pyro-port-remaining.md). |
+| Pyro 2.0 overall | v0.3 | 3 | Catalog + core + search/DP/trajopt done; many demos unported. | Remaining rows in [pyro-port-remaining.md](../plans/pyro-port-remaining.md). |
 
 ## 4. Course objectives
 
@@ -155,9 +155,9 @@ placement and a Kalman observer. Student guide: `GRO501_Guide.pdf`
 (maintainer's copy); references Dorf & Bishop and Åström & Murray.
 
 Baseline audit:
-[docs/reviews/2026-09-07-gro501-coverage.md](docs/reviews/2026-09-07-gro501-coverage.md).
+[docs/reviews/2026-09-07-gro501-coverage.md](../reviews/2026-09-07-gro501-coverage.md).
 Step-level work:
-[docs/plans/gro501-classical-control.md](docs/plans/gro501-classical-control.md).
+TB-b in [docs/plans/TODO.md](../plans/TODO.md) §2; the plan doc retired 2026-10-17.
 
 | Topic | Surface | Status | Gate |
 | --- | --- | --- | --- |
@@ -165,11 +165,11 @@ Step-level work:
 | Closed-loop analysis — poles, root locus, Bode, margins, step specs | `pzmap`, `root_locus`, `bode`, `margins`, `step_info`, `P` / `PI` / `PD` / `PID` | green | every compensator form reports the poles and zeros of the hand calculation, and margins are found wherever the crossover sits |
 | Design to specification — rise time, overshoot, final error, phase margin | `PI`, `PD`, `PID`, `Lead`, `Lag`, `step_info`, `margins` | green | the Table 2 specs of the guide are checkable in one notebook |
 | Loop-shaping specs — disturbance and measurement-noise sensitivity in dB at a frequency | `sensitivity`, `complementary_sensitivity`, `load_sensitivity`, `noise_sensitivity` | green (2026-10-10) | the `sensitivity_functions` teaching notebook |
-| Digital implementation — difference equations on the Arduino | `discretize` (Euler / RK4 step models) | green (2026-10-17) | the law is designed in continuous time, discretized, and the sampled loop validated by simulation; no z-domain analysis family (ruled 2026-10-17, [the record](docs/reviews/2026-10-17-z-tier-dropped.md)) |
+| Digital implementation — difference equations on the Arduino | `discretize` (Euler / RK4 step models) | green (2026-10-17) | the law is designed in continuous time, discretized, and the sampled loop validated by simulation; no z-domain analysis family (ruled 2026-10-17, [the record](../reviews/2026-10-17-z-tier-dropped.md)) |
 | State-space MIMO — bicycle model, controllability at every nominal speed | `KinematicBicycle`, `controllability`, `observability` | green | — |
 | Optimal control — LQR on the guide's cost, closed-loop poles, nonlinear check | `lqr(plant, Q, R, x_bar=)`, `StateFeedbackController` | green | — |
 | Pole placement — `K_sta` for a prescribed pole set | `place` (on a linear model or the plant; `place_gain` on arrays) | green | — |
-| Nested loops — inner speed loop, outer position loop | `@` composition | green for error-driven compensators (`PID @ (PID @ G)`); an outer `r, y` or state controller is refused today | P10 ([automation-by-convention.md](docs/plans/automation-by-convention.md)) nests the inner loop as the outer loop's `plant`; stays green with the observer in the loop |
+| Nested loops — inner speed loop, outer position loop | `@` composition | green for error-driven compensators (`PID @ (PID @ G)`); an outer `r, y` or state controller is refused today | P10 ([automation-by-convention.md](../plans/automation-by-convention.md)) nests the inner loop as the outer loop's `plant`; stays green with the observer in the loop |
 | State estimation — Luenberger observer and Kalman filter | `StateObserver`, `luenberger`, `kalman`, `lqg` | green (2026-10-14) | the observer closes the loop as a standard diagram block: by role with `closed_loop(gain, plant, observer=obs)`, in the `lqg` box, or by hand |
 | Reference scaling — the `N` matrix giving `y = r` at steady state | `OutputReferenceController(K, N)` | green (2026-10-10) | the student writes `N = -(C (A - B K)⁻¹ B)⁻¹`; the block takes the output reference |
 
@@ -200,7 +200,7 @@ did, and turns this table into the release contract.
 | Nonlinear control — feedback linearization, computed torque, sliding mode, Lyapunov | `control.modelbased`, `control.geometric`, `analysis.lyapunov` | audit pending | set by G1 |
 | Robust control — uncertainty, margins, robust design | `analysis` frequency tools | audit pending | set by G1 |
 | Trajectory optimization — direct collocation, shooting | `planning.trajectory_optimization` | audit pending | set by G1 |
-| MPC — receding horizon on the vehicle and the arm | `control.mpc` (provisional, research lane) | audit pending | MPC joins the teaching surface, or stays a lesson on the research lane, decided in G1; the sampling flavour (MPPI, [mppi.md](docs/plans/mppi.md), S72) is on the table for that audit |
+| MPC — receding horizon on the vehicle and the arm | `control.mpc` (provisional, research lane) | audit pending | MPC joins the teaching surface, or stays a lesson on the research lane, decided in G1; the sampling flavour (MPPI, [mppi.md](../plans/mppi.md), S72) is on the table for that audit |
 
 **Cross-cutting gates** (as for GRO501): every topic row green with a demo
 or a notebook; one `examples/teaching/` notebook per topic, Colab-first;
@@ -209,9 +209,9 @@ student-facing GMC714 material imports only through the teaching surface.
 ## 5. The path to v1.0
 
 Each rung names its open steps, one line each. The steps themselves, with files, order and
-"done when", are the rows of [docs/plans/TODO.md](docs/plans/TODO.md). A rung is done when
+"done when", are the rows of [docs/plans/TODO.md](../plans/TODO.md). A rung is done when
 every step in it is landed or explicitly dropped by the maintainer. Landed work leaves this
-section; its history is in git and in [docs/reviews/](docs/reviews/).
+section; its history is in git and in [docs/reviews/](../reviews/).
 
 ### 5.1 v0.1 — close-out
 
@@ -224,7 +224,7 @@ The GRO860 path is green (§4.1) and `0.1.1` is published. One standing rule rem
 Three waves: A and B in parallel, D throughout.
 
 **Wave A — the textbook objects finish speaking.**
-- **A4** The naming quick wins of [naming.md](docs/plans/naming.md) landed 2026-10-17 (the
+- **A4** The naming quick wins landed 2026-10-17 (the
   class name as the default `name`, a shortcut named as the expression it builds, `id`
   documented); its `jmax` and operator-export items stay.
 - **A6** Short catalog names (RULES 2.6): compact public class names, the long explicit display
@@ -233,13 +233,13 @@ Three waves: A and B in parallel, D throughout.
 - **A5** The later nouns, each with its first consumer: `log_prob`, sets and distributions
   over parameter dictionaries, `UnionSet`, `PlanningProblem.hamiltonian()` only if a course
   teaches Pontryagin.
-- **RN-2** of [randomness.md](docs/plans/randomness.md): distributions read `params`,
+- **RN-2** of [randomness.md](../plans/randomness.md): distributions read `params`,
   `Gaussian(cov=)`, every `sample` takes a key.
 
 **Wave B — GRO501 end to end** (§4.2; plan
-[gro501-classical-control.md](docs/plans/gro501-classical-control.md)). Landed: P2, P3,
+TB-b in TODO §2; the plan doc retired 2026-10-17). Landed: P2, P3,
 TB-a, P7, P5, P8, P9.
-- **P10** Automation by convention ([automation-by-convention.md](docs/plans/automation-by-convention.md),
+- **P10** Automation by convention ([automation-by-convention.md](../plans/automation-by-convention.md),
   decided 2026-10-11): standard port names drive the wiring, three reserved names (`plant`,
   `controller`, `observer`) are the roles every tool reads, and the cost is scored on the
   plant. Its composition steps land in this wave; the order is in TODO §2 and the plan's
@@ -258,9 +258,9 @@ TB-a, P7, P5, P8, P9.
 **Wave D — the code reads like the textbook, and the demos like the API.** Standing work,
 behaviour-preserving, one module per step.
 - **T1–T7** The textbook pass landed in one run (PR #125, 2026-10-16, [the
-  record](docs/reviews/2026-10-16-textbook-pass.md)) and its recorded bugs and open questions
+  record](../reviews/2026-10-16-textbook-pass.md)) and its recorded bugs and open questions
   were ruled and fixed the next day (PR #126, [the
-  rulings](docs/reviews/2026-10-17-textbook-pass-follow-up-rulings.md)); its style sheet is
+  rulings](../reviews/2026-10-17-textbook-pass-follow-up-rulings.md)); its style sheet is
   RULES §5. What is left of each row is a behaviour, backend or API item, listed in TODO §3.
 - **D1** Demos and notebooks to the minimal rule (RULES 6.1 / 6.10 / 6.11). **[ask per
   file]**
@@ -283,15 +283,15 @@ the new core objects land in a smaller library; plan in TODO §4):
   rest. **[ask per group]**
 
 **The textbook objects**, before wave C:
-- **A1** `core/fields.py` ([fields.md](docs/plans/fields.md)). **[ask — core]**
-- **A2** Cost parameters ([cost-params.md](docs/plans/cost-params.md)). **[ask — core]**
-- **A3** Workspace geometry, `core/geometry/` ([geometry-module.md](docs/plans/geometry-module.md)).
+- **A1** `core/fields.py` ([fields.md](../plans/fields.md)). **[ask — core]**
+- **A2** Cost parameters ([cost-params.md](../plans/cost-params.md)). **[ask — core]**
+- **A3** Workspace geometry, `core/geometry/` ([geometry-module.md](../plans/geometry-module.md)).
   **[ask — core]**
 
 **Wave C — GMC714, the catalog, pyro parity.**
 - **G1** GMC714 baseline audit: every §4.3 topic run on the teaching surface, the gaps
   written as the release contract. **[ask — course scope]**
-- **C1** Pyro parity open rows ([pyro-port-remaining.md](docs/plans/pyro-port-remaining.md))
+- **C1** Pyro parity open rows ([pyro-port-remaining.md](../plans/pyro-port-remaining.md))
   and the pyro → minilink migration guide in README.
 - **C2** GMC714 modelling ladder: manipulators and the vehicle ladder as a `02_dynamics`
   lesson; robotic PID wrappers.
@@ -301,11 +301,11 @@ the new core objects land in a smaller library; plan in TODO §4):
 - **C5** RL follow-ups: **S50** SAC actor step, **S51** policy iteration on the grid,
   **S52** deep Q-learning.
 - **S63** DP reads a finite horizon from `problem.tf`; **S64** catalog hygiene. **[ask]**
-- **RN-4 / RN-5** of [randomness.md](docs/plans/randomness.md), together, between cohorts:
+- **RN-4 / RN-5** of [randomness.md](../plans/randomness.md), together, between cohorts:
   `realize(key)` and signals on `disturbances=`, then the Monte Carlo test set. **RN-3**
   `NoiseSource` too, unless a GRO501 notebook needs sampled sensor noise first.
 - **AC-7** The cost scored on the plant, across every evaluator and design tool (P10).
-- **S72** The path-integral planner (MPPI) on the research lane ([mppi.md](docs/plans/mppi.md)),
+- **S72** The path-integral planner (MPPI) on the research lane ([mppi.md](../plans/mppi.md)),
   after RN-4 / RN-5. **[ask — name, the MPC block contract]**
 - **V1** The differentiable closed-loop cost: params → closed loop → RK4 run → `J` → the mean
   over stochastic rollouts, fully differentiable; a core feature with one standard entry
@@ -315,7 +315,7 @@ the new core objects land in a smaller library; plan in TODO §4):
 
 What v1.0 asks is adoption, not architecture: a colleague builds a course on minilink and
 trusts it for three years. The
-[adoption review of 2026-09-26](docs/reviews/2026-09-26-adoption-review.md) found the
+[adoption review of 2026-09-26](../reviews/2026-09-26-adoption-review.md) found the
 engine ready and three things missing around it: a stability promise, the two syllabus
 holes every course hits (estimation, discrete time), and material packaged for an
 instructor. v0.9 closes the first two and settles every question that could still break a
@@ -403,22 +403,23 @@ each item; agents execute only what was picked.
 
 Open decisions only, by the rung they block; each needs the maintainer. A decision leaves
 this section when it is taken: its ruling goes to the plan doc it shapes and to a dated
-record in [docs/reviews/](docs/reviews/), and its contract to DESIGN when the code lands.
+record in [docs/reviews/](../reviews/), and its contract to DESIGN when the code lands.
 The automation-by-convention rulings (2026-10-11) are in
-[their record](docs/reviews/2026-10-11-automation-by-convention.md); the disturbance
-convention in [randomness.md](docs/plans/randomness.md); the docs-consistency rulings
-(2026-10-12) in [theirs](docs/reviews/2026-10-12-docs-consistency-rulings.md); the
+[their record](../reviews/2026-10-11-automation-by-convention.md); the disturbance
+convention in [randomness.md](../plans/randomness.md); the docs-consistency rulings
+(2026-10-12) in [theirs](../reviews/2026-10-12-docs-consistency-rulings.md); the
 state-space design rulings (2026-10-14: the nominal state, the model-taking verbs, the
 observer, `lqg`, the role name) in
-[theirs](docs/reviews/2026-10-14-state-space-design-rulings.md); the linear analysis band
+[theirs](../reviews/2026-10-14-state-space-design-rulings.md); the linear analysis band
 rulings (2026-10-15: the step response linearized and labelled, the structural verbs on a
 system, the command port as the default channel) in
-[theirs](docs/reviews/2026-10-15-linear-analysis-rulings.md); the classical control
+[theirs](../reviews/2026-10-15-linear-analysis-rulings.md); the classical control
 family rulings (2026-10-15: `P`, the impedance pair on the family's grammar, matrix
 stiffness and damping, the shared pure functions) in
-[theirs](docs/reviews/2026-10-15-classical-control-family.md); the z tier dropped (2026-10-17) in
-[its record](docs/reviews/2026-10-17-z-tier-dropped.md); the one install story (2026-10-17) in
-[its record](docs/reviews/2026-10-17-one-install-story.md).
+[theirs](../reviews/2026-10-15-classical-control-family.md); the z tier dropped (2026-10-17) in
+[its record](../reviews/2026-10-17-z-tier-dropped.md); the one install story (2026-10-17) in
+[its record](../reviews/2026-10-17-one-install-story.md); the root layout (2026-10-17) in
+[its record](../reviews/2026-10-17-root-layout.md).
 
 **During v0.2**
 
@@ -438,15 +439,15 @@ stiffness and damping, the shared pure functions) in
 - **Lyapunov certificates**: a GRO860 checklist row of their own, or an analysis tool the
   lecture uses; `method=` naming the certificate family.
 - **Solver-specific views on the planning records.**
-- **Naming, the larger alignments** ([naming.md](docs/plans/naming.md)): one separator rule
-  for wires, params paths, block labels and duplicate state labels; plot labels for
-  internal signals; a style sweep of display names.
-- **CBF safety filter** ([cbf-safety-filter.md](docs/plans/cbf-safety-filter.md)): research
+- **Naming, the larger alignments**: one separator rule for wires, params paths, block
+  labels and duplicate state labels; plot labels for internal signals (the display-name
+  sweep is step A6).
+- **CBF safety filter** ([cbf-safety-filter.md](../plans/cbf-safety-filter.md)): research
   lane until a course asks; the barrier is a `Field` once A1 lands.
 
 **Before v0.3 wave C (S72, the path-integral planner)**
 
-- **MPPI** ([mppi.md](docs/plans/mppi.md) §10): the planner's name (`PathIntegralPlanner`
+- **MPPI** ([mppi.md](../plans/mppi.md) §10): the planner's name (`PathIntegralPlanner`
   or `MPPIPlanner`); the three planner verbs the MPC block reads instead of trajopt
   internals; the stochastic default (plant draws per control sample); where
   `RolloutEnvironment` lives once a second band reads it.
@@ -475,8 +476,6 @@ stiffness and damping, the shared pure functions) in
 
 **Before v1.0**
 
-- Whether AGENTS.md, CLAUDE.md, RULES.md and CONSTITUTION.md stay at the repository root
-  or move under `docs/dev/` (V10).
 - Zenodo / DOI, and whether JOSS is wanted (V2).
 
 ## 7. Out of scope

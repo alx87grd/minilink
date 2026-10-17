@@ -3,7 +3,7 @@
 **Status:** integrated 2026-09-23. Every suggestion has a workboard row that
 cites it as `scan: band#n` ([docs/plans/TODO.md](../plans/TODO.md): the
 existing rows it extends, and new rows R3, S58–S68, T7); the open questions
-are on [ROADMAP §6](../../ROADMAP.md#6-decisions). The bugs are workboard row
+are on [ROADMAP §6](../dev/ROADMAP.md#6-decisions). The bugs are workboard row
 S58, fixed on `dev` starting 2026-09-23; §2 records the outcome of each.
 
 **How it was produced.** Ten band scans of the whole library (core,

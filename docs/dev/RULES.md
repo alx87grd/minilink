@@ -4,7 +4,7 @@ The universal standards for writing, reviewing, and refactoring code in Minilink
 Followed identically by human maintainers, contributors, and AI agents.
 
 Governed by [CONSTITUTION.md](CONSTITUTION.md). Agent-specific workflow instructions
-(such as interaction behavior, git gates, and planning procedures) live in [AGENTS.md](AGENTS.md).
+(such as interaction behavior, git gates, and planning procedures) live in [AGENTS.md](../../AGENTS.md).
 
 ---
 

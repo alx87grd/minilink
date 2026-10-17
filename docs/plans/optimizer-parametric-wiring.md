@@ -6,7 +6,7 @@ behaviour, and T5 is byte-identical), and the parametric evaluator's placement i
 D3 row. Lane: research (ROADMAP §2). Analysis + proposed fix for swapping
 `optimizer_method` (e.g. SciPy SLSQP → IPOPT) on the parametric MPC path.
 
-Contracts in code: [DESIGN.md](../../DESIGN.md) §6 (Planning / NLP).
+Contracts in code: [DESIGN.md](../dev/DESIGN.md) §6 (Planning / NLP).
 
 Related: DESIGN §4 planning-params pipeline B (parametric `x0` / reserved `scene` bind).
 

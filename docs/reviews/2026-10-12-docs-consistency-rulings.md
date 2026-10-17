@@ -53,7 +53,7 @@ question that raised it and where the ruling now lives.
 - **The estimation follow-ups are v0.9 syllabus holes.** EKF, time-varying and discrete
   Kalman, online parameter estimators. Lives in: ROADMAP §3 and §5.4, TODO §5.
 - **P6's row sits in v0.9.** The z tier stays held for GRO501; its row moves to the v0.9
-  syllabus holes. Lives in: TODO §5, [gro501-classical-control.md](../plans/gro501-classical-control.md),
+  syllabus holes. Lives in: TODO §5, `gro501-classical-control.md` (plan doc retired 2026-10-17),
   [pyro-port-remaining.md](../plans/pyro-port-remaining.md) (the discrete-time row is no
   longer a drop).
 - **OPW-1–OPW-5 get their own D3 row.** They change behaviour, and T5 is byte-identical.

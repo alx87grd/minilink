@@ -1,13 +1,13 @@
 # Minilink AI Agent Instructions
 
-**Always read CONSTITUTION.md before any interaction** — including questions,
+**Always read docs/dev/CONSTITUTION.md before any interaction** — including questions,
 reviews, and plans that do not touch code.
 
-**Also read RULES.md before editing code** under `minilink/` (or tests, examples,
+**Also read docs/dev/RULES.md before editing code** under `minilink/` (or tests, examples,
 and other Python that implements or exercises that code).
 
 This file is workflow: what to read, when to ask, and the local CI gate.
-User API: README.md. Contracts: DESIGN.md. Maturity: ROADMAP.md.
+User API: README.md. Contracts: docs/dev/DESIGN.md. Maturity: docs/dev/ROADMAP.md.
 Pytest policy: tests/README.md. Examples map: examples/README.md.
 
 ## Before you start: check the remote
@@ -58,11 +58,11 @@ done, even when the tests pass.
 
 | Doc | When to update |
 | --- | --- |
-| CONSTITUTION.md | Vision, contract invariants, conflict precedence — maintainer-owned |
-| RULES.md | Universal code and review ladder (humans and agents) |
+| docs/dev/CONSTITUTION.md | Vision, contract invariants, conflict precedence — maintainer-owned |
+| docs/dev/RULES.md | Universal code and review ladder (humans and agents) |
 | README.md | User workflows, install (conda, Colab, pip), links |
-| DESIGN.md | Public contracts, package layout, evaluator behavior |
-| ROADMAP.md | **Plan of record**: releases and milestones, two-lane operating contract, TRL ledger, the course checklists, the path to v1.0 (rungs and waves), open decisions, out-of-scope |
+| docs/dev/DESIGN.md | Public contracts, package layout, evaluator behavior |
+| docs/dev/ROADMAP.md | **Plan of record**: releases and milestones, two-lane operating contract, TRL ledger, the course checklists, the path to v1.0 (rungs and waves), open decisions, out-of-scope |
 | AGENTS.md | Agent workflow, doc map, local CI gate |
 | CLAUDE.md | Entry stub that points here; update only if this reading order changes |
 | .claude/settings.json | The project hooks: SessionStart warns when the branch is behind its upstream |
