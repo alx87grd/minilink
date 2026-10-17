@@ -1102,3 +1102,23 @@ def test_a_method_reads_the_params_it_is_given(make, method, key, value):
     np.testing.assert_equal(given, from_stored)
     with pytest.raises(AssertionError):
         np.testing.assert_equal(given, default)
+
+
+# The pathtracking project's vehicle: the rolling resistance, the tires, the inputs
+
+from examples.projects.pathtracking.common.vehicle import create_vehicle
+
+
+class TestPathtrackingVehicle(unittest.TestCase):
+    def test_the_front_rolling_resistance_opposes_the_front_wheel_spin(self):
+        vehicle = create_vehicle()
+        vehicle.rolling_friction_constant = 0.015
+        v = np.array(
+            [0.0, 0.0, 0.0, 2.0, -2.0]
+        )  # The rear spins forward, the front back
+        u_in = np.array([0.0, 0.0])
+        Fx_front, _, _, _ = vehicle.compute_tire_physics(v, u_in)
+        Fz_f = vehicle.mass * vehicle.gravity * vehicle.b / vehicle.L
+        d = vehicle.generalized_d(np.zeros(3), v, u_in)
+        tau_front = vehicle.r_f * Fx_front + vehicle.bw_front * v[4] - 0.015 * Fz_f
+        self.assertAlmostEqual(d[4], tau_front, places=9)

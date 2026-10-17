@@ -637,10 +637,10 @@ class RearDriveBicycle(ForceInputBicycle):
         Fz_r = mass * gravity * (a / L)
 
         # Load torque on each wheel: τ_r = r_r F_xr + b_wr ω_r + c_rr F_zr sign(ω_r),
-        # τ_f = r_f F_xf + b_wf ω_f + c_rr F_zf sign(ω_r)
+        # τ_f = r_f F_xf + b_wf ω_f + c_rr F_zf sign(ω_f)
         Tau_load_rear = r_r * Fx_rear + bw_rear * w_rear + c_rr * Fz_r * np.sign(w_rear)
         Tau_load_front = (
-            r_f * Fx_front + bw_front * w_front + c_rr * Fz_f * np.sign(w_rear)
+            r_f * Fx_front + bw_front * w_front + c_rr * Fz_f * np.sign(w_front)
         )
 
         # The external forces: the body wrench, and the load torques against each spin
