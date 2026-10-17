@@ -1860,6 +1860,15 @@ class TestPlotControlLaw(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "not a static map"):
             port_map.plot_control_law(SolverLike(), show=False)
 
+    def test_a_boolean_or_float_axis_is_refused(self):
+        sat = Saturation(-1.0, 1.0)
+        for axis in (np.bool_(True), 0.0, np.float64(0.0), 0.5):
+            with self.subTest(axis=axis):
+                with self.assertRaisesRegex(ValueError, "integer component index"):
+                    sat.plot_input_output_map(x_axis=axis, show=False)
+        res = sat.plot_input_output_map(x_axis=np.int64(0), show=False)
+        self.assertEqual(len(res.axes.lines), 1)
+
 
 class TestAutoFitCamera(unittest.TestCase):
     """``camera_scale=None`` fits the view to the drawn geometry (DESIGN §7)."""

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import operator
 from dataclasses import dataclass
 
 import numpy as np
@@ -380,10 +381,13 @@ def require_io_ports(block):
 
 
 def normalize_axis(axis, dim, name) -> int:
-    """The component index ``axis`` as an int in ``[0, dim - 1]``; a bool is refused."""
-    if isinstance(axis, bool):
+    """The component index ``axis`` as an int in ``[0, dim - 1]``; a bool or a float is refused."""
+    if isinstance(axis, (bool, np.bool_)):
         raise ValueError(f"{name} must be an integer component index")
-    axis_int = int(axis)
+    try:
+        axis_int = operator.index(axis)
+    except TypeError as exc:
+        raise ValueError(f"{name} must be an integer component index") from exc
     if axis_int < 0 or axis_int >= dim:
         raise ValueError(f"{name} must be in [0, {dim - 1}], got {axis_int}")
     return axis_int

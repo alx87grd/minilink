@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import operator
 from dataclasses import dataclass
 
 import numpy as np
@@ -441,10 +442,13 @@ def require_state(n):
 
 
 def normalize_axis(axis, n: int, name: str) -> int:
-    """The state index ``axis`` as an int in ``[0, n - 1]``; a bool is refused."""
-    if isinstance(axis, bool):
+    """The state index ``axis`` as an int in ``[0, n - 1]``; a bool or a float is refused."""
+    if isinstance(axis, (bool, np.bool_)):
         raise ValueError(f"{name} must be an integer state index")
-    axis_int = int(axis)
+    try:
+        axis_int = operator.index(axis)
+    except TypeError as exc:
+        raise ValueError(f"{name} must be an integer state index") from exc
     if axis_int < 0 or axis_int >= n:
         raise ValueError(f"{name} must be in [0, {n - 1}], got {axis_int}")
     return axis_int
@@ -461,10 +465,13 @@ def normalize_grid_shape(grid_shape) -> tuple[int, int]:
         n_x, n_y = tuple(grid_shape)
     except TypeError as exc:
         raise ValueError("grid_shape must be a two-element tuple") from exc
-    if isinstance(n_x, bool) or isinstance(n_y, bool):
+    if isinstance(n_x, (bool, np.bool_)) or isinstance(n_y, (bool, np.bool_)):
         raise ValueError("grid_shape entries must be integers")
-    n_x = int(n_x)
-    n_y = int(n_y)
+    try:
+        n_x = operator.index(n_x)
+        n_y = operator.index(n_y)
+    except TypeError as exc:
+        raise ValueError("grid_shape entries must be integers") from exc
     if n_x < 2 or n_y < 2:
         raise ValueError("grid_shape entries must be at least 2")
     return n_x, n_y

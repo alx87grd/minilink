@@ -1180,6 +1180,21 @@ class TestPhasePlane(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "Unknown plot backend"):
             plot_phase_plane(sys, backend="bokeh", show=False)
 
+    def test_axes_and_grid_refuse_booleans_and_floats(self):
+        sys = PhasePlaneTestSystem()
+        for axis in (np.bool_(True), 1.0, np.float64(1.0), 0.5):
+            with self.subTest(axis=axis):
+                with self.assertRaisesRegex(ValueError, "integer state index"):
+                    build_phase_plane_spec(sys, x_axis=axis, grid_shape=(2, 2))
+        for grid_shape in ((np.bool_(True), 3), (2.5, 3), (3.0, 3)):
+            with self.subTest(grid_shape=grid_shape):
+                with self.assertRaisesRegex(ValueError, "must be integers"):
+                    build_phase_plane_spec(sys, grid_shape=grid_shape)
+        spec = build_phase_plane_spec(
+            sys, x_axis=np.int64(1), y_axis=0, grid_shape=(np.int64(2), 3)
+        )
+        self.assertEqual((spec.x_axis, spec.X.shape), (1, (3, 2)))
+
     def test_plotly_refuses_the_keywords_it_does_not_take(self):
         sys = PhasePlaneTestSystem()
         with self.assertRaisesRegex(TypeError, "dpi, figsize"):
