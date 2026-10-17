@@ -491,6 +491,13 @@ class TestFiniteHorizonLQR(unittest.TestCase):
         np.testing.assert_allclose(stationary.ctl(None, z, t=2.0), [-3.0])
         np.testing.assert_allclose(stationary.ctl(None, z, t=2.5), [-7.0])
 
+    def test_scheduled_gain_refuses_a_gain_after_of_another_shape(self):
+        t = np.array([0.0, 1.0, 2.0])
+        K = np.array([[[1.0, 0.0]], [[2.0, 0.0]], [[3.0, 0.0]]])
+        for K_after in ([[7.0]], [[7.0, 0.0], [0.0, 7.0]], 7.0):
+            with self.assertRaisesRegex(ValueError, r"K_after must have shape"):
+                TimeVaryingStateFeedbackController(t, K, K_after=K_after)
+
     def test_gain_schedule_plot_draws_every_entry(self):
         import matplotlib
 

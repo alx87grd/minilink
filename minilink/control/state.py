@@ -127,7 +127,7 @@ class TimeVaryingStateFeedbackController(System):
         # the schedule's end
         t = np.asarray(t, dtype=float).reshape(-1)
         K = np.asarray(K, dtype=float)
-        require_gain_schedule(t, K)
+        require_gain_schedule(t, K, K_after)
         _, m, n = K.shape
         xbar = point_component(xbar, n, "xbar")
         ubar = point_component(ubar, m, "ubar")
@@ -275,12 +275,23 @@ def reference_gain(N, m):
     return N
 
 
-def require_gain_schedule(t, K):
-    """Refuse a schedule that is not ``(N, m, n)`` gains on ``N >= 2`` increasing times."""
+def require_gain_schedule(t, K, K_after=None):
+    """Refuse a schedule that is not ``(N, m, n)`` gains on ``N >= 2`` increasing times.
+
+    A gain ``K_after`` past the schedule's end, when given, is refused unless
+    it is ``(m, n)``.
+    """
     if K.ndim != 3 or K.shape[0] != t.size or t.size < 2:
         raise ValueError("K must have shape (N, m, n) with N = len(t) >= 2")
     if np.any(np.diff(t) <= 0.0):
         raise ValueError("t must be strictly increasing")
+    if K_after is None:
+        return
+    after_shape = np.atleast_2d(np.asarray(K_after, dtype=float)).shape
+    if after_shape != K.shape[1:]:
+        raise ValueError(
+            f"K_after must have shape (m, n) = {K.shape[1:]}, got {after_shape}"
+        )
 
 
 def require_trajectory_gains(t, K, N, m, n):
