@@ -307,3 +307,15 @@ def test_bounding_boxes():
     np.testing.assert_allclose(
         BoxInputSet.from_bounds([-3.0], [3.0]).bounding_box().lower, [-3.0]
     )
+
+
+def test_disjoint_members_make_an_empty_intersection():
+    far = BoxSet(lower=np.array([2.0, -1.0]), upper=np.array([3.0, 1.0]))
+    box = BoxSet(lower=np.array([-1.0, -1.0]), upper=np.array([1.0, 1.0]))
+    with pytest.raises(ValueError, match="do not intersect: the set is empty"):
+        (box & far).bounding_box()
+
+    # Members that only touch still meet, in a degenerate box
+    touch = BoxSet(lower=np.array([1.0, -1.0]), upper=np.array([2.0, 1.0]))
+    np.testing.assert_allclose((box & touch).bounding_box().lower, [1.0, -1.0])
+    np.testing.assert_allclose((box & touch).bounding_box().upper, [1.0, 1.0])

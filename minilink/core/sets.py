@@ -419,7 +419,10 @@ class IntersectionSet(Set):
         return margin
 
     def bounding_box(self):
-        """The intersection of the members' boxes; ``None`` when no member has one."""
+        """The intersection of the members' boxes; ``None`` when no member has one.
+
+        Members whose boxes do not intersect make the set empty, which is refused.
+        """
         boxes = [
             box
             for box in (set_.bounding_box() for set_ in self.sets)
@@ -431,6 +434,7 @@ class IntersectionSet(Set):
         # The boxes meet in max lowerᵢ ≤ z ≤ min upperᵢ
         lower = np.max([box.lower for box in boxes], axis=0)
         upper = np.min([box.upper for box in boxes], axis=0)
+        require_nonempty_intersection(lower, upper)
 
         return BoxSet(lower, upper)
 
@@ -489,3 +493,9 @@ def require_members(sets):
     """Refuse an intersection of no sets."""
     if not sets:
         raise ValueError("IntersectionSet requires at least one set")
+
+
+def require_nonempty_intersection(lower, upper):
+    """Refuse members whose boxes do not intersect: the intersection is empty."""
+    if np.any(lower > upper):
+        raise ValueError("the members' boxes do not intersect: the set is empty")
