@@ -76,6 +76,7 @@ class RolloutEnvironment:
         else:
             self.tf = 10.0 if episode_length is None else float(episode_length)
         self.n_steps_per_episode = int(round(self.tf / self.dt))
+        require_episode_steps(self.n_steps_per_episode, self.tf, self.dt)
         self.discount_rate = float(self.cost.discount_rate)
 
         # Plant: one integration step, on nominal or on drawn parameters
@@ -357,6 +358,15 @@ def feasible_cost_bound(
 ###############################################################################
 
 
+def require_episode_steps(n_steps, tf, dt):
+    """Refuse an episode shorter than half a control period: it holds no step."""
+    if n_steps == 0:
+        raise ValueError(
+            f"an episode of {tf:g} s is shorter than half the control period dt={dt:g} s "
+            "and holds no step; lengthen the episode or shorten dt"
+        )
+
+
 def warn_inert_noise(sys, disturbances):
     """Warn about noise the held-input rollout never sees: a port only ``h`` reads, a random block inside the plant."""
     # Disturbance ports whose Jacobian on f is zero at the nominal point
@@ -377,6 +387,6 @@ def warn_inert_noise(sys, disturbances):
     if sys.is_random:
         warnings.warn(
             "the plant holds a random block with a fixed seed: every trial and episode "
-            "sees the same noise signal until the tools realize it per trial",
+            "sees the same noise signal",
             stacklevel=3,
         )

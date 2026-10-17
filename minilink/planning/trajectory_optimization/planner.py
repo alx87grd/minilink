@@ -33,6 +33,7 @@ from minilink.planning.results import PlanningSolution
 from minilink.planning.trajectory_optimization.transcription import (
     Transcription,
     dynamics_function,
+    require_jax_compile_backend,
 )
 
 _UNSET = object()  # Marks a keyword the caller did not pass
@@ -310,7 +311,7 @@ class TrajectoryOptimizationPlanner(Planner):
         compile_backend = normalize_backend(
             self.options.compile_backend, allow_direct=True
         )
-        require_jax_backend(compile_backend, self.options.compile_backend)
+        require_jax_compile_backend(self.options.compile_backend)
         require_parametric_transcription(self.transcription)
 
         # Lazy import: the parametric JAX evaluator loads on first compile, not with
@@ -381,7 +382,7 @@ class TrajectoryOptimizationPlanner(Planner):
         the NLP with ``x_start`` replaced (one-time warning suggesting
         :meth:`compile_parametric_program`).
         """
-        reject_unknown_online_params(params)
+        require_online_params(params)
 
         # The fast bind path on a compiled program, else a rebuild from x0
         if self.has_parametric_program:
@@ -895,9 +896,9 @@ class TrajectoryOptimizationIteration:
 _DEFERRED_ONLINE_PARAM_KEYS = frozenset({"scene"})
 
 
-def reject_unknown_online_params(params) -> None:
+def require_online_params(params) -> None:
     """
-    Validate online ``params`` for ``solve_trajectory_from`` / MPC.
+    Refuse online ``params`` that ``solve_trajectory_from`` / MPC cannot bind.
 
     ``None`` or ``{}`` → bind ``x0`` only. The reserved key ``scene`` raises
     :class:`NotImplementedError`. Any other key raises :class:`ValueError`.
@@ -919,15 +920,12 @@ def reject_unknown_online_params(params) -> None:
     if unknown:
         raise ValueError(
             "solve_trajectory_from got unknown params keys "
-            f"{unknown!r}. Pass params=None or {{}} for x0-only bind, "
-            "or reserved key 'scene' (NotImplemented until pipeline B)."
+            f"{unknown!r}; pass params=None or {{}} (x0-only bind)."
         )
     if deferred:
         raise NotImplementedError(
-            f"Online params key(s) {deferred} are reserved for pipeline B "
-            "(ObstacleBank / ParametricMathematicalProgram J(z, p) bind). "
-            "Pass params=None or {} for x0-only bind. See "
-            "docs/plans/TODO.md (Later: scene params / J(z, p) bind)."
+            f"Online params key(s) {deferred} are not supported; "
+            "pass params=None or {} (x0-only bind)."
         )
 
 
@@ -1009,15 +1007,6 @@ def type_name(value: object | None) -> str | None:
         return None
 
     return type(value).__name__
-
-
-def require_jax_backend(compile_backend, requested):
-    """Refuse a parametric compile on any backend but JAX."""
-    if compile_backend != BACKEND_JAX:
-        raise ValueError(
-            "compile_parametric_program requires compile_backend='jax' "
-            f"(got {requested!r})."
-        )
 
 
 def require_parametric_transcription(transcription):

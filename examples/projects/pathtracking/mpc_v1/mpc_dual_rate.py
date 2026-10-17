@@ -17,9 +17,9 @@ class MpcBroadcastAhead(MPCBroadcastController):
         self.name = "MPC Broadcast Ahead"
         self._dt_project = float(dt_project)
 
-    def _compute_x_nom(self, x, u, t=0, params=None):
+    def compute_x_nom(self, x, u, t=0, params=None):
         del x, u, params
-        return self._mpc.get_nominal_x(self._abs_t(t) + self._dt_project)
+        return self.mpc.get_nominal_x(self.abs_t(t) + self._dt_project)
 
 
 def dual_rate_computer_ahead(block, *, dt_broadcast, dt_project=0.2):
@@ -40,8 +40,8 @@ def dual_rate_computer_ahead(block, *, dt_broadcast, dt_project=0.2):
             f"(got dt_mpc={dt_mpc}, dt_broadcast={dt_b}, ratio={ratio})"
         )
 
-    block._replan_divisor = d
-    block._latch.set_after_solve(
+    block.replan_divisor = d
+    block.latch.set_after_solve(
         lambda: block.generate_nominal_interpolator(derivatives=True)
     )
 

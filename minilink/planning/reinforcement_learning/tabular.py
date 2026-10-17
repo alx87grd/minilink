@@ -9,10 +9,10 @@ import numpy as np
 from minilink.planning.evaluation import nominal_trajectory
 from minilink.planning.planner import Planner
 from minilink.planning.policy_synthesis import plotting
-from minilink.planning.policy_synthesis.discretizer import StateSpaceGrid
 from minilink.planning.policy_synthesis.dp import (
     DynamicProgrammingOptions,
     DynamicProgrammingResult,
+    grid_of,
 )
 from minilink.planning.reinforcement_learning.environment import RolloutEnvironment
 from minilink.planning.results import PlanningSolution
@@ -51,7 +51,7 @@ class TabularLearningPlanner(Planner):
         its start, parameter and disturbance draws.
     x_grid, u_grid, dt
         Grid levels per state and input axis and the control period, as for
-        value iteration; or pass ``grid=`` directly.
+        value iteration; or pass ``grid=`` instead, never both.
     algorithm : {"q_learning", "sarsa", "monte_carlo"} or object
         The target of the moving average, or an instance of :class:`QLearning`,
         :class:`SARSA` or :class:`MonteCarloControl`.
@@ -555,25 +555,6 @@ class UCB:
 ###############################################################################
 # Internal machinery
 ###############################################################################
-
-
-def grid_of(problem, grid, x_grid, u_grid, dt):
-    """
-    The grid passed in, or one built from the levels and ``dt``.
-
-    Unlike value iteration's :func:`~minilink.planning.policy_synthesis.dp.grid_of`,
-    levels passed beside a grid are not refused: the grid is used and they are
-    ignored.
-    """
-    if grid is None:
-        if x_grid is None or u_grid is None or dt is None:
-            raise ValueError(
-                "pass grid=StateSpaceGrid(...) or all of x_grid, u_grid, and dt"
-            )
-
-        return StateSpaceGrid(problem, x_grid_shape=x_grid, u_grid_shape=u_grid, dt=dt)
-
-    return grid
 
 
 def require_rounding(rounding):

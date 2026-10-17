@@ -13,6 +13,7 @@ from minilink.core.step_rollout import StepRollout
 from minilink.core.system import System
 from minilink.core.trajectory import Trajectory
 from minilink.simulation.computer import Computer
+from minilink.simulation.input_coercion import coerce_forced_input, require_x0
 
 ###############################################################################
 # Public API
@@ -82,12 +83,12 @@ class HybridSimulator:
         self.plant_eval = self.plant.compile(backend=compile_backend)
 
         # The initial states, each diagram's own x0 unless given
-        self.x0_plant = validate_x0(
+        self.x0_plant = require_x0(
             self.plant.x0 if x0_plant is None else x0_plant,
             self.plant.n,
             label="x0_plant",
         )
-        self.x0_computer = validate_x0(
+        self.x0_computer = require_x0(
             self.computer.diagram.x0 if x0_computer is None else x0_computer,
             self.computer.diagram.n,
             label="x0_computer",
@@ -128,13 +129,15 @@ class HybridSimulator:
         drives that one input port and the other ports hold their nominal
         values.
         """
-        u_traj = coerce_tick_input(
-            u,
-            self.computer.diagram,
-            self.n_ticks,
-            self.times,
-            input_port_id=input_port_id,
-        )
+        diagram = self.computer.diagram
+
+        # The input on the ticks; a computer without inputs has none to force
+        if diagram.m == 0 and input_port_id is None:
+            u_traj = np.zeros((0, self.n_ticks))
+        else:
+            u_traj = coerce_forced_input(
+                diagram, self.times, u, input_port_id=input_port_id
+            )
 
         return self.run(u_traj)
 
@@ -502,17 +505,6 @@ def select_tick_grid(*, t0, tf, dt_base, n_steps):
     return dt_base, n_ticks, times
 
 
-def validate_x0(x0, n, *, label):
-    """``x0`` as a finite float vector ``(n,)``, or a refusal naming ``label``."""
-    x0_arr = np.asarray(x0, dtype=float).reshape(-1)
-    if x0_arr.shape[0] != n:
-        raise ValueError(f"{label} must have shape ({n},)")
-    if not np.all(np.isfinite(x0_arr)):
-        raise ValueError(f"{label} must contain only finite values")
-
-    return x0_arr
-
-
 def index_boundary_connections(hybrid: HybridDiagram):
     """The boundary links as port pairs: computer to plant, then plant to computer."""
     c2p = []
@@ -524,77 +516,6 @@ def index_boundary_connections(hybrid: HybridDiagram):
             p2c.append((conn.plant_port, conn.computer_port))
 
     return tuple(c2p), tuple(p2c)
-
-
-def coerce_tick_input(u, diagram, n_ticks, times, *, input_port_id=None):
-    """The forced input on the tick grid, ``(m, n_ticks)``: the whole vector or one port."""
-    m = diagram.m
-    if input_port_id is None:
-        return coerce_full_tick_input(u, m, n_ticks, times)
-
-    # One port forced, the others held at their nominal values
-    port = diagram.inputs[input_port_id]
-    port_slice = diagram.get_input_port_slice(input_port_id)
-    u_nominal = diagram.get_u_from_input_ports().reshape(m, 1)
-    u_traj = np.repeat(u_nominal, n_ticks, axis=1)
-    u_traj[port_slice, :] = coerce_tick_signal(
-        u,
-        port.dim,
-        n_ticks,
-        times,
-        label=f"u for input port '{input_port_id}'",
-    )
-
-    return u_traj
-
-
-def coerce_full_tick_input(u, m, n_ticks, times):
-    """The whole forced input on the tick grid; empty when the computer has no input."""
-    if m == 0:
-        return np.zeros((0, n_ticks))
-
-    return coerce_tick_signal(u, m, n_ticks, times, label="u")
-
-
-def coerce_tick_signal(data, expected_dim, n_ticks, times, *, label):
-    """A callable, scalar, vector or ``(dim, n_ticks)`` matrix, sampled on the ticks."""
-    if callable(data):
-        return sample_tick_callable(data, expected_dim, times, label=label)
-
-    arr = np.asarray(data, dtype=float)
-    expected_shape = (expected_dim, n_ticks)
-
-    if arr.ndim == 0:
-        if expected_dim != 1:
-            raise ValueError(f"{label} must have shape {expected_shape}")
-        return np.full((1, n_ticks), float(arr), dtype=float)
-
-    if arr.ndim == 1:
-        if expected_dim == 1 and arr.shape[0] == n_ticks:
-            return arr.reshape(1, n_ticks)
-        if arr.shape[0] == expected_dim:
-            return np.repeat(arr.reshape(expected_dim, 1), n_ticks, axis=1)
-        raise ValueError(f"{label} must have shape {expected_shape}")
-
-    if arr.ndim == 2 and arr.shape == expected_shape:
-        return arr
-
-    raise ValueError(f"{label} must have shape {expected_shape}")
-
-
-def sample_tick_callable(fn, expected_dim, times, *, label):
-    """``fn(t)`` sampled at every tick time, ``(expected_dim, n_ticks)``."""
-    samples = np.zeros((expected_dim, times.size), dtype=float)
-    for i, ti in enumerate(times):
-        value = np.asarray(fn(float(ti)), dtype=float)
-        if expected_dim == 1 and value.ndim == 0:
-            samples[0, i] = float(value)
-            continue
-        if value.reshape(-1).shape[0] != expected_dim:
-            raise ValueError(f"{label} callable returned wrong dimension at t={ti}")
-        samples[:, i] = value.reshape(expected_dim)
-
-    return samples
 
 
 def sample_plant_outputs(plant_eval, x_plant, u_plant, t, p2c):

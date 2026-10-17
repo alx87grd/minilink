@@ -259,10 +259,11 @@ class SquashedGaussianHead:
         log_std = self.log_std(params, z)
 
         # Undo the squash, then the Gaussian's density minus the change of variables
+        # Σᵢ ln(max(1 − aᵢ², 0) + 10⁻⁶), finite for an action outside (−1, 1)
         a_gauss = jnp.arctanh(jnp.clip(a, -1.0 + 1e-6, 1.0 - 1e-6))
         eps = (a_gauss - mu) / jnp.exp(log_std)
         log_gauss = jnp.sum(-0.5 * eps**2 - log_std - 0.5 * math.log(2.0 * math.pi))
-        log_jacobian = jnp.sum(jnp.log(1.0 - a**2 + 1e-6))
+        log_jacobian = jnp.sum(jnp.log(jnp.maximum(1.0 - a**2, 0.0) + 1e-6))
         logp = log_gauss - log_jacobian
 
         return logp

@@ -1,4 +1,4 @@
-"""Forced inputs: a callable, constant or sampled ``u`` as the solver's ``(m, n_pts)`` matrix."""
+"""Simulation inputs: the initial state ``x0``, and a forced ``u`` as the solver's ``(m, n_pts)`` matrix."""
 
 import numpy as np
 
@@ -62,6 +62,21 @@ def validate_forced_u_traj(u_traj, m, n_pts):
     return u
 
 
+def require_x0(x0, n, *, label="x0"):
+    """Refuse an initial state that is not a finite 1-D vector ``(n,)``; return it as floats.
+
+    ``label`` names the state in the refusal (``x0_plant``, ``x0_computer``).
+    """
+    x0_arr = np.asarray(x0, dtype=float)
+    if x0_arr.ndim != 1:
+        raise ValueError(f"{label} must be a 1-D array with shape ({n},)")
+    if x0_arr.shape[0] != n:
+        raise ValueError(f"{label} must have shape ({n},)")
+    if not np.all(np.isfinite(x0_arr)):
+        raise ValueError(f"{label} must contain only finite values")
+    return x0_arr
+
+
 ###############################################################################
 # Internal machinery
 ###############################################################################
@@ -70,7 +85,7 @@ def validate_forced_u_traj(u_traj, m, n_pts):
 def coerce_forced_signal(data, expected_dim, times, label):
     """One signal of ``expected_dim`` rows on ``times``: sampled from a callable or broadcast from an array."""
     if callable(data):
-        signal = sample_forced_callable(data, expected_dim, times)
+        signal = sample_forced_callable(data, expected_dim, times, label)
     else:
         signal = coerce_forced_array(data, expected_dim, len(times), label)
 
@@ -80,8 +95,8 @@ def coerce_forced_signal(data, expected_dim, times, label):
     return signal
 
 
-def sample_forced_callable(fn, expected_dim, times):
-    """``fn(t)`` at every time, one column each."""
+def sample_forced_callable(fn, expected_dim, times, label):
+    """``fn(t)`` at every time, one column each; a value of another size is refused."""
     samples = np.zeros((expected_dim, len(times)), dtype=float)
 
     for i, ti in enumerate(times):
@@ -89,6 +104,8 @@ def sample_forced_callable(fn, expected_dim, times):
         if expected_dim == 1 and value.ndim == 0:
             samples[0, i] = float(value)
             continue
+        if value.reshape(-1).shape[0] != expected_dim:
+            raise ValueError(f"{label} callable returned wrong dimension at t={ti}")
         samples[:, i] = value.reshape(expected_dim)
 
     return samples

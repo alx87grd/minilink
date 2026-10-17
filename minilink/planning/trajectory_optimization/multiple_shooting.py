@@ -5,7 +5,6 @@ import numpy as np
 from minilink.core.backends import (
     BACKEND_JAX,
     BACKEND_NUMPY,
-    ensure_jax_x64,
     normalize_backend,
 )
 from minilink.optimization.mathematical_program import MathematicalProgram
@@ -45,6 +44,9 @@ class MultipleShootingTranscription(DirectCollocationTranscription):
     # The collocation parametric build assumes collocation defects; multiple
     # shooting has no parametric (MPC) form.
     supports_parametric = False
+
+    # The transcription's name in a program's metadata
+    name = "multiple_shooting"
 
     def __init__(self, options: MultipleShootingOptions):
         self.options = options
@@ -103,14 +105,12 @@ class MultipleShootingTranscription(DirectCollocationTranscription):
     # Internal machinery
     ###########################################################################
 
-    def transcribe_jax(
-        self,
-        problem: PlanningProblem,
-        *,
-        compile_backend: str,
-    ) -> MathematicalProgram:
-        """Build a JAX-vectorized multiple-shooting program."""
-        jax = ensure_jax_x64()
+    def jax_objective_and_defects(self, problem: PlanningProblem, jax):
+        """The objective and the RK4 shooting defects as traceable JAX closures.
+
+        Returns ``(unpack_jax, J, dynamics_residual)`` as the collocation's does,
+        the defect of each interval the RK4 step between its knots.
+        """
         jnp = jax.numpy
 
         cost = problem.require_cost()
@@ -153,31 +153,7 @@ class MultipleShootingTranscription(DirectCollocationTranscription):
             defect = x[:, 1:] - x_next
             return defect.reshape(-1)
 
-        equalities: list[ConstraintFunction] = [dynamics_residual]
-        inequalities: list[ConstraintFunction] = []
-
-        # The boundary and path constraints, and the box bounds on the knots
-        self.add_boundary_constraints(
-            problem,
-            equalities=equalities,
-            inequalities=inequalities,
-        )
-        self.add_path_constraints(problem, inequalities=inequalities)
-        lower, upper = self.decision_bounds(problem)
-
-        return MathematicalProgram(
-            n_z=self.decision_dimension(problem),
-            J=J,
-            h=stack_constraints(equalities),
-            g=stack_constraints(inequalities),
-            lower=lower,
-            upper=upper,
-            backend=BACKEND_JAX,
-            metadata={
-                "transcription": "multiple_shooting",
-                "compile_backend": compile_backend,
-            },
-        )
+        return unpack_jax, J, dynamics_residual
 
     def make_step(self, problem: PlanningProblem, compile_backend: str):
         """One RK4 step between knots, ``step(x, u0, u1, t)``, on the grid's ``dt``."""

@@ -300,8 +300,11 @@ class ReinforcementLearningPlanner(Planner):
         """
         The learned law ``u = pi(x)`` for one state or a batch of states (rows).
 
-        Returns ``(u, None)``, the shape of Stable-Baselines3's ``predict``, so
-        a script written for one trains and evaluates with the other.
+        ``deterministic=False`` draws the action from the exploration policy
+        instead, ``a ~ pi_theta(. | x)`` on a fresh split of the planner's key,
+        and maps it onto the input port. Returns ``(u, None)``, the shape of
+        Stable-Baselines3's ``predict``, so a script written for one trains and
+        evaluates with the other.
         """
         jax = require_jax()
         jnp = require_jax_numpy()
@@ -310,10 +313,20 @@ class ReinforcementLearningPlanner(Planner):
         x = jnp.asarray(x, dtype=float)
 
         # u = π(x), row by row for a batch of states
-        if x.ndim == 2:
-            u = jax.vmap(self.action_jit, in_axes=(None, 0))(theta, x)
+        if deterministic:
+            if x.ndim == 2:
+                u = jax.vmap(self.action_jit, in_axes=(None, 0))(theta, x)
+            else:
+                u = self.action_jit(theta, x)
+
+        # a ~ π_θ(· | x), one key per state, then u = u_mid + u_half clip(a, −1, 1)
         else:
-            u = self.action_jit(theta, x)
+            self.key, key = jax.random.split(self.key)
+            if x.ndim == 2:
+                key = jax.random.split(key, x.shape[0])
+            a = self.policy.sample(theta, x, key)
+            u = self.policy.input(a)
+
         u = np.asarray(u)
 
         return u, None

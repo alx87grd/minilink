@@ -275,11 +275,19 @@ def model_params(
 
 
 def y_dependencies_of(source) -> tuple | str:
-    """The direct feedthrough of the source's ``y``: ``"all"``, a tuple of input ids, or ``()`` with no ``y``."""
+    """The direct feedthrough of the wrapper's ``y``, read from the source's.
+
+    The wrapper stacks every source input on its one port ``u``: a source ``y``
+    on ``"all"`` stays ``"all"``, one that reads some inputs reads ``("u",)``,
+    and one that reads none (or no ``y``) reads ``()``.
+    """
     y_deps = ()
     if "y" in source.outputs:
-        y_deps = source.outputs["y"].dependencies
-        y_deps = y_deps if y_deps == "all" else tuple(y_deps)
+        source_deps = source.outputs["y"].dependencies
+        if source_deps == "all":
+            y_deps = "all"
+        elif tuple(source_deps):
+            y_deps = ("u",)
     return y_deps
 
 

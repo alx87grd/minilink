@@ -74,10 +74,9 @@ class HybridDiagram:
     ) -> HybridDiagram:
         """Wrap ``step_diagram`` and ``schedule`` in a :class:`Computer`."""
         # Tools import core (DESIGN §3): the simulation band loads on first use
-        from minilink.simulation.computer import Computer, StepSchedule
+        from minilink.simulation.computer import Computer, as_schedule
 
-        if not isinstance(schedule, StepSchedule):
-            schedule = StepSchedule(dt_base=float(schedule))
+        schedule = as_schedule(schedule)
         computer = Computer(step_diagram, schedule)
 
         return cls(computer=computer, plant=plant, connections=list(connections or []))

@@ -575,7 +575,7 @@ def uniform_step(t):
     if t.size < 2:
         raise ValueError("step_response needs at least two time samples")
     dt = t[1] - t[0]
-    if not np.allclose(np.diff(t), dt):
+    if not np.allclose(np.diff(t), dt, atol=0.0):
         raise ValueError("step_response needs a uniform time grid")
 
     return dt

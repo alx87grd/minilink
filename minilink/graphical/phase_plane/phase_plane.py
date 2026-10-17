@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import operator
 from dataclasses import dataclass
 
 import numpy as np
@@ -39,8 +40,9 @@ def plot_phase_plane(
         Continuous-time model whose ``f`` defines the vector field (leaf
         subclass or wired diagram with stacked ``f``).
     """
-    backend_key = normalize_plot_backend(backend)
+    backend_key = plot_backend_of(backend)
     require_plot_backend(backend_key, backend)
+    require_renderer_keywords(backend_key, kwargs)
 
     # The field on its grid, then the figure on the chosen backend
     spec = build_phase_plane_spec(
@@ -89,19 +91,19 @@ def build_phase_plane_spec(
     require_state(n)
 
     # The two plotted coordinates, and the grid's size
-    x_axis = normalize_axis(x_axis, n, "x_axis")
+    x_axis = require_axis(x_axis, n, "x_axis")
     y_axis = default_y_axis(n) if y_axis is None else y_axis
-    y_axis = normalize_axis(y_axis, n, "y_axis")
-    n_x, n_y = normalize_grid_shape(grid_shape)
+    y_axis = require_axis(y_axis, n, "y_axis")
+    n_x, n_y = require_grid_shape(grid_shape)
 
     # The slice: the other states held at x_ref, the input at u, the time at t
-    x_ref_arr = default_x_ref(sys, x_ref)
-    u_arr = default_u(sys, u)
+    x_ref_arr = x_ref_of(sys, x_ref)
+    u_arr = u_of(sys, u)
     t_float = float(t)
 
     # The trajectory on the two coordinates, and the plotted window
     overlay = trajectory_overlay(traj, x_axis, y_axis) if traj is not None else None
-    x_bounds, y_bounds = resolve_phase_bounds(
+    x_bounds, y_bounds = phase_bounds_of(
         sys,
         x_axis=x_axis,
         y_axis=y_axis,
@@ -407,7 +409,7 @@ def render_phase_plane_plotly(
 ###############################################################################
 
 
-def normalize_plot_backend(backend: str) -> str:
+def plot_backend_of(backend: str) -> str:
     """The backend's key, lowercase; ``"mpl"`` is matplotlib."""
     key = str(backend).lower()
     if key in {"matplotlib", "mpl"}:
@@ -423,17 +425,30 @@ def require_plot_backend(key, backend):
         )
 
 
+def require_renderer_keywords(key, kwargs):
+    """Refuse keywords the plotly renderer does not take (matplotlib's renderer checks its own)."""
+    if key == "plotly" and kwargs:
+        names = ", ".join(sorted(kwargs))
+        raise TypeError(
+            f"plot_phase_plane(backend='plotly') got keyword arguments the plotly "
+            f"renderer does not take: {names}"
+        )
+
+
 def require_state(n):
     """Refuse a system without a state to plot."""
     if n < 1:
         raise ValueError("Phase-plane plots require a system with at least one state")
 
 
-def normalize_axis(axis, n: int, name: str) -> int:
-    """The state index ``axis`` as an int in ``[0, n - 1]``; a bool is refused."""
-    if isinstance(axis, bool):
+def require_axis(axis, n: int, name: str) -> int:
+    """Refuse a state index that is not an integer in ``[0, n - 1]``; return it as an int."""
+    if isinstance(axis, (bool, np.bool_)):
         raise ValueError(f"{name} must be an integer state index")
-    axis_int = int(axis)
+    try:
+        axis_int = operator.index(axis)
+    except TypeError as exc:
+        raise ValueError(f"{name} must be an integer state index") from exc
     if axis_int < 0 or axis_int >= n:
         raise ValueError(f"{name} must be in [0, {n - 1}], got {axis_int}")
     return axis_int
@@ -444,22 +459,25 @@ def default_y_axis(n: int) -> int:
     return 1 if n > 1 else 0
 
 
-def normalize_grid_shape(grid_shape) -> tuple[int, int]:
-    """The grid's ``(n_x, n_y)`` as two ints, each at least 2."""
+def require_grid_shape(grid_shape) -> tuple[int, int]:
+    """Refuse a grid that is not two integers of at least 2; return ``(n_x, n_y)``."""
     try:
         n_x, n_y = tuple(grid_shape)
     except TypeError as exc:
         raise ValueError("grid_shape must be a two-element tuple") from exc
-    if isinstance(n_x, bool) or isinstance(n_y, bool):
+    if isinstance(n_x, (bool, np.bool_)) or isinstance(n_y, (bool, np.bool_)):
         raise ValueError("grid_shape entries must be integers")
-    n_x = int(n_x)
-    n_y = int(n_y)
+    try:
+        n_x = operator.index(n_x)
+        n_y = operator.index(n_y)
+    except TypeError as exc:
+        raise ValueError("grid_shape entries must be integers") from exc
     if n_x < 2 or n_y < 2:
         raise ValueError("grid_shape entries must be at least 2")
     return n_x, n_y
 
 
-def default_x_ref(sys, x_ref) -> np.ndarray:
+def x_ref_of(sys, x_ref) -> np.ndarray:
     """The held state: ``x_ref``, else the state's nominal value, else zero."""
     if x_ref is None:
         value = getattr(getattr(sys, "state", None), "nominal_value", None)
@@ -473,7 +491,7 @@ def default_x_ref(sys, x_ref) -> np.ndarray:
     return arr.copy()
 
 
-def default_u(sys, u) -> np.ndarray:
+def u_of(sys, u) -> np.ndarray:
     """The held input: ``u``, else the input ports' values."""
     if u is None:
         value = sys.get_u_from_input_ports()
@@ -503,7 +521,7 @@ def trajectory_overlay(traj, x_axis: int, y_axis: int) -> PhasePlaneTrajectoryOv
     )
 
 
-def resolve_phase_bounds(
+def phase_bounds_of(
     sys,
     *,
     x_axis: int,

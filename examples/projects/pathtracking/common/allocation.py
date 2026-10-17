@@ -2,6 +2,7 @@
 
 import numpy as np
 
+from minilink.core.backends import array_module
 from minilink.core.system import System
 
 ###############################################################################
@@ -56,31 +57,33 @@ class Allocation(System):
         )
 
     def h_throttle(self, x, u, t=0.0, params=None):
+        xp = array_module(u)
+
         r_r = self.r_r
         engine_power_peak = self.engine_power_peak
         transmission_ratio = self.transmission_ratio
 
-        F_rear = float(u[0])
-        w_rear = float(u[8])  # The plant's y[6]: u stacks F_rear, delta, then y
+        F_rear = u[0:1]
+        w_rear = u[8:9]  # The plant's y[6]: u stacks F_rear, delta, then y
 
         # τ_required = F_rear r_r, the rear torque the force asks for
         tau_rear_required = F_rear * r_r
 
         # τ_max = P_peak / ω_engine, the power-limited torque, ω_engine = max(N ω_r, 1)
-        w_engine = max(w_rear * transmission_ratio, 1.0)
+        w_engine = xp.maximum(w_rear * transmission_ratio, 1.0)
         tau_max = engine_power_peak / w_engine
 
         # throttle = clip(τ_required / τ_max, 0, 1)
-        throttle = float(np.clip(tau_rear_required / tau_max, 0.0, 1.0))
-
-        throttle_out = np.array([throttle], dtype=float)
+        throttle_out = xp.clip(tau_rear_required / tau_max, 0.0, 1.0)
 
         return throttle_out
 
     def h_delta(self, x, u, t=0.0, params=None):
-        delta = float(u[1])
+        xp = array_module(u)
+
+        delta = u[1:2]
 
         # The steer passes through: δ_out = δ
-        delta_out = np.array([delta], dtype=float)
+        delta_out = xp.array(delta)
 
         return delta_out

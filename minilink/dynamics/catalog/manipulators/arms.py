@@ -99,9 +99,10 @@ class OneLinkManipulator(Manipulator):
         return tau_d
 
     def forward_kinematics(self, q, params=None):
+        params = self.params if params is None else params
         xp = array_module(q)
 
-        l1 = self.params["l1"]
+        l1 = params["l1"]
 
         theta = q[0]
 
@@ -111,9 +112,10 @@ class OneLinkManipulator(Manipulator):
         return p
 
     def J(self, q, params=None):
+        params = self.params if params is None else params
         xp = array_module(q)
 
-        l1 = self.params["l1"]
+        l1 = params["l1"]
 
         theta = q[0]
 
@@ -135,16 +137,22 @@ class OneLinkManipulator(Manipulator):
         return planar_kinematic_geometry(lengths)
 
     def tf(self, x, u, t=0, params=None):
-        lengths = np.array([self.params["l1"]])
+        params = self.params if params is None else params
+        xp = array_module(x)
+
+        l1 = params["l1"]
 
         q, _ = self.x2q(x)
+        lengths = xp.array([l1])
 
         points, angles = planar_joint_positions(q, lengths)
 
         return planar_frames(points, angles)
 
     def get_dynamic_geometry(self, x, u, t=0, params=None):
-        lengths = np.array([self.params["l1"]])
+        params = self.params if params is None else params
+
+        lengths = np.array([params["l1"]])
         upper_bound = self.inputs["u"].upper_bound
 
         return planar_torque_geometry(lengths, u, upper_bound)
@@ -284,10 +292,11 @@ class TwoLinkManipulator(Manipulator):
         return tau_d
 
     def forward_kinematics(self, q, params=None):
+        params = self.params if params is None else params
         xp = array_module(q)
 
-        l1 = self.params["l1"]
-        l2 = self.params["l2"]
+        l1 = params["l1"]
+        l2 = params["l2"]
 
         c1, s1, _, _, c12, s12 = self.trig(q)
 
@@ -297,10 +306,11 @@ class TwoLinkManipulator(Manipulator):
         return p
 
     def J(self, q, params=None):
+        params = self.params if params is None else params
         xp = array_module(q)
 
-        l1 = self.params["l1"]
-        l2 = self.params["l2"]
+        l1 = params["l1"]
+        l2 = params["l2"]
 
         c1, s1, _, _, c12, s12 = self.trig(q)
 
@@ -318,9 +328,11 @@ class TwoLinkManipulator(Manipulator):
 
         return J
 
-    def lengths(self):
+    def lengths(self, params=None):
         """The link lengths ``[l1, l2]``."""
-        lengths = np.array([self.params["l1"], self.params["l2"]])
+        params = self.params if params is None else params
+
+        lengths = np.array([params["l1"], params["l2"]])
 
         return lengths
 
@@ -330,7 +342,9 @@ class TwoLinkManipulator(Manipulator):
         return planar_kinematic_geometry(lengths)
 
     def tf(self, x, u, t=0, params=None):
-        lengths = self.lengths()
+        params = self.params if params is None else params
+
+        lengths = self.lengths(params)
 
         q, _ = self.x2q(x)
 
@@ -339,7 +353,9 @@ class TwoLinkManipulator(Manipulator):
         return planar_frames(points, angles)
 
     def get_dynamic_geometry(self, x, u, t=0, params=None):
-        lengths = self.lengths()
+        params = self.params if params is None else params
+
+        lengths = self.lengths(params)
         upper_bound = self.inputs["u"].upper_bound
 
         return planar_torque_geometry(lengths, u, upper_bound)
@@ -539,11 +555,12 @@ class ThreeLinkManipulator3D(Manipulator):
         return tau_d
 
     def forward_kinematics(self, q, params=None):
+        params = self.params if params is None else params
         xp = array_module(q)
 
-        l1 = self.params["l1"]
-        l2 = self.params["l2"]
-        l3 = self.params["l3"]
+        l1 = params["l1"]
+        l2 = params["l2"]
+        l3 = params["l3"]
 
         c1, s1, c2, s2, _, _, c23, s23 = self.trig(q)
         radius = l2 * c2 + l3 * c23
@@ -554,10 +571,11 @@ class ThreeLinkManipulator3D(Manipulator):
         return p
 
     def J(self, q, params=None):
+        params = self.params if params is None else params
         xp = array_module(q)
 
-        l2 = self.params["l2"]
-        l3 = self.params["l3"]
+        l2 = params["l2"]
+        l3 = params["l3"]
 
         c1, s1, c2, s2, _, _, c23, s23 = self.trig(q)
         radius = l2 * c2 + l3 * c23
@@ -601,18 +619,21 @@ class ThreeLinkManipulator3D(Manipulator):
         }
 
     def tf(self, x, u, t=0, params=None):
-        l1 = self.params["l1"]
-        l2 = self.params["l2"]
-        l3 = self.params["l3"]
+        params = self.params if params is None else params
+        xp = array_module(x)
+
+        l1 = params["l1"]
+        l2 = params["l2"]
+        l3 = params["l3"]
 
         q, _ = self.x2q(x)
         c1, s1, c2, s2, _, _, c23, s23 = self.trig(q)
 
         # The base, shoulder, elbow and effector points along the chain
-        p0 = np.array([0.0, 0.0, 0.0])
-        p1 = np.array([0.0, 0.0, l1])
-        p2 = np.array([l2 * c2 * c1, l2 * c2 * s1, l1 - l2 * s2])
-        p3 = np.array(
+        p0 = xp.array([0.0, 0.0, 0.0])
+        p1 = xp.array([0.0, 0.0, l1])
+        p2 = xp.array([l2 * c2 * c1, l2 * c2 * s1, l1 - l2 * s2])
+        p3 = xp.array(
             [
                 (l2 * c2 + l3 * c23) * c1,
                 (l2 * c2 + l3 * c23) * s1,
@@ -681,9 +702,10 @@ class FiveLinkPlanarManipulator(Manipulator):
         return cos_abs, sin_abs
 
     def forward_kinematics(self, q, params=None):
+        params = self.params if params is None else params
         xp = array_module(q)
 
-        l = self.params["l"]
+        l = params["l"]
 
         cos_abs, sin_abs = self.absolute_trig(q)
 
@@ -693,9 +715,10 @@ class FiveLinkPlanarManipulator(Manipulator):
         return p
 
     def J(self, q, params=None):
+        params = self.params if params is None else params
         xp = array_module(q)
 
-        l = self.params["l"]
+        l = params["l"]
         dof = self.dof
 
         cos_abs, sin_abs = self.absolute_trig(q)
@@ -716,7 +739,9 @@ class FiveLinkPlanarManipulator(Manipulator):
         return planar_kinematic_geometry(lengths)
 
     def tf(self, x, u, t=0, params=None):
-        lengths = self.params["l"]
+        params = self.params if params is None else params
+
+        lengths = params["l"]
 
         q, _ = self.x2q(x)
 
@@ -725,7 +750,9 @@ class FiveLinkPlanarManipulator(Manipulator):
         return planar_frames(points, angles)
 
     def get_dynamic_geometry(self, x, u, t=0, params=None):
-        lengths = self.params["l"]
+        params = self.params if params is None else params
+
+        lengths = params["l"]
         upper_bound = self.inputs["u"].upper_bound
 
         return planar_torque_geometry(lengths, u, upper_bound)
@@ -840,13 +867,15 @@ class SpeedControlledManipulator(DynamicSystem):
 
         return pdot
 
-    def link_lengths(self):
+    def link_lengths(self, params=None):
+        """The drawn link lengths: the arm's, read from ``params`` when they are given."""
         if self._kin_arm is not None:
             arm = self._kin_arm
+            arm_params = arm.params if params is None else params
             if hasattr(arm, "lengths"):
-                return arm.lengths()
-            if hasattr(arm, "params") and "l" in arm.params:
-                return np.asarray(arm.params["l"], dtype=float)
+                return arm.lengths(arm_params)
+            if "l" in arm_params:
+                return np.asarray(arm_params["l"], dtype=float)
         if hasattr(self, "l"):
             return np.asarray(self.l, dtype=float)
         return np.ones(self.dof)
@@ -857,16 +886,16 @@ class SpeedControlledManipulator(DynamicSystem):
         return planar_kinematic_geometry(lengths)
 
     def tf(self, x, u, t=0, params=None):
-        lengths = self.link_lengths()
+        lengths = self.link_lengths(params)
 
         # The joints along the chain, and the effector's frame at its tip
         points, angles = planar_joint_positions(x, lengths)
-        effector = self.forward_kinematics(x)
+        effector = self.forward_kinematics(x, params)
 
         return planar_frames(points, angles, effector)
 
     def get_dynamic_geometry(self, x, u, t=0, params=None):
-        J = self.J(x)
+        J = self.J(x, params)
 
         # ṗ = J(q) u, drawn at the effector
         velocity = J @ u
@@ -913,17 +942,16 @@ def planar_kinematic_geometry(lengths):
 
 def planar_joint_positions(q, lengths):
     """Joint points of a planar chain from its base, and each link's absolute angle."""
-    q = np.asarray(q, dtype=float)
-    lengths = np.asarray(lengths, dtype=float)
+    xp = array_module(q)
 
     # Each link steps from the last joint along its absolute angle, q = 0 up the y axis
-    angles = np.cumsum(q)
-    points = [np.array([0.0, 0.0])]
+    angles = xp.cumsum(q)
+    points = [xp.array([0.0, 0.0])]
     for length, angle in zip(lengths, angles):
-        step = length * np.array([np.sin(angle), np.cos(angle)])
+        step = length * xp.array([xp.sin(angle), xp.cos(angle)])
         points.append(points[-1] + step)
 
-    return np.asarray(points), angles
+    return xp.asarray(points), angles
 
 
 def planar_frames(points, angles, effector=None):

@@ -204,16 +204,14 @@ class Optimizer:
             return ScipyMinimizeOptimizer(**kwargs)
 
         if backend_key == "ipopt":
-            # Ipopt is an optional dependency: refuse early when cyipopt is missing
-            try:
-                import cyipopt  # noqa: F401
-            except ImportError:
-                raise ImportError(
-                    "IpoptOptimizer requires the optional 'cyipopt' package."
-                )
-
             # Lazy import: the Ipopt adapter loads on first use, not with the optimizer
-            from minilink.optimization.optimizers.ipopt import IpoptOptimizer
+            from minilink.optimization.optimizers.ipopt import (
+                IpoptOptimizer,
+                require_cyipopt,
+            )
+
+            # Ipopt is an optional dependency: refuse early when cyipopt is missing
+            require_cyipopt()
 
             return IpoptOptimizer(**kwargs)
 

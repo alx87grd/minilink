@@ -175,24 +175,3 @@ class JaxMathematicalProgramEvaluator(MathematicalProgramEvaluator):
                 f"MathematicalProgram function {label!r} is not JAX-traceable. "
                 "Use backend='numpy' or rewrite the callable with jax.numpy."
             ) from exc
-
-    def check_derivative_shapes(self, z_sample) -> None:
-        """Evaluate every available quantity once at ``z_sample``: compiles each and checks its shape."""
-        self.objective(z_sample)
-        self.equality_residual(z_sample)
-        self.inequality_margin(z_sample)
-        if self.has_gradient:
-            self.gradient(z_sample)
-        if self.has_hessian:
-            self.hessian(z_sample)
-        if self.has_jacobian_h:
-            self.jacobian_h(z_sample)
-        if self.has_jacobian_g:
-            self.jacobian_g(z_sample)
-
-    def jax_decision_vector(self, z):
-        """``z`` as a flat JAX array of shape ``(n_z,)``."""
-        arr = self.jnp.asarray(z).reshape(-1)
-        if arr.shape != (self.n_z,):
-            raise ValueError(f"decision vector must have shape ({self.n_z},)")
-        return arr

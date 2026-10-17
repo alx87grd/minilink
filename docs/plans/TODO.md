@@ -119,7 +119,8 @@ byte-identical after; ruff and the module's tests). The findings, file by file, 
 [docs/reviews/2026-09-22-consolidation-review.md](../reviews/2026-09-22-consolidation-review.md);
 `planning/policy_synthesis/dp.py` is the reference.
 **Status (2026-10-16):** the textbook layout of TB-b and T1–T7 landed in the second-run pass
-(PR #125, [record](../reviews/2026-10-16-textbook-pass.md)). The MPC mixin's documented
+(PR #125, [record](../reviews/2026-10-16-textbook-pass.md)); its style sheet now lives in
+RULES §5 (5.3's six blocks, 5.8, 5.10, 5.22, 5.25–5.27) and §7.8. The MPC mixin's documented
 extension hooks keep their underscore names until the maintainer rules on that contract. The
 pass changed no behaviour and no backend. What remains in the rows below are their behaviour, backend and API items, each
 recorded in the PR with its question or bug.
@@ -147,7 +148,7 @@ recorded in the PR with its question or bug.
   `RotatingCartPole.tf` on `xp`), `mass_spring_damper/linear.py` (`A` / `B` / `C` / `D` on
   `xp` — a JAX-safety fix; extend the both-backends test), `vehicles/dynamic_bicycle.py`
   (`_u_in` / `_contact_fields` renames ripple to `racecar.py`, two project files and
-  `graphical/catalog/skins.py`; dead `_wheel_rectangle_pts`), `manipulators/ur5.py` (helpers
+  `graphical/catalog/skins.py`), `manipulators/ur5.py` (helpers
   and the two algorithms below the public API), `aerial/plane.py` (`tf` on `xp` reading
   `params`; the 55-line pygame `__main__`), `abstraction/state_space.py` (helpers below), the
   37 inline `array_module(q).array(...)` calls.
@@ -158,10 +159,7 @@ recorded in the PR with its question or bug.
   `require_jax`, `sample_in_ellipsoid` named), `simulation/simulator.py` (solver table and
   helper below the class, `solve` before its helpers, the detached comments, a constructor of
   named steps), `simulation/computer.py` (`as_computer` below the classes, its coercion in a
-  helper), the solver backends' comments and `_finalize_solution`, the duplicated
-  `DISCONTINUOUS_AUTO_DT_SCALE`.
-  Also: one uniform-grid check shared by the fixed-step backends and the simulator (scan:
-  compile-sim#14).
+  helper), the solver backends' comments and `_finalize_solution`.
 - [ ] **T5 planning**: `trajectory_optimization/planner.py` (primary class first, eleven `_`
   methods — `_make_callback` in three test lines —, the `getattr` probes
   `Transcription.supports_parametric` makes redundant, the duplicated optimizer-method
@@ -340,9 +338,33 @@ pick):
 
 ## 4. v0.3 — GMC714, catalog, parity
 
-**Order:** A1–A3 (the textbook objects) before wave C; G1 first in wave C; RN-4 and RN-5
+**Order:** K1–K4 first (November); A1–A3 (the textbook objects) before wave C; G1 first in wave C; RN-4 and RN-5
 together with P10's AC-7, between cohorts; S72 after them; V1 after A2, its Monte Carlo part
 after RN-5.
+
+**K — consolidation first** (November 2026, after the v0.2 tag, before A1–A3). The goal: a
+smaller library that is easier to read and keep — fewer names, fewer demos, prototypes
+labelled as such. It extends D2 (whose open picks join K1's table) and runs before D1.3, so
+the demo sweep touches fewer files. Nothing leaves without the maintainer's ruling (RULES 7.1).
+
+- [ ] **K1 The inventory** (agent). One table in a dated `docs/reviews/` record: every
+  public name of `minilink/` with its callers (library, tests, examples, notebooks,
+  benchmarks, docs), its maturity (final; prototype: no test of its contract, no course or
+  DESIGN use, or a `TODO: User Architectural Review`; dead: no caller), and a proposal (keep,
+  remove, to `experimental/`); every demo in `examples/demos/` and `examples/experimental/`
+  with the feature it shows and its twins. Done when the maintainer can rule on the table in
+  one pass, row by row.
+- [ ] **K2 Remove the unused features** **[ask — removals]**, from K1's ruling: one commit
+  per feature, callers, tests and docs in the same commit, no alias. Done when every
+  "remove" row is gone and `pytest` and the demo checks pass.
+- [ ] **K3 Prototypes to `experimental/`** **[ask — public names]**, from the same ruling:
+  moved under `minilink/experimental/` (repo-only, not on the docs site, not in the wheel's
+  public surface), imports updated, DESIGN §3 and the README say which features are
+  experimental. Done when the teaching surface lists only final features.
+- [ ] **K4 One demo per feature** **[ask per group]**: twins merged or removed, each kept
+  demo the shortest one that shows its feature, `examples/README.md`'s map and the demo
+  checks updated. Done when no two demos show the same feature on the same plant, and the D1.2
+  allowlist shrinks with it.
 
 **The textbook objects.** Design: [fields.md](fields.md), [cost-params.md](cost-params.md),
 [geometry-module.md](geometry-module.md). Baselines first, as each plan states.
@@ -364,7 +386,7 @@ after RN-5.
   `problem.params.cost` through. Done when every planner baseline `cmp`s and `jax.grad` of a
   trajopt objective with respect to `Q` runs.
   Also (scan: core#3, core#4): `discount_rate` a constructor field (or a `params` entry)
-  that `ScaledCost` forwards and `SumCost` reconciles; `validate_diagram_params` checks each
+  that `ScaledCost` forwards and `SumCost` reconciles; `check_diagram_params` checks each
   per-block dict against the block's keys, so a partial dict fails at the setter instead of
   inside `f`. The Monte Carlo evaluator and the gym reward never apply `problem.params.cost`
   while the DP table does, so the two disagree on a parametric cost.
@@ -483,6 +505,14 @@ in December 2026 after the v0.3 tag; the v1.0 rows after two cohorts.
 
 ### v0.9 — what could still break a name
 
+- [ ] **K5 Where the course material and the projects live** **[ask — student-facing]**
+  (ROADMAP §6): `examples/teaching/` and/or `examples/projects/` in their own repositories, or
+  here. Decided between terms (after GMC714). Done when the ruling is recorded.
+- [ ] **K6 The move**, if K5 says so **[ask — student-facing]**: the history kept
+  (`git filter-repo` per folder), every citing document updated (the GRO860 notes and webpage
+  links, GRO501's `\colab{}`), the new repositories' CI pinned on a minilink release, the
+  notebook smoke check moved with them, this repo's README and `examples/README.md` pointing
+  there. Done when every course link resolves and both CIs pass.
 - [ ] **S31** `HybridDiagram` → a `System` (state `[plant; computer]`, periodic discrete
   update) or an honest `HybridLoop` rename; `%` stays the one hybrid operator either way; the
   hand-copied facades go with it; P10's AC-8b lands with it.

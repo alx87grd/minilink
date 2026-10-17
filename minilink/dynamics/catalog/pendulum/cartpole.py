@@ -245,7 +245,7 @@ class CartPoleWithNoisePort(CartPole):
 
     def __init__(self):
         super().__init__()
-        self.name = "Cart Pole"
+        self.name = "Cart Pole with noise ports"
 
         # Ports: the disturbance force d and the measurement noise n
         self.add_input_port("d", dim=1, nominal_value=np.array([0.0]))
@@ -424,22 +424,25 @@ class RotatingCartPole(MechanicalSystem):
         }
 
     def tf(self, x, u, t=0, params=None):
-        l1 = self.params["l1"]
-        l2 = self.params["l2"]
+        params = self.params if params is None else params
+        xp = array_module(x)
+
+        l1 = params["l1"]
+        l2 = params["l2"]
 
         theta1 = x[0]
         theta2 = x[1]
-        c1 = np.cos(theta1)
-        s1 = np.sin(theta1)
-        c2 = np.cos(theta2)
-        s2 = np.sin(theta2)
+        c1 = xp.cos(theta1)
+        s1 = xp.sin(theta1)
+        c2 = xp.cos(theta2)
+        s2 = xp.sin(theta2)
 
         # The arm sweeps the horizontal plane about the support post; the pole tilts
         # by θ₂ from the vertical, across the arm
-        p_support = np.array([0.0, 0.0, -l1])
-        p_pivot = np.array([0.0, 0.0, 0.0])
-        p_arm = np.array([l1 * s1, -l1 * c1, 0.0])
-        p_tip = p_arm + l2 * np.array([s2 * c1, s2 * s1, c2])
+        p_support = xp.array([0.0, 0.0, -l1])
+        p_pivot = xp.array([0.0, 0.0, 0.0])
+        p_arm = xp.array([l1 * s1, -l1 * c1, 0.0])
+        p_tip = p_arm + l2 * xp.array([s2 * c1, s2 * s1, c2])
 
         return {
             "support": link_pose_3d(p_support, p_pivot),

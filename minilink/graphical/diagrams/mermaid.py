@@ -17,8 +17,8 @@ class MermaidTopologyExporter(TopologyExporter):
 
     name = "mermaid"
 
-    def export(self, topology, **kwargs) -> str:
-        """Return the Mermaid flowchart source of one topology snapshot."""
+    def export(self, topology) -> str:
+        """Return the Mermaid flowchart source of one topology snapshot (no options)."""
         lines = ["flowchart LR"]
         nodes = {node.id: node for node in topology.nodes}
         boxed = clustered_node_ids(topology.clusters)

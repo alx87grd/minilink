@@ -9,6 +9,7 @@ from minilink.optimization.mathematical_program import OptimizationResult
 from minilink.optimization.optimizers.optimizer_backend import (
     BackendIterateCallback,
     OptimizerBackend,
+    scipy_constraints_of,
 )
 
 ###############################################################################
@@ -43,19 +44,7 @@ class IpoptOptimizer(OptimizerBackend):
 
         # Equalities h(z) = 0 and inequalities g(z) ≥ 0, each with its Jacobian when
         # the evaluator has one
-        constraints = []
-
-        if program_evaluator.n_h > 0:
-            entry = {"type": "eq", "fun": program_evaluator.equality_residual}
-            if program_evaluator.has_jacobian_h:
-                entry["jac"] = program_evaluator.jacobian_h
-            constraints.append(entry)
-
-        if program_evaluator.n_g > 0:
-            entry = {"type": "ineq", "fun": program_evaluator.inequality_margin}
-            if program_evaluator.has_jacobian_g:
-                entry["jac"] = program_evaluator.jacobian_g
-            constraints.append(entry)
+        constraints = scipy_constraints_of(program_evaluator)
 
         # The interior-point solve from z0, inside the box bounds
         raw_result = minimize_ipopt(
@@ -110,8 +99,9 @@ def require_cyipopt():
         from cyipopt import minimize_ipopt
     except ImportError as exc:  # pragma: no cover - optional dep
         raise ImportError(
-            "IpoptOptimizer requires the optional 'cyipopt' package; "
-            "install with `pip install cyipopt`."
+            "IpoptOptimizer requires the optional 'cyipopt' package; install it "
+            'with `pip install "minilink[ipopt]"` after a system Ipopt, or '
+            "`conda install -c conda-forge ipopt cyipopt`."
         ) from exc
 
     return minimize_ipopt

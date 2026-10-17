@@ -2,6 +2,8 @@
 
 import numpy as np
 
+from minilink.planning.plotting import maybe_show
+
 # Matplotlib is imported inside each view, so the planners stay usable without a
 # display backend until a plot is requested.
 
@@ -85,7 +87,7 @@ def plot_tree(
         ax.set_title(f"RRT tree ({len(tree.nodes)} nodes)")
     ax.legend(loc="best")
 
-    maybe_show(plt, show)
+    maybe_show(plt, show, block_when_needed=True)
 
     return fig, ax
 
@@ -158,7 +160,7 @@ def animate_search(
     if save is not None:
         anim.save(save)
 
-    maybe_show(plt, show)
+    maybe_show(plt, show, block_when_needed=True)
 
     return anim
 
@@ -258,7 +260,7 @@ def animate_convergence(
     if save is not None:
         anim.save(save)
 
-    maybe_show(plt, show)
+    maybe_show(plt, show, block_when_needed=True)
 
     return anim
 
@@ -399,15 +401,6 @@ def label_axes(ax, sys, x_axis, y_axis):
 
     ax.set_xlabel(axis_label(x_axis))
     ax.set_ylabel(axis_label(y_axis))
-
-
-def maybe_show(plt, show):
-    """Show the figure when asked and the backend can (never under Agg)."""
-    if show and plt.get_backend().lower() != "agg":
-        # Lazy import: the graphics load on first use, not with the core
-        from minilink.graphical.common.environment import is_blocking_needed
-
-        plt.show(block=is_blocking_needed())
 
 
 def set_limits(ax, planner, x_axis, y_axis):

@@ -154,6 +154,26 @@ class TestDiagrams(unittest.TestCase):
         self.assertIsNotNone(graph)
         self.assertIn("Integrator", graph.source)
 
+    def test_a_hidden_graph_is_written_only_to_a_requested_file(self):
+        from minilink.graphical.diagrams.dot import render_diagram_graph
+
+        class RecordedGraph:
+            name = "recorded"
+
+            def __init__(self):
+                self.renders = []
+
+            def render(self, filename=None, view=False):
+                self.renders.append((filename, view))
+
+        graph = RecordedGraph()
+        render_diagram_graph(graph, show=False, show_inline=False, show_pdf=True)
+        self.assertEqual(graph.renders, [])
+        render_diagram_graph(
+            graph, show=False, show_inline=False, show_pdf=True, filename="out.gv"
+        )
+        self.assertEqual(graph.renders, [("out.gv", False)])
+
     def test_plot_diagram_without_graphviz_warns_once_and_skips(self):
         import sys
         from unittest import mock
@@ -204,6 +224,33 @@ class TestDiagrams(unittest.TestCase):
         self.assertIn('controller["P::controller"]', source)
         self.assertIn('input -- "r -> r" --> controller', source)
         self.assertIn('plant -- "y -> y_meas" --> output', source)
+
+    def test_exporters_refuse_keywords_they_do_not_take(self):
+        diagram = self._make_diagram()
+        with self.assertRaisesRegex(TypeError, "direction"):
+            export_diagram_topology(diagram, backend="mermaid", direction="TB")
+        pytest.importorskip("graphviz")
+        with self.assertRaisesRegex(TypeError, "rank_dir"):
+            export_diagram_topology(diagram, backend="graphviz", rank_dir="TB")
+        graph = export_diagram_topology(
+            diagram, backend="graphviz", rankdir="TB", engine="neato"
+        )
+        self.assertEqual(graph.engine, "neato")
+        self.assertIn("rankdir=TB", graph.source)
+
+    def test_a_backend_is_a_name_or_an_object_with_an_export_method(self):
+        diagram = self._make_diagram()
+        for backend in (3, object()):
+            with self.subTest(backend=backend):
+                with self.assertRaisesRegex(TypeError, "'graphviz', 'mermaid'"):
+                    export_diagram_topology(diagram, backend=backend)
+
+        class NodeLister:
+            def export(self, topology):
+                return [node.id for node in topology.nodes]
+
+        nodes = export_diagram_topology(diagram, backend=NodeLister())
+        self.assertEqual(nodes, ["input", "controller", "plant", "output"])
 
     def test_print_system_is_a_short_summary(self):
         from minilink.dynamics.catalog.pendulum.pendulum import Pendulum
@@ -460,9 +507,13 @@ class TestNestedDiagramPlot(unittest.TestCase):
 
 
 import numpy as np
-from minilink.core.compile.compiler import check_algebraic_loops
 from minilink.core.system import System
-from minilink.core.wiring import WiredDiagramMixin, validate_diagram_params
+from minilink.core.wiring import (
+    WiredDiagramMixin,
+    check_algebraic_loops,
+    check_diagram_params,
+    evaluation_order_of,
+)
 from minilink.graphical.diagrams import build_diagram_topology
 
 
@@ -578,17 +629,22 @@ class TestWiringMixin(unittest.TestCase):
         local_u = diagram.get_local_input(x, u, t, "controller")
         self.assertEqual(local_u.shape, (2,))
 
-    def test_check_algebraic_loops_valid_order(self):
+    def test_loop_free_diagram_passes_the_check_and_has_an_order(self):
         diagram = _build_closed_loop()
-        order = diagram.check_algebraic_loops()
-        self.assertEqual(order, check_algebraic_loops(diagram))
+        self.assertIsNone(diagram.check_algebraic_loops())
+        self.assertIsNone(check_algebraic_loops(diagram))
+        order = evaluation_order_of(diagram)
         self.assertGreaterEqual(len(order), 1)
 
     def test_check_algebraic_loops_detects_cycle(self):
         diagram = _build_feedthrough_loop()
-        with self.assertRaises(RuntimeError) as ctx:
-            diagram.check_algebraic_loops()
-        self.assertIn("Algebraic loop detected", str(ctx.exception))
+        for call in (
+            diagram.check_algebraic_loops,
+            lambda: evaluation_order_of(diagram),
+        ):
+            with self.assertRaises(RuntimeError) as ctx:
+                call()
+            self.assertIn("Algebraic loop detected", str(ctx.exception))
 
     def test_state_index_after_multi_subsystem_add(self):
         diagram = _build_closed_loop()
@@ -596,16 +652,51 @@ class TestWiringMixin(unittest.TestCase):
         self.assertEqual(diagram.state_index["controller"], (0, 0))
         self.assertEqual(diagram.state_index["plant"], (0, 1))
 
-    def test_validate_diagram_params_unknown_sys_id(self):
+    def test_check_diagram_params_unknown_sys_id(self):
         diagram = _build_closed_loop()
         with self.assertRaises(ValueError) as ctx:
-            validate_diagram_params({"unknown": {"Kp": 1.0}}, diagram.subsystems)
+            check_diagram_params({"unknown": {"Kp": 1.0}}, diagram.subsystems)
         self.assertIn("Unknown subsystem ids", str(ctx.exception))
 
     def test_params_setter_unknown_sys_id(self):
         diagram = _build_closed_loop()
         with self.assertRaises(ValueError):
             diagram.params = {"typo": {"Kp": 1.0}}
+
+    def test_tf_and_geometry_route_params_to_each_block(self):
+        """A diagram's frames and geometry read each block's params, as its f does."""
+
+        class Arm(DynamicSystem):
+            def __init__(self):
+                super().__init__(1)
+                self.params = {"l": 1.0}
+
+            def f(self, x, u, t=0, params=None):
+                return u
+
+            def tf(self, x, u, t=0, params=None):
+                params = self.params if params is None else params
+                return {"tip": np.array([params["l"] * x[0]])}
+
+            def get_dynamic_geometry(self, x, u, t=0, params=None):
+                params = self.params if params is None else params
+                return {"tip": [params["l"]]}
+
+        plant = Arm()
+        diagram = DiagramSystem()
+        diagram.add_subsystem(plant, "plant")
+        x, u, p = np.array([0.5]), np.zeros(0), {"l": 3.0}
+
+        frames = diagram.tf(x, u, 0.0, {"plant": p})
+        geometry = diagram.get_dynamic_geometry(x, u, 0.0, {"plant": p})
+        np.testing.assert_allclose(
+            frames["plant:tip"], plant.tf(x, np.zeros(1), 0.0, p)["tip"]
+        )
+        self.assertEqual(geometry["plant:tip"], [3.0])
+        with self.assertRaises(ValueError):
+            diagram.tf(x, u, 0.0, {"typo": p})
+        with self.assertRaises(ValueError):
+            diagram.get_dynamic_geometry(x, u, 0.0, {"typo": p})
 
     def test_boundary_output_feedthrough_is_derived_from_wiring(self):
         diagram = _build_closed_loop()

@@ -2,12 +2,17 @@
 
 from __future__ import annotations
 
+import operator
 from dataclasses import dataclass
 
 import numpy as np
 
 from minilink.core.feedback import block_roles, plot_space_of, require_command
 from minilink.graphical.common import PlotResult
+from minilink.graphical.phase_plane.phase_plane import (
+    format_axis_label,
+    require_grid_shape,
+)
 
 # The sweep range of a coordinate whose bounds are not finite
 _DEFAULT_BOUNDS = (-10.0, 10.0)
@@ -79,7 +84,7 @@ def plot_input_output_map(
 
     # The swept input components, each over its port bounds unless overridden
     def input_axis(component):
-        component = normalize_axis(component, port.dim, "axis")
+        component = require_axis(component, port.dim, "axis")
         return SweepAxis(
             "u",
             start + component,
@@ -95,7 +100,7 @@ def plot_input_output_map(
 
     # The output component, swept over the axes with every other input pinned
     output = block.outputs[out_port]
-    out_axis = normalize_axis(out_axis, output.dim, "out_axis")
+    out_axis = require_axis(out_axis, output.dim, "out_axis")
     spec = build_spec(
         block,
         output,
@@ -190,17 +195,17 @@ def plot_control_law(
 
     # The swept coordinates: the textbook pair unless named
     x_axis, y_axis = default_law_axes(x_axis, y_axis, space, len(meas_axes))
-    x_axis = normalize_axis(x_axis, len(axes_all), "x_axis")
+    x_axis = require_axis(x_axis, len(axes_all), "x_axis")
     swept = [axes_all[x_axis]]
     if y_axis is not None:
-        y_axis = normalize_axis(y_axis, len(axes_all), "y_axis")
+        y_axis = require_axis(y_axis, len(axes_all), "y_axis")
         require_distinct_axes(x_axis, y_axis)
         swept.append(axes_all[y_axis])
     swept = apply_bounds_override(swept, bounds)
 
     # The command component, with every input at its nominal value and r pinned
     output = block.outputs[roles.control]
-    u_axis = normalize_axis(u_axis, output.dim, "u_axis")
+    u_axis = require_axis(u_axis, output.dim, "u_axis")
     u_base = block.get_u_from_input_ports().astype(float)
     if roles.ref is not None:
         u_base[block.get_input_port_slice(roles.ref)] = rbar
@@ -379,11 +384,14 @@ def require_io_ports(block):
         )
 
 
-def normalize_axis(axis, dim, name) -> int:
-    """The component index ``axis`` as an int in ``[0, dim - 1]``; a bool is refused."""
-    if isinstance(axis, bool):
+def require_axis(axis, dim, name) -> int:
+    """Refuse a component index that is not an integer in ``[0, dim - 1]``; return it as an int."""
+    if isinstance(axis, (bool, np.bool_)):
         raise ValueError(f"{name} must be an integer component index")
-    axis_int = int(axis)
+    try:
+        axis_int = operator.index(axis)
+    except TypeError as exc:
+        raise ValueError(f"{name} must be an integer component index") from exc
     if axis_int < 0 or axis_int >= dim:
         raise ValueError(f"{name} must be in [0, {dim - 1}], got {axis_int}")
     return axis_int
@@ -507,7 +515,7 @@ def evaluate_axes(
     params,
 ):
     """Sweep 1 or 2 axes over the port compute; everything else stays pinned."""
-    n_x, n_y = normalize_grid_shape(grid_shape)
+    n_x, n_y = require_grid_shape(grid_shape)
     t = float(t)
 
     # The output at one point: each swept value v enters as base + sign·v
@@ -537,19 +545,6 @@ def evaluate_axes(
             U[row, col] = value_at((vx, vy))
 
     return x_values, y_values, U
-
-
-def normalize_grid_shape(grid_shape) -> tuple[int, int]:
-    """The grid's ``(n_x, n_y)`` as two ints, each at least 2."""
-    try:
-        n_x, n_y = tuple(grid_shape)
-    except TypeError as exc:
-        raise ValueError("grid_shape must be a two-element tuple") from exc
-    n_x = int(n_x)
-    n_y = int(n_y)
-    if n_x < 2 or n_y < 2:
-        raise ValueError("grid_shape entries must be at least 2")
-    return n_x, n_y
 
 
 @dataclass(frozen=True)
@@ -747,12 +742,3 @@ def require_distinct_axes(x_axis, y_axis):
     """Refuse a sweep of one coordinate against itself."""
     if y_axis == x_axis:
         raise ValueError("x_axis and y_axis must differ")
-
-
-def format_axis_label(label, unit) -> str:
-    """The label with its unit in brackets: ``[m]`` stays ``[m]``."""
-    if unit:
-        if unit.startswith("[") and unit.endswith("]"):
-            return f"{label} {unit}"
-        return f"{label} [{unit}]"
-    return label

@@ -6,6 +6,7 @@ import numpy as np
 
 from minilink.analysis.frequency import transfer_function
 from minilink.analysis.linearization import output_selectors
+from minilink.core.feedback import free_inputs
 
 ###############################################################################
 # Public API
@@ -34,9 +35,11 @@ def sensitivity(
     Parameters
     ----------
     plant : System
-        The plant ``H``, from its first input to its output.
+        The plant ``H``, from its one input besides ``d`` and ``n`` to its output.
     controller : System
-        The controller ``C``, from the error (or the reference) to the command.
+        The controller ``C``, from the error ``e`` to the command ``u``. A
+        controller in the reference form (inputs ``r`` and ``y``) is refused:
+        pass its channel from ``r``, ``transfer_function(C, wrt="r")``.
     filter : System, optional
         The filter ``F`` on the measurement; ``F = 1`` when omitted.
     x_bar, u_bar, t, params : optional
@@ -191,10 +194,11 @@ def loop_pieces(plant, controller, filter, x_bar, u_bar, t, params, method, eps)
 
 def siso_piece(sys, role, x_bar, u_bar, t, params, method, eps):
     """The transfer function of one loop piece; a piece with several channels is refused."""
-    # p outputs (the state, without an output port) and m inputs (the first port)
+    # p outputs (the state, without an output port) and m inputs (every free input:
+    # all but the disturbance d and the noise n)
     outputs = output_selectors(sys, None)
     p = sys.n if outputs is None else sum(sys.outputs[name].dim for name, _ in outputs)
-    m = next(iter(sys.inputs.values())).dim if sys.inputs else 0
+    m = sum(sys.inputs[port_id].dim for port_id in free_inputs(sys.inputs))
     require_siso(sys, role, m, p)
 
     return transfer_function(
@@ -203,12 +207,16 @@ def siso_piece(sys, role, x_bar, u_bar, t, params, method, eps):
 
 
 def require_siso(sys, role, m, p):
-    """Refuse a loop piece that is not single-input, single-output."""
+    """Refuse a loop piece that is not single-input, single-output.
+
+    The fix it names reads the channel from the reference when the piece has one.
+    """
     if m != 1 or p != 1:
+        channel = 'wrt="r"' if "r" in sys.inputs else "of=..., wrt=..."
         raise ValueError(
             f"The {role} {sys.name!r} must be SISO, got {m} input(s) and {p} "
             f"output(s). Select one channel first: "
-            f"{role}=transfer_function({role}, of=..., wrt=...)."
+            f"{role}=transfer_function({role}, {channel})."
         )
 
 

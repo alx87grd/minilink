@@ -5,6 +5,7 @@ from scipy.interpolate import interp1d
 
 from minilink.core.backends import array_module
 from minilink.core.distributions import child_seed, sample_index, standard_normal
+from minilink.core.options import require_one_of
 from minilink.core.system import System
 
 ###############################################################################
@@ -392,12 +393,6 @@ def require_matching_levels(initial_value, final_value):
 def as_channels(value, p):
     """A scalar or a ``(p,)`` array as its own ``(p,)`` float vector, one entry per channel."""
     return np.broadcast_to(np.asarray(value, dtype=float), (p,)).copy()
-
-
-def require_one_of(name, value, choices):
-    """Refuse an option outside its known choices, naming them."""
-    if value not in choices:
-        raise ValueError(f"{name} must be one of {choices}, got {value!r}")
 
 
 def require_seed(seed):

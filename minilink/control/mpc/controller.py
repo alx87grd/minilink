@@ -20,7 +20,7 @@ from minilink.core.trajectory import Trajectory
 from minilink.planning.results import PlanningSolution
 from minilink.planning.trajectory_optimization.planner import (
     TrajectoryOptimizationPlanner,
-    reject_unknown_online_params,
+    require_online_params,
 )
 
 if TYPE_CHECKING:
@@ -103,40 +103,79 @@ class ModelPredictiveControllerMixin:
     """
     Shared deploy / export / debug surface for MPC System family blocks.
 
-    Concrete classes provide ``_planner``, ``_latch``, ``_dt_mpc``, ``_t0``,
-    ``_debug``, and optional warm-start via ``_z_warm_for_command``.
+    A concrete block calls this constructor beside its System base's, then
+    declares its ports with :func:`declare_mpc_ports`.
+
+    Attributes
+    ----------
+    planner : TrajectoryOptimizationPlanner
+        The trajopt planner the block solves with.
+    latch : MPCTickLatch
+        The per-tick solve memo every port (and a stateful block's step) shares.
+    dt_mpc : float
+        Replan period (warm-start shift and Computer schedule).
+    t0 : float
+        Absolute-time epoch: ``t_solve = t0 + k * dt_mpc``.
+    debug : bool
+        Whether every command redraws the live debug figure.
+    deploy_k : int
+        The deploy counter: the tick of the next :meth:`compute_command`.
+    last_command : Command or None
+        Most recent :meth:`compute_command` result, if any.
+    debug_handles : dict or None
+        The live debug figure's handles, once :meth:`init_debug_figure` built it.
+    nominal_cache : NominalCache or None
+        The latched plan's interpolator, once
+        :meth:`generate_nominal_interpolator` built it.
+    replan_divisor : int
+        Base ticks per replan tick (a dual-rate computer sets it).
+
+    Hooks a concrete block defines: ``compute_u_ff``, ``compute_x_ff`` and
+    ``compute_z``, the port functions ``(x, u, t, params)``, and
+    ``measurement(u)``, the measured state from the block input. Hooks the
+    mixin provides, which a block may override: ``z_warm_for_command()``, the
+    packed ``z`` that warm-starts the next deploy command (``None`` here);
+    ``replan_k(k_tick)``, the replan index of a Computer base tick; and
+    ``require_nominal_cache()``, the nominal cache, refused before it is built.
+    A port looks its hook up on the block each time it is evaluated, so a
+    subclass override is honoured.
     """
 
     # The command is a solve call, not a static law: nothing to sweep.
     plot_space = None
 
-    # The state a concrete block sets in its constructor
-    _planner: TrajectoryOptimizationPlanner
-    _latch: object
-    _dt_mpc: float
-    _t0: float
-    _debug: bool
-    _deploy_k: int
-    _last_command: Command | None
-    _debug_handles: object | None
-    _debug_sys: object | None
-    _nominal_cache: NominalCache | None
-    _replan_divisor: int
+    def __init__(
+        self,
+        planner: TrajectoryOptimizationPlanner,
+        *,
+        dt_mpc: float,
+        t0: float = 0.0,
+        verbose: bool = False,
+        debug: bool = False,
+    ) -> None:
+        # The planner, the replan clock and the debug flag
+        self.planner = planner
+        self.dt_mpc = float(dt_mpc)
+        self.t0 = float(t0)
+        self.debug = bool(debug)
 
-    @property
-    def dt_mpc(self) -> float:
-        """Replan period (warm-start shift and Computer schedule)."""
-        return float(self._dt_mpc)
+        # Deploy memory: the tick counter, the last command, the debug figure and
+        # the nominal cache
+        self.deploy_k = 0
+        self.last_command: Command | None = None
+        self.debug_handles: dict | None = None
+        self.nominal_cache: NominalCache | None = None
 
-    @property
-    def t0(self) -> float:
-        """Absolute-time epoch: ``t_solve = t0 + k * dt_mpc``."""
-        return float(self._t0)
+        # Base ticks per replan tick (a dual-rate computer sets it)
+        self.replan_divisor = 1
 
-    @property
-    def last_command(self) -> Command | None:
-        """Most recent :meth:`compute_command` result, if any."""
-        return self._last_command
+        # One NLP per replan tick, shared by every port (and a stateful block's step)
+        self.latch = MPCTickLatch(
+            planner,
+            verbose=verbose,
+            dt_mpc=self.dt_mpc,
+            t0=self.t0,
+        )
 
     # Deploy: one command per replan tick
 
@@ -161,22 +200,22 @@ class ModelPredictiveControllerMixin:
         params : mapping, optional
             Forwarded to
             :meth:`~minilink.planning.trajectory_optimization.planner.TrajectoryOptimizationPlanner.solve_trajectory_from`
-            via the tick latch (``None``/``{}`` = x0-only; ``scene`` reserved /
-            NotImplemented until pipeline B).
+            via the tick latch (``None``/``{}`` = x0-only; the key ``scene``
+            raises ``NotImplementedError``).
         k : int, optional
             Tick index. Default: increment internal deploy counter.
         t : float, optional
             Absolute solve time. Default: ``t0 + k * dt_mpc``.
         """
-        planner = self._planner
-        latch = self._latch
-        t0 = self._t0
-        dt_mpc = self._dt_mpc
+        planner = self.planner
+        latch = self.latch
+        t0 = self.t0
+        dt_mpc = self.dt_mpc
 
         # The replan tick k: the deploy counter's next one, unless given
         if k is None:
-            k_int = int(self._deploy_k)
-            self._deploy_k = k_int + 1
+            k_int = int(self.deploy_k)
+            self.deploy_k = k_int + 1
         else:
             k_int = int(k)
 
@@ -187,9 +226,9 @@ class ModelPredictiveControllerMixin:
             t_solve = float(t)
 
         # Gate early for clear deploy errors; the latch also forwards to the planner
-        reject_unknown_online_params(params)
+        require_online_params(params)
         y_arr = np.asarray(y, dtype=float).reshape(-1)
-        z_warm = self._z_warm_for_command()
+        z_warm = self.z_warm_for_command()
 
         # One NLP from the measurement, warm-started from the last command's z when
         # the block keeps it
@@ -212,10 +251,10 @@ class ModelPredictiveControllerMixin:
             z=np.asarray(tick.z, dtype=float).copy(),
             success=bool(solution.success),
         )
-        self._last_command = cmd
+        self.last_command = cmd
 
         # The live debug figure follows every command
-        if self._debug:
+        if self.debug:
             self.update_debug_figure(cmd)
 
         return cmd
@@ -229,10 +268,10 @@ class ModelPredictiveControllerMixin:
         a hybrid tick with no deploy call). ``None`` if nothing has been
         solved yet.
         """
-        if self._last_command is not None:
-            return self._last_command.solver
+        if self.last_command is not None:
+            return self.last_command.solver
 
-        solution = self._planner.last_solution
+        solution = self.planner.last_solution
         if solution is not None:
             return solution.solver
 
@@ -240,10 +279,10 @@ class ModelPredictiveControllerMixin:
 
     def reset(self) -> None:
         """Clear deploy counter, last command, nominal cache, and tick latch."""
-        self._deploy_k = 0
-        self._last_command = None
-        self._nominal_cache = None
-        self._latch.reset_latch()
+        self.deploy_k = 0
+        self.last_command = None
+        self.nominal_cache = None
+        self.latch.reset_latch()
 
     # Nominal interpolator: the latched plan between replan ticks
 
@@ -262,45 +301,45 @@ class ModelPredictiveControllerMixin:
         derivatives : bool, optional
             If True, attach FD knot rates for ``get_nominal_*_dot``.
         """
-        solution = self._planner.last_solution
+        solution = self.planner.last_solution
         require_latched_solution(solution)
 
         # The solve instant: the last command's, else the latched tick's, else the
         # epoch
-        if self._last_command is not None:
-            t_solve = float(self._last_command.t_solve)
+        if self.last_command is not None:
+            t_solve = float(self.last_command.t_solve)
         else:
-            t_solve = self._latch.last_t_solve
+            t_solve = self.latch.last_t_solve
             if t_solve is None:
-                t_solve = float(self._t0)
+                t_solve = float(self.t0)
 
         # The plan's knots on absolute time, with their rates when asked
         cache = build_nominal_cache(
             solution.trajectory, t_solve, derivatives=bool(derivatives)
         )
-        self._nominal_cache = cache
+        self.nominal_cache = cache
 
         return cache
 
     def get_nominal_u(self, t: float) -> np.ndarray:
         """Linear interp of latched plan ``u`` at absolute time ``t``."""
-        cache = self._require_nominal_cache()
+        cache = self.require_nominal_cache()
         return eval_signal(cache, t, cache.u)
 
     def get_nominal_x(self, t: float) -> np.ndarray:
         """Linear interp of latched plan ``x`` at absolute time ``t``."""
-        cache = self._require_nominal_cache()
+        cache = self.require_nominal_cache()
         return eval_signal(cache, t, cache.x)
 
     def get_nominal_u_dot(self, t: float) -> np.ndarray:
         """Interp of precomputed ``u`` rates (requires ``derivatives=True``)."""
-        cache = self._require_nominal_cache()
+        cache = self.require_nominal_cache()
         require_knot_rates(cache.u_dot, "u_dot")
         return eval_signal(cache, t, cache.u_dot)
 
     def get_nominal_x_dot(self, t: float) -> np.ndarray:
         """Interp of precomputed ``x`` rates (requires ``derivatives=True``)."""
-        cache = self._require_nominal_cache()
+        cache = self.require_nominal_cache()
         require_knot_rates(cache.x_dot, "x_dot")
         return eval_signal(cache, t, cache.x_dot)
 
@@ -308,7 +347,7 @@ class ModelPredictiveControllerMixin:
 
     def export_to_computer(self, schedule=None):
         """Build a single-rate :class:`~minilink.simulation.computer.Computer` (``u_ff`` ZOH)."""
-        return export_mpc_to_computer(self, schedule, dt_mpc=self._dt_mpc)
+        return export_mpc_to_computer(self, schedule, dt_mpc=self.dt_mpc)
 
     def dual_rate_computer(self, dt_broadcast: float) -> Computer:
         """
@@ -342,7 +381,7 @@ class ModelPredictiveControllerMixin:
         Under a non-interactive backend (e.g. ``Agg``), still builds axes so
         tests can smoke the path; ``update_debug_figure`` redraws plan knots.
         """
-        del kwargs
+        del sys, kwargs
         # Lazy import: the graphics load on first use, not with the core
         import matplotlib.pyplot as plt
 
@@ -352,22 +391,21 @@ class ModelPredictiveControllerMixin:
         ax.set_ylabel("state / input")
         ax.set_title("MPC debug: latched plan")
 
-        self._debug_handles = {"fig": fig, "ax": ax, "lines": []}
-        self._debug_sys = sys
+        self.debug_handles = {"fig": fig, "ax": ax, "lines": []}
 
         return fig
 
     def update_debug_figure(self, cmd: Command | None = None):
         """Redraw debug axes from ``cmd`` or :attr:`last_command`."""
-        if self._debug_handles is None:
+        if self.debug_handles is None:
             return None
 
-        use = cmd if cmd is not None else self._last_command
+        use = cmd if cmd is not None else self.last_command
         if use is None:
-            return self._debug_handles["fig"]
+            return self.debug_handles["fig"]
 
         # The axis cleared and titled with this tick
-        ax = self._debug_handles["ax"]
+        ax = self.debug_handles["ax"]
         ax.cla()
         ax.set_xlabel("plan-local time τ")
         ax.set_ylabel("state / input")
@@ -381,7 +419,7 @@ class ModelPredictiveControllerMixin:
             ax.plot(traj.t, traj.u[i], "--", label=f"u[{i}]")
         ax.legend(loc="best", fontsize=8)
 
-        fig = self._debug_handles["fig"]
+        fig = self.debug_handles["fig"]
         fig.canvas.draw_idle()
 
         return fig
@@ -393,13 +431,13 @@ class ModelPredictiveControllerMixin:
     # The hooks of the subclass contract: a concrete block overrides or calls them by
     # these names
 
-    def _z_warm_for_command(self):
+    def z_warm_for_command(self):
         """Override on StepSystem: previous packed ``z`` for warm-start."""
         return None
 
-    def _require_nominal_cache(self) -> NominalCache:
+    def require_nominal_cache(self) -> NominalCache:
         """Refuse a nominal read before the interpolator is built; return the cache."""
-        cache = self._nominal_cache
+        cache = self.nominal_cache
         if cache is None:
             raise RuntimeError(
                 "nominal interpolator not built; call "
@@ -407,10 +445,10 @@ class ModelPredictiveControllerMixin:
             )
         return cache
 
-    def _replan_k(self, k_tick) -> int:
+    def replan_k(self, k_tick) -> int:
         """Map Computer base tick to replan index (dual-rate divisor)."""
         # The divisor d: base ticks per replan tick, at least one
-        d = int(self._replan_divisor)
+        d = int(self.replan_divisor)
         if d < 1:
             d = 1
 
@@ -439,62 +477,37 @@ class MPCStatelessController(ModelPredictiveControllerMixin, System):
     ) -> None:
         n, m, n_z = validate_mpc_planner(planner)
 
-        super().__init__()
+        # An algebraic block, then the shared MPC state: the planner, the replan
+        # clock, the deploy memory and the tick latch
+        System.__init__(self)
         self.name = "MPC Stateless Controller"
-
-        # The planner, the replan clock and the debug flag
-        self._planner = planner
-        self._dt_mpc = float(dt_mpc)
-        self._t0 = float(t0)
-        self._debug = bool(debug)
-
-        # Deploy memory: the tick counter, the last command, the debug figure and
-        # the nominal cache
-        self._deploy_k = 0
-        self._last_command = None
-        self._debug_handles = None
-        self._debug_sys = None
-        self._nominal_cache = None
-
-        # Base ticks per replan tick (a dual-rate computer sets it)
-        self._replan_divisor = 1
-
-        # One NLP per replan tick, shared by every port
-        self._latch = MPCTickLatch(
-            planner,
-            verbose=verbose,
-            dt_mpc=self._dt_mpc,
-            t0=self._t0,
+        ModelPredictiveControllerMixin.__init__(
+            self, planner, dt_mpc=dt_mpc, t0=t0, verbose=verbose, debug=debug
         )
 
         # Ports: the measurement y in; u_ff, x_ff and the packed z out
         declare_mpc_ports(self, n, m, n_z)
 
-    @property
-    def planner(self) -> TrajectoryOptimizationPlanner:
-        """Trajopt planner owned by this block."""
-        return self._planner
-
     ###########################################################################
     # Internal machinery
     ###########################################################################
 
-    def _compute_u_ff(self, x, u, t=0, params=None):
+    def compute_u_ff(self, x, u, t=0, params=None):
         """The port ``u_ff``: the plan's first input, from the replan tick's solve."""
         del x, params
         return tick_solve(self, u, t).u_ff
 
-    def _compute_x_ff(self, x, u, t=0, params=None):
+    def compute_x_ff(self, x, u, t=0, params=None):
         """The port ``x_ff``: the plan's next state, from the replan tick's solve."""
         del x, params
         return tick_solve(self, u, t).x_ff
 
-    def _compute_z(self, x, u, t=0, params=None):
+    def compute_z(self, x, u, t=0, params=None):
         """The port ``z``: the packed decision vector of the replan tick's solve."""
         del x, params
         return tick_solve(self, u, t).z
 
-    def _measurement(self, u) -> np.ndarray:
+    def measurement(self, u) -> np.ndarray:
         """The measured state ``y`` from the block input."""
         return np.asarray(u, dtype=float).reshape(self.inputs["y"].dim)
 
@@ -518,33 +531,13 @@ class MPCStatefulController(ModelPredictiveControllerMixin, StepSystem):
     ) -> None:
         n, m, n_z = validate_mpc_planner(planner)
 
-        # A step block on the packed decision vector z, kept off the outputs
-        super().__init__(n_z, expose_state=False)
+        # A step block on the packed decision vector z, kept off the outputs, then
+        # the shared MPC state: the planner, the replan clock, the deploy memory and
+        # the tick latch
+        StepSystem.__init__(self, n_z, expose_state=False)
         self.name = "MPC Stateful Controller"
-
-        # The planner, the replan clock and the debug flag
-        self._planner = planner
-        self._dt_mpc = float(dt_mpc)
-        self._t0 = float(t0)
-        self._debug = bool(debug)
-
-        # Deploy memory: the tick counter, the last command, the debug figure and
-        # the nominal cache
-        self._deploy_k = 0
-        self._last_command = None
-        self._debug_handles = None
-        self._debug_sys = None
-        self._nominal_cache = None
-
-        # Base ticks per replan tick (a dual-rate computer sets it)
-        self._replan_divisor = 1
-
-        # One NLP per replan tick, shared by every port and the step
-        self._latch = MPCTickLatch(
-            planner,
-            verbose=verbose,
-            dt_mpc=self._dt_mpc,
-            t0=self._t0,
+        ModelPredictiveControllerMixin.__init__(
+            self, planner, dt_mpc=dt_mpc, t0=t0, verbose=verbose, debug=debug
         )
 
         # The state at reset: the default collocation guess, packed
@@ -553,29 +546,19 @@ class MPCStatefulController(ModelPredictiveControllerMixin, StepSystem):
         # Ports: the measurement y in; u_ff, x_ff and the packed z out
         declare_mpc_ports(self, n, m, n_z)
 
-    @property
-    def planner(self) -> TrajectoryOptimizationPlanner:
-        """Trajopt planner owned by this block."""
-        return self._planner
-
-    @property
-    def latch(self) -> MPCTickLatch:
-        """Per-tick solve memo (reset via :meth:`MPCTickLatch.reset_latch`)."""
-        return self._latch
-
     def step(self, x, u, k=0, params=None):
         """The next packed ``z``: the replan tick's solve, warm-started from ``z = x``."""
         del params
 
-        latch = self._latch
-        dt_mpc = self._dt_mpc
+        latch = self.latch
+        dt_mpc = self.dt_mpc
         n = self.n
 
-        y = self._measurement(u)
+        y = self.measurement(u)
 
         # z_{k+1}: the replan tick's NLP from the measurement y, warm-started from z_k = x
         z_new = latch.solve_for_tick(
-            self._replan_k(k),
+            self.replan_k(k),
             y,
             z_warm=x,
             dt_mpc=dt_mpc,
@@ -588,29 +571,29 @@ class MPCStatefulController(ModelPredictiveControllerMixin, StepSystem):
     # Internal machinery
     ###########################################################################
 
-    def _compute_u_ff(self, x, u, t=0, params=None):
+    def compute_u_ff(self, x, u, t=0, params=None):
         """The port ``u_ff``: the plan's first input, from the replan tick's warm-started solve."""
         del params
         return warm_tick_solve(self, x, u, t).u_ff
 
-    def _compute_x_ff(self, x, u, t=0, params=None):
+    def compute_x_ff(self, x, u, t=0, params=None):
         """The port ``x_ff``: the plan's next state, from the replan tick's warm-started solve."""
         del params
         return warm_tick_solve(self, x, u, t).x_ff
 
-    def _compute_z(self, x, u, t=0, params=None):
+    def compute_z(self, x, u, t=0, params=None):
         """The port ``z``: the packed decision vector of the replan tick's warm-started solve."""
         del params
         return warm_tick_solve(self, x, u, t).z
 
-    def _measurement(self, u) -> np.ndarray:
+    def measurement(self, u) -> np.ndarray:
         """The measured state ``y`` from the block input."""
         return np.asarray(u, dtype=float).reshape(self.inputs["y"].dim)
 
-    def _z_warm_for_command(self):
+    def z_warm_for_command(self):
         """The last command's packed ``z``, to warm-start the next deploy command."""
-        if self._last_command is not None:
-            return self._last_command.z
+        if self.last_command is not None:
+            return self.last_command.z
         return None
 
 
@@ -677,7 +660,12 @@ class MPCTickLatch:
         initial_guess=None,
         params=None,
     ) -> MPCTickSolve:
-        """The tick's solve: the latched one at the same ``(k, y)``, else a new NLP."""
+        """
+        The tick's solve: the latched one at the same ``(k, y)``, else a new NLP.
+
+        An explicit ``initial_guess`` always runs a new NLP from that seed, and
+        latches its solve in place of the tick's earlier one.
+        """
         planner = self._planner
         t0 = self._t0
         dt_default = self._dt_mpc
@@ -685,9 +673,10 @@ class MPCTickLatch:
         k_int = int(k)
         y_arr = np.asarray(y, dtype=float).reshape(-1)
 
-        # Same tick, same measurement: the latched solve
+        # Same tick, same measurement, no explicit seed: the latched solve
         if (
-            self._latch is not None
+            initial_guess is None
+            and self._latch is not None
             and self._latch_k == k_int
             and np.array_equal(self._latch_y, y_arr, equal_nan=True)
         ):
@@ -742,7 +731,7 @@ class MPCTickLatch:
         if self._after_solve is not None:
             self._after_solve()
         if self._verbose:
-            self._print_tick(k_int, result)
+            self.print_tick(k_int, result)
 
         return latch
 
@@ -760,7 +749,7 @@ class MPCTickLatch:
     # Internal machinery
     ###########################################################################
 
-    def _print_tick(self, k_int, result) -> None:
+    def print_tick(self, k_int, result) -> None:
         """One line per new solve: its fire time (or tick), success, cost and wall times."""
         planner = self._planner
         t0 = self._t0
@@ -809,7 +798,7 @@ def export_mpc_to_computer(
     from minilink.simulation.computer import StepSchedule, build_computer
 
     # The schedule: one base tick per replan, a given one checked against the period
-    block_dt = dt_mpc if dt_mpc is not None else getattr(block, "_dt_mpc", None)
+    block_dt = dt_mpc if dt_mpc is not None else getattr(block, "dt_mpc", None)
     if schedule is None:
         require_replan_period(block_dt)
         schedule = StepSchedule(dt_base=float(block_dt))
@@ -822,9 +811,9 @@ def export_mpc_to_computer(
     computer = build_computer(block, schedule)
 
     # Single-rate path: undo any dual-rate hooks left on the block
-    if hasattr(block, "_replan_divisor"):
-        block._replan_divisor = 1
-    latch = getattr(block, "_latch", None)
+    if hasattr(block, "replan_divisor"):
+        block.replan_divisor = 1
+    latch = getattr(block, "latch", None)
     if latch is not None and hasattr(latch, "set_after_solve"):
         latch.set_after_solve(None)
 
@@ -856,8 +845,8 @@ def export_mpc_dual_rate_computer(block, *, dt_broadcast: float) -> Computer:
 
     # The replan block maps base ticks to replan ticks and rebuilds the nominal
     # cache after every new solve
-    block._replan_divisor = d
-    block._latch.set_after_solve(
+    block.replan_divisor = d
+    block.latch.set_after_solve(
         lambda: block.generate_nominal_interpolator(derivatives=True)
     )
 
@@ -896,6 +885,21 @@ class MPCBroadcastController(System):
 
     Holds a reference to the replan MPC (shared ``NominalCache``) — not a
     port input. See dual-rate packaging in DESIGN.md (MPC hybrid block).
+
+    Attributes
+    ----------
+    mpc : ModelPredictiveControllerMixin
+        The replan block whose nominal cache the leaf samples.
+    dt_broadcast : float
+        Broadcast period: one base tick of the Computer.
+    t0 : float
+        Absolute-time epoch of base tick zero.
+
+    Hooks a broadcast leaf subclass overrides or calls: ``compute_u_nom`` and
+    ``compute_x_nom``, the port functions ``(x, u, t, params)``, and
+    ``abs_t(k_tick)``, the absolute time of a base tick. A port looks its hook
+    up on the leaf each time it is evaluated, so a subclass override is
+    honoured.
     """
 
     def __init__(self, mpc, *, dt_broadcast: float, t0: float = 0.0) -> None:
@@ -903,37 +907,40 @@ class MPCBroadcastController(System):
         self.name = "MPC Broadcast"
 
         # The replan block it samples, and the broadcast clock
-        self._mpc = mpc
-        self._dt_broadcast = float(dt_broadcast)
-        self._t0 = float(t0)
+        self.mpc = mpc
+        self.dt_broadcast = float(dt_broadcast)
+        self.t0 = float(t0)
 
         # Ports: the latched plan's input and state, sampled at every base tick
-        n = int(mpc._planner.problem.sys.n)
-        m = int(mpc._planner.problem.sys.m)
-        self.add_output_port("u_nom", dim=m, function=self._compute_u_nom)
-        self.add_output_port("x_nom", dim=n, function=self._compute_x_nom)
+        n = int(mpc.planner.problem.sys.n)
+        m = int(mpc.planner.problem.sys.m)
+        self.add_output_port(
+            "u_nom", dim=m, function=port_function_of(self, "compute_u_nom")
+        )
+        self.add_output_port(
+            "x_nom", dim=n, function=port_function_of(self, "compute_x_nom")
+        )
 
     ###########################################################################
     # Internal machinery
     ###########################################################################
 
-    # The port functions and the clock keep their names: a broadcast leaf subclass
-    # overrides or calls them
+    # The hooks of a broadcast leaf: a subclass overrides or calls them by these names
 
-    def _compute_u_nom(self, x, u, t=0, params=None):
+    def compute_u_nom(self, x, u, t=0, params=None):
         """The port ``u_nom``: the latched plan's input at the base tick ``t``."""
         del x, u, params
-        return self._mpc.get_nominal_u(self._abs_t(t))
+        return self.mpc.get_nominal_u(self.abs_t(t))
 
-    def _compute_x_nom(self, x, u, t=0, params=None):
+    def compute_x_nom(self, x, u, t=0, params=None):
         """The port ``x_nom``: the latched plan's state at the base tick ``t``."""
         del x, u, params
-        return self._mpc.get_nominal_x(self._abs_t(t))
+        return self.mpc.get_nominal_x(self.abs_t(t))
 
-    def _abs_t(self, k_tick) -> float:
+    def abs_t(self, k_tick) -> float:
         """The absolute time of the base tick ``k_tick``."""
-        t0 = self._t0
-        dt_broadcast = self._dt_broadcast
+        t0 = self.t0
+        dt_broadcast = self.dt_broadcast
 
         # t = t0 + k Δt_broadcast
         t = float(t0 + float(k_tick) * dt_broadcast)
@@ -941,27 +948,28 @@ class MPCBroadcastController(System):
         return t
 
 
-###############################################################################
-# Internal machinery
-###############################################################################
-
-
 def validate_mpc_planner(planner) -> tuple[int, int, int]:
-    """Validate a plan-producing planner and return ``(n, m, n_z)``.
+    """
+    Validate a plan-producing planner and return ``(n, m, n_z)``.
 
-    Accepts a duck-typed
+    The contract an MPC planner meets: a duck-typed
     :class:`~minilink.planning.trajectory_optimization.planner.TrajectoryOptimizationPlanner`
-    (or compatible) with ``compile_parametric_program``,
-    ``has_parametric_program``, and ``solve_trajectory_from``.
+    (or compatible) with a ``problem``, a ``transcription`` and ``options``, and
+    the verbs ``compile_parametric_program``, ``has_parametric_program`` and
+    ``solve_trajectory_from``. A planner missing any of them is a ``TypeError``.
 
     ``compile_backend='jax'`` auto-compiles a parametric NLP once (bind + solve
     each tick). ``compile_backend='numpy'`` or ``'direct'`` skips parametric
     compile; each tick rebuilds via :meth:`~TrajectoryOptimizationPlanner.solve_trajectory_from`.
     """
-    # The planner's interface: a parametric compile and a solve from a measured state
+    # The planner's interface: its problem, transcription and options, a parametric
+    # compile and a solve from a measured state
     missing = [
         name
         for name in (
+            "problem",
+            "transcription",
+            "options",
             "compile_parametric_program",
             "has_parametric_program",
             "solve_trajectory_from",
@@ -1004,41 +1012,61 @@ def validate_mpc_planner(planner) -> tuple[int, int, int]:
     return n, m, n_z
 
 
+###############################################################################
+# Internal machinery
+###############################################################################
+
+
 def declare_mpc_ports(block, n, m, n_z):
     """The ports of an MPC block: the measurement ``y`` in; ``u_ff``, ``x_ff`` and the packed ``z`` out."""
     block.add_input_port("y", dim=n)
     block.add_output_port(
         "u_ff",
         dim=m,
-        function=block._compute_u_ff,
+        function=port_function_of(block, "compute_u_ff"),
         dependencies=("y",),
     )
     block.add_output_port(
         "x_ff",
         dim=n,
-        function=block._compute_x_ff,
+        function=port_function_of(block, "compute_x_ff"),
         dependencies=("y",),
     )
     block.add_output_port(
         "z",
         dim=n_z,
-        function=block._compute_z,
+        function=port_function_of(block, "compute_z"),
         dependencies=("y",),
     )
 
 
+def port_function_of(block, hook):
+    """
+    The port function that calls ``block``'s method ``hook``.
+
+    The method is looked up on the block each time the port is evaluated, not
+    once when the port is declared, so a subclass (or instance) override of the
+    hook is the one the port calls.
+    """
+
+    def compute(x, u, t=0, params=None):
+        return getattr(block, hook)(x, u, t, params)
+
+    return compute
+
+
 def tick_solve(block, u, t):
     """The replan tick's solve from the measurement in ``u``, cold-started."""
-    return block._latch.solve_for_tick(block._replan_k(t), block._measurement(u))
+    return block.latch.solve_for_tick(block.replan_k(t), block.measurement(u))
 
 
 def warm_tick_solve(block, x, u, t):
     """The replan tick's solve from the measurement in ``u``, warm-started from ``z = x``."""
-    return block._latch.solve_for_tick(
-        block._replan_k(t),
-        block._measurement(u),
+    return block.latch.solve_for_tick(
+        block.replan_k(t),
+        block.measurement(u),
         z_warm=x,
-        dt_mpc=block._dt_mpc,
+        dt_mpc=block.dt_mpc,
     )
 
 

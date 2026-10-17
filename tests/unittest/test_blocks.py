@@ -190,6 +190,12 @@ class TestNonlinearBlocks(unittest.TestCase):
         out = [sat.compute(None, np.array([v]))[0] for v in (-3.0, 0.5, 5.0)]
         np.testing.assert_allclose(out, [-1.0, 0.5, 2.0])
 
+    def test_saturation_refuses_crossed_limits(self):
+        with self.assertRaisesRegex(ValueError, "upper end stop must sit above"):
+            Saturation(lower=1.0, upper=-1.0)
+        flat = Saturation(lower=0.5, upper=0.5)  # equal limits: a constant output
+        np.testing.assert_allclose(flat.compute(None, np.array([3.0])), [0.5])
+
     def test_dead_zone(self):
         dz = DeadZone(width=1.0)
         out = [dz.compute(None, np.array([v]))[0] for v in (-2.0, -0.5, 0.0, 0.5, 2.0)]

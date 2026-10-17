@@ -13,6 +13,13 @@ from minilink.core.compile.execution_plan import PortOperation
 from minilink.core.compile.step_compiler import build_step_execution_plan
 from minilink.core.compile.step_execution_plan import StepExecutionPlan, StepOperation
 from minilink.core.diagram import DiagramSystem, StepDiagramSystem
+from minilink.core.hybrid_composition import (
+    as_step_diagram,
+    builds_own_computer,
+    expose_computer_boundary_ports,
+    hybrid_closed_loop,
+    resolve_hybrid_feedback_ports,
+)
 from minilink.core.system import DynamicSystem, System
 
 ###############################################################################
@@ -97,7 +104,7 @@ class Computer:
 
         # A block's tick latch (an MPC block's memoized solve) forgets its last tick
         for sys in self.diagram.subsystems.values():
-            latch = getattr(sys, "_latch", None)
+            latch = getattr(sys, "latch", None)
             if latch is not None and hasattr(latch, "reset_latch"):
                 latch.reset_latch()
 
@@ -168,12 +175,6 @@ class Computer:
         with the same port-resolution rules as continuous ``ctl @ plant``.
         Like the continuous ``@``, it leaves a plant diagram unchanged.
         """
-        # A real cycle: core.hybrid_composition imports Computer from this module
-        from minilink.core.hybrid_composition import (
-            hybrid_closed_loop,
-            resolve_hybrid_feedback_ports,
-        )
-
         require_plant_side(plant)
 
         # The boundary ports, resolved as for the continuous ``ctl @ plant``
@@ -229,10 +230,14 @@ class StepSchedule:
 
     def __post_init__(self) -> None:
         self.dt_base = validate_dt_base(self.dt_base)
+
+        # The divisors as whole numbers, in a dict of the schedule's own
+        fire = {}
         for sys_id, divisor in self.fire.items():
             d = int(divisor)
             require_fire_divisor(sys_id, d, divisor)
-            self.fire[sys_id] = d
+            fire[sys_id] = d
+        self.fire = fire
 
     @classmethod
     def from_rates(cls, dt_base: float, rates_hz: dict[str, float]) -> StepSchedule:
@@ -260,9 +265,6 @@ def as_computer(
     A block whose class defines its own ``%`` builds the Computer there (an MPC
     block checks ``schedule`` against its ``dt_mpc``).
     """
-    # A real cycle: core.hybrid_composition imports Computer from this module
-    from minilink.core.hybrid_composition import builds_own_computer
-
     # A plain block: wrapped in a step diagram, its boundary ports exposed
     if not builds_own_computer(side):
         return build_computer(side, schedule)
@@ -377,12 +379,6 @@ def build_computer(
     schedule: StepSchedule | float,
 ) -> Computer:
     """Plain build behind ``block % schedule``: never defers to the block's own ``%``."""
-    # A real cycle: core.hybrid_composition imports Computer from this module
-    from minilink.core.hybrid_composition import (
-        as_step_diagram,
-        expose_computer_boundary_ports,
-    )
-
     require_computer_side(side)
     step_schedule = as_schedule(schedule)
 

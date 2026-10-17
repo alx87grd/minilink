@@ -9,6 +9,7 @@ import numpy as np
 
 from minilink.core.sets import is_finite_box
 from minilink.planning.evaluation import Evaluation, MonteCarloEvaluator
+from minilink.planning.plotting import maybe_show
 from minilink.planning.results import PlanningSolution
 
 # Matplotlib is imported inside each view, so the planning layer stays importable
@@ -369,12 +370,6 @@ def panels(plt, n):
     """One row of ``n`` panels side by side: the figure and the list of its axes."""
     fig, axes = plt.subplots(1, n, figsize=(4.5 * n, 4.0), squeeze=False)
     return fig, list(axes[0])
-
-
-def maybe_show(plt, show):
-    """Show the figures, unless asked not to or on the non-interactive Agg backend."""
-    if show and plt.get_backend().lower() != "agg":
-        plt.show()
 
 
 def require_some_cost_to_go(fields):

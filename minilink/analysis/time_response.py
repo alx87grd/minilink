@@ -30,7 +30,7 @@ class StepInfo:
     """Textbook step-response figures (MATLAB ``stepinfo`` conventions)."""
 
     rise_time: float  # 10 % to 90 % of the final value; nan when there is none
-    settling_time: float  # Last time the response leaves the 2 % band
+    settling_time: float  # Last exit from the band of 2 % of the peak deviation
     overshoot: float  # Percent of the final value; nan when there is none
     peak: float
     peak_time: float
@@ -81,7 +81,10 @@ def step_info(time, y) -> StepInfo:
     """Rise time, settling time, overshoot, peak and steady state of a sampled step response.
 
     Reads any sampled response: the linear one from :func:`step_response`, or
-    a simulated trajectory's time and output arrays.
+    a simulated trajectory's time and output arrays. The settling band is 2 %
+    of the response's peak deviation from its final value: 2 % of the final
+    value for a step from rest that neither dips below its start nor overshoots
+    by 100 %, and still defined for a response that returns to zero.
     """
     time = np.asarray(time, dtype=float).reshape(-1)
     y = np.asarray(y, dtype=float).reshape(-1)
@@ -89,9 +92,12 @@ def step_info(time, y) -> StepInfo:
     # Final value y_f: the last sample
     y_final = y[-1]
 
-    # Settled when the last fifth of the record stays within 2 % of y_f
+    # The settling band: 2 % of the peak deviation max |y − y_f|
+    band = 0.02 * np.max(np.abs(y - y_final))
+
+    # Settled when the last fifth of the record stays within the band
     tail = y[time >= 0.8 * time[-1]]
-    settled = np.all(np.abs(tail - y_final) <= 0.02 * max(abs(y_final), 1e-12))
+    settled = np.all(np.abs(tail - y_final) <= band)
 
     # Steady state y_ss = y_f, once settled
     y_ss = float(y_final) if settled else float(np.nan)
@@ -101,13 +107,13 @@ def step_info(time, y) -> StepInfo:
     y_p = float(y[k_p])
     t_p = float(time[k_p])
 
-    # Settling time t_s: the first sample after the last exit from the 2 % band
-    outside = np.flatnonzero(np.abs(y - y_final) > 0.02 * abs(y_final))
+    # Settling time t_s: the first sample after the last exit from the band
+    outside = np.flatnonzero(np.abs(y - y_final) > band)
     t_s = first_sample_after(time, outside) if settled else float(np.nan)
 
     # Rise time and overshoot are relative to a final value: none when the response
-    # has not settled, or settles at zero
-    if not settled or y_final == 0.0:
+    # has not settled, or settles at zero (its final value inside the band)
+    if not settled or abs(y_final) <= band:
         return StepInfo(
             rise_time=float(np.nan),
             settling_time=t_s,

@@ -49,9 +49,9 @@ class RRTStarPlanner(RRTPlanner):
     def __init__(
         self,
         problem,
-        extender,
+        extender=None,
         *,
-        metric=None,
+        metric=euclidean,
         options: RRTOptions | None = None,
         max_nodes=_UNSET,
         goal_bias=_UNSET,
@@ -76,9 +76,6 @@ class RRTStarPlanner(RRTPlanner):
         record_history=_UNSET,
         history_stride=_UNSET,
     ) -> None:
-        if metric is None:
-            metric = euclidean
-
         # Workflow options: the flat keywords over the bag, a plain RRTOptions
         # completed with the RRT* defaults
         star_options = rrt_options_of(
@@ -243,7 +240,7 @@ class RRTStarPlanner(RRTPlanner):
         metric = self.metric
 
         # Steer from the nearest node toward a random sample
-        x_rand = self.goal_biased_sample(rng)
+        x_rand = self.sample_state(rng)
         near = tree.nearest(x_rand, metric)
         edge = self.try_extend(near, x_rand, rng)
         if edge is None:

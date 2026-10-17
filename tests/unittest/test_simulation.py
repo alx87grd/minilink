@@ -8,11 +8,8 @@ import numpy as np
 import pytest
 from minilink.core.backends import array_module
 from minilink.core.system import DEFAULT_SMALLEST_TIME_CONSTANT, DynamicSystem
-from minilink.simulation.simulator import (
-    COMPILE_BACKEND_AUTO,
-    DISCONTINUOUS_AUTO_DT_SCALE,
-    Simulator,
-)
+from minilink.simulation.simulator import COMPILE_BACKEND_AUTO, Simulator
+from minilink.simulation.time_grid import AUTO_DT_SCALE
 
 
 def _have_jax() -> bool:
@@ -156,14 +153,14 @@ class TestNewSimulator(unittest.TestCase):
         )
         self.assertEqual(sim.solver_mode, "euler")
 
-    def test_discontinuous_auto_dt_is_finer(self):
+    def test_discontinuous_auto_dt_is_the_scaled_time_constant(self):
         sim = Simulator(
             DiscontinuousLinearSystem(),
             tf=0.01,
             solver_warnings="ignore",
             verbose=False,
         )
-        expected_dt = DEFAULT_SMALLEST_TIME_CONSTANT * DISCONTINUOUS_AUTO_DT_SCALE
+        expected_dt = DEFAULT_SMALLEST_TIME_CONSTANT * AUTO_DT_SCALE
         self.assertAlmostEqual(sim.t[1] - sim.t[0], expected_dt)
 
     def test_discontinuous_auto_solver_emits_warning(self):
@@ -383,6 +380,42 @@ class TestEulerSolverModes(unittest.TestCase):
         with self.assertRaises(ValueError):
             backend.integrate(self.ev, times, self.plant.x0)
 
+    def test_forced_callable_of_another_size_is_named(self):
+        sim = Simulator(StableLinearSystem(), tf=0.2, n_steps=3, verbose=False)
+        with self.assertRaisesRegex(ValueError, "u callable returned wrong dimension"):
+            sim.solve_forced(lambda t: [t, t])
+
+    def test_rk4_fixedsteps_rejects_nonuniform_grid(self):
+        from minilink.simulation.solvers.rk4_fixed import RK4SolverBackend
+
+        times = np.array([0.0, 0.05, 0.2, 0.25])
+        u = np.zeros((1, times.size))
+        backend = RK4SolverBackend()
+        message = "rk4_fixedsteps requires a uniform time grid"
+        with self.assertRaisesRegex(ValueError, message):
+            backend.integrate(self.ev, times, self.plant.x0)
+        with self.assertRaisesRegex(ValueError, message):
+            backend.integrate_forced(self.ev, times, u, self.plant.x0)
+
+    def test_an_uneven_grid_at_the_nanosecond_scale_is_not_uniform(self):
+        from minilink.analysis.linear import uniform_step
+        from minilink.simulation.simulator import time_grid_is_uniform
+        from minilink.simulation.solvers.euler_fixed import EulerFixedStepSolverBackend
+        from minilink.simulation.solvers.rk4_fixed import RK4SolverBackend
+
+        times = np.array([0.0, 1e-9, 3e-9, 4e-9])
+        for backend in (EulerFixedStepSolverBackend(), RK4SolverBackend()):
+            with self.assertRaisesRegex(ValueError, "requires a uniform time grid"):
+                backend.integrate(self.ev, times, self.plant.x0)
+        self.assertFalse(time_grid_is_uniform(times))
+        with self.assertRaisesRegex(ValueError, "uniform time grid"):
+            uniform_step(times)
+
+        # An even grid at the same scale is uniform
+        even = 1e-9 * np.arange(4)
+        self.assertTrue(time_grid_is_uniform(even))
+        self.assertEqual(uniform_step(even), even[1])
+
     def test_simulator_accepts_euler_fixedsteps(self):
         sim = Simulator(
             StableLinearSystem(),
@@ -460,7 +493,7 @@ class TestStaticSimulatorJax(unittest.TestCase):
 from minilink.control.modelbased import SlidingModeController
 from minilink.core.composition import closed_loop
 from minilink.dynamics.catalog.pendulum.pendulum import Pendulum
-from minilink.simulation.simulator import DISCONTINUOUS_AUTO_DT_SCALE, Simulator
+from minilink.simulation.simulator import Simulator
 
 TF = 1.0
 DT_COARSE = 0.1
@@ -513,7 +546,7 @@ class TestDiscontinuousSolvers(unittest.TestCase):
 
     def test_auto_dt_uses_discontinuous_scale(self):
         sim = Simulator(self.diagram, tf=0.01, solver_warnings="ignore", verbose=False)
-        expected_dt = DEFAULT_SMALLEST_TIME_CONSTANT * DISCONTINUOUS_AUTO_DT_SCALE
+        expected_dt = DEFAULT_SMALLEST_TIME_CONSTANT * AUTO_DT_SCALE
         self.assertAlmostEqual(sim.t[1] - sim.t[0], expected_dt)
 
     def test_euler_matches_f_based_ddq_better_than_rk4_on_coarse_dt(self):
@@ -1104,7 +1137,7 @@ class TestAutomaticTimeGrid(unittest.TestCase):
         sys = StableLinearSystem()
         sys.solver_info["smallest_time_constant"] = 0.1
         sim = Simulator(sys, tf=1.0, solver="rk4_fixedsteps", verbose=False)
-        self.assertAlmostEqual(sim.dt, 0.01)  # 0.1 * SMOOTH_AUTO_DT_SCALE
+        self.assertAlmostEqual(sim.dt, 0.01)  # 0.1 * AUTO_DT_SCALE
         self.assertEqual(sim.n_pts, 101)
 
     def test_discontinuous_plant_defaults_to_euler_with_time_constant_dt(self):
@@ -1181,7 +1214,7 @@ class TestAutomaticTimeGrid(unittest.TestCase):
                 loop.connect("controller", "u", "actuator", "u")
                 loop.connect("actuator", "y", "plant", "u")
                 sim = Simulator(loop, tf=1.0, solver="euler", verbose=False)
-                self.assertAlmostEqual(sim.dt, 0.002)  # 0.02 * SMOOTH_AUTO_DT_SCALE
+                self.assertAlmostEqual(sim.dt, 0.002)  # 0.02 * AUTO_DT_SCALE
 
     def test_a_held_signal_selects_rk4_on_a_divisor_of_its_period(self):
         from minilink import Pendulum, WhiteNoise
@@ -1317,3 +1350,18 @@ class TestDtTimeGrid(unittest.TestCase):
         self.assertEqual(n_pts, 5)
         self.assertAlmostEqual(dt, 0.3)
         np.testing.assert_allclose(t, [0.0, 0.3, 0.6, 0.9, 1.2])
+
+    def test_dt_is_any_positive_finite_scalar_and_always_checked(self):
+        from minilink.simulation.time_grid import build_time_grid
+
+        # A 0-d array is a scalar
+        t, dt, n_pts = build_time_grid(0.0, 1.0, dt=np.array(0.25))
+        self.assertEqual((dt, n_pts), (0.25, 5))
+
+        # Anything else is refused with one message, n_steps given or not
+        message = "dt must be a positive finite scalar"
+        for bad in (np.array([0.1]), "fast", -0.1, np.inf):
+            with self.subTest(dt=bad), self.assertRaisesRegex(ValueError, message):
+                build_time_grid(0.0, 1.0, dt=bad)
+            with self.subTest(dt=bad), self.assertRaisesRegex(ValueError, message):
+                build_time_grid(0.0, 1.0, n_steps=11, dt=bad)

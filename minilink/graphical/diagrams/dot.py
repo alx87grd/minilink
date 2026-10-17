@@ -32,12 +32,16 @@ class GraphvizTopologyExporter(TopologyExporter):
 
     name = "graphviz"
 
-    def export(self, topology, **kwargs):
-        """Build the snapshot's ``graphviz.Digraph``: its blocks, then its wires."""
+    def export(self, topology, *, engine="dot", rankdir="LR"):
+        """Build the snapshot's ``graphviz.Digraph``: its blocks, then its wires.
+
+        ``engine`` is the Graphviz layout program and ``rankdir`` the flow
+        direction; any other keyword is refused.
+        """
         graphviz = require_graphviz()
 
-        graph = graphviz.Digraph(topology.name, engine=kwargs.pop("engine", "dot"))
-        graph.attr(rankdir=kwargs.pop("rankdir", "LR"))
+        graph = graphviz.Digraph(topology.name, engine=engine)
+        graph.attr(rankdir=rankdir)
 
         # The blocks, each nested diagram inside its box
         render_blocks(graph, topology)
@@ -343,8 +347,8 @@ def render_diagram_graph(
                 stacklevel=2,
             )
 
-    # To disk: the requested file, or a temporary one for the PDF viewer
-    need_disk = show_pdf or filename is not None
+    # To disk: the requested file, or a temporary one for the PDF viewer when shown
+    need_disk = (show and show_pdf) or filename is not None
     if not need_disk:
         return drawn
 

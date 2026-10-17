@@ -270,6 +270,16 @@ behaviour-preserving, one module per step.
 
 ### 5.3 v0.3 — GMC714 (December 2026)
 
+**Wave K — consolidation first** (November 2026, after the v0.2 tag and before A1–A3, so
+the new core objects land in a smaller library; plan in TODO §4):
+- **K1** The inventory: every public name and every demo with its callers and a maturity
+  label (final, prototype, dead), the demos mapped to the feature each shows.
+- **K2** Unused features removed, from one ruling pass on K1's table. **[ask — removals]**
+- **K3** Prototype features moved to `minilink/experimental/` (repo-only, off the docs
+  site), from the same pass. **[ask — public names]**
+- **K4** One demo per feature: redundant demos merged or removed, before D1.3 sweeps the
+  rest. **[ask per group]**
+
 **The textbook objects**, before wave C:
 - **A1** `core/fields.py` ([fields.md](docs/plans/fields.md)). **[ask — core]**
 - **A2** Cost parameters ([cost-params.md](docs/plans/cost-params.md)). **[ask — core]**
@@ -318,6 +328,12 @@ public name; v1.0 (§5.5) freezes.
   **[ask — core]**
 - **S30** The glyph / solid rename; **S44** one posed-geometry hook. **[ask]**
 - **V3** The frozen surface: which names the freeze covers. **[ask — public names]**
+
+**The repository's shape** — between terms, after GMC714 and before the freeze:
+- **K5** Course material and/or the research projects in their own repositories
+  (§6). **[ask — student-facing]**
+- **K6** The move, if K5 says so: history kept, the citing course documents updated, the new
+  repositories pinned on a minilink release. **[ask — student-facing]**
 
 **The trust contract:**
 - **V4** Deprecation policy from v1.0: one minor release with a `DeprecationWarning` shim;
@@ -436,6 +452,14 @@ stiffness and damping, the shared pure functions) in
   `RolloutEnvironment` lives once a second band reads it.
 
 **Before v0.9 (the freeze candidate)**
+
+- **Where the course material and the projects live** (K5): `examples/teaching/` (course
+  notebooks, cited by the GRO860 notes and webpage and GRO501's `\colab{}`) and
+  `examples/projects/` (research projects) stay here, or move to their own repositories.
+  Here: one checkout, one CI, renames migrate them in one commit. Apart: a library repo that
+  is only the library, course material versioned per term and pinned on a release, but two
+  CIs and a release before every notebook change that needs a new feature. Move between
+  terms only.
 
 - `HybridDiagram` as a `System` vs `HybridLoop` (S31); the sampled seam's time argument,
   integer ticks (today) or seconds; and whether its run-state caches

@@ -5,6 +5,8 @@
 
 import numpy as np
 
+from minilink.core.options import require_one_of
+
 ###############################################################################
 # Public API
 ###############################################################################
@@ -52,17 +54,22 @@ class GraphicPrimitive:
 class CustomLine(GraphicPrimitive):
     """A generic sequence of connected line segments."""
 
-    def __init__(self, pts, color="blue", linewidth=1, style="-"):
+    def __init__(self, pts, color="blue", linewidth=1, style="-", opacity=1.0):
         """
         Parameters
         ----------
         pts : list or np.ndarray
             Nx2 or Nx3 array of points connected sequentially.
+        opacity : float
+            From 0 (invisible) to 1 (opaque).
         """
         super().__init__(color, linewidth, style)
 
         # Shape
         self.pts = np.array(pts)
+
+        # Style
+        self.opacity = float(opacity)
 
     def points_at(self, t):
         """Nx3 polyline points at playback time *t* (static: time-independent)."""
@@ -642,19 +649,6 @@ def world_to_camera(camera):
     return W
 
 
-def identity_matrix():
-    """4x4 identity transform (primitive drawn at the world origin)."""
-    return np.eye(4)
-
-
-def empty_transform():
-    """Transform that parks a primitive far off-screen (used to hide it)."""
-    # Lazy import: the core kinematics load on first use, not with the primitives
-    from minilink.core.kinematics import translation
-
-    return translation(0.0, 0.0, -1000.0)
-
-
 # Ready-made shapes and poses
 
 
@@ -714,7 +708,7 @@ def vehicle_body(length=1.0, width=0.5, color="blue", opacity=0.85):
         ]
     )
 
-    return CustomLine(pts, color=color, linewidth=2)
+    return CustomLine(pts, color=color, linewidth=2, opacity=opacity)
 
 
 # Extents (used by the auto-fit camera)
@@ -838,12 +832,6 @@ def xy_polyline(trajectory, mask):
     pts = np.column_stack([xy[0], xy[1], np.zeros(xy.shape[1])])
 
     return pts
-
-
-def require_one_of(name, value, choices):
-    """Refuse an option outside its known choices, naming them."""
-    if value not in choices:
-        raise ValueError(f"{name} must be one of {choices}, got {value!r}")
 
 
 def arrow_perp(direction):

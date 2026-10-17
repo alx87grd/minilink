@@ -179,9 +179,30 @@ class MathematicalProgramEvaluator(ABC):
     # Internal machinery
     ###########################################################################
 
+    def check_derivative_shapes(self, z) -> None:
+        """Evaluate every available quantity once at ``z``: each checks its own shape (a JAX evaluator compiles it)."""
+        self.objective(z)
+        self.equality_residual(z)
+        self.inequality_margin(z)
+        if self.has_gradient:
+            self.gradient(z)
+        if self.has_hessian:
+            self.hessian(z)
+        if self.has_jacobian_h:
+            self.jacobian_h(z)
+        if self.has_jacobian_g:
+            self.jacobian_g(z)
+
     def decision_vector(self, z) -> np.ndarray:
         """``z`` as a flat float array of shape ``(n_z,)``."""
         arr = np.asarray(z, dtype=float).reshape(-1)
+        if arr.shape != (self.n_z,):
+            raise ValueError(f"decision vector must have shape ({self.n_z},)")
+        return arr
+
+    def jax_decision_vector(self, z):
+        """``z`` as a flat JAX array of shape ``(n_z,)``, on a JAX evaluator's ``jnp``."""
+        arr = self.jnp.asarray(z).reshape(-1)
         if arr.shape != (self.n_z,):
             raise ValueError(f"decision vector must have shape ({self.n_z},)")
         return arr

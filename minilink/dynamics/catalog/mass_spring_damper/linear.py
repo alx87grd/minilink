@@ -89,6 +89,8 @@ class SingleMass(StateSpaceSystem):
         return {"body": translation(x[0], 0.0, 0.0)}
 
     def get_dynamic_geometry(self, x, u, t=0, params=None):
+        params = self.params if params is None else params
+
         # The spring runs from the wall anchor to the mass's left face
         mass_x = x[0]
         anchor = -2.0
@@ -96,14 +98,20 @@ class SingleMass(StateSpaceSystem):
 
         # The force arrow on the mass, and the spring only when there is one (k ≠ 0)
         geom = {"body": force_arrow(u[0])}
-        if self.params["k"] != 0.0:
+        if params["k"] != 0.0:
             geom["world"] = [spring_between([anchor, 0.0], [left_face, 0.0])]
 
         return geom
 
 
 class TwoMass(StateSpaceSystem):
-    """Two-mass linear spring-damper chain with force on the second mass."""
+    """Two-mass linear spring-damper chain with force on the second mass.
+
+    The springs couple neighbours: ``k1`` ties the first mass to the wall and ``k2``
+    ties the two masses together. Each damper acts on its own mass's absolute
+    velocity (``b1`` on the first mass, ``b2`` on the second), not on the relative
+    velocity across a spring.
+    """
 
     def __init__(self, m=1.0, k=2.0, b=0.2, output_mass=2):
         super().__init__(n=4, m=1, p=1, name="Two Mass Spring Damper")
@@ -208,13 +216,15 @@ class TwoMass(StateSpaceSystem):
         }
 
     def get_dynamic_geometry(self, x, u, t=0, params=None):
+        params = self.params if params is None else params
+
         x1 = x[0] - 2.0
         x2 = x[1]
         anchor = -4.0
 
         # The ground spring only when there is one (k₁ ≠ 0), then the coupling spring
         springs = []
-        if self.params["k1"] != 0.0:
+        if params["k1"] != 0.0:
             springs.append(spring_between([anchor, 0.0], [x1 - 0.3, 0.0]))
         springs.append(spring_between([x1 + 0.3, 0.0], [x2 - 0.3, 0.0]))
 
@@ -222,7 +232,13 @@ class TwoMass(StateSpaceSystem):
 
 
 class ThreeMass(StateSpaceSystem):
-    """Three-mass linear spring-damper chain with force on the third mass."""
+    """Three-mass linear spring-damper chain with force on the third mass.
+
+    The springs couple neighbours: ``k1`` ties the first mass to the wall, ``k2``
+    and ``k3`` tie each mass to the next. Each damper acts on its own mass's
+    absolute velocity (``b1``, ``b2``, ``b3`` on the first, second and third
+    mass), not on the relative velocity across a spring.
+    """
 
     def __init__(self, m=1.0, k=2.0, b=0.2, output_mass=2):
         super().__init__(n=6, m=1, p=1, name="Three Mass Spring Damper")
@@ -346,6 +362,8 @@ class ThreeMass(StateSpaceSystem):
         }
 
     def get_dynamic_geometry(self, x, u, t=0, params=None):
+        params = self.params if params is None else params
+
         x1 = x[0] - 2.0
         x2 = x[1]
         x3 = x[2] + 2.0
@@ -353,7 +371,7 @@ class ThreeMass(StateSpaceSystem):
 
         # The ground spring only when there is one (k₁ ≠ 0), then the two coupling springs
         springs = []
-        if self.params["k1"] != 0.0:
+        if params["k1"] != 0.0:
             springs.append(spring_between([anchor, 0.0], [x1 - 0.28, 0.0]))
         springs.extend(
             [

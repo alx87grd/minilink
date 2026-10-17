@@ -202,24 +202,16 @@ _EXPORTS.update({name: ("minilink.catalog", name) for name in _CATALOG_NAMES})
 __all__, __getattr__, __dir__ = lazy_facade(globals(), _EXPORTS)
 
 
-# Package version
+# Package version: the build's ``_version`` module, else the installed metadata, else
+# 0.0.0; the metadata module is released so the package listing stays the surface
+try:
+    # The build writes _version.py; a source checkout has none
+    from minilink._version import __version__
+except ImportError:
+    from importlib import metadata
 
-
-def package_version():
-    """The version: the build's ``_version`` module, else the installed metadata, else 0.0.0."""
     try:
-        # Lazy import: the build writes _version.py; a source checkout has none
-        from minilink._version import __version__ as ver
-
-        return ver
-    except ImportError:
-        pass
-    try:
-        from importlib.metadata import version as installed_version
-
-        return installed_version("minilink")
+        __version__ = metadata.version("minilink")
     except Exception:
-        return "0.0.0"
-
-
-__version__ = package_version()
+        __version__ = "0.0.0"
+    del metadata

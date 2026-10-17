@@ -271,8 +271,8 @@ class TimeCost(CostFunction):
 
     @classmethod
     def from_system(cls, sys, *, xbar: np.ndarray | None = None, eps: float = 1e-3):
-        """Create a time cost targeting ``xbar`` (default the state origin)."""
-        xbar = np.zeros(int(sys.n)) if xbar is None else xbar
+        """Create a time cost targeting ``xbar`` (default the system's nominal state)."""
+        xbar = sys.state.nominal_value if xbar is None else xbar
 
         return cls(xbar=xbar, eps=eps)
 

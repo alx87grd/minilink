@@ -40,3 +40,28 @@ class OptimizerBackend(ABC):
     ) -> OptimizationResult:
         """Run the backend solver from ``z0``."""
         ...
+
+
+def scipy_constraints_of(program_evaluator: MathematicalProgramEvaluator) -> list:
+    """
+    The program's constraints in SciPy's dict form, as SciPy and Ipopt take them.
+
+    Equalities ``h(z) = 0`` as one ``"eq"`` entry and inequalities ``g(z) ≥ 0``
+    as one ``"ineq"`` entry, each with its Jacobian when the evaluator has one;
+    an empty kind is left out.
+    """
+    constraints = []
+
+    if program_evaluator.n_h > 0:
+        entry = {"type": "eq", "fun": program_evaluator.equality_residual}
+        if program_evaluator.has_jacobian_h:
+            entry["jac"] = program_evaluator.jacobian_h
+        constraints.append(entry)
+
+    if program_evaluator.n_g > 0:
+        entry = {"type": "ineq", "fun": program_evaluator.inequality_margin}
+        if program_evaluator.has_jacobian_g:
+            entry["jac"] = program_evaluator.jacobian_g
+        constraints.append(entry)
+
+    return constraints

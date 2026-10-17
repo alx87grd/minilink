@@ -255,7 +255,7 @@ class System(SharedSystemFacades):
             The input-port ids this output directly feeds through from
             (default: no direct feedthrough).
         """
-        self.validate_output_dependencies(id, dependencies)
+        self.check_output_dependencies(id, dependencies)
 
         self.outputs[id] = OutputPort(
             id,
@@ -474,7 +474,7 @@ class System(SharedSystemFacades):
     # Internal machinery
     ###########################################################################
 
-    def validate_output_dependencies(self, output_id, dependencies):
+    def check_output_dependencies(self, output_id, dependencies):
         """Check the declared dependencies of an output port."""
         if dependencies == "all":
             return

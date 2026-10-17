@@ -395,7 +395,7 @@ def racecar_skin_2d(
         s = -outward_sign(link)
         parts = wheel_2d(s * 0.5 * GEOMETRY["wheel_width"], colors, r)
         for part in parts:
-            part.local_transform = aligned(link)
+            part.local_transform = aligned()
         geometry[link] = parts
 
     # The decks, the Arduino shield, the power bank (dashed), the bumpers, the e-stop
@@ -692,12 +692,12 @@ def axis_rotation(axis, q):
     return T
 
 
-def aligned(link):
-    """Constant offset that re-expresses a link frame with its parent's axes.
+def aligned():
+    """Constant offset that re-expresses a steering hinge frame with its parent's axes.
 
     The steering hinge frames are rotated by the joint rpy ``(0, 1.5708, 0)``;
     geometry authored in chassis-like axes (x forward, y left, z up) at the hinge
-    uses ``local_transform = aligned(link) @ T``.
+    uses ``local_transform = aligned() @ T``.
     """
     T = SE3(rpy_matrix(HINGE_RPY).T, 0.0)
 
@@ -826,9 +826,9 @@ def steering_knuckle(link, colors):
     knuckle = Box(
         length_x=0.016, length_y=0.012, length_z=0.046, color=colors["knuckle"]
     )
-    knuckle.local_transform = aligned(link) @ translation(0.0, s * 0.004, 0.0)
+    knuckle.local_transform = aligned() @ translation(0.0, s * 0.004, 0.0)
     arm = Box(length_x=0.028, length_y=0.006, length_z=0.005, color=colors["knuckle"])
-    arm.local_transform = aligned(link) @ translation(-0.016, -s * 0.004, 0.016)
+    arm.local_transform = aligned() @ translation(-0.016, -s * 0.004, 0.016)
 
     return [knuckle, arm]
 

@@ -2,7 +2,11 @@
 
 import numpy as np
 
-from minilink.simulation.solvers.solver import SolverBackend
+from minilink.simulation.solvers.solver import (
+    SolverBackend,
+    fixed_step_debug,
+    require_uniform_times,
+)
 
 ###############################################################################
 # Public API
@@ -24,7 +28,7 @@ class EulerFixedStepSolverBackend(SolverBackend):
     ) -> np.ndarray:
         n_pts = times.shape[0]
         t0 = times[0]
-        dt = require_uniform_times(times)
+        dt = require_uniform_times(times, "euler_fixedsteps")
         n_steps = n_pts - 1
 
         # x_{k+1} = x_k + Δt f(x_k, ū, t_k), n_steps steps from x₀ in one compiled rollout
@@ -32,14 +36,7 @@ class EulerFixedStepSolverBackend(SolverBackend):
         x_traj = np.asarray(x_seq).T  # (n, n_pts)
 
         # The run's record: one evaluation of f per step
-        self.last_debug = {
-            "solver": "euler_fixedsteps",
-            "mode": "nominal",
-            "nfev": max(n_pts - 1, 0),
-            "njev": 0,
-            "nlu": 0,
-            "n_t": n_pts,
-        }
+        self.last_debug = fixed_step_debug("euler_fixedsteps", "nominal", n_pts, 1)
 
         return x_traj
 
@@ -53,7 +50,7 @@ class EulerFixedStepSolverBackend(SolverBackend):
     ) -> np.ndarray:
         n_pts = times.shape[0]
         t0 = times[0]
-        dt = require_uniform_times(times)
+        dt = require_uniform_times(times, "euler_fixedsteps")
 
         # The samples that drive a step: the last one starts none
         u_sequence = np.asarray(u[:, : n_pts - 1].T)
@@ -63,32 +60,6 @@ class EulerFixedStepSolverBackend(SolverBackend):
         x_traj = np.asarray(x_seq).T
 
         # The run's record: one evaluation of f per step
-        self.last_debug = {
-            "solver": "euler_fixedsteps",
-            "mode": "forced",
-            "nfev": max(n_pts - 1, 0),
-            "njev": 0,
-            "nlu": 0,
-            "n_t": n_pts,
-        }
+        self.last_debug = fixed_step_debug("euler_fixedsteps", "forced", n_pts, 1)
 
         return x_traj
-
-
-###############################################################################
-# Internal machinery
-###############################################################################
-
-
-def require_uniform_times(times: np.ndarray) -> float:
-    """Refuse knots that are not evenly spaced; return the common step."""
-    n_pts = times.shape[0]
-    if n_pts < 2:
-        return 0.0
-    dt = float(times[1] - times[0])
-    if not np.allclose(np.diff(times), dt):
-        raise ValueError(
-            "euler_fixedsteps requires a uniform time grid; use solver='euler' "
-            "for variable dt between knots"
-        )
-    return dt

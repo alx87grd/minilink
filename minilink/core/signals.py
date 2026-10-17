@@ -216,9 +216,8 @@ def infer_signal_dim(
     """
     # An explicit dim wins
     if dim is not None:
+        require_signal_dim(dim, signal_id)
         dim = int(dim)
-        if dim < 0:
-            raise ValueError(f"dim for signal '{signal_id}' must be nonnegative")
         return dim
 
     # The length each provided field implies
@@ -249,6 +248,16 @@ def infer_signal_dim(
             )
 
     return first_dim
+
+
+def require_signal_dim(dim, signal_id):
+    """Refuse a dimension that is a bool, not a whole number, or negative."""
+    if isinstance(dim, (bool, np.bool_)) or int(dim) != dim:
+        raise ValueError(
+            f"dim for signal '{signal_id}' must be a whole number, got {dim!r}"
+        )
+    if dim < 0:
+        raise ValueError(f"dim for signal '{signal_id}' must be nonnegative")
 
 
 def length_or_none(value, *, field_name, signal_id):

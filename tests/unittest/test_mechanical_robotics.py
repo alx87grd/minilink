@@ -715,6 +715,14 @@ class TestRoboticWrappers(unittest.TestCase):
         expected = np.linalg.solve(J, p_d - p)
         np.testing.assert_allclose(dq, expected)
 
+    def test_task_kinematic_builds_from_a_plant_with_a_task_dim(self):
+        arm = TwoLinkManipulator()  # task_dim, no effector_dim
+        for law in (TaskKinematic, TaskKinematicNullspace):
+            with self.subTest(law=law.__name__):
+                ctl = law(arm)
+                self.assertEqual(ctl.outputs["u"].dim, arm.dof)
+                self.assertEqual(ctl.inputs["r"].dim, arm.task_dim)
+
     def test_task_kinematic_closed_loop_y(self):
         arm = SpeedControlledManipulator.from_manipulator(TwoLinkManipulator())
         diagram = closed_loop(TaskKinematic(arm), arm)

@@ -27,7 +27,7 @@ from minilink.core.compile.execution_plan import (
     ExecutionPlan,
 )
 from minilink.core.compile.step_execution_plan import StepExecutionPlan
-from minilink.core.diagram import validate_diagram_params
+from minilink.core.diagram import check_diagram_params
 from minilink.core.step_rollout import StepRollout
 from minilink.core.system import DynamicSystem, StepSystem, System
 
@@ -969,7 +969,7 @@ class JaxDiagramEvaluator(
         return dx
 
     def _jac_validate_params(self, params):
-        validate_diagram_params(params, self._subsystem_ids)
+        check_diagram_params(params, self._subsystem_ids)
 
     def _jac_probe(self, target, wire=None):
         kind, key = target
@@ -1010,21 +1010,21 @@ class JaxDiagramEvaluator(
         return self._outputs_trace_fn(x, u, t)
 
     def f_p(self, x, u, t, params):
-        validate_diagram_params(params, self._subsystem_ids)
+        check_diagram_params(params, self._subsystem_ids)
         return self._f_jit_p_fn(x, u, t, params)
 
     def f_trace_p(self, x, u, t, params):
         """Pre-JIT parametric dynamics for JAX composition."""
-        validate_diagram_params(params, self._subsystem_ids)
+        check_diagram_params(params, self._subsystem_ids)
         return self._f_trace_p_fn(x, u, t, params)
 
     def outputs_p(self, x, u, t, params):
-        validate_diagram_params(params, self._subsystem_ids)
+        check_diagram_params(params, self._subsystem_ids)
         return self._outputs_jit_p_fn(x, u, t, params)
 
     def outputs_trace_p(self, x, u, t, params):
         """Pre-JIT parametric boundary outputs for JAX composition."""
-        validate_diagram_params(params, self._subsystem_ids)
+        check_diagram_params(params, self._subsystem_ids)
         return self._outputs_trace_p_fn(x, u, t, params)
 
     def compute_internal_signals(self, x, u, t=0.0):
@@ -1452,7 +1452,7 @@ class JaxStepDiagramEvaluator(
         }
 
     def _jac_validate_params(self, params):
-        validate_diagram_params(params, self._subsystem_ids)
+        check_diagram_params(params, self._subsystem_ids)
 
     def _jac_probe(self, target, wire=None):
         kind, key = target

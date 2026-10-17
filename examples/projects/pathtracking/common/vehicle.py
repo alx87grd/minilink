@@ -637,10 +637,10 @@ class RearDriveBicycle(ForceInputBicycle):
         Fz_r = mass * gravity * (a / L)
 
         # Load torque on each wheel: τ_r = r_r F_xr + b_wr ω_r + c_rr F_zr sign(ω_r),
-        # τ_f = r_f F_xf + b_wf ω_f + c_rr F_zf sign(ω_r)
+        # τ_f = r_f F_xf + b_wf ω_f + c_rr F_zf sign(ω_f)
         Tau_load_rear = r_r * Fx_rear + bw_rear * w_rear + c_rr * Fz_r * np.sign(w_rear)
         Tau_load_front = (
-            r_f * Fx_front + bw_front * w_front + c_rr * Fz_f * np.sign(w_rear)
+            r_f * Fx_front + bw_front * w_front + c_rr * Fz_f * np.sign(w_front)
         )
 
         # The external forces: the body wrench, and the load torques against each spin
@@ -681,7 +681,8 @@ class RearDriveBicycle(ForceInputBicycle):
         min_steer = self.min_steer
         max_steer = self.max_steer
 
-        # The steer command held inside its limits, in the caller's u itself
+        # The steer command held inside its limits, on a copy of the caller's u
+        u = np.array(u, dtype=float)
         u[1] = np.clip(u[1], min_steer, max_steer)
 
         q, v = self.x2q(x)
@@ -984,13 +985,13 @@ class LinearTire(TireModel):
         Fx = Ck * kappa
         Fy = Ca * alpha
 
-        # Friction circle: √(F_x² + F_y²) ≤ μ F_z
+        # Friction circle: √(F_x² + F_y²) ≤ μ F_z, each force scaled back by
+        # min(1, μ F_z / √(F_x² + F_y²)), the norm floored at 10⁻¹²
         F_max = mu * Fz
         F_total = np.sqrt(Fx**2 + Fy**2)
-        if F_total > F_max:
-            ratio = F_max / F_total
-            Fx *= ratio
-            Fy *= ratio
+        ratio = np.minimum(1.0, F_max / np.maximum(F_total, 1e-12))
+        Fx = Fx * ratio
+        Fy = Fy * ratio
 
         return Fx, Fy
 
@@ -1085,13 +1086,13 @@ class Pacejka(TireModel):
             G_yk = self.Gyk(kappa, alpha)
             Fy *= G_yk
         elif mode == "c":
-            # Friction circle: √(F_x² + F_y²) ≤ μ F_z
+            # Friction circle: √(F_x² + F_y²) ≤ μ F_z, each force scaled back by
+            # min(1, μ F_z / √(F_x² + F_y²)), the norm floored at 10⁻¹²
             F_max = mu * Fz
             F_total = np.sqrt(Fx**2 + Fy**2)
-            if F_total > F_max:
-                ratio = F_max / F_total
-                Fx *= ratio
-                Fy *= ratio
+            ratio = np.minimum(1.0, F_max / np.maximum(F_total, 1e-12))
+            Fx = Fx * ratio
+            Fy = Fy * ratio
 
         return Fx, Fy
 
@@ -1132,8 +1133,8 @@ class Pacejka(TireModel):
         C = r_Cy1
         E = r_Ey1 + r_Ey2 * d_fz
 
-        # G_yκ = cos(C atan(B κ − E (B − atan B)))
-        ratio = np.cos(C * np.arctan(B * k - E * (B - np.arctan(B))))
+        # G_yκ = cos(C atan(B κ − E (B κ − atan(B κ))))
+        ratio = np.cos(C * np.arctan(B * k - E * (B * k - np.arctan(B * k))))
 
         return ratio
 

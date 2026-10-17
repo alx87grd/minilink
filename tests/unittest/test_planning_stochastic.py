@@ -382,6 +382,36 @@ def test_monte_carlo_applies_the_law_beyond_the_port_bounds():
     np.testing.assert_allclose(reports["simulator"].J, reports["numpy"].J, rtol=0.1)
 
 
+def test_an_exiting_trial_scores_alike_on_numpy_and_the_simulator():
+    """An exit is charged the trial environment's price on both backends."""
+    import warnings
+
+    from minilink.control import StateFeedbackController
+    from minilink.planning.evaluation import MonteCarloEvaluator
+
+    plant = pendulum()
+    plant.inputs["u"].lower_bound = np.array([-1.0])
+    plant.inputs["u"].upper_bound = np.array([1.0])
+    problem = StochasticPlanningProblem(
+        plant,
+        cost=quadratic(plant),
+        tf=np.inf,
+        X=plant.state.box,
+        x0_distribution=Particles([[6.0, 5.0]]),  # leaves θ ≤ 2π within 0.1 s
+    )
+    ctl = StateFeedbackController(K=[[0.0, 0.0]])
+    reports = {}
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")  # the announced price of leaving X
+        for backend in ("numpy", "simulator"):
+            reports[backend] = MonteCarloEvaluator(
+                problem, dt=0.01, n_trials=1, episode_length=1.0, backend=backend
+            ).evaluate(ctl)
+    assert reports["numpy"].failed[0] and reports["simulator"].failed[0]
+    assert np.isfinite(reports["numpy"].J[0])
+    np.testing.assert_allclose(reports["simulator"].J, reports["numpy"].J, rtol=0.05)
+
+
 def test_simulator_backend_scores_a_controller_with_internal_state():
     """The controller state is stacked first; the score reads the plant's own trajectory."""
     from minilink import PID, SingleMass
@@ -577,10 +607,30 @@ def test_deterministic_planner_warns_on_a_stochastic_problem():
         tf=2.0,
         x0_distribution=Uniform([-0.1, -0.1], [0.1, 0.1]),
     )
-    with pytest.warns(UserWarning, match="deterministic planner"):
+    with pytest.warns(
+        UserWarning, match="deterministic planner: it reads the start set X0"
+    ):
         TrajectoryOptimizationPlanner(
             problem, n_steps=5, transcription="direct_collocation"
         )
+
+
+def test_nominal_keeps_the_mean_start_and_drops_the_support_and_x_start():
+    from minilink.core.sets import SingletonSet
+
+    plant = pendulum()
+    problem = StochasticPlanningProblem(
+        plant,
+        cost=quadratic(plant),
+        tf=2.0,
+        x_start=[0.05, 0.0],
+        x0_distribution=Uniform([-0.1, -0.1], [0.1, 0.1]),
+    )
+    assert problem.X0.contains(np.array([0.08, -0.08]))  # the support
+    nominal = problem.nominal()
+    np.testing.assert_allclose(nominal.x_start, [0.0, 0.0])  # the mean
+    assert isinstance(nominal.X0, SingletonSet)
+    np.testing.assert_allclose(nominal.X0.point, [0.0, 0.0])
 
 
 def test_gymnasium_view_of_a_stochastic_problem():

@@ -76,22 +76,28 @@ class ConstantSpeedKinematicCar(DynamicSystem):
         return x
 
     def tf(self, x, u, t=0, params=None):
-        full_u = self.bicycle_input(u)
+        params = self.params if params is None else params
 
-        return KinematicBicycle.tf(self, x, full_u, t)
+        full_u = self.bicycle_input(u, params)
+
+        return KinematicBicycle.tf(self, x, full_u, t, params)
 
     def get_dynamic_geometry(self, x, u, t=0, params=None):
-        full_u = self.bicycle_input(u)
+        params = self.params if params is None else params
 
-        return KinematicBicycle.get_dynamic_geometry(self, x, full_u, t)
+        full_u = self.bicycle_input(u, params)
+
+        return KinematicBicycle.get_dynamic_geometry(self, x, full_u, t, params)
 
     ###########################################################################
     # Internal machinery
     ###########################################################################
 
-    def bicycle_input(self, u):
+    def bicycle_input(self, u, params=None):
         """The kinematic bicycle's input ``[speed, steering]``, at the fixed speed."""
-        speed = self.params["speed"]
+        params = self.params if params is None else params
+
+        speed = params["speed"]
 
         steering = u[0]
         full_u = np.array([speed, steering])

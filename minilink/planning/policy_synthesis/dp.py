@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from collections.abc import Callable
 from dataclasses import dataclass, replace
+from functools import partial
 
 import numpy as np
 
@@ -105,6 +106,7 @@ class DynamicProgrammingPlanner(Planner):
         self.result: DynamicProgrammingResult | None = None  # Latest solve's tables
         self._G = None  # Running-cost table, built once when the grid is precomputed
         self._jax_cache = {}  # The JAX engine's device tables and compiled loops
+        self._cached_options = None  # The options those two were built with
 
         # The JAX engine builds the grid's transition tables with JAX
         if self.options.backend == BACKEND_JAX:
@@ -160,6 +162,10 @@ class DynamicProgrammingPlanner(Planner):
         tf = opt.final_time
         dt = self.grid.dt
         tol = opt.tol
+
+        # The cached tables and compiled loops, rebuilt when an option they bake in
+        # has changed since they were built
+        self.forget_stale_caches()
 
         # The JAX engine runs these same sweeps, jitted on device
         if opt.backend == BACKEND_JAX:
@@ -406,9 +412,9 @@ class DynamicProgrammingPlanner(Planner):
         return LookupTableController(self.result.grid, self.result.pi, **kwargs)
 
     def value_at(self, x) -> float:
-        """Interpolate the cost-to-go at the latest solve."""
+        """Interpolate the cost-to-go at the latest solve, by the options' interpolation."""
         self.require_solution()
-        return self.result.value_at(x)
+        return self.result.value_at(x, self.options.interpolation)
 
     def nominal_trajectory(self, tf=None):
         """The greedy law from the problem's start on the grid's control period."""
@@ -473,6 +479,15 @@ class DynamicProgrammingPlanner(Planner):
     # Internal machinery
     ###########################################################################
 
+    def forget_stale_caches(self) -> None:
+        """Clear the running-cost table and the JAX engine's caches when an option they bake in has changed."""
+        snapshot = cached_options_of(self.options)
+
+        if snapshot != self._cached_options:
+            self._G = None
+            self._jax_cache = {}
+            self._cached_options = snapshot
+
     def dp_result_to_planning_solution(
         self, result: DynamicProgrammingResult, *, fixed_horizon, evaluate, n_trials
     ) -> PlanningSolution:
@@ -515,9 +530,11 @@ class DynamicProgrammingPlanner(Planner):
             trajectory = nominal_trajectory(self.problem, policy, dt=dt)
             evaluation = self.evaluate(policy, dt=dt, n_trials=n_trials)
 
-        # The solution: the law, the record, the rollout, the interpolated cost-to-go
+        # The solution: the law, the record, the rollout, the cost-to-go interpolated
+        # as the planner's options say
+        cost_to_go = partial(result.value_at, method=self.options.interpolation)
         solution = PlanningSolution(
-            self.problem, policy, record, trajectory, evaluation, result.value_at
+            self.problem, policy, record, trajectory, evaluation, cost_to_go
         )
 
         return self.store_solution(solution)
@@ -611,9 +628,11 @@ class DynamicProgrammingResult:
     delta: float
     history: list | None = None
 
-    def value_at(self, x) -> float:
-        """Interpolate the cost-to-go at an arbitrary state ``x``."""
-        return float(self.grid.interpolate(self.J, np.atleast_2d(x))[0])
+    def value_at(self, x, method="linear") -> float:
+        """Interpolate the cost-to-go at an arbitrary state ``x`` (``method``: the grid's interpolation)."""
+        J = self.grid.interpolate(self.J, np.atleast_2d(x), method)
+
+        return float(J[0])
 
     def save(self, path: str) -> None:
         """Save ``J`` and ``pi`` to ``path`` (single ``.npz``)."""
@@ -705,6 +724,17 @@ def options_of(problem, grid, options, **flat) -> DynamicProgrammingOptions:
         raise ValueError(f"Unknown backend {opt.backend!r}")
 
     return opt
+
+
+def cached_options_of(options) -> tuple:
+    """The options the cached tables and compiled loops bake in: ``alpha``, ``tol``, ``interpolation``, ``final_time``, ``out_of_bound_cost``."""
+    return (
+        options.alpha,
+        options.tol,
+        options.interpolation,
+        options.final_time,
+        options.out_of_bound_cost,
+    )
 
 
 def infeasible_penalty(price, x_next, t):

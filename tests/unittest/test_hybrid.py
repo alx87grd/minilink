@@ -200,6 +200,25 @@ class TestHybridSimulator(unittest.TestCase):
         self.assertIsInstance(result.plant, Trajectory)
         self.assertIn("u_cmd", result.computer.signals)
 
+    def test_initial_states_are_finite_flat_vectors(self):
+        hybrid = _build_hybrid()
+        with self.assertRaisesRegex(ValueError, r"x0_plant must be a 1-D array"):
+            HybridSimulator(hybrid, t0=0, tf=0.1, x0_plant=np.zeros((1, 1)))
+        with self.assertRaisesRegex(ValueError, r"x0_plant must have shape \(1,\)"):
+            HybridSimulator(hybrid, t0=0, tf=0.1, x0_plant=np.zeros(2))
+        with self.assertRaisesRegex(ValueError, "x0_plant must contain only finite"):
+            HybridSimulator(hybrid, t0=0, tf=0.1, x0_plant=np.array([np.nan]))
+        sim = HybridSimulator(hybrid, t0=0, tf=0.1, x0_plant=[0.5])
+        np.testing.assert_array_equal(sim.x0_plant, [0.5])
+
+    def test_forced_input_refuses_nan_and_a_callable_of_another_size(self):
+        sim = HybridSimulator(_build_hybrid(), t0=0, tf=0.05, n_steps=5)
+        for u in (np.array([np.nan]), lambda t: np.nan):
+            with self.assertRaisesRegex(ValueError, "must contain only finite values"):
+                sim.solve_forced(u, input_port_id="r")
+        with self.assertRaisesRegex(ValueError, "callable returned wrong dimension"):
+            sim.solve_forced(lambda t: [t, t], input_port_id="r")
+
     def test_one_tick_measurement_delay(self):
         hybrid = _build_hybrid()
         sim = HybridSimulator(hybrid, t0=0, tf=0.05, n_steps=5)
@@ -531,6 +550,15 @@ def _reference(k):
 
 
 class TestHybridMultiRate(unittest.TestCase):
+    def test_schedule_keeps_its_own_divisors(self):
+        fire = {"controller": 2.0}
+        schedule = StepSchedule(dt_base=0.01, fire=fire)
+        self.assertEqual(schedule.fire, {"controller": 2})
+        self.assertIs(type(schedule.fire["controller"]), int)
+        self.assertIs(type(fire["controller"]), float)  # the caller's dict untouched
+        fire["controller"] = 5
+        self.assertEqual(schedule.fire, {"controller": 2})
+
     def test_scheduled_hybrid_runs(self):
         hybrid = _build_hybrid_hybrid_topology()
         sim = HybridSimulator(hybrid, t0=0, tf=1.6)

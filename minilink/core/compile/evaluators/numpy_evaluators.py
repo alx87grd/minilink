@@ -21,7 +21,7 @@ from minilink.core.compile.evaluators.step_rollout import StepRolloutMixin, gath
 from minilink.core.compile.evaluators.tiers import NoTraceTierMixin
 from minilink.core.compile.execution_plan import ExecutionPlan
 from minilink.core.compile.step_execution_plan import StepExecutionPlan
-from minilink.core.diagram import validate_diagram_params
+from minilink.core.diagram import check_diagram_params
 from minilink.core.system import DynamicSystem, StepSystem, System
 
 # =============================================================================
@@ -362,7 +362,7 @@ class NumpyDiagramEvaluator(
         return dx
 
     def f_p(self, x, u, t, params):
-        validate_diagram_params(params, self._subsystem_ids)
+        check_diagram_params(params, self._subsystem_ids)
         signals = self._compute_port_signals_p(x, u, t, params)
         return self._dx_from_signals_p(x, u, t, params, signals)
 
@@ -376,7 +376,7 @@ class NumpyDiagramEvaluator(
         return dx
 
     def _jac_validate_params(self, params):
-        validate_diagram_params(params, self._subsystem_ids)
+        check_diagram_params(params, self._subsystem_ids)
 
     def _jac_probe(self, target, wire=None):
         kind, key = target
@@ -406,7 +406,7 @@ class NumpyDiagramEvaluator(
         }
 
     def outputs_p(self, x, u, t, params):
-        validate_diagram_params(params, self._subsystem_ids)
+        check_diagram_params(params, self._subsystem_ids)
         signals = self._compute_port_signals_p(x, u, t, params)
         return {
             port_id: signals[sl]
@@ -551,7 +551,7 @@ class NumpyStepDiagramEvaluator(
         return x_new
 
     def step_p(self, x, u, k, params):
-        validate_diagram_params(params, self._subsystem_ids)
+        check_diagram_params(params, self._subsystem_ids)
         signals = self._compute_port_signals_p(x, u, k, params)
         return self._x_next_from_signals_p(x, u, k, params, signals)
 
@@ -565,7 +565,7 @@ class NumpyStepDiagramEvaluator(
         return x_new
 
     def _jac_validate_params(self, params):
-        validate_diagram_params(params, self._subsystem_ids)
+        check_diagram_params(params, self._subsystem_ids)
 
     def _jac_probe(self, target, wire=None):
         kind, key = target
@@ -595,7 +595,7 @@ class NumpyStepDiagramEvaluator(
         }
 
     def outputs_p(self, x, u, k, params):
-        validate_diagram_params(params, self._subsystem_ids)
+        check_diagram_params(params, self._subsystem_ids)
         signals = self._compute_port_signals_p(x, u, k, params)
         return {
             port_id: signals[sl]

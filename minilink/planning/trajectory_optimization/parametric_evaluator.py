@@ -3,6 +3,9 @@
 import numpy as np
 
 from minilink.core.backends import ensure_jax_x64, require_jax, require_jax_numpy
+from minilink.optimization.evaluators.program_evaluator import (
+    MathematicalProgramEvaluator,
+)
 from minilink.planning.trajectory_optimization.parametric_program import (
     ParametricMathematicalProgram,
 )
@@ -12,14 +15,16 @@ from minilink.planning.trajectory_optimization.parametric_program import (
 ###############################################################################
 
 
-class JaxParametricProgramEvaluator:
+class JaxParametricProgramEvaluator(MathematicalProgramEvaluator):
     """
     JIT-compiled evaluator for :class:`ParametricMathematicalProgram`.
 
     Equality constraints depend on both ``z`` and a bound runtime parameter
     ``x0``. Call :meth:`bind` before each solve to set the current initial
-    state. The SciPy-facing surface matches
-    :class:`~minilink.optimization.evaluators.program_evaluator.MathematicalProgramEvaluator`.
+    state. A
+    :class:`~minilink.optimization.evaluators.program_evaluator.MathematicalProgramEvaluator`:
+    the SciPy-facing surface is the base class's, the constraint summary reads
+    ``z`` flattened, and the shape check runs at the sample ``x0`` too.
     """
 
     def __init__(
@@ -42,18 +47,13 @@ class JaxParametricProgramEvaluator:
                 "Install with `pip install jax jaxlib`."
             ) from exc
 
-        # The program and its sizes
+        # The program, its sizes and the sample point every function is traced and
+        # compiled at
+        super().__init__(program, sample_z)
         self.jax = jax
         self.jnp = jnp
-        self.program = program
         self.backend = "jax"
-        self.n_z = int(program.n_z)
         self.n_x0 = int(program.n_x0)
-
-        # The sample point every function is traced and compiled at
-        self.sample_z = self.decision_vector(
-            np.zeros(self.n_z) if sample_z is None else sample_z
-        )
         self._x0 = jnp.asarray(
             np.zeros(self.n_x0) if sample_x0 is None else sample_x0,
             dtype=jnp.float64,
@@ -141,16 +141,7 @@ class JaxParametricProgramEvaluator:
     def g(self, z):
         return self._jit_g(self.jax_decision_vector(z))
 
-    # The SciPy-facing surface: floats and flat NumPy arrays
-
-    def objective(self, z) -> float:
-        return self.as_scalar(self.J(z), "objective")
-
-    def equality_residual(self, z) -> np.ndarray:
-        return self.as_vector(self.h(z), self.n_h, "equality residual")
-
-    def inequality_margin(self, z) -> np.ndarray:
-        return self.as_vector(self.g(z), self.n_g, "inequality margin")
+    # The derivatives, on the bound initial state
 
     def gradient(self, z) -> np.ndarray:
         value = self._jit_grad_J(self.jax_decision_vector(z))
@@ -191,32 +182,9 @@ class JaxParametricProgramEvaluator:
             bound_inf = max(bound_inf, float(np.max(np.maximum(z_arr - upper, 0.0))))
         return eq_inf, min_ineq, bound_inf
 
-    def scipy_bounds(self):
-        """SciPy ``minimize`` bounds, or ``None`` when the program sets none."""
-        if self.program.lower is None and self.program.upper is None:
-            return None
-        lower = (
-            np.full(self.n_z, -np.inf)
-            if self.program.lower is None
-            else self.program.lower
-        )
-        upper = (
-            np.full(self.n_z, np.inf)
-            if self.program.upper is None
-            else self.program.upper
-        )
-        return list(zip(lower, upper))
-
     ###########################################################################
     # Internal machinery
     ###########################################################################
-
-    def decision_vector(self, z) -> np.ndarray:
-        """``z`` as a flat float NumPy array of shape ``(n_z,)``."""
-        arr = np.asarray(z, dtype=float).reshape(-1)
-        if arr.shape != (self.n_z,):
-            raise ValueError(f"decision vector must have shape ({self.n_z},)")
-        return arr
 
     def require_traceable(self, fn, z_sample, label: str) -> None:
         """Refuse a function that does not trace under JAX at ``z_sample`` (a NumPy-only callable)."""
@@ -238,31 +206,3 @@ class JaxParametricProgramEvaluator:
             self.jacobian_h(z_sample)
         if self.has_jacobian_g:
             self.jacobian_g(z_sample)
-
-    def jax_decision_vector(self, z):
-        """``z`` as a flat JAX array of shape ``(n_z,)``."""
-        arr = self.jnp.asarray(z).reshape(-1)
-        if arr.shape != (self.n_z,):
-            raise ValueError(f"decision vector must have shape ({self.n_z},)")
-        return arr
-
-    def as_scalar(self, value, label: str) -> float:
-        """``value`` as a Python float; refuses anything but one element."""
-        arr = np.asarray(value, dtype=float)
-        if arr.size != 1:
-            raise ValueError(f"{label} must return a scalar")
-        return float(arr.reshape(-1)[0])
-
-    def as_vector(self, value, n_expected: int, label: str) -> np.ndarray:
-        """``value`` as a flat float NumPy array of shape ``(n_expected,)``."""
-        arr = np.asarray(value, dtype=float).reshape(-1)
-        if arr.shape != (n_expected,):
-            raise ValueError(f"{label} must have shape ({n_expected},)")
-        return arr
-
-    def as_matrix(self, value, shape: tuple[int, ...], label: str) -> np.ndarray:
-        """``value`` as a float NumPy array of exactly ``shape``."""
-        arr = np.asarray(value, dtype=float)
-        if arr.shape != shape:
-            raise ValueError(f"{label} must have shape {shape}")
-        return arr

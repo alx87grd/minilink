@@ -10,6 +10,7 @@ from minilink.optimization.mathematical_program import OptimizationResult
 from minilink.optimization.optimizers.optimizer_backend import (
     BackendIterateCallback,
     OptimizerBackend,
+    scipy_constraints_of,
 )
 
 ###############################################################################
@@ -41,19 +42,7 @@ class ScipyMinimizeOptimizer(OptimizerBackend):
         """Solve ``program_evaluator`` with SciPy and return a backend-neutral result."""
         # Equalities h(z) = 0 and inequalities g(z) ≥ 0, each with its Jacobian when
         # the evaluator has one
-        constraints = []
-
-        if program_evaluator.n_h > 0:
-            entry = {"type": "eq", "fun": program_evaluator.equality_residual}
-            if program_evaluator.has_jacobian_h:
-                entry["jac"] = program_evaluator.jacobian_h
-            constraints.append(entry)
-
-        if program_evaluator.n_g > 0:
-            entry = {"type": "ineq", "fun": program_evaluator.inequality_margin}
-            if program_evaluator.has_jacobian_g:
-                entry["jac"] = program_evaluator.jacobian_g
-            constraints.append(entry)
+        constraints = scipy_constraints_of(program_evaluator)
 
         # The user's hook, fed the iterate z in whichever form the method passes it
         scipy_callback = None

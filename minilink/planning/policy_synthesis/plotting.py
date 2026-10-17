@@ -2,6 +2,8 @@
 
 import numpy as np
 
+from minilink.planning.plotting import maybe_show
+
 # The value-iteration result is a node-indexed field over the state grid: these
 # views reshape it, take a 2-D slice when n > 2, and draw it as a heatmap, a 3-D
 # surface or an animation over the recorded sweeps. Matplotlib is imported inside
@@ -44,7 +46,7 @@ def plot_cost2go(
                 axes=pair,
                 anchor=anchor,
                 vmin=vmin,
-                show_3d=False,
+                show_3d=show_3d,
                 trajectory=None,
                 cmap=cmap,
                 title=title,
@@ -185,7 +187,12 @@ def animate_cost2go(
     save_path=None,
     show=True,
 ):
-    """Animate cost-to-go sweeps recorded on ``result.history``."""
+    """
+    Animate cost-to-go sweeps recorded on ``result.history``.
+
+    The colours span ``[0, jmax]``; without ``jmax``, the range of the last
+    sweep's slice.
+    """
     require_history(result)
 
     return animate(
@@ -194,6 +201,7 @@ def animate_cost2go(
         kind="value",
         axes=axes,
         anchor=anchor,
+        vmax=jmax,
         interval=interval,
         show=show,
         save_path=save_path,
@@ -289,6 +297,7 @@ def animate(
     axis=0,
     axes=(0, 1),
     anchor=None,
+    vmax=None,
     interval=60,
     show=True,
     save_path=None,
@@ -298,7 +307,8 @@ def animate(
 
     ``kind`` is ``"value"`` (the cost-to-go ``J``) or ``"policy"`` (input
     ``axis`` of the greedy law); ``history`` is the ``(t, J, pi)`` list from a
-    solve.
+    solve. A value is coloured on ``[0, vmax]``, by default up to the largest
+    value of the last sweep's slice.
     """
     import matplotlib.animation as animation
     import matplotlib.pyplot as plt
@@ -321,6 +331,12 @@ def animate(
     )
     cmap = "bwr" if kind == "policy" else "YlOrRd"
     mesh = ax.pcolormesh(x_level, y_level, Z.T, shading="gouraud", cmap=cmap)
+
+    # A value's colours span [0, vmax], the last sweep's largest value by default,
+    # so every frame shares one scale
+    if kind == "value":
+        mesh.set_clim(vmin=0.0, vmax=last_sweep_max(grid, history, axes, anchor, vmax))
+
     label_axes(ax, grid, axes)
     fig.colorbar(mesh, ax=ax)
 
@@ -400,12 +416,6 @@ def overlay_trajectory(ax, trajectory, axes, labels):
     ax.legend(loc="upper right", fontsize=8)
 
 
-def maybe_show(plt, show):
-    """Show the figures, unless asked not to or on the non-interactive Agg backend."""
-    if show and plt.get_backend().lower() != "agg":
-        plt.show()
-
-
 def plot_policy_field(grid, pi, *, axis, axes, anchor, cmap, ax, show):
     """Heatmap of input ``axis`` of a policy table, scaled to that input's bounds."""
     u_axis = grid.input_from_policy(pi)[:, axis]
@@ -432,6 +442,17 @@ def axis_list_of(axis, axes):
         return axis
 
     return [axis] * len(axes)
+
+
+def last_sweep_max(grid, history, axes, anchor, vmax):
+    """The colour limit ``vmax`` as given, else the largest value of the last sweep's slice."""
+    if vmax is not None:
+        return vmax
+
+    _, J_last, _ = history[-1]
+    Z = grid.slice_2d(grid.grid_from_array(J_last), axes[0], axes[1], anchor=anchor)
+
+    return float(np.max(Z))
 
 
 def require_history(result):

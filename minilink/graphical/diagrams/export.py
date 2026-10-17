@@ -39,11 +39,12 @@ def export_diagram_topology(
 
 
 def resolve_topology_exporter(backend):
-    """The exporter ``backend`` names: an object passed as is, or ``"graphviz"`` or ``"mermaid"``."""
-    # An exporter, or any other object that is not a name, is used as given
+    """The exporter ``backend`` names: an exporter passed as is, or ``"graphviz"`` or ``"mermaid"``."""
+    # An exporter, or any other object with an export method, is used as given
     if isinstance(backend, TopologyExporter):
         return backend
     if not isinstance(backend, str):
+        require_exporter(backend)
         return backend
 
     # A name, read without case or surrounding spaces
@@ -62,3 +63,12 @@ def resolve_topology_exporter(backend):
     raise ValueError(
         f"Unknown topology backend {backend!r}. Expected 'graphviz' or 'mermaid'."
     )
+
+
+def require_exporter(backend):
+    """Refuse an object that is neither a backend name nor an exporter with an ``export`` method."""
+    if not callable(getattr(backend, "export", None)):
+        raise TypeError(
+            "backend must be 'graphviz', 'mermaid' or an exporter with an "
+            f"export(topology) method, got {type(backend).__name__}"
+        )

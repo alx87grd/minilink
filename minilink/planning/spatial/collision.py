@@ -154,7 +154,7 @@ def collision_spheres(shape: Shape) -> tuple:
     if isinstance(shape, Sphere):
         return ((shape.center, shape.radius),)
 
-    raise NotImplementedError("Only Sphere body parts are supported for now")
+    raise NotImplementedError("Only Sphere body parts are supported")
 
 
 ###############################################################################

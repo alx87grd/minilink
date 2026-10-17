@@ -493,8 +493,8 @@ def require_method(method):
         raise ValueError(f"method must be one of {METHODS}, got {method!r}")
     if method == "sos":
         raise NotImplementedError(
-            "sum-of-squares certificates are not implemented; "
-            "quadratic V only (ROADMAP §6, Lyapunov certificates)"
+            "sum-of-squares certificates are not implemented: region of "
+            "attraction certificates take a quadratic V only"
         )
 
 
@@ -753,6 +753,9 @@ def draw_region(
     from matplotlib.lines import Line2D
     from matplotlib.patches import Patch
 
+    # Lazy import: the simulator loads on first use, not with the analysis verbs
+    from minilink.simulation.simulator import Simulator
+
     # The slice: the two swept states over the window, the others at the equilibrium
     grid_x = np.linspace(limits[0][0], limits[0][1], n)
     grid_y = np.linspace(limits[1][0], limits[1][1], n)
@@ -884,17 +887,12 @@ def draw_region(
                 )
             )
 
-    # The overlaid trajectories, simulated from each initial state; the
-    # system's own x0 is restored after
-    x0_saved = np.asarray(cert.sys.x0, dtype=float).copy()
-    try:
-        for x_start in trajectories:
-            cert.sys.x0 = np.asarray(x_start, dtype=float)
-            traj = cert.sys.compute_trajectory(tf=horizon, verbose=False)
-            ax.plot(traj.x[x_axis], traj.x[y_axis], color="0.35", linewidth=1.0)
-            ax.plot(x_start[x_axis], x_start[y_axis], "o", color="0.35", markersize=4)
-    finally:
-        cert.sys.x0 = x0_saved
+    # The overlaid trajectories, each simulated from its initial state; the
+    # system's own x0 and traj are left as they are
+    for x_start in trajectories:
+        traj = Simulator(cert.sys, x0=x_start, tf=horizon, verbose=False).solve()
+        ax.plot(traj.x[x_axis], traj.x[y_axis], color="0.35", linewidth=1.0)
+        ax.plot(x_start[x_axis], x_start[y_axis], "o", color="0.35", markersize=4)
     if len(trajectories):
         keys.append(Line2D([], [], color="0.35", linewidth=1.0, label="trajectory"))
 

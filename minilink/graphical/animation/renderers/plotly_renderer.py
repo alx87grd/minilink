@@ -260,7 +260,7 @@ def _plane_vertices(primitive: Plane) -> np.ndarray:
     )
 
 
-def _line_trace(go, *, x, y, z=None, color, width, dash, name, is_3d):
+def _line_trace(go, *, x, y, z=None, color, width, dash, name, is_3d, opacity=1.0):
     if is_3d:
         return go.Scatter3d(
             x=x,
@@ -270,6 +270,7 @@ def _line_trace(go, *, x, y, z=None, color, width, dash, name, is_3d):
             line={"color": color, "width": width},
             name=name,
             showlegend=False,
+            opacity=opacity,
         )
     return go.Scatter(
         x=x,
@@ -278,6 +279,7 @@ def _line_trace(go, *, x, y, z=None, color, width, dash, name, is_3d):
         line={"color": color, "width": width, "dash": dash},
         name=name,
         showlegend=False,
+        opacity=opacity,
     )
 
 
@@ -633,6 +635,7 @@ class PlotlyRenderer(AnimationRenderer):
                 dash=dash,
                 name=name,
                 is_3d=self.is_3d,
+                opacity=float(np.clip(getattr(primitive, "opacity", 1.0), 0.0, 1.0)),
             )
 
         if isinstance(primitive, Circle):

@@ -425,7 +425,13 @@ class StochasticPlanningProblem(PlanningProblem):
         return {port: self.disturbances[port].sample(k) for port, k in zip(ports, keys)}
 
     def nominal(self) -> PlanningProblem:
-        """Certainty-equivalent deterministic problem: mean start, no draws."""
+        """
+        Certainty-equivalent deterministic problem: the mean start, no draws.
+
+        The start law's mean is the one start (a singleton ``X0``): the support
+        ``X0`` of the start law and an explicit ``x_start`` are dropped, and the
+        parameter and disturbance draws with them.
+        """
         return PlanningProblem(
             sys=self.sys,
             x_start=self.x0_distribution.mean,

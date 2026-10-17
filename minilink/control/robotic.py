@@ -537,7 +537,7 @@ def kinematic_dims_of(plant):
         raise TypeError("TaskKinematic requires a plant with forward_kinematics and J")
 
     dof = plant.dof
-    task_dim = getattr(plant, "task_dim", plant.effector_dim)
+    task_dim = plant.task_dim if hasattr(plant, "task_dim") else plant.effector_dim
     if dof < task_dim:
         raise ValueError(
             f"TaskKinematic requires dof >= task_dim, got {dof} and {task_dim}"

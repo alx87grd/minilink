@@ -146,12 +146,15 @@ class MountainCar(MechanicalSystem):
 
         return tau_d
 
-    def forward_kinematic_effector(self, q):
+    def forward_kinematic_effector(self, q, params=None):
         """The bead's position ``(x, z(x))`` on the hill."""
-        x = q[0]
-        z = self.z(x)
+        params = self.params if params is None else params
+        xp = array_module(q)
 
-        p = np.array([x, z])
+        x = q[0]
+        z = self.z(x, params)
+
+        p = xp.array([x, z])
 
         return p
 
@@ -168,12 +171,15 @@ class MountainCar(MechanicalSystem):
         }
 
     def tf(self, x, u, t=0, params=None):
+        params = self.params if params is None else params
+        xp = array_module(x)
+
         q = x[:1]
-        p = self.forward_kinematic_effector(q)
+        p = self.forward_kinematic_effector(q, params)
 
         # The body frame rides the curve, its x axis along the terrain tangent
         slope = self.dz_dx(q[0], params)
-        theta = np.arctan(slope)
+        theta = xp.arctan(slope)
 
         return {"body": SE2(p[0], p[1], theta)}
 

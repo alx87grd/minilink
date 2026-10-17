@@ -354,6 +354,38 @@ class TestBackends(unittest.TestCase):
         self.assertLess(gap, 0.0001)
         self.assertGreater(np.mean(jax_result.pi == vectorized.pi), 0.98)
 
+    def test_a_changed_option_rebuilds_the_cached_tables(self):
+        """Solve, change an option the caches bake in, solve again: a fresh planner's tables."""
+        cases = [("numpy", "out_of_bound_cost", 50.0)]
+        try:
+            import jax  # noqa: F401
+
+            cases.append(("jax", "alpha", 0.9))
+        except ModuleNotFoundError:
+            pass
+        problem = make_pendulum_problem()
+
+        def planner_of(backend):
+            grid = StateSpaceGrid(
+                problem, x_grid_shape=(11, 11), u_grid_shape=(5,), dt=0.1
+            )
+            return DynamicProgrammingPlanner(
+                problem, grid=grid, backend=backend, alpha=0.95
+            )
+
+        for backend, name, value in cases:
+            with self.subTest(backend=backend):
+                reused = planner_of(backend)
+                reused.solve_steps(5)
+                setattr(reused.options, name, value)
+                reused.solve_steps(5)
+                fresh = planner_of(backend)
+                setattr(fresh.options, name, value)
+                fresh.solve_steps(5)
+                np.testing.assert_allclose(
+                    reused.result.J, fresh.result.J, rtol=0, atol=1e-12
+                )
+
     def test_value_iteration_is_the_algorithm_behind_every_verb(self):
         """solve_steps is value_iteration wrapped in a solution, on every backend."""
         backends = ["loop", "numpy"]
@@ -524,6 +556,41 @@ class TestDynamicProgrammingPlotting(unittest.TestCase):
             ax.collections[0].get_clim()[1], float(np.max(planner.result.J))
         )
 
+    def test_animate_cost2go_colours_up_to_jmax(self):
+        import matplotlib
+
+        matplotlib.use("Agg")
+        import matplotlib.pyplot as plt
+
+        _, result = solve(make_problem(), record_history=True)
+        for jmax, top in ((7.0, 7.0), (None, float(np.max(result.history[-1][1])))):
+            with self.subTest(jmax=jmax):
+                plt.close("all")
+                animation = plotting.animate_cost2go(result, jmax=jmax, show=False)
+                fig = plt.gcf()
+                self.assertEqual(fig.axes[0].collections[0].get_clim(), (0.0, top))
+                fig.canvas.draw()  # the first frame: the animation has rendered
+                del animation
+                plt.close(fig)
+
+    def test_batch_cost2go_draws_the_surfaces(self):
+        import matplotlib
+
+        matplotlib.use("Agg")
+        import matplotlib.pyplot as plt
+
+        _, result = solve(make_problem())
+        plt.close("all")
+        plotting.plot_cost2go(result, axes=[(0, 1), (1, 0)], show_3d=True, show=False)
+        surfaces = [
+            ax
+            for num in plt.get_fignums()
+            for ax in plt.figure(num).axes
+            if ax.name == "3d"
+        ]
+        self.assertEqual(len(surfaces), 2)
+        plt.close("all")
+
     def test_cost2go_colour_scale_has_no_default_for_a_priced_exit(self):
         self.assertIsNone(plotting.cost_scale_limit(exit_price))
         self.assertIsNone(plotting.cost_scale_limit(np.inf))
@@ -657,6 +724,34 @@ class TestPolicyEvaluatorPlots(unittest.TestCase):
         self.assertIsNotNone(fig)
         fig, _ = result.grid.plot_value(evaluator.last_J, show_3d=True, show=False)
         self.assertIsNotNone(fig)
+
+
+class TestValueAtInterpolation(unittest.TestCase):
+    """value_at reads the cost-to-go by the options' interpolation, linear by default."""
+
+    def test_planner_solution_and_evaluator_follow_the_option(self):
+        problem = make_problem()
+        planner, result = solve(problem, interpolation="nearest")
+        x = np.array([[0.13, -0.41]])
+        nearest = float(result.grid.interpolate(result.J, x, "nearest")[0])
+        linear = float(result.grid.interpolate(result.J, x, "linear")[0])
+        self.assertNotEqual(nearest, linear)
+        self.assertEqual(planner.value_at(x[0]), nearest)
+        self.assertEqual(planner.last_solution.cost_to_go(x[0]), nearest)
+        self.assertEqual(result.value_at(x[0]), linear)
+        self.assertEqual(result.value_at(x[0], "nearest"), nearest)
+
+        evaluator = PolicyEvaluator(
+            problem,
+            grid=result.grid,
+            policy=planner.get_controller(),
+            options=planner.options,
+        )
+        evaluator.solve()
+        J = evaluator.last_J
+        self.assertEqual(
+            evaluator.value_at(x[0]), float(result.grid.interpolate(J, x, "nearest")[0])
+        )
 
 
 class TestDpOneObjectSetup(unittest.TestCase):

@@ -2,6 +2,7 @@
 
 import numpy as np
 
+from minilink.core.backends import array_module
 from minilink.core.system import System
 
 ###############################################################################
@@ -42,22 +43,28 @@ class NominalRefs(System):
         )
 
     def h_heading_ref(self, x, u, t=0.0, params=None):
-        theta_nom = u[2]
+        xp = array_module(u)
 
-        heading_ref = np.array([theta_nom], dtype=float)
+        theta_nom = u[2:3]
+
+        heading_ref = xp.array(theta_nom)
 
         return heading_ref
 
     def h_vx_ref(self, x, u, t=0.0, params=None):
-        vx_nom = u[3]
+        xp = array_module(u)
 
-        vx_ref = np.array([vx_nom], dtype=float)
+        vx_nom = u[3:4]
+
+        vx_ref = xp.array(vx_nom)
 
         return vx_ref
 
     def h_delta_ff(self, x, u, t=0.0, params=None):
-        delta_nom = u[7]
+        xp = array_module(u)
 
-        delta_ff = np.array([delta_nom], dtype=float)
+        delta_nom = u[7:8]
+
+        delta_ff = xp.array(delta_nom)
 
         return delta_ff

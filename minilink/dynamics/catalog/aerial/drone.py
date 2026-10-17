@@ -41,9 +41,9 @@ class Drone2D(MechanicalSystem):
         self.outputs["y"].labels = list(self.state.labels)
         self.outputs["y"].units = list(self.state.units)
 
-        # Graphics: a nominal body size, and a camera that follows the body
-        self.width = 1.0
-        self.height = 0.2
+        # Graphics: the drawn body's size, and a camera that follows the body
+        self.width = 1.2
+        self.height = 0.18
         self.camera_scale = 3.0
         self.camera_follow_frame = "body"
 
@@ -123,9 +123,12 @@ class Drone2D(MechanicalSystem):
         return tau_d
 
     def get_kinematic_geometry(self):
+        width = self.width
+        height = self.height
+
         return {
             "world": [ground_line(length=20.0)],
-            "body": [drone_body(width=1.2, height=0.18)],
+            "body": [drone_body(width=width, height=height)],
             "center": [Point(color="blue", marker="o", size=5)],
         }
 
@@ -138,8 +141,10 @@ class Drone2D(MechanicalSystem):
         }
 
     def get_dynamic_geometry(self, x, u, t=0, params=None):
+        params = self.params if params is None else params
+
         # The thrust arrows, 0.08 m per newton, at each thruster along the body vertical
-        offset = self.params["thruster_offset"]
+        offset = params["thruster_offset"]
         scale = 0.08
         thrust_1 = Arrow(
             base=(-offset, 0.0),
@@ -191,7 +196,7 @@ class Drone2DWithSideThruster(Drone2D):
 
     def get_dynamic_geometry(self, x, u, t=0, params=None):
         # The two vertical thrust arrows, then the lateral one at the c.g.
-        dynamic = super().get_dynamic_geometry(x, u[:2], t)
+        dynamic = super().get_dynamic_geometry(x, u[:2], t, params)
         lateral = Arrow(
             base=(0.0, 0.0),
             vector=(1.0, 0.0),

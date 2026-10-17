@@ -132,6 +132,7 @@ class MatplotlibCanvas:
             y = world_pts[:, 1]
             z = world_pts[:, 2]
 
+            alpha = float(np.clip(primitive.opacity, 0.0, 1.0))
             if self.is_3d:
                 (obj,) = self.ax.plot(
                     x,
@@ -140,6 +141,7 @@ class MatplotlibCanvas:
                     color=primitive.color,
                     linewidth=primitive.linewidth,
                     linestyle=primitive.style,
+                    alpha=alpha,
                 )
             else:
                 (obj,) = self.ax.plot(
@@ -148,6 +150,7 @@ class MatplotlibCanvas:
                     color=primitive.color,
                     linewidth=primitive.linewidth,
                     linestyle=primitive.style,
+                    alpha=alpha,
                 )
             self.drawn_objects.append(obj)
 

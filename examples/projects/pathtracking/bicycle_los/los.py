@@ -232,21 +232,29 @@ def project_on_path_with_t(path_xy, x, y, closed=True):
 def point_ahead_along_path(path_xy, idx, t, ds, closed=True):
     """Advance ``ds`` meters along the polyline from a projection point.
 
-    Starts at the fraction ``t`` of segment ``idx``. Returns
-    ``(ax, ay, i, lam, heading)``: the point reached, its segment, its fraction
-    along it and the segment's heading. An open path stops at its last point.
+    Starts at the fraction ``t`` of segment ``idx``, or at ``t = 0`` of the next
+    non-degenerate segment when that one is degenerate. Returns
+    ``(ax, ay, i, lam, heading)``, floats but the int segment ``i``: the point
+    reached, its segment, its fraction along it and the segment's heading. An open
+    path ends with its last segment: it stops at that segment's end point with its
+    heading, and refuses a negative ``ds``.
     """
     n = len(path_xy)
     require_two_points(n)
 
-    # On a closed path the distance wraps around the loop
+    # The segments: the closing one only on a closed path, where the distance wraps
+    # around the loop; an open path only goes forward
     if closed:
+        n_seg = n
         Lt = path_total_length(path_xy, closed=True)
         if Lt > _EPS:
             ds = ds % Lt
+    else:
+        n_seg = n - 1
+        require_forward_distance(ds)
 
-    # The projection's segment
-    i = idx % n
+    # The projection's segment, at most the last one of an open path
+    i = idx % n if closed else min(idx, n_seg - 1)
     j = (i + 1) % n
 
     x0, y0 = path_xy[i]
@@ -256,8 +264,10 @@ def point_ahead_along_path(path_xy, idx, t, ds, closed=True):
     dy = y1 - y0
     seg_len = math.hypot(dx, dy)
 
-    # A degenerate segment hands over to the next one
-    if seg_len <= _EPS:
+    # A degenerate segment hands over to t = 0 of the next non-degenerate one
+    handovers = 0
+    while seg_len <= _EPS and handovers < n_seg - 1 and (closed or i < n_seg - 1):
+        t = 0.0
         i = (i + 1) % n
         j = (i + 1) % n
         x0, y0 = path_xy[i]
@@ -265,6 +275,7 @@ def point_ahead_along_path(path_xy, idx, t, ds, closed=True):
         dx = x1 - x0
         dy = y1 - y0
         seg_len = math.hypot(dx, dy)
+        handovers += 1
 
     # The start c = p_i + t (p_j − p_i), and the length left to the segment's end
     cx = x0 + t * dx
@@ -277,6 +288,11 @@ def point_ahead_along_path(path_xy, idx, t, ds, closed=True):
     max_steps = len(path_xy) + 2
 
     while ds > rem and steps < max_steps:
+        # An open path stops at the end point of its last segment, with its heading
+        if not closed and i == n_seg - 1:
+            heading_end = math.atan2(dy, dx)
+            return float(x1), float(y1), int(i), 1.0, float(heading_end)
+
         ds -= rem
 
         # The next segment
@@ -299,11 +315,6 @@ def point_ahead_along_path(path_xy, idx, t, ds, closed=True):
         cy = y0
         rem = seg_len
         steps += 1
-
-        # An open path stops at its last point
-        if not closed and i == n - 1:
-            heading_end = math.atan2(dy, dx)
-            return x0, y0, i, 0.0, heading_end
 
     # a = c + λ (p_j − p_i), λ = min(1, ds / ℓ) the fraction of the segment still to cover
     lam = 0.0 if seg_len <= _EPS else min(1.0, ds / max(_EPS, seg_len))
@@ -392,3 +403,9 @@ def require_two_points(n):
     """Refuse a path of fewer than two points."""
     if n < 2:
         raise ValueError("path is too short")
+
+
+def require_forward_distance(ds):
+    """Refuse a negative distance along an open path, which has no loop to wrap it."""
+    if ds < 0.0:
+        raise ValueError(f"ds must be non-negative on an open path, got {ds}")

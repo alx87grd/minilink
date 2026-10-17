@@ -14,6 +14,8 @@ class Saturation(System):
     """Symmetric or asymmetric clip ``y = clip(u, lower, upper)``."""
 
     def __init__(self, lower=-1.0, upper=1.0, dim=1):
+        require_ordered_end_stops(lower, upper)
+
         super().__init__()
         self.name = "Saturation"
 
@@ -185,6 +187,11 @@ def require_rate_limiter(rate_max, tau, lower, upper):
         raise ValueError("rate_max must be positive (it scales the tanh)")
     if tau <= 0.0:
         raise ValueError("tau must be positive (it divides the lag rate)")
+    require_ordered_end_stops(lower, upper)
+
+
+def require_ordered_end_stops(lower, upper):
+    """Refuse an upper end stop below the lower one."""
     if upper < lower:
         raise ValueError("the upper end stop must sit above the lower one")
 

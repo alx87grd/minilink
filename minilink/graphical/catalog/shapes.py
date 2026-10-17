@@ -86,16 +86,19 @@ def segment_pose_2d(p0, p1):
     """Pose a unit 2-D segment primitive to span *p0* → *p1* (static ``tf`` tier).
 
     Used for fixed-length chord lines where endpoints are known each frame.
+    Native-array: NumPy or JAX depending on the input backend.
     """
-    p0 = np.asarray(p0, dtype=float).reshape(-1)[:2]
-    p1 = np.asarray(p1, dtype=float).reshape(-1)[:2]
+    xp = array_module(p0, p1)
+
+    p0 = xp.asarray(p0, dtype=float).reshape(-1)[:2]
+    p1 = xp.asarray(p1, dtype=float).reshape(-1)[:2]
 
     # The segment's length ℓ and heading θ
     delta = p1 - p0
-    length = np.hypot(delta[0], delta[1])
-    theta = np.arctan2(delta[1], delta[0])
-    c = np.cos(theta)
-    s = np.sin(theta)
+    length = xp.hypot(delta[0], delta[1])
+    theta = xp.arctan2(delta[1], delta[0])
+    c = xp.cos(theta)
+    s = xp.sin(theta)
 
     # T = [ℓ R(θ), p0; 0, 1]: the unit segment stretched to ℓ, turned by θ, placed at p0
     T11 = length * c
@@ -104,7 +107,7 @@ def segment_pose_2d(p0, p1):
     T22 = length * c
 
     # fmt: off
-    T = np.array([
+    T = xp.array([
         [T11, T12, 0.0, p0[0]],
         [T21, T22, 0.0, p0[1]],
         [0.0, 0.0, 1.0, 0.0],

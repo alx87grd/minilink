@@ -165,6 +165,23 @@ class TestLinearCore(unittest.TestCase):
             self.assertTrue(np.isnan(info.steady_state))
             self.assertAlmostEqual(info.peak_time, 5.0)
 
+    def test_step_info_band_is_two_percent_of_the_peak_deviation(self):
+        # y = t e^(-t) peaks at 1/e and returns to 0: the band is 2 % of that peak
+        # deviation, and y leaves it for the last time at t = 6.834 s
+        t = np.linspace(0.0, 20.0, 20001)
+        info = step_info(t, t * np.exp(-t))
+        self.assertAlmostEqual(info.settling_time, 6.834, places=2)
+        self.assertAlmostEqual(info.steady_state, 0.0)
+
+        # Its last sample is 4·10⁻⁸, inside the band: it settles at zero, so it has
+        # no rise time or overshoot relative to that final value
+        self.assertTrue(np.isnan(info.rise_time))
+        self.assertTrue(np.isnan(info.overshoot))
+
+        # From rest the peak deviation is |y_f|: y = 1 − e^(-t) settles at ln 50
+        info = step_info(t, 1.0 - np.exp(-t))
+        self.assertAlmostEqual(info.settling_time, np.log(50.0), places=2)
+
 
 class TestChannelTools(unittest.TestCase):
     """The system-level verbs share the family signature and the channel selectors."""
@@ -350,6 +367,35 @@ class TestPlots(unittest.TestCase):
     def test_unknown_backend_is_refused(self):
         with self.assertRaisesRegex(ValueError, "Unknown plot backend"):
             plot_bode(self.plant, backend="bokeh", show=False)
+
+    def test_a_short_trace_draws_its_three_arrows_on_both_backends(self):
+        from minilink.graphical.control import (
+            ControlFigure,
+            Panel,
+            Trace,
+            render_control_figure,
+        )
+
+        backends = ["matplotlib"]
+        try:
+            import plotly  # noqa: F401
+
+            backends.append("plotly")
+        except ImportError:
+            pass
+        for n in (3, 4, 5, 6):
+            x = np.linspace(0.0, 1.0, n)
+            trace = Trace(x=x, y=x**2, color="#1f77b4", arrows=True)
+            panel = Panel(traces=(trace,), x_label="x", y_label="y")
+            spec = ControlFigure(title="arrows", panels=(panel,))
+            for backend in backends:
+                with self.subTest(n=n, backend=backend):
+                    r = render_control_figure(spec, backend=backend, show=False)
+                    if backend == "plotly":
+                        arrows = r.figure.layout.annotations
+                    else:
+                        arrows = r.axes.texts
+                    self.assertEqual(len(arrows), 3)
 
     def test_phase_plane_on_plotly(self):
         pytest.importorskip("plotly")

@@ -33,20 +33,19 @@ class WiredDiagramMixin:
     """
 
     def init_wiring(self, *, name: str = "Diagram") -> None:
-        """The wiring tables of a new diagram, set up by each diagram's ``__init__``."""
-        # The subsystem registry and the wiring table: a diagram sets both before
-        # System.__init__, whose params setter reads them
-        if not hasattr(self, "subsystems"):
-            self.subsystems = {}
-        if not hasattr(self, "connections"):
-            self.connections = {}
+        """The wiring memory and the stacked state of a new diagram, set up by its ``__init__``.
 
+        The diagram sets its subsystem registry and wiring table first, before
+        ``System.__init__``, whose params setter reads them.
+        """
         # Wiring memory: a quiet connect, and the diagram's name
         self.connection_verbose = False
         self.name = name
 
         # The stacked state of the (still empty) subsystems
-        self.compute_state_properties()
+        self.n, self.state_index, self.state, self.x0, self.derived_x0 = state_layout(
+            self.subsystems
+        )
 
     @property
     def params(self):
@@ -63,7 +62,7 @@ class WiredDiagramMixin:
 
     @params.setter
     def params(self, value):
-        validate_diagram_params(value, self.subsystems)
+        check_diagram_params(value, self.subsystems)
         if value is None:
             return
 
@@ -89,7 +88,9 @@ class WiredDiagramMixin:
         self.connections[sys_id] = {port_id: None for port_id in sys.inputs}
 
         # The stacked state and the solver hints, with the new block
-        self.compute_state_properties()
+        self.n, self.state_index, self.state, self.x0, self.derived_x0 = state_layout(
+            self.subsystems
+        )
         self.refresh_solver_info()
 
     def connect(self, source_sys_id, source_port_id, target_sys_id, target_port_id):
@@ -141,7 +142,7 @@ class WiredDiagramMixin:
         """
         port = self.subsystems[source_sys_id].outputs[source_port_id]
         if dependencies is not None:
-            self.validate_output_dependencies(output_port_id, dependencies)
+            self.check_output_dependencies(output_port_id, dependencies)
 
         # The boundary output, evaluated through the diagram
         self.outputs[output_port_id] = DiagramOutputPort(
@@ -260,7 +261,7 @@ class WiredDiagramMixin:
         """
         # An x0 set on the diagram differs from the one stacked from its subsystems
         x0 = np.copy(self.x0)
-        derived_x0 = getattr(self, "derived_x0", x0)
+        derived_x0 = self.derived_x0
         user_set_x0 = x0.shape == derived_x0.shape and not np.array_equal(
             x0, derived_x0
         )
@@ -268,7 +269,9 @@ class WiredDiagramMixin:
         # The subsystems first, then the stack of their metadata
         for subsystem in self.subsystems.values():
             subsystem.refresh()
-        self.compute_state_properties()
+        self.n, self.state_index, self.state, self.x0, self.derived_x0 = state_layout(
+            self.subsystems
+        )
 
         # The diagram's own x0 stays while its size still fits
         if user_set_x0 and x0.shape == self.x0.shape:
@@ -285,19 +288,14 @@ class WiredDiagramMixin:
 
     def check_algebraic_loops(self):
         """
-        Detect algebraic loops and return the topological port execution order.
+        Check the wiring for algebraic loops; the port order is :func:`evaluation_order_of`.
 
         Raises
         ------
         RuntimeError
             If an algebraic loop is found (with full cycle path in the message).
-
-        Returns
-        -------
-        list of (sys_id, port_id)
-            Topologically sorted output-port schedule.
         """
-        return check_algebraic_loops(self)
+        check_algebraic_loops(self)
 
     # Gather: one block's state, input and params from the diagram's
 
@@ -350,12 +348,9 @@ class WiredDiagramMixin:
         """
         if params is None:
             return None
-        if isinstance(params, Mapping):
-            return params.get(sys_id)
-        raise TypeError(
-            "Diagram params must be a mapping keyed by subsystem id "
-            f"(e.g. {{'plant': {{...}}}}), got {type(params).__name__}"
-        )
+        require_params_mapping(params)
+
+        return params.get(sys_id)
 
     def compute_subsys_output_port(self, x, u, t, sys_id, port_id, params=None):
         """Evaluate one subsystem output port, recursing through its sources."""
@@ -381,11 +376,14 @@ class WiredDiagramMixin:
             namespace_subsystem_frames,
         )
 
+        check_diagram_params(params, self.subsystems)
+
         frames = {}
         for sys_id, subsystem in self.subsystems.items():
             local_x = self.get_local_state(x, sys_id)
-            local_u = self.get_local_input(x, u, t, sys_id)
-            sub_frames = dict(subsystem.tf(local_x, local_u, t))
+            local_u = self.get_local_input(x, u, t, sys_id, params=params)
+            local_params = self.subsystem_params(params, sys_id)
+            sub_frames = dict(subsystem.tf(local_x, local_u, t, local_params))
             frames.update(namespace_subsystem_frames(sub_frames, sys_id))
 
         return frames
@@ -398,10 +396,13 @@ class WiredDiagramMixin:
             merge_subsystem_geometry,
         )
 
+        check_diagram_params(params, self.subsystems)
+
         merged: dict[str, list] = {}
         for sys_id, subsystem in self.subsystems.items():
             local_x = self.get_local_state(x, sys_id)
-            local_u = self.get_local_input(x, u, t, sys_id)
+            local_u = self.get_local_input(x, u, t, sys_id, params=params)
+            local_params = self.subsystem_params(params, sys_id)
             sub_kin: dict[str, list] = {}
             sub_dyn: dict[str, list] = {}
             merge_subsystem_geometry(
@@ -409,7 +410,7 @@ class WiredDiagramMixin:
             )
             merge_subsystem_geometry(
                 sub_dyn,
-                subsystem.get_dynamic_geometry(local_x, local_u, t),
+                subsystem.get_dynamic_geometry(local_x, local_u, t, local_params),
                 sys_id,
             )
             merged = merge_geometry(merged, sub_kin, sub_dyn)
@@ -419,59 +420,6 @@ class WiredDiagramMixin:
     ###########################################################################
     # Internal machinery
     ###########################################################################
-
-    def compute_state_properties(self):
-        """
-        Rebuild the flattened state metadata from the subsystems.
-
-        The stacked state vector is ``x = [x_1; x_2; ...]`` in subsystem
-        insertion order; :attr:`state_index` maps each subsystem id to its
-        ``(start, end)`` indices in the stacked vector. State labels are
-        prefixed with the subsystem id whenever the same label appears in
-        several subsystems.
-        """
-        # x = [x_1; x_2; ...]: each subsystem's (start, end) in the stack
-        state_index = {}
-        idx = 0
-        for sys_id, subsystem in self.subsystems.items():
-            state_index[sys_id] = (idx, idx + subsystem.n)
-            idx += subsystem.n
-
-        # A label several subsystems share takes its subsystem id as a prefix
-        owned_labels = [
-            (sys_id, label)
-            for sys_id, subsystem in self.subsystems.items()
-            for label in subsystem.state.labels
-        ]
-        label_counts = {}
-        for _, label in owned_labels:
-            label_counts[label] = label_counts.get(label, 0) + 1
-        labels = [
-            f"{sys_id}:{label}" if label_counts[label] > 1 else label
-            for sys_id, label in owned_labels
-        ]
-
-        # The stacked state signal, and its default initial condition
-        self.n = idx
-        self.state_index = state_index
-        self.state = VectorSignal("x", dim=self.n)
-        self.x0 = np.zeros(self.n)
-
-        # The subsystems' metadata and x0, stacked in insertion order
-        if self.subsystems:
-            substates = [sub.state for sub in self.subsystems.values()]
-            self.state.labels = labels
-            self.state.units = [unit for s in substates for unit in s.units]
-            self.state.upper_bound = np.concatenate([s.upper_bound for s in substates])
-            self.state.lower_bound = np.concatenate([s.lower_bound for s in substates])
-            self.state.nominal_value = np.concatenate(
-                [s.nominal_value for s in substates]
-            )
-            self.x0 = np.concatenate([sub.x0 for sub in self.subsystems.values()])
-
-        # The x0 stacked from the subsystems, so refresh() can tell an x0 set on the
-        # diagram from a stale stacked one
-        self.derived_x0 = np.copy(self.x0)
 
     def refresh_solver_info(self):
         """Bubble subsystem solver hints to the diagram root.
@@ -704,16 +652,17 @@ class DiagramOutputPort(OutputPort):
         )
 
 
-def validate_diagram_params(params, subsystem_ids):
-    """Validate the nested diagram params contract.
+def check_diagram_params(params, subsystem_ids):
+    """Check the nested diagram params contract.
 
     ``params`` must be ``None`` or a mapping keyed by subsystem id whose values
     are per-subsystem params dicts. Missing subsystem ids are allowed (those
     subsystems fall back to their live ``self.params``); unknown ids raise so
     sys-id typos fail loudly instead of silently using defaults.
 
-    Called once at public entry points (``DiagramSystem.f``, the evaluators'
-    parametric tier, the ``params`` setter), not inside the recursion.
+    Called once at public entry points (``DiagramSystem.f``, ``tf``,
+    ``get_dynamic_geometry``, the evaluators' parametric tier, the ``params``
+    setter), not inside the recursion.
 
     Parameters
     ----------
@@ -725,11 +674,7 @@ def validate_diagram_params(params, subsystem_ids):
     if params is None:
         return
 
-    if not isinstance(params, Mapping):
-        raise TypeError(
-            "diagram params must be a mapping keyed by subsystem id "
-            f"(e.g. {{'plant': {{...}}}}), got {type(params).__name__}"
-        )
+    require_params_mapping(params)
 
     unknown = [key for key in params if key not in subsystem_ids]
     if unknown:
@@ -740,17 +685,34 @@ def validate_diagram_params(params, subsystem_ids):
         )
 
 
-def check_algebraic_loops(diagram: DiagramSystem) -> list[tuple[str, str]]:
-    """Detect algebraic loops and return the topological port execution order.
+def check_algebraic_loops(diagram: DiagramSystem) -> None:
+    """Check a wired diagram for algebraic loops.
 
-    Uses depth-first search over output-port dependency edges.  An algebraic
-    loop exists when a cycle contains only direct-feedthrough paths (i.e.,
-    output ports whose ``dependencies`` include the input ports that close
-    the cycle).
+    An algebraic loop exists when a cycle contains only direct-feedthrough
+    paths (i.e., output ports whose ``dependencies`` include the input ports
+    that close the cycle). This check is **standalone**: call it right after
+    wiring a diagram to validate its topology before simulation; the order
+    the compiler evaluates the ports in is :func:`evaluation_order_of`.
 
-    This function is **standalone** and can be called independently of
-    :func:`~minilink.core.compile.compiler.build_execution_plan` — for example,
-    right after wiring a diagram to validate its topology before simulation.
+    Parameters
+    ----------
+    diagram : DiagramSystem
+        The wired diagram to analyse.
+
+    Raises
+    ------
+    RuntimeError
+        If an algebraic loop is detected, with the full cycle path in the
+        error message.
+    """
+    evaluation_order_of(diagram)
+
+
+def evaluation_order_of(diagram: DiagramSystem) -> list[tuple[str, str]]:
+    """The topological evaluation order of a diagram's output ports.
+
+    Uses depth-first search over output-port dependency edges; a cycle of
+    direct-feedthrough paths (an algebraic loop) is refused.
 
     Parameters
     ----------
@@ -827,6 +789,68 @@ def iter_subsystems(diagram, prefix=()):
 ###############################################################################
 # Internal machinery
 ###############################################################################
+
+
+def state_layout(subsystems):
+    """
+    The stacked state of a diagram's blocks: ``(n, state_index, state, x0, derived_x0)``.
+
+    The stacked state vector is ``x = [x_1; x_2; ...]`` in subsystem insertion
+    order; ``state_index`` maps each subsystem id to its ``(start, end)``
+    indices in the stacked vector. State labels are prefixed with the
+    subsystem id whenever the same label appears in several subsystems.
+    ``derived_x0`` is a copy of the stacked ``x0``, so a refresh can tell an
+    ``x0`` set on the diagram from a stale stacked one.
+    """
+    # x = [x_1; x_2; ...]: each subsystem's (start, end) in the stack
+    state_index = {}
+    idx = 0
+    for sys_id, subsystem in subsystems.items():
+        state_index[sys_id] = (idx, idx + subsystem.n)
+        idx += subsystem.n
+
+    # A label several subsystems share takes its subsystem id as a prefix
+    owned_labels = [
+        (sys_id, label)
+        for sys_id, subsystem in subsystems.items()
+        for label in subsystem.state.labels
+    ]
+    label_counts = {}
+    for _, label in owned_labels:
+        label_counts[label] = label_counts.get(label, 0) + 1
+    labels = [
+        f"{sys_id}:{label}" if label_counts[label] > 1 else label
+        for sys_id, label in owned_labels
+    ]
+
+    # The stacked state signal, and its default initial condition
+    n = idx
+    state = VectorSignal("x", dim=n)
+    x0 = np.zeros(n)
+
+    # The subsystems' metadata and x0, stacked in insertion order
+    if subsystems:
+        substates = [sub.state for sub in subsystems.values()]
+        state.labels = labels
+        state.units = [unit for s in substates for unit in s.units]
+        state.upper_bound = np.concatenate([s.upper_bound for s in substates])
+        state.lower_bound = np.concatenate([s.lower_bound for s in substates])
+        state.nominal_value = np.concatenate([s.nominal_value for s in substates])
+        x0 = np.concatenate([sub.x0 for sub in subsystems.values()])
+
+    # The x0 stacked from the subsystems
+    derived_x0 = np.copy(x0)
+
+    return n, state_index, state, x0, derived_x0
+
+
+def require_params_mapping(params):
+    """Refuse diagram params that are not a mapping keyed by subsystem id."""
+    if not isinstance(params, Mapping):
+        raise TypeError(
+            "Diagram params must be a mapping keyed by subsystem id "
+            f"(e.g. {{'plant': {{...}}}}), got {type(params).__name__}"
+        )
 
 
 def require_one_size(name, dims):

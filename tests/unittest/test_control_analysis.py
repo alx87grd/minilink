@@ -491,6 +491,13 @@ class TestFiniteHorizonLQR(unittest.TestCase):
         np.testing.assert_allclose(stationary.ctl(None, z, t=2.0), [-3.0])
         np.testing.assert_allclose(stationary.ctl(None, z, t=2.5), [-7.0])
 
+    def test_scheduled_gain_refuses_a_gain_after_of_another_shape(self):
+        t = np.array([0.0, 1.0, 2.0])
+        K = np.array([[[1.0, 0.0]], [[2.0, 0.0]], [[3.0, 0.0]]])
+        for K_after in ([[7.0]], [[7.0, 0.0], [0.0, 7.0]], 7.0):
+            with self.assertRaisesRegex(ValueError, r"K_after must have shape"):
+                TimeVaryingStateFeedbackController(t, K, K_after=K_after)
+
     def test_gain_schedule_plot_draws_every_entry(self):
         import matplotlib
 
@@ -538,6 +545,10 @@ class TestP(unittest.TestCase):
     def test_limits_clip_the_command(self):
         ctl = P(10.0, u_max=1.0)
         np.testing.assert_allclose(ctl.ctl(np.zeros(0), np.array([0.5])), [1.0])
+
+    def test_a_gain_of_another_size_is_reported_with_its_own_shape(self):
+        with self.assertRaisesRegex(ValueError, r"length-2 vector, got shape \(3, 1\)"):
+            P(np.ones((3, 1)), dof=2)
 
     def test_a_coupled_gain_is_a_gain_block_in_the_loop(self):
         from minilink import Gain
@@ -1169,6 +1180,26 @@ class TestPhasePlane(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "Unknown plot backend"):
             plot_phase_plane(sys, backend="bokeh", show=False)
 
+    def test_axes_and_grid_refuse_booleans_and_floats(self):
+        sys = PhasePlaneTestSystem()
+        for axis in (np.bool_(True), 1.0, np.float64(1.0), 0.5):
+            with self.subTest(axis=axis):
+                with self.assertRaisesRegex(ValueError, "integer state index"):
+                    build_phase_plane_spec(sys, x_axis=axis, grid_shape=(2, 2))
+        for grid_shape in ((np.bool_(True), 3), (2.5, 3), (3.0, 3)):
+            with self.subTest(grid_shape=grid_shape):
+                with self.assertRaisesRegex(ValueError, "must be integers"):
+                    build_phase_plane_spec(sys, grid_shape=grid_shape)
+        spec = build_phase_plane_spec(
+            sys, x_axis=np.int64(1), y_axis=0, grid_shape=(np.int64(2), 3)
+        )
+        self.assertEqual((spec.x_axis, spec.X.shape), (1, (3, 2)))
+
+    def test_plotly_refuses_the_keywords_it_does_not_take(self):
+        sys = PhasePlaneTestSystem()
+        with self.assertRaisesRegex(TypeError, "dpi, figsize"):
+            plot_phase_plane(sys, backend="plotly", figsize=(4, 3), dpi=80, show=False)
+
 
 from minilink.analysis.discretization import DiscretizedRK4DynamicSystem, discretize
 
@@ -1236,6 +1267,19 @@ class TestDiscretize(unittest.TestCase):
         plant.outputs["y"].dependencies = "all"
         step_leaf = discretize(plant, 0.1)
         self.assertEqual(step_leaf.outputs["y"].dependencies, "all")
+
+    def test_discretize_reads_a_partial_feedthrough_on_its_one_input(self):
+        from minilink.dynamics.catalog.pendulum.pendulum import PendulumWithNoisePort
+
+        plant = PendulumWithNoisePort()  # y reads the noise port n alone
+        step_leaf = discretize(plant, 0.05)
+        self.assertEqual(step_leaf.outputs["y"].dependencies, ("u",))
+        x = np.array([0.3, 0.1])
+        u = np.array([0.2, 0.0, 0.5])  # torque, disturbance, noise
+        x1 = step_leaf.step(x, u, k=0)
+        np.testing.assert_allclose(x1, _rk4_step(plant.f, x, u, 0.0, 0.05, None))
+        np.testing.assert_allclose(step_leaf.h(x, u, k=0), [0.3, 0.6])
+        self.assertEqual(discretize(Pendulum(), 0.05).outputs["y"].dependencies, ())
 
     def test_discretize_accepts_dt_in_params_only(self):
         step_leaf = discretize(_GainIntegrator(), params={"gain": 2.0, "dt": 0.02})
@@ -2082,3 +2126,20 @@ class TestSensitivity(unittest.TestCase):
             sensitivity(plant=plant, controller=C)
         H = transfer_function(plant, of=("y", 0))
         self.assertEqual(sensitivity(plant=H, controller=C).n, 4)
+
+    def test_a_reference_form_controller_is_refused_with_its_fix(self):
+        from minilink.analysis import sensitivity, transfer_function
+        from minilink.blocks.transfer_function import TransferFunction
+
+        H = TransferFunction([1.0], [1.0, 3.0, 2.0])
+        C = PI(2.0, 1.0, ports="reference")
+        fix = r'controller=transfer_function\(controller, wrt="r"\)'
+        with self.assertRaisesRegex(ValueError, r"2 input\(s\).*" + fix):
+            sensitivity(plant=H, controller=C)
+        np.testing.assert_allclose(
+            self.response(
+                sensitivity(plant=H, controller=transfer_function(C, wrt="r"))
+            ),
+            self.response(sensitivity(plant=H, controller=PI(2.0, 1.0))),
+            atol=1e-9,
+        )
