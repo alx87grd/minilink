@@ -452,9 +452,9 @@ class TestNestedDiagramPlot(unittest.TestCase):
         pytest.importorskip("graphviz")
         source = get_diagram(_build_nested_speed_loop()).source
         self.assertIn("subgraph cluster_controller {", source)
-        self.assertIn('label="Controller::controller"', source)
+        self.assertIn("label=<<B>Controller::controller</B>>", source)
         self.assertIn("subgraph cluster_controller__limiter {", source)
-        self.assertIn('label="Limiter::limiter"', source)
+        self.assertIn("label=<<B>Limiter::limiter</B>>", source)
         for node_id in ("lpf", "pi", "ff", "sum", "limiter__scale", "limiter__sat"):
             self.assertIn(f"controller__{node_id} [label=<", source)
         self.assertNotIn("controller [label=<", source)

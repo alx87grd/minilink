@@ -6,6 +6,7 @@ import warnings
 
 from minilink.graphical.diagrams.dot import (
     MISSING_GRAPHVIZ_MESSAGE,
+    box_attrs,
     graphviz_port_id,
     render_block,
     render_diagram_graph,
@@ -31,14 +32,14 @@ def export_hybrid_graphviz(topology, **kwargs):
 
     # The plant, in its box
     with graph.subgraph(name="cluster_plant") as plant_cluster:
-        plant_cluster.attr(label="Plant")
+        plant_cluster.attr(**box_attrs("Plant"))
         render_diagram_cluster(plant_cluster, topology.plant)
 
     # The computer's box, labelled with its schedule, around its step diagram
     with graph.subgraph(name="cluster_computer") as computer_cluster:
-        computer_cluster.attr(label=topology.computer.schedule_label)
+        computer_cluster.attr(**box_attrs(topology.computer.schedule_label))
         with computer_cluster.subgraph(name="cluster_step_diagram") as step_cluster:
-            step_cluster.attr(label="StepDiagram")
+            step_cluster.attr(**box_attrs("StepDiagram"))
             render_diagram_cluster(step_cluster, topology.step_diagram)
 
     # The dashed ZOH and sample edges across the boundary
