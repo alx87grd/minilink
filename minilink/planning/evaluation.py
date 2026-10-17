@@ -8,6 +8,7 @@ from dataclasses import dataclass
 import numpy as np
 
 from minilink.core.backends import jax_installed, require_jax, require_jax_numpy
+from minilink.core.options import require_one_of
 from minilink.core.trajectory import Trajectory
 from minilink.planning.problems import as_stochastic
 
@@ -482,12 +483,6 @@ def nominal_trajectory(problem, policy, *, dt, tf=None) -> Trajectory:
 ###############################################################################
 # Internal machinery
 ###############################################################################
-
-
-def require_one_of(name, value, choices):
-    """Refuse an option outside its known choices, naming them."""
-    if value not in choices:
-        raise ValueError(f"{name} must be one of {choices}, got {value!r}")
 
 
 def policy_of(controller):

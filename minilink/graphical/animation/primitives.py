@@ -5,6 +5,8 @@
 
 import numpy as np
 
+from minilink.core.options import require_one_of
+
 ###############################################################################
 # Public API
 ###############################################################################
@@ -830,12 +832,6 @@ def xy_polyline(trajectory, mask):
     pts = np.column_stack([xy[0], xy[1], np.zeros(xy.shape[1])])
 
     return pts
-
-
-def require_one_of(name, value, choices):
-    """Refuse an option outside its known choices, naming them."""
-    if value not in choices:
-        raise ValueError(f"{name} must be one of {choices}, got {value!r}")
 
 
 def arrow_perp(direction):
