@@ -125,7 +125,9 @@ class QuarterCarOnRoughTerrain(DynamicSystem):
         return {"body": translation(x[2], mass_y, 0.0)}
 
     def get_dynamic_geometry(self, x, u, t=0, params=None):
-        ground = self.z(x[2])
+        params = self.params if params is None else params
+
+        ground = self.z(x[2], params)
         mass_y = x[1]
 
         return {

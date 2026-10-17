@@ -1016,6 +1016,8 @@ PARAMS_CASES = [
         "wheel_radius",
         0.4,
     ),
+    # The quarter car: the spring down to the road
+    (stored(QuarterCarOnRoughTerrain), "get_dynamic_geometry", "a", np.full(6, 0.4)),
 ]
 
 
