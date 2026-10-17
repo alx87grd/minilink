@@ -376,6 +376,18 @@ def test_sac_trains_through_the_same_planner_loop():
     assert isinstance(rollout, PlanningSolution) and rollout.evaluation is None
 
 
+def test_squashed_head_log_density_is_finite_outside_the_square():
+    from minilink.planning.reinforcement_learning.policy import SquashedGaussianHead
+
+    head = SquashedGaussianHead(n_features=2, m=2, hidden=(4,))
+    params = head.init()
+    mu = jnp.zeros(2)
+    z = jnp.zeros(2)
+    for a in ([1.5, 0.0], [-2.0, 0.3], [0.2, -0.4]):
+        logp = head.log_prob(params, mu, z, jnp.asarray(a))
+        assert bool(jnp.isfinite(logp)), a
+
+
 # --- the learned law is a System: compile, differentiate, linearize ---
 
 
