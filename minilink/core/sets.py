@@ -364,10 +364,10 @@ class CallableSet(Set):
         t: float = 0.0,
         params=None,
     ) -> bool:
-        """Evaluate membership through the supplied callable when present."""
+        """Evaluate membership through the supplied callable when present, on a flat ``z``."""
         contains_fn = self.contains_fn
         if contains_fn is not None:
-            return bool(contains_fn(np.asarray(z, dtype=float), t, params))
+            return bool(contains_fn(np.asarray(z, dtype=float).reshape(-1), t, params))
 
         return super().contains(z, t=t, params=params)
 

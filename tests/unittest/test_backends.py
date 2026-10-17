@@ -100,6 +100,13 @@ def test_callable_set_margin_preserves_numpy_output():
     np.testing.assert_allclose(margin, [1.5, 1.0])
 
 
+def test_callable_set_contains_reads_a_flat_point():
+    set_ = CallableSet(contains_fn=lambda z, t, params: z.shape == (2,) and z[1] > 1.0)
+    assert set_.contains(np.array([[1.0], [2.0]]))
+    assert set_.contains([[1.0, 2.0]])
+    assert not set_.contains(np.array([1.0, 0.5]))
+
+
 def test_quadratic_cost_numpy_math_and_reporting_helpers():
     cost = _quadratic_cost()
     x = np.array([2.0, 1.0])
