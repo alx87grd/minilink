@@ -324,10 +324,12 @@ class DynamicBicycle(DynamicSystem):
 
     def get_dynamic_geometry(self, x, u, t=0, params=None):
         """2-D centerline look: one velocity and one force arrow per axle."""
-        b = self.params["b"]
-        a = self.params["a"]
+        params = self.params if params is None else params
 
-        v_r_loc, v_f_loc, F_r_loc, F_f_loc = self.contact_fields(x, u)
+        b = params["b"]
+        a = params["a"]
+
+        v_r_loc, v_f_loc, F_r_loc, F_f_loc = self.contact_fields(x, u, params)
 
         return {
             "body": [
@@ -377,14 +379,14 @@ class DynamicBicycle(DynamicSystem):
 
         return u_in
 
-    def contact_fields(self, x, u):
+    def contact_fields(self, x, u, params=None):
         """Body-frame per-axle velocities and tire forces for the arrow geometry.
 
         Returns ``(v_r_loc, v_f_loc, F_r_loc, F_f_loc)`` — the rear/front contact
         velocity and tire force in the body frame. The ``body`` ``tf`` rotates them
         to world, so no manual ``cos``/``sin`` here.
         """
-        params = self.params
+        params = self.params if params is None else params
 
         a = params["a"]
         b = params["b"]
@@ -402,7 +404,7 @@ class DynamicBicycle(DynamicSystem):
 
         # Tire forces: the front pair turned from the steered wheel to the body; the
         # rear pair is already in the body frame
-        Fx_f, Fy_f, Fx_r, Fy_r = self.compute_tire_physics(v_body, u_in)
+        Fx_f, Fy_f, Fx_r, Fy_r = self.compute_tire_physics(v_body, u_in, params)
         cd = np.cos(delta)
         sd = np.sin(delta)
         Fx_f_b = Fx_f * cd - Fy_f * sd
@@ -437,13 +439,15 @@ class DynamicBicycleCar3D(DynamicBicycle):
         arrows share the ``body`` frame (``T_wb``); each bakes its wheel
         corner as its ``base`` and lifts to the hub height via ``local_transform``.
         """
-        a = self.params["a"]
-        b = self.params["b"]
-        r_f = self.params["r_f"]
-        r_r = self.params["r_r"]
+        params = self.params if params is None else params
+
+        a = params["a"]
+        b = params["b"]
+        r_f = params["r_f"]
+        r_r = params["r_r"]
         tr = self.track
 
-        v_r_loc, v_f_loc, F_r_loc, F_f_loc = self.contact_fields(x, u)
+        v_r_loc, v_f_loc, F_r_loc, F_f_loc = self.contact_fields(x, u, params)
 
         def _arrow(vec, scale, color, bx, by, bz):
             arr = Arrow(
