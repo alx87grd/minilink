@@ -433,7 +433,7 @@ from minilink.core.trajectory import Trajectory
 from minilink.graphical.animation.drawables import (
     Replay,
     SceneHistory,
-    validate_overlay,
+    require_overlay,
 )
 from minilink.graphical.animation.primitives import (
     CustomLine,
@@ -447,12 +447,12 @@ class TestOverlayValidation(unittest.TestCase):
     def test_rejects_raw_scene(self):
         scene = Scene(obstacles=[GeomBox(np.array([0.0, 0.0]), np.array([1.0, 1.0]))])
         with self.assertRaisesRegex(TypeError, "as_visualizer"):
-            validate_overlay(scene)
+            require_overlay(scene)
 
     def test_rejects_bare_system(self):
         sys = DynamicSystem(1, output_dim=1, expose_state=True)
         with self.assertRaisesRegex(TypeError, "Replay"):
-            validate_overlay(sys)
+            require_overlay(sys)
 
 
 class TestSceneHistory(unittest.TestCase):

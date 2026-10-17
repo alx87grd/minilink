@@ -20,7 +20,7 @@ __all__ = [
     "SceneHistory",
     "SceneVisualizer",
     "scene_as_visualizer",
-    "validate_overlay",
+    "require_overlay",
 ]
 
 
@@ -158,8 +158,8 @@ class SceneVisualizer(Overlay):
         return dict(self._geometry)
 
 
-def validate_overlay(overlay) -> None:
-    """Reject drawable mistakes at the animation boundary."""
+def require_overlay(overlay) -> None:
+    """Refuse a drawable that is not an overlay: a raw scene, a bare system, a missing hook."""
     # Lazy import: the system and scene classes load on first use, not with the overlays
     from minilink.core.system import System
     from minilink.planning.spatial.scene import Scene

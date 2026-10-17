@@ -10,7 +10,7 @@ from minilink.graphical.animation.camera import (
     fit_camera_to_frames,
     resolve_camera_from_hints,
 )
-from minilink.graphical.animation.drawables import validate_overlay
+from minilink.graphical.animation.drawables import require_overlay
 from minilink.graphical.animation.renderers.matplotlib_renderer import (
     MatplotlibRenderer,
 )
@@ -403,7 +403,7 @@ class Animator:
 
     def resolve_overlay_draw_list(self, overlay, t):
         """One overlay's primitives and world transforms at *t*, its kinematic geometry built once."""
-        validate_overlay(overlay)
+        require_overlay(overlay)
 
         cache_key = id(overlay)
         if cache_key not in self._overlay_kinematics:
