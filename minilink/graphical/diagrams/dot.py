@@ -44,7 +44,7 @@ class GraphvizTopologyExporter(TopologyExporter):
         graph = graphviz.Digraph(topology.name, engine=engine)
         graph.attr(rankdir=rankdir, nodesep="0.4", ranksep="0.7", fontname=FONT)
         graph.node_attr.update(fontname=FONT, fontsize="11")
-        graph.edge_attr.update(color=WIRE_COLOR, arrowsize="0.7")
+        graph.edge_attr.update(arrowsize="0.7")
 
         # The blocks, each nested diagram inside its box
         render_blocks(graph, topology)
@@ -122,8 +122,7 @@ def get_system_block_html(sys, html_id="sys1"):
 # The HTML-like block labels and their port identifiers
 
 FONT = "Helvetica"
-WIRE_COLOR = "#52525b"
-TITLE_FILL = "#eef2ff"
+TITLE_FILL = "#e5e7eb"
 BOUNDARY_COLOR = "#71717a"
 
 
@@ -138,8 +137,7 @@ def block_html(node):
     if node.kind == "step_system":
         title = f"Step: {title}"
     html = (
-        f'<TABLE BORDER="1" CELLBORDER="0" CELLSPACING="0" CELLPADDING="4" '
-        f'STYLE="rounded">\n'
+        f'<TABLE BORDER="0" CELLBORDER="1" CELLSPACING="0" CELLPADDING="4">\n'
         f"<TR>\n"
         f'<TD align="left" COLSPAN="2" BGCOLOR="{TITLE_FILL}"><B>{title}</B></TD>\n'
         f"</TR>\n"
