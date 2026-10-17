@@ -632,29 +632,6 @@ def tire_slip(vx, vy, w, R, v_min_epsilon):
     return alpha, kappa
 
 
-###############################################################################
-# Internal machinery
-###############################################################################
-
-
-def wheel_rectangle_pts(wl, ww):
-    """Closed polyline in wheel frame (x forward, y lateral)."""
-    h = wl / 2
-    w = ww / 2
-
-    # fmt: off
-    pts = np.array([
-        [ h,  w, 0.0],
-        [ h, -w, 0.0],
-        [-h, -w, 0.0],
-        [-h,  w, 0.0],
-        [ h,  w, 0.0],
-    ])
-    # fmt: on
-
-    return pts
-
-
 if __name__ == "__main__":
     sys = DynamicBicycle()
     x = np.array([0.0, 0.0, 0.0, 0.0, 0.0, 0.0])
