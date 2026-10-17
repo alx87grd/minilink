@@ -368,6 +368,35 @@ class TestPlots(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "Unknown plot backend"):
             plot_bode(self.plant, backend="bokeh", show=False)
 
+    def test_a_short_trace_draws_its_three_arrows_on_both_backends(self):
+        from minilink.graphical.control import (
+            ControlFigure,
+            Panel,
+            Trace,
+            render_control_figure,
+        )
+
+        backends = ["matplotlib"]
+        try:
+            import plotly  # noqa: F401
+
+            backends.append("plotly")
+        except ImportError:
+            pass
+        for n in (3, 4, 5, 6):
+            x = np.linspace(0.0, 1.0, n)
+            trace = Trace(x=x, y=x**2, color="#1f77b4", arrows=True)
+            panel = Panel(traces=(trace,), x_label="x", y_label="y")
+            spec = ControlFigure(title="arrows", panels=(panel,))
+            for backend in backends:
+                with self.subTest(n=n, backend=backend):
+                    r = render_control_figure(spec, backend=backend, show=False)
+                    if backend == "plotly":
+                        arrows = r.figure.layout.annotations
+                    else:
+                        arrows = r.axes.texts
+                    self.assertEqual(len(arrows), 3)
+
     def test_phase_plane_on_plotly(self):
         pytest.importorskip("plotly")
         self.plant.x0 = np.array([0.5, 0.0])

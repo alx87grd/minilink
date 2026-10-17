@@ -181,9 +181,10 @@ def draw_arrows(ax, x, y, color, count: int = 3) -> None:
         return
 
     # The arrows spread over the middle 70 % of the samples, each one 1/50 of
-    # them long (one sample at least)
+    # them long (one sample at least), none running past the last sample
     span = max(1, x.size // 50)
     starts = np.linspace(x.size * 0.15, x.size * 0.85, count).astype(int)
+    starts = np.minimum(starts, x.size - 1 - span)
     for k in starts:
         ax.annotate(
             "",
