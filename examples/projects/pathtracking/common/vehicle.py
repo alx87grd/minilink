@@ -681,7 +681,8 @@ class RearDriveBicycle(ForceInputBicycle):
         min_steer = self.min_steer
         max_steer = self.max_steer
 
-        # The steer command held inside its limits, in the caller's u itself
+        # The steer command held inside its limits, on a copy of the caller's u
+        u = np.array(u, dtype=float)
         u[1] = np.clip(u[1], min_steer, max_steer)
 
         q, v = self.x2q(x)
@@ -984,13 +985,13 @@ class LinearTire(TireModel):
         Fx = Ck * kappa
         Fy = Ca * alpha
 
-        # Friction circle: √(F_x² + F_y²) ≤ μ F_z
+        # Friction circle: √(F_x² + F_y²) ≤ μ F_z, each force scaled back by
+        # min(1, μ F_z / √(F_x² + F_y²)), the norm floored at 10⁻¹²
         F_max = mu * Fz
         F_total = np.sqrt(Fx**2 + Fy**2)
-        if F_total > F_max:
-            ratio = F_max / F_total
-            Fx *= ratio
-            Fy *= ratio
+        ratio = np.minimum(1.0, F_max / np.maximum(F_total, 1e-12))
+        Fx = Fx * ratio
+        Fy = Fy * ratio
 
         return Fx, Fy
 
@@ -1085,13 +1086,13 @@ class Pacejka(TireModel):
             G_yk = self.Gyk(kappa, alpha)
             Fy *= G_yk
         elif mode == "c":
-            # Friction circle: √(F_x² + F_y²) ≤ μ F_z
+            # Friction circle: √(F_x² + F_y²) ≤ μ F_z, each force scaled back by
+            # min(1, μ F_z / √(F_x² + F_y²)), the norm floored at 10⁻¹²
             F_max = mu * Fz
             F_total = np.sqrt(Fx**2 + Fy**2)
-            if F_total > F_max:
-                ratio = F_max / F_total
-                Fx *= ratio
-                Fy *= ratio
+            ratio = np.minimum(1.0, F_max / np.maximum(F_total, 1e-12))
+            Fx = Fx * ratio
+            Fy = Fy * ratio
 
         return Fx, Fy
 

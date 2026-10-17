@@ -1106,7 +1106,12 @@ def test_a_method_reads_the_params_it_is_given(make, method, key, value):
 
 # The pathtracking project's vehicle: the rolling resistance, the tires, the inputs
 
-from examples.projects.pathtracking.common.vehicle import Pacejka, create_vehicle
+from examples.projects.pathtracking.common.vehicle import (
+    LinearTire,
+    Pacejka,
+    RearDriveBicycle,
+    create_vehicle,
+)
 
 
 class TestPathtrackingVehicle(unittest.TestCase):
@@ -1130,3 +1135,32 @@ class TestPathtrackingVehicle(unittest.TestCase):
         for alpha in (0.0, 0.1, -0.2):
             self.assertEqual(tire.Gyk(0.0, alpha), 1.0)
         self.assertLess(tire.Gyk(0.3, 0.1), 1.0)
+
+    def test_the_rear_drive_bicycle_leaves_the_callers_input_alone(self):
+        vehicle = RearDriveBicycle()
+        vehicle.tire_model_f = LinearTire()
+        vehicle.tire_model_r = LinearTire()
+        x = np.zeros(8)
+        x[3] = 5.0
+        x[6] = 5.0 / vehicle.r_r
+        x[7] = 5.0 / vehicle.r_f
+        u = np.array([10.0, 2.0])  # A steer command past the limit
+        dx = vehicle.f(x, u)
+        np.testing.assert_array_equal(u, [10.0, 2.0])
+        clipped = np.array([10.0, vehicle.max_steer])
+        np.testing.assert_array_equal(dx, vehicle.f(x, clipped))
+
+    def test_the_friction_circle_caps_each_contact_of_an_array(self):
+        # One contact inside the circle, one beyond it: each as its own scalar call
+        alpha = np.array([0.01, 0.5])
+        kappa = np.array([0.005, 0.9])
+        Fz = np.array([3000.0, 3000.0])
+        for tire in (LinearTire(), Pacejka(combined_slip_mode="c")):
+            with self.subTest(tire=type(tire).__name__):
+                Fx, Fy = tire.slip2forces(alpha, kappa, Fz)
+                for i in range(2):
+                    Fx_i, Fy_i = tire.slip2forces(alpha[i], kappa[i], Fz[i])
+                    self.assertEqual((Fx[i], Fy[i]), (Fx_i, Fy_i))
+                self.assertLessEqual(
+                    np.hypot(Fx[1], Fy[1]), tire.mu * Fz[1] * (1 + 1e-12)
+                )
