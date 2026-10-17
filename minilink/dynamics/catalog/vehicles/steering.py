@@ -146,7 +146,9 @@ class KinematicCar(KinematicBicycle):
         }
 
     def tf(self, x, u, t=0, params=None):
-        length = self.params["length"]
+        params = self.params if params is None else params
+
+        length = params["length"]
         wheelbase_ratio = self.visual_wheelbase_ratio
         width = self.width
         tire_width = self.tire_width

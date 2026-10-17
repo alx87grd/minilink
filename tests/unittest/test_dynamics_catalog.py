@@ -903,6 +903,7 @@ from minilink.dynamics.catalog.pendulum.cartpole import (
 from minilink.dynamics.catalog.mass_spring_damper.linear import FloatingTwoMass
 from minilink.dynamics.catalog.pendulum.pendulum import InvertedPendulum
 from minilink.dynamics.catalog.vehicles.dynamic_bicycle import DynamicBicycleCar3D
+from minilink.dynamics.catalog.vehicles.steering import KinematicCar
 
 
 def stored(cls, **attributes):
@@ -984,6 +985,8 @@ PARAMS_CASES = [
     (stored(DynamicBicycle), "get_dynamic_geometry", "Ca", 80000.0),
     (stored(DynamicBicycleCar3D), "get_dynamic_geometry", "r_f", 0.4),
     (stored(DynamicBicycleCar3D), "get_dynamic_geometry", "Ca", 80000.0),
+    # The kinematic car: its steered front wheels
+    (stored(KinematicCar), "tf", "length", 6.0),
 ]
 
 
