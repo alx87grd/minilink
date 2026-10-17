@@ -9,6 +9,7 @@ import numpy as np
 
 from minilink.core.feedback import block_roles, plot_space_of, require_command
 from minilink.graphical.common import PlotResult
+from minilink.graphical.phase_plane.phase_plane import format_axis_label
 
 # The sweep range of a coordinate whose bounds are not finite
 _DEFAULT_BOUNDS = (-10.0, 10.0)
@@ -751,12 +752,3 @@ def require_distinct_axes(x_axis, y_axis):
     """Refuse a sweep of one coordinate against itself."""
     if y_axis == x_axis:
         raise ValueError("x_axis and y_axis must differ")
-
-
-def format_axis_label(label, unit) -> str:
-    """The label with its unit in brackets: ``[m]`` stays ``[m]``."""
-    if unit:
-        if unit.startswith("[") and unit.endswith("]"):
-            return f"{label} {unit}"
-        return f"{label} [{unit}]"
-    return label
