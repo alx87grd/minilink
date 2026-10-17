@@ -45,6 +45,7 @@ from minilink.dynamics.catalog.vehicles.propulsion import (
     LongitudinalFrontWheelDriveCarWithWheelSlipInput,
 )
 from examples.projects.car_trajopt.vehicles.extras import (
+    ConstantSpeedKinematicCar,
     DynamicHolonomicMobileRobot,
     HolonomicMobileRobot3D,
 )
@@ -1059,6 +1060,8 @@ PARAMS_CASES = [
     # The planar drones: the thrust arrows at the thrusters
     (stored(Drone2D), "get_dynamic_geometry", "thruster_offset", 0.7),
     (stored(Drone2DWithSideThruster), "get_dynamic_geometry", "thruster_offset", 0.7),
+    # The constant-speed car of the car_trajopt project: its front axle
+    (stored(ConstantSpeedKinematicCar), "tf", "a", 2.5),
 ]
 
 
@@ -1087,6 +1090,14 @@ def method_args(plant, method):
 
 def case_id(value):
     return getattr(value, "__name__", None)
+
+
+def test_the_constant_speed_car_drives_the_bicycle_at_the_speed_given():
+    car = ConstantSpeedKinematicCar()
+    u = np.array([0.2])
+    np.testing.assert_array_equal(car.bicycle_input(u), [2.0, 0.2])
+    fast = {**car.params, "speed": 5.0}
+    np.testing.assert_array_equal(car.bicycle_input(u, fast), [5.0, 0.2])
 
 
 @pytest.mark.parametrize("make, method, key, value", PARAMS_CASES, ids=case_id)
