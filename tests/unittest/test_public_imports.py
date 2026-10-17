@@ -50,6 +50,11 @@ class TestPublicImports(unittest.TestCase):
         self.assertTrue(minilink.__version__)
         self.assertRegex(minilink.__version__, r"^0\.")
 
+        # The version is assigned in place: no helper or import shows in the package
+        listing = dir(minilink)
+        self.assertNotIn("package_version", listing)
+        self.assertNotIn("metadata", listing)
+
     def test_simulation_band_exports_simulators(self):
         from minilink.simulation import Simulator, StaticSimulator
         from minilink.simulation.simulator import Simulator as SimulatorDef
