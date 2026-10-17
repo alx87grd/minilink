@@ -249,21 +249,30 @@ class Trajectory:
 def interpolate_schedule(xp, t_samples, values, t):
     """Value of a sampled schedule at time ``t``: linear between samples, held outside.
 
-    ``t_samples`` holds ``N`` increasing sample times and ``values`` the
-    samples, shape ``(N, ...)``; the result has the shape of one sample.
-    ``xp`` is the array module of the caller (NumPy or JAX).
+    ``t_samples`` holds ``N`` nondecreasing sample times and ``values`` the
+    samples, shape ``(N, ...)``; the result has the shape of one sample. At a
+    repeated time the later sample holds, and a single sample holds at every
+    ``t``. ``xp`` is the array module of the caller (NumPy or JAX).
     """
     ts = xp.asarray(t_samples)
     values = xp.asarray(values)
+    last = len(t_samples) - 1
 
-    # The interval [t_i, t_{i+1}] holding t, clipped to the schedule
-    i = xp.clip(xp.searchsorted(ts, t, side="right") - 1, 0, len(t_samples) - 2)
+    # The interval [t_i, t_j] holding t, clipped to the schedule (i = j = 0 for one sample)
+    i = xp.clip(xp.searchsorted(ts, t, side="right") - 1, 0, max(last - 1, 0))
+    j = xp.minimum(i + 1, last)
+    width = ts[j] - ts[i]
 
-    # w = (t − t_i) / (t_{i+1} − t_i), held in [0, 1] outside the samples
-    w = xp.clip((t - ts[i]) / (ts[i + 1] - ts[i]), 0.0, 1.0)
+    # w = (t − t_i) / (t_j − t_i), held in [0, 1] outside the samples; on a
+    # repeated time (t_j = t_i) w = 1 from t_i on, the later sample
+    w = xp.where(
+        width > 0.0,
+        xp.clip((t - ts[i]) / xp.where(width > 0.0, width, 1.0), 0.0, 1.0),
+        xp.where(t >= ts[i], 1.0, 0.0),
+    )
 
-    # v(t) = (1 − w) v_i + w v_{i+1}
-    value = (1.0 - w) * values[i] + w * values[i + 1]
+    # v(t) = (1 − w) v_i + w v_j
+    value = (1.0 - w) * values[i] + w * values[j]
 
     return value
 

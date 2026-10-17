@@ -1,5 +1,6 @@
 import unittest
 import numpy as np
+import pytest
 from minilink.core.system import DynamicSystem, StepSystem, System, VectorSignal
 
 
@@ -532,3 +533,47 @@ def test_signal_box_is_derived_from_the_bounds():
     U = BoxInputSet.from_system_inputs(sys)
     np.testing.assert_allclose(U.box.lower, [-5.0, -0.5, -0.5])
     np.testing.assert_allclose(U.box.upper, [5.0, 0.5, 0.5])
+
+
+def schedule_cases():
+    """Sampled schedules, each with the times it is read at."""
+    times = (-1.0, 0.0, 0.25, 0.5, 1.0, 1.5, 2.0, 3.0, 4.0)
+    return [
+        ([0.0, 1.0, 3.0], [2.0, -1.0, 4.0], times),  # strictly increasing
+        ([0.0, 1.0, 1.0], [0.0, 1.0, 5.0], times),  # repeated last time
+        ([0.0, 0.0, 1.0], [3.0, 4.0, 5.0], times),  # repeated first time
+        ([0.0, 1.0, 1.0, 2.0], [0.0, 1.0, 5.0, 6.0], times),  # repeated inner time
+    ]
+
+
+def test_interpolate_schedule_holds_one_sample_and_takes_the_later_at_a_repeated_time():
+    from minilink.core.trajectory import interpolate_schedule
+
+    # One sample holds at every time
+    for t in (-1.0, 0.5, 2.0):
+        np.testing.assert_array_equal(
+            interpolate_schedule(np, [0.5], [[1.0, 2.0]], t), [1.0, 2.0]
+        )
+
+    # Linear between samples, held outside, the later sample at a repeated time:
+    # what np.interp reads
+    for t_samples, values, times in schedule_cases():
+        for t in times:
+            value = interpolate_schedule(np, t_samples, values, t)
+            assert value == np.interp(t, t_samples, values)
+
+
+@pytest.mark.optional
+@pytest.mark.jax
+def test_interpolate_schedule_holds_one_sample_and_a_repeated_time_on_jax():
+    jax = pytest.importorskip("jax")
+    import jax.numpy as jnp
+
+    from minilink.core.trajectory import interpolate_schedule
+
+    one = jax.jit(lambda t: interpolate_schedule(jnp, [0.5], [[1.0, 2.0]], t))
+    np.testing.assert_array_equal(one(2.0), [1.0, 2.0])
+    for t_samples, values, times in schedule_cases():
+        read = jax.jit(lambda t: interpolate_schedule(jnp, t_samples, values, t))
+        for t in times:
+            np.testing.assert_allclose(read(t), np.interp(t, t_samples, values))
