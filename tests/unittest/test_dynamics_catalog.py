@@ -1217,3 +1217,36 @@ def test_a_closed_rounded_rectangle_does_not_repeat_its_first_waypoint():
     # The open path runs the whole loop, back onto its first waypoint
     np.testing.assert_array_equal(open_loop[-1], open_loop[0])
     np.testing.assert_array_equal(open_loop[:-1], closed)
+
+
+# The pathtracking project's signal blocks: one xp body each, so they trace under jit
+
+
+@pytest.mark.jax
+def test_the_pathtracking_signal_blocks_trace_under_jit():
+    jax = pytest.importorskip("jax")
+    configure_jax(enable_x64=True)
+    from examples.projects.pathtracking.common.allocation import Allocation
+    from examples.projects.pathtracking.mpc_v1.nominal_refs import NominalRefs
+    from examples.projects.pathtracking.mpc_v1.plant_to_mpc import PlantToMpcState
+
+    rng = np.random.default_rng(0)
+    allocation = Allocation(0.34, 40000.0, transmission_ratio=2.0)
+    nominal = NominalRefs()
+    to_mpc = PlantToMpcState()
+    cases = [
+        (allocation.h_throttle, np.concatenate([[3000.0, 0.1], rng.normal(size=10)])),
+        (
+            allocation.h_throttle,
+            np.concatenate([[-50.0, 0.1], 40.0 + rng.normal(size=10)]),
+        ),
+        (allocation.h_delta, np.concatenate([[3000.0, 0.1], rng.normal(size=10)])),
+        (nominal.h_heading_ref, rng.normal(size=8)),
+        (nominal.h_vx_ref, rng.normal(size=8)),
+        (nominal.h_delta_ff, rng.normal(size=8)),
+        (to_mpc.h_y_mpc, rng.normal(size=10)),
+    ]
+    for h, u in cases:
+        expected = h(None, u)
+        traced = jax.jit(lambda u, h=h: h(None, u))(u)
+        np.testing.assert_array_equal(np.asarray(traced), expected)
