@@ -987,6 +987,35 @@ PARAMS_CASES = [
     (stored(DynamicBicycleCar3D), "get_dynamic_geometry", "Ca", 80000.0),
     # The kinematic car: its steered front wheels
     (stored(KinematicCar), "tf", "length", 6.0),
+    # The longitudinal cars: the traction arrow
+    (
+        stored(LongitudinalFrontWheelDriveCarWithWheelSlipInput),
+        "get_dynamic_geometry",
+        "length",
+        3.0,
+    ),
+    (
+        stored(LongitudinalFrontWheelDriveCarWithWheelSlipInput),
+        "get_dynamic_geometry",
+        "mu_max",
+        1.2,
+    ),
+    (
+        stored(LongitudinalFrontWheelDriveCarWithTorqueInput),
+        "get_dynamic_geometry",
+        "mu_max",
+        1.2,
+    ),
+    (
+        # Rolling at 10 m/s with the wheel near its rolling speed: the slip is not clipped
+        stored(
+            LongitudinalFrontWheelDriveCarWithTorqueInput,
+            x0=np.array([0.0, 10.0, 33.0, 0.0]),
+        ),
+        "get_dynamic_geometry",
+        "wheel_radius",
+        0.4,
+    ),
 ]
 
 

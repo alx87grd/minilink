@@ -125,8 +125,11 @@ class LongitudinalFrontWheelDriveCarWithWheelSlipInput(DynamicSystem):
         }
 
     def get_dynamic_geometry(self, x, u, t=0, params=None):
-        force = self.slip2force(u[0]) if self.m == 1 else 0.0
-        length = self.params["length"]
+        params = self.params if params is None else params
+
+        length = params["length"]
+
+        force = self.slip2force(u[0], params) if self.m == 1 else 0.0
 
         return {
             "body": [
@@ -242,10 +245,12 @@ class LongitudinalFrontWheelDriveCarWithTorqueInput(
         return y
 
     def get_dynamic_geometry(self, x, u, t=0, params=None):
-        slip = self.slip_ratio(x[1], x[2])
+        params = self.params if params is None else params
+
+        slip = self.slip_ratio(x[1], x[2], params)
         u_slip = np.array([slip])
 
-        return super().get_dynamic_geometry(x, u_slip, t)
+        return super().get_dynamic_geometry(x, u_slip, t, params)
 
 
 if __name__ == "__main__":
