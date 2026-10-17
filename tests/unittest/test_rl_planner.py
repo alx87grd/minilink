@@ -388,6 +388,60 @@ def test_squashed_head_log_density_is_finite_outside_the_square():
         assert bool(jnp.isfinite(logp)), a
 
 
+def test_sac_reused_across_plants_targets_each_plant_input_dimension():
+    from minilink.core.costs import QuadraticCost
+    from minilink.core.system import DynamicSystem
+    from minilink.planning.reinforcement_learning import SAC
+
+    class ThreeAxisPoint(DynamicSystem):
+        """A point driven in velocity on three axes: dx = u."""
+
+        def __init__(self):
+            super().__init__(n=3, input_dim=3, output_dim=3)
+            self.state.lower_bound = -2.0 * np.ones(3)
+            self.state.upper_bound = 2.0 * np.ones(3)
+            self.inputs["u"].lower_bound = -np.ones(3)
+            self.inputs["u"].upper_bound = np.ones(3)
+
+        def f(self, x, u, t=0.0, params=None):
+            return 1.0 * u
+
+    point = ThreeAxisPoint()
+    three_inputs = StochasticPlanningProblem(
+        point,
+        cost=QuadraticCost.from_system(point),
+        X=point.state.box,
+        x0_distribution=Uniform(-0.5 * np.ones(3), 0.5 * np.ones(3)),
+    )
+
+    def sac_planner(prob, sac):
+        return ReinforcementLearningPlanner(
+            prob,
+            dt=0.1,
+            hidden=(8,),
+            algorithm=sac,
+            gamma=0.99,
+            n_envs=2,
+            n_steps=8,
+            verbose=0,
+        )
+
+    def sac():
+        return SAC(batch_size=16, learning_starts=16, buffer_size=64, gradient_steps=2)
+
+    reused = sac()
+    sac_planner(problem(tf=np.inf), reused)  # bound first to a one-input pendulum
+    assert reused.target_entropy is None  # the user's choice, kept
+    planner = sac_planner(three_inputs, reused)
+    fresh = sac_planner(three_inputs, sac())
+    planner.learn(32)
+    fresh.learn(32)
+    np.testing.assert_allclose(
+        np.asarray(planner.train_state["log_alpha"]),
+        np.asarray(fresh.train_state["log_alpha"]),
+    )
+
+
 # --- the learned law is a System: compile, differentiate, linearize ---
 
 

@@ -58,7 +58,8 @@ class SAC(Algorithm):
         self.learning_starts = int(learning_starts)
         self.gradient_steps = gradient_steps
 
-        # Temperature: the entropy target, −m by default once the policy is bound
+        # Temperature: the entropy target as given (None: −m of the bound policy, at
+        # each update)
         self.target_entropy = target_entropy
 
         # Optimizer: one Adam for the actor, the critics and the temperature
@@ -71,10 +72,6 @@ class SAC(Algorithm):
         pi = self.policy
         Q = self.critic
         optimizer = self.optimizer
-
-        # The entropy target defaults to −m, minus the action dimension
-        if self.target_entropy is None:
-            self.target_entropy = -float(pi.m)
 
         # The actor, the twin critics (independent draws) and their targets
         theta = pi.init()
@@ -105,7 +102,7 @@ class SAC(Algorithm):
         optimizer = self.optimizer
         gamma = self.gamma
         tau = self.tau
-        H_target = self.target_entropy
+        H_target = target_entropy_of(self.target_entropy, pi)
         params = train_state["params"]
         opt = train_state["opt"]
         theta = params["policy"]
@@ -188,3 +185,16 @@ class SAC(Algorithm):
         }
 
         return new_state, stats
+
+
+###############################################################################
+# Internal machinery
+###############################################################################
+
+
+def target_entropy_of(target_entropy, pi) -> float:
+    """The entropy target as given, else −m, minus the bound policy's action dimension."""
+    if target_entropy is None:
+        return -float(pi.m)
+
+    return target_entropy
