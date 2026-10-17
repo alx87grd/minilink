@@ -493,8 +493,8 @@ def require_method(method):
         raise ValueError(f"method must be one of {METHODS}, got {method!r}")
     if method == "sos":
         raise NotImplementedError(
-            "sum-of-squares certificates are not implemented; "
-            "quadratic V only (ROADMAP §6, Lyapunov certificates)"
+            "sum-of-squares certificates are not implemented: region of "
+            "attraction certificates take a quadratic V only"
         )
 
 

@@ -192,7 +192,7 @@ class TestQuadraticCertificate(unittest.TestCase):
 
     def test_method_and_search_options(self):
         sys = StableLinear()
-        with self.assertRaises(NotImplementedError):
+        with self.assertRaisesRegex(NotImplementedError, "a quadratic V only"):
             region_of_attraction(sys, method="sos")
         with self.assertRaises(ValueError):
             region_of_attraction(sys, method="neural")
