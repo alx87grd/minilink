@@ -66,10 +66,11 @@ class Planner(ABC):
 
     def solve(self, **kwargs):
         """
-        Offline solve entry.
+        Offline solve entry: the planner's verb, each planner's own solve.
 
-        Subclasses typically override this to call
-        :meth:`solve_trajectory` or :meth:`solve_policy`.
+        A trajectory planner's ``solve`` runs :meth:`solve_trajectory`. A policy
+        planner's ``solve`` is the solve itself, and :meth:`solve_policy`, the
+        family name every policy planner answers, calls it.
         """
         raise NotImplementedError(f"{type(self).__name__}.solve is not implemented")
 
