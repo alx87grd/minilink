@@ -53,6 +53,10 @@ class System(SharedSystemFacades):
     - **Inspect**: :meth:`__str__` is a short summary (name, class, ``n``,
       ports with dimensions; a diagram adds its keys). A notebook last
       expression still draws the Graphviz block.
+    - **Names**: :attr:`name` is the display name, the class name unless the
+      block sets its own; :attr:`id` is the key the block takes in a diagram
+      built by ``+``, ``>>`` or a loop (``None``: its name in snake case; in
+      ``@`` the role names ``plant``, ``controller`` and ``observer`` win).
 
     Overridden :meth:`h` and port ``compute`` functions are functions of
     ``(x, u, t, params)`` alone: no memory between calls, no cached side
@@ -83,9 +87,9 @@ class System(SharedSystemFacades):
         self.n = int(n)
         require_nonnegative_dimension(self.n)
 
-        # Human-readable identifier, and the optional diagram subsystem key
-        # override (see the composition shortcuts)
-        self.name = "System"
+        # The display name, the class name unless a subclass sets its own, and
+        # the optional diagram key override (see the composition shortcuts)
+        self.name = type(self).__name__
         self.id = None
 
         # State metadata
@@ -545,7 +549,6 @@ class DynamicSystem(DynamicSystemFacades, System):
             Direct-feedthrough dependencies for the standard ``y`` output.
         """
         System.__init__(self, n)
-        self.name = "DynamicSystem"
 
         # Ports, each when asked: the input u, the output y = h(x, u), the state x
         add_standard_ports(self, input_dim, output_dim, expose_state, y_dependencies)
@@ -646,7 +649,6 @@ class StepSystem(StepSystemFacades, System):
         """
         require_step_state(n)
         System.__init__(self, n)
-        self.name = "StepSystem"
 
         # Memory: the last rollout ``compute_rollout`` produced
         self.rollout = None
