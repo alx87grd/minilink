@@ -492,8 +492,11 @@ class TestDiagramParamsContract(unittest.TestCase):
             self.diag.f(self.x, self.u, 0.0, params={"Kp": 4.0})
 
     def test_non_mapping_params_raises_typeerror(self):
-        with self.assertRaises(TypeError):
+        message = r"Diagram params must be a mapping keyed by subsystem id .* got list"
+        with self.assertRaisesRegex(TypeError, message):
             self.diag.f(self.x, self.u, 0.0, params=[1.0, 2.0])
+        with self.assertRaisesRegex(TypeError, message):
+            self.diag.subsystem_params([1.0, 2.0], "plant")
 
 
 class TestNumpyDiagramParametricTier(unittest.TestCase):

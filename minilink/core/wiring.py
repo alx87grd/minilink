@@ -350,12 +350,9 @@ class WiredDiagramMixin:
         """
         if params is None:
             return None
-        if isinstance(params, Mapping):
-            return params.get(sys_id)
-        raise TypeError(
-            "Diagram params must be a mapping keyed by subsystem id "
-            f"(e.g. {{'plant': {{...}}}}), got {type(params).__name__}"
-        )
+        require_params_mapping(params)
+
+        return params.get(sys_id)
 
     def compute_subsys_output_port(self, x, u, t, sys_id, port_id, params=None):
         """Evaluate one subsystem output port, recursing through its sources."""
@@ -731,11 +728,7 @@ def validate_diagram_params(params, subsystem_ids):
     if params is None:
         return
 
-    if not isinstance(params, Mapping):
-        raise TypeError(
-            "diagram params must be a mapping keyed by subsystem id "
-            f"(e.g. {{'plant': {{...}}}}), got {type(params).__name__}"
-        )
+    require_params_mapping(params)
 
     unknown = [key for key in params if key not in subsystem_ids]
     if unknown:
@@ -833,6 +826,15 @@ def iter_subsystems(diagram, prefix=()):
 ###############################################################################
 # Internal machinery
 ###############################################################################
+
+
+def require_params_mapping(params):
+    """Refuse diagram params that are not a mapping keyed by subsystem id."""
+    if not isinstance(params, Mapping):
+        raise TypeError(
+            "Diagram params must be a mapping keyed by subsystem id "
+            f"(e.g. {{'plant': {{...}}}}), got {type(params).__name__}"
+        )
 
 
 def require_one_size(name, dims):
