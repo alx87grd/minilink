@@ -1021,6 +1021,21 @@ PARAMS_CASES = [
     # The planar aircraft: its chords and its lift and drag arrows
     (stored(Plane2D), "tf", "l_t", 1.3),
     (stored(Plane2D), "get_dynamic_geometry", "rho", 1.5),
+    # The boats: the thrust, hydrodynamic and current arrows
+    (stored(Boat2D), "get_dynamic_geometry", "l_t", 4.0),
+    (
+        stored(Boat2D, show_hydrodynamic_forces=True),
+        "get_dynamic_geometry",
+        "damping_coef",
+        np.array([20.0, 20.0, 200.0]),
+    ),
+    (stored(Boat2DWithCurrent), "tf", "loa", 7.0),
+    (
+        stored(Boat2DWithCurrent),
+        "get_dynamic_geometry",
+        "current_velocity",
+        np.array([1.0, -0.5]),
+    ),
 ]
 
 

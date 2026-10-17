@@ -218,6 +218,8 @@ class Boat2D(GeneralizedMechanicalSystem):
         }
 
     def get_dynamic_geometry(self, x, u, t=0, params=None):
+        params = self.params if params is None else params
+
         # Arrow lengths: 2·10⁻⁴ m per newton
         force_scale = 0.0002
 
@@ -225,7 +227,7 @@ class Boat2D(GeneralizedMechanicalSystem):
         thrust_len = force_scale * np.hypot(u[0], u[1])
         a = np.arctan2(u[1], u[0])
         thrust_dir = np.array([np.cos(a), np.sin(a)])
-        l_t = self.params["l_t"]
+        l_t = params["l_t"]
         thrust = Arrow(
             base=-thrust_len * thrust_dir,
             vector=thrust_dir,
@@ -239,13 +241,13 @@ class Boat2D(GeneralizedMechanicalSystem):
         # On request, the hydrodynamic force at the c.g. and its yaw moment
         if self.show_hydrodynamic_forces:
             q = x[:3]
-            rho = self.params["rho"]
-            Alc = self.params["Alc"]
-            loa = self.params["loa"]
-            Cm_max = self.params["Cm_max"]
+            rho = params["rho"]
+            Alc = params["Alc"]
+            loa = params["loa"]
+            Cm_max = params["Cm_max"]
 
             # The force the water applies: −d, since d sits on the left side
-            d = self.d(q, x[3:], u, t)
+            d = self.d(q, x[3:], u, t, params)
             hydro_force = -d
 
             # A full turn of the torque arrow is the current moment at V² = 12 m²/s²,
@@ -307,8 +309,10 @@ class Boat2DWithCurrent(Boat2D):
         return d
 
     def tf(self, x, u, t=0, params=None):
-        frames = super().tf(x, u, t)
-        loa = self.params["loa"]
+        params = self.params if params is None else params
+
+        frames = super().tf(x, u, t, params)
+        loa = params["loa"]
 
         # The current arrow, one hull length up and to the left of the boat
         frames["current"] = translation(x[0] - loa, x[1] + loa, 0.0)
@@ -316,9 +320,11 @@ class Boat2DWithCurrent(Boat2D):
         return frames
 
     def get_dynamic_geometry(self, x, u, t=0, params=None):
-        dynamic = super().get_dynamic_geometry(x, u, t)
-        current_velocity = self.params["current_velocity"]
-        loa = self.params["loa"]
+        params = self.params if params is None else params
+
+        dynamic = super().get_dynamic_geometry(x, u, t, params)
+        current_velocity = params["current_velocity"]
+        loa = params["loa"]
 
         # The current arrow along the current, half a hull length per m/s
         length = 0.5 * loa * np.hypot(current_velocity[0], current_velocity[1])

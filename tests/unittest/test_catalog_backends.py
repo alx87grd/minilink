@@ -81,6 +81,7 @@ TRACED_TF = (
     "MountainCar",
     "KinematicCar",
     "Plane2D",
+    "Boat2DWithCurrent",
 )
 
 
