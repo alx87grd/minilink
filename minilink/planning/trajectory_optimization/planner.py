@@ -33,6 +33,7 @@ from minilink.planning.results import PlanningSolution
 from minilink.planning.trajectory_optimization.transcription import (
     Transcription,
     dynamics_function,
+    require_jax_compile_backend,
 )
 
 _UNSET = object()  # Marks a keyword the caller did not pass
@@ -310,7 +311,7 @@ class TrajectoryOptimizationPlanner(Planner):
         compile_backend = normalize_backend(
             self.options.compile_backend, allow_direct=True
         )
-        require_jax_backend(compile_backend, self.options.compile_backend)
+        require_jax_compile_backend(self.options.compile_backend)
         require_parametric_transcription(self.transcription)
 
         # Lazy import: the parametric JAX evaluator loads on first compile, not with
@@ -1006,15 +1007,6 @@ def type_name(value: object | None) -> str | None:
         return None
 
     return type(value).__name__
-
-
-def require_jax_backend(compile_backend, requested):
-    """Refuse a parametric compile on any backend but JAX."""
-    if compile_backend != BACKEND_JAX:
-        raise ValueError(
-            "compile_parametric_program requires compile_backend='jax' "
-            f"(got {requested!r})."
-        )
 
 
 def require_parametric_transcription(transcription):

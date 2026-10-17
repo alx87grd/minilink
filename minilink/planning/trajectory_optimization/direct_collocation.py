@@ -22,6 +22,7 @@ from minilink.planning.trajectory_optimization.transcription import (
     dynamics_function,
     native_concatenate,
     program_backend_for_compile,
+    require_jax_compile_backend,
     stack_constraints,
     trajectory_cost,
     trapezoidal_defect,
@@ -47,6 +48,9 @@ class DirectCollocationTranscription(Transcription):
     """
 
     supports_parametric = True
+
+    # The transcription's name in a program's metadata
+    name = "direct_collocation"
 
     def __init__(self, options: DirectCollocationOptions):
         self.options = options
@@ -285,7 +289,7 @@ class DirectCollocationTranscription(Transcription):
         *,
         compile_backend: str,
     ) -> MathematicalProgram:
-        """Build a JAX-vectorized collocation program.
+        """Build the JAX-vectorized program of :meth:`jax_objective_and_defects`.
 
         Direct collocation is performance-sensitive because SLSQP repeatedly
         calls the objective, gradient, constraints, and constraint Jacobians.
@@ -298,7 +302,8 @@ class DirectCollocationTranscription(Transcription):
 
         _, J, dynamics_residual = self.jax_objective_and_defects(problem, jax)
 
-        # Dynamics: the trapezoidal defect of every interval vanishes
+        # Dynamics: the defect of every interval vanishes, by the transcription's
+        # defect law
         equalities: list[ConstraintFunction] = [dynamics_residual]
         inequalities: list[ConstraintFunction] = []
 
@@ -320,7 +325,7 @@ class DirectCollocationTranscription(Transcription):
             upper=upper,
             backend=BACKEND_JAX,
             metadata={
-                "transcription": "direct_collocation",
+                "transcription": self.name,
                 "compile_backend": compile_backend,
             },
         )
@@ -520,14 +525,6 @@ class DirectCollocationTranscription(Transcription):
 ###############################################################################
 # Internal machinery
 ###############################################################################
-
-
-def require_jax_compile_backend(compile_backend):
-    """Refuse a parametric collocation program on any compile backend but JAX."""
-    if normalize_backend(compile_backend, allow_direct=True) != BACKEND_JAX:
-        raise ValueError(
-            "Parametric direct collocation requires compile_backend='jax'."
-        )
 
 
 def require_singleton_x0(problem):

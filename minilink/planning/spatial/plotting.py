@@ -5,6 +5,7 @@ from __future__ import annotations
 import numpy as np
 
 from minilink.core.geometry import Box, Inflated, Sphere, Union
+from minilink.planning.plotting import maybe_show
 from minilink.planning.spatial.collision import iter_probes
 from minilink.planning.spatial.grid import FieldGrid, sample_grid
 from minilink.planning.spatial.workspace_fields import GaussianField
@@ -722,12 +723,6 @@ def draw_body(ax, body, x, t, params, color, alpha, point_marker_size):
                 markeredgewidth=1.0,
                 zorder=6,
             )
-
-
-def maybe_show(plt, show):
-    """Show the figures, unless asked not to or on the non-interactive Agg backend."""
-    if show and plt.get_backend().lower() != "agg":
-        plt.show()
 
 
 # The track's refusals

@@ -290,3 +290,12 @@ def require_fixed_grid_horizon(tf):
     """Refuse a fixed-grid horizon that is not positive and finite."""
     if not np.isfinite(tf) or tf <= 0.0:
         raise ValueError("fixed-grid tf must be positive and finite")
+
+
+def require_jax_compile_backend(compile_backend):
+    """Refuse a parametric program on any compile backend but JAX."""
+    if normalize_backend(compile_backend, allow_direct=True) != BACKEND_JAX:
+        raise ValueError(
+            "a parametric program requires compile_backend='jax' "
+            f"(got {compile_backend!r})."
+        )

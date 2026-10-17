@@ -2,6 +2,8 @@
 
 import numpy as np
 
+from minilink.planning.plotting import maybe_show
+
 # The value-iteration result is a node-indexed field over the state grid: these
 # views reshape it, take a 2-D slice when n > 2, and draw it as a heatmap, a 3-D
 # surface or an animation over the recorded sweeps. Matplotlib is imported inside
@@ -412,12 +414,6 @@ def overlay_trajectory(ax, trajectory, axes, labels):
     ax.plot(x[axes[0], 0], x[axes[1], 0], "go", label=labels[1])
     ax.plot(x[axes[0], -1], x[axes[1], -1], "r*", markersize=12, label=labels[2])
     ax.legend(loc="upper right", fontsize=8)
-
-
-def maybe_show(plt, show):
-    """Show the figures, unless asked not to or on the non-interactive Agg backend."""
-    if show and plt.get_backend().lower() != "agg":
-        plt.show()
 
 
 def plot_policy_field(grid, pi, *, axis, axes, anchor, cmap, ax, show):

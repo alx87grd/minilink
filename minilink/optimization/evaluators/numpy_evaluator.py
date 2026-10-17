@@ -88,21 +88,3 @@ class NumpyMathematicalProgramEvaluator(MathematicalProgramEvaluator):
             return super().jacobian_g(z)
         value = self.program.jac_g(self.decision_vector(z))
         return self.as_matrix(value, (self.n_g, self.n_z), "inequality Jacobian")
-
-    ###########################################################################
-    # Internal machinery
-    ###########################################################################
-
-    def check_derivative_shapes(self, z) -> None:
-        """Evaluate every available quantity once at ``z``: each checks its own shape."""
-        self.objective(z)
-        self.equality_residual(z)
-        self.inequality_margin(z)
-        if self.has_gradient:
-            self.gradient(z)
-        if self.has_hessian:
-            self.hessian(z)
-        if self.has_jacobian_h:
-            self.jacobian_h(z)
-        if self.has_jacobian_g:
-            self.jacobian_g(z)
