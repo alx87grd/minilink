@@ -76,6 +76,8 @@ TRACED_TF = (
     "Acrobot",
     "RotatingCartPole",
     "UnderactuatedRotatingCartPole",
+    "InvertedPendulum",
+    "TwoIndependentPendulums",
 )
 
 

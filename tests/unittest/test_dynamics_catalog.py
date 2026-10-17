@@ -900,6 +900,7 @@ from minilink.dynamics.catalog.pendulum.cartpole import (
     RotatingCartPole,
     UnderactuatedRotatingCartPole,
 )
+from minilink.dynamics.catalog.pendulum.pendulum import InvertedPendulum
 
 
 def stored(cls, **attributes):
@@ -963,6 +964,11 @@ PARAMS_CASES = [
     # The rotating cart-poles: frames
     (stored(RotatingCartPole), "tf", "l1", 1.4),
     (stored(UnderactuatedRotatingCartPole), "tf", "l2", 1.4),
+    # The single pendulums: frames and torque arcs
+    (stored(Pendulum), "get_dynamic_geometry", "l", 1.5),
+    (stored(InvertedPendulum), "get_dynamic_geometry", "l", 1.5),
+    (stored(TwoIndependentPendulums), "tf", "l", 1.5),
+    (stored(TwoIndependentPendulums), "get_dynamic_geometry", "l", 1.5),
 ]
 
 

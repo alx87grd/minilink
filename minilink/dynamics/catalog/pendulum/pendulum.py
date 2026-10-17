@@ -99,7 +99,9 @@ class Pendulum(MechanicalSystem):
         return {"link": SE2(0.0, 0.0, x[0])}
 
     def get_dynamic_geometry(self, x, u, t=0, params=None):
-        length = self.params["l"]
+        params = self.params if params is None else params
+
+        length = params["l"]
         torque = u[0]
         max_torque = self.inputs["u"].upper_bound[0]
 
@@ -182,11 +184,13 @@ class InvertedPendulum(Pendulum):
         return g
 
     def tf(self, x, u, t=0, params=None):
+        xp = array_module(x)
+
         # θ is measured from the upward vertical (zero angle = upright); the shared
         # geometry draws angles from the downward vertical, so add π
-        upright = np.array([x[0] + np.pi, x[1]])
+        upright = xp.array([x[0] + xp.pi, x[1]])
 
-        return super().tf(upright, u, t)
+        return super().tf(upright, u, t, params)
 
 
 class TwoIndependentPendulums(MechanicalSystem):
@@ -272,7 +276,9 @@ class TwoIndependentPendulums(MechanicalSystem):
         return geo
 
     def tf(self, x, u, t=0, params=None):
-        length = self.params["l"]
+        params = self.params if params is None else params
+
+        length = params["l"]
 
         # The two pivots, 0.6 l either side of the origin
         anchors = [-0.6 * length, 0.6 * length]
@@ -282,7 +288,9 @@ class TwoIndependentPendulums(MechanicalSystem):
         }
 
     def get_dynamic_geometry(self, x, u, t=0, params=None):
-        length = self.params["l"]
+        params = self.params if params is None else params
+
+        length = params["l"]
         torque_radius = length / 5.0
         max_torque = self.inputs["u"].upper_bound[0]
 
