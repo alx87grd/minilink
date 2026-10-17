@@ -198,24 +198,27 @@ class DoublePendulum(MechanicalSystem):
         }
 
     def tf(self, x, u, t=0, params=None):
+        params = self.params if params is None else params
+        xp = array_module(x)
+
         dof = self.dof
-        l1 = self.params["l1"]
+        l1 = params["l1"]
         l2 = self.l2
 
         q = x[:dof]
         _, s1, _, _, c12, s12 = self.trig(q)
-        c1 = np.cos(q[0])
+        c1 = xp.cos(q[0])
 
         # The elbow at the end of the first link, the tip at the end of the second
-        p1 = np.array([l1 * s1, l1 * c1])
-        p2 = p1 + np.array([l2 * s12, l2 * c12])
+        p1 = xp.array([l1 * s1, l1 * c1])
+        p2 = p1 + xp.array([l2 * s12, l2 * c12])
 
         # The rods hang along their local −y, so each frame turns by π − θ; the
         # torque frames point their x axis along the link, at π/2 − θ
-        theta1 = np.pi - q[0]
-        theta12 = np.pi - (q[0] + q[1])
-        rod1_angle = np.pi / 2.0 - q[0]
-        rod2_angle = np.pi / 2.0 - q[0] - q[1]
+        theta1 = xp.pi - q[0]
+        theta12 = xp.pi - (q[0] + q[1])
+        rod1_angle = xp.pi / 2.0 - q[0]
+        rod2_angle = xp.pi / 2.0 - q[0] - q[1]
 
         return {
             "link1": SE2(0.0, 0.0, theta1),
@@ -228,17 +231,19 @@ class DoublePendulum(MechanicalSystem):
 
     def get_dynamic_geometry(self, x, u, t=0, params=None):
         return {
-            "torque1": [self.joint_torque_arc(u[0])],
-            "torque2": [self.joint_torque_arc(u[1])],
+            "torque1": [self.joint_torque_arc(u[0], params)],
+            "torque2": [self.joint_torque_arc(u[1], params)],
         }
 
     ###########################################################################
     # Internal machinery
     ###########################################################################
 
-    def joint_torque_arc(self, tau):
+    def joint_torque_arc(self, tau, params=None):
         """The arc of one joint torque: a third of a turn at the input's upper bound."""
-        l1 = self.params["l1"]
+        params = self.params if params is None else params
+
+        l1 = params["l1"]
         l2 = self.l2
 
         torque_radius = 0.2 * max(l1, l2)
@@ -285,7 +290,7 @@ class Acrobot(DoublePendulum):
 
     def get_dynamic_geometry(self, x, u, t=0, params=None):
         # Only the elbow is actuated: a single torque arc, at joint 2
-        return {"torque2": [self.joint_torque_arc(u[0])]}
+        return {"torque2": [self.joint_torque_arc(u[0], params)]}
 
 
 if __name__ == "__main__":

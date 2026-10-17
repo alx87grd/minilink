@@ -951,6 +951,11 @@ PARAMS_CASES = [
     (stored(FiveLinkPlanarManipulator), "get_dynamic_geometry", "l", np.full(5, 0.6)),
     (speed_two_link, "tf", "l1", 0.7),
     (speed_two_link, "get_dynamic_geometry", "l2", 0.4),
+    # The double pendulum and the acrobot: frames and torque arcs
+    (stored(DoublePendulum), "tf", "l1", 1.5),
+    (stored(DoublePendulum), "get_dynamic_geometry", "l1", 1.5),
+    (stored(Acrobot), "tf", "l1", 1.5),
+    (stored(Acrobot), "get_dynamic_geometry", "l1", 1.5),
 ]
 
 

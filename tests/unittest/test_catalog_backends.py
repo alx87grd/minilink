@@ -72,6 +72,8 @@ TRACED_TF = (
     "ThreeLinkManipulator3D",
     "FiveLinkPlanarManipulator",
     "SpeedControlledManipulator",
+    "DoublePendulum",
+    "Acrobot",
 )
 
 
