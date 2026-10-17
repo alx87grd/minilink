@@ -1106,7 +1106,7 @@ def test_a_method_reads_the_params_it_is_given(make, method, key, value):
 
 # The pathtracking project's vehicle: the rolling resistance, the tires, the inputs
 
-from examples.projects.pathtracking.common.vehicle import create_vehicle
+from examples.projects.pathtracking.common.vehicle import Pacejka, create_vehicle
 
 
 class TestPathtrackingVehicle(unittest.TestCase):
@@ -1122,3 +1122,11 @@ class TestPathtrackingVehicle(unittest.TestCase):
         d = vehicle.generalized_d(np.zeros(3), v, u_in)
         tau_front = vehicle.r_f * Fx_front + vehicle.bw_front * v[4] - 0.015 * Fz_f
         self.assertAlmostEqual(d[4], tau_front, places=9)
+
+    def test_the_lateral_weight_is_one_without_longitudinal_slip(self):
+        # G_yκ(κ = 0) = 1 whatever the curvature E (Pacejka 2006, §4.3.2)
+        tire = Pacejka()
+        tire.r_Ey1 = 0.5  # E = r_Ey1 + r_Ey2 d_fz = −0.5
+        for alpha in (0.0, 0.1, -0.2):
+            self.assertEqual(tire.Gyk(0.0, alpha), 1.0)
+        self.assertLess(tire.Gyk(0.3, 0.1), 1.0)

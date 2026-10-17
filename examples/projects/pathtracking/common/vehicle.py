@@ -1132,8 +1132,8 @@ class Pacejka(TireModel):
         C = r_Cy1
         E = r_Ey1 + r_Ey2 * d_fz
 
-        # G_yκ = cos(C atan(B κ − E (B − atan B)))
-        ratio = np.cos(C * np.arctan(B * k - E * (B - np.arctan(B))))
+        # G_yκ = cos(C atan(B κ − E (B κ − atan(B κ))))
+        ratio = np.cos(C * np.arctan(B * k - E * (B * k - np.arctan(B * k))))
 
         return ratio
 
