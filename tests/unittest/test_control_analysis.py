@@ -1180,6 +1180,11 @@ class TestPhasePlane(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "Unknown plot backend"):
             plot_phase_plane(sys, backend="bokeh", show=False)
 
+    def test_plotly_refuses_the_keywords_it_does_not_take(self):
+        sys = PhasePlaneTestSystem()
+        with self.assertRaisesRegex(TypeError, "dpi, figsize"):
+            plot_phase_plane(sys, backend="plotly", figsize=(4, 3), dpi=80, show=False)
+
 
 from minilink.analysis.discretization import DiscretizedRK4DynamicSystem, discretize
 

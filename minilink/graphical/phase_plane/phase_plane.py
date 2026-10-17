@@ -41,6 +41,7 @@ def plot_phase_plane(
     """
     backend_key = normalize_plot_backend(backend)
     require_plot_backend(backend_key, backend)
+    require_renderer_keywords(backend_key, kwargs)
 
     # The field on its grid, then the figure on the chosen backend
     spec = build_phase_plane_spec(
@@ -420,6 +421,16 @@ def require_plot_backend(key, backend):
     if key not in ("matplotlib", "plotly"):
         raise ValueError(
             f"Unknown plot backend {backend!r}. Expected 'matplotlib' or 'plotly'."
+        )
+
+
+def require_renderer_keywords(key, kwargs):
+    """Refuse keywords the plotly renderer does not take (matplotlib's renderer checks its own)."""
+    if key == "plotly" and kwargs:
+        names = ", ".join(sorted(kwargs))
+        raise TypeError(
+            f"plot_phase_plane(backend='plotly') got keyword arguments the plotly "
+            f"renderer does not take: {names}"
         )
 
 
