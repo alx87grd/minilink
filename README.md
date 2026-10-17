@@ -41,48 +41,27 @@
   </tr>
 </table>
 
-Minilink is an open-source Python toolbox for dynamical systems and control.
-A model is a short class whose equations read like the textbook. Models
-connect into block diagrams in code, with composition operators. Because
-every model, controller and diagram is the same kind of object, one set of
-tools applies to all of them: simulation and animation in 2D and 3D,
-frequency-domain analysis, classical and state-space control, value
-iteration, sampling-based planning, trajectory optimization, model predictive
-control and reinforcement learning. The same equations compile and
-differentiate under JAX, so a course model is also a high-performance
-research model.
+Minilink is an open-source Python framework for dynamical systems and control. A
+model is a `DynamicSystem`: a short class whose equations read like the textbook.
+Models and controllers, yours or from the catalog, compose into block diagrams with
+three operators, and a diagram is itself a `DynamicSystem`. One toolbox works on any
+of them: simulation and animation, linearization and frequency response, classical
+and state-space design, value iteration, sampling-based planning, trajectory
+optimization, model predictive control and reinforcement learning. NumPy, SciPy and
+Matplotlib are enough for a course; the same equations compile and differentiate
+under JAX for research.
 
-## Ten lines
+## Write a model
 
-```python
-from minilink import ImpedanceController, Pendulum
-
-controller = ImpedanceController()
-plant = Pendulum()
-
-plant.x0[0] = 2.0
-plant.params["l"] = 5.0
-
-diagram = controller @ plant
-diagram.compute_trajectory(tf=10.0)
-diagram.plot_diagram()
-diagram.plot_trajectory()
-diagram.animate()
-```
-
-![closed-loop diagram](https://raw.githubusercontent.com/alx87grd/minilink/main/docs/_static/diagram_closed_loop.png)
-
-## What is a System
-
-A model is dynamics `f`, outputs `h` and body poses `tf`, functions of the
-state `x`, the input `u`, the time `t` and the parameters `params`:
+A model is dynamics `f`, outputs `h` and body poses `tf`, functions of the state
+`x`, the input `u`, the time `t` and the parameters `params`:
 
     dx/dt = f(x, u, t; params)      dynamics
     y     = h(x, u, t; params)      one per output port, default y = x
     T     = tf(x, u, t; params)     body poses, for animation
 
-Write `f`, and the plant simulates and plots. Write `h` to choose what the
-sensor measures:
+Write `f`, and the model simulates and plots. Write `h` to choose what the sensor
+measures:
 
 ```python
 import numpy as np
@@ -114,28 +93,71 @@ plant.compute_trajectory(tf=10.0)
 plant.plot_trajectory()
 ```
 
-Add `tf` and a skin, and it animates on matplotlib, plotly, meshcat (3D) or
-pygame, and you can drive it from the keyboard
+Add `tf` and a skin, and it animates on matplotlib, plotly, meshcat (3-D) or pygame,
+and you can drive it from the keyboard
 ([10_graphical](https://github.com/alx87grd/minilink/blob/main/examples/tutorial/10_graphical.ipynb)).
+`f`, `h` and `tf` read `(x, u, t; params)` and nothing else: no hidden state on the
+object. That one convention is what lets a model compose, run in batches and
+differentiate.
 
-`f`, `h` and `tf` are functions of `(x, u, t; params)` only: no hidden state on
-the object. That one convention is what lets a model compose into diagrams,
-run in batches and differentiate later. A diagram flattens to one state vector
-and one `f`, so a closed loop linearizes, animates and nests like a plant.
+## Compose into a diagram
 
-## One model, every tool
-
-![one System (f, h, tf) connected to simulation, analysis, control, planning, learning](https://raw.githubusercontent.com/alx87grd/minilink/main/docs/_static/bridges.svg)
-
-The objects between the tools are the textbook's nouns. A `PlanningProblem`
-is a system, a cost and boundary sets; every planner takes it and returns a
-`PlanningSolution` (a policy, plus the trajectory when the solver computes one):
+`controller @ plant` closes a loop, `a >> b` is a series connection, `a + b` puts
+blocks side by side. The controller can be yours, or one of the catalog's:
 
 ```python
-import numpy as np
+from minilink import PID
+
+loop = PID(2.0, 0.5, 1.0) @ plant
+loop.compute_trajectory(tf=10.0)
+loop.plot_diagram()
+loop.plot_trajectory()
+```
+
+![closed-loop diagram](https://raw.githubusercontent.com/alx87grd/minilink/main/docs/_static/diagram_closed_loop.png)
+
+The operator inserts the error junction, names the two sides `controller` and `plant`,
+and the loop linearizes, animates and nests like any other model. The catalog has
+the plants a course needs, with their parameters and start as data (`Pendulum`,
+`CartPole`, `DoublePendulum`, `UR5Manipulator`, `KinematicBicycle`, `UdeSRacecar`,
+`Drone2D`, `Rocket`, `Boat2D`, …) and the control laws (`PID`, `ImpedanceController`,
+`StateFeedbackController`, `ComputedTorqueController`, `SlidingModeController`,
+`ModelPredictiveController`, `NeuralPolicyController`):
+
+```python
+from minilink import Pendulum
+
+pendulum = Pendulum()
+pendulum.params["l"] = 2.0
+pendulum.x0[0] = 2.0
+pendulum.compute_trajectory(tf=10.0)
+pendulum.animate()
+```
+
+## One toolbox, every System
+
+Every tool is a verb on a `System`, a leaf or a whole diagram alike. One pendulum, six
+tools:
+
+![one pendulum through six tools](https://raw.githubusercontent.com/alx87grd/minilink/main/docs/_static/tool_montage.png)
+
+| | |
+| --- | --- |
+| Simulate, plot, animate, play | `compute_trajectory`, `plot_trajectory`, `plot_phase_plane`, `animate`, `game` |
+| Analyze | `linearize`, `bode`, `pzmap`, `margins`, `root_locus`, `step_response` |
+| Design | `lqr`, `place`, `kalman`, `lqg`, `PID`, `ImpedanceController` |
+| Plan and learn | `DynamicProgrammingPlanner`, `RRTPlanner`, `TrajectoryOptimizationPlanner`, `ModelPredictiveController`, `ReinforcementLearningPlanner` |
+
+## One problem, every planner
+
+A `PlanningProblem` is a system, a cost and boundary sets. Every planner takes the
+same problem, from LQR to value iteration, tree search, trajectory optimization and
+reinforcement learning, and returns a `PlanningSolution` whose policy is a controller:
+
+```python
 from minilink import (
-    BallSet, DynamicProgrammingPlanner, Pendulum, PlanningProblem,
-    QuadraticCost, RRTPlanner, TrajectoryOptimizationPlanner,
+    BallSet, DynamicProgrammingPlanner, PlanningProblem, QuadraticCost,
+    RRTPlanner, TrajectoryOptimizationPlanner,
 )
 
 plant = Pendulum()
@@ -147,59 +169,38 @@ problem = PlanningProblem(
 )
 
 vi = DynamicProgrammingPlanner(problem, x_grid=(101, 101), u_grid=(11,), dt=0.05)
-vi.solve()                                   # value iteration on a grid
-loop = vi.get_controller() @ plant           # the policy is a controller
-
 rrt = RRTPlanner(problem, seed=0)
-tree_traj = rrt.solve().trajectory           # kinodynamic tree search, bang-bang inputs
-
 opt = TrajectoryOptimizationPlanner(problem, n_steps=40, transcription="direct_collocation")
-opt_traj = opt.solve().trajectory            # direct collocation
+
+policy = vi.solve().policy            # value iteration: the policy is a controller
+tree_traj = rrt.solve().trajectory    # kinodynamic tree search, bang-bang inputs
+plan = opt.solve().trajectory         # direct collocation
+
+loop = policy @ plant                 # the script closes the loop
 ```
 
-Trajectory optimization transcribes the problem into a `MathematicalProgram`
-solved by an `Optimizer`.
+## Fast and differentiable with JAX, optional
 
-## Differentiable and compiled
-
-The same `f` traces under JAX. One evaluator gives exact derivatives, batched
-rollouts and gradients through a whole simulation:
+The same `f` traces under JAX. One compiled evaluator gives exact derivatives,
+batched rollouts and gradients through a whole simulation:
 
 ```python
-import numpy as np
-from minilink import Pendulum
-
-plant = Pendulum()
 ev = plant.compile(backend="jax")
-x_bar = np.array([np.pi, 0.0])                    # upright
 x0s = np.tile([1.0, 0.0], (1000, 1))              # 1000 rollouts released at 1 rad
 lengths = np.linspace(0.5, 2.0, 1000)             # one rod length per rollout
 
-A = plant.jacobian("f", "x", x_bar)               # exact linearization
-S = plant.jacobian("f", "params", x_bar)          # sensitivity to each physical parameter
+A = plant.jacobian("f", "x", x_up)                # exact linearization
+S = plant.jacobian("f", "params", x_up)           # sensitivity to each physical parameter
 xs = ev.rollout_batch(x0s, n_steps=1000, dt=0.005,
                       params=dict(plant.params, l=lengths))   # a family of rod lengths, one call
 ```
 
-Measured in the showcase notebook: 1000 rollouts of 1000 RK4 steps take
-27 ms as a compiled batch and about 32 s one step at a time in Python
-(Apple M4 Max). Derivatives are exact to machine precision, float64 by
-default. Under the hood, `compile()` lowers a leaf or a wired diagram to flat
-NumPy or JAX primitives (`f`, `rk4_step`, `rk4_integrate_zoh`,
-`rollout_batch`); the trace tier (`f_trace`, `f_trace_p`) is what you
-differentiate inside your own `jit`. See
-[07_compile](https://github.com/alx87grd/minilink/blob/main/examples/tutorial/07_compile.ipynb) and the
+1000 rollouts of 1000 RK4 steps take 27 ms as a compiled batch, against about
+32 s one step at a time in Python (Apple M4 Max, the showcase notebook).
+Derivatives are exact to machine precision, float64 by default. See
+[07_compile](https://github.com/alx87grd/minilink/blob/main/examples/tutorial/07_compile.ipynb)
+and the
 [JAX showcase](https://github.com/alx87grd/minilink/blob/main/examples/tutorial/showcase_jax.ipynb).
-
-## Two audiences, one codebase
-
-- **Teaching.** NumPy, SciPy and Matplotlib are enough for simulation, phase
-  planes, animation, linearization, LQR and value iteration. Runs in Colab
-  from one setup cell. One import line covers a course:
-  `from minilink import Pendulum, PID, lqr, PlanningProblem, ReinforcementLearningPlanner`.
-- **Research.** Optional JAX for compile and autodiff, Ipopt for large NLPs,
-  meshcat for 3D, a hybrid stack for sampled MPC. Every catalog plant compiles on both
-  backends.
 
 ## Install
 
@@ -226,9 +227,6 @@ sympy and gymnasium. Two optional tools need a system install pip cannot do:
 `pip install graphviz`) and the Ipopt solver needs `conda install -c conda-forge cyipopt`
 (trajectory optimization runs on SciPy without it).
 
-Developers: hooks and test commands in
-[tests/README.md](https://github.com/alx87grd/minilink/blob/main/tests/README.md).
-
 ## Learn more
 
 - [Showcase notebook](https://github.com/alx87grd/minilink/blob/main/examples/tutorial/showcase_minilink.ipynb), the tool ladder on real plants
@@ -237,7 +235,7 @@ Developers: hooks and test commands in
 - [Tutorial series 00–11](https://github.com/alx87grd/minilink/tree/main/examples/tutorial), one notebook per package (core dynamics to reinforcement learning)
 - [Teaching notebooks](https://github.com/alx87grd/minilink/tree/main/examples/teaching), swing-up, DP, PPO, robot equations of motion
 - [Examples index](https://github.com/alx87grd/minilink/blob/main/examples/README.md), demos and projects by chapter
-- [API reference](https://alx87grd.github.io/minilink/), [DESIGN.md](https://github.com/alx87grd/minilink/blob/main/docs/dev/DESIGN.md), [ROADMAP.md](https://github.com/alx87grd/minilink/blob/main/docs/dev/ROADMAP.md), [tests](https://github.com/alx87grd/minilink/blob/main/tests/README.md)
-- [CONSTITUTION.md](https://github.com/alx87grd/minilink/blob/main/docs/dev/CONSTITUTION.md) and [RULES.md](https://github.com/alx87grd/minilink/blob/main/docs/dev/RULES.md), the design law and the code rules every contributor and agent follows
+- [API reference](https://alx87grd.github.io/minilink/)
+- Contributors: [tests/README.md](https://github.com/alx87grd/minilink/blob/main/tests/README.md) and the contracts under [docs/dev](https://github.com/alx87grd/minilink/tree/main/docs/dev)
 
 Minilink is the successor of [pyro](https://github.com/SherbyRobotics/pyro).

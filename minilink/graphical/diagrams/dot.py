@@ -42,7 +42,9 @@ class GraphvizTopologyExporter(TopologyExporter):
         graphviz = require_graphviz()
 
         graph = graphviz.Digraph(topology.name, engine=engine)
-        graph.attr(rankdir=rankdir)
+        graph.attr(rankdir=rankdir, nodesep="0.4", ranksep="0.7", fontname=FONT)
+        graph.node_attr.update(fontname=FONT, fontsize="11")
+        graph.edge_attr.update(color=WIRE_COLOR, arrowsize="0.7")
 
         # The blocks, each nested diagram inside its box
         render_blocks(graph, topology)
@@ -119,17 +121,27 @@ def get_system_block_html(sys, html_id="sys1"):
 
 # The HTML-like block labels and their port identifiers
 
+FONT = "Helvetica"
+WIRE_COLOR = "#52525b"
+TITLE_FILL = "#eef2ff"
+BOUNDARY_COLOR = "#71717a"
+
 
 def block_html(node):
     """Return the Graphviz HTML-like label for one topology node."""
+    # The diagram's edge: its inputs and outputs as plain port cells, no title
+    if node.kind in ("external_input", "external_output"):
+        return boundary_html(node)
+
     # The title row: the block's name and id, a step system marked as such
     title = f"{node.name}::{node.display_id}"
     if node.kind == "step_system":
         title = f"Step: {title}"
     html = (
-        f'<TABLE BORDER="0" CELLSPACING="0">\n'
+        f'<TABLE BORDER="1" CELLBORDER="0" CELLSPACING="0" CELLPADDING="4" '
+        f'STYLE="rounded">\n'
         f"<TR>\n"
-        f'<TD align="left" BORDER="1" COLSPAN="2">{title}</TD>\n'
+        f'<TD align="left" COLSPAN="2" BGCOLOR="{TITLE_FILL}"><B>{title}</B></TD>\n'
         f"</TR>\n"
     )
 
@@ -141,22 +153,37 @@ def block_html(node):
         if j < len(node.inputs):
             port = node.inputs[j]
             html += (
-                f'<TD PORT="{graphviz_port_id(port.id, "in")}" align="left" '
-                f'BORDER="1">{port.text}</TD>\n'
+                f'<TD PORT="{graphviz_port_id(port.id, "in")}" align="left">'
+                f"{port.text}</TD>\n"
             )
         else:
-            html += '<TD BORDER="1"> </TD>\n'
+            html += "<TD> </TD>\n"
 
         if j < len(node.outputs):
             port = node.outputs[j]
             html += (
-                f'<TD PORT="{graphviz_port_id(port.id, "out")}" '
-                f'BORDER="1">{port.text}</TD>\n'
+                f'<TD PORT="{graphviz_port_id(port.id, "out")}" align="right">'
+                f"{port.text}</TD>\n"
             )
         else:
-            html += '<TD BORDER="1"> </TD>\n'
+            html += "<TD> </TD>\n"
         html += "</TR>\n"
 
+    html += "</TABLE>"
+
+    return html
+
+
+def boundary_html(node):
+    """Return the label of the diagram's edge: one grey cell per boundary port."""
+    role = "out" if node.kind == "external_input" else "in"
+    ports = node.outputs if node.kind == "external_input" else node.inputs
+    html = '<TABLE BORDER="0" CELLBORDER="0" CELLSPACING="0" CELLPADDING="3">\n'
+    for port in ports:
+        html += (
+            f'<TR><TD PORT="{graphviz_port_id(port.id, role)}">'
+            f'<FONT COLOR="{BOUNDARY_COLOR}">{port.text}</FONT></TD></TR>\n'
+        )
     html += "</TABLE>"
 
     return html

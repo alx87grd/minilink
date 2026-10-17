@@ -351,24 +351,6 @@ class TestReadmeAssets(unittest.TestCase):
                 gif.stat().st_size, GIF_MAX_BYTES, f"{gif.name} is over 1 MB"
             )
 
-    def test_the_bridges_figure_is_its_tile_list(self):
-        import importlib.util
-
-        spec = importlib.util.spec_from_file_location(
-            "asset_export", REPO / ASSET_EXPORT
-        )
-        asset_export = importlib.util.module_from_spec(spec)
-        spec.loader.exec_module(asset_export)
-        literals = make_assets_literals()
-        svg = asset_export.bridges_svg(
-            ast.literal_eval(literals["BRIDGES_TILES"]),
-            ast.literal_eval(literals["BRIDGES_CORE"]),
-        )
-
-        self.assertEqual(
-            svg, (REPO / STATIC / "bridges.svg").read_text(encoding="utf-8")
-        )
-
 
 class TestMergeGate(unittest.TestCase):
     """The JAX tests gate a merge, not only the JAX demos."""

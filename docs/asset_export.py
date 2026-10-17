@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 from pathlib import Path
-from xml.sax.saxutils import escape
 
 GIF_SIZE = 480  # px, the side of a square README tile
 GIF_FPS = 15
@@ -219,40 +218,33 @@ _HUB_SPOKES = """\
 """
 
 
-def bridges_svg(tiles, core) -> str:
-    """The hub-and-spoke figure: ``tiles`` are ten ``(title, subtitle)`` pairs.
+def montage_png(figures, path: Path, *, columns: int, dpi: int = 110) -> None:
+    """Paste matplotlib figures into one PNG grid, ``columns`` wide, row by row."""
+    import io
 
-    A title with a ``\\n`` takes two lines and no subtitle. ``core`` is the hub's
-    ``(name, equations)``.
-    """
-    if len(tiles) != len(_SLOTS):
-        raise ValueError(f"bridges_svg takes {len(_SLOTS)} tiles, got {len(tiles)}")
-    blocks = [_BRIDGES_HEAD]
-    for (x, y), (title, subtitle) in zip(_SLOTS, tiles):
-        cx = x + _TILE_W // 2
-        block = f'  <rect class="tile" x="{x}" y="{y}" width="{_TILE_W}" height="{_TILE_H}" rx="12"/>\n'
-        lines = title.split("\n")
-        if len(lines) == 2:
-            for dy, line in zip((26, 48), lines):
-                block += f'  <text class="t" x="{cx}" y="{y + dy}" text-anchor="middle">{escape(line)}</text>\n'
-        else:
-            block += f'  <text class="t" x="{cx}" y="{y + 32}" text-anchor="middle">{escape(title)}</text>\n'
-            block += f'  <text class="s" x="{cx}" y="{y + 54}" text-anchor="middle">{escape(subtitle)}</text>\n'
-        blocks.append(block)
-    name, equations = core
-    blocks.append(
-        '  <rect class="core" x="330" y="150" width="340" height="100" rx="16"/>\n'
-        f'  <text class="h1" x="500" y="194" text-anchor="middle">{escape(name)}</text>\n'
-        f'  <text class="math" x="500" y="226" text-anchor="middle">{escape(equations)}</text>\n'
+    from PIL import Image
+
+    tiles = []
+    for figure in figures:
+        buffer = io.BytesIO()
+        figure.savefig(buffer, format="png", dpi=dpi, facecolor="white")
+        buffer.seek(0)
+        tiles.append(Image.open(buffer).convert("RGB"))
+
+    # Every tile on the grid of the largest one, white around the smaller ones
+    width = max(tile.width for tile in tiles)
+    height = max(tile.height for tile in tiles)
+    rows = -(-len(tiles) // columns)
+    sheet = Image.new("RGB", (columns * width, rows * height), "white")
+    for index, tile in enumerate(tiles):
+        row, column = divmod(index, columns)
+        sheet.paste(tile, (column * width, row * height))
+
+    path.parent.mkdir(parents=True, exist_ok=True)
+    sheet.save(path, optimize=True)
+    print(
+        f"  {path.name}: {sheet.width}x{sheet.height}, {path.stat().st_size / 1e3:.0f} kB"
     )
-    spokes = ""
-    for start, bend, end in zip(_SPOKE_START, _SPOKE_BEND, _SPOKE_END):
-        spokes += f'  <path class="spoke" d="M{start},150 Q{bend},120 {end},92"/>\n'
-    spokes += _HUB_SPOKES
-    for start, bend, end in zip(_SPOKE_START, _SPOKE_BEND, _SPOKE_END):
-        spokes += f'  <path class="spoke" d="M{start},250 Q{bend},280 {end},308"/>\n'
-    blocks.append(spokes + "</svg>\n")
-    return "\n".join(blocks)
 
 
 def write_text_asset(path: Path, text: str) -> None:
