@@ -354,6 +354,38 @@ class TestBackends(unittest.TestCase):
         self.assertLess(gap, 0.0001)
         self.assertGreater(np.mean(jax_result.pi == vectorized.pi), 0.98)
 
+    def test_a_changed_option_rebuilds_the_cached_tables(self):
+        """Solve, change an option the caches bake in, solve again: a fresh planner's tables."""
+        cases = [("numpy", "out_of_bound_cost", 50.0)]
+        try:
+            import jax  # noqa: F401
+
+            cases.append(("jax", "alpha", 0.9))
+        except ModuleNotFoundError:
+            pass
+        problem = make_pendulum_problem()
+
+        def planner_of(backend):
+            grid = StateSpaceGrid(
+                problem, x_grid_shape=(11, 11), u_grid_shape=(5,), dt=0.1
+            )
+            return DynamicProgrammingPlanner(
+                problem, grid=grid, backend=backend, alpha=0.95
+            )
+
+        for backend, name, value in cases:
+            with self.subTest(backend=backend):
+                reused = planner_of(backend)
+                reused.solve_steps(5)
+                setattr(reused.options, name, value)
+                reused.solve_steps(5)
+                fresh = planner_of(backend)
+                setattr(fresh.options, name, value)
+                fresh.solve_steps(5)
+                np.testing.assert_allclose(
+                    reused.result.J, fresh.result.J, rtol=0, atol=1e-12
+                )
+
     def test_value_iteration_is_the_algorithm_behind_every_verb(self):
         """solve_steps is value_iteration wrapped in a solution, on every backend."""
         backends = ["loop", "numpy"]
