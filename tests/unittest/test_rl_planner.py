@@ -162,6 +162,23 @@ def test_planner_learns_returns_a_policy_plan_and_a_controller():
     assert u.shape == (3, 1)
 
 
+def test_predict_draws_unless_deterministic():
+    planner = ReinforcementLearningPlanner(
+        problem(tf=np.inf), dt=0.1, hidden=(8, 8), n_envs=4, n_steps=8, verbose=0
+    )
+    x = np.array([[0.1, 0.0], [-0.2, 0.3], [0.4, -0.1], [0.0, 0.2]])
+    mean_1, _ = planner.predict(x)
+    mean_2, _ = planner.predict(x)
+    draw_1, _ = planner.predict(x, deterministic=False)
+    draw_2, _ = planner.predict(x, deterministic=False)
+    np.testing.assert_array_equal(mean_1, mean_2)
+    assert draw_1.shape == mean_1.shape == (4, 1)
+    assert not np.array_equal(draw_1, draw_2)
+    assert np.all(np.abs(draw_1) <= 4.0)  # mapped onto the input port's bounds
+    one, _ = planner.predict(x[0], deterministic=False)
+    assert one.shape == (1,)
+
+
 def test_learn_and_solve_verbose_override_the_constructor(capsys):
     planner = ReinforcementLearningPlanner(
         problem(tf=np.inf),
