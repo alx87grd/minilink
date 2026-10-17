@@ -6,7 +6,24 @@
 
 ## Entry points
 
-**Prerequisites:** repo root, conda env **`minilink`**, `PYTHONPATH=.` (see [install.md](../install.md)).
+**Prerequisites:** repo root, conda env **`minilink`**, `PYTHONPATH=.` (the
+[README's Install](../README.md#install)), and the once-per-clone setup below.
+
+### Setup, once per clone
+
+The conda environment, then the dev tools and the two git hooks:
+
+```bash
+pip install -e ".[dev]"      # conda env: already installed
+pre-commit install
+nbstripout --install
+git config filter.nbstripout.extrakeys "metadata.kernelspec metadata.language_info metadata.colab metadata.accelerator cell.metadata.colab cell.metadata.id cell.metadata.outputId cell.metadata.executionInfo"
+```
+
+The hooks run ruff and strip notebook outputs on commit; the filter keeps a local notebook
+run from dirtying `git status` (one key list, the same as `.pre-commit-config.yaml`). If
+`git pull` refuses on notebooks you never edited, the filter is missing or behind the hook:
+run the block above, then `git -c filter.nbstripout.clean=cat pull --ff-only` once.
 
 ### Folder layout (everything under `tests/` or `benchmarks/`)
 
@@ -121,7 +138,7 @@ detail: [benchmarks/README.md](../benchmarks/README.md).
 
 ## Local environment
 
-Setup: [install.md](../install.md). Non-interactive:
+Setup: [once per clone](#setup-once-per-clone). Non-interactive:
 
 ```bash
 conda run -n minilink python -m pytest
@@ -196,11 +213,11 @@ conda activate minilink
 SDL_VIDEODRIVER=dummy pytest
 ```
 
-Or install library extras in another Python 3.10+ environment (this is not the
-Full teaching stack — no Jupyter / SB3; see [install.md](../install.md)):
+Or the pip stack in another Python 3.10+ environment (no Jupyter, Stable-Baselines3,
+Graphviz or Ipopt; the [README's Install](../README.md#install) has the full story):
 
 ```bash
-pip install -e ".[dev,full,ipopt]"
+pip install -e ".[dev,full]"
 SDL_VIDEODRIVER=dummy pytest
 ```
 

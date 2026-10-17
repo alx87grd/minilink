@@ -540,8 +540,9 @@ in December 2026 after the v0.3 tag; the v1.0 rows after two cohorts.
   0.1.0 / 0.1.1 from ROADMAP §2's breaking changes); `pyproject.toml` `Changelog` URL points
   there. Done when `publish.yml` refuses a tag without its CHANGELOG heading.
 - [ ] **V6 The pinned Colab cell** **[ask — student-facing]**: conda from `environment.yml`
-  stays the default supported install and README leads with it; `pip install minilink` is the
-  Basic alternative in `install.md` (both in place). What remains: the Colab setup cell
+  is the recommended install and README leads with it; `pip install minilink` is the light
+  alternative, one `full` extra beside it (one install story, ruled 2026-10-17,
+  [record](../reviews/2026-10-17-one-install-story.md)). What remains: the Colab setup cell
   installs a pinned release (`%pip install minilink==X.Y`) instead of `git clone main`;
   `COLAB_CLONE` in `tests/unittest/test_repo_contract.py` follows. `showcase_jax.ipynb`
   imports `minilink.experimental.c_export`, which the wheel does not ship: settle it here.

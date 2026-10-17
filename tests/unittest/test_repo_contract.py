@@ -51,7 +51,6 @@ LINKED_DOCS = (
     "DESIGN.md",
     "ROADMAP.md",
     "README.md",
-    "install.md",
     "examples/README.md",
     "tests/README.md",
     "benchmarks/README.md",

@@ -157,7 +157,7 @@ Pinned by the course notes (C5.1, C5.3, C5.4, C5.5). For now the only external p
 
 **Colab tip:** open a badge → **File → Save a copy in Drive** → run from the top.
 The first code cell clones the repo and installs `meshcat` when needed. Locally,
-use the `minilink` conda env (see [install.md](../install.md)).
+use the `minilink` conda env (the [README's Install](../README.md#install)).
 
 ## By chapter
 

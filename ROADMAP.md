@@ -13,7 +13,7 @@ Identity: [CONSTITUTION.md](CONSTITUTION.md).
 
 | Release | Milestone | When |
 | --- | --- | --- |
-| **v0.1** | **GRO860 end to end**, plus a working **`pip install minilink` on PyPI**. Every topic of the running optimal-control & RL course runs on the teaching surface, in Colab (git-clone cell) and in the conda env: value iteration / DP on a grid · LQR + linearization · trajectory optimization · RL via native `ReinforcementLearningPlanner` (with `Sys2Gym` + SB3 as an optional bridge). See §4.1. | Fall 2026 — `0.1.0` on PyPI (2026-09-16); `0.1.1` (2026-09-26) is the first release a GitHub tag published. Conda from `environment.yml` stays the Full local stack. The course notebooks' names are frozen until v1.0, with the freeze paused between terms (§4.1 gate 7). |
+| **v0.1** | **GRO860 end to end**, plus a working **`pip install minilink` on PyPI**. Every topic of the running optimal-control & RL course runs on the teaching surface, in Colab (git-clone cell) and in the conda env: value iteration / DP on a grid · LQR + linearization · trajectory optimization · RL via native `ReinforcementLearningPlanner` (with `Sys2Gym` + SB3 as an optional bridge). See §4.1. | Fall 2026 — `0.1.0` on PyPI (2026-09-16); `0.1.1` (2026-09-26) is the first release a GitHub tag published. Conda from `environment.yml` is the recommended install. The course notebooks' names are frozen until v1.0, with the freeze paused between terms (§4.1 gate 7). |
 | **v0.2** | **GRO501 end to end** (the classical-control course: multi-physics modelling · root locus / Bode / margins · PID to spec · digital implementation · state feedback, pole placement, LQR, observers — see §4.2). Conda stays the recommended Full local install. | October 2026 |
 | **v0.3** | **GMC714 end to end** — the teaching layer solidified for the class: robust control · robotic arm · trajectory optimization · MPC · vehicle models · nonlinear control (§4.3), with **pyro parity**, the catalog work of §5.3 and **the textbook objects** (fields, cost parameters, workspace geometry). | December 2026 |
 | **v0.9** | **Freeze candidate** (§5.4): the foundation questions that could still break a public name are decided (hybrid as a `System`, derived `x0`, evaluator/solver layering, the glyph/solid rename); the trust contract is in place (deprecation policy, pinned export list, CHANGELOG, pinned installs); the standard-syllabus holes close (estimation, discrete time, identification); the docs site renders the tutorials. | Early 2027 |
@@ -342,9 +342,9 @@ public name; v1.0 (§5.5) freezes.
   a snapshot test pins the teaching-surface export list. The renames held back to v1.0
   (`xbar` / `ubar`, `plot_cost2go`, `JaxMechanicalSystem`) are on its list. **[ask]**
 - **V5** `CHANGELOG.md` for users; every release from v0.9 carries its entry.
-- **V6** One install story: conda from `environment.yml` stays the default supported
-  install, `pip install minilink` the Basic alternative; the Colab cell installs a pinned
-  release.
+- **V6** The Colab cell installs a pinned release (the install story itself landed
+  2026-10-17: conda recommended, `pip install minilink` plus one `full` extra, no
+  `install.md`).
 - **S70** A `MinilinkError` family (wiring, shape, solver) under the plain
   `ValueError` / `TypeError`. **[ask — core]**
 - **V11** A light history: the notebook outputs committed before `nbstripout` leave the
@@ -417,7 +417,8 @@ system, the command port as the default channel) in
 family rulings (2026-10-15: `P`, the impedance pair on the family's grammar, matrix
 stiffness and damping, the shared pure functions) in
 [theirs](docs/reviews/2026-10-15-classical-control-family.md); the z tier dropped (2026-10-17) in
-[its record](docs/reviews/2026-10-17-z-tier-dropped.md).
+[its record](docs/reviews/2026-10-17-z-tier-dropped.md); the one install story (2026-10-17) in
+[its record](docs/reviews/2026-10-17-one-install-story.md).
 
 **During v0.2**
 

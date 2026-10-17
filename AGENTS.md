@@ -60,8 +60,7 @@ done, even when the tests pass.
 | --- | --- |
 | CONSTITUTION.md | Vision, contract invariants, conflict precedence — maintainer-owned |
 | RULES.md | Universal code and review ladder (humans and agents) |
-| README.md | User workflows, install entry, links |
-| install.md | Install tiers and commands — the one copy |
+| README.md | User workflows, install (conda, Colab, pip), links |
 | DESIGN.md | Public contracts, package layout, evaluator behavior |
 | ROADMAP.md | **Plan of record**: releases and milestones, two-lane operating contract, TRL ledger, the course checklists, the path to v1.0 (rungs and waves), open decisions, out-of-scope |
 | AGENTS.md | Agent workflow, doc map, local CI gate |
@@ -71,7 +70,7 @@ done, even when the tests pass.
 | docs/plans/ | Design writeups for steps that need one (delete a plan doc once it lands; the index there says which rung each serves) |
 | docs/plans/pyro-port-remaining.md | Pyro parity rows when library or demos land |
 | docs/ | Sphinx autodoc of the teaching-lane API (`docs/api/`, `docs/index.rst`); `experimental/` is repo-only and not on the site. The user guide is `examples/tutorial/`. Every README figure (the showcase GIFs, their interactive 3-D pages in `docs/_static/showcase/`, the diagram PNG, `bridges.svg`) is built by `docs/make_assets.py`; the 3-D GIFs are screenshots of those pages and need Playwright with Chromium, a build-only tool |
-| tests/README.md | Marker policy, test philosophy, **entry points (human · agent · CI)** |
+| tests/README.md | Marker policy, test philosophy, **entry points (human · agent · CI)**, the once-per-clone setup (hooks, notebook filter) |
 | docs/reviews/ | Dated architecture audits and the interview decision records; read-only history, never a backlog |
 
 Keep DESIGN.md call chains minimal.
@@ -123,8 +122,8 @@ public contract. When you spot an opportunity outside your lane, ask — do not 
 
 **Notebooks:** skip review unless updating renamed imports or user asks; outputs and
 volatile metadata are stripped by the `nbstripout` git filter and pre-commit hook (one
-key list, in `.pre-commit-config.yaml`; set up once per clone, install.md "Developer
-clone"), and CI fails a notebook committed without them. A clone without the filter (a
+key list, in `.pre-commit-config.yaml`; set up once per clone, tests/README.md "Setup"),
+and CI fails a notebook committed without them. A clone without the filter (a
 cloud clone, a new machine) runs `pre-commit run nbstripout --all-files` before committing
 a notebook, or sets the filter up first. After notebook edits, run the notebook smoke check
 (tests/README.md, Agent table, "Notebook change"; CI runs it too).
@@ -134,7 +133,7 @@ a notebook, or sets the filter up first. After notebook edits, run the notebook 
 **Entry points:** tests/README.md (section "entry points") is the one written copy of the
 commands — humans use **`tests/run/`** (IDE Run); agents use its Agent table. This section
 says *when*, by the Agent table's row names. Run them from the repo root in the conda env
-**`minilink`** (install.md, Full tier).
+**`minilink`** (README, Install).
 
 GitHub **CI** (`.github/workflows/test.yml`) is the merge gate; tests/README.md's CI table
 lists its jobs and what each runs, and the nightly, publish and docs workflows, which are
@@ -145,7 +144,7 @@ run — check it locally when you land one.
 
 **Always before push:** the "Always before push" row, every time. CI runs it on the
 **whole repo**, not only touched files; the pre-commit hooks run the same once the clone
-is set up (install.md, "Developer clone").
+is set up (tests/README.md, "Setup").
 
 **Pytest and the gates — proportionate:**
 

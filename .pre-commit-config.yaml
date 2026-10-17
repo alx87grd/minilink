@@ -1,4 +1,4 @@
-# Install, once per clone: install.md, "Developer clone" (pre-commit install,
+# Install, once per clone: tests/README.md, "Setup" (pre-commit install,
 # nbstripout --install, the filter's extrakeys). Run every hook on the whole
 # tree: pre-commit run --all-files
 #

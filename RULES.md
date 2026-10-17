@@ -593,7 +593,7 @@ Systems-as-descriptions: CONSTITUTION.md §4.*
   neighborhood; change only what the task requires.
 - **7.6 Cross-link sparingly.** Every link is a maintenance edge: renames and section
   moves break them (`tests/unittest/test_repo_contract.py` checks the links of the
-  governance documents, `README.md`, `install.md`, the `examples/`, `tests/` and
+  governance documents, `README.md`, the `examples/`, `tests/` and
   `benchmarks/` READMEs, and `docs/plans/`; not `docs/reviews/`). Link on first mention
   only, and only when the reader must open the target to act. Otherwise name the document in
   plain text. Documents meant to be read top to bottom (principle lists, the

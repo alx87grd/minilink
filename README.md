@@ -203,8 +203,8 @@ differentiate inside your own `jit`. See
 
 ## Install
 
-Python 3.10+. Recommended: the conda environment from
-[`environment.yml`](https://github.com/alx87grd/minilink/blob/main/environment.yml).
+Python 3.10+. **Recommended: conda**, everything included (JAX, Graphviz, Ipopt, 3-D
+animation, Jupyter):
 
 ```bash
 git clone https://github.com/alx87grd/minilink.git && cd minilink
@@ -212,8 +212,22 @@ conda env create -f environment.yml && conda activate minilink
 conda env config vars set PYTHONPATH="$PWD" && conda deactivate && conda activate minilink
 ```
 
-Or open any notebook in Colab: the first cell clones the repository. Basic
-tier, pip, and options: [install.md](https://github.com/alx87grd/minilink/blob/main/install.md).
+**Colab**: open any notebook with "Open in Colab", or start yours with
+
+```python
+!git clone https://github.com/alx87grd/minilink
+import sys; sys.path.insert(0, "/content/minilink")
+```
+
+**pip**: `pip install minilink` runs simulation, plots, LQR and value iteration on NumPy,
+SciPy and Matplotlib; `pip install "minilink[full]"` adds JAX, plotly, meshcat, pygame,
+sympy and gymnasium. Two optional tools need a system install pip cannot do:
+`plot_diagram()` needs Graphviz ([install](https://graphviz.org/download/), then
+`pip install graphviz`) and the Ipopt solver needs `conda install -c conda-forge cyipopt`
+(trajectory optimization runs on SciPy without it).
+
+Developers: hooks and test commands in
+[tests/README.md](https://github.com/alx87grd/minilink/blob/main/tests/README.md).
 
 ## Learn more
 
