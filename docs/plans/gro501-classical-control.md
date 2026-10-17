@@ -2,9 +2,9 @@
 
 Status: **mostly landed.** P1, GRO-F1, GRO-F2, GRO-F4 (2026-09-07); P2, P3, P7 and TB-a (2026-09-26);
 P5, P8 and P9 (2026-10-10); P4 (2026-10-14); S61 (2026-10-15). Open: P10 (now
-automation-by-convention), TB-b; P6 (z tier) stays held; P11 dropped (2026-10-15). The order is in [TODO.md](TODO.md)
+automation-by-convention), TB-b; P11 dropped (2026-10-15); P6 (z tier) dropped (2026-10-17). The order is in [TODO.md](TODO.md)
 §2.
-Rung: v0.2 wave B, steps P2–P10 of [TODO.md](TODO.md); P6's row sits in its v0.9 section.
+Rung: v0.2 wave B, steps P2–P10 of [TODO.md](TODO.md).
 Lane: teaching surface (`analysis/`, `control/`, `estimation/`, `blocks/`).
 Milestone: v0.2, [ROADMAP §4.2](../../ROADMAP.md#42-v02--gro501-end-to-end).
 Baseline audit: [../reviews/2026-09-07-gro501-coverage.md](../reviews/2026-09-07-gro501-coverage.md).
@@ -26,7 +26,7 @@ additive or replaces boilerplate with generated equivalents.
 | **P3** `place()` → `StateFeedbackController` | GRO-G2 | 1 | **done** 2026-09-26 |
 | **P4** `estimation/` — `StateObserver`, `luenberger`, `kalman`, `lqg` | GRO-G1 | 2 | landed 2026-10-14 |
 | **P5** Named sensitivity functions | GRO-G5 | 2 | landed 2026-10-10 |
-| **P6** Discrete (z) tier | GRO-G4 | 3 | **held** for GRO501; a v0.9 row |
+| **P6** Discrete (z) tier | GRO-G4 | 3 | **dropped** 2026-10-17 ([record](../reviews/2026-10-17-z-tier-dropped.md)) |
 | **P7** `facades.py` boilerplate | GRO-C2 | 2 | **done** 2026-09-26 (explicit + pinned) |
 | **P8** Small teaching helpers (ζ/ω_n, `N`) | GRO-G6 | 2 | landed 2026-10-10 (`N` only) |
 | **P9** `TransferFunction` port construction | GRO-C3 | 3 | landed 2026-10-10 |
@@ -309,11 +309,13 @@ linearize, discretize` returns the functions (scan analysis#11).
 
 ## Wave 3 — polish and material
 
-### P6. Discrete (z) tier — **held**
+### P6. Discrete (z) tier — **dropped**
 
-*On hold by the maintainer 2026-09-07.*
+*On hold by the maintainer 2026-09-07; dropped 2026-10-17: Option A below is the ruling, the z
+tier is not planned ([record](../reviews/2026-10-17-z-tier-dropped.md)). The `discretize`
+follow-ups it carried are a v0.9 row of [TODO.md](TODO.md) §5.*
 
-**The open question**, recorded in [ROADMAP §6](../../ROADMAP.md#6-decisions).
+**The question as it stood.**
 §5.2.2 part 4 assigns Dorf 13.1–13.4 and §1.2 requires translating the
 compensator to difference equations for the Arduino. Today `discretize` gives
 Euler/RK4 *step models*, which simulate correctly but carry no z-domain
@@ -332,9 +334,8 @@ locus. This is a second copy of the analysis family with a different stability
 boundary — the single largest addition on this plan, and the one most likely
 to duplicate `analysis/linear.py` rather than reuse it.
 
-Recommend A for v0.2 and re-open B once a cohort has run, unless the sommatif
-examines z-plane analysis directly. **Maintainer's call — it depends on what
-you examine, which the guide does not say.**
+**Ruled 2026-10-17: Option A, and B is not planned.** The sommatif does not examine z-plane
+analysis; the Arduino code is the deliverable and simulation validates the sampled loop.
 
 ### P9. `TransferFunction` port construction
 
@@ -376,13 +377,13 @@ Wave 1   P1 ─┬─ P2                 correctness; blocks all GRO501 material
              └─ P3 ──┐
 Wave 2   P7          ├─ P4 ── P5   the missing surface
                      └─ P8
-Wave 3   P6? ── P9 ── P10          polish
+Wave 3   P9 ── P10                 polish
 ```
 
 P3 gates P4 (the Luenberger factory places poles on the dual pair). P1 and P2
 gated all GRO501 material (until then the tools taught wrong pole counts); both are
 in (P2 on 2026-09-26). P7 is independent and worth doing before P2
-and P5 add three more facade methods each by hand. With P6 held and P11 dropped, what
+and P5 add three more facade methods each by hand. With P6 and P11 dropped, what
 remains is S62, then **TB-b** (the control objects and the loop)
 ([TODO.md](TODO.md) §2 holds the order; TB-a, P7, P5, P8, P9, RN-1, P4 and P10's
 composition steps have landed).

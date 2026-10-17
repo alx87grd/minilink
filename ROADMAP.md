@@ -80,7 +80,7 @@ State as of 2026-10-17. Step ids (`S29`, `P4`, `T2`, …) are the rows of
 | Simulation | teaching | 7 | Mature; fixed 10 001-point default grid; `verbose` names unified; the textbook pass's layout landed (2026-10-16). | One owner per rule (S65). |
 | Dynamics (abstraction + catalog) | teaching | 7 | Plants QA'd; `MechanicalSystem` / `Manipulator`; UR5 ABA/RNEA; **every catalog plant compiles on both backends** (contract test); four-rung vehicle ladder; UdeS racecar (kinematic, dynamic, 3-D); the textbook pass's layout landed and every `tf` reads its `params` (2026-10-17). | Catalog hygiene (S64); mechanical-base unification (S32, after v1.0). |
 | Control | teaching | 6 | Linear, LQR (infinite horizon, finite horizon, along a trajectory), pole placement, reference scaling (`N`), `P` / `PI` / `PD` / `PID` and the rate-measured `ImpedanceController` / `ImpedanceIntegralController` as one family (what is measured decides the derivative; limits with infinite defaults, anti-windup once a limit is declared; the shared pieces three pure functions), model-based SMC and computed torque, robotic impedance and kinematic laws, neural policy block; a controller is a plain `System`. | P10's resolver and composition steps; the textbook pass's layout landed (2026-10-16). |
-| Analysis | teaching | 6 | Jacobians, linearize, structural, equilibria, modal; one-channel Bode with grid-free margins, pole-zero, root locus, Nyquist, the linear step response on matplotlib and plotly; the sensitivity functions `S` / `T` / `PS` / `CS`. Every verb takes any `System`, the linear model as is, the rest linearized at the operating point (2026-10-15). | z tier held (P6); Nichols and overlays later; the textbook pass's layout landed (2026-10-16). |
+| Analysis | teaching | 6 | Jacobians, linearize, structural, equilibria, modal; one-channel Bode with grid-free margins, pole-zero, root locus, Nyquist, the linear step response on matplotlib and plotly; the sensitivity functions `S` / `T` / `PS` / `CS`. Every verb takes any `System`, the linear model as is, the rest linearized at the operating point (2026-10-15). | Nichols and overlays later; the textbook pass's layout landed (2026-10-16). |
 | Blocks | teaching | 5 | Routing, nonlinear, filters, sources (with `Sine`), TF, 1-layer NN. | `Ramp` / `Chirp` / `Delay` / `Switch` (C3, v0.3); the textbook pass's layout landed (2026-10-16). |
 | Planning / policy synthesis (DP) | teaching (GRO860) | 6 | Grid + value iteration (`loop` / `numpy` / `jax`), lookup controller, `PolicyEvaluator`, `LQRPlanner`; every planner returns a `PlanningSolution`; `compare()` reads solutions side by side; `dp.py` is the textbook reference of the style. | cost-to-go as a `Field` (A1); policy iteration (S51). |
 | Planning / trajopt | teaching (GRO860) | 5 | Collocation, shooting, multiple shooting; live plot; `success` means defects satisfied to `feasibility_tol`; float64 by default on JAX. | Harden SciPy/Ipopt before TRL 6; the textbook pass's layout landed (2026-10-16). |
@@ -165,7 +165,7 @@ Step-level work:
 | Closed-loop analysis — poles, root locus, Bode, margins, step specs | `pzmap`, `root_locus`, `bode`, `margins`, `step_info`, `P` / `PI` / `PD` / `PID` | green | every compensator form reports the poles and zeros of the hand calculation, and margins are found wherever the crossover sits |
 | Design to specification — rise time, overshoot, final error, phase margin | `PI`, `PD`, `PID`, `Lead`, `Lag`, `step_info`, `margins` | green | the Table 2 specs of the guide are checkable in one notebook |
 | Loop-shaping specs — disturbance and measurement-noise sensitivity in dB at a frequency | `sensitivity`, `complementary_sensitivity`, `load_sensitivity`, `noise_sensitivity` | green (2026-10-10) | the `sensitivity_functions` teaching notebook |
-| Digital implementation — difference equations on the Arduino | `discretize` (Euler / RK4 step models) | continuous only, **z tier held** | the sampled loop is validated by simulation; a z tier stays out of v0.2 unless the sommatif examines z-plane analysis (§6) |
+| Digital implementation — difference equations on the Arduino | `discretize` (Euler / RK4 step models) | green (2026-10-17) | the law is designed in continuous time, discretized, and the sampled loop validated by simulation; no z-domain analysis family (ruled 2026-10-17, [the record](docs/reviews/2026-10-17-z-tier-dropped.md)) |
 | State-space MIMO — bicycle model, controllability at every nominal speed | `KinematicBicycle`, `controllability`, `observability` | green | — |
 | Optimal control — LQR on the guide's cost, closed-loop poles, nonlinear check | `lqr(plant, Q, R, x_bar=)`, `StateFeedbackController` | green | — |
 | Pole placement — `K_sta` for a prescribed pole set | `place` (on a linear model or the plant; `place_gain` on arrays) | green | — |
@@ -250,8 +250,6 @@ TB-a, P7, P5, P8, P9.
 - S61 (every analysis verb takes a `System`), S62 (`P` joins the classical family) and
   S73 (one classical family: the impedance pair in the family's grammar, the integrator
   hold, the filtered rate and the clip as pure functions) landed 2026-10-15.
-- **P6** The z tier stays held (teach with `discretize` + simulation) unless the sommatif
-  examines z-plane analysis.
 
 **Wave D — the code reads like the textbook, and the demos like the API.** Standing work,
 behaviour-preserving, one module per step.
@@ -349,8 +347,9 @@ public name; v1.0 (§5.5) freezes.
   git history, once, in December 2026 after the v0.3 tag. **[ask]**
 
 **The syllabus holes** (beyond GRO501's P4):
-- **P6** The z tier, if v0.9 takes it (proposed yes, §6): exact ZOH and Tustin `c2d`, z-plane
-  pole-zero map, discrete step and Bode. **[ask — public names]**
+- **`discretize` follow-ups** (the z tier itself is not planned, ruled 2026-10-17): an exact
+  zero-order-hold option shared with `step_response`; the `params["dt"]` fallback decided; a
+  source's feedthrough from a port other than `u`. **[ask]**
 - **Estimation follow-ups** after P4: EKF, time-varying and discrete Kalman; online parameter
   estimators (recursive least squares, gradient laws).
 - **C4** Identification and trajectory generation, pulled from v0.3 if GMC714 does not
@@ -413,14 +412,10 @@ system, the command port as the default channel) in
 [theirs](docs/reviews/2026-10-15-linear-analysis-rulings.md); the classical control
 family rulings (2026-10-15: `P`, the impedance pair on the family's grammar, matrix
 stiffness and damping, the shared pure functions) in
-[theirs](docs/reviews/2026-10-15-classical-control-family.md).
+[theirs](docs/reviews/2026-10-15-classical-control-family.md); the z tier dropped (2026-10-17) in
+[its record](docs/reviews/2026-10-17-z-tier-dropped.md).
 
-**During v0.2 — this one blocks GRO501**
-
-- **The z tier** (P6): teach the Arduino law with `discretize` + simulation (default), or
-  build a z-domain analysis family. Depends on what the sommatif examines.
-
-**During v0.2 — the others**
+**During v0.2**
 
 - **The terminal cost `h(x_f, t_f)`, one rule for every tool.** `h` is charged exactly when
   `tf` is finite; still to settle whether an infinite-horizon cost with a nonzero `h` warns
@@ -471,7 +466,6 @@ stiffness and damping, the shared pure functions) in
   `control.mpc` join it, or sit behind a provisional name.
 - The deprecation policy (V4): shims from v1.0 on, overriding RULES "no deprecated
   aliases" from then.
-- The z tier (P6) in scope for v0.9 (proposed yes).
 - A `MinilinkError` family (S70).
 
 **Before v1.0**

@@ -65,8 +65,9 @@ Plan: [gro501-classical-control.md](gro501-classical-control.md). Release contra
 
 **Order:** TB-b next (S61, S62 and S73 landed 2026-10-15); P10's AC-0, AC-2a, AC-OP, AC-3,
 AC-2b/c and AC-4 have landed, P4 with them; TB-b (its loop part after AC-3). P11, the two
-GRO501 notebooks, was dropped on 2026-10-15: the students write the APP work themselves. P6
-stays held for GRO501; its row is in §5 (v0.9).
+GRO501 notebooks, was dropped on 2026-10-15: the students write the APP work themselves. P6,
+the z tier, was dropped on 2026-10-17: GRO501 teaches the digital law with `discretize` +
+simulation ([record](../reviews/2026-10-17-z-tier-dropped.md)).
 
 - [ ] **P10 Automation by convention** ([automation-by-convention.md](automation-by-convention.md),
   decided 2026-10-11, amended 2026-10-13 by
@@ -102,8 +103,6 @@ stays held for GRO501; its row is in §5 (v0.9).
   landed with AC-4 (2026-10-14). Dropped, by decision (rulings R20): a `kalman(...,
   disturbance=, noise=)` reading `B_w`, `D_v` and the noise blocks' `psd`; the design verb
   takes the textbook `Q_n`, `R_n`.
-- **P6** held for GRO501 (teach the Arduino law with `discretize` + simulation, unless the
-  sommatif examines z-plane analysis); its row is in §5, v0.9.
 
 ---
 
@@ -559,13 +558,11 @@ in December 2026 after the v0.3 tag; the v1.0 rows after two cohorts.
 
 ### v0.9 — the syllabus holes
 
-- [ ] **P6 Discrete (z) tier** **[ask — public names]**, if v0.9 takes it (proposed yes,
-  ROADMAP §6); held for GRO501, which teaches with `discretize` + simulation unless the
-  sommatif examines z-plane analysis. Exact ZOH and Tustin `c2d` on `LTISystem`, z-plane
-  `pzmap`, discrete `step_response` and `bode` (`analysis/`), checked against
-  `scipy.signal.cont2discrete`; an exact zero-order-hold option on `discretize`, shared with
-  `step_response` (scan: analysis#1). Done when a digital PID and a discrete state feedback
-  run in a topic notebook. Two follow-ups:
+- [ ] **`discretize` follow-ups** **[ask]** (the z tier, P6, is not planned: ruled 2026-10-17,
+  [record](../reviews/2026-10-17-z-tier-dropped.md)): an exact zero-order-hold option on
+  `discretize`, shared with `step_response` and checked against `scipy.signal.cont2discrete`
+  (scan: analysis#1). Done when a digital PID discretized that way runs in a topic notebook.
+  Two more:
   - **[ask]** keep the remaining `params["dt"]` fallback (`dt=` omitted, read from the
     `params=` dict given to `discretize`) or make `dt` required;
   - a source whose `y` feeds through from a port other than `u` does not discretize
@@ -583,7 +580,7 @@ in December 2026 after the v0.3 tag; the v1.0 rows after two cohorts.
   linearized Kalman filter along a trajectory (`trajectory_kalman` → `TrajectoryObserver`,
   the dual of `trajectory_lqr`); the extended Kalman filter (`ExtendedKalmanFilter(model, Q_n,
   R_n, x0, P0)`, `P` a state, Jacobians taken on the model's `f`, `h` inside its own `f`);
-  the sampled filters (unscented, discrete Kalman, particle) after AC-8a / S31 and P6; the
+  the sampled filters (unscented, discrete Kalman, particle) after AC-8a / S31; the
   `EstimationProblem` / `EstimationSolution` and the `*Estimator` tools (§5 of the plan);
   online parameter estimators (recursive least squares, gradient laws) under a role of their
   own. Each revisits the observer conventions of
