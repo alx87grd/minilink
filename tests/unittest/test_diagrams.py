@@ -238,6 +238,20 @@ class TestDiagrams(unittest.TestCase):
         self.assertEqual(graph.engine, "neato")
         self.assertIn("rankdir=TB", graph.source)
 
+    def test_a_backend_is_a_name_or_an_object_with_an_export_method(self):
+        diagram = self._make_diagram()
+        for backend in (3, object()):
+            with self.subTest(backend=backend):
+                with self.assertRaisesRegex(TypeError, "'graphviz', 'mermaid'"):
+                    export_diagram_topology(diagram, backend=backend)
+
+        class NodeLister:
+            def export(self, topology):
+                return [node.id for node in topology.nodes]
+
+        nodes = export_diagram_topology(diagram, backend=NodeLister())
+        self.assertEqual(nodes, ["input", "controller", "plant", "output"])
+
     def test_print_system_is_a_short_summary(self):
         from minilink.dynamics.catalog.pendulum.pendulum import Pendulum
 
