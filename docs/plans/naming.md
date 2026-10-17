@@ -70,7 +70,9 @@ anything.
 - ~~`sys` versus `plant` for the same plant across loop kinds.~~ Settled: `plant` everywhere
   (P10's step AC-2).
 - Plot labels for internal signals: port labels or keys.
-- A style sweep of display names: some diagram ids derive from them, so renaming can change keys.
+- ~~A style sweep of display names.~~ Now step A6 of [TODO.md](TODO.md) (RULES 2.6): short compact
+  class names, the long explicit display names dropped; diagram ids derive from names, so each
+  rename migrates the notebooks in the same commit.
 
 ## Verification (for the quick wins)
 

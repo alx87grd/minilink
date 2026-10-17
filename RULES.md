@@ -73,6 +73,15 @@ Systems-as-descriptions: CONSTITUTION.md §4.*
   is: a `(lower, upper)` pair is a `BoxSet`, a reset rule is a `Distribution`, a sublevel set
   is a `Set`, a scalar function of the state is a `Field` (planned, workboard step A1; today
   `StateField` and `WorkspaceField` in `planning/spatial`), a sampled run is a `Trajectory`.
+- **2.6 Names are short, and the class name is the name.** A block's display `name` is its
+  class name unless the class sets its own, and a composite is named as the expression that
+  built it (`PID @ Pendulum`, `Step >> Integrator`, `A + B`, `feedback(G)`). Those names
+  become diagram labels and plot titles, so a class name is short and compact (`CartPole`,
+  `KinematicBicycle`, `PID`), and a class sets an explicit `name` only when the class name
+  would mislead, two or three words at most. A long name is a name to shorten, never one to
+  restate at length in `name`. Renaming a public class or its display name changes the
+  diagram key derived from it, so it waits for a picked step (A6) and migrates every course
+  notebook in the same commit.
 
 ---
 

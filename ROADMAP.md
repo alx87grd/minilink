@@ -227,6 +227,9 @@ Three waves: A and B in parallel, D throughout.
 - **A4** The naming quick wins of [naming.md](docs/plans/naming.md) landed 2026-10-17 (the
   class name as the default `name`, a shortcut named as the expression it builds, `id`
   documented); its `jmax` and operator-export items stay.
+- **A6** Short catalog names (RULES 2.6): compact public class names, the long explicit display
+  names dropped, one ruled table of renames migrating the notebooks in the same commit. **[ask
+  — public names]**
 - **A5** The later nouns, each with its first consumer: `log_prob`, sets and distributions
   over parameter dictionaries, `UnionSet`, `PlanningProblem.hamiltonian()` only if a course
   teaches Pontryagin.

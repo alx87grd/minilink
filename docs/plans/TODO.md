@@ -41,6 +41,16 @@ Design: [naming.md](naming.md). Runs in parallel with wave B.
   `Comparison`, with S54's clipping (scan: planning#3, examples#5); `plot_cost2go` keeps its
   name to v1.0 and its rename to `plot_cost_to_go` (the name the solution and `Comparison`
   already use) is on V4's list; the operators' named forms exported together (scan: core#9).
+- [ ] **A6 Short catalog names** **[ask — public names]** (RULES 2.6): the public catalog,
+  control and block classes take short compact class names, and the explicit `self.name`
+  strings that only restate the class name at length go, so the class name shows (80 explicit
+  display names today, 32 longer than 18 characters: `Front Wheel Drive Car With Torque
+  Input`, `Time-Varying State Feedback Controller`, `Underactuated Rotating Cart Pole`, …).
+  The maintainer rules on the name list first (one table, old → new, class and display name);
+  each rename changes the diagram key derived from the name, so it migrates every course
+  notebook and demo in the same commit while the name freeze is paused (ROADMAP §4.1 gate 7),
+  or goes on V4's shim list after v1.0. Done when no display name is longer than its class
+  name and `plot_diagram` labels and plot titles read in one glance.
 - [ ] **A5 Later nouns, each with its first consumer.** `log_prob` on the distributions;
   parameter-dictionary support on sets and distributions (one flatten rule, with
   identification or the robust problem); `UnionSet` via `|` when reachability or multi-goal
