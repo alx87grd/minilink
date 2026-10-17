@@ -8,11 +8,8 @@ import numpy as np
 import pytest
 from minilink.core.backends import array_module
 from minilink.core.system import DEFAULT_SMALLEST_TIME_CONSTANT, DynamicSystem
-from minilink.simulation.simulator import (
-    COMPILE_BACKEND_AUTO,
-    DISCONTINUOUS_AUTO_DT_SCALE,
-    Simulator,
-)
+from minilink.simulation.simulator import COMPILE_BACKEND_AUTO, Simulator
+from minilink.simulation.time_grid import AUTO_DT_SCALE
 
 
 def _have_jax() -> bool:
@@ -156,14 +153,14 @@ class TestNewSimulator(unittest.TestCase):
         )
         self.assertEqual(sim.solver_mode, "euler")
 
-    def test_discontinuous_auto_dt_is_finer(self):
+    def test_discontinuous_auto_dt_is_the_scaled_time_constant(self):
         sim = Simulator(
             DiscontinuousLinearSystem(),
             tf=0.01,
             solver_warnings="ignore",
             verbose=False,
         )
-        expected_dt = DEFAULT_SMALLEST_TIME_CONSTANT * DISCONTINUOUS_AUTO_DT_SCALE
+        expected_dt = DEFAULT_SMALLEST_TIME_CONSTANT * AUTO_DT_SCALE
         self.assertAlmostEqual(sim.t[1] - sim.t[0], expected_dt)
 
     def test_discontinuous_auto_solver_emits_warning(self):
@@ -491,7 +488,7 @@ class TestStaticSimulatorJax(unittest.TestCase):
 from minilink.control.modelbased import SlidingModeController
 from minilink.core.composition import closed_loop
 from minilink.dynamics.catalog.pendulum.pendulum import Pendulum
-from minilink.simulation.simulator import DISCONTINUOUS_AUTO_DT_SCALE, Simulator
+from minilink.simulation.simulator import Simulator
 
 TF = 1.0
 DT_COARSE = 0.1
@@ -544,7 +541,7 @@ class TestDiscontinuousSolvers(unittest.TestCase):
 
     def test_auto_dt_uses_discontinuous_scale(self):
         sim = Simulator(self.diagram, tf=0.01, solver_warnings="ignore", verbose=False)
-        expected_dt = DEFAULT_SMALLEST_TIME_CONSTANT * DISCONTINUOUS_AUTO_DT_SCALE
+        expected_dt = DEFAULT_SMALLEST_TIME_CONSTANT * AUTO_DT_SCALE
         self.assertAlmostEqual(sim.t[1] - sim.t[0], expected_dt)
 
     def test_euler_matches_f_based_ddq_better_than_rk4_on_coarse_dt(self):
@@ -1135,7 +1132,7 @@ class TestAutomaticTimeGrid(unittest.TestCase):
         sys = StableLinearSystem()
         sys.solver_info["smallest_time_constant"] = 0.1
         sim = Simulator(sys, tf=1.0, solver="rk4_fixedsteps", verbose=False)
-        self.assertAlmostEqual(sim.dt, 0.01)  # 0.1 * SMOOTH_AUTO_DT_SCALE
+        self.assertAlmostEqual(sim.dt, 0.01)  # 0.1 * AUTO_DT_SCALE
         self.assertEqual(sim.n_pts, 101)
 
     def test_discontinuous_plant_defaults_to_euler_with_time_constant_dt(self):
@@ -1212,7 +1209,7 @@ class TestAutomaticTimeGrid(unittest.TestCase):
                 loop.connect("controller", "u", "actuator", "u")
                 loop.connect("actuator", "y", "plant", "u")
                 sim = Simulator(loop, tf=1.0, solver="euler", verbose=False)
-                self.assertAlmostEqual(sim.dt, 0.002)  # 0.02 * SMOOTH_AUTO_DT_SCALE
+                self.assertAlmostEqual(sim.dt, 0.002)  # 0.02 * AUTO_DT_SCALE
 
     def test_a_held_signal_selects_rk4_on_a_divisor_of_its_period(self):
         from minilink import Pendulum, WhiteNoise

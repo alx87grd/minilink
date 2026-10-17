@@ -5,12 +5,7 @@ from __future__ import annotations
 import warnings
 
 from minilink.core.system import DEFAULT_SMALLEST_TIME_CONSTANT
-
-# Automatic dt scale of a discontinuous loop, relative to
-# ``solver_info["smallest_time_constant"]``: the simulator's policy, which the
-# advisories quote
-DISCONTINUOUS_AUTO_DT_SCALE = 0.1
-
+from minilink.simulation.time_grid import AUTO_DT_SCALE
 
 ###############################################################################
 # Public API
@@ -111,9 +106,9 @@ def collect_discontinuous_solver_notes(
             "substeps near switching surfaces."
         )
 
-    # Δt_rec = τ_min × DISCONTINUOUS_AUTO_DT_SCALE, the automatic step of the loop
+    # Δt_rec = τ_min × AUTO_DT_SCALE, the automatic step of the loop
     smallest = solver_info.get("smallest_time_constant", DEFAULT_SMALLEST_TIME_CONSTANT)
-    recommended_dt = smallest * DISCONTINUOUS_AUTO_DT_SCALE
+    recommended_dt = smallest * AUTO_DT_SCALE
 
     # A forced Euler step coarser than Δt_rec; in the verbose panel, the automatic
     # Euler step
@@ -127,7 +122,7 @@ def collect_discontinuous_solver_notes(
     elif user_solver is None and solver_mode == "euler" and verbose and dt is not None:
         notes.append(
             f"Auto-selected Euler with dt={dt:g} (discontinuous default scale "
-            f"{DISCONTINUOUS_AUTO_DT_SCALE:g} × smallest_time_constant)."
+            f"{AUTO_DT_SCALE:g} × smallest_time_constant)."
         )
 
     return notes

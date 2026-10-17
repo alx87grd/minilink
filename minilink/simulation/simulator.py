@@ -17,15 +17,12 @@ from minilink.simulation.sim_reporting import (
     print_simulation_preamble,
     print_simulation_report,
 )
-from minilink.simulation.solver_warnings import (
-    DISCONTINUOUS_AUTO_DT_SCALE,
-    emit_discontinuous_solver_warnings,
-)
+from minilink.simulation.solver_warnings import emit_discontinuous_solver_warnings
 from minilink.simulation.solvers.euler import EulerSolverBackend
 from minilink.simulation.solvers.euler_fixed import EulerFixedStepSolverBackend
 from minilink.simulation.solvers.rk4_fixed import RK4SolverBackend
 from minilink.simulation.solvers.scipy_ivp import SciPySolverBackend
-from minilink.simulation.time_grid import build_time_grid
+from minilink.simulation.time_grid import AUTO_DT_SCALE, build_time_grid
 
 # User-facing solver labels: (solver backend key, options)
 _USER_SOLVER_MODES: dict[str, tuple[str, dict]] = {
@@ -85,11 +82,6 @@ RK4_AUTO_MIN_TIME_POINTS = 10_000
 FIXED_STEP_SOLVERS = tuple(
     label for label, (backend, _) in _USER_SOLVER_MODES.items() if backend != "scipy"
 )
-
-# Default automatic dt scale of a smooth loop, relative to
-# ``solver_info["smallest_time_constant"]`` (DISCONTINUOUS_AUTO_DT_SCALE, its
-# discontinuous twin, is owned by the advisories that quote it)
-SMOOTH_AUTO_DT_SCALE = 0.1
 
 # Steps per sample period of a held signal on a smooth loop with no declared time
 # constant: the period is the resolution the user chose; ``dt`` buys a finer one
@@ -305,23 +297,19 @@ class Simulator:
         logged warning). With neither, the automatic grid depends on the
         solver: fixed-step solvers (:data:`FIXED_STEP_SOLVERS`) integrate on
         the grid, so ``dt`` comes from the system's smallest time constant
-        scaled by the smooth or discontinuous policy, rounded down to a
-        divisor of the sample period when a block holds a signal; adaptive solvers pick
+        scaled by :data:`~minilink.simulation.time_grid.AUTO_DT_SCALE`, rounded
+        down to a divisor of the sample period when a block holds a signal; adaptive solvers pick
         their own steps, so the grid is only a reporting resolution with
         :data:`~minilink.simulation.time_grid.DEFAULT_N_STEPS` points.
         """
         # An adaptive solver picks its own steps: the DEFAULT_N_STEPS reporting grid
         default_dt = None
 
-        # A fixed-step solver steps on the grid: Δt = τ_min × scale, the scale of
-        # the smooth or the discontinuous policy
+        # A fixed-step solver steps on the grid: Δt = τ_min × AUTO_DT_SCALE
         if solver_mode in FIXED_STEP_SOLVERS:
             discontinuous = sys.solver_info.get("discontinuous_behavior", False)
-            scale = (
-                DISCONTINUOUS_AUTO_DT_SCALE if discontinuous else SMOOTH_AUTO_DT_SCALE
-            )
             tau = sys.solver_info["smallest_time_constant"]
-            default_dt = tau * scale
+            default_dt = tau * AUTO_DT_SCALE
             period = sys.solver_info.get("sample_period")
             if period is not None:
                 # A held signal steps on a divisor of its period, Δt = T_s / n, at or

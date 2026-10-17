@@ -31,10 +31,7 @@ from minilink.core.backends import BACKEND_AUTO, BACKEND_JAX, BACKEND_NUMPY
 from minilink.core.system import DynamicSystem
 from minilink.core.trajectory import Trajectory
 from minilink.simulation.realtime.io import RealtimeInput, RealtimeOutput
-from minilink.simulation.simulator import (
-    DISCONTINUOUS_AUTO_DT_SCALE,
-    SMOOTH_AUTO_DT_SCALE,
-)
+from minilink.simulation.time_grid import AUTO_DT_SCALE
 
 # In ``sync="realtime"`` the measured wall elapsed is clamped to this many
 # frame periods so a stall (window drag, GC pause) cannot inject a huge step.
@@ -379,11 +376,7 @@ class RealtimeSimulator:
     def _offline_auto_dt(self):
         """Same automatic ``dt`` the offline :class:`Simulator` would pick."""
         info = self.sys.solver_info
-        if info.get("discontinuous_behavior", False):
-            scale = DISCONTINUOUS_AUTO_DT_SCALE
-        else:
-            scale = SMOOTH_AUTO_DT_SCALE
-        return float(info["smallest_time_constant"]) * scale
+        return float(info["smallest_time_constant"]) * AUTO_DT_SCALE
 
     def _auto_n_sub_max(self):
         """Max ZOH substeps/frame: offline auto-``dt`` floor, live ceiling.
