@@ -442,6 +442,23 @@ def test_sac_reused_across_plants_targets_each_plant_input_dimension():
     )
 
 
+def test_replay_buffer_refuses_a_draw_before_any_transition():
+    from minilink.planning.reinforcement_learning.collect import ReplayBuffer
+
+    buffer = ReplayBuffer(8, n=2, m=1)
+    with pytest.raises(ValueError, match="replay buffer is empty"):
+        buffer.sample(jax.random.PRNGKey(0), 4)
+    one = {
+        "x": jnp.zeros((1, 2)),
+        "a": jnp.zeros((1, 1)),
+        "reward": jnp.ones(1),
+        "x_next": jnp.zeros((1, 2)),
+        "terminated": jnp.zeros(1),
+    }
+    buffer.add(one)
+    assert buffer.sample(jax.random.PRNGKey(0), 4)["reward"].shape == (4,)
+
+
 # --- the learned law is a System: compile, differentiate, linearize ---
 
 

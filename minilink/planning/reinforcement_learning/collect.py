@@ -157,6 +157,7 @@ class ReplayBuffer:
 
         size = self.size
         data = self.data
+        require_transitions(size)
 
         idx = jax.random.randint(key, (int(n),), 0, size)
 
@@ -226,3 +227,9 @@ def reset_carry(env, key, n_envs):
     ep_return = jnp.zeros(n_envs)
 
     return x, t, ep_return, params
+
+
+def require_transitions(size):
+    """Refuse a draw from a replay buffer that holds no transition."""
+    if size == 0:
+        raise ValueError("the replay buffer is empty; add transitions before sampling")
