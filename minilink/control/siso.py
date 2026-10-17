@@ -57,7 +57,7 @@ class P(ErrorDriven, System):
         }
 
         # Ports: the error (or the reference and the measurement) in, the command out
-        self.add_error_ports(ports, n)
+        self.port_layout = self.add_error_ports(ports, n)
         self.add_output_port(
             "u", dim=n, function=self.ctl, dependencies=self.error_dependencies
         )
@@ -173,7 +173,7 @@ class PID(ErrorDriven, DynamicSystem):
         self.x0 = np.concatenate(x0) if x0 else np.zeros(0)
 
         # Ports: the error (or the reference and the measurement) in, the command out
-        self.add_error_ports(ports, n)
+        self.port_layout = self.add_error_ports(ports, n)
         self.add_output_port(
             "u", dim=n, function=self.ctl, dependencies=self.error_dependencies
         )

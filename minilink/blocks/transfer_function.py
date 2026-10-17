@@ -66,7 +66,7 @@ class TransferFunction(ErrorDriven, LTISystem):
         # from the error only when D ≠ 0
         if compensator:
             feedthrough = bool(np.any(D))
-            self.add_error_ports(ports, 1)
+            self.port_layout = self.add_error_ports(ports, 1)
             self.add_output_port(
                 "u",
                 dim=1,

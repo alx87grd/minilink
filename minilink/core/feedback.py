@@ -232,19 +232,22 @@ class ErrorDriven:
     PORT_LAYOUTS = ("error", "reference")
 
     def add_error_ports(self, ports, dim, *, nominal_value=None):
-        """Declare the input ports of the chosen layout."""
+        """Declare the input ports of the chosen layout, and return the layout.
+
+        The constructor assigns the layout it returns to ``self.port_layout``.
+        """
         require_port_layout(ports, self.PORT_LAYOUTS)
 
-        self.port_layout = ports
         nominal = np.zeros(dim) if nominal_value is None else nominal_value
 
         # The compensator form reads e alone; the controller form reads r and y
         if ports == "error":
             self.add_input_port("e", dim=dim, nominal_value=nominal)
-            self.error_port = "e"
         else:
             self.add_input_port("r", dim=dim, nominal_value=nominal)
             self.add_input_port("y", dim=dim, nominal_value=np.zeros(dim))
+
+        return ports
 
     @property
     def error_dependencies(self):

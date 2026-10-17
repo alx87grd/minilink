@@ -33,20 +33,19 @@ class WiredDiagramMixin:
     """
 
     def init_wiring(self, *, name: str = "Diagram") -> None:
-        """The wiring tables of a new diagram, set up by each diagram's ``__init__``."""
-        # The subsystem registry and the wiring table: a diagram sets both before
-        # System.__init__, whose params setter reads them
-        if not hasattr(self, "subsystems"):
-            self.subsystems = {}
-        if not hasattr(self, "connections"):
-            self.connections = {}
+        """The wiring memory and the stacked state of a new diagram, set up by its ``__init__``.
 
+        The diagram sets its subsystem registry and wiring table first, before
+        ``System.__init__``, whose params setter reads them.
+        """
         # Wiring memory: a quiet connect, and the diagram's name
         self.connection_verbose = False
         self.name = name
 
         # The stacked state of the (still empty) subsystems
-        self.compute_state_properties()
+        self.n, self.state_index, self.state, self.x0, self.derived_x0 = state_layout(
+            self.subsystems
+        )
 
     @property
     def params(self):
@@ -89,7 +88,9 @@ class WiredDiagramMixin:
         self.connections[sys_id] = {port_id: None for port_id in sys.inputs}
 
         # The stacked state and the solver hints, with the new block
-        self.compute_state_properties()
+        self.n, self.state_index, self.state, self.x0, self.derived_x0 = state_layout(
+            self.subsystems
+        )
         self.refresh_solver_info()
 
     def connect(self, source_sys_id, source_port_id, target_sys_id, target_port_id):
@@ -260,7 +261,7 @@ class WiredDiagramMixin:
         """
         # An x0 set on the diagram differs from the one stacked from its subsystems
         x0 = np.copy(self.x0)
-        derived_x0 = getattr(self, "derived_x0", x0)
+        derived_x0 = self.derived_x0
         user_set_x0 = x0.shape == derived_x0.shape and not np.array_equal(
             x0, derived_x0
         )
@@ -268,7 +269,9 @@ class WiredDiagramMixin:
         # The subsystems first, then the stack of their metadata
         for subsystem in self.subsystems.values():
             subsystem.refresh()
-        self.compute_state_properties()
+        self.n, self.state_index, self.state, self.x0, self.derived_x0 = state_layout(
+            self.subsystems
+        )
 
         # The diagram's own x0 stays while its size still fits
         if user_set_x0 and x0.shape == self.x0.shape:
@@ -422,59 +425,6 @@ class WiredDiagramMixin:
     ###########################################################################
     # Internal machinery
     ###########################################################################
-
-    def compute_state_properties(self):
-        """
-        Rebuild the flattened state metadata from the subsystems.
-
-        The stacked state vector is ``x = [x_1; x_2; ...]`` in subsystem
-        insertion order; :attr:`state_index` maps each subsystem id to its
-        ``(start, end)`` indices in the stacked vector. State labels are
-        prefixed with the subsystem id whenever the same label appears in
-        several subsystems.
-        """
-        # x = [x_1; x_2; ...]: each subsystem's (start, end) in the stack
-        state_index = {}
-        idx = 0
-        for sys_id, subsystem in self.subsystems.items():
-            state_index[sys_id] = (idx, idx + subsystem.n)
-            idx += subsystem.n
-
-        # A label several subsystems share takes its subsystem id as a prefix
-        owned_labels = [
-            (sys_id, label)
-            for sys_id, subsystem in self.subsystems.items()
-            for label in subsystem.state.labels
-        ]
-        label_counts = {}
-        for _, label in owned_labels:
-            label_counts[label] = label_counts.get(label, 0) + 1
-        labels = [
-            f"{sys_id}:{label}" if label_counts[label] > 1 else label
-            for sys_id, label in owned_labels
-        ]
-
-        # The stacked state signal, and its default initial condition
-        self.n = idx
-        self.state_index = state_index
-        self.state = VectorSignal("x", dim=self.n)
-        self.x0 = np.zeros(self.n)
-
-        # The subsystems' metadata and x0, stacked in insertion order
-        if self.subsystems:
-            substates = [sub.state for sub in self.subsystems.values()]
-            self.state.labels = labels
-            self.state.units = [unit for s in substates for unit in s.units]
-            self.state.upper_bound = np.concatenate([s.upper_bound for s in substates])
-            self.state.lower_bound = np.concatenate([s.lower_bound for s in substates])
-            self.state.nominal_value = np.concatenate(
-                [s.nominal_value for s in substates]
-            )
-            self.x0 = np.concatenate([sub.x0 for sub in self.subsystems.values()])
-
-        # The x0 stacked from the subsystems, so refresh() can tell an x0 set on the
-        # diagram from a stale stacked one
-        self.derived_x0 = np.copy(self.x0)
 
     def refresh_solver_info(self):
         """Bubble subsystem solver hints to the diagram root.
@@ -826,6 +776,59 @@ def iter_subsystems(diagram, prefix=()):
 ###############################################################################
 # Internal machinery
 ###############################################################################
+
+
+def state_layout(subsystems):
+    """
+    The stacked state of a diagram's blocks: ``(n, state_index, state, x0, derived_x0)``.
+
+    The stacked state vector is ``x = [x_1; x_2; ...]`` in subsystem insertion
+    order; ``state_index`` maps each subsystem id to its ``(start, end)``
+    indices in the stacked vector. State labels are prefixed with the
+    subsystem id whenever the same label appears in several subsystems.
+    ``derived_x0`` is a copy of the stacked ``x0``, so a refresh can tell an
+    ``x0`` set on the diagram from a stale stacked one.
+    """
+    # x = [x_1; x_2; ...]: each subsystem's (start, end) in the stack
+    state_index = {}
+    idx = 0
+    for sys_id, subsystem in subsystems.items():
+        state_index[sys_id] = (idx, idx + subsystem.n)
+        idx += subsystem.n
+
+    # A label several subsystems share takes its subsystem id as a prefix
+    owned_labels = [
+        (sys_id, label)
+        for sys_id, subsystem in subsystems.items()
+        for label in subsystem.state.labels
+    ]
+    label_counts = {}
+    for _, label in owned_labels:
+        label_counts[label] = label_counts.get(label, 0) + 1
+    labels = [
+        f"{sys_id}:{label}" if label_counts[label] > 1 else label
+        for sys_id, label in owned_labels
+    ]
+
+    # The stacked state signal, and its default initial condition
+    n = idx
+    state = VectorSignal("x", dim=n)
+    x0 = np.zeros(n)
+
+    # The subsystems' metadata and x0, stacked in insertion order
+    if subsystems:
+        substates = [sub.state for sub in subsystems.values()]
+        state.labels = labels
+        state.units = [unit for s in substates for unit in s.units]
+        state.upper_bound = np.concatenate([s.upper_bound for s in substates])
+        state.lower_bound = np.concatenate([s.lower_bound for s in substates])
+        state.nominal_value = np.concatenate([s.nominal_value for s in substates])
+        x0 = np.concatenate([sub.x0 for sub in subsystems.values()])
+
+    # The x0 stacked from the subsystems
+    derived_x0 = np.copy(x0)
+
+    return n, state_index, state, x0, derived_x0
 
 
 def require_params_mapping(params):
