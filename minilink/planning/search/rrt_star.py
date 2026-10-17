@@ -49,9 +49,9 @@ class RRTStarPlanner(RRTPlanner):
     def __init__(
         self,
         problem,
-        extender,
+        extender=None,
         *,
-        metric=None,
+        metric=euclidean,
         options: RRTOptions | None = None,
         max_nodes=_UNSET,
         goal_bias=_UNSET,
@@ -76,9 +76,6 @@ class RRTStarPlanner(RRTPlanner):
         record_history=_UNSET,
         history_stride=_UNSET,
     ) -> None:
-        if metric is None:
-            metric = euclidean
-
         # Workflow options: the flat keywords over the bag, a plain RRTOptions
         # completed with the RRT* defaults
         star_options = rrt_options_of(

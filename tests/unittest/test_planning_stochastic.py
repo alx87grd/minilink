@@ -577,10 +577,30 @@ def test_deterministic_planner_warns_on_a_stochastic_problem():
         tf=2.0,
         x0_distribution=Uniform([-0.1, -0.1], [0.1, 0.1]),
     )
-    with pytest.warns(UserWarning, match="deterministic planner"):
+    with pytest.warns(
+        UserWarning, match="deterministic planner: it reads the start set X0"
+    ):
         TrajectoryOptimizationPlanner(
             problem, n_steps=5, transcription="direct_collocation"
         )
+
+
+def test_nominal_keeps_the_mean_start_and_drops_the_support_and_x_start():
+    from minilink.core.sets import SingletonSet
+
+    plant = pendulum()
+    problem = StochasticPlanningProblem(
+        plant,
+        cost=quadratic(plant),
+        tf=2.0,
+        x_start=[0.05, 0.0],
+        x0_distribution=Uniform([-0.1, -0.1], [0.1, 0.1]),
+    )
+    assert problem.X0.contains(np.array([0.08, -0.08]))  # the support
+    nominal = problem.nominal()
+    np.testing.assert_allclose(nominal.x_start, [0.0, 0.0])  # the mean
+    assert isinstance(nominal.X0, SingletonSet)
+    np.testing.assert_allclose(nominal.X0.point, [0.0, 0.0])
 
 
 def test_gymnasium_view_of_a_stochastic_problem():

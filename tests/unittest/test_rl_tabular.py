@@ -138,6 +138,8 @@ def test_sample_average_step_and_the_planner_arguments():
     assert "episodes" in str(solution.solver)
     with pytest.raises(ValueError):
         TabularLearningPlanner(problem, x_grid=(5, 5))
+    with pytest.raises(ValueError, match="not both"):  # value iteration's rule
+        TabularLearningPlanner(problem, grid=learner.grid, x_grid=(5, 5))
     with pytest.raises(ValueError):
         TabularLearningPlanner(problem, algorithm="dqn", **GRID)
 

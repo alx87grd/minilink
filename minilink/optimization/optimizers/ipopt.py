@@ -110,8 +110,9 @@ def require_cyipopt():
         from cyipopt import minimize_ipopt
     except ImportError as exc:  # pragma: no cover - optional dep
         raise ImportError(
-            "IpoptOptimizer requires the optional 'cyipopt' package; "
-            "install with `pip install cyipopt`."
+            "IpoptOptimizer requires the optional 'cyipopt' package; install it "
+            'with `pip install "minilink[ipopt]"` after a system Ipopt, or '
+            "`conda install -c conda-forge ipopt cyipopt`."
         ) from exc
 
     return minimize_ipopt

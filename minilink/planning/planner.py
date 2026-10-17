@@ -43,7 +43,7 @@ class Planner(ABC):
     """
 
     #: Planners that read the uncertainty of a stochastic problem set this;
-    #: the others plan on the nominal start and warn.
+    #: the others read its start set ``X0`` and its ``x_start``, and warn.
     accepts_stochastic = False
 
     def __init__(self, problem: PlanningProblem) -> None:
@@ -53,12 +53,13 @@ class Planner(ABC):
         # Memory
         self.last_solution: PlanningSolution | None = None
 
-        # A deterministic planner plans from the mean start of a stochastic problem
+        # A deterministic planner reads a stochastic problem's start set, not its draws
         if problem.is_stochastic and not self.accepts_stochastic:
             warnings.warn(
-                f"{type(self).__name__} is a deterministic planner: it plans from the "
-                "mean start of this StochasticPlanningProblem and ignores its "
-                "distributions. Pass problem.nominal() to say so explicitly.",
+                f"{type(self).__name__} is a deterministic planner: it reads the "
+                "start set X0 of this StochasticPlanningProblem (the support of "
+                "its start law) and its x_start, and ignores its distributions. "
+                "Pass problem.nominal() to plan from the mean start alone.",
                 stacklevel=2,
             )
 

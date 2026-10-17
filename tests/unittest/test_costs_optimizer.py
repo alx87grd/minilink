@@ -304,6 +304,16 @@ def test_solve_accepts_one_off_initial_guess_without_recompiling():
     assert np.allclose(out.z, [0.0], atol=1e-08)
 
 
+def test_ipopt_without_cyipopt_names_the_install(monkeypatch):
+    import sys
+
+    monkeypatch.setitem(sys.modules, "cyipopt", None)  # import cyipopt fails
+    prog = MathematicalProgram(n_z=1, J=lambda z: float(z[0] ** 2))
+    with pytest.raises(ImportError, match=r"minilink\[ipopt\]") as refusal:
+        Optimizer(prog, z0=np.zeros(1), method="ipopt")
+    assert isinstance(refusal.value.__cause__, ImportError)
+
+
 _IPOPT_QUIET = {"print_level": 0, "max_iter": 200}
 
 

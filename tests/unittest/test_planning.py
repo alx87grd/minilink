@@ -2173,6 +2173,21 @@ def test_rrt_default_extender_is_bang_bang_from_input_bounds():
     assert bang_bang_controls(problem.U)[0].shape == lower.shape
 
 
+def test_rrt_star_defaults_its_extender_and_metric_like_rrt():
+    """``RRTStarPlanner(problem)`` takes RRTPlanner's defaults: the bang-bang extender, euclidean."""
+    from minilink.planning.search.metric import euclidean
+
+    problem, _ = make_holonomic_obstacle_problem()
+    star = RRTStarPlanner(problem, options=RRTStarOptions(seed=0, max_nodes=50))
+    plain = RRTPlanner(problem, options=RRTOptions(seed=0, max_nodes=50))
+    assert isinstance(star.extender, KinodynamicExtender)
+    assert star.metric is euclidean and plain.metric is euclidean
+    rng = np.random.default_rng(0)
+    star_controls = star.extender.candidate_controls(problem, rng)
+    plain_controls = plain.extender.candidate_controls(problem, rng)
+    np.testing.assert_array_equal(star_controls, plain_controls)
+
+
 def test_collocation_bounds_survive_an_intersection():
     """``X = bounds & free`` keeps the box in the decision bounds; the rest stays a margin."""
     from minilink.core.sets import CallableSet
