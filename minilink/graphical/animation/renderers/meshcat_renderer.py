@@ -42,7 +42,7 @@ def _import_meshcat():
     except ImportError as e:
         raise ImportError(
             "meshcat is required for renderer='meshcat'. "
-            "Install with: pip install 'minilink[visualization]'"
+            "Install with: pip install meshcat"
         ) from e
     return meshcat
 

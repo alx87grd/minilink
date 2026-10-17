@@ -53,8 +53,7 @@ def _import_plotly():
         import plotly.graph_objects as go
     except ImportError as exc:
         raise ImportError(
-            "Plotly rendering requires Plotly. Install with: "
-            "pip install 'minilink[plotting]'",
+            "Plotly rendering requires Plotly. Install with: pip install plotly",
         ) from exc
     return go
 

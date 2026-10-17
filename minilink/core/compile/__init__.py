@@ -14,7 +14,7 @@ Import from defining modules, for example::
     )
     from minilink.core.compile.execution_plan import ExecutionPlan, PortOperation, StateOperation
 
-Optional JAX evaluators (requires ``pip install minilink[jax]``)::
+Optional JAX evaluators (requires ``pip install jax jaxlib``)::
 
     from minilink.core.compile.evaluators.jax_evaluators import (
         JaxDiagramEvaluator,

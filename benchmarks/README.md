@@ -37,8 +37,8 @@ scene for fast RRT contract tests.
 ## Running
 
 From the repo root with the **`minilink`** conda env active (see
-[environment.yml](../environment.yml)), or any environment with the extras you
-want to measure (`minilink[jax]` for JAX variants; `cyipopt` for Ipopt
+[environment.yml](../environment.yml)), or any environment with the libraries you
+want to measure (JAX for the JAX variants; `cyipopt` for the Ipopt
 variants — both are skipped gracefully when missing). Gate commands (lint, `pytest`,
 the regression CI flags, demo and notebook checks) are in the Agent table of
 [tests/README.md](../tests/README.md#entry-points); this is the benchmark CLI.

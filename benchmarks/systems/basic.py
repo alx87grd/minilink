@@ -34,7 +34,7 @@ class JaxPendulum(NumpyPendulum):
     Inherits the port layout, parameter attributes, and ``__init__`` of
     :class:`NumpyPendulum`; overrides only the dynamics so ``f`` traces
     through ``jax.numpy``. JAX is loaded lazily on the first ``f`` call so
-    importing this module stays free without the ``minilink[jax]`` extra.
+    importing this module stays free without JAX.
     """
 
     def __init__(self, *, gravity=9.81, length=1.0, damping=0.0):

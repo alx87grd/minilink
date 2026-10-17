@@ -224,8 +224,7 @@ def require_plotly():
         from plotly.subplots import make_subplots
     except ImportError as exc:
         raise ImportError(
-            "Plotly signal plots require Plotly. Install with: "
-            "pip install 'minilink[plotting]'",
+            "Plotly signal plots require Plotly. Install with: pip install plotly",
         ) from exc
 
     return go, make_subplots

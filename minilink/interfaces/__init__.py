@@ -9,7 +9,7 @@ models enter minilink as plants::
 RL environment (``reward = -g * dt``); trained policies come back as
 :class:`~minilink.interfaces.gymnasium.SB3Controller` feedback blocks. Names
 resolve on first use, so the optional ``gymnasium`` dependency (``pip install
-minilink[rl]``) is imported only then.
+gymnasium``) is imported only then.
 
 Placement rule: anything whose job is "talk to another ecosystem" lives
 here; homegrown plants — whatever their implementation technology — live in

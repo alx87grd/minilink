@@ -109,7 +109,7 @@ must be unified.
 | --- | --- |
 | Per-iterate `callback` / `record_history` | Not supported (`IpoptOptimizer` raises) |
 | `use_hessian=True` on parametric evaluator | Evaluator reports `has_hessian=False`; IPOPT uses its own quasi-Newton |
-| Optional dependency | Requires `cyipopt` (`minilink[ipopt]` / conda extra) |
+| Optional dependency | Requires `cyipopt` (conda-forge, or pip after a system Ipopt) |
 
 ---
 

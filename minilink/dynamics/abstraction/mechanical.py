@@ -223,7 +223,7 @@ class JaxMechanicalSystem(MechanicalSystem):
 
     JAX is loaded lazily inside each method via
     :func:`~minilink.core.backends.require_jax_numpy`, so importing this
-    module stays free without the ``minilink[jax]`` extra.
+    module stays free without JAX.
     """
 
     def H(self, q, params=None):

@@ -309,7 +309,9 @@ def test_ipopt_without_cyipopt_names_the_install(monkeypatch):
 
     monkeypatch.setitem(sys.modules, "cyipopt", None)  # import cyipopt fails
     prog = MathematicalProgram(n_z=1, J=lambda z: float(z[0] ** 2))
-    with pytest.raises(ImportError, match=r"minilink\[ipopt\]") as refusal:
+    with pytest.raises(
+        ImportError, match=r"conda install -c conda-forge cyipopt"
+    ) as refusal:
         Optimizer(prog, z0=np.zeros(1), method="ipopt")
     assert isinstance(refusal.value.__cause__, ImportError)
 

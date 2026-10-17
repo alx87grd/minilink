@@ -8,17 +8,14 @@ import types
 
 import numpy as np
 
-# Minilink is NumPy-first; JAX is optional (``minilink[jax]``) and always imported
+# Minilink is NumPy-first; JAX is optional (``pip install jax jaxlib``) and always imported
 # lazily. The backend strings are validated by ``normalize_backend``.
 BACKEND_NUMPY = "numpy"
 BACKEND_JAX = "jax"
 BACKEND_AUTO = "auto"
 BACKEND_DIRECT = "direct"
 
-_JAX_REQUIRED = (
-    "This code path requires JAX. "
-    "Install with `pip install minilink[jax]` (or `pip install jax jaxlib`)."
-)
+_JAX_REQUIRED = "This code path requires JAX. Install with `pip install jax jaxlib`."
 
 #: Backends accepted by :func:`minilink.core.compile.compiler.compile`.
 COMPILE_BACKENDS: tuple[str, ...] = (BACKEND_NUMPY, BACKEND_JAX)
@@ -49,7 +46,7 @@ def normalize_backend(
 
     ================ ============================================================
     ``"numpy"``      NumPy evaluator. Always available.
-    ``"jax"``        JAX evaluator. Hard-requires the ``minilink[jax]`` extra.
+    ``"jax"``        JAX evaluator. Hard-requires JAX (``pip install jax jaxlib``).
     ``"auto"``       Try JAX, fall back to NumPy. Used by the simulator.
     ``"direct"``     Use :meth:`~minilink.core.system.DynamicSystem.f` directly
                      (no compiled evaluator); valid for some trajectory-optimization

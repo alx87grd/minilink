@@ -8,6 +8,6 @@ Import convention: use the defining submodules, for example
 ``JaxMechanicalSystem`` (JAX), and ``from minilink.experimental.symbolic.mechanics.model import MechanicalModel``,
 ``from minilink.experimental.symbolic.mechanics.symbolic_system import MechanicalSystem`` (symbolic EoM; distinct from the numeric class).
 
-Dependencies: SymPy (``pip install minilink[symbolic]``). For ``to_minilink(..., backend="jax")``,
-also install JAX (``pip install minilink[jax]`` or ``jax`` + ``jaxlib``).
+Dependencies: SymPy (``pip install sympy``). For ``to_minilink(..., backend="jax")``,
+also install JAX (``pip install jax jaxlib``).
 """

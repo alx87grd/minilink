@@ -769,7 +769,7 @@ class TestVisualizationOptionalImports(unittest.TestCase):
         try:
             meshcat = _import_meshcat()
         except ImportError as exc:
-            self.assertIn("minilink[visualization]", str(exc))
+            self.assertIn("pip install meshcat", str(exc))
         else:
             self.assertTrue(hasattr(meshcat, "Visualizer"))
 
@@ -777,7 +777,7 @@ class TestVisualizationOptionalImports(unittest.TestCase):
         try:
             pygame = _import_pygame()
         except ImportError as exc:
-            self.assertIn("minilink[visualization]", str(exc))
+            self.assertIn("pip install pygame", str(exc))
         else:
             self.assertTrue(hasattr(pygame, "init"))
 
@@ -1406,7 +1406,7 @@ class TestPlotlyRendererOptionalImport(unittest.TestCase):
         try:
             go = _import_plotly()
         except ImportError as exc:
-            self.assertIn("minilink[plotting]", str(exc))
+            self.assertIn("pip install plotly", str(exc))
         else:
             self.assertTrue(hasattr(go, "Figure"))
 

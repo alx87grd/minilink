@@ -4,7 +4,7 @@ Architecture and public contracts, under the law of [CONSTITUTION.md](CONSTITUTI
 
 ## 1. NumPy and JAX
 
-NumPy required; JAX optional (`minilink[jax]`), imported lazily via
+NumPy required; JAX optional (the `full` extra, or `pip install jax jaxlib`), imported lazily via
 `minilink.core.backends` (`require_jax_numpy()`, `array_module()`). No `minilink.jax`
 package, no global mode. Explicit `compile_backend` and evaluator backend args.
 

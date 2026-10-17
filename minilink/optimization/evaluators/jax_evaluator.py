@@ -41,7 +41,7 @@ class JaxMathematicalProgramEvaluator(MathematicalProgramEvaluator):
         except ImportError as exc:  # pragma: no cover - optional dependency
             raise ImportError(
                 "JAX is required for mathematical-program backend='jax'. "
-                "Install with `pip install minilink[jax]` or `pip install jax jaxlib`."
+                "Install with `pip install jax jaxlib`."
             ) from exc
 
         self.jax = jax

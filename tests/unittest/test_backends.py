@@ -180,7 +180,7 @@ def test_ensure_jax_x64_without_jax_gives_the_install_hint(monkeypatch):
     from minilink.core.backends import ensure_jax_x64
 
     monkeypatch.setitem(sys.modules, "jax", None)  # import jax now fails
-    with pytest.raises(ImportError, match=r"pip install minilink\[jax\]"):
+    with pytest.raises(ImportError, match=r"pip install jax jaxlib"):
         ensure_jax_x64()
 
 

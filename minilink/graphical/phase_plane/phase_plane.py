@@ -644,8 +644,7 @@ def require_plotly():
         import plotly.graph_objects as go
     except ImportError as exc:
         raise ImportError(
-            "Plotly phase-plane plots require Plotly. Install with: "
-            "pip install 'minilink[plotting]'"
+            "Plotly phase-plane plots require Plotly. Install with: pip install plotly"
         ) from exc
 
     return ff, go

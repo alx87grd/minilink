@@ -17,8 +17,9 @@ from minilink.graphical.diagrams.topology import (
 # One warning when the graphviz Python wrapper is missing: diagrams are
 # optional, so plot_diagram skips the figure and the notebook keeps running.
 MISSING_GRAPHVIZ_MESSAGE = (
-    "Diagram skipped: the graphviz Python package is not installed "
-    "(pip install graphviz, or pip install minilink[diagrams])."
+    "Diagram skipped: Graphviz is not installed. It needs a system install: "
+    "`conda install -c conda-forge python-graphviz` (the conda environment has it), "
+    "or install Graphviz from graphviz.org then `pip install graphviz`."
 )
 
 
