@@ -660,7 +660,12 @@ class MPCTickLatch:
         initial_guess=None,
         params=None,
     ) -> MPCTickSolve:
-        """The tick's solve: the latched one at the same ``(k, y)``, else a new NLP."""
+        """
+        The tick's solve: the latched one at the same ``(k, y)``, else a new NLP.
+
+        An explicit ``initial_guess`` always runs a new NLP from that seed, and
+        latches its solve in place of the tick's earlier one.
+        """
         planner = self._planner
         t0 = self._t0
         dt_default = self._dt_mpc
@@ -668,9 +673,10 @@ class MPCTickLatch:
         k_int = int(k)
         y_arr = np.asarray(y, dtype=float).reshape(-1)
 
-        # Same tick, same measurement: the latched solve
+        # Same tick, same measurement, no explicit seed: the latched solve
         if (
-            self._latch is not None
+            initial_guess is None
+            and self._latch is not None
             and self._latch_k == k_int
             and np.array_equal(self._latch_y, y_arr, equal_nan=True)
         ):

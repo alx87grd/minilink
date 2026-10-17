@@ -844,6 +844,30 @@ class TestMPCNumPyRebuild(unittest.TestCase):
                 np.testing.assert_allclose(x_start_neg, y_neg, atol=1e-05)
                 np.testing.assert_allclose(x_ff, cmd_neg.x_ff)
 
+    def test_explicit_initial_guess_bypasses_the_latch(self):
+        """An explicit initial_guess at a latched (k, y) solves anew and re-latches."""
+        from minilink.control.mpc.controller import MPCTickLatch
+
+        planner = _make_numpy_planner(0.0)
+        latch = MPCTickLatch(planner, dt_mpc=0.2)
+        y = np.array([0.5])
+        problem = planner.problem
+        guess = default_initial_trajectory(
+            problem, planner.transcription.initial_guess_time_grid(problem)
+        )
+        first = latch.solve_for_tick(0, y)
+        with patch.object(
+            planner, "solve_trajectory_from", wraps=planner.solve_trajectory_from
+        ) as solve:
+            memo = latch.solve_for_tick(0, y)
+            seeded = latch.solve_for_tick(0, y, initial_guess=guess)
+            again = latch.solve_for_tick(0, y)
+        self.assertIs(memo, first)
+        self.assertEqual(solve.call_count, 1)
+        self.assertIs(solve.call_args.kwargs["initial_guess"], guess)
+        self.assertIsNot(seeded, first)
+        self.assertIs(again, seeded)
+
     def test_hybrid_algebraic_one_solve_per_tick(self):
         """``mpc % dt @ plant``: the u_ff, x_ff and z ports share one solve per tick."""
         planner = _make_numpy_planner(0.0)
