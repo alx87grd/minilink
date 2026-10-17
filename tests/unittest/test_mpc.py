@@ -958,6 +958,69 @@ class TestMpcComputerScheduleCheck(unittest.TestCase):
                 self.assertTrue(np.all(np.isfinite(out["u_nom"])))
                 self.assertAlmostEqual(mpc.latch.last_t_solve, 0.2)
 
+    def test_computer_reset_clears_the_tick_latch(self):
+        """``Computer.reset`` makes the block's latch forget its last tick."""
+        for warm_start in (True, False):
+            with self.subTest(warm_start=warm_start):
+                mpc = ModelPredictiveController(
+                    _make_numpy_planner(0.5), dt_mpc=0.2, warm_start=warm_start
+                )
+                computer = mpc.export_to_computer()
+                computer.compile()
+                computer.reset()
+                computer.tick(np.array([0.5]))
+                self.assertAlmostEqual(mpc.latch.last_t_solve, 0.0)
+                computer.reset()
+                self.assertIsNone(mpc.latch.last_t_solve)
+
+
+from minilink.control.mpc.controller import (
+    MPCBroadcastController,
+    MPCStatelessController,
+)
+
+
+class TestMpcSubclassHooks(unittest.TestCase):
+    """A port reaches its hook through the block, so a subclass override is honoured."""
+
+    def test_broadcast_compute_x_nom_override_changes_x_nom(self):
+        class ShiftedBroadcast(MPCBroadcastController):
+            def compute_x_nom(self, x, u, t=0, params=None):
+                return super().compute_x_nom(x, u, t, params) + 1.0
+
+        mpc = ModelPredictiveController(
+            _make_numpy_planner(0.5), dt_mpc=0.2, warm_start=True
+        )
+        mpc.compute_command(np.array([0.5]), k=0)
+        mpc.generate_nominal_interpolator()
+        leaf = MPCBroadcastController(mpc, dt_broadcast=0.05)
+        shifted = ShiftedBroadcast(mpc, dt_broadcast=0.05)
+        x_nom = leaf.outputs["x_nom"].compute(None, None, t=2)
+        x_nom_shifted = shifted.outputs["x_nom"].compute(None, None, t=2)
+        np.testing.assert_allclose(x_nom_shifted, x_nom + 1.0)
+
+    def test_block_hook_override_changes_u_ff(self):
+        class OffsetController(MPCStatelessController):
+            def compute_u_ff(self, x, u, t=0, params=None):
+                return super().compute_u_ff(x, u, t, params) + 1.0
+
+        y = np.array([0.5])
+        mpc = MPCStatelessController(_make_numpy_planner(0.5), dt_mpc=0.2)
+        offset = OffsetController(_make_numpy_planner(0.5), dt_mpc=0.2)
+        u_ff = mpc.outputs["u_ff"].compute(None, y, t=0)
+        u_ff_offset = offset.outputs["u_ff"].compute(None, y, t=0)
+        np.testing.assert_allclose(u_ff_offset, u_ff + 1.0)
+
+    def test_mixin_replan_k_override_changes_the_solved_tick(self):
+        class LateTicks(MPCStatelessController):
+            def replan_k(self, k_tick):
+                return super().replan_k(k_tick) + 5
+
+        mpc = LateTicks(_make_numpy_planner(0.5), dt_mpc=0.2)
+        mpc.outputs["u_ff"].compute(None, np.array([0.5]), t=0)
+        # Base tick 0 maps to replan tick 5: t_solve = 5 Δt_mpc
+        self.assertAlmostEqual(mpc.latch.last_t_solve, 1.0)
+
 
 from minilink.control.mpc import (
     ModelPredictiveController,

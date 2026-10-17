@@ -104,7 +104,7 @@ class Computer:
 
         # A block's tick latch (an MPC block's memoized solve) forgets its last tick
         for sys in self.diagram.subsystems.values():
-            latch = getattr(sys, "_latch", None)
+            latch = getattr(sys, "latch", None)
             if latch is not None and hasattr(latch, "reset_latch"):
                 latch.reset_latch()
 
