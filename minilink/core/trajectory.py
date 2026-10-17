@@ -14,8 +14,40 @@ from minilink.core.inspect import inspect_text, repr_pretty
 ###############################################################################
 
 
+class SampledSignals:
+    """The named channels of a sampled record: ``x``, ``u`` and the extra ``signals``."""
+
+    @property
+    def n(self) -> int:
+        """State dimension."""
+        return int(self.x.shape[0])
+
+    @property
+    def m(self) -> int:
+        """Input dimension."""
+        return int(self.u.shape[0])
+
+    @property
+    def signal_names(self) -> tuple[str, ...]:
+        """All available sampled channel names."""
+        return ("x", "u", *tuple(self.signals.keys()))
+
+    def has_signal(self, name: str) -> bool:
+        """Return ``True`` when a named signal is available."""
+        return name in {"x", "u"} or name in self.signals
+
+    def get_signal(self, name: str) -> np.ndarray:
+        """Return a sampled signal by name."""
+        if name == "x":
+            return self.x
+        if name == "u":
+            return self.u
+
+        return self.signals[name]
+
+
 @dataclass(frozen=True)
-class Trajectory:
+class Trajectory(SampledSignals):
     """
     Sampled state-input trajectory on a shared time grid.
 
@@ -64,16 +96,6 @@ class Trajectory:
         object.__setattr__(self, "signals", MappingProxyType(signals))
 
     @property
-    def n(self) -> int:
-        """State dimension."""
-        return int(self.x.shape[0])
-
-    @property
-    def m(self) -> int:
-        """Input dimension."""
-        return int(self.u.shape[0])
-
-    @property
     def n_samples(self) -> int:
         """Number of time samples."""
         return int(self.t.size)
@@ -93,25 +115,7 @@ class Trajectory:
         """Total covered time span ``tf - t0``."""
         return float(self.tf - self.t0)
 
-    @property
-    def signal_names(self) -> tuple[str, ...]:
-        """All available sampled channel names."""
-        return ("x", "u", *tuple(self.signals.keys()))
-
     # Signals
-
-    def has_signal(self, name: str) -> bool:
-        """Return ``True`` when a named signal is available."""
-        return name in {"x", "u"} or name in self.signals
-
-    def get_signal(self, name: str) -> np.ndarray:
-        """Return a sampled signal by name."""
-        if name == "x":
-            return self.x
-        if name == "u":
-            return self.u
-
-        return self.signals[name]
 
     def with_signal(self, name: str, values: np.ndarray) -> Trajectory:
         """

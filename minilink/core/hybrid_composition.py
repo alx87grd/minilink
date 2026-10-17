@@ -67,7 +67,7 @@ def hybrid_closed_loop(
         Additional multi-channel boundary edges.
     """
     # Tools import core (DESIGN §3): the simulation band loads on first use
-    from minilink.simulation.computer import Computer, StepSchedule, as_computer
+    from minilink.simulation.computer import Computer, as_computer, as_schedule
 
     # A leaf whose class defines its own ``%`` builds its runtime there
     if computer is None and builds_own_computer(computer_side):
@@ -109,10 +109,7 @@ def hybrid_closed_loop(
     )
 
     # The base tick schedule
-    if isinstance(schedule, StepSchedule):
-        step_schedule = schedule
-    else:
-        step_schedule = StepSchedule(dt_base=float(schedule))
+    step_schedule = as_schedule(schedule)
 
     # The runtime: a new one, or the caller's, built on this diagram and schedule
     if computer is None:

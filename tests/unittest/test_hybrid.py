@@ -211,6 +211,14 @@ class TestHybridSimulator(unittest.TestCase):
         sim = HybridSimulator(hybrid, t0=0, tf=0.1, x0_plant=[0.5])
         np.testing.assert_array_equal(sim.x0_plant, [0.5])
 
+    def test_forced_input_refuses_nan_and_a_callable_of_another_size(self):
+        sim = HybridSimulator(_build_hybrid(), t0=0, tf=0.05, n_steps=5)
+        for u in (np.array([np.nan]), lambda t: np.nan):
+            with self.assertRaisesRegex(ValueError, "must contain only finite values"):
+                sim.solve_forced(u, input_port_id="r")
+        with self.assertRaisesRegex(ValueError, "callable returned wrong dimension"):
+            sim.solve_forced(lambda t: [t, t], input_port_id="r")
+
     def test_one_tick_measurement_delay(self):
         hybrid = _build_hybrid()
         sim = HybridSimulator(hybrid, t0=0, tf=0.05, n_steps=5)

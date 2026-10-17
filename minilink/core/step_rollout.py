@@ -7,7 +7,7 @@ from types import MappingProxyType
 
 import numpy as np
 
-from minilink.core.trajectory import Trajectory
+from minilink.core.trajectory import SampledSignals, Trajectory
 
 ###############################################################################
 # Public API
@@ -15,7 +15,7 @@ from minilink.core.trajectory import Trajectory
 
 
 @dataclass(frozen=True)
-class StepRollout:
+class StepRollout(SampledSignals):
     """
     Sampled state-input rollout on integer step indices ``k``.
 
@@ -59,36 +59,9 @@ class StepRollout:
         object.__setattr__(self, "signals", MappingProxyType(signals))
 
     @property
-    def n(self) -> int:
-        """State dimension."""
-        return int(self.x.shape[0])
-
-    @property
-    def m(self) -> int:
-        """Input dimension."""
-        return int(self.u.shape[0])
-
-    @property
     def n_samples(self) -> int:
         """Number of step samples."""
         return int(self.k.size)
-
-    @property
-    def signal_names(self) -> tuple[str, ...]:
-        """All available sampled channel names."""
-        return ("x", "u", *tuple(self.signals.keys()))
-
-    def has_signal(self, name: str) -> bool:
-        """Return ``True`` when a named signal is available."""
-        return name in {"x", "u"} or name in self.signals
-
-    def get_signal(self, name: str) -> np.ndarray:
-        """Return a sampled signal by name."""
-        if name == "x":
-            return self.x
-        if name == "u":
-            return self.u
-        return self.signals[name]
 
     def as_trajectory(self) -> Trajectory:
         """View for signal plotting only (``k`` mapped to the ``t`` array)."""

@@ -380,6 +380,11 @@ class TestEulerSolverModes(unittest.TestCase):
         with self.assertRaises(ValueError):
             backend.integrate(self.ev, times, self.plant.x0)
 
+    def test_forced_callable_of_another_size_is_named(self):
+        sim = Simulator(StableLinearSystem(), tf=0.2, n_steps=3, verbose=False)
+        with self.assertRaisesRegex(ValueError, "u callable returned wrong dimension"):
+            sim.solve_forced(lambda t: [t, t])
+
     def test_rk4_fixedsteps_rejects_nonuniform_grid(self):
         from minilink.simulation.solvers.rk4_fixed import RK4SolverBackend
 

@@ -99,3 +99,15 @@ def require_uniform_times(times: np.ndarray, solver: str) -> float:
             "for variable dt between knots"
         )
     return dt
+
+
+def fixed_step_debug(solver: str, mode: str, n_pts: int, f_per_step: int) -> dict:
+    """The record of a fixed-step run: ``f_per_step`` evaluations of ``f`` per step, no Jacobian."""
+    return {
+        "solver": solver,
+        "mode": mode,
+        "nfev": f_per_step * max(n_pts - 1, 0),
+        "njev": 0,
+        "nlu": 0,
+        "n_t": n_pts,
+    }

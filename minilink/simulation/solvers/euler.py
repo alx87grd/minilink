@@ -2,7 +2,7 @@
 
 import numpy as np
 
-from minilink.simulation.solvers.solver import SolverBackend
+from minilink.simulation.solvers.solver import SolverBackend, fixed_step_debug
 
 ###############################################################################
 # Public API
@@ -34,14 +34,7 @@ class EulerSolverBackend(SolverBackend):
             x_traj[:, i + 1] = evaluator.euler_step_ivp(x_traj[:, i], times[i], dt)
 
         # The run's record: one evaluation of f per step
-        self.last_debug = {
-            "solver": "euler",
-            "mode": "nominal",
-            "nfev": max(n_pts - 1, 0),
-            "njev": 0,
-            "nlu": 0,
-            "n_t": n_pts,
-        }
+        self.last_debug = fixed_step_debug("euler", "nominal", n_pts, 1)
 
         return x_traj
 
@@ -65,13 +58,6 @@ class EulerSolverBackend(SolverBackend):
             x_traj[:, i + 1] = evaluator.euler_step(x_traj[:, i], u[:, i], times[i], dt)
 
         # The run's record: one evaluation of f per step
-        self.last_debug = {
-            "solver": "euler",
-            "mode": "forced",
-            "nfev": max(n_pts - 1, 0),
-            "njev": 0,
-            "nlu": 0,
-            "n_t": n_pts,
-        }
+        self.last_debug = fixed_step_debug("euler", "forced", n_pts, 1)
 
         return x_traj

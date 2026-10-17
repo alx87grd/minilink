@@ -2,7 +2,11 @@
 
 import numpy as np
 
-from minilink.simulation.solvers.solver import SolverBackend, require_uniform_times
+from minilink.simulation.solvers.solver import (
+    SolverBackend,
+    fixed_step_debug,
+    require_uniform_times,
+)
 
 ###############################################################################
 # Public API
@@ -32,14 +36,7 @@ class EulerFixedStepSolverBackend(SolverBackend):
         x_traj = np.asarray(x_seq).T  # (n, n_pts)
 
         # The run's record: one evaluation of f per step
-        self.last_debug = {
-            "solver": "euler_fixedsteps",
-            "mode": "nominal",
-            "nfev": max(n_pts - 1, 0),
-            "njev": 0,
-            "nlu": 0,
-            "n_t": n_pts,
-        }
+        self.last_debug = fixed_step_debug("euler_fixedsteps", "nominal", n_pts, 1)
 
         return x_traj
 
@@ -63,13 +60,6 @@ class EulerFixedStepSolverBackend(SolverBackend):
         x_traj = np.asarray(x_seq).T
 
         # The run's record: one evaluation of f per step
-        self.last_debug = {
-            "solver": "euler_fixedsteps",
-            "mode": "forced",
-            "nfev": max(n_pts - 1, 0),
-            "njev": 0,
-            "nlu": 0,
-            "n_t": n_pts,
-        }
+        self.last_debug = fixed_step_debug("euler_fixedsteps", "forced", n_pts, 1)
 
         return x_traj
