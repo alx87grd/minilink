@@ -276,6 +276,11 @@ class MonteCarloEvaluator:
 
     def evaluate_simulator(self, controller) -> Evaluation:
         """The trials integrated by the simulator: the continuous-time loop from each drawn start."""
+        # A real cycle: reinforcement_learning imports Evaluation from this module
+        from minilink.planning.reinforcement_learning.environment import (
+            RolloutEnvironment,
+        )
+
         problem = self.problem
         sys = problem.sys
         seed = self.seed
@@ -301,6 +306,12 @@ class MonteCarloEvaluator:
         x0_saved = np.asarray(sys.x0, dtype=float).copy()
         action_port = env_action_port(sys)
 
+        # The price of an exit: the NumPy backend's, from the same trial environment
+        env = RolloutEnvironment(
+            problem, dt=self.dt, episode_length=self.tf, backend="numpy"
+        )
+        price = env.infeasible_cost
+
         try:
             for i, x0 in enumerate(x0s):
                 sys.x0 = np.asarray(x0, dtype=float)
@@ -318,8 +329,8 @@ class MonteCarloEvaluator:
                 u = sys.get_port_values_from_u(plant_traj.u, action_port)
                 traj = Trajectory(t=plant_traj.t, x=plant_traj.x, u=u)
 
-                # The trial scored under the problem's contract
-                J[i], failed[i] = score_trajectory(problem, traj)
+                # The trial scored under the problem's contract, at the environment's price
+                J[i], failed[i] = score_trajectory(problem, traj, infeasible_cost=price)
 
                 if trajectories is not None:
                     trajectories.append(traj)

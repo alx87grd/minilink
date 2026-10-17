@@ -382,6 +382,36 @@ def test_monte_carlo_applies_the_law_beyond_the_port_bounds():
     np.testing.assert_allclose(reports["simulator"].J, reports["numpy"].J, rtol=0.1)
 
 
+def test_an_exiting_trial_scores_alike_on_numpy_and_the_simulator():
+    """An exit is charged the trial environment's price on both backends."""
+    import warnings
+
+    from minilink.control import StateFeedbackController
+    from minilink.planning.evaluation import MonteCarloEvaluator
+
+    plant = pendulum()
+    plant.inputs["u"].lower_bound = np.array([-1.0])
+    plant.inputs["u"].upper_bound = np.array([1.0])
+    problem = StochasticPlanningProblem(
+        plant,
+        cost=quadratic(plant),
+        tf=np.inf,
+        X=plant.state.box,
+        x0_distribution=Particles([[6.0, 5.0]]),  # leaves θ ≤ 2π within 0.1 s
+    )
+    ctl = StateFeedbackController(K=[[0.0, 0.0]])
+    reports = {}
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")  # the announced price of leaving X
+        for backend in ("numpy", "simulator"):
+            reports[backend] = MonteCarloEvaluator(
+                problem, dt=0.01, n_trials=1, episode_length=1.0, backend=backend
+            ).evaluate(ctl)
+    assert reports["numpy"].failed[0] and reports["simulator"].failed[0]
+    assert np.isfinite(reports["numpy"].J[0])
+    np.testing.assert_allclose(reports["simulator"].J, reports["numpy"].J, rtol=0.05)
+
+
 def test_simulator_backend_scores_a_controller_with_internal_state():
     """The controller state is stacked first; the score reads the plant's own trajectory."""
     from minilink import PID, SingleMass
