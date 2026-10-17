@@ -245,7 +245,7 @@ class CartPoleWithNoisePort(CartPole):
 
     def __init__(self):
         super().__init__()
-        self.name = "Cart Pole"
+        self.name = "Cart Pole with noise ports"
 
         # Ports: the disturbance force d and the measurement noise n
         self.add_input_port("d", dim=1, nominal_value=np.array([0.0]))

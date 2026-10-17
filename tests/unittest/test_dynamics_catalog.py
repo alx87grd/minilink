@@ -295,6 +295,7 @@ class TestCartPole(unittest.TestCase):
 
     def test_noise_ports_add_disturbance_and_sensor_noise(self):
         sys = CartPoleWithNoisePort()
+        self.assertEqual(sys.name, "Cart Pole with noise ports")
         self.assertEqual(sys.inputs["d"].dim, 1)
         self.assertEqual(sys.inputs["n"].dim, 4)
         x = np.array([0.1, 0.2, 0.3, 0.4])
