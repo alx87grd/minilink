@@ -9,7 +9,10 @@ import numpy as np
 
 from minilink.core.feedback import block_roles, plot_space_of, require_command
 from minilink.graphical.common import PlotResult
-from minilink.graphical.phase_plane.phase_plane import format_axis_label
+from minilink.graphical.phase_plane.phase_plane import (
+    format_axis_label,
+    require_grid_shape,
+)
 
 # The sweep range of a coordinate whose bounds are not finite
 _DEFAULT_BOUNDS = (-10.0, 10.0)
@@ -542,19 +545,6 @@ def evaluate_axes(
             U[row, col] = value_at((vx, vy))
 
     return x_values, y_values, U
-
-
-def require_grid_shape(grid_shape) -> tuple[int, int]:
-    """Refuse a grid that is not two entries of at least 2; return them as ``(n_x, n_y)``."""
-    try:
-        n_x, n_y = tuple(grid_shape)
-    except TypeError as exc:
-        raise ValueError("grid_shape must be a two-element tuple") from exc
-    n_x = int(n_x)
-    n_y = int(n_y)
-    if n_x < 2 or n_y < 2:
-        raise ValueError("grid_shape entries must be at least 2")
-    return n_x, n_y
 
 
 @dataclass(frozen=True)

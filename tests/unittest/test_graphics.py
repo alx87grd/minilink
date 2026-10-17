@@ -1916,6 +1916,20 @@ class TestPlotControlLaw(unittest.TestCase):
         res = sat.plot_input_output_map(x_axis=np.int64(0), show=False)
         self.assertEqual(len(res.axes.lines), 1)
 
+    def test_a_boolean_or_float_grid_entry_is_refused(self):
+        from minilink.blocks.routing import Mux
+
+        mux = Mux(dims=(1, 1))
+        for grid_shape in ((5.5, 5), (5, np.bool_(True)), (True, 5)):
+            with self.subTest(grid_shape=grid_shape):
+                with self.assertRaisesRegex(ValueError, "entries must be integers"):
+                    mux.plot_input_output_map(
+                        in_port="in0",
+                        bounds=(-1.0, 1.0),
+                        grid_shape=grid_shape,
+                        show=False,
+                    )
+
 
 class TestAutoFitCamera(unittest.TestCase):
     """``camera_scale=None`` fits the view to the drawn geometry (DESIGN §7)."""
