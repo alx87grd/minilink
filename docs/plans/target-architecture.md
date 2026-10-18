@@ -237,23 +237,104 @@ regime mathematically well-posed and maintainable:
   NLP path because defect constraints $h(z) = 0$ break the temporal gradient chain and
   expose sparsity.
 
-### 5.3 Uncut objective + smooth feasibility margin for state-constrained `.program()`
+### 5.3 Multi-mode hard-constraint treatment (`X`, `U`, `Xf`) across all pipelines
 
-- **The trap:** In `score_rollout`, cutting a trajectory at the first exit from $X$ (`alive`
-  mask) and charging `infeasible_cost` is a step function ($\mathbb{I}(x_k \in X)$) with
-  zero gradient almost everywhere and an impulse at the boundary. If a controller gain clips
-  the state box at $t = 2\text{ s}$, `jax.grad(evaluator.cost)(params)` yields zero gradient
-  for all behavior after $t = 2\text{ s}$ and no gradient direction to pull the trajectory
-  back inside $X$.
-- **Recommendation:**
-  - For **reporting and `MonteCarloEvaluator`**, keep the hard exit cut + `infeasible_cost`
-    in `score_rollout`.
-  - For **differentiation and `.program()`**, lower nontrivial state constraints $X$ to the
-    inequality margin `g(z) = evaluator.feasibility(...) >= 0` (the `softmin` of
-    `X.margin(x_k)` over the rollout, or per-knot margins) while `J(z)` integrates the
-    **uncut** rollout. That gives gradient-based solvers (`scipy_slsqp`, `ipopt`) exact
-    boundary derivatives $\frac{\partial\,\text{margin}}{\partial \theta}$ to push the
-    trajectory back into the safe set.
+- **The trap:** A single hard-constraint rule cannot simultaneously serve episodic reporting/RL,
+  unconstrained gradient descent, and constrained SQP/interior-point optimization:
+  1. **Episodic cut (`"cut"`):** In `score_trajectory` and `MonteCarloEvaluator.evaluate_jax`,
+     cutting a rollout at the first exit from $X$ (`alive` mask) and charging `infeasible_cost`
+     is a step function ($\mathbb{I}(x_k \in X)$) with **zero gradient almost everywhere**. If a
+     controller clips $X$ at $t = 2\text{ s}$, `jax.grad(evaluator.cost)(params)` yields zero
+     gradient for all behavior after $t = 2\text{ s}$ and no boundary derivative telling the
+     optimizer how to pull the trajectory back inside $X$.
+  2. **The `SingletonSet(x_goal)` trap on `Xf`:** `PlanningProblem` automatically builds
+     `Xf = SingletonSet(x_goal)` whenever `x_goal` is passed (`problems.py`). In open-loop
+     trajectory optimization and RRT, $x(t_f) = x_{\text{goal}}$ is a terminal boundary
+     condition ($h(z) = 0$). In closed-loop regulation (`PID`, `LQR`, `RL`, `MonteCarlo`), the
+     loop approaches $x_{\text{goal}}$ asymptotically ($e^{-t/\tau}$), so `Xf.contains(x_N)` is
+     always `False` in floating point and treating it as a hard equality $h(z) = 0$ would make
+     gain tuning with fewer parameters than states infeasible.
+  3. **Unsaturated input bounds `U` in closed-loop tuning:** In open-loop planners (`trajopt`,
+     `MPC`, `DP`, `RRT`, `MPPI`), $u_k \in U$ holds by construction. In closed-loop tuning
+     (`problem.compile(controller)`), a linear `PID` or `StateFeedback` without a `Saturation`
+     block can emit $u_k \notin U$ unless `U.margin` is either penalized or constrained.
+
+- **Recommendation — four explicit constraint modes (`constraints=` on `score_rollout`, `evaluator.cost`, and `evaluator.program`) backed by one `Set.margin` contract:**
+  Factor `score_rollout` into the **uncut integral** $J_{\text{uncut}}$ (discounted trapezoid of
+  $g$ plus terminal $h$) and the **margin evaluation** (`X.margin`, `U.margin`, `Xf.margin`),
+  then expose four clean modes so every pipeline gets exact semantics:
+  1. **`constraints="ignore"` (Unconstrained rollout for gradient evaluation + independent
+     success/failure reporting):**
+     - `J` integrates the uncut rollout over $[0, t_f]$, ignoring `X`, `U`, and `Xf` inside the
+       cost integral (guarding only `~isfinite(x)` so NaNs never poison `jax.grad`).
+     - `evaluator.success_rate(params, keys)` (hard boolean fraction staying in $X$ and region
+       $X_f$) and `evaluator.feasibility(params, keys)` (`softmin` of margins) are evaluated
+       **independently** as diagnostics.
+     - *Best for:* direct `jax.grad(evaluator.cost)` loops and unconstrained first-order tuning
+       (`Adam`, `gd`, `scipy_lbfgsb`) when quadratic costs $Q, R$ already regularize the state
+       and input, or when `X = sys.state.box` was only set as a nominal plotting/grid domain and
+       early transient excursions must not zero out late-horizon gradients.
+  2. **`constraints="soft"` (Smooth penalty / barrier folding into $J$, plus `Set.as_cost`):**
+     - Folds any active constraint margin $m = \text{Set.margin}(z, t, \text{params})$ into
+       $J_{\text{uncut}}$ using the shaping functions in `planning/spatial/shaping.py`:
+       $$J_{\text{soft}}(\theta) = J_{\text{uncut}}(\theta) + \int_0^{t_f} e^{-\rho t} w_X \,\phi\big(m_X(x(t), t)\big)\,dt + \int_0^{t_f} e^{-\rho t} w_U \,\phi\big(m_U(x(t), u(t), t)\big)\,dt + e^{-\rho t_f} w_{X_f}\,\phi\big(m_{X_f}(x(t_f), t_f)\big)$$
+       with default exterior hinge $\phi(m) = \sum_i \max(0, -m_i)^2$ (`quadratic_hinge(0.0)`,
+       zero inside the safe set, $C^1$ at the boundary, quadratic in penetration depth to match
+       `QuadraticCost` scaling) or interior `inverse_barrier(epsilon)`.
+     - **Close the noun duality with `Set.as_cost(weight=100.0, shaping=quadratic_hinge(0.0)) -> CostFunction`:**
+       Just as `Field` offers `.as_constraint()` and `.as_cost()`, every `Set` (`BoxSet`,
+       `BallSet`, `FieldSet`, `IntersectionSet`) already computes native-array `margin`;
+       giving `Set` an `.as_cost()` method lets users explicitly soften individual sets
+       (`cost = tracking_cost + problem.X.as_cost(weight=50.0)`) and powers
+       `constraints="soft"` with zero duplicate code.
+     - *Best for:* first-order and box-bounded optimizers (`Adam`, `gd`, `scipy_lbfgsb`) that
+       cannot take nonlinear inequalities $g(z) \ge 0$; sampling-based planners
+       (`PathIntegralPlanner` / `MPPI`) in narrow corridors where near-miss rollouts still carry
+       informative weights; and stochastic expectation tuning (`mean_cost(params, keys)`) where
+       a single $3\sigma$ disturbance grazing $X$ would make hard all-draw constraints
+       infeasible.
+  3. **`constraints="hard"` (Explicit NLP inequality / equality constraints $g(z) \ge 0$,
+     $h(z) = 0$):**
+     - `J(z)` is the **uncut** rollout cost (`"ignore"`), while active sets lower to the
+       `MathematicalProgram` constraint vectors:
+       - In **open-loop transcriptions (`direct_collocation`, `multiple_shooting`) and `MPC`:**
+         `BoxSet` / `BoxInputSet` $\to$ variable box bounds `lower <= z <= upper`; general
+         `X`, `U` $\to$ sparse per-knot inequalities $g_k(z) = \text{margin}(x_k, u_k, t_k) \ge 0$;
+         `SingletonSet` on $X_0, X_f$ $\to$ equality $h(z) = \text{residual}(x_N) = 0$; region
+         $X_f$ $\to$ $g_N(z) = X_f.\text{margin}(x_N, t_N) \ge 0$.
+       - In **`evaluator.program(wrt=..., constraints="hard")` (closed-loop parameter tuning):**
+         Because $z \in \mathbb{R}^{n_\theta}$ is low-dimensional while the horizon has $N+1$
+         steps, aggregate path margins over time via the smooth inner approximation
+         $g_X(z) = \operatorname{softmin}_k X.\text{margin}(x_k(z), t_k) \ge 0$ (one constraint
+         per margin component, guaranteeing $\min_k m_k \ge 0$ while staying $C^\infty$), and
+         similarly $g_U(z) = \operatorname{softmin}_k U.\text{margin}(u_k(z)) \ge 0$ when the
+         loop has no `Saturation` block. For $X_f$, enforce $g_{X_f}(z) = X_f.\text{margin}(x_N(z)) \ge 0$
+         for region sets, and enforce $h_{X_f}(z) = X_f.\text{residual}(x_N(z)) = 0$ only in
+         open-loop shooting (`controller=None`). Over stochastic draws (`keys`), aggregate across
+         draws via worst-case `softmin` or tail `CVaR` of the per-draw margins.
+     - *Best for:* constrained SQP / interior-point solvers (`scipy_slsqp`,
+       `scipy_trust_constr`, `ipopt`) when strict safety or performance bounds (including S73
+       phase-margin / $M_s$ floors) must hold without tuning penalty weights.
+  4. **`constraints="cut"` (Episodic cut at first exit + `infeasible_cost`):**
+     - Integrates $g$ up to the first exit $k_{\text{exit}}$ from $X$ (`alive` mask), skips
+       terminal $h(x_N)$ on early exit, and adds `infeasible_penalty(x_exit, t_exit)` (from
+       `problem.infeasible_cost` or the Halton-sampled `feasible_cost_bound`).
+     - *Best for:* `MonteCarloEvaluator` / `Evaluation` (`score_trajectory`) benchmarking,
+       `RolloutEnvironment` in RL (where leaving $X$ sets `terminated=True, failed=True` and
+       subtracts `infeasible_penalty`, kept distinct from `training_zone` where leaving sets
+       `truncated=True` so PPO/SAC bootstrap $V(x_{\text{next}})$ without a penalty), and
+       `DynamicProgrammingPlanner` (`out_of_bound_cost`).
+
+| Pipeline | Mode for `X` (State) | Mode for `U` (Input) | Mode for `Xf` (Terminal) |
+| --- | --- | --- | --- |
+| `MonteCarloEvaluator` / `score_trajectory` | `"cut"` (`infeasible_penalty`, `failed` flag) | Enforced by loop; optional diagnostic | Region `Xf` checked; `SingletonSet(x_goal)` is reference only |
+| `RolloutEnvironment` (PPO, SAC, REINFORCE, Tabular) | `"cut"` (`terminated=True` + penalty on $X$; `truncated=True` on `training_zone`) | Action space `BoxInputSet` bounds policy head | Region `Xf` terminal check / bonus |
+| `DynamicProgrammingPlanner` (VI / PI) | `"cut"` (`out_of_bound_cost` on leaving $X$ / grid) | Discrete action grid inside `U` | Terminal cost $h$ or absorbing goal set |
+| `RRTPlanner` | Hard boolean `X.contains(x, t)` | Sampled inside `U` | `Xf.contains(x)` (with goal tolerance) |
+| `PathIntegralPlanner` (`MPPI`) | `"soft"` (`X.as_cost()` hinge) or `"cut"` (`infeasible_penalty`) | Clipped to `U.bounding_box()` | Terminal $h(x_N)$ or `Xf.as_cost()` |
+| `TrajectoryOptimizationPlanner` & `MPC` | `"hard"` (`BoxSet` bounds + per-knot `X.margin >= 0`) or `"soft"` (`X.as_cost()`) | `"hard"` (`BoxInputSet` bounds + `U.margin >= 0`) | `"hard"` (`SingletonSet` $h(z)=0$, region $g(z)\ge 0$) |
+| `problem.compile` + `jax.grad` / `Adam` / `L-BFGS-B` | `"ignore"` (uncut $J$ + independent `success_rate` / `feasibility`) or `"soft"` (`X.as_cost()`) | Loop `Saturation` or `"soft"` (`U.as_cost()`) | Terminal $h(x_N)$ or `"soft"` on region `Xf` |
+| `evaluator.program` + `scipy_slsqp` / `ipopt` | `"hard"` (uncut $J$ + `softmin_k X.margin >= 0`) or `"soft"` | `"hard"` (`softmin_k U.margin >= 0` if unsaturated) | Region `Xf` $\to$ `Xf.margin >= 0`; `SingletonSet` $\to$ $h(z)=0$ only when `controller=None` |
 
 ### 5.4 Differentiable rollout (BPTT) vs. policy gradients (RL) as complementary tools
 

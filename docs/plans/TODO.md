@@ -48,7 +48,9 @@ Runs in parallel with wave B.
   name and `plot_diagram` labels and plot titles read in one glance.
 - [ ] **A5 Later nouns, each with its first consumer.** `log_prob` on the distributions;
   parameter-dictionary support on sets and distributions (one flatten rule, with
-  identification or the robust problem); `UnionSet` via `|` when reachability or multi-goal
+  identification or the robust problem); `Set.as_cost(weight=, shaping=)` as the set-to-cost
+  dual of `Field.as_cost()` (used when softening hard constraints `X`, `U`, `Xf` into penalty
+  costs in V1 and MPPI); `UnionSet` via `|` when reachability or multi-goal
   work needs it; vector bounds on `Saturation`; library sets, shapes and fields reading
   `params` (same rule as A2, after it); `PlanningProblem.hamiltonian()` only if the course
   teaches Pontryagin; the RL critic as a `Field` once training is over.
@@ -468,7 +470,9 @@ the demo sweep touches fewer files. Nothing leaves without the maintainer's ruli
   the controller's params matches a central difference on the same draws, through the
   standard entry point.
   The target this serves and the ideas around it, to review, not decided:
-  [target-architecture.md](target-architecture.md).
+  [target-architecture.md](target-architecture.md) (including §5.3's four-mode treatment of
+  hard constraints `X`, `U`, `Xf` across all pipelines: `"ignore"`, `"soft"`, `"hard"`, and
+  `"cut"`).
 - [ ] **S73 Traceable linear analysis** **[idea to review — ask — core]**, proposed by the
   maintainer 2026-10-18, not scheduled: `poles`, `frequency_response` and `margins` in
   `analysis/linear.py` through the array module, so the sensitivity of closed-loop poles,

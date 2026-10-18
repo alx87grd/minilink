@@ -300,15 +300,36 @@ From the big-picture review of the differentiable path ([target-architecture.md]
 - **Facade and object naming (Step 0):** Prefer `problem.compile(controller=None, *, dt, backend="jax")`
   returning `ProblemEvaluator` (or `PlanningProblemEvaluator`), with `wrt=` as the selection
   keyword on `.program(wrt=...)` to match `sys.jacobian(of, wrt)`.
-- **Uncut rollout objective + smooth feasibility margin in `.program()` (Step 5):** Cutting a
-  trajectory at the first exit from $X$ (`alive` mask) and charging `infeasible_cost` is exact
-  for reporting and `MonteCarloEvaluator`, but produces zero gradient after the exit time and
-  no boundary gradient telling the solver how to pull the trajectory back inside $X$. When
-  lowering a state-constrained problem in `evaluator.program(wrt=..., constraints=...)`,
-  integrate the **uncut** rollout in `J(z)` and lower nontrivial state sets $X$ to the smooth
-  inequality constraint `g(z) = evaluator.feasibility(...) >= 0` (`softmin` of `X.margin(x_k)`
-  over the rollout, or per-knot margins) so `scipy_slsqp` and `ipopt` receive informative
-  boundary derivatives $\frac{\partial\,\text{margin}}{\partial \theta}$.
+- **Four-mode hard-constraint treatment across all pipelines (Steps 1, 3, 4, 5):** Factor
+  `score_rollout` into the **uncut integral** $J_{\text{uncut}}$ and the **margin evaluation**
+  (`X.margin`, `U.margin`, `Xf.margin`), and support four explicit constraint modes
+  (`constraints="ignore" | "soft" | "hard" | "cut"`):
+  1. **`"ignore"` (Unconstrained gradient evaluation + independent success/failure reporting):**
+     Integrates the uncut rollout over $[0, t_f]$ for clean BPTT gradients $\nabla_\theta J_{\text{uncut}}$,
+     while `evaluator.success_rate(params, keys)` and `evaluator.feasibility(params, keys)` are
+     evaluated independently as diagnostics. Ideal when $Q, R$ already regularize the trajectory
+     or when `X = sys.state.box` is only a nominal domain box.
+  2. **`"soft"` (Smooth penalty / barrier folding into $J$ + `Set.as_cost`):** Transforms negative
+     margins of $X$, $U$, and region $X_f$ into smooth penalties added to $J_{\text{uncut}}$ using
+     `planning/spatial/shaping.py` (`quadratic_hinge(0.0)` by default, or `inverse_barrier`), and
+     exposes `Set.as_cost(weight=100.0, shaping=quadratic_hinge(0.0)) -> CostFunction` as the
+     set-to-cost dual of `Field.as_cost()`. Ideal for unconstrained first-order solvers (`Adam`,
+     `gd`, `scipy_lbfgsb`), `MPPI` in narrow corridors, and stochastic expectation tuning where a
+     single $3\sigma$ draw grazing $X$ would make hard all-draw constraints infeasible.
+  3. **`"hard"` (Explicit NLP constraints $g(z) \ge 0$, $h(z) = 0$ in `.program()`):** Keeps
+     $J(z) = J_{\text{uncut}}(z)$ and lowers nontrivial $X$ (and unsaturated $U$) to aggregated
+     smooth margins $g(z) = \operatorname{softmin}_k \text{margin}(x_k(z), t_k) \ge 0$ (or
+     per-knot margins in open-loop transcriptions) for `scipy_slsqp`, `scipy_trust_constr`, and
+     `ipopt`. Note the `SingletonSet(x_goal)` rule on `Xf`: in closed-loop tuning
+     (`controller is not None`), an auto-created `SingletonSet(x_goal)` is a regulation reference
+     only (not a hard equality $h(z) = 0$, which would be violated by asymptotic $e^{-t/\tau}$
+     convergence), whereas a region `Xf` (`BallSet`, `BoxSet`) lowers to
+     $g_{X_f}(z) = X_f.\text{margin}(x_N(z)) \ge 0$, and open-loop shooting (`controller=None`)
+     lowers `SingletonSet` to $h(z) = X_f.\text{residual}(x_N(z)) = 0$.
+  4. **`"cut"` (Episodic exit cut + `infeasible_cost`):** Cuts the integral at the first sample
+     leaving $X$ (`alive` mask) and charges `infeasible_penalty(x_exit, t_exit)`. Used by
+     `MonteCarloEvaluator` / `score_trajectory`, `RolloutEnvironment` (RL), and
+     `DynamicProgrammingPlanner`.
 - **Flat `MathematicalProgram` boundary (Step 5):** Keep `MathematicalProgram` strictly on flat
   vectors $z \in \mathbb{R}^{n_z}$; `evaluator.program(wrt=...)` owns `ravel_pytree` and
   provides `program.unravel(result.z)` (or `evaluator.update_params(result.z)`), keeping pytree
