@@ -10,7 +10,7 @@ Identity: [CONSTITUTION.md](CONSTITUTION.md).
 | Release | Milestone | When |
 | --- | --- | --- |
 | **v0.1** | **GRO860 end to end**, plus a working **`pip install minilink` on PyPI**. Every topic of the running optimal-control & RL course runs on the teaching surface, in Colab (git-clone cell) and in the conda env: value iteration / DP on a grid · LQR + linearization · trajectory optimization · RL via native `ReinforcementLearningPlanner` (with `Sys2Gym` + SB3 as an optional bridge). See §4.1. | Fall 2026 — `0.1.0` on PyPI (2026-09-16); `0.1.1` (2026-09-26) is the first release a GitHub tag published. Conda from `environment.yml` is the recommended install. The course notebooks' names are frozen until v1.0, with the freeze paused between terms (§4.1 gate 7). |
-| **v0.2** | **GRO501 end to end** (the classical-control course: multi-physics modelling · root locus / Bode / margins · PID to spec · digital implementation · state feedback, pole placement, LQR, observers — see §4.2). Conda stays the recommended Full local install. | October 2026 |
+| **v0.2** | **GRO501 end to end** (the classical-control course: multi-physics modelling · root locus / Bode / margins · PID to spec · digital implementation · state feedback, pole placement, LQR, observers — see §4.2). Conda stays the recommended install. | `0.2.0` on PyPI (2026-10-17), from the GitHub tag; every §4.2 row green |
 | **v0.3** | **GMC714 end to end** — the teaching layer solidified for the class: robust control · robotic arm · trajectory optimization · MPC · vehicle models · nonlinear control (§4.3), with **pyro parity**, the catalog work of §5.3 and **the textbook objects** (fields, cost parameters, workspace geometry). | December 2026 |
 | **v0.9** | **Freeze candidate** (§5.4): the foundation questions that could still break a public name are decided (hybrid as a `System`, derived `x0`, evaluator/solver layering, the glyph/solid rename); the trust contract is in place (deprecation policy, pinned export list, CHANGELOG, pinned installs); the standard-syllabus holes close (estimation, discrete time, identification); the docs site renders the tutorials. | Early 2027 |
 | **v1.0** | **A colleague can build a course on it and trust it for three years** (§5.5): the API frozen under the deprecation policy, the standard control syllabus covered and checked against textbook worked examples, course-neutral labs an instructor adopts outside UdeS, green on Windows, macOS and Linux; after two cohorts. Two Stable-Baselines3 teaching notebooks retire (S49) and the GRO860 name freeze becomes the general one. | 2027 |
@@ -48,6 +48,14 @@ v0.9 they go to `CHANGELOG.md`, step V5):
 - 2026-09-30: `WhiteNoise(p, *, psd, sample_period, seed, hold)` is a pure block; its
   `var`, `mean`, `t0`, `tf` and `refresh()` are gone (an old variance reads as
   `psd = var × sample_period`), and seeded realizations changed once.
+- 2026-10-14: the state-feedback designs live in `control/design.py` (`lqr`, `place`,
+  `lqr_finite_horizon`, `lqg`, `trajectory_lqr`); the modules `control/lqr.py`, `place.py`
+  and `output.py` are gone, their names unchanged on the teaching surface.
+- 2026-10-17 (`0.2.0`): a block's default `name` is its class name and a shortcut is named
+  as the expression it builds, so diagram labels and plot titles changed; the pip extras are
+  `full` and `dev` only (`[jax]`, `[plotting]`, `[visualization]`, `[diagrams]`,
+  `[symbolic]`, `[rl]`, `[ipopt]` are gone); `install.md` and `environment-basic.yml` are
+  gone, the install story is the README's.
 
 ## 3. Maturity (TRL)
 
@@ -214,9 +222,10 @@ section; its history is in git and in [docs/reviews/](../reviews/).
 
 The GRO860 path is green (§4.1) and `0.1.1` is published; nothing is open.
 
-### 5.2 v0.2 — GRO501 (October 2026)
+### 5.2 v0.2 — shipped; the carry-over
 
-Three waves: A and B in parallel, D throughout.
+`0.2.0` was tagged on 2026-10-17 with every §4.2 row green. The steps below were planned for
+v0.2 and not needed for the tag; they carry into v0.3 as written, wave D standing.
 
 **Wave A — the textbook objects finish speaking.**
 - **A6** Short catalog names (RULES 2.6): compact public class names, the long explicit display
@@ -251,7 +260,7 @@ behaviour-preserving, one module per step.
 
 ### 5.3 v0.3 — GMC714 (December 2026)
 
-**Wave K — consolidation first** (November 2026, after the v0.2 tag and before A1–A3, so
+**Wave K — consolidation first** (November 2026, after `0.2.0` and before A1–A3, so
 the new core objects land in a smaller library; plan in TODO §4):
 - **K1** The inventory: every public name and every demo with its callers and a maturity
   label (final, prototype, dead), the demos mapped to the feature each shows.
@@ -261,9 +270,23 @@ the new core objects land in a smaller library; plan in TODO §4):
 - **K4** One demo per feature: redundant demos merged or removed, before D1.3 sweeps the
   rest. **[ask per group]**
 
-**The textbook objects**, before wave C:
+**The textbook objects**, before wave C, in this order: the differentiable evaluator's
+plumbing first (it waits on nothing), the cost parameters next, then the rest of the
+evaluator they unlock, then the two objects it does not need.
+- **V1, first half** (steps 0–3 of [differentiable-cost.md](../plans/differentiable-cost.md),
+  beside K1): the naming brainstorm, one scoring kernel, the whole trajectory out of the
+  compiled scan, and `problem.compile(controller)` with the deterministic verbs on the
+  system params. **[ask — core, the names]**
+- **A2** Cost parameters ([cost-params.md](../plans/cost-params.md)): every library cost reads
+  `params`, composite costs nest them like a diagram's, and the transcriptions, DP, the
+  evaluators and the RL paths pass `problem.params.cost` through to the program's objective,
+  so `jax.grad` reaches `Q` and `R`. **[ask — core]**
+- **V1, second half** (steps 4–6, right after A2), the differentiable closed-loop cost as a
+  drafted prototype before the GMC714 release: the params of a plant or a controller inside a diagram → the closed-loop run →
+  a scalar cost → its mean over rollouts when the problem is stochastic, one JAX path with
+  one entry point; the design doc first, the prototype on the research lane, the teaching
+  surface once it has run in the course. **[ask — core]**
 - **A1** `core/fields.py` ([fields.md](../plans/fields.md)). **[ask — core]**
-- **A2** Cost parameters ([cost-params.md](../plans/cost-params.md)). **[ask — core]**
 - **A3** Workspace geometry, `core/geometry/` ([geometry-module.md](../plans/geometry-module.md)).
   **[ask — core]**
 
@@ -288,9 +311,6 @@ the new core objects land in a smaller library; plan in TODO §4):
 - **AC-7** The cost scored on the plant, across every evaluator and design tool (P10).
 - **S72** The path-integral planner (MPPI) on the research lane ([mppi.md](../plans/mppi.md)),
   after RN-4 / RN-5. **[ask — name, the MPC block contract]**
-- **V1** The differentiable closed-loop cost: params → closed loop → RK4 run → `J` → the mean
-  over stochastic rollouts, fully differentiable; a core feature with one standard entry
-  point; API and architecture not decided. **[ask — core]**
 
 ### 5.4 v0.9 — freeze candidate (early 2027)
 
@@ -402,7 +422,7 @@ stiffness and damping, the shared pure functions) in
 [its record](../reviews/2026-10-17-one-install-story.md); the root layout (2026-10-17) in
 [its record](../reviews/2026-10-17-root-layout.md).
 
-**During v0.2**
+**Before v0.3, carried over from v0.2**
 
 - **The terminal cost `h(x_f, t_f)`, one rule for every tool.** `h` is charged exactly when
   `tf` is finite; still to settle whether an infinite-horizon cost with a nonzero `h` warns

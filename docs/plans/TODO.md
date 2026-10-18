@@ -17,16 +17,16 @@ git history (`docs/reviews/2026-09-22-improvement-*.md`, before 2026-10-17).
 
 | Section | Rung |
 | --- | --- |
-| [§1](#1-v02-wave-a--the-textbook-objects) | v0.2 wave A — the textbook objects |
-| [§2](#2-v02-wave-b--gro501) | v0.2 wave B — GRO501 |
-| [§3](#3-v02-wave-d--textbook-code-minimal-demos-consolidation) | v0.2 wave D (into v0.3) — textbook code, minimal demos, consolidation |
+| [§1](#1-wave-a--the-textbook-objects-carried-from-v02-into-v03) | Wave A — the textbook objects, carried into v0.3 |
+| [§2](#2-wave-b--gro501-the-carry-over-020-shipped-2026-10-17) | Wave B — GRO501, the carry-over |
+| [§3](#3-wave-d--textbook-code-minimal-demos-consolidation) | Wave D — textbook code, minimal demos, consolidation |
 | [§4](#4-v03--gmc714-catalog-parity) | v0.3 — GMC714, catalog, parity |
 | [§5](#5-v09-freeze-candidate-and-v10) | v0.9 freeze candidate and v1.0 |
 | [§6](#6-later-ideas) | Later ideas |
 
 ---
 
-## 1. v0.2 wave A — the textbook objects
+## 1. Wave A — the textbook objects (carried from v0.2 into v0.3)
 
 Runs in parallel with wave B.
 
@@ -60,7 +60,7 @@ Runs in parallel with wave B.
 
 ---
 
-## 2. v0.2 wave B — GRO501
+## 2. Wave B — GRO501, the carry-over (0.2.0 shipped 2026-10-17)
 
 Baseline audit: [the 2026-09-07 coverage record](../reviews/2026-09-07-gro501-coverage.md). Release contract:
 [ROADMAP §4.2](../dev/ROADMAP.md#42-v02--gro501-end-to-end).
@@ -96,9 +96,9 @@ textbook pass.
 
 ---
 
-## 3. v0.2 wave D — textbook code, minimal demos, consolidation
+## 3. Wave D — textbook code, minimal demos, consolidation
 
-Standing work through v0.2 and into v0.3, behaviour-preserving, one module per step.
+Standing work into v0.3, behaviour-preserving, one module per step.
 
 **Order:** the S69 follow-up now; the T rows' leftovers as picked; D1.1, D1.2, then D1.3
 file by file; D2, D3 and S65–S68 as picked.
@@ -301,11 +301,14 @@ pick):
 
 ## 4. v0.3 — GMC714, catalog, parity
 
-**Order:** K1–K4 first (November); A1–A3 (the textbook objects) before wave C; G1 first in wave C; RN-4 and RN-5
-together with P10's AC-7, between cohorts; S72 after them; V1 after A2, its Monte Carlo part
-after RN-5.
+**Order:** V1's steps 0–3 (the names, the scoring kernel, the whole trajectory out of the
+scan, the evaluator with its deterministic verbs) now, beside K1; K2–K4 (November); then A2
+(the params threaded through every cost and into the program's objective), then V1's steps
+4–6 on that plumbing, so the prototype exists before the GMC714 release, then A1 and A3; G1
+first in wave C; RN-4 and RN-5 together with P10's AC-7, between cohorts; S72 after them; V1's Monte
+Carlo part after RN-5.
 
-**K — consolidation first** (November 2026, after the v0.2 tag, before A1–A3). The goal: a
+**K — consolidation first** (November 2026, after `0.2.0`, before A1–A3). The goal: a
 smaller library that is easier to read and keep — fewer names, fewer demos, prototypes
 labelled as such. It extends D2 (whose open picks join K1's table) and runs before D1.3, so
 the demo sweep touches fewer files. Nothing leaves without the maintainer's ruling (RULES 7.1).
@@ -449,8 +452,12 @@ the demo sweep touches fewer files. Nothing leaves without the maintainer's ruli
   and the poles, the cost-to-go the certainty-equivalent form; `Q_n = B_w W B_wᵀ`,
   `R_n = D_v V D_vᵀ` from `linearize_matrices(sys, wrt="d")` / `wrt="n"` and the blocks'
   `psd`. With RN-4. Design: [estimation-and-state-feedback.md](estimation-and-state-feedback.md) §5.
-- [ ] **V1 The differentiable closed-loop cost** **[ask — core]** (API and architecture not
-  decided). One fully differentiable JAX path: controller params → closed-loop dynamics → RK4
+- [ ] **V1 The differentiable closed-loop cost** **[ask — core]**, a drafted prototype
+  before the GMC714 release: steps 0–3 now beside K1, steps 4–6 right after A2 (moved up
+  2026-10-17; the names of every new object and verb are a brainstorm with the maintainer
+  before code, step 0 of the plan; the API and architecture are the design
+  doc's to settle, `docs/plans/differentiable-cost.md`, written first with the
+  `pid_autotuning_jax` demo as its worked example). One fully differentiable JAX path: controller params → closed-loop dynamics → RK4
   step → the run on a horizon → the cost `J` → the mean of `J` over stochastic rollouts, every
   parameter an input (controller, plant, cost (A2), sets, `x0`), behind one standard entry
   point; teaching surface once mature. Today tutorial 11 and `pid_autotuning_jax` write that
