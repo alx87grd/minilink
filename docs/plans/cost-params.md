@@ -178,9 +178,14 @@ the ODE solver differs from the trapezoid rule of the post-hoc path.
 ## Migration outline
 
 1. Dual pattern on `CostFunction`, `QuadraticCost` and `TimeCost`, attributes as views.
-2. Composition: `SumCost.terms` as `{term_id: cost}`, `SumCost.of(*costs, **named)` with the
-   id and flattening rules, live `params` views on `SumCost` and `ScaledCost`, routing in `g`
-   and `h`, `validate_cost_params`; update the forwarding test.
+2. **Composition & dual-backend evaluation:** `SumCost.terms` as `{term_id: cost}`,
+   `SumCost.of(*costs, **named)` with the id and flattening rules, live `params` views on
+   `SumCost` and `ScaledCost`, routing in `g` and `h`, `validate_cost_params`; upgrade
+   `CostFunction.evaluate_trajectory` and `total_cost` (`core/costs.py`) from their NumPy `for`
+   loop to `xp = array_module(traj.x)` (`vmap` on JAX, vector/loop on NumPy, with a
+   `discount: bool | float = True` option) so the problem-level `score_trajectory` layers
+   constraint handling (`constraints="cut" | "ignore" | "soft"`) cleanly on top; update the
+   forwarding test.
 3. `FieldCost` weight as a parameter, no longer forwarded to the field (open question 4).
 4. Fold the landed contract into the DESIGN parameters section and delete this document.
 5. Research lane: `CostIntegrator` in `examples/experimental/`, with tutorial 11's rollout and

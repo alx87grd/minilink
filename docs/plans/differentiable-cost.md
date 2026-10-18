@@ -106,19 +106,60 @@ the scan emitting the buffer beside `x_next`. The plant's `(x, u)` are slices of
 (`plan.state_index`, `plan.output_slices`): the traced twin of `DiagramSystem.trajectory_of`,
 which today is a NumPy loop after the fact. `rollout_batch` gains the same `signals` output.
 
-### 3.3 One scoring kernel
+### 3.3 One scoring kernel: `score_trajectory` (dual-backend `xp`, on `Trajectory`)
 
-The rule that turns a run into `J` is written three times today and the copies disagree:
-`score_trajectory` (NumPy, the reference: trapezoid, `exp(−ρt)`, cut at the first sample
-outside `X` with the problem's `infeasible_penalty`, `h(x_f, t_f)` at a finite `tf`),
-`MonteCarloEvaluator.evaluate_jax` (JAX, the same rule inline with an `alive` mask), and the
-transcriptions' `trajectory_cost` (trapezoid and `h`, **no discount**).
+The rule that turns a run into `J` is written in five places today with four quadratures:
+`CostFunction.evaluate_trajectory` (NumPy `for` loop, `float(g(...))`), `score_trajectory`
+(NumPy, the reference: trapezoid, `exp(−ρt)`, cut at the first sample outside `X` with the
+problem's `infeasible_penalty`, `h(x_f, t_f)` at a finite `tf`), `MonteCarloEvaluator.evaluate_jax`
+(JAX, the same rule inline with an `alive` mask), and the transcriptions' `trajectory_cost`
+(trapezoid and `h`, **no discount**).
 
-`score_rollout(problem, t, xs, us, params)` in JAX becomes the single owner, with
-`score_trajectory` kept as its NumPy twin and a test pinning both to the same number on the
-same trajectory, with and without an exit. The exit is a mask, so the kernel traces; a
-non-finite state counts as an exit. `evaluate_jax`, `RolloutEnvironment.step` and
-`trajectory_cost` call it (the trajopt discount is ask 4).
+Once `Trajectory` is a native `xp` JAX pytree (Step 2b), **`score_trajectory` in
+`planning/evaluation.py` becomes the single dual-backend (`xp`) owner** — no separate
+`score_rollout` function is needed. By replacing the dynamic slice `t[:last + 1]` with the
+static-shape `alive = xp.cumprod(inside)` interval mask, one textbook body is bit-identical to
+today's NumPy `score_trajectory` on host arrays while tracing natively under `jax.jit`,
+`jax.vmap`, and `jax.grad`.
+
+It layers cleanly on top of a dual-backend `CostFunction.evaluate_trajectory` / `total_cost`
+(`core/costs.py`, upgraded from its NumPy `for` loop to `xp = array_module(traj.x)`) and takes
+explicit options for `constraints` and `discount`:
+
+```python
+score_trajectory(
+    problem,
+    traj,
+    *,
+    params=None,
+    constraints="cut",        # "cut" | "ignore" | "soft"
+    discount=True,            # True (problem.cost.discount_rate) | False (0.0) | float
+    infeasible_cost=np.inf,
+    penalty_weight=100.0,
+    shaping=quadratic_hinge(0.0),
+)
+```
+
+- **`discount` (`True | False | float`):** `True` applies $\exp(-\rho t)$ from
+  `problem.cost.discount_rate` (closed-loop evaluation, RL, DP, `evaluator.cost`); `False`
+  (or `0.0`) integrates undiscounted $g$ (used by open-loop transcriptions `direct_collocation`
+  and `multiple_shooting` so existing discounted-problem trajopt baselines stay bit-identical
+  unless the caller opts in); a `float` overrides $\rho$ directly.
+- **`constraints` (`"cut" | "ignore" | "soft"`):**
+  - `"cut"` (default for `Evaluation.of_trajectory`, `MonteCarloEvaluator`, and RL): applies
+    the `alive` mask up to the first exit from `X` (or non-finite state), adds
+    `infeasible_penalty(x_exit, t_exit)`, and skips terminal $h(x_N)$ on early exit.
+  - `"ignore"` (default for `evaluator.cost` under `jax.grad`, `evaluator.program` with hard
+    NLP constraints, and open-loop transcriptions): integrates the uncut trajectory over
+    $[0, t_f]$ for clean gradients $\nabla_\theta J_{\text{uncut}}$, while still returning
+    `failed` (and smooth `feasibility` via `softmin` of `Set.margin`) independently as
+    diagnostics.
+  - `"soft"` (for unconstrained first-order optimizers `Adam` / `gd` / `scipy_lbfgsb`, `MPPI`,
+    and stochastic expectation tuning): adds smooth shaped penalties (`Set.as_cost(weight=,
+    shaping=)`) for violations of `X`, `U`, and region `Xf` to the uncut integral.
+
+`evaluate_jax`, `Evaluation.of_trajectory`, `RolloutEnvironment.step`, `evaluator.cost`, and
+`transcription.py::trajectory_cost` all call `score_trajectory`.
 
 ### 3.4 The bridge to `MathematicalProgram`
 
@@ -218,7 +259,7 @@ Twelve lines against today's eighty, the cost from the problem instead of an inl
    | the average over draws | `mean_cost`, `expected_cost`, `evaluate`, `value` (the criterion's) |
    | the two feasibility numbers | `success_rate` / `feasibility`, `failure_rate` / `margin`, `p_success` / `soft_margin` |
    | the method on the system evaluators | `rollout_p`, `simulate_p`, `trajectory_p`, `integrate_zoh_rollout_p` |
-   | the scoring kernel | `score_rollout`, `score`, `trajectory_cost` (the transcriptions' name today) |
+   | the scoring kernel | `score_trajectory` (upgraded to dual-backend `xp` with `constraints=` and `discount=`), `score_rollout`, `score`, `trajectory_cost` |
    | the bridge | `program`, `as_program`, `to_program`, `mathematical_program` |
    | the selection argument | `decision=`, `variables=`, `free=`, `wrt=` (the `jacobian` verb's word) |
    | the nominal pytree | `evaluator.params`, `evaluator.nominal_params`, `problem.params` reused |
@@ -228,25 +269,22 @@ Twelve lines against today's eighty, the cost from the problem instead of an inl
    `Evaluator` and `solve` / `Solution`, and the words the course notes already use for these
    quantities. The decision goes to the dated record and to this file's §3.
 
-1. **Kernel.** `score_rollout` in `planning/evaluation.py`; `evaluate_jax` rewired to it; the
-   twin test against `score_trajectory` on recorded trajectories, with and without an exit.
-   Done when the Monte Carlo baselines `cmp`.
+1. **Kernel & native `Trajectory` (2b).** Make `Trajectory` (and `StepRollout`) a native `xp`
+   JAX pytree (decided 2026-10-18: keeps the arrays it is given through `array_module`, no
+   `float` cast, no copy of a traced value, shape checks unchanged, `t`, `x`, `u` and signal
+   arrays as pytree leaves, `Trajectory.from_rollout(x0, xs, us, dt)` inside, reporting verbs
+   NumPy by contract). Upgrade `CostFunction.evaluate_trajectory` / `total_cost` (`core/costs.py`)
+   and `score_trajectory` (`planning/evaluation.py`) to dual-backend `xp` with `constraints="cut" | "ignore" | "soft"`
+   and `discount=True | False | float`, using the static-shape `alive = xp.cumprod(inside)`
+   mask; rewire `evaluate_jax` and `transcription.py::trajectory_cost` to call
+   `score_trajectory`. Done when NumPy and JAX `score_trajectory` agree bit-for-bit on
+   recorded trajectories (with and without an exit) and the Monte Carlo and trajectory
+   baselines `cmp`.
 2. **The whole trajectory.** `rollout_p` on `JaxDiagramEvaluator` returning `(t, xs,
    signals)`; the plant slices as a traced `trajectory_of`. Done when the traced `u` matches
-   `reconstruct_internal_signals` on a PID loop to float64 precision.
-   - **2b. A native `Trajectory`** (decided 2026-10-18). The object keeps the arrays it is
-     given, through `array_module`, with no `float` cast and no copy of a traced value, and
-     the shape checks unchanged; it is registered as a JAX pytree (`t`, `x`, `u` and the
-     signal arrays as leaves, the signal names static), so a trajectory can be a scan output,
-     a `vmap` result (a batch is one object with a leading axis) and a `grad` argument;
-     `Trajectory.from_rollout(x0, xs, us, dt)` builds one from a scan's time-major arrays with
-     the transpose and the grid inside, so the evaluator's `trajectory(params)` returns the
-     noun. The reporting verbs stay NumPy by contract and are documented as such (`t0`, `tf`,
-     `n_samples`, `nearest_index`, `resample`, `save`, `load`, the plots): called after the
-     computation, never inside a traced function. `StepRollout` gets the same treatment.
-     Done when `jax.grad` of a function of `evaluator.trajectory(params).x` runs, a NumPy
-     caller sees no change (the trajectory baselines `cmp`), and the autotuning demo builds
-     no trajectory by hand.
+   `reconstruct_internal_signals` on a PID loop to float64 precision, `jax.grad` of a
+   function of `evaluator.trajectory(params).x` runs, and the autotuning demo builds no
+   trajectory by hand.
 3. **The object.** `PlanningProblemEvaluator` with `trajectory`, `final_state`, `cost`; the
    `problem.compile(controller, dt=)` facade; the autotuning demo rewritten on it. Done when the
    demo's gradient matches the hand-written scan's on the same gains.

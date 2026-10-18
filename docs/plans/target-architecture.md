@@ -98,17 +98,23 @@ the differentiable problem; the kernels are the second half. Schedule them back 
 let the kernels' tests be the "done when" of the parameters work. Changes the order of the
 workboard's v0.3 section only.
 
-### 4.2 One kernel per verb; the NumPy consumers call it
+### 4.2 One kernel per verb (`score_trajectory` on `xp`); the NumPy consumers call it
 
-Five scoring rules with four quadratures (the cost's NumPy evaluator, the planning scorer,
-the transcriptions without discount, the Monte Carlo evaluator in JAX, the RL per-step
-reward) become one traced `score_rollout`, called by the NumPy consumers with NumPy arrays.
-The RL reward stays the documented exception, derived from the same `g`. Two signal
-reconstructions become one (`rollout_p` emits the signals). `Set.contains` is derived from
-`margin ≥ 0`. The quadrature (trapezoid, `h` at the final sample, discount `e^{−ρt}`, cut at
-the first exit) is stated once in DESIGN and cited by the transcriptions. Risk: the
-transcriptions' discount is a behaviour change on every discounted problem's plan (the
-plan's ask 4). Sits in the evaluator plan, steps 1–3.
+Five scoring rules with four quadratures (the cost's NumPy evaluator, the planning scorer
+`score_trajectory`, the transcriptions' `trajectory_cost` without discount, the Monte Carlo
+evaluator in JAX, the RL per-step reward) collapse onto one dual-backend (`xp`)
+`score_trajectory(problem, traj, *, params=None, constraints="cut", discount=True, ...)`
+layered on a dual-backend `CostFunction.evaluate_trajectory` / `total_cost` (`core/costs.py`),
+called by both JAX and NumPy consumers on the native `Trajectory` pytree (§4.3). Using the
+static-shape `alive = xp.cumprod(inside)` interval mask rather than a dynamic slice
+`t[:last+1]` makes the NumPy and JAX evaluations share one exact body. Passing
+`discount=False` in the open-loop transcriptions keeps existing discounted-problem trajopt
+baselines bit-identical while exposing `discount=True` (or a custom $\rho$) as an option, and
+`constraints="cut" | "ignore" | "soft"` selects between episodic exit cutting, smooth uncut
+gradient evaluation, and smooth penalty folding (§5.3). The RL reward stays the documented
+exception, derived from the same `g`. Two signal reconstructions become one (`rollout_p`
+emits the signals). `Set.contains` is derived from `margin ≥ 0`. The quadrature is stated
+once in DESIGN and cited by the transcriptions. Sits in the evaluator plan, steps 1–3.
 
 ### 4.3 A native `Trajectory` (decided 2026-10-18)
 
