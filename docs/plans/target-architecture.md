@@ -382,6 +382,8 @@ regime mathematically well-posed and maintainable:
 
 ## 7. An order, if the ideas are accepted (not scheduled)
 
+**Current baseline order (split `V1` across `K2–K4` and `A2`):**
+
 1. The evaluator plan's steps 0–3 (names, kernel, trajectory, compile) with 4.5 and 4.6
    folded into step 0 so the names and the no-controller case are settled before code.
 2. The cost parameters (A2), then the evaluator's steps 4–6, with the bridge signature of 4.9
@@ -389,6 +391,30 @@ regime mathematically well-posed and maintainable:
 3. 4.7 (traceable analysis) any time, beside the above; 4.8 (the optimizer) at or after the
    bridge, where its first customers appear.
 4. The consolidation rows of 4.10 in the November pass, the RL-environment merge of 4.6 last.
+
+### 7.1 Alternative bottom-up order (to review later — avoids writing `score_trajectory` or the compile demos twice)
+
+Because the unified `score_trajectory(problem, traj, *, params, constraints, discount)`
+operates directly on a `Trajectory` object, layers on top of `CostFunction.total_cost`, and
+uses `Set.as_cost(weight=, shaping=)` for `constraints="soft"`, running `V1` Step 1 *before*
+`Trajectory` is a JAX pytree (`Step 2b`), *before* `CostFunction` is `xp`-native and reads
+`params` (`A2`), and *before* `shaping.py` moves to `core/` would require temporary
+workarounds and touching the compile demos twice (once in `K4` and once in `V1-6` / `S74`).
+This alternative order builds strictly bottom-up:
+
+| Phase | Step | What Lands | Why Here |
+| --- | --- | --- | --- |
+| **Phase 1: Inventory & Surface Cleanup** | **0. Naming & `K1–K3`** | Step 0 brainstorm (`problem.compile`, `score_trajectory` options, verb family); `K1` inventory table; `K2` dead-code removal; `K3` prototypes to `experimental/`. | Settles all public names once and shrinks the codebase before core edits begin (`K4` demo sweep waits until after Phase 4). |
+| **Phase 2: Core Nouns on `xp` & `params`** | **1. Native `Trajectory` (`V1-2b`)** | `Trajectory` (and `StepRollout`) as a native `xp` JAX pytree (`t`, `x`, `u`, `signals` leaves; `Trajectory.from_rollout`); reporting verbs stay NumPy. | Prerequisite for `CostFunction.total_cost(traj)` and `score_trajectory(problem, traj)` to trace. |
+| | **2. `Set` & `shaping` in `core/` (from `A5`/`A3`)** | Move `shaping.py` to `minilink/core/shaping.py`; derive `Set.contains` from `Set.margin >= 0`; add `Set.as_cost(weight=, shaping=)`. | Prerequisite for `score_trajectory(..., constraints="soft")` without `core` $\to$ `planning` imports. |
+| | **3. Cost `params` & `xp` cost integral (`A2`)** | Library costs read `params`; `SumCost` / `ScaledCost` nest `params` like `DiagramSystem`; upgrade `CostFunction.evaluate_trajectory` & `total_cost` to `xp` with `discount=`. | Makes `CostFunction` 100% `xp`-native and param-aware *before* `score_trajectory` is written. |
+| **Phase 3: Unified Scoring & Rollout Kernels** | **4. Unified `score_trajectory` (`V1-1`)** | Dual-backend `score_trajectory(problem, traj, *, params, constraints="cut"\|"ignore"\|"soft", discount=True\|False\|float)` using static `alive = xp.cumprod(inside)` mask; rewire `evaluate_jax` and `transcription.py::trajectory_cost` to call it. | Written **once** on top of the Phase 2 nouns; immediately deletes 3 duplicate scoring rules. |
+| | **5. Traced signal rollout (`V1-2`)** | `rollout_p` on `JaxDiagramEvaluator` emitting `(t, xs, signals)` and traced `trajectory_of` slicing plant `(x, u)` (`AC-7` on compiled loops). | Gives `problem.compile` the plant's internal command `u` for `score_trajectory`. |
+| **Phase 4: Compiled Problem, Draws & Program Bridge** | **6. `problem.compile` deterministic (`V1-3`)** | `PlanningProblemEvaluator` with `trajectory`, `final_state`, `cost(..., constraints=)`, `feasibility`; open-loop `controller=None` support. | Delivers deterministic closed-loop and open-loop BPTT gradients (`dJ/dK`, `dJ/dQ`, `dJ/dm`). |
+| | **7. Stochastic draws (`V1-4` + `RN-4`/`RN-5`)** | Traced `realize(key)` seeds (`RN-4`), `mean_cost(params, keys)`, `success_rate`, `feasibility`; `MonteCarloEvaluator` becomes a thin wrapper (`RN-5`). | Unifies stochastic evaluation and pathwise stochastic gradients in one step (no separate "Monte Carlo part after RN-5"). |
+| | **8. Program bridge + First-order `Optimizer` (`V1-5/6` + `S74`)** | `evaluator.program(wrt=, constraints="hard"\|"soft"\|"ignore")` with `ravel_pytree`; `optimizers/first_order.py` (`adam`, `gd`, `scipy_lbfgsb`); rewrite the 4 compile demos (`V1-6`), then run `K4` demo consolidation. | Solves constrained (`scipy_slsqp`, `ipopt`), soft/box-bounded (`scipy_lbfgsb`, `adam`), and stochastic (`adam`) tuning through one `Optimizer(program).solve()` contract. |
+| **Phase 5: Parallel / Subsequent v0.3 Work** | **9. Traceable Linear Analysis (`S73`)** | `poles`, `frequency_response`, `margins`, and $M_s, M_t$ on `xp` (independent of Phase 2–4; can run in parallel any time before `G1`). | Enables frequency-domain and pole-placement NLP constraints in `.program()` for GMC714 Robust Control. |
+| | **10. Spatial Nouns (`A1`, `A3`) & Wave C (`G1`, `C1–C6`, `S72`)** | `core/fields.py` (`A1`), `core/geometry/` (`A3`), `S72` (`MPPI`, using `score_trajectory` with `constraints="soft" \| "cut"`), and GMC714 Wave C rows. | `A1`, `A3`, and `S72` plug directly into the landed `score_trajectory` and `params` spine. |
 
 ## 8. What needs the maintainer
 

@@ -273,7 +273,9 @@ the new core objects land in a smaller library; plan in TODO §4):
 **The textbook objects**, before wave C, in this order: the differentiable evaluator's
 plumbing first (it waits on nothing), the cost parameters next, then the rest of the
 evaluator they unlock, then the two objects it does not need.
-The target the differentiable work serves, and the ideas around it (to review):
+The target the differentiable work serves, and the ideas around it (to review, including an
+alternative bottom-up build order in §7.1 that lands native `Trajectory`, `Set.as_cost`, and
+`A2` before writing the unified `score_trajectory`):
 [target-architecture.md](../plans/target-architecture.md).
 - **V1, first half** (steps 0–3 of [differentiable-cost.md](../plans/differentiable-cost.md),
   beside K1): the naming brainstorm, one scoring kernel, the whole trajectory out of the

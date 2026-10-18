@@ -308,6 +308,12 @@ scan, the evaluator with its deterministic verbs) now, beside K1; K2–K4 (Novem
 4–6 on that plumbing, so the prototype exists before the GMC714 release, then A1 and A3; G1
 first in wave C; RN-4 and RN-5 together with P10's AC-7, between cohorts; S72 after them; V1's Monte
 Carlo part after RN-5.
+*(Alternative bottom-up order to review later — [target-architecture.md](target-architecture.md) §7.1:
+run `Step 0 + K1–K3` first; then upgrade the core nouns in Phase 2 (`V1-2b` native
+`Trajectory` pytree, `shaping.py` + `Set.as_cost()` in `core/`, and `A2` cost `params` + `xp`
+`total_cost`); then write the unified dual-backend `score_trajectory` (`V1-1`) and `rollout_p`
+(`V1-2`) once in Phase 3; then complete `V1-3`, `V1-4 + RN-4/RN-5`, and `V1-5/6 + S74`
+followed by `K4` in Phase 4, with `S73` in parallel and `A1`/`A3`/Wave C in Phase 5.)*
 
 **K — consolidation first** (November 2026, after `0.2.0`, before A1–A3). The goal: a
 smaller library that is easier to read and keep — fewer names, fewer demos, prototypes

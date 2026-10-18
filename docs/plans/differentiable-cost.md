@@ -385,3 +385,12 @@ From the big-picture review of the differentiable path ([target-architecture.md]
   vectors $z \in \mathbb{R}^{n_z}$; `evaluator.program(wrt=...)` owns `ravel_pytree` and
   provides `program.unravel(result.z)` (or `evaluator.update_params(result.z)`), keeping pytree
   machinery out of `Optimizer`.
+- **Alternative bottom-up step order to review ([target-architecture.md](target-architecture.md) §7.1):**
+  Because the unified `score_trajectory(problem, traj, *, params, constraints, discount)`
+  takes a `Trajectory` object directly, layers on `CostFunction.total_cost`, and uses
+  `Set.as_cost(weight=, shaping=)` for `constraints="soft"`, consider reordering Steps 1–6 and
+  `A2` bottom-up: (1) Step 0 + `K1–K3`; (2) `Step 2b` (native `Trajectory` pytree) + move
+  `shaping.py` to `core/` & add `Set.as_cost()` + `A2` (cost `params` and `xp`
+  `evaluate_trajectory`/`total_cost`); (3) `Step 1` (unified dual-backend `score_trajectory`) +
+  `Step 2` (`rollout_p`); (4) `Step 3` (`problem.compile`), `Step 4` (`mean_cost` + `RN-4`/`RN-5`),
+  and `Step 5–6` (`.program()` + `S74` first-order `Optimizer` + demos, then `K4`).
