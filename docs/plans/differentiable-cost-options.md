@@ -128,7 +128,7 @@ consumer; B stays a research idea; D is ruled out.
 | Where the scoring kernel lives | `core/costs.py` (the cost owns its integral); `planning/evaluation.py` (the problem owns exit, horizon, price) | `planning/evaluation.py`: the rule needs `X`, `tf` and `infeasible_cost`, which are the problem's |
 | The record of a Monte Carlo run | `Evaluation` stays NumPy; or becomes a pytree so `evaluate(params, keys).mean` differentiates | a pytree: one verb, one record, the mean and the worst both differentiable, the failure rate reported |
 | `MonteCarloEvaluator` | deleted; alias one release; or kept as the NumPy and simulator backends' home | alias one release, then gone; its backends are the new object's `backend=` |
-| A traced `Trajectory` | `Trajectory` stays NumPy and the verb returns arrays; or `Trajectory` becomes array-module native | arrays now (`t, x, u, y`), the native `Trajectory` with A5 |
+| A traced `Trajectory` | `Trajectory` stays NumPy and the verb returns arrays; or `Trajectory` becomes array-module native | **ruled 2026-10-18: native**, a pytree whose reporting verbs stay NumPy; step 2b of the plan |
 | The whole run out of the scan | a new method returning `(xs, signals)`; or `rollout_batch` gaining a `signals` output | both, same change; the single-run method is what the object calls |
 
 ## 4. Naming systems

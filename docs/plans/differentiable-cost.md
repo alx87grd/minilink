@@ -159,7 +159,7 @@ for _ in range(200):
     J, dJ = loss_and_grad(params)
     params = tree_map(lambda p, g: p - 0.5 * g, params, dJ)
 
-evaluator.trajectory(params)                        # the tuned run, as a Trajectory
+evaluator.trajectory(params)                        # the tuned run, a Trajectory, traceable
 ```
 
 Twelve lines against today's eighty, the cost from the problem instead of an inline
@@ -226,6 +226,19 @@ Twelve lines against today's eighty, the cost from the problem instead of an inl
 2. **The whole trajectory.** `rollout_p` on `JaxDiagramEvaluator` returning `(t, xs,
    signals)`; the plant slices as a traced `trajectory_of`. Done when the traced `u` matches
    `reconstruct_internal_signals` on a PID loop to float64 precision.
+   - **2b. A native `Trajectory`** (decided 2026-10-18). The object keeps the arrays it is
+     given, through `array_module`, with no `float` cast and no copy of a traced value, and
+     the shape checks unchanged; it is registered as a JAX pytree (`t`, `x`, `u` and the
+     signal arrays as leaves, the signal names static), so a trajectory can be a scan output,
+     a `vmap` result (a batch is one object with a leading axis) and a `grad` argument;
+     `Trajectory.from_rollout(x0, xs, us, dt)` builds one from a scan's time-major arrays with
+     the transpose and the grid inside, so the evaluator's `trajectory(params)` returns the
+     noun. The reporting verbs stay NumPy by contract and are documented as such (`t0`, `tf`,
+     `n_samples`, `nearest_index`, `resample`, `save`, `load`, the plots): called after the
+     computation, never inside a traced function. `StepRollout` gets the same treatment.
+     Done when `jax.grad` of a function of `evaluator.trajectory(params).x` runs, a NumPy
+     caller sees no change (the trajectory baselines `cmp`), and the autotuning demo builds
+     no trajectory by hand.
 3. **The object.** `PlanningProblemEvaluator` with `trajectory`, `final_state`, `cost`; the
    `problem.compile(controller, dt=)` facade; the autotuning demo rewritten on it. Done when the
    demo's gradient matches the hand-written scan's on the same gains.

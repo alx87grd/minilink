@@ -559,7 +559,10 @@ provided.
 
 ### `Trajectory`, sets, costs, geometry
 
-- `Trajectory`: `t (N,)`, `x (n,N)`, `u (m,N)`, optional `signals`; NumPy reporting object.
+- `Trajectory`: `t (N,)`, `x (n,N)`, `u (m,N)`, optional `signals`; array-module native and a
+  JAX pytree once the differentiable-problem plan's step 2b lands, its reporting verbs
+  (`t0`, `tf`, `resample`, `save`, the plots) NumPy by contract; a NumPy reporting object
+  until then.
   `print(traj)` is `N`, the time span, and the array shapes, not the sample dump.
 - Sets: `margin ≥ 0` feasible; `contains` is a NumPy boundary utility; `sample(key, n=None)`
   follows the distributions' draw convention below (`BoxSet.sample` traces);

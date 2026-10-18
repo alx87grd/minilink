@@ -52,8 +52,7 @@ Runs in parallel with wave B.
   work needs it; vector bounds on `Saturation`; library sets, shapes and fields reading
   `params` (same rule as A2, after it); `PlanningProblem.hamiltonian()` only if the course
   teaches Pontryagin; the RL critic as a `Field` once training is over.
-  Also: `Trajectory.from_rollout(x0, xs, us, dt)` for scanned rollouts, V1's first consumer
-  (scan: examples#9); the double-integrator homework's two verbs, entry time into a set and
+  Also: the double-integrator homework's two verbs, entry time into a set and
   the Bellman residual (scan: examples#10).
 - [ ] **RN-2** of [randomness.md](randomness.md): distributions read `params`,
   `Gaussian(cov=)`, every `sample` takes a key.

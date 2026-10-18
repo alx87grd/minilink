@@ -40,6 +40,18 @@ new code and in edits alike. Before committing any math, read the diff next to
 `planning/policy_synthesis/dp.py`, the reference, and say in the report that you did. A change
 that breaks this rule is not done, even when the tests pass.
 
+## Talking to the maintainer
+
+The maintainer does not carry the workboard's label system in his head. Step ids (`A5`,
+`V1`, `K1`, `RN-5`, `AC-7`) and wave letters (`wave A`, `wave K`) are an index for
+`docs/plans/TODO.md`, not a vocabulary. In every message, question and report:
+
+- say what a step is and where it sits in plain words first ("the cost-parameters work,
+  planned for the robotics-course release in December"), then the id in parentheses as a
+  pointer, never the id as the subject of a sentence;
+- give the overview before the detail: which release, which part of the plan, what it unlocks;
+- the same for file-local jargon (a plan doc's own prefixes such as `RD-D12`, `GRO-C1`).
+
 ## Non-negotiables
 
 - **Preserve user edits:** never revert or "clean up" the user's manual changes (see Workflow).
