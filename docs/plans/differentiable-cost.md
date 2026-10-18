@@ -35,7 +35,15 @@ Everything above is what `examples/demos/compile/pid_autotuning_jax.py` and the 
 tutorial 11 write by hand today, each with its own scan, its own cost formula and its own
 params dictionary.
 
+The target this evaluator serves (any traceable metric optimized through the native
+optimizer, with respect to any parameter set the problem holds), the table of metrics by
+parameter set and the ideas around it: [target-architecture.md](target-architecture.md).
+
 ## 2. The objects, today and after
+
+![The planned pipeline: the problem and its params, the compile step, the rollout and scoring kernels around a native Trajectory, the Evaluation, and the NumPy consumers](differentiable-cost-pipeline.png)
+
+*Figure: the end state, from the params pytree to the consumers (`differentiable-cost-pipeline.svg` is the editable source).*
 
 | Object | Today | After |
 | --- | --- | --- |
@@ -248,6 +256,9 @@ Twelve lines against today's eighty, the cost from the problem instead of an inl
    is a call to `mean_cost` plus the `Evaluation` record.
 5. **The program bridge.** `evaluator.program(decision, ...)`; the autotuning demo's second
    half solved by the `Optimizer`. Done when SLSQP reaches the gradient loop's gains.
+   If S74 (the optimizer as the one descent loop, an idea to review) is accepted, the bridge
+   ravels the chosen leaves to `z` and marks the program `stochastic` when keys are resampled,
+   and the demo ends in `method="adam"` or the class default rather than SLSQP alone.
 6. **Material.** Tutorial 11's last cell on the evaluator; a robust-tuning demo (mean cost over a
    mass family); DESIGN §6 states the contract; `MonteCarloEvaluator` an alias.
 
@@ -271,3 +282,13 @@ Twelve lines against today's eighty, the cost from the problem instead of an inl
    the loop with a seed leaf, so the diagram is the one place randomness lives?
 7. **Teaching surface.** `problem.compile` on the root prelude in v0.3, or research lane until
    GMC714 has run it?
+8. **The lane ideas (2026-10-18), to review, not decided.** The verb family on the problem,
+   `Evaluation` as a verb of the problem, the open-loop `compile()` covering single shooting
+   and the RL environment, the `Optimizer` as the one consumer:
+   [target-architecture.md](target-architecture.md) §4. Accept, drop, or fold any of them into
+   step 0.
+9. **Metrics as constraints.** The bridge of step 5 takes one metric as `J`; the target
+   (target-architecture.md §1) wants other
+   metrics as `g ≥ 0` (a margin floor while tuning on cost). Design the bridge's signature for
+   that from the start (`program(objective=, constraints=(), wrt=)`), or keep `J` only in the
+   prototype?

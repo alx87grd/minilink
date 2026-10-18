@@ -1,0 +1,222 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1484" height="990" viewBox="0 0 1484 990" font-family="Helvetica, Arial, sans-serif">
+<defs><marker id="arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M2 1L8 5L2 9" fill="none" stroke="#5F5E5A" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></marker></defs>
+<rect x="0" y="0" width="1484" height="990" fill="white"/>
+<text x="368.0" y="52" text-anchor="middle" dominant-baseline="central" font-size="12" font-weight="600" fill="#5F5E5A">Source object</text>
+<text x="610.0" y="52" text-anchor="middle" dominant-baseline="central" font-size="12" font-weight="600" fill="#5F5E5A">Intermediate</text>
+<text x="852.0" y="52" text-anchor="middle" dominant-baseline="central" font-size="12" font-weight="600" fill="#5F5E5A">Intermediate</text>
+<text x="1094.0" y="52" text-anchor="middle" dominant-baseline="central" font-size="12" font-weight="600" fill="#5F5E5A">Result</text>
+<text x="1336.0" y="52" text-anchor="middle" dominant-baseline="central" font-size="12" font-weight="600" fill="#5F5E5A">Final consumer</text>
+<rect x="28" y="68" width="1428" height="84" rx="6" fill="#FAFAF8"/>
+<text x="40" y="99" dominant-baseline="central" font-size="13" font-weight="600" fill="#2C2C2A">Simulate and score</text>
+<text x="40" y="117" dominant-baseline="central" font-size="11" fill="#5F5E5A">u(t) given, the cost of one run</text>
+<rect x="260" y="80" width="216" height="56" rx="8" fill="#EEEDFE" stroke="#534AB7" stroke-width="0.8"/>
+<text x="368.0" y="99" text-anchor="middle" dominant-baseline="central" font-size="12.5" font-weight="600" fill="#3C3489">System</text>
+<text x="368.0" y="117" text-anchor="middle" dominant-baseline="central" font-size="11" fill="#534AB7">f, h, params</text>
+<path d="M476 108.0 L500 108.0" fill="none" stroke="#5F5E5A" stroke-width="1.2" marker-end="url(#arrow)"/>
+<rect x="502" y="80" width="216" height="56" rx="8" fill="#EEEDFE" stroke="#534AB7" stroke-width="0.8"/>
+<text x="610.0" y="99" text-anchor="middle" dominant-baseline="central" font-size="12.5" font-weight="600" fill="#3C3489">rollout_p</text>
+<text x="610.0" y="117" text-anchor="middle" dominant-baseline="central" font-size="11" fill="#534AB7">today rk4_integrate_zoh</text>
+<path d="M718 108.0 L742 108.0" fill="none" stroke="#5F5E5A" stroke-width="1.2" marker-end="url(#arrow)"/>
+<rect x="744" y="80" width="216" height="56" rx="8" fill="#E1F5EE" stroke="#0F6E56" stroke-width="0.8"/>
+<text x="852.0" y="99" text-anchor="middle" dominant-baseline="central" font-size="12.5" font-weight="600" fill="#085041">Trajectory</text>
+<text x="852.0" y="117" text-anchor="middle" dominant-baseline="central" font-size="11" fill="#0F6E56">pytree after step 2b</text>
+<path d="M960 108.0 L984 108.0" fill="none" stroke="#5F5E5A" stroke-width="1.2" marker-end="url(#arrow)"/>
+<rect x="986" y="80" width="216" height="56" rx="8" fill="#E1F5EE" stroke="#0F6E56" stroke-width="0.8"/>
+<text x="1094.0" y="99" text-anchor="middle" dominant-baseline="central" font-size="12.5" font-weight="600" fill="#085041">score_rollout</text>
+<text x="1094.0" y="117" text-anchor="middle" dominant-baseline="central" font-size="11" fill="#0F6E56">cost, one quadrature</text>
+<path d="M1202 108.0 L1226 108.0" fill="none" stroke="#5F5E5A" stroke-width="1.2" marker-end="url(#arrow)"/>
+<rect x="1228" y="80" width="216" height="56" rx="8" fill="#F1EFE8" stroke="#5F5E5A" stroke-width="0.8"/>
+<text x="1336.0" y="99" text-anchor="middle" dominant-baseline="central" font-size="12.5" font-weight="600" fill="#444441">Plots, animate, save</text>
+<text x="1336.0" y="117" text-anchor="middle" dominant-baseline="central" font-size="11" fill="#5F5E5A">NumPy by contract</text>
+<text x="40" y="183" dominant-baseline="central" font-size="13" font-weight="600" fill="#2C2C2A">Reference simulation</text>
+<text x="40" y="201" dominant-baseline="central" font-size="11" fill="#5F5E5A">adaptive steps, events, hybrid</text>
+<rect x="260" y="164" width="216" height="56" rx="8" fill="#EEEDFE" stroke="#534AB7" stroke-width="0.8"/>
+<text x="368.0" y="183" text-anchor="middle" dominant-baseline="central" font-size="12.5" font-weight="600" fill="#3C3489">System</text>
+<text x="368.0" y="201" text-anchor="middle" dominant-baseline="central" font-size="11" fill="#534AB7">f, h, params</text>
+<path d="M476 192.0 L500 192.0" fill="none" stroke="#5F5E5A" stroke-width="1.2" marker-end="url(#arrow)"/>
+<rect x="502" y="164" width="216" height="56" rx="8" fill="#F1EFE8" stroke="#5F5E5A" stroke-width="0.8"/>
+<text x="610.0" y="183" text-anchor="middle" dominant-baseline="central" font-size="12.5" font-weight="600" fill="#444441">Simulator</text>
+<text x="610.0" y="201" text-anchor="middle" dominant-baseline="central" font-size="11" fill="#5F5E5A">scipy ivp, events</text>
+<path d="M718 192.0 L984 192.0" fill="none" stroke="#5F5E5A" stroke-width="1.2" marker-end="url(#arrow)"/>
+<rect x="986" y="164" width="216" height="56" rx="8" fill="#E1F5EE" stroke="#0F6E56" stroke-width="0.8"/>
+<text x="1094.0" y="183" text-anchor="middle" dominant-baseline="central" font-size="12.5" font-weight="600" fill="#085041">Trajectory</text>
+<text x="1094.0" y="201" text-anchor="middle" dominant-baseline="central" font-size="11" fill="#0F6E56">same noun, NumPy arrays</text>
+<path d="M1202 192.0 L1226 192.0" fill="none" stroke="#5F5E5A" stroke-width="1.2" marker-end="url(#arrow)"/>
+<rect x="1228" y="164" width="216" height="56" rx="8" fill="#F1EFE8" stroke="#5F5E5A" stroke-width="0.8"/>
+<text x="1336.0" y="183" text-anchor="middle" dominant-baseline="central" font-size="12.5" font-weight="600" fill="#444441">Plots, animate, save</text>
+<text x="1336.0" y="201" text-anchor="middle" dominant-baseline="central" font-size="11" fill="#5F5E5A">NumPy by contract</text>
+<rect x="28" y="236" width="1428" height="84" rx="6" fill="#FAFAF8"/>
+<text x="40" y="267" dominant-baseline="central" font-size="13" font-weight="600" fill="#2C2C2A">Closed-loop gain tuning</text>
+<text x="40" y="285" dominant-baseline="central" font-size="11" fill="#5F5E5A">gradient of the loop cost</text>
+<rect x="260" y="248" width="216" height="56" rx="8" fill="#EEEDFE" stroke="#534AB7" stroke-width="0.8"/>
+<text x="368.0" y="267" text-anchor="middle" dominant-baseline="central" font-size="12.5" font-weight="600" fill="#3C3489">PlanningProblem + ctl</text>
+<text x="368.0" y="285" text-anchor="middle" dominant-baseline="central" font-size="11" fill="#534AB7">params pytree</text>
+<path d="M476 276.0 L500 276.0" fill="none" stroke="#5F5E5A" stroke-width="1.2" marker-end="url(#arrow)"/>
+<rect x="502" y="248" width="216" height="56" rx="8" fill="#E1F5EE" stroke="#0F6E56" stroke-width="0.8"/>
+<text x="610.0" y="267" text-anchor="middle" dominant-baseline="central" font-size="12.5" font-weight="600" fill="#085041">problem.compile(ctl)</text>
+<text x="610.0" y="285" text-anchor="middle" dominant-baseline="central" font-size="11" fill="#0F6E56">one object per loop</text>
+<path d="M718 276.0 L742 276.0" fill="none" stroke="#5F5E5A" stroke-width="1.2" marker-end="url(#arrow)"/>
+<rect x="744" y="248" width="216" height="56" rx="8" fill="#E1F5EE" stroke="#0F6E56" stroke-width="0.8"/>
+<text x="852.0" y="267" text-anchor="middle" dominant-baseline="central" font-size="12.5" font-weight="600" fill="#085041">Evaluation</text>
+<text x="852.0" y="285" text-anchor="middle" dominant-baseline="central" font-size="11" fill="#0F6E56">cost(params)</text>
+<path d="M960 276.0 L984 276.0" fill="none" stroke="#5F5E5A" stroke-width="1.2" marker-end="url(#arrow)"/>
+<rect x="986" y="248" width="216" height="56" rx="8" fill="#E1F5EE" stroke="#0F6E56" stroke-width="0.8"/>
+<text x="1094.0" y="267" text-anchor="middle" dominant-baseline="central" font-size="12.5" font-weight="600" fill="#085041">jax.grad</text>
+<text x="1094.0" y="285" text-anchor="middle" dominant-baseline="central" font-size="11" fill="#0F6E56">dJ / dparams</text>
+<path d="M1202 276.0 L1226 276.0" fill="none" stroke="#5F5E5A" stroke-width="1.2" marker-end="url(#arrow)"/>
+<rect x="1228" y="248" width="216" height="56" rx="8" fill="#F1EFE8" stroke="#5F5E5A" stroke-width="0.8"/>
+<text x="1336.0" y="267" text-anchor="middle" dominant-baseline="central" font-size="12.5" font-weight="600" fill="#444441">Tuned controller</text>
+<text x="1336.0" y="285" text-anchor="middle" dominant-baseline="central" font-size="11" fill="#5F5E5A">gradient step, demo</text>
+<text x="40" y="351" dominant-baseline="central" font-size="13" font-weight="600" fill="#2C2C2A">Monte Carlo evaluation</text>
+<text x="40" y="369" dominant-baseline="central" font-size="11" fill="#5F5E5A">mean cost, failure rate</text>
+<rect x="260" y="332" width="216" height="56" rx="8" fill="#EEEDFE" stroke="#534AB7" stroke-width="0.8"/>
+<text x="368.0" y="351" text-anchor="middle" dominant-baseline="central" font-size="12.5" font-weight="600" fill="#3C3489">StochasticPlanningProblem</text>
+<text x="368.0" y="369" text-anchor="middle" dominant-baseline="central" font-size="11" fill="#534AB7">sample_*(key)</text>
+<path d="M476 360.0 L500 360.0" fill="none" stroke="#5F5E5A" stroke-width="1.2" marker-end="url(#arrow)"/>
+<rect x="502" y="332" width="216" height="56" rx="8" fill="#E1F5EE" stroke="#0F6E56" stroke-width="0.8"/>
+<text x="610.0" y="351" text-anchor="middle" dominant-baseline="central" font-size="12.5" font-weight="600" fill="#085041">problem.compile(ctl)</text>
+<text x="610.0" y="369" text-anchor="middle" dominant-baseline="central" font-size="11" fill="#0F6E56">one object per loop</text>
+<path d="M718 360.0 L742 360.0" fill="none" stroke="#5F5E5A" stroke-width="1.2" marker-end="url(#arrow)"/>
+<rect x="744" y="332" width="216" height="56" rx="8" fill="#E1F5EE" stroke="#0F6E56" stroke-width="0.8"/>
+<text x="852.0" y="351" text-anchor="middle" dominant-baseline="central" font-size="12.5" font-weight="600" fill="#085041">vmap over keys</text>
+<text x="852.0" y="369" text-anchor="middle" dominant-baseline="central" font-size="11" fill="#0F6E56">one rollout per draw</text>
+<path d="M960 360.0 L984 360.0" fill="none" stroke="#5F5E5A" stroke-width="1.2" marker-end="url(#arrow)"/>
+<rect x="986" y="332" width="216" height="56" rx="8" fill="#E1F5EE" stroke="#0F6E56" stroke-width="0.8"/>
+<text x="1094.0" y="351" text-anchor="middle" dominant-baseline="central" font-size="12.5" font-weight="600" fill="#085041">Evaluation</text>
+<text x="1094.0" y="369" text-anchor="middle" dominant-baseline="central" font-size="11" fill="#0F6E56">mean, worst, failure_rate</text>
+<path d="M1202 360.0 L1226 360.0" fill="none" stroke="#5F5E5A" stroke-width="1.2" marker-end="url(#arrow)"/>
+<rect x="1228" y="332" width="216" height="56" rx="8" fill="#F1EFE8" stroke="#5F5E5A" stroke-width="0.8"/>
+<text x="1336.0" y="351" text-anchor="middle" dominant-baseline="central" font-size="12.5" font-weight="600" fill="#444441">PlanningSolution</text>
+<text x="1336.0" y="369" text-anchor="middle" dominant-baseline="central" font-size="11" fill="#5F5E5A">evaluation, compare</text>
+<rect x="28" y="404" width="1428" height="84" rx="6" fill="#FAFAF8"/>
+<text x="40" y="435" dominant-baseline="central" font-size="13" font-weight="600" fill="#2C2C2A">Trajectory optimization</text>
+<text x="40" y="453" dominant-baseline="central" font-size="11" fill="#5F5E5A">open loop, knots as decisions</text>
+<rect x="260" y="416" width="216" height="56" rx="8" fill="#EEEDFE" stroke="#534AB7" stroke-width="0.8"/>
+<text x="368.0" y="435" text-anchor="middle" dominant-baseline="central" font-size="12.5" font-weight="600" fill="#3C3489">PlanningProblem</text>
+<text x="368.0" y="453" text-anchor="middle" dominant-baseline="central" font-size="11" fill="#534AB7">params pytree</text>
+<path d="M476 444.0 L500 444.0" fill="none" stroke="#5F5E5A" stroke-width="1.2" marker-end="url(#arrow)"/>
+<rect x="502" y="416" width="216" height="56" rx="8" fill="#EEEDFE" stroke="#534AB7" stroke-width="0.8"/>
+<text x="610.0" y="435" text-anchor="middle" dominant-baseline="central" font-size="12.5" font-weight="600" fill="#3C3489">Transcription</text>
+<text x="610.0" y="453" text-anchor="middle" dominant-baseline="central" font-size="11" fill="#534AB7">collocation, shooting</text>
+<path d="M718 444.0 L742 444.0" fill="none" stroke="#5F5E5A" stroke-width="1.2" marker-end="url(#arrow)"/>
+<rect x="744" y="416" width="216" height="56" rx="8" fill="#EEEDFE" stroke="#534AB7" stroke-width="0.8"/>
+<text x="852.0" y="435" text-anchor="middle" dominant-baseline="central" font-size="12.5" font-weight="600" fill="#3C3489">MathematicalProgram</text>
+<text x="852.0" y="453" text-anchor="middle" dominant-baseline="central" font-size="11" fill="#534AB7">J(z), h(z), g(z)</text>
+<path d="M960 444.0 L984 444.0" fill="none" stroke="#5F5E5A" stroke-width="1.2" marker-end="url(#arrow)"/>
+<rect x="986" y="416" width="216" height="56" rx="8" fill="#F1EFE8" stroke="#5F5E5A" stroke-width="0.8"/>
+<text x="1094.0" y="435" text-anchor="middle" dominant-baseline="central" font-size="12.5" font-weight="600" fill="#444441">Optimizer</text>
+<text x="1094.0" y="453" text-anchor="middle" dominant-baseline="central" font-size="11" fill="#5F5E5A">scipy, ipopt, JAX grads</text>
+<path d="M1202 444.0 L1226 444.0" fill="none" stroke="#5F5E5A" stroke-width="1.2" marker-end="url(#arrow)"/>
+<rect x="1228" y="416" width="216" height="56" rx="8" fill="#F1EFE8" stroke="#5F5E5A" stroke-width="0.8"/>
+<text x="1336.0" y="435" text-anchor="middle" dominant-baseline="central" font-size="12.5" font-weight="600" fill="#444441">PlanningSolution</text>
+<text x="1336.0" y="453" text-anchor="middle" dominant-baseline="central" font-size="11" fill="#5F5E5A">trajectory, plots</text>
+<text x="40" y="519" dominant-baseline="central" font-size="13" font-weight="600" fill="#2C2C2A">Model predictive control</text>
+<text x="40" y="537" dominant-baseline="central" font-size="11" fill="#5F5E5A">the program re-solved each step</text>
+<rect x="260" y="500" width="216" height="56" rx="8" fill="#EEEDFE" stroke="#534AB7" stroke-width="0.8"/>
+<text x="368.0" y="519" text-anchor="middle" dominant-baseline="central" font-size="12.5" font-weight="600" fill="#3C3489">ParametricMathematicalProgram</text>
+<text x="368.0" y="537" text-anchor="middle" dominant-baseline="central" font-size="11" fill="#534AB7">bind(x0)</text>
+<path d="M476 528.0 L500 528.0" fill="none" stroke="#5F5E5A" stroke-width="1.2" marker-end="url(#arrow)"/>
+<rect x="502" y="500" width="216" height="56" rx="8" fill="#F1EFE8" stroke="#5F5E5A" stroke-width="0.8"/>
+<text x="610.0" y="519" text-anchor="middle" dominant-baseline="central" font-size="12.5" font-weight="600" fill="#444441">Inner solve per step</text>
+<text x="610.0" y="537" text-anchor="middle" dominant-baseline="central" font-size="11" fill="#5F5E5A">no implicit gradient</text>
+<path d="M718 528.0 L742 528.0" fill="none" stroke="#5F5E5A" stroke-width="1.2" marker-end="url(#arrow)"/>
+<rect x="744" y="500" width="216" height="56" rx="8" fill="#F1EFE8" stroke="#5F5E5A" stroke-width="0.8"/>
+<text x="852.0" y="519" text-anchor="middle" dominant-baseline="central" font-size="12.5" font-weight="600" fill="#444441">ModelPredictiveController</text>
+<text x="852.0" y="537" text-anchor="middle" dominant-baseline="central" font-size="11" fill="#5F5E5A">a block in a diagram</text>
+<path d="M960 528.0 L984 528.0" fill="none" stroke="#5F5E5A" stroke-width="1.2" marker-end="url(#arrow)"/>
+<rect x="986" y="500" width="216" height="56" rx="8" fill="#E1F5EE" stroke="#0F6E56" stroke-width="0.8"/>
+<text x="1094.0" y="519" text-anchor="middle" dominant-baseline="central" font-size="12.5" font-weight="600" fill="#085041">Trajectory</text>
+<text x="1094.0" y="537" text-anchor="middle" dominant-baseline="central" font-size="11" fill="#0F6E56">ctl @ plant</text>
+<path d="M1202 528.0 L1226 528.0" fill="none" stroke="#5F5E5A" stroke-width="1.2" marker-end="url(#arrow)"/>
+<rect x="1228" y="500" width="216" height="56" rx="8" fill="#F1EFE8" stroke="#5F5E5A" stroke-width="0.8"/>
+<text x="1336.0" y="519" text-anchor="middle" dominant-baseline="central" font-size="12.5" font-weight="600" fill="#444441">Plots, animate, save</text>
+<text x="1336.0" y="537" text-anchor="middle" dominant-baseline="central" font-size="11" fill="#5F5E5A">NumPy by contract</text>
+<rect x="28" y="572" width="1428" height="84" rx="6" fill="#FAFAF8"/>
+<text x="40" y="603" dominant-baseline="central" font-size="13" font-weight="600" fill="#2C2C2A">Dynamic programming</text>
+<text x="40" y="621" dominant-baseline="central" font-size="11" fill="#5F5E5A">value iteration on a grid</text>
+<rect x="260" y="584" width="216" height="56" rx="8" fill="#EEEDFE" stroke="#534AB7" stroke-width="0.8"/>
+<text x="368.0" y="603" text-anchor="middle" dominant-baseline="central" font-size="12.5" font-weight="600" fill="#3C3489">PlanningProblem</text>
+<text x="368.0" y="621" text-anchor="middle" dominant-baseline="central" font-size="11" fill="#534AB7">params pytree</text>
+<path d="M476 612.0 L500 612.0" fill="none" stroke="#5F5E5A" stroke-width="1.2" marker-end="url(#arrow)"/>
+<rect x="502" y="584" width="216" height="56" rx="8" fill="#EEEDFE" stroke="#534AB7" stroke-width="0.8"/>
+<text x="610.0" y="603" text-anchor="middle" dominant-baseline="central" font-size="12.5" font-weight="600" fill="#3C3489">FieldGrid</text>
+<text x="610.0" y="621" text-anchor="middle" dominant-baseline="central" font-size="11" fill="#534AB7">x and u grids</text>
+<path d="M718 612.0 L742 612.0" fill="none" stroke="#5F5E5A" stroke-width="1.2" marker-end="url(#arrow)"/>
+<rect x="744" y="584" width="216" height="56" rx="8" fill="#E1F5EE" stroke="#0F6E56" stroke-width="0.8"/>
+<text x="852.0" y="603" text-anchor="middle" dominant-baseline="central" font-size="12.5" font-weight="600" fill="#085041">Cost-to-go field</text>
+<text x="852.0" y="621" text-anchor="middle" dominant-baseline="central" font-size="11" fill="#0F6E56">GridField after fields plan</text>
+<path d="M960 612.0 L984 612.0" fill="none" stroke="#5F5E5A" stroke-width="1.2" marker-end="url(#arrow)"/>
+<rect x="986" y="584" width="216" height="56" rx="8" fill="#E1F5EE" stroke="#0F6E56" stroke-width="0.8"/>
+<text x="1094.0" y="603" text-anchor="middle" dominant-baseline="central" font-size="12.5" font-weight="600" fill="#085041">LookupTable policy</text>
+<text x="1094.0" y="621" text-anchor="middle" dominant-baseline="central" font-size="11" fill="#0F6E56">scipy interp today</text>
+<path d="M1202 612.0 L1226 612.0" fill="none" stroke="#5F5E5A" stroke-width="1.2" marker-end="url(#arrow)"/>
+<rect x="1228" y="584" width="216" height="56" rx="8" fill="#F1EFE8" stroke="#5F5E5A" stroke-width="0.8"/>
+<text x="1336.0" y="603" text-anchor="middle" dominant-baseline="central" font-size="12.5" font-weight="600" fill="#444441">PlanningSolution</text>
+<text x="1336.0" y="621" text-anchor="middle" dominant-baseline="central" font-size="11" fill="#5F5E5A">policy, ctl @ plant</text>
+<text x="40" y="687" dominant-baseline="central" font-size="13" font-weight="600" fill="#2C2C2A">Reinforcement learning</text>
+<text x="40" y="705" dominant-baseline="central" font-size="11" fill="#5F5E5A">episodes, policy gradient</text>
+<rect x="260" y="668" width="216" height="56" rx="8" fill="#EEEDFE" stroke="#534AB7" stroke-width="0.8"/>
+<text x="368.0" y="687" text-anchor="middle" dominant-baseline="central" font-size="12.5" font-weight="600" fill="#3C3489">StochasticPlanningProblem</text>
+<text x="368.0" y="705" text-anchor="middle" dominant-baseline="central" font-size="11" fill="#534AB7">sample_*(key)</text>
+<path d="M476 696.0 L500 696.0" fill="none" stroke="#5F5E5A" stroke-width="1.2" marker-end="url(#arrow)"/>
+<rect x="502" y="668" width="216" height="56" rx="8" fill="#EEEDFE" stroke="#534AB7" stroke-width="0.8"/>
+<text x="610.0" y="687" text-anchor="middle" dominant-baseline="central" font-size="12.5" font-weight="600" fill="#3C3489">RolloutEnvironment</text>
+<text x="610.0" y="705" text-anchor="middle" dominant-baseline="central" font-size="11" fill="#534AB7">step, reward -g dt</text>
+<path d="M718 696.0 L742 696.0" fill="none" stroke="#5F5E5A" stroke-width="1.2" marker-end="url(#arrow)"/>
+<rect x="744" y="668" width="216" height="56" rx="8" fill="#EEEDFE" stroke="#534AB7" stroke-width="0.8"/>
+<text x="852.0" y="687" text-anchor="middle" dominant-baseline="central" font-size="12.5" font-weight="600" fill="#3C3489">Collectors</text>
+<text x="852.0" y="705" text-anchor="middle" dominant-baseline="central" font-size="11" fill="#534AB7">episodes, JAX or NumPy</text>
+<path d="M960 696.0 L984 696.0" fill="none" stroke="#5F5E5A" stroke-width="1.2" marker-end="url(#arrow)"/>
+<rect x="986" y="668" width="216" height="56" rx="8" fill="#EEEDFE" stroke="#534AB7" stroke-width="0.8"/>
+<text x="1094.0" y="687" text-anchor="middle" dominant-baseline="central" font-size="12.5" font-weight="600" fill="#3C3489">Policy update</text>
+<text x="1094.0" y="705" text-anchor="middle" dominant-baseline="central" font-size="11" fill="#534AB7">REINFORCE, actor-critic</text>
+<path d="M1202 696.0 L1226 696.0" fill="none" stroke="#5F5E5A" stroke-width="1.2" marker-end="url(#arrow)"/>
+<rect x="1228" y="668" width="216" height="56" rx="8" fill="#F1EFE8" stroke="#5F5E5A" stroke-width="0.8"/>
+<text x="1336.0" y="687" text-anchor="middle" dominant-baseline="central" font-size="12.5" font-weight="600" fill="#444441">PlanningSolution</text>
+<text x="1336.0" y="705" text-anchor="middle" dominant-baseline="central" font-size="11" fill="#5F5E5A">policy</text>
+<rect x="28" y="740" width="1428" height="84" rx="6" fill="#FAFAF8"/>
+<text x="40" y="771" dominant-baseline="central" font-size="13" font-weight="600" fill="#2C2C2A">Sampling planner</text>
+<text x="40" y="789" dominant-baseline="central" font-size="11" fill="#5F5E5A">RRT, random tree</text>
+<rect x="260" y="752" width="216" height="56" rx="8" fill="#EEEDFE" stroke="#534AB7" stroke-width="0.8"/>
+<text x="368.0" y="771" text-anchor="middle" dominant-baseline="central" font-size="12.5" font-weight="600" fill="#3C3489">PlanningProblem</text>
+<text x="368.0" y="789" text-anchor="middle" dominant-baseline="central" font-size="11" fill="#534AB7">params pytree</text>
+<path d="M476 780.0 L500 780.0" fill="none" stroke="#5F5E5A" stroke-width="1.2" marker-end="url(#arrow)"/>
+<rect x="502" y="752" width="216" height="56" rx="8" fill="#F1EFE8" stroke="#5F5E5A" stroke-width="0.8"/>
+<text x="610.0" y="771" text-anchor="middle" dominant-baseline="central" font-size="12.5" font-weight="600" fill="#444441">Tree</text>
+<text x="610.0" y="789" text-anchor="middle" dominant-baseline="central" font-size="11" fill="#5F5E5A">NumPy, random draws</text>
+<path d="M718 780.0 L984 780.0" fill="none" stroke="#5F5E5A" stroke-width="1.2" marker-end="url(#arrow)"/>
+<rect x="986" y="752" width="216" height="56" rx="8" fill="#E1F5EE" stroke="#0F6E56" stroke-width="0.8"/>
+<text x="1094.0" y="771" text-anchor="middle" dominant-baseline="central" font-size="12.5" font-weight="600" fill="#085041">Trajectory</text>
+<text x="1094.0" y="789" text-anchor="middle" dominant-baseline="central" font-size="11" fill="#0F6E56">same noun, NumPy arrays</text>
+<path d="M1202 780.0 L1226 780.0" fill="none" stroke="#5F5E5A" stroke-width="1.2" marker-end="url(#arrow)"/>
+<rect x="1228" y="752" width="216" height="56" rx="8" fill="#F1EFE8" stroke="#5F5E5A" stroke-width="0.8"/>
+<text x="1336.0" y="771" text-anchor="middle" dominant-baseline="central" font-size="12.5" font-weight="600" fill="#444441">PlanningSolution</text>
+<text x="1336.0" y="789" text-anchor="middle" dominant-baseline="central" font-size="11" fill="#5F5E5A">trajectory, plot_tree</text>
+<text x="40" y="855" dominant-baseline="central" font-size="13" font-weight="600" fill="#2C2C2A">Analysis</text>
+<text x="40" y="873" dominant-baseline="central" font-size="11" fill="#5F5E5A">linearize, Bode, poles</text>
+<rect x="260" y="836" width="216" height="56" rx="8" fill="#EEEDFE" stroke="#534AB7" stroke-width="0.8"/>
+<text x="368.0" y="855" text-anchor="middle" dominant-baseline="central" font-size="12.5" font-weight="600" fill="#3C3489">System</text>
+<text x="368.0" y="873" text-anchor="middle" dominant-baseline="central" font-size="11" fill="#534AB7">f, h, params</text>
+<path d="M476 864.0 L500 864.0" fill="none" stroke="#5F5E5A" stroke-width="1.2" marker-end="url(#arrow)"/>
+<rect x="502" y="836" width="216" height="56" rx="8" fill="#EEEDFE" stroke="#534AB7" stroke-width="0.8"/>
+<text x="610.0" y="855" text-anchor="middle" dominant-baseline="central" font-size="12.5" font-weight="600" fill="#3C3489">jacobian</text>
+<text x="610.0" y="873" text-anchor="middle" dominant-baseline="central" font-size="11" fill="#534AB7">JAX or finite differences</text>
+<path d="M718 864.0 L742 864.0" fill="none" stroke="#5F5E5A" stroke-width="1.2" marker-end="url(#arrow)"/>
+<rect x="744" y="836" width="216" height="56" rx="8" fill="#EEEDFE" stroke="#534AB7" stroke-width="0.8"/>
+<text x="852.0" y="855" text-anchor="middle" dominant-baseline="central" font-size="12.5" font-weight="600" fill="#3C3489">LTISystem</text>
+<text x="852.0" y="873" text-anchor="middle" dominant-baseline="central" font-size="11" fill="#534AB7">A, B, C, D</text>
+<path d="M960 864.0 L984 864.0" fill="none" stroke="#5F5E5A" stroke-width="1.2" marker-end="url(#arrow)"/>
+<rect x="986" y="836" width="216" height="56" rx="8" fill="#F1EFE8" stroke="#5F5E5A" stroke-width="0.8"/>
+<text x="1094.0" y="855" text-anchor="middle" dominant-baseline="central" font-size="12.5" font-weight="600" fill="#444441">bode, pzmap, margins</text>
+<text x="1094.0" y="873" text-anchor="middle" dominant-baseline="central" font-size="11" fill="#5F5E5A">NumPy, SciPy signal</text>
+<path d="M1202 864.0 L1226 864.0" fill="none" stroke="#5F5E5A" stroke-width="1.2" marker-end="url(#arrow)"/>
+<rect x="1228" y="836" width="216" height="56" rx="8" fill="#F1EFE8" stroke="#5F5E5A" stroke-width="0.8"/>
+<text x="1336.0" y="855" text-anchor="middle" dominant-baseline="central" font-size="12.5" font-weight="600" fill="#444441">Plots</text>
+<text x="1336.0" y="873" text-anchor="middle" dominant-baseline="central" font-size="11" fill="#5F5E5A">NumPy by contract</text>
+<rect x="40" y="930" width="14" height="14" rx="3" fill="#EEEDFE" stroke="#534AB7" stroke-width="0.8"/>
+<text x="62" y="937" dominant-baseline="central" font-size="12" fill="#444441">traced and array in / array out today (jit, grad, vmap)</text>
+<rect x="460" y="930" width="14" height="14" rx="3" fill="#E1F5EE" stroke="#0F6E56" stroke-width="0.8"/>
+<text x="482" y="937" dominant-baseline="central" font-size="12" fill="#444441">traced once the differentiable-problem plan lands</text>
+<rect x="840" y="930" width="14" height="14" rx="3" fill="#F1EFE8" stroke="#5F5E5A" stroke-width="0.8"/>
+<text x="862" y="937" dominant-baseline="central" font-size="12" fill="#444441">NumPy: reporting, solver loops, random search; off the traced path</text>
+</svg>

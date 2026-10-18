@@ -1,0 +1,33 @@
+%% The planned pipeline: the statement, the compiled traced path, the NumPy consumers.
+%% Same content as differentiable-cost-pipeline.png (target-architecture.md §2).
+flowchart TB
+    subgraph statement["PlanningProblem (and its stochastic variant) · ProblemParameters, one params pytree"]
+        sys["System<br/><i>f, h, params</i>"]
+        cost["CostFunction<br/><i>g, h, reads params</i>"]
+        sets["Set<br/><i>margin, reads params</i>"]
+        dist["Distribution<br/><i>sample(key)</i>"]
+    end
+
+    compile["problem.compile(controller, dt)<br/><i>one compiled object per loop</i>"]
+    rollout["rollout_p<br/><i>one integrator, emits signals</i>"]
+    traj["Trajectory<br/><i>native pytree, one noun</i>"]
+    score["score_rollout<br/><i>one quadrature, exit, h</i>"]
+    evaluation["Evaluation<br/><i>cost, mean, worst, failure_rate</i>"]
+
+    solution["PlanningSolution<br/><i>the planner's answer</i>"]
+    program["MathematicalProgram<br/><i>program(wrt=…), bind(params)</i>"]
+    plots["Plots and reports<br/><i>NumPy by contract</i>"]
+
+    sys & cost & sets & dist --> compile
+    compile --> rollout --> traj --> score --> evaluation
+    evaluation --> solution
+    evaluation --> program
+    evaluation --> plots
+
+    classDef stmt fill:#E1F5EE,stroke:#0F6E56,color:#085041
+    classDef traced fill:#EEEDFE,stroke:#534AB7,color:#3C3489
+    classDef numpy fill:#F1EFE8,stroke:#5F5E5A,color:#444441
+    class sys,cost,sets,dist stmt
+    class compile,rollout,traj,score,evaluation traced
+    class solution,program,plots numpy
+    style statement fill:#E1F5EE,stroke:#0F6E56,color:#085041

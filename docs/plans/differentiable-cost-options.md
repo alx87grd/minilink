@@ -214,3 +214,9 @@ The two choices this leaves for the maintainer: the object's noun (`ProblemEvalu
 proposed; `PlanningProblemEvaluator` is longer and exact; `CompiledProblem` says what it is
 but not what it does), and whether both `mean_cost` and `evaluate(...).mean` exist, or only
 one.
+
+## 6. What the workflow lanes showed (2026-10-18)
+
+Consolidated into [target-architecture.md](target-architecture.md) §3 and §4 (the verb
+family, `Evaluation` as a verb of the problem, the open-loop `compile()`, the optimizer as
+the one consumer); the brainstorm of step 0 reads them there.

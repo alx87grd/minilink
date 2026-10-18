@@ -1,0 +1,57 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="680" height="660" viewBox="0 0 680 660" font-family="Helvetica, Arial, sans-serif">
+<defs><marker id="arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M2 1L8 5L2 9" fill="none" stroke="#5F5E5A" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></marker></defs>
+<rect x="0" y="0" width="680" height="660" fill="white"/>
+<rect x="40" y="40" width="600" height="150" rx="16" fill="#E1F5EE" stroke="#0F6E56" stroke-width="0.8"/>
+<text x="340" y="62" text-anchor="middle" dominant-baseline="central" font-size="14" font-weight="600" fill="#085041">PlanningProblem (and its stochastic variant)</text>
+<text x="340" y="80" text-anchor="middle" dominant-baseline="central" font-size="12" fill="#0F6E56">ProblemParameters: one params pytree, the root of the path</text>
+<rect x="60" y="100" width="125" height="56" rx="8" fill="#E1F5EE" stroke="#0F6E56" stroke-width="0.8"/>
+<text x="122.5" y="118" text-anchor="middle" dominant-baseline="central" font-size="14" font-weight="600" fill="#085041">System</text>
+<text x="122.5" y="136" text-anchor="middle" dominant-baseline="central" font-size="12" fill="#0F6E56">f, h, params</text>
+<rect x="205" y="100" width="125" height="56" rx="8" fill="#E1F5EE" stroke="#0F6E56" stroke-width="0.8"/>
+<text x="267.5" y="118" text-anchor="middle" dominant-baseline="central" font-size="14" font-weight="600" fill="#085041">CostFunction</text>
+<text x="267.5" y="136" text-anchor="middle" dominant-baseline="central" font-size="12" fill="#0F6E56">g, h, reads params</text>
+<rect x="350" y="100" width="125" height="56" rx="8" fill="#E1F5EE" stroke="#0F6E56" stroke-width="0.8"/>
+<text x="412.5" y="118" text-anchor="middle" dominant-baseline="central" font-size="14" font-weight="600" fill="#085041">Set</text>
+<text x="412.5" y="136" text-anchor="middle" dominant-baseline="central" font-size="12" fill="#0F6E56">margin, reads params</text>
+<rect x="495" y="100" width="125" height="56" rx="8" fill="#E1F5EE" stroke="#0F6E56" stroke-width="0.8"/>
+<text x="557.5" y="118" text-anchor="middle" dominant-baseline="central" font-size="14" font-weight="600" fill="#085041">Distribution</text>
+<text x="557.5" y="136" text-anchor="middle" dominant-baseline="central" font-size="12" fill="#0F6E56">sample(key)</text>
+<path d="M340 190 L340 228" fill="none" stroke="#5F5E5A" stroke-width="1.5" marker-end="url(#arrow)"/>
+<rect x="190" y="230" width="300" height="56" rx="8" fill="#EEEDFE" stroke="#534AB7" stroke-width="0.8"/>
+<text x="340.0" y="248" text-anchor="middle" dominant-baseline="central" font-size="14" font-weight="600" fill="#3C3489">problem.compile(controller, dt)</text>
+<text x="340.0" y="266" text-anchor="middle" dominant-baseline="central" font-size="12" fill="#534AB7">one compiled object per loop</text>
+<path d="M340 286 L340 308 L130 308 L130 328" fill="none" stroke="#5F5E5A" stroke-width="1.5" marker-end="url(#arrow)"/>
+<rect x="45" y="330" width="170" height="56" rx="8" fill="#EEEDFE" stroke="#534AB7" stroke-width="0.8"/>
+<text x="130.0" y="348" text-anchor="middle" dominant-baseline="central" font-size="14" font-weight="600" fill="#3C3489">rollout_p</text>
+<text x="130.0" y="366" text-anchor="middle" dominant-baseline="central" font-size="12" fill="#534AB7">one integrator, emits signals</text>
+<path d="M215 358 L253 358" fill="none" stroke="#5F5E5A" stroke-width="1.5" marker-end="url(#arrow)"/>
+<rect x="255" y="330" width="170" height="56" rx="8" fill="#EEEDFE" stroke="#534AB7" stroke-width="0.8"/>
+<text x="340.0" y="348" text-anchor="middle" dominant-baseline="central" font-size="14" font-weight="600" fill="#3C3489">Trajectory</text>
+<text x="340.0" y="366" text-anchor="middle" dominant-baseline="central" font-size="12" fill="#534AB7">native pytree, one noun</text>
+<path d="M425 358 L463 358" fill="none" stroke="#5F5E5A" stroke-width="1.5" marker-end="url(#arrow)"/>
+<rect x="465" y="330" width="170" height="56" rx="8" fill="#EEEDFE" stroke="#534AB7" stroke-width="0.8"/>
+<text x="550.0" y="348" text-anchor="middle" dominant-baseline="central" font-size="14" font-weight="600" fill="#3C3489">score_rollout</text>
+<text x="550.0" y="366" text-anchor="middle" dominant-baseline="central" font-size="12" fill="#534AB7">one quadrature, exit, h</text>
+<path d="M550 386 L550 408 L340 408 L340 428" fill="none" stroke="#5F5E5A" stroke-width="1.5" marker-end="url(#arrow)"/>
+<rect x="190" y="430" width="300" height="56" rx="8" fill="#EEEDFE" stroke="#534AB7" stroke-width="0.8"/>
+<text x="340.0" y="448" text-anchor="middle" dominant-baseline="central" font-size="14" font-weight="600" fill="#3C3489">Evaluation</text>
+<text x="340.0" y="466" text-anchor="middle" dominant-baseline="central" font-size="12" fill="#534AB7">cost, mean, worst, failure_rate</text>
+<path d="M340 486 L340 508 L130 508 L130 528" fill="none" stroke="#5F5E5A" stroke-width="1.5" marker-end="url(#arrow)"/>
+<path d="M340 486 L340 528" fill="none" stroke="#5F5E5A" stroke-width="1.5" marker-end="url(#arrow)"/>
+<path d="M340 486 L340 508 L550 508 L550 528" fill="none" stroke="#5F5E5A" stroke-width="1.5" marker-end="url(#arrow)"/>
+<rect x="45" y="530" width="170" height="56" rx="8" fill="#F1EFE8" stroke="#5F5E5A" stroke-width="0.8"/>
+<text x="130.0" y="548" text-anchor="middle" dominant-baseline="central" font-size="14" font-weight="600" fill="#444441">PlanningSolution</text>
+<text x="130.0" y="566" text-anchor="middle" dominant-baseline="central" font-size="12" fill="#5F5E5A">the planner's answer</text>
+<rect x="255" y="530" width="170" height="56" rx="8" fill="#F1EFE8" stroke="#5F5E5A" stroke-width="0.8"/>
+<text x="340.0" y="548" text-anchor="middle" dominant-baseline="central" font-size="14" font-weight="600" fill="#444441">MathematicalProgram</text>
+<text x="340.0" y="566" text-anchor="middle" dominant-baseline="central" font-size="12" fill="#5F5E5A">program(wrt=…), bind(params)</text>
+<rect x="465" y="530" width="170" height="56" rx="8" fill="#F1EFE8" stroke="#5F5E5A" stroke-width="0.8"/>
+<text x="550.0" y="548" text-anchor="middle" dominant-baseline="central" font-size="14" font-weight="600" fill="#444441">Plots and reports</text>
+<text x="550.0" y="566" text-anchor="middle" dominant-baseline="central" font-size="12" fill="#5F5E5A">NumPy by contract</text>
+<rect x="60" y="622" width="14" height="14" rx="3" fill="#E1F5EE" stroke="#0F6E56" stroke-width="0.8"/>
+<text x="82" y="629" dominant-baseline="central" font-size="12" fill="#444441">the statement and its params</text>
+<rect x="270" y="622" width="14" height="14" rx="3" fill="#EEEDFE" stroke="#534AB7" stroke-width="0.8"/>
+<text x="292" y="629" dominant-baseline="central" font-size="12" fill="#444441">traced: jit, grad, vmap</text>
+<rect x="450" y="622" width="14" height="14" rx="3" fill="#F1EFE8" stroke="#5F5E5A" stroke-width="0.8"/>
+<text x="472" y="629" dominant-baseline="central" font-size="12" fill="#444441">NumPy consumers of the kernels</text>
+</svg>

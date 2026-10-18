@@ -84,7 +84,7 @@ Step ids (`S29`, `P4`, `T2`, …) are the rows of
 | Simulation | teaching | 7 | Mature; fixed 10 001-point default grid; `verbose` names unified. | One owner per rule (S65). |
 | Dynamics (abstraction + catalog) | teaching | 7 | Plants QA'd; `MechanicalSystem` / `Manipulator`; UR5 ABA/RNEA; **every catalog plant compiles on both backends** (contract test); four-rung vehicle ladder; UdeS racecar (kinematic, dynamic, 3-D). | Catalog hygiene (S64); the general serial chain (C6, v0.3); mechanical-base unification (S32, after v1.0). |
 | Control | teaching | 6 | Linear, LQR (infinite horizon, finite horizon, along a trajectory), pole placement, reference scaling (`N`), `P` / `PI` / `PD` / `PID` and the rate-measured `ImpedanceController` / `ImpedanceIntegralController` as one family (what is measured decides the derivative; limits with infinite defaults, anti-windup once a limit is declared; the shared pieces three pure functions), model-based SMC and computed torque, robotic impedance and kinematic laws, neural policy block; a controller is a plain `System`. | P10's resolver and composition steps. |
-| Analysis | teaching | 6 | Jacobians, linearize, structural, equilibria, modal; one-channel Bode with grid-free margins, pole-zero, root locus, Nyquist, the linear step response on matplotlib and plotly; the sensitivity functions `S` / `T` / `PS` / `CS`. Every verb takes any `System`, the linear model as is, the rest linearized at the operating point (2026-10-15). | Nichols and overlays later. |
+| Analysis | teaching | 6 | Jacobians, linearize, structural, equilibria, modal; one-channel Bode with grid-free margins, pole-zero, root locus, Nyquist, the linear step response on matplotlib and plotly; the sensitivity functions `S` / `T` / `PS` / `CS`. Every verb takes any `System`, the linear model as is, the rest linearized at the operating point (2026-10-15). | Nichols and overlays later; Bode, poles and margins traceable for sensitivity to params (idea to review, S73). |
 | Blocks | teaching | 5 | Routing, nonlinear, filters, sources (with `Sine`), TF, 1-layer NN. | `Ramp` / `Chirp` / `Delay` / `Switch` (C3, v0.3). |
 | Planning / policy synthesis (DP) | teaching (GRO860) | 6 | Grid + value iteration (`loop` / `numpy` / `jax`), lookup controller, `PolicyEvaluator`, `LQRPlanner`; every planner returns a `PlanningSolution`; `compare()` reads solutions side by side; `dp.py` is the textbook reference of the style. | cost-to-go as a `Field` (A1); policy iteration (S51). |
 | Planning / trajopt | teaching (GRO860) | 5 | Collocation, shooting, multiple shooting; live plot; `success` means defects satisfied to `feasibility_tol`; float64 by default on JAX. | Harden SciPy/Ipopt before TRL 6. |
@@ -273,6 +273,8 @@ the new core objects land in a smaller library; plan in TODO §4):
 **The textbook objects**, before wave C, in this order: the differentiable evaluator's
 plumbing first (it waits on nothing), the cost parameters next, then the rest of the
 evaluator they unlock, then the two objects it does not need.
+The target the differentiable work serves, and the ideas around it (to review):
+[target-architecture.md](../plans/target-architecture.md).
 - **V1, first half** (steps 0–3 of [differentiable-cost.md](../plans/differentiable-cost.md),
   beside K1): the naming brainstorm, one scoring kernel, the whole trajectory out of the
   compiled scan, and `problem.compile(controller)` with the deterministic verbs on the
@@ -444,6 +446,14 @@ stiffness and damping, the shared pure functions) in
   sweep is step A6).
 - **CBF safety filter** ([cbf-safety-filter.md](../plans/cbf-safety-filter.md)): research
   lane until a course asks; the barrier is a `Field` once A1 lands.
+
+**Ideas to review (2026-10-18), not decided** — the target architecture of the
+differentiable toolbox (any traceable metric optimized through the native optimizer, with
+respect to any parameter set the problem holds) and the ideas around it, consolidated in
+[target-architecture.md](../plans/target-architecture.md): the verb family on the problem,
+`Evaluation` as a verb of the problem, the open-loop `compile()`, traceable linear analysis
+(S73), the optimizer as the one descent loop (S74), metrics as constraints in the bridge.
+Each is accepted into a plan, folded into V1's step 0, or dropped; its §7 lists the asks.
 
 **Before v0.3 wave C (S72, the path-integral planner; C6, the serial chain)**
 

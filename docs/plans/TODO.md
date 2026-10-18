@@ -467,6 +467,56 @@ the demo sweep touches fewer files. Nothing leaves without the maintainer's ruli
   neighbours). Done when the pathwise gradient of the mean closed-loop cost with respect to
   the controller's params matches a central difference on the same draws, through the
   standard entry point.
+  The target this serves and the ideas around it, to review, not decided:
+  [target-architecture.md](target-architecture.md).
+- [ ] **S73 Traceable linear analysis** **[idea to review — ask — core]**, proposed by the
+  maintainer 2026-10-18, not scheduled: `poles`, `frequency_response` and `margins` in
+  `analysis/linear.py` through the array module, so the sensitivity of closed-loop poles,
+  damping ratios, Bode magnitude and phase, and gain and phase margins to any plant or
+  controller param is `jax.grad` of the existing verbs on `jacobian("f", "params")`. The
+  math lines stay the textbook ones (`C (jωI − A)⁻¹ B + D` as one batched solve instead of
+  the Python loop; eigenvalues through `xp.linalg.eigvals`, whose derivative is the classical
+  `vᴴ (∂A/∂p) u / (vᴴ u)` sensitivity). Brent's method on the crossovers becomes a fixed number
+  of Newton steps from the grid bracket, so the crossover frequency carries the
+  implicit-function derivative. Zeros stay NumPy (a generalized eigenproblem JAX lacks; the
+  companion-matrix route for `D = 0` is a later step); root-locus branch matching stays NumPy
+  (a plotting concern); the root locus generalizes to any parameter (`root_locus(wrt="m")`).
+  Documented non-differentiable spots: repeated poles, the switch of the minimum margin
+  between crossovers; JAX's nonsymmetric eigensolver is CPU-only. Independent of V1 (needs
+  only the jacobian), self-contained for a cloud agent. Done when `jax.grad` of the phase
+  margin and of each closed-loop pole of `PID() @ Pendulum()` with respect to a gain and to
+  the mass matches a central difference, and the NumPy callers see no change. Design:
+  [target-architecture.md](target-architecture.md) §4.7.
+- [ ] **S74 The optimizer as the one descent loop** **[idea to review — ask — core]**,
+  proposed by the maintainer 2026-10-18, not scheduled. Today `MathematicalProgram` carries
+  `J`, `h`, `g` and the box, `Optimizer` offers three constrained-NLP presets (`scipy_slsqp`,
+  `scipy_trust_constr`, `ipopt`) on a flat `z`, and every gradient-based tuning writes its own
+  loop: four compile demos (`pid_autotuning_jax`, `params_gradient`, `neural_controller_jax`,
+  `cartpole_rollout_gradients`, the last a projected gradient descent with a step schedule),
+  three notebooks (`07_compile`, `showcase_jax`, the cart-pole rollout-gradients lesson) and the
+  RL algorithms, which share one pytree `Adam` in `reinforcement_learning/optim.py`. The idea,
+  in three parts: (1) the program knows its class, read from its fields, `unconstrained` (no
+  `h`, `g`, bounds), `bounded` (box only), `constrained` (any `h` or `g`), plus a
+  `stochastic` flag the program bridge sets when the objective resamples keys; `Optimizer`
+  refuses a method the class does not admit, with the message naming the admissible ones, and
+  `method=None` picks by class (a quasi-Newton method for a smooth unconstrained or bounded
+  program, SLSQP otherwise, Adam when stochastic). (2) One first-order backend,
+  `optimizers/first_order.py`: gradient descent and Adam on the flat `z`, a fixed step count or
+  a gradient tolerance, the box handled by projection (the cart-pole demo's clip), the global
+  gradient clip; the RL package imports that Adam instead of keeping its own, the Optax-style
+  `init` / `update` protocol kept. Two SciPy presets (`scipy_lbfgsb`, `scipy_bfgs`) come free
+  from the existing backend. (3) Pytree decisions stay outside `Optimizer`: the program bridge
+  of V1 (`evaluator.program(wrt=)`) ravels the chosen leaves to `z` and unravels the result, so
+  the optimizer keeps one contract. Then the four demos and the notebooks end in
+  `Optimizer(program, method="adam")` (or the class default) and the library holds one descent
+  loop; the maintainer decides whether one tutorial keeps a hand-written loop on purpose, as
+  the GRO501 from-scratch notebooks do. Related: OPW-1's shared backend factory in
+  [optimizer-parametric-wiring.md](optimizer-parametric-wiring.md), which the new backend
+  joins. Done when `Optimizer(program).solve()` on the autotuning program reaches the hand
+  loop's gains with `method="adam"` and with the class default, SLSQP refuses nothing it
+  accepted before, the RL baselines stay bit-identical with the moved Adam, and no
+  `value_and_grad` loop remains in `examples/demos/compile/`. Design:
+  [target-architecture.md](target-architecture.md) §4.8.
 
 ---
 
