@@ -201,7 +201,87 @@ Not part of the differentiable path, but they remove the code it would otherwise
 - the compiled evaluator refuses the MPC controller (no implicit gradient) with a message
   saying so, as the Monte Carlo evaluator refuses stateful controllers today.
 
-## 5. How this fits the existing plans
+## 5. Architectural guardrails and recommendations (2026-10-18)
+
+Pushing a unified differentiable mathematical-program pattern across classical frequency
+tuning, closed-loop parameter optimization, trajectory optimization, and stochastic policy
+learning introduces four numerical and architectural sharp edges. These guardrails keep each
+regime mathematically well-posed and maintainable:
+
+### 5.1 Smooth frequency-domain surrogates alongside crossover margins (S73)
+
+- **The trap:** Gain and phase margins are defined at crossover frequencies ($\omega_{gc},
+  \omega_{pc}$). During gradient-based gain optimization, crossovers can appear, disappear,
+  or jump discontinuously between local peaks of $|L(j\omega)|$. In addition, nonsymmetric
+  eigenvalue decomposition (`eig`) for closed-loop poles is CPU-only in JAX and has
+  undefined gradients at repeated roots (exactly where root-locus branches break away).
+- **Recommendation:** Keep `margins()` traceable via fixed Newton steps from the grid
+  bracket (implicit-function theorem), **and** expose the **maximum sensitivity peaks**
+  $M_s = \max_\omega |S(j\omega)|$ and $M_t = \max_\omega |T(j\omega)|$ (along with their
+  smooth `logsumexp` approximations over the frequency grid $\omega$) as first-class
+  traceable metrics on `sensitivity` and `complementary_sensitivity`. Bounding $M_s \le 1.5$
+  is a smooth, crossover-free surrogate that simultaneously guarantees both gain margin
+  ($\ge \frac{M_s}{M_s - 1}$) and phase margin ($\ge 2\arcsin(\frac{1}{2M_s})$) without
+  crossover jumps during NLP-based PID loop shaping.
+
+### 5.2 Open-loop `problem.compile()` vs. direct collocation (§4.6)
+
+- **The trap:** Single shooting through an unstable nonlinear ODE over long horizons has
+  exponentially exploding or vanishing gradients ($\prod_k \frac{\partial f}{\partial x_k}$)
+  and a non-convex objective landscape where SLSQP or Adam can stall, whereas direct
+  collocation succeeds in tens of iterations.
+- **Recommendation:** Support `problem.compile(controller=None)` for open-loop evaluation
+  and short-horizon single shooting so the algebra closes, but **do not position
+  `problem.compile().program()` as a replacement for `TrajectoryOptimizationPlanner`**.
+  Keep transcriptions (`direct_collocation`, `multiple_shooting`) as the primary trajectory
+  NLP path because defect constraints $h(z) = 0$ break the temporal gradient chain and
+  expose sparsity.
+
+### 5.3 Uncut objective + smooth feasibility margin for state-constrained `.program()`
+
+- **The trap:** In `score_rollout`, cutting a trajectory at the first exit from $X$ (`alive`
+  mask) and charging `infeasible_cost` is a step function ($\mathbb{I}(x_k \in X)$) with
+  zero gradient almost everywhere and an impulse at the boundary. If a controller gain clips
+  the state box at $t = 2\text{ s}$, `jax.grad(evaluator.cost)(params)` yields zero gradient
+  for all behavior after $t = 2\text{ s}$ and no gradient direction to pull the trajectory
+  back inside $X$.
+- **Recommendation:**
+  - For **reporting and `MonteCarloEvaluator`**, keep the hard exit cut + `infeasible_cost`
+    in `score_rollout`.
+  - For **differentiation and `.program()`**, lower nontrivial state constraints $X$ to the
+    inequality margin `g(z) = evaluator.feasibility(...) >= 0` (the `softmin` of
+    `X.margin(x_k)` over the rollout, or per-knot margins) while `J(z)` integrates the
+    **uncut** rollout. That gives gradient-based solvers (`scipy_slsqp`, `ipopt`) exact
+    boundary derivatives $\frac{\partial\,\text{margin}}{\partial \theta}$ to push the
+    trajectory back into the safe set.
+
+### 5.4 Differentiable rollout (BPTT) vs. policy gradients (RL) as complementary tools
+
+- **The trap:** Direct backpropagation through time (`jax.grad(evaluator.mean_cost)`)
+  differentiates *through* the dynamics $\frac{\partial f}{\partial x}$ and reparameterized
+  draws, whereas policy-gradient RL (`REINFORCE`, `PPO`, `SAC`) differentiates the log-policy
+  score $\nabla_\theta \log \pi_\theta(a|s)$ without differentiating through $f(x, u)$. Long
+  horizons, saturations, or stiff dynamics cause BPTT gradients to explode or exhibit high
+  variance, whereas short smooth horizons converge orders of magnitude faster with BPTT than
+  with PPO.
+- **Recommendation:** Position `problem.compile(policy)` (first-order through dynamics) and
+  `ReinforcementLearningPlanner` (zero-order through dynamics, surrogate critic) side by
+  side on the exact same `StochasticPlanningProblem` and `NeuralPolicyController`, making
+  the sample-complexity vs. gradient-variance trade-off a signature pedagogical comparison.
+
+### 5.5 Keep `MathematicalProgram` flat; ravel pytrees at the bridge, not in `Optimizer` (S74)
+
+- **Recommendation:** Keep `MathematicalProgram` strictly as $J(z), h(z)=0, g(z)\ge 0$ on a
+  flat vector $z \in \mathbb{R}^{n_z}$ (CONSTITUTION §1.4: Minilink is not an optimization
+  modeling language). The bridge `evaluator.program(wrt=...)` owns `jax.flatten_util.ravel_pytree`
+  and exposes `program.unravel(result.z)` (or `evaluator.update_params(result.z)`), so IPOPT,
+  SciPy SLSQP, L-BFGS-B, and first-order Adam all solve the exact same `MathematicalProgram`
+  interchangeably. In tutorials, keep **one** explicit 6-line `jax.value_and_grad` loop in
+  `07_compile.ipynb` / `showcase_jax.ipynb` so students see there is no magic, followed
+  immediately by the `Optimizer(evaluator.program(...)).solve()` one-liner used in all
+  downstream demos.
+
+## 6. How this fits the existing plans
 
 | Document | Owns |
 | --- | --- |
@@ -213,7 +293,7 @@ Not part of the differentiable path, but they remove the code it would otherwise
 | [TODO.md](TODO.md) §4 | the rows: V1 (the evaluator), A2, A5, S73 (4.7), S74 (4.8), the November consolidation rows |
 | [the core-objects review](../reviews/2026-10-18-core-objects-review.md) | the dated record: the per-noun table and the counts |
 
-## 6. An order, if the ideas are accepted (not scheduled)
+## 7. An order, if the ideas are accepted (not scheduled)
 
 1. The evaluator plan's steps 0–3 (names, kernel, trajectory, compile) with 4.5 and 4.6
    folded into step 0 so the names and the no-controller case are settled before code.
@@ -223,10 +303,10 @@ Not part of the differentiable path, but they remove the code it would otherwise
    bridge, where its first customers appear.
 4. The consolidation rows of 4.10 in the November pass, the RL-environment merge of 4.6 last.
 
-## 7. What needs the maintainer
+## 8. What needs the maintainer
 
 - The names (the brainstorm of step 0), now including the verb family of 4.4.
-- Which of 4.4–4.10 are accepted, folded into a plan, or dropped; the workboard rows S73 and
-  S74 wait on that.
+- Which of 4.4–4.10 and the guardrails of §5 are accepted, folded into a plan, or dropped;
+  the workboard rows S73 and S74 wait on that.
 - Whether the one sentence of §1 goes into the constitution's vision text.
-- Whether one tutorial keeps a hand-written gradient loop on purpose (4.8).
+- Whether one tutorial keeps a hand-written gradient loop on purpose (4.8, 5.5).

@@ -482,11 +482,16 @@ the demo sweep touches fewer files. Nothing leaves without the maintainer's ruli
   companion-matrix route for `D = 0` is a later step); root-locus branch matching stays NumPy
   (a plotting concern); the root locus generalizes to any parameter (`root_locus(wrt="m")`).
   Documented non-differentiable spots: repeated poles, the switch of the minimum margin
-  between crossovers; JAX's nonsymmetric eigensolver is CPU-only. Independent of V1 (needs
+  between crossovers; JAX's nonsymmetric eigensolver is CPU-only. Recommendation from the
+  2026-10-18 architectural review: alongside crossover `margins`, expose the maximum
+  sensitivity peaks $M_s = \max_\omega |S(j\omega)|$ and $M_t = \max_\omega |T(j\omega)|$
+  (and their smooth `logsumexp` surrogates over $\omega$) as traceable metrics on
+  `sensitivity` / `complementary_sensitivity`, providing a smooth, crossover-free robustness
+  bound for NLP gain tuning. Independent of V1 (needs
   only the jacobian), self-contained for a cloud agent. Done when `jax.grad` of the phase
   margin and of each closed-loop pole of `PID() @ Pendulum()` with respect to a gain and to
   the mass matches a central difference, and the NumPy callers see no change. Design:
-  [target-architecture.md](target-architecture.md) §4.7.
+  [target-architecture.md](target-architecture.md) §4.7, §5.1.
 - [ ] **S74 The optimizer as the one descent loop** **[idea to review — ask — core]**,
   proposed by the maintainer 2026-10-18, not scheduled. Today `MathematicalProgram` carries
   `J`, `h`, `g` and the box, `Optimizer` offers three constrained-NLP presets (`scipy_slsqp`,

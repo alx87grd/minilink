@@ -292,3 +292,24 @@ Twelve lines against today's eighty, the cost from the problem instead of an inl
    metrics as `g ≥ 0` (a margin floor while tuning on cost). Design the bridge's signature for
    that from the start (`program(objective=, constraints=(), wrt=)`), or keep `J` only in the
    prototype?
+
+## 8. Architectural recommendations for the bridge and scoring (2026-10-18)
+
+From the big-picture review of the differentiable path ([target-architecture.md](target-architecture.md) §5):
+
+- **Facade and object naming (Step 0):** Prefer `problem.compile(controller=None, *, dt, backend="jax")`
+  returning `ProblemEvaluator` (or `PlanningProblemEvaluator`), with `wrt=` as the selection
+  keyword on `.program(wrt=...)` to match `sys.jacobian(of, wrt)`.
+- **Uncut rollout objective + smooth feasibility margin in `.program()` (Step 5):** Cutting a
+  trajectory at the first exit from $X$ (`alive` mask) and charging `infeasible_cost` is exact
+  for reporting and `MonteCarloEvaluator`, but produces zero gradient after the exit time and
+  no boundary gradient telling the solver how to pull the trajectory back inside $X$. When
+  lowering a state-constrained problem in `evaluator.program(wrt=..., constraints=...)`,
+  integrate the **uncut** rollout in `J(z)` and lower nontrivial state sets $X$ to the smooth
+  inequality constraint `g(z) = evaluator.feasibility(...) >= 0` (`softmin` of `X.margin(x_k)`
+  over the rollout, or per-knot margins) so `scipy_slsqp` and `ipopt` receive informative
+  boundary derivatives $\frac{\partial\,\text{margin}}{\partial \theta}$.
+- **Flat `MathematicalProgram` boundary (Step 5):** Keep `MathematicalProgram` strictly on flat
+  vectors $z \in \mathbb{R}^{n_z}$; `evaluator.program(wrt=...)` owns `ravel_pytree` and
+  provides `program.unravel(result.z)` (or `evaluator.update_params(result.z)`), keeping pytree
+  machinery out of `Optimizer`.

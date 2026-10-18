@@ -449,11 +449,11 @@ stiffness and damping, the shared pure functions) in
 
 **Ideas to review (2026-10-18), not decided** — the target architecture of the
 differentiable toolbox (any traceable metric optimized through the native optimizer, with
-respect to any parameter set the problem holds) and the ideas around it, consolidated in
+respect to any parameter set the problem holds) and the ideas and architectural guardrails around it, consolidated in
 [target-architecture.md](../plans/target-architecture.md): the verb family on the problem,
 `Evaluation` as a verb of the problem, the open-loop `compile()`, traceable linear analysis
-(S73), the optimizer as the one descent loop (S74), metrics as constraints in the bridge.
-Each is accepted into a plan, folded into V1's step 0, or dropped; its §7 lists the asks.
+(S73, including smooth sensitivity peaks $M_s / M_t$ alongside crossover margins), the optimizer as the one descent loop (S74), metrics as constraints in the bridge, and uncut rollout objectives paired with smooth feasibility margins in `.program()`.
+Each is accepted into a plan, folded into V1's step 0, or dropped; its §8 lists the asks.
 
 **Before v0.3 wave C (S72, the path-integral planner; C6, the serial chain)**
 
