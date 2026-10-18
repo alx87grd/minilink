@@ -1,5 +1,5 @@
 %% The planned pipeline: the statement, the compiled traced path, the NumPy consumers.
-%% Same content as differentiable-cost-pipeline.png (target-architecture.md §2).
+%% Same content as differentiable-cost-pipeline.png (differentiable-problem.md §2).
 flowchart TB
     subgraph statement["PlanningProblem (and its stochastic variant) · ProblemParameters, one params pytree"]
         sys["System<br/><i>f, h, params</i>"]
@@ -11,7 +11,7 @@ flowchart TB
     compile["problem.compile(controller, dt)<br/><i>one compiled object per loop</i>"]
     rollout["rollout_p<br/><i>one integrator, emits signals</i>"]
     traj["Trajectory<br/><i>native pytree, one noun</i>"]
-    score["score_rollout<br/><i>one quadrature, exit, h</i>"]
+    score["score_trajectory<br/><i>one quadrature, exit, h</i>"]
     evaluation["Evaluation<br/><i>cost, mean, worst, failure_rate</i>"]
 
     solution["PlanningSolution<br/><i>the planner's answer</i>"]

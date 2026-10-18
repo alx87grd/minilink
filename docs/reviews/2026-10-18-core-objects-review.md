@@ -8,6 +8,10 @@ the maintainer asked whether the core object system as a whole is sound for a co
 differentiable path from parameters to trajectory, cost, averaged cost and success rate, with
 no code duplication, or whether the big picture needs adjusting. This is that review. Facts
 were counted on `dev` at ac9a230b.
+**Consolidated:** the plan, the options and the target-architecture ideas this file links to
+were merged into [differentiable-problem.md](../plans/differentiable-problem.md) on
+2026-10-18 ([the record](2026-10-18-differentiable-problem-consolidation.md)); the links below
+are history and this file stays as it was.
 
 ## Verdict
 

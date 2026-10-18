@@ -270,26 +270,24 @@ the new core objects land in a smaller library; plan in TODO §4):
 - **K4** One demo per feature: redundant demos merged or removed, before D1.3 sweeps the
   rest. **[ask per group]**
 
-**The textbook objects**, before wave C, in this order: the differentiable evaluator's
-plumbing first (it waits on nothing), the cost parameters next, then the rest of the
-evaluator they unlock, then the two objects it does not need.
-The target the differentiable work serves, and the ideas around it (to review, including an
-alternative bottom-up build order in §7.1 that lands native `Trajectory`, `Set.as_cost`, and
-`A2` before writing the unified `score_trajectory`):
-[target-architecture.md](../plans/target-architecture.md).
-- **V1, first half** (steps 0–3 of [differentiable-cost.md](../plans/differentiable-cost.md),
-  beside K1): the naming brainstorm, one scoring kernel, the whole trajectory out of the
-  compiled scan, and `problem.compile(controller)` with the deterministic verbs on the
-  system params. **[ask — core, the names]**
+**The textbook objects**, before wave C, bottom-up: the nouns the differentiable path runs
+on (the native `Trajectory`, the cost integral on `xp`), then its kernels, then the compiled
+problem with its deterministic verbs and the program bridge, then the cost parameters, then
+the draws, then the two objects it does not need. The plan, consolidated from three analyses
+on 2026-10-18, its asks in §9: [differentiable-problem.md](../plans/differentiable-problem.md).
+- **V1, first half** (steps 0–5 of the plan, beside K1): the names, the native `Trajectory`,
+  one scoring kernel, the whole run out of the compiled scan, `problem.compile(controller)`
+  with the deterministic verbs, and the program bridge with the optimizer's program classes
+  and first-order backend (S74). **[ask — core, the names]**
 - **A2** Cost parameters ([cost-params.md](../plans/cost-params.md)): every library cost reads
   `params`, composite costs nest them like a diagram's, and the transcriptions, DP, the
   evaluators and the RL paths pass `problem.params.cost` through to the program's objective,
   so `jax.grad` reaches `Q` and `R`. **[ask — core]**
-- **V1, second half** (steps 4–6, right after A2), the differentiable closed-loop cost as a
-  drafted prototype before the GMC714 release: the params of a plant or a controller inside a diagram → the closed-loop run →
-  a scalar cost → its mean over rollouts when the problem is stochastic, one JAX path with
-  one entry point; the design doc first, the prototype on the research lane, the teaching
-  surface once it has run in the course. **[ask — core]**
+- **V1, second half** (steps 7–9, right after A2, which is the plan's step 6), the
+  differentiable planning problem as a drafted prototype before the GMC714 release: the draws
+  (`evaluate`, `mean_cost`, the Monte Carlo evaluator absorbed, RN-5's one path), the sets as
+  costs and the bridge's lowerings, the material; the prototype on the research lane, the
+  teaching surface once it has run in the course. **[ask — core]**
 - **A1** `core/fields.py` ([fields.md](../plans/fields.md)). **[ask — core]**
 - **A3** Workspace geometry, `core/geometry/` ([geometry-module.md](../plans/geometry-module.md)).
   **[ask — core]**
@@ -449,13 +447,15 @@ stiffness and damping, the shared pure functions) in
 - **CBF safety filter** ([cbf-safety-filter.md](../plans/cbf-safety-filter.md)): research
   lane until a course asks; the barrier is a `Field` once A1 lands.
 
-**Ideas to review (2026-10-18), not decided** — the target architecture of the
-differentiable toolbox (any traceable metric optimized through the native optimizer, with
-respect to any parameter set the problem holds) and the ideas and architectural guardrails around it, consolidated in
-[target-architecture.md](../plans/target-architecture.md): the verb family on the problem,
-`Evaluation` as a verb of the problem, the open-loop `compile()`, traceable linear analysis
-(S73, including smooth sensitivity peaks $M_s / M_t$ alongside crossover margins), the optimizer as the one descent loop (S74), metrics as constraints in the bridge, and uncut rollout objectives paired with smooth feasibility margins in `.program()`.
-Each is accepted into a plan, folded into V1's step 0, or dropped; its §8 lists the asks.
+**The differentiable planning problem (2026-10-18), the asks of its consolidated plan** —
+one path from any parameter the problem holds to any traceable metric, optimized through the
+native optimizer: the names (its step 0), one scoring contract without modes, the evaluator's
+numbers changing once as the loop becomes a diagram simulation, the bridge's defaults, the
+optimizer's program classes and its one global preset (S74), the verbs dropped, the lane, and
+whether traceable analysis (S73) is scheduled:
+[differentiable-problem.md](../plans/differentiable-problem.md) §9, each ask with its proposed
+answer; the three analyses it consolidates are compared in
+[the record](../reviews/2026-10-18-differentiable-problem-consolidation.md).
 
 **Before v0.3 wave C (S72, the path-integral planner; C6, the serial chain)**
 

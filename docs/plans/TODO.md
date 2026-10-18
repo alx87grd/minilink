@@ -49,8 +49,9 @@ Runs in parallel with wave B.
 - [ ] **A5 Later nouns, each with its first consumer.** `log_prob` on the distributions;
   parameter-dictionary support on sets and distributions (one flatten rule, with
   identification or the robust problem); `Set.as_cost(weight=, shaping=)` as the set-to-cost
-  dual of `Field.as_cost()` (used when softening hard constraints `X`, `U`, `Xf` into penalty
-  costs in V1 and MPPI); `UnionSet` via `|` when reachability or multi-goal
+  dual of `Field.as_cost()` (its first consumer the program bridge's `"soft"` lowering, step 8
+  of differentiable-problem.md, after `shaping.py` moves to `core/`; MPPI reads it next);
+  `UnionSet` via `|` when reachability or multi-goal
   work needs it; vector bounds on `Saturation`; library sets, shapes and fields reading
   `params` (same rule as A2, after it); `PlanningProblem.hamiltonian()` only if the course
   teaches Pontryagin; the RL critic as a `Field` once training is over.
@@ -302,18 +303,14 @@ pick):
 
 ## 4. v0.3 — GMC714, catalog, parity
 
-**Order:** V1's steps 0–3 (the names, the scoring kernel, the whole trajectory out of the
-scan, the evaluator with its deterministic verbs) now, beside K1; K2–K4 (November); then A2
-(the params threaded through every cost and into the program's objective), then V1's steps
-4–6 on that plumbing, so the prototype exists before the GMC714 release, then A1 and A3; G1
-first in wave C; RN-4 and RN-5 together with P10's AC-7, between cohorts; S72 after them; V1's Monte
-Carlo part after RN-5.
-*(Alternative bottom-up order to review later — [target-architecture.md](target-architecture.md) §7.1:
-run `Step 0 + K1–K3` first; then upgrade the core nouns in Phase 2 (`V1-2b` native
-`Trajectory` pytree, `shaping.py` + `Set.as_cost()` in `core/`, and `A2` cost `params` + `xp`
-`total_cost`); then write the unified dual-backend `score_trajectory` (`V1-1`) and `rollout_p`
-(`V1-2`) once in Phase 3; then complete `V1-3`, `V1-4 + RN-4/RN-5`, and `V1-5/6 + S74`
-followed by `K4` in Phase 4, with `S73` in parallel and `A1`/`A3`/Wave C in Phase 5.)*
+**Order:** V1's steps 0–5 of [differentiable-problem.md](differentiable-problem.md) (the
+names, the native `Trajectory` and the `xp` cost integral, the scoring kernel, the whole run
+out of the scan, the compiled problem with its deterministic verbs, the program bridge with
+S74's program classes and first-order backend) now, beside K1; K2–K4 (November); then A2 (the
+plan's step 6: the params threaded through every cost and set into the bridge), then V1's
+steps 7–9 (the draws, which are RN-5's one path; the sets as costs and the bridge's lowerings;
+the material), so the prototype exists before the GMC714 release, then A1 and A3; G1 first in
+wave C; RN-4 with P10's AC-7, between cohorts; S72 after them; S73 any time, self-contained.
 
 **K — consolidation first** (November 2026, after `0.2.0`, before A1–A3). The goal: a
 smaller library that is easier to read and keep — fewer names, fewer demos, prototypes
@@ -431,8 +428,9 @@ the demo sweep touches fewer files. Nothing leaves without the maintainer's ruli
 - [ ] **RN-3 / RN-4 / RN-5** of [randomness.md](randomness.md) (its §9 holds the files and
   "done when" per step): RN-4 `realize(key)` by name and signals on `disturbances=` (the
   frozen-noise defect fixed), RN-5 the Monte Carlo evaluator as a batched simulation of the
-  closed-loop diagram on its test set; together, between cohorts, before the v0.9 freeze,
-  with P10's AC-7. RN-3 `NoiseSource` with its first consumer. RN-6, the contract in DESIGN,
+  closed-loop diagram on its test set (step 7 of differentiable-problem.md is that one path;
+  RN-4's seeds join it under the same verb when they land); together, between cohorts, before
+  the v0.9 freeze, with P10's AC-7. RN-3 `NoiseSource` with its first consumer. RN-6, the contract in DESIGN,
   goes with each step.
   Also: the evaluator's `simulator` backend fails on a diagram plant with a nested-diagram
   error (randomness.md §1).
@@ -459,26 +457,24 @@ the demo sweep touches fewer files. Nothing leaves without the maintainer's ruli
   and the poles, the cost-to-go the certainty-equivalent form; `Q_n = B_w W B_wᵀ`,
   `R_n = D_v V D_vᵀ` from `linearize_matrices(sys, wrt="d")` / `wrt="n"` and the blocks'
   `psd`. With RN-4. Design: [estimation-and-state-feedback.md](estimation-and-state-feedback.md) §5.
-- [ ] **V1 The differentiable closed-loop cost** **[ask — core]**, a drafted prototype
-  before the GMC714 release: steps 0–3 now beside K1, steps 4–6 right after A2 (moved up
-  2026-10-17; the names of every new object and verb are a brainstorm with the maintainer
-  before code, step 0 of the plan; the API and architecture are the design
-  doc's to settle, `docs/plans/differentiable-cost.md`, written first with the
-  `pid_autotuning_jax` demo as its worked example). One fully differentiable JAX path: controller params → closed-loop dynamics → RK4
-  step → the run on a horizon → the cost `J` → the mean of `J` over stochastic rollouts, every
-  parameter an input (controller, plant, cost (A2), sets, `x0`), behind one standard entry
-  point; teaching surface once mature. Today tutorial 11 and `pid_autotuning_jax` write that
-  scan by hand. In place: the params-traced closed-loop run (`rk4_integrate_zoh_trace_p`; the
-  grad of a PID gain through `PID() @ Pendulum()` matched finite differences to 8 digits on
-  2026-10-12). Missing: the plant's `(x, u)` along a traced run, one traced cost integral, the
-  Monte Carlo path with the controller's params as an input (RN-5 and AC-7 are its
-  neighbours). Done when the pathwise gradient of the mean closed-loop cost with respect to
-  the controller's params matches a central difference on the same draws, through the
-  standard entry point.
-  The target this serves and the ideas around it, to review, not decided:
-  [target-architecture.md](target-architecture.md) (including §5.3's four-mode treatment of
-  hard constraints `X`, `U`, `Xf` across all pipelines: `"ignore"`, `"soft"`, `"hard"`, and
-  `"cut"`).
+- [ ] **V1 The differentiable planning problem** **[ask — core]**, a drafted prototype
+  before the GMC714 release: steps 0–5 of [differentiable-problem.md](differentiable-problem.md)
+  now beside K1, steps 7–9 right after A2 (its step 6). The names of every new object and verb
+  are a brainstorm with the maintainer before code (step 0); the design is the plan's to
+  settle, its asks in §9, with the `pid_autotuning_jax` demo as the worked example. One fully
+  differentiable path: the params of anything in the loop, the cost or the sets → the
+  closed-loop run → the trajectory, the scalar cost `J`, the smallest margin to `X` and `U` →
+  the mean of `J` over the problem's draws → a `MathematicalProgram` over chosen leaves, solved
+  by the `Optimizer`; behind one standard entry point, `problem.compile(controller)`; teaching
+  surface once mature. Today tutorial 11, the showcase cells and the four compile demos write
+  that scan by hand. In place: the params-traced closed-loop run (`rk4_integrate_zoh_trace_p`)
+  and the prototype of 2026-10-18 (the plant's command out of the port-signal buffer, a masked
+  trapezoid kernel, `jax.grad` against central differences to 10⁻⁹, the ravelled program
+  solved by SLSQP in 49 iterations; the consolidation record has the numbers). Missing: all of
+  it as library verbs, and the native `Trajectory` they pass around. Done when the pathwise
+  gradient of the mean closed-loop cost with respect to the controller's params matches a
+  central difference on the same key, through the standard entry point, and the autotuning
+  demo ends in the `Optimizer`.
 - [ ] **S73 Traceable linear analysis** **[idea to review — ask — core]**, proposed by the
   maintainer 2026-10-18, not scheduled: `poles`, `frequency_response` and `margins` in
   `analysis/linear.py` through the array module, so the sensitivity of closed-loop poles,
@@ -501,7 +497,7 @@ the demo sweep touches fewer files. Nothing leaves without the maintainer's ruli
   only the jacobian), self-contained for a cloud agent. Done when `jax.grad` of the phase
   margin and of each closed-loop pole of `PID() @ Pendulum()` with respect to a gain and to
   the mass matches a central difference, and the NumPy callers see no change. Design:
-  [target-architecture.md](target-architecture.md) §4.7, §5.1.
+  [differentiable-problem.md](differentiable-problem.md) §4.8.
 - [ ] **S74 The optimizer as the one descent loop** **[idea to review — ask — core]**,
   proposed by the maintainer 2026-10-18, not scheduled. Today `MathematicalProgram` carries
   `J`, `h`, `g` and the box, `Optimizer` offers three constrained-NLP presets (`scipy_slsqp`,
@@ -531,7 +527,10 @@ the demo sweep touches fewer files. Nothing leaves without the maintainer's ruli
   loop's gains with `method="adam"` and with the class default, SLSQP refuses nothing it
   accepted before, the RL baselines stay bit-identical with the moved Adam, and no
   `value_and_grad` loop remains in `examples/demos/compile/`. Design:
-  [target-architecture.md](target-architecture.md) §4.8.
+  [differentiable-problem.md](differentiable-problem.md) §4.7: the program classes with the
+  admitted methods and the `"auto"` pick, the default method kept at `scipy_slsqp` until V3,
+  the first-order backend with the RL `Adam` moved, one global derivative-free preset
+  (`scipy_differential_evolution`), never picked by `"auto"`; lands as the plan's step 5.
 
 ---
 
