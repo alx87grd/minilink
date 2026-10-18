@@ -259,10 +259,10 @@ regime mathematically well-posed and maintainable:
      (`problem.compile(controller)`), a linear `PID` or `StateFeedback` without a `Saturation`
      block can emit $u_k \notin U$ unless `U.margin` is either penalized or constrained.
 
-- **Recommendation — four explicit constraint modes (`constraints=` on `score_rollout`, `evaluator.cost`, and `evaluator.program`) backed by one `Set.margin` contract:**
-  Factor `score_rollout` into the **uncut integral** $J_{\text{uncut}}$ (discounted trapezoid of
-  $g$ plus terminal $h$) and the **margin evaluation** (`X.margin`, `U.margin`, `Xf.margin`),
-  then expose four clean modes so every pipeline gets exact semantics:
+- **Recommendation — make `score_trajectory` the single dual-backend (`xp`) scoring kernel with explicit `constraints=` and `discount=` options:**
+  Once `Trajectory` is a native `xp` JAX pytree (§4.3 / Step 2b), `score_trajectory(problem, traj, *, params=None, constraints="cut", discount=True, ...)` replaces all three duplicate scoring implementations (`score_trajectory`, `evaluate_jax`'s inline scan, and `transcription.py::trajectory_cost`) without needing a separate `score_rollout` function:
+  - **`discount: bool | float = True`:** `True` applies $\exp(-\rho t)$ from `problem.cost.discount_rate` (closed-loop evaluation, RL, DP, `evaluator.cost`); `False` (or `0.0`) integrates undiscounted $g$ (used by open-loop transcriptions `direct_collocation` and `multiple_shooting` so existing trajopt baselines stay bit-identical unless opted in); a float overrides $\rho$.
+  - **Four explicit constraint modes (`constraints=` on `score_trajectory`, `evaluator.cost`, and `evaluator.program`) backed by one `Set.margin` contract:**
   1. **`constraints="ignore"` (Unconstrained rollout for gradient evaluation + independent
      success/failure reporting):**
      - `J` integrates the uncut rollout over $[0, t_f]$, ignoring `X`, `U`, and `Xf` inside the

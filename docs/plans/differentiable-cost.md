@@ -300,36 +300,49 @@ From the big-picture review of the differentiable path ([target-architecture.md]
 - **Facade and object naming (Step 0):** Prefer `problem.compile(controller=None, *, dt, backend="jax")`
   returning `ProblemEvaluator` (or `PlanningProblemEvaluator`), with `wrt=` as the selection
   keyword on `.program(wrt=...)` to match `sys.jacobian(of, wrt)`.
-- **Four-mode hard-constraint treatment across all pipelines (Steps 1, 3, 4, 5):** Factor
-  `score_rollout` into the **uncut integral** $J_{\text{uncut}}$ and the **margin evaluation**
-  (`X.margin`, `U.margin`, `Xf.margin`), and support four explicit constraint modes
-  (`constraints="ignore" | "soft" | "hard" | "cut"`):
-  1. **`"ignore"` (Unconstrained gradient evaluation + independent success/failure reporting):**
-     Integrates the uncut rollout over $[0, t_f]$ for clean BPTT gradients $\nabla_\theta J_{\text{uncut}}$,
-     while `evaluator.success_rate(params, keys)` and `evaluator.feasibility(params, keys)` are
-     evaluated independently as diagnostics. Ideal when $Q, R$ already regularize the trajectory
-     or when `X = sys.state.box` is only a nominal domain box.
-  2. **`"soft"` (Smooth penalty / barrier folding into $J$ + `Set.as_cost`):** Transforms negative
-     margins of $X$, $U$, and region $X_f$ into smooth penalties added to $J_{\text{uncut}}$ using
-     `planning/spatial/shaping.py` (`quadratic_hinge(0.0)` by default, or `inverse_barrier`), and
-     exposes `Set.as_cost(weight=100.0, shaping=quadratic_hinge(0.0)) -> CostFunction` as the
-     set-to-cost dual of `Field.as_cost()`. Ideal for unconstrained first-order solvers (`Adam`,
-     `gd`, `scipy_lbfgsb`), `MPPI` in narrow corridors, and stochastic expectation tuning where a
-     single $3\sigma$ draw grazing $X$ would make hard all-draw constraints infeasible.
-  3. **`"hard"` (Explicit NLP constraints $g(z) \ge 0$, $h(z) = 0$ in `.program()`):** Keeps
-     $J(z) = J_{\text{uncut}}(z)$ and lowers nontrivial $X$ (and unsaturated $U$) to aggregated
-     smooth margins $g(z) = \operatorname{softmin}_k \text{margin}(x_k(z), t_k) \ge 0$ (or
-     per-knot margins in open-loop transcriptions) for `scipy_slsqp`, `scipy_trust_constr`, and
-     `ipopt`. Note the `SingletonSet(x_goal)` rule on `Xf`: in closed-loop tuning
-     (`controller is not None`), an auto-created `SingletonSet(x_goal)` is a regulation reference
-     only (not a hard equality $h(z) = 0$, which would be violated by asymptotic $e^{-t/\tau}$
-     convergence), whereas a region `Xf` (`BallSet`, `BoxSet`) lowers to
-     $g_{X_f}(z) = X_f.\text{margin}(x_N(z)) \ge 0$, and open-loop shooting (`controller=None`)
-     lowers `SingletonSet` to $h(z) = X_f.\text{residual}(x_N(z)) = 0$.
-  4. **`"cut"` (Episodic exit cut + `infeasible_cost`):** Cuts the integral at the first sample
-     leaving $X$ (`alive` mask) and charges `infeasible_penalty(x_exit, t_exit)`. Used by
-     `MonteCarloEvaluator` / `score_trajectory`, `RolloutEnvironment` (RL), and
-     `DynamicProgrammingPlanner`.
+- **One dual-backend `score_trajectory(problem, traj, *, params=None, constraints="cut", discount=True, ...)` kernel (Steps 1, 2b, 3, 4, 5 — replaces `score_rollout` and `trajectory_cost`):**
+  Once `Trajectory` is a native `xp` JAX pytree (Step 2b), there is no need for a separate
+  `score_rollout(problem, t, xs, us, params)` alongside NumPy `score_trajectory` and
+  `transcription.py::trajectory_cost`. A single dual-backend `score_trajectory` (using
+  `xp = array_module(traj.x)` and a static-shape `alive` step mask `xp.cumprod(inside)` that
+  is bit-identical to slicing `t[:last+1]` on NumPy while tracing under `jax.jit` and
+  `jax.vmap`) owns both `discount` and `constraints`:
+  - **`discount: bool | float = True` (resolves Ask 4 without breaking trajopt baselines):**
+    `discount=True` applies $\exp(-\rho t)$ with $\rho = \text{problem.cost.discount\_rate}$
+    (default for closed-loop evaluation, RL, DP, and `evaluator.cost`); `discount=False` (or
+    `0.0`) integrates undiscounted $g$ (used by open-loop transcriptions `direct_collocation`
+    and `multiple_shooting` so existing discounted-problem trajopt plans stay bit-identical
+    unless the caller opts in); a float overrides $\rho$ directly.
+  - **`constraints: Literal["cut", "ignore", "soft"] = "cut"` (plus `"hard"` on `evaluator.program`):**
+    1. **`"ignore"` (Unconstrained gradient evaluation + independent success/failure reporting):**
+       Integrates the uncut rollout over $[0, t_f]$ for clean BPTT gradients $\nabla_\theta J_{\text{uncut}}$,
+       while `failed` (`evaluator.success_rate`) and `feasibility` (`softmin` of `Set.margin`) are
+       evaluated independently on the same trajectory. Ideal when $Q, R$ already regularize the
+       trajectory, when `X = sys.state.box` is only a nominal domain box, or inside
+       `direct_collocation` / `evaluator.program(constraints="hard")` where constraints are
+       enforced via $g(z) \ge 0$.
+    2. **`"soft"` (Smooth penalty / barrier folding into $J$ + `Set.as_cost`):** Transforms negative
+       margins of $X$, $U$, and region $X_f$ into smooth penalties added to $J_{\text{uncut}}$ using
+       `planning/spatial/shaping.py` (`quadratic_hinge(0.0)` by default, or `inverse_barrier`), and
+       exposes `Set.as_cost(weight=100.0, shaping=quadratic_hinge(0.0)) -> CostFunction` as the
+       set-to-cost dual of `Field.as_cost()`. Ideal for unconstrained first-order solvers (`Adam`,
+       `gd`, `scipy_lbfgsb`), `MPPI` in narrow corridors, and stochastic expectation tuning where a
+       single $3\sigma$ draw grazing $X$ would make hard all-draw constraints infeasible.
+    3. **`"hard"` (Explicit NLP constraints $g(z) \ge 0$, $h(z) = 0$ in `.program()` and transcriptions):**
+       Calls `score_trajectory(..., constraints="ignore")` for $J(z) = J_{\text{uncut}}(z)$ and lowers
+       nontrivial $X$ (and unsaturated $U$) to aggregated smooth margins
+       $g(z) = \operatorname{softmin}_k \text{margin}(x_k(z), t_k) \ge 0$ (or per-knot margins in
+       open-loop transcriptions) for `scipy_slsqp`, `scipy_trust_constr`, and `ipopt`. Note the
+       `SingletonSet(x_goal)` rule on `Xf`: in closed-loop tuning (`controller is not None`), an
+       auto-created `SingletonSet(x_goal)` is a regulation reference only (not a hard equality
+       $h(z) = 0$, which would be violated by asymptotic $e^{-t/\tau}$ convergence), whereas a
+       region `Xf` (`BallSet`, `BoxSet`) lowers to $g_{X_f}(z) = X_f.\text{margin}(x_N(z)) \ge 0$,
+       and open-loop shooting (`controller=None`) lowers `SingletonSet` to
+       $h(z) = X_f.\text{residual}(x_N(z)) = 0$.
+    4. **`"cut"` (Episodic exit cut + `infeasible_cost`):** Cuts the integral at the first sample
+       leaving $X$ (`alive` mask) and charges `infeasible_penalty(x_exit, t_exit)`. Used by
+       `MonteCarloEvaluator` / `Evaluation.of_trajectory`, `RolloutEnvironment` (RL), and
+       `DynamicProgrammingPlanner`.
 - **Flat `MathematicalProgram` boundary (Step 5):** Keep `MathematicalProgram` strictly on flat
   vectors $z \in \mathbb{R}^{n_z}$; `evaluator.program(wrt=...)` owns `ravel_pytree` and
   provides `program.unravel(result.z)` (or `evaluator.update_params(result.z)`), keeping pytree
