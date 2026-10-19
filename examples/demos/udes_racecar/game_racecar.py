@@ -11,6 +11,11 @@ sys = UdeSRacecarDyn3D()
 
 # sys.camera_follow_frame = None
 
-sys.game(renderer="meshcat", is_3d=True)
-# sys.game(renderer="pygame")
-# sys.game(renderer="matplotlib")
+sys.game(
+    renderer="meshcat",
+    is_3d=True,
+    plot="plotly",
+    plot_signals=("slip", "grip"),
+)
+# sys.game(renderer="pygame", plot=True)
+# sys.game(renderer="matplotlib", plot=True)
