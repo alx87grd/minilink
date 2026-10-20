@@ -1254,6 +1254,13 @@ class TestRealtimeSimulator(unittest.TestCase):
             inp.close()
             fake_pygame.quit.assert_called_once()
 
+            # When right-stick axes (3 or 4) are used for control, camera orbit is disabled.
+            inp_plane = PygameInput(joystick_axes=[(5, 1.0), (3, 1.0)])
+            inp_plane.open(sys)
+            self.assertEqual(inp_plane._joy_camera_axes, ())
+            self.assertEqual(inp_plane.poll_camera(0.1), (0.0, 0.0))
+            inp_plane.close()
+
     def test_keyboard_interrupt_returns_partial_trajectory(self):
         sys = StableLinearSystem()
         calls = 0

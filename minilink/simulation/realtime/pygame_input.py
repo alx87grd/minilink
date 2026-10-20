@@ -21,6 +21,12 @@ DEFAULT_KEY_AXES = (
     ("l", "j"),
 )
 
+# Right stick (azimuth, elevation) on 6-axis gamepads (Xbox / DualSense).
+DEFAULT_CAMERA_AXES = (
+    (3, -1.0),
+    (4, -1.0),
+)
+
 # Wall-clock integration step cap for ``mode="rate"`` so a stalled frame
 # cannot slew the command arbitrarily far.
 MAX_RATE_ELAPSED_S = 0.1
@@ -70,12 +76,11 @@ class PygameInput(RealtimeInput):
         e.g. ``[(1, 1.0), (0, -1.0)]`` to remap or invert sticks.
     joystick_deadzone : float
         Deflections below this magnitude are ignored (default ``0.1``).
-    camera_axes : str, bool, or sequence of (int, float), optional
+    camera_axes : bool or sequence of (int, float), optional
         Joystick ``[(azimuth_axis, sign), (elevation_axis, sign)]`` for 3-D
-        camera orbit (e.g. MeshCat). ``"auto"`` (default) binds the right
-        stick (axes ``(3, 4)`` on 6-axis gamepads such as Xbox controllers, or
-        ``(2, 3)`` on 4-axis joysticks) when not already used by
-        ``joystick_axes``. Pass ``False`` or ``None`` to disable joystick
+        camera orbit (e.g. MeshCat). Defaults to :data:`DEFAULT_CAMERA_AXES`
+        (the right stick, axes ``(3, 4)``) when neither axis is used by
+        ``joystick_axes``. Pass ``None`` or ``False`` to disable joystick
         camera orbit.
     camera_rate : float
         Camera orbit angular rate at full stick deflection [rad/s]
@@ -108,7 +113,7 @@ class PygameInput(RealtimeInput):
         joystick=True,
         joystick_axes=None,
         joystick_deadzone=0.1,
-        camera_axes="auto",
+        camera_axes=DEFAULT_CAMERA_AXES,
         camera_rate=2.0,
         window: bool | str = "auto",
     ):
@@ -123,10 +128,12 @@ class PygameInput(RealtimeInput):
         self.joystick = joystick
         self.joystick_axes = None if joystick_axes is None else tuple(joystick_axes)
         self.joystick_deadzone = float(joystick_deadzone)
+        if camera_axes is True:
+            camera_axes = DEFAULT_CAMERA_AXES
         self.camera_axes = (
-            camera_axes
-            if (camera_axes in ("auto", False, None))
-            else tuple(camera_axes)
+            ()
+            if not camera_axes
+            else tuple((int(ax), float(sign)) for ax, sign in camera_axes[:2])
         )
         self.camera_rate = float(camera_rate)
         self.window = window
@@ -359,29 +366,13 @@ class PygameInput(RealtimeInput):
                 (int(ax), float(sign)) for ax, sign in self.joystick_axes[:m]
             )
 
-        if not self.camera_axes:
-            self._joy_camera_axes = ()
-        elif self.camera_axes == "auto":
-            used = {ax for ax, _ in self._joy_axes}
-            # 6-axis gamepads (Xbox / DualSense) put Left Stick on (0, 1),
-            # Left Trigger on 2, Right Stick on (3, 4), and Right Trigger on 5.
-            # 4-axis joysticks without trigger axes put Right Stick on (2, 3).
-            if num_axes >= 5:
-                default_pairs = ((3, -1.0), (4, -1.0), (0, -1.0), (1, -1.0))
-            else:
-                default_pairs = ((2, -1.0), (3, -1.0), (0, -1.0), (1, -1.0))
-            free = [
-                (ax, sign)
-                for ax, sign in default_pairs
-                if 0 <= ax < num_axes and ax not in used
-            ]
-            self._joy_camera_axes = (free[0], free[1]) if len(free) >= 2 else ()
+        used = {ax for ax, _ in self._joy_axes}
+        if len(self.camera_axes) == 2 and all(
+            0 <= ax < num_axes and ax not in used for ax, _ in self.camera_axes
+        ):
+            self._joy_camera_axes = self.camera_axes
         else:
-            self._joy_camera_axes = tuple(
-                (int(ax), float(sign))
-                for ax, sign in self.camera_axes[:2]
-                if 0 <= int(ax) < num_axes
-            )
+            self._joy_camera_axes = ()
 
     def draw_overlay(self, u, *, force: bool = False):
         """Show focus hint, key axes, and current ``u`` on the focus window."""

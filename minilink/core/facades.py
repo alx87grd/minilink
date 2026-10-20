@@ -976,7 +976,7 @@ class DynamicSystemFacades:
         is_3d=False,
         input=None,
         joystick_axes=None,
-        camera_axes="auto",
+        camera_axes=((3, -1.0), (4, -1.0)),
         plot=False,
         plot_signals=None,
         plot_backend="matplotlib",
