@@ -327,7 +327,10 @@ public name; v1.0 (§5.5) freezes.
 **The foundations that can break names** — decided before the freeze:
 - **S31** The sampled loop as a `System` (state `[plant; computer]`, periodic discrete
   update) or an honest `HybridLoop` rename; `%` stays the one hybrid operator either way.
-  With it, P10's AC-8b. **[ask — core]**
+  With it, P10's AC-8b. Recommended (2026-10-20, §6): the loop, not the diagram, with one
+  sampled rollout kernel in two faces that the RL environment, `HybridSimulator` and the MPC
+  export call; tracing decided by the computer. Decided before the differentiable problem's
+  step 0 (V1), not at the freeze. **[ask — core]**
 - **S29** `DiagramSystem.x0` / `n` / `state` as derived properties. **[ask — core]**
 - **S37** Evaluator / solver re-layering; **S27** Diffrax as an optional JAX solve.
   **[ask — core]**
@@ -500,8 +503,28 @@ and which can wait, each with its proposed answer; the analyses and the panel ar
   the prelude trim before v0.9 (silent, or a one-release shim). Analysis, tiers and the
   asks: [the core-consolidation writeup](../plans/core-consolidation.md).
 
-- `HybridDiagram` as a `System` vs `HybridLoop` (S31); the sampled seam's time argument,
-  integer ticks (today) or seconds; and whether its run-state caches
+- **The sampled loop: a `System` or a tool** (S31): `HybridDiagram` as a `System` (a
+  continuous and a piecewise-constant state, periodic update events, a simulator and a
+  compiler that know sample times) or an honest `HybridLoop`. Recommended (2026-10-20):
+  the loop is a tool, not a diagram. The model algebras stay two, the continuous one
+  (`System`, diagrams, the operators) and the discrete-time one (`StepSystem`,
+  `StepDiagramSystem`), both closed; the loop that joins the two clocks is an object with
+  `compute_trajectory` and `compile`, built by `%`, and not a `System`: nesting a sampled
+  loop in a diagram has no consumer, `linearize` and the frequency tools have no meaning on
+  it, and multi-clock scheduling as a framework feature is out of scope (§7). One sampled
+  rollout kernel (the controller held over its period, the plant integrated between
+  samples, a schedule for multi-rate) in a NumPy face and a JAX face, as `Simulator` and
+  `compile` are; its three copies today (the RL `RolloutEnvironment`, `HybridSimulator`, the
+  MPC computer export) become its callers, and the tuning evaluator's continuous closed loop
+  stays a diagram as ruled (RD-D24): the two loops exist on purpose, one for analysis and
+  gradient tuning of a continuous law, one for every sampled controller. The kernel never
+  breaks tracing; the computer decides: a gain, a neural policy or a digital PID traces end
+  to end (the RL planner, gain tuning, a digital PID tuned by gradient); MPC with SciPy or
+  Ipopt inside runs on the NumPy face; a traceable inner solver later makes MPC a
+  differentiable policy too, so the MPC block's `step` stays a pure function of arrays with
+  the solver inside. Timing: before the differentiable problem's step 0, where its evaluator
+  and this kernel meet at the hybrid seam. Still to rule with it: the sampled seam's time
+  argument, integer ticks (today) or seconds; and whether its run-state caches
   (`StepSystem.rollout`, `HybridDiagram.last_result`) join `self.traj` as allowed caches
   (RULES 2.4).
 - Evaluator / solver layering, Diffrax (S37, S27).

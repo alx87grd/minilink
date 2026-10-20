@@ -560,7 +560,10 @@ in December 2026 after the v0.3 tag; the v1.0 rows after two cohorts.
   the ruling is recorded and the moves are rows here.
 - [ ] **S31** `HybridDiagram` → a `System` (state `[plant; computer]`, periodic discrete
   update) or an honest `HybridLoop` rename; `%` stays the one hybrid operator either way; the
-  hand-copied facades go with it; P10's AC-8b lands with it.
+  hand-copied facades go with it; P10's AC-8b lands with it. Recommended 2026-10-20
+  (ROADMAP §6): the loop, with one sampled rollout kernel in a NumPy and a JAX face, called
+  by `RolloutEnvironment`, `HybridSimulator` and the MPC computer export; the kernel never
+  breaks tracing, the computer decides. Decided before V1's step 0.
   Also: the sampled seam's time argument, ticks or seconds (ROADMAP §6; scan: control#3); the
   run-state caches, decided here: RULES 2.4 allows only `self.traj`, while
   `StepSystem.rollout` and `HybridDiagram.last_result` cache a run too (ROADMAP §6); the

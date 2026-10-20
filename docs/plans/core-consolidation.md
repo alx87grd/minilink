@@ -107,7 +107,7 @@ history). The last column says where the usage lens disagreed.
 | `core/system.py`, `diagram.py`, `wiring.py`, `composition.py`, `feedback.py`, `signals.py`, `backends.py` | the model and its algebra | spine | agrees |
 | `core/compile/` (the evaluators, the step compiler) | the rollout; JAX is the accelerator | spine | agrees |
 | `core/trajectory.py`, `sets.py`, `costs.py`, `distributions.py`, `geometry.py` (+ `planning/spatial/` → `core/geometry/`, A3) | the textbook objects every pillar speaks | spine | agrees |
-| `core/hybrid_composition.py`, `hybrid_diagram.py`, `step_rollout.py`; `simulation/computer.py`, `hybrid_simulator.py`; `blocks/step.py` | the sampled loop: every real controller, learned or optimized, runs at a sample rate on a continuous plant. MPC and a deployed policy need it; so does a recorded demonstration | spine (provisional until S31 decides its shape) | agrees |
+| `core/hybrid_composition.py`, `hybrid_diagram.py`, `step_rollout.py`; `simulation/computer.py`, `hybrid_simulator.py`; `blocks/step.py` | the sampled loop: every real controller, learned or optimized, runs at a sample rate on a continuous plant. MPC and a deployed policy need it; so does a recorded demonstration | spine (provisional in shape; S31's recommended option: the loop as a tool, one sampled kernel in two faces) | agrees |
 | `core/facades.py` (32 verbs on `System`) | the student's one-line entry to every pillar | spine; trim the verbs no pillar needs (`get_diagram`, `plot_input_output_map`, `render`) | agrees |
 | `core/kinematics.py` (SE2 / SE3) | pose algebra for robots and vehicles | spine | agrees |
 | `core/inspect.py`, `options.py` | `print` on every noun; option checks | substrate | agrees |

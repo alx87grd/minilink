@@ -497,6 +497,7 @@ the nonsymmetric eigensolver is CPU-only. The done-when is on the workboard row.
 | optimizer-parametric-wiring.md (OPW-1) | the shared backend factory is where the new presets register |
 | TODO C4 (identification) | `fit` is the bridge with a data-mismatch objective (§4.6) |
 | TODO K (November) | two rows the review found: the evaluator grid trimmed to `_p` bodies plus generated bindings (36 integrator methods, 1763 lines); `StepRollout` folded into `Trajectory` once it is a pytree |
+| the sampled loop (S31, ROADMAP §6) | this plan's evaluator is the continuous closed loop as a diagram (RD-D24) and stays so; the sampled rollout kernel S31 recommends (the controller held over its period, one kernel in two faces) is the sibling path the RL environment, the hybrid simulator and MPC share, and the two meet where §4.2 says "until the hybrid seam batches"; a sampled controller tuned by gradient (a digital PID, a held neural policy) goes through that kernel, not through this evaluator |
 
 ## 7. Decided and proposed
 
@@ -605,7 +606,7 @@ consolidation (K rows):** the evaluator grid trimmed; `StepRollout` into `Trajec
 
 Each with the proposed answer; the panel's splits come first. **Before any code** (they shape
 step 0 and the first commits): 1, 2, 5, 6, 7 and 8. **Before the step they name**: 3 (step 7),
-4 (step 5), 9 (step 9). **Any time**: 10, 11, 12. Taking an ask: the ruling goes to §4 or §8
+4 (step 5), 9 (step 9). **Any time**: 10, 11, 12, 13. Taking an ask: the ruling goes to §4 or §8
 here and to a dated record under `docs/reviews/`, and the ask leaves this list and ROADMAP §6.
 
 1. **The noun.** `problem.compile(policy) -> ProblemEvaluator` (five designs of seven; the
@@ -636,3 +637,6 @@ here and to a dated record under `docs/reviews/`, and the ask leaves this list a
 11. **S73**: scheduled beside the above or left as the row it is.
 12. **The `CostIntegrator` block** (cost-params.md's research step): closed as a demo idea; the
     kernel on samples is the contract.
+13. **S31 before step 0**: the sampled-loop recommendation (ROADMAP §6: the loop as a tool,
+    one sampled rollout kernel in two faces, tracing decided by the computer) taken before
+    the first commit, so that kernel and this evaluator are designed once at the seam (§6).
