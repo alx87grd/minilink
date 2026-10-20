@@ -1346,8 +1346,13 @@ class TestRealtimeSimulator(unittest.TestCase):
         self.assertEqual(spec.traces[2].label, "pos")
         plt.close("all")
 
+        # The backend is plot_backend; a name passed as plot is refused and says so
+        with self.assertRaisesRegex(ValueError, "plot_backend"):
+            RealtimeSimulator(sys, renderer=None, plot="plotly")
         with self.assertRaisesRegex(ValueError, "Unknown signal backend"):
-            RealtimeSimulator(sys, renderer=None, plot="invalid_backend")
+            RealtimeSimulator(
+                sys, renderer=None, plot=("y",), plot_backend="invalid_backend"
+            )
 
 
 class TestAutomaticTimeGrid(unittest.TestCase):

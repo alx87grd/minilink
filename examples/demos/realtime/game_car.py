@@ -7,7 +7,7 @@ sys = UdeSRacecarDyn3D()
 sys.game(
     renderer="meshcat",
     is_3d=True,
-    plot="plotly",
-    plot_signals=("slip", "grip"),
+    plot=("slip", "grip"),
+    plot_backend="plotly",
     joystick_axes=[(1, 1.0), (0, -1.0)],
 )

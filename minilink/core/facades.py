@@ -975,10 +975,10 @@ class DynamicSystemFacades:
         renderer="pygame",
         is_3d=False,
         input=None,
+        output=None,
         joystick_axes=None,
         camera_axes=((3, -1.0), (4, -1.0)),
         plot=False,
-        plot_signals=None,
         plot_backend="matplotlib",
         sync="locked",
         compile_backend=None,
@@ -1005,9 +1005,11 @@ class DynamicSystemFacades:
         Pass ``joystick_axes=[(axis, sign), ...]`` to remap or invert gamepad
         sticks, and ``camera_axes=[(az_axis, sign), (el_axis, sign)]`` to
         control 3-D camera orbit (or pass a custom
-        :class:`~minilink.simulation.realtime.RealtimeInput` via ``input=``).
-        Pass ``plot=True`` (or ``plot="plotly"``, ``plot_signals=...``) to open
-        a live rolling-window time-signal plot alongside the scene.
+        :class:`~minilink.simulation.realtime.RealtimeInput` via ``input=``;
+        a :class:`~minilink.simulation.realtime.RealtimeOutput` via
+        ``output=`` receives every frame). Pass ``plot=True``, or the signals
+        to show (``plot=("slip", "grip")``), to open a live rolling-window
+        time-signal plot alongside the scene, on ``plot_backend``.
 
         ``compile_backend=None`` (default) tries JAX when available and
         compatible, otherwise NumPy — preferred for live sessions where speed
@@ -1030,9 +1032,9 @@ class DynamicSystemFacades:
             renderer=renderer,
             is_3d=is_3d,
             plot=plot,
-            plot_signals=plot_signals,
             plot_backend=plot_backend,
             input=input,
+            output=output,
             compile_backend=compile_backend,
             max_steps=max_steps,
             tf=tf,

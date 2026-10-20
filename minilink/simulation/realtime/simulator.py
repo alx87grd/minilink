@@ -93,17 +93,16 @@ class RealtimeSimulator:
         Live input source; ``None`` holds the nominal port values.
     output : RealtimeOutput, optional
         External per-frame consumer; ``None`` publishes nothing.
-    plot : bool or str
-        Open a live rolling-window time-signal plot during the run
-        (default ``False``); pass ``"matplotlib"`` or ``"plotly"`` to select
-        the plotting backend directly. Uses
-        :class:`~minilink.simulation.realtime.live_plot.LiveSignalPlotOutput`.
-    plot_signals : sequence of str or (System, str), optional
-        Signals to display in the live plot; defaults to
-        :func:`~minilink.graphical.signals.resolve_plot_signals` when ``None``.
-        Passing ``plot_signals`` implies ``plot=True``.
+    plot : bool or sequence of str or (System, str)
+        Open a live rolling-window time-signal plot during the run (default
+        ``False``): ``True`` shows the signals of
+        :func:`~minilink.graphical.signals.resolve_plot_signals`, a sequence
+        names the signals to show. Uses
+        :class:`~minilink.simulation.realtime.live_plot.LiveSignalPlotOutput`,
+        published beside ``output`` when both are given.
     plot_backend : str
-        Signal plotting backend when ``plot=True`` (``"matplotlib"`` or ``"plotly"``).
+        Signal plotting backend of the live plot (``"matplotlib"`` or
+        ``"plotly"``), as on every plotting verb.
     compile_backend : str or None
         Evaluator backend. ``None`` or ``"auto"`` (default ``None``): try JAX
         when available and the system is JAX-compatible, otherwise NumPy.
@@ -141,7 +140,6 @@ class RealtimeSimulator:
         input=None,
         output=None,
         plot=False,
-        plot_signals=None,
         plot_backend="matplotlib",
         compile_backend=None,
         max_steps=None,
@@ -171,15 +169,10 @@ class RealtimeSimulator:
         self.renderer = renderer
         self.is_3d = is_3d
         self.input = input
-        if isinstance(plot, str):
-            plot_backend = plot
-            plot = True
-        self.plot = bool(plot or plot_signals is not None)
-        self.plot_signals = plot_signals
+        require_plot_flag(plot)
+        self.plot = plot
         self.plot_backend = plot_backend
-        self.output = realtime_output_of(
-            output, self.plot, plot_signals, plot_backend=plot_backend
-        )
+        self.output = realtime_output_of(output, plot, plot_backend=plot_backend)
         self.max_steps = max_steps
         self.tf = tf
         self.verbose = bool(verbose)
@@ -564,16 +557,24 @@ class CompositeOutput(RealtimeOutput):
             out.close()
 
 
-def realtime_output_of(
-    output, plot: bool, plot_signals, *, plot_backend: str = "matplotlib"
-):
-    """Combine an optional user ``RealtimeOutput`` with ``LiveSignalPlotOutput`` when ``plot=True``."""
-    if not plot:
+def require_plot_flag(plot) -> None:
+    """Refuse a backend name as ``plot``: the backend is ``plot_backend``, ``plot`` is ``True`` or the signals."""
+    if isinstance(plot, str):
+        raise ValueError(
+            f"plot={plot!r}: pass plot=True or a sequence of signal names, and the "
+            "backend as plot_backend='matplotlib' or 'plotly'"
+        )
+
+
+def realtime_output_of(output, plot, *, plot_backend: str = "matplotlib"):
+    """The user's ``RealtimeOutput``, with a ``LiveSignalPlotOutput`` beside it when ``plot`` asks for one."""
+    if plot is False or plot is None:
         return output
 
     from minilink.simulation.realtime.live_plot import LiveSignalPlotOutput
 
-    plot_out = LiveSignalPlotOutput(signals=plot_signals, backend=plot_backend)
+    signals = None if plot is True else tuple(plot)
+    plot_out = LiveSignalPlotOutput(signals=signals, backend=plot_backend)
     if output is None:
         return plot_out
     return CompositeOutput((plot_out, output))
