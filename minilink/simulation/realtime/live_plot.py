@@ -246,9 +246,5 @@ def flush_live_canvas(handle, show: bool) -> None:
         return
     fig = getattr(handle, "fig", None)
     canvas = getattr(fig, "canvas", None)
-    flush_events = getattr(canvas, "flush_events", None)
-    if callable(flush_events):
-        try:
-            flush_events()
-        except Exception:
-            pass
+    if canvas is not None:
+        canvas.flush_events()

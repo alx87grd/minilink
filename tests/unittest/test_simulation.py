@@ -1175,7 +1175,7 @@ class TestRealtimeSimulator(unittest.TestCase):
             renderer=None,
             compile_backend="numpy",
             plot=True,
-            output=CallbackOutput(lambda t, x, u, outputs: published.append(t)),
+            output=CallbackOutput(lambda t, x, u, outputs: published.append(outputs)),
             max_steps=3,
         )
         # Replace the default shown LiveSignalPlotOutput with the headless one for CI
@@ -1190,7 +1190,10 @@ class TestRealtimeSimulator(unittest.TestCase):
             # Internal diagram signals are sampled incrementally per step, never reconstructed O(N).
             self.assertEqual(spy_reconstruct.call_count, 0)
 
+        # A user output that overrides publish alone inherits the base contract: it is
+        # opened beside the live plot and still receives the boundary outputs
         self.assertEqual(len(published), 3)
+        self.assertIn("y", published[0])
         self.assertIn("controller:u", live_out.resolved_signals)
         win_traj = live_out.window_trajectory()
         self.assertTrue(win_traj.has_signal("controller:u"))

@@ -269,13 +269,12 @@ class RealtimeSimulator:
         input_opened = False
         step_idx = 0
         self.n_overruns = 0
-        run_wall_start = time.perf_counter()
         status_open = False
         try:
             # Open output first (e.g. a live Matplotlib signal plot) so the
             # interactive scene / PygameInput window opens last and keeps OS focus.
             if self.output is not None:
-                open_output(self.output, sys, x0=x, u0=u, t0=t)
+                self.output.open(sys, x0=x, u0=u, t0=t)
                 output_opened = True
 
             if backend is not None:
@@ -321,11 +320,9 @@ class RealtimeSimulator:
 
                 if backend is not None:
                     if self.input is not None:
-                        poll_cam = getattr(self.input, "poll_camera", None)
-                        if callable(poll_cam):
-                            d_az, d_el = poll_cam(dt_hold)
-                            if d_az != 0.0 or d_el != 0.0:
-                                backend.orbit_camera(d_az, d_el)
+                        d_az, d_el = self.input.poll_camera(dt_hold)
+                        if d_az != 0.0 or d_el != 0.0:
+                            backend.orbit_camera(d_az, d_el)
                     events = self._animator.update_live_frame(
                         backend, x, u, t, kinematic=kinematic
                     )
@@ -333,7 +330,7 @@ class RealtimeSimulator:
                 if self.output is not None:
                     outputs = (
                         evaluator.outputs(x, u, t)
-                        if getattr(self.output, "needs_boundary_outputs", True)
+                        if self.output.needs_boundary_outputs
                         else {}
                     )
                     self.output.publish(t, x, u, outputs)
@@ -529,9 +526,7 @@ class RealtimeSimulator:
             x, u, t, self.frame_dt, dt_inner=self.sim_dt
         )
         outputs_warm = None
-        if self.output is not None and getattr(
-            self.output, "needs_boundary_outputs", True
-        ):
+        if self.output is not None and self.output.needs_boundary_outputs:
             outputs_warm = self.evaluator.outputs(x, u, t)
         if getattr(self.evaluator, "backend", "numpy") == "jax":
             import jax
@@ -542,18 +537,23 @@ class RealtimeSimulator:
                     jax.block_until_ready(value)
 
 
+###############################################################################
+# Internal machinery
+###############################################################################
+
+
 class CompositeOutput(RealtimeOutput):
     """Fan out lifecycle and per-frame samples to multiple :class:`RealtimeOutput`s."""
 
     def __init__(self, outputs):
         self.outputs = tuple(outputs)
         self.needs_boundary_outputs = any(
-            getattr(out, "needs_boundary_outputs", True) for out in self.outputs
+            out.needs_boundary_outputs for out in self.outputs
         )
 
     def open(self, sys, *, x0=None, u0=None, t0=0.0):
         for out in self.outputs:
-            open_output(out, sys, x0=x0, u0=u0, t0=t0)
+            out.open(sys, x0=x0, u0=u0, t0=t0)
 
     def publish(self, t, x, u, outputs):
         for out in self.outputs:
@@ -562,14 +562,6 @@ class CompositeOutput(RealtimeOutput):
     def close(self):
         for out in self.outputs:
             out.close()
-
-
-def open_output(output: RealtimeOutput, sys, *, x0=None, u0=None, t0=0.0) -> None:
-    """Call ``output.open(sys)``, passing initial sample kwargs when accepted."""
-    try:
-        output.open(sys, x0=x0, u0=u0, t0=t0)
-    except TypeError:
-        output.open(sys)
 
 
 def realtime_output_of(

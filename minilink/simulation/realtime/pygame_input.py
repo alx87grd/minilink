@@ -100,7 +100,9 @@ class PygameInput(RealtimeInput):
     focus window is needed and no pygame display exists when :meth:`open`
     runs, this input opens a small window so SDL can deliver key events, and
     draws a ``u`` overlay on it. ESC, ``Ctrl+C``, or closing the window stops
-    the run.
+    the run. :meth:`open` sets ``SDL_JOYSTICK_ALLOW_BACKGROUND_EVENTS=1`` in
+    the process environment, so SDL keeps reading a gamepad while a browser
+    or a MeshCat window holds the OS focus.
     """
 
     def __init__(
@@ -269,6 +271,7 @@ class PygameInput(RealtimeInput):
 
         # Keys give a digital ±1 direction; a joystick overrides the same
         # component with an analog deflection in [-1, 1].
+        # A controller plugged in after open is picked up on the next frame
         if self._joy is None and (self.joystick or self.joystick_axes is not None):
             self.bind_joystick(self._hold_lower.size)
         keys = pygame.key.get_pressed()

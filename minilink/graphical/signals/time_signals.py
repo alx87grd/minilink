@@ -441,18 +441,18 @@ def labels_and_units_for_extra_signal(sys, name: str, dim: int):
             return labels, units_for_vector(port.units, dim)
 
     # A named output or input port of this system
-    if name in getattr(sys, "outputs", {}):
+    if name in sys.outputs:
         port = sys.outputs[name]
         labels = labels_for_vector(port.labels, dim, name)
         return labels, units_for_vector(port.units, dim)
-    if name in getattr(sys, "inputs", {}):
+    if name in sys.inputs:
         port = sys.inputs[name]
         labels = labels_for_vector(port.labels, dim, name)
         return labels, units_for_vector(port.units, dim)
 
     # A single state component selected by its state label
-    state = getattr(sys, "state", None)
-    if state is not None and dim == 1 and name in state.labels:
+    state = sys.state
+    if dim == 1 and name in state.labels:
         idx = list(state.labels).index(name)
         unit = state.units[idx] if idx < len(state.units) else ""
         return (str(name),), (str(unit),)
@@ -467,14 +467,13 @@ def labels_and_units_for_extra_signal(sys, name: str, dim: int):
 def available_signal_names(sys, traj) -> tuple[str, ...]:
     """The trajectory's signals, then every output/input port and state label of the system or diagram."""
     names = list(traj.signal_names)
-    for port_id in getattr(sys, "outputs", ()):
+    for port_id in sys.outputs:
         if port_id not in names:
             names.append(port_id)
-    for port_id in getattr(sys, "inputs", ()):
+    for port_id in sys.inputs:
         if port_id not in names:
             names.append(port_id)
-    state = getattr(sys, "state", None)
-    for label in getattr(state, "labels", ()):
+    for label in sys.state.labels:
         if label not in names:
             names.append(label)
     if isinstance(sys, DiagramSystem):
@@ -489,10 +488,9 @@ def available_signal_names(sys, traj) -> tuple[str, ...]:
 
 def system_channel_keys_of(sys, resolved_signals: tuple[str, ...]) -> tuple[str, ...]:
     """Named output ports, input ports, or state labels among ``resolved_signals``."""
-    outputs = getattr(sys, "outputs", {})
-    inputs = getattr(sys, "inputs", {})
-    state = getattr(sys, "state", None)
-    state_labels = set(state.labels) if state is not None else set()
+    outputs = sys.outputs
+    inputs = sys.inputs
+    state_labels = set(sys.state.labels)
 
     keys = []
     for name in resolved_signals:
@@ -507,10 +505,10 @@ def evaluate_system_channel(
     sys, name: str, x: np.ndarray, u: np.ndarray, t: float
 ) -> np.ndarray:
     """Evaluate one named output port, input port, or state component at ``(x, u, t)``."""
-    if name in getattr(sys, "outputs", {}):
+    if name in sys.outputs:
         port = sys.outputs[name]
         return np.asarray(port.compute(x, u, t), dtype=float).reshape(port.dim).copy()
-    if name in getattr(sys, "inputs", {}):
+    if name in sys.inputs:
         port = sys.inputs[name]
         (val,) = sys.get_port_values_from_u(u, name)
         return np.asarray(val, dtype=float).reshape(port.dim).copy()
@@ -523,20 +521,12 @@ def system_channel_samples(sys, traj, name: str) -> np.ndarray | None:
     if not system_channel_keys_of(sys, (name,)):
         return None
 
-    state = getattr(sys, "state", None)
-    if (
-        name not in getattr(sys, "outputs", {})
-        and name not in getattr(sys, "inputs", {})
-        and state is not None
-        and name in state.labels
-    ):
-        idx = list(state.labels).index(name)
+    if name not in sys.outputs and name not in sys.inputs and name in sys.state.labels:
+        idx = list(sys.state.labels).index(name)
         return np.asarray(traj.x[idx : idx + 1, :], dtype=float)
 
     n_pts = traj.n_samples
-    port = (
-        sys.outputs[name] if name in getattr(sys, "outputs", {}) else sys.inputs[name]
-    )
+    port = sys.outputs[name] if name in sys.outputs else sys.inputs[name]
     out = np.zeros((port.dim, n_pts), dtype=float)
     for i in range(n_pts):
         out[:, i] = evaluate_system_channel(
