@@ -603,7 +603,10 @@ consolidation (K rows):** the evaluator grid trimmed; `StepRollout` into `Trajec
 
 ## 9. Asks for the maintainer
 
-Each with the proposed answer; the panel's splits come first.
+Each with the proposed answer; the panel's splits come first. **Before any code** (they shape
+step 0 and the first commits): 1, 2, 5, 6, 7 and 8. **Before the step they name**: 3 (step 7),
+4 (step 5), 9 (step 9). **Any time**: 10, 11, 12. Taking an ask: the ruling goes to §4 or §8
+here and to a dated record under `docs/reviews/`, and the ask leaves this list and ROADMAP §6.
 
 1. **The noun.** `problem.compile(policy) -> ProblemEvaluator` (five designs of seven; the
    `System.compile` precedent), with `MonteCarloEvaluator` kept as the thin facade that holds

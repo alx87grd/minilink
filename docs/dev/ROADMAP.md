@@ -447,14 +447,17 @@ stiffness and damping, the shared pure functions) in
 - **CBF safety filter** ([cbf-safety-filter.md](../plans/cbf-safety-filter.md)): research
   lane until a course asks; the barrier is a `Field` once A1 lands.
 
-**The differentiable planning problem (2026-10-18), the asks of its consolidated plan** —
-one path from any parameter the problem holds to any traceable metric, optimized through the
-native optimizer: the names (its step 0), one scoring contract without modes, the evaluator's
-numbers changing once as the loop becomes a diagram simulation, the bridge's defaults, the
-optimizer's program classes and its one global preset (S74), the verbs dropped, the lane, and
-whether traceable analysis (S73) is scheduled:
-[differentiable-problem.md](../plans/differentiable-problem.md) §9, each ask with its proposed
-answer; the three analyses it consolidates are compared in
+**The differentiable planning problem (2026-10-18, panel of 2026-10-20), the asks of its
+consolidated plan** — one path from any parameter the problem holds to any traceable metric,
+optimized through the native optimizer. Four points the seven-design panel split on, each with
+a recommendation: the noun (`problem.compile(policy)` returning an evaluator, or verbs on the
+existing Monte Carlo evaluator), the `Evaluation` record (a NumPy report with a traced `value`
+verb, or a pytree), the draws before or after the program bridge, and the optimizer's method
+keys (by algorithm, or the `scipy_` prefix). Then the names (its step 0), one scoring contract
+without modes, the evaluator's numbers changing once as the loop becomes a diagram simulation,
+the verbs dropped, the lane, S73's scheduling:
+[differentiable-problem.md](../plans/differentiable-problem.md) §9 says which asks block code
+and which can wait, each with its proposed answer; the analyses and the panel are compared in
 [the record](../reviews/2026-10-18-differentiable-problem-consolidation.md).
 
 **Before v0.3 wave C (S72, the path-integral planner; C6, the serial chain)**
