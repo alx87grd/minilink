@@ -1,13 +1,13 @@
 # The differentiable planning problem: one path from any parameter to any metric
 
-Status: consolidated proposal for the maintainer (2026-10-18). One document replaces the
-plan of 2026-10-17, its architecture-and-naming analysis and the target-architecture ideas of
-2026-10-18, after a third, independent review probed each against the code; what each of the
-three said and why the consolidation went the way it did is in
+Status: consolidated proposal for the maintainer (2026-10-18, revised 2026-10-20). One
+document replaces the plan of 2026-10-17, its architecture-and-naming analysis and the
+target-architecture ideas of 2026-10-18, after an independent review probed each against the
+code and a panel of seven independent designs with six critiques amended the result; what each
+said and how the splits were judged is in
 [the consolidation record](../reviews/2026-10-18-differentiable-problem-consolidation.md).
 What is marked **decided** was ruled before this document; everything else is proposed and
-waits on the asks of §9. §10 records where a seven-design panel (2026-10-20) overturned or
-split on the proposals above; where §10 and an earlier section disagree, §10 is the proposal. Nothing is built; §8 is the build order, step V1 and rows S73 and S74
+waits on the asks of §9. Nothing is built; §8 is the build order, step V1 and rows S73 and S74
 of [TODO.md](TODO.md) §4.
 Rung: v0.3 (the evaluator and the optimizer), v0.3 and after (traceable analysis).
 Lane: research first; the teaching surface once a course has run it.
@@ -48,26 +48,27 @@ poles and margins.
 problem = PlanningProblem(Pendulum(), cost=QuadraticCost(...), X=BoxSet(...), tf=10.0)
 evaluator = problem.compile(ImpedanceIntegralController(Kp=1.0, Ki=0.0, Kd=1.0), dt=0.05)
 
-params = evaluator.params                        # {"system": {"controller": …, "plant": …}, "cost": …, "sets": …}
+params = evaluator.params                        # {"controller": …, "plant": …, "cost": …, "sets": …, "x0": …, "r": …}
 traj = evaluator.trajectory(params)              # the run, a Trajectory (of=plant: the plant's own x and u)
 J = evaluator.cost(params)                       # the one scoring contract
-dJ = jax.grad(evaluator.cost)(params)            # dJ / d every parameter: gains, mass, weights
+dJ = jax.grad(evaluator.cost)(params)            # dJ / d every parameter: gains, mass, weights, the start
 m = evaluator.margin(params)                     # the smallest margin to X and U along the run, ≥ 0 iff feasible
-report = evaluator.evaluate(params, key, n_trials=200)     # the draws: J per trial, failed, mean, worst, failure_rate
-J_bar = evaluator.mean_cost(params, key, n_trials=200)     # the same mean as one scalar, for jax.grad
+report = evaluator.evaluate(params, key, n_trials=200)     # the draws: J per trial, failed, keys; mean, worst, failure_rate
+J_bar = evaluator.value(params, key, n_trials=200)         # the problem's criterion over the draws, one traced scalar
 
-program = evaluator.program(wrt=["controller.Kp", "controller.Ki", "controller.Kd"], lower=0.0)
+program = evaluator.program(wrt=["controller.Kp", "controller.Ki", "controller.Kd"], bounds={"controller.Kp": (0.0, None)})
 result = Optimizer(program, method="scipy_slsqp").solve()  # gain tuning as an NLP; "adam", "gd" after S74
+solution = tune(problem, controller, wrt=[...], dt=0.05)  # the same, as a PlanningSolution: print, compare, plot
 ```
 
 Three nouns do the work, and two of them exist:
 
 - **`Trajectory`**, the run, becomes array-native and a JAX pytree (**decided 2026-10-18**),
   so the compiled rollout, the cost integral and the plots speak one noun.
-- **`ProblemEvaluator`** (working name), the problem compiled against a controller: pure
-  functions of one params pytree, from the parameters of anything in the loop, the cost or
-  the sets to the trajectory, the cost, its mean over the problem's draws and the feasibility
-  margin. It absorbs `MonteCarloEvaluator`.
+- **`ProblemEvaluator`** (working name), the problem compiled against a policy: pure
+  functions of one params pytree and a key, from the parameters of anything in the loop, the
+  cost, the sets or the start to the trajectory, the cost, the problem's criterion over its
+  draws and the feasibility margin. `MonteCarloEvaluator` becomes a thin facade on it.
 - **`MathematicalProgram`**, unchanged in shape, gains one more producer (the bridge) and, on
   `Optimizer`, the program classes that pick a method (S74).
 
@@ -118,19 +119,21 @@ control (no implicit gradient of the inner solve) and the sampling planner (rand
 
 | Object | Today | After |
 | --- | --- | --- |
-| `PlanningProblem` (frozen) | `sys`, `cost`, `X`, `U`, `X0`, `Xf`, `tf`, `infeasible_cost`, `params: ProblemParameters`; computes nothing | unchanged in shape; gains `compile(controller=None, *, dt, backend="auto", episode_length=None)`, a two-line facade |
+| `PlanningProblem` (frozen) | `sys`, `cost`, `X`, `U`, `X0`, `Xf`, `tf`, `infeasible_cost`, `params: ProblemParameters`; computes nothing | unchanged in shape; gains `compile(policy, *, dt, backend="auto", episode_length=None)`, a two-line facade, and `realize(key, n=None)` on the stochastic class (§4.5) |
 | `StochasticPlanningProblem` | adds the three laws, `criterion`, the three `sample_*(key)`; every planner takes it through `nominal()` | unchanged; its draws are the one source the evaluator vmaps over |
 | `Trajectory` (frozen) | a NumPy reporting object: `float` casts, copies | **decided:** array-native, a JAX pytree; reporting verbs NumPy by contract (§4.2) |
 | `StepRollout` | the step twin of `Trajectory` | a November consolidation candidate: one noun with `t = k·dt`, after §4.2 |
 | `CostFunction` | `g`, `h` trace; `evaluate_trajectory` is a NumPy `for` loop with `float()` casts | `evaluate_trajectory` / `total_cost` on `xp` (vectorized, no cast); reads `params` with A2 |
 | `Set` | `margin` traces; `contains` is NumPy | `contains` derived from `margin` on `xp`, so the kernel and the RL environment share the one exit test; reads `params` with A5 |
-| `MonteCarloEvaluator` | a verb pretending to be a noun: composes `policy @ plant` again, recompiles, refuses controllers with state, scores with an inline copy of the rule | absorbed: `evaluator.evaluate` (§4.5); the name an alias for one release |
-| `Evaluation` | a NumPy record: `J`, `failed`, `x0`, `trajectories`, `mean`, `worst`, `failure_rate`, `value(criterion)` | a pytree with `xp` statistics, so `jax.grad(lambda p: ev.evaluate(p, key).mean)` runs; the trials' trajectories on demand through `evaluator.trajectory(params, x0=, key=)`, not stored |
+| `MonteCarloEvaluator` | a verb pretending to be a noun: composes `policy @ plant` again, recompiles, refuses controllers with state, scores with an inline copy of the rule | a thin facade holding `dt` and a test set drawn once, `evaluate(policy)` delegating to the compiled problem (§4.5); its three backends go |
+| `Evaluation` | a NumPy record: `J`, `failed`, `x0`, `trajectories`, `mean`, `worst`, `failure_rate`, `value(criterion)` | the same NumPy report, plus the per-trial `keys` for replay and `trajectories` as one batched `Trajectory` when `record=True`; the traced scalar is the evaluator's `value` verb |
+| `TrajectorySource` | an open-loop plan as a block; its table an attribute, `h` a NumPy interpolation | the table in `params["values"]`, `h` on `interpolate_schedule` (traceable), so an open-loop plan is a policy like any other and its samples are leaves (§4.1) |
 | `ProblemEvaluator` | does not exist | **new** (§4.1), in `planning/evaluation.py` |
 | `RolloutEnvironment` | the problem as a step function for the RL collectors | unchanged role; its exit test is the one `Set.contains`, its reward the same `g` |
 | `PlanningSolution` (frozen) | `problem`, `policy`, `solver`, `trajectory`, `evaluation`, `cost_to_go` | unchanged; `trajectory` and `evaluation` of a feedback planner come from the evaluator, reproducible from problem, policy and key |
 | `MathematicalProgram` (frozen) | `J(z)`, `h`, `g`, bounds, `backend`, `metadata`; reached through a trajopt transcription | unchanged in shape; one more producer, `evaluator.program(wrt=)` (§4.6); its class read from its fields (§4.7) |
 | `Optimizer` | three constrained-NLP presets on a flat `z` | the program classes, a first-order backend (`gd`, `adam`), two free SciPy presets, one global derivative-free preset (§4.7) |
+| `tune` | does not exist | **new** facade, `planning/tuning.py`: `tune(problem, policy, wrt, *, dt, ...) -> PlanningSolution` (§4.6) |
 | `ParametricMathematicalProgram` | `h(z, x0)`, `bind(x0)`, the MPC block's | unchanged now; later the case "no decision leaves, `x0` bound" of the same bridge |
 
 The `System` evaluators gain one method (§4.4); nothing else appears or disappears.
@@ -139,32 +142,41 @@ The `System` evaluators gain one method (§4.4); nothing else appears or disappe
 
 ### 4.1 The compiled problem
 
-`problem.compile(controller=None, *, dt, backend="auto", episode_length=None)` builds the loop
-as `closed_loop` does (`controller @ problem.sys`; a `TrajectorySource` policy gives
-`source >> plant`, the open-loop plan replayed; no controller gives the plant alone, driven by
-the input sequence the verbs take), compiles it once on the backend, and returns the
-evaluator. `dt` is the fixed RK4 step and the sampling grid; `tf` is the problem's, or
-`episode_length` on an infinite horizon (10 s by default, as the Monte Carlo evaluator has).
+`problem.compile(policy, *, dt, backend="auto", episode_length=None)` builds the loop as
+`closed_loop` does (`policy @ problem.sys` for a feedback block, `source >> plant` for a
+`TrajectorySource`: the open-loop plan is a policy like any other, placed under `controller`),
+wires the loop's reference from the problem (`x_goal`, else the cost's target, as a leaf; a
+loop whose reference cannot be set is refused with a message, since a loop left at its nominal
+reference regulates to zero while the cost asks for the goal), compiles it once on the backend,
+and returns the evaluator. `dt` is the fixed RK4 step and the sampling grid, always explicit
+(the simulator's automatic grid is 1e-4 s on an undeclared loop and is not this tool's); `tf`
+is the problem's, or `episode_length` on an infinite horizon (10 s by default, as the Monte
+Carlo evaluator has).
 
-Its verbs are pure functions of `(params, x0=None, key=None)`: `params` the pytree below,
-`x0` the plant's start (the problem's `x_start`, or the draw), `key` one episode's draws (a
-stochastic problem's parameters and disturbances; `None` is the nominal episode):
+Its verbs are pure functions of `(params, key)`: `params` the pytree below, `key` one
+episode's draws (a stochastic problem's start, parameters and disturbances; `None` is the
+nominal episode). `key` is positional on every verb, so `vmap` maps it.
 
 | Verb | Returns | Differentiable |
 | --- | --- | --- |
-| `trajectory(params, x0, key, *, u=None, of=None)` | the loop's `Trajectory`: `t`, `x`, its boundary `u` (`u=` a held input sequence, else the nominal), every internal port as a signal (`"controller:u"`, `"plant:y"`); `of=plant` the plant's own `(x, u)`, the traced twin of `trajectory_of` | yes |
-| `cost(params, x0, key)` | `J` under the one scoring contract (§4.3), the plant's run scored | yes; zero after an exit (§5) |
-| `margin(params, x0, key)` | the smallest margin along the run, `min_k min(X.margin(x_k, t_k), U.margin(u_k, x_k, t_k))`: `≥ 0` iff the run is feasible | yes (piecewise) |
-| `evaluate(params, key, *, n_trials)` | the `Evaluation` over the draws of §4.5 | its statistics |
-| `mean_cost(params, key, *, n_trials)` | `evaluate(...).mean`, one scalar for `jax.grad` | yes |
-| `program(wrt, ...)` | a `MathematicalProgram` (§4.6) | through the `Optimizer` |
+| `trajectory(params=None, key=None, *, of=None)` | the loop's `Trajectory`: `t`, `x`, its boundary `u`, every internal port as a signal (`"controller:u"`, `"plant:y"`); `of=plant` the plant's own `(x, u)`, the traced twin of `trajectory_of` | yes |
+| `cost(params=None, key=None)` | `J` under the one scoring contract (§4.3), the plant's run scored | yes; zero after an exit (§5) |
+| `margin(params=None, key=None)` | the smallest margin along the run, `min_k min(X.margin(x_k, t_k), U.margin(u_k, x_k, t_k))`: `≥ 0` iff the run is feasible | yes (piecewise) |
+| `evaluate(params=None, key=0, *, n_trials=100, record=False)` | the `Evaluation` over the draws of §4.5 | its statistics on the host |
+| `value(params=None, key=0, *, n_trials=100)` | the problem's criterion over the draws (the mean, the worst draw, a CVaR) as one traced scalar; one trial on a deterministic problem | yes |
+| `program(wrt, ...)`, `pack(params, wrt)`, `unpack(z, wrt)` | a `MathematicalProgram` and the two sides of its ravel (§4.6) | through the `Optimizer` |
 
-`evaluator.params` is the nominal pytree, a plain nested dict in the shape of
-`ProblemParameters`: `"system"` nests the loop's blocks exactly as `diagram.params` does
-(`problem.params.system` is its `"plant"` entry), `"cost"` is the cost's dictionary (A2),
-`"sets"` the sets' (A5); a group with nothing to read is `None`, an empty pytree. Partial
-dictionaries follow the diagram rule: a missing block reads its own params, an unknown key
-raises. `jax.grad(evaluator.cost)(evaluator.params)` is the first line a student writes.
+`evaluator.params` is the nominal pytree, flat at the root: the loop's blocks by id exactly as
+`diagram.params` has them (`"controller"`, `"plant"`, an observer, a noise block), then
+`"cost"` (the cost's dictionary, A2), `"sets"` (the sets', A5), `"x0"` (the plant's start) and
+one leaf per boundary input port of the loop holding its held sequence (`"r"` the reference,
+`"d"` a disturbance, `"values"` under `controller` for a source policy). A group with nothing
+to read is `None`, an empty pytree; a block id that collides with a reserved leaf name is
+refused at compile. One namespace, so a drawn start, a disturbance sequence, an identification
+input, a tuned reference and a tuned gain are one merge mechanism, and `wrt` needs no special
+case. Partial dictionaries follow the diagram rule: a missing block reads its own params, an
+unknown key raises. `jax.grad(evaluator.cost)(evaluator.params)` is the first line a
+researcher writes; the student writes `tune` (§4.6).
 
 `backend="auto"` is JAX when the loop, `X` and the cost trace on it, NumPy otherwise, with the
 fallback announced when it changes the draws; an explicit `"jax"` on a NumPy-only law raises
@@ -172,10 +184,9 @@ and says so; `"numpy"` is the same object on the NumPy evaluator (`rk4_integrate
 internal signals per sample), one trial at a time, for a lookup-table law or a laptop without
 JAX. The integration is the loop's own RK4 on the diagram, so a controller with state (an
 integrator, an observer) is inside `x` from the first commit; the Monte Carlo evaluator's
-held-input static law goes with it (§4.5). Refused with a message saying so: a model
-predictive controller (its inner solve has no implicit gradient; `backend="numpy"` evaluates
-it), and a `StepSystem` controller or a `Computer @ plant` loop (the sampled seam; the hybrid
-simulator runs it).
+held-input static law goes with it (§4.5). A model predictive controller is refused on JAX
+(its inner solve has no implicit gradient) and evaluated on NumPy; a `Computer @ plant` loop
+runs on the NumPy path (RN-5's scope, RD-D24) until the hybrid seam batches.
 
 The AC-7 rule holds by construction: the cost reads the plant's `(x, u)` inside the loop,
 never the loop's boundary signals.
@@ -231,11 +242,14 @@ otherwise); `failed` is `not all(inside)`. Three facts about this form, from the
   `sum` is pairwise. So the NumPy consumers see a byte-identical refactor (RULES 7.7) and the
   JAX path, which agreed to `3·10⁻¹⁵` relative, gets the tolerance test the backends already
   share (`rtol = 1e-6`).
-- **The transcriptions take the cost's discount.** `trajectory_cost` applies none today while
-  the contract does; it reads `cost.discount_rate` like every other caller. No
-  trajectory-optimization test, demo or benchmark baseline declares a rate, so every baseline
-  stays bit-identical (`e⁰ = 1`), and a discounted problem's plan changes once, as DESIGN §6
-  says it should. No `discount=` keyword: the rate has one owner, the cost (RULES 5.6).
+- **The transcriptions take the cost's discount and keep their quadrature body.**
+  `trajectory_cost` applies no discount today while the contract does; it reads the cost's
+  discounted integrand (`e^{−ρ t_k} g_k`, one owner on `CostFunction`) and keeps its own
+  `xp.sum` trapezoid, because the kernel's running sum would change its bits (a pairwise sum
+  and a sequential one differ in the last place on about half of random grids). No
+  trajectory-optimization baseline declares a rate, so every baseline stays bit-identical
+  (`e⁰ = 1`), and a discounted problem's plan changes once, as DESIGN §6 says it should. No
+  `discount=` keyword: the rate has one owner, the cost (RULES 5.6).
 - **No scoring modes.** The kernel is the problem's contract and nothing else; a tool that
   wants the uncut integral scores the problem without the constraint it lowers elsewhere
   (`dataclasses.replace(problem, X=unconstrained)`, which is what the bridge does in §4.6),
@@ -261,10 +275,12 @@ throws it away. One method on the JAX and NumPy diagram evaluators carries it ou
 t, xs, signals = evaluator.rollout_p(x0, u_seq, t0, dt, params)   # signals (N+1, n_signals), at the sample times
 ```
 
-the scan emitting the buffer of the step's first stage beside `x_next`; `rollout_batch` gains
-the same `signals` output. The plant's `(x, u)` are slices of it (`plan.state_index`,
-`plan.output_slices`), the traced twin of `DiagramSystem.trajectory_of`, whose NumPy loop
-becomes a call to the same method with NumPy arrays. One signal per sample, read at the grid
+the scan emitting the buffer of the step's first stage beside `x_next`; `rollout_batch`
+keeps its documented single-array return (tested, used by the README and the showcases) and
+a batched twin of `rollout_p` serves the evaluator. The plant's `(x, u)` are slices of the
+signals (`plan.state_index`, `plan.output_slices`), the traced twin of
+`DiagramSystem.trajectory_of`, which slices when a trajectory carries recorded signals and
+keeps its recompute path when it does not (every `Simulator` run). One signal per sample, read at the grid
 state as `reconstruct_internal_signals` reads it today, so the plots and the kernel see the
 same `u`. The method is written in the trimmed style the evaluator-grid consolidation wants
 (one `_p` body, the bound and jitted variants generated), so it does not add a seventh column.
@@ -274,20 +290,23 @@ agree to round-off on the same grid, so the traced path cannot drift from what t
 
 ### 4.5 Draws, as the problem states them
 
-`evaluate(params, key, n_trials=)` splits one key per trial (one key per experiment, the
-randomness plan's convention) and `vmap`s one `cost` over the trials: `x0 = problem.sample_x0(k0)`;
-`system = merge(params["system"], problem.sample_params(k1))`, the draw a pytree override so a
-drawn mass and a differentiated gain coexist; the disturbances as held draws per step from
-`sample_disturbances(k2)`, as the RL environment draws them, until RN-4 puts a seed per random
-block in the pytree (`realize(key)` traced: `uint32` seeds instead of Python ints, which the
-blocks' counter-based draws already accept); then the mechanism changes under the same verb.
-A deterministic problem gives `evaluate(params).J` of one trial, equal to `cost(params)`, the
-twin test of randomness.md's RD-D23. `Evaluation` holds `J (B,)`, `failed (B,)`, `x0 (B, n)`
-as leaves and `mean`, `std`, `worst`, `failure_rate`, `value(criterion)` as `xp` scalars
-(`"worst_case"` is the worst draw, a CVaR when the criterion asks for one), so the mean and the
-worst differentiate and the failure rate is reported; `print(report)` formats them. The
-recorded trials of today's `record=True` are not stored: `evaluator.trajectory(params,
-x0=report.x0[i], key=keys[i])` replays any one of them.
+The draws are a function of the problem and one key only, never of the policy, so one test
+set scores many laws with common random numbers: `problem.realize(key, n=None)` on the
+stochastic class draws `n` realizations once (`x0` from `sample_x0`, the parameter draws as a
+pytree override, the disturbance sequences per boundary port until RN-4 puts a seed per random
+block in the pytree, after which the mechanism changes under the same verb), one key per
+experiment split inside, the randomness plan's convention; a deterministic problem realizes
+its single start. `evaluate(params, key, n_trials=, record=)` `vmap`s one `cost` over the
+realizations and returns the `Evaluation`, a NumPy report converted once at the boundary (lower
+late, convert once): `J (B,)`, `failed (B,)`, `x0 (B, n)`, the per-trial `keys` (so
+`evaluator.trajectory(params, report.keys[i])` replays any trial with no bookkeeping), and
+`trajectories` as one batched `Trajectory` when `record=True` (the fan-of-runs plot without a
+second simulation); `mean`, `std`, `worst`, `failure_rate`, `value(criterion)` as today. The
+traced scalar is the evaluator's `value(params, key, n_trials)`: the problem's criterion over
+the draws (`expectation` the mean, `worst_case` the worst draw, a CVaR at a `risk_level` when
+the criterion asks), computed by one shared `criterion_value` the bridge and the sampling
+planner read too. A deterministic problem gives `value(params) == cost(params)`, the twin test
+of randomness.md's RD-D23.
 
 This is RN-5 seen from the other side (randomness.md: "the Monte Carlo evaluator as a batched
 simulation of the closed-loop diagram on its test set", ruled RD-D24): the loop is a diagram,
@@ -295,52 +314,62 @@ compiled once, simulated on every realization, the cost scored on the plant. Two
 the maintainer already accepted there and this plan restates: the evaluator's numbers change
 once (the held-input static law becomes the continuous loop's own RK4, O(dt²) apart on a smooth
 law), re-pinned with a release note; and `backend` chooses the arrays only, the `"simulator"`
-backend being this path. `Planner.evaluate`, `solve(evaluate=True)`, `nominal_trajectory` and
-`compare(...).evaluate(dt=, key=, n_trials=)` read the evaluator; `MonteCarloEvaluator` is an
-alias whose `evaluate` is the new one, gone the release after.
+backend being this path. `MonteCarloEvaluator(problem, dt=, n_trials=, seed=)` stays as the
+thin facade that holds `dt` and a test set and whose `evaluate(policy)` compiles the problem
+against the policy and calls the verb above, so tutorial 11, `compare(...).evaluate(evaluator)`
+and `Planner.evaluate` keep their lines; `solve(evaluate=True)` and `nominal_trajectory` read
+the compiled problem.
 
 ### 4.6 The bridge to `MathematicalProgram`
 
-Tuning parameters is an NLP whose objective is a metric of the run. The bridge is designed
-for the whole table of §1 from the start:
+Tuning parameters is an NLP whose objective is a metric of the run:
 
 ```python
 program = evaluator.program(
-    wrt=["controller.Kp", "controller.Kd"],   # dotted leaves of evaluator.params; "u" the input sequence; "x0" the start
-    objective=None,                           # None: cost (one episode) or mean_cost (key given); else a callable of params
-    constraints=(),                           # callables of params, each lowered to g(z) ≥ 0 (a margin floor, a phase margin)
-    sets="hard",                              # the problem's X and U: "hard" (margin ≥ 0 as g), "soft" (a penalty on J), "ignore"
-    key=None, n_trials=None,                  # the draws of mean_cost, drawn once here: a sample average two solves share
-    lower=None, upper=None,                   # a box on the chosen leaves, scalars or their shape
+    wrt=["controller.Kp", "controller.Kd"],   # leaves of evaluator.params by dotted path, or a pytree mask; never a whole block
+    bounds={"controller.Kp": (0.0, None)},    # a box on the chosen leaves, by path, lowered to the bounds on z
+    key=None, n_trials=None,                  # the draws, realized once here: a sample average two solves share
 )
+z0 = evaluator.pack(evaluator.params, wrt)     # the two sides of the ravel are the evaluator's verbs
+params = evaluator.unpack(result.z, wrt)       # the full pytree with the chosen leaves replaced
 ```
 
-- `wrt` names leaves by dotted path from the root of `evaluator.params` (`system.controller.Kp`,
-  `cost.Q`, `sets.…`); a path whose first segment is a block of the loop is read under
-  `system`, the convention `params_distribution` already uses; a pytree mask is accepted too.
-  `"u"` ravels the held input sequence of the open-loop evaluator (single shooting with a held
-  input, §5), `"x0"` the start. The chosen leaves are ravelled to `z`
-  (`jax.flatten_util.ravel_pytree`); every other leaf is fixed at `evaluator.params`.
-- `J(z)` is the objective at `unravel(z)`; `g(z)` stacks the constraints and the lowered sets;
-  `lower` and `upper` are bounds on `z`. `backend="jax"`: the `Optimizer` differentiates it
-  as it does any program.
-- **The sets lower at the solver boundary**, as the transcriptions lower theirs (RULES 4.3):
-  `"hard"` scores the problem with the lowered set removed from the cut and adds
-  `margin(params) ≥ 0` as `g` (the exact minimum along the run; a smooth minimum,
-  `−τ·logsumexp(−m/τ)`, is an option named `temperature=` only if a solver stalls on the
-  kink); `"soft"` scores the problem with `X.as_cost(weight, shaping)` and `U.as_cost(...)`
-  added to the cost (step 8); `"ignore"` scores the problem without them and reports
-  `failed` beside. The default is `"hard"`: a problem that declares `X` means it.
-- `program.metadata` records `wrt`, the keys and `unravel`, so the callable `program.metadata["unravel"]` applied to `result.z`
-  gives the tuned leaves back as a pytree; `MathematicalProgram` stays flat on `z` and
+- `wrt` names leaves, never a block: every library controller keeps its saturation and
+  integral limits at ±inf in its params, so a whole-block selection would put infinities in
+  `z`; a block may declare its tunable leaves for the facade's default. `"x0"`, a boundary
+  port's sequence and a source policy's `"controller.values"` are ordinary leaves, so the
+  start, a reference and an open-loop input sequence (single shooting, with the source's held
+  or linear input model, the latter matching `ShootingTranscription`) are tuned the same way.
+- `J(z) = value(unpack(z), key, n_trials)` on the problem scored with the lowered sets removed
+  from the cut: the uncut discounted trapezoid plus `h`. `g(z)` stacks every sample's margins
+  of `X` (and of `U` on the plant's command where `U` has a finite face) at every trial, as
+  the transcriptions lower theirs (RULES 4.3): smooth per entry, the natural form for SQP,
+  cheap with forward-mode Jacobians when `n_z` is small; `margin` stays the reported minimum
+  and no smooth-min option exists. `Xf` lowers (a singleton to `h(z) = 0`, a region to its
+  terminal margin) for a source policy only; a feedback law approaches the goal
+  asymptotically and `Xf` is its reference. No `sets=` keyword and no `objective=` or
+  `constraints=` callables in the first cut: a penalty is `problem.cost + w * X.as_cost()`
+  composed on the problem, where `print(problem)` shows it; no constraint is
+  `replace(problem, X=None)`; a metric objective or a metric constraint (a phase-margin floor)
+  comes with S73 and its first consumer. `z` is scaled by the nominal magnitude of each leaf
+  (`|p0|` or 1), since SLSQP's tolerances and a quasi-Newton's initial Hessian are absolute and
+  gains, masses and weights span decades; the gradient is probed once at `z0` and a vanishing
+  one warns.
+- `MathematicalProgram` stays flat on `z` and its `metadata` data-only (`wrt`, the keys);
   `Optimizer` never sees a pytree (the constitution: not an optimization modeling language).
-  A facade, `evaluator.tune(wrt, *, method="scipy_slsqp", **program_kwargs) -> params`, builds
-  the program, runs the `Optimizer` and unravels, for the demo that wants one line (an ask).
-- The same bridge is **identification**: `objective=lambda p: mismatch(evaluator.trajectory(p), data)`
-  with `wrt` the plant's physical parameters or a network's weights (the C4 row's `fit`, one
-  verb for both). `ParametricMathematicalProgram.bind(x0)` is the case "no decision leaves,
-  `x0` bound" of this bridge, and the scene bind `J(z, p)` the case "bound params"; both can
-  follow once the program and the evaluator share the pytree.
+- **The facade**, `tune(problem, policy, wrt, *, dt, bounds=None, method="auto", n_trials=None,
+  key=0, backend="auto", verbose=False) -> PlanningSolution` in `planning/tuning.py`,
+  compiles, builds the program, runs the `Optimizer` and returns the planner family's one
+  result: the policy with the tuned leaves written in (a copy; the plant, cost or start leaves
+  in the solution's problem), a `TuningRecord` (the method, iterations, `J` before and after,
+  the solver record), the tuned run and its evaluation, so `print(solution)`,
+  `compare(LQR=..., tuned=...)` and `solution.plot_trajectory()` work with nothing new. It
+  passes `method="auto"` while `Optimizer`'s default stays `scipy_slsqp`.
+- The same bridge is **identification**: a tracking cost with the logged run as its scheduled
+  target, the logged input as a source leaf, `tune(wrt="plant...")` (the C4 row's `fit` is a
+  facade on it); equation-error identification stays a direct program on `vmap(f_p)`.
+  `ParametricMathematicalProgram.bind(x0)` is the case "no decision leaves, `x0` bound" of
+  this bridge, and the scene bind `J(z, p)` the case "bound params".
 
 ### 4.7 The optimizer as the one descent loop (S74)
 
@@ -366,7 +395,11 @@ concrete:
    | `stochastic` | `gd`, `adam`; `scipy_differential_evolution` when bounded and gradient-free | `adam` |
 
    A NumPy program without `grad_J` keeps SciPy's own finite differences (today's path); `gd`
-   and `adam` refuse it ("needs a gradient: a JAX program or `grad_J`").
+   and `adam` refuse it ("needs a gradient: a JAX program or `grad_J`"); a gradient-free
+   handful of gains (a lookup-table law) may take `nelder-mead`. The new presets are named by
+   their algorithm (`l-bfgs`, `bfgs`, `gd`, `adam`, `nelder-mead`, `differential-evolution`),
+   the backend being implementation technology (RULES 2.1); the three existing `scipy_*` keys
+   stay until V3 rules on their rename (an ask).
 2. **One first-order backend**, `optimization/optimizers/first_order.py`: gradient descent and
    Adam on the flat `z`, a fixed step count or a gradient tolerance, the box by projection
    (the cart-pole demo's clip), the global gradient clip, `callback(z)` per iterate. The RL
@@ -414,6 +447,12 @@ the nonsymmetric eigensolver is CPU-only. The done-when is on the workboard row.
   declared; `X = sys.state.box` is a safety constraint, not a plotting domain), tune through
   the bridge, whose `"hard"` and `"soft"` lowerings carry the margin's gradient, and read
   `margin(params)` beside `cost(params)` in a hand-written loop. Not a mode on the kernel.
+- **The reference is the problem's.** A loop built by `@` reads its reference at the port's
+  nominal value, zero; a cost whose target is the goal then tunes a loop that regulates to
+  zero. `compile` wires the reference from the problem (§4.1) and refuses a loop it cannot
+  set. Every design on the panel missed it until a critic probed the code.
+- **A block is not a leaf list.** `wrt="controller"` would ravel ±inf limits into `z`; the
+  bridge takes leaves by path, and a block may declare which of its params are tunable.
 - **`Xf` is never read by the kernel.** `PlanningProblem` builds `Xf = SingletonSet(x_goal)`
   whenever `x_goal` is given; a closed loop approaches it asymptotically, so it is a reference,
   not a terminal equality. The kernel charges `h(x_N, t_N)` at a finite horizon and nothing
@@ -467,9 +506,9 @@ the nonsymmetric eigensolver is CPU-only. The done-when is on the workboard row.
 | `Trajectory` array-native and a pytree, reporting verbs NumPy | **decided 2026-10-18** |
 | The evaluator simulates the loop as a diagram; its numbers change once | **decided** with RN-5 (RD-D24) |
 | Costs read `params`, nested like a diagram's | **decided 2026-09-13** (cost-params.md) |
-| Every name in §4 (`compile`, `ProblemEvaluator`, the six verbs, `rollout_p`, `wrt`, `tune`) | proposed; step 0 |
-| One scoring kernel without modes; the transcriptions take the cost's rate | proposed |
-| The bridge's signature and `sets="hard"` default | proposed |
+| Every name in §4 (`compile`, `ProblemEvaluator`, the verbs, `rollout_p`, `wrt`, `tune`) | proposed; step 0 |
+| One scoring kernel without modes; the transcriptions take the cost's rate and keep their sum | proposed; unanimous on the panel |
+| The flat pytree with `x0` and the boundary inputs as leaves; the reference wired from the problem; the open-loop plan a source policy; per-sample margins at the bridge with no mode keyword; `tune` returning a `PlanningSolution` | proposed; a panel majority (the record's counts) |
 | The program classes, the first-order backend, the global preset, the default method kept | proposed (S74) |
 | The traceable analysis band and the sensitivity peaks | proposed (S73) |
 
@@ -483,8 +522,9 @@ before it lands.
 0. **The names, in one conversation before any code.** The package of §4 on the table: the
    facade (`compile` / `closed_loop` / `evaluator`), the noun (`ProblemEvaluator` /
    `PlanningProblemEvaluator` / `CompiledProblem`), the run (`trajectory` / `simulate` /
-   `rollout`), the scalar (`cost` / `J` / `score`), the mean (`mean_cost` / `expected_cost` /
-   `evaluate(...).mean` alone), the feasibility number (`margin` / `feasibility`), the
+   `rollout`), the scalar (`cost` / `J` / `score`), the criterion over the draws (`value` /
+   `expected_cost` / `evaluate(...).mean` alone), the feasibility number (`margin` /
+   `feasibility`), the
    system-evaluator method (`rollout_p` / `simulate_p` / `trajectory_p`), the selection keyword
    (`wrt`, the `jacobian` verb's word / `decision` / `free`), the facade on the program
    (`tune`, or none). The constraints: RULES 5.25's verb families, the existing pairs `compile`
@@ -514,15 +554,16 @@ before it lands.
    today's `reconstruct_internal_signals` on a PID loop to `1e-12`, the simulator's
    `rk4_fixedsteps` and the compiled rollout agree to round-off on one diagram (the pinned
    test), and `jax.grad` of a function of the emitted signals runs.
-4. **The object, deterministic.** `ProblemEvaluator` with `params`, `trajectory` (`of=`),
-   `cost`, `margin`; `problem.compile`; the NumPy backend; the refusals of §4.1; the
+4. **The object, deterministic.** `ProblemEvaluator` with the flat `params`, `trajectory`
+   (`of=`), `cost`, `margin`; `problem.compile` wiring the reference; `TrajectorySource` made
+   traceable with its table in `params`; the NumPy backend; the refusals of §4.1; the
    `pid_autotuning_jax` demo rewritten on it with the gradient loop it has today. Done when the
    demo's gradient matches the hand-written scan's on the same gains to `1e-9` relative, the
    pathwise gradient with respect to a controller gain, the plant's mass and `x0` matches a
    central difference (the prototype's three checks, as tests), and `margin` is negative on a
    run that leaves `X` and equals the minimum of the margins on one that does not.
-5. **The bridge and the optimizer.** `evaluator.program(wrt=, lower=, upper=)` on the system
-   leaves with `program.metadata["unravel"]`, and `tune` if accepted; S74 parts 1 and 2: the
+5. **The bridge and the optimizer.** `evaluator.program(wrt, bounds=)`, `pack` / `unpack`,
+   the per-sample lowering on one trial, `tune` returning a `PlanningSolution`; S74 parts 1 and 2: the
    program classes with the refusals, `optimizers/first_order.py` (`gd`, `adam`, the RL `Adam`
    moved and imported back), the `scipy_lbfgsb`, `scipy_bfgs` and `scipy_differential_evolution`
    presets on the shared factory of OPW-1; the autotuning demo ends in the `Optimizer`.
@@ -535,21 +576,23 @@ before it lands.
    `params` (A5's row) so `params["cost"]` and `params["sets"]` have leaves. Done when every
    planner baseline `cmp`s at nominal parameters, `jax.grad(evaluator.cost)` reaches `Q`, and a
    trajopt objective differentiates with respect to `Q` (A2's done-when).
-7. **The draws.** `evaluate`, `mean_cost`, the `Evaluation` pytree; `MonteCarloEvaluator` an
-   alias of the new `evaluate` on both backends; `Planner.evaluate`, `solve(evaluate=True)`,
-   `nominal_trajectory` and `compare(...).evaluate` rewired; the deterministic-twin test; the
-   one intended change of the evaluator's numbers recorded. Done when the pathwise gradient of
-   `mean_cost` with respect to the controller's params matches a central difference on the
-   same key (V1's done-when), the deterministic twin is byte-identical, and RN-5's LQG loop
-   scores within the covariance prediction's sampling error.
+7. **The draws** (between cohorts, with RN-5). `problem.realize`, `evaluate` with keys and
+   `record=`, `value` and `criterion_value`; `MonteCarloEvaluator` reduced to the facade of
+   §4.5; `Planner.evaluate`, `solve(evaluate=True)` and `nominal_trajectory` read the compiled
+   problem; the bridge over `n_trials`; the deterministic-twin test; the one intended change of
+   the evaluator's numbers recorded. Done when the pathwise gradient of `value` with respect to
+   the controller's params matches a central difference on the same key (V1's done-when), the
+   deterministic twin is byte-identical, and RN-5's LQG loop scores within the covariance
+   prediction's sampling error.
 8. **Sets as costs, the lowerings, the metrics as constraints.** `shaping.py` to `core/`,
    `Set.as_cost(weight=, shaping=)` (`quadratic_hinge(0.0)` by default, the same scale as a
-   quadratic cost); the bridge's `sets="hard" | "soft" | "ignore"`, `constraints=`, `objective=`,
-   `wrt="u"` and `"x0"`; the robust-tuning demo (the mean cost over a mass family) and the
-   identification demo on the bridge; the margin-floor example once S73 lands. Done when a
-   tuning that leaves `X` under `"ignore"` stays inside under `"hard"` and `"soft"`, the
-   showcase's shooting cell is `program(wrt="u")`, and `params_gradient`'s identification is
-   `program(objective=mismatch, wrt=[...])`.
+   quadratic cost); `wrt="x0"` and the source policy's `"controller.values"` as decision
+   leaves with `Xf` lowered; the robust-tuning demo (the mean cost over a mass family) and the
+   identification demo on the bridge; the metric objective and the margin-floor example once
+   S73 lands. Done when a tuning that leaves `X` on `replace(problem, X=None)` stays inside on
+   the problem and with `X.as_cost()`, the showcase's shooting cell is
+   `tune(wrt="controller.values")`, and the identification demo is `tune(wrt="plant...")` on a
+   tracking cost.
 9. **Material and contracts.** Tutorial 11's last cell and the showcase cells on the evaluator
    (one hand loop kept if the maintainer says so); the compile demos merged by K4 (one per
    feature); DESIGN §4 (`Trajectory`, parameters), §5 (`rollout_p`), §6 (the evaluator, the
@@ -560,79 +603,33 @@ consolidation (K rows):** the evaluator grid trimmed; `StepRollout` into `Trajec
 
 ## 9. Asks for the maintainer
 
-Each with the proposed answer; a bare option list is not the ask.
+Each with the proposed answer; the panel's splits come first.
 
-1. **The names** (step 0): the package of §4 as proposed, `wrt=` from `jacobian(of, wrt)`,
-   `tune` as the one facade on the bridge.
-2. **One scoring contract, no modes.** `score_trajectory` keeps its signature; no
-   `constraints=` or `discount=` keywords; the transcriptions take the cost's rate (free of
-   baseline risk, §4.3); the uncut integral is the problem without `X`. Confirm.
-3. **The evaluator's numbers change once** (the loop as a diagram, RD-D24): the feedback
-   planners' `trajectory` and `evaluation` re-pinned in step 7 with a release note. Confirm.
-4. **The bridge**: `sets="hard"` by default; `objective=` and `constraints=` as callables of
-   `params`; `unravel` on `program.metadata` plus the `tune` facade, or the metadata alone.
-5. **The optimizer**: the class table of §4.7; `method="scipy_slsqp"` stays the default and
-   `"auto"` is explicit until V3; `scipy_differential_evolution` as the one global preset; the
-   RL `Adam` moves to `optimization/` (the RL package imports it).
-6. **The verbs dropped**: no `final_state` (`trajectory(params).x[:, -1]`), no `success_rate`
-   (`1 − report.failure_rate`), `margin` the exact minimum with the smooth form an option.
-7. **Disturbances under `grad`**: held per-step draws from `sample_disturbances` now; seeds in
-   the pytree with RN-4, the verb unchanged.
-8. **The lane**: research until GMC714 has run it; `problem.compile` is a method, so the root
-   prelude gains no name; `ProblemEvaluator` and `Evaluation` on the `minilink.planning`
-   facade as provisional names.
-9. **The open-loop evaluator** is the plant alone with `u=` (and `wrt="u"`), an evaluation and
-   tuning tool beside the transcriptions; the RL environment is not merged into it (its step
-   keeps the policy outside the plant, the learner's contract). Confirm.
+1. **The noun.** `problem.compile(policy) -> ProblemEvaluator` (five designs of seven; the
+   `System.compile` precedent), with `MonteCarloEvaluator` kept as the thin facade that holds
+   a test set, rather than no new noun and the facade gaining `objective` and `program` verbs
+   that take the law (two designs). The draws are shared either way (§4.5).
+2. **`Evaluation`**: a NumPy report with keys and a traced `value` verb (proposed: lower late,
+   convert once; one spelling of the traced scalar), rather than a pytree with traced
+   statistics (three designs each).
+3. **The order**: the deterministic steps and the bridge on one trial now; the draws and the
+   facade's Monte Carlo form between cohorts with RN-5 (proposed, the ruled order), rather
+   than the draws before the bridge (three designs).
+4. **Method keys** by algorithm, the existing `scipy_*` keys kept as aliases until V3
+   (proposed), or the prefix kept throughout.
+5. **The names** (step 0): the package of §4 as proposed, `wrt=` from `jacobian(of, wrt)`;
+   `tune` the one facade; `value` the traced criterion verb.
+6. **One scoring contract, no modes**: `score_trajectory` keeps its signature; the
+   transcriptions take the cost's rate and keep their own sum. Confirm.
+7. **The evaluator's numbers change once** (the loop as a diagram, RD-D24): re-pinned in step 7
+   with a release note. Confirm.
+8. **The verbs dropped**: no `final_state`, no `success_rate`, no `mean_cost`; `margin` the
+   exact minimum, the per-sample margins the bridge's rows.
+9. **The lane**: `tune` on the teaching surface by the demo rule; `compile`, the class,
+   `program`, `pack` / `unpack`, `margin`, `value` provisional on the planning facade until
+   GMC714 has run them.
 10. **Which tutorial keeps a hand-written loop**, if any (§5), and whether the one sentence of
     §1 enters the constitution's vision text.
 11. **S73**: scheduled beside the above or left as the row it is.
 12. **The `CostIntegrator` block** (cost-params.md's research step): closed as a demo idea; the
     kernel on samples is the contract.
-
-## 10. The panel's amendments (2026-10-20)
-
-Seven independent designs and six critiques (the record's last section has the counts) amend
-the proposal above. Each item below replaces the earlier text where they conflict.
-
-1. **The pytree is flat; `x0` and the boundary inputs are leaves.** `evaluator.params` is
-   `{"controller": …, "plant": …, "cost": …, "sets": …, "x0": …, "r": …}`: the loop's own
-   block ids at the root, one leaf per boundary input port holding its held sequence, the
-   start as a leaf. Every verb is `(params, key)`; `trajectory` keeps `of=`. A draw is a
-   partial override merged over `params`; `wrt` needs no special case.
-2. **`compile` wires the reference.** The loop's reference comes from `problem.x_goal` (the
-   cost's target as the fallback) and is a leaf; a loop whose reference cannot be set is
-   refused with a message. Without this every tuning regulates to zero.
-3. **The open-loop case is a `TrajectorySource` policy**, its table in `params["values"]`
-   (traceable through `interpolate_schedule`), under `controller`; `wrt="controller.values"`
-   is single shooting with the source's input model (held or linear, so it can match
-   `ShootingTranscription`); no bare-plant mode, no `u=`. `Xf` lowers at the bridge for a
-   source policy only.
-4. **`wrt` names leaves, never a whole block**: an explicit list of dotted paths, or the
-   leaves a block declares tunable; a library controller's ±inf limits are never ravelled.
-5. **The hard lowering stacks every sample's margins** of `X` (and `U` where its box has a
-   finite face) as `g(z) ≥ 0`, per trial; `margin` stays the reported minimum; no smooth-min
-   option. No `sets=` keyword, no `objective=` or `constraints=` callables in the first cut:
-   "soft" is `cost + w * X.as_cost()` on the problem, "ignore" is `replace(problem, X=None)`;
-   `bounds` by dotted path. `pack(params, wrt)` and `unpack(z, wrt)` are the evaluator's
-   verbs; `program.metadata` stays data.
-6. **No `mean_cost`.** `evaluate(params, key, n_trials)` returns the record; the traced
-   scalar of the problem's criterion is `value(params, key, n_trials)` or `evaluate(...).mean`
-   (which of the two is an ask). The per-trial keys are stored on the `Evaluation` for replay;
-   `record=True` keeps one batched `Trajectory`.
-7. **Draws depend on the problem and the key only, never on the policy**, so one test set
-   scores many laws with common random numbers; `problem.realize(key, n)` draws it once.
-8. **`tune(problem, policy, wrt, *, dt, ...)` returns a `PlanningSolution`** (the tuned
-   policy, a record, its run, its evaluation), a module verb on the planning facade, on the
-   teaching surface by the demo rule. `MonteCarloEvaluator` stays as a thin facade, not an
-   alias to retire.
-9. **`dt` is explicit** on `compile` and `tune` (or one documented default), never the
-   simulator's automatic grid. `rollout_batch` keeps its documented return; the signals come
-   from `rollout_p`; `trajectory_of` keeps its recompute path for a trajectory without
-   recorded signals. The transcriptions share the discounted integrand, not the kernel's
-   running-sum body, so their bits stay. A `Computer @ plant` loop runs on the NumPy path
-   (RN-5's scope), it is not refused.
-10. **Open for the maintainer** (the panel split): a new noun returned by `problem.compile`
-    versus `MonteCarloEvaluator` gaining `objective` and `program` verbs that take the law;
-    `Evaluation` as a pytree versus a NumPy report with a traced `value`; the draws before or
-    after the bridge; method keys by algorithm or with the `scipy_` prefix.

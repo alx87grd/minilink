@@ -285,7 +285,7 @@ on 2026-10-18, its asks in §9: [differentiable-problem.md](../plans/differentia
   so `jax.grad` reaches `Q` and `R`. **[ask — core]**
 - **V1, second half** (steps 7–9, right after A2, which is the plan's step 6), the
   differentiable planning problem as a drafted prototype before the GMC714 release: the draws
-  (`evaluate`, `mean_cost`, the Monte Carlo evaluator absorbed, RN-5's one path), the sets as
+  (`realize`, `evaluate`, `value`, the Monte Carlo evaluator a thin facade, RN-5's one path), the sets as
   costs and the bridge's lowerings, the material; the prototype on the research lane, the
   teaching surface once it has run in the course. **[ask — core]**
 - **A1** `core/fields.py` ([fields.md](../plans/fields.md)). **[ask — core]**

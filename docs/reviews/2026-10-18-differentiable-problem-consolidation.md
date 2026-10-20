@@ -208,3 +208,24 @@ amendments"; the research and contrarian designs scored highest.
 - `key` is positional on every verb (a keyword-only `key` breaks `vmap`); `Gaussian` takes
   `std`, not `cov`; `replace(problem, x_start=...)` raises today; a `Computer @ plant` loop is
   inside RN-5's scope (RD-D24) and runs on the NumPy path rather than being refused.
+
+### The judgement (2026-10-20, the reviewer alone, no further agents)
+
+The splits above were settled into the plan as follows, by the constitution's precedence and
+then by the fewest nouns that keep the code readable:
+
+- **The noun**: `problem.compile(policy)` returning an evaluator (five of seven, the
+  `System.compile` precedent), with `MonteCarloEvaluator` kept as a thin facade holding a test
+  set. What the minimal and contrarian designs defended, one test set scoring many laws, is
+  kept by drawing the realizations on the problem (`realize(key, n)`), never on the policy.
+- **`Evaluation`**: a NumPy report with the trials' keys and an optional batched `Trajectory`,
+  and one traced verb `value(params, key, n_trials)` for the criterion: lower late, convert
+  once, one spelling of the traced scalar.
+- **The order**: the deterministic steps and the bridge on one trial now; the draws and the
+  facade's Monte Carlo form between cohorts with RN-5, the order already ruled.
+- **Method keys** by algorithm, with the three `scipy_*` keys as aliases until V3; an ask.
+
+Ranking, for the record: the research and contrarian designs scored highest with the critics
+(7 of 10) and the rest 6 to 6.5; every design was "sound with amendments", and the amendments
+the plan now carries came mostly from the critics' probes (the reference, the whole-block
+`wrt`, the `rollout_batch` return, the transcriptions' sum), not from any one design.
