@@ -51,6 +51,7 @@ amendments (`RD-R5`, `RD-D13`, `RD-A2`), the 2026-09-07 GRO501 audit's findings 
 | --- | --- | --- |
 | [rl-reward-scaling.md](rl-reward-scaling.md) | Automatic reward scaling for `ReinforcementLearningPlanner`: raw costs throttle PPO through the joint policy / critic gradient clip; `reward_scale="auto"` = `1 / (g_max dt)` from the failure-price sampling; evidence, options, steps RS-1–RS-4 | proposal 2026-09-27; rung for the maintainer (moves every RL demo's numbers once: between cohorts) |
 | [cbf-safety-filter.md](cbf-safety-filter.md) | Control Barrier Functions: bicubic SDF interpolation in JAX, DCBF with slacks, HOCBF relative degree, `CBFSafetyFilter` block; the barrier becomes a `Field` once A1 lands | design draft 2026-09-11 |
+| [repository-structure.md](repository-structure.md) | The long-term shape of the repository: the package split (keep the four bands, fix the hot spots), the examples tree (one folder per textbook chapter plus `courses/` and `research/`), where the teaching material lives (pinned Colab cells now, a course repo at v1.0); options, a recommendation, the asks | ideas to review 2026-10-20; serves K5 / K6 (ROADMAP §6), maintainer-owned |
 
 Landed or superseded plan docs are deleted; their history is git, and the rulings they carried
 are in the dated records (for example [P11 dropped](../reviews/2026-10-15-gro501-app-notebooks-dropped.md)).

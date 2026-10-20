@@ -546,7 +546,8 @@ in December 2026 after the v0.3 tag; the v1.0 rows after two cohorts.
 
 - [ ] **K5 Where the course material and the projects live** **[ask — student-facing]**
   (ROADMAP §6): `examples/teaching/` and/or `examples/projects/` in their own repositories, or
-  here. Decided between terms (after GMC714). Done when the ruling is recorded.
+  here. Decided between terms (after GMC714). Options, a recommendation and the asks:
+  [repository-structure.md](repository-structure.md). Done when the ruling is recorded.
 - [ ] **K6 The move**, if K5 says so **[ask — student-facing]**: the history kept
   (`git filter-repo` per folder), every citing document updated (the GRO860 notes and webpage
   links, GRO501's `\colab{}`), the new repositories' CI pinned on a minilink release, the

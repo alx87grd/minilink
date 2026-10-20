@@ -478,7 +478,9 @@ and which can wait, each with its proposed answer; the analyses and the panel ar
   Here: one checkout, one CI, renames migrate them in one commit. Apart: a library repo that
   is only the library, course material versioned per term and pinned on a release, but two
   CIs and a release before every notebook change that needs a new feature. Move between
-  terms only.
+  terms only. Options and a recommendation (pin the course notebooks on a release now, a
+  course repository at v1.0; with the examples-tree and package-split questions):
+  [the repository-structure writeup](../plans/repository-structure.md).
 
 - `HybridDiagram` as a `System` vs `HybridLoop` (S31); the sampled seam's time argument,
   integer ticks (today) or seconds; and whether its run-state caches
