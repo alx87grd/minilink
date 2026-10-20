@@ -941,6 +941,7 @@ class TestAsComputer(unittest.TestCase):
 from minilink.simulation.realtime import (
     CallbackInput,
     CallbackOutput,
+    LiveSignalPlotOutput,
     RealtimeSimulator,
 )
 
@@ -1119,6 +1120,239 @@ class TestRealtimeSimulator(unittest.TestCase):
         self.assertIn("budget=", out)
         self.assertIn("Completed in", out)
         self.assertIn("n_frames:", out)
+
+    def test_live_signal_plot_output_updates_rolling_window(self):
+        import matplotlib.pyplot as plt
+
+        sys = StableLinearSystem()
+        live_out = LiveSignalPlotOutput(
+            window=0.03,
+            every=2,
+            show=False,
+            close_on_stop=True,
+        )
+        rt_sim = RealtimeSimulator(
+            sys,
+            frame_dt=0.01,
+            sim_dt=0.005,
+            renderer=None,
+            compile_backend="numpy",
+            input=CallbackInput(lambda t, x: np.array([2.0])),
+            output=live_out,
+            max_steps=6,
+        )
+        traj = rt_sim.run()
+
+        self.assertEqual(traj.t.size, 7)
+        # Window of 0.03 s at t=0.06 keeps samples from t=0.03..0.06 (4 samples).
+        win_traj = live_out.window_trajectory()
+        np.testing.assert_allclose(win_traj.t, [0.03, 0.04, 0.05, 0.06])
+        self.assertEqual(len(live_out.lines), 2)  # x and u
+        np.testing.assert_allclose(live_out.lines[0].get_xdata(), win_traj.t)
+        np.testing.assert_allclose(live_out.lines[0].get_ydata(), win_traj.x[0])
+        np.testing.assert_allclose(live_out.lines[1].get_ydata(), win_traj.u[0])
+        plt.close("all")
+
+    def test_realtime_simulator_plot_flag_and_diagram_signals(self):
+        import matplotlib.pyplot as plt
+        from minilink import Pendulum, StateFeedbackController
+
+        plant = Pendulum()
+        ctl = StateFeedbackController(np.array([[10.0, 2.0]]))
+        loop = ctl @ plant
+
+        live_out = LiveSignalPlotOutput(
+            window=0.05,
+            every=1,
+            show=False,
+            close_on_stop=True,
+        )
+        published = []
+        rt_sim = RealtimeSimulator(
+            loop,
+            frame_dt=0.01,
+            sim_dt=0.005,
+            renderer=None,
+            compile_backend="numpy",
+            plot=True,
+            output=CallbackOutput(lambda t, x, u, outputs: published.append(outputs)),
+            max_steps=3,
+        )
+        # Replace the default shown LiveSignalPlotOutput with the headless one for CI
+        rt_sim.output.outputs = (live_out, rt_sim.output.outputs[1])
+
+        with patch.object(
+            loop,
+            "reconstruct_internal_signals",
+            wraps=loop.reconstruct_internal_signals,
+        ) as spy_reconstruct:
+            rt_sim.run()
+            # Internal diagram signals are sampled incrementally per step, never reconstructed O(N).
+            self.assertEqual(spy_reconstruct.call_count, 0)
+
+        # A user output that overrides publish alone inherits the base contract: it is
+        # opened beside the live plot and still receives the boundary outputs
+        self.assertEqual(len(published), 3)
+        self.assertIn("y", published[0])
+        self.assertIn("controller:u", live_out.resolved_signals)
+        win_traj = live_out.window_trajectory()
+        self.assertTrue(win_traj.has_signal("controller:u"))
+        self.assertEqual(len(live_out.lines), 3)  # x[0], x[1], controller:u[0]
+        plt.close("all")
+
+    def test_pygame_input_windowless_when_joystick_connected(self):
+        import os
+        from unittest.mock import MagicMock
+
+        from minilink.simulation.realtime import PygameInput
+
+        sys = TwoPortLinearSystem()
+        sys.inputs["left"].lower_bound[0] = -10.0
+        sys.inputs["left"].upper_bound[0] = 10.0
+        sys.inputs["right"].lower_bound[0] = -5.0
+        sys.inputs["right"].upper_bound[0] = 5.0
+
+        fake_joy = MagicMock()
+        fake_joy.get_numaxes.return_value = 6
+        fake_joy.get_axis.side_effect = lambda idx: {
+            0: -0.4,
+            1: 0.5,
+            2: -1.0,
+            3: -0.5,
+            4: -0.25,
+            5: -1.0,
+        }[idx]
+
+        fake_pygame = MagicMock()
+        fake_pygame.display.get_init.return_value = False
+        fake_pygame.display.get_surface.return_value = None
+        fake_pygame.joystick.get_count.return_value = 1
+        fake_pygame.joystick.Joystick.return_value = fake_joy
+        fake_pygame.key.key_code.side_effect = lambda name: hash(name) % 256
+        fake_pygame.key.get_pressed.return_value = [False] * 256
+        fake_pygame.event.get.return_value = []
+
+        inp = PygameInput(joystick_axes=[(1, 1.0), (0, -1.0)], camera_rate=2.0)
+        with patch(
+            "minilink.simulation.realtime.pygame_input._import_pygame",
+            return_value=fake_pygame,
+        ):
+            inp.open(sys)
+            self.assertEqual(
+                os.environ.get("SDL_JOYSTICK_ALLOW_BACKGROUND_EVENTS"), "1"
+            )
+            # A connected joystick skips the 640x240 focus window in "auto" mode.
+            fake_pygame.display.set_mode.assert_not_called()
+            self.assertIsNone(inp._screen)
+            # On 6-axis gamepads (Xbox), right stick axes (3, 4) are auto-assigned to camera orbit.
+            self.assertEqual(inp._joy_camera_axes, ((3, -1.0), (4, -1.0)))
+
+            u, should_stop = inp.poll(0.0, sys.x0)
+            self.assertFalse(should_stop)
+            # left = +1.0 * 0.5 * 10 = 5.0; right = -1.0 * (-0.4) * 5 = +2.0
+            np.testing.assert_allclose(u, [5.0, 2.0])
+            d_az, d_el = inp.poll_camera(0.1)
+            np.testing.assert_allclose([d_az, d_el], [0.1, 0.05])
+
+            inp.close()
+            fake_pygame.quit.assert_called_once()
+
+            # When right-stick axes (3 or 4) are used for control, camera orbit is disabled.
+            inp_plane = PygameInput(joystick_axes=[(5, 1.0), (3, 1.0)])
+            inp_plane.open(sys)
+            self.assertEqual(inp_plane._joy_camera_axes, ())
+            self.assertEqual(inp_plane.poll_camera(0.1), (0.0, 0.0))
+            inp_plane.close()
+
+    def test_keyboard_interrupt_returns_partial_trajectory(self):
+        sys = StableLinearSystem()
+        calls = 0
+
+        def interrupt_on_third_step(t, x):
+            nonlocal calls
+            calls += 1
+            if calls >= 3:
+                raise KeyboardInterrupt
+            return np.array([1.0])
+
+        rt_sim = RealtimeSimulator(
+            sys,
+            frame_dt=0.01,
+            sim_dt=0.005,
+            renderer=None,
+            compile_backend="numpy",
+            input=CallbackInput(interrupt_on_third_step),
+            max_steps=10,
+        )
+        traj = rt_sim.run()
+        # Sample 0 + 2 completed steps before KeyboardInterrupt on step 3.
+        self.assertEqual(traj.t.size, 3)
+        self.assertIs(rt_sim.last_traj, traj)
+
+    def test_game_facade_forwards_joystick_axes(self):
+        from unittest.mock import MagicMock
+
+        sys = TwoPortLinearSystem()
+        with (
+            patch("minilink.simulation.realtime.PygameInput") as mock_pg_cls,
+            patch("minilink.simulation.realtime.RealtimeSimulator") as mock_rt_cls,
+        ):
+            expected_traj = MagicMock()
+            mock_rt_cls.return_value.run.return_value = expected_traj
+
+            out = sys.game(
+                renderer=None,
+                joystick_axes=[(1, 1.0), (3, -1.0)],
+                camera_axes=[(2, 1.0), (0, 1.0)],
+                max_steps=1,
+            )
+
+            mock_pg_cls.assert_called_once_with(
+                joystick_axes=[(1, 1.0), (3, -1.0)],
+                camera_axes=[(2, 1.0), (0, 1.0)],
+            )
+            self.assertIs(out, expected_traj)
+            self.assertIs(sys.traj, expected_traj)
+
+    def test_named_system_channels_in_live_and_offline_plots(self):
+        import matplotlib.pyplot as plt
+        from minilink.graphical.signals.time_signals import build_signal_plot_spec
+
+        sys = TwoPortLinearSystem()
+        sys.state.labels = ["pos"]
+        live_out = LiveSignalPlotOutput(
+            signals=("y", "left", "pos"),
+            window=0.05,
+            every=1,
+            show=False,
+            close_on_stop=True,
+        )
+        rt_sim = RealtimeSimulator(
+            sys,
+            frame_dt=0.01,
+            sim_dt=0.005,
+            renderer=None,
+            compile_backend="numpy",
+            output=live_out,
+            max_steps=2,
+        )
+        traj = rt_sim.run()
+        self.assertEqual(len(live_out.lines), 3)  # y (1), left (1), pos (1)
+
+        # Offline spec builder resolves the same output port, input port, and state label.
+        spec = build_signal_plot_spec(sys, traj, signals=("y", "left", "pos"))
+        self.assertEqual(len(spec.traces), 3)
+        self.assertEqual(spec.traces[1].label, "left[0]")
+        self.assertEqual(spec.traces[2].label, "pos")
+        plt.close("all")
+
+        # The backend is plot_backend; a name passed as plot is refused and says so
+        with self.assertRaisesRegex(ValueError, "plot_backend"):
+            RealtimeSimulator(sys, renderer=None, plot="plotly")
+        with self.assertRaisesRegex(ValueError, "Unknown signal backend"):
+            RealtimeSimulator(
+                sys, renderer=None, plot=("y",), plot_backend="invalid_backend"
+            )
 
 
 class TestAutomaticTimeGrid(unittest.TestCase):

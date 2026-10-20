@@ -33,6 +33,10 @@ class RealtimeInput(ABC):
     def open(self, sys):
         """Acquire devices or connections before the loop starts (no-op default)."""
 
+    def poll_camera(self, dt):
+        """Return ``(d_azimuth, d_elevation)`` [rad] to orbit a 3-D camera over the frame (no orbit by default)."""
+        return 0.0, 0.0
+
     @abstractmethod
     def poll(self, t, x):
         """
@@ -62,11 +66,16 @@ class RealtimeOutput(ABC):
     External consumer of per-frame samples during a real-time run.
 
     Lifecycle mirrors :class:`RealtimeInput`: :meth:`open` before the loop,
-    :meth:`publish` once per frame, :meth:`close` after the loop.
+    :meth:`publish` once per frame, :meth:`close` after the loop. The class
+    attribute ``needs_boundary_outputs`` says whether :meth:`publish` reads
+    ``outputs``: the simulator evaluates the boundary outputs each frame only
+    when it is ``True``.
     """
 
-    def open(self, sys):
-        """Acquire connections or files before the loop starts (no-op default)."""
+    needs_boundary_outputs = True
+
+    def open(self, sys, *, x0=None, u0=None, t0=0.0):
+        """Acquire connections or files before the loop starts (no-op default); ``x0``, ``u0``, ``t0`` is the initial sample."""
 
     @abstractmethod
     def publish(self, t, x, u, outputs):

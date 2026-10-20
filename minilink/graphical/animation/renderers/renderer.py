@@ -49,6 +49,9 @@ class AnimationRenderer(ABC):
         """
         return {}
 
+    def orbit_camera(self, d_azimuth: float, d_elevation: float) -> None:
+        """Rotate the 3-D camera eye by ``(d_azimuth, d_elevation)`` [rad] (no-op default)."""
+
     @abstractmethod
     def close_scene(self) -> None:
         """Release/close backend resources for the current session."""

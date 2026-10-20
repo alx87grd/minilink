@@ -126,6 +126,14 @@ def build_signal_plot_spec(
                 traj = sys.reconstruct_internal_signals(traj)
                 break
 
+    # A named output port, input port, or state label of this system
+    for name in requested:
+        if name in ("x", "u") or traj.has_signal(name):
+            continue
+        sampled = system_channel_samples(sys, traj, name)
+        if sampled is not None:
+            traj = traj.with_signal(name, sampled)
+
     traces = []
     internal_index = 0
     for signal_name in requested:
@@ -432,6 +440,23 @@ def labels_and_units_for_extra_signal(sys, name: str, dim: int):
 
             return labels, units_for_vector(port.units, dim)
 
+    # A named output or input port of this system
+    if name in sys.outputs:
+        port = sys.outputs[name]
+        labels = labels_for_vector(port.labels, dim, name)
+        return labels, units_for_vector(port.units, dim)
+    if name in sys.inputs:
+        port = sys.inputs[name]
+        labels = labels_for_vector(port.labels, dim, name)
+        return labels, units_for_vector(port.units, dim)
+
+    # A single state component selected by its state label
+    state = sys.state
+    if dim == 1 and name in state.labels:
+        idx = list(state.labels).index(name)
+        unit = state.units[idx] if idx < len(state.units) else ""
+        return (str(name),), (str(unit),)
+
     # Any other signal: its own name, without a unit
     labels = tuple(f"{name}" if dim == 1 else f"{name}[{i}]" for i in range(dim))
     units = tuple("" for _ in range(dim))
@@ -440,8 +465,17 @@ def labels_and_units_for_extra_signal(sys, name: str, dim: int):
 
 
 def available_signal_names(sys, traj) -> tuple[str, ...]:
-    """The trajectory's signals, then every block output of a diagram not among them."""
+    """The trajectory's signals, then every output/input port and state label of the system or diagram."""
     names = list(traj.signal_names)
+    for port_id in sys.outputs:
+        if port_id not in names:
+            names.append(port_id)
+    for port_id in sys.inputs:
+        if port_id not in names:
+            names.append(port_id)
+    for label in sys.state.labels:
+        if label not in names:
+            names.append(label)
     if isinstance(sys, DiagramSystem):
         for sys_id, subsystem in sys.subsystems.items():
             for port_id in subsystem.outputs:
@@ -450,6 +484,55 @@ def available_signal_names(sys, traj) -> tuple[str, ...]:
                     names.append(name)
 
     return tuple(names)
+
+
+def system_channel_keys_of(sys, resolved_signals: tuple[str, ...]) -> tuple[str, ...]:
+    """Named output ports, input ports, or state labels among ``resolved_signals``."""
+    outputs = sys.outputs
+    inputs = sys.inputs
+    state_labels = set(sys.state.labels)
+
+    keys = []
+    for name in resolved_signals:
+        if name in ("x", "u") or name in keys:
+            continue
+        if name in outputs or name in inputs or name in state_labels:
+            keys.append(name)
+    return tuple(keys)
+
+
+def evaluate_system_channel(
+    sys, name: str, x: np.ndarray, u: np.ndarray, t: float
+) -> np.ndarray:
+    """Evaluate one named output port, input port, or state component at ``(x, u, t)``."""
+    if name in sys.outputs:
+        port = sys.outputs[name]
+        return np.asarray(port.compute(x, u, t), dtype=float).reshape(port.dim).copy()
+    if name in sys.inputs:
+        port = sys.inputs[name]
+        (val,) = sys.get_port_values_from_u(u, name)
+        return np.asarray(val, dtype=float).reshape(port.dim).copy()
+    idx = list(sys.state.labels).index(name)
+    return np.asarray(x[idx : idx + 1], dtype=float).copy()
+
+
+def system_channel_samples(sys, traj, name: str) -> np.ndarray | None:
+    """Sample a system output port, input port, or state component along ``traj``."""
+    if not system_channel_keys_of(sys, (name,)):
+        return None
+
+    if name not in sys.outputs and name not in sys.inputs and name in sys.state.labels:
+        idx = list(sys.state.labels).index(name)
+        return np.asarray(traj.x[idx : idx + 1, :], dtype=float)
+
+    n_pts = traj.n_samples
+    port = sys.outputs[name] if name in sys.outputs else sys.inputs[name]
+    out = np.zeros((port.dim, n_pts), dtype=float)
+    for i in range(n_pts):
+        out[:, i] = evaluate_system_channel(
+            sys, name, traj.x[:, i], traj.u[:, i], float(traj.t[i])
+        )
+    return out
 
 
 def require_traces(traces):
