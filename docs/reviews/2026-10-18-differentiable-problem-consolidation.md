@@ -121,3 +121,90 @@ The twelve asks are §9 of the plan, each with its proposed answer. The ones tha
 ruling or a number: the evaluator's numbers changing once (already accepted with RN-5's
 RD-D24), the transcriptions taking the cost's discount (no baseline moves), and the default
 optimizer method staying `scipy_slsqp` until the V3 freeze decides on `"auto"`.
+
+---
+
+## The panel (2026-10-20): seven independent designs, read against each other
+
+After this record, the maintainer asked for several independent high-level designs and a
+consensus. Seven architects wrote one each from a fixed lens (the textbook, the functional
+JAX purist, numerics, comparable toolboxes, the minimal surface, research workflows, a
+contrarian arguing against a new object), each answering the same twelve questions with
+variations; five per-design critiques (law and code; the user) and one critic over all seven
+(the user's side) completed before the run was stopped for cost. No judge or synthesis agent
+completed; the reading below is the reviewer's, counted over the seven designs and the six
+critiques (every raw result is kept in the session scratchpad, `panel-raw-results.md`).
+Scores from the critics ranged from 6 to 7 of 10 for every design, all "sound with
+amendments"; the research and contrarian designs scored highest.
+
+### Where the panel agrees (and the plan already said so)
+
+- One compiled loop per policy, its verbs pure functions of one params pytree and a key; the
+  `Trajectory` a pytree with the validation-free unflatten; one scoring kernel as the running
+  sum, no modes, the cost owning the discount; the constraints lowered at the program bridge,
+  never on the kernel; `MathematicalProgram` flat on `z`; the `Optimizer` reading a program
+  class from its fields with a first-order backend (the RL `Adam` moved) and `auto` explicit,
+  the default method kept; a `tune` facade. Unanimous.
+
+### Where the panel overturns the plan (a majority or more)
+
+1. **The params pytree is flat and `x0` and the boundary inputs are leaves.** Six of seven put
+   the loop's own block ids at the root (`{"controller", "plant", "cost", "sets", "x0", "u"}`
+   or one leaf per boundary port), not a `"system"` tier; `trajectory(params, key)` has two
+   arguments, and a drawn start, a disturbance sequence, an identification input and a tuned
+   reference are one merge mechanism. The plan's `x0=` and `u=` arguments go.
+2. **The open-loop plan is a `TrajectorySource` policy, not a bare-plant mode.** Five of seven:
+   the source's table lives in its `params` (made traceable on `interpolate_schedule`), it sits
+   under `controller`, `wrt="controller.values"` is single shooting, and the compiled
+   evaluator's linear-input integrator can match `ShootingTranscription` exactly. No `u=`.
+3. **The hard lowering stacks every sample's margins as `g` rows** (five of seven, the
+   transcriptions' own form, smooth per entry), not one exact minimum with a smooth option;
+   `margin` stays the reported scalar. `Xf` lowers at the bridge for a source policy only.
+4. **No `sets=` keyword and no callables on the bridge in the first cut** (six of seven):
+   the declared sets lower, "soft" is `cost + w * X.as_cost()` on the problem, "ignore" is
+   `replace(problem, X=None)`; `bounds` by dotted path. `pack` / `unpack` as named verbs
+   replace a callable in `program.metadata` (three designs, two critics).
+5. **No `mean_cost`.** Seven of seven: `evaluate(...).mean` or a `value(params, key, n_trials)`
+   verb carrying the problem's criterion is the one traced scalar.
+6. **`tune` returns a `PlanningSolution`** (four of seven; two return params, one the block),
+   so `print`, `compare` and `plot_trajectory` work as for every planner; `tune` is a module
+   verb on the planning facade, teaching surface by the demo rule.
+7. **Keys live on the `Evaluation`** for replay, with `record=True` keeping one batched
+   `Trajectory` for the fan-of-runs plot (four of seven). Draws are a function of the problem
+   and the key only, never of the policy, so one test set scores many laws (common random
+   numbers); the research design's `problem.realize(key, n)` draws it once on NumPy.
+8. **`MonteCarloEvaluator` stays**, as a thin facade or the object itself (four of seven),
+   not an alias for one release: course notebooks and `compare(...).evaluate(evaluator)` use it.
+
+### Where the panel splits (the maintainer's call)
+
+- The noun: a new `ProblemEvaluator` from `problem.compile(policy)` (five) versus no new
+  noun, `MonteCarloEvaluator` gaining `objective` and `program` verbs that take the law
+  (minimal, contrarian). The difference is whether the law binds at construction or at verb
+  time; the shared draws are what matter, and item 7 keeps them either way.
+- `Evaluation` as a pytree with traced statistics (three) versus a NumPy report with a
+  separate traced `value` verb (three).
+- The draws before the bridge (three) versus after (the plan, and one critic citing the
+  between-cohorts ruling of RN-5).
+- Method keys by algorithm (`l-bfgs`, `slsqp`, `differential-evolution`; four) versus the
+  `scipy_` prefix kept (two); a `nelder-mead` preset for a gradient-free handful of gains.
+
+### Verified corrections the critics proved against the code
+
+- **The reference.** Every student snippet tuned a loop whose reference reads its nominal
+  value (zero) while the cost's target is elsewhere; `compile` must wire the reference from
+  `problem.x_goal` (the cost's target as the fallback) or refuse. Blocking in five designs
+  and absent from the plan.
+- **`wrt="controller"` must not ravel a whole block**: every library controller keeps
+  `u_min`, `u_max` (and the integral limits) at ±inf in its params, so `z0` holds infinities.
+  The bridge takes an explicit list of leaves, or the block declares its tunable leaves.
+- `rollout_batch`'s single-array return is documented and tested; the signals come from a
+  separate method or a keyword, and `trajectory_of` keeps a recompute path for a trajectory
+  without recorded signals (every `Simulator` run).
+- The transcriptions sum with `xp.sum`; sharing the kernel's running sum changes their bits.
+  Share the integrand, keep their quadrature body, or declare the change.
+- `dt=None` on `compile` cannot mean the simulator's automatic grid (1e-4 s on an undeclared
+  loop); `dt` is explicit, or a documented default.
+- `key` is positional on every verb (a keyword-only `key` breaks `vmap`); `Gaussian` takes
+  `std`, not `cov`; `replace(problem, x_start=...)` raises today; a `Computer @ plant` loop is
+  inside RN-5's scope (RD-D24) and runs on the NumPy path rather than being refused.

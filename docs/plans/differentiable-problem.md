@@ -6,7 +6,8 @@ plan of 2026-10-17, its architecture-and-naming analysis and the target-architec
 three said and why the consolidation went the way it did is in
 [the consolidation record](../reviews/2026-10-18-differentiable-problem-consolidation.md).
 What is marked **decided** was ruled before this document; everything else is proposed and
-waits on the asks of §9. Nothing is built; §8 is the build order, step V1 and rows S73 and S74
+waits on the asks of §9. §10 records where a seven-design panel (2026-10-20) overturned or
+split on the proposals above; where §10 and an earlier section disagree, §10 is the proposal. Nothing is built; §8 is the build order, step V1 and rows S73 and S74
 of [TODO.md](TODO.md) §4.
 Rung: v0.3 (the evaluator and the optimizer), v0.3 and after (traceable analysis).
 Lane: research first; the teaching surface once a course has run it.
@@ -588,3 +589,50 @@ Each with the proposed answer; a bare option list is not the ask.
 11. **S73**: scheduled beside the above or left as the row it is.
 12. **The `CostIntegrator` block** (cost-params.md's research step): closed as a demo idea; the
     kernel on samples is the contract.
+
+## 10. The panel's amendments (2026-10-20)
+
+Seven independent designs and six critiques (the record's last section has the counts) amend
+the proposal above. Each item below replaces the earlier text where they conflict.
+
+1. **The pytree is flat; `x0` and the boundary inputs are leaves.** `evaluator.params` is
+   `{"controller": …, "plant": …, "cost": …, "sets": …, "x0": …, "r": …}`: the loop's own
+   block ids at the root, one leaf per boundary input port holding its held sequence, the
+   start as a leaf. Every verb is `(params, key)`; `trajectory` keeps `of=`. A draw is a
+   partial override merged over `params`; `wrt` needs no special case.
+2. **`compile` wires the reference.** The loop's reference comes from `problem.x_goal` (the
+   cost's target as the fallback) and is a leaf; a loop whose reference cannot be set is
+   refused with a message. Without this every tuning regulates to zero.
+3. **The open-loop case is a `TrajectorySource` policy**, its table in `params["values"]`
+   (traceable through `interpolate_schedule`), under `controller`; `wrt="controller.values"`
+   is single shooting with the source's input model (held or linear, so it can match
+   `ShootingTranscription`); no bare-plant mode, no `u=`. `Xf` lowers at the bridge for a
+   source policy only.
+4. **`wrt` names leaves, never a whole block**: an explicit list of dotted paths, or the
+   leaves a block declares tunable; a library controller's ±inf limits are never ravelled.
+5. **The hard lowering stacks every sample's margins** of `X` (and `U` where its box has a
+   finite face) as `g(z) ≥ 0`, per trial; `margin` stays the reported minimum; no smooth-min
+   option. No `sets=` keyword, no `objective=` or `constraints=` callables in the first cut:
+   "soft" is `cost + w * X.as_cost()` on the problem, "ignore" is `replace(problem, X=None)`;
+   `bounds` by dotted path. `pack(params, wrt)` and `unpack(z, wrt)` are the evaluator's
+   verbs; `program.metadata` stays data.
+6. **No `mean_cost`.** `evaluate(params, key, n_trials)` returns the record; the traced
+   scalar of the problem's criterion is `value(params, key, n_trials)` or `evaluate(...).mean`
+   (which of the two is an ask). The per-trial keys are stored on the `Evaluation` for replay;
+   `record=True` keeps one batched `Trajectory`.
+7. **Draws depend on the problem and the key only, never on the policy**, so one test set
+   scores many laws with common random numbers; `problem.realize(key, n)` draws it once.
+8. **`tune(problem, policy, wrt, *, dt, ...)` returns a `PlanningSolution`** (the tuned
+   policy, a record, its run, its evaluation), a module verb on the planning facade, on the
+   teaching surface by the demo rule. `MonteCarloEvaluator` stays as a thin facade, not an
+   alias to retire.
+9. **`dt` is explicit** on `compile` and `tune` (or one documented default), never the
+   simulator's automatic grid. `rollout_batch` keeps its documented return; the signals come
+   from `rollout_p`; `trajectory_of` keeps its recompute path for a trajectory without
+   recorded signals. The transcriptions share the discounted integrand, not the kernel's
+   running-sum body, so their bits stay. A `Computer @ plant` loop runs on the NumPy path
+   (RN-5's scope), it is not refused.
+10. **Open for the maintainer** (the panel split): a new noun returned by `problem.compile`
+    versus `MonteCarloEvaluator` gaining `objective` and `program` verbs that take the law;
+    `Evaluation` as a pytree versus a NumPy report with a traced `value`; the draws before or
+    after the bridge; method keys by algorithm or with the `scipy_` prefix.
