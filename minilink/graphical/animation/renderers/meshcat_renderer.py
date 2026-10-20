@@ -63,6 +63,7 @@ _VIEWER_FURNITURE = ("/Grid", "/Axes")
 # A top-down hint would put the eye on the orbit's pole, where the view is
 # undefined; the elevation is capped at the viewer's default eye ``(3, 1, 0)``.
 _EYE_ELEVATION_MAX = float(np.arctan2(1.0, 3.0))
+_ORBIT_ELEVATION_MAX = 1.35
 
 
 def camera_world_shift(camera) -> list[float]:
@@ -71,13 +72,8 @@ def camera_world_shift(camera) -> list[float]:
     return [float(v) for v in -target]
 
 
-def camera_eye_position(camera) -> list[float]:
-    """Eye offset from the orbit origin, in the viewer's Y-up camera frame.
-
-    The eye lies on the view-out side (``camera[:3, 2]``) at the distance
-    ``camera[3, 3]``. Its elevation above the ground plane is capped so a
-    top-down hint lands on the viewer's default inclination, on the +X side.
-    """
+def camera_spherical_coords(camera) -> tuple[float, float, float]:
+    """Spherical ``(azimuth, elevation, distance)`` of the camera eye from ``camera``."""
     camera = np.asarray(camera, dtype=float)
     view_out = camera[:3, 2]
     distance = float(camera[3, 3])
@@ -87,12 +83,30 @@ def camera_eye_position(camera) -> list[float]:
     azimuth = float(np.arctan2(view_out[1], view_out[0]))
     elevation = float(np.arcsin(np.clip(view_out[2] / norm, -1.0, 1.0)))
     elevation = float(np.clip(elevation, -_EYE_ELEVATION_MAX, _EYE_ELEVATION_MAX))
+    return azimuth, elevation, distance
+
+
+def eye_xyz_from_spherical(
+    azimuth: float, elevation: float, distance: float
+) -> list[float]:
+    """Viewer Y-up eye position ``[x, z, -y]`` from spherical ``(azimuth, elevation, distance)``."""
     x = distance * np.cos(elevation) * np.cos(azimuth)
     y = distance * np.cos(elevation) * np.sin(azimuth)
     z = distance * np.sin(elevation)
     # The viewer turns its camera frame by +90 deg about X: world (x, y, z)
     # reads (x, z, -y) there.
     return [float(x), float(z), float(-y)]
+
+
+def camera_eye_position(camera) -> list[float]:
+    """Eye offset from the orbit origin, in the viewer's Y-up camera frame.
+
+    The eye lies on the view-out side (``camera[:3, 2]``) at the distance
+    ``camera[3, 3]``. Its elevation above the ground plane is capped so a
+    top-down hint lands on the viewer's default inclination, on the +X side.
+    """
+    azimuth, elevation, distance = camera_spherical_coords(camera)
+    return eye_xyz_from_spherical(azimuth, elevation, distance)
 
 
 # WebGL LineBasicMaterial ignores dash and (on most GPUs) linewidth. Overlay
@@ -838,6 +852,9 @@ class MeshcatRenderer(AnimationRenderer):
         self.vis = None
         self.canvas = None
         self.show = True
+        self._azimuth = 0.0
+        self._elevation = _EYE_ELEVATION_MAX
+        self._distance = 3.0
 
     def open_scene(
         self,
@@ -911,6 +928,24 @@ class MeshcatRenderer(AnimationRenderer):
         self.canvas = None
         self.vis = None
 
+    def orbit_camera(self, d_azimuth: float, d_elevation: float) -> None:
+        """Rotate the 3-D camera eye by ``(d_azimuth, d_elevation)`` [rad]."""
+        if self.canvas is None:
+            return
+        az = self._azimuth + float(d_azimuth)
+        self._azimuth = float((az + np.pi) % (2.0 * np.pi) - np.pi)
+        self._elevation = float(
+            np.clip(
+                self._elevation + float(d_elevation),
+                -_ORBIT_ELEVATION_MAX,
+                _ORBIT_ELEVATION_MAX,
+            )
+        )
+        self.canvas.vis[_CAMERA_EYE].set_property(
+            "position",
+            eye_xyz_from_spherical(self._azimuth, self._elevation, self._distance),
+        )
+
     def _world_nodes(self):
         """The drawn world and the viewer's grid and axes: what slides with the target."""
         vis = self.canvas.vis
@@ -919,11 +954,14 @@ class MeshcatRenderer(AnimationRenderer):
     def _place_eye(self, camera) -> None:
         """Eye at the camera distance on the view-out side, its clip planes scaled to that distance."""
         eye = self.canvas.vis[_CAMERA_EYE]
-        distance = float(np.asarray(camera, dtype=float)[3, 3])
-        eye.set_property("position", camera_eye_position(camera))
+        self._azimuth, self._elevation, self._distance = camera_spherical_coords(camera)
+        eye.set_property(
+            "position",
+            eye_xyz_from_spherical(self._azimuth, self._elevation, self._distance),
+        )
         # the viewer's default planes (0.01, 100) clip a scene seen from far away
-        eye.set_property("near", max(0.01, 1.0e-4 * distance))
-        eye.set_property("far", max(100.0, 50.0 * distance))
+        eye.set_property("near", max(0.01, 1.0e-4 * self._distance))
+        eye.set_property("far", max(100.0, 50.0 * self._distance))
 
     def _set_backdrop(self) -> None:
         """The system's backdrop hint: the viewer's grid and axes hidden when ``scene_grid`` is off."""

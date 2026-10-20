@@ -90,7 +90,7 @@ state-feedback block):
 
 | Package | Role |
 | --- | --- |
-| `simulation/` | `Simulator`, `StaticSimulator`, `Computer`, `StepSchedule`, `HybridSimulator`, solvers, forcing; `realtime/` (`RealtimeSimulator`, `RealtimeInput`/`RealtimeOutput`, `PygameInput`) |
+| `simulation/` | `Simulator`, `StaticSimulator`, `Computer`, `StepSchedule`, `HybridSimulator`, solvers, forcing; `realtime/` (`RealtimeSimulator`, `RealtimeInput`/`RealtimeOutput`, `PygameInput`, `LiveSignalPlotOutput`) |
 | `analysis/` | one calling pattern `tool(sys, x_bar, u_bar, t, params, *, method="auto", eps)` on any `System` (the linear model as is, the rest linearized at the operating point): `jacobian`, `linearize` (→ `LTISystem`), the one-channel frequency and time tools (`bode`, `pzmap`, `nyquist`, `margins`, `root_locus`, `step_response`, `step_info`, `transfer_function`, the sensitivity functions) with their `plot_` twins, `structural` (controllability, observability, `minreal`), `equilibria`, `modal`, `lyapunov`, `riccati`, `discretization`. The API reference is the docs site |
 | `planning/` | `problems.py`, `results.py`, `evaluation.py`, `comparison.py`; `trajectory_optimization/`, `policy_synthesis/` (DP), `reinforcement_learning/`, `search/` (RRT), `spatial/` (scenes; **retires** into `core/geometry/`) |
 | `optimization/` | `MathematicalProgram`, `Optimizer` (generic NLP) |
@@ -237,12 +237,14 @@ the named car profiles live with their scenarios in `examples/projects/car_trajo
 - **Realtime (live sessions):** `RealtimeSimulator` (`simulation/realtime/`) is the third
   orchestrator. Per frame it polls a `RealtimeInput` (`u`, `should_stop`; the nominal `u`
   when none), advances the plant by ZOH integration, draws live through the `Animator`
-  and publishes to an optional `RealtimeOutput`. Two clocks: `frame_dt` (wall period per
+  and publishes to an optional `RealtimeOutput` (including `LiveSignalPlotOutput` when
+  `plot=True` or `plot="plotly"` / `plot_signals=...`). Two clocks: `frame_dt` (wall period per
   frame) and `sim_dt` (the integration step, auto-calibrated at `run` unless given);
   `sync="locked"` advances `frame_dt` of sim time per frame, `sync="realtime"` the measured
   wall time. The run returns a `Trajectory` (one sample per frame), cached on `self.traj`
-  by `sys.game()`. `PygameInput` maps held keys to the input ports' bounds or slews a
-  setpoint.
+  by `sys.game()`. `PygameInput` maps held keys or a connected gamepad (`joystick_axes`,
+  3-D `camera_axes` orbit) to the input ports' bounds or slews a setpoint, staying
+  windowless when a controller is connected.
 - **MPC hybrid block:** `ModelPredictiveController(planner, dt_mpc=)` returns a static
   `System` or, with `warm_start=True`, a `StepSystem` whose state is the last packed `z`.
   On JAX the planner's parametric program is compiled once and each tick is bind + solve,

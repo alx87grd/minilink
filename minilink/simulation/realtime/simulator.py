@@ -93,6 +93,17 @@ class RealtimeSimulator:
         Live input source; ``None`` holds the nominal port values.
     output : RealtimeOutput, optional
         External per-frame consumer; ``None`` publishes nothing.
+    plot : bool or str
+        Open a live rolling-window time-signal plot during the run
+        (default ``False``); pass ``"matplotlib"`` or ``"plotly"`` to select
+        the plotting backend directly. Uses
+        :class:`~minilink.simulation.realtime.live_plot.LiveSignalPlotOutput`.
+    plot_signals : sequence of str or (System, str), optional
+        Signals to display in the live plot; defaults to
+        :func:`~minilink.graphical.signals.resolve_plot_signals` when ``None``.
+        Passing ``plot_signals`` implies ``plot=True``.
+    plot_backend : str
+        Signal plotting backend when ``plot=True`` (``"matplotlib"`` or ``"plotly"``).
     compile_backend : str or None
         Evaluator backend. ``None`` or ``"auto"`` (default ``None``): try JAX
         when available and the system is JAX-compatible, otherwise NumPy.
@@ -129,6 +140,9 @@ class RealtimeSimulator:
         is_3d=False,
         input=None,
         output=None,
+        plot=False,
+        plot_signals=None,
+        plot_backend="matplotlib",
         compile_backend=None,
         max_steps=None,
         tf=None,
@@ -157,7 +171,15 @@ class RealtimeSimulator:
         self.renderer = renderer
         self.is_3d = is_3d
         self.input = input
-        self.output = output
+        if isinstance(plot, str):
+            plot_backend = plot
+            plot = True
+        self.plot = bool(plot or plot_signals is not None)
+        self.plot_signals = plot_signals
+        self.plot_backend = plot_backend
+        self.output = realtime_output_of(
+            output, self.plot, plot_signals, plot_backend=plot_backend
+        )
         self.max_steps = max_steps
         self.tf = tf
         self.verbose = bool(verbose)
@@ -240,32 +262,41 @@ class RealtimeSimulator:
         sim_dt = self.sim_dt
 
         ts, xs, us = [t], [x.copy()], [u.copy()]
-
         backend = self._backend
         kinematic = None
-        if backend is not None:
-            kinematic = sys.get_kinematic_geometry()
-            self._animator.open_live_scene(
-                backend,
-                x,
-                u,
-                t,
-                is_3d=self.is_3d,
-                kinematic=kinematic,
-                title=f"Realtime: {sys.name}",
-            )
-        if self.input is not None:
-            self.input.open(sys)
-        if self.output is not None:
-            self.output.open(sys)
-
+        output_opened = False
+        scene_opened = False
+        input_opened = False
         step_idx = 0
-        last_frame_start = time.perf_counter()
-        last_overrun_warn_s = None
         self.n_overruns = 0
         run_wall_start = time.perf_counter()
         status_open = False
         try:
+            # Open output first (e.g. a live Matplotlib signal plot) so the
+            # interactive scene / PygameInput window opens last and keeps OS focus.
+            if self.output is not None:
+                open_output(self.output, sys, x0=x, u0=u, t0=t)
+                output_opened = True
+
+            if backend is not None:
+                kinematic = sys.get_kinematic_geometry()
+                self._animator.open_live_scene(
+                    backend,
+                    x,
+                    u,
+                    t,
+                    is_3d=self.is_3d,
+                    kinematic=kinematic,
+                    title=f"Realtime: {sys.name}",
+                )
+                scene_opened = True
+            if self.input is not None:
+                self.input.open(sys)
+                input_opened = True
+
+            last_frame_start = time.perf_counter()
+            last_overrun_warn_s = None
+            run_wall_start = last_frame_start
             while True:
                 frame_start = time.perf_counter()
                 if self.sync == "realtime" and step_idx > 0:
@@ -289,12 +320,22 @@ class RealtimeSimulator:
                 us.append(u.copy())
 
                 if backend is not None:
+                    if self.input is not None:
+                        poll_cam = getattr(self.input, "poll_camera", None)
+                        if callable(poll_cam):
+                            d_az, d_el = poll_cam(dt_hold)
+                            if d_az != 0.0 or d_el != 0.0:
+                                backend.orbit_camera(d_az, d_el)
                     events = self._animator.update_live_frame(
                         backend, x, u, t, kinematic=kinematic
                     )
                     should_stop = should_stop or events.get("quit", False)
                 if self.output is not None:
-                    outputs = evaluator.outputs(x, u, t)
+                    outputs = (
+                        evaluator.outputs(x, u, t)
+                        if getattr(self.output, "needs_boundary_outputs", True)
+                        else {}
+                    )
                     self.output.publish(t, x, u, outputs)
 
                 wall_frame_s = time.perf_counter() - frame_start
@@ -323,14 +364,16 @@ class RealtimeSimulator:
                 sleep_s = frame_dt - wall_frame_s
                 if sleep_s > 0.0:
                     time.sleep(sleep_s)
+        except KeyboardInterrupt:
+            pass
         finally:
             if self.verbose and status_open:
                 print()
-            if backend is not None:
+            if backend is not None and scene_opened:
                 backend.close_scene()
-            if self.input is not None:
+            if self.input is not None and input_opened:
                 self.input.close()
-            if self.output is not None:
+            if self.output is not None and output_opened:
                 self.output.close()
 
         if self.verbose:
@@ -486,7 +529,9 @@ class RealtimeSimulator:
             x, u, t, self.frame_dt, dt_inner=self.sim_dt
         )
         outputs_warm = None
-        if self.output is not None:
+        if self.output is not None and getattr(
+            self.output, "needs_boundary_outputs", True
+        ):
             outputs_warm = self.evaluator.outputs(x, u, t)
         if getattr(self.evaluator, "backend", "numpy") == "jax":
             import jax
@@ -495,3 +540,48 @@ class RealtimeSimulator:
             if outputs_warm is not None:
                 for value in outputs_warm.values():
                     jax.block_until_ready(value)
+
+
+class CompositeOutput(RealtimeOutput):
+    """Fan out lifecycle and per-frame samples to multiple :class:`RealtimeOutput`s."""
+
+    def __init__(self, outputs):
+        self.outputs = tuple(outputs)
+        self.needs_boundary_outputs = any(
+            getattr(out, "needs_boundary_outputs", True) for out in self.outputs
+        )
+
+    def open(self, sys, *, x0=None, u0=None, t0=0.0):
+        for out in self.outputs:
+            open_output(out, sys, x0=x0, u0=u0, t0=t0)
+
+    def publish(self, t, x, u, outputs):
+        for out in self.outputs:
+            out.publish(t, x, u, outputs)
+
+    def close(self):
+        for out in self.outputs:
+            out.close()
+
+
+def open_output(output: RealtimeOutput, sys, *, x0=None, u0=None, t0=0.0) -> None:
+    """Call ``output.open(sys)``, passing initial sample kwargs when accepted."""
+    try:
+        output.open(sys, x0=x0, u0=u0, t0=t0)
+    except TypeError:
+        output.open(sys)
+
+
+def realtime_output_of(
+    output, plot: bool, plot_signals, *, plot_backend: str = "matplotlib"
+):
+    """Combine an optional user ``RealtimeOutput`` with ``LiveSignalPlotOutput`` when ``plot=True``."""
+    if not plot:
+        return output
+
+    from minilink.simulation.realtime.live_plot import LiveSignalPlotOutput
+
+    plot_out = LiveSignalPlotOutput(signals=plot_signals, backend=plot_backend)
+    if output is None:
+        return plot_out
+    return CompositeOutput((plot_out, output))
