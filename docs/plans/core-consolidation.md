@@ -4,10 +4,11 @@
 to review, nothing decided.  
 **Lane:** maintainer-owned (every item removes or moves a user-importable name, so each is
 an ask under AGENTS.md; the inventory and the tiers are the agent's analysis).  
-**Rung:** the convergence pass the roadmap calls a standing principle, not a rung
-(ROADMAP §5.5, "Simplify and consolidate"); it fits between the GMC714 audit (step G1 of
-[TODO.md](TODO.md)) and the freeze candidate (ROADMAP §5.4), because the v0.9 freeze should
-cover a smaller surface than today's.  
+**Rung:** the convergence pass (step K7 of [TODO.md](TODO.md), an open decision in
+ROADMAP §6), which the roadmap calls a standing principle, not a rung (ROADMAP §5.5,
+"Simplify and consolidate"); it fits between the GMC714 audit (step G1) and the freeze
+candidate (ROADMAP §5.4), because the v0.9 freeze should cover a smaller surface than
+today's.  
 **Companion:** [repository-structure.md](repository-structure.md) decides *where* things
 live; this document decides *what* stays in the library at all.
 

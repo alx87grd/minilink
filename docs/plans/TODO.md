@@ -553,6 +553,11 @@ in December 2026 after the v0.3 tag; the v1.0 rows after two cohorts.
   links, GRO501's `\colab{}`), the new repositories' CI pinned on a minilink release, the
   notebook smoke check moved with them, this repo's README and `examples/README.md` pointing
   there. Done when every course link resolves and both CIs pass.
+- [ ] **K7 What is core, what is a side feature** **[ask — core, public names]**
+  (ROADMAP §6): the convergence pass; every move is a step of its own once ruled. Decided
+  before the freeze; the first tier any time, the between-terms moves after GMC714.
+  Analysis, tiers and the asks: [core-consolidation.md](core-consolidation.md). Done when
+  the ruling is recorded and the moves are rows here.
 - [ ] **S31** `HybridDiagram` → a `System` (state `[plant; computer]`, periodic discrete
   update) or an honest `HybridLoop` rename; `%` stays the one hybrid operator either way; the
   hand-copied facades go with it; P10's AC-8b lands with it.

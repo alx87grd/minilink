@@ -339,6 +339,9 @@ public name; v1.0 (§5.5) freezes.
   (§6). **[ask — student-facing]**
 - **K6** The move, if K5 says so: history kept, the citing course documents updated, the new
   repositories pinned on a minilink release. **[ask — student-facing]**
+- **K7** The convergence pass: which modules are the core (the spine, the six pillars, the
+  named content) and which are side features that leave for the experimental tier or the
+  example that motivated them (§6). **[ask — core, public names]**
 
 **The trust contract:**
 - **V4** Deprecation policy from v1.0: one minor release with a `DeprecationWarning` shim;
@@ -481,6 +484,21 @@ and which can wait, each with its proposed answer; the analyses and the panel ar
   terms only. Options and a recommendation (pin the course notebooks on a release now, a
   course repository at v1.0; with the examples-tree and package-split questions):
   [the repository-structure writeup](../plans/repository-structure.md).
+
+- **What is core, what is a side feature** (K7): the surface the freeze pins should be
+  the surface the lessons and the pillars stand on, not everything the divergence phase
+  built. The maintainer rules on six things: the shape of the framework itself (one
+  differentiable spine and six pillars: classical and modern, nonlinear, trajectory and
+  MPC, reinforcement learning, identification and imitation, estimation; a different list
+  changes the verdicts); the first tier of side features as a block or item by item, with
+  the plant rule behind it (a plant stays when it is a vehicle, a robot, or a benchmark a
+  course uses); the contact engines, deleted or one file kept as the external-leaf template;
+  the racecar 3-D skin to its plant folder between terms and the SB3 bridge to the
+  experimental tier when its twin notebooks retire (S49); the exit rule for the lane
+  contract (a name nothing uses for two releases moves, unless a roadmap row names it as a
+  pillar's seed, and a seed with no step taken for two releases moves too); the form of
+  the prelude trim before v0.9 (silent, or a one-release shim). Analysis, tiers and the
+  asks: [the core-consolidation writeup](../plans/core-consolidation.md).
 
 - `HybridDiagram` as a `System` vs `HybridLoop` (S31); the sampled seam's time argument,
   integer ticks (today) or seconds; and whether its run-state caches
