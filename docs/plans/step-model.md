@@ -82,6 +82,12 @@ in every argument (`params` included), the same on NumPy and JAX. Four knobs, no
 | `substeps` | integration steps per sample | `1` (today's numbers) |
 | `hold` | `"zoh"`, `"foh"` (what shooting uses between knots) | `"zoh"` |
 
+**Parameters are an argument, always.** The step is `step_p(x, u, t, params)`, and there is
+no frozen twin. The parameterless call students use stays, as a binding: the parameters
+bound once (`partial(step_p, params=sys.params)`) and the result jitted, which JAX treats as
+constants. That is today's frozen behaviour (the evaluator deep-copies `params` at compile
+time and closes over them), obtained from the one body (§3.5).
+
 ### 3.2 Constant-step explicit integration on this path, and only on it
 
 A fixed step is what `scan`, `vmap` and `grad` want, it is deterministic, and its error is
@@ -103,6 +109,36 @@ In `core/compile`, one step per backend, `step(x, u, t, params; dt, method, subs
 an `xp` body where possible; the 36-method grid becomes bindings over it (the K-wave trim),
 and `integrate_zoh(dt_inner=)` is `substeps` under another name. S37 then moves the
 integrator to `simulation/solvers/` as planned.
+
+### 3.5 Why one params path
+
+Measured on the current JAX evaluator, the frozen RK4 step against the one taking `params`
+(identical results in every case):
+
+| Case | Frozen | `params` as argument |
+| --- | --- | --- |
+| pendulum, 1000 rollouts × 1000 steps in one compiled scan | 156 ms | 170 ms |
+| cart-pole, the same batch | 1503 ms | 1514 ms |
+| pendulum, one jitted step called from Python | 13 µs | 34 µs |
+| cart-pole, one jitted step called from Python | 24 µs | 54 µs |
+
+- **Inside a compiled loop there is no real difference** (1 to 9 %): RL training, batch
+  rollouts, trajectory optimization, MPPI and the differentiable tuning all run there.
+- **Step by step from Python, the argument costs about 2.5×**, all of it the per-call
+  flattening of the parameter dictionary, not arithmetic. The binding of §3.1 removes it: the
+  gym bridge, the realtime loop, the RRT extender and the hybrid ticks get the frozen speed
+  from the one body.
+- **The grid halves.** Every integrator exists frozen and with `params` today, before the
+  trace and jit tiers double it again; one `_p` body plus a binding is the trim the K-wave
+  row asks for.
+- **A bug class goes.** A frozen evaluator silently ignores parameters changed after
+  `compile()`; with one path, freezing is an explicit act at a visible place.
+- **The stable names hold.** DESIGN §5's frozen evaluator subset (`f`, `rk4_step`,
+  `integrate_zoh`, their trace twins) keeps every name; each parameterless one becomes the
+  binding over its `_p` body.
+
+It does not fix S53: a batch with a *different* parameter set per rollout (a family under
+`vmap`) runs about 10× slower than the plain batch, a separate problem.
 
 ## 4. The consumers after the change
 
@@ -128,8 +164,9 @@ compare after each step. A number that changes on purpose gets its own test and 
 
 - **SM-0** The baseline: every consumer of §1 on a pendulum and a cart-pole, both backends
   where they exist, `params` on and off, repeated calls.
-- **SM-1** The one compiled step with its four knobs on both backends; the existing methods
-  become bindings over it.
+- **SM-1** The one compiled step, taking `params`, with its four knobs on both backends; the
+  existing methods become bindings over it, the parameterless ones a `partial` over `params`
+  then `jit`, byte-identical and within the measured speed of §3.5.
 - **SM-2** `discretize` on the compiled step, gaining `substeps=` and `hold=`;
   `method="exact"` (the follow-up) checked against `scipy.signal.cont2discrete`.
 - **SM-3** `RolloutEnvironment` and `Sys2Gym` on `discretize`, `substeps` exposed.
@@ -150,6 +187,9 @@ compare after each step. A number that changes on purpose gets its own test and 
    model it was trained on; as an option, or as the default (the comparison lessons' numbers
    change).
 5. **The order**: this first, then S31's kernel, then V1's step 0.
+6. **Params always an argument**: one `_p` body per method, the frozen call a binding at the
+   boundary (§3.5); the parameterless call kept as the student convenience, under its
+   current stable name.
 
 ## 7. Fit with the other plans
 

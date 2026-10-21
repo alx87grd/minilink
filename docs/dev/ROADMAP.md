@@ -538,7 +538,8 @@ and which can wait, each with its proposed answer; the analyses and the panel ar
   `hold`), constant-step explicit integration on the sampled path only (`Simulator` keeps
   adaptive RK45), `discretize` the public verb returning a `StepSystem`, one compiled step
   under it; byte-identical for every consumer. The maintainer rules on the name, the
-  defaults, DP's integrator (Euler kept or RK4), a sampled replay in `compare()`, and the
+  defaults, params always an argument (freezing a binding at the boundary), DP's integrator
+  (Euler kept or RK4), a sampled replay in `compare()`, and the
   order (before S31's kernel and V1's step 0). Design and steps:
   [the step-model writeup](../plans/step-model.md).
 - Evaluator / solver layering, Diffrax (S37, S27).

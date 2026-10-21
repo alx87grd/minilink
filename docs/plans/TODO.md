@@ -562,7 +562,8 @@ in December 2026 after the v0.3 tag; the v1.0 rows after two cohorts.
   to a step map, `discretize(plant, dt, *, method, substeps, hold) -> StepSystem` on one
   compiled step, for every sampled consumer (the RL environment, `Sys2Gym`, the DP grid,
   shooting, the hybrid and realtime simulators, RRT, the Lyapunov sampler, MPPI; later
-  identification and imitation). Before S31 and before V1's step 0. Design, steps SM-0 to
+  identification and imitation); `params` always an argument, the frozen call a binding.
+  Before S31 and before V1's step 0. Design, steps SM-0 to
   SM-6 and the asks: [step-model.md](step-model.md). Done when the ruling is recorded and the
   steps are rows here.
 - [ ] **S31** `HybridDiagram` → a `System` (state `[plant; computer]`, periodic discrete
