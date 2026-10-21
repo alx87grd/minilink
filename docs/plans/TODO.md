@@ -796,6 +796,8 @@ One line each; open a plan doc only when a design needs a writeup.
 - `RolloutEnvironment` may move from `reinforcement_learning/` to `planning/environment.py`
   once a second band reads it (open in ROADMAP §6) (the path-integral planner; the evaluator and the tabular learners
   already do): one import rewrite, no behaviour change.
+- Diffusion policy (research lane, JAX-only, after behavior cloning): a sampled controller with
+  memory and a key, trained by `fit`; see [future-policies.md](future-policies.md).
 - `MjxPlant` (`interfaces/mjx.py`) and `torch` / `flax` model wrappers in `interfaces/`;
   Pacejka tire; stochastic forcing; ROS2 / FMI; sparse long-horizon trajopt; RRT-Connect.
 - Ipopt given the Lagrangian Hessian, not the objective's alone (scan: planning#13);

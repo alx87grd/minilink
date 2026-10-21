@@ -464,7 +464,9 @@ lands without breaking a name **[ask — core]**; **S36** iLQR from parts (resea
 a game mode on `RealtimeSimulator` that records human demonstrations (keyboard or joystick
 driving the plant live) as trajectory datasets, a planner that fits a policy to them
 (imitation beside the RL planner, the neural policy block as its output), and the cloned
-controller closed on the plant and compared against the demonstrator **[ask]**.
+controller closed on the plant and compared against the demonstrator **[ask]**. How the
+current proposals carry it, and diffusion policy after it:
+[future-policies.md](../plans/future-policies.md).
 
 **Simplify and consolidate — a standing principle, not a rung.** The repo must stay
 manageable by one maintainer, so every rung carries consolidation work, and the target is
@@ -521,6 +523,11 @@ v0.4 added, the course audit G1 now, the sampled spine before the differentiable
   hybrid simulator and the MPC export call; tracing decided by the computer. Still to rule
   with it: ticks or seconds, the run-state caches (RULES 2.4).
   [sampled-path.md](../plans/sampled-path.md) §8.
+- **For the same session, to discuss** (not blocking on their own): how the proposals carry
+  MPPI, behavior cloning and diffusion policy, and three points they suggest absorbing now
+  (memory and a random key per tick in the sampled loop; the evaluator running sampled
+  controllers on the kernel's JAX face; a `fit` verb beside `tune` in the names
+  brainstorm): [future-policies.md](../plans/future-policies.md).
 - **The differentiable planning problem (2026-10-18, panel of 2026-10-20), the asks of its
   consolidated plan** — one path from any parameter the problem holds to any traceable metric,
   optimized through the native optimizer. Four points the seven-design panel split on, each with
