@@ -7,10 +7,11 @@ code and a panel of seven independent designs with six critiques amended the res
 said and how the splits were judged is in
 [the consolidation record](../reviews/2026-10-18-differentiable-problem-consolidation.md).
 What is marked **decided** was ruled before this document; everything else is proposed and
-waits on the asks of §9. Nothing is built; §8 is the build order, step V1 and rows S73 and S74
-of [TODO.md](TODO.md) §5.
-Rung: v0.4 (the evaluator and the optimizer), after the sampled spine of v0.3 (S75, S31;
-[sampled-path.md](sampled-path.md)); traceable analysis (S73) any time.
+waits on the asks of §9. Nothing is built; §8 is the build order, step V1 and row S74
+of [TODO.md](TODO.md) §4, row S73 in §5.
+Rung: v0.3 wave V, steps 0–6 (the deterministic path to the cost, the API first, beside the
+sampled spine of [sampled-path.md](sampled-path.md)); v0.4, steps 7–9 (the draws, with
+RN-4 / RN-5); traceable analysis (S73) any time.
 Lane: research first; the teaching surface once a course has run it.
 
 ## 1. The target

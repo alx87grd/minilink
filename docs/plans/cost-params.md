@@ -2,7 +2,7 @@
 
 Status: core contract, design agreed with the maintainer 2026-09-13 (composite costs nest
 their parameters the way a diagram nests its subsystems'); implementation not started.
-Rung: v0.4, step A2 of [TODO.md](TODO.md) (the differentiable problem's step 6).
+Rung: v0.3 wave V, step A2 of [TODO.md](TODO.md) (the differentiable problem's step 6).
 
 ## Problem
 
@@ -16,7 +16,7 @@ nothing uses it.
   `jax.grad` with respect to `Q` raises `TracerArrayConversionError`.
 - `SumCost` hands the same dictionary to every term: two quadratic terms would both read
   `"Q"`, so their weights cannot be set or differentiated separately.
-- The differentiable closed-loop cost (V1 in [TODO.md](TODO.md) §5, v0.4) needs cost weights and
+- The differentiable closed-loop cost (V1 in [TODO.md](TODO.md) §4, v0.3) needs cost weights and
   targets as inputs, next to plant and controller parameters.
 
 ## What is already in place

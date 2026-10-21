@@ -20,8 +20,8 @@ git history (`docs/reviews/2026-09-22-improvement-*.md`, before 2026-10-17).
 | [§1](#1-wave-a--the-textbook-objects-carried-from-v02-into-v03) | Wave A — the textbook objects, carried into v0.3 |
 | [§2](#2-wave-b--gro501-the-carry-over-020-shipped-2026-10-17) | Wave B — GRO501, the carry-over |
 | [§3](#3-wave-d--textbook-code-minimal-demos-consolidation) | Wave D — textbook code, minimal demos, consolidation |
-| [§4](#4-v03--a-cleaner-core-then-gmc714) | v0.3 — a cleaner core, then GMC714 |
-| [§5](#5-v04--the-differentiable-spine-and-the-textbook-objects) | v0.4 — the differentiable spine and the textbook objects |
+| [§4](#4-v03--a-cleaner-core-and-the-differentiable-path-then-gmc714) | v0.3 — a cleaner core and the differentiable path, then GMC714 |
+| [§5](#5-v04--the-draws-and-the-textbook-objects) | v0.4 — the draws and the textbook objects |
 | [§6](#6-v09-freeze-candidate-and-v10) | v0.9 freeze candidate and v1.0 |
 | [§7](#7-later-ideas) | Later ideas |
 
@@ -298,14 +298,15 @@ pick):
 
 ---
 
-## 4. v0.3 — a cleaner core, then GMC714
+## 4. v0.3 — a cleaner core and the differentiable path, then GMC714
 
 **Order** (reorganized 2026-10-21, [record](../reviews/2026-10-21-roadmap-reorganization.md)):
 the rulings that block code first (ROADMAP §6, "Blocking code now"); G1 now, in parallel
 (cheap, and it fixes what December must contain). Then **the cleanup first**, in November:
 wave K (K1–K4 with K7), its first tier any time and its between-terms moves after GMC714;
-then wave S, the sampled spine: S75 (the `discretize` follow-ups as its SM-2), then S31.
-**Then the GMC714 features**, in December: wave G's rows (C1, C2, C3, C6, S63, S64 and the
+then wave S, the sampled spine: S75 (the `discretize` follow-ups as its SM-2), then S31;
+beside it wave V, the deterministic differentiable path to the cost behind a clean API (V1's
+steps 0–5 with S74 and OPW, then A2 as its step 6). **Then the GMC714 features**, in December: wave G's rows (C1, C2, C3, C6, S63, S64 and the
 gaps G1 writes) in the order G1 sets. The rows below are in that order.
 
 **The audit, first.**
@@ -386,49 +387,14 @@ the demo sweep touches fewer files. Nothing leaves without the maintainer's ruli
   `StepSystem.rollout` and `HybridDiagram.last_result` cache a run too (ROADMAP §6); the
   `core` → `simulation` import (scan: core#14).
 
-**Wave G — the GMC714 features** (December, after waves K and S, in the order G1 sets).
+**Wave V — the differentiable path to the cost** (November into early December, beside
+wave S). Design: [differentiable-problem.md](differentiable-problem.md); its step 0 is a
+names brainstorm with the maintainer, so the API comes first.
 
-- [ ] **C1 Pyro parity** open rows — [pyro-port-remaining.md](pyro-port-remaining.md); then
-  the pyro → minilink migration guide in README from the name map there. **[ask]** for the
-  README. Re-audit the table against the code first (scan: docs-gov#11).
-- [ ] **C2 GMC714 modelling ladder**: manipulators + the four-rung vehicle ladder as a
-  `02_dynamics` lesson; robotic PID wrappers (`JointPD`, `EndEffectorPD` twins).
-  Also: one constructor contract for the robotic laws (scan: control#6).
-- [ ] **C3 Blocks**: `Ramp` / `Chirp` / `Delay` / `Switch`; `Integrator` and `ZOHHold` take
-  a `dim` like every static block (scan: graphics#11).
-- [ ] **C6 General serial chain** **[ask — core]**: one mechanism description (DH table or
-  URDF: geometry, inertia, topology) feeding RNEA / ABA beyond the UR5, the shared serial-chain
-  stack, ABA on the other RNEA arms, the symbolic path reading the same description; the GMC714
-  arm topic's modelling rung. Design first (the July 2026 articulated-mechanism draft is in git
-  history; it is re-planned here, the optional `KinematicModel` delegate decided with it, ROADMAP
-  §6). Done when a second arm runs on the shared stack with the catalog both-backends test.
-- [ ] **S63 DP reads the horizon** **[ask — planner API]** (scan: planning#1): a finite
-  `problem.tf` runs `round(tf / dt)` backward sweeps as `solve_steps` does, the way
-  `LQRPlanner` picks the Riccati ODE, or warns once. Done when LQR and DP agree on the
-  finite-horizon double integrator.
-- [ ] **S64 Catalog hygiene** **[ask — catalog]** (scan: dynamics#0, dynamics#1,
-  dynamics#2, dynamics#3, dynamics#4, dynamics#6, dynamics#8): the mechanical default
-  bounds as ROADMAP §6 decides (keep the invented ±2π / ±5, or each plant states its own); output ports that are
-  the state or a slice of it read labels and units from the state (the 56 copy lines go);
-  one port layout across the bicycle rungs; one owner for the wheelbase; the hidden `0.01`
-  damping in `Drone2D.d` and `Rocket.d` named; `VanderPol` with a real input or none;
-  constructor hygiene in the pendulum and mass-spring-damper families.
-
----
-
-## 5. v0.4 — the differentiable spine and the textbook objects
-
-**Order** (winter 2027, between cohorts): V1's steps 0–5 of
-[differentiable-problem.md](differentiable-problem.md), with S74 and OPW-1–OPW-5 as its step
-5; then A2 (its step 6); then V1's steps 7–9 with RN-3 / RN-4 / RN-5 and AC-7 (step 7 is
-RN-5's one path), C4 its first data consumer; then A1, then A3; S72 on the sampled kernel
-after RN-4 / RN-5; C5 and LQGPlanner as picked; S73 any time, self-contained.
-
-**The differentiable spine.**
-
-- [ ] **V1 The differentiable planning problem** **[ask — core]**, v0.4, on the sampled
-  spine of v0.3 (S75, S31): steps 0–5 of [differentiable-problem.md](differentiable-problem.md),
-  then A2 (its step 6), then steps 7–9 with RN-4 and RN-5. The names of every new object and verb
+- [ ] **V1 The differentiable planning problem** **[ask — core]**, v0.3 (steps 0–6:
+  the deterministic path to the cost, the API first) and v0.4 (steps 7–9, the draws, with RN-4
+  and RN-5): [differentiable-problem.md](differentiable-problem.md). Steps 0–2 run beside wave
+  S; step 3 meets the sampled seam after S31; A2 is step 6. The names of every new object and verb
   are a brainstorm with the maintainer before code (step 0); the design is the plan's to
   settle, its asks in §9, with the `pid_autotuning_jax` demo as the worked example. One fully
   differentiable path: the params of anything in the loop, the cost or the sets → the
@@ -445,7 +411,7 @@ after RN-4 / RN-5; C5 and LQGPlanner as picked; S73 any time, self-contained.
   central difference on the same key, through the standard entry point, and the autotuning
   demo ends in the `Optimizer`.
 - [ ] **S74 The optimizer as the one descent loop** **[idea to review — ask — core]**,
-  proposed by the maintainer 2026-10-18; lands as V1's step 5 (v0.4) with OPW-1–OPW-5. Today `MathematicalProgram` carries
+  proposed by the maintainer 2026-10-18; lands as V1's step 5 (v0.3) with OPW-1–OPW-5. Today `MathematicalProgram` carries
   `J`, `h`, `g` and the box, `Optimizer` offers three constrained-NLP presets (`scipy_slsqp`,
   `scipy_trust_constr`, `ipopt`) on a flat `z`, and every gradient-based tuning writes its own
   loop: four compile demos (`pid_autotuning_jax`, `params_gradient`, `neural_controller_jax`,
@@ -477,7 +443,7 @@ after RN-4 / RN-5; C5 and LQGPlanner as picked; S73 any time, self-contained.
   admitted methods and the `"auto"` pick, the default method kept at `scipy_slsqp` until V3,
   the first-order backend with the RL `Adam` moved, one global derivative-free preset
   (`scipy_differential_evolution`), never picked by `"auto"`; lands as the plan's step 5.
-  - [ ] **OPW-1–OPW-5** (with S74, V1's step 5, v0.4) The parametric (MPC) optimizer goes through `Optimizer`'s backend table
+  - [ ] **OPW-1–OPW-5** (with S74, V1's step 5, v0.3) The parametric (MPC) optimizer goes through `Optimizer`'s backend table
     ([optimizer-parametric-wiring.md](optimizer-parametric-wiring.md); scan: planning#9). Out of
     T5, which is byte-identical, because it changes behaviour. Done when
     `optimizer_method="ipopt"` reaches the parametric MPC path and the plan's OPW-4 tests pass.
@@ -492,6 +458,46 @@ after RN-4 / RN-5; C5 and LQGPlanner as picked; S73 any time, self-contained.
   per-block dict against the block's keys, so a partial dict fails at the setter instead of
   inside `f`. The Monte Carlo evaluator and the gym reward never apply `problem.params.cost`
   while the DP table does, so the two disagree on a parametric cost.
+
+**Wave G — the GMC714 features** (December, after waves K, S and V, in the order G1 sets).
+
+- [ ] **C1 Pyro parity** open rows — [pyro-port-remaining.md](pyro-port-remaining.md); then
+  the pyro → minilink migration guide in README from the name map there. **[ask]** for the
+  README. Re-audit the table against the code first (scan: docs-gov#11).
+- [ ] **C2 GMC714 modelling ladder**: manipulators + the four-rung vehicle ladder as a
+  `02_dynamics` lesson; robotic PID wrappers (`JointPD`, `EndEffectorPD` twins).
+  Also: one constructor contract for the robotic laws (scan: control#6).
+- [ ] **C3 Blocks**: `Ramp` / `Chirp` / `Delay` / `Switch`; `Integrator` and `ZOHHold` take
+  a `dim` like every static block (scan: graphics#11).
+- [ ] **C6 General serial chain** **[ask — core]**: one mechanism description (DH table or
+  URDF: geometry, inertia, topology) feeding RNEA / ABA beyond the UR5, the shared serial-chain
+  stack, ABA on the other RNEA arms, the symbolic path reading the same description; the GMC714
+  arm topic's modelling rung. Design first (the July 2026 articulated-mechanism draft is in git
+  history; it is re-planned here, the optional `KinematicModel` delegate decided with it, ROADMAP
+  §6). Done when a second arm runs on the shared stack with the catalog both-backends test.
+- [ ] **S63 DP reads the horizon** **[ask — planner API]** (scan: planning#1): a finite
+  `problem.tf` runs `round(tf / dt)` backward sweeps as `solve_steps` does, the way
+  `LQRPlanner` picks the Riccati ODE, or warns once. Done when LQR and DP agree on the
+  finite-horizon double integrator.
+- [ ] **S64 Catalog hygiene** **[ask — catalog]** (scan: dynamics#0, dynamics#1,
+  dynamics#2, dynamics#3, dynamics#4, dynamics#6, dynamics#8): the mechanical default
+  bounds as ROADMAP §6 decides (keep the invented ±2π / ±5, or each plant states its own); output ports that are
+  the state or a slice of it read labels and units from the state (the 56 copy lines go);
+  one port layout across the bicycle rungs; one owner for the wheelbase; the hidden `0.01`
+  damping in `Drone2D.d` and `Rocket.d` named; `VanderPol` with a real input or none;
+  constructor hygiene in the pendulum and mass-spring-damper families.
+
+---
+
+## 5. v0.4 — the draws and the textbook objects
+
+**Order** (winter 2027, between cohorts): V1's steps 7–9 of
+[differentiable-problem.md](differentiable-problem.md) (its steps 0–6 landed in v0.3) with
+RN-3 / RN-4 / RN-5 and AC-7 (step 7 is RN-5's one path), C4 its first data consumer; then A1, then A3; S72 on the sampled kernel
+after RN-4 / RN-5; C5 and LQGPlanner as picked; S73 any time, self-contained.
+
+**The draws on the path.**
+
 - [ ] **RN-3 / RN-4 / RN-5** of [randomness.md](randomness.md) (its §9 holds the files and
   "done when" per step): RN-4 `realize(key)` by name and signals on `disturbances=` (the
   frozen-noise defect fixed), RN-5 the Monte Carlo evaluator as a batched simulation of the

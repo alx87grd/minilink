@@ -65,3 +65,23 @@ before v0.9, before v1.0.
 
 Checked: every workboard row survived the move (the same 80 row headers before and after),
 and the docs gate (ruff, the repo contract test) is green.
+
+## Amended the same day: the differentiable path joins the cleanup
+
+The maintainer set the order more precisely: "first next step is core cleaning and full diff
+path to cost with nice api, then later December is GMC714 feature adding missing". So the
+deterministic half of the differentiable problem moves from v0.4 into v0.3, as wave V:
+
+| Item | After the first pass | After the amendment |
+| --- | --- | --- |
+| V1 steps 0–5 with S74 and OPW-1–OPW-5 | v0.4 | v0.3 wave V, November into early December, beside wave S (steps 0–2 need neither S75 nor S31; step 3 meets the sampled seam) |
+| A2 cost parameters (V1 step 6) | v0.4 | v0.3 wave V, so the path reaches the cost's own weights |
+| the GMC714 features (wave G's rows) | December | December, after waves K, S and V |
+| V1 steps 7–9, RN-3 / RN-4 / RN-5, AC-7, C4 | v0.4 | v0.4 (unchanged: the evaluator's numbers change once, between cohorts) |
+
+v0.3 is now "a cleaner core and the differentiable path, then GMC714"; v0.4 is "the draws and
+the textbook objects". The API comes first in wave V: the differentiable problem's step 0 is a
+names brainstorm with the maintainer. November now carries four waves (K, S, V and the audit),
+which the timeline in ROADMAP §5 shows overlapping; the order, not the dates, is the
+commitment.
+

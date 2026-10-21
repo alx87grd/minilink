@@ -11,8 +11,8 @@ Identity: [CONSTITUTION.md](CONSTITUTION.md).
 | --- | --- | --- |
 | **v0.1** | **GRO860 end to end**, plus a working **`pip install minilink` on PyPI**. Every topic of the running optimal-control & RL course runs on the teaching surface, in Colab (git-clone cell) and in the conda env: value iteration / DP on a grid · LQR + linearization · trajectory optimization · RL via native `ReinforcementLearningPlanner` (with `Sys2Gym` + SB3 as an optional bridge). See §4.1. | Fall 2026 — `0.1.0` on PyPI (2026-09-16); `0.1.1` (2026-09-26) is the first release a GitHub tag published. Conda from `environment.yml` is the recommended install. The course notebooks' names are frozen until v1.0, with the freeze paused between terms (§4.1 gate 7). |
 | **v0.2** | **GRO501 end to end** (the classical-control course: multi-physics modelling · root locus / Bode / margins · PID to spec · digital implementation · state feedback, pole placement, LQR, observers — see §4.2). Conda stays the recommended install. | `0.2.0` on PyPI (2026-10-17), from the GitHub tag; every §4.2 row green |
-| **v0.3** | **A cleaner core, then GMC714 end to end** (§5.3): first **the convergence pass** (the core kept, side features to the experimental tier) and **the sampled spine** (one step model under every sampled tool, the sampled loop as a tool), November; then the features GMC714 is missing, December — robust control · robotic arm · trajectory optimization · MPC · vehicle models · nonlinear control (§4.3), with **pyro parity**. | December 2026 |
-| **v0.4** | **The differentiable spine and the textbook objects** (§5.4): one path from any parameter to any metric through the native optimizer, cost parameters, the draws, identification as its first data consumer; fields and workspace geometry; MPPI on the sampled kernel. | Winter 2027, between cohorts |
+| **v0.3** | **A cleaner core and the differentiable path, then GMC714 end to end** (§5.3): first, in November, **the convergence pass** (the core kept, side features to the experimental tier), **the sampled spine** (one step model under every sampled tool, the sampled loop as a tool) and **the full differentiable path to the cost behind a clean API** (`problem.compile(controller)`, `tune`, the program bridge, cost parameters); then, in December, the features GMC714 is missing — robust control · robotic arm · trajectory optimization · MPC · vehicle models · nonlinear control (§4.3), with **pyro parity**. | December 2026 |
+| **v0.4** | **The draws and the textbook objects** (§5.4): the mean over the problem's draws through the same differentiable path (the Monte Carlo evaluator one path, its numbers changing once), identification as its first data consumer; fields and workspace geometry; MPPI on the sampled kernel. | Winter 2027, between cohorts |
 | **v0.9** | **Freeze candidate** (§5.5): the foundation questions that could still break a public name are decided (derived `x0`, the integrators' home, the glyph/solid rename, the frozen surface); the trust contract is in place (deprecation policy, pinned export list, CHANGELOG, pinned installs); the standard-syllabus holes close (estimation, discrete time); the docs site renders the tutorials. | Spring 2027 |
 | **v1.0** | **A colleague can build a course on it and trust it for three years** (§5.6): the API frozen under the deprecation policy, the standard control syllabus covered and checked against textbook worked examples, course-neutral labs an instructor adopts outside UdeS, green on Windows, macOS and Linux; after two cohorts. Two Stable-Baselines3 teaching notebooks retire (S49) and the GRO860 name freeze becomes the general one. | 2027 |
 
@@ -81,7 +81,7 @@ Step ids (`S29`, `P4`, `T2`, …) are the rows of
 | Area | Lane | TRL | State | Next |
 | --- | --- | --- | --- | --- |
 | Core + diagrams | teaching | 7 | Public API and diagram API stable; compile-vs-reference parity tested; wrong-shape `f` / `h` fails at `compile()`. | Automation by convention (P10, v0.2); derived `x0` (S29, v0.9). |
-| Compile (`core/compile/`) | teaching (frozen subset) | 4 | Integrated; the frozen evaluator subset is named in DESIGN §5, the stable-internal helper grid kept by ruling. Speed lives in batches (1000 rollouts × 1000 RK4 steps in 27 ms); float64 on JAX by default. | the step model under every sampled tool (S75, v0.3); `rollout_batch` with a `params` family (S53); the differentiable closed-loop cost (V1, v0.4); the integrators' move (S37, v0.9). |
+| Compile (`core/compile/`) | teaching (frozen subset) | 4 | Integrated; the frozen evaluator subset is named in DESIGN §5, the stable-internal helper grid kept by ruling. Speed lives in batches (1000 rollouts × 1000 RK4 steps in 27 ms); float64 on JAX by default. | the step model under every sampled tool (S75, v0.3); `rollout_batch` with a `params` family (S53); the differentiable closed-loop cost (V1: the deterministic path v0.3, the draws v0.4); the integrators' move (S37, v0.9). |
 | Simulation | teaching | 7 | Mature; fixed 10 001-point default grid; `verbose` names unified. | One owner per rule (S65). |
 | Dynamics (abstraction + catalog) | teaching | 7 | Plants QA'd; `MechanicalSystem` / `Manipulator`; UR5 ABA/RNEA; **every catalog plant compiles on both backends** (contract test); four-rung vehicle ladder; UdeS racecar (kinematic, dynamic, 3-D). | Catalog hygiene (S64); the general serial chain (C6, v0.3); mechanical-base unification (S32, after v1.0). |
 | Control | teaching | 6 | Linear, LQR (infinite horizon, finite horizon, along a trajectory), pole placement, reference scaling (`N`), `P` / `PI` / `PD` / `PID` and the rate-measured `ImpedanceController` / `ImpedanceIntegralController` as one family (what is measured decides the derivative; limits with infinite defaults, anti-windup once a limit is declared; the shared pieces three pure functions), model-based SMC and computed torque, robotic impedance and kinematic laws, neural policy block; a controller is a plain `System`. | P10's resolver and composition steps. |
@@ -226,9 +226,9 @@ lowered to a `MathematicalProgram`, solved by the `Optimizer`. Two step paths on
 continuous one (`Simulator`, the differentiable evaluator) and the sampled one (the step
 model and the sampled loop, [sampled-path.md](../plans/sampled-path.md)). Six pillars on the
 spine: classical and modern control, nonlinear control, trajectory optimization and MPC,
-reinforcement learning, identification and imitation, estimation. v0.3 converges the library
-and builds the sampled path, then adds what GMC714 is missing; v0.4 builds the differentiable
-spine and the textbook objects; v0.9 decides what can still break a name; v1.0 freezes.
+reinforcement learning, identification and imitation, estimation. v0.3 converges the library,
+builds the sampled path and the deterministic differentiable path to the cost, then adds what
+GMC714 is missing; v0.4 adds the draws and the textbook objects; v0.9 decides what can still break a name; v1.0 freezes.
 
 **At a glance** (indicative dates; the order is the commitment, the dates are not):
 
@@ -242,17 +242,19 @@ gantt
     GMC714 audit G1 (cheap, early)        :g1, 2026-10-22, 2w
     section v0.3 cleaner core
     Wave K convergence (K1-K4, K7)        :k, 2026-11-01, 3w
-    Wave S step model (S75)               :s75, 2026-11-10, 3w
+    Wave S step model (S75)               :s75, 2026-11-02, 18d
     Wave S sampled loop (S31)             :s31, after s75, 10d
+    section v0.3 differentiable path
+    V1 steps 0-2, the API first           :v1a, 2026-11-09, 18d
+    V1 steps 3-5, compile, tune, bridge   :v1b, 2026-11-27, 10d
+    A2 cost parameters (V1 step 6)        :a2, 2026-12-01, 6d
     section v0.3 GMC714
-    Wave G course features (G1's gaps)    :g, 2026-12-01, 18d
-    v0.3 tag                              :milestone, v03, 2026-12-19, 0d
-    section v0.4 differentiable spine
-    V1 steps 0-5 with S74 and OPW         :v1a, 2027-01-04, 4w
-    A2 cost parameters (V1 step 6)        :a2, after v1a, 2w
-    V1 steps 7-9, the draws, C4           :v1b, after a2, 3w
-    A1 fields, then A3 geometry           :a13, after v1b, 4w
-    MPPI and the RL follow-ups            :mp, after v1b, 4w
+    Wave G course features (G1's gaps)    :g, 2026-12-07, 14d
+    v0.3 tag                              :milestone, v03, 2026-12-21, 0d
+    section v0.4 draws and objects
+    V1 steps 7-9, the draws, C4           :v1c, 2027-01-04, 4w
+    A1 fields, then A3 geometry           :a13, after v1c, 6w
+    MPPI and the RL follow-ups            :mp, after v1c, 5w
     v0.4 tag                              :milestone, v04, 2027-04-30, 0d
     section v0.9 freeze candidate
     Foundations and the trust contract    :v09, 2027-05-03, 8w
@@ -300,32 +302,23 @@ behaviour-preserving, one module per step.
   model, the Monte Carlo defaults); **S66** wiring mistakes fail at wiring time **[ask —
   core]**; **S67** one plot vocabulary; **S68** contracts as tests.
 
-### 5.3 v0.3 — a cleaner core, then GMC714 (December 2026)
+### 5.3 v0.3 — a cleaner core and the differentiable path, then GMC714 (December 2026)
 
 Reorganized 2026-10-21 ([record](../reviews/2026-10-21-roadmap-reorganization.md)); the
-steps, in order, are TODO §4. **The cleanup comes first** (November: wave K, then wave S, on
-a smaller library); **the GMC714 features come after it** (December: wave G's rows, ordered
-by the audit G1, which runs early because it is cheap and fixes what December must contain).
+steps, in order, are TODO §4. **First, November: a cleaner core and the full differentiable
+path to the cost behind a clean API** (wave K, wave S, wave V). **Then, December: the
+features GMC714 is missing** (wave G's rows, ordered by the audit G1, which runs early because
+it is cheap and fixes what December must contain).
 
 **Rulings first**: the asks that block code, listed in §6 "Blocking code now" (the shape of
-the framework, S75, S31, the differentiable problem's blocking asks). One decision session;
-no foundation code before it.
+the framework, S75, S31, the differentiable problem's blocking asks and its names). One
+decision session; no foundation code before it.
 
-**Wave G — the course** (G1 now, in parallel with the rulings; its rows in December, after
-waves K and S):
+**The audit, early** (in parallel with the rulings):
 - **G1** GMC714 baseline audit: every §4.3 topic run on the teaching surface, the gaps
   written as the release contract. **[ask — course scope]**
-- **C1** Pyro parity open rows ([pyro-port-remaining.md](../plans/pyro-port-remaining.md))
-  and the pyro → minilink migration guide in README.
-- **C2** GMC714 modelling ladder: manipulators and the vehicle ladder as a `02_dynamics`
-  lesson; robotic PID wrappers.
-- **C3** Blocks: `Ramp` / `Chirp` / `Delay` / `Switch`.
-- **C6** General serial chain: one mechanism description (DH or URDF) feeding RNEA / ABA, the
-  GMC714 arm topic's modelling rung; design first. **[ask — core]**
-- **S63** DP reads a finite horizon from `problem.tf`; **S64** catalog hygiene. **[ask]**
-- The gaps G1 writes, in the order it sets.
 
-**Wave K — convergence** (November 2026, first, so everything after lands in a smaller library):
+**Wave K — convergence** (November, first, so everything after lands in a smaller library):
 - **K1** The inventory: every public name and every demo with its callers and a maturity
   label; [core-consolidation.md](../plans/core-consolidation.md) §3–§4 is most of it.
 - **K2** Unused features removed and **K3** prototypes moved to `minilink/experimental/`,
@@ -335,35 +328,50 @@ waves K and S):
   features leave for the experimental tier or the example that motivated them; the first
   tier any time, the between-terms moves after GMC714 (§6). **[ask — core, public names]**
 
-**Wave S — the sampled spine** (November, after wave K starts; [sampled-path.md](../plans/sampled-path.md)):
+**Wave S — the sampled spine** (November; [sampled-path.md](../plans/sampled-path.md)):
 - **S75** The step model: `discretize` on one compiled step, `params` always an argument,
   for every sampled consumer; byte-identical steps SM-0 to SM-6, the `discretize` follow-ups
   as SM-2, S37's one scannable step as SM-1. **[ask — core]**
 - **S31** The sampled loop: a tool on one sampled rollout kernel in two faces, after S75;
   with P10's AC-8b. **[ask — core]**
 
-### 5.4 v0.4 — the differentiable spine and the textbook objects (winter 2027)
+**Wave V — the differentiable path to the cost** (November into early December, beside wave
+S: steps 0–2 need neither S75 nor S31, step 3 meets the sampled seam;
+[differentiable-problem.md](../plans/differentiable-problem.md), its asks in §9):
+- **V1, the deterministic path** (steps 0–5 of the plan): the API first, a names
+  brainstorm with the maintainer (step 0); then the native `Trajectory`, one scoring kernel,
+  the whole run out of the compiled scan, `problem.compile(controller)` with the deterministic
+  verbs (the trajectory, the cost, the smallest margin) and `tune`, and the program bridge
+  with the optimizer's program classes and first-order backend (S74, with OPW-1–OPW-5 of
+  [optimizer-parametric-wiring.md](../plans/optimizer-parametric-wiring.md)).
+  **[ask — core, the names]**
+- **A2** Cost parameters ([cost-params.md](../plans/cost-params.md)), the plan's step 6, so the
+  path reaches the cost's own weights: every library cost reads `params`, composite costs nest
+  them like a diagram's, and every planner passes `problem.params.cost` through, so
+  `jax.grad` reaches `Q` and `R`. **[ask — core]**
+
+**Wave G — the GMC714 features** (December, after waves K, S and V, in the order G1 sets):
+- **C1** Pyro parity open rows ([pyro-port-remaining.md](../plans/pyro-port-remaining.md))
+  and the pyro → minilink migration guide in README.
+- **C2** GMC714 modelling ladder: manipulators and the vehicle ladder as a `02_dynamics`
+  lesson; robotic PID wrappers.
+- **C3** Blocks: `Ramp` / `Chirp` / `Delay` / `Switch`.
+- **C6** General serial chain: one mechanism description (DH or URDF) feeding RNEA / ABA, the
+  GMC714 arm topic's modelling rung; design first. **[ask — core]**
+- **S63** DP reads a finite horizon from `problem.tf`; **S64** catalog hygiene. **[ask]**
+- The gaps G1 writes.
+
+### 5.4 v0.4 — the draws and the textbook objects (winter 2027)
 
 Between cohorts, after the GMC714 term; the steps, in order, are TODO §5.
 
-**The differentiable spine** ([differentiable-problem.md](../plans/differentiable-problem.md),
-its asks in §9):
-- **V1, first half** (steps 0–5 of the plan): the names, the native `Trajectory`, one
-  scoring kernel, the whole run out of the compiled scan, `problem.compile(controller)` with
-  the deterministic verbs, and the program bridge with the optimizer's program classes and
-  first-order backend (S74, with OPW-1–OPW-5 of
-  [optimizer-parametric-wiring.md](../plans/optimizer-parametric-wiring.md)).
-  **[ask — core, the names]**
-- **A2** Cost parameters ([cost-params.md](../plans/cost-params.md)), the plan's step 6:
-  every library cost reads `params`, composite costs nest them like a diagram's, and every
-  planner passes `problem.params.cost` through, so `jax.grad` reaches `Q` and `R`.
-  **[ask — core]**
-- **V1, second half** (steps 7–9): the draws (`realize`, `evaluate`, `value`, the Monte Carlo
-  evaluator a thin facade) as one row with **RN-3 / RN-4 / RN-5** of
+**The draws on the path** ([differentiable-problem.md](../plans/differentiable-problem.md)):
+- **V1, the draws** (steps 7–9): `realize`, `evaluate`, `value`, the Monte Carlo evaluator a
+  thin facade, as one row with **RN-3 / RN-4 / RN-5** of
   [randomness.md](../plans/randomness.md) and **AC-7** (the cost scored on the plant); the
-  sets as costs; the material. Research lane until GMC714 or GRO860 has run it.
-  **[ask — core]**
-- **C4** Identification as the spine's first data consumer: V1's `tune` with a data-mismatch
+  sets as costs; the material. Between cohorts because the evaluator's numbers change once.
+  Research lane until GMC714 or GRO860 has run it. **[ask — core]**
+- **C4** Identification as the path's first data consumer: V1's `tune` with a data-mismatch
   cost; trajectory generation and experiment design beside it.
 - **LQGPlanner** with RN-4.
 
@@ -488,7 +496,7 @@ v0.4 added, the course audit G1 now, the sampled spine before the differentiable
 [its record](../reviews/2026-10-21-roadmap-reorganization.md).
 
 
-**Blocking code now** (wave S of v0.3, and the first commit of v0.4)
+**Blocking code now** (waves S and V of v0.3)
 
 - **The shape of the framework** (K7's first ask): one differentiable spine and six pillars
   (classical and modern, nonlinear, trajectory and MPC, reinforcement learning,

@@ -1,6 +1,6 @@
 # Optimizer wiring for parametric trajopt / MPC
 
-Status: **draft plan** (July 2026). Rung: v0.4 of [TODO.md](TODO.md), with S74 as the differentiable problem's step 5
+Status: **draft plan** (July 2026). Rung: v0.3 wave V of [TODO.md](TODO.md), with S74 as the differentiable problem's step 5
 (reorganized 2026-10-21; before that a v0.2 wave D row) — OPW-1 to
 OPW-5 are a hardening row of their own (moved out of T5 on 2026-10-12: they change
 behaviour, and T5 is byte-identical), and the parametric evaluator's placement is another
