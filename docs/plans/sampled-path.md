@@ -1,19 +1,20 @@
-# The step model: one path from a continuous plant to a step map
+# The sampled path: the step model and the sampled loop
 
 **Status:** ideas to review, 2026-10-21 — an evaluation of the code and a recommendation;
 nothing decided.  
 **Lane:** core (the compiled evaluator, `discretize`, every sampled consumer) — every step is
 **[ask — core]**.  
-**Rung:** step S75 of [TODO.md](TODO.md), an open decision in ROADMAP §6; proposed before
-the sampled-loop kernel (S31) and before the differentiable problem's step 0 (V1).  
-**Gathers:** S31, S37, the `discretize` follow-ups, S65's input-hold item, the Later row on
-a sample stride, and the K-wave evaluator-grid trim.
+**Rung:** v0.3, wave S of [TODO.md](TODO.md): step S75 (the step model, §1–§7), then S31
+(the sampled loop, §8); both open decisions in ROADMAP §6, both before the differentiable
+problem's step 0 (V1, v0.4).  
+**Gathers:** S31, S37's one scannable step, the `discretize` follow-ups, S65's input-hold
+item, the Later row on a sample stride, and the K-wave evaluator-grid trim.
 
 Many features turn a continuous plant into a step map: reinforcement learning, dynamic
 programming, the gym bridge, trajectory optimization, the hybrid and realtime loops, RRT,
 the Lyapunov sampler, MPPI, and soon identification and behavior cloning. Each does it its
 own way today. This plan proposes one contract, one public verb and one implementation for
-that conversion.
+that conversion (§1–§7), then the closed loop that runs a sampled controller on it (§8).
 
 ## 1. What the code does today: eight discretizations of the same plant
 
@@ -60,7 +61,7 @@ What it costs:
 | S37 (v0.9) | evaluators keep pure maps and one scannable step; integrators move to `simulation/solvers/`; first dedupe the zero-order-hold sugar and the JAX step rollout | the implementation home |
 | the `discretize` follow-ups (TODO v0.9) | an exact zero-order hold (the matrix exponential) shared with `step_response`; the `params["dt"]` fallback; the ports kept; `PID % dt` needs a discretization method | the public verb |
 | S65 (wave D) | the forced-input hold as one `input_interp` option every solver obeys | the hold rule |
-| Later (TODO §6) | a sample stride on the fixed-step solvers (`substeps=k`) | the substep knob |
+| Later (TODO §7) | a sample stride on the fixed-step solvers (`substeps=k`) | the substep knob |
 | the K-wave row | the evaluator grid trimmed to `_p` bodies plus generated bindings | the trim this enables |
 | V1 ([differentiable-problem.md](differentiable-problem.md)) | the continuous closed loop as a diagram (RD-D24); `rollout_batch` with a params family (S53) | stays continuous; reads the same compiled RK4 |
 
@@ -204,3 +205,39 @@ compare after each step. A number that changes on purpose gets its own test and 
   option; one vocabulary for both.
 - **The Later row on a sample stride**: `substeps` on the step model is the same knob for the
   sampled path; `Simulator`'s fixed-step solvers can read it too.
+
+## 8. The sampled loop (S31)
+
+The plant half above makes one step model; the loop half runs a sampled controller on it.
+The open decision (ROADMAP §6): `HybridDiagram` as a `System` (a continuous and a
+piecewise-constant state, periodic update events, a simulator and a compiler that know
+sample times), or an honest `HybridLoop`.
+
+**Recommended (2026-10-20): the loop is a tool, not a diagram.**
+
+- **Two model algebras, both closed.** The continuous one (`System`, diagrams, `@`, `>>`,
+  `+`) and the discrete-time one (`StepSystem`, `StepDiagramSystem`). The loop that joins the
+  two clocks is neither: an object with `compute_trajectory` and `compile`, built by `%`, and
+  not a `System`. Nesting a sampled loop in a diagram has no consumer, `linearize` and the
+  frequency tools have no meaning on it, and multi-clock scheduling as a framework feature is
+  out of scope (ROADMAP §7).
+- **One sampled rollout kernel, two faces.** The controller held over its period, the plant
+  stepped by the step model between samples, a `StepSchedule` for multi-rate; a NumPy face
+  and a JAX face, as `Simulator` and `compile` have. Its three copies today
+  (`RolloutEnvironment`, `HybridSimulator`, the MPC computer export) become its callers.
+- **Two loops on purpose.** The differentiable problem's evaluator keeps the continuous
+  closed loop as a diagram (RD-D24), for analysis and gradient tuning of a continuous law;
+  this kernel is the loop of every sampled controller. A sampled controller tuned by
+  gradient (a digital PID, a held neural policy) goes through this kernel.
+- **The kernel never breaks tracing; the computer decides.** A gain, a neural policy or a
+  digital PID traces end to end (the RL planner, gain tuning, a digital PID tuned by
+  gradient). MPC with SciPy or Ipopt inside runs on the NumPy face. A traceable inner solver
+  later makes MPC a differentiable policy too, so the MPC block's `step` stays a pure
+  function of arrays with the solver inside.
+- **Still to rule with it:** the sampled seam's time argument, integer ticks (today) or
+  seconds; whether the run-state caches (`StepSystem.rollout`, `HybridDiagram.last_result`)
+  join `self.traj` as allowed caches (RULES 2.4); the `core` → `simulation` import.
+
+**Order:** after S75 in wave S (the kernel scans the step model), with P10's AC-8b; the
+hand-copied `HybridDiagram` facades and the Mermaid twin of the hybrid drawing go with it;
+the hybrid topology drawing stays for teaching.

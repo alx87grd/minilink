@@ -3,8 +3,8 @@
 **Status:** design draft (2026-10-02), for the maintainer's ruling on the asks of §10.
 **Lane:** research lane first (`examples/experimental/`), provisional band with the MPC
 block once MP-5 lands, teaching-surface decision at V3 (v0.9).
-**Rung proposed:** S72 on the workboard, after RN-4 and RN-5 of the randomness plan (the
-ordering of §8), hardened before the v0.9 freeze; see §9.
+**Rung proposed:** S72 on the workboard, v0.4, on S31's sampled kernel (v0.3) and after RN-4
+and RN-5 of the randomness plan (the ordering of §8), hardened before the v0.9 freeze; see §9.
 **Prototype:** `examples/experimental/mppi/pendulum_mppi.py` and `racecar_mppi.py`
 (2026-10-02), two standalone scripts on the library as it stands — the swing-up works, and
 the racecar laps the circuit with the cone against the collocation MPC on the same problem;
@@ -470,8 +470,9 @@ The question asked: when. The proposal, against the rungs of ROADMAP §5:
 
 - **Now (2026-10-02): the standalone script** under `examples/experimental/mppi/`, so
   the G1 audit of GMC714 sees both MPC flavours running; it touches no library file.
-- **v0.3, after RN-4 and RN-5 (after the fall term): MP-1, MP-2, MP-3** on the
-  research lane, on the evaluator's batched rollout over realizations. The three steps
+- **v0.4, after RN-4 and RN-5 (between cohorts): MP-1, MP-2, MP-3** on the
+  research lane, on the sampled kernel of S31 and the step model of S75
+  ([sampled-path.md](sampled-path.md)), batched over realizations. The three steps
   touch no public name and no teaching file.
 - **Before the v0.9 freeze (early 2027): MP-4 and MP-5.** MP-4 is T6's
   `control/mpc/controller.py` conversation, already queued before v0.9 because V3 must
@@ -482,7 +483,7 @@ The question asked: when. The proposal, against the rungs of ROADMAP §5:
   facade names, the DESIGN paragraph. Not before: a planner reaches the teaching
   surface through a demo, a both-backends test and a cohort (ROADMAP §2).
 
-So: a running script now, the planner in v0.3 on the finished rollout contract (the
+So: a running script now, the planner in v0.4 on the finished rollout contract (the
 maintainer's "before v1" is met with a term to spare), provisional in v0.9, frozen or
 visibly provisional at v1.0 with the rest of the MPC band.
 

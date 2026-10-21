@@ -4,10 +4,10 @@
 to review, nothing decided.  
 **Lane:** maintainer-owned (every item removes or moves a user-importable name, so each is
 an ask under AGENTS.md; the inventory and the tiers are the agent's analysis).  
-**Rung:** the convergence pass (step K7 of [TODO.md](TODO.md), an open decision in
-ROADMAP §6), which the roadmap calls a standing principle, not a rung (ROADMAP §5.5,
+**Rung:** v0.3, wave K: the convergence pass (step K7 of [TODO.md](TODO.md) with K1–K4, an
+open decision in ROADMAP §6), which the roadmap calls a standing principle, not a rung (ROADMAP §5.6,
 "Simplify and consolidate"); it fits between the GMC714 audit (step G1) and the freeze
-candidate (ROADMAP §5.4), because the v0.9 freeze should cover a smaller surface than
+candidate (ROADMAP §5.5), because the v0.9 freeze should cover a smaller surface than
 today's.  
 **Companion:** [repository-structure.md](repository-structure.md) decides *where* things
 live; this document decides *what* stays in the library at all.
@@ -18,7 +18,7 @@ The last two releases were a divergence phase on purpose: build every tool of th
 from LQR to PPO through trajectory optimization, to see the whole picture. It worked, and it
 left a library of **70.7k lines**, a root prelude of **162 names**, **50 catalog plants**
 on that prelude, **76 demo scripts**, **42 notebooks** and **28k lines of tests**. The v0.9
-freeze (ROADMAP §5.4) promises every teaching-surface name stability for three years. The
+freeze (ROADMAP §5.5) promises every teaching-surface name stability for three years. The
 smaller that surface is when the freeze lands, the cheaper the promise.
 
 Two lenses sort the library. The first pass (§3) asked **who uses it today**; that lens is
@@ -118,7 +118,7 @@ history). The last column says where the usage lens disagreed.
 | --- | --- | --- | --- |
 | `simulation/simulator.py`, `solvers/`, `time_grid.py`, forcing | integrating time | spine | agrees |
 | `simulation/static_simulator.py` | a memoryless leaf on a grid | substrate, off the prelude | agrees |
-| `simulation/realtime/` (`RealtimeSimulator`, the I/O contract, `PygameInput`, the live plot) and `game()` | **the human in the loop**: the recorder of the imitation pillar (ROADMAP §5.5 names it: "a game mode on `RealtimeSimulator` that records human demonstrations as trajectory datasets") and the only path that shows a controller *feels* right | **pillar seed**: keep in the core, rebuild under the architectural review the ledger already schedules; its next feature is the dataset it records, not more input devices | **disagrees** (TRL 2, three demos: the usage lens moved it) |
+| `simulation/realtime/` (`RealtimeSimulator`, the I/O contract, `PygameInput`, the live plot) and `game()` | **the human in the loop**: the recorder of the imitation pillar (ROADMAP §5.6 names it: "a game mode on `RealtimeSimulator` that records human demonstrations as trajectory datasets") and the only path that shows a controller *feels* right | **pillar seed**: keep in the core, rebuild under the architectural review the ledger already schedules; its next feature is the dataset it records, not more input devices | **disagrees** (TRL 2, three demos: the usage lens moved it) |
 
 ### 4.3 Analysis and estimation
 
@@ -237,7 +237,7 @@ notebook touched; no pillar touched.
 ### 6.3 Tier 3 — pillar seeds: keep, and finish (unused today is not the point)
 
 - **The realtime loop**: the imitation pillar's recorder. Its next step is a trajectory
-  dataset out of `game()` (the behavior-cloning row, ROADMAP §5.5), under the architectural
+  dataset out of `game()` (the behavior-cloning row, ROADMAP §5.6), under the architectural
   review already scheduled; nothing moves.
 - **The Lyapunov certificate**: rebuilt as a `Field` verb when fields land (A1); the
   current module is the prototype, kept provisional until then.

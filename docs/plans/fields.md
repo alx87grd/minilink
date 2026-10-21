@@ -1,7 +1,7 @@
 # The field object
 
 Status: core contract — agreed 2026-09-15 (FD-C12, time and action arguments included), not started.
-Rung: v0.3, step A1 of [TODO.md](TODO.md). Depends on the sets-and-distributions pass (landed 2026-09-15: `bounding_box`, `.box`, the draw convention); the Lyapunov rulings it cites are the open items in ROADMAP §6.
+Rung: v0.4, step A1 of [TODO.md](TODO.md). Depends on the sets-and-distributions pass (landed 2026-09-15: `bounding_box`, `.box`, the draw convention); the Lyapunov rulings it cites are the open items in ROADMAP §6.
 Name-preserving (`V(x)`, `value_at`, `cost_to_go` keep working). Finding FD-F12 of the foundations review, docs/reviews/2026-09-15-foundations-review.md (`FD-` marks that review's findings and comments: its F12, C6, C12).
 
 The scalar function on `(x, u, t)` becomes a core noun, `Field`, with the same verbs

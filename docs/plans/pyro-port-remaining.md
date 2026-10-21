@@ -263,7 +263,7 @@ All 195 pyro scripts under `examples/`, grouped by top-level folder.
 
 | Item | Decision | Replacement |
 | --- | --- | --- |
-| Discrete-time / ZOH library | **TODO (v0.9)** | The z tier, P6 ([TODO.md](TODO.md) §5, v0.9): exact ZOH and Tustin `c2d`, z-plane tools |
+| Discrete-time / ZOH library | **TODO (v0.3)** | The exact zero-order hold on `discretize`, S75's step SM-2 ([TODO.md](TODO.md) §4, [sampled-path.md](sampled-path.md)); the z tier itself (Tustin `c2d`, z-plane tools) is not planned, ruled 2026-10-17 |
 | RNN / recurrent blocks | **Drop** | — |
 | Hybrid events / mixed-rate sim | **Drop** | — |
 | Pyro `sys2game` framework | **Drop** | superseded by `simulation/realtime/` (`RealtimeSimulator`) |

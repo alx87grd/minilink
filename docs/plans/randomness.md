@@ -10,7 +10,8 @@ the review's amendments RD-A1–RD-A10 (§10); `FD-F9` is finding F9 of the foun
 a bare `A5`, `P4`, `RN-2` is a workboard step.
 Rungs (decided 2026-09-26): RN-1 (`WhiteNoise`) in v0.2 wave B, the prerequisite of B3
 (`estimation/`, P4); RN-2 in v0.2 wave A, with A5; RN-3 with its first consumer (v0.3,
-unless a teaching notebook needs sampled sensor noise first); RN-4 and RN-5 together in v0.3, after the fall
+unless a teaching notebook needs sampled sensor noise first); RN-4 and RN-5 together in v0.4 (between
+cohorts, with the differentiable problem's steps 7–9; reorganized 2026-10-21), after the fall
 term, because they change public behaviour and the Monte Carlo numbers once, and before the v0.9
 freeze; RN-6 with each step. It settles the disturbance convention ROADMAP §6
 held open before B3, closes finding FD-F9 of
@@ -705,13 +706,13 @@ Decided 2026-09-30 (maintainer), from the decision batch on RD-A2–RD-A10 of §
   hand-written held-input rollouts (`evaluate_jax`, `evaluate_numpy`, `evaluate_simulator`)
   with one path; `backend` chooses the arrays only. Any controller, any noise block, any
   parameter draw is a regular diagram simulation. `dt` becomes the simulation step rather than
-  a control period, so the evaluator's numbers change once, in v0.3 with RN-5.
+  a control period, so the evaluator's numbers change once, in v0.4 with RN-5.
 
 ## 9. Steps: the implementation plan
 
 Order: RN-1 first (RD-D14: it unblocks P4's Kalman demo, and rewrites the course cell in the same
 commit); RN-2 before RN-3; RN-4 before RN-5; RN-6 closes each step's docs as it lands. Rungs as
-in the header: RN-1 and RN-2 in v0.2, RN-3 with its first consumer, RN-4 and RN-5 in v0.3. Each
+in the header: RN-1 and RN-2 in v0.2, RN-3 with its first consumer, RN-4 and RN-5 in v0.4. Each
 step that changes draws records a seeded baseline before and pins the new numbers with a test
 after (RULES 7.7, AGENTS refactor recipe); each step's math is read next to `dp.py` before it
 lands. The acceptance test of every step is its deterministic twin (RD-D23).

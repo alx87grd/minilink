@@ -8,8 +8,9 @@ said and how the splits were judged is in
 [the consolidation record](../reviews/2026-10-18-differentiable-problem-consolidation.md).
 What is marked **decided** was ruled before this document; everything else is proposed and
 waits on the asks of §9. Nothing is built; §8 is the build order, step V1 and rows S73 and S74
-of [TODO.md](TODO.md) §4.
-Rung: v0.3 (the evaluator and the optimizer), v0.3 and after (traceable analysis).
+of [TODO.md](TODO.md) §5.
+Rung: v0.4 (the evaluator and the optimizer), after the sampled spine of v0.3 (S75, S31;
+[sampled-path.md](sampled-path.md)); traceable analysis (S73) any time.
 Lane: research first; the teaching surface once a course has run it.
 
 ## 1. The target
@@ -497,7 +498,7 @@ the nonsymmetric eigensolver is CPU-only. The done-when is on the workboard row.
 | optimizer-parametric-wiring.md (OPW-1) | the shared backend factory is where the new presets register |
 | TODO C4 (identification) | `fit` is the bridge with a data-mismatch objective (§4.6) |
 | TODO K (November) | two rows the review found: the evaluator grid trimmed to `_p` bodies plus generated bindings (36 integrator methods, 1763 lines); `StepRollout` folded into `Trajectory` once it is a pytree |
-| the step model (S75, [step-model.md](step-model.md)) | the plant side of every sampled tool: `discretize` on one compiled step; this plan's evaluator keeps the continuous loop and reads the same compiled RK4 |
+| the step model (S75, [sampled-path.md](sampled-path.md)) | the plant side of every sampled tool: `discretize` on one compiled step; this plan's evaluator keeps the continuous loop and reads the same compiled RK4 |
 | the sampled loop (S31, ROADMAP §6) | this plan's evaluator is the continuous closed loop as a diagram (RD-D24) and stays so; the sampled rollout kernel S31 recommends (the controller held over its period, one kernel in two faces) is the sibling path the RL environment, the hybrid simulator and MPC share, and the two meet where §4.2 says "until the hybrid seam batches"; a sampled controller tuned by gradient (a digital PID, a held neural policy) goes through that kernel, not through this evaluator |
 
 ## 7. Decided and proposed
