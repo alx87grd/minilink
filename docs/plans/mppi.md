@@ -474,7 +474,7 @@ The question asked: when. The proposal, against the rungs of ROADMAP §5:
   research lane, on the sampled kernel of S31 and the step model of S75
   ([sampled-path.md](sampled-path.md)), batched over realizations. The three steps
   touch no public name and no teaching file.
-- **Before the v0.9 freeze (early 2027): MP-4 and MP-5.** MP-4 is T6's
+- **Before the v0.9 freeze (spring 2027): MP-4 and MP-5.** MP-4 is T6's
   `control/mpc/controller.py` conversation, already queued before v0.9 because V3 must
   decide whether `control.mpc` joins the frozen surface; narrowing the planner contract
   is a prerequisite of freezing that block's name, so MPPI costs the freeze nothing it

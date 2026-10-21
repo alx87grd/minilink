@@ -20,7 +20,7 @@ git history (`docs/reviews/2026-09-22-improvement-*.md`, before 2026-10-17).
 | [§1](#1-wave-a--the-textbook-objects-carried-from-v02-into-v03) | Wave A — the textbook objects, carried into v0.3 |
 | [§2](#2-wave-b--gro501-the-carry-over-020-shipped-2026-10-17) | Wave B — GRO501, the carry-over |
 | [§3](#3-wave-d--textbook-code-minimal-demos-consolidation) | Wave D — textbook code, minimal demos, consolidation |
-| [§4](#4-v03--gmc714-convergence-the-sampled-spine) | v0.3 — GMC714, convergence, the sampled spine |
+| [§4](#4-v03--a-cleaner-core-then-gmc714) | v0.3 — a cleaner core, then GMC714 |
 | [§5](#5-v04--the-differentiable-spine-and-the-textbook-objects) | v0.4 — the differentiable spine and the textbook objects |
 | [§6](#6-v09-freeze-candidate-and-v10) | v0.9 freeze candidate and v1.0 |
 | [§7](#7-later-ideas) | Later ideas |
@@ -298,15 +298,17 @@ pick):
 
 ---
 
-## 4. v0.3 — GMC714, convergence, the sampled spine
+## 4. v0.3 — a cleaner core, then GMC714
 
 **Order** (reorganized 2026-10-21, [record](../reviews/2026-10-21-roadmap-reorganization.md)):
-the rulings that block code first (ROADMAP §6, "Blocking code now"); G1 now, in parallel;
-wave K (K1–K4 with K7) in November, its first tier any time and its between-terms moves after
-GMC714; then wave S, the sampled spine: S75 (the `discretize` follow-ups as its SM-2), then
-S31; the course rows (C1, C2, C3, C6, S63, S64 and the gaps G1 writes) in the order G1 sets.
+the rulings that block code first (ROADMAP §6, "Blocking code now"); G1 now, in parallel
+(cheap, and it fixes what December must contain). Then **the cleanup first**, in November:
+wave K (K1–K4 with K7), its first tier any time and its between-terms moves after GMC714;
+then wave S, the sampled spine: S75 (the `discretize` follow-ups as its SM-2), then S31.
+**Then the GMC714 features**, in December: wave G's rows (C1, C2, C3, C6, S63, S64 and the
+gaps G1 writes) in the order G1 sets. The rows below are in that order.
 
-**Wave G — the course.**
+**The audit, first.**
 
 - [ ] **G1 GMC714 baseline audit** **[ask — course scope]**, now, in parallel with the rulings (ruled
   2026-10-21: the audit fixes what December's release must contain). Run every topic of ROADMAP §4.3
@@ -315,31 +317,6 @@ S31; the course rows (C1, C2, C3, C6, S63, S64 and the gaps G1 writes) in the or
   ([docs/reviews/2026-09-07-gro501-coverage.md](../reviews/2026-09-07-gro501-coverage.md));
   write the gaps as §4.3's gates and as rows here. Decide whether MPC joins the teaching
   surface. Done when every §4.3 row has a status and a gate.
-- [ ] **C1 Pyro parity** open rows — [pyro-port-remaining.md](pyro-port-remaining.md); then
-  the pyro → minilink migration guide in README from the name map there. **[ask]** for the
-  README. Re-audit the table against the code first (scan: docs-gov#11).
-- [ ] **C2 GMC714 modelling ladder**: manipulators + the four-rung vehicle ladder as a
-  `02_dynamics` lesson; robotic PID wrappers (`JointPD`, `EndEffectorPD` twins).
-  Also: one constructor contract for the robotic laws (scan: control#6).
-- [ ] **C3 Blocks**: `Ramp` / `Chirp` / `Delay` / `Switch`; `Integrator` and `ZOHHold` take
-  a `dim` like every static block (scan: graphics#11).
-- [ ] **C6 General serial chain** **[ask — core]**: one mechanism description (DH table or
-  URDF: geometry, inertia, topology) feeding RNEA / ABA beyond the UR5, the shared serial-chain
-  stack, ABA on the other RNEA arms, the symbolic path reading the same description; the GMC714
-  arm topic's modelling rung. Design first (the July 2026 articulated-mechanism draft is in git
-  history; it is re-planned here, the optional `KinematicModel` delegate decided with it, ROADMAP
-  §6). Done when a second arm runs on the shared stack with the catalog both-backends test.
-- [ ] **S63 DP reads the horizon** **[ask — planner API]** (scan: planning#1): a finite
-  `problem.tf` runs `round(tf / dt)` backward sweeps as `solve_steps` does, the way
-  `LQRPlanner` picks the Riccati ODE, or warns once. Done when LQR and DP agree on the
-  finite-horizon double integrator.
-- [ ] **S64 Catalog hygiene** **[ask — catalog]** (scan: dynamics#0, dynamics#1,
-  dynamics#2, dynamics#3, dynamics#4, dynamics#6, dynamics#8): the mechanical default
-  bounds as ROADMAP §6 decides (keep the invented ±2π / ±5, or each plant states its own); output ports that are
-  the state or a slice of it read labels and units from the state (the 56 copy lines go);
-  one port layout across the bicycle rungs; one owner for the wheelbase; the hidden `0.01`
-  damping in `Drone2D.d` and `Rocket.d` named; `VanderPol` with a real input or none;
-  constructor hygiene in the pendulum and mass-spring-damper families.
 
 **Wave K — convergence** (November 2026, after `0.2.0`, before the v0.4 objects; K7's
 analysis is the ruling table K1 asks for). The goal: a
@@ -408,6 +385,34 @@ the demo sweep touches fewer files. Nothing leaves without the maintainer's ruli
   run-state caches, decided here: RULES 2.4 allows only `self.traj`, while
   `StepSystem.rollout` and `HybridDiagram.last_result` cache a run too (ROADMAP §6); the
   `core` → `simulation` import (scan: core#14).
+
+**Wave G — the GMC714 features** (December, after waves K and S, in the order G1 sets).
+
+- [ ] **C1 Pyro parity** open rows — [pyro-port-remaining.md](pyro-port-remaining.md); then
+  the pyro → minilink migration guide in README from the name map there. **[ask]** for the
+  README. Re-audit the table against the code first (scan: docs-gov#11).
+- [ ] **C2 GMC714 modelling ladder**: manipulators + the four-rung vehicle ladder as a
+  `02_dynamics` lesson; robotic PID wrappers (`JointPD`, `EndEffectorPD` twins).
+  Also: one constructor contract for the robotic laws (scan: control#6).
+- [ ] **C3 Blocks**: `Ramp` / `Chirp` / `Delay` / `Switch`; `Integrator` and `ZOHHold` take
+  a `dim` like every static block (scan: graphics#11).
+- [ ] **C6 General serial chain** **[ask — core]**: one mechanism description (DH table or
+  URDF: geometry, inertia, topology) feeding RNEA / ABA beyond the UR5, the shared serial-chain
+  stack, ABA on the other RNEA arms, the symbolic path reading the same description; the GMC714
+  arm topic's modelling rung. Design first (the July 2026 articulated-mechanism draft is in git
+  history; it is re-planned here, the optional `KinematicModel` delegate decided with it, ROADMAP
+  §6). Done when a second arm runs on the shared stack with the catalog both-backends test.
+- [ ] **S63 DP reads the horizon** **[ask — planner API]** (scan: planning#1): a finite
+  `problem.tf` runs `round(tf / dt)` backward sweeps as `solve_steps` does, the way
+  `LQRPlanner` picks the Riccati ODE, or warns once. Done when LQR and DP agree on the
+  finite-horizon double integrator.
+- [ ] **S64 Catalog hygiene** **[ask — catalog]** (scan: dynamics#0, dynamics#1,
+  dynamics#2, dynamics#3, dynamics#4, dynamics#6, dynamics#8): the mechanical default
+  bounds as ROADMAP §6 decides (keep the invented ±2π / ±5, or each plant states its own); output ports that are
+  the state or a slice of it read labels and units from the state (the 56 copy lines go);
+  one port layout across the bicycle rungs; one owner for the wheelbase; the hidden `0.01`
+  damping in `Drone2D.d` and `Rocket.d` named; `VanderPol` with a real input or none;
+  constructor hygiene in the pendulum and mass-spring-damper families.
 
 ---
 
