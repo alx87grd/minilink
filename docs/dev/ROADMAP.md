@@ -332,6 +332,8 @@ public name; v1.0 (§5.5) freezes.
   export call; tracing decided by the computer. Decided before the differentiable problem's
   step 0 (V1), not at the freeze. **[ask — core]**
 - **S29** `DiagramSystem.x0` / `n` / `state` as derived properties. **[ask — core]**
+- **S75** The step model: one path from a continuous plant to a step map (`discretize` on one
+  compiled step) for every sampled consumer; before S31 and V1's step 0. **[ask — core]**
 - **S37** Evaluator / solver re-layering; **S27** Diffrax as an optional JAX solve.
   **[ask — core]**
 - **S30** The glyph / solid rename; **S44** one posed-geometry hook. **[ask]**
@@ -527,6 +529,18 @@ and which can wait, each with its proposed answer; the analyses and the panel ar
   argument, integer ticks (today) or seconds; and whether its run-state caches
   (`StepSystem.rollout`, `HybridDiagram.last_result`) join `self.traj` as allowed caches
   (RULES 2.4).
+- **One path from a continuous plant to a step model** (S75): eight consumers discretize
+  the same plant eight ways today (Euler in dynamic programming, one RK4 step in RL and the
+  gym bridge, RK4 with a linear input in shooting, hand-written RK4 in `discretize`, sub-steps
+  only in the hybrid and realtime simulators), so a law is trained on one model and scored on
+  another, and nothing but the hybrid loops can sub-step. Recommended (2026-10-21): one
+  contract `x_{k+1} = Φ(x_k, u_k, t_k; p)` with four knobs (`dt`, `method`, `substeps`,
+  `hold`), constant-step explicit integration on the sampled path only (`Simulator` keeps
+  adaptive RK45), `discretize` the public verb returning a `StepSystem`, one compiled step
+  under it; byte-identical for every consumer. The maintainer rules on the name, the
+  defaults, DP's integrator (Euler kept or RK4), a sampled replay in `compare()`, and the
+  order (before S31's kernel and V1's step 0). Design and steps:
+  [the step-model writeup](../plans/step-model.md).
 - Evaluator / solver layering, Diffrax (S37, S27).
 - The posed-geometry hook (S44) and the glyph / solid rename (S30).
 - The frozen surface (V3): do `StepSystem`, `StepDiagramSystem`, `ZOHHold` and

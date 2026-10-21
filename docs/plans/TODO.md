@@ -263,7 +263,7 @@ pick):
   automatic `dt` as `auto_dt(sys)` in `time_grid.py`, with the discontinuous scale made
   finer or DESIGN's promise dropped (the duplicated constant goes with it); the
   try-JAX-then-NumPy policy in `compile_auto` with a typed `NotTraceableError`; the
-  forced-input hold as one `input_interp` option every solver obeys (the automatic solver
+  forced-input hold as one `input_interp` option every solver obeys (its sampled side: S75) (the automatic solver
   choice changes the hold model today); what `n_steps` counts on each verb; the one-tick lag
   inside a `Computer` tested and stated, or removed; `has_trace_tier` a boolean;
   `simulation` stops importing `optimization` for display constants; `scipy_stiff` with
@@ -558,6 +558,13 @@ in December 2026 after the v0.3 tag; the v1.0 rows after two cohorts.
   before the freeze; the first tier any time, the between-terms moves after GMC714.
   Analysis, tiers and the asks: [core-consolidation.md](core-consolidation.md). Done when
   the ruling is recorded and the moves are rows here.
+- [ ] **S75 The step model** **[ask — core]** (ROADMAP §6): one path from a continuous plant
+  to a step map, `discretize(plant, dt, *, method, substeps, hold) -> StepSystem` on one
+  compiled step, for every sampled consumer (the RL environment, `Sys2Gym`, the DP grid,
+  shooting, the hybrid and realtime simulators, RRT, the Lyapunov sampler, MPPI; later
+  identification and imitation). Before S31 and before V1's step 0. Design, steps SM-0 to
+  SM-6 and the asks: [step-model.md](step-model.md). Done when the ruling is recorded and the
+  steps are rows here.
 - [ ] **S31** `HybridDiagram` → a `System` (state `[plant; computer]`, periodic discrete
   update) or an honest `HybridLoop` rename; `%` stays the one hybrid operator either way; the
   hand-copied facades go with it; P10's AC-8b lands with it. Recommended 2026-10-20
@@ -632,7 +639,7 @@ in December 2026 after the v0.3 tag; the v1.0 rows after two cohorts.
 
 ### v0.9 — the syllabus holes
 
-- [ ] **`discretize` follow-ups** **[ask]** (the z tier, P6, is not planned: ruled 2026-10-17,
+- [ ] **`discretize` follow-ups** **[ask]** (gathered by S75, [step-model.md](step-model.md); the z tier, P6, is not planned: ruled 2026-10-17,
   [record](../reviews/2026-10-17-z-tier-dropped.md)): an exact zero-order-hold option on
   `discretize`, shared with `step_response` and checked against `scipy.signal.cont2discrete`
   (scan: analysis#1). Done when a digital PID discretized that way runs in a topic notebook.
