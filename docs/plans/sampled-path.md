@@ -5,8 +5,9 @@ nothing decided.
 **Lane:** core (the compiled evaluator, `discretize`, every sampled consumer) — every step is
 **[ask — core]**.  
 **Rung:** v0.3, wave S of [TODO.md](TODO.md): step S75 (the step model, §1–§7), then S31
-(the sampled loop, §8); both open decisions in ROADMAP §6, both before the differentiable
-problem's step 0 (V1, v0.4).  
+(the sampled loop, §8); both open decisions in ROADMAP §6, both ruled before the
+differentiable problem's step 0. Their code runs beside V1's steps 0–2 and lands before its
+step 3, where the evaluator meets the sampled seam (v0.3, wave V).  
 **Gathers:** S31, S37's one scannable step, the `discretize` follow-ups, S65's input-hold
 item, the Later row on a sample stride, and the K-wave evaluator-grid trim.
 

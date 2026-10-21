@@ -29,7 +29,9 @@ git history (`docs/reviews/2026-09-22-improvement-*.md`, before 2026-10-17).
 
 ## 1. Wave A — the textbook objects (carried from v0.2 into v0.3)
 
-Runs in parallel with wave B.
+Their slots in the order: A4 any time (agent); A5's sets reading `params` with A2 in v0.3 wave
+V, `Set.as_cost` with V1's step 8 in v0.4, its other nouns each with its first consumer; A6
+between terms, with wave K's between-terms moves; RN-2 before V1's step 7 in v0.4.
 
 - [ ] **A4 Naming, the rest** (the naming quick wins landed 2026-10-17:
   the class name as the default `name`, shortcuts named as the expression they build, `id`
@@ -306,8 +308,10 @@ the rulings that block code first (ROADMAP §6, "Blocking code now"); G1 now, in
 wave K (K1–K4 with K7), its first tier any time and its between-terms moves after GMC714;
 then wave S, the sampled spine: S75 (the `discretize` follow-ups as its SM-2), then S31;
 beside it wave V, the deterministic differentiable path to the cost behind a clean API (V1's
-steps 0–5 with S74 and OPW, then A2 as its step 6). **Then the GMC714 features**, in December: wave G's rows (C1, C2, C3, C6, S63, S64 and the
-gaps G1 writes) in the order G1 sets. The rows below are in that order.
+steps 0–5 with S74 and OPW, then A2 as its step 6, with A5's sets reading `params`). A6, the
+short catalog names, goes with wave K's between-terms moves. **Then the GMC714 features**, in
+December: wave G's rows (C1, C2, C3, C6, S63, S64 and the gaps G1 writes) in the order G1
+sets. The rows below are in that order.
 
 **The audit, first.**
 
@@ -319,7 +323,7 @@ gaps G1 writes) in the order G1 sets. The rows below are in that order.
   write the gaps as §4.3's gates and as rows here. Decide whether MPC joins the teaching
   surface. Done when every §4.3 row has a status and a gate.
 
-**Wave K — convergence** (November 2026, after `0.2.0`, before the v0.4 objects; K7's
+**Wave K — convergence** (November 2026, first, before waves S and V add new code; K7's
 analysis is the ruling table K1 asks for). The goal: a
 smaller library that is easier to read and keep — fewer names, fewer demos, prototypes
 labelled as such. It extends D2 (whose open picks join K1's table) and runs before D1.3, so
@@ -493,8 +497,8 @@ names brainstorm with the maintainer, so the API comes first.
 
 **Order** (winter 2027, between cohorts): V1's steps 7–9 of
 [differentiable-problem.md](differentiable-problem.md) (its steps 0–6 landed in v0.3) with
-RN-3 / RN-4 / RN-5 and AC-7 (step 7 is RN-5's one path), C4 its first data consumer; then A1, then A3; S72 on the sampled kernel
-after RN-4 / RN-5; C5 and LQGPlanner as picked; S73 any time, self-contained.
+RN-3 / RN-4 / RN-5 and AC-7 (step 7 is RN-5's one path; RN-2 before it), C4 its first data
+consumer; then A1, then A3; S72 on the sampled kernel after RN-4 / RN-5; C5 and LQGPlanner as picked; S73 any time, self-contained.
 
 **The draws on the path.**
 

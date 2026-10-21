@@ -54,6 +54,9 @@ before v0.9, before v1.0.
 
 ## The order now
 
+(Superseded the same day by the amendment below: the differentiable path's deterministic
+half moved into v0.3.)
+
 1. The rulings that block code (ROADMAP §6, "Blocking code now").
 2. v0.3 (December 2026): wave G (the course, G1 now), wave K (convergence, November), wave S
    (S75, then S31).

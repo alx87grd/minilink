@@ -206,7 +206,7 @@ did, and turns this table into the release contract.
 | Nonlinear control — feedback linearization, computed torque, sliding mode, Lyapunov | `control.modelbased`, `control.geometric`, `analysis.lyapunov` | audit pending | set by G1 |
 | Robust control — uncertainty, margins, robust design | `analysis` frequency tools | audit pending | set by G1 |
 | Trajectory optimization — direct collocation, shooting | `planning.trajectory_optimization` | audit pending | set by G1 |
-| MPC — receding horizon on the vehicle and the arm | `control.mpc` (provisional, research lane) | audit pending | MPC joins the teaching surface, or stays a lesson on the research lane, decided in G1; the sampling flavour (MPPI, [mppi.md](../plans/mppi.md), S72) is on the table for that audit |
+| MPC — receding horizon on the vehicle and the arm | `control.mpc` (provisional, research lane) | audit pending | MPC joins the teaching surface, or stays a lesson on the research lane, decided in G1; the sampling flavour (MPPI, [mppi.md](../plans/mppi.md), S72) is on the table for that audit (planned for v0.4 on the sampled kernel; the audit can only ask for it as a research-lane lesson) |
 
 **Cross-cutting gates** (as for GRO501): every topic row green with a demo
 or a notebook; one `examples/teaching/` notebook per topic, Colab-first;
@@ -269,17 +269,20 @@ The GRO860 path is green (§4.1) and `0.1.1` is published; nothing is open.
 ### 5.2 v0.2 — shipped; the carry-over
 
 `0.2.0` was tagged on 2026-10-17 with every §4.2 row green. The steps below were planned for
-v0.2 and not needed for the tag; they carry into v0.3 as written, wave D standing.
+v0.2 and not needed for the tag; they carry into v0.3 and v0.4, each in the slot the order of
+TODO §4 and §5 gives it, wave D standing.
 
 **Wave A — the textbook objects finish speaking.**
 - **A6** Short catalog names (RULES 2.6): compact public class names, the long explicit display
-  names dropped, one ruled table of renames migrating the notebooks in the same commit. **[ask
-  — public names]**
+  names dropped, one ruled table of renames migrating the notebooks in the same commit (between terms,
+  with wave K's between-terms moves, while the name freeze is paused). **[ask — public
+  names]**
 - **A5** The later nouns, each with its first consumer: `log_prob`, sets and distributions
   over parameter dictionaries, `UnionSet`, `PlanningProblem.hamiltonian()` only if a course
-  teaches Pontryagin.
+  teaches Pontryagin (sets reading `params` with A2 in wave V, `Set.as_cost` with V1's step 8
+  in v0.4).
 - **RN-2** of [randomness.md](../plans/randomness.md): distributions read `params`,
-  `Gaussian(cov=)`, every `sample` takes a key.
+  `Gaussian(cov=)`, every `sample` takes a key (before V1's step 7, the draws, in v0.4).
 
 **Wave B — GRO501 end to end** (§4.2; plan
 the plan doc retired 2026-10-17, its steps landed).
@@ -498,6 +501,9 @@ v0.4 added, the course audit G1 now, the sampled spine before the differentiable
 
 **Blocking code now** (waves S and V of v0.3)
 
+- **The terminal cost `h(x_f, t_f)`, one rule for every tool.** `h` is charged exactly when
+  `tf` is finite; still to settle whether an infinite-horizon cost with a nonzero `h` warns
+  or raises, and that exits are priced only by `infeasible_cost` (the scoring kernel, V1's step 2).
 - **The shape of the framework** (K7's first ask): one differentiable spine and six pillars
   (classical and modern, nonlinear, trajectory and MPC, reinforcement learning,
   identification and imitation, estimation), the frame §5 is ordered by; a different list
@@ -556,9 +562,6 @@ v0.4 added, the course audit G1 now, the sampled spine before the differentiable
 
 **Before v0.4**
 
-- **The terminal cost `h(x_f, t_f)`, one rule for every tool.** `h` is charged exactly when
-  `tf` is finite; still to settle whether an infinite-horizon cost with a nonzero `h` warns
-  or raises, and that exits are priced only by `infeasible_cost`.
 - **Lyapunov certificates**: a GRO860 checklist row of their own, or an analysis tool the
   lecture uses; `method=` naming the certificate family.
 - **Solver-specific views on the planning records.**
