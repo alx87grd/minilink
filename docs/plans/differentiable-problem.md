@@ -124,7 +124,7 @@ control (no implicit gradient of the inner solve) and the sampling planner (rand
 | `PlanningProblem` (frozen) | `sys`, `cost`, `X`, `U`, `X0`, `Xf`, `tf`, `infeasible_cost`, `params: ProblemParameters`; computes nothing | unchanged in shape; gains `compile(policy, *, dt, backend="auto", episode_length=None)`, a two-line facade, and `realize(key, n=None)` on the stochastic class (§4.5) |
 | `StochasticPlanningProblem` | adds the three laws, `criterion`, the three `sample_*(key)`; every planner takes it through `nominal()` | unchanged; its draws are the one source the evaluator vmaps over |
 | `Trajectory` (frozen) | a NumPy reporting object: `float` casts, copies | **decided:** array-native, a JAX pytree; reporting verbs NumPy by contract (§4.2) |
-| `StepRollout` | the step twin of `Trajectory` | a November consolidation candidate: one noun with `t = k·dt`, after §4.2 |
+| `StepRollout` | the step twin of `Trajectory` | a follow-on of step 1 (its home, ruled 2026-10-22): one noun with `t = k·dt`, after §4.2 |
 | `CostFunction` | `g`, `h` trace; `evaluate_trajectory` is a NumPy `for` loop with `float()` casts | `evaluate_trajectory` / `total_cost` on `xp` (vectorized, no cast); reads `params` with A2 |
 | `Set` | `margin` traces; `contains` is NumPy | `contains` derived from `margin` on `xp`, so the kernel and the RL environment share the one exit test; reads `params` with A5 |
 | `MonteCarloEvaluator` | a verb pretending to be a noun: composes `policy @ plant` again, recompiles, refuses controllers with state, scores with an inline copy of the rule | a thin facade holding `dt` and a test set drawn once, `evaluate(policy)` delegating to the compiled problem (§4.5); its three backends go |
@@ -187,8 +187,12 @@ internal signals per sample), one trial at a time, for a lookup-table law or a l
 JAX. The integration is the loop's own RK4 on the diagram, so a controller with state (an
 integrator, an observer) is inside `x` from the first commit; the Monte Carlo evaluator's
 held-input static law goes with it (§4.5). A model predictive controller is refused on JAX
-(its inner solve has no implicit gradient) and evaluated on NumPy; a `Computer @ plant` loop
-runs on the NumPy path (RN-5's scope, RD-D24) until the hybrid seam batches.
+(its inner solve has no implicit gradient) and evaluated on NumPy. The fixed RK4 step is
+SM-1's compiled step ([sampled-path.md](sampled-path.md) §3.4) applied to the whole loop
+diagram; no second integrator. In v0.3 the evaluator takes continuous controllers only: a
+sampled controller (`Computer @ plant`, a digital PID, a held neural policy) is refused with a
+message naming step 7b, which in v0.4 dispatches it to S31's kernel on its JAX face
+(ruled 2026-10-22; [future-policies.md](future-policies.md) §5 point 3).
 
 The AC-7 rule holds by construction: the cost reads the plant's `(x, u)` inside the loop,
 never the loop's boundary signals.
@@ -212,8 +216,8 @@ a kernel). Two rules the probe of 2026-10-18 found necessary:
   node), so two trajectories with the same signal names share one treedef and `vmap`,
   `lax.scan` and `jit` accept them.
 
-The follow-on, not decided: `StepRollout` becomes a constructor of the same noun with
-`t = k·dt` (a November consolidation candidate, §6).
+The follow-on, its home ruled 2026-10-22: `StepRollout` becomes a constructor of the same
+noun with `t = k·dt`, the last commit of step 1 (§8).
 
 ### 4.3 One scoring kernel: `score_trajectory`, the contract, on `xp`
 
@@ -499,9 +503,9 @@ the nonsymmetric eigensolver is CPU-only. The done-when is on the workboard row.
 | fields.md (A1) | the planned `Field` absorbs the six field-like classes of `planning/spatial` (the review's §2.5), and `shaping` moves to core with it or earlier (step 8) |
 | parametric-program.md (OPW-1, S76) | the shared backend factory is where the new presets register |
 | TODO C4 (identification) | `fit` is the bridge with a data-mismatch objective (§4.6) |
-| TODO K (November) | two rows the review found: the evaluator grid trimmed to `_p` bodies plus generated bindings (36 integrator methods, 1763 lines); `StepRollout` folded into `Trajectory` once it is a pytree |
-| the step model (S75, [sampled-path.md](sampled-path.md)) | the plant side of every sampled tool: `discretize` on one compiled step; this plan's evaluator keeps the continuous loop and reads the same compiled RK4 |
-| the sampled loop (S31, ROADMAP §6) | this plan's evaluator is the continuous closed loop as a diagram (RD-D24) and stays so; the sampled rollout kernel S31 recommends (the controller held over its period, one kernel in two faces) is the sibling path the RL environment, the hybrid simulator and MPC share, and the two meet where §4.2 says "until the hybrid seam batches"; a sampled controller tuned by gradient (a digital PID, a held neural policy) goes through that kernel, not through this evaluator |
+| the two consolidation findings of the core-objects review | each has one home (ruled 2026-10-22): the evaluator grid trimmed to `_p` bodies plus generated bindings (36 integrator methods, 1763 lines) is S75's SM-6; `StepRollout` folded into `Trajectory` once it is a pytree is the last commit of step 1 here |
+| the step model (S75, [sampled-path.md](sampled-path.md)) | the plant side of every sampled tool: `discretize` on one compiled step; this plan's evaluator keeps the continuous loop and integrates it with that same compiled step (SM-1), so step 3 builds on it |
+| the sampled loop (S31, ROADMAP §6) | this plan's evaluator is the continuous closed loop as a diagram (RD-D24) and stays so for continuous laws; the sampled rollout kernel S31 recommends (the controller held over its period, one kernel in two faces) is the sibling path the RL environment, the hybrid simulator and MPC share; step 7b (v0.4) makes the evaluator dispatch a sampled controller (a digital PID, a held neural policy, MPPI, the RL policies) to that kernel's JAX face, so one `compile`, `evaluate` and `tune` serve both kinds |
 
 ## 7. Decided and proposed
 
@@ -581,6 +585,12 @@ before it lands.
    `params` (A5's row) so `params["cost"]` and `params["sets"]` have leaves. Done when every
    planner baseline `cmp`s at nominal parameters, `jax.grad(evaluator.cost)` reaches `Q`, and a
    trajopt objective differentiates with respect to `Q` (A2's done-when).
+7b. **The sampled face** (v0.4, after S31's kernel; ruled 2026-10-22). `compile` reads the
+   policy's kind: a continuous law runs the loop as a diagram (steps 4 and 7); a sampled
+   controller runs S31's kernel on its JAX face, the controller held over its period, its
+   memory and seed threaded by the tick; the v0.3 refusal goes. Done when `tune` of a digital
+   PID's gains through the kernel matches a central difference and a continuous law's numbers
+   are unchanged.
 7. **The draws** (between cohorts, with RN-5). `problem.realize`, `evaluate` with keys and
    `record=`, `value` and `criterion_value`; `MonteCarloEvaluator` reduced to the facade of
    §4.5; `Planner.evaluate`, `solve(evaluate=True)` and `nominal_trajectory` read the compiled
@@ -603,8 +613,8 @@ before it lands.
    feature); DESIGN §4 (`Trajectory`, parameters), §5 (`rollout_p`), §6 (the evaluator, the
    bridge, the program classes); ROADMAP §3's ledger; the alias removed the release after.
 
-**In parallel, any time:** S73 (§4.8), self-contained for a cloud agent. **November
-consolidation (K rows):** the evaluator grid trimmed; `StepRollout` into `Trajectory`.
+**In parallel, any time:** S73 (§4.8), self-contained for a cloud agent. The evaluator-grid
+trim is S75's SM-6; `StepRollout` into `Trajectory` closes step 1 (§6).
 
 ## 9. Asks for the maintainer
 

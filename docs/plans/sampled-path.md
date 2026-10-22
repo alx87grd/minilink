@@ -8,8 +8,10 @@ nothing decided.
 (the sampled loop, §8); both open decisions in ROADMAP §6, both ruled before the
 differentiable problem's step 0. Their code runs beside V1's steps 0–2 and lands before its
 step 3, where the evaluator meets the sampled seam (v0.3, wave V).  
-**Gathers:** S31, S37's one scannable step, the `discretize` follow-ups, S65's input-hold
-item, the Later row on a sample stride, and the K-wave evaluator-grid trim.
+**Gathers:** S31, S37 whole (its one scannable step as SM-1, its integrators' move and the
+evaluator-grid trim as SM-6; ruled 2026-10-22, S27 Diffrax stays in v0.9), the `discretize`
+follow-ups, S65's input-hold item and the Later row on a sample stride. SM-6 is the one home
+of the grid trim; no K row carries it.
 
 Many features turn a continuous plant into a step map: reinforcement learning, dynamic
 programming, the gym bridge, trajectory optimization, the hybrid and realtime loops, RRT,
@@ -59,11 +61,11 @@ What it costs:
 | Row | What it says | Its part of this |
 | --- | --- | --- |
 | S31 (ROADMAP §6, recommended 2026-10-20) | one sampled rollout kernel in a NumPy and a JAX face, called by the RL environment, `HybridSimulator` and the MPC export | the closed-loop half; it presupposes the plant step this plan standardizes |
-| S37 (v0.9) | evaluators keep pure maps and one scannable step; integrators move to `simulation/solvers/`; first dedupe the zero-order-hold sugar and the JAX step rollout | the implementation home |
+| S37 (absorbed here, 2026-10-22) | evaluators keep pure maps and one scannable step; integrators move to `simulation/solvers/`; first dedupe the zero-order-hold sugar and the JAX step rollout | SM-1 and SM-6 |
 | the `discretize` follow-ups (TODO v0.9) | an exact zero-order hold (the matrix exponential) shared with `step_response`; the `params["dt"]` fallback; the ports kept; `PID % dt` needs a discretization method | the public verb |
 | S65 (wave D) | the forced-input hold as one `input_interp` option every solver obeys | the hold rule |
 | Later (TODO §7) | a sample stride on the fixed-step solvers (`substeps=k`) | the substep knob |
-| the K-wave row | the evaluator grid trimmed to `_p` bodies plus generated bindings | the trim this enables |
+| the evaluator-grid trim (the core-objects review's finding; its home is SM-6) | the evaluator grid trimmed to `_p` bodies plus generated bindings | the trim this enables |
 | V1 ([differentiable-problem.md](differentiable-problem.md)) | the continuous closed loop as a diagram (RD-D24); `rollout_batch` with a params family (S53) | stays continuous; reads the same compiled RK4 |
 
 The pieces are planned; the contract that ties them is not.
@@ -108,9 +110,12 @@ scannable step. Its body stops being hand-written and calls the compiled step.
 ### 3.4 One implementation
 
 In `core/compile`, one step per backend, `step(x, u, t, params; dt, method, substeps, hold)`,
-an `xp` body where possible; the 36-method grid becomes bindings over it (the K-wave trim),
-and `integrate_zoh(dt_inner=)` is `substeps` under another name. S37 then moves the
-integrator to `simulation/solvers/` as planned.
+an `xp` body where possible; the 36-method grid becomes bindings over it (the grid trim,
+SM-6), and `integrate_zoh(dt_inner=)` is `substeps` under another name. SM-6 then moves the
+integrator to `simulation/solvers/`, the move S37 planned. The differentiable problem's
+evaluator (V1) is this same step applied to the whole closed-loop diagram with the controller
+inside `x`: a continuous controller is never held, so it is not the sampled path, but it reads
+no other integrator.
 
 ### 3.5 Why one params path
 
@@ -131,8 +136,8 @@ Measured on the current JAX evaluator, the frozen RK4 step against the one takin
   gym bridge, the realtime loop, the RRT extender and the hybrid ticks get the frozen speed
   from the one body.
 - **The grid halves.** Every integrator exists frozen and with `params` today, before the
-  trace and jit tiers double it again; one `_p` body plus a binding is the trim the K-wave
-  row asks for.
+  trace and jit tiers double it again; one `_p` body plus a binding is the trim SM-6
+  delivers.
 - **A bug class goes.** A frozen evaluator silently ignores parameters changed after
   `compile()`; with one path, freezing is an explicit act at a visible place.
 - **The stable names hold.** DESIGN §5's frozen evaluator subset (`f`, `rk4_step`,
@@ -175,8 +180,10 @@ compare after each step. A number that changes on purpose gets its own test and 
 - **SM-4** The RRT extender, the Lyapunov sampler, the MPPI scripts, the hybrid and realtime
   simulators on the step model.
 - **SM-5** Shooting on `hold="foh"`; the DP grid on `method="euler"`.
-- **SM-6** The grid trim (the K-wave row), then S37's move of the integrators to
-  `simulation/solvers/`.
+- **SM-6** The grid trim (one `_p` body per integrator, the bound and jitted variants
+  generated; the evaluator internals deduplicated: ZOH sugar, the JAX step rollout, the four
+  Jacobian probes, the undeclared batch cache), then the integrators' move to
+  `simulation/solvers/`. The one home of both (S37 absorbed, 2026-10-22).
 
 ## 6. The asks
 
@@ -197,11 +204,13 @@ compare after each step. A number that changes on purpose gets its own test and 
 
 - **S31**: the sampled kernel is "scan the step model, call the controller between samples";
   this plan is its plant half.
-- **S37**: this plan is S37's "one scannable step", defined by its consumers before the files
-  move.
+- **S37**: absorbed; SM-1 is its "one scannable step", defined by its consumers before the
+  files move, and SM-6 its move.
 - **V1** ([differentiable-problem.md](differentiable-problem.md)): its evaluator keeps the
-  continuous closed loop (RD-D24); a sampled controller tuned by gradient goes through the
-  step model and S31's kernel.
+  continuous closed loop (RD-D24) on SM-1's compiled step; in v0.3 it takes continuous
+  controllers only, and its step 7b (v0.4) dispatches a sampled controller to S31's kernel on
+  its JAX face, so a digital PID or a held neural policy is tuned by gradient through that
+  kernel.
 - **S65**: the hold rule here (`zoh` / `foh`) is the sampled side of its `input_interp`
   option; one vocabulary for both.
 - **The Later row on a sample stride**: `substeps` on the step model is the same knob for the

@@ -2,8 +2,10 @@
 
 Status: **draft plan**. The optimizer table (OPW-1–OPW-5, §6) dates from July 2026; the
 parameter binding (PP-0–PP-5) and the recommendation of §2 were added 2026-10-22 and wait
-on the asks of ROADMAP §6. Rung: v0.3 wave V of [TODO.md](TODO.md), row S76, beside the
-differentiable problem's step 5 (S74 with OPW-1–OPW-5) and its step 6 (A2). Lane: research
+on the asks of ROADMAP §6. Rung: OPW-1–OPW-5 in v0.3 wave V with S74 (the differentiable
+problem's step 5); the binding (row S76) in v0.4 on S74's evaluator and A2's cost leaves,
+its names (PP-0) ruled in V1's step 0 session in v0.3 (moved from wave V on 2026-10-22: the
+MPC band is research lane and nothing GMC714 teaches in December needs it). Lane: research
 (the MPC band is provisional, ROADMAP §2). Scope: direct collocation and the MPC block
 first; the other transcriptions later (§5).
 

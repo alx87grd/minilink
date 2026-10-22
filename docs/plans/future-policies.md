@@ -138,9 +138,10 @@ demo than human driving, and free of hardware.
 ## 6. Timing
 
 - **Points 2 and 3 are cheap now and expensive later**: they shape the sampled loop and the
-  evaluator, both designed this November.
-- **Point 4 is planned now and built with the RL follow-ups (v0.4)**; nothing new hard-codes
-  the RL-only head meanwhile.
+  evaluator, both designed this November. They are S31's asks in the second rulings session
+  (ROADMAP §6), and point 3 is V1's step 7b in v0.4 (ruled 2026-10-22).
+- **Point 4 is planned now and built with the RL follow-ups (v0.4)** as a C5 row of TODO §5;
+  nothing new hard-codes the RL-only head meanwhile.
 - **Points 1 and 5 are not critical to the core tools** (the maintainer, 2026-10-22): the
   supervised pipeline, a `fit` verb and a dataset noun, stays a note for behavior cloning, not
   part of the names brainstorm.
