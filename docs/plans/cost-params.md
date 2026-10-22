@@ -110,9 +110,10 @@ inside the sum.
 
 ### What stays a structural attribute
 
-`horizon` and `discount_rate` choose the algorithm and the effective horizon (planners
-convert the rate with `float()`); `TimeCost.eps` is a threshold with no useful gradient. They
-stay attributes, like a system's dimensions.
+`TimeCost.eps` is a threshold with no useful gradient and stays an attribute, like a system's
+dimensions. `discount_rate` leaves the cost for the problem (`PlanningProblem.discount_rate`,
+ruled 2026-10-22): the cost owns the integrand `g` and `h`, the problem owns the functional's
+shape (`tf`, the sets, the infeasible price, the discount).
 
 ### Scene parameters travel separately
 
@@ -139,7 +140,7 @@ the ODE solver differs from the trapezoid rule of the post-hoc path.
 1. Library costs follow the System dual parameter pattern.
 2. Composite costs nest parameters by term id, with the diagram's live-view, partial-dictionary
    and unknown-id rules.
-3. `horizon`, `discount_rate` and `TimeCost.eps` stay attributes.
+3. `TimeCost.eps` stays an attribute; `discount_rate` moves to the problem (ruled 2026-10-22).
 4. User costs that ignore `params` keep working; library cost attributes stay readable and
    writable in place.
 

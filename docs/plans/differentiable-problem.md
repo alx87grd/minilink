@@ -225,9 +225,9 @@ DESIGN §6 states one scoring contract and the code writes it five times with fo
 `CostFunction.evaluate_trajectory` (a NumPy loop), `score_trajectory` (NumPy, the reference),
 the transcriptions' `trajectory_cost` (both backends, no discount), `MonteCarloEvaluator.evaluate_jax`
 (JAX, inline, an `alive` mask) and the RL reward (`−g dt` per step). After this plan,
-`score_trajectory(problem, traj, *, params=None, infeasible_cost=inf)` keeps its name and its
-signature and becomes the one body, on `xp = array_module(traj.x)`, layered on
-`CostFunction.evaluate_trajectory` / `total_cost` upgraded the same way:
+`evaluate_trajectory(problem, traj, *, params=None, infeasible_cost=inf)` (the ruled name,
+2026-10-22; today's `score_trajectory`, which folds `CostFunction.evaluate_trajectory` /
+`total_cost` into it) becomes the one body, on `xp = array_module(traj.x)`:
 
 ```
 inside_k = X.contains(x_k, t_k; p_X) and x_k finite              every sample k
@@ -255,7 +255,8 @@ otherwise); `failed` is `not all(inside)`. Three facts about this form, from the
   and a sequential one differ in the last place on about half of random grids). No
   trajectory-optimization baseline declares a rate, so every baseline stays bit-identical
   (`e⁰ = 1`), and a discounted problem's plan changes once, as DESIGN §6 says it should. No
-  `discount=` keyword: the rate has one owner, the cost (RULES 5.6).
+  `discount=` keyword: the rate has one owner, the problem (`PlanningProblem.discount_rate`,
+  ruled 2026-10-22; it leaves `CostFunction`, one ledger line) (RULES 5.6).
 - **No scoring modes.** The kernel is the problem's contract and nothing else; a tool that
   wants the uncut integral scores the problem without the constraint it lowers elsewhere
   (`dataclasses.replace(problem, X=unconstrained)`, which is what the bridge does in §4.6),
