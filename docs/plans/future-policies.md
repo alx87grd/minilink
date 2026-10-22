@@ -19,9 +19,12 @@ The proposals carry MPPI well, diffusion policy reasonably, and behavior cloning
 The core nouns hold for all three: the system, the problem, the trajectory, the program and the
 optimizer. The gaps sit in three places:
 
-- no verb to fit parameters to **recorded data**;
-- no **controller memory or random key** threaded through the sampled loop;
-- no shared **stochastic-policy** contract outside the RL package.
+- no **controller memory** threaded through the sampled loop (the random draws need no key
+  threading: a seeded controller draws from its seed and the tick, as the noise block does);
+- no shared **stochastic policy** outside the RL package (§5 point 4: a seeded block, the
+  maintainer's direction);
+- no verb to fit parameters to **recorded data** (not critical to the core tools, the
+  maintainer judged on 2026-10-22; a note for behavior cloning).
 
 ## 2. MPPI
 
@@ -95,19 +98,38 @@ demo than human driving, and free of hardware.
    tuned    = tune(problem, controller, wrt=[...], dt=0.05)        # a rollout cost
    cloned   = fit(policy, demos, wrt="policy", loss="action")      # a dataset loss
    ```
-2. **The sampled loop threads controller memory and a random key** on every tick, the key
-   derived from the experiment's key and the tick count, as [randomness.md](randomness.md)
-   already rules. MPPI, diffusion policy and any stochastic deployed policy depend on it.
+2. **The sampled loop passes the tick and threads controller memory** (MPPI's warm-start
+   sequence, a diffusion policy's observation history and action chunk). It threads no random
+   key: a controller's draws come from its own seed and the tick, the noise block's
+   counter-based pattern ([randomness.md](randomness.md)), as point 4 describes.
 3. **The evaluator dispatches on the policy kind.** A continuous law runs the continuous
    closed loop, as ruled (RD-D24); a sampled controller runs the sampled kernel's JAX face, so
    MPPI and diffusion policies get the same batched Monte Carlo evaluation and tuning. The plan
    today says a sampled loop falls back to NumPy "until the hybrid seam batches"; with the
    kernel, that fallback goes.
-4. **One small stochastic-policy contract outside the RL package**: a policy whose output is a
-   sample given a key and a state, with the mean as its deterministic face; a log-probability
-   optional (RL and likelihood-based cloning need one, a diffusion policy has none). Sized like
-   the constitution's two-method distributions, not a probability library. Today it lives in
-   the RL package as an exploration head.
+4. **One standard stochastic policy outside the RL package, built like the noise block**
+   (the maintainer's direction, 2026-10-22). The white-noise block keeps its `seed` in
+   `params`, draws `ε_k = F(seed, ⌊t/Δ⌋)` with a counter-based Threefry generator identical on
+   NumPy and JAX, holds each sample over its period, returns the mean when `seed=None`, and
+   gets a seed per experiment from `realize(key)`. A stochastic policy built the same way,
+   `u = μ_θ(x) + σ_θ(x) · ε(seed, ⌊t/Δ⌋)` with Δ the control period:
+   - is a plain `System` with a pure `h`: diagrams, the sampled loop, `compare()`, the
+     evaluator and `vmap` over seeds, on both backends;
+   - has its deterministic face for free: `seed=None` gives the mean, the law one deploys or
+     plots;
+   - is reproducible by one key, with common random numbers across compared laws;
+   - holds its draw over the control period, so the continuous evaluator's RK4 stages see one
+     action per period, the rule the noise block already states;
+   - gives pathwise gradients through the fixed `ε` (the reparameterization), so `tune` and
+     SAC-style updates reach `θ`.
+
+   What the block form does not give, the contract adds as methods beside `h`, not outputs:
+   the log-probability of an action and the entropy (PPO and likelihood-based cloning need
+   them; a diffusion policy has none), the squashed Gaussian with its change-of-variables
+   term. The RL Gaussian and squashed-Gaussian heads become such blocks; moving the RL
+   collectors from their own keys to per-episode seeds changes the RL numbers once (a baseline
+   and a re-pin, between cohorts). Sized like the constitution's two-method distributions, not
+   a probability library.
 5. **A dataset noun**: batched, masked trajectories with outputs logged. The recorder,
    simulations and logs produce it; `fit`, identification and evaluation read it.
 6. **Architectures stay out of the core.** The small MLP stays for teaching; larger networks
@@ -117,16 +139,20 @@ demo than human driving, and free of hardware.
 
 - **Points 2 and 3 are cheap now and expensive later**: they shape the sampled loop and the
   evaluator, both designed this November.
-- **Points 1 and 5 shape the names**: they belong in the names brainstorm of the
-  differentiable path, so `tune` is not named without its sibling `fit`.
-- **Point 4 can wait for the RL follow-ups**, as long as nothing new hard-codes the RL-only
-  head meanwhile.
+- **Point 4 is planned now and built with the RL follow-ups (v0.4)**; nothing new hard-codes
+  the RL-only head meanwhile.
+- **Points 1 and 5 are not critical to the core tools** (the maintainer, 2026-10-22): the
+  supervised pipeline, a `fit` verb and a dataset noun, stays a note for behavior cloning, not
+  part of the names brainstorm.
 - **Behavior cloning stays after v1.0, and diffusion policy after it.** With points 1 to 5 in
   place, both are additive features rather than redesigns.
 
 ## 7. Questions for the maintainer (for discussion, not blocking)
 
 1. Does `fit` join `solve` and `tune` as the third verb, and under that name?
-2. Does the sampled loop's tick contract carry controller memory and a random key now?
+2. Does the sampled loop's tick contract carry controller memory now (the draws coming from
+   the controller's seed and the tick, no key threaded)?
 3. Is diffusion policy in scope at all, and on the research lane only?
 4. Is distilling MPC or MPPI into a neural policy the first imitation demo?
+5. The standard stochastic policy as a seeded block (point 4) is the maintainer's direction;
+   still to rule: its contract beyond `h` (the methods' names, which heads ship first).

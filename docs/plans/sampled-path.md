@@ -238,8 +238,9 @@ sample times), or an honest `HybridLoop`.
 - **Still to rule with it:** the sampled seam's time argument, integer ticks (today) or
   seconds; whether the run-state caches (`StepSystem.rollout`, `HybridDiagram.last_result`)
   join `self.traj` as allowed caches (RULES 2.4); the `core` → `simulation` import; whether
-  the tick carries controller memory and a random key (MPPI's warm start, a diffusion
-  policy's action chunk; [future-policies.md](future-policies.md)).
+  the tick carries controller memory (MPPI's warm start, a diffusion policy's action chunk;
+  random draws come from the controller's seed and the tick, as the noise block's;
+  [future-policies.md](future-policies.md)).
 
 **Order:** after S75 in wave S (the kernel scans the step model), with P10's AC-8b; the
 hand-copied `HybridDiagram` facades and the Mermaid twin of the hybrid drawing go with it;

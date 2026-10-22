@@ -625,9 +625,7 @@ here and to a dated record under `docs/reviews/`, and the ask leaves this list a
 4. **Method keys** by algorithm, the existing `scipy_*` keys kept as aliases until V3
    (proposed), or the prefix kept throughout.
 5. **The names** (step 0): the package of §4 as proposed, `wrt=` from `jacobian(of, wrt)`;
-   `tune` the one facade; `value` the traced criterion verb; with `fit` (a dataset loss) as
-   the sibling of `tune` to weigh in the same brainstorm
-   ([future-policies.md](future-policies.md)).
+   `tune` the one facade; `value` the traced criterion verb.
 6. **One scoring contract, no modes**: `score_trajectory` keeps its signature; the
    transcriptions take the cost's rate and keep their own sum. Confirm.
 7. **The evaluator's numbers change once** (the loop as a diagram, RD-D24): re-pinned in step 7

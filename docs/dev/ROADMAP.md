@@ -525,9 +525,9 @@ v0.4 added, the course audit G1 now, the sampled spine before the differentiable
   [sampled-path.md](../plans/sampled-path.md) §8.
 - **For the same session, to discuss** (not blocking on their own): how the proposals carry
   MPPI, behavior cloning and diffusion policy, and three points they suggest absorbing now
-  (memory and a random key per tick in the sampled loop; the evaluator running sampled
-  controllers on the kernel's JAX face; a `fit` verb beside `tune` in the names
-  brainstorm): [future-policies.md](../plans/future-policies.md).
+  (controller memory and the tick per step in the sampled loop, the draws seeded like the
+  noise block; the evaluator running sampled controllers on the kernel's JAX face; a standard
+  stochastic policy as a seeded block): [future-policies.md](../plans/future-policies.md).
 - **The differentiable planning problem (2026-10-18, panel of 2026-10-20), the asks of its
   consolidated plan** — one path from any parameter the problem holds to any traceable metric,
   optimized through the native optimizer. Four points the seven-design panel split on, each with
