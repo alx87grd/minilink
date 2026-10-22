@@ -13,7 +13,7 @@ Identity: [CONSTITUTION.md](CONSTITUTION.md).
 | **v0.2** | **GRO501 end to end** (the classical-control course: multi-physics modelling · root locus / Bode / margins · PID to spec · digital implementation · state feedback, pole placement, LQR, observers — see §4.2). Conda stays the recommended install. | `0.2.0` on PyPI (2026-10-17), from the GitHub tag; every §4.2 row green |
 | **v0.3** | **A cleaner core and the differentiable path, then GMC714 end to end** (§5.3): first, in November, **the convergence pass** (the core kept, side features to the experimental tier), **the sampled spine** (one step model under every sampled tool, the sampled loop as a tool) and **the full differentiable path to the cost behind a clean API** (`problem.compile(controller)`, `tune`, the program bridge, cost parameters); then, in December, the features GMC714 is missing — robust control · robotic arm · trajectory optimization · MPC · vehicle models · nonlinear control (§4.3), with **pyro parity**. | December 2026 |
 | **v0.4** | **The draws and the textbook objects** (§5.4): the mean over the problem's draws through the same differentiable path (the Monte Carlo evaluator one path, its numbers changing once), identification as its first data consumer; fields and workspace geometry; MPPI on the sampled kernel. | Winter 2027, between cohorts |
-| **v0.9** | **Freeze candidate** (§5.5): the foundation questions that could still break a public name are decided (derived `x0`, the integrators' home, the glyph/solid rename, the frozen surface); the trust contract is in place (deprecation policy, pinned export list, CHANGELOG, pinned installs); the standard-syllabus holes close (estimation, discrete time); the docs site renders the tutorials. | Spring 2027 |
+| **v0.9** | **Freeze candidate** (§5.5): the foundation questions that could still break a public name are decided (derived `x0`, the integrators' home, the glyph/solid rename, the frozen surface); the trust contract is in place (deprecation policy, pinned export list, CHANGELOG, pinned installs); the standard-syllabus holes close (estimation; the discrete-time one closes with S75 in v0.3); the docs site renders the tutorials. | Spring 2027 |
 | **v1.0** | **A colleague can build a course on it and trust it for three years** (§5.6): the API frozen under the deprecation policy, the standard control syllabus covered and checked against textbook worked examples, course-neutral labs an instructor adopts outside UdeS, green on Windows, macOS and Linux; after two cohorts. Two Stable-Baselines3 teaching notebooks retire (S49) and the GRO860 name freeze becomes the general one. | 2027 |
 
 ## 2. Two lanes
@@ -161,9 +161,7 @@ placement and a Kalman observer. Student guide: `GRO501_Guide.pdf`
 
 Baseline audit:
 [docs/reviews/2026-09-07-gro501-coverage.md](../reviews/2026-09-07-gro501-coverage.md).
-Step-level work:
-the plan doc retired 2026-10-17, its steps landed; the baseline audit is
-[docs/reviews/2026-09-07-gro501-coverage.md](../reviews/2026-09-07-gro501-coverage.md).
+The step-level plan doc retired 2026-10-17, its steps landed.
 
 | Topic | Surface | Status | Gate |
 | --- | --- | --- | --- |
@@ -284,8 +282,7 @@ TODO §4 and §5 gives it, wave D standing.
 - **RN-2** of [randomness.md](../plans/randomness.md): distributions read `params`,
   `Gaussian(cov=)`, every `sample` takes a key (before V1's step 7, the draws, in v0.4).
 
-**Wave B — GRO501 end to end** (§4.2; plan
-the plan doc retired 2026-10-17, its steps landed).
+**Wave B — GRO501 end to end** (§4.2; the plan doc retired 2026-10-17, its steps landed).
 - **P10** Automation by convention ([automation-by-convention.md](../plans/automation-by-convention.md),
   decided 2026-10-11): standard port names drive the wiring, three reserved names (`plant`,
   `controller`, `observer`) are the roles every tool reads, and the cost is scored on the
@@ -341,13 +338,14 @@ decision session; no foundation code before it.
 **Wave V — the differentiable path to the cost** (November into early December, beside wave
 S: steps 0–2 need neither S75 nor S31, step 3 meets the sampled seam;
 [differentiable-problem.md](../plans/differentiable-problem.md), its asks in §9):
-- **V1, the deterministic path** (steps 0–5 of the plan): the API first, a names
-  brainstorm with the maintainer (step 0); then the native `Trajectory`, one scoring kernel,
-  the whole run out of the compiled scan, `problem.compile(controller)` with the deterministic
-  verbs (the trajectory, the cost, the smallest margin) and `tune`, and the program bridge
-  with the optimizer's program classes and first-order backend (S74, with OPW-1–OPW-5 of
-  [parametric-program.md](../plans/parametric-program.md)).
-  **[ask — core, the names]**
+- **V1** The differentiable planning problem, the deterministic path (steps 0–5 of the
+  plan): the API first, a names brainstorm with the maintainer (step 0); then the native
+  `Trajectory`, one scoring kernel, the whole run out of the compiled scan,
+  `problem.compile(controller)` with the deterministic verbs (the trajectory, the cost, the
+  smallest margin) and `tune`, and the program bridge. **[ask — core, the names]**
+- **S74** The optimizer as the one descent loop: the program classes and the first-order
+  backend, landing as V1's step 5 with **OPW-1–OPW-5** of
+  [parametric-program.md](../plans/parametric-program.md). **[ask — core]**
 - **S76** The compiled MPC program binds every problem parameter, not only `x0`
   (parametric-program.md): the start, the plant, the cost and the sets as one parameter tree
   bound at each solve; recommended, one program family whose frozen form is a binding (the
@@ -403,7 +401,8 @@ trusts it for three years. The
 [adoption review of 2026-09-26](../reviews/2026-09-26-adoption-review.md) found the
 engine ready and three things missing around it: a stability promise, the two syllabus
 holes every course hits (estimation, discrete time), and material packaged for an
-instructor. v0.9 closes the first two and settles every question that could still break a
+instructor. The discrete-time hole closes with S75 in v0.3 (§5.3); v0.9 closes the stability
+promise and the estimation hole, and settles every question that could still break a
 public name; v1.0 (§5.6) freezes.
 
 **The foundations that can break names** — decided before the freeze:

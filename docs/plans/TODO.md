@@ -85,8 +85,8 @@ textbook pass.
     (all landed 2026-10-13; the MPC's `u_ff` → `u` trails with AC-8a, plan §10). Wave B
     of P10 is done.
   - AC-4 the loop inputs and `observer=` (landed 2026-10-14; rulings R18, R19); AC-5
-    plots and AC-6 animation, in the plotting lane; AC-7 the cost on the plant, v0.3; AC-8a
-    the sampled loop keeps in step, alongside; AC-8b with S31, v0.9.
+    plots and AC-6 animation, in the plotting lane; AC-7 the cost on the plant, v0.4 (§5);
+    AC-8a the sampled loop keeps in step, alongside; AC-8b with S31, v0.3 wave S (§4).
 
   Related rows: S66 lands after
   AC-4; RN-4 and RN-5 build on AC-2, AC-4 and AC-7; S70 turns P10's refusals into
@@ -148,8 +148,8 @@ on `dev` at 638215e; the recipe and the reference are AGENTS'.
   D3 row); `spatial/paths.py`'s `PolylinePath` sets `_seg_lengths`, `_s_knots` and
   `_total_length` through `object.__setattr__` without declaring them as fields.
   `ReinforcementLearningPlanner(verbose=True)` keeps printing by default (ruled). The
-  parametric optimizer's backend table (OPW-1–OPW-5) changes behaviour, so it is a D3 row of
-  its own.
+  parametric optimizer's backend table (OPW-1–OPW-5) changes behaviour, so it is out of this
+  row: it lands with S74 in v0.3 wave V (§4).
 - [ ] **T6 the MPC block's contract** **[ask first]**: `export_mpc_dual_rate_computer`'s
   single-rate path still undoes the dual-rate hooks with `hasattr(block, "replan_divisor")`
   and `hasattr(latch, "set_after_solve")`; `validate_mpc_planner` probes the planner's
@@ -723,7 +723,8 @@ in December 2026 after the v0.3 tag; the v1.0 rows after two cohorts.
   process, ball and beam, differential drive, 3-D quadrotor, each with `tf`, a skin and the
   catalog both-backends contract test; LQI beside the `N` matrix of P8. Done when each has a
   one-line demo in `examples/demos/dynamics/`.
-- C4 (identification, trajectory generation) moves here if GMC714 does not land it (§4).
+- C4 (identification, trajectory generation) is a v0.4 row (§5), as V1's `tune` with a data
+  cost; it moves here only if v0.4 does not land it.
 
 ### v0.9 — the reference site
 
