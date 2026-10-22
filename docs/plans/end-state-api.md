@@ -310,6 +310,15 @@ two bodies to keep in step per integrator and per knob; the silent-ignore bug st
 one place for a knob, freezing an explicit act; the first call after `sys.params` changes
 recompiles. Recommended: B. The family slowdown (S53) is untouched either way.
 
+**Jitted or traceable, which to keep** (measured 2026-10-22, pendulum, one RK4 step): the
+traced body called eagerly from Python 5 700 µs; a jit cached once on the evaluator 17 µs;
+`jax.jit(body)` rebuilt at every call 87 µs; `jit(partial(body, p=params))` rebuilt at every
+call 93 000 µs (a new object, a cache miss, a recompile). So the **traced `_p` body is the
+contract** (it composes in `scan`, `vmap`, `grad`); the jitted and the bound forms are
+**lazily built, cached attributes generated from it** by one helper, never hand-written and
+never built inside a loop; Python-level callers (the gym bridge, RRT, the realtime loop) use
+the cached forms, compiled callers the traced body.
+
 **The maintainer's call, pending** (session 1 stopped here on 2026-10-22).
 
 ### D10b The compiled problem is the traceable twin of `evaluate` (ruled 2026-10-22)
