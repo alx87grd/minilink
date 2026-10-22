@@ -293,37 +293,18 @@ compare(LQR=report_lqr, PPO=report_ppo).plot()                      # the side-b
   `cost.g_max(X, U) · tf` (or `/ ρ` on a discounted infinite horizon); no "infinity" on the
   cost.
 
-### D10 `params` always an argument; freezing is a binding (S75, ask 6) — **open**
+### D10 `params` always an argument; freezing is a binding (S75, ask 6) — **ruled B, 2026-10-22**
 
-**Today:** every integrator exists frozen and with `params` (36 methods); a frozen evaluator
-silently ignores parameters changed after `compile()`.
+**Today:** every integrator exists frozen and with `params` (91 names across the two
+backends); a frozen evaluator silently ignores parameters changed after `compile()`.
 
-**Measured 2026-10-22** (`benchmarks/params_binding.py`, the table in sampled-path.md §3.5):
-inside a scan or a `vmap` the two forms are equal; called step by step from Python the dict
-costs about 3 µs per call (10.1 vs 13.6 µs on the pendulum), all of it dispatch, and the
-bound form `jit(partial(step_p, params=sys.params))` equals the frozen call within noise.
-Only the `params` form can take a gradient through the rollout (2.2× the value's cost).
-
-**Options:** (A) keep the frozen and parametric bodies as hand-written twins: nothing moves;
-two bodies to keep in step per integrator and per knob; the silent-ignore bug stays. (B) one
-`_p` body per method, the frozen name a binding under its current stable name: half the grid,
-one place for a knob, freezing an explicit act; the first call after `sys.params` changes
-recompiles. Recommended: B. The family slowdown (S53) is untouched either way.
-
-**Jitted or traceable, which to keep** (measured 2026-10-22, pendulum, one RK4 step): the
-traced body called eagerly from Python 5 700 µs; a jit cached once on the evaluator 17 µs;
-`jax.jit(body)` rebuilt at every call 87 µs; `jit(partial(body, p=params))` rebuilt at every
-call 93 000 µs (a new object, a cache miss, a recompile). So the **traced `_p` body is the
-contract** (it composes in `scan`, `vmap`, `grad`); the jitted and the bound forms are
-**lazily built, cached attributes generated from it** by one helper, never hand-written and
-never built inside a loop; Python-level callers (the gym bridge, RRT, the realtime loop) use
-the cached forms, compiled callers the traced body.
-
-**The surface this would leave** (four traced bodies `f`, `h`, `step`, `rollout`, the
-`rollout_batch` convenience, the generated `jit` and `frozen` namespaces; shared or per-member
-leaves in a batch; the parameter-family trade-off): sampled-path.md §3.6.
-
-**The maintainer's call, pending** (session 1 stopped here on 2026-10-22).
+**Ruled:** the traced parametric body is the only code. The jitted form (`ev.jit.step`) and
+the frozen form (`ev.frozen.step`, the system's current `params` bound at first use, rebound
+when they change) are generated and cached once on the evaluator by one helper, never
+hand-written, never rebuilt inside a loop. With the four-body surface of sampled-path.md §3.6
+(`f`, `h`, `step`, `rollout`, plus `rollout_batch`) the evaluator goes from 91 names to about
+12; DESIGN §5's stable names become one-line aliases for one release, then go with a ledger
+line. Measured cost: none (sampled-path.md §3.5); only the parametric body differentiates.
 
 ### D10b The compiled problem is the traceable twin of `evaluate` (ruled 2026-10-22)
 

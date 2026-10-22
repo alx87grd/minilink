@@ -398,8 +398,10 @@ the demo sweep touches fewer files. Nothing leaves without the maintainer's ruli
   and of the integrators' move to `simulation/solvers/` (S37 is absorbed; S27 Diffrax stays in
   §6). V1's evaluator integrates the continuous loop diagram with SM-1's compiled step, so
   wave V's step 3 builds on it. Design, steps SM-0 to SM-6 and the asks:
-  [sampled-path.md](sampled-path.md). Done when the ruling is recorded and the steps are rows
-  here.
+  [sampled-path.md](sampled-path.md). Ruled 2026-10-22 (session 1, R6–R8, R12): the contract,
+  the knobs and defaults, DP on Euler, one traced body with generated `jit` / `frozen` forms,
+  the four-body surface of §3.6. Open: a sampled replay waits for v0.4. Next: SM-0's baseline,
+  then SM-1.
   - [ ] **`discretize` follow-ups** **[ask]** (S75's step SM-2, [sampled-path.md](sampled-path.md); the z tier, P6, is not planned: ruled 2026-10-17,
     [record](../reviews/2026-10-17-z-tier-dropped.md)): an exact zero-order-hold option on
     `discretize`, shared with `step_response` and checked against `scipy.signal.cont2discrete`

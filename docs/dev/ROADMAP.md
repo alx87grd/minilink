@@ -546,13 +546,11 @@ sessions, the sampled face of V1, the missing rows) in
 2026-10-22 ([record](../reviews/2026-10-22-rulings-session-1.md)): the shape (two foundations,
 the problem statement with them, six tooling pillars), the catalog clean-up (K8), the
 experimental tier untested (K9), no exit rule, the silent prelude trim, the step model's
-contract, knobs and defaults, DP on Euler through it. Still open from it:
-
-- **A sampled replay in `compare()` and the Monte Carlo facade** (S75, ask 4): score a law on
-  the model it was trained on, as an option or as the default.
-  [sampled-path.md](../plans/sampled-path.md) §6, [end-state-api.md](../plans/end-state-api.md) D9.
-- **`params` always an argument, freezing a binding** (S75, ask 6; D10): measured 2026-10-22
-  (`benchmarks/params_binding.py`, sampled-path.md §3.5), the maintainer's call pending.
+contract, knobs and defaults, DP on Euler through it. Also ruled the same day: one `evaluate` family with the ODE solver as the judge and the
+compiled fixed-step run as the engine under `tune` (D9, D17); one `evaluate_trajectory`,
+the cost owning `g` and `h`, the problem owning `tf`, the sets, `infeasible_cost` and
+`discount_rate` (D16, D20); one traced body per integrator, the jitted and frozen forms
+generated (D10). Session 1 is closed; wave K and S75's SM-0 to SM-6 may start.
 
 **Blocking code now, session 2** (a week later; unblocks S31 and wave V)
 

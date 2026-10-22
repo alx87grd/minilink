@@ -83,7 +83,12 @@ in the plan doc it shapes.
   controller, wired by the problem; roles are never inferred; the cost is scored on the
   `plant` role; `tune` names leaves by the diagram's params paths. Lives in: end-state-api.md
   D10b; differentiable-problem.md §4.1, §4.5 to rewrite at step 0.
-- **D10 measured, not yet ruled.** `benchmarks/params_binding.py` (2026-10-22, CPU): inside a
+- **R12 (D10) One body per integrator; the frozen name is a binding (B).** The traced
+  parametric body is the only code; `ev.jit.*` and `ev.frozen.*` are generated and cached once,
+  never rebuilt in a loop; the four-body surface of sampled-path.md §3.6 follows (91 names to
+  about 12); the stable names become aliases for one release. Lives in: sampled-path.md §3.5,
+  §3.6; end-state-api.md D10; TODO §4 S75 (SM-1, SM-6).
+- **D10's measurement.** `benchmarks/params_binding.py` (2026-10-22, CPU): inside a
   scan or `vmap` the frozen and `params` forms are equal; from Python the dict costs about
   3 µs of dispatch per call and the bound form equals the frozen call; only the `params` form
   differentiates (2.2× the value). The table is in sampled-path.md §3.5. Session 1 stopped
@@ -91,8 +96,8 @@ in the plan doc it shapes.
 
 ## Where session 1 stands
 
-Ruled: D1–D9, D16, D17, D20 and D10b (R1–R11). Open: D10 (the maintainer's call, data in
-hand), then session 2 (D11–D15, D18, D19, D21–D24) and the v0.4 names (D25–D30).
+Ruled: D1–D10, D10b, D16, D17, D20 (R1–R12). Session 1 is closed. Open: session 2 (D11–D15,
+D18, D19, D21–D24) and the v0.4 names (D25–D30).
 
 ## Addendum, the same evening: the evaluator's surface and the speed trade-offs (discussion)
 
