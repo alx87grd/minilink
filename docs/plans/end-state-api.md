@@ -343,15 +343,14 @@ only. The hand-copied facades and the cache go (D13). Implementation after the c
 path lands (the maintainer's order: rule the whole plan, then implement the continuous core
 first).
 
-### D12 The sampled seam's time: ticks or seconds (S31)
+### D12 The sampled seam's clock: ticks (S31) — **ruled 2026-10-22**
 
-**Today:** `StepSystem.step(x, u, k, params)` takes the integer tick; the computer schedules
-in ticks; the plant runs in seconds.
+`step(x, u, k, params)` keeps the integer tick, the textbook's `x_{k+1} = Φ(x_k, u_k, k)`; the
+loop owns `t_k = t0 + k·dt` where it calls the continuous plant; a discrete block that needs
+real time reads its own `dt`. Byte-identical, no signature change.
 
-**Recommended:** ticks stay on the step contract, the textbook's `x_{k+1} = Φ(x_k, u_k, k)`,
-and the loop owns the conversion `t_k = t0 + k·dt` where it calls the continuous plant. A
-`StepSystem` that needs the clock reads `self.dt` (one owner, as `discretize` already rules).
-Byte-identical; no signature changes.
+**Parked 2026-10-22 (the maintainer): D13, D14 and D15 below are ruled after the continuous
+architecture and API are done and implemented; the hybrid tool's details wait for that phase.**
 
 ### D13 The run-state caches (S31; RULES 2.4)
 

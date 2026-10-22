@@ -120,3 +120,6 @@ of it in sampled-path.md §3.6; the numbers from `benchmarks/params_binding.py`.
   `HybridSimulator`, the MPC export and replay, later the sampled face of `evaluate` / `tune`
   (v0.4). The RL environment depends on the step model only, not on the loop. Lives in:
   end-state-api.md D11; sampled-path.md §8.
+- **R14 (D12) Ticks.** `step(x, u, k, params)` keeps the integer tick; the loop converts to
+  seconds where it calls the plant. **D13–D15 parked** until the continuous architecture and
+  API are done and implemented (the hybrid tool's details come in that later phase).
