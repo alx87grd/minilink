@@ -28,7 +28,7 @@ a **contract**, not a documentation convention.
 | Lane | What it is | Rules |
 | --- | --- | --- |
 | **Teaching surface** | The names students meet: root prelude (`from minilink import …`) and the band facades (`minilink.catalog`, `.blocks`, `.control`, `.analysis`, `.simulation`, `.planning`). Registered in one place, tested as a set. | *Soft rule:* nothing enters without a demo or notebook, a both-backends test where it defines dynamics, and a docstring. Names and semantics change only with a deprecation note. Student-facing examples and notebooks import **only** through it (CI-checked). |
-| **Research lane** | Everything else: the provisional bands (hybrid, MPC, realtime), the `minilink/experimental/` tier (symbolic mechanics, contact engines, C export), `examples/projects/`, `examples/experimental/`. | No stability promise, no entry requirements, out of the release contract. The provisional bands ship in the wheel; `minilink/experimental/` and the research examples stay **out of the wheel** and run from a git checkout. Deep imports always remain valid. |
+| **Research lane** | Everything else: the provisional bands (hybrid, MPC, realtime), the experimental tier (`minilink/experimental/`: symbolic mechanics, the contact-engine leaf, C export, the unsupported plants; the top-level `experimental/` folder of prototype scripts), `examples/projects/`. | No stability promise, no entry requirements, out of the release contract. The provisional bands ship in the wheel. The experimental tier is **out of the wheel**, **untested by default** (nightly smoke at most; `c_export`'s flagship smoke the one gate exception), off the docs site, never cited by a course, and the staging area for what may leave into its own project at v1.0 (ruled 2026-10-22). Deep imports always remain valid. |
 
 **Provisional teaching names:** the spatial names the planning facade exports (`Scene`,
 `bind`, `ReferenceTrack`, `car_outline`, `plot_track`, …) sit in the teaching lane under
@@ -542,24 +542,16 @@ v0.4 added, the course audit G1 now, the sampled spine before the differentiable
 sessions, the sampled face of V1, the missing rows) in
 [its record](../reviews/2026-10-22-second-roadmap-review-rulings.md).
 
-**Blocking code now, session 1** (unblocks wave K and S75's SM-0 to SM-2)
+**Blocking code now, session 1** (unblocks wave K and S75's SM-0 to SM-2) — ruled
+2026-10-22 ([record](../reviews/2026-10-22-rulings-session-1.md)): the shape (two foundations,
+the problem statement with them, six tooling pillars), the catalog clean-up (K8), the
+experimental tier untested (K9), no exit rule, the silent prelude trim, the step model's
+contract, knobs and defaults, DP on Euler through it. Still open from it:
 
-- **The shape of the framework** (K7's first ask): one differentiable spine and six pillars
-  (classical and modern, nonlinear, trajectory and MPC, reinforcement learning,
-  identification and imitation, estimation), the frame §5 is ordered by; a different list
-  changes the convergence verdicts. [core-consolidation.md](../plans/core-consolidation.md)
-  §2.
-- **K7's tier 1 and the exit rule** (its asks 2, 3, 5): tier 1 as a block or item by item
-  with the plant rule; `experimental/engines/`; the exit rule into §2 before the first K2
-  removal, so the December tag's removals follow a stated rule.
-  [core-consolidation.md](../plans/core-consolidation.md) §6, §8, §10.
-- **One path from a continuous plant to a step model** (S75): eight consumers discretize the
-  same plant eight ways today. Recommended (2026-10-21): one contract with four knobs (`dt`,
-  `method`, `substeps`, `hold`), constant-step explicit integration on the sampled path only,
-  `discretize` the verb returning a `StepSystem`, one compiled step under it taking `params`
-  always (freezing a binding at the boundary). To rule: the name, the defaults, DP's
-  integrator, a sampled replay in `compare()`. [sampled-path.md](../plans/sampled-path.md)
-  §1–§7.
+- **A sampled replay in `compare()` and the Monte Carlo facade** (S75, ask 4): score a law on
+  the model it was trained on, as an option or as the default.
+  [sampled-path.md](../plans/sampled-path.md) §6, [end-state-api.md](../plans/end-state-api.md) D9.
+- **`params` always an argument, freezing a binding** (S75, ask 6; D10).
 
 **Blocking code now, session 2** (a week later; unblocks S31 and wave V)
 

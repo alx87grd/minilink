@@ -184,12 +184,21 @@ alone, and the README names the catalog by domain, not by class.
 
 ### D3 `experimental/engines/` (K7, ask 3)
 
-**Recommended:** delete. CONSTITUTION §1.4 excludes a contact engine; the MJX spike will write
-its own leaf against the `System` contract, which is the template, not `world.py`.
+**Ruled 2026-10-22 (c, amended):** kept in `minilink/experimental/` as a demo of a contact-engine
+leaf, clearly not core. With it, the experimental tier's contract: `minilink/experimental/`
+(importable prototypes) and a top-level `experimental/` folder (prototype scripts, moved out of
+`examples/`, the student tree) are repo-only, untested by default (their tests leave the CI gate
+for the nightly sweep or go), off the docs site, never cited by a course, and the staging area
+for what may leave into its own project at v1.0 (with K5). The one exception: `c_export`'s
+flagship smoke test stays in the JAX regression job, since the showcase runs it. Steps: TODO K9.
 
 ### D4 The exit rule (K7, ask 5)
 
-**Recommended:** the sentence of core-consolidation.md §8 into ROADMAP §2 in session 1, so
+**Ruled 2026-10-22: no exit rule.** The maintainer prunes by hand at each release from a
+K1-style table; the three seeds lose their clock and are plain rows (tabular RL's demo, the
+Lyapunov field in A1, PurePursuit's lesson in C2). The proposal, for the record:
+
+~~**Recommended:** the sentence of core-consolidation.md §8 into ROADMAP §2 in session 1, so
 K2's removals in the December tag follow a rule that exists:
 
 > At each minor release's close-out, a teaching-surface or provisional name that no notebook,
@@ -198,11 +207,11 @@ K2's removals in the December tag follow a rule that exists:
 > pillar's seed; a seed that has not grown for two releases moves too.
 
 The three seeds with a clock: tabular RL (owes its demo before v0.9), the Lyapunov field (A1),
-`PurePursuit` (C2's lesson).
+`PurePursuit` (C2's lesson).~~
 
 ### D5 The prelude trim's form (K7, ask 6)
 
-**Recommended:** silent before v0.9, one ledger line per release in ROADMAP §2 (as every
+**Ruled 2026-10-22: (a) silent.** One ledger line per release in ROADMAP §2 (as every
 breaking change so far); shims start with V4 at v1.0. The names stay importable from their
 band facade, so a deep import never breaks.
 
@@ -215,7 +224,7 @@ over `source.f`, and the evaluator keeps a frozen and a `params` twin of every i
 **Options:** a new noun (`StepModel`); the existing `StepSystem` returned by `discretize`; a
 method on `System` (`plant.sampled(dt)`).
 
-**Recommended:** the existing verb and noun. `discretize` is already the GRO501 word for the
+**Ruled 2026-10-22: yes.** The existing verb and noun. `discretize` is already the GRO501 word for the
 digital-implementation step, and a `StepSystem` already composes, rolls out and compiles.
 
 ```python
@@ -230,7 +239,7 @@ stays accepted for one release with the ledger line, no alias beyond that.
 
 ### D7 The four knobs, their defaults, and who exposes `substeps` (S75, ask 2)
 
-**Recommended:** `method="rk4"`, `substeps=1`, `hold="zoh"` (today's numbers everywhere);
+**Ruled 2026-10-22: yes.** `method="rk4"`, `substeps=1`, `hold="zoh"` (today's numbers everywhere);
 `"exact"` for linear models (the `discretize` follow-up); `hold="foh"` only where shooting
 needs it. `substeps` is exposed on every sampled consumer that takes `dt`:
 
@@ -245,7 +254,7 @@ HybridSimulator(loop, dt_inner=…)   # -> substeps=, the same word
 
 **Today:** the grid steps `x + f(x, u, t) dt` inline (Euler), twice.
 
-**Recommended:** the step model with `method="euler"` by default (byte-identical, every
+**Ruled 2026-10-22: (a).** The step model with `method="euler"` by default (byte-identical, every
 value-iteration lesson's numbers hold); `DynamicProgrammingPlanner(problem, dt=, method="rk4")`
 as an option from day one; whether the default flips is V3's question, decided with the course
 notebooks pinned on a release.

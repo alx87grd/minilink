@@ -366,6 +366,18 @@ the demo sweep touches fewer files. Nothing leaves without the maintainer's ruli
   site's plant page. Done when the root prelude lists at most 15 plants, `minilink.catalog`
   lists only tested plants, no two supported plants differ by parameters alone, and
   `test_teaching_surface.py` pins both lists.
+- [ ] **K9 The experimental tier, untested** (ruled 2026-10-22, [end-state-api.md](end-state-api.md)
+  D3; [record](../reviews/2026-10-22-rulings-session-1.md)): **K9-1** `examples/experimental/`
+  moves to a top-level `experimental/` folder (the MPPI scripts, the boat and ODE showpieces'
+  demos, the contact-engine demo), out of the student tree, never cited by a course, with the
+  demo-check manifests and `examples/README.md` updated; **K9-2** the experimental tier's tests
+  (`test_symbolic.py`, `test_engine_jax.py`, the unsupported plants' rows) leave the CI merge
+  gate for the nightly sweep or are deleted, `c_export`'s flagship smoke staying in the JAX
+  regression job; **K9-3** one module docstring line on every `minilink/experimental/` module
+  ("experimental: no test, no docs, no promise") and the ROADMAP §2 lane row (landed with the
+  ruling). `experimental/engines/` stays as the contact-engine leaf demo. Done when CI's gate
+  imports nothing under the tier, `pip wheel` ships nothing under it, and the nightly job
+  lists what it smokes.
 - [ ] **K7 What is core, what is a side feature** **[ask — core, public names]**
   (ROADMAP §6): the convergence pass; every move is a step of its own once ruled. In v0.3
   with K1–K4: K1's inventory is core-consolidation.md §3–§4, K2 and K3 are its tiers; the
