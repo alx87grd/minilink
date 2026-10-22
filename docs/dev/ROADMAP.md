@@ -97,7 +97,7 @@ Step ids (`S29`, `P4`, `T2`, …) are the rows of
 | Planning / path integral (MPPI) | research lane (planned) | 1 | Two standalone scripts (`examples/experimental/mppi/`): the pendulum swings up; the kinematic racecar laps the cone circuit at a lower closed-loop cost than the collocation MPC. Design: [mppi.md](../plans/mppi.md). | The planner (S72, v0.4) on the sampled kernel, after RN-4 / RN-5. |
 | Geometry / spatial | provisional (teaching) | 4 | SDF + `Scene` / fields / bodies under `planning/spatial/`, JAX twins tested; the planning facade's spatial names are provisional teaching names (§2). Home designed: `core/geometry/`. | Package move and course catalog (A3); bicubic SDF and CBF filter (research). |
 | Graphics / animation | teaching | 5 | Frame-keyed `tf` / geometry / overlays; four renderers; auto-fit camera. | Camera and plot defaults from roles (P10); constructor-derived camera hints (S43); glyph/solid rename (S30, v0.9). |
-| Hybrid / step / MPC | provisional (research) | 4 | `StepSystem`, `Computer`, `HybridDiagram`, `HybridSimulator`, MPC with parametric JAX. A side helper for MPC simulation; the sampled loop is the one thing that is not a `System`. | Keeps in step with the core rules (P10); no new hybrid features before S31 (v0.3, recommended: the loop as a tool on one sampled kernel). |
+| Hybrid / step / MPC | provisional (research) | 4 | `StepSystem`, `Computer`, `HybridDiagram`, `HybridSimulator`, MPC with parametric JAX. A side helper for MPC simulation; the sampled loop is the one thing that is not a `System`. | Keeps in step with the core rules (P10); no new hybrid features before S31 (v0.3, recommended: the loop as a tool on one sampled kernel); the compiled MPC program binds every problem parameter, not only `x0` (S76, v0.3). |
 | Realtime simulation | provisional | 2 | `RealtimeSimulator` + pygame I/O. | Architectural review (v1.0); later the human-demonstration recorder of the behavior-cloning pipeline (after v1.0). |
 | Estimation | teaching (GRO501) | 6 | `StateObserver` (innovation form, operating point on the block, hat labels), `luenberger` and `kalman` on arrays, a linear model or the plant (the duals of `place` and `lqr`, 2026-10-14); `lqg` returns the observer + gain box; an observer is refused as a controller; `closed_loop(gain, plant, observer=obs)` wires the LQG loop by role (AC-4, 2026-10-14). | the trajectory observer and the finite-horizon filter, the EKF, the estimation problem and its tools (v0.9, [the plan](../plans/estimation-and-state-feedback.md)). |
 | Identification | planned | 2 | Parametric-tier prototype only. | V1's `tune` with a data cost (C4, v0.4). |
@@ -346,8 +346,13 @@ S: steps 0–2 need neither S75 nor S31, step 3 meets the sampled seam;
   the whole run out of the compiled scan, `problem.compile(controller)` with the deterministic
   verbs (the trajectory, the cost, the smallest margin) and `tune`, and the program bridge
   with the optimizer's program classes and first-order backend (S74, with OPW-1–OPW-5 of
-  [optimizer-parametric-wiring.md](../plans/optimizer-parametric-wiring.md)).
+  [parametric-program.md](../plans/parametric-program.md)).
   **[ask — core, the names]**
+- **S76** The compiled MPC program binds every problem parameter, not only `x0`
+  (parametric-program.md): the start, the plant, the cost and the sets as one parameter tree
+  bound at each solve; recommended, one program family whose frozen form is a binding (the
+  plain `MathematicalProgram` unchanged). Direct collocation and the MPC block first, beside
+  V1's step 5; the cost and set leaves right after A2. **[ask — core]**
 - **A2** Cost parameters ([cost-params.md](../plans/cost-params.md)), the plan's step 6, so the
   path reaches the cost's own weights: every library cost reads `params`, composite costs nest
   them like a diagram's, and every planner passes `problem.params.cost` through, so
@@ -540,6 +545,17 @@ v0.4 added, the course audit G1 now, the sampled spine before the differentiable
   [differentiable-problem.md](../plans/differentiable-problem.md) §9 says which asks block code
   (1, 2, 5, 6, 7, 8, and 13: S31 first) and which can wait, each with its proposed answer; the analyses and the panel are compared in
   [the record](../reviews/2026-10-18-differentiable-problem-consolidation.md).
+
+**Before S76 (wave V, beside V1's step 5)**
+
+- **The compiled MPC program's parameters** (S76): one program family, the library
+  building `J(z, p)`, `h(z, p)`, `g(z, p)` on the problem's parameter tree and the frozen
+  `MathematicalProgram` its binding, or two parallel types, or one class whose functions
+  always take `p`. Recommended (2026-10-22): the family, so hand-written programs stay `J(z)`
+  and one evaluator serves both. Still to rule with it: the family's name and the plant's key
+  in the tree (`system` or `plant`, in V1's step 0 session), whether a hand-written program
+  may declare its own parameters, and the MPC block's live-parameter ports.
+  [parametric-program.md](../plans/parametric-program.md) §2–§3.
 
 **Before v0.3's convergence (wave K)**
 

@@ -136,7 +136,7 @@ control (no implicit gradient of the inner solve) and the sampling planner (rand
 | `MathematicalProgram` (frozen) | `J(z)`, `h`, `g`, bounds, `backend`, `metadata`; reached through a trajopt transcription | unchanged in shape; one more producer, `evaluator.program(wrt=)` (§4.6); its class read from its fields (§4.7) |
 | `Optimizer` | three constrained-NLP presets on a flat `z` | the program classes, a first-order backend (`gd`, `adam`), two free SciPy presets, one global derivative-free preset (§4.7) |
 | `tune` | does not exist | **new** facade, `planning/tuning.py`: `tune(problem, policy, wrt, *, dt, ...) -> PlanningSolution` (§4.6) |
-| `ParametricMathematicalProgram` | `h(z, x0)`, `bind(x0)`, the MPC block's | unchanged now; later the case "no decision leaves, `x0` bound" of the same bridge |
+| `ParametricMathematicalProgram` | `h(z, x0)`, `bind(x0)`, the MPC block's | binds every problem parameter, `J(z, p)`, `h(z, p)`, `g(z, p)`, the frozen `MathematicalProgram` its binding (S76, [parametric-program.md](parametric-program.md)): the case "no decision leaves, parameters bound" of the same bridge |
 
 The `System` evaluators gain one method (§4.4); nothing else appears or disappears.
 
@@ -371,7 +371,8 @@ params = evaluator.unpack(result.z, wrt)       # the full pytree with the chosen
   target, the logged input as a source leaf, `tune(wrt="plant...")` (the C4 row's `fit` is a
   facade on it); equation-error identification stays a direct program on `vmap(f_p)`.
   `ParametricMathematicalProgram.bind(x0)` is the case "no decision leaves, `x0` bound" of
-  this bridge, and the scene bind `J(z, p)` the case "bound params".
+  this bridge, widened by S76 to every problem parameter bound at solve time
+  ([parametric-program.md](parametric-program.md)), the scene among them once A3 lands.
 
 ### 4.7 The optimizer as the one descent loop (S74)
 
@@ -415,7 +416,7 @@ concrete:
    `"auto"` never picks it, the user does, knowing its cost in evaluations. The sampling
    planner (MPPI, S72) stays the global search *over trajectories*; the optimizer's global
    preset is the one over *parameters*. Presets join one registry, the shared factory of
-   OPW-1 (optimizer-parametric-wiring.md), where the trajopt planner's duplicate registry dies.
+   OPW-1 (parametric-program.md §6), where the trajopt planner's duplicate registry dies.
 3. **Pytree decisions stay outside `Optimizer`**: the bridge ravels and unravels (§4.6).
 
 Then the four demos and the notebook cells end in `Optimizer(program, method=...)` or
@@ -496,7 +497,7 @@ the nonsymmetric eigensolver is CPU-only. The done-when is on the workboard row.
 | automation-by-convention.md (AC-7) | the evaluator scores the plant by construction; AC-7 extends the rule to the design tools |
 | mppi.md (S72) | `rollout_batch` with `signals` and the realization batch are what MP-1 and MP-3 roll out on; `score_trajectory` is their scoring rule |
 | fields.md (A1) | the planned `Field` absorbs the six field-like classes of `planning/spatial` (the review's §2.5), and `shaping` moves to core with it or earlier (step 8) |
-| optimizer-parametric-wiring.md (OPW-1) | the shared backend factory is where the new presets register |
+| parametric-program.md (OPW-1, S76) | the shared backend factory is where the new presets register |
 | TODO C4 (identification) | `fit` is the bridge with a data-mismatch objective (§4.6) |
 | TODO K (November) | two rows the review found: the evaluator grid trimmed to `_p` bodies plus generated bindings (36 integrator methods, 1763 lines); `StepRollout` folded into `Trajectory` once it is a pytree |
 | the step model (S75, [sampled-path.md](sampled-path.md)) | the plant side of every sampled tool: `discretize` on one compiled step; this plan's evaluator keeps the continuous loop and reads the same compiled RK4 |

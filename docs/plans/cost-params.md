@@ -120,7 +120,7 @@ A `FieldCost` passes `params` down to `scene.clearance(world, params=params)`, s
 obstacle term would share one scene override. The plumbing is unused: the shapes accept
 `params` and none reads it, and the online planner raises for a `scene` key. A field term's
 dictionary therefore holds its own weight, `FieldCost` stops forwarding its parameters to the
-field, and scene overrides are designed with pipeline B through `ProblemParameters.scene`,
+field, and scene overrides are designed with S76 (parametric-program.md) through `ProblemParameters.scene`,
 already reserved for them. Nothing changes numerically today.
 
 ## Beyond this plan: the cost as a block
@@ -155,7 +155,7 @@ the ODE solver differs from the trapezoid rule of the post-hoc path.
    Rejected: a class-level `{}` (one mutable dictionary shared by every subclass) and a base
    `__init__` (student costs define `__init__` without calling `super()`).
 4. **Scene overrides.** Proposed: out of this plan. `FieldCost` keeps its weight only and stops
-   forwarding; pipeline B designs the scene channel.
+   forwarding; S76 designs the scene channel.
 5. **Dataclasses.** Proposed: plain classes, as systems are. Nothing compares, copies with
    `replace` or serializes costs; the keyword constructors and `from_system` keep working;
    the parameters become mutable, as a system's are.
@@ -173,7 +173,7 @@ the ODE solver differs from the trapezoid rule of the post-hoc path.
   names its terms (`SumCost.of(path=..., corridor=...)`) so gradients read by role.
 - `ProblemParameters.cost` can default to the cost's live `params`.
 - Online cost weights and targets in MPC (a moving `xbar`) become possible once the parametric
-  program binds `p` (pipeline B).
+  program binds `p` (S76, its step PP-3, right after this plan).
 
 ## Migration outline
 

@@ -218,11 +218,7 @@ pick):
 
 - [ ] RRT `KinodynamicExtender` ignores `problem.params.system`; `extenders.py` probes
   `getattr(U, "box", None)` instead of `U.bounding_box()`.
-- [ ] MPC port computes drop `params`; dual online-params façades.
 - [ ] `ShootingTranscription` orphaned from the string presets.
-- [ ] `ParametricMathematicalProgram` / `JaxParametricProgramEvaluator` placement (54 %
-  duplicate of `optimization/evaluators/jax_evaluator.py`;
-  [optimizer-parametric-wiring.md](optimizer-parametric-wiring.md)).
 - [ ] `HybridSimulator` conventions drift (shared input coercion, positional
   `input_port_id`, the framed verbose panel; the plant sub-step from the plant time constant
   instead of one RK4 step per tick; scan: compile-sim#4, compile-sim#5).
@@ -308,7 +304,9 @@ the rulings that block code first (ROADMAP §6, "Blocking code now"); G1 now, in
 wave K (K1–K4 with K7), its first tier any time and its between-terms moves after GMC714;
 then wave S, the sampled spine: S75 (the `discretize` follow-ups as its SM-2), then S31;
 beside it wave V, the deterministic differentiable path to the cost behind a clean API (V1's
-steps 0–5 with S74 and OPW, then A2 as its step 6, with A5's sets reading `params`). A6, the
+steps 0–5 with S74 and OPW, and S76's binding of every problem parameter in the compiled MPC
+program beside step 5, then A2 as its step 6, with A5's sets reading `params`, then S76's cost
+and set leaves). A6, the
 short catalog names, goes with wave K's between-terms moves. **Then the GMC714 features**, in
 December: wave G's rows (C1, C2, C3, C6, S63, S64 and the gaps G1 writes) in the order G1
 sets. The rows below are in that order.
@@ -438,7 +436,7 @@ names brainstorm with the maintainer, so the API comes first.
   `Optimizer(program, method="adam")` (or the class default) and the library holds one descent
   loop; the maintainer decides whether one tutorial keeps a hand-written loop on purpose, as
   the GRO501 from-scratch notebooks do. Related: OPW-1's shared backend factory in
-  [optimizer-parametric-wiring.md](optimizer-parametric-wiring.md), which the new backend
+  [parametric-program.md](parametric-program.md) §6, which the new backend
   joins. Done when `Optimizer(program).solve()` on the autotuning program reaches the hand
   loop's gains with `method="adam"` and with the class default, SLSQP refuses nothing it
   accepted before, the RL baselines stay bit-identical with the moved Adam, and no
@@ -448,9 +446,25 @@ names brainstorm with the maintainer, so the API comes first.
   the first-order backend with the RL `Adam` moved, one global derivative-free preset
   (`scipy_differential_evolution`), never picked by `"auto"`; lands as the plan's step 5.
   - [ ] **OPW-1–OPW-5** (with S74, V1's step 5, v0.3) The parametric (MPC) optimizer goes through `Optimizer`'s backend table
-    ([optimizer-parametric-wiring.md](optimizer-parametric-wiring.md); scan: planning#9). Out of
+    ([parametric-program.md](parametric-program.md) §6; scan: planning#9). Out of
     T5, which is byte-identical, because it changes behaviour. Done when
     `optimizer_method="ipopt"` reaches the parametric MPC path and the plan's OPW-4 tests pass.
+- [ ] **S76 The parametric program binds every problem parameter** **[ask — core]**,
+  proposed 2026-10-22: [parametric-program.md](parametric-program.md), steps PP-0–PP-5.
+  Today the compiled MPC program binds the measured `x0` only: direct collocation freezes the
+  plant, cost and set parameters in its closures, the online call refuses every other key,
+  and the MPC block's port functions drop `params` (this row absorbs that D3 row, the
+  parametric evaluator's placement and the scene bind of the Later list). The recommendation
+  (the plan's §2, option C): one family, the library building `J(z, p)`, `h(z, p)`,
+  `g(z, p)` on the problem's parameter tree (`x0`, plant, cost, sets; the scene with A3), the
+  frozen `MathematicalProgram` its binding, so hand-written programs stay `J(z)`, one
+  evaluator body serves both, and the optimizer still sees a flat `z`. Direct collocation and
+  the MPC block first (optional live-parameter ports, unwired ports at their nominal). Order:
+  PP-0 in V1's step 0 (the names, the plant's key `system` or `plant`); PP-1, PP-2 and PP-4
+  with V1's step 5 (same evaluator and backend factory as OPW); PP-3, the cost and set
+  leaves, right after A2. Done when one compiled MPC program, bound with two values of a plant
+  parameter and of a cost target, gives the solutions a rebuild gives, the MPC baselines are
+  byte-identical with only `x0` bound, and the friction-aware MPC example runs from a port.
 - [ ] **A2 Cost parameters** **[ask — core]**. [cost-params.md](cost-params.md): `params` on
   every library cost (`QuadraticCost`, `TimeCost`, `FieldCost`, `SumCost`, `ScaledCost`),
   composite costs nested like diagram params with `cost.id`, attributes as views so the
@@ -781,8 +795,6 @@ One line each; open a plan doc only when a design needs a writeup.
   PR #99, `minilink/control/guidance_los_coupled.py` (`compute_curve_demand_norm`,
   `speed_limit_from_curve_demand`). Weigh the tables against the one-parameter textbook cap
   `v ≤ sqrt(a_y_max / κ)` on the sharpest curvature ahead.
-- Scene params / `J(z, p)` bind (DESIGN §4 planning-params pipeline B; moving obstacles
-  online without rebuilding the NLP).
 - `SimulationOptions`, one record for the `Simulator` solver presets (DESIGN §5), weighed
   against RULES 2.5 (no option bags) before it is built.
 - A sample stride on the fixed-step solvers (`compute_trajectory(..., substeps=k)`: `k` RK4

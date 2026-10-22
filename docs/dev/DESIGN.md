@@ -340,7 +340,7 @@ read `params` yet, the gap is tracked below.
   `scene` is reserved (`None`) for spatial overrides.
   Online façade on `solve_trajectory_from` / `compute_command`: `params=None`
   or `{}` binds `x0` only; `params={"scene": …}` raises `NotImplementedError` (moving
-  obstacles online, a `J(z, p)` bind, is a Later idea on the workboard).
+  obstacles online; binding the plant, cost and set parameters per solve is planned as S76).
   **Gap:** call-time `params` on the base `Shape`, `Set`, `CostFunction` and field
   primitives in `core/` — those types declare `(t, params)` but read their own attributes
   only. The constitution's one-signature rule makes this a gap to close, not a design;
