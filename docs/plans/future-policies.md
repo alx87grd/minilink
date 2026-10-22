@@ -37,8 +37,8 @@ optimizer. The gaps sit in three places:
   new machinery.
 - **Two strains.** The receding-horizon wrapper still reads trajectory-optimization internals,
   so it needs the small planner interface [mppi.md](mppi.md) already asks for. And each tick
-  carries memory (the shifted warm-start sequence) and a fresh random key; the sampled loop
-  must thread both.
+  carries memory (the shifted warm-start sequence), which the sampled loop must thread; its
+  fresh samples come from its own seed and the tick, as the noise block's do (§5 point 2).
 - **A payoff.** MPPI's update is a weighted average, so it is differentiable end to end: its
   temperature and noise level can be tuned by gradient with the same `tune` as a PID gain.
   That works only because tracing is decided by the controller, not blocked by the loop.
@@ -74,7 +74,7 @@ demo than human driving, and free of hardware.
 
 - **Run time is the MPPI shape again.** A diffusion policy observes a short history, samples a
   chunk of future actions by iterative denoising, executes a few and replans: a sampled
-  controller with memory (the observation history, the current chunk), a random key and a
+  controller with memory (the observation history, the current chunk), seeded draws and a
   slower replanning rate. It cannot be a continuous `System`, which is fine under the "loop as
   a tool" recommendation; the MPPI requirements on the loop cover it.
 - **Training reuses the fitting verb**, with a denoising loss instead of an action loss.
