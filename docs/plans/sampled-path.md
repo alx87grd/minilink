@@ -160,6 +160,64 @@ every case:
 It does not fix S53: a batch with a *different* parameter set per rollout (a family under
 `vmap`) runs about 10× slower than the plain batch, a separate problem.
 
+### 3.6 The evaluator's surface after the trim (discussed 2026-10-22, the shape proposed for D10)
+
+Today the JAX evaluator has 61 method names and the NumPy one 30; they are four families, two
+adapters and one convenience. After the trim, **four traced bodies**, all taking `params`:
+
+```python
+ev = plant.compile(backend="jax")            # or "numpy": the same four names, no jit tier
+
+ev.f(x, u, t, params)                        # the law; u=None is the nominal input (the _ivp family goes)
+ev.h(x, u, t, params)                        # the outputs and, for a diagram, the internal signals
+ev.step(x, u, t, params, *, dt, method="rk4", substeps=1, hold="zoh")   # x_{k+1}: the one step model (SM-1)
+ev.rollout(x0, u_seq, t0, dt, params, **knobs)                          # scan of step: (t, xs, signals)
+ev.rollout_batch(x0s, u_seqs, dt=, params=family)                       # the one convenience: vmap(rollout)
+```
+
+| Today | After |
+| --- | --- |
+| `f`, `f_p`, `f_trace`, `f_trace_p`, `f_ivp*` | `f`; `u=None` nominal |
+| `outputs*`, `compute_internal_signals*` | `h` |
+| `rk4_step*`, `euler_step*`, `step*` (20 names) | `step` with `method`, `substeps`, `hold`; for a `StepSystem` evaluator `step` is the system's own map, same signature, no knobs |
+| `rk4_integrate_zoh*`, `rk4_integrate_linear*` (`hold="foh"`), `*_integrate_ivp*`, `euler_integrate_*`, `integrate_zoh*`, `rollout`, `integrate_zoh_rollout` (22 names) | `rollout` |
+| `f_scipy`, `f_ivp_scipy`, `as_scipy_jac` | not evaluator methods: the `Simulator` swaps the arguments of `frozen.f` for `solve_ivp`, in one place |
+| `rollout_batch` | stays |
+
+Jacobians stay in `analysis.derivatives` (`jax.jacobian` of `f`).
+
+**Three access forms of one body**, the two derived ones built lazily and cached by one helper,
+never hand-written:
+
+| Form | What it is | Who calls it | Pendulum, one step |
+| --- | --- | --- | --- |
+| traced: `ev.step(x, u, t, params, dt=)` | the plain function; eager if called from Python | composed inside `scan`, `vmap`, `grad`: RL, batches, `tune`, MPPI | 5 700 µs eager (never meant to be called so) |
+| jitted: `ev.jit.step(x, u, t, params, dt=)` | `jax.jit(ev.step)`, compiled once, cached | one step at a time from Python with changing params (an estimator feeding `mu`, a sweep) | 14 µs |
+| frozen: `ev.frozen.step(x, u, t, dt=)` | `jit(partial(ev.step, params=plant.params))`, bound at first use, cached, rebound when `plant.params` changes | the student's `discretize(plant, dt).step`, the realtime loop, the gym bridge, RRT | 10 µs (today's hand-written frozen method) |
+
+Rebuilding the wrapper per call is the one thing to forbid: `jax.jit(body)` at every call costs
+87 µs, `jit(partial(...))` at every call 93 000 µs (a new object, a cache miss, a recompile).
+DESIGN §5's stable names (`rk4_step`, `integrate_zoh`, their trace twins) become one-line
+aliases onto `frozen.step` / `step` for one release, then go with a ledger line.
+
+**Batches: shared or per-member, any mix.** In `rollout_batch` a leaf with a leading axis of
+length `B` is mapped and a leaf without one is shared: `x0s (B, n)` with one shared `u_seq`,
+`u_seqs (B, N, m)`, a `params` family with one `m` per member and every other parameter
+shared, or one `x0` with `B` parameter sets. `problem.realize(key, n)` returns exactly such a
+triple (starts, a parameter family, seeds), which is what `evaluate` hands to the batch.
+
+**The speed trade-off of a parameter family.** Shared parameters are compile-time constants:
+XLA folds `g/l`, `m·l²`, `1/I` once and each step is a few fused multiply-adds on the `(B, n)`
+state. A per-member parameter is a `(B,)` operand: nothing folds, the derived quantities are
+recomputed at every step for every member, and each step reads one more operand per
+parameter. On a small, memory-bound plant that is the whole cost (pendulum: 673 ms vs 127 ms,
+5×); on a plant whose step is already compute-bound it is hidden (cart-pole: 1276 vs 1307 ms,
+none). Results never change; it is the price of differentiating or sampling with respect to a
+plant parameter at all. Two mitigations for the profiling row (S53), neither a design change:
+hoist the plant's pre-computation block (the `m·l²` lines RULES 5.3 already separates) out of
+the scan when parameters are batched, computing it once per member; or carry the drawn
+parameters as constant columns of the batched state so they ride the same memory stream.
+
 ## 4. The consumers after the change
 
 | Consumer | After | Numbers |

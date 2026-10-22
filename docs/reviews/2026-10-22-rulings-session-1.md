@@ -93,3 +93,15 @@ in the plan doc it shapes.
 
 Ruled: D1–D9, D16, D17, D20 and D10b (R1–R11). Open: D10 (the maintainer's call, data in
 hand), then session 2 (D11–D15, D18, D19, D21–D24) and the v0.4 names (D25–D30).
+
+## Addendum, the same evening: the evaluator's surface and the speed trade-offs (discussion)
+
+Measured and discussed, not ruled (they shape D10): no real speed difference between the
+frozen and the `params` step once the frozen name is a binding; the traced body is the
+contract and the jitted and bound forms are generated and cached once (re-jitting per call
+costs 5×, re-binding per call 5000×); the evaluator's 91 method names across the two backends
+reduce to four traced bodies (`f`, `h`, `step`, `rollout`) plus `rollout_batch`, with `step`
+the same word for a continuous system's integrator step and a discrete system's own map;
+batches map any leaf with a leading `B` axis and share the rest; a parameter family costs up
+to 5× on a memory-bound plant and nothing on a compute-bound one, the S53 row's subject. All
+of it in sampled-path.md §3.6; the numbers from `benchmarks/params_binding.py`.

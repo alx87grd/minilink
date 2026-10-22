@@ -319,6 +319,10 @@ contract** (it composes in `scan`, `vmap`, `grad`); the jitted and the bound for
 never built inside a loop; Python-level callers (the gym bridge, RRT, the realtime loop) use
 the cached forms, compiled callers the traced body.
 
+**The surface this would leave** (four traced bodies `f`, `h`, `step`, `rollout`, the
+`rollout_batch` convenience, the generated `jit` and `frozen` namespaces; shared or per-member
+leaves in a batch; the parameter-family trade-off): sampled-path.md §3.6.
+
 **The maintainer's call, pending** (session 1 stopped here on 2026-10-22).
 
 ### D10b The compiled problem is the traceable twin of `evaluate` (ruled 2026-10-22)
