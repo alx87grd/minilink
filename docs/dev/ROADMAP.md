@@ -327,7 +327,9 @@ it is cheap and fixes what December must contain).
 session 1 rules the shape of the framework, K7's tier 1 and the exit rule, and the S75
 contract, so wave K and SM-0 to SM-2 start on November 1; session 2, a week later, rules S31,
 the names of V1's step 0 (with S76's PP-0), the terminal cost and the sampled loop's tick,
-so wave V starts. No foundation code before the session that rules it.
+so wave V starts. No foundation code before the session that rules it. The agenda, every
+decision answered as the code a user would write:
+[end-state-api.md](../plans/end-state-api.md).
 
 **The audit, early** (in parallel with the rulings):
 - **G1** GMC714 baseline audit: every §4.3 topic run on the teaching surface, the gaps
