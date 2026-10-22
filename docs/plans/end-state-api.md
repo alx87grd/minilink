@@ -325,28 +325,23 @@ params paths.
 
 ## 3. Session 2: the sampled loop, the compiled problem, the names
 
-### D11 The sampled loop: a `System` or a tool (S31)
+### D11 The sampled loop: a tool, the name kept (S31) — **ruled 2026-10-22**
 
-**Today:** `law % dt` builds a `Computer`; `computer @ plant` builds a `HybridDiagram`, which
-is not a `System`, with hand-copied facades, `last_result` as a cache, and three copies of
-the sampled rollout (`RolloutEnvironment`, `HybridSimulator`, the MPC computer export).
+**Today:** `law % dt` builds a `Computer`; `computer @ plant` a `HybridDiagram`, already not a
+`System`, with hand-copied facades and a cached `last_result`; the sampled rollout is written
+in `HybridSimulator` and again in the MPC export to a `Computer`.
 
-**Options:** (a) a `System` with state `[plant; computer]` and periodic update events, so it
-nests in diagrams and `linearize` has to be taught to refuse it; (b) a tool built by `%` and
-`@`, not a `System`, on one sampled rollout kernel in two faces.
-
-**Recommended:** (b), named `SampledLoop` (the plan's working name is `HybridLoop`; "sampled"
-is the word the rest of the plan uses, and the course notes' vocabulary decides in the
-naming session). Two closed algebras stay closed; the loop that joins their clocks is a tool
-with `compute_trajectory`, `compile`, `plot_trajectory`, `animate` and nothing else.
-
-```python
-loop = StateFeedbackController(K) % 0.05 @ plant     # SampledLoop
-loop.plant, loop.computer                            # the two roles
-traj = loop.compute_trajectory(tf=10)                # NumPy face: a Trajectory with the held u as a signal
-run = loop.compile(backend="jax")                    # JAX face: scan over ticks; vmap over trials; grad through a gain
-run.rollout_p(x0, t0, n_ticks, params)               # the one kernel RolloutEnvironment, HybridSimulator and MPC export call
-```
+**Ruled:** a **tool**, not a `System`; the name **`HybridDiagram` stays for now**. One kernel: a
+scan over clock ticks, the computer's `step` on `y_k` giving `u_k` held, the plant advanced one
+period by the step model (RK4, `substeps`), in a NumPy and a JAX face; tracing is decided by
+the computer (a gain, a neural policy, a digital PID, MPPI's update trace; MPC with SciPy or
+Ipopt inside runs the NumPy face until an inner solver traces). Consumers: `HybridSimulator`
+(what `loop.compute_trajectory` runs), the MPC export and replay, and later the sampled face
+of `evaluate` and `tune` (v0.4). **The RL environment is not a consumer**: it is the plant's
+step model plus the reward, the learner calling the policy itself; it depends on the step model
+only. The hand-copied facades and the cache go (D13). Implementation after the continuous
+path lands (the maintainer's order: rule the whole plan, then implement the continuous core
+first).
 
 ### D12 The sampled seam's time: ticks or seconds (S31)
 

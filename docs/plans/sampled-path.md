@@ -294,7 +294,8 @@ The open decision (ROADMAP §6): `HybridDiagram` as a `System` (a continuous and
 piecewise-constant state, periodic update events, a simulator and a compiler that know
 sample times), or an honest `HybridLoop`.
 
-**Recommended (2026-10-20): the loop is a tool, not a diagram.**
+**Ruled 2026-10-22: the loop is a tool, not a `System`; the name `HybridDiagram` stays for now**
+(recommended 2026-10-20).
 
 - **Two model algebras, both closed.** The continuous one (`System`, diagrams, `@`, `>>`,
   `+`) and the discrete-time one (`StepSystem`, `StepDiagramSystem`). The loop that joins the
@@ -304,8 +305,9 @@ sample times), or an honest `HybridLoop`.
   out of scope (ROADMAP §7).
 - **One sampled rollout kernel, two faces.** The controller held over its period, the plant
   stepped by the step model between samples, a `StepSchedule` for multi-rate; a NumPy face
-  and a JAX face, as `Simulator` and `compile` have. Its three copies today
-  (`RolloutEnvironment`, `HybridSimulator`, the MPC computer export) become its callers.
+  and a JAX face, as `Simulator` and `compile` have. Its two copies today
+  (`HybridSimulator`, the MPC computer export) become its callers; the RL environment is a
+  consumer of the step model only, the learner calling the policy itself (ruled 2026-10-22).
 - **Two loops on purpose.** The differentiable problem's evaluator keeps the continuous
   closed loop as a diagram (RD-D24), for analysis and gradient tuning of a continuous law;
   this kernel is the loop of every sampled controller. A sampled controller tuned by

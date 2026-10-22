@@ -110,3 +110,13 @@ the same word for a continuous system's integrator step and a discrete system's 
 batches map any leaf with a leading `B` axis and share the rest; a parameter family costs up
 to 5× on a memory-bound plant and nothing on a compute-bound one, the S53 row's subject. All
 of it in sampled-path.md §3.6; the numbers from `benchmarks/params_binding.py`.
+
+## Session 2 (started the same day; the maintainer's order: rule the whole plan now, then
+## implement the continuous-time core first, the sampled loop's code after)
+
+- **R13 (D11) The sampled loop is a tool; `HybridDiagram` keeps its name for now.** One
+  kernel, a scan over clock ticks on the step model with the computer's `step` between samples,
+  NumPy and JAX faces, tracing decided by the computer (MPC runs the NumPy face). Consumers:
+  `HybridSimulator`, the MPC export and replay, later the sampled face of `evaluate` / `tune`
+  (v0.4). The RL environment depends on the step model only, not on the loop. Lives in:
+  end-state-api.md D11; sampled-path.md §8.
