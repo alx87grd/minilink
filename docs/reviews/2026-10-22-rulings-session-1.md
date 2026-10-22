@@ -55,3 +55,11 @@ in the plan doc it shapes.
 - **R8 (D8) DP stays on Euler through the step model.** `method="euler"` the default,
   byte-identical; `DynamicProgrammingPlanner(problem, dt=, method="rk4")` available; whether
   the default flips is V3's question.
+- **R9 (D16, D20) The cost of a trajectory: one formula, the cost owns `g` and `h`, the
+  problem owns the rest.** `evaluate_trajectory(problem, traj)` is the one body (today's
+  `score_trajectory` and `CostFunction.evaluate_trajectory`): trapezoid on the trajectory's
+  grid, the problem's discount, cut at the first exit and charged `infeasible_cost`, `h` at a
+  finite `tf`; byte-identical on NumPy, traceable on JAX; an infinite horizon with a nonzero
+  `h` warns once. `discount_rate` moves from `CostFunction` to `PlanningProblem` (one ledger
+  line; RL's γ and DP read it there). No scoring modes. Lives in: end-state-api.md D16, D20;
+  differentiable-problem.md §4.3; cost-params.md.

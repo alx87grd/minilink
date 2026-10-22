@@ -354,17 +354,25 @@ a diagram; a `Computer` (anything built by `%`) runs the sampled kernel's JAX fa
 second branch refuses with a message naming step 7b; in v0.4 it lands. One `compile`,
 `evaluate`, `tune` for both kinds.
 
-### D16 The terminal cost, one rule (the scoring kernel, V1 step 2)
+### D16 The cost of a trajectory: one formula, and who owns what (V1 step 2)
 
-**Today:** five scoring rules with four quadratures; `h` is charged by some and not others.
+**Today:** five scoring rules with four quadratures; `h` charged by some and not others;
+`discount_rate` an attribute of the cost.
 
-**Recommended:** the contract of differentiable-problem.md §4.3, stated once in DESIGN §6 and
-cited by the transcriptions: trapezoid on the samples, `e^{−ρt}` discount from the cost, cut at
-the first exit, the exit priced by `infeasible_cost` only, `h(x_N, t_N)` charged exactly when
-`tf` is finite. An infinite horizon with a nonzero `h` **warns once** at problem construction
-(`h` probed at the nominal state and at a perturbed one; a user cost cannot be inspected
-structurally, so a raise would be a guess). The deterministic-twin test pins every planner
-baseline byte-identical.
+**Ruled 2026-10-22:** one function, `evaluate_trajectory(problem, traj)` (the name; today's
+`score_trajectory` and `CostFunction.evaluate_trajectory` fold into it), the one body on `xp`:
+trapezoid on the trajectory's own grid, the problem's discount `e^{−ρt}`, cut at the first exit
+from `X` and charged `infeasible_cost`, `h(x_N, t_N)` added exactly when `tf` is finite. Same
+numbers as today on NumPy; traceable on JAX. An infinite horizon with a nonzero `h` warns once
+at problem construction. **Ownership:** the cost owns the integrand, `g(x, u, t)` and
+`h(x_f, t_f)`; the problem owns the functional's shape: `tf`, `X`, `U`, `Xf`,
+`infeasible_cost` and **`discount_rate`** (moved from `CostFunction`; RL's γ and DP read it
+on the problem; one ledger line).
+
+```python
+problem = PlanningProblem(plant, cost=QuadraticCost(Q, R, S), X=box, tf=10.0, discount_rate=0.1)
+J = evaluate_trajectory(problem, traj)          # the one formula, every tool
+```
 
 ### D17 The noun: `problem.compile(policy) -> ProblemEvaluator` (differentiable-problem.md ask 1)
 
@@ -408,12 +416,11 @@ no second spelling of the traced number.
 | the parametric program (S76) | `ParametricProgram` | keep `ParametricMathematicalProgram` | RULES 2.6, short |
 | the plant's key in every parameter tree | `"plant"` | `"system"` | the role name every tool reads (P10); `ProblemParameters.system` renames on V4's list |
 
-### D20 One scoring contract, no modes (ask 6) — confirm
+### D20 No scoring modes — ruled with D16
 
-`score_trajectory(problem, traj, *, params=None, infeasible_cost=inf)` keeps its name and
-signature and becomes the one body on `xp`; the transcriptions take the cost's discount and
-keep their own sum (byte-identical: no baseline declares a rate). No `discount=`, no
-`mode=`: a tool that wants the uncut integral scores `replace(problem, X=None)`.
+`evaluate_trajectory` is the problem's contract and nothing else; a tool that wants the uncut
+integral scores `replace(problem, X=None)`; the transcriptions take the problem's discount and
+keep their own sum (byte-identical: no baseline declares a rate).
 
 ### D21 The evaluator's numbers change once (ask 7) — confirm
 
