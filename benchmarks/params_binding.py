@@ -6,6 +6,7 @@ docs/plans/end-state-api.md): one step called from Python, one scan, a vmapped b
 parameter family, and a gradient through the rollout, for the pendulum and the cart-pole.
 """
 
+import sys
 import time
 from functools import partial
 
