@@ -293,15 +293,39 @@ compare(LQR=report_lqr, PPO=report_ppo).plot()                      # the side-b
   `cost.g_max(X, U) · tf` (or `/ ρ` on a discounted infinite horizon); no "infinity" on the
   cost.
 
-### D10 `params` always an argument; freezing is a binding (S75, ask 6)
+### D10 `params` always an argument; freezing is a binding (S75, ask 6) — **open**
 
 **Today:** every integrator exists frozen and with `params` (36 methods); a frozen evaluator
 silently ignores parameters changed after `compile()`.
 
-**Recommended:** one `_p` body per method; the parameterless name is `partial(step_p, params=sys.params)`
-then `jit`, under its current stable name (DESIGN §5's frozen subset keeps every name).
-Measured cost inside a compiled loop: 1 to 9 % (sampled-path.md §3.5); from Python step by
-step the binding gives the frozen speed back.
+**Measured 2026-10-22** (`benchmarks/params_binding.py`, the table in sampled-path.md §3.5):
+inside a scan or a `vmap` the two forms are equal; called step by step from Python the dict
+costs about 3 µs per call (10.1 vs 13.6 µs on the pendulum), all of it dispatch, and the
+bound form `jit(partial(step_p, params=sys.params))` equals the frozen call within noise.
+Only the `params` form can take a gradient through the rollout (2.2× the value's cost).
+
+**Options:** (A) keep the frozen and parametric bodies as hand-written twins: nothing moves;
+two bodies to keep in step per integrator and per knob; the silent-ignore bug stays. (B) one
+`_p` body per method, the frozen name a binding under its current stable name: half the grid,
+one place for a knob, freezing an explicit act; the first call after `sys.params` changes
+recompiles. Recommended: B. The family slowdown (S53) is untouched either way.
+
+**The maintainer's call, pending** (session 1 stopped here on 2026-10-22).
+
+### D10b The compiled problem is the traceable twin of `evaluate` (ruled 2026-10-22)
+
+`evaluate(problem, controller, …)` and `problem.compile(controller).evaluate(…)` share every
+piece but the run: one `closed_loop_of(problem, controller)` wiring the loop from the problem,
+one `problem.realize(key, n)` for the draws, one `evaluate_trajectory` for the score, one
+`feasibility_margin(problem, traj)` for the margin, one `Evaluation` record; the run is the
+`Simulator` on one side and the compiled fixed-step scan on the other. The compiled object's
+verbs are thin calls into those functions with `run="compiled"`, plus the program bridge,
+which has no ODE twin. A pinned test: `Simulator(solver="rk4_fixedsteps")` and the compiled
+scan on the same grid agree to round-off. **The loop may be passed built**: a diagram carrying
+the role `plant` (that block the problem's system) is used as is; anything else is a controller
+and wired; roles are never inferred from the wiring; the cost is scored on the `plant` role
+either way; `tune(problem, loop, wrt=["controller/observer.L"])` names leaves by the diagram's
+params paths.
 
 ---
 

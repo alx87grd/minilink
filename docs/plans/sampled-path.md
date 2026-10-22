@@ -119,22 +119,35 @@ no other integrator.
 
 ### 3.5 Why one params path
 
-Measured on the current JAX evaluator, the frozen RK4 step against the one taking `params`
-(identical results in every case):
+Measured on the current JAX evaluator (`benchmarks/params_binding.py`; 2026-10-22, CPU, JAX
+0.12, float64), the frozen RK4 step against the one taking `params`, and against the frozen
+name defined as a binding (`jit(partial(step_p, params=sys.params))`); identical results in
+every case:
 
-| Case | Frozen | `params` as argument |
-| --- | --- | --- |
-| pendulum, 1000 rollouts × 1000 steps in one compiled scan | 156 ms | 170 ms |
-| cart-pole, the same batch | 1503 ms | 1514 ms |
-| pendulum, one jitted step called from Python | 13 µs | 34 µs |
-| cart-pole, one jitted step called from Python | 24 µs | 54 µs |
+| Case | Frozen | `params` dict each call | `params` bound |
+| --- | --- | --- | --- |
+| pendulum, one jitted step called from Python | 10.1 µs | 13.6 µs | 10.0 µs |
+| cart-pole, one jitted step called from Python | 14.4 µs | 17.5 µs | 13.6 µs |
+| pendulum, 1000 RK4 steps in one scan | 2.59 ms | 2.33 ms | 2.52 ms |
+| cart-pole, the same scan | 4.55 ms | 4.52 ms | 4.42 ms |
+| pendulum, 1000 rollouts × 1000 steps, `vmap` | 139 ms | 127 ms | — |
+| cart-pole, the same batch | 1307 ms | 1307 ms | — |
+| pendulum, the same batch with one `m` per rollout (a family) | — | 673 ms | — |
+| cart-pole, the same batch with one `lcg` per rollout | — | 1276 ms | — |
+| `jax.grad` of a rollout cost w.r.t. every param (pendulum / cart-pole) | impossible | 5.5 / 10.1 ms (value 2.3 / 4.6 ms) | — |
 
-- **Inside a compiled loop there is no real difference** (1 to 9 %): RL training, batch
-  rollouts, trajectory optimization, MPPI and the differentiable tuning all run there.
-- **Step by step from Python, the argument costs about 2.5×**, all of it the per-call
-  flattening of the parameter dictionary, not arithmetic. The binding of §3.1 removes it: the
-  gym bridge, the realtime loop, the RRT extender and the hybrid ticks get the frozen speed
-  from the one body.
+- **Inside a compiled scan or `vmap` there is no difference**: RL training, batch rollouts,
+  trajectory optimization, MPPI and the differentiable tuning all run there.
+- **Step by step from Python, the dict costs about 3 µs per call**, constant whatever the
+  plant: a trivial jitted function dispatches in 5.2 µs, 7.9 µs with a dict argument. On a
+  10 to 15 µs step that is 25 to 35 %, and it matters only where a Python loop calls the step
+  one at a time (the gym bridge, the RRT extender, the realtime loop at 30 Hz). **The binding
+  removes it**: the bound form equals the frozen call within noise. (An earlier measurement on
+  another machine read 13 vs 34 µs; the ratio here is 1.3, not 2.5.)
+- **A gradient through the rollout costs about 2.2× the value**, and only the `params` form
+  can take it.
+- **The parameter family is the one real cost** (S53, a separate row): 5× on the pendulum,
+  none on the cart-pole.
 - **The grid halves.** Every integrator exists frozen and with `params` today, before the
   trace and jit tiers double it again; one `_p` body plus a binding is the trim SM-6
   delivers.

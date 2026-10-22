@@ -551,7 +551,8 @@ contract, knobs and defaults, DP on Euler through it. Still open from it:
 - **A sampled replay in `compare()` and the Monte Carlo facade** (S75, ask 4): score a law on
   the model it was trained on, as an option or as the default.
   [sampled-path.md](../plans/sampled-path.md) §6, [end-state-api.md](../plans/end-state-api.md) D9.
-- **`params` always an argument, freezing a binding** (S75, ask 6; D10).
+- **`params` always an argument, freezing a binding** (S75, ask 6; D10): measured 2026-10-22
+  (`benchmarks/params_binding.py`, sampled-path.md §3.5), the maintainer's call pending.
 
 **Blocking code now, session 2** (a week later; unblocks S31 and wave V)
 

@@ -73,3 +73,23 @@ in the plan doc it shapes.
   `infeasible_cost` on the problem is the one price of an exit (DP, RL, the evaluator), its
   default `cost.g_max(X, U) · tf` (or `/ ρ`); no "infinity" on the cost. Lives in:
   end-state-api.md D9, D16, D17; differentiable-problem.md §4.1, §4.5 to amend at step 0.
+- **R11 (D10b) The compiled problem is the traceable twin of `evaluate`.** One body with the
+  run as its one varying piece: `closed_loop_of(problem, controller)`, `problem.realize(key,
+  n)`, `evaluate_trajectory`, `feasibility_margin` and `Evaluation` are each one function;
+  `evaluate` runs the `Simulator`, `problem.compile(controller)` runs the compiled fixed-step
+  scan, and its verbs are thin calls into the same functions plus the program bridge. A
+  pinned test keeps the two runs at round-off on one grid. A built loop is accepted when it
+  carries the role `plant` (that block the problem's system); otherwise the argument is a
+  controller, wired by the problem; roles are never inferred; the cost is scored on the
+  `plant` role; `tune` names leaves by the diagram's params paths. Lives in: end-state-api.md
+  D10b; differentiable-problem.md §4.1, §4.5 to rewrite at step 0.
+- **D10 measured, not yet ruled.** `benchmarks/params_binding.py` (2026-10-22, CPU): inside a
+  scan or `vmap` the frozen and `params` forms are equal; from Python the dict costs about
+  3 µs of dispatch per call and the bound form equals the frozen call; only the `params` form
+  differentiates (2.2× the value). The table is in sampled-path.md §3.5. Session 1 stopped
+  here; D10 is the first item of the next session.
+
+## Where session 1 stands
+
+Ruled: D1–D9, D16, D17, D20 and D10b (R1–R11). Open: D10 (the maintainer's call, data in
+hand), then session 2 (D11–D15, D18, D19, D21–D24) and the v0.4 names (D25–D30).
