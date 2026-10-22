@@ -351,6 +351,21 @@ the demo sweep touches fewer files. Nothing leaves without the maintainer's ruli
   demo the shortest one that shows its feature, `examples/README.md`'s map and the demo
   checks updated. Done when no two demos show the same feature on the same plant, and the D1.2
   allowlist shrinks with it.
+- [ ] **K8 The catalog clean-up** (ruled 2026-10-22, [end-state-api.md](end-state-api.md) D2;
+  [record](../reviews/2026-10-22-rulings-session-1.md)): two import layers and support by
+  test. Steps, one commit each: **K8-1** the root prelude trimmed to the course set (the
+  plants the course notebooks and the tutorial import, at most 15; ledger line in ROADMAP §2);
+  **K8-2** `minilink.catalog` the one flat index of every supported plant, each passing the
+  both-backends contract test, with a docs entry; **K8-3** the unsupported plants the
+  maintainer names from K1's table moved to `minilink/experimental/catalog/` with their skins
+  and demos (`examples/experimental/`), their tests and docs entries removed, out of the
+  wheel **[ask — per plant]**; **K8-4** twins merged and the dead helpers deleted from K1's
+  ruling (the Mermaid exporters, `camera.py`, the pygame renderer, `ProblemEnv` /
+  `to_gymnasium`, the `identification/` stub) **[ask — per item]**; **K8-5** S64's hygiene,
+  one plant family per commit; **K8-6** the README's catalog line by domain and the API
+  site's plant page. Done when the root prelude lists at most 15 plants, `minilink.catalog`
+  lists only tested plants, no two supported plants differ by parameters alone, and
+  `test_teaching_surface.py` pins both lists.
 - [ ] **K7 What is core, what is a side feature** **[ask — core, public names]**
   (ROADMAP §6): the convergence pass; every move is a step of its own once ruled. In v0.3
   with K1–K4: K1's inventory is core-consolidation.md §3–§4, K2 and K3 are its tiers; the

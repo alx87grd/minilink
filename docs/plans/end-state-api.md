@@ -134,32 +134,53 @@ approaches are pillars, so a "keep or move" verdict has no bar.
 identification and imitation, estimation); RRT as a seventh; imitation folded into RL;
 deployment (C export) as a pillar.
 
-**Recommended:** the six, with RRT a *side pillar* kept small (the proof that the planning
-contract spans the family) and deployment experimental until a vehicle runs it. The sentence
-for CONSTITUTION §1 (an amendment the maintainer owns):
+**Ruled 2026-10-22 (yes, amended):** the six pillars are *tooling* pillars standing on two
+foundations: **modelling** is the primary foundation (the `System` and its algebra, the
+catalog plants, compile and the rollout), **optimization** the secondary one (the
+`MathematicalProgram` and the `Optimizer`, the solver boundary every pillar lowers to). RRT
+stays a side pillar kept small; deployment stays experimental until a vehicle runs it. The
+sentence for CONSTITUTION §1 (the maintainer's to place):
 
-> One differentiable path from a model to a cost, on which every approach that controls a
-> vehicle or a robot is a special case: classical and modern control, nonlinear control,
-> trajectory optimization and MPC, reinforcement learning, identification and imitation,
-> estimation.
+> One model and one differentiable path from it to a cost, solved by one optimizer; every
+> approach that controls a vehicle or a robot is a tool on that path: classical and modern
+> control, nonlinear control, trajectory optimization and MPC, reinforcement learning,
+> identification and imitation, estimation.
 
-### D2 Tier 1 as a block, with the plant rule (K7, ask 2)
+### D2 The catalog clean-up (K7, ask 2)
 
-**Today:** 50 catalog plants on the prelude, 24 used by nothing; the Mermaid exporters, a
-fourth renderer, `ProblemEnv` / `to_gymnasium` and the `identification/` stub with no caller.
+**Today:** 50 catalog plants on the root prelude beside 110 other names, 24 used by nothing;
+three import layers (prelude, `minilink.catalog`, the defining module); the Mermaid exporters,
+a fourth renderer, `ProblemEnv` / `to_gymnasium` and the `identification/` stub with no caller.
 
-**Options:** tier 1 as one ruling; item by item.
+**Ruled 2026-10-22:** a plant is a leaf, so the choice is managed at the import surface and
+by support, not by architecture.
 
-**Recommended:** as a block, under one rule written into RULES 2.6's neighbourhood: *a plant
-stays on the surface when it is a vehicle, a robot, or a benchmark a course uses*. One move
-reads:
+- **Two import layers.** The root prelude carries the course set (about 15 plants: what the
+  course notebooks and the tutorial import; K1 counts it). `minilink.catalog` is the one full
+  index of every *supported* plant, flat. The defining module stays valid as Python does, but
+  is not a documented layer; no domain sub-modules.
+- **Supported means tested.** Every plant in `minilink.catalog` runs the both-backends
+  contract test and has a docs entry; that is the price of entry and of staying.
+- **Unsupported plants move to `minilink/experimental/catalog/`**, untested, off the docs
+  site, out of the wheel, free to be abandoned later. The maintainer rules the list item by
+  item from K1's table; the candidates are core-consolidation.md §6.1's first row. The rule for
+  the line: a plant stays supported when it is a vehicle, a robot, or a benchmark a course or
+  a tutorial chapter uses, or the maintainer names it as one to keep.
+- **Twins merge, dead helpers go**: `SimpleIntegrator`, `TwoIndependentPendulums` and
+  parameter-only drone variants are candidates (K1 lists them); the Mermaid exporters,
+  `camera.py`, the pygame renderer, `ProblemEnv` / `to_gymnasium` and the `identification/`
+  stub are deleted.
+- **S64's hygiene rides along**, one plant family per commit.
 
 ```python
-# before                                   # after
-from minilink import Plane3D               from minilink.experimental.catalog.aerial import Plane3D
+from minilink import Pendulum                              # the course set
+from minilink.catalog import DynamicBicycleCar3D           # every supported plant, one flat index
+from minilink.experimental.catalog import Plane3D          # unsupported: no test, no promise
 ```
 
-The deleted helpers leave no name behind; the ledger line in ROADMAP §2 lists them.
+Steps: the K8 row of TODO §4. Done when the root prelude lists at most 15 plants,
+`minilink.catalog` lists only tested plants, no two supported plants differ by parameters
+alone, and the README names the catalog by domain, not by class.
 
 ### D3 `experimental/engines/` (K7, ask 3)
 
