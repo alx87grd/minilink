@@ -259,20 +259,39 @@ value-iteration lesson's numbers hold); `DynamicProgrammingPlanner(problem, dt=,
 as an option from day one; whether the default flips is V3's question, decided with the course
 notebooks pinned on a release.
 
-### D9 A sampled replay in `compare()` and the Monte Carlo facade (S75, ask 4)
+### D9 One evaluator family; the ODE solver is the judge (S75 ask 4, and D17 revisited)
 
-**Today:** every law is replayed by the continuous `Simulator` (adaptive RK45), so a law
-trained on Euler at `dt = 0.05` is scored on a fourth discretization.
+**Today:** `compare()` replays each law with the adaptive `Simulator`; `MonteCarloEvaluator`
+runs a held static law in a hand scan on three backends; the differentiable-problem plan made
+the compiled fixed-step run the evaluator and the Monte Carlo class a facade on it.
 
-**Recommended:** an option, default unchanged:
+**Ruled 2026-10-22:** one verb, one record, one judge.
 
 ```python
-compare(VI=sol_dp, LQR=sol_lqr, PPO=sol_rl)                      # the continuous replay, as today
-compare(VI=sol_dp, LQR=sol_lqr, PPO=sol_rl, replay=discretize(plant, 0.05))   # scored on the training model
+report = evaluate(problem, controller)                              # one run from x_start, the true ODE solver
+report = evaluate(noisy_problem, controller, n_trials=200, key=0)   # Monte Carlo over the draws, same solver
+report.J, report.mean, report.worst, report.failure_rate, report.trajectories
+compare(LQR=report_lqr, PPO=report_ppo).plot()                      # the side-by-side figure: a plot of Evaluations
 ```
 
-The comparison lessons keep their numbers; a lesson that wants "the model it was trained on"
-says so in one keyword.
+- `evaluate` runs the closed loop as a diagram with the adaptive ODE solver, deterministic or
+  Monte Carlo alike, and scores with `evaluate_trajectory`; what is reported is always what
+  the plant really does. On NumPy the trials are a loop; on JAX they batch when the solver is
+  fixed-step.
+- The fixed-step compiled run (`problem.compile(controller)`, the `ProblemEvaluator`) is the
+  **engine under `tune`** and the researcher's `jax.grad`, never the reported number: `tune`
+  differentiates through it, then reports the tuned controller through `evaluate`.
+- `MonteCarloEvaluator` the class folds into `evaluate(..., n_trials=)`; `Planner.evaluate`
+  and `solve(evaluate=True)` call the same verb. Its numbers change once (the held static law
+  becomes the real loop), in v0.4 with the draws.
+- **Continuous first.** In v0.3 `evaluate` and `tune` take continuous controllers; a sampled
+  controller (anything built by `%`) is refused with a message. Its face lands in v0.4 with the
+  sampled loop (step 7b): the law held per period, the plant between samples still integrated
+  by the judge. No sampled replay option before then.
+- Infeasibility price: `PlanningProblem.infeasible_cost`, one owner for DP's out-of-bound
+  cost, the RL failure price and the evaluator's exit price; its default derived as
+  `cost.g_max(X, U) · tf` (or `/ ρ` on a discounted infinite horizon); no "infinity" on the
+  cost.
 
 ### D10 `params` always an argument; freezing is a binding (S75, ask 6)
 
@@ -374,22 +393,12 @@ problem = PlanningProblem(plant, cost=QuadraticCost(Q, R, S), X=box, tf=10.0, di
 J = evaluate_trajectory(problem, traj)          # the one formula, every tool
 ```
 
-### D17 The noun: `problem.compile(policy) -> ProblemEvaluator` (differentiable-problem.md ask 1)
+### D17 The noun: `problem.compile(policy) -> ProblemEvaluator`, an engine (ask 1)
 
-**Today:** `MonteCarloEvaluator(problem, dt=, n_trials=)` is a verb pretending to be a noun:
-it composes `policy @ plant` again at every call, recompiles, refuses controllers with state
-and scores with an inline copy of the rule.
-
-**Options:** a new noun returned by `compile` (five designs of seven); verbs added to the
-existing facade (two).
-
-**Recommended:** the new noun, by the `System.compile() -> Evaluator` precedent; the facade
-stays as the thin object that holds `dt` and a test set so tutorial 11 keeps its lines:
-
-```python
-ev = problem.compile(ctl, dt=0.05)                 # one compiled object per (problem, policy)
-MonteCarloEvaluator(problem, dt=0.05, n_trials=200).evaluate(ctl)   # == problem.compile(ctl, dt=0.05).evaluate(key, 200)
-```
+**Ruled with D9 (2026-10-22):** the compiled problem exists as the engine under `tune` and
+the researcher's direct `jax.grad`; it is not the user-facing evaluator, which is the verb
+`evaluate` on the ODE solver. Its noun and verbs are named in step 0 (D19) and sit on the
+planning facade as provisional names.
 
 ### D18 `Evaluation`: a NumPy report plus a traced `value` verb (ask 2)
 

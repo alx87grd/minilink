@@ -63,3 +63,13 @@ in the plan doc it shapes.
   `h` warns once. `discount_rate` moves from `CostFunction` to `PlanningProblem` (one ledger
   line; RL's γ and DP read it there). No scoring modes. Lives in: end-state-api.md D16, D20;
   differentiable-problem.md §4.3; cost-params.md.
+- **R10 (D9, D17) One evaluator family; the ODE solver is the judge.** `evaluate(problem,
+  controller, *, n_trials=, key=)` is the one verb (deterministic: one run; Monte Carlo: the
+  draws), `Evaluation` its record, `compare` a plot of Evaluations; `MonteCarloEvaluator` folds
+  into it. The adaptive ODE solver produces every reported trajectory; the fixed-step compiled
+  run (`problem.compile`, `ProblemEvaluator`) is the engine under `tune` and the researcher's
+  `jax.grad`, never the reported number. Continuous controllers first: a sampled controller is
+  refused in v0.3 and runs in v0.4 with the sampled loop; no sampled replay before then.
+  `infeasible_cost` on the problem is the one price of an exit (DP, RL, the evaluator), its
+  default `cost.g_max(X, U) · tf` (or `/ ρ`); no "infinity" on the cost. Lives in:
+  end-state-api.md D9, D16, D17; differentiable-problem.md §4.1, §4.5 to amend at step 0.
