@@ -430,3 +430,9 @@ split when it starts; this section marks the reversals).
   `Boat2DWithCurrent`, `ThreeBodyProblem`, `Lorenz`, `VanderPol`. To the experimental tier (research
   tests): `TwoIndependentPendulums`, `ConstantSpeedHelicopterTunnel`, `Drone2DWithSideThruster`,
   `Plane3D` with its 3-D skin and airframe (`OneLinkManipulator` already, R56).
+- **R59 (2026-10-23, K8) The mass family on the root; the rest of the plants placed.** `SingleMass`,
+  `TwoMass`, `ThreeMass` are on the root prelude (many lessons use one, two and three masses); the
+  floating variants merge into them (`FloatingSingleMass` is `SingleMass` with `k1 = 0`, and so on:
+  one class per chain, the floating case a parameter value). `TripleIntegrator` and `QuarterCar` stay
+  on `minilink.catalog`. `SpeedControlledDrone2D` is deleted (`HolonomicMobileRobot` has the same
+  `ẋ = u`). The root then holds 16 plants, one over R2's cap of 15 (to settle, R59's note below).
