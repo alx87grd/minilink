@@ -116,7 +116,7 @@ class TestSymbolicMechanics(unittest.TestCase):
     @pytest.mark.jax
     @unittest.skipUnless(HAS_SYMPY and HAS_JAX, "sympy and jax required")
     def test_to_minilink_jax_returns_jax_mechanical_system(self):
-        from minilink.dynamics.abstraction.mechanical import JaxMechanicalSystem
+        from minilink.dynamics.abstraction.mechanical import MechanicalSystem
 
         m = MechanicalModel("Pendulum")
         g_sym, mass, length = m.parameters("g m l")
@@ -129,7 +129,7 @@ class TestSymbolicMechanics(unittest.TestCase):
         m._setup_velocities()
         sys = derive_lagrange(m, simplify=True)
         num = sys.to_minilink({g_sym: 9.81, mass: 1.0, length: 0.5}, backend="jax")
-        self.assertIsInstance(num, JaxMechanicalSystem)
+        self.assertIsInstance(num, MechanicalSystem)
 
 
 if __name__ == "__main__":

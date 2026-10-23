@@ -127,27 +127,6 @@ class TestMechanicalSystem(unittest.TestCase):
         )
 
 
-class TestJaxMechanicalInheritance(unittest.TestCase):
-    def test_jax_mechanical_subclasses_numpy_mechanical(self):
-        from minilink.dynamics.abstraction.mechanical import (
-            JaxMechanicalSystem,
-            MechanicalSystem,
-        )
-
-        self.assertTrue(issubclass(JaxMechanicalSystem, MechanicalSystem))
-
-    def test_jax_mechanical_init_matches_numpy_layout(self):
-        from minilink.dynamics.abstraction.mechanical import (
-            JaxMechanicalSystem,
-            MechanicalSystem,
-        )
-
-        a = MechanicalSystem(dof=3, actuators=2)
-        b = JaxMechanicalSystem(dof=3, actuators=2)
-        self.assertEqual((a.n, a.m, a.p), (b.n, b.m, b.p))
-        self.assertEqual(a.state.labels, b.state.labels)
-
-
 from minilink.dynamics.abstraction.generalized_mechanical import (
     GeneralizedMechanicalSystem,
 )
@@ -272,10 +251,7 @@ class TestGeneralizedMechanicalSystem(unittest.TestCase):
 
 
 from minilink.core.backends import configure_jax
-from minilink.dynamics.abstraction.mechanical import (
-    JaxMechanicalSystem,
-    MechanicalSystem,
-)
+from minilink.dynamics.abstraction.mechanical import MechanicalSystem
 
 
 @pytest.mark.optional
@@ -287,14 +263,14 @@ class TestMechanicalSystemJax(unittest.TestCase):
     def test_f_is_jaxpr_traceable(self):
         jax = pytest.importorskip("jax")
         jnp = pytest.importorskip("jax.numpy")
-        sys = JaxMechanicalSystem(dof=2)
+        sys = MechanicalSystem(dof=2)
         x = jnp.zeros(4)
         u = jnp.zeros(2)
         jax.make_jaxpr(lambda xx, uu: sys.f(xx, uu))(x, u)
 
     def test_f_matches_numpy_1dof_linear_regime(self):
         jnp = pytest.importorskip("jax.numpy")
-        sys_j = JaxMechanicalSystem(dof=1)
+        sys_j = MechanicalSystem(dof=1)
         sys_n = MechanicalSystem(dof=1)
         x = jnp.array([0.2, -0.1])
         u = jnp.zeros(1)
@@ -334,7 +310,7 @@ class TestMechanicalSystemJax(unittest.TestCase):
             def d(self, q, dq, u=None, t=0.0, params=None):
                 return 0.05 * np.asarray(dq)
 
-        class _JaxTwoLink(JaxMechanicalSystem):
+        class _JaxTwoLink(MechanicalSystem):
             def H(self, q, params=None):
                 m1, m2, l = (1.5, 0.7, 0.4)
                 c2 = jnp.cos(q[1])
@@ -372,7 +348,7 @@ class TestMechanicalSystemJax(unittest.TestCase):
     def test_f_uses_explicit_params_in_matrix_hooks(self):
         jnp = pytest.importorskip("jax.numpy")
 
-        class MassSystem(JaxMechanicalSystem):
+        class MassSystem(MechanicalSystem):
             def __init__(self):
                 super().__init__(dof=1)
                 self.params = {"mass": 2.0}

@@ -149,6 +149,13 @@ TEACHING_SURFACE: dict[str, tuple[str, ...]] = {
         "KinodynamicExtender",
         "SteeringExtender",
     ),
+    "minilink.dynamics": (
+        "MechanicalSystem",
+        "GeneralizedMechanicalSystem",
+        "Manipulator",
+        "StateSpaceSystem",
+        "LTISystem",
+    ),
     "minilink.learning": (
         "ReinforcementLearningPlanner",
         "TabularLearningPlanner",
