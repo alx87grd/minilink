@@ -140,7 +140,7 @@ def gym_entries(out):
         plant.x0 = X0.copy()
         cost = QuadraticCost.from_system(plant)
         env = Sys2Gym(
-            plant, cost, dt=DT, tf=10.0, integrator=integrator, reset_mode="nominal"
+            plant, cost, dt=DT, tf=10.0, solver=integrator, reset_mode="nominal"
         )
         env.reset(seed=0)
         rows = []

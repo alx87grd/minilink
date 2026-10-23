@@ -51,7 +51,7 @@ def test_q_learning_approaches_value_iteration_on_the_same_grid():
 
     # The same grid, Euler step and exit price; the learner samples what value iteration sweeps
     learner = TabularLearningPlanner(
-        problem, alpha=0.9, eta=0.1, integrator="euler", seed=0, **GRID
+        problem, alpha=0.9, eta=0.1, solver="euler", seed=0, **GRID
     )
     solution = learner.solve(episodes=2000)
     assert isinstance(solution, PlanningSolution) and solution.success
@@ -78,13 +78,13 @@ def test_nearest_rounding_aliases_a_coarse_grid():
     # From a node with a small speed, one Euler step rounds back to the same node
     problem = double_integrator_problem()
     nearest = TabularLearningPlanner(
-        problem, rounding="nearest", integrator="euler", seed=0, **GRID
+        problem, rounding="nearest", solver="euler", seed=0, **GRID
     )
     x = nearest.grid.states[nearest.node(np.array([0.9, 0.5]))]
     x_next = x + problem.sys.f(x, np.array([0.0])) * GRID["dt"]
     assert nearest.node(x_next) == nearest.node(x)
     # stochastic rounding moves on with the probability of the fractional position
-    stochastic = TabularLearningPlanner(problem, integrator="euler", seed=0, **GRID)
+    stochastic = TabularLearningPlanner(problem, solver="euler", seed=0, **GRID)
     nodes = {stochastic.node(x_next) for _ in range(200)}
     assert len(nodes) == 2
     with pytest.raises(ValueError):

@@ -86,7 +86,7 @@ class TestSys2Gym(unittest.TestCase):
         self.assertAlmostEqual(r, expected)
 
     def test_euler_option_reproduces_the_explicit_formula(self):
-        env = self.make_env(reset_mode="determinist", integrator="euler")
+        env = self.make_env(reset_mode="determinist", solver="euler")
         env.reset()
         x, t = env.x.copy(), env.t
         u = np.array([0.0])
@@ -96,7 +96,7 @@ class TestSys2Gym(unittest.TestCase):
 
     def test_default_step_is_rk4_on_the_compiled_plant(self):
         env = self.make_env(reset_mode="determinist", compile_backend="numpy")
-        self.assertEqual(env.integrator, "rk4")
+        self.assertEqual(env.solver, "rk4")
         self.assertEqual(env.compile_backend, "numpy")
         env.reset()
         x, t, dt = env.x.copy(), env.t, env.dt
@@ -121,7 +121,7 @@ class TestSys2Gym(unittest.TestCase):
                 dt=1e-3,
                 tf=1.0,
                 reset_mode="determinist",
-                integrator=name,
+                solver=name,
                 compile_backend="numpy",
             )
             for name in ("rk4", "euler")
@@ -136,9 +136,9 @@ class TestSys2Gym(unittest.TestCase):
         np.testing.assert_allclose(envs[0].x, envs[1].x, atol=1e-4)
         self.assertGreater(np.abs(envs[0].x - envs[1].x).max(), 0.0)
 
-    def test_unknown_integrator_is_rejected(self):
+    def test_unknown_solver_is_rejected(self):
         with self.assertRaises(ValueError):
-            self.make_env(integrator="rk45")
+            self.make_env(solver="rk45")
 
     def test_truncates_on_horizon(self):
         env = self.make_env(reset_mode="determinist")

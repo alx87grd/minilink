@@ -19,6 +19,7 @@ import gymnasium as gym
 import numpy as np
 from gymnasium import spaces
 
+from minilink.core.compile.evaluators.stepping import require_step_knobs
 from minilink.core.sets import BoxInputSet
 from minilink.core.system import System
 
@@ -65,9 +66,10 @@ class Sys2Gym(gym.Env):
         spread set by hand); :meth:`reset` raises ``ValueError`` otherwise.
     render_mode : None or "human"
         ``"human"`` renders the system with the matplotlib animator.
-    integrator : {"rk4", "euler"}
-        Integration scheme of one env step on the compiled plant. ``"euler"``
-        reproduces ``x + f(x, u, t) * dt`` exactly (the historical path).
+    solver : {"rk4", "euler"}
+        Integration scheme of the step model on the compiled plant.
+    substeps : int
+        Integration steps per env step, the action held over them.
     compile_backend : {None, "numpy", "jax"}
         Evaluator used for the step. ``None`` picks JAX when it is installed
         and the plant traces (one jitted step per env step), NumPy otherwise;
@@ -102,7 +104,8 @@ class Sys2Gym(gym.Env):
         t0=0.0,
         render_mode=None,
         reset_mode="uniform",
-        integrator="rk4",
+        solver="rk4",
+        substeps=1,
         compile_backend=None,
     ):
         self.sys = sys
@@ -111,12 +114,11 @@ class Sys2Gym(gym.Env):
         self.t0 = t0
         self.tf = tf  # for truncation of episodes
 
-        # One compiled step for the whole training run (RK4 by default; a
-        # single jitted call per env step when the plant traces under JAX)
-        self.integrator = integrator
-        self.compile_backend, self.evaluator, self._step_fn = _compiled_step(
-            sys, integrator, compile_backend
-        )
+        # The step model of one env step, compiled once for the whole run
+        require_step_knobs(solver, substeps)
+        self.solver = solver
+        self.substeps = int(substeps)
+        self.compile_backend, self.evaluator = _compiled_step(sys, compile_backend)
 
         # Boundaries
         self.x_lb, self.x_ub = _state_bounds(sys)
@@ -216,8 +218,13 @@ class Sys2Gym(gym.Env):
         # State and time at the beginning of the step
         x, t, dt = self.x, self.t, self.dt
 
-        # One integration step on the compiled plant, action held (ZOH)
-        x_new = np.asarray(self._step_fn(x, u, t, dt), dtype=float)
+        # One step of the plant's step model, the action held
+        x_new = np.asarray(
+            self.evaluator.jit.step(
+                x, u, t, dt=dt, solver=self.solver, substeps=self.substeps
+            ),
+            dtype=float,
+        )
         t_new = t + dt
 
         if self.clipping_states:
@@ -383,15 +390,13 @@ class ProblemEnv(Sys2Gym):
         return y, r, terminated, truncated, info
 
 
-def _compiled_step(sys, integrator, compile_backend):
-    """Return ``(backend, evaluator, step)`` with ``step(x, u, t, dt) -> x_next``.
+def _compiled_step(sys, compile_backend):
+    """Return ``(backend, evaluator)``; the env steps through ``evaluator.jit.step``.
 
     ``compile_backend=None`` tries JAX when it is installed and falls back to
     NumPy for plants that do not trace (catalog plants written with NumPy
-    branches). Under JAX the whole RK4 / Euler step is one jitted call.
+    branches). Under JAX the whole step is one jitted call.
     """
-    if integrator not in ("rk4", "euler"):
-        raise ValueError(f"integrator must be 'rk4' or 'euler', got {integrator!r}")
     if compile_backend is None:
         from minilink.core.compile.compiler import compile_auto
 
@@ -400,18 +405,7 @@ def _compiled_step(sys, integrator, compile_backend):
         backend = compile_backend
         evaluator = sys.compile(backend=backend, verbose=False)
 
-    if backend == "jax":
-        import jax
-
-        trace = (
-            evaluator.rk4_step_trace
-            if integrator == "rk4"
-            else evaluator.euler_step_trace
-        )
-        step = jax.jit(trace)
-    else:
-        step = evaluator.rk4_step if integrator == "rk4" else evaluator.euler_step
-    return backend, evaluator, step
+    return backend, evaluator
 
 
 def _require_finite_start(sys, reset_mode, *spread):

@@ -755,3 +755,25 @@ def test_cost_to_go_comes_from_the_critic_only_when_the_discounts_match():
         verbose=0,
     )
     assert other.solve(timesteps=64).cost_to_go is None
+
+
+def test_the_planner_trains_on_a_substepped_step_model():
+    """Two RK4 substeps per control period: the environment's step is the step model's."""
+    planner = ReinforcementLearningPlanner(
+        problem(tf=np.inf),
+        dt=0.1,
+        substeps=2,
+        hidden=(8, 8),
+        n_envs=4,
+        n_steps=8,
+        batch_size=32,
+        verbose=False,
+    )
+    solution = planner.solve(timesteps=32)
+    env = planner.env
+    x, u = np.array([0.3, 0.0]), np.array([0.5])
+    expected = env.evaluator.step(x, u, 0.0, dt=0.1, substeps=2)
+    np.testing.assert_allclose(
+        np.asarray(env.plant_step(x, u, 0.0)), np.asarray(expected)
+    )
+    assert solution.policy is not None

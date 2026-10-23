@@ -207,7 +207,7 @@ def test_grid_policies_roll_out_as_held_input_closed_loops(make):
         solution = planner.solve(evaluate=True)
     else:
         planner = TabularLearningPlanner(
-            problem, alpha=0.9, integrator="euler", seed=0, **grid
+            problem, alpha=0.9, solver="euler", seed=0, **grid
         )
         solution = planner.solve(episodes=300, evaluate=True)
     assert not solution.open_loop and solution.evaluation.n_trials == 1

@@ -6,6 +6,7 @@ import numpy as np
 from scipy.stats import qmc
 
 from minilink.core.backends import BACKEND_JAX, BACKEND_NUMPY, array_module
+from minilink.core.compile.evaluators.stepping import require_step_knobs
 from minilink.core.feedback import command_port
 from minilink.core.sets import is_finite_box
 from minilink.planning.problems import as_stochastic, merge_params
@@ -41,8 +42,10 @@ class RolloutEnvironment:
     episode_length : float, optional
         Episode duration for an infinite-horizon problem (default 10 s);
         ignored for a finite horizon, whose episodes end at ``problem.tf``.
-    integrator : {"rk4", "euler"}
-        Integration scheme of one step.
+    solver : {"rk4", "euler"}
+        Integration scheme of the step model.
+    substeps : int
+        Integration steps per control period, the action held over them.
     backend : {"jax", "numpy"}
         Arrays the step functions run on.
     training_zone : Set, optional
@@ -56,7 +59,8 @@ class RolloutEnvironment:
         *,
         dt=0.05,
         episode_length=None,
-        integrator="rk4",
+        solver="rk4",
+        substeps=1,
         backend="jax",
         training_zone=None,
     ):
@@ -79,9 +83,12 @@ class RolloutEnvironment:
         require_episode_steps(self.n_steps_per_episode, self.tf, self.dt)
         self.discount_rate = float(self.cost.discount_rate)
 
-        # Plant: one integration step, on nominal or on drawn parameters
+        # Plant: the step model of one control period, on nominal or drawn parameters
+        require_rollout_backend(backend)
+        require_step_knobs(solver, substeps)
         self.evaluator = self.sys.compile(backend=backend, verbose=False)
-        self.step_plant, self.step_plant_p = self.integration_step(integrator, backend)
+        self.solver = solver
+        self.substeps = int(substeps)
 
         # Randomized plant parameters: the episode carries its own draw
         self.params_distribution = dict(problem.params_distribution)
@@ -178,11 +185,12 @@ class RolloutEnvironment:
         return x_next, t_next, reward, terminated, truncated
 
     def plant_step(self, x, u_full, t, params=None):
-        """One integration step of the plant, on the nominal or the episode's parameters."""
-        if not params:
-            return self.step_plant(x, u_full, t, self.dt)
+        """One control period of the plant, on the nominal or the episode's parameters."""
+        p = self.full_params(params) if params else None
 
-        return self.step_plant_p(x, u_full, t, self.dt, self.full_params(params))
+        return self.evaluator.step(
+            x, u_full, t, p, dt=self.dt, solver=self.solver, substeps=self.substeps
+        )
 
     def input_vector(self, u, key):
         """
@@ -238,29 +246,6 @@ class RolloutEnvironment:
     ###########################################################################
     # Internal machinery
     ###########################################################################
-
-    def integration_step(self, integrator, backend):
-        """The compiled one-step integrator, without and with a params argument."""
-        ev = self.evaluator
-
-        # The evaluator's steps on the chosen backend
-        if backend == BACKEND_JAX:
-            steps = {
-                "rk4": (ev.rk4_step_trace, ev.rk4_step_trace_p),
-                "euler": (ev.euler_step_trace, ev.euler_step_trace_p),
-            }
-        elif backend == BACKEND_NUMPY:
-            steps = {
-                "rk4": (ev.rk4_step, ev.rk4_step_p),
-                "euler": (ev.euler_step, ev.euler_step_p),
-            }
-        else:
-            raise ValueError(f"backend must be 'jax' or 'numpy', got {backend!r}")
-
-        if integrator not in steps:
-            raise ValueError(f"integrator must be 'rk4' or 'euler', got {integrator!r}")
-
-        return steps[integrator]
 
     def nominal_port_values(self):
         """The nominal value of each input port, in port order."""
@@ -390,3 +375,9 @@ def warn_inert_noise(sys, disturbances):
             "sees the same noise signal",
             stacklevel=3,
         )
+
+
+def require_rollout_backend(backend):
+    """Refuse an array backend other than ``"jax"`` and ``"numpy"``."""
+    if backend not in (BACKEND_JAX, BACKEND_NUMPY):
+        raise ValueError(f"backend must be 'jax' or 'numpy', got {backend!r}")

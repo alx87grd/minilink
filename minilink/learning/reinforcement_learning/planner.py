@@ -138,7 +138,8 @@ class ReinforcementLearningPlanner(Planner):
         episode_length=None,
         gamma=None,
         log_std_init=0.0,
-        integrator="rk4",
+        solver="rk4",
+        substeps=1,
         training_zone=None,
         seed=0,
         verbose=True,
@@ -164,7 +165,8 @@ class ReinforcementLearningPlanner(Planner):
             problem,
             dt=dt,
             episode_length=episode_length,
-            integrator=integrator,
+            solver=solver,
+            substeps=substeps,
             training_zone=training_zone,
         )
         self.require_expectation_criterion()
