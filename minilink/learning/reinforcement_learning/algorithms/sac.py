@@ -2,7 +2,7 @@
 
 from minilink.core.backends import require_jax, require_jax_numpy
 from minilink.learning.reinforcement_learning.algorithms.base import Algorithm
-from minilink.learning.reinforcement_learning.optim import Adam
+from minilink.optimization.optimizers.first_order import Adam
 
 ###############################################################################
 # Public API

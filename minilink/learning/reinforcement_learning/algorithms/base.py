@@ -2,7 +2,7 @@
 
 from abc import ABC, abstractmethod
 
-from minilink.learning.reinforcement_learning.optim import Adam
+from minilink.optimization.optimizers.first_order import Adam
 
 ###############################################################################
 # Public API

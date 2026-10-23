@@ -26,6 +26,12 @@ OptimizationProgressCallback = Callable[[np.ndarray, float, float], None]
 
 # User-facing optimizer methods mapped to (backend_key, default_constructor_kwargs).
 _USER_OPTIMIZER_METHODS: dict[str, tuple[str, dict]] = {
+    "gd": ("first_order", {"algorithm": "gd", "options": {}}),
+    "adam": ("first_order", {"algorithm": "adam", "options": {}}),
+    "l-bfgs": (
+        "scipy_minimize",
+        {"scipy_method": "L-BFGS-B", "options": {}},
+    ),
     "scipy_slsqp": (
         "scipy_minimize",
         {"scipy_method": "SLSQP", "options": {"disp": False}},
@@ -35,6 +41,28 @@ _USER_OPTIMIZER_METHODS: dict[str, tuple[str, dict]] = {
         {"scipy_method": "trust-constr", "options": {}},
     ),
     "ipopt": ("ipopt", {"options": {}, "tol": 1e-8}),
+}
+
+# The program's class, read from its fields, and the methods each class admits
+# ("auto" picks the first).
+PROGRAM_CLASSES: dict[str, tuple[str, ...]] = {
+    "unconstrained": (
+        "l-bfgs",
+        "gd",
+        "adam",
+        "scipy_slsqp",
+        "scipy_trust_constr",
+        "ipopt",
+    ),
+    "bounded": (
+        "l-bfgs",
+        "gd",
+        "adam",
+        "scipy_slsqp",
+        "scipy_trust_constr",
+        "ipopt",
+    ),
+    "constrained": ("scipy_slsqp", "scipy_trust_constr", "ipopt"),
 }
 
 
@@ -62,11 +90,16 @@ class Optimizer:
     ----------
     program : MathematicalProgram
         Pure NLP description to compile and solve.
-    z0 : array_like
-        Default initial decision vector for :meth:`solve`.
+    z0 : array_like, optional
+        Default initial decision vector for :meth:`solve`; unset, the program's
+        own start (``program.metadata["z0"]``, set by an exported program).
     method : str, optional
-        Optimizer method preset. One of ``"scipy_slsqp"``,
-        ``"scipy_trust_constr"``, or ``"ipopt"``.
+        Optimizer method preset, named by algorithm: ``"gd"`` and ``"adam"``
+        (first-order, projected on the box), ``"l-bfgs"``, ``"scipy_slsqp"``,
+        ``"scipy_trust_constr"``, ``"ipopt"``; or ``"auto"``, the default of the
+        program's class (see :func:`program_class`): L-BFGS for an unconstrained
+        or box-bounded program, SLSQP for a constrained one. A method the class
+        does not admit is refused (``gd`` on a program with constraint rows).
     compile_backend : str, optional
         Mathematical-program evaluator backend, ``"numpy"`` or ``"jax"``.
         Defaults to ``program.backend`` (the native backend of the program's
@@ -84,7 +117,7 @@ class Optimizer:
     def __init__(
         self,
         program: MathematicalProgram,
-        z0,
+        z0=None,
         *,
         method: str = "scipy_slsqp",
         compile_backend: str | None = None,
@@ -92,11 +125,12 @@ class Optimizer:
         options: dict | None = None,
         **method_kwargs,
     ):
-        require_method(method)
+        # The method: the class default for "auto", refused when the class does not admit it
+        method = method_for(program, method)
 
         # The program, compiled once at the default start
         self.program = program
-        self.z0 = self.decision_vector(z0, program.n_z)
+        self.z0 = self.decision_vector(start_of(program, z0), program.n_z)
         self.method = method
         self.compile_backend = (
             program.backend if compile_backend is None else compile_backend
@@ -215,6 +249,14 @@ class Optimizer:
 
             return IpoptOptimizer(**kwargs)
 
+        if backend_key == "first_order":
+            # Lazy import: the first-order loop loads on first use
+            from minilink.optimization.optimizers.first_order import (
+                FirstOrderOptimizer,
+            )
+
+            return FirstOrderOptimizer(**kwargs)
+
         raise ValueError(f"Unknown optimizer backend key {backend_key!r}.")
 
     def print_solve_preamble(self, z0: np.ndarray) -> None:
@@ -250,10 +292,51 @@ class Optimizer:
 ###############################################################################
 
 
+def program_class(program) -> str:
+    """The program's class from its fields: ``"constrained"`` (rows ``g`` or ``h``), ``"bounded"`` (a finite box face) or ``"unconstrained"``."""
+    if program.g is not None or program.h is not None:
+        return "constrained"
+
+    faces = [side for side in (program.lower, program.upper) if side is not None]
+    if any(np.any(np.isfinite(side)) for side in faces):
+        return "bounded"
+
+    return "unconstrained"
+
+
+def method_for(program, method):
+    """The preset to run: the class default for ``"auto"``; refuse one the class does not admit."""
+    require_method(method)
+    kind = program_class(program)
+    admitted = PROGRAM_CLASSES[kind]
+
+    if method == "auto":
+        return admitted[0]
+    if method not in admitted:
+        raise ValueError(
+            f"method {method!r} does not take a {kind} program; it admits "
+            f"{', '.join(admitted)} (or method='auto')"
+        )
+
+    return method
+
+
+def start_of(program, z0):
+    """The default start: ``z0`` given, else the program's own (``metadata["z0"]``)."""
+    if z0 is not None:
+        return z0
+    if "z0" in program.metadata:
+        return program.metadata["z0"]
+
+    raise ValueError(
+        "Optimizer needs z0: this program carries no start (metadata['z0'])"
+    )
+
+
 def require_method(method):
     """Refuse a method that names no preset."""
-    if method not in _USER_OPTIMIZER_METHODS:
-        valid = ", ".join(sorted(_USER_OPTIMIZER_METHODS))
+    if method != "auto" and method not in _USER_OPTIMIZER_METHODS:
+        valid = ", ".join(["auto", *sorted(_USER_OPTIMIZER_METHODS)])
         raise ValueError(
             f"Unknown optimizer method {method!r}. Expected one of: {valid}."
         )

@@ -447,3 +447,102 @@ def test_ipopt_solve_callback_not_supported():
 
     with pytest.raises(NotImplementedError, match="does not support solve\\(callback"):
         opt.solve(callback=_cb)
+
+
+# --- the method table: the program's class, "auto", and the first-order backend ---
+
+
+def quadratic_program(**fields):
+    from minilink.optimization.mathematical_program import MathematicalProgram
+
+    target = np.array([1.0, -2.0])
+    return MathematicalProgram(
+        n_z=2,
+        J=lambda z: (z - target) @ (z - target),
+        grad_J=lambda z: 2.0 * (z - target),
+        **fields,
+    )
+
+
+def test_the_program_class_is_read_from_its_fields():
+    from minilink.optimization.optimizer import program_class
+
+    assert program_class(quadratic_program()) == "unconstrained"
+    assert program_class(quadratic_program(lower=[0.0, -np.inf])) == "bounded"
+    assert program_class(quadratic_program(lower=[-np.inf] * 2)) == "unconstrained"
+    assert program_class(quadratic_program(g=lambda z: z)) == "constrained"
+
+
+def test_auto_picks_by_class_and_a_method_the_class_refuses_is_refused():
+    from minilink.optimization.optimizer import Optimizer
+
+    assert (
+        Optimizer(quadratic_program(), z0=np.zeros(2), method="auto").method == "l-bfgs"
+    )
+    constrained = quadratic_program(g=lambda z: z)
+    assert Optimizer(constrained, z0=np.zeros(2), method="auto").method == "scipy_slsqp"
+    with pytest.raises(ValueError, match="constrained"):
+        Optimizer(constrained, z0=np.zeros(2), method="gd")
+    with pytest.raises(ValueError, match="Unknown optimizer method"):
+        Optimizer(quadratic_program(), z0=np.zeros(2), method="newton")
+
+
+@pytest.mark.parametrize(
+    "method", ["gd", "l-bfgs", pytest.param("adam", marks=pytest.mark.jax)]
+)
+def test_each_method_reaches_the_minimum(method):
+    from minilink.optimization.optimizer import Optimizer
+
+    options = (
+        {"learning_rate": 0.1, "maxiter": 2000} if method in ("gd", "adam") else {}
+    )
+    result = Optimizer(
+        quadratic_program(), z0=np.zeros(2), method=method, options=options
+    ).solve()
+    np.testing.assert_allclose(result.z, [1.0, -2.0], atol=1e-4)
+
+
+def test_gradient_descent_is_projected_on_the_box():
+    from minilink.optimization.optimizer import Optimizer
+
+    program = quadratic_program(lower=[-np.inf, 0.0])
+    result = Optimizer(
+        program, z0=np.ones(2), method="gd", options={"learning_rate": 0.1}
+    ).solve()
+    np.testing.assert_allclose(result.z, [1.0, 0.0], atol=1e-6)
+    assert result.stats["algorithm"] == "gd"
+
+
+def test_gradient_descent_steps_like_the_hand_loop():
+    from minilink.optimization.optimizer import Optimizer
+
+    target = np.array([1.0, -2.0])
+    z = np.zeros(2)
+    for _ in range(5):
+        z = z - 0.1 * 2.0 * (z - target)
+
+    result = Optimizer(
+        quadratic_program(),
+        z0=np.zeros(2),
+        method="gd",
+        options={"learning_rate": 0.1, "maxiter": 5},
+    ).solve()
+    np.testing.assert_allclose(result.z, z, rtol=1e-12)
+
+
+def test_a_first_order_method_needs_a_gradient():
+    from minilink.optimization.mathematical_program import MathematicalProgram
+    from minilink.optimization.optimizer import Optimizer
+
+    program = MathematicalProgram(n_z=1, J=lambda z: z @ z)
+    with pytest.raises(ValueError, match="gradient"):
+        Optimizer(program, z0=np.ones(1), method="gd").solve()
+
+
+def test_the_start_defaults_to_the_programs_own():
+    from minilink.optimization.optimizer import Optimizer
+
+    program = quadratic_program(metadata={"z0": np.array([3.0, 3.0])})
+    assert Optimizer(program).z0.tolist() == [3.0, 3.0]
+    with pytest.raises(ValueError, match="z0"):
+        Optimizer(quadratic_program())
