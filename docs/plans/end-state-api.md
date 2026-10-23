@@ -458,6 +458,29 @@ finite, the horizon; `None`, infinite, simulated over an `episode_length` the to
 no `h`. Still to rule: whether DP and RL refuse an unbounded `X` instead of silently using the
 state box, and whether RL's action space reads `U` instead of the port box (D31).
 
+### D16b The cost object (ruled 2026-10-23)
+
+A pure integrand plus one quadrature, nothing about a run's horizon, sets or price:
+
+```python
+class CostFunction:
+    params                                   # Q, R, S, xbar, ubar … (A2); None for a user cost without parameters
+    def g(self, x, u, t=0.0, params=None)    # running cost density
+    def h(self, x, t=0.0, params=None)       # terminal cost
+    def g_max(self, X, U, params=None)       # the bound evaluate reads for infeasible_cost's default (exact on a box for a quadratic, sampled otherwise)
+    def integrate(self, traj, *, discount_rate=0.0, params=None)
+        # the one quadrature: J(t_k) = ∫₀^{t_k} e^{−ρt} g dt, trapezoid on the trajectory's grid, on xp; (cost_rate, cost) arrays, no h
+    __add__, __mul__                         # SumCost, ScaledCost, params nested by term id; a ClippedCost when a saturating cost is needed
+
+evaluate_trajectory(problem, traj)   # cost.integrate(traj, discount_rate=problem.discount_rate)[-1] + e^{−ρ tf} h(x_tf), then the margins and value
+traj.with_cost(problem)              # the plotting wrapper: attaches the "cost_rate" and "cost" signals (today's evaluate_trajectory output)
+```
+
+Leaves the cost: `discount_rate` and `discount_factor` (the problem's), `evaluate_trajectory`,
+`terminal_cost`, `total_cost` (the problem-level verb's). `TimeCost` stays the minimum-time
+cost; `QuadraticCost.from_system` keeps targeting the nominal state; `FieldCost` becomes
+`field.as_cost()` with A1.
+
 ### D17 The noun — ruled with D9
 
 `problem.compile(controller, dt) -> ProblemEvaluator` (name open, D19) is the engine and the

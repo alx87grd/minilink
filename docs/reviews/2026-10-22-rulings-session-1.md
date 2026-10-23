@@ -152,3 +152,12 @@ of it in sampled-path.md §3.6; the numbers from `benchmarks/params_binding.py`.
   everywhere; `x_goal` and `cost.xbar` are reconciled at construction. This replaces R9's "cut
   at the first exit". Lives in: end-state-api.md D16; the field inventory
   (docs/reviews/2026-10-23-planning-problem-field-inventory.md).
+- **R20 (D16b, 2026-10-23) The cost object.** `params`, `g`, `h`, `g_max(X, U)` (the scaling
+  hint for `infeasible_cost`), `integrate(traj, *, discount_rate, params)` (the one quadrature,
+  the running integral without `h`), and the algebra; `evaluate_trajectory(problem, traj)` reads
+  `integrate`'s last value plus the discounted `h`; a plotting wrapper attaches the `cost_rate`
+  and `cost` signals. `discount_rate`, `evaluate_trajectory`, `terminal_cost`, `total_cost` leave
+  the cost. Lives in: end-state-api.md D16b; cost-params.md to amend at step 0.
+- **Time-dependent sets (2026-10-23).** `X(t)` and `U(x, t)` are the contract and nearly the
+  practice; the one gap is RRT, which checks `X` and the goal without `t` (a hardening row for
+  D3 in TODO §3). `evaluate_trajectory` reads the margins at every sample's time.

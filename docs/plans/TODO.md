@@ -218,6 +218,9 @@ pick):
 
 - [ ] RRT `KinodynamicExtender` ignores `problem.params.system`; `extenders.py` probes
   `getattr(U, "box", None)` instead of `U.bounding_box()`.
+- [ ] RRT checks `X.contains(sample)` and the goal region without the time: a time-varying `X` or
+  `Xf` is read at `t = 0` (`rrt.py`, `rrt_star.py`); the tree nodes need a time (the sum of the
+  edge durations) and the checks pass it (found 2026-10-23).
 - [ ] `ShootingTranscription` orphaned from the string presets.
 - [ ] `HybridSimulator` conventions drift (shared input coercion, positional
   `input_port_id`, the framed verbose panel; the plant sub-step from the plant time constant
