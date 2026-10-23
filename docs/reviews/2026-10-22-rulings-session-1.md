@@ -424,3 +424,9 @@ split when it starts; this section marks the reversals).
   example exists (an unmatched disturbance the loop cannot add, e.g. a push on the cart-pole's tip
   or a lateral wind on `Drone2D`, with noise on some sensors only), the two variants are revisited:
   one becomes that example, the other folds into `closed_loop`. A Later row on the workboard.
+- **R58 (2026-10-23, K8) The classical examples stay in the catalog; the research tests go.**
+  On `minilink.catalog` (supported, tested, documented): `MountainCar`, `Acrobot`, the two Furuta
+  pendulums (`RotatingCartPole`, `UnderactuatedRotatingCartPole`), `Plane2D`, `Boat2D` and
+  `Boat2DWithCurrent`, `ThreeBodyProblem`, `Lorenz`, `VanderPol`. To the experimental tier (research
+  tests): `TwoIndependentPendulums`, `ConstantSpeedHelicopterTunnel`, `Drone2DWithSideThruster`,
+  `Plane3D` with its 3-D skin and airframe (`OneLinkManipulator` already, R56).
