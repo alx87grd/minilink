@@ -7,7 +7,6 @@ from minilink.graphical.catalog.shapes import (
     Box,
     Line,
     Plane,
-    Point,
     Rod,
     Sphere,
     link_pose_3d,
@@ -213,53 +212,6 @@ def ur5_skin(plant):
     geometry["tool"] = [Sphere(radius=0.035, color="#3f4245", opacity=1.0)]
 
     return geometry
-
-
-def merge_skins(*skins):
-    """Compose skin factories into one ``(plant) -> dict`` that merges their output.
-
-    Primitive lists are concatenated per frame key, so several looks stack on a
-    single plant (e.g. a base body plus a decal layer).
-    """
-
-    def merged(plant):
-        out: dict[str, list] = {}
-        for skin in skins:
-            for key, primitives in skin(plant).items():
-                out.setdefault(key, []).extend(primitives)
-        return out
-
-    return merged
-
-
-def debug_state_skin(plant):
-    """Opt-in schematic dashboard: one marker per state and input, in a column.
-
-    A quick look for non-spatial plants (chemical reactors, filters, …) that have
-    no natural geometry. Markers are keyed to ``world`` and offset vertically via
-    ``local_transform`` (blue dots for states, red crosses for inputs).
-    """
-
-    # A marker's offset: ``row`` units along the world y axis
-    def column_offset(row):
-        T = np.eye(4)
-        T[1, 3] = float(row)
-        return T
-
-    # The states, one blue dot per row from 0 upward
-    markers = []
-    for i in range(plant.n):
-        marker = Point(color="blue", marker="o")
-        marker.local_transform = column_offset(i)
-        markers.append(marker)
-
-    # The inputs, one red cross per row from −1 downward
-    for i in range(getattr(plant, "m", 0)):
-        marker = Point(color="red", marker="x")
-        marker.local_transform = column_offset(-i - 1)
-        markers.append(marker)
-
-    return {"world": markers}
 
 
 ###############################################################################

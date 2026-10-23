@@ -13,7 +13,7 @@ _DRAWABLES = "minilink.graphical.animation.drawables"
 # ``dynamics.catalog`` for plants, e.g.
 #
 #     from minilink.graphical.catalog import Box, Circle, Arrow, car_skin_3d
-#     from minilink.graphical.catalog import follow_frame_camera, fixed_camera
+#     from minilink.graphical.catalog import camera_matrix
 #
 # The classes and functions live in the internal ``graphical/animation/`` band; this
 # package is the friendly re-export, resolved on first use. Each exported name maps to
@@ -48,14 +48,10 @@ _EXPORTS: dict[str, tuple[str, str]] = {
     # Skins
     "car_skin_2d": (_SKINS, "car_skin_2d"),
     "car_skin_3d": (_SKINS, "car_skin_3d"),
-    "debug_state_skin": (_SKINS, "debug_state_skin"),
-    "merge_skins": (_SKINS, "merge_skins"),
     "plane_skin_3d": (_SKINS, "plane_skin_3d"),
     "ur5_skin": (_SKINS, "ur5_skin"),
     # Camera
     "camera_matrix": (_CAMERA, "camera_matrix"),
-    "fixed_camera": (_CAMERA, "fixed_camera"),
-    "follow_frame_camera": (_CAMERA, "follow_frame_camera"),
     "world_to_camera": (_CAMERA, "world_to_camera"),
 }
 

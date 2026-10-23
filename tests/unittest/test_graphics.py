@@ -1380,13 +1380,25 @@ from minilink.graphical.animation.renderers.plotly_renderer import (
     PlotlyRenderer,
     _import_plotly,
 )
-from minilink.graphical.catalog.skins import debug_state_skin
 from minilink.graphical.common.plotly_style import (
     PLOTLY_ANIMATION_2D_MARGIN,
     PLOTLY_ANIMATION_HEIGHT,
     PLOTLY_FIG_WIDTH,
 )
 from minilink.graphical.signals import open_time_signal_plot, plot_time_signals
+
+
+def debug_state_skin(plant):
+    """One marker per state upward and per input downward, in a column along y."""
+    markers = []
+    for row, color in [(i, "blue") for i in range(plant.n)] + [
+        (-i - 1, "red") for i in range(plant.m)
+    ]:
+        marker = Point(color=color, marker="o")
+        marker.local_transform = np.eye(4)
+        marker.local_transform[1, 3] = float(row)
+        markers.append(marker)
+    return {"world": markers}
 
 
 class Integrator_plotly_renderer(DynamicSystem):

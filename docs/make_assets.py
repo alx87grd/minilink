@@ -182,7 +182,7 @@ def gif_cartpole() -> None:
         QuadraticCost,
         TrajectoryOptimizationPlanner,
     )
-    from minilink.graphical.animation.camera import fixed_camera
+    from minilink.graphical.catalog import camera_matrix
 
     plant = CartPole()
     plant.inputs["u"].lower_bound[0] = -10.0
@@ -206,7 +206,9 @@ def gif_cartpole() -> None:
         verbose=False,
     )
     traj = planner.solve().trajectory.resample(n_samples=240)
-    camera = fixed_camera((-1.0, 0.75, 0.0), scale=3.6)  # the cart's run and the pole
+    camera = camera_matrix(
+        target=(-1.0, 0.75, 0.0), scale=3.6
+    )  # the cart's run and the pole
     save_gif(plant, traj, "cartpole_swingup.gif", time_factor_video=1.0, camera=camera)
 
 
@@ -400,7 +402,7 @@ def gif_rocket() -> None:
         Rocket,
         StochasticPlanningProblem,
     )
-    from minilink.graphical.animation.camera import fixed_camera
+    from minilink.graphical.catalog import camera_matrix
 
     # examples/demos/rl/rocket_landing_rl.py: PPO learns to land from 20 m.
     TRAINING_TIMESTEPS = 4_000_000
@@ -459,7 +461,9 @@ def gif_rocket() -> None:
     plant.x0 = np.array([6.0, 14.0, 0.0, 0.0, 0.0, 0.0])
     cl_sys = planner.get_controller() @ plant
     traj = cl_sys.compute_trajectory(tf=TF_SHOWN, dt=0.01)
-    camera = fixed_camera((3.0, 7.0, 0.0), scale=8.0)  # the whole descent, still
+    camera = camera_matrix(
+        target=(3.0, 7.0, 0.0), scale=8.0
+    )  # the whole descent, still
     save_gif(cl_sys, traj, "rocket_landing.gif", time_factor_video=1.0, camera=camera)
 
 
