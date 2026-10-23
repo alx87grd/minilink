@@ -506,3 +506,7 @@ split when it starts; this section marks the reversals).
   over the declared boxes, else the plant's own, else `1e6` with one warning). `infeasible_cost=True`
   prices a failure at it; DP, RL and MPPI read it when `infeasible_cost` is `None`. Supersedes R32's
   working name `infeasible_cost_bound()`.
+- **R72 (2026-10-23, V1.5) A diverging run inside the program warns once.** With the price off, a run
+  that blows up makes the program's objective `+inf`; the program keeps that number (one `J`
+  everywhere, R32) and warns once, naming the cause and the fix (`infeasible_cost=True` prices a
+  failure at `problem.cost_bound()`). No hidden rule changes the objective.

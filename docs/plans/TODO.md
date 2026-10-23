@@ -523,7 +523,8 @@ moved to the new interface (R47).
   rows; `pe.pack` / `pe.unpack`; the leaves scaled by their nominal magnitude; the docstring's three
   caveats (the price has no gradient; with the price on and sets declared it counts beside the
   rows; with the price off a diverging trial makes the objective `+inf`, so a search that may
-  reach unstable gains sets `infeasible_cost=True`); today's `Optimizer` unchanged (S74 deferred, R25). No `tune`. Done when
+  reach unstable gains sets `infeasible_cost=True`), and a one-time warning naming that fix when the
+  objective comes out non-finite (R72); today's `Optimizer` unchanged (S74 deferred, R25). No `tune`. Done when
   `Optimizer(program).solve()` on the autotuning program reaches the hand loop's gains, the demo
   ends in the `Optimizer`, and a tuning that leaves `X` comes back inside through the margin rows.
 - [ ] **V1.6 Cost parameters** (A2 below; [cost-params.md](cost-params.md)): the nesting lands,
