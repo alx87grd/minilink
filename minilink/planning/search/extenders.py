@@ -83,17 +83,12 @@ class KinodynamicExtender(TrajectoryExtender):
         dt = self.dt
         T = self.horizon
 
-        # x_{k+1} = RK4(x_k, u, dt), the control held over every step
-        x = np.asarray(from_state, dtype=float)
-        xs = [x]
-        for _ in range(N):
-            x = np.asarray(evaluator.rk4_step(x, u, 0.0, dt), dtype=float)
-            xs.append(x)
+        # x_{k+1} = RK4(x_k, u, t_k), the control held over every step
+        inputs = np.tile(u, (N, 1))
+        states = np.asarray(evaluator.rollout(from_state, inputs, 0.0, dt), dtype=float)
 
         # The knots, the held input on each step, the knot times, and the
         # minimum-time cost: the duration T
-        states = np.asarray(xs)
-        inputs = np.tile(u, (N, 1))
         times = np.arange(N + 1) * dt
         cost = T
 

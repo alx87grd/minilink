@@ -709,27 +709,24 @@ def rollout_on(backend, evaluator, u_bar, t, dt: float, tf: float):
     """Return ``rollout(X0) -> X_final`` integrating each state for ``tf``."""
     n_steps = max(1, int(round(tf / dt)))
 
-    # JAX: the RK4 steps scanned, vectorized over the stack and jitted
+    u_seq = np.tile(np.asarray(u_bar, dtype=float), (n_steps, 1))
+
+    # JAX: the step model's rollout, vectorized over the stack and jitted
     if backend == BACKEND_JAX:
         jax = require_jax()
         jnp = require_jax_numpy()
 
         def one(x0):
-            def step(x, _):
-                return evaluator.rk4_step_trace(x, u_bar, t, dt), None
-
-            return jax.lax.scan(step, x0, None, length=n_steps)[0]
+            return evaluator.rollout(x0, u_seq, t, dt)[-1]
 
         batch = jax.jit(jax.vmap(one))
         return lambda states: np.asarray(batch(jnp.asarray(states)))
 
-    # NumPy: x_{k+1} = RK4(x_k), n_steps times, state by state
+    # NumPy: x_{k+1} = RK4(x_k, ū, t_k), n_steps times, state by state
     def rollout_numpy(states):
         final = np.empty_like(states)
         for i, x in enumerate(states):
-            for _ in range(n_steps):
-                x = evaluator.rk4_step(x, u_bar, t, dt)
-            final[i] = x
+            final[i] = evaluator.rollout(x, u_seq, t, dt)[-1]
         return final
 
     return rollout_numpy
