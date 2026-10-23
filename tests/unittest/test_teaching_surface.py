@@ -397,13 +397,16 @@ class TestRootPrelude(unittest.TestCase):
     def test_every_surface_name_is_the_same_object_at_the_root(self):
         import minilink
 
+        # The root prelude is the course set, a subset of the band facades (R60, R64):
+        # a band name need not be on the root, but where it is, it is the same object
         for band, names in TEACHING_SURFACE.items():
             module = importlib.import_module(band)
             for name in names:
-                self.assertIn(
-                    name, minilink.__all__, f"{name} missing from the root prelude"
-                )
-                self.assertIs(getattr(minilink, name), getattr(module, name), name)
+                if band == "minilink" or name in minilink.__all__:
+                    self.assertIn(
+                        name, minilink.__all__, f"{name} missing from the root"
+                    )
+                    self.assertIs(getattr(minilink, name), getattr(module, name), name)
         for module_path, name in TEACHING_MODULE_FUNCTIONS:
             self.assertIs(
                 getattr(minilink, name),
