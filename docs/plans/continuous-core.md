@@ -1,7 +1,7 @@
 # The continuous core: architecture, API and pipelines
 
 **Status:** the design of the next implementation phase, as ruled on 2026-10-22/23
-([the rulings](../reviews/2026-10-22-rulings-session-1.md), R1–R28; the decision ledger with
+([the rulings](../reviews/2026-10-22-rulings-session-1.md), R1–R29; the decision ledger with
 the alternatives is [end-state-api.md](end-state-api.md)). This document is the *what*: the
 shape of the architecture, every public name, and the pipelines a user writes. Nothing here is
 built yet.
@@ -9,8 +9,14 @@ built yet.
 MPPI) is a later phase and appears only where its contract is fixed by this one.
 **Lane:** maintainer-owned names; the detail of each piece lives in the plan it came from
 ([sampled-path.md](sampled-path.md), [differentiable-problem.md](differentiable-problem.md),
-[cost-params.md](cost-params.md), [randomness.md](randomness.md)), which are rewritten to this
-document at the start of the phase.
+[cost-params.md](cost-params.md), [randomness.md](randomness.md)), aligned to this document on
+2026-10-23. The steps, in order and with their gates, are [TODO.md](TODO.md) §4.
+**What v0.3 builds of it:** the step model (S75), the deterministic path (V1's steps 1–6: one
+run, `n_trials = 1`) and the cost parameters (A2). The draws on a `StochasticPlanningProblem`
+(§4.5, the stochastic column of §5: `realize`, `n_trials > 1`, the Monte Carlo evaluator folded
+into `evaluate`) are V1's step 7, a v0.4 row of the roadmap; until then `evaluate` refuses
+`n_trials > 1` and points to `MonteCarloEvaluator`. Whether that fold moves into v0.3 is
+raised in ROADMAP §6 (2026-10-23).
 
 ---
 
@@ -133,8 +139,9 @@ whose policy re-enters as a controller; dashed, the sampled loop of the next pha
 
 Each verb is named by what it returns. Gone from the plan: `tune` / `optimize` facades, the
 engine verbs `cost` / `value` / `margin`, `TrajectoryEvaluation`, `MonteCarloEvaluator` (one
-facade line until removed), `score_trajectory`, the cost's `discount_rate`,
-`evaluate_trajectory`, `terminal_cost`, `total_cost`.
+facade line until removed, V1's step 7), `score_trajectory` (it becomes the problem-level
+`evaluate_trajectory`), and four members of the cost: `discount_rate`, `evaluate_trajectory`,
+`terminal_cost`, `total_cost`.
 
 ---
 
@@ -157,7 +164,8 @@ ev.frozen.step(...)    # jit(partial(ev.step, params=plant.params)), bound at fi
 Rules: the traced body is the only code, the two access forms are generated and cached once,
 never rebuilt inside a loop; `method`, `substeps`, `hold` are static Python values, never
 traced; `dt` and `params` are the only array arguments. For a `StepSystem` evaluator, `step` is
-the system's own map, same signature, no knobs. Measured: no speed difference between the
+the system's own map with the integer tick in place of `t` (`step(x, u, k, params)`, R14), no
+knobs; `discretize` is the one place that binds `t_k = t0 + k·dt`. Measured: no speed difference between the
 frozen and the parametric forms once bound (`benchmarks/params_binding.py`).
 
 ### 3.2 The step model
@@ -203,7 +211,7 @@ noisy = StochasticPlanningProblem(..., x0_distribution=Gaussian(...), params_dis
 | `X`, `U` | constraints along the run; enforced where a planner can (trajectory optimization, RRT, DP's grid, RL's action space), judged by the margin for any run; default unbounded, and a planner that needs a finite box **refuses** an unbounded one (`X=plant.state.box`, `U=plant.input_box` are the lines to write); LQR ignores `U` and warns once |
 | `Xf` | the goal set; enforced by the open-loop planners, judged by `reached` for any run; `None` is no terminal constraint (any `x(tf)` is `reached`; the terminal cost `h` is the soft end) |
 | `x_goal`, `x_start` | one point of `Xf` and of `X0`, for the tools that need a point: RRT's bias, trajopt's initial guess, the loop's reference `r`. The problem never reads the cost's target (`xbar` exists only on the quadratic and time costs); a loop whose controller reads `r` is refused when `x_goal` is `None` |
-| `tf` | finite: the horizon, `h` charged at `tf`; `None`: infinite, no `h`, simulated over an `episode_length` the tool names |
+| `tf` | finite: the horizon, `h` charged at `tf`; `None`: infinite, no `h` (a nonzero `h` warns once, R9), simulated over an `episode_length` the tool names |
 | `discount_rate` | ρ, applied to `g` and `h` by every consumer (RL's γ and DP's α read it here) |
 | `infeasible_cost` | the one price; default `cost.g_max(X, U) · tf` (or `/ ρ`) |
 | `criterion` | `"expectation"`, `("cvar", α)`, `"worst_case"`: how `criterion_value` reduces the runs |
@@ -261,7 +269,8 @@ pe.pack(params, wrt) -> z;  pe.unpack(z, wrt) -> params
 
 evaluate(problem, arg, *, dt=None, method="rk4", n_trials=1, key=0)   # == problem.compile(arg, dt).evaluate(key=, n_trials=)
 #   method="scipy": the adaptive Simulator, one run per trial, the one-line escape
-#   dt=None: the Simulator's automatic rule (a tenth of the declared smallest time constant; 0.01 fallback)
+#   dt=None: the Simulator's automatic rule, a tenth of the declared smallest time constant; on a loop that
+#   declares none that is 1e-4 s (the 1e-3 default), the open question raised in ROADMAP §6 (2026-10-23)
 compare(problem, **args, dt=None, n_trials=1, key=0)                  # several Evaluations, one key, the table and the plots
 ```
 
@@ -388,6 +397,9 @@ compare(problem, DP=sol_dp, TO=sol_to, PPO=sol_rl, dt=0.05).plot_trajectory()   
 
 ## 5. Deterministic and stochastic, step by step
 
+The deterministic column is v0.3 (V1's steps 1–6); the stochastic column lands with V1's step 7
+(v0.4 on the roadmap; the pull into v0.3 is raised in ROADMAP §6).
+
 | Step | `PlanningProblem` | `StochasticPlanningProblem` |
 | --- | --- | --- |
 | the statement | `x_start` one point; no criterion | plus the three laws and `criterion`; `x_start` the start law's mean |
@@ -427,5 +439,7 @@ compare(problem, DP=sol_dp, TO=sol_to, PPO=sol_rl, dt=0.05).plot_trajectory()   
 - **The v0.4 names**: the parametric MPC program (`ParametricProgram`, the key `plant`, live
   ports), `MPPIPlanner` and the three planner verbs the MPC block reads, the seeded stochastic
   policy block (`GaussianPolicy`).
-- **The draws' evaluator re-pin**: the Monte Carlo numbers change once when the held static law
-  becomes the real loop and the cut at exit the integral to `tf`.
+- **The draws** (V1's step 7, with RN-4 / RN-5): `problem.realize`, `n_trials > 1`, the Monte
+  Carlo evaluator folded into `evaluate`, and its re-pin: its numbers change once when the held
+  static law becomes the real loop and the cut at exit the integral to `tf` (D21). The single-run
+  scorer changes to the integral to `tf` in v0.3 already (V1's step 2).

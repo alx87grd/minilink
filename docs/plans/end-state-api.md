@@ -14,8 +14,10 @@ evidence and the alternatives live in [sampled-path.md](sampled-path.md),
 [core-consolidation.md](core-consolidation.md), [future-policies.md](future-policies.md),
 [mppi.md](mppi.md), [cost-params.md](cost-params.md), [fields.md](fields.md),
 [geometry-module.md](geometry-module.md) and [randomness.md](randomness.md). A ruling taken
-here goes to the plan doc it shapes and to a dated record; this file is deleted once the
-sessions have ruled and the plan docs carry the answers (one fact, one home).
+here goes to the plan doc it shapes and to a dated record. The continuous-phase answers are in
+the plan docs since 2026-10-23; this file stays as the ledger of the alternatives and the home of
+the open v0.4 asks (D25–D30) and the parked hybrid ones (D13–D15), and is deleted once those are
+ruled (one fact, one home).
 
 ---
 
@@ -277,7 +279,7 @@ pe.program(wrt, bounds=None, key=0, n_trials=1) -> MathematicalProgram   # objec
 evaluate(problem, loop_or_controller, *, dt=None, method="rk4", n_trials=1, key=0) -> Evaluation
 #   the student's facade: == problem.compile(arg, dt).evaluate(key=key, n_trials=n_trials) for method="rk4"
 #   method="scipy": the adaptive Simulator, one run per trial; the one-line escape for stiff or switching loops
-#   dt=None: the Simulator's automatic rule (a tenth of the declared smallest time constant; 0.01 fallback)
+#   dt=None: the Simulator's automatic rule (a tenth of the declared smallest time constant; 1e-4 s on a loop that declares none: raised in ROADMAP §6, 2026-10-23)
 ```
 
 - The fixed-step compiled rollout is the judge **and** the engine: the program minimizes the
@@ -673,7 +675,7 @@ RL-facing adapter in `reinforcement_learning/`; no move.
 | Plan | Change |
 | --- | --- |
 | sampled-path.md | the loop a tool named `HybridDiagram` for now, ticks kept (ruled); caches and memory parked to the hybrid phase |
-| differentiable-problem.md | rewritten at step 0 to D9, D16–D19: one `Evaluation`, `trajectory` / `evaluate` / `program`, the integral to `tf`, the program as the export, no `tune` |
+| differentiable-problem.md | rewritten 2026-10-23 to D9, D16–D19: one `Evaluation`, `trajectory` / `evaluate` / `program`, the integral to `tf`, the program as the export, no `tune` |
 | parametric-program.md | `ParametricProgram`, the key `plant`, live ports as `live=` |
 | mppi.md | `MPPIPlanner`, `n_plant_samples=1`, the three verbs |
 | future-policies.md | point 4 (`GaussianPolicy`) a C5 row; points 2 and 3 parked with the hybrid phase |
@@ -682,7 +684,9 @@ RL-facing adapter in `reinforcement_learning/`; no move.
 
 ## 6. Status
 
-Session 1 and the continuous-core part of session 2 are ruled (R1–R28). Open for this phase:
-nothing. Parked: D13–D15 (the hybrid phase). Deferred: D23 (the optimizer upgrade). For v0.4:
-D25–D30. Next: fold the rulings into the plan docs they shape and into workboard rows, then
-implement the continuous core.
+Session 1 and the continuous-core part of session 2 are ruled (R1–R29). Open for this phase:
+the confirmation of `criterion_value`, and the points the 2026-10-23 alignment pass and second
+opinion raised (ROADMAP §6, "Raised 2026-10-23"). The plan docs were aligned on 2026-10-23 and
+the workboard rows written (TODO §4). Parked: D13–D15 (the hybrid phase). Deferred: D23 (the
+optimizer upgrade). For v0.4: D25–D30. Next: implement the continuous core, the step model's
+baseline (SM-0) first.

@@ -11,7 +11,7 @@ Identity: [CONSTITUTION.md](CONSTITUTION.md).
 | --- | --- | --- |
 | **v0.1** | **GRO860 end to end**, plus a working **`pip install minilink` on PyPI**. Every topic of the running optimal-control & RL course runs on the teaching surface, in Colab (git-clone cell) and in the conda env: value iteration / DP on a grid · LQR + linearization · trajectory optimization · RL via native `ReinforcementLearningPlanner` (with `Sys2Gym` + SB3 as an optional bridge). See §4.1. | Fall 2026 — `0.1.0` on PyPI (2026-09-16); `0.1.1` (2026-09-26) is the first release a GitHub tag published. Conda from `environment.yml` is the recommended install. The course notebooks' names are frozen until v1.0, with the freeze paused between terms (§4.1 gate 7). |
 | **v0.2** | **GRO501 end to end** (the classical-control course: multi-physics modelling · root locus / Bode / margins · PID to spec · digital implementation · state feedback, pole placement, LQR, observers — see §4.2). Conda stays the recommended install. | `0.2.0` on PyPI (2026-10-17), from the GitHub tag; every §4.2 row green |
-| **v0.3** | **A cleaner core and the differentiable path, then GMC714 end to end** (§5.3): first, in November, **the convergence pass** (the core kept, side features to the experimental tier), **the sampled spine** (one step model under every sampled tool, the sampled loop as a tool) and **the full differentiable path to the cost behind a clean API** (`problem.compile(controller)`, `tune`, the program bridge, cost parameters); then, in December, the features GMC714 is missing that the audit G1 ranks as needed before the term — robust control · robotic arm · trajectory optimization · MPC · vehicle models · nonlinear control (§4.3), with **pyro parity**; the rest of wave G moves to v0.4. | December 2026 |
+| **v0.3** | **A cleaner core and the differentiable path, then GMC714 end to end** (§5.3): first, in November, **the convergence pass** (the core kept, side features to the experimental tier), **the continuous core** ([continuous-core.md](../plans/continuous-core.md): one step model under every sampled tool, one evaluation of any run, and the deterministic differentiable path to the cost behind a clean API: `evaluate`, `compare`, `problem.compile(loop)`, the program export, cost parameters), then the sampled loop as a tool if the calendar leaves room; then, in December, the features GMC714 is missing that the audit G1 ranks as needed before the term — robust control · robotic arm · trajectory optimization · MPC · vehicle models · nonlinear control (§4.3), with **pyro parity**; the rest of wave G moves to v0.4. | December 2026 |
 | **v0.4** | **The draws and the textbook objects** (§5.4): the mean over the problem's draws through the same differentiable path (the Monte Carlo evaluator one path, its numbers changing once), the sampled face of the compiled problem, identification as its first data consumer; fields and workspace geometry; MPPI on the sampled kernel; the parametric MPC program (S76) and the general serial chain (C6). | Winter 2027 (the window between GRO860 cohorts, whose material the evaluator's numbers touch) |
 | **v0.9** | **Freeze candidate** (§5.5): the foundation questions that could still break a public name are decided (derived `x0`, Diffrax as an optional solve, the glyph/solid rename, the frozen surface); the trust contract is in place (deprecation policy, pinned export list, CHANGELOG, pinned installs); the standard-syllabus holes close (estimation; the discrete-time one closes with S75 in v0.3); the docs site renders the tutorials. | Spring 2027 |
 | **v1.0** | **A colleague can build a course on it and trust it for three years** (§5.6): the API frozen under the deprecation policy, the standard control syllabus covered and checked against textbook worked examples, course-neutral labs an instructor adopts outside UdeS, green on Windows, macOS and Linux; after two cohorts. Two Stable-Baselines3 teaching notebooks retire (S49) and the GRO860 name freeze becomes the general one. | 2027 |
@@ -97,10 +97,10 @@ Step ids (`S29`, `P4`, `T2`, …) are the rows of
 | Planning / path integral (MPPI) | research lane (planned) | 1 | Two standalone scripts (`examples/experimental/mppi/`): the pendulum swings up; the kinematic racecar laps the cone circuit at a lower closed-loop cost than the collocation MPC. Design: [mppi.md](../plans/mppi.md). | The planner (S72, v0.4) on the sampled kernel, after RN-4 / RN-5. |
 | Geometry / spatial | provisional (teaching) | 4 | SDF + `Scene` / fields / bodies under `planning/spatial/`, JAX twins tested; the planning facade's spatial names are provisional teaching names (§2). Home designed: `core/geometry/`. | Package move and course catalog (A3); bicubic SDF and CBF filter (research). |
 | Graphics / animation | teaching | 5 | Frame-keyed `tf` / geometry / overlays; four renderers; auto-fit camera. | Camera and plot defaults from roles (P10); constructor-derived camera hints (S43); glyph/solid rename (S30, v0.9). |
-| Hybrid / step / MPC | provisional (research) | 4 | `StepSystem`, `Computer`, `HybridDiagram`, `HybridSimulator`, MPC with parametric JAX. A side helper for MPC simulation; the sampled loop is the one thing that is not a `System`. | Keeps in step with the core rules (P10); no new hybrid features before S31 (v0.3, recommended: the loop as a tool on one sampled kernel); the compiled MPC program binds every problem parameter, not only `x0` (S76, v0.4; its names ruled in V1's step 0). |
+| Hybrid / step / MPC | provisional (research) | 4 | `StepSystem`, `Computer`, `HybridDiagram`, `HybridSimulator`, MPC with parametric JAX. A side helper for MPC simulation; the sampled loop is the one thing that is not a `System`. | Keeps in step with the core rules (P10); no new hybrid features before S31 (ruled a tool on one tick-scan kernel, R13–R14; its code after the continuous core); the compiled MPC program binds every problem parameter, not only `x0` (S76, v0.4; its names ruled: `ParametricProgram`, the key `plant`). |
 | Realtime simulation | provisional | 2 | `RealtimeSimulator` + pygame I/O. | Architectural review (v1.0); later the human-demonstration recorder of the behavior-cloning pipeline (after v1.0). |
 | Estimation | teaching (GRO501) | 6 | `StateObserver` (innovation form, operating point on the block, hat labels), `luenberger` and `kalman` on arrays, a linear model or the plant (the duals of `place` and `lqr`, 2026-10-14); `lqg` returns the observer + gain box; an observer is refused as a controller; `closed_loop(gain, plant, observer=obs)` wires the LQG loop by role (AC-4, 2026-10-14). | the trajectory observer and the finite-horizon filter, the EKF, the estimation problem and its tools (v0.9, [the plan](../plans/estimation-and-state-feedback.md)). |
-| Identification | planned | 2 | Parametric-tier prototype only. | V1's `tune` with a data cost (C4, v0.4). |
+| Identification | planned | 2 | Parametric-tier prototype only. | V1's program export with a data cost (C4, v0.4). |
 | C export (`experimental/c_export`) | research | 1 | JAX→C transpiler; two demos; flagship smoke in the JAX regression job. | Keep isolated; repo-only. |
 | Experimental tier (`experimental/symbolic`, `experimental/engines`) | research | 1 | Not on the teaching path nor the API site. | Keep isolated; repo-only. |
 | External multibody leaf (MJX) | research | 0 | Not started. | Spike later. |
@@ -247,17 +247,16 @@ gantt
     dateFormat YYYY-MM-DD
     axisFormat %b %Y
     section Decide
-    Session 1: K7 shape, tier 1, S75      :rul1, 2026-10-22, 5d
-    Session 2: S31, V1 names, h, S76 names :rul2, after rul1, 7d
-    GMC714 audit G1 ranks wave G          :g1, 2026-10-22, 2w
+    Rulings sessions 1 and 2 (R1-R29)     :done, rul1, 2026-10-22, 2d
+    GMC714 audit G1 ranks wave G          :g1, 2026-10-24, 2w
     section v0.3 cleaner core
-    Wave K convergence (K1-K4, K7)        :k, 2026-11-01, 3w
-    Wave S step model (S75)               :s75, 2026-11-02, 18d
-    Wave S sampled loop (S31)             :s31, after s75, 10d
-    section v0.3 differentiable path
-    V1 steps 0-2, the API first           :v1a, 2026-11-09, 18d
-    V1 steps 3-5, compile, tune, bridge   :v1b, 2026-11-27, 10d
-    A2 cost parameters (V1 step 6)        :a2, 2026-12-01, 6d
+    Wave K convergence (K1-K4, K7-K9)     :k, 2026-11-01, 3w
+    section v0.3 continuous core
+    Step model S75 (SM-0 to SM-7)         :s75, 2026-11-02, 18d
+    V1 steps 1-2, Trajectory, evaluation  :v1a, 2026-11-02, 12d
+    V1 steps 3-5, run, engine, program    :v1b, after s75, 10d
+    A2 cost parameters (V1 step 6)        :a2, after v1b, 5d
+    Sampled loop S31, if room             :s31, after a2, 7d
     section v0.3 GMC714
     Wave G, the rows G1 ranks first       :g, 2026-12-07, 14d
     v0.3 tag                              :milestone, v03, 2026-12-21, 0d
@@ -290,7 +289,7 @@ TODO §4 and §5 gives it, wave D standing.
   names]**
 - **A5** The later nouns, each with its first consumer: `log_prob`, sets and distributions
   over parameter dictionaries, `UnionSet`, `PlanningProblem.hamiltonian()` only if a course
-  teaches Pontryagin (sets reading `params` with A2 in wave V, `Set.as_cost` with V1's step 8
+  teaches Pontryagin (sets reading `params` with A2, V1's step 6 in v0.3, `Set.as_cost` with V1's step 8
   in v0.4).
 - **RN-2** of [randomness.md](../plans/randomness.md): distributions read `params`,
   `Gaussian(cov=)`, every `sample` takes a key (before V1's step 7, the draws, in v0.4).
@@ -319,24 +318,22 @@ behaviour-preserving, one module per step.
 
 Reorganized 2026-10-21 ([record](../reviews/2026-10-21-roadmap-reorganization.md)); the
 steps, in order, are TODO §4. **First, November: a cleaner core and the full differentiable
-path to the cost behind a clean API** (wave K, wave S, wave V). **Then, December: the
+path to the cost behind a clean API** (wave K and the continuous core). **Then, December: the
 features GMC714 is missing** (wave G's rows, ordered by the audit G1, which runs early because
 it is cheap and fixes what December must contain).
 
-**Rulings first**, in two sessions ordered by what each unblocks (§6 "Blocking code now"):
-session 1 rules the shape of the framework, K7's tier 1 and the exit rule, and the S75
-contract, so wave K and SM-0 to SM-2 start on November 1; session 2, a week later, rules S31,
-the names of V1's step 0 (with S76's PP-0), the terminal cost and the sampled loop's tick,
-so wave V starts. No foundation code before the session that rules it. **Both sessions ruled on
-2026-10-22/23** ([record](../reviews/2026-10-22-rulings-session-1.md)): the design of record for
+**Rulings first**, in two sessions ordered by what each unblocks: the shape, the convergence
+and the step model, then the sampled loop, the compiled problem and the names. No foundation
+code before the session that rules it. **Both sessions ruled on
+2026-10-22/23** (R1–R29, [record](../reviews/2026-10-22-rulings-session-1.md)): the design of record for
 the continuous-core phase is [continuous-core.md](../plans/continuous-core.md) (the decision
-ledger with the alternatives: [end-state-api.md](../plans/end-state-api.md)). **Next, in order:**
-(1) rewrite differentiable-problem.md, sampled-path.md, cost-params.md and randomness.md's
-evaluator step to that design; (2) turn it into workboard rows with gates (TODO §4); (3)
-implement, the step model's baseline first. The sampled loop's details, the optimizer upgrade
-(S74) and the v0.4 names stay open as the design says.
+ledger with the alternatives: [end-state-api.md](../plans/end-state-api.md)). **Done 2026-10-23:**
+the plan docs aligned to it and its steps written as workboard rows with gates (TODO §4); the
+points that pass and an independent second opinion raised are under "Raised 2026-10-23" in §6.
+**Next:** implement, the step model's baseline (SM-0) first. The sampled loop's details
+(D13–D15), the optimizer upgrade (S74, deferred by R25) and the v0.4 names stay open.
 
-**The audit, early** (in parallel with the rulings):
+**The audit, now** (in parallel with everything; not started on 2026-10-23, and the one input with a hard date):
 - **G1** GMC714 baseline audit: every §4.3 topic run on the teaching surface, the gaps
   written as the release contract, and wave G's rows ranked into what the term needs in
   December and what moves to v0.4. **[ask — course scope]**
@@ -347,44 +344,38 @@ implement, the step model's baseline first. The sampled loop's details, the opti
 - **K2** Unused features removed and **K3** prototypes moved to `minilink/experimental/`,
   from one ruling pass: K7's tiers. **[ask — removals, public names]**
 - **K4** One demo per feature, before D1.3 sweeps the rest. **[ask per group]**
+- **K8** The catalog clean-up (R2: the root prelude trimmed to the course set, `minilink.catalog`
+  the flat index of tested plants, the unsupported ones to the experimental tier) and **K9**
+  the experimental tier out of the CI gate (R3). Ruled.
 - **K7** The convergence pass: the spine, the six pillars and the named content stay; side
   features leave for the experimental tier or the example that motivated them; the first
   tier any time, the between-terms moves in the late-December window (§5's calendar rule;
   §6). **[ask — core, public names]**
 
-**Wave S — the sampled spine** (November; [sampled-path.md](../plans/sampled-path.md)):
-- **S75** The step model: `discretize` on one compiled step, `params` always an argument,
-  for every sampled consumer; byte-identical steps SM-0 to SM-6, the `discretize` follow-ups
-  as SM-2, S37's one scannable step as SM-1, the evaluator-grid trim and the integrators'
-  move to `simulation/solvers/` as SM-6 (S37 is absorbed; S27 Diffrax stays in v0.9).
-  **[ask — core]**
-- **S31** The sampled loop: a tool on one sampled rollout kernel in two faces, after S75;
-  the tick carries controller memory and the computer's draws come from its seed and the
-  tick; with P10's AC-8b. **[ask — core]**
+**The continuous core** (November, beside wave K; the design of record
+[continuous-core.md](../plans/continuous-core.md), ruled R1–R29; the steps and gates are TODO
+§4):
+- **S75** The step model ([sampled-path.md](../plans/sampled-path.md)): one compiled step taking
+  `params`, `discretize(plant, dt, *, method, substeps, hold) -> StepSystem` on it for every
+  sampled consumer, `compute_forced` on the same rollout (its forced numbers change once, R18),
+  the evaluator trimmed to four traced bodies and the integrators moved to `simulation/solvers/`
+  (steps SM-0 to SM-7; S37 absorbed, S27 Diffrax stays in v0.9). **[ask — core]**, ruled.
+- **V1** The deterministic path to the cost (steps 1–6 of
+  [differentiable-problem.md](../plans/differentiable-problem.md)): the native `Trajectory`, one
+  evaluation of any run (`evaluate_trajectory` and the `Evaluation` record, the integral to `tf`,
+  the problem's fields with one meaning each), the whole run out of the scan,
+  `problem.compile(loop)` with `evaluate` and `compare` as its facades, the program export to
+  today's `Optimizer` (no tuning facade, R23). One run per call: the draws are step 7 (§5.4), a
+  sampled controller is refused until the hybrid phase. **[ask — core]**, ruled.
+- **A2** Cost parameters ([cost-params.md](../plans/cost-params.md)), V1's step 6, so the path
+  reaches the cost's own weights. **[ask — core]**, ruled.
+- **S31** The sampled loop, ruled a tool with ticks (R13, R14), after the continuous core: in
+  v0.3 if the calendar leaves room before wave G, else the first core row of v0.4; its details
+  (D13–D15) parked until then. **[ask — core]**
+- **S74** The optimizer upgrade: deferred by R25 to after the continuous core, with OPW-1–OPW-5;
+  it lands before S76 (§5.4), which builds on its backend factory.
 
-**Wave V — the differentiable path to the cost** (November into early December, beside wave
-S: steps 0–2 need neither S75 nor S31, step 3 meets the sampled seam;
-[differentiable-problem.md](../plans/differentiable-problem.md), its asks in §9):
-- **V1** The differentiable planning problem, the deterministic path (steps 0–5 of the
-  plan): the API first, a names brainstorm with the maintainer (step 0); then the native
-  `Trajectory`, one scoring kernel, the whole run out of the compiled scan,
-  `problem.compile(controller)` with the deterministic verbs (the trajectory, the cost, the
-  smallest margin) and `tune`, and the program bridge. In v0.3 the evaluator runs continuous
-  controllers only (the loop as a diagram on SM-1's compiled step); a sampled controller
-  (a digital PID, a held neural policy) is refused with a message until its face lands in
-  v0.4 (§5.4). **[ask — core, the names]**
-- **S74** The optimizer as the one descent loop: the program classes and the first-order
-  backend, landing as V1's step 5 with **OPW-1–OPW-5** of
-  [parametric-program.md](../plans/parametric-program.md). **[ask — core]**
-- The names of S76's program family and the plant's key in the parameter tree (PP-0 of
-  [parametric-program.md](../plans/parametric-program.md)) are ruled in V1's step 0 session;
-  S76 itself is a v0.4 row (§5.4).
-- **A2** Cost parameters ([cost-params.md](../plans/cost-params.md)), the plan's step 6, so the
-  path reaches the cost's own weights: every library cost reads `params`, composite costs nest
-  them like a diagram's, and every planner passes `problem.params.cost` through, so
-  `jax.grad` reaches `Q` and `R`. **[ask — core]**
-
-**Wave G — the GMC714 features** (December, after waves K, S and V). G1 ranks the rows
+**Wave G — the GMC714 features** (December, after wave K and the continuous core). G1 ranks the rows
 below: what the term needs lands in December, the rest moves to v0.4 (§5.4). Two weeks hold
 lessons and small features, not a core design, so C6 is already a v0.4 row.
 - **C1** Pyro parity open rows ([pyro-port-remaining.md](../plans/pyro-port-remaining.md))
@@ -401,20 +392,23 @@ Winter 2027, the window between GRO860 cohorts (§5's calendar rule: the GMC714 
 meanwhile and does not gate it); the steps, in order, are TODO §5.
 
 **The draws on the path** ([differentiable-problem.md](../plans/differentiable-problem.md)):
-- **V1, the draws** (steps 7–9): `realize`, `evaluate`, `value`, the Monte Carlo evaluator a
-  thin facade, as one row with **RN-3 / RN-4 / RN-5** of
+- **V1, the draws** (steps 7–9): `problem.realize(key, n)`, `evaluate(..., n_trials, key)` on a
+  stochastic problem with `criterion_value` the criterion over the runs, the Monte Carlo
+  evaluator folded into `evaluate`, as one row with **RN-3 / RN-4 / RN-5** of
   [randomness.md](../plans/randomness.md) and **AC-7** (the cost scored on the plant); the
-  sets as costs; the material. In this window because the evaluator's numbers change once.
-  Research lane until GMC714 or GRO860 has run it. **[ask — core]**
+  sets as costs; the material. Placed in this window because the evaluator's numbers change
+  once; whether the fold moves into v0.3 under the calendar rule is raised in §6. The engine
+  and `program` stay provisional until GMC714 or GRO860 has run them (R28). **[ask — core]**
 - **V1, the sampled face** (step 7b): `problem.compile(sampled controller)` dispatches to
   S31's kernel on its JAX face, so a digital PID, a held neural policy, MPPI and the RL
-  policies get the same `evaluate` and `tune` as a continuous law. **[ask — core]**
+  policies get the same `evaluate` and `program` as a continuous law. **[ask — core]**
 - **S76** The compiled MPC program binds every problem parameter, not only `x0`
   ([parametric-program.md](../plans/parametric-program.md)): the start, the plant, the cost
   and the sets as one parameter tree bound at each solve; recommended, one program family
   whose frozen form is a binding (the plain `MathematicalProgram` unchanged); its names ruled
-  in V1's step 0 (v0.3). **[ask — core]**
-- **C4** Identification as the path's first data consumer: V1's `tune` with a data-mismatch
+  (`ParametricProgram`, the key `plant`, D19); on S74's backend factory, so S74 lands first.
+  **[ask — core]**
+- **C4** Identification as the path's first data consumer: V1's program export with a data-mismatch
   cost; trajectory generation and experiment design beside it.
 - **LQGPlanner** with RN-4.
 
@@ -476,7 +470,7 @@ public name; v1.0 (§5.6) freezes.
 - **`discretize` follow-ups**: moved to S75 in v0.3 (its step SM-2).
 - **Estimation follow-ups** after P4: EKF, time-varying and discrete Kalman; online parameter
   estimators (recursive least squares, gradient laws).
-- **C4** Identification: moved to v0.4 (V1's `tune` with a data cost).
+- **C4** Identification: moved to v0.4 (V1's program export with a data cost).
 - **S71** The classic first plants (DC motor, tank / thermal process, ball and beam,
   differential drive, 3-D quadrotor); LQI beside the `N` matrix.
 
@@ -547,48 +541,54 @@ v0.4 added, the course audit G1 now, the sampled spine before the differentiable
 sessions, the sampled face of V1, the missing rows) in
 [its record](../reviews/2026-10-22-second-roadmap-review-rulings.md).
 
-**Blocking code now, session 1** (unblocks wave K and S75's SM-0 to SM-2) — ruled
-2026-10-22 ([record](../reviews/2026-10-22-rulings-session-1.md)): the shape (two foundations,
-the problem statement with them, six tooling pillars), the catalog clean-up (K8), the
-experimental tier untested (K9), no exit rule, the silent prelude trim, the step model's
-contract, knobs and defaults, DP on Euler through it. Also ruled the same day: one `evaluate` family with the ODE solver as the judge and the
-compiled fixed-step run as the engine under `tune` (D9, D17); one `evaluate_trajectory`,
-the cost owning `g` and `h`, the problem owning `tf`, the sets, `infeasible_cost` and
-`discount_rate` (D16, D20); one traced body per integrator, the jitted and frozen forms
-generated (D10). Session 1 is closed; wave K and S75's SM-0 to SM-6 may start.
+**Ruled 2026-10-22/23, the two sessions** (R1–R29,
+[record](../reviews/2026-10-22-rulings-session-1.md); the design of record
+[continuous-core.md](../plans/continuous-core.md)): the shape (three foundations, six tooling
+pillars), the catalog clean-up (K8), the experimental tier untested (K9), no exit rule, the
+silent prelude trim; the step model's contract, knobs and defaults, DP on Euler, one traced
+body per integrator; the sampled loop a tool with ticks (S31: R13, R14); one engine, the
+compiled fixed-step run the judge, `evaluate` and `compare` its facades (R15, R16); one
+evaluation of any run, the integral to `tf` with no cut, the terminal cost charged at a finite
+`tf` and exits priced only by `infeasible_cost` (R19); the cost object (R20), the sets explicit
+(R21), the loop the pipeline reads (R22), the program as this phase's export (R23), the
+criterion on the problem (R24), the names and the record (R26, R27; S76's names among them:
+`ParametricProgram`, the key `plant`), the lane (R28), `x_goal` and `Xf=None` (R29); the
+optimizer upgrade deferred (R25). Parked to the hybrid phase: D13–D15 (the run-state caches,
+controller memory and draws on the tick, the dispatch of a sampled controller). To discuss
+when convenient, not blocking: how the proposals carry MPPI, behavior cloning and diffusion
+policy ([future-policies.md](../plans/future-policies.md) §7).
 
-**Blocking code now, session 2** (a week later; unblocks S31 and wave V)
+**Raised 2026-10-23, to discuss** (the alignment pass and an independent second opinion; the
+evidence, the options and a recommendation for each are in
+[the record](../reviews/2026-10-23-v03-alignment-and-second-opinion.md); none blocks SM-0, wave K
+or V1's steps 1–2):
 
-- **The sampled loop: a `System` or a tool** (S31). Recommended (2026-10-20): a tool, built by
-  `%`, on one sampled rollout kernel in a NumPy and a JAX face that the RL environment, the
-  hybrid simulator and the MPC export call; tracing decided by the computer. To rule with it:
-  ticks or seconds; the run-state caches (RULES 2.4); the tick carrying controller memory
-  (MPPI's warm start, a diffusion policy's chunk) with the computer's draws from its own seed
-  and the tick, as the noise block's; the evaluator dispatching a sampled controller to the
-  kernel's JAX face (V1's step 7b, v0.4). [sampled-path.md](../plans/sampled-path.md) §8,
-  [future-policies.md](../plans/future-policies.md) §5 points 2 and 3.
-- **The terminal cost `h(x_f, t_f)`, one rule for every tool.** `h` is charged exactly when
-  `tf` is finite; still to settle whether an infinite-horizon cost with a nonzero `h` warns
-  or raises, and that exits are priced only by `infeasible_cost` (the scoring kernel, V1's step 2).
-- **The differentiable planning problem (2026-10-18, panel of 2026-10-20), the asks of its
-  consolidated plan** — one path from any parameter the problem holds to any traceable metric,
-  optimized through the native optimizer. Four points the seven-design panel split on, each with
-  a recommendation: the noun (`problem.compile(policy)` returning an evaluator, or verbs on the
-  existing Monte Carlo evaluator), the `Evaluation` record (a NumPy report with a traced `value`
-  verb, or a pytree), the draws before or after the program bridge, and the optimizer's method
-  keys (by algorithm, or the `scipy_` prefix). Then the names (its step 0), one scoring contract
-  without modes, the evaluator's numbers changing once as the loop becomes a diagram simulation,
-  the verbs dropped, the lane, S73's scheduling:
-  [differentiable-problem.md](../plans/differentiable-problem.md) §9 says which asks block code
-  (1, 2, 5, 6, 7, 8, and 13: S31 first) and which can wait, each with its proposed answer; the analyses and the panel are compared in
-  [the record](../reviews/2026-10-18-differentiable-problem-consolidation.md).
-- **S76's names** (PP-0, in the same step 0 session): the program family's name and the
-  plant's key in the parameter tree (`system` or `plant`).
-  [parametric-program.md](../plans/parametric-program.md) §2.
-- **For the same session, to discuss** (not blocking on their own): how the proposals carry
-  MPPI, behavior cloning and diffusion policy
-  ([future-policies.md](../plans/future-policies.md) §7); the standard stochastic policy as a
-  seeded block is a C5 row (v0.4), its contract beyond `h` ruled there.
+- **Where the line between v0.3 and v0.4 falls for the Monte Carlo evaluator.** v0.3 changes
+  the `Evaluation` record and the scoring formula (V1's step 2); the Monte Carlo evaluator keeps
+  its own copy of the old rule until V1's step 7 in v0.4, so for one release two scorers give
+  two numbers for one run. The calendar rule (numbers may move behind the pinned release the
+  course runs on) removed the reason to wait. Recommended: pull the fold (step 7 without RN-4's
+  per-block seeds) into v0.3, or accept the two scorers for one release.
+- **`evaluate`'s automatic `dt`.** The design says "a tenth of the smallest time constant, 0.01
+  fallback"; the code's fallback on a loop that declares no time constant is 1e-4 s (100 000
+  steps for 10 s). Recommended: `evaluate` and `compare` require `dt` when the loop declares no
+  time constant, with the line to write in the message.
+- **The reference from `x_goal`.** `r` is filled from `x_goal`, a state; a controller whose `r`
+  is an output reference (a PID on `y`) needs `h(x_goal)` or a refusal. Recommended: fill `r`
+  with the plant's output at `x_goal` when the controller's `r` has the output's size, the
+  state when it has the state's, refuse otherwise.
+- **A diverging run inside the program export.** With no cut and no saturating cost in this
+  phase, an optimizer step into an unstable gain gives an infinite or NaN objective and the
+  solve fails instead of backing off. Recommended: `program` warns and the objective is capped
+  at `infeasible_cost` per run, or the saturating cost wrapper enters the phase.
+- **`evaluate` on a stochastic problem in v0.3** with `n_trials = 1`: the nominal problem or the
+  draw of `key`. Recommended: refuse a stochastic problem in v0.3 except through
+  `MonteCarloEvaluator`, unless the fold moves into v0.3 (the first item).
+- **The slot of the sampled loop (S31)**: v0.3 if the calendar leaves room before wave G, else
+  the first core row of v0.4; and the slot of S74, deferred, which S76 needs first.
+- **`criterion_value`**, the proposed name of the criterion over the runs: to confirm.
+- **The `params["dt"]` fallback of `discretize`**: R7 says `dt` is required; proposed, drop the
+  fallback with a ledger line.
 
 **Before v0.4 (S76, the parametric program)**
 
@@ -596,16 +596,17 @@ generated (D10). Session 1 is closed; wave K and S75's SM-0 to SM-6 may start.
   building `J(z, p)`, `h(z, p)`, `g(z, p)` on the problem's parameter tree and the frozen
   `MathematicalProgram` its binding, or two parallel types, or one class whose functions
   always take `p`. Recommended (2026-10-22): the family, so hand-written programs stay `J(z)`
-  and one evaluator serves both. Still to rule with it (the names apart, ruled in session 2):
+  and one evaluator serves both (end-state-api.md D25). Still to rule with it (the names apart,
+  ruled: `ParametricProgram`, the key `plant`):
   whether a hand-written program may declare its own parameters, and the MPC block's
   live-parameter ports. [parametric-program.md](../plans/parametric-program.md) §2–§3.
 
 **Before v0.3's convergence (wave K)**
 
-- **What is core, what is a side feature** (K7, its other asks): the first tier of side
-  features as a block or item by item, with the plant rule; the contact engines; the racecar
-  3-D skin between terms and the SB3 bridge at S49; the exit rule for the lane contract; the
-  form of the prelude trim. [core-consolidation.md](../plans/core-consolidation.md) §10.
+- **What is core, what is a side feature** (K7, its other asks; the shape, the catalog rule,
+  the contact engines, the exit rule and the prelude trim are ruled, R1–R5): the first tier of
+  side features as a block or item by item, from K1's table; the racecar 3-D skin between terms
+  and the SB3 bridge at S49. [core-consolidation.md](../plans/core-consolidation.md) §10.
 
 **Before v0.3's course rows (wave G)**
 
