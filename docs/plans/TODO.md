@@ -301,6 +301,14 @@ pick):
 
 ## 4. v0.3 — a cleaner core and the differentiable path, then GMC714
 
+**Start here (2026-10-23):** the continuous-core phase is designed and ruled; its design of record is
+[continuous-core.md](continuous-core.md), the rulings
+[2026-10-22-rulings-session-1.md](../reviews/2026-10-22-rulings-session-1.md). The next
+session rewrites the plan docs that design supersedes (differentiable-problem.md, sampled-path.md,
+cost-params.md, randomness.md's evaluator step), then writes the rows below as the design's steps
+with gates, then implements (the step model's baseline, SM-0, first). The V1, S75, A2 and K8/K9
+rows below are the slots those steps fill; their wording predates the rulings where it conflicts.
+
 **Order** (reorganized 2026-10-21, [record](../reviews/2026-10-21-roadmap-reorganization.md)):
 the rulings that block code first, in two sessions (ROADMAP §6, "Blocking code now": session 1
 the shape, K7's tier 1 and the exit rule, S75; session 2 a week later S31, V1's names with

@@ -1,5 +1,11 @@
 # The differentiable planning problem: one path from any parameter to any metric
 
+> **Superseded in part (2026-10-23).** The rulings of 2026-10-22/23 changed this plan's API:
+> one `Evaluation` record, the engine's verbs `trajectory` / `evaluate` / `program`, the integral
+> to `tf` with no cut, the program as the phase's export (no `tune`), the criterion on the problem.
+> Read [continuous-core.md](continuous-core.md) first; this document is rewritten to it at the
+> start of the phase and keeps the analysis, the guardrails and the step list until then.
+
 Status: consolidated proposal for the maintainer (2026-10-18, revised 2026-10-20). One
 document replaces the plan of 2026-10-17, its architecture-and-naming analysis and the
 target-architecture ideas of 2026-10-18, after an independent review probed each against the

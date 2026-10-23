@@ -237,3 +237,15 @@ turn them into workboard rows, then implement.
   slice; each plant input a static index into the recorded signals, the boundary `u` or a
   nominal constant; no recomputation. Today's recompute loop is the NumPy fallback for a
   signal-less trajectory. Lives in: continuous-core.md §3.5.
+
+## Handoff (2026-10-23, the session closes)
+
+The design of record is [continuous-core.md](../plans/continuous-core.md); the decision ledger
+[end-state-api.md](../plans/end-state-api.md); the picture `docs/plans/pipeline.mmd`; the
+numbers `benchmarks/params_binding.py`; the audit
+[2026-10-23-planning-problem-field-inventory.md](2026-10-23-planning-problem-field-inventory.md).
+ROADMAP §5.3 and TODO §4 point here. Next, in order: (1) rewrite differentiable-problem.md,
+sampled-path.md, cost-params.md and randomness.md's evaluator step to the design; (2) the
+design as workboard rows with gates; (3) implement, the step model's baseline (SM-0) first.
+Open by the maintainer's choice: the hybrid tool's details (D13–D15), the optimizer upgrade
+(D23, S74), the v0.4 names (D25–D30).

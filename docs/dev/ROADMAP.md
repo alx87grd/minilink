@@ -327,9 +327,14 @@ it is cheap and fixes what December must contain).
 session 1 rules the shape of the framework, K7's tier 1 and the exit rule, and the S75
 contract, so wave K and SM-0 to SM-2 start on November 1; session 2, a week later, rules S31,
 the names of V1's step 0 (with S76's PP-0), the terminal cost and the sampled loop's tick,
-so wave V starts. No foundation code before the session that rules it. The agenda, every
-decision answered as the code a user would write:
-[end-state-api.md](../plans/end-state-api.md).
+so wave V starts. No foundation code before the session that rules it. **Both sessions ruled on
+2026-10-22/23** ([record](../reviews/2026-10-22-rulings-session-1.md)): the design of record for
+the continuous-core phase is [continuous-core.md](../plans/continuous-core.md) (the decision
+ledger with the alternatives: [end-state-api.md](../plans/end-state-api.md)). **Next, in order:**
+(1) rewrite differentiable-problem.md, sampled-path.md, cost-params.md and randomness.md's
+evaluator step to that design; (2) turn it into workboard rows with gates (TODO §4); (3)
+implement, the step model's baseline first. The sampled loop's details, the optimizer upgrade
+(S74) and the v0.4 names stay open as the design says.
 
 **The audit, early** (in parallel with the rulings):
 - **G1** GMC714 baseline audit: every §4.3 topic run on the teaching surface, the gaps

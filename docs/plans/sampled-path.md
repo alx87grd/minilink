@@ -1,5 +1,11 @@
 # The sampled path: the step model and the sampled loop
 
+> **Ruled in part (2026-10-22/23).** The step model (§1–§7) is ruled as written, with the
+> four-body evaluator surface of §3.6; the sampled loop (§8) is a tool named `HybridDiagram`
+> for now, ticks on its clock, its remaining details parked to the hybrid phase. The design of
+> record is [continuous-core.md](continuous-core.md); this document is aligned to it at the
+> start of the phase.
+
 **Status:** ideas to review, 2026-10-21 — an evaluation of the code and a recommendation;
 nothing decided.  
 **Lane:** core (the compiled evaluator, `discretize`, every sampled consumer) — every step is

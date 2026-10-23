@@ -1,5 +1,10 @@
 # Cost parameters: one dictionary, nested like a diagram's
 
+> **Amended (2026-10-23).** `discount_rate` leaves the cost for the problem; the cost's surface is
+> `params`, `g`, `h`, `g_max`, `integrate` and the algebra; `evaluate_trajectory`,
+> `terminal_cost`, `total_cost` leave it. See [continuous-core.md](continuous-core.md) §3.3; this
+> document is aligned to it at the start of the phase.
+
 Status: core contract, design agreed with the maintainer 2026-09-13 (composite costs nest
 their parameters the way a diagram nests its subsystems'); implementation not started.
 Rung: v0.3 wave V, step A2 of [TODO.md](TODO.md) (the differentiable problem's step 6).
