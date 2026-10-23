@@ -249,3 +249,96 @@ sampled-path.md, cost-params.md and randomness.md's evaluator step to the design
 design as workboard rows with gates; (3) implement, the step model's baseline (SM-0) first.
 Open by the maintainer's choice: the hybrid tool's details (D13–D15), the optimizer upgrade
 (D23, S74), the v0.4 names (D25–D30).
+
+## Session 3 (2026-10-23, evening): the second opinion
+
+Taken one by one over the points the alignment pass and the independent second opinion raised
+([the record](2026-10-23-v03-alignment-and-second-opinion.md) §3, whose item numbers are cited).
+Where a ruling here differs from an earlier one, it supersedes it; the superseded ones are
+named.
+
+- **R30 (item 6) The GMC714 audit now.** The agent runs G1 this week on the teaching surface
+  and writes "what each GMC714 lesson needs by January 5"; the course page
+  (alexandregirard.com/courses/gmc714) is the syllabus, to be read once the environment allows
+  the host or the maintainer pastes it.
+- **R31 (item 1) A run that is not finite is failed.** `failed = ~finite | (feasibility_margin
+  < 0)`; its raw `cost` is `+inf`, the gradient kept finite by a safe `where`; its `J` is the
+  price when the price is on (R32).
+- **R32 (items 2, 4; the price, one rule for every pipeline).** The cost carries its
+  upper-bound hint, `CostFunction.g_max(X, U)` and `h_max(X)`, always defined;
+  `problem.infeasible_cost_bound()` resolves it to a finite number: `g_max(X_b, U_b) · tf +
+  h_max(X_b)` (`/ ρ` on an infinite horizon), `X_b`, `U_b` the declared boxes, else the plant's
+  own, else `1e6` with one warning (the name to confirm). `infeasible_cost` is the switch:
+  `None` (the default), `True` (the bound) or a number. Then, read the same way by `evaluate`,
+  `compare`, `jax.grad` and `pe.program`: `J = cost` when off, `J = cost + price · (failed or not
+  reached)` when on; `objective` is the criterion over `J`. `pe.program` adds the declared `X`,
+  `U`, `Xf` as hard margin rows beside it; its docstring states the two caveats (the price is a
+  step with no gradient; with the switch on and sets declared it counts beside the rows) and
+  the smooth alternative, `cost + w · X.as_cost()`. DP, RL and later MPPI read `infeasible_cost`
+  when set, else `infeasible_cost_bound()`; nothing refuses. Supersedes R10's default
+  (`g_max · tf`) and R19's always-priced `value`.
+- **R33 (item 3) `x_goal` never creates `Xf`.** A terminal set is written (`Xf=BallSet(x_goal,
+  r)`); trajectory optimization's terminal equality needs `Xf=SingletonSet(...)` explicitly (its
+  demos and lessons gain the line; a ledger line).
+- **R34 (the criterion)** keeps its three values, `"expectation"`, `("cvar", α)`,
+  `"worst_case"`, on `StochasticPlanningProblem`, reducing `J`; the mean over successful runs,
+  the plain cost's mean and the rates are report fields, never criteria.
+- **R35 (the settings map).** The problem says *what* is optimal (the sets, the horizon, the
+  discount, the price switch, the laws, the criterion); the engine says *how a run is computed*
+  (`dt`, `substeps`, `solver`, `backend`); the program says *how it is lowered* (`wrt`, `bounds`,
+  the sample set).
+- **R36 (item 5) `dt` is required** on `evaluate` and `compare`, as on `problem.compile`; with an
+  adaptive `solver` it is the reporting grid. Supersedes R15's `dt=None`.
+- **R37 (item 11) `U` unbounded unless declared** (R21 kept); `plant.input_box`, the input
+  ports' `BoxInputSet`, is added so the refusal's line works; the trajectory-optimization
+  numbers are re-pinned once (a ledger line); the lessons gain `U=plant.input_box`.
+- **R38 (item 13) The problem never fills `r`.** Every free input of the loop stays at its
+  port's nominal value; the setpoint is set on the controller (`inputs["r"].set_nominal_value`)
+  or by a source block; the free inputs stay leaves of `pe.params`. `x_goal` serves RRT's bias and
+  trajectory optimization's initial guess only. Supersedes R22's reference filling and R29's
+  refusal.
+- **R39 (item 14) A role-less trajectory** is taken as the plant's run only when `x` has the
+  plant's `n`, `u` its `m`, and it carries no recorded signals; a loop trajectory carries its
+  roles (a static layout, kept by save and load) and is projected; signals without roles are
+  refused. Supersedes R29's dimension rule.
+- **R40 (item 12) A step map holds its input by definition.** `step` and `discretize` have no
+  `hold` (their knobs: `dt`, `solver`, `substeps`); `hold="zoh" | "foh"` lives on `rollout` and
+  `compute_forced`, which hold a sequence; a callable `u(t)` given to `compute_forced` is
+  evaluated at the RK4 stage times; a sampled matrix is held (`zoh` by default, R18 for sampled
+  inputs only). Supersedes R7's `hold` on the step and R18 for callables.
+- **R41 (item 15) One home per number.** Each object owns its parameters (`plant.params`,
+  `cost.params`, a set's); `ProblemParameters` is retired, its readers migrating with A2;
+  `pe.params` is the tree assembled from the objects, plus `x0` and the free inputs (`"sets"` once
+  A5 lands); `pe.evaluate(p)` takes an override tree.
+- **R42 (item 16) One keyword per kind of choice.** `method=` is the verb's own numerical method
+  (the derivative, the optimizer's algorithm, the interpolation, the certificate family);
+  `solver=` is the time integration on every tool that integrates (`Simulator`,
+  `compute_trajectory`, `compute_forced`, `evaluate`, `compare`, `discretize`, the RL planners,
+  `RolloutEnvironment`, `Sys2Gym`); `integrator=` is retired (one release accepted, a ledger line;
+  it clashes with the `Integrator` block). Values: `"rk4"`, `"euler"`, `"exact"` for a step,
+  `"rk4"` accepted for `"rk4_fixedsteps"`, the `"scipy*"` family adaptive. RULES gains the rule.
+  Supersedes R6's `integrator=` → `method=` and the `method=` of R15 and R17.
+- **R43 (item 17) The RL episode is a training setting.** `RolloutEnvironment` owns it and reads
+  the problem's fields as hints (`X` the exit, `infeasible_cost` else the bound its price,
+  `discount_rate` its γ, `tf` or `episode_length`, `U` the action box), keeping its own rules
+  (termination at an exit, truncation at the training zone, the left-Riemann reward); the learned
+  law is scored by `evaluate` like any other. `RolloutEnvironment` stops serving the Monte Carlo
+  trials.
+- **R44 (items 10, 20) The Monte Carlo fold is v0.3,** right after `evaluate` exists (V1's step
+  4): `evaluate` and `compare` take `n_trials` and `key` over `problem.realize(key, n)` (the start
+  and parameter laws; RN-4's per-block noise seeds join in v0.4 under the same verb);
+  `MonteCarloEvaluator` becomes a one-line facade, then goes; the RL lessons and tutorial 11
+  migrate once. Supersedes the v0.4 slot of V1's step 7 for its fold.
+- **R45 (item 19) The record's names: `cost`, `J`, `objective`.** `cost` the plain integral per
+  run, `J` the run's score (the price added when on), `objective` the criterion over `J`, the one
+  scalar the program minimizes and `jax.grad` targets. Supersedes R27's `value` and the proposed
+  `criterion_value` (no clash with `V(x)`, `critic.value`, `Field.value`).
+- **R46 (item 22) No hook for a term on the parameters.** The autotuning demo drops its `1e-4`
+  gain regularizer (its numbers re-pinned once) and ends in the `Optimizer`; a `jax.grad` user adds
+  any term to `pe.evaluate(p).objective`.
+- **R47 (item 7) No pin; v0.3 stays on `dev`** until every notebook has moved to the new
+  interface; `main` stays what the running course clones.
+
+Left open from the record: items 8, 9 and 18 (v0.3's scope and the slots of S31 and S74, after
+G1), 21 (`discretize`'s `params["dt"]` fallback, proposed dropped), 23 and 24 (agent-managed: V1.1
+split when it starts; this section marks the reversals).

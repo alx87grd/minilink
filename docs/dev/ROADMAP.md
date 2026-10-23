@@ -356,17 +356,19 @@ points that pass and an independent second opinion raised are under "Raised 2026
 [continuous-core.md](../plans/continuous-core.md), ruled R1–R29; the steps and gates are TODO
 §4):
 - **S75** The step model ([sampled-path.md](../plans/sampled-path.md)): one compiled step taking
-  `params`, `discretize(plant, dt, *, method, substeps, hold) -> StepSystem` on it for every
-  sampled consumer, `compute_forced` on the same rollout (its forced numbers change once, R18),
+  `params`, `discretize(plant, dt, *, solver, substeps) -> StepSystem` on it for every
+  sampled consumer, `compute_forced` on the same rollout (a sampled input held, its forced numbers changing once, R18, R40),
   the evaluator trimmed to four traced bodies and the integrators moved to `simulation/solvers/`
-  (steps SM-0 to SM-7; S37 absorbed, S27 Diffrax stays in v0.9). **[ask — core]**, ruled.
-- **V1** The deterministic path to the cost (steps 1–6 of
+  (steps SM-0 to SM-8; S37 absorbed, S27 Diffrax stays in v0.9). **[ask — core]**, ruled.
+- **V1** The path to the cost (steps 1–6 and the Monte Carlo fold of
   [differentiable-problem.md](../plans/differentiable-problem.md)): the native `Trajectory`, one
   evaluation of any run (`evaluate_trajectory` and the `Evaluation` record, the integral to `tf`,
   the problem's fields with one meaning each), the whole run out of the scan,
   `problem.compile(loop)` with `evaluate` and `compare` as its facades, the program export to
-  today's `Optimizer` (no tuning facade, R23). One run per call: the draws are step 7 (§5.4), a
-  sampled controller is refused until the hybrid phase. **[ask — core]**, ruled.
+  today's `Optimizer` (no tuning facade, R23), and the Monte Carlo evaluator folded into
+  `evaluate(..., n_trials, key)` (R44); the record's names `cost`, `J`, `objective` (R45). A
+  sampled controller is refused until the hybrid phase; the noise blocks' per-trial seeds are
+  v0.4 (§5.4). Nothing merges to `main` until every notebook has moved (R47). **[ask — core]**, ruled.
 - **A2** Cost parameters ([cost-params.md](../plans/cost-params.md)), V1's step 6, so the path
   reaches the cost's own weights. **[ask — core]**, ruled.
 - **S31** The sampled loop, ruled a tool with ticks (R13, R14), after the continuous core: in
@@ -392,13 +394,11 @@ Winter 2027, the window between GRO860 cohorts (§5's calendar rule: the GMC714 
 meanwhile and does not gate it); the steps, in order, are TODO §5.
 
 **The draws on the path** ([differentiable-problem.md](../plans/differentiable-problem.md)):
-- **V1, the draws** (steps 7–9): `problem.realize(key, n)`, `evaluate(..., n_trials, key)` on a
-  stochastic problem with `criterion_value` the criterion over the runs, the Monte Carlo
-  evaluator folded into `evaluate`, as one row with **RN-3 / RN-4 / RN-5** of
-  [randomness.md](../plans/randomness.md) and **AC-7** (the cost scored on the plant); the
-  sets as costs; the material. Placed in this window because the evaluator's numbers change
-  once; whether the fold moves into v0.3 under the calendar rule is raised in §6. The engine
-  and `program` stay provisional until GMC714 or GRO860 has run them (R28). **[ask — core]**
+- **V1, the draws' noise** (steps 7–9): one seed per random block in `problem.realize(key, n)`
+  under the same `evaluate(..., n_trials, key)` (the fold itself landed in v0.3, R44), as one row
+  with **RN-3 / RN-4 / RN-5** of [randomness.md](../plans/randomness.md) and **AC-7** (the cost
+  scored on the plant); the sets as costs; the material. The engine and `program` stay
+  provisional until GMC714 or GRO860 has run them (R28). **[ask — core]**
 - **V1, the sampled face** (step 7b): `problem.compile(sampled controller)` dispatches to
   S31's kernel on its JAX face, so a digital PID, a held neural policy, MPPI and the RL
   policies get the same `evaluate` and `program` as a continuous law. **[ask — core]**
@@ -558,36 +558,25 @@ controller memory and draws on the tick, the dispatch of a sampled controller). 
 when convenient, not blocking: how the proposals carry MPPI, behavior cloning and diffusion
 policy ([future-policies.md](../plans/future-policies.md) §7).
 
-**Raised 2026-10-23, to discuss** (the alignment pass and an independent second opinion,
-merged and checked against the code; the evidence, the options and a recommendation for each
-are in [the record](../reviews/2026-10-23-v03-alignment-and-second-opinion.md) §3, whose numbers
-these are). None blocks SM-0, wave K or V1's step 1; items 1–5 block V1's step 2, and the
-record recommends a one-day spike of the scoring formula on the pendulum before it.
+**Ruled 2026-10-23, the evening session** (R30–R47, the same
+[record](../reviews/2026-10-22-rulings-session-1.md), on the points of
+[the alignment and second-opinion record](../reviews/2026-10-23-v03-alignment-and-second-opinion.md)):
+the GMC714 audit now (R30); a non-finite run failed (R31); the price one switch read the same
+way by every pipeline, `infeasible_cost=None | True | a number`, with the cost's upper-bound hint
+and `problem.infeasible_cost_bound()` for DP and RL (R32); `x_goal` never creates `Xf` (R33); the
+criterion's three values reducing `J` (R34); the settings map (R35); `dt` required on `evaluate`
+and `compare` (R36); `U` unbounded unless declared, `plant.input_box` added (R37); the problem
+never fills `r` (R38); role-less trajectories (R39); the hold on sequences only (R40); one home
+per parameter, `ProblemParameters` retired (R41); `method=` for the verb's own method, `solver=`
+for time (R42); the RL episode a training setting (R43); the Monte Carlo fold in v0.3 (R44); the
+record's names `cost`, `J`, `objective` (R45); no regularizer hook (R46); v0.3 on `dev` until
+every notebook has moved, no pin (R47).
 
-- **The scoring formula** (major): (1) a diverging run scores NaN and counts as feasible, since
-  "no mask, no stop" drops today's finite guard; (2) the default price `g_max · tf` is `+inf`
-  under the default unbounded sets, and `inf · 0` makes successful runs NaN; (3) `x_goal` still
-  builds a singleton `Xf`, so no closed-loop run is ever "reached"; (4) the program's objective
-  is priced and its rows are the margins, counting infeasibility twice; (5) `evaluate`'s
-  automatic `dt` is 1e-4 s on almost every plant: recommended, `dt` required.
-- **The calendar** (major): (6) the GMC714 audit (G1) has not started; (7) the 13 GRO860 course
-  notebooks clone `main` with no tag, so the "pinned release" the calendar rule relies on does
-  not exist yet (V6 pulled forward, before `dev` merges to `main`); (8) v0.3's scope against the
-  maintainer's attention: proposed cuts to v0.4 (SM-7, SM-6's move, A2, K4, K8-3, S31) and a
-  GMC714 API freeze on December 1; (9) MPC (a sampled controller) and robust control (the draws)
-  fall on the wrong side of the v0.3 / v0.4 line if GMC714 needs them in `evaluate`.
-- **Moderate**: (10) the Monte Carlo evaluator keeps the old rule for one release (pull the fold
-  into v0.3, or accept); (11) `U` unbounded by default changes trajectory optimization and
-  `plant.input_box` does not exist yet; (12) `hold` belongs to the rollout, not the one-step map,
-  and R18's forced `zoh` degrades RK4 on a callable `u(t)`; (13) `r` from `x_goal` has a
-  dimension gap (`h(x_goal)` proposed); (14) a role-less trajectory scored by its dimension is
-  inference; (15) the cost's parameters have three homes and the sets' none; (16) `method=`
-  against the Simulator's `solver=`; (17) an exit priced two ways, RL training against
-  evaluation; (18) the slots of S31 and S74.
-- **Minor**: (19) `criterion_value` to confirm, and `value` with three meanings where the notes
-  say `J`; (20) `evaluate` on a stochastic problem in v0.3; (21) `discretize`'s `params["dt"]`
-  fallback; (22) the autotuning demo's gain regularizer has no place in the program; (23) V1.1
-  is a core rewrite, to split; (24) two reversals the rulings record does not mark.
+**Still open from the second opinion** (after G1): v0.3's scope against the maintainer's
+attention, the proposed cuts to v0.4 (SM-7, SM-6's move, A2, K4, K8-3, S31) and a GMC714 API
+freeze on December 1 (record item 8); whether MPC and robust control need the engine in
+December (item 9); the slots of S31 and S74 (item 18); `discretize`'s `params["dt"]` fallback,
+proposed dropped (item 21).
 
 **Before v0.4 (S76, the parametric program)**
 

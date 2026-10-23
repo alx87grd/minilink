@@ -41,6 +41,12 @@ maintainer (listed in ROADMAP §6, "Raised 2026-10-23"). Nothing here is ruled.
 
 ## 3. The points raised, merged and ranked
 
+> **Ruled the same evening** as R30–R47 ([the rulings record](2026-10-22-rulings-session-1.md),
+> "Session 3"): items 1–7, 10–17, 19, 20 and 22, some with a different answer than recommended
+> below (the price became one switch read by every pipeline, R32; the problem never fills `r`,
+> R38; `solver=` for time, R42; the names `cost`, `J`, `objective`, R45; no pin, R47). Open:
+> items 8, 9, 18, 21; items 23 and 24 are agent-managed.
+
 From both sources (marked *pass* and *2nd*), checked against the code where they make a claim
 about it. ROADMAP §6 "Raised 2026-10-23" lists them in one line each; nothing is ruled.
 
