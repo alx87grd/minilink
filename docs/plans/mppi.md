@@ -38,7 +38,7 @@ few screens plus one contract narrowing in `control/mpc`.
 - **The rollout is the one Minilink already has.** `rollout_batch` /
   `rk4_integrate_zoh_trace` vmap `K` held-input RK4 rollouts in one jitted call; the
   `RolloutEnvironment` owns what a step costs (exit from `X` charged the problem's price:
-  `infeasible_cost` when set, else `problem.infeasible_cost_bound()`, the cost's upper-bound
+  `infeasible_cost` when set, else `problem.cost_bound()`, the cost's upper-bound
   hint, R32; `h` at the horizon, disturbance draws on their ports). It is a training setting
   that reads the problem's fields as hints (R43), as for the RL planner; MPPI reads those; it
   does not redefine them. The plan it returns is scored by `evaluate` like any law.
@@ -163,7 +163,7 @@ nominal sequence is `U = (u_0, …, u_{N-1})`, each `u_k ∈ ℝ^m`.
    `θ^k = θ` and `w^k_t` is the nominal value of the disturbance ports for every `k`.
 3. **Score.** The path cost under the problem's contract:
    `S^k = Σ_t g(x^k_t, v^k_t, t_k) dt + h(x^k_N, t_N) + c_X^k`, with `c_X^k` the
-   problem's price (`infeasible_cost`, else `infeasible_cost_bound()`, R32) charged once when
+   problem's price (`infeasible_cost`, else `cost_bound()`, R32) charged once when
    the path leaves `X` (the exit rule of `RolloutEnvironment`), plus the information-theoretic control term
    `λ (1 − α) Σ_t u_tᵀ Σ⁻¹ ε^k_t` (`α = 1` turns it off; the default of the paper is
    `α = 0`, the term on).

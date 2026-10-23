@@ -578,7 +578,7 @@ policy ([future-policies.md](../plans/future-policies.md) §7).
 [the alignment and second-opinion record](../reviews/2026-10-23-v03-alignment-and-second-opinion.md)):
 the GMC714 audit now (R30); a non-finite run failed (R31); the price one switch read the same
 way by every pipeline, `infeasible_cost=None | True | a number`, with the cost's upper-bound hint
-and `problem.infeasible_cost_bound()` for DP and RL (R32); `x_goal` never creates `Xf` (R33); the
+and `problem.cost_bound()` for DP and RL (R32); `x_goal` never creates `Xf` (R33); the
 criterion's three values reducing `J` (R34); the settings map (R35); `dt` required on `evaluate`
 and `compare` (R36); `U` unbounded unless declared, `plant.input_box` added (R37); the problem
 never fills `r` (R38); role-less trajectories (R39); the hold on sequences only (R40); one home

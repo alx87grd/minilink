@@ -752,7 +752,7 @@ history of this plan; where they conflict, the later rulings hold:
 - **The score** is the integral to `tf` with no cut at exit (R19); the price is a switch
   (R32): with `infeasible_cost=None`, the default, `J = cost`; with `True` or a number, `J = cost
   + price · (failed or not reached)`, the price `True` reads from the cost's upper-bound hint
-  (`problem.infeasible_cost_bound()`). A run that is not finite is failed, its cost `+inf` (R31).
+  (`problem.cost_bound()`). A run that is not finite is failed, its cost `+inf` (R31).
   RD-D24's "the numbers change once" now covers both changes (D21).
 - **The RL environment** keeps its own episode (R43): a training setting reading the problem's
   fields as hints, no longer the Monte Carlo trials' plant.

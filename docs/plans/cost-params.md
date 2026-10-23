@@ -38,7 +38,7 @@ anywhere.
 
 **The upper-bound hint (R32).** `g_max` and `h_max` are the cost's one statement about its own
 scale, always defined. The problem resolves them to a finite price,
-`problem.infeasible_cost_bound() = g_max(X_b, U_b) · tf + h_max(X_b)` (`/ ρ` on an infinite
+`problem.cost_bound() = g_max(X_b, U_b) · tf + h_max(X_b)` (`/ ρ` on an infinite
 horizon), `X_b`, `U_b` the declared boxes, else the plant's own, else `1e6` with one warning;
 DP, RL and later MPPI read it when `infeasible_cost` is `None`, and `infeasible_cost=True` puts
 it in the run's score `J`. The cost itself still knows no price.

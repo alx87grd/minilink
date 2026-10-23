@@ -105,7 +105,7 @@ The "after" column is continuous-core.md §2–§3; this table says only what ch
 | `StepRollout` | the step twin of `Trajectory` | a constructor of `Trajectory` with `t = k·dt` (step 1, last commit) |
 | `CostFunction` | `g`, `h` trace; `evaluate_trajectory` / `total_cost` a NumPy loop with `float()` casts; owns `discount_rate` | `params`, `g`, `h`, `g_max(X, U)`, `h_max(X)` (the upper-bound hint, R32), `integrate(traj, *, discount_rate, params)` on `xp`, the algebra; `discount_rate`, `evaluate_trajectory`, `terminal_cost`, `total_cost` leave it (D16b; steps 1–2); `params` nested (A2, step 6) |
 | `Set` | `margin` traces; `contains` is NumPy | `contains` derived from `margin` on `xp`, one exit test for the scorer and the RL environment (step 1); reads `params` with A5 (step 8) |
-| `PlanningProblem` | `sys`, `cost`, `X`, `U`, `X0`, `Xf`, `tf`, `infeasible_cost`, `params`; eight consumers read the fields eight ways ([inventory](../reviews/2026-10-23-planning-problem-field-inventory.md)) | one meaning per field (continuous-core.md §3.4): gains `discount_rate`; `X` / `U` explicit with refusals and `plant.input_box` (R37); `infeasible_cost` the price switch (`None`, `True`, a number) and `infeasible_cost_bound()` (R32); `x_goal` never creating `Xf` (R33); no `params` bundle (R41) (step 2); `compile(arg, dt)` (step 4) |
+| `PlanningProblem` | `sys`, `cost`, `X`, `U`, `X0`, `Xf`, `tf`, `infeasible_cost`, `params`; eight consumers read the fields eight ways ([inventory](../reviews/2026-10-23-planning-problem-field-inventory.md)) | one meaning per field (continuous-core.md §3.4): gains `discount_rate`; `X` / `U` explicit with refusals and `plant.input_box` (R37); `infeasible_cost` the price switch (`None`, `True`, a number) and `cost_bound()` (R32); `x_goal` never creating `Xf` (R33); no `params` bundle (R41) (step 2); `compile(arg, dt)` (step 4) |
 | `StochasticPlanningProblem` | the three laws, `criterion`, the three `sample_*(key)`; every planner reads `nominal()` | `realize(key, n)` and `criterion` read by `objective` (step 7a; the per-block noise seeds step 7) |
 | `score_trajectory` | NumPy, the reference; cuts the run at the first exit | gone: `evaluate_trajectory(problem, traj) -> Evaluation`, the integral to `tf` with no cut (§4.2; step 2) |
 | `Evaluation` | a NumPy record: `J`, `failed`, `x0`, `trajectories`, `mean`, `worst`, `failure_rate`, `value(criterion)` | the one pytree record, one row per run: `cost`, `J`, `objective`, the three rates (continuous-core.md §3.5; step 2); `failure_rate` → `feasibility_rate`, `value(criterion)` → `objective` |
@@ -407,7 +407,7 @@ steps 1–6, §5 for 7–9); this list is the content.
    DP's α and the gym bridge; `X`, `U` explicit, `plant.input_box` added, DP and RL refusing an
    unbounded set with the line to write, LQR warning once, the lessons gaining the line in the
    same commit; `Xf=None` reached; `x_goal` never creating `Xf`, trajopt's terminal equality
-   written; the price switch `infeasible_cost` and `infeasible_cost_bound()`, read by DP and RL
+   written; the price switch `infeasible_cost` and `cost_bound()`, read by DP and RL
    when unset; `ProblemParameters` retired, its readers migrating); the transcriptions take the
    problem's discount (bit-identical). The intended changes: the integral to `tf` replaces the
    cut wherever `score_trajectory` scored; trajopt's numbers where `U` or `Xf` came from a
@@ -468,5 +468,5 @@ record, and leaves ROADMAP §6.
    margin-constrained tuning.
 3. **The `CostIntegrator` block** (cost-params.md's research step): proposed, closed as a demo
    idea; `cost.integrate` on samples is the contract.
-4. **The name `infeasible_cost_bound()`** (R32): proposed as written; a property
+4. **The name `cost_bound()`** (R32): proposed as written; a property
    (`problem.price`) or a cost-side verb (`cost.upper_bound(X, U, tf)`) are the alternatives.

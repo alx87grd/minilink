@@ -472,7 +472,7 @@ moved to the new interface (R47).
   `failed`, `reachability_margin`, `reached`, the three rates, `objective` (R27, R45); a run that
   is not finite is failed with `cost = +inf` behind a safe `where` (R31); `J = cost`, plus the
   price when `infeasible_cost` is on (`None` by default, `True` for
-  `problem.infeasible_cost_bound()`, or a number; R32); `discount_rate` moves from the cost to
+  `problem.cost_bound()`, or a number; R32); `discount_rate` moves from the cost to
   `PlanningProblem` (a ledger line); `evaluate_trajectory`, `terminal_cost`, `total_cost` leave
   the cost; `X` and `U` unbounded unless declared, `plant.input_box` added, DP and RL refuse an
   unbounded set with the line to write, LQR warns once, the trajectory-optimization numbers

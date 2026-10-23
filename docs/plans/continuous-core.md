@@ -129,7 +129,7 @@ whose policy re-enters as a controller; dashed, the sampled loop of the next pha
 | cost | `traj.with_cost(cost, discount_rate)` | `Trajectory` with `cost_rate`, `cost` signals |
 | problem | `PlanningProblem(sys, cost, X, U, Xf, tf, discount_rate, infeasible_cost, x_start, x_goal)` | — |
 | problem | `StochasticPlanningProblem(..., x0_distribution, params_distribution, disturbances, criterion)` | — |
-| problem | `problem.infeasible_cost_bound()` (name to confirm) | the price the hint gives, always finite |
+| problem | `problem.cost_bound()` (R71) | an upper bound on any feasible run's cost, always finite: the price of a failure |
 | problem | `problem.realize(key, n)` | the draws |
 | scoring | `evaluate_trajectory(problem, traj)` | `Evaluation` (one row) |
 | engine | `problem.compile(loop_or_controller, dt, *, substeps, solver, backend)` | `ProblemEvaluator` |
@@ -223,10 +223,10 @@ noisy = StochasticPlanningProblem(..., x0_distribution=Gaussian(...), params_dis
 | `x_goal`, `x_start` | one point, for the tools that need a point: RRT's bias, trajectory optimization's initial guess. The problem never reads the cost's target and never fills the loop's `r` (R38) |
 | `tf` | finite: the horizon, `h` charged at `tf`; `None`: infinite, no `h` (a nonzero `h` warns once, R9), simulated over an `episode_length` the tool names |
 | `discount_rate` | ρ, applied to `g` and `h` by every consumer (RL's γ and DP's α read it here) |
-| `infeasible_cost` | **the price switch** (R32): `None` (default) no price in the evaluation; `True` the price from the cost's hint, `problem.infeasible_cost_bound()`; a number, that price. DP, RL and later MPPI read it when set, else the bound |
+| `infeasible_cost` | **the price switch** (R32): `None` (default) no price in the evaluation; `True` the price from the cost's hint, `problem.cost_bound()`; a number, that price. DP, RL and later MPPI read it when set, else the bound |
 | `criterion` | `"expectation"`, `("cvar", α)`, `"worst_case"`: how `objective` reduces the runs' `J` (R34) |
 
-`problem.infeasible_cost_bound()` is `cost.g_max(X_b, U_b) · tf + cost.h_max(X_b)` (`/ ρ` on an
+`problem.cost_bound()` is `cost.g_max(X_b, U_b) · tf + cost.h_max(X_b)` (`/ ρ` on an
 infinite horizon), `X_b`, `U_b` the declared boxes, else the plant's own boxes, else `1e6` with
 one warning naming `infeasible_cost=`; always finite. **One home per number** (R41): the plant's,
 the cost's and a set's parameters live on those objects; the problem holds no parameter bundle

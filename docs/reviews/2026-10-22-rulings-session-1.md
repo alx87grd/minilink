@@ -501,3 +501,8 @@ split when it starts; this section marks the reversals).
 - **R70 (2026-10-23, SM-2) `discretize` takes `dt` once.** The `params["dt"]` fallback goes with its
   five guard rules: `discretize(plant, dt, *, solver, substeps)` with `dt` required, a `"dt"` key in
   `params` refused with the line to write; one ledger line.
+- **R71 (2026-10-23) The bound is `problem.cost_bound()`.** It names what the number is, an upper bound
+  on the cost of any run that stays inside the sets (`g_max · tf + h_max`, `/ ρ` on an infinite horizon,
+  over the declared boxes, else the plant's own, else `1e6` with one warning). `infeasible_cost=True`
+  prices a failure at it; DP, RL and MPPI read it when `infeasible_cost` is `None`. Supersedes R32's
+  working name `infeasible_cost_bound()`.
