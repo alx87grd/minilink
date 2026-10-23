@@ -537,9 +537,9 @@ Evaluation                       # a pytree record, one row per run (n_trials = 
     .cost, .value, .feasibility_margin, .failed, .reachability_margin, .reached, .x0, .keys   # (n,) arrays; .trajectories optional
     .value                       # the problem's criterion over the trials, the scalar the program minimizes (one trial: that run's value)
     .mean, .std, .worst, .cvar(a)                      # statistics of value, on xp
-    .failure_rate = mean(failed)                       # left X or U at some point of the run
+    .feasibility_rate = mean(~failed)                  # never left X or U during the run
     .reachability_rate = mean(reached)                 # ended inside Xf at tf (1.0 when the problem declares no Xf)
-    .success_rate = mean(reached & ~failed)            # the goal reached without ever leaving the allowed sets
+    .success_rate = mean(reached & ~failed)            # feasible and reached; no failure_rate statistic (it would read as 1 - success_rate)
     print(report), report.plot_...                     # reporting verbs, called outside a trace (the Trajectory's rule)
 ```
 
@@ -587,8 +587,8 @@ law), re-pinned with a release note in V1's step 7 (v0.4), the window the calend
 
 ### D22 The statistics (ruled 2026-10-23)
 
-`failure_rate`, `reachability_rate` and `success_rate` as defined in D18; no `mean_cost`, no
-`final_state`.
+`feasibility_rate`, `reachability_rate` and `success_rate` as defined in D18, three positive
+rates parallel to the margins; no `failure_rate`, no `mean_cost`, no `final_state`.
 
 ### D23 The optimizer's method keys and program classes — **deferred 2026-10-23**
 

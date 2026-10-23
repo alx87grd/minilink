@@ -203,3 +203,5 @@ of it in sampled-path.md §3.6; the numbers from `benchmarks/params_binding.py`.
   one-row `Evaluation`. `TrajectoryEvaluation`, `mean_cost`, `final_state` and the engine verbs
   `cost`, `value`, `margin` do not exist. This supersedes R26's verb list. Lives in:
   end-state-api.md D18, D19, D22.
+  Amended the same day: the three rates are `feasibility_rate` (never left `X` or `U`),
+  `reachability_rate`, `success_rate`; no `failure_rate` (it would read as `1 − success_rate`).
