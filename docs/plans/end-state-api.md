@@ -37,6 +37,10 @@ Two step paths on the spine, and no third:
 The same compiled step serves both; the continuous path integrates the whole loop with it,
 the sampled path integrates the plant with it and calls the controller between samples.
 
+The pipeline as ruled on 2026-10-22/23, one picture: [`pipeline.mmd`](pipeline.mmd) (Mermaid;
+the statement, the loop, two simulations of it, one scoring, the outputs; the planners feed a
+policy back in; the sampled loop dashed, its code after this phase).
+
 ### 1.1 The whole toolbox, in the final API
 
 ```python
