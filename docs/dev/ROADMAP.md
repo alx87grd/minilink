@@ -294,7 +294,8 @@ TODO §4 and §5 gives it, wave D standing.
 **Wave A — the textbook objects finish speaking.**
 - **A6** Short catalog names (RULES 2.6): compact public class names, the long explicit display
   names dropped, one ruled table of renames migrating the notebooks in the same commit (between terms,
-  with wave K's between-terms moves, while the name freeze is paused). **[ask — public
+  with wave K's between-terms moves, while the name freeze is paused, and before the GMC714 term
+  starts on January 9, R50). **[ask — public
   names]**
 - **A5** The later nouns, each with its first consumer: `log_prob`, sets and distributions
   over parameter dictionaries, `UnionSet`, `PlanningProblem.hamiltonian()` only if a course
@@ -387,7 +388,9 @@ feature (R48).
 
 **GMC714** (R48): no new feature; the teaching surface already covers every lab (§4.3).
 - **G3** GMC714's names stable by January (R49): `RRTPlanner` to the teaching lane, the robotic
-  laws and `Manipulator` onto the prelude, MPC as one teaching name with a frozen constructor.
+  laws onto the prelude, `Manipulator` and `MechanicalSystem` on a new `minilink.dynamics` band
+  facade, MPC as `ModelPredictiveController` with a frozen constructor (R50); A6's short catalog
+  names land before the term (R50).
   **[ask — public names]**
 - The former wave G rows (C1's pyro parity and migration guide, C2's robotic PID wrappers, C3's
   blocks, S63, S64) move to v0.4 (§5.4); the labs are the maintainer's teaching work, outside

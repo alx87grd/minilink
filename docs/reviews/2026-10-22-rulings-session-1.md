@@ -361,3 +361,11 @@ split when it starts; this section marks the reversals).
   `TaskKinematic`, `TaskKinematicNullspace` are on the `control` facade only; `Manipulator` and
   `MechanicalSystem` are a deep import; MPC is two research-lane classes
   (`MPCStatelessController`, `MPCStatefulController`). A v0.3 row (TODO §4, G3) carries it.
+- **R50 (2026-10-23) G3's three choices.** (1) MPC's teaching name is `ModelPredictiveController`,
+  over today's `MPCStatelessController` / `MPCStatefulController`, its constructor frozen for the
+  term. (2) `Manipulator` and `MechanicalSystem` go on a new band facade, `minilink.dynamics`
+  (the package exists; its `__init__` becomes the facade of the modelling abstractions, beside
+  `minilink.catalog` for the plants), registered with the other bands in the teaching-surface
+  test; its exact list is ruled with G3's table. (3) A6's short catalog names land **before** the
+  GMC714 term (by January 9), with every course notebook migrated in the same commit while the
+  name freeze is paused; v0.3 stays on `dev` until then (R47).

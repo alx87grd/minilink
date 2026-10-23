@@ -31,7 +31,8 @@ git history (`docs/reviews/2026-09-22-improvement-*.md`, before 2026-10-17).
 
 Their slots in the order: A4 any time (agent); A5's sets reading `params` with A2 in v0.3 (V1's
 step 6), `Set.as_cost` with V1's step 8 in v0.4, its other nouns each with its first consumer; A6
-between terms, with wave K's between-terms moves; RN-2 before V1's step 7 in v0.4.
+between terms, with wave K's between-terms moves, and in any case before the GMC714 term starts on
+January 9 (R50), so G3's names are pinned after it; RN-2 before V1's step 7 in v0.4.
 
 - [ ] **A4 Naming, the rest** (the naming quick wins landed 2026-10-17:
   the class name as the default `name`, shortcuts named as the expression they build, `id`
@@ -564,12 +565,12 @@ workboard; the former wave G rows are §5 rows.
   uses has one public teaching name on the teaching surface, frozen for the term (week 1 on
   January 9). Moves: `RRTPlanner` from provisional to the teaching lane; `ModelJointImpedance`,
   `TaskKinematic`, `TaskKinematicNullspace` onto the root prelude; `Manipulator` and
-  `MechanicalSystem` onto a facade (`minilink.catalog` or a `dynamics` band facade, to rule);
-  MPC as one teaching name (`ModelPredictiveController` proposed) over today's
+  `MechanicalSystem` onto a new band facade, `minilink.dynamics` (R50; its list ruled with this
+  row's table); MPC as one teaching name, `ModelPredictiveController` (R50), over today's
   `MPCStatelessController` / `MPCStatefulController`, its constructor frozen while S76 and the
   planner contract (D27) reshape its internals in v0.4, and the loop it runs in (`mpc % dt @
-  plant`) kept as the user's syntax through S31. A6's catalog renames land before the term or
-  after it, never during. Each name gets a docstring, a demo and the teaching-surface test
+  plant`) kept as the user's syntax through S31. A6's catalog renames land before the term
+  (R50), so G3's list is pinned after them. Each name gets a docstring, a demo and the teaching-surface test
   (ROADMAP §2's soft rule). Done when `test_teaching_surface.py` pins the list, each name has a
   demo under `examples/demos/`, and no GMC714 lab needs a deep import. Lands by mid-December.
 
