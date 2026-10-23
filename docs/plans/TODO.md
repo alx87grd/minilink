@@ -329,13 +329,9 @@ smaller library that is easier to read and keep — fewer names, fewer demos, pr
 labelled as such. It extends D2 (whose open picks join K1's table) and runs before D1.3, so
 the demo sweep touches fewer files. Nothing leaves without the maintainer's ruling (RULES 7.1).
 
-- [ ] **K1 The inventory** (agent). One table in a dated `docs/reviews/` record: every
-  public name of `minilink/` with its callers (library, tests, examples, notebooks,
-  benchmarks, docs), its maturity (final; prototype: no test of its contract, no course or
-  DESIGN use, or a `TODO: User Architectural Review`; dead: no caller), and a proposal (keep,
-  remove, to `experimental/`); every demo in `examples/demos/` and the top-level `experimental/`
-  with the feature it shows and its twins. Done when the maintainer can rule on the table in
-  one pass, row by row.
+- K1, the inventory, landed 2026-10-23: [the record](../reviews/2026-10-23-k1-inventory.md)
+  (every public name with its callers, maturity and a proposal; the plants; the demos and their
+  twins; the draft A6 and G3 rename tables). K2, K3, K4, K8, A6 and G3 rule from it.
 - [ ] **K2 Remove the unused features** **[ask — removals]**, from K1's ruling: one commit
   per feature, callers, tests and docs in the same commit, no alias. Done when every
   "remove" row is gone and `pytest` and the demo checks pass.
@@ -570,8 +566,10 @@ workboard; the former wave G rows are §5 rows.
   `MechanicalSystem` onto a new band facade, `minilink.dynamics` (R50; its list ruled with this
   row's table); MPC as one teaching name, `ModelPredictiveController` (R50), over today's
   `MPCStatelessController` / `MPCStatefulController`, its constructor frozen while S76 and the
-  planner contract (D27) reshape its internals in v0.4, and the loop it runs in (`mpc % dt @
-  plant`) kept as the user's syntax through S31. A6's catalog renames land before the term
+  planner contract (D27) reshape its internals in v0.4, and the loop it runs in (`mpc @ plant`,
+  as every demo and lesson writes it) kept as the user's syntax through S31. `ModelPredictiveController`
+  already exists as a factory over the two classes, in a research-lane module the teaching-surface
+  test rejects: it moves to a teaching-lane module. A6's catalog renames land before the term
   (R50), so G3's list is pinned after them. Each name gets a docstring, a demo and the teaching-surface test
   (ROADMAP §2's soft rule). Done when `test_teaching_surface.py` pins the list, each name has a
   demo under `examples/demos/`, and no GMC714 lab needs a deep import. Lands by mid-December.
