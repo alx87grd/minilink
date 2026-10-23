@@ -455,3 +455,8 @@ split when it starts; this section marks the reversals).
   model-based controllers (`ComputedTorque`, `SlidingMode`, the joint impedance laws) read one set of
   matrices and accept every mechanical plant, working in `v`. Both forms stay for teaching; S32's
   single class (`N = I` by default) is not adopted.
+- **R63 (2026-10-23, G3) Joint and task impedance are two plain classes.** `ModelJointImpedance` is
+  renamed `JointImpedance` (the class: the law on a mechanical plant, optional `gravity_comp`), and the
+  `JointImpedance(...)` factory that returned either it or a generic `ImpedanceController` is deleted;
+  the generic spring-damper is `Impedance(dof=…)` (R52). `JointImpedance` and `TaskImpedance` are the
+  pair on the root; the one `JointImpedance(dof=2)` call (a test) becomes `Impedance(dof=2)`.

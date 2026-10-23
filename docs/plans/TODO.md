@@ -561,8 +561,9 @@ workboard; the former wave G rows are §5 rows.
 - [ ] **G3 GMC714's names stable by January** **[ask — public names]** (R49): every tool a lab
   uses has one public teaching name on the teaching surface, frozen for the term (week 1 on
   January 9), after A6's renames (R52: `ComputedTorque`, `SlidingMode`, `Impedance`,
-  `ThreeLinkManipulator`, `LongitudinalTorqueCar`). Moves: `RRTPlanner` from provisional to the teaching lane; `ModelJointImpedance`,
-  `TaskKinematic`, `TaskKinematicNullspace` onto the root prelude; a new band facade,
+  `ThreeLinkManipulator`, `LongitudinalTorqueCar`). Moves: `RRTPlanner` from provisional to the teaching lane; `JointImpedance` (R63: the class,
+  was `ModelJointImpedance`; the factory deleted), `TaskKinematic`, `TaskKinematicNullspace` onto the
+  root prelude; a new band facade,
   `minilink.dynamics` (R50, R61): `MechanicalSystem`, `Manipulator`, `GeneralizedMechanicalSystem`,
   `StateSpaceSystem`, `LTISystem`, with `JaxMechanicalSystem` deleted (`MechanicalSystem`'s default
   builders on `xp`); MPC as one teaching name, `ModelPredictiveController` (R50), over today's
