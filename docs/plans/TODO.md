@@ -315,8 +315,8 @@ the late-December window (ROADMAP §5's calendar rule), A6 with them. **The cont
 beside it: the step model (S75: SM-0, SM-1, SM-2, SM-7, SM-3, SM-4, SM-5, SM-6, SM-8), and V1's
 path to the cost (V1.1–V1.6 with V1.4b, the Monte Carlo fold; steps 1 and 2 need nothing from S75
 and may start at once, step 3 needs SM-1, step 6 is A2, with A5's sets reading `params`). **Then the sampled loop** (S31,
-the hybrid phase) once V1's step 6 lands, if the calendar leaves room; otherwise
-it opens §5. GMC714 needs no new feature (R48): the former wave G rows (C1, C2, C3, S63,
+the hybrid phase) once V1's step 6 lands, in v0.3 (R73). The names and structure the GMC714 term
+freezes come first (A6, K2, K8, K10, S32, G3, R68; R73). GMC714 needs no new feature (R48): the former wave G rows (C1, C2, C3, S63,
 S64) are §5 rows beside C6 and S76.
 The rows below are in that order.
 
@@ -548,7 +548,7 @@ moved to the new interface (R47).
   it. Parked until the continuous core lands (the maintainer, 2026-10-22): the run-state caches
   (RULES 2.4), controller memory and the computer's draws on the tick, the evaluator's dispatch
   of a sampled controller (D13–D15), the `core` → `simulation` import (scan: core#14). In v0.3
-  if the calendar leaves room, else the first core row of §5 (raised). Done when
+  (R73). Done when
   D13–D15 are ruled and the kernel's steps are rows here.
 - [ ] **S74 The optimizer as the one descent loop** **[idea to review — ask — core]**, proposed
   2026-10-18, **deferred by R25 (2026-10-23)** to after the continuous core: the program's class
@@ -559,10 +559,8 @@ moved to the new interface (R47).
     backend table ([parametric-program.md](parametric-program.md) §6; scan: planning#9). Done
     when `optimizer_method="ipopt"` reaches the parametric MPC path and the plan's OPW-4 tests
     pass.
-- [ ] **Still open from the second opinion** **[ask]** (the rest ruled as R30–R47): v0.3's scope
-  against the maintainer's attention and the slots of S31 and S74 (items 8, 9, 18 of
-  [the record](../reviews/2026-10-23-v03-alignment-and-second-opinion.md)), after G1; ROADMAP §6
-  lists them. Done when ruled.
+- [ ] **Still open from the second opinion** **[ask]**: the slot of S74 (the optimizer upgrade, deferred
+  by R25; before S76). Everything else is ruled (R30–R73).
 
 **GMC714** (R48, 2026-10-23): no new feature; the teaching surface covers every lab (ROADMAP
 §4.3). The labs move from pyro to minilink as the maintainer's teaching work, outside this

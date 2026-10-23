@@ -11,7 +11,7 @@ Identity: [CONSTITUTION.md](CONSTITUTION.md).
 | --- | --- | --- |
 | **v0.1** | **GRO860 end to end**, plus a working **`pip install minilink` on PyPI**. Every topic of the running optimal-control & RL course runs on the teaching surface, in Colab (git-clone cell) and in the conda env: value iteration / DP on a grid · LQR + linearization · trajectory optimization · RL via native `ReinforcementLearningPlanner` (with `Sys2Gym` + SB3 as an optional bridge). See §4.1. | Fall 2026 — `0.1.0` on PyPI (2026-09-16); `0.1.1` (2026-09-26) is the first release a GitHub tag published. Conda from `environment.yml` is the recommended install. The course notebooks' names are frozen until v1.0, with the freeze paused between terms (§4.1 gate 7). |
 | **v0.2** | **GRO501 end to end** (the classical-control course: multi-physics modelling · root locus / Bode / margins · PID to spec · digital implementation · state feedback, pole placement, LQR, observers — see §4.2). Conda stays the recommended install. | `0.2.0` on PyPI (2026-10-17), from the GitHub tag; every §4.2 row green |
-| **v0.3** | **A cleaner core and the differentiable path; GMC714 covered** (§5.3; GMC714 needs no new feature, R48): **the convergence pass** (the core kept, side features to the experimental tier), **the continuous core** ([continuous-core.md](../plans/continuous-core.md): one step model under every sampled tool, one evaluation of any run, and the deterministic differentiable path to the cost behind a clean API: `evaluate`, `compare`, `problem.compile(loop)`, the program export, cost parameters), then the sampled loop as a tool if the calendar leaves room. The teaching surface covers every GMC714 lab (§4.3); the labs move from pyro to minilink as the maintainer's teaching work, outside this roadmap. | December 2026 |
+| **v0.3** | **A cleaner core and the differentiable path; GMC714 covered** (§5.3; GMC714 needs no new feature, R48): **the convergence pass** (the core kept, side features to the experimental tier), **the continuous core** ([continuous-core.md](../plans/continuous-core.md): one step model under every sampled tool, one evaluation of any run, and the deterministic differentiable path to the cost behind a clean API: `evaluate`, `compare`, `problem.compile(loop)`, the program export, cost parameters), then the sampled loop as a tool (R73). The teaching surface covers every GMC714 lab (§4.3); the labs move from pyro to minilink as the maintainer's teaching work, outside this roadmap. | December 2026 |
 | **v0.4** | **The draws and the textbook objects** (§5.4): the mean over the problem's draws through the same differentiable path (the Monte Carlo evaluator one path, its numbers changing once), the sampled face of the compiled problem, identification as its first data consumer; fields and workspace geometry; MPPI on the sampled kernel; the parametric MPC program (S76) and the general serial chain (C6). | Winter 2027 (the window between GRO860 cohorts, whose material the evaluator's numbers touch) |
 | **v0.9** | **Freeze candidate** (§5.5): the foundation questions that could still break a public name are decided (derived `x0`, Diffrax as an optional solve, the glyph/solid rename, the frozen surface); the trust contract is in place (deprecation policy, pinned export list, CHANGELOG, pinned installs); the standard-syllabus holes close (estimation; the discrete-time one closes with S75 in v0.3); the docs site renders the tutorials. | Spring 2027 |
 | **v1.0** | **A colleague can build a course on it and trust it for three years** (§5.6): the API frozen under the deprecation policy, the standard control syllabus covered and checked against textbook worked examples, course-neutral labs an instructor adopts outside UdeS, green on Windows, macOS and Linux; after two cohorts. Two Stable-Baselines3 teaching notebooks retire (S49) and the GRO860 name freeze becomes the general one. | 2027 |
@@ -269,7 +269,7 @@ gantt
     V1 steps 1-2, Trajectory, evaluation  :v1a, 2026-11-02, 12d
     V1 steps 3-5, run, engine, program    :v1b, after s75, 10d
     A2 cost parameters (V1 step 6)        :a2, after v1b, 5d
-    Sampled loop S31, if room             :s31, after a2, 7d
+    Sampled loop S31                      :s31, after a2, 7d
     v0.3 tag                              :milestone, v03, 2026-12-21, 0d
     section v0.4 draws and objects
     V1 steps 7-9, the draws, C4           :v1c, 2027-01-04, 4w
@@ -383,9 +383,8 @@ feature (R48).
   v0.4 (§5.4). Nothing merges to `main` until every notebook has moved (R47). **[ask — core]**, ruled.
 - **A2** Cost parameters ([cost-params.md](../plans/cost-params.md)), V1's step 6, so the path
   reaches the cost's own weights. **[ask — core]**, ruled.
-- **S31** The sampled loop, ruled a tool with ticks (R13, R14), after the continuous core: in
-  v0.3 if the calendar leaves room, else the first core row of v0.4; its details
-  (D13–D15) parked until then. **[ask — core]**
+- **S31** The sampled loop, ruled a tool with ticks (R13, R14), after the continuous core, in v0.3
+  (R73); its details (D13–D15) are ruled when it starts. **[ask — core]**
 - **S74** The optimizer upgrade: deferred by R25 to after the continuous core, with OPW-1–OPW-5;
   it lands before S76 (§5.4), which builds on its backend factory.
 
@@ -587,12 +586,10 @@ for time (R42); the RL episode a training setting (R43); the Monte Carlo fold in
 record's names `cost`, `J`, `objective` (R45); no regularizer hook (R46); v0.3 on `dev` until
 every notebook has moved, no pin (R47).
 
-**Still open from the second opinion:** v0.3's scope against the maintainer's attention, the
-proposed cuts to v0.4 (SM-7, SM-6's move, A2, K4, K8-3, S31), now that GMC714 needs no feature
-(R48) (record item 8; item 9 is answered
-by R48: neither MPC nor the draws); the slots of S31 and S74 (item 18; with R49, MPC's loop syntax, `mpc @ plant` as every demo and lesson writes it, must stay
-stable through S31, whichever slot it takes); `discretize`'s `params["dt"]` fallback
-(item 21, dropped by R70); the program with the price off warns once on a diverging run (R72).
+**Still open from the second opinion:** the slot of the optimizer upgrade (S74, deferred by R25; it
+lands before S76). The rest is ruled: v0.3 holds everything planned, ordered by the GMC714 deadline
+(R73; the sampled loop S31 in v0.3); item 9 by R48; `discretize`'s `params["dt"]` fallback dropped
+(R70); the program warns once on a diverging run (R72).
 
 **Before v0.4 (S76, the parametric program)**
 

@@ -510,3 +510,8 @@ split when it starts; this section marks the reversals).
   that blows up makes the program's objective `+inf`; the program keeps that number (one `J`
   everywhere, R32) and warns once, naming the cause and the fix (`infeasible_cost=True` prices a
   failure at `problem.cost_bound()`). No hidden rule changes the objective.
+- **R73 (2026-10-23) v0.3 holds everything planned; the order follows the deadline.** No row moves to
+  v0.4 for time (the second opinion's item 8 closed). Order: first the names and structure the
+  GMC714 term freezes (A6, K2, K8, K10, S32, G3, R68), then the step model (SM-0–SM-8, SM-7 included),
+  the path to the cost (V1.1–V1.6 with V1.4b and A2), and the sampled loop (S31, in v0.3: its slot,
+  item 18, settled).
