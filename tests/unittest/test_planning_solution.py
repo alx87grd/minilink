@@ -7,6 +7,7 @@ from minilink import DynamicProgrammingPlanner, Pendulum, PlanningProblem, Quadr
 from minilink.blocks import TrajectorySource
 from minilink.core.trajectory import Trajectory
 from minilink.dynamics.catalog.equations import DoubleIntegrator
+from minilink.learning.reinforcement_learning import TabularLearningPlanner
 from minilink.planning import (
     MonteCarloEvaluator,
     PlanningSolution,
@@ -14,7 +15,6 @@ from minilink.planning import (
     Uniform,
 )
 from minilink.planning.evaluation import control_law, nominal_trajectory
-from minilink.planning.reinforcement_learning import TabularLearningPlanner
 from minilink.planning.search.extenders import KinodynamicExtender
 from minilink.planning.search.rrt import RRTOptions, RRTPlanner
 from minilink.planning.trajectory_optimization.direct_collocation import (
@@ -243,7 +243,7 @@ def test_one_evaluator_scores_an_open_loop_and_a_feedback_law_on_the_same_draws(
 
 def test_nominal_trajectory_verb_matches_the_rl_planner_rollout():
     pytest.importorskip("jax")
-    from minilink.planning.reinforcement_learning import ReinforcementLearningPlanner
+    from minilink.learning.reinforcement_learning import ReinforcementLearningPlanner
 
     plant = Pendulum()
     plant.inputs["u"].lower_bound = np.array([-4.0])

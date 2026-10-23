@@ -50,4 +50,4 @@ examples/teaching/courses/udes_gro501/racecar_toward_mpc.ipynb minilink.core.hyb
 examples/teaching/courses/udes_gro501/racecar_toward_mpc.ipynb minilink.graphical.catalog.racecar_skin
 examples/teaching/courses/udes_gro501/racecar_toward_mpc.ipynb minilink.planning.spatial.grid
 examples/teaching/courses/udes_gro501/racecar_toward_mpc.ipynb minilink.planning.spatial.plotting
-examples/teaching/courses/udes_gro860/pendulum_value_iteration_vs_lqr_vs_ppo_sb3.ipynb minilink.planning.policy_synthesis
+examples/teaching/courses/udes_gro860/pendulum_value_iteration_vs_lqr_vs_ppo_sb3.ipynb minilink.planning.dynamic_programming

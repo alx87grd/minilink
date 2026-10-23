@@ -6,6 +6,7 @@ from dataclasses import dataclass, replace
 
 import numpy as np
 
+from minilink.learning.reinforcement_learning.environment import RolloutEnvironment
 from minilink.planning.dynamic_programming import plotting
 from minilink.planning.dynamic_programming.dp import (
     DynamicProgrammingOptions,
@@ -14,7 +15,6 @@ from minilink.planning.dynamic_programming.dp import (
 )
 from minilink.planning.evaluation import nominal_trajectory
 from minilink.planning.planner import Planner
-from minilink.planning.reinforcement_learning.environment import RolloutEnvironment
 from minilink.planning.results import PlanningSolution
 
 ###############################################################################

@@ -1,11 +1,11 @@
 """REINFORCE: the Monte Carlo policy gradient, from complete episodes and nothing else."""
 
 from minilink.core.backends import require_jax, require_jax_numpy
-from minilink.planning.reinforcement_learning.algorithms.base import (
+from minilink.learning.reinforcement_learning.algorithms.base import (
     Algorithm,
     optimizer_of,
 )
-from minilink.planning.reinforcement_learning.collect import returns_to_go
+from minilink.learning.reinforcement_learning.collect import returns_to_go
 
 ###############################################################################
 # Public API

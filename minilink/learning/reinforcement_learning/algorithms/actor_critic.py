@@ -1,11 +1,11 @@
 """Advantage actor-critic: a critic's temporal-difference errors guide a policy-gradient actor."""
 
 from minilink.core.backends import require_jax, require_jax_numpy
-from minilink.planning.reinforcement_learning.algorithms.base import (
+from minilink.learning.reinforcement_learning.algorithms.base import (
     Algorithm,
     optimizer_of,
 )
-from minilink.planning.reinforcement_learning.collect import advantages
+from minilink.learning.reinforcement_learning.collect import advantages
 
 ###############################################################################
 # Public API

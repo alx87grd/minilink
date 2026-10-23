@@ -113,7 +113,7 @@ state-feedback block):
   computed torque, `estimation/` EKFs.)
 - **Exception:** `control/mpc` may import `planning.trajectory_optimization`
   (receding-horizon controller wraps a traj-family planner).
-- **Exception:** `planning.reinforcement_learning`, `planning.evaluation`
+- **Exception:** `learning.reinforcement_learning`, `planning.evaluation`
   and `planning.planner` may import `control.neural` and `blocks` (a learned
   law is a control block, the critics share its multilayer perceptron, and an
   open-loop plan is a `TrajectorySource` block).
@@ -870,7 +870,7 @@ lookup table interpolates with SciPy), and warns when that fallback changes the 
 law: port bounds are information, and saturation lives inside the law or in a
 `Saturation` block. Same contract for LQR, DP, MPC and RL laws.
 
-**Reinforcement learning (`planning/reinforcement_learning/`):** two
+**Reinforcement learning (`learning/reinforcement_learning/`):** two
 policy-family planners beside DP, one per representation of the law.
 
 `TabularLearningPlanner(problem, x_grid=, u_grid=, dt=, algorithm=)` learns

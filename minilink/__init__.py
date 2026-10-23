@@ -153,11 +153,11 @@ _EXPORTS: dict[str, tuple[str, str]] = {
     "Gaussian": ("minilink.core.distributions", "Gaussian"),
     "Uniform": ("minilink.core.distributions", "Uniform"),
     "ReinforcementLearningPlanner": (
-        "minilink.planning.reinforcement_learning.planner",
+        "minilink.learning.reinforcement_learning.planner",
         "ReinforcementLearningPlanner",
     ),
     "TabularLearningPlanner": (
-        "minilink.planning.reinforcement_learning.tabular",
+        "minilink.learning.reinforcement_learning.tabular",
         "TabularLearningPlanner",
     ),
     "MonteCarloEvaluator": ("minilink.planning.evaluation", "MonteCarloEvaluator"),

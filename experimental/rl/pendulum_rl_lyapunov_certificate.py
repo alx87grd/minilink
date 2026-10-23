@@ -8,11 +8,8 @@ from scipy.linalg import solve_continuous_lyapunov
 
 from minilink import CostFunction, Pendulum
 from minilink.control import angle_features
-from minilink.planning import (
-    ReinforcementLearningPlanner,
-    StochasticPlanningProblem,
-    Uniform,
-)
+from minilink.learning import ReinforcementLearningPlanner
+from minilink.planning import StochasticPlanningProblem, Uniform
 
 TORQUE = 4.0  # Nm, below m g l = 9.81 Nm: the pendulum must pump to get up
 DT = 0.05

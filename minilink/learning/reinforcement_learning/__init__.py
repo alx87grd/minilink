@@ -1,23 +1,23 @@
 """Reinforcement learning as policy-family planners: tabular on a grid, neural in pure JAX."""
 
-from minilink.planning.reinforcement_learning.algorithms import (
+from minilink.learning.reinforcement_learning.algorithms import (
     PPO,
     REINFORCE,
     SAC,
     ActorCritic,
     Algorithm,
 )
-from minilink.planning.reinforcement_learning.collect import (
+from minilink.learning.reinforcement_learning.collect import (
     advantages,
     gae,
     returns_to_go,
 )
-from minilink.planning.reinforcement_learning.environment import RolloutEnvironment
-from minilink.planning.reinforcement_learning.planner import (
+from minilink.learning.reinforcement_learning.environment import RolloutEnvironment
+from minilink.learning.reinforcement_learning.planner import (
     ReinforcementLearningPlanner,
 )
-from minilink.planning.reinforcement_learning.policy import StochasticPolicy
-from minilink.planning.reinforcement_learning.tabular import (
+from minilink.learning.reinforcement_learning.policy import StochasticPolicy
+from minilink.learning.reinforcement_learning.tabular import (
     SARSA,
     UCB,
     EpsilonGreedy,

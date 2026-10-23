@@ -146,7 +146,7 @@ class MonteCarloEvaluator:
         jax = require_jax()
         jnp = require_jax_numpy()
         # A real cycle: reinforcement_learning imports Evaluation from this module
-        from minilink.planning.reinforcement_learning.environment import (
+        from minilink.learning.reinforcement_learning.environment import (
             RolloutEnvironment,
         )
 
@@ -223,7 +223,7 @@ class MonteCarloEvaluator:
     def evaluate_numpy(self, controller) -> Evaluation:
         """The trials one at a time on NumPy, the law held over each period."""
         # A real cycle: reinforcement_learning imports Evaluation from this module
-        from minilink.planning.reinforcement_learning.environment import (
+        from minilink.learning.reinforcement_learning.environment import (
             RolloutEnvironment,
         )
 
@@ -278,7 +278,7 @@ class MonteCarloEvaluator:
     def evaluate_simulator(self, controller) -> Evaluation:
         """The trials integrated by the simulator: the continuous-time loop from each drawn start."""
         # A real cycle: reinforcement_learning imports Evaluation from this module
-        from minilink.planning.reinforcement_learning.environment import (
+        from minilink.learning.reinforcement_learning.environment import (
             RolloutEnvironment,
         )
 

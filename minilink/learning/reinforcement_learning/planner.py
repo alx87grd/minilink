@@ -11,28 +11,28 @@ import numpy as np
 from minilink.control.neural import NeuralPolicyController
 from minilink.core.backends import require_jax, require_jax_numpy
 from minilink.core.trajectory import Trajectory
-from minilink.planning.evaluation import Evaluation
-from minilink.planning.planner import Planner
-from minilink.planning.reinforcement_learning.algorithms import (
+from minilink.learning.reinforcement_learning.algorithms import (
     PPO,
     REINFORCE,
     SAC,
     ActorCritic,
     Algorithm,
 )
-from minilink.planning.reinforcement_learning.collect import (
+from minilink.learning.reinforcement_learning.collect import (
     ReplayBuffer,
     flatten,
     reset_carry,
     rollout,
 )
-from minilink.planning.reinforcement_learning.critics import QFunction, ValueFunction
-from minilink.planning.reinforcement_learning.environment import RolloutEnvironment
-from minilink.planning.reinforcement_learning.policy import (
+from minilink.learning.reinforcement_learning.critics import QFunction, ValueFunction
+from minilink.learning.reinforcement_learning.environment import RolloutEnvironment
+from minilink.learning.reinforcement_learning.policy import (
     GaussianHead,
     SquashedGaussianHead,
     StochasticPolicy,
 )
+from minilink.planning.evaluation import Evaluation
+from minilink.planning.planner import Planner
 from minilink.planning.results import PlanningSolution
 
 #: The update rule of each name ``algorithm=`` accepts.
@@ -64,9 +64,9 @@ class ReinforcementLearningPlanner(Planner):
     also rolls the law out and scores it by Monte Carlo on the problem's own
     cost, the yardstick shared with every planner.
     The loop is generic, collect experience then update, and the update rule
-    is an :class:`~minilink.planning.reinforcement_learning.algorithms.Algorithm`,
+    is an :class:`~minilink.learning.reinforcement_learning.algorithms.Algorithm`,
     so a new method is one file, not a new planner. The law being trained is
-    a :class:`~minilink.planning.reinforcement_learning.policy.StochasticPolicy`:
+    a :class:`~minilink.learning.reinforcement_learning.policy.StochasticPolicy`:
     the controller block's mean action with the algorithm family's
     exploration head around it.
 

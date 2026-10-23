@@ -17,14 +17,14 @@ import jax  # noqa: E402
 import jax.numpy as jnp  # noqa: E402
 
 from minilink.control.neural import NeuralPolicyController  # noqa: E402
-from minilink.planning.evaluation import (  # noqa: E402
-    MonteCarloEvaluator,
-    score_trajectory,
-)
-from minilink.planning.reinforcement_learning import (  # noqa: E402
+from minilink.learning.reinforcement_learning import (  # noqa: E402
     PPO,
     ReinforcementLearningPlanner,
     RolloutEnvironment,
+)
+from minilink.planning.evaluation import (  # noqa: E402
+    MonteCarloEvaluator,
+    score_trajectory,
 )
 
 pytestmark = [pytest.mark.optional, pytest.mark.jax]
@@ -358,7 +358,7 @@ def test_monte_carlo_refuses_a_trial_shorter_than_half_a_period():
 
 
 def test_sac_trains_through_the_same_planner_loop():
-    from minilink.planning.reinforcement_learning import SAC
+    from minilink.learning.reinforcement_learning import SAC
 
     prob = problem(tf=np.inf)
     planner = ReinforcementLearningPlanner(
@@ -386,7 +386,7 @@ def test_sac_trains_through_the_same_planner_loop():
 
 
 def test_squashed_head_log_density_is_finite_outside_the_square():
-    from minilink.planning.reinforcement_learning.policy import SquashedGaussianHead
+    from minilink.learning.reinforcement_learning.policy import SquashedGaussianHead
 
     head = SquashedGaussianHead(n_features=2, m=2, hidden=(4,))
     params = head.init()
@@ -400,7 +400,7 @@ def test_squashed_head_log_density_is_finite_outside_the_square():
 def test_sac_reused_across_plants_targets_each_plant_input_dimension():
     from minilink.core.costs import QuadraticCost
     from minilink.core.system import DynamicSystem
-    from minilink.planning.reinforcement_learning import SAC
+    from minilink.learning.reinforcement_learning import SAC
 
     class ThreeAxisPoint(DynamicSystem):
         """A point driven in velocity on three axes: dx = u."""
@@ -452,7 +452,7 @@ def test_sac_reused_across_plants_targets_each_plant_input_dimension():
 
 
 def test_replay_buffer_refuses_a_draw_before_any_transition():
-    from minilink.planning.reinforcement_learning.collect import ReplayBuffer
+    from minilink.learning.reinforcement_learning.collect import ReplayBuffer
 
     buffer = ReplayBuffer(8, n=2, m=1)
     with pytest.raises(ValueError, match="replay buffer is empty"):
@@ -623,7 +623,7 @@ def test_a_step_that_blows_up_ends_the_episode_finitely():
 
 @pytest.mark.parametrize("algorithm", ["reinforce", "actor_critic"])
 def test_reinforce_and_actor_critic_train_through_the_same_planner(algorithm):
-    from minilink.planning.reinforcement_learning import REINFORCE, ActorCritic
+    from minilink.learning.reinforcement_learning import REINFORCE, ActorCritic
 
     planner = ReinforcementLearningPlanner(
         problem(tf=np.inf),
@@ -653,7 +653,7 @@ def test_reinforce_and_actor_critic_train_through_the_same_planner(algorithm):
 
 
 def test_gae_limits_are_the_td_error_and_the_return_minus_the_baseline():
-    from minilink.planning.reinforcement_learning import gae, returns_to_go
+    from minilink.learning.reinforcement_learning import gae, returns_to_go
 
     key = jax.random.PRNGKey(0)
     reward, value, last_value = (

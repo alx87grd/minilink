@@ -5,10 +5,7 @@ import pytest
 
 from minilink import DynamicProgrammingPlanner, PlanningProblem, QuadraticCost
 from minilink.dynamics.catalog.equations import DoubleIntegrator
-from minilink.planning import StochasticPlanningProblem, Uniform
-from minilink.planning.dynamic_programming.dp import DynamicProgrammingResult
-from minilink.planning.dynamic_programming.lookup_policy import LookupTableController
-from minilink.planning.reinforcement_learning import (
+from minilink.learning.reinforcement_learning import (
     SARSA,
     UCB,
     EpsilonGreedy,
@@ -16,7 +13,10 @@ from minilink.planning.reinforcement_learning import (
     QLearning,
     TabularLearningPlanner,
 )
-from minilink.planning.reinforcement_learning.environment import RolloutEnvironment
+from minilink.learning.reinforcement_learning.environment import RolloutEnvironment
+from minilink.planning import StochasticPlanningProblem, Uniform
+from minilink.planning.dynamic_programming.dp import DynamicProgrammingResult
+from minilink.planning.dynamic_programming.lookup_policy import LookupTableController
 from minilink.planning.results import PlanningSolution
 
 GRID = dict(x_grid=(11, 11), u_grid=(3,), dt=0.2)

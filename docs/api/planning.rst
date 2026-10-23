@@ -100,12 +100,3 @@ Policy synthesis
 
 .. automodule:: minilink.planning.dynamic_programming.approximation
    :members:
-
-Reinforcement learning
-----------------------
-
-.. automodule:: minilink.planning.reinforcement_learning.planner
-   :members:
-
-.. automodule:: minilink.planning.reinforcement_learning.tabular
-   :members:

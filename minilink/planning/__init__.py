@@ -1,4 +1,4 @@
-"""Planning: problems, trajectory optimization, dynamic programming, reinforcement learning, search."""
+"""Planning: problems and solutions, dynamic programming, trajectory optimization, search."""
 
 from __future__ import annotations
 
@@ -9,7 +9,6 @@ from minilink.core.facade import lazy_facade
 #     from minilink.planning import PlanningProblem, TrajectoryOptimizationPlanner
 #     from minilink.planning import StateSpaceGrid, DynamicProgrammingPlanner, LQRPlanner
 #     from minilink.planning import compare
-#     from minilink.planning import ReinforcementLearningPlanner, TabularLearningPlanner
 #     from minilink.planning import QuadraticFeatures, LinearApproximator
 #
 # The defining modules stay importable (``minilink.planning.problems``, ...). Each
@@ -29,7 +28,7 @@ _EXPORTS: dict[str, tuple[str, str]] = {
     "PlanningSolution": ("minilink.planning.results", "PlanningSolution"),
     "compare": ("minilink.planning.comparison", "compare"),
     "Comparison": ("minilink.planning.comparison", "Comparison"),
-    # Linear-quadratic regulator (policy synthesis)
+    # Linear-quadratic regulator
     "LQRPlanner": ("minilink.planning.dynamic_programming.lqr", "LQRPlanner"),
     # Trajectory optimization
     "TrajectoryOptimizationPlanner": (
@@ -40,7 +39,7 @@ _EXPORTS: dict[str, tuple[str, str]] = {
         "minilink.planning.trajectory_optimization.planner",
         "TrajectoryOptimizationOptions",
     ),
-    # Dynamic programming (policy synthesis)
+    # Dynamic programming
     "StateSpaceGrid": (
         "minilink.planning.dynamic_programming.discretizer",
         "StateSpaceGrid",
@@ -74,20 +73,7 @@ _EXPORTS: dict[str, tuple[str, str]] = {
         "minilink.planning.dynamic_programming.approximation",
         "LinearApproximator",
     ),
-    # Reinforcement learning (policy synthesis) and Monte Carlo evaluation
-    "ReinforcementLearningPlanner": (
-        "minilink.planning.reinforcement_learning.planner",
-        "ReinforcementLearningPlanner",
-    ),
-    "TabularLearningPlanner": (
-        "minilink.planning.reinforcement_learning.tabular",
-        "TabularLearningPlanner",
-    ),
-    "EpsilonGreedy": (
-        "minilink.planning.reinforcement_learning.tabular",
-        "EpsilonGreedy",
-    ),
-    "UCB": ("minilink.planning.reinforcement_learning.tabular", "UCB"),
+    # Monte Carlo evaluation
     "MonteCarloEvaluator": ("minilink.planning.evaluation", "MonteCarloEvaluator"),
     "Evaluation": ("minilink.planning.evaluation", "Evaluation"),
     # Spatial scene: tracks, collision geometry, cost shaping

@@ -139,8 +139,6 @@ TEACHING_SURFACE: dict[str, tuple[str, ...]] = {
         "StochasticPlanningProblem",
         "Gaussian",
         "Uniform",
-        "ReinforcementLearningPlanner",
-        "TabularLearningPlanner",
         "MonteCarloEvaluator",
         "Evaluation",
         "RRTPlanner",
@@ -148,6 +146,12 @@ TEACHING_SURFACE: dict[str, tuple[str, ...]] = {
         "RRTOptions",
         "KinodynamicExtender",
         "SteeringExtender",
+    ),
+    "minilink.learning": (
+        "ReinforcementLearningPlanner",
+        "TabularLearningPlanner",
+        "EpsilonGreedy",
+        "UCB",
     ),
 }
 
@@ -178,6 +182,7 @@ TEACHING_LANE_PREFIXES = (
     "minilink.simulation.simulator",
     "minilink.simulation.static_simulator",
     "minilink.planning.",
+    "minilink.learning.",
     "minilink.optimization.",
 )
 RESEARCH_LANE_PREFIXES = (

@@ -2,7 +2,7 @@
 
 from minilink.blocks.neural import MLP
 from minilink.core.backends import require_jax, require_jax_numpy
-from minilink.planning.reinforcement_learning.policy import over_states
+from minilink.learning.reinforcement_learning.policy import over_states
 
 ###############################################################################
 # Public API

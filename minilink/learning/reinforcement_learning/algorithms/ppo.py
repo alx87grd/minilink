@@ -1,11 +1,11 @@
 """Proximal Policy Optimization: the clipped surrogate on an on-policy batch, several epochs of minibatches."""
 
 from minilink.core.backends import require_jax, require_jax_numpy
-from minilink.planning.reinforcement_learning.algorithms.base import (
+from minilink.learning.reinforcement_learning.algorithms.base import (
     Algorithm,
     optimizer_of,
 )
-from minilink.planning.reinforcement_learning.collect import advantages, flatten
+from minilink.learning.reinforcement_learning.collect import advantages, flatten
 
 ###############################################################################
 # Public API

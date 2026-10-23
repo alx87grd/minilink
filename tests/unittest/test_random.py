@@ -276,8 +276,8 @@ def test_the_rollout_environment_warns_about_noise_it_never_sees():
     from minilink import PendulumWithNoisePort
     from minilink.core.costs import QuadraticCost
     from minilink.core.distributions import Gaussian, Uniform
+    from minilink.learning.reinforcement_learning.environment import RolloutEnvironment
     from minilink.planning.problems import StochasticPlanningProblem
-    from minilink.planning.reinforcement_learning.environment import RolloutEnvironment
 
     def problem(sys, **disturbances):
         return StochasticPlanningProblem(

@@ -163,10 +163,10 @@ class Sys2Gym(gym.Env):
         starts every episode at its ``x_start``.
         """
         from minilink.core.feedback import command_port
-        from minilink.planning.problems import as_stochastic
-        from minilink.planning.reinforcement_learning.environment import (
+        from minilink.learning.reinforcement_learning.environment import (
             feasible_cost_bound,
         )
+        from minilink.planning.problems import as_stochastic
 
         problem = as_stochastic(problem)
         finite = problem.horizon_kind() == "finite"

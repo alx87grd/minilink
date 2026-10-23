@@ -1,8 +1,8 @@
 """Soft Actor-Critic: the off-policy update on replayed transitions."""
 
 from minilink.core.backends import require_jax, require_jax_numpy
-from minilink.planning.reinforcement_learning.algorithms.base import Algorithm
-from minilink.planning.reinforcement_learning.optim import Adam
+from minilink.learning.reinforcement_learning.algorithms.base import Algorithm
+from minilink.learning.reinforcement_learning.optim import Adam
 
 ###############################################################################
 # Public API

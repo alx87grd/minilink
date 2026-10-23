@@ -92,7 +92,7 @@ twins `rk4_integrate_zoh_trace` / `_trace_p` compose under a caller's own `jit` 
 `{name: value}` override of `sys.params`, dotted names into a diagram) and
 `sample_disturbances(key)` (one `{port: value}` draw held on the port), plus the
 `criterion` (`"expectation"` / `"worst_case"`). `RolloutEnvironment`
-(`minilink/planning/reinforcement_learning/environment.py`) is "a planning problem
+(`minilink/learning/reinforcement_learning/environment.py`) is "a planning problem
 seen by a learner": `step(x, t, u, key, params)` integrates one control period with the
 input held (`rk4_step_trace_p`), scores it `-g dt`, charges `infeasible_cost` when the
 state leaves `X`, charges `h` at a finite horizon, and fills the disturbance ports from
@@ -300,7 +300,7 @@ predictive path integral" — the composition spells the acronym. The alternativ
 it either way. [ask]
 
 **Dependencies:** `core` (backends, trajectory, sets, costs), `planning.problems`,
-`planning.planner`, `planning.results`, and `planning.reinforcement_learning.environment`
+`planning.planner`, `planning.results`, and `learning.reinforcement_learning.environment`
 for `RolloutEnvironment` — an intra-band import, legal under the dependency law; if the
 maintainer prefers, `environment.py` moves up to `planning/environment.py` first (it is
 already shared by the evaluator and the tabular learners, DESIGN §6 says so; the move is
