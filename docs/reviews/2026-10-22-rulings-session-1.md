@@ -524,3 +524,6 @@ split when it starts; this section marks the reversals).
   hand-written gradient-descent loop, then the one-line `Optimizer(program, method="adam")` doing the
   same; every other demo and notebook uses the `Optimizer`. The pattern is a teaching rule (RULES 6.15):
   one place per hidden mechanism writes it out, then the tool, as the GRO501 from-scratch notebooks do.
+- **R76 (2026-10-23) Traceable linear analysis (S73) stays a v0.4 row, any time.** Self-contained,
+  scheduled when a course asks for margin-constrained tuning; a good job for a background agent once
+  v0.3's core has landed.

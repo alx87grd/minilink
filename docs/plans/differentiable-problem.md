@@ -462,8 +462,7 @@ Each with the proposed answer. Taking one: the ruling goes to §4 or §8 here, t
 record, and leaves ROADMAP §6.
 
 1. ~~Which tutorial keeps a hand-written loop~~: ruled, tutorial 07 (R75, RULES 6.15).
-2. **S73**: proposed, left as the self-contained row it is, scheduled when a course asks for a
-   margin-constrained tuning.
+2. ~~S73~~: ruled, a v0.4 row any time, when a course asks for margin-constrained tuning (R76).
 3. **The `CostIntegrator` block** (cost-params.md's research step): proposed, closed as a demo
    idea; `cost.integrate` on samples is the contract.
 4. ~~The name of the bound~~: ruled `problem.cost_bound()` (R71).
