@@ -166,3 +166,8 @@ of it in sampled-path.md §3.6; the numbers from `benchmarks/params_binding.py`.
   its cost and discount; one body, `cost.integrate`.
   The problem form `traj.with_cost(problem)` is dropped (2026-10-23): one signature, a cost
   and an optional discount rate.
+- **R21 (D31a, D31b, 2026-10-23) The sets are explicit.** `X` and `U` default to unbounded; DP
+  and RL refuse an unbounded one with the line to write (`X=plant.state.box`,
+  `U=plant.input_box`); RL's action space and policy scaling read `U`'s box; LQR ignores `U`
+  and warns once when it is declared; the lessons that relied on the silent fallback gain the
+  explicit line in the same change. Lives in: end-state-api.md D16.

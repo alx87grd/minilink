@@ -455,8 +455,14 @@ run. `Xf`: the goal set, enforced by the open-loop planners, judged by `reached`
 `Xf=None` is a regulation problem. `x_goal`: one point of `Xf` and the cost's target, checked
 against `cost.xbar` at construction (derive one from the other, refuse a conflict). `tf`:
 finite, the horizon; `None`, infinite, simulated over an `episode_length` the tool names and
-no `h`. Still to rule: whether DP and RL refuse an unbounded `X` instead of silently using the
-state box, and whether RL's action space reads `U` instead of the port box (D31).
+no `h`. **Ruled 2026-10-23 (D31a, D31b): the sets are explicit.** `X` and `U` both default to the
+unbounded set; a planner that needs a finite box refuses an unbounded one with the line to
+write (`X=plant.state.box`, `U=plant.input_box`): DP for its grid and its inputs, RL for its
+training zone and its action space (the neural policy's output scaling reads `U`'s box). No
+silent fallback to the plant's boxes. Trajectory optimization with an unbounded `U` has no
+input bounds, as the problem says. LQR ignores `U` by design and warns once when the problem
+declares one. The lessons and demos that relied on the fallback gain the explicit line in the
+same change.
 
 ### D16b The cost object (ruled 2026-10-23)
 
