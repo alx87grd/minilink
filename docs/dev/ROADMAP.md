@@ -11,7 +11,7 @@ Identity: [CONSTITUTION.md](CONSTITUTION.md).
 | --- | --- | --- |
 | **v0.1** | **GRO860 end to end**, plus a working **`pip install minilink` on PyPI**. Every topic of the running optimal-control & RL course runs on the teaching surface, in Colab (git-clone cell) and in the conda env: value iteration / DP on a grid · LQR + linearization · trajectory optimization · RL via native `ReinforcementLearningPlanner` (with `Sys2Gym` + SB3 as an optional bridge). See §4.1. | Fall 2026 — `0.1.0` on PyPI (2026-09-16); `0.1.1` (2026-09-26) is the first release a GitHub tag published. Conda from `environment.yml` is the recommended install. The course notebooks' names are frozen until v1.0, with the freeze paused between terms (§4.1 gate 7). |
 | **v0.2** | **GRO501 end to end** (the classical-control course: multi-physics modelling · root locus / Bode / margins · PID to spec · digital implementation · state feedback, pole placement, LQR, observers — see §4.2). Conda stays the recommended install. | `0.2.0` on PyPI (2026-10-17), from the GitHub tag; every §4.2 row green |
-| **v0.3** | **A cleaner core and the differentiable path, then GMC714 end to end** (§5.3): first, in November, **the convergence pass** (the core kept, side features to the experimental tier), **the continuous core** ([continuous-core.md](../plans/continuous-core.md): one step model under every sampled tool, one evaluation of any run, and the deterministic differentiable path to the cost behind a clean API: `evaluate`, `compare`, `problem.compile(loop)`, the program export, cost parameters), then the sampled loop as a tool if the calendar leaves room; then, in December, the features GMC714 is missing that the audit G1 ranks as needed before the term — robust control · robotic arm · trajectory optimization · MPC · vehicle models · nonlinear control (§4.3), with **pyro parity**; the rest of wave G moves to v0.4. | December 2026 |
+| **v0.3** | **A cleaner core and the differentiable path; GMC714 covered** (§5.3; GMC714 needs no new feature, R48): **the convergence pass** (the core kept, side features to the experimental tier), **the continuous core** ([continuous-core.md](../plans/continuous-core.md): one step model under every sampled tool, one evaluation of any run, and the deterministic differentiable path to the cost behind a clean API: `evaluate`, `compare`, `problem.compile(loop)`, the program export, cost parameters), then the sampled loop as a tool if the calendar leaves room. The teaching surface covers every GMC714 lab (§4.3); the labs move from pyro to minilink as the maintainer's teaching work, outside this roadmap. | December 2026 |
 | **v0.4** | **The draws and the textbook objects** (§5.4): the mean over the problem's draws through the same differentiable path (the Monte Carlo evaluator one path, its numbers changing once), the sampled face of the compiled problem, identification as its first data consumer; fields and workspace geometry; MPPI on the sampled kernel; the parametric MPC program (S76) and the general serial chain (C6). | Winter 2027 (the window between GRO860 cohorts, whose material the evaluator's numbers touch) |
 | **v0.9** | **Freeze candidate** (§5.5): the foundation questions that could still break a public name are decided (derived `x0`, Diffrax as an optional solve, the glyph/solid rename, the frozen surface); the trust contract is in place (deprecation policy, pinned export list, CHANGELOG, pinned installs); the standard-syllabus holes close (estimation; the discrete-time one closes with S75 in v0.3); the docs site renders the tutorials. | Spring 2027 |
 | **v1.0** | **A colleague can build a course on it and trust it for three years** (§5.6): the API frozen under the deprecation policy, the standard control syllabus covered and checked against textbook worked examples, course-neutral labs an instructor adopts outside UdeS, green on Windows, macOS and Linux; after two cohorts. Two Stable-Baselines3 teaching notebooks retire (S49) and the GRO860 name freeze becomes the general one. | 2027 |
@@ -93,11 +93,11 @@ Step ids (`S29`, `P4`, `T2`, …) are the rows of
 | Interfaces / RL bridge | research lane (bridge) | 4 | `Sys2Gym` + `SB3Controller`; the env step is one compiled RK4 call. | Keep for external interop; courses solve with the native planner. |
 | Analysis / Lyapunov certificates | provisional (research) | 4 | `region_of_attraction` → `LyapunovCertificate` (quadratic `V`, sampled level, `verify`, `plot`, `contains`); demo and showcase §11. | Cohort validation; `V` as a `QuadraticField` (A1); SOS and discrete time later. |
 | Planning / RL planner | teaching (GRO860) | 6 | `ReinforcementLearningPlanner` (REINFORCE, actor-critic, PPO, SAC in pure JAX), `TabularLearningPlanner` (Q-learning, SARSA, Monte Carlo control), `StochasticPlanningProblem`, `MonteCarloEvaluator`; on the root prelude; canonical demos in `examples/demos/rl/`, chapter 11 and the native teaching notebooks. | SAC actor step (S50); deep Q-learning (S52); automatic reward scaling ([rl-reward-scaling.md](../plans/rl-reward-scaling.md)). |
-| Planning / search (RRT) | provisional | 5 | RRT / RRT*; `RRTPlanner(problem)` works from the input bounds alone (bang-bang extender); returns a `PlanningSolution`. | RRT-Connect later. |
+| Planning / search (RRT) | provisional → teaching by January (G3, R49) | 5 | RRT / RRT*; `RRTPlanner(problem)` works from the input bounds alone (bang-bang extender); returns a `PlanningSolution`. | RRT-Connect later. |
 | Planning / path integral (MPPI) | research lane (planned) | 1 | Two standalone scripts (`examples/experimental/mppi/`): the pendulum swings up; the kinematic racecar laps the cone circuit at a lower closed-loop cost than the collocation MPC. Design: [mppi.md](../plans/mppi.md). | The planner (S72, v0.4) on the sampled kernel, after RN-4 / RN-5. |
 | Geometry / spatial | provisional (teaching) | 4 | SDF + `Scene` / fields / bodies under `planning/spatial/`, JAX twins tested; the planning facade's spatial names are provisional teaching names (§2). Home designed: `core/geometry/`. | Package move and course catalog (A3); bicubic SDF and CBF filter (research). |
 | Graphics / animation | teaching | 5 | Frame-keyed `tf` / geometry / overlays; four renderers; auto-fit camera. | Camera and plot defaults from roles (P10); constructor-derived camera hints (S43); glyph/solid rename (S30, v0.9). |
-| Hybrid / step / MPC | provisional (research) | 4 | `StepSystem`, `Computer`, `HybridDiagram`, `HybridSimulator`, MPC with parametric JAX. A side helper for MPC simulation; the sampled loop is the one thing that is not a `System`. | Keeps in step with the core rules (P10); no new hybrid features before S31 (ruled a tool on one tick-scan kernel, R13–R14; its code after the continuous core); the compiled MPC program binds every problem parameter, not only `x0` (S76, v0.4; its names ruled: `ParametricProgram`, the key `plant`). |
+| Hybrid / step / MPC | provisional (research); MPC's teaching name by January (G3, R49) | 4 | `StepSystem`, `Computer`, `HybridDiagram`, `HybridSimulator`, MPC with parametric JAX. A side helper for MPC simulation; the sampled loop is the one thing that is not a `System`. | Keeps in step with the core rules (P10); no new hybrid features before S31 (ruled a tool on one tick-scan kernel, R13–R14; its code after the continuous core); the compiled MPC program binds every problem parameter, not only `x0` (S76, v0.4; its names ruled: `ParametricProgram`, the key `plant`). |
 | Realtime simulation | provisional | 2 | `RealtimeSimulator` + pygame I/O. | Architectural review (v1.0); later the human-demonstration recorder of the behavior-cloning pipeline (after v1.0). |
 | Estimation | teaching (GRO501) | 6 | `StateObserver` (innovation form, operating point on the block, hat labels), `luenberger` and `kalman` on arrays, a linear model or the plant (the duals of `place` and `lqr`, 2026-10-14); `lqg` returns the observer + gain box; an observer is refused as a controller; `closed_loop(gain, plant, observer=obs)` wires the LQG loop by role (AC-4, 2026-10-14). | the trajectory observer and the finite-horizon filter, the EKF, the estimation problem and its tools (v0.9, [the plan](../plans/estimation-and-state-feedback.md)). |
 | Identification | planned | 2 | Parametric-tier prototype only. | V1's program export with a data cost (C4, v0.4). |
@@ -193,22 +193,33 @@ runs beyond what `identification/` already offers.
 
 ### 4.3 v0.3 — GMC714 end to end
 
-The robotics course: the teaching layer solidified for GMC714, December 2026.
-No baseline audit yet — step G1 of the workboard runs it, as the GRO501 audit
-did, and turns this table into the release contract.
+The robotics course (*Robotique : modélisation et commande*), winter term, week 1 on
+January 9. Syllabus: [the course page](https://www.alexandregirard.com/courses/gmc714/) and its
+notes (*Notes_Robotique_UdeS*), read 2026-10-23. Its labs run today on pyro, through Colab
+notebooks one per homework. **Ruled 2026-10-23 (R48): GMC714 needs no new feature.** Its labs
+move from pyro to minilink as the maintainer's teaching work, outside this roadmap; the
+release's part is that the teaching surface covers every lab, checked the same day:
 
-| Topic | Surface today (to confirm in G1) | Status | Gate |
-| --- | --- | --- | --- |
-| Vehicle models — the four-rung ladder, kinematic to dynamic with tires | `dynamics.catalog` vehicles, `KinematicBicycle` | audit pending | the ladder runs as one lesson (C2) |
-| Robotic arm — kinematics, dynamics, joint and task-space control | `manipulators`, `UR5Manipulator`, `control.robotic`, `control.impedance` | audit pending | robotic PID wrappers (C2) |
-| Nonlinear control — feedback linearization, computed torque, sliding mode, Lyapunov | `control.modelbased`, `control.geometric`, `analysis.lyapunov` | audit pending | set by G1 |
-| Robust control — uncertainty, margins, robust design | `analysis` frequency tools | audit pending | set by G1 |
-| Trajectory optimization — direct collocation, shooting | `planning.trajectory_optimization` | audit pending | set by G1 |
-| MPC — receding horizon on the vehicle and the arm | `control.mpc` (provisional, research lane) | audit pending | MPC joins the teaching surface, or stays a lesson on the research lane, decided in G1; the sampling flavour (MPPI, [mppi.md](../plans/mppi.md), S72) is on the table for that audit (planned for v0.4 on the sampled kernel; the audit can only ask for it as a research-lane lesson) |
+| Week | Topic (notes chapters) | The lab's numerical part | Surface | Status |
+| --- | --- | --- | --- | --- |
+| 1 | Phase space, model types (1, 7) | lateral control of a bicycle model, the phase plane of the closed loop | `KinematicBicycle`, `sys.plot_phase_plane` | on the surface |
+| 2–3 | Arm kinematics, then dynamics (2–6) | forward and inverse kinematics, Jacobian, manipulability; `M`, `C`, `g` (mostly by hand) | `TwoLinkManipulator`, `ThreeLinkManipulator3D`, `UR5Manipulator` | on the surface |
+| 4 | Arm control I, quasi-static (7, 8) | impedance control of a 3-DoF drilling robot in simulation | `ThreeLinkManipulator3D`, `ImpedanceController`, `TaskImpedance`, `JointImpedance` | on the surface; the drilling contact is the notebook's |
+| 5 | Arm control II, dynamic (9, 20) | computed torque, sliding mode, adaptive control | `ComputedTorqueController`, `SlidingModeController`, `DynamicSystem` | on the surface; the adaptive law built by hand in the lab as a custom `DynamicSystem` with the controller's ports (pyro's `DynamicController`; R48) |
+| 6 | Vehicle modelling (11) | longitudinal model with tire slip; the dynamic bicycle, oversteer, linearization | `LongitudinalFrontWheelDriveCarWithTorqueInput`, `DynamicBicycle`, `linearize` | on the surface |
+| 7 | Vehicle planning (13, 16, 21) | trajectory optimization of a pendulum (`Q`, `R`, the torque limit, `n`, `dt`); RRT then trajectory optimization on a cart-pole | `TrajectoryOptimizationPlanner`, `RRTPlanner`, `QuadraticCost`, `Pendulum`, `CartPole` | on the surface |
+| 8 | To come | — | — | — |
+| 10–13 | Projects | "a new system or controller integrated into the library" | the `System` contract | on the surface |
 
-**Cross-cutting gates** (as for GRO501): every topic row green with a demo
-or a notebook; one `examples/teaching/` notebook per topic, Colab-first;
-student-facing GMC714 material imports only through the teaching surface.
+Not a week of the syllabus: MPC (its teaching name stable by January all the same, R49), robust control as a topic of its own
+(one section of week 5, the sliding mode), the draws and Monte Carlo, gradient tuning.
+
+**The gate:** every row above stays on the teaching surface through the v0.3 changes, so a lab
+written against the v0.3 interface needs nothing more; and (R49) the tools the labs use carry
+one public, stable teaching name by January (RRT, MPC, trajectory optimization, computed
+torque, sliding mode, the task- and joint-space impedance laws, task-space position control
+with a nullspace posture, `Manipulator`), frozen for the term (TODO §4, G3). The lab notebooks themselves are the
+maintainer's teaching design (AGENTS), written when he chooses; agents draft on request.
 
 ## 5. The path to v1.0
 
@@ -248,7 +259,7 @@ gantt
     axisFormat %b %Y
     section Decide
     Rulings sessions 1 and 2 (R1-R29)     :done, rul1, 2026-10-22, 2d
-    GMC714 audit G1 ranks wave G          :g1, 2026-10-24, 2w
+    GMC714 audit G1 (no gap, R48)         :done, g1, 2026-10-23, 1d
     section v0.3 cleaner core
     Wave K convergence (K1-K4, K7-K9)     :k, 2026-11-01, 3w
     section v0.3 continuous core
@@ -257,8 +268,6 @@ gantt
     V1 steps 3-5, run, engine, program    :v1b, after s75, 10d
     A2 cost parameters (V1 step 6)        :a2, after v1b, 5d
     Sampled loop S31, if room             :s31, after a2, 7d
-    section v0.3 GMC714
-    Wave G, the rows G1 ranks first       :g, 2026-12-07, 14d
     v0.3 tag                              :milestone, v03, 2026-12-21, 0d
     section v0.4 draws and objects
     V1 steps 7-9, the draws, C4           :v1c, 2027-01-04, 4w
@@ -314,13 +323,13 @@ behaviour-preserving, one module per step.
   model, the Monte Carlo defaults); **S66** wiring mistakes fail at wiring time **[ask —
   core]**; **S67** one plot vocabulary; **S68** contracts as tests.
 
-### 5.3 v0.3 — a cleaner core and the differentiable path, then GMC714 (December 2026)
+### 5.3 v0.3 — a cleaner core and the differentiable path (December 2026)
 
 Reorganized 2026-10-21 ([record](../reviews/2026-10-21-roadmap-reorganization.md)); the
 steps, in order, are TODO §4. **First, November: a cleaner core and the full differentiable
-path to the cost behind a clean API** (wave K and the continuous core). **Then, December: the
-features GMC714 is missing** (wave G's rows, ordered by the audit G1, which runs early because
-it is cheap and fixes what December must contain).
+path to the cost behind a clean API** (wave K and the continuous core). GMC714 needs no new feature (R48:
+the audit G1 found the teaching surface covers every lab), so v0.3 is the clean-up and the
+continuous core.
 
 **Rulings first**, in two sessions ordered by what each unblocks: the shape, the convergence
 and the step model, then the sampled loop, the compiled problem and the names. No foundation
@@ -333,10 +342,9 @@ points that pass and an independent second opinion raised are under "Raised 2026
 **Next:** implement, the step model's baseline (SM-0) first. The sampled loop's details
 (D13–D15), the optimizer upgrade (S74, deferred by R25) and the v0.4 names stay open.
 
-**The audit, now** (in parallel with everything; not started on 2026-10-23, and the one input with a hard date):
-- **G1** GMC714 baseline audit: every §4.3 topic run on the teaching surface, the gaps
-  written as the release contract, and wave G's rows ranked into what the term needs in
-  December and what moves to v0.4. **[ask — course scope]**
+**The audit, done 2026-10-23** (G1): the GMC714 syllabus read and every lab's ingredients
+checked on the teaching surface (§4.3); no gap; the maintainer ruled that GMC714 needs no new
+feature (R48).
 
 **Wave K — convergence** (November, first, so everything after lands in a smaller library):
 - **K1** The inventory: every public name and every demo with its callers and a maturity
@@ -372,21 +380,18 @@ points that pass and an independent second opinion raised are under "Raised 2026
 - **A2** Cost parameters ([cost-params.md](../plans/cost-params.md)), V1's step 6, so the path
   reaches the cost's own weights. **[ask — core]**, ruled.
 - **S31** The sampled loop, ruled a tool with ticks (R13, R14), after the continuous core: in
-  v0.3 if the calendar leaves room before wave G, else the first core row of v0.4; its details
+  v0.3 if the calendar leaves room, else the first core row of v0.4; its details
   (D13–D15) parked until then. **[ask — core]**
 - **S74** The optimizer upgrade: deferred by R25 to after the continuous core, with OPW-1–OPW-5;
   it lands before S76 (§5.4), which builds on its backend factory.
 
-**Wave G — the GMC714 features** (December, after wave K and the continuous core). G1 ranks the rows
-below: what the term needs lands in December, the rest moves to v0.4 (§5.4). Two weeks hold
-lessons and small features, not a core design, so C6 is already a v0.4 row.
-- **C1** Pyro parity open rows ([pyro-port-remaining.md](../plans/pyro-port-remaining.md))
-  and the pyro → minilink migration guide in README.
-- **C2** GMC714 modelling ladder: manipulators and the vehicle ladder as a `02_dynamics`
-  lesson; robotic PID wrappers.
-- **C3** Blocks: `Ramp` / `Chirp` / `Delay` / `Switch`.
-- **S63** DP reads a finite horizon from `problem.tf`; **S64** catalog hygiene. **[ask]**
-- The gaps G1 writes.
+**GMC714** (R48): no new feature; the teaching surface already covers every lab (§4.3).
+- **G3** GMC714's names stable by January (R49): `RRTPlanner` to the teaching lane, the robotic
+  laws and `Manipulator` onto the prelude, MPC as one teaching name with a frozen constructor.
+  **[ask — public names]**
+- The former wave G rows (C1's pyro parity and migration guide, C2's robotic PID wrappers, C3's
+  blocks, S63, S64) move to v0.4 (§5.4); the labs are the maintainer's teaching work, outside
+  this roadmap.
 
 ### 5.4 v0.4 — the draws and the textbook objects (winter 2027)
 
@@ -426,7 +431,9 @@ meanwhile and does not gate it); the steps, in order, are TODO §5.
   heads rebuilt on it, the RL numbers changing once).
 - **C6** General serial chain: one mechanism description (DH or URDF) feeding RNEA / ABA, the
   GMC714 arm topic's modelling rung; design first. **[ask — core]**
-- The wave G rows G1 ranks after the term's needs.
+- The former wave G rows (R48): **C1** pyro parity and the pyro → minilink migration guide,
+  **C2**'s robotic PID wrappers, **C3** the blocks (`Ramp` / `Chirp` / `Delay` / `Switch`),
+  **S63** DP reading a finite horizon, **S64** catalog hygiene.
 - **S73** Traceable linear analysis, any time, self-contained.
 
 ### 5.5 v0.9 — freeze candidate (spring 2027)
@@ -572,10 +579,11 @@ for time (R42); the RL episode a training setting (R43); the Monte Carlo fold in
 record's names `cost`, `J`, `objective` (R45); no regularizer hook (R46); v0.3 on `dev` until
 every notebook has moved, no pin (R47).
 
-**Still open from the second opinion** (after G1): v0.3's scope against the maintainer's
-attention, the proposed cuts to v0.4 (SM-7, SM-6's move, A2, K4, K8-3, S31) and a GMC714 API
-freeze on December 1 (record item 8); whether MPC and robust control need the engine in
-December (item 9); the slots of S31 and S74 (item 18); `discretize`'s `params["dt"]` fallback,
+**Still open from the second opinion:** v0.3's scope against the maintainer's attention, the
+proposed cuts to v0.4 (SM-7, SM-6's move, A2, K4, K8-3, S31), now that GMC714 needs no feature
+(R48) (record item 8; item 9 is answered
+by R48: neither MPC nor the draws); the slots of S31 and S74 (item 18; with R49, MPC's loop syntax `mpc % dt @ plant` must stay
+stable through S31, whichever slot it takes); `discretize`'s `params["dt"]` fallback,
 proposed dropped (item 21); and the program with the price off (the default), where one
 diverging trial makes the objective `+inf`: written as a caveat (set `infeasible_cost=True` for a
 search that may reach unstable gains), to confirm.
@@ -598,7 +606,7 @@ search that may reach unstable gains), to confirm.
   side features as a block or item by item, from K1's table; the racecar 3-D skin between terms
   and the SB3 bridge at S49. [core-consolidation.md](../plans/core-consolidation.md) §10.
 
-**Before v0.3's course rows (wave G)**
+**Before the former wave G rows (v0.4, R48)**
 
 - **The optional `KinematicModel` delegate**: adopt or drop, decided with C6's mechanism
   description.

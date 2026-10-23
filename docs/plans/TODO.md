@@ -306,36 +306,21 @@ pick):
 points the same evening) and aligned: the design of record is
 [continuous-core.md](continuous-core.md); the plan docs it shaped were rewritten to it, and the
 rows below are its steps with their gates. The first code is the step model's baseline (SM-0)
-and the GMC714 audit (G1, R30). Before V1's step 2, a one-day spike of the scoring formula
+(the GMC714 audit, G1, is done: no gap, R48). Before V1's step 2, a one-day spike of the scoring formula
 (R31–R33, R45) on the pendulum. Nothing merges to `main` until every notebook has moved to the
 new interface (R47).
 
 **Order** (reorganized 2026-10-21, [record](../reviews/2026-10-21-roadmap-reorganization.md);
-the rulings of 2026-10-22/23 fixed the rest): **G1 now**, in parallel with everything (it is
-cheap, and it ranks what December must contain). **The cleanup first**, from November 1: wave K
+the rulings of 2026-10-22/23 fixed the rest): **The cleanup first**, from November 1: wave K
 (K1 and K9 first, then K8 and K7's first tier as K2 / K3, then K4), its between-terms moves in
 the late-December window (ROADMAP §5's calendar rule), A6 with them. **The continuous core**
 beside it: the step model (S75: SM-0, SM-1, SM-2, SM-7, SM-3, SM-4, SM-5, SM-6, SM-8), and V1's
 path to the cost (V1.1–V1.6 with V1.4b, the Monte Carlo fold; steps 1 and 2 need nothing from S75
 and may start at once, step 3 needs SM-1, step 6 is A2, with A5's sets reading `params`). **Then the sampled loop** (S31,
-the hybrid phase) once V1's step 6 lands, if the calendar leaves room before wave G; otherwise
-it opens §5. **Then the GMC714 features**, in December: the wave G rows G1 ranks as needed
-before the term (C1, C2, C3, S63, S64 and the gaps G1 writes); the rest, C6 and S76 among them,
-are §5 rows (ruled 2026-10-22, [record](../reviews/2026-10-22-second-roadmap-review-rulings.md)).
+the hybrid phase) once V1's step 6 lands, if the calendar leaves room; otherwise
+it opens §5. GMC714 needs no new feature (R48): the former wave G rows (C1, C2, C3, S63,
+S64) are §5 rows beside C6 and S76.
 The rows below are in that order.
-
-**The audit, first.**
-
-- [ ] **G1 GMC714 baseline audit** **[ask — course scope]**, now, in parallel with the rulings (ruled
-  2026-10-21: the audit fixes what December's release must contain). Run every topic of ROADMAP §4.3
-  (vehicle models, robotic arm, nonlinear control, robust control, trajectory optimization,
-  MPC) on the teaching surface, as the GRO501 audit did
-  ([docs/reviews/2026-09-07-gro501-coverage.md](../reviews/2026-09-07-gro501-coverage.md));
-  write the gaps as §4.3's gates and as rows here, as behaviour the lesson needs rather than
-  module paths (S75, S31 and V1 reshape the trajopt and MPC internals in November). Rank wave
-  G's rows into what the term needs in December and what moves to §5. Decide whether MPC
-  joins the teaching surface. Done when every §4.3 row has a status and a gate and every wave
-  G row has its rung.
 
 **Wave K — convergence** (November 2026, first, before the continuous core adds new code; K7's
 analysis is the ruling table K1 asks for). The goal: a
@@ -555,7 +540,7 @@ moved to the new interface (R47).
   it. Parked until the continuous core lands (the maintainer, 2026-10-22): the run-state caches
   (RULES 2.4), controller memory and the computer's draws on the tick, the evaluator's dispatch
   of a sampled controller (D13–D15), the `core` → `simulation` import (scan: core#14). In v0.3
-  if the calendar leaves room before wave G, else the first core row of §5 (raised). Done when
+  if the calendar leaves room, else the first core row of §5 (raised). Done when
   D13–D15 are ruled and the kernel's steps are rows here.
 - [ ] **S74 The optimizer as the one descent loop** **[idea to review — ask — core]**, proposed
   2026-10-18, **deferred by R25 (2026-10-23)** to after the continuous core: the program's class
@@ -571,28 +556,22 @@ moved to the new interface (R47).
   [the record](../reviews/2026-10-23-v03-alignment-and-second-opinion.md)), after G1; ROADMAP §6
   lists them. Done when ruled.
 
-**Wave G — the GMC714 features** (December, after wave K and the continuous core, in the order G1 sets;
-the rows G1 ranks after the term's needs move to §5, where C6 already sits).
+**GMC714** (R48, 2026-10-23): no new feature; the teaching surface covers every lab (ROADMAP
+§4.3). The labs move from pyro to minilink as the maintainer's teaching work, outside this
+workboard; the former wave G rows are §5 rows.
 
-- [ ] **C1 Pyro parity** open rows — [pyro-port-remaining.md](pyro-port-remaining.md); then
-  the pyro → minilink migration guide in README from the name map there. **[ask]** for the
-  README. Re-audit the table against the code first (scan: docs-gov#11).
-- [ ] **C2 GMC714 modelling ladder**: manipulators + the four-rung vehicle ladder as a
-  `02_dynamics` lesson; robotic PID wrappers (`JointPD`, `EndEffectorPD` twins).
-  Also: one constructor contract for the robotic laws (scan: control#6).
-- [ ] **C3 Blocks**: `Ramp` / `Chirp` / `Delay` / `Switch`; `Integrator` and `ZOHHold` take
-  a `dim` like every static block (scan: graphics#11).
-- [ ] **S63 DP reads the horizon** **[ask — planner API]** (scan: planning#1): a finite
-  `problem.tf` runs `round(tf / dt)` backward sweeps as `solve_steps` does, the way
-  `LQRPlanner` picks the Riccati ODE, or warns once. Done when LQR and DP agree on the
-  finite-horizon double integrator.
-- [ ] **S64 Catalog hygiene** **[ask — catalog]** (scan: dynamics#0, dynamics#1,
-  dynamics#2, dynamics#3, dynamics#4, dynamics#6, dynamics#8): the mechanical default
-  bounds as ROADMAP §6 decides (keep the invented ±2π / ±5, or each plant states its own); output ports that are
-  the state or a slice of it read labels and units from the state (the 56 copy lines go);
-  one port layout across the bicycle rungs; one owner for the wheelbase; the hidden `0.01`
-  damping in `Drone2D.d` and `Rocket.d` named; `VanderPol` with a real input or none;
-  constructor hygiene in the pendulum and mass-spring-damper families.
+- [ ] **G3 GMC714's names stable by January** **[ask — public names]** (R49): every tool a lab
+  uses has one public teaching name on the teaching surface, frozen for the term (week 1 on
+  January 9). Moves: `RRTPlanner` from provisional to the teaching lane; `ModelJointImpedance`,
+  `TaskKinematic`, `TaskKinematicNullspace` onto the root prelude; `Manipulator` and
+  `MechanicalSystem` onto a facade (`minilink.catalog` or a `dynamics` band facade, to rule);
+  MPC as one teaching name (`ModelPredictiveController` proposed) over today's
+  `MPCStatelessController` / `MPCStatefulController`, its constructor frozen while S76 and the
+  planner contract (D27) reshape its internals in v0.4, and the loop it runs in (`mpc % dt @
+  plant`) kept as the user's syntax through S31. A6's catalog renames land before the term or
+  after it, never during. Each name gets a docstring, a demo and the teaching-surface test
+  (ROADMAP §2's soft rule). Done when `test_teaching_surface.py` pins the list, each name has a
+  demo under `examples/demos/`, and no GMC714 lab needs a deep import. Lands by mid-December.
 
 ---
 
@@ -605,7 +584,7 @@ Monte Carlo fold land in v0.3, R44) with RN-3 / RN-4 / RN-5 and AC-7 (step 7 is 
 per-block seeds under the same verb; RN-2 before it), its step 7b
 the sampled face (after S31), C4 its first data consumer; S74 before S76 (S76 builds on its
 backend factory), S76 beside them (its names ruled: `ParametricProgram`, the key `plant`); then A1,
-then A3; S72 on the sampled kernel after RN-4 / RN-5; C6, C5, the wave G rows G1 deferred and
+then A3; S72 on the sampled kernel after RN-4 / RN-5; C6, C5, the former wave G rows (R48) and
 LQGPlanner as picked; S73 any time, self-contained.
 
 **The draws on the path.**
@@ -735,10 +714,29 @@ LQGPlanner as picked; S73 any time, self-contained.
   stack, ABA on the other RNEA arms, the symbolic path reading the same description; the GMC714
   arm topic's modelling rung. Design first (the July 2026 articulated-mechanism draft is in git
   history; it is re-planned here, the optional `KinematicModel` delegate decided with it, ROADMAP
-  §6). Moved here from wave G on 2026-10-22: a core design does not fit December's two weeks
-  unless G1 shows a second arm is taught in January. Done when a second arm runs on the shared
+  §6). Moved here from wave G on 2026-10-22; the GMC714 audit (2026-10-23) found the labs need no
+  second arm description (`ThreeLinkManipulator3D` and the UR5 cover them). Done when a second arm runs on the shared
   stack with the catalog both-backends test.
-- The wave G rows G1 ranks after the term's needs land here, in the order G1 gives them.
+- **The former wave G rows** (moved from v0.3 by R48; none is needed by GMC714):
+  - [ ] **C1 Pyro parity** open rows — [pyro-port-remaining.md](pyro-port-remaining.md); then
+    the pyro → minilink migration guide in README from the name map there. **[ask]** for the
+    README. Re-audit the table against the code first (scan: docs-gov#11).
+  - [ ] **C2 Modelling ladder**: manipulators + the four-rung vehicle ladder as a
+    `02_dynamics` tutorial lesson (not a GMC714 lab); robotic PID wrappers (`JointPD`, `EndEffectorPD` twins).
+    Also: one constructor contract for the robotic laws (scan: control#6).
+  - [ ] **C3 Blocks**: `Ramp` / `Chirp` / `Delay` / `Switch`; `Integrator` and `ZOHHold` take
+    a `dim` like every static block (scan: graphics#11).
+  - [ ] **S63 DP reads the horizon** **[ask — planner API]** (scan: planning#1): a finite
+    `problem.tf` runs `round(tf / dt)` backward sweeps as `solve_steps` does, the way
+    `LQRPlanner` picks the Riccati ODE, or warns once. Done when LQR and DP agree on the
+    finite-horizon double integrator.
+  - [ ] **S64 Catalog hygiene** **[ask — catalog]** (scan: dynamics#0, dynamics#1,
+    dynamics#2, dynamics#3, dynamics#4, dynamics#6, dynamics#8): the mechanical default
+    bounds as ROADMAP §6 decides (keep the invented ±2π / ±5, or each plant states its own); output ports that are
+    the state or a slice of it read labels and units from the state (the 56 copy lines go);
+    one port layout across the bicycle rungs; one owner for the wheelbase; the hidden `0.01`
+    damping in `Drone2D.d` and `Rocket.d` named; `VanderPol` with a real input or none;
+    constructor hygiene in the pendulum and mass-spring-damper families.
 - [ ] **S73 Traceable linear analysis** **[idea to review — ask — core]**, proposed by the
   maintainer 2026-10-18, not scheduled: `poles`, `frequency_response` and `margins` in
   `analysis/linear.py` through the array module, so the sensitivity of closed-loop poles,

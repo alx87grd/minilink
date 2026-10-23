@@ -157,7 +157,7 @@ dropping them. The argument's name and form are the naming session's.
 export (V1's step 5) and beside S74 with OPW-1–OPW-5 if it has landed (the same evaluator and
 backend factory); PP-3 after A2 (V1's step 6); the scene
 leaf with A3 in v0.4. No dependency on S75 or S31: collocation uses the continuous `f`, not
-the step model. Before wave G, so the MPC topic G1 weighs for GMC714 meets one API.
+the step model. MPC is not a week of the GMC714 syllabus, but its teaching name is frozen by January (R49, G3).
 
 ## 5. Later, not scheduled
 

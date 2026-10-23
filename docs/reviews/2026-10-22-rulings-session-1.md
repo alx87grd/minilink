@@ -342,3 +342,22 @@ named.
 Left open from the record: items 8, 9 and 18 (v0.3's scope and the slots of S31 and S74, after
 G1), 21 (`discretize`'s `params["dt"]` fallback, proposed dropped), 23 and 24 (agent-managed: V1.1
 split when it starts; this section marks the reversals).
+- **R48 (2026-10-23, after G1) GMC714 needs no new feature.** The course page and its notes
+  were read (8 homework labs: the bicycle's phase plane, arm kinematics and dynamics, impedance
+  on a 3-DoF arm, computed torque, sliding mode and adaptive control, the longitudinal and
+  dynamic bicycle models, trajectory optimization and RRT); every lab's ingredients are on the
+  teaching surface (ROADMAP §4.3). The labs move from pyro to minilink as the maintainer's
+  teaching work, outside the roadmap; the adaptive law is a custom `DynamicSystem` written in
+  the lab (pyro's `DynamicController`). MPC, the draws and robust control as a topic are not in
+  the syllabus, which answers the second opinion's item 9. The former wave G rows (C1, C2, C3,
+  S63, S64) move to v0.4. This closes G1 (R30).
+- **R49 (2026-10-23) GMC714's names stable by January.** The tools the labs use carry a public,
+  stable teaching name on the teaching surface before the term (week 1 on January 9): RRT,
+  MPC and trajectory optimization; `ComputedTorqueController`, `SlidingModeController`; the
+  impedance laws in task and joint space (`ImpedanceController`, `TaskImpedance`,
+  `JointImpedance`, `ModelJointImpedance`); task-space position control with a nullspace
+  posture (`TaskKinematicNullspace`); the `Manipulator` and `MechanicalSystem` classes. Checked
+  the same day: `RRTPlanner` is on the surface but provisional; `ModelJointImpedance`,
+  `TaskKinematic`, `TaskKinematicNullspace` are on the `control` facade only; `Manipulator` and
+  `MechanicalSystem` are a deep import; MPC is two research-lane classes
+  (`MPCStatelessController`, `MPCStatefulController`). A v0.3 row (TODO §4, G3) carries it.
