@@ -1,0 +1,1109 @@
+"""The problem evaluator: a controller on a problem, compiled once, run to the horizon and scored."""
+
+from __future__ import annotations
+
+import math
+import warnings
+from dataclasses import dataclass
+from functools import lru_cache
+
+import numpy as np
+
+from minilink.core.backends import (
+    BACKEND_JAX,
+    BACKEND_NUMPY,
+    array_module,
+    ensure_jax_x64,
+)
+from minilink.core.compile.evaluators.stepping import require_step_knobs
+from minilink.core.options import require_one_of
+from minilink.core.trajectory import Trajectory
+
+BACKENDS = ("auto", BACKEND_JAX, BACKEND_NUMPY)
+EPISODE_LENGTH = 10.0  # s, the run of an infinite-horizon problem when none is named
+PLANT_INPUT = "plant.u"  # the recorded signal of the plant's input, the plant role's u
+
+###############################################################################
+# Public API
+###############################################################################
+
+
+class ProblemEvaluator:
+    """
+    A planning problem and a controller, compiled into one parametric run and its score.
+
+    The loop is the controller closed on the problem's plant (``controller @ plant``,
+    every free input held at its port's nominal value), or a built loop whose block
+    ``plant`` is the problem's system. One run integrates the loop to the horizon on
+    the fixed-step model (``solver``, ``dt``, ``substeps``), records every block
+    output, and scores the plant's run by the problem's formula::
+
+        pe = problem.compile(pid, dt=0.01)
+        report = pe.evaluate()                                   # the Evaluation
+        dJ = jax.grad(lambda p: pe.evaluate(p).objective)(pe.params)
+        program = pe.program(wrt=["controller.Kp", "controller.Kd"])
+
+    Parameters
+    ----------
+    problem : PlanningProblem
+        The task: plant, cost, sets, horizon, price switch (and, for a stochastic
+        problem, the draws and the criterion).
+    controller : System or PlanningSolution
+        A controller block (or a solution's policy) closed on the plant, a source
+        block (no input) driving the plant's command, or a built loop with a
+        ``plant`` block.
+    dt : float
+        Sample period of the run: the free inputs are held over it and the run is
+        recorded on its grid.
+    solver : {"rk4", "euler"}
+        Integration formula of one step.
+    substeps : int
+        Integration steps per sample period.
+    backend : {"auto", "jax", "numpy"}
+        ``"auto"`` is JAX when it is installed and the loop traces on it.
+    episode_length : float, optional
+        Length of the run of an infinite-horizon problem (10 s by default).
+    """
+
+    def __init__(
+        self,
+        problem,
+        controller,
+        dt,
+        *,
+        solver="rk4",
+        substeps=1,
+        backend="auto",
+        episode_length=None,
+    ):
+        require_step_knobs(solver, substeps)
+        require_one_of("backend", backend, BACKENDS)
+
+        # The task and the loop that runs it
+        self.problem = problem
+        self.loop = closed_loop_of(problem, controller)
+        self.solver = solver
+        self.substeps = int(substeps)
+
+        # The grid: N periods of dt to the horizon
+        self.dt = float(dt)
+        self.tf = horizon_of(problem, episode_length)
+        self.n_steps = steps_of(self.tf, self.dt)
+
+        # The loop, compiled once on its backend
+        self.backend, self.evaluator = compile_loop(self.loop, backend)
+
+        # The static layout of the run: the plant's state slice, the sources of its
+        # input, the recorded signals and the free inputs
+        self.plant_slice = self.loop.state_index["plant"]
+        self.plant_input = plant_input_sources(self.loop, self.evaluator)
+        self.block_ids = tuple(self.loop.subsystems)
+        self.free_inputs = tuple(self.loop.inputs)
+        require_free_names(self.free_inputs, self.block_ids)
+
+        # The forms generated once: the batched trial, jitted on JAX
+        self.trials_fn = None
+
+    @property
+    def params(self) -> dict:
+        """
+        The run's parameters as one nested tree, fresh from the objects.
+
+        ``{block_id: block params}`` for every block of the loop, ``"x_start"``,
+        and each free input of the loop at its nominal value; every leaf a float
+        array, so ``jax.grad`` differentiates the whole tree.
+        """
+        loop = self.loop
+        problem = self.problem
+
+        tree = {sys_id: loop.subsystems[sys_id].params for sys_id in self.block_ids}
+        tree["x_start"] = problem.x_start
+        for port in self.free_inputs:
+            tree[port] = loop.inputs[port].nominal_value
+
+        return float_leaves(tree)
+
+    def trajectory(self, params=None, key=None) -> Trajectory:
+        """
+        One run of the loop, every block output recorded: the loop's trajectory.
+
+        ``params`` overrides entries of :attr:`params` (a partial tree is merged);
+        ``key=None`` is the nominal run (a stochastic problem at its mean start).
+        The plant's run is ``traj.of("plant")``.
+        """
+        params = self.merged(params)
+
+        # The nominal run, or the draw of one trial
+        if key is None:
+            x_start, params = params["x_start"], params
+        else:
+            x_start, params = self.realize(params, key, 1)
+            x_start = x_start[0]
+            params = take_trial(params, 0)
+
+        return self.run(params, x_start)
+
+    def evaluate(self, params=None, key=0, n_trials=None, *, record=False):
+        """
+        The :class:`Evaluation` of the loop on the problem: one run, or ``n_trials`` draws.
+
+        A deterministic problem is one run (``n_trials`` 1 or unset); a stochastic
+        problem draws ``n_trials`` starts and parameter overrides from ``key``. On
+        JAX the whole evaluation traces, so ``jax.grad`` of ``.objective`` gives
+        the gradient with respect to every leaf of ``params``. ``record=True``
+        keeps the runs' trajectories (outside a trace).
+        """
+        params = self.merged(params)
+        n_trials = trials_of(self.problem, n_trials)
+
+        # The draws, then the runs and their scores, batched on JAX
+        x_starts, trial_params = self.realize(params, key, n_trials)
+        rows, trajectories = self.run_trials(trial_params, x_starts, record)
+
+        return Evaluation(
+            **rows,
+            x0=x_starts,
+            trajectories=trajectories,
+            criterion=criterion_of(self.problem),
+        )
+
+    def program(self, wrt, bounds=None, key=0, n_trials=None, *, params=None):
+        """
+        The tuning program over the leaves ``wrt``: ``min_z J(z)`` with the declared sets as rows.
+
+        ``J(z)`` is the objective of :meth:`evaluate` with the leaves named by
+        ``wrt`` (dotted paths into :attr:`params`, as ``"controller.Kp"``) read
+        from ``z`` and every other leaf at its current value; the draws are
+        realized once, from ``key``. The constraint rows ``g(z) ≥ 0`` are the
+        per-trial feasibility margin when ``X`` or ``U`` is bounded and the
+        reachability margin when ``Xf`` is set. ``bounds`` maps a path to
+        ``(lower, upper)`` (``None`` for an open side). ``params`` overrides
+        entries of :attr:`params` at the base point (the leaves not tuned keep
+        these values; the start ``z0`` reads the tuned ones).
+
+        Three caveats of the price switch: the price is a step, with no gradient;
+        with sets declared it counts beside their rows; with the switch off, one
+        diverging trial makes ``J`` infinite and a line search fails, so a search
+        that may cross into unstable gains sets ``infeasible_cost=True``. A smooth
+        alternative for gradient tuning is a penalty term in the cost,
+        ``cost + w * X.as_cost()``, with ``X`` left undeclared.
+        """
+        # Lazy import: the optimization package loads with its first program
+        from minilink.optimization.mathematical_program import MathematicalProgram
+
+        wrt = paths_of(wrt)
+        base = self.merged(params)
+        z0 = self.pack(base, wrt)
+        n_trials = trials_of(self.problem, n_trials)
+
+        # J(z): the objective of the evaluation at the unpacked leaves
+        def J(z):
+            return self.evaluate(self.unpack(z, wrt, base), key, n_trials).objective
+
+        # g(z) ≥ 0: the margins of the declared sets, one row per trial
+        rows = declared_rows(self.problem)
+
+        def g(z):
+            report = self.evaluate(self.unpack(z, wrt, base), key, n_trials)
+            xp = array_module(report.J)
+            return xp.concatenate([getattr(report, row) for row in rows])
+
+        # The objective's gradient, by reverse mode on JAX
+        grad_J = None
+        if self.backend == BACKEND_JAX:
+            jax = ensure_jax_x64()
+            grad_J = jax.grad(J)
+
+        lower, upper = box_of(bounds, wrt, base)
+        warn_if_infinite(J(z0), self.problem)
+
+        return MathematicalProgram(
+            n_z=z0.size,
+            J=J,
+            g=g if rows else None,
+            lower=lower,
+            upper=upper,
+            grad_J=grad_J,
+            backend=self.backend,
+            metadata={"wrt": wrt, "z0": z0, "rows": rows},
+        )
+
+    def pack(self, params, wrt) -> np.ndarray:
+        """The leaves of ``params`` named by ``wrt``, flattened into one vector ``z``."""
+        wrt = paths_of(wrt)
+        xp = array_module(*(lookup(params, path) for path in wrt))
+
+        leaves = [xp.reshape(lookup(params, path), (-1,)) for path in wrt]
+
+        return xp.concatenate(leaves)
+
+    def unpack(self, z, wrt, params=None) -> dict:
+        """``params`` (default :attr:`params`) with the leaves named by ``wrt`` read from ``z``."""
+        wrt = paths_of(wrt)
+        tree = self.params if params is None else params
+
+        # Each leaf takes the next size(leaf) entries of z, in the leaf's shape
+        start = 0
+        for path in wrt:
+            shape = np.shape(lookup(tree, path))
+            size = int(np.prod(shape))
+            tree = with_leaf(tree, path, z[start : start + size].reshape(shape))
+            start += size
+
+        return tree
+
+    ###########################################################################
+    # Internal machinery
+    ###########################################################################
+
+    def merged(self, params):
+        """:attr:`params`, with the entries of ``params`` overriding."""
+        if params is None:
+            return self.params
+
+        return merge_tree(self.params, params)
+
+    def realize(self, params, key, n_trials):
+        """The trials' starts ``(n_trials, n)`` and parameters (one tree, a leading trial axis where drawn)."""
+        problem = self.problem
+
+        # A deterministic problem: its one start, the parameters as they are
+        if not problem.is_stochastic:
+            xp = array_module(params["x_start"])
+            return xp.reshape(params["x_start"], (1, -1)), params
+
+        draw_key = trial_key(key, self.backend)
+        x_key, p_key = split_two(draw_key, self.backend)
+
+        # x0 ~ p(x0), and each drawn parameter, n_trials times
+        x_starts = problem.sample_x0(x_key, n_trials)
+        draws = draw_params(problem, p_key, n_trials, self.backend)
+
+        # The plant's draws override its entries; the free inputs' draws their port
+        plant_draws = {k: v for k, v in draws.items() if k != "inputs"}
+        overrides = {"plant": plant_draws} if plant_draws else {}
+        overrides.update(draws.get("inputs", {}))
+
+        axes = merge_tree(axes_like(params, None), axes_like(overrides, 0))
+
+        return x_starts, Batched(merge_tree(params, overrides), axes)
+
+    def run(self, params, x_start) -> Trajectory:
+        """One run of the loop from the plant state ``x_start``: the loop's trajectory, signals recorded."""
+        ev = self.evaluator
+        loop = self.loop
+        xp = array_module(x_start, *flat_leaves(params))
+        dt = self.dt
+        N = self.n_steps
+        a, b = self.plant_slice
+
+        # The loop's start: its own initial state, the plant's slice at x_start
+        x0_loop = xp.asarray(loop.x0, dtype=float)
+        x0 = xp.concatenate([x0_loop[:a], xp.reshape(x_start, (-1,)), x0_loop[b:]])
+
+        # The free inputs held at their parameters over every period
+        u = self.held_inputs(params, xp)
+        u_seq = xp.broadcast_to(u, (N, u.size))
+
+        # x_{k+1} = Φ(x_k, u, t_k), t_k = k dt, k = 0 … N − 1
+        loop_params = {sys_id: params[sys_id] for sys_id in self.block_ids}
+        xs = ev.jit.rollout(
+            x0,
+            u_seq,
+            0.0,
+            dt,
+            loop_params,
+            solver=self.solver,
+            substeps=self.substeps,
+            n_steps=N,
+        )
+        ts = xp.arange(N + 1) * dt
+        us = xp.broadcast_to(u, (N + 1, u.size))
+
+        # Every block output at every sample, and the plant's input among them
+        signals = signals_along(ev, xs, us, ts, loop_params)
+        u_plant = gather_samples(self.plant_input, signals, us, xp)
+
+        recorded = {
+            f"{sys_id}:{port}": signals[:, sl].T
+            for (sys_id, port), sl in ev.plan.output_slices.items()
+        }
+        recorded[PLANT_INPUT] = u_plant.T
+
+        return Trajectory(
+            t=ts,
+            x=xs.T,
+            u=us.T,
+            signals=recorded,
+            roles={"plant": {"x": (a, b), "u": PLANT_INPUT}},
+        )
+
+    def held_inputs(self, params, xp):
+        """The loop's boundary input: each free input's parameter, stacked in port order."""
+        if not self.free_inputs:
+            return xp.zeros(0)
+
+        return xp.concatenate(
+            [xp.reshape(params[port], (-1,)) for port in self.free_inputs]
+        )
+
+    def score(self, params, x_start, record):
+        """One trial's row of the record (and its trajectory when ``record``)."""
+        traj = self.run(params, x_start)
+        plant_run = traj.of("plant")
+
+        row = score_run(self.problem, plant_run, tf=self.tf)
+
+        return row, (traj if record else None)
+
+    def run_trials(self, params, x_starts, record):
+        """The rows of every trial: a ``vmap`` on JAX, a loop on NumPy."""
+        if self.backend == BACKEND_JAX:
+            return self.run_trials_jax(params, x_starts, record)
+
+        return self.run_trials_numpy(params, x_starts, record)
+
+    def run_trials_jax(self, params, x_starts, record):
+        """The trials as one ``vmap`` of the run, jitted once."""
+        jax = ensure_jax_x64()
+        register_evaluation_pytree()
+
+        if self.trials_fn is None:
+            self.trials_fn = {}
+
+        # The batched axes: a drawn leaf carries the trial axis, the others are shared
+        tree, axes = batch_axes(params)
+        if (axes_key := (record, tree_signature(axes))) not in self.trials_fn:
+            batched = jax.vmap(
+                lambda p, x0: self.score(p, x0, record), in_axes=(axes, 0)
+            )
+            self.trials_fn[axes_key] = jax.jit(batched)
+
+        rows, trajs = self.trials_fn[axes_key](tree, x_starts)
+
+        return rows, unbatch(trajs, x_starts.shape[0]) if record else None
+
+    def run_trials_numpy(self, params, x_starts, record):
+        """The trials one at a time, stacked into the record's arrays."""
+        rows, trajs = [], []
+        for i, x_start in enumerate(x_starts):
+            row, traj = self.score(take_trial(params, i), x_start, record)
+            rows.append(row)
+            trajs.append(traj)
+
+        stacked = {name: np.stack([row[name] for row in rows]) for name in rows[0]}
+
+        return stacked, (trajs if record else None)
+
+
+@dataclass(frozen=True)
+class Evaluation:
+    """
+    The scores of the runs of one evaluation: one row per run, and their statistics.
+
+    A pytree record (traceable inside a trace, plain arrays outside), each field
+    of shape ``(n_runs,)``:
+
+    - ``cost``: ``∫₀^{tf} e^{−ρt} g dt + e^{−ρ tf} h(x(tf))``, ``+inf`` for a run
+      that is not finite;
+    - ``J``: the cost, plus the problem's price when the run failed or missed the
+      goal (with the price switch on);
+    - ``feasibility_margin``: the least margin of ``x`` to ``X`` and of ``u`` to
+      ``U`` along the run, and ``failed`` (not finite, or a negative margin);
+    - ``reachability_margin``: the margin of ``x(tf)`` to ``Xf`` (``+inf`` without
+      ``Xf``), and ``reached``;
+    - ``x0``: the starts, ``(n_runs, n)``.
+
+    :attr:`objective` is the problem's criterion over ``J``: the one number a
+    program minimizes.
+    """
+
+    cost: object
+    J: object
+    feasibility_margin: object
+    failed: object
+    reachability_margin: object
+    reached: object
+    x0: object
+    trajectories: list | None = None
+    criterion: object = "expectation"
+
+    @property
+    def n_trials(self) -> int:
+        """Number of runs."""
+        return int(np.shape(self.J)[0])
+
+    @property
+    def objective(self):
+        """The criterion over the runs' ``J``: the mean, a CVaR or the worst."""
+        return reduce_criterion(self.J, self.criterion)
+
+    @property
+    def mean(self):
+        """Mean of ``J`` over the runs."""
+        return array_module(self.J).mean(self.J)
+
+    @property
+    def std(self):
+        """Standard deviation of ``J`` over the runs."""
+        return array_module(self.J).std(self.J)
+
+    @property
+    def worst(self):
+        """Largest ``J`` over the runs."""
+        return array_module(self.J).max(self.J)
+
+    def cvar(self, alpha):
+        """Mean of the worst ``ceil(alpha · n)`` values of ``J``."""
+        return reduce_criterion(self.J, ("cvar", alpha))
+
+    @property
+    def feasibility_rate(self):
+        """Fraction of the runs that stayed finite, in ``X`` and in ``U``."""
+        return array_module(self.J).mean(~self.failed)
+
+    @property
+    def reachability_rate(self):
+        """Fraction of the runs that ended in ``Xf``."""
+        return array_module(self.J).mean(self.reached)
+
+    @property
+    def success_rate(self):
+        """Fraction of the runs that stayed feasible and ended in ``Xf``."""
+        return array_module(self.J).mean(self.reached & ~self.failed)
+
+    # Display
+
+    def __str__(self) -> str:
+        if self.n_trials == 1:
+            notes = []
+            if bool(self.failed[0]):
+                notes.append("failed")
+            if not bool(self.reached[0]):
+                notes.append("goal missed")
+            note = f" ({', '.join(notes)})" if notes else ""
+            return (
+                f"J = {float(self.J[0]):.4g}{note}, cost = {float(self.cost[0]):.4g}, "
+                f"feasibility margin = {float(self.feasibility_margin[0]):.3g}"
+            )
+
+        return (
+            f"J over {self.n_trials} runs: objective {float(self.objective):.4g}, "
+            f"mean {float(self.mean):.4g}, std {float(self.std):.4g}, "
+            f"worst {float(self.worst):.4g}; feasible {100 * float(self.feasibility_rate):.0f}%, "
+            f"reached {100 * float(self.reachability_rate):.0f}%"
+        )
+
+
+def evaluate(
+    problem,
+    controller,
+    *,
+    dt,
+    solver="rk4",
+    substeps=1,
+    n_trials=None,
+    key=0,
+    record=False,
+    backend="auto",
+    episode_length=None,
+) -> Evaluation:
+    """
+    The :class:`Evaluation` of a controller on a problem: ``problem.compile(...).evaluate(...)``.
+
+    One run for a deterministic problem, ``n_trials`` draws for a stochastic one;
+    see :class:`ProblemEvaluator` for the loop, the run and the score.
+    """
+    pe = ProblemEvaluator(
+        problem,
+        controller,
+        dt,
+        solver=solver,
+        substeps=substeps,
+        backend=backend,
+        episode_length=episode_length,
+    )
+
+    return pe.evaluate(key=key, n_trials=n_trials, record=record)
+
+
+def score_run(problem, traj: Trajectory, *, tf=None) -> dict:
+    """
+    The scores of one plant run under the problem: the formula every evaluation reports.
+
+    ``traj`` is the plant's run (its state and its input on a time grid). On the
+    trajectory's array module, so it traces under JAX::
+
+        finite              = every x_k and u_k finite
+        feasibility_margin  = min over the run of X.margin(x_k, t_k), U.margin(u_k, x_k, t_k)
+        failed              = not finite, or feasibility_margin < 0
+        reachability_margin = Xf.margin(x(tf), tf)       reached = margin ≥ 0  (no Xf: reached)
+        cost                = ∫ e^{−ρt} g dt + e^{−ρ tf} h(x(tf))   (+inf when not finite)
+        J                   = cost, or cost + price · (failed or not reached) with the price on
+
+    A run that is not finite is scored on zeros (a safe ``where``), so its
+    gradient is zero and never poisons a mean.
+    """
+    cost_fn = problem.require_cost()
+    xp = array_module(traj.x)
+    rho = discount_rate_of(problem)
+    price = price_of(problem)
+    finite_horizon = problem.horizon_kind() == "finite"
+
+    t = traj.t
+    x = traj.x.T
+    u = traj.u.T
+    tf = t[-1] if tf is None else tf
+
+    # Finite: every sample, then the run on zeros where it is not (the safe where)
+    finite = xp.all(xp.isfinite(x)) & xp.all(xp.isfinite(u))
+    x = xp.where(finite, x, 0.0)
+    u = xp.where(finite, u, 0.0)
+
+    # The least margin to X and U along the run, the margin of x(tf) to Xf
+    feasibility_margin = xp.minimum(
+        least_margin(lambda xk, uk, tk: problem.X.margin(xk, tk), x, u, t),
+        least_margin(lambda xk, uk, tk: problem.U.margin(uk, xk, tk), x, u, t),
+    )
+    failed = ~finite | (feasibility_margin < 0.0)
+    if problem.Xf is None:
+        reachability_margin = xp.asarray(xp.inf)
+    else:
+        reachability_margin = xp.min(problem.Xf.margin(x[-1], tf))
+    reached = reachability_margin >= 0.0
+
+    # cost = ∫₀^{tf} e^{−ρt} g dt + e^{−ρ tf} h(x(tf)), the integral by the trapezoid
+    safe_run = Trajectory(t=t, x=x.T, u=u.T)
+    _, running = cost_fn.integrate(safe_run, discount_rate=rho)
+    cost = running[-1]
+    if finite_horizon:
+        cost = cost + xp.exp(-rho * tf) * cost_fn.h(x[-1], tf)
+
+    # J = cost, or cost + price · (failed or not reached); a run not finite costs +inf
+    if price is None:
+        J = xp.where(finite, cost, xp.inf)
+    else:
+        J = xp.where(finite, cost, 0.0) + xp.where(failed | ~reached, price, 0.0)
+
+    return {
+        "cost": xp.where(finite, cost, xp.inf),
+        "J": J,
+        "feasibility_margin": feasibility_margin,
+        "failed": failed,
+        "reachability_margin": reachability_margin,
+        "reached": reached,
+    }
+
+
+def closed_loop_of(problem, controller):
+    """The loop a :class:`ProblemEvaluator` runs: ``controller`` closed on the problem's plant.
+
+    A built loop (a diagram with a block ``plant`` of the plant's state size) is
+    taken as it is; a solution gives its policy; a source block (no input) drives
+    the plant's command; any other block is closed by ``controller @ plant``.
+    """
+    # Lazy imports: the composition tools and the results load with the first loop
+    from minilink.core.composition import closed_loop
+    from minilink.core.diagram import DiagramSystem
+    from minilink.core.system import StepSystem
+    from minilink.planning.results import PlanningSolution
+
+    plant = problem.sys
+    if isinstance(controller, PlanningSolution):
+        controller = controller.policy
+
+    require_continuous(controller)
+    if isinstance(controller, DiagramSystem) and "plant" in controller.subsystems:
+        require_plant_block(controller, plant)
+        return controller
+    if isinstance(plant, StepSystem):
+        raise TypeError(
+            "the problem's system is a discrete-time StepSystem: the evaluator runs "
+            "a continuous loop"
+        )
+    if int(controller.m) == 0:
+        return open_loop_of(controller, plant)
+
+    return closed_loop(controller, plant)
+
+
+###############################################################################
+# Internal machinery
+###############################################################################
+
+
+@dataclass(frozen=True)
+class Batched:
+    """A parameter tree whose drawn leaves carry a leading trial axis, and its axes tree (``0`` drawn, ``None`` shared)."""
+
+    tree: dict
+    axes: dict
+
+
+def compile_loop(loop, backend):
+    """``(backend, evaluator)`` of the loop: JAX when asked, or when ``"auto"`` and it traces."""
+    # Lazy import: the compiler loads with the first evaluator
+    from minilink.core.compile.compiler import compile, compile_auto
+
+    if backend == "auto":
+        backend, evaluator = compile_auto(loop)
+    else:
+        evaluator = compile(loop, backend=backend)
+    if backend == BACKEND_JAX:
+        ensure_jax_x64()
+
+    return backend, evaluator
+
+
+def open_loop_of(source, plant):
+    """A source block driving the plant's command: the loop ``{"controller", "plant"}``."""
+    # Lazy imports: the diagram tools load with the first loop
+    from minilink.core.diagram import DiagramSystem
+    from minilink.core.feedback import command_port
+
+    loop = DiagramSystem()
+    loop.add_subsystem(source, "controller")
+    loop.add_subsystem(plant, "plant")
+    loop.connect("controller", next(iter(source.outputs)), "plant", command_port(plant))
+    loop.name = f"{source.name} >> {plant.name}"
+
+    return loop
+
+
+def require_continuous(controller):
+    """Refuse a sampled controller: the evaluator runs a continuous loop in this release."""
+    from minilink.core.system import StepSystem
+
+    if isinstance(controller, StepSystem):
+        raise TypeError(
+            f"{getattr(controller, 'name', controller)!r} is a discrete-time "
+            "StepSystem: the evaluator runs a continuous loop; a sampled controller "
+            "joins it with the hybrid loop"
+        )
+
+
+def require_plant_block(loop, plant):
+    """Refuse a built loop whose ``plant`` block is not the problem's plant."""
+    block = loop.subsystems["plant"]
+    if block is not plant and int(block.n) != int(plant.n):
+        raise ValueError(
+            "the loop's block 'plant' must be the problem's system (or a box with its "
+            f"state): it has n={int(block.n)}, the problem's system n={int(plant.n)}"
+        )
+
+
+def plant_input_sources(loop, evaluator):
+    """The sources of the plant's input, port by port: ``(kind, where, dim)``.
+
+    ``kind`` is ``"signal"`` (a block output, ``where`` its slice in the signal
+    buffer), ``"input"`` (a free input of the loop, ``where`` its slice in the
+    loop's input) or ``"nominal"`` (an unconnected port, ``where`` its value).
+    """
+    plant = loop.subsystems["plant"]
+    wires = loop.connections.get("plant", {})
+    output_slices = evaluator.plan.output_slices
+
+    sources = []
+    for port_id, port in plant.inputs.items():
+        dim = int(port.dim)
+        if port_id not in wires:
+            sources.append(("nominal", np.asarray(port.nominal_value, float), dim))
+            continue
+
+        src_id, src_port = wires[port_id]
+        if src_id == "input":
+            sources.append(("input", loop.get_input_port_slice(src_port), dim))
+        else:
+            sources.append(("signal", output_slices[(src_id, src_port)], dim))
+
+    return tuple(sources)
+
+
+def signals_along(ev, xs, us, ts, params):
+    """Every block output at every sample, shape ``(N + 1, n_signals)``: ``vmap`` on JAX."""
+    xp = array_module(xs)
+    if xp is np:
+        return np.stack([ev.signals(x, u, t, params) for x, u, t in zip(xs, us, ts)])
+
+    jax = ensure_jax_x64()
+    return jax.vmap(lambda x, u, t: ev.signals(x, u, t, params))(xs, us, ts)
+
+
+def gather_samples(sources, signals, us, xp):
+    """The plant's input at every sample, ``(N + 1, m)``, from its port sources."""
+    n_samples = signals.shape[0]
+
+    pieces = []
+    for kind, where, dim in sources:
+        if kind == "signal":
+            pieces.append(signals[:, where])
+        elif kind == "input":
+            pieces.append(us[:, where])
+        else:
+            pieces.append(xp.broadcast_to(xp.asarray(where), (n_samples, dim)))
+
+    return xp.concatenate(pieces, axis=1)
+
+
+def least_margin(margin, x, u, t):
+    """``min_k min margin(x_k, u_k, t_k)`` over the run (``+inf`` for no rows)."""
+    xp = array_module(x)
+    if xp is np:
+        rows = [np.reshape(margin(xk, uk, tk), (-1,)) for xk, uk, tk in zip(x, u, t)]
+        values = np.concatenate(rows) if rows else np.zeros(0)
+    else:
+        jax = ensure_jax_x64()
+        values = jax.vmap(lambda xk, uk, tk: xp.reshape(margin(xk, uk, tk), (-1,)))(
+            x, u, t
+        )
+
+    if values.size == 0:
+        return xp.asarray(xp.inf)
+
+    return xp.min(values)
+
+
+def discount_rate_of(problem):
+    """ρ of the problem: the problem's own rate, else its cost's."""
+    rate = getattr(problem, "discount_rate", None)
+    if rate is None:
+        rate = getattr(problem.cost, "discount_rate", 0.0)
+
+    return float(rate)
+
+
+def price_of(problem):
+    """The price of a failed or missed run: ``None`` (switch off), the bound (``True``), or the number."""
+    price = problem.infeasible_cost
+    if price is None:
+        return None
+    if price is True:
+        return problem.cost_bound()
+    if callable(price):
+        raise TypeError(
+            "infeasible_cost must be None, True or a number for an evaluation, got a "
+            "callable"
+        )
+
+    return float(price)
+
+
+def horizon_of(problem, episode_length):
+    """The length of a run: the finite horizon, else ``episode_length`` (10 s by default)."""
+    if problem.horizon_kind() == "finite":
+        return float(problem.tf)
+
+    return EPISODE_LENGTH if episode_length is None else float(episode_length)
+
+
+def steps_of(tf, dt):
+    """The number of periods of ``dt`` in ``tf``; refuse a ``dt`` that does not divide it."""
+    if not dt > 0.0:
+        raise ValueError(f"dt must be positive, got {dt!r}")
+
+    n_steps = int(round(tf / dt))
+    if n_steps < 1 or abs(n_steps * dt - tf) > 1e-9 * max(1.0, tf):
+        raise ValueError(
+            f"dt={dt!r} must divide the horizon tf={tf!r} into a whole number of periods"
+        )
+
+    return n_steps
+
+
+def trials_of(problem, n_trials):
+    """The number of runs: one for a deterministic problem, ``n_trials`` (required) for a stochastic one."""
+    if not problem.is_stochastic:
+        if n_trials not in (None, 1):
+            raise ValueError(
+                "a deterministic problem is one run: n_trials must be 1 or unset, "
+                f"got {n_trials!r}"
+            )
+        return 1
+
+    if n_trials is None:
+        raise ValueError("a stochastic problem needs n_trials, the number of draws")
+
+    return int(n_trials)
+
+
+def criterion_of(problem):
+    """The criterion over the runs: the problem's, or the expectation of one run."""
+    return getattr(problem, "criterion", "expectation")
+
+
+def reduce_criterion(J, criterion):
+    """The criterion over ``J``: ``"expectation"``, ``"worst_case"`` or ``("cvar", α)``."""
+    xp = array_module(J)
+
+    if criterion == "expectation":
+        return xp.mean(J)
+    if criterion == "worst_case":
+        return xp.max(J)
+
+    # CVaR_α: the mean of the worst ⌈α n⌉ runs
+    _, alpha = criterion
+    n = J.shape[0]
+    k = max(1, math.ceil(float(alpha) * n))
+    worst = xp.sort(J)[n - k :]
+
+    return xp.mean(worst)
+
+
+def require_free_names(free_inputs, block_ids):
+    """Refuse a free input named like a block: both would be one key of the tree."""
+    clash = sorted(set(free_inputs) & set(block_ids))
+    if clash:
+        raise ValueError(
+            f"the loop's free input(s) {clash} share a name with a block: rename the "
+            "port or the block"
+        )
+
+
+def declared_rows(problem):
+    """The program's constraint rows: the feasibility margin for a bounded ``X`` or ``U``, the reachability margin for ``Xf``."""
+    rows = []
+    if is_bounded(problem.X.bounding_box()) or is_bounded(problem.U.bounding_box()):
+        rows.append("feasibility_margin")
+    if problem.Xf is not None:
+        rows.append("reachability_margin")
+
+    return rows
+
+
+def is_bounded(box):
+    """Whether a box has any finite face (``None``, no box, counts as bounded: a general set)."""
+    if box is None:
+        return True
+
+    return bool(np.any(np.isfinite(box.lower)) or np.any(np.isfinite(box.upper)))
+
+
+def box_of(bounds, wrt, base):
+    """The program's box on ``z`` from ``{path: (lower, upper)}``; ``None`` sides open."""
+    if not bounds:
+        return None, None
+
+    unknown = sorted(set(bounds) - set(wrt))
+    if unknown:
+        raise ValueError(f"bounds name {unknown}, which are not in wrt={list(wrt)}")
+
+    lower, upper = [], []
+    for path in wrt:
+        size = int(np.size(lookup(base, path)))
+        lo, hi = bounds.get(path, (None, None))
+        lower.append(
+            np.full(size, -np.inf) if lo is None else np.broadcast_to(lo, size)
+        )
+        upper.append(np.full(size, np.inf) if hi is None else np.broadcast_to(hi, size))
+
+    return np.concatenate(lower).astype(float), np.concatenate(upper).astype(float)
+
+
+def warn_if_infinite(J0, problem):
+    """Warn once when the program's objective is infinite at its start (the price switch off)."""
+    if np.isfinite(float(J0)):
+        return
+
+    warnings.warn(
+        "the program's objective is infinite at its start: a run diverged or left "
+        "the horizon unfinished. Set infeasible_cost=True on the problem to price it, "
+        "or start from a stabilizing point",
+        stacklevel=3,
+    )
+
+
+def paths_of(wrt):
+    """``wrt`` as a tuple of paths (one path given as a string)."""
+    return (wrt,) if isinstance(wrt, str) else tuple(wrt)
+
+
+def split_path(path):
+    """A dotted path (``"controller.Kp"``; a nested box ``"plant/motor.R"``) as its keys."""
+    return path.replace("/", ".").split(".")
+
+
+def lookup(tree, path):
+    """The leaf of ``tree`` at ``path``; refuse a path that names none."""
+    node = tree
+    for part in split_path(path):
+        if not isinstance(node, dict) or part not in node:
+            raise KeyError(f"{path!r} names no leaf of the parameters")
+        node = node[part]
+
+    return node
+
+
+def with_leaf(tree, path, value):
+    """A copy of ``tree`` (copied along ``path`` only) with the leaf at ``path`` replaced."""
+    head, *rest = split_path(path)
+    copy = dict(tree)
+    copy[head] = value if not rest else with_leaf(tree[head], ".".join(rest), value)
+
+    return copy
+
+
+def merge_tree(tree, override):
+    """``tree`` with the entries of ``override`` replacing its own, recursively."""
+    if isinstance(override, Batched):
+        override = override.tree
+
+    merged = dict(tree)
+    for key, value in override.items():
+        if isinstance(value, dict) and isinstance(merged.get(key), dict):
+            merged[key] = merge_tree(merged[key], value)
+        else:
+            merged[key] = value
+
+    return merged
+
+
+def float_leaves(tree):
+    """``tree`` with every leaf a float NumPy array."""
+    if isinstance(tree, dict):
+        return {key: float_leaves(value) for key, value in tree.items()}
+
+    return np.asarray(tree, dtype=float)
+
+
+def flat_leaves(tree):
+    """The leaves of a nested dict, in order."""
+    if isinstance(tree, Batched):
+        tree = tree.tree
+    if isinstance(tree, dict):
+        return [leaf for value in tree.values() for leaf in flat_leaves(value)]
+
+    return [tree]
+
+
+def batch_axes(params):
+    """``(tree, axes)``: ``0`` on the drawn leaves (a leading trial axis), ``None`` on the shared ones."""
+    if isinstance(params, Batched):
+        return params.tree, params.axes
+
+    return params, axes_like(params, None)
+
+
+def axes_like(tree, value):
+    """A tree of the same shape as ``tree``, every leaf ``value``."""
+    if isinstance(tree, dict):
+        return {key: axes_like(sub, value) for key, sub in tree.items()}
+
+    return value
+
+
+def tree_signature(axes):
+    """A hashable form of an axes tree, a key of the jitted forms."""
+    if isinstance(axes, dict):
+        return tuple(
+            sorted((key, tree_signature(value)) for key, value in axes.items())
+        )
+
+    return axes
+
+
+def take_trial(params, i):
+    """The parameters of trial ``i``: each drawn leaf indexed, the shared ones as they are."""
+    tree, axes = batch_axes(params)
+
+    return index_tree(tree, axes, i)
+
+
+def index_tree(tree, axes, i):
+    """``tree`` with every leaf whose axis is ``0`` indexed at ``i``."""
+    if isinstance(tree, dict):
+        return {key: index_tree(tree[key], axes[key], i) for key in tree}
+
+    return tree if axes is None else tree[i]
+
+
+def unbatch(trajs, n):
+    """The batched trajectory of the runs as a list of NumPy trajectories."""
+    out = []
+    for i in range(n):
+        out.append(
+            Trajectory(
+                t=np.asarray(trajs.t[i]),
+                x=np.asarray(trajs.x[i]),
+                u=np.asarray(trajs.u[i]),
+                signals={k: np.asarray(v[i]) for k, v in trajs.signals.items()},
+                roles=dict(trajs.roles),
+            )
+        )
+
+    return out
+
+
+def trial_key(key, backend):
+    """The draws' key on the backend: a JAX PRNG key, or a NumPy generator."""
+    if backend == BACKEND_JAX:
+        jax = ensure_jax_x64()
+        return jax.random.PRNGKey(key) if isinstance(key, int) else key
+
+    return np.random.default_rng(key)
+
+
+def split_two(key, backend):
+    """Two independent keys from one: the starts' and the parameters'."""
+    if backend == BACKEND_JAX:
+        jax = ensure_jax_x64()
+        return tuple(jax.random.split(key, 2))
+
+    return key, key
+
+
+def draw_params(problem, key, n_trials, backend):
+    """``n_trials`` draws of every drawn parameter and disturbance, a leading trial axis on each.
+
+    The plant's parameters are keyed by name (dotted for a nested entry); the
+    disturbances, held over a run, under ``"inputs"`` by the loop's port.
+    """
+    from minilink.core.distributions import split_keys
+
+    draws = {}
+    names = list(problem.params_distribution)
+    ports = list(problem.disturbances)
+    keys = split_keys(key, len(names) + len(ports))
+
+    # Each parameter: n_trials draws in the nominal entry's shape
+    for name, k in zip(names, keys[: len(names)]):
+        nominal = np.shape(lookup(problem.sys.params, name))
+        values = problem.params_distribution[name].sample(k, n_trials)
+        node = draws
+        *path, last = split_path(name)
+        for part in path:
+            node = node.setdefault(part, {})
+        node[last] = values.reshape((n_trials, *nominal))
+
+    # Each disturbance: n_trials held values on the loop's port of that name
+    inputs = {}
+    for port, k in zip(ports, keys[len(names) :]):
+        inputs[port] = problem.disturbances[port].sample(k, n_trials)
+    if inputs:
+        draws["inputs"] = inputs
+
+    return draws
+
+
+@lru_cache(maxsize=None)
+def register_evaluation_pytree():
+    """Register :class:`Evaluation` as a JAX pytree: the arrays as children, the criterion static."""
+    jax = ensure_jax_x64()
+
+    fields = (
+        "cost",
+        "J",
+        "feasibility_margin",
+        "failed",
+        "reachability_margin",
+        "reached",
+        "x0",
+        "trajectories",
+    )
+
+    def flatten(record):
+        return [getattr(record, name) for name in fields], record.criterion
+
+    def unflatten(criterion, children):
+        return Evaluation(**dict(zip(fields, children)), criterion=criterion)
+
+    jax.tree_util.register_pytree_node(Evaluation, flatten, unflatten)

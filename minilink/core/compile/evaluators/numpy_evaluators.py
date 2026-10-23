@@ -236,6 +236,13 @@ class NumpyDiagramEvaluator(
     def compute_internal_signals(self, x: np.ndarray, u: np.ndarray, t: float = 0.0):
         return self._compute_port_signals(x, u, t)
 
+    def signals(self, x, u, t=0.0, params=None):
+        """The internal signal buffer at ``(x, u, t)``: every block output."""
+        if params is None:
+            return self._compute_port_signals(x, u, t)
+
+        return self._compute_port_signals_p(x, u, t, params)
+
     def compute_internal_signals_dict(
         self, x: np.ndarray, u: np.ndarray, t: float = 0.0
     ) -> dict:

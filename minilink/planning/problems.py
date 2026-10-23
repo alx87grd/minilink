@@ -185,6 +185,36 @@ class PlanningProblem:
 
         return price(x, t) if callable(price) else price
 
+    def compile(
+        self,
+        controller,
+        dt,
+        *,
+        solver="rk4",
+        substeps=1,
+        backend="auto",
+        episode_length=None,
+    ):
+        """
+        The :class:`~minilink.planning.engine.ProblemEvaluator` of a controller on this problem.
+
+        The controller closed on the plant (or a built loop with a ``plant`` block),
+        compiled once: ``pe.evaluate()`` scores it, ``pe.params`` holds every
+        parameter of the run, ``pe.program(wrt)`` exports the tuning program.
+        """
+        # Lazy import: the engine loads with its first evaluator
+        from minilink.planning.engine import ProblemEvaluator
+
+        return ProblemEvaluator(
+            self,
+            controller,
+            dt,
+            solver=solver,
+            substeps=substeps,
+            backend=backend,
+            episode_length=episode_length,
+        )
+
     def horizon_kind(self) -> str:
         """``"finite"`` when ``tf`` is a finite length (``h`` is charged there), ``"infinite"`` for ``+inf`` or unset."""
         return "infinite" if self.tf is None or not np.isfinite(self.tf) else "finite"

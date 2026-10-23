@@ -620,6 +620,14 @@ class JaxDiagramEvaluator(
     def compute_internal_signals(self, x, u, t=0.0):
         return self._internal_signals_jit_fn(x, u, t)
 
+    def signals(self, x, u, t=0.0, params=None):
+        """The internal signal buffer at ``(x, u, t)``: every block output, traceable."""
+        dtype = self._infer_dtype(x, u)
+        if params is None:
+            return self._compute_port_signals(x, u, t, dtype)
+
+        return self._compute_port_signals_p(x, u, t, dtype, params)
+
     def _outputs_trace_fn(self, x, u, t=0.0):
         dtype = self._infer_dtype(x, u)
         signals = self._compute_port_signals(x, u, t, dtype)
