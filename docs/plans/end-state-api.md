@@ -572,20 +572,14 @@ No `final_state`, no `success_rate`, no `mean_cost`: the trajectory's last colum
 failure_rate` and `report.mean` already say them. `margin` is the exact minimum; the
 per-sample margins are the bridge's constraint rows.
 
-### D23 The optimizer's method keys (ask 4; S74)
+### D23 The optimizer's method keys and program classes — **deferred 2026-10-23**
 
-**Today:** `method="scipy_slsqp" | "scipy_trust_constr" | "ipopt"`.
-
-**Recommended:** new presets named by their algorithm (`l-bfgs`, `bfgs`, `gd`, `adam`,
-`nelder-mead`, `differential-evolution`), the three `scipy_*` keys kept as aliases until V3
-rules on their rename; `method="auto"` picks by the program's class; the default stays
-`scipy_slsqp` until V3.
-
-```python
-Optimizer(program).solve()                      # scipy_slsqp, as today
-Optimizer(program, method="auto").solve()        # l-bfgs for a bounded smooth program, slsqp if constrained, adam if stochastic
-Optimizer(program, method="adam", steps=400).solve()
-```
+The upgrade of `MathematicalProgram` / `Optimizer` (the program's class read from its fields:
+unconstrained, bounded, constrained, stochastic; `method="auto"` picking the solver by class
+and refusing a method the class does not admit; presets named by algorithm with the `scipy_*`
+keys as aliases; the first-order backend with the RL `Adam` moved) is planned as a later step
+after the continuous core lands (S74 leaves this phase's wave V; its row keeps its design).
+This phase exports the program to today's `Optimizer` unchanged.
 
 ### D24 The lane (ask 9)
 

@@ -461,7 +461,8 @@ names brainstorm with the maintainer, so the API comes first.
   central difference on the same key, through the standard entry point, and the autotuning
   demo ends in the `Optimizer`.
 - [ ] **S74 The optimizer as the one descent loop** **[idea to review — ask — core]**,
-  proposed by the maintainer 2026-10-18; lands as V1's step 5 (v0.3) with OPW-1–OPW-5. Today `MathematicalProgram` carries
+  proposed by the maintainer 2026-10-18; **deferred 2026-10-23 to after the continuous core
+  lands** (this phase exports the program to today's `Optimizer`); with OPW-1–OPW-5 when it comes. Today `MathematicalProgram` carries
   `J`, `h`, `g` and the box, `Optimizer` offers three constrained-NLP presets (`scipy_slsqp`,
   `scipy_trust_constr`, `ipopt`) on a flat `z`, and every gradient-based tuning writes its own
   loop: four compile demos (`pid_autotuning_jax`, `params_gradient`, `neural_controller_jax`,

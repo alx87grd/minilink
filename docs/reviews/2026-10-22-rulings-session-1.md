@@ -186,3 +186,6 @@ of it in sampled-path.md §3.6; the numbers from `benchmarks/params_binding.py`.
   `("cvar", α)`, `"worst_case"`, read by `value`; `Evaluation.value(criterion)` loses its
   argument; the report keeps the statistics (`mean`, `worst`, `cvar(α)`) free. Lives in:
   end-state-api.md D18.
+- **R25 (D23, 2026-10-23) The optimizer upgrade is deferred.** Program classes hinting the
+  solver, `auto` selection, algorithm-named presets and the first-order backend (S74) come
+  after the continuous core; this phase exports the program to today's `Optimizer`.
