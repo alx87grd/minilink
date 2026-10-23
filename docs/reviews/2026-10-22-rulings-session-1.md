@@ -409,3 +409,10 @@ split when it starts; this section marks the reversals).
   animation). `BicycleDynRate` (the MPC reformulation), the two longitudinal cars and
   `HolonomicMobileRobot` stay on `minilink.catalog`. The tutorial, the GRO501 `racecar_toward_mpc`
   notebook and the racecar demos migrate in the same commit.
+- **R56 (2026-10-23, K8) Three arms on the root.** `TwoLinkManipulator` (the planar textbook arm),
+  `KinematicManipulator` (joint-speed inputs, kinematic control; was `SpeedControlledManipulator`)
+  and `UR5Manipulator` (the real robot). `ThreeLinkManipulator` (the GMC714 drilling lab) and
+  `FiveLinkManipulator` (the nullspace demo) stay on `minilink.catalog`; `OneLinkManipulator` goes
+  to the experimental tier (`Pendulum` teaches one link). The root then holds 14 plants: `Pendulum`,
+  `InvertedPendulum`, `NoisyPendulum`, `CartPole`, `NoisyCartPole`, `DoubleIntegrator`, `SingleMass`,
+  `Drone2D`, the three cars of R55, the three arms.
