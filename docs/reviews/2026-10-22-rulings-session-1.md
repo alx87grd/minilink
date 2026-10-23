@@ -472,3 +472,11 @@ split when it starts; this section marks the reversals).
 - **R65 (2026-10-23) The tabular learners stay and get their demo.** `TabularLearningPlanner`,
   `EpsilonGreedy` and `UCB` stay on the teaching surface; one demo shows tabular Q-learning on the
   pendulum grid beside value iteration, converging toward the DP cost-to-go (GRO860's RL row).
+- **R66 (2026-10-23, K10) The package structure, by pillar.** `minilink.planning` keeps the problem and
+  its solutions (problems, results, `evaluate`, `compare`, the planner base) with three sub-packages:
+  `dynamic_programming/` (was `policy_synthesis/`: value iteration, policy evaluation, `LQRPlanner`, the
+  lookup policy), `trajectory_optimization/` (collocation, shooting; MPC moved in from `control/mpc/`,
+  its block still importable from `minilink.control`) and `search/` (RRT, RRT*). Reinforcement
+  learning moves out to a new band, `minilink.learning` (`reinforcement_learning/`, the tabular
+  learners with it; identification and imitation later). `spatial/` leaves with A3. The band facades
+  keep their names; deep paths, demos, tests and the API docs migrate in the same commit.

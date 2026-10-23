@@ -355,7 +355,7 @@ feature (R48).
 - **K2** Unused features removed and **K3** prototypes moved to `minilink/experimental/`,
   from one ruling pass: K7's tiers. **[ask — removals, public names]**
 - **K4** One demo per feature, before D1.3 sweeps the rest: the maintainer's own pass (R54).
-- **K10** The package structure: `planning/` regrouped by pillar (dynamic programming, trajectory optimization with MPC, search), RL to a `minilink.learning` or kept in planning (TODO §4). **[ask — public names]**
+- **K10** The package structure: `planning/` regrouped by pillar (dynamic programming, trajectory optimization with MPC, search), RL to a new `minilink.learning` band (R66). **[ask — public names]**, ruled.
 - **K8** The catalog clean-up (R2: the root prelude trimmed to the course set, `minilink.catalog`
   the flat index of tested plants, the unsupported ones to the experimental tier) and **K9**
   the experimental tier out of the CI gate (R3). Ruled.
