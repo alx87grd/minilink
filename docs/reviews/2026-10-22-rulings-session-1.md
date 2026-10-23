@@ -373,3 +373,19 @@ split when it starts; this section marks the reversals).
   `examples/teaching/topics/robotics/manipulator_eom.ipynb` is deleted (it imported the
   symbolic mechanics); `examples/tutorial/showcase_jax.ipynb` keeps its quick C-export demo, the
   second documented gate exception beside the C-export flagship smoke.
+- **R52 (2026-10-23, A6) The short names: drop every display name, rename seventeen classes.**
+  The 68 explicit display names go, so the class name shows. Seventeen classes are renamed
+  (the K1 inventory's §4.1 options A and B, as drafted): `LongitudinalTorqueCar`,
+  `LongitudinalSlipCar`, `ThreeLinkManipulator`, `FiveLinkManipulator`,
+  `KinematicManipulator` (was `SpeedControlledManipulator`), `QuarterCar`, `NoisyCartPole`,
+  `NoisyPendulum`, `TimeVaryingFeedback`, `IntegralImpedance`, `ComputedTorque`, `SlidingMode`,
+  `Impedance`, `StateFeedback`, `OutputReference`, `TrajectoryFeedback`, `LookupPolicy`. `UdeS`
+  is an acronym (Université de Sherbrooke) and stays whole: `UdeSRacecar`, `UdeSRacecarDyn`,
+  `UdeSRacecarDyn3D` are unchanged. Breaking names is accepted: every notebook, demo and test
+  migrates in the same commit, no alias. The GMC714 names G3 freezes are these new ones.
+- **R53 (2026-10-23) A block's id defaults to its class name, verbatim.** No snake-case
+  conversion (`Pendulum`, `Pendulum2`, `Drone2D`, `UdeSRacecar`, `ComputedTorque`), so digits
+  and acronyms are never mangled. An id the user gives (`add_subsystem(sys, "arm")`,
+  `sys.id = …`) still wins, and a loop the library builds (`@`, `closed_loop`) still keys its
+  blocks by role (`plant`, `controller`, `observer`), so loop code survives swapping the
+  controller and the tools find the plant by its key (R22).

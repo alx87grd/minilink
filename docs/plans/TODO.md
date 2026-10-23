@@ -40,16 +40,14 @@ January 9 (R50), so G3's names are pinned after it; RN-2 before V1's step 7 in v
   `Comparison`, with S54's clipping (scan: planning#3, examples#5); `plot_cost2go` keeps its
   name to v1.0 and its rename to `plot_cost_to_go` (the name the solution and `Comparison`
   already use) is on V4's list; the operators' named forms exported together (scan: core#9).
-- [ ] **A6 Short catalog names** **[ask — public names]** (RULES 2.6): the public catalog,
-  control and block classes take short compact class names, and the explicit `self.name`
-  strings that only restate the class name at length go, so the class name shows (80 explicit
-  display names today, 32 longer than 18 characters: `Front Wheel Drive Car With Torque
-  Input`, `Time-Varying State Feedback Controller`, `Underactuated Rotating Cart Pole`, …).
-  The maintainer rules on the name list first (one table, old → new, class and display name);
-  each rename changes the diagram key derived from the name, so it migrates every course
-  notebook and demo in the same commit while the name freeze is paused (ROADMAP §4.1 gate 7),
-  or goes on V4's shim list after v1.0. Done when no display name is longer than its class
-  name and `plot_diagram` labels and plot titles read in one glance.
+- [ ] **A6 Short catalog names** **[ask — public names]**, ruled 2026-10-23 (R52, R53): the 68
+  explicit display names dropped, the seventeen class renames of R52 (the K1 inventory's §4.1,
+  options A and B), and a block's default id the class name verbatim (R53: `normalize_identifier`
+  no longer converts; a given id and the loop roles keep priority). One commit per band (catalog,
+  control, planning), every notebook, demo and test migrated in the same commit, no alias; before
+  the GMC714 term (R50). Done when no class carries an explicit display name, the renamed classes
+  are the only spellings in the repo, the teaching-surface test pins the new names, and the
+  notebook checks pass.
 - [ ] **A5 Later nouns, each with its first consumer.** `log_prob` on the distributions;
   parameter-dictionary support on sets and distributions (one flatten rule, with
   identification or the robust problem); `Set.as_cost(weight=, shaping=)` as the set-to-cost
@@ -557,7 +555,8 @@ workboard; the former wave G rows are §5 rows.
 
 - [ ] **G3 GMC714's names stable by January** **[ask — public names]** (R49): every tool a lab
   uses has one public teaching name on the teaching surface, frozen for the term (week 1 on
-  January 9). Moves: `RRTPlanner` from provisional to the teaching lane; `ModelJointImpedance`,
+  January 9), after A6's renames (R52: `ComputedTorque`, `SlidingMode`, `Impedance`,
+  `ThreeLinkManipulator`, `LongitudinalTorqueCar`). Moves: `RRTPlanner` from provisional to the teaching lane; `ModelJointImpedance`,
   `TaskKinematic`, `TaskKinematicNullspace` onto the root prelude; `Manipulator` and
   `MechanicalSystem` onto a new band facade, `minilink.dynamics` (R50; its list ruled with this
   row's table); MPC as one teaching name, `ModelPredictiveController` (R50), over today's
