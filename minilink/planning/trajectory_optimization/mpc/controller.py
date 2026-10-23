@@ -7,17 +7,17 @@ from typing import TYPE_CHECKING
 
 import numpy as np
 
-from minilink.control.mpc.utilities import (
+from minilink.core.backends import BACKEND_JAX, normalize_backend
+from minilink.core.system import StepSystem, System
+from minilink.core.trajectory import Trajectory
+from minilink.planning.results import PlanningSolution
+from minilink.planning.trajectory_optimization.mpc.utilities import (
     NominalCache,
     build_nominal_cache,
     eval_signal,
     mpc_default_computer_x0,
     mpc_warm_start_guess,
 )
-from minilink.core.backends import BACKEND_JAX, normalize_backend
-from minilink.core.system import StepSystem, System
-from minilink.core.trajectory import Trajectory
-from minilink.planning.results import PlanningSolution
 from minilink.planning.trajectory_optimization.planner import (
     TrajectoryOptimizationPlanner,
     require_online_params,

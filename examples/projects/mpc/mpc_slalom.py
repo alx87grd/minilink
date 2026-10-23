@@ -11,10 +11,6 @@ Run from repo root::
 import numpy as np
 
 from minilink import BicycleDynRate
-from minilink.control.mpc import (
-    ModelPredictiveController,
-    mpc_animation_overlays,
-)
 from minilink.core.backends import configure_jax
 from minilink.core.costs import QuadraticCost
 from minilink.core.geometry import Sphere
@@ -22,6 +18,10 @@ from minilink.planning.problems import PlanningProblem
 from minilink.planning.spatial.collision import bind, point_probe
 from minilink.planning.spatial.scene import Scene
 from minilink.planning.spatial.shaping import inverse_barrier
+from minilink.planning.trajectory_optimization.mpc import (
+    ModelPredictiveController,
+    mpc_animation_overlays,
+)
 from minilink.planning.trajectory_optimization.planner import (
     TrajectoryOptimizationPlanner,
 )

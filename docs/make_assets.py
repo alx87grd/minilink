@@ -266,7 +266,6 @@ def ur5_impedance() -> None:
 def racecar_mpc() -> None:
     from minilink import PlanningProblem, QuadraticCost, TrajectoryOptimizationPlanner
     from minilink.catalog import UdeSRacecarDyn
-    from minilink.control.mpc import ModelPredictiveController, mpc_animation_overlays
     from minilink.graphical.catalog.racecar_skin import racecar_skin_3d
     from minilink.planning import (
         ReferenceTrack,
@@ -279,6 +278,10 @@ def racecar_mpc() -> None:
         point_probe,
         quadratic_excess,
         quadratic_hinge,
+    )
+    from minilink.planning.trajectory_optimization.mpc import (
+        ModelPredictiveController,
+        mpc_animation_overlays,
     )
 
     # examples/demos/udes_racecar/mpc_racecar_dynamic.py: a lap past two cones,

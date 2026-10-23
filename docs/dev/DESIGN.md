@@ -39,7 +39,7 @@ Rules:
 
 - `minilink.catalog` is a **teaching alias** of `dynamics/catalog/` (plants still
   live under `dynamics/`; no math moves).
-- Band packages (`control/`, `analysis/`, `simulation/`, `control.mpc`, …)
+- Band packages (`control/`, `analysis/`, `simulation/`, `learning/`, …)
   re-export their teaching symbols via `__all__` / lazy `__getattr__`. A
   module never takes the name of a function it defines (`control/design.py`
   holds `lqr`), so the facade can export the function.
@@ -111,8 +111,11 @@ state-feedback block):
   never catalog content. (The abstraction modules are the shared mathematical
   bases of the library band: `blocks/` builds LTI wiring on them, `control/`
   computed torque, `estimation/` EKFs.)
-- **Exception:** `control/mpc` may import `planning.trajectory_optimization`
-  (receding-horizon controller wraps a traj-family planner).
+- **Exception:** the `minilink.control` facade re-exports `ModelPredictiveController`
+  from `planning/trajectory_optimization/mpc/` (the receding-horizon block wraps a
+  trajectory optimization planner, so it lives with it).
+- **Exception:** `learning/` builds on `planning/`: the problem, the planner base,
+  the solution and the dynamic programming grid its tabular learners share.
 - **Exception:** `learning.reinforcement_learning`, `planning.evaluation`
   and `planning.planner` may import `control.neural` and `blocks` (a learned
   law is a control block, the critics share its multilayer perceptron, and an
@@ -124,10 +127,8 @@ state-feedback block):
   noun, wherever it lives.
 - **Exception:** `analysis/` imports `blocks.TransferFunction`: the transfer
   function and sensitivity tools return one, so `bode` and `margins` apply.
-- **Exception:** `control/mpc` also imports `planning.problems`,
-  `planning.results`, `planning.initial_guess` and `planning.spatial.overlays`
-  (the controller returns a `PlanningSolution`; its plots draw the problem and
-  the track).
+- **Exception:** `planning/trajectory_optimization/mpc/` imports `planning.spatial.overlays`
+  (its plots draw the track).
 - **Exception:** `graphical/animation` imports `planning.spatial.Scene`, to
   draw a scene as an overlay.
 - A new import across libraries needs an exception here, with its reason.
@@ -252,7 +253,7 @@ the named car profiles live with their scenarios in `examples/projects/car_trajo
   `t_solve`, `u_ff`, `x_ff`, `z`, `success`); `reset()` clears the latch. A dual-rate
   `Computer` (`dual_rate_computer(dt_broadcast)`) replans at `dt_mpc` and broadcasts the
   interpolated nominal in between; the two leaves share one block, so there is no port
-  edge between them. Post-run horizons and animation overlays: `control/mpc/viz.py`.
+  edge between them. Post-run horizons and animation overlays: `planning/trajectory_optimization/mpc/viz.py`.
 - **Observer:** a block that reads the plant's `u` and `y` and gives the estimate on `x`
   (`StateObserver`; later filters keep the ports, their state may be larger than the
   estimate). Under the id `observer`, top level or inside the controller box, `roles()`

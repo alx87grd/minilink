@@ -6,7 +6,7 @@ from minilink.core.facade import lazy_facade
 
 # The band facade for short teaching imports, e.g.
 # ``from minilink.control import PID, ImpedanceController, lqr, place`` and
-# ``from minilink.control.mpc import ModelPredictiveController``.
+# ``from minilink.planning.trajectory_optimization.mpc import ModelPredictiveController``.
 #
 # The classical family is ``P``, ``PI``, ``PD``, ``PID`` (one measurement per axis, the
 # derivative filtered) and ``ImpedanceController``, ``ImpedanceIntegralController`` (a
@@ -19,6 +19,11 @@ from minilink.core.facade import lazy_facade
 #
 # Each exported name maps to its (module path, attribute).
 _EXPORTS: dict[str, tuple[str, str]] = {
+    # Model predictive control: the block lives with its trajectory optimization planner
+    "ModelPredictiveController": (
+        "minilink.planning.trajectory_optimization.mpc.controller",
+        "ModelPredictiveController",
+    ),
     "ComputedTorqueController": (
         "minilink.control.modelbased",
         "ComputedTorqueController",
@@ -73,7 +78,4 @@ _EXPORTS: dict[str, tuple[str, str]] = {
     ),
 }
 
-__all__, __getattr__, __dir__ = lazy_facade(
-    globals(), _EXPORTS, modules={"mpc": "minilink.control.mpc"}
-)
-__all__ = [*__all__, "mpc"]
+__all__, __getattr__, __dir__ = lazy_facade(globals(), _EXPORTS)

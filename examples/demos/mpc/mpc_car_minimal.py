@@ -8,7 +8,10 @@ from minilink import (
     QuadraticCost,
     TrajectoryOptimizationPlanner,
 )
-from minilink.control.mpc import ModelPredictiveController, mpc_animation_overlays
+from minilink.planning.trajectory_optimization.mpc import (
+    ModelPredictiveController,
+    mpc_animation_overlays,
+)
 
 U_TARGET = 4.0
 TF_SIM = 5.0

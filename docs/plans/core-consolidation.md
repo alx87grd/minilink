@@ -54,7 +54,7 @@ against what:
 | --- | --- | --- | --- |
 | classical and modern control | nothing by search: closed-form designs (`lqr`, `place`, `kalman`, `lqg`, PID tuning rules) on the linearization | specifications (poles, margins, bandwidth) | `analysis/`, `control/design.py`, `control/siso.py`, `estimation/` |
 | nonlinear control | hand-designed laws (computed torque, sliding mode, impedance, geometric), certified by a Lyapunov function | the model's structure | `control/modelbased.py`, `impedance.py`, `robotic.py`, `geometric.py`, `analysis/lyapunov.py` |
-| trajectory optimization and MPC | the open-loop plan (knots) | the problem's cost and sets; MPC re-solves it online in a sampled loop | `planning/trajectory_optimization/`, `control/mpc/`, the hybrid sibling |
+| trajectory optimization and MPC | the open-loop plan (knots) | the problem's cost and sets; MPC re-solves it online in a sampled loop | `planning/trajectory_optimization/`, `planning/trajectory_optimization/mpc/`, the hybrid sibling |
 | reinforcement learning | a stochastic policy's weights | sampled returns of the stochastic problem | `learning/reinforcement_learning/`, `planning/dynamic_programming/` (the DP reference), `control/neural.py`, `blocks/neural.py` |
 | identification and imitation (planned) | plant parameters, or a policy's weights | logged trajectories: measurements, or human demonstrations | `identification/` (stub), `simulation/realtime/` (the recorder), the RL planner's rollout and data path, `NeuralPolicyController` |
 | estimation | nothing by search: observer designs; later the EKF | the measurement model | `estimation/` |
@@ -140,7 +140,7 @@ history). The last column says where the usage lens disagreed.
 | `control/modelbased.py`, `impedance.py`, `robotic.py` | the nonlinear pillar's laws for arms (computed torque, sliding mode, joint and task impedance, kinematic and nullspace laws) | pillar; `ModelJointImpedance` and the law count are G1's call | agrees |
 | `control/geometric.py` (`PurePursuit`) | **the vehicle pillar's baseline path tracker**: every vehicle stack compares its MPC or learned policy against pure pursuit (Stanley is the other); the geometry module (A3) is built so this law can take a `Track` | **pillar**: keep; it needs the vehicle lesson (GMC714) that makes it visible, and it is the first consumer of `core/geometry/` | **disagrees** (no user today: the usage lens moved it) |
 | `control/neural.py` (`NeuralPolicyController`), `blocks/neural.py` (`MLP`, `NeuralNetwork`) | the output of the RL pillar and of the imitation pillar: the one learned law, deployed in the same diagram as any other | spine (shared by two pillars) | agrees |
-| `control/mpc/` | the trajectory pillar online; the state of the art for vehicles and arms; the hybrid sibling's exemplar | pillar; `utilities.py` and `viz.py` are internal (lose their band names) | agrees (G1 decides teaching surface or research lane; the vision says it is a pillar either way) |
+| `planning/trajectory_optimization/mpc/` | the trajectory pillar online; the state of the art for vehicles and arms; the hybrid sibling's exemplar | pillar; `utilities.py` and `viz.py` are internal (lose their band names) | agrees (G1 decides teaching surface or research lane; the vision says it is a pillar either way) |
 
 ### 4.5 Planning
 
@@ -234,7 +234,7 @@ notebook touched; no pillar touched.
 | `Sys2Gym` / `SB3Controller` → experimental | 0.3k | when the SB3 twin notebooks retire (S49, v1.0) |
 | `planning/search/` extras: `dubins.py`, `steering.py`, `live_plot.py`, `plotting.py` cut to the two demos; the two planners stay as a side pillar | ≈ 0.9k of 2.5k | any time; the planners' tutorial section is student-facing (ask) |
 | `spatial/plotting.py` (800) cut to `plot_track`; `workspace_fields.py` folded into the fields plan | ≈ 0.6k | with the geometry move (A3) |
-| `control/mpc/utilities.py`, `viz.py` lose their band names (internal) | 0 | any time |
+| `planning/trajectory_optimization/mpc/utilities.py`, `viz.py` lose their band names (internal) | 0 | any time |
 | the facade verbs no pillar needs (`get_diagram`, `plot_input_output_map`, `render`) | ≈ 0.1k | before the freeze (V3) |
 
 ### 6.3 Tier 3 — pillar seeds: keep, and finish (unused today is not the point)

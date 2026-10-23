@@ -15,7 +15,6 @@ Run from repo root::
 import numpy as np
 
 from minilink import BicycleDynRate
-from minilink.control.mpc import ModelPredictiveController
 from minilink.core.backends import configure_jax
 from minilink.core.costs import QuadraticCost
 from minilink.core.trajectory import Trajectory
@@ -32,6 +31,7 @@ from minilink.planning.spatial.paths import from_waypoints
 from minilink.planning.spatial.plotting import plot_cost_field_3d
 from minilink.planning.spatial.shaping import quadratic_excess, quadratic_hinge
 from minilink.planning.spatial.track import ReferenceTrack
+from minilink.planning.trajectory_optimization.mpc import ModelPredictiveController
 from minilink.planning.trajectory_optimization.planner import (
     TrajectoryOptimizationPlanner,
 )

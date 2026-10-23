@@ -705,8 +705,12 @@ class TestHybridDefaultComputerX0(unittest.TestCase):
     def test_omit_x0_computer_matches_helper(self):
         pytest.importorskip("jax")
         import jax.numpy as jnp
-        from minilink.control.mpc import ModelPredictiveController
-        from minilink.control.mpc.utilities import mpc_default_computer_x0
+        from minilink.planning.trajectory_optimization.mpc import (
+            ModelPredictiveController,
+        )
+        from minilink.planning.trajectory_optimization.mpc.utilities import (
+            mpc_default_computer_x0,
+        )
         from minilink.core.backends import configure_jax
 
         class JaxSingleIntegrator(DynamicSystem):

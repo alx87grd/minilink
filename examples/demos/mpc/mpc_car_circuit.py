@@ -8,7 +8,6 @@ from minilink import (
     QuadraticCost,
     TrajectoryOptimizationPlanner,
 )
-from minilink.control.mpc import ModelPredictiveController, mpc_animation_overlays
 from minilink.core.geometry import Sphere
 from minilink.planning.spatial.collision import bind, car_outline, point_probe
 from minilink.planning.spatial.grid import sample_field_costs
@@ -21,6 +20,10 @@ from minilink.planning.spatial.shaping import (
     quadratic_hinge,
 )
 from minilink.planning.spatial.track import ReferenceTrack
+from minilink.planning.trajectory_optimization.mpc import (
+    ModelPredictiveController,
+    mpc_animation_overlays,
+)
 
 # --- knobs ---
 U_TARGET = 12.0

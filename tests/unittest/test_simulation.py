@@ -897,7 +897,9 @@ class TestAsComputer(unittest.TestCase):
         pytest = __import__("pytest")
         jax = pytest.importorskip("jax")
         del jax
-        from minilink.control.mpc import ModelPredictiveController
+        from minilink.planning.trajectory_optimization.mpc import (
+            ModelPredictiveController,
+        )
         from minilink.core.backends import configure_jax
         from minilink.core.costs import QuadraticCost
         from minilink import BicycleDynRate

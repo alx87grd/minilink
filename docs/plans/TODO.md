@@ -200,7 +200,7 @@ pick):
   it (scan: graphics#14) **[ask — user-callable]**.
 - [ ] Dead modules `planning/spatial/overlays.py` (retires with A3) and
   `experimental/symbolic/mechanics/utils.py` **[ask — importable names]**.
-- [ ] MPC debug figure → `control/mpc/viz.py`.
+- [ ] MPC debug figure → `planning/trajectory_optimization/mpc/viz.py`.
 - [ ] `HybridDiagram` hand-copied facades (with S31).
 - [ ] Plotting in eight homes: write the placement rule in DESIGN first, then move
   `graphical/port_map.py` next to `control/` if agreed.
@@ -390,7 +390,7 @@ the demo sweep touches fewer files. Nothing leaves without the maintainer's ruli
   and `pip wheel` ships nothing under it.
 - [ ] **K10 The package structure** **[ask — public names]**, ruled 2026-10-23 (R66): `minilink.planning`
   keeps the problem and its solutions with `dynamic_programming/` (was `dynamic_programming/`),
-  `trajectory_optimization/` (MPC moved in from `control/mpc/`, the block still importable from
+  `trajectory_optimization/` (MPC moved in from `planning/trajectory_optimization/mpc/`, the block still importable from
   `minilink.control`) and `search/`; reinforcement learning moves to a new `minilink.learning` band
   (the tabular learners with it; identification and imitation later); `spatial/` leaves with A3 (v0.4), so it stays put in v0.3. One
   commit per move, the band facades keeping their names, deep paths, demos, tests, the teaching-surface
@@ -729,7 +729,7 @@ LQGPlanner as picked; S73 any time, self-contained.
   green. Glyph rename stays S30.
   Also: `Shape` unions flatten like `IntersectionSet` and `SumCost` (scan: core#6);
   `PurePursuit` sizes its measurement from the vehicle, not `state_dim=9` (scan: control#9);
-  retarget `control/mpc/viz.py`'s `TrackCorridorOverlay` import in the change that deletes
+  retarget `planning/trajectory_optimization/mpc/viz.py`'s `TrackCorridorOverlay` import in the change that deletes
   `planning.spatial.overlays` (scan: control#12).
 
 **On the spine.**

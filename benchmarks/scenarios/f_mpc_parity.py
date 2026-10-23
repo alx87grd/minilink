@@ -17,8 +17,6 @@ from benchmarks.scenarios.common import (
 )
 from benchmarks.trajopt import jax_trajopt_available
 from minilink import BicycleDynRate
-from minilink.control.mpc import ModelPredictiveController
-from minilink.control.mpc.utilities import mpc_default_computer_x0
 from minilink.core.backends import configure_jax
 from minilink.core.costs import QuadraticCost
 from minilink.core.trajectory import Trajectory
@@ -26,6 +24,10 @@ from minilink.planning.problems import PlanningProblem
 from minilink.planning.trajectory_optimization.direct_collocation import (
     DirectCollocationOptions,
     DirectCollocationTranscription,
+)
+from minilink.planning.trajectory_optimization.mpc import ModelPredictiveController
+from minilink.planning.trajectory_optimization.mpc.utilities import (
+    mpc_default_computer_x0,
 )
 from minilink.planning.trajectory_optimization.planner import (
     TrajectoryOptimizationOptions,

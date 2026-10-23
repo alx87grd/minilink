@@ -6,7 +6,10 @@ import pytest
 import matplotlib
 
 matplotlib.use("Agg")
-from minilink.control.mpc import Command, ModelPredictiveController
+from minilink.planning.trajectory_optimization.mpc import (
+    Command,
+    ModelPredictiveController,
+)
 from minilink.core.backends import configure_jax, require_jax_numpy
 from minilink.core.costs import QuadraticCost
 from minilink.core.hybrid_diagram import HybridDiagram
@@ -195,7 +198,9 @@ class TestModelPredictiveController(unittest.TestCase):
     def test_hybrid_one_nlp_per_tick_and_compile_once(self):
         """Latch + compile-once: no per-tick re-prepare / re-compile / multi-solve."""
         from unittest.mock import patch
-        from minilink.control.mpc.utilities import mpc_default_computer_x0
+        from minilink.planning.trajectory_optimization.mpc.utilities import (
+            mpc_default_computer_x0,
+        )
         from minilink.simulation.computer import Computer
         from minilink.simulation.hybrid_simulator import HybridSimulator
 
@@ -276,7 +281,7 @@ class TestModelPredictiveController(unittest.TestCase):
 
 from unittest.mock import patch
 
-from minilink.control.mpc import ModelPredictiveController
+from minilink.planning.trajectory_optimization.mpc import ModelPredictiveController
 from minilink.core.system import DynamicSystem, System
 
 
@@ -357,7 +362,10 @@ class TestMPCAlgebraicController(unittest.TestCase):
             ModelPredictiveController(planner, dt_mpc=0.2, warm_start=False)
 
 
-from minilink.control.mpc.utilities import shift_plan_trajectory, mpc_warm_start_guess
+from minilink.planning.trajectory_optimization.mpc.utilities import (
+    shift_plan_trajectory,
+    mpc_warm_start_guess,
+)
 from minilink.core.system import DynamicSystem, StepSystem
 from minilink.core.trajectory import Trajectory
 
@@ -730,8 +738,10 @@ class TestMpcExportComputer(unittest.TestCase):
 
 
 import warnings
-from minilink.control.mpc import ModelPredictiveController
-from minilink.control.mpc.utilities import mpc_default_computer_x0
+from minilink.planning.trajectory_optimization.mpc import ModelPredictiveController
+from minilink.planning.trajectory_optimization.mpc.utilities import (
+    mpc_default_computer_x0,
+)
 from minilink.planning.trajectory_optimization.planner import (
     TrajectoryOptimizationPlanner,
 )
@@ -792,7 +802,9 @@ class TestMPCNumPyRebuild(unittest.TestCase):
         """A duck planner lacking the transcription the block reads is a TypeError."""
         from types import SimpleNamespace
 
-        from minilink.control.mpc.controller import validate_mpc_planner
+        from minilink.planning.trajectory_optimization.mpc.controller import (
+            validate_mpc_planner,
+        )
 
         planner = _make_numpy_planner()
         duck = SimpleNamespace(
@@ -864,7 +876,9 @@ class TestMPCNumPyRebuild(unittest.TestCase):
 
     def test_explicit_initial_guess_bypasses_the_latch(self):
         """An explicit initial_guess at a latched (k, y) solves anew and re-latches."""
-        from minilink.control.mpc.controller import MPCTickLatch
+        from minilink.planning.trajectory_optimization.mpc.controller import (
+            MPCTickLatch,
+        )
 
         planner = _make_numpy_planner(0.0)
         latch = MPCTickLatch(planner, dt_mpc=0.2)
@@ -1016,7 +1030,7 @@ class TestMpcComputerScheduleCheck(unittest.TestCase):
                 self.assertIsNone(mpc.latch.last_t_solve)
 
 
-from minilink.control.mpc.controller import (
+from minilink.planning.trajectory_optimization.mpc.controller import (
     MPCBroadcastController,
     MPCStatelessController,
 )
@@ -1064,7 +1078,7 @@ class TestMpcSubclassHooks(unittest.TestCase):
         self.assertAlmostEqual(mpc.latch.last_t_solve, 1.0)
 
 
-from minilink.control.mpc.utilities import finite_diff_knots
+from minilink.planning.trajectory_optimization.mpc.utilities import finite_diff_knots
 
 
 class TestMpcKnotRates(unittest.TestCase):
@@ -1076,7 +1090,7 @@ class TestMpcKnotRates(unittest.TestCase):
         self.assertTrue(np.all(np.isfinite(y_dot)))
 
 
-from minilink.control.mpc import (
+from minilink.planning.trajectory_optimization.mpc import (
     ModelPredictiveController,
     mpc_animation_overlays,
     mpc_plans_from_rollout,
@@ -1209,7 +1223,10 @@ class TestMpcHybridStraightLine(unittest.TestCase):
 
 
 from minilink.blocks.routing import Demux
-from minilink.control.mpc.utilities import mpc_default_computer_x0, mpc_warm_start_guess
+from minilink.planning.trajectory_optimization.mpc.utilities import (
+    mpc_default_computer_x0,
+    mpc_warm_start_guess,
+)
 from minilink.core.diagram import DiagramSystem, StepDiagramSystem
 from minilink import BicycleDynRate
 from minilink.simulation.computer import Computer, StepSchedule
@@ -1327,7 +1344,7 @@ class TestMpcHybridWarmStartParity(unittest.TestCase):
             )
 
 
-from minilink.control.mpc.utilities import (
+from minilink.planning.trajectory_optimization.mpc.utilities import (
     mpc_default_computer_x0,
     warm_start_guess_from_prev_plan,
 )

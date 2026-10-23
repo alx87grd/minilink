@@ -186,7 +186,7 @@ TEACHING_LANE_PREFIXES = (
     "minilink.optimization.",
 )
 RESEARCH_LANE_PREFIXES = (
-    "minilink.control.mpc",
+    "minilink.planning.trajectory_optimization.mpc",
     "minilink.simulation.realtime",
     "minilink.simulation.computer",
     "minilink.simulation.hybrid_simulator",
@@ -206,6 +206,7 @@ BAND_FACADES = (
 # `Simulator`). They carry a docstring and an API page, never reach the root
 # prelude, and this list only shrinks.
 BAND_RESEARCH_NAMES = {
+    "minilink.control": ("ModelPredictiveController",),
     "minilink.simulation": (
         "Computer",
         "StepSchedule",

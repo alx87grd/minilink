@@ -26,7 +26,7 @@ TEACHING_MODULES = {
     "minilink.blocks",
     "minilink.graphical.catalog",
     "minilink.control",
-    "minilink.control.mpc",
+    "minilink.planning.trajectory_optimization.mpc",
     "minilink.estimation",
     "minilink.analysis",
     "minilink.analysis.linearization",

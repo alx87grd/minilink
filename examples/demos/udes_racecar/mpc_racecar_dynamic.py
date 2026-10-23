@@ -4,7 +4,6 @@ import numpy as np
 
 from minilink import PlanningProblem, QuadraticCost, TrajectoryOptimizationPlanner
 from minilink.catalog import UdeSRacecarDyn
-from minilink.control.mpc import ModelPredictiveController, mpc_animation_overlays
 from minilink.graphical.catalog.racecar_skin import (
     racecar_skin_2d,  # noqa: F401  (used by the commented 2-D look below)
     racecar_skin_3d,
@@ -20,6 +19,10 @@ from minilink.planning import (
     point_probe,
     quadratic_excess,
     quadratic_hinge,
+)
+from minilink.planning.trajectory_optimization.mpc import (
+    ModelPredictiveController,
+    mpc_animation_overlays,
 )
 
 LENGTH, WIDTH, RADIUS = 12.0, 8.0, 2.0  # [m] the circuit: a rounded rectangle, 36.6 m

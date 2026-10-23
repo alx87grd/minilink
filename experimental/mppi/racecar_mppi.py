@@ -15,7 +15,6 @@ from minilink import (
     TrajectoryOptimizationPlanner,
     UdeSRacecar,
 )
-from minilink.control.mpc import ModelPredictiveController
 from minilink.graphical.animation.drawables import Overlay, SceneHistory
 from minilink.graphical.animation.primitives import CustomLine, TrajectoryPolyline
 from minilink.graphical.animation.visualization import WORLD
@@ -32,6 +31,7 @@ from minilink.planning import (
     quadratic_hinge,
 )
 from minilink.planning.evaluation import score_trajectory
+from minilink.planning.trajectory_optimization.mpc import ModelPredictiveController
 
 V_REF = 3.5  # [m/s]
 TF = 10.0  # closed-loop run, s

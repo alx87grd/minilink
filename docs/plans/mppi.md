@@ -56,7 +56,7 @@ few screens plus one contract narrowing in `control/mpc`.
 What exists, what it is coupled to, and what MPPI reuses.
 
 **The receding-horizon block is not planner-agnostic.** `ModelPredictiveController`
-(`minilink/control/mpc/controller.py`) accepts "a duck-typed
+(`minilink/planning/trajectory_optimization/mpc/controller.py`) accepts "a duck-typed
 `TrajectoryOptimizationPlanner`", and `validate_mpc_planner` (line 740) requires
 `compile_parametric_program`, `has_parametric_program`, `solve_trajectory_from`,
 `planner.transcription.options.n_steps`, `planner.options.compile_backend` and
@@ -383,7 +383,7 @@ dual-rate broadcast, `export_to_computer`, `mpc @ plant` and the overlays
 trajectory of the tick's solution. The check that `dt_mpc` is a multiple of the
 planner's `dt` belongs to `warm_start_guess` (MPPI raises; trajopt interpolates as today).
 
-This is the T6 `control/mpc/controller.py` conversation the workboard already owes (and
+This is the T6 `planning/trajectory_optimization/mpc/controller.py` conversation the workboard already owes (and
 the D3 rows "MPC port computes drop `params`" and "dual online-params façades"). Doing
 it with MPPI as the second consumer is what makes the contract honest instead of a
 refactor in the abstract.
@@ -396,7 +396,7 @@ refactor in the abstract.
 | Problem class | (a) deterministic only; (b) stochastic only via `as_stochastic`; (c) both, one branch in the sampling beat | (c) | The base class already makes every planner accept both; `accepts_stochastic=True` is one attribute; the deterministic twin is the test |
 | Where the step semantics live | (a) rewrite `x_{t+1}`, the exit rule and `h` inside the planner on `rk4_integrate_zoh_trace`; (b) `RolloutEnvironment.step` | (b) | One owner of what an episode costs (S65); the equations still appear as the named lines of §5; the env already carries the disturbance and parameter draws and will carry `realize(key)` after RN-4 |
 | Plant draws per control sample | `M = 1` always; `M` a knob | `M` a knob, default 4 on a stochastic problem | §4: `M = 1` rewards lucky draws |
-| Home | `planning/trajectory_optimization/`; a new `planning/sampling/`; `control/mpc/` | `trajectory_optimization/` | Output is a schedule; a package per algorithm family is the existing taxonomy; `control/mpc` is the wrapper, not the solver |
+| Home | `planning/trajectory_optimization/`; a new `planning/sampling/`; `planning/trajectory_optimization/mpc/` | `trajectory_optimization/` | Output is a schedule; a package per algorithm family is the existing taxonomy; `control/mpc` is the wrapper, not the solver |
 | Backend | JAX only; `xp` body from day one | JAX only for the prototype, NumPy `loop` backend with the teaching decision | The vectorized-over-`K` `xp` path needs the NumPy evaluator to batch, which it does not; the per-sample loop is the `loop` rung of the DP ladder and is fine for a 2-D teaching plant |
 | Grid | `dt=`; `n_steps=` | `dt=` | §3 |
 | Name | `PathIntegralPlanner`; `MPPIPlanner` | `PathIntegralPlanner` [ask] | §5 |
@@ -482,7 +482,7 @@ The question asked: when. The proposal, against the rungs of ROADMAP §5:
   ([sampled-path.md](sampled-path.md)), batched over realizations. The three steps
   touch no public name and no teaching file.
 - **Before the v0.9 freeze (spring 2027): MP-4 and MP-5.** MP-4 is T6's
-  `control/mpc/controller.py` conversation, already queued before v0.9 because V3 must
+  `planning/trajectory_optimization/mpc/controller.py` conversation, already queued before v0.9 because V3 must
   decide whether `control.mpc` joins the frozen surface; narrowing the planner contract
   is a prerequisite of freezing that block's name, so MPPI costs the freeze nothing it
   did not already owe. MP-5's demos land as soon as MP-4 does.
