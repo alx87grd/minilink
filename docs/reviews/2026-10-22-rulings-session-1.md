@@ -161,3 +161,6 @@ of it in sampled-path.md §3.6; the numbers from `benchmarks/params_binding.py`.
 - **Time-dependent sets (2026-10-23).** `X(t)` and `U(x, t)` are the contract and nearly the
   practice; the one gap is RRT, which checks `X` and the goal without `t` (a hardening row for
   D3 in TODO §3). `evaluate_trajectory` reads the margins at every sample's time.
+- **R20 amended (2026-10-23):** the cost signals are attachable from a cost alone,
+  `traj.with_cost(cost, discount_rate=0.0)`, no problem object needed; the problem form reads
+  its cost and discount; one body, `cost.integrate`.
