@@ -399,3 +399,13 @@ split when it starts; this section marks the reversals).
   K1 inventory (§3) are not ruled: the maintainer runs his own pass on the demos (K4).
 - **R54 amended (2026-10-23): `Lag` is deleted too; `Lead` stays** (used by the frequency-response
   topic notebook, the root-locus demo and the tutorial's showcase).
+- **R55 (2026-10-23, K8) Three cars on the teaching surface.** The car family has three distinct
+  models: the kinematic bicycle, the dynamic bicycle with tires, and the real 1/10 racecar. The
+  root prelude carries those three: `KinematicBicycle`, `DynamicBicycle`, `UdeSRacecarDyn`. The
+  variants fold in: `KinematicCar` and `DynamicBicycleCar3D` merge away (a drawing is the plant's
+  `skin`, set on the instance; the car's size is the bicycle's parameters); `UdeSRacecar` becomes a
+  parameter preset of `KinematicBicycle` (`KinematicBicycle(**UDES_RACECAR)`); `UdeSRacecarDyn3D`
+  folds into `UdeSRacecarDyn(wheel_angles=True)` (the two wheel angles exist only for the 3-D
+  animation). `BicycleDynRate` (the MPC reformulation), the two longitudinal cars and
+  `HolonomicMobileRobot` stay on `minilink.catalog`. The tutorial, the GRO501 `racecar_toward_mpc`
+  notebook and the racecar demos migrate in the same commit.
