@@ -343,7 +343,7 @@ ledger with the alternatives: [end-state-api.md](../plans/end-state-api.md)). **
 the plan docs aligned to it and its steps written as workboard rows with gates (TODO §4); the
 points that pass and an independent second opinion raised are under "Raised 2026-10-23" in §6.
 **Next:** implement, the step model's baseline (SM-0) first. The sampled loop's details
-(D13–D15), the optimizer upgrade (S74, deferred by R25) and the v0.4 names stay open.
+(D13–D15, ruled when S31 starts) and the v0.4 names stay open; the optimizer upgrade (S74) is in v0.3 (R74).
 
 **The audit, done 2026-10-23** (G1): the GMC714 syllabus read and every lab's ingredients
 checked on the teaching surface (§4.3); no gap; the maintainer ruled that GMC714 needs no new

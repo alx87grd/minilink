@@ -491,12 +491,13 @@ stochastic column with RN-4 in v0.4.
 
 - **The sampled loop** (`law % dt @ plant`, `HybridDiagram`): a tool, ticks on its clock, one
   tick-scan kernel over the step model; its caches, controller memory and the dispatch of a
-  sampled controller in `evaluate` are ruled in the hybrid phase.
+  sampled controller in `evaluate` are ruled in the hybrid phase, which follows the continuous core
+  in v0.3 (R73).
 - **A disturbance block's draws** (RN-4, v0.4): one seed per noise block in `realize`, joining
   `evaluate(..., n_trials, key)` under the same verb.
-- **The optimizer upgrade** (S74, deferred by R25): program classes hinting the solver,
-  `method="auto"`, algorithm-named presets, the first-order backend. Today's `Optimizer` receives
-  the program unchanged.
+- **The optimizer upgrade** (S74): program classes hinting the solver, `method="auto"`,
+  algorithm-named presets, the first-order backend. Right after the program export, still in v0.3
+  (R74); until it lands, today's `Optimizer` receives the program unchanged.
 - **The v0.4 names**: the parametric MPC program (`ParametricProgram`, the key `plant`, live
   ports), `MPPIPlanner` and the three planner verbs the MPC block reads, the seeded stochastic
   policy block (`GaussianPolicy`).

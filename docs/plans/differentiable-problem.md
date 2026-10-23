@@ -115,7 +115,7 @@ The "after" column is continuous-core.md §2–§3; this table says only what ch
 | `evaluate`, `compare` | `compare(*solutions)` replays with the adaptive `Simulator` | the student's facades on the engine (step 4); `compare(*solutions)` keeps working |
 | `RolloutEnvironment` | the problem as a step function for the RL collectors | on `discretize` (SM-3); the RL episode, a training setting reading the problem's fields as hints (R43); its exit test the one `Set.contains`, its reward the same `g`, its γ from `problem.discount_rate`; it stops serving the Monte Carlo trials |
 | `PlanningSolution` | `problem`, `policy`, `solver`, `trajectory`, `evaluation`, `cost_to_go` | unchanged; `trajectory` and `evaluation` of a feedback planner come from `evaluate` |
-| `MathematicalProgram`, `Optimizer` | `J(z)`, `h`, `g`, bounds; three constrained-NLP presets | unchanged; one more producer, `pe.program(wrt, bounds)` (step 5); the upgrade deferred (S74, §4.5) |
+| `MathematicalProgram`, `Optimizer` | `J(z)`, `h`, `g`, bounds; three constrained-NLP presets | unchanged; one more producer, `pe.program(wrt, bounds)` (step 5); the upgrade right after it (S74, §4.5; R74) |
 
 ## 4. Implementation rules
 
@@ -254,7 +254,7 @@ R38, R41, R42, R45, R46). Implementation detail:
   is the case "no decision leaves, `x0` bound" of the same export, widened by S76 to every
   problem parameter ([parametric-program.md](parametric-program.md)).
 
-### 4.5 The optimizer upgrade (S74): deferred by R25, its design kept for when it comes
+### 4.5 The optimizer upgrade (S74): in v0.3 right after the program export (R74)
 
 The program would know its class from its fields, `Optimizer` would refuse a method the class
 does not admit and `method="auto"` pick by class; one first-order backend
