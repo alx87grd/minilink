@@ -7,7 +7,8 @@ reviewer read CONSTITUTION, RULES, ROADMAP, TODO §4, continuous-core.md, the ru
 [the earlier second opinion](2026-10-23-v03-alignment-and-second-opinion.md), then checked the
 plan's statements of fact against the code on `dev-v0.3` at `e9f69dff` (three read-only passes:
 the step model, the path to the cost, the clean-up and the names; the key claims re-checked by
-hand). Nothing here is ruled: §1 needs the maintainer, §2 and §3 are agent-managed fixes.
+hand). §1 was ruled the same night (R78–R85, [the rulings record](2026-10-22-rulings-session-1.md),
+session 4) except §1.3, whose options are §5; §2 and §3 were fixed in the plan docs the same night.
 
 **Verdict.** The architecture holds and the rulings are coherent with each other; the earlier
 second opinion's four scoring defects are all closed by R31–R33 and R72. What remains is of a
@@ -183,3 +184,79 @@ AGENTS.md protects. CI does not run on it today (`test.yml` triggers on `main`, 
 About thirty of the forty-four notebooks under `examples/` change at least once, and five
 intended number changes need the maintainer's sign-off (the forced hold, the integral to `tf`,
 trajopt's `U`/`Xf` defaults, the DP/RL price, the Monte Carlo re-pin).
+
+## 5. Where the problem's parameters live (open; options for the maintainer)
+
+### The code as it stands
+
+`PlanningProblem(..., params=ProblemParameters(system=, cost=, sets=, scene=))` is an *override
+bundle* beside the objects' own `params`. The planners read it, never the objects:
+
+```python
+# planning/policy_synthesis/dp.py and its neighbours, today
+dx = sys.f(x, u, t, problem.params.system)       # None means "the plant's own"
+g = cost.g(x, u, t, problem.params.cost)         # costs have no params of their own yet
+ok = X.contains(x_next, t, problem.params.sets)  # ONE dict handed to every set: X, U, X0, Xf
+```
+
+46 reader lines (14 cost, 13 system, 19 sets); 6 tests build one (`sets={"r": 0.8}` for a ball's
+radius, `system={"k": 3.0}`); no notebook or demo does. A random plant's nominal draw is stored in
+`params.system` at construction. Two homes for the plant's numbers (`plant.params` and
+`problem.params.system`), and the sets share one dictionary whatever they are.
+
+R41 retired the bundle ("each object owns its parameters") but left the sets with no home until
+A5, and no single tree for "the problem's numbers" outside the engine's `pe.params`.
+
+The diagram already solved the same question (`core/wiring.py`): `diagram.params` is a **live
+nested view** `{sys_id: subsystem.params}` assembled on each access, so the subsystems stay the one
+home; assigning `diagram.params = {...}` routes each entry into its subsystem; `f(x, u, t,
+params)` takes the same nested shape as an override.
+
+### The options
+
+**A. No problem-level parameters (R41 as written).** Each object owns its own; tools read
+`problem.sys.params`, `problem.cost.params`, `problem.X.params`; only the engine assembles a tree
+(`pe.params`). Simple, but the problem has no one place to read or override its numbers, and a
+solver that wants "this problem with `m = 1.2`" has to know which object holds `m`.
+
+**B. The problem as a container, like a diagram (the maintainer's idea; recommended).**
+`problem.params` is a live nested view keyed by the problem's parts; the objects stay the one home.
+
+```python
+problem = PlanningProblem(plant, cost=QuadraticCost.from_system(plant), X=plant.state.box,
+                          U=plant.input_box, Xf=BallSet(x_goal, radius=0.1), tf=10.0)
+problem.params
+# {"plant": {"m": 1.0, "l": 1.0, ...}, "cost": {"Q": ..., "R": ...},
+#  "X": {...}, "U": {...}, "Xf": {"center": ..., "radius": 0.1}}
+problem.params["cost"]["Q"][0, 0] = 10.0       # writes into cost.params, as on a diagram
+problem.params = {"plant": {"m": 1.2}}         # routed into plant.params by the setter
+
+pe = problem.compile(pid, dt=0.01)
+pe.params
+# {"plant": ..., "controller": ..., "cost": ..., "X": ..., "Xf": ..., "x0": ..., "r": ...}
+```
+
+- One rule across the library: a container's `params` is the nested view of its parts' (diagram,
+  composite cost, problem), and an equation path takes that shape as an override.
+- The key `plant` is the loop's reserved key too (D19, R22), so the problem's tree and the loop's
+  merge in `pe.params` without a collision: the same object, one entry.
+- Each set owns its own parameters (a ball's centre and radius), so no shared `sets` dictionary;
+  the library sets reading `params` is A5's part, which lands with A2 (TODO §4).
+- `ProblemParameters` goes; a random plant's nominal draw is taken where a tool needs it
+  (`problem.nominal()`, `realize(key, n)`), not stored on the problem.
+- Cost: one view property and one routing setter on `PlanningProblem` (the diagram's are 15 lines),
+  the 46 readers rewritten to `problem.params["plant"]`, `["cost"]`, `["X"]`, …
+
+**C. A stored nested dictionary on the problem** (`ProblemParameters` as a dict that overrides the
+objects). The closest to today, but it keeps two homes for every number (the object's and the
+problem's), which can silently disagree (RULES 5.6). Not recommended.
+
+### Recommended: B, with three details to confirm
+
+1. **The keys** by role: `"plant"`, `"cost"`, `"X"`, `"U"`, `"X0"`, `"Xf"` (not `"system"` /
+   `"sets"`), so they match the loop's `plant` key and the problem's own field names.
+2. **The problem's own numbers stay fields in v0.3** (`tf`, `discount_rate`, `x_start`): `tf` sets
+   array shapes, and `x0` already enters `pe.params` through the engine. `discount_rate` could
+   become a leaf later if a gradient with respect to it is wanted.
+3. **No `params=` argument on `Planner.solve()` in v0.3:** a planner reads `problem.params` at solve
+   time; overriding is `problem.params = {...}` before `solve()`, or `pe.evaluate(p)` on the engine.

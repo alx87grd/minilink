@@ -541,3 +541,51 @@ structure (R66), the price's name and the program's warning (R71, R72), the scop
 R74), the teaching pattern (R75), S73 (R76), the cost block (R77). Open by design: the maintainer's demo
 pass (K4); the hybrid tool's details (D13–D15), ruled when S31 starts; the v0.4 names (D25–D30).
 Next: code, the names and structure first (A6, K2, K8, K10, S32, G3, R68), then the step model.
+
+## Session 4 (2026-10-23, night): the final review before code
+
+Taken over the seven points of [the final review](2026-10-23-v03-final-review.md) §1. Where a
+ruling here differs from an earlier one, it supersedes it; the superseded ones are named.
+
+- **R78 (point 1) The implementation order is the agent's; the course calendar does not drive
+  v0.3.** The branch builds the vision; when it reaches `main` is the maintainer's call, by the
+  courses. Supersedes R73's ordering by the GMC714 deadline and the calendar wording of the rows
+  (A6 "between terms", G3 "by mid-December", K7's late-December window) for the branch work;
+  what the rows build is unchanged. The order the agent picked is TODO §4's.
+- **R79 (point 7) `dev-v0.3` is a temporary branch** for the v0.3 work, merged into `dev` by the
+  maintainer after his review. Supersedes R47's "v0.3 stays on `dev`" (R47's rule that the
+  notebooks move to the new interface stands).
+- **R80 (point 2) The numbers may change; the check is closeness.** The scoring rule changes
+  (the integral to `tf`, the price, the defaults), so the DP, RL, trajectory-optimization and
+  Monte Carlo numbers move. Each intended change is validated by running the same problem and
+  the same cost before and after: the results agree closely, not exactly, and the step's report
+  gives the relative differences. Supersedes V1.2's "DP and RL baselines byte-identical".
+- **R81 (point 4) Close agreement replaces byte-identical** where a step restructures a
+  computation (a new traced body, a scan, a solver moved onto the one rollout): `rtol 1e-6`
+  is the bar for this pass, the agreement integration needs. A pure move or rename is still
+  expected to be identical, which is cheap to check. Amends the refactor recipe's bar
+  (RULES 7.7) for v0.3.
+- **R82 (point 5) No fallback, one sweep.** Every rename and keyword change lands with all its
+  callers in one change: no alias, no one-release shim, no one-line facade, DESIGN §5's
+  evaluator names included. Supersedes R42's "one release accepted", the shims of SM-2, SM-3,
+  SM-4, SM-6 and SM-8, and V1.4b's `MonteCarloEvaluator` facade.
+- **R83 (point 6) The Euler solvers stay.** No Euler solver is removed: `euler` keeps its roles
+  (the discontinuous default of `select_solver`, the non-uniform grid) and `euler_fixedsteps`
+  runs on the one rollout like `rk4_fixedsteps`. Supersedes SM-7's "the `euler` Python-loop
+  backend goes".
+- **R84 (point 6) One way to compare controllers.** Every notebook and demo that scores or
+  compares controllers moves to `evaluate` and `compare`: `Comparison.evaluate(evaluator)` and
+  the `MonteCarloEvaluator` calls go with V1.4b.
+- **R85 (new) The closing example.** The last v0.3 row is the PID tuning example in two sections:
+  the gradient-descent loop written by hand, as today, then the automatic pipeline (the problem
+  stated, `pe.program` exported, gradient descent run on the program's cost and gradient), the
+  two agreeing.
+
+Open: where the problem's parameters live (point 3; the maintainer's first idea, a nested
+dictionary like a diagram's, to be developed with options). Taken by the agent where the
+maintainer did not speak (point 6, each reversible): the callable `infeasible_cost` goes (R32's
+values); `("cvar", α)` is built in V1.4b (R34); `PlanningProblem.X0` stays, `metadata` is left
+as is; `discretize` loses `params=` (the `StepSystem` takes `params` per call); the compiled
+`rollout(x0, u_seq, t0, dt, params)` replaces the step evaluators' `rollout(x0, *, n_steps, u)`;
+the RRT extender moves onto `rollout` (it keeps every knot) and both it and the Lyapunov sampler
+pass `t` as it advances.

@@ -121,7 +121,7 @@ scannable step. Its body stops being hand-written and calls the compiled step.
 …)` takes the time in seconds, as `f` does; a `StepSystem`'s `step(x, u, k, params)` takes the
 integer tick. `discretize` binds `t_k = t0 + k·dt` between the two, so the tick is the step
 contract of every sampled consumer and seconds are the continuous plant's business. `integrator=`
-becomes `solver=` (accepted for one release, with a ledger line; R42, which replaces R6's
+becomes `solver=` (at every caller in one sweep, R82; R42, which replaces R6's
 `method=`: `method=` stays the verb's own numerical method, the derivative or the optimizer's
 algorithm, and `integrator=` would clash with the `Integrator` block).
 
@@ -216,8 +216,8 @@ never hand-written:
 
 Rebuilding the wrapper per call is the one thing to forbid: `jax.jit(body)` at every call costs
 87 µs, `jit(partial(...))` at every call 93 000 µs (a new object, a cache miss, a recompile).
-DESIGN §5's stable names (`rk4_step`, `integrate_zoh`, their trace twins) become one-line
-aliases onto `frozen.step` / `step` for one release, then go with a ledger line.
+DESIGN §5's stable names (`rk4_step`, `integrate_zoh`, their trace twins) go, every caller moved
+to `frozen.step` / `step` in the same change (R82), with a ledger line.
 
 **The knobs are static, never traced.** `solver`, `substeps` and `hold` are keyword-only
 Python values (strings, ints), resolved at trace time (`static_argnames` on the generated
@@ -249,7 +249,7 @@ parameters as constant columns of the batched state so they ride the same memory
 
 | Consumer | After | Numbers |
 | --- | --- | --- |
-| `discretize` | calls the compiled step; gains `substeps=`, `solver="exact"`; `integrator=` read as `solver=` for one release | identical for RK4 and Euler (checked by the baseline) |
+| `discretize` | calls the compiled step; gains `substeps=`, `solver="exact"`; `integrator=` replaced by `solver=` at every caller (R82) | identical for RK4 and Euler (checked by the baseline) |
 | `RolloutEnvironment` | takes the step of `discretize(plant, dt, ...)`; gains `substeps=`, `solver=` replaces `integrator=`; the RL episode is a training setting it owns, reading the problem's fields as hints (R43), and it no longer serves the Monte Carlo trials | identical at `substeps=1` |
 | `Sys2Gym` | the same | identical |
 | the DP grid | the step model with `solver="euler"` | identical; moving DP to RK4 is a separate ask |
@@ -258,7 +258,7 @@ parameters as constant columns of the batched state so they ride the same memory
 | shooting, multiple shooting | the rollout with `hold="foh"` | identical |
 | direct collocation | unchanged | — |
 | `compare()`, `MonteCarloEvaluator` | the compiled fixed-step engine is the judge (R15): `evaluate` and `compare` run `problem.compile(arg, dt)` (`dt` required, R36), the continuous loop on SM-1's step; `solver="scipy"` is the adaptive escape; the Monte Carlo fold into `evaluate` lands in v0.3, right after `evaluate` exists (R44) | change once with V1 (the integral to `tf`, R19) and with the fold (the draws, D21); a sampled replay on the training model waits for v0.4 |
-| `compute_forced` (R17, R18, R40) | the one `ev.rollout`, `hold` on its sequence; `solver="rk4" \| "scipy"`; `input_interp` becomes `hold`; a callable `u(t)` evaluated at the RK4 stage times; the `euler` loop backend goes | a sampled input matrix held `zoh` by default: those `rk4_fixedsteps` forced numbers change once (a baseline and a ledger line); a callable `u(t)` becomes exact at the stages |
+| `compute_forced` (R17, R18, R40) | the one `ev.rollout`, `hold` on its sequence; `solver="rk4" \| "scipy"`; `input_interp` becomes `hold`; a callable `u(t)` evaluated at the RK4 stage times; `euler_fixedsteps` on the same rollout, `euler` kept for discontinuous systems and non-uniform grids (R83) | a sampled input matrix held `zoh` by default: those `rk4_fixedsteps` forced numbers change once (a baseline and a ledger line); a callable `u(t)` becomes exact at the stages |
 | S31's sampled kernel | scans the step model with the controller's `step` between samples | lands on this |
 | identification, behavior cloning (planned) | roll the step model at the logging rate | born on the standard |
 
@@ -277,12 +277,12 @@ compare after each step. A number that changes on purpose gets its own test and 
   then `jit`, byte-identical and within the measured speed of §3.5.
 - **SM-2** `discretize` on the compiled step, gaining `substeps=` (no `hold`: R40);
   `StepSystem.step(x, u, k, params)` on the tick, `t_k = t0 + k·dt` bound by `discretize`;
-  `integrator=` accepted as `solver=` for one release (R42); `solver="exact"` (the follow-up) checked
+  `integrator=` replaced by `solver=` at every caller (R42, R82); `solver="exact"` (the follow-up) checked
   against `scipy.signal.cont2discrete`; the `params["dt"]` fallback and the source-port
   follow-ups (TODO §4).
 - **SM-3** `RolloutEnvironment` and `Sys2Gym` on `discretize`, `substeps` exposed, `solver=`
   replacing `integrator=` (also on `ReinforcementLearningPlanner` and `TabularLearningPlanner`,
-  one release accepted).
+  in one sweep, R82).
 - **SM-4** The RRT extender, the Lyapunov sampler, the MPPI scripts, the hybrid and realtime
   simulators on the step model.
 - **SM-5** Shooting on the rollout's `hold="foh"`; the DP grid on `solver="euler"` (byte-identical;

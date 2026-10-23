@@ -230,7 +230,8 @@ noisy = StochasticPlanningProblem(..., x0_distribution=Gaussian(...), params_dis
 infinite horizon), `X_b`, `U_b` the declared boxes, else the plant's own boxes, else `1e6` with
 one warning naming `infeasible_cost=`; always finite. **One home per number** (R41): the plant's,
 the cost's and a set's parameters live on those objects; the problem holds no parameter bundle
-(`ProblemParameters` is retired).
+(`ProblemParameters` is retired). Whether the problem also offers a nested view of its parts'
+parameters, as a diagram does, is open: [the final review](../reviews/2026-10-23-v03-final-review.md) §5.
 
 ### 3.5 One evaluation of any run
 

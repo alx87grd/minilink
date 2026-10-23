@@ -11,7 +11,7 @@ Identity: [CONSTITUTION.md](CONSTITUTION.md).
 | --- | --- | --- |
 | **v0.1** | **GRO860 end to end**, plus a working **`pip install minilink` on PyPI**. Every topic of the running optimal-control & RL course runs on the teaching surface, in Colab (git-clone cell) and in the conda env: value iteration / DP on a grid · LQR + linearization · trajectory optimization · RL via native `ReinforcementLearningPlanner` (with `Sys2Gym` + SB3 as an optional bridge). See §4.1. | Fall 2026 — `0.1.0` on PyPI (2026-09-16); `0.1.1` (2026-09-26) is the first release a GitHub tag published. Conda from `environment.yml` is the recommended install. The course notebooks' names are frozen until v1.0, with the freeze paused between terms (§4.1 gate 7). |
 | **v0.2** | **GRO501 end to end** (the classical-control course: multi-physics modelling · root locus / Bode / margins · PID to spec · digital implementation · state feedback, pole placement, LQR, observers — see §4.2). Conda stays the recommended install. | `0.2.0` on PyPI (2026-10-17), from the GitHub tag; every §4.2 row green |
-| **v0.3** | **A cleaner core and the differentiable path; GMC714 covered** (§5.3; GMC714 needs no new feature, R48): **the convergence pass** (the core kept, side features to the experimental tier), **the continuous core** ([continuous-core.md](../plans/continuous-core.md): one step model under every sampled tool, one evaluation of any run, and the deterministic differentiable path to the cost behind a clean API: `evaluate`, `compare`, `problem.compile(loop)`, the program export, cost parameters), then the sampled loop as a tool (R73). The teaching surface covers every GMC714 lab (§4.3); the labs move from pyro to minilink as the maintainer's teaching work, outside this roadmap. | December 2026 |
+| **v0.3** | **A cleaner core and the differentiable path; GMC714 covered** (§5.3; GMC714 needs no new feature, R48): **the convergence pass** (the core kept, side features to the experimental tier), **the continuous core** ([continuous-core.md](../plans/continuous-core.md): one step model under every sampled tool, one evaluation of any run, and the deterministic differentiable path to the cost behind a clean API: `evaluate`, `compare`, `problem.compile(loop)`, the program export, cost parameters), then the sampled loop as a tool (R73), and a closing PID-tuning example by hand and by the pipeline (S77). The teaching surface covers every GMC714 lab (§4.3); the labs move from pyro to minilink as the maintainer's teaching work, outside this roadmap. | December 2026 |
 | **v0.4** | **The draws and the textbook objects** (§5.4): the mean over the problem's draws through the same differentiable path (the Monte Carlo evaluator one path, its numbers changing once), the sampled face of the compiled problem, identification as its first data consumer; fields and workspace geometry; MPPI on the sampled kernel; the parametric MPC program (S76) and the general serial chain (C6). | Winter 2027 (the window between GRO860 cohorts, whose material the evaluator's numbers touch) |
 | **v0.9** | **Freeze candidate** (§5.5): the foundation questions that could still break a public name are decided (derived `x0`, Diffrax as an optional solve, the glyph/solid rename, the frozen surface); the trust contract is in place (deprecation policy, pinned export list, CHANGELOG, pinned installs); the standard-syllabus holes close (estimation; the discrete-time one closes with S75 in v0.3); the docs site renders the tutorials. | Spring 2027 |
 | **v1.0** | **A colleague can build a course on it and trust it for three years** (§5.6): the API frozen under the deprecation policy, the standard control syllabus covered and checked against textbook worked examples, course-neutral labs an instructor adopts outside UdeS, green on Windows, macOS and Linux; after two cohorts. Two Stable-Baselines3 teaching notebooks retire (S49) and the GRO860 name freeze becomes the general one. | 2027 |
@@ -342,8 +342,15 @@ the continuous-core phase is [continuous-core.md](../plans/continuous-core.md) (
 ledger with the alternatives: [end-state-api.md](../plans/end-state-api.md)). **Done 2026-10-23:**
 the plan docs aligned to it and its steps written as workboard rows with gates (TODO §4); the
 points that pass and an independent second opinion raised are under "Raised 2026-10-23" in §6.
-**Next:** implement, the step model's baseline (SM-0) first. The sampled loop's details
-(D13–D15, ruled when S31 starts) and the v0.4 names stay open; the optimizer upgrade (S74) is in v0.3 (R74).
+**Done 2026-10-23, night:** [a final review](../reviews/2026-10-23-v03-final-review.md) checked
+the plan against the code, and session 4 ruled its points (R78–R85): the order is the agent's
+and the course calendar does not drive the work (R78); the work happens on `dev-v0.3`, merged into
+`dev` after the maintainer's review (R79); number changes are checked by closeness on the same
+problem and cost (R80); `rtol 1e-6` where a computation is restructured (R81); no alias or shim,
+one sweep (R82); the Euler solvers stay (R83); one way to compare controllers (R84); a closing
+PID-tuning example (S77, R85). **Next:** where the problem's parameters live (open, §6), then
+code in TODO §4's order: the clean-up, the step model, the path to the cost, the optimizer, the
+sampled loop once D13–D15 are ruled, the closing example. The v0.4 names stay open.
 
 **The audit, done 2026-10-23** (G1): the GMC714 syllabus read and every lab's ingredients
 checked on the teaching surface (§4.3); no gap; the maintainer ruled that GMC714 needs no new
@@ -584,10 +591,25 @@ never fills `r` (R38); role-less trajectories (R39); the hold on sequences only 
 per parameter, `ProblemParameters` retired (R41); `method=` for the verb's own method, `solver=`
 for time (R42); the RL episode a training setting (R43); the Monte Carlo fold in v0.3 (R44); the
 record's names `cost`, `J`, `objective` (R45); no regularizer hook (R46); v0.3 on `dev` until
-every notebook has moved, no pin (R47).
+every notebook has moved, no pin (R47; the branch since R79: `dev-v0.3`).
 
-**The second opinion:** every point ruled (R30–R74); v0.3 holds everything planned, ordered by the
-GMC714 deadline (R73), the optimizer upgrade right after the program export (R74).
+**The second opinion:** every point ruled (R30–R74); v0.3 holds everything planned (R73), the
+optimizer upgrade right after the program export (R74).
+
+**Ruled 2026-10-23, the night session** (R78–R85, the same record, on the points of
+[the final review](../reviews/2026-10-23-v03-final-review.md)): the order the agent's, not the
+course calendar's (R78); `dev-v0.3` a temporary branch merged into `dev` (R79); number changes
+checked by closeness (R80); `rtol 1e-6` where a computation is restructured (R81); no alias or
+shim (R82); the Euler solvers stay (R83); one way to compare controllers (R84); the closing
+example (S77, R85).
+
+**Before v0.3's path to the cost (V1.2, A2)**
+
+- **Where the problem's parameters live.** Today `ProblemParameters` (`system`, `cost`, `sets`,
+  `scene`) is an override bundle beside the objects' own `params`, with 46 readers (14 cost, 13
+  system, 19 sets); R41 retired it with no home for the sets'. The maintainer's first idea: the
+  problem holds its parameters as a diagram does, a nested dictionary by part. Options and a
+  recommendation: the final review's §5.
 
 **Before v0.4 (S76, the parametric program)**
 
