@@ -123,3 +123,14 @@ of it in sampled-path.md §3.6; the numbers from `benchmarks/params_binding.py`.
 - **R14 (D12) Ticks.** `step(x, u, k, params)` keeps the integer tick; the loop converts to
   seconds where it calls the plant. **D13–D15 parked** until the continuous architecture and
   API are done and implemented (the hybrid tool's details come in that later phase).
+- **R15 (D9, D17 revised, 2026-10-23) One evaluator, one engine.** The fixed-step compiled
+  rollout is the judge and the engine: `problem.compile(controller, dt)` is the one
+  implementation (`trajectory`, `cost`, `margin`, `value`, `evaluate`, `program`), and
+  `evaluate(problem, controller, *, dt=None, method="rk4", n_trials=1, key=0)` its facade;
+  `method="scipy"` swaps the run for the adaptive `Simulator` and nothing else; `dt=None` is
+  the Simulator's automatic rule. This supersedes R10's "the ODE solver is the judge"; the
+  rest of R10 stands. Lives in: end-state-api.md D9, D17.
+- **R16 `compare` (2026-10-23).** `compare(problem, **entries, dt=, n_trials=, key=)` wraps
+  `evaluate` on several controllers (or solutions, or evaluations) with one key, returns a
+  `Comparison` of `Evaluation`s with the table and the plot verbs (trajectory, cost, phase
+  plane, control law, cost-to-go, paired difference). Lives in: end-state-api.md D9.

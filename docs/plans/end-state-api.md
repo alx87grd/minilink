@@ -259,39 +259,53 @@ value-iteration lesson's numbers hold); `DynamicProgrammingPlanner(problem, dt=,
 as an option from day one; whether the default flips is V3's question, decided with the course
 notebooks pinned on a release.
 
-### D9 One evaluator family; the ODE solver is the judge (S75 ask 4, and D17 revisited)
+### D9 One evaluator, one engine; `compare` on top (S75 ask 4, D17) — **ruled 2026-10-22/23**
 
 **Today:** `compare()` replays each law with the adaptive `Simulator`; `MonteCarloEvaluator`
-runs a held static law in a hand scan on three backends; the differentiable-problem plan made
-the compiled fixed-step run the evaluator and the Monte Carlo class a facade on it.
+runs a held static law in a hand scan on three backends.
 
-**Ruled 2026-10-22:** one verb, one record, one judge.
+**Ruled:** one engine and one facade; no parallel paths.
 
 ```python
-report = evaluate(problem, controller)                              # one run from x_start, the true ODE solver
-report = evaluate(noisy_problem, controller, n_trials=200, key=0)   # Monte Carlo over the draws, same solver
-report.J, report.mean, report.worst, report.failure_rate, report.trajectories
-compare(LQR=report_lqr, PPO=report_ppo).plot()                      # the side-by-side figure: a plot of Evaluations
+ev = problem.compile(controller, dt=0.01)      # compile once: the loop as a diagram, the fixed-step rollout, the score
+ev.trajectory(params, key)                     # one run, traced
+ev.cost(params, key)                           # J of that run, traced
+ev.margin(params, key)                         # the smallest margin to X and U, traced
+ev.value(params, key, n_trials)                # the problem's criterion over the draws (mean, worst, CVaR), traced: what tune minimizes
+ev.evaluate(key, n_trials) -> Evaluation       # the NumPy report from the same rollouts
+ev.program(wrt=) -> MathematicalProgram        # the bridge to the Optimizer
+
+evaluate(problem, controller, *, dt=None, method="rk4", n_trials=1, key=0) -> Evaluation
+#   the student's facade: == problem.compile(controller, dt).evaluate(key, n_trials) for method="rk4"
+#   method="scipy": the adaptive Simulator, one run per trial; the one-line escape for stiff or switching loops
+#   dt=None: the Simulator's automatic rule (a tenth of the declared smallest time constant; 0.01 fallback)
 ```
 
-- `evaluate` runs the closed loop as a diagram with the adaptive ODE solver, deterministic or
-  Monte Carlo alike, and scores with `evaluate_trajectory`; what is reported is always what
-  the plant really does. On NumPy the trials are a loop; on JAX they batch when the solver is
-  fixed-step.
-- The fixed-step compiled run (`problem.compile(controller)`, the `ProblemEvaluator`) is the
-  **engine under `tune`** and the researcher's `jax.grad`, never the reported number: `tune`
-  differentiates through it, then reports the tuned controller through `evaluate`.
-- `MonteCarloEvaluator` the class folds into `evaluate(..., n_trials=)`; `Planner.evaluate`
-  and `solve(evaluate=True)` call the same verb. Its numbers change once (the held static law
-  becomes the real loop), in v0.4 with the draws.
-- **Continuous first.** In v0.3 `evaluate` and `tune` take continuous controllers; a sampled
-  controller (anything built by `%`) is refused with a message. Its face lands in v0.4 with the
-  sampled loop (step 7b): the law held per period, the plant between samples still integrated
-  by the judge. No sampled replay option before then.
-- Infeasibility price: `PlanningProblem.infeasible_cost`, one owner for DP's out-of-bound
-  cost, the RL failure price and the evaluator's exit price; its default derived as
-  `cost.g_max(X, U) · tf` (or `/ ρ` on a discounted infinite horizon); no "infinity" on the
-  cost.
+- The fixed-step compiled rollout is the judge **and** the engine: `tune` reports the number it
+  minimized. The `method` keyword swaps the run function only; loop wiring
+  (`closed_loop_of(problem, controller)`), the draws (`problem.realize(key, n)`), the score
+  (`evaluate_trajectory`), the margin and the record are each one function. The adaptive
+  number is also `evaluate_trajectory(problem, loop.compute_trajectory())`.
+- `MonteCarloEvaluator` the class folds into `evaluate(..., n_trials=)`; `Planner.evaluate` and
+  `solve(evaluate=True)` call the same verb. Its numbers change once (in v0.4 with the draws).
+- **Continuous first.** A sampled controller is refused in v0.3 with a message; its face lands
+  with the hybrid tool's phase.
+- `PlanningProblem.infeasible_cost` is the one price of an exit (DP, RL, the evaluator), its
+  default `cost.g_max(X, U) · tf` (or `/ ρ`); no "infinity" on the cost.
+
+**`compare`, ruled 2026-10-23:** one call, several controllers, the same draws.
+
+```python
+cmp = compare(problem, PID=pid, LQR=lqr_law, NN=nn, dt=0.01)                      # one run each
+cmp = compare(problem, PID=pid, LQR=lqr_law, NN=nn, dt=0.01, n_trials=200, key=0) # Monte Carlo, common random numbers
+print(cmp)                 # J (or mean ± std), worst, failure rate per controller
+cmp.plot_trajectory(); cmp.plot_cost(); cmp.plot_phase_plane(); cmp.plot_control_law(); cmp.plot_cost_to_go()
+cmp.evaluations["PID"]; cmp.difference("PID", "LQR")   # paired, per trial
+```
+
+An entry is a controller (evaluated here), a `PlanningSolution` (its policy; its `cost_to_go`
+kept for the last plot) or an `Evaluation`; mixed is fine; one `key` for all; the cost scored
+on the `plant` role. Today's `compare(*solutions)` keeps working.
 
 ### D10 `params` always an argument; freezing is a binding (S75, ask 6) — **ruled B, 2026-10-22**
 
@@ -405,12 +419,10 @@ problem = PlanningProblem(plant, cost=QuadraticCost(Q, R, S), X=box, tf=10.0, di
 J = evaluate_trajectory(problem, traj)          # the one formula, every tool
 ```
 
-### D17 The noun: `problem.compile(policy) -> ProblemEvaluator`, an engine (ask 1)
+### D17 The noun — ruled with D9
 
-**Ruled with D9 (2026-10-22):** the compiled problem exists as the engine under `tune` and
-the researcher's direct `jax.grad`; it is not the user-facing evaluator, which is the verb
-`evaluate` on the ODE solver. Its noun and verbs are named in step 0 (D19) and sit on the
-planning facade as provisional names.
+`problem.compile(controller, dt) -> ProblemEvaluator` (name open, D19) is the engine and the
+only implementation; `evaluate` is its facade.
 
 ### D18 `Evaluation`: a NumPy report plus a traced `value` verb (ask 2)
 
