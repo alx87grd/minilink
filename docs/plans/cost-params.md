@@ -174,19 +174,12 @@ field, and scene overrides are designed with S76 (parametric-program.md) as the 
 `params` in the assembled tree (R41; the `ProblemParameters.scene` slot reserved for them goes
 with the bundle). Nothing changes numerically today.
 
-## Beyond this plan: the cost as a block (proposed: closed as a demo idea)
+## Beyond this plan: the cost as a block (closed, R77)
 
-A prototype `CostIntegrator(cost)` is a `DynamicSystem` with state `J` and
-`dJ/dt = exp(-rho t) g(x, u, t; p)`, wired to the plant state and the controller output. The
-closed loop then holds one nested dictionary, `{"controller": ..., "plant": ..., "cost": ...}`, and
-`jax.grad` through the compiled loop returned `dJ/dK`, `dJ/dQ`, `dJ/dR` and `dJ/dm` in one
-call. Its `J` matched the post-hoc `compute_cost` to 0.02 % on a pendulum loop. This is the
-route to the differentiable closed-loop cost; it depends on the cost dictionary above.
-Caveats: the terminal cost stays outside the block, and integrating `J` with the ODE solver
-differs from the trapezoid rule of the post-hoc path. Since the rulings of 2026-10-22/23 the
-route to the differentiable closed-loop cost is the compiled problem instead (`problem.compile`,
-the loop's recorded signals scored by `evaluate_trajectory`), so the block is proposed closed as
-a demo idea: the ask is in [differentiable-problem.md](differentiable-problem.md) §9.
+No `CostIntegrator` block: `cost.integrate` on the recorded samples is the one contract for a run's
+cost. The augmented-state formulation (`dJ/dt = e^{−ρt} g` as one more state of the loop) is an
+optional teaching demo, a few lines of custom `DynamicSystem` compared against `evaluate`'s cost (RULES
+6.15), the maintainer's call.
 
 ## Decisions (2026-09-13; 3 and 5 from 2026-10-22/23)
 

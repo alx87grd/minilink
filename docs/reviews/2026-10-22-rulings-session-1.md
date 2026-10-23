@@ -527,3 +527,17 @@ split when it starts; this section marks the reversals).
 - **R76 (2026-10-23) Traceable linear analysis (S73) stays a v0.4 row, any time.** Self-contained,
   scheduled when a course asks for margin-constrained tuning; a good job for a background agent once
   v0.3's core has landed.
+- **R77 (2026-10-23) No `CostIntegrator` block.** `cost.integrate` on the recorded samples is the one
+  contract for a run's cost (a block integrating `dJ/dt = e^{−ρt} g` would be a second number for the
+  same quantity). The cost as an augmented state, the classic optimal-control formulation, is an
+  optional teaching demo (a few-line custom `DynamicSystem` compared against `evaluate`'s cost, RULES
+  6.15), the maintainer's call in his demo pass.
+
+## Where the plan stands after R77 (2026-10-23, end of the day)
+
+Every decision the v0.3 code needs is ruled (R1–R77): the continuous core (R1–R47), GMC714 (R48–R50),
+the names and the catalog (R51–R61, R63, R64, R67–R70), one mechanical family (R62), the package
+structure (R66), the price's name and the program's warning (R71, R72), the scope and the order (R73,
+R74), the teaching pattern (R75), S73 (R76), the cost block (R77). Open by design: the maintainer's demo
+pass (K4); the hybrid tool's details (D13–D15), ruled when S31 starts; the v0.4 names (D25–D30).
+Next: code, the names and structure first (A6, K2, K8, K10, S32, G3, R68), then the step model.

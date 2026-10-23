@@ -458,11 +458,12 @@ steps 1–6, §5 for 7–9); this list is the content.
 
 ## 9. Open
 
+Nothing is open for this plan after 2026-10-23 (R71–R77); the list is kept as the record.
+
 Each with the proposed answer. Taking one: the ruling goes to §4 or §8 here, to the dated
 record, and leaves ROADMAP §6.
 
 1. ~~Which tutorial keeps a hand-written loop~~: ruled, tutorial 07 (R75, RULES 6.15).
 2. ~~S73~~: ruled, a v0.4 row any time, when a course asks for margin-constrained tuning (R76).
-3. **The `CostIntegrator` block** (cost-params.md's research step): proposed, closed as a demo
-   idea; `cost.integrate` on samples is the contract.
+3. ~~The `CostIntegrator` block~~: closed (R77); `cost.integrate` on samples is the contract.
 4. ~~The name of the bound~~: ruled `problem.cost_bound()` (R71).
