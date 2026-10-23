@@ -480,3 +480,8 @@ split when it starts; this section marks the reversals).
   learning moves out to a new band, `minilink.learning` (`reinforcement_learning/`, the tabular
   learners with it; identification and imitation later). `spatial/` leaves with A3. The band facades
   keep their names; deep paths, demos, tests and the API docs migrate in the same commit.
+- **R67 (2026-10-23, K8-4) The three helpers.** The Mermaid diagram exporters (`mermaid.py`,
+  `hybrid_mermaid.py`, the `backend="mermaid"` option and its test) are deleted: Graphviz is the one
+  diagram backend. The pygame renderer stays: it is `RealtimeSimulator`'s default renderer and the game
+  demos' (K8-4 had listed it by mistake). The `identification/` stub is deleted: identification's home
+  is `minilink.learning` when C4 lands (R66).

@@ -354,9 +354,9 @@ the demo sweep touches fewer files. Nothing leaves without the maintainer's ruli
   both-backends contract test, with a docs entry; **K8-3** the unsupported plants the
   maintainer names from K1's table moved to `minilink/experimental/catalog/` with their skins
   and demos (the top-level `experimental/`), their tests and docs entries removed, out of the
-  wheel **[ask — per plant]**; **K8-4** twins merged and the dead helpers deleted from K1's
-  ruling (the Mermaid exporters, `camera.py`, the pygame renderer, `ProblemEnv` /
-  `to_gymnasium`, the `identification/` stub) **[ask — per item]**; **K8-5** S64's hygiene,
+  wheel **[ask — per plant]**; **K8-4** twins merged (R55, R59) and the dead helpers deleted
+  (R54, R67: the Mermaid exporters, `camera.py`, `ProblemEnv` / `to_gymnasium`, the
+  `identification/` stub; the pygame renderer stays, the real-time default); **K8-5** S64's hygiene,
   one plant family per commit; **K8-6** the README's catalog line by domain and the API
   site's plant page. Done when the root prelude lists exactly R60's plants, `minilink.catalog`
   lists only tested plants, no two supported plants differ by parameters alone, and
