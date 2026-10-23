@@ -439,3 +439,9 @@ split when it starts; this section marks the reversals).
 - **R60 (2026-10-23) The root's plants have no cap.** The rule is the course set: the root prelude
   holds exactly the plants a course notebook, the tutorial or a ruling (R55–R59) puts there, pinned
   by the teaching-surface test; R2's cap of 15 goes. Today: 16 plants.
+- **R61 (2026-10-23, G3) The `minilink.dynamics` facade, and one mechanical base.** It exports the
+  textbook model forms a student subclasses: `MechanicalSystem`, `Manipulator`,
+  `GeneralizedMechanicalSystem`, `StateSpaceSystem`, `LTISystem`. `JaxMechanicalSystem` is deleted:
+  `MechanicalSystem`'s default matrix builders are written once with the `xp` idiom (as every catalog
+  plant's are), the experimental symbolic export reads `MechanicalSystem`, and its one test moves
+  with it (CONSTITUTION §6: one equation path for NumPy and JAX).

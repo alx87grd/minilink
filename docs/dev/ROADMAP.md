@@ -466,7 +466,7 @@ public name; v1.0 (§5.6) freezes.
 **The trust contract:**
 - **V4** Deprecation policy from v1.0: one minor release with a `DeprecationWarning` shim;
   a snapshot test pins the teaching-surface export list. The renames held back to v1.0
-  (`xbar` / `ubar`, `plot_cost2go`, `JaxMechanicalSystem`) are on its list. **[ask]**
+  (`xbar` / `ubar`, `plot_cost2go`; `JaxMechanicalSystem` is deleted instead, R61) are on its list. **[ask]**
 - **V5** `CHANGELOG.md` for users; every release from v0.9 carries its entry.
 - **V6** The Colab cell installs a pinned release (the install story itself landed
   2026-10-17: conda recommended, `pip install minilink` plus one `full` extra, no

@@ -562,9 +562,10 @@ workboard; the former wave G rows are §5 rows.
   uses has one public teaching name on the teaching surface, frozen for the term (week 1 on
   January 9), after A6's renames (R52: `ComputedTorque`, `SlidingMode`, `Impedance`,
   `ThreeLinkManipulator`, `LongitudinalTorqueCar`). Moves: `RRTPlanner` from provisional to the teaching lane; `ModelJointImpedance`,
-  `TaskKinematic`, `TaskKinematicNullspace` onto the root prelude; `Manipulator` and
-  `MechanicalSystem` onto a new band facade, `minilink.dynamics` (R50; its list ruled with this
-  row's table); MPC as one teaching name, `ModelPredictiveController` (R50), over today's
+  `TaskKinematic`, `TaskKinematicNullspace` onto the root prelude; a new band facade,
+  `minilink.dynamics` (R50, R61): `MechanicalSystem`, `Manipulator`, `GeneralizedMechanicalSystem`,
+  `StateSpaceSystem`, `LTISystem`, with `JaxMechanicalSystem` deleted (`MechanicalSystem`'s default
+  builders on `xp`); MPC as one teaching name, `ModelPredictiveController` (R50), over today's
   `MPCStatelessController` / `MPCStatefulController`, its constructor frozen while S76 and the
   planner contract (D27) reshape its internals in v0.4, and the loop it runs in (`mpc @ plant`,
   as every demo and lesson writes it) kept as the user's syntax through S31. `ModelPredictiveController`
