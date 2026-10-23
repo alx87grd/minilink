@@ -530,39 +530,49 @@ The former `tune` lines of this document read as this export.
 `problem.compile(controller, dt) -> ProblemEvaluator` (name open, D19) is the engine and the
 only implementation; `evaluate` is its facade.
 
-### D18 `Evaluation`: a NumPy report plus a traced `value` verb (ask 2)
-
-**Recommended:** lower late, convert once. `evaluate()` returns the NumPy record (`J`,
-`failed`, `x0`, `keys`, `trajectories` when recorded; `mean`, `worst`, `failure_rate`);
-`value()` is the one traced scalar, the problem's criterion over the draws. No pytree record,
-no second spelling of the traced number.
-
-### D19 The names (ruled 2026-10-23)
+### D18 One record, two verbs (ruled 2026-10-23)
 
 ```python
-# level 1: scoring a run you hold
-evaluate_trajectory(problem, traj) -> TrajectoryEvaluation(cost, value, feasibility_margin, failed, reachability_margin, reached)
+Evaluation                       # a pytree record, one row per run (n_trials = 1 for one run): traceable inside a trace, plain outside
+    .cost, .value, .feasibility_margin, .failed, .reachability_margin, .reached, .x0, .keys   # (n,) arrays; .trajectories optional
+    .value                       # the problem's criterion over the trials, the scalar the program minimizes (one trial: that run's value)
+    .mean, .std, .worst, .cvar(a)                      # statistics of value, on xp
+    .failure_rate = mean(failed)                       # left X or U at some point of the run
+    .reachability_rate = mean(reached)                 # ended inside Xf at tf (1.0 when the problem declares no Xf)
+    .success_rate = mean(reached & ~failed)            # the goal reached without ever leaving the allowed sets
+    print(report), report.plot_...                     # reporting verbs, called outside a trace (the Trajectory's rule)
+```
 
-# level 2: the engine; every verb takes (params=None, key=...) first, params=None the loop's own, key=None the nominal draw
-pe = problem.compile(loop_or_controller, dt)      -> ProblemEvaluator
-pe.params
-pe.trajectory(params=None, key=None)              -> Trajectory               # one run
-pe.evaluate_trajectory(params=None, key=None)     -> TrajectoryEvaluation     # one run's record, traced (the verb formerly named cost)
-pe.value(params=None, key=0, n_trials=1)          -> scalar                   # the problem's criterion over the draws, traced
-pe.evaluate(params=None, key=0, n_trials=1)       -> Evaluation               # the report over the draws, NumPy
-pe.program(wrt, bounds=None, key=0, n_trials=1)   -> MathematicalProgram
+No `TrajectoryEvaluation`: an `Evaluation` with one row is the record of one run. No `mean_cost`,
+no `final_state`: `report.cost.mean()` and `report.trajectories.x[..., -1]` are one line on the
+arrays the record carries. `n_trials` must be written on a stochastic problem; a deterministic
+problem refuses `n_trials > 1`.
+
+### D19 The names (ruled 2026-10-23, final form)
+
+```python
+# scoring a run you hold
+evaluate_trajectory(problem, traj)                 -> Evaluation     # one row
+
+# the engine: two verbs and the program; every verb takes (params=None, key=...) first
+pe = problem.compile(loop_or_controller, dt)       -> ProblemEvaluator
+pe.params                                          # the nominal pytree: the loop's params + cost, x0, the free boundary inputs
+pe.trajectory(params=None, key=None)               -> Trajectory      # one run, every signal recorded; key=None the nominal draw
+pe.evaluate(params=None, key=0, n_trials=1)        -> Evaluation      # one run or n draws, the same record
+pe.program(wrt, bounds=None, key=0, n_trials=1)    -> MathematicalProgram   # objective: pe.evaluate(...).value
 pe.pack(params, wrt) / pe.unpack(z, wrt)
+jax.grad(lambda p: pe.evaluate(p, key, 200).value)(pe.params)              # the researcher's line
 
-# level 3: the student's verbs
+# the student's verbs
 evaluate(problem, arg, *, dt=None, method="rk4", n_trials=1, key=0) -> Evaluation
 compare(problem, **args, dt=None, n_trials=1, key=0)                -> Comparison
 ```
 
-`wrt=` is the selection keyword (as `jacobian(of, wrt)`); `"plant"` is the plant's key in every
-parameter tree (`ProblemParameters.system` renames on the v1.0 list); `ParametricProgram` is the
-later name for the parametric MPC program. Gone: `tune`, `margin` as a verb, `cost` as a verb,
-`MonteCarloEvaluator` (one facade line until removed). One word, one meaning at every level:
-`evaluate_trajectory` is the six-field record of one run, `evaluate` the report over draws.
+Each verb is named by what it returns: `trajectory` a `Trajectory`, `evaluate` an `Evaluation`,
+`program` a `MathematicalProgram`. `wrt=` is the selection keyword; `"plant"` the plant's key in
+every parameter tree; `ParametricProgram` the later name of the parametric MPC program. Gone:
+`tune`, `cost` / `value` / `margin` / `evaluate_trajectory` as engine verbs, `TrajectoryEvaluation`,
+`MonteCarloEvaluator` (one facade line until removed).
 
 ### D20 No scoring modes — ruled with D16
 
@@ -575,11 +585,10 @@ keep their own sum (byte-identical: no baseline declares a rate).
 The held-input static law becomes the continuous loop's own RK4 (O(dt²) apart on a smooth
 law), re-pinned with a release note in V1's step 7 (v0.4), the window the calendar rule names.
 
-### D22 The verbs dropped (ask 8) — confirm
+### D22 The statistics (ruled 2026-10-23)
 
-No `final_state`, no `success_rate`, no `mean_cost`: the trajectory's last column, `1 −
-failure_rate` and `report.mean` already say them. `margin` is the exact minimum; the
-per-sample margins are the bridge's constraint rows.
+`failure_rate`, `reachability_rate` and `success_rate` as defined in D18; no `mean_cost`, no
+`final_state`.
 
 ### D23 The optimizer's method keys and program classes — **deferred 2026-10-23**
 

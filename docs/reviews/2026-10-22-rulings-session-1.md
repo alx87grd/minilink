@@ -194,3 +194,12 @@ of it in sampled-path.md §3.6; the numbers from `benchmarks/params_binding.py`.
   the verb formerly `cost`), `value`, `evaluate` (the report), `program`, `pack` / `unpack`;
   `wrt=`; the key `plant`; `TrajectoryEvaluation` and `Evaluation` the two records. Lives in:
   end-state-api.md D19.
+- **R27 (D18, D19, D22, 2026-10-23) One record, two verbs.** `Evaluation` is the one pytree
+  record (one row per run; `n_trials = 1` for one run) with `.value` the criterion scalar the
+  program minimizes, the statistics on `xp`, and three rates: `failure_rate` (left `X` or `U`),
+  `reachability_rate` (ended in `Xf`), `success_rate` (reached and never failed). The engine has
+  `trajectory`, `evaluate`, `program` (plus `pack` / `unpack`), each named by what it returns,
+  each taking `(params=None, key=...)` first. `evaluate_trajectory(problem, traj)` returns a
+  one-row `Evaluation`. `TrajectoryEvaluation`, `mean_cost`, `final_state` and the engine verbs
+  `cost`, `value`, `margin` do not exist. This supersedes R26's verb list. Lives in:
+  end-state-api.md D18, D19, D22.
