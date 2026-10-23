@@ -369,3 +369,7 @@ split when it starts; this section marks the reversals).
   test; its exact list is ruled with G3's table. (3) A6's short catalog names land **before** the
   GMC714 term (by January 9), with every course notebook migrated in the same commit while the
   name freeze is paused; v0.3 stays on `dev` until then (R47).
+- **R51 (2026-10-23, K9) The two notebooks on the experimental tier.**
+  `examples/teaching/topics/robotics/manipulator_eom.ipynb` is deleted (it imported the
+  symbolic mechanics); `examples/tutorial/showcase_jax.ipynb` keeps its quick C-export demo, the
+  second documented gate exception beside the C-export flagship smoke.

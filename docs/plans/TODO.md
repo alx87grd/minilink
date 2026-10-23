@@ -182,8 +182,7 @@ foundations review, docs/reviews/2026-09-15-foundations-review.md).
 - [ ] **D1.3 The sweep**, one file per step, maintainer reviews each diff **[ask per file]**:
   the tutorial chapters (`11_reinforcement_learning.ipynb` and `showcase_jax.ipynb` first;
   `showcase_jax` rewritten, awaiting review), then the non-clean demos, then the teaching
-  notebooks; the three `compile/` demos wait for V1 (their helpers *are* that feature);
-  `manipulator_eom.ipynb` reviewed for which of its 26 helpers the text teaches. Done when
+  notebooks; the three `compile/` demos wait for V1 (their helpers *are* that feature). Done when
   the D1.2 allowlist is empty and the notebook checks pass.
   Also: the placeholder sections of tutorials 01, 02, 03, 05, 08 and 09 filled (scan:
   examples#3); the facade gaps the import allowlist records closed (scan: examples#13).
@@ -364,14 +363,11 @@ the demo sweep touches fewer files. Nothing leaves without the maintainer's ruli
   tests (`test_symbolic.py`, `test_engine_jax.py`) moved to `tests/experimental/`, off the merge
   gate, run by the nightly job (`pytest tests/experimental`), `c_export`'s flagship smoke kept in
   the JAX regression job (K9-2); the status line on every `minilink/experimental/` module
-  docstring (K9-3). Left: the unsupported plants' test rows leave with K8-3; and two teaching
-  notebooks still import the tier, so the notebook smoke of the gate does too:
-  `examples/tutorial/showcase_jax.ipynb` (`minilink.experimental.c_export`) and
-  `examples/teaching/topics/robotics/manipulator_eom.ipynb`
-  (`minilink.experimental.symbolic`) **[ask — student-facing]**: keep them as the documented
-  exceptions, move the cells to `experimental/`, or move the notebooks there. Done when CI's
-  gate imports nothing under the tier but the flagship smoke and the exceptions ruled, and
-  `pip wheel` ships nothing under it.
+  docstring (K9-3). Ruled 2026-10-23: `manipulator_eom.ipynb` deleted (it imported the symbolic
+  tier); `showcase_jax.ipynb` keeps its quick C-export demo, the one documented exception beside the
+  flagship smoke (both on `minilink.experimental.c_export`). Left: the unsupported plants' test rows
+  leave with K8-3. Done when CI's gate imports nothing under the tier but those two exceptions,
+  and `pip wheel` ships nothing under it.
 - [ ] **K7 What is core, what is a side feature** **[ask — core, public names]**
   (ROADMAP §6): the convergence pass; every move is a step of its own once ruled. In v0.3
   with K1–K4: K1's inventory is core-consolidation.md §3–§4, K2 and K3 are its tiers; the

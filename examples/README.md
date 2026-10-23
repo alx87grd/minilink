@@ -120,11 +120,6 @@ Course-agnostic textbook pages. Long notebooks (UR5 EoM, DP grids, PPO training)
 | [pendulum_value_iteration_vs_lqr_vs_rl](teaching/topics/reinforcement_learning/pendulum_value_iteration_vs_lqr_vs_rl.ipynb) | [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/alx87grd/minilink/blob/main/examples/teaching/topics/reinforcement_learning/pendulum_value_iteration_vs_lqr_vs_rl.ipynb) |
 | [drone_ppo](teaching/topics/reinforcement_learning/drone_ppo.ipynb) | [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/alx87grd/minilink/blob/main/examples/teaching/topics/reinforcement_learning/drone_ppo.ipynb) |
 
-#### Robotics
-| Notebook | Colab |
-| --- | --- |
-| [manipulator_eom](teaching/topics/robotics/manipulator_eom.ipynb) (UR5 ABA, RNEA, Euler-Lagrange) | [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/alx87grd/minilink/blob/main/examples/teaching/topics/robotics/manipulator_eom.ipynb) |
-
 #### Machine learning
 | Notebook | Colab |
 | --- | --- |
@@ -178,7 +173,7 @@ research lane sits apart.
 | Core / diagrams | [`demos/core/`](demos/core/) | |
 | Blocks | [`demos/blocks/`](demos/blocks/) | |
 | Dynamics catalog | [`demos/dynamics/`](demos/dynamics/) | `from minilink import Pendulum, CartPole, …` |
-| Control | [`demos/control/`](demos/control/), [`demos/robotic/`](demos/robotic/) | [state_space_design](teaching/topics/classical_control/state_space_design.ipynb) (place, LQR, observers, LQG), [manipulator_eom](teaching/topics/robotics/manipulator_eom.ipynb) |
+| Control | [`demos/control/`](demos/control/), [`demos/robotic/`](demos/robotic/) | [state_space_design](teaching/topics/classical_control/state_space_design.ipynb) (place, LQR, observers, LQG) |
 | Analysis | [`demos/analysis/`](demos/analysis/) | [frequency_response](teaching/topics/classical_control/frequency_response.ipynb) (Bode, margins, Nyquist, root locus, step response) |
 | Simulation | [`demos/graphical/`](demos/graphical/) | |
 | Hybrid / step | [`demos/hybrid/`](demos/hybrid/), [`demos/mpc/`](demos/mpc/) | [`projects/mpc/`](projects/mpc/) (spatial MPC stack, dual-rate `mpc_dual_rate.py`), [`projects/car_trajopt/`](projects/car_trajopt/), [`projects/pathtracking/`](projects/pathtracking/) |

@@ -58,10 +58,6 @@
     ],
     "smoke": false
   },
-  "examples/teaching/topics/robotics/manipulator_eom.ipynb": {
-    "smoke": false,
-    "nightly": false
-  },
   "examples/teaching/courses/udes_gro860/pendulum_value_iteration.ipynb": {
     "smoke": false
   },
