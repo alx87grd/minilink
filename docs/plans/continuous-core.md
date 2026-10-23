@@ -316,8 +316,8 @@ term on the parameters (R46: a `jax.grad` user adds it to `pe.evaluate(p).object
 program reads the same `J` as the report; its docstring states the three caveats of the price
 switch (the price is a step with no gradient; with sets declared it counts beside their rows;
 with the switch off, one diverging trial makes the objective `+inf` and the line search fails,
-so a search that may cross into unstable gains sets `infeasible_cost=True`)
-and the smooth alternative for gradient tuning, `cost + w · X.as_cost()` with `X` left
+so a search that may cross into unstable gains sets `infeasible_cost=True`; the program warns
+once when its objective comes out non-finite, R72) and the smooth alternative for gradient tuning, `cost + w · X.as_cost()` with `X` left
 undeclared.
 
 ---
