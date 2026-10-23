@@ -99,6 +99,7 @@ TEACHING_SURFACE: dict[str, tuple[str, ...]] = {
         "TaskKinematicNullspace",
         "ComputedTorque",
         "SlidingMode",
+        "ModelPredictiveController",
         "IntegralImpedance",
         "NeuralPolicyController",
     ),
@@ -195,7 +196,9 @@ TEACHING_LANE_PREFIXES = (
     "minilink.optimization.",
 )
 RESEARCH_LANE_PREFIXES = (
-    "minilink.planning.trajectory_optimization.mpc",
+    "minilink.planning.trajectory_optimization.mpc.controller",
+    "minilink.planning.trajectory_optimization.mpc.utilities",
+    "minilink.planning.trajectory_optimization.mpc.viz",
     "minilink.simulation.realtime",
     "minilink.simulation.computer",
     "minilink.simulation.hybrid_simulator",
@@ -215,7 +218,6 @@ BAND_FACADES = (
 # `Simulator`). They carry a docstring and an API page, never reach the root
 # prelude, and this list only shrinks.
 BAND_RESEARCH_NAMES = {
-    "minilink.control": ("ModelPredictiveController",),
     "minilink.simulation": (
         "Computer",
         "StepSchedule",

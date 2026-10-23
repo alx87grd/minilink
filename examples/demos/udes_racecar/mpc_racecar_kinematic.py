@@ -8,6 +8,7 @@ from minilink import (
     TrajectoryOptimizationPlanner,
     UdeSRacecar,
 )
+from minilink.control import ModelPredictiveController
 from minilink.graphical.catalog.racecar_skin import racecar_skin_3d
 from minilink.planning import (
     ReferenceTrack,
@@ -19,10 +20,7 @@ from minilink.planning import (
     point_probe,
     quadratic_hinge,
 )
-from minilink.planning.trajectory_optimization.mpc import (
-    ModelPredictiveController,
-    mpc_animation_overlays,
-)
+from minilink.planning.trajectory_optimization.mpc import mpc_animation_overlays
 
 V_REF = 3.5  # [m/s]
 TF = 10.0

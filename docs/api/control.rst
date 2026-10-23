@@ -25,6 +25,9 @@ Control
 .. automodule:: minilink.control.neural
    :members:
 
+.. automodule:: minilink.planning.trajectory_optimization.mpc.predictive
+   :members:
+
 .. automodule:: minilink.planning.trajectory_optimization.mpc.controller
    :members:
 

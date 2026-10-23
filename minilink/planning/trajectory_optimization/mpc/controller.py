@@ -32,50 +32,6 @@ if TYPE_CHECKING:
 ###############################################################################
 
 
-def ModelPredictiveController(
-    planner: TrajectoryOptimizationPlanner,
-    *,
-    dt_mpc: float,
-    warm_start: bool = True,
-    verbose: bool = False,
-    t0: float = 0.0,
-    debug: bool = False,
-):
-    """
-    Build the product MPC System family block.
-
-    Parameters
-    ----------
-    planner : TrajectoryOptimizationPlanner
-        Trajopt planner (auto-compiles parametric NLP when needed).
-    dt_mpc : float
-        Replan period (required for both warm-start modes).
-    warm_start : bool, optional
-        If True, return a :class:`~minilink.core.system.StepSystem` with packed
-        ``z`` on ``Computer.x``. If False, algebraic :class:`~minilink.core.system.System`.
-    verbose, t0, debug
-        Latch printouts, absolute-time epoch, and live debug figure auto-update.
-    """
-    # Warm start: the last solve's packed z is the block's state
-    if warm_start:
-        return MPCStatefulController(
-            planner,
-            dt_mpc=dt_mpc,
-            verbose=verbose,
-            t0=t0,
-            debug=debug,
-        )
-
-    # Cold start: an algebraic block, no solver state kept between ticks
-    return MPCStatelessController(
-        planner,
-        dt_mpc=dt_mpc,
-        verbose=verbose,
-        t0=t0,
-        debug=debug,
-    )
-
-
 @dataclass(frozen=True)
 class Command:
     """

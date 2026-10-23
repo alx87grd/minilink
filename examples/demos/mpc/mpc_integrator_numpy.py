@@ -8,7 +8,7 @@ from minilink import (
     QuadraticCost,
     TrajectoryOptimizationPlanner,
 )
-from minilink.planning.trajectory_optimization.mpc import ModelPredictiveController
+from minilink.control import ModelPredictiveController
 
 
 class SingleIntegrator(DynamicSystem):

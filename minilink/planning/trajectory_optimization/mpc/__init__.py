@@ -6,8 +6,8 @@
 # ``compile_backend='numpy'`` or ``'direct'`` rebuilds the NLP each replan tick (no JAX
 # required). Terminal boundaries, non-singleton ``X0`` and shooting transcriptions are
 # not supported.
-from minilink.planning.trajectory_optimization.mpc.controller import (
-    Command,
+from minilink.planning.trajectory_optimization.mpc.controller import Command
+from minilink.planning.trajectory_optimization.mpc.predictive import (
     ModelPredictiveController,
 )
 from minilink.planning.trajectory_optimization.mpc.viz import (

@@ -5,8 +5,7 @@ from __future__ import annotations
 from minilink.core.facade import lazy_facade
 
 # The band facade for short teaching imports, e.g.
-# ``from minilink.control import PID, Impedance, lqr, place`` and
-# ``from minilink.planning.trajectory_optimization.mpc import ModelPredictiveController``.
+# ``from minilink.control import PID, Impedance, lqr, place, ModelPredictiveController``.
 #
 # The classical family is ``P``, ``PI``, ``PD``, ``PID`` (one measurement per axis, the
 # derivative filtered) and ``Impedance``, ``IntegralImpedance`` (a
@@ -21,7 +20,7 @@ from minilink.core.facade import lazy_facade
 _EXPORTS: dict[str, tuple[str, str]] = {
     # Model predictive control: the block lives with its trajectory optimization planner
     "ModelPredictiveController": (
-        "minilink.planning.trajectory_optimization.mpc.controller",
+        "minilink.planning.trajectory_optimization.mpc.predictive",
         "ModelPredictiveController",
     ),
     "ComputedTorque": (
