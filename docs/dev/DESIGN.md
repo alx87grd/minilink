@@ -96,7 +96,7 @@ state-feedback block):
 | `optimization/` | `MathematicalProgram`, `Optimizer` (generic NLP) |
 | `identification/` | fit parametric systems to data (planned; physical params and NN weights are the same verb) |
 | `graphical/` | signals, phase plane, diagrams, animation |
-| `interfaces/` | lazy facade: `Sys2Gym` / `SB3Controller` / `ProblemEnv` / `to_gymnasium` (gymnasium extra); cosimulation / MJX planned |
+| `interfaces/` | lazy facade: `Sys2Gym` / `SB3Controller` (gymnasium extra); cosimulation / MJX planned |
 
 **Experimental tier** — unproven modules under `experimental/`:
 

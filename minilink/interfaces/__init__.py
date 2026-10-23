@@ -24,8 +24,6 @@ from minilink.core.facade import lazy_facade
 _EXPORTS: dict[str, tuple[str, str]] = {
     "Sys2Gym": ("minilink.interfaces.gymnasium", "Sys2Gym"),
     "SB3Controller": ("minilink.interfaces.gymnasium", "SB3Controller"),
-    "ProblemEnv": ("minilink.interfaces.gymnasium", "ProblemEnv"),
-    "to_gymnasium": ("minilink.interfaces.gymnasium", "to_gymnasium"),
 }
 
 __all__, __getattr__, __dir__ = lazy_facade(globals(), _EXPORTS)

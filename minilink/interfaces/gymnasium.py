@@ -348,6 +348,9 @@ class SB3Controller(System):
         return self.action(u)
 
 
+# Internal machinery
+
+
 class ProblemEnv(Sys2Gym):
     """:class:`Sys2Gym` whose starts and episode ends follow a planning problem."""
 
@@ -377,14 +380,6 @@ class ProblemEnv(Sys2Gym):
             r -= float(problem.require_cost().h(x, t))
             terminated, truncated = True, False
         return y, r, terminated, truncated, info
-
-
-def to_gymnasium(sys, cost, **kwargs) -> Sys2Gym:
-    """Convenience factory returning a :class:`Sys2Gym` environment."""
-    return Sys2Gym(sys, cost, **kwargs)
-
-
-# Internal machinery
 
 
 def _compiled_step(sys, integrator, compile_backend):

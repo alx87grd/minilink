@@ -26,6 +26,7 @@ tuned constants in examples, CONSTITUTION, the demo pass (K4).
 
 | Id | Step | Question | Choice and reason | Alternative | Commit |
 | --- | --- | --- | --- | --- | --- |
+| OD-1 | K2 | R54 deletes `ProblemEnv`, but it is the class behind `Sys2Gym.from_problem`, which the `gymnasium_interface` notebook teaches | Kept as internal machinery of the gym module, off the `interfaces` facade; `to_gymnasium` deleted. The ruling's aim (no public name without a caller) holds | Fold its reset/step into `Sys2Gym` (more branches in the plain env) | — |
 
 ## 3. Intended number changes (R80)
 
