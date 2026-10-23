@@ -35,11 +35,13 @@ tuned constants in examples, CONSTITUTION, the demo pass (K4).
 | OD-7 | SM-1, SM-2 | The plan has discretize 'on the compiled step', but a StepSystem's step must stay an equation path on both backends | The RK4/Euler formula is written once (core/compile/evaluators/stepping.py) and used by the compiled evaluators' step/rollout and by discretize, which applies it to the source's f; compiling the discretized system traces through it. Same numbers, one formula | discretize compiles its source per backend and caches the evaluator (a cache on a System) | — |
 | OD-8 | SM-1, V1.3 | Should rollout return (t, xs, signals) as the plan writes? | rollout returns the states (N+1, n) only; t is t0 + k dt, and the recorded signals come after the scan by evaluating the pure output map on the samples (vmap on JAX), which is identical, traceable and costs nothing to callers that do not need them (RL, DP) | Record the signals inside the scan, changing rollout's return type for every caller | — |
 | OD-9 | SM-1, SM-6 | The evaluator's port map: rename outputs to h as the plan's four bodies say? | Kept as outputs(x, u, t, params=None), which returns the dict of output ports; h is a system's vector output, and a dict named h would mislead | Rename to h | — |
+| OD-10 | SM-7 | The NumPy evaluator has no jit tier; how does a speed-minded caller write one line for both backends? | On NumPy `ev.jit` is the evaluator itself (nothing to compile), so `ev.jit.rollout(...)` runs on both backends; the fixed-step solvers use it (the JAX one stays as fast as the old jitted rollouts) | Raise on NumPy and branch on the backend in every caller | — |
 
 ## 3. Intended number changes (R80)
 
 | Step | What changed | Problem and cost | Before | After | Relative difference |
 | --- | --- | --- | --- | --- | --- |
+| SM-7 | compute_forced on rk4_fixedsteps: a sampled input matrix is held (zero-order) over each period instead of interpolated; a callable u(t) is read at the RK4 stage times instead of sampled and interpolated | Pendulum, x0 = [0.4, −0.2], u = 0.5 sin 2t on [0, 1], 20 steps (SM-0 entries forced.rk4_fixedsteps.*) | linear input between samples | held / at the stages | sampled 4.4e-3, callable 9.5e-5 (max over the run, relative) |
 
 ## 4. Not done, or blocked
 

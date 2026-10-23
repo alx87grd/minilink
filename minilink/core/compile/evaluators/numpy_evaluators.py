@@ -86,6 +86,11 @@ class IntegrationMixin:
 
         return np.array(x_samples)
 
+    @property
+    def jit(self):
+        """The bodies themselves: NumPy has nothing to compile, so ``ev.jit.rollout`` is ``ev.rollout``."""
+        return self
+
     def rhs_of(self, params):
         """``f(x, u, t)`` on the compiled parameters, or on ``params``."""
         if params is None:

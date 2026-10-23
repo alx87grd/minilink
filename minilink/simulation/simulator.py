@@ -273,13 +273,25 @@ class Simulator:
         if time_solve:
             t_start = time.perf_counter()
 
-        x_traj = self.solver_backend.integrate_forced(
-            self.evaluator,
-            self.t,
-            u_traj,
-            self.x0,
-            args=self.solver_backend_options,
-        )
+        # A function of time read where the solver needs it (RK4: at its stage times);
+        # a sampled input held over each sample period
+        if callable(u) and self.solver_backend.reads_input_at_stages:
+            sys = self.sys
+
+            def u_of_t(t):
+                return coerce_forced_input(sys, np.array([t]), u, input_port_id)[:, 0]
+
+            x_traj = self.solver_backend.integrate_input(
+                self.evaluator, self.t, u_of_t, self.x0
+            )
+        else:
+            x_traj = self.solver_backend.integrate_forced(
+                self.evaluator,
+                self.t,
+                u_traj,
+                self.x0,
+                args=self.solver_backend_options,
+            )
 
         if time_solve:
             self.last_solve_time_s = time.perf_counter() - t_start

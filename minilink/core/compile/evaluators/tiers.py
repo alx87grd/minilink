@@ -11,7 +11,7 @@ def is_trace_tier_attribute(name: str) -> bool:
     """Return True when *name* is a JAX-only trace/fast-tier surface."""
     if name == "has_trace_tier":
         return False
-    return name == "jit" or name.endswith(_TRACE_TIER_SUFFIXES)
+    return name.endswith(_TRACE_TIER_SUFFIXES)
 
 
 class NoTraceTierMixin:

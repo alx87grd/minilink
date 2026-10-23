@@ -17,6 +17,10 @@ class SolverBackend(ABC):
     ``f_ivp(x, t) = f(x, u_nom, t)`` for the nominal one.
     """
 
+    #: Whether a forced input given as a function of time is read at the solver's
+    #: stage times (:meth:`integrate_input`) rather than sampled on the grid.
+    reads_input_at_stages = False
+
     @abstractmethod
     def integrate(
         self,

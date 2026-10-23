@@ -76,6 +76,11 @@ class DynamicsEvaluator(OutputEvaluator):
         """dx = f(x, u, t, p) with caller-supplied params."""
         ...
 
+    @property
+    def nominal_input(self):
+        """The input held when none is given: every port at its nominal value."""
+        return self._u_nominal
+
     def f_ivp(self, x, t=0.0):
         """dx = f(x, u_nom, t) with nominal input fixed at compile."""
         return self.f(x, self._u_nominal, t)

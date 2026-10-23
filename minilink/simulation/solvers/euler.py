@@ -31,7 +31,9 @@ class EulerSolverBackend(SolverBackend):
         for i in range(n_pts - 1):
             # x_{k+1} = x_k + Δt_k f(x_k, ū, t_k), with Δt_k = t_{k+1} − t_k
             dt = times[i + 1] - times[i]
-            x_traj[:, i + 1] = evaluator.euler_step_ivp(x_traj[:, i], times[i], dt)
+            x_traj[:, i + 1] = evaluator.step(
+                x_traj[:, i], evaluator.nominal_input, times[i], dt=dt, solver="euler"
+            )
 
         # The run's record: one evaluation of f per step
         self.last_debug = fixed_step_debug("euler", "nominal", n_pts, 1)
@@ -55,7 +57,9 @@ class EulerSolverBackend(SolverBackend):
         for i in range(n_pts - 1):
             # x_{k+1} = x_k + Δt_k f(x_k, u_k, t_k), u_k held over the interval
             dt = times[i + 1] - times[i]
-            x_traj[:, i + 1] = evaluator.euler_step(x_traj[:, i], u[:, i], times[i], dt)
+            x_traj[:, i + 1] = evaluator.step(
+                x_traj[:, i], u[:, i], times[i], dt=dt, solver="euler"
+            )
 
         # The run's record: one evaluation of f per step
         self.last_debug = fixed_step_debug("euler", "forced", n_pts, 1)

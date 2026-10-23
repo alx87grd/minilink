@@ -1318,11 +1318,10 @@ def test_the_jit_forms_are_built_once():
     assert ev.jit.rollout is first.rollout
 
 
-def test_the_step_refuses_an_unknown_solver_and_a_numpy_jit():
+def test_the_step_refuses_an_unknown_solver_and_numpy_jit_is_the_body():
     from minilink import Pendulum
 
     ev = Pendulum().compile("numpy")
     with pytest.raises(ValueError, match="solver"):
         ev.step(np.ones(2), np.zeros(1), 0.0, dt=0.1, solver="scipy")
-    with pytest.raises(AttributeError, match="jax"):
-        ev.jit
+    assert ev.jit is ev

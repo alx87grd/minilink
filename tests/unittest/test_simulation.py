@@ -1599,3 +1599,37 @@ class TestDtTimeGrid(unittest.TestCase):
                 build_time_grid(0.0, 1.0, dt=bad)
             with self.subTest(dt=bad), self.assertRaisesRegex(ValueError, message):
                 build_time_grid(0.0, 1.0, n_steps=11, dt=bad)
+
+
+def test_rk4_forced_holds_a_sampled_input_and_reads_a_function_at_its_stages():
+    """A sampled input is held over each period; a function of time is read at the RK4 stage times."""
+    from minilink import Pendulum
+
+    plant = Pendulum()
+    plant.x0 = np.array([0.4, -0.2])
+    ev = plant.compile("numpy")
+    t = np.linspace(0.0, 1.0, 20)
+    dt = t[1] - t[0]
+    u = 0.5 * np.sin(2.0 * t)[None, :]
+
+    sampled = plant.compute_forced(
+        u, tf=1.0, n_steps=20, solver="rk4_fixedsteps", verbose=False
+    )
+    held = ev.rollout(plant.x0, u[:, :-1].T, 0.0, dt)
+    np.testing.assert_allclose(sampled.x, held.T, rtol=1e-12)
+
+    def u_of_t(tt):
+        return np.array([0.5 * np.sin(2.0 * tt)])
+
+    forced = plant.compute_forced(
+        u_of_t, tf=1.0, n_steps=20, solver="rk4_fixedsteps", verbose=False
+    )
+    x = plant.x0
+    for k in range(19):
+        tk = k * dt
+        k1 = ev.f(x, u_of_t(tk), tk)
+        k2 = ev.f(x + 0.5 * dt * k1, u_of_t(tk + 0.5 * dt), tk + 0.5 * dt)
+        k3 = ev.f(x + 0.5 * dt * k2, u_of_t(tk + 0.5 * dt), tk + 0.5 * dt)
+        k4 = ev.f(x + dt * k3, u_of_t(tk + dt), tk + dt)
+        x = x + dt / 6.0 * (k1 + 2.0 * k2 + 2.0 * k3 + k4)
+    np.testing.assert_allclose(forced.x[:, -1], x, rtol=1e-12)

@@ -504,9 +504,9 @@ class TestFamilyPattern(unittest.TestCase):
         auto = lqr(plant, Q, R, x_bar=[0.0, 0.0])
         np.testing.assert_allclose(fd.params["K"], auto.params["K"], atol=1e-4)
 
-    def test_discretize_names_its_integrator(self):
+    def test_discretize_names_its_solver(self):
         disc = discretize(Pendulum(), 0.05, solver="euler")
-        self.assertEqual(disc.integrator, "euler")
+        self.assertEqual(disc.solver, "euler")
         np.testing.assert_allclose(
             disc.jacobian("step", "x")[0], [1.0, 0.05], atol=1e-8
         )
