@@ -33,7 +33,6 @@ _EXPORTS: dict[str, tuple[str, str]] = {
     "Gaussian": ("minilink.core.distributions", "Gaussian"),
     "Uniform": ("minilink.core.distributions", "Uniform"),
     "Particles": ("minilink.core.distributions", "Particles"),
-    "Sampler": ("minilink.core.distributions", "Sampler"),
 }
 
 __all__, __getattr__, __dir__ = lazy_facade(globals(), _EXPORTS)

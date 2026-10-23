@@ -579,7 +579,7 @@ provided.
   `sample(key, n=None)` with `key` a NumPy generator, an integer seed or a JAX PRNG key
   (JAX arrays out, traceable); `(dim,)` for one draw, `(n, dim)` with `n`; `support` an
   optional `Set`. `Uniform(lower, upper)` holds its `BoxSet`; the same `sample` convention
-  holds on sets. `Gaussian`, `Uniform`, `Particles`, `Sampler`; sets are support,
+  holds on sets. `Gaussian`, `Uniform`, `Particles`; sets are support,
   distributions are probability.
 - Randomness (`blocks/sources.py`, `core/distributions.py`): a `Distribution` has no time; a
   noise signal is a block holding draws over a sample period. `WhiteNoise(p, *, psd,

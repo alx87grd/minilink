@@ -5,7 +5,7 @@ import pytest
 
 from minilink import Pendulum
 from minilink.core.costs import CostFunction, QuadraticCost
-from minilink.core.distributions import Gaussian, Particles, Sampler, Uniform
+from minilink.core.distributions import Gaussian, Particles, Uniform
 from minilink.core.trajectory import Trajectory
 from minilink.planning.policy_synthesis.dp import DynamicProgrammingPlanner
 from minilink.planning.problems import (
@@ -119,9 +119,6 @@ def test_distributions_sample_on_numpy():
     pts = Particles([[0.0, 0.0], [1.0, 1.0]])
     assert pts.sample(rng, n=4).shape == (4, 2)
 
-    custom = Sampler(lambda key: np.array([1.0, -1.0]), mean=[1.0, -1.0])
-    assert custom.sample(rng, n=2).shape == (2, 2)
-
 
 @pytest.mark.optional
 @pytest.mark.jax
@@ -134,7 +131,6 @@ def test_distributions_sample_and_trace_on_jax():
         Gaussian([0.0, 0.0], [1.0, 2.0]),
         Uniform([-1.0, -1.0], [1.0, 1.0]),
         Particles([[0.0, 1.0], [2.0, 3.0]]),
-        Sampler(lambda k: jax.random.normal(k, (2,)), mean=[0.0, 0.0]),
     ):
         one = dist.sample(key)
         assert one.shape == (2,)

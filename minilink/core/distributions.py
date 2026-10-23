@@ -131,40 +131,6 @@ class Particles(Distribution):
         return x
 
 
-class Sampler(Distribution):
-    """
-    Distribution defined by a sampling function ``draw(key) -> x``.
-
-    For task-specific starts (a random point along a track, a random pose in
-    free space). ``draw`` must accept a JAX key and trace; ``mean`` is the
-    representative point given explicitly.
-    """
-
-    def __init__(self, draw, mean, support: Set | None = None):
-        self.draw = draw
-        self.mean = np.asarray(mean, dtype=float).reshape(-1)
-        self.support = support
-
-    @property
-    def dim(self) -> int:
-        return int(self.mean.size)
-
-    def sample(self, key, n=None):
-        draw = self.draw
-
-        # One draw, or n draws: a key each on JAX, the same generator in turn on NumPy
-        if n is None:
-            x = draw(key)
-        elif is_jax_key(key):
-            jax = require_jax()
-            x = jax.vmap(draw)(jax.random.split(key, int(n)))
-        else:
-            rng = numpy_generator(key)
-            x = np.stack([np.asarray(draw(rng)) for _ in range(int(n))])
-
-        return x
-
-
 ###############################################################################
 # Internal machinery
 ###############################################################################

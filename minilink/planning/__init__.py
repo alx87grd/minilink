@@ -26,7 +26,6 @@ _EXPORTS: dict[str, tuple[str, str]] = {
     "Gaussian": ("minilink.core.distributions", "Gaussian"),
     "Uniform": ("minilink.core.distributions", "Uniform"),
     "Particles": ("minilink.core.distributions", "Particles"),
-    "Sampler": ("minilink.core.distributions", "Sampler"),
     "PlanningSolution": ("minilink.planning.results", "PlanningSolution"),
     "compare": ("minilink.planning.comparison", "compare"),
     "Comparison": ("minilink.planning.comparison", "Comparison"),
