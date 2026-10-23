@@ -237,6 +237,14 @@ Evaluation                                 # a frozen pytree record, one row per
 | the plant's run | `traj.of("plant")` (today's `trajectory_of`) | the plant's state slice, the plant's command signal | a projection of the loop's run; what `X`, `U`, `Xf` and the cost are written over |
 | the record | `evaluate_trajectory(problem, traj)` | — | scores the plant's run: a trajectory whose `x` has the plant's dimension and no roles is taken as the plant's; a loop trajectory carrying the `plant` role is projected first; anything else is refused |
 
+**`of("plant")` traces because it only indexes.** The plant's state is a static slice of the
+loop's state (`state_index`); each plant input port is, statically, a recorded block output
+signal (`plan.output_slices`), a slice of the loop's boundary `u`, or a nominal constant for an
+unconnected port. With the signals recorded by the rollout, the projection never recomputes a
+block, so `jit`, `vmap` and `grad` pass through it and the record is traceable end to end.
+Today's `trajectory_of` (a Python loop recomputing `get_local_input` per sample) survives only
+as the fallback for a trajectory without recorded signals, on NumPy.
+
 The two margins are the differentiable carriers (the program's constraint rows); the booleans
 and `value`'s jump are reported facts. A diverging failed run is handled, if ever needed, by a
 saturating cost wrapper, not by a mask.

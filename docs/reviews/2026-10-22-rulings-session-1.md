@@ -233,3 +233,7 @@ turn them into workboard rows, then implement.
   over), the record (`evaluate_trajectory` scores the plant's run, projecting a loop trajectory
   by its `plant` role; a plant-dimension trajectory without roles is taken as the plant's).
   Lives in: continuous-core.md §3.4–§3.6, §4.8; end-state-api.md D16, D16c.
+- **Checked (2026-10-23): `traj.of("plant")` traces once signals are recorded.** State a static
+  slice; each plant input a static index into the recorded signals, the boundary `u` or a
+  nominal constant; no recomputation. Today's recompute loop is the NumPy fallback for a
+  signal-less trajectory. Lives in: continuous-core.md §3.5.
