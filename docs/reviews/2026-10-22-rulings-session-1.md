@@ -498,3 +498,6 @@ split when it starts; this section marks the reversals).
   `mpc_warm_start_guess` and `MPCBroadcastController` off the `control.mpc` facade as internals (MPC's
   one public name is `ModelPredictiveController`, R50). K7: answered by R1–R5 and R52–R67. An agent row
   writes the missing contract tests.
+- **R70 (2026-10-23, SM-2) `discretize` takes `dt` once.** The `params["dt"]` fallback goes with its
+  five guard rules: `discretize(plant, dt, *, solver, substeps)` with `dt` required, a `"dt"` key in
+  `params` refused with the line to write; one ledger line.

@@ -591,8 +591,8 @@ every notebook has moved, no pin (R47).
 proposed cuts to v0.4 (SM-7, SM-6's move, A2, K4, K8-3, S31), now that GMC714 needs no feature
 (R48) (record item 8; item 9 is answered
 by R48: neither MPC nor the draws); the slots of S31 and S74 (item 18; with R49, MPC's loop syntax, `mpc @ plant` as every demo and lesson writes it, must stay
-stable through S31, whichever slot it takes); `discretize`'s `params["dt"]` fallback,
-proposed dropped (item 21); and the program with the price off (the default), where one
+stable through S31, whichever slot it takes); `discretize`'s `params["dt"]` fallback
+(item 21, dropped by R70); and the program with the price off (the default), where one
 diverging trial makes the objective `+inf`: written as a caveat (set `infeasible_cost=True` for a
 search that may reach unstable gains), to confirm.
 

@@ -410,8 +410,8 @@ change (AGENTS' refactor recipe; baseline JSON in the scratchpad, `cmp` after ea
   `solver="exact"` (the matrix exponential, linear models); the follow-ups below. Done when the
   RK4 and Euler numbers are byte-identical, `"exact"` matches `scipy.signal.cont2discrete` to
   `1e-12`, and a digital PID discretized with it runs in a topic notebook.
-  - **[ask]** the `params["dt"]` fallback (`dt=` omitted, read from the `params=` dict given to
-    `discretize`): R7 says `dt` is required; proposed, drop the fallback with a ledger line;
+  - the `params["dt"]` fallback dropped with its five guards (R70): `dt` required, a `"dt"` key in
+    `params` refused with the line to write, one ledger line;
   - a source whose `y` feeds through from a port other than `u` does not discretize
     (`PendulumWithNoisePort`): map `y`'s dependencies to `("u",)`, or keep the source's ports;
   - future work, `PID % dt` (a sampled controller with continuous states): `%` raises
