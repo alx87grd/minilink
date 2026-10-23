@@ -200,6 +200,14 @@ Rebuilding the wrapper per call is the one thing to forbid: `jax.jit(body)` at e
 DESIGN §5's stable names (`rk4_step`, `integrate_zoh`, their trace twins) become one-line
 aliases onto `frozen.step` / `step` for one release, then go with a ledger line.
 
+**The knobs are static, never traced.** `method`, `substeps` and `hold` are keyword-only
+Python values (strings, ints), resolved at trace time (`static_argnames` on the generated
+`jit`), so a `hold` branch or a `substeps` loop leaves no branch in the compiled program and
+each distinct combination compiles once. `dt` and `params` are the only array arguments. A knob
+is never a pytree leaf (a runtime array choosing the integrator would need `lax.switch` and has
+no meaning under `vmap`). The `method="scipy"` door of `evaluate` and `compute_forced` swaps the
+run function in Python before anything is traced; `problem.compile` has no such door.
+
 **Batches: shared or per-member, any mix.** In `rollout_batch` a leaf with a leading axis of
 length `B` is mapped and a leaf without one is shared: `x0s (B, n)` with one shared `u_seq`,
 `u_seqs (B, N, m)`, a `params` family with one `m` per member and every other parameter
