@@ -171,3 +171,18 @@ of it in sampled-path.md §3.6; the numbers from `benchmarks/params_binding.py`.
   `U=plant.input_box`); RL's action space and policy scaling read `U`'s box; LQR ignores `U`
   and warns once when it is declared; the lessons that relied on the silent fallback gain the
   explicit line in the same change. Lives in: end-state-api.md D16.
+- **R22 (D16c, 2026-10-23) The loop the pipeline reads.** A controller (the loop built by
+  `closed_loop` under the automation-by-convention rules, the reference from the problem, no
+  command-port argument, ambiguity refused) or a built loop (a diagram whose `plant` key is
+  the problem's system or a box containing it; roles never inferred). `pe.params` is the
+  loop's params plus the problem's leaves; `wrt` names leaves by path. Lives in:
+  end-state-api.md D16c.
+- **R23 (2026-10-23) This phase exports the program only.** `pe.program(wrt, bounds)` returns a
+  `MathematicalProgram` whose objective is the problem's value; the user runs `Optimizer` and
+  `pe.unpack(z, wrt)` writes the leaves back. No `tune` / `optimize` facade, no
+  `OptimizationSolution`, no `PlanningSolution` from it until a lesson needs one. Lives in:
+  end-state-api.md D16c; differentiable-problem.md §4.6 and step 5 to amend at step 0.
+- **R24 (2026-10-23) The criterion lives on the problem.** `criterion` in `"expectation"`,
+  `("cvar", α)`, `"worst_case"`, read by `value`; `Evaluation.value(criterion)` loses its
+  argument; the report keeps the statistics (`mean`, `worst`, `cvar(α)`) free. Lives in:
+  end-state-api.md D18.

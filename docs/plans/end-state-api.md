@@ -487,6 +487,40 @@ Leaves the cost: `discount_rate` and `discount_factor` (the problem's), `evaluat
 cost; `QuadraticCost.from_system` keeps targeting the nominal state; `FieldCost` becomes
 `field.as_cost()` with A1.
 
+### D16c The loop the pipeline reads, and what it exports (ruled 2026-10-23)
+
+**Two ways in, one rule.** `evaluate(problem, arg)` and `problem.compile(arg, dt)` take either
+a controller (a block or a controller box with the standard edge) or a built loop. The argument
+is a built loop when it is a diagram whose reserved key `plant` is the problem's system, or a
+box containing it (`plant/arm`); otherwise it is a controller and the loop is built by
+`closed_loop` with the automation-by-convention rules: the plant's command input is
+`command_port(plant)` (`u`, else its one input that is not `d` / `n`, else refused), the
+measurement wired by port name or through an `Error` block, the reference `r` filled from the
+problem (`x_goal`, else the cost's target; a loop whose reference cannot be set is refused),
+every other free input at its nominal value. No command-port argument exists: ambiguity is
+refused with "build the loop and name the plant `plant`". Roles are never inferred: a hand-wired
+diagram without the `plant` key, or whose plant is another instance than the problem's system,
+is refused with the fix named. Scoring reads the plant block's recorded `x` and `u` wherever it
+sits. A cascade with two controllers, a filter and a three-block plant box needs nothing more
+than those two facts (the worked case: end-state-api.md's session notes, 2026-10-23).
+
+**`pe.params`** is the loop's own `params` dict (nested by block name, `plant/motor` two levels
+deep) plus the problem's leaves (`cost`, `x0`, the free boundary inputs); `wrt` names leaves
+by that path, never a block.
+
+**What this phase exports: the program, nothing above it.**
+
+```python
+pe = problem.compile(loop, dt)
+program = pe.program(wrt=["pos_ctl.Kp", "plant/motor.R"], bounds={"plant/motor.R": (0.1, 10)})   # objective: the problem's value
+result = Optimizer(program, method=...).solve()
+params = pe.unpack(result.z, wrt)             # the pytree with the optimized leaves written in
+```
+
+No `tune` / `optimize` facade, no `OptimizationSolution`, no `PlanningSolution` from it in this
+phase (the maintainer, 2026-10-23); a facade comes later on this export if a lesson needs one.
+The former `tune` lines of this document read as this export.
+
 ### D17 The noun — ruled with D9
 
 `problem.compile(controller, dt) -> ProblemEvaluator` (name open, D19) is the engine and the
