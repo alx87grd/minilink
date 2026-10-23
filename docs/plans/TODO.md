@@ -331,8 +331,8 @@ the demo sweep touches fewer files. Nothing leaves without the maintainer's ruli
   twins; the draft A6 and G3 rename tables). K2, K3, K4, K8, A6 and G3 rule from it.
 - [ ] **K2 Remove the unused features** **[ask — removals]**, ruled 2026-10-23 (R54): `ProblemEnv`,
   `to_gymnasium`, `fixed_camera`, `follow_frame_camera`, `merge_skins`, `debug_state_skin`, `Replay`,
-  `Sampler`, `RateLimiter`, the `SimpleIntegrator` plant; `NeuralNetwork` folded into `MLP`; `Lag`
-  kept with a new demo beside `Lead`. One commit per feature, callers, tests and docs in the same
+  `Sampler`, `RateLimiter`, `Lag`, the `SimpleIntegrator` plant; `NeuralNetwork` folded into `MLP`;
+  `Lead` stays (R54 amended). One commit per feature, callers, tests and docs in the same
   commit, no alias. `ProblemParameters` leaves with its migration (R41). Done when every listed name
   is gone, `pytest` and the demo checks pass.
 - [ ] **K3 Prototypes to `experimental/`** **[ask — public names]**, from the same ruling:

@@ -397,3 +397,5 @@ split when it starts; this section marks the reversals).
   beside `Lead` (classical control). `ProblemParameters` is not deleted here: the planners read it
   internally, so it goes with its migration (R41, V1.2 / A2). The demo removals and merges of the
   K1 inventory (§3) are not ruled: the maintainer runs his own pass on the demos (K4).
+- **R54 amended (2026-10-23): `Lag` is deleted too; `Lead` stays** (used by the frequency-response
+  topic notebook, the root-locus demo and the tutorial's showcase).
