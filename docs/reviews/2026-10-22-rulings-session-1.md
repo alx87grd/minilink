@@ -460,3 +460,12 @@ split when it starts; this section marks the reversals).
   `JointImpedance(...)` factory that returned either it or a generic `ImpedanceController` is deleted;
   the generic spring-damper is `Impedance(dof=…)` (R52). `JointImpedance` and `TaskImpedance` are the
   pair on the root; the one `JointImpedance(dof=2)` call (a test) becomes `Impedance(dof=2)`.
+- **R64 (2026-10-23, K8-1 / K2) The root's other names, and the basic blocks.** Off the root prelude,
+  kept on their band facade (the silent trim of R5): `Error`, `Mux`, `Source`, `MLP`, `UnitDelay`,
+  `TimeVaryingFeedback`, `TrajectoryFeedback`, `modal_analysis` (the method stays),
+  `StaticSimulator`, `LinearApproximator`, `QuadraticFeatures`, `RadialBasisFeatures`, `LookupPolicy`,
+  `RRTStarPlanner`. Kept on the root as course-relevant: `LowPassFilter`, `PurePursuit`. The block
+  library keeps the basic blocks only, a special block existing when a lesson needs it: `DeadZone`,
+  `Relay`, `NotchFilter` and `Washout` are deleted (their one user is the `signal_blocks.py`
+  showcase); `ZOHHold`, a discrete unit delay `x_{k+1} = u_k` and not the continuous zero-order hold
+  (that is the sampled loop's and the sequences' `hold`, R40), is renamed `UnitDelay`.
