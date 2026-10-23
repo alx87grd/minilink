@@ -165,23 +165,6 @@ def trapezoidal_defect(x, dx, dt):
     return defect
 
 
-def rk4_step_between_knots(f, x, u0, u1, t, dt):
-    """One RK4 step from knot ``k`` to ``k+1`` with linear input interpolation."""
-    # The input at mid-step, interpolated linearly between the knots
-    umid = 0.5 * (u0 + u1)
-
-    # The four slopes
-    k1 = f(x, u0, t)
-    k2 = f(x + 0.5 * dt * k1, umid, t + 0.5 * dt)
-    k3 = f(x + 0.5 * dt * k2, umid, t + 0.5 * dt)
-    k4 = f(x + dt * k3, u1, t + dt)
-
-    # x_{k+1} = x_k + dt/6 (k₁ + 2 k₂ + 2 k₃ + k₄)
-    x_next = x + (dt / 6.0) * (k1 + 2.0 * k2 + 2.0 * k3 + k4)
-
-    return x_next
-
-
 ###############################################################################
 # Internal machinery
 ###############################################################################

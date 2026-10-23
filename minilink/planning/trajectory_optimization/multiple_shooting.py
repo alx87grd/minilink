@@ -7,6 +7,7 @@ from minilink.core.backends import (
     BACKEND_NUMPY,
     normalize_backend,
 )
+from minilink.core.compile.evaluators.stepping import step_body
 from minilink.optimization.mathematical_program import MathematicalProgram
 from minilink.planning.problems import PlanningProblem
 from minilink.planning.trajectory_optimization.direct_collocation import (
@@ -18,7 +19,6 @@ from minilink.planning.trajectory_optimization.transcription import (
     dynamics_function,
     native_concatenate,
     program_backend_for_compile,
-    rk4_step_between_knots,
     stack_constraints,
     trajectory_cost,
 )
@@ -134,7 +134,7 @@ class MultipleShootingTranscription(DirectCollocationTranscription):
             return problem.sys.f(x, u, t_k, system_params)
 
         def rk4_step(x_k, u0, u1, t_k):
-            return rk4_step_between_knots(f, x_k, u0, u1, t_k, dt)
+            return step_body(f, x_k, u0, u1, t_k, dt, "rk4", 1)
 
         # J = Σ dt/2 (g_k + g_{k+1}) + h(x_N, t_N)
         def J(z):
@@ -161,7 +161,7 @@ class MultipleShootingTranscription(DirectCollocationTranscription):
         dt = self.options.dt(problem)
 
         def step(x, u0, u1, t):
-            return rk4_step_between_knots(f, x, u0, u1, t, dt)
+            return step_body(f, x, u0, u1, t, dt, "rk4", 1)
 
         return step
 

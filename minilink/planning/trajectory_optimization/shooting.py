@@ -10,6 +10,7 @@ from minilink.core.backends import (
     ensure_jax_x64,
     normalize_backend,
 )
+from minilink.core.compile.evaluators.stepping import step_body
 from minilink.core.sets import BoxInputSet, SingletonSet
 from minilink.core.trajectory import Trajectory
 from minilink.optimization.mathematical_program import (
@@ -24,7 +25,6 @@ from minilink.planning.trajectory_optimization.transcription import (
     dynamics_function,
     native_concatenate,
     program_backend_for_compile,
-    rk4_step_between_knots,
     stack_constraints,
     trajectory_cost,
 )
@@ -205,7 +205,7 @@ class ShootingTranscription(Transcription):
         def rollout(u):
             def body(x, inputs):
                 u0, u1, t_k = inputs
-                x_next = rk4_step_between_knots(f, x, u0, u1, t_k, dt)
+                x_next = step_body(f, x, u0, u1, t_k, dt, "rk4", 1)
                 return x_next, x_next
 
             _, xs = jax.lax.scan(
@@ -269,7 +269,7 @@ class ShootingTranscription(Transcription):
                 dt = self.options.dt(problem)
 
                 # x_{k+1} = RK4(x_k, u_k, u_{k+1}), one row per knot, turned to columns
-                x_samples = evaluator.rk4_integrate_linear(x0, u.T, t0, dt)
+                x_samples = evaluator.jit.rollout(x0, u.T, t0, dt, hold="foh")
                 x = x_samples.T
 
                 return x
@@ -299,7 +299,7 @@ class ShootingTranscription(Transcription):
         x_k = xp.asarray(x0).reshape(n)
         x_samples = [x_k]
         for k in range(n_steps - 1):
-            x_k = rk4_step_between_knots(f, x_k, u[:, k], u[:, k + 1], float(t[k]), dt)
+            x_k = step_body(f, x_k, u[:, k], u[:, k + 1], float(t[k]), dt, "rk4", 1)
             x_samples.append(x_k)
 
         # The state knots, one column per knot
