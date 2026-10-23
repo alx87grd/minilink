@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import re
 import warnings
 from dataclasses import dataclass
 
@@ -1188,36 +1187,18 @@ def default_input_port(sys) -> str:
 
 
 def default_subsystem_id(sys, *, role=None) -> str:
-    """The id a block takes: its ``id``, else its role in a loop, else its own name."""
+    """The id a block takes: its ``id``, else its role in a loop, else its class name, verbatim."""
     if sys.id:
-        return normalize_identifier(str(sys.id))
+        return str(sys.id)
     if role is not None:
-        return normalize_identifier(str(role))
+        return str(role)
 
     return base_system_id(sys)
 
 
 def base_system_id(sys) -> str:
-    """The block's name as an id; its class name when the name is empty."""
-    raw = getattr(sys, "name", "") or sys.__class__.__name__
-
-    return normalize_identifier(raw)
-
-
-def normalize_identifier(value: str) -> str:
-    """``value`` in snake case (``LowPassFilter`` -> ``low_pass_filter``), never empty, never opening on a digit."""
-    # CamelCase words split by underscores, then any run of other characters as one
-    value = re.sub(r"(?<=[a-z0-9])(?=[A-Z])", "_", str(value))
-    value = re.sub(r"[^0-9A-Za-z]+", "_", value)
-    value = value.strip("_").lower()
-
-    # Never empty, never a leading digit
-    if not value:
-        value = "system"
-    if value[0].isdigit():
-        value = f"sys_{value}"
-
-    return value
+    """The block's class name as an id (``Pendulum``, ``Drone2D``, ``UdeSRacecar``)."""
+    return type(sys).__name__
 
 
 def unique_id(base: str, existing) -> str:

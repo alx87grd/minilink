@@ -1265,7 +1265,7 @@ class TestAdvancedPlotting(unittest.TestCase):
         from minilink.dynamics.catalog.pendulum.pendulum import Pendulum
 
         diagram = Step(final_value=[1.0], step_time=0.0) >> Impedance() @ Pendulum()
-        self.assertEqual(resolve_plot_signals(diagram), ("x", "step:y", "controller:u"))
+        self.assertEqual(resolve_plot_signals(diagram), ("x", "Step:y", "controller:u"))
 
     def test_resolve_plot_signals_dynamic_controller(self):
         from minilink.blocks.sources import Step
@@ -1276,7 +1276,7 @@ class TestAdvancedPlotting(unittest.TestCase):
             Step(final_value=[1.0], step_time=0.0)
             >> PID(ports="reference") @ DoubleIntegrator()
         )
-        self.assertEqual(resolve_plot_signals(diagram), ("x", "step:y", "controller:u"))
+        self.assertEqual(resolve_plot_signals(diagram), ("x", "Step:y", "controller:u"))
 
     def test_plot_trajectory_uses_default_signals_for_closed_loop(self):
         from minilink.graphical.common.environment import override_env

@@ -105,28 +105,28 @@ class TestDiagramCompositionShortcuts(unittest.TestCase):
     def test_add_operator_adds_subsystems_without_wiring(self):
         diagram = Step(final_value=[1.0]) + P(ports="reference") + Integrator()
         self.assertIsInstance(diagram, DiagramSystem)
-        self.assertEqual(list(diagram.subsystems), ["step", "p", "integrator"])
-        self.assertEqual(diagram.connections["p"]["r"], None)
-        self.assertEqual(diagram.connections["p"]["y"], None)
-        self.assertEqual(diagram.connections["integrator"]["u"], None)
+        self.assertEqual(list(diagram.subsystems), ["Step", "P", "Integrator"])
+        self.assertEqual(diagram.connections["P"]["r"], None)
+        self.assertEqual(diagram.connections["P"]["y"], None)
+        self.assertEqual(diagram.connections["Integrator"]["u"], None)
 
     def test_add_operator_uniquifies_repeated_subsystem_ids(self):
         diagram = Integrator() + Integrator()
-        self.assertEqual(list(diagram.subsystems), ["integrator", "integrator2"])
-        self.assertEqual(diagram.connections["integrator"]["u"], None)
-        self.assertEqual(diagram.connections["integrator2"]["u"], None)
+        self.assertEqual(list(diagram.subsystems), ["Integrator", "Integrator2"])
+        self.assertEqual(diagram.connections["Integrator"]["u"], None)
+        self.assertEqual(diagram.connections["Integrator2"]["u"], None)
 
     def test_series_operator_wires_source_to_default_input(self):
         diagram = Step(final_value=[1.0], step_time=0.0) >> Integrator()
-        self.assertEqual(diagram.connections["integrator"]["u"], ("step", "y"))
-        self.assertEqual(diagram.connections["output"]["y"], ("integrator", "y"))
+        self.assertEqual(diagram.connections["Integrator"]["u"], ("Step", "y"))
+        self.assertEqual(diagram.connections["output"]["y"], ("Integrator", "y"))
 
     def test_series_operator_exposes_first_input_and_final_output(self):
         diagram = Integrator() >> Integrator()
         self.assertIn("u", diagram.inputs)
-        self.assertEqual(diagram.connections["integrator"]["u"], ("input", "u"))
-        self.assertEqual(diagram.connections["integrator2"]["u"], ("integrator", "y"))
-        self.assertEqual(diagram.connections["output"]["y"], ("integrator2", "y"))
+        self.assertEqual(diagram.connections["Integrator"]["u"], ("input", "u"))
+        self.assertEqual(diagram.connections["Integrator2"]["u"], ("Integrator", "y"))
+        self.assertEqual(diagram.connections["output"]["y"], ("Integrator2", "y"))
         dx = diagram.f(np.array([1.0, 2.0]), np.array([3.0]))
         np.testing.assert_allclose(dx, np.array([3.0, 1.0]))
 
@@ -168,24 +168,24 @@ class TestDiagramCompositionShortcuts(unittest.TestCase):
             self.assertEqual(result.name, "chain")
             self.assertEqual(result.x0[0], 2.0)
             self.assertIs(
-                result.subsystems["integrator"], left.subsystems["integrator"]
+                result.subsystems["Integrator"], left.subsystems["Integrator"]
             )
-        self.assertEqual(list(left.subsystems), ["step", "integrator"])
-        self.assertEqual(left.connections["output"]["y"], ("integrator", "y"))
-        self.assertEqual(list(chain.subsystems), ["step", "integrator", "integrator2"])
-        self.assertEqual(chain.connections["integrator2"]["u"], ("integrator", "y"))
+        self.assertEqual(list(left.subsystems), ["Step", "Integrator"])
+        self.assertEqual(left.connections["output"]["y"], ("Integrator", "y"))
+        self.assertEqual(list(chain.subsystems), ["Step", "Integrator", "Integrator2"])
+        self.assertEqual(chain.connections["Integrator2"]["u"], ("Integrator", "y"))
         self.assertEqual(
-            list(side_by_side.subsystems), ["step", "integrator", "pendulum"]
+            list(side_by_side.subsystems), ["Step", "Integrator", "Pendulum"]
         )
-        self.assertIsNone(side_by_side.connections["pendulum"]["u"])
+        self.assertIsNone(side_by_side.connections["Pendulum"]["u"])
 
     def test_series_operator_flattens_source_into_closed_loop_diagram(self):
         diagram = Step(final_value=[1.0], step_time=0.0) >> Impedance() @ Pendulum()
-        self.assertEqual(list(diagram.subsystems), ["step", "controller", "plant"])
+        self.assertEqual(list(diagram.subsystems), ["Step", "controller", "plant"])
         self.assertFalse(
             any((isinstance(sys, DiagramSystem) for sys in diagram.subsystems.values()))
         )
-        self.assertEqual(diagram.connections["controller"]["r"], ("step", "y"))
+        self.assertEqual(diagram.connections["controller"]["r"], ("Step", "y"))
         self.assertEqual(diagram.connections["controller"]["y"], ("plant", "y"))
         self.assertEqual(diagram.connections["plant"]["u"], ("controller", "u"))
         self.assertEqual(diagram.connections["output"]["y"], ("plant", "y"))
@@ -196,12 +196,12 @@ class TestDiagramCompositionShortcuts(unittest.TestCase):
         right = Impedance() @ Pendulum()
         diagram = left + right
         self.assertEqual(
-            list(diagram.subsystems), ["step", "integrator", "controller", "plant"]
+            list(diagram.subsystems), ["Step", "Integrator", "controller", "plant"]
         )
         self.assertFalse(
             any((isinstance(sys, DiagramSystem) for sys in diagram.subsystems.values()))
         )
-        self.assertEqual(diagram.connections["integrator"]["u"], None)
+        self.assertEqual(diagram.connections["Integrator"]["u"], None)
         self.assertEqual(diagram.connections["controller"]["r"], ("input", "r"))
         self.assertEqual(diagram.connections["controller"]["y"], ("plant", "y"))
         self.assertEqual(diagram.connections["plant"]["u"], ("controller", "u"))
@@ -211,15 +211,15 @@ class TestDiagramCompositionShortcuts(unittest.TestCase):
         right = Gain(2.0, dim=1) >> Gain(3.0, dim=1)
         diagram = left >> right
         self.assertEqual(
-            list(diagram.subsystems), ["step", "integrator", "gain", "gain2"]
+            list(diagram.subsystems), ["Step", "Integrator", "Gain", "Gain2"]
         )
         self.assertFalse(
             any((isinstance(sys, DiagramSystem) for sys in diagram.subsystems.values()))
         )
-        self.assertEqual(diagram.connections["integrator"]["u"], ("step", "y"))
-        self.assertEqual(diagram.connections["gain"]["u"], ("integrator", "y"))
-        self.assertEqual(diagram.connections["gain2"]["u"], ("gain", "y"))
-        self.assertEqual(diagram.connections["output"]["y"], ("gain2", "y"))
+        self.assertEqual(diagram.connections["Integrator"]["u"], ("Step", "y"))
+        self.assertEqual(diagram.connections["Gain"]["u"], ("Integrator", "y"))
+        self.assertEqual(diagram.connections["Gain2"]["u"], ("Gain", "y"))
+        self.assertEqual(diagram.connections["output"]["y"], ("Gain2", "y"))
         self.assertNotIn("u", diagram.inputs)
 
     def test_series_into_closed_loop_without_free_boundary_input_fails(self):
@@ -236,25 +236,25 @@ class TestDiagramCompositionShortcuts(unittest.TestCase):
         diagram.connect_new_output_port("plant", "y", "y")
         diagram.add_subsystem(P(ports="reference"), "monitor")  # added last
         chain = diagram >> Saturation()
-        self.assertEqual(chain.connections["saturation"]["u"], ("plant", "y"))
+        self.assertEqual(chain.connections["Saturation"]["u"], ("plant", "y"))
 
     def test_autowire_connects_unique_matches_without_overwrites(self):
         diagram = (
             Step(final_value=[1.0], port="r") + P(ports="reference") + Integrator()
         ).autowire(strict=True)
-        self.assertEqual(diagram.connections["p"]["r"], ("step", "r"))
-        self.assertEqual(diagram.connections["p"]["y"], ("integrator", "y"))
-        self.assertEqual(diagram.connections["integrator"]["u"], ("p", "u"))
-        diagram.connect("step", "r", "integrator", "u")
+        self.assertEqual(diagram.connections["P"]["r"], ("Step", "r"))
+        self.assertEqual(diagram.connections["P"]["y"], ("Integrator", "y"))
+        self.assertEqual(diagram.connections["Integrator"]["u"], ("P", "u"))
+        diagram.connect("Step", "r", "Integrator", "u")
         diagram.autowire(strict=True)
-        self.assertEqual(diagram.connections["integrator"]["u"], ("step", "r"))
+        self.assertEqual(diagram.connections["Integrator"]["u"], ("Step", "r"))
 
     def test_autowire_reads_names_only(self):
         with self.assertWarnsRegex(UserWarning, "no output named 'r'"):
             diagram = (Step(final_value=[1.0]) + Impedance() + Pendulum()).autowire()
-        self.assertIsNone(diagram.connections["impedance_controller"]["r"])
+        self.assertIsNone(diagram.connections["Impedance"]["r"])
         self.assertEqual(
-            diagram.connections["impedance_controller"]["y"], ("pendulum", "y")
+            diagram.connections["Impedance"]["y"], ("Pendulum", "y")
         )
         with self.assertRaisesRegex(ValueError, "no output named 'r'"):
             (Step(final_value=[1.0]) + Impedance() + Pendulum()).autowire(strict=True)
@@ -267,12 +267,12 @@ class TestDiagramCompositionShortcuts(unittest.TestCase):
             + Integrator()
         )
         with self.assertRaisesRegex(
-            ValueError, "Ambiguous autowire target integrator:u"
+            ValueError, "Ambiguous autowire target Integrator:u"
         ):
             diagram.autowire(strict=True)
-        self.assertEqual(diagram.connections["p"]["y"], None)
-        self.assertEqual(diagram.connections["p2"]["y"], None)
-        self.assertEqual(diagram.connections["integrator"]["u"], None)
+        self.assertEqual(diagram.connections["P"]["y"], None)
+        self.assertEqual(diagram.connections["P2"]["y"], None)
+        self.assertEqual(diagram.connections["Integrator"]["u"], None)
 
     def test_autowire_follows_renamed_ports_through_an_actuator(self):
         ref = Step(final_value=[1.0], port="r")
@@ -280,9 +280,9 @@ class TestDiagramCompositionShortcuts(unittest.TestCase):
         sat = Saturation(-1, 1).rename_ports(u="u_cmd", y="u")
         diagram = (ref + ctl + sat + Integrator()).autowire(strict=True)
         ctl_id = diagram.subsystem_id(ctl)
-        self.assertEqual(diagram.connections["saturation"]["u_cmd"], (ctl_id, "u_cmd"))
-        self.assertEqual(diagram.connections["integrator"]["u"], ("saturation", "u"))
-        self.assertEqual(diagram.connections[ctl_id]["y"], ("integrator", "y"))
+        self.assertEqual(diagram.connections["Saturation"]["u_cmd"], (ctl_id, "u_cmd"))
+        self.assertEqual(diagram.connections["Integrator"]["u"], ("Saturation", "u"))
+        self.assertEqual(diagram.connections[ctl_id]["y"], ("Integrator", "y"))
         self.assertEqual(list(sat.inputs), ["u_cmd"])
         self.assertEqual(list(sat.outputs), ["u"])
         measured = P(ports="reference").rename_ports(y="y_meas")
@@ -309,18 +309,18 @@ class TestDiagramCompositionShortcuts(unittest.TestCase):
         self.assertEqual(list(box.inputs), ["x", "r"])
         self.assertEqual(list(box.outputs), ["y"])
         self.assertEqual(
-            box.connections["state_feedback_controller"]["x"], ("input", "x")
+            box.connections["StateFeedback"]["x"], ("input", "x")
         )
         self.assertEqual(
-            box.connections["state_feedback_controller"]["r"], ("input", "r")
+            box.connections["StateFeedback"]["r"], ("input", "r")
         )
         self.assertEqual(
-            box.connections["saturation"]["u"], ("state_feedback_controller", "u")
+            box.connections["Saturation"]["u"], ("StateFeedback", "u")
         )
-        self.assertEqual(box.connections["output"]["y"], ("saturation", "y"))
+        self.assertEqual(box.connections["output"]["y"], ("Saturation", "y"))
 
         fan_in = (Integrator() + Integrator()).expose("u")
-        self.assertEqual(fan_in.connections["integrator2"]["u"], ("input", "u"))
+        self.assertEqual(fan_in.connections["Integrator2"]["u"], ("input", "u"))
         chain = (Integrator() >> Integrator()).expose("x")  # the box's own state
         np.testing.assert_allclose(
             chain.outputs["x"].compute(np.array([1.0, 2.0]), np.zeros(1), 0.0, None),
@@ -623,7 +623,7 @@ class TestDefaultNames(unittest.TestCase):
 
         # The diagram key follows the name, so a user's class keys itself
         diagram = MyPlant() + Integrator()
-        self.assertEqual(list(diagram.subsystems), ["my_plant", "integrator"])
+        self.assertEqual(list(diagram.subsystems), ["MyPlant", "Integrator"])
 
     def test_shortcut_names_read_as_the_expression(self):
         from minilink import PID, Pendulum, feedback

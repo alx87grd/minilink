@@ -88,7 +88,7 @@ class TestJunction(unittest.TestCase):
         self.assertEqual(T.connections["error"]["-"], ("demux", "y[1]"))
         T = feedback(L, 0.5)
         self.assertEqual(
-            list(T.subsystems), ["pid", "pendulum", "demux", "filter", "error"]
+            list(T.subsystems), ["PID", "Pendulum", "demux", "filter", "error"]
         )
         np.testing.assert_allclose(T.subsystems["filter"].params["K"], [[0.5]])
         T = feedback(L, filter=TransferFunction([1.0], [0.1, 1.0]))
@@ -182,14 +182,14 @@ class TestSeriesRule(unittest.TestCase):
         K = StateFeedback(np.array([[10.0, 2.0]]))
         L = PID() >> Pendulum()  # one output, one input
         self.assertEqual((list(L.inputs), list(L.outputs)), (["e"], ["y"]))
-        self.assertEqual(L.connections["pendulum"]["u"], ("pid", "u"))
+        self.assertEqual(L.connections["Pendulum"]["u"], ("PID", "u"))
         L = Pendulum() >> K  # a shared name wins over the textbook pair
         self.assertEqual(
-            L.connections["state_feedback_controller"]["x"], ("pendulum", "x")
+            L.connections["StateFeedback"]["x"], ("Pendulum", "x")
         )
-        self.assertIsNone(L.connections["state_feedback_controller"]["r"])
+        self.assertIsNone(L.connections["StateFeedback"]["r"])
         L = TransferFunction([1.0], [1.0, 3.0, 2.0]) >> Integrator()  # y to u
-        self.assertEqual(L.connections["integrator"]["u"], ("transfer_function", "y"))
+        self.assertEqual(L.connections["Integrator"]["u"], ("TransferFunction", "y"))
         self.assertEqual(list((K >> Saturation()).inputs), ["x", "r"])  # a leaf's edge
 
     def test_a_source_into_a_reference_and_measurement_block_is_refused(self):
@@ -200,7 +200,7 @@ class TestSeriesRule(unittest.TestCase):
 
     def test_feedback_closes_on_the_command_input_or_refuses(self):
         T = feedback(PID() >> Integrator())
-        self.assertEqual(T.connections["pid"]["e"], ("error", "e"))
+        self.assertEqual(T.connections["PID"]["e"], ("error", "e"))
         with self.assertRaisesRegex(ValueError, "measurement on 'y' \\(on its edge\\)"):
             feedback(P(ports="reference") >> Integrator())
         from minilink import DiagramSystem
@@ -225,10 +225,10 @@ class TestLoopNames(unittest.TestCase):
         chain = (
             Step(final_value=[1.0], port="r") >> P(ports="reference") >> Integrator()
         )
-        self.assertEqual(list(chain.subsystems), ["step", "p", "integrator"])
+        self.assertEqual(list(chain.subsystems), ["Step", "P", "Integrator"])
         self.assertEqual(
             list((Integrator() + Integrator()).subsystems),
-            ["integrator", "integrator2"],
+            ["Integrator", "Integrator2"],
         )
 
     def test_two_loops_cannot_sit_side_by_side(self):
@@ -332,7 +332,7 @@ class TestPortLayouts(unittest.TestCase):
             Lead(z=10.0, p=1.0)
         L = Lead() >> DoubleIntegrator()
         self.assertEqual(list(L.inputs), ["e"])
-        self.assertEqual(list(L.subsystems), ["lead", "double_integrator"])
+        self.assertEqual(list(L.subsystems), ["Lead", "DoubleIntegrator"])
 
 
 class TestLoopInputs(unittest.TestCase):

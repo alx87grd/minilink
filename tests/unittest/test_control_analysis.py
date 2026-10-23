@@ -2031,7 +2031,7 @@ class TestSensitivity(unittest.TestCase):
         )
         np.testing.assert_allclose(
             self.response(T),
-            self.response(loop, of="transfer_function:y", wrt="r"),
+            self.response(loop, of="TransferFunction:y", wrt="r"),
             atol=1e-9,
         )
 
