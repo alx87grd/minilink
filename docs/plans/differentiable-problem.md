@@ -468,5 +468,4 @@ record, and leaves ROADMAP §6.
    margin-constrained tuning.
 3. **The `CostIntegrator` block** (cost-params.md's research step): proposed, closed as a demo
    idea; `cost.integrate` on samples is the contract.
-4. **The name `cost_bound()`** (R32): proposed as written; a property
-   (`problem.price`) or a cost-side verb (`cost.upper_bound(X, U, tf)`) are the alternatives.
+4. ~~The name of the bound~~: ruled `problem.cost_bound()` (R71).
