@@ -139,3 +139,6 @@ of it in sampled-path.md §3.6; the numbers from `benchmarks/params_binding.py`.
   the step model's `hold`; the `euler` loop backend goes; SciPy keeps its interpolant;
   `input_interp` becomes `hold`. Open: the `rk4_fixedsteps` forced default, `foh`
   (byte-identical) or `zoh`. Lives in: end-state-api.md D9b; sampled-path.md §7 (S65).
+- **R18 (2026-10-23) The forced hold is `zoh` everywhere.** `rk4_fixedsteps` forced runs stop
+  interpolating the input linearly; their numbers change once (baseline, ledger line). The
+  knobs `method`, `substeps`, `hold` are static Python values, never traced (sampled-path §3.6).

@@ -321,8 +321,9 @@ does; the fixed-step backends call the one `ev.rollout(x0, u_seq, t0, dt, params
 hold=)`; the `euler` loop backend goes; SciPy keeps its interpolant as the one adaptive path;
 `input_interp` is replaced by the step model's `hold` (`zoh` / `foh`), one vocabulary for "what
 happens between samples" (S65's input-hold row closes here). A callable `u(t)` on the fixed-step
-path is sampled at the grid points. Open: whether `rk4_fixedsteps` forced runs keep `hold="foh"`
-as their default (byte-identical) or move to `zoh` (consistent, numbers change once).
+path is sampled at the grid points. Ruled 2026-10-23: `hold="zoh"` everywhere by default; the `rk4_fixedsteps`
+forced numbers change once (a baseline and a ledger line), so the hold never depends on the
+solver's name again.
 
 ### D10 `params` always an argument; freezing is a binding (S75, ask 6) — **ruled B, 2026-10-22**
 
