@@ -13,7 +13,6 @@ ANIMATE = True
 
 plant = CartPole()
 evaluator = plant.compile(backend="jax")
-rk4_step_p = evaluator.rk4_step_p
 
 # Shared swing-up task (same horizon / cost for a fair (a) vs (b) comparison).
 H = 50
@@ -41,7 +40,7 @@ def rollout(u_seq, p_vec):
     p = params_dict(p_vec)
 
     def step(x, u_scalar):
-        x_next = rk4_step_p(x, jnp.array([u_scalar]), 0.0, dt, p)
+        x_next = evaluator.step(x, jnp.array([u_scalar]), 0.0, p, dt=dt)
         return x_next, x_next
 
     x_final, traj = jax.lax.scan(step, x0, u_seq)

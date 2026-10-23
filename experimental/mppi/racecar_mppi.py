@@ -102,9 +102,7 @@ def mppi_tick(U, x0, key):
     V = jnp.clip(U + eps, u_lower, u_upper)
 
     # Roll out: x^k_{t+1} = Phi(x^k_t, v^k_t) over dt, input held, from x0
-    X = jax.vmap(ev.rk4_integrate_zoh_trace, in_axes=(None, 0, None, None))(
-        x0, V, 0.0, DT
-    )
+    X = jax.vmap(lambda v: ev.rollout(x0, v, 0.0, DT))(V)
 
     # Score: the path cost plus lam (1 - alpha) sum_t u_t^T Sigma^-1 eps^k_t
     S = jax.vmap(path_cost)(X, V)
@@ -118,7 +116,7 @@ def mppi_tick(U, x0, key):
     # Update: U <- U + sum_k w^k eps^k
     U_new = U + jnp.einsum("k,ktm->tm", w, eps)
 
-    x_plan = ev.rk4_integrate_zoh_trace(x0, U_new, 0.0, DT)
+    x_plan = ev.rollout(x0, U_new, 0.0, DT)
     return U_new, x_plan, X, S, w, 1.0 / jnp.sum(w**2)
 
 
@@ -126,7 +124,7 @@ def mppi_tick(U, x0, key):
 def plant_period(x, u, t):
     """The true plant over one control period: RK4 at SIM_DT with the input held."""
     for i in range(sub_steps):
-        x = ev.rk4_step_trace(x, u, t + i * SIM_DT, SIM_DT)
+        x = ev.step(x, u, t + i * SIM_DT, dt=SIM_DT)
     return x
 
 

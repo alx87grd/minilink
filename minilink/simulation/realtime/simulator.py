@@ -28,6 +28,7 @@ import warnings
 import numpy as np
 
 from minilink.core.backends import BACKEND_AUTO, BACKEND_JAX, BACKEND_NUMPY
+from minilink.core.compile.evaluators.stepping import substeps_of
 from minilink.core.system import DynamicSystem
 from minilink.core.trajectory import Trajectory
 from minilink.simulation.realtime.io import RealtimeInput, RealtimeOutput
@@ -57,7 +58,7 @@ class RealtimeSimulator:
     Advance a continuous system live, one rendered frame at a time.
 
     Each frame: ``u, stop = input.poll(t, x)`` (nominal ``u`` when no input),
-    then ``x = evaluator.integrate_zoh(x, u, t, dt_hold, dt_inner=sim_dt)``,
+    then ``x = evaluator.jit.step(x, u, t, dt=dt_hold, substeps=…)`` (steps of about ``sim_dt``),
     live draw, optional external publish, then sleep out the frame budget.
 
     Parameters
@@ -302,7 +303,9 @@ class RealtimeSimulator:
                     u, should_stop = self.input.poll(t, x)
                     u = np.asarray(u, dtype=float).reshape(evaluator.m)
 
-                x = evaluator.integrate_zoh(x, u, t, dt_hold, dt_inner=sim_dt)
+                x = evaluator.jit.step(
+                    x, u, t, dt=dt_hold, substeps=substeps_of(dt_hold, sim_dt)
+                )
                 x = np.asarray(x, dtype=float)  # native array → NumPy boundary
                 t += dt_hold
                 step_idx += 1
@@ -444,7 +447,9 @@ class RealtimeSimulator:
         evaluator = self.evaluator
 
         def _one_frame():
-            x_out = evaluator.integrate_zoh(x, u, t, frame_dt, dt_inner=sim_dt_probe)
+            x_out = evaluator.jit.step(
+                x, u, t, dt=frame_dt, substeps=substeps_of(frame_dt, sim_dt_probe)
+            )
             if getattr(evaluator, "backend", "numpy") == "jax":
                 import jax
 
@@ -515,8 +520,8 @@ class RealtimeSimulator:
         inside the loop would stall the first frame. The warm result is
         discarded.
         """
-        x_warm = self.evaluator.integrate_zoh(
-            x, u, t, self.frame_dt, dt_inner=self.sim_dt
+        x_warm = self.evaluator.jit.step(
+            x, u, t, dt=self.frame_dt, substeps=substeps_of(self.frame_dt, self.sim_dt)
         )
         outputs_warm = None
         if self.output is not None and self.output.needs_boundary_outputs:

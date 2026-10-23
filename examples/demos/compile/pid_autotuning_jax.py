@@ -62,7 +62,7 @@ def apply_pid_params(pid):
 
 def simulate_traj(pid):
     apply_pid_params(pid)
-    xs = np_evaluator.rk4_integrate_linear(diagram.x0, plot_u_knots, 0.0, DT)
+    xs = np_evaluator.jit.rollout(diagram.x0, plot_u_knots, 0.0, DT, hold="foh")
     return Trajectory(t=plot_t, x=xs.T, u=plot_u_knots.T)
 
 
@@ -78,7 +78,7 @@ def rollout_loss(pid):
     }
 
     def step(x, t):
-        x_next = evaluator.rk4_step_p(x, u_ref, t, DT, params)
+        x_next = evaluator.jit.step(x, u_ref, t, params, dt=DT)
         err = u_ref[0] - x_next[theta_idx]
         return x_next, err**2 + 1e-4 * jnp.sum(pid**2)
 

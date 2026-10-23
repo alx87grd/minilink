@@ -179,7 +179,9 @@ class TestJaxDirectCollocation(unittest.TestCase):
     def test_jax_evaluator_forced_rk4_rollout_smoke(self):
         sys = JaxSingleIntegrator()
         evaluator = sys.compile(backend="jax", verbose=False)
-        x = evaluator.rk4_integrate_linear(np.array([0.0]), np.ones((5, 1)), 0.0, 0.25)
+        x = evaluator.jit.rollout(
+            np.array([0.0]), np.ones((5, 1)), 0.0, 0.25, hold="foh"
+        )
         np.testing.assert_allclose(np.asarray(x).reshape(-1), np.linspace(0.0, 1.0, 5))
 
 

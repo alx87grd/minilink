@@ -579,7 +579,7 @@ class TestHybridMultiRate(unittest.TestCase):
             )
             outs = computer.tick(u_computer)
             u_plant = np.array([float(outs["u_cmd"][0])])
-            x_plant = plant_eval.integrate_zoh(x_plant, u_plant, k * dt_base, dt_base)
+            x_plant = plant_eval.step(x_plant, u_plant, k * dt_base, dt=dt_base)
             y_sample = float(
                 plant_eval.outputs(x_plant, u_plant, (k + 1) * dt_base)["y"][0]
             )
@@ -647,7 +647,7 @@ class TestSmcHybrid(unittest.TestCase):
             u_computer[slice_y] = y_sample
             outs = computer.tick(u_computer)
             u_plant = np.asarray(outs["u"], dtype=float).reshape(-1)
-            x_plant = plant_eval.integrate_zoh(x_plant, u_plant, k * dt_base, dt_base)
+            x_plant = plant_eval.step(x_plant, u_plant, k * dt_base, dt=dt_base)
             y_sample = plant_eval.outputs(x_plant, u_plant, (k + 1) * dt_base)["y"]
             q_hand.append(float(y_sample[0]))
         sim = HybridSimulator(hybrid, t0=0.0, n_steps=n_steps, plant_dt_inner=0.002)

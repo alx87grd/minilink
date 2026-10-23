@@ -811,68 +811,6 @@ class TestEvaluatorTiersNumPy(unittest.TestCase):
             _ = ev.f_trace
         self.assertIn(TRACE_TIER_MSG, str(ctx.exception))
 
-    def test_numpy_rk4_step_trace_raises(self):
-        ev = compile(Integrator(), backend="numpy")
-        with self.assertRaises(AttributeError) as ctx:
-            _ = ev.rk4_step_trace
-        self.assertIn(TRACE_TIER_MSG, str(ctx.exception))
-
-
-@pytest.mark.optional
-@pytest.mark.jax
-@unittest.skipUnless(_JAX_AVAILABLE, "JAX not installed")
-class TestIntegrationTiersJax(unittest.TestCase):
-    def setUp(self):
-        self.ev = compile(Integrator(), backend="jax")
-        self.x = jnp.array([0.2])
-        self.u = jnp.array([1.0])
-        self.t = 0.0
-        self.dt = 0.01
-        self.params = {"k": 1.0}
-
-    def test_rk4_step_trace_parity(self):
-        np.testing.assert_allclose(
-            np.asarray(self.ev.rk4_step_trace(self.x, self.u, self.t, self.dt)),
-            np.asarray(self.ev.rk4_step(self.x, self.u, self.t, self.dt)),
-            atol=1e-06,
-        )
-
-    def test_rk4_integrate_zoh_trace_parity(self):
-        u_seq = jnp.array([[1.0], [0.5], [0.0]])
-        np.testing.assert_allclose(
-            np.asarray(self.ev.rk4_integrate_zoh_trace(self.x, u_seq, self.t, self.dt)),
-            np.asarray(self.ev.rk4_integrate_zoh(self.x, u_seq, self.t, self.dt)),
-            atol=1e-06,
-        )
-
-    def test_rk4_integrate_linear_p_fast_tier(self):
-        u_knots = jnp.array([[1.0], [0.5], [0.0]])
-        out = self.ev.rk4_integrate_linear_p(
-            self.x, u_knots, self.t, self.dt, self.params
-        )
-        self.assertEqual(out.shape, (3, 1))
-
-    def test_euler_integrate_zoh_trace_parity(self):
-        u_seq = jnp.array([[1.0], [0.5], [0.0]])
-        np.testing.assert_allclose(
-            np.asarray(
-                self.ev.euler_integrate_zoh_trace(self.x, u_seq, self.t, self.dt)
-            ),
-            np.asarray(self.ev.euler_integrate_zoh(self.x, u_seq, self.t, self.dt)),
-            atol=1e-06,
-        )
-
-    def test_f_ivp_p_matches_f_ivp_with_frozen(self):
-        np.testing.assert_allclose(
-            np.asarray(self.ev.f_ivp_p(self.x, self.t, self.params)),
-            np.asarray(self.ev.f_ivp(self.x, self.t)),
-            atol=1e-06,
-        )
-
-    def test_euler_step_p(self):
-        out = self.ev.euler_step_p(self.x, self.u, self.t, self.dt, self.params)
-        self.assertEqual(out.shape, (1,))
-
 
 @pytest.mark.optional
 @pytest.mark.jax
@@ -1160,9 +1098,7 @@ class TestRolloutBatch(unittest.TestCase):
         )
         self.assertEqual(xs.shape, (4, self.n_steps + 1, 2))
         for i in range(4):
-            single = self.ev.rk4_integrate_zoh(
-                self.x0s[i], self.u_nominal, 0.0, self.dt
-            )
+            single = self.ev.jit.rollout(self.x0s[i], self.u_nominal, 0.0, self.dt)
             np.testing.assert_allclose(
                 xs[i], np.asarray(single), rtol=1e-12, atol=1e-12
             )
@@ -1171,7 +1107,7 @@ class TestRolloutBatch(unittest.TestCase):
         u_seqs = 0.5 * self.rng.standard_normal((4, self.n_steps, 1))
         xs = np.asarray(self.ev.rollout_batch(self.x0s, u_seqs, dt=self.dt))
         for i in range(4):
-            single = self.ev.rk4_integrate_zoh(self.x0s[i], u_seqs[i], 0.0, self.dt)
+            single = self.ev.jit.rollout(self.x0s[i], u_seqs[i], 0.0, self.dt)
             np.testing.assert_allclose(
                 xs[i], np.asarray(single), rtol=1e-12, atol=1e-12
             )
@@ -1186,9 +1122,7 @@ class TestRolloutBatch(unittest.TestCase):
         )
         for i in range(4):
             p_i = dict(self.sys.params, l=float(lengths[i]))
-            single = self.ev.rk4_integrate_zoh_p(
-                self.x0s[i], self.u_nominal, 0.0, self.dt, p_i
-            )
+            single = self.ev.jit.rollout(self.x0s[i], self.u_nominal, 0.0, self.dt, p_i)
             np.testing.assert_allclose(
                 xs[i], np.asarray(single), rtol=1e-12, atol=1e-12
             )

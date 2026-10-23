@@ -704,7 +704,7 @@ def test_open_loop_source_scores_like_its_replayed_trajectory_on_every_backend()
     x = np.zeros((2, n_steps + 1))
     x[:, 0] = problem.x_start
     for k in range(n_steps):
-        x[:, k + 1] = evaluator.rk4_step(x[:, k], u[:, k], t[k], dt)
+        x[:, k + 1] = evaluator.jit.step(x[:, k], u[:, k], t[k], dt=dt)
     J_hand, _ = score_trajectory(problem, Trajectory(t=t, x=x, u=u))
 
     reports = {}

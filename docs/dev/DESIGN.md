@@ -641,7 +641,7 @@ compiles all run this check.
 
 Speed lives in batches and compiled integrators, not in single calls: a
 jitted `f` call costs about the same as the NumPy one (dispatch dominates),
-while `rollout_batch` and the `rk4_integrate_*` primitives run 1000 rollouts of
+while `rollout_batch` and the compiled `jit.rollout` run 1000 rollouts of
 1000 RK4 steps in tens of milliseconds. Quote those; never a per-call ratio.
 
 `compile(system, backend)` returns a typed evaluator:
@@ -668,37 +668,42 @@ Diagrams → `ExecutionPlan` → diagram evaluator. Internal outputs via
 only** (not diagram internals). Compiled evaluators expose **`outputs` / `outputs_p`**
 (dict keyed by port id); they do not mirror model `h` as a separate evaluator API.
 
-**Evaluator execution tiers (JAX).** Default methods (`.f`, `.f_p`, `.outputs`, …)
-are the **fast tier** — JIT-compiled on JAX, eager on NumPy. JAX evaluators also
-expose a **trace tier** (`.f_trace`, `.f_trace_p`, `.rk4_step_trace`, …):
-pre-JIT flat callables for composition inside outer `jit` / `grad` / `vmap`
-(identification losses, C export). Optional `_jit` aliases (`.f_jit` ≡ `.f`)
-document the fast tier. NumPy evaluators reject `*_trace` / `*_jit` attributes.
-`has_trace_tier` is `True` on JAX evaluators.
+**The step model.** Every sampled consumer steps a continuous plant through two
+bodies, written once (`core/compile/evaluators/stepping.py`) for both backends:
+
+    ev.step(x, u, t, params=None, *, dt, solver="rk4", substeps=1)            # x_{k+1}, u held
+    ev.rollout(x0, u_seq, t0, dt, params=None, *, solver="rk4", substeps=1, hold="zoh")
+    ev.jit.step(...), ev.jit.rollout(...)                                     # compiled once
+
+`solver` is `"rk4"` or `"euler"`, `substeps` splits each period, `hold="zoh"` holds each
+row of `u_seq` (shape `(N, m)`) and `hold="foh"` reads `N + 1` knots, linear between
+them; `u_seq=None` holds the nominal input for `n_steps` periods; `rollout` returns
+`[x_0, …, x_N]`, `t_k = t₀ + k dt`. `params=None` reads the compiled parameters. The
+knobs are static. On JAX `ev.step` / `ev.rollout` trace inside an outer `jit`, `grad`,
+`vmap`, and `ev.jit.*` is the same body under `jax.jit`, built once per evaluator; on
+NumPy `ev.jit` is the evaluator itself. `discretize`, the RL environment, the gym bridge,
+value iteration (`StateSpaceGrid.successor`), shooting, the fixed-step solvers, RRT,
+the Lyapunov sampler and the hybrid and realtime simulators all call them.
+
+**Evaluator execution tiers (JAX).** `.f`, `.f_p`, `.outputs` are the **fast tier** —
+JIT-compiled on JAX, eager on NumPy. JAX evaluators also expose a **trace tier**
+(`.f_trace`, `.f_trace_p`): pre-JIT flat callables for composition inside outer `jit` /
+`grad` / `vmap`. NumPy evaluators reject `*_trace` attributes. `has_trace_tier` is
+`True` on JAX evaluators.
 
 |  | Bound | Parametric |
 | --- | --- | --- |
 | Fast (default) | `f` ≡ `f_jit` | `f_p` ≡ `f_jit_p` |
 | Trace (JAX only) | `f_trace` | `f_trace_p` |
 
-Same 2×2 for `outputs`, `step`, and integration helpers
-(`rk4_step`, `rk4_integrate_zoh`, `rk4_integrate_linear`, `euler_integrate_*`, …)
-on JAX dynamics evaluators. Layout:
-`evaluators.py` (ABCs), `numpy_evaluators.py`, `jax_evaluators.py`,
-`step_rollout.py` (`gather_u`, `StepRolloutMixin`).
+Same 2×2 for `outputs`. Layout:
+`evaluators.py` (ABCs), `stepping.py` (the step model's formulas), `numpy_evaluators.py`,
+`jax_evaluators.py`, `step_rollout.py` (`gather_u`, `StepRolloutMixin`).
 
-**Frozen evaluator subset.** The stable-tier evaluator API is:
-`f` / `f_p`, `outputs` / `outputs_p`, `step` / `step_p`, `rollout`,
-`rk4_step` / `rk4_step_p`, `integrate_zoh` / `integrate_zoh_rollout` /
-`integrate_zoh_p`, and the JAX trace-tier twins of those names
-(`f_trace`, `f_trace_p`, …). The rest of the integration-helper grid
-(`euler_*`, `*_ivp*`, `rk4_integrate_linear*`, `_jit` aliases) is
-**stable-internal**: used by simulators and transcriptions, kept working, but
-its names may still change before v1.0 — do not build external code on it.
-
-Rollout method names carry the integrator and the input model
-(`rk4_integrate_zoh`, `rk4_integrate_linear`, …); trace-tier JAX twins follow the
-same pattern (`*_trace`, `*_trace_p`).
+**Frozen evaluator subset.** The stable-tier evaluator API is: `f` / `f_p`,
+`outputs` / `outputs_p`, the step model `step`, `rollout` and `jit`, `rollout_batch`,
+and the JAX trace tier `f_trace` / `f_trace_p`; a step evaluator's `step` / `step_p` and
+state-only `rollout`.
 
 Keep `ExecutionPlan.output_slices` and `external_output_slices` aligned.
 
@@ -749,8 +754,9 @@ the block: one set by hand on the diagram is replaced. `StaticSimulator` shares
 the 10001-point default.
 
 Solver presets: `scipy`, `scipy_stiff`, `scipy_max`, `scipy_ultra`, `scipy_lsoda`,
-`euler` (variable knot spacing), `euler_fixedsteps` (uniform grid via
-`euler_integrate_*` rollouts), `rk4_fixedsteps` (auto-picked on JAX only for an explicit uniform grid of ≥ 10 000 points). Both fixed-step backends refuse a non-uniform grid, with one relative check (`atol=0`) shared with the simulator.
+`euler` (variable knot spacing), `euler_fixedsteps` (uniform grid via the step
+model's Euler rollout), `rk4_fixedsteps` (the RK4 rollout: a sampled input held over
+each period, a function of time read at the stage times; auto-picked on JAX only for an explicit uniform grid of ≥ 10 000 points). Both fixed-step backends refuse a non-uniform grid, with one relative check (`atol=0`) shared with the simulator.
 
 ### Discontinuous closed loops
 
@@ -847,7 +853,7 @@ would discount twice). Its plans report the trapezoidal Monte Carlo score.
 `x0_distribution` (its mean is `x_start`, its support `X0`),
 `params_distribution` (`{name: Distribution}` over `sys.params`, dotted names
 reaching a diagram's subsystem params such as `"sys.mass"`, one draw per
-episode carried through the parametric step `rk4_step_trace_p`),
+episode carried through the step model's `params`),
 `disturbances` (`{port_id: Distribution}`, a fresh draw per step held on the
 port) and `criterion` (`"expectation"` default; `"worst_case"` is reported by
 the Monte Carlo evaluator and refused by the RL planner, which optimizes the
@@ -918,7 +924,7 @@ plant has one, else its single input port — so an inner loop `impedance @
 arm` (input `r`) is a plant for an outer learned law; a step that leaves the
 box or blows up (non-finite state) ends the episode. The learned law is a `System`:
 `ctl @ plant` compiles on both backends, `linearize` / `jacobian` differentiate
-through the network, and the parametric tier (`rk4_step_trace_p` with
+through the network, and the step model (`ev.step(x, u, t, params, dt=…)` with
 `params={"controller": ..., "plant": ...}`) gives gradients of a rollout with respect
 to the policy weights. Official demos: `examples/demos/rl/` (pendulum swing-up, cart-pole,
 drone, rocket); the tutorial chapter is

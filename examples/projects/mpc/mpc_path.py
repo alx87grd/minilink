@@ -201,7 +201,7 @@ while t < TF_SIM - 1e-12:
         next_broadcast_t += DT_BROADCAST
 
     # offline only: integrate plant (ROS2 talks to the real vehicle / estimator)
-    x = plant.rk4_step(x, u_nom, t, SIM_DT)
+    x = plant.jit.step(x, u_nom, t, dt=SIM_DT)
     t += SIM_DT
     t_hist.append(t)
     x_hist.append(x.copy())

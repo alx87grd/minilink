@@ -148,7 +148,7 @@ print(
 @jax.jit
 def converges(x0):
     def step(x, _):
-        return evaluator.rk4_step_trace(x, u_none, 0.0, 0.02), None
+        return evaluator.step(x, u_none, 0.0, dt=0.02), None
 
     x_final = jax.lax.scan(step, x0, None, length=300)[0]  # 6 s
     return (jnp.abs(x_final[0] - x_eq[0]) < 0.05) & (jnp.abs(x_final[1]) < 0.2)

@@ -582,57 +582,15 @@ class TestDiscontinuousSolvers(unittest.TestCase):
 from minilink.blocks.basic import Integrator
 
 
-class TestIntegrateZoh(unittest.TestCase):
-    def test_single_step_matches_integrate(self):
-        plant = Integrator()
-        evaluator = plant.compile()
-        x0 = np.array([0.0])
-        u_hold = np.array([2.0])
-        x_final = evaluator.integrate_zoh(x0, u_hold, t0=0.0, dt_hold=0.1)
-        x_seq = evaluator.rk4_integrate_zoh(x0, u_hold.reshape(1, 1), t0=0.0, dt=0.1)
-        np.testing.assert_allclose(x_final, x_seq[-1])
-
-    def test_subdivided_dt_inner(self):
+class TestStepSubsteps(unittest.TestCase):
+    def test_substeps_are_the_fine_rollout_of_the_held_input(self):
         plant = Integrator()
         evaluator = plant.compile()
         x0 = np.array([0.0])
         u_hold = np.array([1.0])
-        dt_hold = 0.1
-        dt_inner = 0.02
-        x_final = evaluator.integrate_zoh(
-            x0, u_hold, t0=0.0, dt_hold=dt_hold, dt_inner=dt_inner
-        )
-        n_sub = int(round(dt_hold / dt_inner))
-        u_sequence = np.ones((n_sub, 1))
-        dt_step = dt_hold / n_sub
-        x_seq = evaluator.rk4_integrate_zoh(x0, u_sequence, t0=0.0, dt=dt_step)
+        x_final = evaluator.step(x0, u_hold, 0.0, dt=0.1, substeps=5)
+        x_seq = evaluator.rollout(x0, np.ones((5, 1)), 0.0, 0.02)
         np.testing.assert_allclose(x_final, x_seq[-1], rtol=1e-10, atol=1e-10)
-
-    def test_integrate_zoh_rollout_grid(self):
-        plant = Integrator()
-        evaluator = plant.compile()
-        x0 = np.array([0.0])
-        u_hold = np.array([1.0])
-        dt_hold = 0.1
-        dt_inner = 0.02
-        t_samples, x_samples = evaluator.integrate_zoh_rollout(
-            x0, u_hold, t0=0.0, dt_hold=dt_hold, dt_inner=dt_inner
-        )
-        n_sub = int(round(dt_hold / dt_inner))
-        self.assertEqual(t_samples.shape[0], n_sub + 1)
-        self.assertEqual(x_samples.shape, (n_sub + 1, 1))
-        np.testing.assert_allclose(t_samples[0], 0.0)
-        np.testing.assert_allclose(t_samples[-1], dt_hold, rtol=1e-12)
-        x_final = evaluator.integrate_zoh(
-            x0, u_hold, t0=0.0, dt_hold=dt_hold, dt_inner=dt_inner
-        )
-        np.testing.assert_allclose(x_samples[-1], x_final)
-
-    def test_invalid_dt_raises(self):
-        plant = Integrator()
-        evaluator = plant.compile()
-        with self.assertRaises(ValueError):
-            evaluator.integrate_zoh(np.array([0.0]), np.array([1.0]), 0.0, 0.0)
 
 
 from minilink.core.compile.evaluators.step_rollout import gather_u
@@ -1087,16 +1045,15 @@ class TestRealtimeSimulator(unittest.TestCase):
             compile_backend="numpy",
             max_steps=1,
         )
-        real_zoh = rt_sim.evaluator.integrate_zoh
+        real_step = rt_sim.evaluator.step
         n_cap = rt_sim._auto_n_sub_max()
 
-        def slow_zoh(x, u, t, dt_hold, dt_inner=None):
+        def slow_step(x, u, t, params=None, *, dt, solver="rk4", substeps=1):
             # ~3 ms per substep → probe exceeds the quarter-frame budget.
-            n_sub = max(1, int(round(float(dt_hold) / float(dt_inner))))
-            time_mod.sleep(0.003 * n_sub)
-            return real_zoh(x, u, t, dt_hold, dt_inner=dt_inner)
+            time_mod.sleep(0.003 * substeps)
+            return real_step(x, u, t, params, dt=dt, solver=solver, substeps=substeps)
 
-        with patch.object(rt_sim.evaluator, "integrate_zoh", side_effect=slow_zoh):
+        with patch.object(rt_sim.evaluator, "step", side_effect=slow_step):
             rt_sim.run()
         n_sub = int(round(frame_dt / rt_sim.sim_dt))
         self.assertLess(n_sub, n_cap)

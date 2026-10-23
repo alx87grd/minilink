@@ -47,6 +47,14 @@ def step_body(f, x, u0, u1, t, dt, solver, substeps):
     return x
 
 
+def substeps_of(dt_hold, dt_inner=None):
+    """The number of integration steps of about ``dt_inner`` in one hold of ``dt_hold``."""
+    if dt_inner is None:
+        return 1
+
+    return max(1, int(round(float(dt_hold) / float(dt_inner))))
+
+
 def held_inputs(u_seq, hold):
     """The input at the start and at the end of each period: ``(u_k, u_k)`` or ``(u_k, u_{k+1})``."""
     if hold == "zoh":

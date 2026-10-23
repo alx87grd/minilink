@@ -453,7 +453,9 @@ class TestPlanningArchitecture(unittest.TestCase):
     def test_evaluator_forced_rk4_rollout_matches_integrator(self):
         sys = self.make_single_integrator()
         evaluator = sys.compile(backend="numpy", verbose=False)
-        x = evaluator.rk4_integrate_linear(np.array([0.0]), np.ones((5, 1)), 0.0, 0.25)
+        x = evaluator.jit.rollout(
+            np.array([0.0]), np.ones((5, 1)), 0.0, 0.25, hold="foh"
+        )
         np.testing.assert_allclose(x.reshape(-1), np.linspace(0.0, 1.0, 5))
 
     def test_live_trajectory_plot_callback_reuses_artists(self):
@@ -947,7 +949,7 @@ def test_steering_edge_is_dynamically_feasible():
     x = np.asarray(edge.states[0], dtype=float)
     for k in range(len(edge.inputs)):
         dt = float(edge.times[k + 1] - edge.times[k])
-        x = np.asarray(evaluator.rk4_step(x, edge.inputs[k], 0.0, dt), dtype=float)
+        x = np.asarray(evaluator.jit.step(x, edge.inputs[k], 0.0, dt=dt), dtype=float)
         assert np.allclose(x, edge.states[k + 1], atol=1e-06)
 
 
@@ -985,7 +987,7 @@ def test_dubins_edge_is_dynamically_feasible():
     x = np.asarray(states[0], dtype=float)
     for k in range(len(inputs)):
         dt = float(times[k + 1] - times[k])
-        x = np.asarray(evaluator.rk4_step(x, inputs[k], 0.0, dt), dtype=float)
+        x = np.asarray(evaluator.jit.step(x, inputs[k], 0.0, dt=dt), dtype=float)
         assert np.allclose(x, states[k + 1], atol=1e-06)
 
 

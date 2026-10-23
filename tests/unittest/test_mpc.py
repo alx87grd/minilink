@@ -1449,7 +1449,7 @@ def run_hand_loop_warm_mpc(*, sys_sim, planner, problem):
         for _ in range(SUBSTEPS):
             if t >= TF_SIM:
                 break
-            x = sim_evaluator.rk4_step(x, u_hold, t, SIM_DT)
+            x = sim_evaluator.jit.step(x, u_hold, t, dt=SIM_DT)
             t += SIM_DT
             t_hist.append(t)
             x_hist.append(x.copy())

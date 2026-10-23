@@ -484,7 +484,7 @@ def test_neural_closed_loop_compiles_and_differentiates_under_jax():
 
     # gradient of a one-step cost with respect to the policy weights, through the diagram
     def J(params):
-        x_next = evaluator.rk4_step_trace_p(x, jnp.zeros(0), 0.0, 0.05, params)
+        x_next = evaluator.step(x, jnp.zeros(0), 0.0, params, dt=0.05)
         return jnp.sum(x_next**2)
 
     grads = jax.grad(J)({"controller": ctl.params, "plant": plant.params})

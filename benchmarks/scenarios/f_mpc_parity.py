@@ -162,7 +162,7 @@ def run_hand_loop() -> list[MetricRecord]:
             if planner.last_solve_time_s is not None:
                 nlp_sum += float(planner.last_solve_time_s)
             next_mpc_t += MPC_DT
-        x = plant_eval.rk4_step(x, u_hold, t, SIM_DT)
+        x = plant_eval.jit.step(x, u_hold, t, dt=SIM_DT)
         t += SIM_DT
         t_hist.append(t)
         x_hist.append(x.copy())

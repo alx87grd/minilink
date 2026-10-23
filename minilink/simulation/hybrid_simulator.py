@@ -8,6 +8,7 @@ from dataclasses import dataclass, field
 import numpy as np
 
 from minilink.core.backends import BACKEND_NUMPY
+from minilink.core.compile.evaluators.stepping import substeps_of
 from minilink.core.hybrid_diagram import HybridDiagram
 from minilink.core.step_rollout import StepRollout
 from minilink.core.system import System
@@ -209,13 +210,11 @@ class HybridSimulator:
             )
 
             # Integrate the plant over [t_k, t_k + Δt], then sample its outputs
-            t_seg, x_seg = plant_eval.integrate_zoh_rollout(
-                x_plant,
-                u_plant,
-                t_k,
-                dt_base,
-                dt_inner=dt_inner,
-            )
+            n_sub = substeps_of(dt_base, dt_inner)
+            h = dt_base / n_sub
+            u_held = np.tile(np.asarray(u_plant, dtype=float), (n_sub, 1))
+            x_seg = np.asarray(plant_eval.jit.rollout(x_plant, u_held, t_k, h))
+            t_seg = t_k + h * np.arange(n_sub + 1)
             x_plant = x_seg[-1]
             sample_buffers = sample_plant_outputs(
                 plant_eval,
