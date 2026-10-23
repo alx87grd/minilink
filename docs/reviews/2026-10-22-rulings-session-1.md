@@ -134,3 +134,8 @@ of it in sampled-path.md §3.6; the numbers from `benchmarks/params_binding.py`.
   `evaluate` on several controllers (or solutions, or evaluations) with one key, returns a
   `Comparison` of `Evaluation`s with the table and the plot verbs (trajectory, cost, phase
   plane, control law, cost-to-go, paired difference). Lives in: end-state-api.md D9.
+- **R17 (D9b, 2026-10-23) `compute_forced` on the same engine.** Keeps its name and argument
+  kinds, gains `method="rk4" | "scipy"`; the fixed-step backends call the one `rollout` with
+  the step model's `hold`; the `euler` loop backend goes; SciPy keeps its interpolant;
+  `input_interp` becomes `hold`. Open: the `rk4_fixedsteps` forced default, `foh`
+  (byte-identical) or `zoh`. Lives in: end-state-api.md D9b; sampled-path.md §7 (S65).

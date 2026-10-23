@@ -307,6 +307,23 @@ An entry is a controller (evaluated here), a `PlanningSolution` (its policy; its
 kept for the last plot) or an `Evaluation`; mixed is fine; one `key` for all; the cost scored
 on the `plant` role. Today's `compare(*solutions)` keeps working.
 
+### D9b `compute_forced` on the same engine (ruled 2026-10-23)
+
+**Today:** `sys.compute_forced(u, …)` samples `u` on the grid, then four solver backends
+integrate it: SciPy adaptively with an `interp1d` interpolant between samples (`input_interp`,
+linear by default), `rk4_fixedsteps` through the compiled `rk4_integrate_linear` (**linear**
+between samples), `euler_fixedsteps` through the compiled `euler_integrate_zoh` (**held**), and
+an `euler` Python loop (held). The hold is chosen by the solver's name, silently.
+
+**Ruled:** `compute_forced` keeps its name and argument kinds (a callable `u(t)`, a constant, a
+sampled matrix, one port by `input_port_id`) and gains `method="rk4" | "scipy"` as `evaluate`
+does; the fixed-step backends call the one `ev.rollout(x0, u_seq, t0, dt, params, method=,
+hold=)`; the `euler` loop backend goes; SciPy keeps its interpolant as the one adaptive path;
+`input_interp` is replaced by the step model's `hold` (`zoh` / `foh`), one vocabulary for "what
+happens between samples" (S65's input-hold row closes here). A callable `u(t)` on the fixed-step
+path is sampled at the grid points. Open: whether `rk4_fixedsteps` forced runs keep `hold="foh"`
+as their default (byte-identical) or move to `zoh` (consistent, numbers change once).
+
 ### D10 `params` always an argument; freezing is a binding (S75, ask 6) — **ruled B, 2026-10-22**
 
 **Today:** every integrator exists frozen and with `params` (91 names across the two
