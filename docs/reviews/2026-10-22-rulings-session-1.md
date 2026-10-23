@@ -520,3 +520,7 @@ split when it starts; this section marks the reversals).
   keys kept, one first-order backend with the RL `Adam` moved, OPW-1–OPW-5 routing the parametric MPC
   solve through the same table) follows V1.5; the compile demos lose their hand loops in the same pass.
   Supersedes R25's deferral to "after the continuous core"; the second opinion's last item closed.
+- **R75 (2026-10-23) Show the mechanism once, then the tool.** Tutorial 07 keeps one short
+  hand-written gradient-descent loop, then the one-line `Optimizer(program, method="adam")` doing the
+  same; every other demo and notebook uses the `Optimizer`. The pattern is a teaching rule (RULES 6.15):
+  one place per hidden mechanism writes it out, then the tool, as the GRO501 from-scratch notebooks do.

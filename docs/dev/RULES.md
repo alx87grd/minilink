@@ -522,6 +522,12 @@ concrete formatting, ordered by the cost of being wrong:
   overlay (`show=False` then `plt.show()`, stacked `animate`). A script may still plot
   after the API in one file. Apply this when writing or editing a notebook; do not
   restyle an existing dense notebook unless asked.
+- **6.15 Show the mechanism once, then the tool.** Where a library verb hides a mechanism a
+  student should understand (a gradient-descent loop behind `Optimizer`, a Riccati iteration behind
+  `lqr`, an integration loop behind `compute_trajectory`), one teaching place writes the mechanism
+  out in a few lines, then shows the one-line tool doing the same and agreeing with it; every other
+  demo and notebook uses the tool. One place per mechanism, named in the doc that owns the tool
+  (ruled 2026-10-23, R75; tutorial 07 for gradient descent).
 
 ---
 

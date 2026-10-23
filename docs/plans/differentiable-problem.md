@@ -461,9 +461,7 @@ steps 1–6, §5 for 7–9); this list is the content.
 Each with the proposed answer. Taking one: the ruling goes to §4 or §8 here, to the dated
 record, and leaves ROADMAP §6.
 
-1. **Which tutorial keeps a hand-written loop**, if any: proposed, tutorial 07 keeps a six-line
-   `jax.value_and_grad` loop so the student sees there is no magic, followed by the one-line
-   `Optimizer` call every other demo uses.
+1. ~~Which tutorial keeps a hand-written loop~~: ruled, tutorial 07 (R75, RULES 6.15).
 2. **S73**: proposed, left as the self-contained row it is, scheduled when a course asks for a
    margin-constrained tuning.
 3. **The `CostIntegrator` block** (cost-params.md's research step): proposed, closed as a demo
