@@ -558,41 +558,36 @@ controller memory and draws on the tick, the dispatch of a sampled controller). 
 when convenient, not blocking: how the proposals carry MPPI, behavior cloning and diffusion
 policy ([future-policies.md](../plans/future-policies.md) §7).
 
-**Raised 2026-10-23, to discuss** (the alignment pass and an independent second opinion; the
-evidence, the options and a recommendation for each are in
-[the record](../reviews/2026-10-23-v03-alignment-and-second-opinion.md); none blocks SM-0, wave K
-or V1's steps 1–2):
+**Raised 2026-10-23, to discuss** (the alignment pass and an independent second opinion,
+merged and checked against the code; the evidence, the options and a recommendation for each
+are in [the record](../reviews/2026-10-23-v03-alignment-and-second-opinion.md) §3, whose numbers
+these are). None blocks SM-0, wave K or V1's step 1; items 1–5 block V1's step 2, and the
+record recommends a one-day spike of the scoring formula on the pendulum before it.
 
-- **Where the line between v0.3 and v0.4 falls for the Monte Carlo evaluator.** v0.3 changes
-  the `Evaluation` record and the scoring formula (V1's step 2); the Monte Carlo evaluator keeps
-  its own copy of the old rule until V1's step 7 in v0.4, so for one release two scorers give
-  two numbers for one run. The calendar rule (numbers may move behind the pinned release the
-  course runs on) removed the reason to wait. Recommended: pull the fold (step 7 without RN-4's
-  per-block seeds) into v0.3, or accept the two scorers for one release.
-- **`evaluate`'s automatic `dt`.** The design says "a tenth of the smallest time constant, 0.01
-  fallback"; the code's fallback on a loop that declares no time constant is 1e-4 s (100 000
-  steps for 10 s). Recommended: `evaluate` and `compare` require `dt` when the loop declares no
-  time constant, with the line to write in the message.
-- **The reference from `x_goal`.** `r` is filled from `x_goal`, a state; a controller whose `r`
-  is an output reference (a PID on `y`) needs `h(x_goal)` or a refusal. Recommended: fill `r`
-  with the plant's output at `x_goal` when the controller's `r` has the output's size, the
-  state when it has the state's, refuse otherwise.
-- **A diverging run inside the program export.** With no cut and no saturating cost in this
-  phase, an optimizer step into an unstable gain gives an infinite or NaN objective and the
-  solve fails instead of backing off. Recommended: `program` warns and the objective is capped
-  at `infeasible_cost` per run, or the saturating cost wrapper enters the phase.
-- **`evaluate` on a stochastic problem in v0.3** with `n_trials = 1`: the nominal problem or the
-  draw of `key`. Recommended: refuse a stochastic problem in v0.3 except through
-  `MonteCarloEvaluator`, unless the fold moves into v0.3 (the first item).
-- **The slot of the sampled loop (S31)**: v0.3 if the calendar leaves room before wave G, else
-  the first core row of v0.4; and the slot of S74, deferred, which S76 needs first.
-- **`criterion_value`**, the proposed name of the criterion over the runs: to confirm.
-- **An exit priced two ways**: the RL environment ends an episode at the first exit, `evaluate`
-  integrates to `tf` (R19), so a policy trains on one rule and is judged on another.
-  Recommended: RL's termination the documented exception, tested equal on a run that never
-  exits.
-- **The `params["dt"]` fallback of `discretize`**: R7 says `dt` is required; proposed, drop the
-  fallback with a ledger line.
+- **The scoring formula** (major): (1) a diverging run scores NaN and counts as feasible, since
+  "no mask, no stop" drops today's finite guard; (2) the default price `g_max · tf` is `+inf`
+  under the default unbounded sets, and `inf · 0` makes successful runs NaN; (3) `x_goal` still
+  builds a singleton `Xf`, so no closed-loop run is ever "reached"; (4) the program's objective
+  is priced and its rows are the margins, counting infeasibility twice; (5) `evaluate`'s
+  automatic `dt` is 1e-4 s on almost every plant: recommended, `dt` required.
+- **The calendar** (major): (6) the GMC714 audit (G1) has not started; (7) the 13 GRO860 course
+  notebooks clone `main` with no tag, so the "pinned release" the calendar rule relies on does
+  not exist yet (V6 pulled forward, before `dev` merges to `main`); (8) v0.3's scope against the
+  maintainer's attention: proposed cuts to v0.4 (SM-7, SM-6's move, A2, K4, K8-3, S31) and a
+  GMC714 API freeze on December 1; (9) MPC (a sampled controller) and robust control (the draws)
+  fall on the wrong side of the v0.3 / v0.4 line if GMC714 needs them in `evaluate`.
+- **Moderate**: (10) the Monte Carlo evaluator keeps the old rule for one release (pull the fold
+  into v0.3, or accept); (11) `U` unbounded by default changes trajectory optimization and
+  `plant.input_box` does not exist yet; (12) `hold` belongs to the rollout, not the one-step map,
+  and R18's forced `zoh` degrades RK4 on a callable `u(t)`; (13) `r` from `x_goal` has a
+  dimension gap (`h(x_goal)` proposed); (14) a role-less trajectory scored by its dimension is
+  inference; (15) the cost's parameters have three homes and the sets' none; (16) `method=`
+  against the Simulator's `solver=`; (17) an exit priced two ways, RL training against
+  evaluation; (18) the slots of S31 and S74.
+- **Minor**: (19) `criterion_value` to confirm, and `value` with three meanings where the notes
+  say `J`; (20) `evaluate` on a stochastic problem in v0.3; (21) `discretize`'s `params["dt"]`
+  fallback; (22) the autotuning demo's gain regularizer has no place in the program; (23) V1.1
+  is a core rewrite, to split; (24) two reversals the rulings record does not mark.
 
 **Before v0.4 (S76, the parametric program)**
 

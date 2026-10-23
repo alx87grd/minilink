@@ -141,7 +141,9 @@ deployment (C export) as a pillar.
 **Ruled 2026-10-22 (yes, amended):** the six pillars are *tooling* pillars standing on two
 foundations: **modelling** is the primary foundation (the `System` and its algebra, the
 catalog plants, compile and the rollout), **optimization** the secondary one (the
-`MathematicalProgram` and the `Optimizer`, the solver boundary every pillar lowers to). RRT
+`MathematicalProgram` and the `Optimizer`, the solver boundary every pillar lowers to);
+amended the same day (R1 amended): the problem statement (`PlanningProblem`,
+`StochasticPlanningProblem`, `PlanningSolution`) is the third foundation. RRT
 stays a side pillar kept small; deployment stays experimental until a vehicle runs it. The
 sentence for CONSTITUTION §1 (the maintainer's to place):
 
@@ -504,17 +506,18 @@ than those two facts:
 
 ```python
 plant = DiagramSystem()                                   # a box of three blocks with the standard edge
-plant.add_subsystem("motor", DCMotor()); plant.add_subsystem("arm", Arm()); plant.add_subsystem("encoder", Quantizer())
-plant.connect("motor:torque", "arm:tau"); plant.connect("arm:q", "encoder:u")
-plant.add_input_port("u", "motor:v"); plant.connect_new_output_port("y", "encoder:y"); plant.expose("x")
+plant.add_subsystem(DCMotor(), "motor"); plant.add_subsystem(Arm(), "arm"); plant.add_subsystem(Quantizer(), "encoder")
+plant.connect("motor", "torque", "arm", "tau"); plant.connect("arm", "q", "encoder", "u")
+plant.expose_input("u", [("motor", "v")]); plant.connect_new_output_port("encoder", "y", "y"); plant.connect_new_output_port("arm", "x", "x")
 problem = PlanningProblem(plant, cost=cost, X=box_over_plant_x, U=ubox, tf=5.0)      # stated on the plant box
 
 loop = DiagramSystem()
-loop.add_subsystem("plant", plant)                        # the reserved key: this block is scored
-loop.add_subsystem("speed_ctl", PI(2.0, 0.5)); loop.add_subsystem("pos_ctl", PD(10.0, 1.0)); loop.add_subsystem("filter", LowPassFilter(cutoff_hz=20))
-loop.connect("plant:y", "filter:u"); loop.connect("filter:y", "pos_ctl:y"); loop.connect("pos_ctl:u", "speed_ctl:r")
-loop.connect("plant:x", "speed_ctl:y", slice=velocity); loop.connect("speed_ctl:u", "plant:u")
-loop.add_input_port("r", "pos_ctl:r")                     # left free: filled from the problem
+loop.add_subsystem(plant, "plant")                        # the reserved key: this block is scored
+loop.add_subsystem(PI(2.0, 0.5), "speed_ctl"); loop.add_subsystem(PD(10.0, 1.0), "pos_ctl")
+loop.add_subsystem(LowPassFilter(cutoff_hz=20), "filter"); loop.add_subsystem(Demux((1, 1), port="x"), "split")
+loop.connect("plant", "y", "filter", "u"); loop.connect("filter", "y", "pos_ctl", "y"); loop.connect("pos_ctl", "u", "speed_ctl", "r")
+loop.connect("plant", "x", "split", "x"); loop.connect("split", "x[1]", "speed_ctl", "y"); loop.connect("speed_ctl", "u", "plant", "u")
+loop.expose_input("r", [("pos_ctl", "r")])               # left free: filled from the problem
 
 pe = problem.compile(loop, dt=0.001)
 pe.params                 # {"plant": {"motor": …, "arm": …, "encoder": …}, "speed_ctl": …, "pos_ctl": …, "filter": …, "cost": …, "x0": …, "r": …}
@@ -574,13 +577,13 @@ evaluate_trajectory(problem, traj)                 -> Evaluation     # one row
 pe = problem.compile(loop_or_controller, dt)       -> ProblemEvaluator
 pe.params                                          # the nominal pytree: the loop's params + cost, x0, the free boundary inputs
 pe.trajectory(params=None, key=None)               -> Trajectory      # one run, every signal recorded; key=None the nominal draw
-pe.evaluate(params=None, key=0, n_trials=1)        -> Evaluation      # one run or n draws, the same record
+pe.evaluate(params=None, key=0, n_trials=1, *, record=False)      -> Evaluation      # one run or n draws, the same record
 pe.program(wrt, bounds=None, key=0, n_trials=1)    -> MathematicalProgram   # objective: pe.evaluate(...).criterion_value
 pe.pack(params, wrt) / pe.unpack(z, wrt)
 jax.grad(lambda p: pe.evaluate(p, key, 200).criterion_value)(pe.params)    # the researcher's line
 
 # the student's verbs
-evaluate(problem, arg, *, dt=None, method="rk4", n_trials=1, key=0) -> Evaluation
+evaluate(problem, arg, *, dt=None, method="rk4", n_trials=1, key=0, record=False) -> Evaluation
 compare(problem, **args, dt=None, n_trials=1, key=0)                -> Comparison
 ```
 

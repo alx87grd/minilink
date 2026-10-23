@@ -307,8 +307,9 @@ pick):
 sampled-path.md, cost-params.md, randomness.md) were rewritten to it on 2026-10-23, and the rows
 below are its steps with their gates. The first code is the step model's baseline (SM-0). The
 points the alignment pass and the second opinion raised are the **[ask]** row "Raised
-2026-10-23" at the end of this section (ROADMAP §6 lists them); none of them blocks SM-0, wave K
-or V1's steps 1–2.
+2026-10-23" at the end of this section (ROADMAP §6 lists them); none blocks SM-0, wave K or
+V1's step 1, and items 1–5 (the scoring formula) are to rule before V1's step 2, after a one-day
+spike of the formula on the pendulum.
 
 **Order** (reorganized 2026-10-21, [record](../reviews/2026-10-21-roadmap-reorganization.md);
 the rulings of 2026-10-22/23 fixed the rest): **G1 now**, in parallel with everything (it is
@@ -546,7 +547,8 @@ reads its math next to `dp.py` before it lands.
 - [ ] **Raised 2026-10-23, to discuss with the maintainer** **[ask]**: the points the alignment
   pass and the independent second opinion found, each with the evidence, the options and a
   recommendation, in [the record](../reviews/2026-10-23-v03-alignment-and-second-opinion.md);
-  ROADMAP §6 lists them under "Raised 2026-10-23". Done when each is ruled (its answer to the
+  ROADMAP §6 lists them under "Raised 2026-10-23". First: G1 (item 6), the Colab pin (item 7)
+  and the scoring formula (items 1–5, before V1.2). Done when each is ruled (its answer to the
   plan doc it shapes) or dropped.
 
 **Wave G — the GMC714 features** (December, after wave K and the continuous core, in the order G1 sets;

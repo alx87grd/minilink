@@ -263,11 +263,11 @@ saturating cost wrapper, not by a mask.
 pe = problem.compile(loop_or_controller, dt, *, substeps=1, backend="auto")   # ProblemEvaluator
 pe.params                                          # the loop's params by block path + "cost", "x0", the free boundary inputs
 pe.trajectory(params=None, key=None)               # one run, every signal recorded; key=None the nominal draw
-pe.evaluate(params=None, key=0, n_trials=1)        # one run or n draws, the Evaluation
+pe.evaluate(params=None, key=0, n_trials=1, *, record=False)      # one run or n draws, the Evaluation
 pe.program(wrt, bounds=None, key=0, n_trials=1)    # MathematicalProgram, objective pe.evaluate(...).criterion_value, draws realized once
 pe.pack(params, wrt) -> z;  pe.unpack(z, wrt) -> params
 
-evaluate(problem, arg, *, dt=None, method="rk4", n_trials=1, key=0)   # == problem.compile(arg, dt).evaluate(key=, n_trials=)
+evaluate(problem, arg, *, dt=None, method="rk4", n_trials=1, key=0, record=False)   # == problem.compile(arg, dt).evaluate(key=, n_trials=)
 #   method="scipy": the adaptive Simulator, one run per trial, the one-line escape
 #   dt=None: the Simulator's automatic rule, a tenth of the declared smallest time constant; on a loop that
 #   declares none that is 1e-4 s (the 1e-3 default), the open question raised in ROADMAP §6 (2026-10-23)
@@ -357,17 +357,18 @@ Robust tuning and identification are the same lines on a stochastic problem, or 
 
 ```python
 plant = DiagramSystem()                                   # a box with the standard edge: u in, y and x out
-plant.add_subsystem("motor", DCMotor()); plant.add_subsystem("arm", Arm()); plant.add_subsystem("encoder", Quantizer())
-plant.connect("motor:torque", "arm:tau"); plant.connect("arm:q", "encoder:u")
-plant.add_input_port("u", "motor:v"); plant.connect_new_output_port("y", "encoder:y"); plant.expose("x")
+plant.add_subsystem(DCMotor(), "motor"); plant.add_subsystem(Arm(), "arm"); plant.add_subsystem(Quantizer(), "encoder")
+plant.connect("motor", "torque", "arm", "tau"); plant.connect("arm", "q", "encoder", "u")
+plant.expose_input("u", [("motor", "v")]); plant.connect_new_output_port("encoder", "y", "y"); plant.connect_new_output_port("arm", "x", "x")
 problem = PlanningProblem(plant, cost=cost, X=box_over_plant_x, U=ubox, tf=5.0)     # stated on the plant box
 
 loop = DiagramSystem()
-loop.add_subsystem("plant", plant)                        # the reserved key: this block is scored
-loop.add_subsystem("speed_ctl", PI(2.0, 0.5)); loop.add_subsystem("pos_ctl", PD(10.0, 1.0)); loop.add_subsystem("filter", LowPassFilter(cutoff_hz=20))
-loop.connect("plant:y", "filter:u"); loop.connect("filter:y", "pos_ctl:y"); loop.connect("pos_ctl:u", "speed_ctl:r")
-loop.connect("plant:x", "speed_ctl:y", slice=velocity); loop.connect("speed_ctl:u", "plant:u")
-loop.add_input_port("r", "pos_ctl:r")                     # left free: filled from the problem
+loop.add_subsystem(plant, "plant")                        # the reserved key: this block is scored
+loop.add_subsystem(PI(2.0, 0.5), "speed_ctl"); loop.add_subsystem(PD(10.0, 1.0), "pos_ctl")
+loop.add_subsystem(LowPassFilter(cutoff_hz=20), "filter"); loop.add_subsystem(Demux((1, 1), port="x"), "split")
+loop.connect("plant", "y", "filter", "u"); loop.connect("filter", "y", "pos_ctl", "y"); loop.connect("pos_ctl", "u", "speed_ctl", "r")
+loop.connect("plant", "x", "split", "x"); loop.connect("split", "x[1]", "speed_ctl", "y"); loop.connect("speed_ctl", "u", "plant", "u")
+loop.expose_input("r", [("pos_ctl", "r")])               # left free: filled from the problem
 
 pe = problem.compile(loop, dt=0.001)
 pe.params        # {"plant": {"motor": …, "arm": …, "encoder": …}, "speed_ctl": …, "pos_ctl": …, "filter": …, "cost": …, "x0": …, "r": …}
