@@ -94,7 +94,6 @@ state-feedback block):
 | `analysis/` | one calling pattern `tool(sys, x_bar, u_bar, t, params, *, method="auto", eps)` on any `System` (the linear model as is, the rest linearized at the operating point): `jacobian`, `linearize` (→ `LTISystem`), the one-channel frequency and time tools (`bode`, `pzmap`, `nyquist`, `margins`, `root_locus`, `step_response`, `step_info`, `transfer_function`, the sensitivity functions) with their `plot_` twins, `structural` (controllability, observability, `minreal`), `equilibria`, `modal`, `lyapunov`, `riccati`, `discretization`. The API reference is the docs site |
 | `planning/` | `problems.py`, `results.py`, `evaluation.py`, `comparison.py`; `trajectory_optimization/`, `policy_synthesis/` (DP), `reinforcement_learning/`, `search/` (RRT), `spatial/` (scenes; **retires** into `core/geometry/`) |
 | `optimization/` | `MathematicalProgram`, `Optimizer` (generic NLP) |
-| `identification/` | fit parametric systems to data (planned; physical params and NN weights are the same verb) |
 | `graphical/` | signals, phase plane, diagrams, animation |
 | `interfaces/` | lazy facade: `Sys2Gym` / `SB3Controller` (gymnasium extra); cosimulation / MJX planned |
 

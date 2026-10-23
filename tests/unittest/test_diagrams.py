@@ -218,17 +218,8 @@ class TestDiagrams(unittest.TestCase):
         self.assertEqual(inputs["r"], ("controller", "r"))
         self.assertEqual(outputs["y_meas"], ("plant", "y"))
 
-    def test_mermaid_exporter_returns_deterministic_source(self):
-        source = export_diagram_topology(self._make_diagram(), backend="mermaid")
-        self.assertIn("flowchart LR", source)
-        self.assertIn('controller["P::controller"]', source)
-        self.assertIn('input -- "r -> r" --> controller', source)
-        self.assertIn('plant -- "y -> y_meas" --> output', source)
-
     def test_exporters_refuse_keywords_they_do_not_take(self):
         diagram = self._make_diagram()
-        with self.assertRaisesRegex(TypeError, "direction"):
-            export_diagram_topology(diagram, backend="mermaid", direction="TB")
         pytest.importorskip("graphviz")
         with self.assertRaisesRegex(TypeError, "rank_dir"):
             export_diagram_topology(diagram, backend="graphviz", rank_dir="TB")
@@ -242,7 +233,7 @@ class TestDiagrams(unittest.TestCase):
         diagram = self._make_diagram()
         for backend in (3, object()):
             with self.subTest(backend=backend):
-                with self.assertRaisesRegex(TypeError, "'graphviz', 'mermaid'"):
+                with self.assertRaisesRegex(TypeError, "'graphviz' or an exporter"):
                     export_diagram_topology(diagram, backend=backend)
 
         class NodeLister:
@@ -490,20 +481,6 @@ class TestNestedDiagramPlot(unittest.TestCase):
             get_diagram(diagram, expand=True).source,
             get_diagram(diagram, expand=False).source,
         )
-
-    def test_mermaid_exporter_nests_subgraphs(self):
-        loop = _build_nested_speed_loop()
-        source = export_diagram_topology(loop, backend="mermaid")
-        self.assertIn('  subgraph controller["Controller::controller"]', source)
-        self.assertIn('    controller__pi["PI::pi"]', source)
-        self.assertIn('    subgraph controller__limiter["Limiter::limiter"]', source)
-        self.assertIn('      controller__limiter__sat["Saturation::sat"]', source)
-        self.assertEqual(source.count("  end"), 2)
-        self.assertIn('ref -- "y -> r" --> controller__pi', source)
-        self.assertIn('controller__limiter__sat -- "y -> u" --> plant', source)
-        collapsed = export_diagram_topology(loop, backend="mermaid", expand=False)
-        self.assertNotIn("subgraph", collapsed)
-        self.assertIn('controller["Controller::controller"]', collapsed)
 
 
 import numpy as np

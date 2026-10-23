@@ -112,14 +112,9 @@ def export_hybrid_topology(
         from minilink.graphical.diagrams.hybrid_dot import export_hybrid_graphviz
 
         return export_hybrid_graphviz(topology, **kwargs)
-    if key == "mermaid":
-        # A real cycle: hybrid_mermaid imports the boundary anchors from this module
-        from minilink.graphical.diagrams.hybrid_mermaid import export_hybrid_mermaid
-
-        return export_hybrid_mermaid(topology, **kwargs)
 
     raise ValueError(
-        f"Unknown hybrid topology backend {backend!r}. Expected 'graphviz' or 'mermaid'."
+        f"Unknown hybrid topology backend {backend!r}. Expected 'graphviz'."
     )
 
 

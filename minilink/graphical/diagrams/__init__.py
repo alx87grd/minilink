@@ -1,4 +1,4 @@
-"""Block diagrams: a system's topology, flat or hybrid, exported to Graphviz or Mermaid and drawn."""
+"""Block diagrams: a system's topology, flat or hybrid, exported to Graphviz and drawn."""
 
 from minilink.graphical.diagrams.dot import (
     get_diagram,

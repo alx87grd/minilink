@@ -531,19 +531,6 @@ class TestHybridTopology(unittest.TestCase):
             if os.path.exists(svg_path):
                 os.unlink(svg_path)
 
-    def test_mermaid_source(self):
-        source = export_hybrid_topology(
-            _build_hybrid_hybrid_topology(), backend="mermaid"
-        )
-        self.assertIn('subgraph Plant["Plant"]', source)
-        self.assertIn('subgraph Computer["', source)
-        self.assertIn('subgraph StepDiagram["StepDiagram"]', source)
-        self.assertIn("plant__plant", source)
-        self.assertIn("computer__filter", source)
-        self.assertIn("ZOH", source)
-        self.assertIn("sample", source)
-        self.assertIn("dt_base=0.01", source)
-
 
 def _reference(k):
     return np.array([1.0 if k < 60 else 0.0])
