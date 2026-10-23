@@ -142,3 +142,13 @@ of it in sampled-path.md §3.6; the numbers from `benchmarks/params_binding.py`.
 - **R18 (2026-10-23) The forced hold is `zoh` everywhere.** `rk4_fixedsteps` forced runs stop
   interpolating the input linearly; their numbers change once (baseline, ledger line). The
   knobs `method`, `substeps`, `hold` are static Python values, never traced (sampled-path §3.6).
+- **R19 (D16 revised, 2026-10-23) One evaluation of a run: no event, no mask, no stop.** Every
+  run is integrated to `tf`; `evaluate_trajectory` returns `TrajectoryEvaluation(cost, value,
+  feasibility_margin, failed, reachability_margin, reached)` with `cost` the plain discounted
+  integral plus `e^{−ρ tf} h(x(tf))`, `failed` from the minimum margin to `X` and `U` over the
+  run, `reached` from `Xf.margin(x(tf))` (`Xf=None` means reached), and `value = cost +
+  infeasible_cost · (failed or not reached)`. Minimum time is `TimeCost`. A diverging failed run
+  is handled later by a saturating cost wrapper, not a mask. The discount applies to `g` and `h`
+  everywhere; `x_goal` and `cost.xbar` are reconciled at construction. This replaces R9's "cut
+  at the first exit". Lives in: end-state-api.md D16; the field inventory
+  (docs/reviews/2026-10-23-planning-problem-field-inventory.md).

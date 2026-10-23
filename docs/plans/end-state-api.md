@@ -417,25 +417,46 @@ a diagram; a `Computer` (anything built by `%`) runs the sampled kernel's JAX fa
 second branch refuses with a message naming step 7b; in v0.4 it lands. One `compile`,
 `evaluate`, `tune` for both kinds.
 
-### D16 The cost of a trajectory: one formula, and who owns what (V1 step 2)
+### D16 The cost of a trajectory and the problem's fields (V1 step 2) — **ruled 2026-10-22, revised 2026-10-23**
 
-**Today:** five scoring rules with four quadratures; `h` charged by some and not others;
-`discount_rate` an attribute of the cost.
+**Today:** five scoring rules with four quadratures, and eight consumers reading the problem's
+fields eight ways ([the inventory](../reviews/2026-10-23-planning-problem-field-inventory.md)):
+`Xf` a hard terminal equality in trajectory optimization and ignored elsewhere; `X` hard, or
+priced INF, or an episode end, or a cut; `U` ignored by LQR and RL; `tf` a 10 s default for RL
+and the evaluator; `infeasible_cost` 1e6, a derived bound or +inf; `x_goal` never checked
+against the cost's target.
 
-**Ruled 2026-10-22:** one function, `evaluate_trajectory(problem, traj)` (the name; today's
-`score_trajectory` and `CostFunction.evaluate_trajectory` fold into it), the one body on `xp`:
-trapezoid on the trajectory's own grid, the problem's discount `e^{−ρt}`, cut at the first exit
-from `X` and charged `infeasible_cost`, `h(x_N, t_N)` added exactly when `tf` is finite. Same
-numbers as today on NumPy; traceable on JAX. An infinite horizon with a nonzero `h` warns once
-at problem construction. **Ownership:** the cost owns the integrand, `g(x, u, t)` and
-`h(x_f, t_f)`; the problem owns the functional's shape: `tf`, `X`, `U`, `Xf`,
-`infeasible_cost` and **`discount_rate`** (moved from `CostFunction`; RL's γ and DP read it
-on the problem; one ledger line).
+**Ruled: one evaluation of a run, no event, no mask, no stop.** Every run is integrated to `tf`;
+then, in one pass:
 
-```python
-problem = PlanningProblem(plant, cost=QuadraticCost(Q, R, S), X=box, tf=10.0, discount_rate=0.1)
-J = evaluate_trajectory(problem, traj)          # the one formula, every tool
 ```
+feasibility_margin  = min over the run of X.margin(x_k), U.margin(u_k)     failed  = margin < 0
+reachability_margin = Xf.margin(x(tf))                                       reached = margin ≥ 0   (Xf=None ⇒ reached)
+cost                = ∫₀^{tf} e^{−ρt} g dt  +  e^{−ρ tf} h(x(tf))             the plain integral, trapezoid on the trajectory's grid
+value               = cost + infeasible_cost · (failed or not reached)       the one scalar tune and evaluate rank by
+```
+
+`evaluate_trajectory(problem, traj) -> TrajectoryEvaluation(cost, value, feasibility_margin,
+failed, reachability_margin, reached)`, a frozen pytree record: the two margins are the
+differentiable carriers (the program bridge's constraint rows), the booleans and `value`'s jump
+the reported facts. Minimum time is `TimeCost` (`g = 1` outside the goal), no stopping needed.
+If a diverging plant makes a failed run's `cost` huge, the fix is a saturating cost wrapper,
+not a mask (the maintainer, 2026-10-23); a NaN from the model is a model bug.
+
+**Ownership.** The cost owns `g` and `h`; the problem owns `tf`, `X`, `U`, `Xf`,
+`infeasible_cost` and **`discount_rate`** (moved from `CostFunction`; RL's γ and DP read it
+there). The discount applies to `g` and to `h` by every consumer, the trajectory-optimization
+objective included (its baselines declare no rate, so they stay bit-identical).
+`infeasible_cost` has one default, `cost.g_max(X, U) · tf` (or `/ ρ`), and one place.
+
+**One meaning per field, for every consumer.** `X`, `U`: constraints along the run, enforced
+where a planner can (trajectory optimization, RRT, DP's grid), judged by the margin for any
+run. `Xf`: the goal set, enforced by the open-loop planners, judged by `reached` for any run;
+`Xf=None` is a regulation problem. `x_goal`: one point of `Xf` and the cost's target, checked
+against `cost.xbar` at construction (derive one from the other, refuse a conflict). `tf`:
+finite, the horizon; `None`, infinite, simulated over an `episode_length` the tool names and
+no `h`. Still to rule: whether DP and RL refuse an unbounded `X` instead of silently using the
+state box, and whether RL's action space reads `U` instead of the port box (D31).
 
 ### D17 The noun — ruled with D9
 
