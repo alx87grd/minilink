@@ -18,6 +18,11 @@ from minilink.core.compile.evaluators.evaluators import (
 )
 from minilink.core.compile.evaluators.jacobian import NumpyJacobianMixin
 from minilink.core.compile.evaluators.step_rollout import StepRolloutMixin, gather_u
+from minilink.core.compile.evaluators.stepping import (
+    held_inputs,
+    require_step_knobs,
+    step_body,
+)
 from minilink.core.compile.evaluators.tiers import NoTraceTierMixin
 from minilink.core.compile.execution_plan import ExecutionPlan
 from minilink.core.compile.step_execution_plan import StepExecutionPlan
@@ -31,6 +36,75 @@ from minilink.core.system import DynamicSystem, StepSystem, System
 
 class IntegrationMixin:
     """RK4 / Euler integration on :meth:`f`, :meth:`f_p`, :meth:`f_ivp`, :meth:`f_ivp_p`."""
+
+    # --- The step model: one body per backend ---
+
+    def step(self, x, u, t, params=None, *, dt, solver="rk4", substeps=1):
+        """``x_{k+1}``: the plant one sample period ``dt`` later, ``u`` held over it.
+
+        ``params=None`` reads the compiled parameters; ``solver`` (``"rk4"``,
+        ``"euler"``) and ``substeps`` are Python values.
+        """
+        require_step_knobs(solver, substeps)
+        f = self.rhs_of(params)
+
+        x_next = step_body(f, x, u, u, t, dt, solver, substeps)
+
+        return x_next
+
+    def rollout(
+        self,
+        x0,
+        u_seq,
+        t0,
+        dt,
+        params=None,
+        *,
+        solver="rk4",
+        substeps=1,
+        hold="zoh",
+        n_steps=None,
+    ):
+        """``[x_0, …, x_N]``, shape ``(N + 1, n)``: the step model looped over ``u_seq``.
+
+        ``hold="zoh"`` holds each row of ``u_seq`` (shape ``(N, m)``) over its
+        period; ``hold="foh"`` reads ``u_seq`` as ``N + 1`` knots, linear between
+        them. ``u_seq=None`` holds the nominal input for ``n_steps`` periods.
+        """
+        require_step_knobs(solver, substeps, hold)
+
+        f = self.rhs_of(params)
+        x = np.asarray(x0, dtype=float).reshape(self.n)
+        u_seq = self.input_sequence_of(u_seq, n_steps, hold)
+        u_start, u_end = held_inputs(u_seq, hold)
+
+        # x_{k+1} = Φ(x_k, u_k, t_k), t_k = t₀ + k dt
+        x_samples = [x]
+        for k in range(u_start.shape[0]):
+            x = step_body(f, x, u_start[k], u_end[k], t0 + k * dt, dt, solver, substeps)
+            x_samples.append(x)
+
+        return np.array(x_samples)
+
+    def rhs_of(self, params):
+        """``f(x, u, t)`` on the compiled parameters, or on ``params``."""
+        if params is None:
+            return self.f
+        f_p = self.f_p
+
+        return lambda x, u, t: f_p(x, u, t, params)
+
+    def input_sequence_of(self, u_seq, n_steps, hold):
+        """The input sequence as a ``(rows, m)`` array; the nominal input repeated when None."""
+        if u_seq is None:
+            rows = int(n_steps) + (1 if hold == "foh" else 0)
+            return np.tile(np.asarray(self._u_nominal, dtype=float), (rows, 1))
+
+        u_seq = np.asarray(u_seq, dtype=float)
+        if u_seq.ndim != 2 or u_seq.shape[1] != self.m:
+            raise ValueError(f"u_seq must have shape (N, {self.m}), got {u_seq.shape}")
+
+        return u_seq
 
     # --- RK4 step (ZOH) ---
 

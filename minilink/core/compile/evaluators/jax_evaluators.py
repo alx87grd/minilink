@@ -19,6 +19,11 @@ from minilink.core.compile.evaluators.evaluators import (
 )
 from minilink.core.compile.evaluators.jacobian import JaxJacobianMixin
 from minilink.core.compile.evaluators.step_rollout import StepRolloutMixin
+from minilink.core.compile.evaluators.stepping import (
+    held_inputs,
+    require_step_knobs,
+    step_body,
+)
 from minilink.core.compile.evaluators.tiers import TraceTierMixin, register_jit_aliases
 from minilink.core.compile.execution_plan import (
     EXTERNAL_INPUT,
@@ -34,6 +39,19 @@ from minilink.core.system import DynamicSystem, StepSystem, System
 # =============================================================================
 # Public API — JaxIntegrationMixin (textbook)
 # =============================================================================
+
+
+class JitForms:
+    """The step model's bodies compiled once with ``jax.jit``, the knobs static."""
+
+    def __init__(self, evaluator):
+        jax = evaluator.jax
+
+        self.step = jax.jit(evaluator.step, static_argnames=("solver", "substeps"))
+        self.rollout = jax.jit(
+            evaluator.rollout,
+            static_argnames=("solver", "substeps", "hold", "n_steps"),
+        )
 
 
 class JaxIntegrationMixin:
@@ -183,6 +201,9 @@ class JaxIntegrationMixin:
         self._euler_integrate_ivp_trace_fn = _euler_integrate_ivp_trace_fn
         self._euler_integrate_ivp_trace_p_fn = _euler_integrate_ivp_trace_p_fn
 
+        # The step model's compiled forms, built on first use
+        self._jit_forms = None
+
         # Lazy rollout JIT slots (bound on first call; no compile-time warm-start)
         self._jit_rk4_integrate_zoh = None
         self._jit_rk4_integrate_zoh_p = None
@@ -194,6 +215,88 @@ class JaxIntegrationMixin:
         self._jit_euler_integrate_zoh_p = None
         self._jit_euler_integrate_ivp = None
         self._jit_euler_integrate_ivp_p = None
+
+    # --- The step model: one traced body per backend ---
+
+    def step(self, x, u, t, params=None, *, dt, solver="rk4", substeps=1):
+        """``x_{k+1}``: the plant one sample period ``dt`` later, ``u`` held over it.
+
+        ``params=None`` reads the compiled parameters; ``solver`` (``"rk4"``,
+        ``"euler"``) and ``substeps`` are static. Traceable; ``ev.jit.step`` is
+        the same body compiled once.
+        """
+        require_step_knobs(solver, substeps)
+        f = self.rhs_of(params)
+
+        x_next = step_body(f, x, u, u, t, dt, solver, substeps)
+
+        return x_next
+
+    def rollout(
+        self,
+        x0,
+        u_seq,
+        t0,
+        dt,
+        params=None,
+        *,
+        solver="rk4",
+        substeps=1,
+        hold="zoh",
+        n_steps=None,
+    ):
+        """``[x_0, …, x_N]``, shape ``(N + 1, n)``: the step model scanned over ``u_seq``.
+
+        ``hold="zoh"`` holds each row of ``u_seq`` (shape ``(N, m)``) over its
+        period; ``hold="foh"`` reads ``u_seq`` as ``N + 1`` knots, linear between
+        them. ``u_seq=None`` holds the nominal input for ``n_steps`` periods.
+        """
+        jax = self.jax
+        jnp = self.jnp
+        require_step_knobs(solver, substeps, hold)
+
+        f = self.rhs_of(params)
+        x0 = jnp.asarray(x0)
+        u_seq = self.input_sequence_of(u_seq, n_steps, hold)
+        u_start, u_end = held_inputs(u_seq, hold)
+        ks = jnp.arange(u_start.shape[0])
+
+        # x_{k+1} = Φ(x_k, u_k, t_k), t_k = t₀ + k dt
+        def period(x, inputs):
+            k, ua, ub = inputs
+            x_next = step_body(f, x, ua, ub, t0 + k * dt, dt, solver, substeps)
+            return x_next, x_next
+
+        _, xs = jax.lax.scan(period, x0, (ks, u_start, u_end))
+        x_samples = jnp.concatenate((x0[None, :], xs), axis=0)
+
+        return x_samples
+
+    @property
+    def jit(self):
+        """The step model compiled once: ``ev.jit.step(...)``, ``ev.jit.rollout(...)``."""
+        if self._jit_forms is None:
+            self._jit_forms = JitForms(self)
+
+        return self._jit_forms
+
+    def rhs_of(self, params):
+        """``f(x, u, t)`` on the compiled parameters, or on ``params``."""
+        if params is None:
+            return self._f_trace_fn
+        f_p = self._f_trace_p_fn
+
+        return lambda x, u, t: f_p(x, u, t, params)
+
+    def input_sequence_of(self, u_seq, n_steps, hold):
+        """The input sequence as an array; the nominal input repeated when ``u_seq`` is None."""
+        jnp = self.jnp
+        if u_seq is not None:
+            return jnp.asarray(u_seq)
+
+        rows = int(n_steps) + (1 if hold == "foh" else 0)
+
+        return jnp.tile(jnp.asarray(self._u_nominal), (rows, 1))
 
     # --- RK4 step (ZOH) ---
 

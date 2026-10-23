@@ -1201,3 +1201,128 @@ class TestRolloutBatch(unittest.TestCase):
             self.ev.rollout_batch(self.x0s[:, :1], n_steps=3, dt=self.dt)
         with self.assertRaises(ValueError):
             self.ev.rollout_batch(self.x0s, np.zeros((3, 5, 1)), dt=self.dt)
+
+
+# The step model: one step body and one rollout body per backend
+
+
+def step_model_plants():
+    from minilink import PID, Pendulum
+
+    return [Pendulum(), PID(Kp=5.0, Ki=1.0, Kd=1.0) @ Pendulum()]
+
+
+def held_inputs_of(ev, n_steps=12):
+    k = np.arange(n_steps)[:, None]
+    return 0.3 * np.sin(0.4 * k + np.arange(ev.m)[None, :])
+
+
+@pytest.mark.parametrize(
+    "backend", ["numpy", pytest.param("jax", marks=pytest.mark.jax)]
+)
+@pytest.mark.parametrize("index", [0, 1], ids=["leaf", "diagram"])
+def test_rk4_rollout_is_the_textbook_scheme_step_by_step(backend, index):
+    """``rollout`` is ``step`` repeated at ``t_k = t₀ + k dt``, and RK4 is the four-stage formula."""
+    if backend == "jax":
+        pytest.importorskip("jax")
+    ev = step_model_plants()[index].compile(backend)
+    x0 = np.linspace(0.1, 0.3, ev.n)
+    us = held_inputs_of(ev)
+    dt = 0.05
+
+    xs = np.asarray(ev.rollout(x0, us, 0.2, dt))
+    x = x0
+    for k, u in enumerate(us):
+        t = 0.2 + k * dt
+        k1 = np.asarray(ev.f(x, u, t))
+        k2 = np.asarray(ev.f(x + 0.5 * dt * k1, u, t + 0.5 * dt))
+        k3 = np.asarray(ev.f(x + 0.5 * dt * k2, u, t + 0.5 * dt))
+        k4 = np.asarray(ev.f(x + dt * k3, u, t + dt))
+        x = x + dt / 6.0 * (k1 + 2.0 * k2 + 2.0 * k3 + k4)
+        np.testing.assert_allclose(xs[k + 1], x, rtol=1e-12, atol=1e-14)
+        np.testing.assert_allclose(
+            np.asarray(ev.step(xs[k], u, t, dt=dt)), x, rtol=1e-12, atol=1e-14
+        )
+
+
+@pytest.mark.jax
+def test_the_two_backends_agree_on_every_knob():
+    pytest.importorskip("jax")
+    for plant in step_model_plants():
+        ev_np, ev_jax = plant.compile("numpy"), plant.compile("jax")
+        x0 = np.linspace(0.1, 0.3, ev_np.n)
+        us = held_inputs_of(ev_np)
+        for solver in ("rk4", "euler"):
+            for substeps in (1, 3):
+                for hold in ("zoh", "foh"):
+                    seq = us if hold == "zoh" else np.vstack([us, us[-1:]])
+                    a = ev_np.rollout(
+                        x0, seq, 0.0, 0.05, solver=solver, substeps=substeps, hold=hold
+                    )
+                    b = ev_jax.jit.rollout(
+                        x0, seq, 0.0, 0.05, solver=solver, substeps=substeps, hold=hold
+                    )
+                    np.testing.assert_allclose(np.asarray(b), a, rtol=1e-12, atol=1e-14)
+
+
+def test_substeps_converge_to_the_fine_step():
+    from minilink import Pendulum
+
+    ev = Pendulum().compile("numpy")
+    x0, u = np.array([1.0, 0.0]), np.array([0.2])
+    fine = ev.step(x0, u, 0.0, dt=0.4, substeps=40)
+    errors = [
+        np.max(np.abs(ev.step(x0, u, 0.0, dt=0.4, substeps=s) - fine))
+        for s in (1, 2, 4)
+    ]
+    assert errors[0] > errors[1] > errors[2]
+
+
+def test_params_reach_the_step_and_none_reads_the_compiled_ones():
+    from minilink import Pendulum
+
+    plant = Pendulum()
+    ev = plant.compile("numpy")
+    x0, u = np.array([0.5, 0.0]), np.array([0.0])
+    heavy = {**plant.params, "m": 2.0 * plant.params["m"]}
+    np.testing.assert_array_equal(
+        ev.step(x0, u, 0.0, dt=0.1), ev.step(x0, u, 0.0, plant.params, dt=0.1)
+    )
+    assert not np.allclose(
+        ev.step(x0, u, 0.0, heavy, dt=0.1), ev.step(x0, u, 0.0, dt=0.1)
+    )
+
+
+def test_a_rollout_without_inputs_holds_the_nominal_input():
+    from minilink import Pendulum
+
+    plant = Pendulum()
+    plant.inputs["u"].nominal_value = np.array([0.7])
+    ev = plant.compile("numpy")
+    us = np.full((5, 1), 0.7)
+    np.testing.assert_array_equal(
+        ev.rollout(np.ones(2), None, 0.0, 0.1, n_steps=5),
+        ev.rollout(np.ones(2), us, 0.0, 0.1),
+    )
+
+
+@pytest.mark.jax
+def test_the_jit_forms_are_built_once():
+    pytest.importorskip("jax")
+    from minilink import Pendulum
+
+    ev = Pendulum().compile("jax")
+    first = ev.jit
+    ev.jit.rollout(np.ones(2), np.zeros((3, 1)), 0.0, 0.1)
+    assert ev.jit is first
+    assert ev.jit.rollout is first.rollout
+
+
+def test_the_step_refuses_an_unknown_solver_and_a_numpy_jit():
+    from minilink import Pendulum
+
+    ev = Pendulum().compile("numpy")
+    with pytest.raises(ValueError, match="solver"):
+        ev.step(np.ones(2), np.zeros(1), 0.0, dt=0.1, solver="scipy")
+    with pytest.raises(AttributeError, match="jax"):
+        ev.jit
