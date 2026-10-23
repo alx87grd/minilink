@@ -16,7 +16,6 @@ from minilink.graphical.animation.visualization import WORLD
 
 __all__ = [
     "Overlay",
-    "Replay",
     "SceneHistory",
     "SceneVisualizer",
     "scene_as_visualizer",
@@ -100,44 +99,6 @@ class SceneHistory(Overlay):
         return {WORLD: lines}
 
 
-class Replay(Overlay):
-    """Full-skin ghost: forward another drawable's hooks at ``trajectory`` samples."""
-
-    def __init__(self, drawable, trajectory):
-        self.drawable = drawable
-        self.trajectory = trajectory
-
-        # Memory
-        self._kinematic = None  # The drawable's kinematic geometry, read once
-
-    def tf(self, t=0.0, params=None):
-        x, u = self.sample_at(t)
-
-        return self.drawable.tf(x, u, t, params=params)
-
-    def get_kinematic_geometry(self):
-        if self._kinematic is None:
-            self._kinematic = self.drawable.get_kinematic_geometry()
-
-        return self._kinematic
-
-    def get_dynamic_geometry(self, t=0.0, params=None):
-        x, u = self.sample_at(t)
-
-        return self.drawable.get_dynamic_geometry(x, u, t, params=params)
-
-    ###########################################################################
-    # Internal machinery
-    ###########################################################################
-
-    def sample_at(self, t):
-        """The trajectory's state and input at time ``t``."""
-        x = self.trajectory.t2x(t)
-        u = self.trajectory.t2u(t)
-
-        return x, u
-
-
 class SceneVisualizer(Overlay):
     """Static obstacle skin exported from a collision-first :class:`~minilink.planning.spatial.scene.Scene`."""
 
@@ -171,8 +132,8 @@ def require_overlay(overlay) -> None:
 
     if isinstance(overlay, System):
         raise TypeError(
-            "Wrap a secondary System in Replay(drawable, trajectory); "
-            "bare systems are not valid overlays."
+            "A bare system is not an overlay: pass a scene visualizer, a SceneHistory "
+            "or a primitive with tf, get_kinematic_geometry and get_dynamic_geometry."
         )
 
     for method in ("tf", "get_kinematic_geometry", "get_dynamic_geometry"):

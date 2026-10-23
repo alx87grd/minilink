@@ -43,7 +43,6 @@ _EXPORTS: dict[str, tuple[str, str]] = {
     "vehicle_body": (_SHAPES, "vehicle_body"),
     "wheel_box": (_SHAPES, "wheel_box"),
     # Overlays
-    "Replay": (_DRAWABLES, "Replay"),
     "SceneHistory": (_DRAWABLES, "SceneHistory"),
     # Skins
     "car_skin_2d": (_SKINS, "car_skin_2d"),

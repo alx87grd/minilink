@@ -431,7 +431,6 @@ class TestCameraFollowWorld(unittest.TestCase):
 from minilink.core.geometry import Box as GeomBox
 from minilink.core.trajectory import Trajectory
 from minilink.graphical.animation.drawables import (
-    Replay,
     SceneHistory,
     require_overlay,
 )
@@ -451,7 +450,7 @@ class TestOverlayValidation(unittest.TestCase):
 
     def test_rejects_bare_system(self):
         sys = DynamicSystem(1, output_dim=1, expose_state=True)
-        with self.assertRaisesRegex(TypeError, "Replay"):
+        with self.assertRaisesRegex(TypeError, "not an overlay"):
             require_overlay(sys)
 
 
@@ -476,27 +475,6 @@ class TestSceneHistory(unittest.TestCase):
         early_pts = history.get_dynamic_geometry(t=0.0)["world"][0].pts
         late_pts = history.get_dynamic_geometry(t=0.5)["world"][0].pts
         self.assertFalse(np.allclose(early_pts, late_pts))
-
-
-class TestReplay(unittest.TestCase):
-    def test_forwards_drawable_at_trajectory_time(self):
-
-        class MarkerPlant(DynamicSystem):
-            def __init__(self):
-                super().__init__(0)
-                self.last_t = None
-
-            def tf(self, x, u, t=0, params=None):
-                self.last_t = t
-                return {}
-
-        plant = MarkerPlant()
-        traj = Trajectory(
-            t=np.array([0.0, 0.5, 1.0]), x=np.zeros((0, 3)), u=np.zeros((0, 3))
-        )
-        ghost = Replay(plant, traj)
-        ghost.tf(t=0.5)
-        self.assertAlmostEqual(plant.last_t, 0.5)
 
 
 class TestTrajectoryPolyline(unittest.TestCase):
