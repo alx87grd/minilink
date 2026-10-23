@@ -128,7 +128,6 @@ class PolicyEvaluator:
         """Per-state successor and running cost under the fixed policy."""
         grid = self.grid
         policy = self.policy
-        f = self.problem.sys.f
         g = self.problem.cost.g
         X = self.problem.X
         U = self.problem.U
@@ -150,8 +149,8 @@ class PolicyEvaluator:
             # The policy's action at this node
             u = np.asarray(policy(x), dtype=float).reshape(-1)
 
-            # Forward Euler step under the policy's action
-            x_next = x + f(x, u, t, sys_params) * dt
+            # x_{k+1} = Φ(x_k, π(x_k), t), the grid's step model under the policy
+            x_next = grid.successor(x, u, t, sys_params)
             successors[s] = x_next
 
             # An admissible action, and a successor in X and on the grid (the

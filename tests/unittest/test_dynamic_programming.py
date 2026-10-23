@@ -1042,3 +1042,29 @@ def test_grid_exposes_the_boxes_it_spans():
     np.testing.assert_allclose(grid.U.box.lower, [-1.0])
     assert all(grid.X.contains(x) for x in grid.states)
     assert all(grid.U.contains(u) for u in grid.inputs)
+
+
+def test_the_grid_steps_through_the_step_model_euler_by_default():
+    """The successor map is the step model of one period: Euler by default, RK4 on request."""
+    from minilink import Pendulum, PlanningProblem, QuadraticCost
+    from minilink.analysis import discretize
+    from minilink.planning.dynamic_programming.discretizer import StateSpaceGrid
+
+    plant = Pendulum()
+    problem = PlanningProblem(plant, cost=QuadraticCost.from_system(plant))
+    x, u = np.array([0.4, -0.3]), np.array([0.5])
+    for solver in ("euler", "rk4"):
+        grid = StateSpaceGrid(
+            problem,
+            x_grid_shape=(5, 5),
+            u_grid_shape=(3,),
+            dt=0.1,
+            solver=solver,
+            precompute=False,
+        )
+        expected = discretize(plant, 0.1, solver=solver).step(x, u)
+        np.testing.assert_allclose(grid.successor(x, u, 0.0), expected, rtol=1e-14)
+    euler = StateSpaceGrid(
+        problem, x_grid_shape=(5, 5), u_grid_shape=(3,), dt=0.1, precompute=False
+    )
+    np.testing.assert_allclose(euler.successor(x, u, 0.0), x + 0.1 * plant.f(x, u))

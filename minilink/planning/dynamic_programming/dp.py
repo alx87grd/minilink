@@ -67,6 +67,7 @@ class DynamicProgrammingPlanner(Planner):
         x_grid=None,
         u_grid=None,
         dt=None,
+        solver="euler",
         options: DynamicProgrammingOptions | None = None,
         backend=_UNSET,
         alpha=_UNSET,
@@ -83,7 +84,7 @@ class DynamicProgrammingPlanner(Planner):
         self.require_cost()
 
         # Discretized state and input spaces
-        self.grid = grid_of(problem, grid, x_grid, u_grid, dt)
+        self.grid = grid_of(problem, grid, x_grid, u_grid, dt, solver)
 
         # Workflow options: the flat keywords over the bag, then the problem's defaults
         self.options = options_of(
@@ -228,7 +229,6 @@ class DynamicProgrammingPlanner(Planner):
         up the arrival cost-to-go, and keep the cheapest action.
         """
         grid = self.grid
-        sys = self.problem.sys
         cost = self.problem.cost
         X = self.problem.X
         U = self.problem.U
@@ -254,8 +254,8 @@ class DynamicProgrammingPlanner(Planner):
             for a in range(grid.actions_n):
                 u = grid.inputs[a]
 
-                # Forward dynamics
-                x_next = sys.f(x, u, t, params.system) * dt + x
+                # x_{k+1} = Φ(x_k, u, t), the grid's step model
+                x_next = grid.successor(x, u, t, params.system)
 
                 # If action is in allowable set
                 if U.contains(u, x, t, params.sets):
@@ -681,7 +681,7 @@ class ValueIterationRecord:
 ###############################################################################
 
 
-def grid_of(problem, grid, x_grid, u_grid, dt) -> StateSpaceGrid:
+def grid_of(problem, grid, x_grid, u_grid, dt, solver="euler") -> StateSpaceGrid:
     """The grid passed in, or one built from the shapes and ``dt`` (never both)."""
     if grid is None:
         if x_grid is None or u_grid is None or dt is None:
@@ -689,7 +689,9 @@ def grid_of(problem, grid, x_grid, u_grid, dt) -> StateSpaceGrid:
                 "pass grid=StateSpaceGrid(...) or all of x_grid, u_grid, and dt"
             )
 
-        return StateSpaceGrid(problem, x_grid_shape=x_grid, u_grid_shape=u_grid, dt=dt)
+        return StateSpaceGrid(
+            problem, x_grid_shape=x_grid, u_grid_shape=u_grid, dt=dt, solver=solver
+        )
 
     if x_grid is not None or u_grid is not None or dt is not None:
         raise ValueError("pass either grid= or x_grid/u_grid/dt, not both")

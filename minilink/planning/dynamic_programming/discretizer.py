@@ -6,6 +6,7 @@ import numpy as np
 from scipy.interpolate import RegularGridInterpolator
 
 from minilink.core.backends import BACKEND_JAX, BACKEND_NUMPY, ensure_jax_x64
+from minilink.core.compile.evaluators.stepping import require_step_knobs, step_body
 from minilink.core.sets import BoxInputSet, BoxSet, is_finite_box
 from minilink.planning.dynamic_programming.progress import (
     maybe_print_build_progress,
@@ -37,7 +38,10 @@ class StateSpaceGrid:
     u_grid_shape : sequence of int
         Number of levels per input axis, length ``m``.
     dt : float
-        Forward-Euler time step used by the successor map.
+        Sample period of the successor map, the input held over it.
+    solver : {"euler", "rk4"}, optional
+        The step model of the successor map: forward Euler (default, the
+        textbook value iteration) or RK4.
     precompute : bool, optional
         When ``True`` (default) the successor and validity tables are built once
         at construction (``t = 0``) — fast sweeps, but only valid when neither
@@ -73,16 +77,19 @@ class StateSpaceGrid:
         x_grid_shape,
         u_grid_shape,
         dt: float,
+        solver: str = "euler",
         precompute: bool = True,
         precompute_backend: str = BACKEND_NUMPY,
         verbose: bool = False,
     ) -> None:
-        # The problem, its system's dimensions and the Euler time step
+        # The problem, its system's dimensions and the step model of one period
+        require_step_knobs(solver, 1)
         self.problem = problem
         self.sys = problem.sys
         self.n = int(self.sys.n)
         self.m = int(self.sys.m)
         self.dt = float(dt)
+        self.solver = solver
 
         # Levels per axis, and the box they span
         self.x_grid_shape = self.coerce_shape(x_grid_shape, self.n, "x_grid_shape")
@@ -195,18 +202,29 @@ class StateSpaceGrid:
         self.precomputed = True
         self._jax_transition = True
 
+    # The successor map
+
+    def successor(self, x, u, t, params=None):
+        """``x_{k+1}``: the plant one period ``dt`` after ``x``, ``u`` held (the step model)."""
+        sys_f = self.sys.f
+
+        def f(x, u, t):
+            return sys_f(x, u, t, params)
+
+        x_next = step_body(f, x, u, u, t, self.dt, self.solver, 1)
+
+        return x_next
+
     # The successor tables
 
     def compute_transition_numpy(self, t):
         """Build the forward-Euler successors and the input/state validity masks."""
-        f = self.sys.f
         X = self.problem.X
         U = self.problem.U
         sys_params = self.problem.params.system
         set_params = self.problem.params.sets
         states = self.states
         inputs = self.inputs
-        dt = self.dt
         N = self.nodes_n
         A = self.actions_n
         n = self.n
@@ -228,8 +246,8 @@ class StateSpaceGrid:
             for a in range(A):
                 u = inputs[a]
 
-                # Forward Euler step of the continuous dynamics: x + f(x, u, t) dt
-                xnext = x + f(x, u, t, sys_params) * dt
+                # x_{k+1} = Φ(x_k, u, t): the step model, x + f(x, u, t) dt for Euler
+                xnext = self.successor(x, u, t, sys_params)
                 x_next[s, a] = xnext
 
                 # Admissible input, and a successor in X and on the grid (the table's
@@ -246,11 +264,9 @@ class StateSpaceGrid:
         jax = ensure_jax_x64()
         jnp = jax.numpy
 
-        f = self.sys.f
         N = self.nodes_n
         A = self.actions_n
         n = self.n
-        dt = self.dt
         sys_params = self.problem.params.system
         X = self.problem.X
         U = self.problem.U
@@ -272,8 +288,8 @@ class StateSpaceGrid:
             x = states[s]
             u = inputs[a]
 
-            # Forward Euler step of the continuous dynamics: x + f(x, u, t) dt
-            xnext = x + f(x, u, t, sys_params) * dt
+            # x_{k+1} = Φ(x_k, u, t): the step model, x + f(x, u, t) dt for Euler
+            xnext = self.successor(x, u, t, sys_params)
 
             # Validity from the problem's sets and the grid: u ∈ U(x, t), x_next ∈ X(t)
             # and on the grid (the table's domain; off the grid is infeasible)
