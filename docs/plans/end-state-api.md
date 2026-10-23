@@ -192,7 +192,7 @@ from minilink.catalog import DynamicBicycleCar3D           # every supported pla
 from minilink.experimental.catalog import Plane3D          # unsupported: no test, no promise
 ```
 
-Steps: the K8 row of TODO §4. Done when the root prelude lists at most 15 plants,
+Steps: the K8 row of TODO §4. Done when the root prelude lists exactly the course set (R60: no cap),
 `minilink.catalog` lists only tested plants, no two supported plants differ by parameters
 alone, and the README names the catalog by domain, not by class.
 

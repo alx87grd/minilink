@@ -436,3 +436,6 @@ split when it starts; this section marks the reversals).
   one class per chain, the floating case a parameter value). `TripleIntegrator` and `QuarterCar` stay
   on `minilink.catalog`. `SpeedControlledDrone2D` is deleted (`HolonomicMobileRobot` has the same
   `ẋ = u`). The root then holds 16 plants, one over R2's cap of 15 (to settle, R59's note below).
+- **R60 (2026-10-23) The root's plants have no cap.** The rule is the course set: the root prelude
+  holds exactly the plants a course notebook, the tutorial or a ruling (R55–R59) puts there, pinned
+  by the teaching-surface test; R2's cap of 15 goes. Today: 16 plants.

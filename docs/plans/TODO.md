@@ -348,7 +348,7 @@ the demo sweep touches fewer files. Nothing leaves without the maintainer's ruli
   `DynamicBicycle`, `UdeSRacecarDyn` on the root; `KinematicCar` and `DynamicBicycleCar3D` merged as
   skins, `UdeSRacecar` a parameter preset, `UdeSRacecarDyn3D` a `wheel_angles=True` option, the
   notebooks and demos migrated); **K8-1** the root prelude trimmed to the course set (the
-  plants the course notebooks and the tutorial import, at most 15; ledger line in ROADMAP §2);
+  plants of R55–R60, 16 today, no cap; ledger line in ROADMAP §2);
   **K8-2** `minilink.catalog` the one flat index of every supported plant, each passing the
   both-backends contract test, with a docs entry; **K8-3** the unsupported plants the
   maintainer names from K1's table moved to `minilink/experimental/catalog/` with their skins
@@ -357,7 +357,7 @@ the demo sweep touches fewer files. Nothing leaves without the maintainer's ruli
   ruling (the Mermaid exporters, `camera.py`, the pygame renderer, `ProblemEnv` /
   `to_gymnasium`, the `identification/` stub) **[ask — per item]**; **K8-5** S64's hygiene,
   one plant family per commit; **K8-6** the README's catalog line by domain and the API
-  site's plant page. Done when the root prelude lists at most 15 plants, `minilink.catalog`
+  site's plant page. Done when the root prelude lists exactly R60's plants, `minilink.catalog`
   lists only tested plants, no two supported plants differ by parameters alone, and
   `test_teaching_surface.py` pins both lists.
 - [ ] **K9 The experimental tier, untested** (ruled 2026-10-22, R3; [end-state-api.md](end-state-api.md)
