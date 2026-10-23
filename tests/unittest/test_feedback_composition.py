@@ -184,9 +184,7 @@ class TestSeriesRule(unittest.TestCase):
         self.assertEqual((list(L.inputs), list(L.outputs)), (["e"], ["y"]))
         self.assertEqual(L.connections["Pendulum"]["u"], ("PID", "u"))
         L = Pendulum() >> K  # a shared name wins over the textbook pair
-        self.assertEqual(
-            L.connections["StateFeedback"]["x"], ("Pendulum", "x")
-        )
+        self.assertEqual(L.connections["StateFeedback"]["x"], ("Pendulum", "x"))
         self.assertIsNone(L.connections["StateFeedback"]["r"])
         L = TransferFunction([1.0], [1.0, 3.0, 2.0]) >> Integrator()  # y to u
         self.assertEqual(L.connections["Integrator"]["u"], ("TransferFunction", "y"))

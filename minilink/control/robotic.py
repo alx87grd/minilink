@@ -7,7 +7,6 @@ from collections.abc import Callable
 
 import numpy as np
 
-from minilink.control.impedance import Impedance
 from minilink.control.siso import as_dof_vector
 from minilink.core.backends import array_module
 from minilink.core.system import System
@@ -22,7 +21,7 @@ GravityHook = Callable[..., np.ndarray]
 ###############################################################################
 
 
-class ModelJointImpedance(System):
+class JointImpedance(System):
     """Joint-space impedance on a mechanical plant with optional gravity feedforward.
 
     Law: ``τ = Kp e + Kd ė + g(q)`` when ``gravity_comp`` is enabled.
@@ -104,48 +103,6 @@ class ModelJointImpedance(System):
             tau = tau + gravity_feedforward(plant, gravity, q)
 
         return tau.reshape(-1)
-
-
-def JointImpedance(
-    plant_or_dof=1,
-    *,
-    dof=None,
-    tracking_ref: bool = False,
-    gravity_comp: bool = False,
-    gravity: GravityHook | None = None,
-    Kp=None,
-    Kd=None,
-    **impedance_kwargs,
-):
-    """Joint-space impedance: generic (``dof`` only) or plant-aware.
-
-    ``JointImpedance(dof=n)`` returns a domain-neutral
-    :class:`~minilink.control.impedance.Impedance`.
-
-    ``JointImpedance(plant, gravity_comp=True)`` returns
-    :class:`ModelJointImpedance` with optional ``τ += g(q)`` (or a custom
-    ``gravity(q)`` hook).
-    """
-    # A mechanical plant: the model-based law, with its optional gravity feedforward
-    if isinstance(plant_or_dof, MechanicalSystem):
-        require_plant_alone(dof, impedance_kwargs)
-        return ModelJointImpedance(
-            plant_or_dof,
-            tracking_ref=tracking_ref,
-            gravity_comp=gravity_comp,
-            gravity=gravity,
-            Kp=Kp,
-            Kd=Kd,
-        )
-
-    # A number of axes: the domain-neutral spring-damper
-    require_plant_for_gravity(gravity_comp, gravity)
-    n = int(dof if dof is not None else plant_or_dof)
-    return Impedance(
-        dof=n,
-        tracking_ref=tracking_ref,
-        **impedance_kwargs,
-    )
 
 
 class TaskImpedance(System):
@@ -463,7 +420,7 @@ class TaskKinematicNullspace(TaskKinematic):
 def require_mechanical_plant(plant):
     """Refuse a plant without the mechanical structure the joint law reads."""
     if not isinstance(plant, MechanicalSystem):
-        raise TypeError("ModelJointImpedance requires a MechanicalSystem plant")
+        raise TypeError("JointImpedance requires a MechanicalSystem plant")
 
 
 def require_gravity_model(plant, gravity_comp, gravity):
@@ -509,20 +466,6 @@ def gravity_feedforward(plant, gravity, q, model_params=None):
     g = xp.asarray(g, dtype=float).reshape(-1)
 
     return g
-
-
-def require_plant_alone(dof, impedance_kwargs):
-    """Refuse a number of axes, or ``Impedance`` keywords, given with a plant."""
-    if dof is not None:
-        raise ValueError("pass either a plant or dof=, not both")
-    if impedance_kwargs:
-        raise ValueError("plant-based JointImpedance does not accept Impedance kwargs")
-
-
-def require_plant_for_gravity(gravity_comp, gravity):
-    """Refuse a gravity feedforward without a mechanical plant to read it from."""
-    if gravity_comp or gravity is not None:
-        raise ValueError("gravity_comp and gravity require a MechanicalSystem plant")
 
 
 def kinematic_dims_of(plant):

@@ -253,9 +253,7 @@ class TestDiagramCompositionShortcuts(unittest.TestCase):
         with self.assertWarnsRegex(UserWarning, "no output named 'r'"):
             diagram = (Step(final_value=[1.0]) + Impedance() + Pendulum()).autowire()
         self.assertIsNone(diagram.connections["Impedance"]["r"])
-        self.assertEqual(
-            diagram.connections["Impedance"]["y"], ("Pendulum", "y")
-        )
+        self.assertEqual(diagram.connections["Impedance"]["y"], ("Pendulum", "y"))
         with self.assertRaisesRegex(ValueError, "no output named 'r'"):
             (Step(final_value=[1.0]) + Impedance() + Pendulum()).autowire(strict=True)
 
@@ -308,15 +306,9 @@ class TestDiagramCompositionShortcuts(unittest.TestCase):
         box.expose("x", "r", "y")
         self.assertEqual(list(box.inputs), ["x", "r"])
         self.assertEqual(list(box.outputs), ["y"])
-        self.assertEqual(
-            box.connections["StateFeedback"]["x"], ("input", "x")
-        )
-        self.assertEqual(
-            box.connections["StateFeedback"]["r"], ("input", "r")
-        )
-        self.assertEqual(
-            box.connections["Saturation"]["u"], ("StateFeedback", "u")
-        )
+        self.assertEqual(box.connections["StateFeedback"]["x"], ("input", "x"))
+        self.assertEqual(box.connections["StateFeedback"]["r"], ("input", "r"))
+        self.assertEqual(box.connections["Saturation"]["u"], ("StateFeedback", "u"))
         self.assertEqual(box.connections["output"]["y"], ("Saturation", "y"))
 
         fan_in = (Integrator() + Integrator()).expose("u")

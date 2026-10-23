@@ -547,7 +547,7 @@ and kinematic laws default to regulation (`tracking_ref=False`,
 ``r = [q_d; dq_d]``).
 
 **Embedded-model params rule (frozen).** Model-based controllers
-(`ModelJointImpedance`, `TaskImpedance`, `ComputedTorque`,
+(`JointImpedance`, `TaskImpedance`, `ComputedTorque`,
 `SlidingMode`) hold a reference to a plant object and call its model
 hooks (`g(q)`, `H(q)`, `inverse_dynamics`) with ``params=None`` — the embedded
 model always reads that plant object's **live** ``self.params``. The

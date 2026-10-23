@@ -59,6 +59,8 @@ _EXPORTS: dict[str, tuple[str, str]] = {
     "PD": ("minilink.control.siso", "PD"),
     "Impedance": ("minilink.control.impedance", "Impedance"),
     "JointImpedance": ("minilink.control.robotic", "JointImpedance"),
+    "TaskKinematic": ("minilink.control.robotic", "TaskKinematic"),
+    "TaskKinematicNullspace": ("minilink.control.robotic", "TaskKinematicNullspace"),
     "TaskImpedance": ("minilink.control.robotic", "TaskImpedance"),
     "ComputedTorque": (
         "minilink.control.modelbased",

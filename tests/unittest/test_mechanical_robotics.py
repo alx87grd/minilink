@@ -450,9 +450,10 @@ class TestManipulator(unittest.TestCase):
 
 
 from minilink.blocks.sources import Source
+from minilink.blocks.basic import Integrator
+from minilink.control.impedance import Impedance
 from minilink.control.robotic import (
     JointImpedance,
-    ModelJointImpedance,
     TaskImpedance,
     TaskKinematic,
     TaskKinematicNullspace,
@@ -486,7 +487,7 @@ class TestManipulatorPorts(unittest.TestCase):
 
 class TestRoboticWrappers(unittest.TestCase):
     def test_joint_impedance_closed_loop(self):
-        diagram = closed_loop(JointImpedance(dof=2), TwoLinkManipulator())
+        diagram = closed_loop(Impedance(dof=2), TwoLinkManipulator())
         self.assertNotIn("mux", diagram.subsystems)
         self.assertEqual(diagram.connections["controller"]["y"], ("plant", "y"))
 
@@ -507,7 +508,7 @@ class TestRoboticWrappers(unittest.TestCase):
 
     def test_model_joint_impedance_custom_gravity_hook(self):
         arm = TwoLinkManipulator()
-        ctl = ModelJointImpedance(
+        ctl = JointImpedance(
             arm, gravity_comp=True, gravity=lambda q: np.array([1.0, 2.0])
         )
         q = np.array([0.2, 0.3])
@@ -525,7 +526,7 @@ class TestRoboticWrappers(unittest.TestCase):
         q = np.array([0.2, 0.3])
         for hook in (hook_q, hook_q_params):
             with self.subTest(hook=hook.__name__):
-                ctl = ModelJointImpedance(arm, gravity_comp=True, gravity=hook)
+                ctl = JointImpedance(arm, gravity_comp=True, gravity=hook)
                 with self.assertRaisesRegex(TypeError, "bug inside the hook"):
                     ctl.ctl(None, np.concatenate([q, q, np.zeros(2)]))
 
@@ -544,13 +545,13 @@ class TestRoboticWrappers(unittest.TestCase):
         q = np.array([0.2, 0.3])
         for name, hook in (("*args wrapper", wrapper), ("CubicSpline", spline)):
             with self.subTest(hook=name):
-                ctl = ModelJointImpedance(arm, gravity_comp=True, gravity=hook)
+                ctl = JointImpedance(arm, gravity_comp=True, gravity=hook)
                 u = ctl.ctl(None, np.concatenate([q, q, np.zeros(2)]))
                 np.testing.assert_allclose(u, hook(q))
 
-    def test_joint_impedance_gravity_requires_plant(self):
-        with self.assertRaises(ValueError):
-            JointImpedance(dof=2, gravity_comp=True)
+    def test_joint_impedance_requires_a_mechanical_plant(self):
+        with self.assertRaises(TypeError):
+            JointImpedance(Integrator(), gravity_comp=True)
 
     def test_task_impedance_uses_internal_kinematics(self):
         arm = TwoLinkManipulator()

@@ -95,6 +95,8 @@ TEACHING_SURFACE: dict[str, tuple[str, ...]] = {
         "Impedance",
         "JointImpedance",
         "TaskImpedance",
+        "TaskKinematic",
+        "TaskKinematicNullspace",
         "ComputedTorque",
         "SlidingMode",
         "IntegralImpedance",
