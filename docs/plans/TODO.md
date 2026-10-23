@@ -922,6 +922,12 @@ in December 2026 after the v0.3 tag; the v1.0 rows after two cohorts.
 
 One line each; open a plan doc only when a design needs a writeup.
 
+- **A plant that owns its noise ports, as a real example** (R57): a disturbance the loop cannot
+  add (unmatched, `B_w ≠ B`: a push on the cart-pole's tip, a lateral wind on `Drone2D`) and noise
+  on some sensors only, with a demo and its LQG twin test. When it lands, `NoisyPendulum` and
+  `NoisyCartPole` are revisited: one becomes that example, the other folds into
+  `closed_loop(disturbance=, noise=)` (the tutorial cells and GRO501 `cartpole_dynamic_controller`
+  migrate). **[ask — student-facing]**
 - Order reduction by neglecting fast modes (out of v0.2 by decision): keep the slow modes and
   the DC gain, a band function in `analysis/modal.py`. Separately, swap the guide's §9.13
   realization into `TestMinreal` and its §1.4.2 parking model into `TestPolePlacement` once

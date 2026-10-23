@@ -416,3 +416,11 @@ split when it starts; this section marks the reversals).
   to the experimental tier (`Pendulum` teaches one link). The root then holds 14 plants: `Pendulum`,
   `InvertedPendulum`, `NoisyPendulum`, `CartPole`, `NoisyCartPole`, `DoubleIntegrator`, `SingleMass`,
   `Drone2D`, the three cars of R55, the three arms.
+- **R57 (2026-10-23, K8) The pendulum and cart-pole variants stay for now.** `Pendulum`,
+  `InvertedPendulum`, `NoisyPendulum`, `CartPole`, `NoisyCartPole` stay on the root as five classes
+  (no `noise_ports=` option: it would put two input layouts in one `f`). A plant that declares its
+  own `d` and `n` is a use case the library must show, but today's two noisy variants add the
+  disturbance at the actuator, which `closed_loop(disturbance=, noise=)` already does. Once a better
+  example exists (an unmatched disturbance the loop cannot add, e.g. a push on the cart-pole's tip
+  or a lateral wind on `Drone2D`, with noise on some sensors only), the two variants are revisited:
+  one becomes that example, the other folds into `closed_loop`. A Later row on the workboard.
