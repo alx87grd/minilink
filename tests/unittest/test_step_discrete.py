@@ -2,7 +2,7 @@
 
 import unittest
 import numpy as np
-from minilink.blocks.step import ZOHHold
+from minilink.blocks.step import UnitDelay
 from minilink.core.system import StepSystem
 
 
@@ -41,8 +41,8 @@ class TestStepSystem(unittest.TestCase):
         plant = Accumulator()
         self.assertIsNone(plant.rollout)
 
-    def test_zoh_hold_latches_command(self):
-        hold = ZOHHold()
+    def test_unit_delay_returns_the_input_one_tick_late(self):
+        hold = UnitDelay()
         x1 = hold.step(np.array([0.0]), np.array([2.5]), k=0)
         np.testing.assert_allclose(x1, [2.5])
         np.testing.assert_allclose(hold.h(np.array([1.0]), np.array([0.0]), k=1), [1.0])

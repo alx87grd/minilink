@@ -677,7 +677,7 @@ problem's own, as a system's (R87), with `x_start` and `discount_rate` as leaves
   [the repository-structure writeup](../plans/repository-structure.md).
 - Diffrax as an optional JAX solve (S27).
 - The posed-geometry hook (S44) and the glyph / solid rename (S30).
-- The frozen surface (V3): do `StepSystem`, `StepDiagramSystem`, `ZOHHold` and
+- The frozen surface (V3): do `StepSystem`, `StepDiagramSystem`, `UnitDelay` and
   `control.mpc` join it, or sit behind a provisional name.
 - The deprecation policy (V4): shims from v1.0 on, overriding RULES "no deprecated
   aliases" from then.

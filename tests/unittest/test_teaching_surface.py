@@ -80,7 +80,7 @@ TEACHING_SURFACE: dict[str, tuple[str, ...]] = {
         "TransferFunction",
         "Lead",
         "Source",
-        "ZOHHold",
+        "UnitDelay",
         "MLP",
     ),
     "minilink.control": (

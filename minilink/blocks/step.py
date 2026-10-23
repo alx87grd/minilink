@@ -1,4 +1,4 @@
-"""Discrete-time wiring blocks: a command latch on the step side of a hybrid loop."""
+"""Discrete-time wiring blocks: the unit delay."""
 
 import numpy as np
 
@@ -10,24 +10,24 @@ from minilink.core.system import StepSystem
 ###############################################################################
 
 
-class ZOHHold(StepSystem):
-    """Command latch: ``x_{k+1} = u_k``, ``y_k = x_k``.
+class UnitDelay(StepSystem):
+    """Unit delay ``z⁻¹``: ``x_{k+1} = u_k``, ``y_k = x_k``.
 
-    Teaches the zero-order hold / hold-register pattern on the step side of
-    hybrid boundaries (plant-side holds are handled by :class:`~minilink.simulation.hybrid_simulator.HybridSimulator`).
+    The output is the input one tick late. The continuous zero-order hold of a
+    sampled signal is not a block: the sampled loop and the rollouts hold their
+    sequences.
     """
 
     def __init__(self):
         super().__init__(n=1, input_dim=1, output_dim=1, y_dependencies=())
-        self.name = "ZOHHold"
 
-        # Initial state: the latch holds zero
+        # Initial state: the delay holds zero
         self.x0 = np.zeros(1)
 
     def step(self, x, u, k=0, params=None):
         xp = array_module(u)
 
-        # The latch: x_{k+1} = u_k
+        # The delay: x_{k+1} = u_k
         x_next = xp.asarray(u, dtype=float).reshape(1).copy()
 
         return x_next

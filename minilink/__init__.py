@@ -180,7 +180,6 @@ _EXPORTS: dict[str, tuple[str, str]] = {
     "BallSet": ("minilink.core.sets", "BallSet"),
     "closed_loop": ("minilink.core.composition", "closed_loop"),
     "feedback": ("minilink.core.composition", "feedback"),
-    "ZOHHold": ("minilink.blocks.step", "ZOHHold"),
     "Source": ("minilink.blocks.sources", "Source"),
     "ImpedanceIntegralController": (
         "minilink.control.impedance",

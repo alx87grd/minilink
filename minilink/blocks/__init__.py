@@ -33,7 +33,7 @@ _EXPORTS: dict[str, tuple[str, str]] = {
     "NeuralNetwork": ("minilink.blocks.neural", "NeuralNetwork"),
     "MLP": ("minilink.blocks.neural", "MLP"),
     # Discrete
-    "ZOHHold": ("minilink.blocks.step", "ZOHHold"),
+    "UnitDelay": ("minilink.blocks.step", "UnitDelay"),
 }
 
 __all__, __getattr__, __dir__ = lazy_facade(globals(), _EXPORTS)
