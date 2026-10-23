@@ -12,14 +12,14 @@ from pathlib import Path
 def _leaked_research_lane(names: list[str]) -> list[str]:
     leaked: list[str] = []
     for name in names:
-        path = name.replace("\\", "/")
+        parts = name.replace("\\", "/").split("/")
+        pairs = set(zip(parts, parts[1:]))
+        # The library's tier, the examples' projects, and the repo's top-level experimental/
+        # (the sdist's second segment); tests/experimental/ is a test folder and may ship
         if (
-            "/minilink/experimental/" in path
-            or path.endswith("/minilink/experimental")
-            or "/experimental/" in path
-            or path.endswith("/experimental")
-            or "/examples/projects/" in path
-            or path.endswith("/examples/projects")
+            ("minilink", "experimental") in pairs
+            or ("examples", "projects") in pairs
+            or (len(parts) > 1 and parts[1] == "experimental")
         ):
             leaked.append(name)
     return leaked
