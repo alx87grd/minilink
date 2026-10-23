@@ -6,14 +6,14 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 from minilink import DiagramSystem, Integrator, Mux
-from minilink.blocks import NeuralNetwork
+from minilink.blocks import MLP
 from minilink.graphical.common.environment import is_blocking_needed
 from minilink.graphical.common.matplotlib_style import DPI_FIGURE
 
 # Part 1: build a neural closed-loop controller
 plant = Integrator()
 mux = Mux(dims=(1, 1))
-controller = NeuralNetwork(input_dim=2, output_dim=1, hidden_dim=8, seed=2, scale=0.2)
+controller = MLP(input_dim=2, output_dim=1, hidden=(8,), seed=2)
 
 diagram = DiagramSystem()
 diagram.connection_verbose = False

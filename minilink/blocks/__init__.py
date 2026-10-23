@@ -30,7 +30,6 @@ _EXPORTS: dict[str, tuple[str, str]] = {
     "TransferFunction": ("minilink.blocks.transfer_function", "TransferFunction"),
     "Lead": ("minilink.blocks.transfer_function", "Lead"),
     # Neural
-    "NeuralNetwork": ("minilink.blocks.neural", "NeuralNetwork"),
     "MLP": ("minilink.blocks.neural", "MLP"),
     # Discrete
     "UnitDelay": ("minilink.blocks.step", "UnitDelay"),

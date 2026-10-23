@@ -27,6 +27,8 @@ tuned constants in examples, CONSTITUTION, the demo pass (K4).
 | Id | Step | Question | Choice and reason | Alternative | Commit |
 | --- | --- | --- | --- | --- | --- |
 | OD-1 | K2 | R54 deletes `ProblemEnv`, but it is the class behind `Sys2Gym.from_problem`, which the `gymnasium_interface` notebook teaches | Kept as internal machinery of the gym module, off the `interfaces` facade; `to_gymnasium` deleted. The ruling's aim (no public name without a caller) holds | Fold its reset/step into `Sys2Gym` (more branches in the plain env) | — |
+| OD-2 | K2, K8-1 | R64 takes names off the root but the teaching-surface test required every band name on the root | The test now reads the root prelude as a subset of the band facades: a band name need not be on the root, and where it is, it is the same object | Keep the test and leave the names on the root (contradicts R64) | — |
+| OD-3 | K2 | Folding `NeuralNetwork` into `MLP` changes the neural-controller demo's initial weights (Gaussian × 0.2 → orthogonal) and so its numbers | `MLP(2, 1, hidden=(8,), seed=2)`, every tuned constant of the demo kept; it still trains (batch loss 0.32 → 0.0011). No `scale=` option added to `MLP` for one demo | Give `MLP` a Gaussian `scale=` initialisation to keep the old numbers | — |
 
 ## 3. Intended number changes (R80)
 

@@ -10,71 +10,6 @@ from minilink.core.system import System
 ###############################################################################
 
 
-class NeuralNetwork(System):
-    """One-hidden-layer neural network ``y = W2 tanh(W1 u + b1) + b2``.
-
-    Parameters
-    ----------
-    input_dim : int
-        Dimension of the input port ``u``.
-    output_dim : int
-        Dimension of the output port ``y``.
-    hidden_dim : int, optional
-        Number of hidden units.
-    seed : int, optional
-        Seed for deterministic weight initialization.
-    scale : float, optional
-        Standard-deviation scale for the initial weights. Biases start at zero.
-    """
-
-    def __init__(
-        self,
-        input_dim: int,
-        output_dim: int,
-        hidden_dim: int = 8,
-        seed: int = 0,
-        scale: float = 0.1,
-    ):
-        super().__init__()
-        self.name = "Neural Network"
-
-        # Layer widths
-        input_dim = int(input_dim)
-        output_dim = int(output_dim)
-        hidden_dim = int(hidden_dim)
-        require_positive_widths(input_dim, output_dim, hidden_dim)
-
-        # Parameters: Gaussian weights of standard deviation scale, zero biases
-        rng = np.random.default_rng(seed)
-        self.params = {
-            "W1": scale * rng.standard_normal((hidden_dim, input_dim)),
-            "b1": np.zeros(hidden_dim),
-            "W2": scale * rng.standard_normal((output_dim, hidden_dim)),
-            "b2": np.zeros(output_dim),
-        }
-
-        # Ports
-        self.add_input_port("u", dim=input_dim)
-        self.add_output_port(
-            "y", dim=output_dim, function=self.compute, dependencies="all"
-        )
-
-    def compute(self, x, u, t=0, params=None):
-        params = self.params if params is None else params
-        xp = array_module(u)
-
-        W1 = params["W1"]
-        b1 = params["b1"]
-        W2 = params["W2"]
-        b2 = params["b2"]
-
-        # Hidden layer, then the affine output layer: y = W₂ tanh(W₁ u + b₁) + b₂
-        a = xp.tanh(W1 @ u + b1)
-        y = W2 @ a + b2
-
-        return y
-
-
 class MLP(System):
     """
     Multilayer perceptron ``y = W_L a_{L-1} + b_L`` with ``a_k = act(W_k a_{k-1} + b_k)``.
@@ -161,12 +96,6 @@ class MLP(System):
 ###############################################################################
 # Internal machinery
 ###############################################################################
-
-
-def require_positive_widths(input_dim, output_dim, hidden_dim):
-    """Refuse a layer without a unit."""
-    if input_dim <= 0 or output_dim <= 0 or hidden_dim <= 0:
-        raise ValueError("input_dim, output_dim, and hidden_dim must be positive")
 
 
 def require_activation(activation):
