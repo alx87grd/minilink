@@ -619,3 +619,5 @@ pass `t` as it advances.
   take a routing setter; RULES 5.21 already makes a parametric object a plain class with `params`
   (systems, costs) and a value object a frozen dataclass. The constructor's keywords are unchanged
   but `params=`.
+- **R90 (2026-10-23) Two places show the hand-written gradient loop**, for now: tutorial 07 (R75)
+  and the closing PID example's first section (S77); whether to merge them is looked at later.
