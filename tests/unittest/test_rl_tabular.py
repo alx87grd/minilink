@@ -6,8 +6,8 @@ import pytest
 from minilink import DynamicProgrammingPlanner, PlanningProblem, QuadraticCost
 from minilink.dynamics.catalog.equations import DoubleIntegrator
 from minilink.planning import StochasticPlanningProblem, Uniform
-from minilink.planning.policy_synthesis.dp import DynamicProgrammingResult
-from minilink.planning.policy_synthesis.lookup_policy import LookupTableController
+from minilink.planning.dynamic_programming.dp import DynamicProgrammingResult
+from minilink.planning.dynamic_programming.lookup_policy import LookupTableController
 from minilink.planning.reinforcement_learning import (
     SARSA,
     UCB,

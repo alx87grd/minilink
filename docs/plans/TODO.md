@@ -389,7 +389,7 @@ the demo sweep touches fewer files. Nothing leaves without the maintainer's ruli
   leave with K8-3. Done when CI's gate imports nothing under the tier but those two exceptions,
   and `pip wheel` ships nothing under it.
 - [ ] **K10 The package structure** **[ask — public names]**, ruled 2026-10-23 (R66): `minilink.planning`
-  keeps the problem and its solutions with `dynamic_programming/` (was `policy_synthesis/`),
+  keeps the problem and its solutions with `dynamic_programming/` (was `dynamic_programming/`),
   `trajectory_optimization/` (MPC moved in from `control/mpc/`, the block still importable from
   `minilink.control`) and `search/`; reinforcement learning moves to a new `minilink.learning` band
   (the tabular learners with it; identification and imitation later); `spatial/` leaves with A3 (v0.4), so it stays put in v0.3. One
@@ -453,7 +453,7 @@ compared after each step).
 - [ ] **SM-5 Shooting and DP.** Shooting and multiple shooting on `ev.rollout(..., hold="foh")`;
   the DP grid's four inline Euler steps (`discretizer.py` ×2, `dp.py`, `policy_eval.py`) on `solver="euler"`, `DynamicProgrammingPlanner(problem, dt=, solver="rk4")`
   available (R8). Done when the trajopt and DP baselines agree (R81) and no inline
-  `x + f dt` remains in `policy_synthesis/`.
+  `x + f dt` remains in `dynamic_programming/`.
 - [ ] **SM-6 The trim and the move.** The four-body surface (`f`, `h`, `step`, `rollout`, plus
   `rollout_batch`; 69 distinct public names to about 12, sampled-path.md §3.6), DESIGN §5's names
   migrated at every caller (R82); the evaluator internals deduplicated (the ZOH sugar, the JAX
@@ -757,7 +757,7 @@ LQGPlanner as picked; S73 any time, self-contained.
     mode or sibling. **[ask — planner API]**
   - [ ] **S52 Deep Q-learning** (course ch. 17): a discrete-action head over the grid's input
     levels, `QFunction` with replay and a target network. Research lane first.
-  - [ ] **Approximate dynamic programming** on `policy_synthesis/approximation.py` (fitted
+  - [ ] **Approximate dynamic programming** on `dynamic_programming/approximation.py` (fitted
     value iteration); design first, it touches the planner API. **[ask]**
   - [ ] `Sys2Gym` takes a `Distribution` for the start state (scan: graphics#1;
     randomness.md RD-R5, step RN-5).

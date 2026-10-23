@@ -7,7 +7,7 @@ from scipy.interpolate import RegularGridInterpolator
 
 from minilink.core.backends import BACKEND_JAX, BACKEND_NUMPY, ensure_jax_x64
 from minilink.core.sets import BoxInputSet, BoxSet, is_finite_box
-from minilink.planning.policy_synthesis.progress import (
+from minilink.planning.dynamic_programming.progress import (
     maybe_print_build_progress,
     print_build_complete,
     progress,
@@ -173,7 +173,7 @@ class StateSpaceGrid:
     def ensure_jax_transition(self, t: float = 0.0) -> None:
         """Build or rebuild transition tables with the JAX backend.
 
-        Called by :class:`~minilink.planning.policy_synthesis.dp.DynamicProgrammingPlanner`
+        Called by :class:`~minilink.planning.dynamic_programming.dp.DynamicProgrammingPlanner`
         when ``backend="jax"``. Use ``precompute=False`` on the grid in JAX demos
         so the slow NumPy build is skipped at construction time.
         """
@@ -379,10 +379,10 @@ class StateSpaceGrid:
         ``values`` has shape ``(nodes_n,)`` — a cost-to-go, a policy's value, a
         fitted approximation. Options (``axes``, ``anchor``, ``vmin``, ``vmax``,
         ``title``, ``show``) are those of
-        :func:`~minilink.planning.policy_synthesis.plotting.plot_value`.
+        :func:`~minilink.planning.dynamic_programming.plotting.plot_value`.
         """
         # Lazy import: the graphics load on first use, not with the core
-        from minilink.planning.policy_synthesis import plotting
+        from minilink.planning.dynamic_programming import plotting
 
         values = np.asarray(values, dtype=float)
 

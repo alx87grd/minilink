@@ -7,7 +7,7 @@ from minilink import Pendulum
 from minilink.core.costs import CostFunction, QuadraticCost
 from minilink.core.distributions import Gaussian, Particles, Uniform
 from minilink.core.trajectory import Trajectory
-from minilink.planning.policy_synthesis.dp import DynamicProgrammingPlanner
+from minilink.planning.dynamic_programming.dp import DynamicProgrammingPlanner
 from minilink.planning.problems import (
     PlanningProblem,
     StochasticPlanningProblem,

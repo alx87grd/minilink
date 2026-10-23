@@ -6,14 +6,14 @@ from dataclasses import dataclass, replace
 
 import numpy as np
 
-from minilink.planning.evaluation import nominal_trajectory
-from minilink.planning.planner import Planner
-from minilink.planning.policy_synthesis import plotting
-from minilink.planning.policy_synthesis.dp import (
+from minilink.planning.dynamic_programming import plotting
+from minilink.planning.dynamic_programming.dp import (
     DynamicProgrammingOptions,
     DynamicProgrammingResult,
     grid_of,
 )
+from minilink.planning.evaluation import nominal_trajectory
+from minilink.planning.planner import Planner
 from minilink.planning.reinforcement_learning.environment import RolloutEnvironment
 from minilink.planning.results import PlanningSolution
 
@@ -41,7 +41,7 @@ class TabularLearningPlanner(Planner):
     field and greedy policy that value iteration returns, so ``plot_cost2go``,
     ``plot_policy`` and ``get_controller`` (a lookup-table block) read the
     same way, and the same grid solved by
-    :class:`~minilink.planning.policy_synthesis.dp.DynamicProgrammingPlanner`
+    :class:`~minilink.planning.dynamic_programming.dp.DynamicProgrammingPlanner`
     is the exact answer the learner approaches.
 
     Parameters
@@ -303,7 +303,7 @@ class TabularLearningPlanner(Planner):
     # Controller and plots
 
     def get_controller(self, **kwargs):
-        """The greedy policy as a :class:`~minilink.planning.policy_synthesis.lookup_policy.LookupTableController`."""
+        """The greedy policy as a :class:`~minilink.planning.dynamic_programming.lookup_policy.LookupTableController`."""
         return plotting.get_controller(self.result, **kwargs)
 
     def value_at(self, x) -> float:

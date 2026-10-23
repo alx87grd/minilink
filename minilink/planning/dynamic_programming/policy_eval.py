@@ -3,12 +3,12 @@
 import numpy as np
 
 from minilink.core.feedback import block_roles
-from minilink.planning.evaluation import policy_of
-from minilink.planning.policy_synthesis.dp import (
+from minilink.planning.dynamic_programming.dp import (
     DynamicProgrammingOptions,
     infeasible_penalty,
 )
-from minilink.planning.policy_synthesis.plotting import cost_scale_limit
+from minilink.planning.dynamic_programming.plotting import cost_scale_limit
+from minilink.planning.evaluation import policy_of
 from minilink.planning.problems import PlanningProblem
 
 ###############################################################################
@@ -23,8 +23,8 @@ class PolicyEvaluator:
     Solves the Bellman *expectation* equation for a given policy: the
     dynamic-programming sweep with the action fixed by a control law instead
     of minimized over the action set. It reuses the same
-    :class:`~minilink.planning.policy_synthesis.discretizer.StateSpaceGrid` and
-    interpolation as :class:`~minilink.planning.policy_synthesis.dp.DynamicProgrammingPlanner`
+    :class:`~minilink.planning.dynamic_programming.discretizer.StateSpaceGrid` and
+    interpolation as :class:`~minilink.planning.dynamic_programming.dp.DynamicProgrammingPlanner`
     and returns the policy's cost-to-go field ``J``.
 
     Parameters

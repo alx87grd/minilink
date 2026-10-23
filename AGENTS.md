@@ -37,7 +37,7 @@ the branch is behind its upstream; act on it.
 
 Every line of math an agent writes or touches follows RULES §5 (5.3, 5.8, 5.22, 5.24), in
 new code and in edits alike. Before committing any math, read the diff next to
-`planning/policy_synthesis/dp.py`, the reference, and say in the report that you did. A change
+`planning/dynamic_programming/dp.py`, the reference, and say in the report that you did. A change
 that breaks this rule is not done, even when the tests pass.
 
 ## Talking to the maintainer

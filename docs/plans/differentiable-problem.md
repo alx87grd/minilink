@@ -388,7 +388,7 @@ All in [the rulings record](../reviews/2026-10-22-rulings-session-1.md); the alt
 One commit per step or sub-step; each records a seeded baseline of every branch it touches
 before any edit, runs it twice and `cmp`s, and ends byte-identical unless the step names its
 one intended change, which gets its own test and a ledger line. Every math line reads next to
-`planning/policy_synthesis/dp.py` before it lands. **The gates are the TODO rows** (§4 for
+`planning/dynamic_programming/dp.py` before it lands. **The gates are the TODO rows** (§4 for
 steps 1–6, §5 for 7–9); this list is the content.
 
 0. **The names.** Done (R26–R28, R45, 2026-10-23).

@@ -22,9 +22,9 @@ from minilink.core.diagram import DiagramSystem
 from minilink.core.sets import BallSet
 from minilink.dynamics.catalog.pendulum.double_pendulum import DoublePendulum
 from minilink.dynamics.catalog.pendulum.pendulum import Pendulum
-from minilink.planning.policy_synthesis import plotting
-from minilink.planning.policy_synthesis.discretizer import StateSpaceGrid
-from minilink.planning.policy_synthesis.dp import (
+from minilink.planning.dynamic_programming import plotting
+from minilink.planning.dynamic_programming.discretizer import StateSpaceGrid
+from minilink.planning.dynamic_programming.dp import (
     DynamicProgrammingOptions,
     DynamicProgrammingPlanner,
 )

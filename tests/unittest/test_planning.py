@@ -2288,7 +2288,7 @@ def test_box_probes_stay_at_the_solver_boundary():
     lowering = {
         "planning/trajectory_optimization/direct_collocation.py",
         "planning/trajectory_optimization/shooting.py",
-        "planning/policy_synthesis/discretizer.py",
+        "planning/dynamic_programming/discretizer.py",
         "core/inspect.py",  # the printer names the set's type; reporting, not math
     }
     offenders = []

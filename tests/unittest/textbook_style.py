@@ -41,7 +41,7 @@ STRUCTURE = (
     "minilink/simulation/hybrid_simulator.py",
     "minilink/planning/results.py",
     "minilink/planning/comparison.py",
-    "minilink/planning/policy_synthesis/progress.py",
+    "minilink/planning/dynamic_programming/progress.py",
 )
 
 # Methods and functions whose body is an equation path or an algorithm step.

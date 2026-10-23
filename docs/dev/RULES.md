@@ -359,7 +359,7 @@ concrete formatting, ordered by the cost of being wrong:
 - **5.16 Two-audience files:** Write each file for its primary reader. Student-facing modules
   (`core/system.py`, `blocks/`, `dynamics/`, `control/`) and every algorithm (analysis tools,
   controller and observer design, planners, solvers, learning updates) read like a textbook;
-  the reference is `planning/policy_synthesis/dp.py`. Library-developer modules
+  the reference is `planning/dynamic_programming/dp.py`. Library-developer modules
   (`core/compile/`, evaluators) may carry compiler machinery.
 - **5.17 Native-array equation paths:** Does an equation path (5.1) convert its arrays inside,
   or stop tracing in an argument, `params` included? Contract: DESIGN §4, 'Native-array

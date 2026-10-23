@@ -15,7 +15,7 @@ class LookupTableController(System):
     State-feedback controller backed by a policy lookup table.
 
     Wraps a discrete policy ``pi`` (action ids over a
-    :class:`~minilink.planning.policy_synthesis.discretizer.StateSpaceGrid`) as a
+    :class:`~minilink.planning.dynamic_programming.discretizer.StateSpaceGrid`) as a
     state-feedback block ``u = pi(x)``. Its input port is named ``x``, so it
     composes with a plant through ``controller @ plant`` and simulates like any
     other block. Each input axis is interpolated independently, so the discrete

@@ -1,6 +1,6 @@
 """How much faster is the lookup-table / JAX value iteration than the loop?
 
-Times the three :class:`~minilink.planning.policy_synthesis.dp.DynamicProgrammingPlanner`
+Times the three :class:`~minilink.planning.dynamic_programming.dp.DynamicProgrammingPlanner`
 backends on a pendulum swing-up:
 
 - ``loop``  — per-node Python double loop (pyro's reference engine).
@@ -18,8 +18,8 @@ import numpy as np
 
 from minilink.core.costs import QuadraticCost
 from minilink.dynamics.catalog.pendulum.pendulum import Pendulum
-from minilink.planning.policy_synthesis.discretizer import StateSpaceGrid
-from minilink.planning.policy_synthesis.dp import (
+from minilink.planning.dynamic_programming.discretizer import StateSpaceGrid
+from minilink.planning.dynamic_programming.dp import (
     DynamicProgrammingOptions,
     DynamicProgrammingPlanner,
 )

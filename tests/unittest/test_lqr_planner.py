@@ -11,7 +11,7 @@ from minilink.control.state import (
     TimeVaryingStateFeedbackController,
 )
 from minilink.core.costs import TimeCost
-from minilink.planning.policy_synthesis.lqr import RiccatiRecord
+from minilink.planning.dynamic_programming.lqr import RiccatiRecord
 
 UPRIGHT = np.array([np.pi, 0.0])
 Q = np.diag([10.0, 1.0])

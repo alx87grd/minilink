@@ -31,7 +31,7 @@ def plot_cost2go(
     show=True,
 ):
     """
-    Draw cost-to-go heatmap(s) from a :class:`~minilink.planning.policy_synthesis.dp.DynamicProgrammingResult`.
+    Draw cost-to-go heatmap(s) from a :class:`~minilink.planning.dynamic_programming.dp.DynamicProgrammingResult`.
 
     ``axes`` may be ``(i, j)`` for one slice or a list of pairs for several.
     """
@@ -378,9 +378,11 @@ def cost_scale_limit(price):
 
 
 def get_controller(result, *, interpolation="linear"):
-    """Build a :class:`~minilink.planning.policy_synthesis.lookup_policy.LookupTableController`."""
+    """Build a :class:`~minilink.planning.dynamic_programming.lookup_policy.LookupTableController`."""
     # Lazy import: the lookup law loads on first use, not with the plots
-    from minilink.planning.policy_synthesis.lookup_policy import LookupTableController
+    from minilink.planning.dynamic_programming.lookup_policy import (
+        LookupTableController,
+    )
 
     return LookupTableController(result.grid, result.pi, interpolation=interpolation)
 

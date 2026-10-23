@@ -30,7 +30,7 @@ _EXPORTS: dict[str, tuple[str, str]] = {
     "compare": ("minilink.planning.comparison", "compare"),
     "Comparison": ("minilink.planning.comparison", "Comparison"),
     # Linear-quadratic regulator (policy synthesis)
-    "LQRPlanner": ("minilink.planning.policy_synthesis.lqr", "LQRPlanner"),
+    "LQRPlanner": ("minilink.planning.dynamic_programming.lqr", "LQRPlanner"),
     # Trajectory optimization
     "TrajectoryOptimizationPlanner": (
         "minilink.planning.trajectory_optimization.planner",
@@ -42,36 +42,36 @@ _EXPORTS: dict[str, tuple[str, str]] = {
     ),
     # Dynamic programming (policy synthesis)
     "StateSpaceGrid": (
-        "minilink.planning.policy_synthesis.discretizer",
+        "minilink.planning.dynamic_programming.discretizer",
         "StateSpaceGrid",
     ),
     "DynamicProgrammingPlanner": (
-        "minilink.planning.policy_synthesis.dp",
+        "minilink.planning.dynamic_programming.dp",
         "DynamicProgrammingPlanner",
     ),
     "DynamicProgrammingOptions": (
-        "minilink.planning.policy_synthesis.dp",
+        "minilink.planning.dynamic_programming.dp",
         "DynamicProgrammingOptions",
     ),
     "LookupTableController": (
-        "minilink.planning.policy_synthesis.lookup_policy",
+        "minilink.planning.dynamic_programming.lookup_policy",
         "LookupTableController",
     ),
     "PolicyEvaluator": (
-        "minilink.planning.policy_synthesis.policy_eval",
+        "minilink.planning.dynamic_programming.policy_eval",
         "PolicyEvaluator",
     ),
     # Function approximation (cost-to-go fits, approximate dynamic programming)
     "QuadraticFeatures": (
-        "minilink.planning.policy_synthesis.approximation",
+        "minilink.planning.dynamic_programming.approximation",
         "QuadraticFeatures",
     ),
     "RadialBasisFeatures": (
-        "minilink.planning.policy_synthesis.approximation",
+        "minilink.planning.dynamic_programming.approximation",
         "RadialBasisFeatures",
     ),
     "LinearApproximator": (
-        "minilink.planning.policy_synthesis.approximation",
+        "minilink.planning.dynamic_programming.approximation",
         "LinearApproximator",
     ),
     # Reinforcement learning (policy synthesis) and Monte Carlo evaluation

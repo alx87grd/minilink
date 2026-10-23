@@ -92,7 +92,7 @@ state-feedback block):
 | --- | --- |
 | `simulation/` | `Simulator`, `StaticSimulator`, `Computer`, `StepSchedule`, `HybridSimulator`, solvers, forcing; `realtime/` (`RealtimeSimulator`, `RealtimeInput`/`RealtimeOutput`, `PygameInput`, `LiveSignalPlotOutput`) |
 | `analysis/` | one calling pattern `tool(sys, x_bar, u_bar, t, params, *, method="auto", eps)` on any `System` (the linear model as is, the rest linearized at the operating point): `jacobian`, `linearize` (→ `LTISystem`), the one-channel frequency and time tools (`bode`, `pzmap`, `nyquist`, `margins`, `root_locus`, `step_response`, `step_info`, `transfer_function`, the sensitivity functions) with their `plot_` twins, `structural` (controllability, observability, `minreal`), `equilibria`, `modal`, `lyapunov`, `riccati`, `discretization`. The API reference is the docs site |
-| `planning/` | `problems.py`, `results.py`, `evaluation.py`, `comparison.py`; `trajectory_optimization/`, `policy_synthesis/` (DP), `reinforcement_learning/`, `search/` (RRT), `spatial/` (scenes; **retires** into `core/geometry/`) |
+| `planning/` | `problems.py`, `results.py`, `evaluation.py`, `comparison.py`; `trajectory_optimization/`, `dynamic_programming/` (DP), `reinforcement_learning/`, `search/` (RRT), `spatial/` (scenes; **retires** into `core/geometry/`) |
 | `optimization/` | `MathematicalProgram`, `Optimizer` (generic NLP) |
 | `graphical/` | signals, phase plane, diagrams, animation |
 | `interfaces/` | lazy facade: `Sys2Gym` / `SB3Controller` (gymnasium extra); cosimulation / MJX planned |
@@ -976,7 +976,7 @@ solved.
 fixed-horizon `solve_steps` always succeeds); the record carries the sweep
 count and the last cost-to-go change.
 
-**Policy synthesis** (`planning/policy_synthesis/`): offline dynamic programming on a
+**Policy synthesis** (`planning/dynamic_programming/`): offline dynamic programming on a
 continuous plant. A `StateSpaceGrid` discretizes the `PlanningProblem` — grid *extent*
 comes from the sets' bounding boxes (so it stays finite), grid *validity* from
 the sets (`contains` on NumPy, `margin >= 0` on the JAX precompute, so `X = bounds & free`
@@ -999,7 +999,7 @@ textbook algorithm. `precompute` trades the `(N,A,n)`
 successor table for per-sweep recomputation (memory vs time-varying support); a precomputed
 grid also freezes the running-cost table, so a time-varying `f` or `g` needs `precompute=False`. `get_controller()` returns a `LookupTableController` (a static `System`); `PolicyEvaluator`
 gives the cost-to-go of any fixed law. **Function approximation**
-(`policy_synthesis/approximation.py`): linear-in-the-weights fits `f_hat(x | w) = wᵀφ(x)` with fixed
+(`dynamic_programming/approximation.py`): linear-in-the-weights fits `f_hat(x | w) = wᵀφ(x)` with fixed
 features — `QuadraticFeatures(xbar)` (a quadratic form, the LQR shape; `quadratic_form(w)` reads
 `(c, b, S)` back) and `RadialBasisFeatures` (Gaussian bumps, `on_grid` for a mesh of centres),
 stacked with `+` — and a `LinearApproximator` that fits by least squares (`fit`) or one

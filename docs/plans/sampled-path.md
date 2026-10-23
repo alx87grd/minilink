@@ -32,7 +32,7 @@ Every row computes "the state one sample period later, the input held", or close
 | `discretize()` ([`analysis/discretization.py`](../../minilink/analysis/discretization.py); GRO501 digital implementation, tutorial 04) | RK4 or Euler on `source.f` | 1 per `dt` | zero-order | hand-written |
 | `RolloutEnvironment` ([`reinforcement_learning/environment.py`](../../minilink/planning/reinforcement_learning/environment.py); also the Monte Carlo evaluator's and the tabular learners' plant) | compiled `rk4_step_trace(_p)` | 1 | zero-order | compiled evaluator |
 | `Sys2Gym` ([`interfaces/gymnasium.py`](../../minilink/interfaces/gymnasium.py)) | compiled `rk4_step` / `euler_step`, jitted by its own `_compiled_step` | 1 | zero-order | compiled evaluator |
-| the DP grid ([`policy_synthesis/discretizer.py`](../../minilink/planning/policy_synthesis/discretizer.py), two places) | inline `x + f(x, u, t) dt` | 1 | zero-order | hand-written Euler |
+| the DP grid ([`dynamic_programming/discretizer.py`](../../minilink/planning/dynamic_programming/discretizer.py), two places) | inline `x + f(x, u, t) dt` | 1 | zero-order | hand-written Euler |
 | shooting and multiple shooting (`rk4_step_between_knots` in [`transcription.py`](../../minilink/planning/trajectory_optimization/transcription.py)) | RK4 | 1 per knot | **first-order** (linear between knots) | hand-written |
 | direct collocation | trapezoidal defects | — | linear | implicit: a transcription, not a step map; correct as is |
 | `HybridSimulator`, `RealtimeSimulator` | compiled `integrate_zoh(..., dt_inner=)` | **n** (the only ones) | zero-order | compiled evaluator |

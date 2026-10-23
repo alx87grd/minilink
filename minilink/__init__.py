@@ -112,38 +112,38 @@ _EXPORTS: dict[str, tuple[str, str]] = {
     # Planning
     "PlanningProblem": ("minilink.planning.problems", "PlanningProblem"),
     "PlanningSolution": ("minilink.planning.results", "PlanningSolution"),
-    "LQRPlanner": ("minilink.planning.policy_synthesis.lqr", "LQRPlanner"),
+    "LQRPlanner": ("minilink.planning.dynamic_programming.lqr", "LQRPlanner"),
     "compare": ("minilink.planning.comparison", "compare"),
     "TrajectoryOptimizationPlanner": (
         "minilink.planning.trajectory_optimization.planner",
         "TrajectoryOptimizationPlanner",
     ),
     "StateSpaceGrid": (
-        "minilink.planning.policy_synthesis.discretizer",
+        "minilink.planning.dynamic_programming.discretizer",
         "StateSpaceGrid",
     ),
     "DynamicProgrammingPlanner": (
-        "minilink.planning.policy_synthesis.dp",
+        "minilink.planning.dynamic_programming.dp",
         "DynamicProgrammingPlanner",
     ),
     "LookupTableController": (
-        "minilink.planning.policy_synthesis.lookup_policy",
+        "minilink.planning.dynamic_programming.lookup_policy",
         "LookupTableController",
     ),
     "QuadraticFeatures": (
-        "minilink.planning.policy_synthesis.approximation",
+        "minilink.planning.dynamic_programming.approximation",
         "QuadraticFeatures",
     ),
     "RadialBasisFeatures": (
-        "minilink.planning.policy_synthesis.approximation",
+        "minilink.planning.dynamic_programming.approximation",
         "RadialBasisFeatures",
     ),
     "LinearApproximator": (
-        "minilink.planning.policy_synthesis.approximation",
+        "minilink.planning.dynamic_programming.approximation",
         "LinearApproximator",
     ),
     "PolicyEvaluator": (
-        "minilink.planning.policy_synthesis.policy_eval",
+        "minilink.planning.dynamic_programming.policy_eval",
         "PolicyEvaluator",
     ),
     "StochasticPlanningProblem": (

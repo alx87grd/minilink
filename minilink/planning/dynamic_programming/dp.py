@@ -9,12 +9,12 @@ from functools import partial
 import numpy as np
 
 from minilink.core.backends import BACKEND_JAX, BACKEND_NUMPY
+from minilink.planning.dynamic_programming import plotting
+from minilink.planning.dynamic_programming.discretizer import StateSpaceGrid
+from minilink.planning.dynamic_programming.lookup_policy import LookupTableController
+from minilink.planning.dynamic_programming.progress import SweepLog, progress
 from minilink.planning.evaluation import nominal_trajectory
 from minilink.planning.planner import Planner
-from minilink.planning.policy_synthesis import plotting
-from minilink.planning.policy_synthesis.discretizer import StateSpaceGrid
-from minilink.planning.policy_synthesis.lookup_policy import LookupTableController
-from minilink.planning.policy_synthesis.progress import SweepLog, progress
 from minilink.planning.problems import PlanningProblem
 from minilink.planning.results import PlanningSolution
 
@@ -34,7 +34,7 @@ class DynamicProgrammingPlanner(Planner):
     Value-iteration planner over a discretized state space.
 
     Sweeps the Bellman equation backward in time on a
-    :class:`~minilink.planning.policy_synthesis.discretizer.StateSpaceGrid`,
+    :class:`~minilink.planning.dynamic_programming.discretizer.StateSpaceGrid`,
     from the terminal cost ``h`` at the horizon, and keeps the minimizing
     action of every node as the greedy policy ``pi``::
 
@@ -43,7 +43,7 @@ class DynamicProgrammingPlanner(Planner):
     builds the grid itself; pass ``grid=`` for a custom one. The backend picks
     how the backward step runs: ``"loop"`` is the textbook double loop,
     ``"numpy"`` (default) the same step over lookup tables, and ``"jax"`` the
-    table step jitted on device (:mod:`~minilink.planning.policy_synthesis.dp_jax`).
+    table step jitted on device (:mod:`~minilink.planning.dynamic_programming.dp_jax`).
 
     Parameters
     ----------
@@ -170,7 +170,7 @@ class DynamicProgrammingPlanner(Planner):
         # The JAX engine runs these same sweeps, jitted on device
         if opt.backend == BACKEND_JAX:
             # A real cycle: dp_jax imports DynamicProgrammingResult from this module
-            from minilink.planning.policy_synthesis import dp_jax
+            from minilink.planning.dynamic_programming import dp_jax
 
             return dp_jax.value_iteration(self, max_sweeps, stop_on_tol)
 

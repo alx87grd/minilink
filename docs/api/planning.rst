@@ -83,22 +83,22 @@ Search
 Policy synthesis
 ----------------
 
-.. automodule:: minilink.planning.policy_synthesis.dp
+.. automodule:: minilink.planning.dynamic_programming.dp
    :members:
 
-.. automodule:: minilink.planning.policy_synthesis.discretizer
+.. automodule:: minilink.planning.dynamic_programming.discretizer
    :members:
 
-.. automodule:: minilink.planning.policy_synthesis.lookup_policy
+.. automodule:: minilink.planning.dynamic_programming.lookup_policy
    :members:
 
-.. automodule:: minilink.planning.policy_synthesis.lqr
+.. automodule:: minilink.planning.dynamic_programming.lqr
    :members:
 
-.. automodule:: minilink.planning.policy_synthesis.policy_eval
+.. automodule:: minilink.planning.dynamic_programming.policy_eval
    :members:
 
-.. automodule:: minilink.planning.policy_synthesis.approximation
+.. automodule:: minilink.planning.dynamic_programming.approximation
    :members:
 
 Reinforcement learning

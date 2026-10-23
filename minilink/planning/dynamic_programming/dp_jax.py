@@ -5,9 +5,9 @@ import time
 import numpy as np
 
 from minilink.core.backends import ensure_jax_x64
-from minilink.planning.policy_synthesis.discretizer import PAIR_CHUNK_SIZE
-from minilink.planning.policy_synthesis.dp import DynamicProgrammingResult
-from minilink.planning.policy_synthesis.progress import (
+from minilink.planning.dynamic_programming.discretizer import PAIR_CHUNK_SIZE
+from minilink.planning.dynamic_programming.dp import DynamicProgrammingResult
+from minilink.planning.dynamic_programming.progress import (
     SweepLog,
     maybe_print_build_progress,
     print_build_complete,
@@ -23,7 +23,7 @@ def value_iteration(planner, max_sweeps, stop_on_tol=True) -> DynamicProgramming
     The planner's value iteration, run on device.
 
     The same backward sweeps as
-    :meth:`~minilink.planning.policy_synthesis.dp.DynamicProgrammingPlanner.value_iteration`
+    :meth:`~minilink.planning.dynamic_programming.dp.DynamicProgrammingPlanner.value_iteration`
     over the lookup tables, with the whole loop compiled as one ``lax`` loop.
     With ``verbose`` or ``record_history`` the sweeps run one at a time from
     Python instead, so each one can be reported or recorded.

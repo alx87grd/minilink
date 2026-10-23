@@ -43,7 +43,7 @@ Release criterion carried over: every **in-scope** pyro library module has a min
 | Control | `pyro/control/linear.py` | PIDController | `minilink/control/siso.py` | PID (filtered PID), PI, PD | **Done** | PI / PD landed 2026-09-07 (P1); robotic PID wrappers are C2 |
 | Control | `pyro/control/lqr.py` | TrajectoryLQRController | `minilink/control/design.py`, `minilink/control/state.py` | trajectory_lqr, TrajectoryFeedbackController | **Done** | Demo: `examples/demos/control/trajectory_lqr_cartpole.py` |
 | Control | `pyro/control/robotcontrollers.py` | JointPD, EndEffectorPD, … | `minilink/control/robotic.py` | JointImpedance, TaskImpedance, TaskKinematic, TaskKinematicNullspace | **Partial** | Dynamic joint/effector PID wrappers TODO |
-| Planning | `pyro/planning/dynamicprogramming.py` | DynamicProgramming2DRectBivariateSpline | `minilink/planning/policy_synthesis/dp.py` | — | **Drop** | Not needed; grid backends cover use cases |
+| Planning | `pyro/planning/dynamicprogramming.py` | DynamicProgramming2DRectBivariateSpline | `minilink/planning/dynamic_programming/dp.py` | — | **Drop** | Not needed; grid backends cover use cases |
 | Planning | `pyro/planning/filters.py` | TrajectoryFilter | `minilink/planning/` | — | **TODO** | Butterworth filtfilt post-filter |
 | Planning | `pyro/planning/plan.py` | OpenLoopController | `minilink/blocks/sources.py` | TrajectorySource | **Partial** |  |
 | Planning | `pyro/planning/trajectorygeneration.py` | SingleAxisPolynomialTrajectoryGenerator | `minilink/planning/` | — | **TODO** | trajectory_generation/ |
@@ -370,11 +370,11 @@ Two-column record of every symbol marked Done before the shrink; the source for 
 | TrajectoryPlotter | plot_trajectory() | `minilink/graphical/` |
 | Animator | animate() | `minilink/graphical/animation/` |
 | PhasePlot, PhasePlot3 | plot_phase_plane() | `minilink/graphical/phase_plane/` |
-| GridDynamicSystem | StateSpaceGrid | `minilink/planning/policy_synthesis/discretizer.py` |
-| DynamicProgramming | DynamicProgrammingPlanner | `minilink/planning/policy_synthesis/dp.py` |
-| DynamicProgrammingWithLookUpTable | same planner + lookup | `minilink/planning/policy_synthesis/dp.py` |
-| LookUpTableController | LookupTableController | `minilink/planning/policy_synthesis/lookup_policy.py` |
-| PolicyEvaluator | PolicyEvaluator | `minilink/planning/policy_synthesis/policy_eval.py` |
+| GridDynamicSystem | StateSpaceGrid | `minilink/planning/dynamic_programming/discretizer.py` |
+| DynamicProgramming | DynamicProgrammingPlanner | `minilink/planning/dynamic_programming/dp.py` |
+| DynamicProgrammingWithLookUpTable | same planner + lookup | `minilink/planning/dynamic_programming/dp.py` |
+| LookUpTableController | LookupTableController | `minilink/planning/dynamic_programming/lookup_policy.py` |
+| PolicyEvaluator | PolicyEvaluator | `minilink/planning/dynamic_programming/policy_eval.py` |
 | Planner | Planner | `minilink/planning/planner.py` |
 | RRT | RRTPlanner, RRTStarPlanner | `minilink/planning/search/` |
 | DirectCollocationTrajectoryOptimisation | TrajectoryOptimizationPlanner (DirectCollocationTranscription, ShootingTranscription, MultipleShootingTranscription) | `minilink/planning/trajectory_optimization/` |

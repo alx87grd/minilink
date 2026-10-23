@@ -7,19 +7,19 @@ import numpy as np
 from minilink.core.costs import QuadraticCost, TimeCost
 from minilink.core.diagram import DiagramSystem
 from minilink.core.system import DynamicSystem
-from minilink.planning.policy_synthesis import dp_jax, plotting
-from minilink.planning.policy_synthesis.approximation import (
+from minilink.planning.dynamic_programming import dp_jax, plotting
+from minilink.planning.dynamic_programming.approximation import (
     LinearApproximator,
     QuadraticFeatures,
     RadialBasisFeatures,
 )
-from minilink.planning.policy_synthesis.discretizer import StateSpaceGrid
-from minilink.planning.policy_synthesis.dp import (
+from minilink.planning.dynamic_programming.discretizer import StateSpaceGrid
+from minilink.planning.dynamic_programming.dp import (
     DynamicProgrammingOptions,
     DynamicProgrammingPlanner,
     DynamicProgrammingResult,
 )
-from minilink.planning.policy_synthesis.policy_eval import PolicyEvaluator
+from minilink.planning.dynamic_programming.policy_eval import PolicyEvaluator
 from minilink.planning.problems import PlanningProblem
 
 
@@ -769,7 +769,7 @@ class TestDpOneObjectSetup(unittest.TestCase):
         )
 
     def test_shapes_and_dt_build_the_grid(self):
-        from minilink.planning.policy_synthesis.dp import DynamicProgrammingPlanner
+        from minilink.planning.dynamic_programming.dp import DynamicProgrammingPlanner
 
         planner = DynamicProgrammingPlanner(
             self._problem(), x_grid=(11, 11), u_grid=(3,), dt=0.05
@@ -779,7 +779,7 @@ class TestDpOneObjectSetup(unittest.TestCase):
         self.assertAlmostEqual(planner.grid.dt, 0.05)
 
     def test_success_reports_convergence(self):
-        from minilink.planning.policy_synthesis.dp import DynamicProgrammingPlanner
+        from minilink.planning.dynamic_programming.dp import DynamicProgrammingPlanner
 
         problem = make_problem()
         capped = DynamicProgrammingPlanner(
@@ -815,7 +815,7 @@ class TestDpOneObjectSetup(unittest.TestCase):
         self.assertAlmostEqual(fixed.trajectory.t[1] - fixed.trajectory.t[0], 0.05)
 
     def test_final_time_reads_the_problem_horizon(self):
-        from minilink.planning.policy_synthesis.dp import DynamicProgrammingPlanner
+        from minilink.planning.dynamic_programming.dp import DynamicProgrammingPlanner
 
         sys = DoubleIntegrator()
         cost = QuadraticCost.from_system(sys, xbar=np.zeros(2))
@@ -832,8 +832,8 @@ class TestDpOneObjectSetup(unittest.TestCase):
         self.assertEqual(untimed.options.final_time, 0.0)
 
     def test_grid_and_shapes_are_exclusive(self):
-        from minilink.planning.policy_synthesis.discretizer import StateSpaceGrid
-        from minilink.planning.policy_synthesis.dp import DynamicProgrammingPlanner
+        from minilink.planning.dynamic_programming.discretizer import StateSpaceGrid
+        from minilink.planning.dynamic_programming.dp import DynamicProgrammingPlanner
 
         problem = self._problem()
         grid = StateSpaceGrid(
@@ -856,7 +856,7 @@ class TestCleanInfeasible(unittest.TestCase):
         self.assertTrue(np.all(result.J[saturated] == penalty))
 
     def test_dp_clean_infeasible_can_be_disabled(self):
-        from minilink.planning.policy_synthesis.dp import DynamicProgrammingPlanner
+        from minilink.planning.dynamic_programming.dp import DynamicProgrammingPlanner
 
         problem = make_problem()
         planner = DynamicProgrammingPlanner(
@@ -1022,7 +1022,7 @@ class TestDpFlatConstructor(unittest.TestCase):
 
 
 def test_grid_exposes_the_boxes_it_spans():
-    from minilink.planning.policy_synthesis.discretizer import StateSpaceGrid
+    from minilink.planning.dynamic_programming.discretizer import StateSpaceGrid
 
     class DoubleIntegrator(DynamicSystem):
         def __init__(self):
