@@ -329,17 +329,19 @@ the demo sweep touches fewer files. Nothing leaves without the maintainer's ruli
 - K1, the inventory, landed 2026-10-23: [the record](../reviews/2026-10-23-k1-inventory.md)
   (every public name with its callers, maturity and a proposal; the plants; the demos and their
   twins; the draft A6 and G3 rename tables). K2, K3, K4, K8, A6 and G3 rule from it.
-- [ ] **K2 Remove the unused features** **[ask — removals]**, from K1's ruling: one commit
-  per feature, callers, tests and docs in the same commit, no alias. Done when every
-  "remove" row is gone and `pytest` and the demo checks pass.
+- [ ] **K2 Remove the unused features** **[ask — removals]**, ruled 2026-10-23 (R54): `ProblemEnv`,
+  `to_gymnasium`, `fixed_camera`, `follow_frame_camera`, `merge_skins`, `debug_state_skin`, `Replay`,
+  `Sampler`, `RateLimiter`, the `SimpleIntegrator` plant; `NeuralNetwork` folded into `MLP`; `Lag`
+  kept with a new demo beside `Lead`. One commit per feature, callers, tests and docs in the same
+  commit, no alias. `ProblemParameters` leaves with its migration (R41). Done when every listed name
+  is gone, `pytest` and the demo checks pass.
 - [ ] **K3 Prototypes to `experimental/`** **[ask — public names]**, from the same ruling:
   moved under `minilink/experimental/` (repo-only, not on the docs site, not in the wheel's
   public surface), imports updated, DESIGN §3 and the README say which features are
   experimental. Done when the teaching surface lists only final features.
-- [ ] **K4 One demo per feature** **[ask per group]**: twins merged or removed, each kept
-  demo the shortest one that shows its feature, `examples/README.md`'s map and the demo
-  checks updated. Done when no two demos show the same feature on the same plant, and the D1.2
-  allowlist shrinks with it.
+- [ ] **K4 One demo per feature** **[maintainer]** (R54): the maintainer's own pass on the demos,
+  with the K1 inventory's §3 (twins and proposals) as the input; agents update `examples/README.md`'s
+  map and the demo checks after each of his changes.
 - [ ] **K8 The catalog clean-up** (ruled 2026-10-22, [end-state-api.md](end-state-api.md) D2;
   [record](../reviews/2026-10-22-rulings-session-1.md)): two import layers and support by
   test. Steps, one commit each: **K8-1** the root prelude trimmed to the course set (the

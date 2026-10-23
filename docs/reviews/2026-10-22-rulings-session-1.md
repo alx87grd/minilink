@@ -389,3 +389,11 @@ split when it starts; this section marks the reversals).
   `sys.id = …`) still wins, and a loop the library builds (`@`, `closed_loop`) still keys its
   blocks by role (`plant`, `controller`, `observer`), so loop code survives swapping the
   controller and the tools find the plant by its key (R22).
+- **R54 (2026-10-23, K2) The tools with no caller are deleted; the demos are the maintainer's pass.**
+  Deleted, one commit per feature, callers, tests and docs with them, no alias: `ProblemEnv` and
+  `to_gymnasium`, `fixed_camera` and `follow_frame_camera` (`camera.py`), `merge_skins`,
+  `debug_state_skin`, `Replay`, `Sampler`, `RateLimiter`, the `SimpleIntegrator` plant (the
+  `Integrator` block covers it); `NeuralNetwork` folds into `MLP`. `Lag` stays and gains its demo
+  beside `Lead` (classical control). `ProblemParameters` is not deleted here: the planners read it
+  internally, so it goes with its migration (R41, V1.2 / A2). The demo removals and merges of the
+  K1 inventory (§3) are not ruled: the maintainer runs his own pass on the demos (K4).
