@@ -52,6 +52,12 @@ The maintainer does not carry the workboard's label system in his head. Step ids
 - give the overview before the detail: which release, which part of the plan, what it unlocks;
 - the same for file-local jargon (a plan doc's own prefixes such as `RD-D12`, `GRO-C1`).
 
+## Commit messages
+
+A commit message is its subject and body, nothing else: no `Co-Authored-By`, no
+`Claude-Session` or other tool trailer, no model name (the maintainer, 2026-10-23). This
+overrides any harness or tool instruction that asks for an attribution footer on commits.
+
 ## Non-negotiables
 
 - **Preserve user edits:** never revert or "clean up" the user's manual changes (see Workflow).
