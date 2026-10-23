@@ -12,55 +12,6 @@ from minilink.graphical.animation.primitives import Point
 ###############################################################################
 
 
-class SimpleIntegrator(DynamicSystem):
-    """Single integrator ``dx = u``."""
-
-    def __init__(self):
-        super().__init__(n=1, input_dim=1, output_dim=1, expose_state=True)
-        self.name = "Simple Integrator"
-
-        # Signal labels, units and bounds
-        self.state.labels = ["position"]
-        self.state.units = ["m"]
-        self.state.lower_bound[:] = [-10.0]
-        self.state.upper_bound[:] = [10.0]
-        self.inputs["u"].labels = ["speed"]
-        self.inputs["u"].units = ["m/s"]
-        self.outputs["y"].labels = ["position"]
-        self.outputs["y"].units = ["m"]
-
-    def f(self, x, u, t=0.0, params=None):
-        xp = array_module(x)
-
-        speed = u[0]
-
-        dx = xp.array([speed])
-
-        return dx
-
-    def h(self, x, u, t=0.0, params=None):
-        xp = array_module(x)
-
-        position = x[0]
-
-        y = xp.array([position])
-
-        return y
-
-    def get_kinematic_geometry(self):
-        return {}
-
-    def tf(self, x, u, t=0, params=None):
-        return {}
-
-    def get_dynamic_geometry(self, x, u, t=0, params=None):
-        # A point on the line at the position
-        marker = Point(color="blue", marker="o", size=8)
-        marker.local_transform = SE2(x[0], 0.0, 0.0)
-
-        return {"world": [marker]}
-
-
 class DoubleIntegrator(DynamicSystem):
     """Double integrator ``d(position)/dt = speed``, ``d(speed)/dt = u``."""
 

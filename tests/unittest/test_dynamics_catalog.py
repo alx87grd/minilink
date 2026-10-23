@@ -16,7 +16,6 @@ from minilink.dynamics.catalog.aerial.plane import Plane2D, Plane3D
 from minilink.dynamics.catalog.aerial.rocket import Rocket
 from minilink.dynamics.catalog.equations.integrators import (
     DoubleIntegrator,
-    SimpleIntegrator,
     TripleIntegrator,
 )
 from minilink.dynamics.catalog.equations.oscillators import Lorenz, VanderPol
@@ -63,9 +62,6 @@ from tests.unittest.graphics_contract_helpers import (
 
 class TestCatalogSmoke(unittest.TestCase):
     def test_low_risk_equation_reference_values(self):
-        np.testing.assert_allclose(
-            SimpleIntegrator().f(np.array([2.0]), np.array([3.0])), [3.0]
-        )
         np.testing.assert_allclose(
             DoubleIntegrator().f(np.array([2.0, 4.0]), np.array([3.0])), [4.0, 3.0]
         )

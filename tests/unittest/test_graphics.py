@@ -256,7 +256,6 @@ class TestRendererHelpers(unittest.TestCase):
 
 from minilink.core.kinematics import SE2
 from minilink.core.system import DynamicSystem, System
-from minilink.dynamics.catalog.equations.integrators import SimpleIntegrator
 from minilink.graphical.animation.drawables import SceneHistory
 from minilink.graphical.animation.primitives import CustomLine, Point
 from minilink.graphical.animation.visualization import (
@@ -303,17 +302,6 @@ class TestEmptyTfWorldGeometry(unittest.TestCase):
         self.assertEqual(len(draw_list), 1)
         _, transform = draw_list[0]
         np.testing.assert_allclose(transform, np.eye(4))
-
-
-class TestIntegratorLocalTransform(unittest.TestCase):
-    def test_marker_tracks_state_via_local_transform(self):
-        sys = SimpleIntegrator()
-        x = np.array([3.0])
-        frame = resolve_draw_frame(sys, x, np.zeros(sys.m))
-        self.assertEqual(len(frame["primitives"]), 1)
-        transform = np.asarray(frame["transforms"][0], dtype=float)
-        self.assertAlmostEqual(transform[0, 3], 3.0)
-        self.assertAlmostEqual(transform[1, 3], 0.0)
 
 
 class TestDiagramSharedWorld(unittest.TestCase):

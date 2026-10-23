@@ -165,9 +165,9 @@ Student-facing taxonomy: wiring from `blocks/`, plants from `minilink.catalog`
 (or `dynamics/catalog/…`), controllers from `control/`, analysis verbs from
 `analysis/` — everything is a `System`.
 `blocks/` holds plant-agnostic wiring primitives; `dynamics/catalog/equations/`
-holds canonical textbook ODEs (integrator chains, `VanderPol`) with graphics,
-labels, and bounds for teaching demos — the name overlap (`Integrator` vs
-`SimpleIntegrator`) is intentional given those roles.
+holds canonical textbook ODEs (the double and triple integrators, `VanderPol`) with
+graphics, labels, and bounds for teaching demos; the single integrator is the `Integrator`
+block.
 
 ### Continuous-time core; step/hybrid subsidiary
 

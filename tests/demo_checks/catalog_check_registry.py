@@ -33,7 +33,6 @@ from minilink.dynamics.catalog.aerial.rocket import Rocket
 from minilink.dynamics.catalog.astro.three_body import ThreeBodyProblem
 from minilink.dynamics.catalog.equations.integrators import (
     DoubleIntegrator,
-    SimpleIntegrator,
     TripleIntegrator,
 )
 from minilink.dynamics.catalog.equations.oscillators import Lorenz, VanderPol
@@ -102,7 +101,6 @@ class KinematicRenderPlant:
 
 
 CATALOG_CHECK_ENTRIES: tuple[CatalogCheckEntry, ...] = (
-    CatalogCheckEntry("SimpleIntegrator", SimpleIntegrator),
     CatalogCheckEntry("DoubleIntegrator", DoubleIntegrator),
     CatalogCheckEntry("TripleIntegrator", TripleIntegrator),
     CatalogCheckEntry("VanderPol", lambda: VanderPol(mu=0.5)),
@@ -197,11 +195,6 @@ KINEMATIC_RENDER_PLANTS: tuple[KinematicRenderPlant, ...] = (
     ),
     KinematicRenderPlant(
         "drone2d", "minilink.dynamics.catalog.aerial.drone", "Drone2D"
-    ),
-    KinematicRenderPlant(
-        "simple_integrator",
-        "minilink.dynamics.catalog.equations.integrators",
-        "SimpleIntegrator",
     ),
     KinematicRenderPlant(
         "single_mass",

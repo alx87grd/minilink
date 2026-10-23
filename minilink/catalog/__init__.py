@@ -50,7 +50,6 @@ _EXPORTS: dict[str, tuple[str, str]] = {
     "TwoMass": ("minilink.dynamics.catalog.mass_spring_damper", "TwoMass"),
     # Equations
     "DoubleIntegrator": ("minilink.dynamics.catalog.equations", "DoubleIntegrator"),
-    "SimpleIntegrator": ("minilink.dynamics.catalog.equations", "SimpleIntegrator"),
     "TripleIntegrator": ("minilink.dynamics.catalog.equations", "TripleIntegrator"),
     "VanderPol": ("minilink.dynamics.catalog.equations", "VanderPol"),
     "Lorenz": ("minilink.dynamics.catalog.equations", "Lorenz"),
