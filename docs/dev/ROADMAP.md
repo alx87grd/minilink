@@ -200,13 +200,15 @@ notebooks one per homework. **Ruled 2026-10-23 (R48): GMC714 needs no new featur
 move from pyro to minilink as the maintainer's teaching work, outside this roadmap; the
 release's part is that the teaching surface covers every lab, checked the same day:
 
+Names as ruled by R52 and R63 (the renames land with A6 before the term).
+
 | Week | Topic (notes chapters) | The lab's numerical part | Surface | Status |
 | --- | --- | --- | --- | --- |
 | 1 | Phase space, model types (1, 7) | lateral control of a bicycle model, the phase plane of the closed loop | `KinematicBicycle`, `sys.plot_phase_plane` | on the surface |
-| 2–3 | Arm kinematics, then dynamics (2–6) | forward and inverse kinematics, Jacobian, manipulability; `M`, `C`, `g` (mostly by hand) | `TwoLinkManipulator`, `ThreeLinkManipulator3D`, `UR5Manipulator` | on the surface |
-| 4 | Arm control I, quasi-static (7, 8) | impedance control of a 3-DoF drilling robot in simulation | `ThreeLinkManipulator3D`, `ImpedanceController`, `TaskImpedance`, `JointImpedance` | on the surface; the drilling contact is the notebook's |
-| 5 | Arm control II, dynamic (9, 20) | computed torque, sliding mode, adaptive control | `ComputedTorqueController`, `SlidingModeController`, `DynamicSystem` | on the surface; the adaptive law built by hand in the lab as a custom `DynamicSystem` with the controller's ports (pyro's `DynamicController`; R48) |
-| 6 | Vehicle modelling (11) | longitudinal model with tire slip; the dynamic bicycle, oversteer, linearization | `LongitudinalFrontWheelDriveCarWithTorqueInput`, `DynamicBicycle`, `linearize` | on the surface |
+| 2–3 | Arm kinematics, then dynamics (2–6) | forward and inverse kinematics, Jacobian, manipulability; `M`, `C`, `g` (mostly by hand) | `TwoLinkManipulator`, `ThreeLinkManipulator`, `UR5Manipulator` | on the surface |
+| 4 | Arm control I, quasi-static (7, 8) | impedance control of a 3-DoF drilling robot in simulation | `ThreeLinkManipulator`, `Impedance`, `TaskImpedance`, `JointImpedance` | on the surface; the drilling contact is the notebook's |
+| 5 | Arm control II, dynamic (9, 20) | computed torque, sliding mode, adaptive control | `ComputedTorque`, `SlidingMode`, `DynamicSystem` | on the surface; the adaptive law built by hand in the lab as a custom `DynamicSystem` with the controller's ports (pyro's `DynamicController`; R48) |
+| 6 | Vehicle modelling (11) | longitudinal model with tire slip; the dynamic bicycle, oversteer, linearization | `LongitudinalTorqueCar`, `DynamicBicycle`, `linearize` | on the surface |
 | 7 | Vehicle planning (13, 16, 21) | trajectory optimization of a pendulum (`Q`, `R`, the torque limit, `n`, `dt`); RRT then trajectory optimization on a cart-pole | `TrajectoryOptimizationPlanner`, `RRTPlanner`, `QuadraticCost`, `Pendulum`, `CartPole` | on the surface |
 | 8 | To come | — | — | — |
 | 10–13 | Projects | "a new system or controller integrated into the library" | the `System` contract | on the surface |
