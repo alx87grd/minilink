@@ -16,7 +16,7 @@ from minilink.catalog import (
     DoublePendulum,
     DynamicBicycle,
     DynamicBicycleCar3D,
-    PendulumWithNoisePort,
+    NoisyPendulum,
     Plane3D,
     UdeSRacecar,
     UdeSRacecarDyn,
@@ -37,10 +37,10 @@ from minilink.dynamics.catalog.equations.integrators import (
 )
 from minilink.dynamics.catalog.equations.oscillators import Lorenz, VanderPol
 from minilink.dynamics.catalog.manipulators.arms import (
-    FiveLinkPlanarManipulator,
+    FiveLinkManipulator,
+    KinematicManipulator,
     OneLinkManipulator,
-    SpeedControlledManipulator,
-    ThreeLinkManipulator3D,
+    ThreeLinkManipulator,
     TwoLinkManipulator,
 )
 from minilink.dynamics.catalog.manipulators.ur5 import UR5Manipulator
@@ -55,7 +55,7 @@ from minilink.dynamics.catalog.mass_spring_damper.linear import (
 )
 from minilink.dynamics.catalog.pendulum.cartpole import (
     CartPole,
-    CartPoleWithNoisePort,
+    NoisyCartPole,
     RotatingCartPole,
     UnderactuatedRotatingCartPole,
 )
@@ -68,15 +68,15 @@ from minilink.dynamics.catalog.pendulum.pendulum import (
 from minilink.dynamics.catalog.vehicles.dynamic_bicycle import BicycleDynRate
 from minilink.dynamics.catalog.vehicles.mountain_car import MountainCar
 from minilink.dynamics.catalog.vehicles.propulsion import (
-    LongitudinalFrontWheelDriveCarWithTorqueInput,
-    LongitudinalFrontWheelDriveCarWithWheelSlipInput,
+    LongitudinalSlipCar,
+    LongitudinalTorqueCar,
 )
 from minilink.dynamics.catalog.vehicles.steering import (
     HolonomicMobileRobot,
     KinematicBicycle,
     KinematicCar,
 )
-from minilink.dynamics.catalog.vehicles.suspension import QuarterCarOnRoughTerrain
+from minilink.dynamics.catalog.vehicles.suspension import QuarterCar
 
 PlantFactory = Callable[[], Any]
 
@@ -123,20 +123,20 @@ CATALOG_CHECK_ENTRIES: tuple[CatalogCheckEntry, ...] = (
     CatalogCheckEntry("RotatingCartPole", RotatingCartPole),
     CatalogCheckEntry("UnderactuatedRotatingCartPole", UnderactuatedRotatingCartPole),
     CatalogCheckEntry("CartPole", CartPole),
-    CatalogCheckEntry("CartPoleWithNoisePort", CartPoleWithNoisePort),
+    CatalogCheckEntry("NoisyCartPole", NoisyCartPole),
     CatalogCheckEntry("KinematicBicycle", KinematicBicycle),
     CatalogCheckEntry("KinematicCar", KinematicCar),
     CatalogCheckEntry("HolonomicMobileRobot", HolonomicMobileRobot),
     CatalogCheckEntry("BicycleDynRate", BicycleDynRate),
     CatalogCheckEntry(
-        "LongitudinalFrontWheelDriveCarWithWheelSlipInput",
-        LongitudinalFrontWheelDriveCarWithWheelSlipInput,
+        "LongitudinalSlipCar",
+        LongitudinalSlipCar,
     ),
     CatalogCheckEntry(
-        "LongitudinalFrontWheelDriveCarWithTorqueInput",
-        LongitudinalFrontWheelDriveCarWithTorqueInput,
+        "LongitudinalTorqueCar",
+        LongitudinalTorqueCar,
     ),
-    CatalogCheckEntry("QuarterCarOnRoughTerrain", QuarterCarOnRoughTerrain),
+    CatalogCheckEntry("QuarterCar", QuarterCar),
     CatalogCheckEntry("MountainCar", MountainCar),
     CatalogCheckEntry("Drone2D", Drone2D),
     CatalogCheckEntry("Drone2DWithSideThruster", Drone2DWithSideThruster),
@@ -146,7 +146,7 @@ CATALOG_CHECK_ENTRIES: tuple[CatalogCheckEntry, ...] = (
     CatalogCheckEntry("Plane2D", Plane2D),
     CatalogCheckEntry("Plane3D", Plane3D),
     CatalogCheckEntry("DoublePendulum", DoublePendulum),
-    CatalogCheckEntry("PendulumWithNoisePort", PendulumWithNoisePort),
+    CatalogCheckEntry("NoisyPendulum", NoisyPendulum),
     CatalogCheckEntry("DynamicBicycle", DynamicBicycle),
     CatalogCheckEntry("UdeSRacecar", UdeSRacecar),
     CatalogCheckEntry("UdeSRacecarDyn", UdeSRacecarDyn),
@@ -155,13 +155,13 @@ CATALOG_CHECK_ENTRIES: tuple[CatalogCheckEntry, ...] = (
     CatalogCheckEntry("Boat2D", Boat2D),
     CatalogCheckEntry("Boat2DWithCurrent", Boat2DWithCurrent),
     CatalogCheckEntry(
-        "SpeedControlledManipulator",
-        lambda: SpeedControlledManipulator(2, 2),
+        "KinematicManipulator",
+        lambda: KinematicManipulator(2, 2),
     ),
     CatalogCheckEntry("OneLinkManipulator", OneLinkManipulator),
     CatalogCheckEntry("TwoLinkManipulator", TwoLinkManipulator),
-    CatalogCheckEntry("ThreeLinkManipulator3D", ThreeLinkManipulator3D),
-    CatalogCheckEntry("FiveLinkPlanarManipulator", FiveLinkPlanarManipulator),
+    CatalogCheckEntry("ThreeLinkManipulator", ThreeLinkManipulator),
+    CatalogCheckEntry("FiveLinkManipulator", FiveLinkManipulator),
     CatalogCheckEntry("UR5Manipulator", UR5Manipulator),
 )
 
@@ -191,7 +191,7 @@ KINEMATIC_RENDER_PLANTS: tuple[KinematicRenderPlant, ...] = (
     KinematicRenderPlant(
         "five_link_planar_manipulator",
         "minilink.dynamics.catalog.manipulators.arms",
-        "FiveLinkPlanarManipulator",
+        "FiveLinkManipulator",
     ),
     KinematicRenderPlant(
         "drone2d", "minilink.dynamics.catalog.aerial.drone", "Drone2D"

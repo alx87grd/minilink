@@ -3,13 +3,13 @@
 from minilink import (
     DiagramSystem,
     ImpedanceController,
-    PendulumWithNoisePort,
+    NoisyPendulum,
     Step,
     WhiteNoise,
 )
 
 # Plant system
-sys = PendulumWithNoisePort()
+sys = NoisyPendulum()
 
 sys.params["m"] = 1.0
 sys.params["l"] = 5.0

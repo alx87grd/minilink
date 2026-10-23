@@ -331,7 +331,7 @@ class TaskKinematic(System):
     """Task-space kinematic controller for velocity-controlled manipulators.
 
     Joint measurements ``y = q``; output ``u = dq`` drives a
-    :class:`~minilink.dynamics.catalog.manipulators.arms.SpeedControlledManipulator`.
+    :class:`~minilink.dynamics.catalog.manipulators.arms.KinematicManipulator`.
 
         v_task = Kp (p_d − p)
         dq = J(q)⁺ v_task

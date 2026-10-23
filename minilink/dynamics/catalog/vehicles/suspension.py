@@ -17,7 +17,7 @@ from minilink.graphical.catalog.shapes import spring_between
 ###############################################################################
 
 
-class QuarterCarOnRoughTerrain(DynamicSystem):
+class QuarterCar(DynamicSystem):
     """Quarter-car suspension moving over prescribed rough terrain."""
 
     def __init__(self):
@@ -147,7 +147,7 @@ class QuarterCarOnRoughTerrain(DynamicSystem):
 
 
 if __name__ == "__main__":
-    sys = QuarterCarOnRoughTerrain()
+    sys = QuarterCar()
     sys.x0 = np.array([0.0, 0.0, 0.0])
     sys.inputs["u"].nominal_value = np.array([1.0])
     sys.compute_trajectory(tf=8.0)

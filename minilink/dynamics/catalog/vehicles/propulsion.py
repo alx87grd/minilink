@@ -17,7 +17,7 @@ from minilink.graphical.animation.primitives import (
 ###############################################################################
 
 
-class LongitudinalFrontWheelDriveCarWithWheelSlipInput(DynamicSystem):
+class LongitudinalSlipCar(DynamicSystem):
     """Longitudinal front-wheel-drive car with wheel slip as input."""
 
     def __init__(self):
@@ -148,9 +148,7 @@ class LongitudinalFrontWheelDriveCarWithWheelSlipInput(DynamicSystem):
         }
 
 
-class LongitudinalFrontWheelDriveCarWithTorqueInput(
-    LongitudinalFrontWheelDriveCarWithWheelSlipInput
-):
+class LongitudinalTorqueCar(LongitudinalSlipCar):
     """Longitudinal front-wheel-drive car with wheel torque input."""
 
     def __init__(self):
@@ -258,7 +256,7 @@ class LongitudinalFrontWheelDriveCarWithTorqueInput(
 
 
 if __name__ == "__main__":
-    sys = LongitudinalFrontWheelDriveCarWithWheelSlipInput()
+    sys = LongitudinalSlipCar()
     sys.x0 = np.array([0.0, 20.0])
     sys.inputs["u"].nominal_value = np.array([-0.1])
     sys.compute_trajectory(tf=10.0)

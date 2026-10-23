@@ -459,9 +459,9 @@ from minilink.control.robotic import (
 )
 from minilink.core.composition import closed_loop
 from minilink.dynamics.catalog.manipulators.arms import (
-    FiveLinkPlanarManipulator,
+    FiveLinkManipulator,
     OneLinkManipulator,
-    SpeedControlledManipulator,
+    KinematicManipulator,
     TwoLinkManipulator,
 )
 from minilink.dynamics.catalog.manipulators import UR5Manipulator
@@ -705,7 +705,7 @@ class TestRoboticWrappers(unittest.TestCase):
         self.assertEqual(geom["task"][0].color, "gold")
 
     def test_task_kinematic_law(self):
-        arm = SpeedControlledManipulator.from_manipulator(TwoLinkManipulator())
+        arm = KinematicManipulator.from_manipulator(TwoLinkManipulator())
         ctl = TaskKinematic(arm, Kp=[1.0, 1.0])
         q = np.array([0.2, -0.1])
         p_d = np.array([0.5, 0.5])
@@ -724,13 +724,13 @@ class TestRoboticWrappers(unittest.TestCase):
                 self.assertEqual(ctl.inputs["r"].dim, arm.task_dim)
 
     def test_task_kinematic_closed_loop_y(self):
-        arm = SpeedControlledManipulator.from_manipulator(TwoLinkManipulator())
+        arm = KinematicManipulator.from_manipulator(TwoLinkManipulator())
         diagram = closed_loop(TaskKinematic(arm), arm)
         self.assertEqual(diagram.connections["controller"]["y"], ("plant", "y"))
         self.assertNotIn("mux", diagram.subsystems)
 
     def test_task_kinematic_nullspace_projection(self):
-        arm = SpeedControlledManipulator.from_manipulator(FiveLinkPlanarManipulator())
+        arm = KinematicManipulator.from_manipulator(FiveLinkManipulator())
         ctl = TaskKinematicNullspace(arm, Kp=[1.0, 1.0], K_null=[10.0] * 5)
         q = np.array([0.1, 0.1, 0.1, 0.1, 0.1])
         p_d = np.array([1.0, 1.0])
@@ -746,7 +746,7 @@ class TestRoboticWrappers(unittest.TestCase):
         np.testing.assert_allclose(dq, dq_task + dq_null_only)
 
     def test_task_kinematic_nullspace_dual_ref_autowire(self):
-        arm = SpeedControlledManipulator.from_manipulator(FiveLinkPlanarManipulator())
+        arm = KinematicManipulator.from_manipulator(FiveLinkManipulator())
         ref_p = Source(2)
         ref_p.params["value"] = np.array([1.0, 1.0])
         ref_q = Source(5, port="r_null")

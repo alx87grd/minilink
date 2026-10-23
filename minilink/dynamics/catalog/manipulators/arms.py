@@ -361,7 +361,7 @@ class TwoLinkManipulator(Manipulator):
         return planar_torque_geometry(lengths, u, upper_bound)
 
 
-class ThreeLinkManipulator3D(Manipulator):
+class ThreeLinkManipulator(Manipulator):
     """Three-link spatial manipulator from the Pyro catalog."""
 
     def __init__(self):
@@ -652,7 +652,7 @@ class ThreeLinkManipulator3D(Manipulator):
         }
 
 
-class FiveLinkPlanarManipulator(Manipulator):
+class FiveLinkManipulator(Manipulator):
     """Five-link planar manipulator with Pyro's default unit joint dynamics.
 
     Kinematics and Jacobian are fully specified; dynamics use the
@@ -758,7 +758,7 @@ class FiveLinkPlanarManipulator(Manipulator):
         return planar_torque_geometry(lengths, u, upper_bound)
 
 
-class SpeedControlledManipulator(DynamicSystem):
+class KinematicManipulator(DynamicSystem):
     """Joint-space integrator for velocity-controlled manipulators.
 
     Dynamics: ``dq = u``. State and default output ``y`` are joint angles ``q``.

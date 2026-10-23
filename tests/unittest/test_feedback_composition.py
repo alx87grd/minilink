@@ -433,10 +433,10 @@ class TestLoopInputs(unittest.TestCase):
         )
 
     def test_a_plant_that_declares_d_and_n_owns_them(self):
-        from minilink import PendulumWithNoisePort, WhiteNoise, lqg
+        from minilink import NoisyPendulum, WhiteNoise, lqg
         from minilink.core.composition import closed_loop
 
-        plant = PendulumWithNoisePort()
+        plant = NoisyPendulum()
         box = lqg(plant, np.eye(2), np.eye(1), 1e-2 * np.eye(2), 1e-3 * np.eye(2))
         loop = closed_loop(box, plant, disturbance=True, noise=True)
         self.assertEqual(list(loop.inputs), ["r", "d", "n"])
@@ -606,7 +606,7 @@ class TestResolver(unittest.TestCase):
     """The roles every tool reads: the port names of a block, the reserved names of a diagram."""
 
     def test_block_roles_read_the_port_names(self):
-        from minilink import PendulumWithNoisePort, StateFeedbackController
+        from minilink import NoisyPendulum, StateFeedbackController
 
         pid = block_roles(PID())
         self.assertEqual(
@@ -625,17 +625,17 @@ class TestResolver(unittest.TestCase):
         compensator = block_roles(TransferFunction([1.0], [1.0, 1.0]))
         self.assertEqual((compensator.measurements, compensator.entry), ((), "u"))
 
-        plant = block_roles(PendulumWithNoisePort())
+        plant = block_roles(NoisyPendulum())
         # a plant's d and n are never the entry: its one free input is u
         self.assertEqual(
             (plant.measurements, plant.command, plant.entry), ((), None, "u")
         )
 
     def test_command_port_is_u_or_the_one_free_input(self):
-        from minilink import PendulumWithNoisePort
+        from minilink import NoisyPendulum
 
         self.assertEqual(command_port(Pendulum()), "u")
-        self.assertEqual(command_port(PendulumWithNoisePort()), "u")
+        self.assertEqual(command_port(NoisyPendulum()), "u")
         self.assertEqual(command_port(PID() @ Pendulum()), "r")
         self.assertEqual(command_port(Lead()), "e")
         with self.assertRaisesRegex(ValueError, "input port named 'u'"):

@@ -372,7 +372,7 @@
     "plant": "five_link_planar_manipulator",
     "sample": "rest",
     "module": "minilink.dynamics.catalog.manipulators.arms",
-    "class": "FiveLinkPlanarManipulator",
+    "class": "FiveLinkManipulator",
     "requires": [],
     "x": [
       0.0,
@@ -399,7 +399,7 @@
     "plant": "five_link_planar_manipulator",
     "sample": "pose_a",
     "module": "minilink.dynamics.catalog.manipulators.arms",
-    "class": "FiveLinkPlanarManipulator",
+    "class": "FiveLinkManipulator",
     "requires": [],
     "x": [
       0.38213459565024244,
@@ -426,7 +426,7 @@
     "plant": "five_link_planar_manipulator",
     "sample": "pose_b",
     "module": "minilink.dynamics.catalog.manipulators.arms",
-    "class": "FiveLinkPlanarManipulator",
+    "class": "FiveLinkManipulator",
     "requires": [],
     "x": [
       0.7129658880491484,

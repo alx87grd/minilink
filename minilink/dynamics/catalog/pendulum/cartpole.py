@@ -236,7 +236,7 @@ class CartPole(MechanicalSystem):
         }
 
 
-class CartPoleWithNoisePort(CartPole):
+class NoisyCartPole(CartPole):
     """Linear cart-pole with process and measurement noise ports.
 
     ``d`` injects a disturbance force into the cart; ``n`` corrupts the

@@ -112,7 +112,7 @@ class Pendulum(MechanicalSystem):
         return {"link": [arc]}
 
 
-class PendulumWithNoisePort(Pendulum):
+class NoisyPendulum(Pendulum):
     """Single actuated pendulum with process and measurement noise ports.
 
     ``d`` injects disturbance torque into the dynamics; ``n`` corrupts the

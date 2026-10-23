@@ -155,7 +155,7 @@ def noisy_loop(seed_w=1, seed_v=2):
     from minilink import (
         DiagramSystem,
         ImpedanceController,
-        PendulumWithNoisePort,
+        NoisyPendulum,
         Step,
         WhiteNoise,
     )
@@ -163,7 +163,7 @@ def noisy_loop(seed_w=1, seed_v=2):
     loop = DiagramSystem()
     loop.add_subsystem(Step(final_value=1.0, step_time=10.0), "step")
     loop.add_subsystem(ImpedanceController(Kp=100.0, Kd=50.0), "controller")
-    loop.add_subsystem(PendulumWithNoisePort(), "plant")
+    loop.add_subsystem(NoisyPendulum(), "plant")
     loop.add_subsystem(WhiteNoise(seed=seed_w), "process_noise")
     loop.add_subsystem(WhiteNoise(seed=seed_v), "measurement_noise")
     loop.connect("step", "y", "controller", "r")
@@ -176,10 +176,10 @@ def noisy_loop(seed_w=1, seed_v=2):
 
 def noisy_plant():
     """A pendulum with white noise on its sensor and its action port exported."""
-    from minilink import DiagramSystem, PendulumWithNoisePort, WhiteNoise
+    from minilink import DiagramSystem, NoisyPendulum, WhiteNoise
 
     plant = DiagramSystem()
-    plant.add_subsystem(PendulumWithNoisePort(), "plant")
+    plant.add_subsystem(NoisyPendulum(), "plant")
     plant.add_subsystem(WhiteNoise(seed=5), "sensor_noise")
     plant.connect("sensor_noise", "y", "plant", "n")
     plant.add_input_port("u", dim=1)
@@ -273,7 +273,7 @@ def test_compile_warns_when_two_random_blocks_share_a_seed():
 def test_the_rollout_environment_warns_about_noise_it_never_sees():
     import warnings
 
-    from minilink import PendulumWithNoisePort
+    from minilink import NoisyPendulum
     from minilink.core.costs import QuadraticCost
     from minilink.core.distributions import Gaussian, Uniform
     from minilink.learning.reinforcement_learning.environment import RolloutEnvironment
@@ -289,8 +289,8 @@ def test_the_rollout_environment_warns_about_noise_it_never_sees():
         )
 
     cases = [
-        (problem(PendulumWithNoisePort(), d=Gaussian(0.0, 0.1)), None),
-        (problem(PendulumWithNoisePort(), n=Gaussian(0.0, 0.1)), "never calls h"),
+        (problem(NoisyPendulum(), d=Gaussian(0.0, 0.1)), None),
+        (problem(NoisyPendulum(), n=Gaussian(0.0, 0.1)), "never calls h"),
         (problem(noisy_plant()), "fixed seed"),
     ]
     for prob, expected in cases:

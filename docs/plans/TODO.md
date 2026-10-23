@@ -775,7 +775,7 @@ LQGPlanner as picked; S73 any time, self-contained.
   arm topic's modelling rung. Design first (the July 2026 articulated-mechanism draft is in git
   history; it is re-planned here, the optional `KinematicModel` delegate decided with it, ROADMAP
   §6). Moved here from wave G on 2026-10-22; the GMC714 audit (2026-10-23) found the labs need no
-  second arm description (`ThreeLinkManipulator3D` and the UR5 cover them). Done when a second arm runs on the shared
+  second arm description (`ThreeLinkManipulator` and the UR5 cover them). Done when a second arm runs on the shared
   stack with the catalog both-backends test.
 - **The former wave G rows** (moved from v0.3 by R48; none is needed by GMC714):
   - [ ] **C1 Pyro parity** open rows — [pyro-port-remaining.md](pyro-port-remaining.md); then

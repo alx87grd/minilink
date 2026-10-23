@@ -298,11 +298,11 @@ class TestLQR(unittest.TestCase):
         from minilink.analysis.linearization import design_model
         from minilink.dynamics.catalog.pendulum.cartpole import (
             CartPole,
-            CartPoleWithNoisePort,
+            NoisyCartPole,
         )
 
         x_up = np.array([0.0, np.pi, 0.0, 0.0])
-        model = design_model(CartPoleWithNoisePort(), x_up)
+        model = design_model(NoisyCartPole(), x_up)
         self.assertEqual(model.B().shape, (4, 1))
         self.assertEqual(model.D().shape, (4, 1))
         np.testing.assert_allclose(model.ubar, [0.0])
@@ -318,7 +318,7 @@ class TestLQR(unittest.TestCase):
         self.assertEqual(sensed.C().shape, (2, 4))
         np.testing.assert_allclose(sensed.ybar, x_up[:2])
         Q, R = np.diag([1.0, 10.0, 1.0, 1.0]), np.array([[0.1]])
-        K_noisy = lqr(CartPoleWithNoisePort(), Q, R, x_bar=x_up).params["K"]
+        K_noisy = lqr(NoisyCartPole(), Q, R, x_bar=x_up).params["K"]
         K_quiet = lqr(CartPole(), Q, R, x_bar=x_up).params["K"]
         self.assertEqual(K_noisy.shape, (1, 4))
         np.testing.assert_allclose(K_noisy, K_quiet)
@@ -1269,9 +1269,9 @@ class TestDiscretize(unittest.TestCase):
         self.assertEqual(step_leaf.outputs["y"].dependencies, "all")
 
     def test_discretize_reads_a_partial_feedthrough_on_its_one_input(self):
-        from minilink.dynamics.catalog.pendulum.pendulum import PendulumWithNoisePort
+        from minilink.dynamics.catalog.pendulum.pendulum import NoisyPendulum
 
-        plant = PendulumWithNoisePort()  # y reads the noise port n alone
+        plant = NoisyPendulum()  # y reads the noise port n alone
         step_leaf = discretize(plant, 0.05)
         self.assertEqual(step_leaf.outputs["y"].dependencies, ("u",))
         x = np.array([0.3, 0.1])

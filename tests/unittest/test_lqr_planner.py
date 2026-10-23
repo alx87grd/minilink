@@ -69,9 +69,9 @@ def test_finite_horizon_is_the_riccati_differential_equation():
 
 
 def test_a_plant_with_noise_ports_is_designed_about_its_command():
-    from minilink import CartPoleWithNoisePort, lqr
+    from minilink import NoisyCartPole, lqr
 
-    plant = CartPoleWithNoisePort()  # inputs u, d, n
+    plant = NoisyCartPole()  # inputs u, d, n
     x_up = np.array([0.0, np.pi, 0.0, 0.0])
     Q_x = np.diag([1.0, 10.0, 1.0, 1.0])
     R_all = 0.1 * np.eye(plant.m)  # a cost over every input stacked

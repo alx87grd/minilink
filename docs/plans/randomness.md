@@ -334,7 +334,7 @@ The RL environment already works with Δ = Tₛ: it draws a disturbance per cont
 holds it while the plant integrates inside the period.
 
 **The solver.** No minilink solver breaks with a zero-order hold. Prototype 2026-09-26
-(scratchpad, not in the library): `PendulumWithNoisePort` driven on `w`, Δ = 10 ms, 20 s.
+(scratchpad, not in the library): `NoisyPendulum` driven on `w`, Δ = 10 ms, 20 s.
 
 | Solver | ZOH: `h` calls per sample | ZOH: time | Linear: calls per sample | Linear: time |
 | --- | --- | --- | --- | --- |
@@ -519,7 +519,7 @@ evaluator's.
 ## 6. The six uses, one page
 
 ```python
-plant = PendulumWithNoisePort()                        # ports u, d [N m], n [rad/s]
+plant = NoisyPendulum()                        # ports u, d [N m], n [rad/s]
 
 # white noise: the intensity is the dt-free number; w_k ~ N(0, psd / Δ)
 w = WhiteNoise(psd=1e-2, sample_period=0.01, seed=1)
@@ -917,7 +917,7 @@ stay as the evidence. Their remedies were not stress-tested by a second reviewer
    on the drag plant `A` went from −0.40 to −1.6 (Δ = 0.01) and −6.1 (Δ = 0.001), equilibria
    moved with the seed, and direct collocation planned against the frozen realization with
    `success=True`. Separately, planners treat a declared disturbance port as an actuator today:
-   the then `lqr_at_operating_point(PendulumWithNoisePort())` returned a 3 × 2 gain (fixed 2026-10-14: `lqr(plant, …)` linearizes about the command port alone), and `wrt="u"` names
+   the then `lqr_at_operating_point(NoisyPendulum())` returned a 3 × 2 gain (fixed 2026-10-14: `lqr(plant, …)` linearizes about the command port alone), and `wrt="u"` names
    every input stacked, so the control port is `("u", 0)`.
 4. **RD-D11's noise array reaches ports only.** The evaluator steps `plant_step(x, u, t, params)`;
    a block inside `sys` is a compiled port operation with no override. With Philox on NumPy and
@@ -988,7 +988,7 @@ stay as the evidence. Their remedies were not stress-tested by a second reviewer
   (frozen across trials until RN-4): one line each, with RN-1.
 - **RD-A6. Monte Carlo of an observer-based loop: the `simulator` backend realizes its trials.**
   No new rollout is needed. Checked 2026-09-30 on an LQG compensator (a `DynamicController`
-  with ports `r`, `y` → `u`) and `PendulumWithNoisePort`: `compensator @ plant` builds the
+  with ports `r`, `y` → `u`) and `NoisyPendulum`: `compensator @ plant` builds the
   four-state loop; `backend="simulator"` runs it, projects it on the plant with `trajectory_of`
   and scores it with the problem's cost, but returns J = 0 in every trial because it applies no
   draw; the NumPy and JAX backends refuse a controller with state. The same loop simulated by

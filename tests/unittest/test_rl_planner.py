@@ -8,7 +8,7 @@ import pytest
 from minilink import Pendulum
 from minilink.core.costs import CostFunction
 from minilink.core.distributions import Gaussian, Uniform
-from minilink.dynamics.catalog.pendulum.pendulum import PendulumWithNoisePort
+from minilink.dynamics.catalog.pendulum.pendulum import NoisyPendulum
 from minilink.planning.problems import PlanningProblem, StochasticPlanningProblem
 from minilink.planning.results import PlanningSolution
 
@@ -273,7 +273,7 @@ def test_nominal_trajectory_is_the_undisturbed_rollout_from_the_start():
 
     # a disturbance port: the nominal rollout holds it at its nominal value
     noisy = StochasticPlanningProblem(
-        bounded_pendulum(PendulumWithNoisePort()),
+        bounded_pendulum(NoisyPendulum()),
         cost=HangCost(),
         x0_distribution=Uniform([-0.5, -0.5], [0.5, 0.5]),
         disturbances={"d": Gaussian([0.0], [1.0])},

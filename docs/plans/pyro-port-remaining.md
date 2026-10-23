@@ -334,11 +334,11 @@ Two-column record of every symbol marked Done before the shrink; the source for 
 | Drone2DwithSideTruster | Drone2DWithSideThruster | `minilink/dynamics/catalog/aerial/drone.py` |
 | Plane2D | Plane2D | `minilink/dynamics/catalog/aerial/plane.py` |
 | Rocket | Rocket | `minilink/dynamics/catalog/aerial/rocket.py` |
-| QuarterCarOnRoughTerrain | QuarterCarOnRoughTerrain | `minilink/dynamics/catalog/vehicles/suspension.py` |
+| QuarterCar | QuarterCar | `minilink/dynamics/catalog/vehicles/suspension.py` |
 | LinearTire | `tire_slip` / `linear_tire_forces` (coefficients in plant `params`) | `minilink/dynamics/catalog/vehicles/dynamic_bicycle.py` |
 | DynamicBicycle | DynamicBicycle (+ JAX twins, rate inputs) | `minilink/dynamics/catalog/vehicles/dynamic_bicycle.py` |
-| LongitudinalFrontWheelDriveCarWithWheelSlipInput | same | `minilink/dynamics/catalog/vehicles/propulsion.py` |
-| LongitudinalFrontWheelDriveCarWithTorqueInput | same | `minilink/dynamics/catalog/vehicles/propulsion.py` |
+| LongitudinalSlipCar | same | `minilink/dynamics/catalog/vehicles/propulsion.py` |
+| LongitudinalTorqueCar | same | `minilink/dynamics/catalog/vehicles/propulsion.py` |
 | KinematicBicyleModel | KinematicBicycle | `minilink/dynamics/catalog/vehicles/steering.py` |
 | HolonomicMobileRobot | HolonomicMobileRobot | `minilink/dynamics/catalog/vehicles/steering.py` |
 | Holonomic3DMobileRobot | not in minilink (check at C1) | project only: `examples/projects/car_trajopt/vehicles/extras.py` |
@@ -346,11 +346,11 @@ Two-column record of every symbol marked Done before the shrink; the source for 
 | ConstantSpeedKinematicCarModel | not in minilink (check at C1) | project only: `examples/projects/car_trajopt/vehicles/extras.py` |
 | UdeSRacecar | UdeSRacecar | `minilink/dynamics/catalog/vehicles/racecar.py` |
 | Manipulator | Manipulator | `minilink/dynamics/abstraction/manipulator.py` |
-| SpeedControlledManipulator | SpeedControlledManipulator | `minilink/dynamics/catalog/manipulators/arms.py` |
+| KinematicManipulator | KinematicManipulator | `minilink/dynamics/catalog/manipulators/arms.py` |
 | OneLinkManipulator | OneLinkManipulator | `minilink/dynamics/catalog/manipulators/arms.py` |
 | TwoLinkManipulator | TwoLinkManipulator | `minilink/dynamics/catalog/manipulators/arms.py` |
-| ThreeLinkManipulator3D | ThreeLinkManipulator3D | `minilink/dynamics/catalog/manipulators/arms.py` |
-| FiveLinkPlanarManipulator | FiveLinkPlanarManipulator | `minilink/dynamics/catalog/manipulators/arms.py` |
+| ThreeLinkManipulator | ThreeLinkManipulator | `minilink/dynamics/catalog/manipulators/arms.py` |
+| FiveLinkManipulator | FiveLinkManipulator | `minilink/dynamics/catalog/manipulators/arms.py` |
 | StaticController | DiagramSystem wiring | `minilink/core/diagram.py` |
 | StaticController.plot_control_law | plot_control_law(), plot_input_output_map() | `minilink/graphical/port_map.py` |
 | ClosedLoopSystem | `@`, `>>`, `+` composition | `minilink/core/diagram.py` |

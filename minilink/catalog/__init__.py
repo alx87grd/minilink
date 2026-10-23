@@ -12,16 +12,16 @@ _EXPORTS: dict[str, tuple[str, str]] = {
     # Pendulum
     "Acrobot": ("minilink.dynamics.catalog.pendulum", "Acrobot"),
     "CartPole": ("minilink.dynamics.catalog.pendulum", "CartPole"),
-    "CartPoleWithNoisePort": (
+    "NoisyCartPole": (
         "minilink.dynamics.catalog.pendulum",
-        "CartPoleWithNoisePort",
+        "NoisyCartPole",
     ),
     "DoublePendulum": ("minilink.dynamics.catalog.pendulum", "DoublePendulum"),
     "InvertedPendulum": ("minilink.dynamics.catalog.pendulum", "InvertedPendulum"),
     "Pendulum": ("minilink.dynamics.catalog.pendulum", "Pendulum"),
-    "PendulumWithNoisePort": (
+    "NoisyPendulum": (
         "minilink.dynamics.catalog.pendulum",
-        "PendulumWithNoisePort",
+        "NoisyPendulum",
     ),
     "RotatingCartPole": ("minilink.dynamics.catalog.pendulum", "RotatingCartPole"),
     "TwoIndependentPendulums": (
@@ -94,35 +94,35 @@ _EXPORTS: dict[str, tuple[str, str]] = {
         "minilink.dynamics.catalog.vehicles",
         "UdeSRacecarDyn3D",
     ),
-    "LongitudinalFrontWheelDriveCarWithTorqueInput": (
+    "LongitudinalTorqueCar": (
         "minilink.dynamics.catalog.vehicles",
-        "LongitudinalFrontWheelDriveCarWithTorqueInput",
+        "LongitudinalTorqueCar",
     ),
-    "LongitudinalFrontWheelDriveCarWithWheelSlipInput": (
+    "LongitudinalSlipCar": (
         "minilink.dynamics.catalog.vehicles",
-        "LongitudinalFrontWheelDriveCarWithWheelSlipInput",
+        "LongitudinalSlipCar",
     ),
     "MountainCar": ("minilink.dynamics.catalog.vehicles", "MountainCar"),
-    "QuarterCarOnRoughTerrain": (
+    "QuarterCar": (
         "minilink.dynamics.catalog.vehicles",
-        "QuarterCarOnRoughTerrain",
+        "QuarterCar",
     ),
     # Manipulators
-    "FiveLinkPlanarManipulator": (
+    "FiveLinkManipulator": (
         "minilink.dynamics.catalog.manipulators",
-        "FiveLinkPlanarManipulator",
+        "FiveLinkManipulator",
     ),
     "OneLinkManipulator": (
         "minilink.dynamics.catalog.manipulators",
         "OneLinkManipulator",
     ),
-    "SpeedControlledManipulator": (
+    "KinematicManipulator": (
         "minilink.dynamics.catalog.manipulators",
-        "SpeedControlledManipulator",
+        "KinematicManipulator",
     ),
-    "ThreeLinkManipulator3D": (
+    "ThreeLinkManipulator": (
         "minilink.dynamics.catalog.manipulators",
-        "ThreeLinkManipulator3D",
+        "ThreeLinkManipulator",
     ),
     "TwoLinkManipulator": (
         "minilink.dynamics.catalog.manipulators",

@@ -3,8 +3,8 @@
 from minilink import (
     ImpedanceController,
     Integrator,
+    NoisyPendulum,
     Pendulum,
-    PendulumWithNoisePort,
     Step,
     WhiteNoise,
 )
@@ -76,7 +76,7 @@ show(
 
 # Noise and disturbance ports stay explicit. This keeps ``>>`` from guessing
 # between open internal plant inputs such as ``d`` and ``n``.
-noisy = Step(final_value=[1.0]) >> ImpedanceController() @ PendulumWithNoisePort()
+noisy = Step(final_value=[1.0]) >> ImpedanceController() @ NoisyPendulum()
 noise = WhiteNoise()
 noisy.add_subsystem(noise, "sensor_noise")
 noisy
