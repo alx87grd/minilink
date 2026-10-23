@@ -333,7 +333,7 @@ the demo sweep touches fewer files. Nothing leaves without the maintainer's ruli
   public name of `minilink/` with its callers (library, tests, examples, notebooks,
   benchmarks, docs), its maturity (final; prototype: no test of its contract, no course or
   DESIGN use, or a `TODO: User Architectural Review`; dead: no caller), and a proposal (keep,
-  remove, to `experimental/`); every demo in `examples/demos/` and `examples/experimental/`
+  remove, to `experimental/`); every demo in `examples/demos/` and the top-level `experimental/`
   with the feature it shows and its twins. Done when the maintainer can rule on the table in
   one pass, row by row.
 - [ ] **K2 Remove the unused features** **[ask — removals]**, from K1's ruling: one commit
@@ -354,7 +354,7 @@ the demo sweep touches fewer files. Nothing leaves without the maintainer's ruli
   **K8-2** `minilink.catalog` the one flat index of every supported plant, each passing the
   both-backends contract test, with a docs entry; **K8-3** the unsupported plants the
   maintainer names from K1's table moved to `minilink/experimental/catalog/` with their skins
-  and demos (`examples/experimental/`), their tests and docs entries removed, out of the
+  and demos (the top-level `experimental/`), their tests and docs entries removed, out of the
   wheel **[ask — per plant]**; **K8-4** twins merged and the dead helpers deleted from K1's
   ruling (the Mermaid exporters, `camera.py`, the pygame renderer, `ProblemEnv` /
   `to_gymnasium`, the `identification/` stub) **[ask — per item]**; **K8-5** S64's hygiene,
@@ -363,10 +363,7 @@ the demo sweep touches fewer files. Nothing leaves without the maintainer's ruli
   lists only tested plants, no two supported plants differ by parameters alone, and
   `test_teaching_surface.py` pins both lists.
 - [ ] **K9 The experimental tier, untested** (ruled 2026-10-22, [end-state-api.md](end-state-api.md)
-  D3; [record](../reviews/2026-10-22-rulings-session-1.md)): **K9-1** `examples/experimental/`
-  moves to a top-level `experimental/` folder (the MPPI scripts, the boat and ODE showpieces'
-  demos, the contact-engine demo), out of the student tree, never cited by a course, with the
-  demo-check manifests and `examples/README.md` updated; **K9-2** the experimental tier's tests
+  D3; [record](../reviews/2026-10-22-rulings-session-1.md)): **K9-1** landed 2026-10-23 (`examples/experimental/` is the top-level `experimental/`); **K9-2** the experimental tier's tests
   (`test_symbolic.py`, `test_engine_jax.py`, the unsupported plants' rows) leave the CI merge
   gate for the nightly sweep or are deleted, `c_export`'s flagship smoke staying in the JAX
   regression job; **K9-3** one module docstring line on every `minilink/experimental/` module

@@ -16,8 +16,8 @@ def _leaked_research_lane(names: list[str]) -> list[str]:
         if (
             "/minilink/experimental/" in path
             or path.endswith("/minilink/experimental")
-            or "/examples/experimental/" in path
-            or path.endswith("/examples/experimental")
+            or "/experimental/" in path
+            or path.endswith("/experimental")
             or "/examples/projects/" in path
             or path.endswith("/examples/projects")
         ):

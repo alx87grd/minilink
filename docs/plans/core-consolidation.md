@@ -175,7 +175,7 @@ prelude name, a both-backends contract test and a docs page.
 | the manipulators (`arms.py`, `ur5.py`) | the robot pillar's content | content: keep the arms a lesson uses; `OneLinkManipulator` and `ThreeLinkManipulator3D` are G1's call | agrees |
 | pendulums, cart-poles, `DoublePendulum`, `DoubleIntegrator`, `SingleMass` | the textbook benchmarks every course and every pillar's demo uses | content: keep | agrees |
 | `Drone2D`, `Rocket` | the RL pillar's two benchmarks (learn to fly, land) | content: keep | agrees |
-| `aerial/plane.py` (`Plane2D`, `Plane3D`, 827 lines, with their 3-D skin), `marine/boat.py`, `astro/three_body.py`, `oscillators.py` (`Lorenz`, `VanderPol`), the floating and multi-mass springs, the drone variants, the rotating cart-poles, `Acrobot`, `TwoIndependentPendulums`, `SimpleIntegrator`, `TripleIntegrator` | other domains and variants; none is a vehicle, a robot or a benchmark a course needs | **side**: `experimental/catalog/<domain>/`, or the example that motivated them (the boat to `examples/experimental/boat/`); `Lorenz` and `ThreeBodyProblem` keep their one-file demos under the research examples | agrees, except the usage lens kept `Lorenz` and `ThreeBodyProblem` for their demos |
+| `aerial/plane.py` (`Plane2D`, `Plane3D`, 827 lines, with their 3-D skin), `marine/boat.py`, `astro/three_body.py`, `oscillators.py` (`Lorenz`, `VanderPol`), the floating and multi-mass springs, the drone variants, the rotating cart-poles, `Acrobot`, `TwoIndependentPendulums`, `SimpleIntegrator`, `TripleIntegrator` | other domains and variants; none is a vehicle, a robot or a benchmark a course needs | **side**: `experimental/catalog/<domain>/`, or the example that motivated them (the boat to `experimental/boat/`); `Lorenz` and `ThreeBodyProblem` keep their one-file demos under the research examples | agrees, except the usage lens kept `Lorenz` and `ThreeBodyProblem` for their demos |
 
 ### 4.8 Presentation and interfaces
 
@@ -315,7 +315,7 @@ on them.
 2. Drop the names from the root prelude and the band facade; `test_teaching_surface.py`
    and `test_public_imports.py` pin the new list.
 3. Drop the `docs/api/*.rst` entry; the research tier is not on the API site.
-4. Move the demo to `examples/experimental/<topic>/`; move or trim the tests, keeping them
+4. Move the demo to `experimental/<topic>/`; move or trim the tests, keeping them
    running.
 5. The TRL ledger row (ROADMAP §3) moves to "research lane"; one dated record under
    `docs/reviews/` lists the pass's rulings; the "Breaking changes so far" ledger in

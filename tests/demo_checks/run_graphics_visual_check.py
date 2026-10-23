@@ -38,7 +38,7 @@ CHECKS = (
     ),
     (
         "Meshcat 3D (physics in diagram — optional meshcat extra)",
-        [sys.executable, "examples/experimental/engine/engine_physics_in_diagram.py"],
+        [sys.executable, "experimental/engine/engine_physics_in_diagram.py"],
     ),
     (
         "Cartpole trajopt animate (set LIVE_PLOT=True for Plotly iterates)",

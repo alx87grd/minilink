@@ -161,9 +161,7 @@ def parking_cost(boat, x_dock=X_DOCK, terminal=0.0, well=0.0):
 
 
 POLICY_HIDDEN = (64, 64)  # the learned law's network
-POLICY_WEIGHTS = (
-    "examples/experimental/boat/parking_ppo_policy.npz"  # written by parking_ppo.py
-)
+POLICY_WEIGHTS = "experimental/boat/parking_ppo_policy.npz"  # written by parking_ppo.py
 
 
 def dock_features(x):

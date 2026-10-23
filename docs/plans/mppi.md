@@ -4,12 +4,12 @@
 recommended answers are D26–D28 and D30 of [end-state-api.md](end-state-api.md) (2026-10-22:
 `MPPIPlanner`, the three planner verbs, `n_plant_samples=1`, `RolloutEnvironment` staying in
 `reinforcement_learning/` as a caller of the step model), to rule for v0.4.
-**Lane:** research lane first (`examples/experimental/`), provisional band with the MPC
+**Lane:** research lane first (`experimental/`), provisional band with the MPC
 block once MP-5 lands, teaching-surface decision at V3 (v0.9).
 **Rung proposed:** S72 on the workboard, v0.4, on S31's sampled kernel (the hybrid phase,
 after the continuous core) and the step model of S75, and after RN-4
 and RN-5 of the randomness plan (the ordering of §8), hardened before the v0.9 freeze; see §9.
-**Prototype:** `examples/experimental/mppi/pendulum_mppi.py` and `racecar_mppi.py`
+**Prototype:** `experimental/mppi/pendulum_mppi.py` and `racecar_mppi.py`
 (2026-10-02), two standalone scripts on the library as it stands — the swing-up works, and
 the racecar laps the circuit with the cone against the collocation MPC on the same problem;
 the findings are in §1.
@@ -101,7 +101,7 @@ collectors, the tabular learners and the NumPy Monte Carlo trials. The randomnes
 (`randomness.md`, RN-4) will turn `disturbances` into signals realized per episode by
 `realize(key)`; the env's `reset(key)` / `step` keep their shape.
 
-**The standalone prototype.** `examples/experimental/mppi/pendulum_mppi.py` is the
+**The standalone prototype.** `experimental/mppi/pendulum_mppi.py` is the
 algorithm of §2 as one script on the library as it stands: `plant.compile(backend="jax")`,
 a `vmap` of `rk4_integrate_zoh_trace` over `K = 1024` sampled sequences of `N = 40` held
 inputs, the cost's `g` vmapped along each path, the softmin, the update, a hand receding-
@@ -116,7 +116,7 @@ so, and the record's effective sample size is how a user sees it (`≈ K` means 
 ones RN-5 rewrites — a batched held-input rollout and the problem's cost on a path — so
 the planner should be built on that contract once, not before it (§8).
 
-**The racecar benchmark.** `examples/experimental/mppi/racecar_mppi.py` runs the same MPPI
+**The racecar benchmark.** `experimental/mppi/racecar_mppi.py` runs the same MPPI
 on the problem of `demos/udes_racecar/mpc_racecar_kinematic.py` — the kinematic UdeS
 racecar, the rounded circuit, the corridor and the cone, the demo's own cost objects — and
 then the demo's collocation MPC on the same plant and run, and scores both with
@@ -432,7 +432,7 @@ stated in the report.
   the plan; the record's `str`. Done when both tests pass and the body reads next to
   `dp.py`.
 - [ ] **MP-2 The hand-loop demo** (research lane).
-  `examples/experimental/mppi/pendulum_mppi.py`: the planner, `compute_command`-style
+  `experimental/mppi/pendulum_mppi.py`: the planner, `compute_command`-style
   hand loop (`solve_trajectory_from`, apply `u_0`, step the plant with `discretize`,
   shift) until MP-4; `print(solution)`; the plan over the closed-loop trajectory.
   Done when it runs in the nightly sweep's wall-clock budget.
@@ -475,7 +475,7 @@ in the room.
 
 The question asked: when. The proposal, against the rungs of ROADMAP §5:
 
-- **Now (2026-10-02): the standalone script** under `examples/experimental/mppi/`, so
+- **Now (2026-10-02): the standalone script** under `experimental/mppi/`, so
   the G1 audit of GMC714 sees both MPC flavours running; it touches no library file.
 - **v0.4, after RN-4 and RN-5 (between cohorts): MP-1, MP-2, MP-3** on the
   research lane, on the sampled kernel of S31 and the step model of S75

@@ -140,7 +140,7 @@ git_describe_command = "git describe --dirty --tags --long --match '0.*'"
 [tool.hatch.build.targets.sdist]
 exclude = [
     "/minilink/experimental",
-    "/examples/experimental",
+    "/experimental",
     "/examples/projects",
     "/docs/_static/showcase",
 ]
