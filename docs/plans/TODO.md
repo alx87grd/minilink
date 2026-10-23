@@ -520,7 +520,8 @@ moved to the new interface (R47).
   n)` (the start and parameter laws), `evaluate` and `compare` with `n_trials` and `key` (`vmap`
   of the one rollout, a loop on NumPy), `objective` the problem's criterion over `J`, paired
   trials in `compare`; `MonteCarloEvaluator` a one-line facade, then removed; tutorial 11 and the
-  RL lessons migrated once. **One intended change:** the Monte Carlo numbers move once (the real
+  RL lessons migrated once. Noise blocks keep today's per-port draws until RN-4's per-block seeds
+  (v0.4), so the frozen-noise defect stays through v0.3. **One intended change:** the Monte Carlo numbers move once (the real
   loop, the integral to `tf`; D21), re-pinned with a note. Done when the pathwise gradient of
   `objective` with respect to the controller's params matches a central difference on the same
   key, the deterministic twin (`n_trials = 1`, no laws) is byte-identical to V1.4, and the RL

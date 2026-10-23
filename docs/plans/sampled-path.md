@@ -1,7 +1,8 @@
 # The sampled path: the step model and the sampled loop
 
 **Status:** ruled 2026-10-22/23 (R6–R8, R12–R14, R17, R18 of
-[the rulings](../reviews/2026-10-22-rulings-session-1.md)); aligned to
+[the rulings](../reviews/2026-10-22-rulings-session-1.md), amended by session 3: R40 the hold on
+sequences only, R42 the keyword `solver=`, R43 the RL episode a training setting); aligned to
 [continuous-core.md](continuous-core.md), the design of record for the phase, on 2026-10-23.
 First written 2026-10-21 as an evaluation of the code and a recommendation.  
 **Lane:** core (the compiled evaluator, `discretize`, every sampled consumer) — every step is
@@ -80,14 +81,20 @@ The pieces are planned; the contract that ties them is not.
 $$x_{k+1} = \Phi(x_k, u_k, t_k; p)$$
 
 the plant integrated over one sample period with the input held: pure in arrays, traceable
-in every argument (`params` included), the same on NumPy and JAX. Four knobs, no more:
+in every argument (`params` included), the same on NumPy and JAX. Three knobs, no more (R40:
+a step map holds its input by definition, so the hold is not a knob of the step):
 
 | Knob | Values | Default |
 | --- | --- | --- |
 | `dt` | the sample period, owned by the step model and never a key of `params` (as `discretize` already rules) | — |
-| `method` | `"rk4"`, `"euler"`, `"exact"` (the matrix exponential, linear models only) | `"rk4"` |
+| `solver` | `"rk4"`, `"euler"`, `"exact"` (the matrix exponential, linear models only); the time-integration keyword of every tool that integrates (R42) | `"rk4"` |
 | `substeps` | integration steps per sample | `1` (today's numbers) |
-| `hold` | `"zoh"`, `"foh"` (what shooting uses between knots) | `"zoh"` |
+
+**The hold belongs to a sequence (R40).** A first-order hold interpolates from `u_k` to
+`u_{k+1}`, which a one-step map `step(x, u, k)` never receives; so `hold="zoh" | "foh"` (`foh`
+being what shooting uses between knots) is a keyword of `rollout` and `compute_forced`, which
+hold a sequence, never of `step` or `discretize`. A callable `u(t)` given to `compute_forced` is
+evaluated at the RK4 stage times (no hold); a sampled input matrix is held, `zoh` by default.
 
 **Parameters are an argument, always.** The step is `step_p(x, u, t, params)`, and there is
 no frozen twin. The parameterless call students use stays, as a binding: the parameters
@@ -105,7 +112,7 @@ later identification and imitation.
 
 ### 3.3 One public verb: `discretize`
 
-`discretize(plant, dt, *, method, substeps, hold) -> StepSystem` becomes the standard path,
+`discretize(plant, dt, *, solver, substeps) -> StepSystem` becomes the standard path,
 as it already is in the GRO501 digital-implementation lesson. The result is a `StepSystem`:
 it composes in a `StepDiagramSystem`, runs `compute_rollout`, and its `compile()` gives the
 scannable step. Its body stops being hand-written and calls the compiled step.
@@ -114,11 +121,14 @@ scannable step. Its body stops being hand-written and calls the compiled step.
 …)` takes the time in seconds, as `f` does; a `StepSystem`'s `step(x, u, k, params)` takes the
 integer tick. `discretize` binds `t_k = t0 + k·dt` between the two, so the tick is the step
 contract of every sampled consumer and seconds are the continuous plant's business. `integrator=`
-becomes `method=` (accepted for one release, with a ledger line; R6).
+becomes `solver=` (accepted for one release, with a ledger line; R42, which replaces R6's
+`method=`: `method=` stays the verb's own numerical method, the derivative or the optimizer's
+algorithm, and `integrator=` would clash with the `Integrator` block).
 
 ### 3.4 One implementation
 
-In `core/compile`, one step per backend, `step(x, u, t, params; dt, method, substeps, hold)`,
+In `core/compile`, one step per backend, `step(x, u, t, params; dt, solver, substeps)`, and one
+rollout over it, `rollout(x0, u_seq, t0, dt, params; solver, substeps, hold)`,
 an `xp` body where possible; the 36-method grid becomes bindings over it (the grid trim,
 SM-6), and `integrate_zoh(dt_inner=)` is `substeps` under another name. SM-6 then moves the
 integrator to `simulation/solvers/`, the move S37 planned. The differentiable problem's
@@ -179,8 +189,8 @@ ev = plant.compile(backend="jax")            # or "numpy": the same four names, 
 
 ev.f(x, u, t, params)                        # the law; u=None is the nominal input (the _ivp family goes)
 ev.h(x, u, t, params)                        # the outputs and, for a diagram, the internal signals
-ev.step(x, u, t, params, *, dt, method="rk4", substeps=1, hold="zoh")   # x_{k+1}: the one step model (SM-1)
-ev.rollout(x0, u_seq, t0, dt, params, **knobs)                          # scan of step: (t, xs, signals)
+ev.step(x, u, t, params, *, dt, solver="rk4", substeps=1)              # x_{k+1}: the one step model (SM-1), u held
+ev.rollout(x0, u_seq, t0, dt, params, *, solver="rk4", substeps=1, hold="zoh")   # scan of step: (t, xs, signals); hold "foh" interpolates u_seq
 ev.rollout_batch(x0s, u_seqs, dt=, params=family)                       # the one convenience: vmap(rollout)
 ```
 
@@ -188,8 +198,8 @@ ev.rollout_batch(x0s, u_seqs, dt=, params=family)                       # the on
 | --- | --- |
 | `f`, `f_p`, `f_trace`, `f_trace_p`, `f_ivp*` | `f`; `u=None` nominal |
 | `outputs*`, `compute_internal_signals*` | `h` |
-| `rk4_step*`, `euler_step*`, `step*` (20 names) | `step` with `method`, `substeps`, `hold`; for a `StepSystem` evaluator `step` is the system's own map `step(x, u, k, params)` on the integer tick, no knobs |
-| `rk4_integrate_zoh*`, `rk4_integrate_linear*` (`hold="foh"`), `*_integrate_ivp*`, `euler_integrate_*`, `integrate_zoh*`, `rollout`, `integrate_zoh_rollout` (22 names) | `rollout` |
+| `rk4_step*`, `euler_step*`, `step*` (20 names) | `step` with `solver`, `substeps`; for a `StepSystem` evaluator `step` is the system's own map `step(x, u, k, params)` on the integer tick, no knobs |
+| `rk4_integrate_zoh*`, `rk4_integrate_linear*` (`hold="foh"`), `*_integrate_ivp*`, `euler_integrate_*`, `integrate_zoh*`, `rollout`, `integrate_zoh_rollout` (22 names) | `rollout`, the one place `hold` lives |
 | `f_scipy`, `f_ivp_scipy`, `as_scipy_jac` | not evaluator methods: the `Simulator` swaps the arguments of `frozen.f` for `solve_ivp`, in one place |
 | `rollout_batch` | stays |
 
@@ -209,12 +219,12 @@ Rebuilding the wrapper per call is the one thing to forbid: `jax.jit(body)` at e
 DESIGN §5's stable names (`rk4_step`, `integrate_zoh`, their trace twins) become one-line
 aliases onto `frozen.step` / `step` for one release, then go with a ledger line.
 
-**The knobs are static, never traced.** `method`, `substeps` and `hold` are keyword-only
+**The knobs are static, never traced.** `solver`, `substeps` and `hold` are keyword-only
 Python values (strings, ints), resolved at trace time (`static_argnames` on the generated
 `jit`), so a `hold` branch or a `substeps` loop leaves no branch in the compiled program and
 each distinct combination compiles once. `dt` and `params` are the only array arguments. A knob
 is never a pytree leaf (a runtime array choosing the integrator would need `lax.switch` and has
-no meaning under `vmap`). The `method="scipy"` door of `evaluate` and `compute_forced` swaps the
+no meaning under `vmap`). The `solver="scipy"` door of `evaluate` and `compute_forced` swaps the
 run function in Python before anything is traced; `problem.compile` has no such door.
 
 **Batches: shared or per-member, any mix.** In `rollout_batch` a leaf with a leading axis of
@@ -239,16 +249,16 @@ parameters as constant columns of the batched state so they ride the same memory
 
 | Consumer | After | Numbers |
 | --- | --- | --- |
-| `discretize` | calls the compiled step; gains `substeps=`, `hold=`, `method="exact"` | identical for RK4 and Euler (checked by the baseline) |
-| `RolloutEnvironment` | takes the step of `discretize(plant, dt, ...)`; gains `substeps=` | identical at `substeps=1` |
+| `discretize` | calls the compiled step; gains `substeps=`, `solver="exact"`; `integrator=` read as `solver=` for one release | identical for RK4 and Euler (checked by the baseline) |
+| `RolloutEnvironment` | takes the step of `discretize(plant, dt, ...)`; gains `substeps=`, `solver=` replaces `integrator=`; the RL episode is a training setting it owns, reading the problem's fields as hints (R43), and it no longer serves the Monte Carlo trials | identical at `substeps=1` |
 | `Sys2Gym` | the same | identical |
-| the DP grid | the step model with `method="euler"` | identical; moving DP to RK4 is a separate ask |
+| the DP grid | the step model with `solver="euler"` | identical; moving DP to RK4 is a separate ask |
 | the RRT extender, the Lyapunov sampler, the MPPI scripts | `substeps` instead of hand loops | identical |
 | `HybridSimulator`, `RealtimeSimulator` | the step model (`dt_inner` becomes `substeps`) | identical |
-| shooting, multiple shooting | the step model with `hold="foh"` | identical |
+| shooting, multiple shooting | the rollout with `hold="foh"` | identical |
 | direct collocation | unchanged | — |
-| `compare()`, `MonteCarloEvaluator` | the compiled fixed-step engine is the judge (R15): `evaluate` and `compare` run `problem.compile(arg, dt)`, the continuous loop on SM-1's step; `method="scipy"` is the adaptive escape; the Monte Carlo fold into `evaluate` is V1's step 7 | change once with V1 (the integral to `tf`, R19) and with step 7 (the draws, D21); a sampled replay on the training model waits for v0.4 |
-| `compute_forced` (R17, R18) | the one `ev.rollout` with the step model's `hold`; `method="rk4" \| "scipy"`; `input_interp` becomes `hold`; the `euler` loop backend goes | `zoh` by default everywhere: the `rk4_fixedsteps` forced numbers change once (a baseline and a ledger line) |
+| `compare()`, `MonteCarloEvaluator` | the compiled fixed-step engine is the judge (R15): `evaluate` and `compare` run `problem.compile(arg, dt)` (`dt` required, R36), the continuous loop on SM-1's step; `solver="scipy"` is the adaptive escape; the Monte Carlo fold into `evaluate` lands in v0.3, right after `evaluate` exists (R44) | change once with V1 (the integral to `tf`, R19) and with the fold (the draws, D21); a sampled replay on the training model waits for v0.4 |
+| `compute_forced` (R17, R18, R40) | the one `ev.rollout`, `hold` on its sequence; `solver="rk4" \| "scipy"`; `input_interp` becomes `hold`; a callable `u(t)` evaluated at the RK4 stage times; the `euler` loop backend goes | a sampled input matrix held `zoh` by default: those `rk4_fixedsteps` forced numbers change once (a baseline and a ledger line); a callable `u(t)` becomes exact at the stages |
 | S31's sampled kernel | scans the step model with the controller's `step` between samples | lands on this |
 | identification, behavior cloning (planned) | roll the step model at the logging rate | born on the standard |
 
@@ -261,23 +271,27 @@ compare after each step. A number that changes on purpose gets its own test and 
 
 - **SM-0** The baseline: every consumer of §1 on a pendulum and a cart-pole, both backends
   where they exist, `params` on and off, repeated calls.
-- **SM-1** The one compiled step, taking `params`, with its four knobs on both backends; the
+- **SM-1** The one compiled step, taking `params`, with its knobs (`dt`, `solver`, `substeps`)
+  and the rollout with `hold` on both backends; the
   existing methods become bindings over it, the parameterless ones a `partial` over `params`
   then `jit`, byte-identical and within the measured speed of §3.5.
-- **SM-2** `discretize` on the compiled step, gaining `substeps=` and `hold=`;
+- **SM-2** `discretize` on the compiled step, gaining `substeps=` (no `hold`: R40);
   `StepSystem.step(x, u, k, params)` on the tick, `t_k = t0 + k·dt` bound by `discretize`;
-  `integrator=` accepted as `method=` for one release; `method="exact"` (the follow-up) checked
+  `integrator=` accepted as `solver=` for one release (R42); `solver="exact"` (the follow-up) checked
   against `scipy.signal.cont2discrete`; the `params["dt"]` fallback and the source-port
   follow-ups (TODO §4).
-- **SM-3** `RolloutEnvironment` and `Sys2Gym` on `discretize`, `substeps` exposed.
+- **SM-3** `RolloutEnvironment` and `Sys2Gym` on `discretize`, `substeps` exposed, `solver=`
+  replacing `integrator=` (also on `ReinforcementLearningPlanner` and `TabularLearningPlanner`,
+  one release accepted).
 - **SM-4** The RRT extender, the Lyapunov sampler, the MPPI scripts, the hybrid and realtime
   simulators on the step model.
-- **SM-5** Shooting on `hold="foh"`; the DP grid on `method="euler"` (byte-identical;
-  `DynamicProgrammingPlanner(method="rk4")` available, R8).
-- **SM-7** `compute_forced` on the one rollout (R17, R18): `method="rk4" | "scipy"`,
-  `input_interp` replaced by `hold`, `zoh` the default everywhere, the `euler` loop backend
-  removed; the one intended change, the `rk4_fixedsteps` forced numbers, gets a baseline, its
-  own test and a ledger line. Lands after SM-2 and before SM-6 (the number keeps its id; it was
+- **SM-5** Shooting on the rollout's `hold="foh"`; the DP grid on `solver="euler"` (byte-identical;
+  `DynamicProgrammingPlanner(solver="rk4")` available, R8, R42).
+- **SM-7** `compute_forced` on the one rollout (R17, R18, R40): `solver="rk4" | "scipy"`,
+  `input_interp` replaced by `hold`; a callable `u(t)` evaluated at the RK4 stage times; a
+  sampled input matrix held `zoh` by default; the `euler` loop backend removed; the one
+  intended change, the `rk4_fixedsteps` forced numbers (held matrices; exact callables), gets a
+  baseline, its own test and a ledger line. Lands after SM-2 and before SM-6 (the number keeps its id; it was
   added on 2026-10-23).
 - **SM-6** The grid trim (one `_p` body per integrator, the bound and jitted variants
   generated; the evaluator internals deduplicated: ZOH sugar, the JAX step rollout, the four
@@ -288,9 +302,11 @@ compare after each step. A number that changes on purpose gets its own test and 
 
 1. **The contract and its name**: the step model, produced by `discretize`, a `StepSystem`
    (R6).
-2. **The four knobs and their defaults**: `dt` required; `method` `rk4` / `euler` / `exact`,
-   default `rk4`; `substeps=1`; `hold` `zoh` / `foh`, default `zoh`; `substeps` exposed on
-   every consumer that takes `dt` (R7); the forced hold `zoh` everywhere (R18).
+2. **The knobs and their defaults**: `dt` required; `solver` `rk4` / `euler` / `exact`,
+   default `rk4` (R42, the word replacing R7's `method`); `substeps=1`; `substeps` exposed on
+   every consumer that takes `dt` (R7). The hold is a keyword of the sequences only, `rollout`
+   and `compute_forced`, `zoh` / `foh`, default `zoh` for a sampled matrix, a callable `u(t)`
+   exact at the stages (R40, which supersedes R7's hold on the step and R18 for callables).
 3. **DP's integrator**: Euler through the step model, byte-identical; RK4 available; whether
    the default flips is V3's question (R8).
 4. **A sampled replay** in `compare()` and the Monte Carlo evaluator: superseded by R15 (the
@@ -314,8 +330,8 @@ compare after each step. A number that changes on purpose gets its own test and 
   `Optimizer`, R23). In this phase it takes continuous controllers only; its step 7b (after
   S31) dispatches a sampled controller to the kernel of §8, so a digital PID or a held neural
   policy gets the same `evaluate` and program export through that kernel.
-- **S65**: the hold rule here (`zoh` / `foh`) replaces its `input_interp` option (SM-7, R17);
-  one vocabulary for both.
+- **S65**: the hold rule here (`zoh` / `foh`, on sequences, R40) replaces its `input_interp`
+  option (SM-7, R17); one vocabulary for both.
 - **The Later row on a sample stride**: `substeps` on the step model is the same knob for the
   sampled path; `Simulator`'s fixed-step solvers can read it too.
 

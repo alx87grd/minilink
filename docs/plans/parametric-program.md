@@ -90,15 +90,16 @@ program (the plain noun returned).
 
 ### 3.1 The parameter tree
 
-`p` is a pytree with the planning tiers of `ProblemParameters` as keys: `x0`, `system`,
-`cost`, `sets`, and `scene` once A3 gives workspace geometry its home. Its sample is the
+`p` is the parameter tree assembled from the objects' own `params` (R41, 2026-10-23:
+`ProblemParameters` is retired, one home per number): `x0`, `plant`, `cost`, `sets`, and
+`scene` once A3 gives workspace geometry its home. Its sample is the
 problem's nominal values, so its structure is fixed at compile time and its values vary
 without retracing (JAX takes numeric leaves; the diagram parameters already work this way,
 DESIGN §4). A bind takes a partial tree, merged onto the bound values and checked against
 the structure: an unknown path raises and names the known ones; a leaf of a new shape
-raises; `scene` raises until A3. The key for the plant is `plant` (ruled 2026-10-23, D19): the
-planning tiers' `system` key is renamed with this plan, so the compiled problem's `pe.params`
-and this tree say one word.
+raises; `scene` raises until A3. The key for the plant is `plant` (ruled 2026-10-23, D19), the
+same tree as the compiled problem's `pe.params`, so the two say one word; the bundle's `system`
+key goes with the bundle.
 
 ### 3.2 The program and its evaluator
 

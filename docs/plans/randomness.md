@@ -11,12 +11,15 @@ a bare `A5`, `P4`, `RN-2` is a workboard step.
 Rungs (decided 2026-09-26, reorganized 2026-10-21): RN-1 (`WhiteNoise`) in v0.2 wave B, the
 prerequisite of B3 (`estimation/`, P4); RN-2 carried into v0.3 (wave A, before V1's step 7);
 RN-3 with its first consumer (v0.3, unless a teaching notebook needs sampled sensor noise
-first); RN-4 and RN-5 together with V1's step 7 (the draws) in v0.4 per ROADMAP §5.4, because
-they change public behaviour and the Monte Carlo numbers once, and before the v0.9 freeze
-(pulling the Monte Carlo fold into v0.3 is raised in ROADMAP §6); RN-6 with each step.
+first); RN-5, the Monte Carlo fold into `evaluate`, in v0.3 right after `evaluate` exists
+(R44, 2026-10-23: V1's step 4, the draws over the start and parameter laws); RN-4's per-block
+noise seeds in v0.4, joining under the same verb, before the v0.9 freeze; RN-6 with each step.
+Both change public behaviour and the Monte Carlo numbers once; the course runs on `main` while
+v0.3 stays on `dev` (R47).
 **Aligned 2026-10-23** to [continuous-core.md](continuous-core.md) and the rulings R10, R15,
-R27 of [2026-10-22-rulings-session-1.md](../reviews/2026-10-22-rulings-session-1.md): the
-evaluator is `evaluate(problem, arg, *, dt, n_trials, key)` on the compiled problem, the draws
+R27 of [2026-10-22-rulings-session-1.md](../reviews/2026-10-22-rulings-session-1.md), and to
+its session 3 (R36 `dt` required, R44 the fold in v0.3, R45 the record's names): the evaluator
+is `evaluate(problem, arg, *, dt, n_trials, key)` on the compiled problem, the draws
 `problem.realize(key, n)`, the record `Evaluation`; §8's note says which rulings here that
 supersedes. It settles the disturbance convention ROADMAP §6
 held open before B3, closes finding FD-F9 of
@@ -487,7 +490,7 @@ In the 2026-10-23 form the same comparison reads
 
 ```python
 cmp = compare(problem, LQR=lqr, VI=vi, dt=0.01, n_trials=100, key=1)   # one realization, shared: common random numbers
-cmp.evaluations["LQR"].criterion_value, cmp.difference("LQR", "VI")
+cmp.evaluations["LQR"].objective, cmp.difference("LQR", "VI")
 ```
 
 The same seed gives the same trials on any backend, and the same `J` to rounding (the two
@@ -499,7 +502,7 @@ The options weighed are in §7. RL training stays key-threaded in JAX, where cro
 
 **The evaluator simulates the closed-loop diagram (RD-D24).** (Since 2026-10-23 the run is the
 compiled fixed-step rollout of `problem.compile(ctl, dt)` on both backends, the judge and the
-engine; the adaptive `Simulator` is the `method="scipy"` escape, one run per trial: R15.) A
+engine; the adaptive `Simulator` is the `solver="scipy"` escape, one run per trial: R15, R42.) A
 trial is a realization, and a
 realization is simulated by the one path every diagram uses. So the evaluator builds the loop
 as a diagram, `ctl @ sys` for a feedback block or `source >> sys` for an open-loop law, wires
@@ -547,7 +550,7 @@ observer = kalman(LTISystem(A, B, C), B_w @ W @ B_w.T, D_v @ V @ D_v.T)     # Q_
 
 # RL training and Monte Carlo: one integer seed per tool, one key per evaluation
 ctl = ReinforcementLearningPlanner(problem, dt=0.05, seed=0).solve().policy
-report = evaluate(problem, ctl, dt=0.05, n_trials=100, key=1)   # an Evaluation; report.criterion_value, report.success_rate
+report = evaluate(problem, ctl, dt=0.05, n_trials=100, key=1)   # an Evaluation; report.objective, report.success_rate
 
 # one continuous closed-loop run of a fresh realization, on a fixed step at Δ
 loop = ...                                              # a diagram: d and n wired to the plant, ctl @ plant
@@ -738,21 +741,29 @@ history of this plan; where they conflict, the later rulings hold:
   `Distribution.sample` is realized on one backend inside `realize`.
 - **RD-D24's run** is the compiled fixed-step rollout of `problem.compile(ctl, dt)` on both
   backends (R15: the judge and the engine), not a loop of `Simulator` runs at the automatic
-  grid; `evaluate(..., method="scipy")` is the adaptive escape, one run per trial. `dt` stays
-  the simulation step.
+  grid; `evaluate(..., solver="scipy")` is the adaptive escape, one run per trial (R42). `dt`
+  stays the simulation step and is required (R36).
 - **`MonteCarloEvaluator`** folds into `evaluate(problem, arg, *, dt, n_trials, key)` (R10),
-  one facade line until removed; its record is the one `Evaluation` of R27 (`cost`, `value`,
-  the two margins, `failed`, `reached`, `criterion_value`, the three rates
-  `feasibility_rate` / `reachability_rate` / `success_rate`; no `failure_rate`).
-- **The score** is the integral to `tf` with no cut at exit, an exit priced once by the
-  problem's `infeasible_cost` (R19). RD-D24's "the numbers change once" now covers both changes
-  (D21).
+  one facade line until removed, **in v0.3** right after `evaluate` exists (R44; RD-D24's "in
+  v0.4" no longer holds); its record is the one `Evaluation` (`cost` the plain integral, `J` the
+  run's score, the two margins, `failed`, `reached`, `objective` the problem's criterion over
+  `J`, the three rates `feasibility_rate` / `reachability_rate` / `success_rate`; no
+  `failure_rate`; R27 as renamed by R45).
+- **The score** is the integral to `tf` with no cut at exit (R19); the price is a switch
+  (R32): with `infeasible_cost=None`, the default, `J = cost`; with `True` or a number, `J = cost
+  + price · (failed or not reached)`, the price `True` reads from the cost's upper-bound hint
+  (`problem.infeasible_cost_bound()`). A run that is not finite is failed, its cost `+inf` (R31).
+  RD-D24's "the numbers change once" now covers both changes (D21).
+- **The RL environment** keeps its own episode (R43): a training setting reading the problem's
+  fields as hints, no longer the Monte Carlo trials' plant.
 
 ## 9. Steps: the implementation plan
 
 Order: RN-1 first (RD-D14: it unblocks P4's Kalman demo, and rewrites the course cell in the same
-commit); RN-2 before RN-3; RN-4 before RN-5; RN-6 closes each step's docs as it lands. Rungs as
-in the header: RN-1 and RN-2 in v0.2, RN-3 with its first consumer, RN-4 and RN-5 in v0.4. Each
+commit); RN-2 before RN-3; RN-5 before RN-4 since R44 (the fold in v0.3 on the start and
+parameter draws; RN-4's per-block seeds join under the same verb in v0.4); RN-6 closes each
+step's docs as it lands. Rungs as in the header: RN-1 in v0.2, RN-2 and RN-5 in v0.3, RN-3 with
+its first consumer, RN-4 in v0.4. Each
 step that changes draws records a seeded baseline before and pins the new numbers with a test
 after (RULES 7.7, AGENTS refactor recipe); each step's math is read next to `dp.py` before it
 lands. The acceptance test of every step is its deterministic twin (RD-D23).
@@ -815,8 +826,8 @@ lands. The acceptance test of every step is its deterministic twin (RD-D23).
 - [ ] **RN-4 `realize` and the problem** (RD-R4, RD-R4b, RD-D6, RD-D7, RD-D10, RD-D18, RD-D20–RD-D22).
   1. `System.realize(key)` gathered over subsystems, each block's seed
      `child_seed(key, id_path)` with the cipher of RN-1 (RD-D21); `StochasticPlanningProblem.realize(key)`
-     returns `(x0, params)`: the start, the drawn parameter values (`child_seed(key, name)` per
-     parameter), a seed for each `disturbances` block and for each random block inside `sys`.
+     (in v0.3 already with RN-5, drawing the start and the parameter values) gains a seed for
+     each `disturbances` block and for each random block inside `sys`, under the same verb.
      Files: `core/system.py`, `core/wiring.py`, `planning/problems.py`, `core/distributions.py`.
   2. `disturbances` takes signals only (RD-D6), the one line of `test_rl_planner.py` updated; a
      planner pins the declared disturbance ports at their nominal value (RD-D22), in
@@ -834,16 +845,18 @@ lands. The acceptance test of every step is its deterministic twin (RD-D23).
   bit-identical on NumPy and JAX, two episodes from one training key draw distinct noise, and
   adding a random parameter leaves every other stream unchanged (the table of §5, by name).
 - [ ] **RN-5 Monte Carlo is the closed-loop diagram on the draws** (RD-D20, RD-D24 as amended
-  in §8's note; R10, R15, R27; V1's step 7 in [differentiable-problem.md](differentiable-problem.md),
-  the same row).
-  1. `evaluate(problem, arg, *, dt, n_trials, key)` on a `StochasticPlanningProblem`: the loop
-     built by `closed_loop_of(problem, arg)` with each `disturbances` signal wired on its port,
-     the draws `problem.realize(key, n)` (RN-4) realized once, the compiled fixed-step rollout
-     `vmap`ped over them on JAX and looped on NumPy, the cost scored on the plant's run by
-     `evaluate_trajectory`, the record one `Evaluation` (one row per draw, `criterion_value` the
-     problem's criterion). `compare(problem, **entries, n_trials=, key=)` shares the draws.
-     `pe.program(wrt, key=, n_trials=)` minimizes `criterion_value` over the same draws, realized
-     once at the call.
+  in §8's note; R10, R15, R27, R44, R45; V1's step 7 in
+  [differentiable-problem.md](differentiable-problem.md), the same row), **v0.3**, right after
+  `evaluate` exists.
+  1. `evaluate(problem, arg, *, dt, n_trials, key)` on a `StochasticPlanningProblem` (`dt`
+     required, R36): the loop built by `closed_loop_of(problem, arg)` with each `disturbances`
+     signal wired on its port, the draws `problem.realize(key, n)` realized once (the start and
+     the parameter laws; the noise blocks as today's evaluator draws them until RN-4 adds the
+     per-block seeds), the compiled fixed-step rollout `vmap`ped over them on JAX and looped on
+     NumPy, the cost scored on the plant's run by `evaluate_trajectory`, the record one
+     `Evaluation` (one row per draw, `objective` the problem's criterion over `J`).
+     `compare(problem, **entries, n_trials=, key=)` shares the draws. `pe.program(wrt, key=,
+     n_trials=)` minimizes `objective` over the same draws, realized once at the call.
   2. `MonteCarloEvaluator` reduced to one facade line onto `evaluate`, then removed;
      `evaluate_jax`, `evaluate_numpy`, `evaluate_simulator`, the fallback warning, `compare`'s
      NumPy forcing and the `simulator` backend's nested-diagram failure go with their tests;
@@ -856,7 +869,7 @@ lands. The acceptance test of every step is its deterministic twin (RD-D23).
   the same `evaluate` call on JAX and on NumPy agrees to a tolerance on one key; the
   deterministic twin (`n_trials=1` on the nominal problem) equals the deterministic `evaluate`;
   the release note records the one change of the evaluator's numbers. The workboard row
-  (TODO §5, V1's step 7) carries the gate.
+  (V1's step 7, moved into v0.3 by R44) carries the gate.
 - [ ] **RN-6 Docs**, with each step: DESIGN §4 (the distributions entry: the convention, the
   three periods, the bridge table with its two periods, the solver hint) and §6 (the stochastic
   problem's `disturbances`, `realize`, `evaluate` on the draws); the ROADMAP §6

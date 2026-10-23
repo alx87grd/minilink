@@ -280,7 +280,7 @@ is the seed, so the convergence does not cut the branch the next pillar grows on
 | Planned (ROADMAP) | Seed in the library today | What it reuses |
 | --- | --- | --- |
 | behavior cloning (after v1.0) | `simulation/realtime/` (the recorder), `planning/reinforcement_learning/collect.py` and `environment.py` (the data path), `NeuralPolicyController` (the output), the first-order optimizer backend (V1) | the spine end to end: demonstrations are a `Trajectory` dataset, imitation is the program export with a data cost, or a `fit` verb beside it (future-policies.md) |
-| identification (C4) | the `rollout_batch` evaluator, `ProblemParameters`, the same program export (`pe.program(wrt=["plant…"])`) | the spine: plant params instead of policy params |
+| identification (C4) | the `rollout_batch` evaluator, the plant's own `params` (R41; `ProblemParameters` retired), the same program export (`pe.program(wrt=["plant…"])`) | the spine: plant params instead of policy params |
 | MPPI (S72) | `planning/trajectory_optimization/`'s problem and transcription, `realize` (the draws, RN-5) | the trajectory pillar, sampled |
 | the EKF and the trajectory observer (v0.9) | `estimation/observer.py`, `analysis/linearization` | the estimation pillar |
 | the Lyapunov field (A1) | `analysis/lyapunov.py` | fields |

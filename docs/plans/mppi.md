@@ -37,9 +37,11 @@ few screens plus one contract narrowing in `control/mpc`.
   deterministic twin is byte-identical to the stochastic one with no draws (the test).
 - **The rollout is the one Minilink already has.** `rollout_batch` /
   `rk4_integrate_zoh_trace` vmap `K` held-input RK4 rollouts in one jitted call; the
-  `RolloutEnvironment` owns what a step costs (exit from `X` charged `infeasible_cost`,
-  `h` at the horizon, disturbance draws on their ports). MPPI reads those; it does not
-  redefine them.
+  `RolloutEnvironment` owns what a step costs (exit from `X` charged the problem's price:
+  `infeasible_cost` when set, else `problem.infeasible_cost_bound()`, the cost's upper-bound
+  hint, R32; `h` at the horizon, disturbance draws on their ports). It is a training setting
+  that reads the problem's fields as hints (R43), as for the RL planner; MPPI reads those; it
+  does not redefine them. The plan it returns is scored by `evaluate` like any law.
 - **JAX first, the ladder later.** The prototype is JAX-only (one `jit(vmap(scan))` per
   tick). The three-backend ladder of `dp.py` (`loop` / `numpy` / `jax`) is the teaching
   form and comes with the teaching-surface decision, not before.
@@ -161,8 +163,8 @@ nominal sequence is `U = (u_0, …, u_{N-1})`, each `u_k ∈ ℝ^m`.
    `θ^k = θ` and `w^k_t` is the nominal value of the disturbance ports for every `k`.
 3. **Score.** The path cost under the problem's contract:
    `S^k = Σ_t g(x^k_t, v^k_t, t_k) dt + h(x^k_N, t_N) + c_X^k`, with `c_X^k` the
-   problem's `infeasible_cost` charged once when the path leaves `X` (the exit rule of
-   `RolloutEnvironment`), plus the information-theoretic control term
+   problem's price (`infeasible_cost`, else `infeasible_cost_bound()`, R32) charged once when
+   the path leaves `X` (the exit rule of `RolloutEnvironment`), plus the information-theoretic control term
    `λ (1 − α) Σ_t u_tᵀ Σ⁻¹ ε^k_t` (`α = 1` turns it off; the default of the paper is
    `α = 0`, the term on).
 4. **Weigh.** `w^k = exp(−(S^k − S_min) / λ) / Σ_j exp(−(S^j − S_min) / λ)`, the softmin
@@ -203,7 +205,7 @@ PathIntegralPlanner(
     control_cost=0.0,        # alpha: 0 charges the information term, 1 turns it off
     n_iterations=1,          # passes of sample-score-weigh-update per solve
     n_plant_samples=1,       # M plant realizations per control sample (stochastic problem)
-    integrator="rk4",
+    solver="rk4",            # the time-integration keyword of every tool (R42)
     seed=0,
     verbose=False,
 )
