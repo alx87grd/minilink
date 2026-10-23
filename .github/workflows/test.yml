@@ -148,8 +148,9 @@ jobs:
         pip install -e ".[dev,full]"
         pip install graphviz
 
-    # JAX and symbolic tests skip in the ``test`` job (no extra); gate them here.
-    - name: Test with pytest (incl. JAX and symbolic)
+    # JAX tests skip in the ``test`` job (no extra); gate them here. The experimental
+    # tier's tests (symbolic mechanics, contact engines) are nightly only (ROADMAP §2).
+    - name: Test with pytest (incl. JAX)
       env:
         SDL_VIDEODRIVER: dummy
       run: pytest

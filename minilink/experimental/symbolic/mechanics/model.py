@@ -2,6 +2,9 @@
 Mechanical model before equations of motion — frames, bodies, DH chains, loads.
 
 Call :meth:`derive` to obtain a symbolic :class:`~minilink.experimental.symbolic.mechanics.symbolic_system.MechanicalSystem`.
+
+Experimental tier: out of the wheel, off the docs site, nightly smoke at most, no stability
+promise (ROADMAP §2).
 """
 
 import sympy as sp

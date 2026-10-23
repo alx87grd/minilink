@@ -10,6 +10,9 @@ TODO: User Architectural Review. This is an ANCF ring/cable tire prototype, not
 Chrono's full laminated ANCF shell tire. It is meant to prove the Minilink
 system wrapping, differentiability, contact, and animation path before adding
 full shell elements, pressure loads, rim constraints, and tire-section layers.
+
+Experimental tier: out of the wheel, off the docs site, nightly smoke at most, no stability
+promise (ROADMAP §2).
 """
 
 from typing import NamedTuple

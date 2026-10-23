@@ -362,15 +362,20 @@ the demo sweep touches fewer files. Nothing leaves without the maintainer's ruli
   site's plant page. Done when the root prelude lists at most 15 plants, `minilink.catalog`
   lists only tested plants, no two supported plants differ by parameters alone, and
   `test_teaching_surface.py` pins both lists.
-- [ ] **K9 The experimental tier, untested** (ruled 2026-10-22, [end-state-api.md](end-state-api.md)
-  D3; [record](../reviews/2026-10-22-rulings-session-1.md)): **K9-1** landed 2026-10-23 (`examples/experimental/` is the top-level `experimental/`); **K9-2** the experimental tier's tests
-  (`test_symbolic.py`, `test_engine_jax.py`, the unsupported plants' rows) leave the CI merge
-  gate for the nightly sweep or are deleted, `c_export`'s flagship smoke staying in the JAX
-  regression job; **K9-3** one module docstring line on every `minilink/experimental/` module
-  ("experimental: no test, no docs, no promise") and the ROADMAP §2 lane row (landed with the
-  ruling). `experimental/engines/` stays as the contact-engine leaf demo. Done when CI's gate
-  imports nothing under the tier, `pip wheel` ships nothing under it, and the nightly job
-  lists what it smokes.
+- [ ] **K9 The experimental tier, untested** (ruled 2026-10-22, R3; [end-state-api.md](end-state-api.md)
+  D3; [record](../reviews/2026-10-22-rulings-session-1.md)). Landed 2026-10-23: the prototype
+  scripts moved from `examples/experimental/` to a top-level `experimental/` (K9-1); the tier's
+  tests (`test_symbolic.py`, `test_engine_jax.py`) moved to `tests/experimental/`, off the merge
+  gate, run by the nightly job (`pytest tests/experimental`), `c_export`'s flagship smoke kept in
+  the JAX regression job (K9-2); the status line on every `minilink/experimental/` module
+  docstring (K9-3). Left: the unsupported plants' test rows leave with K8-3; and two teaching
+  notebooks still import the tier, so the notebook smoke of the gate does too:
+  `examples/tutorial/showcase_jax.ipynb` (`minilink.experimental.c_export`) and
+  `examples/teaching/topics/robotics/manipulator_eom.ipynb`
+  (`minilink.experimental.symbolic`) **[ask — student-facing]**: keep them as the documented
+  exceptions, move the cells to `experimental/`, or move the notebooks there. Done when CI's
+  gate imports nothing under the tier but the flagship smoke and the exceptions ruled, and
+  `pip wheel` ships nothing under it.
 - [ ] **K7 What is core, what is a side feature** **[ask — core, public names]**
   (ROADMAP §6): the convergence pass; every move is a step of its own once ruled. In v0.3
   with K1–K4: K1's inventory is core-consolidation.md §3–§4, K2 and K3 are its tiers; the

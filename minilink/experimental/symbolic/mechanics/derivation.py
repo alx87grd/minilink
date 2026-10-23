@@ -1,4 +1,8 @@
-"""Lagrangian and Kane derivation: MechanicalModel → symbolic MechanicalSystem."""
+"""Lagrangian and Kane derivation: MechanicalModel → symbolic MechanicalSystem.
+
+Experimental tier: out of the wheel, off the docs site, nightly smoke at most, no stability
+promise (ROADMAP §2).
+"""
 
 import sympy as sp
 from sympy.physics.mechanics import KanesMethod

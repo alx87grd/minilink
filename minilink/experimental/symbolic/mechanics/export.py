@@ -5,6 +5,9 @@ Lambdify a symbolic MechanicalSystem into a numeric plant.
 * ``backend="jax"`` → :class:`~minilink.dynamics.abstraction.mechanical.JaxMechanicalSystem`
 
 Chain kinematics for drawing are always lambdified with NumPy for Matplotlib.
+
+Experimental tier: out of the wheel, off the docs site, nightly smoke at most, no stability
+promise (ROADMAP §2).
 """
 
 from __future__ import annotations

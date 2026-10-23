@@ -1,3 +1,9 @@
+"""JAX-to-C export of a system: its jaxpr transpiled to C, compiled and loaded back (prototype).
+
+Experimental tier: out of the wheel, off the docs site, nightly smoke at most, no stability
+promise (ROADMAP §2).
+"""
+
 import ctypes
 import math
 import platform

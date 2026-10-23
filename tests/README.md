@@ -97,12 +97,13 @@ pull requests to the branches its `on:` block lists (`main` and `dev` among them
 | **`test`** | ruff + `pytest` (py 3.10–3.13; demo-check bridge; JAX tests and demos skip); coverage report on py 3.12, no gate; on py 3.12, the `nbstripout` hook over every notebook (committed notebooks carry no outputs and no volatile metadata) |
 | **`laptops`** | Basic tier (`pip install -e ".[dev]"`, no extras) on `windows-latest` and `macos-latest`, py 3.12: `pytest` + **notebook smoke** (notebooks that need an extra skip) |
 | **`packaging`** | `python -m build` + wheel/sdist check (no `experimental/`) + `twine check` + install the wheel and `import minilink` |
-| **`regression`** | `pytest` (incl. the JAX and symbolic tests) + regression gates (CI flags above) + **flagship demos** + **notebook smoke** (py 3.12 + JAX + viz + symbolic) |
+| **`regression`** | `pytest` (incl. the JAX tests; the experimental tier's tests are nightly only) + regression gates (CI flags above) + **flagship demos** + **notebook smoke** (py 3.12 + JAX + viz + symbolic) |
 
 Not merge gates: `publish.yml` runs on a `0.*` tag, and its **`check`** job (ruff +
 `pytest`) and **`build`** job (sdist and wheel, checked) must pass before **`publish`**
 uploads to PyPI; `nightly.yml` installs the full optional stack (every extra, Ipopt,
-Stable-Baselines3) and runs `pytest` (the symbolic and Ipopt tests included), every demo
+Stable-Baselines3) and runs `pytest` (the Ipopt tests included), the experimental tier's
+tests (`pytest tests/experimental`: the symbolic mechanics and the contact engines), every demo
 script, and every notebook (`run_notebook_checks.py --all`: those marked `smoke: false`
 in `notebook_overrides.json` too, except those marked `nightly: false`, run only by name);
 `docs.yml` builds the Sphinx site.

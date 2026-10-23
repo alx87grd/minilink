@@ -6,6 +6,9 @@ Symbolic mechanical system in manipulator form (SymPy).
 This class lives in ``minilink.experimental.symbolic.mechanics`` only. For a numeric block, call
 :meth:`to_minilink` (NumPy :class:`~minilink.dynamics.abstraction.mechanical.MechanicalSystem`
 or, with ``backend="jax"``, :class:`~minilink.dynamics.abstraction.mechanical.JaxMechanicalSystem`).
+
+Experimental tier: out of the wheel, off the docs site, nightly smoke at most, no stability
+promise (ROADMAP §2).
 """
 
 import sympy as sp

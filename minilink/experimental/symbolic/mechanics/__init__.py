@@ -10,4 +10,7 @@ Import convention: use the defining submodules, for example
 
 Dependencies: SymPy (``pip install sympy``). For ``to_minilink(..., backend="jax")``,
 also install JAX (``pip install jax jaxlib``).
+
+Experimental tier: out of the wheel, off the docs site, nightly smoke at most, no stability
+promise (ROADMAP §2).
 """
