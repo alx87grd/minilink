@@ -336,10 +336,14 @@ the demo sweep touches fewer files. Nothing leaves without the maintainer's ruli
   `Lead` stays (R54 amended). One commit per feature, callers, tests and docs in the same
   commit, no alias. `ProblemParameters` leaves with its migration (R41). Done when every listed name
   is gone, `pytest` and the demo checks pass.
-- [ ] **K3 Prototypes to `experimental/`** **[ask — public names]**, from the same ruling:
-  moved under `minilink/experimental/` (repo-only, not on the docs site, not in the wheel's
-  public surface), imports updated, DESIGN §3 and the README say which features are
-  experimental. Done when the teaching surface lists only final features.
+- [ ] **K3 Prototypes to `experimental/`**, ruled 2026-10-23 (R69): `line_segment` to the
+  experimental tier; `mpc_default_computer_x0`, `mpc_warm_start_guess`, `MPCBroadcastController` off the
+  `control.mpc` facade (internal); the plants and drawings of R56 and R58 go with K8-3. Done when those
+  moves land and the teaching-surface test pins the facades.
+- [ ] **K3b Contract tests for the kept prototypes** (agent, R69): every name the K1 inventory labels
+  "prototype" and keeps gets a test of its contract (the sets, the blocks, the sensitivity functions,
+  `discretize`, the graphics primitives, …). Done when the inventory's script finds no kept public
+  name without a contract test.
 - [ ] **K4 One demo per feature** **[maintainer]** (R54): the maintainer's own pass on the demos,
   with the K1 inventory's §3 (twins and proposals) as the input; agents update `examples/README.md`'s
   map and the demo checks after each of his changes.
@@ -379,12 +383,8 @@ the demo sweep touches fewer files. Nothing leaves without the maintainer's ruli
   commit per move, the band facades keeping their names, deep paths, demos, tests, the teaching-surface
   registry and the API docs migrated in the same commit. Done when the tree matches R66, `pytest`, the
   demo and notebook checks pass, and DESIGN's package layout says so.
-- [ ] **K7 What is core, what is a side feature** **[ask — core, public names]**
-  (ROADMAP §6): the convergence pass; every move is a step of its own once ruled. In v0.3
-  with K1–K4: K1's inventory is core-consolidation.md §3–§4, K2 and K3 are its tiers; the
-  first tier any time, the between-terms moves after GMC714.
-  Analysis, tiers and the asks: [core-consolidation.md](core-consolidation.md). Done when
-  the ruling is recorded and the moves are rows here.
+- K7, what is core and what is a side feature, closed 2026-10-23 (R69): answered by R1–R5 and
+  R52–R67; its moves are the K2, K3, K8 and K10 rows.
 
 **The continuous core — the step model** (S75, ruled R6–R8, R12, R17, R18, R40, R42;
 [sampled-path.md](sampled-path.md) §1–§7, the API in [continuous-core.md](continuous-core.md)

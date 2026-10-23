@@ -492,3 +492,9 @@ split when it starts; this section marks the reversals).
   the tools that need a finite box refuse it with the line to write (R21). Lands in v0.3 with V1.2,
   since `plant.input_box` (R37), `plant.state.box` (R21) and the price bound (R32) read these boxes. The
   rest of S64's hygiene stays in v0.4 (R48); the K8 row's step K8-5 is removed.
+- **R69 (2026-10-23) K3 and K7 closed.** K3: the prototypes the K1 inventory names stay (they lack a
+  contract test, not a use); the moves are the plants and drawings of R56 and R58, `line_segment` to the
+  experimental tier (the contact engine is its one user), and `mpc_default_computer_x0`,
+  `mpc_warm_start_guess` and `MPCBroadcastController` off the `control.mpc` facade as internals (MPC's
+  one public name is `ModelPredictiveController`, R50). K7: answered by R1–R5 and R52–R67. An agent row
+  writes the missing contract tests.

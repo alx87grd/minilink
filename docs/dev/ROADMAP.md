@@ -609,10 +609,8 @@ search that may reach unstable gains), to confirm.
 
 **Before v0.3's convergence (wave K)**
 
-- **What is core, what is a side feature** (K7, its other asks; the shape, the catalog rule,
-  the contact engines, the exit rule and the prelude trim are ruled, R1–R5): the first tier of
-  side features as a block or item by item, from K1's table; the racecar 3-D skin between terms
-  and the SB3 bridge at S49. [core-consolidation.md](../plans/core-consolidation.md) §10.
+- **What is core, what is a side feature** (K7): closed 2026-10-23 (R69), answered by R1–R5 and
+  R52–R67.
 
 **Before the former wave G rows (v0.4, R48)**
 
