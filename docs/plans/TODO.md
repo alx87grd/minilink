@@ -344,7 +344,10 @@ the demo sweep touches fewer files. Nothing leaves without the maintainer's ruli
   map and the demo checks after each of his changes.
 - [ ] **K8 The catalog clean-up** (ruled 2026-10-22, [end-state-api.md](end-state-api.md) D2;
   [record](../reviews/2026-10-22-rulings-session-1.md)): two import layers and support by
-  test. Steps, one commit each: **K8-1** the root prelude trimmed to the course set (the
+  test. Steps, one commit each: **K8-0** the car family to three models (R55: `KinematicBicycle`,
+  `DynamicBicycle`, `UdeSRacecarDyn` on the root; `KinematicCar` and `DynamicBicycleCar3D` merged as
+  skins, `UdeSRacecar` a parameter preset, `UdeSRacecarDyn3D` a `wheel_angles=True` option, the
+  notebooks and demos migrated); **K8-1** the root prelude trimmed to the course set (the
   plants the course notebooks and the tutorial import, at most 15; ledger line in ROADMAP §2);
   **K8-2** `minilink.catalog` the one flat index of every supported plant, each passing the
   both-backends contract test, with a docs entry; **K8-3** the unsupported plants the
