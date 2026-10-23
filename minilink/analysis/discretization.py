@@ -3,10 +3,13 @@
 from __future__ import annotations
 
 import numpy as np
+import scipy.linalg
 
+from minilink.core.backends import array_module, require_jax
+from minilink.core.compile.evaluators.stepping import step_body
 from minilink.core.system import DynamicSystem, StepSystem
 
-_INTEGRATORS = frozenset({"rk4", "euler"})
+DISCRETIZE_SOLVERS = ("rk4", "euler", "exact")
 
 
 ###############################################################################
@@ -16,63 +19,55 @@ _INTEGRATORS = frozenset({"rk4", "euler"})
 
 def discretize(
     system: DynamicSystem,
-    dt: float | None = None,
+    dt: float,
     *,
-    integrator: str = "rk4",
-    params: dict | None = None,
+    solver: str = "rk4",
+    substeps: int = 1,
 ) -> StepSystem:
     """
-    Wrap a :class:`DynamicSystem` as a :class:`StepSystem` with hold interval ``dt``.
+    The plant one sample period later: a :class:`StepSystem` ``x_{k+1} = Φ(x_k, u_k, k)``.
 
-    ``x_{k+1} = step(x, u, k; p)`` integrates ``f`` over ``[k dt, (k + 1) dt]``
-    with ``integrator`` ``"rk4"`` or ``"euler"`` (the same word as ``Sys2Gym``),
-    the input held. ``p`` defaults to the wrapper's :attr:`params`: the
-    source's live ``params`` when ``params`` is ``None``, else the dict given,
-    which replaces them (RULES 4.4). The hold interval has one owner, the
-    wrapper's :attr:`dt`, and never reaches ``f`` or ``h``: when ``dt`` is
-    omitted it is read once from ``params["dt"]``, and a ``"dt"`` key is
-    dropped from the ``params`` given. Three cases are therefore refused:
-    ``dt`` and a ``params["dt"]`` that differ, since one would be dropped
-    unseen; a ``params`` that holds only ``"dt"`` while the source has other
-    params, since it would replace them with ``{}`` (pass ``dt=`` to keep
-    them); and, when ``params`` is ``None``, a source whose own params carry
-    ``"dt"``, since they reach ``f`` live beside :attr:`dt` (remove the key
-    and pass ``dt=``). The wrapper starts from the source's ``x0`` and keeps
-    its state, input and ``y`` metadata.
+    The input is held over each period ``[k dt, (k + 1) dt]``. ``solver`` is
+    ``"rk4"`` or ``"euler"``, taking ``substeps`` steps per period, or
+    ``"exact"`` for a linear model, the matrix exponential
+    ``x_{k+1} = e^{A dt} x_k + ∫₀^{dt} e^{A s} ds B u_k``. The step model reads
+    the source's live ``params`` (``step(x, u, k, params)`` overrides them), and
+    the sample time is ``dt`` alone: the source's ``params`` may not carry a
+    ``"dt"`` key. The wrapper starts from the source's ``x0`` and keeps its
+    state, input and ``y`` metadata.
     """
-    require_discretizable(system, integrator)
+    require_discretizable(system, solver, substeps)
+    require_dt_free(system)
 
-    # One owner for the sample time: the wrapper's dt, never a key of the params f reads
-    dt = hold_interval(system, dt, params)
-    params = model_params(system, params, dt)
+    # The exact hold of a linear model: the matrix exponential, once
+    if solver == "exact":
+        return ExactDiscretization(system, dt)
 
-    # The wrapper that takes one step of the chosen integrator
-    if integrator == "euler":
-        return DiscretizedEulerDynamicSystem(system, dt, params)
-
-    return DiscretizedRK4DynamicSystem(system, dt, params)
+    return Discretization(system, dt, solver=solver, substeps=substeps)
 
 
-class DiscretizedDynamicSystem(StepSystem):
+class Discretization(StepSystem):
     """
-    Discrete-time wrapper over a continuous :class:`DynamicSystem`.
+    A continuous :class:`DynamicSystem` sampled every :attr:`dt`, its input held.
 
-    The hold interval :attr:`dt` lives on the wrapper and nowhere else:
-    :attr:`params` are handed to the source's ``f`` and ``h`` untouched, so
-    building the wrapper or assigning :attr:`params` refuses a ``"dt"`` key in
-    them (a key added later in place to the source's live params is not
-    checked). The wrapper starts from the source's ``x0`` and copies its
-    state, input and ``y`` labels, units, bounds and nominal values.
+    ``step`` is the step model of the compiled evaluator, written once
+    (``rk4`` or ``euler``, ``substeps`` per period) on the source's ``f``; the
+    sample time lives here and never reaches ``f``. The wrapper starts from the
+    source's ``x0`` and copies its state, input and ``y`` labels, units, bounds
+    and nominal values.
     """
 
     def __init__(
         self,
         source: DynamicSystem,
         dt: float,
-        params: dict | None = None,
         *,
-        integrator: str,
+        solver: str = "rk4",
+        substeps: int = 1,
     ):
+        # The source
+        self.source = source
+
         # The source's y feedthrough, which the standard y port copies
         y_deps = y_dependencies_of(source)
 
@@ -85,12 +80,11 @@ class DiscretizedDynamicSystem(StepSystem):
         )
         self.name = f"Discretized({source.name})"
 
-        # The source, the hold interval, and the params f receives: the params
-        # setter reads the source and dt, so they come first
-        self.source = source
+        # The sample time and the step model's knobs; the source's params, live
+        self.params = None
         self.dt = positive_dt(dt)
-        self.params = params
-        self.integrator = integrator
+        self.solver = solver
+        self.substeps = int(substeps)
 
         # State: the source's initial state, labels, units, bounds and nominal value
         state = source.state
@@ -122,15 +116,7 @@ class DiscretizedDynamicSystem(StepSystem):
 
     @property
     def params(self) -> dict:
-        """
-        The params ``f`` and ``h`` receive: the source's live ones, or the override.
-
-        The source's live ``params`` while :attr:`params_override` is ``None``
-        (the same dict, so an in-place edit reaches the source), else that dict.
-        Assigning ``params`` sets :attr:`params_override`, and refuses a
-        ``"dt"`` key in the params that would reach ``f``: the value, or the
-        source's ``params`` when the value is ``None``.
-        """
+        """The source's live ``params`` while no override is assigned, else the override."""
         if self.params_override is None:
             return self.source.params
 
@@ -138,11 +124,25 @@ class DiscretizedDynamicSystem(StepSystem):
 
     @params.setter
     def params(self, value: dict | None):
-        # One owner for the sample time: the params that reach f never carry it
-        p = self.source.params if value is None else value
-        self.require_dt_free(p, value)
-
         self.params_override = value
+
+    def step(self, x, u, k=0, params=None):
+        params = self.params if params is None else params
+
+        source_f = self.source.f
+        dt = self.dt
+        solver = self.solver
+        substeps = self.substeps
+
+        def f(x, u, t):
+            return source_f(x, u, t, params)
+
+        t_k = k * dt
+
+        # x_{k+1} = Φ(x_k, u_k, t_k), the input held over [t_k, t_k + Δt]
+        x_next = step_body(f, x, u, u, t_k, dt, solver, substeps)
+
+        return x_next
 
     def h(self, x, u, k=0, params=None):
         params = self.params if params is None else params
@@ -157,63 +157,40 @@ class DiscretizedDynamicSystem(StepSystem):
 
         return y
 
-    ###########################################################################
-    # Internal machinery
-    ###########################################################################
 
-    def require_dt_free(self, p, value):
-        """Refuse params that carry ``"dt"``: the sample time is the wrapper's :attr:`dt` alone."""
-        if "dt" in p:
-            where = f"the params of {self.source.name}" if value is None else "params"
-            raise ValueError(
-                f"{where} carry 'dt' = {p['dt']!r}, but the sample time of "
-                f"{self.name} is its dt = {self.dt} s, which f never receives; "
-                f"remove 'dt' from {where} and set the sample time through dt alone."
-            )
+class ExactDiscretization(Discretization):
+    """The exact sampled linear model: ``x_{k+1} = A_d x_k + B_d u_k``, ``y_k = C x_k + D u_k``."""
 
-
-class DiscretizedEulerDynamicSystem(DiscretizedDynamicSystem):
-    """``x_{k+1} = x_k + dt f(x_k, u_k, t_k; p)``."""
-
-    def __init__(self, source: DynamicSystem, dt: float, params: dict | None = None):
-        super().__init__(source, dt, params, integrator="euler")
+    def __init__(self, source: DynamicSystem, dt: float):
+        super().__init__(source, dt, solver="exact")
+        require_linear_model(source)
 
     def step(self, x, u, k=0, params=None):
         params = self.params if params is None else params
+        xp = array_module(x, u)
 
-        f = self.source.f
+        source = self.source
         dt = self.dt
+        n = source.n
+        m = source.m
 
         t_k = k * dt
+        A = xp.asarray(source.A(t_k, params))
+        B = xp.asarray(source.B(t_k, params))
 
-        # x_{k+1} = x_k + Δt f(x_k, u_k, t_k), the input held over [t_k, t_k + Δt]
-        x_next = x + dt * f(x, u, t_k, params)
+        # [A_d B_d; 0 I] = exp([A B; 0 0] Δt)
+        # fmt: off
+        M = xp.block([
+            [A, B],
+            [xp.zeros((m, n)), xp.zeros((m, m))],
+        ])
+        # fmt: on
+        E = expm(M * dt)
+        A_d = E[:n, :n]
+        B_d = E[:n, n:]
 
-        return x_next
-
-
-class DiscretizedRK4DynamicSystem(DiscretizedDynamicSystem):
-    """One RK4 step of ``f`` over ``[t_k, t_k + dt]`` with ZOH on ``u``."""
-
-    def __init__(self, source: DynamicSystem, dt: float, params: dict | None = None):
-        super().__init__(source, dt, params, integrator="rk4")
-
-    def step(self, x, u, k=0, params=None):
-        params = self.params if params is None else params
-
-        f = self.source.f
-        dt = self.dt
-
-        t_k = k * dt
-
-        # The four slopes over [t_k, t_k + Δt], the input held
-        k1 = f(x, u, t_k, params)
-        k2 = f(x + 0.5 * dt * k1, u, t_k + 0.5 * dt, params)
-        k3 = f(x + 0.5 * dt * k2, u, t_k + 0.5 * dt, params)
-        k4 = f(x + dt * k3, u, t_k + dt, params)
-
-        # x_{k+1} = x_k + Δt/6 (k₁ + 2k₂ + 2k₃ + k₄)
-        x_next = x + (dt / 6.0) * (k1 + 2.0 * k2 + 2.0 * k3 + k4)
+        # x_{k+1} = A_d x_k + B_d u_k
+        x_next = A_d @ x + B_d @ u
 
         return x_next
 
@@ -223,55 +200,50 @@ class DiscretizedRK4DynamicSystem(DiscretizedDynamicSystem):
 ###############################################################################
 
 
-def require_discretizable(system, integrator: str) -> None:
-    """Refuse a source that is not a :class:`DynamicSystem`, or an unknown integrator."""
+def require_discretizable(system, solver: str, substeps: int) -> None:
+    """Refuse a source that is not a :class:`DynamicSystem`, an unknown solver or a bad substep count."""
     if not isinstance(system, DynamicSystem):
         raise TypeError(
             f"discretize requires DynamicSystem, got {type(system).__name__}"
         )
-    if integrator not in _INTEGRATORS:
+    if solver not in DISCRETIZE_SOLVERS:
         raise ValueError(
-            f"Unknown integrator {integrator!r}; expected one of {sorted(_INTEGRATORS)!r}."
+            f"Unknown solver {solver!r}; expected one of {list(DISCRETIZE_SOLVERS)!r}."
+        )
+    if int(substeps) != substeps or substeps < 1:
+        raise ValueError(f"substeps must be a positive integer, got {substeps!r}")
+
+
+def require_dt_free(system) -> None:
+    """Refuse a source whose ``params`` carry ``"dt"``: the sample time is discretize's ``dt``."""
+    if "dt" in system.params:
+        raise ValueError(
+            f"the params of {system.name} carry 'dt' = {system.params['dt']!r}, but "
+            "the sample time is discretize's dt, which f never receives; remove 'dt' "
+            "from the params and call discretize(system, dt)."
         )
 
 
-def hold_interval(
-    system: DynamicSystem,
-    dt: float | None,
-    params: dict | None,
-) -> float:
-    """The sample time: ``dt``, or ``params["dt"]`` when ``dt`` is omitted; never two that differ."""
-    p = system.params if params is None else params
-    if dt is None:
-        if "dt" not in p:
-            raise ValueError(
-                "discretize requires the sample time: call discretize(system, "
-                "dt=...) or discretize(system, params={..., 'dt': ...})."
-            )
-        dt = p["dt"]
-    elif params is not None and "dt" in params and params["dt"] != dt:
-        raise ValueError(
-            f"dt={dt!r} and params['dt'] = {params['dt']!r} are two different "
-            f"sample times, and one would be dropped; pass the sample time once."
+def require_linear_model(source) -> None:
+    """Refuse an exact discretization of a model without ``A`` and ``B`` matrices."""
+    if not (
+        callable(getattr(source, "A", None)) and callable(getattr(source, "B", None))
+    ):
+        raise TypeError(
+            f"solver='exact' needs a linear model with A and B, got {source.name}; "
+            "pass linearize(system) or use solver='rk4'"
         )
-    return dt
 
 
-def model_params(
-    system: DynamicSystem,
-    params: dict | None,
-    dt: float,
-) -> dict | None:
-    """The params ``f`` receives: ``params`` without its ``"dt"`` key, ``None`` for the source's."""
-    if params is None:
-        return None
-    if set(params) == {"dt"} and set(system.params) - {"dt"}:
-        raise ValueError(
-            f"params={params!r} holds only the sample time, so it would replace "
-            f"the params of {system.name} with {{}}; call "
-            f"discretize(system, dt={dt!r}) to keep them."
-        )
-    return {key: value for key, value in params.items() if key != "dt"}
+def expm(M):
+    """The matrix exponential on the array's backend."""
+    xp = array_module(M)
+    if xp is np:
+        return scipy.linalg.expm(M)
+
+    jax = require_jax()
+
+    return jax.scipy.linalg.expm(M)
 
 
 def y_dependencies_of(source) -> tuple | str:

@@ -1197,7 +1197,7 @@ class TestPhasePlane(unittest.TestCase):
             plot_phase_plane(sys, backend="plotly", figsize=(4, 3), dpi=80, show=False)
 
 
-from minilink.analysis.discretization import DiscretizedRK4DynamicSystem, discretize
+from minilink.analysis.discretization import Discretization, discretize
 
 
 def _rk4_step(f, x, u, t, dt, params):
@@ -1249,14 +1249,14 @@ class TestDiscretize(unittest.TestCase):
     def test_discretize_euler_matches_source_step(self):
         plant = DoubleIntegrator()
         dt = 0.05
-        step_leaf = discretize(plant, dt, integrator="euler")
+        step_leaf = discretize(plant, dt, solver="euler")
         p = step_leaf.params
         x0 = np.array([0.2, -0.1])
         u = np.array([0.4])
         x1_ref = x0 + dt * plant.f(x0, u, 0.0, p)
         x1 = step_leaf.step(x0, u, k=0)
         np.testing.assert_allclose(x1, x1_ref, rtol=1e-09, atol=1e-09)
-        self.assertEqual(step_leaf.integrator, "euler")
+        self.assertEqual(step_leaf.solver, "euler")
 
     def test_discretize_keeps_full_feedthrough(self):
         plant = _GainIntegrator()
@@ -1277,61 +1277,37 @@ class TestDiscretize(unittest.TestCase):
         np.testing.assert_allclose(step_leaf.h(x, u, k=0), [0.3, 0.6])
         self.assertEqual(discretize(Pendulum(), 0.05).outputs["y"].dependencies, ())
 
-    def test_discretize_accepts_dt_in_params_only(self):
-        step_leaf = discretize(_GainIntegrator(), params={"gain": 2.0, "dt": 0.02})
-        self.assertEqual(step_leaf.dt, 0.02)
-        self.assertEqual(step_leaf.params, {"gain": 2.0})
-        x1 = step_leaf.step(np.array([0.0]), np.array([1.0]), k=0)
-        np.testing.assert_allclose(x1, [0.02 * 2.0])
-
-    def test_discretize_refuses_params_holding_only_dt(self):
-        with self.assertRaisesRegex(ValueError, r"discretize\(system, dt=0.05\)"):
-            discretize(Pendulum(), params={"dt": 0.05})
-        with self.assertRaisesRegex(ValueError, r"discretize\(system, dt=0.05\)"):
-            discretize(Pendulum(), 0.05, params={"dt": 0.05})
-        step_leaf = discretize(DoubleIntegrator(), params={"dt": 0.05})
-        self.assertEqual(step_leaf.dt, 0.05)
-        self.assertEqual(step_leaf.params, {})
-        plant = DoubleIntegrator()
-        plant.params = {"dt": 0.05}
-        step_leaf = discretize(plant, params=plant.params)
-        self.assertEqual(step_leaf.dt, 0.05)
-        self.assertEqual(step_leaf.params, {})
-
-    def test_discretize_refuses_two_different_sample_times(self):
-        with self.assertRaisesRegex(ValueError, r"dt=0.1 and params\['dt'\] = 0.02"):
-            discretize(_GainIntegrator(), 0.1, params={"gain": 2.0, "dt": 0.02})
-        step_leaf = discretize(
-            _GainIntegrator(), 0.02, params={"gain": 2.0, "dt": 0.02}
-        )
-        self.assertEqual(step_leaf.dt, 0.02)
-        self.assertEqual(step_leaf.params, {"gain": 2.0})
-
-    def test_assigning_params_refuses_a_dt(self):
-        step_leaf = discretize(Pendulum(), 0.05)
-        with self.assertRaisesRegex(ValueError, r"'dt' = 0.5.*dt = 0.05 s"):
-            step_leaf.params = {**Pendulum().params, "dt": 0.5}
-        self.assertNotIn("dt", step_leaf.params)
-        self.assertNotIn("dt", step_leaf.jacobian("step", "params"))
-        plant = _GainIntegrator()
-        step_leaf = discretize(plant, 0.05, params={"gain": 2.0})
-        plant.params["dt"] = 0.05
-        with self.assertRaisesRegex(ValueError, "the params of"):
-            step_leaf.params = None
-        self.assertEqual(step_leaf.params, {"gain": 2.0})
-
     def test_discretize_refuses_a_dt_in_the_source_params(self):
         plant = _GainIntegrator()
         plant.params["dt"] = 0.05
-        for dt in (None, 0.05, 0.1):
-            with self.assertRaisesRegex(ValueError, "'dt'"):
-                discretize(plant, dt)
-        with self.assertRaisesRegex(ValueError, "'dt'"):
-            DiscretizedRK4DynamicSystem(plant, 0.05)
-        step_leaf = discretize(plant, params=plant.params)
-        self.assertEqual(step_leaf.dt, 0.05)
-        self.assertNotIn("dt", step_leaf.params)
-        self.assertNotIn("dt", step_leaf.jacobian("step", "params"))
+        with self.assertRaisesRegex(ValueError, "remove 'dt'"):
+            discretize(plant, 0.05)
+
+    def test_discretize_requires_the_sample_time(self):
+        with self.assertRaises(TypeError):
+            discretize(Pendulum())
+
+    def test_exact_discretization_matches_cont2discrete(self):
+        from scipy.signal import cont2discrete
+
+        from minilink.analysis import linearize
+
+        lin = linearize(Pendulum())
+        dt = 0.1
+        A_d, B_d, *_ = cont2discrete((lin.A(), lin.B(), lin.C(), lin.D()), dt)
+        step_leaf = discretize(lin, dt, solver="exact")
+        x, u = np.array([0.3, -0.2]), np.array([0.5])
+        np.testing.assert_allclose(step_leaf.step(x, u), A_d @ x + B_d @ u, atol=1e-12)
+        with self.assertRaisesRegex(TypeError, "linear model"):
+            discretize(Pendulum(), dt, solver="exact")
+
+    def test_substeps_split_the_period(self):
+        plant = Pendulum()
+        x, u = np.array([1.0, 0.0]), np.array([0.0])
+        fine = discretize(plant, 0.2, substeps=50).step(x, u)
+        coarse = discretize(plant, 0.2).step(x, u)
+        two = discretize(plant, 0.2, substeps=2).step(x, u)
+        self.assertLess(np.max(np.abs(two - fine)), np.max(np.abs(coarse - fine)))
 
     def test_step_params_override_gain(self):
         plant = _GainIntegrator(gain=1.0)
@@ -1359,7 +1335,6 @@ class TestDiscretize(unittest.TestCase):
         np.testing.assert_allclose(
             step_leaf.step(x, u, 0, plant.params), step_leaf.step(x, u)
         )
-        self.assertNotIn("dt", step_leaf.jacobian("step", "params"))
 
     def test_step_reads_the_source_live_params(self):
         plant = _GainIntegrator(gain=1.0)
@@ -1384,26 +1359,12 @@ class TestDiscretize(unittest.TestCase):
         x1 = step_leaf.step(x, u, k=0)
         np.testing.assert_allclose(x1, x1_ref, rtol=1e-09, atol=1e-09)
 
-    def test_discretize_steps_a_closed_loop_with_dt_in_params(self):
-        loop = PID(Kp=1.0, Ki=0.0, Kd=0.0) @ Pendulum()
-        dt = 0.01
-        x = np.linspace(0.1, 0.4, loop.n)
-        u = np.zeros(loop.m)
-        x1_ref = _rk4_step(loop.f, x, u, 0.0, dt, None)
-        for step_leaf in (
-            discretize(loop, params={**loop.params, "dt": dt}),
-            discretize(loop, dt, params={**loop.params, "dt": dt}),
-        ):
-            x1 = step_leaf.step(x, u, k=0)
-            np.testing.assert_allclose(x1, x1_ref, rtol=1e-09, atol=1e-09)
-            self.assertNotIn("dt", step_leaf.jacobian("step", "params"))
-
     def test_discretized_system_checks_dt(self):
         plant = _GainIntegrator()
         with self.assertRaises(TypeError):
-            DiscretizedRK4DynamicSystem(plant, {"gain": 1.0, "dt": 0.1})
+            Discretization(plant, {"gain": 1.0, "dt": 0.1})
         with self.assertRaises(ValueError):
-            DiscretizedRK4DynamicSystem(plant, -0.1)
+            Discretization(plant, -0.1)
 
     def test_discretize_keeps_the_y_metadata(self):
         plant = Pendulum()
@@ -1445,12 +1406,7 @@ class TestDiscretize(unittest.TestCase):
     def test_discretize_rejects_unknown_integrator(self):
         plant = DoubleIntegrator()
         with self.assertRaises(ValueError):
-            discretize(plant, 0.01, integrator="bdf")
-
-    def test_discretize_rejects_missing_dt(self):
-        plant = DoubleIntegrator()
-        with self.assertRaisesRegex(ValueError, r"params=\{\.\.\., 'dt': \.\.\.\}"):
-            discretize(plant)
+            discretize(plant, 0.01, solver="bdf")
 
     def test_discretize_rejects_static_system(self):
         with self.assertRaises(TypeError):

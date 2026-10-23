@@ -99,7 +99,7 @@ def discretize_entries(out):
     explicit = {**plant.params, **PARAMS}
     for integrator in ("rk4", "euler"):
         for label, params in (("nominal", None), ("params", explicit)):
-            step = discretize(plant, DT, integrator=integrator)
+            step = discretize(plant, DT, solver=integrator)
             x = X0.copy()
             xs = [x]
             for k in range(N):
