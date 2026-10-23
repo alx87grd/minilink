@@ -5,7 +5,7 @@ from dataclasses import dataclass
 
 import numpy as np
 
-from minilink.core.backends import array_module
+from minilink.core.backends import array_module, require_jax
 from minilink.core.inspect import inspect_text, repr_pretty
 from minilink.core.trajectory import Trajectory
 
@@ -62,6 +62,35 @@ class CostFunction(ABC):
         gamma = np.exp(-rho * dt)
 
         return float(gamma)
+
+    def integrate(self, traj: Trajectory, *, discount_rate=0.0, params=None):
+        """
+        The run's discounted running cost: ``(cost_rate, cost)``, both shape ``(N,)``.
+
+        ``cost_rate`` is the integrand ``e^{−ρ t_k} g(x_k, u_k, t_k)`` at each
+        sample and ``cost`` its integral ``∫_{t_0}^{t_k}`` by the trapezoid,
+        ``cost[0] = 0``; the terminal cost ``h`` is not included. On the
+        trajectory's array module, so it traces under JAX.
+        """
+        xp = array_module(traj.x)
+
+        g = self.g
+        rho = discount_rate
+        t = traj.t
+        x = traj.x
+        u = traj.u
+
+        # g_k = g(x_k, u_k, t_k), every sample (a vmap on JAX, a loop on NumPy)
+        g_k = per_sample(g, x.T, u.T, t, params)
+
+        # dJ_k = e^{−ρ t_k} g_k
+        cost_rate = xp.exp(-rho * t) * g_k
+
+        # J(t_k) = Σ_{i<k} ½ (dJ_i + dJ_{i+1}) (t_{i+1} − t_i), J(t_0) = 0
+        increments = 0.5 * (cost_rate[:-1] + cost_rate[1:]) * (t[1:] - t[:-1])
+        cost = xp.concatenate([xp.zeros(1), xp.cumsum(increments)])
+
+        return cost_rate, cost
 
     def evaluate_trajectory(
         self,
@@ -411,3 +440,16 @@ def require_common_rate(rates):
             "one objective has one rate rho, so give every term the same "
             "discount_rate"
         )
+
+
+def per_sample(g, xs, us, ts, params):
+    """``g(x_k, u_k, t_k, params)`` for every sample, as an ``(N,)`` array (vmap on JAX)."""
+    xp = array_module(xs)
+    if xp is np:
+        return np.array(
+            [float(g(x, u, t, params=params)) for x, u, t in zip(xs, us, ts)]
+        )
+
+    jax = require_jax()
+
+    return jax.vmap(lambda x, u, t: g(x, u, t, params=params))(xs, us, ts)

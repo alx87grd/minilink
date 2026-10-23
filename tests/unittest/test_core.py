@@ -633,3 +633,71 @@ class TestDefaultNames(unittest.TestCase):
         chain = source >> Integrator()
         chain.name = "chain"
         self.assertEqual((chain >> Integrator()).name, "chain")
+
+
+# The native trajectory
+
+
+def test_a_trajectory_is_a_jax_pytree_and_its_plant_run_traces():
+    jax = pytest.importorskip("jax")
+    from minilink.core.backends import require_jax
+    from minilink.core.trajectory import Trajectory
+
+    require_jax()
+    jnp = jax.numpy
+
+    def run(a):
+        t = jnp.linspace(0.0, 1.0, 5)
+        x = jnp.stack([a * t, t])
+        return Trajectory(
+            t=t,
+            x=x,
+            u=jnp.zeros((1, 5)),
+            signals={"plant.u": a * x[:1]},
+            roles={"plant": {"x": (0, 1), "u": "plant.u"}},
+        )
+
+    assert isinstance(jax.jit(run)(2.0), Trajectory)
+    assert jax.vmap(run)(jnp.array([1.0, 2.0])).x.shape == (2, 2, 5)
+    np.testing.assert_allclose(
+        jax.grad(lambda a: jnp.sum(run(a).of("plant").u))(2.0), 10.0
+    )
+
+
+def test_cost_integrate_is_the_trapezoid_on_both_backends():
+    jax = pytest.importorskip("jax")
+    from minilink import Pendulum, QuadraticCost
+    from minilink.core.backends import require_jax
+    from minilink.core.trajectory import Trajectory
+
+    require_jax()
+    plant = Pendulum()
+    cost = QuadraticCost.from_system(plant)
+    traj = plant.compute_trajectory(tf=1.0, verbose=False)
+    rate, running = cost.integrate(traj)
+    g = np.array([cost.g(x, u, t) for x, u, t in zip(traj.x.T, traj.u.T, traj.t)])
+    np.testing.assert_allclose(rate, g)
+    trapezoid = np.sum(0.5 * (g[1:] + g[:-1]) * np.diff(traj.t))
+    np.testing.assert_allclose(running[-1], trapezoid, rtol=1e-12)
+    native = Trajectory(
+        jax.numpy.asarray(traj.t), jax.numpy.asarray(traj.x), jax.numpy.asarray(traj.u)
+    )
+    np.testing.assert_allclose(
+        np.asarray(cost.integrate(native)[1]), running, rtol=1e-12
+    )
+
+
+def test_a_saved_trajectory_keeps_its_roles(tmp_path):
+    from minilink.core.trajectory import Trajectory
+
+    traj = Trajectory(
+        t=np.linspace(0.0, 1.0, 3),
+        x=np.zeros((2, 3)),
+        u=np.zeros((1, 3)),
+        signals={"plant.u": np.ones((1, 3))},
+        roles={"plant": {"x": (0, 1), "u": "plant.u"}},
+    )
+    traj.save(tmp_path / "run.npz")
+    loaded = Trajectory.load(tmp_path / "run.npz")
+    assert dict(loaded.roles) == {"plant": {"x": (0, 1), "u": "plant.u"}}
+    np.testing.assert_array_equal(loaded.of("plant").u, np.ones((1, 3)))

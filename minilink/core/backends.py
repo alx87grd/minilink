@@ -176,6 +176,8 @@ def ensure_jax_x64() -> types.ModuleType:
     if jax_x64_policy():
         jax.config.update("jax_enable_x64", True)
 
+    register_jax_pytrees()
+
     return jax
 
 
@@ -206,3 +208,12 @@ def numpy_generator(key) -> np.random.Generator:
         return key
 
     return np.random.default_rng(key)
+
+
+@functools.lru_cache(maxsize=1)
+def register_jax_pytrees() -> None:
+    """Register the core records (:class:`~minilink.core.trajectory.Trajectory`) as JAX pytrees, once."""
+    # A real cycle: the trajectory module imports this one
+    from minilink.core.trajectory import register_trajectory_pytree
+
+    register_trajectory_pytree()
