@@ -24,8 +24,8 @@ from minilink import BicycleDynRate
 from minilink.control.mpc import (
     ModelPredictiveController,
     mpc_animation_overlays,
-    mpc_default_computer_x0,
 )
+from minilink.control.mpc.utilities import mpc_default_computer_x0
 from minilink.core.backends import configure_jax
 from minilink.core.costs import QuadraticCost
 from minilink.core.diagram import DiagramSystem

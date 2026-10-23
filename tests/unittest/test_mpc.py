@@ -730,7 +730,8 @@ class TestMpcExportComputer(unittest.TestCase):
 
 
 import warnings
-from minilink.control.mpc import ModelPredictiveController, mpc_default_computer_x0
+from minilink.control.mpc import ModelPredictiveController
+from minilink.control.mpc.utilities import mpc_default_computer_x0
 from minilink.planning.trajectory_optimization.planner import (
     TrajectoryOptimizationPlanner,
 )

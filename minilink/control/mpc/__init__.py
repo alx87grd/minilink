@@ -7,10 +7,6 @@
 # required). Terminal boundaries, non-singleton ``X0`` and shooting transcriptions are
 # not supported.
 from minilink.control.mpc.controller import Command, ModelPredictiveController
-from minilink.control.mpc.utilities import (
-    mpc_default_computer_x0,
-    mpc_warm_start_guess,
-)
 from minilink.control.mpc.viz import (
     mpc_animation_overlays,
     mpc_plans_from_rollout,
@@ -20,7 +16,5 @@ __all__ = [
     "Command",
     "ModelPredictiveController",
     "mpc_animation_overlays",
-    "mpc_default_computer_x0",
     "mpc_plans_from_rollout",
-    "mpc_warm_start_guess",
 ]

@@ -72,16 +72,6 @@ def spring_between(p0, p1, *, coils=6, amplitude=0.12, color="black", linewidth=
     return CustomLine(points, color=color, linewidth=linewidth)
 
 
-def line_segment(p0, p1, **style):
-    """Honest world-space line segment (dynamic-tier geometry)."""
-    p0 = point3(p0)
-    p1 = point3(p1)
-
-    points = np.array([p0, p1])
-
-    return CustomLine(points, **style)
-
-
 def segment_pose_2d(p0, p1):
     """Pose a unit 2-D segment primitive to span *p0* → *p1* (static ``tf`` tier).
 
@@ -342,7 +332,6 @@ __all__ = [
     "ground_line",
     "spring_line",
     "spring_between",
-    "line_segment",
     "segment_pose_2d",
     "link_pose_3d",
     "point_pose",

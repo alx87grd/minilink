@@ -35,7 +35,6 @@ _EXPORTS: dict[str, tuple[str, str]] = {
     "ground_line": (_SHAPES, "ground_line"),
     "spring_line": (_SHAPES, "spring_line"),
     "spring_between": (_SHAPES, "spring_between"),
-    "line_segment": (_SHAPES, "line_segment"),
     "segment_pose_2d": (_SHAPES, "segment_pose_2d"),
     "link_pose_3d": (_SHAPES, "link_pose_3d"),
     "plane_airframe_3d": (_SHAPES, "plane_airframe_3d"),
