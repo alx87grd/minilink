@@ -164,3 +164,5 @@ of it in sampled-path.md §3.6; the numbers from `benchmarks/params_binding.py`.
 - **R20 amended (2026-10-23):** the cost signals are attachable from a cost alone,
   `traj.with_cost(cost, discount_rate=0.0)`, no problem object needed; the problem form reads
   its cost and discount; one body, `cost.integrate`.
+  The problem form `traj.with_cost(problem)` is dropped (2026-10-23): one signature, a cost
+  and an optional discount rate.

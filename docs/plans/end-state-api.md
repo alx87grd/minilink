@@ -473,8 +473,7 @@ class CostFunction:
     __add__, __mul__                         # SumCost, ScaledCost, params nested by term id; a ClippedCost when a saturating cost is needed
 
 evaluate_trajectory(problem, traj)   # cost.integrate(traj, discount_rate=problem.discount_rate)[-1] + e^{−ρ tf} h(x_tf), then the margins and value
-traj.with_cost(cost, discount_rate=0.0)   # the plotting wrapper from a cost alone (no problem needed): the "cost_rate" and "cost" signals
-traj.with_cost(problem)                    # the same from a problem: its cost and its discount; plant.plot_cost(cost) keeps working
+traj.with_cost(cost, discount_rate=0.0)   # the plotting wrapper, from a cost alone: the "cost_rate" and "cost" signals; plant.plot_cost(cost) keeps working
 ```
 
 Leaves the cost: `discount_rate` and `discount_factor` (the problem's), `evaluate_trajectory`,
