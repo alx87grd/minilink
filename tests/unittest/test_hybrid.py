@@ -84,16 +84,16 @@ from minilink.core.hybrid_diagram import HybridDiagram
 
 class TestHybridClosedLoop(unittest.TestCase):
     def test_sampled_state_feedback_runs_close_to_the_continuous_loop(self):
-        from minilink.control.state import StateFeedbackController
+        from minilink.control.state import StateFeedback
         from minilink.dynamics.catalog.pendulum.pendulum import Pendulum
 
         K = np.array([[10.0, 2.0]])
         plant = Pendulum()
         plant.x0 = np.array([0.3, 0.0])
-        loop = StateFeedbackController(K) % 0.01 @ plant
+        loop = StateFeedback(K) % 0.01 @ plant
         self.assertIn("x", loop.plant.outputs)
         sampled = loop.compute_trajectory(tf=2.0, verbose=False)
-        continuous = (StateFeedbackController(K) @ plant).compute_trajectory(
+        continuous = (StateFeedback(K) @ plant).compute_trajectory(
             tf=2.0, verbose=False
         )
         np.testing.assert_allclose(sampled.plant.x[:, 0], [0.3, 0.0])
@@ -276,11 +276,11 @@ class TestHybridSimulator(unittest.TestCase):
         import matplotlib
 
         matplotlib.use("Agg")
-        from minilink.control.modelbased import SlidingModeController
+        from minilink.control.modelbased import SlidingMode
         from minilink.dynamics.catalog.pendulum.pendulum import Pendulum
 
         plant = Pendulum(length=1.0, mass=1.0)
-        smc = SlidingModeController(plant)
+        smc = SlidingMode(plant)
         hybrid = hybrid_closed_loop(
             smc, plant, schedule=0.02, computer_in="y", plant_out="y"
         )
@@ -290,7 +290,7 @@ class TestHybridSimulator(unittest.TestCase):
         hybrid.plot_trajectory(show=False)
 
     def test_plot_defaults_states_and_inputs_only(self):
-        from minilink.control.modelbased import SlidingModeController
+        from minilink.control.modelbased import SlidingMode
         from minilink.dynamics.catalog.pendulum.pendulum import Pendulum
         from minilink.graphical.signals.time_signals import (
             build_signal_plot_spec,
@@ -298,7 +298,7 @@ class TestHybridSimulator(unittest.TestCase):
         )
 
         plant = Pendulum(length=1.0, mass=1.0)
-        smc = SlidingModeController(plant)
+        smc = SlidingMode(plant)
         hybrid = hybrid_closed_loop(
             smc, plant, schedule=0.02, computer_in="y", plant_out="y"
         )
@@ -591,7 +591,7 @@ class TestHybridMultiRate(unittest.TestCase):
         )
 
 
-from minilink.control.modelbased import SlidingModeController
+from minilink.control.modelbased import SlidingMode
 from minilink.dynamics.catalog.pendulum.pendulum import Pendulum
 
 
@@ -599,7 +599,7 @@ class TestHybridFineRecording(unittest.TestCase):
     def test_plant_records_finer_than_computer(self):
         plant = Pendulum(length=1.0, mass=1.0)
         plant.x0 = np.array([0.5, 0.0])
-        ctl = SlidingModeController(plant, lam=2.0, gain=4.0, nab=0.1)
+        ctl = SlidingMode(plant, lam=2.0, gain=4.0, nab=0.1)
         hybrid = hybrid_closed_loop(
             ctl, plant, schedule=0.1, computer_in="y", plant_out="y"
         )
@@ -619,7 +619,7 @@ class TestHybridFineRecording(unittest.TestCase):
 def _build_hybrid_smc_hybrid(*, ts=0.05):
     plant = Pendulum(length=1.0, mass=1.0)
     plant.x0 = np.array([2.5, -0.2])
-    ctl = SlidingModeController(plant, lam=2.0, gain=6.0, nab=0.12)
+    ctl = SlidingMode(plant, lam=2.0, gain=6.0, nab=0.12)
     return hybrid_closed_loop(ctl, plant, schedule=ts, computer_in="y", plant_out="y")
 
 

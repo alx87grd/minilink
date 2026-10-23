@@ -2,7 +2,7 @@
 
 import numpy as np
 
-from minilink import Pendulum, SlidingModeController, Step
+from minilink import Pendulum, SlidingMode, Step
 
 plant = Pendulum(length=1.0, mass=1.0)
 model = Pendulum(length=1.0, mass=0.5)
@@ -14,7 +14,7 @@ ref = Step(
     step_time=0.5,
 )
 
-smc = SlidingModeController(model, lam=20.0, gain=8.0, nab=0.15)
+smc = SlidingMode(model, lam=20.0, gain=8.0, nab=0.15)
 smc.plot_control_law()  # switching surface over (q, dq)
 
 diagram = ref >> smc @ plant  # the plant's y is its state [q; dq]

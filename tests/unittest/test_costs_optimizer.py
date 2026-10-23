@@ -140,7 +140,7 @@ def test_compute_cost_scores_a_system_or_a_block_inside_a_diagram():
 
     matplotlib.use("Agg", force=True)
     from minilink import Pendulum
-    from minilink.control import StateFeedbackController
+    from minilink.control import StateFeedback
 
     plant = Pendulum()
     plant.x0 = np.array([0.5, 0.0])
@@ -151,7 +151,7 @@ def test_compute_cost_scores_a_system_or_a_block_inside_a_diagram():
     assert plant.compute_cost(cost) == pytest.approx(cost.total_cost(traj))
 
     # Closed loop: the plant as it ran inside the loop, last or given trajectory
-    loop = StateFeedbackController(K=[[5.0, 1.0]]) @ plant
+    loop = StateFeedback(K=[[5.0, 1.0]]) @ plant
     loop_traj = loop.compute_trajectory(tf=1.0, dt=0.05, verbose=False)
     J = cost.total_cost(loop.trajectory_of(plant, loop_traj))
     assert loop.compute_cost(cost, of=plant) == pytest.approx(J)

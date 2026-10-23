@@ -378,13 +378,13 @@ def cost_scale_limit(price):
 
 
 def get_controller(result, *, interpolation="linear"):
-    """Build a :class:`~minilink.planning.dynamic_programming.lookup_policy.LookupTableController`."""
+    """Build a :class:`~minilink.planning.dynamic_programming.lookup_policy.LookupPolicy`."""
     # Lazy import: the lookup law loads on first use, not with the plots
     from minilink.planning.dynamic_programming.lookup_policy import (
-        LookupTableController,
+        LookupPolicy,
     )
 
-    return LookupTableController(result.grid, result.pi, interpolation=interpolation)
+    return LookupPolicy(result.grid, result.pi, interpolation=interpolation)
 
 
 ###############################################################################

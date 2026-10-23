@@ -52,9 +52,9 @@ _EXPORTS: dict[str, tuple[str, str]] = {
         "minilink.planning.dynamic_programming.dp",
         "DynamicProgrammingOptions",
     ),
-    "LookupTableController": (
+    "LookupPolicy": (
         "minilink.planning.dynamic_programming.lookup_policy",
-        "LookupTableController",
+        "LookupPolicy",
     ),
     "PolicyEvaluator": (
         "minilink.planning.dynamic_programming.policy_eval",

@@ -308,7 +308,7 @@ class PD(PID):
     of the comparison. An unfiltered ``Kp + Kd s`` is improper and has no
     block: filter the derivative (this block, or its frequency-domain twin
     :class:`~minilink.blocks.transfer_function.Lead`) or measure the rate
-    (:class:`~minilink.control.impedance.ImpedanceController`). For the
+    (:class:`~minilink.control.impedance.Impedance`). For the
     proportional law alone use :class:`P`.
     """
 

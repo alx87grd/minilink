@@ -1,6 +1,6 @@
 # State feedback and state estimation as one pattern: the design for P4 and beyond
 
-**Status:** decided 2026-10-13; P4 (the control sweep, the observer, the designs, `lqg`, the demos) landed 2026-10-14, and the review that followed made the verbs system-only, split the output reference out of `StateFeedbackController` and put `LQRPlanner` on the command port (rulings R14–R17), the open follow-ups are TODO rows (P4 follow-ups, `LQGPlanner`, the estimation follow-ups); §3, §5 and §6 are the live design for what comes next. The rulings and their reasons are in
+**Status:** decided 2026-10-13; P4 (the control sweep, the observer, the designs, `lqg`, the demos) landed 2026-10-14, and the review that followed made the verbs system-only, split the output reference out of `StateFeedback` and put `LQRPlanner` on the command port (rulings R14–R17), the open follow-ups are TODO rows (P4 follow-ups, `LQGPlanner`, the estimation follow-ups); §3, §5 and §6 are the live design for what comes next. The rulings and their reasons are in
 [2026-10-14-state-space-design-rulings.md](../reviews/2026-10-14-state-space-design-rulings.md).
 Workboard row P4 (v0.2 wave B). Items marked **[ruled]** were decided in the design
 conversation; the role name was ruled `observer` (R11) and `analysis/riccati.py` taken (R5).
@@ -54,9 +54,9 @@ Layer 0  gains on arrays            lqr_gain(A, B, Q, R) -> K                 ka
                                     place_gain(A, B, poles) -> K              luenberger_gain(A, C, poles) -> L  (= place_gain(Aᵀ, Cᵀ, poles)ᵀ)
                                     lqr_gain_schedule(..., tf) -> (t, K, S)   kalman_gain_schedule(..., P0, tf) -> (t, L, P)   [later]
 
-Layer 1  blocks                     StateFeedbackController(K, xbar, ubar)            x, r -> u    u = ū − K (x − r)
-                                    TimeVaryingStateFeedbackController(t, K, ...)    x, r -> u    u = ū − K(t)(x − r)
-                                    TrajectoryFeedbackController(traj, K)            x -> u       u = u_d(t) − K(t)(x − x_d(t))
+Layer 1  blocks                     StateFeedback(K, xbar, ubar)            x, r -> u    u = ū − K (x − r)
+                                    TimeVaryingFeedback(t, K, ...)    x, r -> u    u = ū − K(t)(x − r)
+                                    TrajectoryFeedback(traj, K)            x -> u       u = u_d(t) − K(t)(x − x_d(t))
                                     StateObserver(A, B, C, L, D, xbar, ubar, ybar)    u, y -> x    dx̂ = A(x̂−x̄) + B(u−ū) + L(y−ŷ)
                                     TimeVaryingStateObserver(t, L, A, B, C, ...)      u, y -> x    L(t)                                 [later]
                                     TrajectoryObserver(traj, L, A, B, C schedules)    u, y -> x    δx̂ about x_d(t), y_d(t)              [later]
@@ -94,11 +94,11 @@ before they are exposed, so the demos and `lqg` wire it with `connect`.)
 | Along a nominal trajectory, offline | `trajectory_lqr(sys, traj, Q, R)` -> `K(t)`, backward Riccati from `S_f` | `trajectory_kalman(sys, traj, Q_n, R_n, P0)` -> `L(t)`, forward Riccati from `P0` (the linearized Kalman filter about `x_d(t)`, `u_d(t)`, `y_d(t)`) | at every sample of the trajectory, `A_k`, `B_k`, `C_k` | the same exact Hamiltonian step, dual pair, opposite direction |
 | At the current point, online | iLQR / MPC (research lane) | `ExtendedKalmanFilter`: `A(x̂)`, `C(x̂)` inside `f`, `P` integrated as state | every instant, at x̂ | the Riccati differential equation integrated with the estimate |
 
-The EKF along a trajectory is the middle rung: the same block shape as `TrajectoryFeedbackController` (schedules in `params`, `interpolate_schedule` between samples, held past the end), with the plant's nominal `y_d(t) = h(x_d, u_d)` as a third schedule and the estimate written as `x̂ = x_d(t) + δx̂`. Nothing in the core changes for it; it needs the Riccati machinery to run forward on the dual pair (the backward map already exists in `riccati_step`) and `interpolate_schedule` to have one home both bands import.
+The EKF along a trajectory is the middle rung: the same block shape as `TrajectoryFeedback` (schedules in `params`, `interpolate_schedule` between samples, held past the end), with the plant's nominal `y_d(t) = h(x_d, u_d)` as a third schedule and the estimate written as `x̂ = x_d(t) + δx̂`. Nothing in the core changes for it; it needs the Riccati machinery to run forward on the dual pair (the backward map already exists in `riccati_step`) and `interpolate_schedule` to have one home both bands import.
 
 ## 4. Names **[ruled unless marked]**
 
-- Blocks: `StateFeedbackController`, `StateObserver` (returned by both `kalman` and
+- Blocks: `StateFeedback`, `StateObserver` (returned by both `kalman` and
   `luenberger`; its `name` reads "Kalman Filter" or "Luenberger Observer" for `print` and
   `plot_diagram`). Later: `TrajectoryObserver`, `ExtendedKalmanFilter`, `UnscentedKalmanFilter`,
   `ParticleFilter`. Blocks are named for what they are; a design verb for how it is obtained.

@@ -24,14 +24,14 @@ class TestPublicImports(unittest.TestCase):
 
     def test_control_and_analysis_band_exports(self):
         from minilink.analysis import bode, discretize, linearize, modal_analysis
-        from minilink.control import ImpedanceController, lqr
+        from minilink.control import Impedance, lqr
 
         self.assertTrue(callable(lqr))
         self.assertTrue(callable(linearize))  # the function, not a module of that name
         self.assertTrue(callable(discretize))
         self.assertTrue(callable(bode))
         self.assertTrue(callable(modal_analysis))
-        self.assertTrue(callable(ImpedanceController))
+        self.assertTrue(callable(Impedance))
 
     def test_root_prelude_is_the_teaching_surface(self):
         import minilink

@@ -10,8 +10,8 @@ from minilink.analysis.linearization import design_model
 from minilink.analysis.riccati import care
 from minilink.control.design import lqr_gain_schedule
 from minilink.control.state import (
-    StateFeedbackController,
-    TimeVaryingStateFeedbackController,
+    StateFeedback,
+    TimeVaryingFeedback,
 )
 from minilink.core.costs import QuadraticCost
 from minilink.core.feedback import command_port
@@ -128,7 +128,7 @@ class LQRPlanner(Planner):
             t, K, S = lqr_gain_schedule(A, B, Q, R, S_f, tf, n_steps=n_steps)
 
             # The law u = ū − K(t) (x − x̄)
-            policy = TimeVaryingStateFeedbackController(t, K, xbar=x_bar, ubar=u_bar)
+            policy = TimeVaryingFeedback(t, K, xbar=x_bar, ubar=u_bar)
 
             # Closed-loop poles at t = 0: eig(A − B K(0))
             poles = np.linalg.eigvals(A - B @ K[0])
@@ -146,7 +146,7 @@ class LQRPlanner(Planner):
             K = np.linalg.solve(R, B.T @ P)
 
             # The law u = ū − K (x − x̄)
-            policy = StateFeedbackController(K, xbar=x_bar, ubar=u_bar)
+            policy = StateFeedback(K, xbar=x_bar, ubar=u_bar)
 
             # Closed-loop poles: eig(A − B K)
             poles = np.linalg.eigvals(A - B @ K)

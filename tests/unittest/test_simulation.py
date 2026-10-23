@@ -61,17 +61,17 @@ class DiscontinuousLinearSystem(StableLinearSystem):
 
 class TestNewSimulator(unittest.TestCase):
     def test_a_diagram_x0_set_by_the_user_is_kept(self):
-        from minilink import Pendulum, StateFeedbackController
+        from minilink import Pendulum, StateFeedback
 
         K = np.array([[10.0, 2.0]])
-        loop = StateFeedbackController(K) @ Pendulum()
+        loop = StateFeedback(K) @ Pendulum()
         loop.x0 = np.array([0.5, -0.2])
         traj = loop.compute_trajectory(tf=0.05, verbose=False)
         np.testing.assert_allclose(traj.x[:, 0], [0.5, -0.2])
         np.testing.assert_allclose(loop.x0, [0.5, -0.2])
 
         plant = Pendulum()
-        loop = StateFeedbackController(K) @ plant
+        loop = StateFeedback(K) @ plant
         plant.x0 = np.array([0.7, 0.0])  # set on the block after composition
         traj = loop.compute_trajectory(tf=0.05, verbose=False)
         np.testing.assert_allclose(traj.x[:, 0], [0.7, 0.0])
@@ -490,7 +490,7 @@ class TestStaticSimulatorJax(unittest.TestCase):
         self.assertIn("y", traj.signals)
 
 
-from minilink.control.modelbased import SlidingModeController
+from minilink.control.modelbased import SlidingMode
 from minilink.core.composition import closed_loop
 from minilink.dynamics.catalog.pendulum.pendulum import Pendulum
 from minilink.simulation.simulator import Simulator
@@ -509,7 +509,7 @@ def _build_smc_diagram():
         final_value=np.array([0.0, 0.0]),
         step_time=0.5,
     )
-    smc = SlidingModeController(model, lam=20.0, gain=8.0, nab=0.15)
+    smc = SlidingMode(model, lam=20.0, gain=8.0, nab=0.15)
     return ref >> closed_loop(smc, plant)
 
 
@@ -1157,10 +1157,10 @@ class TestRealtimeSimulator(unittest.TestCase):
 
     def test_realtime_simulator_plot_flag_and_diagram_signals(self):
         import matplotlib.pyplot as plt
-        from minilink import Pendulum, StateFeedbackController
+        from minilink import Pendulum, StateFeedback
 
         plant = Pendulum()
-        ctl = StateFeedbackController(np.array([[10.0, 2.0]]))
+        ctl = StateFeedback(np.array([[10.0, 2.0]]))
         loop = ctl @ plant
 
         live_out = LiveSignalPlotOutput(
@@ -1389,11 +1389,11 @@ class TestAutomaticTimeGrid(unittest.TestCase):
         self.assertAlmostEqual(sim.dt, 0.005)
 
     def test_loop_takes_dt_from_its_plant_time_constant(self):
-        from minilink import Integrator, Pendulum, StateFeedbackController
+        from minilink import Integrator, Pendulum, StateFeedback
 
         plant = Pendulum()
         plant.solver_info["smallest_time_constant"] = 0.5
-        controller = StateFeedbackController(np.array([[10.0, 2.0]]))
+        controller = StateFeedback(np.array([[10.0, 2.0]]))
 
         alone = Simulator(plant, tf=1.0, solver="euler", verbose=False)
         loop = Simulator(controller @ plant, tf=1.0, solver="euler", verbose=False)
@@ -1407,10 +1407,10 @@ class TestAutomaticTimeGrid(unittest.TestCase):
         )
 
     def test_loop_follows_a_plant_hint_changed_after_composing(self):
-        from minilink import Pendulum, StateFeedbackController
+        from minilink import Pendulum, StateFeedback
 
         plant = Pendulum()
-        loop = StateFeedbackController(np.array([[10.0, 2.0]])) @ plant
+        loop = StateFeedback(np.array([[10.0, 2.0]])) @ plant
         plant.solver_info["smallest_time_constant"] = 0.5
 
         alone = Simulator(plant, tf=1.0, solver="euler", verbose=False)
@@ -1428,12 +1428,12 @@ class TestAutomaticTimeGrid(unittest.TestCase):
             DiagramSystem,
             Pendulum,
             Saturation,
-            StateFeedbackController,
+            StateFeedback,
         )
 
         plant = Pendulum()
         plant.solver_info["smallest_time_constant"] = 0.5
-        controller = StateFeedbackController(np.array([[10.0, 2.0]]))
+        controller = StateFeedback(np.array([[10.0, 2.0]]))
 
         # a static block that declares a time constant counts like a stateful one
         saturation = Saturation(-1.0, 1.0)

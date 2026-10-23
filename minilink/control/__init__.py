@@ -5,11 +5,11 @@ from __future__ import annotations
 from minilink.core.facade import lazy_facade
 
 # The band facade for short teaching imports, e.g.
-# ``from minilink.control import PID, ImpedanceController, lqr, place`` and
+# ``from minilink.control import PID, Impedance, lqr, place`` and
 # ``from minilink.planning.trajectory_optimization.mpc import ModelPredictiveController``.
 #
 # The classical family is ``P``, ``PI``, ``PD``, ``PID`` (one measurement per axis, the
-# derivative filtered) and ``ImpedanceController``, ``ImpedanceIntegralController`` (a
+# derivative filtered) and ``Impedance``, ``IntegralImpedance`` (a
 # measured ``[q; dq]``, the rate read), six blocks in one grammar: per-axis gains, ``dof``
 # independent loops, actuator limits that are infinite by default.
 #
@@ -24,9 +24,9 @@ _EXPORTS: dict[str, tuple[str, str]] = {
         "minilink.planning.trajectory_optimization.mpc.controller",
         "ModelPredictiveController",
     ),
-    "ComputedTorqueController": (
+    "ComputedTorque": (
         "minilink.control.modelbased",
-        "ComputedTorqueController",
+        "ComputedTorque",
     ),
     "NeuralPolicyController": ("minilink.control.neural", "NeuralPolicyController"),
     "angle_features": ("minilink.control.neural", "angle_features"),
@@ -34,7 +34,7 @@ _EXPORTS: dict[str, tuple[str, str]] = {
     "PurePursuit": ("minilink.control.geometric", "PurePursuit"),
     "PI": ("minilink.control.siso", "PI"),
     "PD": ("minilink.control.siso", "PD"),
-    "ImpedanceController": ("minilink.control.impedance", "ImpedanceController"),
+    "Impedance": ("minilink.control.impedance", "Impedance"),
     "lqr": ("minilink.control.design", "lqr"),
     "lqr_gain": ("minilink.control.design", "lqr_gain"),
     "lqr_gain_schedule": ("minilink.control.design", "lqr_gain_schedule"),
@@ -43,32 +43,32 @@ _EXPORTS: dict[str, tuple[str, str]] = {
     "place": ("minilink.control.design", "place"),
     "place_gain": ("minilink.control.design", "place_gain"),
     "lqg": ("minilink.control.design", "lqg"),
-    "ImpedanceIntegralController": (
+    "IntegralImpedance": (
         "minilink.control.impedance",
-        "ImpedanceIntegralController",
+        "IntegralImpedance",
     ),
     "JointImpedance": ("minilink.control.robotic", "JointImpedance"),
     "ModelJointImpedance": ("minilink.control.robotic", "ModelJointImpedance"),
     "P": ("minilink.control.siso", "P"),
-    "SlidingModeController": (
+    "SlidingMode": (
         "minilink.control.modelbased",
-        "SlidingModeController",
+        "SlidingMode",
     ),
-    "StateFeedbackController": (
+    "StateFeedback": (
         "minilink.control.state",
-        "StateFeedbackController",
+        "StateFeedback",
     ),
-    "OutputReferenceController": (
+    "OutputReference": (
         "minilink.control.state",
-        "OutputReferenceController",
+        "OutputReference",
     ),
-    "TimeVaryingStateFeedbackController": (
+    "TimeVaryingFeedback": (
         "minilink.control.state",
-        "TimeVaryingStateFeedbackController",
+        "TimeVaryingFeedback",
     ),
-    "TrajectoryFeedbackController": (
+    "TrajectoryFeedback": (
         "minilink.control.state",
-        "TrajectoryFeedbackController",
+        "TrajectoryFeedback",
     ),
     "TaskImpedance": ("minilink.control.robotic", "TaskImpedance"),
     "TaskKinematic": ("minilink.control.robotic", "TaskKinematic"),

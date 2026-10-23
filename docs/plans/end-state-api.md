@@ -54,7 +54,7 @@ policy back in; the sampled loop dashed, its code after this phase).
 
 ```python
 import numpy as np
-from minilink import (Pendulum, PID, StateFeedbackController, WhiteNoise, Step, PlanningProblem,
+from minilink import (Pendulum, PID, StateFeedback, WhiteNoise, Step, PlanningProblem,
                       StochasticPlanningProblem, QuadraticCost, BoxSet, BoxInputSet, Gaussian, lqr,
                       discretize, evaluate, evaluate_trajectory, compare, Optimizer)
 
@@ -91,7 +91,7 @@ pe.evaluate()                                                    # Evaluation, o
 noisy.compile(pid, dt=0.01).evaluate(key=0, n_trials=200)        # Evaluation, 200 rows: objective, mean, worst, cvar, the three rates
 jax.grad(lambda p: pe.evaluate(p).objective)(pe.params)          # the researcher's line
 report = evaluate(problem, pid, dt=0.01)                         # the facade: dt required, solver="rk4"
-compare(problem, PID=pid, LQR=StateFeedbackController(K), dt=0.01).plot_trajectory()
+compare(problem, PID=pid, LQR=StateFeedback(K), dt=0.01).plot_trajectory()
 
 # 6. What this phase exports: the program
 program = pe.program(wrt=["controller.Kp", "controller.Kd"], bounds={"controller.Kp": (0, None)})
@@ -101,10 +101,10 @@ result = Optimizer(program).solve();  tuned = pe.unpack(result.z, wrt=["controll
 sol_dp = DynamicProgrammingPlanner(problem, dt=0.05).solve()                 # Euler on the grid through the step model; solver="rk4" available
 sol_to = TrajectoryOptimizationPlanner(problem, transcription="direct_collocation").solve()
 sol_rl = ReinforcementLearningPlanner(noisy, dt=0.05, substeps=1, algorithm="ppo").solve()   # actions from U
-compare(problem, DP=sol_dp, LQR=StateFeedbackController(K), PPO=sol_rl, dt=0.05).plot_trajectory()
+compare(problem, DP=sol_dp, LQR=StateFeedback(K), PPO=sol_rl, dt=0.05).plot_trajectory()
 
 # 8. After this phase: the sampled loop (a tool, HybridDiagram), MPC and MPPI on it, the parametric MPC program
-sampled = StateFeedbackController(K) % 0.05 @ plant
+sampled = StateFeedback(K) % 0.05 @ plant
 mpc = ModelPredictiveController(TrajectoryOptimizationPlanner(problem, compile_backend="jax"), dt_mpc=0.1)
 ```
 
@@ -118,7 +118,7 @@ Everything above is one of the foundations' nouns or a verb on one of them. The 
 | `core` | `System`, `DynamicSystem`, `StepSystem`, `DiagramSystem`, `Trajectory`, `CostFunction`, `QuadraticCost`, `TimeCost`, `Set` family, `Distribution` family, `Field`, `QuadraticField`, `GridField`, `Shape`, `Scene`, `Track`, `closed_loop`, `feedback`, `discretize`, `realize` | `StepDiagramSystem`, `HybridDiagram` (the sampled loop, a tool), `CallableField` | — |
 | `catalog` | the vehicle ladder, the three racecars, the arms and the UR5, pendulums, cart-poles, double pendulum, double integrator, single mass, drone, rocket (≈ 26 plants) | — | `experimental/catalog/<domain>/` (≈ 24 plants) |
 | `blocks` | routing, nonlinear, filters, sources (`Step`, `Sine`, `Ramp`, `Chirp`, `WhiteNoise`, `NoiseSource`, `TrajectorySource`), `TransferFunction`, `MLP` | `Delay`, `Switch`, `ZOHHold` | — |
-| `control` | `P` / `PI` / `PD` / `PID`, `Lead` / `Lag`, `ImpedanceController` family, `StateFeedbackController`, `OutputReferenceController`, `lqr`, `place`, `lqg`, computed torque, sliding mode, robotic laws, `PurePursuit`, `NeuralPolicyController` | `ModelPredictiveController`, `GaussianPolicy` (the seeded stochastic policy), `CBFSafetyFilter` | — |
+| `control` | `P` / `PI` / `PD` / `PID`, `Lead` / `Lag`, `Impedance` family, `StateFeedback`, `OutputReference`, `lqr`, `place`, `lqg`, computed torque, sliding mode, robotic laws, `PurePursuit`, `NeuralPolicyController` | `ModelPredictiveController`, `GaussianPolicy` (the seeded stochastic policy), `CBFSafetyFilter` | — |
 | `estimation` | `StateObserver`, `luenberger`, `kalman` | `ExtendedKalmanFilter`, `TrajectoryObserver` | — |
 | `analysis` | `linearize`, `transfer_function`, `bode`, `margins`, `pzmap`, `root_locus`, `step_response`, `sensitivity` family, `controllability`, `observability`, `region_of_attraction` | the traceable twins (S73) | `modal` |
 | `simulation` | `Simulator`, `RealtimeSimulator`, `game` | the sampled kernel's faces | — |

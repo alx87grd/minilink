@@ -154,7 +154,7 @@ def test_the_held_train_reproduces_the_lyapunov_variance():
 def noisy_loop(seed_w=1, seed_v=2):
     from minilink import (
         DiagramSystem,
-        ImpedanceController,
+        Impedance,
         NoisyPendulum,
         Step,
         WhiteNoise,
@@ -162,7 +162,7 @@ def noisy_loop(seed_w=1, seed_v=2):
 
     loop = DiagramSystem()
     loop.add_subsystem(Step(final_value=1.0, step_time=10.0), "step")
-    loop.add_subsystem(ImpedanceController(Kp=100.0, Kd=50.0), "controller")
+    loop.add_subsystem(Impedance(Kp=100.0, Kd=50.0), "controller")
     loop.add_subsystem(NoisyPendulum(), "plant")
     loop.add_subsystem(WhiteNoise(seed=seed_w), "process_noise")
     loop.add_subsystem(WhiteNoise(seed=seed_v), "measurement_noise")

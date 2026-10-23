@@ -82,7 +82,7 @@ solve; random search). The picture predates the 2026-10-23 names.*
   evaluator already fills at every step and throws away.
 - With a trapezoid kernel on that run, `jax.grad` with respect to a gain, a damping gain and
   the plant's mass matched central differences to better than 10⁻⁹ relative, through the real
-  `Pendulum`, `ImpedanceIntegralController` and `QuadraticCost`.
+  `Pendulum`, `IntegralImpedance` and `QuadraticCost`.
 - The chosen leaves ravelled to `z`, a `MathematicalProgram` with `backend="jax"` and the
   existing `Optimizer` reached a stationary point (`‖∇J‖ = 2·10⁻⁸`) in 49 SLSQP iterations and
   two seconds, where 400 steps of the demo's hand-written gradient loop stopped at twice the

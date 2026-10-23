@@ -93,7 +93,7 @@ class TestCoreComponents(unittest.TestCase):
 from minilink.blocks.basic import Integrator
 from minilink.blocks.nonlinear import Saturation
 from minilink.blocks.sources import Step, WhiteNoise
-from minilink.control.impedance import ImpedanceController
+from minilink.control.impedance import Impedance
 from minilink.control.siso import P
 from minilink.core.composition import closed_loop
 from minilink.core.diagram import DiagramSystem
@@ -131,7 +131,7 @@ class TestDiagramCompositionShortcuts(unittest.TestCase):
         np.testing.assert_allclose(dx, np.array([3.0, 1.0]))
 
     def test_matmul_operator_builds_closed_loop_diagram(self):
-        diagram = ImpedanceController() @ Pendulum()
+        diagram = Impedance() @ Pendulum()
         self.assertIn("r", diagram.inputs)
         self.assertIn("y", diagram.outputs)
         self.assertEqual(diagram.connections["controller"]["r"], ("input", "r"))
@@ -180,9 +180,7 @@ class TestDiagramCompositionShortcuts(unittest.TestCase):
         self.assertIsNone(side_by_side.connections["pendulum"]["u"])
 
     def test_series_operator_flattens_source_into_closed_loop_diagram(self):
-        diagram = (
-            Step(final_value=[1.0], step_time=0.0) >> ImpedanceController() @ Pendulum()
-        )
+        diagram = Step(final_value=[1.0], step_time=0.0) >> Impedance() @ Pendulum()
         self.assertEqual(list(diagram.subsystems), ["step", "controller", "plant"])
         self.assertFalse(
             any((isinstance(sys, DiagramSystem) for sys in diagram.subsystems.values()))
@@ -195,7 +193,7 @@ class TestDiagramCompositionShortcuts(unittest.TestCase):
 
     def test_add_operator_flattens_diagrams_without_cross_wiring(self):
         left = Step(final_value=[1.0]) + Integrator()
-        right = ImpedanceController() @ Pendulum()
+        right = Impedance() @ Pendulum()
         diagram = left + right
         self.assertEqual(
             list(diagram.subsystems), ["step", "integrator", "controller", "plant"]
@@ -225,9 +223,7 @@ class TestDiagramCompositionShortcuts(unittest.TestCase):
         self.assertNotIn("u", diagram.inputs)
 
     def test_series_into_closed_loop_without_free_boundary_input_fails(self):
-        diagram = (
-            Step(final_value=[1.0], step_time=0.0) >> ImpedanceController() @ Pendulum()
-        )
+        diagram = Step(final_value=[1.0], step_time=0.0) >> Impedance() @ Pendulum()
         with self.assertRaisesRegex(ValueError, "no free input port"):
             WhiteNoise() >> diagram
         self.assertEqual(diagram.connections["plant"]["u"], ("controller", "u"))
@@ -255,17 +251,13 @@ class TestDiagramCompositionShortcuts(unittest.TestCase):
 
     def test_autowire_reads_names_only(self):
         with self.assertWarnsRegex(UserWarning, "no output named 'r'"):
-            diagram = (
-                Step(final_value=[1.0]) + ImpedanceController() + Pendulum()
-            ).autowire()
+            diagram = (Step(final_value=[1.0]) + Impedance() + Pendulum()).autowire()
         self.assertIsNone(diagram.connections["impedance_controller"]["r"])
         self.assertEqual(
             diagram.connections["impedance_controller"]["y"], ("pendulum", "y")
         )
         with self.assertRaisesRegex(ValueError, "no output named 'r'"):
-            (Step(final_value=[1.0]) + ImpedanceController() + Pendulum()).autowire(
-                strict=True
-            )
+            (Step(final_value=[1.0]) + Impedance() + Pendulum()).autowire(strict=True)
 
     def test_autowire_strict_refuses_ambiguous_matches(self):
         diagram = (
@@ -309,10 +301,10 @@ class TestDiagramCompositionShortcuts(unittest.TestCase):
         self.assertEqual(list(swapped.inputs), ["y", "r"])
 
     def test_expose_names_the_edge_of_a_box(self):
-        from minilink import StateFeedbackController
+        from minilink import StateFeedback
 
         K = np.array([[10.0, 2.0]])
-        box = (StateFeedbackController(K) + Saturation()).autowire()
+        box = (StateFeedback(K) + Saturation()).autowire()
         box.expose("x", "r", "y")
         self.assertEqual(list(box.inputs), ["x", "r"])
         self.assertEqual(list(box.outputs), ["y"])
@@ -342,11 +334,11 @@ class TestDiagramCompositionShortcuts(unittest.TestCase):
     def test_a_mechanical_plant_closes_on_its_state_y(self):
         plant = TwoLinkManipulator()
         self.assertFalse({"q", "dq"} & set(plant.outputs))  # y is [q; dq]
-        diagram = closed_loop(ImpedanceController(dof=2), plant)
+        diagram = closed_loop(Impedance(dof=2), plant)
         self.assertEqual(list(diagram.subsystems), ["controller", "plant"])
         self.assertEqual(diagram.connections["controller"]["y"], ("plant", "y"))
         with self.assertRaisesRegex(ValueError, "declares measurement 'y' dim 2"):
-            closed_loop(ImpedanceController(dof=1), plant)
+            closed_loop(Impedance(dof=1), plant)
 
 
 from minilink.core.composition import closed_loop, resolve_standard_feedback
@@ -382,21 +374,19 @@ class TestStandardFeedback(unittest.TestCase):
         self.assertEqual(wiring.control_out, "u_ff")
 
 
-from minilink.control.state import StateFeedbackController
+from minilink.control.state import StateFeedback
 from minilink.core.system import System
 
 
 class TestPortNamesDriveTheLoop(unittest.TestCase):
     def test_the_sweep_space_comes_from_the_ports_or_plot_space(self):
-        from minilink import ImpedanceController
+        from minilink import Impedance
         from minilink.core.feedback import plot_space_of
 
         self.assertEqual(plot_space_of(P(0.5, ports="reference")), "error")
-        self.assertEqual(
-            plot_space_of(StateFeedbackController(np.array([[1.0, 1.0]]))), "state"
-        )
+        self.assertEqual(plot_space_of(StateFeedback(np.array([[1.0, 1.0]]))), "state")
         self.assertEqual(plot_space_of(Integrator()), "measurement")
-        self.assertEqual(plot_space_of(ImpedanceController()), "error_qdq")
+        self.assertEqual(plot_space_of(Impedance()), "error_qdq")
 
         class Measured(System):
             def __init__(self):

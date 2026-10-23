@@ -303,7 +303,7 @@ class TabularLearningPlanner(Planner):
     # Controller and plots
 
     def get_controller(self, **kwargs):
-        """The greedy policy as a :class:`~minilink.planning.dynamic_programming.lookup_policy.LookupTableController`."""
+        """The greedy policy as a :class:`~minilink.planning.dynamic_programming.lookup_policy.LookupPolicy`."""
         return plotting.get_controller(self.result, **kwargs)
 
     def value_at(self, x) -> float:

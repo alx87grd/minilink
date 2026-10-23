@@ -906,11 +906,11 @@ class TestDiagramRenderWithoutDot(unittest.TestCase):
         import warnings
         from unittest import mock
 
-        from minilink.control.impedance import ImpedanceController
+        from minilink.control.impedance import Impedance
         from minilink.dynamics.catalog.pendulum.pendulum import Pendulum
         from minilink.graphical.diagrams import dot as dot_module
 
-        graph = (ImpedanceController() @ Pendulum()).get_diagram()
+        graph = (Impedance() @ Pendulum()).get_diagram()
         if graph is None:
             self.skipTest("graphviz Python package not installed")
 
@@ -930,10 +930,10 @@ class TestDiagramRenderWithoutDot(unittest.TestCase):
         from unittest import mock
 
         graphviz = pytest.importorskip("graphviz")
-        from minilink.control.impedance import ImpedanceController
+        from minilink.control.impedance import Impedance
         from minilink.dynamics.catalog.pendulum.pendulum import Pendulum
 
-        loop = ImpedanceController() @ Pendulum()
+        loop = Impedance() @ Pendulum()
         missing_dot = RuntimeError("failed to execute PosixPath('dot')")
         with mock.patch.object(graphviz.Digraph, "pipe", side_effect=missing_dot):
             with warnings.catch_warnings(record=True) as caught:

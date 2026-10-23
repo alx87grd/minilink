@@ -7,8 +7,8 @@ from scipy.linalg import solve_continuous_are
 from minilink import LQRPlanner, Pendulum, PlanningProblem, QuadraticCost
 from minilink.control.design import lqr_gain, lqr_gain_schedule
 from minilink.control.state import (
-    StateFeedbackController,
-    TimeVaryingStateFeedbackController,
+    StateFeedback,
+    TimeVaryingFeedback,
 )
 from minilink.core.costs import TimeCost
 from minilink.planning.dynamic_programming.lqr import RiccatiRecord
@@ -40,7 +40,7 @@ def test_infinite_horizon_is_the_algebraic_riccati_solution():
     np.testing.assert_allclose(solution.solver.K, lqr_gain(A, B, Q, R))
     np.testing.assert_allclose(solution.solver.P, P)
     assert np.all(np.real(solution.solver.poles) < 0.0)
-    assert isinstance(solution.policy, StateFeedbackController)
+    assert isinstance(solution.policy, StateFeedback)
     np.testing.assert_allclose(solution.policy.inputs["r"].nominal_value, UPRIGHT)
     x = UPRIGHT + [0.4, -0.2]
     assert solution.cost_to_go(x) == pytest.approx((x - UPRIGHT) @ P @ (x - UPRIGHT))
@@ -55,7 +55,7 @@ def test_finite_horizon_is_the_riccati_differential_equation():
     A, B = planner.linear_model()
     t, K, S = lqr_gain_schedule(A, B, Q, R, S_f, tf, n_steps=201)
 
-    assert isinstance(solution.policy, TimeVaryingStateFeedbackController)
+    assert isinstance(solution.policy, TimeVaryingFeedback)
     assert solution.success and not solution.open_loop
     np.testing.assert_allclose(solution.policy.params["K"], K)
     np.testing.assert_allclose(solution.solver.K, K[0])

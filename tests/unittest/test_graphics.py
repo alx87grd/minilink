@@ -1192,13 +1192,13 @@ class TestAdvancedPlotting(unittest.TestCase):
         plt.close(result.figure)
 
     def test_a_block_nested_in_a_sub_diagram_is_plotted_by_identity(self):
-        from minilink.control.impedance import ImpedanceController
+        from minilink.control.impedance import Impedance
         from minilink.dynamics.catalog.pendulum.pendulum import Pendulum
 
         pendulum = Pendulum()
         pendulum.x0 = np.array([0.3, 0.0])
         outer = DiagramSystem()
-        outer.add_subsystem(ImpedanceController() @ pendulum, "loop")
+        outer.add_subsystem(Impedance() @ pendulum, "loop")
         traj = outer.compute_trajectory(tf=0.5, verbose=False)
 
         spec = build_signal_plot_spec(outer, traj, signals=((pendulum, "y"),))
@@ -1211,12 +1211,12 @@ class TestAdvancedPlotting(unittest.TestCase):
             build_signal_plot_spec(outer, traj, signals=((Pendulum(), "y"),))
 
     def test_the_state_port_reads_the_state_labels(self):
-        from minilink.control.impedance import ImpedanceController
+        from minilink.control.impedance import Impedance
         from minilink.dynamics.catalog.pendulum.pendulum import Pendulum
 
         pendulum = Pendulum()
         outer = DiagramSystem()
-        outer.add_subsystem(ImpedanceController() @ pendulum, "loop")
+        outer.add_subsystem(Impedance() @ pendulum, "loop")
         traj = outer.compute_trajectory(tf=0.2, verbose=False)
         spec = build_signal_plot_spec(outer, traj, signals=((pendulum, "x"),))
         self.assertEqual(
@@ -1261,12 +1261,10 @@ class TestAdvancedPlotting(unittest.TestCase):
 
     def test_resolve_plot_signals_series_into_closed_loop(self):
         from minilink.blocks.sources import Step
-        from minilink.control.impedance import ImpedanceController
+        from minilink.control.impedance import Impedance
         from minilink.dynamics.catalog.pendulum.pendulum import Pendulum
 
-        diagram = (
-            Step(final_value=[1.0], step_time=0.0) >> ImpedanceController() @ Pendulum()
-        )
+        diagram = Step(final_value=[1.0], step_time=0.0) >> Impedance() @ Pendulum()
         self.assertEqual(resolve_plot_signals(diagram), ("x", "step:y", "controller:u"))
 
     def test_resolve_plot_signals_dynamic_controller(self):
@@ -1707,11 +1705,11 @@ class TestArrowGeometry(unittest.TestCase):
 # error-space sign conventions (e = r − y, de = vel_d − rate).
 
 from minilink.blocks.nonlinear import Saturation  # noqa: E402
-from minilink.control.impedance import ImpedanceController  # noqa: E402
-from minilink.control.modelbased import ComputedTorqueController  # noqa: E402
+from minilink.control.impedance import Impedance  # noqa: E402
+from minilink.control.modelbased import ComputedTorque  # noqa: E402
 from minilink.control.siso import P  # noqa: E402
 from minilink.control.siso import PID  # noqa: E402
-from minilink.control.state import StateFeedbackController  # noqa: E402
+from minilink.control.state import StateFeedback  # noqa: E402
 from minilink.dynamics.catalog.pendulum.pendulum import Pendulum  # noqa: E402
 from minilink.graphical import port_map  # noqa: E402
 
@@ -1767,7 +1765,7 @@ class TestPlotControlLaw(unittest.TestCase):
         K = np.array([[3.0, 1.0]])
         xbar = np.array([np.pi, 0.0])
         ubar = np.array([0.5])
-        lqr = StateFeedbackController(K, xbar=xbar, ubar=ubar)
+        lqr = StateFeedback(K, xbar=xbar, ubar=ubar)
         spec_bounds = ((0.0, 2 * np.pi), (-4.0, 4.0))
         res = lqr.plot_control_law(bounds=spec_bounds, grid_shape=(5, 5), show=False)
         mesh = res.axes.collections[0]
@@ -1782,7 +1780,7 @@ class TestPlotControlLaw(unittest.TestCase):
         plt.close(res.figure)
 
     def test_impedance_error_plane_values(self):
-        pd = ImpedanceController(dof=1, Kp=10.0, Kd=1.0)
+        pd = Impedance(dof=1, Kp=10.0, Kd=1.0)
         res = pd.plot_control_law(
             bounds=((-1.0, 1.0), (-2.0, 2.0)), grid_shape=(5, 5), show=False
         )
@@ -1798,7 +1796,7 @@ class TestPlotControlLaw(unittest.TestCase):
         plt.close(res.figure)
 
     def test_modelbased_default_axes_are_qdq(self):
-        ct = ComputedTorqueController(Pendulum())
+        ct = ComputedTorque(Pendulum())
         res = ct.plot_control_law(grid_shape=(5, 5), show=False)
         self.assertEqual(res.axes.get_xlabel(), "q0")
         self.assertEqual(res.axes.get_ylabel(), "dq0")
@@ -1842,7 +1840,7 @@ class TestPlotControlLaw(unittest.TestCase):
         np.testing.assert_allclose(line.get_ydata(), 2.0 * line.get_xdata())
         plt.close(res.figure)
 
-        lqr = StateFeedbackController(np.array([[1.0, 1.0]]))
+        lqr = StateFeedback(np.array([[1.0, 1.0]]))
         res = lqr.plot_control_law(
             bounds=((-1.0, 1.0), (-1.0, 1.0)),
             grid_shape=(5, 5),

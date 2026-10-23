@@ -31,8 +31,8 @@ deep defining-module paths stay valid but are not what README / intro show.
 
 | Layer | Example | Role |
 | --- | --- | --- |
-| **Root prelude** | `from minilink import Pendulum, ImpedanceController, lqr, QuadraticCost, DynamicProgrammingPlanner, ReinforcementLearningPlanner` | **The teaching surface, one import line** — every name a student meets (tested as a set in `test_teaching_surface.py`) |
-| **Band facades** | `from minilink.catalog import Pendulum` · `from minilink.control import ImpedanceController` · `from minilink.analysis import bode` · `from minilink.control import lqr` · `from minilink.analysis import linearize` | Canonical course / script API |
+| **Root prelude** | `from minilink import Pendulum, Impedance, lqr, QuadraticCost, DynamicProgrammingPlanner, ReinforcementLearningPlanner` | **The teaching surface, one import line** — every name a student meets (tested as a set in `test_teaching_surface.py`) |
+| **Band facades** | `from minilink.catalog import Pendulum` · `from minilink.control import Impedance` · `from minilink.analysis import bode` · `from minilink.control import lqr` · `from minilink.analysis import linearize` | Canonical course / script API |
 | **Defining module** | `from minilink.dynamics.catalog.pendulum.pendulum import Pendulum` | Implementation home; always valid |
 
 Rules:
@@ -134,7 +134,7 @@ state-feedback block):
   draw a scene as an overlay.
 - A new import across libraries needs an exception here, with its reason.
 - Libraries may ship **design verbs for their own blocks**, a model in, block out
-  (`control.design.lqr(sys, Q, R) -> StateFeedbackController`,
+  (`control.design.lqr(sys, Q, R) -> StateFeedback`,
   `estimation.design.kalman(sys, Q_n, R_n) -> StateObserver`), and their gains on
   arrays (`lqr_gain(A, B, Q, R) -> K`); the linearization producing the model lives in
   `analysis/`.
@@ -209,7 +209,7 @@ the named car profiles live with their scenarios in `examples/projects/car_trajo
   omitted (`analysis.derivatives.operating_point`); `x0` is the start of a simulation
   and nothing else. Both default to zeros; a diagram derives both from its blocks. Where
   the point lives: on a system, the nominal value of its signals; in a block whose law
-  reads it (`OutputReferenceController`, `StateObserver`), its `params`; in a tool, the
+  reads it (`OutputReference`, `StateObserver`), its `params`; in a tool, the
   `x_bar` / `u_bar` arguments, defaulting to the nominal (the target of
   `QuadraticCost.from_system` included); on a linear model, `xbar`, `ubar` and `ybar`,
   where its deviations are measured from.
@@ -529,8 +529,8 @@ they read and what the zero-argument sweep draws:
 | Module | Measurement | `plot_control_law` sweep |
 | --- | --- | --- |
 | (a law on `y` used absolutely, `u = c(y, r)`: learned policies) | `y`, `r` of another size or absent | measurement, `r` pinned |
-| `impedance.py` (`ImpedanceController`, `ImpedanceIntegralController`) | `y = [q; dq]` dim `2n`, the rate measured so no filter state; `Kp`, `Kd` are `n×n` (a scalar or vector is diagonal, a matrix couples the axes), `Ki` per axis; the same limits and integrator hold as `siso.py`; optional robotic `+ g(q)` via `robotic.py` | `(e, de)` plane (`plot_space = "error_qdq"`) |
-| `state.py` | full state `x`; constant gain `K` (`StateFeedbackController`, what `lqr` returns: `u = ubar - K (x - r)` on a state reference, `r` defaulting to `xbar`; `OutputReferenceController(K, N)`, the textbook output reference `u = ubar - K (x - xbar) + N r`, `r` of the output's dimension) or a gain schedule `K(t)` interpolated between samples and held or replaced past its end (`TimeVaryingStateFeedbackController`, what `lqr_finite_horizon` returns; the schedule itself comes from `lqr_gain_schedule`, the Riccati differential equation propagated exactly through the Hamiltonian system); feedback around a reference trajectory `u = u_d(t) - K(t)(x - x_d(t))` (`TrajectoryFeedbackController`, no reference port — the trajectory is the reference; what `trajectory_lqr` returns: the plant linearized at every sample of the reference, the Riccati equation swept backward interval by interval from the stationary solution at the end point) | `(x0, x1)` |
+| `impedance.py` (`Impedance`, `IntegralImpedance`) | `y = [q; dq]` dim `2n`, the rate measured so no filter state; `Kp`, `Kd` are `n×n` (a scalar or vector is diagonal, a matrix couples the axes), `Ki` per axis; the same limits and integrator hold as `siso.py`; optional robotic `+ g(q)` via `robotic.py` | `(e, de)` plane (`plot_space = "error_qdq"`) |
+| `state.py` | full state `x`; constant gain `K` (`StateFeedback`, what `lqr` returns: `u = ubar - K (x - r)` on a state reference, `r` defaulting to `xbar`; `OutputReference(K, N)`, the textbook output reference `u = ubar - K (x - xbar) + N r`, `r` of the output's dimension) or a gain schedule `K(t)` interpolated between samples and held or replaced past its end (`TimeVaryingFeedback`, what `lqr_finite_horizon` returns; the schedule itself comes from `lqr_gain_schedule`, the Riccati differential equation propagated exactly through the Hamiltonian system); feedback around a reference trajectory `u = u_d(t) - K(t)(x - x_d(t))` (`TrajectoryFeedback`, no reference port — the trajectory is the reference; what `trajectory_lqr` returns: the plant linearized at every sample of the reference, the Riccati equation swept backward interval by interval from the stationary solution at the end point) | `(x0, x1)` |
 | `siso.py` (`P`, `PI`, `PD`, `PID`) | `e` per axis, or `y` with `r` (decoupled loops) | error per axis |
 | `robotic.py` (task laws) | Joint ``[q; dq]`` feedback; internal FK/J; optional ``+ g(q)``; optional task-force arrow | `(q0, dq0)` absolute (`plot_space = "absolute_qdq"`) |
 | `robotic.py` (kinematic laws) | Joint ``q`` only; outputs ``dq`` for speed-controlled plants | measurement (`plot_space = "measurement"`: the task reference is not a joint error) |
@@ -542,13 +542,13 @@ and `modelbased`; non-PID shaping constants keep their textbook lowercase
 names (`tau`, sliding-mode `lam` / `gain` / `nab`). `tracking_ref` defaults
 follow the law's nature and are deliberately **not** uniform: spring-damper
 and kinematic laws default to regulation (`tracking_ref=False`,
-``r = pos_d``); model-based trajectory laws (`ComputedTorqueController`,
-`SlidingModeController`) default to tracking (`tracking_ref=True`,
+``r = pos_d``); model-based trajectory laws (`ComputedTorque`,
+`SlidingMode`) default to tracking (`tracking_ref=True`,
 ``r = [q_d; dq_d]``).
 
 **Embedded-model params rule (frozen).** Model-based controllers
-(`ModelJointImpedance`, `TaskImpedance`, `ComputedTorqueController`,
-`SlidingModeController`) hold a reference to a plant object and call its model
+(`ModelJointImpedance`, `TaskImpedance`, `ComputedTorque`,
+`SlidingMode`) hold a reference to a plant object and call its model
 hooks (`g(q)`, `H(q)`, `inverse_dynamics`) with ``params=None`` — the embedded
 model always reads that plant object's **live** ``self.params``. The
 controller's own params dict carries gains only and is never forwarded to the
@@ -754,7 +754,7 @@ Solver presets: `scipy`, `scipy_stiff`, `scipy_max`, `scipy_ultra`, `scipy_lsoda
 
 ### Discontinuous closed loops
 
-A discontinuous law (`SlidingModeController`'s `sign(s)`) on a continuous closed loop sets
+A discontinuous law (`SlidingMode`'s `sign(s)`) on a continuous closed loop sets
 `discontinuous_behavior`, which diagrams aggregate; the automatic solver choice then takes
 explicit Euler at `dt = AUTO_DT_SCALE × τ_min` and warns on every solve (louder when
 `rk4_fixedsteps` or a SciPy solver is forced). The reason: the diagram evaluator re-solves
@@ -883,10 +883,10 @@ own sample of the cost-to-go, `Q <- Q + eta (q - Q)`: `QLearning` (target
 `c + alpha min Q(x', .)`, off-policy), `SARSA` (the action taken next,
 on-policy), `MonteCarloControl` (the cost observed to the episode's end).
 Exploration is an object, `EpsilonGreedy` (annealed) or `UCB`. `solve()`
-returns a `PlanningSolution` (the greedy `LookupTableController` as `policy`,
+returns a `PlanningSolution` (the greedy `LookupPolicy` as `policy`,
 `J = min Q` as `cost_to_go`); `planner.result` is the table as a
 `DynamicProgrammingResult` (`J = min Q`, `pi = argmin Q`), so
-`plot_cost2go`, `plot_policy` and `get_controller` (a `LookupTableController`)
+`plot_cost2go`, `plot_policy` and `get_controller` (a `LookupPolicy`)
 are those of value iteration, and the same grid solved by
 `DynamicProgrammingPlanner` is the exact answer the learner approaches.
 
@@ -986,7 +986,7 @@ works on both); `grid.X` and `grid.U` are the boxes it spans, and successors fro
 forward-Euler step `x_next = x + f(x,u,t)·dt` (the time step `dt` lives on the grid, not
 on `System`). `DynamicProgrammingPlanner` runs value iteration backward — `solve`
 to tolerance, `solve_steps` for a fixed horizon — returning a `PlanningSolution` whose
-`policy` is the `LookupTableController` of the greedy table and whose `cost_to_go`
+`policy` is the `LookupPolicy` of the greedy table and whose `cost_to_go`
 interpolates `J` (the raw `DynamicProgrammingResult`, `J` and `pi` as action ids, stays on
 `planner.result`); out-of-domain
 transitions are charged a finite `out_of_bound_cost` (pyro's
@@ -999,7 +999,7 @@ built with `vmap`, so the plant and cost must be JAX-traceable; linear/nearest o
 engine lives in `dp_jax.py` and the progress reports in `progress.py`, so `dp.py` reads as the
 textbook algorithm. `precompute` trades the `(N,A,n)`
 successor table for per-sweep recomputation (memory vs time-varying support); a precomputed
-grid also freezes the running-cost table, so a time-varying `f` or `g` needs `precompute=False`. `get_controller()` returns a `LookupTableController` (a static `System`); `PolicyEvaluator`
+grid also freezes the running-cost table, so a time-varying `f` or `g` needs `precompute=False`. `get_controller()` returns a `LookupPolicy` (a static `System`); `PolicyEvaluator`
 gives the cost-to-go of any fixed law. **Function approximation**
 (`dynamic_programming/approximation.py`): linear-in-the-weights fits `f_hat(x | w) = wᵀφ(x)` with fixed
 features — `QuadraticFeatures(xbar)` (a quadratic form, the LQR shape; `quadratic_form(w)` reads

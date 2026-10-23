@@ -2,7 +2,7 @@
 
 from minilink import (
     DiagramSystem,
-    ImpedanceController,
+    Impedance,
     NoisyPendulum,
     Step,
     WhiteNoise,
@@ -26,7 +26,7 @@ noise = WhiteNoise(seed=1)
 noise2 = WhiteNoise(seed=2)
 
 # Closed loop system
-ctl = ImpedanceController(Kp=100.0, Kd=50.0)
+ctl = Impedance(Kp=100.0, Kd=50.0)
 
 # Diagram
 diagram = DiagramSystem()

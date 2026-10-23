@@ -5,7 +5,7 @@ import jax.numpy as jnp
 import matplotlib.pyplot as plt
 import numpy as np
 
-from minilink import DiagramSystem, ImpedanceIntegralController, Pendulum, Trajectory
+from minilink import DiagramSystem, IntegralImpedance, Pendulum, Trajectory
 from minilink.graphical.signals import open_time_signal_plot, resolve_plot_signals
 
 # Rollout horizon (JAX loss and NumPy plot share dt and tf).
@@ -23,7 +23,7 @@ PLOT_PAUSE = 0.05
 PLOT_BACKEND = "matplotlib"  # use "plotly" if matplotlib live updates stall
 
 plant = Pendulum()
-ctl = ImpedanceIntegralController(Kp=1.0, Ki=0.0, Kd=1.0)
+ctl = IntegralImpedance(Kp=1.0, Ki=0.0, Kd=1.0)
 I = jnp.eye(1)  # the gains are 1×1 matrices, the integral gain a 1-vector
 
 diagram = DiagramSystem()

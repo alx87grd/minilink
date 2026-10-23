@@ -41,7 +41,7 @@ Release criterion carried over: every **in-scope** pyro library module has a min
 | Catalog | `pyro/dynamic/manipulator.py` | FiveLinkPlanarManipulatorwithObstacles | `minilink/planning/spatial/` | Scene | **Partial** |  |
 | Control | `pyro/control/controller.py` | DynamicClosedLoopSystem | `minilink/core/diagram.py` | DiagramSystem | **Partial** |  |
 | Control | `pyro/control/linear.py` | PIDController | `minilink/control/siso.py` | PID (filtered PID), PI, PD | **Done** | PI / PD landed 2026-09-07 (P1); robotic PID wrappers are C2 |
-| Control | `pyro/control/lqr.py` | TrajectoryLQRController | `minilink/control/design.py`, `minilink/control/state.py` | trajectory_lqr, TrajectoryFeedbackController | **Done** | Demo: `examples/demos/control/trajectory_lqr_cartpole.py` |
+| Control | `pyro/control/lqr.py` | TrajectoryLQRController | `minilink/control/design.py`, `minilink/control/state.py` | trajectory_lqr, TrajectoryFeedback | **Done** | Demo: `examples/demos/control/trajectory_lqr_cartpole.py` |
 | Control | `pyro/control/robotcontrollers.py` | JointPD, EndEffectorPD, … | `minilink/control/robotic.py` | JointImpedance, TaskImpedance, TaskKinematic, TaskKinematicNullspace | **Partial** | Dynamic joint/effector PID wrappers TODO |
 | Planning | `pyro/planning/dynamicprogramming.py` | DynamicProgramming2DRectBivariateSpline | `minilink/planning/dynamic_programming/dp.py` | — | **Drop** | Not needed; grid backends cover use cases |
 | Planning | `pyro/planning/filters.py` | TrajectoryFilter | `minilink/planning/` | — | **TODO** | Butterworth filtfilt post-filter |
@@ -358,8 +358,8 @@ Two-column record of every symbol marked Done before the shrink; the source for 
 | ProportionalController | ProportionalController | `minilink/control/output.py` |
 | synthesize_lqr_controller | not in minilink (check at C1) | `minilink/control/design.py` |
 | linearize_and_synthesize_lqr_controller | not in minilink (check at C1) | `minilink/control/design.py` |
-| ComputedTorqueController | ComputedTorqueController | `minilink/control/modelbased.py` |
-| SlidingModeController | SlidingModeController | `minilink/control/modelbased.py` |
+| ComputedTorque | ComputedTorque | `minilink/control/modelbased.py` |
+| SlidingMode | SlidingMode | `minilink/control/modelbased.py` |
 | stable_baseline3_controller | SB3Controller | `minilink/interfaces/gymnasium.py` |
 | Trajectory | Trajectory | `minilink/core/trajectory.py` |
 | Simulator | Simulator | `minilink/simulation/simulator.py` |
@@ -373,7 +373,7 @@ Two-column record of every symbol marked Done before the shrink; the source for 
 | GridDynamicSystem | StateSpaceGrid | `minilink/planning/dynamic_programming/discretizer.py` |
 | DynamicProgramming | DynamicProgrammingPlanner | `minilink/planning/dynamic_programming/dp.py` |
 | DynamicProgrammingWithLookUpTable | same planner + lookup | `minilink/planning/dynamic_programming/dp.py` |
-| LookUpTableController | LookupTableController | `minilink/planning/dynamic_programming/lookup_policy.py` |
+| LookUpTableController | LookupPolicy | `minilink/planning/dynamic_programming/lookup_policy.py` |
 | PolicyEvaluator | PolicyEvaluator | `minilink/planning/dynamic_programming/policy_eval.py` |
 | Planner | Planner | `minilink/planning/planner.py` |
 | RRT | RRTPlanner, RRTStarPlanner | `minilink/planning/search/` |

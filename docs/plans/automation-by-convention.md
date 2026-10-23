@@ -48,7 +48,7 @@ loop.compute_trajectory(tf=10)
 loop.plot_trajectory()                              # plant and controller signals
 loop.animate()                                      # camera on the plant
 
-loop2 = closed_loop(StateFeedbackController(K), NoisyPendulum(),
+loop2 = closed_loop(StateFeedback(K), NoisyPendulum(),
                     reference=Step(), disturbance=WhiteNoise(psd=1e-2),
                     noise=WhiteNoise(psd=1e-4),
                     observer=observer)             # u, y → x̂ → controller

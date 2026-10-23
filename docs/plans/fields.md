@@ -33,7 +33,7 @@ Baseline first: the region-of-attraction level, extent and
   `test_planning.py` are byte-identical.
 - [ ] **4.2 `QuadraticField(center, P)`** — `value = (x − c)ᵀ P (x − c)`, `gradient = 2 P (x − c)`,
   written once with `xp`; frozen dataclass (FD-C6). `P` is a matrix, or a schedule `(t, S)` as
-  `lqr_gain_schedule` returns it, interpolated in `t` the way `TimeVaryingStateFeedbackController`
+  `lqr_gain_schedule` returns it, interpolated in `t` the way `TimeVaryingFeedback`
   interpolates `K(t)`: then `value(x, t)` is the finite-horizon LQR value `xᵀ S(t) x`, and
   `lqr_finite_horizon` can hand it out beside the controller (additive; the cart-pole LQR
   notebook is its consumer). Its sublevel set is the one set that knows how
@@ -54,7 +54,7 @@ Baseline first: the region-of-attraction level, extent and
   `record_history=True` / `solve_steps`, one per `dt`), and then `value(x, t)` picks the table
   of `t` — the finite-horizon `J(x, t)`; or a trailing action axis (the tabular `Q` table over
   `grid.actions`), and then `value(x, u)` reads `Q(x, u)`, `min_over_u()` returns the `J` field
-  and `greedy()` the `LookupTableController` — the two lines the `TabularLearningPlanner` docstring
+  and `greedy()` the `LookupPolicy` — the two lines the `TabularLearningPlanner` docstring
   already states. DP's `PlanningSolution.cost_to_go` becomes `GridField(grid, J)`;
   `TabularLearningPlanner`'s result the same; `PolicyEvaluator` holds a `GridField` and
   `value_at(x)` delegates (the name stays: `double_integrator_policy_evaluation.ipynb` uses it);

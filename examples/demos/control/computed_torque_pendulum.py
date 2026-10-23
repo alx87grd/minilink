@@ -2,7 +2,7 @@
 
 import numpy as np
 
-from minilink import ComputedTorqueController, Pendulum, Step
+from minilink import ComputedTorque, Pendulum, Step
 
 plant = Pendulum()
 plant.x0 = np.array([np.pi + 0.25, 0.0])
@@ -13,7 +13,7 @@ ref = Step(
     step_time=0.0,
 )
 
-ct = ComputedTorqueController(plant, Kp=[25.0], Kd=[8.0])
+ct = ComputedTorque(plant, Kp=[25.0], Kd=[8.0])
 ct.plot_control_law()  # τ over (q, dq)
 
 diagram = ref >> ct @ plant

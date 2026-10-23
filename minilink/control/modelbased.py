@@ -14,7 +14,7 @@ from minilink.dynamics.abstraction.mechanical import MechanicalSystem
 ###############################################################################
 
 
-class ComputedTorqueController(System):
+class ComputedTorque(System):
     """Computed torque with built-in outer PD on joint space (Pyro ``nonlinear.py``).
 
     Desired acceleration ``qdd = Kp (q_d - q) + Kd (dq_d - dq)`` (regulation
@@ -124,7 +124,7 @@ class ComputedTorqueController(System):
         return tau
 
 
-class SlidingModeController(ComputedTorqueController):
+class SlidingMode(ComputedTorque):
     """Joint-space sliding-mode law on a mechanical plant (Pyro ``nonlinear.py``).
 
     Inherits computed-torque port layout (``r``, ``y = [q; dq]``). Fixed-goal
@@ -244,4 +244,4 @@ class SlidingModeController(ComputedTorqueController):
 def require_mechanical_plant(plant):
     """Refuse a plant that is not a ``MechanicalSystem``: the law needs its model."""
     if not isinstance(plant, MechanicalSystem):
-        raise TypeError("ComputedTorqueController requires a MechanicalSystem plant")
+        raise TypeError("ComputedTorque requires a MechanicalSystem plant")

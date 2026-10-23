@@ -15,9 +15,9 @@ from minilink.analysis.riccati import (
 )
 from minilink.analysis.structural import controllability_matrix, rank
 from minilink.control.state import (
-    StateFeedbackController,
-    TimeVaryingStateFeedbackController,
-    TrajectoryFeedbackController,
+    StateFeedback,
+    TimeVaryingFeedback,
+    TrajectoryFeedback,
 )
 from minilink.core.diagram import DiagramSystem
 
@@ -78,7 +78,7 @@ def place_gain(A, B, poles):
 def lqr(
     sys, Q, R, *, x_bar=None, u_bar=None, t=0.0, params=None, method="auto", eps=1e-6
 ):
-    """Design an LQR on ``sys`` and return a ``StateFeedbackController``.
+    """Design an LQR on ``sys`` and return a ``StateFeedback``.
 
     ``sys`` is a linear model (an ``LTISystem``, used as is with the operating
     point it carries) or any plant, linearized first about its command port at
@@ -109,13 +109,13 @@ def lqr(
 
     K = lqr_gain(A, B, Q, R)
 
-    return StateFeedbackController(K, xbar=model.xbar, ubar=model.ubar)
+    return StateFeedback(K, xbar=model.xbar, ubar=model.ubar)
 
 
 def place(
     sys, poles, *, x_bar=None, u_bar=None, t=0.0, params=None, method="auto", eps=1e-6
 ):
-    """Place the closed-loop poles of ``sys`` and return a ``StateFeedbackController``.
+    """Place the closed-loop poles of ``sys`` and return a ``StateFeedback``.
 
     ``sys`` is a linear model or any plant, linearized first about its command
     port at ``(x_bar, u_bar)``, as in :func:`lqr`, with ``poles`` (``n`` of
@@ -129,7 +129,7 @@ def place(
 
     K = place_gain(A, B, poles)
 
-    return StateFeedbackController(K, xbar=model.xbar, ubar=model.ubar)
+    return StateFeedback(K, xbar=model.xbar, ubar=model.ubar)
 
 
 def lqg(
@@ -153,7 +153,7 @@ def lqg(
     weights, ``Q_n, R_n`` the process and measurement noise intensities of
     :func:`~minilink.estimation.design.kalman`. The box holds the
     :class:`~minilink.estimation.observer.StateObserver` under ``observer`` and
-    the :class:`~minilink.control.state.StateFeedbackController` under ``gain``,
+    the :class:`~minilink.control.state.StateFeedback` under ``gain``,
     the estimate wired into the gain and the command back into the observer,
     with ``r``, ``y`` -> ``u`` on its edge: ``box @ plant`` closes the loop, and
     the closed-loop poles are the gain's and the observer's together (the
@@ -241,7 +241,7 @@ def lqr_finite_horizon(
     method="auto",
     eps=1e-6,
 ):
-    """Design a finite-horizon LQR on ``sys`` and return a ``TimeVaryingStateFeedbackController``.
+    """Design a finite-horizon LQR on ``sys`` and return a ``TimeVaryingFeedback``.
 
     ``sys`` is a linear model or any plant, as in :func:`lqr`. The block
     implements ``u = ubar - K(t) (x - r)`` with
@@ -261,7 +261,7 @@ def lqr_finite_horizon(
     # Past the horizon: K(t_f) held, or the stationary gain
     K_after = lqr_gain(A, B, Q, R) if after == "stationary" else None
 
-    return TimeVaryingStateFeedbackController(
+    return TimeVaryingFeedback(
         t_schedule, K, xbar=model.xbar, ubar=model.ubar, K_after=K_after
     )
 
@@ -269,7 +269,7 @@ def lqr_finite_horizon(
 def trajectory_lqr(
     sys, trajectory, Q, R, S_f=None, *, params=None, method="auto", eps=1e-6
 ):
-    """Design an LQR along a reference trajectory and return a ``TrajectoryFeedbackController``.
+    """Design an LQR along a reference trajectory and return a ``TrajectoryFeedback``.
 
     ``sys`` is linearized at every sample ``(x_d(t_k), u_d(t_k))`` of
     ``trajectory``, and the Riccati differential equation of the error
@@ -323,7 +323,7 @@ def trajectory_lqr(
     # K_k = R⁻¹ B_kᵀ S_k
     K = R_inv @ np.swapaxes(B, 1, 2) @ S
 
-    return TrajectoryFeedbackController(trajectory, K)
+    return TrajectoryFeedback(trajectory, K)
 
 
 ###############################################################################

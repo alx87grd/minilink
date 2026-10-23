@@ -347,13 +347,13 @@ class TestLQR(unittest.TestCase):
         np.testing.assert_allclose(traj.x[:, -1], [0.0, 0.0], atol=0.01)
 
 
-from minilink.control.impedance import ImpedanceController, ImpedanceIntegralController
+from minilink.control.impedance import Impedance, IntegralImpedance
 from minilink.control.siso import P
 from minilink.control.siso import PD, PI, PID
 from minilink.control.state import (
-    StateFeedbackController,
-    TimeVaryingStateFeedbackController,
-    TrajectoryFeedbackController,
+    StateFeedback,
+    TimeVaryingFeedback,
+    TrajectoryFeedback,
 )
 from minilink.dynamics.catalog.equations.integrators import DoubleIntegrator
 
@@ -418,7 +418,7 @@ class TestTrajectoryLQR(unittest.TestCase):
         reference = self.sinusoid(tf=1.0, n=3)  # samples at t = 0, 0.5, 1
         K = np.zeros((3, 1, 2))
         K[:, 0, 0] = [1.0, 2.0, 3.0]
-        ctl = TrajectoryFeedbackController(reference, K)
+        ctl = TrajectoryFeedback(reference, K)
         x = reference.x[:, 1]  # on the reference at t = 0.5: only the feedforward acts
         np.testing.assert_allclose(ctl.ctl(None, x, t=0.5), reference.u[:, 1])
         x = reference.x[:, 2] + np.array(
@@ -481,13 +481,13 @@ class TestFiniteHorizonLQR(unittest.TestCase):
     def test_scheduled_gain_interpolates_and_holds(self):
         t = np.array([0.0, 1.0, 2.0])
         K = np.array([[[1.0, 0.0]], [[2.0, 0.0]], [[3.0, 0.0]]])
-        ctl = TimeVaryingStateFeedbackController(t, K)
+        ctl = TimeVaryingFeedback(t, K)
         z = np.array([1.0, 0.0, 0.0, 0.0])  # x = [1, 0], r = 0
         np.testing.assert_allclose(ctl.ctl(None, z, t=-1.0), [-1.0])
         np.testing.assert_allclose(ctl.ctl(None, z, t=0.0), [-1.0])
         np.testing.assert_allclose(ctl.ctl(None, z, t=1.5), [-2.5])
         np.testing.assert_allclose(ctl.ctl(None, z, t=9.0), [-3.0])
-        stationary = TimeVaryingStateFeedbackController(t, K, K_after=[[7.0, 0.0]])
+        stationary = TimeVaryingFeedback(t, K, K_after=[[7.0, 0.0]])
         np.testing.assert_allclose(stationary.ctl(None, z, t=2.0), [-3.0])
         np.testing.assert_allclose(stationary.ctl(None, z, t=2.5), [-7.0])
 
@@ -496,7 +496,7 @@ class TestFiniteHorizonLQR(unittest.TestCase):
         K = np.array([[[1.0, 0.0]], [[2.0, 0.0]], [[3.0, 0.0]]])
         for K_after in ([[7.0]], [[7.0, 0.0], [0.0, 7.0]], 7.0):
             with self.assertRaisesRegex(ValueError, r"K_after must have shape"):
-                TimeVaryingStateFeedbackController(t, K, K_after=K_after)
+                TimeVaryingFeedback(t, K, K_after=K_after)
 
     def test_gain_schedule_plot_draws_every_entry(self):
         import matplotlib
@@ -560,28 +560,26 @@ class TestP(unittest.TestCase):
 
 class TestStateFeedbackController(unittest.TestCase):
     def test_reference_defaults_to_xbar(self):
-        ctl = StateFeedbackController(
-            np.array([[1.0, 2.0]]), xbar=[0.5, 0.0], ubar=[0.1]
-        )
+        ctl = StateFeedback(np.array([[1.0, 2.0]]), xbar=[0.5, 0.0], ubar=[0.1])
         np.testing.assert_allclose(ctl.inputs["r"].nominal_value, [0.5, 0.0])
 
     def test_an_operating_point_of_the_wrong_size_is_refused(self):
         K = np.array([[1.0, 2.0]])
         with self.assertRaisesRegex(ValueError, r"ubar must have shape \(1,\)"):
-            StateFeedbackController(K, ubar=[0.5, 0.5])
+            StateFeedback(K, ubar=[0.5, 0.5])
         with self.assertRaisesRegex(ValueError, r"xbar must have shape \(2,\)"):
-            TimeVaryingStateFeedbackController([0.0, 1.0], [K, K], xbar=[0.0])
+            TimeVaryingFeedback([0.0, 1.0], [K, K], xbar=[0.0])
 
     def test_state_feedback_law(self):
         K = np.array([[1.0, 2.0]])
-        ctl = StateFeedbackController(K, xbar=[0.0, 0.0], ubar=[0.5])
+        ctl = StateFeedback(K, xbar=[0.0, 0.0], ubar=[0.5])
         u = ctl.ctl(None, np.array([1.0, 1.0, 0.0, 0.0]))
         np.testing.assert_allclose(u, [0.5 - 3.0])
 
 
 class TestImpedanceIntegralController(unittest.TestCase):
     def test_equations(self):
-        pid = ImpedanceIntegralController()
+        pid = IntegralImpedance()
         np.testing.assert_allclose(
             pid.f(np.array([0.0]), np.array([1.0, 0.2, 0.5])), [0.8]
         )
@@ -591,7 +589,7 @@ class TestImpedanceIntegralController(unittest.TestCase):
 
     def test_closed_loop_removes_steady_state_error(self):
         plant = DoubleIntegrator()
-        pid = ImpedanceIntegralController(Kp=5.0, Ki=1.0, Kd=4.0)
+        pid = IntegralImpedance(Kp=5.0, Ki=1.0, Kd=4.0)
         setpoint = 1.0
         pid.inputs["r"].nominal_value = np.array([setpoint])
         diagram = DiagramSystem()
@@ -657,28 +655,28 @@ class TestPID(unittest.TestCase):
 
 class TestImpedanceController(unittest.TestCase):
     def test_gain_init_kwargs(self):
-        ctl = ImpedanceController(Kp=100.0, Kd=10.0)
+        ctl = Impedance(Kp=100.0, Kd=10.0)
         np.testing.assert_allclose(ctl.params["Kp"], [[100.0]])
         np.testing.assert_allclose(ctl.params["Kd"], [[10.0]])
 
     def test_vector_regulation(self):
-        ctl = ImpedanceController(dof=2, Kp=[2.0, 3.0], Kd=[0.5, 0.5])
+        ctl = Impedance(dof=2, Kp=[2.0, 3.0], Kd=[0.5, 0.5])
         u = ctl.ctl(None, np.array([1.0, 2.0, 0.1, 0.2, 0.3, 0.4]))
         np.testing.assert_allclose(u, [2.0 * 0.9 - 0.5 * 0.3, 3.0 * 1.8 - 0.5 * 0.4])
 
     def test_a_full_stiffness_matrix_couples_the_axes(self):
         Kp = np.array([[2.0, 1.0], [0.0, 3.0]])
-        ctl = ImpedanceController(dof=2, Kp=Kp, Kd=0.0)
+        ctl = Impedance(dof=2, Kp=Kp, Kd=0.0)
         e = np.array([0.9, 1.8])
         u = ctl.ctl(None, np.array([1.0, 2.0, 0.1, 0.2, 0.0, 0.0]))
         np.testing.assert_allclose(u, Kp @ e)
         with self.assertRaisesRegex(ValueError, r"\(2, 2\) matrix"):
-            ImpedanceController(dof=2, Kp=np.ones((3, 3)))
+            Impedance(dof=2, Kp=np.ones((3, 3)))
 
     def test_the_limits_clip_the_command_and_hold_the_integrator(self):
-        ctl = ImpedanceController(Kp=10.0, Kd=0.0, u_max=1.0)
+        ctl = Impedance(Kp=10.0, Kd=0.0, u_max=1.0)
         np.testing.assert_allclose(ctl.ctl(None, np.array([1.0, 0.0, 0.0])), [1.0])
-        pid = ImpedanceIntegralController(Kp=10.0, Ki=1.0, Kd=0.0, u_max=1.0)
+        pid = IntegralImpedance(Kp=10.0, Ki=1.0, Kd=0.0, u_max=1.0)
         # the command sits on u_max with the error pushing further: the integrator is held
         np.testing.assert_allclose(
             pid.f(np.array([0.0]), np.array([1.0, 0.0, 0.0])), [0.0]
@@ -689,9 +687,7 @@ class TestImpedanceController(unittest.TestCase):
         )
 
     def test_vector_tracking_ref(self):
-        ctl = ImpedanceController(
-            dof=2, tracking_ref=True, Kp=[1.0, 1.0], Kd=[1.0, 1.0]
-        )
+        ctl = Impedance(dof=2, tracking_ref=True, Kp=[1.0, 1.0], Kd=[1.0, 1.0])
         u = ctl.ctl(None, np.array([1.0, 2.0, 0.0, 0.0, 0.5, 0.1, 0.2, 0.3]))
         np.testing.assert_allclose(
             u,
@@ -1598,8 +1594,8 @@ class TestCompensatorStateLayout(unittest.TestCase):
     def test_the_rate_measured_pair_adds_no_filter_pole(self):
         plant_poles = 2
         for controller, extra_poles in (
-            (ImpedanceController(Kp=20.0, Kd=2.0), 0),
-            (ImpedanceIntegralController(Kp=20.0, Ki=10.0, Kd=2.0), 1),
+            (Impedance(Kp=20.0, Kd=2.0), 0),
+            (IntegralImpedance(Kp=20.0, Ki=10.0, Kd=2.0), 1),
         ):
             with self.subTest(controller=type(controller).__name__):
                 _, poles, _ = pzmap(controller @ self.plant)
@@ -1862,7 +1858,7 @@ class TestPolePlacement(unittest.TestCase):
 
 
 class TestOutputReference(unittest.TestCase):
-    """``OutputReferenceController(K, N)``: the textbook output reference."""
+    """``OutputReference(K, N)``: the textbook output reference."""
 
     def setUp(self):
         from minilink.control.design import place_gain
@@ -1874,11 +1870,11 @@ class TestOutputReference(unittest.TestCase):
         self.K = place_gain(self.A, self.B, [-2.0, -3.0])
 
     def test_y_tracks_r_at_steady_state(self):
-        from minilink.control.state import OutputReferenceController
+        from minilink.control.state import OutputReference
 
         A, B, C, K = self.A, self.B, self.C, self.K
         N = -np.linalg.inv(C @ np.linalg.inv(A - B @ K) @ B)
-        ctl = OutputReferenceController(K, N)
+        ctl = OutputReference(K, N)
         self.assertEqual(ctl.inputs["r"].dim, 1)
 
         loop = ctl @ self.plant
@@ -1888,9 +1884,9 @@ class TestOutputReference(unittest.TestCase):
         np.testing.assert_allclose(C @ trajectory.x[:, -1], [0.5], atol=1e-4)
 
     def test_the_state_reference_is_the_other_block(self):
-        from minilink.control.state import StateFeedbackController
+        from minilink.control.state import StateFeedback
 
-        ctl = StateFeedbackController(self.K, xbar=[0.1, 0.0])
+        ctl = StateFeedback(self.K, xbar=[0.1, 0.0])
         self.assertEqual(ctl.inputs["r"].dim, 2)
         np.testing.assert_allclose(ctl.inputs["r"].nominal_value, [0.1, 0.0])
         self.assertEqual(set(ctl.params), {"K", "ubar"})
@@ -1899,13 +1895,13 @@ class TestOutputReference(unittest.TestCase):
             ctl.ctl(None, np.concatenate([x, r])), -self.K @ (x - r)
         )
         with self.assertRaises(TypeError):
-            StateFeedbackController(self.K, N=np.ones((1, 1)))
+            StateFeedback(self.K, N=np.ones((1, 1)))
 
     def test_n_needs_one_row_per_command(self):
-        from minilink.control.state import OutputReferenceController
+        from minilink.control.state import OutputReference
 
         with self.assertRaisesRegex(ValueError, "needs 1 row"):
-            OutputReferenceController(self.K, np.ones((2, 1)))
+            OutputReference(self.K, np.ones((2, 1)))
 
 
 class TestPrint(unittest.TestCase):

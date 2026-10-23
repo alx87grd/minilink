@@ -6,7 +6,7 @@ from scipy.linalg import solve_continuous_are
 
 from minilink.analysis.linearization import linearize
 from minilink.control.design import lqg, lqr, lqr_gain, place_gain
-from minilink.control.state import StateFeedbackController
+from minilink.control.state import StateFeedback
 from minilink.core.composition import closed_loop
 from minilink.core.diagram import DiagramSystem
 from minilink.core.feedback import roles
@@ -89,7 +89,7 @@ def test_traces_under_jax():
 
 def test_a_box_with_a_gain_is_a_controller_and_the_roles_see_the_observer():
     plant = LTISystem(A, B, C)
-    obs, gain = observer(), StateFeedbackController(np.array([[2.0, 3.0]]))
+    obs, gain = observer(), StateFeedback(np.array([[2.0, 3.0]]))
     box = DiagramSystem()
     box.add_subsystem(obs, "observer")
     box.add_subsystem(gain, "gain")

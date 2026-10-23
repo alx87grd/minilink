@@ -257,7 +257,7 @@ def test_score_trajectory_cuts_at_the_exit_and_charges_the_problem_price():
 
 def test_every_backend_scores_the_constraint_set_on_its_parameters_and_time():
     """A parametric, time-varying X is read with problem.params.sets at each sample time."""
-    from minilink.control import StateFeedbackController
+    from minilink.control import StateFeedback
     from minilink.core.backends import array_module
     from minilink.core.sets import Set
     from minilink.planning.evaluation import MonteCarloEvaluator
@@ -275,7 +275,7 @@ def test_every_backend_scores_the_constraint_set_on_its_parameters_and_time():
             return xp.concatenate([z + r, r - z])
 
     plant = pendulum()
-    ctl = StateFeedbackController(K=[[-20.0, 0.0]])  # u = 20 theta: the loop diverges
+    ctl = StateFeedback(K=[[-20.0, 0.0]])  # u = 20 theta: the loop diverges
     backends = ("numpy", "simulator") + (("jax",) if jax_available() else ())
     for r, leaves in ((0.5, True), (3.0, False)):
         problem = PlanningProblem(
@@ -347,14 +347,14 @@ def test_monte_carlo_backends_share_the_score_on_identical_starts():
 def test_monte_carlo_applies_the_law_beyond_the_port_bounds():
     """Port bounds are information: no backend clips a law that exceeds them."""
     pytest.importorskip("jax")
-    from minilink.control import StateFeedbackController
+    from minilink.control import StateFeedback
     from minilink.core.distributions import Particles
     from minilink.planning.evaluation import MonteCarloEvaluator
 
     plant = pendulum()
     plant.inputs["u"].lower_bound = np.array([-0.5])
     plant.inputs["u"].upper_bound = np.array([0.5])
-    ctl = StateFeedbackController(K=[[30.0, 8.0]])  # |u| = 15 N m at the start
+    ctl = StateFeedback(K=[[30.0, 8.0]])  # |u| = 15 N m at the start
 
     class Effort(CostFunction):
         def g(self, x, u, t=0.0, params=None):
@@ -382,7 +382,7 @@ def test_an_exiting_trial_scores_alike_on_numpy_and_the_simulator():
     """An exit is charged the trial environment's price on both backends."""
     import warnings
 
-    from minilink.control import StateFeedbackController
+    from minilink.control import StateFeedback
     from minilink.planning.evaluation import MonteCarloEvaluator
 
     plant = pendulum()
@@ -395,7 +395,7 @@ def test_an_exiting_trial_scores_alike_on_numpy_and_the_simulator():
         X=plant.state.box,
         x0_distribution=Particles([[6.0, 5.0]]),  # leaves θ ≤ 2π within 0.1 s
     )
-    ctl = StateFeedbackController(K=[[0.0, 0.0]])
+    ctl = StateFeedback(K=[[0.0, 0.0]])
     reports = {}
     with warnings.catch_warnings():
         warnings.simplefilter("ignore")  # the announced price of leaving X
@@ -411,7 +411,7 @@ def test_an_exiting_trial_scores_alike_on_numpy_and_the_simulator():
 def test_simulator_backend_scores_a_controller_with_internal_state():
     """The controller state is stacked first; the score reads the plant's own trajectory."""
     from minilink import PID, SingleMass
-    from minilink.control import StateFeedbackController
+    from minilink.control import StateFeedback
     from minilink.core.distributions import Particles
     from minilink.planning.evaluation import MonteCarloEvaluator
 
@@ -430,7 +430,7 @@ def test_simulator_backend_scores_a_controller_with_internal_state():
     )
     J_static = (
         MonteCarloEvaluator(problem, backend="numpy", **settings)
-        .evaluate(StateFeedbackController(K=[[4.0, 0.0]]))
+        .evaluate(StateFeedback(K=[[4.0, 0.0]]))
         .J
     )
     np.testing.assert_allclose(J_pid, J_static, rtol=0.05)
@@ -485,7 +485,7 @@ def test_default_backend_scores_a_lookup_table_law_on_numpy():
     """A DP law runs on NumPy only: the default falls back, an explicit JAX backend says why."""
     import warnings
 
-    from minilink.control import StateFeedbackController
+    from minilink.control import StateFeedback
     from minilink.planning.evaluation import MonteCarloEvaluator
 
     plant = pendulum()
@@ -523,7 +523,7 @@ def test_default_backend_scores_a_lookup_table_law_on_numpy():
         MonteCarloEvaluator(problem, backend="jax", **settings).evaluate(vi)
 
     # a law that traces keeps the JAX backend and its numbers
-    law = StateFeedbackController(K=[[5.0, 1.0]])
+    law = StateFeedback(K=[[5.0, 1.0]])
     on_jax = MonteCarloEvaluator(spread, backend="jax", **settings).evaluate(law)
     report = MonteCarloEvaluator(spread, **settings).evaluate(law)
     np.testing.assert_array_equal(report.J, on_jax.J)
@@ -533,7 +533,7 @@ def test_default_backend_scores_a_lookup_table_law_on_numpy():
 @pytest.mark.jax
 def test_default_backend_falls_back_on_a_numpy_only_set_or_cost():
     """The JAX trial traces X and the cost as well: a NumPy-only one keeps the default on NumPy."""
-    from minilink.control import StateFeedbackController
+    from minilink.control import StateFeedback
     from minilink.core.backends import array_module
     from minilink.core.sets import Set
     from minilink.planning.evaluation import MonteCarloEvaluator
@@ -566,7 +566,7 @@ def test_default_backend_falls_back_on_a_numpy_only_set_or_cost():
             return 0.0
 
     plant = pendulum()
-    law = StateFeedbackController(K=[[5.0, 1.0]])
+    law = StateFeedback(K=[[5.0, 1.0]])
     settings = dict(dt=0.1, n_trials=3, episode_length=1.0)
     task = dict(
         tf=np.inf,
@@ -676,9 +676,9 @@ def test_evaluation_of_one_trajectory_prints_a_single_cost():
     assert single.n_trials == 1 and single.trajectories[0] is traj
     assert str(single).startswith("J = ") and "trials" not in str(single)
     # a deterministic problem is one trial for the evaluator as well
-    from minilink.control import StateFeedbackController
+    from minilink.control import StateFeedback
 
-    law = StateFeedbackController(K=[[1.0, 0.5]], xbar=[0.0, 0.0])
+    law = StateFeedback(K=[[1.0, 0.5]], xbar=[0.0, 0.0])
     report = MonteCarloEvaluator(problem, dt=0.1, n_trials=1, backend="numpy").evaluate(
         law
     )
@@ -737,12 +737,12 @@ def test_monte_carlo_scores_a_time_varying_law_at_each_instant():
     pytest.importorskip("jax")
     import jax
 
-    from minilink.control.state import TimeVaryingStateFeedbackController
+    from minilink.control.state import TimeVaryingFeedback
     from minilink.planning.evaluation import MonteCarloEvaluator, control_law
 
     t = np.linspace(0.0, 1.0, 5)
     K = np.stack([np.array([[1.0 + 10.0 * k, 0.5]]) for k in range(5)])
-    ctl = TimeVaryingStateFeedbackController(t, K)
+    ctl = TimeVaryingFeedback(t, K)
     x = np.array([0.3, -0.1])
     grid = np.linspace(0.0, 1.0, 21)
     for backend in ("numpy", "jax"):

@@ -8,7 +8,7 @@ from minilink.core.facade import lazy_facade
 # The root package exports the teaching surface (ROADMAP §2): every name a student
 # meets, so a script or notebook needs one import line, e.g.
 #
-#     from minilink import Pendulum, ImpedanceController, lqr
+#     from minilink import Pendulum, Impedance, lqr
 #     from minilink import QuadraticCost, PlanningProblem, DynamicProgrammingPlanner
 #     from minilink import ReinforcementLearningPlanner, StochasticPlanningProblem
 #
@@ -48,23 +48,23 @@ _EXPORTS: dict[str, tuple[str, str]] = {
     "Lead": ("minilink.blocks.transfer_function", "Lead"),
     # Control
     "P": ("minilink.control.siso", "P"),
-    "StateFeedbackController": ("minilink.control.state", "StateFeedbackController"),
-    "OutputReferenceController": (
+    "StateFeedback": ("minilink.control.state", "StateFeedback"),
+    "OutputReference": (
         "minilink.control.state",
-        "OutputReferenceController",
+        "OutputReference",
     ),
     "PID": ("minilink.control.siso", "PID"),
     "PurePursuit": ("minilink.control.geometric", "PurePursuit"),
     "PI": ("minilink.control.siso", "PI"),
     "PD": ("minilink.control.siso", "PD"),
-    "ImpedanceController": ("minilink.control.impedance", "ImpedanceController"),
+    "Impedance": ("minilink.control.impedance", "Impedance"),
     "JointImpedance": ("minilink.control.robotic", "JointImpedance"),
     "TaskImpedance": ("minilink.control.robotic", "TaskImpedance"),
-    "ComputedTorqueController": (
+    "ComputedTorque": (
         "minilink.control.modelbased",
-        "ComputedTorqueController",
+        "ComputedTorque",
     ),
-    "SlidingModeController": ("minilink.control.modelbased", "SlidingModeController"),
+    "SlidingMode": ("minilink.control.modelbased", "SlidingMode"),
     "lqr": ("minilink.control.design", "lqr"),
     "lqr_gain": ("minilink.control.design", "lqr_gain"),
     "lqr_finite_horizon": ("minilink.control.design", "lqr_finite_horizon"),
@@ -78,13 +78,13 @@ _EXPORTS: dict[str, tuple[str, str]] = {
     "kalman_gain": ("minilink.estimation.design", "kalman_gain"),
     "luenberger": ("minilink.estimation.design", "luenberger"),
     "luenberger_gain": ("minilink.estimation.design", "luenberger_gain"),
-    "TimeVaryingStateFeedbackController": (
+    "TimeVaryingFeedback": (
         "minilink.control.state",
-        "TimeVaryingStateFeedbackController",
+        "TimeVaryingFeedback",
     ),
-    "TrajectoryFeedbackController": (
+    "TrajectoryFeedback": (
         "minilink.control.state",
-        "TrajectoryFeedbackController",
+        "TrajectoryFeedback",
     ),
     "NeuralPolicyController": ("minilink.control.neural", "NeuralPolicyController"),
     # Analysis
@@ -126,9 +126,9 @@ _EXPORTS: dict[str, tuple[str, str]] = {
         "minilink.planning.dynamic_programming.dp",
         "DynamicProgrammingPlanner",
     ),
-    "LookupTableController": (
+    "LookupPolicy": (
         "minilink.planning.dynamic_programming.lookup_policy",
-        "LookupTableController",
+        "LookupPolicy",
     ),
     "QuadraticFeatures": (
         "minilink.planning.dynamic_programming.approximation",
@@ -181,9 +181,9 @@ _EXPORTS: dict[str, tuple[str, str]] = {
     "closed_loop": ("minilink.core.composition", "closed_loop"),
     "feedback": ("minilink.core.composition", "feedback"),
     "Source": ("minilink.blocks.sources", "Source"),
-    "ImpedanceIntegralController": (
+    "IntegralImpedance": (
         "minilink.control.impedance",
-        "ImpedanceIntegralController",
+        "IntegralImpedance",
     ),
     "discretize": ("minilink.analysis.discretization", "discretize"),
     "RRTStarPlanner": ("minilink.planning.search.rrt_star", "RRTStarPlanner"),

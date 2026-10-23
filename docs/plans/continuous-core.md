@@ -358,7 +358,7 @@ report = evaluate(problem, pid, dt=0.01, solver="scipy")    # the same, on the a
 ### 4.4 Compare controllers
 
 ```python
-cmp = compare(problem, PID=pid, LQR=StateFeedbackController(K), DP=sol_dp, dt=0.01)
+cmp = compare(problem, PID=pid, LQR=StateFeedback(K), DP=sol_dp, dt=0.01)
 print(cmp); cmp.plot_trajectory(); cmp.plot_cost(); cmp.plot_phase_plane(); cmp.plot_control_law(); cmp.plot_cost_to_go()
 ```
 

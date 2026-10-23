@@ -1,7 +1,7 @@
 """Diagram composition shortcut examples."""
 
 from minilink import (
-    ImpedanceController,
+    Impedance,
     Integrator,
     NoisyPendulum,
     Pendulum,
@@ -24,7 +24,7 @@ def show(diagram, name, operation):
 # diagram.add_subsystem(ctl, "controller")
 # diagram.add_subsystem(plant, "pendulum")
 step = Step(final_value=[1.0])
-ctl = ImpedanceController()
+ctl = Impedance()
 plant = Pendulum()
 
 
@@ -57,26 +57,26 @@ show(chain, "Shortcut integrator chain", "Step() >> Integrator() >> Integrator()
 # closed.connect("pendulum", "y", "controller", "y")
 # closed.connect("controller", "u", "pendulum", "u")
 # closed.connect_new_output_port("pendulum", "y", "y")
-closed = ImpedanceController() @ Pendulum()
-show(closed, "Shortcut closed-loop pendulum", "ImpedanceController() @ Pendulum()")
+closed = Impedance() @ Pendulum()
+show(closed, "Shortcut closed-loop pendulum", "Impedance() @ Pendulum()")
 # closed.compute_trajectory(tf=10.0, show=False)
 
 
 # Python parses this as ``step >> (controller @ plant)``. Shortcut composition
 # flattens the closed-loop diagram, so the result has direct ``ref``,
 # ``ctl``, and ``sys`` subsystems.
-fed_closed = Step(final_value=[1.0]) >> ImpedanceController() @ Pendulum()
+fed_closed = Step(final_value=[1.0]) >> Impedance() @ Pendulum()
 show(
     fed_closed,
     "Source into closed-loop shortcut",
-    "Step() >> ImpedanceController() @ Pendulum()",
+    "Step() >> Impedance() @ Pendulum()",
 )
 # fed_closed.compute_trajectory(tf=10.0, show=False)
 
 
 # Noise and disturbance ports stay explicit. This keeps ``>>`` from guessing
 # between open internal plant inputs such as ``d`` and ``n``.
-noisy = Step(final_value=[1.0]) >> ImpedanceController() @ NoisyPendulum()
+noisy = Step(final_value=[1.0]) >> Impedance() @ NoisyPendulum()
 noise = WhiteNoise()
 noisy.add_subsystem(noise, "sensor_noise")
 noisy
@@ -84,7 +84,7 @@ noisy.connect("sensor_noise", "y", "plant", "n")
 show(
     noisy,
     "Closed loop with explicit sensor noise",
-    "Step() >> ImpedanceController() @ Pendulum(), WhiteNoise() -> pendulum.n",
+    "Step() >> Impedance() @ Pendulum(), WhiteNoise() -> pendulum.n",
 )
 noisy.plot_diagram()
 
@@ -97,9 +97,9 @@ noisy.plot_diagram()
 # auto.connect("step", "y", "controller", "r")
 # auto.connect("pendulum", "y", "controller", "y")
 # auto.connect("controller", "u", "pendulum", "u")
-auto = (Step(port="r") + ImpedanceController() + Pendulum()).autowire(strict=True)
+auto = (Step(port="r") + Impedance() + Pendulum()).autowire(strict=True)
 show(
     auto,
     "Autowired shortcut diagram",
-    '(Step(port="r") + ImpedanceController() + Pendulum()).autowire(strict=True)',
+    '(Step(port="r") + Impedance() + Pendulum()).autowire(strict=True)',
 )

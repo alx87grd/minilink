@@ -538,13 +538,13 @@ def test_planner_trains_with_randomized_parameters():
 
 
 def test_outer_loop_on_an_inner_loop_with_nested_params():
-    from minilink.control import StateFeedbackController
+    from minilink.control import StateFeedback
     from minilink.core.distributions import Particles
     from minilink.planning.evaluation import MonteCarloEvaluator
     from minilink.planning.problems import lookup_param, merge_params
 
     plant = bounded_pendulum()
-    inner = StateFeedbackController(K=[[20.0, 4.0]], xbar=[0.0, 0.0]) @ plant
+    inner = StateFeedback(K=[[20.0, 4.0]], xbar=[0.0, 0.0]) @ plant
     inner.inputs["r"].lower_bound = np.array([-1.0, -2.0])
     inner.inputs["r"].upper_bound = np.array([1.0, 2.0])
     inner.state.lower_bound = plant.state.lower_bound

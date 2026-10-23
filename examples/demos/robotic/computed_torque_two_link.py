@@ -2,7 +2,7 @@
 
 import numpy as np
 
-from minilink import ComputedTorqueController, Step, TwoLinkManipulator
+from minilink import ComputedTorque, Step, TwoLinkManipulator
 
 p0 = np.array([0.5, 0.5])
 p1 = np.array([-0.5, 0.5])
@@ -17,9 +17,7 @@ q1 = arm.inverse_kinematics(p1)
 
 ref = Step(initial_value=q0, final_value=q1, step_time=STEP_TIME)
 
-ctl = ComputedTorqueController(
-    arm, tracking_ref=False, Kp=[20.0, 20.0], Kd=[10.0, 10.0]
-)
+ctl = ComputedTorque(arm, tracking_ref=False, Kp=[20.0, 20.0], Kd=[10.0, 10.0])
 ctl.plot_control_law()  # τ1 over (q0, dq0)
 
 diagram = ref >> ctl @ arm

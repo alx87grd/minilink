@@ -10,7 +10,7 @@ from minilink.core.system import System
 ###############################################################################
 
 
-class LookupTableController(System):
+class LookupPolicy(System):
     """
     State-feedback controller backed by a policy lookup table.
 

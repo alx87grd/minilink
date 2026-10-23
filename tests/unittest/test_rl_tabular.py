@@ -16,7 +16,7 @@ from minilink.learning.reinforcement_learning import (
 from minilink.learning.reinforcement_learning.environment import RolloutEnvironment
 from minilink.planning import StochasticPlanningProblem, Uniform
 from minilink.planning.dynamic_programming.dp import DynamicProgrammingResult
-from minilink.planning.dynamic_programming.lookup_policy import LookupTableController
+from minilink.planning.dynamic_programming.lookup_policy import LookupPolicy
 from minilink.planning.results import PlanningSolution
 
 GRID = dict(x_grid=(11, 11), u_grid=(3,), dt=0.2)
@@ -55,7 +55,7 @@ def test_q_learning_approaches_value_iteration_on_the_same_grid():
     )
     solution = learner.solve(episodes=2000)
     assert isinstance(solution, PlanningSolution) and solution.success
-    assert isinstance(solution.policy, LookupTableController)
+    assert isinstance(solution.policy, LookupPolicy)
     assert isinstance(learner.result, DynamicProgrammingResult)
     assert solution.solver.episodes == 2000 and len(learner.history) == 2000
     assert solution.cost_to_go(np.zeros(2)) == learner.value_at(np.zeros(2))
@@ -67,7 +67,7 @@ def test_q_learning_approaches_value_iteration_on_the_same_grid():
 
     # The greedy law is a lookup-table block that closes the loop and regulates
     ctl = learner.get_controller()
-    assert isinstance(ctl, LookupTableController)
+    assert isinstance(ctl, LookupPolicy)
     plant = problem.sys
     plant.x0 = np.array([1.0, 0.0])
     traj = (ctl @ plant).compute_trajectory(tf=6.0, dt=0.01, verbose=False)

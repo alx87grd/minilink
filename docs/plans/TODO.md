@@ -210,7 +210,7 @@ pick):
   **[ask — importable name]**: the name stays to v1.0 and leaves on V4's list, with no alias
   before.
 - [ ] `NeuralNetwork` folded into `MLP` (scan: graphics#12) **[ask — importable name]**.
-- [ ] One `ctl` for the model-based laws; `LookupTableController` beside the other laws
+- [ ] One `ctl` for the model-based laws; `LookupPolicy` beside the other laws
   (scan: control#8, control#13).
 
 **D3 — hardening rows** (research lane, small):

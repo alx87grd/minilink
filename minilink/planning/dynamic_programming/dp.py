@@ -11,7 +11,7 @@ import numpy as np
 from minilink.core.backends import BACKEND_JAX, BACKEND_NUMPY
 from minilink.planning.dynamic_programming import plotting
 from minilink.planning.dynamic_programming.discretizer import StateSpaceGrid
-from minilink.planning.dynamic_programming.lookup_policy import LookupTableController
+from minilink.planning.dynamic_programming.lookup_policy import LookupPolicy
 from minilink.planning.dynamic_programming.progress import SweepLog, progress
 from minilink.planning.evaluation import nominal_trajectory
 from minilink.planning.planner import Planner
@@ -409,7 +409,7 @@ class DynamicProgrammingPlanner(Planner):
         if not kwargs:
             return solution.policy
 
-        return LookupTableController(self.result.grid, self.result.pi, **kwargs)
+        return LookupPolicy(self.result.grid, self.result.pi, **kwargs)
 
     def value_at(self, x) -> float:
         """Interpolate the cost-to-go at the latest solve, by the options' interpolation."""
@@ -510,7 +510,7 @@ class DynamicProgrammingPlanner(Planner):
 
         # The greedy policy: the minimizing action of every node, interpolated between
         # nodes
-        policy = LookupTableController(result.grid, result.pi)
+        policy = LookupPolicy(result.grid, result.pi)
 
         # How the sweeps ended: converged to tol (a fixed horizon always completes
         # its sweeps)

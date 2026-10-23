@@ -120,8 +120,8 @@ The operator inserts the error junction, names the two sides `controller` and `p
 and the loop linearizes, animates and nests like any other model. The catalog has
 the plants a course needs, with their parameters and start as data (`Pendulum`,
 `CartPole`, `DoublePendulum`, `UR5Manipulator`, `KinematicBicycle`, `UdeSRacecar`,
-`Drone2D`, `Rocket`, `Boat2D`, …) and the control laws (`PID`, `ImpedanceController`,
-`StateFeedbackController`, `ComputedTorqueController`, `SlidingModeController`,
+`Drone2D`, `Rocket`, `Boat2D`, …) and the control laws (`PID`, `Impedance`,
+`StateFeedback`, `ComputedTorque`, `SlidingMode`,
 `ModelPredictiveController`, `NeuralPolicyController`):
 
 ```python
@@ -145,7 +145,7 @@ tools:
 | --- | --- |
 | Simulate, plot, animate, play | `compute_trajectory`, `plot_trajectory`, `plot_phase_plane`, `animate`, `game` |
 | Analyze | `linearize`, `bode`, `pzmap`, `margins`, `root_locus`, `step_response` |
-| Design | `lqr`, `place`, `kalman`, `lqg`, `PID`, `ImpedanceController` |
+| Design | `lqr`, `place`, `kalman`, `lqg`, `PID`, `Impedance` |
 | Plan and learn | `DynamicProgrammingPlanner`, `RRTPlanner`, `TrajectoryOptimizationPlanner`, `ModelPredictiveController`, `ReinforcementLearningPlanner` |
 
 ## One problem, every planner

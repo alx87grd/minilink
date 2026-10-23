@@ -7,7 +7,7 @@ from collections.abc import Callable
 
 import numpy as np
 
-from minilink.control.impedance import ImpedanceController
+from minilink.control.impedance import Impedance
 from minilink.control.siso import as_dof_vector
 from minilink.core.backends import array_module
 from minilink.core.system import System
@@ -121,7 +121,7 @@ def JointImpedance(
     """Joint-space impedance: generic (``dof`` only) or plant-aware.
 
     ``JointImpedance(dof=n)`` returns a domain-neutral
-    :class:`~minilink.control.impedance.ImpedanceController`.
+    :class:`~minilink.control.impedance.Impedance`.
 
     ``JointImpedance(plant, gravity_comp=True)`` returns
     :class:`ModelJointImpedance` with optional ``τ += g(q)`` (or a custom
@@ -142,7 +142,7 @@ def JointImpedance(
     # A number of axes: the domain-neutral spring-damper
     require_plant_for_gravity(gravity_comp, gravity)
     n = int(dof if dof is not None else plant_or_dof)
-    return ImpedanceController(
+    return Impedance(
         dof=n,
         tracking_ref=tracking_ref,
         **impedance_kwargs,
@@ -516,13 +516,11 @@ def gravity_feedforward(plant, gravity, q, model_params=None):
 
 
 def require_plant_alone(dof, impedance_kwargs):
-    """Refuse a number of axes, or ``ImpedanceController`` keywords, given with a plant."""
+    """Refuse a number of axes, or ``Impedance`` keywords, given with a plant."""
     if dof is not None:
         raise ValueError("pass either a plant or dof=, not both")
     if impedance_kwargs:
-        raise ValueError(
-            "plant-based JointImpedance does not accept ImpedanceController kwargs"
-        )
+        raise ValueError("plant-based JointImpedance does not accept Impedance kwargs")
 
 
 def require_plant_for_gravity(gravity_comp, gravity):

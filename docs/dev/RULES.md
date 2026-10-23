@@ -42,7 +42,7 @@ concrete formatting, ordered by the cost of being wrong:
 ## 2. What Is It in Domain Terms?
 
 - **2.1 Name by diagram role, never by implementation technology.** Class and variable names reflect
-  their functional role in the block diagram (e.g., `Plant`, `ImpedanceController`, `ErrorBlock`),
+  their functional role in the block diagram (e.g., `Plant`, `Impedance`, `ErrorBlock`),
   not their software mechanism (e.g., avoid names like `JittedVectorizedEvaluatorLeaf`).
 - **2.2 Reserve "Leaf" strictly for diagram roles.** Standalone systems or wrapper classes must use
   descriptive domain names (e.g., `DiscretizedDynamicSystem`), reserving the term `Leaf` exclusively

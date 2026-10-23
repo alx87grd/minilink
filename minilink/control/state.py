@@ -12,13 +12,13 @@ from minilink.dynamics.abstraction.state_space import point_component
 ###############################################################################
 
 
-class StateFeedbackController(System):
+class StateFeedback(System):
     """Full-state feedback ``u = ubar - K (x - r)`` on a state reference.
 
     The reference ``r`` is a state (dimension ``n``); left unconnected it holds
     ``xbar``, so the law regulates to ``xbar``. This is the block
     :func:`minilink.control.design.lqr` and :func:`minilink.control.design.place`
-    return. A reference on the output is :class:`OutputReferenceController`.
+    return. A reference on the output is :class:`OutputReference`.
 
     Ports: the plant state ``x`` (dimension ``n``) and the reference ``r``.
     ``K`` has shape ``(m, n)``; ``ubar`` is the feedforward command.
@@ -59,14 +59,14 @@ class StateFeedbackController(System):
         return u_cmd
 
 
-class OutputReferenceController(System):
+class OutputReference(System):
     """Full-state feedback ``u = ubar - K (x - xbar) + N r`` on an output reference.
 
     The reference ``r`` is a desired output (dimension ``p``, zero when
     unconnected), and ``N`` of shape ``(m, p)`` scales it to a command: the
     textbook's ``N = -(C (A - B K)^-1 B)^-1`` gives ``y = r`` at steady state
     for the plant ``(A, B, C)`` linearized about ``(xbar, ubar)``. A reference
-    on the state is :class:`StateFeedbackController`.
+    on the state is :class:`StateFeedback`.
 
     Ports: the plant state ``x`` (dimension ``n``) and the reference ``r``.
     ``K`` has shape ``(m, n)``; ``ubar`` is the feedforward command.
@@ -107,7 +107,7 @@ class OutputReferenceController(System):
         return u_cmd
 
 
-class TimeVaryingStateFeedbackController(System):
+class TimeVaryingFeedback(System):
     """Full-state feedback with a gain schedule ``u = ubar - K(t) (x - r)``.
 
     ``t`` holds ``N`` increasing sample times and ``K`` the matching gains,
@@ -115,7 +115,7 @@ class TimeVaryingStateFeedbackController(System):
     before the first sample ``K[0]`` applies, and past the last sample the
     block keeps ``K[-1]`` — or applies ``K_after`` when one is given (for a
     finite-horizon design, the stationary gain). Ports are those of
-    :class:`StateFeedbackController`. This is the block
+    :class:`StateFeedback`. This is the block
     :func:`minilink.control.design.lqr_finite_horizon` returns.
     """
 
@@ -172,7 +172,7 @@ class TimeVaryingStateFeedbackController(System):
         )
 
 
-class TrajectoryFeedbackController(System):
+class TrajectoryFeedback(System):
     """Feedback around a reference trajectory ``u = u_d(t) - K(t) (x - x_d(t))``.
 
     ``trajectory`` is the reference, a :class:`~minilink.core.trajectory.Trajectory`

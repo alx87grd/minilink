@@ -30,7 +30,7 @@ TEACHING_SURFACE: dict[str, tuple[str, ...]] = {
         "Pendulum",
         "InvertedPendulum",
         "CartPole",
-        "ImpedanceController",
+        "Impedance",
         "lqr",
         "lqr_gain",
         "place",
@@ -85,19 +85,19 @@ TEACHING_SURFACE: dict[str, tuple[str, ...]] = {
     ),
     "minilink.control": (
         "P",
-        "StateFeedbackController",
-        "TimeVaryingStateFeedbackController",
-        "TrajectoryFeedbackController",
+        "StateFeedback",
+        "TimeVaryingFeedback",
+        "TrajectoryFeedback",
         "PID",
         "PurePursuit",
         "PI",
         "PD",
-        "ImpedanceController",
+        "Impedance",
         "JointImpedance",
         "TaskImpedance",
-        "ComputedTorqueController",
-        "SlidingModeController",
-        "ImpedanceIntegralController",
+        "ComputedTorque",
+        "SlidingMode",
+        "IntegralImpedance",
         "NeuralPolicyController",
     ),
     "minilink.analysis": (
@@ -131,7 +131,7 @@ TEACHING_SURFACE: dict[str, tuple[str, ...]] = {
         "TrajectoryOptimizationPlanner",
         "StateSpaceGrid",
         "DynamicProgrammingPlanner",
-        "LookupTableController",
+        "LookupPolicy",
         "PolicyEvaluator",
         "QuadraticFeatures",
         "RadialBasisFeatures",
@@ -356,14 +356,14 @@ for mod in list(sys.modules):
         del sys.modules[mod]
 
 import numpy as np
-from minilink import ImpedanceController, Pendulum, lqr
+from minilink import Impedance, Pendulum, lqr
 from minilink.analysis import linearize
 from minilink.core import QuadraticCost
 from minilink.planning import DynamicProgrammingPlanner, PlanningProblem, StateSpaceGrid
 
 plant = Pendulum()
 plant.x0[0] = 1.0
-loop = ImpedanceController() @ plant
+loop = Impedance() @ plant
 traj = loop.compute_trajectory(tf=2.0, verbose=False)
 loop.plot_trajectory(show=False)
 loop.plot_phase_plane(show=False)

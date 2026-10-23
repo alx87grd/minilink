@@ -2,7 +2,7 @@
 
 import numpy as np
 
-from minilink import Pendulum, SlidingModeController
+from minilink import Pendulum, SlidingMode
 from minilink.core.hybrid_composition import hybrid_closed_loop
 
 TF = 5.0
@@ -14,7 +14,7 @@ plant = Pendulum(length=1.0, mass=1.0)
 plant.x0 = np.array([np.pi + 0.25, 0.0])
 
 smc_params = {"lam": 2.0, "gain": 8.0, "nab": 0.15}
-ctl = SlidingModeController(plant, **smc_params)
+ctl = SlidingMode(plant, **smc_params)
 
 hybrid = hybrid_closed_loop(
     ctl,
