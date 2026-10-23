@@ -11,7 +11,7 @@ Identity: [CONSTITUTION.md](CONSTITUTION.md).
 | --- | --- | --- |
 | **v0.1** | **GRO860 end to end**, plus a working **`pip install minilink` on PyPI**. Every topic of the running optimal-control & RL course runs on the teaching surface, in Colab (git-clone cell) and in the conda env: value iteration / DP on a grid · LQR + linearization · trajectory optimization · RL via native `ReinforcementLearningPlanner` (with `Sys2Gym` + SB3 as an optional bridge). See §4.1. | Fall 2026 — `0.1.0` on PyPI (2026-09-16); `0.1.1` (2026-09-26) is the first release a GitHub tag published. Conda from `environment.yml` is the recommended install. The course notebooks' names are frozen until v1.0, with the freeze paused between terms (§4.1 gate 7). |
 | **v0.2** | **GRO501 end to end** (the classical-control course: multi-physics modelling · root locus / Bode / margins · PID to spec · digital implementation · state feedback, pole placement, LQR, observers — see §4.2). Conda stays the recommended install. | `0.2.0` on PyPI (2026-10-17), from the GitHub tag; every §4.2 row green |
-| **v0.3** | **A cleaner core and the differentiable path; GMC714 covered** (§5.3; GMC714 needs no new feature, R48): **the convergence pass** (the core kept, side features to the experimental tier), **the continuous core** ([continuous-core.md](../plans/continuous-core.md): one step model under every sampled tool, one evaluation of any run, and the deterministic differentiable path to the cost behind a clean API: `evaluate`, `compare`, `problem.compile(loop)`, the program export, cost parameters), then the sampled loop as a tool (R73), and a closing PID-tuning example by hand and by the pipeline (S77). The teaching surface covers every GMC714 lab (§4.3); the labs move from pyro to minilink as the maintainer's teaching work, outside this roadmap. | December 2026 |
+| **v0.3** | **A cleaner core and the differentiable path; GMC714 covered** (§5.3; GMC714 needs no new feature, R48): **the convergence pass** (the core kept, side features to the experimental tier), **the continuous core** ([continuous-core.md](../plans/continuous-core.md): one step model under every sampled tool, one evaluation of any run, and the deterministic differentiable path to the cost behind a clean API: `evaluate`, `compare`, `problem.compile(loop)`, the program export, cost parameters), all continuous (R86), and a closing PID-tuning example by hand and by the pipeline (S77). The teaching surface covers every GMC714 lab (§4.3); the labs move from pyro to minilink as the maintainer's teaching work, outside this roadmap. | December 2026 |
 | **v0.4** | **The draws and the textbook objects** (§5.4): the mean over the problem's draws through the same differentiable path (the Monte Carlo evaluator one path, its numbers changing once), the sampled face of the compiled problem, identification as its first data consumer; fields and workspace geometry; MPPI on the sampled kernel; the parametric MPC program (S76) and the general serial chain (C6). | Winter 2027 (the window between GRO860 cohorts, whose material the evaluator's numbers touch) |
 | **v0.9** | **Freeze candidate** (§5.5): the foundation questions that could still break a public name are decided (derived `x0`, Diffrax as an optional solve, the glyph/solid rename, the frozen surface); the trust contract is in place (deprecation policy, pinned export list, CHANGELOG, pinned installs); the standard-syllabus holes close (estimation; the discrete-time one closes with S75 in v0.3); the docs site renders the tutorials. | Spring 2027 |
 | **v1.0** | **A colleague can build a course on it and trust it for three years** (§5.6): the API frozen under the deprecation policy, the standard control syllabus covered and checked against textbook worked examples, course-neutral labs an instructor adopts outside UdeS, green on Windows, macOS and Linux; after two cohorts. Two Stable-Baselines3 teaching notebooks retire (S49) and the GRO860 name freeze becomes the general one. | 2027 |
@@ -269,9 +269,10 @@ gantt
     V1 steps 1-2, Trajectory, evaluation  :v1a, 2026-11-02, 12d
     V1 steps 3-5, run, engine, program    :v1b, after s75, 10d
     A2 cost parameters (V1 step 6)        :a2, after v1b, 5d
-    Sampled loop S31                      :s31, after a2, 7d
+    Optimizer S74, closing example S77    :s74, after a2, 7d
     v0.3 tag                              :milestone, v03, 2026-12-21, 0d
     section v0.4 draws and objects
+    Sampled loop S31, OPW                 :s31, 2027-01-04, 3w
     V1 steps 7-9, the draws, C4           :v1c, 2027-01-04, 4w
     S76 parametric program, wave G rest   :s76, 2027-01-04, 4w
     V1 sampled face, A1 fields, A3        :a13, after v1c, 6w
@@ -348,9 +349,9 @@ and the course calendar does not drive the work (R78); the work happens on `dev-
 `dev` after the maintainer's review (R79); number changes are checked by closeness on the same
 problem and cost (R80); `rtol 1e-6` where a computation is restructured (R81); no alias or shim,
 one sweep (R82); the Euler solvers stay (R83); one way to compare controllers (R84); a closing
-PID-tuning example (S77, R85). **Next:** where the problem's parameters live (open, §6), then
-code in TODO §4's order: the clean-up, the step model, the path to the cost, the optimizer, the
-sampled loop once D13–D15 are ruled, the closing example. The v0.4 names stay open.
+PID-tuning example (S77, R85). Session 5 (R86–R89) kept v0.3 continuous and ruled the problem's parameters. **Next:** code in
+TODO §4's order: the clean-up, the step model, the path to the cost, the optimizer, the closing
+example. The sampled loop and the v0.4 names stay open for v0.4.
 
 **The audit, done 2026-10-23** (G1): the GMC714 syllabus read and every lab's ingredients
 checked on the teaching surface (§4.3); no gap; the maintainer ruled that GMC714 needs no new
@@ -390,10 +391,11 @@ feature (R48).
   v0.4 (§5.4). Nothing merges to `main` until every notebook has moved (R47). **[ask — core]**, ruled.
 - **A2** Cost parameters ([cost-params.md](../plans/cost-params.md)), V1's step 6, so the path
   reaches the cost's own weights. **[ask — core]**, ruled.
-- **S31** The sampled loop, ruled a tool with ticks (R13, R14), after the continuous core, in v0.3
-  (R73); its details (D13–D15) are ruled when it starts. **[ask — core]**
-- **S74** The optimizer upgrade, with OPW-1–OPW-5: in v0.3 right after the program export (R74),
-  before S76 (§5.4), which builds on its backend factory.
+- **S74** The optimizer upgrade: in v0.3 right after the program export (R74), before S76
+  (§5.4), which builds on its backend factory; its OPW part (the parametric MPC solve) is v0.4
+  (R86).
+- **S77** The closing example (R85): the PID tuned by a hand-written gradient loop, then by the
+  pipeline (the problem, `pe.program`, gradient descent on the program).
 
 **GMC714** (R48): no new feature; the teaching surface already covers every lab (§4.3).
 - **G3** GMC714's names stable by January (R49): `RRTPlanner` to the teaching lane, the robotic
@@ -412,6 +414,11 @@ feature (R48).
 
 Winter 2027, the window between GRO860 cohorts (§5's calendar rule: the GMC714 term runs
 meanwhile and does not gate it); the steps, in order, are TODO §5.
+
+**The sampled loop** (moved from v0.3, R86):
+- **S31** The sampled loop, ruled a tool with ticks (R13, R14); its details (D13–D15) are
+  ruled when it starts; the hybrid and realtime simulators move onto the step model with it, and
+  OPW-1–OPW-5 route the parametric MPC solve through S74's backend table. **[ask — core]**
 
 **The draws on the path** ([differentiable-problem.md](../plans/differentiable-problem.md)):
 - **V1, the draws' noise** (steps 7–9): one seed per random block in `problem.realize(key, n)`
@@ -603,13 +610,11 @@ checked by closeness (R80); `rtol 1e-6` where a computation is restructured (R81
 shim (R82); the Euler solvers stay (R83); one way to compare controllers (R84); the closing
 example (S77, R85).
 
-**Before v0.3's path to the cost (V1.2, A2)**
-
-- **Where the problem's parameters live.** Today `ProblemParameters` (`system`, `cost`, `sets`,
-  `scene`) is an override bundle beside the objects' own `params`, with 46 readers (14 cost, 13
-  system, 19 sets); R41 retired it with no home for the sets'. The maintainer's first idea: the
-  problem holds its parameters as a diagram does, a nested dictionary by part. Options and a
-  recommendation: the final review's §5.
+**Ruled 2026-10-23, session 5** (R86–R89, the same record): v0.3 is the continuous path, every
+hybrid piece (S31, the hybrid and realtime simulators on the step model, OPW-1–OPW-5) in v0.4
+(R86); `problem.params` a live nested view of the parts keyed by role, `params=None` the
+problem's own, as a system's (R87), with `x_start` and `discount_rate` as leaves and `tf` a field
+(R88); `PlanningProblem` a plain class (R89).
 
 **Before v0.4 (S76, the parametric program)**
 

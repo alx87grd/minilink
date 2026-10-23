@@ -8,7 +8,7 @@ reviewer read CONSTITUTION, RULES, ROADMAP, TODO §4, continuous-core.md, the ru
 plan's statements of fact against the code on `dev-v0.3` at `e9f69dff` (three read-only passes:
 the step model, the path to the cost, the clean-up and the names; the key claims re-checked by
 hand). §1 was ruled the same night (R78–R85, [the rulings record](2026-10-22-rulings-session-1.md),
-session 4) except §1.3, whose options are §5; §2 and §3 were fixed in the plan docs the same night.
+session 4) except §1.3, whose options are §5 (ruled in session 5, R87–R89); §2 and §3 were fixed in the plan docs the same night.
 
 **Verdict.** The architecture holds and the rulings are coherent with each other; the earlier
 second opinion's four scoring defects are all closed by R31–R33 and R72. What remains is of a
@@ -185,7 +185,7 @@ About thirty of the forty-four notebooks under `examples/` change at least once,
 intended number changes need the maintainer's sign-off (the forced hold, the integral to `tf`,
 trajopt's `U`/`Xf` defaults, the DP/RL price, the Monte Carlo re-pin).
 
-## 5. Where the problem's parameters live (open; options for the maintainer)
+## 5. Where the problem's parameters live (ruled in session 5: option B, R87–R89)
 
 ### The code as it stands
 

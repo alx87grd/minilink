@@ -10,8 +10,8 @@ First written 2026-10-21 as an evaluation of the code and a recommendation.
 **Rung:** v0.3, the continuous-core phase of [TODO.md](TODO.md) §4: step S75 (the step
 model, §1–§7, steps SM-0 to SM-7) first; V1's steps 1–2 may run beside it, and its step 3 (the
 whole run out of the scan) needs SM-1. S31 (the sampled loop, §8) is ruled in principle and
-its code comes after the continuous core: in v0.3 if the calendar allows, else v0.4 (the slot
-is raised in ROADMAP §6).  
+its code comes after the continuous path, in v0.4 (R86), with the hybrid and realtime
+simulators' move onto the step model.  
 **Gathers:** S31, S37 whole (its one scannable step as SM-1, its integrators' move and the
 evaluator-grid trim as SM-6; ruled 2026-10-22, S27 Diffrax stays in v0.9), the `discretize`
 follow-ups, S65's input-hold item and the Later row on a sample stride. SM-6 is the one home
@@ -313,7 +313,7 @@ compare after each step. A number that changes on purpose gets its own test and 
    compiled continuous loop is the judge); a sampled replay waits for v0.4, the one item still
    open here.
 5. **The order**: this first, beside wave K; V1's step 3 builds on SM-1; S31 after the
-   continuous core (R13, the maintainer's order of 2026-10-22).
+   continuous path, in v0.4 (R13, R86).
 6. **Params always an argument**: one traced body, the jitted and frozen forms generated and
    cached once (R12).
 
@@ -372,7 +372,7 @@ to the hybrid phase, after the continuous core.
   [future-policies.md](future-policies.md)); how the compiled problem dispatches a sampled
   controller to this kernel (V1's step 7b).
 
-**Order:** after the continuous core (S75, then V1's steps 1–6), with P10's AC-8b; in v0.3 if
-the calendar allows, else v0.4 (the slot is raised in ROADMAP §6); the
+**Order:** after the continuous core (S75, then V1's steps 1–6), with P10's AC-8b; in v0.4
+(R86); the
 hand-copied `HybridDiagram` facades and the Mermaid twin of the hybrid drawing go with it;
 the hybrid topology drawing stays for teaching.

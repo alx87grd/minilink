@@ -57,7 +57,7 @@ flowchart TD
     PROB --> LOOP
 
     subgraph engine["The compiled engine: problem.compile(loop, dt)"]
-        PE["ProblemEvaluator<br/>params assembled: the loop's, cost, x0, free inputs"]
+        PE["ProblemEvaluator<br/>params assembled: the loop's, cost, sets, x_start, free inputs"]
         RUN["rollout: one traced fixed-step body<br/>(the same step as discretize; vmap over draws)"]
         PE --> RUN --> TRAJ["Trajectory, every signal recorded"]
     end
@@ -230,8 +230,10 @@ noisy = StochasticPlanningProblem(..., x0_distribution=Gaussian(...), params_dis
 infinite horizon), `X_b`, `U_b` the declared boxes, else the plant's own boxes, else `1e6` with
 one warning naming `infeasible_cost=`; always finite. **One home per number** (R41): the plant's,
 the cost's and a set's parameters live on those objects; the problem holds no parameter bundle
-(`ProblemParameters` is retired). Whether the problem also offers a nested view of its parts'
-parameters, as a diagram does, is open: [the final review](../reviews/2026-10-23-v03-final-review.md) §5.
+(`ProblemParameters` is retired). `problem.params` is their live nested view, as a diagram's
+(R87): `{"plant", "cost", "X", "U", "X0", "Xf"}` by role plus the problem's own leaves
+`"x_start"` and `"discount_rate"` (R88; `tf` stays a field, it sets the number of steps); its
+setter routes each entry to its part, and `params=None` reads the problem's own.
 
 ### 3.5 One evaluation of any run
 
@@ -289,7 +291,7 @@ and the price's jump in `J` are reported facts.
 
 ```python
 pe = problem.compile(loop_or_controller, dt, *, substeps=1, solver="rk4", backend="auto")   # ProblemEvaluator
-pe.params                                          # assembled from the objects: the loop's params by block path, "cost", "x0", the free inputs
+pe.params                                          # assembled from the objects: the loop's params by block path, "cost", the sets by role, "x_start", "discount_rate", the free inputs (R87, R88)
 pe.trajectory(params=None, key=None)               # one run, every signal recorded; key=None the nominal draw
 pe.evaluate(params=None, key=0, n_trials=1, *, record=False)    # one run or n draws, the Evaluation; params an override tree
 pe.program(wrt, bounds=None, key=0, n_trials=1)    # MathematicalProgram: objective pe.evaluate(...).objective, the declared X, U, Xf as rows
@@ -382,7 +384,7 @@ block) join the same verb with RN-4 in v0.4.
 
 ```python
 pe = problem.compile(pid, dt=0.01)
-dJ = jax.grad(lambda p: pe.evaluate(p).objective)(pe.params)          # every leaf: gains, plant params, cost, x0, r
+dJ = jax.grad(lambda p: pe.evaluate(p).objective)(pe.params)          # every leaf: gains, plant params, cost, x_start, r
 program = pe.program(wrt=["controller.Kp", "controller.Kd"], bounds={"controller.Kp": (0, None)})
 result = Optimizer(program).solve()                                   # objective over J, the declared X, U as rows
 params = pe.unpack(result.z, wrt=["controller.Kp", "controller.Kd"])
@@ -412,7 +414,7 @@ loop.connect("plant", "x", "split", "x"); loop.connect("split", "x[1]", "speed_c
 loop.expose_input("r", [("pos_ctl", "r")])               # left free: held at its nominal value, a leaf of pe.params
 
 pe = problem.compile(loop, dt=0.001)
-pe.params        # {"plant": {"motor": …, "arm": …, "encoder": …}, "speed_ctl": …, "pos_ctl": …, "filter": …, "cost": …, "x0": …, "r": …}
+pe.params        # {"plant": {"motor": …, "arm": …, "encoder": …}, "speed_ctl": …, "pos_ctl": …, "filter": …, "cost": …, "X": …, "x_start": …, "discount_rate": …, "r": …}
 pe.evaluate()
 pe.program(wrt=["pos_ctl.Kp", "speed_ctl.Ki", "plant/motor.R"], bounds={"plant/motor.R": (0.1, 10)})
 ```
@@ -492,8 +494,7 @@ stochastic column with RN-4 in v0.4.
 
 - **The sampled loop** (`law % dt @ plant`, `HybridDiagram`): a tool, ticks on its clock, one
   tick-scan kernel over the step model; its caches, controller memory and the dispatch of a
-  sampled controller in `evaluate` are ruled in the hybrid phase, which follows the continuous core
-  in v0.3 (R73).
+  sampled controller in `evaluate` are ruled in the hybrid phase, v0.4, after the continuous path (R86).
 - **A disturbance block's draws** (RN-4, v0.4): one seed per noise block in `realize`, joining
   `evaluate(..., n_trials, key)` under the same verb.
 - **The optimizer upgrade** (S74): program classes hinting the solver, `method="auto"`,

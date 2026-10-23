@@ -589,3 +589,33 @@ as is; `discretize` loses `params=` (the `StepSystem` takes `params` per call); 
 `rollout(x0, u_seq, t0, dt, params)` replaces the step evaluators' `rollout(x0, *, n_steps, u)`;
 the RRT extender moves onto `rollout` (it keeps every knot) and both it and the Lyapunov sampler
 pass `t` as it advances.
+
+## Session 5 (2026-10-23, night): continuous only, and the problem's parameters
+
+- **R86 v0.3 is the continuous path; every hybrid piece waits.** The first pass is the new names
+  and the differentiable evaluation of the cost and the criterion, all continuous. S31 (the
+  sampled loop) moves to v0.4, after the continuous path, with what touches the sampled loop:
+  the hybrid and realtime simulators and the MPPI scripts of SM-4, SM-2's digital-PID notebook
+  gate, OPW-1–OPW-5 (the parametric MPC solve, with S76) and P10's AC-8. The step model stays in
+  v0.3 for its continuous consumers (the engine's fixed-step rollout, `discretize` for DP and RL,
+  trajectory optimization's shooting, `compute_forced`, the RRT extender, the Lyapunov sampler).
+  G3's MPC teaching name stays: a name, not hybrid machinery. Supersedes R73's S31 in v0.3 and
+  R74's OPW part.
+- **R87 (the final review §5, option B) The problem's parameters are a nested view, as a
+  diagram's.** `problem.params` is assembled on each access from the parts, keyed by role
+  (`"plant"`, `"cost"`, `"X"`, `"U"`, `"X0"`, `"Xf"`); assigning to it routes each entry into its
+  part; the parts stay the one home. Every computation on a problem follows the system pattern:
+  `params=None` reads the problem's own (`problem.params`), a dictionary overrides
+  (`evaluate_trajectory`, `cost_bound`, `realize`, the engine). Each set owns its parameters (no
+  shared `sets` dictionary). `ProblemParameters` and the constructor's `params=` go; a random
+  plant's nominal draw is taken where a tool needs it, not stored. Planners read `problem.params`
+  at `solve()` (no `params=` argument on `solve` in v0.3). Supersedes R41's "the problem holds no
+  parameter bundle" (R41's one home per number stands).
+- **R88 (the maintainer's question, the agent's answer, adopted) Two of the problem's own numbers
+  are leaves:** `problem.params["x_start"]` and `problem.params["discount_rate"]`, read and
+  written like the parts'; the engine's start leaf is `x_start` (not a second `x0`). `tf` stays a
+  field: it sets the number of steps, an array shape, so a traced `tf` could not run under `jit`.
+- **R89 (the agent, from R87) `PlanningProblem` becomes a plain class.** A frozen dataclass cannot
+  take a routing setter; RULES 5.21 already makes a parametric object a plain class with `params`
+  (systems, costs) and a value object a frozen dataclass. The constructor's keywords are unchanged
+  but `params=`.
