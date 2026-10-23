@@ -587,6 +587,10 @@ or V1's steps 1–2):
 - **The slot of the sampled loop (S31)**: v0.3 if the calendar leaves room before wave G, else
   the first core row of v0.4; and the slot of S74, deferred, which S76 needs first.
 - **`criterion_value`**, the proposed name of the criterion over the runs: to confirm.
+- **An exit priced two ways**: the RL environment ends an episode at the first exit, `evaluate`
+  integrates to `tf` (R19), so a policy trains on one rule and is judged on another.
+  Recommended: RL's termination the documented exception, tested equal on a run that never
+  exits.
 - **The `params["dt"]` fallback of `discretize`**: R7 says `dt` is required; proposed, drop the
   fallback with a ledger line.
 

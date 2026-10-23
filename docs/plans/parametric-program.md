@@ -1,11 +1,14 @@
 # The parametric program: every problem parameter bound at solve time
 
 Status: **draft plan**. The optimizer table (OPW-1–OPW-5, §6) dates from July 2026; the
-parameter binding (PP-0–PP-5) and the recommendation of §2 were added 2026-10-22 and wait
-on the asks of ROADMAP §6. Rung: OPW-1–OPW-5 in v0.3 wave V with S74 (the differentiable
-problem's step 5); the binding (row S76) in v0.4 on S74's evaluator and A2's cost leaves,
-its names (PP-0) ruled in V1's step 0 session in v0.3 (moved from wave V on 2026-10-22: the
-MPC band is research lane and nothing GMC714 teaches in December needs it). Lane: research
+parameter binding (PP-0–PP-5) and the recommendation of §2 were added 2026-10-22. The names
+(PP-0) were ruled 2026-10-23 (D19 of [end-state-api.md](end-state-api.md), R26): the family is
+`ParametricProgram`, the plant's key in every parameter tree is `plant`; the two remaining asks
+(a hand-written program declaring its own `p`, the MPC block's live ports) are D25, for v0.4.
+Rung: OPW-1–OPW-5 go with S74, the optimizer upgrade, deferred on 2026-10-23 to after the
+continuous core (R25); the binding (row S76) in v0.4 on the compiled problem's program export
+and A2's cost leaves (moved from wave V on 2026-10-22: the MPC band is research lane and nothing
+GMC714 teaches in December needs it). Lane: research
 (the MPC band is provisional, ROADMAP §2). Scope: direct collocation and the MPC block
 first; the other transcriptions later (§5).
 
@@ -74,11 +77,11 @@ Why C:
 3. The optimizer's contract does not move: backends see a flat `z` (§6's design law), and
    minilink stays out of optimization modelling (CONSTITUTION §1.4).
 4. It is the case the differentiable problem's bridge names: the compiled MPC program is "no
-   decision leaves, parameters bound" ([differentiable-problem.md](differentiable-problem.md)
-   §4.6), which is `bind`.
+   decision leaves, parameters bound" ([differentiable-problem.md](differentiable-problem.md),
+   the program export), which is `bind`.
 
-Open with C (the asks, ROADMAP §6): the family's name (keep `ParametricMathematicalProgram`,
-or a shorter noun, in the naming session of V1's step 0); whether a hand-written program may
+Open with C (the asks, ROADMAP §6): the family's name (ruled 2026-10-23: `ParametricProgram`,
+D19); whether a hand-written program may
 declare its own `p` (free, and tutorial 08 could solve one NLP for several values of a
 parameter); `bind` on both the evaluator (the fast path, compiled functions kept) and the
 program (the plain noun returned).
@@ -93,13 +96,13 @@ problem's nominal values, so its structure is fixed at compile time and its valu
 without retracing (JAX takes numeric leaves; the diagram parameters already work this way,
 DESIGN §4). A bind takes a partial tree, merged onto the bound values and checked against
 the structure: an unknown path raises and names the known ones; a leaf of a new shape
-raises; `scene` raises until A3. The key for the plant is the naming session's (V1's step
-0): the planning tiers say `system`, the differentiable problem's evaluator says `plant`, and
-one word serves both.
+raises; `scene` raises until A3. The key for the plant is `plant` (ruled 2026-10-23, D19): the
+planning tiers' `system` key is renamed with this plan, so the compiled problem's `pe.params`
+and this tree say one word.
 
 ### 3.2 The program and its evaluator
 
-`ParametricMathematicalProgram` (or its new name) holds `n_z`, the sample `params`,
+`ParametricProgram` (today's `ParametricMathematicalProgram`, renamed with PP-1) holds `n_z`, the sample `params`,
 `J(z, p)`, `h(z, p)`, `g(z, p)`, the box and the metadata; `bind(p)` returns a
 `MathematicalProgram` whose functions close over `p`. One JAX evaluator jits the functions
 of `(z, p)` and their derivatives with respect to `z`; `bind(p)` on it replaces the bound
@@ -131,8 +134,8 @@ dropping them. The argument's name and form are the naming session's.
 
 ## 4. The steps (one commit each; the AGENTS recipe where behaviour must hold)
 
-- **PP-0 The names**, in V1's step 0 session: the family's noun, the plant's key, the MPC
-  argument, `bind`.
+- **PP-0 The names**: ruled 2026-10-23 (D19): `ParametricProgram`, the key `plant`; the MPC
+  argument (`live=`, recommended in D25) and `bind` with D25 in v0.4.
 - **PP-1 The program with parameters**: the family of §3.2, one evaluator, `bind` on both.
   Done when the MPC baselines (`test_mpc.py`, the trajopt parity scenario) are byte-identical
   with `p = {"x0": …}` and the plain programs of tutorial 08 and the optimization demos solve
@@ -149,8 +152,9 @@ dropping them. The argument's name and form are the naming session's.
 - **PP-5 The contracts**: DESIGN §4 (the online call binds the tree) and §6 (the family, the
   evaluator), once the code lands; this plan's landed parts leave it.
 
-**Order**: PP-0 with V1's step 0; PP-1, PP-2 and PP-4 with V1's step 5 (S74 and OPW-1–OPW-5
-touch the same evaluator and backend factory); PP-3 right after A2 (V1's step 6); the scene
+**Order**: PP-0 ruled; PP-1, PP-2 and PP-4 in v0.4 with S76, after the continuous core's program
+export (V1's step 5) and beside S74 with OPW-1–OPW-5 if it has landed (the same evaluator and
+backend factory); PP-3 after A2 (V1's step 6); the scene
 leaf with A3 in v0.4. No dependency on S75 or S31: collocation uses the continuous `f`, not
 the step model. Before wave G, so the MPC topic G1 weighs for GMC714 meets one API.
 
@@ -177,7 +181,7 @@ method but SciPy's.
 PlanningProblem
     → Transcription
         → MathematicalProgram              [offline / rebuild each tick]
-        → ParametricMathematicalProgram    [compile-once MPC; bound parameters, §2]
+        → ParametricProgram                [compile-once MPC; bound parameters, §2; today ParametricMathematicalProgram]
 
 Program (either kind)
     → compile → evaluator (+ bind(p) on the parametric one)

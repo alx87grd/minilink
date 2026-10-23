@@ -1,13 +1,37 @@
 # Cost parameters: one dictionary, nested like a diagram's
 
-> **Amended (2026-10-23).** `discount_rate` leaves the cost for the problem; the cost's surface is
-> `params`, `g`, `h`, `g_max`, `integrate` and the algebra; `evaluate_trajectory`,
-> `terminal_cost`, `total_cost` leave it. See [continuous-core.md](continuous-core.md) §3.3; this
-> document is aligned to it at the start of the phase.
-
 Status: core contract, design agreed with the maintainer 2026-09-13 (composite costs nest
-their parameters the way a diagram nests its subsystems'); implementation not started.
-Rung: v0.3 wave V, step A2 of [TODO.md](TODO.md) (the differentiable problem's step 6).
+their parameters the way a diagram nests its subsystems'); the cost's surface ruled 2026-10-22/23
+(R9, R20 of [the rulings](../reviews/2026-10-22-rulings-session-1.md), D16b of
+[end-state-api.md](end-state-api.md)); aligned to [continuous-core.md](continuous-core.md) §3.3
+on 2026-10-23; implementation not started.
+Rung: v0.3, the continuous-core phase: the surface lands in V1's steps 1 and 2 (the cost's
+`integrate`, `g_max`, the moves to the problem), the nesting is step A2 of [TODO.md](TODO.md)
+§4, V1's step 6.
+
+## The cost's surface after the rulings (2026-10-22/23)
+
+The cost is a pure integrand plus one quadrature; it knows nothing about a horizon, a set, a
+price or a discount:
+
+```python
+class CostFunction:
+    params                                         # Q, R, S, xbar, ubar …; None for a user cost without parameters
+    def g(self, x, u, t=0.0, params=None)          # running cost density
+    def h(self, x, t=0.0, params=None)             # terminal cost
+    def g_max(self, X, U, params=None)             # the scale of g over the allowed sets; infeasible_cost's default reads it
+    def integrate(self, traj, *, discount_rate=0.0, params=None)   # the running cost (e^{−ρt_k} g_k) and J(t_k) = ∫₀^{t_k} e^{−ρt} g dt, both (N,), trapezoid, on xp; no h
+    __add__, __mul__                               # SumCost, ScaledCost; params nested by term id (this plan)
+
+evaluate_trajectory(problem, traj)                 # problem-level: integrate(...)[-1] + e^{−ρ tf} h, the margins, value
+traj.with_cost(cost, discount_rate=0.0)            # the plotting wrapper: the "cost_rate" and "cost" signals
+```
+
+Leave the cost: `discount_rate` and `discount_factor` (the problem's,
+`PlanningProblem.discount_rate`, read by RL's γ, DP's α and the gym bridge), and
+`evaluate_trajectory`, `terminal_cost`, `total_cost` (replaced by the problem-level
+`evaluate_trajectory`). No scoring modes (D20): no `constraints=` or `discount=` keyword
+anywhere. The rest of this document is the parameter design (A2), unchanged in substance.
 
 ## Problem
 
@@ -21,19 +45,22 @@ nothing uses it.
   `jax.grad` with respect to `Q` raises `TracerArrayConversionError`.
 - `SumCost` hands the same dictionary to every term: two quadratic terms would both read
   `"Q"`, so their weights cannot be set or differentiated separately.
-- The differentiable closed-loop cost (V1 in [TODO.md](TODO.md) §4, v0.3) needs cost weights and
-  targets as inputs, next to plant and controller parameters.
+- The compiled problem (V1 in [TODO.md](TODO.md) §4, v0.3; `pe.params["cost"]`) needs cost
+  weights and targets as leaves, next to plant and controller parameters, so
+  `jax.grad(lambda p: pe.evaluate(p).criterion_value)` and `pe.program(wrt=["cost.…"])` reach
+  them.
 
 ## What is already in place
 
 The path runs end to end; only the costs and their composition are missing.
 
-| Caller | Passes |
-| --- | --- |
-| Trajectory optimization (collocation, shooting, multiple shooting) | `problem.params.cost` to every `g` and `h` |
-| Value iteration and policy evaluation | `problem.params.cost` |
-| Monte Carlo score (`score_trajectory`) and `evaluate_trajectory` | a `params` argument |
-| RL environment, JAX Monte Carlo backend | nothing (the cost's own defaults) |
+| Caller | Passes today | After V1 |
+| --- | --- | --- |
+| Trajectory optimization (collocation, shooting, multiple shooting) | `problem.params.cost` to every `g` and `h` | unchanged |
+| Value iteration and policy evaluation | `problem.params.cost` | unchanged |
+| The scoring rule (today's `score_trajectory`, `CostFunction.evaluate_trajectory`) | a `params` argument | one problem-level `evaluate_trajectory(problem, traj)` reading `cost.integrate(..., params=)` (V1's step 2) |
+| RL environment, JAX Monte Carlo backend | nothing (the cost's own defaults) | the environment passes `problem.params.cost`; the Monte Carlo path folds into `evaluate` (V1's step 7) |
+| The compiled problem | does not exist | `pe.params["cost"]`, a live view of the cost's nested dictionary (V1's step 6) |
 
 Census on 2026-09-13: five library costs (`QuadraticCost`, `TimeCost`, `SumCost`,
 `ScaledCost`, `FieldCost`) and about twenty user-written costs in demos, notebooks and tests,
@@ -117,8 +144,10 @@ inside the sum.
 
 `TimeCost.eps` is a threshold with no useful gradient and stays an attribute, like a system's
 dimensions. `discount_rate` leaves the cost for the problem (`PlanningProblem.discount_rate`,
-ruled 2026-10-22): the cost owns the integrand `g` and `h`, the problem owns the functional's
-shape (`tf`, the sets, the infeasible price, the discount).
+ruled 2026-10-22, R9 and R20): the cost owns the integrand `g` and `h`, the problem owns the
+functional's shape (`tf`, the sets, the infeasible price, the discount). So `SumCost` and
+`ScaledCost` no longer reconcile or forward a rate: the check that the terms' rates agree goes
+with the attribute.
 
 ### Scene parameters travel separately
 
@@ -129,7 +158,7 @@ dictionary therefore holds its own weight, `FieldCost` stops forwarding its para
 field, and scene overrides are designed with S76 (parametric-program.md) through `ProblemParameters.scene`,
 already reserved for them. Nothing changes numerically today.
 
-## Beyond this plan: the cost as a block
+## Beyond this plan: the cost as a block (proposed: closed as a demo idea)
 
 A prototype `CostIntegrator(cost)` is a `DynamicSystem` with state `J` and
 `dJ/dt = exp(-rho t) g(x, u, t; p)`, wired to the plant state and the controller output. The
@@ -137,10 +166,13 @@ closed loop then holds one nested dictionary, `{"controller": ..., "plant": ...,
 `jax.grad` through the compiled loop returned `dJ/dK`, `dJ/dQ`, `dJ/dR` and `dJ/dm` in one
 call. Its `J` matched the post-hoc `compute_cost` to 0.02 % on a pendulum loop. This is the
 route to the differentiable closed-loop cost; it depends on the cost dictionary above.
-Caveats: the terminal cost and the exit rule stay outside the block, and integrating `J` with
-the ODE solver differs from the trapezoid rule of the post-hoc path.
+Caveats: the terminal cost stays outside the block, and integrating `J` with the ODE solver
+differs from the trapezoid rule of the post-hoc path. Since the rulings of 2026-10-22/23 the
+route to the differentiable closed-loop cost is the compiled problem instead (`problem.compile`,
+the loop's recorded signals scored by `evaluate_trajectory`), so the block is proposed closed as
+a demo idea: the ask is in [differentiable-problem.md](differentiable-problem.md) §9.
 
-## Decisions (2026-09-13)
+## Decisions (2026-09-13; 3 and 5 from 2026-10-22/23)
 
 1. Library costs follow the System dual parameter pattern.
 2. Composite costs nest parameters by term id, with the diagram's live-view, partial-dictionary
@@ -148,6 +180,9 @@ the ODE solver differs from the trapezoid rule of the post-hoc path.
 3. `TimeCost.eps` stays an attribute; `discount_rate` moves to the problem (ruled 2026-10-22).
 4. User costs that ignore `params` keep working; library cost attributes stay readable and
    writable in place.
+5. The cost's surface is `params`, `g`, `h`, `g_max`, `integrate` and the algebra;
+   `evaluate_trajectory`, `terminal_cost`, `total_cost` leave it for the problem-level verb
+   (ruled 2026-10-23, R20).
 
 ## Open questions (each with the proposed answer)
 
@@ -165,9 +200,8 @@ the ODE solver differs from the trapezoid rule of the post-hoc path.
 5. **Dataclasses.** Proposed: plain classes, as systems are. Nothing compares, copies with
    `replace` or serializes costs; the keyword constructors and `from_system` keep working;
    the parameters become mutable, as a system's are.
-6. **The cost block.** Proposed: a separate step after this plan, in the research lane; its
-   name (`CostIntegrator`), a wiring helper on `add_subsystem` / `connect`, which integration
-   rule each tool reports, and the terminal cost wait for the terminal-cost decision in ROADMAP §6.
+6. **The cost block.** Proposed (2026-10-23): closed as a demo idea; the compiled problem is
+   the route to the differentiable cost (the ask is differentiable-problem.md §9).
 
 ## Consequences
 
@@ -177,26 +211,32 @@ the ODE solver differs from the trapezoid rule of the post-hoc path.
 - Planners, evaluators and RL are unchanged for nominal runs (`params=None`).
 - Sums of several field costs get ids like `field`, `field2`; code that differentiates them
   names its terms (`SumCost.of(path=..., corridor=...)`) so gradients read by role.
-- `ProblemParameters.cost` can default to the cost's live `params`.
+- `ProblemParameters.cost` can default to the cost's live `params`; the compiled problem's
+  `pe.params["cost"]` reads the same view.
+- `SumCost` loses its discount-rate reconciliation (the rate is the problem's).
 - Online cost weights and targets in MPC (a moving `xbar`) become possible once the parametric
   program binds `p` (S76, its step PP-3, right after this plan).
 
 ## Migration outline
 
-1. Dual pattern on `CostFunction`, `QuadraticCost` and `TimeCost`, attributes as views.
-2. **Composition & dual-backend evaluation:** `SumCost.terms` as `{term_id: cost}`,
+What each step builds; the order and the "done when" are TODO §4 (V1's steps 1, 2 and 6).
+
+1. **The surface** (V1's step 1): `integrate(traj, *, discount_rate, params)` on
+   `xp = array_module(traj.x)` (`vmap` on JAX, vector or loop on NumPy, no `float` cast), the
+   one quadrature of the running integral; `g_max(X, U)` (exact on a box for a quadratic,
+   sampled otherwise); `traj.with_cost(cost, discount_rate=0.0)` attaching the `cost_rate` and
+   `cost` signals. Byte-identical.
+2. **The moves to the problem** (V1's step 2): `discount_rate` to `PlanningProblem` (one
+   ledger line; RL, DP and the gym bridge read it there; `SumCost`'s reconciliation goes);
+   `evaluate_trajectory`, `terminal_cost`, `total_cost` leave the cost for the problem-level
+   `evaluate_trajectory`.
+3. **The parameters** (A2, V1's step 6): the dual pattern on `CostFunction`, `QuadraticCost`
+   and `TimeCost`, attributes as views; `SumCost.terms` as `{term_id: cost}`,
    `SumCost.of(*costs, **named)` with the id and flattening rules, live `params` views on
-   `SumCost` and `ScaledCost`, routing in `g` and `h`, `validate_cost_params`; upgrade
-   `CostFunction.evaluate_trajectory` and `total_cost` (`core/costs.py`) from their NumPy `for`
-   loop to `xp = array_module(traj.x)` (`vmap` on JAX, vector/loop on NumPy, with a
-   `discount: bool | float = True` option) so the problem-level `score_trajectory` layers
-   constraint handling (`constraints="cut" | "ignore" | "soft"`) cleanly on top; update the
-   forwarding test.
-3. `FieldCost` weight as a parameter, no longer forwarded to the field (open question 4).
+   `SumCost` and `ScaledCost`, routing in `g` and `h`, `validate_cost_params`; the forwarding
+   test updated; `FieldCost`'s weight a parameter, no longer forwarded to the field (open
+   question 4); every planner and the compiled problem pass `problem.params.cost` through.
 4. Fold the landed contract into the DESIGN parameters section and delete this document.
-5. Research lane: `CostIntegrator` in `examples/experimental/`, with tutorial 11's rollout and
-   `pid_autotuning_jax` rewritten on it; decide promotion with the differentiable closed-loop
-   cost.
 
 ## Verification
 
@@ -211,4 +251,6 @@ the ODE solver differs from the trapezoid rule of the post-hoc path.
 - The MPC and trajectory-optimization projects that add costs with `+` run unchanged.
 - Seeded baselines of trajectory optimization, value iteration, Monte Carlo and RL at nominal
   parameters are byte-identical before and after.
+- `jax.grad(lambda p: pe.evaluate(p).criterion_value)(pe.params)["cost"]["Q"]` runs on the
+  compiled problem and matches a central difference.
 - `vmap` over a family of `R` weights runs on the compiled path.

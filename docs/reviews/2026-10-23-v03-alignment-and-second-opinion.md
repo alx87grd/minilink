@@ -33,6 +33,10 @@ maintainer (listed in ROADMAP §6, "Raised 2026-10-23"). Nothing here is ruled.
 | ROADMAP §5.3, §6, TRL table; TODO C4 | `tune`, "the engine under `tune`", S74 as V1's step 5, session 2 open | the program export (R23); S74 deferred (R25); the sessions ruled |
 | TODO S76 row | builds on "S74's backend factory (landed in v0.3)" | S74 is deferred, so it must land before S76 |
 | end-state-api.md header | "deleted once the sessions have ruled" | kept as the ledger and the home of D13–D15 and D25–D30 until those are ruled |
+| continuous-core.md §3.3, cost-params.md vs end-state-api.md D16b | `integrate` returns `J(t_k)` / returns `(cost_rate, cost)` | both arrays, one body (what `with_cost` attaches) |
+| automation-by-convention.md, TODO AC-7 | AC-7 whole in v0.4 | its deterministic half with V1's steps 2–4 (v0.3) |
+| TODO V1.4 | the key `plant` (D19) with no step renaming `ProblemParameters.system` | the rename in V1's step 4 |
+| randomness.md §6 | `.solve().ctl` | `.policy` (the field since 2026-09-15) |
 | randomness.md RD-D11, RD-D24, RN-5 | the evaluator as a loop of `Simulator` runs on a NumPy test set | superseded in part by R10, R15, R27: the compiled run is the judge, one key realized once |
 
 ## 3. Raised by the alignment pass
@@ -67,6 +71,15 @@ maintainer (listed in ROADMAP §6, "Raised 2026-10-23"). Nothing here is ruled.
    needs its backend factory. *Recommended:* S31 in v0.3 only if V1's step 6 lands by early
    December, else the first core row of v0.4; S74 the first v0.4 row before S76.
 7. **`criterion_value`**: the proposed name, to confirm.
+10. **An exit priced two ways, training against evaluation** (moderate). The RL environment
+    ends an episode at the first exit and charges the price
+    (`planning/reinforcement_learning/environment.py`, around line 175); `evaluate` integrates
+    to `tf` with no cut (R19). A policy is trained on one rule and judged on another, while
+    continuous-core.md §3.4 says `X` has one meaning for every consumer. *Options:* state RL's
+    termination as the documented exception (as the reward's left-Riemann sum already is), or
+    run RL episodes to `tf` with the price as a one-time terminal charge. *Recommended:* the
+    documented exception now (the learner needs the episode end for its bootstrap), with a
+    test that the two agree on a run that never exits.
 8. **The `params["dt"]` fallback of `discretize`**: R7 says `dt` is required. *Recommended:*
    drop the fallback with a ledger line (SM-2).
 9. **The course audit (G1) has not started** (major, calendar). It is the one input with a hard

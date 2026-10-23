@@ -497,7 +497,8 @@ reads its math next to `dp.py` before it lands.
   method="rk4" | "scipy", key)` and `compare(problem, **entries, dt, key) -> Comparison` (the
   table and the plot verbs; today's `compare(*solutions)` kept); `Planner.evaluate` and
   `solve(evaluate=True)` on `evaluate`; the `pid_autotuning_jax` demo on
-  `jax.grad(lambda p: pe.evaluate(p).criterion_value)`. Lane (R28): `evaluate`, `compare`,
+  `jax.grad(lambda p: pe.evaluate(p).criterion_value)`; the planning tiers' parameter key
+  `ProblemParameters.system` renamed `plant` (D19), every reader migrated. Lane (R28): `evaluate`, `compare`,
   `evaluate_trajectory`, `discretize` on the teaching surface by the demo rule;
   `problem.compile`, `ProblemEvaluator`, `program` provisional on the planning facade. Done when
   the demo's gradient matches its hand scan to `1e-9` relative, the pathwise gradient with
@@ -632,7 +633,9 @@ LQGPlanner as picked; S73 any time, self-contained.
   Also: the evaluator's `simulator` backend fails on a diagram plant with a nested-diagram
   error (randomness.md §1).
 - [ ] **AC-7 of P10: the cost scored on the plant** across every evaluator and design tool
-  ([automation-by-convention.md](automation-by-convention.md) §5, §7), with RN-4 and RN-5.
+  ([automation-by-convention.md](automation-by-convention.md) §5, §7). Its deterministic half
+  (the plant's run scored, controllers with state, one price) lands with V1's steps 2–4 in v0.3;
+  this row is the rest, with the draws (V1's step 7, RN-4, RN-5).
 - [ ] **C4 Identification and generation**: identification is V1's program export
   (`pe.program(wrt=["plant.…"])` and the `Optimizer`) with a data-mismatch cost (`identification/fitting.py` on `rollout_batch`; physical params and NN
   weights are one verb), its first data consumer; `trajectory_generation/` port (polynomial,

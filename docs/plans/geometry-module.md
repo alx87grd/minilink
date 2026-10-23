@@ -14,7 +14,7 @@ track, scene = racecar_circuit()
 body = bind(car, point_probe())
 cost = track.distance_field(body).as_cost() + scene.clearance_field(body).as_cost(shaping=quadratic_hinge())
 loop = PurePursuit(track) @ car
-J = cost.total_cost(loop.compute_trajectory(tf=10))
+J_t = cost.integrate(loop.compute_trajectory(tf=10))   # the running integral J(t_k), no problem needed (total_cost leaves the cost, R20)
 ```
 
 Graphics stay a second vocabulary on purpose (the 2026-09-05 architecture review §4.6, in git history): glyphs, skins, S30, S44 are not this module. Constitution still holds: a few textbook objects (`Shape`, `Path`, `Track`, `Scene`, posed probes), not a computational-geometry library.

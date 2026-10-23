@@ -8,12 +8,17 @@ simulates the closed-loop diagram). §10 stays as the record of the findings.
 Ids: `RD-` marks this doc's own, the rules RD-R1–RD-R6 (§3), the rulings RD-D1–RD-D24 (§8) and
 the review's amendments RD-A1–RD-A10 (§10); `FD-F9` is finding F9 of the foundations review;
 a bare `A5`, `P4`, `RN-2` is a workboard step.
-Rungs (decided 2026-09-26): RN-1 (`WhiteNoise`) in v0.2 wave B, the prerequisite of B3
-(`estimation/`, P4); RN-2 in v0.2 wave A, with A5; RN-3 with its first consumer (v0.3,
-unless a teaching notebook needs sampled sensor noise first); RN-4 and RN-5 together in v0.4 (between
-cohorts, with the differentiable problem's steps 7–9; reorganized 2026-10-21), after the fall
-term, because they change public behaviour and the Monte Carlo numbers once, and before the v0.9
-freeze; RN-6 with each step. It settles the disturbance convention ROADMAP §6
+Rungs (decided 2026-09-26, reorganized 2026-10-21): RN-1 (`WhiteNoise`) in v0.2 wave B, the
+prerequisite of B3 (`estimation/`, P4); RN-2 carried into v0.3 (wave A, before V1's step 7);
+RN-3 with its first consumer (v0.3, unless a teaching notebook needs sampled sensor noise
+first); RN-4 and RN-5 together with V1's step 7 (the draws) in v0.4 per ROADMAP §5.4, because
+they change public behaviour and the Monte Carlo numbers once, and before the v0.9 freeze
+(pulling the Monte Carlo fold into v0.3 is raised in ROADMAP §6); RN-6 with each step.
+**Aligned 2026-10-23** to [continuous-core.md](continuous-core.md) and the rulings R10, R15,
+R27 of [2026-10-22-rulings-session-1.md](../reviews/2026-10-22-rulings-session-1.md): the
+evaluator is `evaluate(problem, arg, *, dt, n_trials, key)` on the compiled problem, the draws
+`problem.realize(key, n)`, the record `Evaluation`; §8's note says which rulings here that
+supersedes. It settles the disturbance convention ROADMAP §6
 held open before B3, closes finding FD-F9 of
 [2026-09-15-foundations-review.md](../reviews/2026-09-15-foundations-review.md), and absorbs the
 `Gaussian(cov=)`, `NoiseSource`, `Distribution.sample(key=None)` and `WhiteNoise` guard-test
@@ -47,10 +52,11 @@ inputs meet RD-A9 and RD-D24.
 - **A problem declares noise on ports**, `disturbances={"d": WhiteNoise(psd=W)}`; a noise block
   already inside the system also works. Planners see the nominal port; the RL environment and
   the evaluator draw on it.
-- **The Monte Carlo evaluator simulates the closed-loop diagram on a fixed test set.** It
-  builds `ctl @ sys` with the disturbance blocks wired on their ports, draws the trials once
-  (starts, parameter values, seeds), and runs that diagram on every trial, batched. Any
-  controller, any noise block, any parameter draw goes through the one simulation path.
+- **Monte Carlo is the closed-loop diagram simulated on draws realized once from one key.**
+  `evaluate(problem, ctl, dt=, n_trials=, key=)` builds the loop with the disturbance blocks
+  wired on their ports, realizes the draws once (`problem.realize(key, n)`: starts, parameter
+  values, seeds), and runs the compiled fixed-step rollout on every draw, batched (R10, R15).
+  Any controller, any noise block, any parameter draw goes through the one path.
 - **A noisy diagram picks its own solver.** The noise block publishes its period as the
   solver hint, so a plain `compute_trajectory()` runs fixed-step RK4 at `dt = Δ`.
 - **LQG reads the same numbers the simulation draws from**: `Q = B_w W B_wᵀ`, `R = V` for the
@@ -462,7 +468,9 @@ With spawned streams, the only difference between two runs is what was changed. 
 changes the numbers a given seed produces once, in the `realize` step, and adds a
 `numpy>=1.25` floor (`Generator.spawn`).
 
-**The evaluator holds a fixed test set.** A trial needs a start, parameter values and noise
+**The evaluator holds a fixed test set** (the 2026-09-30 form; since 2026-10-23 the test set is
+`problem.realize(key, n)`, one key realized once per call, shared by every law `compare`
+scores, and the `MonteCarloEvaluator` class folds into `evaluate`: §8's note). A trial needs a start, parameter values and noise
 signals. Starts and parameter values come from `Distribution.sample`, whose numbers differ
 between NumPy and JAX; the noise comes from the block, whose numbers do not (RD-D13). So
 `MonteCarloEvaluator` draws its test set once, on NumPy: the starts and the params (values and
@@ -475,6 +483,13 @@ ev.evaluate(lqr)   # rolled out on JAX, on ev.trials
 ev.evaluate(vi)    # rolled out on NumPy, on the same ev.trials: J comparable
 ```
 
+In the 2026-10-23 form the same comparison reads
+
+```python
+cmp = compare(problem, LQR=lqr, VI=vi, dt=0.01, n_trials=100, key=1)   # one realization, shared: common random numbers
+cmp.evaluations["LQR"].criterion_value, cmp.difference("LQR", "VI")
+```
+
 The same seed gives the same trials on any backend, and the same `J` to rounding (the two
 backends' arithmetic already differs by 3e-16 from the second step of a noise-free rollout, so
 a test compares with a tolerance); the "one seed, two streams" warning and `compare`'s NumPy
@@ -482,7 +497,10 @@ forcing go; any trial replays in the continuous `Simulator`. Cost: a few numbers
 (80 kB of seeds for 10,000 trials, against 320 MB for the noise values of 10,000 × 1,000 × 4).
 The options weighed are in §7. RL training stays key-threaded in JAX, where cross-backend identity buys nothing.
 
-**The evaluator simulates the closed-loop diagram (RD-D24).** A trial is a realization, and a
+**The evaluator simulates the closed-loop diagram (RD-D24).** (Since 2026-10-23 the run is the
+compiled fixed-step rollout of `problem.compile(ctl, dt)` on both backends, the judge and the
+engine; the adaptive `Simulator` is the `method="scipy"` escape, one run per trial: R15.) A
+trial is a realization, and a
 realization is simulated by the one path every diagram uses. So the evaluator builds the loop
 as a diagram, `ctl @ sys` for a feedback block or `source >> sys` for an open-loop law, wires
 each `disturbances` signal onto its port, and simulates that diagram on `ev.trials`:
@@ -527,9 +545,9 @@ W, V = w.psd, v.psd                                              # (1, 1) arrays
 K = lqr_gain(A, B, Q_x, R_u)
 observer = kalman(LTISystem(A, B, C), B_w @ W @ B_w.T, D_v @ V @ D_v.T)     # Q_n = B_w W B_wᵀ,  R_n = D_v V D_vᵀ
 
-# RL training and Monte Carlo: one integer seed per tool, draws at the tool's dt
-ctl = ReinforcementLearningPlanner(problem, dt=0.05, seed=0).solve().ctl
-report = MonteCarloEvaluator(problem, dt=0.05, n_trials=100, seed=1).evaluate(ctl)
+# RL training and Monte Carlo: one integer seed per tool, one key per evaluation
+ctl = ReinforcementLearningPlanner(problem, dt=0.05, seed=0).solve().policy
+report = evaluate(problem, ctl, dt=0.05, n_trials=100, key=1)   # an Evaluation; report.criterion_value, report.success_rate
 
 # one continuous closed-loop run of a fresh realization, on a fixed step at Δ
 loop = ...                                              # a diagram: d and n wired to the plant, ctl @ plant
@@ -708,6 +726,28 @@ Decided 2026-09-30 (maintainer), from the decision batch on RD-A2–RD-A10 of §
   parameter draw is a regular diagram simulation. `dt` becomes the simulation step rather than
   a control period, so the evaluator's numbers change once, in v0.4 with RN-5.
 
+**Superseded in part by R10, R15, R19, R27 (2026-10-22/23;
+[the rulings](../reviews/2026-10-22-rulings-session-1.md)).** The rulings above stand as the
+history of this plan; where they conflict, the later rulings hold:
+
+- **RD-D11's test set** is no longer `ev.trials` drawn on NumPy and held by an evaluator object:
+  the draws are `problem.realize(key, n)`, a function of the problem and one key, realized once
+  per `evaluate` or `program` call and shared by every entry `compare` scores (common random
+  numbers). Cross-backend identity still holds for the noise blocks (counter-based, RD-D13) and
+  for the realization itself (RN-4's done-when); a start or parameter law drawn by
+  `Distribution.sample` is realized on one backend inside `realize`.
+- **RD-D24's run** is the compiled fixed-step rollout of `problem.compile(ctl, dt)` on both
+  backends (R15: the judge and the engine), not a loop of `Simulator` runs at the automatic
+  grid; `evaluate(..., method="scipy")` is the adaptive escape, one run per trial. `dt` stays
+  the simulation step.
+- **`MonteCarloEvaluator`** folds into `evaluate(problem, arg, *, dt, n_trials, key)` (R10),
+  one facade line until removed; its record is the one `Evaluation` of R27 (`cost`, `value`,
+  the two margins, `failed`, `reached`, `criterion_value`, the three rates
+  `feasibility_rate` / `reachability_rate` / `success_rate`; no `failure_rate`).
+- **The score** is the integral to `tf` with no cut at exit, an exit priced once by the
+  problem's `infeasible_cost` (R19). RD-D24's "the numbers change once" now covers both changes
+  (D21).
+
 ## 9. Steps: the implementation plan
 
 Order: RN-1 first (RD-D14: it unblocks P4's Kalman demo, and rewrites the course cell in the same
@@ -793,26 +833,33 @@ lands. The acceptance test of every step is its deterministic twin (RD-D23).
   A seeded baseline records the one change of draws. Done when `problem.realize(key)` is
   bit-identical on NumPy and JAX, two episodes from one training key draw distinct noise, and
   adding a random parameter leaves every other stream unchanged (the table of §5, by name).
-- [ ] **RN-5 The evaluator simulates the closed-loop diagram** (RD-D11, RD-D13, RD-D20, RD-D24).
-  1. `MonteCarloEvaluator` builds the loop as a diagram (`ctl @ sys`, or `source >> sys`), wires
-     each `disturbances` signal onto its port, draws `ev.trials` once on NumPy (the realizations
-     `(x0, params)`), and simulates the diagram on every trial: `rollout_batch` over the family
-     on JAX, a loop of `Simulator` runs on NumPy, RK4 at the automatic grid of RD-D16; the cost
-     scored on the plant's trajectory (`trajectory_of`). One path replaces `evaluate_jax`,
-     `evaluate_numpy` and `evaluate_simulator`; `backend` chooses the arrays only (`"auto"`: JAX
-     when the loop traces); `dt` is the simulation step. Files: `planning/evaluation.py`,
-     `core/compile/evaluators/jax_evaluators.py` (`rollout_batch` over `(x0, params)`).
-  2. The fallback warning, `compare`'s NumPy forcing and the `simulator` backend's nested-diagram
-     failure go with their tests; a controller with state, a `Computer @ plant` loop (NumPy path
-     until the hybrid seam batches) and a noise block inside `sys` are accepted.
+- [ ] **RN-5 Monte Carlo is the closed-loop diagram on the draws** (RD-D20, RD-D24 as amended
+  in §8's note; R10, R15, R27; V1's step 7 in [differentiable-problem.md](differentiable-problem.md),
+  the same row).
+  1. `evaluate(problem, arg, *, dt, n_trials, key)` on a `StochasticPlanningProblem`: the loop
+     built by `closed_loop_of(problem, arg)` with each `disturbances` signal wired on its port,
+     the draws `problem.realize(key, n)` (RN-4) realized once, the compiled fixed-step rollout
+     `vmap`ped over them on JAX and looped on NumPy, the cost scored on the plant's run by
+     `evaluate_trajectory`, the record one `Evaluation` (one row per draw, `criterion_value` the
+     problem's criterion). `compare(problem, **entries, n_trials=, key=)` shares the draws.
+     `pe.program(wrt, key=, n_trials=)` minimizes `criterion_value` over the same draws, realized
+     once at the call.
+  2. `MonteCarloEvaluator` reduced to one facade line onto `evaluate`, then removed;
+     `evaluate_jax`, `evaluate_numpy`, `evaluate_simulator`, the fallback warning, `compare`'s
+     NumPy forcing and the `simulator` backend's nested-diagram failure go with their tests;
+     `Planner.evaluate` and `solve(evaluate=True)` call `evaluate`; a controller with state and
+     a noise block inside `sys` are accepted; a sampled controller stays refused until V1's
+     step 7b (the hybrid phase).
   3. `Sys2Gym` takes a `Distribution` for the start (RD-R5); `x0_lb / x0_ub / x0_std` go.
-  Done when an LQG loop (P4's observer and gain, noise on `d` and `n`) scores a mean cost within the
-  sampling error of the covariance prediction (1.013 ± 0.023 measured by hand, §10 RD-A6);
-  `ev.evaluate(lqr)` on JAX and `ev.evaluate(vi)` on NumPy agree to a tolerance on the same
-  trials; the release note records the one change of the evaluator's numbers.
+  Done when an LQG loop (P4's observer and gain, noise on `d` and `n`) scores a mean cost within
+  the sampling error of the covariance prediction (1.013 ± 0.023 measured by hand, §10 RD-A6);
+  the same `evaluate` call on JAX and on NumPy agrees to a tolerance on one key; the
+  deterministic twin (`n_trials=1` on the nominal problem) equals the deterministic `evaluate`;
+  the release note records the one change of the evaluator's numbers. The workboard row
+  (TODO §5, V1's step 7) carries the gate.
 - [ ] **RN-6 Docs**, with each step: DESIGN §4 (the distributions entry: the convention, the
   three periods, the bridge table with its two periods, the solver hint) and §6 (the stochastic
-  problem's `disturbances`, `realize`, the evaluator as a diagram simulation); the ROADMAP §6
+  problem's `disturbances`, `realize`, `evaluate` on the draws); the ROADMAP §6
   entry is closed (DESIGN §4 carries the convention); TODO A5 rows retired; `kalman()` (P4)
   reads intensities, the discrete filter later reads `Q_d`, `R_d`; the release notes of RN-1,
   RN-4 and RN-5.

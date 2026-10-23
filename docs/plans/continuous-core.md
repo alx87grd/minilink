@@ -189,7 +189,7 @@ class CostFunction:
     def g(self, x, u, t=0.0, params=None)         # running cost density
     def h(self, x, t=0.0, params=None)            # terminal cost
     def g_max(self, X, U, params=None)            # the scale of g over the allowed sets: infeasible_cost's default reads it
-    def integrate(self, traj, *, discount_rate=0.0, params=None)   # J(t_k) = ∫₀^{t_k} e^{−ρt} g dt, trapezoid, on xp; no h
+    def integrate(self, traj, *, discount_rate=0.0, params=None)   # the running cost (e^{−ρt_k} g_k) and J(t_k) = ∫₀^{t_k} e^{−ρt} g dt, both (N,), trapezoid, on xp; no h
     __add__, __mul__                              # SumCost, ScaledCost; params nested by term id
 ```
 

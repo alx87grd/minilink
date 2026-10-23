@@ -1,9 +1,13 @@
 # Path integral control (MPPI) in Minilink
 
-**Status:** design draft (2026-10-02), for the maintainer's ruling on the asks of §10.
+**Status:** design draft (2026-10-02), for the maintainer's ruling on the asks of §10; the
+recommended answers are D26–D28 and D30 of [end-state-api.md](end-state-api.md) (2026-10-22:
+`MPPIPlanner`, the three planner verbs, `n_plant_samples=1`, `RolloutEnvironment` staying in
+`reinforcement_learning/` as a caller of the step model), to rule for v0.4.
 **Lane:** research lane first (`examples/experimental/`), provisional band with the MPC
 block once MP-5 lands, teaching-surface decision at V3 (v0.9).
-**Rung proposed:** S72 on the workboard, v0.4, on S31's sampled kernel (v0.3) and after RN-4
+**Rung proposed:** S72 on the workboard, v0.4, on S31's sampled kernel (the hybrid phase,
+after the continuous core) and the step model of S75, and after RN-4
 and RN-5 of the randomness plan (the ordering of §8), hardened before the v0.9 freeze; see §9.
 **Prototype:** `examples/experimental/mppi/pendulum_mppi.py` and `racecar_mppi.py`
 (2026-10-02), two standalone scripts on the library as it stands — the swing-up works, and
@@ -114,7 +118,8 @@ the planner should be built on that contract once, not before it (§8).
 on the problem of `demos/udes_racecar/mpc_racecar_kinematic.py` — the kinematic UdeS
 racecar, the rounded circuit, the corridor and the cone, the demo's own cost objects — and
 then the demo's collocation MPC on the same plant and run, and scores both with
-`score_trajectory`. On the 10 s run (`K = 1024`, `N = 10` at `dt = 0.1 s`, `λ = 0.05`,
+`score_trajectory` (today's scoring rule; the problem-level `evaluate_trajectory` after V1's step
+2, which integrates to `tf` with no cut at exit, R19). On the 10 s run (`K = 1024`, `N = 10` at `dt = 0.1 s`, `λ = 0.05`,
 `σ = (0.5 m/s, 0.2 rad)`, control term off):
 
 | Controller | closed-loop `J` | min cone clearance | min corridor margin | driven | tick (CPU) |
@@ -236,7 +241,7 @@ PathIntegralPlanner(
 
 Why `dt` and not `n_steps`: the MPPI grid is a control grid, the same object
 `ReinforcementLearningPlanner(dt=)`, `RolloutEnvironment(dt=)` and
-`MonteCarloEvaluator(dt=)` name; trajopt's `n_steps` counts collocation knots on a
+`evaluate(problem, arg, dt=)` (formerly `MonteCarloEvaluator(dt=)`) name; trajopt's `n_steps` counts collocation knots on a
 continuous plan, a different object. The receding-horizon shift is then one control
 period, so `dt_mpc` should be a multiple of `dt` (checked at wrap time, §6).
 
@@ -488,6 +493,10 @@ maintainer's "before v1" is met with a term to spare), provisional in v0.9, froz
 visibly provisional at v1.0 with the rest of the MPC band.
 
 ## 10. Asks for the maintainer
+
+Recommended answers (2026-10-22) in [end-state-api.md](end-state-api.md): ask 1 D26
+(`MPPIPlanner`), ask 2 D27 (the three verbs), ask 3 D28 (`n_plant_samples=1`), ask 5 D30 (no
+move: a caller of the step model and the sampled kernel). All for v0.4.
 
 1. **The name** (§5): `PathIntegralPlanner` or `MPPIPlanner`. One decides the record's
    name and the facade entry.

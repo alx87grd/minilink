@@ -1,19 +1,16 @@
 # The sampled path: the step model and the sampled loop
 
-> **Ruled in part (2026-10-22/23).** The step model (§1–§7) is ruled as written, with the
-> four-body evaluator surface of §3.6; the sampled loop (§8) is a tool named `HybridDiagram`
-> for now, ticks on its clock, its remaining details parked to the hybrid phase. The design of
-> record is [continuous-core.md](continuous-core.md); this document is aligned to it at the
-> start of the phase.
-
-**Status:** ideas to review, 2026-10-21 — an evaluation of the code and a recommendation;
-nothing decided.  
+**Status:** ruled 2026-10-22/23 (R6–R8, R12–R14, R17, R18 of
+[the rulings](../reviews/2026-10-22-rulings-session-1.md)); aligned to
+[continuous-core.md](continuous-core.md), the design of record for the phase, on 2026-10-23.
+First written 2026-10-21 as an evaluation of the code and a recommendation.  
 **Lane:** core (the compiled evaluator, `discretize`, every sampled consumer) — every step is
 **[ask — core]**.  
-**Rung:** v0.3, wave S of [TODO.md](TODO.md): step S75 (the step model, §1–§7), then S31
-(the sampled loop, §8); both open decisions in ROADMAP §6, both ruled before the
-differentiable problem's step 0. Their code runs beside V1's steps 0–2 and lands before its
-step 3, where the evaluator meets the sampled seam (v0.3, wave V).  
+**Rung:** v0.3, the continuous-core phase of [TODO.md](TODO.md) §4: step S75 (the step
+model, §1–§7, steps SM-0 to SM-7) first; V1's steps 1–2 may run beside it, and its step 3 (the
+whole run out of the scan) needs SM-1. S31 (the sampled loop, §8) is ruled in principle and
+its code comes after the continuous core: in v0.3 if the calendar allows, else v0.4 (the slot
+is raised in ROADMAP §6).  
 **Gathers:** S31, S37 whole (its one scannable step as SM-1, its integrators' move and the
 evaluator-grid trim as SM-6; ruled 2026-10-22, S27 Diffrax stays in v0.9), the `discretize`
 follow-ups, S65's input-hold item and the Later row on a sample stride. SM-6 is the one home
@@ -113,6 +110,12 @@ as it already is in the GRO501 digital-implementation lesson. The result is a `S
 it composes in a `StepDiagramSystem`, runs `compute_rollout`, and its `compile()` gives the
 scannable step. Its body stops being hand-written and calls the compiled step.
 
+**Two clocks, two signatures (R14).** The compiled evaluator's `ev.step(x, u, t, params, *, dt,
+…)` takes the time in seconds, as `f` does; a `StepSystem`'s `step(x, u, k, params)` takes the
+integer tick. `discretize` binds `t_k = t0 + k·dt` between the two, so the tick is the step
+contract of every sampled consumer and seconds are the continuous plant's business. `integrator=`
+becomes `method=` (accepted for one release, with a ledger line; R6).
+
 ### 3.4 One implementation
 
 In `core/compile`, one step per backend, `step(x, u, t, params; dt, method, substeps, hold)`,
@@ -185,7 +188,7 @@ ev.rollout_batch(x0s, u_seqs, dt=, params=family)                       # the on
 | --- | --- |
 | `f`, `f_p`, `f_trace`, `f_trace_p`, `f_ivp*` | `f`; `u=None` nominal |
 | `outputs*`, `compute_internal_signals*` | `h` |
-| `rk4_step*`, `euler_step*`, `step*` (20 names) | `step` with `method`, `substeps`, `hold`; for a `StepSystem` evaluator `step` is the system's own map, same signature, no knobs |
+| `rk4_step*`, `euler_step*`, `step*` (20 names) | `step` with `method`, `substeps`, `hold`; for a `StepSystem` evaluator `step` is the system's own map `step(x, u, k, params)` on the integer tick, no knobs |
 | `rk4_integrate_zoh*`, `rk4_integrate_linear*` (`hold="foh"`), `*_integrate_ivp*`, `euler_integrate_*`, `integrate_zoh*`, `rollout`, `integrate_zoh_rollout` (22 names) | `rollout` |
 | `f_scipy`, `f_ivp_scipy`, `as_scipy_jac` | not evaluator methods: the `Simulator` swaps the arguments of `frozen.f` for `solve_ivp`, in one place |
 | `rollout_batch` | stays |
@@ -197,7 +200,7 @@ never hand-written:
 
 | Form | What it is | Who calls it | Pendulum, one step |
 | --- | --- | --- | --- |
-| traced: `ev.step(x, u, t, params, dt=)` | the plain function; eager if called from Python | composed inside `scan`, `vmap`, `grad`: RL, batches, `tune`, MPPI | 5 700 µs eager (never meant to be called so) |
+| traced: `ev.step(x, u, t, params, dt=)` | the plain function; eager if called from Python | composed inside `scan`, `vmap`, `grad`: RL, batches, the compiled problem and its program, MPPI | 5 700 µs eager (never meant to be called so) |
 | jitted: `ev.jit.step(x, u, t, params, dt=)` | `jax.jit(ev.step)`, compiled once, cached | one step at a time from Python with changing params (an estimator feeding `mu`, a sweep) | 14 µs |
 | frozen: `ev.frozen.step(x, u, t, dt=)` | `jit(partial(ev.step, params=plant.params))`, bound at first use, cached, rebound when `plant.params` changes | the student's `discretize(plant, dt).step`, the realtime loop, the gym bridge, RRT | 10 µs (today's hand-written frozen method) |
 
@@ -244,13 +247,15 @@ parameters as constant columns of the batched state so they ride the same memory
 | `HybridSimulator`, `RealtimeSimulator` | the step model (`dt_inner` becomes `substeps`) | identical |
 | shooting, multiple shooting | the step model with `hold="foh"` | identical |
 | direct collocation | unchanged | — |
-| `compare()`, `MonteCarloEvaluator` | unchanged (the continuous replay, RD-D24); optionally a sampled replay on the training model | a separate ask |
+| `compare()`, `MonteCarloEvaluator` | the compiled fixed-step engine is the judge (R15): `evaluate` and `compare` run `problem.compile(arg, dt)`, the continuous loop on SM-1's step; `method="scipy"` is the adaptive escape; the Monte Carlo fold into `evaluate` is V1's step 7 | change once with V1 (the integral to `tf`, R19) and with step 7 (the draws, D21); a sampled replay on the training model waits for v0.4 |
+| `compute_forced` (R17, R18) | the one `ev.rollout` with the step model's `hold`; `method="rk4" \| "scipy"`; `input_interp` becomes `hold`; the `euler` loop backend goes | `zoh` by default everywhere: the `rk4_fixedsteps` forced numbers change once (a baseline and a ledger line) |
 | S31's sampled kernel | scans the step model with the controller's `step` between samples | lands on this |
 | identification, behavior cloning (planned) | roll the step model at the logging rate | born on the standard |
 
 ## 5. The steps, bottom-up (one commit each; byte-identical is the bar)
 
-The AGENTS recipe for behaviour-preserving refactors applies to every step: read the tests
+What each step builds; the order and each step's "done when" are the S75 rows of
+[TODO.md](TODO.md) §4. The AGENTS recipe for behaviour-preserving refactors applies to every step: read the tests
 first, capture a seeded baseline of every consumer to JSON, run it twice and `cmp`, and
 compare after each step. A number that changes on purpose gets its own test and its own ask.
 
@@ -260,30 +265,41 @@ compare after each step. A number that changes on purpose gets its own test and 
   existing methods become bindings over it, the parameterless ones a `partial` over `params`
   then `jit`, byte-identical and within the measured speed of §3.5.
 - **SM-2** `discretize` on the compiled step, gaining `substeps=` and `hold=`;
-  `method="exact"` (the follow-up) checked against `scipy.signal.cont2discrete`.
+  `StepSystem.step(x, u, k, params)` on the tick, `t_k = t0 + k·dt` bound by `discretize`;
+  `integrator=` accepted as `method=` for one release; `method="exact"` (the follow-up) checked
+  against `scipy.signal.cont2discrete`; the `params["dt"]` fallback and the source-port
+  follow-ups (TODO §4).
 - **SM-3** `RolloutEnvironment` and `Sys2Gym` on `discretize`, `substeps` exposed.
 - **SM-4** The RRT extender, the Lyapunov sampler, the MPPI scripts, the hybrid and realtime
   simulators on the step model.
-- **SM-5** Shooting on `hold="foh"`; the DP grid on `method="euler"`.
+- **SM-5** Shooting on `hold="foh"`; the DP grid on `method="euler"` (byte-identical;
+  `DynamicProgrammingPlanner(method="rk4")` available, R8).
+- **SM-7** `compute_forced` on the one rollout (R17, R18): `method="rk4" | "scipy"`,
+  `input_interp` replaced by `hold`, `zoh` the default everywhere, the `euler` loop backend
+  removed; the one intended change, the `rk4_fixedsteps` forced numbers, gets a baseline, its
+  own test and a ledger line. Lands after SM-2 and before SM-6 (the number keeps its id; it was
+  added on 2026-10-23).
 - **SM-6** The grid trim (one `_p` body per integrator, the bound and jitted variants
   generated; the evaluator internals deduplicated: ZOH sugar, the JAX step rollout, the four
   Jacobian probes, the undeclared batch cache), then the integrators' move to
   `simulation/solvers/`. The one home of both (S37 absorbed, 2026-10-22).
 
-## 6. The asks
+## 6. The asks, ruled
 
-1. **The contract and its name**: the step model, produced by `discretize`, a `StepSystem`.
-2. **The four knobs and their defaults** (`rk4`, `substeps=1`, `zoh`), and whether the RL
-   planner and the gym bridge expose `substeps`.
-3. **DP's integrator**: keep Euler (byte-identical) or move to RK4 (every value-iteration
-   lesson's numbers change once).
-4. **A sampled replay** in `compare()` and `MonteCarloEvaluator`, so a law is scored on the
-   model it was trained on; as an option, or as the default (the comparison lessons' numbers
-   change).
-5. **The order**: this first, then S31's kernel, then V1's step 0.
-6. **Params always an argument**: one `_p` body per method, the frozen call a binding at the
-   boundary (§3.5); the parameterless call kept as the student convenience, under its
-   current stable name.
+1. **The contract and its name**: the step model, produced by `discretize`, a `StepSystem`
+   (R6).
+2. **The four knobs and their defaults**: `dt` required; `method` `rk4` / `euler` / `exact`,
+   default `rk4`; `substeps=1`; `hold` `zoh` / `foh`, default `zoh`; `substeps` exposed on
+   every consumer that takes `dt` (R7); the forced hold `zoh` everywhere (R18).
+3. **DP's integrator**: Euler through the step model, byte-identical; RK4 available; whether
+   the default flips is V3's question (R8).
+4. **A sampled replay** in `compare()` and the Monte Carlo evaluator: superseded by R15 (the
+   compiled continuous loop is the judge); a sampled replay waits for v0.4, the one item still
+   open here.
+5. **The order**: this first, beside wave K; V1's step 3 builds on SM-1; S31 after the
+   continuous core (R13, the maintainer's order of 2026-10-22).
+6. **Params always an argument**: one traced body, the jitted and frozen forms generated and
+   cached once (R12).
 
 ## 7. Fit with the other plans
 
@@ -291,25 +307,26 @@ compare after each step. A number that changes on purpose gets its own test and 
   this plan is its plant half.
 - **S37**: absorbed; SM-1 is its "one scannable step", defined by its consumers before the
   files move, and SM-6 its move.
-- **V1** ([differentiable-problem.md](differentiable-problem.md)): its evaluator keeps the
-  continuous closed loop (RD-D24) on SM-1's compiled step; in v0.3 it takes continuous
-  controllers only, and its step 7b (v0.4) dispatches a sampled controller to S31's kernel on
-  its JAX face, so a digital PID or a held neural policy is tuned by gradient through that
-  kernel.
-- **S65**: the hold rule here (`zoh` / `foh`) is the sampled side of its `input_interp`
-  option; one vocabulary for both.
+- **V1** ([differentiable-problem.md](differentiable-problem.md), rewritten to
+  [continuous-core.md](continuous-core.md)): `problem.compile(arg, dt)` integrates the whole
+  continuous closed loop on SM-1's compiled step, the controller's state inside `x`; it is the
+  judge and the engine (R15), and it exports the program (`pe.program(wrt)` for today's
+  `Optimizer`, R23). In this phase it takes continuous controllers only; its step 7b (after
+  S31) dispatches a sampled controller to the kernel of §8, so a digital PID or a held neural
+  policy gets the same `evaluate` and program export through that kernel.
+- **S65**: the hold rule here (`zoh` / `foh`) replaces its `input_interp` option (SM-7, R17);
+  one vocabulary for both.
 - **The Later row on a sample stride**: `substeps` on the step model is the same knob for the
   sampled path; `Simulator`'s fixed-step solvers can read it too.
 
 ## 8. The sampled loop (S31)
 
 The plant half above makes one step model; the loop half runs a sampled controller on it.
-The open decision (ROADMAP §6): `HybridDiagram` as a `System` (a continuous and a
-piecewise-constant state, periodic update events, a simulator and a compiler that know
-sample times), or an honest `HybridLoop`.
 
-**Ruled 2026-10-22: the loop is a tool, not a `System`; the name `HybridDiagram` stays for now**
-(recommended 2026-10-20).
+**Ruled 2026-10-22 (R13): the loop is a tool, not a `System`; the name `HybridDiagram` stays for
+now. Ruled the same day (R14): ticks** (`step(x, u, k, params)`; the loop converts to seconds
+where it calls the plant). The rest (D13–D15 of [end-state-api.md](end-state-api.md)) is parked
+to the hybrid phase, after the continuous core.
 
 - **Two model algebras, both closed.** The continuous one (`System`, diagrams, `@`, `>>`,
   `+`) and the discrete-time one (`StepSystem`, `StepDiagramSystem`). The loop that joins the
@@ -322,22 +339,24 @@ sample times), or an honest `HybridLoop`.
   and a JAX face, as `Simulator` and `compile` have. Its two copies today
   (`HybridSimulator`, the MPC computer export) become its callers; the RL environment is a
   consumer of the step model only, the learner calling the policy itself (ruled 2026-10-22).
-- **Two loops on purpose.** The differentiable problem's evaluator keeps the continuous
-  closed loop as a diagram (RD-D24), for analysis and gradient tuning of a continuous law;
-  this kernel is the loop of every sampled controller. A sampled controller tuned by
-  gradient (a digital PID, a held neural policy) goes through this kernel.
+- **Two loops on purpose.** The compiled problem (`problem.compile(arg, dt)`, R15) keeps the
+  continuous closed loop as a diagram, for evaluation and the program export of a continuous
+  law; this kernel is the loop of every sampled controller. A sampled controller optimized by
+  gradient (a digital PID, a held neural policy) goes through this kernel, once V1's step 7b
+  dispatches it there (D15, the hybrid phase).
 - **The kernel never breaks tracing; the computer decides.** A gain, a neural policy or a
   digital PID traces end to end (the RL planner, gain tuning, a digital PID tuned by
   gradient). MPC with SciPy or Ipopt inside runs on the NumPy face. A traceable inner solver
   later makes MPC a differentiable policy too, so the MPC block's `step` stays a pure
   function of arrays with the solver inside.
-- **Still to rule with it:** the sampled seam's time argument, integer ticks (today) or
-  seconds; whether the run-state caches (`StepSystem.rollout`, `HybridDiagram.last_result`)
-  join `self.traj` as allowed caches (RULES 2.4); the `core` → `simulation` import; whether
+- **Parked to the hybrid phase (D13–D15):** whether the run-state caches
+  (`StepSystem.rollout`, `HybridDiagram.last_result`) join `self.traj` as allowed caches (RULES 2.4); the `core` → `simulation` import; whether
   the tick carries controller memory (MPPI's warm start, a diffusion policy's action chunk;
   random draws come from the controller's seed and the tick, as the noise block's;
-  [future-policies.md](future-policies.md)).
+  [future-policies.md](future-policies.md)); how the compiled problem dispatches a sampled
+  controller to this kernel (V1's step 7b).
 
-**Order:** after S75 in wave S (the kernel scans the step model), with P10's AC-8b; the
+**Order:** after the continuous core (S75, then V1's steps 1–6), with P10's AC-8b; in v0.3 if
+the calendar allows, else v0.4 (the slot is raised in ROADMAP §6); the
 hand-copied `HybridDiagram` facades and the Mermaid twin of the hybrid drawing go with it;
 the hybrid topology drawing stays for teaching.

@@ -1,6 +1,10 @@
 # Projecting the API onto MPPI, behavior cloning and diffusion policy
 
-**Status:** ideas to review, 2026-10-21 — an independent analysis; nothing decided.  
+**Status:** ideas to review, 2026-10-21 — an independent analysis. Aligned 2026-10-23 to the
+rulings of 2026-10-22/23 ([continuous-core.md](continuous-core.md)): the compiled problem
+exports a `MathematicalProgram` and no `tune` facade exists (R23); the sampled loop is a tool on
+ticks (R13, R14), its memory and dispatch parked to the hybrid phase (D13–D15); point 4 is D29
+for v0.4.  
 **Lane:** maintainer-owned: it shapes core decisions still open.  
 **Serves:** the sampled loop (S31, [sampled-path.md](sampled-path.md) §8), the names of the
 differentiable path ([differentiable-problem.md](differentiable-problem.md), step 0 and ask 5),
@@ -8,7 +12,7 @@ identification (C4), the MPPI planner ([mppi.md](mppi.md)), and the behavior-clo
 after v1.0 (ROADMAP §5.6).
 
 The question: do the proposals on the table (the step model, the sampled loop as a tool, the
-compiled problem with `tune` and the program bridge, the optimizer's program classes, planners
+compiled problem and its program export, the optimizer's program classes (deferred, R25), planners
 returning a `PlanningSolution`) carry the features that come later, or will those features
 force a redesign? Three are projected here: MPPI (planned), behavior cloning (planned after
 v1.0) and diffusion policy (not planned).
@@ -40,7 +44,8 @@ optimizer. The gaps sit in three places:
   carries memory (the shifted warm-start sequence), which the sampled loop must thread; its
   fresh samples come from its own seed and the tick, as the noise block's do (§5 point 2).
 - **A payoff.** MPPI's update is a weighted average, so it is differentiable end to end: its
-  temperature and noise level can be tuned by gradient with the same `tune` as a PID gain.
+  temperature and noise level can be optimized by gradient through the same program export
+  (`pe.program(wrt=[...])` solved by `Optimizer`) as a PID gain.
   That works only because tracing is decided by the controller, not blocked by the loop.
 
 ## 3. Behavior cloning
@@ -56,9 +61,10 @@ optimizer. The gaps sit in three places:
 - The differentiable path is built around a rollout cost: simulate the closed loop, integrate
   the cost. Behavior cloning's loss is supervised: on recorded states, how far is the policy's
   action from the demonstrator's? No rollout is involved.
-- The roadmap's "identification is `tune` with a data-mismatch cost" has the same blind spot:
+- The roadmap's "identification is the program export with a data-mismatch cost" has the same
+  blind spot:
   equation-error identification is also a one-step loss.
-- So the framework needs **a second training verb** beside `tune`: fit these parameters to this
+- So the framework needs **a second training verb** beside the program export: fit these parameters to this
   dataset with this loss, on the same program bridge and optimizer, minibatches drawn through
   the random key the stochastic program class already plans for.
 - It needs **a dataset noun**: a batch of trajectories with padding masks, which the native
@@ -90,13 +96,15 @@ demo than human driving, and free of hardware.
 
 ## 5. What the proposals should absorb
 
-1. **Three training verbs on one bridge.** `solve` for planners, `tune` for parameters through
-   a closed-loop rollout, `fit` for parameters against a dataset; all three produce a
+1. **Three ways to train on one bridge.** `solve` for planners, the compiled problem's program
+   export for parameters through a closed-loop rollout (ruled 2026-10-23: no `tune` facade in
+   this phase), `fit` for parameters against a dataset (the open idea); all three produce a
    `MathematicalProgram` for the same `Optimizer`. The plans have the first two.
    ```python
-   solution = MPPIPlanner(problem, n_samples=512).solve()          # a planner
-   tuned    = tune(problem, controller, wrt=[...], dt=0.05)        # a rollout cost
-   cloned   = fit(policy, demos, wrt="policy", loss="action")      # a dataset loss
+   solution = MPPIPlanner(problem, n_samples=512).solve()                     # a planner
+   pe = problem.compile(controller, dt=0.05)                                  # a rollout cost
+   params = pe.unpack(Optimizer(pe.program(wrt=[...])).solve().z, wrt=[...])
+   cloned   = fit(policy, demos, wrt="policy", loss="action")                 # a dataset loss (open)
    ```
 2. **The sampled loop passes the tick and threads controller memory** (MPPI's warm-start
    sequence, a diffusion policy's observation history and action chunk). It threads no random
@@ -104,7 +112,7 @@ demo than human driving, and free of hardware.
    counter-based pattern ([randomness.md](randomness.md)), as point 4 describes.
 3. **The evaluator dispatches on the policy kind.** A continuous law runs the continuous
    closed loop, as ruled (RD-D24); a sampled controller runs the sampled kernel's JAX face, so
-   MPPI and diffusion policies get the same batched Monte Carlo evaluation and tuning. The plan
+   MPPI and diffusion policies get the same batched `evaluate` and program export. The plan
    today says a sampled loop falls back to NumPy "until the hybrid seam batches"; with the
    kernel, that fallback goes.
 4. **One standard stochastic policy outside the RL package, built like the noise block**
@@ -120,7 +128,8 @@ demo than human driving, and free of hardware.
    - is reproducible by one key, with common random numbers across compared laws;
    - holds its draw over the control period, so the continuous evaluator's RK4 stages see one
      action per period, the rule the noise block already states;
-   - gives pathwise gradients through the fixed `ε` (the reparameterization), so `tune` and
+   - gives pathwise gradients through the fixed `ε` (the reparameterization), so the program
+     export and
      SAC-style updates reach `θ`.
 
    What the block form does not give, the contract adds as methods beside `h`, not outputs:
@@ -138,8 +147,9 @@ demo than human driving, and free of hardware.
 ## 6. Timing
 
 - **Points 2 and 3 are cheap now and expensive later**: they shape the sampled loop and the
-  evaluator, both designed this November. They are S31's asks in the second rulings session
-  (ROADMAP §6), and point 3 is V1's step 7b in v0.4 (ruled 2026-10-22).
+  evaluator. Ruled 2026-10-22/23: the loop a tool on ticks (R13, R14); the tick's memory and the
+  dispatch (D14, D15) parked to the hybrid phase, after the continuous core; point 3 is V1's step
+  7b.
 - **Point 4 is planned now and built with the RL follow-ups (v0.4)** as a C5 row of TODO §5;
   nothing new hard-codes the RL-only head meanwhile.
 - **Points 1 and 5 are not critical to the core tools** (the maintainer, 2026-10-22): the
@@ -150,10 +160,12 @@ demo than human driving, and free of hardware.
 
 ## 7. Questions for the maintainer (for discussion, not blocking)
 
-1. Does `fit` join `solve` and `tune` as the third verb, and under that name?
-2. Does the sampled loop's tick contract carry controller memory now (the draws coming from
-   the controller's seed and the tick, no key threaded)?
+1. Does `fit` join `solve` and the program export as the third way to train, and under that
+   name?
+2. Does the sampled loop's tick contract carry controller memory (the draws coming from the
+   controller's seed and the tick, no key threaded)? Parked to the hybrid phase (D14).
 3. Is diffusion policy in scope at all, and on the research lane only?
 4. Is distilling MPC or MPPI into a neural policy the first imitation demo?
 5. The standard stochastic policy as a seeded block (point 4) is the maintainer's direction;
-   still to rule: its contract beyond `h` (the methods' names, which heads ship first).
+   still to rule: its contract beyond `h` (the methods' names, which heads ship first);
+   recommended as `GaussianPolicy` in D29 of [end-state-api.md](end-state-api.md), for v0.4.

@@ -1,7 +1,10 @@
 # Core consolidation: what is core, what is a side feature
 
-**Status:** analysis and recommendations, 2026-10-20 (second pass, by the vision) — ideas
-to review, nothing decided.  
+**Status:** analysis and recommendations, 2026-10-20 (second pass, by the vision). Asks 1–3,
+5 and 6 of §10 ruled 2026-10-22 (R1–R5 of
+[the rulings](../reviews/2026-10-22-rulings-session-1.md); the shape amended: three
+foundations, model, problem and program, with six tooling pillars); ask 4 open. The tiers'
+item-by-item ruling (K7) is still to come from K1's table.  
 **Lane:** maintainer-owned (every item removes or moves a user-importable name, so each is
 an ask under AGENTS.md; the inventory and the tiers are the agent's analysis).  
 **Rung:** v0.3, wave K: the convergence pass (step K7 of [TODO.md](TODO.md) with K1–K4, an
@@ -248,7 +251,8 @@ notebook touched; no pillar touched.
 - **The value-function approximators**: folded into the fields plan (A1) as the cost-to-go
   approximators; the module itself retires into that work.
 - **The identification verb**: the stub says nothing; the verb arrives with the
-  differentiable problem (V1) and fitting (C4), as the same `tune` path with a data cost.
+  differentiable problem (V1) and fitting (C4), as the same program export (`pe.program(wrt)`
+solved by `Optimizer`, R23) with a data cost.
 - **The hybrid sibling** (5.0k lines): spine, provisional in shape only; no new features
   before S31.
 - **The RL planner**: four algorithms as options on one planner; `collect.py` and
@@ -275,8 +279,8 @@ is the seed, so the convergence does not cut the branch the next pillar grows on
 
 | Planned (ROADMAP) | Seed in the library today | What it reuses |
 | --- | --- | --- |
-| behavior cloning (after v1.0) | `simulation/realtime/` (the recorder), `planning/reinforcement_learning/collect.py` and `environment.py` (the data path), `NeuralPolicyController` (the output), the first-order optimizer backend (V1) | the spine end to end: demonstrations are a `Trajectory` dataset, imitation is `tune` with a data cost |
-| identification (C4) | the `rollout_batch` evaluator, `ProblemParameters`, the same `tune` | the spine: plant params instead of policy params |
+| behavior cloning (after v1.0) | `simulation/realtime/` (the recorder), `planning/reinforcement_learning/collect.py` and `environment.py` (the data path), `NeuralPolicyController` (the output), the first-order optimizer backend (V1) | the spine end to end: demonstrations are a `Trajectory` dataset, imitation is the program export with a data cost, or a `fit` verb beside it (future-policies.md) |
+| identification (C4) | the `rollout_batch` evaluator, `ProblemParameters`, the same program export (`pe.program(wrt=["plant…"])`) | the spine: plant params instead of policy params |
 | MPPI (S72) | `planning/trajectory_optimization/`'s problem and transcription, `realize` (the draws, RN-5) | the trajectory pillar, sampled |
 | the EKF and the trajectory observer (v0.9) | `estimation/observer.py`, `analysis/linearization` | the estimation pillar |
 | the Lyapunov field (A1) | `analysis/lyapunov.py` | fields |
@@ -289,6 +293,9 @@ A2: once imitation and identification exist, RL, imitation and identification ar
 a reason to move RL now.
 
 ## 8. The exit rule (proposed amendment to the lane contract)
+
+**Not adopted (R4, 2026-10-22):** no exit rule; the maintainer prunes by hand at each release
+from a K1-style table, and the seeds have no clock. The proposal stays below as the record.
 
 ROADMAP §2's teaching-surface rule says what it takes to enter. Add the symmetric rule,
 with the two lenses built in:
@@ -317,6 +324,13 @@ on them.
    with the citing documents updated in the same change.
 
 ## 10. The asks
+
+Ruled 2026-10-22 ([the record](../reviews/2026-10-22-rulings-session-1.md)): ask 1 (R1,
+amended: model, problem and program as the three foundations, the six pillars on them; RRT a
+side pillar, deployment experimental), ask 2 (R2: the catalog clean-up by two import layers and
+support by test, TODO K8; the tiers' items still per K1's table), ask 3 (R3: the engines stay
+as the contact-leaf demo, the tier untested, TODO K9), ask 5 (R4: no exit rule), ask 6 (R5: the
+trim silent, one ledger line per release). Open: ask 4.
 
 1. **The six pillars of §2** as the stated shape of the framework. If the maintainer's list
    differs (RRT as a seventh pillar, imitation folded into RL, deployment as a pillar), the
