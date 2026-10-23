@@ -1,9 +1,10 @@
 # The end state on paper: the architecture and the API after v0.4
 
-**Status:** a sketch for the maintainer, 2026-10-22 — ideas to review, nothing decided.
-Every open decision of ROADMAP §6 that shapes a public name or a core contract is answered
-here with its recommended option *as the code a user would write*, so the whole can be read
-once before any of it is built.
+**Status:** the end state as ruled on 2026-10-22/23 for the continuous phase (D1–D12, D16–D22,
+D24, D31; the record is
+[2026-10-22-rulings-session-1.md](../reviews/2026-10-22-rulings-session-1.md)); D13–D15 parked
+to the hybrid phase, D23 deferred, D25–D30 proposals for v0.4. Every decision is written *as
+the code a user would write*, so the whole can be read once before any of it is built.
 **Lane:** maintainer-owned (every item is an **[ask — core]** or **[ask — public names]**).
 **Rung:** the agenda of the two rulings sessions (ROADMAP §5.3, §6 "Blocking code now"), and
 the v0.4 asks that fix a name the v0.3 code will already print.
@@ -23,15 +24,15 @@ sessions have ruled and the plan docs carry the answers (one fact, one home).
 One spine, read left to right; every pillar is a special case of it.
 
 ```
-System ──compile──► rollout ──► Trajectory ──► cost · margin ──► MathematicalProgram ──► Optimizer
-  p = (plant, controller, cost, sets, x0, draws)                                  ∂J/∂p
+System ──compile──► rollout ──► Trajectory ──► evaluate_trajectory ──► MathematicalProgram ──► Optimizer
+  p = (plant, controller, cost, x0, draws)                                             ∂value/∂p
 ```
 
 Two step paths on the spine, and no third:
 
 | Path | What steps | Integrator | Who uses it |
 | --- | --- | --- | --- |
-| **continuous** | the closed-loop *diagram*, the controller's state inside `x` | `Simulator` (adaptive RK45 by default) for "what does it really do"; SM-1's compiled fixed step for the compiled problem | simulation, analysis, `compare()`, `tune` of a continuous law |
+| **continuous** | the closed-loop *diagram*, the controller's state inside `x` | the one compiled fixed step (`evaluate`, `compare`, `problem.compile`, the program); `Simulator` (adaptive RK45) for the plots and the `method="scipy"` door | simulation, analysis, evaluation, the program export |
 | **sampled** | the plant by the *step model* `x_{k+1} = Φ(x_k, u_k, k; p)`, the controller run once per period on a computer | SM-1's compiled fixed step, `substeps` per period | RL, DP, the gym bridge, MPC, MPPI, the digital PID, the realtime loop, identification and imitation |
 
 The same compiled step serves both; the continuous path integrates the whole loop with it,
@@ -45,83 +46,80 @@ policy back in; the sampled loop dashed, its code after this phase).
 
 ```python
 import numpy as np
-from minilink import (Pendulum, PID, StateFeedbackController, WhiteNoise, Step,
-                      PlanningProblem, StochasticPlanningProblem, QuadraticCost, BoxSet,
-                      Gaussian, lqr, discretize, compare, tune)
+from minilink import (Pendulum, PID, StateFeedbackController, WhiteNoise, Step, PlanningProblem,
+                      StochasticPlanningProblem, QuadraticCost, BoxSet, BoxInputSet, Gaussian, lqr,
+                      discretize, evaluate, evaluate_trajectory, compare, Optimizer)
 
-# 1. A model, a loop, a simulation, an analysis — unchanged from v0.2
+# 1. A model, a loop, a simulation, an analysis: unchanged from v0.2
 plant = Pendulum()
 loop = Step(port="r") >> PID(Kp=20, Ki=10, Kd=2) @ plant
-loop.compute_trajectory(tf=10)
-loop.plot_trajectory()
-loop.plot_bode()
+loop.compute_trajectory(tf=10);  loop.plot_trajectory();  loop.plot_bode()
 K = lqr(plant, Q=np.eye(2), R=np.eye(1))
+plant.compute_forced(u_of_t, tf=10, method="rk4")                 # the one rollout body, hold="zoh"; method="scipy" the adaptive door
 
-# 2. The sampled path: one step model, one sampled loop
-plant_k = discretize(plant, dt=0.05)                      # x_{k+1} = Φ(x_k, u_k, k; p), RK4, zoh, 1 substep
-plant_k = discretize(plant, dt=0.05, method="rk4", substeps=4, hold="zoh")
-digital = PID(Kp=20, Ki=10, Kd=2) % 0.05                  # a computer: the law, sampled (continuous states: future work)
-sampled = StateFeedbackController(K) % 0.05 @ plant       # the sampled loop: a tool, not a System
-sampled.compute_trajectory(tf=10)                        # the plant continuous between samples, the law held
-sampled.compile(backend="jax")                           # the kernel's JAX face: scan over ticks, vmap over trials
+# 2. The compiled plant and the step model
+ev = plant.compile("jax")                                        # f, h, step, rollout, rollout_batch; ev.jit.*, ev.frozen.* generated
+plant_k = discretize(plant, dt=0.05, method="rk4", substeps=1, hold="zoh")   # a StepSystem, step(x, u, k, params)
 
-# 3. The problem, deterministic and stochastic
-problem = PlanningProblem(plant, cost=QuadraticCost.from_system(plant), X=BoxSet.from_system_state(plant), tf=10.0)
-noisy = StochasticPlanningProblem(plant, cost=problem.cost, X=problem.X, tf=10.0,
+# 3. The cost and the problem
+cost = QuadraticCost.from_system(plant)                          # params, g, h, g_max, integrate
+traj = loop.compute_trajectory(tf=10).with_cost(cost)            # the cost_rate / cost signals, no problem needed
+problem = PlanningProblem(plant, cost=cost, X=plant.state.box, U=plant.input_box, Xf=None, tf=10.0, discount_rate=0.0)
+noisy = StochasticPlanningProblem(plant, cost=cost, X=plant.state.box, U=plant.input_box, tf=10.0,
                                   x0_distribution=Gaussian(mean=plant.x0, cov=0.1 * np.eye(2)),
                                   params_distribution={"m": Gaussian(1.0, cov=0.01)},
-                                  disturbances={"d": WhiteNoise(psd=1e-2)})
+                                  disturbances={"d": WhiteNoise(psd=1e-2)}, criterion=("cvar", 0.1))
 
-# 4. The compiled problem: one differentiable path from any parameter to any metric
-ev = problem.compile(PID(Kp=20, Ki=10, Kd=2), dt=0.05)   # a ProblemEvaluator; the loop as a diagram
-ev.params                                                # {"controller": …, "plant": …, "cost": …, "sets": …, "x0": …, "r": …}
-traj = ev.trajectory()                                   # a Trajectory, every internal signal recorded
-J = ev.cost()                                            # the one scoring contract
-m = ev.margin()                                          # ≥ 0 iff the run stayed in X and U
-dJ = jax.grad(ev.cost)(ev.params)                        # d J / d every parameter
-report = noisy.compile(ctl, dt=0.05).evaluate(key=0, n_trials=200)   # mean, worst, failure_rate; replay any trial
-J_bar = noisy.compile(ctl, dt=0.05).value(key=0, n_trials=200)       # the criterion over the draws, one traced scalar
-ev_k = problem.compile(StateFeedbackController(K) % 0.05, dt=0.05)   # v0.4: a sampled controller runs the kernel's JAX face
+# 4. One evaluation of any run, one record
+evaluate_trajectory(problem, traj)                               # Evaluation, one row: cost, value, the two margins, failed, reached
 
-# 5. Tuning, identification, imitation: three verbs on one bridge to the optimizer
-program = ev.program(wrt=["controller.Kp", "controller.Kd"], bounds={"controller.Kp": (0, None)})
-Optimizer(program, method="l-bfgs").solve()               # the program knows its class; "auto" picks by class
-tuned = tune(problem, PID(Kp=20, Ki=10, Kd=2), wrt=["controller.Kp", "controller.Ki", "controller.Kd"], dt=0.05)
-fitted = tune(logged_problem, plant, wrt=["plant.m", "plant.b"], dt=0.05)   # identification: a tracking cost on logged data
-compare(LQR=LQRPlanner(problem).solve(), tuned=tuned).plot_trajectory()
+# 5. The engine and the student's verbs
+pe = problem.compile(PID(Kp=20, Ki=10, Kd=2), dt=0.01)          # ProblemEvaluator; the loop built by the port-name rules, r from the problem
+pe.params                                                        # {"controller": …, "plant": …, "cost": …, "x0": …, "r": …}
+pe.trajectory()                                                  # one run, every signal recorded
+pe.evaluate()                                                    # Evaluation, one row
+noisy.compile(ctl, dt=0.01).evaluate(key=0, n_trials=200)        # Evaluation, 200 rows: criterion_value, mean, worst, cvar, the three rates
+jax.grad(lambda p: pe.evaluate(p).criterion_value)(pe.params)    # the researcher's line
+report = evaluate(problem, PID(Kp=20, Ki=10, Kd=2))              # the facade: dt from the plant's time constant, method="rk4"
+compare(problem, PID=PID(20, 10, 2), LQR=StateFeedbackController(K), n_trials=1).plot_trajectory()
 
-# 6. The planners, every one a PlanningSolution; MPC and MPPI on the sampled loop
-sol_dp = DynamicProgrammingPlanner(problem, dt=0.05).solve()           # Euler on the grid (byte-identical today), method= later
+# 6. What this phase exports: the program
+program = pe.program(wrt=["controller.Kp", "controller.Kd"], bounds={"controller.Kp": (0, None)})
+result = Optimizer(program).solve();  tuned = pe.unpack(result.z, wrt=["controller.Kp", "controller.Kd"])
+
+# 7. The planners, every one a PlanningSolution; its policy re-enters as a controller
+sol_dp = DynamicProgrammingPlanner(problem, dt=0.05).solve()                 # Euler on the grid through the step model; method="rk4" available
 sol_to = TrajectoryOptimizationPlanner(problem, transcription="direct_collocation").solve()
-sol_rl = ReinforcementLearningPlanner(noisy, dt=0.05, substeps=1, algorithm="ppo").solve()
+sol_rl = ReinforcementLearningPlanner(noisy, dt=0.05, substeps=1, algorithm="ppo").solve()   # actions from U
+compare(problem, DP=sol_dp, LQR=StateFeedbackController(K), PPO=sol_rl, dt=0.05).plot_trajectory()
+
+# 8. After this phase: the sampled loop (a tool, HybridDiagram), MPC and MPPI on it, the parametric MPC program
+sampled = StateFeedbackController(K) % 0.05 @ plant
 mpc = ModelPredictiveController(TrajectoryOptimizationPlanner(problem, compile_backend="jax"), dt_mpc=0.1)
-mppi = ModelPredictiveController(MPPIPlanner(noisy, dt=0.05, n_samples=1024), dt_mpc=0.05)
-(mpc @ plant).compute_trajectory(tf=10)                               # the sampled loop again
-mpc.bind({"plant": {"m": 1.2}, "cost": {"xbar": x_target}})           # v0.4: every problem parameter bound online
 ```
 
-Everything above is one of the five nouns the constitution names, or a verb on one of them.
-No new noun beyond `ProblemEvaluator` (the compiled problem) and the sampled loop's class.
+Everything above is one of the foundations' nouns or a verb on one of them. The new nouns:
+`ProblemEvaluator` (the compiled problem) and the one `Evaluation` record.
 
 ### 1.2 The surface, by band and lane, after v0.4
 
 | Band | Teaching surface (frozen at v1.0) | Provisional (in the wheel, no promise) | Experimental (repo only) |
 | --- | --- | --- | --- |
-| `core` | `System`, `DynamicSystem`, `StepSystem`, `DiagramSystem`, `Trajectory`, `CostFunction`, `QuadraticCost`, `TimeCost`, `Set` family, `Distribution` family, `Field`, `QuadraticField`, `GridField`, `Shape`, `Scene`, `Track`, `closed_loop`, `feedback`, `discretize`, `realize` | `StepDiagramSystem`, `SampledLoop`, `CallableField` | — |
+| `core` | `System`, `DynamicSystem`, `StepSystem`, `DiagramSystem`, `Trajectory`, `CostFunction`, `QuadraticCost`, `TimeCost`, `Set` family, `Distribution` family, `Field`, `QuadraticField`, `GridField`, `Shape`, `Scene`, `Track`, `closed_loop`, `feedback`, `discretize`, `realize` | `StepDiagramSystem`, `HybridDiagram` (the sampled loop, a tool), `CallableField` | — |
 | `catalog` | the vehicle ladder, the three racecars, the arms and the UR5, pendulums, cart-poles, double pendulum, double integrator, single mass, drone, rocket (≈ 26 plants) | — | `experimental/catalog/<domain>/` (≈ 24 plants) |
 | `blocks` | routing, nonlinear, filters, sources (`Step`, `Sine`, `Ramp`, `Chirp`, `WhiteNoise`, `NoiseSource`, `TrajectorySource`), `TransferFunction`, `MLP` | `Delay`, `Switch`, `ZOHHold` | — |
 | `control` | `P` / `PI` / `PD` / `PID`, `Lead` / `Lag`, `ImpedanceController` family, `StateFeedbackController`, `OutputReferenceController`, `lqr`, `place`, `lqg`, computed torque, sliding mode, robotic laws, `PurePursuit`, `NeuralPolicyController` | `ModelPredictiveController`, `GaussianPolicy` (the seeded stochastic policy), `CBFSafetyFilter` | — |
 | `estimation` | `StateObserver`, `luenberger`, `kalman` | `ExtendedKalmanFilter`, `TrajectoryObserver` | — |
 | `analysis` | `linearize`, `transfer_function`, `bode`, `margins`, `pzmap`, `root_locus`, `step_response`, `sensitivity` family, `controllability`, `observability`, `region_of_attraction` | the traceable twins (S73) | `modal` |
 | `simulation` | `Simulator`, `RealtimeSimulator`, `game` | the sampled kernel's faces | — |
-| `planning` | `PlanningProblem`, `StochasticPlanningProblem`, `PlanningSolution`, `Evaluation`, `compare`, `tune`, `DynamicProgrammingPlanner`, `LQRPlanner`, `TrajectoryOptimizationPlanner`, `ReinforcementLearningPlanner`, `TabularLearningPlanner`, `MonteCarloEvaluator` (facade) | `ProblemEvaluator` and its verbs, `MPPIPlanner`, `LQGPlanner`, `RRTPlanner` / `RRTStarPlanner` | — |
+| `planning` | `PlanningProblem`, `StochasticPlanningProblem`, `PlanningSolution`, `Evaluation`, `evaluate`, `evaluate_trajectory`, `compare`, `DynamicProgrammingPlanner`, `LQRPlanner`, `TrajectoryOptimizationPlanner`, `ReinforcementLearningPlanner`, `TabularLearningPlanner` | `ProblemEvaluator` and its verbs (`MonteCarloEvaluator` one facade line until removed), `MPPIPlanner`, `LQGPlanner`, `RRTPlanner` / `RRTStarPlanner` | — |
 | `optimization` | `MathematicalProgram`, `Optimizer` | `ParametricProgram` (S76) | — |
-| `identification` | — (the verb is `tune` with a data cost) | `fitting` helpers (C4) | — |
+| `identification` | — (the program export on the plant's leaves, with a data problem) | `fitting` helpers (C4) | — |
 | `interfaces` | — | `Sys2Gym`, `SB3Controller` (to experimental at S49) | `c_export`, `symbolic`, `mjx` |
 
-About 115 prelude names instead of 162 (core-consolidation.md §6.4); the five nouns plus
-`Field`, `Shape` and the sampled loop are the only classes a student meets outside the
-catalog and the laws.
+About 115 prelude names instead of 162 (core-consolidation.md §6.4); the foundations' nouns,
+`Evaluation`, `Field`, `Shape` and the sampled loop are the only classes a student meets outside
+the catalog and the laws.
 
 ---
 
@@ -235,7 +233,7 @@ digital-implementation step, and a `StepSystem` already composes, rolls out and 
 plant_k = discretize(plant, dt, *, method="rk4", substeps=1, hold="zoh")   # -> StepSystem
 x1 = plant_k.step(x0, u0, k=0)                     # the bound form students use
 x1 = plant_k.step(x0, u0, k=0, params={"m": 1.2})  # the same body; params always an argument
-plant_k.compile(backend="jax").step_trace_p         # the one scannable step every sampled tool reads
+plant_k.compile(backend="jax").step                 # the one traced step every sampled tool reads (D10)
 ```
 
 `integrator=` becomes `method=` (the word `Simulator` and the MPPI plan use); the keyword
@@ -271,38 +269,35 @@ runs a held static law in a hand scan on three backends.
 **Ruled:** one engine and one facade; no parallel paths.
 
 ```python
-ev = problem.compile(controller, dt=0.01)      # compile once: the loop as a diagram, the fixed-step rollout, the score
-ev.trajectory(params, key)                     # one run, traced
-ev.cost(params, key)                           # J of that run, traced
-ev.margin(params, key)                         # the smallest margin to X and U, traced
-ev.value(params, key, n_trials)                # the problem's criterion over the draws (mean, worst, CVaR), traced: what tune minimizes
-ev.evaluate(key, n_trials) -> Evaluation       # the NumPy report from the same rollouts
-ev.program(wrt=) -> MathematicalProgram        # the bridge to the Optimizer
+pe = problem.compile(loop_or_controller, dt=0.01)   # compile once: the loop as a diagram, the fixed-step rollout, the score
+pe.trajectory(params=None, key=None)   -> Trajectory      # one run, traced
+pe.evaluate(params=None, key=0, n_trials=1) -> Evaluation # one run or n draws: the arrays, criterion_value, the statistics
+pe.program(wrt, bounds=None, key=0, n_trials=1) -> MathematicalProgram   # objective: pe.evaluate(...).criterion_value
 
-evaluate(problem, controller, *, dt=None, method="rk4", n_trials=1, key=0) -> Evaluation
-#   the student's facade: == problem.compile(controller, dt).evaluate(key, n_trials) for method="rk4"
+evaluate(problem, loop_or_controller, *, dt=None, method="rk4", n_trials=1, key=0) -> Evaluation
+#   the student's facade: == problem.compile(arg, dt).evaluate(key=key, n_trials=n_trials) for method="rk4"
 #   method="scipy": the adaptive Simulator, one run per trial; the one-line escape for stiff or switching loops
 #   dt=None: the Simulator's automatic rule (a tenth of the declared smallest time constant; 0.01 fallback)
 ```
 
-- The fixed-step compiled rollout is the judge **and** the engine: `tune` reports the number it
-  minimized. The `method` keyword swaps the run function only; loop wiring
+- The fixed-step compiled rollout is the judge **and** the engine: the program minimizes the
+  number `evaluate` reports. The `method` keyword swaps the run function only; loop wiring
   (`closed_loop_of(problem, controller)`), the draws (`problem.realize(key, n)`), the score
-  (`evaluate_trajectory`), the margin and the record are each one function. The adaptive
-  number is also `evaluate_trajectory(problem, loop.compute_trajectory())`.
+  (`evaluate_trajectory`) and the record are each one function. The adaptive number is also
+  `evaluate_trajectory(problem, loop.compute_trajectory())`.
 - `MonteCarloEvaluator` the class folds into `evaluate(..., n_trials=)`; `Planner.evaluate` and
-  `solve(evaluate=True)` call the same verb. Its numbers change once (in v0.4 with the draws).
-- **Continuous first.** A sampled controller is refused in v0.3 with a message; its face lands
-  with the hybrid tool's phase.
-- `PlanningProblem.infeasible_cost` is the one price of an exit (DP, RL, the evaluator), its
-  default `cost.g_max(X, U) · tf` (or `/ ρ`); no "infinity" on the cost.
+  `solve(evaluate=True)` call the same verb. Its numbers change once (D21).
+- **Continuous first.** A sampled controller is refused in this phase with a message; its face
+  lands with the hybrid tool's phase.
+- `PlanningProblem.infeasible_cost` is the one price (DP, RL, the evaluator), its default
+  `cost.g_max(X, U) · tf` (or `/ ρ`); no "infinity" on the cost.
 
 **`compare`, ruled 2026-10-23:** one call, several controllers, the same draws.
 
 ```python
 cmp = compare(problem, PID=pid, LQR=lqr_law, NN=nn, dt=0.01)                      # one run each
 cmp = compare(problem, PID=pid, LQR=lqr_law, NN=nn, dt=0.01, n_trials=200, key=0) # Monte Carlo, common random numbers
-print(cmp)                 # J (or mean ± std), worst, failure rate per controller
+print(cmp)                 # value (or mean ± std), worst, the three rates per controller
 cmp.plot_trajectory(); cmp.plot_cost(); cmp.plot_phase_plane(); cmp.plot_control_law(); cmp.plot_cost_to_go()
 cmp.evaluations["PID"]; cmp.difference("PID", "LQR")   # paired, per trial
 ```
@@ -342,20 +337,15 @@ hand-written, never rebuilt inside a loop. With the four-body surface of sampled
 12; DESIGN §5's stable names become one-line aliases for one release, then go with a ledger
 line. Measured cost: none (sampled-path.md §3.5); only the parametric body differentiates.
 
-### D10b The compiled problem is the traceable twin of `evaluate` (ruled 2026-10-22)
+### D10b The compiled problem is the one implementation of `evaluate` (ruled 2026-10-22, read with D9)
 
-`evaluate(problem, controller, …)` and `problem.compile(controller).evaluate(…)` share every
-piece but the run: one `closed_loop_of(problem, controller)` wiring the loop from the problem,
-one `problem.realize(key, n)` for the draws, one `evaluate_trajectory` for the score, one
-`feasibility_margin(problem, traj)` for the margin, one `Evaluation` record; the run is the
-`Simulator` on one side and the compiled fixed-step scan on the other. The compiled object's
-verbs are thin calls into those functions with `run="compiled"`, plus the program bridge,
-which has no ODE twin. A pinned test: `Simulator(solver="rk4_fixedsteps")` and the compiled
-scan on the same grid agree to round-off. **The loop may be passed built**: a diagram carrying
-the role `plant` (that block the problem's system) is used as is; anything else is a controller
-and wired; roles are never inferred from the wiring; the cost is scored on the `plant` role
-either way; `tune(problem, loop, wrt=["controller/observer.L"])` names leaves by the diagram's
-params paths.
+`evaluate(problem, arg, …)` is `problem.compile(arg, dt).evaluate(…)` for `method="rk4"`; the
+pieces are each one function: `closed_loop_of(problem, controller)` wiring the loop from the
+problem, `problem.realize(key, n)` for the draws, the one rollout body for the run, and
+`evaluate_trajectory` for the record (the margins are its fields, not a separate function).
+`method="scipy"` swaps the run for the `Simulator` and nothing else; a pinned test keeps the
+`Simulator`'s fixed-step RK4 and the compiled scan at round-off on one grid. The loop may be
+passed built (D16c).
 
 ---
 
@@ -373,7 +363,7 @@ period by the step model (RK4, `substeps`), in a NumPy and a JAX face; tracing i
 the computer (a gain, a neural policy, a digital PID, MPPI's update trace; MPC with SciPy or
 Ipopt inside runs the NumPy face until an inner solver traces). Consumers: `HybridSimulator`
 (what `loop.compute_trajectory` runs), the MPC export and replay, and later the sampled face
-of `evaluate` and `tune` (v0.4). **The RL environment is not a consumer**: it is the plant's
+of `evaluate` (v0.4). **The RL environment is not a consumer**: it is the plant's
 step model plus the reward, the learner calling the policy itself; it depends on the step model
 only. The hand-copied facades and the cache go (D13). Implementation after the continuous
 path lands (the maintainer's order: rule the whole plan, then implement the continuous core
@@ -418,8 +408,8 @@ class MPPIController(StepSystem):          # memory = the shifted input sequence
 
 **Recommended:** `problem.compile(policy)` reads the policy: a continuous law runs the loop as
 a diagram; a `Computer` (anything built by `%`) runs the sampled kernel's JAX face. In v0.3 the
-second branch refuses with a message naming step 7b; in v0.4 it lands. One `compile`,
-`evaluate`, `tune` for both kinds.
+second branch refuses with a message naming step 7b; in v0.4 it lands. One `compile` and one
+`evaluate` for both kinds.
 
 ### D16 The cost of a trajectory and the problem's fields (V1 step 2) — **ruled 2026-10-22, revised 2026-10-23**
 
@@ -437,13 +427,13 @@ then, in one pass:
 feasibility_margin  = min over the run of X.margin(x_k), U.margin(u_k)     failed  = margin < 0
 reachability_margin = Xf.margin(x(tf))                                       reached = margin ≥ 0   (Xf=None ⇒ reached)
 cost                = ∫₀^{tf} e^{−ρt} g dt  +  e^{−ρ tf} h(x(tf))             the plain integral, trapezoid on the trajectory's grid
-value               = cost + infeasible_cost · (failed or not reached)       the one scalar tune and evaluate rank by
+value               = cost + infeasible_cost · (failed or not reached)       the per-run scalar; the criterion over runs is criterion_value
 ```
 
-`evaluate_trajectory(problem, traj) -> TrajectoryEvaluation(cost, value, feasibility_margin,
-failed, reachability_margin, reached)`, a frozen pytree record: the two margins are the
-differentiable carriers (the program bridge's constraint rows), the booleans and `value`'s jump
-the reported facts. Minimum time is `TimeCost` (`g = 1` outside the goal), no stopping needed.
+`evaluate_trajectory(problem, traj) -> Evaluation` (one row: `cost`, `value`,
+`feasibility_margin`, `failed`, `reachability_margin`, `reached`), a frozen pytree record: the
+two margins are the differentiable carriers (the program's constraint rows), the booleans and
+`value`'s jump the reported facts. Minimum time is `TimeCost` (`g = 1` outside the goal), no stopping needed.
 If a diverging plant makes a failed run's `cost` huge, the fix is a saturating cost wrapper,
 not a mask (the maintainer, 2026-10-23); a NaN from the model is a model bug.
 
@@ -506,7 +496,27 @@ refused with "build the loop and name the plant `plant`". Roles are never inferr
 diagram without the `plant` key, or whose plant is another instance than the problem's system,
 is refused with the fix named. Scoring reads the plant block's recorded `x` and `u` wherever it
 sits. A cascade with two controllers, a filter and a three-block plant box needs nothing more
-than those two facts (the worked case: end-state-api.md's session notes, 2026-10-23).
+than those two facts:
+
+```python
+plant = DiagramSystem()                                   # a box of three blocks with the standard edge
+plant.add_subsystem("motor", DCMotor()); plant.add_subsystem("arm", Arm()); plant.add_subsystem("encoder", Quantizer())
+plant.connect("motor:torque", "arm:tau"); plant.connect("arm:q", "encoder:u")
+plant.add_input_port("u", "motor:v"); plant.connect_new_output_port("y", "encoder:y"); plant.expose("x")
+problem = PlanningProblem(plant, cost=cost, X=box_over_plant_x, U=ubox, tf=5.0)      # stated on the plant box
+
+loop = DiagramSystem()
+loop.add_subsystem("plant", plant)                        # the reserved key: this block is scored
+loop.add_subsystem("speed_ctl", PI(2.0, 0.5)); loop.add_subsystem("pos_ctl", PD(10.0, 1.0)); loop.add_subsystem("filter", LowPassFilter(cutoff_hz=20))
+loop.connect("plant:y", "filter:u"); loop.connect("filter:y", "pos_ctl:y"); loop.connect("pos_ctl:u", "speed_ctl:r")
+loop.connect("plant:x", "speed_ctl:y", slice=velocity); loop.connect("speed_ctl:u", "plant:u")
+loop.add_input_port("r", "pos_ctl:r")                     # left free: filled from the problem
+
+pe = problem.compile(loop, dt=0.001)
+pe.params                 # {"plant": {"motor": …, "arm": …, "encoder": …}, "speed_ctl": …, "pos_ctl": …, "filter": …, "cost": …, "x0": …, "r": …}
+pe.evaluate()             # scored on plant:x and plant:u, read from the recorded signals
+pe.program(wrt=["pos_ctl.Kp", "speed_ctl.Ki", "plant/motor.R"])
+```
 
 **`pe.params`** is the loop's own `params` dict (nested by block name, `plant/motor` two levels
 deep) plus the problem's leaves (`cost`, `x0`, the free boundary inputs); `wrt` names leaves
@@ -527,24 +537,26 @@ The former `tune` lines of this document read as this export.
 
 ### D17 The noun — ruled with D9
 
-`problem.compile(controller, dt) -> ProblemEvaluator` (name open, D19) is the engine and the
-only implementation; `evaluate` is its facade.
+`problem.compile(loop_or_controller, dt) -> ProblemEvaluator` is the engine and the only
+implementation; `evaluate` is its facade (D19 for the names).
 
 ### D18 One record, two verbs (ruled 2026-10-23)
 
 ```python
 Evaluation                       # a pytree record, one row per run (n_trials = 1 for one run): traceable inside a trace, plain outside
-    .cost, .value, .feasibility_margin, .failed, .reachability_margin, .reached, .x0, .keys   # (n,) arrays; .trajectories optional
-    .value                       # the problem's criterion over the trials, the scalar the program minimizes (one trial: that run's value)
-    .mean, .std, .worst, .cvar(a)                      # statistics of value, on xp
+    .cost, .value, .feasibility_margin, .failed, .reachability_margin, .reached, .x0, .keys   # (n,) arrays, one entry per run
+    .trajectories                # one batched Trajectory (a leading run axis on x, u and every signal) when record=True, else None
+    .criterion_value             # the problem's criterion over the runs (mean, cvar, worst): the scalar the program minimizes; one run: value[0]
+    .mean, .std, .worst, .cvar(a)                      # statistics of the per-run value, on xp
     .feasibility_rate = mean(~failed)                  # never left X or U during the run
     .reachability_rate = mean(reached)                 # ended inside Xf at tf (1.0 when the problem declares no Xf)
     .success_rate = mean(reached & ~failed)            # feasible and reached; no failure_rate statistic (it would read as 1 - success_rate)
     print(report), report.plot_...                     # reporting verbs, called outside a trace (the Trajectory's rule)
 ```
 
-No `TrajectoryEvaluation`: an `Evaluation` with one row is the record of one run. No `mean_cost`,
-no `final_state`: `report.cost.mean()` and `report.trajectories.x[..., -1]` are one line on the
+No `TrajectoryEvaluation`: an `Evaluation` with one row is the record of one run; `cost` and
+`value` are per-run arrays (`(n,)`), `criterion_value` the one scalar. No `mean_cost`, no
+`final_state`: `report.cost.mean()` and `report.trajectories.x[..., -1]` are one line on the
 arrays the record carries. `n_trials` must be written on a stochastic problem; a deterministic
 problem refuses `n_trials > 1`.
 
@@ -559,9 +571,9 @@ pe = problem.compile(loop_or_controller, dt)       -> ProblemEvaluator
 pe.params                                          # the nominal pytree: the loop's params + cost, x0, the free boundary inputs
 pe.trajectory(params=None, key=None)               -> Trajectory      # one run, every signal recorded; key=None the nominal draw
 pe.evaluate(params=None, key=0, n_trials=1)        -> Evaluation      # one run or n draws, the same record
-pe.program(wrt, bounds=None, key=0, n_trials=1)    -> MathematicalProgram   # objective: pe.evaluate(...).value
+pe.program(wrt, bounds=None, key=0, n_trials=1)    -> MathematicalProgram   # objective: pe.evaluate(...).criterion_value
 pe.pack(params, wrt) / pe.unpack(z, wrt)
-jax.grad(lambda p: pe.evaluate(p, key, 200).value)(pe.params)              # the researcher's line
+jax.grad(lambda p: pe.evaluate(p, key, 200).criterion_value)(pe.params)    # the researcher's line
 
 # the student's verbs
 evaluate(problem, arg, *, dt=None, method="rk4", n_trials=1, key=0) -> Evaluation
@@ -576,9 +588,10 @@ every parameter tree; `ParametricProgram` the later name of the parametric MPC p
 
 ### D20 No scoring modes — ruled with D16
 
-`evaluate_trajectory` is the problem's contract and nothing else; a tool that wants the uncut
-integral scores `replace(problem, X=None)`; the transcriptions take the problem's discount and
-keep their own sum (byte-identical: no baseline declares a rate).
+`evaluate_trajectory` is the problem's contract and nothing else: `cost` is the plain integral
+to `tf`, `value` the priced one, the margins and booleans beside them; no keyword changes the
+formula. The transcriptions take the problem's discount and keep their own sum (byte-identical:
+no baseline declares a rate).
 
 ### D21 The evaluator's numbers change once — **confirmed 2026-10-23**
 
@@ -657,16 +670,17 @@ RL-facing adapter in `reinforcement_learning/`; no move.
 
 | Plan | Change |
 | --- | --- |
-| sampled-path.md | the loop's name (`SampledLoop`), ticks kept, caches gone, memory as the computer's `x`: §8's "still to rule" list closes |
-| differentiable-problem.md | §4's working names become the names; ask 13 (S31 first) is met by session order |
+| sampled-path.md | the loop a tool named `HybridDiagram` for now, ticks kept (ruled); caches and memory parked to the hybrid phase |
+| differentiable-problem.md | rewritten at step 0 to D9, D16–D19: one `Evaluation`, `trajectory` / `evaluate` / `program`, the integral to `tf`, the program as the export, no `tune` |
 | parametric-program.md | `ParametricProgram`, the key `plant`, live ports as `live=` |
 | mppi.md | `MPPIPlanner`, `n_plant_samples=1`, the three verbs |
-| future-policies.md | points 2 and 4 answered without a new channel; `GaussianPolicy` named |
-| core-consolidation.md | asks 1–6 answered; the plant rule's sentence |
+| future-policies.md | point 4 (`GaussianPolicy`) a C5 row; points 2 and 3 parked with the hybrid phase |
+| core-consolidation.md | asks 1–3, 5, 6 answered (R1–R5); the catalog clean-up K8, the experimental tier K9 |
 | CONSTITUTION §1 | one sentence, the spine and the six pillars (maintainer-owned) |
 
-## 6. How to read this in the sessions
+## 6. Status
 
-Session 1 rules D1–D10 in one pass; each is a yes, a no with the alternative named, or a
-different list. Session 2 rules D11–D24 the same way; D19 is the one table to argue over.
-D25–D30 can wait for v0.4 but are written so that nothing v0.3 prints has to be renamed.
+Session 1 and the continuous-core part of session 2 are ruled (R1–R28). Open for this phase:
+nothing. Parked: D13–D15 (the hybrid phase). Deferred: D23 (the optimizer upgrade). For v0.4:
+D25–D30. Next: fold the rulings into the plan docs they shape and into workboard rows, then
+implement the continuous core.

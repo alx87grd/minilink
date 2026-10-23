@@ -218,3 +218,9 @@ Ruled for this phase (the continuous core): D1–D12, D16 (with 16b, 16c), D17�
 MPPI's name and contract, the seeded stochastic policy) to v0.4. Next: fold the rulings into
 the plan docs (differentiable-problem.md, sampled-path.md, cost-params.md, randomness.md) and
 turn them into workboard rows, then implement.
+- **Consistency pass (2026-10-23).** The sketch (end-state-api.md) and the diagram were
+  re-read against R1–R28: `tune`, the engine verbs `cost` / `margin` / `value`,
+  `TrajectoryEvaluation`, `SampledLoop`, a separate `feasibility_margin` function and the
+  "cut at exit" wording in D20 were leftovers and are gone. The per-run `value` is an `(n,)`
+  array; the criterion over the runs is the one scalar **`criterion_value`** (proposed name,
+  the maintainer to confirm), the objective of the program and the target of `jax.grad`.
