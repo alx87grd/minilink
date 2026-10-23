@@ -1425,7 +1425,6 @@ class TestAutomaticTimeGrid(unittest.TestCase):
         from minilink import (
             DiagramSystem,
             Pendulum,
-            RateLimiter,
             Saturation,
             StateFeedbackController,
         )
@@ -1437,8 +1436,7 @@ class TestAutomaticTimeGrid(unittest.TestCase):
         # a static block that declares a time constant counts like a stateful one
         saturation = Saturation(-1.0, 1.0)
         saturation.solver_info["smallest_time_constant"] = 0.02
-        limiter = RateLimiter(rate_max=5.0, tau=0.02)
-        for block in (saturation, limiter):
+        for block in (saturation,):
             with self.subTest(block=block.name):
                 loop = DiagramSystem()
                 loop.add_subsystem(controller, "controller")

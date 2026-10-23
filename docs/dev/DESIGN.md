@@ -77,10 +77,10 @@ or neural network alike):
 
 | Package | Role |
 | --- | --- |
-| `blocks/` | plant-agnostic wiring: sources, `Integrator`, `TransferFunction`, routing (`Sum`/`Gain`/`Mux`/`Demux`), nonlinear (`Saturation`/`DeadZone`/`Relay`), filters, neural (`NeuralNetwork`) |
+| `blocks/` | plant-agnostic wiring: sources, `Integrator`, `TransferFunction`, routing (`Sum`/`Gain`/`Mux`/`Demux`), nonlinear (`Saturation`), filters (`LowPassFilter`), neural (`MLP`) |
 | `dynamics/` | plants: `abstraction/` mother classes, `catalog/` by physical domain |
 | `catalog/` | **teaching alias** of `dynamics/catalog/` — flat re-exports for short imports (`from minilink.catalog import Pendulum`); ownership stays in `dynamics/` |
-| `control/` | control laws and design verbs: `design.py` (`lqr`, `place`, `lqr_finite_horizon`, `lqg`, `trajectory_lqr` on a linear model or a plant; their gains on arrays), `siso.py` (`P`, `PI`, `PD`, `PID`, `Lead`, `Lag`), `state.py`, `impedance.py`, `robotic.py`, `modelbased.py`, `neural.py`; `mpc/` (provisional). The port contract is §4, 'Control laws' |
+| `control/` | control laws and design verbs: `design.py` (`lqr`, `place`, `lqr_finite_horizon`, `lqg`, `trajectory_lqr` on a linear model or a plant; their gains on arrays), `siso.py` (`P`, `PI`, `PD`, `PID`, `Lead`), `state.py`, `impedance.py`, `robotic.py`, `modelbased.py`, `neural.py`; `mpc/` (provisional). The port contract is §4, 'Control laws' |
 | `estimation/` | state observers and their designs: `observer.py` (`StateObserver`, the innovation form, ports `u`, `y` → `x`, role `observer`), `design.py` (`luenberger`, `kalman`, the duals of `place` and `lqr`) |
 
 **Tools** — verbs on a `System`; they return data or plots and never define
@@ -449,7 +449,7 @@ pair), the limits are parameters with infinite defaults, and the integrator hold
 filtered rate and the clip are the three functions of `control/siso.py` every member
 calls. They are written once on the tracking error and take a port-layout switch:
 `ports="error"` declares one input `e` and command `u` (the compensator
-form, `P`, `PI`, `PD`, `PID`, `Lead`, `Lag`, `TransferFunction(ports="error")`),
+form, `P`, `PI`, `PD`, `PID`, `Lead`, `TransferFunction(ports="error")`),
 `ports="reference"` declares `r` and `y` (the controller form the generic
 framework uses). A bare `TransferFunction` stays a plant (`u`, `y`). An
 error-driven block (`core.feedback.block_roles`: an input `e`, or a single

@@ -24,17 +24,11 @@ _EXPORTS: dict[str, tuple[str, str]] = {
     "Mux": ("minilink.blocks.routing", "Mux"),
     "Sum": ("minilink.blocks.routing", "Sum"),
     # Nonlinear
-    "DeadZone": ("minilink.blocks.nonlinear", "DeadZone"),
-    "RateLimiter": ("minilink.blocks.nonlinear", "RateLimiter"),
-    "Relay": ("minilink.blocks.nonlinear", "Relay"),
     "Saturation": ("minilink.blocks.nonlinear", "Saturation"),
     # Transfer functions and filters
     "LowPassFilter": ("minilink.blocks.filters", "LowPassFilter"),
-    "NotchFilter": ("minilink.blocks.filters", "NotchFilter"),
     "TransferFunction": ("minilink.blocks.transfer_function", "TransferFunction"),
     "Lead": ("minilink.blocks.transfer_function", "Lead"),
-    "Lag": ("minilink.blocks.transfer_function", "Lag"),
-    "Washout": ("minilink.blocks.filters", "Washout"),
     # Neural
     "NeuralNetwork": ("minilink.blocks.neural", "NeuralNetwork"),
     "MLP": ("minilink.blocks.neural", "MLP"),

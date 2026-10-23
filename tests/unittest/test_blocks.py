@@ -118,8 +118,8 @@ class TestBlocks(unittest.TestCase):
         np.testing.assert_allclose(np.asarray(out["y"]), [6.0])
 
 
-from minilink.blocks.filters import LowPassFilter, NotchFilter, Washout
-from minilink.blocks.nonlinear import DeadZone, Relay, Saturation
+from minilink.blocks.filters import LowPassFilter
+from minilink.blocks.nonlinear import Saturation
 from minilink.blocks.routing import Demux, Error, Gain, Mux, Sum
 from minilink.blocks.sources import TrajectorySource
 from minilink.core.trajectory import Trajectory
@@ -196,16 +196,6 @@ class TestNonlinearBlocks(unittest.TestCase):
         flat = Saturation(lower=0.5, upper=0.5)  # equal limits: a constant output
         np.testing.assert_allclose(flat.compute(None, np.array([3.0])), [0.5])
 
-    def test_dead_zone(self):
-        dz = DeadZone(width=1.0)
-        out = [dz.compute(None, np.array([v]))[0] for v in (-2.0, -0.5, 0.0, 0.5, 2.0)]
-        np.testing.assert_allclose(out, [-1.0, 0.0, 0.0, 0.0, 1.0])
-
-    def test_relay_sign(self):
-        relay = Relay(amplitude=2.0)
-        out = [relay.compute(None, np.array([v]))[0] for v in (-3.0, 0.0, 4.0)]
-        np.testing.assert_allclose(out, [-2.0, 0.0, 2.0])
-
 
 class TestFilterBlocks(unittest.TestCase):
     def _dc_gain(self, lti):
@@ -218,21 +208,10 @@ class TestFilterBlocks(unittest.TestCase):
         self.assertAlmostEqual(self._dc_gain(lpf), 1.0, places=6)
 
     def test_a_filter_is_not_a_plant_and_exposes_no_state(self):
-        for block in (LowPassFilter(), NotchFilter(), Washout()):
+        for block in (LowPassFilter(),):
             with self.subTest(block=block.name):
                 self.assertEqual(list(block.inputs), ["u"])
                 self.assertEqual(list(block.outputs), ["y"])
-
-    def test_washout_blocks_dc(self):
-        self.assertAlmostEqual(self._dc_gain(Washout(cutoff_hz=1.0)), 0.0, places=6)
-
-    def test_notch_rejects_centre_frequency(self):
-        notch = NotchFilter(notch_hz=1.0, quality=10.0)
-        w0 = 2.0 * np.pi * 1.0
-        A, B, C, D = (notch.A(), notch.B(), notch.C(), notch.D())
-        n = A.shape[0]
-        H = C @ np.linalg.solve(1j * w0 * np.eye(n) - A, B) + D
-        self.assertLess(abs(H[0, 0]), 1e-06)
 
 
 class TestTrajectorySource(unittest.TestCase):

@@ -11,7 +11,6 @@ from minilink import (
     DoubleIntegrator,
     ImpedanceController,
     Integrator,
-    Lag,
     Lead,
     P,
     Pendulum,
@@ -329,11 +328,8 @@ class TestPortLayouts(unittest.TestCase):
         self.assertEqual(lead.name, "Lead")
         self.assertEqual(list(lead.inputs), ["e"])
         self.assertEqual(list(lead.outputs), ["u"])
-        np.testing.assert_allclose(Lag(K=1.0, z=1.0, p=0.1).poles, [-0.1])
         with self.assertRaises(ValueError):
             Lead(z=10.0, p=1.0)
-        with self.assertRaises(ValueError):
-            Lag(z=0.1, p=1.0)
         L = Lead() >> DoubleIntegrator()
         self.assertEqual(list(L.inputs), ["e"])
         self.assertEqual(list(L.subsystems), ["lead", "double_integrator"])
@@ -518,7 +514,6 @@ class TestDispatchTable(unittest.TestCase):
                 junction,
             ),
             ("Lead", Lead() @ G, ["controller", "plant", "error"], junction),
-            ("Lag", Lag() @ G, ["controller", "plant", "error"], junction),
             (
                 "TransferFunction error",
                 TransferFunction([2.0, 1.0], [1.0, 5.0], ports="error") @ G,
