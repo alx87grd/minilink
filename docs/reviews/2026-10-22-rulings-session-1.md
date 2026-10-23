@@ -224,3 +224,12 @@ turn them into workboard rows, then implement.
   "cut at exit" wording in D20 were leftovers and are gone. The per-run `value` is an `(n,)`
   array; the criterion over the runs is the one scalar **`criterion_value`** (proposed name,
   the maintainer to confirm), the objective of the program and the target of `jax.grad`.
+- **R29 (2026-10-23) Three corrections.** The problem never reads the cost's target (`xbar` is
+  not a generic attribute): `x_goal` is a point of `Xf` for the tools that need one, and a loop
+  whose controller reads `r` is refused when `x_goal` is `None`. `Xf=None` means no terminal
+  constraint (`reached` by definition, `h` the soft end), not "regulation". Three trajectories
+  named once: the loop's run (what the engine and the Simulator return, signals recorded, what
+  the plots show), the plant's run (`traj.of("plant")`, what the sets and the cost are written
+  over), the record (`evaluate_trajectory` scores the plant's run, projecting a loop trajectory
+  by its `plant` role; a plant-dimension trajectory without roles is taken as the plant's).
+  Lives in: continuous-core.md §3.4–§3.6, §4.8; end-state-api.md D16, D16c.

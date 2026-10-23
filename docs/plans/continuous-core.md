@@ -201,8 +201,8 @@ noisy = StochasticPlanningProblem(..., x0_distribution=Gaussian(...), params_dis
 | Field | Meaning, for every consumer |
 | --- | --- |
 | `X`, `U` | constraints along the run; enforced where a planner can (trajectory optimization, RRT, DP's grid, RL's action space), judged by the margin for any run; default unbounded, and a planner that needs a finite box **refuses** an unbounded one (`X=plant.state.box`, `U=plant.input_box` are the lines to write); LQR ignores `U` and warns once |
-| `Xf` | the goal set; enforced by the open-loop planners, judged by `reached` for any run; `None` is a regulation problem |
-| `x_goal`, `x_start` | one point of `Xf` and of `X0`; `x_goal` and `cost.xbar` are reconciled at construction |
+| `Xf` | the goal set; enforced by the open-loop planners, judged by `reached` for any run; `None` is no terminal constraint (any `x(tf)` is `reached`; the terminal cost `h` is the soft end) |
+| `x_goal`, `x_start` | one point of `Xf` and of `X0`, for the tools that need a point: RRT's bias, trajopt's initial guess, the loop's reference `r`. The problem never reads the cost's target (`xbar` exists only on the quadratic and time costs); a loop whose controller reads `r` is refused when `x_goal` is `None` |
 | `tf` | finite: the horizon, `h` charged at `tf`; `None`: infinite, no `h`, simulated over an `episode_length` the tool names |
 | `discount_rate` | ρ, applied to `g` and `h` by every consumer (RL's γ and DP's α read it here) |
 | `infeasible_cost` | the one price; default `cost.g_max(X, U) · tf` (or `/ ρ`) |
@@ -214,7 +214,7 @@ Every run is integrated to `tf`; no event, no mask, no stop. Then, in one pass:
 
 ```
 feasibility_margin  = min over the run of X.margin(x_k, t_k), U.margin(u_k, x_k, t_k)     failed  = margin < 0
-reachability_margin = Xf.margin(x(tf), tf)                                                   reached = margin ≥ 0   (Xf=None ⇒ reached)
+reachability_margin = Xf.margin(x(tf), tf)                                                   reached = margin ≥ 0   (Xf=None ⇒ reached, no terminal constraint)
 cost                = ∫₀^{tf} e^{−ρt} g dt + e^{−ρ tf} h(x(tf))                              the plain integral
 value               = cost + infeasible_cost · (failed or not reached)                      the per-run scalar
 ```
@@ -228,6 +228,14 @@ Evaluation                                 # a frozen pytree record, one row per
     .feasibility_rate, .reachability_rate, .success_rate   # mean(~failed), mean(reached), mean(reached & ~failed)
     print(report); report.plot_cost(); report.plot_trajectories()     # reporting, outside a trace
 ```
+
+**Which trajectory.** Three objects, named once:
+
+| | What it is | `x`, `u` | Who produces it |
+| --- | --- | --- | --- |
+| the loop's run | `pe.trajectory()`, `loop.compute_trajectory()` | the whole loop's state (plant and controller states), the loop's boundary input; every internal signal recorded (`plant:u`, `plant:y`, …) | the engine, the `Simulator`; what `report.trajectories` holds and the plots show |
+| the plant's run | `traj.of("plant")` (today's `trajectory_of`) | the plant's state slice, the plant's command signal | a projection of the loop's run; what `X`, `U`, `Xf` and the cost are written over |
+| the record | `evaluate_trajectory(problem, traj)` | — | scores the plant's run: a trajectory whose `x` has the plant's dimension and no roles is taken as the plant's; a loop trajectory carrying the `plant` role is projected first; anything else is refused |
 
 The two margins are the differentiable carriers (the program's constraint rows); the booleans
 and `value`'s jump are reported facts. A diverging failed run is handled, if ever needed, by a
@@ -252,8 +260,9 @@ compare(problem, **args, dt=None, n_trials=1, key=0)                  # several 
 **What the engine accepts.** A controller (a block, or a controller box with the standard
 edge): the loop is built by `closed_loop` under the port-name rules, the plant's command
 input by `command_port` (`u`, else its one input that is not `d` / `n`, else refused), the
-measurement by port name or through an `Error` block, the reference `r` filled from the
-problem, every other free input at its nominal value; no command-port argument, ambiguity
+measurement by port name or through an `Error` block, the reference `r` filled from `x_goal`
+(refused when the controller reads `r` and `x_goal` is `None`), every other free input at its
+nominal value; no command-port argument, ambiguity
 refused. Or a built loop: a diagram whose reserved key `plant` is the problem's system or a box
 containing it; roles are never inferred. Scoring reads the plant block's recorded `x` and `u`.
 A stochastic problem requires `n_trials`; a deterministic one refuses `n_trials > 1`; a
@@ -352,8 +361,10 @@ pe.program(wrt=["pos_ctl.Kp", "speed_ctl.Ki", "plant/motor.R"], bounds={"plant/m
 ### 4.8 Score a trajectory you already hold
 
 ```python
-traj = (PID(20, 10, 2) @ plant).compute_trajectory(tf=10)   # or a logged run with the plant's x and u recorded
-evaluate_trajectory(problem, traj)                           # Evaluation, one row
+traj = (PID(20, 10, 2) @ plant).compute_trajectory(tf=10)   # the loop's run, signals recorded
+evaluate_trajectory(problem, traj)                           # projected to the plant's run by the plant role, then scored
+evaluate_trajectory(problem, traj.of("plant"))               # the same, from the plant's run
+evaluate_trajectory(problem, logged)                         # a logged run: x the plant's state, u its command
 ```
 
 ### 4.9 The planners, and the sampled plant they step

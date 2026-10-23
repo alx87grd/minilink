@@ -425,7 +425,7 @@ then, in one pass:
 
 ```
 feasibility_margin  = min over the run of X.margin(x_k), U.margin(u_k)     failed  = margin < 0
-reachability_margin = Xf.margin(x(tf))                                       reached = margin ≥ 0   (Xf=None ⇒ reached)
+reachability_margin = Xf.margin(x(tf))                                       reached = margin ≥ 0   (Xf=None ⇒ reached: no terminal constraint)
 cost                = ∫₀^{tf} e^{−ρt} g dt  +  e^{−ρ tf} h(x(tf))             the plain integral, trapezoid on the trajectory's grid
 value               = cost + infeasible_cost · (failed or not reached)       the per-run scalar; the criterion over runs is criterion_value
 ```
@@ -446,8 +446,10 @@ objective included (its baselines declare no rate, so they stay bit-identical).
 **One meaning per field, for every consumer.** `X`, `U`: constraints along the run, enforced
 where a planner can (trajectory optimization, RRT, DP's grid), judged by the margin for any
 run. `Xf`: the goal set, enforced by the open-loop planners, judged by `reached` for any run;
-`Xf=None` is a regulation problem. `x_goal`: one point of `Xf` and the cost's target, checked
-against `cost.xbar` at construction (derive one from the other, refuse a conflict). `tf`:
+`Xf=None` is no terminal constraint (any `x(tf)` is `reached`; `h` the soft end). `x_goal`: one
+point of `Xf`, for the tools that need a point (RRT, trajopt's guess, the loop's `r`); the problem
+never reads the cost's target (`xbar` is not a generic attribute; corrected 2026-10-23), and a
+loop whose controller reads `r` is refused when `x_goal` is `None`. `tf`:
 finite, the horizon; `None`, infinite, simulated over an `episode_length` the tool names and
 no `h`. **Ruled 2026-10-23 (D31a, D31b): the sets are explicit.** `X` and `U` both default to the
 unbounded set; a planner that needs a finite box refuses an unbounded one with the line to
@@ -490,7 +492,7 @@ box containing it (`plant/arm`); otherwise it is a controller and the loop is bu
 `closed_loop` with the automation-by-convention rules: the plant's command input is
 `command_port(plant)` (`u`, else its one input that is not `d` / `n`, else refused), the
 measurement wired by port name or through an `Error` block, the reference `r` filled from the
-problem (`x_goal`, else the cost's target; a loop whose reference cannot be set is refused),
+problem's `x_goal` (a loop whose controller reads `r` is refused when `x_goal` is `None`; the cost's target is never read),
 every other free input at its nominal value. No command-port argument exists: ambiguity is
 refused with "build the loop and name the plant `plant`". Roles are never inferred: a hand-wired
 diagram without the `plant` key, or whose plant is another instance than the problem's system,
