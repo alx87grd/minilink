@@ -576,7 +576,9 @@ every notebook has moved, no pin (R47).
 attention, the proposed cuts to v0.4 (SM-7, SM-6's move, A2, K4, K8-3, S31) and a GMC714 API
 freeze on December 1 (record item 8); whether MPC and robust control need the engine in
 December (item 9); the slots of S31 and S74 (item 18); `discretize`'s `params["dt"]` fallback,
-proposed dropped (item 21).
+proposed dropped (item 21); and the program with the price off (the default), where one
+diverging trial makes the objective `+inf`: written as a caveat (set `infeasible_cost=True` for a
+search that may reach unstable gains), to confirm.
 
 **Before v0.4 (S76, the parametric program)**
 

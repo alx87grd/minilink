@@ -528,9 +528,10 @@ moved to the new interface (R47).
   lessons run on `evaluate`.
 - [ ] **V1.5 The program export** (R23, R32). `pe.program(wrt, bounds=None, key, n_trials)` with
   the objective `pe.evaluate(...).objective` and the declared `X`, `U`, `Xf` as per-sample `g ≥ 0`
-  rows; `pe.pack` / `pe.unpack`; the leaves scaled by their nominal magnitude; the docstring's two
+  rows; `pe.pack` / `pe.unpack`; the leaves scaled by their nominal magnitude; the docstring's three
   caveats (the price has no gradient; with the price on and sets declared it counts beside the
-  rows); today's `Optimizer` unchanged (S74 deferred, R25). No `tune`. Done when
+  rows; with the price off a diverging trial makes the objective `+inf`, so a search that may
+  reach unstable gains sets `infeasible_cost=True`); today's `Optimizer` unchanged (S74 deferred, R25). No `tune`. Done when
   `Optimizer(program).solve()` on the autotuning program reaches the hand loop's gains, the demo
   ends in the `Optimizer`, and a tuning that leaves `X` comes back inside through the margin rows.
 - [ ] **V1.6 Cost parameters** (A2 below; [cost-params.md](cost-params.md)): the nesting lands,

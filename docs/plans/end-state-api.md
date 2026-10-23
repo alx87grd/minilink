@@ -5,6 +5,12 @@ D24, D31; the record is
 [2026-10-22-rulings-session-1.md](../reviews/2026-10-22-rulings-session-1.md)); D13–D15 parked
 to the hybrid phase, D23 deferred, D25–D30 proposals for v0.4. Every decision is written *as
 the code a user would write*, so the whole can be read once before any of it is built.
+**Session 3 (2026-10-23, evening, R30–R47)** supersedes parts of D9, D9b, D16, D16b, D16c, D18,
+D19 and D21 (the price switch, the finite guard, `x_goal`, `dt` required, the reference left to
+the controller, the hold on sequences, one home per number, `solver=`, the Monte Carlo fold in
+v0.3, the names `cost` / `J` / `objective`): the current form is
+[continuous-core.md](continuous-core.md); the entries below keep the alternatives as they were
+weighed, and §1.1 and D19's code show the current names.
 **Lane:** maintainer-owned (every item is an **[ask — core]** or **[ask — public names]**).
 **Rung:** the agenda of the two rulings sessions (ROADMAP §5.3, §6 "Blocking code now"), and
 the v0.4 asks that fix a name the v0.3 code will already print.
@@ -57,40 +63,42 @@ plant = Pendulum()
 loop = Step(port="r") >> PID(Kp=20, Ki=10, Kd=2) @ plant
 loop.compute_trajectory(tf=10);  loop.plot_trajectory();  loop.plot_bode()
 K = lqr(plant, Q=np.eye(2), R=np.eye(1))
-plant.compute_forced(u_of_t, tf=10, method="rk4")                 # the one rollout body, hold="zoh"; method="scipy" the adaptive door
+plant.compute_forced(u_of_t, tf=10, solver="rk4")                 # the one rollout body: a callable at the stage times, a matrix held; solver="scipy" adaptive
 
 # 2. The compiled plant and the step model
 ev = plant.compile("jax")                                        # f, h, step, rollout, rollout_batch; ev.jit.*, ev.frozen.* generated
-plant_k = discretize(plant, dt=0.05, method="rk4", substeps=1, hold="zoh")   # a StepSystem, step(x, u, k, params)
+plant_k = discretize(plant, dt=0.05, solver="rk4", substeps=1)   # a StepSystem, step(x, u, k, params); the input held by definition
 
 # 3. The cost and the problem
-cost = QuadraticCost.from_system(plant)                          # params, g, h, g_max, integrate
+cost = QuadraticCost.from_system(plant)                          # params, g, h, g_max, h_max, integrate
 traj = loop.compute_trajectory(tf=10).with_cost(cost)            # the cost_rate / cost signals, no problem needed
 problem = PlanningProblem(plant, cost=cost, X=plant.state.box, U=plant.input_box, Xf=None, tf=10.0, discount_rate=0.0)
 noisy = StochasticPlanningProblem(plant, cost=cost, X=plant.state.box, U=plant.input_box, tf=10.0,
                                   x0_distribution=Gaussian(mean=plant.x0, cov=0.1 * np.eye(2)),
                                   params_distribution={"m": Gaussian(1.0, cov=0.01)},
-                                  disturbances={"d": WhiteNoise(psd=1e-2)}, criterion=("cvar", 0.1))
+                                  disturbances={"d": WhiteNoise(psd=1e-2)}, criterion=("cvar", 0.1),
+                                  infeasible_cost=True)          # the price switch: the cost's bound
 
 # 4. One evaluation of any run, one record
-evaluate_trajectory(problem, traj)                               # Evaluation, one row: cost, value, the two margins, failed, reached
+evaluate_trajectory(problem, traj)                               # Evaluation, one row: cost, J, the two margins, failed, reached
 
 # 5. The engine and the student's verbs
-pe = problem.compile(PID(Kp=20, Ki=10, Kd=2), dt=0.01)          # ProblemEvaluator; the loop built by the port-name rules, r from the problem
+pid = PID(Kp=20, Ki=10, Kd=2); pid.inputs["r"].set_nominal_value([np.pi])   # the setpoint is the controller's
+pe = problem.compile(pid, dt=0.01)                               # ProblemEvaluator; the loop built by the port-name rules
 pe.params                                                        # {"controller": …, "plant": …, "cost": …, "x0": …, "r": …}
 pe.trajectory()                                                  # one run, every signal recorded
 pe.evaluate()                                                    # Evaluation, one row
-noisy.compile(ctl, dt=0.01).evaluate(key=0, n_trials=200)        # Evaluation, 200 rows: criterion_value, mean, worst, cvar, the three rates
-jax.grad(lambda p: pe.evaluate(p).criterion_value)(pe.params)    # the researcher's line
-report = evaluate(problem, PID(Kp=20, Ki=10, Kd=2))              # the facade: dt from the plant's time constant, method="rk4"
-compare(problem, PID=PID(20, 10, 2), LQR=StateFeedbackController(K), n_trials=1).plot_trajectory()
+noisy.compile(pid, dt=0.01).evaluate(key=0, n_trials=200)        # Evaluation, 200 rows: objective, mean, worst, cvar, the three rates
+jax.grad(lambda p: pe.evaluate(p).objective)(pe.params)          # the researcher's line
+report = evaluate(problem, pid, dt=0.01)                         # the facade: dt required, solver="rk4"
+compare(problem, PID=pid, LQR=StateFeedbackController(K), dt=0.01).plot_trajectory()
 
 # 6. What this phase exports: the program
 program = pe.program(wrt=["controller.Kp", "controller.Kd"], bounds={"controller.Kp": (0, None)})
 result = Optimizer(program).solve();  tuned = pe.unpack(result.z, wrt=["controller.Kp", "controller.Kd"])
 
 # 7. The planners, every one a PlanningSolution; its policy re-enters as a controller
-sol_dp = DynamicProgrammingPlanner(problem, dt=0.05).solve()                 # Euler on the grid through the step model; method="rk4" available
+sol_dp = DynamicProgrammingPlanner(problem, dt=0.05).solve()                 # Euler on the grid through the step model; solver="rk4" available
 sol_to = TrajectoryOptimizationPlanner(problem, transcription="direct_collocation").solve()
 sol_rl = ReinforcementLearningPlanner(noisy, dt=0.05, substeps=1, algorithm="ppo").solve()   # actions from U
 compare(problem, DP=sol_dp, LQR=StateFeedbackController(K), PPO=sol_rl, dt=0.05).plot_trajectory()
@@ -221,7 +229,7 @@ The three seeds with a clock: tabular RL (owes its demo before v0.9), the Lyapun
 breaking change so far); shims start with V4 at v1.0. The names stay importable from their
 band facade, so a deep import never breaks.
 
-### D6 The step model's contract and name (S75, asks 1 and 6)
+### D6 The step model's contract and name (S75, asks 1 and 6) — `method=` superseded by `solver=` (R42)
 
 **Today:** eight discretizations of the same plant (sampled-path.md §1);
 `discretize(system, dt=None, *, integrator="rk4", params=None) -> StepSystem` is hand-written
@@ -243,7 +251,7 @@ plant_k.compile(backend="jax").step                 # the one traced step every 
 `integrator=` becomes `method=` (the word `Simulator` and the MPPI plan use); the keyword
 stays accepted for one release with the ledger line, no alias beyond that.
 
-### D7 The four knobs, their defaults, and who exposes `substeps` (S75, ask 2)
+### D7 The four knobs, their defaults, and who exposes `substeps` (S75, ask 2) — three knobs since R40 (no `hold` on the step), `solver=` (R42)
 
 **Ruled 2026-10-22: yes.** `method="rk4"`, `substeps=1`, `hold="zoh"` (today's numbers everywhere);
 `"exact"` for linear models (the `discretize` follow-up); `hold="foh"` only where shooting
@@ -281,7 +289,7 @@ pe.program(wrt, bounds=None, key=0, n_trials=1) -> MathematicalProgram   # objec
 evaluate(problem, loop_or_controller, *, dt=None, method="rk4", n_trials=1, key=0) -> Evaluation
 #   the student's facade: == problem.compile(arg, dt).evaluate(key=key, n_trials=n_trials) for method="rk4"
 #   method="scipy": the adaptive Simulator, one run per trial; the one-line escape for stiff or switching loops
-#   dt=None: the Simulator's automatic rule (a tenth of the declared smallest time constant; 1e-4 s on a loop that declares none: raised in ROADMAP §6, 2026-10-23)
+#   dt=None: the Simulator's automatic rule (a tenth of the declared smallest time constant; 1e-4 s on a loop that declares none; superseded: dt required, R36; solver= for method=, R42)
 ```
 
 - The fixed-step compiled rollout is the judge **and** the engine: the program minimizes the
@@ -431,7 +439,7 @@ then, in one pass:
 feasibility_margin  = min over the run of X.margin(x_k), U.margin(u_k)     failed  = margin < 0
 reachability_margin = Xf.margin(x(tf))                                       reached = margin ≥ 0   (Xf=None ⇒ reached: no terminal constraint)
 cost                = ∫₀^{tf} e^{−ρt} g dt  +  e^{−ρ tf} h(x(tf))             the plain integral, trapezoid on the trajectory's grid
-value               = cost + infeasible_cost · (failed or not reached)       the per-run scalar; the criterion over runs is criterion_value
+value               = cost + infeasible_cost · (failed or not reached)       the per-run scalar (superseded: J, priced only when the switch is on, R32, R45); the criterion over runs is criterion_value
 ```
 
 `evaluate_trajectory(problem, traj) -> Evaluation` (one row: `cost`, `value`,
@@ -562,7 +570,8 @@ Evaluation                       # a pytree record, one row per run (n_trials = 
 ```
 
 No `TrajectoryEvaluation`: an `Evaluation` with one row is the record of one run; `cost` and
-`value` are per-run arrays (`(n,)`), `criterion_value` the one scalar. No `mean_cost`, no
+`value` are per-run arrays (`(n,)`), `criterion_value` the one scalar (the names superseded by
+R45: `cost`, `J`, `objective`; `J` priced only when the problem's switch is on, R32). No `mean_cost`, no
 `final_state`: `report.cost.mean()` and `report.trajectories.x[..., -1]` are one line on the
 arrays the record carries. `n_trials` must be written on a stochastic problem; a deterministic
 problem refuses `n_trials > 1`.
@@ -574,18 +583,21 @@ problem refuses `n_trials > 1`.
 evaluate_trajectory(problem, traj)                 -> Evaluation     # one row
 
 # the engine: two verbs and the program; every verb takes (params=None, key=...) first
-pe = problem.compile(loop_or_controller, dt)       -> ProblemEvaluator
-pe.params                                          # the nominal pytree: the loop's params + cost, x0, the free boundary inputs
+pe = problem.compile(loop_or_controller, dt, *, substeps=1, solver="rk4") -> ProblemEvaluator
+pe.params                                          # assembled from the objects: the loop's params + cost, x0, the free inputs at their nominal
 pe.trajectory(params=None, key=None)               -> Trajectory      # one run, every signal recorded; key=None the nominal draw
-pe.evaluate(params=None, key=0, n_trials=1, *, record=False)      -> Evaluation      # one run or n draws, the same record
-pe.program(wrt, bounds=None, key=0, n_trials=1)    -> MathematicalProgram   # objective: pe.evaluate(...).criterion_value
+pe.evaluate(params=None, key=0, n_trials=1, *, record=False)      -> Evaluation      # one run or n draws: cost, J, objective
+pe.program(wrt, bounds=None, key=0, n_trials=1)    -> MathematicalProgram   # objective: pe.evaluate(...).objective; the declared sets as rows
 pe.pack(params, wrt) / pe.unpack(z, wrt)
-jax.grad(lambda p: pe.evaluate(p, key, 200).criterion_value)(pe.params)    # the researcher's line
+jax.grad(lambda p: pe.evaluate(p, key, 200).objective)(pe.params)    # the researcher's line
 
 # the student's verbs
-evaluate(problem, arg, *, dt=None, method="rk4", n_trials=1, key=0, record=False) -> Evaluation
-compare(problem, **args, dt=None, n_trials=1, key=0)                -> Comparison
+evaluate(problem, arg, *, dt, solver="rk4", n_trials=1, key=0, record=False) -> Evaluation   # dt required (R36)
+compare(problem, **args, dt, n_trials=1, key=0)                -> Comparison
 ```
+
+The code above is the current form (session 3: `objective` for R27's `criterion_value`, R45;
+`solver=` for `method=`, R42; `dt` required, R36).
 
 Each verb is named by what it returns: `trajectory` a `Trajectory`, `evaluate` an `Evaluation`,
 `program` a `MathematicalProgram`. `wrt=` is the selection keyword; `"plant"` the plant's key in
@@ -687,9 +699,9 @@ RL-facing adapter in `reinforcement_learning/`; no move.
 
 ## 6. Status
 
-Session 1 and the continuous-core part of session 2 are ruled (R1–R29). Open for this phase:
-the confirmation of `criterion_value`, and the points the 2026-10-23 alignment pass and second
-opinion raised (ROADMAP §6, "Raised 2026-10-23"). The plan docs were aligned on 2026-10-23 and
+Sessions 1 to 3 are ruled (R1–R47). Open for this phase:
+the points of the 2026-10-23 second opinion left after session 3 (R30–R47): v0.3's scope and the
+slots of S31 and S74, after the GMC714 audit (ROADMAP §6). The plan docs were aligned on 2026-10-23 and
 the workboard rows written (TODO §4). Parked: D13–D15 (the hybrid phase). Deferred: D23 (the
 optimizer upgrade). For v0.4: D25–D30. Next: implement the continuous core, the step model's
 baseline (SM-0) first.
