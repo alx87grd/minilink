@@ -189,3 +189,8 @@ of it in sampled-path.md §3.6; the numbers from `benchmarks/params_binding.py`.
 - **R25 (D23, 2026-10-23) The optimizer upgrade is deferred.** Program classes hinting the
   solver, `auto` selection, algorithm-named presets and the first-order backend (S74) come
   after the continuous core; this phase exports the program to today's `Optimizer`.
+- **R26 (D19, 2026-10-23) The names.** `problem.compile -> ProblemEvaluator`; its verbs all
+  take `(params=None, key=...)` first: `trajectory`, `evaluate_trajectory` (one run's record;
+  the verb formerly `cost`), `value`, `evaluate` (the report), `program`, `pack` / `unpack`;
+  `wrt=`; the key `plant`; `TrajectoryEvaluation` and `Evaluation` the two records. Lives in:
+  end-state-api.md D19.

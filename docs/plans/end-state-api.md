@@ -537,23 +537,32 @@ only implementation; `evaluate` is its facade.
 `value()` is the one traced scalar, the problem's criterion over the draws. No pytree record,
 no second spelling of the traced number.
 
-### D19 The names of step 0 (ask 5)
+### D19 The names (ruled 2026-10-23)
 
-**Recommended package**, one line each, with the alternative in parentheses:
+```python
+# level 1: scoring a run you hold
+evaluate_trajectory(problem, traj) -> TrajectoryEvaluation(cost, value, feasibility_margin, failed, reachability_margin, reached)
 
-| Thing | Recommended | Alternatives | Why |
-| --- | --- | --- | --- |
-| the facade | `problem.compile(policy, dt=)` | `closed_loop`, `evaluator` | the `System.compile` pair |
-| the noun | `ProblemEvaluator` | `CompiledProblem`, `PlanningProblemEvaluator` | the `compile → Evaluator` pair |
-| the run | `trajectory()` | `simulate()`, `rollout()` | returns a `Trajectory`; "simulate" is `Simulator`'s |
-| the scalar | `cost()` | `J()`, `score()` | the cost is the noun the problem holds |
-| the criterion over the draws | `value()` | `expected_cost()` | the criterion may be a CVaR; "value" is the DP word |
-| the feasibility number | `margin()` | `feasibility()` | the sets' own verb |
-| the system-evaluator method | `rollout_p()` | `simulate_p()` | the RL word for a run of the compiled step |
-| the selection keyword | `wrt=` | `decision=`, `free=` | `jacobian(of, wrt)` already says it |
-| the facade on the program | `tune()` | none | the course notes' word for gain tuning |
-| the parametric program (S76) | `ParametricProgram` | keep `ParametricMathematicalProgram` | RULES 2.6, short |
-| the plant's key in every parameter tree | `"plant"` | `"system"` | the role name every tool reads (P10); `ProblemParameters.system` renames on V4's list |
+# level 2: the engine; every verb takes (params=None, key=...) first, params=None the loop's own, key=None the nominal draw
+pe = problem.compile(loop_or_controller, dt)      -> ProblemEvaluator
+pe.params
+pe.trajectory(params=None, key=None)              -> Trajectory               # one run
+pe.evaluate_trajectory(params=None, key=None)     -> TrajectoryEvaluation     # one run's record, traced (the verb formerly named cost)
+pe.value(params=None, key=0, n_trials=1)          -> scalar                   # the problem's criterion over the draws, traced
+pe.evaluate(params=None, key=0, n_trials=1)       -> Evaluation               # the report over the draws, NumPy
+pe.program(wrt, bounds=None, key=0, n_trials=1)   -> MathematicalProgram
+pe.pack(params, wrt) / pe.unpack(z, wrt)
+
+# level 3: the student's verbs
+evaluate(problem, arg, *, dt=None, method="rk4", n_trials=1, key=0) -> Evaluation
+compare(problem, **args, dt=None, n_trials=1, key=0)                -> Comparison
+```
+
+`wrt=` is the selection keyword (as `jacobian(of, wrt)`); `"plant"` is the plant's key in every
+parameter tree (`ProblemParameters.system` renames on the v1.0 list); `ParametricProgram` is the
+later name for the parametric MPC program. Gone: `tune`, `margin` as a verb, `cost` as a verb,
+`MonteCarloEvaluator` (one facade line until removed). One word, one meaning at every level:
+`evaluate_trajectory` is the six-field record of one run, `evaluate` the report over draws.
 
 ### D20 No scoring modes — ruled with D16
 
