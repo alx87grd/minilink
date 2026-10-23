@@ -469,3 +469,6 @@ split when it starts; this section marks the reversals).
   `Relay`, `NotchFilter` and `Washout` are deleted (their one user is the `signal_blocks.py`
   showcase); `ZOHHold`, a discrete unit delay `x_{k+1} = u_k` and not the continuous zero-order hold
   (that is the sampled loop's and the sequences' `hold`, R40), is renamed `UnitDelay`.
+- **R65 (2026-10-23) The tabular learners stay and get their demo.** `TabularLearningPlanner`,
+  `EpsilonGreedy` and `UCB` stay on the teaching surface; one demo shows tabular Q-learning on the
+  pendulum grid beside value iteration, converging toward the DP cost-to-go (GRO860's RL row).

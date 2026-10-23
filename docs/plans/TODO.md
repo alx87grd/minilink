@@ -372,6 +372,16 @@ the demo sweep touches fewer files. Nothing leaves without the maintainer's ruli
   flagship smoke (both on `minilink.experimental.c_export`). Left: the unsupported plants' test rows
   leave with K8-3. Done when CI's gate imports nothing under the tier but those two exceptions,
   and `pip wheel` ships nothing under it.
+- [ ] **K10 The package structure** **[ask — public names]** (raised by the maintainer 2026-10-23):
+  `planning/` is a 63-file umbrella where value iteration hides under `policy_synthesis/` and MPC lives
+  in `control/mpc/`. Proposed, by R1's pillars: `minilink.planning` keeps the problem and its solutions
+  with three sub-packages, `dynamic_programming/` (was `policy_synthesis/`), `trajectory_optimization/`
+  (MPC moved in, the block still importable from `control`) and `search/`; reinforcement learning moves
+  to a new `minilink.learning` (later with identification and imitation), or stays as
+  `planning.reinforcement_learning` (to rule); `spatial/` leaves with A3. The band facades keep their
+  names, so course imports barely move; deep paths, demos, tests and the API docs migrate in the same
+  commit. Reopens [repository-structure.md](repository-structure.md) §2 (its A2, rejected then for the
+  name freeze). Done when the ruling is recorded and the moves are rows here.
 - [ ] **K7 What is core, what is a side feature** **[ask — core, public names]**
   (ROADMAP §6): the convergence pass; every move is a step of its own once ruled. In v0.3
   with K1–K4: K1's inventory is core-consolidation.md §3–§4, K2 and K3 are its tiers; the

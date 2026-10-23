@@ -96,6 +96,10 @@ handful). High cost, low visible gain.
 
 ### 2.3 Recommendation
 
+> **Reopened 2026-10-23** (the maintainer): `planning/` is to be regrouped and breaking names is
+> accepted, so A2's objection (the name freeze) no longer holds. The proposal and the open choice are
+> workboard row K10 (TODO §4).
+
 **A1.** The top level says the right thing; the churn budget goes to the hot spots and to
 B and C. Revisit A2 only if a `learning/` chapter (imitation, identification, RL together)
 becomes a course in its own right.
