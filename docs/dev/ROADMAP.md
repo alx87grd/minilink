@@ -385,8 +385,8 @@ feature (R48).
   reaches the cost's own weights. **[ask — core]**, ruled.
 - **S31** The sampled loop, ruled a tool with ticks (R13, R14), after the continuous core, in v0.3
   (R73); its details (D13–D15) are ruled when it starts. **[ask — core]**
-- **S74** The optimizer upgrade: deferred by R25 to after the continuous core, with OPW-1–OPW-5;
-  it lands before S76 (§5.4), which builds on its backend factory.
+- **S74** The optimizer upgrade, with OPW-1–OPW-5: in v0.3 right after the program export (R74),
+  before S76 (§5.4), which builds on its backend factory.
 
 **GMC714** (R48): no new feature; the teaching surface already covers every lab (§4.3).
 - **G3** GMC714's names stable by January (R49): `RRTPlanner` to the teaching lane, the robotic
@@ -586,10 +586,8 @@ for time (R42); the RL episode a training setting (R43); the Monte Carlo fold in
 record's names `cost`, `J`, `objective` (R45); no regularizer hook (R46); v0.3 on `dev` until
 every notebook has moved, no pin (R47).
 
-**Still open from the second opinion:** the slot of the optimizer upgrade (S74, deferred by R25; it
-lands before S76). The rest is ruled: v0.3 holds everything planned, ordered by the GMC714 deadline
-(R73; the sampled loop S31 in v0.3); item 9 by R48; `discretize`'s `params["dt"]` fallback dropped
-(R70); the program warns once on a diverging run (R72).
+**The second opinion:** every point ruled (R30–R74); v0.3 holds everything planned, ordered by the
+GMC714 deadline (R73), the optimizer upgrade right after the program export (R74).
 
 **Before v0.4 (S76, the parametric program)**
 

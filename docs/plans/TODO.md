@@ -550,17 +550,20 @@ moved to the new interface (R47).
   of a sampled controller (D13–D15), the `core` → `simulation` import (scan: core#14). In v0.3
   (R73). Done when
   D13–D15 are ruled and the kernel's steps are rows here.
-- [ ] **S74 The optimizer as the one descent loop** **[idea to review — ask — core]**, proposed
-  2026-10-18, **deferred by R25 (2026-10-23)** to after the continuous core: the program's class
-  read from its fields, `method="auto"`, presets named by algorithm, one first-order backend with
-  the RL `Adam` moved; design in [differentiable-problem.md](differentiable-problem.md) §4.7.
-  Its slot is open; S76 (§5) builds on its backend factory (OPW-1), so S74 lands before S76.
+- [ ] **S74 The optimizer as the one descent loop** **[ask — core]**, ruled 2026-10-23 (R74): in v0.3,
+  right after V1.5. The program's class read from its fields (unconstrained, bounded, constrained),
+  `method="auto"` picking by class and refusing a method the class does not admit, presets named by
+  algorithm (`"l-bfgs"`, `"adam"`, `"gd"`; the `scipy_*` keys kept), one first-order backend with the
+  RL `Adam` moved (the RL baselines bit-identical); design in
+  [differentiable-problem.md](differentiable-problem.md) §4.5. Done when `Optimizer(program).solve()`
+  on the autotuning program reaches the hand loop's gains with `method="adam"` and with the class
+  default, SLSQP refuses nothing it accepted before, the RL baselines stay bit-identical, and no
+  `value_and_grad` loop remains in `examples/demos/compile/` (one tutorial loop kept if §9 says so).
   - [ ] **OPW-1–OPW-5** (with S74) The parametric (MPC) optimizer goes through `Optimizer`'s
     backend table ([parametric-program.md](parametric-program.md) §6; scan: planning#9). Done
     when `optimizer_method="ipopt"` reaches the parametric MPC path and the plan's OPW-4 tests
     pass.
-- [ ] **Still open from the second opinion** **[ask]**: the slot of S74 (the optimizer upgrade, deferred
-  by R25; before S76). Everything else is ruled (R30–R73).
+- Second opinion: every point ruled (R30–R74).
 
 **GMC714** (R48, 2026-10-23): no new feature; the teaching surface covers every lab (ROADMAP
 §4.3). The labs move from pyro to minilink as the maintainer's teaching work, outside this

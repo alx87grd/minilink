@@ -515,3 +515,8 @@ split when it starts; this section marks the reversals).
   GMC714 term freezes (A6, K2, K8, K10, S32, G3, R68), then the step model (SM-0–SM-8, SM-7 included),
   the path to the cost (V1.1–V1.6 with V1.4b and A2), and the sampled loop (S31, in v0.3: its slot,
   item 18, settled).
+- **R74 (2026-10-23) The optimizer upgrade lands in v0.3, right after the program export.** S74 (the
+  program's class read from its fields, `method="auto"`, presets named by algorithm with the `scipy_*`
+  keys kept, one first-order backend with the RL `Adam` moved, OPW-1–OPW-5 routing the parametric MPC
+  solve through the same table) follows V1.5; the compile demos lose their hand loops in the same pass.
+  Supersedes R25's deferral to "after the continuous core"; the second opinion's last item closed.
