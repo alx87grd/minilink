@@ -485,3 +485,10 @@ split when it starts; this section marks the reversals).
   diagram backend. The pygame renderer stays: it is `RealtimeSimulator`'s default renderer and the game
   demos' (K8-4 had listed it by mistake). The `identification/` stub is deleted: identification's home
   is `minilink.learning` when C4 lands (R66).
+- **R68 (2026-10-23, S64) Every plant states its own bounds; the base class invents none.**
+  `MechanicalSystem` no longer gives every subclass `q, q̇ ∈ ±2π` and `u ∈ ±5`: its default bounds are
+  unbounded, and each catalog plant writes its bounds in its own constructor, keeping today's numbers
+  (no catalog number changes; a byte-identical baseline). A user's own subclass starts unbounded, and
+  the tools that need a finite box refuse it with the line to write (R21). Lands in v0.3 with V1.2,
+  since `plant.input_box` (R37), `plant.state.box` (R21) and the price bound (R32) read these boxes. The
+  rest of S64's hygiene stays in v0.4 (R48); the K8 row's step K8-5 is removed.

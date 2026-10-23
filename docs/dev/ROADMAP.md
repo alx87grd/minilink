@@ -618,9 +618,8 @@ search that may reach unstable gains), to confirm.
 
 - **The optional `KinematicModel` delegate**: adopt or drop, decided with C6's mechanism
   description.
-- **Mechanical default bounds** (S64): keep the invented ±2π / ±5 on every
-  `MechanicalSystem`, or each plant states its own and `StateSpaceGrid` refuses infinite
-  bounds.
+- **Mechanical default bounds** (S64): ruled 2026-10-23 (R68): each plant states its own, the base
+  class invents none; lands in v0.3 with V1.2.
 - **Which pyro demos the courses still need** (drives the parity rows).
 - **Pyro game demos** — port the rest to `simulation/realtime/` or drop (the
   behavior-cloning game mode after v1.0 would reuse them).

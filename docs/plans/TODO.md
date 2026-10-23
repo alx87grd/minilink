@@ -356,8 +356,7 @@ the demo sweep touches fewer files. Nothing leaves without the maintainer's ruli
   and demos (the top-level `experimental/`), their tests and docs entries removed, out of the
   wheel **[ask — per plant]**; **K8-4** twins merged (R55, R59) and the dead helpers deleted
   (R54, R67: the Mermaid exporters, `camera.py`, `ProblemEnv` / `to_gymnasium`, the
-  `identification/` stub; the pygame renderer stays, the real-time default); **K8-5** S64's hygiene,
-  one plant family per commit; **K8-6** the README's catalog line by domain and the API
+  `identification/` stub; the pygame renderer stays, the real-time default); **K8-6** the README's catalog line by domain and the API
   site's plant page. Done when the root prelude lists exactly R60's plants, `minilink.catalog`
   lists only tested plants, no two supported plants differ by parameters alone, and
   `test_teaching_surface.py` pins both lists.
@@ -480,7 +479,8 @@ moved to the new interface (R47).
   re-pinned once (R21, R37); `x_goal` never creates `Xf` (R33: the terminal equality written as
   `Xf=SingletonSet(...)` where a lesson wants it); `Xf=None` is reached; `ProblemParameters`
   retired, each object owning its parameters (R41; the readers migrate here or with A2); a
-  role-less trajectory scored only without signals and with the plant's sizes (R39).
+  role-less trajectory scored only without signals and with the plant's sizes (R39); every catalog
+  plant states its own bounds and `MechanicalSystem` invents none (R68, today's numbers kept).
   **Intended changes:** the integral to `tf` replaces the cut at exit wherever `score_trajectory`
   scored; trajopt's `U` and `Xf` defaults (one baseline, one test, a ledger line each). The
   lessons that relied on a default gain the explicit line in the same commit. Done when DP and
