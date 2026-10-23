@@ -388,9 +388,12 @@ feature (R48).
 
 **GMC714** (R48): no new feature; the teaching surface already covers every lab (§4.3).
 - **G3** GMC714's names stable by January (R49): `RRTPlanner` to the teaching lane, the robotic
-  laws onto the prelude, `Manipulator` and `MechanicalSystem` on a new `minilink.dynamics` band
+  laws onto the prelude, the textbook model forms on a new `minilink.dynamics` band
   facade, MPC as `ModelPredictiveController` with a frozen constructor (R50); A6's short catalog
   names land before the term (R50).
+- **S32** One mechanical family (R62, pulled forward from after v1.0): `GeneralizedMechanicalSystem`
+  a child of `MechanicalSystem` beside `Manipulator`, `H` the one mass-matrix name, the model-based
+  controllers accepting every mechanical plant. **[ask — core]**, ruled.
   **[ask — public names]**
 - The former wave G rows (C1's pyro parity and migration guide, C2's robotic PID wrappers, C3's
   blocks, S63, S64) move to v0.4 (§5.4); the labs are the maintainer's teaching work, outside
@@ -506,8 +509,7 @@ After two cohorts have run on v0.2 and the freeze candidate has held a term:
 - The freeze: the V3 surface under the V4 policy; the GRO860 name freeze becomes the
   general one.
 
-**After v1.0 (1.x features, additive by construction):** **S32** one mechanical base, if it
-lands without breaking a name **[ask — core]**; **S36** iLQR from parts (research lane); a
+**After v1.0 (1.x features, additive by construction):** **S36** iLQR from parts (research lane); a
 **behavior-cloning pipeline** end to end:
 a game mode on `RealtimeSimulator` that records human demonstrations (keyboard or joystick
 driving the plant live) as trajectory datasets, a planner that fits a policy to them

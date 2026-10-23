@@ -591,6 +591,14 @@ LQGPlanner as picked; S73 any time, self-contained.
 
 **The draws on the path.**
 
+- [ ] **S32 One mechanical family** **[ask — core]**, ruled 2026-10-23 (R62), pulled forward to v0.3
+  with G3: `GeneralizedMechanicalSystem` a child of `MechanicalSystem` beside `Manipulator`, `H` the
+  one mass-matrix name (`M` renamed in the class, the boat and the plane), `qv2x` / `x2qv` aligned, the
+  model-based controllers accepting every mechanical plant; `Boat2D` (and `Plane3D` in the
+  experimental tier) with `y` and `x` like every mechanical plant (no `q` / `dq` ports);
+  `DynamicBicycle` on the generalized child (scan: dynamics#5). Done when the boat and the plane pass the
+  catalog contract test as children of `MechanicalSystem`, `ComputedTorque` runs on one of them in a
+  test, and no class names the mass matrix `M`.
 - [ ] **V1, step 7: the noise seeds on the draws** **[ask — core]** (the fold itself is v0.3,
   V1.4b, R44): `problem.realize(key, n)` gains one seed per random block (RN-4), so a noise block
   inside the loop or on a port draws per trial under the same `evaluate(..., n_trials, key)`; with
@@ -906,10 +914,7 @@ in December 2026 after the v0.3 tag; the v1.0 rows after two cohorts.
 
 ### After v1.0 — 1.x features, additive
 
-- [ ] **S32** Unify `MechanicalSystem` / `GeneralizedMechanicalSystem` (`N = I` special
-  case); `Boat2D` / `Plane3D` on the mechanical base, with `y` and `x` like every mechanical
-  plant (no `q` / `dq` ports); `DynamicBicycle` on `GeneralizedMechanicalSystem` (scan:
-  dynamics#5).
+
 - [ ] **S36** iLQR planner from parts (`jacfwd` of `f_trace`; idea, research lane).
 - [ ] **Behavior-cloning pipeline** **[ask]**: a game mode on `RealtimeSimulator` that records
   human demonstrations (keyboard or joystick driving the plant live) as trajectory datasets; a

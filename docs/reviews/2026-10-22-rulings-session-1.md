@@ -445,3 +445,13 @@ split when it starts; this section marks the reversals).
   `MechanicalSystem`'s default matrix builders are written once with the `xp` idiom (as every catalog
   plant's are), the experimental symbolic export reads `MechanicalSystem`, and its one test moves
   with it (CONSTITUTION §6: one equation path for NumPy and JAX).
+- **R62 (2026-10-23) One mechanical family, one vocabulary.** `GeneralizedMechanicalSystem` becomes a
+  child of `MechanicalSystem`, beside `Manipulator`: the base keeps the textbook manipulator equation
+  `H(q) q̈ + C(q, q̇) q̇ + d + g(q) = B(q) u`; the child adds `N(q)` (`q̇ = N(q) v`, body-frame
+  velocities) and the state split when `q` and `v` differ in size. The mass matrix is `H` everywhere,
+  as in the course notes (ch. 6, eq. 6.14; ch. 11, eqs. 11.5 and 11.8, where `M_b` is a body's own
+  inertia): `GeneralizedMechanicalSystem.M`, the boat's and the plane's become `H`, the docstring
+  noting "often written `M` (Craig, Lynch & Park)"; `qv2x` / `x2qv` align with `q2x` / `x2q`. The
+  model-based controllers (`ComputedTorque`, `SlidingMode`, the joint impedance laws) read one set of
+  matrices and accept every mechanical plant, working in `v`. Both forms stay for teaching; S32's
+  single class (`N = I` by default) is not adopted.
