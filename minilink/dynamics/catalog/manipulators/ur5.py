@@ -29,7 +29,6 @@ class UR5Manipulator(Manipulator):
 
     def __init__(self):
         super().__init__(dof=6, actuators=6, task_dim=3)
-        self.name = "UR5 Manipulator"
 
         # Parameters: the DH chain, the published masses and centers of mass, and
         # cylinder inertias

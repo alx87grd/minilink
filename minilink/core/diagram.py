@@ -51,8 +51,8 @@ class DiagramSystem(WiredDiagramMixin, DynamicSystem):
         # DynamicSystem's standard u and y
         System.__init__(self, 0)
 
-        # Wiring tables, the name and the stacked-state layout
-        self.init_wiring(name="Diagram")
+        # Wiring tables and the stacked-state layout
+        self.init_wiring()
 
     def add_subsystem(self, sys, sys_id):
         """Add a continuous or static subsystem under a unique id.
@@ -229,8 +229,8 @@ class StepDiagramSystem(WiredDiagramMixin, StepSystem):
         # Memory: the last rollout ``compute_rollout`` produced
         self.rollout = None
 
-        # Wiring tables, the name and the stacked-state layout
-        self.init_wiring(name="StepDiagram")
+        # Wiring tables and the stacked-state layout
+        self.init_wiring()
 
     def add_subsystem(self, sys, sys_id):
         """Add a step or static subsystem under a unique id.

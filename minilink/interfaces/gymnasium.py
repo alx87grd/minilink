@@ -299,9 +299,10 @@ class SB3Controller(System):
     ports (sweep domain and axis names for ``plot_control_law``).
     """
 
-    def __init__(self, model, sys=None, name="RL Policy Controller"):
+    def __init__(self, model, sys=None, name=None):
         super().__init__()
-        self.name = name
+        if name is not None:
+            self.name = name
         self.model = model
 
         n = int(model.observation_space.shape[0])

@@ -26,7 +26,6 @@ class CartPole(MechanicalSystem):
 
     def __init__(self):
         super().__init__(dof=2, actuators=1)
-        self.name = "Cart Pole"
 
         # Parameters
         self.params = {
@@ -245,7 +244,6 @@ class NoisyCartPole(CartPole):
 
     def __init__(self):
         super().__init__()
-        self.name = "Cart Pole with noise ports"
 
         # Ports: the disturbance force d and the measurement noise n
         self.add_input_port("d", dim=1, nominal_value=np.array([0.0]))
@@ -289,7 +287,6 @@ class RotatingCartPole(MechanicalSystem):
 
     def __init__(self):
         super().__init__(dof=2, actuators=2)
-        self.name = "Rotating Cart Pole"
 
         # Parameters
         self.params = {
@@ -459,7 +456,6 @@ class UnderactuatedRotatingCartPole(RotatingCartPole):
 
     def __init__(self):
         super().__init__()
-        self.name = "Underactuated Rotating Cart Pole"
 
         # Ports: one torque, on the base joint, within ±5 N·m
         self.inputs.clear()

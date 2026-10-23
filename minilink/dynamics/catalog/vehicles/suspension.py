@@ -22,7 +22,6 @@ class QuarterCar(DynamicSystem):
 
     def __init__(self):
         super().__init__(n=3, input_dim=1, output_dim=3, expose_state=True)
-        self.name = "Quarter Car On Rough Terrain"
 
         # Parameters
         self.params = {

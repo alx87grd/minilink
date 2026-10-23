@@ -43,7 +43,6 @@ class MechanicalSystem(DynamicSystem):
             expose_state=True,
             y_dependencies=(),
         )
-        self.name = f"{dof}DoF Mechanical System"
 
         # Signal labels, units and bounds: an angle and a velocity per coordinate
         lim = 2 * np.pi

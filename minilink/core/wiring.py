@@ -32,15 +32,14 @@ class WiredDiagramMixin:
     step index ``k`` (int) in the same parameter position.
     """
 
-    def init_wiring(self, *, name: str = "Diagram") -> None:
+    def init_wiring(self) -> None:
         """The wiring memory and the stacked state of a new diagram, set up by its ``__init__``.
 
         The diagram sets its subsystem registry and wiring table first, before
         ``System.__init__``, whose params setter reads them.
         """
-        # Wiring memory: a quiet connect, and the diagram's name
+        # Wiring memory: a quiet connect
         self.connection_verbose = False
-        self.name = name
 
         # The stacked state of the (still empty) subsystems
         self.n, self.state_index, self.state, self.x0, self.derived_x0 = state_layout(

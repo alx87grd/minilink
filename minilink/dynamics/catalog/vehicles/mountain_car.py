@@ -26,7 +26,6 @@ class MountainCar(MechanicalSystem):
 
     def __init__(self):
         super().__init__(dof=1, actuators=1)
-        self.name = "Mountain Car"
 
         # Parameters: the bead's mass, gravity, and the hill z(x) = a cos(w x)
         self.params = {

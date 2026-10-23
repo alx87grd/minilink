@@ -244,7 +244,7 @@ def test_plot_draws_the_slice_and_the_basin():
     roa = region_of_attraction(loop)
 
     fig, ax = roa.plot(basin=True, n=41, show=False)
-    self_titled = ax.get_title()
+    self_titled = " ".join(ax.get_title().split())
     assert "region of attraction" in self_titled
     assert len(ax.collections) >= 1  # the shaded basin
     assert ax.get_xlabel() == loop.state.labels[0]

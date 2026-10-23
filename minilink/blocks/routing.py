@@ -20,7 +20,6 @@ class Error(System):
 
     def __init__(self, dim=1):
         super().__init__()
-        self.name = "Error"
 
         # Parameters: the dimension the three ports share
         self.dim = int(dim)
@@ -56,7 +55,6 @@ class Sum(System):
 
     def __init__(self, signs=(1.0, -1.0), dim=1):
         super().__init__()
-        self.name = "Sum"
 
         # Parameters: the sign of each input, which sets the port count, and the
         # dimension the ports share
@@ -95,7 +93,6 @@ class Gain(System):
 
     def __init__(self, K, dim=None):
         super().__init__()
-        self.name = "Gain"
 
         # Parameters: the gain as a (p, m) matrix
         K = gain_matrix(K, dim)
@@ -126,7 +123,6 @@ class Mux(System):
 
     def __init__(self, dims=(1, 1)):
         super().__init__()
-        self.name = "Mux"
 
         # Parameters: the dimension of each input port
         self.dims = [int(d) for d in dims]
@@ -154,7 +150,6 @@ class Demux(System):
 
     def __init__(self, dims=(1, 1), *, port="u"):
         super().__init__()
-        self.name = "Demux"
 
         # Parameters: the dimension of each output slice, and the signal's name
         self.dims = [int(d) for d in dims]

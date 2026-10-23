@@ -34,7 +34,7 @@ class TransferFunction(ErrorDriven, LTISystem):
         denominator,
         *,
         ports=None,
-        name="Transfer Function",
+        name=None,
         expose_state=True,
     ):
         require_tf_ports(ports)
@@ -134,7 +134,7 @@ class Lead(TransferFunction):
         require_lead_corners(z, p)
 
         # C(s) = (K s + K z) / (s + p)
-        super().__init__([K, K * z], [1.0, p], ports=ports, name="Lead")
+        super().__init__([K, K * z], [1.0, p], ports=ports)
 
 
 ###############################################################################

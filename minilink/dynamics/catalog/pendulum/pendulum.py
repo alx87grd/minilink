@@ -21,7 +21,6 @@ class Pendulum(MechanicalSystem):
 
     def __init__(self, length=1.0, mass=1.0):
         super().__init__(dof=1, actuators=1)
-        self.name = "Pendulum"
 
         # Parameters
         self.params = {
@@ -121,7 +120,6 @@ class NoisyPendulum(Pendulum):
 
     def __init__(self):
         super().__init__()
-        self.name = "Pendulum"
 
         # Ports: the disturbance torque d and the measurement noise n
         self.add_input_port("d", dim=1, nominal_value=np.array([0.0]))
@@ -175,7 +173,6 @@ class InvertedPendulum(Pendulum):
 
     def __init__(self):
         super().__init__()
-        self.name = "Inverted Pendulum"
 
     def g(self, q, params=None):
         # The upright zero angle flips the sign of the hanging pendulum's gravity term
@@ -198,7 +195,6 @@ class TwoIndependentPendulums(MechanicalSystem):
 
     def __init__(self):
         super().__init__(dof=2, actuators=2)
-        self.name = "Two Independent Pendulums"
 
         # Parameters
         self.params = {

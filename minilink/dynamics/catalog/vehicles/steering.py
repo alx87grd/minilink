@@ -25,7 +25,6 @@ class KinematicBicycle(DynamicSystem):
 
     def __init__(self):
         super().__init__(n=3, input_dim=2, output_dim=3, expose_state=True)
-        self.name = "Kinematic Bicycle"
 
         # Parameters: a CG-centered wheelbase, ``length = a + b`` (the frame
         # convention of
@@ -94,7 +93,6 @@ class KinematicCar(KinematicBicycle):
 
     def __init__(self):
         super().__init__()
-        self.name = "Kinematic Car"
 
         # Parameters: a full-size wheelbase
         self.a = 2.0
@@ -173,7 +171,6 @@ class HolonomicMobileRobot(DynamicSystem):
 
     def __init__(self):
         super().__init__(n=2, input_dim=2, output_dim=2, expose_state=True)
-        self.name = "Holonomic Mobile Robot"
 
         # Signal labels and units
         self.state.labels = ["x", "y"]

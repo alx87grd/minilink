@@ -73,7 +73,6 @@ class PurePursuit(System):
         state_dim: int = 9,
     ):
         super().__init__()
-        self.name = "Pure Pursuit"
 
         # Parameters. ``waypoints`` and ``closed`` are not gains: they say what the
         # block tracks. They live in ``params`` all the same, because the search reads

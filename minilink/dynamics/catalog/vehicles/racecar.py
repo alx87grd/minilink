@@ -71,7 +71,6 @@ class UdeSRacecar(KinematicBicycle):
 
     def __init__(self):
         super().__init__()
-        self.name = "UdeS Racecar"
 
         # Parameters: the 1/10 car's wheelbase and rear wheel radius
         a = PUBLIC_RACECAR_PARAMS["a"]
@@ -141,7 +140,6 @@ class UdeSRacecarDyn(DynamicBicycle):
 
     def __init__(self, named_ports=True):
         super().__init__(named_ports=True)
-        self.name = "UdeS Racecar"
         self.named_ports = bool(named_ports)
 
         # State: the body's six, the rear wheel rate, the steer angle and the power
@@ -483,8 +481,6 @@ class UdeSRacecarDyn3D(UdeSRacecarDyn):
 
         # Lazy import: the graphics load on first use, not with the core
         from minilink.graphical.catalog.racecar_skin import racecar_skin_3d
-
-        self.name = "UdeS Racecar (3D)"
 
         # State: the car's nine, then the rear and front rolling angles
         self.n = 11

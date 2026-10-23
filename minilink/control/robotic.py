@@ -44,7 +44,6 @@ class ModelJointImpedance(System):
         require_gravity_model(plant, gravity_comp, gravity)
 
         super().__init__()
-        self.name = "Joint Impedance"
 
         # The embedded plant model, and its custom gravity hook
         self.plant = plant
@@ -188,7 +187,6 @@ class TaskImpedance(System):
         task_target_radius: float = 0.04,
     ):
         super().__init__()
-        self.name = "Task Impedance"
 
         # The embedded kinematic model, and its custom gravity hook
         self.plant = plant
@@ -345,7 +343,6 @@ class TaskKinematic(System):
         dof, task_dim = kinematic_dims_of(plant)
 
         super().__init__()
-        self.name = "Task Kinematic"
 
         # The embedded kinematic model
         self.plant = plant
@@ -407,7 +404,6 @@ class TaskKinematicNullspace(TaskKinematic):
 
         # System's constructor, not TaskKinematic's: this block declares its own ports
         super(TaskKinematic, self).__init__()
-        self.name = "Task Kinematic Nullspace"
 
         # The embedded kinematic model
         self.plant = plant

@@ -24,7 +24,6 @@ class Source(System):
 
     def __init__(self, p, *, port="y"):
         super().__init__()
-        self.name = "Source"
 
         # Parameters
         self.params = {"value": np.zeros(p)}
@@ -150,7 +149,6 @@ class Step(Source):
 
         p = initial_value.shape[0]
         Source.__init__(self, p, port=port)
-        self.name = "Step"
 
         # Parameters
         self.params = {
@@ -187,7 +185,6 @@ class Sine(Source):
         p = amplitude.shape[0]
 
         Source.__init__(self, p, port=port)
-        self.name = "Sine"
 
         # Parameters: the frequency, phase and offset, one per channel
         self.params = {
@@ -241,7 +238,6 @@ class WhiteNoise(Source):
         require_positive_period(sample_period)
 
         Source.__init__(self, p, port=port)
-        self.name = "WhiteNoise"
         self.hold = hold
 
         # Parameters: the realization's seed, the sample period Δ and the intensity W
@@ -329,7 +325,6 @@ class TrajectorySource(Source):
         require_one_of("interpolation", interpolation, self.INTERPOLATIONS)
 
         Source.__init__(self, values.shape[0], port=port)
-        self.name = "Trajectory Source"
 
         # The samples and the rule between them
         self.sample_times = t

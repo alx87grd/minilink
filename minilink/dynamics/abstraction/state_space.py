@@ -30,7 +30,7 @@ class StateSpaceSystem(DynamicSystem):
         m,
         p=None,
         feedthrough=False,
-        name="State Space System",
+        name=None,
         declare_ports=True,
         expose_state=True,
     ):
@@ -41,7 +41,8 @@ class StateSpaceSystem(DynamicSystem):
             expose_state=declare_ports and expose_state,
             y_dependencies=("u",) if feedthrough else (),
         )
-        self.name = name
+        if name is not None:
+            self.name = name
 
     def A(self, t=0.0, params=None):
         """State matrix ``A`` as a function of time and parameters."""
@@ -108,7 +109,7 @@ class LTISystem(StateSpaceSystem):
         C=None,
         D=None,
         *,
-        name="LTI System",
+        name=None,
         declare_ports=True,
         expose_state=True,
         xbar=None,

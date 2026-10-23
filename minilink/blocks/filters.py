@@ -30,7 +30,7 @@ class LowPassFilter(TransferFunction):
         wc = 2.0 * np.pi * f_c
         num, den = signal.butter(order, wc, btype="low", analog=True, output="ba")
 
-        super().__init__(num, den, name="Low-Pass Filter", expose_state=False)
+        super().__init__(num, den, expose_state=False)
 
 
 if __name__ == "__main__":

@@ -48,7 +48,6 @@ class StateObserver(DynamicSystem):
         ybar = C @ xbar + D @ ubar if ybar is None else point_component(ybar, p, "ybar")
 
         super().__init__(n)
-        self.name = "State Observer"
         self.id = "observer"
 
         # Parameters

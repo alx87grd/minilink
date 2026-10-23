@@ -42,7 +42,6 @@ class ComputedTorque(System):
         require_mechanical_plant(plant)
 
         super().__init__()
-        self.name = "Computed Torque Controller"
 
         # The embedded model: the plant itself, read with its live params
         self.plant = plant
@@ -149,7 +148,6 @@ class SlidingMode(ComputedTorque):
     ):
         super().__init__(plant, tracking_ref=tracking_ref, Kp=0.0, Kd=0.0)
         n = plant.dof
-        self.name = "Sliding Mode Controller"
 
         # Parameters: the surface slope λ, the switching gain, and the switching gain
         # scaled by the inertia, per joint

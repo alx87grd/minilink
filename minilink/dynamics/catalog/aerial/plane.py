@@ -27,7 +27,6 @@ class Plane2D(MechanicalSystem):
 
     def __init__(self):
         super().__init__(dof=3, actuators=2)
-        self.name = "Planar Aircraft"
 
         # Parameters
         self.params = {
@@ -423,7 +422,6 @@ class Plane3D(GeneralizedMechanicalSystem):
 
     def __init__(self):
         super().__init__(dof=6, pos=6, actuators=4)
-        self.name = "Aircraft 3D"
 
         # Parameters
         self.params = {

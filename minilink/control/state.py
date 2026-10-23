@@ -29,7 +29,6 @@ class StateFeedback(System):
 
     def __init__(self, K, xbar=None, ubar=None):
         super().__init__()
-        self.name = "State Feedback Controller"
 
         # Parameters: the gain and the operating point
         K = np.atleast_2d(np.asarray(K, dtype=float))
@@ -74,7 +73,6 @@ class OutputReference(System):
 
     def __init__(self, K, N, xbar=None, ubar=None):
         super().__init__()
-        self.name = "Output Reference Controller"
 
         # Parameters: the gain, the operating point and the reference gain
         K = np.atleast_2d(np.asarray(K, dtype=float))
@@ -121,7 +119,6 @@ class TimeVaryingFeedback(System):
 
     def __init__(self, t, K, xbar=None, ubar=None, K_after=None):
         super().__init__()
-        self.name = "Time-Varying State Feedback Controller"
 
         # Parameters: the schedule (t, K(t)), the operating point and the gain past
         # the schedule's end
@@ -187,7 +184,6 @@ class TrajectoryFeedback(System):
 
     def __init__(self, trajectory, K):
         super().__init__()
-        self.name = "Trajectory Feedback Controller"
 
         # Parameters: the reference samples (t, x_d, u_d) and the gains K(t)
         t = np.asarray(trajectory.t, dtype=float).reshape(-1)

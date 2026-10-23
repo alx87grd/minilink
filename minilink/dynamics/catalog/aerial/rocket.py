@@ -22,7 +22,6 @@ class Rocket(MechanicalSystem):
 
     def __init__(self):
         super().__init__(dof=3, actuators=2)
-        self.name = "Planar Rocket"
 
         # Parameters
         self.params = {

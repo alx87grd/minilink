@@ -66,7 +66,6 @@ class Impedance(System):
 
         super().__init__()
         self.dof = n
-        self.name = "Impedance Controller"
 
         # Parameters: stiffness and damping as (n, n) matrices, the limits per axis
         self.params = {
@@ -145,7 +144,6 @@ class IntegralImpedance(DynamicSystem):
 
         super().__init__(n=n)
         self.dof = n
-        self.name = "Impedance Integral Controller"
 
         # Parameters: stiffness and damping as (n, n) matrices, the integral gain,
         # the limits and the end stops per axis

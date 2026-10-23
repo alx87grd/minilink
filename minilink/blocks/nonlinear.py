@@ -17,7 +17,6 @@ class Saturation(System):
         require_ordered_end_stops(lower, upper)
 
         super().__init__()
-        self.name = "Saturation"
 
         # Parameters: the number of channels and the clip limits
         self.dim = int(dim)

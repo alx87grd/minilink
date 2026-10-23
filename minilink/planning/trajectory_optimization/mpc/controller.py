@@ -480,7 +480,6 @@ class MPCStatelessController(ModelPredictiveControllerMixin, System):
         # An algebraic block, then the shared MPC state: the planner, the replan
         # clock, the deploy memory and the tick latch
         System.__init__(self)
-        self.name = "MPC Stateless Controller"
         ModelPredictiveControllerMixin.__init__(
             self, planner, dt_mpc=dt_mpc, t0=t0, verbose=verbose, debug=debug
         )
@@ -535,7 +534,6 @@ class MPCStatefulController(ModelPredictiveControllerMixin, StepSystem):
         # the shared MPC state: the planner, the replan clock, the deploy memory and
         # the tick latch
         StepSystem.__init__(self, n_z, expose_state=False)
-        self.name = "MPC Stateful Controller"
         ModelPredictiveControllerMixin.__init__(
             self, planner, dt_mpc=dt_mpc, t0=t0, verbose=verbose, debug=debug
         )
@@ -904,7 +902,6 @@ class MPCBroadcastController(System):
 
     def __init__(self, mpc, *, dt_broadcast: float, t0: float = 0.0) -> None:
         super().__init__()
-        self.name = "MPC Broadcast"
 
         # The replan block it samples, and the broadcast clock
         self.mpc = mpc

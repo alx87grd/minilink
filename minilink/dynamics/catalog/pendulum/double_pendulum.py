@@ -30,7 +30,6 @@ class DoublePendulum(MechanicalSystem):
 
     def __init__(self):
         super().__init__(dof=2, actuators=2)
-        self.name = "Double Pendulum"
 
         # Parameters
         self.params = {
@@ -267,7 +266,6 @@ class Acrobot(DoublePendulum):
 
     def __init__(self):
         super().__init__()
-        self.name = "Acrobot"
 
         # Ports: one torque, on the elbow, within ±10 N·m
         self.inputs.clear()

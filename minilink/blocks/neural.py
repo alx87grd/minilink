@@ -42,7 +42,6 @@ class MLP(System):
         output_gain: float = 1.0,
     ):
         super().__init__()
-        self.name = "MLP"
 
         # Hidden nonlinearity
         require_activation(activation)

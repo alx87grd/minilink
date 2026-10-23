@@ -33,7 +33,6 @@ class Manipulator(MechanicalSystem):
         super().__init__(dof=dof, actuators=actuators)
         self.task_dim = int(task_dim)
         require_positive_task_dim(self.task_dim)
-        self.name = f"{dof}DoF Manipulator"
 
         # Graphics: the scale of the optional tool-force arrow, in m/N
         self.force_arrow_scale = 0.02

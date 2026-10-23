@@ -25,7 +25,6 @@ class OneLinkManipulator(Manipulator):
 
     def __init__(self):
         super().__init__(dof=1, actuators=1, task_dim=2)
-        self.name = "One Link Manipulator"
 
         # Parameters
         self.params = {
@@ -163,7 +162,6 @@ class TwoLinkManipulator(Manipulator):
 
     def __init__(self):
         super().__init__(dof=2, actuators=2, task_dim=2)
-        self.name = "Two Link Manipulator"
 
         # Parameters
         self.params = {
@@ -366,7 +364,6 @@ class ThreeLinkManipulator(Manipulator):
 
     def __init__(self):
         super().__init__(dof=3, actuators=3, task_dim=3)
-        self.name = "Three Link Manipulator 3D"
 
         # Parameters
         self.params = {
@@ -663,7 +660,6 @@ class FiveLinkManipulator(Manipulator):
 
     def __init__(self):
         super().__init__(dof=5, actuators=5, task_dim=2)
-        self.name = "Five Link Planar Manipulator"
 
         # Parameters
         self.params = {"l": np.array([0.5, 0.5, 0.5, 0.5, 0.5])}
@@ -777,7 +773,6 @@ class KinematicManipulator(DynamicSystem):
             output_dim=self.dof,
             expose_state=True,
         )
-        self.name = f"{self.dof} Joint Speed Controlled Manipulator"
 
         # Signal labels and units: the joint angles, driven by the joint rates
         self.state.labels = [f"q{i + 1}" for i in range(self.dof)]

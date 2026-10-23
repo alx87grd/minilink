@@ -47,7 +47,6 @@ class P(ErrorDriven, System):
 
         super().__init__()
         self.dof = n
-        self.name = "P"
 
         # Parameters
         self.params = {

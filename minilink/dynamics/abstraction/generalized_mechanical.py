@@ -42,7 +42,6 @@ class GeneralizedMechanicalSystem(DynamicSystem):
             expose_state=True,
             y_dependencies=(),
         )
-        self.name = f"{self.dof}DoF Generalized Mechanical System"
 
         # Signal labels, units and bounds: the positions q, then the velocities v
         for i in range(self.pos):

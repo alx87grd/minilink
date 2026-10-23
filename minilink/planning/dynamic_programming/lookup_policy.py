@@ -33,7 +33,6 @@ class LookupPolicy(System):
 
     def __init__(self, grid, pi, *, interpolation: str = "linear") -> None:
         super().__init__()
-        self.name = "Lookup Table Controller"
 
         # Parameters: the grid and the policy's action ids
         self.grid = grid

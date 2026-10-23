@@ -33,7 +33,6 @@ class DynamicBicycle(DynamicSystem):
 
     def __init__(self, named_ports=True):
         super().__init__(n=6)
-        self.name = "Dynamic Bicycle"
         self.named_ports = bool(named_ports)
 
         # Parameters: CG-to-axle distances a/b [m], wheel radii r_f/r_r [m],
@@ -425,7 +424,6 @@ class DynamicBicycleCar3D(DynamicBicycle):
 
     def __init__(self):
         super().__init__()
-        self.name = "Dynamic Bicycle (3D car)"
 
         # Graphics: the 3-D skin over the base plant's 3-D look; the dynamic arrows
         # stay a per-class override, since four corner arrows are not skin-driven
@@ -482,7 +480,6 @@ class BicycleDynRate(DynamicBicycle):
 
     def __init__(self, named_ports=False):
         super().__init__(named_ports=False)
-        self.name = "BicycleDynRate"
         self.named_ports = bool(named_ports)
 
         # State: the body's six, then the rear wheel rate and the steer angle

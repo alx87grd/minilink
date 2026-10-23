@@ -78,7 +78,7 @@ class NeuralPolicyController(System):
         normalize=True,
         squash="clip",
         seed=0,
-        name="Neural Policy Controller",
+        name=None,
         show_setpoint=False,
         setpoint_plant=None,
         setpoint_radius=0.04,
@@ -86,7 +86,8 @@ class NeuralPolicyController(System):
         task_target_radius=0.04,
     ):
         super().__init__()
-        self.name = name
+        if name is not None:
+            self.name = name
         self.sys = sys
 
         # Graphics: the set-point ball and the fixed task ball
