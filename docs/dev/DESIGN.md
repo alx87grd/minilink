@@ -80,7 +80,7 @@ or neural network alike):
 | `blocks/` | plant-agnostic wiring: sources, `Integrator`, `TransferFunction`, routing (`Sum`/`Gain`/`Mux`/`Demux`), nonlinear (`Saturation`), filters (`LowPassFilter`), neural (`MLP`) |
 | `dynamics/` | plants: `abstraction/` mother classes, `catalog/` by physical domain |
 | `catalog/` | **teaching alias** of `dynamics/catalog/` — flat re-exports for short imports (`from minilink.catalog import Pendulum`); ownership stays in `dynamics/` |
-| `control/` | control laws and design verbs: `design.py` (`lqr`, `place`, `lqr_finite_horizon`, `lqg`, `trajectory_lqr` on a linear model or a plant; their gains on arrays), `siso.py` (`P`, `PI`, `PD`, `PID`, `Lead`), `state.py`, `impedance.py`, `robotic.py`, `modelbased.py`, `neural.py`; `mpc/` (provisional). The port contract is §4, 'Control laws' |
+| `control/` | control laws and design verbs: `design.py` (`lqr`, `place`, `lqr_finite_horizon`, `lqg`, `trajectory_lqr` on a linear model or a plant; their gains on arrays), `siso.py` (`P`, `PI`, `PD`, `PID`, `Lead`), `state.py`, `impedance.py`, `robotic.py`, `modelbased.py`, `neural.py`; `ModelPredictiveController` re-exported from `planning/trajectory_optimization/mpc/`. The port contract is §4, 'Control laws' |
 | `estimation/` | state observers and their designs: `observer.py` (`StateObserver`, the innovation form, ports `u`, `y` → `x`, role `observer`), `design.py` (`luenberger`, `kalman`, the duals of `place` and `lqr`) |
 
 **Tools** — verbs on a `System`; they return data or plots and never define
@@ -92,7 +92,8 @@ state-feedback block):
 | --- | --- |
 | `simulation/` | `Simulator`, `StaticSimulator`, `Computer`, `StepSchedule`, `HybridSimulator`, solvers, forcing; `realtime/` (`RealtimeSimulator`, `RealtimeInput`/`RealtimeOutput`, `PygameInput`, `LiveSignalPlotOutput`) |
 | `analysis/` | one calling pattern `tool(sys, x_bar, u_bar, t, params, *, method="auto", eps)` on any `System` (the linear model as is, the rest linearized at the operating point): `jacobian`, `linearize` (→ `LTISystem`), the one-channel frequency and time tools (`bode`, `pzmap`, `nyquist`, `margins`, `root_locus`, `step_response`, `step_info`, `transfer_function`, the sensitivity functions) with their `plot_` twins, `structural` (controllability, observability, `minreal`), `equilibria`, `modal`, `lyapunov`, `riccati`, `discretization`. The API reference is the docs site |
-| `planning/` | `problems.py`, `results.py`, `evaluation.py`, `comparison.py`; `trajectory_optimization/`, `dynamic_programming/` (DP), `reinforcement_learning/`, `search/` (RRT), `spatial/` (scenes; **retires** into `core/geometry/`) |
+| `planning/` | `problems.py`, `results.py`, `evaluation.py`, `comparison.py`; `dynamic_programming/` (value iteration, policy evaluation, `LQRPlanner`, the lookup policy), `trajectory_optimization/` (collocation, shooting; `mpc/`, the receding-horizon block, provisional), `search/` (RRT), `spatial/` (scenes; **retires** into `core/geometry/`) |
+| `learning/` | policies learned from interaction: `reinforcement_learning/` (the neural planner, the tabular learners); identification and imitation later |
 | `optimization/` | `MathematicalProgram`, `Optimizer` (generic NLP) |
 | `graphical/` | signals, phase plane, diagrams, animation |
 | `interfaces/` | lazy facade: `Sys2Gym` / `SB3Controller` (gymnasium extra); cosimulation / MJX planned |
@@ -156,8 +157,8 @@ state-feedback block):
    `estimation/`. Do **not** put plant math under top-level `catalog/` — that
    package is a teaching alias only.
 2. New verb → tool: integrate time (`simulation`), characterize (`analysis`),
-   find inputs/policies (`planning`), solve NLPs (`optimization`), fit to data
-   (`identification`), render (`graphical`), talk to another ecosystem
+   find inputs/policies (`planning`), learn them or fit models to data
+   (`learning`), solve NLPs (`optimization`), render (`graphical`), talk to another ecosystem
    (`interfaces`).
 3. Neither, and unproven → `experimental/` with a TRL tag.
 
@@ -977,7 +978,7 @@ solved.
 fixed-horizon `solve_steps` always succeeds); the record carries the sweep
 count and the last cost-to-go change.
 
-**Policy synthesis** (`planning/dynamic_programming/`): offline dynamic programming on a
+**Dynamic programming** (`planning/dynamic_programming/`): offline dynamic programming on a
 continuous plant. A `StateSpaceGrid` discretizes the `PlanningProblem` — grid *extent*
 comes from the sets' bounding boxes (so it stays finite), grid *validity* from
 the sets (`contains` on NumPy, `margin >= 0` on the JAX precompute, so `X = bounds & free`
