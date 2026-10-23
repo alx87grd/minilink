@@ -205,3 +205,16 @@ of it in sampled-path.md §3.6; the numbers from `benchmarks/params_binding.py`.
   end-state-api.md D18, D19, D22.
   Amended the same day: the three rates are `feasibility_rate` (never left `X` or `U`),
   `reachability_rate`, `success_rate`; no `failure_rate` (it would read as `1 − success_rate`).
+- **R28 (D21, D24, 2026-10-23) Confirmed.** The evaluator's numbers change once (the real loop,
+  the integral to `tf`), re-pinned with a note. The lane: `evaluate`, `compare`,
+  `evaluate_trajectory`, `discretize` teaching surface; `problem.compile`, `ProblemEvaluator`,
+  `program` provisional on the planning facade.
+
+## Where the plan stands after 2026-10-23
+
+Ruled for this phase (the continuous core): D1–D12, D16 (with 16b, 16c), D17–D22, D24, D31
+(R1–R28). Deferred: D23 (the optimizer upgrade, S74) to after the continuous core; D13–D15
+(the hybrid tool's details) to the hybrid phase; D25–D30 (the parametric program's details,
+MPPI's name and contract, the seeded stochastic policy) to v0.4. Next: fold the rulings into
+the plan docs (differentiable-problem.md, sampled-path.md, cost-params.md, randomness.md) and
+turn them into workboard rows, then implement.

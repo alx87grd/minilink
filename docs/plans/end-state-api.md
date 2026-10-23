@@ -580,10 +580,10 @@ every parameter tree; `ParametricProgram` the later name of the parametric MPC p
 integral scores `replace(problem, X=None)`; the transcriptions take the problem's discount and
 keep their own sum (byte-identical: no baseline declares a rate).
 
-### D21 The evaluator's numbers change once (ask 7) — confirm
+### D21 The evaluator's numbers change once — **confirmed 2026-10-23**
 
-The held-input static law becomes the continuous loop's own RK4 (O(dt²) apart on a smooth
-law), re-pinned with a release note in V1's step 7 (v0.4), the window the calendar rule names.
+The held static law becomes the real loop and the cut at exit becomes the integral to `tf`; the
+pinned numbers in the RL lessons move once, with a baseline and a release note.
 
 ### D22 The statistics (ruled 2026-10-23)
 
@@ -599,11 +599,11 @@ keys as aliases; the first-order backend with the RL `Adam` moved) is planned as
 after the continuous core lands (S74 leaves this phase's wave V; its row keeps its design).
 This phase exports the program to today's `Optimizer` unchanged.
 
-### D24 The lane (ask 9)
+### D24 The lane — **ruled 2026-10-23**
 
-**Recommended:** `tune` on the teaching surface by the demo rule (its demo is the autotuning
-one); `compile`, `ProblemEvaluator`, `program`, `pack` / `unpack`, `margin`, `value`
-provisional on the planning facade until GMC714 has run them.
+`evaluate`, `compare`, `evaluate_trajectory` and `discretize` on the teaching surface by the
+demo rule; `problem.compile`, `ProblemEvaluator` and `program` provisional on the planning
+facade until a course has run them.
 
 ### D25 S76's two remaining asks, for v0.4 (parametric-program.md §2)
 
