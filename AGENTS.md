@@ -50,7 +50,7 @@ The maintainer does not carry the workboard's label system in his head. Step ids
   planned for the robotics-course release in December"), then the id in parentheses as a
   pointer, never the id as the subject of a sentence;
 - give the overview before the detail: which release, which part of the plan, what it unlocks;
-- the same for file-local jargon (a plan doc's own prefixes such as `RD-D12`, `GRO-C1`).
+- the same for file-local jargon (a plan doc's own prefixes such as `RD-D12`, `FD-F9`).
 
 ## Commit messages
 

@@ -11,7 +11,7 @@ Identity: [CONSTITUTION.md](CONSTITUTION.md).
 | --- | --- | --- |
 | **v0.1** | **GRO860 end to end**, plus a working **`pip install minilink` on PyPI**. Every topic of the running optimal-control & RL course runs on the teaching surface, in Colab (git-clone cell) and in the conda env: value iteration / DP on a grid · LQR + linearization · trajectory optimization · RL via native `ReinforcementLearningPlanner` (with `Sys2Gym` + SB3 as an optional bridge). See §4.1. | Fall 2026 — `0.1.0` on PyPI (2026-09-16); `0.1.1` (2026-09-26) is the first release a GitHub tag published. Conda from `environment.yml` is the recommended install. The course notebooks' names are frozen until v1.0, with the freeze paused between terms (§4.1 gate 7). |
 | **v0.2** | **GRO501 end to end** (the classical-control course: multi-physics modelling · root locus / Bode / margins · PID to spec · digital implementation · state feedback, pole placement, LQR, observers — see §4.2). Conda stays the recommended install. | `0.2.0` on PyPI (2026-10-17), from the GitHub tag; every §4.2 row green |
-| **v0.3** | **A cleaner core and the differentiable path; GMC714 covered** (§5.3; GMC714 needs no new feature, R48): **the convergence pass** (the core kept, side features to the experimental tier), **the continuous core** ([continuous-core.md](../plans/continuous-core.md): one step model under every sampled tool, one evaluation of any run, and the deterministic differentiable path to the cost behind a clean API: `evaluate`, `compare`, `problem.compile(loop)`, the program export, cost parameters), all continuous (R86), and a closing PID-tuning example by hand and by the pipeline (S77). The teaching surface covers every GMC714 lab (§4.3); the labs move from pyro to minilink as the maintainer's teaching work, outside this roadmap. | December 2026 |
+| **v0.3** | **A cleaner core and the differentiable path; GMC714 covered** (§5.3; GMC714 needs no new feature, R48): **the convergence pass** (the core kept, side features to the experimental tier), **the continuous core** (landed 2026-10-24, DESIGN §4–§6: one step model under every sampled tool, one evaluation of any run, and the deterministic differentiable path to the cost behind a clean API: `evaluate`, `compare`, `problem.compile(loop)`, the program export, cost parameters), all continuous (R86), and a closing PID-tuning example by hand and by the pipeline (S77). The teaching surface covers every GMC714 lab (§4.3); the labs move from pyro to minilink as the maintainer's teaching work, outside this roadmap. | December 2026 |
 | **v0.4** | **The draws and the textbook objects** (§5.4): the mean over the problem's draws through the same differentiable path (the Monte Carlo evaluator one path, its numbers changing once), the sampled face of the compiled problem, identification as its first data consumer; fields and workspace geometry; MPPI on the sampled kernel; the parametric MPC program (S76) and the general serial chain (C6). | Winter 2027 (the window between GRO860 cohorts, whose material the evaluator's numbers touch) |
 | **v0.9** | **Freeze candidate** (§5.5): the foundation questions that could still break a public name are decided (derived `x0`, Diffrax as an optional solve, the glyph/solid rename, the frozen surface); the trust contract is in place (deprecation policy, pinned export list, CHANGELOG, pinned installs); the standard-syllabus holes close (estimation; the discrete-time one closes with S75 in v0.3); the docs site renders the tutorials. | Spring 2027 |
 | **v1.0** | **A colleague can build a course on it and trust it for three years** (§5.6): the API frozen under the deprecation policy, the standard control syllabus covered and checked against textbook worked examples, course-neutral labs an instructor adopts outside UdeS, green on Windows, macOS and Linux; after two cohorts. Two Stable-Baselines3 teaching notebooks retire (S49) and the GRO860 name freeze becomes the general one. | 2027 |
@@ -185,9 +185,7 @@ Arduino; APP4 is the bicycle-model MIMO plant with LQR, nested loops, pole
 placement and a Kalman observer. Student guide: `GRO501_Guide.pdf`
 (maintainer's copy); references Dorf & Bishop and Åström & Murray.
 
-Baseline audit:
-[docs/reviews/2026-09-07-gro501-coverage.md](../reviews/2026-09-07-gro501-coverage.md).
-The step-level plan doc retired 2026-10-17, its steps landed.
+The baseline audit (2026-09-07) and the step-level plan doc retired, their steps landed.
 
 | Topic | Surface | Status | Gate |
 | --- | --- | --- | --- |
@@ -267,12 +265,12 @@ reads the Monte Carlo evaluator and the RL numbers (v0.4's one-time number chang
 window delays a wave: a step that would move a running course's numbers ships behind the
 pinned release the course runs on (V6) rather than waiting.
 
-**The shape the rungs build** (proposed, the first ask of K7, maintainer-owned:
-[core-consolidation.md](../plans/core-consolidation.md) §2). One spine every approach is a
+**The shape the rungs build** (proposed, maintainer-owned; the CONSTITUTION sentence it
+would add waits in [end-state-api.md](../plans/end-state-api.md)). One spine every approach is a
 special case of: a `System`, compiled, rolled out to a `Trajectory`, scored by a cost,
 lowered to a `MathematicalProgram`, solved by the `Optimizer`. Two step paths on it: the
 continuous one (`Simulator`, the differentiable evaluator) and the sampled one (the step
-model and the sampled loop, [sampled-path.md](../plans/sampled-path.md)). Six pillars on the
+model, DESIGN §5, and the sampled loop, [sampled-path.md](../plans/sampled-path.md)). Six pillars on the
 spine: classical and modern control, nonlinear control, trajectory optimization and MPC,
 reinforcement learning, identification and imitation, estimation. v0.3 converges the library,
 builds the sampled path and the deterministic differentiable path to the cost, then adds what
@@ -336,8 +334,7 @@ TODO §4 and §5 gives it, wave D standing.
 
 **Wave D — the code reads like the textbook, and the demos like the API.** Standing work,
 behaviour-preserving, one module per step.
-- The textbook pass landed 2026-10-16/17 ([record](../reviews/2026-10-16-textbook-pass.md),
-  [rulings](../reviews/2026-10-17-textbook-pass-follow-up-rulings.md)); its behaviour and API
+- The textbook pass landed 2026-10-16/17 ([rulings](../reviews/2026-10-17-textbook-pass-follow-up-rulings.md)); its behaviour and API
   leftovers are TODO §3's T rows.
 - **D1** Demos and notebooks to the minimal rule (RULES 6.1 / 6.10 / 6.11). **[ask per
   file]**
@@ -358,13 +355,13 @@ continuous core.
 **Rulings first**, in two sessions ordered by what each unblocks: the shape, the convergence
 and the step model, then the sampled loop, the compiled problem and the names. No foundation
 code before the session that rules it. **Both sessions ruled on
-2026-10-22/23** (R1–R29, [record](../reviews/2026-10-22-rulings-session-1.md)): the design of record for
-the continuous-core phase is [continuous-core.md](../plans/continuous-core.md) (the decision
-ledger with the alternatives: [end-state-api.md](../plans/end-state-api.md)). **Done 2026-10-23:**
+2026-10-22/23** (R1–R29, [record](../reviews/2026-10-22-rulings-session-1.md)); the phase they designed
+landed 2026-10-24 (DESIGN §4–§6), and the decisions still open for v0.4 are
+[end-state-api.md](../plans/end-state-api.md). **Done 2026-10-23:**
 the plan docs aligned to it and its steps written as workboard rows with gates (TODO §4); the
 points that pass and an independent second opinion raised were ruled the same evening (R30–R74,
 the same record).
-**Done 2026-10-23, night:** [a final review](../reviews/2026-10-23-v03-final-review.md) checked
+**Done 2026-10-23, night:** a final review checked
 the plan against the code, and session 4 ruled its points (R78–R85): the order is the agent's
 and the course calendar does not drive the work (R78); the work happens on `dev-v0.3`, merged into
 `dev` after the maintainer's review (R79); number changes are checked by closeness on the same
@@ -397,9 +394,8 @@ by R69):
   the experimental tier out of the CI gate (R3; its last items, the unsupported plants' tests,
   leave with K8). Ruled.
 
-**The continuous core** (November, beside wave K; the design of record
-[continuous-core.md](../plans/continuous-core.md), ruled R1–R29; the steps and gates are TODO
-§4). The step model (S75), the path to the cost (V1's steps 1–6 with the cost parameters A2 and
+**The continuous core** (November, beside wave K; ruled R1–R29, the contract now DESIGN §4–§6;
+the steps and gates are TODO §4). The step model (S75), the path to the cost (V1's steps 1–6 with the cost parameters A2 and
 the Monte Carlo fold), the optimizer's method table (S74) and the closing PID example (S77)
 landed 2026-10-24; their rests:
 - **V1** The path to the cost, the rest ([differentiable-problem.md](../plans/differentiable-problem.md)):
@@ -478,7 +474,7 @@ meanwhile and does not gate it); the steps, in order, are TODO §5.
 
 What v1.0 asks is adoption, not architecture: a colleague builds a course on minilink and
 trusts it for three years. The
-[adoption review of 2026-09-26](../reviews/2026-09-26-adoption-review.md) found the
+adoption review of 2026-09-26 found the
 engine ready and three things missing around it: a stability promise, the two syllabus
 holes every course hits (estimation, discrete time), and material packaged for an
 instructor. The discrete-time hole closed with S75 in v0.3 (§5.3); v0.9 closes the stability
@@ -644,7 +640,7 @@ the restructure after it (2026-10-24) in [the run's log](../reviews/2026-10-24-v
   is only the library, course material versioned per term and pinned on a release, but two
   CIs and a release before every notebook change that needs a new feature. Move between
   terms only. Options and a recommendation (pin the course notebooks on a release now, a
-  course repository at v1.0; with the examples-tree and package-split questions):
+  course repository at v1.0; with the examples-tree question):
   [the repository-structure writeup](../plans/repository-structure.md).
 - Diffrax as an optional JAX solve (S27).
 - The posed-geometry hook (S44) and the glyph / solid rename (S30).

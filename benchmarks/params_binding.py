@@ -1,8 +1,8 @@
 """Frozen step vs params-as-argument vs bound params, in the situations that matter.
 
 Run: ``PYTHONPATH=. python benchmarks/params_binding.py`` (needs JAX). The numbers it
-prints are the evidence of docs/plans/sampled-path.md §3.5 (the step model, D10 of
-docs/plans/end-state-api.md): one step called from Python, one scan, a vmapped batch, a
+prints are the evidence for docs/dev/DESIGN.md §5, 'One body per method' (``params=None``
+costs what a frozen form would): one step called from Python, one scan, a vmapped batch, a
 parameter family, and a gradient through the rollout, for the pendulum and the cart-pole.
 """
 

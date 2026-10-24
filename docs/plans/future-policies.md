@@ -1,14 +1,14 @@
 # Projecting the API onto MPPI, behavior cloning and diffusion policy
 
 **Status:** ideas to review, 2026-10-21 — an independent analysis. Aligned 2026-10-23 to the
-rulings of 2026-10-22/23 ([continuous-core.md](continuous-core.md)): the compiled problem
+rulings of 2026-10-22/23 ([the record](../reviews/2026-10-22-rulings-session-1.md)): the compiled problem
 exports a `MathematicalProgram` and no `tune` facade exists (R23); the sampled loop is a tool on
 ticks (R13, R14), its memory and dispatch parked to the hybrid phase (D13–D15); point 4 is D29
 for v0.4. Points 2–4 of §5 now stand as workboard rows (S31, V1's step 7b, C5) or open
 decisions (D14, D15, D29); §7's questions 1, 3, 4 and 5 are open, maintainer-owned.  
 **Lane:** maintainer-owned: it shapes core decisions still open.  
 **Serves:** the sampled loop (S31, [sampled-path.md](sampled-path.md) §8), the names of the
-differentiable path ([differentiable-problem.md](differentiable-problem.md), step 0 and ask 5),
+differentiable path (landed: DESIGN §6; the open steps in [differentiable-problem.md](differentiable-problem.md)),
 identification (C4), the MPPI planner ([mppi.md](mppi.md)), and the behavior-cloning row
 after v1.0 (ROADMAP §5.6).
 

@@ -259,7 +259,7 @@ The open pyro scripts under `examples/` (of 195; the 28 Done at the 2026-09-05 s
 
 | Item | Decision | Replacement |
 | --- | --- | --- |
-| Discrete-time / ZOH library | **Done** (2026-10-24) | The exact zero-order hold on `discretize(sys, dt, solver="exact")` (`analysis/discretization.py`), S75's step SM-2 ([TODO.md](TODO.md) §4, [sampled-path.md](sampled-path.md)); the z tier itself (Tustin `c2d`, z-plane tools) is not planned, ruled 2026-10-17 |
+| Discrete-time / ZOH library | **Done** (2026-10-24) | The exact zero-order hold on `discretize(sys, dt, solver="exact")` (`analysis/discretization.py`), S75's step SM-2 (the contract in DESIGN §5); the z tier itself (Tustin `c2d`, z-plane tools) is not planned, ruled 2026-10-17 |
 | RNN / recurrent blocks | **Drop** | — |
 | Hybrid events / mixed-rate sim | **Drop** | — |
 | Pyro `sys2game` framework | **Drop** | superseded by `simulation/realtime/` (`RealtimeSimulator`) |

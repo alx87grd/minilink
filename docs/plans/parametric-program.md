@@ -2,7 +2,7 @@
 
 Status: **draft plan**. The optimizer table (OPW-1–OPW-5, §6) dates from July 2026; the
 parameter binding (PP-0–PP-5) and the recommendation of §2 were added 2026-10-22. The names
-(PP-0) were ruled 2026-10-23 (D19 of [end-state-api.md](end-state-api.md), R26): the family is
+(PP-0) were ruled 2026-10-23 (R26): the family is
 `ParametricProgram`, the plant's key in every parameter tree is `plant`; the two remaining asks
 (a hand-written program declaring its own `p`, the MPC block's live ports) are D25, for v0.4.
 Not started: PP-1–PP-5 and OPW-1–OPW-5 are open for v0.4 with S76.
@@ -69,17 +69,16 @@ MathematicalProgram(n_z=3, J=J, grad_J=grad)                   # J(z): an empty 
 
 Why C:
 
-1. It is the rule the other plans already set. The step model "takes `params` always;
-   freezing is a binding", and the parameterless call students use stays as a binding
-   ([sampled-path.md](sampled-path.md) §3); every system evaluator method takes `params=None`,
-   `None` the compiled parameters (DESIGN §5). The program follows the plant and the step model.
+1. It is the rule the step model already set: one body taking `params`, the compiled
+   parameters read when `params=None`, the parameterless call students use being that default
+   (DESIGN §5). The program follows the plant and the step model.
 2. One evaluator. A plain program compiles as `(z, p)` with `p = {}`, so the duplicate of §1
    goes instead of growing.
 3. The optimizer's contract does not move: backends see a flat `z` (§6's design law), and
    minilink stays out of optimization modelling (CONSTITUTION §1.4).
 4. It is the case the differentiable problem's bridge names: the compiled MPC program is "no
-   decision leaves, parameters bound" ([differentiable-problem.md](differentiable-problem.md),
-   the program export), which is `bind`.
+   decision leaves, parameters bound" (the program export, `pe.program`: DESIGN §6), which is
+   `bind`.
 
 Open with C (the asks, ROADMAP §6): the family's name (ruled 2026-10-23: `ParametricProgram`,
 D19); whether a hand-written program may

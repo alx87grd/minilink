@@ -490,3 +490,50 @@ Textbook style (RULES 5.3, 5.22), applied to the lines the restructure moved, re
 names its objective; `least_margin`, the step model's `iterate` and the central differences
 of the numeric Jacobian name their results, the last with its formula; the compiler's
 underscore helpers take plain names like the ones beside them. Every baseline is identical.
+
+## 12. The docs brought to the branch, the landed plans and stale audits retired
+
+Asked for on 2026-10-24: every doc checked against the code of `dev-evaluator-cleanup`, the
+completed plans and the stale analyses retired. Five read-only triages, then the edits.
+
+Corrections to this log: §1's "one compiled `ev.step` / `ev.rollout` / `ev.jit`" and OD-10's
+jitted form are superseded by §9 (no `ev.jit`); §10's row for `46a7d4df` put the shared layout
+helpers in `operators.py`, and `5990a053` moved them to `core/assembly.py`; `701954f0` moved the
+port-dependency graph out of `wiring.py` into `core/topology.py`.
+
+Retired, their history in git:
+- **Plans:** `cost-params.md` (A2 landed whole), `continuous-core.md` (the phase it designed
+  landed; DESIGN §4–§6 is its contract), `core-consolidation.md` (K7 closed by R69, its moves
+  done). Its open asks, never ruled, are one TODO §7 bullet marked [ask]; R65's tabular demo, an
+  orphan ruling, is an "Also" on K4; four small reporting verbs planned with the evaluation
+  record are an "Also" on D1.1; `ClippedCost` a Later line.
+- **Audits** (no live plan builds on them; their findings ruled or done):
+  `2026-09-07-gro501-coverage`, `2026-09-26-adoption-review`, `2026-10-16-textbook-pass`,
+  `2026-10-18-core-objects-review`, `2026-10-18-differentiable-problem-consolidation`,
+  `2026-10-23-planning-problem-field-inventory`, `2026-10-23-v03-alignment-and-second-opinion`,
+  `2026-10-23-v03-final-review`. The rulings records that cite their "item N" or "point N"
+  (sessions 3 and 4 above, the 2026-10-17 follow-up) still read on their own.
+
+Trimmed to what is open: `sampled-path.md` (now the sampled loop, v0.4), `differentiable-problem.md`
+(steps 7, 7b, 8, 9, the `StepRollout` fold, S73), `end-state-api.md` (D13–D15, D25–D30, the
+proposed CONSTITUTION sentence), `automation-by-convention.md` (AC-5…AC-8b), `estimation-and-
+state-feedback.md`, `repository-structure.md` (the examples tree and the course material),
+`randomness.md` (its rulings kept in place; the code before RN-1 cut). The eight live plans had
+their status lines and code references corrected. DESIGN gained the landed contracts the
+retired plans still held (the cost parameters, `discretize`, a trajectory without roles, the
+evaluator's refusals and draws, the program's caveats); ROADMAP's ledger and §5 say what
+landed, §6 lost the items already ruled.
+
+Found and left for the maintainer:
+- A diagram compiled without `bind_params`: `params=None` reads each block's live parameters on
+  NumPy and the values of the first call on JAX (the same before the evaluator merge). DESIGN §5
+  says `None` reads "the parameters compiled in".
+- The dependency law has no exception for `planning/dynamic_programming/lqr.py` importing
+  `control`, for `core/discrete/` and `System.__mod__` importing `simulation.discrete`, or for
+  `graphical/diagrams/` importing `blocks.routing` and `simulation.discrete`.
+- Tutorial 07 has no hand-written gradient loop, which R75 and RULES 6.15 give it.
+- CONSTITUTION invariant 1 calls the `Computer` / `HybridDiagram` seam an open decision of the
+  roadmap; R13 ruled the sampled loop a tool and §6 holds no such item.
+- D30 (`RolloutEnvironment` "a caller of the sampled kernel") reads against R13.
+- The pyro parity table's "Hybrid events / mixed-rate sim: Drop" row, with the hybrid simulator
+  in the code.
