@@ -62,8 +62,8 @@ class TabularLearningPlanner(Planner):
         Learning rate of the moving average; ``None`` averages the samples of
         each cell (the step ``1/N(x, u)``).
     alpha : float, optional
-        Discount per control period; default the cost's
-        ``discount_factor(dt)``, which is 1 for an undiscounted cost, as for
+        Discount per control period; default the problem's
+        ``discount_factor(dt)``, which is 1 for an undiscounted problem, as for
         value iteration.
     episode_length : float, optional
         Duration of an episode for an infinite-horizon problem (default 10 s).
@@ -115,7 +115,7 @@ class TabularLearningPlanner(Planner):
         seed=0,
     ):
         super().__init__(problem)
-        cost = self.require_cost()
+        self.require_cost()
 
         # Discretized state and input spaces
         grid = grid_of(problem, grid, x_grid, u_grid, dt)
@@ -143,7 +143,7 @@ class TabularLearningPlanner(Planner):
         self.algorithm = self.build_algorithm(algorithm)
         self.exploration = EpsilonGreedy() if exploration is None else exploration
         self.eta = None if eta is None else float(eta)
-        self.alpha = cost.discount_factor(grid.dt) if alpha is None else float(alpha)
+        self.alpha = problem.discount_factor(grid.dt) if alpha is None else float(alpha)
         self.exploring_starts = bool(exploring_starts)
         self.rng = np.random.default_rng(seed)
 

@@ -78,7 +78,7 @@ def inspect_text(obj):
 
     # Costs, state fields, planning problems and programs
     if isinstance(obj, CostFunction):
-        return f"{type(obj).__name__}, rho={float(obj.discount_rate):g}"
+        return type(obj).__name__
     if isinstance(obj, StateField):
         return type(obj).__name__
     if isinstance(obj, PlanningProblem):
@@ -141,7 +141,7 @@ def array_text(values):
 
 
 def problem_text(problem):
-    """The problem's class, system and horizon, then the summary of each set and cost."""
+    """The problem's class, system, horizon and discount, then the summary of each set and cost."""
     sys = problem.sys
     name = getattr(sys, "name", type(sys).__name__)
     tf = problem.tf
@@ -154,7 +154,8 @@ def problem_text(problem):
     else:
         tf_s = f"{tf:g}"
 
-    lines = [f"{type(problem).__name__}, {name}, tf={tf_s}"]
+    rho = problem.discount_rate
+    lines = [f"{type(problem).__name__}, {name}, tf={tf_s}, rho={rho:g}"]
     for label, item in (
         ("X", problem.X),
         ("X0", problem.X0),

@@ -555,8 +555,8 @@ class DynamicProgrammingOptions:
     alpha : float
         Discount (exponential forgetting) factor; use ``alpha < 1`` for
         guaranteed contraction in infinite-horizon value iteration.
-        When omitted, the cost's ``discount_factor(dt)`` is used if the
-        cost declares a positive ``discount_rate``; otherwise ``1`` (undiscounted).
+        When omitted, the problem's ``discount_factor(dt)`` is used if the
+        problem declares a positive ``discount_rate``; otherwise ``1`` (undiscounted).
     tol : float
         Stopping tolerance on the largest cost-to-go change per sweep.
     max_iterations : int
@@ -711,10 +711,10 @@ def options_of(problem, grid, options, **flat) -> DynamicProgrammingOptions:
     if "out_of_bound_cost" not in given and price is not None:
         opt = replace(opt, out_of_bound_cost=price if callable(price) else float(price))
 
-    # The cost's continuous discount rate becomes the per-step factor, unless alpha
-    # is set
-    if "alpha" not in given and float(problem.cost.discount_rate) > 0.0:
-        opt = replace(opt, alpha=problem.cost.discount_factor(grid.dt))
+    # The problem's continuous discount rate becomes the per-step factor, unless
+    # alpha is set
+    if "alpha" not in given and problem.discount_rate > 0.0:
+        opt = replace(opt, alpha=problem.discount_factor(grid.dt))
 
     # The problem's horizon is the terminal time unless final_time is set
     if "final_time" not in given and opt.final_time == 0.0:

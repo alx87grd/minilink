@@ -197,15 +197,13 @@ def test_learn_and_solve_verbose_override_the_constructor(capsys):
     assert capsys.readouterr().out == ""
 
 
-def test_planner_reads_the_cost_discount_and_rejects_bad_batches():
-    class Discounted(HangCost):
-        discount_rate = 1.0
-
+def test_planner_reads_the_problem_discount_and_rejects_bad_batches():
     plant = bounded_pendulum()
     prob = StochasticPlanningProblem(
         plant,
-        cost=Discounted(),
+        cost=HangCost(),
         x0_distribution=Uniform([-0.5, -0.5], [0.5, 0.5]),
+        discount_rate=1.0,
         U=plant.input_box,
     )
     planner = ReinforcementLearningPlanner(
@@ -215,7 +213,7 @@ def test_planner_reads_the_cost_discount_and_rejects_bad_batches():
     # the step reward is −g dt; gamma carries the discount (not exp(−ρ t) in r)
     x = jnp.array([1.0, 0.0])
     u = jnp.zeros(1)
-    g0 = float(Discounted().g(np.array([1.0, 0.0]), np.array([0.0])))
+    g0 = float(HangCost().g(np.array([1.0, 0.0]), np.array([0.0])))
     _, _, r0, _, _ = planner.env.step(x, 0.0, u, jax.random.PRNGKey(0))
     _, _, r_later, _, _ = planner.env.step(x, 5.0, u, jax.random.PRNGKey(0))
     np.testing.assert_allclose(float(r0), -g0 * 0.1, atol=1e-6)
@@ -225,14 +223,12 @@ def test_planner_reads_the_cost_discount_and_rejects_bad_batches():
 
 
 def test_the_discount_has_one_owner_and_an_announced_default():
-    class Discounted(HangCost):
-        discount_rate = 1.0
-
     undiscounted = problem(tf=np.inf)
     discounted = StochasticPlanningProblem(
         bounded_pendulum(),
-        cost=Discounted(),
+        cost=HangCost(),
         x0_distribution=Uniform([-0.5, -0.5], [0.5, 0.5]),
+        discount_rate=1.0,
     )
     small = dict(dt=0.1, hidden=(8, 8), n_envs=4, n_steps=8, batch_size=32, verbose=0)
 
@@ -735,13 +731,11 @@ def test_numpy_and_jax_environments_take_the_same_step():
 
 
 def test_cost_to_go_comes_from_the_critic_only_when_the_discounts_match():
-    class Discounted(HangCost):
-        discount_rate = 1.0
-
     prob = StochasticPlanningProblem(
         bounded_pendulum(),
-        cost=Discounted(),
+        cost=HangCost(),
         x0_distribution=Uniform([-0.5, -0.5], [0.5, 0.5]),
+        discount_rate=1.0,
     )
     planner = ReinforcementLearningPlanner(
         prob, dt=0.1, hidden=(8, 8), n_envs=4, n_steps=16, batch_size=32, verbose=0

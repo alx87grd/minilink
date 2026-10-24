@@ -73,6 +73,11 @@ class PlanningProblem:
         explicitly. Knot count ``N`` lives on transcription options.
     params : ProblemParameters, optional
         Explicit parameter bundle for system, cost, and set evaluation.
+    discount_rate : float, optional
+        The continuous discount rate ``ρ ≥ 0`` of the objective
+        ``∫ e^{−ρt} g dt + e^{−ρ tf} h``, applied by every consumer (value
+        iteration's ``α`` and reinforcement learning's ``γ`` are
+        :meth:`discount_factor` of their step). ``0`` (default) is undiscounted.
     infeasible_cost : float or callable, optional
         The finite stand-in for the infinite cost of an infeasible trajectory (one
         that leaves ``X``): a scalar, or ``infeasible_cost(x, t)`` evaluated at the
@@ -95,12 +100,14 @@ class PlanningProblem:
     params: ProblemParameters | None = None
     metadata: Mapping[str, object] | None = None
     infeasible_cost: object = None
+    discount_rate: float = 0.0
 
     def __post_init__(self) -> None:
         n = int(self.sys.n)
 
-        # The horizon, and a scalar price of infeasibility as a float
+        # The horizon and the discount rate, and a scalar price of infeasibility as a float
         tf = self.coerce_tf(self.tf)
+        object.__setattr__(self, "discount_rate", coerce_rate(self.discount_rate))
         if self.infeasible_cost is not None and not callable(self.infeasible_cost):
             object.__setattr__(self, "infeasible_cost", float(self.infeasible_cost))
 
@@ -181,6 +188,15 @@ class PlanningProblem:
     def is_stochastic(self) -> bool:
         """``True`` when the problem draws starts, parameters or disturbances."""
         return False
+
+    def discount_factor(self, dt) -> float:
+        """The per-step factor ``γ = e^{−ρ dt}`` of a planner stepping ``dt``."""
+        rho = self.discount_rate
+
+        # γ = exp(−ρ dt)
+        gamma = np.exp(-rho * float(dt))
+
+        return float(gamma)
 
     def infeasible_penalty(self, x, t=0.0):
         """The declared price of infeasibility at ``(x, t)`` (scalar or callable); ``None`` when unset."""
@@ -479,6 +495,7 @@ class StochasticPlanningProblem(PlanningProblem):
             params=self.params,
             metadata=self.metadata,
             infeasible_cost=self.infeasible_cost,
+            discount_rate=self.discount_rate,
         )
 
     ###########################################################################
@@ -590,6 +607,7 @@ def as_stochastic(problem: PlanningProblem) -> StochasticPlanningProblem:
         params=problem.params,
         metadata=problem.metadata,
         infeasible_cost=problem.infeasible_cost,
+        discount_rate=problem.discount_rate,
         x0_distribution=Particles(np.atleast_2d(problem.x_start)),
     )
 
@@ -597,6 +615,15 @@ def as_stochastic(problem: PlanningProblem) -> StochasticPlanningProblem:
 ###############################################################################
 # Internal machinery
 ###############################################################################
+
+
+def coerce_rate(rate) -> float:
+    """The discount rate as a float; refuse a negative one."""
+    rate = float(rate)
+    if not rate >= 0.0:
+        raise ValueError(f"discount_rate must be >= 0, got {rate!r}")
+
+    return rate
 
 
 def unconstrained(n):

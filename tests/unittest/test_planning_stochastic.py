@@ -46,17 +46,13 @@ def test_horizon_is_the_problem_tf_and_the_cost_only_discounts():
     )
     assert not hasattr(CostFunction, "horizon")  # one owner: the problem's tf
 
-    class Discounted(CostFunction):
-        discount_rate = 0.5
-
-        def g(self, x, u, t=0.0, params=None):
-            return 0.0
-
-        def h(self, x, t=0.0, params=None):
-            return 0.0
-
-    np.testing.assert_allclose(Discounted().discount_factor(0.1), np.exp(-0.05))
-    assert cost.discount_factor(0.1) == 1.0
+    # The discount has one owner too: the problem
+    discounted = PlanningProblem(plant, cost=cost, tf=np.inf, discount_rate=0.5)
+    np.testing.assert_allclose(discounted.discount_factor(0.1), np.exp(-0.05))
+    assert PlanningProblem(plant, cost=cost).discount_factor(0.1) == 1.0
+    assert not hasattr(CostFunction, "discount_rate")
+    with pytest.raises(ValueError, match="discount_rate"):
+        PlanningProblem(plant, cost=cost, discount_rate=-1.0)
 
 
 def test_problem_exit_rule_and_penalty():
@@ -93,10 +89,8 @@ def test_dp_reads_the_problem_infeasible_cost():
     assert explicit.options.out_of_bound_cost == 7.0
 
 
-def test_dp_reads_the_cost_discount_rate():
-    class Discounted(CostFunction):
-        discount_rate = 1.0
-
+def test_dp_reads_the_problem_discount_rate():
+    class Zero(CostFunction):
         def g(self, x, u, t=0.0, params=None):
             return 0.0
 
@@ -104,7 +98,7 @@ def test_dp_reads_the_cost_discount_rate():
             return 0.0
 
     plant = pendulum()
-    problem = PlanningProblem(plant, cost=Discounted(), U=plant.input_box)
+    problem = PlanningProblem(plant, cost=Zero(), U=plant.input_box, discount_rate=1.0)
     planner = DynamicProgrammingPlanner(problem, x_grid=(5, 5), u_grid=(3,), dt=0.05)
     np.testing.assert_allclose(planner.options.alpha, np.exp(-0.05))
     explicit = DynamicProgrammingPlanner(
@@ -218,8 +212,6 @@ def test_evaluate_trajectory_applies_the_discount_rate():
     from minilink.core.trajectory import Trajectory
 
     class Unit(CostFunction):
-        discount_rate = 1.0
-
         def g(self, x, u, t=0.0, params=None):
             return 1.0
 
@@ -228,7 +220,7 @@ def test_evaluate_trajectory_applies_the_discount_rate():
 
     t = np.linspace(0.0, 1.0, 101)
     traj = Trajectory(t=t, x=np.zeros((2, t.size)), u=np.zeros((1, t.size)))
-    J = Unit().evaluate_trajectory(traj).signals["cost"][0, -1]
+    J = Unit().evaluate_trajectory(traj, discount_rate=1.0).signals["cost"][0, -1]
     np.testing.assert_allclose(J, 1.0 - np.exp(-1.0), atol=1e-4)  # int_0^1 e^{-t} dt
 
 
@@ -341,8 +333,6 @@ def test_monte_carlo_backends_share_the_score_on_identical_starts():
     plant.inputs["u"].upper_bound = np.array([4.0])
 
     class Discounted(CostFunction):
-        discount_rate = 0.2
-
         def g(self, x, u, t=0.0, params=None):
             return x[0] ** 2 + 0.01 * u[0] ** 2
 
@@ -356,7 +346,11 @@ def test_monte_carlo_backends_share_the_score_on_identical_starts():
         {"tf": 1.0, "infeasible_cost": 20.0},
     ):
         problem = StochasticPlanningProblem(
-            plant, cost=Discounted(), x0_distribution=one_start, **kwargs
+            plant,
+            cost=Discounted(),
+            x0_distribution=one_start,
+            discount_rate=0.2,
+            **kwargs,
         )
         reports = {
             backend: MonteCarloEvaluator(

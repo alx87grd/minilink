@@ -81,7 +81,7 @@ class RolloutEnvironment:
             self.tf = 10.0 if episode_length is None else float(episode_length)
         self.n_steps_per_episode = int(round(self.tf / self.dt))
         require_episode_steps(self.n_steps_per_episode, self.tf, self.dt)
-        self.discount_rate = float(self.cost.discount_rate)
+        self.discount_rate = problem.discount_rate
 
         # Plant: the step model of one control period, on nominal or drawn parameters
         require_rollout_backend(backend)

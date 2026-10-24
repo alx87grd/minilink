@@ -765,12 +765,8 @@ def least_margin(margin, x, u, t):
 
 
 def discount_rate_of(problem):
-    """ρ of the problem: the problem's own rate, else its cost's."""
-    rate = getattr(problem, "discount_rate", None)
-    if rate is None:
-        rate = getattr(problem.cost, "discount_rate", 0.0)
-
-    return float(rate)
+    """ρ of the problem."""
+    return float(problem.discount_rate)
 
 
 def price_of(problem):

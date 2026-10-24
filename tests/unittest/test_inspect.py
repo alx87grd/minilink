@@ -45,7 +45,6 @@ class TestInspectPrint(unittest.TestCase):
         cost = QuadraticCost.from_system(Integrator())
         text = str(cost)
         self.assertIn("QuadraticCost", text)
-        self.assertIn("rho=0", text)
         self.assertNotIn("array(", text)
 
     def test_planning_problem(self):
@@ -56,7 +55,7 @@ class TestInspectPrint(unittest.TestCase):
             cost=QuadraticCost.from_system(plant),
         )
         text = str(problem)
-        self.assertIn("PlanningProblem, Integrator, tf=2", text)
+        self.assertIn("PlanningProblem, Integrator, tf=2, rho=0", text)
         self.assertIn("X0:", text)
         self.assertIn("cost: QuadraticCost", text)
 

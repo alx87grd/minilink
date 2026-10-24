@@ -30,18 +30,9 @@ class CostFunction(ABC):
     on a :class:`~minilink.core.system.System`, so one model serves many
     planning problems.
 
-    Class attribute (override it in the body of a subclass):
-
-    - ``discount_rate``: continuous rate ``rho >= 0``; ``0`` is undiscounted.
-      Planners convert it with :meth:`discount_factor` (value iteration's
-      ``alpha`` and reinforcement learning's ``gamma`` are both ``exp(-rho dt)``).
-      The library costs are frozen dataclasses, so assigning it on one of their
-      instances raises. ``weight * cost`` keeps the cost's rate and ``a + b``
-      requires equal rates. No constructor field or ``params`` entry sets
-      the rate; a subclass does.
+    The discount rate ``rho`` is the problem's (``PlanningProblem.discount_rate``):
+    the cost is the integrand only, and :meth:`integrate` takes the rate.
     """
-
-    discount_rate = 0.0
 
     @abstractmethod
     def g(self, x, u, t=0.0, params=None):
@@ -52,16 +43,6 @@ class CostFunction(ABC):
     def h(self, x, t=0.0, params=None):
         """Return the native scalar terminal cost ``h(x, t)``."""
         ...
-
-    def discount_factor(self, dt) -> float:
-        """Per-step factor ``exp(-rho dt)`` for a planner with time step ``dt``."""
-        rho = float(self.discount_rate)
-        dt = float(dt)
-
-        # γ = exp(−ρ dt)
-        gamma = np.exp(-rho * dt)
-
-        return float(gamma)
 
     def integrate(self, traj: Trajectory, *, discount_rate=0.0, params=None):
         """
@@ -96,6 +77,8 @@ class CostFunction(ABC):
         self,
         traj: Trajectory,
         params=None,
+        *,
+        discount_rate=0.0,
     ) -> Trajectory:
         """
         Return ``traj`` with sampled running and cumulative costs.
@@ -107,7 +90,7 @@ class CostFunction(ABC):
         ``h(x(tf), tf)`` when they need the full objective scalar.
         """
         g = self.g
-        rho = float(self.discount_rate)
+        rho = float(discount_rate)
         N = traj.n_samples
 
         # dJ_k = exp(−ρ t_k) g(x_k, u_k, t_k), each sample's discounted running cost
@@ -142,9 +125,13 @@ class CostFunction(ABC):
         self,
         traj: Trajectory,
         params=None,
+        *,
+        discount_rate=0.0,
     ) -> float:
         """Return the trapezoidal running cost plus terminal cost."""
-        evaluated = self.evaluate_trajectory(traj, params=params)
+        evaluated = self.evaluate_trajectory(
+            traj, params=params, discount_rate=discount_rate
+        )
         running = evaluated.signals["cost"][0, -1]
         terminal = self.terminal_cost(traj, params)
 
@@ -330,22 +317,10 @@ class SumCost(CostFunction):
     Additive cost ``J = sum_i J_i`` over several cost functions.
 
     Built by the ``+`` operator on :class:`CostFunction`; use it to add an
-    obstacle or traversability term to a base objective. The terms share one
-    ``discount_rate``; terms whose rates differ raise ``ValueError``.
+    obstacle or traversability term to a base objective.
     """
 
     terms: tuple
-
-    def __post_init__(self) -> None:
-        # One objective, one discount rate ρ
-        rates = sorted({float(cost.discount_rate) for cost in self.terms})
-        require_common_rate(rates)
-
-    @property
-    def discount_rate(self) -> float:
-        """The terms' common rate ``rho`` (``0`` for an empty sum)."""
-        terms = self.terms
-        return terms[0].discount_rate if terms else 0.0
 
     @classmethod
     def of(cls, *costs: CostFunction) -> "SumCost":
@@ -384,17 +359,11 @@ class ScaledCost(CostFunction):
     Cost scaled by a weight, ``J = weight * J0``.
 
     Built by the ``*`` operator on :class:`CostFunction`, so a weighted sum
-    reads as ``base + weight * obstacle_cost``. The weight leaves the
-    ``discount_rate`` of ``J0`` unchanged.
+    reads as ``base + weight * obstacle_cost``.
     """
 
     cost: CostFunction
     weight: float
-
-    @property
-    def discount_rate(self) -> float:
-        """The scaled cost's rate ``rho``."""
-        return self.cost.discount_rate
 
     def g(self, x, u, t=0.0, params=None):
         """Return the weighted running cost."""
@@ -430,16 +399,6 @@ def check_weights(Q, R, S, n, m):
         raise ValueError("S must have shape (n, n)")
     if R.shape != (m, m):
         raise ValueError("R must have shape (m, m)")
-
-
-def require_common_rate(rates):
-    """Refuse terms whose discount rates differ."""
-    if len(rates) > 1:
-        raise ValueError(
-            f"SumCost terms have different discount rates {rates}; "
-            "one objective has one rate rho, so give every term the same "
-            "discount_rate"
-        )
 
 
 def per_sample(g, xs, us, ts, params):

@@ -185,7 +185,7 @@ class Sys2Gym(gym.Env):
                 command_port(problem.sys),
                 dt,
                 int(round(tf / dt)),
-                float(problem.require_cost().discount_rate),
+                problem.discount_rate,
             )
         return env
 

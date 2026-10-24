@@ -96,8 +96,8 @@ class ReinforcementLearningPlanner(Planner):
         Episode duration for an infinite-horizon problem (default 10 s).
     gamma : float, optional
         Discount per control period, used when the algorithm does not set its
-        own. Default: the cost's ``discount_factor(dt)`` when the cost declares
-        a rate, else 0.99 with a warning that states the effective horizon.
+        own. Default: the problem's ``discount_factor(dt)`` when the problem
+        declares a rate, else 0.99 with a warning that states the effective horizon.
     log_std_init : float
         Initial exploration log-std on the normalized action (Gaussian head).
     seed : int
@@ -454,19 +454,19 @@ class ReinforcementLearningPlanner(Planner):
         if gamma is not None:
             return float(gamma)
 
-        cost = self.env.cost
+        problem = self.env.problem
         dt = self.dt
 
-        # The cost's discount rate over one control period
-        if cost.discount_rate > 0:
-            return cost.discount_factor(dt)
+        # The problem's discount rate over one control period
+        if problem.discount_rate > 0:
+            return problem.discount_factor(dt)
 
         # The default, announced with its effective horizon dt / (−ln γ)
         horizon = dt / -math.log(DEFAULT_GAMMA)
         warnings.warn(
             f"the cost is undiscounted, so training discounts at gamma={DEFAULT_GAMMA} "
             f"per control period, an effective horizon of {horizon:.1f} s at "
-            f"dt={dt:g}; declare discount_rate on the cost or pass gamma to choose it",
+            f"dt={dt:g}; declare discount_rate on the problem or pass gamma to choose it",
             stacklevel=3,
         )
 
@@ -629,11 +629,11 @@ class ReinforcementLearningPlanner(Planner):
 
     def critic_cost_to_go(self):
         """``J(x) = -V_w(x)`` from the critic, only when it estimates the problem's own discount; else ``None``."""
-        # Only a state-value critic trained on the cost's own discount estimates J
+        # Only a state-value critic trained on the problem's own discount estimates J
         if self.algorithm.critic_kind != "V":
             return None
 
-        if self.gamma != self.env.cost.discount_factor(self.dt):
+        if self.gamma != self.env.problem.discount_factor(self.dt):
             return None
 
         jnp = require_jax_numpy()
