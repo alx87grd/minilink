@@ -337,15 +337,22 @@ read `params` yet, the gap is tracked below.
   callable is jit-compatible for blocks written with `array_module` all the
   way through, and diagrams address internal wires as `"block:port"`, as
   output or as an additive perturbation.
-- **Planning params tiers** (`ProblemParameters`): `system`, `cost`, `sets`;
-  `scene` is reserved (`None`) for spatial overrides.
+- **A problem's parameters are a view of its parts** (as a diagram's are of its
+  blocks): `problem.params` is `{"plant", "cost", "X", "U", "X0", "Xf", "x_start",
+  "discount_rate"}`, assembled on each access from the parts, which stay the one home of
+  each number; assigning a dictionary routes each entry to its part (a singleton `X0`
+  moves with `x_start`; a set that holds no parameters refuses a write). Library costs
+  hold their parameters on the System pattern (`QuadraticCost.params` is `Q`, `R`, `S`,
+  `xbar`, `ubar`, its attributes views); a `SumCost` keys its terms by id like a diagram
+  (the class name verbatim, `QuadraticCost2` for a repeat, a scaled term the id of the
+  cost it scales) and routes a nested dictionary to them. Each set owns its `params`
+  (`None` by default). Planners read each part's own parameters; a random plant's
+  nominal draw is `nominal_plant_params(problem)`.
   Online façade on `solve_trajectory_from` / `compute_command`: `params=None`
   or `{}` binds `x0` only; `params={"scene": …}` raises `NotImplementedError` (moving
   obstacles online; binding the plant, cost and set parameters per solve is planned as S76).
-  **Gap:** call-time `params` on the base `Shape`, `Set`, `CostFunction` and field
-  primitives in `core/` — those types declare `(t, params)` but read their own attributes
-  only. The constitution's one-signature rule makes this a gap to close, not a design;
-  the workboard holds the steps.
+  **Gap:** call-time `params` on the base `Shape` and field primitives, and the library
+  sets reading their own `params` (A5).
 
 ### `DiagramSystem`
 
@@ -362,7 +369,7 @@ methods reach `DiagramSystem` through the mixin.
 block saw it — its own state and the input it received — on the diagram
 trajectory's grid (default: the last one computed). A cost written for the
 plant alone scores the plant inside any loop:
-`cost.total_cost(loop.trajectory_of(plant))`. The input is recomputed from the
+`loop.compute_cost(cost, of=plant)`. The input is recomputed from the
 stored states with the blocks' current `params`: the ones the simulation used,
 unless they were changed after simulating.
 Every `System` has the two cost shortcuts over that path:
@@ -572,10 +579,9 @@ provided.
   `bounding_box()` is the tightest box containing the set, or `None` — tools that need a
   box (decision bounds, a grid's extent, a sampler's box) ask for it and never probe the
   set's type. Compose with
-  `&` → `IntersectionSet`. `margin(z, t, params)` is threaded by transcriptions via
-  `problem.params.sets`; field-backed spatial sets forward that same parameter
-  object to their scene queries. Base `Set` subclasses other than `FieldSet` /
-  `CallableSet` do not yet read `params` (the gap in 'Parameters').
+  `&` → `IntersectionSet`. `margin(z, t, params=None)`: a set that holds parameters
+  stores `self.params` and reads it when `params` is `None`; the tools pass nothing, so
+  each set reads its own. The library sets hold none yet (the gap in 'Parameters').
 - Distributions (`core/distributions.py`): a duck type — `dim`, `mean` (an array),
   `sample(key, n=None)` with `key` a NumPy generator, an integer seed or a JAX PRNG key
   (JAX arrays out, traceable); `(dim,)` for one draw, `(n, dim)` with `n`; `support` an
@@ -603,12 +609,13 @@ provided.
   adaptive solver, two blocks sharing a seed, and a declared disturbance the stepped tools
   never read are announced. Kalman reads `Q = B_w W B_wᵀ`, `R = D_v V D_vᵀ` for the
   continuous filter, `Q_d = B_w W B_wᵀ Δ`, `R_d = D_v V D_vᵀ / Δ` for the discrete one.
-- Costs: `g(x,u,t)`, `h(x,t)` on `CostFunction` in `core`; attach to
-  `PlanningProblem`, not the plant. Compose with `+` → `SumCost` and `*` →
-  `ScaledCost` (e.g. `base + w * obstacle_cost`). `g`/`h` receive
-  `problem.params.cost`; `FieldCost` forwards that parameter object to its
-  underlying spatial field. Built-in costs such as `QuadraticCost` do not yet
-  read `params` (the gap in 'Parameters').
+- Costs: `g(x,u,t,params=None)`, `h(x,t,params=None)` on `CostFunction` in `core`; attach
+  to `PlanningProblem`, not the plant. The cost is the integrand only: `integrate(traj, *,
+  discount_rate, params)` is its trapezoid on the trajectory's array module, `g_max(X, U)`
+  and `h_max(X)` its upper bounds over boxes (exact for a quadratic, sampled otherwise),
+  `traj.with_cost(cost)` the plotting signals. Compose with `+` → `SumCost` and `*` →
+  `ScaledCost` (e.g. `base + w * obstacle_cost`); parameters nest by term id ('Parameters').
+  The horizon, the discount, the sets and the price are the problem's.
 - Geometry (`geometry.py`; its planned package `core/geometry/` is in §3): `Shape.sdf(p)` is the signed distance to a workspace
   *solid* — `< 0` inside (occupied), the dual of an allowable `Set` (`margin ≥ 0`).
   Primitives `Sphere`/`Box`/`Union`/`Inflated`; native-array math path (NumPy and
@@ -774,23 +781,32 @@ is a sampled loop: `HybridSimulator` holds the torque between ticks, the intende
 ## 6. Optimization And Planning
 
 **NLP:** `minimize J(z)` s.t. `h=0`, `g≥0`, bounds. Pure `MathematicalProgram`;
-`Optimizer` binds method preset (`scipy_slsqp`, `scipy_trust_constr`, `ipopt`).
+`Optimizer(program, z0=None, method=)` binds a method preset named by algorithm: `gd`
+and `adam` (the first-order backend, projected on the box), `l-bfgs`, `scipy_slsqp`
+(the default), `scipy_trust_constr`, `ipopt`. The program's class is read from its
+fields (`unconstrained`, `bounded`, `constrained`); `method="auto"` picks L-BFGS for the
+first two and SLSQP for the third, and a method the class does not admit (`gd` on
+constraint rows) is refused. `z0` defaults to `program.metadata["z0"]`.
 
-**Planning:** `PlanningProblem` owns system, sets (`X` unconstrained unless declared,
-`U` the input ports' box), cost, and the continuous horizon `tf` (one owner; below). `X0`/`Xf` authoritative;
-`x_start`/`x_goal` are shortcuts/representative points. Offline entry is
+**Planning:** `PlanningProblem` (a plain class; `problem.replace(**fields)` derives one)
+owns system, sets (`X` and `U` unconstrained unless declared: `X=plant.state.box`,
+`U=plant.input_box`), cost, the continuous horizon `tf`, the discount rate and the price
+switch (below). `X0`/`Xf` authoritative; `x_start`/`x_goal` are representative points,
+and `x_goal` never creates `Xf` (an exact terminal state is `Xf=SingletonSet(x_goal)`).
+A planner that needs a finite box (value iteration's grid, RRT's bang-bang) refuses an
+unbounded one with the line to write. Offline entry is
 `Planner.solve()` → `PlanningSolution`, one result for every planner: the
-`problem` it solved (a frozen reference), the
+`problem` it solved (a reference), the
 `policy` (a controller block `u = pi(x)`, a `TrajectorySource` `u = pi(t)`
 for the trajectory family — `solution.open_loop` — or a time-varying feedback
 `u = pi(x, t)` for a finite-horizon LQR), the `solver` record (one
 frozen dataclass per planner with `success` and a one-line `str`; `method`
 names it), the
 `trajectory` (native for open-loop planners; the feedback law's nominal
-rollout on the planner's grid otherwise), the Monte Carlo `evaluation`, and
+rollout on the planner's grid otherwise), the `evaluation`, and
 `cost_to_go` where the method produces one (the DP and tabular tables; the
 Riccati form of `LQRPlanner`; the RL critic when the training discount equals
-the cost's). Everything on the solution is the solver's own claim under its
+the problem's). Everything on the solution is the solver's own claim under its
 own model — `cost_to_go` is the method's estimate, never a measurement; a
 measurement comes back from the evaluators as its own object. A planner
 computes only what its solve computes natively; `solve(evaluate=True,
@@ -805,8 +821,10 @@ simulation; the planner keeps one-line shortcuts to its latest solution.
 `compare(VI=..., LQR=..., PPO=...)` → `Comparison` reads named solutions
 side by side: `print` is the table of records and evaluations,
 `plot_control_law` / `plot_cost_to_go` / `plot_trajectory` the overlays on
-one scale, `evaluate(evaluator)` the same table with every policy scored on one evaluator's draws (an `"auto"`
-backend is chosen once for all of them: NumPy when one law does not trace). `LQRPlanner
+one scale; `compare(problem, VI=..., PID=pid, dt=, n_trials=, key=)` also scores every
+entry (a solution, a controller, or a given `Evaluation`) by `evaluate` on the same draws
+and one backend (NumPy for all when one entry does not trace), and `difference(a, b)` is
+the paired `J_a − J_b`. `LQRPlanner
 (problem)` is the linear-quadratic method on a `QuadraticCost` problem: `A`,
 `B` at the cost's `(xbar, ubar)`, the algebraic Riccati equation for an
 infinite `tf`, the differential one swept from `S` for a finite `tf`; its
@@ -819,19 +837,18 @@ finite length is a finite horizon and `h` is charged at `tf`; `+inf` or unset is
 infinite horizon and `h` is never charged (`problem.horizon_kind()`). How long to run
 an infinite-horizon problem is a tool setting, `episode_length` on the evaluator and
 the RL planner.
-A `CostFunction` states only its continuous `discount_rate` `rho`; planners
-convert it with `cost.discount_factor(dt)` (DP `alpha`, RL `gamma`);
-`weight * cost` keeps the rate and `a + b` refuses terms whose rates differ. `X` is a hard constraint in every tool: a trajectory that
-leaves it is a failure, with infinite cost. `X` is **unconstrained unless
-declared** (the whole state space; `X=sys.state.box` constrains the plant to its
-declared range); `U` defaults to the input ports' box, an actuator limit being
-part of the plant model. Where a number must stand in for infinity, it is the
-problem's `infeasible_cost` (scalar or `infeasible_cost(x, t)`): trajopt and
-RRT keep `X` exact; DP reads `infeasible_cost` as its default
-`out_of_bound_cost`, and treats leaving the *grid* as infeasible too (the table
-has no value off its domain); the learners and the Monte Carlo score charge it
-at the exit, or, unset, a bound of any feasible cost that the environment
-derives from the running cost over the zone and announces. The learners also
+The discount rate `rho` is the problem's, `problem.discount_rate`; planners convert it
+with `problem.discount_factor(dt)` (DP `alpha`, RL `gamma`). `X` and `U` are hard
+constraints in every tool: a run that leaves them is a failure. **The price switch**
+`infeasible_cost` is `None` (an evaluation reports the plain cost and the facts), `True`
+(the price is `problem.cost_bound()`) or a number. `cost_bound(tf=None, *,
+discount_rate=None)` is `g_max ∫₀ᵀ e^{−ρt} dt + e^{−ρT} h_max` over the declared boxes,
+else the plant's declared ranges; always finite (`1e6` with a warning naming
+`infeasible_cost` when no bound exists). Trajopt and RRT keep the sets exact; value
+iteration, tabular learning, the RL environment and the Gym bridge always price a failure
+by `problem.infeasibility_price()` (the number, else the bound on the tool's own
+discount; value iteration's sum `Σ αᵏ dt` gives its rate `(1 − α)/dt`), and DP treats
+leaving the *grid* as infeasible too (the table has no value off its domain). The learners also
 take a **training zone** (`ReinforcementLearningPlanner(training_zone=)`, the
 plant's state box by default): leaving it *truncates* the episode, the critic's
 value at that state standing in for the rest, because the model is not studied
@@ -839,15 +856,24 @@ there; it is a training choice, not a constraint. An exit is always a failure:
 terminating without cost would reward escaping under a cost. `h` keeps its one
 job: the end of a finite horizon.
 
-**One scoring contract:** `planning.evaluation.score_trajectory(problem, traj)`
-is the cost of a sampled closed-loop trajectory for every tool's reporting —
-the discounted running cost by the trapezoidal rule
-(`CostFunction.evaluate_trajectory`, which applies `discount_rate`), cut at
-the first sample outside `X` (a failure, charged when priced), plus `h` at a
-reached finite horizon. RL *trains* on the left-Riemann discretization of
-the same running cost (`r_k = -g dt`) with per-step factor
-`gamma = exp(-rho dt)`; `exp(-rho t)` is not folded into the reward (that
-would discount twice). Its plans report the trapezoidal Monte Carlo score.
+**One scoring formula** (`planning.engine.score_run`, every evaluation's): a run is
+integrated to `tf` (no event, no cut), then
+
+```
+finite              = every x_k and u_k finite
+feasibility_margin  = min over the run of X.margin(x_k, t_k), U.margin(u_k, x_k, t_k)
+failed              = not finite, or feasibility_margin < 0
+reachability_margin = Xf.margin(x(tf), tf)        reached = margin ≥ 0   (Xf = None: reached)
+cost                = ∫₀^{tf} e^{−ρt} g dt + e^{−ρ tf} h(x(tf))  (trapezoid; +inf when not finite; no h on an infinite horizon)
+J                   = cost, or cost + price · (failed or not reached) with the price on
+```
+
+A run that is not finite is scored on zeros behind a safe `where`, so its gradient is zero.
+`evaluate_trajectory(problem, traj)` scores a trajectory already held (a loop's run
+through its `plant` role; a logged plant run without signals). RL *trains* on the
+left-Riemann discretization of the same running cost (`r_k = -g dt`) with per-step factor
+`gamma = exp(-rho dt)`; `exp(-rho t)` is not folded into the reward (that would discount
+twice); its plans report `evaluate`.
 
 **Stochastic problem:** `StochasticPlanningProblem(PlanningProblem)` adds
 `x0_distribution` (its mean is `x_start`, its support `X0`),
@@ -855,28 +881,37 @@ would discount twice). Its plans report the trapezoidal Monte Carlo score.
 reaching a diagram's subsystem params such as `"sys.mass"`, one draw per
 episode carried through the step model's `params`),
 `disturbances` (`{port_id: Distribution}`, a fresh draw per step held on the
-port) and `criterion` (`"expectation"` default; `"worst_case"` is reported by
-the Monte Carlo evaluator and refused by the RL planner, which optimizes the
-expectation). A deterministic planner given a stochastic problem plans from
+port) and `criterion` (`"expectation"` default, `"worst_case"`, or `("cvar", alpha)`, the
+mean of the worst `alpha` fraction; an evaluation's `objective` is this reduction of the
+runs' `J`, and the RL planner, which optimizes the expectation, refuses the others). A deterministic planner given a stochastic problem plans from
 the mean start and warns; `Sys2Gym.from_problem(problem, dt=)` is the
 Gymnasium view (draws of `x0`, the exit rule, `h` at a finite horizon). Distributions are §4's duck type. `nominal()` is the certainty-equivalent
 `PlanningProblem`. Every planner that takes a `PlanningProblem` takes the
 stochastic one.
 
-**Monte Carlo evaluation (the second verb):** `MonteCarloEvaluator(problem,
-dt=, n_trials=, backend=)` scores any state-feedback block on the draws —
-an `Evaluation` with per-trial `J`, mean / std / worst / failure rate
-(trials that left the box), `value(criterion)`. `backend="jax"` vmaps the
-compiled held-input rollout (static laws; parameter and disturbance draws
-applied); `backend="numpy"` produces the same samples one trial at a time on
-the NumPy evaluator (identical numbers, tested); `backend="simulator"` runs the
-continuous-time closed loop for any controller, dynamic ones included, without
-draws. The default, `backend="auto"`, is JAX when it is installed and the plant,
-the law, the constraint set and the cost trace on it, NumPy otherwise (a DP
-lookup table interpolates with SciPy), and warns when that fallback changes the draws; an explicit
-`backend="jax"` on a NumPy-only law raises and says so. No backend clips the
-law: port bounds are information, and saturation lives inside the law or in a
-`Saturation` block. Same contract for LQR, DP, MPC and RL laws.
+**The problem evaluator (the second verb, `planning/engine.py`):**
+`pe = problem.compile(controller, dt, *, solver="rk4", substeps=1, backend="auto")` closes
+a controller on the plant (`controller @ plant`; a source block drives the command; a built
+loop is taken when its block `plant` is the problem's system) and compiles it once.
+`pe.params` is the run's tree: the loop's blocks by id, the problem's own leaves (`"cost"`,
+the sets' parameters, `"x_start"`, `"discount_rate"`) and each free input at its nominal
+value. `pe.trajectory(params)` is one run to the horizon on the step model, every block
+output recorded (`"id:port"`, the plant's input `"plant.u"`, the role `plant`);
+`pe.evaluate(params, key, n_trials)` the `Evaluation` (a pytree record, one row per run:
+`cost`, `J`, the margins, `failed`, `reached`, `x0`; `objective` the criterion over `J`,
+`mean` / `std` / `worst` / `cvar(alpha)` and the three rates), the draws of a stochastic
+problem `vmap`ped on JAX, so `jax.grad(lambda p: pe.evaluate(p).objective)(pe.params)`
+reaches every gain, plant parameter, cost weight and the start. `solver="scipy*"` is the
+adaptive integral on NumPy, `dt` its reporting grid; `"auto"` falls back to NumPy when the
+loop, the cost or a set does not trace. `pe.program(wrt, bounds, key, n_trials,
+params=)` exports the tuning `MathematicalProgram` over the leaves `wrt` (dotted paths,
+`"controller.Kp"`): the objective `pe.evaluate(...).objective`, its reverse-mode gradient on
+JAX, the per-trial feasibility margin as a row when `X` or `U` is bounded and the
+reachability margin when `Xf` is set; `pe.pack` / `pe.unpack` move between the tree and
+`z`. `evaluate(problem, controller, *, dt, ...)` is the facade. No backend clips the law:
+port bounds are information, and saturation lives inside the law or in a `Saturation`
+block. The feedback planners' reported `trajectory` is their own held-input rollout on their
+grid (`nominal_trajectory`), the planner's evidence; `evaluate` scores the continuous loop.
 
 **Reinforcement learning (`learning/reinforcement_learning/`):** two
 policy-family planners beside DP, one per representation of the law.
@@ -915,8 +950,8 @@ Flax/Optax dependency. Training prints one line per update; `verbose=False` sile
 
 `RolloutEnvironment(problem, dt=, backend=)` is the problem's semantics as
 step functions on either backend — the reward `r = -g dt`, the exit rule and
-the horizon — shared by the JAX collectors, the tabular learners and the NumPy
-Monte Carlo trials, so one object owns what an episode means.
+the horizon — shared by the JAX collectors and the tabular learners, so one object owns
+what a training episode means (an evaluation scores the learned law by `evaluate`).
 Teaching demos write the observation map by hand
 (``z = (cos θ, sin θ, scaled rate)``). `control.angle_features(angles, scales)`
 is the same map as a helper for scripts. The action port is `u` when the

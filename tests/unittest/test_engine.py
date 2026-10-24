@@ -374,3 +374,59 @@ def test_the_gradient_reaches_the_cost_weights_and_the_discount():
     ) / (2 * h)
     assert float(grad["cost"]["R"][0, 0]) == pytest.approx(central, rel=1e-5)
     assert float(grad["discount_rate"]) < 0.0  # discounting lowers the cost
+
+
+@pytest.mark.jax
+@pytest.mark.parametrize("path", ["plant.m", "x_start"])
+def test_the_gradient_reaches_the_plants_mass_and_the_start(path):
+    import jax
+
+    pe = upright_problem().compile(pid(), dt=0.01, backend="jax")
+    params = pe.merged({**UPRIGHT, "x_start": np.array([0.3, 0.0])})
+    grad = jax.grad(lambda p: pe.evaluate(p).objective)(params)
+
+    # The derivative along the first entry of the leaf, by a central difference
+    z = pe.pack(params, [path])
+    dz = np.zeros_like(z)
+    dz[0] = 1e-5
+    J_plus = float(pe.evaluate(pe.unpack(z + dz, [path], params)).objective)
+    J_minus = float(pe.evaluate(pe.unpack(z - dz, [path], params)).objective)
+    central = (J_plus - J_minus) / 2e-5
+    analytic = np.reshape(pe.pack(grad, [path]), (-1,))[0]
+    assert float(analytic) == pytest.approx(central, rel=1e-4)
+
+
+def test_the_recorded_plant_command_is_the_reconstructed_signal():
+    pe = upright_problem().compile(pid(), dt=0.01, backend="numpy")
+    traj = pe.trajectory(UPRIGHT)
+
+    loop = pe.loop
+    loop.inputs["r"].nominal_value = np.array([np.pi])
+    rebuilt = loop.reconstruct_internal_signals(traj)
+    np.testing.assert_allclose(
+        traj.signals["plant.u"], rebuilt.signals["controller:u"], atol=1e-12
+    )
+
+
+@pytest.mark.jax
+def test_a_tuning_that_leaves_X_comes_back_inside_through_the_margin_row():
+    from minilink import Optimizer
+    from minilink.core.sets import BoxSet
+
+    sys = plant()
+    cost = QuadraticCost.from_system(
+        sys, xbar=np.array([np.pi, 0.0]), R=0.001 * np.eye(1)
+    )
+    X = BoxSet([-1.0, -20.0], [np.pi + 0.05, 20.0])  # no overshoot past upright
+    problem = PlanningProblem(sys, cost=cost, tf=3.0, X=X)
+    pe = problem.compile(PID(Kp=60.0, Ki=0.0, Kd=2.0), dt=0.01, backend="jax")
+    assert pe.evaluate(UPRIGHT).failed[0]  # the start overshoots
+
+    wrt = ["controller.Kp", "controller.Kd"]
+    bounds = {"controller.Kp": (1.0, 200.0), "controller.Kd": (0.0, 50.0)}
+    program = pe.program(wrt, bounds=bounds, params=UPRIGHT)
+    assert program.metadata["rows"] == ["feasibility_margin"]
+    result = Optimizer(program, method="scipy_slsqp", options={"maxiter": 100}).solve()
+
+    tuned = pe.evaluate(pe.unpack(result.z, wrt, pe.merged(UPRIGHT)))
+    assert not tuned.failed[0] and float(tuned.feasibility_margin[0]) >= 0.0
