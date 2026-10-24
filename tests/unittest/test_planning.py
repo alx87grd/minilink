@@ -2359,3 +2359,21 @@ def test_box_probes_stay_at_the_solver_boundary():
                 if names & {"BoxSet", "BoxInputSet"}:
                     offenders.append(f"{rel}:{node.lineno}")
     assert offenders == [], offenders
+
+
+def test_a_track_draws_and_overlays_its_corridor_at_half_width_from_the_centerline():
+    from minilink.planning import TrackCorridorOverlay, plot_track
+
+    track = ReferenceTrack(from_waypoints([[0, 0], [10, 0]]), half_width=1.5)
+
+    # The overlay: both edges and the centerline, in the world frame, at y = ±w and 0
+    geometry = TrackCorridorOverlay(track, n_samples=5).get_kinematic_geometry()
+    edges = [line.pts[:, 1] for line in geometry["world"]]
+    np.testing.assert_allclose(edges, [[1.5] * 5, [-1.5] * 5, [0.0] * 5])
+
+    # The plot: the same three polylines on one axes
+    import matplotlib.pyplot as plt
+
+    fig, ax = plot_track(track, show=False)
+    assert len(ax.get_lines()) >= 3
+    plt.close(fig)

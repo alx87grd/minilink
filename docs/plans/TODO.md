@@ -295,7 +295,8 @@ clean-up's renames and moves (K2, K3, K10, A6, G3's moves), the step model (SM-0
 path to the cost (V1.1 to V1.5 with A2), the optimizer's method table (S74) and the closing PID
 example (S77) landed; what each row left is below, and every decision taken without the
 maintainer is in [the run's log](../reviews/2026-10-24-v03-run-decisions.md). Left of the
-clean-up: K8, S32, K3b (R68 landed: every plant states its own bounds).
+clean-up: K8 and S32 (R68 landed: every plant states its own bounds; K3b landed: every public
+name has a test, held by `tests/unittest/test_public_names.py`).
 
 **Start here (2026-10-23, after session 5):** every decision the code needs is ruled (R1–R89,
 [the record](../reviews/2026-10-22-rulings-session-1.md)). v0.3 is the continuous path: the new
@@ -338,11 +339,6 @@ the demo sweep touches fewer files. Nothing leaves without the maintainer's ruli
 - K1, the inventory, landed 2026-10-23: [the record](../reviews/2026-10-23-k1-inventory.md)
   (every public name with its callers, maturity and a proposal; the plants; the demos and their
   twins; the draft A6 and G3 rename tables). K2, K3, K4, K8, A6 and G3 rule from it.
-- [ ] **K3b Contract tests for the kept prototypes** (agent, R69): every name the K1 inventory labels
-  "prototype" and keeps gets a test of its contract (the sets, the blocks, the sensitivity functions,
-  `discretize`, the graphics primitives, …). The K1 inventory's script lived in a lost scratchpad: it
-  lands in `benchmarks/` first. Done when that script finds no kept public name without a
-  contract test.
 - [ ] **K4 One demo per feature** **[maintainer]** (R54): the maintainer's own pass on the demos,
   with the K1 inventory's §3 (twins and proposals) as the input; agents update `examples/README.md`'s
   map and the demo checks after each of his changes.

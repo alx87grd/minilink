@@ -267,3 +267,15 @@ def test_plot_overlays_leave_the_system_run_and_start_untouched():
     assert len(ax.lines) >= 4  # each overlay: its path and its start
     assert sys.traj is traj
     np.testing.assert_array_equal(sys.x0, [1.0, -1.0])
+
+
+def test_a_verification_reports_every_trial_and_no_counterexample_when_it_holds():
+    from minilink.analysis import VerificationReport
+
+    report = region_of_attraction(StableLinear()).verify(n=20)
+
+    # One verdict and one final distance per trial; a counterexample only on failure
+    assert isinstance(report, VerificationReport)
+    assert report.converged.shape == (20,) and report.final_distance.shape == (20,)
+    assert report.holds and bool(np.all(report.converged))
+    assert report.counterexample is None

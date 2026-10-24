@@ -655,3 +655,18 @@ class TestSmcHybrid(unittest.TestCase):
         np.testing.assert_allclose(
             result.computer.signals["y"][0, :n_steps], q_hand, rtol=1e-05, atol=1e-05
         )
+
+
+def test_a_hybrid_run_returns_the_computer_and_plant_views():
+    from minilink.simulation import HybridSimResult
+
+    hybrid = _build_hybrid()
+    result = HybridSimulator(hybrid, t0=0, tf=0.2).solve_forced(
+        np.array([1.0]), input_port_id="r"
+    )
+
+    # The tick-indexed computer record, the plant's trajectory, and their source
+    assert isinstance(result, HybridSimResult)
+    assert isinstance(result.computer, StepRollout)
+    assert isinstance(result.plant, Trajectory)
+    assert result.hybrid is hybrid

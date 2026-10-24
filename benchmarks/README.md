@@ -33,6 +33,7 @@ scene for fast RRT contract tests.
 | [`run_e4_trajopt_parity.py`](run_e4_trajopt_parity.py) | Thin wrapper → `--suite e4` (capture/compare) |
 | [`run_f_mpc_parity.py`](run_f_mpc_parity.py) | Thin wrapper → `--suite f_mpc` (capture/compare) |
 | [`baselines/*.json`](baselines/) | Committed golden metrics |
+| [`public_names.py`](public_names.py) | The public-name inventory: every facade name and the files using it; `--untested` lists the names no test uses (held empty by `tests/unittest/test_public_names.py`) |
 
 ## Running
 

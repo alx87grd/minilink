@@ -767,3 +767,16 @@ def test_the_planner_trains_on_a_substepped_step_model():
         np.asarray(env.plant_step(x, u, 0.0)), np.asarray(expected)
     )
     assert solution.policy is not None
+
+
+def test_angle_features_map_each_angle_to_its_cosine_and_sine():
+    from minilink.control import angle_features
+
+    features = angle_features([0], scales={1: 0.1})
+    x = np.array([np.pi / 3, 4.0])
+
+    # z = [cos θ, sin θ, 0.1 ω]: periodic in θ, the rate scaled, on NumPy and under jit
+    z = features(x)
+    np.testing.assert_allclose(z, [0.5, np.sqrt(3) / 2, 0.4])
+    np.testing.assert_allclose(features(x + [2 * np.pi, 0.0]), z, atol=1e-12)
+    np.testing.assert_allclose(jax.jit(features)(jnp.asarray(x)), z, atol=1e-12)

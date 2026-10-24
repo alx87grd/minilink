@@ -326,3 +326,17 @@ Meshcat animation: in this container `animate(renderer="meshcat")` hangs for a b
 at the base commit e9f69dff too (no server left running), while the notebook passed in the first
 pass's container. Its other cells run in seconds (the UR5 rollout 4 s on JAX).
 
+
+## 8. K3b, the contract tests for the kept prototypes
+
+The K1 inventory's lost script is rebuilt as `benchmarks/public_names.py`: the facades'
+`__all__` by identity, one caller per file by AST (imports, attributes from an imported module,
+the nine System verbs called as methods), notebooks' code cells included. "A contract test" is
+read as the row's done-when reads it: a test file that uses the name. 21 public names had none:
+the five result records (`StructuralResult`, `VerificationReport`, `OptimizationResult`,
+`Comparison`, `HybridSimResult`), `angle_features`, the `Distribution` base, twelve graphics
+primitives and skins, `plot_track` and `TrackCorridorOverlay`. Each now has a test of what its
+docstring states, in the domain's test file (a skin draws only on frames its plant's `tf`
+places; a pose is a rotation at `p0` along `p1 − p0`; a user `Distribution` drives a stochastic
+problem). `tests/unittest/test_public_names.py` holds the list empty (6 s; it passes with JAX,
+Meshcat, Plotly and pygame blocked, as the main CI job runs), so a new public name needs a test.

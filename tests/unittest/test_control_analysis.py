@@ -2095,3 +2095,17 @@ class TestSensitivity(unittest.TestCase):
             self.response(sensitivity(plant=H, controller=PI(2.0, 1.0))),
             atol=1e-9,
         )
+
+
+def test_a_structural_test_returns_its_matrix_rank_and_dimension():
+    from minilink.analysis import StructuralResult, controllability
+
+    A = np.array([[1.0, 0.0], [0.0, 2.0]])
+    B = np.array([[1.0], [0.0]])
+    result = controllability(LTISystem(A, B))
+
+    # The record: 𝒞 = [B, A B], its rank and n; full rank when rank = n
+    assert isinstance(result, StructuralResult)
+    np.testing.assert_allclose(result.matrix, [[1.0, 1.0], [0.0, 0.0]])
+    assert (result.rank, result.n, result.is_full_rank) == (1, 2, False)
+    assert "rank 1 of n = 2" in str(result)

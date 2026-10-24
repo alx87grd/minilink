@@ -313,3 +313,34 @@ def test_a_renamed_noise_source_keeps_its_dimension():
     assert list(noise.outputs) == ["n"] and noise.dim == 4
     assert noise.h(np.array([]), np.array([]), 0.3).shape == (4,)
     assert noise.compile().outputs(np.array([]), np.array([]), 0.3)["n"].shape == (4,)
+
+
+def test_a_distribution_is_dim_mean_and_sample_and_a_user_law_drives_a_problem():
+    from minilink import Gaussian, PlanningProblem, QuadraticCost, Uniform
+    from minilink.core import Distribution
+    from minilink.dynamics.catalog.equations import DoubleIntegrator
+    from minilink.planning.problems import StochasticPlanningProblem
+
+    # The library laws are Distributions: their draws have the shape (n, dim)
+    for law in (Gaussian([0.0, 1.0], 0.1), Uniform([-1.0, -1.0], [1.0, 1.0])):
+        assert isinstance(law, Distribution) and law.dim == 2
+        assert np.shape(law.sample(0, 5)) == (5, 2) and np.shape(law.mean) == (2,)
+
+    # A user law: the two-method surface, nothing else
+    class Corners(Distribution):
+        dim = 2
+        mean = np.zeros(2)
+        support = None
+
+        def sample(self, key, n=None):
+            rng = np.random.default_rng(key)
+            draws = rng.choice([-1.0, 1.0], size=(1 if n is None else n, 2))
+            return draws[0] if n is None else draws
+
+    plant = DoubleIntegrator()
+    problem = StochasticPlanningProblem(
+        plant, cost=QuadraticCost.from_system(plant), x0_distribution=Corners()
+    )
+    x0s, _ = problem.realize(0, 4)
+    assert x0s.shape == (4, 2) and set(np.abs(x0s).ravel()) == {1.0}
+    assert isinstance(problem.nominal(), PlanningProblem)

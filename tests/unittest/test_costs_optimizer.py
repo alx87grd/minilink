@@ -649,3 +649,16 @@ def test_the_start_defaults_to_the_programs_own():
     assert Optimizer(program).z0.tolist() == [3.0, 3.0]
     with pytest.raises(ValueError, match="z0"):
         Optimizer(quadratic_program())
+
+
+def test_an_optimizer_returns_the_optimum_its_cost_and_its_record():
+    from minilink.optimization import OptimizationResult
+    from minilink.optimization.optimizer import Optimizer
+
+    result = Optimizer(quadratic_program(), z0=np.zeros(2), method="l-bfgs").solve()
+
+    # z*, J(z*), the verdict and the solver's own record
+    assert isinstance(result, OptimizationResult)
+    np.testing.assert_allclose(result.z, [1.0, -2.0], atol=1e-6)
+    assert result.success and result.cost == pytest.approx(0.0, abs=1e-10)
+    assert isinstance(result.message, str) and isinstance(result.stats, dict)

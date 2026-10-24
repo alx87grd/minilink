@@ -2034,3 +2034,91 @@ class TestGifExport(unittest.TestCase):
                         file_name=os.path.join(tmp, name),
                     )
             self.assertEqual(sorted(os.listdir(tmp)), ["clip.gif", "plain.gif"])
+
+
+# --- the catalog's drawing pieces: skins keyed to frames, primitives as declared ---
+
+
+def catalog_skins():
+    from minilink import KinematicBicycle, UR5Manipulator
+    from minilink.dynamics.catalog.aerial.plane import Plane3D
+    from minilink.graphical.catalog import car_skin_2d, plane_skin_3d, ur5_skin
+
+    return [
+        (KinematicBicycle, car_skin_2d),
+        (Plane3D, plane_skin_3d),
+        (UR5Manipulator, ur5_skin),
+    ]
+
+
+def test_each_catalog_skin_draws_on_the_frames_its_plant_places():
+    from minilink.graphical.animation.primitives import GraphicPrimitive
+
+    for plant_class, skin in catalog_skins():
+        plant = plant_class()
+        frames = plant.tf(plant.x0, np.zeros(plant.m), 0.0)
+        look = skin(plant)
+
+        # A skin is (plant) -> {frame: [primitive]}: the frames of tf, or the world
+        assert set(look) <= set(frames) | {"world"}, plant_class.__name__
+        assert all(isinstance(p, GraphicPrimitive) for ps in look.values() for p in ps)
+
+
+def test_the_line_primitives_span_what_their_docstrings_state():
+    from minilink.graphical.catalog import ground_line, spring_between, spring_line
+
+    # The ground: a backdrop of span L at height y
+    ground = ground_line(length=4.0, y=-1.0)
+    np.testing.assert_allclose(ground.pts, [[-2.0, -1.0, 0.0], [2.0, -1.0, 0.0]])
+    assert ground.camera_fit is False
+
+    # The unit spring: from x = 0 to x = 1, 2·coils + 1 coil vertices within ±amplitude
+    spring = spring_line(coils=4, amplitude=0.2)
+    assert spring.pts[0, 0] == 0.0 and spring.pts[-1, 0] == 1.0
+    assert len(spring.pts) == 2 * 4 + 1 + 4 and np.max(np.abs(spring.pts[:, 1])) == 0.2
+
+    # The spring between two points: its ends pinned on them
+    coil = spring_between([0.0, 0.0], [3.0, 4.0])
+    np.testing.assert_allclose(coil.pts[0], [0.0, 0.0, 0.0])
+    np.testing.assert_allclose(coil.pts[-1], [3.0, 4.0, 0.0])
+
+
+def test_the_solid_primitives_hold_their_declared_extents():
+    from minilink.graphical.catalog import ExtrudedPolygon, plane_airframe_3d, wheel_box
+
+    # A wheel: a flat box of the given length and width
+    wheel = wheel_box(length=0.5, width=0.2)
+    assert (wheel.length_x, wheel.length_y) == (0.5, 0.2)
+
+    # An extruded polygon: its outline on z = ∓h/2, the closing repeat dropped
+    prism = ExtrudedPolygon([[0, 0], [1, 0], [0, 1], [0, 0]], height=2.0)
+    vertices = prism.vertices_local()
+    assert vertices.shape == (6, 3)
+    np.testing.assert_allclose(vertices[:3, 2], -1.0)
+    np.testing.assert_allclose(vertices[3:, 2], 1.0)
+
+    # The airframe: fuselage, wing and the two tails
+    assert len(plane_airframe_3d()) == 4
+
+
+def test_the_poses_place_a_unit_primitive_between_two_points():
+    from minilink.graphical.catalog import link_pose_3d, point_pose, segment_pose_2d
+
+    p0 = np.array([1.0, 2.0, 0.5])
+    p1 = np.array([1.0, 5.0, 4.5])
+
+    # The rod's pose: a rotation (orthonormal, det +1) at p0, its −y along p1 − p0
+    T = link_pose_3d(p0, p1)
+    R = T[:3, :3]
+    np.testing.assert_allclose(R.T @ R, np.eye(3), atol=1e-12)
+    assert np.linalg.det(R) == pytest.approx(1.0)
+    np.testing.assert_allclose(T[:3, 3], p0)
+    np.testing.assert_allclose(-R[:, 1], (p1 - p0) / 5.0, atol=1e-12)
+
+    # A point's pose: the identity rotation, the point lifted to z = 0
+    np.testing.assert_allclose(point_pose([1.0, 2.0])[:3, 3], [1.0, 2.0, 0.0])
+
+    # The planar segment: (0, 0) ↦ p0 and (1, 0) ↦ p1
+    S = segment_pose_2d([1.0, 1.0], [4.0, 5.0])
+    np.testing.assert_allclose(S @ [0.0, 0.0, 0.0, 1.0], [1.0, 1.0, 0.0, 1.0])
+    np.testing.assert_allclose(S @ [1.0, 0.0, 0.0, 1.0], [4.0, 5.0, 0.0, 1.0])

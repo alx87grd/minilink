@@ -455,3 +455,18 @@ def test_compare_scores_every_policy_on_one_backend_and_the_same_draws():
     scored = compare(spread, LQR=lqr, **settings)
     on_jax = evaluate(spread, lqr, backend="jax", **settings)
     np.testing.assert_array_equal(scored.evaluations["LQR"].J, on_jax.J)
+
+
+def test_compare_returns_a_comparison_of_the_solutions_and_their_scores():
+    from minilink.planning import Comparison, compare
+
+    problem, vi, lqr = solved_pendulum()
+    race = compare(problem, VI=vi, LQR=lqr, dt=0.1, backend="numpy")
+
+    # The named solutions, in order, and one evaluation each on the same draws
+    assert isinstance(race, Comparison)
+    assert list(race.solutions) == ["VI", "LQR"] and list(race.evaluations) == [
+        "VI",
+        "LQR",
+    ]
+    assert race.difference("VI", "LQR").shape == race.evaluations["VI"].J.shape
