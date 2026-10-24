@@ -250,7 +250,7 @@ def test_evaluate_trajectory_applies_the_discount_rate():
 
     t = np.linspace(0.0, 1.0, 101)
     traj = Trajectory(t=t, x=np.zeros((2, t.size)), u=np.zeros((1, t.size)))
-    J = Unit().evaluate_trajectory(traj, discount_rate=1.0).signals["cost"][0, -1]
+    J = traj.with_cost(Unit(), discount_rate=1.0).signals["cost"][0, -1]
     np.testing.assert_allclose(J, 1.0 - np.exp(-1.0), atol=1e-4)  # int_0^1 e^{-t} dt
 
 

@@ -221,10 +221,10 @@ class TestPlanningArchitecture(unittest.TestCase):
             x=np.array([[0.0, 1.0], [0.0, 0.0]]),
             u=np.array([[0.0, 0.0]]),
         )
-        evaluated = cost.evaluate_trajectory(traj)
+        evaluated = traj.with_cost(cost)
         self.assertTrue(evaluated.has_signal("cost_rate"))
         self.assertTrue(evaluated.has_signal("cost"))
-        self.assertGreaterEqual(cost.total_cost(traj), 0.0)
+        self.assertGreaterEqual(float(evaluated.signals["cost"][0, -1]), 0.0)
 
     def test_trajectory_save_load_roundtrip(self):
         traj = Trajectory(

@@ -595,6 +595,28 @@ def score_run(problem, traj: Trajectory, *, tf=None) -> dict:
     }
 
 
+def evaluate_trajectory(problem, traj: Trajectory) -> Evaluation:
+    """
+    The :class:`Evaluation` of a trajectory you already hold: one row, by :func:`score_run`.
+
+    A loop's run is projected to the plant's by its ``plant`` role
+    (``traj.of("plant")``); a trajectory without roles is the plant's own only
+    when its ``x`` and ``u`` have the plant's sizes and it records no signals
+    (a logged run). On the trajectory's array module.
+    """
+    run = plant_run_of(problem, traj)
+    xp = array_module(run.x)
+
+    row = score_run(problem, run)
+
+    return Evaluation(
+        **{name: xp.reshape(value, (1,)) for name, value in row.items()},
+        x0=xp.reshape(run.x[:, 0], (1, -1)),
+        trajectories=[traj],
+        criterion=criterion_of(problem),
+    )
+
+
 def closed_loop_of(problem, controller):
     """The loop a :class:`ProblemEvaluator` runs: ``controller`` closed on the problem's plant.
 
@@ -630,6 +652,27 @@ def closed_loop_of(problem, controller):
 ###############################################################################
 # Internal machinery
 ###############################################################################
+
+
+def plant_run_of(problem, traj):
+    """The plant's run in ``traj``: its ``plant`` role, else ``traj`` when it is a logged plant run."""
+    if "plant" in traj.roles:
+        return traj.of("plant")
+
+    plant = problem.sys
+    sizes = (int(traj.x.shape[0]), int(traj.u.shape[0]))
+    if traj.signals:
+        raise ValueError(
+            "a trajectory with recorded signals and no 'plant' role: score the loop's "
+            "run from problem.compile(...).trajectory(), or pass traj.of('plant')"
+        )
+    if sizes != (int(plant.n), int(plant.m)):
+        raise ValueError(
+            f"the trajectory's (n, m) = {sizes} is not the plant's "
+            f"({int(plant.n)}, {int(plant.m)}): pass the plant's run"
+        )
+
+    return traj
 
 
 @dataclass(frozen=True)

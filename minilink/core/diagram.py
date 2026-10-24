@@ -171,7 +171,7 @@ class DiagramSystem(WiredDiagramMixin, DynamicSystem):
         the stored states with the blocks' current ``params``, so change them
         only after scoring the trajectory they produced. Anything written for
         the block alone applies to it, such as the cost of the plant inside a
-        closed loop: ``cost.total_cost(closed_loop.trajectory_of(plant))``.
+        closed loop: ``closed_loop.compute_cost(cost, of=plant)``.
 
         Parameters
         ----------

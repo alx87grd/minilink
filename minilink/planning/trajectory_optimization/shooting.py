@@ -116,7 +116,11 @@ class ShootingTranscription(Transcription):
         # The trajectory, with the cost's signals when the problem has a cost
         traj = Trajectory(t=self.options.t(problem), x=x, u=u, signals={"dx": dx})
         if problem.cost is not None:
-            traj = problem.cost.evaluate_trajectory(traj, params=problem.params.cost)
+            traj = traj.with_cost(
+                problem.cost,
+                discount_rate=problem.discount_rate,
+                params=problem.params.cost,
+            )
 
         return traj
 

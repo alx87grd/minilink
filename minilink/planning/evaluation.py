@@ -450,8 +450,8 @@ def score_trajectory(problem, traj: Trajectory, params=None, infeasible_cost=np.
 
     # J = ∫ e^{−ρt} g(x, u, t) dt by the trapezoid over the kept samples
     rho = problem.discount_rate
-    evaluated = cost.evaluate_trajectory(kept, params=params, discount_rate=rho)
-    J = float(evaluated.signals["cost"][0, -1])
+    _, running = cost.integrate(kept, discount_rate=rho, params=params)
+    J = float(running[-1])
 
     # An exit is charged its price; a reached finite horizon adds h(x(t_f), t_f)
     if failed:

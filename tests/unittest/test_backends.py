@@ -116,9 +116,7 @@ def test_quadratic_cost_numpy_math_and_reporting_helpers():
     traj = Trajectory(
         t=np.array([0.0, 1.0]), x=np.column_stack((x, x)), u=np.column_stack((u, u))
     )
-    evaluated = cost.evaluate_trajectory(traj)
-    assert isinstance(cost.terminal_cost(traj), float)
-    assert isinstance(cost.total_cost(traj), float)
+    evaluated = traj.with_cost(cost)
     np.testing.assert_allclose(evaluated.signals["cost_rate"], [[6.0, 6.0]])
     np.testing.assert_allclose(evaluated.signals["cost"], [[0.0, 6.0]])
 

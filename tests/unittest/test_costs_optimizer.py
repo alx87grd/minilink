@@ -100,16 +100,22 @@ def test_scaled_cost_weights():
     assert combo.g(x, u) == pytest.approx(3.0 * c.g(x, u))
 
 
+def total(cost, traj, discount_rate=0.0):
+    """J = ∫ e^{−ρt} g dt + h(x(t_N)) along ``traj``."""
+    _, running = cost.integrate(traj, discount_rate=discount_rate)
+    return float(running[-1]) + float(cost.h(traj.x[:, -1], traj.t[-1]))
+
+
 def test_scaled_and_summed_costs_take_the_discount_as_an_argument():
     d = QuadraticCost(
         Q=np.eye(2), R=np.eye(1), S=np.zeros((2, 2)), xbar=np.zeros(2), ubar=np.zeros(1)
     )
     t = np.linspace(0.0, 2.0, 21)
     traj = Trajectory(t=t, x=np.ones((2, t.size)), u=np.ones((1, t.size)))
-    assert (2.0 * d).total_cost(traj) == pytest.approx(2.0 * d.total_cost(traj))
-    discounted = (d + d).total_cost(traj, discount_rate=0.5)
-    assert discounted == pytest.approx(2.0 * d.total_cost(traj, discount_rate=0.5))
-    assert discounted < (d + d).total_cost(traj)
+    assert total(2.0 * d, traj) == pytest.approx(2.0 * total(d, traj))
+    discounted = total(d + d, traj, discount_rate=0.5)
+    assert discounted == pytest.approx(2.0 * total(d, traj, discount_rate=0.5))
+    assert discounted < total(d + d, traj)
     assert not hasattr(d + d, "discount_rate")
 
 
@@ -122,12 +128,12 @@ def test_params_forwarded_to_terms():
     assert (3.0 * _ParamCost()).g(x, u, params={"w": 2.0}) == pytest.approx(6.0)
 
 
-def test_total_cost_on_trajectory():
+def test_the_running_cost_of_a_sum_on_a_trajectory():
     c = make_quadratic()
     s = c + c
     t = np.linspace(0.0, 1.0, 5)
     traj = Trajectory(t=t, x=np.ones((2, 5)), u=np.ones((1, 5)))
-    assert s.total_cost(traj) == pytest.approx(2.0 * c.total_cost(traj))
+    assert total(s, traj) == pytest.approx(2.0 * total(c, traj))
 
 
 def test_compute_cost_scores_a_system_or_a_block_inside_a_diagram():
@@ -143,20 +149,18 @@ def test_compute_cost_scores_a_system_or_a_block_inside_a_diagram():
 
     # Open loop: the plant's own trajectory
     traj = plant.compute_trajectory(tf=1.0, dt=0.05, verbose=False)
-    assert plant.compute_cost(cost) == pytest.approx(cost.total_cost(traj))
+    assert plant.compute_cost(cost) == pytest.approx(total(cost, traj))
 
     # Closed loop: the plant as it ran inside the loop, last or given trajectory
     loop = StateFeedback(K=[[5.0, 1.0]]) @ plant
     loop_traj = loop.compute_trajectory(tf=1.0, dt=0.05, verbose=False)
-    J = cost.total_cost(loop.trajectory_of(plant, loop_traj))
+    J = total(cost, loop.trajectory_of(plant, loop_traj))
     assert loop.compute_cost(cost, of=plant) == pytest.approx(J)
     assert loop.compute_cost(cost, of=plant, traj=loop_traj) == pytest.approx(J)
 
     # of=None scores the loop in its own (x, u): here x = plant state, u = r
     loop_cost = QuadraticCost.from_system(loop, S=np.eye(2))
-    assert loop.compute_cost(loop_cost) == pytest.approx(
-        loop_cost.total_cost(loop_traj)
-    )
+    assert loop.compute_cost(loop_cost) == pytest.approx(total(loop_cost, loop_traj))
 
     result = loop.plot_cost(cost, of=plant, show=False)
     assert result is not None

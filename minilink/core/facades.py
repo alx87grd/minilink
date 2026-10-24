@@ -255,9 +255,9 @@ class SharedSystemFacades:
         """
         Convenience shortcut returning the cost ``J`` of a trajectory, as a number.
 
-        ``J`` is the running cost integrated along the trajectory plus the
-        terminal cost at its end
-        (:meth:`~minilink.core.costs.CostFunction.total_cost`).
+        ``J`` is the running cost integrated along the trajectory (the trapezoid
+        of :meth:`~minilink.core.costs.CostFunction.integrate`) plus the
+        terminal cost at its end.
 
         Parameters
         ----------
@@ -275,7 +275,13 @@ class SharedSystemFacades:
         float
             The cost ``J``.
         """
-        return cost.total_cost(scored_trajectory(self, of, traj))
+        scored = scored_trajectory(self, of, traj)
+        _, running = cost.integrate(scored)
+
+        # J = ∫ g dt + h(x(t_N), t_N)
+        J = float(running[-1]) + float(cost.h(scored.x[:, -1], float(scored.t[-1])))
+
+        return J
 
     def plot_cost(self, cost, *, of=None, traj=None, backend="matplotlib", show=True):
         """
@@ -293,7 +299,7 @@ class SharedSystemFacades:
             :func:`minilink.graphical.signals.plot_time_signals`.
         """
         scored_system = self if of is None else of
-        scored = cost.evaluate_trajectory(scored_trajectory(self, of, traj))
+        scored = scored_trajectory(self, of, traj).with_cost(cost)
 
         return scored_system.plot_trajectory(
             scored, signals=("cost_rate", "cost"), backend=backend, show=show

@@ -25,8 +25,8 @@ class CostFunction(ABC):
     set is priced by the problem (``infeasible_cost``), not by the cost.
 
     ``g`` and ``h`` are native-array equation paths: NumPy in, NumPy out;
-    JAX in, JAX out. Reporting helpers such as :meth:`total_cost` convert to
-    Python floats at the boundary. A cost lives in :mod:`minilink.core`, not
+    JAX in, JAX out. :meth:`integrate` gives the running cost along a
+    trajectory on its array module. A cost lives in :mod:`minilink.core`, not
     on a :class:`~minilink.core.system.System`, so one model serves many
     planning problems.
 
@@ -99,73 +99,6 @@ class CostFunction(ABC):
         cost = xp.concatenate([xp.zeros(1), xp.cumsum(increments)])
 
         return cost_rate, cost
-
-    def evaluate_trajectory(
-        self,
-        traj: Trajectory,
-        params=None,
-        *,
-        discount_rate=0.0,
-    ) -> Trajectory:
-        """
-        Return ``traj`` with sampled running and cumulative costs.
-
-        The added signals are ``"cost_rate"`` and ``"cost"`` with shape
-        ``(1, N)``. ``cost_rate`` is the discounted integrand
-        ``exp(-rho t) g(x, u, t)``; the cumulative integral uses the
-        trapezoidal rule and excludes the terminal cost; callers can add
-        ``h(x(tf), tf)`` when they need the full objective scalar.
-        """
-        g = self.g
-        rho = float(discount_rate)
-        N = traj.n_samples
-
-        # dJ_k = exp(−ρ t_k) g(x_k, u_k, t_k), each sample's discounted running cost
-        dJ = np.zeros(N, dtype=float)
-        for i, t in enumerate(traj.t):
-            g_i = float(g(traj.x[:, i], traj.u[:, i], float(t), params=params))
-            dJ[i] = np.exp(-rho * float(t)) * g_i
-
-        # J(t_k) = ∫ dJ dt from t_0 to t_k by the trapezoidal rule, J(t_0) = 0
-        J = np.zeros(N, dtype=float)
-        if N > 1:
-            dt = np.diff(traj.t)
-            increments = 0.5 * (dJ[:-1] + dJ[1:]) * dt
-            J[1:] = np.cumsum(increments)
-
-        return traj.with_signals(
-            {
-                "cost_rate": dJ.reshape(1, -1),
-                "cost": J.reshape(1, -1),
-            }
-        )
-
-    def terminal_cost(
-        self,
-        traj: Trajectory,
-        params=None,
-    ) -> float:
-        """Return ``h`` evaluated at the final state of ``traj``."""
-        return float(self.h(traj.x[:, -1], traj.tf, params=params))
-
-    def total_cost(
-        self,
-        traj: Trajectory,
-        params=None,
-        *,
-        discount_rate=0.0,
-    ) -> float:
-        """Return the trapezoidal running cost plus terminal cost."""
-        evaluated = self.evaluate_trajectory(
-            traj, params=params, discount_rate=discount_rate
-        )
-        running = evaluated.signals["cost"][0, -1]
-        terminal = self.terminal_cost(traj, params)
-
-        # J = ∫ exp(−ρ t) g dt + h(x(t_f), t_f)
-        J = running + terminal
-
-        return float(J)
 
     # Cost algebra
 

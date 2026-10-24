@@ -275,3 +275,54 @@ def test_a_built_loop_is_taken_as_it_is_and_a_step_system_refused():
 def test_dt_must_divide_the_horizon():
     with pytest.raises(ValueError, match="divide"):
         upright_problem(tf=1.0).compile(pid(), dt=0.3)
+
+
+# --- a trajectory you already hold ---
+
+
+def test_evaluate_trajectory_scores_the_plant_run_of_a_loop_or_a_logged_run():
+    from minilink.planning.engine import evaluate_trajectory
+
+    problem = upright_problem()
+    pe = problem.compile(pid(), dt=0.01, backend="numpy")
+    traj = pe.trajectory(UPRIGHT)
+    report = pe.evaluate(UPRIGHT)
+
+    # The loop's run, projected by its role, and the plant's run itself: one score
+    for held in (traj, traj.of("plant")):
+        np.testing.assert_allclose(evaluate_trajectory(problem, held).J, report.J)
+
+    # Signals without a role, or the wrong sizes, are refused
+    with pytest.raises(ValueError, match="role"):
+        evaluate_trajectory(
+            problem, Trajectory(traj.t, traj.x, traj.u, signals={"s": traj.u})
+        )
+    with pytest.raises(ValueError, match="plant's"):
+        evaluate_trajectory(problem, Trajectory(traj.t, traj.x, traj.u))
+
+
+@pytest.mark.jax
+def test_evaluate_trajectory_agrees_on_numpy_and_jax_with_an_exit_and_a_divergence():
+    import jax.numpy as jnp
+
+    from minilink.planning.engine import evaluate_trajectory
+
+    sys = plant()
+    cost = QuadraticCost.from_system(sys)
+    problem = PlanningProblem(
+        sys, cost=cost, tf=1.0, U=sys.input_box, infeasible_cost=100.0
+    )
+    t = np.linspace(0.0, 1.0, 11)
+    runs = {
+        "inside": np.zeros((1, t.size)),
+        "exit": np.full((1, t.size), 10.0),
+        "diverges": np.where(t > 0.5, np.inf, 0.0)[None, :],
+    }
+    for name, u in runs.items():
+        x = np.vstack([np.sin(t), np.cos(t)])
+        on_numpy = evaluate_trajectory(problem, Trajectory(t, x, u))
+        on_jax = evaluate_trajectory(
+            problem, Trajectory(jnp.asarray(t), jnp.asarray(x), jnp.asarray(u))
+        )
+        np.testing.assert_allclose(np.asarray(on_jax.J), on_numpy.J, rtol=1e-6)
+        assert bool(on_jax.failed[0]) == bool(on_numpy.failed[0]) == (name != "inside")
