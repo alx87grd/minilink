@@ -20,7 +20,68 @@ tuned constants in examples, CONSTITUTION, the demo pass (K4).
 
 ## 1. Morning summary
 
-(written at the end of the run)
+**What works.** The pipeline you asked for runs end to end on `dev-v0.3`, every step pushed:
+
+```python
+problem = PlanningProblem(plant, cost=cost, tf=TF)          # the task, a plain class
+pe = problem.compile(loop_or_controller, dt)                 # the problem evaluator
+report = pe.evaluate()                                       # one run (or n_trials draws), the Evaluation
+jax.grad(lambda p: pe.evaluate(p).objective)(pe.params)      # every gain, plant parameter, cost weight, start
+program = pe.program(wrt=["controller.Kp", "controller.Ki", "controller.Kd"])
+result = Optimizer(program, method="gd").solve()             # or "adam", "l-bfgs", "auto"
+tuned = pe.unpack(result.z, wrt)                             # written back, judged by pe.evaluate
+```
+
+The closing example (`examples/demos/compile/pid_autotuning_jax.py`) has your two sections on
+one cost. The hand-written gradient loop lands at Kp 6.68, Ki 9.67, Kd 3.74. The pipeline's
+`Optimizer(program, method="gd")`, with the same learning rate and number of steps, lands on the
+same gains to 1.8e-15 (the same cost, gradient and step). Then `method="auto"` (L-BFGS, 16
+iterations) finishes the descent that 1000 hand steps leave halfway: J drops from 0.0701 to 0.0555
+at gains (13.4, 21.2, 8.0). The demo's tuned constants are kept. Its loss had to become the
+problem's cost: the tracking error plus an effort term measured from the torque that holds the
+setpoint (OD-20), because the old penalty on the gains cannot be a cost on the run.
+
+**What landed, in plan order.**
+- The clean-up's renames and moves: the removals, the package moves (dynamic programming,
+  `minilink.learning`, MPC under trajectory optimization), the short names, GMC714's teaching
+  names (K2, K3, K10, A6, G3).
+- The step model, one compiled `ev.step` / `ev.rollout` / `ev.jit` for every consumer, the old
+  integrator grid gone (SM-0 to SM-8).
+- The path to the cost (V1.1 to V1.5, A2):
+  - the native `Trajectory` and the cost's quadrature;
+  - the problem's fields with one meaning each: `U` unconstrained unless declared,
+    `x_goal` never creating `Xf`, the discount on the problem, the price switch and
+    `cost_bound()`;
+  - the one scoring formula, and `evaluate_trajectory` for a held run;
+  - the costs' parameters, and the problem's parameters as a live view;
+  - the problem evaluator, `evaluate` / `compare`, and the program export.
+- The optimizer's method table with the first-order backend (S74).
+- The closing example (S77).
+
+**Checks.**
+- Level 2 (the full suite minus the six slowest): 1692 passed.
+- The six slow ones pass. The RRT flagship demo timed out once under load and runs in 51 s
+  alone.
+- The 70-entry step-model baseline agrees at rtol 1e-6 through every step, apart from SM-7's
+  intended change.
+- The regression gate passes apart from speed rows on this slow VM.
+- The notebook gate on the final commit is in §5.
+
+**Please look first at:**
+1. The number changes in §3. Value iteration's default price changed from 1e6 to the cost bound,
+   so the course notebooks' cost-to-go colour scale now tops at the bound. The evaluation
+   scores moved from a held law to the continuous loop: a few percent, 8% for a stiff PD at
+   dt = 0.05.
+2. The U sweep (OD-18). About 90 constructions now write `U=plant.input_box`, the course
+   notebooks among them, so their numbers stay the same. You may prefer fewer such lines in
+   lessons where U never mattered (LQR).
+3. The planners' reported trajectory stays their held-input rollout on their grid, while
+   `evaluate` scores the continuous loop (OD-27).
+4. `compare` keeps the names-only form beside `compare(problem, ..., dt=)` (OD-28).
+5. Cost term ids follow your R53 (the class name verbatim), not the plan doc's snake case
+   (OD-22).
+6. The three demos that still teach a hand gradient loop (OD-32), and the LQR warning (OD-33),
+   are yours to call.
 
 ## 2. Decisions
 
@@ -52,6 +113,14 @@ tuned constants in examples, CONSTITUTION, the demo pass (K4).
 | OD-24 | A2 (R87) | 'Each set owns its parameters': the library sets are frozen dataclasses with margin(z, t, params=None) and no params of their own | Set and InputSet gain a class attribute params = None; problem.params shows each set's params by role, and writing one to a set that holds none (a frozen library set) is refused with TypeError; every planner that passed problem.params.sets now passes nothing, so a set reads its own. A user set that keeps parameters stores self.params and reads it when params is None (the System pattern); the tests' Band and ShrinkingInputs show it. Library sets reading params stay A5's. | Keep a shared sets dictionary on the problem: the bundle R87 retires. | — |
 | OD-25 | A2 (R87) | The bundle carried a random plant's nominal draw (sys.realize(None)); R87 says it is 'taken where a tool needs it, not stored' | nominal_plant_params(problem) in planning/problems.py: the mean draw of a random plant, else None (the plant's own); the planners that read problem.params.system (DP, policy evaluation, the grid, LQR, the transcriptions, the MPC tick) call it. The engine keeps the plant's own params in pe.params (its draws are the stochastic problem's). | A problem method: a second home for a derived value. | — |
 | OD-26 | A2, V1.4 | Which of the problem's leaves join the run's tree pe.params? | pe.params = the loop's blocks by id, then the problem's own leaves (cost, the parameters of the sets that hold any by role, x_start, discount_rate), then the free inputs; score_run reads cost, X, U, Xf and discount_rate from it, so jax.grad reaches Q, R and rho (tested against a central difference) and pe.program(wrt=['cost.R']) works. A block or free input named like one of these leaves is refused. | Keep the cost out of the tree until a consumer asks: V1.4's gate names the Q gradient. | — |
+| OD-27 | V1.4b | The feedback planners' solution.trajectory was the old evaluator's held-input rollout on the planner's grid; with the evaluator gone, does it become the continuous run? | No: nominal_trajectory (now in the engine) keeps the held-input rollout, u_k = π(x_k, t_k) held while the plant steps (rk4) to x_{k+1}: the PlanningSolution docstring calls it the planner's evidence on its own model, and its tests pin it to 1e-10. evaluate scores the continuous loop. The sampled loop of v0.4 is where the two meet. | The continuous run for both: the planners' reported trajectories would change and no longer show the law the planner designed (sampled at its dt). | — |
+| OD-28 | V1.4b | compare: today's compare(VI=sol, LQR=sol) lines solutions up for the overlays with no problem; the plan writes compare(problem, PID=pid, ..., dt) scoring every entry | Both, by the first argument: compare(**named) as today (solutions only); compare(problem, **entries, dt=, n_trials=, key=, solver=, backend=) also scores each entry (a PlanningSolution, a controller block, or an Evaluation already computed) on one key and one backend (NumPy for all when one entry does not trace, so the trials are paired). Comparison gains evaluations {name: Evaluation} and difference(a, b), the per-trial J_a − J_b as an array; a bare controller is wrapped as a solution with a 'given' record so the overlays read it. | Two verbs (compare and a scoring variant): one way to compare controllers is R84. | — |
+| OD-29 | V1.4 | The plan's evaluate takes solver='scipy' (dt the reporting grid), and 'auto' must fall back to NumPy when the cost or a set does not trace (today's Monte Carlo did) | The engine integrates an adaptive solver label (the Simulator's 'scipy*' table) with SciPy's solve_ivp on the NumPy evaluator, reported on the dt grid; an explicit JAX backend with it is refused. Under 'auto', after the loop compiles on JAX, one abstract trace of a trial's run and score (jax.eval_shape, no compile) decides: a NumPy-only cost or set falls back to NumPy for the whole run. | Refuse an untraceable cost under 'auto': a regression for every NumPy-written student cost. | — |
+| OD-30 | V1.4b | A planned schedule (TrajectorySource, the open-loop policy) did not trace on JAX (scipy's interp1d per channel), so a trajectory-optimization solution could not be evaluated on JAX in the loop | TrajectorySource.h interpolates on the array module (xp.interp for 'linear', searchsorted for 'previous', endpoints held), so it traces; its interpolator memory and refresh() override are gone. Numbers unchanged (the same linear and previous rules). | Pre-tabulate the source on the evaluation grid as the old evaluator did: a second path for one block kind. | — |
+| OD-31 | V1.5 | The row asks for the program's leaves scaled by their nominal magnitude | Not done: with z in the leaves' own units, gradient descent on the program takes exactly the hand loop's steps (the closing example's two sections agree to 1e-15), and pe.unpack(result.z) needs no scale; L-BFGS and Adam absorb the scaling. Scaling can come back as an option of program() if a tuning needs it. | Scale by \|leaf\| (or 1 at zero): the gd section would then differ from the hand loop, and every unpack would need the scale. | — |
+| OD-32 | S74 | The row asks that no hand descent loop remain in examples/demos/compile/ but the closing example's first section and tutorial 07's | Left for the maintainer: cartpole_rollout_gradients (an open-loop schedule, which the engine cannot tune until a source's samples are parameters), neural_controller_jax and params_gradient (identification) each teach the hand loop, and R90 kept that loop in two places on purpose; converting them changes what they teach (student-facing). | Convert all three now: three lessons rewritten without the maintainer. | — |
+| OD-33 | V1.2 | 'LQR warns once' when U is declared | Deferred: the U sweep (OD-18) wrote U=plant.input_box on every lesson whose plant has a finite input box, LQR lessons included, to keep their numbers; a warning would now fire in the GRO860 LQR notebooks although nothing changed for them. Whether those lessons keep the line (and see the warning) is the maintainer's call. | Warn now: new warnings in course notebooks overnight. | — |
+| OD-34 | V1.2 | The README's planning snippet builds a problem without U and hands it to value iteration and RRT, which now refuse an unbounded U | Its API line gains U=plant.input_box beside X=plant.state.box (as examples/demos/core/readme_examples.py, which the sweep updated); no other README change. | Leave the README stale until the maintainer's pass: its snippet would raise. | — |
 
 ## 3. Intended number changes (R80)
 
@@ -59,10 +128,38 @@ tuned constants in examples, CONSTITUTION, the demo pass (K4).
 | --- | --- | --- | --- | --- | --- |
 | SM-7 | compute_forced on rk4_fixedsteps: a sampled input matrix is held (zero-order) over each period instead of interpolated; a callable u(t) is read at the RK4 stage times instead of sampled and interpolated | Pendulum, x0 = [0.4, −0.2], u = 0.5 sin 2t on [0, 1], 20 steps (SM-0 entries forced.rk4_fixedsteps.*) | linear input between samples | held / at the stages | sampled 4.4e-3, callable 9.5e-5 (max over the run, relative) |
 | V1.2 (price) | Value iteration's default price of an inadmissible pair: 1e6 → the problem's cost bound on the grid's own sum (g_max dt/(1−α), exact for a quadratic on the boxes); tabular learning prices its grid the same way; the RL environment and the Gym bridge price by cost_bound over the episode (was a sampled bound, Halton 4096, over the training zone and the action port) | DoubleIntegrator test problem (tests/unittest/test_dynamic_programming.py make_problem), QuadraticCost Q=I R=I, grid 31×31×7, dt 0.1, α 0.95 | price 1e6; J on the 203 cells with J < 5 as solved | price 38.0 (= the bound); on those 203 cells J lower in 99%, median \|ΔJ\| 5e-4, max 3.07 (cells next to the boundary, where 1e6 leaked through the interpolation), the same action in 89% (ties) | median 1e-4 relative; up to 0.64 at boundary-adjacent cells. The step-model baseline (its DP entries price explicitly) and the regression gate agree unchanged; the value-iteration course notebooks' cost-to-go colour scale now tops at the bound instead of 1e6: worth a look |
+| V1.4b | Every evaluation score: the old Monte Carlo trial held the law over each period dt and cut the integral at the first exit; evaluate runs the continuous loop (the law at every RK4 stage) and integrates to tf | Pendulum, state box ±1 rad × ±6 rad/s, QuadraticCost Q=I R=0.01, tf=2 s, 20 starts ~ U([−0.5, 0.5]²) from seed 1 (the same starts on both paths), dt=0.05, price 100; a PD law K=[30, 8] and a weak one K=[2, 0.5] | MonteCarloEvaluator(backend='numpy', seed=1): mean J 0.2946 (PD), 0.4509 (weak) | evaluate(n_trials=20, key=1, backend='numpy'): 0.2713 (PD), 0.4385 (weak); no run failed on either path | per run, median 7.7e-2 (max 1.0e-1) for the PD law, 2.8e-2 (max 3.0e-2) for the weak one: the difference between a law held over 50 ms and the continuous law, larger for the stiffer gain, as expected |
 
 ## 4. Not done, or blocked
+
+The rest of v0.3's clean-up, not started (each needs a pass of its own, with its numbers kept):
+
+- the catalog clean-up (K8): the car family to three models, the root prelude trimmed to the
+  course plants (R60), `minilink.catalog` as the index of tested plants, the unsupported plants
+  to the experimental tier, the twins merged, the README's catalog line;
+- one mechanical family (S32): `H` the one mass-matrix name, the boat and the plane under
+  `MechanicalSystem`, `DynamicBicycle` on the generalized child;
+- every catalog plant stating its own bounds (R68);
+- the contract tests for the kept prototypes (K3b).
+
+What the landed rows left (each written as a "rest" row in TODO §4):
+
+- the evaluator's internals deduplicated and the `f` / `f_p` tiers folded (OD-9; SM-6's rest);
+- `StepRollout` folded into the native `Trajectory`, and `Set.contains` on the array module
+  (V1.1's rest);
+- the LQR warning (OD-33) and R68 (V1.2's rest);
+- `problem.realize(key, n)` as a public verb (V1.4b's rest; the engine draws internally);
+- the three hand-loop demos (OD-32; S74's rest);
+- the program's leaves scaled by their nominal magnitude (OD-31, decided against);
+- the library sets reading their own `params` (A5, by design after A2).
 
 ## 5. Tests skipped in this container
 
 No Ipopt (`cyipopt`) in the cloud container: the `ipopt` tests skip and trajectory optimization
 falls back to SciPy where a test or demo asks for Ipopt.
+
+The other skips in `pytest tests/unittest` (9 in all): the six Ipopt tests; the notebook smoke
+inside pytest (run instead by `tests/demo_checks/run_notebook_checks.py`, the "Notebook change"
+row); one hybrid test needing the graphviz `dot` binary; one SciPy run on a discontinuous
+sliding-mode loop that is skipped by design. Speed rows of the regression gate fail on this VM
+(for example `f.dual_rate.nlp_s` at 0.22 s against a 0.15 s gate); every value row passes.

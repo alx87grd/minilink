@@ -57,6 +57,27 @@ v0.9 they go to `CHANGELOG.md`, step V5):
   `full` and `dev` only (`[jax]`, `[plotting]`, `[visualization]`, `[diagrams]`,
   `[symbolic]`, `[rl]`, `[ipopt]` are gone); `install.md` and `environment-basic.yml` are
   gone, the install story is the README's.
+- 2026-10-24 (on `dev-v0.3`, pending the maintainer's merge; every lesson migrated in the same
+  commits): the removals of R54 and R64 (`ProblemEnv` off the facade, `to_gymnasium`, the camera
+  helpers, `Replay`, `Sampler`, `RateLimiter`, `Lag`, `DeadZone`, `Relay`, `NotchFilter`,
+  `Washout`, `SimpleIntegrator`; `ZOHHold` is `UnitDelay`, `NeuralNetwork` folded into `MLP`);
+  the package moves of R66 (`planning/dynamic_programming/`, `minilink.learning`, MPC under
+  trajectory optimization); A6's short names and every block's default id its class name
+  (R52, R53); the step model: the evaluator's integrator grid is `ev.step` / `ev.rollout` /
+  `ev.jit.*` (`solver=`, `substeps=`, `hold=`), `integrator=` is `solver=` everywhere,
+  `discretize(sys, dt, *, solver, substeps)` with `dt` required, and `compute_forced` on
+  `rk4_fixedsteps` holds a sampled input (those forced numbers changed once); the problem: a
+  plain class whose `params` is a live view of its parts (`ProblemParameters` and `params=`
+  gone), `U` unconstrained unless declared (`U=plant.input_box`), `x_goal` never creates `Xf`,
+  `discount_rate` on the problem (gone from the cost), `infeasible_cost` the switch
+  `None` / `True` / a number with `cost_bound()`, value iteration's default price the cost
+  bound instead of `1e6` (its numbers changed once); the costs: parameters on the System
+  pattern, a sum's terms keyed by id, `evaluate_trajectory` / `terminal_cost` / `total_cost` off
+  the cost (`traj.with_cost`, `evaluate_trajectory(problem, traj)`); the evaluation:
+  `MonteCarloEvaluator`, `score_trajectory` and `Comparison.evaluate` gone for
+  `problem.compile(controller, dt)`, `evaluate` and `compare(problem, ...)` (the continuous loop
+  integrated to `tf`, so the scores changed once); the optimizer: presets `gd`, `adam`,
+  `l-bfgs`, `method="auto"`, `z0` optional.
 
 ## 3. Maturity (TRL)
 
@@ -349,9 +370,14 @@ and the course calendar does not drive the work (R78); the work happens on `dev-
 `dev` after the maintainer's review (R79); number changes are checked by closeness on the same
 problem and cost (R80); `rtol 1e-6` where a computation is restructured (R81); no alias or shim,
 one sweep (R82); the Euler solvers stay (R83); one way to compare controllers (R84); a closing
-PID-tuning example (S77, R85). Session 5 (R86–R89) kept v0.3 continuous and ruled the problem's parameters. **Next:** code in
-TODO §4's order: the clean-up, the step model, the path to the cost, the optimizer, the closing
-example. The sampled loop and the v0.4 names stay open for v0.4.
+PID-tuning example (S77, R85). Session 5 (R86–R89) kept v0.3 continuous and ruled the problem's parameters.
+**Done 2026-10-24, overnight, on `dev-v0.3` (pending the maintainer's review, R79):** the
+clean-up's renames and moves, the step model, the path to the cost (the problem evaluator
+`problem.compile`, `evaluate`, `compare`, the program export), the optimizer's method table and
+the closing PID example, every decision taken without the maintainer in
+[the run's log](../reviews/2026-10-24-v03-run-decisions.md). **Next:** the maintainer's review of
+that log; then what TODO §4 left (the catalog clean-up K8, S32, R68, the rows' rests). The sampled
+loop and the v0.4 names stay open for v0.4.
 
 **The audit, done 2026-10-23** (G1): the GMC714 syllabus read and every lab's ingredients
 checked on the teaching surface (§4.3); no gap; the maintainer ruled that GMC714 needs no new

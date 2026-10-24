@@ -39,16 +39,6 @@ in v0.3's clean-up, after K2, K8 and K10 and before G3 (TODO §4's order, R78); 
   `Comparison`, with S54's clipping (scan: planning#3, examples#5); `plot_cost2go` keeps its
   name to v1.0 and its rename to `plot_cost_to_go` (the name the solution and `Comparison`
   already use) is on V4's list; the operators' named forms exported together (scan: core#9).
-- [ ] **A6 Short catalog names** **[ask — public names]**, ruled 2026-10-23 (R52, R53): the 68
-  explicit display names dropped (plus the `name=` defaults the count missed: the filters,
-  `TransferFunction`, `StateSpaceSystem`, `LTISystem`, `NeuralPolicyController`, the three
-  mechanical bases' f-strings, `lqg`'s box), the seventeen class renames of R52 (R63's
-  `JointImpedance` lands with G3) (the K1 inventory's §4.1,
-  options A and B), and a block's default id the class name verbatim (R53: `normalize_identifier`
-  no longer converts; a given id and the loop roles keep priority). One commit per band (catalog,
-  control, planning), every notebook, demo and test migrated in the same commit, no alias. Done when no class carries an explicit display name, the renamed classes
-  are the only spellings in the repo, the teaching-surface test pins the new names, and the
-  notebook checks pass.
 - [ ] **A5 Later nouns, each with its first consumer.** `log_prob` on the distributions;
   parameter-dictionary support on sets and distributions (one flatten rule, with
   identification or the robust problem); `Set.as_cost(weight=, shaping=)` as the set-to-cost
@@ -300,6 +290,13 @@ pick):
 
 ## 4. v0.3 — a cleaner core and the differentiable path, then GMC714
 
+**Status (2026-10-24, the overnight run on `dev-v0.3`, pending the maintainer's review):** the
+clean-up's renames and moves (K2, K3, K10, A6, G3's moves), the step model (SM-0 to SM-8), the
+path to the cost (V1.1 to V1.5 with A2), the optimizer's method table (S74) and the closing PID
+example (S77) landed; what each row left is below, and every decision taken without the
+maintainer is in [the run's log](../reviews/2026-10-24-v03-run-decisions.md). Left of the
+clean-up: K8, S32, R68 (in V1.2's rest), K3b.
+
 **Start here (2026-10-23, after session 5):** every decision the code needs is ruled (R1–R89,
 [the record](../reviews/2026-10-22-rulings-session-1.md)). v0.3 is the continuous path: the new
 names and the differentiable evaluation of the cost and the criterion; every hybrid piece (the
@@ -341,17 +338,6 @@ the demo sweep touches fewer files. Nothing leaves without the maintainer's ruli
 - K1, the inventory, landed 2026-10-23: [the record](../reviews/2026-10-23-k1-inventory.md)
   (every public name with its callers, maturity and a proposal; the plants; the demos and their
   twins; the draft A6 and G3 rename tables). K2, K3, K4, K8, A6 and G3 rule from it.
-- [ ] **K2 Remove the unused features** **[ask — removals]**, ruled 2026-10-23 (R54): `ProblemEnv`,
-  `to_gymnasium`, `fixed_camera`, `follow_frame_camera`, `merge_skins`, `debug_state_skin`, `Replay`,
-  `Sampler`, `RateLimiter`, `Lag`, `DeadZone`, `Relay`, `NotchFilter`, `Washout` (R64), the
-  `SimpleIntegrator` plant; `ZOHHold` renamed `UnitDelay` (R64); `NeuralNetwork` folded into `MLP`;
-  `Lead` stays (R54 amended). One commit per feature, callers, tests and docs in the same
-  commit, no alias. `ProblemParameters` leaves with its migration (R41). Done when every listed name
-  is gone, `pytest` and the demo checks pass.
-- [ ] **K3 Prototypes to `experimental/`**, ruled 2026-10-23 (R69): `line_segment` to the
-  experimental tier; `mpc_default_computer_x0`, `mpc_warm_start_guess` off the
-  `control.mpc` facade (internal; `MPCBroadcastController` is not on it); the plants and drawings of R56 and R58 go with K8-3. Done when those
-  moves land and the teaching-surface test pins the facades.
 - [ ] **K3b Contract tests for the kept prototypes** (agent, R69): every name the K1 inventory labels
   "prototype" and keeps gets a test of its contract (the sets, the blocks, the sensitivity functions,
   `discretize`, the graphics primitives, …). The K1 inventory's script lived in a lost scratchpad: it
@@ -388,14 +374,6 @@ the demo sweep touches fewer files. Nothing leaves without the maintainer's ruli
   flagship smoke (both on `minilink.experimental.c_export`). Left: the unsupported plants' test rows
   leave with K8-3. Done when CI's gate imports nothing under the tier but those two exceptions,
   and `pip wheel` ships nothing under it.
-- [ ] **K10 The package structure** **[ask — public names]**, ruled 2026-10-23 (R66): `minilink.planning`
-  keeps the problem and its solutions with `dynamic_programming/` (was `dynamic_programming/`),
-  `trajectory_optimization/` (MPC moved in from `planning/trajectory_optimization/mpc/`, the block still importable from
-  `minilink.control`) and `search/`; reinforcement learning moves to a new `minilink.learning` band
-  (the tabular learners with it; identification and imitation later); `spatial/` leaves with A3 (v0.4), so it stays put in v0.3. One
-  commit per move, the band facades keeping their names, deep paths, demos, tests, the teaching-surface
-  registry and the API docs migrated in the same commit. Done when the tree matches R66 apart from `spatial/`, `pytest`, the
-  demo and notebook checks pass, and DESIGN's package layout says so.
 - K7, what is core and what is a side feature, closed 2026-10-23 (R69): answered by R1–R5 and
   R52–R67; its moves are the K2, K3, K8 and K10 rows.
 
@@ -406,64 +384,10 @@ the computation is restructured, identical for a move) unless it names its inten
 (AGENTS' refactor recipe; the baseline JSON and the script that writes it under `benchmarks/`,
 compared after each step).
 
-- [ ] **SM-0 The baseline.** Every consumer of sampled-path.md §1 (the RL environment,
-  `Sys2Gym`, the DP grid, shooting and multiple shooting, `discretize`, the RRT extender, the Lyapunov
-  sampler, `compute_forced` on each
-  fixed-step solver, with a callable and a sampled input) on a pendulum and a cart-pole, both
-  backends where they exist, `params` on and off, repeated calls, timings left out; also the continuous
-  hand steppers sampled-path.md §1 omits (`pid_autotuning_jax`,
-  `neural_controller_jax`, `cartpole_rollout_gradients`, the Simulator's fixed-step solvers). Done
-  when two runs `cmp` identical and the script that writes the JSON is in the repository.
-- [ ] **SM-1 One compiled step.** `ev.step(x, u, t, params, *, dt, solver="rk4", substeps=1)` (a
-  step holds its input by definition, R40) and `ev.rollout(x0, u_seq, t0, dt, params, *, solver,
-  substeps, hold="zoh")` as the one traced body per backend; `ev.jit.*` and `ev.frozen.*`
-  generated and cached once by one helper (never rebuilt in a loop); the knobs static; every
-  existing integrator name a binding over it; the step evaluators' `rollout(x0, *, n_steps, u)` and
-  `rollout_p` give way to the new `rollout`. Done when the SM-0 baseline agrees (R81), the
-  frozen form times within the noise of today's frozen `rk4_step_trace` (`benchmarks/params_binding.py`),
-  and a test fails if a call rebuilds the jitted wrapper.
-- [ ] **SM-2 `discretize` on the compiled step.** `discretize(plant, dt, *, solver="rk4",
-  substeps=1) -> StepSystem`, its `step(x, u, k, params)` with the integer tick and `t_k = t0 +
-  k·dt` bound here; `integrator=` replaced by `solver=` at every caller (R42, R82); `params=` leaves the
-  signature (the `StepSystem` takes `params` per call);
-  `solver="exact"` (the matrix exponential, linear models); the follow-ups below. Done when the
-  RK4 and Euler numbers are byte-identical, `"exact"` matches `scipy.signal.cont2discrete` to
-  `1e-12`, and DP and RL read it (SM-3, SM-5).
-  - the `params["dt"]` fallback dropped with its five guards (R70): `dt` required, a `"dt"` key in
-    `params` refused with the line to write, one ledger line;
-  - future work, `PID % dt` (a sampled controller with continuous states): `%` raises
-    `TypeError` today (P10); with the hybrid phase (v0.4, R86).
-- [ ] **SM-7 `compute_forced` on the one rollout** (R17, R18, R40, R42). `solver="rk4" |
-  "scipy*"`; the fixed-step backends call `ev.rollout`; `input_interp` becomes `hold` (`zoh` by
-  default) for a sampled input; a callable `u(t)` is evaluated at the RK4 stage times (no hold);
-  `euler_fixedsteps` on the same rollout; `euler` stays (the discontinuous default of
-  `select_solver`, the non-uniform grid; R83); SciPy keeps its interpolant (its `input_interp` option). **One intended change:** a
-  sampled input on `rk4_fixedsteps` is held instead of interpolated, so those forced runs change
-  once. Lands after SM-2. Done when every other SM-0 entry agrees (R81; callable inputs included), the sampled forced runs
-  are re-pinned with a test and a ledger line, and S65's input-hold item closes.
-- [ ] **SM-3 The RL environment and the gym bridge on `discretize`.** `RolloutEnvironment`,
-  `Sys2Gym` and `ReinforcementLearningPlanner` take `solver=` (`integrator=` gone, R82)
-  and `substeps=`; `RolloutEnvironment` keeps the episode's rules as a training setting and stops
-  serving the Monte Carlo trials (R43). Done when the RL baselines agree (R81) at
-  `substeps=1` and one test trains at `substeps=2`.
-- [ ] **SM-4 The other continuous steppers.** The RRT extender on `rollout` (it keeps every
-  knot) and the Lyapunov sampler on `step`, both passing `t` as it advances. `HybridSimulator`,
-  `RealtimeSimulator` and the MPPI scripts move onto the step model with S31 in v0.4 (R86). Done
-  when their SM-0 entries agree (R81) and neither keeps a hand-written substep loop.
-- [ ] **SM-5 Shooting and DP.** Shooting and multiple shooting on `ev.rollout(..., hold="foh")`;
-  the DP grid's four inline Euler steps (`discretizer.py` ×2, `dp.py`, `policy_eval.py`) on `solver="euler"`, `DynamicProgrammingPlanner(problem, dt=, solver="rk4")`
-  available (R8). Done when the trajopt and DP baselines agree (R81) and no inline
-  `x + f dt` remains in `dynamic_programming/`.
-- [ ] **SM-6 The trim and the move.** The four-body surface (`f`, `h`, `step`, `rollout`, plus
-  `rollout_batch`; 69 distinct public names to about 12, sampled-path.md §3.6), DESIGN §5's names
-  migrated at every caller (R82); the evaluator internals deduplicated (the ZOH sugar, the JAX
-  step rollout, the four Jacobian probes, the undeclared batch cache); then the integrators to
-  `simulation/solvers/` (S37 absorbed; S27 Diffrax stays in §6). Done when the full SM-0
-  baseline agrees (R81), DESIGN §5 lists the four bodies, and the "Regression gates, full
-  local" row of tests/README passes.
-- [ ] **SM-8 One keyword per kind of choice** (R42): `solver=` on every tool that integrates
-  (`evaluate`, `compare` with V1.4; the step model's tools above), `integrator=` gone (R82), the rule in RULES. Done when no public signature takes
-  `integrator=` and `rg "integrator="` finds no example.
+- [ ] **SM-6, the rest** (the trim landed 2026-10-23; the integrators stay in `core/compile/`, OD-11 of
+  [the run's log](../reviews/2026-10-24-v03-run-decisions.md)): the evaluator internals
+  deduplicated (the ZOH sugar, the JAX step rollout, the four Jacobian probes, the undeclared batch
+  cache) and the `f` / `f_p` tiers folded (OD-9). Done when the SM-0 baseline agrees (R81).
 
 **The continuous core — the path to the cost** (V1, steps 1–6 and 7a of
 [differentiable-problem.md](differentiable-problem.md); the API is
@@ -473,120 +397,25 @@ sampled controller waits for the hybrid phase; RN-4's per-block noise seeds for 
 reads its math next to `dp.py` before it lands. Nothing merges to `main` until every notebook has
 moved to the new interface (R47).
 
-- [ ] **V1.1 The native `Trajectory` and the cost's quadrature.** `Trajectory` array-native and
-  a JAX pytree (the validation-free unflatten, the signals in sorted order, the static role
-  layout kept by save and load, R39; differentiable-problem.md §4.2); `StepRollout` folded in as
-  `t = k·dt`; `Set.contains` and `InputSet.contains` derived from `margin` on `xp`; the cost's
-  surface: `integrate(traj, *, discount_rate, params)` on `xp` (the running-sum trapezoid),
-  the upper-bound hint `g_max(X, U)` and `h_max(X)` (R32), `traj.with_cost(cost,
-  discount_rate=0.0)`. A core rewrite (72 constructor calls): split into commits when it starts.
-  Done when `jit`, `grad` and `vmap` of a function returning a `Trajectory` run, `test_core.py`,
-  `test_costs_optimizer.py` and `test_planning.py` pass byte-identical, and `integrate` agrees
-  NumPy against JAX to `1e-12`.
-- [ ] **V1.2 One evaluation of a run, and the problem's fields.** `evaluate_trajectory(problem,
-  traj) -> Evaluation`, a frozen pytree record, one row: `cost`, `J`, `feasibility_margin`,
-  `failed`, `reachability_margin`, `reached`, the three rates, `objective` (R27, R45); a run that
-  is not finite is failed with `cost = +inf` behind a safe `where` (R31); `J = cost`, plus the
-  price when `infeasible_cost` is on (`None` by default, `True` for
-  `problem.cost_bound()`, or a number; R32); `discount_rate` moves from the cost to
-  `PlanningProblem` (a ledger line; its 18 readers, `tabular.py` and `core/inspect.py` among them);
-  `evaluate_trajectory`, `terminal_cost`, `total_cost` leave
-  the cost; `X` and `U` unbounded unless declared, `plant.input_box` added, DP and RL refuse an
-  unbounded set with the line to write, LQR warns once, the trajectory-optimization numbers
-  re-pinned once (R21, R37); `x_goal` never creates `Xf` (R33: the terminal equality written as
-  `Xf=SingletonSet(...)` where a lesson wants it); `Xf=None` is reached; `infeasible_cost` takes
-  `None`, `True` or a number (the callable goes); DP's `1e6` and RL's sampled bound give way to
-  `problem.cost_bound()`, and DP and RL stop falling back to the plant's state box (R21); a
-  role-less trajectory scored only without signals and with the plant's sizes (R39); every catalog
-  plant states its own bounds and `MechanicalSystem` invents none (R68, today's numbers kept).
-  **Intended changes** (R80): the integral to `tf` replaces the cut at exit wherever
-  `score_trajectory` scored; trajopt's `U` and `Xf` defaults; the DP and RL price. Each is checked
-  by the same problem and cost run before and after, the relative differences in the report, then
-  re-pinned with a ledger line. The lessons that relied on a default gain the explicit line in the
-  same commit. Done when the DP, RL, single-run and trajopt numbers are re-pinned once,
-  each with its before-and-after check, `evaluate_trajectory` agrees NumPy against JAX to `rtol 1e-6` on a run with an exit,
-  one without and one that diverges, and DESIGN §6 states the formula once.
-- [ ] **A2 Cost parameters, and the problem's parameters as a view (V1's step 6)** **[ask —
-  core]**, ruled 2026-09-13, 2026-10-23 and in session 5 (R87–R89;
-  [cost-params.md](cost-params.md)); after V1.2 and before V1.3 (R78), so the engine assembles
-  its parameters from the objects from the start: `params` on every library cost (`QuadraticCost`,
-  `TimeCost`, `FieldCost`, `SumCost`, `ScaledCost`), composite costs nested like diagram params
-  with `cost.id`, attributes as views so the notebooks' in-place writes keep working; the
-  trajopt, DP and RL paths read the cost's own parameters; with A5's sets reading `params`, each
-  set its own; then `problem.params`, the live nested view of the parts keyed by role (`"plant"`,
-  `"cost"`, `"X"`, `"U"`, `"X0"`, `"Xf"`) plus the problem's own leaves `"x_start"` and
-  `"discount_rate"`, its setter routing each entry to its part (R87, R88); `PlanningProblem` a plain
-  class (R89); `params=None` reads the problem's own in `evaluate_trajectory`, `cost_bound` and
-  `realize`; `ProblemParameters` and the constructor's `params=` gone, its 46 readers (14 cost,
-  13 system, 19 sets) reading `problem.params` (scan: core#3, core#4:
-  `check_diagram_params` checks each per-block dict against the block's keys). Done when every
-  planner baseline agrees at nominal parameters (R81), a test writes `problem.params["cost"]` and
-  `problem.params = {"plant": …}` and reads the change on the parts, and `jax.grad` of a trajopt
-  objective with respect to `Q` runs; V1.4's gate adds that `jax.grad` of `pe.evaluate(p).objective` reaches `Q`.
-- [ ] **V1.3 The whole run out of the scan** (after SM-1). `ev.rollout` returns `(t, xs,
-  signals)`, every internal signal at the sample times; `traj.of("plant")` by static indexing
-  (the recompute loop kept as the NumPy fallback for a trajectory without signals). Done when the
-  traced plant command matches today's `reconstruct_internal_signals` on a PID loop to `1e-12`,
-  the `Simulator`'s `rk4_fixedsteps` and the compiled scan agree to round-off on one diagram (the
-  pinned test), and `jax.grad` of a function of the recorded signals runs.
-- [ ] **V1.4 The engine and its facades.** `closed_loop_of(problem, arg)` (D16c: a controller
-  wired by the automation-by-convention rules, every free input at its port's nominal value and a
-  leaf of `pe.params`, R38; or a built loop with the `plant` key; every refusal of
-  continuous-core.md §3.6 with its fix in the message); `problem.compile(arg, dt, *, solver,
-  substeps, backend) -> ProblemEvaluator` with `params`, `trajectory`, `evaluate`, on JAX and
-  NumPy; `evaluate(problem, arg, *, dt, solver="rk4", key, record)` and `compare(problem,
-  **entries, dt, key) -> Comparison` with `dt` required (R36; with an adaptive `solver` the
-  reporting grid); `Planner.evaluate` and `solve(evaluate=True)` on `evaluate`; the
-  `pid_autotuning_jax` demo on `jax.grad(lambda p: pe.evaluate(p).objective)` with its gain
-  regularizer dropped (R46). Lane (R28): `evaluate`, `compare`, `evaluate_trajectory`,
-  `discretize` on the teaching surface by the demo rule; `problem.compile`, `ProblemEvaluator`,
-  `program` provisional on the planning facade. Done when the demo's gradient matches a central
-  difference on the same objective (the hand loop's rectangle-rule mean is a different number), the pathwise gradient with respect to a
-  gain, the plant's mass, `x_start` and the cost's `Q` matches a central difference (four tests), `solver="scipy"`
-  and `"rk4"` agree within the solver tolerance on the pendulum, and every refusal has a test.
-- [ ] **V1.4b The draws, and the Monte Carlo fold** (R44; V1's step 7a). `problem.realize(key,
-  n)` (the start and parameter laws), `evaluate` and `compare` with `n_trials` and `key` (`vmap`
-  of the one rollout, a loop on NumPy), `objective` the problem's criterion over `J`, paired
-  trials in `compare`; the criterion's `("cvar", α)` added (today `"expectation"` and
-  `"worst_case"`); `MonteCarloEvaluator` and `Comparison.evaluate(evaluator)` removed and every
-  notebook and demo that scores or compares controllers moved to `evaluate` and `compare` in the
-  same change (R82, R84). Noise blocks keep today's per-port draws until RN-4's per-block seeds
-  (v0.4), so the frozen-noise defect stays through v0.3. **One intended change:** the Monte Carlo numbers move once (the real
-  loop, the integral to `tf`; D21), re-pinned with its before-and-after check (R80). Done when the pathwise gradient of
-  `objective` with respect to the controller's params matches a central difference on the same
-  key, the deterministic twin (`n_trials = 1`, no laws) agrees with V1.4 (R81), and the RL
-  lessons run on `evaluate`.
-- [ ] **V1.5 The program export** (R23, R32). `pe.program(wrt, bounds=None, key, n_trials)` with
-  the objective `pe.evaluate(...).objective` and the declared `X`, `U`, `Xf` as per-sample `g ≥ 0`
-  rows; `pe.pack` / `pe.unpack`; the leaves scaled by their nominal magnitude; the docstring's three
-  caveats (the price has no gradient; with the price on and sets declared it counts beside the
-  rows; with the price off a diverging trial makes the objective `+inf`, so a search that may
-  reach unstable gains sets `infeasible_cost=True`), and a one-time warning naming that fix when the
-  objective comes out non-finite (R72); today's `Optimizer` unchanged (S74 follows, R74). No `tune`. Done when
-  `Optimizer(program).solve()` on the autotuning program reaches the hand loop's gains, the demo
-  ends in the `Optimizer`, and a tuning that leaves `X` comes back inside through the margin rows.
+- [ ] **V1.1, the rest** (the native `Trajectory` and the cost's quadrature landed 2026-10-24): `StepRollout`
+  folded in as `t = k·dt`; `Set.contains` and `InputSet.contains` derived from `margin` on `xp`.
+  Done when both land byte-identical.
+- [ ] **V1.2, the rest** (the evaluation of a run, the problem's fields, the price switch and the cost
+  bound landed 2026-10-24): LQR warns once when `U` is declared (the U sweep wrote
+  `U=plant.input_box` on lessons that never needed it, so the warning waits for the maintainer's
+  pass on those lines); every catalog plant states its own bounds and `MechanicalSystem` invents
+  none (R68, today's numbers kept).
+- [ ] **V1.4b, the rest** (the Monte Carlo fold landed 2026-10-24): `problem.realize(key, n)` as a public
+  verb (the engine draws the start and the parameter laws internally today).
 
 **After the continuous core: the optimizer and the closing example.**
 
-- [ ] **S74 The optimizer as the one descent loop** **[ask — core]**, ruled 2026-10-23 (R74): in v0.3,
-  right after V1.5. The program's class read from its fields (unconstrained, bounded, constrained),
-  `method="auto"` picking by class and refusing a method the class does not admit, presets named by
-  algorithm (`"l-bfgs"`, `"adam"`, `"gd"`; the `scipy_*` keys kept), one first-order backend with the
-  RL `Adam` moved (its OPW part, the parametric MPC solve, is a v0.4 row with S76, R86) (the RL baselines agreeing, R81); design in
-  [differentiable-problem.md](differentiable-problem.md) §4.5. Done when `Optimizer(program).solve()`
-  on the autotuning program reaches the hand loop's gains with `method="adam"` and with the class
-  default, SLSQP refuses nothing it accepted before, the RL baselines agree (R81), and no
-  `value_and_grad` loop remains in `examples/demos/compile/` but the closing example's first
-  section (S77) and tutorial 07's (R75).
-- [ ] **S77 The closing example: tuning a PID by hand, then by the pipeline** (R85), the last
-  v0.3 row; it needs V1.5 and S74 only. `examples/demos/compile/pid_autotuning_jax.py` in two
-  sections: the gradient-descent loop written by hand, as today; then the automatic pipeline: the
-  problem stated (`PlanningProblem` with a `QuadraticCost`), `pe = problem.compile(loop, dt)`,
-  `program = pe.program(wrt=[...])`, gradient descent on the program's cost and gradient
-  (`Optimizer(program, method="gd")`), the tuned gains written back with `pe.unpack` and
-  judged by `evaluate`. Done when both sections reach gains that agree closely (the two
-  objectives being the same cost), the demo runs in the demo checks, and `examples/README.md`
-  maps it.
+- [ ] **S74, the rest** (the method table and the first-order backend landed 2026-10-24): the hand
+  descent loops of `examples/demos/compile/` other than the closing example's first section
+  (`cartpole_rollout_gradients`, `neural_controller_jax`, `params_gradient`) moved onto
+  `Optimizer` **[ask — student-facing]**: each teaches the hand loop today, and R90 kept that
+  loop in two places on purpose; the open-loop schedule needs a source whose samples are
+  parameters first.
 - Second opinion and final review: every point ruled (R30–R89).
 
 **GMC714** (R48, 2026-10-23): no new feature; the teaching surface covers every lab (ROADMAP
