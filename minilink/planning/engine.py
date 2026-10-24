@@ -401,17 +401,18 @@ class ProblemEvaluator:
 
         # The batched axes: a drawn leaf carries the trial axis, the others are shared.
         # The trace reads the problem's cost and sets, so a part replaced on the
-        # problem traces anew (the entry holds the parts, so their ids stay theirs)
+        # problem traces anew, in place of the entry it replaces
         tree, axes = batch_axes(params)
         parts = problem_parts(self.problem)
-        key = (record, tree_signature(axes), tuple(id(part) for part in parts))
-        if key not in self.trials_fn:
+        layout = (record, tree_signature(axes))
+        cached = self.trials_fn.get(layout)
+        if cached is None or any(a is not b for a, b in zip(cached[1], parts)):
             batched = jax.vmap(
                 lambda p, x0, c: self.score(p, x0, record, c), in_axes=(axes, 0, None)
             )
-            self.trials_fn[key] = (jax.jit(batched), parts)
+            self.trials_fn[layout] = (jax.jit(batched), parts)
 
-        trials_fn, _ = self.trials_fn[key]
+        trials_fn, _ = self.trials_fn[layout]
         rows, trajs = trials_fn(tree, x_starts, price)
 
         return rows, unbatch(trajs, x_starts.shape[0]) if record else None

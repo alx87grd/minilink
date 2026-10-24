@@ -44,7 +44,9 @@ class PolicyEvaluator:
         the grid state feeds that port, the reference stays pinned at its
         nominal value, and the control port supplies ``u``.
     options : DynamicProgrammingOptions, optional
-        Shared workflow options (``alpha``, ``tol``, ``interpolation``, ...).
+        Shared workflow options (``alpha``, ``tol``, ``interpolation``, ...),
+        used as given: pass the planner's resolved ``planner.options``. ``None``
+        takes the problem's discount, horizon and price, as the planner does.
     """
 
     def __init__(

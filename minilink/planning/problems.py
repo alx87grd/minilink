@@ -345,7 +345,7 @@ class PlanningProblem:
         else:
             dt = float(dt)
             gamma = np.exp(-rho * dt)
-            N = round(T / dt) if np.isfinite(T) else np.inf
+            N = max(1, round(T / dt)) if np.isfinite(T) else np.inf
             horizon = dt * (1.0 - gamma**N) / (1.0 - gamma) if gamma < 1.0 else N * dt
 
         # J_max = g_max ∫₀ᵀ e^{−ρt} dt + e^{−ρT} h_max

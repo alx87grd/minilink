@@ -244,3 +244,30 @@ Open, for the maintainer (not changed):
    of the problem's own weights. Worked out once per evaluation, it costs 4096 calls of `g`
    for a cost with no exact bound (`QuadraticCost` has one) at every `evaluate`, a program's
    every iteration included; a cache keyed on the cost's parameters would remove that.
+
+## 7. The second review pass
+
+A fresh reviewer read the first pass's two commits adversarially; two more read the parts the
+first pass did not cover (the blocks, control, diagrams and facades, learning, trajectory
+optimization and MPC, graphics; and the documents, demos and student-facing material).
+
+Fixed in the first pass's own work:
+
+- The first-order optimizer reported `success=False` for a gradient descent converged to
+  machine precision (the default `gtol = 0` asks for an exact zero). A step that no longer moves
+  `z` is now a fixed point, hence converged, for gradient descent; Adam keeps its step until its
+  moments settle, so it stops on the projected gradient alone.
+- Value iteration's `solve()` sweeps to convergence whatever the problem's horizon, so its sum is
+  `Σ_{k≥0} αᵏ dt = dt / (1 − α)`; the price took the sum cut at `tf` (below the converged cost
+  of a feasible cell). `grid_price` now bounds the converged sum; `α = 0` no longer warns.
+- `PolicyEvaluator` uses a passed options bag as given; its docstring now says to pass the
+  planner's resolved `planner.options` (a fresh bag is the user's explicit choice).
+- The substep check now refuses every non-integer type (`np.float32(2.0)`, `True`), not only
+  Python floats.
+- The JAX evaluator's compiled-trial cache grew one entry per replaced set or cost; it now
+  keeps one entry per batch layout, replaced when the problem's parts change.
+- `cost_bound(dt=)` counts at least one period, as the stepped tools run at least one.
+
+Number change (R80): value iteration's price at a finite horizon with `α < 1` is the converged
+sum's bound (pendulum, ρ = 0.5, dt = 0.05: 71.7 → 113.4 at tf = 2 s); at an infinite horizon it
+is unchanged. The 19-evaluation baseline stays byte-identical.

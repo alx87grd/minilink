@@ -85,20 +85,29 @@ class FirstOrderOptimizer(OptimizerBackend):
             adam_step = jax.jit(adam.update)  # One compiled update, not one per step
 
         z = np.clip(np.asarray(z0, dtype=float), lower, upper)
+        converged = False
         for k in range(maxiter):
             # Stationary on the box: ‖z − Π(z − ∇J)‖ ≤ gtol (‖∇J‖ inside the box)
             grad = program_evaluator.gradient(z)
             grad_norm = float(np.linalg.norm(z - np.clip(z - grad, lower, upper)))
             if grad_norm <= gtol:
+                converged = True
                 break
 
             # z ← Π(z − η ∇J), or Π of Adam's step
             if adam_step is None:
-                z = z - eta * grad
+                z_next = z - eta * grad
             else:
-                z, state = adam_step(grad, state, z)
-                z = np.asarray(z, dtype=float)
-            z = np.clip(z, lower, upper)
+                z_next, state = adam_step(grad, state, z)
+                z_next = np.asarray(z_next, dtype=float)
+            z_next = np.clip(z_next, lower, upper)
+
+            # Gradient descent at a fixed point in floating point: the step no longer
+            # moves z (Adam's moments still evolve, so its step may move z again)
+            if adam_step is None and np.array_equal(z_next, z):
+                converged = True
+                break
+            z = z_next
 
             if callback is not None:
                 callback(z.copy())
@@ -108,9 +117,8 @@ class FirstOrderOptimizer(OptimizerBackend):
             grad_norm = float(np.linalg.norm(z - np.clip(z - grad, lower, upper)))
 
         J = program_evaluator.objective(z)
-        converged = grad_norm <= gtol
         message = (
-            f"gradient norm {grad_norm:.3g} <= gtol"
+            f"stationary (projected gradient {grad_norm:.3g})"
             if converged
             else f"{maxiter} steps taken"
         )

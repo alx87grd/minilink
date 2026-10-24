@@ -262,6 +262,21 @@ class TestControllerAndEvaluation(unittest.TestCase):
         feasible = result.J < 0.5 * price  # The cells clear of the price
         self.assertLess(np.max(np.abs(J_pi[feasible] - result.J[feasible])), 0.05)
 
+    def test_the_price_covers_the_converged_sum_at_a_finite_horizon(self):
+        from minilink.planning.dynamic_programming.dp import grid_price
+
+        # solve() sweeps to convergence: its sum is Σₖ αᵏ dt = dt / (1 − α), tf or not
+        sys = DoubleIntegrator()
+        X, U = sys.state.box, sys.input_box.box
+        cost = QuadraticCost.from_system(sys, xbar=np.zeros(2))
+        g_max = cost.g_max(X, U)
+        for tf in (np.inf, 2.0):
+            problem = PlanningProblem(
+                sys, cost=cost, tf=tf, X=sys.state.box, U=sys.input_box
+            )
+            price = grid_price(problem, 0.9, 0.1)
+            self.assertGreaterEqual(price, g_max * 0.1 / (1.0 - 0.9) * (1 - 1e-12))
+
     def test_result_save_load_round_trip(self):
         import os
         import tempfile

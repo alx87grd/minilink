@@ -535,3 +535,9 @@ def test_a_disturbance_the_loop_does_not_draw_is_announced():
     )
     with pytest.warns(UserWarning, match="does not draw the disturbances on \\['d'\\]"):
         problem.compile(PID(Kp=5.0, Kd=1.0), dt=0.05, backend="numpy")
+
+
+@pytest.mark.parametrize("substeps", [2.0, np.float32(2.0), True, 0])
+def test_the_step_refuses_a_substep_count_that_is_not_a_positive_integer(substeps):
+    with pytest.raises(ValueError, match="substeps"):
+        upright_problem().compile(pid(), dt=0.01, substeps=substeps)

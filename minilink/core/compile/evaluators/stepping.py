@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import operator
+
 SOLVERS = ("rk4", "euler")
 HOLDS = ("zoh", "foh")
 
@@ -75,7 +77,17 @@ def require_step_knobs(solver, substeps, hold="zoh"):
             f"solver must be one of {SOLVERS} for a step, got {solver!r}; "
             "an adaptive solver integrates through Simulator(solver='scipy')"
         )
-    if isinstance(substeps, float) or int(substeps) != substeps or substeps < 1:
+    if isinstance(substeps, bool) or not is_integer(substeps) or substeps < 1:
         raise ValueError(f"substeps must be a positive integer, got {substeps!r}")
     if hold not in HOLDS:
         raise ValueError(f"hold must be one of {HOLDS}, got {hold!r}")
+
+
+def is_integer(value) -> bool:
+    """Whether ``value`` is an integer type (``int``, a NumPy integer), not a float holding one."""
+    try:
+        operator.index(value)
+    except TypeError:
+        return False
+
+    return True

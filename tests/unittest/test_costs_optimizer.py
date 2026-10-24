@@ -588,6 +588,19 @@ def test_gradient_descent_is_projected_on_the_box():
     assert result.success and result.stats["nit"] < 1000
 
 
+def test_gradient_descent_at_its_floating_point_fixed_point_is_a_success():
+    from minilink.optimization.optimizer import Optimizer
+
+    result = Optimizer(
+        quadratic_program(),
+        z0=np.zeros(2),
+        method="gd",
+        options={"learning_rate": 0.1, "maxiter": 3000},
+    ).solve()
+    assert result.success and result.stats["nit"] < 3000
+    np.testing.assert_allclose(result.z, [1.0, -2.0], atol=1e-12)
+
+
 def test_gradient_descent_out_of_steps_is_not_a_success():
     from minilink.optimization.optimizer import Optimizer
 
