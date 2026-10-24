@@ -13,7 +13,7 @@ from minilink.planning.dynamic_programming.dp import (
     grid_of,
     grid_price,
 )
-from minilink.planning.engine import nominal_trajectory
+from minilink.planning.evaluator import nominal_trajectory
 from minilink.planning.planner import Planner
 from minilink.planning.results import PlanningSolution
 

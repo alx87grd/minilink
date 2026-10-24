@@ -8,7 +8,7 @@ from dataclasses import dataclass
 
 from minilink.core.system import System
 from minilink.core.trajectory import Trajectory
-from minilink.planning.engine import Evaluation
+from minilink.planning.evaluation import Evaluation
 from minilink.planning.problems import PlanningProblem
 
 ###############################################################################
@@ -23,7 +23,7 @@ class PlanningSolution:
 
     Everything here is the solver's own claim under its own model — the table
     on its grid, the Riccati form on the linear model, the critic's fit. A
-    measurement of the law comes from the evaluators (:func:`~minilink.planning.engine.evaluate`,
+    measurement of the law comes from the evaluators (:func:`~minilink.planning.evaluator.evaluate`,
     ``PolicyEvaluator``) as its own object and is never written back here.
 
     Parameters

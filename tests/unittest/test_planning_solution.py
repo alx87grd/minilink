@@ -15,7 +15,7 @@ from minilink.planning import (
     Uniform,
     evaluate,
 )
-from minilink.planning.engine import held_law, nominal_trajectory
+from minilink.planning.evaluator import held_law, nominal_trajectory
 from minilink.planning.search.extenders import KinodynamicExtender
 from minilink.planning.search.rrt import RRTOptions, RRTPlanner
 from minilink.planning.trajectory_optimization.direct_collocation import (

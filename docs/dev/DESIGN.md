@@ -93,7 +93,7 @@ state-feedback block):
 | --- | --- |
 | `simulation/` | `Simulator`, `StaticSimulator`, solvers, forcing; `discrete/` (`Computer`, `StepSchedule`: the computer's tick engine; `HybridSimulator`); `realtime/` (`RealtimeSimulator`, `RealtimeInput`/`RealtimeOutput`, `PygameInput`, `LiveSignalPlotOutput`) |
 | `analysis/` | one calling pattern `tool(sys, x_bar, u_bar, t, params, *, method="auto", eps)` on any `System` (the linear model as is, the rest linearized at the operating point): `jacobian`, `linearize` (→ `LTISystem`), the one-channel frequency and time tools (`bode`, `pzmap`, `nyquist`, `margins`, `root_locus`, `step_response`, `step_info`, `transfer_function`, the sensitivity functions) with their `plot_` twins, `structural` (controllability, observability, `minreal`), `equilibria`, `modal`, `lyapunov`, `riccati`, `discretization`. The API reference is the docs site |
-| `planning/` | `problems.py`, `results.py`, `engine.py` (the problem evaluator), `comparison.py`; `dynamic_programming/` (value iteration, policy evaluation, `LQRPlanner`, the lookup policy), `trajectory_optimization/` (collocation, shooting; `mpc/`, the receding-horizon block, provisional), `search/` (RRT), `spatial/` (scenes; **retires** into `core/geometry/`) |
+| `planning/` | `problems.py`, `results.py`, `evaluator.py` (the problem evaluator, `evaluate`), `evaluation.py` (`score_run`, the `Evaluation` record), `comparison.py`; `dynamic_programming/` (value iteration, policy evaluation, `LQRPlanner`, the lookup policy), `trajectory_optimization/` (collocation, shooting; `mpc/`, the receding-horizon block, provisional), `search/` (RRT), `spatial/` (scenes; **retires** into `core/geometry/`) |
 | `learning/` | policies learned from interaction: `reinforcement_learning/` (the neural planner, the tabular learners); identification and imitation later |
 | `optimization/` | `MathematicalProgram`, `Optimizer` (generic NLP) |
 | `graphical/` | signals, phase plane, diagrams, animation |
@@ -118,7 +118,7 @@ state-feedback block):
   trajectory optimization planner, so it lives with it).
 - **Exception:** `learning/` builds on `planning/`: the problem, the planner base,
   the solution and the dynamic programming grid its tabular learners share.
-- **Exception:** `learning.reinforcement_learning`, `planning.engine`
+- **Exception:** `learning.reinforcement_learning`, `planning.evaluator`
   and `planning.planner` may import `control.neural` and `blocks` (a learned
   law is a control block, the critics share its multilayer perceptron, and an
   open-loop plan is a `TrajectorySource` block).
@@ -867,7 +867,7 @@ there; it is a training choice, not a constraint. An exit is always a failure:
 terminating without cost would reward escaping under a cost. `h` keeps its one
 job: the end of a finite horizon.
 
-**One scoring formula** (`planning.engine.score_run`, every evaluation's): a run is
+**One scoring formula** (`planning.evaluation.score_run`, every evaluation's): a run is
 integrated to `tf` (no event, no cut), then
 
 ```
@@ -902,7 +902,7 @@ Gymnasium view (draws of `x0`, the exit rule, `h` at a finite horizon). Distribu
 `PlanningProblem`. Every planner that takes a `PlanningProblem` takes the
 stochastic one.
 
-**The problem evaluator (the second verb, `planning/engine.py`):**
+**The problem evaluator (the second verb, `planning/evaluator.py`):**
 `pe = problem.compile(controller, dt, *, solver="rk4", substeps=1, backend="auto")` closes
 a controller on the plant (`controller @ plant`; a source block drives the command; a built
 loop is taken when its block `plant` is the problem's system) and compiles it once.

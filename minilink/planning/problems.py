@@ -374,14 +374,14 @@ class PlanningProblem:
         episode_length=None,
     ):
         """
-        The :class:`~minilink.planning.engine.ProblemEvaluator` of a controller on this problem.
+        The :class:`~minilink.planning.evaluator.ProblemEvaluator` of a controller on this problem.
 
         The controller closed on the plant (or a built loop with a ``plant`` block),
         compiled once: ``pe.evaluate()`` scores it, ``pe.params`` holds every
         parameter of the run, ``pe.program(wrt)`` exports the tuning program.
         """
         # Lazy import: the engine loads with its first evaluator
-        from minilink.planning.engine import ProblemEvaluator
+        from minilink.planning.evaluator import ProblemEvaluator
 
         return ProblemEvaluator(
             self,

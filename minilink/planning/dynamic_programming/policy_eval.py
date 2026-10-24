@@ -12,7 +12,7 @@ from minilink.planning.dynamic_programming.dp import (
     options_of,
 )
 from minilink.planning.dynamic_programming.plotting import cost_scale_limit
-from minilink.planning.engine import policy_of
+from minilink.planning.evaluator import policy_of
 from minilink.planning.problems import PlanningProblem, nominal_plant_params
 
 ###############################################################################

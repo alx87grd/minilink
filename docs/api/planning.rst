@@ -14,7 +14,10 @@ Planning
    :members:
    :exclude-members: Evaluation
 
-.. automodule:: minilink.planning.engine
+.. automodule:: minilink.planning.evaluator
+   :members:
+
+.. automodule:: minilink.planning.evaluation
    :members:
 
 .. automodule:: minilink.planning.initial_guess

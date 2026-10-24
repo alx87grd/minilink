@@ -8,13 +8,8 @@ from minilink.core.costs import QuadraticCost
 from minilink.core.distributions import Gaussian, Uniform
 from minilink.core.sets import BallSet, BoxInputSet
 from minilink.core.trajectory import Trajectory
-from minilink.planning.engine import (
-    Evaluation,
-    closed_loop_of,
-    evaluate,
-    reduce_criterion,
-    score_run,
-)
+from minilink.planning.evaluation import Evaluation, reduce_criterion, score_run
+from minilink.planning.evaluator import closed_loop_of, evaluate
 from minilink.planning.problems import PlanningProblem, StochasticPlanningProblem
 
 UPRIGHT = {"r": np.array([np.pi])}
@@ -281,7 +276,7 @@ def test_dt_must_divide_the_horizon():
 
 
 def test_evaluate_trajectory_scores_the_plant_run_of_a_loop_or_a_logged_run():
-    from minilink.planning.engine import evaluate_trajectory
+    from minilink.planning.evaluation import evaluate_trajectory
 
     problem = upright_problem()
     pe = problem.compile(pid(), dt=0.01, backend="numpy")
@@ -305,7 +300,7 @@ def test_evaluate_trajectory_scores_the_plant_run_of_a_loop_or_a_logged_run():
 def test_evaluate_trajectory_agrees_on_numpy_and_jax_with_an_exit_and_a_divergence():
     import jax.numpy as jnp
 
-    from minilink.planning.engine import evaluate_trajectory
+    from minilink.planning.evaluation import evaluate_trajectory
 
     sys = plant()
     cost = QuadraticCost.from_system(sys)

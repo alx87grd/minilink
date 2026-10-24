@@ -8,7 +8,8 @@ from minilink.core.costs import CostFunction
 from minilink.core.roles import command_port
 from minilink.core.sets import Set
 from minilink.core.trajectory import Trajectory
-from minilink.planning.engine import Evaluation, evaluate
+from minilink.planning.evaluation import Evaluation
+from minilink.planning.evaluator import evaluate
 from minilink.planning.problems import PlanningProblem
 from minilink.planning.results import PlanningSolution
 
@@ -172,7 +173,7 @@ class Planner(ABC):
         self, policy, *, dt, n_trials=50, tf=None, backend="numpy"
     ) -> Evaluation | None:
         """
-        The :func:`~minilink.planning.engine.evaluate` of ``policy`` on this planner's problem.
+        The :func:`~minilink.planning.evaluator.evaluate` of ``policy`` on this planner's problem.
 
         One run when nothing is random, ``n_trials`` draws from key 0 otherwise;
         ``None`` when the problem declares no cost (a search without one).

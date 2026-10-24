@@ -116,7 +116,7 @@ _EXPORTS: dict[str, tuple[str, str]] = {
     "PlanningSolution": ("minilink.planning.results", "PlanningSolution"),
     "LQRPlanner": ("minilink.planning.dynamic_programming.lqr", "LQRPlanner"),
     "compare": ("minilink.planning.comparison", "compare"),
-    "evaluate": ("minilink.planning.engine", "evaluate"),
+    "evaluate": ("minilink.planning.evaluator", "evaluate"),
     "TrajectoryOptimizationPlanner": (
         "minilink.planning.trajectory_optimization.planner",
         "TrajectoryOptimizationPlanner",
@@ -163,7 +163,7 @@ _EXPORTS: dict[str, tuple[str, str]] = {
         "minilink.learning.reinforcement_learning.tabular",
         "TabularLearningPlanner",
     ),
-    "Evaluation": ("minilink.planning.engine", "Evaluation"),
+    "Evaluation": ("minilink.planning.evaluation", "Evaluation"),
     "RRTPlanner": ("minilink.planning.search.rrt", "RRTPlanner"),
     "RRTOptions": ("minilink.planning.search.rrt", "RRTOptions"),
     "KinodynamicExtender": (
