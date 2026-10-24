@@ -20,7 +20,7 @@ from minilink.core.compile.evaluators.stepping import (
     require_step_knobs,
     step_body,
 )
-from minilink.core.compile.execution_plan import (
+from minilink.core.compile.plan import (
     EXTERNAL_INPUT,
     INTERNAL_SIGNAL,
     NOMINAL,

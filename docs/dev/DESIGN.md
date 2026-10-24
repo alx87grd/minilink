@@ -69,7 +69,7 @@ in [ROADMAP.md](ROADMAP.md) §5 and the workboard
 | Package | Role |
 | --- | --- |
 | `core/` | `System` (+ façade mixins: `SharedSystemFacades`, `DynamicSystemFacades`, `StepSystemFacades`), `DiagramSystem` (subclasses `DynamicSystem`), shared diagram wiring (`wiring.py`: `WiredDiagramMixin`, gather, topology checks), signals/ports (`signals.py`), backend policy & helpers (`backends.py`), `Trajectory`, sets, distributions (`distributions.py`), costs, geometry (`geometry.py`; **planned package** `core/geometry/` — Path, Track, Scene, bind, spatial Fields, course catalog: [docs/plans/geometry-module.md](../plans/geometry-module.md)) |
-| `core/compile/` | `ExecutionPlan`, compiler, NumPy/JAX evaluators |
+| `core/compile/` | the compiler, the two execution plans, one evaluator per system kind |
 
 **System libraries** — `System` subclasses you drop into a diagram, shelved by
 *role in the diagram*, never by implementation technology (linear, Lagrangian,
@@ -708,7 +708,9 @@ value iteration (`StateSpaceGrid.successor`), shooting, the fixed-step solvers, 
 the Lyapunov sampler and the hybrid and realtime simulators all call them. The adaptive
 SciPy solver adapts `f` for `solve_ivp` itself (`simulation/solvers/scipy_ivp.py`).
 
-Layout of `core/compile/evaluators/`: `base.py` (the `Evaluator` base, the continuous step
+Layout of `core/compile/`: `compiler.py` (`compile`, `compile_diagram`, `compile_step_diagram` and
+the plan builders), `plan.py` (`ExecutionPlan` and `StepExecutionPlan`, their operation rows),
+and `evaluators/`: `base.py` (the `Evaluator` base, the continuous step
 model, `gather_u`), `dynamic.py`, `diagram.py`, `static.py`, `discrete.py` (one class per
 system kind, both backends), `compiled.py` (the mark), `stepping.py` (the step model's
 formulas and the loop / `lax.scan` that runs them), `jacobian.py` (`jacobian`: central

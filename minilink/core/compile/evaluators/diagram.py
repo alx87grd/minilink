@@ -13,7 +13,7 @@ from minilink.core.compile.evaluators.base import (
     gather_u,
 )
 from minilink.core.compile.evaluators.compiled import compiled
-from minilink.core.compile.execution_plan import ExecutionPlan
+from minilink.core.compile.plan import ExecutionPlan
 from minilink.core.diagram import check_diagram_params
 from minilink.core.system import DynamicSystem
 

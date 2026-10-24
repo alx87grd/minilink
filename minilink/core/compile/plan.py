@@ -1,15 +1,18 @@
 """
-Execution plan data structures for compiled diagrams.
+The execution plans of compiled diagrams: a flow diagram's and a step diagram's.
 
-An :class:`ExecutionPlan` is the output of the compilation step: it captures,
-in an immutable and flattened form, all the information needed to evaluate a
-:class:`~minilink.core.diagram.DiagramSystem` without any dictionary lookups
-or recursive calls.
+A plan is the output of the compilation step: it captures, in an immutable
+and flattened form, all the information needed to evaluate a diagram without
+any dictionary lookups or recursive calls. :class:`ExecutionPlan` (a
+:class:`~minilink.core.diagram.DiagramSystem`) holds ``state_ops``, one ``dx``
+per stateful block; :class:`StepExecutionPlan` (a
+:class:`~minilink.core.diagram.StepDiagramSystem`) holds ``step_ops``, one
+``x_{k+1}`` per stateful block. Both share the port topology.
 
-The plan is consumed by the
-:class:`~minilink.core.compile.evaluators.diagram.DiagramEvaluator` (on either
-backend), which walks through the operation lists in topological order to
-compute state derivatives and outputs.
+The plans are consumed by the evaluators
+(:class:`~minilink.core.compile.evaluators.diagram.DiagramEvaluator`,
+:class:`~minilink.core.compile.evaluators.discrete.StepDiagramEvaluator`),
+which walk the operation lists in topological order.
 """
 
 from collections.abc import Callable
@@ -163,5 +166,40 @@ class ExecutionPlan:
     signal_dim: int
     port_ops: tuple[PortOperation, ...]
     state_ops: tuple[StateOperation, ...]
+    output_slices: dict[tuple[str, str], slice]
+    external_output_slices: dict[str, slice]
+
+
+@dataclass(frozen=True)
+class StepOperation:
+    """One discrete state-advance step in a compiled step diagram.
+
+    Calls ``step(x, u, k, params) -> x_new`` and writes the result into the
+    global state vector at ``local_x_slice``; the fields read as on
+    :class:`StateOperation`.
+    """
+
+    step_func: Callable[..., object]
+    local_x_slice: slice
+    gather_sources: tuple[tuple[int, object, int], ...]
+    u_dim: int
+    bound_params: dict | None = None
+    label: str = ""
+    sys_id: str = ""
+
+
+@dataclass(frozen=True)
+class StepExecutionPlan:
+    """Immutable flattened schedule for a compiled step diagram.
+
+    Built by :func:`~minilink.core.compile.compiler.build_step_execution_plan`;
+    the fields read as on :class:`ExecutionPlan`, ``step_ops`` in place of
+    ``state_ops``.
+    """
+
+    state_dim: int
+    signal_dim: int
+    port_ops: tuple[PortOperation, ...]
+    step_ops: tuple[StepOperation, ...]
     output_slices: dict[tuple[str, str], slice]
     external_output_slices: dict[str, slice]

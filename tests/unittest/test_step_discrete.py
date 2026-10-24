@@ -276,7 +276,7 @@ class TestStepDiagramRollout(unittest.TestCase):
 
 import pytest
 from minilink.core.compile.evaluators.base import gather_u
-from minilink.core.compile.execution_plan import (
+from minilink.core.compile.plan import (
     EXTERNAL_INPUT,
     INTERNAL_SIGNAL,
     NOMINAL,

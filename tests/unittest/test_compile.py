@@ -17,7 +17,7 @@ from minilink.control.siso import P
 from minilink.core.backends import array_module
 from minilink.core.compile.compiler import build_execution_plan, compile_diagram
 from minilink.core.compile.evaluators.diagram import DiagramEvaluator
-from minilink.core.compile.execution_plan import ExecutionPlan
+from minilink.core.compile.plan import ExecutionPlan
 from minilink.core.diagram import DiagramSystem
 from minilink.core.system import DynamicSystem, System
 from minilink.core.wiring import check_algebraic_loops, evaluation_order_of

@@ -38,7 +38,7 @@ class DiagramSystem(WiredDiagramMixin, DynamicSystem):
 
     This class implements the wiring contract and a simple recursive
     evaluation of ``f`` used as the reference; :meth:`compile` produces the
-    fast :class:`~minilink.core.compile.execution_plan.ExecutionPlan`-based
+    fast :class:`~minilink.core.compile.plan.ExecutionPlan`-based
     evaluator used by simulation and optimization.
     """
 
@@ -292,8 +292,8 @@ class StepDiagramSystem(WiredDiagramMixin, StepSystem):
         -------
         StepDiagramEvaluator
         """
-        # Lazy import: a cycle, the step compiler reads StepDiagramSystem from here
-        from minilink.core.compile.step_compiler import compile_step_diagram
+        # Lazy import: a cycle, the compiler reads StepDiagramSystem from here
+        from minilink.core.compile.compiler import compile_step_diagram
 
         return compile_step_diagram(
             self, backend=backend, bind_params=bind_params, verbose=verbose

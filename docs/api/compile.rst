@@ -4,7 +4,7 @@ Compile
 .. automodule:: minilink.core.compile.compiler
    :members:
 
-.. automodule:: minilink.core.compile.execution_plan
+.. automodule:: minilink.core.compile.plan
    :members:
 
 .. automodule:: minilink.core.backends

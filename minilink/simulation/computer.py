@@ -8,10 +8,9 @@ from dataclasses import dataclass, field
 import numpy as np
 
 from minilink.core.backends import BACKEND_NUMPY, normalize_backend
+from minilink.core.compile.compiler import build_step_execution_plan
 from minilink.core.compile.evaluators.base import gather_u
-from minilink.core.compile.execution_plan import PortOperation
-from minilink.core.compile.step_compiler import build_step_execution_plan
-from minilink.core.compile.step_execution_plan import StepExecutionPlan, StepOperation
+from minilink.core.compile.plan import PortOperation, StepExecutionPlan, StepOperation
 from minilink.core.diagram import DiagramSystem, StepDiagramSystem
 from minilink.core.hybrid_composition import (
     as_step_diagram,
@@ -32,7 +31,7 @@ class Computer:
     Stateful scheduled runtime for a :class:`StepDiagramSystem`.
 
     Compiles the same
-    :class:`~minilink.core.compile.step_execution_plan.StepExecutionPlan` as the
+    :class:`~minilink.core.compile.plan.StepExecutionPlan` as the
     synchronous ``compute_rollout``, then advances with :meth:`tick` under
     :attr:`schedule` divisors (multi-rate firing) and double-buffered internal
     port signals.

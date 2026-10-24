@@ -19,7 +19,7 @@ from minilink.core.compile.evaluators.base import (
 from minilink.core.compile.evaluators.compiled import body_of, compiled
 from minilink.core.compile.evaluators.dynamic import check_leaf_traces
 from minilink.core.compile.evaluators.stepping import iterate
-from minilink.core.compile.step_execution_plan import StepExecutionPlan
+from minilink.core.compile.plan import StepExecutionPlan
 from minilink.core.diagram import check_diagram_params
 from minilink.core.step_rollout import StepRollout
 from minilink.core.system import StepSystem
