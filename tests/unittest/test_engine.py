@@ -445,3 +445,20 @@ def test_a_problem_realizes_its_draws_from_one_key():
     assert one.shape == (1, 2) and none == {"params": {}, "disturbances": {}}
     with pytest.raises(ValueError, match="one realization"):
         upright_problem().realize(0, 3)
+
+
+@pytest.mark.jax
+def test_a_sets_membership_traces_on_jax():
+    import jax
+    import jax.numpy as jnp
+
+    from minilink.core.sets import BallSet
+
+    ball = BallSet(center=[0.0, 0.0], radius=1.0)
+    box = BoxInputSet.from_bounds([-1.0], [1.0])
+    inside = jax.jit(lambda z: ball.contains(z))
+    assert bool(inside(jnp.array([0.5, 0.0]))) and not bool(
+        inside(jnp.array([2.0, 0.0]))
+    )
+    assert bool(jax.jit(lambda u: box.contains(u))(jnp.array([0.5])))
+    assert ball.contains(np.array([0.5, 0.0]))  # NumPy in, a NumPy boolean out

@@ -26,9 +26,10 @@ class Set(ABC):
     A point is feasible when all components of :meth:`margin` are
     nonnegative. The set may depend on time and optional parameters, so
     the generic notation is ``z in Z(t)``. :meth:`margin` is a native-array
-    equation path (NumPy in, NumPy out; JAX in, JAX out); :meth:`contains` is
-    a NumPy boundary utility, and :meth:`sample` follows the draw convention
-    of :class:`~minilink.core.distributions.Distribution`.
+    equation path (NumPy in, NumPy out; JAX in, JAX out), and :meth:`contains`
+    is derived from it on the same array module (a JAX boolean under a trace);
+    :meth:`sample` follows the draw convention of
+    :class:`~minilink.core.distributions.Distribution`.
 
     ``params`` is the set's own parameters (``None`` for a set without any): a
     set that reads them takes ``params=None`` in :meth:`margin` as its own.
@@ -47,12 +48,13 @@ class Set(ABC):
         t: float = 0.0,
         params=None,
     ) -> bool:
-        """Return ``True`` when ``z`` belongs to the set."""
-        z_arr = np.asarray(z, dtype=float).reshape(-1)
-        margin = np.asarray(self.margin(z_arr, t=t, params=params), dtype=float)
+        """Whether ``z`` belongs to the set: a boolean on ``z``'s array module."""
+        xp = array_module(z)
+        z_arr = xp.reshape(xp.asarray(z, dtype=float), (-1,))
+        margin = xp.asarray(self.margin(z_arr, t=t, params=params), dtype=float)
 
         # z ∈ Z(t) ⇔ every margin ≥ 0
-        inside = bool(np.all(margin >= 0.0))
+        inside = xp.all(margin >= 0.0)
 
         return inside
 
@@ -109,16 +111,16 @@ class InputSet(ABC):
         t: float = 0.0,
         params=None,
     ) -> bool:
-        """Return ``True`` when ``u`` is admissible at ``(x, t)``."""
-        u_arr = np.asarray(u, dtype=float).reshape(-1)
-        x_arr = None if x is None else np.asarray(x, dtype=float).reshape(-1)
-        margin = np.asarray(
-            self.margin(u_arr, x=x_arr, t=t, params=params),
-            dtype=float,
+        """Whether ``u`` is admissible at ``(x, t)``: a boolean on ``u``'s array module."""
+        xp = array_module(u)
+        u_arr = xp.reshape(xp.asarray(u, dtype=float), (-1,))
+        x_arr = None if x is None else xp.reshape(xp.asarray(x, dtype=float), (-1,))
+        margin = xp.asarray(
+            self.margin(u_arr, x=x_arr, t=t, params=params), dtype=float
         )
 
         # u ∈ U(x, t) ⇔ every margin ≥ 0
-        admissible = bool(np.all(margin >= 0.0))
+        admissible = xp.all(margin >= 0.0)
 
         return admissible
 

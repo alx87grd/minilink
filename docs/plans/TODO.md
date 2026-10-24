@@ -397,9 +397,9 @@ sampled controller waits for the hybrid phase; RN-4's per-block noise seeds for 
 reads its math next to `dp.py` before it lands. Nothing merges to `main` until every notebook has
 moved to the new interface (R47).
 
-- [ ] **V1.1, the rest** (the native `Trajectory` and the cost's quadrature landed 2026-10-24): `StepRollout`
-  folded in as `t = k·dt`; `Set.contains` and `InputSet.contains` derived from `margin` on `xp`.
-  Done when both land byte-identical.
+- [ ] **V1.1, the rest** (the native `Trajectory`, the cost's quadrature and `contains` on `xp` landed
+  2026-10-24): `StepRollout` folded in as `t = k·dt`, with S31 in v0.4 (it is the hybrid
+  simulator's computer record, R86). Done when it lands byte-identical.
 - [ ] **V1.2, the rest** (the evaluation of a run, the problem's fields, the price switch and the cost
   bound landed 2026-10-24): LQR warns once when `U` is declared (the U sweep wrote
   `U=plant.input_box` on lessons that never needed it, so the warning waits for the maintainer's

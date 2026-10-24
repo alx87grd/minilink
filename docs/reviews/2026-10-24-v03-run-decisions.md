@@ -122,6 +122,7 @@ setpoint (OD-20), because the old penalty on the gains cannot be a cost on the r
 | OD-33 | V1.2 | 'LQR warns once' when U is declared | Deferred: the U sweep (OD-18) wrote U=plant.input_box on every lesson whose plant has a finite input box, LQR lessons included, to keep their numbers; a warning would now fire in the GRO860 LQR notebooks although nothing changed for them. Whether those lessons keep the line (and see the warning) is the maintainer's call. | Warn now: new warnings in course notebooks overnight. | — |
 | OD-34 | V1.2 | The README's planning snippet builds a problem without U and hands it to value iteration and RRT, which now refuse an unbounded U | Its API line gains U=plant.input_box beside X=plant.state.box (as examples/demos/core/readme_examples.py, which the sweep updated); no other README change. | Leave the README stale until the maintainer's pass: its snippet would raise. | — |
 | OD-35 | R68 | R68 names MechanicalSystem; GeneralizedMechanicalSystem invents bounds the same way (±10 on the state, ±5 on the inputs) | Both bases invent none: their bound-writing lines are gone, and the 23 catalog plants on them (the experimental tier's included) write their range in their own constructor, at the class that calls the base (a subclass inherits it), as np.full(self.n, ±2π) / np.full(dim, ±5) or ±10 / ±5; a snapshot of every plant's state and input bounds before and after is byte-identical, as are the step-model baseline and the regression gate. A user's own subclass starts unbounded (examples/demos/robotic/custom_one_link_arm.py runs as it was). | MechanicalSystem only, the literal ruling: the generalized family would keep inventing bounds until S32 merges it. | — |
+| OD-36 | V1.1 | The row folds StepRollout into Trajectory and derives Set.contains from margin on xp | contains is derived on the array module (a NumPy boolean on NumPy, a traceable JAX boolean under jit; tested), numbers unchanged. The StepRollout fold waits for S31 in v0.4: StepRollout is the hybrid simulator's computer record and MPC's dual-rate view, and R86 moved every hybrid piece to v0.4. | Fold it now: a rewrite of the hybrid simulator's records in the release that defers the hybrid work. | — |
 
 ## 3. Intended number changes (R80)
 
@@ -145,8 +146,7 @@ The rest of v0.3's clean-up, not started (each needs a pass of its own, with its
 What the landed rows left (each written as a "rest" row in TODO §4):
 
 - the evaluator's internals deduplicated and the `f` / `f_p` tiers folded (OD-9; SM-6's rest);
-- `StepRollout` folded into the native `Trajectory`, and `Set.contains` on the array module
-  (V1.1's rest);
+- `StepRollout` folded into the native `Trajectory` (V1.1's rest; OD-36);
 - the LQR warning (OD-33; V1.2's rest);
 - the three hand-loop demos (OD-32; S74's rest);
 - the program's leaves scaled by their nominal magnitude (OD-31, decided against);
