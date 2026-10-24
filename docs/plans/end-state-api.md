@@ -13,10 +13,10 @@ contract and default, the seeded stochastic policy, and `RolloutEnvironment`'s h
 sentence proposed for CONSTITUTION §1. Deleted once these are ruled (one fact, one home).  
 **Lane:** maintainer-owned (every item is an **[ask — core]** or **[ask — public names]**).  
 **Rung:** v0.4: the sampled loop (S31) for D13–D15; the parametric program (S76), MPPI (S72)
-and the seeded stochastic policy (C5) for D25–D30 (ROADMAP §6, "Before v0.4").
+and the seeded stochastic policy (C5) for D25–D30 ([QUESTIONS.md](../dev/QUESTIONS.md), "Blocks v0.4").
 
 Every decision is written *as the code a user would write*, so each can be read and ruled on
-its own. The ids are kept because ROADMAP §6, TODO, [sampled-path.md](sampled-path.md),
+its own. The ids are kept because QUESTIONS.md, TODO, [sampled-path.md](sampled-path.md),
 [mppi.md](mppi.md), [future-policies.md](future-policies.md) and
 [parametric-program.md](parametric-program.md) cite them. The arguments and the evidence live
 in those plan docs; a ruling taken here goes to the plan doc it shapes and to a dated record.

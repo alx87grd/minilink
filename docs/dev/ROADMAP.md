@@ -556,104 +556,11 @@ each item; agents execute only what was picked.
 
 ## 6. Decisions
 
-Open decisions only, by the rung they block; each needs the maintainer. A decision leaves
-this section when it is taken: its ruling goes to the plan doc it shapes and to a dated
-record in [docs/reviews/](../reviews/), and its contract to DESIGN when the code lands.
-The automation-by-convention rulings (2026-10-11) are in
-[their record](../reviews/2026-10-11-automation-by-convention.md); the disturbance
-convention in [randomness.md](../plans/randomness.md); the docs-consistency rulings
-(2026-10-12) in [theirs](../reviews/2026-10-12-docs-consistency-rulings.md); the
-state-space design rulings (2026-10-14: the nominal state, the model-taking verbs, the
-observer, `lqg`, the role name) in
-[theirs](../reviews/2026-10-14-state-space-design-rulings.md); the linear analysis band
-rulings (2026-10-15: the step response linearized and labelled, the structural verbs on a
-system, the command port as the default channel) in
-[theirs](../reviews/2026-10-15-linear-analysis-rulings.md); the classical control
-family rulings (2026-10-15: `P`, the impedance pair on the family's grammar, matrix
-stiffness and damping, the shared pure functions) in
-[theirs](../reviews/2026-10-15-classical-control-family.md); the z tier dropped (2026-10-17) in
-[its record](../reviews/2026-10-17-z-tier-dropped.md); the one install story (2026-10-17) in
-[its record](../reviews/2026-10-17-one-install-story.md); the root layout (2026-10-17) in
-[its record](../reviews/2026-10-17-root-layout.md); the roadmap reorganization (2026-10-21:
-v0.4 added, the course audit G1 now, the sampled spine before the differentiable one) in
-[its record](../reviews/2026-10-21-roadmap-reorganization.md); the second roadmap review
-(2026-10-22: the calendar rule, one home per item, wave G ranked by G1, the two rulings
-sessions, the sampled face of V1, the missing rows) in
-[its record](../reviews/2026-10-22-second-roadmap-review-rulings.md); the v0.3 rulings sessions
-(2026-10-22/23, R1–R90: the shape and the convergence, the step model, the evaluation and the
-price, the gates of the run, the continuous phase, the problem's parameters) in
-[theirs](../reviews/2026-10-22-rulings-session-1.md), and the decisions of the v0.3 run and of
-the restructure after it (2026-10-24) in [the run's log](../reviews/2026-10-24-v03-run-decisions.md).
+The open decisions live in [QUESTIONS.md](QUESTIONS.md), one entry each, by the release each
+blocks. A decision leaves it when it is taken: its ruling goes to the plan doc it shapes and to
+a dated record in [docs/reviews/](../reviews/), and its contract to DESIGN when the code lands.
 
-**Before v0.4 (S76, the parametric program)**
-
-- **The compiled MPC program's parameters** (S76): one program family, the library
-  building `J(z, p)`, `h(z, p)`, `g(z, p)` on the problem's parameter tree and the frozen
-  `MathematicalProgram` its binding, or two parallel types, or one class whose functions
-  always take `p`. Recommended (2026-10-22): the family, so hand-written programs stay `J(z)`
-  and one evaluator serves both (end-state-api.md D25). Still to rule with it (the names apart,
-  ruled: `ParametricProgram`, the key `plant`):
-  whether a hand-written program may declare its own parameters, and the MPC block's
-  live-parameter ports. [parametric-program.md](../plans/parametric-program.md) §2–§3.
-
-**Before the former wave G rows (v0.4, R48)**
-
-- **The optional `KinematicModel` delegate**: adopt or drop, decided with C6's mechanism
-  description.
-- **Which pyro demos the courses still need** (drives the parity rows).
-- **Pyro game demos** — port the rest to `simulation/realtime/` or drop (the
-  behavior-cloning game mode after v1.0 would reuse them).
-
-**Standing (wave D)**
-
-- **Undeclared feedthrough** (S66): an output that moves with an input it does not declare
-  simulates a wrong fixed point silently today; raise or warn at compile.
-- **Naming, the larger alignments**: one separator rule for wires, params paths, block
-  labels and duplicate state labels; plot labels for internal signals (the display-name
-  sweep, step A6, landed 2026-10-24).
-
-**Before v0.4**
-
-- **The sampled loop's details** (S31), parked to the hybrid phase (R14): D13–D15, the
-  run-state caches, controller memory and draws on the tick, the dispatch of a sampled
-  controller ([end-state-api.md](../plans/end-state-api.md)).
-- **How the proposals carry MPPI, behavior cloning and diffusion policy**: to discuss when
-  convenient, not blocking ([future-policies.md](../plans/future-policies.md) §7).
-- **Lyapunov certificates**: a GRO860 checklist row of their own, or an analysis tool the
-  lecture uses; `method=` naming the certificate family.
-- **Solver-specific views on the planning records.**
-- **`PlanningProblem.metadata`**: document it or retire it.
-- **MPPI** ([mppi.md](../plans/mppi.md) §10): the planner's name (`PathIntegralPlanner`
-  or `MPPIPlanner`); the three planner verbs the MPC block reads instead of trajopt
-  internals; the stochastic default (plant draws per control sample); where
-  `RolloutEnvironment` lives once a second band reads it (answered by S75 and S31 if they
-  are ruled as recommended: it becomes a caller of the step model and the sampled kernel).
-- **CBF safety filter** ([cbf-safety-filter.md](../plans/cbf-safety-filter.md)): research
-  lane until a course asks; the barrier is a `Field` once A1 lands.
-
-**Before v0.9 (the freeze candidate)**
-
-- **Where the course material and the projects live** (K5): `examples/teaching/` (course
-  notebooks, cited by the GRO860 notes and webpage and GRO501's `\colab{}`) and
-  `examples/projects/` (research projects) stay here, or move to their own repositories.
-  Here: one checkout, one CI, renames migrate them in one commit. Apart: a library repo that
-  is only the library, course material versioned per term and pinned on a release, but two
-  CIs and a release before every notebook change that needs a new feature. Move between
-  terms only. Options and a recommendation (pin the course notebooks on a release now, a
-  course repository at v1.0; with the examples-tree question):
-  [the repository-structure writeup](../plans/repository-structure.md).
-- Diffrax as an optional JAX solve (S27).
-- The posed-geometry hook (S44) and the glyph / solid rename (S30).
-- The frozen surface (V3): do `StepSystem`, `StepDiagramSystem`, `UnitDelay` and the MPC
-  sub-facade (`minilink.planning.trajectory_optimization.mpc`) join it, or sit behind a
-  provisional name.
-- The deprecation policy (V4): shims from v1.0 on, overriding RULES "no deprecated
-  aliases" from then.
-- A `MinilinkError` family (S70).
-
-**Before v1.0**
-
-- Zenodo / DOI, and whether JOSS is wanted (V2).
+Past rulings: the dated records in [docs/reviews/](../reviews/), named by date and subject.
 
 ## 7. Out of scope
 

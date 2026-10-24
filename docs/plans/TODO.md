@@ -111,9 +111,8 @@ on `dev` at 638215e; the recipe and the reference are AGENTS'.
 
 - [ ] **T1 core**: `system.py`'s default `h` stub builds `np.zeros(p)` (a returned-type
   decision under JAX) **[ask — core]**; `wiring.py`'s `refresh` still guards with
-  `hasattr(self, "solver_info")`. Bug found by the audit, its own test first:
-  `StepDiagramSystem.step` (`core/diagram.py`) writes `x_next[start:end] = …` in place, which
-  a JAX array refuses.
+  `hasattr(self, "solver_info")`. (The audit's bug, `StepDiagramSystem.step` writing in place,
+  is fixed, 2026-10-24.)
 - [ ] **T2 blocks and control**: `blocks/transfer_function.py`'s `tf` calls `self.h(x, u, t)`
   on `np` and drops `params`; `TrajectorySource.h` cannot trace (`interp1d`); `mpc/viz.py`
   imports `HybridSimResult` at module level instead of under `TYPE_CHECKING` (RULES 3.2;
@@ -198,10 +197,6 @@ pick):
   `graphical/port_map.py` next to `control/` if agreed.
 - [ ] The DESIGN research-lane trim (scan: docs-gov#10).
 - [ ] The three catalog rows the dynamics scan names (scan: dynamics#13).
-- [ ] `JaxMechanicalSystem` retired, the `xp` base already traces (scan: dynamics#14)
-  **[ask — importable name]**: the name stays to v1.0 and leaves on V4's list, with no alias
-  before.
-- [ ] `NeuralNetwork` folded into `MLP` (scan: graphics#12) **[ask — importable name]**.
 - [ ] One `ctl` for the model-based laws; `LookupPolicy` beside the other laws
   (scan: control#8, control#13).
 
@@ -236,7 +231,6 @@ pick):
   explicit `backend='jax'` on a NumPy-only set or cost raises a raw trace error;
   `discretize(diagram, params={'dt': v})` is refused although a diagram would keep its
   blocks' params, and a raising params setter can leave a diagram half-updated;
-  `JaxMechanicalSystem` keeps the integer-state dtype defect (it retires on V4's list);
   assigning into `q.labels[i]` in place no longer sticks; the gravity hook's signature is
   read on every call; the collocation demo's SLSQP fallback is not run in CI (its manifest
   entry still requires Ipopt).
@@ -264,7 +258,7 @@ pick):
 - [ ] **S66 Wiring mistakes fail at wiring time** **[ask — core]** (RULES 4.10; scan:
   core#2, core#13): `connect` refuses to rewire a connected subsystem input; the compile
   probe detects an output that moves with an input it does not declare (raise or warn:
-  ROADMAP §6). After P10's AC-4 (landed 2026-10-14): the loop-input junctions still rewire
+  [QUESTIONS.md](../dev/QUESTIONS.md)). After P10's AC-4 (landed 2026-10-14): the loop-input junctions still rewire
   the connected input they sum into (`composition.sum_into`), so S66 changes them first.
 - [ ] **S67 One plot vocabulary** (scan: graphics#0, graphics#4, graphics#5, graphics#6,
   graphics#8, graphics#9, analysis#9, analysis#10): `title`, `ax`, `backend` and `show`
@@ -657,7 +651,7 @@ in December 2026 after the v0.3 tag; the v1.0 rows after two cohorts.
 ### v0.9 — what could still break a name
 
 - [ ] **K5 Where the course material and the projects live** **[ask — student-facing]**
-  (ROADMAP §6): `examples/teaching/` and/or `examples/projects/` in their own repositories, or
+  ([QUESTIONS.md](../dev/QUESTIONS.md)): `examples/teaching/` and/or `examples/projects/` in their own repositories, or
   here. Decided between terms (after GMC714). Options, a recommendation and the asks:
   [repository-structure.md](repository-structure.md). Done when the ruling is recorded.
 - [ ] **K6 The move**, if K5 says so **[ask — student-facing]**: the history kept
@@ -697,8 +691,7 @@ in December 2026 after the v0.3 tag; the v1.0 rows after two cohorts.
   The rename list, applied with shims under the policy (the names hold until then, with no
   alias before): `xbar` / `ubar` → `x_bar` / `u_bar`, the name everywhere else, on the costs
   (`QuadraticCost.from_system(xbar=, ubar=)`, `cost.xbar`, `cost.ubar`, `TimeCost`'s
-  `xbar`); `plot_cost2go` → `plot_cost_to_go` (A4); `JaxMechanicalSystem` retired into the
-  `xp` base (D2).
+  `xbar`); `plot_cost2go` → `plot_cost_to_go` (A4).
 - [ ] **V5 `CHANGELOG.md`**: user-facing, one entry per release from v0.9 (back-filled for
   0.1.0 / 0.1.1 from ROADMAP §2's breaking changes); `pyproject.toml` `Changelog` URL points
   there. Done when `publish.yml` refuses a tag without its CHANGELOG heading.
@@ -793,7 +786,7 @@ in December 2026 after the v0.3 tag; the v1.0 rows after two cohorts.
   human demonstrations (keyboard or joystick driving the plant live) as trajectory datasets; a
   planner that fits a policy to them (imitation beside the RL planner, `NeuralPolicyController`
   as its output); the cloned controller closed on the plant and compared against the
-  demonstrator. The pyro game demos, if ported (ROADMAP §6), are its first scenes.
+  demonstrator. The pyro game demos, if ported (an open question, [QUESTIONS.md](../dev/QUESTIONS.md)), are its first scenes.
 
 ---
 
@@ -844,7 +837,7 @@ One line each; open a plan doc only when a design needs a writeup.
   consumer exists; the path-integral planner's `"worst_case"` branch (CVaR over plant draws,
   [mppi.md](mppi.md) §4) would be that consumer; the two decisions go together.
 - `RolloutEnvironment` may move from `reinforcement_learning/` to `planning/environment.py`
-  once a second band reads it (open in ROADMAP §6) (the path-integral planner; the RL
+  once a second band reads it (open: [QUESTIONS.md](../dev/QUESTIONS.md)) (the path-integral planner; the RL
   collectors and the tabular learners already do): one import rewrite, no behaviour change.
 - Diffusion policy (research lane, JAX-only, after behavior cloning): a sampled controller with
   memory and a key, trained by `fit`; see [future-policies.md](future-policies.md).
@@ -852,7 +845,7 @@ One line each; open a plan doc only when a design needs a writeup.
   Pacejka tire; stochastic forcing; ROS2 / FMI; sparse long-horizon trajopt; RRT-Connect.
 - Ipopt given the Lagrangian Hessian, not the objective's alone (scan: planning#13);
   `optimizer_method="auto"` picking Ipopt when installed (scan: examples#11);
-  `PlanningProblem.metadata` documented or retired (scan: planning#14; ROADMAP §6).
+  `PlanningProblem.metadata` documented or retired (scan: planning#14; [QUESTIONS.md](../dev/QUESTIONS.md)).
 - `LowPassFilter(tau=)`: the shaping filter of the colored-noise recipe parameterized by its
   time constant, beside `cutoff_hz` (randomness.md RD-D23, RN-4).
 - A fixed-step RK4 that samples held sources once per step, so the four stages read one

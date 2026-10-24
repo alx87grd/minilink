@@ -50,6 +50,8 @@ LINKED_DOCS = (
     "docs/dev/RULES.md",
     "docs/dev/DESIGN.md",
     "docs/dev/ROADMAP.md",
+    "docs/dev/QUESTIONS.md",
+    "docs/dev/KNOWN_ISSUES.md",
     "README.md",
     "examples/README.md",
     "tests/README.md",

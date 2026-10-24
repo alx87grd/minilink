@@ -80,7 +80,7 @@ Why C:
    decision leaves, parameters bound" (the program export, `pe.program`: DESIGN §6), which is
    `bind`.
 
-Open with C (the asks, ROADMAP §6): the family's name (ruled 2026-10-23: `ParametricProgram`,
+Open with C (the asks, [QUESTIONS.md](../dev/QUESTIONS.md)): the family's name (ruled 2026-10-23: `ParametricProgram`,
 D19); whether a hand-written program may
 declare its own `p` (free, and tutorial 08 could solve one NLP for several values of a
 parameter); `bind` on both the evaluator (the fast path, compiled functions kept) and the

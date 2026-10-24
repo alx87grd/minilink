@@ -734,9 +734,9 @@ lands. The acceptance test of every step is its deterministic twin (RD-D23).
 - [ ] **RN-6 Docs**, with each step: DESIGN §4 (the distributions entry: the convention, the
   three periods, the bridge table with its two periods, the solver hint) and §6 (the stochastic
   problem's `disturbances`, `realize`, `evaluate` on the draws). Done so far: DESIGN §4
-  ("Randomness") for RN-1 and §6 ("The problem evaluator") for `evaluate`; still missing,
-  `problem.realize(key, n)` and the disturbances `evaluate` holds at nominal. Then the ROADMAP §6
-  entry is closed (DESIGN §4 carries the convention); TODO A5 rows retired; `kalman()` (P4)
+  ("Randomness") for RN-1 and §6 ("The problem evaluator") for `evaluate`,
+  `problem.realize(key, n)` and the disturbances `evaluate` holds at nominal. Then the open
+  question is closed (DESIGN §4 carries the convention); TODO A5 rows retired; `kalman()` (P4)
   reads intensities, the discrete filter later reads `Q_d`, `R_d`; the release notes of RN-1,
   RN-4 and RN-5.
 

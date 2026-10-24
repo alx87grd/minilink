@@ -8,7 +8,7 @@ learning moved to `minilink.learning` (R66, 2026-10-23), the `identification/` s
 and maintainer-owned: the examples tree (B, §3) and where the course material lives (C, §4).  
 **Lane:** maintainer-owned (student-facing paths and public names; AGENTS.md "Ask first").  
 **Rung:** serves the open decision "Where the course material and the projects live"
-([ROADMAP §6](../dev/ROADMAP.md#6-decisions), steps K5 / K6 of [TODO.md](TODO.md), v0.9);
+([QUESTIONS.md](../dev/QUESTIONS.md), steps K5 / K6 of [TODO.md](TODO.md), v0.9);
 the pinned Colab cell waits in step V6.  
 **Constraint:** the course notebooks' names are frozen until v1.0, with the freeze paused
 between terms (ROADMAP §4.1 gate 7); any move happens **between terms only**.
@@ -152,7 +152,7 @@ notebooks is a library, and packaging them adds a release process for prose.
 
 ### 4.3 Recommendation
 
-**C3 now, C2 at v1.0.** This keeps ROADMAP §6's "move between terms only" and matches
+**C3 now, C2 at v1.0.** This keeps the rule "move between terms only" (QUESTIONS.md, K5) and matches
 v1.0's promise ("a colleague can build a course on it"): by then the course repo is the
 template an outside instructor forks. The pin is also the first concrete piece of the trust
 contract (pinned installs, step V6). Whether `projects/` follows the courses or stays as
@@ -178,4 +178,4 @@ research material is a separate call (§6, ask 3).
 
 When the maintainer rules, the ruling goes to a dated record under
 [../reviews/](../reviews/) and the steps to [TODO.md](TODO.md); the open decision then
-leaves ROADMAP §6 (one fact, one home: [README.md](README.md)).
+leaves QUESTIONS.md (one fact, one home: [README.md](README.md)).
