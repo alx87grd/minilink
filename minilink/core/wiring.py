@@ -9,7 +9,7 @@ import numpy as np
 
 from minilink.core.backends import array_module
 from minilink.core.distributions import child_seed
-from minilink.core.feedback import check_reserved_id
+from minilink.core.roles import check_reserved_id
 from minilink.core.signals import OutputPort, VectorSignal
 from minilink.core.system import DEFAULT_SMALLEST_TIME_CONSTANT
 
@@ -79,7 +79,7 @@ class WiredDiagramMixin:
         """Add a subsystem under a unique id, with all its inputs unconnected.
 
         The ids ``plant``, ``controller`` and ``observer`` name the roles every
-        tool reads (:func:`minilink.core.feedback.roles`); one of each per level.
+        tool reads (:func:`minilink.core.roles.roles`); one of each per level.
         """
         require_plain_id(sys_id)
         check_reserved_id(sys_id, self.subsystems)
@@ -225,8 +225,8 @@ class WiredDiagramMixin:
         This is an optional diagram-building shortcut. It does not overwrite
         existing connections and returns ``self`` so it can be used fluently.
         """
-        # A real cycle: composition imports DiagramSystem, built on this mixin
-        from minilink.core.composition import autowire
+        # A real cycle: the operators import DiagramSystem, built on this mixin
+        from minilink.core.operators import autowire
 
         return autowire(self, strict=strict, validate=validate)
 

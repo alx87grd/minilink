@@ -4,16 +4,15 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from minilink.core.composition import (
+from minilink.core.closed_loop import (
     default_computer_boundary_ports,
-    new_diagram_like,
-    propagate_animation_camera,
     resolve_standard_feedback,
 )
 from minilink.core.diagram import DiagramSystem
 from minilink.core.discrete.hybrid_diagram import BoundaryConnection, HybridDiagram
 from minilink.core.discrete.step_diagram import StepDiagramSystem
 from minilink.core.discrete.step_system import StepSystem
+from minilink.core.operators import new_diagram_like, propagate_animation_camera
 from minilink.core.system import System
 
 if TYPE_CHECKING:
@@ -159,7 +158,7 @@ def resolve_hybrid_feedback_ports(
     """
     Return ``(computer_out, computer_in, plant_in, plant_out)`` for standard wiring.
 
-    Uses the same rules as :func:`~minilink.core.composition.resolve_standard_feedback`.
+    Uses the same rules as :func:`~minilink.core.closed_loop.resolve_standard_feedback`.
     Multi-leaf step diagrams (e.g. dual-rate MPC) use boundary ports when present.
     """
     # A multi-leaf step diagram is wired through its own boundary ports

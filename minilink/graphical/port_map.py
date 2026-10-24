@@ -7,7 +7,7 @@ from dataclasses import dataclass
 
 import numpy as np
 
-from minilink.core.feedback import block_roles, plot_space_of, require_command
+from minilink.core.roles import block_roles, plot_space_of, require_command
 from minilink.graphical.common import PlotResult
 from minilink.graphical.phase_plane.phase_plane import (
     format_axis_label,
@@ -142,9 +142,9 @@ def plot_control_law(
     """Plot the textbook slice of a controller block's control law.
 
     The block's port names say what it reads
-    (:func:`minilink.core.feedback.block_roles`): the measurement ``y`` or
+    (:func:`minilink.core.roles.block_roles`): the measurement ``y`` or
     ``x``, or the error entry of a compensator. The zero-argument call picks
-    the sweep space (:func:`minilink.core.feedback.plot_space_of`: error
+    the sweep space (:func:`minilink.core.roles.plot_space_of`: error
     space for error-driven laws, absolute measurement/state otherwise),
     sweeps the first relevant coordinates, and pins the reference and every
     other coordinate at its nominal value. Blocks with internal state are

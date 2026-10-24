@@ -18,7 +18,7 @@ from minilink import (
     TransferFunction,
     feedback,
 )
-from minilink.core.feedback import block_roles, command_port, roles
+from minilink.core.roles import block_roles, command_port, roles
 from minilink.core.system import DynamicSystem, System
 
 
@@ -346,7 +346,7 @@ class TestLoopInputs(unittest.TestCase):
         )
 
     def test_each_keyword_adds_or_drops_its_port(self):
-        from minilink.core.composition import closed_loop
+        from minilink.core.closed_loop import closed_loop
 
         for layout, C in self.layouts():
             with self.subTest(layout=layout):
@@ -366,7 +366,7 @@ class TestLoopInputs(unittest.TestCase):
             noise_sensitivity,
             sensitivity,
         )
-        from minilink.core.composition import closed_loop
+        from minilink.core.closed_loop import closed_loop
 
         w = np.logspace(-2, 3, 200)
         pieces = dict(plant=self.H, controller=PID(4.0, 2.0, 0.5))
@@ -394,7 +394,7 @@ class TestLoopInputs(unittest.TestCase):
 
     def test_a_source_block_drives_its_input_inside_the_loop(self):
         from minilink import WhiteNoise
-        from minilink.core.composition import closed_loop
+        from minilink.core.closed_loop import closed_loop
 
         entries = {"error": ("error", "+"), "reference": ("controller", "r")}
         for layout, C in self.layouts():
@@ -415,7 +415,7 @@ class TestLoopInputs(unittest.TestCase):
                 self.assertEqual(loop.connections["noise_sum"]["in1"], ("noise", "y"))
 
     def test_a_source_inside_equals_the_same_source_outside(self):
-        from minilink.core.composition import closed_loop
+        from minilink.core.closed_loop import closed_loop
         from minilink.core.diagram import DiagramSystem
 
         C = PID(4.0, 2.0, 0.5)
@@ -432,7 +432,7 @@ class TestLoopInputs(unittest.TestCase):
 
     def test_a_plant_that_declares_d_and_n_owns_them(self):
         from minilink import NoisyPendulum, WhiteNoise, lqg
-        from minilink.core.composition import closed_loop
+        from minilink.core.closed_loop import closed_loop
 
         plant = NoisyPendulum()
         box = lqg(plant, np.eye(2), np.eye(1), 1e-2 * np.eye(2), 1e-3 * np.eye(2))
@@ -456,7 +456,7 @@ class TestLoopInputs(unittest.TestCase):
 
     def test_a_loop_input_is_a_flag_or_a_source(self):
         from minilink.blocks.routing import Gain
-        from minilink.core.composition import closed_loop
+        from minilink.core.closed_loop import closed_loop
 
         with self.assertRaisesRegex(TypeError, "source block"):
             closed_loop(PID(4.0, 2.0, 0.5), self.H, disturbance=0.1)

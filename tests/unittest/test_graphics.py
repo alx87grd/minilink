@@ -9,7 +9,7 @@ import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import numpy as np
-from minilink.core.composition import propagate_animation_camera
+from minilink.core.operators import propagate_animation_camera
 from minilink.core.diagram import DiagramSystem
 from minilink.core.kinematics import translation
 from minilink.core.system import DynamicSystem

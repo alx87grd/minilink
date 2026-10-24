@@ -434,7 +434,7 @@ from minilink.control.robotic import (
     TaskKinematic,
     TaskKinematicNullspace,
 )
-from minilink.core.composition import closed_loop
+from minilink.core.closed_loop import closed_loop
 from minilink.dynamics.catalog.manipulators.arms import (
     FiveLinkManipulator,
     OneLinkManipulator,

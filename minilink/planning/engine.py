@@ -677,7 +677,7 @@ def nominal_trajectory(problem, policy, *, dt, tf=None) -> Trajectory:
     the plant's command port.
     """
     # Lazy import: the loop roles load with the first rollout
-    from minilink.core.feedback import command_port
+    from minilink.core.roles import command_port
 
     nominal = problem.nominal() if problem.is_stochastic else problem
     policy = policy_of(policy)
@@ -725,7 +725,7 @@ def closed_loop_of(problem, controller):
     the plant's command; any other block is closed by ``controller @ plant``.
     """
     # Lazy imports: the composition tools and the results load with the first loop
-    from minilink.core.composition import closed_loop
+    from minilink.core.closed_loop import closed_loop
     from minilink.core.diagram import DiagramSystem
     from minilink.core.discrete.step_system import StepSystem
 
@@ -852,7 +852,7 @@ def static_law(controller):
     gain ``K(t)`` is read at each instant.
     """
     # Lazy import: the loop roles load with the first law
-    from minilink.core.feedback import block_roles
+    from minilink.core.roles import block_roles
 
     roles = block_roles(controller)
     require_feedback_roles(controller, roles)
@@ -915,7 +915,7 @@ def open_loop_of(source, plant):
     """A source block driving the plant's command: the loop ``{"controller", "plant"}``."""
     # Lazy imports: the diagram tools load with the first loop
     from minilink.core.diagram import DiagramSystem
-    from minilink.core.feedback import command_port
+    from minilink.core.roles import command_port
 
     loop = DiagramSystem()
     loop.add_subsystem(source, "controller")

@@ -181,8 +181,8 @@ _EXPORTS: dict[str, tuple[str, str]] = {
     "StepDiagramSystem": ("minilink.core.discrete.step_diagram", "StepDiagramSystem"),
     "BallSet": ("minilink.core.sets", "BallSet"),
     "SingletonSet": ("minilink.core.sets", "SingletonSet"),
-    "closed_loop": ("minilink.core.composition", "closed_loop"),
-    "feedback": ("minilink.core.composition", "feedback"),
+    "closed_loop": ("minilink.core.closed_loop", "closed_loop"),
+    "feedback": ("minilink.core.closed_loop", "feedback"),
     "Source": ("minilink.blocks.sources", "Source"),
     "IntegralImpedance": (
         "minilink.control.impedance",

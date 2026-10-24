@@ -60,7 +60,7 @@ its own small step, most already on the workboard:
 - `planning/spatial/` → `core/geometry/` ([geometry-module.md](geometry-module.md), step
   A3): sets and posed geometry are core objects a controller may import; the placement test
   there ("would you still import it with no `PlanningProblem`?") decides.
-- `core/composition.py`, `facades.py`, `wiring.py`: split by concern when the
+- `core/facades.py`, `wiring.py`: split by concern when the
   differentiable-problem work ([differentiable-problem.md](differentiable-problem.md), V1)
   touches them anyway; no public name changes, so it is agent-managed internal structure.
 - `identification/`: remove the stub until `fitting.py` lands (C4), or keep it with a

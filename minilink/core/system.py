@@ -409,10 +409,10 @@ class System(SharedSystemFacades):
         Neither operand is modified: a diagram operand is laid out flat in the
         result, which shares its blocks and carries the left operand's name,
         ``x0`` and camera settings. See
-        :func:`~minilink.core.composition.add_systems`.
+        :func:`~minilink.core.operators.add_systems`.
         """
-        # A real cycle: composition imports System from this module
-        from minilink.core.composition import add_systems
+        # A real cycle: the operators import System from this module
+        from minilink.core.operators import add_systems
 
         return add_systems(self, other)
 
@@ -422,10 +422,10 @@ class System(SharedSystemFacades):
         Neither operand is modified: a diagram operand is laid out flat in the
         result, which shares its blocks and carries the left operand's name,
         ``x0`` and camera settings. See
-        :func:`~minilink.core.composition.series`.
+        :func:`~minilink.core.operators.series`.
         """
-        # A real cycle: composition imports System from this module
-        from minilink.core.composition import series
+        # A real cycle: the operators import System from this module
+        from minilink.core.operators import series
 
         return series(self, other)
 
@@ -438,11 +438,11 @@ class System(SharedSystemFacades):
         inserted. A number on the right is refused: ``feedback(L)`` and
         ``feedback(L, K)`` close an open loop on itself. Neither operand is
         modified: the loop is a new diagram. See
-        :func:`~minilink.core.composition.closed_loop` and
-        :func:`~minilink.core.composition.feedback`.
+        :func:`~minilink.core.closed_loop.closed_loop` and
+        :func:`~minilink.core.closed_loop.feedback`.
         """
-        # A real cycle: composition imports System from this module
-        from minilink.core.composition import closed_loop
+        # A real cycle: the closed loop imports System from this module
+        from minilink.core.closed_loop import closed_loop
 
         return closed_loop(self, other)
 

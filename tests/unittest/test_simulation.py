@@ -491,7 +491,7 @@ class TestStaticSimulatorJax(unittest.TestCase):
 
 
 from minilink.control.modelbased import SlidingMode
-from minilink.core.composition import closed_loop
+from minilink.core.closed_loop import closed_loop
 from minilink.dynamics.catalog.pendulum.pendulum import Pendulum
 from minilink.simulation.simulator import Simulator
 

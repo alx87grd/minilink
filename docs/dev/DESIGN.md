@@ -122,8 +122,8 @@ state-feedback block):
   and `planning.planner` may import `control.neural` and `blocks` (a learned
   law is a control block, the critics share its multilayer perceptron, and an
   open-loop plan is a `TrajectorySource` block).
-- **Exception:** `core/composition.py` imports `blocks.routing` (`Error`, `Sum`,
-  `Gain`, `Demux`, `Mux`): the `@`, `>>` and `+` operators build those blocks.
+- **Exception:** `core/closed_loop.py` imports `blocks.routing` (`Error`, `Sum`,
+  `Gain`, `Demux`): `@` and `feedback` build those blocks.
 - **Exception:** `core/inspect.py` imports `optimization` and `planning`
   (`PlanningProblem`, the spatial fields): `print()` dispatches on every core
   noun, wherever it lives.
@@ -262,7 +262,7 @@ the named car profiles live with their scenarios in `examples/projects/car_trajo
   estimate). Under the id `observer`, top level or inside the controller box, `roles()`
   finds it. A block that reads a measurement and gives the state back with no `u` and no
   `y` is refused as a controller by `@`, `closed_loop`, `%` and `plot_control_law`
-  (`core.feedback.require_command`): pass it with its gain as
+  (`core.roles.require_command`): pass it with its gain as
   `closed_loop(gain, plant, observer=obs)`, put the two in a controller box, or design
   the pair with `lqg`. The designs read the plant's command port for `B` (every other
   input held at its nominal; `LQRPlanner` too) and, for an observer, its `y` for `C`: a
@@ -388,7 +388,7 @@ source reaches through `dependencies` edges — unless declared explicitly. A cl
 loop nested with `add_subsystem` therefore declares what the same leaf would, and
 closing an outer loop around it is not a false algebraic loop.
 
-Shortcuts (`core.composition`): `+` flat add only, `>>` series, `@` closed loop
+Shortcuts (`core.operators`, `core.closed_loop`): `+` flat add only, `>>` series, `@` closed loop
 (``closed_loop(C, plant, reference=, disturbance=, noise=, filter=, observer=)`` is
 `@` with options: the keywords are words, the ports the letters ``r``, ``d``, ``n``;
 each is `True` (an edge port), `False` (none) or a source block driving it inside
@@ -462,10 +462,10 @@ calls. They are written once on the tracking error and take a port-layout switch
 form, `P`, `PI`, `PD`, `PID`, `Lead`, `TransferFunction(ports="error")`),
 `ports="reference"` declares `r` and `y` (the controller form the generic
 framework uses). A bare `TransferFunction` stays a plant (`u`, `y`). An
-error-driven block (`core.feedback.block_roles`: an input `e`, or a single
+error-driven block (`core.roles.block_roles`: an input `e`, or a single
 input with no measurement — a compensator, a transfer function, a plant, a
 series diagram `C >> G`) gets an `Error` block (`e = r - y`, ports `+`, `-`,
-`e`) inserted by `core.composition.feedback`. `@` always means controller at
+`e`) inserted by `core.closed_loop.feedback`. `@` always means controller at
 plant and refuses a number on the right; `feedback(sys)` closes any such system
 on itself, through a `Gain` (`feedback(sys, K)`) or a sensor or filter block
 (`feedback(sys, F)`), the return block named `filter` either way;
@@ -483,7 +483,7 @@ block, no new operator.
 
 A controller is an ordinary `System`: explicit ports, and `ctl` as the port
 compute — `ctl` *is* the control law. **The port names are the declaration**,
-and `minilink/core/feedback.py` reads them, never a class or an `isinstance`:
+and `minilink/core/roles.py` reads them, never a class or an `isinstance`:
 
 - `block_roles(block)` says what a block measures (`y`, `x`, or both), its
   reference `r`, its command `u`, and whether an `Error` block drives it (an

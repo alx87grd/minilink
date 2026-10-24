@@ -35,7 +35,7 @@ class DiagramSystem(WiredDiagramMixin, DynamicSystem):
 
     Build diagrams with :meth:`add_subsystem` + :meth:`connect` (canonical
     wiring for any topology) or with the shortcuts ``+``, ``>>``, ``@``, and
-    :meth:`autowire` from :mod:`minilink.core.composition`.
+    :meth:`autowire` from :mod:`minilink.core.operators`.
 
     This class implements the wiring contract and a simple recursive
     evaluation of ``f`` used as the reference; :meth:`compile` produces the

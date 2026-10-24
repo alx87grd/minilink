@@ -5,7 +5,7 @@ from abc import ABC
 
 from minilink.blocks.sources import TrajectorySource
 from minilink.core.costs import CostFunction
-from minilink.core.feedback import command_port
+from minilink.core.roles import command_port
 from minilink.core.sets import Set
 from minilink.core.trajectory import Trajectory
 from minilink.planning.engine import Evaluation, evaluate

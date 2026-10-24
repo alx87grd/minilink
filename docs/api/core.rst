@@ -17,7 +17,10 @@ Core
    :members:
    :undoc-members:
 
-.. automodule:: minilink.core.composition
+.. automodule:: minilink.core.operators
+   :members:
+
+.. automodule:: minilink.core.closed_loop
    :members:
 
 .. automodule:: minilink.core.trajectory
@@ -29,7 +32,7 @@ Core
 .. automodule:: minilink.core.costs
    :members:
 
-.. automodule:: minilink.core.feedback
+.. automodule:: minilink.core.roles
    :members:
 
 .. automodule:: minilink.core.distributions

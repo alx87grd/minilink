@@ -4,7 +4,7 @@ import numpy as np
 
 from minilink.blocks.neural import MLP
 from minilink.core.backends import array_module
-from minilink.core.feedback import command_port
+from minilink.core.roles import command_port
 from minilink.core.system import System
 
 ###############################################################################

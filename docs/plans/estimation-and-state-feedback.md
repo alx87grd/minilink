@@ -26,7 +26,7 @@ operating point subtracted by hand in a demo.
 
 ## 2. Principles, from the core
 
-1. **A block is what its ports say** (`core/feedback.py`): a controller reads `y` or `x`
+1. **A block is what its ports say** (`core/roles.py`): a controller reads `y` or `x`
    and `r` and gives `u`; an observer reads `u` and `y` and gives `x`, the estimate. Role
    keys `plant`, `controller`, `observer` name blocks in a diagram. No controller or
    observer base class.
@@ -129,7 +129,7 @@ The EKF along a trajectory is the middle rung: the same block shape as `Trajecto
   reading `B_w = ∂f/∂d`, `D_v = ∂h/∂n` and the noise blocks' `psd` was planned here and
   dropped (rulings R20): the design takes the textbook `Q_n`, `R_n`.
 - **A block that reads a measurement and commands nothing is an estimator, not a
-  controller**: `require_command(block)` in `core/feedback.py` refuses it with one message
+  controller**: `require_command(block)` in `core/roles.py` refuses it with one message
   ("… reads y but gives no u: an estimator; put it in a controller box"), used by
   `default_control_out` (`@`, `closed_loop`), `default_computer_boundary_ports` (`%`),
   `feedback()` and `plot_control_law`'s `law_roles_of`. Today all three fall back to the first
@@ -190,7 +190,7 @@ exposes `x` and an observer gives `x` in one diagram, `autowire` finds two candi
 ## 6b. Ask-first items, by name (AGENTS "Ask first")
 
 Core: `operating_point()`'s default (A0); the `LTISystem` constructor (A1); `require_command`
-in `core/feedback.py` and its callers in `composition.py` (B1); `interpolate_schedule` to
+in `core/roles.py` and its callers in `composition.py` (B1); `interpolate_schedule` to
 `core/trajectory.py` (A1). Public names: `lqr_at_operating_point` and
 `place_at_operating_point` removed, the `control.lqr` / `control.place` module paths removed,
 `StateObserver`, `luenberger`, `kalman`, `lqg` added to the root prelude (A3, B5). New

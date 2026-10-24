@@ -6,7 +6,7 @@ import numpy as np
 
 from minilink.analysis.derivatives import compiled, jacobian, operating_point
 from minilink.core.diagram import DiagramSystem
-from minilink.core.feedback import command_port
+from minilink.core.roles import command_port
 from minilink.core.system import System
 from minilink.dynamics.abstraction.state_space import LTISystem
 from minilink.graphical.control import style

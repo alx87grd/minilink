@@ -7,9 +7,9 @@ from scipy.linalg import solve_continuous_are
 from minilink.analysis.linearization import linearize
 from minilink.control.design import lqg, lqr, lqr_gain, place_gain
 from minilink.control.state import StateFeedback
-from minilink.core.composition import closed_loop
+from minilink.core.closed_loop import closed_loop
 from minilink.core.diagram import DiagramSystem
-from minilink.core.feedback import roles
+from minilink.core.roles import roles
 from minilink.core.system import DynamicSystem
 from minilink.dynamics.abstraction.state_space import LTISystem
 from minilink.dynamics.catalog.pendulum.pendulum import Pendulum
