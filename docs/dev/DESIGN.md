@@ -327,9 +327,9 @@ read `params` yet, the gap is tracked below.
   allowed (missing sys_id → that block's live `self.params`); unknown sys_ids
   raise; per-subsystem dicts are full replacements at the block level. Nested
   diagrams nest the dict recursively.
-- Compile: `bind_params=True` copies params into the plan (frozen tier only).
-  The parametric tier (`f_p`/`h_p`/`outputs_p`) takes the nested dict on both
-  backends and ignores `bound_params`. On JAX the dict is a pytree argument
+- Compile: `bind_params=True` copies params into the plan; the evaluator's
+  `params=None` reads them. A `params` dict passed to `f` / `outputs` / `step`
+  takes the nested dict on both backends in their place. On JAX the dict is a pytree argument
   (numeric leaves required): values vary without retracing, and
   `evaluator.jacobian("f", "params")` / `jax.grad` differentiate dynamics
   w.r.t. parameters (see `examples/demos/compile/params_gradient.py`).
@@ -649,7 +649,7 @@ compiles all run this check.
 
 Speed lives in batches and compiled integrators, not in single calls: a
 jitted `f` call costs about the same as the NumPy one (dispatch dominates),
-while `rollout_batch` and the compiled `jit.rollout` run 1000 rollouts of
+while `rollout_batch` and the compiled `rollout` run 1000 rollouts of
 1000 RK4 steps in tens of milliseconds. Quote those; never a per-call ratio.
 
 `compile(system, backend)` returns a typed evaluator:
@@ -671,47 +671,47 @@ parameter-family experiments.
 Leaf `compile` accepts `numpy` or `jax` only (`auto` / `direct` are simulator /
 transcription concepts — see :mod:`minilink.core.backends`).
 
-Diagrams → `ExecutionPlan` → diagram evaluator. Internal outputs via
-`reconstruct_internal_signals`; **`outputs()` / `outputs_p()` are boundary outputs
-only** (not diagram internals). Compiled evaluators expose **`outputs` / `outputs_p`**
-(dict keyed by port id); they do not mirror model `h` as a separate evaluator API.
+Diagrams → `ExecutionPlan` → diagram evaluator. **`outputs()` are boundary outputs
+only** (dict keyed by port id, not diagram internals); a diagram's internal signals are
+`signals(x, u, t, params=None)` (the buffer) and `compute_internal_signals_dict` (keyed
+`"block:port"`). Evaluators do not mirror model `h` as a separate evaluator API.
 
-**The step model.** Every sampled consumer steps a continuous plant through two
-bodies, written once (`core/compile/evaluators/stepping.py`) for both backends:
+**One body per method, compiled on JAX.** Every evaluator method takes `params=None`
+(`None` reads the parameters compiled in; a dict replaces them, a diagram's block by
+block):
 
+    ev.f(x, u, t=0.0, params=None)                                            # dx; a continuous evaluator
+    ev.outputs(x, u, t=0.0, params=None)                                      # the boundary ports
     ev.step(x, u, t, params=None, *, dt, solver="rk4", substeps=1)            # x_{k+1}, u held
     ev.rollout(x0, u_seq, t0, dt, params=None, *, solver="rk4", substeps=1, hold="zoh", n_steps=None)
-    ev.jit.step(...), ev.jit.rollout(...)                                     # compiled once
+    ev.rollout_batch(x0s, u_sequences=None, *, t0=0.0, dt, n_steps=None, params=None)   # JAX: a family, one vmap
 
+A step evaluator has `step(x, u, k=0, params=None)` (the system's own map on the integer
+tick, no knobs), `outputs` and a state-only `rollout(x0, *, n_steps, u=None, params=None)`;
+a static evaluator has `outputs` only. On NumPy each method is its plain body. On JAX each
+is marked `@compiled` (`core/compile/evaluators/compiled.py`): `jax.jit` of the body, built
+on first use and cached per evaluator, the knobs (`solver`, `substeps`, `hold`, `n_steps`)
+static. A compiled method is fast from Python and composes inside an outer `jit`, `grad`,
+`vmap` or `scan` with the numbers of the uncompiled body, so there is one name per method:
+no parametric twin, no trace tier, no `jit` namespace.
+
+**The step model.** Every sampled consumer steps a continuous plant through `step` and
+`rollout`, written once (`core/compile/evaluators/stepping.py`) for both backends.
 `solver` is `"rk4"` or `"euler"`, `substeps` splits each period, `hold="zoh"` holds each
 row of `u_seq` (shape `(N, m)`) and `hold="foh"` reads `N + 1` knots, linear between
 them; `u_seq=None` holds the nominal input for `n_steps` periods; `rollout` returns
-`[x_0, …, x_N]`, `t_k = t₀ + k dt`. `params=None` reads the compiled parameters. The
-knobs are static. On JAX `ev.step` / `ev.rollout` trace inside an outer `jit`, `grad`,
-`vmap`, and `ev.jit.*` is the same body under `jax.jit`, built once per evaluator; on
-NumPy `ev.jit` is the evaluator itself. `discretize`, the RL environment, the gym bridge,
+`[x_0, …, x_N]`, `t_k = t₀ + k dt`. `discretize`, the RL environment, the gym bridge,
 value iteration (`StateSpaceGrid.successor`), shooting, the fixed-step solvers, RRT,
-the Lyapunov sampler and the hybrid and realtime simulators all call them.
+the Lyapunov sampler and the hybrid and realtime simulators all call them. The adaptive
+SciPy solver adapts `f` for `solve_ivp` itself (`simulation/solvers/scipy_ivp.py`).
 
-**Evaluator execution tiers (JAX).** `.f`, `.f_p`, `.outputs` are the **fast tier** —
-JIT-compiled on JAX, eager on NumPy. JAX evaluators also expose a **trace tier**
-(`.f_trace`, `.f_trace_p`): pre-JIT flat callables for composition inside outer `jit` /
-`grad` / `vmap`. NumPy evaluators reject `*_trace` attributes. `has_trace_tier` is
-`True` on JAX evaluators.
+Layout: `evaluators.py` (the bases), `compiled.py` (the mark), `stepping.py` (the step
+model's formulas), `numpy_evaluators.py`, `jax_evaluators.py`, `jacobian.py` (`jacobian`),
+`step_rollout.py` (`gather_u`, `StepRolloutMixin`).
 
-|  | Bound | Parametric |
-| --- | --- | --- |
-| Fast (default) | `f` ≡ `f_jit` | `f_p` ≡ `f_jit_p` |
-| Trace (JAX only) | `f_trace` | `f_trace_p` |
-
-Same 2×2 for `outputs`. Layout:
-`evaluators.py` (ABCs), `stepping.py` (the step model's formulas), `numpy_evaluators.py`,
-`jax_evaluators.py`, `step_rollout.py` (`gather_u`, `StepRolloutMixin`).
-
-**Frozen evaluator subset.** The stable-tier evaluator API is: `f` / `f_p`,
-`outputs` / `outputs_p`, the step model `step`, `rollout` and `jit`, `rollout_batch`,
-and the JAX trace tier `f_trace` / `f_trace_p`; a step evaluator's `step` / `step_p` and
-state-only `rollout`.
+**Frozen evaluator subset.** The stable evaluator API is the methods above: `f`,
+`outputs`, `signals`, `step`, `rollout`, `rollout_batch` and `jacobian`, each with
+`params=None`, and `nominal_input`.
 
 Keep `ExecutionPlan.output_slices` and `external_output_slices` aligned.
 
@@ -1003,9 +1003,9 @@ Online ``params`` binds `x0` only; the reserved key ``scene`` raises
 options); the time grid is
 `linspace(0, problem.tf, n_steps)` for finite `tf`. Single backend-native
 transcription classes; no parallel JAX transcription types. NumPy transcriptions
-build constraints via `dynamics_function` (compiled evaluator, trace tier when
-JAX). **JAX transcriptions** embed `problem.sys.f` directly in the NLP (not
-evaluator `f` / `f_trace`). `compile_backend="direct"` calls `system.f`
+build constraints via `dynamics_function` (the compiled evaluator's `f`).
+**JAX transcriptions** embed `problem.sys.f` directly in the NLP (not the
+evaluator's `f`). `compile_backend="direct"` calls `system.f`
 uncompiled (escape hatch). A `MathematicalProgram` carries the native backend of
 its callables in its `backend` field, and the `Optimizer` compiles with it by
 default.

@@ -46,7 +46,7 @@ class JacobianMixin:
         """Record the port layout the resolver needs.
 
         ``kind`` is ``"dynamic"``, ``"static"`` or ``"step"``; ``state_fn`` is
-        the parametric evolution (``f_p`` / ``step_p`` or ``None``) and
+        the evolution (``f`` / ``step``, taking ``params``, or ``None``) and
         ``outputs_fn`` the parametric output map returning a dict by port id.
         Diagrams pass their execution ``plan`` so wires become addressable.
         """

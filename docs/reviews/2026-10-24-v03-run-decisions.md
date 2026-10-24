@@ -95,7 +95,7 @@ setpoint (OD-20), because the old penalty on the gains cannot be a cost on the r
 | OD-6 | G3 | Where the teaching name `ModelPredictiveController` lives, and its frozen constructor | A module of its own, `planning/trajectory_optimization/mpc/predictive.py` (teaching lane); the MPC classes, utilities and plots stay research lane by module. The frozen constructor is today's: `(planner, *, dt_mpc, warm_start=True, verbose=False, t0=0.0, debug=False)`. Students import it from `minilink.control`; it is not on the root (GMC714 does not teach MPC, R48) | Put it on the root prelude; or drop `debug=` before freezing | — |
 | OD-7 | SM-1, SM-2 | The plan has discretize 'on the compiled step', but a StepSystem's step must stay an equation path on both backends | The RK4/Euler formula is written once (core/compile/evaluators/stepping.py) and used by the compiled evaluators' step/rollout and by discretize, which applies it to the source's f; compiling the discretized system traces through it. Same numbers, one formula | discretize compiles its source per backend and caches the evaluator (a cache on a System) | — |
 | OD-8 | SM-1, V1.3 | Should rollout return (t, xs, signals) as the plan writes? | rollout returns the states (N+1, n) only; t is t0 + k dt, and the recorded signals come after the scan by evaluating the pure output map on the samples (vmap on JAX), which is identical, traceable and costs nothing to callers that do not need them (RL, DP) | Record the signals inside the scan, changing rollout's return type for every caller | — |
-| OD-9 | SM-1, SM-6 | The evaluator's port map: rename outputs to h as the plan's four bodies say? | Kept as outputs(x, u, t, params=None), which returns the dict of output ports; h is a system's vector output, and a dict named h would mislead | Rename to h | — |
+| OD-9 | SM-1, SM-6 | The evaluator's port map: rename outputs to h as the plan's four bodies say? | Kept as `outputs`, which returns the dict of output ports; h is a system's vector output, and a dict named h would mislead. (Corrected 2026-10-24: at the time `outputs(x, u, t)` still had its `outputs_p` twin; the fold of §9 gave it `params=None`, and the maintainer confirmed the name.) | Rename to h | — |
 | OD-10 | SM-7 | The NumPy evaluator has no jit tier; how does a speed-minded caller write one line for both backends? | On NumPy `ev.jit` is the evaluator itself (nothing to compile), so `ev.jit.rollout(...)` runs on both backends; the fixed-step solvers use it (the JAX one stays as fast as the old jitted rollouts) | Raise on NumPy and branch on the backend in every caller | — |
 | OD-11 | SM-6 | Move the integrators to simulation/solvers/ (S37) as the row says? | No: the step model's formulas (stepping.py) stay in core/compile, since the compiled evaluator, a core object, calls them and core never imports simulation (dependency law); simulation/solvers/ keeps the solver backends, which now call ev.jit.rollout. The relocation the row asks for has nothing left to move | Move stepping.py to simulation/solvers and have core import it (breaks the dependency law) | — |
 | OD-12 | Order (V1) | The path to the cost bundles semantic migrations (V1.2 problem fields, A2 params view, V1.4b Monte Carlo fold) with the new engine; which goes first? | The engine first, additive, in its own module planning/engine.py (ProblemEvaluator, the scoring formula score_run, the new Evaluation record, the evaluate facade, PlanningProblem.compile), so the PID pipeline the run must finish works end to end on a green suite; the semantic migrations then land one at a time against a working engine, and the old MonteCarloEvaluator module is deleted when its callers move (V1.4b). | The plan's order (V1.2, A2, then the engine): every step breaks callers before anything new runs. | — |
@@ -340,3 +340,46 @@ docstring states, in the domain's test file (a skin draws only on frames its pla
 places; a pose is a rotation at `p0` along `p1 − p0`; a user `Distribution` drives a stochastic
 problem). `tests/unittest/test_public_names.py` holds the list empty (6 s; it passes with JAX,
 Meshcat, Plotly and pygame blocked, as the main CI job runs), so a new public name needs a test.
+
+## 9. R12 finished: one body per evaluator method, compiled on JAX
+
+The run had folded only the step model (`step`, `rollout`); R12 asked the same of every
+method. The maintainer's rulings (2026-10-24, in conversation):
+
+- **`outputs` keeps its name** (OD-9 confirmed), folded like the rest.
+- **No `ev.frozen.*`.** `params=None` already reads the compiled parameters as constants:
+  measured, the same call cost as today's frozen jitted `f` (10 µs on the pendulum leaf,
+  12–13 µs on `PID @ Pendulum`).
+- **One compiled name per method, marked `@compiled`** (`core/compile/evaluators/compiled.py`),
+  and no `ev.jit`. A traced body called from Python on JAX is 120–640× slower than its
+  compiled form (1 223 µs and 7 860 µs against 10 and 12 µs), so a backend-agnostic
+  `ev.f(x, u, t)` would have been slow on JAX; a compiled method also composes inside an outer
+  `jit`, `vmap`, `scan` and `jit(grad)` with bit-identical numbers (measured on both systems),
+  so the trace tier and the `jit` namespace had no remaining job.
+
+What changed: `f`, `outputs`, `signals`, the continuous `step` / `rollout` and the discrete
+`step` / `outputs` / `rollout` are each one method taking `params=None` (`None` the compiled
+parameters, block by block on a diagram, as the old frozen tier). Gone: `f_p`, `f_trace`,
+`f_trace_p`, `f_jit`, `f_jit_p`, `f_ivp`, `f_ivp_p`, `f_scipy`, `f_ivp_scipy`,
+`as_scipy_rhs`, `as_scipy_rhs_forced`, `as_scipy_jac`, `outputs_p`, `outputs_trace`,
+`outputs_trace_p`, `outputs_jit`, `outputs_jit_p`, `step_p`, `step_trace`, `step_trace_p`,
+`step_jit`, `step_jit_p`, `rollout_p`, `compute_internal_signals`, `step_block`,
+`has_trace_tier`, `tiers.py` and its generated aliases, and `ev.jit`. Each diagram evaluator
+keeps one signal sweep for both parameter conventions (it was two). The SciPy solver adapts
+`f` itself, its analytic Jacobian compiled once per evaluator as before. Every caller moved in
+the same change (R82): the library, the tests, the benchmarks, the demos
+(`params_gradient`, `neural_controller_jax`, `pid_autotuning_jax`, `mpc_path`), the
+experimental scripts, and the notebooks `07_compile`, `showcase_jax` and `showcase_minilink`
+(their trace-tier paragraphs rewritten to the one rule).
+
+Numbers (R80, R81): a seeded baseline of 164 evaluator entries (the five evaluator kinds on
+both backends: `f`, `outputs`, the step model on both solvers and holds, `jacobian` with
+respect to `x`, `u`, `params` and a wire, the discrete rollouts; the simulator on three solvers
+and both backends, forced runs, `linearize` of a wire, a Lyapunov certificate) is identical in
+157 entries; the 7 others are JAX calls from Python that ran op by op before and run compiled
+now, at most 9e-16 absolute (4e-14 relative). The step-model baseline agrees on all 70 entries
+(one RL entry at 7e-16) and the engine baseline on 18 of 19 (the program's gradient at 9e-16).
+
+One semantic note: a diagram's `params=None` reads each block's compiled parameters; a
+partial dict still reads the live parameters of the blocks it leaves out, as `f_p` did.
+

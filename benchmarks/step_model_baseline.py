@@ -64,32 +64,26 @@ def evaluator_entries(out):
             ev = plant.compile(backend)
             key = f"ev.{name}.{backend}"
             u0 = us[0]
-            out[f"{key}.rk4_step"] = ev.jit.step(x0, u0, 0.1, dt=DT)
-            out[f"{key}.euler_step"] = ev.jit.step(x0, u0, 0.1, dt=DT, solver="euler")
-            out[f"{key}.rk4_step_p"] = ev.jit.step(x0, u0, 0.1, p, dt=DT)
-            out[f"{key}.euler_step_p"] = ev.jit.step(
-                x0, u0, 0.1, p, dt=DT, solver="euler"
-            )
-            out[f"{key}.rk4_integrate_zoh"] = ev.jit.rollout(x0, us, 0.0, DT)
-            out[f"{key}.rk4_integrate_zoh_p"] = ev.jit.rollout(x0, us, 0.0, DT, p)
-            out[f"{key}.euler_integrate_zoh"] = ev.jit.rollout(
+            out[f"{key}.rk4_step"] = ev.step(x0, u0, 0.1, dt=DT)
+            out[f"{key}.euler_step"] = ev.step(x0, u0, 0.1, dt=DT, solver="euler")
+            out[f"{key}.rk4_step_p"] = ev.step(x0, u0, 0.1, p, dt=DT)
+            out[f"{key}.euler_step_p"] = ev.step(x0, u0, 0.1, p, dt=DT, solver="euler")
+            out[f"{key}.rk4_integrate_zoh"] = ev.rollout(x0, us, 0.0, DT)
+            out[f"{key}.rk4_integrate_zoh_p"] = ev.rollout(x0, us, 0.0, DT, p)
+            out[f"{key}.euler_integrate_zoh"] = ev.rollout(
                 x0, us, 0.0, DT, solver="euler"
             )
-            out[f"{key}.rk4_integrate_linear"] = ev.jit.rollout(
+            out[f"{key}.rk4_integrate_linear"] = ev.rollout(
                 x0, knots, 0.0, DT, hold="foh"
             )
-            out[f"{key}.rk4_integrate_linear_p"] = ev.jit.rollout(
+            out[f"{key}.rk4_integrate_linear_p"] = ev.rollout(
                 x0, knots, 0.0, DT, p, hold="foh"
             )
-            out[f"{key}.rk4_integrate_ivp"] = ev.jit.rollout(
-                x0, None, 0.0, DT, n_steps=N
-            )
-            out[f"{key}.euler_integrate_ivp"] = ev.jit.rollout(
+            out[f"{key}.rk4_integrate_ivp"] = ev.rollout(x0, None, 0.0, DT, n_steps=N)
+            out[f"{key}.euler_integrate_ivp"] = ev.rollout(
                 x0, None, 0.0, DT, solver="euler", n_steps=N
             )
-            out[f"{key}.integrate_zoh_inner"] = ev.jit.step(
-                x0, u0, 0.0, dt=DT, substeps=4
-            )
+            out[f"{key}.integrate_zoh_inner"] = ev.step(x0, u0, 0.0, dt=DT, substeps=4)
             if backend == "jax":
                 out[f"{key}.rollout_batch"] = ev.rollout_batch(
                     np.stack([x0, 0.5 * x0]), us, dt=DT

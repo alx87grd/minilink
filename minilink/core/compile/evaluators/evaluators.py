@@ -1,6 +1,8 @@
 """
-Compiled evaluator ABCs — output, dynamics, step, and static contracts.
+Compiled evaluator bases — the output, dynamics, step and static contracts.
 
+Every method is one body taking ``params=None`` (``None`` reads the parameters
+compiled in); on JAX each is compiled once (:func:`~minilink.core.compile.evaluators.compiled.compiled`).
 Concrete backends live in :mod:`numpy_evaluators` and :mod:`jax_evaluators`.
 """
 
@@ -10,27 +12,14 @@ from abc import ABC, abstractmethod
 
 import numpy as np
 
-# =============================================================================
-# Public API — helpers
-# =============================================================================
-
-
-def outputs_from_ports(system, x, u, t, params) -> dict:
-    """Evaluate every output port on ``system``."""
-    return {
-        port_id: port.compute(x, u, t, params)
-        for port_id, port in system.outputs.items()
-    }
-
-
-# =============================================================================
-# Public API — OutputEvaluator
-# =============================================================================
+###############################################################################
+# Public API
+###############################################################################
 
 
 class OutputEvaluator(ABC):
     """
-    Base class for compiled evaluators — output tier only.
+    Base class for compiled evaluators: the boundary outputs.
 
     Boundary signals are returned as a dict keyed by output port id.
     """
@@ -39,41 +28,11 @@ class OutputEvaluator(ABC):
     m: int
     p: int
     backend: str
-    _frozen_params: dict
     _u_nominal: np.ndarray
 
     @abstractmethod
-    def outputs(self, x, u, t=0.0) -> dict:
-        """All boundary output ports, frozen params."""
-        ...
-
-    @abstractmethod
-    def outputs_p(self, x, u, t, params) -> dict:
-        """All boundary output ports; caller-supplied params."""
-        ...
-
-
-# =============================================================================
-# Public API — DynamicsEvaluator
-# =============================================================================
-
-
-class DynamicsEvaluator(OutputEvaluator):
-    """
-    Base class for compiled continuous-time evaluators.
-
-    Subclasses implement ``f``, ``f_p``, ``outputs``, and ``outputs_p``.
-    Integration helpers are mixed in by the NumPy / JAX backend modules.
-    """
-
-    @abstractmethod
-    def f(self, x, u, t=0.0):
-        """dx = f(x, u, t) with frozen params."""
-        ...
-
-    @abstractmethod
-    def f_p(self, x, u, t, params):
-        """dx = f(x, u, t, p) with caller-supplied params."""
+    def outputs(self, x, u, t=0.0, params=None) -> dict:
+        """Every boundary output port at ``(x, u, t)``; ``params=None`` reads the compiled ones."""
         ...
 
     @property
@@ -81,60 +40,36 @@ class DynamicsEvaluator(OutputEvaluator):
         """The input held when none is given: every port at its nominal value."""
         return self._u_nominal
 
-    def f_ivp(self, x, t=0.0):
-        """dx = f(x, u_nom, t) with nominal input fixed at compile."""
-        return self.f(x, self._u_nominal, t)
 
-    def f_ivp_p(self, x, t, params):
-        """dx = f(x, u_nom, t, p) — nominal u, runtime params."""
-        return self.f_p(x, self._u_nominal, t, params)
+class DynamicsEvaluator(OutputEvaluator):
+    """
+    Base class for compiled continuous-time evaluators: ``f``, ``outputs`` and the step model.
 
-    def f_scipy(self, x, u, t=0.0):
-        return np.asarray(self.f(x, u, t))
+    The step model (``step``, ``rollout``) is mixed in by the NumPy / JAX backend modules.
+    """
 
-    def f_ivp_scipy(self, x, t=0.0):
-        return np.asarray(self.f_ivp(x, t))
-
-    def as_scipy_rhs(self):
-        return lambda t, x: self.f_ivp_scipy(x, t)
-
-    def as_scipy_rhs_forced(self, u_of_t):
-        return lambda t, x: self.f_scipy(x, u_of_t(t), t)
-
-    def as_scipy_jac(self):
-        raise NotImplementedError(
-            "Jacobian callable is not available for this evaluator"
-        )
-
-
-# =============================================================================
-# Public API — StepEvaluator
-# =============================================================================
+    @abstractmethod
+    def f(self, x, u, t=0.0, params=None):
+        """``dx = f(x, u, t; p)``; ``params=None`` reads the compiled parameters."""
+        ...
 
 
 class StepEvaluator(OutputEvaluator):
-    """
-    Base class for compiled discrete-time evaluators.
-
-    Subclasses implement ``step``, ``step_p``, ``outputs``, and ``outputs_p``.
-    Rollout helpers live on the NumPy / JAX backend mixins.
-    """
+    """Base class for compiled discrete-time evaluators: the system's own ``step`` and ``outputs``."""
 
     @abstractmethod
-    def step(self, x, u, k=0):
-        """x_{k+1} = step(x, u, k) with frozen params."""
+    def step(self, x, u, k=0, params=None):
+        """``x_{k+1} = step(x, u, k; p)``; ``params=None`` reads the compiled parameters."""
         ...
-
-    @abstractmethod
-    def step_p(self, x, u, k, params):
-        """x_{k+1} = step(x, u, k, p) with caller-supplied params."""
-        ...
-
-
-# =============================================================================
-# Public API — StaticEvaluator
-# =============================================================================
 
 
 class StaticEvaluator(OutputEvaluator):
-    """Compiled evaluator for stateless IO blocks — no evolution map."""
+    """Compiled evaluator for stateless IO blocks: outputs only."""
+
+
+def outputs_from_ports(system, x, u, t, params) -> dict:
+    """Evaluate every output port on ``system``."""
+    return {
+        port_id: port.compute(x, u, t, params)
+        for port_id, port in system.outputs.items()
+    }

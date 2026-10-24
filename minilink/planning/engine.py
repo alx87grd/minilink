@@ -317,7 +317,7 @@ class ProblemEvaluator:
         loop_params = {sys_id: params[sys_id] for sys_id in self.block_ids}
         ts = xp.arange(N + 1) * dt
         if self.adaptive is None:
-            xs = ev.jit.rollout(
+            xs = ev.rollout(
                 x0,
                 u_seq,
                 0.0,

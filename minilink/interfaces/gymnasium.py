@@ -207,7 +207,7 @@ class Sys2Gym(gym.Env):
 
         # One step of the plant's step model, the action held
         x_new = np.asarray(
-            self.evaluator.jit.step(
+            self.evaluator.step(
                 x, u, t, dt=dt, solver=self.solver, substeps=self.substeps
             ),
             dtype=float,
@@ -383,7 +383,7 @@ class ProblemEnv(Sys2Gym):
 
 
 def _compiled_step(sys, compile_backend):
-    """Return ``(backend, evaluator)``; the env steps through ``evaluator.jit.step``.
+    """Return ``(backend, evaluator)``; the env steps through ``evaluator.step``.
 
     ``compile_backend=None`` tries JAX when it is installed and falls back to
     NumPy for plants that do not trace (catalog plants written with NumPy

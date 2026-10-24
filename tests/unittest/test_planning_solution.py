@@ -124,7 +124,7 @@ def held_input_rollout(plant, law, t, x0):
     x[:, 0] = x0
     for k in range(t.size - 1):
         u = law(x[:, k], t[k])
-        x[:, k + 1] = evaluator.jit.step(x[:, k], u, t[k], dt=t[k + 1] - t[k])
+        x[:, k + 1] = evaluator.step(x[:, k], u, t[k], dt=t[k + 1] - t[k])
     return x
 
 

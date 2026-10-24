@@ -346,7 +346,7 @@ class TrajectoryOptimizationPlanner(Planner):
         if params is None:
             self._dynamics = evaluator.f
         else:
-            self._dynamics = lambda x, u, t: evaluator.f_p(x, u, t, params)
+            self._dynamics = lambda x, u, t: evaluator.f(x, u, t, params)
 
         # The optimizer every online tick reuses
         self.optimizer_backend = self.build_parametric_optimizer_backend()

@@ -101,7 +101,7 @@ def V(x):
 
 
 def V_dot(x):
-    return jax.grad(V)(x) @ evaluator.f_trace(x, u_none, 0.0)
+    return jax.grad(V)(x) @ evaluator.f(x, u_none, 0.0)
 
 
 # Sweep the phase plane: the certified region is the largest sublevel set

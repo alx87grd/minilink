@@ -340,7 +340,7 @@ def point_outputs(sys, outputs, x_bar, u_bar, t, params):
 
     # The output ports, and the internal wires only when a selector names one
     evaluator = compiled(sys, "fd")
-    ports = evaluator.outputs_p(x_bar, u_bar, t, params)
+    ports = evaluator.outputs(x_bar, u_bar, t, params)
     wires = (
         evaluator.compute_internal_signals_dict(x_bar, u_bar, t)
         if any(name not in ports for name, _ in outputs)

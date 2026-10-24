@@ -213,7 +213,7 @@ class HybridSimulator:
             n_sub = substeps_of(dt_base, dt_inner)
             h = dt_base / n_sub
             u_held = np.tile(np.asarray(u_plant, dtype=float), (n_sub, 1))
-            x_seg = np.asarray(plant_eval.jit.rollout(x_plant, u_held, t_k, h))
+            x_seg = np.asarray(plant_eval.rollout(x_plant, u_held, t_k, h))
             t_seg = t_k + h * np.arange(n_sub + 1)
             x_plant = x_seg[-1]
             sample_buffers = sample_plant_outputs(

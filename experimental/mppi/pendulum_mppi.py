@@ -106,7 +106,7 @@ for k in range(n_ticks):
     ts.append(k * DT)
     xs.append(np.asarray(x))
     us.append(np.asarray(u))
-    x = ev.jit.step(x, u, k * DT, dt=DT)
+    x = ev.step(x, u, k * DT, dt=DT)
     U = jnp.concatenate([U[1:], U[-1:]])  # shift: (u_1, ..., u_{N-1}, u_{N-1})
 traj = Trajectory(np.array(ts), np.array(xs).T, np.array(us).T)
 

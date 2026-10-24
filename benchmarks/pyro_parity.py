@@ -94,7 +94,7 @@ class EulerKinodynamicExtender(KinodynamicExtender):
         states = [x]
         for _ in range(self.n_substeps):
             x = np.asarray(
-                evaluator.jit.step(x, u, 0.0, dt=self.dt, solver="euler"), dtype=float
+                evaluator.step(x, u, 0.0, dt=self.dt, solver="euler"), dtype=float
             )
             states.append(x)
         return Edge(

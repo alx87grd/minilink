@@ -63,8 +63,10 @@ v0.9 they go to `CHANGELOG.md`, step V5):
   `Washout`, `SimpleIntegrator`; `ZOHHold` is `UnitDelay`, `NeuralNetwork` folded into `MLP`);
   the package moves of R66 (`planning/dynamic_programming/`, `minilink.learning`, MPC under
   trajectory optimization); A6's short names and every block's default id its class name
-  (R52, R53); the step model: the evaluator's integrator grid is `ev.step` / `ev.rollout` /
-  `ev.jit.*` (`solver=`, `substeps=`, `hold=`), `integrator=` is `solver=` everywhere,
+  (R52, R53); the step model: the evaluator's integrator grid is `ev.step` / `ev.rollout`
+  (`solver=`, `substeps=`, `hold=`), `integrator=` is `solver=` everywhere; every evaluator
+  method one body with `params=None`, compiled once on JAX (`f_p`, `*_trace`, `*_jit`, the
+  `_ivp` and SciPy adapters and `ev.jit` gone, R12),
   `discretize(sys, dt, *, solver, substeps)` with `dt` required, and `compute_forced` on
   `rk4_fixedsteps` holds a sampled input (those forced numbers changed once); the problem: a
   plain class whose `params` is a live view of its parts (`ProblemParameters` and `params=`

@@ -82,7 +82,7 @@ class StepRolloutMixin:
     """
     Discrete-time rollouts for compiled :class:`~minilink.core.system.StepSystem` evaluators.
 
-    Subclasses must implement ``step``, ``step_p``, ``outputs``, and ``outputs_p``
+    Subclasses must implement ``step`` and ``outputs`` (each taking ``params=None``)
     and expose ``n``, ``m``, ``p``, and ``_u_nominal``.
     """
 
@@ -133,13 +133,14 @@ class StepRolloutMixin:
 
         return u_samples
 
-    def rollout(self, x0, *, n_steps, u=None) -> StepRollout:
+    def rollout(self, x0, *, n_steps, u=None, params=None) -> StepRollout:
         """
         Roll out ``x_{k+1} = step(x_k, u_k, k)`` for ``n_steps`` transitions.
 
         Returns a state-only :class:`~minilink.core.step_rollout.StepRollout` with
         ``k.shape == (n_steps + 1,)``, ``x.shape == (n, n_steps + 1)``, and
-        ``u.shape == (m, n_steps + 1)``. Signal histories are owned by
+        ``u.shape == (m, n_steps + 1)``; ``params=None`` reads the compiled
+        parameters. Signal histories are owned by
         :class:`~minilink.simulation.computer.Computer` and
         :class:`~minilink.simulation.hybrid_simulator.HybridSimulator`.
         """
@@ -153,23 +154,7 @@ class StepRolloutMixin:
 
         for step_k in range(n_steps):
             u_k = u_samples[:, step_k]
-            x_samples[:, step_k + 1] = self.step(x_samples[:, step_k], u_k, step_k)
-
-        return StepRollout(k=k, x=x_samples, u=u_samples)
-
-    def rollout_p(self, x0, *, n_steps, u=None, params) -> StepRollout:
-        """Parametric twin of :meth:`rollout`."""
-        x0 = np.asarray(x0, dtype=float).reshape(self.n)
-        n_samples = n_steps + 1
-        k = np.arange(n_samples, dtype=float)
-        x_samples = np.zeros((self.n, n_samples), dtype=float)
-        x_samples[:, 0] = x0
-
-        u_samples = self._coerce_rollout_inputs(n_steps, u)
-
-        for step_k in range(n_steps):
-            u_k = u_samples[:, step_k]
-            x_samples[:, step_k + 1] = self.step_p(
+            x_samples[:, step_k + 1] = self.step(
                 x_samples[:, step_k], u_k, step_k, params
             )
 
