@@ -76,8 +76,12 @@ class ProblemEvaluator:
         backend="auto",
         episode_length=None,
     ):
-        require_step_knobs(solver, substeps)
         require_one_of("backend", backend, BACKENDS)
+        self.adaptive = adaptive_options(solver)
+        if self.adaptive is None:
+            require_step_knobs(solver, substeps)
+        else:
+            backend = require_numpy_for_adaptive(backend)
 
         # The task and the loop that runs it
         self.problem = problem
@@ -103,6 +107,10 @@ class ProblemEvaluator:
 
         # The forms generated once: the batched trial, jitted on JAX
         self.trials_fn = None
+
+        # "auto" keeps JAX only when the whole score traces (the cost and the sets too)
+        if backend == "auto" and self.backend == BACKEND_JAX and not self.traces():
+            self.backend, self.evaluator = compile_loop(self.loop, BACKEND_NUMPY)
 
     @property
     def params(self) -> dict:
@@ -305,19 +313,23 @@ class ProblemEvaluator:
         u = self.held_inputs(params, xp)
         u_seq = xp.broadcast_to(u, (N, u.size))
 
-        # x_{k+1} = Φ(x_k, u, t_k), t_k = k dt, k = 0 … N − 1
+        # x_{k+1} = Φ(x_k, u, t_k), t_k = k dt, k = 0 … N − 1; or the adaptive
+        # integral reported on that grid
         loop_params = {sys_id: params[sys_id] for sys_id in self.block_ids}
-        xs = ev.jit.rollout(
-            x0,
-            u_seq,
-            0.0,
-            dt,
-            loop_params,
-            solver=self.solver,
-            substeps=self.substeps,
-            n_steps=N,
-        )
         ts = xp.arange(N + 1) * dt
+        if self.adaptive is None:
+            xs = ev.jit.rollout(
+                x0,
+                u_seq,
+                0.0,
+                dt,
+                loop_params,
+                solver=self.solver,
+                substeps=self.substeps,
+                n_steps=N,
+            )
+        else:
+            xs = integrate_adaptive(ev.rhs_of(loop_params), x0, u, ts, self.adaptive)
         us = xp.broadcast_to(u, (N + 1, u.size))
 
         # Every block output at every sample, and the plant's input among them
@@ -337,6 +349,20 @@ class ProblemEvaluator:
             signals=recorded,
             roles={"plant": {"x": (a, b), "u": PLANT_INPUT}},
         )
+
+    def traces(self) -> bool:
+        """Whether one trial's score traces on JAX (the loop does; the cost, ``X``, ``U`` and ``Xf`` may not)."""
+        jax = ensure_jax_x64()
+        params = self.params
+        x_start = np.asarray(self.problem.x_start, dtype=float)
+
+        # An abstract trace of the run and its score: no compile, no numbers
+        try:
+            jax.eval_shape(lambda p, x0: self.score(p, x0, False)[0], params, x_start)
+        except (TypeError, jax.errors.JAXTypeError, jax.errors.ConcretizationTypeError):
+            return False
+
+        return True
 
     def held_inputs(self, params, xp):
         """The loop's boundary input: each free input's parameter, stacked in port order."""
@@ -548,6 +574,9 @@ def score_run(problem, traj: Trajectory, *, tf=None) -> dict:
     xp = array_module(traj.x)
     rho = discount_rate_of(problem)
     finite_horizon = problem.horizon_kind() == "finite"
+    X, U = problem.X, problem.U
+    set_params = problem.params.sets
+    cost_params = problem.params.cost
 
     t = traj.t
     x = traj.x.T
@@ -562,22 +591,22 @@ def score_run(problem, traj: Trajectory, *, tf=None) -> dict:
 
     # The least margin to X and U along the run, the margin of x(tf) to Xf
     feasibility_margin = xp.minimum(
-        least_margin(lambda xk, uk, tk: problem.X.margin(xk, tk), x, u, t),
-        least_margin(lambda xk, uk, tk: problem.U.margin(uk, xk, tk), x, u, t),
+        least_margin(lambda xk, uk, tk: X.margin(xk, tk, set_params), x, u, t),
+        least_margin(lambda xk, uk, tk: U.margin(uk, xk, tk, set_params), x, u, t),
     )
     failed = ~finite | (feasibility_margin < 0.0)
     if problem.Xf is None:
         reachability_margin = xp.asarray(xp.inf)
     else:
-        reachability_margin = xp.min(problem.Xf.margin(x[-1], tf))
+        reachability_margin = xp.min(problem.Xf.margin(x[-1], tf, set_params))
     reached = reachability_margin >= 0.0
 
     # cost = ∫₀^{tf} e^{−ρt} g dt + e^{−ρ tf} h(x(tf)), the integral by the trapezoid
     safe_run = Trajectory(t=t, x=x.T, u=u.T)
-    _, running = cost_fn.integrate(safe_run, discount_rate=rho)
+    _, running = cost_fn.integrate(safe_run, discount_rate=rho, params=cost_params)
     cost = running[-1]
     if finite_horizon:
-        cost = cost + xp.exp(-rho * tf) * cost_fn.h(x[-1], tf)
+        cost = cost + xp.exp(-rho * tf) * cost_fn.h(x[-1], tf, cost_params)
 
     # J = cost, or cost + price · (failed or not reached); a run not finite costs +inf
     if price is None:
@@ -617,6 +646,58 @@ def evaluate_trajectory(problem, traj: Trajectory) -> Evaluation:
     )
 
 
+def nominal_trajectory(problem, policy, *, dt, tf=None) -> Trajectory:
+    """
+    The planner's evidence: ``policy`` held over each period of ``dt`` from the problem's start.
+
+    ``u_k = π(x_k, t_k)`` held while one step of the plant takes ``x_k`` to
+    ``x_{k+1}``, nominal parameters, on NumPy: the sampled loop a feedback
+    planner designs for (its grid, its model), reported beside its policy;
+    :func:`evaluate` scores the continuous loop. A stochastic problem runs at
+    its mean start; ``tf`` is the run's length for an infinite horizon. ``u`` is
+    the plant's command port.
+    """
+    # Lazy import: the loop roles load with the first rollout
+    from minilink.core.feedback import command_port
+
+    nominal = problem.nominal() if problem.is_stochastic else problem
+    policy = policy_of(policy)
+    plant = nominal.sys
+    n_steps = steps_of(horizon_of(nominal, tf), float(dt))
+
+    # The plant's step, the law on the grid, the command's slice of the plant input
+    ev = plant.compile(backend=BACKEND_NUMPY, verbose=False)
+    t = float(dt) * np.arange(n_steps + 1)
+    law = held_law(policy, t)
+    command = plant.get_input_port_slice(command_port(plant))
+    u_full = np.asarray(plant.get_u_from_input_ports(), dtype=float)
+
+    # u_k = π(x_k, t_k) held over the period, one step to x_{k+1}; the last sample
+    # takes its input only
+    xs = np.zeros((plant.n, n_steps + 1))
+    us = np.zeros((command.stop - command.start, n_steps + 1))
+    xs[:, 0] = nominal.x_start
+    for k in range(n_steps + 1):
+        us[:, k] = law(xs[:, k], t[k])
+        if k == n_steps:
+            break
+        u_full[command] = us[:, k]
+        xs[:, k + 1] = ev.step(xs[:, k], u_full, t[k], dt=float(dt))
+
+    return Trajectory(t=t, x=xs, u=us)
+
+
+def policy_of(controller):
+    """The block itself, or the policy of a :class:`~minilink.planning.results.PlanningSolution`."""
+    # A real cycle: results imports Evaluation from this module
+    from minilink.planning.results import PlanningSolution
+
+    if isinstance(controller, PlanningSolution):
+        return controller.policy
+
+    return controller
+
+
 def closed_loop_of(problem, controller):
     """The loop a :class:`ProblemEvaluator` runs: ``controller`` closed on the problem's plant.
 
@@ -628,11 +709,9 @@ def closed_loop_of(problem, controller):
     from minilink.core.composition import closed_loop
     from minilink.core.diagram import DiagramSystem
     from minilink.core.system import StepSystem
-    from minilink.planning.results import PlanningSolution
 
     plant = problem.sys
-    if isinstance(controller, PlanningSolution):
-        controller = controller.policy
+    controller = policy_of(controller)
 
     require_continuous(controller)
     if isinstance(controller, DiagramSystem) and "plant" in controller.subsystems:
@@ -681,6 +760,121 @@ class Batched:
 
     tree: dict
     axes: dict
+
+
+def adaptive_options(solver):
+    """The SciPy method and tolerances of an adaptive solver label (``"scipy"`` …), or ``None`` for a step."""
+    # Lazy import: the simulator's labels load with the first adaptive run
+    from minilink.simulation.simulator import _USER_SOLVER_MODES
+
+    if solver not in _USER_SOLVER_MODES or _USER_SOLVER_MODES[solver][0] != "scipy":
+        return None
+
+    options = dict(_USER_SOLVER_MODES[solver][1])
+    options.pop("use_jac", None)
+
+    return options
+
+
+def require_numpy_for_adaptive(backend):
+    """An adaptive run integrates on NumPy (SciPy): ``"auto"`` resolves to it, JAX is refused."""
+    if backend == BACKEND_JAX:
+        raise ValueError(
+            "an adaptive solver integrates with SciPy on NumPy: pass backend='numpy' "
+            "(or 'auto'), or a step solver ('rk4', 'euler') for a traceable run"
+        )
+
+    return BACKEND_NUMPY
+
+
+def integrate_adaptive(f, x0, u, ts, options):
+    """``x(t_k)`` on the grid ``ts`` by SciPy's adaptive integrator, the input ``u`` held: ``(N + 1, n)``."""
+    # Lazy import: SciPy's integrators load with the first adaptive run
+    from scipy.integrate import solve_ivp
+
+    # ẋ = f(x, u, t) from x(0) = x₀, reported at the samples
+    solution = solve_ivp(
+        lambda t, x: f(x, u, t),
+        (float(ts[0]), float(ts[-1])),
+        np.asarray(x0, dtype=float),
+        t_eval=np.asarray(ts, dtype=float),
+        **options,
+    )
+
+    return solution.y.T
+
+
+def held_law(policy, t):
+    """``u = π(x, t)`` of a policy block on NumPy: a source by its table on the grid ``t``, a feedback block by its state law."""
+    if int(policy.m) == 0:
+        return time_law(policy, t)
+
+    return static_law(policy)
+
+
+def time_law(source, t):
+    """``u = π(t)`` of a source block, sampled on the grid ``t`` and held over each period."""
+    empty = np.zeros(0)
+
+    # u_k = π(t_k): the source's output at each sample of the grid
+    table = np.stack([np.asarray(source.h(empty, empty, float(t_k))) for t_k in t])
+    dt = float(t[1] - t[0])
+
+    # u(t) = u_k at the nearest sample, k = round(t / dt)
+    return lambda x, t: table[int(round(t / dt))]
+
+
+def static_law(controller):
+    """
+    ``u = π(x, t)`` of a static feedback block on NumPy: the state on its measurement port.
+
+    Every other input of the block holds its nominal value (an unconnected
+    reference its set point); the time reaches the block, so a time-varying
+    gain ``K(t)`` is read at each instant.
+    """
+    # Lazy import: the loop roles load with the first law
+    from minilink.core.feedback import block_roles
+
+    roles = block_roles(controller)
+    require_feedback_roles(controller, roles)
+    require_static_law(controller)
+    ev = controller.compile(backend=BACKEND_NUMPY, verbose=False)
+
+    # The measurement's slice of the block's stacked input vector
+    start = 0
+    for port_id, port in controller.inputs.items():
+        if port_id == roles.measurement:
+            measurement = slice(start, start + port.dim)
+        start += port.dim
+    u_nominal = np.asarray(controller.get_u_from_input_ports(), dtype=float)
+    x_ctl = np.zeros(0)
+
+    # u = π(x, t): the state on the measurement port, every other input at nominal
+    def law(x, t=0.0):
+        u_in = u_nominal.copy()
+        u_in[measurement] = x
+        return np.asarray(ev.outputs(x_ctl, u_in, float(t))[roles.command])
+
+    return law
+
+
+def require_feedback_roles(controller, roles):
+    """Refuse a block that reads no state or commands no ``u``."""
+    if roles.measurement is None or roles.command is None:
+        raise ValueError(
+            "the policy must read the state on an input named 'x' (or 'y') "
+            f"and command 'u'; {controller.name!r} reads {list(controller.inputs)} "
+            f"and gives {list(controller.outputs)}"
+        )
+
+
+def require_static_law(controller):
+    """Refuse a policy with internal state for the held rollout: a sample holds none."""
+    if int(controller.n) > 0:
+        raise ValueError(
+            "the planner's rollout holds a static law u = pi(x, t); a controller "
+            "with internal state is scored by evaluate(problem, controller, dt=)"
+        )
 
 
 def compile_loop(loop, backend):

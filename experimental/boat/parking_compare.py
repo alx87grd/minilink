@@ -21,7 +21,7 @@ from minilink import (
     Trajectory,
     TrajectoryOptimizationPlanner,
 )
-from minilink.planning.evaluation import score_trajectory
+from minilink.planning import evaluate_trajectory
 from minilink.planning.trajectory_optimization.mpc import ModelPredictiveController
 
 TF = 60.0  # [s]
@@ -75,7 +75,7 @@ for water, current in WATERS.items():
     for name in ("Cascade", "MPC", "PPO"):
         runs[name, water] = (
             runs[name, water],
-            score_trajectory(problem, runs[name, water])[0],
+            float(evaluate_trajectory(problem, runs[name, water]).J[0]),
         )
 
 # --- the comparison: paths over the water, distance and heading to the dock, thrust ---

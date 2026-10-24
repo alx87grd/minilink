@@ -74,9 +74,7 @@ print(solution.solver)
 vi_ctl = planner.get_controller()
 vi_ctl.plot_control_law(x_axis=1, y_axis=3, u_axis=0)  # force vs (theta, dtheta)
 
-# report = MonteCarloEvaluator(
-#     problem, dt=DT, n_trials=100, seed=1, backend="numpy"
-# ).evaluate(vi_ctl)
+# report = evaluate(problem, vi_ctl, dt=DT, backend="numpy")
 # print(report)
 
 plant.x0 = np.array([0.0, 0.05, 0.0, 0.0])  # hanging, a tiny tip

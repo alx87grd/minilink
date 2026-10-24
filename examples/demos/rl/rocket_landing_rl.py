@@ -5,10 +5,10 @@ import numpy as np
 from minilink import (
     CostFunction,
     Gaussian,
-    MonteCarloEvaluator,
     ReinforcementLearningPlanner,
     Rocket,
     StochasticPlanningProblem,
+    evaluate,
 )
 
 TRAINING_TIMESTEPS = 4_000_000  # about 80 s on a laptop CPU
@@ -82,7 +82,7 @@ planner.plot_learning_curve()
 ppo_ctl = planner.get_controller()
 ppo_ctl.plot_control_law(x_axis=1, y_axis=4, u_axis=0)  # thrust vs (altitude, vy)
 
-report = MonteCarloEvaluator(problem, dt=DT, n_trials=100, seed=1).evaluate(ppo_ctl)
+report = evaluate(problem, ppo_ctl, dt=DT, n_trials=100, key=1)
 print(report)
 
 plant.x0 = np.array([10.0, 30.0, 0.0, 0.0, 0.0, 0.0])

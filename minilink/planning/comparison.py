@@ -2,14 +2,14 @@
 
 from __future__ import annotations
 
-from copy import copy
-from dataclasses import dataclass, replace
+from dataclasses import dataclass
 
 import numpy as np
 
 from minilink.core.sets import is_finite_box
-from minilink.planning.evaluation import Evaluation, MonteCarloEvaluator
+from minilink.planning.engine import Evaluation, ProblemEvaluator
 from minilink.planning.plotting import maybe_show
+from minilink.planning.problems import PlanningProblem
 from minilink.planning.results import PlanningSolution
 
 # Matplotlib is imported inside each view, so the planning layer stays importable
@@ -21,36 +21,76 @@ from minilink.planning.results import PlanningSolution
 ###############################################################################
 
 
-def compare(*args, **solutions) -> Comparison:
+def compare(
+    *args,
+    dt=None,
+    n_trials=None,
+    key=0,
+    solver="rk4",
+    substeps=1,
+    backend="auto",
+    episode_length=None,
+    **entries,
+) -> Comparison:
     """
-    Name solutions of one problem for a side-by-side reading.
+    Name the solutions of one problem side by side, and score them with one evaluation.
 
-    ``compare(VI=vi, LQR=lqr)`` or ``compare({"VI": vi, "LQR": lqr})``.
+    ``compare(VI=vi, LQR=lqr)`` (or ``compare({"VI": vi, "LQR": lqr})``) names
+    solutions for the table and the overlays. With the problem first,
+    ``compare(problem, PID=pid, VI=vi, dt=0.01)`` also scores every entry by
+    :func:`~minilink.planning.engine.evaluate` on the same draws (one ``key``,
+    one backend for all, so the trials are paired): an entry is a
+    :class:`~minilink.planning.results.PlanningSolution`, a controller block, or
+    an :class:`~minilink.planning.engine.Evaluation` already computed.
     """
-    require_named(args)
+    problem, named = split_entries(args, entries)
 
-    # The dict passed positionally, then the keyword solutions over it
-    named = dict(args[0]) if args else {}
-    named.update(solutions)
-    require_solutions(named)
+    # Names only: the solutions, read as they are
+    if problem is None:
+        require_no_scoring(dt, n_trials)
+        require_solutions(named)
+        return Comparison(named)
 
-    return Comparison(named)
+    # Every entry scored on the same draws, its solution kept for the overlays
+    require_dt(dt)
+    evaluations = score_entries(
+        problem,
+        named,
+        dict(
+            dt=dt,
+            solver=solver,
+            substeps=substeps,
+            backend=backend,
+            episode_length=episode_length,
+        ),
+        n_trials,
+        key,
+    )
+    solutions = {
+        name: solution_of(problem, entry)
+        for name, entry in named.items()
+        if not isinstance(entry, Evaluation)
+    }
+
+    return Comparison(solutions, evaluations)
 
 
 @dataclass(frozen=True)
 class Comparison:
     """
-    Named solutions of one problem and the overlays that read them together.
+    Named solutions of one problem, their scores, and the overlays that read them together.
 
     ``solutions`` maps a name to a :class:`~minilink.planning.results.PlanningSolution`
-    (``compare(VI=vi, LQR=lqr, PPO=ppo)`` builds one). ``print`` is the table of
-    their records, and each ``plot_*`` draws every solution on one figure with
-    one scale. The verbs read what the planners produced and nothing else:
-    closing a loop and simulating it stays in the script, ``solution.policy @
-    plant``. The first solution's system labels the axes.
+    (a controller entry is wrapped as one); ``evaluations`` maps every scored
+    name to its :class:`~minilink.planning.engine.Evaluation` (``None`` when
+    :func:`compare` was given no problem). ``print`` is the table, each
+    ``plot_*`` draws every solution on one figure with one scale, and
+    :meth:`difference` reads the paired trials. The first solution's system
+    labels the axes.
     """
 
     solutions: dict
+    evaluations: dict | None = None
 
     # The named solutions, read as a mapping
 
@@ -68,29 +108,11 @@ class Comparison:
 
     # Scores and overlays
 
-    def evaluate(self, evaluator) -> Comparison:
-        """
-        Score every policy with one evaluator, the same draws for all.
+    def difference(self, a, b):
+        """The paired differences ``J_a − J_b``, one per trial (the same draws for both)."""
+        require_scores(self.evaluations, (a, b))
 
-        Returns a new comparison whose solutions carry that ``evaluation``,
-        so ``print(race.evaluate(evaluator))`` is the table with one yardstick.
-        A Monte Carlo evaluator's ``backend="auto"`` is chosen once for the
-        whole comparison: NumPy for every policy when one of them does not
-        trace on JAX, JAX otherwise.
-        """
-        # One backend for every policy, resolved on a copy of the evaluator
-        if isinstance(evaluator, MonteCarloEvaluator) and evaluator.backend == "auto":
-            policies = [solution.policy for solution in self.solutions.values()]
-            evaluator = copy(evaluator)
-            evaluator.backend = evaluator.auto_backend(*policies)
-
-        # Each solution with its evaluation under the one evaluator
-        scored = {
-            name: replace(solution, evaluation=evaluator.evaluate(solution))
-            for name, solution in self.items()
-        }
-
-        return Comparison(scored)
+        return np.asarray(self.evaluations[a].J) - np.asarray(self.evaluations[b].J)
 
     def plot_control_law(self, *, show=True, **kwargs):
         """One panel per feedback law, side by side, one colour scale from the problem's inputs."""
@@ -178,16 +200,21 @@ class Comparison:
     # Display
 
     def __str__(self) -> str:
-        # One row per solution: its name, success, solver record and evaluation
-        rows = [
-            (
-                name,
-                "yes" if solution.success else "no",
-                str(solution.solver),
-                "-" if solution.evaluation is None else str(solution.evaluation),
+        # One row per entry: its name, success, solver record and evaluation
+        scores = self.evaluations or {}
+        names = list(dict.fromkeys([*self.solutions, *scores]))
+        rows = []
+        for name in names:
+            solution = self.solutions.get(name)
+            evaluation = scores.get(name, getattr(solution, "evaluation", None))
+            rows.append(
+                (
+                    name,
+                    "-" if solution is None else ("yes" if solution.success else "no"),
+                    "-" if solution is None else str(solution.solver),
+                    "-" if evaluation is None else str(evaluation),
+                )
             )
-            for name, solution in self.items()
-        ]
         header = ("", "success", "solver", "evaluation")
 
         # Each column as wide as its widest cell
@@ -351,10 +378,96 @@ def control_law_kwargs(solution, kwargs) -> dict:
 ###############################################################################
 
 
-def require_named(args):
-    """Refuse positional solutions other than one dict of named ones."""
+@dataclass(frozen=True)
+class GivenPolicy:
+    """The record of a controller compared as given: no planner solved it."""
+
+    success: bool = True
+
+    def __str__(self) -> str:
+        return "given"
+
+
+def split_entries(args, entries):
+    """``(problem or None, named entries)`` from ``compare``'s positional and keyword arguments."""
+    args = list(args)
+    problem = args.pop(0) if args and isinstance(args[0], PlanningProblem) else None
     if len(args) > 1 or (args and not isinstance(args[0], dict)):
-        raise TypeError("compare takes named solutions: compare(VI=vi, LQR=lqr)")
+        raise TypeError(
+            "compare takes named entries, after the problem when they are scored: "
+            "compare(VI=vi, LQR=lqr), compare(problem, PID=pid, VI=vi, dt=0.01)"
+        )
+
+    # The dict passed positionally, then the keyword entries over it
+    named = dict(args[0]) if args else {}
+    named.update(entries)
+    if not named:
+        raise ValueError("compare needs at least one entry")
+
+    return problem, named
+
+
+def score_entries(problem, named, settings, n_trials, key):
+    """Every entry's :class:`Evaluation` on one key and one backend (NumPy for all when one entry does not trace)."""
+    scored = {n: e for n, e in named.items() if not isinstance(e, Evaluation)}
+
+    # The loops compiled, then on NumPy for all when one of them is
+    evaluators = {
+        n: ProblemEvaluator(problem, e, **settings) for n, e in scored.items()
+    }
+    if settings["backend"] == "auto":
+        backends = {pe.backend for pe in evaluators.values()}
+        if len(backends) > 1:
+            numpy = {**settings, "backend": "numpy"}
+            evaluators = {
+                n: ProblemEvaluator(problem, e, **numpy) for n, e in scored.items()
+            }
+
+    evaluations = {}
+    for name, entry in named.items():
+        if isinstance(entry, Evaluation):
+            evaluations[name] = entry
+        else:
+            evaluations[name] = evaluators[name].evaluate(key=key, n_trials=n_trials)
+
+    return evaluations
+
+
+def solution_of(problem, entry):
+    """A solution as given, or a controller wrapped as a solution of ``problem``."""
+    if isinstance(entry, PlanningSolution):
+        return entry
+
+    return PlanningSolution(
+        problem=problem,
+        policy=entry,
+        solver=GivenPolicy(),
+        trajectory=None,
+        evaluation=None,
+    )
+
+
+def require_no_scoring(dt, n_trials):
+    """Refuse scoring settings without a problem to score on."""
+    if dt is not None or n_trials is not None:
+        raise TypeError(
+            "compare scores its entries only on a problem: compare(problem, ..., dt=)"
+        )
+
+
+def require_dt(dt):
+    """Refuse a scored comparison without the sample period."""
+    if dt is None:
+        raise TypeError("compare(problem, ...) needs dt, the period of the runs")
+
+
+def require_scores(evaluations, names):
+    """Refuse a difference of entries that were not scored."""
+    missing = [name for name in names if not evaluations or name not in evaluations]
+    if missing:
+        raise ValueError(
+            f"{missing} carry no evaluation: compare(problem, ..., dt=) scores them"
+        )
 
 
 def require_solutions(named):
@@ -421,5 +534,4 @@ __all__ = [
     "Comparison",
     "plot_cost_to_go",
     "sample_cost_to_go",
-    "Evaluation",
 ]

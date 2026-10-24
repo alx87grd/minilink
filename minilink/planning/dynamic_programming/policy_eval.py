@@ -11,7 +11,7 @@ from minilink.planning.dynamic_programming.dp import (
     infeasible_penalty,
 )
 from minilink.planning.dynamic_programming.plotting import cost_scale_limit
-from minilink.planning.evaluation import policy_of
+from minilink.planning.engine import policy_of
 from minilink.planning.problems import PlanningProblem
 
 ###############################################################################

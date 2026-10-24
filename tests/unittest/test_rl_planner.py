@@ -22,10 +22,7 @@ from minilink.learning.reinforcement_learning import (  # noqa: E402
     ReinforcementLearningPlanner,
     RolloutEnvironment,
 )
-from minilink.planning.evaluation import (  # noqa: E402
-    MonteCarloEvaluator,
-    score_trajectory,
-)
+from minilink.planning import evaluate, evaluate_trajectory  # noqa: E402
 
 pytestmark = [pytest.mark.optional, pytest.mark.jax]
 
@@ -155,8 +152,8 @@ def test_planner_learns_returns_a_policy_plan_and_a_controller():
     np.testing.assert_allclose(ctl.params["mlp"]["W0"], np.asarray(actor["W0"]))
     rollout = planner.solve_trajectory_from(np.zeros(2), tf=0.5, evaluate=True)
     assert isinstance(rollout, PlanningSolution) and rollout.trajectory.n_samples == 6
-    J, _ = score_trajectory(prob, rollout.trajectory)
-    np.testing.assert_allclose(rollout.evaluation.mean, J)
+    J = evaluate_trajectory(prob, rollout.trajectory).J
+    np.testing.assert_allclose(rollout.evaluation.J, J)
     assert planner.last_solution is solution  # an online rollout is not stored
     u, _ = planner.predict(np.zeros((3, 2)))
     assert u.shape == (3, 1)
@@ -300,7 +297,7 @@ def test_solve_with_evaluate_carries_the_rollout_and_the_full_evaluation():
     )
     solution = planner.solve(timesteps=64, evaluate=True, n_trials=4)
     assert solution.evaluation.J.shape == (4,)
-    assert 0.0 <= solution.evaluation.failure_rate <= 1.0
+    assert 0.0 <= solution.evaluation.feasibility_rate <= 1.0
     np.testing.assert_array_equal(solution.trajectory.x, planner.nominal_trajectory().x)
     assert np.isfinite(solution.solver.cost) and "plant steps" in str(solution.solver)
     assert solution.solver.history[-1]["cost"] == -planner.history[-1]["ep_return_mean"]
@@ -322,37 +319,31 @@ def test_plain_planning_problem_trains_from_its_single_start():
     assert planner.num_timesteps == 32
 
 
-# --- Monte Carlo evaluation ---
+# --- the evaluation of a learned law ---
 
 
-def test_monte_carlo_backends_agree_on_a_fixed_law():
+def test_the_backends_score_a_fixed_law_on_their_own_draws():
     prob = problem(tf=np.inf)
     plant = prob.sys
 
     ctl = NeuralPolicyController(plant, hidden=(8,), seed=3)  # any fixed static law
-    report_jax = MonteCarloEvaluator(
-        prob, dt=0.05, n_trials=6, episode_length=1.0, backend="jax", seed=0
-    ).evaluate(ctl)
-    report_np = MonteCarloEvaluator(
-        prob, dt=0.05, n_trials=6, episode_length=1.0, backend="numpy", seed=0
-    ).evaluate(ctl)
+    settings = dict(dt=0.05, n_trials=6, episode_length=1.0, key=0)
+    report_jax = evaluate(prob, ctl, backend="jax", **settings)
+    report_np = evaluate(prob, ctl, backend="numpy", **settings)
     assert report_jax.J.shape == (6,) and report_np.J.shape == (6,)
-    assert report_jax.failure_rate == 0.0 and report_np.failure_rate == 0.0
+    assert report_jax.feasibility_rate == 1.0 and report_np.feasibility_rate == 1.0
     # different draws (JAX vs NumPy streams), same order of magnitude
-    assert (
-        abs(report_jax.mean - report_np.mean)
-        < 0.5 * max(report_jax.mean, report_np.mean) + 0.1
-    )
-    assert "trials" in str(report_jax)
+    mean_jax, mean_np = float(report_jax.mean), float(report_np.mean)
+    assert abs(mean_jax - mean_np) < 0.5 * max(mean_jax, mean_np) + 0.1
+    assert "runs" in str(report_jax)
 
 
-def test_monte_carlo_refuses_a_trial_shorter_than_half_a_period():
-    prob = problem(tf=0.04)
+def test_the_evaluation_refuses_a_period_that_does_not_divide_the_horizon():
+    prob = problem(tf=0.25)
     ctl = NeuralPolicyController(prob.sys, hidden=(8,), seed=3)
     for backend in ("numpy", "jax"):
-        evaluator = MonteCarloEvaluator(prob, dt=0.1, n_trials=2, backend=backend)
-        with pytest.raises(ValueError, match="shorter than half the control period"):
-            evaluator.evaluate(ctl)
+        with pytest.raises(ValueError, match="divide"):
+            evaluate(prob, ctl, dt=0.1, n_trials=2, backend=backend)
 
 
 # --- the off-policy family through the same planner ---
@@ -500,7 +491,7 @@ def test_solve_reports_the_monte_carlo_score_and_rejects_other_criteria():
     )
     solution = planner.solve(timesteps=64, evaluate=True, n_trials=4)
     assert np.isfinite(solution.evaluation.mean) and solution.success
-    assert 0.0 <= solution.evaluation.failure_rate <= 1.0
+    assert 0.0 <= solution.evaluation.feasibility_rate <= 1.0
     assert "truncates" in planner.env.describe()
 
     worst = StochasticPlanningProblem(
@@ -543,7 +534,6 @@ def test_planner_trains_with_randomized_parameters():
 def test_outer_loop_on_an_inner_loop_with_nested_params():
     from minilink.control import StateFeedback
     from minilink.core.distributions import Particles
-    from minilink.planning.evaluation import MonteCarloEvaluator
     from minilink.planning.problems import lookup_param, merge_params
 
     plant = bounded_pendulum()
@@ -579,9 +569,7 @@ def test_outer_loop_on_an_inner_loop_with_nested_params():
     ctl = planner.get_controller()
     u = ctl.action(np.zeros(2))
     assert u.shape == (2,) and -1.0 <= u[0] <= 1.0 and -2.0 <= u[1] <= 2.0
-    report = MonteCarloEvaluator(prob, dt=0.1, n_trials=3, episode_length=0.5).evaluate(
-        ctl
-    )
+    report = evaluate(prob, ctl, dt=0.1, n_trials=3, episode_length=0.5)
     assert np.all(np.isfinite(report.J))
 
 

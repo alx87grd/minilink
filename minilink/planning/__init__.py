@@ -73,9 +73,11 @@ _EXPORTS: dict[str, tuple[str, str]] = {
         "minilink.planning.dynamic_programming.approximation",
         "LinearApproximator",
     ),
-    # Monte Carlo evaluation
-    "MonteCarloEvaluator": ("minilink.planning.evaluation", "MonteCarloEvaluator"),
-    "Evaluation": ("minilink.planning.evaluation", "Evaluation"),
+    # Evaluation: a controller on a problem, one run or the problem's draws
+    "evaluate": ("minilink.planning.engine", "evaluate"),
+    "evaluate_trajectory": ("minilink.planning.engine", "evaluate_trajectory"),
+    "Evaluation": ("minilink.planning.engine", "Evaluation"),
+    "ProblemEvaluator": ("minilink.planning.engine", "ProblemEvaluator"),
     # Spatial scene: tracks, collision geometry, cost shaping
     "ReferenceTrack": ("minilink.planning.spatial.track", "ReferenceTrack"),
     "circuit_waypoints": (

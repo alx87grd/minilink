@@ -10,12 +10,12 @@ from minilink.core.trajectory import Trajectory
 from minilink.dynamics.catalog.equations import DoubleIntegrator
 from minilink.learning.reinforcement_learning import TabularLearningPlanner
 from minilink.planning import (
-    MonteCarloEvaluator,
     PlanningSolution,
     StochasticPlanningProblem,
     Uniform,
+    evaluate,
 )
-from minilink.planning.evaluation import control_law, nominal_trajectory
+from minilink.planning.engine import held_law, nominal_trajectory
 from minilink.planning.search.extenders import KinodynamicExtender
 from minilink.planning.search.rrt import RRTOptions, RRTPlanner
 from minilink.planning.trajectory_optimization.direct_collocation import (
@@ -190,7 +190,7 @@ def test_rrt_policy_holds_each_control_and_reproduces_the_path():
     assert solution.open_loop and solution.policy.interpolation == "previous"
     assert solution.evaluation is None  # the problem declares no cost
     planned = solution.trajectory
-    law = control_law(solution.policy, planned.t, "numpy")
+    law = held_law(solution.policy, planned.t)
     x_hand = held_input_rollout(problem.sys, law, planned.t, planned.x[:, 0])
     np.testing.assert_allclose(x_hand, planned.x, atol=1e-8)
 
@@ -243,17 +243,17 @@ def test_grid_policies_roll_out_as_held_input_closed_loops(make):
     assert str(solution.evaluation).startswith("J = ")
 
 
-def test_one_evaluator_scores_an_open_loop_and_a_feedback_law_on_the_same_draws():
+def test_one_evaluation_scores_an_open_loop_and_a_feedback_law_on_the_same_draws():
     problem = pendulum_problem(stochastic=True)
     with pytest.warns(UserWarning):
         open_loop = trajopt(problem, shooting).solve()
     feedback = DynamicProgrammingPlanner(
         problem.nominal(), x_grid=(21, 21), u_grid=(3,), dt=0.1, alpha=0.95, tol=0.1
     ).solve()
-    evaluator = MonteCarloEvaluator(
-        problem, dt=0.1, n_trials=4, backend="numpy", seed=3
-    )
-    scored = [evaluator.evaluate(s.policy) for s in (open_loop, feedback)]
+    scored = [
+        evaluate(problem, s, dt=0.1, n_trials=4, backend="numpy", key=3)
+        for s in (open_loop, feedback)
+    ]
     np.testing.assert_array_equal(scored[0].x0, scored[1].x0)
     assert all(np.all(np.isfinite(report.J)) for report in scored)
 
@@ -398,14 +398,20 @@ def test_compare_reads_the_solutions_side_by_side():
     fig, axes = race.plot_trajectory(show=False)
     assert len(axes) == 3 and len(axes[0].get_lines()) == 2
 
-    # one evaluator scores every policy on the same draws; a solution stands for its policy
-    evaluator = MonteCarloEvaluator(problem, dt=0.1, n_trials=1, backend="numpy")
-    scored = race.evaluate(evaluator)
-    assert list(scored) == ["VI", "LQR"] and scored["LQR"].policy is lqr.policy
-    assert scored["LQR"].evaluation.mean == evaluator.evaluate(lqr.policy).mean
-    assert (
-        "J = " in str(scored) and race["LQR"].evaluation is not scored["LQR"].evaluation
+    # one evaluation scores every policy on the same draws; a solution stands for its policy
+    scored = compare(problem, VI=vi, LQR=lqr, dt=0.1, backend="numpy")
+    assert list(scored) == ["VI", "LQR"] and scored["LQR"] is lqr
+    J_lqr = evaluate(problem, lqr.policy, dt=0.1, backend="numpy").J
+    np.testing.assert_array_equal(scored.evaluations["LQR"].J, J_lqr)
+    assert "J = " in str(scored)
+    np.testing.assert_array_equal(
+        scored.difference("VI", "LQR"),
+        scored.evaluations["VI"].J - scored.evaluations["LQR"].J,
     )
+
+    # a bare controller and an evaluation already computed take part too
+    mixed = compare(problem, LQR=lqr.policy, VI=scored.evaluations["VI"], dt=0.1)
+    assert list(mixed) == ["LQR"] and "given" in str(mixed)
     grid_eval = PolicyEvaluator(
         problem, grid=DynamicProgrammingPlanner(
             problem, x_grid=(11, 11), u_grid=(3,), dt=0.2
@@ -436,19 +442,16 @@ def test_compare_scores_every_policy_on_one_backend_and_the_same_draws():
         U=problem.sys.input_box,
     )
     settings = dict(dt=0.1, n_trials=3, episode_length=1.0)
-    evaluator = MonteCarloEvaluator(spread, **settings)
 
     # the lookup table runs on NumPy only, so the LQR law is scored there too
-    with pytest.warns(UserWarning, match="does not trace on JAX"):
-        scored = compare(VI=vi, LQR=lqr).evaluate(evaluator)
+    scored = compare(spread, VI=vi, LQR=lqr, **settings)
     np.testing.assert_array_equal(
-        scored["VI"].evaluation.x0, scored["LQR"].evaluation.x0
+        scored.evaluations["VI"].x0, scored.evaluations["LQR"].x0
     )
-    on_numpy = MonteCarloEvaluator(spread, backend="numpy", **settings)
-    np.testing.assert_array_equal(scored["LQR"].evaluation.J, on_numpy.evaluate(lqr).J)
-    assert evaluator.backend == "auto"  # the caller's evaluator keeps its choice
+    on_numpy = evaluate(spread, lqr, backend="numpy", **settings)
+    np.testing.assert_array_equal(scored.evaluations["LQR"].J, on_numpy.J)
 
     # laws that all trace keep the JAX backend and its numbers
-    scored = compare(LQR=lqr).evaluate(evaluator)
-    on_jax = MonteCarloEvaluator(spread, backend="jax", **settings)
-    np.testing.assert_array_equal(scored["LQR"].evaluation.J, on_jax.evaluate(lqr).J)
+    scored = compare(spread, LQR=lqr, **settings)
+    on_jax = evaluate(spread, lqr, backend="jax", **settings)
+    np.testing.assert_array_equal(scored.evaluations["LQR"].J, on_jax.J)

@@ -31,7 +31,7 @@ from minilink.learning.reinforcement_learning.policy import (
     SquashedGaussianHead,
     StochasticPolicy,
 )
-from minilink.planning.evaluation import Evaluation
+from minilink.planning.engine import evaluate_trajectory
 from minilink.planning.planner import Planner
 from minilink.planning.results import PlanningSolution
 
@@ -348,9 +348,7 @@ class ReinforcementLearningPlanner(Planner):
         trajectory = self.rollout_law(x0, tf, key)
 
         # Its score under the problem's contract, when asked
-        evaluation = (
-            Evaluation.of_trajectory(self.problem, trajectory) if evaluate else None
-        )
+        evaluation = evaluate_trajectory(self.problem, trajectory) if evaluate else None
 
         return self.learned_solution(trajectory, evaluation)
 
@@ -387,7 +385,7 @@ class ReinforcementLearningPlanner(Planner):
         if criterion != "expectation":
             raise NotImplementedError(
                 "reinforcement learning optimizes the expectation; "
-                f"criterion={criterion!r} is only reported by MonteCarloEvaluator"
+                f"criterion={criterion!r} is only reported by evaluate"
             )
 
     def build_algorithm(self, algorithm, algorithm_kwargs):

@@ -8,7 +8,7 @@ from minilink.core.costs import CostFunction
 from minilink.core.feedback import command_port
 from minilink.core.sets import Set
 from minilink.core.trajectory import Trajectory
-from minilink.planning.evaluation import Evaluation, MonteCarloEvaluator
+from minilink.planning.engine import Evaluation, evaluate
 from minilink.planning.problems import PlanningProblem
 from minilink.planning.results import PlanningSolution
 
@@ -172,27 +172,27 @@ class Planner(ABC):
         self, policy, *, dt, n_trials=50, tf=None, backend="numpy"
     ) -> Evaluation | None:
         """
-        The standalone evaluator on this planner's problem.
+        The :func:`~minilink.planning.engine.evaluate` of ``policy`` on this planner's problem.
 
-        One trial when nothing is random; ``None`` when the problem declares no
-        cost (a search without one).
+        One run when nothing is random, ``n_trials`` draws from key 0 otherwise;
+        ``None`` when the problem declares no cost (a search without one).
         """
         # A problem without a cost has nothing to score
         if self.problem.cost is None:
             return None
 
-        # One trial when nothing is random, n_trials draws otherwise
-        trials = int(n_trials) if self.problem.is_stochastic else 1
-        evaluator = MonteCarloEvaluator(
+        # One run when nothing is random, n_trials draws otherwise
+        trials = int(n_trials) if self.problem.is_stochastic else None
+
+        return evaluate(
             self.problem,
+            policy,
             dt=dt,
             n_trials=trials,
-            episode_length=tf,
+            key=0,
             backend=backend,
-            seed=0,
+            episode_length=tf,
         )
-
-        return evaluator.evaluate(policy)
 
     def store_solution(self, solution: PlanningSolution) -> PlanningSolution:
         """Keep ``solution`` as :attr:`last_solution`, and return it."""

@@ -26,11 +26,11 @@ from minilink.planning import (
     TrackCorridorOverlay,
     bind,
     circuit_waypoints,
+    evaluate_trajectory,
     from_waypoints,
     point_probe,
     quadratic_hinge,
 )
-from minilink.planning.evaluation import score_trajectory
 from minilink.planning.trajectory_optimization.mpc import ModelPredictiveController
 
 V_REF = 3.5  # [m/s]
@@ -178,7 +178,7 @@ traj_mpc = result.plant
 
 # --- the benchmark: closed-loop cost, clearance to the cone, corridor margin, tick time ---
 def report(name, traj, tick_ms):
-    J, _ = score_trajectory(problem, traj)
+    J = float(evaluate_trajectory(problem, traj).J[0])
     xy = traj.x[:2].T
     clearance = np.min(np.linalg.norm(xy - cone.center, axis=1)) - cone.radius
     margin = min(float(track.corridor_field(probe).value(xk)) for xk in traj.x.T)

@@ -1,7 +1,6 @@
 """Source blocks: constant, step, sine, white noise and a replayed trajectory as a signal."""
 
 import numpy as np
-from scipy.interpolate import interp1d
 
 from minilink.core.backends import array_module
 from minilink.core.distributions import child_seed, sample_index, standard_normal
@@ -331,39 +330,27 @@ class TrajectorySource(Source):
         self.sample_values = values
         self.interpolation = interpolation
 
-        # Memory: one interpolator per channel, built from the samples
-        self._interpolators = []
-        self.refresh()
-
     @classmethod
     def from_trajectory(cls, traj, signal="u", *, interpolation="linear"):
         """Build a source that replays a :class:`Trajectory` signal (``u`` or ``x``)."""
         return cls(traj.t, getattr(traj, signal), interpolation=interpolation)
 
     def h(self, x, u, t=0, params=None):
-        p = self.dim
-        interpolators = self._interpolators
+        """The sample at ``t``: linear between samples, or the previous one; endpoints held (traces on JAX)."""
+        xp = array_module(x, u, t)
 
-        # One interpolated sample per channel at time t
-        y = np.zeros(p)
-        for i, interpolator in enumerate(interpolators):
-            y[i] = float(interpolator(float(t)))
+        t_k = xp.asarray(self.sample_times)
+        y_k = xp.asarray(self.sample_values)
+
+        # Linear: y(t) = y_k + (t − t_k) (y_{k+1} − y_k) / (t_{k+1} − t_k), clamped at the ends
+        if self.interpolation == "linear":
+            return xp.stack([xp.interp(t, t_k, y_k[i]) for i in range(self.dim)])
+
+        # Previous: y(t) = y_k for t_k ≤ t < t_{k+1}, clamped at the ends
+        k = xp.clip(xp.searchsorted(t_k, t, side="right") - 1, 0, t_k.size - 1)
+        y = y_k[:, k]
 
         return y
-
-    def refresh(self):
-        """Rebuild the per-channel interpolators, each endpoint held outside the samples."""
-        self._interpolators = [
-            interp1d(
-                self.sample_times,
-                self.sample_values[i, :],
-                kind=self.interpolation,
-                bounds_error=False,
-                fill_value=(self.sample_values[i, 0], self.sample_values[i, -1]),
-                assume_sorted=True,
-            )
-            for i in range(self.dim)
-        ]
 
 
 ###############################################################################

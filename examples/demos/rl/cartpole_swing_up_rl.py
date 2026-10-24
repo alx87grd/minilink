@@ -6,10 +6,10 @@ import numpy as np
 from minilink import (
     CartPole,
     CostFunction,
-    MonteCarloEvaluator,
     ReinforcementLearningPlanner,
     StochasticPlanningProblem,
     Uniform,
+    evaluate,
 )
 
 TRAINING_TIMESTEPS = 2_000_000  # about 30 s on a laptop CPU
@@ -73,7 +73,7 @@ planner.plot_learning_curve()
 ppo_ctl = planner.get_controller()
 ppo_ctl.plot_control_law(x_axis=1, y_axis=3, u_axis=0)  # force vs (theta, dtheta)
 
-report = MonteCarloEvaluator(problem, dt=DT, n_trials=100, seed=1).evaluate(ppo_ctl)
+report = evaluate(problem, ppo_ctl, dt=DT, n_trials=100, key=1)
 print(report)
 
 plant.x0 = np.array([0.0, 0.05, 0.0, 0.0])  # hanging, a tiny tip

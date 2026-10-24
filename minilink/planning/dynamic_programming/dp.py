@@ -13,7 +13,7 @@ from minilink.planning.dynamic_programming import plotting
 from minilink.planning.dynamic_programming.discretizer import StateSpaceGrid
 from minilink.planning.dynamic_programming.lookup_policy import LookupPolicy
 from minilink.planning.dynamic_programming.progress import SweepLog, progress
-from minilink.planning.evaluation import nominal_trajectory
+from minilink.planning.engine import nominal_trajectory
 from minilink.planning.planner import Planner
 from minilink.planning.problems import PlanningProblem
 from minilink.planning.results import PlanningSolution

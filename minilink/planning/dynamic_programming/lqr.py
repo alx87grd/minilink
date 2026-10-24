@@ -16,7 +16,7 @@ from minilink.control.state import (
 from minilink.core.costs import QuadraticCost
 from minilink.core.feedback import command_port
 from minilink.core.trajectory import interpolate_schedule
-from minilink.planning.evaluation import nominal_trajectory
+from minilink.planning.engine import nominal_trajectory
 from minilink.planning.planner import Planner
 from minilink.planning.problems import PlanningProblem
 from minilink.planning.results import PlanningSolution
