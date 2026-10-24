@@ -282,17 +282,12 @@ class ProblemEvaluator:
             xp = array_module(params["x_start"])
             return xp.reshape(params["x_start"], (1, -1)), params
 
-        draw_key = trial_key(key, self.backend)
-        x_key, p_key = split_two(draw_key, self.backend)
+        # x0 ~ p(x0) and each law, n_trials times, from one key on the backend
+        x_starts, draws = problem.realize(trial_key(key, self.backend), n_trials)
 
-        # x0 ~ p(x0), and each drawn parameter, n_trials times
-        x_starts = problem.sample_x0(x_key, n_trials)
-        draws = draw_params(problem, p_key, n_trials, self.backend)
-
-        # The plant's draws override its entries; the free inputs' draws their port
-        plant_draws = {k: v for k, v in draws.items() if k != "inputs"}
-        overrides = {"plant": plant_draws} if plant_draws else {}
-        overrides.update(draws.get("inputs", {}))
+        # The plant's draws override its entries; the disturbances their loop port
+        overrides = {"plant": draws["params"]} if draws["params"] else {}
+        overrides.update(draws["disturbances"])
 
         axes = merge_tree(axes_like(params, None), axes_like(overrides, 0))
 
@@ -1292,49 +1287,6 @@ def trial_key(key, backend):
         return jax.random.PRNGKey(key) if isinstance(key, int) else key
 
     return np.random.default_rng(key)
-
-
-def split_two(key, backend):
-    """Two independent keys from one: the starts' and the parameters'."""
-    if backend == BACKEND_JAX:
-        jax = ensure_jax_x64()
-        return tuple(jax.random.split(key, 2))
-
-    return key, key
-
-
-def draw_params(problem, key, n_trials, backend):
-    """``n_trials`` draws of every drawn parameter and disturbance, a leading trial axis on each.
-
-    The plant's parameters are keyed by name (dotted for a nested entry); the
-    disturbances, held over a run, under ``"inputs"`` by the loop's port.
-    """
-    # Lazy import: the distributions load with the first stochastic evaluation
-    from minilink.core.distributions import split_keys
-
-    draws = {}
-    names = list(problem.params_distribution)
-    ports = list(problem.disturbances)
-    keys = split_keys(key, len(names) + len(ports))
-
-    # Each parameter: n_trials draws in the nominal entry's shape
-    for name, k in zip(names, keys[: len(names)]):
-        nominal = np.shape(lookup(problem.sys.params, name))
-        values = problem.params_distribution[name].sample(k, n_trials)
-        node = draws
-        *path, last = split_path(name)
-        for part in path:
-            node = node.setdefault(part, {})
-        node[last] = values.reshape((n_trials, *nominal))
-
-    # Each disturbance: n_trials held values on the loop's port of that name
-    inputs = {}
-    for port, k in zip(ports, keys[len(names) :]):
-        inputs[port] = problem.disturbances[port].sample(k, n_trials)
-    if inputs:
-        draws["inputs"] = inputs
-
-    return draws
 
 
 @lru_cache(maxsize=None)

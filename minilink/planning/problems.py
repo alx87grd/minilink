@@ -8,6 +8,7 @@ from types import MappingProxyType
 
 import numpy as np
 
+from minilink.core.backends import is_jax_key, numpy_generator, require_jax
 from minilink.core.costs import CostFunction
 from minilink.core.distributions import Distribution, Particles, split_keys
 from minilink.core.inspect import inspect_text, repr_pretty
@@ -249,6 +250,13 @@ class PlanningProblem:
         self.require_member(self.X0, start, set_label="X0", point_label="x_start")
 
         self.x_start = start
+
+    def realize(self, key=None, n=1):
+        """The one realization of a deterministic problem: its start, no draws (``n`` is 1)."""
+        require_one_run(n)
+        x0s = np.reshape(self.x_start, (1, -1))
+
+        return x0s, {"params": {}, "disturbances": {}}
 
     def replace(self, **changes):
         """A new problem of the same class with the named fields replaced (the others shared)."""
@@ -633,6 +641,51 @@ class StochasticPlanningProblem(PlanningProblem):
 
         return {port: self.disturbances[port].sample(k) for port, k in zip(ports, keys)}
 
+    def realize(self, key, n):
+        """
+        ``n`` realizations of the problem's draws from one key: ``(x0s, draws)``.
+
+        ``x0s`` is ``(n, nx)``, drawn from the start law; ``draws`` is
+        ``{"params": {...}, "disturbances": {...}}``, each drawn parameter of
+        ``sys.params`` at its (dotted) path and each disturbance port's held value,
+        every leaf with a leading axis of ``n``. ``key`` follows the draw
+        convention of :class:`~minilink.core.distributions.Distribution`: a JAX key
+        gives JAX arrays (traceable), a NumPy generator or a seed NumPy arrays.
+        """
+        n = int(n)
+
+        # One key for the starts, one for the laws
+        if is_jax_key(key):
+            jax = require_jax()
+            x_key, law_key = jax.random.split(key)
+        else:
+            x_key = law_key = numpy_generator(key)
+
+        # x0 ~ p(x0), n times
+        x0s = self.sample_x0(x_key, n)
+
+        # Each drawn parameter n times, in its nominal entry's shape, at its path
+        names = list(self.params_distribution)
+        ports = list(self.disturbances)
+        keys = split_keys(law_key, len(names) + len(ports))
+        params = {}
+        for name, k in zip(names, keys[: len(names)]):
+            nominal = np.shape(lookup_param(self.sys.params, name))
+            values = self.params_distribution[name].sample(k, n)
+            node = params
+            *path, last = name.split(".")
+            for part in path:
+                node = node.setdefault(part, {})
+            node[last] = values.reshape((n, *nominal))
+
+        # Each disturbance port's held value, n times
+        disturbances = {
+            port: self.disturbances[port].sample(k, n)
+            for port, k in zip(ports, keys[len(names) :])
+        }
+
+        return x0s, {"params": params, "disturbances": disturbances}
+
     def nominal(self) -> PlanningProblem:
         """
         Certainty-equivalent deterministic problem: the mean start, no draws.
@@ -757,6 +810,15 @@ def as_stochastic(problem: PlanningProblem) -> StochasticPlanningProblem:
 ###############################################################################
 # Internal machinery
 ###############################################################################
+
+
+def require_one_run(n):
+    """Refuse more than one realization of a deterministic problem."""
+    if int(n) != 1:
+        raise ValueError(
+            f"a deterministic problem has one realization, got n={n!r}: give the "
+            "problem laws (StochasticPlanningProblem) to draw several"
+        )
 
 
 def nominal_plant_params(problem):

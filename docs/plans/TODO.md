@@ -404,11 +404,6 @@ moved to the new interface (R47).
   bound landed 2026-10-24): LQR warns once when `U` is declared (the U sweep wrote
   `U=plant.input_box` on lessons that never needed it, so the warning waits for the maintainer's
   pass on those lines).
-- [ ] **V1.4b, the rest** (the Monte Carlo fold landed 2026-10-24): `problem.realize(key, n)` as a public
-  verb (the engine draws the start and the parameter laws internally today).
-
-**After the continuous core: the optimizer and the closing example.**
-
 - [ ] **S74, the rest** (the method table and the first-order backend landed 2026-10-24): the hand
   descent loops of `examples/demos/compile/` other than the closing example's first section
   (`cartpole_rollout_gradients`, `neural_controller_jax`, `params_gradient`) moved onto

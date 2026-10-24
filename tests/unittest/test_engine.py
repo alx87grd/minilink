@@ -430,3 +430,18 @@ def test_a_tuning_that_leaves_X_comes_back_inside_through_the_margin_row():
 
     tuned = pe.evaluate(pe.unpack(result.z, wrt, pe.merged(UPRIGHT)))
     assert not tuned.failed[0] and float(tuned.feasibility_margin[0]) >= 0.0
+
+
+def test_a_problem_realizes_its_draws_from_one_key():
+    problem = stochastic_problem()
+    x0s, draws = problem.realize(0, 5)
+    assert x0s.shape == (5, 2) and draws["params"]["m"].shape == (5,)
+    again, _ = problem.realize(0, 5)
+    np.testing.assert_array_equal(x0s, again)  # one key, the same draws
+    assert np.all((draws["params"]["m"] >= 0.9) & (draws["params"]["m"] <= 1.1))
+
+    # A deterministic problem has one realization: its start, no draws
+    one, none = upright_problem().realize()
+    assert one.shape == (1, 2) and none == {"params": {}, "disturbances": {}}
+    with pytest.raises(ValueError, match="one realization"):
+        upright_problem().realize(0, 3)

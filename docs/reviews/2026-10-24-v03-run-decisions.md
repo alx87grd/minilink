@@ -148,7 +148,6 @@ What the landed rows left (each written as a "rest" row in TODO §4):
 - `StepRollout` folded into the native `Trajectory`, and `Set.contains` on the array module
   (V1.1's rest);
 - the LQR warning (OD-33; V1.2's rest);
-- `problem.realize(key, n)` as a public verb (V1.4b's rest; the engine draws internally);
 - the three hand-loop demos (OD-32; S74's rest);
 - the program's leaves scaled by their nominal magnitude (OD-31, decided against);
 - the library sets reading their own `params` (A5, by design after A2).
