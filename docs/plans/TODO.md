@@ -380,10 +380,9 @@ the computation is restructured, identical for a move) unless it names its inten
 (AGENTS' refactor recipe; the baseline JSON and the script that writes it under `benchmarks/`,
 compared after each step).
 
-- [ ] **SM-6, the rest** (the trim landed 2026-10-23; the tiers folded 2026-10-24, R12 with the
-  `@compiled` mark, §9 of [the run's log](../reviews/2026-10-24-v03-run-decisions.md)): the
-  Jacobian probes, one per evaluator kind, deduplicated, and the NumPy and JAX diagram sweeps
-  written once on the array module. Done when the SM-0 baseline agrees (R81).
+- SM-6 landed 2026-10-24: the tiers folded (R12, the `@compiled` mark), then one evaluator
+  class per system kind on either backend, its Jacobian probe and its sweep written once
+  (§9 and §10 of [the run's log](../reviews/2026-10-24-v03-run-decisions.md)).
 
 **The continuous core — the path to the cost** (V1, steps 1–6 and 7a of
 [differentiable-problem.md](differentiable-problem.md); the API is

@@ -394,3 +394,62 @@ commit before the change (best of three, µs per Python call, pendulum leaf / `P
 19.3; with a dict, `f` 36 / 74 against 30 / 66 and `step` 40 / 89 against 35 / 75 (the scan of
 the dict's leaves). Inside an outer `jit`, `vmap` or `grad` the check runs once, at trace time.
 
+## 10. The package folders restructured
+
+Asked for on 2026-10-24, on `dev-evaluator-cleanup`, after a review of the compile folder
+("super hard to follow"). The maintainer's answers to the seven questions:
+
+- **Now, in v0.3**, the discrete-time split included (not deferred to v0.4's sampled loop).
+- **The folder is `discrete/`**, not `sampled/`: a Fibonacci sequence or a chess game is a
+  discrete-time system, `x_{k+1} = F(x_k, u_k, k)` on an integer index, and is sampled from
+  nothing. `StepSystem` keeps its name.
+- **The NumPy-only install keeps working**: a JAX evaluator imports JAX in its constructor,
+  `@compiled` is the plain method off JAX; checked with JAX blocked on every commit below.
+- **One evaluator class per system kind**: `DynamicEvaluator` (not the proposed
+  `LeafEvaluator`: RULES 2.2 keeps "leaf" for a diagram's nodes), `DiagramEvaluator`,
+  `StaticEvaluator`, `StepEvaluator`, `StepDiagramEvaluator`, the backend picked at
+  construction; the `Numpy*` / `Jax*` classes and the abstract `*Evaluator` bases are gone.
+- **`composition.py` → `operators.py` + `closed_loop.py`**; **`engine.py` → `evaluator.py` +
+  `evaluation.py`**; **the facades split into a package**; **`core/compile/` keeps its place**
+  and its `evaluators/` sub-folder; **`facade.py` folds into the facades package**.
+- **`hybrid_closed_loop` through a facade** (the agent's recommendation, taken when the answer
+  named none): `from minilink.simulation import hybrid_closed_loop`, a research-lane name beside
+  `Computer`, and the GRO501 `racecar_toward_mpc` notebook's import line, its only change.
+
+What landed, one commit each, every call site moved with no alias (R82):
+
+| Commit | Move |
+| --- | --- |
+| `46e3d4c3` | ten evaluator classes → five: `evaluators/base.py`, `dynamic.py`, `diagram.py`, `static.py`, `discrete.py`; `numpy_evaluators.py`, `jax_evaluators.py`, `evaluators.py` and the compile-side `step_rollout.py` gone. Each method written once on the array module (`assigned` / `added` for the buffer writes, `iterate` for the loop / `lax.scan`); the Jacobian picks central differences or `jax.jacfwd` by backend |
+| `13253648` | `execution_plan.py` + `step_execution_plan.py` → `plan.py`; `step_compiler.py` folded into `compiler.py`, the two plan builders sharing the signal layout, the port operations and the boundary slices |
+| `ae448e0f` | `core/discrete/` (`step_system.py`, `step_diagram.py`, `hybrid_diagram.py`, `hybrid_composition.py`, `step_rollout.py`) and `simulation/discrete/` (`computer.py`, `hybrid_simulator.py`) |
+| `46a7d4df` | `core/composition.py` → `operators.py` (`+`, `>>`, `autowire`, the shared layout helpers) and `closed_loop.py` (`@`, `closed_loop`, `feedback`) |
+| `dfdda1de` | `planning/engine.py` → `evaluator.py` (`ProblemEvaluator`, `evaluate`) and `evaluation.py` (`score_run`, `evaluate_trajectory`, `Evaluation`) |
+
+Departures from the plan as approved, each the smaller option:
+
+- **`feedback.py` is renamed `roles.py`, not folded into `closed_loop.py`.** The fold would
+  have made a 1,000-line file (the restructure's own bar is about 600), and `wiring.py`
+  imports `check_reserved_id` from it at import time, so the fold would also tie the wiring
+  to the whole loop builder. The module is the block roles the port names declare
+  (`block_roles`, `command_port`, `ErrorDriven`); `feedback.py` beside the `feedback()` verb
+  misled.
+- **`hybrid_diagram.py` and `hybrid_composition.py` stay two files** in `core/discrete/`
+  (the tree drafted one `hybrid.py`): together they are 920 lines.
+- **`evaluate` sits in `evaluator.py`**, not with the record in `evaluation.py`: it builds a
+  `ProblemEvaluator`, and the record module importing the evaluator would make the two import
+  each other. `evaluator.py` is still 1,040 lines, 400 of them the class; its params-tree
+  helpers (`paths_of` … `unbatch`, 130 lines) are the next candidate if it is split again.
+
+Numbers (R81, identical for a move): after every commit the 164-entry evaluator baseline,
+the 70-entry SM-0 baseline and the 19-entry engine baseline were rerun and compared; all
+identical except the evaluator commit's three JAX Jacobians with respect to `params`, which
+return exactly to their values before R12 (the Jacobian now differentiates the uncompiled
+body, as its docstring says). The textbook-style allowlist is unchanged.
+
+
+Not yet done: the facades package (`core/facades.py` and `core/facade.py`), held for the
+maintainer. Split by verb (`simulate.py`, `analyze.py`, `draw.py`) as approved, each of the
+three mixins (`SharedSystemFacades`, `DynamicSystemFacades`, `StepSystemFacades`) becomes three,
+nine classes; split by system kind, the three keep their names and their files read like the
+evaluators. The question and a sketch of each are in the session's report.

@@ -60,6 +60,10 @@ its own small step, most already on the workboard:
 - `planning/spatial/` → `core/geometry/` ([geometry-module.md](geometry-module.md), step
   A3): sets and posed geometry are core objects a controller may import; the placement test
   there ("would you still import it with no `PlanningProblem`?") decides.
+- Landed 2026-10-24 ([the run's log](../reviews/2026-10-24-v03-run-decisions.md) §10):
+  `core/composition.py` split into `operators.py` and `closed_loop.py`, `planning/engine.py`
+  into `evaluator.py` and `evaluation.py`, the discrete-time pieces moved to `core/discrete/`
+  and `simulation/discrete/`, and `core/compile/` to one evaluator class per system kind.
 - `core/facades.py`, `wiring.py`: split by concern when the
   differentiable-problem work ([differentiable-problem.md](differentiable-problem.md), V1)
   touches them anyway; no public name changes, so it is agent-managed internal structure.
