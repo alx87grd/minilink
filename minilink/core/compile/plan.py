@@ -9,16 +9,33 @@ per stateful block; :class:`StepExecutionPlan` (a
 :class:`~minilink.core.discrete.step_diagram.StepDiagramSystem`) holds ``step_ops``, one
 ``x_{k+1}`` per stateful block. Both share the port topology.
 
-The plans are consumed by the evaluators
+:func:`build_execution_plan` and :func:`build_step_execution_plan` build them;
+the evaluators
 (:class:`~minilink.core.compile.evaluators.diagram.DiagramEvaluator`,
-:class:`~minilink.core.compile.evaluators.discrete.StepDiagramEvaluator`),
-which walk the operation lists in topological order.
+:class:`~minilink.core.compile.evaluators.discrete.StepDiagramEvaluator`)
+walk the operation lists in topological order.
 """
 
+from __future__ import annotations
+
+import copy
 from collections.abc import Callable
 from dataclasses import dataclass
+from typing import TYPE_CHECKING
 
 import numpy as np
+
+from minilink.core.discrete.step_system import StepSystem
+from minilink.core.system import DynamicSystem
+from minilink.core.topology import evaluation_order_of
+
+if TYPE_CHECKING:
+    from minilink.core.diagram import DiagramSystem
+    from minilink.core.discrete.step_diagram import StepDiagramSystem
+
+###############################################################################
+# Public API
+###############################################################################
 
 # Source-type constants
 # Used in the ``gather_sources`` tuples of PortOperation / StateOperation.
@@ -134,7 +151,7 @@ class StateOperation:
 class ExecutionPlan:
     """Immutable flattened execution schedule for a compiled diagram.
 
-    Built by :func:`~minilink.core.compile.compiler.build_execution_plan`.
+    Built by :func:`~minilink.core.compile.plan.build_execution_plan`.
     Consumed by evaluator backends to compute state derivatives and outputs
     without any dictionary lookups or recursive traversals.
 
@@ -192,7 +209,7 @@ class StepOperation:
 class StepExecutionPlan:
     """Immutable flattened schedule for a compiled step diagram.
 
-    Built by :func:`~minilink.core.compile.compiler.build_step_execution_plan`;
+    Built by :func:`~minilink.core.compile.plan.build_step_execution_plan`;
     the fields read as on :class:`ExecutionPlan`, ``step_ops`` in place of
     ``state_ops``.
     """
@@ -203,3 +220,272 @@ class StepExecutionPlan:
     step_ops: tuple[StepOperation, ...]
     output_slices: dict[tuple[str, str], slice]
     external_output_slices: dict[str, slice]
+
+
+def build_execution_plan(
+    diagram: DiagramSystem, *, bind_params: bool = False
+) -> ExecutionPlan:
+    """Build an immutable ExecutionPlan from a DiagramSystem.
+
+    This is the core compilation step.  It:
+
+    1. Orders the output ports, refusing an algebraic loop, via
+       :func:`~minilink.core.topology.evaluation_order_of`.
+    2. Assigns each output port a slice in the flat signal buffer.
+    3. Builds the gather-source recipes for each port and state operation.
+    4. Returns a frozen :class:`ExecutionPlan`.
+
+    Parameters
+    ----------
+    diagram : DiagramSystem
+        Must have subsystems added and connections wired.
+    bind_params : bool, optional
+        When ``True``, set :attr:`~minilink.core.compile.plan.PortOperation.bound_params`
+        / :attr:`~minilink.core.compile.plan.StateOperation.bound_params` on each row
+        (deep copy of ``subsystem.params`` only; see :func:`compile_diagram` Notes).
+
+    Returns
+    -------
+    ExecutionPlan
+    """
+    port_execution_order = evaluation_order_of(diagram)
+    return execution_plan_from_order(
+        diagram, port_execution_order, bind_params=bind_params
+    )
+
+
+def build_step_execution_plan(
+    diagram: StepDiagramSystem, *, bind_params: bool = False
+) -> StepExecutionPlan:
+    """Build an immutable :class:`StepExecutionPlan` from a step diagram."""
+    port_execution_order = evaluation_order_of(diagram)
+    return step_execution_plan_from_order(
+        diagram, port_execution_order, bind_params=bind_params
+    )
+
+
+def execution_plan_from_order(
+    diagram: DiagramSystem,
+    port_execution_order: list[tuple[str, str]],
+    *,
+    bind_params: bool = False,
+) -> ExecutionPlan:
+    """Build the execution plan given a pre-computed topological order.
+
+    This is the inner implementation of :func:`build_execution_plan`,
+    split out so that :func:`compile_diagram` can time each step
+    individually.
+    """
+    output_slices, signal_dim = signal_layout(diagram)
+    port_ops = port_operations(
+        diagram, port_execution_order, output_slices, DynamicSystem, bind_params
+    )
+
+    # One dx per continuous block
+    state_ops = tuple(
+        StateOperation(f_func=sys.f, **fields)
+        for sys, fields in state_fields(
+            diagram, output_slices, DynamicSystem, bind_params
+        )
+    )
+
+    return ExecutionPlan(
+        state_dim=diagram.n,
+        signal_dim=signal_dim,
+        port_ops=port_ops,
+        state_ops=state_ops,
+        output_slices=output_slices,
+        external_output_slices=boundary_output_slices(diagram, output_slices),
+    )
+
+
+def step_execution_plan_from_order(
+    diagram: StepDiagramSystem,
+    port_execution_order: list[tuple[str, str]],
+    *,
+    bind_params: bool = False,
+) -> StepExecutionPlan:
+    """The step twin of :func:`execution_plan_from_order`: ``step_ops`` for ``state_ops``."""
+    output_slices, signal_dim = signal_layout(diagram)
+    port_ops = port_operations(
+        diagram, port_execution_order, output_slices, StepSystem, bind_params
+    )
+
+    # One x_{k+1} per discrete block
+    step_ops = tuple(
+        StepOperation(step_func=sys.step, **fields)
+        for sys, fields in state_fields(diagram, output_slices, StepSystem, bind_params)
+    )
+
+    return StepExecutionPlan(
+        state_dim=diagram.n,
+        signal_dim=signal_dim,
+        port_ops=port_ops,
+        step_ops=step_ops,
+        output_slices=output_slices,
+        external_output_slices=boundary_output_slices(diagram, output_slices),
+    )
+
+
+###############################################################################
+# Internal machinery
+###############################################################################
+
+
+def signal_layout(diagram):
+    """Every output port's slice of the flat signal buffer, and the buffer's size."""
+    output_slices: dict[tuple[str, str], slice] = {}
+    current_idx = 0
+    for sys_id, sys in diagram.subsystems.items():
+        for port_id, port in sys.outputs.items():
+            dim = port.dim
+            output_slices[(sys_id, port_id)] = slice(current_idx, current_idx + dim)
+            current_idx += dim
+
+    return output_slices, current_idx
+
+
+def port_operations(
+    diagram, port_execution_order, output_slices, stateful, bind_params
+):
+    """One :class:`PortOperation` per output port, in topological order."""
+    port_ops: list[PortOperation] = []
+    for sys_id, port_id in port_execution_order:
+        sys = diagram.subsystems[sys_id]
+        port = sys.outputs[port_id]
+
+        gather_sources, u_dim = gather_sources_of(
+            diagram, sys_id, output_slices, dependencies=port.dependencies
+        )
+
+        out_slice = output_slices[(sys_id, port_id)]
+        local_x_slice = state_slice_of(diagram, sys_id, stateful)
+
+        bound = copy.deepcopy(getattr(sys, "params", {})) if bind_params else None
+
+        port_ops.append(
+            PortOperation(
+                compute_func=port.compute,
+                local_x_slice=local_x_slice,
+                gather_sources=tuple(gather_sources),
+                out_slice=out_slice,
+                u_dim=u_dim,
+                bound_params=bound,
+                label=f"{sys_id}:{port_id}",
+                sys_id=sys_id,
+            )
+        )
+
+    return tuple(port_ops)
+
+
+def state_fields(diagram, output_slices, stateful, bind_params):
+    """``(block, fields)`` for every ``stateful`` block: the fields its state operation shares."""
+    for sys_id, sys in diagram.subsystems.items():
+        if not isinstance(sys, stateful):
+            continue
+        gather_sources, u_dim = gather_sources_of(
+            diagram, sys_id, output_slices, dependencies="all"
+        )
+        bound = copy.deepcopy(getattr(sys, "params", {})) if bind_params else None
+        fields = {
+            "local_x_slice": state_slice_of(diagram, sys_id, stateful),
+            "gather_sources": tuple(gather_sources),
+            "u_dim": u_dim,
+            "bound_params": bound,
+            "label": sys_id,
+            "sys_id": sys_id,
+        }
+        yield sys, fields
+
+
+def boundary_output_slices(diagram, output_slices):
+    """Each diagram output port's slice: the slice of the block port wired to it."""
+    external_output_slices: dict[str, slice] = {}
+    out_conns = diagram.connections.get("output", {})
+    for out_port_id in diagram.outputs:
+        src = out_conns.get(out_port_id)
+        if src is None:
+            continue
+        source_sys_id, source_port_id = src
+        key = (source_sys_id, source_port_id)
+        if key not in output_slices:
+            raise RuntimeError(
+                f"Diagram output {out_port_id!r} source {key} missing from output_slices"
+            )
+        external_output_slices[out_port_id] = output_slices[key]
+
+    return external_output_slices
+
+
+def gather_sources_of(
+    diagram: DiagramSystem,
+    sys_id: str,
+    output_slices: dict[tuple[str, str], slice],
+    dependencies="all",
+) -> tuple[list[tuple[int, object, int]], int]:
+    """Build the gather-source recipe for a subsystem's input ports.
+
+    This is the **single implementation** of the signal-gathering logic that
+    was previously duplicated across the codebase.
+
+    Parameters
+    ----------
+    diagram : DiagramSystem
+    sys_id : str
+        The subsystem whose inputs to gather.
+    output_slices : dict
+        Pre-computed ``(sys_id, port_id) → slice`` map.
+    dependencies : list or ``"all"``
+        Which input ports are required.  ``"all"`` means every input port.
+
+    Returns
+    -------
+    gather_sources : list[tuple[int, Any, int]]
+        List of ``(source_type, source_value, dim)`` entries.
+    u_dim : int
+        Total dimension of the assembled local input vector.
+    """
+    sys = diagram.subsystems[sys_id]
+    gather_sources: list[tuple[int, object, int]] = []
+    u_dim = 0
+
+    for in_port_id, in_port in sys.inputs.items():
+        # If this input port is not a dependency, use the nominal value
+        if dependencies != "all" and in_port_id not in dependencies:
+            source_type = NOMINAL
+            source_val = in_port.nominal_value
+        else:
+            source = diagram.connections[sys_id].get(in_port_id)
+            if source is None:
+                # Not connected → use nominal value
+                source_type = NOMINAL
+                source_val = in_port.nominal_value
+            else:
+                src_sys_id, src_port_id = source
+                if src_sys_id == "input":
+                    source_type = EXTERNAL_INPUT
+                    u_idx = 0
+                    for input_port_id, input_port in diagram.inputs.items():
+                        if input_port_id == src_port_id:
+                            source_val = slice(u_idx, u_idx + input_port.dim)
+                            break
+                        u_idx += input_port.dim
+                else:
+                    source_type = INTERNAL_SIGNAL
+                    source_val = output_slices[(src_sys_id, src_port_id)]
+
+        dim = in_port.dim
+        gather_sources.append((source_type, source_val, dim))
+        u_dim += dim
+
+    return gather_sources, u_dim
+
+
+def state_slice_of(diagram, sys_id: str, stateful=DynamicSystem) -> slice:
+    """Return the global state-vector slice for a subsystem (empty unless ``stateful``)."""
+    sys = diagram.subsystems[sys_id]
+    if isinstance(sys, stateful):
+        start, end = diagram.state_index[sys_id]
+        return slice(start, end)
+    return slice(0, 0)

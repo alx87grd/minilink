@@ -9,6 +9,9 @@ Core
    :members:
    :undoc-members:
 
+.. automodule:: minilink.core.topology
+   :members:
+
 .. automodule:: minilink.core.discrete.step_system
    :members:
    :undoc-members:

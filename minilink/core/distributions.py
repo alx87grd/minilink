@@ -212,8 +212,8 @@ def random_bits(seed, k, p):
         k = int(k)
         key = (seed & _MASK_32, (seed >> 32) & _MASK_32)
         words = [threefry_2x32(key, (k & _MASK_32, channel)) for channel in range(p)]
-        bits_1 = np.array([w[0] for w in words], dtype=np.uint32)
-        bits_2 = np.array([w[1] for w in words], dtype=np.uint32)
+        bits_1 = xp.array([w[0] for w in words], dtype=xp.uint32)
+        bits_2 = xp.array([w[1] for w in words], dtype=xp.uint32)
         return bits_1, bits_2
 
     # JAX: uint32 arrays, every channel in one block of rounds

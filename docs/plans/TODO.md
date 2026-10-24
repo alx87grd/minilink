@@ -438,6 +438,13 @@ workboard; the former wave G rows are §5 rows.
   moves from `DynamicSystem` to the generalized child. Done when the boat and the plane pass the
   catalog contract test as children of `MechanicalSystem`, `ComputedTorque` runs on one of them in a
   test, and no class names the mass matrix `M`.
+  Postponed by the maintainer (2026-10-24) on three open questions, each with the agent's
+  recommendation: (1) computed torque on a body-frame plant,
+  `v̇_des = Kp N(q)⁻¹ (q_d − q) + Kd (v_d − v)` (today's law when `N = I`), refusing a
+  non-square `N`; (2) an underactuated plant (the boat, the plane, the cart-pole, which fails
+  at wiring today): `u = B(q)⁺ τ` when `B` is not square, a solve when it is; (3)
+  `DynamicBicycle`: `M` renamed `H` only, its base left on `DynamicSystem` until K8 reworks
+  the car family (its named ports and its subclasses' extra states do not fit `[q; v]`).
 
 ---
 

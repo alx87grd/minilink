@@ -485,12 +485,8 @@ class TestNestedDiagramPlot(unittest.TestCase):
 
 import numpy as np
 from minilink.core.system import System
-from minilink.core.wiring import (
-    WiredDiagramMixin,
-    check_algebraic_loops,
-    check_diagram_params,
-    evaluation_order_of,
-)
+from minilink.core.wiring import WiredDiagramMixin, check_diagram_params
+from minilink.core.topology import check_algebraic_loops, evaluation_order_of
 from minilink.graphical.diagrams import build_diagram_topology
 
 

@@ -68,7 +68,7 @@ in [ROADMAP.md](ROADMAP.md) §5 and the workboard
 
 | Package | Role |
 | --- | --- |
-| `core/` | `System` (+ its shortcuts, `facades/` by what they do: `simulation.py`, `analysis.py`, `plotting.py`, `animation.py`), the package import tables (`exports.py`), `DynamicSystem`, `DiagramSystem` (subclasses `DynamicSystem`), shared diagram wiring (`wiring.py`: `WiredDiagramMixin`, gather, topology checks), signals/ports (`signals.py`), backend policy & helpers (`backends.py`), `Trajectory`, sets, distributions (`distributions.py`), costs, geometry (`geometry.py`; **planned package** `core/geometry/` — Path, Track, Scene, bind, spatial Fields, course catalog: [docs/plans/geometry-module.md](../plans/geometry-module.md)) |
+| `core/` | `System` (+ its shortcuts, `facades/` by what they do: `simulation.py`, `analysis.py`, `plotting.py`, `animation.py`), the package import tables (`exports.py`), `DynamicSystem`, `DiagramSystem` (subclasses `DynamicSystem`), shared diagram wiring (`wiring.py`: `WiredDiagramMixin`, gather, params nesting), the port-dependency graph (`topology.py`: evaluation order, algebraic loops), signals/ports (`signals.py`), backend policy & helpers (`backends.py`), `Trajectory`, sets, distributions (`distributions.py`), costs, geometry (`geometry.py`; **planned package** `core/geometry/` — Path, Track, Scene, bind, spatial Fields, course catalog: [docs/plans/geometry-module.md](../plans/geometry-module.md)) |
 | `core/discrete/` | the discrete-time sibling, `x_{k+1} = F(x_k, u_k, k)` on an integer index: `StepSystem` (`step_system.py`), `StepDiagramSystem` (`step_diagram.py`), the hybrid loop (`hybrid_diagram.py`: `HybridDiagram`; `hybrid_composition.py`: `hybrid_closed_loop` and the port resolution behind `Computer @ plant`), `StepRollout` (`step_rollout.py`) |
 | `core/compile/` | the compiler, the two execution plans, one evaluator per system kind |
 
@@ -367,9 +367,10 @@ Subclasses :class:`~minilink.core.system.DynamicSystem` (diagrams are continuous
 evolution systems with a compile fast path). Composes subsystems by named ports;
 flattens state; compiled `ExecutionPlan` is the main execution path (reference
 recursive path must stay equivalent).
-Wiring, port gather, params nesting, `check_algebraic_loops` (raises on a loop,
-returns nothing) and `evaluation_order_of` (the port order the compilers read)
-live on `WiredDiagramMixin` in `wiring.py`; `DiagramSystem` adds flow-only `f`,
+Wiring, port gather and params nesting live on `WiredDiagramMixin` in `wiring.py`;
+the port-dependency graph is `topology.py`: `check_algebraic_loops` (raises on a loop,
+returns nothing; also a diagram method) and `evaluation_order_of` (the port order the
+compilers read); `DiagramSystem` adds flow-only `f`,
 `compile`, `reconstruct_internal_signals`, and `trajectory_of`; the wiring
 methods reach `DiagramSystem` through the mixin.
 `loop.trajectory_of(plant, traj=None)` returns one block's trajectory as that
@@ -714,8 +715,9 @@ value iteration (`StateSpaceGrid.successor`), shooting, the fixed-step solvers, 
 the Lyapunov sampler and the hybrid and realtime simulators all call them. The adaptive
 SciPy solver adapts `f` for `solve_ivp` itself (`simulation/solvers/scipy_ivp.py`).
 
-Layout of `core/compile/`: `compiler.py` (`compile`, `compile_diagram`, `compile_step_diagram` and
-the plan builders), `plan.py` (`ExecutionPlan` and `StepExecutionPlan`, their operation rows),
+Layout of `core/compile/`: `compiler.py` (`compile`, `compile_auto`, `compile_diagram`,
+`compile_step_diagram`, the shape probe), `plan.py` (`ExecutionPlan` and `StepExecutionPlan`, their
+operation rows, and the builders),
 and `evaluators/`: `base.py` (the `Evaluator` base, the continuous step
 model, `gather_u`), `dynamic.py`, `diagram.py`, `static.py`, `discrete.py` (one class per
 system kind, both backends), `compiled.py` (the mark), `stepping.py` (the step model's

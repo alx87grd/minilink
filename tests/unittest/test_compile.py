@@ -15,12 +15,13 @@ import pytest
 from minilink.blocks.basic import Integrator
 from minilink.control.siso import P
 from minilink.core.backends import array_module
-from minilink.core.compile.compiler import build_execution_plan, compile_diagram
+from minilink.core.compile.compiler import compile_diagram
+from minilink.core.compile.plan import build_execution_plan
 from minilink.core.compile.evaluators.diagram import DiagramEvaluator
 from minilink.core.compile.plan import ExecutionPlan
 from minilink.core.diagram import DiagramSystem
 from minilink.core.system import DynamicSystem, System
-from minilink.core.wiring import check_algebraic_loops, evaluation_order_of
+from minilink.core.topology import check_algebraic_loops, evaluation_order_of
 
 
 class _JAXFriendlyPController(System):
