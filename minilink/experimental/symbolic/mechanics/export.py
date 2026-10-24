@@ -1,8 +1,7 @@
 """
 Lambdify a symbolic MechanicalSystem into a numeric plant.
 
-* ``backend="numpy"`` → :class:`~minilink.dynamics.abstraction.mechanical.MechanicalSystem`
-* ``backend="jax"`` → :class:`~minilink.dynamics.abstraction.mechanical.MechanicalSystem`
+* ``backend="numpy"`` or ``"jax"`` → :class:`~minilink.dynamics.abstraction.mechanical.MechanicalSystem`, one class on both
 
 Chain kinematics for drawing are always lambdified with NumPy for Matplotlib.
 
@@ -80,9 +79,9 @@ def create_minilink_system(sym_sys, parameters=None, *, backend: str = "numpy"):
     parameters : dict, optional
         ``{symbol: value}`` substitution before lambdify.
     backend : {"numpy", "jax"}
-        ``"numpy"`` → :class:`~minilink.dynamics.abstraction.mechanical.MechanicalSystem``.
-        ``"jax"`` → :class:`~minilink.dynamics.abstraction.mechanical.MechanicalSystem``
-        (requires ``jax`` / ``jaxlib``). Chain FK for :meth:`tf`
+        The array module of the lambdified equations; either gives a
+        :class:`~minilink.dynamics.abstraction.mechanical.MechanicalSystem`
+        (``"jax"`` requires ``jax`` / ``jaxlib``). Chain FK for :meth:`tf`
         is always NumPy-based.
     """
     if backend not in ("numpy", "jax"):

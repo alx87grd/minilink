@@ -271,3 +271,20 @@ Fixed in the first pass's own work:
 Number change (R80): value iteration's price at a finite horizon with `α < 1` is the converged
 sum's bound (pendulum, ρ = 0.5, dt = 0.05: 71.7 → 113.4 at tf = 2 s); at an infinite horizon it
 is unchanged. The 19-evaluation baseline stays byte-identical.
+
+From the library reviewer:
+
+- A block id holding `.`, `/` or `:` silently broke the parameter paths (`"motor.v2.A"`) and the
+  port names (`linearize(loop, of="g:1:y")`): the run's verbatim ids (R53) dropped the old
+  normalization. `add_subsystem` now refuses such an id and names the separators; no id in the
+  library, tests, examples or benchmarks holds one.
+- DESIGN's package map and dependency exception named the deleted `planning/evaluation.py`
+  (now `engine.py`) and promised a Mermaid export (deleted, R67); ROADMAP §3 listed
+  `MonteCarloEvaluator` (now `evaluate`). Stale wording of the renames fixed in a test comment,
+  a benchmark docstring, the dynamic-programming package docstring, the symbolic export and the
+  RL planner's discount warning. `TrajectorySource.h` names its result before one return; the RRT
+  planner's dead `set_params = None` bindings are gone.
+
+Open, for the maintainer: `minilink.closed_loop` and `minilink.feedback` are on the root
+prelude but on no band facade (true at the base commit; the facade is a public name, so it waits
+for a nod); `A >> B >> C` is named `A >> B` (the left operand's name carried, true at the base).

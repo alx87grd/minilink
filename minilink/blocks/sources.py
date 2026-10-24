@@ -344,11 +344,12 @@ class TrajectorySource(Source):
 
         # Linear: y(t) = y_k + (t − t_k) (y_{k+1} − y_k) / (t_{k+1} − t_k), clamped at the ends
         if self.interpolation == "linear":
-            return xp.stack([xp.interp(t, t_k, y_k[i]) for i in range(self.dim)])
+            y = xp.stack([xp.interp(t, t_k, y_k[i]) for i in range(self.dim)])
 
         # Previous: y(t) = y_k for t_k ≤ t < t_{k+1}, clamped at the ends
-        k = xp.clip(xp.searchsorted(t_k, t, side="right") - 1, 0, t_k.size - 1)
-        y = y_k[:, k]
+        else:
+            k = xp.clip(xp.searchsorted(t_k, t, side="right") - 1, 0, t_k.size - 1)
+            y = y_k[:, k]
 
         return y
 

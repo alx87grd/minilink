@@ -92,7 +92,7 @@ state-feedback block):
 | --- | --- |
 | `simulation/` | `Simulator`, `StaticSimulator`, `Computer`, `StepSchedule`, `HybridSimulator`, solvers, forcing; `realtime/` (`RealtimeSimulator`, `RealtimeInput`/`RealtimeOutput`, `PygameInput`, `LiveSignalPlotOutput`) |
 | `analysis/` | one calling pattern `tool(sys, x_bar, u_bar, t, params, *, method="auto", eps)` on any `System` (the linear model as is, the rest linearized at the operating point): `jacobian`, `linearize` (→ `LTISystem`), the one-channel frequency and time tools (`bode`, `pzmap`, `nyquist`, `margins`, `root_locus`, `step_response`, `step_info`, `transfer_function`, the sensitivity functions) with their `plot_` twins, `structural` (controllability, observability, `minreal`), `equilibria`, `modal`, `lyapunov`, `riccati`, `discretization`. The API reference is the docs site |
-| `planning/` | `problems.py`, `results.py`, `evaluation.py`, `comparison.py`; `dynamic_programming/` (value iteration, policy evaluation, `LQRPlanner`, the lookup policy), `trajectory_optimization/` (collocation, shooting; `mpc/`, the receding-horizon block, provisional), `search/` (RRT), `spatial/` (scenes; **retires** into `core/geometry/`) |
+| `planning/` | `problems.py`, `results.py`, `engine.py` (the problem evaluator), `comparison.py`; `dynamic_programming/` (value iteration, policy evaluation, `LQRPlanner`, the lookup policy), `trajectory_optimization/` (collocation, shooting; `mpc/`, the receding-horizon block, provisional), `search/` (RRT), `spatial/` (scenes; **retires** into `core/geometry/`) |
 | `learning/` | policies learned from interaction: `reinforcement_learning/` (the neural planner, the tabular learners); identification and imitation later |
 | `optimization/` | `MathematicalProgram`, `Optimizer` (generic NLP) |
 | `graphical/` | signals, phase plane, diagrams, animation |
@@ -117,7 +117,7 @@ state-feedback block):
   trajectory optimization planner, so it lives with it).
 - **Exception:** `learning/` builds on `planning/`: the problem, the planner base,
   the solution and the dynamic programming grid its tabular learners share.
-- **Exception:** `learning.reinforcement_learning`, `planning.evaluation`
+- **Exception:** `learning.reinforcement_learning`, `planning.engine`
   and `planning.planner` may import `control.neural` and `blocks` (a learned
   law is a control block, the critics share its multilayer perceptron, and an
   open-loop plan is a `TrajectorySource` block).
@@ -1104,7 +1104,7 @@ selects brute-force or a SciPy ``cKDTree`` for Euclidean nearest queries.
 
 Facades delegate to `graphical/`. Time plots: `signals=("x", "u", "block:port")`.
 Phase plane: matplotlib default. Diagrams: Graphviz layout (notebook SVG;
-script Matplotlib window), Mermaid export. `print(sys)` is a short text
+script Matplotlib window). `print(sys)` is a short text
 summary: name, class, `n`, ports with dimensions; a diagram adds its keys, an
 `LTISystem` its `A`, `B`, `C`, `D`, a `TransferFunction` its `G(s) = (s + 2) / (s² + 3 s + 2)`.
 The same inspect print lives on `Trajectory`, sets, distributions, costs,

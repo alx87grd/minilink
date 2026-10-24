@@ -1,7 +1,7 @@
 """F MPC regression parity (hybrid ZOH, hand-loop, dual-rate).
 
 Compare against ``benchmarks/baselines/f_mpc_parity.json`` for the landed
-``control/mpc`` product path.
+``planning/trajectory_optimization/mpc`` product path.
 """
 
 from __future__ import annotations

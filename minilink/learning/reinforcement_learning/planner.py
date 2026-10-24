@@ -462,7 +462,7 @@ class ReinforcementLearningPlanner(Planner):
         # The default, announced with its effective horizon dt / (−ln γ)
         horizon = dt / -math.log(DEFAULT_GAMMA)
         warnings.warn(
-            f"the cost is undiscounted, so training discounts at gamma={DEFAULT_GAMMA} "
+            f"the problem is undiscounted, so training discounts at gamma={DEFAULT_GAMMA} "
             f"per control period, an effective horizon of {horizon:.1f} s at "
             f"dt={dt:g}; declare discount_rate on the problem or pass gamma to choose it",
             stacklevel=3,

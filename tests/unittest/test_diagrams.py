@@ -941,3 +941,10 @@ class TestDiagramRenderWithoutDot(unittest.TestCase):
                 graph = loop.plot_diagram(show=True, show_inline=True)
         self.assertIsNone(graph)
         self.assertTrue(any("Graphviz binary" in str(w.message) for w in caught))
+
+
+def test_a_block_id_holding_a_path_separator_is_refused():
+    diagram = DiagramSystem()
+    for sys_id in ("motor.v2", "g:1", "a/b"):
+        with pytest.raises(ValueError, match="block id"):
+            diagram.add_subsystem(Integrator(), sys_id)

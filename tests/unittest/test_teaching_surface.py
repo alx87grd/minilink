@@ -306,7 +306,7 @@ class TestTeachingSurface(unittest.TestCase):
             for name in module.__all__:
                 value = getattr(module, name)
                 if isinstance(value, types.ModuleType):
-                    continue  # a subpackage the band exposes, e.g. control.mpc
+                    continue  # a subpackage the band exposes, e.g. planning.trajectory_optimization
                 self.assertTrue(
                     (getattr(value, "__doc__", None) or "").strip(),
                     f"{band}.{name} is exported to students with no docstring",

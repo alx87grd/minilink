@@ -81,6 +81,7 @@ class WiredDiagramMixin:
         The ids ``plant``, ``controller`` and ``observer`` name the roles every
         tool reads (:func:`minilink.core.feedback.roles`); one of each per level.
         """
+        require_plain_id(sys_id)
         check_reserved_id(sys_id, self.subsystems)
 
         self.subsystems[sys_id] = sys
@@ -858,6 +859,17 @@ def require_one_size(name, dims):
         raise ValueError(
             f"the open inputs named {name!r} have different sizes ({sorted(dims)}); "
             "wire them with connect"
+        )
+
+
+def require_plain_id(sys_id):
+    """Refuse a block id holding a path separator: ``.`` and ``/`` join parameter paths, ``:`` a port."""
+    separators = [c for c in ".:/" if c in str(sys_id)]
+    if separators:
+        raise ValueError(
+            f"block id {sys_id!r} holds {''.join(separators)!r}: '.' and '/' join "
+            "parameter paths ('controller.Kp') and ':' names a port ('plant:y'); "
+            "use letters, digits and '_' (motor_v2)"
         )
 
 

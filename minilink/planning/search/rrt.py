@@ -291,13 +291,12 @@ class RRTPlanner(Planner):
     def sample_free_state(self, rng):
         """A state of ``X``: drawn from ``X`` itself, or by rejection from the sampling box."""
         problem = self.problem
-        set_params = None
         X = problem.X
 
         # A set that samples itself, when its draw lands in it
         try:
-            sample = X.sample(rng, params=set_params)
-            if X.contains(sample, params=set_params):
+            sample = X.sample(rng)
+            if X.contains(sample):
                 return np.asarray(sample, dtype=float)
         except NotImplementedError:
             pass
@@ -305,7 +304,7 @@ class RRTPlanner(Planner):
         # Otherwise by rejection: at most max_sample_attempts draws from the box
         for _ in range(self.options.max_sample_attempts):
             candidate = self.sample_box.sample(rng)
-            if X.contains(candidate, params=set_params):
+            if X.contains(candidate):
                 return np.asarray(candidate, dtype=float)
 
         raise RuntimeError(
@@ -339,20 +338,15 @@ class RRTPlanner(Planner):
     def edge_is_free(self, edge) -> bool:
         """Every state of the edge in ``X`` and every input in ``U``."""
         problem = self.problem
-        set_params = None
 
         if problem.X is not None:
-            if not all(
-                problem.X.contains(state, params=set_params)
-                for state in self.edge_states(edge)
-            ):
+            if not all(problem.X.contains(state) for state in self.edge_states(edge)):
                 return False
 
         # Each input at the state it is applied from: u_k ∈ U(x_k)
         if problem.U is not None:
             if not all(
-                problem.U.contains(u, x, params=set_params)
-                for x, u in zip(edge.states[:-1], edge.inputs)
+                problem.U.contains(u, x) for x, u in zip(edge.states[:-1], edge.inputs)
             ):
                 return False
 
