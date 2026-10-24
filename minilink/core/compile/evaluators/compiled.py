@@ -31,8 +31,7 @@ def compiled(method=None, *, static=()):
 
 def body_of(evaluator, name):
     """The plain body of a compiled method, bound to ``evaluator``: what the Jacobian differentiates."""
-    method = getattr(type(evaluator), name)
-    body = method.method if isinstance(method, CompiledMethod) else method
+    body = getattr(type(evaluator), name)
 
     return body.__get__(evaluator, type(evaluator))
 
@@ -56,8 +55,9 @@ class CompiledMethod:
         self.name = name
 
     def __get__(self, evaluator, owner=None):
+        # On the class, the plain body: its signature and docstring (help, Sphinx)
         if evaluator is None:
-            return self
+            return self.method
         bound = self.method.__get__(evaluator, owner)
         if evaluator.backend != "jax":
             return bound
