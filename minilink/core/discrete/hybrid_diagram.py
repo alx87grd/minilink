@@ -218,7 +218,7 @@ class HybridDiagram:
                 self.compute_trajectory(show=False, verbose=False)
             traj = self.last_result
 
-        # A real cycle: simulation.hybrid_simulator imports HybridDiagram from this module
+        # A real cycle: simulation.discrete.hybrid_simulator imports HybridDiagram from this module
         from minilink.simulation.discrete.hybrid_simulator import HybridSimResult
 
         # A hybrid result draws its own plant and computer views
@@ -305,7 +305,7 @@ class HybridDiagram:
 
         resolved_html = prefers_inline_animation() if html is None else html
 
-        # A real cycle: core.hybrid_composition imports HybridDiagram from this module
+        # A real cycle: core.discrete.hybrid_composition imports HybridDiagram from this module
         from minilink.core.discrete.hybrid_composition import (
             refresh_plant_animation_camera,
         )
@@ -396,7 +396,7 @@ class HybridDiagram:
         verbose=False,
     ):
         """The :class:`~minilink.simulation.discrete.hybrid_simulator.HybridSimulator` of one run."""
-        # A real cycle: simulation.hybrid_simulator imports HybridDiagram from this module
+        # A real cycle: simulation.discrete.hybrid_simulator imports HybridDiagram from this module
         from minilink.simulation.discrete.hybrid_simulator import HybridSimulator
 
         return HybridSimulator(

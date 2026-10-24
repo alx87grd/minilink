@@ -117,7 +117,7 @@ All 195 pyro scripts under `examples/`, grouped by top-level folder.
 | `demos_by_system/car_steering/car_with_custom_lateral_controller.py` | **TODO** | Representative closed-loop for car_steering |
 | `demos_by_system/car_steering/car_with_valueiteration_minimum_time.py` | **Partial** | DP done; plant-specific demo TODO |
 | `demos_by_system/car_steering/car_with_valueiteration_quadratic_cost.py` | **Partial** | DP done; plant-specific demo TODO |
-| `demos_by_system/cartpole/cartpole_LQG.py` | **TODO** | estimation/kalman.py |
+| `demos_by_system/cartpole/cartpole_LQG.py` | **TODO** | `kalman` (`estimation/design.py`), `lqg` (`control/design.py`) |
 | `demos_by_system/cartpole/cartpole_demo.py` | **TODO** | Open-loop cartpole showcase |
 | `demos_by_system/cartpole/cartpole_stabilization.py` | **Partial** | examples/demos/control/cartpole_lqr.py |
 | `demos_by_system/cartpole/cartpole_with_trajectory_optimization.py` | **Partial** | trajopt framework; cartpole-specific demo TODO |
@@ -287,7 +287,7 @@ Ordered by unblock count:
 | prio 2 | ~~`Manipulator` catalog rebase + `control/modelbased.py`, `control/robotic.py`~~ (library landed) | representative closed-loop demos per plant band |
 | prio 2 | ~~`TrajectoryLQRController`~~ (landed: `trajectory_lqr`) | trajectory_stabilization/ demos |
 | prio 3 | `planning/trajectory_generation/` (min-snap) | differentialflatness/ demos |
-| prio 3 | `estimation/luenberger.py`, `kalman.py` | LQG demos |
+| prio 3 | ~~`estimation/luenberger.py`, `kalman.py`~~ (landed: `luenberger`, `kalman` in `estimation/design.py`) | LQG demos |
 | prio 3 | `identification/fitting.py` | params-gradient workflow |
 | prio 3 | ~~`interfaces/gymnasium.py`~~ (landed) | GRO860 course notebooks |
 | prio 3 | ~~Frequency tools (pole-zero, Nyquist, margins, `ss2tf`)~~ (landed 2026-09-07) | transfer_functions/ completion |
@@ -355,7 +355,7 @@ Two-column record of every symbol marked Done before the shrink; the source for 
 | StaticController.plot_control_law | plot_control_law(), plot_input_output_map() | `minilink/graphical/port_map.py` |
 | ClosedLoopSystem | `@`, `>>`, `+` composition | `minilink/core/diagram.py` |
 | DynamicController | a `DynamicSystem` with the standard ports (the controller classes are removed by P10's AC-0) | `minilink/core/system.py` |
-| ProportionalController | ProportionalController | `minilink/control/output.py` |
+| ProportionalController | `P` | `minilink/control/siso.py` |
 | synthesize_lqr_controller | not in minilink (check at C1) | `minilink/control/design.py` |
 | linearize_and_synthesize_lqr_controller | not in minilink (check at C1) | `minilink/control/design.py` |
 | ComputedTorque | ComputedTorque | `minilink/control/modelbased.py` |
@@ -363,7 +363,7 @@ Two-column record of every symbol marked Done before the shrink; the source for 
 | stable_baseline3_controller | SB3Controller | `minilink/interfaces/gymnasium.py` |
 | Trajectory | Trajectory | `minilink/core/trajectory.py` |
 | Simulator | Simulator | `minilink/simulation/simulator.py` |
-| CLosedLoopSimulator | compute_trajectory() | `minilink/core/facades.py` |
+| CLosedLoopSimulator | compute_trajectory() | `minilink/core/facades/simulation.py` |
 | DynamicCLosedLoopSimulator | Simulator | `minilink/simulation/simulator.py` |
 | CostFunction, QuadraticCostFunction, … | CostFunction, QuadraticCost, … | `minilink/core/costs.py` |
 | Reachability | not in minilink (check at C1) | — |

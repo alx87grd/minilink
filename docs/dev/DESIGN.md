@@ -569,8 +569,8 @@ model always reads that plant object's **live** ``self.params``. The
 controller's own params dict carries gains only and is never forwarded to the
 embedded model. Consequences: mutating ``plant.params`` updates both the real
 plant and the controller model (they are usually the same object — nominal
-model-based control); diagram-level ``params={"plant": {...}}`` overrides and the
-evaluator parametric tier reach the plant subsystem but **not** the
+model-based control); diagram-level ``params={"plant": {...}}`` overrides, the
+evaluators' included, reach the plant subsystem but **not** the
 controller's embedded copy (which is exactly the model-mismatch semantics —
 override the plant to study robustness). No forwarded model-params channel is
 provided.

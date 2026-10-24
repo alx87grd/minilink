@@ -150,29 +150,28 @@ facade line, then removed, V1's step 7a), `score_trajectory` (it becomes the pro
 
 ## 3. The objects
 
-### 3.1 The compiled system: four traced bodies
+### 3.1 The compiled system: one body per method
 
 ```python
-ev = plant.compile("jax")                   # or "numpy": the same names, no jit tier
-ev.f(x, u, t, params)                       # the law; u=None is the nominal input
-ev.h(x, u, t, params)                       # the outputs and, for a diagram, the internal signals
-ev.step(x, u, t, params, *, dt, solver="rk4", substeps=1)          # x_{k+1}, u held: the one step model
-ev.rollout(x0, u_seq, t0, dt, params, *, solver="rk4", substeps=1, hold="zoh")   # scan of step: (t, xs, signals)
-ev.rollout_batch(x0s, u_seqs, dt=, params=family)                  # vmap(rollout): any leaf with a leading B axis is mapped
-
-ev.jit.step(...)       # jax.jit(ev.step), compiled once, cached; params still an argument
-ev.frozen.step(...)    # jit(partial(ev.step, params=plant.params)), bound at first use, rebound when params change
+ev = plant.compile("jax")                   # or "numpy": the same names
+ev.f(x, u, t, params=None)                  # the law; params=None reads the compiled parameters
+ev.outputs(x, u, t, params=None)            # the boundary outputs; a diagram adds ev.signals(...)
+ev.step(x, u, t, params=None, *, dt, solver="rk4", substeps=1)     # x_{k+1}, u held: the one step model
+ev.rollout(x0, u_seq, t0, dt, params=None, *, solver="rk4", substeps=1, hold="zoh", n_steps=None)   # [x_0, …, x_N]
+ev.rollout_batch(x0s, u_sequences=None, *, t0=0.0, dt, n_steps=None, params=None)   # JAX: vmap(rollout), a leaf with a leading B axis mapped
 ```
 
-Rules: the traced body is the only code, the two access forms are generated and cached once,
-never rebuilt inside a loop; `solver`, `substeps`, `hold` are static Python values, never
-traced; `dt` and `params` are the only array arguments. A step map holds its input over the
+Rules: each method is one body, written once on the array module; on JAX it is compiled once
+per evaluator (`@compiled`, R12 as finished 2026-10-24), with no `jit` or `frozen` namespace,
+and composes inside an outer `jit`, `vmap`, `scan` or `grad`; `solver`, `substeps`, `hold`
+are static Python values, never traced; `dt` and `params` are the only array arguments. The
+output method kept its name, `outputs` (OD-9). A step map holds its input over the
 step by definition, so `step` has no `hold`; `hold="zoh" | "foh"` lives on `rollout`, which
 holds a sequence (`"foh"` is the linear input shooting uses between knots; R40). For a
 `StepSystem` evaluator, `step` is the system's own map with the integer tick in place of `t`
 (`step(x, u, k, params)`, R14), no knobs; `discretize` is the one place that binds
-`t_k = t0 + k·dt`. Measured: no speed difference between the frozen and the parametric forms
-once bound (`benchmarks/params_binding.py`).
+`t_k = t0 + k·dt`. Measured: `params=None` costs what the old frozen form did
+(`benchmarks/params_binding.py`).
 
 ### 3.2 The step model
 

@@ -70,8 +70,8 @@ Why C:
 
 1. It is the rule the other plans already set. The step model "takes `params` always;
    freezing is a binding", and the parameterless call students use stays as a binding
-   ([sampled-path.md](sampled-path.md) §3); the system evaluators have a parametric tier and a
-   frozen one bound over it (DESIGN §4). The program follows the plant and the step model.
+   ([sampled-path.md](sampled-path.md) §3); every system evaluator method takes `params=None`,
+   `None` the compiled parameters (DESIGN §5). The program follows the plant and the step model.
 2. One evaluator. A plain program compiles as `(z, p)` with `p = {}`, so the duplicate of §1
    goes instead of growing.
 3. The optimizer's contract does not move: backends see a flat `z` (§6's design law), and

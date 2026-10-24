@@ -5,6 +5,10 @@
 sequences only, R42 the keyword `solver=`, R43 the RL episode a training setting); aligned to
 [continuous-core.md](continuous-core.md), the design of record for the phase, on 2026-10-23.
 First written 2026-10-21 as an evaluation of the code and a recommendation.  
+**Landed 2026-10-24** (SM-0 to SM-8): the evaluator as built is DESIGN §5, one method per
+name taking `params=None` and compiled once on JAX, with no `jit` or `frozen` forms
+([the run's log](../reviews/2026-10-24-v03-run-decisions.md) §9–§10); "today" below
+means the code of 2026-10-21.  
 **Lane:** core (the compiled evaluator, `discretize`, every sampled consumer) — every step is
 **[ask — core]**.  
 **Rung:** v0.3, the continuous-core phase of [TODO.md](TODO.md) §4: step S75 (the step
@@ -180,6 +184,9 @@ It does not fix S53: a batch with a *different* parameter set per rollout (a fam
 `vmap`) runs about 10× slower than the plain batch, a separate problem.
 
 ### 3.6 The evaluator's surface after the trim (discussed 2026-10-22, the shape proposed for D10)
+
+As landed (2026-10-24), `h` kept the name `outputs`, every method takes `params=None`, and
+the jitted and frozen access forms below were dropped for one compiled method per name.
 
 Today the JAX evaluator has 61 method names and the NumPy one 30; they are four families, two
 adapters and one convenience. After the trim, **four traced bodies**, all taking `params`:

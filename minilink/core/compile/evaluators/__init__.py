@@ -1,1 +1,1 @@
-"""Compiled evaluators — ABCs in ``evaluators``, backends in ``numpy_`` / ``jax_``."""
+"""Compiled evaluators: one class per system kind, on either backend, and the step model they share."""

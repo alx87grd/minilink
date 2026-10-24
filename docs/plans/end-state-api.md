@@ -66,7 +66,7 @@ K = lqr(plant, Q=np.eye(2), R=np.eye(1))
 plant.compute_forced(u_of_t, tf=10, solver="rk4")                 # the one rollout body: a callable at the stage times, a matrix held; solver="scipy" adaptive
 
 # 2. The compiled plant and the step model
-ev = plant.compile("jax")                                        # f, h, step, rollout, rollout_batch; ev.jit.*, ev.frozen.* generated
+ev = plant.compile("jax")                                        # f, outputs, step, rollout, rollout_batch, each compiled once on JAX
 plant_k = discretize(plant, dt=0.05, solver="rk4", substeps=1)   # a StepSystem, step(x, u, k, params); the input held by definition
 
 # 3. The cost and the problem
@@ -340,6 +340,10 @@ solver's name again.
 
 **Today:** every integrator exists frozen and with `params` (91 names across the two
 backends); a frozen evaluator silently ignores parameters changed after `compile()`.
+
+**Superseded 2026-10-24** ([the run's log](../reviews/2026-10-24-v03-run-decisions.md) §9):
+one method per name taking `params=None`, compiled once on JAX by `@compiled`; no `ev.jit`, no
+`ev.frozen`; `h` kept the name `outputs`. The ruling as first written:
 
 **Ruled:** the traced parametric body is the only code. The jitted form (`ev.jit.step`) and
 the frozen form (`ev.frozen.step`, the system's current `params` bound at first use, rebound

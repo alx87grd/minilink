@@ -436,7 +436,7 @@ class TestPlanningArchitecture(unittest.TestCase):
         self.assertTrue(traj.has_signal("cost"))
 
     def test_dynamics_function_routes_system_params_through_compiled_evaluator(self):
-        """System params flow through the parametric tier f_p, not direct sys.f."""
+        """System params flow through the compiled evaluator's params argument, not direct sys.f."""
         from minilink.blocks.basic import Integrator
         from minilink.planning.trajectory_optimization.transcription import (
             dynamics_function,

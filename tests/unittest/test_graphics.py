@@ -1143,7 +1143,7 @@ class TestAdvancedPlotting(unittest.TestCase):
         self.assertEqual(stream.getvalue(), "")
         self.assertEqual(plt.isinteractive(), interactive)
 
-    def test_compute_internal_signals(self):
+    def test_reconstruct_internal_signals(self):
         self.assertFalse(self.traj.has_signal("step:y"))
         traj_plus = self.diagram.reconstruct_internal_signals(self.traj)
         self.assertTrue(traj_plus.has_signal("step:y"))

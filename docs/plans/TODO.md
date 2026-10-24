@@ -252,7 +252,7 @@ pick):
   try-JAX-then-NumPy policy in `compile_auto` with a typed `NotTraceableError`; the
   forced-input hold as one `input_interp` option every solver obeys (its sampled side: S75) (the automatic solver
   choice changes the hold model today); what `n_steps` counts on each verb; the one-tick lag
-  inside a `Computer` tested and stated, or removed; `has_trace_tier` a boolean;
+  inside a `Computer` tested and stated, or removed;
   `simulation` stops importing `optimization` for display constants; `scipy_stiff` with
   explicit tolerances and a Jacobian; `compile(verbose=True)` in order; one set of Monte
   Carlo defaults for `MonteCarloEvaluator` and `Planner.evaluate`; flat-kwarg keys derived
@@ -561,13 +561,13 @@ LQGPlanner as picked; S73 any time, self-contained.
 
 - [ ] **S72 The path-integral planner (MPPI)** **[ask — name, MPC block contract]**, after
   S31's sampled kernel (v0.3) and RN-4 and RN-5, its plant the step model (S75), on the evaluator's batched rollout over realizations. Design:
-  [mppi.md](mppi.md); the standalone prototypes `examples/experimental/mppi/pendulum_mppi.py`
+  [mppi.md](mppi.md); the standalone prototypes `experimental/mppi/pendulum_mppi.py`
   and `racecar_mppi.py` run today. MP-1 `planning/trajectory_optimization/path_integral.py`:
   `PathIntegralPlanner` / `PathIntegralRecord` (working names; the name is the ask), `solve`
   and `solve_trajectory_from` on
   `RolloutEnvironment` (`jit(vmap(scan))` over `K` samples), the six-beat body of the plan's
   §5, `decision_dimension` and `warm_start_guess`; MP-2 the hand-loop demo
-  `examples/experimental/mppi/pendulum_mppi.py`; MP-3 the stochastic branch
+  `experimental/mppi/pendulum_mppi.py`; MP-3 the stochastic branch
   (`n_plant_samples` realizations per control sample, mean or CVaR by the problem's
   criterion) and the fan of sampled futures as `solution.plot_samples()`. Done when the
   seeded-determinism, LQR-agreement and swing-up tests pass, the deterministic twin of the
@@ -790,7 +790,7 @@ in December 2026 after the v0.3 tag; the v1.0 rows after two cohorts.
 ### After v1.0 — 1.x features, additive
 
 
-- [ ] **S36** iLQR planner from parts (`jacfwd` of `f_trace`; idea, research lane).
+- [ ] **S36** iLQR planner from parts (`jacfwd` of `ev.f`; idea, research lane).
 - [ ] **Behavior-cloning pipeline** **[ask]**: a game mode on `RealtimeSimulator` that records
   human demonstrations (keyboard or joystick driving the plant live) as trajectory datasets; a
   planner that fits a policy to them (imitation beside the RL planner, `NeuralPolicyController`

@@ -77,13 +77,13 @@ that overrides `solve` and `solve_trajectory_from` and returns a `PlanningSoluti
 with its own frozen record (`TrajectoryOptimizationRecord`, `RiccatiRecord`, … each
 with `success` and a one-line `str`).
 
-**The batched rollout.** `JaxDynamicEvaluator.rollout_batch(x0s, u_sequences, dt=,
-params=)` (`minilink/core/compile/evaluators/jax_evaluators.py`, line 348) rolls `B`
+**The batched rollout.** `ev.rollout_batch(x0s, u_sequences, dt=, params=)` on a JAX
+evaluator (`minilink/core/compile/evaluators/base.py`) rolls `B`
 RK4 / zero-order-hold trajectories in one `jit(vmap)`: `u_sequences` may be `(B, N, m)`
 (one sequence per member — the MPPI samples), and `params` may carry a leading family
-axis on any leaf (a parameter draw per member — the stochastic variant). The pre-JIT
-twins `rk4_integrate_zoh_trace` / `_trace_p` compose under a caller's own `jit` and
-`vmap`, which is what a planner that also samples and weighs on device wants. Measured
+axis on any leaf (a parameter draw per member — the stochastic variant). The compiled
+`ev.rollout` composes under a caller's own `jit` and `vmap`, which is what a planner that
+also samples and weighs on device wants. Measured
 2026-09: 1000 rollouts × 1000 RK4 steps in 27 ms (ROADMAP §3); an MPPI tick is
 `K = 1024` × `N = 40`.
 
@@ -94,7 +94,7 @@ twins `rk4_integrate_zoh_trace` / `_trace_p` compose under a caller's own `jit` 
 `criterion` (`"expectation"` / `"worst_case"`). `RolloutEnvironment`
 (`minilink/learning/reinforcement_learning/environment.py`) is "a planning problem
 seen by a learner": `step(x, t, u, key, params)` integrates one control period with the
-input held (`rk4_step_trace_p`), scores it `-g dt`, charges `infeasible_cost` when the
+input held (`ev.step` with `params`), scores it `-g dt`, charges `infeasible_cost` when the
 state leaves `X`, charges `h` at a finite horizon, and fills the disturbance ports from
 `key`. DESIGN §6 names it the one owner of what an episode means, shared by the RL
 collectors, the tabular learners and the NumPy Monte Carlo trials. The randomness plan

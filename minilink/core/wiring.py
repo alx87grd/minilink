@@ -665,7 +665,7 @@ def check_diagram_params(params, subsystem_ids):
     sys-id typos fail loudly instead of silently using defaults.
 
     Called once at public entry points (``DiagramSystem.f``, ``tf``,
-    ``get_dynamic_geometry``, the evaluators' parametric tier, the ``params``
+    ``get_dynamic_geometry``, the evaluators given ``params``, the ``params``
     setter), not inside the recursion.
 
     Parameters

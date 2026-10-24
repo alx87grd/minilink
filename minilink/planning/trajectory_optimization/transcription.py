@@ -180,7 +180,7 @@ def dynamics_function(problem: PlanningProblem, compile_backend: str):
     """Return ``(x, u, t) -> f(x, u, t)`` for a transcription.
 
     ``"numpy"`` and ``"jax"`` use a compiled evaluator; system params from
-    ``nominal_plant_params(problem)`` flow through the parametric tier ``f_p``.
+    ``nominal_plant_params(problem)`` flow through the evaluator's ``params`` argument.
     ``"direct"`` calls ``system.f`` without compiling (escape hatch for
     systems that cannot be compiled).
     """

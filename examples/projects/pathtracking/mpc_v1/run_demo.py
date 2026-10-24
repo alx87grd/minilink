@@ -5,7 +5,7 @@ PathTracking is replaced by MPC on ``BicycleDynRate``; the cascade
 
 Run from repo root::
 
-    PYTHONPATH=. python examples/projects/bicycle_los_v3/run_demo.py
+    PYTHONPATH=. python examples/projects/pathtracking/mpc_v1/run_demo.py
 """
 
 import numpy as np
