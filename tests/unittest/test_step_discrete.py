@@ -56,7 +56,7 @@ from minilink.blocks.basic import Integrator
 from minilink.blocks.routing import Gain
 from minilink.core.backends import array_module
 from minilink.core.compile.compiler import compile
-from minilink.core.compile.evaluators.numpy_evaluators import NumpyStepDiagramEvaluator
+from minilink.core.compile.evaluators.discrete import StepDiagramEvaluator
 from minilink.core.diagram import StepDiagramSystem
 from minilink.core.system import StepSystem, System
 
@@ -138,7 +138,7 @@ class TestStepDiagram(unittest.TestCase):
     def test_compile_returns_step_diagram_evaluator(self):
         diagram = _build_gain_plant_loop()
         ev = compile(diagram)
-        self.assertIsInstance(ev, NumpyStepDiagramEvaluator)
+        self.assertIsInstance(ev, StepDiagramEvaluator)
 
     def test_compiled_step_matches_interpreted(self):
         diagram = _build_gain_plant_loop()
@@ -275,7 +275,7 @@ class TestStepDiagramRollout(unittest.TestCase):
 
 
 import pytest
-from minilink.core.compile.evaluators.step_rollout import gather_u
+from minilink.core.compile.evaluators.base import gather_u
 from minilink.core.compile.execution_plan import (
     EXTERNAL_INPUT,
     INTERNAL_SIGNAL,
@@ -420,7 +420,7 @@ class TestStepRolloutJax(unittest.TestCase):
         np.testing.assert_allclose(rollout.x, ref.x, atol=1e-05)
 
 
-from minilink.core.compile.evaluators.jax_evaluators import JaxStepDiagramEvaluator
+from minilink.core.compile.evaluators.discrete import StepDiagramEvaluator
 
 try:
     import jax
@@ -454,7 +454,7 @@ class TestStepDiagramJax(unittest.TestCase):
         diagram.connect("input", "u", "gain", "u")
         diagram.connect("gain", "y", "plant", "u")
         ev = compile(diagram, backend="jax")
-        self.assertIsInstance(ev, JaxStepDiagramEvaluator)
+        self.assertIsInstance(ev, StepDiagramEvaluator)
         rollout = ev.rollout(diagram.x0, n_steps=5, u=np.array([1.0]))
         np_ev = compile(diagram, backend="numpy")
         ref = np_ev.rollout(diagram.x0, n_steps=5, u=np.array([1.0]))

@@ -87,19 +87,11 @@ def compile_step_diagram(
         print(f"  ({time.perf_counter() - t0:.3f}s)")
 
     key = normalize_backend(backend)
-    if key == BACKEND_NUMPY:
-        from minilink.core.compile.evaluators.numpy_evaluators import (
-            NumpyStepDiagramEvaluator,
-        )
-
-        evaluator = NumpyStepDiagramEvaluator(plan, diagram)
-    else:
+    if key != BACKEND_NUMPY:
         require_jax_numpy()
-        from minilink.core.compile.evaluators.jax_evaluators import (
-            JaxStepDiagramEvaluator,
-        )
+    from minilink.core.compile.evaluators.discrete import StepDiagramEvaluator
 
-        evaluator = JaxStepDiagramEvaluator(plan, diagram, verbose=verbose)
+    evaluator = StepDiagramEvaluator(plan, diagram, backend=key, verbose=verbose)
 
     if verbose:
         print(f"[compile] Done.  ({time.perf_counter() - t_total:.3f}s total)")

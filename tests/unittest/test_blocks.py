@@ -109,11 +109,11 @@ class TestBlocks(unittest.TestCase):
         pytest.importorskip("jax")
         import jax.numpy as jnp
         from minilink.blocks.routing import Gain
-        from minilink.core.compile.evaluators.jax_evaluators import JaxStaticEvaluator
+        from minilink.core.compile.evaluators.static import StaticEvaluator
 
         gain = Gain(K=2.0, dim=1)
         ev = gain.compile(backend="jax")
-        self.assertIsInstance(ev, JaxStaticEvaluator)
+        self.assertIsInstance(ev, StaticEvaluator)
         out = ev.outputs(jnp.array([]), jnp.array([3.0]), 0.0)
         np.testing.assert_allclose(np.asarray(out["y"]), [6.0])
 

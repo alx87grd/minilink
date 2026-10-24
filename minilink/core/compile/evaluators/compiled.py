@@ -29,6 +29,14 @@ def compiled(method=None, *, static=()):
     return CompiledMethod(method, tuple(static))
 
 
+def body_of(evaluator, name):
+    """The plain body of a compiled method, bound to ``evaluator``: what the Jacobian differentiates."""
+    method = getattr(type(evaluator), name)
+    body = method.method if isinstance(method, CompiledMethod) else method
+
+    return body.__get__(evaluator, type(evaluator))
+
+
 ###############################################################################
 # Internal machinery
 ###############################################################################

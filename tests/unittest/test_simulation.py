@@ -593,7 +593,7 @@ class TestStepSubsteps(unittest.TestCase):
         np.testing.assert_allclose(x_final, x_seq[-1], rtol=1e-10, atol=1e-10)
 
 
-from minilink.core.compile.evaluators.step_rollout import gather_u
+from minilink.core.compile.evaluators.base import gather_u
 from minilink.core.diagram import StepDiagramSystem
 from minilink.core.system import StepSystem, System
 from minilink.simulation.computer import Computer, StepSchedule

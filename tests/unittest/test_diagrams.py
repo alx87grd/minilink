@@ -768,11 +768,9 @@ class TestWiringMixin(unittest.TestCase):
 
 
 from minilink.blocks.routing import Gain
-from minilink.core.compile.evaluators.numpy_evaluators import (
-    NumpyDiagramEvaluator,
-    NumpyDynamicEvaluator,
-    NumpyStaticEvaluator,
-)
+from minilink.core.compile.evaluators.diagram import DiagramEvaluator
+from minilink.core.compile.evaluators.dynamic import DynamicEvaluator
+from minilink.core.compile.evaluators.static import StaticEvaluator
 from minilink.core.facades import (
     DynamicSystemFacades,
     SharedSystemFacades,
@@ -853,15 +851,15 @@ class TestSimBoundaries(unittest.TestCase):
 class TestCompileTypes(unittest.TestCase):
     def test_compile_gain_static_evaluator(self):
         gain = Gain(K=2.0, dim=1)
-        self.assertIsInstance(gain.compile(), NumpyStaticEvaluator)
+        self.assertIsInstance(gain.compile(), StaticEvaluator)
 
     def test_compile_integrator_dynamic_evaluator(self):
         plant = Integrator()
-        self.assertIsInstance(plant.compile(), NumpyDynamicEvaluator)
+        self.assertIsInstance(plant.compile(), DynamicEvaluator)
 
     def test_compile_diagram_diagram_evaluator(self):
         diagram = _unity_feedback_diagram()
-        self.assertIsInstance(diagram.compile(), NumpyDiagramEvaluator)
+        self.assertIsInstance(diagram.compile(), DiagramEvaluator)
 
 
 class TestSubsystemEvolutionKind(unittest.TestCase):

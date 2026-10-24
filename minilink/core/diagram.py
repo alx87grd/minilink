@@ -117,7 +117,7 @@ class DiagramSystem(WiredDiagramMixin, DynamicSystem):
 
         Returns
         -------
-        NumpyDiagramEvaluator or JaxDiagramEvaluator
+        DiagramEvaluator
         """
         # Lazy import: a cycle, the compiler reads DiagramSystem from this module
         from minilink.core.compile.compiler import compile_diagram
@@ -213,7 +213,7 @@ class StepDiagramSystem(WiredDiagramMixin, StepSystem):
     inputs, or port nominal values. The third gather slot is step index ``k``
     (``int``), not simulation time.
 
-    :meth:`compile` produces a :class:`~minilink.core.compile.evaluators.evaluators.StepEvaluator`
+    :meth:`compile` produces a :class:`~minilink.core.compile.evaluators.discrete.StepDiagramEvaluator`
     for fast :meth:`~minilink.core.facades.StepSystemFacades.compute_rollout`.
     """
 
@@ -290,7 +290,7 @@ class StepDiagramSystem(WiredDiagramMixin, StepSystem):
 
         Returns
         -------
-        NumpyStepDiagramEvaluator or JaxStepDiagramEvaluator
+        StepDiagramEvaluator
         """
         # Lazy import: a cycle, the step compiler reads StepDiagramSystem from here
         from minilink.core.compile.step_compiler import compile_step_diagram

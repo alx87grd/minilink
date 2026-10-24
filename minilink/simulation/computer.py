@@ -8,7 +8,7 @@ from dataclasses import dataclass, field
 import numpy as np
 
 from minilink.core.backends import BACKEND_NUMPY, normalize_backend
-from minilink.core.compile.evaluators.step_rollout import gather_u
+from minilink.core.compile.evaluators.base import gather_u
 from minilink.core.compile.execution_plan import PortOperation
 from minilink.core.compile.step_compiler import build_step_execution_plan
 from minilink.core.compile.step_execution_plan import StepExecutionPlan, StepOperation

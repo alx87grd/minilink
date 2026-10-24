@@ -1,7 +1,7 @@
 """Tests for the compilation pipeline.
 
 Validates that:
-- ``compile_diagram()`` produces a working ``NumpyDiagramEvaluator``
+- ``compile_diagram()`` produces a working ``DiagramEvaluator``
 - ``f()`` matches ``diagram.f()`` (the slow recursive reference)
 - ``signals()`` / ``compute_internal_signals_dict()`` expose the buffer
 - ``check_algebraic_loops()`` detects loops and ``evaluation_order_of()`` returns a valid order
@@ -16,7 +16,7 @@ from minilink.blocks.basic import Integrator
 from minilink.control.siso import P
 from minilink.core.backends import array_module
 from minilink.core.compile.compiler import build_execution_plan, compile_diagram
-from minilink.core.compile.evaluators.numpy_evaluators import NumpyDiagramEvaluator
+from minilink.core.compile.evaluators.diagram import DiagramEvaluator
 from minilink.core.compile.execution_plan import ExecutionPlan
 from minilink.core.diagram import DiagramSystem
 from minilink.core.system import DynamicSystem, System
@@ -201,7 +201,7 @@ class TestCompileDiagram(unittest.TestCase):
     def test_returns_numpy_evaluator(self):
         diag = _build_small_closed_loop()
         evaluator = compile_diagram(diag, backend="numpy")
-        self.assertIsInstance(evaluator, NumpyDiagramEvaluator)
+        self.assertIsInstance(evaluator, DiagramEvaluator)
 
     def test_invalid_backend_raises(self):
         diag = _build_small_closed_loop()
@@ -209,8 +209,8 @@ class TestCompileDiagram(unittest.TestCase):
             compile_diagram(diag, backend="unknown")
 
 
-class TestNumpyDiagramEvaluator(unittest.TestCase):
-    """Test NumpyDiagramEvaluator against the reference diagram.f()."""
+class TestDiagramEvaluatorNumPy(unittest.TestCase):
+    """Test the NumPy DiagramEvaluator against the reference diagram.f()."""
 
     def setUp(self):
         self.diag = _build_small_closed_loop()
@@ -364,7 +364,7 @@ class TestNumpyDiagramEvaluator(unittest.TestCase):
 try:
     import jax
     import jax.numpy as jnp
-    from minilink.core.compile.evaluators.jax_evaluators import JaxDiagramEvaluator
+    from minilink.core.compile.evaluators.diagram import DiagramEvaluator
 
     _JAX_AVAILABLE = True
 except ImportError:
@@ -374,8 +374,8 @@ except ImportError:
 @pytest.mark.optional
 @pytest.mark.jax
 @unittest.skipUnless(_JAX_AVAILABLE, "JAX not installed")
-class TestJaxDiagramEvaluatorOutputs(unittest.TestCase):
-    """JaxDiagramEvaluator boundary outputs are JIT-compiled and match NumPy."""
+class TestDiagramEvaluatorOutputsJax(unittest.TestCase):
+    """The JAX DiagramEvaluator's boundary outputs are compiled and match NumPy."""
 
     def test_outputs_match_numpy_for_boundary_configurations(self):
         for diag in [
@@ -384,7 +384,7 @@ class TestJaxDiagramEvaluatorOutputs(unittest.TestCase):
         ]:
             ev_np = compile_diagram(diag, backend="numpy")
             ev_jax = compile_diagram(diag, backend="jax")
-            self.assertIsInstance(ev_jax, JaxDiagramEvaluator)
+            self.assertIsInstance(ev_jax, DiagramEvaluator)
             x_np, u_np = (np.array([0.5]), np.array([1.0]))
             x_j = jnp.array([0.5], dtype=jnp.float32)
             u_j = jnp.array([1.0], dtype=jnp.float32)
@@ -500,7 +500,7 @@ class TestDiagramParamsContract(unittest.TestCase):
 
 
 class TestNumpyDiagramParametricTier(unittest.TestCase):
-    """NumpyDiagramEvaluator ``f`` / ``outputs`` with nested params."""
+    """DiagramEvaluator ``f`` / ``outputs`` with nested params."""
 
     def setUp(self):
         self.diag = _build_closed_loop_with_external_output()
@@ -556,7 +556,7 @@ class TestNumpyDiagramParametricTier(unittest.TestCase):
 @pytest.mark.optional
 @pytest.mark.jax
 @unittest.skipUnless(_JAX_AVAILABLE, "JAX not installed")
-class TestJaxDiagramParametricTier(unittest.TestCase):
+class TestDiagramEvaluatorParamsJax(unittest.TestCase):
     """JAX evaluator with params: ``f``, ``outputs``, gradients w.r.t. params."""
 
     def setUp(self):
@@ -610,16 +610,14 @@ class TestJaxDiagramParametricTier(unittest.TestCase):
 
 from minilink.blocks.routing import Gain
 from minilink.core.compile.compiler import compile
-from minilink.core.compile.evaluators.evaluators import DynamicsEvaluator
-from minilink.core.compile.evaluators.numpy_evaluators import NumpyStaticEvaluator
+from minilink.core.compile.evaluators.base import ContinuousEvaluator
+from minilink.core.compile.evaluators.static import StaticEvaluator
 
 try:
     import jax
-    from minilink.core.compile.evaluators.jax_evaluators import JaxStaticEvaluator
 
     _JAX_AVAILABLE = True
 except ImportError:
-    JaxStaticEvaluator = None
     _JAX_AVAILABLE = False
 
 
@@ -627,8 +625,8 @@ class TestCompileStatic(unittest.TestCase):
     def test_compile_gain_returns_numpy_static_evaluator(self):
         gain = Gain(K=3.0, dim=1)
         ev = compile(gain)
-        self.assertIsInstance(ev, NumpyStaticEvaluator)
-        self.assertFalse(isinstance(ev, DynamicsEvaluator))
+        self.assertIsInstance(ev, StaticEvaluator)
+        self.assertFalse(isinstance(ev, ContinuousEvaluator))
         self.assertFalse(hasattr(ev, "f") or callable(getattr(ev, "f", None)))
 
     def test_static_outputs_match_block(self):
@@ -647,14 +645,14 @@ class TestCompileStaticJax(unittest.TestCase):
         gain = Gain(K=2.5, dim=1)
         ev_np = compile(gain, backend="numpy")
         ev_jx = compile(gain, backend="jax")
-        self.assertIsInstance(ev_jx, JaxStaticEvaluator)
+        self.assertIsInstance(ev_jx, StaticEvaluator)
         u = np.array([2.0])
         out_np = ev_np.outputs(np.array([]), u, 0.0)
         out_jx = ev_jx.outputs(np.array([]), u, 0.0)
         np.testing.assert_allclose(np.asarray(out_jx["y"]), out_np["y"], atol=1e-05)
 
 
-from minilink.core.compile.evaluators.numpy_evaluators import NumpyStepEvaluator
+from minilink.core.compile.evaluators.discrete import StepEvaluator
 from minilink.core.system import StepSystem
 
 
@@ -672,7 +670,7 @@ class LinearStep(StepSystem):
 class TestCompileStepLeaf(unittest.TestCase):
     def test_compile_returns_numpy_step_evaluator(self):
         ev = compile(LinearStep())
-        self.assertIsInstance(ev, NumpyStepEvaluator)
+        self.assertIsInstance(ev, StepEvaluator)
 
     def test_frozen_params_step_parity(self):
         plant = LinearStep()
@@ -724,12 +722,12 @@ class TestEvaluatorApi(unittest.TestCase):
                 return x
 
         ev = compile(IdentityStep())
-        self.assertIsInstance(ev, NumpyStepEvaluator)
+        self.assertIsInstance(ev, StepEvaluator)
         self.assertTrue(hasattr(ev, "rollout"))
         self.assertFalse(hasattr(ev, "f"))
         self.assertFalse(hasattr(ev, "integrate"))
         self.assertFalse(hasattr(ev, "h"))
-        self.assertFalse(isinstance(ev, DynamicsEvaluator))
+        self.assertFalse(isinstance(ev, ContinuousEvaluator))
 
 
 @pytest.mark.optional
@@ -823,7 +821,7 @@ class TestCompiledMethodsNumPy(unittest.TestCase):
     def test_numpy_methods_are_the_plain_bodies(self):
         ev = compile(Integrator(), backend="numpy")
         self.assertEqual(ev.f.__func__.__name__, "f")
-        self.assertFalse(hasattr(ev, "compiled_forms"))
+        self.assertEqual(ev.compiled_forms, {})
 
 
 @pytest.mark.optional

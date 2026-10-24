@@ -79,7 +79,7 @@ class Sys2Gym(gym.Env):
     ----------
     compile_backend : str
         Backend actually used for the step (``"numpy"`` or ``"jax"``).
-    evaluator : DynamicsEvaluator
+    evaluator : DynamicEvaluator or DiagramEvaluator
         Compiled plant the step runs on.
     clipping_inputs : bool
         Clip the actions to the input-port bounds (default ``True``).

@@ -652,21 +652,22 @@ jitted `f` call costs about the same as the NumPy one (dispatch dominates),
 while `rollout_batch` and the compiled `rollout` run 1000 rollouts of
 1000 RK4 steps in tens of milliseconds. Quote those; never a per-call ratio.
 
-`compile(system, backend)` returns a typed evaluator:
+`compile(system, backend)` returns one evaluator class per system kind, on either
+backend (`backend` picked at construction; JAX imported only by a JAX evaluator):
 
-On JAX the evaluator also offers `rollout_batch(x0s, u_sequences=None, *, t0, dt,
-n_steps, params=None)` — one `vmap` of the RK4 / ZOH rollout over a family of
+- :class:`DynamicSystem` → `DynamicEvaluator` (`evaluators/dynamic.py`): `f`, `outputs`,
+  the step model
+- :class:`DiagramSystem` → `DiagramEvaluator` (`evaluators/diagram.py`): the same, and the
+  internal `signals`
+- static :class:`System` (`n=0`) → `StaticEvaluator` (`evaluators/static.py`): `outputs` only
+- :class:`StepSystem` → `StepEvaluator`, a step diagram → `StepDiagramEvaluator`
+  (`evaluators/discrete.py`): `step`, `outputs`, state-only `rollout`; no `f`
+
+On JAX a continuous evaluator also offers `rollout_batch(x0s, u_sequences=None, *, t0,
+dt, n_steps, params=None)` — one `vmap` of the RK4 / ZOH rollout over a family of
 initial states, input sequences, and params (a params leaf with one more
 dimension than the compiled value is swept); the research facade for
 parameter-family experiments.
-
-- :class:`DynamicSystem` leaf → :class:`~minilink.core.compile.evaluators.evaluators.DynamicsEvaluator`
-  (`NumpyDynamicEvaluator` / `JaxDynamicEvaluator`)
-- :class:`StepSystem` leaf → :class:`~minilink.core.compile.evaluators.evaluators.StepEvaluator`
-  (`NumpyStepEvaluator` / `JaxStepEvaluator`) — `.step`, `.outputs`, state-only `.rollout`; no `.f`
-- static :class:`System` leaf (`n=0`) → :class:`~minilink.core.compile.evaluators.evaluators.StaticEvaluator`
-  (`NumpyStaticEvaluator` / `JaxStaticEvaluator`) — `.outputs` only, no `.f`
-- :class:`DiagramSystem` → diagram evaluator (same dynamics tier as above)
 
 Leaf `compile` accepts `numpy` or `jax` only (`auto` / `direct` are simulator /
 transcription concepts — see :mod:`minilink.core.backends`).
@@ -707,9 +708,11 @@ value iteration (`StateSpaceGrid.successor`), shooting, the fixed-step solvers, 
 the Lyapunov sampler and the hybrid and realtime simulators all call them. The adaptive
 SciPy solver adapts `f` for `solve_ivp` itself (`simulation/solvers/scipy_ivp.py`).
 
-Layout: `evaluators.py` (the bases), `compiled.py` (the mark), `stepping.py` (the step
-model's formulas), `numpy_evaluators.py`, `jax_evaluators.py`, `jacobian.py` (`jacobian`),
-`step_rollout.py` (`gather_u`, `StepRolloutMixin`).
+Layout of `core/compile/evaluators/`: `base.py` (the `Evaluator` base, the continuous step
+model, `gather_u`), `dynamic.py`, `diagram.py`, `static.py`, `discrete.py` (one class per
+system kind, both backends), `compiled.py` (the mark), `stepping.py` (the step model's
+formulas and the loop / `lax.scan` that runs them), `jacobian.py` (`jacobian`: central
+differences on NumPy, `jax.jacfwd` on the uncompiled body on JAX).
 
 **Frozen evaluator subset.** The stable evaluator API is the methods above: `f`,
 `outputs`, `signals`, `step`, `rollout`, `rollout_batch` and `jacobian`, each with

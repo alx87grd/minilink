@@ -6,10 +6,10 @@ in an immutable and flattened form, all the information needed to evaluate a
 :class:`~minilink.core.diagram.DiagramSystem` without any dictionary lookups
 or recursive calls.
 
-The plan is consumed by evaluator backends
-(:class:`~minilink.core.compile.evaluators.numpy_evaluators.NumpyDiagramEvaluator`,
-:class:`~minilink.core.compile.evaluators.jax_evaluators.JaxDiagramEvaluator`) which walk through the
-operation lists in topological order to compute state derivatives and outputs.
+The plan is consumed by the
+:class:`~minilink.core.compile.evaluators.diagram.DiagramEvaluator` (on either
+backend), which walks through the operation lists in topological order to
+compute state derivatives and outputs.
 """
 
 from collections.abc import Callable

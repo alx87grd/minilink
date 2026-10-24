@@ -100,9 +100,10 @@ def _check_shape(value, expected, what, context):
 def compile(system, backend=BACKEND_NUMPY, verbose=False):
     """Compile a system into a typed evaluator.
 
-    Returns :class:`StaticEvaluator` for static ``System`` leaves (``n=0``),
-    :class:`StepEvaluator` for :class:`StepSystem` leaves,
-    :class:`DynamicsEvaluator` for :class:`DynamicSystem` leaves and diagrams.
+    Returns a :class:`DynamicEvaluator` for a :class:`DynamicSystem`, a
+    :class:`DiagramEvaluator` for a diagram, a :class:`StepEvaluator` for a
+    :class:`StepSystem`, a :class:`StepDiagramEvaluator` for a step diagram and a
+    :class:`StaticEvaluator` for a static ``System`` (``n=0``).
 
     Parameters
     ----------
@@ -126,58 +127,27 @@ def compile(system, backend=BACKEND_NUMPY, verbose=False):
 
     key = normalize_backend(backend)
     validate_equation_shapes(system)
+    if key != BACKEND_NUMPY:
+        require_jax_numpy()
 
+    # One evaluator class per system kind, on either backend
     if isinstance(system, StepSystem):
-        if key == BACKEND_NUMPY:
-            from minilink.core.compile.evaluators.numpy_evaluators import (
-                NumpyStepEvaluator,
-            )
-
-            return NumpyStepEvaluator(system)
-        require_jax_numpy()
-        from minilink.core.compile.evaluators.jax_evaluators import JaxStepEvaluator
-
-        t_total = time.perf_counter()
-        evaluator = JaxStepEvaluator(system, verbose=verbose)
-        if verbose:
-            print(f"[compile] Done.  ({time.perf_counter() - t_total:.3f}s total)")
-        return evaluator
-
-    if isinstance(system, DynamicSystem):
-        if key == BACKEND_NUMPY:
-            from minilink.core.compile.evaluators.numpy_evaluators import (
-                NumpyDynamicEvaluator,
-            )
-
-            return NumpyDynamicEvaluator(system)
-        require_jax_numpy()
-        from minilink.core.compile.evaluators.jax_evaluators import JaxDynamicEvaluator
-
-        t_total = time.perf_counter()
-        evaluator = JaxDynamicEvaluator(system, verbose=verbose)
-        if verbose:
-            print(f"[compile] Done.  ({time.perf_counter() - t_total:.3f}s total)")
-        return evaluator
-
-    if system.n > 0:
+        from minilink.core.compile.evaluators.discrete import StepEvaluator as kind
+    elif isinstance(system, DynamicSystem):
+        from minilink.core.compile.evaluators.dynamic import DynamicEvaluator as kind
+    elif system.n > 0:
         raise TypeError(
             f"Cannot compile {type(system).__name__} with n={system.n}; "
             "subclass DynamicSystem and implement f(), or StepSystem for discrete evolution."
         )
-
-    if key == BACKEND_NUMPY:
-        from minilink.core.compile.evaluators.numpy_evaluators import (
-            NumpyStaticEvaluator,
-        )
-
-        return NumpyStaticEvaluator(system)
-    require_jax_numpy()
-    from minilink.core.compile.evaluators.jax_evaluators import JaxStaticEvaluator
+    else:
+        from minilink.core.compile.evaluators.static import StaticEvaluator as kind
 
     t_total = time.perf_counter()
-    evaluator = JaxStaticEvaluator(system, verbose=verbose)
+    evaluator = kind(system, backend=key, verbose=verbose)
     if verbose:
         print(f"[compile] Done.  ({time.perf_counter() - t_total:.3f}s total)")
+
     return evaluator
 
 
@@ -225,7 +195,7 @@ def compile_diagram(
 
     Returns
     -------
-    NumpyDiagramEvaluator or JaxDiagramEvaluator
+    DiagramEvaluator
         A stateless evaluator that can compute state derivatives and outputs.
 
     Examples
@@ -294,18 +264,11 @@ def compile_diagram(
 
     # Create evaluator (steps 0, 3, 4 handled inside for JAX)
     key = normalize_backend(backend)
-    if key == BACKEND_NUMPY:
-        from minilink.core.compile.evaluators.numpy_evaluators import (
-            NumpyDiagramEvaluator,
-        )
-
-        evaluator = NumpyDiagramEvaluator(plan, diagram)
-    else:
-        # key == BACKEND_JAX (normalize_backend already validated)
+    if key != BACKEND_NUMPY:
         require_jax_numpy()
-        from minilink.core.compile.evaluators.jax_evaluators import JaxDiagramEvaluator
+    from minilink.core.compile.evaluators.diagram import DiagramEvaluator
 
-        evaluator = JaxDiagramEvaluator(plan, diagram, verbose=verbose)
+    evaluator = DiagramEvaluator(plan, diagram, backend=key, verbose=verbose)
 
     if verbose:
         print(f"[compile] Done.  ({time.perf_counter() - t_total:.3f}s total)")
