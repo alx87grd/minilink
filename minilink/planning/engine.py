@@ -547,13 +547,13 @@ def score_run(problem, traj: Trajectory, *, tf=None) -> dict:
     cost_fn = problem.require_cost()
     xp = array_module(traj.x)
     rho = discount_rate_of(problem)
-    price = price_of(problem)
     finite_horizon = problem.horizon_kind() == "finite"
 
     t = traj.t
     x = traj.x.T
     u = traj.u.T
     tf = t[-1] if tf is None else tf
+    price = price_of(problem, tf)
 
     # Finite: every sample, then the run on zeros where it is not (the safe where)
     finite = xp.all(xp.isfinite(x)) & xp.all(xp.isfinite(u))
@@ -769,20 +769,15 @@ def discount_rate_of(problem):
     return float(problem.discount_rate)
 
 
-def price_of(problem):
-    """The price of a failed or missed run: ``None`` (switch off), the bound (``True``), or the number."""
+def price_of(problem, tf):
+    """The price of a failed or missed run of length ``tf``: ``None`` (switch off), the bound (``True``), or the number."""
     price = problem.infeasible_cost
     if price is None:
         return None
     if price is True:
-        return problem.cost_bound()
-    if callable(price):
-        raise TypeError(
-            "infeasible_cost must be None, True or a number for an evaluation, got a "
-            "callable"
-        )
+        return problem.cost_bound(tf)
 
-    return float(price)
+    return price
 
 
 def horizon_of(problem, episode_length):

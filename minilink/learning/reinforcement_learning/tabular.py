@@ -9,9 +9,9 @@ import numpy as np
 from minilink.learning.reinforcement_learning.environment import RolloutEnvironment
 from minilink.planning.dynamic_programming import plotting
 from minilink.planning.dynamic_programming.dp import (
-    DynamicProgrammingOptions,
     DynamicProgrammingResult,
     grid_of,
+    grid_price,
 )
 from minilink.planning.evaluation import nominal_trajectory
 from minilink.planning.planner import Planner
@@ -121,11 +121,10 @@ class TabularLearningPlanner(Planner):
         grid = grid_of(problem, grid, x_grid, u_grid, dt)
         self.grid = grid
 
-        # The world is the grid: leaving it is infeasible, at the problem's price or
-        # value iteration's default, so the learner approaches the same table
-        price = problem.infeasible_cost
-        if price is None:
-            price = DynamicProgrammingOptions().out_of_bound_cost
+        # The world is the grid: leaving it is infeasible, at value iteration's
+        # price, so the learner approaches the same table
+        alpha_dp = problem.discount_factor(grid.dt) if alpha is None else float(alpha)
+        price = grid_price(problem, alpha_dp, grid.dt)
         self.env = RolloutEnvironment(
             replace(problem, X=problem.X & grid.X, infeasible_cost=price),
             dt=grid.dt,

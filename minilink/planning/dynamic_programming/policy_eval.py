@@ -1,10 +1,13 @@
 """Policy evaluation: the cost-to-go of a fixed control law on a discretized state space."""
 
+from dataclasses import replace
+
 import numpy as np
 
 from minilink.core.feedback import block_roles
 from minilink.planning.dynamic_programming.dp import (
     DynamicProgrammingOptions,
+    grid_price,
     infeasible_penalty,
 )
 from minilink.planning.dynamic_programming.plotting import cost_scale_limit
@@ -61,8 +64,13 @@ class PolicyEvaluator:
         policy = policy_of(policy)
         self.policy = policy if callable(policy) else policy_from_block(policy)
 
-        # Workflow options, shared with the dynamic-programming planner
-        self.options = DynamicProgrammingOptions() if options is None else options
+        # Workflow options, shared with the dynamic-programming planner, the price
+        # the problem's when unset
+        options = DynamicProgrammingOptions() if options is None else options
+        if options.out_of_bound_cost is None:
+            price = grid_price(problem, options.alpha, grid.dt)
+            options = replace(options, out_of_bound_cost=price)
+        self.options = options
 
         # Memory
         self.last_J = None  # The latest solve's cost-to-go

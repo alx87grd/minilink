@@ -565,12 +565,13 @@ class DynamicProgrammingOptions:
         Cost-to-go interpolation. ``"linear"`` (default) and ``"nearest"`` are
         robust; spline methods (``"cubic"``, the ``"spline"`` alias, ``"quintic"``)
         are smoother but can ring across the infeasibility penalty.
-    out_of_bound_cost : float or callable
+    out_of_bound_cost : float or callable, optional
         Finite penalty charged to inadmissible inputs or out-of-domain
         successors: a scalar, or ``out_of_bound_cost(x_next, t)`` evaluated at
         each inadmissible pair's successor (the ``"jax"`` backend needs it
-        traceable and time-invariant). The planner reads the problem's
-        ``infeasible_cost`` as its default.
+        traceable and time-invariant). Unset (``None``), the problem's price:
+        its ``infeasible_cost`` when a number, else the bound of its cost on
+        this discount (:func:`grid_price`).
     final_time : float
         Terminal time ``tf``; sweeps step backward as ``t = tf - k dt``. Left
         at ``0.0``, the planner reads ``problem.tf`` when the problem sets one.
@@ -593,7 +594,7 @@ class DynamicProgrammingOptions:
     tol: float = 0.1
     max_iterations: int = 1000
     interpolation: str = "linear"
-    out_of_bound_cost: float | Callable = 1.0e6
+    out_of_bound_cost: float | Callable | None = None
     final_time: float = 0.0
     record_history: bool = False
     verbose: bool = False
@@ -705,16 +706,14 @@ def options_of(problem, grid, options, **flat) -> DynamicProgrammingOptions:
     given = {key: value for key, value in flat.items() if value is not _UNSET}
     opt = replace(base, **given) if given else base
 
-    # The problem's price of infeasibility, a scalar or price(x, t) at the exit state,
-    # is the default price of leaving the grid
-    price = problem.infeasible_cost
-    if "out_of_bound_cost" not in given and price is not None:
-        opt = replace(opt, out_of_bound_cost=price if callable(price) else float(price))
-
     # The problem's continuous discount rate becomes the per-step factor, unless
     # alpha is set
     if "alpha" not in given and problem.discount_rate > 0.0:
         opt = replace(opt, alpha=problem.discount_factor(grid.dt))
+
+    # The price of leaving the grid, unless set: the problem's, else the bound of its cost
+    if opt.out_of_bound_cost is None:
+        opt = replace(opt, out_of_bound_cost=grid_price(problem, opt.alpha, grid.dt))
 
     # The problem's horizon is the terminal time unless final_time is set
     if "final_time" not in given and opt.final_time == 0.0:
@@ -726,6 +725,23 @@ def options_of(problem, grid, options, **flat) -> DynamicProgrammingOptions:
         raise ValueError(f"Unknown backend {opt.backend!r}")
 
     return opt
+
+
+def grid_price(problem, alpha, dt):
+    """
+    The price of an inadmissible pair: ``infeasible_cost`` when a number, else the cost bound.
+
+    The bound is the problem's :meth:`~minilink.planning.problems.PlanningProblem.cost_bound`
+    on value iteration's own sum: with ``α < 1``, ``Σₖ αᵏ dt = dt / (1 − α)``,
+    the horizon ``1 / ρ`` of the rate ``ρ = (1 − α) / dt`` (above ``−ln(α) / dt``,
+    so the bound covers the discrete sum); with ``α = 1``, the problem's horizon.
+    """
+    rho = problem.discount_rate
+    if alpha < 1.0:
+        # Σₖ αᵏ dt = dt / (1 − α) = 1 / ρ
+        rho = (1.0 - alpha) / dt
+
+    return problem.infeasibility_price(discount_rate=rho)
 
 
 def cached_options_of(options) -> tuple:

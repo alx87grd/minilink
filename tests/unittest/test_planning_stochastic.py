@@ -61,19 +61,49 @@ def test_problem_exit_rule_and_penalty():
         plant, cost=quadratic(plant), tf=np.inf, U=plant.input_box
     )
     assert problem.infeasible_cost is None
-    assert problem.infeasible_penalty(np.zeros(2)) is None
     assert problem.X.contains(np.array([1e9, -1e9]))  # unconstrained by default
     assert problem.horizon_kind() == "infinite"
 
     scalar = PlanningProblem(plant, tf=2.0, infeasible_cost=50, U=plant.input_box)
     assert scalar.infeasible_cost == 50.0
-    assert scalar.infeasible_penalty(np.zeros(2), 1.0) == 50.0
+    assert scalar.infeasibility_price() == 50.0
     assert scalar.horizon_kind() == "finite"
 
-    shaped = PlanningProblem(
-        plant, infeasible_cost=lambda x, t: 10.0 * float(x[0] ** 2), U=plant.input_box
+    # The switch: None, True (the bound) or a number; a callable price is refused
+    assert PlanningProblem(plant, infeasible_cost=True).infeasible_cost is True
+    for refused in (lambda x, t: 1.0, False, "big"):
+        with pytest.raises(TypeError, match="infeasible_cost"):
+            PlanningProblem(plant, infeasible_cost=refused)
+
+
+def test_the_cost_bound_integrates_the_cost_maximum_over_the_horizon():
+    plant = pendulum()  # state box ±2π × ±10, input box the plant's ±5
+    cost = QuadraticCost.from_system(plant, Q=np.eye(2), R=np.eye(1), S=np.eye(2))
+    g_max = (2 * np.pi) ** 2 + 10.0**2 + 5.0**2
+    h_max = (2 * np.pi) ** 2 + 10.0**2
+
+    # Finite horizon: g_max T + h_max
+    finite = PlanningProblem(
+        plant, cost=cost, tf=2.0, X=plant.state.box, U=plant.input_box
     )
-    assert shaped.infeasible_penalty(np.array([2.0, 0.0])) == 40.0
+    assert finite.cost_bound() == pytest.approx(2.0 * g_max + h_max)
+    assert finite.infeasibility_price() == pytest.approx(2.0 * g_max + h_max)
+
+    # Discounted infinite horizon: g_max / ρ, no h
+    discounted = PlanningProblem(
+        plant,
+        cost=cost,
+        tf=np.inf,
+        X=plant.state.box,
+        U=plant.input_box,
+        discount_rate=0.5,
+    )
+    assert discounted.cost_bound() == pytest.approx(g_max / 0.5)
+
+    # Undiscounted infinite horizon: no bound, 1e6 announced
+    undiscounted = PlanningProblem(plant, cost=cost, tf=np.inf, U=plant.input_box)
+    with pytest.warns(UserWarning, match="infeasible_cost"):
+        assert undiscounted.cost_bound() == 1.0e6
 
 
 def test_dp_reads_the_problem_infeasible_cost():

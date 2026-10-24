@@ -164,10 +164,6 @@ class Sys2Gym(gym.Env):
         deterministic :class:`~minilink.planning.problems.PlanningProblem`
         starts every episode at its ``x_start``.
         """
-        from minilink.core.feedback import command_port
-        from minilink.learning.reinforcement_learning.environment import (
-            feasible_cost_bound,
-        )
         from minilink.planning.problems import as_stochastic
 
         problem = as_stochastic(problem)
@@ -177,16 +173,7 @@ class Sys2Gym(gym.Env):
         env = ProblemEnv(problem.sys, problem.require_cost(), dt=dt, tf=tf, **kwargs)
         env.problem = problem
         env.finite_horizon = finite
-        env.infeasible_cost = problem.infeasible_cost
-        if env.infeasible_cost is None:
-            env.infeasible_cost = feasible_cost_bound(
-                problem,
-                problem.sys.state.box,
-                command_port(problem.sys),
-                dt,
-                int(round(tf / dt)),
-                problem.discount_rate,
-            )
+        env.infeasible_cost = problem.infeasibility_price(tf)
         return env
 
     def reset(self, seed=None, options=None):

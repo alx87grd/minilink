@@ -3,12 +3,10 @@
 import warnings
 
 import numpy as np
-from scipy.stats import qmc
 
 from minilink.core.backends import BACKEND_JAX, BACKEND_NUMPY, array_module
 from minilink.core.compile.evaluators.stepping import require_step_knobs
 from minilink.core.feedback import command_port
-from minilink.core.sets import is_finite_box
 from minilink.planning.problems import as_stochastic, merge_params
 
 ###############################################################################
@@ -108,7 +106,7 @@ class RolloutEnvironment:
         self.nominal_inputs = self.nominal_port_values()
 
         # The price of infeasibility a failure is charged: declared on the problem,
-        # else a bound of any feasible cost, announced once
+        # else the bound of its cost over an episode
         self.infeasible_cost = self.price_of_infeasibility()
 
         # Noise the held-input rollout never sees is announced
@@ -217,10 +215,8 @@ class RolloutEnvironment:
         return u_full
 
     def infeasible_penalty(self, x, t):
-        """The price of infeasibility at ``(x, t)``: the problem's, scalar or callable."""
-        price = self.infeasible_cost
-
-        return price(x, t) if callable(price) else price
+        """The price of infeasibility at ``(x, t)``: one number for every exit."""
+        return self.infeasible_cost
 
     def full_params(self, params):
         """The plant's params with the episode's draws merged in (other entries untouched)."""
@@ -230,7 +226,7 @@ class RolloutEnvironment:
         """One line naming the horizon, the constraint's price, the training zone and the randomization."""
         kind = "finite horizon" if self.finite_horizon else "infinite horizon"
         price = self.infeasible_cost
-        charged = "infeasible_cost(x, t)" if callable(price) else f"{price:.3g}"
+        charged = f"{price:.3g}"
         randomized = (
             f", randomized params {sorted(self.params_distribution)}"
             if self.randomizes_params
@@ -261,81 +257,8 @@ class RolloutEnvironment:
         return values
 
     def price_of_infeasibility(self):
-        """The problem's ``infeasible_cost``; else a bound of any feasible cost, announced once."""
-        if self.problem.infeasible_cost is not None:
-            return self.problem.infeasible_cost
-
-        bound = feasible_cost_bound(
-            self.problem,
-            self.training_zone,
-            self.action_port,
-            self.dt,
-            self.n_steps_per_episode,
-            self.discount_rate,
-        )
-
-        # Announced only when X is a finite box and the bound is finite
-        if is_finite_box(self.X.bounding_box()) and np.isfinite(bound):
-            warnings.warn(
-                f"leaving X is charged {bound:.3g}, a bound of any feasible cost over "
-                f"{self.tf:g} s; set infeasible_cost on the problem to choose",
-                stacklevel=3,
-            )
-
-        return bound
-
-
-def feasible_cost_bound(
-    problem, zone, action_port, dt, n_steps, discount_rate, samples=4096
-):
-    """
-    A bound of the discounted cost of any trajectory that stays in the zone.
-
-    Samples the running cost on the box of the zone (else of ``X``) and of the
-    action port, the other ports at their nominal values (a Halton set), for its
-    maximum ``g_max``, then sums it over the episode with the discount:
-    ``g_max dt (1 - gamma^N) / (1 - gamma)``. A failure charged this much is
-    never preferable to any feasible continuation (the penalty method). ``+inf``
-    when no finite box bounds the cost.
-    """
-    sys = problem.sys
-
-    # The box of the zone, else of X, and of the action port: none finite, no bound
-    X_box = zone.bounding_box()
-    if not is_finite_box(X_box):
-        X_box = problem.X.bounding_box()
-    U_box = sys.inputs[action_port].box
-    if not (is_finite_box(X_box) and is_finite_box(U_box)):
-        return np.inf
-
-    # A Halton set over the box of (x, u)
-    lower = np.concatenate([X_box.lower, U_box.lower])
-    upper = np.concatenate([X_box.upper, U_box.upper])
-    unit = qmc.Halton(d=lower.size, scramble=False).random(int(samples) + 1)[1:]
-    points = lower + unit * (upper - lower)
-
-    # The running cost at a point, the other ports at their nominal values
-    n = X_box.dim
-    g = problem.cost.g
-    u_full = np.asarray(sys.get_u_from_input_ports(), dtype=float)
-    action = sys.get_input_port_slice(action_port)
-
-    def running_cost(point):
-        u = u_full.copy()
-        u[action] = point[n:]
-        return float(g(point[:n], u, 0.0))
-
-    # The largest running cost on that set
-    g_max = max(running_cost(p) for p in points)
-
-    # J_max = Σ_{k<N} γᵏ g_max dt, with γ = exp(−ρ dt)
-    gamma = float(np.exp(-discount_rate * dt))
-    if gamma >= 1.0:
-        J_max = g_max * dt * n_steps
-    else:
-        J_max = g_max * dt * (1.0 - gamma**n_steps) / (1.0 - gamma)
-
-    return J_max
+        """The problem's ``infeasible_cost`` when a number, else the bound of its cost over the episode."""
+        return self.problem.infeasibility_price(self.tf)
 
 
 ###############################################################################

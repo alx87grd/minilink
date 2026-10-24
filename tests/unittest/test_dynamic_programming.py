@@ -258,7 +258,8 @@ class TestControllerAndEvaluation(unittest.TestCase):
             problem, grid=result.grid, policy=controller.action, options=planner.options
         )
         J_pi = evaluator.solve()
-        feasible = result.J < planner.options.out_of_bound_cost - 1.0
+        price = planner.options.out_of_bound_cost
+        feasible = result.J < 0.5 * price  # The cells clear of the price
         self.assertLess(np.max(np.abs(J_pi[feasible] - result.J[feasible])), 0.05)
 
     def test_result_save_load_round_trip(self):
@@ -901,14 +902,12 @@ def exit_price(x, t):
 
 
 class TestInfeasibleCostPrice(unittest.TestCase):
-    """The problem's infeasible_cost(x, t) prices each inadmissible pair at its successor."""
+    """Value iteration's out_of_bound_cost(x, t) prices each inadmissible pair at its successor."""
 
     def planner(self, price, backend="numpy", **kwargs):
-        from dataclasses import replace
-
-        problem = replace(make_pendulum_problem(), infeasible_cost=price)
         return DynamicProgrammingPlanner(
-            problem,
+            make_pendulum_problem(),
+            out_of_bound_cost=price,
             x_grid=(11, 11),
             u_grid=(5,),
             dt=0.1,

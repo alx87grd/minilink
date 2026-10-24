@@ -44,6 +44,33 @@ class CostFunction(ABC):
         """Return the native scalar terminal cost ``h(x, t)``."""
         ...
 
+    def g_max(self, X, U, params=None):
+        """
+        An upper bound of ``g`` over the boxes ``X × U`` (two :class:`~minilink.core.sets.BoxSet`).
+
+        The largest ``g`` on a quasi-random sample of the boxes at ``t = 0``: a
+        sampled estimate, which a subclass replaces by its exact maximum.
+        """
+        xs, us = box_samples(X, U)
+        g = self.g
+
+        # g_max ≈ max over the samples of g(x, u, 0)
+        values = [float(g(x, u, 0.0, params)) for x, u in zip(xs, us)]
+        g_max = max(values)
+
+        return g_max
+
+    def h_max(self, X, params=None):
+        """An upper bound of ``h`` over the box ``X``: the largest ``h`` on a quasi-random sample."""
+        xs, _ = box_samples(X, None)
+        h = self.h
+
+        # h_max ≈ max over the samples of h(x, 0)
+        values = [float(h(x, 0.0, params)) for x in xs]
+        h_max = max(values)
+
+        return h_max
+
     def integrate(self, traj: Trajectory, *, discount_rate=0.0, params=None):
         """
         The run's discounted running cost: ``(cost_rate, cost)``, both shape ``(N,)``.
@@ -265,6 +292,19 @@ class QuadraticCost(CostFunction):
 
         return h
 
+    def g_max(self, X, U, params=None):
+        """The exact maximum of ``g`` over the boxes: each quadratic at its farthest vertex."""
+        # max g = max (x − x̄)ᵀ Q (x − x̄) + max (u − ū)ᵀ R (u − ū), the two independent
+        g_max = quadratic_max(self.Q, self.xbar, X) + quadratic_max(
+            self.R, self.ubar, U
+        )
+
+        return g_max
+
+    def h_max(self, X, params=None):
+        """The exact maximum of ``h`` over the box ``X``."""
+        return quadratic_max(self.S, self.xbar, X)
+
 
 @dataclass(frozen=True)
 class TimeCost(CostFunction):
@@ -310,6 +350,14 @@ class TimeCost(CostFunction):
         """Return zero terminal cost."""
         return 0.0
 
+    def g_max(self, X, U, params=None):
+        """``g`` is at most 1."""
+        return 1.0
+
+    def h_max(self, X, params=None):
+        """``h`` is 0."""
+        return 0.0
+
 
 @dataclass(frozen=True)
 class SumCost(CostFunction):
@@ -352,6 +400,14 @@ class SumCost(CostFunction):
 
         return h
 
+    def g_max(self, X, U, params=None):
+        """The sum of the terms' bounds: ``max Σ gᵢ ≤ Σ max gᵢ``."""
+        return sum(cost.g_max(X, U, params) for cost in self.terms)
+
+    def h_max(self, X, params=None):
+        """The sum of the terms' bounds."""
+        return sum(cost.h_max(X, params) for cost in self.terms)
+
 
 @dataclass(frozen=True)
 class ScaledCost(CostFunction):
@@ -385,6 +441,20 @@ class ScaledCost(CostFunction):
 
         return h
 
+    def g_max(self, X, U, params=None):
+        """``w · max g₀`` for a nonnegative weight; sampled for a negative one."""
+        if self.weight < 0.0:
+            return super().g_max(X, U, params)
+
+        return self.weight * self.cost.g_max(X, U, params)
+
+    def h_max(self, X, params=None):
+        """``w · max h₀`` for a nonnegative weight; sampled for a negative one."""
+        if self.weight < 0.0:
+            return super().h_max(X, params)
+
+        return self.weight * self.cost.h_max(X, params)
+
 
 ###############################################################################
 # Internal machinery
@@ -399,6 +469,71 @@ def check_weights(Q, R, S, n, m):
         raise ValueError("S must have shape (n, n)")
     if R.shape != (m, m):
         raise ValueError("R must have shape (m, m)")
+
+
+def quadratic_max(W, center, box):
+    """
+    ``max (z − c)ᵀ W (z − c)`` over a box, for ``W ⪰ 0``: at a vertex (a convex function).
+
+    Exact for a diagonal ``W`` and for up to 12 coupled entries (every vertex);
+    beyond, the bound ``λ_max(W) Σ max(dᵢ²)``. Entries ``W`` does not weigh may be
+    unbounded; a weighed unbounded entry gives ``+inf``.
+    """
+    W = np.asarray(W, dtype=float)
+
+    # The entries W weighs, and their farthest offsets from the center
+    weighed = np.flatnonzero(np.any(W != 0.0, axis=0) | np.any(W != 0.0, axis=1))
+    if weighed.size == 0:
+        return 0.0
+    lo = box.lower[weighed] - center[weighed]
+    hi = box.upper[weighed] - center[weighed]
+    W = W[np.ix_(weighed, weighed)]
+    if not (np.all(np.isfinite(lo)) and np.all(np.isfinite(hi))):
+        return float(np.inf)
+
+    # Diagonal: Σ wᵢᵢ max(loᵢ², hiᵢ²)
+    if np.all(W == np.diag(np.diag(W))):
+        return float(np.sum(np.diag(W) * np.maximum(lo**2, hi**2)))
+
+    # Coupled, small: the largest value at the 2^k vertices
+    if weighed.size <= 12:
+        vertices = np.array(np.meshgrid(*zip(lo, hi), indexing="ij")).reshape(
+            weighed.size, -1
+        )
+        return float(np.max(np.einsum("ik,ij,jk->k", vertices, W, vertices)))
+
+    # Coupled, large: λ_max(W) ‖d‖², d the farthest offset of each entry
+    lam_max = float(np.max(np.linalg.eigvalsh(0.5 * (W + W.T))))
+
+    return lam_max * float(np.sum(np.maximum(lo**2, hi**2)))
+
+
+def box_samples(X, U, n_samples=4096):
+    """A Halton set of ``(x, u)`` over the finite boxes ``X × U`` (``U=None``: ``x`` only)."""
+    # Lazy import: SciPy's quasi-Monte Carlo loads with the first sampled bound
+    from scipy.stats import qmc
+
+    boxes = [X] if U is None else [X, U]
+    lower = np.concatenate([box.lower for box in boxes])
+    upper = np.concatenate([box.upper for box in boxes])
+    require_finite_bounds(lower, upper)
+
+    # The Halton points mapped on the box, the origin of the sequence skipped
+    unit = qmc.Halton(d=lower.size, scramble=False).random(int(n_samples) + 1)[1:]
+    points = lower + unit * (upper - lower)
+    n = X.dim
+
+    return points[:, :n], (None if U is None else points[:, n:])
+
+
+def require_finite_bounds(lower, upper):
+    """Refuse a sampled bound over an unbounded box."""
+    if not (np.all(np.isfinite(lower)) and np.all(np.isfinite(upper))):
+        raise ValueError(
+            "a sampled bound of the cost needs finite boxes: declare X and U on the "
+            "problem (X=plant.state.box, U=plant.input_box), or give the problem "
+            "infeasible_cost as a number"
+        )
 
 
 def per_sample(g, xs, us, ts, params):

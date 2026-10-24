@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import warnings
 from collections.abc import Mapping
 from dataclasses import dataclass, replace
 from types import MappingProxyType
@@ -11,7 +12,14 @@ import numpy as np
 from minilink.core.costs import CostFunction
 from minilink.core.distributions import Distribution, Particles, split_keys
 from minilink.core.inspect import inspect_text, repr_pretty
-from minilink.core.sets import BoxInputSet, BoxSet, InputSet, Set, SingletonSet
+from minilink.core.sets import (
+    BoxInputSet,
+    BoxSet,
+    InputSet,
+    Set,
+    SingletonSet,
+    is_finite_box,
+)
 from minilink.core.system import System
 
 ###############################################################################
@@ -78,14 +86,14 @@ class PlanningProblem:
         ``∫ e^{−ρt} g dt + e^{−ρ tf} h``, applied by every consumer (value
         iteration's ``α`` and reinforcement learning's ``γ`` are
         :meth:`discount_factor` of their step). ``0`` (default) is undiscounted.
-    infeasible_cost : float or callable, optional
-        The finite stand-in for the infinite cost of an infeasible trajectory (one
-        that leaves ``X``): a scalar, or ``infeasible_cost(x, t)`` evaluated at the
-        exit state. Value iteration reads it as its default ``out_of_bound_cost``;
-        the learners and the Monte Carlo score charge it when a trajectory leaves
-        ``X``. Unset, the sampling tools derive a bound of any feasible cost and
-        announce it; a declared price should exceed the cost-to-go of finishing the
-        task from a typical start.
+    infeasible_cost : None, True or float, optional
+        The price switch: the finite stand-in for the infinite cost of a run that
+        fails (leaves ``X`` or ``U``, or stops being finite) or misses ``Xf``.
+        ``None`` (default): an evaluation reports the plain cost and the facts;
+        ``True``: the price is :meth:`cost_bound`; a number: that price. Value
+        iteration and the learners always price a failure: this number when it
+        is one, else :meth:`cost_bound`. A declared price should exceed the
+        cost-to-go of finishing the task from a typical start.
     """
 
     sys: System
@@ -99,7 +107,7 @@ class PlanningProblem:
     tf: float | None = None
     params: ProblemParameters | None = None
     metadata: Mapping[str, object] | None = None
-    infeasible_cost: object = None
+    infeasible_cost: bool | float | None = None
     discount_rate: float = 0.0
 
     def __post_init__(self) -> None:
@@ -108,8 +116,7 @@ class PlanningProblem:
         # The horizon and the discount rate, and a scalar price of infeasibility as a float
         tf = self.coerce_tf(self.tf)
         object.__setattr__(self, "discount_rate", coerce_rate(self.discount_rate))
-        if self.infeasible_cost is not None and not callable(self.infeasible_cost):
-            object.__setattr__(self, "infeasible_cost", float(self.infeasible_cost))
+        object.__setattr__(self, "infeasible_cost", coerce_price(self.infeasible_cost))
 
         # The representative start and goal
         x_start = self.coerce_state(
@@ -198,13 +205,57 @@ class PlanningProblem:
 
         return float(gamma)
 
-    def infeasible_penalty(self, x, t=0.0):
-        """The declared price of infeasibility at ``(x, t)`` (scalar or callable); ``None`` when unset."""
-        price = self.infeasible_cost
-        if price is None:
-            return None
+    def cost_bound(self, tf=None, *, discount_rate=None):
+        """
+        An upper bound of the cost of any run that stays in the boxes: always finite.
 
-        return price(x, t) if callable(price) else price
+        ``g_max ∫₀ᵀ e^{−ρt} dt + e^{−ρT} h_max``, with ``g_max`` and ``h_max`` the
+        cost's bounds over the boxes of ``X`` and ``U`` (the declared sets', else
+        the plant's declared state and input ranges), ``T`` the run's length
+        (``tf``, default the problem's horizon) and ``ρ`` the problem's rate (or
+        ``discount_rate``, a planner's own). An infinite horizon charges no
+        ``h``; one with ``ρ = 0``, or boxes with no finite bound, falls back to
+        ``1e6`` with a warning naming ``infeasible_cost``.
+        """
+        cost = self.require_cost()
+        rho = self.discount_rate if discount_rate is None else float(discount_rate)
+        T = (
+            (self.tf if self.horizon_kind() == "finite" else np.inf)
+            if tf is None
+            else float(tf)
+        )
+
+        # The boxes: the declared sets', else the plant's declared ranges
+        X_box = finite_box_or(self.X.bounding_box(), self.sys.state.box)
+        U_box = finite_box_or(self.U.bounding_box(), self.sys.input_box.box)
+        if X_box is None or U_box is None:
+            return fallback_bound("the state or input box has no finite bound")
+
+        g_max = cost.g_max(X_box, U_box)
+        h_max = cost.h_max(X_box) if np.isfinite(T) else 0.0
+
+        # ∫₀ᵀ e^{−ρt} dt = (1 − e^{−ρT}) / ρ, or T when ρ = 0
+        if rho > 0.0:
+            horizon = (1.0 - np.exp(-rho * T)) / rho
+        elif np.isfinite(T):
+            horizon = T
+        else:
+            return fallback_bound("an infinite undiscounted horizon has no cost bound")
+
+        # J_max = g_max ∫₀ᵀ e^{−ρt} dt + e^{−ρT} h_max
+        bound = g_max * horizon + (np.exp(-rho * T) * h_max if np.isfinite(T) else 0.0)
+        if not np.isfinite(bound):
+            return fallback_bound("the cost has no finite bound on the boxes")
+
+        return float(bound)
+
+    def infeasibility_price(self, tf=None, *, discount_rate=None):
+        """The price a planner charges a failure: ``infeasible_cost`` when a number, else :meth:`cost_bound`."""
+        price = self.infeasible_cost
+        if price is None or price is True:
+            return self.cost_bound(tf, discount_rate=discount_rate)
+
+        return price
 
     def compile(
         self,
@@ -615,6 +666,39 @@ def as_stochastic(problem: PlanningProblem) -> StochasticPlanningProblem:
 ###############################################################################
 # Internal machinery
 ###############################################################################
+
+
+def coerce_price(price):
+    """The price switch as ``None``, ``True`` or a float; refuse anything else."""
+    if price is None or price is True:
+        return price
+    if price is False or callable(price) or isinstance(price, str):
+        raise TypeError(
+            "infeasible_cost must be None (no price), True (the cost bound) or a "
+            f"number, got {price!r}"
+        )
+
+    return float(price)
+
+
+def finite_box_or(box, fallback):
+    """``box`` when every face is finite, else ``fallback`` when it is, else ``None``."""
+    for candidate in (box, fallback):
+        if candidate is not None and is_finite_box(candidate):
+            return candidate
+
+    return None
+
+
+def fallback_bound(reason):
+    """``1e6``, announced with the reason and the line that sets a price."""
+    warnings.warn(
+        f"{reason}: a failure is priced 1e6; set infeasible_cost on the problem to "
+        "choose the price",
+        stacklevel=4,
+    )
+
+    return 1.0e6
 
 
 def coerce_rate(rate) -> float:

@@ -455,8 +455,8 @@ def score_trajectory(problem, traj: Trajectory, params=None, infeasible_cost=np.
 
     # An exit is charged its price; a reached finite horizon adds h(x(t_f), t_f)
     if failed:
-        penalty = problem.infeasible_penalty(x[:, last], float(t[last]))
-        J += float(infeasible_cost if penalty is None else penalty)
+        price = problem.infeasible_cost
+        J += float(infeasible_cost if price is None or price is True else price)
     elif problem.horizon_kind() == "finite" and t[-1] >= problem.tf - 1e-6:
         J += float(cost.h(x[:, -1], float(t[-1]), params=params))
 
