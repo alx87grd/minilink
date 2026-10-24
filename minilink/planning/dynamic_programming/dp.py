@@ -236,7 +236,7 @@ class DynamicProgrammingPlanner(Planner):
         cost_params = cost.params
         dt = grid.dt
         alpha = self.options.alpha
-        INF = self.options.out_of_bound_cost  # A large finite penalty (pyro's cf.INF)
+        INF = self.options.out_of_bound_cost  # The finite price (pyro's cf.INF)
 
         # Interpolation of the cost-to-go one step ahead
         J_interpol = grid.build_interpolator(J_next, self.options.interpolation)
@@ -361,7 +361,7 @@ class DynamicProgrammingPlanner(Planner):
         dt = grid.dt
         N = grid.nodes_n
         A = grid.actions_n
-        INF = self.options.out_of_bound_cost  # A large finite penalty (pyro's cf.INF)
+        INF = self.options.out_of_bound_cost  # The finite price (pyro's cf.INF)
 
         # The grid's mask, and its successors when a callable price needs them
         if admissible is None or (x_next is None and callable(INF)):

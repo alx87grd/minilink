@@ -145,7 +145,7 @@ class PolicyEvaluator:
         dt = grid.dt
         N = grid.nodes_n  # Number of nodes
         n = grid.n  # State dimension
-        INF = self.options.out_of_bound_cost  # A large finite penalty (pyro's cf.INF)
+        INF = self.options.out_of_bound_cost  # The finite price (pyro's cf.INF)
 
         successors = np.empty((N, n), dtype=float)
         G = np.empty(N, dtype=float)
