@@ -1,9 +1,12 @@
 # Path integral control (MPPI) in Minilink
 
-**Status:** design draft (2026-10-02), for the maintainer's ruling on the asks of §10; the
-recommended answers are D26–D28 and D30 of [end-state-api.md](end-state-api.md) (2026-10-22:
-`MPPIPlanner`, the three planner verbs, `n_plant_samples=1`, `RolloutEnvironment` staying in
-`reinforcement_learning/` as a caller of the step model), to rule for v0.4.
+**Status:** design draft (2026-10-02), not started (the prototypes in `experimental/mppi/`
+run). Asks 1–3 and 5 of §10 are for the maintainer's ruling; the recommended answers are
+D26–D28 and D30 of [end-state-api.md](end-state-api.md) (2026-10-22: `MPPIPlanner`, the three
+planner verbs, `n_plant_samples=1`, `RolloutEnvironment` staying in `reinforcement_learning/`
+as a caller of the step model), to rule for v0.4; ask 4 (timing) decided 2026-10-02. The
+planner waits on S31's sampled kernel, RN-4 and the rest of RN-5 (RN-5's v0.3 part, `evaluate`
+over the start and parameter draws, landed 2026-10-24).
 **Lane:** research lane first (`experimental/`), provisional band with the MPC
 block once MP-5 lands, teaching-surface decision at V3 (v0.9).
 **Rung proposed:** S72 on the workboard, v0.4, on S31's sampled kernel (the hybrid phase,
@@ -20,7 +23,8 @@ rollouts of a nominal input sequence perturbed by noise, a softmin over their co
 weighted average as the new sequence, one step applied, shift, repeat. Minilink already
 owns every piece it needs — a batched JAX rollout, the stochastic problem's draws, the
 scoring contract of an episode, a receding-horizon block — so the work is a planner of a
-few screens plus one contract narrowing in `control/mpc`.
+few screens plus one contract narrowing in the MPC block
+(`planning/trajectory_optimization/mpc/`, exported from `minilink.control`).
 
 ## The design in one screen
 
@@ -35,8 +39,8 @@ few screens plus one contract narrowing in `control/mpc`.
   parameter draws and disturbance draws from the problem's own distributions — so the
   softmin scores paths under model uncertainty, not only under input noise. The
   deterministic twin is byte-identical to the stochastic one with no draws (the test).
-- **The rollout is the one Minilink already has.** `rollout_batch` /
-  `rk4_integrate_zoh_trace` vmap `K` held-input RK4 rollouts in one jitted call; the
+- **The rollout is the one Minilink already has.** `ev.rollout_batch`
+  (or a `vmap` of `ev.rollout`) runs `K` held-input RK4 rollouts in one jitted call; the
   `RolloutEnvironment` owns what a step costs (exit from `X` charged the problem's price:
   `infeasible_cost` when set, else `problem.cost_bound()`, the cost's upper-bound
   hint, R32; `h` at the horizon, disturbance draws on their ports). It is a training setting
@@ -45,7 +49,7 @@ few screens plus one contract narrowing in `control/mpc`.
 - **JAX first, the ladder later.** The prototype is JAX-only (one `jit(vmap(scan))` per
   tick). The three-backend ladder of `dp.py` (`loop` / `numpy` / `jax`) is the teaching
   form and comes with the teaching-surface decision, not before.
-- **One narrowing in `control/mpc`.** The block today reads trajopt internals
+- **One narrowing in the MPC block.** The block today reads trajopt internals
   (`planner.transcription`, `last_optimization_result.z`, `compile_parametric_program`).
   It needs three planner verbs instead: `decision_dimension()`, `solve_trajectory_from()`
   returning a record that carries `z`, and `warm_start_guess()`. That is the T6
@@ -57,11 +61,11 @@ What exists, what it is coupled to, and what MPPI reuses.
 
 **The receding-horizon block is not planner-agnostic.** `ModelPredictiveController`
 (`minilink/planning/trajectory_optimization/mpc/controller.py`) accepts "a duck-typed
-`TrajectoryOptimizationPlanner`", and `validate_mpc_planner` (line 740) requires
+`TrajectoryOptimizationPlanner`", and `validate_mpc_planner` (line 905) requires
 `compile_parametric_program`, `has_parametric_program`, `solve_trajectory_from`,
 `planner.transcription.options.n_steps`, `planner.options.compile_backend` and
 `planner.transcription.decision_dimension(problem)`. The tick latch (`MPCTickLatch`,
-line 597) reads `planner.last_optimization_result.z` after every solve and builds the
+line 567) reads `planner.last_optimization_result.z` after every solve and builds the
 warm start through `mpc_warm_start_guess`, which unpacks `z` with
 `planner.transcription.unpack`. So the block takes exactly one planner family. The
 workboard already carries the fix as T6 ("one record per MPC tick, `Command` and
@@ -70,8 +74,8 @@ workboard already carries the fix as T6 ("one record per MPC tick, `Command` and
 
 **The planner base.** `Planner` (`minilink/planning/planner.py`) gives `solve`,
 `solve_trajectory`, `solve_trajectory_from(x0)`, `last_solution`, `open_loop_policy`
-(a `TrajectorySource` on the plant's action port), `evaluate` (the Monte Carlo
-evaluator on the problem's draws) and the `accepts_stochastic` flag that silences the
+(a `TrajectorySource` on the plant's action port), `evaluate` (the problem-level
+`evaluate` of `planning/evaluator.py`, over the problem's draws) and the `accepts_stochastic` flag that silences the
 "deterministic planner on a stochastic problem" warning. A new planner is one class
 that overrides `solve` and `solve_trajectory_from` and returns a `PlanningSolution`
 with its own frozen record (`TrajectoryOptimizationRecord`, `RiccatiRecord`, … each
@@ -96,14 +100,15 @@ also samples and weighs on device wants. Measured
 seen by a learner": `step(x, t, u, key, params)` integrates one control period with the
 input held (`ev.step` with `params`), scores it `-g dt`, charges `infeasible_cost` when the
 state leaves `X`, charges `h` at a finite horizon, and fills the disturbance ports from
-`key`. DESIGN §6 names it the one owner of what an episode means, shared by the RL
-collectors, the tabular learners and the NumPy Monte Carlo trials. The randomness plan
+`key`. DESIGN §6 names it the one owner of what a training episode means, shared by the RL
+collectors and the tabular learners (`evaluate` scores a law on the compiled continuous
+loop instead, since V1's step 4b). The randomness plan
 (`randomness.md`, RN-4) will turn `disturbances` into signals realized per episode by
 `realize(key)`; the env's `reset(key)` / `step` keep their shape.
 
 **The standalone prototype.** `experimental/mppi/pendulum_mppi.py` is the
 algorithm of §2 as one script on the library as it stands: `plant.compile(backend="jax")`,
-a `vmap` of `rk4_integrate_zoh_trace` over `K = 1024` sampled sequences of `N = 40` held
+a `vmap` of `ev.rollout` over `K = 1024` sampled sequences of `N = 40` held
 inputs, the cost's `g` vmapped along each path, the softmin, the update, a hand receding-
 horizon loop, `plot_trajectory` and a fan figure of the sampled futures. The pendulum
 swings up with 4 Nm (below `m g l`) at `λ = 0.1`, `σ = 3 Nm`, a 2 s horizon; one tick is
@@ -120,8 +125,9 @@ the planner should be built on that contract once, not before it (§8).
 on the problem of `demos/udes_racecar/mpc_racecar_kinematic.py` — the kinematic UdeS
 racecar, the rounded circuit, the corridor and the cone, the demo's own cost objects — and
 then the demo's collocation MPC on the same plant and run, and scores both with
-`score_trajectory` (today's scoring rule; the problem-level `evaluate_trajectory` after V1's step
-2, which integrates to `tf` with no cut at exit, R19). On the 10 s run (`K = 1024`, `N = 10` at `dt = 0.1 s`, `λ = 0.05`,
+`evaluate_trajectory` (`planning/evaluation.py`, the problem-level rule, which integrates to
+`tf` with no cut at exit, R19; the table below was measured 2026-10-02 with its predecessor
+`score_trajectory`). On the 10 s run (`K = 1024`, `N = 10` at `dt = 0.1 s`, `λ = 0.05`,
 `σ = (0.5 m/s, 0.2 rad)`, control term off):
 
 | Controller | closed-loop `J` | min cone clearance | min corridor margin | driven | tick (CPU) |
@@ -303,7 +309,7 @@ it either way. [ask]
 `planning.planner`, `planning.results`, and `learning.reinforcement_learning.environment`
 for `RolloutEnvironment` — an intra-band import, legal under the dependency law; if the
 maintainer prefers, `environment.py` moves up to `planning/environment.py` first (it is
-already shared by the evaluator and the tabular learners, DESIGN §6 says so; the move is
+already shared by the RL collectors and the tabular learners, DESIGN §6 says so; the move is
 one import rewrite with no behaviour change and a Later row of its own).
 
 **The body, in the `dp.py` style** (three beats, no `self.` in the math, plumbing in
@@ -394,9 +400,9 @@ refactor in the abstract.
 | --- | --- | --- | --- |
 | Planner or controller | (a) a planner wrapped by `ModelPredictiveController`; (b) an `MPPIController` block of its own | (a) | One receding-horizon loop, one latch, one export, one animation path; `compare(MPC=, MPPI=)` on one problem is then one line; (b) duplicates 900 lines of `controller.py` |
 | Problem class | (a) deterministic only; (b) stochastic only via `as_stochastic`; (c) both, one branch in the sampling beat | (c) | The base class already makes every planner accept both; `accepts_stochastic=True` is one attribute; the deterministic twin is the test |
-| Where the step semantics live | (a) rewrite `x_{t+1}`, the exit rule and `h` inside the planner on `rk4_integrate_zoh_trace`; (b) `RolloutEnvironment.step` | (b) | One owner of what an episode costs (S65); the equations still appear as the named lines of §5; the env already carries the disturbance and parameter draws and will carry `realize(key)` after RN-4 |
+| Where the step semantics live | (a) rewrite `x_{t+1}`, the exit rule and `h` inside the planner on `ev.rollout`; (b) `RolloutEnvironment.step` | (b) | One owner of what an episode costs (S65); the equations still appear as the named lines of §5; the env already carries the disturbance and parameter draws and will carry `realize(key)` after RN-4 |
 | Plant draws per control sample | `M = 1` always; `M` a knob | `M` a knob, default 4 on a stochastic problem | §4: `M = 1` rewards lucky draws |
-| Home | `planning/trajectory_optimization/`; a new `planning/sampling/`; `planning/trajectory_optimization/mpc/` | `trajectory_optimization/` | Output is a schedule; a package per algorithm family is the existing taxonomy; `control/mpc` is the wrapper, not the solver |
+| Home | `planning/trajectory_optimization/`; a new `planning/sampling/`; `planning/trajectory_optimization/mpc/` | `trajectory_optimization/` | Output is a schedule; a package per algorithm family is the existing taxonomy; the MPC block is the wrapper, not the solver |
 | Backend | JAX only; `xp` body from day one | JAX only for the prototype, NumPy `loop` backend with the teaching decision | The vectorized-over-`K` `xp` path needs the NumPy evaluator to batch, which it does not; the per-sample loop is the `loop` rung of the DP ladder and is fine for a 2-D teaching plant |
 | Grid | `dt=`; `n_steps=` | `dt=` | §3 |
 | Name | `PathIntegralPlanner`; `MPPIPlanner` | `PathIntegralPlanner` [ask] | §5 |
@@ -407,7 +413,9 @@ refactor in the abstract.
 **Order (decided with the maintainer 2026-10-02):** RN-4 and RN-5 of the randomness plan
 land first — `realize(key)`, signals on `disturbances`, the Monte Carlo evaluator as a
 batched simulation of the closed-loop diagram over realizations `(x0, params, seeds)`,
-any diagram and any output. Then the path-integral planner lands on that contract: its
+any diagram and any output. (RN-5's v0.3 part landed 2026-10-24: `evaluate` over the
+start and parameter draws of `problem.realize(key, n)`; the per-block seeds of RN-4 and the
+disturbance signals on their ports are what is left.) Then the path-integral planner lands on that contract: its
 `K × M` rollouts are the evaluator's own batch over realizations, so MP-1 and MP-3 share
 one rollout path with the evaluator and the RL collectors instead of a scan of their own,
 and MP-3 is written once. Two things RN-4 and RN-5 should settle with this consumer in
@@ -483,7 +491,7 @@ The question asked: when. The proposal, against the rungs of ROADMAP §5:
   touch no public name and no teaching file.
 - **Before the v0.9 freeze (spring 2027): MP-4 and MP-5.** MP-4 is T6's
   `planning/trajectory_optimization/mpc/controller.py` conversation, already queued before v0.9 because V3 must
-  decide whether `control.mpc` joins the frozen surface; narrowing the planner contract
+  decide whether the MPC block joins the frozen surface; narrowing the planner contract
   is a prerequisite of freezing that block's name, so MPPI costs the freeze nothing it
   did not already owe. MP-5's demos land as soon as MP-4 does.
 - **v0.9 / v1.0: MP-6** with V3 — the teaching form (`loop` backend, Basic tier), the

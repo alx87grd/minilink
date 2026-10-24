@@ -1,6 +1,6 @@
 # The field object
 
-Status: core contract — agreed 2026-09-15 (FD-C12, time and action arguments included), not started.
+Status: core contract — agreed 2026-09-15 (FD-C12, time and action arguments included); not started, step 4.7 done 2026-10-12; the field signature `value(x, u=None, t=0.0, params=None)` already on `StateField`.
 Rung: v0.4, step A1 of [TODO.md](TODO.md). Depends on the sets-and-distributions pass (landed 2026-09-15: `bounding_box`, `.box`, the draw convention); the Lyapunov rulings it cites are the open items in ROADMAP §6.
 Name-preserving (`V(x)`, `value_at`, `cost_to_go` keep working). Finding FD-F12 of the foundations review, docs/reviews/2026-09-15-foundations-review.md (`FD-` marks that review's findings and comments: its F12, C6, C12).
 
@@ -32,8 +32,8 @@ Baseline first: the region-of-attraction level, extent and
   (the one place finite differences already live). Done when the corridor and RRT demos and
   `test_planning.py` are byte-identical.
 - [ ] **4.2 `QuadraticField(center, P)`** — `value = (x − c)ᵀ P (x − c)`, `gradient = 2 P (x − c)`,
-  written once with `xp`; frozen dataclass (FD-C6). `P` is a matrix, or a schedule `(t, S)` as
-  `lqr_gain_schedule` returns it, interpolated in `t` the way `TimeVaryingFeedback`
+  written once with `xp`; frozen dataclass (FD-C6). `P` is a matrix, or a schedule `(t, S)` taken from
+  the `(t, K, S)` that `lqr_gain_schedule` returns, interpolated in `t` the way `TimeVaryingFeedback`
   interpolates `K(t)`: then `value(x, t)` is the finite-horizon LQR value `xᵀ S(t) x`, and
   `lqr_finite_horizon` can hand it out beside the controller (additive; the cart-pole LQR
   notebook is its consumer). Its sublevel set is the one set that knows how
@@ -43,10 +43,11 @@ Baseline first: the region-of-attraction level, extent and
   points, jit parity, `sample` inside the set, `bounding_box` contains every sample.
 - [ ] **4.3 `LyapunovCertificate` speaks the field** **[ask — `V` becomes an attribute].**
   `certificate.V` is the `QuadraticField(x_bar, P)`; `StateField.__call__ = value` so the
-  existing `certificate.V(x)` calls (tests, showcase §11, DESIGN §3) keep working and
+  existing `certificate.V(x)` calls (`test_analysis_lyapunov.py`, the certificate's own `verify` and
+  plot in `analysis/lyapunov.py`) keep working and
   `certificate.V.as_constraint(upper=certificate.level)` reads as math; `region` property
   returns that set; `contains`, `extent`, `slice_extent` and `verify` delegate to it
-  (`sample_in_ellipsoid`, `state_box`, `as_box`, `clip_box` go — the window is a `BoxSet`); `V_dot` is `gradient · f`; `search_level` reads `V.value` / `V.gradient`. Public
+  (`sample_in_ellipsoid`, `as_box`, `clip_box` go — the window is a `BoxSet`); `V_dot` is `gradient · f`; `search_level` reads `V.value` / `V.gradient`. Public
   names unchanged. Done when the RoA baseline `cmp`s and `test_analysis_lyapunov.py` passes.
 - [ ] **4.4 `GridField(grid, values)`** — `value(x)` interpolates a node-indexed table on a
   `StateSpaceGrid` (wraps `grid.interpolate`; the same `fill_value=0` outside the grid, so the
@@ -65,7 +66,7 @@ Baseline first: the region-of-attraction level, extent and
   `QuadraticFeatures.quadratic_form(w)` returns a `QuadraticField` beside the `(c, b, S)`
   triple it returns today (additive). Done when the approximator tests of
   `test_dynamic_programming.py` pass with identical fitted weights.
-- [ ] **4.6 `CallableField(fn)`** — the escape hatch, mirror of `CallableSet` and `Sampler`; the RL
+- [ ] **4.6 `CallableField(fn)`** — the escape hatch, mirror of `CallableSet`; the RL
   planner's `critic_cost_to_go()` returns one (`V_w(x)`, and `Q_w(x, a)` for the SAC family), so
   `PlanningSolution.cost_to_go` is typed `Field | None` on every planner. Done when
   `test_rl_planner.py` passes.

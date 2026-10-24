@@ -67,10 +67,10 @@ Short teaching list, like `minilink.catalog` for plants. No `Course` DTO: `track
 | Factory | What | Today |
 | --- | --- | --- |
 | `oval_circuit(length, width, radius, half_width=…)` | rounded-rectangle `Track` (wraps `circuit_waypoints`) | tests |
-| `racecar_circuit()` | 6×4 m oval, `half_width=0.6`, far-straight cones | three UdeS racecar demos (MPC, dyn MPC, RL) |
+| `racecar_circuit()` | 6×4 m oval, `half_width=0.6`, far-straight cones | the two UdeS racecar demos (`mpc_racecar_kinematic.py`, `mpc_racecar_dynamic.py`) |
 | `holonomic_forest()` | scatter of discs in `[-6, 6]²` | [`rrt_holonomic_obstacles.py`](../../examples/demos/rrt/rrt_holonomic_obstacles.py) |
 
-Leave in the owning demo until a second teaching script needs them: wide MPC circuit, slalom, U-turn corridor, car_trajopt corner. `circuit_waypoints` stays a thin alias during the split. The RL racecar demo may keep extra cones as arguments on `racecar_circuit`, not a second factory.
+Leave in the owning demo until a second teaching script needs them: wide MPC circuit, slalom, U-turn corridor, car_trajopt corner. `circuit_waypoints` stays a thin alias during the split. A demo that needs extra cones passes them as arguments on `racecar_circuit`, not a second factory (no RL racecar demo exists today).
 
 ## Where new things go later
 
@@ -110,7 +110,7 @@ minilink/graphical/          # drawing only
 1. `geometry.py` → `core/geometry/shapes.py`.
 2. Move Path, Track, Scene, probes, `bind`, spatial Fields, grid; shaping next to `Field.as_cost`; plots/overlays under `graphical/` with lazy methods on Scene/Track.
 3. `planning.spatial` re-exports, then delete in the same change as call-site updates ([RULES.md](../dev/RULES.md) 3.4).
-4. Catalog factories; switch the three UdeS racecar demos and the RRT forest demo.
+4. Catalog factories; switch the two UdeS racecar demos and the RRT forest demo.
 5. PurePursuit accepts a `Path` / `Track`.
 6. Step 4.1 of [fields.md](fields.md): spatial subclasses already live in geometry when `Field` lands.
 

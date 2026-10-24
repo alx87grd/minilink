@@ -5,8 +5,9 @@ parameter binding (PP-0–PP-5) and the recommendation of §2 were added 2026-10
 (PP-0) were ruled 2026-10-23 (D19 of [end-state-api.md](end-state-api.md), R26): the family is
 `ParametricProgram`, the plant's key in every parameter tree is `plant`; the two remaining asks
 (a hand-written program declaring its own `p`, the MPC block's live ports) are D25, for v0.4.
-Rung: OPW-1–OPW-5 go with S74, the optimizer upgrade, deferred on 2026-10-23 to after the
-continuous core (R25); the binding (row S76) in v0.4 on the compiled problem's program export
+Not started: PP-1–PP-5 and OPW-1–OPW-5 are open for v0.4 with S76.
+Rung: OPW-1–OPW-5 wait with S76 (R86), on the optimizer method table and first-order backend
+that S74 landed in v0.3 (R74, 2026-10-24); the binding (row S76) in v0.4 on the compiled problem's program export
 and A2's cost leaves (moved from wave V on 2026-10-22: the MPC band is research lane and nothing
 GMC714 teaches in December needs it). Lane: research
 (the MPC band is provisional, ROADMAP §2). Scope: direct collocation and the MPC block
@@ -25,8 +26,8 @@ argument of the compiled program. Today only the measured state is:
 
 - `ParametricMathematicalProgram` is `J(z)`, `h(z, x0)`, `g(z)`: "only `x0` may vary between
   solves; all other problem data is frozen at compile time".
-- Direct collocation captures `problem.params.system`, `.cost` and `.sets` in its closures
-  when it transcribes, so the plant, the cost and the sets are constants of the compiled
+- Direct collocation captures the plant's nominal parameters (`nominal_plant_params(problem)`),
+  the cost's (`problem.cost.params`) and the sets in its closures when it transcribes, so the plant, the cost and the sets are constants of the compiled
   program.
 - `solve_trajectory_from(x0, params=…)` and the MPC block's `compute_command` refuse every
   key but the reserved `scene` (`require_online_params`), and the MPC block's port
@@ -52,10 +53,10 @@ Three ways to give a program parameters:
 ```python
 # The library side: transcribed and compiled once
 parametric = transcription.transcribe_parametric(problem)      # J(z, p), h(z, p), g(z, p)
-p = parametric.params                                          # {"x0": …, "system": {…}, "cost": {…}, "sets": {…}}
+p = parametric.params                                          # {"x0": …, "plant": {…}, "cost": {…}, "sets": {…}}
 
 # Each MPC tick: new values, no recompile
-evaluator.bind({"x0": y, "system": {"mu": mu_hat}})            # a partial override, merged onto p
+evaluator.bind({"x0": y, "plant": {"mu": mu_hat}})            # a partial override, merged onto p
 result = backend.solve(evaluator, z0)
 
 # The frozen program, for one-off use
@@ -113,9 +114,9 @@ surface (`objective`, `gradient`, `jacobian_h`, `jacobian_g`, `scipy_bounds`) is
 ### 3.3 Direct collocation
 
 `transcribe_parametric` builds every closure on `p`: the dynamics
-`f(x_k, u_k, t_k, p["system"])`, the cost integral with `p["cost"]`, the set constraints with
+`f(x_k, u_k, t_k, p["plant"])`, the cost integral with `p["cost"]`, the set constraints with
 `p["sets"]`, the initial residual `x_0 − p["x0"]`. The plant leaves work at once (`f` takes
-its parameters already); the cost leaves need A2, the set leaves A5's sets reading
+its parameters already); the cost leaves come with A2 (landed in v0.3), the set leaves A5's sets reading
 `params`. The rebuild path (the NumPy MPC) takes the same tree and retranscribes with it,
 so the two paths answer one API at two speeds.
 
@@ -145,7 +146,7 @@ dropping them. The argument's name and form are the naming session's.
   program, bound with two values of a plant parameter, gives the two solutions a rebuild
   gives, and the friction-aware MPC example (the dynamic racecar's planner `mu` from a port)
   runs on the research lane.
-- **PP-3 The cost and set leaves**, after A2 and A5's sets. Done when a moving tracking
+- **PP-3 The cost and set leaves**, after A5's sets (A2 landed in v0.3). Done when a moving tracking
   target binds without a rebuild and matches the rebuilt program.
 - **PP-4 The planner's online call and the MPC ports** (§3.4, §3.5), the rebuild path on the
   same API. Done when an unknown path raises naming the known ones, an unwired port reads its
@@ -155,7 +156,7 @@ dropping them. The argument's name and form are the naming session's.
 
 **Order**: PP-0 ruled; PP-1, PP-2 and PP-4 in v0.4 with S76, after the continuous core's program
 export (V1's step 5) and beside S74 with OPW-1–OPW-5 if it has landed (the same evaluator and
-backend factory); PP-3 after A2 (V1's step 6); the scene
+backend factory); PP-3 after A5's sets reading `params` (A2, V1's step 6, landed in v0.3); the scene
 leaf with A3 in v0.4. No dependency on S75 or S31: collocation uses the continuous `f`, not
 the step model. MPC is not a week of the GMC714 syllabus, but its teaching name is frozen by January (R49, G3).
 

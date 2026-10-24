@@ -1,6 +1,6 @@
 # Automatic reward scaling for the RL planner
 
-**Status:** Proposal (2026-09-27). Evidence gathered; not scheduled.
+**Status:** Proposal (2026-09-27). Evidence gathered; not started (no `reward_scale` in the code) and not scheduled (a Later row of TODO §7); the rung is the maintainer's (it moves every RL demo's numbers once, between cohorts).
 **Lane:** teaching (a keyword on `ReinforcementLearningPlanner`) — **[ask — planner API]**.
 **Found on:** the GRO860 Gymnasium lab (`examples/teaching/courses/udes_gro860/particle_gymnasium_sb3.ipynb`), where the native planner trained a worse policy than Stable-Baselines3 on the same task.
 
@@ -39,7 +39,7 @@ Reading the table:
 
 Both PPOs normalize the advantages, so the policy gradient does not see the reward scale. The value loss does: the critic regresses returns of order 10^3 to 10^4.
 
-Both optimizers clip the gradient to a global norm of 0.5, taken over the policy and the critic together (`optim.clip_by_global_norm` on the whole parameter tree). The critic's gradient therefore sets the clip factor, and the policy's share is shrunk with it.
+Both optimizers clip the gradient to a global norm of 0.5, taken over the policy and the critic together (`clip_by_global_norm` of `optimization/optimizers/first_order.py`, through `Adam`'s `max_grad_norm=0.5`, on the whole parameter tree). The critic's gradient therefore sets the clip factor, and the policy's share is shrunk with it.
 
 Measured on one minibatch of 64, as the median over 20 minibatches, with the default planner:
 
@@ -63,7 +63,7 @@ With the raw reward, the policy's clipped gradient sits one to two orders of mag
 
 | | What | For | Against |
 | --- | --- | --- | --- |
-| A | **Fixed scale `1 / (g_max dt)`** from the problem, computed once | Deterministic and stateless; compiles as a constant. `feasible_cost_bound` already samples `g_max` on the training box for the failure price, so one pass serves both. The optimum is unchanged. | Needs a finite box (the same condition as the failure price). A pessimistic `g_max` makes rewards small, but the table shows that is harmless here. |
+| A | **Fixed scale `1 / (g_max dt)`** from the problem, computed once | Deterministic and stateless; compiles as a constant. `problem.cost_bound()` already gives `g_max` over the declared boxes for the failure price (exact for a quadratic cost on a box), so one source serves both. The optimum is unchanged. | Needs a finite box (the same condition as the failure price). A pessimistic `g_max` makes rewards small, but the table shows that is harmless here. |
 | B | **Running return normalization** (SB3's `VecNormalize(norm_reward=True)`): divide rewards by a running std of the discounted return | Works without a box | State in the train state, carried through `scan`. The critic's targets drift during training. The learning curve needs unscaling. |
 | C | **Value-target normalization** (PopArt): normalize the critic's targets and rescale its output layer | Treats the actual cause (the critic's scale); leaves the reward's meaning intact | Most code; an algorithm-level change in every actor-critic family |
 | D | **Clip the policy and the critic separately** | Removes the throttling directly | §4 shows an unscaled critic is unstable anyway; not enough alone |
@@ -78,8 +78,8 @@ Option A, as a planner keyword:
 ReinforcementLearningPlanner(problem, ..., reward_scale="auto")  # or a float, or 1.0 to opt out
 ```
 
-- `"auto"` sets `c = 1 / (g_max dt)` from the same sampling as the failure price. The algorithm sees `c r` and `c` times the failure price.
-- Everything reported to the user stays in cost units: the learning curve, "mean episode cost", the solver record and `MonteCarloEvaluator`. The solver record also carries `c`.
+- `"auto"` sets `c = 1 / (g_max dt)` from the same bound as the failure price (`problem.cost_bound()`). The algorithm sees `c r` and `c` times the failure price.
+- Everything reported to the user stays in cost units: the learning curve, "mean episode cost", the solver record and `evaluate`. The solver record also carries `c`.
 - With no finite box, `"auto"` falls back to `c = 1` and prints one line saying so. Option B can come later if a consumer needs it.
 - Whether `"auto"` is the default is the maintainer's call. It moves every RL demo's numbers once, so it lands between cohorts, like RN-4 and RN-5 of [randomness.md](randomness.md).
 
@@ -95,7 +95,7 @@ ReinforcementLearningPlanner(problem, ..., reward_scale="auto")  # or a float, o
 
 ## 8. A related observation (not this feature)
 
-In the same lab, `MonteCarloEvaluator` scored the LQR law at 4485, against 3324 on the same starts in the yardstick above.
+In the same lab, the Monte Carlo evaluator of the time (`MonteCarloEvaluator`, since replaced by `evaluate`) scored the LQR law at 4485, against 3324 on the same starts in the yardstick above.
 
 The plant saturated the force inside `f` (`u.clip(...)`), while the evaluator charged `R u^2` on the controller's command, up to 499 N at the start. Charging the command in the yardstick gives 4715; the rest is trapezoid vs rectangle integration and RK4 vs Euler.
 
@@ -105,6 +105,6 @@ This is consistent with the rule that port bounds are information, not saturatio
 
 The runs used `git archive origin/main` of 2026-09-27 in a clean venv (gymnasium, stable-baselines3, jax[cpu]).
 
-- **Scaled cost.** `QuadraticCost.from_system(plant, xbar=..., Q=c * Q, R=c * R)` with `infeasible_cost=c * PENALTY`.
+- **Scaled cost.** `QuadraticCost.from_system(plant, xbar=..., Q=c * Q, R=c * R)` with `infeasible_cost=c * PENALTY` on the `PlanningProblem`.
 - **Gradient norms.** From `algorithm.loss` on minibatches built exactly as `PPO.update` builds them (`collect.advantages`, `collect.flatten`).
 - **The scripts** lived in a session scratchpad and are not kept. They are about 150 lines and easy to rebuild from this description.
