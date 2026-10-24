@@ -34,6 +34,7 @@ EXEMPT = (
 STRUCTURE = (
     "minilink/graphical/",
     "minilink/core/operators.py",
+    "minilink/core/assembly.py",
     "minilink/core/closed_loop.py",
     "minilink/core/wiring.py",
     "minilink/core/discrete/hybrid_composition.py",

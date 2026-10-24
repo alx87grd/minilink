@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
+from minilink.core.assembly import new_diagram_like, propagate_animation_camera
 from minilink.core.closed_loop import (
     default_computer_boundary_ports,
     resolve_standard_feedback,
@@ -12,7 +13,6 @@ from minilink.core.diagram import DiagramSystem
 from minilink.core.discrete.hybrid_diagram import BoundaryConnection, HybridDiagram
 from minilink.core.discrete.step_diagram import StepDiagramSystem
 from minilink.core.discrete.step_system import StepSystem
-from minilink.core.operators import new_diagram_like, propagate_animation_camera
 from minilink.core.system import System
 
 if TYPE_CHECKING:

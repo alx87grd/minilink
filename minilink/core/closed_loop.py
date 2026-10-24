@@ -6,8 +6,7 @@ from dataclasses import dataclass
 
 import numpy as np
 
-from minilink.core.diagram import DiagramSystem
-from minilink.core.operators import (
+from minilink.core.assembly import (
     add_input_port_like,
     add_system_to_diagram,
     copy_diagram,
@@ -15,6 +14,7 @@ from minilink.core.operators import (
     inline_diagram,
     propagate_animation_camera,
 )
+from minilink.core.diagram import DiagramSystem
 from minilink.core.roles import (
     block_roles,
     command_port,
