@@ -22,6 +22,7 @@ from minilink.core.trajectory import Trajectory
 BACKENDS = ("auto", BACKEND_JAX, BACKEND_NUMPY)
 EPISODE_LENGTH = 10.0  # s, the run of an infinite-horizon problem when none is named
 PLANT_INPUT = "plant.u"  # the recorded signal of the plant's input, the plant role's u
+PROBLEM_PRICE = "problem"  # score_run's price read from the problem
 
 ###############################################################################
 # Public API
@@ -86,6 +87,7 @@ class ProblemEvaluator:
         # The task and the loop that runs it
         self.problem = problem
         self.loop = closed_loop_of(problem, controller)
+        warn_if_disturbed(problem)
         self.solver = solver
         self.substeps = int(substeps)
 
@@ -166,9 +168,10 @@ class ProblemEvaluator:
         params = self.merged(params)
         n_trials = trials_of(self.problem, n_trials)
 
-        # The draws, then the runs and their scores, batched on JAX
+        # The draws, the price of a failure, then the runs and their scores, batched on JAX
         x_starts, trial_params = self.realize(params, key, n_trials)
-        rows, trajectories = self.run_trials(trial_params, x_starts, record)
+        price = price_of(self.problem, self.tf)
+        rows, trajectories = self.run_trials(trial_params, x_starts, record, price)
 
         return Evaluation(
             **rows,
@@ -285,9 +288,8 @@ class ProblemEvaluator:
         # x0 ~ p(x0) and each law, n_trials times, from one key on the backend
         x_starts, draws = problem.realize(trial_key(key, self.backend), n_trials)
 
-        # The plant's draws override its entries; the disturbances their loop port
+        # The plant's draws override its entries
         overrides = {"plant": draws["params"]} if draws["params"] else {}
-        overrides.update(draws["disturbances"])
 
         axes = merge_tree(axes_like(params, None), axes_like(overrides, 0))
 
@@ -355,7 +357,10 @@ class ProblemEvaluator:
 
         # An abstract trace of the run and its score: no compile, no numbers
         try:
-            jax.eval_shape(lambda p, x0: self.score(p, x0, False)[0], params, x_start)
+            price = price_of(self.problem, self.tf)
+            jax.eval_shape(
+                lambda p, x0: self.score(p, x0, False, price)[0], params, x_start
+            )
         except (TypeError, jax.errors.JAXTypeError, jax.errors.ConcretizationTypeError):
             return False
 
@@ -370,47 +375,52 @@ class ProblemEvaluator:
             [xp.reshape(params[port], (-1,)) for port in self.free_inputs]
         )
 
-    def score(self, params, x_start, record):
+    def score(self, params, x_start, record, price):
         """One trial's row of the record (and its trajectory when ``record``)."""
         traj = self.run(params, x_start)
         plant_run = traj.of("plant")
 
-        row = score_run(self.problem, plant_run, tf=self.tf, params=params)
+        row = score_run(self.problem, plant_run, tf=self.tf, params=params, price=price)
 
         return row, (traj if record else None)
 
-    def run_trials(self, params, x_starts, record):
+    def run_trials(self, params, x_starts, record, price):
         """The rows of every trial: a ``vmap`` on JAX, a loop on NumPy."""
         if self.backend == BACKEND_JAX:
-            return self.run_trials_jax(params, x_starts, record)
+            return self.run_trials_jax(params, x_starts, record, price)
 
-        return self.run_trials_numpy(params, x_starts, record)
+        return self.run_trials_numpy(params, x_starts, record, price)
 
-    def run_trials_jax(self, params, x_starts, record):
-        """The trials as one ``vmap`` of the run, jitted once."""
+    def run_trials_jax(self, params, x_starts, record, price):
+        """The trials as one ``vmap`` of the run, jitted once per batch layout and problem parts."""
         jax = ensure_jax_x64()
         register_evaluation_pytree()
 
         if self.trials_fn is None:
             self.trials_fn = {}
 
-        # The batched axes: a drawn leaf carries the trial axis, the others are shared
+        # The batched axes: a drawn leaf carries the trial axis, the others are shared.
+        # The trace reads the problem's cost and sets, so a part replaced on the
+        # problem traces anew (the entry holds the parts, so their ids stay theirs)
         tree, axes = batch_axes(params)
-        if (axes_key := (record, tree_signature(axes))) not in self.trials_fn:
+        parts = problem_parts(self.problem)
+        key = (record, tree_signature(axes), tuple(id(part) for part in parts))
+        if key not in self.trials_fn:
             batched = jax.vmap(
-                lambda p, x0: self.score(p, x0, record), in_axes=(axes, 0)
+                lambda p, x0, c: self.score(p, x0, record, c), in_axes=(axes, 0, None)
             )
-            self.trials_fn[axes_key] = jax.jit(batched)
+            self.trials_fn[key] = (jax.jit(batched), parts)
 
-        rows, trajs = self.trials_fn[axes_key](tree, x_starts)
+        trials_fn, _ = self.trials_fn[key]
+        rows, trajs = trials_fn(tree, x_starts, price)
 
         return rows, unbatch(trajs, x_starts.shape[0]) if record else None
 
-    def run_trials_numpy(self, params, x_starts, record):
+    def run_trials_numpy(self, params, x_starts, record, price):
         """The trials one at a time, stacked into the record's arrays."""
         rows, trajs = [], []
         for i, x_start in enumerate(x_starts):
-            row, traj = self.score(take_trial(params, i), x_start, record)
+            row, traj = self.score(take_trial(params, i), x_start, record, price)
             rows.append(row)
             trajs.append(traj)
 
@@ -550,7 +560,9 @@ def evaluate(
     return pe.evaluate(key=key, n_trials=n_trials, record=record)
 
 
-def score_run(problem, traj: Trajectory, *, tf=None, params=None) -> dict:
+def score_run(
+    problem, traj: Trajectory, *, tf=None, params=None, price=PROBLEM_PRICE
+) -> dict:
     """
     The scores of one plant run under the problem: the formula every evaluation reports.
 
@@ -565,9 +577,12 @@ def score_run(problem, traj: Trajectory, *, tf=None, params=None) -> dict:
         J                   = cost, or cost + price · (failed or not reached) with the price on
 
     A run that is not finite is scored on zeros (a safe ``where``), so its
-    gradient is zero and never poisons a mean. ``params`` overrides the
+    score stays finite with the price on; its gradient is not defined, since
+    the rollout itself overflowed before the ``where``. ``params`` overrides the
     problem's own leaves (``"cost"``, the sets' by role, ``"discount_rate"``);
-    ``None`` reads the problem's.
+    ``None`` reads the problem's. ``price`` is the failure price as
+    :func:`price_of` resolves it (``None`` the switch off); by default the
+    problem's.
     """
     cost_fn = problem.require_cost()
     xp = array_module(traj.x)
@@ -585,7 +600,7 @@ def score_run(problem, traj: Trajectory, *, tf=None, params=None) -> dict:
     x = traj.x.T
     u = traj.u.T
     tf = t[-1] if tf is None else tf
-    price = price_of(problem, tf)
+    price = price_of(problem, tf) if price is PROBLEM_PRICE else price
 
     # Finite: every sample, then the run on zeros where it is not (the safe where)
     finite = xp.all(xp.isfinite(x)) & xp.all(xp.isfinite(u))
@@ -910,8 +925,23 @@ def open_loop_of(source, plant):
     return loop
 
 
+def warn_if_disturbed(problem):
+    """Warn when the problem draws disturbances: the evaluated loop holds those ports at nominal."""
+    if not problem.is_stochastic or not problem.disturbances:
+        return
+    ports = sorted(problem.disturbances)
+
+    warnings.warn(
+        f"the evaluation does not draw the disturbances on {ports}: the loop reads "
+        "those ports at their nominal values. The per-step draws run in the stepped "
+        "environment (Sys2Gym.from_problem); a disturbance inside the loop is a source "
+        "block (closed_loop(controller, plant, disturbance=WhiteNoise(...)))",
+        stacklevel=4,
+    )
+
+
 def require_continuous(controller):
-    """Refuse a sampled controller: the evaluator runs a continuous loop in this release."""
+    """Refuse a sampled controller: the evaluator runs a continuous loop."""
     # Lazy import: the system module imports the compile chain, which loads after this one
     from minilink.core.system import StepSystem
 
@@ -947,7 +977,7 @@ def plant_input_sources(loop, evaluator):
     sources = []
     for port_id, port in plant.inputs.items():
         dim = int(port.dim)
-        if port_id not in wires:
+        if wires.get(port_id) is None:
             sources.append(("nominal", np.asarray(port.nominal_value, float), dim))
             continue
 
@@ -1028,6 +1058,11 @@ def price_of(problem, tf):
     return price
 
 
+def problem_parts(problem):
+    """The objects a trial's trace reads from the problem: its cost and its sets."""
+    return (problem.cost, problem.X, problem.U, problem.Xf)
+
+
 def horizon_of(problem, episode_length):
     """The length of a run: the finite horizon, else ``episode_length`` (10 s by default)."""
     if problem.horizon_kind() == "finite":
@@ -1083,7 +1118,7 @@ def reduce_criterion(J, criterion):
     # CVaR_α: the mean of the worst ⌈α n⌉ runs
     _, alpha = criterion
     n = J.shape[0]
-    k = max(1, math.ceil(float(alpha) * n))
+    k = max(1, math.ceil(round(float(alpha) * n, 9)))  # 0.07 · 100 is 7.000000000000001
     worst = xp.sort(J)[n - k :]
 
     return xp.mean(worst)

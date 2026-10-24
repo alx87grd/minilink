@@ -548,9 +548,8 @@ def test_outer_loop_on_an_inner_loop_with_nested_params():
         inner,
         cost=HangCost(),
         x0_distribution=Uniform([-0.3, -0.3], [0.3, 0.3]),
-        params_distribution={
-            "plant.m": Particles([[0.5], [2.0]])
-        },  # the plant inside, U=inner.input_box
+        params_distribution={"plant.m": Particles([[0.5], [2.0]])},  # the plant inside
+        U=inner.input_box,
     )
     assert lookup_param(inner.params, "plant.m") == 1.0
     draw = prob.sample_params(0)

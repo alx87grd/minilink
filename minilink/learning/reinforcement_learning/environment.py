@@ -156,9 +156,10 @@ class RolloutEnvironment:
         x_next = self.plant_step(x, u_full, t, params)
         t_next = t + dt
 
-        # Reward: r_k = −g(x_k, u_k) dt, the stage cost with its sign flipped; the
-        # discount enters the return once, through the algorithm, never the reward
-        reward = -g(x, u, t) * dt
+        # Reward: r_k = −g(x_k, u_k) dt, the stage cost on the plant's whole input
+        # with its sign flipped; the discount enters the return once, through the
+        # algorithm, never the reward
+        reward = -g(x, u_full, t) * dt
 
         # A step that blew up ends the episode; the last finite state stands in
         # for the next one so rewards, values and the reset stay finite
@@ -258,7 +259,7 @@ class RolloutEnvironment:
 
     def price_of_infeasibility(self):
         """The problem's ``infeasible_cost`` when a number, else the bound of its cost over the episode."""
-        return self.problem.infeasibility_price(self.tf)
+        return self.problem.infeasibility_price(self.tf, dt=self.dt)
 
 
 ###############################################################################

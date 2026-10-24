@@ -733,16 +733,13 @@ def grid_price(problem, alpha, dt):
     The price of an inadmissible pair: ``infeasible_cost`` when a number, else the cost bound.
 
     The bound is the problem's :meth:`~minilink.planning.problems.PlanningProblem.cost_bound`
-    on value iteration's own sum: with ``α < 1``, ``Σₖ αᵏ dt = dt / (1 − α)``,
-    the horizon ``1 / ρ`` of the rate ``ρ = (1 − α) / dt`` (above ``−ln(α) / dt``,
-    so the bound covers the discrete sum); with ``α = 1``, the problem's horizon.
+    on value iteration's own sum ``Σ_{k<N} αᵏ dt``: the rate ``ρ = −ln(α) / dt``
+    makes ``e^{−ρ dt} = α``; with ``α = 1``, the problem's horizon undiscounted.
     """
-    rho = problem.discount_rate
-    if alpha < 1.0:
-        # Σₖ αᵏ dt = dt / (1 − α) = 1 / ρ
-        rho = (1.0 - alpha) / dt
+    # α = e^{−ρ dt}
+    rho = -np.log(alpha) / dt if alpha < 1.0 else 0.0
 
-    return problem.infeasibility_price(discount_rate=rho)
+    return problem.infeasibility_price(discount_rate=rho, dt=dt)
 
 
 def cached_options_of(options) -> tuple:

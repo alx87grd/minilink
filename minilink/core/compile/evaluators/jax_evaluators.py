@@ -101,7 +101,7 @@ class JaxIntegrationMixin:
         require_step_knobs(solver, substeps, hold)
 
         f = self.rhs_of(params)
-        x0 = jnp.asarray(x0)
+        x0 = jnp.asarray(x0, dtype=float)
         u_seq = self.input_sequence_of(u_seq, n_steps, hold)
         u_start, u_end = held_inputs(u_seq, hold)
         ks = jnp.arange(u_start.shape[0])

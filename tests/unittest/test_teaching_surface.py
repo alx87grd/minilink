@@ -417,7 +417,7 @@ class TestRootPrelude(unittest.TestCase):
     def test_every_surface_name_is_the_same_object_at_the_root(self):
         import minilink
 
-        # The root prelude is the course set, a subset of the band facades (R60, R64):
+        # The root prelude is the course set, a subset of the band facades:
         # a band name need not be on the root, but where it is, it is the same object
         for band, names in TEACHING_SURFACE.items():
             module = importlib.import_module(band)

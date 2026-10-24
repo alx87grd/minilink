@@ -1,6 +1,6 @@
 """Model predictive control: receding-horizon control blocks on trajectory optimization."""
 
-# The product entry is :func:`~minilink.planning.trajectory_optimization.mpc.controller.ModelPredictiveController`
+# The product entry is :func:`~minilink.planning.trajectory_optimization.mpc.predictive.ModelPredictiveController`
 # with a :class:`~minilink.planning.trajectory_optimization.planner.TrajectoryOptimizationPlanner`.
 # ``compile_backend='jax'`` auto-compiles a parametric NLP once (bind + solve per tick);
 # ``compile_backend='numpy'`` or ``'direct'`` rebuilds the NLP each replan tick (no JAX

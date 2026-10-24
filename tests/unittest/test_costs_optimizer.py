@@ -80,6 +80,27 @@ def test_add_flattens_nested_sums():
     assert len(s.terms) == 3
 
 
+def test_a_sums_keys_do_not_depend_on_the_bracketing():
+    a, b, c = make_quadratic(), make_quadratic(), make_quadratic()
+    assert list(((a + b) + c).terms) == list((a + (b + c)).terms)
+    assert list(SumCost.of(a, SumCost.of(b, obstacle=c)).terms) == [
+        "QuadraticCost",
+        "QuadraticCost2",
+        "obstacle",
+    ]
+
+
+def test_the_quadratic_bound_holds_for_an_indefinite_weight():
+    from minilink.core.costs import quadratic_max
+    from minilink.core.sets import BoxSet
+
+    box = BoxSet([-1.0, -1.0], [1.0, 1.0])
+    grid = np.stack(np.meshgrid(*[np.linspace(-1.0, 1.0, 41)] * 2), -1).reshape(-1, 2)
+    for W in (np.diag([1.0, -1.0]), np.array([[1.0, 2.0], [2.0, -1.0]])):
+        largest = np.max(np.einsum("ki,ij,kj->k", grid, W, grid))
+        assert quadratic_max(W, [0.0, 0.0], box) >= largest - 1e-12
+
+
 def test_sum_builtin_uses_radd_zero_seed():
     costs = [make_quadratic() for _ in range(3)]
     s = sum(costs)
@@ -562,6 +583,24 @@ def test_gradient_descent_is_projected_on_the_box():
     ).solve()
     np.testing.assert_allclose(result.z, [1.0, 0.0], atol=1e-6)
     assert result.stats["algorithm"] == "gd"
+
+    # The optimum on the face z₂ = 0: stationary on the box, though ∇J ≠ 0 there
+    assert result.success and result.stats["nit"] < 1000
+
+
+def test_gradient_descent_out_of_steps_is_not_a_success():
+    from minilink.optimization.optimizer import Optimizer
+
+    result = Optimizer(
+        quadratic_program(),
+        z0=np.zeros(2),
+        method="gd",
+        options={"learning_rate": 0.1, "maxiter": 5},
+    ).solve()
+    assert not result.success
+    np.testing.assert_allclose(
+        result.stats["grad_norm"], np.linalg.norm(2.0 * (result.z - [1.0, -2.0]))
+    )
 
 
 def test_gradient_descent_steps_like_the_hand_loop():

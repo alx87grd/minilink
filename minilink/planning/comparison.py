@@ -111,8 +111,13 @@ class Comparison:
     def difference(self, a, b):
         """The paired differences ``J_a − J_b``, one per trial (the same draws for both)."""
         require_scores(self.evaluations, (a, b))
+        J_a = np.asarray(self.evaluations[a].J)
+        J_b = np.asarray(self.evaluations[b].J)
+        require_paired(J_a, J_b, (a, b))
 
-        return np.asarray(self.evaluations[a].J) - np.asarray(self.evaluations[b].J)
+        dJ = J_a - J_b
+
+        return dJ
 
     def plot_control_law(self, *, show=True, **kwargs):
         """One panel per feedback law, side by side, one colour scale from the problem's inputs."""
@@ -467,6 +472,15 @@ def require_scores(evaluations, names):
     if missing:
         raise ValueError(
             f"{missing} carry no evaluation: compare(problem, ..., dt=) scores them"
+        )
+
+
+def require_paired(J_a, J_b, names):
+    """Refuse a difference of two evaluations that do not hold the same trials."""
+    if J_a.shape != J_b.shape:
+        raise ValueError(
+            f"{names[0]!r} holds {J_a.shape[0]} runs and {names[1]!r} {J_b.shape[0]}: "
+            "a paired difference needs the same trials, as compare scores them"
         )
 
 

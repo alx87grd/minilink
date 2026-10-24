@@ -162,3 +162,81 @@ inside pytest (run instead by `tests/demo_checks/run_notebook_checks.py`, the "N
 row); one hybrid test needing the graphviz `dot` binary; one SciPy run on a discontinuous
 sliding-mode loop that is skipped by design. Speed rows of the regression gate fail on this VM
 (for example `f.dual_rate.nlp_s` at 0.22 s against a 0.15 s gate); every value row passes.
+
+## 6. The review pass after the run
+
+Three independent reviewers read the run's diff: the engine and the problem classes; the costs,
+sets and optimizer; the step model and its callers. Each finding was checked by its own script
+before a fix. A seeded baseline of 19 evaluations (NumPy and JAX, the price off, on and a number,
+deterministic and stochastic, one program gradient) stayed byte-identical through every fix.
+
+Fixed:
+
+- A cost under the user's own `jax.jit` crashed in a fresh process: the per-sample cost
+  switched JAX to 64-bit floats in the middle of the trace. It no longer touches the config, and
+  the `Trajectory` pytree is registered on the first JAX array (it was registered by the first
+  minilink JAX tool only).
+- `problem.compile` crashed on a plant with an input nothing wires (`NoisyPendulum`'s `d`, `n`):
+  the port now reads its nominal value.
+- On JAX, a compiled evaluator kept the price and the sets of its first trace, so a changed
+  `infeasible_cost` or `Xf` gave NumPy and JAX different numbers. The price is now an argument
+  of the compiled trial, worked out once per evaluation (NumPy no longer recomputes it per
+  trial), and a replaced cost or set traces anew.
+- `problem.params = problem.params` refused the `None` entries of sets without parameters;
+  `replace(x0_distribution=...)` kept the old start and support; the CVaR counted one run too
+  many at `α n` = 7.000000000000001; `Comparison.difference` broadcast mismatched trial counts.
+- The first-order optimizer tested `‖∇J‖`, so an optimum on a face of the box never converged,
+  and it reported `success` after running out of steps. It now tests the projected step
+  `‖z − Π(z − ∇J)‖` at the returned `z` and reports `success` only when converged.
+- `SumCost` keys depended on the bracketing (`a + (b + c)` gave `QuadraticCost22`).
+- `quadratic_max` returned less than the maximum for an indefinite weight; it now returns the
+  bound `dᵀ |W| d` there. The sampled `g_max` / `h_max` docstrings now say "estimate".
+- `PolicyEvaluator` built without options ignored the problem's discount and horizon (about
+  50× the optimal cost on a ρ = 1 problem); it now resolves them as the planner does.
+- The failure price of the stepped tools (value iteration at a finite horizon, the RL
+  environment, the Gym bridge) used the continuous `∫ e^{−ρt} dt`, below their discrete sum
+  `Σ_{k<N} γᵏ dt`, so a failure could cost less than staying feasible (a regression from the
+  removed `feasible_cost_bound`). `cost_bound(dt=)` now takes the discrete sum.
+- The Gym bridge charged a failure on the last step of a finite horizon the price but not `h`,
+  unlike the RL environment and `evaluate`.
+- The RL reward read `g` on the action alone; a plant with more input ports (a `d`, an `n`) was
+  charged the action on every port. It now reads the plant's whole input, as `evaluate` does.
+- The JAX rollout refused an integer `x0`; `substeps=2.0` passed the check, then failed in
+  `range`.
+- The U sweep of the run had written `U=plant.input_box` into a comment in the particle
+  Gymnasium notebook (GRO860) and one RL test, so the argument was never passed.
+- `evaluate` dropped a problem's disturbance draws silently; it now warns (open item 1).
+- Smaller: the terminal-cost discount in `CostFunction`'s
+  docstring, "in this release" in a docstring, a ruling id in a test comment, a stale DESIGN
+  sentence on a callable price, the MPC module pointer, the `Discretization` docstring.
+
+Number changes (R80): a stepped tool's price at a finite horizon with `α < 1` rises to the
+discrete sum (pendulum, ρ = 0.5, tf = 2 s: 171.36 → 172.06 at α = 0.99, dt = 0.05; 89.89 →
+91.32 at α = 0.9, dt = 0.1); the infinite horizon is unchanged. The RL reward changes only on a
+plant whose cost reads more input ports than the action.
+
+Open, for the maintainer (not changed):
+
+1. **Disturbance draws in `evaluate`.** The run turned the old Monte Carlo evaluator (which
+   stepped the RL environment and drew `d` every step) into the continuous loop, which holds the
+   problem's `disturbances` ports at nominal. The evaluator now warns instead of silently
+   dropping the draws. Per-step draws in the continuous loop are the noise-signal work planned
+   with the randomness steps (RN-4); bringing them forward is a design choice.
+2. **A diverged run scores better than a failing one** under the price: a run that blows up
+   is charged `price`, a finite run that leaves `X` is charged `cost + price`, and the
+   integral runs to `tf` with no cut (the ruling). Options: charge a diverged run
+   `cost_bound + price`, or include `isfinite(cost)` in `finite` and keep the cost of the
+   finite prefix. Its gradient through the overflowed rollout is NaN (the docstring now says so).
+3. **The tabular learner's model.** Its environment steps with RK4 while its grid defaults
+   to Euler, so "the same grid solved by value iteration is the exact answer the learner
+   approaches" holds only with `solver="euler"` passed. Making the grid's solver the default
+   changes the course results.
+4. **The Gym bridge runs one step too many** on an infinite horizon (`t_new > tf` on summed
+   floats: 11 steps for `tf = 1`, `dt = 0.1`), unlike the RL environment. The GRO860
+   Gymnasium notebook's hand-written class mirrors this line, so the fix touches the notebook.
+5. **The same cost added twice** (`q + 10 * q`) shares its params between both terms. Refusing
+   it would refuse `cost + cost`.
+6. **The price ignores a run's cost overrides**: a program over cost weights keeps the price
+   of the problem's own weights. Worked out once per evaluation, it costs 4096 calls of `g`
+   for a cost with no exact bound (`QuadraticCost` has one) at every `evaluate`, a program's
+   every iteration included; a cache keyed on the cost's parameters would remove that.

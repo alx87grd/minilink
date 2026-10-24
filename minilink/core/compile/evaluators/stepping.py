@@ -75,7 +75,7 @@ def require_step_knobs(solver, substeps, hold="zoh"):
             f"solver must be one of {SOLVERS} for a step, got {solver!r}; "
             "an adaptive solver integrates through Simulator(solver='scipy')"
         )
-    if int(substeps) != substeps or substeps < 1:
+    if isinstance(substeps, float) or int(substeps) != substeps or substeps < 1:
         raise ValueError(f"substeps must be a positive integer, got {substeps!r}")
     if hold not in HOLDS:
         raise ValueError(f"hold must be one of {HOLDS}, got {hold!r}")

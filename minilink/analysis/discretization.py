@@ -50,8 +50,8 @@ class Discretization(StepSystem):
     """
     A continuous :class:`DynamicSystem` sampled every :attr:`dt`, its input held.
 
-    ``step`` is the step model of the compiled evaluator, written once
-    (``rk4`` or ``euler``, ``substeps`` per period) on the source's ``f``; the
+    ``step`` is the step model's one step body (``rk4`` or ``euler``,
+    ``substeps`` per period), the one the compiled evaluator steps, on the source's ``f``; the
     sample time lives here and never reaches ``f``. The wrapper starts from the
     source's ``x0`` and copies its state, input and ``y`` labels, units, bounds
     and nominal values.

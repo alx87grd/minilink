@@ -1031,8 +1031,8 @@ to tolerance, `solve_steps` for a fixed horizon — returning a `PlanningSolutio
 interpolates `J` (the raw `DynamicProgrammingResult`, `J` and `pi` as action ids, stays on
 `planner.result`); out-of-domain
 transitions are charged a finite `out_of_bound_cost` (pyro's
-`cf.INF`), or, when it is a callable like the problem's `infeasible_cost`, its price
-`out_of_bound_cost(x_next, t)` at each such transition's successor. Three interchangeable
+`cf.INF`), or, when it is a callable, its price `out_of_bound_cost(x_next, t)` at each
+such transition's successor. Three interchangeable
 backward-step backends share this workflow: `loop` (per-node Python, pyro's reference),
 `numpy` (vectorized over the precomputed lookup table, the default),
 and `jax` (the same backup as one jitted `lax.while_loop` with `map_coordinates`, on tables

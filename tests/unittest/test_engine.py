@@ -462,3 +462,76 @@ def test_a_sets_membership_traces_on_jax():
     )
     assert bool(jax.jit(lambda u: box.contains(u))(jnp.array([0.5])))
     assert ball.contains(np.array([0.5, 0.0]))  # NumPy in, a NumPy boolean out
+
+
+# --- the edges: unwired plant ports, a changed problem, the view round trip ---
+
+
+def test_a_plant_input_left_unwired_reads_its_nominal_value():
+    from minilink import NoisyPendulum
+
+    # The noise ports d and n at their nominal zero: the plain pendulum's run
+    J = {}
+    for sys in (NoisyPendulum(), Pendulum()):
+        problem = PlanningProblem(
+            sys, x_start=[0.5, 0.0], cost=QuadraticCost.from_system(sys), tf=1.0
+        )
+        pe = problem.compile(PID(Kp=5.0, Kd=1.0), dt=0.01, backend="numpy")
+        J[type(sys).__name__] = pe.evaluate().J
+    np.testing.assert_allclose(J["NoisyPendulum"], J["Pendulum"])
+
+
+@pytest.mark.parametrize(
+    "backend", ["numpy", pytest.param("jax", marks=pytest.mark.jax)]
+)
+def test_an_evaluator_reads_the_price_and_the_sets_the_problem_holds_now(backend):
+    problem = upright_problem(x_start=[0.0, 0.0], Xf=BallSet([np.pi, 0.0], 0.01))
+    pe = problem.compile(PID(Kp=1.0, Kd=0.1), dt=0.05, backend=backend)
+    before = pe.evaluate(UPRIGHT)
+    assert not bool(before.reached[0])
+
+    # The price switched on, then the goal widened to hold the run's end
+    problem.infeasible_cost = 1000.0
+    priced = pe.evaluate(UPRIGHT)
+    np.testing.assert_allclose(priced.J, before.J + 1000.0)
+    problem.Xf = BallSet([np.pi, 0.0], 10.0)
+    widened = pe.evaluate(UPRIGHT)
+    assert bool(widened.reached[0])
+    np.testing.assert_allclose(widened.J, before.J)
+
+
+def test_the_problems_params_write_back_to_themselves():
+    problem = upright_problem(x_start=[0.1, 0.0], X=plant().state.box)
+    problem.params = problem.params
+    np.testing.assert_allclose(problem.x_start, [0.1, 0.0])
+
+
+def test_a_new_start_law_brings_its_own_mean_and_support():
+    sys = plant()
+    problem = StochasticPlanningProblem(
+        sys,
+        cost=QuadraticCost.from_system(sys),
+        x0_distribution=Uniform([-0.1, -0.1], [0.1, 0.1]),
+    )
+    moved = problem.replace(x0_distribution=Uniform([2.0, 0.0], [2.2, 0.1]))
+    np.testing.assert_allclose(moved.x_start, [2.1, 0.05])
+    assert moved.X0.contains(np.array([2.1, 0.05]))
+
+
+def test_the_cvar_counts_the_worst_fraction_without_rounding_up():
+    J = np.arange(100.0)
+    assert reduce_criterion(J, ("cvar", 0.07)) == np.mean(J[-7:])
+
+
+def test_a_disturbance_the_loop_does_not_draw_is_announced():
+    from minilink import NoisyPendulum
+
+    sys = NoisyPendulum()
+    problem = StochasticPlanningProblem(
+        sys,
+        cost=QuadraticCost.from_system(sys),
+        x0_distribution=Uniform([-0.1, -0.1], [0.1, 0.1]),
+        disturbances={"d": Gaussian([0.0], [1.0])},
+    )
+    with pytest.warns(UserWarning, match="does not draw the disturbances on \\['d'\\]"):
+        problem.compile(PID(Kp=5.0, Kd=1.0), dt=0.05, backend="numpy")

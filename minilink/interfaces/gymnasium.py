@@ -173,7 +173,7 @@ class Sys2Gym(gym.Env):
         env = ProblemEnv(problem.sys, problem.require_cost(), dt=dt, tf=tf, **kwargs)
         env.problem = problem
         env.finite_horizon = finite
-        env.infeasible_cost = problem.infeasibility_price(tf)
+        env.infeasible_cost = problem.infeasibility_price(tf, dt=dt)
         return env
 
     def reset(self, seed=None, options=None):
@@ -367,13 +367,18 @@ class ProblemEnv(Sys2Gym):
         problem = self.problem
         y, r, terminated, truncated, info = super().step(u)
         x, t = self.x, self.t
-        if not problem.X.contains(x, t, None):
-            price = self.infeasible_cost
-            r -= float(price(x, t) if callable(price) else price)
-            terminated, truncated = True, False
-        elif self.finite_horizon and t >= self.tf - 0.5 * self.dt:
+
+        # A failure is charged its price; the end of a finite horizon its h, a
+        # failure on the last step both, as the evaluation scores the run
+        failed = not problem.X.contains(x, t, None)
+        ended = self.finite_horizon and t >= self.tf - 0.5 * self.dt
+        if failed:
+            r -= float(self.infeasible_cost)
+        if ended:
             r -= float(problem.require_cost().h(x, t))
+        if failed or ended:
             terminated, truncated = True, False
+
         return y, r, terminated, truncated, info
 
 

@@ -271,6 +271,12 @@ class PlanningProblem:
             if isinstance(self.X0, SingletonSet):
                 fields["X0"] = None
 
+        # A new start law takes its own mean and support, unless they are given
+        if "x0_distribution" in changes:
+            for name in ("x_start", "X0"):
+                if name not in changes:
+                    fields[name] = None
+
         return type(self)(**fields)
 
     @property
@@ -297,7 +303,7 @@ class PlanningProblem:
 
         return float(gamma)
 
-    def cost_bound(self, tf=None, *, discount_rate=None):
+    def cost_bound(self, tf=None, *, discount_rate=None, dt=None):
         """
         An upper bound of the cost of any run that stays in the boxes: always finite.
 
@@ -305,9 +311,11 @@ class PlanningProblem:
         cost's bounds over the boxes of ``X`` and ``U`` (the declared sets', else
         the plant's declared state and input ranges), ``T`` the run's length
         (``tf``, default the problem's horizon) and ``ρ`` the problem's rate (or
-        ``discount_rate``, a planner's own). An infinite horizon charges no
-        ``h``; one with ``ρ = 0``, or boxes with no finite bound, falls back to
-        ``1e6`` with a warning naming ``infeasible_cost``.
+        ``discount_rate``, a planner's own). A stepped tool passes its period
+        ``dt``: the integral is then its sum ``Σ_{k<N} γᵏ dt``, ``γ = e^{−ρ dt}``,
+        ``N = T / dt``, which is larger. An infinite horizon charges no ``h``; one
+        with ``ρ = 0``, or boxes with no finite bound, falls back to ``1e6`` with
+        a warning naming ``infeasible_cost``.
         """
         cost = self.require_cost()
         rho = self.discount_rate if discount_rate is None else float(discount_rate)
@@ -326,13 +334,19 @@ class PlanningProblem:
         g_max = cost.g_max(X_box, U_box)
         h_max = cost.h_max(X_box) if np.isfinite(T) else 0.0
 
-        # ∫₀ᵀ e^{−ρt} dt = (1 − e^{−ρT}) / ρ, or T when ρ = 0
-        if rho > 0.0:
-            horizon = (1.0 - np.exp(-rho * T)) / rho
-        elif np.isfinite(T):
-            horizon = T
-        else:
+        if not (rho > 0.0 or np.isfinite(T)):
             return fallback_bound("an infinite undiscounted horizon has no cost bound")
+
+        # ∫₀ᵀ e^{−ρt} dt = (1 − e^{−ρT}) / ρ, or T when ρ = 0
+        if dt is None:
+            horizon = (1.0 - np.exp(-rho * T)) / rho if rho > 0.0 else T
+
+        # Σ_{k<N} γᵏ dt = dt (1 − γᴺ) / (1 − γ), or N dt when γ = 1
+        else:
+            dt = float(dt)
+            gamma = np.exp(-rho * dt)
+            N = round(T / dt) if np.isfinite(T) else np.inf
+            horizon = dt * (1.0 - gamma**N) / (1.0 - gamma) if gamma < 1.0 else N * dt
 
         # J_max = g_max ∫₀ᵀ e^{−ρt} dt + e^{−ρT} h_max
         bound = g_max * horizon + (np.exp(-rho * T) * h_max if np.isfinite(T) else 0.0)
@@ -341,11 +355,11 @@ class PlanningProblem:
 
         return float(bound)
 
-    def infeasibility_price(self, tf=None, *, discount_rate=None):
+    def infeasibility_price(self, tf=None, *, discount_rate=None, dt=None):
         """The price a planner charges a failure: ``infeasible_cost`` when a number, else :meth:`cost_bound`."""
         price = self.infeasible_cost
         if price is None or price is True:
-            return self.cost_bound(tf, discount_rate=discount_rate)
+            return self.cost_bound(tf, discount_rate=discount_rate, dt=dt)
 
         return price
 
@@ -840,6 +854,9 @@ def require_roles(value, view):
 
 def write_set_params(role, set_, entry):
     """Set a set's parameters; refuse a set that holds none (a frozen library set)."""
+    # The view's own entry for a set without parameters writes back as nothing
+    if entry is None and set_.params is None:
+        return
     try:
         set_.params = entry
     except AttributeError:

@@ -105,6 +105,9 @@ def array_module(*values) -> types.ModuleType:
         if type(value).__module__.startswith("jax"):
             import jax.numpy as jnp
 
+            # The core records are pytrees from the first JAX array on, traced or not
+            register_jax_pytrees()
+
             return jnp
 
     return np

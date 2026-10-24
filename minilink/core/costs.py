@@ -4,7 +4,7 @@ from abc import ABC, abstractmethod
 
 import numpy as np
 
-from minilink.core.backends import array_module, require_jax
+from minilink.core.backends import array_module
 from minilink.core.inspect import inspect_text, repr_pretty
 from minilink.core.trajectory import Trajectory
 
@@ -31,7 +31,7 @@ class CostFunction(ABC):
     Mother class for deterministic planning cost functions.
 
     Subclasses define a running cost ``g(x, u, t)`` and a terminal cost
-    ``h(x, t)`` of the objective ``J = ∫ exp(-rho t) g dt + h(x(tf), tf)``.
+    ``h(x, t)`` of the objective ``J = ∫ e^{−ρt} g dt + e^{−ρ tf} h(x(tf), tf)``.
     The horizon is the planning problem's: a finite ``tf`` ends the integral
     and charges ``h`` there, an infinite one never does. Leaving the allowed
     set is priced by the problem (``infeasible_cost``), not by the cost.
@@ -66,10 +66,11 @@ class CostFunction(ABC):
 
     def g_max(self, X, U, params=None):
         """
-        An upper bound of ``g`` over the boxes ``X × U`` (two :class:`~minilink.core.sets.BoxSet`).
+        The largest ``g`` over the boxes ``X × U`` (two :class:`~minilink.core.sets.BoxSet`).
 
         The largest ``g`` on a quasi-random sample of the boxes at ``t = 0``: a
-        sampled estimate, which a subclass replaces by its exact maximum.
+        sampled estimate, which may fall short of the maximum between the samples;
+        a subclass replaces it by its exact maximum or a bound.
         """
         xs, us = box_samples(X, U)
         g = self.g
@@ -81,7 +82,7 @@ class CostFunction(ABC):
         return g_max
 
     def h_max(self, X, params=None):
-        """An upper bound of ``h`` over the box ``X``: the largest ``h`` on a quasi-random sample."""
+        """The largest ``h`` over the box ``X``: a sampled estimate, as :meth:`g_max`."""
         xs, _ = box_samples(X, None)
         h = self.h
 
@@ -347,7 +348,8 @@ class SumCost(CostFunction):
         for cost in costs:
             if isinstance(cost, SumCost) and cost.id is None:
                 for term_id, term in cost.terms.items():
-                    terms[unique_term_id(term_id, terms)] = term
+                    base = term_id if is_named_term(term_id, term) else term_id_of(term)
+                    terms[unique_term_id(base, terms)] = term
             else:
                 terms[unique_term_id(term_id_of(cost), terms)] = cost
         for name, cost in named.items():
@@ -497,6 +499,14 @@ def term_id_of(cost) -> str:
     return type(cost).__name__
 
 
+def is_named_term(term_id, term) -> bool:
+    """Whether a sum's key was given by name: not the term's own id, nor that id with a repeat count."""
+    base = term_id_of(term)
+    count = term_id[len(base) :]
+
+    return not (term_id.startswith(base) and (count == "" or count.isdigit()))
+
+
 def unique_term_id(base, existing) -> str:
     """``base``, else the first of ``base2``, ``base3``, … not in ``existing``."""
     if base not in existing:
@@ -550,10 +560,12 @@ def quadratic_max(W, center, box):
     ``max (z − c)ᵀ W (z − c)`` over a box, for ``W ⪰ 0``: at a vertex (a convex function).
 
     Exact for a diagonal ``W`` and for up to 12 coupled entries (every vertex);
-    beyond, the bound ``λ_max(W) Σ max(dᵢ²)``. Entries ``W`` does not weigh may be
-    unbounded; a weighed unbounded entry gives ``+inf``.
+    beyond, the bound ``λ_max(W) Σ max(dᵢ²)``. An indefinite ``W`` takes the bound
+    ``dᵀ |W| d``. Entries ``W`` does not weigh may be unbounded; a weighed
+    unbounded entry gives ``+inf``.
     """
     W = np.asarray(W, dtype=float)
+    center = np.asarray(center, dtype=float)
 
     # The entries W weighs, and their farthest offsets from the center
     weighed = np.flatnonzero(np.any(W != 0.0, axis=0) | np.any(W != 0.0, axis=1))
@@ -564,6 +576,12 @@ def quadratic_max(W, center, box):
     W = W[np.ix_(weighed, weighed)]
     if not (np.all(np.isfinite(lo)) and np.all(np.isfinite(hi))):
         return float(np.inf)
+
+    # Indefinite: |zᵢ − cᵢ| ≤ dᵢ bounds every term, (z − c)ᵀ W (z − c) ≤ dᵀ |W| d
+    eigenvalues = np.linalg.eigvalsh(0.5 * (W + W.T))
+    if eigenvalues[0] < -1e-12 * max(1.0, abs(eigenvalues[-1])):
+        d = np.maximum(np.abs(lo), np.abs(hi))
+        return float(d @ np.abs(W) @ d)
 
     # Diagonal: Σ wᵢᵢ max(loᵢ², hiᵢ²)
     if np.all(W == np.diag(np.diag(W))):
@@ -577,7 +595,7 @@ def quadratic_max(W, center, box):
         return float(np.max(np.einsum("ik,ij,jk->k", vertices, W, vertices)))
 
     # Coupled, large: λ_max(W) ‖d‖², d the farthest offset of each entry
-    lam_max = float(np.max(np.linalg.eigvalsh(0.5 * (W + W.T))))
+    lam_max = float(eigenvalues[-1])
 
     return lam_max * float(np.sum(np.maximum(lo**2, hi**2)))
 
@@ -618,6 +636,9 @@ def per_sample(g, xs, us, ts, params):
             [float(g(x, u, t, params=params)) for x, u, t in zip(xs, us, ts)]
         )
 
-    jax = require_jax()
+    # The float width is the caller's trace: no change to the JAX config here
+    g_vectorized = xp.vectorize(
+        lambda x, u, t: g(x, u, t, params=params), signature="(n),(m),()->()"
+    )
 
-    return jax.vmap(lambda x, u, t: g(x, u, t, params=params))(xs, us, ts)
+    return g_vectorized(xs, us, ts)

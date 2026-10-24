@@ -85,10 +85,10 @@ class FirstOrderOptimizer(OptimizerBackend):
             adam_step = jax.jit(adam.update)  # One compiled update, not one per step
 
         z = np.clip(np.asarray(z0, dtype=float), lower, upper)
-        grad_norm = np.inf
         for k in range(maxiter):
+            # Stationary on the box: ‖z − Π(z − ∇J)‖ ≤ gtol (‖∇J‖ inside the box)
             grad = program_evaluator.gradient(z)
-            grad_norm = float(np.linalg.norm(grad))
+            grad_norm = float(np.linalg.norm(z - np.clip(z - grad, lower, upper)))
             if grad_norm <= gtol:
                 break
 
@@ -104,6 +104,8 @@ class FirstOrderOptimizer(OptimizerBackend):
                 callback(z.copy())
         else:
             k = maxiter
+            grad = program_evaluator.gradient(z)
+            grad_norm = float(np.linalg.norm(z - np.clip(z - grad, lower, upper)))
 
         J = program_evaluator.objective(z)
         converged = grad_norm <= gtol
@@ -115,7 +117,7 @@ class FirstOrderOptimizer(OptimizerBackend):
 
         return OptimizationResult(
             z=z,
-            success=bool(np.isfinite(J)),
+            success=bool(converged and np.isfinite(J)),
             cost=float(J),
             message=message,
             stats={"nit": k, "grad_norm": grad_norm, "algorithm": self.algorithm},
