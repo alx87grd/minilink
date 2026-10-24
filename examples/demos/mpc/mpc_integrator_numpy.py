@@ -6,6 +6,7 @@ from minilink import (
     DynamicSystem,
     PlanningProblem,
     QuadraticCost,
+    SingletonSet,
     TrajectoryOptimizationPlanner,
 )
 from minilink.control import ModelPredictiveController
@@ -41,7 +42,7 @@ planner = TrajectoryOptimizationPlanner(
         sys=sys,
         tf=1.0,
         x_start=x0,
-        x_goal=x_goal,
+        Xf=SingletonSet(x_goal),
         cost=QuadraticCost.from_system(
             sys,
             Q=np.eye(1),
@@ -49,6 +50,7 @@ planner = TrajectoryOptimizationPlanner(
             xbar=x_goal,
         ),
         X=sys.state.box,
+        U=sys.input_box,
     ),
     n_steps=8,
     transcription="direct_collocation",

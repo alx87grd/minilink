@@ -180,6 +180,7 @@ _EXPORTS: dict[str, tuple[str, str]] = {
     "TimeCost": ("minilink.core.costs", "TimeCost"),
     "StepDiagramSystem": ("minilink.core.diagram", "StepDiagramSystem"),
     "BallSet": ("minilink.core.sets", "BallSet"),
+    "SingletonSet": ("minilink.core.sets", "SingletonSet"),
     "closed_loop": ("minilink.core.composition", "closed_loop"),
     "feedback": ("minilink.core.composition", "feedback"),
     "Source": ("minilink.blocks.sources", "Source"),

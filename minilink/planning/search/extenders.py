@@ -219,4 +219,7 @@ def require_box_input_set(U):
 def require_finite_input_bounds(lower, upper):
     """Refuse an input box with an infinite bound."""
     if not np.all(np.isfinite(lower)) or not np.all(np.isfinite(upper)):
-        raise ValueError("the 'bang-bang' preset needs finite input bounds")
+        raise ValueError(
+            "the 'bang-bang' preset needs finite input bounds: declare U on the "
+            "problem (U=plant.input_box, the plant's declared range)"
+        )

@@ -22,7 +22,7 @@ cost = QuadraticCost.from_system(
     R=np.array([[1.0]]),
     S=np.diag([10.0, 10.0]),
 )
-problem = PlanningProblem(plant, x_goal=UPRIGHT, cost=cost)
+problem = PlanningProblem(plant, x_goal=UPRIGHT, cost=cost, U=plant.input_box)
 
 planner = DynamicProgrammingPlanner(
     problem,

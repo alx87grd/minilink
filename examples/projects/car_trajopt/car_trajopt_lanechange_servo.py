@@ -68,6 +68,7 @@ problem = PlanningProblem(
     tf=TF,
     x_start=x_start,
     cost=cost,
+    U=sys.input_box,
 )
 
 planner = TrajectoryOptimizationPlanner(

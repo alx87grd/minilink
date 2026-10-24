@@ -44,9 +44,11 @@ class PlanningProblem:
         is used by solvers or guesses that need one concrete start point.
         Defaults to singleton ``X0`` when available, otherwise ``sys.x0``.
     x_goal : array_like, optional
-        Representative terminal target. When ``Xf`` is omitted, this creates a
-        singleton ``Xf``. When ``Xf`` is provided, it must belong to ``Xf`` and
-        is used by initial guesses or reports that need one concrete target.
+        Representative terminal target, for the tools that need one point (an
+        initial guess, RRT's goal bias). It never creates ``Xf``: an exact
+        terminal state is ``Xf=SingletonSet(x_goal)``, written. When ``Xf`` is
+        provided, ``x_goal`` must belong to it; unset, it is the point of a
+        singleton ``Xf``.
     cost : CostFunction, optional
         Planning cost. Required by solvers that optimize an objective.
     X : Set, optional
@@ -55,8 +57,11 @@ class PlanningProblem:
         ``X=sys.state.box`` to constrain the plant to its declared state range,
         or any set (``sys.state.box & free``).
     U : InputSet, optional
-        Input constraint ``u(t) in U(x, t)``. Defaults to the input ports' box:
-        an actuator limit is part of the plant model.
+        Input constraint ``u(t) in U(x, t)``: a hard constraint, like ``X``.
+        Unconstrained by default; pass ``U=sys.input_box`` to constrain the input
+        to its ports' declared range. A planner that needs a finite box (value
+        iteration's grid, an RL action space, RRT's bang-bang controls) refuses
+        an unbounded one.
     X0, Xf : Set, optional
         Initial and terminal boundary sets. These are the authoritative
         feasibility constraints; ``x_start`` and ``x_goal`` are shortcuts or
@@ -111,12 +116,12 @@ class PlanningProblem:
             required=False,
         )
 
-        # The sets: X unconstrained and U the input ports' box unless given, the
-        # boundary sets the singletons of the start and the goal
+        # The sets: X and U unconstrained unless given, X0 the start's singleton,
+        # Xf as given (none by default)
         X = unconstrained(n) if self.X is None else self.X
-        U = BoxInputSet.from_system_inputs(self.sys) if self.U is None else self.U
+        U = unconstrained_inputs(int(self.sys.m)) if self.U is None else self.U
         X0 = SingletonSet(x_start) if self.X0 is None else self.X0
-        Xf = SingletonSet(x_goal) if self.Xf is None and x_goal is not None else self.Xf
+        Xf = self.Xf
 
         # The parameter bundle (a random plant's draw at its mean) and the metadata
         params = self.coerce_params(self.params)
@@ -597,6 +602,11 @@ def as_stochastic(problem: PlanningProblem) -> StochasticPlanningProblem:
 def unconstrained(n):
     """The whole state space as a set: no constraint on ``x``."""
     return BoxSet(np.full(int(n), -np.inf), np.full(int(n), np.inf))
+
+
+def unconstrained_inputs(m):
+    """The whole input space as an input set: no constraint on ``u``."""
+    return BoxInputSet(unconstrained(m))
 
 
 def lookup_param(params, name):

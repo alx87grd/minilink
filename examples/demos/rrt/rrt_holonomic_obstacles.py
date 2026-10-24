@@ -67,7 +67,9 @@ def make_holonomic_problem(*, robot_radius=0.25):
     scene = Scene(obstacles=HOLONOMIC_OBSTACLES)
     body = bind(sys, disc(robot_radius))
     X = BoxSet.from_system_state(sys) & scene.clearance_field(body).as_constraint()
-    problem = PlanningProblem(sys=sys, x_start=X_START, x_goal=X_GOAL, X=X)
+    problem = PlanningProblem(
+        sys=sys, x_start=X_START, x_goal=X_GOAL, X=X, U=sys.input_box
+    )
     return sys, scene, body, problem
 
 

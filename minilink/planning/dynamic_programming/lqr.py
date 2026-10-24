@@ -301,7 +301,9 @@ if __name__ == "__main__":
     cost = QuadraticCost.from_system(
         plant, Q=np.diag([1.0, 10.0, 1.0, 1.0]), R=np.array([[0.1]]), xbar=x_bar
     )
-    problem = PlanningProblem(plant, x_start=x0, cost=cost, tf=np.inf)
+    problem = PlanningProblem(
+        plant, x_start=x0, cost=cost, tf=np.inf, U=plant.input_box
+    )
 
     solution = LQRPlanner(problem).solve(evaluate=True)
     print(solution)

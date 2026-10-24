@@ -33,7 +33,12 @@ runs = {}
 for water, current in WATERS.items():
     boat = ParkingBoat(current)
     problem = PlanningProblem(
-        sys=boat, x_start=X_START, cost=parking_cost(boat), tf=TF, X=boat.state.box
+        sys=boat,
+        x_start=X_START,
+        cost=parking_cost(boat),
+        tf=TF,
+        X=boat.state.box,
+        U=boat.input_box,
     )
 
     # The two state-feedback laws: the cascade, and PPO's weights from parking_ppo.py
@@ -53,6 +58,7 @@ for water, current in WATERS.items():
             cost=parking_cost(boat, terminal=MPC_TERMINAL),
             tf=MPC_HORIZON,
             X=boat.state.box,
+            U=boat.input_box,
         ),
         n_steps=MPC_STEPS,
         transcription="direct_collocation",

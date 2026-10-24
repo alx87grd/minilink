@@ -126,7 +126,12 @@ x0 = np.array(
 
 planner = TrajectoryOptimizationPlanner(
     PlanningProblem(
-        sys=design, x_start=x0, cost=cost, tf=MPC_HORIZON, X=design.state.box
+        sys=design,
+        x_start=x0,
+        cost=cost,
+        tf=MPC_HORIZON,
+        X=design.state.box,
+        U=design.input_box,
     ),
     n_steps=MPC_STEPS,
     transcription="direct_collocation",

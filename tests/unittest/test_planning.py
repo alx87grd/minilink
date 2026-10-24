@@ -84,9 +84,10 @@ class TestPlanningArchitecture(unittest.TestCase):
             sys=sys,
             tf=1.0,
             x_start=np.array([0.0]),
-            x_goal=np.array([1.0]),
+            Xf=SingletonSet(np.array([1.0])),
             cost=cost,
             X=sys.state.box,
+            U=sys.input_box,
         )
 
     def test_box_and_boundary_sets(self):
@@ -107,7 +108,9 @@ class TestPlanningArchitecture(unittest.TestCase):
 
     def test_planning_problem_defaults(self):
         sys = self.make_system()
-        problem = PlanningProblem(sys=sys, x_goal=np.array([0.0, 0.0]))
+        problem = PlanningProblem(
+            sys=sys, Xf=SingletonSet(np.array([0.0, 0.0])), U=sys.input_box
+        )
         np.testing.assert_allclose(problem.x_start, sys.x0)
         self.assertIsNone(problem.tf)
         self.assertTrue(problem.X.contains(np.array([0.0, 0.0])))
@@ -119,24 +122,32 @@ class TestPlanningArchitecture(unittest.TestCase):
     def test_planning_problem_tf_validation_and_grid(self):
         sys = self.make_system()
         with self.assertRaisesRegex(ValueError, "tf must be positive"):
-            PlanningProblem(sys=sys, x_goal=np.array([0.0, 0.0]), tf=0.0)
+            PlanningProblem(
+                sys=sys, Xf=SingletonSet(np.array([0.0, 0.0])), tf=0.0, U=sys.input_box
+            )
         infinite = PlanningProblem(
-            sys=sys, x_goal=np.array([0.0, 0.0]), tf=float("inf")
+            sys=sys,
+            Xf=SingletonSet(np.array([0.0, 0.0])),
+            tf=float("inf"),
+            U=sys.input_box,
         )
         self.assertTrue(np.isposinf(infinite.tf))
         with self.assertRaisesRegex(ValueError, "finite problem.tf"):
             infinite.require_finite_tf()
         problem = PlanningProblem(
             sys=sys,
-            x_goal=np.array([0.0, 0.0]),
+            Xf=SingletonSet(np.array([0.0, 0.0])),
             cost=QuadraticCost.from_system(sys),
             tf=2.0,
+            U=sys.input_box,
         )
         options = DirectCollocationOptions(n_steps=5)
         np.testing.assert_allclose(options.t(problem), np.linspace(0.0, 2.0, 5))
         self.assertAlmostEqual(options.dt(problem), 0.5)
         self.assertNotIn("tf", options.__dataclass_fields__)
-        unset = PlanningProblem(sys=sys, x_goal=np.array([0.0, 0.0]))
+        unset = PlanningProblem(
+            sys=sys, Xf=SingletonSet(np.array([0.0, 0.0])), U=sys.input_box
+        )
         with self.assertRaisesRegex(ValueError, "finite problem.tf"):
             options.t(unset)
 
@@ -146,7 +157,9 @@ class TestPlanningArchitecture(unittest.TestCase):
         Xf = BallSet(center=np.array([0.5, 0.0]), radius=0.25)
         x_start = np.array([0.1, -0.1])
         x_goal = np.array([0.5, 0.0])
-        problem = PlanningProblem(sys=sys, x_start=x_start, x_goal=x_goal, X0=X0, Xf=Xf)
+        problem = PlanningProblem(
+            sys=sys, x_start=x_start, x_goal=x_goal, X0=X0, Xf=Xf, U=sys.input_box
+        )
         self.assertIs(problem.X0, X0)
         self.assertIs(problem.Xf, Xf)
         np.testing.assert_allclose(problem.x_start, x_start)
@@ -157,7 +170,7 @@ class TestPlanningArchitecture(unittest.TestCase):
         x_start = np.array([0.25, -0.5])
         x_goal = np.array([0.75, 0.5])
         problem = PlanningProblem(
-            sys=sys, X0=SingletonSet(x_start), Xf=SingletonSet(x_goal)
+            sys=sys, X0=SingletonSet(x_start), Xf=SingletonSet(x_goal), U=sys.input_box
         )
         np.testing.assert_allclose(problem.x_start, x_start)
         np.testing.assert_allclose(problem.x_goal, x_goal)
@@ -169,12 +182,14 @@ class TestPlanningArchitecture(unittest.TestCase):
                 sys=sys,
                 x_start=np.array([1.0, 0.0]),
                 X0=BallSet(center=np.zeros(2), radius=0.25),
+                U=sys.input_box,
             )
         with self.assertRaisesRegex(ValueError, "x_goal must belong to Xf"):
             PlanningProblem(
                 sys=sys,
                 x_goal=np.array([1.0, 0.0]),
                 Xf=BallSet(center=np.zeros(2), radius=0.25),
+                U=sys.input_box,
             )
 
     def test_planning_problem_boundary_types_are_validated(self):
@@ -184,18 +199,19 @@ class TestPlanningArchitecture(unittest.TestCase):
         )
         problem = PlanningProblem(
             sys=sys,
-            x_goal=np.array([0.0, 0.0]),
+            Xf=SingletonSet(np.array([0.0, 0.0])),
             params=params,
             metadata={"tag": "demo"},
+            U=sys.input_box,
         )
         self.assertIs(problem.params, params)
         self.assertEqual(problem.metadata["tag"], "demo")
         with self.assertRaises(TypeError):
             problem.metadata["tag"] = "changed"
         with self.assertRaisesRegex(TypeError, "params must be"):
-            PlanningProblem(sys=sys, params={"system": {}})
+            PlanningProblem(sys=sys, params={"system": {}}, U=sys.input_box)
         with self.assertRaisesRegex(TypeError, "metadata must be"):
-            PlanningProblem(sys=sys, metadata=[("tag", "demo")])
+            PlanningProblem(sys=sys, metadata=[("tag", "demo")], U=sys.input_box)
 
     def test_quadratic_cost_evaluates_trajectory(self):
         sys = self.make_system()
@@ -230,7 +246,9 @@ class TestPlanningArchitecture(unittest.TestCase):
         sys = MechanicalSystem(dof=1)
         x_start = np.array([0.0, 0.5])
         x_goal = np.array([1.0, -0.25])
-        problem = PlanningProblem(sys=sys, x_start=x_start, x_goal=x_goal)
+        problem = PlanningProblem(
+            sys=sys, x_start=x_start, Xf=SingletonSet(x_goal), U=sys.input_box
+        )
         guess = mechanical_cubic_initial_trajectory(problem, np.linspace(0.0, 2.0, 5))
         np.testing.assert_allclose(guess.x[:, 0], x_start)
         np.testing.assert_allclose(guess.x[:, -1], x_goal)
@@ -239,7 +257,11 @@ class TestPlanningArchitecture(unittest.TestCase):
         sys = self.make_system()
         cost = QuadraticCost.from_system(sys)
         problem = PlanningProblem(
-            sys=sys, x_goal=np.array([0.0, 0.0]), cost=cost, tf=1.0
+            sys=sys,
+            Xf=SingletonSet(np.array([0.0, 0.0])),
+            cost=cost,
+            tf=1.0,
+            U=sys.input_box,
         )
         planner = TrajectoryOptimizationPlanner(
             problem,
@@ -279,7 +301,11 @@ class TestPlanningArchitecture(unittest.TestCase):
         sys = self.make_system()
         cost = QuadraticCost.from_system(sys)
         problem = PlanningProblem(
-            sys=sys, x_goal=np.array([0.0, 0.0]), cost=cost, tf=1.0
+            sys=sys,
+            Xf=SingletonSet(np.array([0.0, 0.0])),
+            cost=cost,
+            tf=1.0,
+            U=sys.input_box,
         )
         to = TrajectoryOptimizationPlanner(
             problem,
@@ -423,9 +449,10 @@ class TestPlanningArchitecture(unittest.TestCase):
         sys = Integrator()
         problem = PlanningProblem(
             sys=sys,
-            x_goal=np.array([1.0]),
+            Xf=SingletonSet(np.array([1.0])),
             cost=QuadraticCost.from_system(sys),
             params=ProblemParameters(system={"k": 3.0}),
+            U=sys.input_box,
         )
         x = np.array([0.0])
         u = np.array([2.0])
@@ -433,7 +460,10 @@ class TestPlanningArchitecture(unittest.TestCase):
             f = dynamics_function(problem, backend)
             np.testing.assert_allclose(f(x, u, 0.0), [6.0], atol=1e-12)
         plain = PlanningProblem(
-            sys=sys, x_goal=np.array([1.0]), cost=QuadraticCost.from_system(sys)
+            sys=sys,
+            Xf=SingletonSet(np.array([1.0])),
+            cost=QuadraticCost.from_system(sys),
+            U=sys.input_box,
         )
         f = dynamics_function(plain, "numpy")
         np.testing.assert_allclose(f(x, u, 0.0), [2.0], atol=1e-12)
@@ -572,6 +602,7 @@ def _trajopt_problem():
         cost=QuadraticCost.from_system(
             sys, Q=np.zeros((1, 1)), R=np.eye(1), S=np.zeros((1, 1))
         ),
+        U=sys.input_box,
     )
 
 
@@ -739,6 +770,7 @@ class TestHybridDefaultComputerX0(unittest.TestCase):
             cost=QuadraticCost.from_system(
                 sys, Q=np.zeros((1, 1)), R=np.eye(1), S=np.zeros((1, 1))
             ),
+            U=sys.input_box,
         )
         planner = TrajectoryOptimizationPlanner(
             problem,
@@ -849,8 +881,9 @@ def test_kdtree_requires_euclidean_metric():
     problem = PlanningProblem(
         sys=sys,
         x_start=np.array([-3.0, -3.0, 0.0]),
-        x_goal=np.array([3.0, 3.0, np.pi / 2]),
+        Xf=SingletonSet(np.array([3.0, 3.0, np.pi / 2])),
         X=BoxSet.from_system_state(sys),
+        U=sys.input_box,
     )
     dubins = DubinsSteering(wheelbase=sys.params["length"], max_steering=0.5, speed=1.5)
     planner = RRTPlanner(
@@ -997,7 +1030,12 @@ def test_dubins_rrt_reaches_goal_pose():
     x_goal = np.array([3.0, 3.0, np.pi / 2])
     X = BoxSet.from_system_state(sys)
     problem = PlanningProblem(
-        sys=sys, x_start=x_start, x_goal=x_goal, X=X, Xf=BallSet(x_goal, 0.6)
+        sys=sys,
+        x_start=x_start,
+        x_goal=x_goal,
+        X=X,
+        Xf=BallSet(x_goal, 0.6),
+        U=sys.input_box,
     )
     dubins = DubinsSteering(wheelbase=sys.params["length"], max_steering=0.5, speed=1.5)
     planner = RRTPlanner(
@@ -1113,7 +1151,7 @@ def edge_inputs_problem(params=None):
     return PlanningProblem(
         sys=sys,
         x_start=np.zeros(2),
-        x_goal=np.ones(2),
+        Xf=SingletonSet(np.ones(2)),
         U=ShrinkingInputs(),
         **kwargs,
     )
@@ -2066,9 +2104,10 @@ class TestParametricCapabilityFlag(unittest.TestCase):
         problem = PlanningProblem(
             plant,
             x_start=np.zeros(2),
-            x_goal=goal,
+            Xf=SingletonSet(goal),
             tf=2.0,
             cost=QuadraticCost.from_system(plant, Q=np.eye(2), R=np.eye(1), xbar=goal),
+            U=plant.input_box,
         )
         planner = TrajectoryOptimizationPlanner(
             problem,
@@ -2093,9 +2132,10 @@ class TestTrajoptSuccessSemantics(unittest.TestCase):
         return PlanningProblem(
             plant,
             x_start=np.zeros(2),
-            x_goal=goal,
+            Xf=SingletonSet(goal),
             tf=tf,
             cost=QuadraticCost.from_system(plant, Q=np.eye(2), R=np.eye(1), xbar=goal),
+            U=plant.input_box,
         )
 
     def test_feasible_plan_records_violations_and_succeeds(self):
@@ -2163,9 +2203,10 @@ class TestTextbookOptions(unittest.TestCase):
         problem = PlanningProblem(
             plant,
             x_start=np.zeros(2),
-            x_goal=goal,
+            Xf=SingletonSet(goal),
             tf=1.0,
             cost=QuadraticCost.from_system(plant, Q=np.eye(2), R=np.eye(1), xbar=goal),
+            U=plant.input_box,
         )
         planner = TrajectoryOptimizationPlanner(
             problem, n_steps=5, transcription="direct_collocation", live_plot=True
@@ -2186,9 +2227,10 @@ class TestTextbookOptions(unittest.TestCase):
         problem = PlanningProblem(
             plant,
             x_start=np.zeros(2),
-            x_goal=goal,
+            Xf=SingletonSet(goal),
             tf=1.0,
             cost=QuadraticCost.from_system(plant, Q=np.eye(2), R=np.eye(1), xbar=goal),
+            U=plant.input_box,
         )
         seen = []
         planner = TrajectoryOptimizationPlanner(
@@ -2265,15 +2307,22 @@ def test_collocation_bounds_survive_an_intersection():
     cost = QuadraticCost.from_system(sys)
     free = CallableSet(lambda z, t, params: np.reshape(1.0 - abs(z[0]), (1,)))
     boxed = PlanningProblem(
-        sys, x_start=np.zeros(2), x_goal=np.ones(2), cost=cost, tf=1.0, X=sys.state.box
+        sys,
+        x_start=np.zeros(2),
+        Xf=SingletonSet(np.ones(2)),
+        cost=cost,
+        tf=1.0,
+        X=sys.state.box,
+        U=sys.input_box,
     )
     mixed = PlanningProblem(
         sys,
         x_start=np.zeros(2),
-        x_goal=np.ones(2),
+        Xf=SingletonSet(np.ones(2)),
         cost=cost,
         tf=1.0,
         X=sys.state.box & free,
+        U=sys.input_box,
     )
     transcription = DirectCollocationTranscription(DirectCollocationOptions(n_steps=4))
     lower_boxed, upper_boxed = transcription.decision_bounds(boxed)

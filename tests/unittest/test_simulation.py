@@ -880,6 +880,7 @@ class TestAsComputer(unittest.TestCase):
                 tf=1.0,
                 x_start=x0,
                 cost=QuadraticCost.from_system(sys, xbar=x0),
+                U=sys.input_box,
             ),
             transcription=DirectCollocationTranscription(
                 DirectCollocationOptions(n_steps=5)

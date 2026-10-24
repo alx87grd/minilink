@@ -142,6 +142,14 @@ class System(SharedSystemFacades):
         """Primary output dimension: the dimension of the ``"y"`` port, or 0."""
         return self.outputs["y"].dim if "y" in self.outputs else 0
 
+    @property
+    def input_box(self):
+        """The input ports' bounds as an input set, stacked in port order: ``U=sys.input_box``."""
+        # Lazy import: the sets import the backends, which load after the system
+        from minilink.core.sets import BoxInputSet
+
+        return BoxInputSet.from_system_inputs(self)
+
     # Core output contract (static IO)
 
     def h(self, x, u, t=0, params=None):

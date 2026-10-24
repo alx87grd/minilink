@@ -203,7 +203,10 @@ def test_planner_reads_the_cost_discount_and_rejects_bad_batches():
 
     plant = bounded_pendulum()
     prob = StochasticPlanningProblem(
-        plant, cost=Discounted(), x0_distribution=Uniform([-0.5, -0.5], [0.5, 0.5])
+        plant,
+        cost=Discounted(),
+        x0_distribution=Uniform([-0.5, -0.5], [0.5, 0.5]),
+        U=plant.input_box,
     )
     planner = ReinforcementLearningPlanner(
         prob, dt=0.1, n_envs=2, n_steps=16, batch_size=32, verbose=0
@@ -312,7 +315,9 @@ def test_solve_with_evaluate_carries_the_rollout_and_the_full_evaluation():
 
 def test_plain_planning_problem_trains_from_its_single_start():
     plant = bounded_pendulum()
-    prob = PlanningProblem(plant, x_start=[0.2, 0.0], cost=HangCost(), tf=np.inf)
+    prob = PlanningProblem(
+        plant, x_start=[0.2, 0.0], cost=HangCost(), tf=np.inf, U=plant.input_box
+    )
     planner = ReinforcementLearningPlanner(
         prob, dt=0.1, n_envs=2, n_steps=16, batch_size=32, verbose=0
     )
@@ -421,6 +426,7 @@ def test_sac_reused_across_plants_targets_each_plant_input_dimension():
         cost=QuadraticCost.from_system(point),
         X=point.state.box,
         x0_distribution=Uniform(-0.5 * np.ones(3), 0.5 * np.ones(3)),
+        U=point.input_box,
     )
 
     def sac_planner(prob, sac):
@@ -520,6 +526,7 @@ def test_planner_trains_with_randomized_parameters():
         cost=HangCost(),
         x0_distribution=Uniform([-0.5, -0.5], [0.5, 0.5]),
         params_distribution={"m": Particles([[0.5], [2.0]])},
+        U=plant.input_box,
     )
     planner = ReinforcementLearningPlanner(
         prob, dt=0.1, hidden=(8, 8), n_envs=4, n_steps=16, batch_size=32, verbose=0
@@ -555,7 +562,9 @@ def test_outer_loop_on_an_inner_loop_with_nested_params():
         inner,
         cost=HangCost(),
         x0_distribution=Uniform([-0.3, -0.3], [0.3, 0.3]),
-        params_distribution={"plant.m": Particles([[0.5], [2.0]])},  # the plant inside
+        params_distribution={
+            "plant.m": Particles([[0.5], [2.0]])
+        },  # the plant inside, U=inner.input_box
     )
     assert lookup_param(inner.params, "plant.m") == 1.0
     draw = prob.sample_params(0)

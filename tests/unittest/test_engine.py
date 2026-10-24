@@ -90,7 +90,7 @@ def test_the_fixed_step_run_matches_the_adaptive_simulator():
 def test_the_score_is_the_integral_plus_the_terminal_cost():
     sys = plant()
     cost = QuadraticCost.from_system(sys, S=np.eye(2))
-    problem = PlanningProblem(sys, cost=cost, tf=1.0)
+    problem = PlanningProblem(sys, cost=cost, tf=1.0, U=sys.input_box)
     t = np.linspace(0.0, 1.0, 101)
     x = np.vstack([np.ones_like(t), np.zeros_like(t)])
     u = np.zeros((1, t.size))
@@ -111,7 +111,9 @@ def test_the_price_switch_charges_a_failed_or_missed_run():
     run = Trajectory(t, np.zeros((2, t.size)), np.full((1, t.size), 10.0))
 
     # Off: J is the cost; the run left U (|u| > 5) and missed the goal
-    off = score_run(PlanningProblem(sys, cost=cost, tf=1.0, Xf=goal), run)
+    off = score_run(
+        PlanningProblem(sys, cost=cost, tf=1.0, Xf=goal, U=sys.input_box), run
+    )
     assert off["failed"] and not off["reached"]
     assert off["J"] == pytest.approx(off["cost"])
     assert off["feasibility_margin"] == pytest.approx(-5.0)
@@ -119,7 +121,10 @@ def test_the_price_switch_charges_a_failed_or_missed_run():
 
     # On: the price is added once
     on = score_run(
-        PlanningProblem(sys, cost=cost, tf=1.0, Xf=goal, infeasible_cost=1000.0), run
+        PlanningProblem(
+            sys, cost=cost, tf=1.0, Xf=goal, infeasible_cost=1000.0, U=sys.input_box
+        ),
+        run,
     )
     assert on["J"] == pytest.approx(off["cost"] + 1000.0)
 
@@ -132,10 +137,13 @@ def test_a_run_that_is_not_finite_costs_inf_or_the_price():
     x[0, -1] = np.nan
     run = Trajectory(t, x, np.zeros((1, t.size)))
 
-    off = score_run(PlanningProblem(sys, cost=cost, tf=1.0), run)
+    off = score_run(PlanningProblem(sys, cost=cost, tf=1.0, U=sys.input_box), run)
     assert off["failed"] and off["J"] == np.inf and off["cost"] == np.inf
 
-    on = score_run(PlanningProblem(sys, cost=cost, tf=1.0, infeasible_cost=50.0), run)
+    on = score_run(
+        PlanningProblem(sys, cost=cost, tf=1.0, infeasible_cost=50.0, U=sys.input_box),
+        run,
+    )
     assert on["J"] == pytest.approx(50.0)
 
 

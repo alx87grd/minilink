@@ -189,7 +189,9 @@ X = (
     & scene.clearance_field(body).as_constraint(lower=0.0)
     & track.corridor_field(body).as_constraint(lower=0.0)
 )
-problem = PlanningProblem(sys=sys_mpc, x_start=x0, X=X, cost=cost, tf=MPC_HORIZON)
+problem = PlanningProblem(
+    sys=sys_mpc, x_start=x0, X=X, cost=cost, tf=MPC_HORIZON, U=sys_mpc.input_box
+)
 planner = TrajectoryOptimizationPlanner(
     problem,
     n_steps=MPC_STEPS,

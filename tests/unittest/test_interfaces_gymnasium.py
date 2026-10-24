@@ -194,7 +194,12 @@ class TestSys2Gym(unittest.TestCase):
         plant = make_unbounded_pendulum()
         cost = QuadraticCost.from_system(plant, Q=np.eye(2), R=np.eye(1))
         problem = PlanningProblem(
-            plant, x_start=np.array([0.2, 0.0]), x_goal=np.zeros(2), cost=cost, tf=1.0
+            plant,
+            x_start=np.array([0.2, 0.0]),
+            x_goal=np.zeros(2),
+            cost=cost,
+            tf=1.0,
+            U=plant.input_box,
         )
         env = Sys2Gym.from_problem(problem, compile_backend="numpy")
         y, info = env.reset(seed=0)
@@ -238,6 +243,7 @@ class TestSys2Gym(unittest.TestCase):
                 X=Band(),
                 params=ProblemParameters(sets={"r": r}),
                 infeasible_cost=50.0,
+                U=plant.input_box,
             )
             env = Sys2Gym.from_problem(problem, compile_backend="numpy")
             env.reset(seed=0)

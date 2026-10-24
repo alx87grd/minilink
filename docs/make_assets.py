@@ -17,6 +17,7 @@ import numpy as np  # noqa: E402
 from asset_export import html_to_gif, montage_png, shrink_gif  # noqa: E402
 
 from minilink import DynamicSystem  # noqa: E402
+from minilink.core.sets import SingletonSet  # noqa: E402
 
 
 def save_gif(
@@ -126,6 +127,7 @@ def tool_montage() -> None:
         tf=4.0,
         cost=QuadraticCost.from_system(plant, Q=np.eye(2), R=np.eye(1), xbar=x_up),
         X=plant.state.box,
+        U=plant.input_box,
     )
 
     # Each verb draws its own figure; the montage pastes the six side by side
@@ -192,10 +194,11 @@ def gif_cartpole() -> None:
         sys=plant,
         tf=4.0,
         x_start=np.array([-2.0, 1.0, 0.0, 0.0]),
-        x_goal=x_goal,
+        Xf=SingletonSet(x_goal),
         cost=QuadraticCost.from_system(
             plant, Q=np.diag([1.0, 1.0, 0.0, 0.0]), R=np.diag([0.01]), xbar=x_goal
         ),
+        U=plant.input_box,
     )
     planner = TrajectoryOptimizationPlanner(
         problem,
@@ -362,7 +365,12 @@ def racecar_mpc() -> None:
 
     planner = TrajectoryOptimizationPlanner(
         PlanningProblem(
-            sys=design, x_start=x0, cost=cost, tf=MPC_HORIZON, X=design.state.box
+            sys=design,
+            x_start=x0,
+            cost=cost,
+            tf=MPC_HORIZON,
+            X=design.state.box,
+            U=design.input_box,
         ),
         n_steps=MPC_STEPS,
         transcription="direct_collocation",
@@ -444,6 +452,7 @@ def gif_rocket() -> None:
         ),
         infeasible_cost=100.0,
         X=plant.state.box,
+        U=plant.input_box,
     )
     planner = ReinforcementLearningPlanner(
         problem,

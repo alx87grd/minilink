@@ -8,6 +8,7 @@ from minilink import (
     CartPole,
     PlanningProblem,
     QuadraticCost,
+    SingletonSet,
     TrajectoryOptimizationPlanner,
     TrajectorySource,
     trajectory_lqr,
@@ -28,7 +29,13 @@ cost = QuadraticCost.from_system(
     plant, Q=np.diag([1.0, 1.0, 0.0, 0.0]), R=np.diag([0.01]), xbar=X_GOAL
 )
 problem = PlanningProblem(
-    plant, tf=TF, x_start=X_START, x_goal=X_GOAL, cost=cost, X=plant.state.box
+    plant,
+    tf=TF,
+    x_start=X_START,
+    Xf=SingletonSet(X_GOAL),
+    cost=cost,
+    X=plant.state.box,
+    U=plant.input_box,
 )
 planner = TrajectoryOptimizationPlanner(
     problem,

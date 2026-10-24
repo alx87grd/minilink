@@ -56,6 +56,7 @@ problem = StochasticPlanningProblem(
     ),
     infeasible_cost=100.0,
     X=plant.state.box,
+    U=plant.input_box,
 )
 
 # Policy features: the error to the landed state, metres scaled by 0.25

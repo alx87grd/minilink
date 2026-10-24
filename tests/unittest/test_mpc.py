@@ -55,7 +55,7 @@ class TestModelPredictiveController(unittest.TestCase):
             sys, Q=np.zeros((1, 1)), R=np.eye(1), S=np.zeros((1, 1))
         )
         problem = PlanningProblem(
-            sys=sys, x_start=np.array([x_start]), cost=cost, tf=1.0
+            sys=sys, x_start=np.array([x_start]), cost=cost, tf=1.0, U=sys.input_box
         )
         return TrajectoryOptimizationPlanner(
             problem,
@@ -297,7 +297,7 @@ class TestMPCAlgebraicController(unittest.TestCase):
             sys, Q=np.zeros((1, 1)), R=np.eye(1), S=np.zeros((1, 1))
         )
         problem = PlanningProblem(
-            sys=sys, x_start=np.array([x_start]), cost=cost, tf=1.0
+            sys=sys, x_start=np.array([x_start]), cost=cost, tf=1.0, U=sys.input_box
         )
         transcription = DirectCollocationTranscription(
             DirectCollocationOptions(n_steps=5)
@@ -382,7 +382,7 @@ class TestMPCWarmStartController(unittest.TestCase):
             sys, Q=np.zeros((1, 1)), R=np.eye(1), S=np.zeros((1, 1))
         )
         problem = PlanningProblem(
-            sys=sys, x_start=np.array([x_start]), cost=cost, tf=1.0
+            sys=sys, x_start=np.array([x_start]), cost=cost, tf=1.0, U=sys.input_box
         )
         transcription = DirectCollocationTranscription(
             DirectCollocationOptions(n_steps=5)
@@ -484,7 +484,9 @@ class TestTrajectoryOptimizationPlanner(unittest.TestCase):
         cost = QuadraticCost.from_system(
             sys, Q=np.zeros((1, 1)), R=np.eye(1), S=np.zeros((1, 1))
         )
-        return PlanningProblem(sys=sys, tf=1.0, x_start=np.array([x_start]), cost=cost)
+        return PlanningProblem(
+            sys=sys, tf=1.0, x_start=np.array([x_start]), cost=cost, U=sys.input_box
+        )
 
     def make_planner(self, problem):
         transcription = DirectCollocationTranscription(
@@ -555,7 +557,9 @@ class TestMPCSolveTrajectoryFrom(unittest.TestCase):
         cost = QuadraticCost.from_system(
             sys, Q=np.zeros((1, 1)), R=np.eye(1), S=np.zeros((1, 1))
         )
-        return PlanningProblem(sys=sys, tf=1.0, x_start=np.array([x_start]), cost=cost)
+        return PlanningProblem(
+            sys=sys, tf=1.0, x_start=np.array([x_start]), cost=cost, U=sys.input_box
+        )
 
     def make_planner(self, problem):
         transcription = DirectCollocationTranscription(
@@ -661,7 +665,11 @@ def _planner():
     x0 = sys.x0.copy()
     return TrajectoryOptimizationPlanner(
         PlanningProblem(
-            sys=sys, tf=1.0, x_start=x0, cost=QuadraticCost.from_system(sys, xbar=x0)
+            sys=sys,
+            tf=1.0,
+            x_start=x0,
+            cost=QuadraticCost.from_system(sys, xbar=x0),
+            U=sys.input_box,
         ),
         transcription=DirectCollocationTranscription(
             DirectCollocationOptions(n_steps=5)
@@ -767,7 +775,9 @@ def _make_numpy_planner(x_start=0.0):
     cost = QuadraticCost.from_system(
         sys, Q=np.zeros((1, 1)), R=np.eye(1), S=np.zeros((1, 1))
     )
-    problem = PlanningProblem(sys=sys, x_start=np.array([x_start]), cost=cost, tf=1.0)
+    problem = PlanningProblem(
+        sys=sys, x_start=np.array([x_start]), cost=cost, tf=1.0, U=sys.input_box
+    )
     return TrajectoryOptimizationPlanner(
         problem,
         n_steps=5,
@@ -1131,7 +1141,7 @@ def _build_bicycle_hybrid(*, mpc_hz=5.0):
     x0 = np.array([0.0, 3.0, 0.0, u_target * 0.8, 0.0, 0.0, u_target * 0.8 / r_r, 0.0])
     sys_sim.x0 = x0.copy()
     template_problem = PlanningProblem(
-        sys=sys_mpc, x_start=x0, cost=cost, tf=mpc_horizon
+        sys=sys_mpc, x_start=x0, cost=cost, tf=mpc_horizon, U=sys_mpc.input_box
     )
     transcription = DirectCollocationTranscription(
         DirectCollocationOptions(n_steps=mpc_steps)
@@ -1267,7 +1277,7 @@ def _build_bicycle_hybrid_warm(*, mpc_hz=5.0):
     x0 = np.array([0.0, 3.0, 0.0, u_target * 0.8, 0.0, 0.0, u_target * 0.8 / r_r, 0.0])
     sys_sim.x0 = x0.copy()
     template_problem = PlanningProblem(
-        sys=sys_mpc, x_start=x0, cost=cost, tf=mpc_horizon
+        sys=sys_mpc, x_start=x0, cost=cost, tf=mpc_horizon, U=sys_mpc.input_box
     )
     transcription = DirectCollocationTranscription(
         DirectCollocationOptions(n_steps=mpc_steps)
@@ -1397,7 +1407,9 @@ def _configure_bicycle_systems():
 
 
 def _make_planner(sys_mpc, cost, x0):
-    problem = PlanningProblem(sys=sys_mpc, x_start=x0, cost=cost, tf=MPC_HORIZON)
+    problem = PlanningProblem(
+        sys=sys_mpc, x_start=x0, cost=cost, tf=MPC_HORIZON, U=sys_mpc.input_box
+    )
     transcription = DirectCollocationTranscription(
         DirectCollocationOptions(n_steps=MPC_STEPS)
     )

@@ -17,6 +17,7 @@ import numpy as np
 from benchmarks.common import ansi, ipopt_available
 from minilink.core.backends import configure_jax
 from minilink.core.costs import QuadraticCost
+from minilink.core.sets import SingletonSet
 from minilink.core.trajectory import Trajectory
 from minilink.dynamics.catalog.pendulum.cartpole import CartPole
 from minilink.optimization.evaluators.program_evaluator import (
@@ -712,10 +713,11 @@ def _cartpole_problem(sys, *, tf: float) -> PlanningProblem:
     return PlanningProblem(
         sys=sys,
         x_start=x_start,
-        x_goal=x_goal,
+        Xf=SingletonSet(x_goal),
         cost=cost,
         tf=float(tf),
         X=sys.state.box,
+        U=sys.input_box,
     )
 
 

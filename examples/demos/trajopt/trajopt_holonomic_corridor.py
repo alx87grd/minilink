@@ -115,6 +115,7 @@ problem = PlanningProblem(
     X=X,
     Xf=SingletonSet(X_GOAL),
     cost=control_cost + path_cost,
+    U=sys.input_box,
 )
 
 planner = TrajectoryOptimizationPlanner(

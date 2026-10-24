@@ -649,6 +649,7 @@ def _solve_obstacle_case(case: ModelCase, scene: Scene) -> SolveRun:
         x_start=x_start,
         cost=tracking_cost + obstacle_cost,
         X=sys.state.box,
+        U=sys.input_box,
     )
     planner = TrajectoryOptimizationPlanner(
         problem,
@@ -689,6 +690,7 @@ def _solve_corner_case(case: ModelCase, track: ReferenceTrack) -> SolveRun:
         x_start=x_start,
         cost=tracking_cost + path_cost + corridor_cost,
         X=sys.state.box,
+        U=sys.input_box,
     )
     planner = TrajectoryOptimizationPlanner(
         problem,

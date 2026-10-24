@@ -63,6 +63,7 @@ problem = StochasticPlanningProblem(
     cost=HoverCost(),
     tf=np.inf,
     x0_distribution=Gaussian(np.zeros(6), [5.0, 5.0, 1.0, 1.0, 1.0, 0.2]),
+    U=plant.input_box,
 )
 
 planner = ReinforcementLearningPlanner(

@@ -36,11 +36,18 @@ def double_integrator_problem(stochastic=False):
             cost=cost,
             tf=np.inf,
             X=plant.state.box,
+            U=plant.input_box,
             x0_distribution=Uniform([-1, -1], [1, 1]),
             **exit_rule,
         )
     return PlanningProblem(
-        plant, x_start=[1.0, 0.0], cost=cost, tf=np.inf, X=plant.state.box, **exit_rule
+        plant,
+        x_start=[1.0, 0.0],
+        cost=cost,
+        tf=np.inf,
+        X=plant.state.box,
+        U=plant.input_box,
+        **exit_rule,
     )
 
 

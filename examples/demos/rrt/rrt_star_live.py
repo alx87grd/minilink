@@ -47,7 +47,7 @@ X = BoxSet.from_system_state(sys) & scene.clearance_field(body).as_constraint()
 
 x_start = np.array([-4.5, -4.5])
 x_goal = np.array([4.5, 4.5])
-problem = PlanningProblem(sys=sys, x_start=x_start, x_goal=x_goal, X=X)
+problem = PlanningProblem(sys=sys, x_start=x_start, x_goal=x_goal, X=X, U=sys.input_box)
 
 extender = SteeringExtender(
     StraightLineSteering(speed=1.0), max_distance=0.55, resolution=0.05

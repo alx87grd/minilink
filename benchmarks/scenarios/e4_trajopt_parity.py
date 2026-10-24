@@ -21,6 +21,7 @@ from benchmarks.trajopt import jax_trajopt_available
 from minilink import BicycleDynRate
 from minilink.core.backends import configure_jax
 from minilink.core.costs import QuadraticCost
+from minilink.core.sets import SingletonSet
 from minilink.dynamics.catalog.pendulum.pendulum import Pendulum
 from minilink.planning.problems import PlanningProblem
 from minilink.planning.trajectory_optimization.direct_collocation import (
@@ -113,9 +114,10 @@ def run_pendulum_rebuild(*, n_runs: int = 1, tiny: bool = False) -> list[MetricR
         sys=sys,
         tf=PENDULUM_TF,
         x_start=x_start,
-        x_goal=x_goal,
+        Xf=SingletonSet(x_goal),
         cost=cost,
         X=sys.state.box,
+        U=sys.input_box,
     )
     planner = TrajectoryOptimizationPlanner(
         problem,
@@ -222,7 +224,12 @@ def run_bicycle_parametric(
         ]
     )
     problem = PlanningProblem(
-        sys=sys, x_start=x_start, cost=cost, tf=BICYCLE_TF, X=sys.state.box
+        sys=sys,
+        x_start=x_start,
+        cost=cost,
+        tf=BICYCLE_TF,
+        X=sys.state.box,
+        U=sys.input_box,
     )
     planner = TrajectoryOptimizationPlanner(
         problem,

@@ -5,6 +5,7 @@ import pytest
 
 from minilink import DynamicProgrammingPlanner, Pendulum, PlanningProblem, QuadraticCost
 from minilink.blocks import TrajectorySource
+from minilink.core.sets import SingletonSet
 from minilink.core.trajectory import Trajectory
 from minilink.dynamics.catalog.equations import DoubleIntegrator
 from minilink.learning.reinforcement_learning import TabularLearningPlanner
@@ -41,10 +42,19 @@ def pendulum_problem(stochastic=False):
     )
     if stochastic:
         return StochasticPlanningProblem(
-            plant, cost=cost, tf=2.0, x0_distribution=Uniform([-0.2, -0.2], [0.2, 0.2])
+            plant,
+            cost=cost,
+            tf=2.0,
+            x0_distribution=Uniform([-0.2, -0.2], [0.2, 0.2]),
+            U=plant.input_box,
         )
     return PlanningProblem(
-        plant, x_start=[0.0, 0.0], x_goal=[np.pi, 0.0], cost=cost, tf=2.0
+        plant,
+        x_start=[0.0, 0.0],
+        Xf=SingletonSet([np.pi, 0.0]),
+        cost=cost,
+        tf=2.0,
+        U=plant.input_box,
     )
 
 
@@ -59,11 +69,17 @@ def move_problem(stochastic=False):
             plant,
             cost=cost,
             tf=2.0,
-            x_goal=[0.0, 0.0],
+            Xf=SingletonSet([0.0, 0.0]),
             x0_distribution=Uniform([0.8, -0.2], [1.2, 0.2]),
+            U=plant.input_box,
         )
     return PlanningProblem(
-        plant, x_start=[1.0, 0.0], x_goal=[0.0, 0.0], cost=cost, tf=2.0
+        plant,
+        x_start=[1.0, 0.0],
+        Xf=SingletonSet([0.0, 0.0]),
+        cost=cost,
+        tf=2.0,
+        U=plant.input_box,
     )
 
 
@@ -195,6 +211,7 @@ def double_integrator_problem():
         cost=cost,
         tf=np.inf,
         infeasible_cost=20.0,
+        U=plant.input_box,
     )
 
 
@@ -252,7 +269,11 @@ def test_nominal_trajectory_verb_matches_the_rl_planner_rollout():
     plant.state.upper_bound = np.array([np.pi, 8.0])
     cost = QuadraticCost.from_system(plant, Q=np.eye(2), R=0.01 * np.eye(1))
     problem = StochasticPlanningProblem(
-        plant, cost=cost, tf=np.inf, x0_distribution=Uniform([-0.5, -0.5], [0.5, 0.5])
+        plant,
+        cost=cost,
+        tf=np.inf,
+        x0_distribution=Uniform([-0.5, -0.5], [0.5, 0.5]),
+        U=plant.input_box,
     )
     planner = ReinforcementLearningPlanner(
         problem,
@@ -289,11 +310,12 @@ def solved_pendulum():
     problem = PlanningProblem(
         plant,
         x_start=[0.0, 0.0],
-        x_goal=[np.pi, 0.0],
+        Xf=SingletonSet([np.pi, 0.0]),
         cost=cost,
         tf=np.inf,
         X=plant.state.box,
         infeasible_cost=500.0,
+        U=plant.input_box,
     )
     vi = DynamicProgrammingPlanner(
         problem, x_grid=(21, 21), u_grid=(3,), dt=0.1, alpha=0.95, tol=0.5
@@ -411,6 +433,7 @@ def test_compare_scores_every_policy_on_one_backend_and_the_same_draws():
         X=problem.X,
         infeasible_cost=500.0,
         x0_distribution=Uniform([-0.5, -0.5], [0.5, 0.5]),
+        U=problem.sys.input_box,
     )
     settings = dict(dt=0.1, n_trials=3, episode_length=1.0)
     evaluator = MonteCarloEvaluator(spread, **settings)

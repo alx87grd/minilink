@@ -458,11 +458,8 @@ def trajectory_unflatten(aux, children):
     return traj
 
 
-def register_trajectory_pytree():
-    """Register :class:`Trajectory` as a JAX pytree (called once, when minilink loads JAX)."""
-    # Lazy import: JAX is optional, and loads with the first JAX tool
-    import jax
-
+def register_trajectory_pytree(jax):
+    """Register :class:`Trajectory` as a JAX pytree with the module ``jax`` (once, when minilink loads JAX)."""
     jax.tree_util.register_pytree_node(
         Trajectory, trajectory_flatten, trajectory_unflatten
     )

@@ -82,6 +82,7 @@ def holonomic_problem():
         x_start=np.array([-4.0, -4.0]),
         x_goal=x_goal,
         X=X,
+        U=sys.input_box,
     )
     extender = SteeringExtender(
         StraightLineSteering(speed=1.0),

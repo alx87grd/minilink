@@ -46,6 +46,7 @@ problem = PlanningProblem(
     plant,
     cost=SwingUpCost(),
     tf=np.inf,
+    U=plant.input_box,
 )
 
 grid = StateSpaceGrid(

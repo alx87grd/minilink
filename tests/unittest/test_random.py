@@ -245,7 +245,7 @@ def test_a_problem_on_a_random_system_plans_against_the_mean():
     from minilink.planning.problems import PlanningProblem
 
     noisy = noisy_loop()
-    problem = PlanningProblem(noisy, x_start=noisy.x0)
+    problem = PlanningProblem(noisy, x_start=noisy.x0, U=noisy.input_box)
     assert problem.params.system["process_noise"]["seed"] is None
     assert problem.params.system["plant"] is noisy.subsystems["plant"].params
 
@@ -286,6 +286,7 @@ def test_the_rollout_environment_warns_about_noise_it_never_sees():
             tf=1.0,
             x0_distribution=Uniform([-0.5, -0.5], [0.5, 0.5]),
             disturbances=disturbances or None,
+            U=sys.input_box,
         )
 
     cases = [

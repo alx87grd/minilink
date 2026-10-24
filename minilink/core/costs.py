@@ -446,7 +446,7 @@ def per_sample(g, xs, us, ts, params):
     """``g(x_k, u_k, t_k, params)`` for every sample, as an ``(N,)`` array (vmap on JAX)."""
     xp = array_module(xs)
     if xp is np:
-        return np.array(
+        return xp.array(
             [float(g(x, u, t, params=params)) for x, u, t in zip(xs, us, ts)]
         )
 

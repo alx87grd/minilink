@@ -40,7 +40,7 @@ class DoubleIntegrator(DynamicSystem):
 def make_problem():
     sys = DoubleIntegrator()
     cost = QuadraticCost.from_system(sys, xbar=np.zeros(2))
-    return PlanningProblem(sys, x_goal=np.zeros(2), cost=cost)
+    return PlanningProblem(sys, x_goal=np.zeros(2), cost=cost, U=sys.input_box)
 
 
 def make_pendulum_problem():
@@ -51,7 +51,9 @@ def make_pendulum_problem():
     sys.state.upper_bound = np.array([2.0, 2.0])
     sys.inputs["u"].lower_bound = np.array([-1.0])
     sys.inputs["u"].upper_bound = np.array([1.0])
-    return PlanningProblem(sys, x_goal=np.zeros(2), cost=QuadraticCost.from_system(sys))
+    return PlanningProblem(
+        sys, x_goal=np.zeros(2), cost=QuadraticCost.from_system(sys), U=sys.input_box
+    )
 
 
 def solve(problem, *, precompute=True, **opt_kwargs):
@@ -96,7 +98,10 @@ class TestStateSpaceGrid(unittest.TestCase):
         sys.inputs["u"].lower_bound = np.array([-1.0])
         sys.inputs["u"].upper_bound = np.array([1.0])
         problem = PlanningProblem(
-            sys, x_goal=np.zeros(2), cost=QuadraticCost.from_system(sys)
+            sys,
+            x_goal=np.zeros(2),
+            cost=QuadraticCost.from_system(sys),
+            U=sys.input_box,
         )
         grid_np = StateSpaceGrid(
             problem, x_grid_shape=(11, 11), u_grid_shape=(5,), dt=0.1
@@ -134,7 +139,7 @@ class TestStateSpaceGrid(unittest.TestCase):
     def test_infinite_bounds_raise(self):
         sys = DoubleIntegrator()
         sys.state.upper_bound = np.array([np.inf, 3.0])
-        problem = PlanningProblem(sys, x_goal=np.zeros(2))
+        problem = PlanningProblem(sys, x_goal=np.zeros(2), U=sys.input_box)
         with self.assertRaises(ValueError):
             StateSpaceGrid(problem, x_grid_shape=(5, 5), u_grid_shape=(3,), dt=0.1)
 
@@ -313,7 +318,10 @@ class TestJaxPrecompute(unittest.TestCase):
         sys.inputs["u"].lower_bound = np.array([-1.0])
         sys.inputs["u"].upper_bound = np.array([1.0])
         problem = PlanningProblem(
-            sys, x_goal=np.zeros(2), cost=TimeCost.from_system(sys, eps=0.1)
+            sys,
+            x_goal=np.zeros(2),
+            cost=TimeCost.from_system(sys, eps=0.1),
+            U=sys.input_box,
         )
         grid = StateSpaceGrid(
             problem, x_grid_shape=(11, 11), u_grid_shape=(5,), dt=0.1, precompute=False
@@ -485,7 +493,7 @@ class TestBackends(unittest.TestCase):
 
         sys = DrivenIntegrator()
         cost = QuadraticCost.from_system(sys, xbar=np.zeros(2))
-        problem = PlanningProblem(sys, x_goal=np.zeros(2), cost=cost)
+        problem = PlanningProblem(sys, x_goal=np.zeros(2), cost=cost, U=sys.input_box)
 
         def fixed_horizon(backend, final_time):
             grid = StateSpaceGrid(
@@ -766,6 +774,7 @@ class TestDpOneObjectSetup(unittest.TestCase):
             plant,
             x_goal=goal,
             cost=QuadraticCost.from_system(plant, Q=np.eye(2), R=np.eye(1), xbar=goal),
+            U=plant.input_box,
         )
 
     def test_shapes_and_dt_build_the_grid(self):
@@ -819,7 +828,9 @@ class TestDpOneObjectSetup(unittest.TestCase):
 
         sys = DoubleIntegrator()
         cost = QuadraticCost.from_system(sys, xbar=np.zeros(2))
-        timed = PlanningProblem(sys, x_goal=np.zeros(2), cost=cost, tf=2.0)
+        timed = PlanningProblem(
+            sys, x_goal=np.zeros(2), cost=cost, tf=2.0, U=sys.input_box
+        )
         planner = DynamicProgrammingPlanner(timed, x_grid=(5, 5), u_grid=(3,), dt=0.1)
         self.assertEqual(planner.options.final_time, 2.0)
         explicit = DynamicProgrammingPlanner(
@@ -1005,7 +1016,10 @@ class TestDpFlatConstructor(unittest.TestCase):
     def test_flat_matches_options(self):
         sys = DoubleIntegrator()
         problem = PlanningProblem(
-            sys=sys, x_start=np.array([0.0, 0.0]), cost=QuadraticCost.from_system(sys)
+            sys=sys,
+            x_start=np.array([0.0, 0.0]),
+            cost=QuadraticCost.from_system(sys),
+            U=sys.input_box,
         )
         grid = StateSpaceGrid(problem, x_grid_shape=(5, 5), u_grid_shape=(3,), dt=0.1)
         nested = DynamicProgrammingPlanner(
@@ -1035,7 +1049,8 @@ def test_grid_exposes_the_boxes_it_spans():
         def f(self, x, u, t=0, params=None):
             return np.array([x[1], u[0]])
 
-    problem = PlanningProblem(DoubleIntegrator(), x_goal=np.zeros(2))
+    plant = DoubleIntegrator()
+    problem = PlanningProblem(plant, x_goal=np.zeros(2), U=plant.input_box)
     grid = StateSpaceGrid(problem, x_grid_shape=(5, 5), u_grid_shape=(3,), dt=0.1)
     np.testing.assert_allclose(grid.X.lower, [-2.0, -3.0])
     np.testing.assert_allclose(grid.X.upper, [2.0, 3.0])
@@ -1051,7 +1066,9 @@ def test_the_grid_steps_through_the_step_model_euler_by_default():
     from minilink.planning.dynamic_programming.discretizer import StateSpaceGrid
 
     plant = Pendulum()
-    problem = PlanningProblem(plant, cost=QuadraticCost.from_system(plant))
+    problem = PlanningProblem(
+        plant, cost=QuadraticCost.from_system(plant), U=plant.input_box
+    )
     x, u = np.array([0.4, -0.3]), np.array([0.5])
     for solver in ("euler", "rk4"):
         grid = StateSpaceGrid(

@@ -32,9 +32,18 @@ def quadratic(plant):
 def test_horizon_is_the_problem_tf_and_the_cost_only_discounts():
     plant = pendulum()
     cost = quadratic(plant)
-    assert PlanningProblem(plant, cost=cost, tf=5.0).horizon_kind() == "finite"
-    assert PlanningProblem(plant, cost=cost, tf=np.inf).horizon_kind() == "infinite"
-    assert PlanningProblem(plant, cost=cost).horizon_kind() == "infinite"
+    assert (
+        PlanningProblem(plant, cost=cost, tf=5.0, U=plant.input_box).horizon_kind()
+        == "finite"
+    )
+    assert (
+        PlanningProblem(plant, cost=cost, tf=np.inf, U=plant.input_box).horizon_kind()
+        == "infinite"
+    )
+    assert (
+        PlanningProblem(plant, cost=cost, U=plant.input_box).horizon_kind()
+        == "infinite"
+    )
     assert not hasattr(CostFunction, "horizon")  # one owner: the problem's tf
 
     class Discounted(CostFunction):
@@ -52,26 +61,30 @@ def test_horizon_is_the_problem_tf_and_the_cost_only_discounts():
 
 def test_problem_exit_rule_and_penalty():
     plant = pendulum()
-    problem = PlanningProblem(plant, cost=quadratic(plant), tf=np.inf)
+    problem = PlanningProblem(
+        plant, cost=quadratic(plant), tf=np.inf, U=plant.input_box
+    )
     assert problem.infeasible_cost is None
     assert problem.infeasible_penalty(np.zeros(2)) is None
     assert problem.X.contains(np.array([1e9, -1e9]))  # unconstrained by default
     assert problem.horizon_kind() == "infinite"
 
-    scalar = PlanningProblem(plant, tf=2.0, infeasible_cost=50)
+    scalar = PlanningProblem(plant, tf=2.0, infeasible_cost=50, U=plant.input_box)
     assert scalar.infeasible_cost == 50.0
     assert scalar.infeasible_penalty(np.zeros(2), 1.0) == 50.0
     assert scalar.horizon_kind() == "finite"
 
     shaped = PlanningProblem(
-        plant, infeasible_cost=lambda x, t: 10.0 * float(x[0] ** 2)
+        plant, infeasible_cost=lambda x, t: 10.0 * float(x[0] ** 2), U=plant.input_box
     )
     assert shaped.infeasible_penalty(np.array([2.0, 0.0])) == 40.0
 
 
 def test_dp_reads_the_problem_infeasible_cost():
     plant = pendulum()
-    problem = PlanningProblem(plant, cost=quadratic(plant), infeasible_cost=42.0)
+    problem = PlanningProblem(
+        plant, cost=quadratic(plant), infeasible_cost=42.0, U=plant.input_box
+    )
     planner = DynamicProgrammingPlanner(problem, x_grid=(5, 5), u_grid=(3,), dt=0.05)
     assert planner.options.out_of_bound_cost == 42.0
     explicit = DynamicProgrammingPlanner(
@@ -91,7 +104,7 @@ def test_dp_reads_the_cost_discount_rate():
             return 0.0
 
     plant = pendulum()
-    problem = PlanningProblem(plant, cost=Discounted())
+    problem = PlanningProblem(plant, cost=Discounted(), U=plant.input_box)
     planner = DynamicProgrammingPlanner(problem, x_grid=(5, 5), u_grid=(3,), dt=0.05)
     np.testing.assert_allclose(planner.options.alpha, np.exp(-0.05))
     explicit = DynamicProgrammingPlanner(
@@ -148,6 +161,7 @@ def test_stochastic_problem_is_a_planning_problem_with_a_nominal_bridge():
         x0_distribution=Uniform([-np.pi, -1.0], [np.pi, 1.0]),
         params_distribution={"m": Uniform([0.8], [1.2])},
         infeasible_cost=100.0,
+        U=plant.input_box,
     )
     assert isinstance(problem, PlanningProblem)
     np.testing.assert_allclose(problem.x_start, [0.0, 0.0])
@@ -161,12 +175,15 @@ def test_stochastic_problem_is_a_planning_problem_with_a_nominal_bridge():
     assert nominal.infeasible_cost == 100.0
 
     with pytest.raises(ValueError):
-        StochasticPlanningProblem(plant, x0_distribution=Gaussian([0.0], 1.0))
+        StochasticPlanningProblem(
+            plant, x0_distribution=Gaussian([0.0], 1.0), U=plant.input_box
+        )
     with pytest.raises(ValueError):
         StochasticPlanningProblem(
             plant,
             x0_distribution=Gaussian([0.0, 0.0], 1.0),
             params_distribution={"nope": Uniform([0.0], [1.0])},
+            U=plant.input_box,
         )
 
 
@@ -178,6 +195,7 @@ def test_as_stochastic_is_the_inverse_bridge_of_nominal():
         cost=quadratic(plant),
         tf=5.0,
         infeasible_cost=10.0,
+        U=plant.input_box,
     )
     stochastic = as_stochastic(deterministic)
     assert type(stochastic) is StochasticPlanningProblem
@@ -238,19 +256,28 @@ def test_score_trajectory_cuts_at_the_exit_and_charges_the_problem_price():
     exits = Trajectory(t=t, x=x_exit, u=u)
 
     finite = PlanningProblem(
-        plant, cost=Unit(), tf=1.0, X=plant.state.box, infeasible_cost=50.0
+        plant,
+        cost=Unit(),
+        tf=1.0,
+        X=plant.state.box,
+        infeasible_cost=50.0,
+        U=plant.input_box,
     )
     J, failed = score_trajectory(finite, inside)
     assert not failed and np.isclose(J, 1.0 + 7.0)  # running cost + h at tf
     J, failed = score_trajectory(finite, exits)
     assert failed and np.isclose(J, 0.5 + 50.0)  # cut at the exit sample, charged, no h
 
-    unpriced = PlanningProblem(plant, cost=Unit(), tf=np.inf, X=plant.state.box)
+    unpriced = PlanningProblem(
+        plant, cost=Unit(), tf=np.inf, X=plant.state.box, U=plant.input_box
+    )
     J, failed = score_trajectory(unpriced, exits)
     assert failed and np.isinf(J)  # no price declared, none derived: infinity itself
     J, failed = score_trajectory(unpriced, exits, infeasible_cost=30.0)
     assert failed and np.isclose(J, 0.5 + 30.0)  # the evaluator's derived bound
-    free = PlanningProblem(plant, cost=Unit(), tf=np.inf)  # unconstrained: no failure
+    free = PlanningProblem(
+        plant, cost=Unit(), tf=np.inf, U=plant.input_box
+    )  # unconstrained: no failure
     J, failed = score_trajectory(free, exits)
     assert not failed and np.isclose(J, 1.0)
 
@@ -286,6 +313,7 @@ def test_every_backend_scores_the_constraint_set_on_its_parameters_and_time():
             X=Band(),
             params=ProblemParameters(sets={"r": r}),
             infeasible_cost=1.0,
+            U=plant.input_box,
         )
         reports = {
             backend: MonteCarloEvaluator(
@@ -364,7 +392,11 @@ def test_monte_carlo_applies_the_law_beyond_the_port_bounds():
             return 0.0
 
     problem = StochasticPlanningProblem(
-        plant, cost=Effort(), tf=np.inf, x0_distribution=Particles([[0.5, 0.0]])
+        plant,
+        cost=Effort(),
+        tf=np.inf,
+        x0_distribution=Particles([[0.5, 0.0]]),
+        U=plant.input_box,
     )
     reports = {
         backend: MonteCarloEvaluator(
@@ -393,7 +425,9 @@ def test_an_exiting_trial_scores_alike_on_numpy_and_the_simulator():
         cost=quadratic(plant),
         tf=np.inf,
         X=plant.state.box,
-        x0_distribution=Particles([[6.0, 5.0]]),  # leaves θ ≤ 2π within 0.1 s
+        x0_distribution=Particles(
+            [[6.0, 5.0]]
+        ),  # leaves θ ≤ 2π within 0.1 s, U=plant.input_box
     )
     ctl = StateFeedback(K=[[0.0, 0.0]])
     reports = {}
@@ -421,6 +455,7 @@ def test_simulator_backend_scores_a_controller_with_internal_state():
         cost=quadratic(mass),
         tf=np.inf,
         x0_distribution=Particles([[0.5, 0.0]]),
+        U=mass.input_box,
     )
     settings = dict(dt=0.01, n_trials=1, episode_length=2.0)
     J_pid = (  # a proportional law with filter states
@@ -455,9 +490,14 @@ def test_randomized_parameters_reach_the_dynamics_on_both_backends():
         tf=np.inf,
         x0_distribution=start,
         params_distribution={"m": Particles([[3.0]])},
+        U=plant.input_box,
     )
     nominal = StochasticPlanningProblem(
-        plant, cost=quadratic(plant), tf=np.inf, x0_distribution=start
+        plant,
+        cost=quadratic(plant),
+        tf=np.inf,
+        x0_distribution=start,
+        U=plant.input_box,
     )
     for backend in ("jax", "numpy"):
         J_heavy = (
@@ -492,7 +532,11 @@ def test_default_backend_scores_a_lookup_table_law_on_numpy():
     plant.inputs["u"].lower_bound = np.array([-5.0])
     plant.inputs["u"].upper_bound = np.array([5.0])
     task = dict(
-        cost=quadratic(plant), tf=np.inf, X=plant.state.box, infeasible_cost=500.0
+        cost=quadratic(plant),
+        tf=np.inf,
+        X=plant.state.box,
+        U=plant.input_box,
+        infeasible_cost=500.0,
     )
     problem = PlanningProblem(plant, x_start=[0.5, 0.0], **task)
     vi = DynamicProgrammingPlanner(
@@ -602,6 +646,7 @@ def test_deterministic_planner_warns_on_a_stochastic_problem():
         cost=quadratic(plant),
         tf=2.0,
         x0_distribution=Uniform([-0.1, -0.1], [0.1, 0.1]),
+        U=plant.input_box,
     )
     with pytest.warns(
         UserWarning, match="deterministic planner: it reads the start set X0"
@@ -621,6 +666,7 @@ def test_nominal_keeps_the_mean_start_and_drops_the_support_and_x_start():
         tf=2.0,
         x_start=[0.05, 0.0],
         x0_distribution=Uniform([-0.1, -0.1], [0.1, 0.1]),
+        U=plant.input_box,
     )
     assert problem.X0.contains(np.array([0.08, -0.08]))  # the support
     nominal = problem.nominal()
@@ -644,6 +690,7 @@ def test_gymnasium_view_of_a_stochastic_problem():
         X=plant.state.box,
         x0_distribution=Particles([[0.3, 0.0], [-0.3, 0.0]]),
         infeasible_cost=50.0,
+        U=plant.input_box,
     )
     env = Sys2Gym.from_problem(problem, dt=0.05)
     starts = {
@@ -669,7 +716,7 @@ def test_evaluation_of_one_trajectory_prints_a_single_cost():
     from minilink.planning.evaluation import Evaluation, MonteCarloEvaluator
 
     plant = pendulum()
-    problem = PlanningProblem(plant, cost=quadratic(plant), tf=1.0)
+    problem = PlanningProblem(plant, cost=quadratic(plant), tf=1.0, U=plant.input_box)
     t = np.linspace(0.0, 1.0, 6)
     traj = Trajectory(t=t, x=np.vstack([0.1 * t, np.zeros(6)]), u=np.zeros((1, 6)))
     single = Evaluation.of_trajectory(problem, traj)
@@ -692,7 +739,9 @@ def test_open_loop_source_scores_like_its_replayed_trajectory_on_every_backend()
     plant = pendulum()
     plant.inputs["u"].lower_bound = np.array([-5.0])
     plant.inputs["u"].upper_bound = np.array([5.0])
-    problem = PlanningProblem(plant, x_start=[0.3, 0.0], cost=quadratic(plant), tf=1.0)
+    problem = PlanningProblem(
+        plant, x_start=[0.3, 0.0], cost=quadratic(plant), tf=1.0, U=plant.input_box
+    )
     dt, n_steps = 0.1, 10
     t = dt * np.arange(n_steps + 1)
     u = 2.0 * np.sin(3.0 * t)[None, :]

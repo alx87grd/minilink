@@ -7,6 +7,7 @@ import pytest
 pytest.importorskip("jax")
 import jax
 import jax.numpy as jnp
+from minilink.core.sets import SingletonSet
 from minilink.core.backends import configure_jax
 from minilink.core.costs import QuadraticCost
 from minilink.core.sets import BallSet
@@ -63,9 +64,10 @@ class TestJaxDirectCollocation(unittest.TestCase):
             sys=sys,
             tf=1.0,
             x_start=np.array([0.0]),
-            x_goal=np.array([1.0]),
+            Xf=SingletonSet(np.array([1.0])),
             cost=cost,
             X=sys.state.box,
+            U=sys.input_box,
         )
 
     def test_jax_cartpole_matches_numpy_dynamics(self):
@@ -165,6 +167,7 @@ class TestJaxDirectCollocation(unittest.TestCase):
             x_start=np.array([0.0]),
             Xf=BallSet(center=np.array([1.0]), radius=0.1),
             cost=base.cost,
+            U=base.sys.input_box,
         )
         tr = DirectCollocationTranscription(DirectCollocationOptions(n_steps=5))
         guess = default_initial_trajectory(problem, tr.initial_guess_time_grid(problem))

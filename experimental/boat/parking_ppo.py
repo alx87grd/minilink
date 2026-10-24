@@ -39,6 +39,7 @@ problem = StochasticPlanningProblem(
     ),
     X=boat.state.box,
     infeasible_cost=INFEASIBLE_COST,
+    U=boat.input_box,
 )
 
 planner = ReinforcementLearningPlanner(

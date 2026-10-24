@@ -14,6 +14,7 @@ from benchmarks.scenarios.common import (
 from benchmarks.trajopt import jax_trajopt_available
 from minilink.core.backends import configure_jax
 from minilink.core.costs import QuadraticCost
+from minilink.core.sets import SingletonSet
 from minilink.dynamics.catalog.pendulum.cartpole import CartPole
 from minilink.planning.problems import PlanningProblem
 from minilink.planning.trajectory_optimization.direct_collocation import (
@@ -50,9 +51,10 @@ def build_showcase_cartpole_problem() -> PlanningProblem:
         sys=sys,
         tf=SHOWCASE_TRAJOPT_TF,
         x_start=x_start,
-        x_goal=x_goal,
+        Xf=SingletonSet(x_goal),
         cost=cost,
         X=sys.state.box,
+        U=sys.input_box,
     )
 
 

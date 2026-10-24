@@ -42,6 +42,7 @@ problem = StochasticPlanningProblem(
     cost=SwingUpCost(),
     tf=np.inf,
     x0_distribution=Uniform([-np.pi, -1.0], [np.pi, 1.0]),
+    U=plant.input_box,
 )
 
 

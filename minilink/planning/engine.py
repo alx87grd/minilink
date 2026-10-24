@@ -672,6 +672,7 @@ def open_loop_of(source, plant):
 
 def require_continuous(controller):
     """Refuse a sampled controller: the evaluator runs a continuous loop in this release."""
+    # Lazy import: the system module imports the compile chain, which loads after this one
     from minilink.core.system import StepSystem
 
     if isinstance(controller, StepSystem):
@@ -723,7 +724,7 @@ def signals_along(ev, xs, us, ts, params):
     """Every block output at every sample, shape ``(N + 1, n_signals)``: ``vmap`` on JAX."""
     xp = array_module(xs)
     if xp is np:
-        return np.stack([ev.signals(x, u, t, params) for x, u, t in zip(xs, us, ts)])
+        return xp.stack([ev.signals(x, u, t, params) for x, u, t in zip(xs, us, ts)])
 
     jax = ensure_jax_x64()
     return jax.vmap(lambda x, u, t: ev.signals(x, u, t, params))(xs, us, ts)
@@ -749,8 +750,8 @@ def least_margin(margin, x, u, t):
     """``min_k min margin(x_k, u_k, t_k)`` over the run (``+inf`` for no rows)."""
     xp = array_module(x)
     if xp is np:
-        rows = [np.reshape(margin(xk, uk, tk), (-1,)) for xk, uk, tk in zip(x, u, t)]
-        values = np.concatenate(rows) if rows else np.zeros(0)
+        rows = [xp.reshape(margin(xk, uk, tk), (-1,)) for xk, uk, tk in zip(x, u, t)]
+        values = xp.concatenate(rows) if rows else xp.zeros(0)
     else:
         jax = ensure_jax_x64()
         values = jax.vmap(lambda xk, uk, tk: xp.reshape(margin(xk, uk, tk), (-1,)))(
@@ -1057,6 +1058,7 @@ def draw_params(problem, key, n_trials, backend):
     The plant's parameters are keyed by name (dotted for a nested entry); the
     disturbances, held over a run, under ``"inputs"`` by the loop's port.
     """
+    # Lazy import: the distributions load with the first stochastic evaluation
     from minilink.core.distributions import split_keys
 
     draws = {}

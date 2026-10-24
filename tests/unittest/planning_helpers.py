@@ -26,4 +26,6 @@ def make_holonomic_obstacle_problem():
     scene = Scene(obstacles=(Sphere([0.0, 0.0], 1.0),))
     body = bind(sys, disc(0.2))
     X = BoxSet.from_system_state(sys) & scene.clearance_field(body).as_constraint()
-    return PlanningProblem(sys=sys, x_start=X_START, x_goal=X_GOAL, X=X), X
+    return PlanningProblem(
+        sys=sys, x_start=X_START, x_goal=X_GOAL, X=X, U=sys.input_box
+    ), X

@@ -464,9 +464,11 @@ class StateSpaceGrid:
         lower = np.asarray(lower, dtype=float)
         upper = np.asarray(upper, dtype=float)
         if not (np.all(np.isfinite(lower)) and np.all(np.isfinite(upper))):
+            line = "U=plant.input_box" if label == "input" else "X=plant.state.box"
             raise ValueError(
-                f"StateSpaceGrid needs finite {label} bounds; "
-                f"set them on the system or pass an explicit box set."
+                f"StateSpaceGrid needs finite {label} bounds: the problem's set is "
+                f"unbounded. Declare it on the problem ({line}, the plant's declared "
+                "range, or a finite box set)."
             )
 
         return lower, upper
@@ -610,7 +612,8 @@ if __name__ == "__main__":
         def f(self, x, u, t=0, params=None):
             return np.array([x[1], u[0]])
 
-    problem = PlanningProblem(DoubleIntegrator(), x_goal=np.zeros(2))
+    plant = DoubleIntegrator()
+    problem = PlanningProblem(plant, x_goal=np.zeros(2), U=plant.input_box)
     grid = StateSpaceGrid(problem, x_grid_shape=(11, 11), u_grid_shape=(3,), dt=0.1)
     print("nodes:", grid.nodes_n, "actions:", grid.actions_n)
     print("x_next shape:", grid.successors().shape)

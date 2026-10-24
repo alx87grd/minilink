@@ -213,7 +213,10 @@ def numpy_generator(key) -> np.random.Generator:
 @functools.lru_cache(maxsize=1)
 def register_jax_pytrees() -> None:
     """Register the core records (:class:`~minilink.core.trajectory.Trajectory`) as JAX pytrees, once."""
+    # JAX imported here, not through require_jax: this runs inside its first call
+    import jax
+
     # A real cycle: the trajectory module imports this one
     from minilink.core.trajectory import register_trajectory_pytree
 
-    register_trajectory_pytree()
+    register_trajectory_pytree(jax)

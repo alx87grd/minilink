@@ -28,6 +28,7 @@ planner = TrajectoryOptimizationPlanner(
         cost=parking_cost(boat, terminal=MPC_TERMINAL),
         tf=MPC_HORIZON,
         X=boat.state.box,
+        U=boat.input_box,
     ),
     n_steps=MPC_STEPS,
     transcription="direct_collocation",

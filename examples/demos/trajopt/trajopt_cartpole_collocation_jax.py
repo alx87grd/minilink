@@ -8,6 +8,7 @@ from minilink import (
     CartPole,
     PlanningProblem,
     QuadraticCost,
+    SingletonSet,
     TrajectoryOptimizationPlanner,
 )
 
@@ -32,9 +33,10 @@ problem = PlanningProblem(
     sys=sys,
     tf=4.0,
     x_start=x_start,
-    x_goal=x_goal,
+    Xf=SingletonSet(x_goal),
     cost=cost,
     X=sys.state.box,
+    U=sys.input_box,
 )
 
 planner = TrajectoryOptimizationPlanner(
