@@ -9,7 +9,7 @@ from minilink.core.backends import (
 )
 from minilink.core.compile.evaluators.stepping import step_body
 from minilink.optimization.mathematical_program import MathematicalProgram
-from minilink.planning.problems import PlanningProblem
+from minilink.planning.problems import PlanningProblem, nominal_plant_params
 from minilink.planning.trajectory_optimization.direct_collocation import (
     DirectCollocationTranscription,
 )
@@ -119,8 +119,8 @@ class MultipleShootingTranscription(DirectCollocationTranscription):
         n = int(problem.sys.n)
         m = int(problem.sys.m)
         n_steps = int(self.options.n_steps)
-        system_params = problem.params.system
-        cost_params = problem.params.cost
+        system_params = nominal_plant_params(problem)
+        cost_params = problem.cost.params
 
         # The knots packed in z: the states row by row, then the inputs
         def unpack_jax(z):

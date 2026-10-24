@@ -29,7 +29,12 @@ class Set(ABC):
     equation path (NumPy in, NumPy out; JAX in, JAX out); :meth:`contains` is
     a NumPy boundary utility, and :meth:`sample` follows the draw convention
     of :class:`~minilink.core.distributions.Distribution`.
+
+    ``params`` is the set's own parameters (``None`` for a set without any): a
+    set that reads them takes ``params=None`` in :meth:`margin` as its own.
     """
+
+    params = None
 
     @abstractmethod
     def margin(self, z, t=0.0, params=None):
@@ -89,6 +94,8 @@ class InputSet(ABC):
     is optional so constant input boxes stay simple. :meth:`margin` and
     :meth:`contains` follow the conventions of :class:`Set`.
     """
+
+    params = None
 
     @abstractmethod
     def margin(self, u, x=None, t=0.0, params=None):

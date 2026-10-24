@@ -1,10 +1,9 @@
-"""Planning problems: the deterministic task, its stochastic class, and their parameters."""
+"""Planning problems: the deterministic task and its stochastic class."""
 
 from __future__ import annotations
 
 import warnings
 from collections.abc import Mapping
-from dataclasses import dataclass, replace
 from types import MappingProxyType
 
 import numpy as np
@@ -27,7 +26,6 @@ from minilink.core.system import System
 ###############################################################################
 
 
-@dataclass(frozen=True)
 class PlanningProblem:
     """
     Deterministic planning problem for a Minilink system.
@@ -38,9 +36,10 @@ class PlanningProblem:
     but feasibility/search planners may leave it unset.
 
     The problem is the continuous task: the system, the admissible and boundary
-    sets, the continuous horizon ``tf``, the optional cost and parameter bundle.
-    The knot count and the other discretization choices belong to the solvers,
-    not to the problem.
+    sets, the continuous horizon ``tf``, the optional cost. The knot count and
+    the other discretization choices belong to the solvers, not to the problem.
+    The parameters live on the parts; :attr:`params` is their live view by role,
+    as a diagram's are by block.
 
     Parameters
     ----------
@@ -79,8 +78,6 @@ class PlanningProblem:
         (RRT / some DP tasks). ``+inf`` means infinite-horizon. Finite trajopt /
         MPC grids require a finite ``tf`` — demos should always set it
         explicitly. Knot count ``N`` lives on transcription options.
-    params : ProblemParameters, optional
-        Explicit parameter bundle for system, cost, and set evaluation.
     discount_rate : float, optional
         The continuous discount rate ``ρ ≥ 0`` of the objective
         ``∫ e^{−ρt} g dt + e^{−ρ tf} h``, applied by every consumer (value
@@ -96,27 +93,56 @@ class PlanningProblem:
         cost-to-go of finishing the task from a typical start.
     """
 
-    sys: System
-    x_start: np.ndarray | None = None
-    x_goal: np.ndarray | None = None
-    cost: CostFunction | None = None
-    X: Set | None = None
-    U: InputSet | None = None
-    X0: Set | None = None
-    Xf: Set | None = None
-    tf: float | None = None
-    params: ProblemParameters | None = None
-    metadata: Mapping[str, object] | None = None
-    infeasible_cost: bool | float | None = None
-    discount_rate: float = 0.0
+    FIELDS = (
+        "sys",
+        "x_start",
+        "x_goal",
+        "cost",
+        "X",
+        "U",
+        "X0",
+        "Xf",
+        "tf",
+        "metadata",
+        "infeasible_cost",
+        "discount_rate",
+    )
+    ROLES = ("plant", "cost", "X", "U", "X0", "Xf", "x_start", "discount_rate")
 
-    def __post_init__(self) -> None:
+    def __init__(
+        self,
+        sys: System,
+        x_start=None,
+        x_goal=None,
+        cost: CostFunction | None = None,
+        X: Set | None = None,
+        U: InputSet | None = None,
+        X0: Set | None = None,
+        Xf: Set | None = None,
+        tf: float | None = None,
+        metadata: Mapping[str, object] | None = None,
+        infeasible_cost: bool | float | None = None,
+        discount_rate: float = 0.0,
+    ):
+        # The fields as given, coerced below
+        self.sys = sys
+        self.x_start = x_start
+        self.x_goal = x_goal
+        self.cost = cost
+        self.X = X
+        self.U = U
+        self.X0 = X0
+        self.Xf = Xf
+        self.tf = tf
+        self.metadata = metadata
+        self.infeasible_cost = infeasible_cost
+        self.discount_rate = discount_rate
         n = int(self.sys.n)
 
         # The horizon and the discount rate, and a scalar price of infeasibility as a float
         tf = self.coerce_tf(self.tf)
-        object.__setattr__(self, "discount_rate", coerce_rate(self.discount_rate))
-        object.__setattr__(self, "infeasible_cost", coerce_price(self.infeasible_cost))
+        self.discount_rate = coerce_rate(self.discount_rate)
+        self.infeasible_cost = coerce_price(self.infeasible_cost)
 
         # The representative start and goal
         x_start = self.coerce_state(
@@ -137,10 +163,7 @@ class PlanningProblem:
         X0 = SingletonSet(x_start) if self.X0 is None else self.X0
         Xf = self.Xf
 
-        # The parameter bundle (a random plant's draw at its mean) and the metadata
-        params = self.coerce_params(self.params)
-        if params.system is None and self.sys.is_random:
-            params = replace(params, system=self.sys.realize(None))  # Noise at its mean
+        # The metadata, read-only
         metadata = self.coerce_metadata(self.metadata)
 
         # The sets' types
@@ -159,7 +182,6 @@ class PlanningProblem:
             x_start,
             set_label="X0",
             point_label="x_start",
-            set_params=params.sets,
         )
         if Xf is not None and x_goal is not None:
             self.require_member(
@@ -167,19 +189,81 @@ class PlanningProblem:
                 x_goal,
                 set_label="Xf",
                 point_label="x_goal",
-                set_params=params.sets,
             )
 
-        # The coerced fields, frozen
-        object.__setattr__(self, "tf", tf)
-        object.__setattr__(self, "x_start", x_start)
-        object.__setattr__(self, "x_goal", x_goal)
-        object.__setattr__(self, "X", X)
-        object.__setattr__(self, "U", U)
-        object.__setattr__(self, "X0", X0)
-        object.__setattr__(self, "Xf", Xf)
-        object.__setattr__(self, "params", params)
-        object.__setattr__(self, "metadata", metadata)
+        # The coerced fields
+        self.tf = tf
+        self.x_start = x_start
+        self.x_goal = x_goal
+        self.X = X
+        self.U = U
+        self.X0 = X0
+        self.Xf = Xf
+        self.metadata = metadata
+
+    @property
+    def params(self) -> dict:
+        """
+        The live view of the problem's parameters, by role, as a diagram's by block.
+
+        ``{"plant": sys.params, "cost": cost.params, "X": …, "U": …, "X0": …,
+        "Xf": …, "x_start": x_start, "discount_rate": ρ}``, assembled on each
+        access from the parts, which stay the one home of each number (a set's
+        entry is its own ``params``, ``None`` for a set without parameters).
+        Assigning a dictionary routes each entry to its part, so
+        ``problem.params = {"plant": {...}}`` sets the plant's parameters.
+        """
+        view = {"plant": self.sys.params}
+        if self.cost is not None:
+            view["cost"] = self.cost.params
+        for role in ("X", "U", "X0", "Xf"):
+            set_ = getattr(self, role)
+            if set_ is not None:
+                view[role] = getattr(set_, "params", None)
+        view["x_start"] = self.x_start
+        view["discount_rate"] = self.discount_rate
+
+        return view
+
+    @params.setter
+    def params(self, value):
+        require_roles(value, self.params)
+        for role, entry in value.items():
+            if role == "plant":
+                self.sys.params = entry
+            elif role == "cost":
+                self.cost.params = entry
+            elif role == "x_start":
+                self.move_start(entry)
+            elif role == "discount_rate":
+                self.discount_rate = coerce_rate(entry)
+            else:
+                write_set_params(role, getattr(self, role), entry)
+
+    def move_start(self, x_start):
+        """Set ``x_start``: a singleton ``X0`` moves with it, any other ``X0`` must hold it."""
+        start = self.coerce_state(x_start, label="x_start", required=True)
+        self.check_state_shape("x_start", start, int(self.sys.n))
+        if isinstance(self.X0, SingletonSet):
+            self.X0 = SingletonSet(start)
+        self.require_member(self.X0, start, set_label="X0", point_label="x_start")
+
+        self.x_start = start
+
+    def replace(self, **changes):
+        """A new problem of the same class with the named fields replaced (the others shared)."""
+        fields = {name: getattr(self, name) for name in self.FIELDS}
+        unknown = sorted(set(changes) - set(fields))
+        if unknown:
+            raise TypeError(f"{type(self).__name__} has no field(s) {unknown}")
+        fields.update(changes)
+
+        # A new start takes its own singleton X0, unless one is given
+        if "x_start" in changes and "X0" not in changes:
+            if isinstance(self.X0, SingletonSet):
+                fields["X0"] = None
+
+        return type(self)(**fields)
 
     @property
     def has_goal(self) -> bool:
@@ -381,16 +465,6 @@ class PlanningProblem:
         return None
 
     @staticmethod
-    def coerce_params(params) -> ProblemParameters:
-        """The parameter bundle, empty when unset."""
-        if params is None:
-            return ProblemParameters()
-        if isinstance(params, ProblemParameters):
-            return params
-
-        raise TypeError("params must be a ProblemParameters instance or None")
-
-    @staticmethod
     def coerce_metadata(metadata) -> Mapping[str, object]:
         """A read-only copy of the metadata, empty when unset."""
         if metadata is None:
@@ -419,14 +493,12 @@ class PlanningProblem:
         *,
         set_label: str,
         point_label: str,
-        set_params,
     ) -> None:
         """Refuse a representative point outside its boundary set."""
-        if not set_.contains(point, params=set_params):
+        if not set_.contains(point):
             raise ValueError(f"{point_label} must belong to {set_label}")
 
 
-@dataclass(frozen=True)
 class StochasticPlanningProblem(PlanningProblem):
     """
     Planning problem with probabilistic uncertainty (the stochastic class).
@@ -450,9 +522,11 @@ class StochasticPlanningProblem(PlanningProblem):
         Mapping of input port ids to :class:`~minilink.core.distributions.Distribution`
         on ``sys``: a fresh draw per step held on that port (a seeded
         disturbance signal).
-    criterion : {"expectation", "worst_case"}
-        What "optimal" means over the draws. Reinforcement learning optimizes
-        the expectation; Monte Carlo evaluation reports both.
+    criterion : {"expectation", "worst_case"} or ("cvar", alpha)
+        What "optimal" means over the draws: the mean, the worst, or the mean
+        of the worst ``alpha`` fraction of the runs' ``J`` (the conditional value
+        at risk). Reinforcement learning optimizes the expectation; an
+        evaluation reports every statistic and its ``objective`` is this one.
 
     Notes
     -----
@@ -461,35 +535,68 @@ class StochasticPlanningProblem(PlanningProblem):
     :class:`PlanningProblem` for trajectory optimization and LQR.
     """
 
-    x0_distribution: Distribution | None = None
-    params_distribution: Mapping[str, Distribution] | None = None
-    disturbances: Mapping[str, Distribution] | None = None
-    criterion: str = "expectation"
+    FIELDS = (
+        *PlanningProblem.FIELDS,
+        "x0_distribution",
+        "params_distribution",
+        "disturbances",
+        "criterion",
+    )
+    CRITERIA = ("expectation", "worst_case", "cvar")
 
-    CRITERIA = ("expectation", "worst_case")
-
-    def __post_init__(self) -> None:
+    def __init__(
+        self,
+        sys: System,
+        x_start=None,
+        x_goal=None,
+        cost: CostFunction | None = None,
+        X: Set | None = None,
+        U: InputSet | None = None,
+        X0: Set | None = None,
+        Xf: Set | None = None,
+        tf: float | None = None,
+        metadata: Mapping[str, object] | None = None,
+        infeasible_cost: bool | float | None = None,
+        discount_rate: float = 0.0,
+        x0_distribution: Distribution | None = None,
+        params_distribution: Mapping[str, Distribution] | None = None,
+        disturbances: Mapping[str, Distribution] | None = None,
+        criterion="expectation",
+    ):
         # The start law: its mean the default start, its support the default X0
-        self.require_start_law(self.x0_distribution)
-        if self.x_start is None:
-            object.__setattr__(self, "x_start", self.x0_distribution.mean)
-        if self.X0 is None and self.x0_distribution.support is not None:
-            object.__setattr__(self, "X0", self.x0_distribution.support)
+        self.require_start_law(x0_distribution)
+        if x_start is None:
+            x_start = x0_distribution.mean
+        if X0 is None and x0_distribution.support is not None:
+            X0 = x0_distribution.support
 
         # The deterministic spine
-        super().__post_init__()
+        super().__init__(
+            sys,
+            x_start=x_start,
+            x_goal=x_goal,
+            cost=cost,
+            X=X,
+            U=U,
+            X0=X0,
+            Xf=Xf,
+            tf=tf,
+            metadata=metadata,
+            infeasible_cost=infeasible_cost,
+            discount_rate=discount_rate,
+        )
 
         # The criterion, and the draws against the system they perturb
-        self.require_criterion(self.criterion, self.CRITERIA)
-        self.require_start_dim(self.x0_distribution, self.sys)
-        self.require_param_names(self.params_distribution, self.sys)
-        self.require_disturbance_ports(self.disturbances, self.sys)
+        self.require_criterion(criterion, self.CRITERIA)
+        self.require_start_dim(x0_distribution, self.sys)
+        self.require_param_names(params_distribution, self.sys)
+        self.require_disturbance_ports(disturbances, self.sys)
 
-        # The draws as plain dicts, frozen
-        object.__setattr__(
-            self, "params_distribution", dict(self.params_distribution or {})
-        )
-        object.__setattr__(self, "disturbances", dict(self.disturbances or {}))
+        # The laws, the draws as plain dicts
+        self.x0_distribution = x0_distribution
+        self.params_distribution = dict(params_distribution or {})
+        self.disturbances = dict(disturbances or {})
+        self.criterion = criterion
 
     @property
     def is_stochastic(self) -> bool:
@@ -543,7 +650,6 @@ class StochasticPlanningProblem(PlanningProblem):
             U=self.U,
             Xf=self.Xf,
             tf=self.tf,
-            params=self.params,
             metadata=self.metadata,
             infeasible_cost=self.infeasible_cost,
             discount_rate=self.discount_rate,
@@ -561,9 +667,21 @@ class StochasticPlanningProblem(PlanningProblem):
 
     @staticmethod
     def require_criterion(criterion, criteria) -> None:
-        """Refuse a criterion that is not one of ``criteria``."""
-        if criterion not in criteria:
-            raise ValueError(f"criterion must be one of {criteria}, got {criterion!r}")
+        """Refuse a criterion that is not one of ``criteria`` (``("cvar", alpha)`` with ``0 < alpha ≤ 1``)."""
+        if isinstance(criterion, tuple):
+            kind = criterion[0] if criterion else None
+            ok = (
+                kind == "cvar"
+                and len(criterion) == 2
+                and 0.0 < float(criterion[1]) <= 1
+            )
+        else:
+            ok = criterion in criteria and criterion != "cvar"
+        if not ok:
+            raise ValueError(
+                "criterion must be 'expectation', 'worst_case' or ('cvar', alpha) with "
+                f"0 < alpha <= 1, got {criterion!r}"
+            )
 
     @staticmethod
     def require_start_dim(x0_distribution, sys) -> None:
@@ -607,32 +725,6 @@ class StochasticPlanningProblem(PlanningProblem):
                 )
 
 
-@dataclass(frozen=True)
-class ProblemParameters:
-    """
-    Optional scenario-level parameter bundle for planning.
-
-    Parameters
-    ----------
-    system : object, optional
-        Parameters for the system dynamics; a solver may freeze them at compile
-        time.
-    cost : object, optional
-        Parameters passed to :class:`~minilink.core.costs.CostFunction`.
-    sets : object, optional
-        Parameters passed to allowable set objects.
-    scene : object, optional
-        Spatial overrides of the scene bind (``ObstacleBank`` /
-        ``SceneParameters``), not implemented: always ``None``, and an online
-        ``params={"scene": …}`` raises ``NotImplementedError``.
-    """
-
-    system: object | None = None
-    cost: object | None = None
-    sets: object | None = None
-    scene: object | None = None
-
-
 def as_stochastic(problem: PlanningProblem) -> StochasticPlanningProblem:
     """
     The same task as a stochastic problem, the inverse of :meth:`StochasticPlanningProblem.nominal`.
@@ -655,7 +747,6 @@ def as_stochastic(problem: PlanningProblem) -> StochasticPlanningProblem:
         X0=problem.X0,
         Xf=problem.Xf,
         tf=problem.tf,
-        params=problem.params,
         metadata=problem.metadata,
         infeasible_cost=problem.infeasible_cost,
         discount_rate=problem.discount_rate,
@@ -666,6 +757,31 @@ def as_stochastic(problem: PlanningProblem) -> StochasticPlanningProblem:
 ###############################################################################
 # Internal machinery
 ###############################################################################
+
+
+def nominal_plant_params(problem):
+    """The plant's parameters to plan with: a random plant's draw at its mean, else ``None`` (its own)."""
+    if problem.sys.is_random:
+        return problem.sys.realize(None)
+
+    return None
+
+
+def require_roles(value, view):
+    """Refuse a params assignment with a role the problem does not have."""
+    unknown = sorted(set(value or {}) - set(view))
+    if unknown:
+        raise ValueError(
+            f"unknown problem role(s) {unknown}; the problem's are {list(view)}"
+        )
+
+
+def write_set_params(role, set_, entry):
+    """Set a set's parameters; refuse a set that holds none (a frozen library set)."""
+    try:
+        set_.params = entry
+    except AttributeError:
+        raise TypeError(f"{role} ({type(set_).__name__}) holds no parameters") from None
 
 
 def coerce_price(price):

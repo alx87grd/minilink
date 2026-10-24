@@ -1,13 +1,25 @@
 """Cost functions: the running cost ``g(x, u, t)`` and the terminal cost ``h(x, t)`` of ``J``."""
 
 from abc import ABC, abstractmethod
-from dataclasses import dataclass
 
 import numpy as np
 
 from minilink.core.backends import array_module, require_jax
 from minilink.core.inspect import inspect_text, repr_pretty
 from minilink.core.trajectory import Trajectory
+
+
+def param_view(key):
+    """An attribute that reads and writes ``self.params[key]``: a view, so in-place writes reach the cost."""
+
+    def read(self):
+        return self.params[key]
+
+    def write(self, value):
+        self.params[key] = value
+
+    return property(read, write, doc=f"View of ``params[{key!r}]``.")
+
 
 ###############################################################################
 # Public API
@@ -32,7 +44,15 @@ class CostFunction(ABC):
 
     The discount rate ``rho`` is the problem's (``PlanningProblem.discount_rate``):
     the cost is the integrand only, and :meth:`integrate` takes the rate.
+
+    Class attributes: ``params``, the cost's parameters (``None`` for a cost
+    that hard-codes its constants; the library costs hold a dictionary, the
+    System pattern: ``params=None`` in ``g`` and ``h`` reads them), and ``id``,
+    the cost's key in a sum (``None``: its class name).
     """
+
+    params = None
+    id = None
 
     @abstractmethod
     def g(self, x, u, t=0.0, params=None):
@@ -128,7 +148,6 @@ class CostFunction(ABC):
         repr_pretty(self, p, cycle)
 
 
-@dataclass(frozen=True)
 class QuadraticCost(CostFunction):
     """
     Quadratic running and terminal cost.
@@ -136,32 +155,31 @@ class QuadraticCost(CostFunction):
     The running cost is
     ``(x - xbar).T @ Q @ (x - xbar) + (u - ubar).T @ R @ (u - ubar)``.
     The terminal cost is ``(x - xbar).T @ S @ (x - xbar)``.
+
+    The weights and the targets are :attr:`params` (``"Q"``, ``"R"``, ``"S"``,
+    ``"xbar"``, ``"ubar"``), the System pattern: ``params=None`` in :meth:`g`
+    and :meth:`h` reads them, a dictionary replaces them, so ``jax.grad``
+    reaches ``Q``. The attributes ``cost.Q`` … are views of the dictionary.
     """
 
-    Q: np.ndarray
-    R: np.ndarray
-    S: np.ndarray
-    xbar: np.ndarray
-    ubar: np.ndarray
-
-    def __post_init__(self) -> None:
+    def __init__(self, Q, R, S, xbar, ubar):
         # The weights and the targets as float copies, the targets flat
-        Q = np.asarray(self.Q, dtype=float).copy()
-        R = np.asarray(self.R, dtype=float).copy()
-        S = np.asarray(self.S, dtype=float).copy()
-        xbar = np.asarray(self.xbar, dtype=float).reshape(-1).copy()
-        ubar = np.asarray(self.ubar, dtype=float).reshape(-1).copy()
+        Q = np.asarray(Q, dtype=float).copy()
+        R = np.asarray(R, dtype=float).copy()
+        S = np.asarray(S, dtype=float).copy()
+        xbar = np.asarray(xbar, dtype=float).reshape(-1).copy()
+        ubar = np.asarray(ubar, dtype=float).reshape(-1).copy()
 
         # The weights sized by the targets: Q and S are n × n, R is m × m
-        n = xbar.size
-        m = ubar.size
-        check_weights(Q, R, S, n, m)
+        check_weights(Q, R, S, xbar.size, ubar.size)
 
-        object.__setattr__(self, "Q", Q)
-        object.__setattr__(self, "R", R)
-        object.__setattr__(self, "S", S)
-        object.__setattr__(self, "xbar", xbar)
-        object.__setattr__(self, "ubar", ubar)
+        self.params = {"Q": Q, "R": R, "S": S, "xbar": xbar, "ubar": ubar}
+
+    Q = param_view("Q")
+    R = param_view("R")
+    S = param_view("S")
+    xbar = param_view("xbar")
+    ubar = param_view("ubar")
 
     @classmethod
     def from_system(
@@ -200,10 +218,11 @@ class QuadraticCost(CostFunction):
 
     def g(self, x, u, t=0.0, params=None):
         """Return the quadratic running cost."""
-        Q = self.Q
-        R = self.R
-        xbar = self.xbar
-        ubar = self.ubar
+        params = self.params if params is None else params
+        Q = params["Q"]
+        R = params["R"]
+        xbar = params["xbar"]
+        ubar = params["ubar"]
 
         dx = x - xbar
         du = u - ubar
@@ -215,8 +234,9 @@ class QuadraticCost(CostFunction):
 
     def h(self, x, t=0.0, params=None):
         """Return the quadratic terminal cost."""
-        S = self.S
-        xbar = self.xbar
+        params = self.params if params is None else params
+        S = params["S"]
+        xbar = params["xbar"]
 
         dx = x - xbar
 
@@ -227,19 +247,24 @@ class QuadraticCost(CostFunction):
 
     def g_max(self, X, U, params=None):
         """The exact maximum of ``g`` over the boxes: each quadratic at its farthest vertex."""
+        params = self.params if params is None else params
+        Q = params["Q"]
+        R = params["R"]
+        xbar = params["xbar"]
+        ubar = params["ubar"]
+
         # max g = max (x − x̄)ᵀ Q (x − x̄) + max (u − ū)ᵀ R (u − ū), the two independent
-        g_max = quadratic_max(self.Q, self.xbar, X) + quadratic_max(
-            self.R, self.ubar, U
-        )
+        g_max = quadratic_max(Q, xbar, X) + quadratic_max(R, ubar, U)
 
         return g_max
 
     def h_max(self, X, params=None):
         """The exact maximum of ``h`` over the box ``X``."""
-        return quadratic_max(self.S, self.xbar, X)
+        params = self.params if params is None else params
+
+        return quadratic_max(params["S"], params["xbar"], X)
 
 
-@dataclass(frozen=True)
 class TimeCost(CostFunction):
     """
     Minimum-time cost ``J = T``.
@@ -247,16 +272,15 @@ class TimeCost(CostFunction):
     The running cost is ``g = 1`` everywhere except within ``eps`` of the target
     ``xbar``, where it is ``0`` (the absorbing goal); the terminal cost is ``0``.
     Under dynamic programming the cost-to-go becomes the time-to-go and the
-    optimal policy is bang-bang.
+    optimal policy is bang-bang. The target is :attr:`params` (``"xbar"``);
+    ``eps``, a threshold with no useful gradient, stays an attribute.
     """
 
-    xbar: np.ndarray
-    eps: float = 1e-3
+    def __init__(self, xbar, eps=1e-3):
+        self.params = {"xbar": np.asarray(xbar, dtype=float).reshape(-1).copy()}
+        self.eps = float(eps)
 
-    def __post_init__(self) -> None:
-        xbar = np.asarray(self.xbar, dtype=float).reshape(-1).copy()
-        object.__setattr__(self, "xbar", xbar)
-        object.__setattr__(self, "eps", float(self.eps))
+    xbar = param_view("xbar")
 
     @classmethod
     def from_system(cls, sys, *, xbar: np.ndarray | None = None, eps: float = 1e-3):
@@ -268,8 +292,9 @@ class TimeCost(CostFunction):
     def g(self, x, u, t=0.0, params=None):
         """Return unit running cost away from the target, zero on it."""
         xp = array_module(x)
+        params = self.params if params is None else params
 
-        xbar = xp.asarray(self.xbar)
+        xbar = xp.asarray(params["xbar"])
         eps = self.eps
 
         on_target = xp.linalg.norm(x - xbar) < eps
@@ -292,106 +317,222 @@ class TimeCost(CostFunction):
         return 0.0
 
 
-@dataclass(frozen=True)
 class SumCost(CostFunction):
     """
     Additive cost ``J = sum_i J_i`` over several cost functions.
 
     Built by the ``+`` operator on :class:`CostFunction`; use it to add an
-    obstacle or traversability term to a base objective.
+    obstacle or traversability term to a base objective. The terms are keyed
+    by id, as a diagram keys its blocks (:meth:`of`): ``terms`` is
+    ``{term_id: cost}`` and :attr:`params` the live view
+    ``{term_id: cost.params}``, its setter routing each entry to its term, so
+    a partial dictionary changes only the terms it names.
     """
 
-    terms: tuple
+    def __init__(self, terms):
+        self.terms = dict(terms)
 
     @classmethod
-    def of(cls, *costs: CostFunction) -> "SumCost":
-        """Build a sum cost, flattening nested sums into a single term list."""
-        terms: list[CostFunction] = []
-        for cost in costs:
-            if isinstance(cost, SumCost):
-                terms.extend(cost.terms)
-            else:
-                terms.append(cost)
+    def of(cls, *costs: CostFunction, **named: CostFunction) -> "SumCost":
+        """
+        Build a sum cost: anonymous terms keyed by their id, named ones by their name.
 
-        return cls(tuple(terms))
+        An anonymous sum (``a + b + c``, ``sum([...])``) is flattened into one level,
+        so the dictionary does not depend on the order Python adds; a term's id is
+        its ``id``, else its class name verbatim, with ``2``, ``3``, … for repeats
+        (a scaled cost takes the id of the cost it scales). A sum with an ``id``,
+        and every term passed by name, stays nested.
+        """
+        terms = {}
+        for cost in costs:
+            if isinstance(cost, SumCost) and cost.id is None:
+                for term_id, term in cost.terms.items():
+                    terms[unique_term_id(term_id, terms)] = term
+            else:
+                terms[unique_term_id(term_id_of(cost), terms)] = cost
+        for name, cost in named.items():
+            require_new_term(name, terms)
+            terms[name] = cost
+
+        return cls(terms)
+
+    @property
+    def params(self):
+        """Nested live view ``{term_id: cost.params}``."""
+        return {term_id: cost.params for term_id, cost in self.terms.items()}
+
+    @params.setter
+    def params(self, value):
+        validate_cost_params(value, self.terms)
+        for term_id, term_params in (value or {}).items():
+            self.terms[term_id].params = term_params
 
     def g(self, x, u, t=0.0, params=None):
-        """Return the summed running cost."""
-        terms = self.terms
+        """Return the summed running cost, each term on its own entry of ``params``."""
+        validate_cost_params(params, self.terms)
+        params = params or {}
 
         # g = Σᵢ gᵢ(x, u, t)
-        g = sum(cost.g(x, u, t, params) for cost in terms)
+        g = sum(
+            cost.g(x, u, t, params.get(term_id)) for term_id, cost in self.terms.items()
+        )
 
         return g
 
     def h(self, x, t=0.0, params=None):
-        """Return the summed terminal cost."""
-        terms = self.terms
+        """Return the summed terminal cost, each term on its own entry of ``params``."""
+        validate_cost_params(params, self.terms)
+        params = params or {}
 
         # h = Σᵢ hᵢ(x, t)
-        h = sum(cost.h(x, t, params) for cost in terms)
+        h = sum(
+            cost.h(x, t, params.get(term_id)) for term_id, cost in self.terms.items()
+        )
 
         return h
 
     def g_max(self, X, U, params=None):
         """The sum of the terms' bounds: ``max Σ gᵢ ≤ Σ max gᵢ``."""
-        return sum(cost.g_max(X, U, params) for cost in self.terms)
+        params = params or {}
+
+        return sum(
+            cost.g_max(X, U, params.get(term_id))
+            for term_id, cost in self.terms.items()
+        )
 
     def h_max(self, X, params=None):
         """The sum of the terms' bounds."""
-        return sum(cost.h_max(X, params) for cost in self.terms)
+        params = params or {}
+
+        return sum(
+            cost.h_max(X, params.get(term_id)) for term_id, cost in self.terms.items()
+        )
 
 
-@dataclass(frozen=True)
 class ScaledCost(CostFunction):
     """
     Cost scaled by a weight, ``J = weight * J0``.
 
     Built by the ``*`` operator on :class:`CostFunction`, so a weighted sum
-    reads as ``base + weight * obstacle_cost``.
+    reads as ``base + weight * obstacle_cost``. Its :attr:`params` nest the
+    scaled cost's, ``{"weight": w, "cost": cost.params}``; in a sum it takes
+    the id of the cost it scales.
     """
 
-    cost: CostFunction
-    weight: float
+    def __init__(self, cost, weight):
+        self.cost = cost
+        self.weight = float(weight)
+
+    @property
+    def params(self):
+        """Live view ``{"weight": w, "cost": cost.params}``."""
+        return {"weight": self.weight, "cost": self.cost.params}
+
+    @params.setter
+    def params(self, value):
+        require_known_keys(value, ("weight", "cost"), "ScaledCost")
+        if value is None:
+            return
+        if "weight" in value:
+            self.weight = value["weight"]
+        if "cost" in value:
+            self.cost.params = value["cost"]
 
     def g(self, x, u, t=0.0, params=None):
         """Return the weighted running cost."""
+        weight, inner = self.split(params)
         cost = self.cost
-        weight = self.weight
 
         # g = w g₀(x, u, t)
-        g = weight * cost.g(x, u, t, params)
+        g = weight * cost.g(x, u, t, inner)
 
         return g
 
     def h(self, x, t=0.0, params=None):
         """Return the weighted terminal cost."""
+        weight, inner = self.split(params)
         cost = self.cost
-        weight = self.weight
 
         # h = w h₀(x, t)
-        h = weight * cost.h(x, t, params)
+        h = weight * cost.h(x, t, inner)
 
         return h
 
     def g_max(self, X, U, params=None):
         """``w · max g₀`` for a nonnegative weight; sampled for a negative one."""
-        if self.weight < 0.0:
+        weight, inner = self.split(params)
+        if weight < 0.0:
             return super().g_max(X, U, params)
 
-        return self.weight * self.cost.g_max(X, U, params)
+        return weight * self.cost.g_max(X, U, inner)
 
     def h_max(self, X, params=None):
         """``w · max h₀`` for a nonnegative weight; sampled for a negative one."""
-        if self.weight < 0.0:
+        weight, inner = self.split(params)
+        if weight < 0.0:
             return super().h_max(X, params)
 
-        return self.weight * self.cost.h_max(X, params)
+        return weight * self.cost.h_max(X, inner)
+
+    def split(self, params):
+        """``(weight, the scaled cost's params)``: the entries given, else the cost's own."""
+        require_known_keys(params, ("weight", "cost"), "ScaledCost")
+        params = params or {}
+
+        return params.get("weight", self.weight), params.get("cost")
 
 
 ###############################################################################
 # Internal machinery
 ###############################################################################
+
+
+def term_id_of(cost) -> str:
+    """A term's id in a sum: its ``id``, else (a scaled cost) its scaled cost's, else its class name verbatim."""
+    if cost.id is not None:
+        return str(cost.id)
+    if isinstance(cost, ScaledCost):
+        return term_id_of(cost.cost)
+
+    return type(cost).__name__
+
+
+def unique_term_id(base, existing) -> str:
+    """``base``, else the first of ``base2``, ``base3``, … not in ``existing``."""
+    if base not in existing:
+        return base
+
+    i = 2
+    while f"{base}{i}" in existing:
+        i += 1
+
+    return f"{base}{i}"
+
+
+def require_new_term(name, terms):
+    """Refuse a named term whose name another term already holds."""
+    if name in terms:
+        raise ValueError(f"the sum already has a term {name!r}; name the terms apart")
+
+
+def validate_cost_params(params, terms):
+    """Refuse a sum's params with an id that names no term."""
+    if params is None:
+        return
+    unknown = sorted(set(params) - set(terms))
+    if unknown:
+        raise ValueError(
+            f"unknown cost term id(s) {unknown}; the sum's terms are {list(terms)}"
+        )
+
+
+def require_known_keys(params, keys, owner):
+    """Refuse a params dictionary with a key the owner does not have."""
+    if params is None:
+        return
+    unknown = sorted(set(params) - set(keys))
+    if unknown:
+        raise ValueError(f"{owner} params take {list(keys)}, got {unknown}")
 
 
 def check_weights(Q, R, S, n, m):

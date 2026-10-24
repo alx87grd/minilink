@@ -14,7 +14,7 @@ from minilink.optimization.mathematical_program import (
     MathematicalProgram,
     OptimizationResult,
 )
-from minilink.planning.problems import PlanningProblem
+from minilink.planning.problems import PlanningProblem, nominal_plant_params
 from minilink.planning.trajectory_optimization.transcription import (
     ConstraintFunction,
     FixedGridOptions,
@@ -198,7 +198,7 @@ class DirectCollocationTranscription(Transcription):
             traj = traj.with_cost(
                 problem.cost,
                 discount_rate=problem.discount_rate,
-                params=problem.params.cost,
+                params=problem.cost.params,
             )
 
         return traj
@@ -350,8 +350,8 @@ class DirectCollocationTranscription(Transcription):
         n = int(problem.sys.n)
         m = int(problem.sys.m)
         n_steps = int(self.options.n_steps)
-        system_params = problem.params.system
-        cost_params = problem.params.cost
+        system_params = nominal_plant_params(problem)
+        cost_params = problem.cost.params
 
         # The knots packed in z: the states row by row, then the inputs
         def unpack_jax(z):
@@ -449,7 +449,7 @@ class DirectCollocationTranscription(Transcription):
                 return boundary.margin(
                     x[:, index],
                     t=t_i,
-                    params=problem.params.sets,
+                    params=None,
                 )
 
             inequalities.append(margin)
@@ -488,7 +488,7 @@ class DirectCollocationTranscription(Transcription):
                     margin = problem.X.margin(
                         x[:, k],
                         t=float(t_k),
-                        params=problem.params.sets,
+                        params=None,
                     )
                     margins.append(margin)
                 return native_concatenate(margins, z)
@@ -505,7 +505,7 @@ class DirectCollocationTranscription(Transcription):
                         u[:, k],
                         x=x[:, k],
                         t=float(t_k),
-                        params=problem.params.sets,
+                        params=None,
                     )
                     margins.append(margin)
                 return native_concatenate(margins, z)
@@ -518,7 +518,7 @@ class DirectCollocationTranscription(Transcription):
         x, u = self.unpack(z, problem)
         t = self.options.t(problem)
         dt = self.options.dt(problem)
-        cost_params = problem.params.cost
+        cost_params = problem.cost.params
 
         # J = Σ dt/2 (g_k + g_{k+1}) + h(x_N, t_N)
         J = trajectory_cost(cost, x, u, t, dt, cost_params)

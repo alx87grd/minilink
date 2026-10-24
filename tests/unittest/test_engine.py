@@ -326,3 +326,51 @@ def test_evaluate_trajectory_agrees_on_numpy_and_jax_with_an_exit_and_a_divergen
         )
         np.testing.assert_allclose(np.asarray(on_jax.J), on_numpy.J, rtol=1e-6)
         assert bool(on_jax.failed[0]) == bool(on_numpy.failed[0]) == (name != "inside")
+
+
+# --- the problem's parameters: a live view of the parts, and leaves of the run ---
+
+
+def test_the_problems_params_are_a_live_view_whose_writes_reach_the_parts():
+    problem = upright_problem(discount_rate=0.0)
+    sys, cost = problem.sys, problem.cost
+    view = problem.params
+    assert view["plant"] is sys.params and view["cost"] is cost.params
+    assert set(view) == {"plant", "cost", "X", "U", "X0", "x_start", "discount_rate"}
+
+    # In place, and by assignment: the parts change
+    problem.params["cost"]["R"][0, 0] = 2.0
+    assert cost.R[0, 0] == 2.0
+    problem.params = {"plant": {**sys.params, "m": 3.0}, "discount_rate": 0.5}
+    assert sys.params["m"] == 3.0 and problem.discount_rate == 0.5
+    problem.params = {"x_start": [0.2, 0.0]}
+    assert problem.x_start.tolist() == [0.2, 0.0] and problem.X0.point.tolist() == [
+        0.2,
+        0.0,
+    ]
+
+    with pytest.raises(ValueError, match="unknown problem role"):
+        problem.params = {"gains": {}}
+    with pytest.raises(TypeError, match="holds no parameters"):
+        problem.params = {"U": {"lower": 0.0}}
+
+
+@pytest.mark.jax
+def test_the_gradient_reaches_the_cost_weights_and_the_discount():
+    import jax
+
+    pe = upright_problem().compile(pid(), dt=0.01, backend="jax")
+    params = pe.merged(UPRIGHT)
+    assert set(params["cost"]) == {"Q", "R", "S", "xbar", "ubar"}
+
+    grad = jax.grad(lambda p: pe.evaluate(p).objective)(params)
+
+    # dJ/dR₁₁ by a central difference
+    h = 1e-5
+    plus = pe.unpack(params["cost"]["R"].reshape(-1) + h, ["cost.R"], params)
+    minus = pe.unpack(params["cost"]["R"].reshape(-1) - h, ["cost.R"], params)
+    central = (
+        float(pe.evaluate(plus).objective) - float(pe.evaluate(minus).objective)
+    ) / (2 * h)
+    assert float(grad["cost"]["R"][0, 0]) == pytest.approx(central, rel=1e-5)
+    assert float(grad["discount_rate"]) < 0.0  # discounting lowers the cost

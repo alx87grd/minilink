@@ -12,7 +12,7 @@ from minilink.planning.dynamic_programming.dp import (
 )
 from minilink.planning.dynamic_programming.plotting import cost_scale_limit
 from minilink.planning.engine import policy_of
-from minilink.planning.problems import PlanningProblem
+from minilink.planning.problems import PlanningProblem, nominal_plant_params
 
 ###############################################################################
 # Public API
@@ -139,9 +139,9 @@ class PolicyEvaluator:
         g = self.problem.cost.g
         X = self.problem.X
         U = self.problem.U
-        sys_params = self.problem.params.system
-        cost_params = self.problem.params.cost
-        set_params = self.problem.params.sets
+        sys_params = nominal_plant_params(self.problem)
+        cost_params = self.problem.cost.params
+        set_params = None
         dt = grid.dt
         N = grid.nodes_n  # Number of nodes
         n = grid.n  # State dimension
@@ -182,7 +182,7 @@ class PolicyEvaluator:
         """The terminal cost ``h`` at time ``t`` of every grid node, by node id."""
         grid = self.grid
         h = self.problem.cost.h
-        cost_params = self.problem.params.cost
+        cost_params = self.problem.cost.params
         N = grid.nodes_n
 
         # Final cost of every state node

@@ -15,7 +15,7 @@ from minilink.planning.dynamic_programming.lookup_policy import LookupPolicy
 from minilink.planning.dynamic_programming.progress import SweepLog, progress
 from minilink.planning.engine import nominal_trajectory
 from minilink.planning.planner import Planner
-from minilink.planning.problems import PlanningProblem
+from minilink.planning.problems import PlanningProblem, nominal_plant_params
 from minilink.planning.results import PlanningSolution
 
 #: Per-node Python reference engine (pyro's base ``DynamicProgramming``).
@@ -232,7 +232,8 @@ class DynamicProgrammingPlanner(Planner):
         cost = self.problem.cost
         X = self.problem.X
         U = self.problem.U
-        params = self.problem.params
+        plant_params = nominal_plant_params(self.problem)
+        cost_params = cost.params
         dt = grid.dt
         alpha = self.options.alpha
         INF = self.options.out_of_bound_cost  # A large finite penalty (pyro's cf.INF)
@@ -255,18 +256,18 @@ class DynamicProgrammingPlanner(Planner):
                 u = grid.inputs[a]
 
                 # x_{k+1} = Φ(x_k, u, t), the grid's step model
-                x_next = grid.successor(x, u, t, params.system)
+                x_next = grid.successor(x, u, t, plant_params)
 
                 # If action is in allowable set
-                if U.contains(u, x, t, params.sets):
+                if U.contains(u, x, t):
                     # If the next state is in X and on the grid (the table's domain)
-                    if X.contains(x_next, t, params.sets) and grid.X.contains(x_next):
+                    if X.contains(x_next, t) and grid.X.contains(x_next):
                         # Estimated (interpolation) cost-to-go of the arrival state
                         # (the interpolator takes a batch of states: [0] is this one)
                         J_arrival = J_interpol(x_next)[0]
 
                         # Cost-to-go of a given action
-                        Q[a] = cost.g(x, u, t, params.cost) * dt + alpha * J_arrival
+                        Q[a] = cost.g(x, u, t, cost_params) * dt + alpha * J_arrival
 
                     else:
                         # The next state leaves the admissible states: the penalty
@@ -317,7 +318,7 @@ class DynamicProgrammingPlanner(Planner):
         """The terminal cost ``h`` at time ``t`` of every grid node, by node id."""
         grid = self.grid
         h = self.problem.cost.h
-        cost_params = self.problem.params.cost
+        cost_params = self.problem.cost.params
         N = grid.nodes_n
 
         J = np.empty(N, dtype=float)
@@ -356,7 +357,7 @@ class DynamicProgrammingPlanner(Planner):
 
         grid = self.grid
         g = self.problem.cost.g
-        cost_params = self.problem.params.cost
+        cost_params = self.problem.cost.params
         dt = grid.dt
         N = grid.nodes_n
         A = grid.actions_n

@@ -14,7 +14,7 @@ from minilink.planning.initial_guess import (
     default_initial_trajectory,
     mechanical_cubic_initial_trajectory,
 )
-from minilink.planning.problems import PlanningProblem, ProblemParameters
+from minilink.planning.problems import PlanningProblem
 from minilink.planning.trajectory_optimization.direct_collocation import (
     DirectCollocationOptions,
     DirectCollocationTranscription,
@@ -194,22 +194,18 @@ class TestPlanningArchitecture(unittest.TestCase):
 
     def test_planning_problem_boundary_types_are_validated(self):
         sys = self.make_system()
-        params = ProblemParameters(
-            system={"mass": 1.0}, cost={"weight": 2.0}, sets={"radius": 0.25}
-        )
         problem = PlanningProblem(
             sys=sys,
             Xf=SingletonSet(np.array([0.0, 0.0])),
-            params=params,
             metadata={"tag": "demo"},
             U=sys.input_box,
         )
-        self.assertIs(problem.params, params)
+        self.assertIs(problem.params["plant"], sys.params)  # a view of the parts
         self.assertEqual(problem.metadata["tag"], "demo")
         with self.assertRaises(TypeError):
             problem.metadata["tag"] = "changed"
-        with self.assertRaisesRegex(TypeError, "params must be"):
-            PlanningProblem(sys=sys, params={"system": {}}, U=sys.input_box)
+        with self.assertRaises(TypeError):
+            PlanningProblem(sys=sys, params={"plant": {}}, U=sys.input_box)
         with self.assertRaisesRegex(TypeError, "metadata must be"):
             PlanningProblem(sys=sys, metadata=[("tag", "demo")], U=sys.input_box)
 
@@ -451,22 +447,18 @@ class TestPlanningArchitecture(unittest.TestCase):
             sys=sys,
             Xf=SingletonSet(np.array([1.0])),
             cost=QuadraticCost.from_system(sys),
-            params=ProblemParameters(system={"k": 3.0}),
             U=sys.input_box,
         )
         x = np.array([0.0])
         u = np.array([2.0])
+        f = dynamics_function(problem, "numpy")
+        np.testing.assert_allclose(f(x, u, 0.0), [2.0], atol=1e-12)
+
+        # The plant's parameters, written through the problem's view, reach f
+        problem.params = {"plant": {**sys.params, "k": 3.0}}
         for backend in ("numpy", "direct"):
             f = dynamics_function(problem, backend)
             np.testing.assert_allclose(f(x, u, 0.0), [6.0], atol=1e-12)
-        plain = PlanningProblem(
-            sys=sys,
-            Xf=SingletonSet(np.array([1.0])),
-            cost=QuadraticCost.from_system(sys),
-            U=sys.input_box,
-        )
-        f = dynamics_function(plain, "numpy")
-        np.testing.assert_allclose(f(x, u, 0.0), [2.0], atol=1e-12)
 
     def test_shooting_packs_trajectory_guess_as_inputs_only(self):
         problem = self.make_single_integrator_problem()
@@ -1134,9 +1126,13 @@ def test_edge_resolution_rejects_segment_through_obstacle():
 
 
 class ShrinkingInputs(InputSet):
-    """|uᵢ| ≤ 1 − |x₀| / 2, or ≤ ``u_max`` when the set parameters give one."""
+    """|uᵢ| ≤ 1 − |x₀| / 2, or ≤ ``u_max`` when its parameters give one."""
+
+    def __init__(self, params=None):
+        self.params = params
 
     def margin(self, u, x=None, t=0.0, params=None):
+        params = self.params if params is None else params
         limit = 1.0 - 0.5 * abs(x[0]) if params is None else params["u_max"]
         return limit - np.abs(u)
 
@@ -1147,13 +1143,11 @@ def edge_inputs_problem(params=None):
     sys = HolonomicMobileRobot()
     sys.state.lower_bound = np.array([-6.0, -6.0])
     sys.state.upper_bound = np.array([6.0, 6.0])
-    kwargs = {} if params is None else {"params": params}
     return PlanningProblem(
         sys=sys,
         x_start=np.zeros(2),
         Xf=SingletonSet(np.ones(2)),
-        U=ShrinkingInputs(),
-        **kwargs,
+        U=ShrinkingInputs(params),
     )
 
 
@@ -1175,7 +1169,8 @@ def test_edge_inputs_are_checked_at_their_states():
 
 
 def test_edge_inputs_read_the_set_parameters():
-    problem = edge_inputs_problem(ProblemParameters(sets={"u_max": 0.3}))
+    problem = edge_inputs_problem({"u_max": 0.3})
+    assert problem.params["U"] == {"u_max": 0.3}
     planner = RRTPlanner(problem, extender=KinodynamicExtender(controls=COMPASS))
     assert planner.edge_is_free(straight_edge(0.0, 0.2))
     assert not planner.edge_is_free(straight_edge(0.0, 0.6))

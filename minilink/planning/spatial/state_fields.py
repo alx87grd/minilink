@@ -8,7 +8,7 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
 from minilink.core.backends import array_module
-from minilink.core.costs import CostFunction
+from minilink.core.costs import CostFunction, param_view
 from minilink.core.inspect import inspect_text, repr_pretty
 from minilink.core.sets import Set
 from minilink.planning.spatial.collision import CollisionBody, iter_probes
@@ -182,20 +182,28 @@ class FieldSet(Set):
         return margin
 
 
-@dataclass(frozen=True)
 class FieldCost(CostFunction):
-    """``g = weight * shaping(value)``; ``shaping=None`` uses ``value`` directly."""
+    """
+    ``g = weight * shaping(value)``; ``shaping=None`` uses ``value`` directly.
 
-    field: StateField
-    weight: float = 1.0
-    shaping: Callable | None = None
+    The weight is :attr:`params` (``{"weight": w}``, the System pattern); the
+    field reads its own parameters, never the cost's.
+    """
+
+    def __init__(self, field: StateField, weight: float = 1.0, shaping=None):
+        self.field = field
+        self.shaping = shaping
+        self.params = {"weight": float(weight)}
+
+    weight = param_view("weight")
 
     def g(self, x, u, t=0.0, params=None):
+        params = self.params if params is None else params
         field = self.field
         shaping = self.shaping
-        weight = self.weight
+        weight = params["weight"]
 
-        v = field.value(x, u, t=t, params=params)
+        v = field.value(x, u, t=t)
         shaped = v if shaping is None else shaping(v)
 
         # g = w φ(v), with φ the identity when no shaping is given

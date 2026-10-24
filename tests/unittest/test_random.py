@@ -242,15 +242,16 @@ def test_analysis_verbs_see_the_noise_at_its_mean():
 
 def test_a_problem_on_a_random_system_plans_against_the_mean():
     from minilink import Pendulum
-    from minilink.planning.problems import PlanningProblem
+    from minilink.planning.problems import PlanningProblem, nominal_plant_params
 
     noisy = noisy_loop()
     problem = PlanningProblem(noisy, x_start=noisy.x0, U=noisy.input_box)
-    assert problem.params.system["process_noise"]["seed"] is None
-    assert problem.params.system["plant"] is noisy.subsystems["plant"].params
+    nominal = nominal_plant_params(problem)
+    assert nominal["process_noise"]["seed"] is None
+    assert nominal["plant"] is noisy.subsystems["plant"].params
 
     quiet = PlanningProblem(Pendulum(), x_start=np.zeros(2))
-    assert quiet.params.system is None
+    assert nominal_plant_params(quiet) is None
 
 
 # --- the two warnings: a shared seed, noise the stepped tools never see ---

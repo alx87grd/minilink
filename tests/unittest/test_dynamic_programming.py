@@ -941,7 +941,7 @@ class TestInfeasibleCostPrice(unittest.TestCase):
             with self.subTest(price=price):
                 planner = self.planner(price)
                 grid = planner.grid
-                g, cost_params = planner.problem.cost.g, planner.problem.params.cost
+                g, cost_params = planner.problem.cost.g, planner.problem.cost.params
                 x_next = grid.transition(0.0)[0]
 
                 # Only the first pair is inadmissible, whatever the grid's own mask

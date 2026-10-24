@@ -220,13 +220,16 @@ class TestSys2Gym(unittest.TestCase):
         from minilink.core.backends import array_module
         from minilink.core.sets import Set
         from minilink.interfaces.gymnasium import Sys2Gym
-        from minilink.planning.problems import PlanningProblem, ProblemParameters
+        from minilink.planning.problems import PlanningProblem
 
         class Band(Set):
             """|z_i| <= r, r = 1 by default."""
 
+            def __init__(self, r=1.0):
+                self.params = {"r": r}
+
             def margin(self, z, t=0.0, params=None):
-                r = 1.0 if params is None else params["r"]
+                r = (self.params if params is None else params)["r"]
                 xp = array_module(z)
 
                 return xp.concatenate([z + r, r - z])
@@ -240,8 +243,7 @@ class TestSys2Gym(unittest.TestCase):
                 x_start=[0.0, 0.0],
                 cost=cost,
                 tf=np.inf,
-                X=Band(),
-                params=ProblemParameters(sets={"r": r}),
+                X=Band(r),
                 infeasible_cost=50.0,
                 U=plant.input_box,
             )

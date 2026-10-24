@@ -17,7 +17,7 @@ from minilink.optimization.mathematical_program import (
     MathematicalProgram,
     OptimizationResult,
 )
-from minilink.planning.problems import PlanningProblem
+from minilink.planning.problems import PlanningProblem, nominal_plant_params
 from minilink.planning.trajectory_optimization.transcription import (
     ConstraintFunction,
     FixedGridOptions,
@@ -119,7 +119,7 @@ class ShootingTranscription(Transcription):
             traj = traj.with_cost(
                 problem.cost,
                 discount_rate=problem.discount_rate,
-                params=problem.params.cost,
+                params=problem.cost.params,
             )
 
         return traj
@@ -194,8 +194,8 @@ class ShootingTranscription(Transcription):
         n_steps = int(self.options.n_steps)
         m = int(problem.sys.m)
         x0 = jnp.asarray(self.initial_state(problem))
-        system_params = problem.params.system
-        cost_params = problem.params.cost
+        system_params = nominal_plant_params(problem)
+        cost_params = problem.cost.params
 
         # The input knots packed in z, one input's row after another
         def unpack_jax(z):
@@ -265,7 +265,7 @@ class ShootingTranscription(Transcription):
         key = normalize_backend(compile_backend, allow_direct=True)
 
         # A compiled system without explicit params: its own integrator over the grid
-        if key != BACKEND_DIRECT and problem.params.system is None:
+        if key != BACKEND_DIRECT and nominal_plant_params(problem) is None:
             evaluator = problem.sys.compile(backend=key, verbose=False)
 
             def rollout(u):
@@ -340,7 +340,7 @@ class ShootingTranscription(Transcription):
             return boundary.margin(
                 x[:, -1],
                 t=float(self.options.t(problem)[-1]),
-                params=problem.params.sets,
+                params=None,
             )
 
         inequalities.append(margin)
@@ -364,7 +364,7 @@ class ShootingTranscription(Transcription):
                     margin = problem.X.margin(
                         x[:, k],
                         t=float(t_k),
-                        params=problem.params.sets,
+                        params=None,
                     )
                     margins.append(margin)
                 return native_concatenate(margins, z)
@@ -384,7 +384,7 @@ class ShootingTranscription(Transcription):
                         u[:, k],
                         x=x[:, k],
                         t=float(t_k),
-                        params=problem.params.sets,
+                        params=None,
                     )
                     margins.append(margin)
                 return native_concatenate(margins, z)
@@ -403,7 +403,7 @@ class ShootingTranscription(Transcription):
         x = rollout(u)
         t = self.options.t(problem)
         dt = self.options.dt(problem)
-        cost_params = problem.params.cost
+        cost_params = problem.cost.params
 
         # J = Σ dt/2 (g_k + g_{k+1}) + h(x_N, t_N)
         J = trajectory_cost(cost, x, u, t, dt, cost_params)

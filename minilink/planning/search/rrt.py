@@ -291,7 +291,7 @@ class RRTPlanner(Planner):
     def sample_free_state(self, rng):
         """A state of ``X``: drawn from ``X`` itself, or by rejection from the sampling box."""
         problem = self.problem
-        set_params = problem.params.sets
+        set_params = None
         X = problem.X
 
         # A set that samples itself, when its draw lands in it
@@ -339,7 +339,7 @@ class RRTPlanner(Planner):
     def edge_is_free(self, edge) -> bool:
         """Every state of the edge in ``X`` and every input in ``U``."""
         problem = self.problem
-        set_params = problem.params.sets
+        set_params = None
 
         if problem.X is not None:
             if not all(

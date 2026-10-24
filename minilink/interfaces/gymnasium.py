@@ -367,7 +367,7 @@ class ProblemEnv(Sys2Gym):
         problem = self.problem
         y, r, terminated, truncated, info = super().step(u)
         x, t = self.x, self.t
-        if not problem.X.contains(x, t, problem.params.sets):
+        if not problem.X.contains(x, t, None):
             price = self.infeasible_cost
             r -= float(price(x, t) if callable(price) else price)
             terminated, truncated = True, False

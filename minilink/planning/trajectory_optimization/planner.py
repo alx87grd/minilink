@@ -28,7 +28,7 @@ from minilink.optimization.reporting import (
 )
 from minilink.planning.initial_guess import default_initial_trajectory
 from minilink.planning.planner import Planner
-from minilink.planning.problems import PlanningProblem
+from minilink.planning.problems import PlanningProblem, nominal_plant_params
 from minilink.planning.results import PlanningSolution
 from minilink.planning.trajectory_optimization.transcription import (
     Transcription,
@@ -341,7 +341,7 @@ class TrajectoryOptimizationPlanner(Planner):
         self.program_evaluator.bind(self.problem.x_start)
 
         # The compiled dynamics that read each tick's plan back
-        params = self.problem.params.system
+        params = nominal_plant_params(self.problem)
         evaluator = self.problem.sys.compile(backend=compile_backend, verbose=False)
         if params is None:
             self._dynamics = evaluator.f
@@ -665,11 +665,7 @@ class TrajectoryOptimizationPlanner(Planner):
         step_t0 = time.perf_counter()
         x_arr = np.asarray(x0, dtype=float).reshape(-1)
         require_x0_shape(x_arr, self.problem.sys)
-        problem_k = replace(
-            self.problem,
-            x_start=x_arr,
-            X0=SingletonSet(x_arr),
-        )
+        problem_k = self.problem.replace(x_start=x_arr, X0=SingletonSet(x_arr))
         self.program_evaluator.bind(x_arr)
 
         # The seed: the given guess, else the default schedule from the measured state
@@ -772,11 +768,7 @@ class TrajectoryOptimizationPlanner(Planner):
         x_arr = np.asarray(x0, dtype=float).reshape(-1)
         require_x0_shape(x_arr, self.problem.sys)
         saved_problem = self.problem
-        self.problem = replace(
-            saved_problem,
-            x_start=x_arr,
-            X0=SingletonSet(x_arr),
-        )
+        self.problem = saved_problem.replace(x_start=x_arr, X0=SingletonSet(x_arr))
         try:
             return self.solve_trajectory(
                 initial_guess=initial_guess,

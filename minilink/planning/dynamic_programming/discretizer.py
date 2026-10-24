@@ -13,7 +13,7 @@ from minilink.planning.dynamic_programming.progress import (
     print_build_complete,
     progress,
 )
-from minilink.planning.problems import PlanningProblem
+from minilink.planning.problems import PlanningProblem, nominal_plant_params
 
 #: Node-action pairs evaluated per JAX chunk when building tables on device.
 PAIR_CHUNK_SIZE = 50_000
@@ -221,8 +221,8 @@ class StateSpaceGrid:
         """Build the forward-Euler successors and the input/state validity masks."""
         X = self.problem.X
         U = self.problem.U
-        sys_params = self.problem.params.system
-        set_params = self.problem.params.sets
+        sys_params = nominal_plant_params(self.problem)
+        set_params = None
         states = self.states
         inputs = self.inputs
         N = self.nodes_n
@@ -267,10 +267,10 @@ class StateSpaceGrid:
         N = self.nodes_n
         A = self.actions_n
         n = self.n
-        sys_params = self.problem.params.system
+        sys_params = nominal_plant_params(self.problem)
         X = self.problem.X
         U = self.problem.U
-        set_params = self.problem.params.sets
+        set_params = None
         verbose = self.verbose
 
         # The nodes, the actions and the grid's box, on device

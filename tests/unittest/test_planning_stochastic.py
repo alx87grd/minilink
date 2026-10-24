@@ -296,18 +296,20 @@ def test_evaluate_trajectory_integrates_to_tf_and_prices_by_the_switch():
 
 
 def test_every_backend_scores_the_constraint_set_on_its_parameters_and_time():
-    """A parametric, time-varying X is read with problem.params.sets at each sample time."""
+    """A parametric, time-varying X is read on its own parameters at each sample time."""
     from minilink.control import StateFeedback
     from minilink.core.backends import array_module
     from minilink.core.sets import Set
     from minilink.planning import evaluate
-    from minilink.planning.problems import ProblemParameters
 
     class Band(Set):
-        """|z_i| <= r - 0.2 t: a band narrowing from its half-width r (1 by default)."""
+        """|z_i| <= r - 0.2 t: a band narrowing from its half-width r."""
+
+        def __init__(self, r):
+            self.params = {"r": r}
 
         def margin(self, z, t=0.0, params=None):
-            r0 = 1.0 if params is None else params["r"]
+            r0 = (self.params if params is None else params)["r"]
             xp = array_module(z)
 
             r = r0 - 0.2 * t
@@ -324,8 +326,7 @@ def test_every_backend_scores_the_constraint_set_on_its_parameters_and_time():
             x_start=[0.1, 0.0],
             cost=quadratic(plant),
             tf=1.0,
-            X=Band(),
-            params=ProblemParameters(sets={"r": r}),
+            X=Band(r),
             infeasible_cost=1.0,
         )
         reports = {
@@ -527,21 +528,24 @@ def test_the_default_backend_falls_back_on_a_numpy_only_set_or_cost():
     from minilink.core.backends import array_module
     from minilink.core.sets import Set
     from minilink.planning import ProblemEvaluator
-    from minilink.planning.problems import ProblemParameters
 
     class NumpyBand(Set):
-        """|z_i| <= r, the margin written with NumPy only (r = 1 by default)."""
+        """|z_i| <= r, the margin written with NumPy only."""
+
+        params = {"r": 0.8}
 
         def margin(self, z, t=0.0, params=None):
-            r = 1.0 if params is None else params["r"]
+            r = (self.params if params is None else params)["r"]
 
             return np.concatenate([np.asarray(z) + r, r - np.asarray(z)])
 
     class Band(Set):
         """The same band, written for both backends."""
 
+        params = {"r": 0.8}
+
         def margin(self, z, t=0.0, params=None):
-            r = 1.0 if params is None else params["r"]
+            r = (self.params if params is None else params)["r"]
             xp = array_module(z)
 
             return xp.concatenate([z + r, r - z])
@@ -560,7 +564,6 @@ def test_the_default_backend_falls_back_on_a_numpy_only_set_or_cost():
     task = dict(
         tf=1.0,
         x0_distribution=Uniform([-0.5, -0.5], [0.5, 0.5]),
-        params=ProblemParameters(sets={"r": 0.8}),
         infeasible_cost=5.0,
     )
     for X, cost in ((NumpyBand(), quadratic(plant)), (plant.state.box, NumpyEnergy())):

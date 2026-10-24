@@ -19,7 +19,7 @@ from minilink.optimization.mathematical_program import (
     MathematicalProgram,
     OptimizationResult,
 )
-from minilink.planning.problems import PlanningProblem
+from minilink.planning.problems import PlanningProblem, nominal_plant_params
 
 ConstraintFunction = Callable[[np.ndarray], np.ndarray]
 
@@ -180,12 +180,12 @@ def dynamics_function(problem: PlanningProblem, compile_backend: str):
     """Return ``(x, u, t) -> f(x, u, t)`` for a transcription.
 
     ``"numpy"`` and ``"jax"`` use a compiled evaluator; system params from
-    ``problem.params.system`` flow through the parametric tier ``f_p``.
+    ``nominal_plant_params(problem)`` flow through the parametric tier ``f_p``.
     ``"direct"`` calls ``system.f`` without compiling (escape hatch for
     systems that cannot be compiled).
     """
     key = normalize_backend(compile_backend, allow_direct=True)
-    params = problem.params.system
+    params = nominal_plant_params(problem)
 
     # The escape hatch: the system's own f, uncompiled
     if key == BACKEND_DIRECT:

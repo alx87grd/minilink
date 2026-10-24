@@ -117,15 +117,17 @@ class ProblemEvaluator:
         """
         The run's parameters as one nested tree, fresh from the objects.
 
-        ``{block_id: block params}`` for every block of the loop, ``"x_start"``,
-        and each free input of the loop at its nominal value; every leaf a float
-        array, so ``jax.grad`` differentiates the whole tree.
+        ``{block_id: block params}`` for every block of the loop; the problem's
+        own leaves (``"cost"``, the parameters of the sets that hold any by role,
+        ``"x_start"``, ``"discount_rate"``); and each free input of the loop at its
+        nominal value. Every leaf a float array, so ``jax.grad`` differentiates the
+        whole tree.
         """
         loop = self.loop
         problem = self.problem
 
         tree = {sys_id: loop.subsystems[sys_id].params for sys_id in self.block_ids}
-        tree["x_start"] = problem.x_start
+        tree.update(problem_leaves(problem))
         for port in self.free_inputs:
             tree[port] = loop.inputs[port].nominal_value
 
@@ -378,7 +380,7 @@ class ProblemEvaluator:
         traj = self.run(params, x_start)
         plant_run = traj.of("plant")
 
-        row = score_run(self.problem, plant_run, tf=self.tf)
+        row = score_run(self.problem, plant_run, tf=self.tf, params=params)
 
         return row, (traj if record else None)
 
@@ -553,7 +555,7 @@ def evaluate(
     return pe.evaluate(key=key, n_trials=n_trials, record=record)
 
 
-def score_run(problem, traj: Trajectory, *, tf=None) -> dict:
+def score_run(problem, traj: Trajectory, *, tf=None, params=None) -> dict:
     """
     The scores of one plant run under the problem: the formula every evaluation reports.
 
@@ -568,15 +570,21 @@ def score_run(problem, traj: Trajectory, *, tf=None) -> dict:
         J                   = cost, or cost + price · (failed or not reached) with the price on
 
     A run that is not finite is scored on zeros (a safe ``where``), so its
-    gradient is zero and never poisons a mean.
+    gradient is zero and never poisons a mean. ``params`` overrides the
+    problem's own leaves (``"cost"``, the sets' by role, ``"discount_rate"``);
+    ``None`` reads the problem's.
     """
     cost_fn = problem.require_cost()
     xp = array_module(traj.x)
-    rho = discount_rate_of(problem)
+    params = problem_leaves(problem) if params is None else params
+    rho = params.get("discount_rate", problem.discount_rate)
     finite_horizon = problem.horizon_kind() == "finite"
-    X, U = problem.X, problem.U
-    set_params = problem.params.sets
-    cost_params = problem.params.cost
+    X = problem.X
+    U = problem.U
+    cost_params = params.get("cost")
+    X_params = params.get("X")
+    U_params = params.get("U")
+    Xf_params = params.get("Xf")
 
     t = traj.t
     x = traj.x.T
@@ -591,14 +599,14 @@ def score_run(problem, traj: Trajectory, *, tf=None) -> dict:
 
     # The least margin to X and U along the run, the margin of x(tf) to Xf
     feasibility_margin = xp.minimum(
-        least_margin(lambda xk, uk, tk: X.margin(xk, tk, set_params), x, u, t),
-        least_margin(lambda xk, uk, tk: U.margin(uk, xk, tk, set_params), x, u, t),
+        least_margin(lambda xk, uk, tk: X.margin(xk, tk, X_params), x, u, t),
+        least_margin(lambda xk, uk, tk: U.margin(uk, xk, tk, U_params), x, u, t),
     )
     failed = ~finite | (feasibility_margin < 0.0)
     if problem.Xf is None:
         reachability_margin = xp.asarray(xp.inf)
     else:
-        reachability_margin = xp.min(problem.Xf.margin(x[-1], tf, set_params))
+        reachability_margin = xp.min(problem.Xf.margin(x[-1], tf, Xf_params))
     reached = reachability_margin >= 0.0
 
     # cost = ∫₀^{tf} e^{−ρt} g dt + e^{−ρ tf} h(x(tf)), the integral by the trapezoid
@@ -1001,9 +1009,17 @@ def least_margin(margin, x, u, t):
     return xp.min(values)
 
 
-def discount_rate_of(problem):
-    """ρ of the problem."""
-    return float(problem.discount_rate)
+def problem_leaves(problem) -> dict:
+    """The problem's own leaves of a run's tree: ``"cost"``, the sets' parameters by role, ``"x_start"``, ``"discount_rate"``."""
+    leaves = {"cost": problem.cost.params if problem.cost is not None else None}
+    for role in ("X", "U", "Xf"):
+        set_params = getattr(getattr(problem, role), "params", None)
+        if set_params is not None:
+            leaves[role] = set_params
+    leaves["x_start"] = problem.x_start
+    leaves["discount_rate"] = problem.discount_rate
+
+    return leaves
 
 
 def price_of(problem, tf):
@@ -1079,12 +1095,17 @@ def reduce_criterion(J, criterion):
 
 
 def require_free_names(free_inputs, block_ids):
-    """Refuse a free input named like a block: both would be one key of the tree."""
-    clash = sorted(set(free_inputs) & set(block_ids))
+    """Refuse a free input or a block named like another key of the tree (or a problem leaf)."""
+    reserved = {"cost", "X", "U", "Xf", "x_start", "discount_rate"}
+    clash = sorted(
+        (set(free_inputs) & set(block_ids))
+        | ((set(free_inputs) | set(block_ids)) & reserved)
+    )
     if clash:
         raise ValueError(
-            f"the loop's free input(s) {clash} share a name with a block: rename the "
-            "port or the block"
+            f"the loop's name(s) {clash} clash in the run's parameter tree (a block, a "
+            "free input, or the problem's cost, sets, x_start, discount_rate): rename "
+            "the port or the block"
         )
 
 
@@ -1187,9 +1208,11 @@ def merge_tree(tree, override):
 
 
 def float_leaves(tree):
-    """``tree`` with every leaf a float NumPy array."""
+    """``tree`` with every leaf a float NumPy array (``None``, an empty entry, kept)."""
     if isinstance(tree, dict):
         return {key: float_leaves(value) for key, value in tree.items()}
+    if tree is None:
+        return None
 
     return np.asarray(tree, dtype=float)
 

@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass, replace
+from dataclasses import dataclass
 
 import numpy as np
 
@@ -126,7 +126,7 @@ class TabularLearningPlanner(Planner):
         alpha_dp = problem.discount_factor(grid.dt) if alpha is None else float(alpha)
         price = grid_price(problem, alpha_dp, grid.dt)
         self.env = RolloutEnvironment(
-            replace(problem, X=problem.X & grid.X, infeasible_cost=price),
+            problem.replace(X=problem.X & grid.X, infeasible_cost=price),
             dt=grid.dt,
             episode_length=episode_length,
             solver=solver,

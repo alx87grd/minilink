@@ -95,7 +95,7 @@ class RolloutEnvironment:
         # The constraint X, whose exit is a failure, and the training zone, whose
         # exit is a truncation
         self.X = problem.X
-        self.set_params = problem.params.sets
+        self.set_params = None
         self.training_zone = (
             self.sys.state.box if training_zone is None else training_zone
         )

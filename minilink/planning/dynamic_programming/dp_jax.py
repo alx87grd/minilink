@@ -69,7 +69,7 @@ def terminal_cost(planner, t) -> np.ndarray:
 
     grid = planner.grid
     h = planner.problem.cost.h
-    cost_params = planner.problem.params.cost
+    cost_params = planner.problem.cost.params
     N = grid.nodes_n
     verbose = planner.options.verbose
 
@@ -107,7 +107,7 @@ def running_cost_table(planner, t) -> np.ndarray:
 
     grid = planner.grid
     g = planner.problem.cost.g
-    cost_params = planner.problem.params.cost
+    cost_params = planner.problem.cost.params
     dt = grid.dt
     N = grid.nodes_n
     A = grid.actions_n

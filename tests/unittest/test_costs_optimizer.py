@@ -119,13 +119,65 @@ def test_scaled_and_summed_costs_take_the_discount_as_an_argument():
     assert not hasattr(d + d, "discount_rate")
 
 
-def test_params_forwarded_to_terms():
+def test_params_reach_each_term_by_its_id():
     s = make_quadratic() + _ParamCost()
     x = np.array([1.0, 2.0])
     u = np.array([3.0])
     base = make_quadratic().g(x, u)
-    assert s.g(x, u, params={"w": 5.0}) == pytest.approx(base + 5.0)
-    assert (3.0 * _ParamCost()).g(x, u, params={"w": 2.0}) == pytest.approx(6.0)
+    assert list(s.terms) == ["QuadraticCost", "_ParamCost"]
+    assert s.g(x, u, params={"_ParamCost": {"w": 5.0}}) == pytest.approx(base + 5.0)
+    scaled = 3.0 * _ParamCost()
+    assert scaled.g(x, u, params={"cost": {"w": 2.0}}) == pytest.approx(6.0)
+    with pytest.raises(ValueError, match="unknown cost term"):
+        s.g(x, u, params={"w": 5.0})  # a flat dictionary names no term
+
+
+def test_a_composite_cost_nests_its_terms_params_like_a_diagram():
+    q = make_quadratic()
+    other = make_quadratic()
+    obstacle = 5.0 * TimeCost(xbar=np.zeros(2))
+    cost = q + obstacle + other
+    x, u = np.array([1.0, 2.0]), np.array([1.0])
+
+    # Ids from the class names, verbatim, a repeat suffixed; a scaled term takes its cost's
+    assert list(cost.terms) == ["QuadraticCost", "TimeCost", "QuadraticCost2"]
+    assert cost.params["TimeCost"] == {
+        "weight": 5.0,
+        "cost": {"xbar": obstacle.cost.xbar},
+    }
+
+    # A partial override changes its term only; the attributes are views
+    assert cost.g(x, u, params={"TimeCost": {"weight": 0.0}}) == pytest.approx(
+        q.g(x, u) + other.g(x, u)
+    )
+    q.R[0, 0] = 3.0
+    assert cost.g(x, u) == pytest.approx(q.g(x, u) + 5.0 + other.g(x, u))
+    cost.params = {"TimeCost": {"weight": 2.0}}
+    assert obstacle.weight == 2.0
+
+    # Named terms keep their names; sum() flattens like +
+    named = SumCost.of(tracking=q, effort=other)
+    assert list(named.terms) == ["tracking", "effort"]
+    assert list(sum([q, other, q]).terms) == [
+        "QuadraticCost",
+        "QuadraticCost2",
+        "QuadraticCost3",
+    ]
+
+
+@pytest.mark.jax
+def test_the_gradient_reaches_every_cost_weight():
+    import jax
+    import jax.numpy as jnp
+
+    cost = make_quadratic() + 5.0 * TimeCost(xbar=np.zeros(2))
+    x, u = jnp.array([1.0, 2.0]), jnp.array([1.0])
+    params = jax.tree_util.tree_map(jnp.asarray, cost.params)
+    grad = jax.grad(lambda p: cost.g(x, u, params=p))(params)
+
+    # ∂g/∂Q = (x − x̄)(x − x̄)ᵀ, ∂g/∂w = g₀ = 1 off the target
+    np.testing.assert_allclose(grad["QuadraticCost"]["Q"], np.outer(x, x))
+    assert float(grad["TimeCost"]["weight"]) == pytest.approx(1.0)
 
 
 def test_the_running_cost_of_a_sum_on_a_trajectory():
