@@ -19,6 +19,14 @@ class Accumulator(StepSystem):
 
 
 class TestStepSystem(unittest.TestCase):
+    def test_the_default_step_is_a_fresh_copy_of_the_state(self):
+        x = np.array([1.0, 2.0])
+
+        x_next = StepSystem(2).step(x, np.zeros(0))
+        x_next[0] = 9.0
+
+        np.testing.assert_allclose(x, [1.0, 2.0])
+
     def test_step_returns_next_state(self):
         plant = Accumulator()
         x1 = plant.step(np.array([1.0]), np.array([2.0]), k=3)
@@ -460,6 +468,13 @@ class TestStepDiagramJax(unittest.TestCase):
         np_ev = compile(diagram, backend="numpy")
         ref = np_ev.rollout(diagram.x0, n_steps=5, u=np.array([1.0]))
         np.testing.assert_allclose(rollout.x, ref.x, rtol=1e-10, atol=1e-10)
+
+    def test_the_default_step_holds_the_state_on_jax(self):
+        ev = compile(StepSystem(2, input_dim=1), backend="jax")
+
+        x_next = ev.step(np.array([1.0, 2.0]), np.zeros(1))
+
+        np.testing.assert_allclose(x_next, [1.0, 2.0])
 
     def test_the_interpreted_step_runs_on_jax_arrays(self):
         import jax.numpy as jnp

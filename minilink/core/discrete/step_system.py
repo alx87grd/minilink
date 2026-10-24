@@ -2,6 +2,7 @@
 
 import numpy as np
 
+from minilink.core.backends import array_module
 from minilink.core.facades.analysis import StepAnalysis
 from minilink.core.facades.plotting import StepPlotting
 from minilink.core.facades.simulation import StepSimulation
@@ -74,10 +75,12 @@ class StepSystem(StepSimulation, StepAnalysis, StepPlotting, System):
         -------
         x_next : array of shape (n,)
         """
+        xp = array_module(x)
+
         n = self.n
 
         # x_{k+1} = x_k, as a fresh copy of the state
-        x_next = np.asarray(x).reshape(n).copy()
+        x_next = xp.array(x).reshape(n)
 
         return x_next
 
