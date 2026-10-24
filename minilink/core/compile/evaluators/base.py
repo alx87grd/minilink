@@ -11,7 +11,12 @@ from __future__ import annotations
 
 import numpy as np
 
-from minilink.core.backends import BACKEND_JAX, require_jax, require_jax_numpy
+from minilink.core.backends import (
+    BACKEND_JAX,
+    ensure_jax_x64,
+    require_jax,
+    require_jax_numpy,
+)
 from minilink.core.compile.evaluators.compiled import compiled
 from minilink.core.compile.evaluators.jacobian import JacobianMixin
 from minilink.core.compile.evaluators.stepping import (
@@ -47,8 +52,10 @@ class Evaluator(JacobianMixin):
         self.backend = backend
         self.compiled_forms = {}
 
-        # The array module: NumPy, or JAX imported here and only here
+        # The array module: NumPy, or JAX imported here and only here, under the
+        # float64 policy applied again for every evaluator
         if backend == BACKEND_JAX:
+            ensure_jax_x64()
             self.jax = require_jax()
             self.jnp = require_jax_numpy()
             self.xp = self.jnp
@@ -286,7 +293,7 @@ def gather_u(gather_sources, u_dim, signals, u, xp=np, dtype=float):
         elif kind == NOMINAL:
             pieces.append(xp.asarray(where, dtype=dtype))
         elif kind == EXTERNAL_INPUT:
-            pieces.append(u[where])
+            pieces.append(xp.asarray(u[where], dtype=dtype))
         else:
             raise RuntimeError(f"Unknown source_type={kind}")
 

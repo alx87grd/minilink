@@ -66,19 +66,22 @@ def iterate(evaluator, transition, x0, sequences):
     """
     if evaluator.backend != "jax":
         x = x0
-        x_samples = [x]
+        x_path = [x]
         for row in zip(*sequences):
             x = transition(x, *row)
-            x_samples.append(x)
-        return np.array(x_samples)
+            x_path.append(x)
+        x_samples = np.array(x_path)
+
+        return x_samples
 
     def scan_body(x, row):
         x_next = transition(x, *row)
         return x_next, x_next
 
     _, xs = evaluator.jax.lax.scan(scan_body, x0, sequences)
+    x_samples = evaluator.jnp.concatenate((x0[None, :], xs), axis=0)
 
-    return evaluator.jnp.concatenate((x0[None, :], xs), axis=0)
+    return x_samples
 
 
 def held_inputs(u_seq, hold):

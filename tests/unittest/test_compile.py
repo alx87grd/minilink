@@ -1269,3 +1269,51 @@ def test_the_step_refuses_an_unknown_solver():
     ev = Pendulum().compile("numpy")
     with pytest.raises(ValueError, match="solver"):
         ev.step(np.ones(2), np.zeros(1), 0.0, dt=0.1, solver="scipy")
+
+
+def test_a_step_returning_a_bare_number_rolls_out():
+    class HalfStep(StepSystem):
+        def __init__(self):
+            super().__init__(n=1, input_dim=1, output_dim=1)
+
+        def step(self, x, u, k=0, params=None):
+            x_next = 0.5 * x[0] + u[0]
+            return x_next
+
+    rollout = compile(HalfStep()).rollout(np.zeros(1), n_steps=3, u=np.ones(1))
+
+    np.testing.assert_allclose(rollout.x, [[0.0, 1.0, 1.5, 1.75]])
+
+
+def test_a_diagram_hands_its_blocks_float_inputs():
+    class Reciprocal(DynamicSystem):
+        def __init__(self):
+            super().__init__(n=1, input_dim=1, output_dim=1)
+
+        def f(self, x, u, t=0.0, params=None):
+            dx = -x + u**-1
+            return dx
+
+    diagram = DiagramSystem()
+    diagram.add_subsystem(Reciprocal(), "plant")
+    diagram.add_input_port("u", dim=1)
+    diagram.connect("input", "u", "plant", "u")
+    ev = diagram.compile()
+
+    np.testing.assert_allclose(ev.f(np.zeros(1), np.array([2])), [0.5])
+
+
+@pytest.mark.jax
+def test_every_jax_evaluator_applies_the_float64_policy():
+    jax = pytest.importorskip("jax")
+    from minilink import Pendulum
+
+    Pendulum().compile("jax")
+    jax.config.update("jax_enable_x64", False)
+    try:
+        ev = Pendulum().compile("jax")
+        dx = ev.f(np.ones(2), np.zeros(1))
+    finally:
+        jax.config.update("jax_enable_x64", True)
+
+    assert dx.dtype == np.float64

@@ -210,7 +210,9 @@ def finite_difference_jacobian(evaluator, target, variable, eps):
             t = float(t)
             plus = probe(x, u, t + eps, params, zero)
             minus = probe(x, u, t - eps, params, zero)
-            return (plus - minus) / (2.0 * eps)
+            # ∂g/∂t ≈ (g(t + ε) − g(t − ε)) / 2ε
+            dg_dt = (plus - minus) / (2.0 * eps)
+            return dg_dt
         # params: one column per element of every float leaf
         result = {}
         for path, leaf in _float_leaves(params):
@@ -304,7 +306,9 @@ def central_difference(g, z, eps):
         dz[i] = eps
         plus = np.asarray(g(z + dz), dtype=float).reshape(-1)
         minus = np.asarray(g(z - dz), dtype=float).reshape(-1)
-        columns.append((plus - minus) / (2.0 * eps))
+        # ∂g/∂zᵢ ≈ (g(z + ε eᵢ) − g(z − ε eᵢ)) / 2ε
+        dg_dzi = (plus - minus) / (2.0 * eps)
+        columns.append(dg_dzi)
     if not columns:  # nothing to perturb: only the row count is needed
         return np.zeros((np.asarray(g(z), dtype=float).reshape(-1).size, 0))
     return np.column_stack(columns)

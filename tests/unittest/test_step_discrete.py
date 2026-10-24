@@ -461,6 +461,23 @@ class TestStepDiagramJax(unittest.TestCase):
         ref = np_ev.rollout(diagram.x0, n_steps=5, u=np.array([1.0]))
         np.testing.assert_allclose(rollout.x, ref.x, rtol=1e-10, atol=1e-10)
 
+    def test_the_interpreted_step_runs_on_jax_arrays(self):
+        import jax.numpy as jnp
+
+        diagram = StepDiagramSystem()
+        diagram.add_subsystem(Gain(1.0, dim=1), "gain")
+        diagram.add_subsystem(Accumulator_step_diagram_jax(), "plant")
+        diagram.add_input_port("u")
+        diagram.connect("input", "u", "gain", "u")
+        diagram.connect("gain", "y", "plant", "u")
+
+        x_next = diagram.step(jnp.array([1.0]), jnp.array([2.0]), k=0)
+
+        np.testing.assert_allclose(x_next, [3.0])
+        np.testing.assert_allclose(
+            diagram.step(np.array([1.0]), np.array([2.0]), k=0), [3.0]
+        )
+
 
 class Counter(StepSystem):
     def __init__(self):

@@ -460,3 +460,33 @@ the facades package: it is not a `System` shortcut. Every public method of seven
 (a gain, an integrator, the pendulum, a transfer function, a step system, a diagram, a step
 diagram) resolves to the same signature, docstring and source as before, the one docstring
 that named the old class aside. Every call site moved; the three baselines are identical.
+
+## 11. The review pass on the restructure
+
+An independent read of the evaluator merge (old and new code run side by side) found three
+behaviour changes the baselines did not cover, each now fixed with its own test:
+
+- **A step that returns a bare number for `n = 1`** (which `validate_equation_shapes` accepts)
+  crashed the NumPy rollout: the merged loop fed the scalar back as the next state, where the
+  old one wrote it into a preallocated column. `scan_steps` now reads the step's result as
+  the `n`-vector, which also makes the JAX scan accept it.
+- **The float64 policy was applied once per process**, not once per JAX evaluator:
+  `require_jax` is cached, so a later `jax_enable_x64 = False` made new evaluators run in
+  float32, against `ensure_jax_x64`'s docstring. The JAX evaluator's constructor calls it again.
+- **A NumPy diagram handed its blocks an integer `u`** when called with one (`u**-1` then
+  failed); the old gather copied into a float buffer. `gather_u` casts the boundary input to
+  the buffer's dtype.
+
+One more defect, older than the restructure but in a file it created: the interpreted
+`StepDiagramSystem.step` wrote its slots in place, so it raised on JAX arrays. It now stacks
+the step blocks' `x_{k+1}` like `DiagramSystem.f` stacks `ẋ`.
+
+Kept as is: a NumPy evaluator has a `rollout_batch` attribute that refuses with a `TypeError`
+naming `compile(backend='jax')` (the old classes had no attribute); no caller tests for it.
+
+Textbook style (RULES 5.3, 5.22), applied to the lines the restructure moved, read against
+`planning/dynamic_programming/dp.py`: `score_run` binds `params` then `xp` first, and its
+`cost` is a named line, no longer an equation on the `return` line; `reduce_criterion`
+names its objective; `least_margin`, the step model's `iterate` and the central differences
+of the numeric Jacobian name their results, the last with its formula; the compiler's
+underscore helpers take plain names like the ones beside them. Every baseline is identical.

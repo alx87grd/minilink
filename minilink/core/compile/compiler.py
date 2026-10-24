@@ -264,7 +264,7 @@ def compile_diagram(
             flush=True,
         )
 
-    plan = _build_execution_plan_from_order(
+    plan = execution_plan_from_order(
         diagram, port_execution_order, bind_params=bind_params
     )
 
@@ -312,7 +312,7 @@ def build_execution_plan(
     ExecutionPlan
     """
     port_execution_order = evaluation_order_of(diagram)
-    return _build_execution_plan_from_order(
+    return execution_plan_from_order(
         diagram, port_execution_order, bind_params=bind_params
     )
 
@@ -370,7 +370,7 @@ def compile_step_diagram(
             flush=True,
         )
 
-    plan = _build_step_execution_plan_from_order(
+    plan = step_execution_plan_from_order(
         diagram, port_execution_order, bind_params=bind_params
     )
 
@@ -395,7 +395,7 @@ def build_step_execution_plan(
 ) -> StepExecutionPlan:
     """Build an immutable :class:`StepExecutionPlan` from a step diagram."""
     port_execution_order = evaluation_order_of(diagram)
-    return _build_step_execution_plan_from_order(
+    return step_execution_plan_from_order(
         diagram, port_execution_order, bind_params=bind_params
     )
 
@@ -417,7 +417,7 @@ def warn_shared_seeds(diagram):
             )
 
 
-def _build_execution_plan_from_order(
+def execution_plan_from_order(
     diagram: DiagramSystem,
     port_execution_order: list[tuple[str, str]],
     *,
@@ -452,13 +452,13 @@ def _build_execution_plan_from_order(
     )
 
 
-def _build_step_execution_plan_from_order(
+def step_execution_plan_from_order(
     diagram: StepDiagramSystem,
     port_execution_order: list[tuple[str, str]],
     *,
     bind_params: bool = False,
 ) -> StepExecutionPlan:
-    """The step twin of :func:`_build_execution_plan_from_order`: ``step_ops`` for ``state_ops``."""
+    """The step twin of :func:`execution_plan_from_order`: ``step_ops`` for ``state_ops``."""
     output_slices, signal_dim = signal_layout(diagram)
     port_ops = port_operations(
         diagram, port_execution_order, output_slices, StepSystem, bind_params
@@ -502,12 +502,12 @@ def port_operations(
         sys = diagram.subsystems[sys_id]
         port = sys.outputs[port_id]
 
-        gather_sources, u_dim = _build_gather_sources(
+        gather_sources, u_dim = gather_sources_of(
             diagram, sys_id, output_slices, dependencies=port.dependencies
         )
 
         out_slice = output_slices[(sys_id, port_id)]
-        local_x_slice = _state_slice(diagram, sys_id, stateful)
+        local_x_slice = state_slice_of(diagram, sys_id, stateful)
 
         bound = copy.deepcopy(getattr(sys, "params", {})) if bind_params else None
 
@@ -532,12 +532,12 @@ def state_fields(diagram, output_slices, stateful, bind_params):
     for sys_id, sys in diagram.subsystems.items():
         if not isinstance(sys, stateful):
             continue
-        gather_sources, u_dim = _build_gather_sources(
+        gather_sources, u_dim = gather_sources_of(
             diagram, sys_id, output_slices, dependencies="all"
         )
         bound = copy.deepcopy(getattr(sys, "params", {})) if bind_params else None
         fields = {
-            "local_x_slice": _state_slice(diagram, sys_id, stateful),
+            "local_x_slice": state_slice_of(diagram, sys_id, stateful),
             "gather_sources": tuple(gather_sources),
             "u_dim": u_dim,
             "bound_params": bound,
@@ -566,7 +566,7 @@ def boundary_output_slices(diagram, output_slices):
     return external_output_slices
 
 
-def _build_gather_sources(
+def gather_sources_of(
     diagram: DiagramSystem,
     sys_id: str,
     output_slices: dict[tuple[str, str], slice],
@@ -630,7 +630,7 @@ def _build_gather_sources(
     return gather_sources, u_dim
 
 
-def _state_slice(diagram, sys_id: str, stateful=DynamicSystem) -> slice:
+def state_slice_of(diagram, sys_id: str, stateful=DynamicSystem) -> slice:
     """Return the global state-vector slice for a subsystem (empty unless ``stateful``)."""
     sys = diagram.subsystems[sys_id]
     if isinstance(sys, stateful):

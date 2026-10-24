@@ -62,11 +62,14 @@ class DiscreteEvaluator(Evaluator):
     @compiled
     def scan_steps(self, x0, u_steps, params=None):
         """``[x_0, …, x_N]``: the step run over the rows of ``u_steps`` (the rollout's core)."""
+        xp = self.xp
         step = self.step
+        n = self.n
 
-        # x_{k+1} = step(x_k, u_k, k)
+        # x_{k+1} = step(x_k, u_k, k), a bare number for n = 1 read as its one entry
         def transition(x, k, u_k):
-            return step(x, u_k, k, params)
+            x_next = xp.reshape(step(x, u_k, k, params), (n,))
+            return x_next
 
         x_path = iterate(
             self, transition, x0, (self.indices(u_steps.shape[0]), u_steps)

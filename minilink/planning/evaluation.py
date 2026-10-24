@@ -145,9 +145,10 @@ def score_run(
     :func:`price_of` resolves it (``None`` the switch off); by default the
     problem's.
     """
-    cost_fn = problem.require_cost()
-    xp = array_module(traj.x)
     params = problem_leaves(problem) if params is None else params
+    xp = array_module(traj.x)
+
+    cost_fn = problem.require_cost()
     rho = params.get("discount_rate", problem.discount_rate)
     finite_horizon = problem.horizon_kind() == "finite"
     X = problem.X
@@ -186,15 +187,16 @@ def score_run(
     cost = running[-1]
     if finite_horizon:
         cost = cost + xp.exp(-rho * tf) * cost_fn.h(x[-1], tf, cost_params)
+    cost = xp.where(finite, cost, xp.inf)  # A run not finite costs +inf
 
-    # J = cost, or cost + price · (failed or not reached); a run not finite costs +inf
+    # J = cost, or cost + price · (failed or not reached) with the price on
     if price is None:
-        J = xp.where(finite, cost, xp.inf)
+        J = cost
     else:
         J = xp.where(finite, cost, 0.0) + xp.where(failed | ~reached, price, 0.0)
 
     return {
-        "cost": xp.where(finite, cost, xp.inf),
+        "cost": cost,
         "J": J,
         "feasibility_margin": feasibility_margin,
         "failed": failed,
@@ -266,7 +268,9 @@ def least_margin(margin, x, u, t):
     if values.size == 0:
         return xp.asarray(xp.inf)
 
-    return xp.min(values)
+    least = xp.min(values)
+
+    return least
 
 
 def problem_leaves(problem) -> dict:
@@ -302,18 +306,21 @@ def reduce_criterion(J, criterion):
     """The criterion over ``J``: ``"expectation"``, ``"worst_case"`` or ``("cvar", α)``."""
     xp = array_module(J)
 
+    # E[J], max J, or CVaR_α: the mean of the worst ⌈α n⌉ runs
     if criterion == "expectation":
-        return xp.mean(J)
-    if criterion == "worst_case":
-        return xp.max(J)
+        objective = xp.mean(J)
+    elif criterion == "worst_case":
+        objective = xp.max(J)
+    else:
+        _, alpha = criterion
+        n = J.shape[0]
+        k = max(
+            1, math.ceil(round(float(alpha) * n, 9))
+        )  # 0.07 · 100 is 7.000000000000001
+        worst = xp.sort(J)[n - k :]
+        objective = xp.mean(worst)
 
-    # CVaR_α: the mean of the worst ⌈α n⌉ runs
-    _, alpha = criterion
-    n = J.shape[0]
-    k = max(1, math.ceil(round(float(alpha) * n, 9)))  # 0.07 · 100 is 7.000000000000001
-    worst = xp.sort(J)[n - k :]
-
-    return xp.mean(worst)
+    return objective
 
 
 @lru_cache(maxsize=None)

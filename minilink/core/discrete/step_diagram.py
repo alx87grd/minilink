@@ -63,24 +63,29 @@ class StepDiagramSystem(WiredDiagramMixin, StepSystem):
 
         n = self.n
 
-        # x_{k+1} starts as a copy of x_k; each step block then writes its own slots
-        x_arr = xp.asarray(x, dtype=float).reshape(n)
-        x_next = xp.array(x_arr, copy=True)
+        x_k = xp.asarray(x, dtype=float).reshape(n)
 
+        x_next_pieces = []
         for sys_id, subsystem in self.subsystems.items():
-            # A static block has no step to stack
+            # A static block has no step to stack, and no slot in x
             if not isinstance(subsystem, StepSystem):
                 continue
 
             # x_i, u_i and p_i of block i, gathered through the wiring
-            local_x = self.get_local_state(x_arr, sys_id)
+            local_x = self.get_local_state(x_k, sys_id)
             local_u = self.get_local_input(x, u, k, sys_id, params=params)
             local_params = self.subsystem_params(params, sys_id)
 
-            # Block i's slots of x_{k+1} = step_i(x_i, u_i, k; p_i)
-            piece = subsystem.step(local_x, local_u, k, local_params)
+            # x_{i,k+1} = step_i(x_i, u_i, k; p_i), on block i's slots
             start, end = self.state_index[sys_id]
-            x_next[start:end] = xp.asarray(piece, dtype=float).reshape(end - start)
+            x_next_i = subsystem.step(local_x, local_u, k, local_params)
+            x_next_pieces.append(xp.asarray(x_next_i, dtype=float).reshape(end - start))
+
+        # x_{k+1} = [step_1(x_1, u_1, k); step_2(x_2, u_2, k); …], one block per step subsystem
+        if not x_next_pieces:
+            x_next = xp.zeros(0)
+        else:
+            x_next = xp.concatenate(x_next_pieces)
 
         return x_next
 
