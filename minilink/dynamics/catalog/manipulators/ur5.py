@@ -30,6 +30,10 @@ class UR5Manipulator(Manipulator):
     def __init__(self):
         super().__init__(dof=6, actuators=6, task_dim=3)
 
+        # The plant's own range: angles and rates within ±2π
+        self.state.lower_bound = np.full(self.n, -2 * np.pi)
+        self.state.upper_bound = np.full(self.n, 2 * np.pi)
+
         # Parameters: the DH chain, the published masses and centers of mass, and
         # cylinder inertias
         masses = np.array([3.7, 8.393, 2.275, 1.219, 1.219, 0.1879])

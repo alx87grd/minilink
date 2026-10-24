@@ -22,6 +22,12 @@ class Pendulum(MechanicalSystem):
     def __init__(self, length=1.0, mass=1.0):
         super().__init__(dof=1, actuators=1)
 
+        # The plant's own range: angles and rates within ±2π, torques within ±5
+        self.state.lower_bound = np.full(self.n, -2 * np.pi)
+        self.state.upper_bound = np.full(self.n, 2 * np.pi)
+        self.inputs["u"].lower_bound = np.full(self.inputs["u"].dim, -5.0)
+        self.inputs["u"].upper_bound = np.full(self.inputs["u"].dim, 5.0)
+
         # Parameters
         self.params = {
             "m": mass,
@@ -195,6 +201,12 @@ class TwoIndependentPendulums(MechanicalSystem):
 
     def __init__(self):
         super().__init__(dof=2, actuators=2)
+
+        # The plant's own range: angles and rates within ±2π, torques within ±5
+        self.state.lower_bound = np.full(self.n, -2 * np.pi)
+        self.state.upper_bound = np.full(self.n, 2 * np.pi)
+        self.inputs["u"].lower_bound = np.full(self.inputs["u"].dim, -5.0)
+        self.inputs["u"].upper_bound = np.full(self.inputs["u"].dim, 5.0)
 
         # Parameters
         self.params = {

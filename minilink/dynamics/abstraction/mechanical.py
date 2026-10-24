@@ -1,7 +1,5 @@
 """Second-order mechanical systems in generalized coordinates: ``H(q) v̇ + C(q, v) v + d + g(q) = τ``."""
 
-import numpy as np
-
 from minilink.core.backends import array_module
 from minilink.core.system import DynamicSystem
 
@@ -44,26 +42,20 @@ class MechanicalSystem(DynamicSystem):
             y_dependencies=(),
         )
 
-        # Signal labels, units and bounds: an angle and a velocity per coordinate
-        lim = 2 * np.pi
+        # Signal labels and units: an angle and a velocity per coordinate; no bounds,
+        # each plant states its own range
         for i in range(dof):
             self.state.labels[i] = f"Angle {i}"
             self.state.units[i] = "[rad]"
-            self.state.upper_bound[i] = lim
-            self.state.lower_bound[i] = -lim
             j = i + dof
             self.state.labels[j] = f"Velocity {i}"
             self.state.units[j] = "[rad/sec]"
-            self.state.upper_bound[j] = lim
-            self.state.lower_bound[j] = -lim
 
         # A torque per actuator, and the output named after the state
         uport = self.inputs["u"]
         for i in range(actuators):
             uport.labels[i] = f"Torque {i}"
             uport.units[i] = "[Nm]"
-            uport.upper_bound[i] = 5.0
-            uport.lower_bound[i] = -5.0
 
         self.outputs["y"].labels = list(self.state.labels)
         self.outputs["y"].units = list(self.state.units)

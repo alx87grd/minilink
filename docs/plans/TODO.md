@@ -295,7 +295,7 @@ clean-up's renames and moves (K2, K3, K10, A6, G3's moves), the step model (SM-0
 path to the cost (V1.1 to V1.5 with A2), the optimizer's method table (S74) and the closing PID
 example (S77) landed; what each row left is below, and every decision taken without the
 maintainer is in [the run's log](../reviews/2026-10-24-v03-run-decisions.md). Left of the
-clean-up: K8, S32, R68 (in V1.2's rest), K3b.
+clean-up: K8, S32, K3b (R68 landed: every plant states its own bounds).
 
 **Start here (2026-10-23, after session 5):** every decision the code needs is ruled (R1–R89,
 [the record](../reviews/2026-10-22-rulings-session-1.md)). v0.3 is the continuous path: the new
@@ -403,8 +403,7 @@ moved to the new interface (R47).
 - [ ] **V1.2, the rest** (the evaluation of a run, the problem's fields, the price switch and the cost
   bound landed 2026-10-24): LQR warns once when `U` is declared (the U sweep wrote
   `U=plant.input_box` on lessons that never needed it, so the warning waits for the maintainer's
-  pass on those lines); every catalog plant states its own bounds and `MechanicalSystem` invents
-  none (R68, today's numbers kept).
+  pass on those lines).
 - [ ] **V1.4b, the rest** (the Monte Carlo fold landed 2026-10-24): `problem.realize(key, n)` as a public
   verb (the engine draws the start and the parameter laws internally today).
 

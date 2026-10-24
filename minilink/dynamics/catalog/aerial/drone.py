@@ -1,5 +1,7 @@
 """Planar drones: two vertical thrusters, a lateral thruster, velocity inputs, the tunnel helicopter."""
 
+import numpy as np
+
 from minilink.core.backends import array_module
 from minilink.core.kinematics import SE2, translation
 from minilink.core.system import DynamicSystem
@@ -22,6 +24,12 @@ class Drone2D(MechanicalSystem):
 
     def __init__(self):
         super().__init__(dof=3, actuators=2)
+
+        # The plant's own range: angles and rates within ±2π, torques within ±5
+        self.state.lower_bound = np.full(self.n, -2 * np.pi)
+        self.state.upper_bound = np.full(self.n, 2 * np.pi)
+        self.inputs["u"].lower_bound = np.full(self.inputs["u"].dim, -5.0)
+        self.inputs["u"].upper_bound = np.full(self.inputs["u"].dim, 5.0)
 
         # Parameters
         self.params = {

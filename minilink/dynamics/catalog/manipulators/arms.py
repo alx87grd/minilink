@@ -26,6 +26,12 @@ class OneLinkManipulator(Manipulator):
     def __init__(self):
         super().__init__(dof=1, actuators=1, task_dim=2)
 
+        # The plant's own range: angles and rates within ±2π, torques within ±5
+        self.state.lower_bound = np.full(self.n, -2 * np.pi)
+        self.state.upper_bound = np.full(self.n, 2 * np.pi)
+        self.inputs["u"].lower_bound = np.full(self.inputs["u"].dim, -5.0)
+        self.inputs["u"].upper_bound = np.full(self.inputs["u"].dim, 5.0)
+
         # Parameters
         self.params = {
             "l1": 2.5,
@@ -162,6 +168,12 @@ class TwoLinkManipulator(Manipulator):
 
     def __init__(self):
         super().__init__(dof=2, actuators=2, task_dim=2)
+
+        # The plant's own range: angles and rates within ±2π, torques within ±5
+        self.state.lower_bound = np.full(self.n, -2 * np.pi)
+        self.state.upper_bound = np.full(self.n, 2 * np.pi)
+        self.inputs["u"].lower_bound = np.full(self.inputs["u"].dim, -5.0)
+        self.inputs["u"].upper_bound = np.full(self.inputs["u"].dim, 5.0)
 
         # Parameters
         self.params = {
@@ -364,6 +376,12 @@ class ThreeLinkManipulator(Manipulator):
 
     def __init__(self):
         super().__init__(dof=3, actuators=3, task_dim=3)
+
+        # The plant's own range: angles and rates within ±2π, torques within ±5
+        self.state.lower_bound = np.full(self.n, -2 * np.pi)
+        self.state.upper_bound = np.full(self.n, 2 * np.pi)
+        self.inputs["u"].lower_bound = np.full(self.inputs["u"].dim, -5.0)
+        self.inputs["u"].upper_bound = np.full(self.inputs["u"].dim, 5.0)
 
         # Parameters
         self.params = {
@@ -660,6 +678,12 @@ class FiveLinkManipulator(Manipulator):
 
     def __init__(self):
         super().__init__(dof=5, actuators=5, task_dim=2)
+
+        # The plant's own range: angles and rates within ±2π, torques within ±5
+        self.state.lower_bound = np.full(self.n, -2 * np.pi)
+        self.state.upper_bound = np.full(self.n, 2 * np.pi)
+        self.inputs["u"].lower_bound = np.full(self.inputs["u"].dim, -5.0)
+        self.inputs["u"].upper_bound = np.full(self.inputs["u"].dim, 5.0)
 
         # Parameters
         self.params = {"l": np.array([0.5, 0.5, 0.5, 0.5, 0.5])}

@@ -43,27 +43,22 @@ class GeneralizedMechanicalSystem(DynamicSystem):
             y_dependencies=(),
         )
 
-        # Signal labels, units and bounds: the positions q, then the velocities v
+        # Signal labels and units: the positions q, then the velocities v; no bounds,
+        # each plant states its own range
         for i in range(self.pos):
             self.state.labels[i] = f"Position {i}"
             self.state.units[i] = "[m]"
-            self.state.upper_bound[i] = 10.0
-            self.state.lower_bound[i] = -10.0
 
         for i in range(self.dof):
             j = self.pos + i
             self.state.labels[j] = f"Velocity {i}"
             self.state.units[j] = "[m/s]"
-            self.state.upper_bound[j] = 10.0
-            self.state.lower_bound[j] = -10.0
 
         # A force per input, and the output named after the state
         uport = self.inputs["u"]
         for i in range(self.m):
             uport.labels[i] = f"Force input {i}"
             uport.units[i] = "[N]"
-            uport.upper_bound[i] = 5.0
-            uport.lower_bound[i] = -5.0
 
         self.outputs["y"].labels = list(self.state.labels)
         self.outputs["y"].units = list(self.state.units)

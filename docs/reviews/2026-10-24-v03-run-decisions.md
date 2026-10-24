@@ -65,7 +65,7 @@ setpoint (OD-20), because the old penalty on the gains cannot be a cost on the r
 - The 70-entry step-model baseline agrees at rtol 1e-6 through every step, apart from SM-7's
   intended change.
 - The regression gate passes apart from speed rows on this slow VM.
-- The notebook gate on the final commit is in §5.
+- The notebook gate (34 notebooks), the flagship demos (10) and the regression gate pass on the A2 commit (d2861275); the final commit is rechecked in §5.
 
 **Please look first at:**
 1. The number changes in §3. Value iteration's default price changed from 1e6 to the cost bound,
@@ -121,6 +121,7 @@ setpoint (OD-20), because the old penalty on the gains cannot be a cost on the r
 | OD-32 | S74 | The row asks that no hand descent loop remain in examples/demos/compile/ but the closing example's first section and tutorial 07's | Left for the maintainer: cartpole_rollout_gradients (an open-loop schedule, which the engine cannot tune until a source's samples are parameters), neural_controller_jax and params_gradient (identification) each teach the hand loop, and R90 kept that loop in two places on purpose; converting them changes what they teach (student-facing). | Convert all three now: three lessons rewritten without the maintainer. | — |
 | OD-33 | V1.2 | 'LQR warns once' when U is declared | Deferred: the U sweep (OD-18) wrote U=plant.input_box on every lesson whose plant has a finite input box, LQR lessons included, to keep their numbers; a warning would now fire in the GRO860 LQR notebooks although nothing changed for them. Whether those lessons keep the line (and see the warning) is the maintainer's call. | Warn now: new warnings in course notebooks overnight. | — |
 | OD-34 | V1.2 | The README's planning snippet builds a problem without U and hands it to value iteration and RRT, which now refuse an unbounded U | Its API line gains U=plant.input_box beside X=plant.state.box (as examples/demos/core/readme_examples.py, which the sweep updated); no other README change. | Leave the README stale until the maintainer's pass: its snippet would raise. | — |
+| OD-35 | R68 | R68 names MechanicalSystem; GeneralizedMechanicalSystem invents bounds the same way (±10 on the state, ±5 on the inputs) | Both bases invent none: their bound-writing lines are gone, and the 23 catalog plants on them (the experimental tier's included) write their range in their own constructor, at the class that calls the base (a subclass inherits it), as np.full(self.n, ±2π) / np.full(dim, ±5) or ±10 / ±5; a snapshot of every plant's state and input bounds before and after is byte-identical, as are the step-model baseline and the regression gate. A user's own subclass starts unbounded (examples/demos/robotic/custom_one_link_arm.py runs as it was). | MechanicalSystem only, the literal ruling: the generalized family would keep inventing bounds until S32 merges it. | — |
 
 ## 3. Intended number changes (R80)
 
@@ -139,7 +140,6 @@ The rest of v0.3's clean-up, not started (each needs a pass of its own, with its
   to the experimental tier, the twins merged, the README's catalog line;
 - one mechanical family (S32): `H` the one mass-matrix name, the boat and the plane under
   `MechanicalSystem`, `DynamicBicycle` on the generalized child;
-- every catalog plant stating its own bounds (R68);
 - the contract tests for the kept prototypes (K3b).
 
 What the landed rows left (each written as a "rest" row in TODO §4):
@@ -147,7 +147,7 @@ What the landed rows left (each written as a "rest" row in TODO §4):
 - the evaluator's internals deduplicated and the `f` / `f_p` tiers folded (OD-9; SM-6's rest);
 - `StepRollout` folded into the native `Trajectory`, and `Set.contains` on the array module
   (V1.1's rest);
-- the LQR warning (OD-33) and R68 (V1.2's rest);
+- the LQR warning (OD-33; V1.2's rest);
 - `problem.realize(key, n)` as a public verb (V1.4b's rest; the engine draws internally);
 - the three hand-loop demos (OD-32; S74's rest);
 - the program's leaves scaled by their nominal magnitude (OD-31, decided against);

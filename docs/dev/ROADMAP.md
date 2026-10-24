@@ -77,7 +77,9 @@ v0.9 they go to `CHANGELOG.md`, step V5):
   `MonteCarloEvaluator`, `score_trajectory` and `Comparison.evaluate` gone for
   `problem.compile(controller, dt)`, `evaluate` and `compare(problem, ...)` (the continuous loop
   integrated to `tf`, so the scores changed once); the optimizer: presets `gd`, `adam`,
-  `l-bfgs`, `method="auto"`, `z0` optional.
+  `l-bfgs`, `method="auto"`, `z0` optional; `MechanicalSystem` and `GeneralizedMechanicalSystem`
+  invent no bounds (each catalog plant states its own, the same numbers), so a user's own
+  mechanical subclass starts unbounded (R68).
 
 ## 3. Maturity (TRL)
 
