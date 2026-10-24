@@ -20,7 +20,7 @@ opts out for GPU/RL workloads. Tools built on JAX evaluators (trajopt,
 
 | Layer | Use | Examples |
 | --- | --- | --- |
-| 1 Facades | Teaching, quick looks | `compute_trajectory`, `plot_trajectory`, `jacobian`, `linearize`, `+`/`>>`/`@` (`C >> G` is the loop gain, `C @ G` or `L @ 1` the loop closed through an Error block) |
+| 1 Facades | Teaching, quick looks | `compute_trajectory`, `plot_trajectory`, `jacobian`, `linearize`, `+`/`>>`/`@` (`C >> G` is the loop gain, `C @ G` the loop closed through an Error block, `feedback(L)` an open loop closed on itself) |
 | 2 Tools and orchestrators | Scripts, projects, repeat runs, trajopt, NLP | `Simulator`, `analysis.jacobian`, `analysis.bode`, `TrajectoryOptimizationPlanner`, `Optimizer` |
 | 3 Contracts | Custom wiring, extension | `DiagramSystem.connect`, `compile()`, `MathematicalProgram` |
 
@@ -78,10 +78,10 @@ or neural network alike):
 
 | Package | Role |
 | --- | --- |
-| `blocks/` | plant-agnostic wiring: sources, `Integrator`, `TransferFunction`, routing (`Sum`/`Gain`/`Mux`/`Demux`), nonlinear (`Saturation`), filters (`LowPassFilter`), neural (`MLP`) |
+| `blocks/` | plant-agnostic wiring: sources, `Integrator`, `TransferFunction` (and `Lead`, its lead compensator), routing (`Error`/`Sum`/`Gain`/`Mux`/`Demux`), nonlinear (`Saturation`), filters (`LowPassFilter`), neural (`MLP`), the step block `UnitDelay` |
 | `dynamics/` | plants: `abstraction/` mother classes, `catalog/` by physical domain |
 | `catalog/` | **teaching alias** of `dynamics/catalog/` — flat re-exports for short imports (`from minilink.catalog import Pendulum`); ownership stays in `dynamics/` |
-| `control/` | control laws and design verbs: `design.py` (`lqr`, `place`, `lqr_finite_horizon`, `lqg`, `trajectory_lqr` on a linear model or a plant; their gains on arrays), `siso.py` (`P`, `PI`, `PD`, `PID`, `Lead`), `state.py`, `impedance.py`, `robotic.py`, `modelbased.py`, `neural.py`; `ModelPredictiveController` re-exported from `planning/trajectory_optimization/mpc/`. The port contract is §4, 'Control laws' |
+| `control/` | control laws and design verbs: `design.py` (`lqr`, `place`, `lqr_finite_horizon`, `lqg`, `trajectory_lqr` on a linear model or a plant; their gains on arrays), `siso.py` (`P`, `PI`, `PD`, `PID`), `state.py`, `impedance.py`, `robotic.py`, `modelbased.py`, `neural.py`, `geometric.py` (`PurePursuit`); `ModelPredictiveController` re-exported from `planning/trajectory_optimization/mpc/`. The port contract is §4, 'Control laws' |
 | `estimation/` | state observers and their designs: `observer.py` (`StateObserver`, the innovation form, ports `u`, `y` → `x`, role `observer`), `design.py` (`luenberger`, `kalman`, the duals of `place` and `lqr`) |
 
 **Tools** — verbs on a `System`; they return data or plots and never define
@@ -91,9 +91,9 @@ state-feedback block):
 
 | Package | Role |
 | --- | --- |
-| `simulation/` | `Simulator`, `StaticSimulator`, solvers, forcing; `discrete/` (`Computer`, `StepSchedule`: the computer's tick engine; `HybridSimulator`); `realtime/` (`RealtimeSimulator`, `RealtimeInput`/`RealtimeOutput`, `PygameInput`, `LiveSignalPlotOutput`) |
-| `analysis/` | one calling pattern `tool(sys, x_bar, u_bar, t, params, *, method="auto", eps)` on any `System` (the linear model as is, the rest linearized at the operating point): `jacobian`, `linearize` (→ `LTISystem`), the one-channel frequency and time tools (`bode`, `pzmap`, `nyquist`, `margins`, `root_locus`, `step_response`, `step_info`, `transfer_function`, the sensitivity functions) with their `plot_` twins, `structural` (controllability, observability, `minreal`), `equilibria`, `modal`, `lyapunov`, `riccati`, `discretization`. The API reference is the docs site |
-| `planning/` | `problems.py`, `results.py`, `evaluator.py` (the problem evaluator, `evaluate`), `evaluation.py` (`score_run`, the `Evaluation` record), `comparison.py`; `dynamic_programming/` (value iteration, policy evaluation, `LQRPlanner`, the lookup policy), `trajectory_optimization/` (collocation, shooting; `mpc/`, the receding-horizon block, provisional), `search/` (RRT), `spatial/` (scenes; **retires** into `core/geometry/`) |
+| `simulation/` | `Simulator`, `StaticSimulator`, solvers, forcing; `discrete/` (`Computer`, the tick engine, and its firing `StepSchedule`; `HybridSimulator`); `realtime/` (`RealtimeSimulator`, `RealtimeInput`/`RealtimeOutput`, `PygameInput`, `LiveSignalPlotOutput`) |
+| `analysis/` | one calling pattern `tool(sys, x_bar, u_bar, t, params, *, method="auto", eps)` on any `System` (the linear model as is, the rest linearized at the operating point): `jacobian`, `linearize` (→ `LTISystem`), the one-channel frequency and time tools (`bode`, `pzmap`, `nyquist`, `margins`, `root_locus`, `step_response`, `step_info`, `transfer_function`, the sensitivity functions) with their `plot_` twins, `structural` (controllability, observability), `linear` (the one-channel matrix math, `minreal`), `equilibria`, `modal`, `lyapunov`, `riccati`, `discretization`. The API reference is the docs site |
+| `planning/` | `problems.py`, `results.py`, `evaluator.py` (the problem evaluator, `evaluate`), `evaluation.py` (`score_run`, `evaluate_trajectory`, the `Evaluation` record), `comparison.py`; `dynamic_programming/` (value iteration, policy evaluation, `LQRPlanner`, the lookup policy), `trajectory_optimization/` (collocation, shooting; `mpc/`, the receding-horizon block, provisional), `search/` (RRT), `spatial/` (scenes; **retires** into `core/geometry/`) |
 | `learning/` | policies learned from interaction: `reinforcement_learning/` (the neural planner, the tabular learners); identification and imitation later |
 | `optimization/` | `MathematicalProgram`, `Optimizer` (generic NLP) |
 | `graphical/` | signals, phase plane, diagrams, animation |
@@ -118,8 +118,8 @@ state-feedback block):
   trajectory optimization planner, so it lives with it).
 - **Exception:** `learning/` builds on `planning/`: the problem, the planner base,
   the solution and the dynamic programming grid its tabular learners share.
-- **Exception:** `learning.reinforcement_learning`, `planning.evaluator`
-  and `planning.planner` may import `control.neural` and `blocks` (a learned
+- **Exception:** `learning.reinforcement_learning` and `planning.planner`
+  may import `control.neural` and `blocks` (a learned
   law is a control block, the critics share its multilayer perceptron, and an
   open-loop plan is a `TrajectorySource` block).
 - **Exception:** `core/closed_loop.py` imports `blocks.routing` (`Error`, `Sum`,
@@ -143,7 +143,7 @@ state-feedback block):
   gains are the dual designs; and `control.design.lqg` imports `estimation.design.kalman`, inside the
   function: an LQR gain on a Kalman estimate.
 - **Exception:** `control/` (and `estimation/`) import `analysis`
-  (`linearization.design_model`, `riccati`, `structural`): a design on a plant is
+  (`derivatives.jacobian`, `linearization.design_model`, `riccati`, `structural`): a design on a plant is
   an adapter on its linearization (RULES 4.3), and the Riccati equations are
   analysis-tier math shared with the planners.
 - Tools import `core`; they may consume libraries in demos and benchmarks.
@@ -333,14 +333,15 @@ read `params` yet, the gap is tracked below.
   allowed (missing sys_id → that block's live `self.params`); unknown sys_ids
   raise; per-subsystem dicts are full replacements at the block level. Nested
   diagrams nest the dict recursively.
-- Compile: `bind_params=True` copies params into the plan; the evaluator's
+- Compile: a diagram's `bind_params=True` (`diagram.compile(bind_params=True)`) copies params into the plan; the evaluator's
   `params=None` reads them. A `params` dict passed to `f` / `outputs` / `step`
   takes the nested dict on both backends in their place. On JAX the dict is a pytree argument
   (numeric leaves required): values vary without retracing, and
   `evaluator.jacobian("f", "params")` / `jax.grad` differentiate dynamics
   w.r.t. parameters (see `examples/demos/compile/params_gradient.py`).
   `evaluator.jacobian(of, wrt)` returns a callable `(x, u, t, params)` on every
-  evaluator (`jax.jacfwd` eagerly on JAX, central differences on NumPy); the
+  evaluator (`(x, u, k, params)` on a step evaluator; `jax.jacfwd` eagerly on JAX,
+  central differences on NumPy); the
   callable is jit-compatible for blocks written with `array_module` all the
   way through, and diagrams address internal wires as `"block:port"`, as
   output or as an additive perturbation.
@@ -352,7 +353,12 @@ read `params` yet, the gap is tracked below.
   hold their parameters on the System pattern (`QuadraticCost.params` is `Q`, `R`, `S`,
   `xbar`, `ubar`, its attributes views); a `SumCost` keys its terms by id like a diagram
   (the class name verbatim, `QuadraticCost2` for a repeat, a scaled term the id of the
-  cost it scales) and routes a nested dictionary to them. Each set owns its `params`
+  cost it scales) and routes a nested dictionary to them. Anonymous `+` and `sum()` flatten
+  into one level of terms; `SumCost.of(**named)` and a cost with an `id` stay nested. A
+  `ScaledCost`'s params are `{"weight": w, "cost": {...}}`. A partial dictionary fills the
+  missing entries from the composite's own, a leaf's dictionary replaces it whole, and an
+  unknown id raises. A cost without parameters has `params = None`, an empty pytree;
+  `FieldCost`'s params are its weight. Each set owns its `params`
   (`None` by default). Planners read each part's own parameters; a random plant's
   nominal draw is `nominal_plant_params(problem)`.
   Online façade on `solve_trajectory_from` / `compute_command`: `params=None`
@@ -441,7 +447,7 @@ edge output, and `"x"` with no such port is the box's own state as an output.
 
 **Shortcut subsystem ids.** `@` names its two sides `controller` and `plant`,
 `feedback(leaf)` names the leaf `plant`; `+` and `>>` keep each block's own
-name (``System.id``, else the name: `step`, `pid`, `integrator2` on a repeat).
+name (``System.id``, else the class name verbatim: `Step`, `PID`, `Integrator2` on a repeat).
 The reserved names `plant`, `controller` and `observer` are never suffixed: a
 second block under one of them is refused.
 Block titles in ``plot_diagram()`` read ``name::id``.
@@ -471,7 +477,7 @@ framework uses). A bare `TransferFunction` stays a plant (`u`, `y`). An
 error-driven block (`core.roles.block_roles`: an input `e`, or a single
 input with no measurement — a compensator, a transfer function, a plant, a
 series diagram `C >> G`) gets an `Error` block (`e = r - y`, ports `+`, `-`,
-`e`) inserted by `core.closed_loop.feedback`. `@` always means controller at
+`e`) inserted by `core.closed_loop` (`@`, `closed_loop` and `feedback` alike). `@` always means controller at
 plant and refuses a number on the right; `feedback(sys)` closes any such system
 on itself, through a `Gain` (`feedback(sys, K)`) or a sensor or filter block
 (`feedback(sys, F)`), the return block named `filter` either way;
@@ -577,12 +583,13 @@ provided.
 
 ### `Trajectory`, sets, costs, geometry
 
-- `Trajectory`: `t (N,)`, `x (n,N)`, `u (m,N)`, optional `signals`; array-module native and a
-  JAX pytree once the differentiable-problem plan's step 1 lands, its reporting verbs
-  (`t0`, `tf`, `resample`, `save`, the plots) NumPy by contract; a NumPy reporting object
-  until then.
+- `Trajectory`: `t (N,)`, `x (n,N)`, `u (m,N)`, optional `signals`; array-module native
+  (JAX arrays kept) and a JAX pytree, its reporting verbs (`t0`, `tf`, `resample`, `save`,
+  the plots) NumPy by contract; a loop's run carries `roles`, so `traj.of("plant")` is the
+  plant's run by static indexing.
   `print(traj)` is `N`, the time span, and the array shapes, not the sample dump.
-- Sets: `margin ≥ 0` feasible; `contains` is a NumPy boundary utility; `sample(key, n=None)`
+- Sets: `margin ≥ 0` feasible; `contains` is that test on the array module (a traceable
+  boolean under JAX); `sample(key, n=None)`
   follows the distributions' draw convention below (`BoxSet.sample` traces);
   `bounding_box()` is the tightest box containing the set, or `None` — tools that need a
   box (decision bounds, a grid's extent, a sampler's box) ask for it and never probe the
@@ -697,7 +704,8 @@ block):
 A step evaluator has `step(x, u, k=0, params=None)` (the system's own map on the integer
 tick, no knobs), `outputs` and a state-only `rollout(x0, *, n_steps, u=None, params=None)`;
 a static evaluator has `outputs` only. On NumPy each method is its plain body. On JAX each
-is marked `@compiled` (`core/compile/evaluators/compiled.py`): `jax.jit` of the body, built
+is marked `@compiled` (a step evaluator's `rollout` through its scan, returned as a NumPy
+`StepRollout`) (`core/compile/evaluators/compiled.py`): `jax.jit` of the body, built
 on first use and cached per evaluator, the knobs (`solver`, `substeps`, `hold`, `n_steps`)
 static. In a `params` tree the numbers and arrays are traced; a leaf that is not a number (a
 Python `bool` flag, a string) is held static, so a block that branches on a flag in its
@@ -712,8 +720,14 @@ row of `u_seq` (shape `(N, m)`) and `hold="foh"` reads `N + 1` knots, linear bet
 them; `u_seq=None` holds the nominal input for `n_steps` periods; `rollout` returns
 `[x_0, …, x_N]`, `t_k = t₀ + k dt`. `discretize`, the RL environment, the gym bridge,
 value iteration (`StateSpaceGrid.successor`), shooting, the fixed-step solvers, RRT,
-the Lyapunov sampler and the hybrid and realtime simulators all call them. The adaptive
+the Lyapunov sampler, the problem evaluator and the hybrid and realtime simulators all
+call them, or the one-period formula they share (`step_body`). The adaptive
 SciPy solver adapts `f` for `solve_ivp` itself (`simulation/solvers/scipy_ivp.py`).
+`discretize(plant, dt, *, solver="rk4", substeps=1) -> StepSystem` is the plant one sample
+period later, the input held: `solver` is `"rk4"` or `"euler"` (`substeps` per period) or
+`"exact"` (the matrix exponential, a linear model only). Its `step(x, u, k=0, params=None)`
+takes the integer tick and binds `t_k = t₀ + k dt`; the sample time is `dt` alone, never a
+key of the plant's `params`. The hold belongs to sequences (`rollout`), never to a step.
 
 Layout of `core/compile/`: `compiler.py` (`compile`, `compile_auto`, `compile_diagram`,
 `compile_step_diagram`, the shape probe), `plan.py` (`ExecutionPlan` and `StepExecutionPlan`, their
@@ -888,7 +902,10 @@ J                   = cost, or cost + price · (failed or not reached) with the 
 
 A run that is not finite is scored on zeros behind a safe `where`, so its score stays finite with
 the price on; its gradient is not defined (the rollout overflowed before the `where`). A run whose
-states stay finite while its cost overflows scores `+inf`, price or not.
+states stay finite while its cost overflows scores `+inf`, price or not. A trajectory is
+scored on its `plant` role; one without roles is scored as the plant's run only when `x`
+has the plant's `n`, `u` its `m`, and it carries no recorded signals (a logged run), and a
+trajectory with recorded signals and no role is refused.
 `evaluate_trajectory(problem, traj)` scores a trajectory already held (a loop's run
 through its `plant` role; a logged plant run without signals). RL *trains* on the
 left-Riemann discretization of the same running cost (`r_k = -g dt`) with per-step factor
@@ -901,7 +918,8 @@ twice); its plans report `evaluate`.
 reaching a diagram's subsystem params such as `"sys.mass"`, one draw per
 episode carried through the step model's `params`),
 `disturbances` (`{port_id: Distribution}`, a fresh draw per step held on the
-port) and `criterion` (`"expectation"` default, `"worst_case"`, or `("cvar", alpha)`, the
+port in the stepped environment and `Sys2Gym`; `evaluate` holds those ports at their
+nominal value and warns) and `criterion` (`"expectation"` default, `"worst_case"`, or `("cvar", alpha)`, the
 mean of the worst `alpha` fraction; an evaluation's `objective` is this reduction of the
 runs' `J`, and the RL planner, which optimizes the expectation, refuses the others). A deterministic planner given a stochastic problem plans from
 the mean start and warns; `Sys2Gym.from_problem(problem, dt=)` is the
@@ -930,7 +948,12 @@ JAX, the per-trial feasibility margin as a row when `X` or `U` is bounded and th
 reachability margin when `Xf` is set; `pe.pack` / `pe.unpack` move between the tree and
 `z`. `evaluate(problem, controller, *, dt, ...)` is the facade. No backend clips the law:
 port bounds are information, and saturation lives inside the law or in a `Saturation`
-block. The feedback planners' reported `trajectory` is their own held-input rollout on their
+block. `problem.compile` refuses a sampled controller (a `StepSystem`) and a discrete-time
+plant, which join through the hybrid loop; a stochastic problem needs `n_trials`, its
+draws `problem.realize(key, n)` → `(x0s, {"params": …, "disturbances": …})`, one key per
+call. The program reads the same `J` as the report: with the price on, the price is a step
+with no gradient, and a non-finite objective at `z0` warns once. The feedback planners'
+reported `trajectory` is their own held-input rollout on their
 grid (`nominal_trajectory`), the planner's evidence; `evaluate` scores the continuous loop.
 
 **Reinforcement learning (`learning/reinforcement_learning/`):** two
@@ -1043,9 +1066,9 @@ count and the last cost-to-go change.
 continuous plant. A `StateSpaceGrid` discretizes the `PlanningProblem` — grid *extent*
 comes from the sets' bounding boxes (so it stays finite), grid *validity* from
 the sets (`contains` on NumPy, `margin >= 0` on the JAX precompute, so `X = bounds & free`
-works on both); `grid.X` and `grid.U` are the boxes it spans, and successors from a
-forward-Euler step `x_next = x + f(x,u,t)·dt` (the time step `dt` lives on the grid, not
-on `System`). `DynamicProgrammingPlanner` runs value iteration backward — `solve`
+works on both); `grid.X` and `grid.U` are the boxes it spans, and successors from one
+period of the step model, forward Euler by default (`x_next = x + f(x,u,t)·dt`; the grid's
+`solver="rk4"` otherwise; the time step `dt` lives on the grid, not on `System`). `DynamicProgrammingPlanner` runs value iteration backward — `solve`
 to tolerance, `solve_steps` for a fixed horizon — returning a `PlanningSolution` whose
 `policy` is the `LookupPolicy` of the greedy table and whose `cost_to_go`
 interpolates `J` (the raw `DynamicProgrammingResult`, `J` and `pi` as action ids, stays on

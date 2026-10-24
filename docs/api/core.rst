@@ -12,6 +12,18 @@ Core
 .. automodule:: minilink.core.topology
    :members:
 
+.. automodule:: minilink.core.facades.simulation
+   :members:
+
+.. automodule:: minilink.core.facades.analysis
+   :members:
+
+.. automodule:: minilink.core.facades.plotting
+   :members:
+
+.. automodule:: minilink.core.facades.animation
+   :members:
+
 .. automodule:: minilink.core.discrete.step_system
    :members:
    :undoc-members:
@@ -19,6 +31,9 @@ Core
 .. automodule:: minilink.core.discrete.step_diagram
    :members:
    :undoc-members:
+
+.. automodule:: minilink.core.discrete.step_rollout
+   :members:
 
 .. automodule:: minilink.core.operators
    :members:

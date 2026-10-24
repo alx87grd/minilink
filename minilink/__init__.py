@@ -13,8 +13,9 @@ from minilink.core.exports import lazy_facade
 #     from minilink import ReinforcementLearningPlanner, StochasticPlanningProblem
 #
 # The band facades organise the same names by role (``minilink.catalog``,
-# ``minilink.blocks``, ``minilink.control``, ``minilink.analysis``,
-# ``minilink.simulation``, ``minilink.planning``, ``minilink.optimization``,
+# ``minilink.blocks``, ``minilink.dynamics``, ``minilink.control``,
+# ``minilink.estimation``, ``minilink.analysis``, ``minilink.simulation``,
+# ``minilink.planning``, ``minilink.learning``, ``minilink.optimization``,
 # ``minilink.core``); the defining modules stay importable. The surface is tested as a
 # set in ``tests/unittest/test_teaching_surface.py``; research-lane names never appear
 # here. Each exported name maps to its (module path, attribute); the catalog plants

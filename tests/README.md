@@ -33,6 +33,7 @@ tests/
   run/                   ← human IDE launchers (click Run)
   demo_checks/           ← catalog + demo check scripts
   unittest/              ← contract tests (pytest)
+  experimental/          ← the experimental tier's tests (nightly only, off the merge gate)
   fixtures/              ← graphics/regression fixtures
 
 benchmarks/

@@ -233,7 +233,7 @@ sympy and gymnasium. Two optional tools need a system install pip cannot do:
 - [JAX showcase](https://github.com/alx87grd/minilink/blob/main/examples/tutorial/showcase_jax.ipynb), write `f` once, get every gradient
 - [From RL to Bode showcase](https://github.com/alx87grd/minilink/blob/main/examples/tutorial/showcase_from_rl_to_bode.ipynb), six-axis robot, impedance loop, neural policy, frequency response and Lyapunov certificates
 - [Tutorial series 00–11](https://github.com/alx87grd/minilink/tree/main/examples/tutorial), one notebook per package (core dynamics to reinforcement learning)
-- [Teaching notebooks](https://github.com/alx87grd/minilink/tree/main/examples/teaching), swing-up, DP, PPO, robot equations of motion
+- [Teaching notebooks](https://github.com/alx87grd/minilink/tree/main/examples/teaching), swing-up, DP, PPO
 - [Examples index](https://github.com/alx87grd/minilink/blob/main/examples/README.md), demos and projects by chapter
 - [API reference](https://alx87grd.github.io/minilink/)
 - Contributors: [tests/README.md](https://github.com/alx87grd/minilink/blob/main/tests/README.md) and the contracts under [docs/dev](https://github.com/alx87grd/minilink/tree/main/docs/dev)

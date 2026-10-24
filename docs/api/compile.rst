@@ -25,6 +25,9 @@ Compile
 .. automodule:: minilink.core.compile.evaluators.discrete
    :members:
 
+.. automodule:: minilink.core.compile.evaluators.jacobian
+   :members:
+
 .. automodule:: minilink.core.compile.evaluators.compiled
    :members:
 

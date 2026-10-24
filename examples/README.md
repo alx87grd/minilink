@@ -17,7 +17,7 @@ examples/
     topics/<domain>/           # Textbook pages — refactorable (classical_control, optimal_control, …)
     courses/<id>/              # Live course pins (udes_gro860, udes_gro501, later udes_gmc714) — frozen paths
   demos/<chapter>/             # Canonical single-file textbook scripts (1:1 with tutorial chapters)
-  demos/udes_racecar/          # Plant folder: MPC and keyboard game on the 1/10 car
+  demos/udes_racecar/          # Plant folder: MPC on the 1/10 car (kinematic and dynamic models)
 
   # --- Research Lane (Repo-only, unconstrained, exploratory) ---
   projects/<name>/             # Multi-file applications (pathtracking, car_trajopt, mpc)
@@ -33,7 +33,7 @@ untested by default (ROADMAP §2).
 | [`teaching/topics/`](teaching/topics/) | teaching, smoked unless long | Learn a **subject** — course-agnostic textbook page |
 | [`teaching/courses/<id>/`](teaching/courses/) | teaching, smoked unless long | Homework cited by a live course — do not rename without the notes |
 | [`demos/<chapter>/`](demos/) | teaching, nightly sweep | Canonical single-file demo (incl. pedagogical compares) |
-| [`demos/udes_racecar/`](demos/udes_racecar/) | teaching, nightly | 1/10 racecar plant folder (MPC, keyboard game) |
+| [`demos/udes_racecar/`](demos/udes_racecar/) | teaching, nightly | 1/10 racecar plant folder (MPC on the kinematic and dynamic models) |
 | [`projects/<name>/`](projects/) | research | Multi-file experiment — outside release contract, repo-only |
 | [`../experimental/<topic>/`](../experimental/) | experimental tier | Non-core single files, scenario sprawl, WIP; `scratch/` for personal checks; outside `examples/` |
 
@@ -100,7 +100,7 @@ folders on GitHub, then open a notebook badge.
 
 ### Teaching — topics
 
-Course-agnostic textbook pages. Long notebooks (UR5 EoM, DP grids, PPO training) are skipped in fast CI smoke checks.
+Course-agnostic textbook pages. Long notebooks are skipped in fast CI smoke checks (`"smoke": false` in `tests/demo_checks/notebook_overrides.json`).
 
 #### Classical control
 | Notebook | Colab |
@@ -183,7 +183,8 @@ research lane sits apart.
 | Reinforcement learning | [`demos/rl/`](demos/rl/) (pendulum swing-up, cart-pole, rocket landing, learn to fly) | [Gymnasium interface](teaching/courses/udes_gro860/gymnasium_interface.ipynb), [VI vs LQR vs RL](teaching/topics/reinforcement_learning/pendulum_value_iteration_vs_lqr_vs_rl.ipynb), [learn to fly](teaching/topics/reinforcement_learning/drone_ppo.ipynb), [function approximation by SGD](teaching/topics/machine_learning/least_squares_sgd.ipynb), [cost-to-go approximation](teaching/courses/udes_gro860/pendulum_cost_to_go_approximation.ipynb); Lyapunov check in [`experimental/rl/`](../experimental/rl/) |
 | Graphical | [`demos/graphical/`](demos/graphical/), [`demos/realtime/`](demos/realtime/) (keyboard/gamepad game mode: `game_cartpole.py`, `game_car.py`) | |
 | UdeS racecar | [`demos/udes_racecar/`](demos/udes_racecar/) (MPC on the kinematic model, MPC on the dynamic model) | [racecar_toward_mpc](teaching/courses/udes_gro501/racecar_toward_mpc.ipynb) (GRO501 C5.5: kinematic MPC, then the same MPC on the dynamic car) |
-| Experimental tier | [`../experimental/`](../experimental/) (`c_export/`, `engine/`, `symbolic/`, `robotic/` UR5, `boat/` parking in a current: cascade vs MPC vs PPO) | not nightly-swept; `c_export` is TRL 1 (flagship smoke in the JAX regression job); C export demos: `experimental/c_export/c_export_proportional.py`, `c_export.py` (repo root) |
+| Experimental tier | [`../experimental/`](../experimental/) (`c_export/`, `engine/`, `symbolic/`, `robotic/` UR5, `boat/` parking in a current: cascade vs MPC vs PPO, `mppi/` pendulum and racecar MPPI, `rl/` Lyapunov check, `random/` noise and seeds) | not nightly-swept; `c_export` is TRL 1 (flagship smoke in the JAX regression job); C export demos: `experimental/c_export/c_export_proportional.py`, `experimental/c_export/c_export.py` |
+
 Run demos from the repo root, e.g.
 `PYTHONPATH=. python examples/demos/core/readme_examples.py`.
 

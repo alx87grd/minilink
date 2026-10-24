@@ -115,7 +115,8 @@ class SystemSimulation:
         Parameters
         ----------
         u : np.ndarray or callable
-            Forced input description.
+            Forced input description:
+
             - If ``input_port_id is None``: either a full input trajectory with
               shape ``(m, n_pts)`` or a callable ``u(t)`` returning the full
               input vector.
@@ -288,7 +289,8 @@ class DynamicSimulation:
         Parameters
         ----------
         u : np.ndarray or callable
-            Forced input description.
+            Forced input description:
+
             - If ``input_port_id is None``: either a full input trajectory with
               shape ``(m, n_pts)`` or a callable ``u(t)`` returning the full
               input vector.

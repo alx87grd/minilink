@@ -31,6 +31,9 @@ Simulation
 .. automodule:: minilink.simulation.discrete.hybrid_simulator
    :members:
 
+.. automodule:: minilink.core.discrete.hybrid_diagram
+   :members:
+
 .. automodule:: minilink.core.discrete.hybrid_composition
    :members:
 
