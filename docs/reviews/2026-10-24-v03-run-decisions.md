@@ -65,7 +65,7 @@ setpoint (OD-20), because the old penalty on the gains cannot be a cost on the r
 - The 70-entry step-model baseline agrees at rtol 1e-6 through every step, apart from SM-7's
   intended change.
 - The regression gate passes apart from speed rows on this slow VM.
-- The notebook gate (34 notebooks), the flagship demos (10) and the regression gate pass on the A2 commit (d2861275); the final commit is rechecked in §5.
+- On the final code commit (852a3018): the full `pytest` (1704 passed, 9 skipped), the notebook gate (34 of 34), the flagship demos (10 of 10) and the regression gate all pass.
 
 **Please look first at:**
 1. The number changes in §3. Value iteration's default price changed from 1e6 to the cost bound,
