@@ -318,3 +318,11 @@ Open, for the maintainer:
   `diagram_shortcuts.py` labels its noisy loop `Pendulum()` while it builds `NoisyPendulum()`
   (as at the base commit); `custom_one_link_arm.py` reads module constants, not `params`, and
   its `# H = m l²` comment restates the line below.
+
+Gates on the second pass (at 2e468130, in this container): ruff and the
+format check repo-wide; `pytest` 1721 passed, 9 skipped; the regression gate (CI flags) passes;
+the notebook checks 33 of 34. The one that fails, `showcase_from_rl_to_bode`, times out on its
+Meshcat animation: in this container `animate(renderer="meshcat")` hangs for a bare `Pendulum`
+at the base commit e9f69dff too (no server left running), while the notebook passed in the first
+pass's container. Its other cells run in seconds (the UR5 rollout 4 s on JAX).
+
