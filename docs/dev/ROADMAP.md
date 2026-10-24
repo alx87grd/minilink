@@ -378,7 +378,8 @@ clean-up's renames and moves, the step model, the path to the cost (the problem 
 `problem.compile`, `evaluate`, `compare`, the program export), the optimizer's method table and
 the closing PID example, every decision taken without the maintainer in
 [the run's log](../reviews/2026-10-24-v03-run-decisions.md). **Next:** the maintainer's review of
-that log; then what TODO §4 left (the catalog clean-up K8, S32, R68, the rows' rests). The sampled
+that log and of the two review passes after it (§6 and §7 of the same log); then what TODO §4
+left (the catalog clean-up K8, S32, K3b, the rows' rests). The sampled
 loop and the v0.4 names stay open for v0.4.
 
 **The audit, done 2026-10-23** (G1): the GMC714 syllabus read and every lab's ingredients
