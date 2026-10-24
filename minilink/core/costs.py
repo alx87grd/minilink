@@ -581,7 +581,8 @@ def quadratic_max(W, center, box):
     eigenvalues = np.linalg.eigvalsh(0.5 * (W + W.T))
     if eigenvalues[0] < -1e-12 * max(1.0, abs(eigenvalues[-1])):
         d = np.maximum(np.abs(lo), np.abs(hi))
-        return float(d @ np.abs(W) @ d)
+        bound = d @ np.abs(W) @ d
+        return float(bound)
 
     # Diagonal: Σ wᵢᵢ max(loᵢ², hiᵢ²)
     if np.all(W == np.diag(np.diag(W))):

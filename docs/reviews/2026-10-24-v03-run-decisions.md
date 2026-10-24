@@ -210,6 +210,10 @@ Fixed:
   docstring, "in this release" in a docstring, a ruling id in a test comment, a stale DESIGN
   sentence on a callable price, the MPC module pointer, the `Discretization` docstring.
 
+Gates on the fixed code: ruff and the format check repo-wide; `pytest` 1714 passed, 9 skipped
+(the container skips of §5); the notebook checks 34/34; the regression gate (CI flags) passes.
+The math edits were read next to `planning/dynamic_programming/dp.py`.
+
 Number changes (R80): a stepped tool's price at a finite horizon with `α < 1` rises to the
 discrete sum (pendulum, ρ = 0.5, tf = 2 s: 171.36 → 172.06 at α = 0.99, dt = 0.05; 89.89 →
 91.32 at α = 0.9, dt = 0.1); the infinite horizon is unchanged. The RL reward changes only on a
