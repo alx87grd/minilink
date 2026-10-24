@@ -246,8 +246,9 @@ the named car profiles live with their scenarios in `examples/projects/car_trajo
   by `sys.game()`. `PygameInput` maps held keys or a connected gamepad (`joystick_axes`,
   3-D `camera_axes` orbit) to the input ports' bounds or slews a setpoint, staying
   windowless when a controller is connected.
-- **MPC hybrid block:** `ModelPredictiveController(planner, dt_mpc=)` returns a static
-  `System` or, with `warm_start=True`, a `StepSystem` whose state is the last packed `z`.
+- **MPC hybrid block:** `ModelPredictiveController(planner, dt_mpc=)` returns a
+  `StepSystem` whose state is the last packed `z` (the default `warm_start=True`), or a
+  static `System` with `warm_start=False`.
   On JAX the planner's parametric program is compiled once and each tick is bind + solve,
   memoized across the ports `u`, `x_ff`, `z`; on NumPy each tick rebuilds the NLP. The
   deploy loop is `compute_command` → `Command` (the tick's `PlanningSolution`, `k`,
@@ -679,7 +680,7 @@ only** (not diagram internals). Compiled evaluators expose **`outputs` / `output
 bodies, written once (`core/compile/evaluators/stepping.py`) for both backends:
 
     ev.step(x, u, t, params=None, *, dt, solver="rk4", substeps=1)            # x_{k+1}, u held
-    ev.rollout(x0, u_seq, t0, dt, params=None, *, solver="rk4", substeps=1, hold="zoh")
+    ev.rollout(x0, u_seq, t0, dt, params=None, *, solver="rk4", substeps=1, hold="zoh", n_steps=None)
     ev.jit.step(...), ev.jit.rollout(...)                                     # compiled once
 
 `solver` is `"rk4"` or `"euler"`, `substeps` splits each period, `hold="zoh"` holds each
@@ -802,8 +803,8 @@ for the trajectory family — `solution.open_loop` — or a time-varying feedbac
 `u = pi(x, t)` for a finite-horizon LQR), the `solver` record (one
 frozen dataclass per planner with `success` and a one-line `str`; `method`
 names it), the
-`trajectory` (native for open-loop planners; the feedback law's nominal
-rollout on the planner's grid otherwise), the `evaluation`, and
+`trajectory` (native for open-loop planners; for a feedback law its nominal
+rollout on the planner's grid, filled by `solve(evaluate=True)`, else `None`), the `evaluation`, and
 `cost_to_go` where the method produces one (the DP and tabular tables; the
 Riccati form of `LQRPlanner`; the RL critic when the training discount equals
 the problem's). Everything on the solution is the solver's own claim under its
@@ -842,12 +843,14 @@ with `problem.discount_factor(dt)` (DP `alpha`, RL `gamma`). `X` and `U` are har
 constraints in every tool: a run that leaves them is a failure. **The price switch**
 `infeasible_cost` is `None` (an evaluation reports the plain cost and the facts), `True`
 (the price is `problem.cost_bound()`) or a number. `cost_bound(tf=None, *,
-discount_rate=None)` is `g_max ∫₀ᵀ e^{−ρt} dt + e^{−ρT} h_max` over the declared boxes,
+discount_rate=None, dt=None)` is `g_max ∫₀ᵀ e^{−ρt} dt + e^{−ρT} h_max` over the declared boxes
+(with `dt`, a stepped tool's sum `Σ_{k<N} γᵏ dt = dt (1 − γᴺ)/(1 − γ)`, `γ = e^{−ρ dt}`, in place of the integral),
 else the plant's declared ranges; always finite (`1e6` with a warning naming
 `infeasible_cost` when no bound exists). Trajopt and RRT keep the sets exact; value
 iteration, tabular learning, the RL environment and the Gym bridge always price a failure
 by `problem.infeasibility_price()` (the number, else the bound on the tool's own
-discount; value iteration's sum `Σ αᵏ dt` gives its rate `(1 − α)/dt`), and DP treats
+discount and period; value iteration sweeps to convergence, so its sum is `Σₖ αᵏ dt = dt/(1 − α)`,
+the rate `ρ = −ln α / dt`), and DP treats
 leaving the *grid* as infeasible too (the table has no value off its domain). The learners also
 take a **training zone** (`ReinforcementLearningPlanner(training_zone=)`, the
 plant's state box by default): leaving it *truncates* the episode, the critic's
@@ -868,7 +871,9 @@ cost                = ∫₀^{tf} e^{−ρt} g dt + e^{−ρ tf} h(x(tf))  (trap
 J                   = cost, or cost + price · (failed or not reached) with the price on
 ```
 
-A run that is not finite is scored on zeros behind a safe `where`, so its gradient is zero.
+A run that is not finite is scored on zeros behind a safe `where`, so its score stays finite with
+the price on; its gradient is not defined (the rollout overflowed before the `where`). A run whose
+states stay finite while its cost overflows scores `+inf`, price or not.
 `evaluate_trajectory(problem, traj)` scores a trajectory already held (a loop's run
 through its `plant` role; a logged plant run without signals). RL *trains* on the
 left-Riemann discretization of the same running cost (`r_k = -g dt`) with per-step factor

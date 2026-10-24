@@ -607,7 +607,7 @@ LQGPlanner as picked; S73 any time, self-contained.
   - [ ] **C2 Modelling ladder**: manipulators + the four-rung vehicle ladder as a
     `02_dynamics` tutorial lesson (not a GMC714 lab); robotic PID wrappers (`JointPD`, `EndEffectorPD` twins).
     Also: one constructor contract for the robotic laws (scan: control#6).
-  - [ ] **C3 Blocks**: `Ramp` / `Chirp` / `Delay` / `Switch`; `Integrator` and `ZOHHold` take
+  - [ ] **C3 Blocks**: `Ramp` / `Chirp` / `Delay` / `Switch`; `Integrator` and `UnitDelay` take
     a `dim` like every static block (scan: graphics#11).
   - [ ] **S63 DP reads the horizon** **[ask — planner API]** (scan: planning#1): a finite
     `problem.tf` runs `round(tf / dt)` backward sweeps as `solve_steps` does, the way
@@ -681,7 +681,7 @@ in December 2026 after the v0.3 tag; the v1.0 rows after two cohorts.
 - [ ] **S30** Rename the graphical `Sphere` / `Box` glyphs so no two importable public types
   share a name with the geometry solids. **[ask — public names]**
 - [ ] **V3 The frozen surface** **[ask — public names]**: list the names the v1.0 freeze
-  covers. `StepSystem`, `StepDiagramSystem`, `ZOHHold` (root prelude), `control.mpc`
+  covers. `StepSystem`, `StepDiagramSystem`, `UnitDelay` (blocks facade), `ModelPredictiveController`
   (control facade) and the spatial names A3 moves to `core/geometry/` (provisional teaching
   names, ROADMAP §2) join it or move behind a visibly provisional name. Done when the
   teaching-surface registry (`tests/unittest/test_teaching_surface.py`) marks each name

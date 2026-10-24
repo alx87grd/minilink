@@ -104,7 +104,7 @@ Step ids (`S29`, `P4`, `T2`, …) are the rows of
 | Area | Lane | TRL | State | Next |
 | --- | --- | --- | --- | --- |
 | Core + diagrams | teaching | 7 | Public API and diagram API stable; compile-vs-reference parity tested; wrong-shape `f` / `h` fails at `compile()`. | Automation by convention (P10, v0.2); derived `x0` (S29, v0.9). |
-| Compile (`core/compile/`) | teaching (frozen subset) | 4 | Integrated; the frozen evaluator subset is named in DESIGN §5, the stable-internal helper grid kept by ruling. Speed lives in batches (1000 rollouts × 1000 RK4 steps in 27 ms); float64 on JAX by default. | the step model under every sampled tool (S75, v0.3); `rollout_batch` with a `params` family (S53); the differentiable closed-loop cost (V1: the deterministic path v0.3, the draws and the sampled face v0.4); the evaluator grid trimmed and the integrators moved to `simulation/solvers/` (S75's SM-6, v0.3); Diffrax (S27, v0.9). |
+| Compile (`core/compile/`) | teaching (frozen subset) | 4 | Integrated; the frozen evaluator subset is named in DESIGN §5, the stable-internal helper grid kept by ruling. Speed lives in batches (1000 rollouts × 1000 RK4 steps in 27 ms); float64 on JAX by default. | the step model under every sampled tool (S75, v0.3); `rollout_batch` with a `params` family (S53); the differentiable closed-loop cost (V1: the deterministic path v0.3, the draws and the sampled face v0.4); the evaluator grid trimmed to the step model, its formulas in `core/compile/evaluators/stepping.py` (S75's SM-6, v0.3); Diffrax (S27, v0.9). |
 | Simulation | teaching | 7 | Mature; fixed 10 001-point default grid; `verbose` names unified. | One owner per rule (S65). |
 | Dynamics (abstraction + catalog) | teaching | 7 | Plants QA'd; `MechanicalSystem` / `Manipulator`; UR5 ABA/RNEA; **every catalog plant compiles on both backends** (contract test); four-rung vehicle ladder; UdeS racecar (kinematic, dynamic, 3-D). | Catalog hygiene (S64); the general serial chain (C6, v0.3); one mechanical family (S32, v0.3, R62). |
 | Control | teaching | 6 | Linear, LQR (infinite horizon, finite horizon, along a trajectory), pole placement, reference scaling (`N`), `P` / `PI` / `PD` / `PID` and the rate-measured `Impedance` / `IntegralImpedance` as one family (what is measured decides the derivative; limits with infinite defaults, anti-windup once a limit is declared; the shared pieces three pure functions), model-based SMC and computed torque, robotic impedance and kinematic laws, neural policy block; a controller is a plain `System`. | P10's resolver and composition steps. |
@@ -406,7 +406,7 @@ feature (R48).
 - **S75** The step model ([sampled-path.md](../plans/sampled-path.md)): one compiled step taking
   `params`, `discretize(plant, dt, *, solver, substeps) -> StepSystem` on it for every
   sampled consumer, `compute_forced` on the same rollout (a sampled input held, its forced numbers changing once, R18, R40),
-  the evaluator trimmed to four traced bodies and the integrators moved to `simulation/solvers/`
+  the evaluator trimmed to four traced bodies, the step formulas kept in `core/compile/` (OD-11)
   (steps SM-0 to SM-8; S37 absorbed, S27 Diffrax stays in v0.9). **[ask — core]**, ruled.
 - **V1** The path to the cost (steps 1–6 and the Monte Carlo fold of
   [differentiable-problem.md](../plans/differentiable-problem.md)): the native `Trajectory`, one

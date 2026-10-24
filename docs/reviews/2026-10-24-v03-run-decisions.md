@@ -288,3 +288,33 @@ From the library reviewer:
 Open, for the maintainer: `minilink.closed_loop` and `minilink.feedback` are on the root
 prelude but on no band facade (true at the base commit; the facade is a public name, so it waits
 for a nod); `A >> B >> C` is named `A >> B` (the left operand's name carried, true at the base).
+
+From the documents and demos reviewer:
+
+- A stray 80 KB file named `--compare` sat at the repository root since the run's V1.2 (sets)
+  commit: `benchmarks/step_model_baseline.py` wrote to `sys.argv[1]` whatever it was. Removed;
+  the script now refuses a first argument that is a flag.
+- DESIGN corrected where the code says otherwise: a diverged run's gradient (not zero, not
+  defined) and a finite run whose cost overflows (`+inf`, price or not); `cost_bound(dt=)` and
+  value iteration's converged sum `dt/(1 − α)` with `ρ = −ln α / dt`; a feedback planner's
+  `trajectory` (filled by `solve(evaluate=True)`, else `None`); `ev.rollout`'s `n_steps=`;
+  `ModelPredictiveController` (a `StepSystem` by default). ROADMAP §3 and §5.3 no longer say the
+  integrators moved to `simulation/solvers/` (OD-11 kept them in `core/compile/`); TODO's frozen
+  surface and blocks rows name `UnitDelay` and `ModelPredictiveController`; the API page's
+  section is "Dynamic programming".
+- The changed demos: 46 of 51 ran headless; the five that did not finish in the reviewer's
+  7-minute cap (four MPC and value-iteration demos on SciPy without Ipopt, one value iteration
+  killed for memory with four demos in parallel) showed no error before the cut. The closing PID
+  example runs in 61 s; its pipeline descent matches the hand loop to 1.8e-15.
+
+Open, for the maintainer:
+
+- RULES 6.15 names tutorial 07 as the one place gradient descent is written out; tutorial 07 has
+  no descent loop, and the closing PID example now holds one. Which place is canonical?
+- ROADMAP §4.2 says "beyond what `identification/` already offers": the package was deleted
+  (R67).
+- Demo style, as questions: `pid_autotuning_jax.py` keeps its two helpers (as before the run),
+  its new prints carry arithmetic, and its last figure is hand-made Matplotlib;
+  `diagram_shortcuts.py` labels its noisy loop `Pendulum()` while it builds `NoisyPendulum()`
+  (as at the base commit); `custom_one_link_arm.py` reads module constants, not `params`, and
+  its `# H = m l²` comment restates the line below.

@@ -80,8 +80,8 @@ Search
 .. automodule:: minilink.planning.search.tree
    :members:
 
-Policy synthesis
-----------------
+Dynamic programming
+-------------------
 
 .. automodule:: minilink.planning.dynamic_programming.dp
    :members:

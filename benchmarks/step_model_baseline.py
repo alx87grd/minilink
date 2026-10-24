@@ -317,6 +317,10 @@ def compare(current, reference, rtol):
 
 
 if __name__ == "__main__":
+    if len(sys.argv) < 2 or sys.argv[1].startswith("--"):
+        raise SystemExit(
+            "usage: step_model_baseline.py OUT.json [--compare REF.json [--rtol R]]"
+        )
     path = sys.argv[1]
     data = capture()
     with open(path, "w", encoding="utf-8") as file:
