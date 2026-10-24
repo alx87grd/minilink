@@ -2,7 +2,9 @@
 
 import numpy as np
 
-from minilink.core.facades import StepSystemFacades
+from minilink.core.facades.analysis import StepAnalysis
+from minilink.core.facades.plotting import StepPlotting
+from minilink.core.facades.simulation import StepSimulation
 from minilink.core.system import System, add_standard_ports
 
 ###############################################################################
@@ -10,7 +12,7 @@ from minilink.core.system import System, add_standard_ports
 ###############################################################################
 
 
-class StepSystem(StepSystemFacades, System):
+class StepSystem(StepSimulation, StepAnalysis, StepPlotting, System):
     """
     A system with discrete states (``n >= 1``)
 

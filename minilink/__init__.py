@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from minilink.catalog import __all__ as _CATALOG_NAMES
-from minilink.core.facade import lazy_facade
+from minilink.core.exports import lazy_facade
 
 # The root package exports the teaching surface (ROADMAP §2): every name a student
 # meets, so a script or notebook needs one import line, e.g.

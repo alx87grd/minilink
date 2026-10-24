@@ -200,7 +200,7 @@ class HybridDiagram:
         or the computer channels on the tick index with ``abscissa="k"``.
 
         If ``traj`` is omitted and :attr:`traj` is unset, runs :meth:`compute_trajectory`
-        first (same convenience pattern as :class:`~minilink.core.facades.SharedSystemFacades`).
+        first (same convenience pattern as :class:`~minilink.core.facades.plotting.SystemPlotting`).
 
         ``abscissa`` picks the view: ``"t"`` plots the plant channels against time
         (:meth:`HybridSimResult.plot`); ``"k"`` plots the computer channels against
@@ -285,7 +285,7 @@ class HybridDiagram:
         """
         Animate the continuous plant using the fine :attr:`traj` cache.
 
-        Same kwargs as :meth:`~minilink.core.facades.SharedSystemFacades.animate`
+        Same kwargs as :meth:`~minilink.core.facades.animation.SystemAnimation.animate`
         on a flow diagram. Uses :attr:`plant` geometry; ``traj`` defaults to the
         last plant trajectory from :meth:`compute_trajectory` / :meth:`compute_forced`.
         """
@@ -341,7 +341,7 @@ class HybridDiagram:
     ):
         """Render Plant + Computer clusters with boundary ZOH/sample edges.
 
-        Display policy matches :meth:`minilink.core.facades.SharedSystemFacades.plot_diagram`
+        Display policy matches :meth:`minilink.core.facades.plotting.SystemPlotting.plot_diagram`
         (notebook SVG as the returned cell output, without a second
         ``display()``; script Matplotlib window; ``show_pdf`` / ``filename`` /
         ``show=False`` overrides). ``abstract_boundary=True`` (default) omits

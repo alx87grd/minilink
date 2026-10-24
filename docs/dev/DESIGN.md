@@ -68,7 +68,7 @@ in [ROADMAP.md](ROADMAP.md) §5 and the workboard
 
 | Package | Role |
 | --- | --- |
-| `core/` | `System` (+ façade mixins: `SharedSystemFacades`, `DynamicSystemFacades`, `StepSystemFacades`), `DynamicSystem`, `DiagramSystem` (subclasses `DynamicSystem`), shared diagram wiring (`wiring.py`: `WiredDiagramMixin`, gather, topology checks), signals/ports (`signals.py`), backend policy & helpers (`backends.py`), `Trajectory`, sets, distributions (`distributions.py`), costs, geometry (`geometry.py`; **planned package** `core/geometry/` — Path, Track, Scene, bind, spatial Fields, course catalog: [docs/plans/geometry-module.md](../plans/geometry-module.md)) |
+| `core/` | `System` (+ its shortcuts, `facades/` by what they do: `simulation.py`, `analysis.py`, `plotting.py`, `animation.py`), the package import tables (`exports.py`), `DynamicSystem`, `DiagramSystem` (subclasses `DynamicSystem`), shared diagram wiring (`wiring.py`: `WiredDiagramMixin`, gather, topology checks), signals/ports (`signals.py`), backend policy & helpers (`backends.py`), `Trajectory`, sets, distributions (`distributions.py`), costs, geometry (`geometry.py`; **planned package** `core/geometry/` — Path, Track, Scene, bind, spatial Fields, course catalog: [docs/plans/geometry-module.md](../plans/geometry-module.md)) |
 | `core/discrete/` | the discrete-time sibling, `x_{k+1} = F(x_k, u_k, k)` on an integer index: `StepSystem` (`step_system.py`), `StepDiagramSystem` (`step_diagram.py`), the hybrid loop (`hybrid_diagram.py`: `HybridDiagram`; `hybrid_composition.py`: `hybrid_closed_loop` and the port resolution behind `Computer @ plant`), `StepRollout` (`step_rollout.py`) |
 | `core/compile/` | the compiler, the two execution plans, one evaluator per system kind |
 
@@ -291,13 +291,18 @@ the named car profiles live with their scenarios in `examples/projects/car_trajo
   `animate(save=True)` writes the backend file: matplotlib a GIF, meshcat a
   standalone HTML page of that native animation.
 - **Facades:** user shortcuts only (lazy simulation/graphics); split across
-  `core.facades` mixins — `SharedSystemFacades` on `System` (compile, static
-  `compute_trajectory`, `plot_trajectory`, `animate`, …),
-  `DynamicSystemFacades` on `DynamicSystem` (continuous `compute_trajectory`,
-  the analysis shortcuts — `linearize`, `find_equilibrium`,
-  `transfer_function`, `plot_phase_plane`, `plot_bode`, `plot_pzmap`,
-  `plot_root_locus`, `plot_step_response`, `animate_modal` — and `game`),
-  `StepSystemFacades` on `StepSystem` (`compute_rollout`, `jacobian` with `k`). The
+  `core/facades/` by what they do, one mixin per category and system kind:
+  `simulation.py` (`SystemSimulation`: `compile`, static `compute_trajectory`,
+  `compute_forced`, `compute_cost`; `DynamicSimulation`: the continuous ones;
+  `StepSimulation`: `compute_rollout`), `analysis.py` (`SystemAnalysis`:
+  `jacobian`; `DynamicAnalysis`: `linearize`, `transfer_function`,
+  `find_equilibrium`; `StepAnalysis`: `jacobian` with `k`), `plotting.py`
+  (`SystemPlotting`: `plot_trajectory`, `plot_cost`, the maps, `plot_diagram`;
+  `DynamicPlotting`: `plot_phase_plane`, `plot_bode`, `plot_pzmap`,
+  `plot_root_locus`, `plot_step_response`; `StepPlotting`: `plot_rollout`) and
+  `animation.py` (`SystemAnimation`: `render`, `animate`; `DynamicAnimation`:
+  `animate_modal`, `game`). `System`, `DynamicSystem` and `StepSystem` list
+  their kind's mixins as bases. The
   analysis shortcuts are written out, so every
   editor shows their parameters, and `tests/unittest/test_system_shortcuts.py` pins each
   to its band function (parameters, defaults, forwarding, docstring target). Every facade is a two-line delegation to the tool's module and
@@ -740,7 +745,7 @@ Keep `ExecutionPlan.output_slices` and `external_output_slices` aligned.
   :class:`~minilink.simulation.discrete.hybrid_simulator.HybridSimulator` or façade
   `compute_trajectory` / `compute_forced` (hybrid :class:`~minilink.simulation.discrete.hybrid_simulator.HybridSimResult`)
 
-`animate` / `plot_trajectory` live on `SharedSystemFacades` for continuous and static
+`animate` / `plot_trajectory` live on `SystemAnimation` / `SystemPlotting` for continuous and static
 systems; :class:`~minilink.core.discrete.hybrid_diagram.HybridDiagram` mirrors the pattern with
 ``self.traj`` (plant :class:`~minilink.core.trajectory.Trajectory`) and
 ``self.last_result`` (:class:`~minilink.simulation.discrete.hybrid_simulator.HybridSimResult`).

@@ -23,7 +23,7 @@ class StepDiagramSystem(WiredDiagramMixin, StepSystem):
     (``int``), not simulation time.
 
     :meth:`compile` produces a :class:`~minilink.core.compile.evaluators.discrete.StepDiagramEvaluator`
-    for fast :meth:`~minilink.core.facades.StepSystemFacades.compute_rollout`.
+    for fast :meth:`~minilink.core.facades.simulation.StepSimulation.compute_rollout`.
     """
 
     def __init__(self):

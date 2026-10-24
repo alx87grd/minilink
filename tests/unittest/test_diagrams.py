@@ -771,10 +771,11 @@ from minilink.blocks.routing import Gain
 from minilink.core.compile.evaluators.diagram import DiagramEvaluator
 from minilink.core.compile.evaluators.dynamic import DynamicEvaluator
 from minilink.core.compile.evaluators.static import StaticEvaluator
-from minilink.core.facades import (
-    DynamicSystemFacades,
-    SharedSystemFacades,
-    StepSystemFacades,
+from minilink.core.facades.animation import DynamicAnimation, SystemAnimation
+from minilink.core.facades.simulation import (
+    DynamicSimulation,
+    StepSimulation,
+    SystemSimulation,
 )
 from minilink.core.system import DynamicSystem
 from minilink.core.discrete.step_system import StepSystem
@@ -803,9 +804,11 @@ def _unity_feedback_diagram():
 class TestFacadeMixinMRO(unittest.TestCase):
     def test_gain_shared_facades_only(self):
         gain = Gain(K=1.0, dim=1)
-        self.assertIsInstance(gain, SharedSystemFacades)
-        self.assertNotIsInstance(gain, DynamicSystemFacades)
-        self.assertNotIsInstance(gain, StepSystemFacades)
+        self.assertIsInstance(gain, SystemSimulation)
+        self.assertIsInstance(gain, SystemAnimation)
+        self.assertNotIsInstance(gain, DynamicSimulation)
+        self.assertNotIsInstance(gain, DynamicAnimation)
+        self.assertNotIsInstance(gain, StepSimulation)
         self.assertTrue(hasattr(gain, "compute_trajectory"))
         self.assertTrue(hasattr(gain, "animate"))
         self.assertFalse(hasattr(type(gain), "plot_phase_plane"))
@@ -814,22 +817,22 @@ class TestFacadeMixinMRO(unittest.TestCase):
 
     def test_integrator_dynamic_facades(self):
         plant = Integrator()
-        self.assertIsInstance(plant, DynamicSystemFacades)
-        self.assertIsInstance(plant, SharedSystemFacades)
+        self.assertIsInstance(plant, DynamicSimulation)
+        self.assertIsInstance(plant, SystemSimulation)
         self.assertTrue(hasattr(plant, "plot_phase_plane"))
         self.assertTrue(hasattr(plant, "game"))
         self.assertFalse(hasattr(type(plant), "compute_rollout"))
 
     def test_step_system_rollout_facade(self):
         counter = _Counter()
-        self.assertIsInstance(counter, StepSystemFacades)
+        self.assertIsInstance(counter, StepSimulation)
         self.assertTrue(hasattr(counter, "compute_rollout"))
         self.assertFalse(hasattr(type(counter), "plot_phase_plane"))
 
     def test_diagram_is_dynamic_system(self):
         diagram = _unity_feedback_diagram()
         self.assertIsInstance(diagram, DynamicSystem)
-        self.assertIsInstance(diagram, DynamicSystemFacades)
+        self.assertIsInstance(diagram, DynamicSimulation)
 
 
 class TestSimBoundaries(unittest.TestCase):

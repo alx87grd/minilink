@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from minilink.core.facade import lazy_facade
+from minilink.core.exports import lazy_facade
 
 # The band facade for short teaching imports, e.g.
 # ``from minilink.control import PID, Impedance, lqr, place, ModelPredictiveController``.

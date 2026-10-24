@@ -63,8 +63,9 @@ its own small step, most already on the workboard:
 - Landed 2026-10-24 ([the run's log](../reviews/2026-10-24-v03-run-decisions.md) §10):
   `core/composition.py` split into `operators.py` and `closed_loop.py`, `planning/engine.py`
   into `evaluator.py` and `evaluation.py`, the discrete-time pieces moved to `core/discrete/`
-  and `simulation/discrete/`, and `core/compile/` to one evaluator class per system kind.
-- `core/facades.py`, `wiring.py`: split by concern when the
+  and `simulation/discrete/`, `core/compile/` to one evaluator class per system kind, and
+  `core/facades.py` into `core/facades/` by what the shortcuts do.
+- `wiring.py`: split by concern when the
   differentiable-problem work ([differentiable-problem.md](differentiable-problem.md), V1)
   touches them anyway; no public name changes, so it is agent-managed internal structure.
 - `identification/`: remove the stub until `fitting.py` lands (C4), or keep it with a

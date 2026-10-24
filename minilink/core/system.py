@@ -4,7 +4,10 @@ from typing import TYPE_CHECKING
 
 import numpy as np
 
-from minilink.core.facades import DynamicSystemFacades, SharedSystemFacades
+from minilink.core.facades.analysis import DynamicAnalysis, SystemAnalysis
+from minilink.core.facades.animation import DynamicAnimation, SystemAnimation
+from minilink.core.facades.plotting import DynamicPlotting, SystemPlotting
+from minilink.core.facades.simulation import DynamicSimulation, SystemSimulation
 from minilink.core.inspect import inspect_text
 from minilink.core.signals import InputPort, OutputPort, VectorSignal
 
@@ -20,7 +23,7 @@ DEFAULT_SMALLEST_TIME_CONSTANT = 0.001
 ###############################################################################
 
 
-class System(SharedSystemFacades):
+class System(SystemSimulation, SystemAnalysis, SystemPlotting, SystemAnimation):
     """Static input-output shell: ports, parameters, metadata, and facades.
 
     ``y = h(x, u, t; p)`` (via port ``compute`` / :meth:`h`).
@@ -42,10 +45,10 @@ class System(SharedSystemFacades):
       (:attr:`solver_info`).
     - **Visualization contract**: forward-kinematic geometry for rendering
       and animation.
-    - **User shortcut façade**: :meth:`compile`, :meth:`compute_trajectory`,
-      :meth:`render`, :meth:`animate` on
-      :class:`~minilink.core.facades.SharedSystemFacades` (continuous analysis
-      and :meth:`game` on :class:`~minilink.core.facades.DynamicSystemFacades`).
+    - **User shortcuts** (:mod:`minilink.core.facades`), by what they do:
+      simulation (:meth:`compile`, :meth:`compute_trajectory`), analysis,
+      plotting and animation (:meth:`render`, :meth:`animate`); a
+      :class:`DynamicSystem` adds the continuous analysis and :meth:`game`.
     - **Inspect**: :meth:`__str__` is a short summary (name, class, ``n``,
       ports with dimensions; a diagram adds its keys). A notebook last
       expression still draws the Graphviz block.
@@ -510,7 +513,9 @@ class System(SharedSystemFacades):
 # Specialized system types
 
 
-class DynamicSystem(DynamicSystemFacades, System):
+class DynamicSystem(
+    DynamicSimulation, DynamicAnalysis, DynamicPlotting, DynamicAnimation, System
+):
     """
     A system with continuous evolution ``dx = f(x, u, t; p)``.
 

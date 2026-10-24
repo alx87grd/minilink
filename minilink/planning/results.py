@@ -93,7 +93,7 @@ class PlanningSolution:
         """
         Draw the feedback law over the problem's state box.
 
-        The policy's own :meth:`~minilink.core.facades.SharedSystemFacades.plot_control_law`,
+        The policy's own :meth:`~minilink.core.facades.plotting.SystemPlotting.plot_control_law`,
         with ``bounds`` filled from the problem's constraint set (or the
         plant's state box) and the colour limits from its input set, so that
         laws of one problem share one scale. Every keyword passes through

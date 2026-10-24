@@ -448,8 +448,15 @@ return exactly to their values before R12 (the Jacobian now differentiates the u
 body, as its docstring says). The textbook-style allowlist is unchanged.
 
 
-Not yet done: the facades package (`core/facades.py` and `core/facade.py`), held for the
-maintainer. Split by verb (`simulate.py`, `analyze.py`, `draw.py`) as approved, each of the
-three mixins (`SharedSystemFacades`, `DynamicSystemFacades`, `StepSystemFacades`) becomes three,
-nine classes; split by system kind, the three keep their names and their files read like the
-evaluators. The question and a sketch of each are in the session's report.
+**The facades, ruled after the first report** (2026-10-24): split by what the shortcuts do,
+not by system kind, and no obscure file names ("shared", "lazy"). `core/facades.py` became
+`core/facades/` with `simulation.py`, `analysis.py`, `plotting.py` and `animation.py`, one
+mixin per category and system kind (`SystemPlotting`, `DynamicPlotting`, `StepPlotting`, …;
+eleven in all, `StepAnimation` has nothing to hold). `System`, `DynamicSystem` and `StepSystem`
+list their kind's mixins as bases; `SharedSystemFacades`, `DynamicSystemFacades` and
+`StepSystemFacades` are gone. `core/facade.py`, the package import tables behind
+`from minilink import Pendulum` (names imported on first use), is `core/exports.py`, outside
+the facades package: it is not a `System` shortcut. Every public method of seven systems
+(a gain, an integrator, the pendulum, a transfer function, a step system, a diagram, a step
+diagram) resolves to the same signature, docstring and source as before, the one docstring
+that named the old class aside. Every call site moved; the three baselines are identical.

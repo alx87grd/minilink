@@ -6,59 +6,64 @@ from importlib import import_module
 from unittest import mock
 
 from minilink import InvertedPendulum, TransferFunction
-from minilink.core.facades import DynamicSystemFacades
+from minilink.core.facades.analysis import DynamicAnalysis
+from minilink.core.facades.animation import DynamicAnimation
+from minilink.core.facades.plotting import DynamicPlotting
 
 # name -> (owner class, band function "module:attr", kind)
 #   forward: the shortcut's parameters are the band function's after its first one
 #   narrowed: a deliberate subset of them, each kept one identical to the band's
 SHORTCUTS = {
     "linearize": (
-        DynamicSystemFacades,
+        DynamicAnalysis,
         "minilink.analysis.linearization:linearize",
         "forward",
     ),
     "find_equilibrium": (
-        DynamicSystemFacades,
+        DynamicAnalysis,
         "minilink.analysis.equilibria:find_equilibrium",
         "forward",
     ),
     "transfer_function": (
-        DynamicSystemFacades,
+        DynamicAnalysis,
         "minilink.analysis.frequency:transfer_function",
         "forward",
     ),
     "plot_bode": (
-        DynamicSystemFacades,
+        DynamicPlotting,
         "minilink.analysis.frequency:plot_bode",
         "forward",
     ),
     "plot_root_locus": (
-        DynamicSystemFacades,
+        DynamicPlotting,
         "minilink.analysis.frequency:plot_root_locus",
         "forward",
     ),
     "plot_pzmap": (
-        DynamicSystemFacades,
+        DynamicPlotting,
         "minilink.analysis.frequency:plot_pzmap",
         "forward",
     ),
     "animate_modal": (
-        DynamicSystemFacades,
+        DynamicAnimation,
         "minilink.analysis.modal:animate_modal",
         "forward",
     ),
     # traj defaults to the system's last simulation; the rest pass through **kwargs
     "plot_phase_plane": (
-        DynamicSystemFacades,
+        DynamicPlotting,
         "minilink.graphical.phase_plane:plot_phase_plane",
         "narrowed",
     ),
     "plot_step_response": (
-        DynamicSystemFacades,
+        DynamicPlotting,
         "minilink.analysis.time_response:plot_step_response",
         "forward",
     ),
 }
+
+# The shortcut mixins of a DynamicSystem
+DYNAMIC_SHORTCUTS = (DynamicAnalysis, DynamicPlotting, DynamicAnimation)
 
 # The data verbs stay band functions
 REMOVED = (
@@ -92,7 +97,7 @@ class TestSystemShortcuts(unittest.TestCase):
     def test_the_kept_and_the_removed_shortcuts(self):
         plant = InvertedPendulum()
         for name, (owner, _, _) in SHORTCUTS.items():
-            if owner is DynamicSystemFacades:
+            if owner in DYNAMIC_SHORTCUTS:
                 self.assertTrue(callable(getattr(plant, name)), name)
         for name in REMOVED:
             self.assertFalse(hasattr(plant, name), name)
@@ -119,7 +124,7 @@ class TestSystemShortcuts(unittest.TestCase):
     def test_each_forward_passes_every_argument_under_its_own_name(self):
         plant = InvertedPendulum()
         for name, (owner, target, kind) in SHORTCUTS.items():
-            if owner is not DynamicSystemFacades or kind != "forward":
+            if owner not in DYNAMIC_SHORTCUTS or kind != "forward":
                 continue
             with self.subTest(name):
                 module, attr = target.split(":")
