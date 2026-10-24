@@ -38,7 +38,7 @@ def ModelPredictiveController(
         The replan period, in seconds.
     warm_start : bool, optional
         True: each solve starts from the previous plan, kept as the block's state (a
-        :class:`~minilink.core.system.StepSystem`). False: every solve starts cold (a
+        :class:`~minilink.core.discrete.step_system.StepSystem`). False: every solve starts cold (a
         static :class:`~minilink.core.system.System`).
     verbose : bool, optional
         Print one line per solve.

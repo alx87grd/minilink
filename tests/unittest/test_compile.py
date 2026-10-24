@@ -653,7 +653,7 @@ class TestCompileStaticJax(unittest.TestCase):
 
 
 from minilink.core.compile.evaluators.discrete import StepEvaluator
-from minilink.core.system import StepSystem
+from minilink.core.discrete.step_system import StepSystem
 
 
 class LinearStep(StepSystem):
@@ -1019,8 +1019,8 @@ class TestEquationShapeValidation(unittest.TestCase):
         self.assertIn("expected (2,)", str(ctx.exception))
 
     def test_wrong_step_shape_inside_a_step_diagram_raises(self):
-        from minilink.core.diagram import StepDiagramSystem
-        from minilink.core.system import StepSystem
+        from minilink.core.discrete.step_diagram import StepDiagramSystem
+        from minilink.core.discrete.step_system import StepSystem
 
         class BadStep(StepSystem):
             def __init__(self):
@@ -1039,8 +1039,8 @@ class TestEquationShapeValidation(unittest.TestCase):
         self.assertIn("(plant)", str(ctx.exception))
 
     def test_step_diagram_compile_probes_each_hook_once(self):
-        from minilink.core.diagram import StepDiagramSystem
-        from minilink.core.system import StepSystem
+        from minilink.core.discrete.step_diagram import StepDiagramSystem
+        from minilink.core.discrete.step_system import StepSystem
 
         class CountingStep(StepSystem):
             def __init__(self):

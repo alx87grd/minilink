@@ -203,9 +203,9 @@ RESEARCH_LANE_PREFIXES = (
     "minilink.planning.trajectory_optimization.mpc.utilities",
     "minilink.planning.trajectory_optimization.mpc.viz",
     "minilink.simulation.realtime",
-    "minilink.simulation.computer",
-    "minilink.simulation.hybrid_simulator",
-    "minilink.core.hybrid",
+    "minilink.simulation.discrete.computer",
+    "minilink.simulation.discrete.hybrid_simulator",
+    "minilink.core.discrete.hybrid",
     "minilink.experimental",
 )
 
@@ -227,6 +227,7 @@ BAND_RESEARCH_NAMES = {
         "HybridSimulator",
         "HybridSimResult",
         "RealtimeSimulator",
+        "hybrid_closed_loop",
     ),
 }
 

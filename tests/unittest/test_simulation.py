@@ -594,9 +594,10 @@ class TestStepSubsteps(unittest.TestCase):
 
 
 from minilink.core.compile.evaluators.base import gather_u
-from minilink.core.diagram import StepDiagramSystem
-from minilink.core.system import StepSystem, System
-from minilink.simulation.computer import Computer, StepSchedule
+from minilink.core.discrete.step_diagram import StepDiagramSystem
+from minilink.core.system import System
+from minilink.core.discrete.step_system import StepSystem
+from minilink.simulation.discrete.computer import Computer, StepSchedule
 
 
 class KDependentPort(System):
@@ -790,8 +791,8 @@ class TestComputer(unittest.TestCase):
 
 
 from minilink.control.siso import P
-from minilink.core.hybrid_composition import hybrid_closed_loop
-from minilink.simulation.computer import Computer, StepSchedule, as_computer
+from minilink.core.discrete.hybrid_composition import hybrid_closed_loop
+from minilink.simulation.discrete.computer import Computer, StepSchedule, as_computer
 
 
 class ScheduledP(P):

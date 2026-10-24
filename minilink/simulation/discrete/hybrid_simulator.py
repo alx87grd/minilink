@@ -9,11 +9,11 @@ import numpy as np
 
 from minilink.core.backends import BACKEND_NUMPY
 from minilink.core.compile.evaluators.stepping import substeps_of
-from minilink.core.hybrid_diagram import HybridDiagram
-from minilink.core.step_rollout import StepRollout
+from minilink.core.discrete.hybrid_diagram import HybridDiagram
+from minilink.core.discrete.step_rollout import StepRollout
 from minilink.core.system import System
 from minilink.core.trajectory import Trajectory
-from minilink.simulation.computer import Computer
+from minilink.simulation.discrete.computer import Computer
 from minilink.simulation.input_coercion import coerce_forced_input, require_x0
 
 ###############################################################################

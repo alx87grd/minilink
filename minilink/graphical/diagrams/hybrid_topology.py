@@ -4,13 +4,13 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from minilink.core.hybrid_diagram import HybridDiagram
+from minilink.core.discrete.hybrid_diagram import HybridDiagram
 from minilink.graphical.diagrams.topology import (
     DiagramTopology,
     build_diagram_topology,
     prefix_topology,
 )
-from minilink.simulation.computer import StepSchedule
+from minilink.simulation.discrete.computer import StepSchedule
 
 # Each side's node ids carry its prefix, so the two diagrams share one graph
 _PLANT_PREFIX = "plant__"

@@ -9,6 +9,14 @@ Core
    :members:
    :undoc-members:
 
+.. automodule:: minilink.core.discrete.step_system
+   :members:
+   :undoc-members:
+
+.. automodule:: minilink.core.discrete.step_diagram
+   :members:
+   :undoc-members:
+
 .. automodule:: minilink.core.composition
    :members:
 

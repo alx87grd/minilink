@@ -10,12 +10,14 @@ from minilink.core.composition import (
     propagate_animation_camera,
     resolve_standard_feedback,
 )
-from minilink.core.diagram import DiagramSystem, StepDiagramSystem
-from minilink.core.hybrid_diagram import BoundaryConnection, HybridDiagram
-from minilink.core.system import StepSystem, System
+from minilink.core.diagram import DiagramSystem
+from minilink.core.discrete.hybrid_diagram import BoundaryConnection, HybridDiagram
+from minilink.core.discrete.step_diagram import StepDiagramSystem
+from minilink.core.discrete.step_system import StepSystem
+from minilink.core.system import System
 
 if TYPE_CHECKING:
-    from minilink.simulation.computer import Computer, StepSchedule
+    from minilink.simulation.discrete.computer import Computer, StepSchedule
 
 ###############################################################################
 # Public API
@@ -67,7 +69,7 @@ def hybrid_closed_loop(
         Additional multi-channel boundary edges.
     """
     # Tools import core (DESIGN §3): the simulation band loads on first use
-    from minilink.simulation.computer import Computer, as_computer, as_schedule
+    from minilink.simulation.discrete.computer import Computer, as_computer, as_schedule
 
     # A leaf whose class defines its own ``%`` builds its runtime there
     if computer is None and builds_own_computer(computer_side):

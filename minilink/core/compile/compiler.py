@@ -44,11 +44,13 @@ from minilink.core.compile.plan import (
     StepExecutionPlan,
     StepOperation,
 )
-from minilink.core.system import DynamicSystem, StepSystem
+from minilink.core.discrete.step_system import StepSystem
+from minilink.core.system import DynamicSystem
 from minilink.core.wiring import evaluation_order_of, iter_subsystems
 
 if TYPE_CHECKING:
-    from minilink.core.diagram import DiagramSystem, StepDiagramSystem
+    from minilink.core.diagram import DiagramSystem
+    from minilink.core.discrete.step_diagram import StepDiagramSystem
 
 
 # Public API
@@ -61,8 +63,10 @@ def validate_equation_shapes(system, label=None):
     ``ValueError`` naming the block, the hook, and both shapes. Custom port
     computes are not probed (they may be expensive or stateful).
     """
-    from minilink.core.diagram import DiagramSystem, StepDiagramSystem
-    from minilink.core.system import DynamicSystem, StepSystem
+    from minilink.core.diagram import DiagramSystem
+    from minilink.core.discrete.step_diagram import StepDiagramSystem
+    from minilink.core.discrete.step_system import StepSystem
+    from minilink.core.system import DynamicSystem
 
     if isinstance(system, (DiagramSystem, StepDiagramSystem)):
         return
@@ -119,8 +123,10 @@ def compile(system, backend=BACKEND_NUMPY, verbose=False):
     verbose : bool
         If ``True``, print timed compilation steps.
     """
-    from minilink.core.diagram import DiagramSystem, StepDiagramSystem
-    from minilink.core.system import DynamicSystem, StepSystem
+    from minilink.core.diagram import DiagramSystem
+    from minilink.core.discrete.step_diagram import StepDiagramSystem
+    from minilink.core.discrete.step_system import StepSystem
+    from minilink.core.system import DynamicSystem
 
     if isinstance(system, DiagramSystem):
         return compile_diagram(system, backend=backend, verbose=verbose)
@@ -213,8 +219,8 @@ def compile_diagram(
     It does **not** make user ``f`` / port ``compute`` implementations pure if they still
     read or mutate other instance state; see :class:`minilink.core.system.System`.
     """
-    from minilink.core.diagram import StepDiagramSystem
-    from minilink.core.system import StepSystem
+    from minilink.core.discrete.step_diagram import StepDiagramSystem
+    from minilink.core.discrete.step_system import StepSystem
 
     if isinstance(diagram, StepDiagramSystem):
         raise TypeError(
@@ -318,12 +324,14 @@ def compile_step_diagram(
     bind_params: bool = False,
     verbose: bool = False,
 ):
-    """Compile a :class:`~minilink.core.diagram.StepDiagramSystem` into an evaluator.
+    """Compile a :class:`~minilink.core.discrete.step_diagram.StepDiagramSystem` into an evaluator.
 
     The step twin of :func:`compile_diagram`: same arguments, a
     :class:`~minilink.core.compile.evaluators.discrete.StepDiagramEvaluator` back.
     """
-    from minilink.core.diagram import StepDiagramSystem as StepDiagramSystemType
+    from minilink.core.discrete.step_diagram import (
+        StepDiagramSystem as StepDiagramSystemType,
+    )
 
     if not isinstance(diagram, StepDiagramSystemType):
         raise TypeError(

@@ -727,7 +727,7 @@ def closed_loop_of(problem, controller):
     # Lazy imports: the composition tools and the results load with the first loop
     from minilink.core.composition import closed_loop
     from minilink.core.diagram import DiagramSystem
-    from minilink.core.system import StepSystem
+    from minilink.core.discrete.step_system import StepSystem
 
     plant = problem.sys
     controller = policy_of(controller)
@@ -944,7 +944,7 @@ def warn_if_disturbed(problem):
 def require_continuous(controller):
     """Refuse a sampled controller: the evaluator runs a continuous loop."""
     # Lazy import: the system module imports the compile chain, which loads after this one
-    from minilink.core.system import StepSystem
+    from minilink.core.discrete.step_system import StepSystem
 
     if isinstance(controller, StepSystem):
         raise TypeError(

@@ -11,14 +11,15 @@ from minilink.core.backends import BACKEND_NUMPY, normalize_backend
 from minilink.core.compile.compiler import build_step_execution_plan
 from minilink.core.compile.evaluators.base import gather_u
 from minilink.core.compile.plan import PortOperation, StepExecutionPlan, StepOperation
-from minilink.core.diagram import DiagramSystem, StepDiagramSystem
-from minilink.core.hybrid_composition import (
+from minilink.core.diagram import DiagramSystem
+from minilink.core.discrete.hybrid_composition import (
     as_step_diagram,
     builds_own_computer,
     expose_computer_boundary_ports,
     hybrid_closed_loop,
     resolve_hybrid_feedback_ports,
 )
+from minilink.core.discrete.step_diagram import StepDiagramSystem
 from minilink.core.system import DynamicSystem, System
 
 ###############################################################################
@@ -170,7 +171,7 @@ class Computer:
         """
         Hybrid feedback using standard port auto-wiring.
 
-        ``computer @ plant`` returns a :class:`~minilink.core.hybrid_diagram.HybridDiagram`
+        ``computer @ plant`` returns a :class:`~minilink.core.discrete.hybrid_diagram.HybridDiagram`
         with the same port-resolution rules as continuous ``ctl @ plant``.
         Like the continuous ``@``, it leaves a plant diagram unchanged.
         """

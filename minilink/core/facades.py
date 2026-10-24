@@ -1054,7 +1054,7 @@ class DynamicSystemFacades:
 
 
 class StepSystemFacades:
-    """Discrete-time rollout shortcuts for :class:`~minilink.core.system.StepSystem`.
+    """Discrete-time rollout shortcuts for :class:`~minilink.core.discrete.step_system.StepSystem`.
 
     Step plants do **not** use :class:`~minilink.simulation.simulator.Simulator`
     or :class:`~minilink.simulation.static_simulator.StaticSimulator` — those
@@ -1121,9 +1121,9 @@ class StepSystemFacades:
         """
         Convenience shortcut to roll out a discrete-time step system.
 
-        Returns a state-only :class:`~minilink.core.step_rollout.StepRollout`.
-        Boundary output logging belongs in :class:`~minilink.simulation.computer.Computer`
-        or :class:`~minilink.simulation.hybrid_simulator.HybridSimulator` — not here.
+        Returns a state-only :class:`~minilink.core.discrete.step_rollout.StepRollout`.
+        Boundary output logging belongs in :class:`~minilink.simulation.discrete.computer.Computer`
+        or :class:`~minilink.simulation.discrete.hybrid_simulator.HybridSimulator` — not here.
 
         Parameters
         ----------

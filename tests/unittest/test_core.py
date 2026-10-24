@@ -1,7 +1,8 @@
 import unittest
 import numpy as np
 import pytest
-from minilink.core.system import DynamicSystem, StepSystem, System, VectorSignal
+from minilink.core.system import DynamicSystem, System, VectorSignal
+from minilink.core.discrete.step_system import StepSystem
 
 
 class TestCoreComponents(unittest.TestCase):

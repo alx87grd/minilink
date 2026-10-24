@@ -21,8 +21,8 @@ from minilink.core.compile.evaluators.dynamic import check_leaf_traces
 from minilink.core.compile.evaluators.stepping import iterate
 from minilink.core.compile.plan import StepExecutionPlan
 from minilink.core.diagram import check_diagram_params
-from minilink.core.step_rollout import StepRollout
-from minilink.core.system import StepSystem
+from minilink.core.discrete.step_rollout import StepRollout
+from minilink.core.discrete.step_system import StepSystem
 
 ###############################################################################
 # Public API
@@ -40,12 +40,12 @@ class DiscreteEvaluator(Evaluator):
         """
         Roll out ``x_{k+1} = step(x_k, u_k, k)`` for ``n_steps`` transitions.
 
-        Returns a state-only :class:`~minilink.core.step_rollout.StepRollout` with
+        Returns a state-only :class:`~minilink.core.discrete.step_rollout.StepRollout` with
         ``k.shape == (n_steps + 1,)``, ``x.shape == (n, n_steps + 1)``, and
         ``u.shape == (m, n_steps + 1)``; ``params=None`` reads the compiled
         parameters. Signal histories are owned by
-        :class:`~minilink.simulation.computer.Computer` and
-        :class:`~minilink.simulation.hybrid_simulator.HybridSimulator`.
+        :class:`~minilink.simulation.discrete.computer.Computer` and
+        :class:`~minilink.simulation.discrete.hybrid_simulator.HybridSimulator`.
         """
         xp = self.xp
         x0 = xp.asarray(x0, dtype=float).reshape(self.n)

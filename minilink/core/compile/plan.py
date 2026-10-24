@@ -6,7 +6,7 @@ and flattened form, all the information needed to evaluate a diagram without
 any dictionary lookups or recursive calls. :class:`ExecutionPlan` (a
 :class:`~minilink.core.diagram.DiagramSystem`) holds ``state_ops``, one ``dx``
 per stateful block; :class:`StepExecutionPlan` (a
-:class:`~minilink.core.diagram.StepDiagramSystem`) holds ``step_ops``, one
+:class:`~minilink.core.discrete.step_diagram.StepDiagramSystem`) holds ``step_ops``, one
 ``x_{k+1}`` per stateful block. Both share the port topology.
 
 The plans are consumed by the evaluators

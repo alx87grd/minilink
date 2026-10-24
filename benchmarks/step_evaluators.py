@@ -1,6 +1,6 @@
 """How fast is one ``step(x, u, k)`` call?
 
-Times repeated discrete updates of one :class:`~minilink.core.system.StepSystem`
+Times repeated discrete updates of one :class:`~minilink.core.discrete.step_system.StepSystem`
 across the native Python path and the compiled NumPy/JAX evaluators, reporting
 compile time, per-call time, and speedup versus native.
 """

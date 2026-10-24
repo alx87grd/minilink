@@ -776,7 +776,8 @@ from minilink.core.facades import (
     SharedSystemFacades,
     StepSystemFacades,
 )
-from minilink.core.system import DynamicSystem, StepSystem
+from minilink.core.system import DynamicSystem
+from minilink.core.discrete.step_system import StepSystem
 from minilink.simulation.simulator import Simulator
 from minilink.simulation.static_simulator import StaticSimulator
 

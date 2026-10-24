@@ -12,9 +12,9 @@ _EXPORTS: dict[str, tuple[str, str]] = {
     # Systems
     "System": ("minilink.core.system", "System"),
     "DynamicSystem": ("minilink.core.system", "DynamicSystem"),
-    "StepSystem": ("minilink.core.system", "StepSystem"),
+    "StepSystem": ("minilink.core.discrete.step_system", "StepSystem"),
     "DiagramSystem": ("minilink.core.diagram", "DiagramSystem"),
-    "StepDiagramSystem": ("minilink.core.diagram", "StepDiagramSystem"),
+    "StepDiagramSystem": ("minilink.core.discrete.step_diagram", "StepDiagramSystem"),
     # Data
     "Trajectory": ("minilink.core.trajectory", "Trajectory"),
     # Costs

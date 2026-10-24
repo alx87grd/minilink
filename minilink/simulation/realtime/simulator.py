@@ -11,7 +11,7 @@ return a :class:`~minilink.core.trajectory.Trajectory` when the session stops.
 
 Sibling orchestrators: :class:`~minilink.simulation.simulator.Simulator`
 (offline time grid) and
-:class:`~minilink.simulation.hybrid_simulator.HybridSimulator` (computer
+:class:`~minilink.simulation.discrete.hybrid_simulator.HybridSimulator` (computer
 ticks). The stepping math lives in the evaluators; this module owns only the
 loop, the clock policy, and the recording.
 

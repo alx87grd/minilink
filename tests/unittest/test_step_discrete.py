@@ -3,7 +3,7 @@
 import unittest
 import numpy as np
 from minilink.blocks.step import UnitDelay
-from minilink.core.system import StepSystem
+from minilink.core.discrete.step_system import StepSystem
 
 
 class Accumulator(StepSystem):
@@ -57,8 +57,9 @@ from minilink.blocks.routing import Gain
 from minilink.core.backends import array_module
 from minilink.core.compile.compiler import compile
 from minilink.core.compile.evaluators.discrete import StepDiagramEvaluator
-from minilink.core.diagram import StepDiagramSystem
-from minilink.core.system import StepSystem, System
+from minilink.core.discrete.step_diagram import StepDiagramSystem
+from minilink.core.system import System
+from minilink.core.discrete.step_system import StepSystem
 
 
 class KDependentPort(System):
@@ -281,7 +282,7 @@ from minilink.core.compile.plan import (
     INTERNAL_SIGNAL,
     NOMINAL,
 )
-from minilink.core.step_rollout import StepRollout
+from minilink.core.discrete.step_rollout import StepRollout
 from minilink.core.trajectory import Trajectory
 
 try:

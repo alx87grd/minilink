@@ -68,7 +68,8 @@ in [ROADMAP.md](ROADMAP.md) §5 and the workboard
 
 | Package | Role |
 | --- | --- |
-| `core/` | `System` (+ façade mixins: `SharedSystemFacades`, `DynamicSystemFacades`, `StepSystemFacades`), `DiagramSystem` (subclasses `DynamicSystem`), shared diagram wiring (`wiring.py`: `WiredDiagramMixin`, gather, topology checks), signals/ports (`signals.py`), backend policy & helpers (`backends.py`), `Trajectory`, sets, distributions (`distributions.py`), costs, geometry (`geometry.py`; **planned package** `core/geometry/` — Path, Track, Scene, bind, spatial Fields, course catalog: [docs/plans/geometry-module.md](../plans/geometry-module.md)) |
+| `core/` | `System` (+ façade mixins: `SharedSystemFacades`, `DynamicSystemFacades`, `StepSystemFacades`), `DynamicSystem`, `DiagramSystem` (subclasses `DynamicSystem`), shared diagram wiring (`wiring.py`: `WiredDiagramMixin`, gather, topology checks), signals/ports (`signals.py`), backend policy & helpers (`backends.py`), `Trajectory`, sets, distributions (`distributions.py`), costs, geometry (`geometry.py`; **planned package** `core/geometry/` — Path, Track, Scene, bind, spatial Fields, course catalog: [docs/plans/geometry-module.md](../plans/geometry-module.md)) |
+| `core/discrete/` | the discrete-time sibling, `x_{k+1} = F(x_k, u_k, k)` on an integer index: `StepSystem` (`step_system.py`), `StepDiagramSystem` (`step_diagram.py`), the hybrid loop (`hybrid_diagram.py`: `HybridDiagram`; `hybrid_composition.py`: `hybrid_closed_loop` and the port resolution behind `Computer @ plant`), `StepRollout` (`step_rollout.py`) |
 | `core/compile/` | the compiler, the two execution plans, one evaluator per system kind |
 
 **System libraries** — `System` subclasses you drop into a diagram, shelved by
@@ -90,7 +91,7 @@ state-feedback block):
 
 | Package | Role |
 | --- | --- |
-| `simulation/` | `Simulator`, `StaticSimulator`, `Computer`, `StepSchedule`, `HybridSimulator`, solvers, forcing; `realtime/` (`RealtimeSimulator`, `RealtimeInput`/`RealtimeOutput`, `PygameInput`, `LiveSignalPlotOutput`) |
+| `simulation/` | `Simulator`, `StaticSimulator`, solvers, forcing; `discrete/` (`Computer`, `StepSchedule`: the computer's tick engine; `HybridSimulator`); `realtime/` (`RealtimeSimulator`, `RealtimeInput`/`RealtimeOutput`, `PygameInput`, `LiveSignalPlotOutput`) |
 | `analysis/` | one calling pattern `tool(sys, x_bar, u_bar, t, params, *, method="auto", eps)` on any `System` (the linear model as is, the rest linearized at the operating point): `jacobian`, `linearize` (→ `LTISystem`), the one-channel frequency and time tools (`bode`, `pzmap`, `nyquist`, `margins`, `root_locus`, `step_response`, `step_info`, `transfer_function`, the sensitivity functions) with their `plot_` twins, `structural` (controllability, observability, `minreal`), `equilibria`, `modal`, `lyapunov`, `riccati`, `discretization`. The API reference is the docs site |
 | `planning/` | `problems.py`, `results.py`, `engine.py` (the problem evaluator), `comparison.py`; `dynamic_programming/` (value iteration, policy evaluation, `LQRPlanner`, the lookup policy), `trajectory_optimization/` (collocation, shooting; `mpc/`, the receding-horizon block, provisional), `search/` (RRT), `spatial/` (scenes; **retires** into `core/geometry/`) |
 | `learning/` | policies learned from interaction: `reinforcement_learning/` (the neural planner, the tabular learners); identification and imitation later |
@@ -220,7 +221,7 @@ the named car profiles live with their scenarios in `examples/projects/car_trajo
 - **StepSystem (discrete leaf):** same port shortcut as `DynamicSystem`; evolution is
   `step(x, u, k, params)` → `x_new`. Facades: `compute_rollout` / `plot_rollout`
   (state-only ``k/x/u``); cache `self.rollout`. Boundary signal histories:
-  :class:`~minilink.simulation.computer.Computer` / hybrid sim, not evaluators.
+  :class:`~minilink.simulation.discrete.computer.Computer` / hybrid sim, not evaluators.
   A flow `DiagramSystem` refuses it at `add_subsystem` (a `StepDiagramSystem`
   likewise refuses a `DynamicSystem` with states); it meets a continuous plant
   only through a `Computer`: `block % dt @ plant`.
@@ -732,17 +733,17 @@ Keep `ExecutionPlan.output_slices` and `external_output_slices` aligned.
   :class:`~minilink.simulation.static_simulator.StaticSimulator` (time grid +
   boundary outputs in `Trajectory.signals`; not state evolution)
 - :class:`StepSystem` → `compile().rollout(...)` or `compute_rollout(n_steps=...)`
-  (state-only :class:`~minilink.core.step_rollout.StepRollout` ``(k, x, u)``; evaluators
+  (state-only :class:`~minilink.core.discrete.step_rollout.StepRollout` ``(k, x, u)``; evaluators
   and the façade do not record boundary signals — logging is owned by
-  :class:`~minilink.simulation.computer.Computer` / :class:`~minilink.simulation.hybrid_simulator.HybridSimulator`; not `Simulator`)
-- :class:`~minilink.core.hybrid_diagram.HybridDiagram` →
-  :class:`~minilink.simulation.hybrid_simulator.HybridSimulator` or façade
-  `compute_trajectory` / `compute_forced` (hybrid :class:`~minilink.simulation.hybrid_simulator.HybridSimResult`)
+  :class:`~minilink.simulation.discrete.computer.Computer` / :class:`~minilink.simulation.discrete.hybrid_simulator.HybridSimulator`; not `Simulator`)
+- :class:`~minilink.core.discrete.hybrid_diagram.HybridDiagram` →
+  :class:`~minilink.simulation.discrete.hybrid_simulator.HybridSimulator` or façade
+  `compute_trajectory` / `compute_forced` (hybrid :class:`~minilink.simulation.discrete.hybrid_simulator.HybridSimResult`)
 
 `animate` / `plot_trajectory` live on `SharedSystemFacades` for continuous and static
-systems; :class:`~minilink.core.hybrid_diagram.HybridDiagram` mirrors the pattern with
+systems; :class:`~minilink.core.discrete.hybrid_diagram.HybridDiagram` mirrors the pattern with
 ``self.traj`` (plant :class:`~minilink.core.trajectory.Trajectory`) and
-``self.last_result`` (:class:`~minilink.simulation.hybrid_simulator.HybridSimResult`).
+``self.last_result`` (:class:`~minilink.simulation.discrete.hybrid_simulator.HybridSimResult`).
 Auto-sim fallback calls `compute_trajectory` (MRO picks engine on homogeneous diagrams).
 
 **Two static paths:** a static *leaf* (`Gain`, `Step` source) uses

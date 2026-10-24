@@ -5,10 +5,11 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Literal
 
-from minilink.core.diagram import DiagramSystem, StepDiagramSystem
+from minilink.core.diagram import DiagramSystem
+from minilink.core.discrete.step_diagram import StepDiagramSystem
 
 if TYPE_CHECKING:
-    from minilink.simulation.computer import Computer
+    from minilink.simulation.discrete.computer import Computer
 
 # The older spellings, which name the computer side after its step diagram
 _DIRECTION_ALIASES = {
@@ -31,12 +32,12 @@ class HybridDiagram:
 
     Boundary ports between the sides use ZOH (computer → plant) or sample
     (plant → computer). The schedule lives on
-    :class:`~minilink.simulation.computer.Computer`.
+    :class:`~minilink.simulation.discrete.computer.Computer`.
 
     Parameters
     ----------
     computer : Computer
-        Scheduled step runtime (diagram + :class:`~minilink.simulation.computer.StepSchedule`).
+        Scheduled step runtime (diagram + :class:`~minilink.simulation.discrete.computer.StepSchedule`).
     plant : DiagramSystem
         Continuous plant diagram.
     connections : list of BoundaryConnection, optional
@@ -74,7 +75,7 @@ class HybridDiagram:
     ) -> HybridDiagram:
         """Wrap ``step_diagram`` and ``schedule`` in a :class:`Computer`."""
         # Tools import core (DESIGN §3): the simulation band loads on first use
-        from minilink.simulation.computer import Computer, as_schedule
+        from minilink.simulation.discrete.computer import Computer, as_schedule
 
         schedule = as_schedule(schedule)
         computer = Computer(step_diagram, schedule)
@@ -218,7 +219,7 @@ class HybridDiagram:
             traj = self.last_result
 
         # A real cycle: simulation.hybrid_simulator imports HybridDiagram from this module
-        from minilink.simulation.hybrid_simulator import HybridSimResult
+        from minilink.simulation.discrete.hybrid_simulator import HybridSimResult
 
         # A hybrid result draws its own plant and computer views
         if isinstance(traj, HybridSimResult):
@@ -305,7 +306,9 @@ class HybridDiagram:
         resolved_html = prefers_inline_animation() if html is None else html
 
         # A real cycle: core.hybrid_composition imports HybridDiagram from this module
-        from minilink.core.hybrid_composition import refresh_plant_animation_camera
+        from minilink.core.discrete.hybrid_composition import (
+            refresh_plant_animation_camera,
+        )
 
         # The plant's camera hints, refreshed from its blocks
         refresh_plant_animation_camera(self.plant)
@@ -392,9 +395,9 @@ class HybridDiagram:
         compile_backend="numpy",
         verbose=False,
     ):
-        """The :class:`~minilink.simulation.hybrid_simulator.HybridSimulator` of one run."""
+        """The :class:`~minilink.simulation.discrete.hybrid_simulator.HybridSimulator` of one run."""
         # A real cycle: simulation.hybrid_simulator imports HybridDiagram from this module
-        from minilink.simulation.hybrid_simulator import HybridSimulator
+        from minilink.simulation.discrete.hybrid_simulator import HybridSimulator
 
         return HybridSimulator(
             self,
@@ -436,7 +439,7 @@ class BoundaryConnection:
 def require_sides(computer, plant) -> None:
     """Refuse a computer that is not a ``Computer``, or a plant not a ``DiagramSystem``."""
     # Tools import core (DESIGN §3): the simulation band loads on first use
-    from minilink.simulation.computer import Computer
+    from minilink.simulation.discrete.computer import Computer
 
     if not isinstance(computer, Computer):
         raise TypeError(

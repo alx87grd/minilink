@@ -8,7 +8,8 @@ from typing import TYPE_CHECKING
 import numpy as np
 
 from minilink.core.backends import BACKEND_JAX, normalize_backend
-from minilink.core.system import StepSystem, System
+from minilink.core.discrete.step_system import StepSystem
+from minilink.core.system import System
 from minilink.core.trajectory import Trajectory
 from minilink.planning.results import PlanningSolution
 from minilink.planning.trajectory_optimization.mpc.utilities import (
@@ -24,7 +25,7 @@ from minilink.planning.trajectory_optimization.planner import (
 )
 
 if TYPE_CHECKING:
-    from minilink.simulation.computer import Computer, StepSchedule
+    from minilink.simulation.discrete.computer import Computer, StepSchedule
 
 
 ###############################################################################
@@ -302,12 +303,12 @@ class ModelPredictiveControllerMixin:
     # Computer export
 
     def export_to_computer(self, schedule=None):
-        """Build a single-rate :class:`~minilink.simulation.computer.Computer` (``u_ff`` ZOH)."""
+        """Build a single-rate :class:`~minilink.simulation.discrete.computer.Computer` (``u_ff`` ZOH)."""
         return export_mpc_to_computer(self, schedule, dt_mpc=self.dt_mpc)
 
     def dual_rate_computer(self, dt_broadcast: float) -> Computer:
         """
-        Advanced multi-rate :class:`~minilink.simulation.computer.Computer`.
+        Advanced multi-rate :class:`~minilink.simulation.discrete.computer.Computer`.
 
         Replan leaf at :attr:`dt_mpc`; broadcast leaf at ``dt_broadcast`` applying
         :meth:`get_nominal_u`. Requires ``dt_mpc / dt_broadcast`` to be a positive
@@ -571,7 +572,7 @@ class MPCTickLatch:
     call at a new ``(k, y)`` runs the NLP via
     :meth:`~TrajectoryOptimizationPlanner.solve_trajectory_from`, later calls
     with the same ``k`` and an equal ``y`` read the latch. Inside a
-    :class:`~minilink.simulation.computer.Computer` tick every port sees the same
+    :class:`~minilink.simulation.discrete.computer.Computer` tick every port sees the same
     ``y``, so the block still solves once per tick.
     """
 
@@ -741,7 +742,7 @@ def export_mpc_to_computer(
     dt_mpc: float | None = None,
 ) -> Computer:
     """
-    Build a single-rate :class:`~minilink.simulation.computer.Computer` from an MPC block.
+    Build a single-rate :class:`~minilink.simulation.discrete.computer.Computer` from an MPC block.
 
     ``schedule`` defaults to ``dt_mpc`` (the block's own when not passed); a
     given ``schedule`` must tick at ``dt_mpc``. Once the schedule is accepted,
@@ -749,7 +750,7 @@ def export_mpc_to_computer(
     the block; a rejected schedule leaves the block as it was.
     """
     # Tools import core (DESIGN §3): the simulation band loads on first use
-    from minilink.simulation.computer import StepSchedule, build_computer
+    from minilink.simulation.discrete.computer import StepSchedule, build_computer
 
     # The schedule: one base tick per replan, a given one checked against the period
     block_dt = dt_mpc if dt_mpc is not None else getattr(block, "dt_mpc", None)
@@ -785,8 +786,8 @@ def export_mpc_dual_rate_computer(block, *, dt_broadcast: float) -> Computer:
     ``get_nominal_*``) — not a diagram port. Graphviz correctly shows no edge.
     """
     # Tools import core (DESIGN §3): the simulation band loads on first use
-    from minilink.core.diagram import StepDiagramSystem
-    from minilink.simulation.computer import Computer, StepSchedule
+    from minilink.core.discrete.step_diagram import StepDiagramSystem
+    from minilink.simulation.discrete.computer import Computer, StepSchedule
 
     dt_mpc = float(block.dt_mpc)
     dt_b = float(dt_broadcast)

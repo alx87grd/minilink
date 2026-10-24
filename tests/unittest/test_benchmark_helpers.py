@@ -36,7 +36,8 @@ from benchmarks.trajopt import (
     TrajectoryOptimizationBenchmarkVariant,
     benchmark_trajectory_optimization,
 )
-from minilink.core.system import DynamicSystem, StepSystem
+from minilink.core.discrete.step_system import StepSystem
+from minilink.core.system import DynamicSystem
 from minilink.planning.search.rrt import RRTPlanner
 
 

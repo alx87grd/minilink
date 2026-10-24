@@ -109,7 +109,7 @@ def test_a_box_with_a_gain_is_a_controller_and_the_roles_see_the_observer():
 
 
 def test_an_observer_is_not_a_controller():
-    from minilink.core.system import StepSystem
+    from minilink.core.discrete.step_system import StepSystem
 
     plant = LTISystem(A, B, C)
     obs = observer()

@@ -4,11 +4,11 @@ Samples the latched plan at ``t + dt_project`` for servo references while
 keeping ``u_nom`` at time ``t`` (logging only in bicycle_los_v3).
 """
 
-from minilink.core.diagram import StepDiagramSystem
+from minilink.core.discrete.step_diagram import StepDiagramSystem
 from minilink.planning.trajectory_optimization.mpc.controller import (
     MPCBroadcastController,
 )
-from minilink.simulation.computer import Computer, StepSchedule
+from minilink.simulation.discrete.computer import Computer, StepSchedule
 
 
 class MpcBroadcastAhead(MPCBroadcastController):

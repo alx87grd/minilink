@@ -27,7 +27,7 @@ class WiredDiagramMixin:
     Evolution-agnostic diagram wiring, gather, and visualization helpers.
 
     Shared by :class:`~minilink.core.diagram.DiagramSystem` and
-    :class:`~minilink.core.diagram.StepDiagramSystem`. Flow diagrams pass
+    :class:`~minilink.core.discrete.step_diagram.StepDiagramSystem`. Flow diagrams pass
     simulation time ``t`` (float) as the third gather slot; step diagrams pass
     step index ``k`` (int) in the same parameter position.
     """

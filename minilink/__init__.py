@@ -23,7 +23,7 @@ _EXPORTS: dict[str, tuple[str, str]] = {
     # Core
     "System": ("minilink.core.system", "System"),
     "DynamicSystem": ("minilink.core.system", "DynamicSystem"),
-    "StepSystem": ("minilink.core.system", "StepSystem"),
+    "StepSystem": ("minilink.core.discrete.step_system", "StepSystem"),
     "DiagramSystem": ("minilink.core.diagram", "DiagramSystem"),
     "Trajectory": ("minilink.core.trajectory", "Trajectory"),
     "CostFunction": ("minilink.core.costs", "CostFunction"),
@@ -178,7 +178,7 @@ _EXPORTS: dict[str, tuple[str, str]] = {
     ),
     # Band names the teaching demos use
     "TimeCost": ("minilink.core.costs", "TimeCost"),
-    "StepDiagramSystem": ("minilink.core.diagram", "StepDiagramSystem"),
+    "StepDiagramSystem": ("minilink.core.discrete.step_diagram", "StepDiagramSystem"),
     "BallSet": ("minilink.core.sets", "BallSet"),
     "SingletonSet": ("minilink.core.sets", "SingletonSet"),
     "closed_loop": ("minilink.core.composition", "closed_loop"),
