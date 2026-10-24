@@ -691,7 +691,9 @@ tick, no knobs), `outputs` and a state-only `rollout(x0, *, n_steps, u=None, par
 a static evaluator has `outputs` only. On NumPy each method is its plain body. On JAX each
 is marked `@compiled` (`core/compile/evaluators/compiled.py`): `jax.jit` of the body, built
 on first use and cached per evaluator, the knobs (`solver`, `substeps`, `hold`, `n_steps`)
-static. A compiled method is fast from Python and composes inside an outer `jit`, `grad`,
+static. In a `params` tree the numbers and arrays are traced; a leaf that is not a number (a
+Python `bool` flag, a string) is held static, so a block that branches on a flag in its
+`params` compiles with the dict passed too. A compiled method is fast from Python and composes inside an outer `jit`, `grad`,
 `vmap` or `scan` with the numbers of the uncompiled body, so there is one name per method:
 no parametric twin, no trace tier, no `jit` namespace.
 

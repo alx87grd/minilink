@@ -777,7 +777,7 @@ class TestCompiledMethodsJax(unittest.TestCase):
     def test_each_method_is_compiled_once_per_evaluator(self):
         # The jitted form, built on first use and cached: the same object each time
         self.assertIs(self.ev.f, self.ev.f)
-        self.assertTrue(hasattr(self.ev.f, "lower"))
+        self.assertEqual(self.ev.f.__name__, "f")
         other = compile(Integrator(), backend="jax")
         self.assertIsNot(other.f, self.ev.f)
 
@@ -791,6 +791,23 @@ class TestCompiledMethodsJax(unittest.TestCase):
 
         grad = jax.jit(jax.grad(loss))(jnp.array([1.0]))
         self.assertEqual(grad.shape, (1,))
+
+    def test_a_flag_in_a_params_dict_stays_a_python_value(self):
+        from minilink import JointImpedance, Pendulum
+
+        # The impedance law branches on params["gravity_comp"], a Python bool
+        plant = Pendulum()
+        loop = JointImpedance(plant) @ plant
+        ev = compile(loop, backend="jax")
+        x = jnp.full(ev.n, 0.1)
+        u = jnp.zeros(ev.m)
+        np.testing.assert_array_equal(
+            np.asarray(ev.f(x, u, 0.0, loop.params)), np.asarray(ev.f(x, u, 0.0))
+        )
+        steps = jax.vmap(lambda xx: ev.step(xx, u, 0.0, loop.params, dt=0.01))(
+            jnp.stack([x, x])
+        )
+        self.assertEqual(steps.shape, (2, ev.n))
 
     def test_the_step_model_composes_inside_vmap(self):
         x0s = jnp.stack([self.x, 2.0 * self.x])

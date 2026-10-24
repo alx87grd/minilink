@@ -383,3 +383,14 @@ now, at most 9e-16 absolute (4e-14 relative). The step-model baseline agrees on 
 One semantic note: a diagram's `params=None` reads each block's compiled parameters; a
 partial dict still reads the live parameters of the blocks it leaves out, as `f_p` did.
 
+A correction to the trade-off given before the change ("nothing lost"): a `params` dict
+passed explicitly is traced whole by `jax.jit`, so a block that branches on a Python flag in
+its parameters (`JointImpedance`'s `gravity_comp`) failed where the old traced tier kept the
+flag a Python value (the RL environment of `showcase_from_rl_to_bode` hit it). `@compiled` now
+holds every leaf of `params` that is not a number static and traces the rest; `params=None`
+and a tree of numbers take the plain jitted body. Measured on the same machine against the
+commit before the change (best of three, µs per Python call, pendulum leaf / `PID @ Pendulum`):
+`f(params=None)` 10.0 / 10.5 against 10.1 / 10.8; `step(params=None)` 19.8 / 20.0 against 18.0 /
+19.3; with a dict, `f` 36 / 74 against 30 / 66 and `step` 40 / 89 against 35 / 75 (the scan of
+the dict's leaves). Inside an outer `jit`, `vmap` or `grad` the check runs once, at trace time.
+
