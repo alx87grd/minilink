@@ -4,6 +4,8 @@ import numpy as np
 import pytest
 
 from minilink import PID, Pendulum, Simulator
+from minilink.blocks.sources import WhiteNoise
+from minilink.core.closed_loop import closed_loop
 from minilink.core.costs import QuadraticCost
 from minilink.core.distributions import Gaussian, Uniform
 from minilink.core.sets import BallSet, BoxInputSet
@@ -440,6 +442,90 @@ def test_a_problem_realizes_its_draws_from_one_key():
     assert one.shape == (1, 2) and none == {"params": {}, "disturbances": {}}
     with pytest.raises(ValueError, match="one realization"):
         upright_problem().realize(0, 3)
+
+
+def noisy_loop(seed=3):
+    noise = WhiteNoise(1, psd=0.5, sample_period=0.01, seed=seed)
+    return closed_loop(PID(Kp=20.0, Ki=1.0, Kd=4.0), plant(), disturbance=noise)
+
+
+def point_start_problem():
+    sys = plant()
+    return StochasticPlanningProblem(
+        sys=sys,
+        cost=QuadraticCost.from_system(sys),
+        tf=1.0,
+        x0_distribution=Gaussian(mean=np.array([0.5, 0.0]), std=np.array([0.0, 0.0])),
+    )
+
+
+def test_each_trial_realizes_the_noise_blocks_of_the_loop():
+    pe = point_start_problem().compile(noisy_loop(), dt=0.01, backend="numpy")
+    report = pe.evaluate(n_trials=3, key=1)
+
+    # One start for all, a noise realization per trial
+    np.testing.assert_array_equal(report.x0, np.tile([0.5, 0.0], (3, 1)))
+    assert len(np.unique(report.J)) == 3
+
+    # One key, the same trials; another key, other trials
+    np.testing.assert_array_equal(pe.evaluate(n_trials=3, key=1).J, report.J)
+    assert not np.allclose(pe.evaluate(n_trials=3, key=2).J, report.J)
+
+    # One trial is trial 0, in the evaluation and in the trajectory
+    np.testing.assert_array_equal(pe.evaluate(n_trials=1, key=1).J, report.J[:1])
+    with pytest.raises(TypeError, match="integer key"):
+        pe.evaluate(n_trials=3, key=np.random.default_rng(1))
+
+
+@pytest.mark.jax
+def test_numpy_and_jax_draw_the_same_noise_for_an_integer_key():
+    problem = point_start_problem()
+    reports = [
+        problem.compile(noisy_loop(), dt=0.01, backend=backend).evaluate(
+            n_trials=3, key=1
+        )
+        for backend in ("numpy", "jax")
+    ]
+    np.testing.assert_allclose(reports[0].J, reports[1].J, rtol=1e-9)
+
+
+def test_a_deterministic_problem_runs_the_noise_blocks_own_seed():
+    sys = plant()
+    problem = PlanningProblem(
+        sys, x_start=[0.5, 0.0], cost=QuadraticCost.from_system(sys), tf=1.0
+    )
+    loop = noisy_loop(seed=3)
+    pe = problem.compile(loop, dt=0.01, backend="numpy")
+    traj = pe.trajectory()
+
+    # The loop simulated with its own params: the block's seed 3
+    x0 = np.asarray(loop.x0, dtype=float)
+    a, b = loop.state_index["plant"]
+    x0[a:b] = [0.5, 0.0]
+    reference = Simulator(loop, x0=x0, tf=1.0, dt=0.01, solver="rk4_fixedsteps").solve()
+    np.testing.assert_allclose(traj.x[:, -1], reference.x[:, -1], rtol=1e-9)
+
+    # Another seed, another run
+    other = problem.compile(noisy_loop(seed=4), dt=0.01, backend="numpy")
+    assert not np.allclose(other.evaluate().J, pe.evaluate().J)
+
+
+@pytest.mark.jax
+@pytest.mark.parametrize("stochastic", [False, True])
+def test_the_gradient_crosses_a_loop_with_a_noise_block(stochastic):
+    import jax
+
+    sys = plant()
+    deterministic = PlanningProblem(
+        sys, x_start=[0.5, 0.0], cost=QuadraticCost.from_system(sys), tf=1.0
+    )
+    problem = point_start_problem() if stochastic else deterministic
+    n_trials = 3 if stochastic else None
+    pe = problem.compile(noisy_loop(), dt=0.01, backend="jax")
+
+    grad = jax.grad(lambda p: pe.evaluate(p, 1, n_trials).objective)(pe.params)
+    assert np.isfinite(float(grad["controller"]["Kp"][0]))
+    assert float(grad["disturbance"]["seed"]) == 0.0  # a seed carries no gradient
 
 
 @pytest.mark.jax

@@ -527,7 +527,8 @@ concrete formatting, ordered by the cost of being wrong:
   `lqr`, an integration loop behind `compute_trajectory`), one teaching place writes the mechanism
   out in a few lines, then shows the one-line tool doing the same and agreeing with it; every other
   demo and notebook uses the tool. One place per mechanism, named in the doc that owns the tool
-  (ruled 2026-10-23, R75; tutorial 07 for gradient descent).
+  (ruled 2026-10-23, R75, amended 2026-10-25, R91: the closing PID example,
+  `examples/demos/compile/pid_autotuning_jax.py`, for gradient descent).
 
 ---
 

@@ -8,18 +8,6 @@ lands. Last checked against the code: 2026-10-24.
 
 ## Simulation and evaluation
 
-### A noise block inside an evaluated loop plays the same signal in every trial
-- **Symptom:** `evaluate(problem, loop, n_trials=…, key=…)` draws a new start and new plant
-  parameters per trial, but a `WhiteNoise` block inside `loop` keeps its own `seed`, so every
-  trial sees the same noise. No warning says so.
-- **Reproduce:** `closed_loop(PID(Kp=20, Ki=1, Kd=4), Pendulum(), disturbance=WhiteNoise(1,
-  psd=0.5, sample_period=0.01, seed=3))` evaluated on a problem whose start law is a point:
-  three trials give the same `J`.
-- **Workaround:** draw the seeds yourself, one evaluation per realization:
-  `loop.params = loop.realize(k)` for `k = 0, 1, …`.
-- **Fix:** the per-block seeds in `problem.realize` (RN-4, v0.4); the warning promised by
-  [randomness.md](../plans/randomness.md) (RD-A5) could come first — see QUESTIONS.md.
-
 ### The same key draws different trials on NumPy and on JAX
 - **Symptom:** `evaluate(..., key=0, backend="numpy")` and `backend="jax"` draw different
   starts and parameters: the key seeds a NumPy generator on one backend and a JAX PRNG key on

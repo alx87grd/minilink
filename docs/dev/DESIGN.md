@@ -951,7 +951,9 @@ port bounds are information, and saturation lives inside the law or in a `Satura
 block. `problem.compile` refuses a sampled controller (a `StepSystem`) and a discrete-time
 plant, which join through the hybrid loop; a stochastic problem needs `n_trials`, its
 draws `problem.realize(key, n)` → `(x0s, {"params": …, "disturbances": …})`, one key per
-call. The program reads the same `J` as the report: with the price on, the price is a step
+call, and each trial realizes the loop's random blocks under that key (trial `i` is
+`loop.realize(child_seed(key, "trial i"))`), the same noise on both backends for an integer
+key, while a deterministic problem runs each block's own seed. The program reads the same `J` as the report: with the price on, the price is a step
 with no gradient, and a non-finite objective at `z0` warns once. The feedback planners'
 reported `trajectory` is their own held-input rollout on their
 grid (`nominal_trajectory`), the planner's evidence; `evaluate` scores the continuous loop.

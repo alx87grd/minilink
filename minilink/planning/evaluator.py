@@ -14,6 +14,7 @@ from minilink.core.backends import (
     ensure_jax_x64,
 )
 from minilink.core.compile.evaluators.stepping import require_step_knobs
+from minilink.core.distributions import child_seed
 from minilink.core.options import require_one_of
 from minilink.core.trajectory import Trajectory
 from minilink.planning.evaluation import (
@@ -283,8 +284,16 @@ class ProblemEvaluator:
         return merge_tree(self.params, params)
 
     def realize(self, params, key, n_trials):
-        """The trials' starts ``(n_trials, n)`` and parameters (one tree, a leading trial axis where drawn)."""
+        """
+        The trials' starts ``(n_trials, n)`` and parameters (one tree, a leading trial axis where drawn).
+
+        A stochastic problem draws the starts and the plant's laws from ``key``,
+        and each trial ``i`` realizes the loop's random blocks under
+        ``child_seed(key, "trial i")``: an integer key gives the same noise on
+        NumPy and JAX. A deterministic problem keeps each block's own seed.
+        """
         problem = self.problem
+        loop = self.loop
 
         # A deterministic problem: its one start, the parameters as they are
         if not problem.is_stochastic:
@@ -296,6 +305,10 @@ class ProblemEvaluator:
 
         # The plant's draws override its entries
         overrides = {"plant": draws["params"]} if draws["params"] else {}
+
+        # Each trial's seeds of the loop's random blocks override theirs
+        if loop.is_random:
+            overrides = merge_tree(overrides, trial_seeds(loop, key, n_trials))
 
         axes = merge_tree(axes_like(params, None), axes_like(overrides, 0))
 
@@ -321,6 +334,7 @@ class ProblemEvaluator:
         # x_{k+1} = Φ(x_k, u, t_k), t_k = k dt, k = 0 … N − 1; or the adaptive
         # integral reported on that grid
         loop_params = {sys_id: params[sys_id] for sys_id in self.block_ids}
+        loop_params = integer_seeds(loop, loop_params)
         ts = xp.arange(N + 1) * dt
         if self.adaptive is None:
             xs = ev.rollout(
@@ -973,6 +987,75 @@ def flat_leaves(tree):
         return [leaf for value in tree.values() for leaf in flat_leaves(value)]
 
     return [tree]
+
+
+def trial_seeds(loop, key, n_trials):
+    """The seeds of the loop's random blocks for each trial, stacked on a leading trial axis.
+
+    Trial ``i`` is the loop's realization under ``child_seed(key, "trial i")``,
+    the library's cipher on the host, so the seeds do not depend on the backend.
+    """
+    require_integer_key(key)
+
+    seeds = []
+    for i in range(n_trials):
+        realized = loop.realize(child_seed(int(key), f"trial {i}"))
+        seeds.append(seeds_of(loop, realized))
+
+    return stack_leaves(seeds)
+
+
+def require_integer_key(key):
+    """Refuse a key that is not an integer: the loop's random blocks are realized from one."""
+    if isinstance(key, bool) or not isinstance(key, (int, np.integer)):
+        raise TypeError(
+            "the loop holds random blocks, whose seeds are realized from an integer "
+            f"key: pass key as an int, got {type(key).__name__}"
+        )
+
+
+def seeds_of(system, realized):
+    """The ``"seed"`` entries of the random blocks in a realization of ``system``, nested like it."""
+    # Lazy import: the diagram tools load with the first loop
+    from minilink.core.diagram import DiagramSystem
+
+    if not isinstance(system, DiagramSystem):
+        return {"seed": realized["seed"]}
+
+    return {
+        sys_id: seeds_of(subsystem, realized[sys_id])
+        for sys_id, subsystem in system.subsystems.items()
+        if subsystem.is_random
+    }
+
+
+def stack_leaves(trees):
+    """One tree of the shape of each of ``trees``, each leaf their values stacked on a leading axis."""
+    if isinstance(trees[0], dict):
+        return {key: stack_leaves([tree[key] for tree in trees]) for key in trees[0]}
+
+    return np.stack([np.asarray(leaf) for leaf in trees])
+
+
+def integer_seeds(system, params):
+    """``params`` with the seed of every random block of ``system`` an integer (the tree holds floats)."""
+    # Lazy import: the diagram tools load with the first loop
+    from minilink.core.diagram import DiagramSystem
+
+    if not system.is_random:
+        return params
+    if isinstance(system, DiagramSystem):
+        return {
+            sys_id: integer_seeds(system.subsystems[sys_id], value)
+            for sys_id, value in params.items()
+        }
+
+    seed = params["seed"]
+    if seed is None:
+        return params
+    xp = array_module(seed)
+
+    return dict(params, seed=xp.asarray(seed).astype(int))
 
 
 def batch_axes(params):

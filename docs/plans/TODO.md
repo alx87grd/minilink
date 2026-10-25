@@ -801,6 +801,8 @@ One line each; open a plan doc only when a design needs a writeup.
   `live_plot.py` and `plotting.py` cut to what the two RRT demos use; the facade verbs no
   pillar needs (`get_diagram`, `plot_input_output_map`, `render`) decided before V3.
 - A `ClippedCost`, when a saturating cost is needed (planned with the cost, 2026-10-23).
+- A tutorial on gradient descent and the `Optimizer`, once the generic optimizer and the
+  mathematical-program system are extended (R91); until then the closing PID example teaches it.
 
 - **A plant that owns its noise ports, as a real example** (R57): a disturbance the loop cannot
   add (unmatched, `B_w ≠ B`: a push on the cart-pole's tip, a lateral wind on `Drone2D`) and noise
