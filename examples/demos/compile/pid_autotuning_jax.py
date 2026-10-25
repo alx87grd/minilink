@@ -83,7 +83,9 @@ def apply_pid_params(pid):
 
 def simulate_traj(pid):
     apply_pid_params(pid)
-    xs = np_evaluator.rollout(diagram.x0, plot_u_knots, 0.0, DT, hold="foh")
+    xs = np_evaluator.rollout(
+        diagram.x0, plot_u_knots, 0.0, DT, diagram.params, hold="foh"
+    )
     return Trajectory(t=plot_t, x=xs.T, u=plot_u_knots.T)
 
 

@@ -312,31 +312,19 @@ class TestDiagramEvaluatorNumPy(unittest.TestCase):
         self.assertIn("y_meas", y)
         np.testing.assert_allclose(y["y_meas"], np.array([0.5]), atol=1e-10)
 
-    def test_bind_params_freezes_snapshot(self):
-        """bound_params in plan: mutating subsystem.params does not change dx."""
+    def test_params_none_reads_the_snapshot_taken_at_compile(self):
+        """An edit of a block's params after compile leaves dx unchanged; a recompile sees it."""
         diag = _build_small_closed_loop()
         plant = diag.subsystems["plant"]
         x = np.array([0.3])
         u = np.array([1.0])
         t = 0.0
-        ev = compile_diagram(diag, bind_params=True)
+        ev = compile_diagram(diag)
         dx1 = ev.f(x, u, t)
         plant.params["k"] = 99.0
-        dx2 = ev.f(x, u, t)
-        np.testing.assert_allclose(dx1, dx2, atol=1e-10)
-
-    def test_bind_params_false_follows_live_params(self):
-        """Default compile: dx changes when subsystem.params changes (no recompile)."""
-        diag = _build_small_closed_loop()
-        plant = diag.subsystems["plant"]
-        x = np.array([0.3])
-        u = np.array([1.0])
-        t = 0.0
-        ev = compile_diagram(diag, bind_params=False)
-        dx1 = ev.f(x, u, t)
-        plant.params["k"] = 99.0
-        dx2 = ev.f(x, u, t)
-        self.assertGreater(np.abs(dx2 - dx1).max(), 1e-06)
+        np.testing.assert_allclose(ev.f(x, u, t), dx1, atol=1e-10)
+        dx_recompiled = compile_diagram(diag).f(x, u, t)
+        self.assertGreater(np.abs(dx_recompiled - dx1).max(), 1e-06)
 
     def test_f_as_callable(self):
         fn = self.evaluator.f
@@ -354,12 +342,41 @@ class TestDiagramEvaluatorNumPy(unittest.TestCase):
             atol=1e-10,
         )
 
-    def test_build_execution_plan_bind_params_sets_bound_params(self):
+    def test_every_plan_operation_carries_a_copy_of_its_blocks_params(self):
         diag = _build_small_closed_loop()
-        plan_free = build_execution_plan(diag, bind_params=False)
-        plan_bound = build_execution_plan(diag, bind_params=True)
-        self.assertIsNone(plan_free.port_ops[0].bound_params)
-        self.assertIsNotNone(plan_bound.port_ops[0].bound_params)
+        plan = build_execution_plan(diag)
+        for op in (*plan.port_ops, *plan.state_ops):
+            params = diag.subsystems[op.sys_id].params
+            np.testing.assert_equal(op.bound_params, params)
+            self.assertIsNot(op.bound_params, params)
+
+
+@pytest.mark.parametrize("backend", ["numpy", "jax"])
+def test_a_params_edit_after_compile_is_not_seen_and_explicit_params_override(backend):
+    """Both backends read the params as compiled, whether the edit comes before or after the first call."""
+    if backend == "jax":
+        pytest.importorskip("jax")
+    diag = _build_small_closed_loop_jax()
+    plant = diag.subsystems["plant"]
+    ctl = diag.subsystems["controller"]
+    x = np.array([0.3])
+    u = np.array([1.0])
+
+    # dx = k Kp (r − y) = 1 · 2.5 · 0.7, the edit made before the first call
+    ev = diag.compile(backend=backend)
+    plant.params["k"] = 99.0
+    np.testing.assert_allclose(np.asarray(ev.f(x, u, 0.0)), [1.75])
+    np.testing.assert_allclose(np.asarray(ev.f(x, u, 0.0)), [1.75])
+
+    # Explicit params override the snapshot for that call only
+    explicit = {"controller": dict(ctl.params), "plant": {"k": 2.0}}
+    np.testing.assert_allclose(np.asarray(ev.f(x, u, 0.0, explicit)), [3.5])
+    np.testing.assert_allclose(np.asarray(ev.f(x, u, 0.0)), [1.75])
+
+    # A recompile reads the edit
+    np.testing.assert_allclose(
+        np.asarray(diag.compile(backend=backend).f(x, u, 0.0)), [99.0 * 1.75]
+    )
 
 
 try:

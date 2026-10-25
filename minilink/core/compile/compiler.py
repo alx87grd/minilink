@@ -110,7 +110,6 @@ def compile_diagram(
     diagram: DiagramSystem,
     backend: str = BACKEND_NUMPY,
     *,
-    bind_params: bool = False,
     verbose: bool = False,
 ):
     """Compile a DiagramSystem into a backend evaluator.
@@ -121,10 +120,6 @@ def compile_diagram(
         The wired diagram to compile.
     backend : str
         ``'numpy'`` or ``'jax'``.
-    bind_params : bool, optional
-        If ``True``, each plan operation stores a deep copy of that subsystem's
-        ``params`` and evaluators pass it into ``f`` / port ``compute``. If
-        ``False`` (default), ``None`` is passed and blocks use live ``self.params``.
     verbose : bool
         If ``True``, print timed compilation steps.
 
@@ -141,9 +136,12 @@ def compile_diagram(
 
     Notes
     -----
-    ``bind_params=True`` snapshots only each subsystem's ``params`` dict into the plan.
-    It does **not** make user ``f`` / port ``compute`` implementations pure if they still
-    read or mutate other instance state; see :class:`minilink.core.system.System`.
+    Each plan operation carries a deep copy of its subsystem's ``params``, taken
+    here, so ``params=None`` reads the parameters as compiled on both backends; an
+    edit after compile needs a recompile or an explicit ``params``. Only the
+    ``params`` dicts are copied: it does **not** make user ``f`` / port ``compute``
+    implementations pure if they still read or mutate other instance state; see
+    :class:`minilink.core.system.System`.
     """
     from minilink.core.discrete.step_diagram import StepDiagramSystem
     from minilink.core.discrete.step_system import StepSystem
@@ -190,9 +188,7 @@ def compile_diagram(
             flush=True,
         )
 
-    plan = execution_plan_from_order(
-        diagram, port_execution_order, bind_params=bind_params
-    )
+    plan = execution_plan_from_order(diagram, port_execution_order)
 
     if verbose:
         print(f"  ({time.perf_counter() - t0:.3f}s)")
@@ -215,7 +211,6 @@ def compile_step_diagram(
     diagram: StepDiagramSystem,
     backend: str = BACKEND_NUMPY,
     *,
-    bind_params: bool = False,
     verbose: bool = False,
 ):
     """Compile a :class:`~minilink.core.discrete.step_diagram.StepDiagramSystem` into an evaluator.
@@ -264,9 +259,7 @@ def compile_step_diagram(
             flush=True,
         )
 
-    plan = step_execution_plan_from_order(
-        diagram, port_execution_order, bind_params=bind_params
-    )
+    plan = step_execution_plan_from_order(diagram, port_execution_order)
 
     if verbose:
         print(f"  ({time.perf_counter() - t0:.3f}s)")

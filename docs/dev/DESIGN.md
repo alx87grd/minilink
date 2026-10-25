@@ -333,8 +333,9 @@ read `params` yet, the gap is tracked below.
   allowed (missing sys_id → that block's live `self.params`); unknown sys_ids
   raise; per-subsystem dicts are full replacements at the block level. Nested
   diagrams nest the dict recursively.
-- Compile: a diagram's `bind_params=True` (`diagram.compile(bind_params=True)`) copies params into the plan; the evaluator's
-  `params=None` reads them. A `params` dict passed to `f` / `outputs` / `step`
+- Compile: a diagram's compile copies every block's params into the plan, as a leaf's does, and
+  the evaluator's `params=None` reads the parameters as compiled on both backends; an edit after
+  compile needs a recompile or an explicit `params`. A `params` dict passed to `f` / `outputs` / `step`
   takes the nested dict on both backends in their place. On JAX the dict is a pytree argument
   (numeric leaves required): values vary without retracing, and
   `evaluator.jacobian("f", "params")` / `jax.grad` differentiate dynamics

@@ -89,7 +89,7 @@ class StepDiagramSystem(WiredDiagramMixin, StepSystem):
 
         return x_next
 
-    def compile(self, backend="numpy", bind_params=False, verbose=False):
+    def compile(self, backend="numpy", verbose=False):
         """
         Compile the step diagram into a stateless step evaluator.
 
@@ -97,8 +97,6 @@ class StepDiagramSystem(WiredDiagramMixin, StepSystem):
         ----------
         backend : str
             ``'numpy'`` (default) or ``'jax'``.
-        bind_params : bool, optional
-            If ``True``, subsystem ``params`` are deep-copied into the plan.
         verbose : bool
             If ``True``, print timed compilation steps.
 
@@ -109,9 +107,7 @@ class StepDiagramSystem(WiredDiagramMixin, StepSystem):
         # Lazy import: a cycle, the compiler reads StepDiagramSystem from here
         from minilink.core.compile.compiler import compile_step_diagram
 
-        return compile_step_diagram(
-            self, backend=backend, bind_params=bind_params, verbose=verbose
-        )
+        return compile_step_diagram(self, backend=backend, verbose=verbose)
 
 
 ###############################################################################

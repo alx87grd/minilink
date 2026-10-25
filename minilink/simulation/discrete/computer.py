@@ -69,7 +69,6 @@ class Computer:
         self,
         backend: str = BACKEND_NUMPY,
         *,
-        bind_params: bool = False,
         verbose: bool = False,
     ) -> None:
         """Build the step execution plan and per-subsystem lookup tables."""
@@ -78,7 +77,7 @@ class Computer:
         require_scheduled_subsystems(self.schedule, self.diagram)
 
         # The plan: the same lowering as the synchronous rollout
-        plan = build_step_execution_plan(self.diagram, bind_params=bind_params)
+        plan = build_step_execution_plan(self.diagram)
         self.plan = plan
 
         # Each block's port operations and its one step operation, by block id

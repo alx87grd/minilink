@@ -15,16 +15,6 @@ lands. Last checked against the code: 2026-10-24.
 - **Workaround:** compare runs within one backend.
 - **Fix:** RN-4 (v0.4), one draw convention on both backends.
 
-### A diagram's `params=None` reads live parameters on NumPy, the first call's on JAX
-- **Symptom:** compile a diagram without `bind_params`, change a block's `params`, call
-  `ev.f` again: NumPy uses the new values, JAX the values of its first call (its compiled
-  form keeps them). The same before and after the 2026-10-24 evaluator merge.
-- **Reproduce:** `loop = Gain(2.0, dim=1) >> Pendulum(); ev = loop.compile(backend=…)`; call
-  `ev.f(x, u)`, triple `loop.subsystems["Pendulum"].params["m"]`, call it again.
-- **Workaround:** recompile after editing parameters, or pass them explicitly
-  (`ev.f(x, u, t, params)`), or compile with `bind_params=True` for a snapshot on both.
-- **Fix:** waits on a decision (QUESTIONS.md: live parameters or a snapshot).
-
 ## Composition and control
 
 ### `ComputedTorque` cannot drive an underactuated plant
@@ -50,7 +40,7 @@ lands. Last checked against the code: 2026-10-24.
   `Step(final_value=[1.0])` that drives it: the compiled output at `t = 2` is `0`, not `2`
   (declared `dependencies=("u",)`, it is `2`).
 - **Workaround:** declare every input a port reads (`dependencies=("u",)` or `"all"`).
-- **Fix:** S66 (the compile probe detects it; raise or warn is QUESTIONS.md's).
+- **Fix:** S66 (the compile probe detects it and raises, R116).
 
 ### A misspelled key in a block's `params` is ignored
 - **Symptom:** `plant.params["mass_typo"] = 3.0` is accepted; the block keeps reading its own

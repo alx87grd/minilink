@@ -63,9 +63,8 @@ class PortOperation:
     Attributes
     ----------
     compute_func : Callable[..., np.ndarray]
-        The port's compute function ``(x, u, t, params) → y``.
-        ``params`` may be ``None`` (use live ``self.params`` in the block) or a
-        bound snapshot when ``bind_params=True`` at compile time.
+        The port's compute function ``(x, u, t, params) → y``; ``params`` is
+        :attr:`bound_params` unless the caller passes its own.
     local_x_slice : slice
         Index slice into the global state vector ``x`` that extracts this
         subsystem's local state.  For static systems (``n = 0``): ``slice(0, 0)``.
@@ -88,11 +87,10 @@ class PortOperation:
         Total dimension of the assembled local input vector.
         Equal to the sum of all ``dim`` values in ``gather_sources``.
     bound_params : dict | None
-        If set, a deep copy of the subsystem ``params`` at compile time; passed
-        as the fourth argument to ``compute_func``. If ``None``, evaluators pass
-        ``None`` so blocks use their default ``self.params``. This does not
-        freeze other instance attributes; purity of ``compute_func`` is not
-        enforced.
+        The subsystem's ``params`` as compiled, a deep copy, passed as the
+        fourth argument to ``compute_func`` when the caller passes no
+        ``params``. It does not freeze other instance attributes; purity of
+        ``compute_func`` is not enforced.
     sys_id : str
         Id of the owning subsystem in the diagram. Used by the parametric
         evaluator tier to route nested diagram params (``params[sys_id]``).
@@ -119,8 +117,8 @@ class StateOperation:
     Attributes
     ----------
     f_func : Callable[..., np.ndarray]
-        The subsystem's state-derivative function ``(x, u, t, params) → dx``.
-        ``params`` may be ``None`` or a bound snapshot (see :attr:`bound_params`).
+        The subsystem's state-derivative function ``(x, u, t, params) → dx``;
+        ``params`` is :attr:`bound_params` unless the caller passes its own.
     local_x_slice : slice
         Index slice into the global state vector ``x`` and derivative vector
         ``dx`` for this subsystem's local state.
@@ -222,9 +220,7 @@ class StepExecutionPlan:
     external_output_slices: dict[str, slice]
 
 
-def build_execution_plan(
-    diagram: DiagramSystem, *, bind_params: bool = False
-) -> ExecutionPlan:
+def build_execution_plan(diagram: DiagramSystem) -> ExecutionPlan:
     """Build an immutable ExecutionPlan from a DiagramSystem.
 
     This is the core compilation step.  It:
@@ -232,43 +228,32 @@ def build_execution_plan(
     1. Orders the output ports, refusing an algebraic loop, via
        :func:`~minilink.core.topology.evaluation_order_of`.
     2. Assigns each output port a slice in the flat signal buffer.
-    3. Builds the gather-source recipes for each port and state operation.
+    3. Builds the gather-source recipes for each port and state operation, each
+       with its block's ``params`` as compiled (one deep copy per block).
     4. Returns a frozen :class:`ExecutionPlan`.
 
     Parameters
     ----------
     diagram : DiagramSystem
         Must have subsystems added and connections wired.
-    bind_params : bool, optional
-        When ``True``, set :attr:`~minilink.core.compile.plan.PortOperation.bound_params`
-        / :attr:`~minilink.core.compile.plan.StateOperation.bound_params` on each row
-        (deep copy of ``subsystem.params`` only; see :func:`compile_diagram` Notes).
 
     Returns
     -------
     ExecutionPlan
     """
     port_execution_order = evaluation_order_of(diagram)
-    return execution_plan_from_order(
-        diagram, port_execution_order, bind_params=bind_params
-    )
+    return execution_plan_from_order(diagram, port_execution_order)
 
 
-def build_step_execution_plan(
-    diagram: StepDiagramSystem, *, bind_params: bool = False
-) -> StepExecutionPlan:
+def build_step_execution_plan(diagram: StepDiagramSystem) -> StepExecutionPlan:
     """Build an immutable :class:`StepExecutionPlan` from a step diagram."""
     port_execution_order = evaluation_order_of(diagram)
-    return step_execution_plan_from_order(
-        diagram, port_execution_order, bind_params=bind_params
-    )
+    return step_execution_plan_from_order(diagram, port_execution_order)
 
 
 def execution_plan_from_order(
     diagram: DiagramSystem,
     port_execution_order: list[tuple[str, str]],
-    *,
-    bind_params: bool = False,
 ) -> ExecutionPlan:
     """Build the execution plan given a pre-computed topological order.
 
@@ -277,16 +262,15 @@ def execution_plan_from_order(
     individually.
     """
     output_slices, signal_dim = signal_layout(diagram)
+    snapshot = params_snapshot(diagram)
     port_ops = port_operations(
-        diagram, port_execution_order, output_slices, DynamicSystem, bind_params
+        diagram, port_execution_order, output_slices, DynamicSystem, snapshot
     )
 
     # One dx per continuous block
     state_ops = tuple(
         StateOperation(f_func=sys.f, **fields)
-        for sys, fields in state_fields(
-            diagram, output_slices, DynamicSystem, bind_params
-        )
+        for sys, fields in state_fields(diagram, output_slices, DynamicSystem, snapshot)
     )
 
     return ExecutionPlan(
@@ -302,19 +286,18 @@ def execution_plan_from_order(
 def step_execution_plan_from_order(
     diagram: StepDiagramSystem,
     port_execution_order: list[tuple[str, str]],
-    *,
-    bind_params: bool = False,
 ) -> StepExecutionPlan:
     """The step twin of :func:`execution_plan_from_order`: ``step_ops`` for ``state_ops``."""
     output_slices, signal_dim = signal_layout(diagram)
+    snapshot = params_snapshot(diagram)
     port_ops = port_operations(
-        diagram, port_execution_order, output_slices, StepSystem, bind_params
+        diagram, port_execution_order, output_slices, StepSystem, snapshot
     )
 
     # One x_{k+1} per discrete block
     step_ops = tuple(
         StepOperation(step_func=sys.step, **fields)
-        for sys, fields in state_fields(diagram, output_slices, StepSystem, bind_params)
+        for sys, fields in state_fields(diagram, output_slices, StepSystem, snapshot)
     )
 
     return StepExecutionPlan(
@@ -345,9 +328,15 @@ def signal_layout(diagram):
     return output_slices, current_idx
 
 
-def port_operations(
-    diagram, port_execution_order, output_slices, stateful, bind_params
-):
+def params_snapshot(diagram):
+    """Every block's ``params`` as compiled: one deep copy per block, by block id."""
+    return {
+        sys_id: copy.deepcopy(getattr(sys, "params", {}))
+        for sys_id, sys in diagram.subsystems.items()
+    }
+
+
+def port_operations(diagram, port_execution_order, output_slices, stateful, snapshot):
     """One :class:`PortOperation` per output port, in topological order."""
     port_ops: list[PortOperation] = []
     for sys_id, port_id in port_execution_order:
@@ -361,8 +350,6 @@ def port_operations(
         out_slice = output_slices[(sys_id, port_id)]
         local_x_slice = state_slice_of(diagram, sys_id, stateful)
 
-        bound = copy.deepcopy(getattr(sys, "params", {})) if bind_params else None
-
         port_ops.append(
             PortOperation(
                 compute_func=port.compute,
@@ -370,7 +357,7 @@ def port_operations(
                 gather_sources=tuple(gather_sources),
                 out_slice=out_slice,
                 u_dim=u_dim,
-                bound_params=bound,
+                bound_params=snapshot[sys_id],
                 label=f"{sys_id}:{port_id}",
                 sys_id=sys_id,
             )
@@ -379,7 +366,7 @@ def port_operations(
     return tuple(port_ops)
 
 
-def state_fields(diagram, output_slices, stateful, bind_params):
+def state_fields(diagram, output_slices, stateful, snapshot):
     """``(block, fields)`` for every ``stateful`` block: the fields its state operation shares."""
     for sys_id, sys in diagram.subsystems.items():
         if not isinstance(sys, stateful):
@@ -387,12 +374,11 @@ def state_fields(diagram, output_slices, stateful, bind_params):
         gather_sources, u_dim = gather_sources_of(
             diagram, sys_id, output_slices, dependencies="all"
         )
-        bound = copy.deepcopy(getattr(sys, "params", {})) if bind_params else None
         fields = {
             "local_x_slice": state_slice_of(diagram, sys_id, stateful),
             "gather_sources": tuple(gather_sources),
             "u_dim": u_dim,
-            "bound_params": bound,
+            "bound_params": snapshot[sys_id],
             "label": sys_id,
             "sys_id": sys_id,
         }
