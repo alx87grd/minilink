@@ -180,6 +180,40 @@ a dated record in docs/reviews/), applies it, and deletes the entry. Rulings alr
 - **Detail:** [TODO, S29](../plans/TODO.md#v09--what-could-still-break-a-name)
 - **Answer:**
 
+### Native optimizers: is the solver a pure kernel with a step-system view, or a `StepSystem` itself?
+- **Blocks:** the native-optimizer plan (NS-1, NS-2, NS-5); no rung yet.
+- **Today:** `gd` and `adam` are a Python loop in `optimizers/first_order.py`; a hand-wired
+  `StepDiagramSystem` of a law `z⁺ = z − η u` and a gradient oracle already rolls out gradient
+  descent.
+- **Options:** (A) every native solver a `StepSystem` by construction; (B) a pure
+  `init` / `step` kernel run by `Optimizer`, with the step-diagram loop as a teaching view of it;
+  (C) kernel only.
+- **Recommendation:** B: A forces Adam's pytree state into a flat `x`, C loses the
+  step-size-as-stability lesson.
+- **Detail:** [native-optimizers.md](../plans/native-optimizers.md) §3
+- **Answer:**
+
+### Native optimizers: which program categories and which native algorithms are in scope?
+- **Blocks:** NS-4, NS-6, NS-7; CONSTITUTION §1.4 ("not a solver framework").
+- **Today:** three classes read from the fields (`unconstrained`, `bounded`, `constrained`);
+  native `gd` and `adam` only.
+- **Options:** add least squares, stochastic and parametric categories; native GD, momentum,
+  Adam, Newton, Gauss–Newton, Levenberg–Marquardt, augmented Lagrangian; or a smaller set.
+- **Recommendation:** the categories each with a named consumer (identification, inverse
+  kinematics, the Monte Carlo objective, the MPC); the textbook algorithms only; Ipopt stays the
+  constrained workhorse.
+- **Detail:** [native-optimizers.md](../plans/native-optimizers.md) §4.1–§4.2
+- **Answer:**
+
+### Native optimizers: where does the plan enter the roadmap?
+- **Blocks:** scheduling NS-1–NS-7.
+- **Today:** unscheduled, research lane.
+- **Options:** NS-1 any time and the traced solve after S76 in v0.4; or all of it in v0.9.
+- **Recommendation:** NS-1 (internal) any time; NS-2 and NS-3 after S76's parameters, NS-5 after
+  the `StepRollout` fold (v0.4).
+- **Detail:** [native-optimizers.md](../plans/native-optimizers.md) §5
+- **Answer:**
+
 ### Does Diffrax join as an optional JAX solver?
 - **Blocks:** the foundations (S27); a new optional dependency.
 - **Today:** the integrators are in `core/compile/evaluators/stepping.py` (OD-11).
