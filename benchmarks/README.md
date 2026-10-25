@@ -67,6 +67,10 @@ python benchmarks/run_regression_check.py --suite e4           # E4 trajopt/MPC 
 python benchmarks/run_regression_check.py --suite f_mpc        # F MPC hybrid/hand-loop/dual-rate
 python benchmarks/run_regression_check.py --suite all          # all regression-gate suites
 python benchmarks/run_regression_check.py --suite all --tiny   # CI reduced workload
+python benchmarks/run_nested_flatten_study.py                  # nested PID-loop flatten parity + speed (informational)
+python benchmarks/run_nested_dense_flatten_study.py            # dense / deep-chain nested subnets (informational)
+python benchmarks/run_nested_dense_flatten_study.py --quick    # smaller workload
+
 python benchmarks/run_regression_check.py --update             # refresh committed JSON
 python benchmarks/run_e4_trajopt_parity.py --capture           # same as --suite e4 --update
 python benchmarks/run_f_mpc_parity.py --capture                # same as --suite f_mpc --update

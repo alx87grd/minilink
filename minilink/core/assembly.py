@@ -2,11 +2,15 @@
 
 from __future__ import annotations
 
+from collections.abc import Mapping
+from dataclasses import dataclass
+
 import numpy as np
 
 from minilink.core.diagram import DiagramSystem
 from minilink.core.roles import check_reserved_id
 from minilink.core.system import System
+from minilink.core.wiring import check_diagram_params, state_layout
 
 ###############################################################################
 # Public API
@@ -22,6 +26,8 @@ def inline_diagram(
     *,
     input_bindings=None,
     output_collision: str,
+    id_prefix: str = "",
+    boundary_outputs: bool = True,
 ) -> dict[str, str]:
     """Flatten ``source`` into ``diagram``, remapping ids; return the id map."""
     input_bindings = {} if input_bindings is None else dict(input_bindings)
@@ -39,8 +45,9 @@ def inline_diagram(
     # Each block under a fresh id, a reserved role once per level
     id_map = {}
     for source_id, subsystem in source_subsystems:
-        check_reserved_id(source_id, diagram.subsystems)
-        target_id = unique_id(source_id, diagram.subsystems)
+        target_id = unique_id(f"{id_prefix}{source_id}", diagram.subsystems)
+        if not id_prefix:
+            check_reserved_id(source_id, diagram.subsystems)
         diagram.add_subsystem(subsystem, target_id)
         id_map[source_id] = target_id
 
@@ -81,27 +88,188 @@ def inline_diagram(
                 )
 
     # The boundary outputs, remapped; one read straight off an edge input is refused
-    for output_id, edge in source_output_connections.items():
-        if edge is None:
-            continue
-        source_sys_id, source_port_id = edge
-        if source_sys_id == "input":
-            raise TypeError(
-                "Flattening diagram outputs sourced directly from external "
-                "inputs is not supported by composition shortcuts."
+    if boundary_outputs:
+        for output_id, edge in source_output_connections.items():
+            if edge is None:
+                continue
+            source_sys_id, source_port_id = edge
+            if source_sys_id == "input":
+                raise TypeError(
+                    "Flattening diagram outputs sourced directly from external "
+                    "inputs is not supported by composition shortcuts."
+                )
+            target_output_id = boundary_output_id(diagram, output_id, output_collision)
+            connect_new_output_port_like(
+                diagram,
+                id_map[source_sys_id],
+                source_port_id,
+                target_output_id,
+                source_outputs[output_id],
             )
-        target_output_id = boundary_output_id(diagram, output_id, output_collision)
-        connect_new_output_port_like(
-            diagram,
-            id_map[source_sys_id],
-            source_port_id,
-            target_output_id,
-            source_outputs[output_id],
-        )
 
     propagate_animation_camera(diagram, source)
 
     return id_map
+
+
+@dataclass(frozen=True)
+class FlattenReport:
+    """How :func:`flatten_diagram` renamed nested blocks (``parent/child`` → ``parent__child``)."""
+
+    id_map: dict[str, str]
+
+
+def flatten_diagram(diagram: DiagramSystem) -> tuple[DiagramSystem, FlattenReport]:
+    """Return a single-level copy of ``diagram`` with nested boxes inlined.
+
+    Nested block ids join with ``__`` (``inner__plant``), matching topology
+    expand. The stacked state ``x = [x_1; x_2; \\ldots]`` (block order from
+    :func:`~minilink.core.wiring.state_layout`) matches the unflattened diagram.
+    The input diagram is not modified.
+    """
+    if not isinstance(diagram, DiagramSystem):
+        raise TypeError(
+            f"flatten_diagram expects DiagramSystem, got {type(diagram).__name__}"
+        )
+
+    flat = copy_diagram(diagram)
+    id_map: dict[str, str] = {}
+
+    while True:
+        nested_id = _first_nested_subsystem_id(flat)
+        if nested_id is None:
+            break
+        inner_flat, _inner_report = flatten_diagram(flat.subsystems[nested_id])
+        local_map = _replace_nested_subsystem(flat, nested_id, inner_flat)
+        for source_id, target_id in local_map.items():
+            id_map[f"{nested_id}/{source_id}"] = target_id
+
+    for sys_id in flat.subsystems:
+        id_map.setdefault(sys_id, sys_id)
+
+    return flat, FlattenReport(id_map=id_map)
+
+
+def remap_params_nested_to_flat(diagram: DiagramSystem, params) -> dict | None:
+    """Remap a nested diagram params tree to flat ``__`` block ids for :func:`flatten_diagram`."""
+    if params is None:
+        return None
+
+    check_diagram_params(params, diagram.subsystems)
+    flat, _report = flatten_diagram(diagram)
+    remapped = _remap_params_tree(diagram, params, prefix="")
+    check_diagram_params(remapped, flat.subsystems)
+    return remapped
+
+
+def _first_nested_subsystem_id(diagram: DiagramSystem) -> str | None:
+    for sys_id, subsystem in diagram.subsystems.items():
+        if isinstance(subsystem, DiagramSystem):
+            return sys_id
+    return None
+
+
+def _reorder_subsystems_after_inline(
+    diagram: DiagramSystem,
+    order_before: list[str],
+    nested_id: str,
+    inner_flat: DiagramSystem,
+    local_map: dict[str, str],
+) -> None:
+    """Restore subsystem insertion order after :func:`inline_diagram` appends leaves.
+
+    ``state_layout`` stacks ``x`` in subsystem order; inlined blocks must occupy
+    the index where the nested box ``nested_id`` sat in ``order_before``.
+    """
+    new_order: list[str] = []
+    for sid in order_before:
+        if sid == nested_id:
+            for inner_id in inner_flat.subsystems:
+                new_order.append(local_map[inner_id])
+        elif sid in diagram.subsystems:
+            new_order.append(sid)
+
+    diagram.subsystems = {key: diagram.subsystems[key] for key in new_order}
+
+    output_connections = diagram.connections.get("output")
+    diagram.connections = {
+        key: diagram.connections[key] for key in new_order if key in diagram.connections
+    }
+    if output_connections is not None:
+        diagram.connections["output"] = output_connections
+
+
+def _replace_nested_subsystem(
+    diagram: DiagramSystem,
+    nested_id: str,
+    inner_flat: DiagramSystem,
+) -> dict[str, str]:
+    """Inline ``inner_flat`` in place of nested block ``nested_id`` on ``diagram``."""
+    order_before = list(diagram.subsystems.keys())
+    input_bindings = {
+        port_id: edge
+        for port_id, edge in diagram.connections[nested_id].items()
+        if edge is not None
+    }
+    outbound = []
+    for target_sys_id, port_map in diagram.connections.items():
+        if target_sys_id in (nested_id, "output"):
+            continue
+        for target_port_id, edge in port_map.items():
+            if edge is not None and edge[0] == nested_id:
+                outbound.append((target_sys_id, target_port_id, edge[1]))
+
+    local_map = inline_diagram(
+        diagram,
+        inner_flat,
+        input_bindings=input_bindings,
+        output_collision="replace",
+        id_prefix=f"{nested_id}__",
+        boundary_outputs=False,
+    )
+    for target_sys_id, target_port_id, nested_port_id in outbound:
+        inner_edge = inner_flat.connections["output"].get(nested_port_id)
+        if inner_edge is None:
+            raise ValueError(
+                f"Nested block {nested_id!r} output port {nested_port_id!r} is not "
+                "exposed on the inner diagram boundary"
+            )
+        source_sys_id, source_port_id = inner_edge
+        if source_sys_id == "input":
+            raise TypeError(
+                "Flattening nested diagram outputs sourced directly from external "
+                "inputs is not supported."
+            )
+        diagram.connect(
+            local_map[source_sys_id],
+            source_port_id,
+            target_sys_id,
+            target_port_id,
+        )
+
+    del diagram.subsystems[nested_id]
+    del diagram.connections[nested_id]
+    # x = [x_block1; x_block2; …] follows subsystem order; inline_diagram appends.
+    _reorder_subsystems_after_inline(
+        diagram, order_before, nested_id, inner_flat, local_map
+    )
+    diagram.n, diagram.state_index, diagram.state, diagram.x0, diagram.derived_x0 = (
+        state_layout(diagram.subsystems)
+    )
+    diagram.refresh_solver_info()
+    return local_map
+
+
+def _remap_params_tree(diagram: DiagramSystem, params: Mapping, *, prefix: str) -> dict:
+    remapped = {}
+    for sys_id, subsystem in diagram.subsystems.items():
+        flat_id = f"{prefix}__{sys_id}" if prefix else sys_id
+        piece = params[sys_id]
+        if isinstance(subsystem, DiagramSystem):
+            remapped.update(_remap_params_tree(subsystem, piece, prefix=flat_id))
+        else:
+            remapped[flat_id] = piece
+    return remapped
 
 
 def add_system_to_diagram(diagram, sys, *, role=None) -> str:

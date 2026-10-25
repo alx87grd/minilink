@@ -99,7 +99,7 @@ class DiagramSystem(WiredDiagramMixin, DynamicSystem):
 
         return dx
 
-    def compile(self, backend="numpy", verbose=False):
+    def compile(self, backend="numpy", verbose=False, *, flatten=False):
         """
         Compile the diagram into a stateless evaluator for fast simulation.
 
@@ -110,6 +110,9 @@ class DiagramSystem(WiredDiagramMixin, DynamicSystem):
         ----------
         backend : str
             ``'numpy'`` (default) or ``'jax'``.
+        flatten : bool
+            If ``True``, inline nested diagram blocks before compiling (default
+            ``False``).
         verbose : bool
             If ``True``, print timed compilation steps.
 
@@ -120,7 +123,7 @@ class DiagramSystem(WiredDiagramMixin, DynamicSystem):
         # Lazy import: a cycle, the compiler reads DiagramSystem from this module
         from minilink.core.compile.compiler import compile_diagram
 
-        return compile_diagram(self, backend=backend, verbose=verbose)
+        return compile_diagram(self, backend=backend, verbose=verbose, flatten=flatten)
 
     def reconstruct_internal_signals(self, traj: Trajectory) -> Trajectory:
         """

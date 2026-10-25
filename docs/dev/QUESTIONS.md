@@ -7,6 +7,18 @@ a dated record in docs/reviews/), applies it, and deletes the entry. Rulings alr
 
 ## Blocks v0.3 (the robotics-course release, December 2026)
 
+### Should compile-time diagram flatten default to on after the parity and speed study?
+- **Blocks:** nothing until benchmarks and tests are stable; default stays `False` until you decide.
+- **Today:** `compile_diagram(..., flatten=False)` inlines nested boxes with ``__`` ids
+  (`inner__plant`); parity tests and `benchmarks/scenarios/nested_compile_flatten.py`
+  compare nested compile, `flatten=True`, and hand-flat wiring.
+- **Options:** keep default off; turn default on if flatten wins on compile and/or `f()`;
+  drop the flag and always flatten at compile.
+- **Recommendation:** wait for one informational benchmark run on your reference machine,
+  then choose.
+- **Detail:** [DESIGN.md](DESIGN.md) (compile-time flatten paragraph)
+- **Answer:**
+
 ### Do you review the overnight run's 16 remaining decisions, or accept them as a block?
 - **Blocks:** your merge of the v0.3 branch into `dev` (R79).
 - **Today:** the run of 2026-10-24 decided 36 points without you, each with its reason, the

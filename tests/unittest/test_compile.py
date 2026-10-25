@@ -1392,6 +1392,104 @@ def test_a_diagram_hands_its_blocks_float_inputs():
     np.testing.assert_allclose(ev.f(np.zeros(1), np.array([2])), [0.5])
 
 
+class TestCompileFlatten(unittest.TestCase):
+    """Optional compile-time flatten matches nested reference dynamics.
+
+    Global state stack order for ``flatten_diagram`` is covered in
+    ``tests/unittest/test_flatten_diagram.py``.
+    """
+
+    def test_nested_compile_flatten_matches_nested_and_hand_flat(self):
+        from tests.unittest.test_diagrams import _nested_and_flat_outer_loops
+
+        nested, flat = _nested_and_flat_outer_loops()
+        x = np.array([0.3, -0.2, 0.5, 0.1])
+        u = np.zeros(0)
+        ev_nested = compile_diagram(nested, backend="numpy")
+        ev_flatten = compile_diagram(nested, backend="numpy", flatten=True)
+        ev_hand_flat = compile_diagram(flat, backend="numpy")
+        np.testing.assert_allclose(ev_nested.f(x, u, 0.0), ev_flatten.f(x, u, 0.0))
+        np.testing.assert_allclose(ev_hand_flat.f(x, u, 0.0), ev_flatten.f(x, u, 0.0))
+
+    def test_nested_compile_flatten_jax(self):
+        pytest.importorskip("jax")
+        from tests.unittest.test_diagrams import _nested_and_flat_outer_loops
+
+        nested, flat = _nested_and_flat_outer_loops()
+        x = np.array([0.3, -0.2, 0.5, 0.1])
+        u = np.zeros(0)
+        ev_flatten = compile_diagram(nested, backend="jax", flatten=True)
+        ev_hand_flat = compile_diagram(flat, backend="jax")
+        np.testing.assert_allclose(
+            ev_hand_flat.f(x, u, 0.0), ev_flatten.f(x, u, 0.0), atol=1e-12
+        )
+
+    def test_flatten_with_nested_params(self):
+        from minilink.core.assembly import remap_params_nested_to_flat
+        from tests.unittest.test_diagrams import _nested_and_flat_outer_loops
+
+        nested, _flat = _nested_and_flat_outer_loops()
+        nested_params = nested.params
+        flat_params = remap_params_nested_to_flat(nested, nested_params)
+        x = np.array([0.3, -0.2, 0.5, 0.1])
+        u = np.zeros(0)
+        ev = compile_diagram(nested, flatten=True)
+        np.testing.assert_allclose(
+            ev.f(x, u, 0.0, params=flat_params),
+            nested.f(x, u, 0.0, params=nested_params),
+            atol=1e-10,
+        )
+
+    def test_deep_nest_flatten_compile(self):
+        from minilink.blocks.routing import Gain
+        from minilink.control.siso import PID
+        from minilink.dynamics.catalog.mass_spring_damper.linear import SingleMass
+
+        pid = PID(Kp=1.0, Ki=0.0, Kd=0.0, ports="reference")
+        mass = SingleMass()
+        inner = DiagramSystem()
+        inner.add_subsystem(pid, "controller")
+        inner.add_subsystem(mass, "plant")
+        inner.add_input_port("r")
+        inner.connect("input", "r", "controller", "r")
+        inner.connect("plant", "y", "controller", "y")
+        inner.connect("controller", "u", "plant", "u")
+        inner.connect_new_output_port("plant", "y", "y")
+
+        mid = DiagramSystem()
+        mid.add_subsystem(Gain([1.0]), "gain")
+        mid.add_subsystem(inner, "loop")
+        mid.connect("loop", "y", "gain", "u")
+        mid.connect("gain", "y", "loop", "r")
+        mid.connect_new_output_port("gain", "y", "y")
+        mid.add_input_port("r")
+        mid.connect("input", "r", "loop", "r")
+
+        outer = DiagramSystem()
+        outer.add_subsystem(Gain([0.5]), "scale")
+        outer.add_subsystem(mid, "box")
+        outer.connect("box", "y", "scale", "u")
+        outer.connect("scale", "y", "box", "r")
+
+        x = np.array([0.2, 0.1, 0.0, 0.0])
+        u = np.zeros(0)
+        np.testing.assert_allclose(
+            compile_diagram(outer, flatten=True).f(x, u, 0.0),
+            outer.f(x, u, 0.0),
+            atol=1e-10,
+        )
+
+    def test_flatten_jacobian_wire_ids(self):
+        from tests.unittest.test_diagrams import _nested_and_flat_outer_loops
+
+        nested, _flat = _nested_and_flat_outer_loops()
+        ev = compile_diagram(nested, flatten=True)
+        x = np.array([0.3, -0.2, 0.5, 0.1])
+        u = np.zeros(0)
+        jac = ev.jacobian("f", "inner__controller:u")(x, u, 0.0, None)
+        self.assertEqual(jac.shape[0], nested.n)
+
+
 @pytest.mark.jax
 def test_every_jax_evaluator_applies_the_float64_policy():
     jax = pytest.importorskip("jax")

@@ -32,7 +32,7 @@ if TYPE_CHECKING:
 ###############################################################################
 
 
-def compile(system, backend=BACKEND_NUMPY, verbose=False):
+def compile(system, backend=BACKEND_NUMPY, verbose=False, *, flatten=False):
     """Compile a system into a typed evaluator.
 
     Returns a :class:`DynamicEvaluator` for a :class:`DynamicSystem`, a
@@ -55,10 +55,14 @@ def compile(system, backend=BACKEND_NUMPY, verbose=False):
     from minilink.core.system import DynamicSystem
 
     if isinstance(system, DiagramSystem):
-        return compile_diagram(system, backend=backend, verbose=verbose)
+        return compile_diagram(
+            system, backend=backend, verbose=verbose, flatten=flatten
+        )
 
     if isinstance(system, StepDiagramSystem):
-        return compile_step_diagram(system, backend=backend, verbose=verbose)
+        return compile_step_diagram(
+            system, backend=backend, verbose=verbose, flatten=flatten
+        )
 
     key = normalize_backend(backend)
     validate_equation_shapes(system)
@@ -110,6 +114,7 @@ def compile_diagram(
     diagram: DiagramSystem,
     backend: str = BACKEND_NUMPY,
     *,
+    flatten: bool = False,
     verbose: bool = False,
 ):
     """Compile a DiagramSystem into a backend evaluator.
@@ -120,6 +125,9 @@ def compile_diagram(
         The wired diagram to compile.
     backend : str
         ``'numpy'`` or ``'jax'``.
+    flatten : bool
+        If ``True``, inline nested diagram blocks into one level (``parent__child``
+        ids) before building the execution plan. Default ``False``.
     verbose : bool
         If ``True``, print timed compilation steps.
 
@@ -143,6 +151,7 @@ def compile_diagram(
     implementations pure if they still read or mutate other instance state; see
     :class:`minilink.core.system.System`.
     """
+    from minilink.core.assembly import flatten_diagram
     from minilink.core.discrete.step_diagram import StepDiagramSystem
     from minilink.core.discrete.step_system import StepSystem
 
@@ -160,6 +169,18 @@ def compile_diagram(
             )
 
     t_total = time.perf_counter() if verbose else None
+
+    if flatten:
+        if verbose:
+            t0 = time.perf_counter()
+            n_before = len(diagram.subsystems)
+            print("[compile] Step 0: Flattening nested diagrams...", end="", flush=True)
+        diagram, _flatten_report = flatten_diagram(diagram)
+        if verbose:
+            print(
+                f"  ({n_before} → {len(diagram.subsystems)} blocks, "
+                f"{time.perf_counter() - t0:.3f}s)"
+            )
 
     # Step 1: Algebraic loop detection
     if verbose:
@@ -211,6 +232,7 @@ def compile_step_diagram(
     diagram: StepDiagramSystem,
     backend: str = BACKEND_NUMPY,
     *,
+    flatten: bool = False,
     verbose: bool = False,
 ):
     """Compile a :class:`~minilink.core.discrete.step_diagram.StepDiagramSystem` into an evaluator.
@@ -225,6 +247,12 @@ def compile_step_diagram(
     if not isinstance(diagram, StepDiagramSystemType):
         raise TypeError(
             f"compile_step_diagram requires StepDiagramSystem, got {type(diagram).__name__}"
+        )
+
+    if flatten:
+        raise NotImplementedError(
+            "compile_step_diagram(flatten=True) is not supported yet; "
+            "use a flow DiagramSystem or flatten=False."
         )
 
     for sys_id, subsystem in diagram.subsystems.items():

@@ -698,7 +698,22 @@ parameter-family experiments.
 Leaf `compile` accepts `numpy` or `jax` only (`auto` / `direct` are simulator /
 transcription concepts — see :mod:`minilink.core.backends`).
 
-Diagrams → `ExecutionPlan` → diagram evaluator. **`outputs()` are boundary outputs
+Diagrams → `ExecutionPlan` → diagram evaluator. Optional **compile-time flatten**
+(`compile_diagram(..., flatten=False)` by default): before the plan is built,
+:func:`~minilink.core.assembly.flatten_diagram` copies the diagram and inlines each
+nested :class:`~minilink.core.diagram.DiagramSystem` block so every leaf sits at the
+top level. Inlined ids join with ``__`` (``inner__plant``), the same convention as
+expanded topology (`controller__pi`); ``:`` stays ``block:port``, ``/`` stays the
+hierarchical plot path on the **unflattened** diagram. After flatten, diagram
+``params`` keys are those flat ids; :func:`~minilink.core.assembly.remap_params_nested_to_flat`
+rewrites a nested tree for an explicit ``params`` argument. ``+`` / ``>>`` already
+inline via :func:`~minilink.core.assembly.inline_diagram`; ``@`` nests until flatten
+is requested at compile. :func:`~minilink.core.assembly.flatten_diagram` preserves
+global state stacking order: inlined leaves replace each nested box at the same stack
+position as that box's inner states, so ``x``, ``x0``, and native
+:meth:`~minilink.core.diagram.DiagramSystem.f` agree with the unflattened diagram.
+
+**`outputs()` are boundary outputs
 only** (dict keyed by port id, not diagram internals); a diagram's internal signals are
 `signals(x, u, t, params=None)` (the buffer) and `compute_internal_signals_dict` (keyed
 `"block:port"`). Evaluators do not mirror model `h` as a separate evaluator API.
