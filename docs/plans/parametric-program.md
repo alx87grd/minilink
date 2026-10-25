@@ -80,6 +80,10 @@ Why C:
    decision leaves, parameters bound" (the program export, `pe.program`: DESIGN §6), which is
    `bind`.
 
+**Needs analysis (2026-10-25):** how the solvers take `p` (bind or pass it to a traced solve),
+how a stochastic program's seed fits in `p`, and §3.1's partial `bind` against R121's complete
+trees are open for discussion in [native-optimizers.md](native-optimizers.md) §7.
+
 Open with C (the asks, [QUESTIONS.md](../dev/QUESTIONS.md)): the family's name (ruled 2026-10-23: `ParametricProgram`,
 D19); whether a hand-written program may
 declare its own `p` (free, and tutorial 08 could solve one NLP for several values of a

@@ -251,6 +251,19 @@ a dated record in docs/reviews/), applies it, and deletes the entry. Rulings alr
 
 ## Standing (no release depends on it)
 
+### How do programs and solvers take parameters and randomness? (needs analysis and discussion)
+- **Blocks:** nothing yet; it shapes S76's `ParametricProgram` (v0.4), the native solvers and the
+  stochastic category of native-optimizers.md.
+- **Today:** only `x0` varies in the compiled MPC program; `pe.program(wrt, key, n_trials)`
+  freezes its draws at build (a sample average); seeds live in `params` as integers (RD-R6, R118);
+  overrides are complete trees (R121) while `parametric-program.md` §3.1 binds partial ones.
+- **Options:** not yet; a first idea is one signature `J(z, p)` with the seed an integer leaf of
+  `p` (bound for a sample average, advanced per iteration by the solver for SGD), and seven open
+  points to settle.
+- **Recommendation:** none yet; a discussion session first.
+- **Detail:** [native-optimizers.md](../plans/native-optimizers.md) §7
+- **Answer:**
+
 ### Is there one separator rule for wires, parameter paths, block labels and duplicate state labels?
 - **Blocks:** the larger naming alignment.
 - **Today:** block outputs are recorded `id:port`, the plant's input `plant.u` (OD-13), parameter

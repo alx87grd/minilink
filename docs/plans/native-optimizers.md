@@ -22,6 +22,7 @@ two goals; the neighbours hold what they already owned):
 | The differentiable evaluation of a hybrid loop (`problem.compile` of a sampled controller) | [differentiable-problem.md](differentiable-problem.md), step 7b (R105) |
 | The MPC block's contract with its planner (the verbs a native tick must answer) | [end-state-api.md](end-state-api.md) D27, [mppi.md](mppi.md) §6 |
 | A gradient-descent tutorial on the extended `Optimizer` | [TODO.md](TODO.md) §7 (R91) |
+| Parametric and stochastic programs in the solvers: keys, seeds, bind (**needs analysis**) | this doc, §7; the parameter family itself is [parametric-program.md](parametric-program.md), randomness in simulation [randomness.md](randomness.md) |
 
 Contracts in code today: [DESIGN.md](../dev/DESIGN.md) §6 (Planning / NLP). The neighbours:
 [parametric-program.md](parametric-program.md) (the program's parameters and one backend table,
@@ -367,5 +368,75 @@ identification, the Monte Carlo objective).
    CONSTITUTION §1.4?
 Ruled: the discrete step analysis goal 2 needs comes back with NS-5, when solver stability
 requires it (R122, §4.7).
+
+Needs analysis before any recommendation: how programs and solvers take parameters and
+randomness (§7).
 3. Where does this enter the roadmap? The maintainer's priority is the MPC path (§1.1); the
    ask left is the rung: with S76 and S31 in v0.4, or after them.
+
+## 7. Needs analysis: parametric and stochastic programs (not converged)
+
+**Status: open for discussion, flagged by the maintainer 2026-10-25.** How a program and its
+solvers handle (a) many versions of one program solved without recompiling and (b) randomness
+is not settled. This section holds the facts and the agent's first ideas; nothing in it is a
+recommendation yet. The ask is in QUESTIONS.md ("Standing").
+
+### 7.1 What is already fixed around it
+
+- **Parameters.** `parametric-program.md` §2 recommends one family: the library builds
+  `J(z, p)`, `h(z, p)`, `g(z, p)` and `bind(p)` returns the plain `MathematicalProgram` (option C;
+  the name `ParametricProgram` and the key `plant` ruled, D19; a hand-written `p` still open,
+  D25). Only `x0` varies today (`ParametricMathematicalProgram`).
+- **Parameter overrides are complete** (R121, 2026-10-25): `params=None` (the snapshot) or a tree
+  naming every block; one convenience merge, `ProblemEvaluator.merged`, at the problem boundary.
+  `parametric-program.md` §3.1's `bind` takes a *partial* tree merged onto the bound values:
+  the two must be reconciled.
+- **Randomness.** Every draw takes a key; seeds enter a tool as an integer or live in a random
+  block's `params` (randomness.md RD-R6); a sampled controller's draws come from its
+  `params["seed"]` and the tick (R104); `params` hold numbers and integer seeds only (R118).
+- **What the problem evaluator does today.** `pe.program(wrt, key=0, n_trials=N)` realizes the
+  `N` draws once, from `key`, and freezes them when neither the start nor the cost is tuned
+  (`planning/evaluator.py`): the program is the deterministic average over a fixed sample.
+
+### 7.2 First idea: one signature, `J(z, p)`, with the seed a leaf of `p`
+
+Three things are called a stochastic program; they need different solvers:
+
+| Kind | The objective | Draws | Solvers |
+| --- | --- | --- | --- |
+| **Sample average** (common random numbers) | `J(z) = 1/N Σᵢ J(z, ωᵢ)` | fixed at build, from one seed | any, Ipopt and SciPy included: it is deterministic (today's `pe.program`) |
+| **Stochastic approximation** | `E[J(z, ω)]`, estimated per iteration | fresh at every iteration `k` | native first order only (SGD, Adam); L-BFGS and SLSQP break on a noisy `J` |
+| **Risk and chance** | `CVaR`, `P(x ∈ X) ≥ 1 − α` | either | later; the evaluator's criterion is the hook |
+
+The idea that ties them together, and to the parametric family, is that **a key is not a new
+argument: the seed is an integer leaf of `p`**, as RD-R6 and R118 already have it for blocks.
+Then:
+
+- a sample-average program is a parametric program whose seed is bound: a new seed is a new
+  instance, solved without recompiling, like a new `x0`; `vmap` over seeds is a Monte Carlo over
+  solves (how much the answer moves with the sample);
+- stochastic approximation is the solver advancing the seed itself, `seed_k = child(seed, k)`,
+  the same rule as R104's sampled controller: the solver's step is `step(state, k, p)`, which is
+  §3.3's kernel with no new argument;
+- the program has one signature for every case (CONSTITUTION §2, "One signature"):
+  deterministic `p = {}`, parametric, stochastic.
+
+### 7.3 Open points the analysis must settle
+
+1. **Bind or pass.** A host solver needs `bind(p)` (a closed `J(z)`); a traced native solver
+   wants `p` as an argument, `solve(z0, p)`, so that `vmap` and `grad` reach it. Both, or one?
+2. **Partial or complete trees** at `bind` (R121 against `parametric-program.md` §3.1).
+3. **Non-differentiable leaves.** An integer seed in `p` cannot take a gradient; `jax.grad` over
+   `p` needs the differentiable leaves split from the rest (the problem evaluator's `wrt` paths
+   already do this for `pe.program`).
+4. **Which leaf is the seed.** Does the program declare it (a stochastic category flag), or is
+   it found by convention (every `seed` key)?
+5. **Structural versus value parameters.** The sample size `N`, a minibatch size and `K` are
+   shapes, fixed at compile; values (`x0`, plant parameters, weights, seeds) vary without a
+   recompile. Where the line is drawn for each category.
+6. **The warm start** belongs to the solve call, not to the program (it is solver state, like
+   Adam's moments).
+7. **Sensitivities**: `dz*/dp` by implicit differentiation (§4.3) for a sample-average program is
+   the derivative for a fixed sample; for stochastic approximation it is not defined the same
+   way.
+
