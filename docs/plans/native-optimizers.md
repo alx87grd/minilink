@@ -1,7 +1,9 @@
 # Native optimizers: the solve as a rollout
 
 Status: **ideas to review**, written 2026-10-25 from the maintainer's vision (§1), with the
-state of the code (§2) and the agent's read (§3–§6). Nothing here is ruled; the asks are in
+state of the code (§2) and the agent's read (§3–§6). The maintainer named the two goals the same
+day (§1.1): the fixed-iteration MPC first, convergence analysis with control tools long term.
+The design choices are not ruled; the asks are in
 [QUESTIONS.md](../dev/QUESTIONS.md) ("Blocks v0.9 / v1.0"). Lane: research. Rung: none yet; the
 natural slot is after the sampled loop (S31) and the parametric program (S76), both v0.4,
 because this plan builds on the step model's rollout and on the program's parameters.
@@ -26,6 +28,15 @@ parameter to the cost), [sampled-path.md](sampled-path.md) §8 (the one rollout 
 - **The ultimate goal: some solvers fully JAX-compatible**, so that the whole solve can be
   jitted, differentiated and vmapped: a solve inside a loss, a batch of starts or of problem
   parameters in one call.
+
+### 1.1 The two goals (the maintainer, 2026-10-25)
+
+1. **First: an MPC whose solver runs a fixed number of iterations**, so the controller's tick
+   is fully compilable and even differentiable; the closed loop with the MPC then simulates
+   end to end in JAX, very fast.
+2. **Long term: analyse the convergence of an optimization process with the control tools**:
+   the algorithm as a feedback loop, its convergence as stability. A connection between the two
+   fields.
 
 ## 2. What exists today
 
@@ -194,7 +205,67 @@ loop = gradient_loop(GradientStep(eta=0.1), GradientOracle(program))  # a StepDi
 loop.linearize(z_star).poles()                        # the convergence rate (needs step linearize)
 ```
 
-## 5. Steps (local ids NS-1–NS-7; none scheduled)
+### 4.6 The first target: a fixed-iteration MPC, compiled end to end
+
+**What exists.** `MPCStatefulController` (`planning/trajectory_optimization/mpc/controller.py`)
+is already the ruled shape (R104: a sampled controller's memory is its state): a `StepSystem`
+whose state `x` is the packed plan `z` of the last tick, warm-starting the next. What stops it
+compiling is the inside of its `step`: a host solve (SciPy SLSQP) through a tick latch with side
+effects. The sampled loop's JAX face that would run it (S31, R105: a `Computer` runs the sampled
+kernel's JAX face under `problem.compile(policy)`) is v0.4 work.
+
+**The law.** One tick is `K` iterations of a native method on the parametric program, bound
+with the measurement:
+
+```text
+z_{k+1} = step_MPC(z_k, y_k; p) = S^K( shift(z_k) ; x0 = y_k, p )
+u_k     = first input of z_{k+1}
+```
+
+`shift` moves the last plan one tick forward (the warm start), `S` is one iteration of the
+method (projected fast gradient, Adam), and `K` is a structural constant fixed at
+construction, like a transcription's `n_steps`. Every piece is pure array code, so the tick is
+one jitted function and the closed loop `controller % dt @ plant` is one `lax.scan`.
+
+**Why a fixed `K` is the right contract here**, not a tolerance:
+- The tick's cost is known in advance: a real-time budget, the same on every tick.
+- `lax.scan` over `K` is traceable in every mode; a tolerance would need `while_loop`, which
+  reverse-mode `grad` refuses.
+- The gradient of the closed-loop cost is then **exact for the controller that runs**,
+  truncation included: tuning sees the truncated solver honestly, not an idealised optimum.
+- With the warm start, the iterations accumulate across ticks: the loop keeps converging while
+  the plant moves (the real-time-iteration idea of Diehl, and the fast-gradient MPC of Richter,
+  Jones and Morari).
+
+**The transcription.** Single shooting first (`shooting.py`, already a `lax.scan` rollout): the
+dynamics leave the program, the input box is the program's box, so the program is box-bounded
+and projected first-order methods solve it with no constraint rows. State constraints come
+second, by penalty or augmented Lagrangian over the same `K` budget (NS-6). Direct collocation,
+whose dynamics are equality rows, stays on Ipopt and SciPy.
+
+**What it unlocks.**
+- The closed loop with an MPC simulates as fast as any compiled diagram, and `vmap` runs a batch
+  of starts or of plant parameters in one call (the Monte Carlo evaluator's trials).
+- `jax.grad` of the closed-loop cost with respect to the MPC's cost weights, its horizon's
+  terminal weight, or the step size: MPC tuning by gradient, through the same
+  `problem.compile(policy)` path the PID tuning uses (DESIGN §6, the problem evaluator).
+- A first differentiable MPC without implicit differentiation; the implicit mode (§4.3) stays
+  for a solve run to convergence.
+
+**What it needs first.** S76's parametric program (the tick binds `x0 = y` and the plant's
+parameters without a recompile); NS-1 and NS-2 (the native kernel and its fixed-`K` traced
+form); for the closed loop, S31's sampled kernel with its JAX face.
+
+### 4.7 The long-term target: convergence as stability
+
+§3.1's loop, analysed with the control tools: the step size's stability region from the poles
+of `I − ηH`, heavy ball and Nesterov as second-order linear filters in feedback with `∇J`, and
+later the robust view (the gradient a sector-bounded nonlinearity, the rate certified for a
+whole class of `J`: the integral quadratic constraints of Lessard, Recht and Packard). It needs
+`linearize` and discrete poles on step systems (today `jacobian` only), and the `@` shortcut on
+step systems or a helper that wires the law to the oracle.
+
+## 5. Steps (local ids NS-1–NS-9; none scheduled)
 
 - **NS-1 The kernel**: `init` / `step` laws for `gd` and `adam`, on the array module of their
   input; the `Optimizer` loop on NumPy unchanged in behaviour (the AGENTS refactor recipe, a
@@ -213,11 +284,22 @@ loop.linearize(z_star).poles()                        # the convergence rate (ne
   derivative through the KKT system.
 - **NS-7 The stochastic category**: `J(z, key)` with SGD and Adam, the problem evaluator's
   Monte Carlo objective its first consumer.
+- **NS-8 The fixed-iteration MPC tick** (§4.6): the stateful MPC block's `step` as `K`
+  iterations of a native method on a single-shooting parametric program, warm-started by the
+  shift; done when one tick jits, its result matches the host SLSQP plan within a tolerance on
+  the pendulum and the cart-pole after enough ticks, and `jax.grad` of one tick's input with
+  respect to a cost weight matches finite differences.
+- **NS-9 The closed loop in one scan** (§4.6): the MPC loop simulated through the sampled
+  kernel's JAX face; done when `problem.compile(mpc_computer).evaluate(p)` runs, `vmap`s over
+  starts, and its gradient with respect to the MPC's cost weights tunes a demo by `Optimizer`.
 
-**Order and dependencies**: NS-1 any time (internal, no public change); NS-2 and NS-3 after
-S76's `ParametricProgram`, so that `p` has one home; NS-5 after the `StepRollout` fold into
-`Trajectory` (V1's rest, with S31, v0.4); NS-4, NS-6 and NS-7 when their consumers are
-scheduled (C4 identification, the constrained native path, the Monte Carlo objective).
+**Order, by the maintainer's two goals.** The MPC path first: NS-1 (any time, internal) →
+NS-2's fixed-`K` form → NS-8, after S76's `ParametricProgram` (so the tick binds `x0` and the
+plant without a recompile) → NS-9, after S31's sampled kernel (v0.4); NS-6 when the MPC needs
+state constraints. The control-analysis path is long term: NS-5 with `linearize` and poles on
+step systems, after the `StepRollout` fold into `Trajectory` (V1's rest, with S31). NS-3, NS-4
+and NS-7 when their consumers are scheduled (a solve to convergence inside a loss, C4
+identification, the Monte Carlo objective).
 
 ## 6. Open (the asks, in QUESTIONS.md)
 
@@ -225,4 +307,5 @@ scheduled (C4 identification, the constrained native path, the Monte Carlo objec
    a teaching view, rather than every solver a `StepSystem` by construction?
 2. Which categories and which native algorithms are in scope (§4.1, §4.2), against
    CONSTITUTION §1.4?
-3. Where does this enter the roadmap: after S76 in v0.4, or later (v0.9)?
+3. Where does this enter the roadmap? The maintainer's priority is the MPC path (§1.1); the
+   ask left is the rung: with S76 and S31 in v0.4, or after them.

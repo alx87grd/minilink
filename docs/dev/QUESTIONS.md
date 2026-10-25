@@ -205,13 +205,16 @@ a dated record in docs/reviews/), applies it, and deletes the entry. Rulings alr
 - **Detail:** [native-optimizers.md](../plans/native-optimizers.md) §4.1–§4.2
 - **Answer:**
 
-### Native optimizers: where does the plan enter the roadmap?
-- **Blocks:** scheduling NS-1–NS-7.
-- **Today:** unscheduled, research lane.
-- **Options:** NS-1 any time and the traced solve after S76 in v0.4; or all of it in v0.9.
-- **Recommendation:** NS-1 (internal) any time; NS-2 and NS-3 after S76's parameters, NS-5 after
-  the `StepRollout` fold (v0.4).
-- **Detail:** [native-optimizers.md](../plans/native-optimizers.md) §5
+### Native optimizers: which rung does the fixed-iteration MPC take?
+- **Blocks:** scheduling NS-1, NS-2, NS-8 and NS-9.
+- **Today:** unscheduled, research lane. Your priority (2026-10-25): the MPC whose solver runs a
+  fixed number of iterations first, fully compiled and differentiable with its closed loop;
+  convergence analysis with control tools long term.
+- **Options:** with S76 and S31 in v0.4 (NS-8 right after S76, NS-9 right after S31); or after
+  v0.4.
+- **Recommendation:** NS-1 (internal) any time; NS-8 and NS-9 in v0.4 behind S76 and S31, since
+  both already change the MPC block and the sampled loop.
+- **Detail:** [native-optimizers.md](../plans/native-optimizers.md) §4.6, §5
 - **Answer:**
 
 ### Does Diffrax join as an optional JAX solver?
