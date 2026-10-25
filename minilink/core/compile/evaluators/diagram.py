@@ -11,7 +11,6 @@ from minilink.core.compile.evaluators.base import (
     assigned,
     check_jax_compatible,
     gather_u,
-    op_params_of,
 )
 from minilink.core.compile.evaluators.compiled import compiled
 from minilink.core.compile.plan import ExecutionPlan
@@ -32,7 +31,11 @@ class DiagramEvaluator(ContinuousEvaluator):
             plan.state_dim, diagram.m, p, backend, diagram.get_u_from_input_ports()
         )
         self.plan = plan
-        self._frozen_params = None
+        self._frozen_params = {
+            op.sys_id: op.bound_params
+            for op in (*plan.port_ops, *plan.state_ops)
+            if op.sys_id
+        }
         self._subsystem_ids = tuple(diagram.subsystems)
 
         if backend == BACKEND_JAX:
@@ -61,6 +64,7 @@ class DiagramEvaluator(ContinuousEvaluator):
     @compiled
     def signals(self, x, u, t=0.0, params=None):
         """The internal signal buffer at ``(x, u, t)``: every block output."""
+        self.require_params(params)
         dtype = self.dtype_of(x, u)
         return self.port_signals(x, u, t, dtype, params)
 
@@ -95,11 +99,11 @@ class DiagramEvaluator(ContinuousEvaluator):
         """Fill the signal buffer; ``inject=(wire_slice, delta)`` adds ``delta`` to one wire."""
         xp = self.xp
         signals = xp.zeros(self.plan.signal_dim, dtype=dtype)
+        params = self._frozen_params if params is None else params
         for op in self.plan.port_ops:
             local_x = x[op.local_x_slice]
             local_u = gather_u(op.gather_sources, op.u_dim, signals, u, xp, dtype)
-            op_params = op_params_of(op, params)
-            y_out = op.compute_func(local_x, local_u, t, op_params)
+            y_out = op.compute_func(local_x, local_u, t, params[op.sys_id])
             signals = assigned(xp, signals, op.out_slice, y_out)
             if inject is not None and op.out_slice == inject[0]:
                 signals = added(xp, signals, op.out_slice, inject[1])
@@ -109,12 +113,15 @@ class DiagramEvaluator(ContinuousEvaluator):
         """Every block's ``dx`` from the filled signal buffer."""
         xp = self.xp
         dx = xp.zeros(self.plan.state_dim, dtype=dtype)
+        params = self._frozen_params if params is None else params
         for op in self.plan.state_ops:
             local_x = x[op.local_x_slice]
             local_u = gather_u(op.gather_sources, op.u_dim, signals, u, xp, dtype)
-            op_params = op_params_of(op, params)
             dx = assigned(
-                xp, dx, op.local_x_slice, op.f_func(local_x, local_u, t, op_params)
+                xp,
+                dx,
+                op.local_x_slice,
+                op.f_func(local_x, local_u, t, params[op.sys_id]),
             )
         return dx
 

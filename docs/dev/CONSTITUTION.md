@@ -12,7 +12,14 @@ is well-architected, or is worth keeping, this document is the governing authori
    modern control, trajectory optimization, and reinforcement learning. Minilink is the
    integrating systems backbone: one clean Python interface for modeling, simulation,
    control, optimization, and learning. The same `System` does all of those jobs —
-   there is no separate simulation stack and learning stack.
+   there is no separate simulation stack and learning stack. Three foundations hold the
+   toolbox together — the continuous model (`System`), the task (`PlanningProblem` and
+   `PlanningSolution`), and the solver boundary (`MathematicalProgram` and `Optimizer`) —
+   connected by one differentiable path from the model and its parameters to the cost.
+   Every approach that controls a vehicle or a robot is a tool on that path: classical
+   and state-space control, nonlinear control, dynamic programming, trajectory
+   optimization and MPC, reinforcement learning, system identification, and state
+   estimation.
 2. **Code that reads like a textbook.** Mathematical equations in the code mirror the textbook
    ($\dot{x} = A x + B u$, $dx = f(x, u, t)$). Verbs and nouns belong to the domain of
    mechanical and control engineering, not computer science abstractions.
@@ -82,10 +89,11 @@ parameter family reach any object the way they reach `f`. An object that does no
 
 ### The Five Contract Invariants
 1. **Everything that can be viewed as a system is a System.** Plants, controllers, observers,
-   filters, neural policies, and flow diagrams share the identical object model. One seam
-   stands open: the sampled-loop containers `Computer` and `HybridDiagram` are not Systems,
-   though `StepSystem` and `StepDiagramSystem` are. Closing it is an open
-   decision of the roadmap, not a licence to open a second one.
+   filters, neural policies, and flow diagrams share the identical object model;
+   discrete-time systems (`StepSystem`, `StepDiagramSystem`) form a closed sibling algebra
+   on an integer tick. The sampled loop (`Computer`, `HybridDiagram`) that couples a
+   discrete clock to a continuous plant is a simulation tool, not a `System`, keeping
+   discrete scheduling out of continuous dynamics `f`.
 2. **Functional purity in equation paths.** Arrays in, arrays out. Equation paths — $f$, $h$,
    and the equation methods of sets, costs, fields, shapes and distributions (`margin`, `g`,
    `h`, `value`, `sdf`, `sample`) — have no internal mutable state, no cached side effects,
@@ -155,8 +163,12 @@ When trade-offs or design tensions arise, higher-ranked principles strictly over
   `feedback()` are the explicit-wiring entry points for topologies the operators do not
   reach. The sibling hybrid algebra adds exactly one operator, `%`, which schedules a block
   into a `Computer`. Do not grow a second wiring dialect in either algebra.
-- **Build vs run:** Wiring, validation, and `compile()` freeze diagram structure. Runtime
-  stepping must not mutate topology.
+- **Build vs run:** Wiring, structural switches (which terms or ports a block carries),
+  validation, and `compile()` freeze structure and snapshot each block's default
+  `params`. `params` holds numbers and numeric arrays only (never `bool` or `str` mode
+  switches); runtime stepping and an explicit `params=...` override (the full nested
+  tree, or `None` for the snapshot) vary parameter values without mutating structure
+  or topology.
 - **Backend-native math:** One equation path for NumPy and JAX. A backend-specific plant
   twin exists only when a single class would sacrifice textbook readability.
 - **Backend honesty:** Minilink guarantees that its own wiring does not impede JAX tracing. If a user's

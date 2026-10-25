@@ -347,14 +347,14 @@ class WiredDiagramMixin:
         """Route nested diagram params to one subsystem (strict contract).
 
         ``None`` → ``None`` (subsystem uses its live ``self.params``);
-        a mapping → ``params.get(sys_id)`` (missing id → ``None`` → defaults).
+        a mapping → ``params[sys_id]`` (every block id must be present).
         Anything else is a contract violation.
         """
         if params is None:
             return None
         require_params_mapping(params)
 
-        return params.get(sys_id)
+        return params[sys_id]
 
     def compute_subsys_output_port(self, x, u, t, sys_id, port_id, params=None):
         """Evaluate one subsystem output port, recursing through its sources."""
@@ -659,11 +659,8 @@ class DiagramOutputPort(OutputPort):
 def check_diagram_params(params, subsystem_ids):
     """Check the nested diagram params contract.
 
-    ``params`` must be ``None`` or a mapping keyed by subsystem id whose values
-    are per-subsystem params dicts. Missing subsystem ids are allowed: those
-    subsystems fall back to their live ``self.params`` on the uncompiled diagram,
-    and to their parameters as compiled on an evaluator. Unknown ids raise so
-    sys-id typos fail loudly instead of silently using defaults.
+    ``params`` must be ``None`` or a mapping that names every subsystem id.
+    A missing id is an error; unknown ids raise so sys-id typos fail loudly.
 
     Called once at public entry points (``DiagramSystem.f``, ``tf``,
     ``get_dynamic_geometry``, the evaluators given ``params``, the ``params``
@@ -672,7 +669,7 @@ def check_diagram_params(params, subsystem_ids):
     Parameters
     ----------
     params : None or Mapping
-        Candidate diagram-level params, e.g. ``{"plant": {"m": 1.0}}``.
+        Candidate diagram-level params, e.g. ``{"plant": {…}, "controller": {…}}``.
     subsystem_ids : container of str
         Valid subsystem ids (e.g. ``diagram.subsystems``).
     """
@@ -688,6 +685,11 @@ def check_diagram_params(params, subsystem_ids):
         raise ValueError(
             f"Unknown subsystem ids in diagram params: {names}; available: {available}"
         )
+
+    missing = [key for key in subsystem_ids if key not in params]
+    if missing:
+        names = ", ".join(repr(key) for key in missing)
+        raise ValueError(f"Diagram params must name every subsystem; missing: {names}")
 
 
 def iter_subsystems(diagram, prefix=()):

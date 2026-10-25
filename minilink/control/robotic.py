@@ -52,14 +52,14 @@ class JointImpedance(System):
         n = self.dof
         ref_dim = 2 * n if tracking_ref else n
 
-        # Parameters: the joint stiffness and damping, and the feedforward switch
+        # Parameters: the joint stiffness and damping
         self.params = {
             "Kp": as_dof_vector(10.0 if Kp is None else Kp, n),
             "Kd": as_dof_vector(1.0 if Kd is None else Kd, n),
-            "gravity_comp": bool(gravity_comp),
         }
 
-        # Ports: the reference and the measurement [q; dq] in, the joint torque out
+        # Ports: the reference and the measurement [q; dq] in, the joint torque out.
+        # Gravity feedforward is a second law, bound here, not a flag in params.
         self.add_input_port("r", dim=ref_dim, nominal_value=np.zeros(ref_dim))
         self.add_input_port(
             "y",
@@ -70,16 +70,15 @@ class JointImpedance(System):
         self.add_output_port(
             "u",
             dim=n,
-            function=self.ctl,
+            function=self.ctl_with_gravity if gravity_comp else self.ctl,
             dependencies=("r", "y"),
         )
 
     def ctl(self, x, u, t=0, params=None):
+        """τ = Kp e + Kd ė."""
         params = self.params if params is None else params
         xp = array_module(u)
 
-        plant = self.plant
-        gravity = self.gravity
         n = self.dof
         ref_dim = self.inputs["r"].dim
         Kp = xp.asarray(params["Kp"])
@@ -98,11 +97,16 @@ class JointImpedance(System):
             dq_d = r[n:]
             tau = Kp * (q_d - q) + Kd * (dq_d - dq)
 
-        # τ ← τ + g(q), when the gravity feedforward is on
-        if params.get("gravity_comp", False):
-            tau = tau + gravity_feedforward(plant, gravity, q)
-
         return tau.reshape(-1)
+
+    def ctl_with_gravity(self, x, u, t=0, params=None):
+        """τ = Kp e + Kd ė + g(q)."""
+        params = self.params if params is None else params
+        n = self.dof
+        ref_dim = self.inputs["r"].dim
+        q = u[ref_dim : ref_dim + n]
+        tau = self.ctl(x, u, t, params)
+        return tau + gravity_feedforward(self.plant, self.gravity, q)
 
 
 class TaskImpedance(System):
@@ -159,17 +163,16 @@ class TaskImpedance(System):
         n = self.task_dim
         ref_dim = 2 * n if tracking_ref else n
 
-        # Parameters: the task stiffness and damping, and the feedforward switch
+        # Parameters: the task stiffness and damping
         Kp = np.full(n, 10.0) if Kp is None else as_dof_vector(Kp, n)
         Kd = np.full(n, 1.0) if Kd is None else as_dof_vector(Kd, n)
         self.params = {
             "Kp": Kp,
             "Kd": Kd,
-            "gravity_comp": bool(gravity_comp),
         }
 
         # Ports: the task reference and the joint measurement [q; dq] in, the joint
-        # torque out
+        # torque out. Gravity feedforward is a second law, bound here.
         self.add_input_port("r", dim=ref_dim, nominal_value=np.zeros(ref_dim))
         self.add_input_port(
             "y",
@@ -181,7 +184,7 @@ class TaskImpedance(System):
         self.add_output_port(
             "u",
             dim=self.dof,
-            function=self.ctl,
+            function=self.ctl_with_gravity if gravity_comp else self.ctl,
             dependencies=("r", "y"),
         )
 
@@ -218,21 +221,20 @@ class TaskImpedance(System):
         return q, p, p_d, J, f_task
 
     def ctl(self, x, u, t=0, params=None):
+        """τ = J(q)ᵀ (Kp e_p + Kd e_v)."""
         params = self.params if params is None else params
-
-        plant = self.plant
-        gravity = self.gravity
-
-        q, _, _, J, f_task = self.task_quantities(u, params)
+        _, _, _, J, f_task = self.task_quantities(u, params)
 
         # τ = Jᵀ f_task
         tau = J.T @ f_task
-
-        # τ ← τ + g(q), when the gravity feedforward is on
-        if params.get("gravity_comp", False):
-            tau = tau + gravity_feedforward(plant, gravity, q)
-
         return tau.reshape(-1)
+
+    def ctl_with_gravity(self, x, u, t=0, params=None):
+        """τ = J(q)ᵀ (Kp e_p + Kd e_v) + g(q)."""
+        params = self.params if params is None else params
+        tau = self.ctl(x, u, t, params)
+        q = u[self.inputs["r"].dim : self.inputs["r"].dim + self.dof]
+        return tau + gravity_feedforward(self.plant, self.gravity, q)
 
     def tf(self, x, u, t=0, params=None):
         if not self.show_task_force:

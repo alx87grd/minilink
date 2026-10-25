@@ -3,12 +3,13 @@
 **Status:** steps 0–6 and the Monte Carlo fold (step 7a) landed on 2026-10-24: the native
 `Trajectory`, one scoring formula on the problem's fields, the problem evaluator
 (`problem.compile`, `evaluate`, `compare`) and its program export, the cost parameters, and the
-draws of the start and of the plant parameters. The contract is DESIGN §4–§6 (§6 "One scoring
+draws of the start and of the plant parameters (and on 2026-10-25, R92, per-trial realizations
+of random blocks inside the evaluated loop). The contract is DESIGN §4–§6 (§6 "One scoring
 formula", "Stochastic problem", "The problem evaluator"); the decisions the run took without the
 maintainer are [the run's log](../reviews/2026-10-24-v03-run-decisions.md) §2, and the rulings
 are [the rulings record](../reviews/2026-10-22-rulings-session-1.md) (R9–R11, R15–R47,
-R71–R77). The design of the landed steps is in git history. This doc now holds what remains,
-all v0.4: the `StepRollout` fold, step 7 (a noise block's per-trial seeds), step 7b (the sampled
+R71–R77) and [the 2026-10-25 rulings](../reviews/2026-10-25-open-questions-rulings.md) (R91–R97). The design of the landed steps is in git history. This doc now holds what remains,
+all v0.4: the `StepRollout` fold, step 7 (`disturbances=` port signals and cross-backend draws in `problem.realize`), step 7b (the sampled
 face), step 8 (sets as costs, a source policy's samples as leaves) and step 9 (the material),
 and traceable linear analysis (S73, §4.6), any time. Two leftovers of landed steps wait for the
 maintainer in [TODO.md](TODO.md) §4: the LQR warning on a declared `U` (OD-33 of the run's log)
@@ -41,7 +42,7 @@ is `objective`, the problem's criterion over the runs' `J` (R45).
 | --- | --- | --- | --- | --- | --- |
 | The run's `cost` and `J` (`Evaluation.cost`, `.J`, `.objective`) | landed | step 8 (a source policy's leaves) | landed | cost landed; sets step 8 | landed |
 | The whole run (`pe.trajectory(params)`) | landed | step 8 | landed | — | landed |
-| The criterion over the problem's draws (mean, CVaR, worst) | landed; a noise block's draws step 7 | step 8 | landed | cost landed; sets step 8 | landed |
+| The criterion over the problem's draws (mean, CVaR, worst) | landed (loop noise blocks included, R92; `disturbances=` ports step 7) | step 8 | landed | cost landed; sets step 8 | landed |
 | The feasibility and reachability margins (`Evaluation.feasibility_margin`, `.reachability_margin`) | landed | step 8 | landed | step 8 | landed |
 | Closed-loop poles, damping ratios, natural frequencies | S73 | — | S73 | — | — (linearized at `x̄`) |
 | Gain and phase margins, Bode values, the sensitivity peaks `M_s`, `M_t` | S73 | — | S73 | — | — |
@@ -120,10 +121,12 @@ content. Steps 0–6 and 7a landed on 2026-10-24.
   becomes a constructor of `Trajectory` with `t = k·dt`, byte-identical; it waits for S31
   because it is the hybrid simulator's computer record and MPC's dual-rate view, and every
   hybrid piece moved to v0.4 (R86).
-- **Step 7, a disturbance block's draws** (v0.4, RN-4): one seed per noise block in `realize`,
-  joining the same verb; a noise block inside `sys` and on a `disturbances` port realized per
-  trial. Today `evaluate` holds the `disturbances` ports at their nominal values and warns
-  (`warn_if_disturbed` in `planning/evaluator.py`).
+- **Step 7, `disturbances=` port signals and `problem.realize` seeds** (v0.4, RN-4): per-trial
+  realization of random blocks inside the evaluated loop landed in v0.3 (`trial_seeds`, R92);
+  step 7 moves those seeds into `problem.realize(key, n)` (alongside cross-backend start and
+  parameter draws) and wires `disturbances=` signal blocks onto their ports in `evaluate`
+  (today `evaluate` holds the `disturbances` ports at their nominal values and warns,
+  `warn_if_disturbed` in `planning/evaluator.py`).
 - **Step 7b, the sampled face** (the hybrid phase, after S31's kernel): `compile` dispatches a
   sampled controller (a digital PID, a held neural policy, MPPI, the RL policies) to the
   kernel's JAX face; the refusal goes (today `require_continuous` in `planning/evaluator.py`

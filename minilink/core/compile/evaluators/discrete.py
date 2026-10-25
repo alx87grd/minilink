@@ -14,7 +14,6 @@ from minilink.core.compile.evaluators.base import (
     assigned,
     check_jax_compatible,
     gather_u,
-    op_params_of,
     outputs_from_ports,
 )
 from minilink.core.compile.evaluators.compiled import body_of, compiled
@@ -173,7 +172,11 @@ class StepDiagramEvaluator(DiscreteEvaluator):
         )
         self.plan = plan
         self.dtype = self.xp.float64
-        self._frozen_params = None
+        self._frozen_params = {
+            op.sys_id: op.bound_params
+            for op in (*plan.port_ops, *plan.step_ops)
+            if op.sys_id
+        }
         self._subsystem_ids = tuple(diagram.subsystems)
 
         if backend == BACKEND_JAX:
@@ -228,11 +231,11 @@ class StepDiagramEvaluator(DiscreteEvaluator):
         dtype = self.dtype
         signals = xp.zeros(self.plan.signal_dim, dtype=dtype)
         x_arr = xp.asarray(x, dtype=dtype).reshape(self.plan.state_dim)
+        params = self._frozen_params if params is None else params
         for op in self.plan.port_ops:
             local_x = x_arr[op.local_x_slice]
             local_u = gather_u(op.gather_sources, op.u_dim, signals, u, xp, dtype)
-            op_params = op_params_of(op, params)
-            y_out = op.compute_func(local_x, local_u, k, op_params)
+            y_out = op.compute_func(local_x, local_u, k, params[op.sys_id])
             signals = assigned(xp, signals, op.out_slice, y_out)
             if inject is not None and op.out_slice == inject[0]:
                 signals = added(xp, signals, op.out_slice, inject[1])
@@ -243,15 +246,15 @@ class StepDiagramEvaluator(DiscreteEvaluator):
         xp = self.xp
         dtype = self.dtype
         x_new = xp.array(x, dtype=dtype).reshape(self.plan.state_dim)
+        params = self._frozen_params if params is None else params
         for op in self.plan.step_ops:
             local_x = x_new[op.local_x_slice]
             local_u = gather_u(op.gather_sources, op.u_dim, signals, u, xp, dtype)
-            op_params = op_params_of(op, params)
             x_new = assigned(
                 xp,
                 x_new,
                 op.local_x_slice,
-                op.step_func(local_x, local_u, k, op_params),
+                op.step_func(local_x, local_u, k, params[op.sys_id]),
             )
         return x_new
 

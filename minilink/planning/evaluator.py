@@ -217,19 +217,52 @@ class ProblemEvaluator:
         from minilink.optimization.mathematical_program import MathematicalProgram
 
         wrt = paths_of(wrt)
+        if tunes(wrt, "x_start") and self.problem.is_stochastic:
+            raise ValueError(
+                "cannot put 'x_start' in wrt on a stochastic problem: the starts are drawn"
+            )
+
         base = self.merged(params)
         z0 = self.pack(base, wrt)
         n_trials = trials_of(self.problem, n_trials)
-
-        # J(z): the objective of the evaluation at the unpacked leaves
-        def J(z):
-            return self.evaluate(self.unpack(z, wrt, base), key, n_trials).objective
-
-        # g(z) ≥ 0: the margins of the declared sets, one row per trial
         rows = declared_rows(self.problem)
 
+        # The draws, the price and the cost bound stay fixed when the start and
+        # the cost are not among the tuned leaves
+        freeze = not tunes(wrt, "x_start") and not tunes(wrt, "cost")
+        if freeze:
+            x_starts, trial_params = self.realize(base, key, n_trials)
+            price = price_of(self.problem, self.tf)
+            bound = diverged_cost_of(self.problem, self.tf, price)
+            batched = isinstance(trial_params, Batched)
+            frozen_tree = trial_params.tree if batched else trial_params
+            frozen_axes = trial_params.axes if batched else None
+
+            def overlay(z):
+                tree = self.unpack(z, wrt, frozen_tree)
+                return Batched(tree, frozen_axes) if batched else tree
+
+            def report_of(z):
+                trial_rows, _ = self.run_trials(
+                    overlay(z), x_starts, False, price, bound
+                )
+                return Evaluation(
+                    **trial_rows,
+                    x0=x_starts,
+                    trajectories=None,
+                    criterion=criterion_of(self.problem),
+                )
+
+        else:
+
+            def report_of(z):
+                return self.evaluate(self.unpack(z, wrt, base), key, n_trials)
+
+        def J(z):
+            return report_of(z).objective
+
         def g(z):
-            report = self.evaluate(self.unpack(z, wrt, base), key, n_trials)
+            report = report_of(z)
             xp = array_module(report.J)
             return xp.concatenate([getattr(report, row) for row in rows])
 
@@ -943,6 +976,11 @@ def warn_if_infinite(J0, problem):
 def paths_of(wrt):
     """``wrt`` as a tuple of paths (one path given as a string)."""
     return (wrt,) if isinstance(wrt, str) else tuple(wrt)
+
+
+def tunes(wrt, name):
+    """Whether ``wrt`` names ``name`` or a leaf under it (``"cost"``, ``"cost.Q"``)."""
+    return any(path == name or path.startswith(name + ".") for path in wrt)
 
 
 def split_path(path):

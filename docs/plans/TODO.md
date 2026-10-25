@@ -237,6 +237,16 @@ pick):
 - [ ] Bare `import jax` in `simulation/compile_backend.py` and `from jax.errors` in
   `analysis/derivatives.py` → `require_jax()` (RULES 5.12); the two rows the textbook-style
   allowlist still carries.
+- [x] **Numeric-only `params` (R118):** `"gravity_comp"` is gone from `JointImpedance.params`
+  and `TaskImpedance.params`; port `"u"` binds `ctl_with_gravity` or `ctl` at `__init__`;
+  `@compiled` is plain `jax.jit` (`params_filtered_jit` deleted).
+- [x] **Complete-tree `params` (R121, supersedes R117):** `params=None` or a nested tree
+  that names every block; `check_diagram_params` refuses a missing id; `op_params_of` is
+  gone; diagram evaluators hold `_frozen_params` / public `evaluator.params`;
+  `params_batch_axes` compares `ndim == ref_ndim + 1` only.
+- [x] `ProblemEvaluator.program` realizes `(x_starts, trial_params)`, `price` and `bound`
+  once when `"x_start"` and `"cost"` are not in `wrt`, and refuses `"x_start"` in `wrt`
+  on a `StochasticPlanningProblem`.
 
 **S65–S69 — one owner per rule, contracts as tests, students' laptops:**
 
@@ -392,7 +402,9 @@ moved to the new interface (R47).
 - [ ] **V1.2, the rest** (the evaluation of a run, the problem's fields, the price switch and the cost
   bound landed 2026-10-24): LQR warns once when `U` is declared (the U sweep wrote
   `U=plant.input_box` on lessons that never needed it, so the warning waits for the maintainer's
-  pass on those lines).
+  pass on those lines); `ReinforcementLearningPlanner` sizes its default `NeuralPolicyController`
+  from `problem.U.bounding_box()` and refuses an unbounded `problem.U` (R21), and
+  `StateSpaceGrid.state_bounds` aligns with `input_bounds`.
 - [ ] **S74, the rest** (the method table and the first-order backend landed 2026-10-24): the hand
   descent loops of `examples/demos/compile/` other than the closing example's first section
   (`cartpole_rollout_gradients`, `neural_controller_jax`, `params_gradient`) moved onto

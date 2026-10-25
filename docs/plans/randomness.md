@@ -89,8 +89,9 @@ steps still change:
   (`warn_if_disturbed`, `planning/evaluator.py`). RN-4 makes them signals; the rest of RN-5 wires
   them on their ports.
 - `problem.realize(key, n)` draws the starts, the parameter values and one held value per
-  disturbance port, with no per-block seeds: a noise block inside `sys` keeps its own seed across
-  trials, so every trial sees the same noise signal (RN-4). `System.realize(key)` and
+  disturbance port, with no per-block seeds (`evaluate` realizes random blocks inside the
+  evaluated loop per trial via `trial_seeds`, R92, while `RolloutEnvironment` still keeps a
+  random block's seed across episodes until RN-4). `System.realize(key)` and
   `child_seed` exist since RN-1.
 - `Gaussian(mean, std)` has no `cov`, and `Distribution.sample(key, n=None)` takes no `params`
   (RN-2).
@@ -415,9 +416,9 @@ builds the loop as a diagram (`closed_loop_of(problem, arg)`: `ctl @ sys` for a 
 solver label is the escape, one run per trial, R42). The cost is scored on the plant's own run
 (`traj.of("plant")`). There is no static-law assumption left: a controller with state and the
 observer-based compensator of P4 go through it; a sampled law (a `Computer @ plant` loop) is
-refused until V1's step 7b. Still open (RN-4, the rest of RN-5): each `disturbances` signal wired
-onto its port (today held at nominal, with a warning), and a noise block already inside `sys`
-realized per trial. A continuous law acts continuously; a sampled law is a `Computer`. The
+refused until V1's step 7b.   Still open (RN-4, the rest of RN-5): each `disturbances` signal wired
+  onto its port (today held at nominal, with a warning), and per-block seeds moved into
+  `problem.realize` (`evaluate` already realizes random blocks inside the loop per trial, R92). A continuous law acts continuously; a sampled law is a `Computer`. The
 held-input rollout of `RolloutEnvironment` stays the learner's stepped view and is not the
 evaluator's.
 

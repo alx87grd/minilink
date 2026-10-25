@@ -57,7 +57,7 @@ A model is dynamics `f`, outputs `h` and body poses `tf`, functions of the state
 `x`, the input `u`, the time `t` and the parameters `params`:
 
     dx/dt = f(x, u, t; params)      dynamics
-    y     = h(x, u, t; params)      one per output port, default y = x
+    y     = h(x, u, t; params)      outputs, default y = x
     T     = tf(x, u, t; params)     body poses, for animation
 
 Write `f`, and the model simulates and plots. Write `h` to choose what the sensor
@@ -146,7 +146,7 @@ tools:
 | Simulate, plot, animate, play | `compute_trajectory`, `plot_trajectory`, `plot_phase_plane`, `animate`, `game` |
 | Analyze | `linearize`, `bode`, `pzmap`, `margins`, `root_locus`, `step_response` |
 | Design | `lqr`, `place`, `kalman`, `lqg`, `PID`, `Impedance` |
-| Plan and learn | `DynamicProgrammingPlanner`, `RRTPlanner`, `TrajectoryOptimizationPlanner`, `ModelPredictiveController`, `ReinforcementLearningPlanner` |
+| Plan, evaluate, optimize and learn | `DynamicProgrammingPlanner`, `RRTPlanner`, `TrajectoryOptimizationPlanner`, `ModelPredictiveController`, `ReinforcementLearningPlanner`, `evaluate`, `compare`, `Optimizer` |
 
 ## One problem, every planner
 
@@ -157,7 +157,7 @@ reinforcement learning, and returns a `PlanningSolution` whose policy is a contr
 ```python
 from minilink import (
     BallSet, DynamicProgrammingPlanner, PlanningProblem, QuadraticCost,
-    RRTPlanner, TrajectoryOptimizationPlanner,
+    RRTPlanner, TrajectoryOptimizationPlanner, compare,
 )
 
 plant = Pendulum()
@@ -172,19 +172,24 @@ vi = DynamicProgrammingPlanner(problem, x_grid=(101, 101), u_grid=(11,), dt=0.05
 rrt = RRTPlanner(problem, seed=0)
 opt = TrajectoryOptimizationPlanner(problem, n_steps=40, transcription="direct_collocation")
 
-policy = vi.solve().policy            # value iteration: the policy is a controller
-tree_traj = rrt.solve().trajectory    # kinodynamic tree search, bang-bang inputs
-plan = opt.solve().trajectory         # direct collocation
+vi_sol = vi.solve()                   # value iteration: the policy is a controller
+rrt_sol = rrt.solve()                 # kinodynamic tree search, bang-bang inputs
+opt_sol = opt.solve()                 # direct collocation
 
-loop = policy @ plant                 # the script closes the loop
+loop = vi_sol.policy @ plant          # the script closes the loop
+print(compare(problem, VI=vi_sol, RRT=rrt_sol, TrajOpt=opt_sol, dt=0.05))
 ```
 
 ## Fast and differentiable with JAX, optional
 
 The same `f` traces under JAX. One compiled evaluator gives exact derivatives,
-batched rollouts and gradients through a whole simulation:
+batched rollouts, and gradients of a closed-loop cost with respect to any gain or
+physical parameter:
 
 ```python
+import jax
+from minilink import Optimizer
+
 ev = plant.compile(backend="jax")
 x0s = np.tile([1.0, 0.0], (1000, 1))              # 1000 rollouts released at 1 rad
 lengths = np.linspace(0.5, 2.0, 1000)             # one rod length per rollout
@@ -193,6 +198,12 @@ A = plant.jacobian("f", "x", x_up)                # exact linearization
 S = plant.jacobian("f", "params", x_up)           # sensitivity to each physical parameter
 xs = ev.rollout_batch(x0s, n_steps=1000, dt=0.005,
                       params=dict(plant.params, l=lengths))   # a family of rod lengths, one call
+
+tuning = PlanningProblem(plant, x_start=[1.0, 0.0], cost=QuadraticCost.from_system(plant), tf=4.0)
+pe = tuning.compile(PID(2.0, 0.5, 1.0), dt=0.02)
+dJ = jax.grad(lambda p: pe.evaluate(p).objective)(pe.params)  # gradient w.r.t. every gain and plant param
+program = pe.program(wrt=["controller.Kp", "controller.Ki", "controller.Kd"])
+result = Optimizer(program, method="auto").solve()            # L-BFGS on the closed-loop cost
 ```
 
 1000 rollouts of 1000 RK4 steps take 27 ms as a compiled batch, against about

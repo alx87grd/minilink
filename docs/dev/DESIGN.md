@@ -337,15 +337,15 @@ read `params` yet, the gap is tracked below.
 - **Diagram params are nested by subsystem id**: `{"plant": {…}, "controller": {…}}`.
   `DiagramSystem.params` is a live-view property — the getter assembles
   `{sys_id: subsystem.params}` from live references (subsystems stay the
-  single source of truth), the setter distributes by sys_id. Partial dicts are
-  allowed (missing sys_id → that block's live `self.params` on the uncompiled
-  diagram, its parameters as compiled on an evaluator, both backends); unknown sys_ids
-  raise; per-subsystem dicts are full replacements at the block level. Nested
-  diagrams nest the dict recursively.
-- Compile: a diagram's compile copies every block's params into the plan, as a leaf's does, and
-  the evaluator's `params=None` reads the parameters as compiled on both backends; an edit after
-  compile needs a recompile or an explicit `params`. A `params` dict passed to `f` / `outputs` / `step`
-  takes the nested dict on both backends in their place. On JAX the dict is a pytree argument
+  single source of truth), the setter distributes by sys_id. A tree passed to
+  `f` / `outputs` / `step`, or assigned to `diagram.params`, names every block
+  (a missing id is an error; unknown ids raise). Edit one number by mutating a
+  live key (`diagram.params["plant"]["m"] = 4`). Nested diagrams nest the dict
+  recursively.
+- Compile: a diagram's compile copies every block's params into the plan, as a leaf's does.
+  The evaluator's `params` is that snapshot; `params=None` reads it. An edit after
+  compile needs a recompile or an explicit complete tree (copy `evaluator.params` and
+  replace the block you change). On JAX the dict is a pytree argument
   (numeric leaves required): values vary without retracing, and
   `evaluator.jacobian("f", "params")` / `jax.grad` differentiate dynamics
   w.r.t. parameters (see `examples/demos/compile/params_gradient.py`).
@@ -715,13 +715,13 @@ block):
 
 A step evaluator has `step(x, u, k=0, params=None)` (the system's own map on the integer
 tick, no knobs), `outputs` and a state-only `rollout(x0, *, n_steps, u=None, params=None)`;
-a static evaluator has `outputs` only. On NumPy each method is its plain body. On JAX each
+a static evaluator has `outputs` only.   On NumPy each method is its plain body. On JAX each
 is marked `@compiled` (a step evaluator's `rollout` through its scan, returned as a NumPy
 `StepRollout`) (`core/compile/evaluators/compiled.py`): `jax.jit` of the body, built
 on first use and cached per evaluator, the knobs (`solver`, `substeps`, `hold`, `n_steps`)
-static. In a `params` tree the numbers and arrays are traced; a leaf that is not a number (a
-Python `bool` flag, a string) is held static, so a block that branches on a flag in its
-`params` compiles with the dict passed too. A compiled method is fast from Python and composes inside an outer `jit`, `grad`,
+static. Every leaf of `params` is numeric (floats, numeric arrays, or integer seeds; never
+a `bool` or `str` mode switch, which belongs on the constructor, R118), so the whole
+`params` tree traces directly. A compiled method is fast from Python and composes inside an outer `jit`, `grad`,
 `vmap` or `scan` with the numbers of the uncompiled body, so there is one name per method:
 no parametric twin, no trace tier, no `jit` namespace.
 

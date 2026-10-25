@@ -87,10 +87,10 @@ class PortOperation:
         Total dimension of the assembled local input vector.
         Equal to the sum of all ``dim`` values in ``gather_sources``.
     bound_params : dict | None
-        The subsystem's ``params`` as compiled, a deep copy, passed as the
-        fourth argument to ``compute_func`` when the caller passes no
-        ``params``. It does not freeze other instance attributes; purity of
-        ``compute_func`` is not enforced.
+        The subsystem's ``params`` as compiled, a deep copy. The evaluator
+        collects these into ``evaluator.params``; ``params=None`` reads that
+        tree and each op takes ``params[sys_id]``. It does not freeze other
+        instance attributes; purity of ``compute_func`` is not enforced.
     sys_id : str
         Id of the owning subsystem in the diagram. Used by the parametric
         evaluator tier to route nested diagram params (``params[sys_id]``).

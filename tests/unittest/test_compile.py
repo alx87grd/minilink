@@ -416,31 +416,37 @@ def _build_step_loop_jax():
 
 
 @pytest.mark.parametrize("backend", ["numpy", "jax"])
-def test_a_block_left_out_of_a_partial_tree_reads_its_snapshot(backend):
-    """A tree naming the plant only: the controller keeps its compiled gain, on both backends."""
+def test_a_missing_block_in_params_raises(backend):
+    """A tree that omits a block is refused, on both backends."""
     if backend == "jax":
         pytest.importorskip("jax")
     x = np.array([0.3])
     u = np.array([1.0])
     plant_only = {"plant": {"k": 2.0}}
 
-    # The flow diagram: u = Kp (r − y) = 2.5 · 0.7, dx = k u
     flow = _build_small_closed_loop_jax()
     flow.connect_new_output_port("controller", "u", "u_cmd")
     ev = flow.compile(backend=backend)
+    with pytest.raises(ValueError, match="missing"):
+        ev.f(x, u, 0.0, plant_only)
+
+    # A copy of the snapshot with the plant replaced: the compiled gain stays
+    p = {**ev.params, "plant": {"k": 2.0}}
     flow.subsystems["controller"].params["Kp"] = 100.0
-    np.testing.assert_allclose(np.asarray(ev.f(x, u, 0.0, plant_only)), [3.5])
-    signals = ev.compute_internal_signals_dict(x, u, 0.0, plant_only)
+    np.testing.assert_allclose(np.asarray(ev.f(x, u, 0.0, p)), [3.5])
+    signals = ev.compute_internal_signals_dict(x, u, 0.0, p)
     np.testing.assert_allclose(np.asarray(signals["controller:u"]), [1.75])
-    outputs = ev.outputs(x, u, 0.0, plant_only)
+    outputs = ev.outputs(x, u, 0.0, p)
     np.testing.assert_allclose(np.asarray(outputs["u_cmd"]), [1.75])
 
-    # The step diagram: x_{k+1} = x_k + k u_k
     loop = _build_step_loop_jax()
     step_ev = loop.compile(backend=backend)
+    with pytest.raises(ValueError, match="missing"):
+        step_ev.step(x, u, 0, plant_only)
+    p_step = {**step_ev.params, "plant": {"k": 2.0}}
     loop.subsystems["controller"].params["Kp"] = 100.0
-    np.testing.assert_allclose(np.asarray(step_ev.step(x, u, 0, plant_only)), [3.8])
-    step_outputs = step_ev.outputs(x, u, 0, plant_only)
+    np.testing.assert_allclose(np.asarray(step_ev.step(x, u, 0, p_step)), [3.8])
+    step_outputs = step_ev.outputs(x, u, 0, p_step)
     np.testing.assert_allclose(np.asarray(step_outputs["u_cmd"]), [1.75])
 
 
@@ -550,7 +556,7 @@ class TestDiagramParamsContract(unittest.TestCase):
         self.assertIs(params["plant"], self.diag.subsystems["plant"].params)
 
     def test_params_setter_distributes_by_sys_id(self):
-        self.diag.params = {"plant": {"k": 3.0}}
+        self.diag.params = {**self.diag.params, "plant": {"k": 3.0}}
         self.assertEqual(self.diag.subsystems["plant"].params["k"], 3.0)
         np.testing.assert_allclose(self.diag.f(self.x, self.u), [11.25], atol=1e-10)
 
@@ -562,9 +568,9 @@ class TestDiagramParamsContract(unittest.TestCase):
         self.diag.params["plant"]["k"] = 5.0
         np.testing.assert_allclose(self.diag.f(self.x, self.u), [18.75], atol=1e-10)
 
-    def test_partial_params_fall_back_to_defaults(self):
-        dx = self.diag.f(self.x, self.u, 0.0, params={"plant": {"k": 3.0}})
-        np.testing.assert_allclose(dx, [11.25], atol=1e-10)
+    def test_a_missing_block_raises(self):
+        with self.assertRaises(ValueError):
+            self.diag.f(self.x, self.u, 0.0, params={"plant": {"k": 3.0}})
 
     def test_unknown_sys_id_raises(self):
         with self.assertRaises(ValueError):
@@ -615,9 +621,9 @@ class TestNumpyDiagramParametricTier(unittest.TestCase):
             atol=1e-10,
         )
 
-    def test_partial_params(self):
-        dx = self.evaluator.f(self.x, self.u, 0.0, {"plant": {"k": 3.0}})
-        np.testing.assert_allclose(dx, [11.25], atol=1e-10)
+    def test_a_missing_block_raises(self):
+        with self.assertRaises(ValueError):
+            self.evaluator.f(self.x, self.u, 0.0, {"plant": {"k": 3.0}})
 
     def test_unknown_sys_id_raises(self):
         with self.assertRaises(ValueError):
@@ -625,11 +631,12 @@ class TestNumpyDiagramParametricTier(unittest.TestCase):
 
     def test_outputs_with_params_single_boundary(self):
         params = {
+            **self.evaluator.params,
             "controller": {
                 "Kp": np.array([4.0]),
                 "u_min": np.array([-np.inf]),
                 "u_max": np.array([np.inf]),
-            }
+            },
         }
         out = self.evaluator.outputs(self.x, self.u, 0.0, params)
         self.assertEqual(set(out), {"y_meas"})
@@ -660,7 +667,7 @@ class TestDiagramEvaluatorParamsJax(unittest.TestCase):
         )
 
     def test_outputs_p_matches_numpy(self):
-        params = {"plant": {"k": 3.0}}
+        params = {**self.ev.params, "plant": {"k": 3.0}}
         out_j = self.ev.outputs(self.x_j, self.u_j, 0.0, params)
         out_n = self.ev_np.outputs(self.x_np, self.u_np, 0.0, params)
         self.assertEqual(set(out_j), set(out_n))
@@ -683,7 +690,7 @@ class TestDiagramEvaluatorParamsJax(unittest.TestCase):
         def dx0(params):
             return f(self.x_j, self.u_j, 0.0, params)[0]
 
-        g = jax.grad(dx0)({"plant": {"k": 1.0}})
+        g = jax.grad(dx0)({**self.ev.params, "plant": {"k": 1.0}})
         self.assertAlmostEqual(float(g["plant"]["k"]), 2.5 * 1.5, places=4)
 
     def test_jacobian_wrt_params_requires_params(self):
@@ -873,19 +880,18 @@ class TestCompiledMethodsJax(unittest.TestCase):
         grad = jax.jit(jax.grad(loss))(jnp.array([1.0]))
         self.assertEqual(grad.shape, (1,))
 
-    def test_a_flag_in_a_params_dict_stays_a_python_value(self):
+    def test_a_compiled_impedance_loop_traces_with_its_params_tree(self):
         from minilink import JointImpedance, Pendulum
 
-        # The impedance law branches on params["gravity_comp"], a Python bool
         plant = Pendulum()
         loop = JointImpedance(plant) @ plant
         ev = compile(loop, backend="jax")
         x = jnp.full(ev.n, 0.1)
         u = jnp.zeros(ev.m)
         np.testing.assert_array_equal(
-            np.asarray(ev.f(x, u, 0.0, loop.params)), np.asarray(ev.f(x, u, 0.0))
+            np.asarray(ev.f(x, u, 0.0, ev.params)), np.asarray(ev.f(x, u, 0.0))
         )
-        steps = jax.vmap(lambda xx: ev.step(xx, u, 0.0, loop.params, dt=0.01))(
+        steps = jax.vmap(lambda xx: ev.step(xx, u, 0.0, ev.params, dt=0.01))(
             jnp.stack([x, x])
         )
         self.assertEqual(steps.shape, (2, ev.n))

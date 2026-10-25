@@ -118,7 +118,7 @@ Step ids (`S29`, `P4`, `T2`, …) are the rows of
 | Interfaces / RL bridge | research lane (bridge) | 4 | `Sys2Gym` + `SB3Controller`; the env step is one compiled RK4 call. | Keep for external interop; courses solve with the native planner. |
 | Analysis / Lyapunov certificates | provisional (research) | 4 | `region_of_attraction` → `LyapunovCertificate` (quadratic `V`, sampled level, `verify`, `plot`, `contains`); demo and showcase §11. | Cohort validation; `V` as a `QuadraticField` (A1); SOS and discrete time later. |
 | Planning / RL planner | teaching (GRO860) | 6 | `ReinforcementLearningPlanner` (REINFORCE, actor-critic, PPO, SAC in pure JAX), `TabularLearningPlanner` (Q-learning, SARSA, Monte Carlo control), `StochasticPlanningProblem`, `evaluate` and its `Evaluation`; on the root prelude; canonical demos in `examples/demos/rl/`, chapter 11 and the native teaching notebooks. | SAC actor step (S50); deep Q-learning (S52); automatic reward scaling ([rl-reward-scaling.md](../plans/rl-reward-scaling.md)). |
-| Planning / evaluation (the path to the cost) | provisional until a course runs it (R28) | 4 | `problem.compile(controller, dt)` → the problem evaluator; `evaluate` (one run or `n_trials` draws of the continuous loop, integrated to `tf`) and `compare(problem, …)` its facades, `evaluate_trajectory` for a held run; `jax.grad` reaches every gain, plant parameter, cost weight and start; `pe.program(wrt=)` to the `Optimizer`; the closing PID example (S77). On `dev-v0.3`, pending the maintainer's review (R79). | The draws' noise and the sampled face (V1, v0.4); identification's data cost (C4, v0.4). |
+| Planning / evaluation (the path to the cost) | provisional until a course runs it (R28) | 4 | `problem.compile(controller, dt)` → the problem evaluator; `evaluate` (one run or `n_trials` draws of the continuous loop, integrated to `tf`, each trial realizing the loop's random blocks, R92) and `compare(problem, …)` its facades, `evaluate_trajectory` for a held run; `jax.grad` reaches every gain, plant parameter, cost weight and start; `pe.program(wrt=)` to the `Optimizer`; the closing PID example (S77). On `dev-v0.3`, pending the maintainer's review (R79). | The `disturbances=` port signals, cross-backend start/parameter draws and the sampled face (V1, v0.4); identification's data cost (C4, v0.4). |
 | Planning / search (RRT) | teaching (G3, R49) | 5 | RRT / RRT*; `RRTPlanner(problem)` works from the problem's input box alone (bang-bang extender; an unbounded `U` refused with the line to write); returns a `PlanningSolution`. | RRT-Connect later. |
 | Planning / path integral (MPPI) | research lane (planned) | 1 | Two standalone scripts (`experimental/mppi/`): the pendulum swings up; the kinematic racecar laps the cone circuit at a lower closed-loop cost than the collocation MPC. Design: [mppi.md](../plans/mppi.md). | The planner (S72, v0.4) on the sampled kernel, after RN-4 / RN-5. |
 | Geometry / spatial | provisional (teaching) | 4 | SDF + `Scene` / fields / bodies under `planning/spatial/`, JAX twins tested; the planning facade's spatial names are provisional teaching names (§2). Home designed: `core/geometry/`. | Package move and course catalog (A3); bicubic SDF and CBF filter (research). |
@@ -376,9 +376,15 @@ the closing PID example, every decision taken without the maintainer in
 K3b (every public name tested), R12 finished (one body per evaluator method, compiled once on
 JAX) and the package folders restructured (one evaluator class per system kind, the discrete-time
 pieces in their own folders, the composition, engine and facade modules split by job), §8–§11 of
-the same log; S32 postponed by the maintainer on three open questions (TODO §4). **Next:** the
-maintainer's review of that log and of the review passes after it; then what TODO §4 left: the
-catalog clean-up (K8, with K9's last items), S32 once its questions are answered, G3's gate, K4,
+the same log; S32 postponed by the maintainer on three open questions (TODO §4). **Done
+2026-10-25:** the open questions settled without reading code (R91–R120 in
+[the 2026-10-25 record](../reviews/2026-10-25-open-questions-rulings.md): per-trial loop noise seeds,
+compiled diagram parameter snapshots, diverged runs scored at `cost_bound + price`, the tabular
+learner on its grid's solver, the Gym bridge stopping at `tf`, duplicate cost sum refusal,
+`closed_loop` and `feedback` on `minilink.control`, full `>>` chain names, numeric-only `params`,
+and sixteen overnight decisions accepted). **Next:** the
+maintainer's review of the remaining sixteen decisions of that log; then what TODO §4 left: the
+catalog clean-up (K8, with K9's last items), S32 once its last question is answered, G3's gate, K4,
 and the rows' rests (V1.1, V1.2, S74). The sampled loop and the v0.4 names stay open for v0.4.
 
 **The audit, done 2026-10-23** (G1): the GMC714 syllabus read and every lab's ingredients
@@ -401,8 +407,9 @@ landed 2026-10-24; their rests:
 - **V1** The path to the cost, the rest ([differentiable-problem.md](../plans/differentiable-problem.md)):
   `StepRollout` folded into the native `Trajectory` (with S31 in v0.4), and the LQR warning when
   `U` is declared (the maintainer's call on the lessons' `U=plant.input_box` lines). A sampled
-  controller is refused until the hybrid phase; the noise blocks' per-trial seeds are v0.4
-  (§5.4). Nothing merges to `main` until every notebook has moved (R47). **[ask — core]**, ruled.
+  controller is refused until the hybrid phase; the `disturbances=` port signals and
+  cross-backend start/parameter draws are v0.4 (§5.4; per-trial seeds for random blocks inside
+  the loop landed with R92). Nothing merges to `main` until every notebook has moved (R47). **[ask — core]**, ruled.
 - **S74** The optimizer upgrade, the rest: the hand descent loops of three compile demos moved
   onto `Optimizer` **[ask — student-facing]**; its OPW part (the parametric MPC solve) is v0.4
   (R86).

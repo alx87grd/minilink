@@ -131,4 +131,28 @@ Numbering continues the rulings record of 2026-10-22 (R1–R90).
 - **R117 (2026-10-25) A block missing from a partial params tree reads its compiled snapshot**
   (completing R93): with `ev.f(x, u, t, params={"plant": {...}})`, every block the tree leaves
   out falls back to the parameters taken at compile, on NumPy and JAX alike, not to its live
-  `self.params`.
+  `self.params`. **Superseded by R121** (the merge that would have implemented this was
+  not written; a missing block is an error).
+- **R118 (2026-10-25) `params` are numeric only (no `bool` or `str` switches).** A parameter dictionary
+  holds scalars, numeric arrays and integer PRNG seeds only; structural choices that change
+  which equation or branch runs (`gravity_comp`, `tracking_ref`, `hold`, `interpolation`) are
+  fixed at `__init__` and never stored in `params`. `JointImpedance` and `TaskImpedance` keep
+  `gravity_comp=` in `__init__`, remove `"gravity_comp"` from `self.params`, and bind output
+  port `"u"` to `ctl_with_gravity` when `gravity_comp=True` and `ctl` when `False`; `@compiled`
+  drops `params_filtered_jit` (every leaf of `params` is numeric).
+- **R119 (2026-10-25) The three-foundation spine in CONSTITUTION §1.1.** CONSTITUTION §1.1 names
+  the three foundations (`System`, `PlanningProblem` / `PlanningSolution`,
+  `MathematicalProgram` / `Optimizer`) and the one differentiable path from the model and its
+  parameters to the cost that every control, planning, learning, identification and estimation
+  tool sits on.
+- **R120 (2026-10-25) CONSTITUTION invariant 1 names the sampled loop a simulation tool.** Invariant 1
+  states that discrete-time systems (`StepSystem`, `StepDiagramSystem`) form a closed sibling
+  algebra on an integer tick, and the sampled loop (`Computer`, `HybridDiagram`) is a
+  simulation tool coupling the two clocks rather than an open `System` seam (matching R13).
+- **R121 (2026-10-25) A params override is `None` or a complete nested tree.** The compiled
+  loop and the uncompiled diagram `f` see `params=None` (the compile snapshot /
+  live defaults) or a mapping that names every block. A missing block is an error;
+  there is no partial-tree merge in the compile pipeline (`op_params_of` and
+  `params_filtered_jit` are gone). Copy `evaluator.params` and replace the block
+  you change. `ProblemEvaluator.merged` stays the one convenience merge, at the
+  problem boundary, and hands a complete tree down. Supersedes R117.

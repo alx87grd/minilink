@@ -153,6 +153,6 @@ plt.show(block=is_blocking_needed())
 
 
 # Part 4: simulate with the learned controller
-diagram.params = {"nn": learned_params}
+diagram.params = {**diagram.params, "nn": learned_params}
 diagram.compute_trajectory()
 diagram.plot_trajectory()

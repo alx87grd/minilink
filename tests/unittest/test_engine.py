@@ -279,6 +279,12 @@ def test_the_program_reads_the_same_objective_and_the_declared_rows():
     assert np.asarray(program.grad_J(z0)).shape == (2,)
 
 
+def test_a_stochastic_program_refuses_x_start_in_wrt():
+    pe = stochastic_problem().compile(pid(), dt=0.01, backend="numpy")
+    with pytest.raises(ValueError, match="x_start"):
+        pe.program(["controller.Kp", "x_start"], n_trials=4)
+
+
 # --- the loop: what the evaluator accepts ---
 
 

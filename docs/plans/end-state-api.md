@@ -9,9 +9,10 @@ entries are cut; git history keeps them, alternatives included. This doc now hol
 decisions still open that fix a v0.4 name or contract, each with the code as it stands and the
 recommended answer: D13, the sampled loop's run caches, ruled when the sampled loop (S31)
 starts; D25, D27 and D29, the parametric program's asks, the MPC block's planner contract and
-the seeded stochastic policy; and one sentence proposed for CONSTITUTION §1. Ruled on
+the seeded stochastic policy. Ruled on
 2026-10-25 and kept here until they land ([the record](../reviews/2026-10-25-open-questions-rulings.md)):
-D14 (R104), D15 (R105), D26 (R106), D28 (R107), D30 (R108). Deleted once these are ruled (one fact, one home).  
+D14 (R104), D15 (R105), D26 (R106), D28 (R107), D30 (R108); the proposed CONSTITUTION §1
+sentence landed in CONSTITUTION §1.1 (R119). Deleted once these are ruled (one fact, one home).  
 **Lane:** maintainer-owned (every item is an **[ask — core]** or **[ask — public names]**).  
 **Rung:** v0.4: the sampled loop (S31) for D13–D15; the parametric program (S76), MPPI (S72)
 and the seeded stochastic policy (C5) for D25–D30 ([QUESTIONS.md](../dev/QUESTIONS.md), "Blocks v0.4").
@@ -128,16 +129,3 @@ sampled at `dt`, a planning object read by RL and MPPI alike.
 **Recommended:** answered by D11 (the sampled loop a tool on one kernel, R13;
 [sampled-path.md](sampled-path.md) §8): it becomes a caller of the sampled kernel and stays a
 thin RL-facing adapter in `learning/reinforcement_learning/`; no move.
-
----
-
-## 4. A sentence for CONSTITUTION §1 (maintainer-owned)
-
-D1 ruled the shape on 2026-10-22 (R1, amended the same day): six tooling pillars on three
-foundations, modelling, optimization and the problem statement. The sentence proposed then
-for CONSTITUTION §1, still unplaced (the maintainer's to place or drop):
-
-> One model and one differentiable path from it to a cost, solved by one optimizer; every
-> approach that controls a vehicle or a robot is a tool on that path: classical and modern
-> control, nonlinear control, trajectory optimization and MPC, reinforcement learning,
-> identification and imitation, estimation.

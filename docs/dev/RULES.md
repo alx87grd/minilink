@@ -50,7 +50,15 @@ concrete formatting, ordered by the cost of being wrong:
 - **2.3 Dual parameter pattern with student tolerance:** All internal library models follow the dual
   parameter pattern: `self.params` provides the default dictionary for high-level teaching, while
   equations accept an explicit argument (`f(x, u, t, params=None)`) for computing parameter gradients
-  ($\partial f / \partial p$) and system identification. However, the core framework remains forgiving:
+  ($\partial f / \partial p$) and system identification. `params` holds numeric values only
+  (floats, numeric arrays, and integer PRNG seeds; never `bool` or `str` flags). Structural
+  choices that change which equation or branch runs (`gravity_comp`, `tracking_ref`, `hold`,
+  `interpolation`) are fixed at `__init__` (for example by binding a port's compute function
+  to `ctl` vs. `ctl_with_gravity`), never stored in `params` (ruled 2026-10-25, R118).
+  An explicit override on a diagram or evaluator is the complete nested tree (every
+  block id present) or `None` for the compile snapshot; a missing block is an error
+  (ruled 2026-10-25, R121). Live mutation of one number stays `sys.params["m"] = 4`.
+  However, the core framework remains forgiving:
   models where a student hard-codes constants directly into equations must simulate without friction.
   Costs, sets, fields and shapes owe the same signature; the library ones do not read
   `params` yet. Override rule and gap: DESIGN §4, 'Parameters'.
@@ -139,7 +147,9 @@ concrete formatting, ordered by the cost of being wrong:
   requiring a stochastic problem accepts a deterministic one via `as_stochastic()`. Convert once
   at the boundary, then use the richer object directly: never probe it with `hasattr` or
   `getattr` defaults inside the math. A tool that needs a box asks the set
-  (`X.bounding_box()`); it does not `isinstance` the set. The one `isinstance` on a set is the
+  (`X.bounding_box()`); it does not `isinstance` the set. A planner or policy builder that
+  needs state or action bounds reads `problem.X.bounding_box()` and `problem.U.bounding_box()`,
+  never `sys.state.box` or an input port's `box` behind the problem's back. The one `isinstance` on a set is the
   lowering at the solver boundary: a singleton to an equality residual, a box to decision bounds.
 - **4.4 Parameter override rule.** Does `params is None` resolve to the defaults and any
   dictionary replace them, never `params or self.params`? Contract: DESIGN §4, 'Parameters'.
@@ -362,7 +372,9 @@ concrete formatting, ordered by the cost of being wrong:
   the reference is `planning/dynamic_programming/dp.py`. Library-developer modules
   (`core/compile/`, evaluators) may carry compiler machinery.
 - **5.17 Native-array equation paths:** Does an equation path (5.1) convert its arrays inside,
-  or stop tracing in an argument, `params` included? Contract: DESIGN §4, 'Native-array
+  or stop tracing in an argument, `params` included? Parameter leaves are strictly numeric
+  (floats, numeric arrays, and integer PRNG seeds; never `bool` or `str` mode switches, 2.3).
+  Contract: DESIGN §4, 'Native-array
   equation rule'.
 - **5.18 `__main__` hello-worlds:** Core modules may ship a `__main__` smoke that constructs the
   class and runs it once. Keep it short enough to read at a glance, and stop where the teaching

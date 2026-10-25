@@ -472,8 +472,11 @@ class TestRoboticWrappers(unittest.TestCase):
         ctl = JointImpedance(arm, gravity_comp=True)
         q = np.array([0.8, -0.5])
         r = q.copy()
-        u = ctl.ctl(None, np.concatenate([r, q, np.zeros(2)]))
+        u = ctl.ctl_with_gravity(None, np.concatenate([r, q, np.zeros(2)]))
         np.testing.assert_allclose(u, arm.g(q))
+        self.assertIs(
+            ctl.outputs["u"].compute.__func__, JointImpedance.ctl_with_gravity
+        )
 
     def test_model_joint_impedance_no_gravity_by_default(self):
         arm = TwoLinkManipulator()
@@ -488,7 +491,7 @@ class TestRoboticWrappers(unittest.TestCase):
             arm, gravity_comp=True, gravity=lambda q: np.array([1.0, 2.0])
         )
         q = np.array([0.2, 0.3])
-        u = ctl.ctl(None, np.concatenate([q, q, np.zeros(2)]))
+        u = ctl.ctl_with_gravity(None, np.concatenate([q, q, np.zeros(2)]))
         np.testing.assert_allclose(u, [1.0, 2.0])
 
     def test_gravity_hook_type_error_reaches_the_caller(self):
@@ -504,7 +507,7 @@ class TestRoboticWrappers(unittest.TestCase):
             with self.subTest(hook=hook.__name__):
                 ctl = JointImpedance(arm, gravity_comp=True, gravity=hook)
                 with self.assertRaisesRegex(TypeError, "bug inside the hook"):
-                    ctl.ctl(None, np.concatenate([q, q, np.zeros(2)]))
+                    ctl.ctl_with_gravity(None, np.concatenate([q, q, np.zeros(2)]))
 
     def test_gravity_hook_with_an_optional_second_argument_is_called_as_g_of_q(self):
         from scipy.interpolate import CubicSpline
@@ -522,7 +525,7 @@ class TestRoboticWrappers(unittest.TestCase):
         for name, hook in (("*args wrapper", wrapper), ("CubicSpline", spline)):
             with self.subTest(hook=name):
                 ctl = JointImpedance(arm, gravity_comp=True, gravity=hook)
-                u = ctl.ctl(None, np.concatenate([q, q, np.zeros(2)]))
+                u = ctl.ctl_with_gravity(None, np.concatenate([q, q, np.zeros(2)]))
                 np.testing.assert_allclose(u, hook(q))
 
     def test_joint_impedance_requires_a_mechanical_plant(self):
@@ -549,8 +552,9 @@ class TestRoboticWrappers(unittest.TestCase):
         ctl = TaskImpedance(arm, gravity_comp=True)
         q = np.array([0.8, -0.5])
         p_d = arm.forward_kinematics(q)
-        u = ctl.ctl(None, np.concatenate([p_d, q, np.zeros(2)]))
+        u = ctl.ctl_with_gravity(None, np.concatenate([p_d, q, np.zeros(2)]))
         np.testing.assert_allclose(u, arm.g(q))
+        self.assertIs(ctl.outputs["u"].compute.__func__, TaskImpedance.ctl_with_gravity)
 
     def test_task_impedance_closed_loop(self):
         diagram = closed_loop(TaskImpedance(TwoLinkManipulator()), TwoLinkManipulator())
@@ -580,7 +584,7 @@ class TestRoboticWrappers(unittest.TestCase):
         J = arm.J(q)
         pdot = J @ dq
         f_task = ctl.params["Kp"] * (p_d - p) - ctl.params["Kd"] * pdot
-        tau = ctl.ctl(None, u)
+        tau = ctl.ctl_with_gravity(None, u)
         np.testing.assert_allclose(tau, J.T @ f_task + arm.g(q))
 
         frames = ctl.tf(None, u)

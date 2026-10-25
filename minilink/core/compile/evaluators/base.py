@@ -64,6 +64,12 @@ class Evaluator(JacobianMixin):
             self.jnp = None
             self.xp = np
         self._u_nominal = self.xp.array(np.asarray(u_nominal, dtype=float))
+        self._frozen_params = None
+
+    @property
+    def params(self):
+        """The parameters taken at compile: ``params=None`` reads these."""
+        return self._frozen_params
 
     @property
     def nominal_input(self):
@@ -246,23 +252,19 @@ class ContinuousEvaluator(Evaluator):
         """``in_axes`` for ``params``: 0 on family leaves, ``None`` on shared ones.
 
         A leaf is a family when it has one more dimension than the compiled
-        value at the same path; leaves without a compiled twin (partial nested
-        params) count as a family when their leading axis has size ``batch``.
+        value at the same path.
         """
         tree_util = self.jax.tree_util
-
-        reference = {}
-        compiled_params = getattr(self, "_frozen_params", None)
-        if compiled_params is not None:
-            for path, leaf in tree_util.tree_leaves_with_path(compiled_params):
-                reference[tree_util.keystr(path)] = np.ndim(leaf)
+        reference = {
+            tree_util.keystr(path): np.ndim(leaf)
+            for path, leaf in tree_util.tree_leaves_with_path(self._frozen_params)
+        }
 
         def axis(path, leaf):
-            ndim = np.ndim(leaf)
             ref_ndim = reference.get(tree_util.keystr(path))
-            if ref_ndim is not None:
-                return 0 if ndim == ref_ndim + 1 else None
-            return 0 if (ndim >= 1 and np.shape(leaf)[0] == batch) else None
+            if ref_ndim is None:
+                return None
+            return 0 if np.ndim(leaf) == ref_ndim + 1 else None
 
         return tree_util.tree_map_with_path(axis, params)
 
@@ -273,19 +275,6 @@ def outputs_from_ports(system, x, u, t, params) -> dict:
         port_id: port.compute(x, u, t, params)
         for port_id, port in system.outputs.items()
     }
-
-
-def op_params_of(op, params):
-    """
-    The params a plan operation runs on: its block's entry in ``params``, else its snapshot.
-
-    ``params`` is ``None`` or a tree keyed by block id; a block it leaves out (or
-    ``None`` itself) reads the parameters taken at compile, on both backends.
-    """
-    if params is None:
-        return op.bound_params
-
-    return params.get(op.sys_id, op.bound_params)
 
 
 def gather_u(gather_sources, u_dim, signals, u, xp=np, dtype=float):

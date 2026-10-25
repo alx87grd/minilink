@@ -59,6 +59,7 @@ from minilink import (  # noqa: E402
     QuadraticCost,
     RRTPlanner,
     TrajectoryOptimizationPlanner,
+    compare,
 )
 
 plant = Pendulum()
@@ -80,11 +81,12 @@ opt = TrajectoryOptimizationPlanner(
     problem, n_steps=40, transcription="direct_collocation"
 )
 
-policy = vi.solve().policy  # value iteration: the policy is a controller
-tree_traj = rrt.solve().trajectory  # kinodynamic tree search, bang-bang inputs
-plan = opt.solve().trajectory  # direct collocation
+vi_sol = vi.solve()  # value iteration: the policy is a controller
+rrt_sol = rrt.solve()  # kinodynamic tree search, bang-bang inputs
+opt_sol = opt.solve()  # direct collocation
 
-loop = policy @ plant  # the script closes the loop
+loop = vi_sol.policy @ plant  # the script closes the loop
+print(compare(problem, VI=vi_sol, RRT=rrt_sol, TrajOpt=opt_sol, dt=0.05))
 loop.compute_trajectory(tf=10.0)
 loop.plot_trajectory()
 rrt.plot_tree(x_axis=0, y_axis=1)
@@ -98,6 +100,10 @@ from importlib.util import find_spec  # noqa: E402
 if find_spec("jax") is None:
     print("JAX is not installed: the differentiable block is skipped")
 else:
+    import jax
+
+    from minilink import Optimizer
+
     plant = Pendulum()
     ev = plant.compile(backend="jax")
     x0s = np.tile([1.0, 0.0], (1000, 1))  # 1000 rollouts released at 1 rad
@@ -108,3 +114,13 @@ else:
     xs = ev.rollout_batch(
         x0s, n_steps=1000, dt=0.005, params=dict(plant.params, l=lengths)
     )  # a family of rod lengths, one call
+
+    tuning = PlanningProblem(
+        plant, x_start=[1.0, 0.0], cost=QuadraticCost.from_system(plant), tf=4.0
+    )
+    pe = tuning.compile(PID(2.0, 0.5, 1.0), dt=0.02)
+    dJ = jax.grad(lambda p: pe.evaluate(p).objective)(
+        pe.params
+    )  # gradient w.r.t. every gain and plant param
+    program = pe.program(wrt=["controller.Kp", "controller.Ki", "controller.Kd"])
+    result = Optimizer(program, method="auto").solve()  # L-BFGS on the closed-loop cost

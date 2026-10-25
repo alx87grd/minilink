@@ -202,22 +202,6 @@ a dated record in docs/reviews/), applies it, and deletes the entry. Rulings alr
 
 ## Standing (no release depends on it)
 
-### Do you place the proposed sentence in CONSTITUTION §1, or drop it?
-- **Blocks:** nothing; the shape it states is ruled (R1).
-- **Today:** "One model and one differentiable path from it to a cost, solved by one optimizer;
-  every approach that controls a vehicle or a robot is a tool on that path: …".
-- **Recommendation:** none (yours to place or drop).
-- **Detail:** [end-state-api.md §4](../plans/end-state-api.md#4-a-sentence-for-constitution-1-maintainer-owned)
-- **Answer:**
-
-### Does CONSTITUTION invariant 1 still call the sampled-loop seam an open decision?
-- **Blocks:** nothing.
-- **Today:** it says closing the `Computer` / `HybridDiagram` seam "is an open decision of the
-  roadmap"; R13 ruled the sampled loop a tool, and no such item is open.
-- **Recommendation:** none yet.
-- **Detail:** [CONSTITUTION, the invariants](CONSTITUTION.md#the-five-contract-invariants)
-- **Answer:**
-
 ### Is there one separator rule for wires, parameter paths, block labels and duplicate state labels?
 - **Blocks:** the larger naming alignment.
 - **Today:** block outputs are recorded `id:port`, the plant's input `plant.u` (OD-13), parameter

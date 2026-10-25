@@ -102,14 +102,15 @@ xs = true_evaluator.rollout(x0, rs, 0.0, dt, hold="foh")
 f_true = true_evaluator.f
 dxs = jax.vmap(f_true, in_axes=(0, 0, 0))(xs, rs, ts)
 
-# Equation-error identification: only the plant entry of the nested params
-# dict is supplied; the controller keeps its live defaults.
+# Equation-error identification: copy the compiled snapshot and replace the plant.
 f = true_evaluator.f
+compiled_params = true_evaluator.params
 
 
 def loss(theta):
     plant_params = {"m": 1.0, "l": 1.0, "gravity": theta[0], "d": theta[1]}
-    dx_hat = jax.vmap(f, in_axes=(0, 0, 0, None))(xs, rs, ts, {"plant": plant_params})
+    p = {**compiled_params, "plant": plant_params}
+    dx_hat = jax.vmap(f, in_axes=(0, 0, 0, None))(xs, rs, ts, p)
     return jnp.mean((dx_hat - dxs) ** 2)
 
 

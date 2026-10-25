@@ -77,7 +77,8 @@ def apply_pid_params(pid):
             "Kp": float(pid[0]) * np.eye(1),
             "Ki": np.array([float(pid[1])]),
             "Kd": float(pid[2]) * np.eye(1),
-        }
+        },
+        "plant": plant_params,
     }
 
 
