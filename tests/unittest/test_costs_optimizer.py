@@ -1,3 +1,5 @@
+import copy
+
 import numpy as np
 import pytest
 from minilink.core.costs import (
@@ -74,10 +76,27 @@ def test_sum_cost_is_additive():
 
 
 def test_add_flattens_nested_sums():
-    c = make_quadratic()
-    s = c + c + c
+    a, b, c = make_quadratic(), make_quadratic(), make_quadratic()
+    s = a + b + c
     assert isinstance(s, SumCost)
     assert len(s.terms) == 3
+
+
+def test_a_sum_holding_one_cost_object_twice_is_refused():
+    q = make_quadratic()
+    for twice in (lambda: q + 10 * q, lambda: q + q, lambda: 2 * q + 3 * q):
+        with pytest.raises(ValueError, match="11 \\* q"):
+            twice()
+    with pytest.raises(ValueError, match="twice"):
+        SumCost.of(q, obstacle=q)
+    with pytest.raises(ValueError, match="twice"):
+        (q + make_quadratic()) + q
+
+    # One weighted term, or a copy, is the same cost
+    x = np.array([1.0, 2.0])
+    u = np.array([3.0])
+    assert (11 * q).g(x, u) == pytest.approx(11.0 * q.g(x, u))
+    assert (q + 10 * copy.deepcopy(q)).g(x, u) == pytest.approx(11.0 * q.g(x, u))
 
 
 def test_a_sums_keys_do_not_depend_on_the_bracketing():
@@ -117,7 +136,7 @@ def test_scaled_cost_weights():
     weighted = 2.5 * c
     assert isinstance(weighted, ScaledCost)
     assert weighted.g(x, u) == pytest.approx(2.5 * c.g(x, u))
-    combo = c + 2.0 * c
+    combo = c + 2.0 * make_quadratic()
     assert combo.g(x, u) == pytest.approx(3.0 * c.g(x, u))
 
 
@@ -134,10 +153,11 @@ def test_scaled_and_summed_costs_take_the_discount_as_an_argument():
     t = np.linspace(0.0, 2.0, 21)
     traj = Trajectory(t=t, x=np.ones((2, t.size)), u=np.ones((1, t.size)))
     assert total(2.0 * d, traj) == pytest.approx(2.0 * total(d, traj))
-    discounted = total(d + d, traj, discount_rate=0.5)
+    pair = d + copy.deepcopy(d)
+    discounted = total(pair, traj, discount_rate=0.5)
     assert discounted == pytest.approx(2.0 * total(d, traj, discount_rate=0.5))
-    assert discounted < total(d + d, traj)
-    assert not hasattr(d + d, "discount_rate")
+    assert discounted < total(pair, traj)
+    assert not hasattr(pair, "discount_rate")
 
 
 def test_params_reach_each_term_by_its_id():
@@ -179,7 +199,7 @@ def test_a_composite_cost_nests_its_terms_params_like_a_diagram():
     # Named terms keep their names; sum() flattens like +
     named = SumCost.of(tracking=q, effort=other)
     assert list(named.terms) == ["tracking", "effort"]
-    assert list(sum([q, other, q]).terms) == [
+    assert list(sum([q, other, make_quadratic()]).terms) == [
         "QuadraticCost",
         "QuadraticCost2",
         "QuadraticCost3",
@@ -203,7 +223,7 @@ def test_the_gradient_reaches_every_cost_weight():
 
 def test_the_running_cost_of_a_sum_on_a_trajectory():
     c = make_quadratic()
-    s = c + c
+    s = c + copy.deepcopy(c)
     t = np.linspace(0.0, 1.0, 5)
     traj = Trajectory(t=t, x=np.ones((2, 5)), u=np.ones((1, 5)))
     assert total(s, traj) == pytest.approx(2.0 * total(c, traj))

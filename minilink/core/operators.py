@@ -92,7 +92,7 @@ def series(
     ----------
     left : System or DiagramSystem
         The first system or diagram; a diagram is laid out flat in the result
-        and left unchanged, its name, ``x0`` and camera settings carried.
+        and left unchanged, its ``x0`` and camera settings carried.
     right : System or DiagramSystem
         System or diagram to connect after ``left``.
     *rest : System or DiagramSystem
@@ -101,7 +101,8 @@ def series(
     Returns
     -------
     DiagramSystem
-        A new diagram with each stage connected output-to-input.
+        A new diagram with each stage connected output-to-input, named after
+        every operand (``"Step >> PID >> Pendulum"``).
     """
     # The chain so far: a diagram operand copied, a leaf with its inputs on the edge
     diagram = as_composition_diagram(left)
@@ -111,11 +112,10 @@ def series(
     for next_sys in rest:
         series_pair(diagram, next_sys)
 
-    # The left operand's name, x0 and camera, when it is a diagram; else the
-    # chain as written
+    # The left operand's x0 and camera, when it is a diagram; the chain's name
+    # carries every operand's
     carry_left_operand(diagram, left)
-    if not isinstance(left, DiagramSystem):
-        diagram.name = " >> ".join(sys.name for sys in (left, right, *rest))
+    diagram.name = " >> ".join(sys.name for sys in (left, right, *rest))
 
     return diagram
 

@@ -164,9 +164,10 @@ class TestDiagramCompositionShortcuts(unittest.TestCase):
         chain = left >> Integrator()
         side_by_side = left + Pendulum()
 
+        self.assertEqual(chain.name, "chain >> Integrator")
+        self.assertEqual(side_by_side.name, "chain")
         for result in (chain, side_by_side):
             self.assertIsNot(result, left)
-            self.assertEqual(result.name, "chain")
             self.assertEqual(result.x0[0], 2.0)
             self.assertIs(
                 result.subsystems["Integrator"], left.subsystems["Integrator"]
@@ -624,16 +625,20 @@ class TestDefaultNames(unittest.TestCase):
         source = Step(final_value=[1.0], step_time=0.0)
         self.assertEqual((source >> Integrator()).name, "Step >> Integrator")
         self.assertEqual(
-            (source >> Integrator() >> Integrator()).name, "Step >> Integrator"
-        )  # the second >> sees a diagram on its left and carries its name
+            (source >> Integrator() >> Integrator()).name,
+            "Step >> Integrator >> Integrator",
+        )  # the second >> sees a diagram on its left and extends its name
         self.assertEqual((Integrator() + Pendulum()).name, "Integrator + Pendulum")
         self.assertEqual((PID() @ Pendulum()).name, "PID @ Pendulum")
         self.assertEqual(feedback(Integrator()).name, "feedback(Integrator)")
 
-        # A diagram operand carries its own name instead
+        # A named diagram operand enters the chain by its name
         chain = source >> Integrator()
         chain.name = "chain"
-        self.assertEqual((chain >> Integrator()).name, "chain")
+        self.assertEqual((chain >> Integrator()).name, "chain >> Integrator")
+        self.assertEqual(
+            (Step() >> PID() >> Pendulum()).name, "Step >> PID >> Pendulum"
+        )
 
 
 # The native trajectory

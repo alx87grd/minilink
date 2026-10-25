@@ -16,8 +16,14 @@ from minilink.core.exports import lazy_facade
 # ``trajectory_lqr``) take a linear model or a plant; their gains (``lqr_gain``,
 # ``place_gain``, ``lqr_gain_schedule``) take arrays. Both live in ``control.design``.
 #
+# The loop builders ``closed_loop`` and ``feedback`` close a controller around a plant;
+# they live in ``core.closed_loop`` and stay on the root prelude too.
+#
 # Each exported name maps to its (module path, attribute).
 _EXPORTS: dict[str, tuple[str, str]] = {
+    # The loop builders
+    "closed_loop": ("minilink.core.closed_loop", "closed_loop"),
+    "feedback": ("minilink.core.closed_loop", "feedback"),
     # Model predictive control: the block lives with its trajectory optimization planner
     "ModelPredictiveController": (
         "minilink.planning.trajectory_optimization.mpc.predictive",

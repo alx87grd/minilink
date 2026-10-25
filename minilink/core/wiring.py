@@ -660,8 +660,9 @@ def check_diagram_params(params, subsystem_ids):
     """Check the nested diagram params contract.
 
     ``params`` must be ``None`` or a mapping keyed by subsystem id whose values
-    are per-subsystem params dicts. Missing subsystem ids are allowed (those
-    subsystems fall back to their live ``self.params``); unknown ids raise so
+    are per-subsystem params dicts. Missing subsystem ids are allowed: those
+    subsystems fall back to their live ``self.params`` on the uncompiled diagram,
+    and to their parameters as compiled on an evaluator. Unknown ids raise so
     sys-id typos fail loudly instead of silently using defaults.
 
     Called once at public entry points (``DiagramSystem.f``, ``tf``,

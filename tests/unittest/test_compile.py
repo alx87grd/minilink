@@ -20,6 +20,8 @@ from minilink.core.compile.plan import build_execution_plan
 from minilink.core.compile.evaluators.diagram import DiagramEvaluator
 from minilink.core.compile.plan import ExecutionPlan
 from minilink.core.diagram import DiagramSystem
+from minilink.core.discrete.step_diagram import StepDiagramSystem
+from minilink.core.discrete.step_system import StepSystem
 from minilink.core.system import DynamicSystem, System
 from minilink.core.topology import check_algebraic_loops, evaluation_order_of
 
@@ -377,6 +379,69 @@ def test_a_params_edit_after_compile_is_not_seen_and_explicit_params_override(ba
     np.testing.assert_allclose(
         np.asarray(diag.compile(backend=backend).f(x, u, 0.0)), [99.0 * 1.75]
     )
+
+
+class _JAXFriendlyStepIntegrator(StepSystem):
+    """``x_{k+1} = x_k + k u_k``; the step twin of :class:`_JAXFriendlyIntegrator`."""
+
+    def __init__(self):
+        super().__init__(n=1, input_dim=1, output_dim=1, y_dependencies=())
+        self.params = {"k": 1.0}
+        self.x0 = np.zeros(1)
+
+    def step(self, x, u, k=0, params=None):
+        params = self.params if params is None else params
+        xp = array_module(x)
+        return xp.array([x[0] + params["k"] * u[0]])
+
+    def h(self, x, u, k=0, params=None):
+        xp = array_module(x)
+        return xp.array([x[0]])
+
+
+def _build_step_loop_jax():
+    """r → P → step integrator → feedback to the controller, its command a boundary output."""
+    diag = StepDiagramSystem()
+    diag.connection_verbose = False
+    ctl = _JAXFriendlyPController()
+    ctl.params["Kp"] = 2.5
+    diag.add_subsystem(ctl, "controller")
+    diag.add_subsystem(_JAXFriendlyStepIntegrator(), "plant")
+    diag.add_input_port("r")
+    diag.connect("input", "r", "controller", "r")
+    diag.connect("plant", "y", "controller", "y")
+    diag.connect("controller", "u", "plant", "u")
+    diag.connect_new_output_port("controller", "u", "u_cmd")
+    return diag
+
+
+@pytest.mark.parametrize("backend", ["numpy", "jax"])
+def test_a_block_left_out_of_a_partial_tree_reads_its_snapshot(backend):
+    """A tree naming the plant only: the controller keeps its compiled gain, on both backends."""
+    if backend == "jax":
+        pytest.importorskip("jax")
+    x = np.array([0.3])
+    u = np.array([1.0])
+    plant_only = {"plant": {"k": 2.0}}
+
+    # The flow diagram: u = Kp (r − y) = 2.5 · 0.7, dx = k u
+    flow = _build_small_closed_loop_jax()
+    flow.connect_new_output_port("controller", "u", "u_cmd")
+    ev = flow.compile(backend=backend)
+    flow.subsystems["controller"].params["Kp"] = 100.0
+    np.testing.assert_allclose(np.asarray(ev.f(x, u, 0.0, plant_only)), [3.5])
+    signals = ev.compute_internal_signals_dict(x, u, 0.0, plant_only)
+    np.testing.assert_allclose(np.asarray(signals["controller:u"]), [1.75])
+    outputs = ev.outputs(x, u, 0.0, plant_only)
+    np.testing.assert_allclose(np.asarray(outputs["u_cmd"]), [1.75])
+
+    # The step diagram: x_{k+1} = x_k + k u_k
+    loop = _build_step_loop_jax()
+    step_ev = loop.compile(backend=backend)
+    loop.subsystems["controller"].params["Kp"] = 100.0
+    np.testing.assert_allclose(np.asarray(step_ev.step(x, u, 0, plant_only)), [3.8])
+    step_outputs = step_ev.outputs(x, u, 0, plant_only)
+    np.testing.assert_allclose(np.asarray(step_outputs["u_cmd"]), [1.75])
 
 
 try:

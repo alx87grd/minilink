@@ -133,6 +133,14 @@ state-feedback block):
   (its plots draw the track).
 - **Exception:** `graphical/animation` imports `planning.spatial.Scene`, to
   draw a scene as an overlay.
+- **Exception:** the LQR planner (`planning/dynamic_programming/lqr.py`) imports
+  `control.design` and `control.state`: it solves with the design verb and returns its
+  state-feedback law.
+- **Exception:** `core/discrete/` and `System.__mod__` import `simulation.discrete`
+  lazily: the `%` operator builds a `Computer`, and a hybrid diagram simulates through
+  the `HybridSimulator`.
+- **Exception:** `graphical/diagrams/` imports `blocks.routing.Sum` and `StepSchedule`,
+  to draw a summing junction and a rate.
 - A new import across libraries needs an exception here, with its reason.
 - Libraries may ship **design verbs for their own blocks**, a model in, block out
   (`control.design.lqr(sys, Q, R) -> StateFeedback`,
@@ -330,7 +338,8 @@ read `params` yet, the gap is tracked below.
   `DiagramSystem.params` is a live-view property — the getter assembles
   `{sys_id: subsystem.params}` from live references (subsystems stay the
   single source of truth), the setter distributes by sys_id. Partial dicts are
-  allowed (missing sys_id → that block's live `self.params`); unknown sys_ids
+  allowed (missing sys_id → that block's live `self.params` on the uncompiled
+  diagram, its parameters as compiled on an evaluator, both backends); unknown sys_ids
   raise; per-subsystem dicts are full replacements at the block level. Nested
   diagrams nest the dict recursively.
 - Compile: a diagram's compile copies every block's params into the plan, as a leaf's does, and
@@ -355,7 +364,8 @@ read `params` yet, the gap is tracked below.
   `xbar`, `ubar`, its attributes views); a `SumCost` keys its terms by id like a diagram
   (the class name verbatim, `QuadraticCost2` for a repeat, a scaled term the id of the
   cost it scales) and routes a nested dictionary to them. Anonymous `+` and `sum()` flatten
-  into one level of terms; `SumCost.of(**named)` and a cost with an `id` stay nested. A
+  into one level of terms; `SumCost.of(**named)` and a cost with an `id` stay nested. A sum
+  holds each cost object once (`q + 10 * q` is refused; write `11 * q`, or add a copy). A
   `ScaledCost`'s params are `{"weight": w, "cost": {...}}`. A partial dictionary fills the
   missing entries from the composite's own, a leaf's dictionary replaces it whole, and an
   unknown id raises. A cost without parameters has `params = None`, an empty pytree;
@@ -425,7 +435,8 @@ Explicit `add_subsystem` / `connect` remains canonical for general topology.
 a new diagram that shares the operands' blocks: a diagram operand is laid out
 flat in the result with its ids, wiring and boundary ports, and the left operand
 keeps its blocks, wiring, ports, name, `x0` and camera settings, which `+` and
-`>>` carry into the result. Blocks are shared, never copied, so `a >> b >> c`
+`>>` carry into the result; a `>>` chain is named after every operand
+(`"Step >> PID >> Pendulum"`). Blocks are shared, never copied, so `a >> b >> c`
 chains stay cheap. `connect()`, `autowire()` and `expose()` are methods and
 change the diagram they are called on. Known gap (on the workboard): `step_diagram % dt`
 on a user-built `StepDiagramSystem` adds its boundary ports to that diagram.

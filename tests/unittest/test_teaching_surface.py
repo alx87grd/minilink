@@ -103,6 +103,8 @@ TEACHING_SURFACE: dict[str, tuple[str, ...]] = {
         "ModelPredictiveController",
         "IntegralImpedance",
         "NeuralPolicyController",
+        "closed_loop",
+        "feedback",
     ),
     "minilink.analysis": (
         "jacobian",

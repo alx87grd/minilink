@@ -197,17 +197,13 @@ class TestPlanningArchitecture(unittest.TestCase):
         problem = PlanningProblem(
             sys=sys,
             Xf=SingletonSet(np.array([0.0, 0.0])),
-            metadata={"tag": "demo"},
             U=sys.input_box,
         )
         self.assertIs(problem.params["plant"], sys.params)  # a view of the parts
-        self.assertEqual(problem.metadata["tag"], "demo")
-        with self.assertRaises(TypeError):
-            problem.metadata["tag"] = "changed"
         with self.assertRaises(TypeError):
             PlanningProblem(sys=sys, params={"plant": {}}, U=sys.input_box)
-        with self.assertRaisesRegex(TypeError, "metadata must be"):
-            PlanningProblem(sys=sys, metadata=[("tag", "demo")], U=sys.input_box)
+        with self.assertRaises(TypeError):  # A problem keeps no free-form notes
+            PlanningProblem(sys=sys, metadata={"tag": "demo"}, U=sys.input_box)
 
     def test_quadratic_cost_evaluates_trajectory(self):
         sys = self.make_system()

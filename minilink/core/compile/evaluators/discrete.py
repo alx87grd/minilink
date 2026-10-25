@@ -14,6 +14,7 @@ from minilink.core.compile.evaluators.base import (
     assigned,
     check_jax_compatible,
     gather_u,
+    op_params_of,
     outputs_from_ports,
 )
 from minilink.core.compile.evaluators.compiled import body_of, compiled
@@ -230,7 +231,7 @@ class StepDiagramEvaluator(DiscreteEvaluator):
         for op in self.plan.port_ops:
             local_x = x_arr[op.local_x_slice]
             local_u = gather_u(op.gather_sources, op.u_dim, signals, u, xp, dtype)
-            op_params = op.bound_params if params is None else params.get(op.sys_id)
+            op_params = op_params_of(op, params)
             y_out = op.compute_func(local_x, local_u, k, op_params)
             signals = assigned(xp, signals, op.out_slice, y_out)
             if inject is not None and op.out_slice == inject[0]:
@@ -245,7 +246,7 @@ class StepDiagramEvaluator(DiscreteEvaluator):
         for op in self.plan.step_ops:
             local_x = x_new[op.local_x_slice]
             local_u = gather_u(op.gather_sources, op.u_dim, signals, u, xp, dtype)
-            op_params = op.bound_params if params is None else params.get(op.sys_id)
+            op_params = op_params_of(op, params)
             x_new = assigned(
                 xp,
                 x_new,

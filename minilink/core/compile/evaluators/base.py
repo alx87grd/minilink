@@ -275,6 +275,19 @@ def outputs_from_ports(system, x, u, t, params) -> dict:
     }
 
 
+def op_params_of(op, params):
+    """
+    The params a plan operation runs on: its block's entry in ``params``, else its snapshot.
+
+    ``params`` is ``None`` or a tree keyed by block id; a block it leaves out (or
+    ``None`` itself) reads the parameters taken at compile, on both backends.
+    """
+    if params is None:
+        return op.bound_params
+
+    return params.get(op.sys_id, op.bound_params)
+
+
 def gather_u(gather_sources, u_dim, signals, u, xp=np, dtype=float):
     """
     A block's local input from the compiled gather plan: its sources, concatenated.
