@@ -254,7 +254,14 @@ whose dynamics are equality rows, stays on Ipopt and SciPy.
 
 **What it needs first.** S76's parametric program (the tick binds `x0 = y` and the plant's
 parameters without a recompile); NS-1 and NS-2 (the native kernel and its fixed-`K` traced
-form); for the closed loop, S31's sampled kernel with its JAX face.
+form); for the closed loop, S31's sampled kernel with its JAX face, and the differentiable
+evaluation of a hybrid loop on it (step 7b of [differentiable-problem.md](differentiable-problem.md),
+ruled by R105). Neither exists today: `HybridSimulator` steps the ticks in a Python loop and
+appends to lists, and the problem evaluator refuses a `StepSystem` controller
+(`require_continuous` in `planning/evaluator.py`). That work does not wait for a traceable MPC
+tick: its first consumers are a digital PID and a held neural policy, so the hybrid path can be
+built and checked before NS-8, and MPPI (§4.6b) and the fixed-iteration MPC then plug into it.
+A host-solver MPC (today's SLSQP tick) stays on the NumPy face.
 
 ### 4.6b MPPI: the same tick, already pure
 
