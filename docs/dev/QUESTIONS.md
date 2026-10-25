@@ -257,9 +257,12 @@ a dated record in docs/reviews/), applies it, and deletes the entry. Rulings alr
 - **Today:** only `x0` varies in the compiled MPC program; `pe.program(wrt, key, n_trials)`
   freezes its draws at build (a sample average); seeds live in `params` as integers (RD-R6, R118);
   overrides are complete trees (R121) while `parametric-program.md` §3.1 binds partial ones.
-- **Options:** not yet; a first idea is one signature `J(z, p)` with the seed an integer leaf of
-  `p` (bound for a sample average, advanced per iteration by the solver for SGD), and seven open
-  points to settle.
+- **Your leaning (2026-10-25, draft):** seeds are params, as on a system, so every program is
+  deterministic given its params; a stochastic solver may change the seed internally to work on
+  the sampled, noisy function.
+- **Options:** not yet; the draft is one signature `J(z, p)` with the seed an integer leaf of `p`,
+  kept fixed by deterministic solvers (a sample average), advanced per iteration by stochastic
+  ones (`child(seed, k)`), with four soundness conditions and seven open points to settle.
 - **Recommendation:** none yet; a discussion session first.
 - **Detail:** [native-optimizers.md](../plans/native-optimizers.md) §7
 - **Answer:**

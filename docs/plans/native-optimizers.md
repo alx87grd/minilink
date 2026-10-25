@@ -370,16 +370,17 @@ Ruled: the discrete step analysis goal 2 needs comes back with NS-5, when solver
 requires it (R122, §4.7).
 
 Needs analysis before any recommendation: how programs and solvers take parameters and
-randomness (§7).
+randomness (§7; the maintainer's leaning recorded as a draft in §7.2).
 3. Where does this enter the roadmap? The maintainer's priority is the MPC path (§1.1); the
    ask left is the rung: with S76 and S31 in v0.4, or after them.
 
 ## 7. Needs analysis: parametric and stochastic programs (not converged)
 
-**Status: open for discussion, flagged by the maintainer 2026-10-25.** How a program and its
-solvers handle (a) many versions of one program solved without recompiling and (b) randomness
-is not settled. This section holds the facts and the agent's first ideas; nothing in it is a
-recommendation yet. The ask is in QUESTIONS.md ("Standing").
+**Status: draft ideas, flagged by the maintainer 2026-10-25 as needing more analysis.** How a
+program and its solvers handle (a) many versions of one program solved without recompiling and
+(b) randomness is not settled. This section holds the facts (§7.1), the maintainer's leaning
+(§7.2), the agent's draft of how it would work (§7.3–§7.4) and the open points (§7.5). Nothing
+here is ruled. The ask is in QUESTIONS.md ("Standing").
 
 ### 7.1 What is already fixed around it
 
@@ -398,7 +399,17 @@ recommendation yet. The ask is in QUESTIONS.md ("Standing").
   `N` draws once, from `key`, and freezes them when neither the start nor the cost is tuned
   (`planning/evaluator.py`): the program is the deterministic average over a fixed sample.
 
-### 7.2 First idea: one signature, `J(z, p)`, with the seed a leaf of `p`
+### 7.2 The maintainer's leaning (2026-10-25, draft)
+
+> Seeds are params, as on a system: **every program is deterministic given its params**. A
+> stochastic solver may decide internally to change the seed, to work directly with the
+> sampled, noisy function.
+
+It mirrors the system side exactly: a stochastic simulation is the deterministic simulation of
+one realization `(x0, params)` with the seeds inside `params` (randomness.md §5); a stochastic
+program is the deterministic program at one `p` with its seed inside.
+
+### 7.3 Draft: one signature, `J(z, p)`, with the seed a leaf of `p`
 
 Three things are called a stochastic program; they need different solvers:
 
@@ -421,14 +432,45 @@ Then:
 - the program has one signature for every case (CONSTITUTION §2, "One signature"):
   deterministic `p = {}`, parametric, stochastic.
 
-### 7.3 Open points the analysis must settle
+### 7.4 Draft: what makes a solver that changes the seed sound
+
+The leaning works, on four conditions, each already close to a rule the library has:
+
+1. **The solve stays deterministic given `p`.** The solver never draws fresh entropy: it derives
+   iteration `k`'s seed from the user's, `seed_k = child(seed, k)` (RD-R6's cipher, R104's tick
+   rule). The same `p` and the same `z0` give the same iterates, on replay and under `jit`; the
+   seed stream is part of the result's record.
+2. **One seed per iteration, shared inside it.** Every evaluation within iteration `k` (the
+   gradient, a line search, a second sample for a variance estimate) uses `seed_k`: common random
+   numbers inside the step, fresh noise across steps. Otherwise a line search compares two
+   different functions.
+3. **The solver touches only the seed leaf.** The rest of `p` is the problem and stays fixed;
+   the seed is not a decision variable and takes no gradient (§7.5, point 3).
+4. **The answer is scored at a stated seed.** The final `J(z*)` is reported on the user's seed,
+   or averaged over a held-out set of seeds, never on the last iteration's noisy sample: the
+   number printed is a deterministic function of `p`.
+
+What each solver family then does with the same program:
+
+| Solver | Seed handling | Program it sees |
+| --- | --- | --- |
+| Wrapped (Ipopt, SciPy) and deterministic natives (L-BFGS, Newton) | keeps `p`'s seed fixed | the sample average at that seed, deterministic |
+| Stochastic natives (SGD, Adam on a stochastic program) | advances it, `child(seed, k)` | the noisy function, a fresh sample per iteration |
+| A Monte Carlo over solves | `vmap` over seeds, each solve keeping its own fixed | a family of sample averages |
+
+So the stochastic category is a property of how a *solver* uses the program, not a different
+kind of program: the program declares which leaf is its seed (§7.5, point 4), and a solver that
+knows how to use noise is free to vary it.
+
+### 7.5 Open points the analysis must settle
 
 1. **Bind or pass.** A host solver needs `bind(p)` (a closed `J(z)`); a traced native solver
    wants `p` as an argument, `solve(z0, p)`, so that `vmap` and `grad` reach it. Both, or one?
 2. **Partial or complete trees** at `bind` (R121 against `parametric-program.md` §3.1).
 3. **Non-differentiable leaves.** An integer seed in `p` cannot take a gradient; `jax.grad` over
    `p` needs the differentiable leaves split from the rest (the problem evaluator's `wrt` paths
-   already do this for `pe.program`).
+   already do this for `pe.program`). With §7.4, the solver also needs to know which leaf it may
+   advance.
 4. **Which leaf is the seed.** Does the program declare it (a stochastic category flag), or is
    it found by convention (every `seed` key)?
 5. **Structural versus value parameters.** The sample size `N`, a minibatch size and `K` are
