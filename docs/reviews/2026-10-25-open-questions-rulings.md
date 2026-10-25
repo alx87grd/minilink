@@ -128,3 +128,7 @@ Numbering continues the rulings record of 2026-10-22 (R1–R90).
   an output that moves with an input missing from its `dependencies` and raises, naming the
   block, the port and the fix (`dependencies=("u",)` or `"all"`); the library's under-declared
   blocks are fixed first, in the same work.
+- **R117 (2026-10-25) A block missing from a partial params tree reads its compiled snapshot**
+  (completing R93): with `ev.f(x, u, t, params={"plant": {...}})`, every block the tree leaves
+  out falls back to the parameters taken at compile, on NumPy and JAX alike, not to its live
+  `self.params`.
