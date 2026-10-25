@@ -64,6 +64,72 @@ to the hybrid phase, after the continuous core.
   [future-policies.md](future-policies.md)); how the compiled problem dispatches a sampled
   controller to this kernel (V1's step 7b).
 
+### 8.1 The pure tick of a multi-rate loop (draft ideas, 2026-10-25)
+
+**The question (the maintainer, 2026-10-25).** The early `Computer` design chose not to write a
+pure step function for a multi-clock loop, because the slow clock's state must be held while the
+fast clock updates, and the continuous plant integrated between samples. A fully native, pure
+step model of the hybrid loop (one `lax.scan`, `jit`, `vmap`, `grad`: native-optimizers.md §4.6)
+needs that solved. Nothing below is ruled.
+
+**What the code already does.** `Computer.tick` (`simulation/discrete/computer.py`) is nearly
+pure already: its only mutable fields are the tick `k`, the block states `x` and the committed
+signal buffer `signal_read`. A block fires when `k mod d = 0` (`StepSchedule`'s integer divisors,
+so the rates are commensurate by construction); a skipped block holds by the copy of the read
+buffer into the write buffer; fired blocks read the committed buffer only. What keeps it from
+tracing: in-place writes, a Python `if` on `k`, NumPy only (`require_numpy_backend`), each op
+reading `op.bound_params` (an explicit `params` never reaches the blocks), and the MPC block's
+tick latch, a side effect.
+
+**Draft 1: the held values are state.** Lift the runtime's mutable fields into the carry:
+
+```text
+X_k = (x_computer, held, x_plant)          held = the committed signal buffer (the ZOH latches)
+X_{k+1}, y_k = tick(X_k, u_k, k; p)        one base tick, pure
+```
+
+This is the textbook sampled-data model: a zero-order hold is a memory, so it is a state of the
+discretized loop. It is R104's rule ("a sampled controller's memory is its state") applied to
+the hold itself, and the tick latch goes the same way (the MPC's plan in its `StepSystem` state).
+
+**Draft 2: firing as a select, not a branch.** Inside the tick, for each block with divisor `d`:
+`fired = (k mod d == 0)`, then `x_i⁺ = where(fired, step_i(x_i, u_i, k, p_i), x_i)` and the same
+for its held outputs. Pure, traceable, differentiable (the gradient flows through the branch
+taken). Same semantics as today's double buffer, so `Computer.tick` is the test oracle: the pure
+tick must match it byte for byte on NumPy.
+
+**Draft 3: three ways to lay out the rates, by cost.**
+
+| Layout | How | Cost | Fits |
+| --- | --- | --- | --- |
+| **Nested scan** (two clocks) | outer `scan` over controller periods; inner fixed RK4 substeps of the plant with the input held | no wasted work; what `HybridSimulator` does today in a Python loop | the common case: one controller, one plant (PID, MPC, MPPI, a neural policy) |
+| **Base tick with selects** (any commensurate rates) | one `scan` over the base tick, Draft 2's `where` per block | slow blocks are computed and discarded on the ticks they skip | general multi-rate, small ratios |
+| **Hyperperiod unrolled** | one step per hyperperiod `lcm(d_i)`; inside it the schedule is static Python, only fired blocks computed | no wasted work; the traced graph grows with `lcm(d_i)` | multi-rate with a short hyperperiod; an optimization of the second |
+
+The nested scan first, as the kernel of the two-clock loop; the base tick next, for the general
+`StepSchedule`; the hyperperiod as a later optimization.
+
+**Draft 4: the plant between samples.** A fixed-step integrator (RK4 substeps, `stepping.py`'s
+`step_body`) inside the tick: the sample times are known in advance (commensurate rates), so no
+event detection is needed, which is what makes the loop pure. An adaptive solver
+(`solve_ivp`) stays on the NumPy face; Diffrax is a separate question (QUESTIONS.md, S27).
+
+**Draft 5: what stays out.** Rates that are not integer multiples of a base tick, asynchronous
+or event-triggered clocks, jitter: the arbitrary multi-clock scheduling ROADMAP §7 puts out of
+scope. The schedule's divisors, `dt_base` and the substep count are structural (fixed at
+compile); the parameter tree is the loop's, every block named (R121).
+
+**Open for the maintainer.**
+1. Is the pure tick of the closed loop also exposed as a `StepSystem` (it is one,
+   mathematically: `X_{k+1} = F(X_k, k; p)`)? That would let the step tools read it, the
+   linearization of R122 included (the sampled-data loop's stability as the eigenvalues of its
+   map), but R13 and R120 rule the loop a simulation tool, not a `System`; a read-only view
+   (`loop.as_step_map()`) would sit between the two.
+2. Does the realtime and game mode keep a stateful runner over the pure tick (it must read the
+   keyboard between ticks), as a thin shell rather than a second implementation?
+3. The computational delay (a one-tick delay of the command, as on a real computer): a schedule
+   option, or modelled by the user as a delay block?
+
 **Order:** the continuous core it waits for landed on 2026-10-24 (the step model, then V1's
 steps 1–6); the loop comes in v0.4 (R86), with P10's AC-8b; the hand-copied `HybridDiagram`
 facades go with it; the hybrid topology drawing (`graphical/diagrams/hybrid_topology.py`)
