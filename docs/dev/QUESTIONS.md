@@ -72,6 +72,8 @@ a dated record in docs/reviews/), applies it, and deletes the entry. Rulings alr
 - **Detail:** [the run's log, §7](../reviews/2026-10-24-v03-run-decisions.md#7-the-second-review-pass)
 - **Answer:**
 
+## Blocks v0.4 (winter 2027)
+
 ### Do the run caches on the sampled loop go?
 - **Blocks:** the sampled loop (S31, D13); RULES 2.4, no run state on a System.
 - **Today:** `StepSystem.rollout` and `HybridDiagram.last_result` cache a run beside `self.traj`.

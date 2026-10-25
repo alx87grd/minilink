@@ -787,7 +787,7 @@ in December 2026 after the v0.3 tag; the v1.0 rows after two cohorts.
   human demonstrations (keyboard or joystick driving the plant live) as trajectory datasets; a
   planner that fits a policy to them (imitation beside the RL planner, `NeuralPolicyController`
   as its output); the cloned controller closed on the plant and compared against the
-  demonstrator. The pyro game demos, if ported (an open question, [QUESTIONS.md](../dev/QUESTIONS.md)), are its first scenes.
+  demonstrator. Its first scenes are realtime games written for it (pyro's are not ported, R109).
 
 ---
 

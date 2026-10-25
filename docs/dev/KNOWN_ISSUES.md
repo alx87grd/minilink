@@ -4,7 +4,7 @@ Defects and surprising behaviour a user can hit in the code today, each reproduc
 names the symptom, a minimal reproduction, a workaround, and the workboard row that fixes it
 (or the open question it waits on, in [QUESTIONS.md](QUESTIONS.md)). The fix is planned work
 in [TODO.md](../plans/TODO.md); this list is the index, and an entry leaves it when its fix
-lands. Last checked against the code: 2026-10-24.
+lands. Last checked against the code: 2026-10-25.
 
 ## Simulation and evaluation
 
@@ -23,8 +23,8 @@ lands. Last checked against the code: 2026-10-24.
   coordinate, which fits only when `B = I`; the boat and the 3-D plane (body-frame velocities)
   are refused as not mechanical.
 - **Workaround:** a fully actuated plant, or the allocation `u = B⁺ τ` in a custom block.
-- **Fix:** the one-mechanical-family work (S32, postponed), whose three open questions are in
-  QUESTIONS.md.
+- **Fix:** the one-mechanical-family work (S32, postponed): a model-based law will refuse an
+  underactuated plant at construction, with a clear message (R102).
 
 ### Connecting an already-connected input replaces its source silently
 - **Symptom:** a second `diagram.connect(..., "i", "u")` onto the same input rewires it to the

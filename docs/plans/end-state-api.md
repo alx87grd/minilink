@@ -7,10 +7,11 @@ landed on 2026-10-24 ([the run's log](../reviews/2026-10-24-v03-run-decisions.md
 are DESIGN §5 and §6; D23, the optimizer's method keys, landed with S74, OD-15 of the log). Their
 entries are cut; git history keeps them, alternatives included. This doc now holds the
 decisions still open that fix a v0.4 name or contract, each with the code as it stands and the
-recommended answer: D13–D15, the sampled loop's details, parked to the hybrid phase and ruled
-when the sampled loop (S31) starts; D25–D30, the parametric program's asks, MPPI's name,
-contract and default, the seeded stochastic policy, and `RolloutEnvironment`'s home; and one
-sentence proposed for CONSTITUTION §1. Deleted once these are ruled (one fact, one home).  
+recommended answer: D13, the sampled loop's run caches, ruled when the sampled loop (S31)
+starts; D25, D27 and D29, the parametric program's asks, the MPC block's planner contract and
+the seeded stochastic policy; and one sentence proposed for CONSTITUTION §1. Ruled on
+2026-10-25 and kept here until they land ([the record](../reviews/2026-10-25-open-questions-rulings.md)):
+D14 (R104), D15 (R105), D26 (R106), D28 (R107), D30 (R108). Deleted once these are ruled (one fact, one home).  
 **Lane:** maintainer-owned (every item is an **[ask — core]** or **[ask — public names]**).  
 **Rung:** v0.4: the sampled loop (S31) for D13–D15; the parametric program (S76), MPPI (S72)
 and the seeded stochastic policy (C5) for D25–D30 ([QUESTIONS.md](../dev/QUESTIONS.md), "Blocks v0.4").
