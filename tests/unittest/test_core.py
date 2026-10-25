@@ -1,7 +1,8 @@
 import unittest
 import numpy as np
 import pytest
-from minilink.core.system import DynamicSystem, StepSystem, System, VectorSignal
+from minilink.core.system import DynamicSystem, System, VectorSignal
+from minilink.core.discrete.step_system import StepSystem
 
 
 class TestCoreComponents(unittest.TestCase):
@@ -95,7 +96,7 @@ from minilink.blocks.nonlinear import Saturation
 from minilink.blocks.sources import Step, WhiteNoise
 from minilink.control.impedance import Impedance
 from minilink.control.siso import P
-from minilink.core.composition import closed_loop
+from minilink.core.closed_loop import closed_loop
 from minilink.core.diagram import DiagramSystem
 from minilink.dynamics.catalog.manipulators.arms import TwoLinkManipulator
 from minilink.dynamics.catalog.pendulum.pendulum import Pendulum
@@ -163,9 +164,10 @@ class TestDiagramCompositionShortcuts(unittest.TestCase):
         chain = left >> Integrator()
         side_by_side = left + Pendulum()
 
+        self.assertEqual(chain.name, "chain >> Integrator")
+        self.assertEqual(side_by_side.name, "chain")
         for result in (chain, side_by_side):
             self.assertIsNot(result, left)
-            self.assertEqual(result.name, "chain")
             self.assertEqual(result.x0[0], 2.0)
             self.assertIs(
                 result.subsystems["Integrator"], left.subsystems["Integrator"]
@@ -333,7 +335,7 @@ class TestDiagramCompositionShortcuts(unittest.TestCase):
             closed_loop(Impedance(dof=1), plant)
 
 
-from minilink.core.composition import closed_loop, resolve_standard_feedback
+from minilink.core.closed_loop import closed_loop, resolve_standard_feedback
 
 
 class TestStandardFeedback(unittest.TestCase):
@@ -373,7 +375,7 @@ from minilink.core.system import System
 class TestPortNamesDriveTheLoop(unittest.TestCase):
     def test_the_sweep_space_comes_from_the_ports_or_plot_space(self):
         from minilink import Impedance
-        from minilink.core.feedback import plot_space_of
+        from minilink.core.roles import plot_space_of
 
         self.assertEqual(plot_space_of(P(0.5, ports="reference")), "error")
         self.assertEqual(plot_space_of(StateFeedback(np.array([[1.0, 1.0]]))), "state")
@@ -623,16 +625,20 @@ class TestDefaultNames(unittest.TestCase):
         source = Step(final_value=[1.0], step_time=0.0)
         self.assertEqual((source >> Integrator()).name, "Step >> Integrator")
         self.assertEqual(
-            (source >> Integrator() >> Integrator()).name, "Step >> Integrator"
-        )  # the second >> sees a diagram on its left and carries its name
+            (source >> Integrator() >> Integrator()).name,
+            "Step >> Integrator >> Integrator",
+        )  # the second >> sees a diagram on its left and extends its name
         self.assertEqual((Integrator() + Pendulum()).name, "Integrator + Pendulum")
         self.assertEqual((PID() @ Pendulum()).name, "PID @ Pendulum")
         self.assertEqual(feedback(Integrator()).name, "feedback(Integrator)")
 
-        # A diagram operand carries its own name instead
+        # A named diagram operand enters the chain by its name
         chain = source >> Integrator()
         chain.name = "chain"
-        self.assertEqual((chain >> Integrator()).name, "chain")
+        self.assertEqual((chain >> Integrator()).name, "chain >> Integrator")
+        self.assertEqual(
+            (Step() >> PID() >> Pendulum()).name, "Step >> PID >> Pendulum"
+        )
 
 
 # The native trajectory

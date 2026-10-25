@@ -3,7 +3,7 @@
 import numpy as np
 
 from minilink import Pendulum, SlidingMode
-from minilink.core.hybrid_composition import hybrid_closed_loop
+from minilink.core.discrete.hybrid_composition import hybrid_closed_loop
 
 TF = 5.0
 SIM_DT = 0.001

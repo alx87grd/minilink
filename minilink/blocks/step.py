@@ -3,7 +3,7 @@
 import numpy as np
 
 from minilink.core.backends import array_module
-from minilink.core.system import StepSystem
+from minilink.core.discrete.step_system import StepSystem
 
 ###############################################################################
 # Public API

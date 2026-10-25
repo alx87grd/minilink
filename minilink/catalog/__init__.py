@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from minilink.core.facade import lazy_facade
+from minilink.core.exports import lazy_facade
 
 # The teaching alias of ``dynamics.catalog``, for short plant imports, e.g.
 # ``from minilink.catalog import Pendulum, CartPole, Boat2D``. The plant math stays

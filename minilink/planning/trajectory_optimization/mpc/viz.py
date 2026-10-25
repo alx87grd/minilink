@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import numpy as np
 
-from minilink.core.step_rollout import StepRollout
+from minilink.core.discrete.step_rollout import StepRollout
 from minilink.core.trajectory import Trajectory
 from minilink.graphical.animation.drawables import SceneHistory
 from minilink.graphical.animation.primitives import (
@@ -16,7 +16,7 @@ from minilink.planning.problems import PlanningProblem
 from minilink.planning.trajectory_optimization.direct_collocation import (
     DirectCollocationTranscription,
 )
-from minilink.simulation.hybrid_simulator import HybridSimResult
+from minilink.simulation.discrete.hybrid_simulator import HybridSimResult
 
 ###############################################################################
 # Public API
@@ -47,7 +47,7 @@ def mpc_animation_overlays(
     Parameters
     ----------
     result : HybridSimResult
-        Output of :meth:`~minilink.core.hybrid_diagram.HybridDiagram.compute_trajectory`.
+        Output of :meth:`~minilink.core.discrete.hybrid_diagram.HybridDiagram.compute_trajectory`.
     planner :
         Trajopt planner (transcription and template problem).
     scene : Scene, optional
@@ -74,7 +74,7 @@ def mpc_animation_overlays(
     Returns
     -------
     list
-        Overlay drawables ready for :meth:`~minilink.core.hybrid_diagram.HybridDiagram.animate`.
+        Overlay drawables ready for :meth:`~minilink.core.discrete.hybrid_diagram.HybridDiagram.animate`.
     """
     dt_mpc = mpc_period_of(result, dt_mpc)
     traj = result.plant if traj is None else traj
@@ -150,7 +150,7 @@ def mpc_plans_from_rollout(
     Parameters
     ----------
     computer : StepRollout
-        Tick-indexed computer rollout from :class:`~minilink.simulation.hybrid_simulator.HybridSimulator`.
+        Tick-indexed computer rollout from :class:`~minilink.simulation.discrete.hybrid_simulator.HybridSimulator`.
     transcription : DirectCollocationTranscription
         Collocation transcription used by the MPC block.
     problem : PlanningProblem

@@ -4,7 +4,7 @@ import numpy as np
 
 from minilink import Integrator, P, StepDiagramSystem, StepSystem
 from minilink.core.backends import array_module
-from minilink.core.hybrid_composition import hybrid_closed_loop
+from minilink.core.discrete.hybrid_composition import hybrid_closed_loop
 from minilink.simulation import StepSchedule
 
 DT_BASE = 0.01

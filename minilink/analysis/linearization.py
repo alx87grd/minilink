@@ -6,7 +6,7 @@ import numpy as np
 
 from minilink.analysis.derivatives import compiled, jacobian, operating_point
 from minilink.core.diagram import DiagramSystem
-from minilink.core.feedback import command_port
+from minilink.core.roles import command_port
 from minilink.core.system import System
 from minilink.dynamics.abstraction.state_space import LTISystem
 from minilink.graphical.control import style
@@ -340,7 +340,7 @@ def point_outputs(sys, outputs, x_bar, u_bar, t, params):
 
     # The output ports, and the internal wires only when a selector names one
     evaluator = compiled(sys, "fd")
-    ports = evaluator.outputs_p(x_bar, u_bar, t, params)
+    ports = evaluator.outputs(x_bar, u_bar, t, params)
     wires = (
         evaluator.compute_internal_signals_dict(x_bar, u_bar, t)
         if any(name not in ports for name, _ in outputs)

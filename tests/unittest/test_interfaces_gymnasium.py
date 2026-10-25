@@ -141,14 +141,17 @@ class TestSys2Gym(unittest.TestCase):
             self.make_env(solver="rk45")
 
     def test_truncates_on_horizon(self):
-        env = self.make_env(reset_mode="determinist")
+        from minilink.interfaces.gymnasium import Sys2Gym
+
+        plant = make_bounded_pendulum()
+        cost = QuadraticCost.from_system(plant, xbar=np.zeros(2))
+        env = Sys2Gym(plant, cost, dt=0.1, tf=1.0, reset_mode="determinist")
         env.reset()
-        truncated = False
-        for _ in range(30):  # tf=1.0, dt=0.05 -> truncation within 21 steps
-            _, _, _, truncated, _ = env.step(np.array([0.0]))
-            if truncated:
-                break
-        self.assertTrue(truncated)
+
+        # tf = 1, dt = 0.1: the episode is 10 steps, the last one truncated
+        flags = [env.step(np.array([0.0]))[3] for _ in range(10)]
+        self.assertEqual(flags, [False] * 9 + [True])
+        self.assertAlmostEqual(env.t, 1.0)
 
     def test_input_clipping(self):
         env = self.make_env(reset_mode="determinist")

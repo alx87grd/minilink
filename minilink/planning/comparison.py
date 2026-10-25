@@ -7,7 +7,8 @@ from dataclasses import dataclass
 import numpy as np
 
 from minilink.core.sets import is_finite_box
-from minilink.planning.engine import Evaluation, ProblemEvaluator
+from minilink.planning.evaluation import Evaluation
+from minilink.planning.evaluator import ProblemEvaluator
 from minilink.planning.plotting import maybe_show
 from minilink.planning.problems import PlanningProblem
 from minilink.planning.results import PlanningSolution
@@ -38,10 +39,10 @@ def compare(
     ``compare(VI=vi, LQR=lqr)`` (or ``compare({"VI": vi, "LQR": lqr})``) names
     solutions for the table and the overlays. With the problem first,
     ``compare(problem, PID=pid, VI=vi, dt=0.01)`` also scores every entry by
-    :func:`~minilink.planning.engine.evaluate` on the same draws (one ``key``,
+    :func:`~minilink.planning.evaluator.evaluate` on the same draws (one ``key``,
     one backend for all, so the trials are paired): an entry is a
     :class:`~minilink.planning.results.PlanningSolution`, a controller block, or
-    an :class:`~minilink.planning.engine.Evaluation` already computed.
+    an :class:`~minilink.planning.evaluation.Evaluation` already computed.
     """
     problem, named = split_entries(args, entries)
 
@@ -82,7 +83,7 @@ class Comparison:
 
     ``solutions`` maps a name to a :class:`~minilink.planning.results.PlanningSolution`
     (a controller entry is wrapped as one); ``evaluations`` maps every scored
-    name to its :class:`~minilink.planning.engine.Evaluation` (``None`` when
+    name to its :class:`~minilink.planning.evaluation.Evaluation` (``None`` when
     :func:`compare` was given no problem). ``print`` is the table, each
     ``plot_*`` draws every solution on one figure with one scale, and
     :meth:`difference` reads the paired trials. The first solution's system

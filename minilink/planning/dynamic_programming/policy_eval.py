@@ -4,7 +4,7 @@ from dataclasses import replace
 
 import numpy as np
 
-from minilink.core.feedback import block_roles
+from minilink.core.roles import block_roles
 from minilink.planning.dynamic_programming.dp import (
     DynamicProgrammingOptions,
     grid_price,
@@ -12,7 +12,7 @@ from minilink.planning.dynamic_programming.dp import (
     options_of,
 )
 from minilink.planning.dynamic_programming.plotting import cost_scale_limit
-from minilink.planning.engine import policy_of
+from minilink.planning.evaluator import policy_of
 from minilink.planning.problems import PlanningProblem, nominal_plant_params
 
 ###############################################################################
@@ -40,7 +40,7 @@ class PolicyEvaluator:
     policy : callable, System or PlanningSolution
         State-feedback law ``u = policy(x)``, a solution (its policy), or a
         controller block that reads the state on an input named ``x`` (or
-        ``y``) and commands ``u`` (:func:`minilink.core.feedback.block_roles`):
+        ``y``) and commands ``u`` (:func:`minilink.core.roles.block_roles`):
         the grid state feeds that port, the reference stays pinned at its
         nominal value, and the control port supplies ``u``.
     options : DynamicProgrammingOptions, optional

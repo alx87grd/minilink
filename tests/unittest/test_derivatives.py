@@ -25,7 +25,8 @@ from minilink.blocks.transfer_function import TransferFunction
 from minilink.control.state import StateFeedback
 from minilink.core.backends import array_module, jax_installed
 from minilink.core.compile.compiler import compile_auto
-from minilink.core.system import DynamicSystem, StepSystem
+from minilink.core.discrete.step_system import StepSystem
+from minilink.core.system import DynamicSystem
 
 JAX = jax_installed()
 jax_only = pytest.mark.skipif(not JAX, reason="JAX not installed")

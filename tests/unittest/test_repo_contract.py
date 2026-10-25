@@ -50,6 +50,8 @@ LINKED_DOCS = (
     "docs/dev/RULES.md",
     "docs/dev/DESIGN.md",
     "docs/dev/ROADMAP.md",
+    "docs/dev/QUESTIONS.md",
+    "docs/dev/KNOWN_ISSUES.md",
     "README.md",
     "examples/README.md",
     "tests/README.md",
@@ -80,8 +82,13 @@ REPO_URL = re.compile(r"https://github\.com/alx87grd/minilink/(?:blob|tree)/main
 # research lane (ROADMAP §3, TRL 2) and is out of scope until its review.
 NAMED_CLASS_MODULES = (
     "minilink/core/system.py",
-    "minilink/core/facades.py",
+    "minilink/core/facades/simulation.py",
+    "minilink/core/facades/analysis.py",
+    "minilink/core/facades/plotting.py",
+    "minilink/core/facades/animation.py",
     "minilink/core/diagram.py",
+    "minilink/core/discrete/step_system.py",
+    "minilink/core/discrete/step_diagram.py",
     "minilink/simulation/simulator.py",
     "minilink/simulation/static_simulator.py",
 )

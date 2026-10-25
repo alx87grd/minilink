@@ -7,7 +7,8 @@ import scipy.linalg
 
 from minilink.core.backends import array_module, require_jax
 from minilink.core.compile.evaluators.stepping import step_body
-from minilink.core.system import DynamicSystem, StepSystem
+from minilink.core.discrete.step_system import StepSystem
+from minilink.core.system import DynamicSystem
 
 DISCRETIZE_SOLVERS = ("rk4", "euler", "exact")
 

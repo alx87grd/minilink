@@ -689,7 +689,7 @@ def test_an_open_loop_source_scores_like_its_first_order_hold_rollout():
 
     # The source interpolates linearly: the plant's first-order-hold rollout
     evaluator = plant.compile(backend="numpy", verbose=False)
-    xs = evaluator.jit.rollout(problem.x_start, u.T, 0.0, dt, hold="foh")
+    xs = evaluator.rollout(problem.x_start, u.T, 0.0, dt, hold="foh")
     J_hand = evaluate_trajectory(problem, Trajectory(t=t, x=xs.T, u=u)).J
 
     runs = [("numpy", "rk4"), ("numpy", "scipy")]

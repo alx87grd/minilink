@@ -180,7 +180,7 @@ def dynamics_function(problem: PlanningProblem, compile_backend: str):
     """Return ``(x, u, t) -> f(x, u, t)`` for a transcription.
 
     ``"numpy"`` and ``"jax"`` use a compiled evaluator; system params from
-    ``nominal_plant_params(problem)`` flow through the parametric tier ``f_p``.
+    ``nominal_plant_params(problem)`` flow through the evaluator's ``params`` argument.
     ``"direct"`` calls ``system.f`` without compiling (escape hatch for
     systems that cannot be compiled).
     """
@@ -191,15 +191,11 @@ def dynamics_function(problem: PlanningProblem, compile_backend: str):
     if key == BACKEND_DIRECT:
         return lambda x, u, t: problem.sys.f(x, u, t, params)
 
-    # A compiled evaluator: its trace tier when it has one, the params when given
+    # A compiled evaluator, on the params when given
     evaluator = problem.sys.compile(backend=key, verbose=False)
-    if getattr(evaluator, "has_trace_tier", False):
-        if params is None:
-            return lambda x, u, t: evaluator.f_trace(x, u, t)
-        return lambda x, u, t: evaluator.f_trace_p(x, u, t, params)
-    if params is None:
-        return lambda x, u, t: evaluator.f(x, u, t)
-    return lambda x, u, t: evaluator.f_p(x, u, t, params)
+    f = evaluator.f
+
+    return lambda x, u, t: f(x, u, t, params)
 
 
 def native_concatenate(values, like):

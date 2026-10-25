@@ -95,7 +95,7 @@ n_samples = 400
 ts = dt * jnp.arange(n_samples)
 rs = 1.2 * jnp.sin(0.8 * ts).reshape(-1, 1)
 x0 = jnp.array([0.5, 0.0])
-xs = true_evaluator.jit.rollout(x0, rs, 0.0, dt, hold="foh")
+xs = true_evaluator.rollout(x0, rs, 0.0, dt, hold="foh")
 
 # "Measured" state derivatives (in practice: numerical differentiation of
 # logged states; here taken from the true model).
@@ -104,12 +104,12 @@ dxs = jax.vmap(f_true, in_axes=(0, 0, 0))(xs, rs, ts)
 
 # Equation-error identification: only the plant entry of the nested params
 # dict is supplied; the controller keeps its live defaults.
-f_p = true_evaluator.f_p
+f = true_evaluator.f
 
 
 def loss(theta):
     plant_params = {"m": 1.0, "l": 1.0, "gravity": theta[0], "d": theta[1]}
-    dx_hat = jax.vmap(f_p, in_axes=(0, 0, 0, None))(xs, rs, ts, {"plant": plant_params})
+    dx_hat = jax.vmap(f, in_axes=(0, 0, 0, None))(xs, rs, ts, {"plant": plant_params})
     return jnp.mean((dx_hat - dxs) ** 2)
 
 

@@ -36,7 +36,7 @@ class RK4SolverBackend(SolverBackend):
 
         # x_{k+1} = x_k + Δt/6 (k₁ + 2k₂ + 2k₃ + k₄), n_steps steps from x₀ in one
         # compiled rollout, the nominal input held
-        x_seq = evaluator.jit.rollout(x0, None, t0, dt, n_steps=n_steps)  # (n_pts, n)
+        x_seq = evaluator.rollout(x0, None, t0, dt, n_steps=n_steps)  # (n_pts, n)
         x_traj = np.asarray(x_seq).T  # (n, n_pts)
 
         # The run's record: four evaluations of f per step
@@ -57,7 +57,7 @@ class RK4SolverBackend(SolverBackend):
         dt = require_uniform_times(times, "rk4_fixedsteps")
 
         # The same RK4 step, each sample u_k held over [t_k, t_{k+1}]; one compiled rollout
-        x_seq = evaluator.jit.rollout(x0, u[:, : n_pts - 1].T, t0, dt)
+        x_seq = evaluator.rollout(x0, u[:, : n_pts - 1].T, t0, dt)
         x_traj = np.asarray(x_seq).T
 
         # The run's record: four evaluations of f per step

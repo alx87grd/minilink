@@ -9,7 +9,7 @@ import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import numpy as np
-from minilink.core.composition import propagate_animation_camera
+from minilink.core.assembly import propagate_animation_camera
 from minilink.core.diagram import DiagramSystem
 from minilink.core.kinematics import translation
 from minilink.core.system import DynamicSystem
@@ -1143,7 +1143,7 @@ class TestAdvancedPlotting(unittest.TestCase):
         self.assertEqual(stream.getvalue(), "")
         self.assertEqual(plt.isinteractive(), interactive)
 
-    def test_compute_internal_signals(self):
+    def test_reconstruct_internal_signals(self):
         self.assertFalse(self.traj.has_signal("step:y"))
         traj_plus = self.diagram.reconstruct_internal_signals(self.traj)
         self.assertTrue(traj_plus.has_signal("step:y"))

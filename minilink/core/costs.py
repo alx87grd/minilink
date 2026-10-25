@@ -327,11 +327,13 @@ class SumCost(CostFunction):
     by id, as a diagram keys its blocks (:meth:`of`): ``terms`` is
     ``{term_id: cost}`` and :attr:`params` the live view
     ``{term_id: cost.params}``, its setter routing each entry to its term, so
-    a partial dictionary changes only the terms it names.
+    a partial dictionary changes only the terms it names. A sum holds each cost
+    object once: ``q + 10 * q`` is refused, ``11 * q`` is the same cost.
     """
 
     def __init__(self, terms):
         self.terms = dict(terms)
+        require_distinct_terms(self.terms)
 
     @classmethod
     def of(cls, *costs: CostFunction, **named: CostFunction) -> "SumCost":
@@ -497,6 +499,32 @@ def term_id_of(cost) -> str:
         return term_id_of(cost.cost)
 
     return type(cost).__name__
+
+
+def require_distinct_terms(terms):
+    """Refuse a sum holding one cost object twice: its parameters would sit twice in the tree."""
+    seen = set()
+    for cost in leaf_costs_of(terms.values()):
+        if id(cost) in seen:
+            name = term_id_of(cost)
+            raise ValueError(
+                f"the sum holds the cost {name!r} twice, so its parameters would sit "
+                "twice in the parameter tree; write one weighted term (11 * q for "
+                "q + 10 * q, 2 * cost for cost + cost), or add a copy "
+                "(copy.deepcopy(cost))"
+            )
+        seen.add(id(cost))
+
+
+def leaf_costs_of(costs):
+    """The cost objects under ``costs``, through nested sums and scalings, in order."""
+    for cost in costs:
+        if isinstance(cost, SumCost):
+            yield from leaf_costs_of(cost.terms.values())
+        elif isinstance(cost, ScaledCost):
+            yield from leaf_costs_of([cost.cost])
+        else:
+            yield cost
 
 
 def is_named_term(term_id, term) -> bool:

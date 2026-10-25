@@ -15,7 +15,7 @@ from minilink.planning import (
     Uniform,
     evaluate,
 )
-from minilink.planning.engine import held_law, nominal_trajectory
+from minilink.planning.evaluator import held_law, nominal_trajectory
 from minilink.planning.search.extenders import KinodynamicExtender
 from minilink.planning.search.rrt import RRTOptions, RRTPlanner
 from minilink.planning.trajectory_optimization.direct_collocation import (
@@ -124,7 +124,7 @@ def held_input_rollout(plant, law, t, x0):
     x[:, 0] = x0
     for k in range(t.size - 1):
         u = law(x[:, k], t[k])
-        x[:, k + 1] = evaluator.jit.step(x[:, k], u, t[k], dt=t[k + 1] - t[k])
+        x[:, k + 1] = evaluator.step(x[:, k], u, t[k], dt=t[k + 1] - t[k])
     return x
 
 

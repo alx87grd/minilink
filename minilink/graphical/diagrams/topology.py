@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, replace
 
-from minilink.core.system import StepSystem
+from minilink.core.discrete.step_system import StepSystem
 from minilink.core.wiring import WiredDiagramMixin
 
 ###############################################################################

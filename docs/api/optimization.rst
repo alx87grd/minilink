@@ -21,3 +21,6 @@ Optimization
 
 .. automodule:: minilink.optimization.optimizers.scipy_minimize
    :members:
+
+.. automodule:: minilink.optimization.optimizers.first_order
+   :members:

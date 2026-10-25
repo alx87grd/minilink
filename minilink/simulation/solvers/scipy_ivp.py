@@ -27,14 +27,18 @@ class SciPySolverBackend(SolverBackend):
     ) -> np.ndarray:
         t0 = times[0]
         tf = times[-1]
-        rhs = evaluator.as_scipy_rhs()
+        f = evaluator.f
+        u_nominal = evaluator.nominal_input
+
+        def rhs(t, x):
+            return np.asarray(f(x, u_nominal, t))
 
         # Solver options: the analytic Jacobian only from a JAX evaluator
         kw = dict(args or {})
         use_jac = kw.pop("use_jac", False)
         method = kw.get("method", "RK45")
-        if use_jac and getattr(evaluator, "backend", None) == "jax":
-            kw["jac"] = evaluator.as_scipy_jac()
+        if use_jac and evaluator.backend == "jax":
+            kw["jac"] = nominal_jacobian_of(evaluator)
             jac_applied = True
         else:
             jac_applied = False
@@ -70,7 +74,10 @@ class SciPySolverBackend(SolverBackend):
 
         # u(t) read between the samples by the scheme
         u_at_t = build_u_at_t(times, u, scheme)
-        rhs = evaluator.as_scipy_rhs_forced(u_at_t)
+        f = evaluator.f
+
+        def rhs(t, x):
+            return np.asarray(f(x, u_at_t(t), t))
 
         # x(t) = x₀ + ∫ f(x(s), u(s), s) ds, solved adaptively and reported on the grid
         sol = solve_ivp(rhs, [t0, tf], x0, t_eval=times, **kw)
@@ -124,3 +131,18 @@ def require_success(sol, mode, method):
         raise RuntimeError(
             f"SciPy solver failed in {mode} mode with method {method}: {sol.message}"
         )
+
+
+def nominal_jacobian_of(evaluator):
+    """``(t, x) -> ∂f/∂x`` at the nominal input, compiled once per JAX evaluator."""
+    forms = evaluator.compiled_forms
+    if "scipy_jacobian" not in forms:
+        jax = evaluator.jax
+        f = evaluator.f
+        u_nominal = evaluator.nominal_input
+        forms["scipy_jacobian"] = jax.jit(
+            jax.jacfwd(lambda x, t: f(x, u_nominal, t), argnums=0)
+        )
+    jacobian = forms["scipy_jacobian"]
+
+    return lambda t, x: np.asarray(jacobian(evaluator.jnp.asarray(x), t))

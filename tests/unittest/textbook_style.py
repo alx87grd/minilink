@@ -33,12 +33,14 @@ EXEMPT = (
 # Orchestrators and plots: the structure checks only (5.8, 5.9, 5.12).
 STRUCTURE = (
     "minilink/graphical/",
-    "minilink/core/composition.py",
+    "minilink/core/operators.py",
+    "minilink/core/assembly.py",
+    "minilink/core/closed_loop.py",
     "minilink/core/wiring.py",
-    "minilink/core/hybrid_composition.py",
-    "minilink/core/hybrid_diagram.py",
+    "minilink/core/discrete/hybrid_composition.py",
+    "minilink/core/discrete/hybrid_diagram.py",
     "minilink/simulation/simulator.py",
-    "minilink/simulation/hybrid_simulator.py",
+    "minilink/simulation/discrete/hybrid_simulator.py",
     "minilink/planning/results.py",
     "minilink/planning/comparison.py",
     "minilink/planning/dynamic_programming/progress.py",

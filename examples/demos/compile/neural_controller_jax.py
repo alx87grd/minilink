@@ -34,7 +34,7 @@ diagram.compute_trajectory()
 diagram.plot_trajectory()
 
 evaluator = diagram.compile(backend="jax")
-f_p = evaluator.f_p
+f = evaluator.f
 
 
 # Part 2: train on several initial conditions and references
@@ -47,10 +47,10 @@ r_batch = jnp.array([[0.0], [0.2], [0.5], [0.8], [-0.2], [1.0]])
 
 def rk4_step(x, t, r, nn_params):
     params = {"nn": nn_params}
-    k1 = f_p(x, r, t, params)
-    k2 = f_p(x + 0.5 * dt * k1, r, t + 0.5 * dt, params)
-    k3 = f_p(x + 0.5 * dt * k2, r, t + 0.5 * dt, params)
-    k4 = f_p(x + dt * k3, r, t + dt, params)
+    k1 = f(x, r, t, params)
+    k2 = f(x + 0.5 * dt * k1, r, t + 0.5 * dt, params)
+    k3 = f(x + 0.5 * dt * k2, r, t + 0.5 * dt, params)
+    k4 = f(x + dt * k3, r, t + dt, params)
 
     return x + (dt / 6.0) * (k1 + 2.0 * k2 + 2.0 * k3 + k4)
 

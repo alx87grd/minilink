@@ -31,7 +31,7 @@ from minilink.learning.reinforcement_learning.policy import (
     SquashedGaussianHead,
     StochasticPolicy,
 )
-from minilink.planning.engine import evaluate_trajectory
+from minilink.planning.evaluation import evaluate_trajectory
 from minilink.planning.planner import Planner
 from minilink.planning.results import PlanningSolution
 

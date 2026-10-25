@@ -4,17 +4,14 @@ import numpy as np
 import pytest
 
 from minilink import PID, Pendulum, Simulator
+from minilink.blocks.sources import WhiteNoise
+from minilink.core.closed_loop import closed_loop
 from minilink.core.costs import QuadraticCost
 from minilink.core.distributions import Gaussian, Uniform
 from minilink.core.sets import BallSet, BoxInputSet
 from minilink.core.trajectory import Trajectory
-from minilink.planning.engine import (
-    Evaluation,
-    closed_loop_of,
-    evaluate,
-    reduce_criterion,
-    score_run,
-)
+from minilink.planning.evaluation import Evaluation, reduce_criterion, score_run
+from minilink.planning.evaluator import closed_loop_of, evaluate
 from minilink.planning.problems import PlanningProblem, StochasticPlanningProblem
 
 UPRIGHT = {"r": np.array([np.pi])}
@@ -140,11 +137,35 @@ def test_a_run_that_is_not_finite_costs_inf_or_the_price():
     off = score_run(PlanningProblem(sys, cost=cost, tf=1.0, U=sys.input_box), run)
     assert off["failed"] and off["J"] == np.inf and off["cost"] == np.inf
 
-    on = score_run(
-        PlanningProblem(sys, cost=cost, tf=1.0, infeasible_cost=50.0, U=sys.input_box),
-        run,
+    problem = PlanningProblem(
+        sys, cost=cost, tf=1.0, infeasible_cost=50.0, U=sys.input_box
     )
-    assert on["J"] == pytest.approx(50.0)
+    on = score_run(problem, run)
+    assert on["J"] == pytest.approx(problem.cost_bound(1.0) + 50.0)
+
+
+def test_a_run_not_finite_scores_above_a_finite_run_that_leaves_x():
+    sys = plant()
+    cost = QuadraticCost.from_system(sys)
+    problem = PlanningProblem(
+        sys, cost=cost, tf=1.0, infeasible_cost=50.0, X=sys.state.box, U=sys.input_box
+    )
+    t = np.linspace(0.0, 1.0, 11)
+    diverged = np.zeros((2, t.size))
+    diverged[0, -1] = np.inf
+    left = np.zeros((2, t.size))
+    left[0, -1] = 10.0  # Past the state box, |θ| ≤ 2π
+    u = np.zeros((1, t.size))
+
+    nan_row = score_run(problem, Trajectory(t, diverged, u))
+    out_row = score_run(problem, Trajectory(t, left, u))
+
+    # J = cost_bound + price for the run not finite, cost + price for the one that left
+    assert nan_row["failed"] and out_row["failed"]
+    assert np.isfinite(nan_row["J"])
+    assert nan_row["J"] == pytest.approx(problem.cost_bound(1.0) + 50.0)
+    assert out_row["J"] == pytest.approx(out_row["cost"] + 50.0)
+    assert nan_row["J"] > out_row["J"]
 
 
 def test_the_criteria_reduce_the_runs():
@@ -281,7 +302,7 @@ def test_dt_must_divide_the_horizon():
 
 
 def test_evaluate_trajectory_scores_the_plant_run_of_a_loop_or_a_logged_run():
-    from minilink.planning.engine import evaluate_trajectory
+    from minilink.planning.evaluation import evaluate_trajectory
 
     problem = upright_problem()
     pe = problem.compile(pid(), dt=0.01, backend="numpy")
@@ -305,7 +326,7 @@ def test_evaluate_trajectory_scores_the_plant_run_of_a_loop_or_a_logged_run():
 def test_evaluate_trajectory_agrees_on_numpy_and_jax_with_an_exit_and_a_divergence():
     import jax.numpy as jnp
 
-    from minilink.planning.engine import evaluate_trajectory
+    from minilink.planning.evaluation import evaluate_trajectory
 
     sys = plant()
     cost = QuadraticCost.from_system(sys)
@@ -445,6 +466,90 @@ def test_a_problem_realizes_its_draws_from_one_key():
     assert one.shape == (1, 2) and none == {"params": {}, "disturbances": {}}
     with pytest.raises(ValueError, match="one realization"):
         upright_problem().realize(0, 3)
+
+
+def noisy_loop(seed=3):
+    noise = WhiteNoise(1, psd=0.5, sample_period=0.01, seed=seed)
+    return closed_loop(PID(Kp=20.0, Ki=1.0, Kd=4.0), plant(), disturbance=noise)
+
+
+def point_start_problem():
+    sys = plant()
+    return StochasticPlanningProblem(
+        sys=sys,
+        cost=QuadraticCost.from_system(sys),
+        tf=1.0,
+        x0_distribution=Gaussian(mean=np.array([0.5, 0.0]), std=np.array([0.0, 0.0])),
+    )
+
+
+def test_each_trial_realizes_the_noise_blocks_of_the_loop():
+    pe = point_start_problem().compile(noisy_loop(), dt=0.01, backend="numpy")
+    report = pe.evaluate(n_trials=3, key=1)
+
+    # One start for all, a noise realization per trial
+    np.testing.assert_array_equal(report.x0, np.tile([0.5, 0.0], (3, 1)))
+    assert len(np.unique(report.J)) == 3
+
+    # One key, the same trials; another key, other trials
+    np.testing.assert_array_equal(pe.evaluate(n_trials=3, key=1).J, report.J)
+    assert not np.allclose(pe.evaluate(n_trials=3, key=2).J, report.J)
+
+    # One trial is trial 0, in the evaluation and in the trajectory
+    np.testing.assert_array_equal(pe.evaluate(n_trials=1, key=1).J, report.J[:1])
+    with pytest.raises(TypeError, match="integer key"):
+        pe.evaluate(n_trials=3, key=np.random.default_rng(1))
+
+
+@pytest.mark.jax
+def test_numpy_and_jax_draw_the_same_noise_for_an_integer_key():
+    problem = point_start_problem()
+    reports = [
+        problem.compile(noisy_loop(), dt=0.01, backend=backend).evaluate(
+            n_trials=3, key=1
+        )
+        for backend in ("numpy", "jax")
+    ]
+    np.testing.assert_allclose(reports[0].J, reports[1].J, rtol=1e-9)
+
+
+def test_a_deterministic_problem_runs_the_noise_blocks_own_seed():
+    sys = plant()
+    problem = PlanningProblem(
+        sys, x_start=[0.5, 0.0], cost=QuadraticCost.from_system(sys), tf=1.0
+    )
+    loop = noisy_loop(seed=3)
+    pe = problem.compile(loop, dt=0.01, backend="numpy")
+    traj = pe.trajectory()
+
+    # The loop simulated with its own params: the block's seed 3
+    x0 = np.asarray(loop.x0, dtype=float)
+    a, b = loop.state_index["plant"]
+    x0[a:b] = [0.5, 0.0]
+    reference = Simulator(loop, x0=x0, tf=1.0, dt=0.01, solver="rk4_fixedsteps").solve()
+    np.testing.assert_allclose(traj.x[:, -1], reference.x[:, -1], rtol=1e-9)
+
+    # Another seed, another run
+    other = problem.compile(noisy_loop(seed=4), dt=0.01, backend="numpy")
+    assert not np.allclose(other.evaluate().J, pe.evaluate().J)
+
+
+@pytest.mark.jax
+@pytest.mark.parametrize("stochastic", [False, True])
+def test_the_gradient_crosses_a_loop_with_a_noise_block(stochastic):
+    import jax
+
+    sys = plant()
+    deterministic = PlanningProblem(
+        sys, x_start=[0.5, 0.0], cost=QuadraticCost.from_system(sys), tf=1.0
+    )
+    problem = point_start_problem() if stochastic else deterministic
+    n_trials = 3 if stochastic else None
+    pe = problem.compile(noisy_loop(), dt=0.01, backend="jax")
+
+    grad = jax.grad(lambda p: pe.evaluate(p, 1, n_trials).objective)(pe.params)
+    assert np.isfinite(float(grad["controller"]["Kp"][0]))
+    assert float(grad["disturbance"]["seed"]) == 0.0  # a seed carries no gradient
 
 
 @pytest.mark.jax

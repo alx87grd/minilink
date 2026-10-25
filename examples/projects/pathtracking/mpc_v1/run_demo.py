@@ -5,7 +5,7 @@ PathTracking is replaced by MPC on ``BicycleDynRate``; the cascade
 
 Run from repo root::
 
-    PYTHONPATH=. python examples/projects/bicycle_los_v3/run_demo.py
+    PYTHONPATH=. python examples/projects/pathtracking/mpc_v1/run_demo.py
 """
 
 import numpy as np
@@ -24,7 +24,7 @@ from minilink import BicycleDynRate
 from minilink.core.backends import configure_jax
 from minilink.core.costs import QuadraticCost
 from minilink.core.diagram import DiagramSystem
-from minilink.core.hybrid_composition import hybrid_closed_loop
+from minilink.core.discrete.hybrid_composition import hybrid_closed_loop
 from minilink.planning.problems import PlanningProblem
 from minilink.planning.spatial.collision import bind, car_outline
 from minilink.planning.spatial.paths import from_waypoints

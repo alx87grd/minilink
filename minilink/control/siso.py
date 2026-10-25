@@ -3,7 +3,7 @@
 import numpy as np
 
 from minilink.core.backends import array_module
-from minilink.core.feedback import ErrorDriven
+from minilink.core.roles import ErrorDriven
 from minilink.core.system import DynamicSystem, System
 
 ###############################################################################

@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from minilink.catalog import __all__ as _CATALOG_NAMES
-from minilink.core.facade import lazy_facade
+from minilink.core.exports import lazy_facade
 
 # The root package exports the teaching surface (ROADMAP §2): every name a student
 # meets, so a script or notebook needs one import line, e.g.
@@ -13,8 +13,9 @@ from minilink.core.facade import lazy_facade
 #     from minilink import ReinforcementLearningPlanner, StochasticPlanningProblem
 #
 # The band facades organise the same names by role (``minilink.catalog``,
-# ``minilink.blocks``, ``minilink.control``, ``minilink.analysis``,
-# ``minilink.simulation``, ``minilink.planning``, ``minilink.optimization``,
+# ``minilink.blocks``, ``minilink.dynamics``, ``minilink.control``,
+# ``minilink.estimation``, ``minilink.analysis``, ``minilink.simulation``,
+# ``minilink.planning``, ``minilink.learning``, ``minilink.optimization``,
 # ``minilink.core``); the defining modules stay importable. The surface is tested as a
 # set in ``tests/unittest/test_teaching_surface.py``; research-lane names never appear
 # here. Each exported name maps to its (module path, attribute); the catalog plants
@@ -23,7 +24,7 @@ _EXPORTS: dict[str, tuple[str, str]] = {
     # Core
     "System": ("minilink.core.system", "System"),
     "DynamicSystem": ("minilink.core.system", "DynamicSystem"),
-    "StepSystem": ("minilink.core.system", "StepSystem"),
+    "StepSystem": ("minilink.core.discrete.step_system", "StepSystem"),
     "DiagramSystem": ("minilink.core.diagram", "DiagramSystem"),
     "Trajectory": ("minilink.core.trajectory", "Trajectory"),
     "CostFunction": ("minilink.core.costs", "CostFunction"),
@@ -116,7 +117,7 @@ _EXPORTS: dict[str, tuple[str, str]] = {
     "PlanningSolution": ("minilink.planning.results", "PlanningSolution"),
     "LQRPlanner": ("minilink.planning.dynamic_programming.lqr", "LQRPlanner"),
     "compare": ("minilink.planning.comparison", "compare"),
-    "evaluate": ("minilink.planning.engine", "evaluate"),
+    "evaluate": ("minilink.planning.evaluator", "evaluate"),
     "TrajectoryOptimizationPlanner": (
         "minilink.planning.trajectory_optimization.planner",
         "TrajectoryOptimizationPlanner",
@@ -163,7 +164,7 @@ _EXPORTS: dict[str, tuple[str, str]] = {
         "minilink.learning.reinforcement_learning.tabular",
         "TabularLearningPlanner",
     ),
-    "Evaluation": ("minilink.planning.engine", "Evaluation"),
+    "Evaluation": ("minilink.planning.evaluation", "Evaluation"),
     "RRTPlanner": ("minilink.planning.search.rrt", "RRTPlanner"),
     "RRTOptions": ("minilink.planning.search.rrt", "RRTOptions"),
     "KinodynamicExtender": (
@@ -178,11 +179,11 @@ _EXPORTS: dict[str, tuple[str, str]] = {
     ),
     # Band names the teaching demos use
     "TimeCost": ("minilink.core.costs", "TimeCost"),
-    "StepDiagramSystem": ("minilink.core.diagram", "StepDiagramSystem"),
+    "StepDiagramSystem": ("minilink.core.discrete.step_diagram", "StepDiagramSystem"),
     "BallSet": ("minilink.core.sets", "BallSet"),
     "SingletonSet": ("minilink.core.sets", "SingletonSet"),
-    "closed_loop": ("minilink.core.composition", "closed_loop"),
-    "feedback": ("minilink.core.composition", "feedback"),
+    "closed_loop": ("minilink.core.closed_loop", "closed_loop"),
+    "feedback": ("minilink.core.closed_loop", "feedback"),
     "Source": ("minilink.blocks.sources", "Source"),
     "IntegralImpedance": (
         "minilink.control.impedance",

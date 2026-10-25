@@ -333,7 +333,7 @@ def render_diagram_graph(
         # raising. Do not IPython.display the graph: plot_diagram returns it,
         # and the notebook auto-displays that last expression. Calling
         # display() *and* returning the object renders the figure twice
-        # (same rule as SharedSystemFacades.animate).
+        # (same rule as SystemAnimation.animate).
         try:
             graph.pipe(format="svg")
         except Exception as exc:

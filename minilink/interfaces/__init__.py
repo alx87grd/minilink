@@ -18,7 +18,7 @@ here; homegrown plants — whatever their implementation technology — live in
 
 from __future__ import annotations
 
-from minilink.core.facade import lazy_facade
+from minilink.core.exports import lazy_facade
 
 # name -> (module path, attribute)
 _EXPORTS: dict[str, tuple[str, str]] = {

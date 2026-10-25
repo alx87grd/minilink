@@ -11,7 +11,7 @@ Identity: [CONSTITUTION.md](CONSTITUTION.md).
 | --- | --- | --- |
 | **v0.1** | **GRO860 end to end**, plus a working **`pip install minilink` on PyPI**. Every topic of the running optimal-control & RL course runs on the teaching surface, in Colab (git-clone cell) and in the conda env: value iteration / DP on a grid · LQR + linearization · trajectory optimization · RL via native `ReinforcementLearningPlanner` (with `Sys2Gym` + SB3 as an optional bridge). See §4.1. | Fall 2026 — `0.1.0` on PyPI (2026-09-16); `0.1.1` (2026-09-26) is the first release a GitHub tag published. Conda from `environment.yml` is the recommended install. The course notebooks' names are frozen until v1.0, with the freeze paused between terms (§4.1 gate 7). |
 | **v0.2** | **GRO501 end to end** (the classical-control course: multi-physics modelling · root locus / Bode / margins · PID to spec · digital implementation · state feedback, pole placement, LQR, observers — see §4.2). Conda stays the recommended install. | `0.2.0` on PyPI (2026-10-17), from the GitHub tag; every §4.2 row green |
-| **v0.3** | **A cleaner core and the differentiable path; GMC714 covered** (§5.3; GMC714 needs no new feature, R48): **the convergence pass** (the core kept, side features to the experimental tier), **the continuous core** ([continuous-core.md](../plans/continuous-core.md): one step model under every sampled tool, one evaluation of any run, and the deterministic differentiable path to the cost behind a clean API: `evaluate`, `compare`, `problem.compile(loop)`, the program export, cost parameters), all continuous (R86), and a closing PID-tuning example by hand and by the pipeline (S77). The teaching surface covers every GMC714 lab (§4.3); the labs move from pyro to minilink as the maintainer's teaching work, outside this roadmap. | December 2026 |
+| **v0.3** | **A cleaner core and the differentiable path; GMC714 covered** (§5.3; GMC714 needs no new feature, R48): **the convergence pass** (the core kept, side features to the experimental tier), **the continuous core** (landed 2026-10-24, DESIGN §4–§6: one step model under every sampled tool, one evaluation of any run, and the deterministic differentiable path to the cost behind a clean API: `evaluate`, `compare`, `problem.compile(loop)`, the program export, cost parameters), all continuous (R86), and a closing PID-tuning example by hand and by the pipeline (S77). The teaching surface covers every GMC714 lab (§4.3); the labs move from pyro to minilink as the maintainer's teaching work, outside this roadmap. | December 2026 |
 | **v0.4** | **The draws and the textbook objects** (§5.4): the mean over the problem's draws through the same differentiable path (the Monte Carlo evaluator one path, its numbers changing once), the sampled face of the compiled problem, identification as its first data consumer; fields and workspace geometry; MPPI on the sampled kernel; the parametric MPC program (S76) and the general serial chain (C6). | Winter 2027 (the window between GRO860 cohorts, whose material the evaluator's numbers touch) |
 | **v0.9** | **Freeze candidate** (§5.5): the foundation questions that could still break a public name are decided (derived `x0`, Diffrax as an optional solve, the glyph/solid rename, the frozen surface); the trust contract is in place (deprecation policy, pinned export list, CHANGELOG, pinned installs); the standard-syllabus holes close (estimation; the discrete-time one closes with S75 in v0.3); the docs site renders the tutorials. | Spring 2027 |
 | **v1.0** | **A colleague can build a course on it and trust it for three years** (§5.6): the API frozen under the deprecation policy, the standard control syllabus covered and checked against textbook worked examples, course-neutral labs an instructor adopts outside UdeS, green on Windows, macOS and Linux; after two cohorts. Two Stable-Baselines3 teaching notebooks retire (S49) and the GRO860 name freeze becomes the general one. | 2027 |
@@ -27,8 +27,8 @@ a **contract**, not a documentation convention.
 
 | Lane | What it is | Rules |
 | --- | --- | --- |
-| **Teaching surface** | The names students meet: root prelude (`from minilink import …`) and the band facades (`minilink.catalog`, `.blocks`, `.control`, `.analysis`, `.simulation`, `.planning`). Registered in one place, tested as a set. | *Soft rule:* nothing enters without a demo or notebook, a both-backends test where it defines dynamics, and a docstring. Names and semantics change only with a deprecation note. Student-facing examples and notebooks import **only** through it (CI-checked). |
-| **Research lane** | Everything else: the provisional bands (hybrid, MPC, realtime), the experimental tier (`minilink/experimental/`: symbolic mechanics, the contact-engine leaf, C export, the unsupported plants; the top-level `experimental/` folder of prototype scripts), `examples/projects/`. | No stability promise, no entry requirements, out of the release contract. The provisional bands ship in the wheel. The experimental tier is **out of the wheel**, **untested by default** (nightly smoke at most; `c_export`'s flagship smoke and the quick C-export demo of `showcase_jax.ipynb` the two gate exceptions, ruled 2026-10-23), off the docs site, never cited by a course, and the staging area for what may leave into its own project at v1.0 (ruled 2026-10-22). Deep imports always remain valid. |
+| **Teaching surface** | The names students meet: root prelude (`from minilink import …`) and the band facades (`minilink.catalog`, `.blocks`, `.control`, `.estimation`, `.analysis`, `.simulation`, `.planning`, `.learning`, `.optimization`, `.dynamics`, `.core`). Registered in one place, tested as a set. | *Soft rule:* nothing enters without a demo or notebook, a both-backends test where it defines dynamics, and a docstring. Names and semantics change only with a deprecation note. Student-facing examples and notebooks import **only** through it (CI-checked). |
+| **Research lane** | Everything else: the provisional bands (hybrid, MPC, realtime), the experimental tier (`minilink/experimental/`: symbolic mechanics, the contact-engine leaf, C export, the unsupported plants once the catalog clean-up moves them; the top-level `experimental/` folder of prototype scripts), `examples/projects/`. | No stability promise, no entry requirements, out of the release contract. The provisional bands ship in the wheel. The experimental tier is **out of the wheel**, **untested by default** (nightly smoke at most; `c_export`'s flagship smoke and the quick C-export demo of `showcase_jax.ipynb` the two gate exceptions, ruled 2026-10-23), off the docs site, never cited by a course, and the staging area for what may leave into its own project at v1.0 (ruled 2026-10-22). Deep imports always remain valid. |
 
 **Provisional teaching names:** the spatial names the planning facade exports (`Scene`,
 `bind`, `ReferenceTrack`, `car_outline`, `plot_track`, …) sit in the teaching lane under
@@ -63,8 +63,10 @@ v0.9 they go to `CHANGELOG.md`, step V5):
   `Washout`, `SimpleIntegrator`; `ZOHHold` is `UnitDelay`, `NeuralNetwork` folded into `MLP`);
   the package moves of R66 (`planning/dynamic_programming/`, `minilink.learning`, MPC under
   trajectory optimization); A6's short names and every block's default id its class name
-  (R52, R53); the step model: the evaluator's integrator grid is `ev.step` / `ev.rollout` /
-  `ev.jit.*` (`solver=`, `substeps=`, `hold=`), `integrator=` is `solver=` everywhere,
+  (R52, R53); the step model: the evaluator's integrator grid is `ev.step` / `ev.rollout`
+  (`solver=`, `substeps=`, `hold=`), `integrator=` is `solver=` everywhere; every evaluator
+  method one body with `params=None`, compiled once on JAX (`f_p`, `*_trace`, `*_jit`, the
+  `_ivp` and SciPy adapters and `ev.jit` gone, R12),
   `discretize(sys, dt, *, solver, substeps)` with `dt` required, and `compute_forced` on
   `rk4_fixedsteps` holds a sampled input (those forced numbers changed once); the problem: a
   plain class whose `params` is a live view of its parts (`ProblemParameters` and `params=`
@@ -103,31 +105,32 @@ Step ids (`S29`, `P4`, `T2`, …) are the rows of
 
 | Area | Lane | TRL | State | Next |
 | --- | --- | --- | --- | --- |
-| Core + diagrams | teaching | 7 | Public API and diagram API stable; compile-vs-reference parity tested; wrong-shape `f` / `h` fails at `compile()`. | Automation by convention (P10, v0.2); derived `x0` (S29, v0.9). |
-| Compile (`core/compile/`) | teaching (frozen subset) | 4 | Integrated; the frozen evaluator subset is named in DESIGN §5, the stable-internal helper grid kept by ruling. Speed lives in batches (1000 rollouts × 1000 RK4 steps in 27 ms); float64 on JAX by default. | the step model under every sampled tool (S75, v0.3); `rollout_batch` with a `params` family (S53); the differentiable closed-loop cost (V1: the deterministic path v0.3, the draws and the sampled face v0.4); the evaluator grid trimmed to the step model, its formulas in `core/compile/evaluators/stepping.py` (S75's SM-6, v0.3); Diffrax (S27, v0.9). |
+| Core + diagrams | teaching | 7 | Public API and diagram API stable; compile-vs-reference parity tested; wrong-shape `f` / `h` fails at `compile()`; the modules by job (the operators, the closed loop, the roles, the port graph; the discrete-time pieces in `core/discrete/`, the `System` shortcuts in `core/facades/`, 2026-10-24). | Automation by convention, the rest (P10: plots and animation by role; the cost on the plant, v0.4); derived `x0` (S29, v0.9). |
+| Compile (`core/compile/`) | teaching (frozen subset) | 4 | Integrated; the frozen evaluator subset is named in DESIGN §5; one evaluator class per system kind on either backend, one body per method compiled on JAX (SM-6, 2026-10-24); the step model (`ev.step` / `ev.rollout`, `solver=`, `substeps=`, `hold=`) under every sampled tool, `discretize` on it (S75, 2026-10-24). Speed lives in batches (1000 rollouts × 1000 RK4 steps in 27 ms); float64 on JAX by default. | `rollout_batch` with a `params` family (S53); the differentiable closed-loop cost, the draws and the sampled face (V1, v0.4; the deterministic path landed in v0.3); Diffrax (S27, v0.9). |
 | Simulation | teaching | 7 | Mature; fixed 10 001-point default grid; `verbose` names unified. | One owner per rule (S65). |
-| Dynamics (abstraction + catalog) | teaching | 7 | Plants QA'd; `MechanicalSystem` / `Manipulator`; UR5 ABA/RNEA; **every catalog plant compiles on both backends** (contract test); four-rung vehicle ladder; UdeS racecar (kinematic, dynamic, 3-D). | Catalog hygiene (S64); the general serial chain (C6, v0.3); one mechanical family (S32, v0.3, R62). |
-| Control | teaching | 6 | Linear, LQR (infinite horizon, finite horizon, along a trajectory), pole placement, reference scaling (`N`), `P` / `PI` / `PD` / `PID` and the rate-measured `Impedance` / `IntegralImpedance` as one family (what is measured decides the derivative; limits with infinite defaults, anti-windup once a limit is declared; the shared pieces three pure functions), model-based SMC and computed torque, robotic impedance and kinematic laws, neural policy block; a controller is a plain `System`. | P10's resolver and composition steps. |
+| Dynamics (abstraction + catalog) | teaching | 7 | Plants QA'd; `MechanicalSystem` / `Manipulator`; UR5 ABA/RNEA; **every catalog plant compiles on both backends** (contract test); four-rung vehicle ladder; UdeS racecar (kinematic, dynamic, 3-D); every plant states its own bounds, the mechanical bases invent none (R68, 2026-10-24). | The catalog clean-up (K8, v0.3); one mechanical family (S32, v0.3, R62; postponed by the maintainer on three open questions, TODO §4); catalog hygiene (S64) and the general serial chain (C6), v0.4. |
+| Control | teaching | 6 | Linear, LQR (infinite horizon, finite horizon, along a trajectory), pole placement, reference scaling (`N`), `P` / `PI` / `PD` / `PID` and the rate-measured `Impedance` / `IntegralImpedance` as one family (what is measured decides the derivative; limits with infinite defaults, anti-windup once a limit is declared; the shared pieces three pure functions), model-based SMC and computed torque, robotic impedance and kinematic laws, neural policy block; a controller is a plain `System`; MPC's teaching name `ModelPredictiveController` on `minilink.control` (G3). | The robotic PID wrappers (C2, v0.4). |
 | Analysis | teaching | 6 | Jacobians, linearize, structural, equilibria, modal; one-channel Bode with grid-free margins, pole-zero, root locus, Nyquist, the linear step response on matplotlib and plotly; the sensitivity functions `S` / `T` / `PS` / `CS`. Every verb takes any `System`, the linear model as is, the rest linearized at the operating point (2026-10-15). | Nichols and overlays later; Bode, poles and margins traceable for sensitivity to params (idea to review, S73). |
-| Blocks | teaching | 5 | Routing, nonlinear, filters, sources (with `Sine`), TF, 1-layer NN. | `Ramp` / `Chirp` / `Delay` / `Switch` (C3, v0.3). |
-| Planning / policy synthesis (DP) | teaching (GRO860) | 6 | Grid + value iteration (`loop` / `numpy` / `jax`), lookup controller, `PolicyEvaluator`, `LQRPlanner`; every planner returns a `PlanningSolution`; `compare()` reads solutions side by side; `dp.py` is the textbook reference of the style. | cost-to-go as a `Field` (A1); policy iteration (S51). |
+| Blocks | teaching | 5 | Routing, nonlinear, filters, sources (with `Sine`), TF, `MLP`, `UnitDelay`. | `Ramp` / `Chirp` / `Delay` / `Switch` (C3, v0.4). |
+| Planning / policy synthesis (DP) | teaching (GRO860) | 6 | Grid + value iteration (`loop` / `numpy` / `jax`), lookup controller, `PolicyEvaluator`, `LQRPlanner`; every planner returns a `PlanningSolution`; `compare()` reads solutions side by side, and `compare(problem, …, dt=)` scores them on the problem; an inadmissible pair priced by the problem's cost bound; `dp.py` is the textbook reference of the style. | cost-to-go as a `Field` (A1); policy iteration (S51); DP reading a finite horizon (S63), v0.4. |
 | Planning / trajopt | teaching (GRO860) | 5 | Collocation, shooting, multiple shooting; live plot; `success` means defects satisfied to `feasibility_tol`; float64 by default on JAX. | Harden SciPy/Ipopt before TRL 6. |
-| Optimization | teaching (via trajopt) | 5 | `MathematicalProgram` + `Optimizer`, SciPy/Ipopt. | Harden SciPy/Ipopt before TRL 6. |
+| Optimization | teaching (via trajopt) | 5 | `MathematicalProgram` + `Optimizer`, SciPy/Ipopt; the method table (`gd`, `adam`, `l-bfgs`, `method="auto"`) with a first-order backend, `z0` optional (S74, 2026-10-24). | Harden SciPy/Ipopt before TRL 6; the parametric program on the backend table (S76, OPW, v0.4). |
 | Interfaces / RL bridge | research lane (bridge) | 4 | `Sys2Gym` + `SB3Controller`; the env step is one compiled RK4 call. | Keep for external interop; courses solve with the native planner. |
 | Analysis / Lyapunov certificates | provisional (research) | 4 | `region_of_attraction` → `LyapunovCertificate` (quadratic `V`, sampled level, `verify`, `plot`, `contains`); demo and showcase §11. | Cohort validation; `V` as a `QuadraticField` (A1); SOS and discrete time later. |
 | Planning / RL planner | teaching (GRO860) | 6 | `ReinforcementLearningPlanner` (REINFORCE, actor-critic, PPO, SAC in pure JAX), `TabularLearningPlanner` (Q-learning, SARSA, Monte Carlo control), `StochasticPlanningProblem`, `evaluate` and its `Evaluation`; on the root prelude; canonical demos in `examples/demos/rl/`, chapter 11 and the native teaching notebooks. | SAC actor step (S50); deep Q-learning (S52); automatic reward scaling ([rl-reward-scaling.md](../plans/rl-reward-scaling.md)). |
-| Planning / search (RRT) | provisional → teaching by January (G3, R49) | 5 | RRT / RRT*; `RRTPlanner(problem)` works from the input bounds alone (bang-bang extender); returns a `PlanningSolution`. | RRT-Connect later. |
+| Planning / evaluation (the path to the cost) | provisional until a course runs it (R28) | 4 | `problem.compile(controller, dt)` → the problem evaluator; `evaluate` (one run or `n_trials` draws of the continuous loop, integrated to `tf`) and `compare(problem, …)` its facades, `evaluate_trajectory` for a held run; `jax.grad` reaches every gain, plant parameter, cost weight and start; `pe.program(wrt=)` to the `Optimizer`; the closing PID example (S77). On `dev-v0.3`, pending the maintainer's review (R79). | The draws' noise and the sampled face (V1, v0.4); identification's data cost (C4, v0.4). |
+| Planning / search (RRT) | teaching (G3, R49) | 5 | RRT / RRT*; `RRTPlanner(problem)` works from the problem's input box alone (bang-bang extender; an unbounded `U` refused with the line to write); returns a `PlanningSolution`. | RRT-Connect later. |
 | Planning / path integral (MPPI) | research lane (planned) | 1 | Two standalone scripts (`experimental/mppi/`): the pendulum swings up; the kinematic racecar laps the cone circuit at a lower closed-loop cost than the collocation MPC. Design: [mppi.md](../plans/mppi.md). | The planner (S72, v0.4) on the sampled kernel, after RN-4 / RN-5. |
 | Geometry / spatial | provisional (teaching) | 4 | SDF + `Scene` / fields / bodies under `planning/spatial/`, JAX twins tested; the planning facade's spatial names are provisional teaching names (§2). Home designed: `core/geometry/`. | Package move and course catalog (A3); bicubic SDF and CBF filter (research). |
 | Graphics / animation | teaching | 5 | Frame-keyed `tf` / geometry / overlays; four renderers; auto-fit camera. | Camera and plot defaults from roles (P10); constructor-derived camera hints (S43); glyph/solid rename (S30, v0.9). |
-| Hybrid / step / MPC | provisional (research); MPC's teaching name by January (G3, R49) | 4 | `StepSystem`, `Computer`, `HybridDiagram`, `HybridSimulator`, MPC with parametric JAX. A side helper for MPC simulation; the sampled loop is the one thing that is not a `System`. | Keeps in step with the core rules (P10); no new hybrid features before S31 (ruled a tool on one tick-scan kernel, R13–R14; its code after the continuous core); the compiled MPC program binds every problem parameter, not only `x0` (S76, v0.4; its names ruled: `ParametricProgram`, the key `plant`). |
+| Hybrid / step / MPC | provisional (research); MPC's teaching name `ModelPredictiveController` (G3, R49) | 4 | `StepSystem`, `Computer`, `HybridDiagram`, `HybridSimulator` (in `core/discrete/` and `simulation/discrete/`, 2026-10-24), MPC with parametric JAX under `planning/trajectory_optimization/mpc/`. A side helper for MPC simulation; the sampled loop is the one thing that is not a `System`. | Keeps in step with the core rules (P10); no new hybrid features before S31 (ruled a tool on one tick-scan kernel, R13–R14; its code after the continuous core); the compiled MPC program binds every problem parameter, not only `x0` (S76, v0.4; its names ruled: `ParametricProgram`, the key `plant`). |
 | Realtime simulation | provisional | 2 | `RealtimeSimulator` + pygame I/O. | Architectural review (v1.0); later the human-demonstration recorder of the behavior-cloning pipeline (after v1.0). |
 | Estimation | teaching (GRO501) | 6 | `StateObserver` (innovation form, operating point on the block, hat labels), `luenberger` and `kalman` on arrays, a linear model or the plant (the duals of `place` and `lqr`, 2026-10-14); `lqg` returns the observer + gain box; an observer is refused as a controller; `closed_loop(gain, plant, observer=obs)` wires the LQG loop by role (AC-4, 2026-10-14). | the trajectory observer and the finite-horizon filter, the EKF, the estimation problem and its tools (v0.9, [the plan](../plans/estimation-and-state-feedback.md)). |
-| Identification | planned | 2 | Parametric-tier prototype only. | V1's program export with a data cost (C4, v0.4). |
+| Identification | planned | 1 | No library module (the `identification/` stub deleted, R67; its home `minilink.learning` when C4 lands, R66); the `params_gradient` demo fits plant parameters by a hand gradient loop. | V1's program export with a data cost (C4, v0.4). |
 | C export (`experimental/c_export`) | research | 1 | JAX→C transpiler; two demos; flagship smoke in the JAX regression job. | Keep isolated; repo-only. |
 | Experimental tier (`experimental/symbolic`, `experimental/engines`) | research | 1 | Not on the teaching path nor the API site. | Keep isolated; repo-only. |
 | External multibody leaf (MJX) | research | 0 | Not started. | Spike later. |
-| Pyro 2.0 overall | v0.3 | 3 | Catalog + core + search/DP/trajopt done; many demos unported. | Remaining rows in [pyro-port-remaining.md](../plans/pyro-port-remaining.md). |
+| Pyro 2.0 overall | v0.4 (C1, R48) | 3 | Catalog + core + search/DP/trajopt done; many demos unported. | Remaining rows in [pyro-port-remaining.md](../plans/pyro-port-remaining.md). |
 
 ## 4. Course objectives
 
@@ -166,7 +169,7 @@ GRO501 (§4.2, v0.2) and GMC714 (§4.3, v0.3). A course is
    resumes when the next term's notebooks are pinned.
 8. `pip install minilink` installs the teaching surface, published from a GitHub tag
    (Trusted Publishing in `.github/workflows/publish.yml`, the version read from the
-   tag); extras (`[jax]`, `[visualization]`, …) match `pyproject.toml`. Conda remains
+   tag); extras (`full`, `dev`) match `pyproject.toml`. Conda remains
    the Full local stack (JAX, Ipopt, notebooks).
 
 Out of the v0.1 checklist by decision: MPC/hybrid (provisional, lesson keeps
@@ -182,9 +185,7 @@ Arduino; APP4 is the bicycle-model MIMO plant with LQR, nested loops, pole
 placement and a Kalman observer. Student guide: `GRO501_Guide.pdf`
 (maintainer's copy); references Dorf & Bishop and Åström & Murray.
 
-Baseline audit:
-[docs/reviews/2026-09-07-gro501-coverage.md](../reviews/2026-09-07-gro501-coverage.md).
-The step-level plan doc retired 2026-10-17, its steps landed.
+The baseline audit (2026-09-07) and the step-level plan doc retired, their steps landed.
 
 | Topic | Surface | Status | Gate |
 | --- | --- | --- | --- |
@@ -212,7 +213,7 @@ The step-level plan doc retired 2026-10-17, its steps landed.
 
 Out of the GRO501 checklist by decision: hardware, ROS, and the Arduino
 firmware itself (the course owns those); system identification from logged
-runs beyond what `identification/` already offers.
+runs.
 
 ### 4.3 v0.3 — GMC714 end to end
 
@@ -223,7 +224,7 @@ notebooks one per homework. **Ruled 2026-10-23 (R48): GMC714 needs no new featur
 move from pyro to minilink as the maintainer's teaching work, outside this roadmap; the
 release's part is that the teaching surface covers every lab, checked the same day:
 
-Names as ruled by R52 and R63 (the renames land with A6 before the term).
+Names as ruled by R52 and R63 (the renames landed with A6 on 2026-10-24, on `dev-v0.3`).
 
 | Week | Topic (notes chapters) | The lab's numerical part | Surface | Status |
 | --- | --- | --- | --- | --- |
@@ -264,12 +265,12 @@ reads the Monte Carlo evaluator and the RL numbers (v0.4's one-time number chang
 window delays a wave: a step that would move a running course's numbers ships behind the
 pinned release the course runs on (V6) rather than waiting.
 
-**The shape the rungs build** (proposed, the first ask of K7, maintainer-owned:
-[core-consolidation.md](../plans/core-consolidation.md) §2). One spine every approach is a
+**The shape the rungs build** (proposed, maintainer-owned; the CONSTITUTION sentence it
+would add waits in [end-state-api.md](../plans/end-state-api.md)). One spine every approach is a
 special case of: a `System`, compiled, rolled out to a `Trajectory`, scored by a cost,
 lowered to a `MathematicalProgram`, solved by the `Optimizer`. Two step paths on it: the
 continuous one (`Simulator`, the differentiable evaluator) and the sampled one (the step
-model and the sampled loop, [sampled-path.md](../plans/sampled-path.md)). Six pillars on the
+model, DESIGN §5, and the sampled loop, [sampled-path.md](../plans/sampled-path.md)). Six pillars on the
 spine: classical and modern control, nonlinear control, trajectory optimization and MPC,
 reinforcement learning, identification and imitation, estimation. v0.3 converges the library,
 builds the sampled path and the deterministic differentiable path to the cost, then adds what
@@ -286,13 +287,11 @@ gantt
     Rulings sessions 1 and 2 (R1-R29)     :done, rul1, 2026-10-22, 2d
     GMC714 audit G1 (no gap, R48)         :done, g1, 2026-10-23, 1d
     section v0.3 cleaner core
-    Wave K convergence (K1-K4, K7-K9)     :k, 2026-11-01, 3w
+    Wave K renames and moves (K1-K3, K10, A6) :done, k1, 2026-10-23, 2d
+    Wave K rest (K4, K8, K9), S32, G3     :k, 2026-11-01, 3w
     section v0.3 continuous core
-    Step model S75 (SM-0 to SM-7)         :s75, 2026-11-02, 18d
-    V1 steps 1-2, Trajectory, evaluation  :v1a, 2026-11-02, 12d
-    V1 steps 3-5, run, engine, program    :v1b, after s75, 10d
-    A2 cost parameters (V1 step 6)        :a2, after v1b, 5d
-    Optimizer S74, closing example S77    :s74, after a2, 7d
+    Step model S75 (SM-0 to SM-8)         :done, s75, 2026-10-23, 2d
+    V1 steps 1-6 with A2, S74, S77        :done, v1a, 2026-10-23, 2d
     v0.3 tag                              :milestone, v03, 2026-12-21, 0d
     section v0.4 draws and objects
     Sampled loop S31, OPW                 :s31, 2027-01-04, 3w
@@ -318,15 +317,10 @@ v0.2 and not needed for the tag; they carry into v0.3 and v0.4, each in the slot
 TODO §4 and §5 gives it, wave D standing.
 
 **Wave A — the textbook objects finish speaking.**
-- **A6** Short catalog names (RULES 2.6): compact public class names, the long explicit display
-  names dropped, one ruled table of renames migrating the notebooks in the same commit (between terms,
-  with wave K's between-terms moves, while the name freeze is paused, and before the GMC714 term
-  starts on January 9, R50). **[ask — public
-  names]**
 - **A5** The later nouns, each with its first consumer: `log_prob`, sets and distributions
   over parameter dictionaries, `UnionSet`, `PlanningProblem.hamiltonian()` only if a course
-  teaches Pontryagin (sets reading `params` with A2, V1's step 6 in v0.3, `Set.as_cost` with V1's step 8
-  in v0.4).
+  teaches Pontryagin (the library sets reading `params`, after A2, which landed in v0.3; `Set.as_cost`
+  with V1's step 8 in v0.4).
 - **RN-2** of [randomness.md](../plans/randomness.md): distributions read `params`,
   `Gaussian(cov=)`, every `sample` takes a key (before V1's step 7, the draws, in v0.4).
 
@@ -334,13 +328,13 @@ TODO §4 and §5 gives it, wave D standing.
 - **P10** Automation by convention ([automation-by-convention.md](../plans/automation-by-convention.md),
   decided 2026-10-11): standard port names drive the wiring, three reserved names (`plant`,
   `controller`, `observer`) are the roles every tool reads, and the cost is scored on the
-  plant. Its composition steps land in this wave; the order is in TODO §2 and the plan's
-  §7.
+  plant. Its composition steps landed in this wave (2026-10-13/14); the rest (plots and
+  animation by role, the cost on the plant in v0.4, the sampled loop with S31) is in TODO §2 and
+  the plan's §7.
 
 **Wave D — the code reads like the textbook, and the demos like the API.** Standing work,
 behaviour-preserving, one module per step.
-- The textbook pass landed 2026-10-16/17 ([record](../reviews/2026-10-16-textbook-pass.md),
-  [rulings](../reviews/2026-10-17-textbook-pass-follow-up-rulings.md)); its behaviour and API
+- The textbook pass landed 2026-10-16/17 ([rulings](../reviews/2026-10-17-textbook-pass-follow-up-rulings.md)); its behaviour and API
   leftovers are TODO §3's T rows.
 - **D1** Demos and notebooks to the minimal rule (RULES 6.1 / 6.10 / 6.11). **[ask per
   file]**
@@ -361,12 +355,13 @@ continuous core.
 **Rulings first**, in two sessions ordered by what each unblocks: the shape, the convergence
 and the step model, then the sampled loop, the compiled problem and the names. No foundation
 code before the session that rules it. **Both sessions ruled on
-2026-10-22/23** (R1–R29, [record](../reviews/2026-10-22-rulings-session-1.md)): the design of record for
-the continuous-core phase is [continuous-core.md](../plans/continuous-core.md) (the decision
-ledger with the alternatives: [end-state-api.md](../plans/end-state-api.md)). **Done 2026-10-23:**
+2026-10-22/23** (R1–R29, [record](../reviews/2026-10-22-rulings-session-1.md)); the phase they designed
+landed 2026-10-24 (DESIGN §4–§6), and the decisions still open for v0.4 are
+[end-state-api.md](../plans/end-state-api.md). **Done 2026-10-23:**
 the plan docs aligned to it and its steps written as workboard rows with gates (TODO §4); the
-points that pass and an independent second opinion raised are under "Raised 2026-10-23" in §6.
-**Done 2026-10-23, night:** [a final review](../reviews/2026-10-23-v03-final-review.md) checked
+points that pass and an independent second opinion raised were ruled the same evening (R30–R74,
+the same record).
+**Done 2026-10-23, night:** a final review checked
 the plan against the code, and session 4 ruled its points (R78–R85): the order is the agent's
 and the course calendar does not drive the work (R78); the work happens on `dev-v0.3`, merged into
 `dev` after the maintainer's review (R79); number changes are checked by closeness on the same
@@ -377,64 +372,52 @@ PID-tuning example (S77, R85). Session 5 (R86–R89) kept v0.3 continuous and ru
 clean-up's renames and moves, the step model, the path to the cost (the problem evaluator
 `problem.compile`, `evaluate`, `compare`, the program export), the optimizer's method table and
 the closing PID example, every decision taken without the maintainer in
-[the run's log](../reviews/2026-10-24-v03-run-decisions.md). **Next:** the maintainer's review of
-that log and of the two review passes after it (§6 and §7 of the same log); then what TODO §4
-left (the catalog clean-up K8, S32, the rows' rests; K3b landed, every public name tested). The sampled
-loop and the v0.4 names stay open for v0.4.
+[the run's log](../reviews/2026-10-24-v03-run-decisions.md). **Done 2026-10-24, the same day:**
+K3b (every public name tested), R12 finished (one body per evaluator method, compiled once on
+JAX) and the package folders restructured (one evaluator class per system kind, the discrete-time
+pieces in their own folders, the composition, engine and facade modules split by job), §8–§11 of
+the same log; S32 postponed by the maintainer on three open questions (TODO §4). **Next:** the
+maintainer's review of that log and of the review passes after it; then what TODO §4 left: the
+catalog clean-up (K8, with K9's last items), S32 once its questions are answered, G3's gate, K4,
+and the rows' rests (V1.1, V1.2, S74). The sampled loop and the v0.4 names stay open for v0.4.
 
 **The audit, done 2026-10-23** (G1): the GMC714 syllabus read and every lab's ingredients
 checked on the teaching surface (§4.3); no gap; the maintainer ruled that GMC714 needs no new
 feature (R48).
 
-**Wave K — convergence** (November, first, so everything after lands in a smaller library):
-- **K1** The inventory: every public name and every demo with its callers and a maturity
-  label; [core-consolidation.md](../plans/core-consolidation.md) §3–§4 is most of it.
-- **K2** Unused features removed and **K3** prototypes moved to `minilink/experimental/`,
-  from one ruling pass: K7's tiers. **[ask — removals, public names]**
+**Wave K — convergence** (November, first, so everything after lands in a smaller library; the
+inventory K1, the removals K2, the prototypes K3 and the package structure K10 landed, K7 closed
+by R69):
 - **K4** One demo per feature, before D1.3 sweeps the rest: the maintainer's own pass (R54).
-- **K10** The package structure: `planning/` regrouped by pillar (dynamic programming, trajectory optimization with MPC, search), RL to a new `minilink.learning` band (R66). **[ask — public names]**, ruled.
 - **K8** The catalog clean-up (R2: the root prelude trimmed to the course set, `minilink.catalog`
   the flat index of tested plants, the unsupported ones to the experimental tier) and **K9**
-  the experimental tier out of the CI gate (R3). Ruled.
-- **K7** The convergence pass: the spine, the six pillars and the named content stay; side
-  features leave for the experimental tier or the example that motivated them; the first
-  tier any time, the between-terms moves in the late-December window (§5's calendar rule;
-  §6). **[ask — core, public names]**
+  the experimental tier out of the CI gate (R3; its last items, the unsupported plants' tests,
+  leave with K8). Ruled.
 
-**The continuous core** (November, beside wave K; the design of record
-[continuous-core.md](../plans/continuous-core.md), ruled R1–R29; the steps and gates are TODO
-§4):
-- **S75** The step model ([sampled-path.md](../plans/sampled-path.md)): one compiled step taking
-  `params`, `discretize(plant, dt, *, solver, substeps) -> StepSystem` on it for every
-  sampled consumer, `compute_forced` on the same rollout (a sampled input held, its forced numbers changing once, R18, R40),
-  the evaluator trimmed to four traced bodies, the step formulas kept in `core/compile/` (OD-11)
-  (steps SM-0 to SM-8; S37 absorbed, S27 Diffrax stays in v0.9). **[ask — core]**, ruled.
-- **V1** The path to the cost (steps 1–6 and the Monte Carlo fold of
-  [differentiable-problem.md](../plans/differentiable-problem.md)): the native `Trajectory`, one
-  evaluation of any run (`evaluate_trajectory` and the `Evaluation` record, the integral to `tf`,
-  the problem's fields with one meaning each), the whole run out of the scan,
-  `problem.compile(loop)` with `evaluate` and `compare` as its facades, the program export to
-  today's `Optimizer` (no tuning facade, R23), and the Monte Carlo evaluator folded into
-  `evaluate(..., n_trials, key)` (R44); the record's names `cost`, `J`, `objective` (R45). A
-  sampled controller is refused until the hybrid phase; the noise blocks' per-trial seeds are
-  v0.4 (§5.4). Nothing merges to `main` until every notebook has moved (R47). **[ask — core]**, ruled.
-- **A2** Cost parameters ([cost-params.md](../plans/cost-params.md)), V1's step 6, so the path
-  reaches the cost's own weights. **[ask — core]**, ruled.
-- **S74** The optimizer upgrade: in v0.3 right after the program export (R74), before S76
-  (§5.4), which builds on its backend factory; its OPW part (the parametric MPC solve) is v0.4
+**The continuous core** (November, beside wave K; ruled R1–R29, the contract now DESIGN §4–§6;
+the steps and gates are TODO §4). The step model (S75), the path to the cost (V1's steps 1–6 with the cost parameters A2 and
+the Monte Carlo fold), the optimizer's method table (S74) and the closing PID example (S77)
+landed 2026-10-24; their rests:
+- **V1** The path to the cost, the rest ([differentiable-problem.md](../plans/differentiable-problem.md)):
+  `StepRollout` folded into the native `Trajectory` (with S31 in v0.4), and the LQR warning when
+  `U` is declared (the maintainer's call on the lessons' `U=plant.input_box` lines). A sampled
+  controller is refused until the hybrid phase; the noise blocks' per-trial seeds are v0.4
+  (§5.4). Nothing merges to `main` until every notebook has moved (R47). **[ask — core]**, ruled.
+- **S74** The optimizer upgrade, the rest: the hand descent loops of three compile demos moved
+  onto `Optimizer` **[ask — student-facing]**; its OPW part (the parametric MPC solve) is v0.4
   (R86).
-- **S77** The closing example (R85): the PID tuned by a hand-written gradient loop, then by the
-  pipeline (the problem, `pe.program`, gradient descent on the program).
 
 **GMC714** (R48): no new feature; the teaching surface already covers every lab (§4.3).
 - **G3** GMC714's names stable by January (R49): `RRTPlanner` to the teaching lane, the robotic
   laws onto the prelude, the textbook model forms on a new `minilink.dynamics` band
   facade, MPC as `ModelPredictiveController` with a frozen constructor (R50); A6's short catalog
-  names land before the term (R50).
+  names land before the term (R50). The moves and the renames landed 2026-10-24; its gate is left
+  (TODO §4).
 - **S32** One mechanical family (R62, pulled forward from after v1.0): `GeneralizedMechanicalSystem`
   a child of `MechanicalSystem` beside `Manipulator`, `H` the one mass-matrix name, the model-based
   controllers accepting every mechanical plant. **[ask — core]**, ruled.
-  **[ask — public names]**
+  **[ask — public names]** Postponed by the maintainer (2026-10-24) on three open questions,
+  written with the agent's recommendations in its TODO row.
 - The former wave G rows (C1's pyro parity and migration guide, C2's robotic PID wrappers, C3's
   blocks, S63, S64) move to v0.4 (§5.4); the labs are the maintainer's teaching work, outside
   this roadmap.
@@ -462,7 +445,7 @@ meanwhile and does not gate it); the steps, in order, are TODO §5.
   ([parametric-program.md](../plans/parametric-program.md)): the start, the plant, the cost
   and the sets as one parameter tree bound at each solve; recommended, one program family
   whose frozen form is a binding (the plain `MathematicalProgram` unchanged); its names ruled
-  (`ParametricProgram`, the key `plant`, D19); on S74's backend factory, so S74 lands first.
+  (`ParametricProgram`, the key `plant`, D19); on S74's backend factory, which landed in v0.3.
   **[ask — core]**
 - **C4** Identification as the path's first data consumer: V1's program export with a data-mismatch
   cost; trajectory generation and experiment design beside it.
@@ -476,7 +459,7 @@ meanwhile and does not gate it); the steps, in order, are TODO §5.
 
 **On the spine:**
 - **S72** The path-integral planner (MPPI) on the sampled kernel, after RN-4 / RN-5
-  ([mppi.md](../plans/mppi.md)). **[ask — name, the MPC block contract]**
+  ([mppi.md](../plans/mppi.md)). **[ask — the MPC block contract]**
 - **C5** RL follow-ups: **S50** SAC actor step, **S51** policy iteration on the grid,
   **S52** deep Q-learning, and the standard stochastic policy as a seeded block (the RL
   heads rebuilt on it, the RL numbers changing once).
@@ -491,17 +474,17 @@ meanwhile and does not gate it); the steps, in order, are TODO §5.
 
 What v1.0 asks is adoption, not architecture: a colleague builds a course on minilink and
 trusts it for three years. The
-[adoption review of 2026-09-26](../reviews/2026-09-26-adoption-review.md) found the
+adoption review of 2026-09-26 found the
 engine ready and three things missing around it: a stability promise, the two syllabus
 holes every course hits (estimation, discrete time), and material packaged for an
-instructor. The discrete-time hole closes with S75 in v0.3 (§5.3); v0.9 closes the stability
+instructor. The discrete-time hole closed with S75 in v0.3 (§5.3); v0.9 closes the stability
 promise and the estimation hole, and settles every question that could still break a
 public name; v1.0 (§5.6) freezes.
 
 **The foundations that can break names** — decided before the freeze:
 - **S29** `DiagramSystem.x0` / `n` / `state` as derived properties. **[ask — core]**
-- **S27** Diffrax as an optional JAX solve, on the integrators S75's SM-6 moved to
-  `simulation/solvers/` (S37 is absorbed by S75). **[ask — core]**
+- **S27** Diffrax as an optional JAX solve, beside the step formulas S75 kept in
+  `core/compile/` (OD-11; S37 is absorbed by S75). **[ask — core]**
 - **S30** The glyph / solid rename; **S44** one posed-geometry hook. **[ask]**
 - **V3** The frozen surface: which names the freeze covers. **[ask — public names]**
 
@@ -525,7 +508,7 @@ public name; v1.0 (§5.6) freezes.
   git history, once, in December 2026 after the v0.3 tag. **[ask]**
 
 **The syllabus holes** (beyond GRO501's P4):
-- **`discretize` follow-ups**: moved to S75 in v0.3 (its step SM-2).
+- **`discretize` follow-ups**: landed with S75 in v0.3 (its step SM-2).
 - **Estimation follow-ups** after P4: EKF, time-varying and discrete Kalman; online parameter
   estimators (recursive least squares, gradient laws).
 - **C4** Identification: moved to v0.4 (V1's program export with a data cost).
@@ -573,148 +556,11 @@ each item; agents execute only what was picked.
 
 ## 6. Decisions
 
-Open decisions only, by the rung they block; each needs the maintainer. A decision leaves
-this section when it is taken: its ruling goes to the plan doc it shapes and to a dated
-record in [docs/reviews/](../reviews/), and its contract to DESIGN when the code lands.
-The automation-by-convention rulings (2026-10-11) are in
-[their record](../reviews/2026-10-11-automation-by-convention.md); the disturbance
-convention in [randomness.md](../plans/randomness.md); the docs-consistency rulings
-(2026-10-12) in [theirs](../reviews/2026-10-12-docs-consistency-rulings.md); the
-state-space design rulings (2026-10-14: the nominal state, the model-taking verbs, the
-observer, `lqg`, the role name) in
-[theirs](../reviews/2026-10-14-state-space-design-rulings.md); the linear analysis band
-rulings (2026-10-15: the step response linearized and labelled, the structural verbs on a
-system, the command port as the default channel) in
-[theirs](../reviews/2026-10-15-linear-analysis-rulings.md); the classical control
-family rulings (2026-10-15: `P`, the impedance pair on the family's grammar, matrix
-stiffness and damping, the shared pure functions) in
-[theirs](../reviews/2026-10-15-classical-control-family.md); the z tier dropped (2026-10-17) in
-[its record](../reviews/2026-10-17-z-tier-dropped.md); the one install story (2026-10-17) in
-[its record](../reviews/2026-10-17-one-install-story.md); the root layout (2026-10-17) in
-[its record](../reviews/2026-10-17-root-layout.md); the roadmap reorganization (2026-10-21:
-v0.4 added, the course audit G1 now, the sampled spine before the differentiable one) in
-[its record](../reviews/2026-10-21-roadmap-reorganization.md); the second roadmap review
-(2026-10-22: the calendar rule, one home per item, wave G ranked by G1, the two rulings
-sessions, the sampled face of V1, the missing rows) in
-[its record](../reviews/2026-10-22-second-roadmap-review-rulings.md).
+The open decisions live in [QUESTIONS.md](QUESTIONS.md), one entry each, by the release each
+blocks. A decision leaves it when it is taken: its ruling goes to the plan doc it shapes and to
+a dated record in [docs/reviews/](../reviews/), and its contract to DESIGN when the code lands.
 
-**Ruled 2026-10-22/23, the two sessions** (R1–R29,
-[record](../reviews/2026-10-22-rulings-session-1.md); the design of record
-[continuous-core.md](../plans/continuous-core.md)): the shape (three foundations, six tooling
-pillars), the catalog clean-up (K8), the experimental tier untested (K9), no exit rule, the
-silent prelude trim; the step model's contract, knobs and defaults, DP on Euler, one traced
-body per integrator; the sampled loop a tool with ticks (S31: R13, R14); one engine, the
-compiled fixed-step run the judge, `evaluate` and `compare` its facades (R15, R16); one
-evaluation of any run, the integral to `tf` with no cut, the terminal cost charged at a finite
-`tf` and exits priced only by `infeasible_cost` (R19); the cost object (R20), the sets explicit
-(R21), the loop the pipeline reads (R22), the program as this phase's export (R23), the
-criterion on the problem (R24), the names and the record (R26, R27; S76's names among them:
-`ParametricProgram`, the key `plant`), the lane (R28), `x_goal` and `Xf=None` (R29); the
-optimizer upgrade deferred (R25). Parked to the hybrid phase: D13–D15 (the run-state caches,
-controller memory and draws on the tick, the dispatch of a sampled controller). To discuss
-when convenient, not blocking: how the proposals carry MPPI, behavior cloning and diffusion
-policy ([future-policies.md](../plans/future-policies.md) §7).
-
-**Ruled 2026-10-23, the evening session** (R30–R47, the same
-[record](../reviews/2026-10-22-rulings-session-1.md), on the points of
-[the alignment and second-opinion record](../reviews/2026-10-23-v03-alignment-and-second-opinion.md)):
-the GMC714 audit now (R30); a non-finite run failed (R31); the price one switch read the same
-way by every pipeline, `infeasible_cost=None | True | a number`, with the cost's upper-bound hint
-and `problem.cost_bound()` for DP and RL (R32); `x_goal` never creates `Xf` (R33); the
-criterion's three values reducing `J` (R34); the settings map (R35); `dt` required on `evaluate`
-and `compare` (R36); `U` unbounded unless declared, `plant.input_box` added (R37); the problem
-never fills `r` (R38); role-less trajectories (R39); the hold on sequences only (R40); one home
-per parameter, `ProblemParameters` retired (R41); `method=` for the verb's own method, `solver=`
-for time (R42); the RL episode a training setting (R43); the Monte Carlo fold in v0.3 (R44); the
-record's names `cost`, `J`, `objective` (R45); no regularizer hook (R46); v0.3 on `dev` until
-every notebook has moved, no pin (R47; the branch since R79: `dev-v0.3`).
-
-**The second opinion:** every point ruled (R30–R74); v0.3 holds everything planned (R73), the
-optimizer upgrade right after the program export (R74).
-
-**Ruled 2026-10-23, the night session** (R78–R85, the same record, on the points of
-[the final review](../reviews/2026-10-23-v03-final-review.md)): the order the agent's, not the
-course calendar's (R78); `dev-v0.3` a temporary branch merged into `dev` (R79); number changes
-checked by closeness (R80); `rtol 1e-6` where a computation is restructured (R81); no alias or
-shim (R82); the Euler solvers stay (R83); one way to compare controllers (R84); the closing
-example (S77, R85).
-
-**Ruled 2026-10-23, session 5** (R86–R89, the same record): v0.3 is the continuous path, every
-hybrid piece (S31, the hybrid and realtime simulators on the step model, OPW-1–OPW-5) in v0.4
-(R86); `problem.params` a live nested view of the parts keyed by role, `params=None` the
-problem's own, as a system's (R87), with `x_start` and `discount_rate` as leaves and `tf` a field
-(R88); `PlanningProblem` a plain class (R89).
-
-**Before v0.4 (S76, the parametric program)**
-
-- **The compiled MPC program's parameters** (S76): one program family, the library
-  building `J(z, p)`, `h(z, p)`, `g(z, p)` on the problem's parameter tree and the frozen
-  `MathematicalProgram` its binding, or two parallel types, or one class whose functions
-  always take `p`. Recommended (2026-10-22): the family, so hand-written programs stay `J(z)`
-  and one evaluator serves both (end-state-api.md D25). Still to rule with it (the names apart,
-  ruled: `ParametricProgram`, the key `plant`):
-  whether a hand-written program may declare its own parameters, and the MPC block's
-  live-parameter ports. [parametric-program.md](../plans/parametric-program.md) §2–§3.
-
-**Before v0.3's convergence (wave K)**
-
-- **What is core, what is a side feature** (K7): closed 2026-10-23 (R69), answered by R1–R5 and
-  R52–R67.
-
-**Before the former wave G rows (v0.4, R48)**
-
-- **The optional `KinematicModel` delegate**: adopt or drop, decided with C6's mechanism
-  description.
-- **Mechanical default bounds** (S64): ruled 2026-10-23 (R68): each plant states its own, the base
-  class invents none; lands in v0.3 with V1.2.
-- **Which pyro demos the courses still need** (drives the parity rows).
-- **Pyro game demos** — port the rest to `simulation/realtime/` or drop (the
-  behavior-cloning game mode after v1.0 would reuse them).
-
-**Standing (wave D)**
-
-- **Undeclared feedthrough** (S66): an output that moves with an input it does not declare
-  simulates a wrong fixed point silently today; raise or warn at compile.
-- **Naming, the larger alignments**: one separator rule for wires, params paths, block
-  labels and duplicate state labels; plot labels for internal signals (the display-name
-  sweep is step A6).
-
-**Before v0.4**
-
-- **Lyapunov certificates**: a GRO860 checklist row of their own, or an analysis tool the
-  lecture uses; `method=` naming the certificate family.
-- **Solver-specific views on the planning records.**
-- **`PlanningProblem.metadata`**: document it or retire it.
-- **MPPI** ([mppi.md](../plans/mppi.md) §10): the planner's name (`PathIntegralPlanner`
-  or `MPPIPlanner`); the three planner verbs the MPC block reads instead of trajopt
-  internals; the stochastic default (plant draws per control sample); where
-  `RolloutEnvironment` lives once a second band reads it (answered by S75 and S31 if they
-  are ruled as recommended: it becomes a caller of the step model and the sampled kernel).
-- **CBF safety filter** ([cbf-safety-filter.md](../plans/cbf-safety-filter.md)): research
-  lane until a course asks; the barrier is a `Field` once A1 lands.
-
-**Before v0.9 (the freeze candidate)**
-
-- **Where the course material and the projects live** (K5): `examples/teaching/` (course
-  notebooks, cited by the GRO860 notes and webpage and GRO501's `\colab{}`) and
-  `examples/projects/` (research projects) stay here, or move to their own repositories.
-  Here: one checkout, one CI, renames migrate them in one commit. Apart: a library repo that
-  is only the library, course material versioned per term and pinned on a release, but two
-  CIs and a release before every notebook change that needs a new feature. Move between
-  terms only. Options and a recommendation (pin the course notebooks on a release now, a
-  course repository at v1.0; with the examples-tree and package-split questions):
-  [the repository-structure writeup](../plans/repository-structure.md).
-- Diffrax as an optional JAX solve (S27).
-- The posed-geometry hook (S44) and the glyph / solid rename (S30).
-- The frozen surface (V3): do `StepSystem`, `StepDiagramSystem`, `UnitDelay` and
-  `control.mpc` join it, or sit behind a provisional name.
-- The deprecation policy (V4): shims from v1.0 on, overriding RULES "no deprecated
-  aliases" from then.
-- A `MinilinkError` family (S70).
-
-**Before v1.0**
-
-- Zenodo / DOI, and whether JOSS is wanted (V2).
+Past rulings: the dated records in [docs/reviews/](../reviews/), named by date and subject.
 
 ## 7. Out of scope
 

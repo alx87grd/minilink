@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import warnings
 from collections.abc import Mapping
-from types import MappingProxyType
 
 import numpy as np
 
@@ -104,7 +103,6 @@ class PlanningProblem:
         "X0",
         "Xf",
         "tf",
-        "metadata",
         "infeasible_cost",
         "discount_rate",
     )
@@ -121,7 +119,6 @@ class PlanningProblem:
         X0: Set | None = None,
         Xf: Set | None = None,
         tf: float | None = None,
-        metadata: Mapping[str, object] | None = None,
         infeasible_cost: bool | float | None = None,
         discount_rate: float = 0.0,
     ):
@@ -135,7 +132,6 @@ class PlanningProblem:
         self.X0 = X0
         self.Xf = Xf
         self.tf = tf
-        self.metadata = metadata
         self.infeasible_cost = infeasible_cost
         self.discount_rate = discount_rate
         n = int(self.sys.n)
@@ -163,9 +159,6 @@ class PlanningProblem:
         U = unconstrained_inputs(int(self.sys.m)) if self.U is None else self.U
         X0 = SingletonSet(x_start) if self.X0 is None else self.X0
         Xf = self.Xf
-
-        # The metadata, read-only
-        metadata = self.coerce_metadata(self.metadata)
 
         # The sets' types
         self.require_type("X", X, Set)
@@ -200,7 +193,6 @@ class PlanningProblem:
         self.U = U
         self.X0 = X0
         self.Xf = Xf
-        self.metadata = metadata
 
     @property
     def params(self) -> dict:
@@ -374,14 +366,14 @@ class PlanningProblem:
         episode_length=None,
     ):
         """
-        The :class:`~minilink.planning.engine.ProblemEvaluator` of a controller on this problem.
+        The :class:`~minilink.planning.evaluator.ProblemEvaluator` of a controller on this problem.
 
         The controller closed on the plant (or a built loop with a ``plant`` block),
         compiled once: ``pe.evaluate()`` scores it, ``pe.params`` holds every
         parameter of the run, ``pe.program(wrt)`` exports the tuning program.
         """
         # Lazy import: the engine loads with its first evaluator
-        from minilink.planning.engine import ProblemEvaluator
+        from minilink.planning.evaluator import ProblemEvaluator
 
         return ProblemEvaluator(
             self,
@@ -487,16 +479,6 @@ class PlanningProblem:
         return None
 
     @staticmethod
-    def coerce_metadata(metadata) -> Mapping[str, object]:
-        """A read-only copy of the metadata, empty when unset."""
-        if metadata is None:
-            return MappingProxyType({})
-        if not isinstance(metadata, Mapping):
-            raise TypeError("metadata must be a mapping or None")
-
-        return MappingProxyType(dict(metadata))
-
-    @staticmethod
     def require_type(label: str, value: object, expected_type: type) -> None:
         """Refuse a value that is not an instance of ``expected_type``."""
         if not isinstance(value, expected_type):
@@ -577,7 +559,6 @@ class StochasticPlanningProblem(PlanningProblem):
         X0: Set | None = None,
         Xf: Set | None = None,
         tf: float | None = None,
-        metadata: Mapping[str, object] | None = None,
         infeasible_cost: bool | float | None = None,
         discount_rate: float = 0.0,
         x0_distribution: Distribution | None = None,
@@ -603,7 +584,6 @@ class StochasticPlanningProblem(PlanningProblem):
             X0=X0,
             Xf=Xf,
             tf=tf,
-            metadata=metadata,
             infeasible_cost=infeasible_cost,
             discount_rate=discount_rate,
         )
@@ -717,7 +697,6 @@ class StochasticPlanningProblem(PlanningProblem):
             U=self.U,
             Xf=self.Xf,
             tf=self.tf,
-            metadata=self.metadata,
             infeasible_cost=self.infeasible_cost,
             discount_rate=self.discount_rate,
         )
@@ -814,7 +793,6 @@ def as_stochastic(problem: PlanningProblem) -> StochasticPlanningProblem:
         X0=problem.X0,
         Xf=problem.Xf,
         tf=problem.tf,
-        metadata=problem.metadata,
         infeasible_cost=problem.infeasible_cost,
         discount_rate=problem.discount_rate,
         x0_distribution=Particles(np.atleast_2d(problem.x_start)),

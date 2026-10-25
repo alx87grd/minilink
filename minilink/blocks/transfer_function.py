@@ -3,9 +3,9 @@
 import numpy as np
 from scipy import signal
 
-from minilink.core.feedback import ErrorDriven
 from minilink.core.inspect import inspect_text
 from minilink.core.kinematics import translation
+from minilink.core.roles import ErrorDriven
 from minilink.dynamics.abstraction.state_space import LTISystem
 from minilink.graphical.animation.primitives import (
     Arrow,

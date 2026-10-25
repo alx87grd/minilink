@@ -523,18 +523,11 @@ def dynamics_on(backend, evaluator, u_bar, t, params):
         jax = require_jax()
         jnp = require_jax_numpy()
 
-        if params is None:
-            batch = jax.jit(jax.vmap(lambda x: evaluator.f_trace(x, u_bar, t)))
-        else:
-            batch = jax.jit(
-                jax.vmap(lambda x: evaluator.f_trace_p(x, u_bar, t, params))
-            )
+        batch = jax.jit(jax.vmap(lambda x: evaluator.f(x, u_bar, t, params)))
         return lambda states: np.asarray(batch(jnp.asarray(states)))
 
     # NumPy: f state by state
-    if params is None:
-        return lambda states: np.stack([evaluator.f(x, u_bar, t) for x in states])
-    return lambda states: np.stack([evaluator.f_p(x, u_bar, t, params) for x in states])
+    return lambda states: np.stack([evaluator.f(x, u_bar, t, params) for x in states])
 
 
 def natural_window(x_bar, P, domain: BoxSet) -> BoxSet:

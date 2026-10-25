@@ -83,7 +83,9 @@ def apply_pid_params(pid):
 
 def simulate_traj(pid):
     apply_pid_params(pid)
-    xs = np_evaluator.jit.rollout(diagram.x0, plot_u_knots, 0.0, DT, hold="foh")
+    xs = np_evaluator.rollout(
+        diagram.x0, plot_u_knots, 0.0, DT, diagram.params, hold="foh"
+    )
     return Trajectory(t=plot_t, x=xs.T, u=plot_u_knots.T)
 
 
@@ -99,7 +101,7 @@ def rollout_loss(pid):
     }
 
     # The run: x_{k+1} = Φ(x_k, r, t_k), and the command u_k the controller outputs
-    xs = evaluator.jit.rollout(x0, u_seq, 0.0, DT, params)
+    xs = evaluator.rollout(x0, u_seq, 0.0, DT, params)
     us = jax.vmap(lambda x, t: evaluator.signals(x, u_ref, t, params)[u_slice])(
         xs, t_grid
     )

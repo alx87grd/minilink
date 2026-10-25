@@ -6,7 +6,7 @@ import numpy as np
 
 from minilink.core.backends import BACKEND_JAX, BACKEND_NUMPY, array_module
 from minilink.core.compile.evaluators.stepping import require_step_knobs
-from minilink.core.feedback import command_port
+from minilink.core.roles import command_port
 from minilink.planning.problems import as_stochastic, merge_params
 
 ###############################################################################

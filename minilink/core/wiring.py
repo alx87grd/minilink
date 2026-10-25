@@ -9,9 +9,13 @@ import numpy as np
 
 from minilink.core.backends import array_module
 from minilink.core.distributions import child_seed
-from minilink.core.feedback import check_reserved_id
+from minilink.core.roles import check_reserved_id
 from minilink.core.signals import OutputPort, VectorSignal
 from minilink.core.system import DEFAULT_SMALLEST_TIME_CONSTANT
+from minilink.core.topology import (
+    check_algebraic_loops,
+    feedthrough_inputs,
+)
 
 if TYPE_CHECKING:
     from minilink.core.diagram import DiagramSystem
@@ -27,7 +31,7 @@ class WiredDiagramMixin:
     Evolution-agnostic diagram wiring, gather, and visualization helpers.
 
     Shared by :class:`~minilink.core.diagram.DiagramSystem` and
-    :class:`~minilink.core.diagram.StepDiagramSystem`. Flow diagrams pass
+    :class:`~minilink.core.discrete.step_diagram.StepDiagramSystem`. Flow diagrams pass
     simulation time ``t`` (float) as the third gather slot; step diagrams pass
     step index ``k`` (int) in the same parameter position.
     """
@@ -79,7 +83,7 @@ class WiredDiagramMixin:
         """Add a subsystem under a unique id, with all its inputs unconnected.
 
         The ids ``plant``, ``controller`` and ``observer`` name the roles every
-        tool reads (:func:`minilink.core.feedback.roles`); one of each per level.
+        tool reads (:func:`minilink.core.roles.roles`); one of each per level.
         """
         require_plain_id(sys_id)
         check_reserved_id(sys_id, self.subsystems)
@@ -225,8 +229,8 @@ class WiredDiagramMixin:
         This is an optional diagram-building shortcut. It does not overwrite
         existing connections and returns ``self`` so it can be used fluently.
         """
-        # A real cycle: composition imports DiagramSystem, built on this mixin
-        from minilink.core.composition import autowire
+        # A real cycle: the operators import DiagramSystem, built on this mixin
+        from minilink.core.operators import autowire
 
         return autowire(self, strict=strict, validate=validate)
 
@@ -656,12 +660,13 @@ def check_diagram_params(params, subsystem_ids):
     """Check the nested diagram params contract.
 
     ``params`` must be ``None`` or a mapping keyed by subsystem id whose values
-    are per-subsystem params dicts. Missing subsystem ids are allowed (those
-    subsystems fall back to their live ``self.params``); unknown ids raise so
+    are per-subsystem params dicts. Missing subsystem ids are allowed: those
+    subsystems fall back to their live ``self.params`` on the uncompiled diagram,
+    and to their parameters as compiled on an evaluator. Unknown ids raise so
     sys-id typos fail loudly instead of silently using defaults.
 
     Called once at public entry points (``DiagramSystem.f``, ``tf``,
-    ``get_dynamic_geometry``, the evaluators' parametric tier, the ``params``
+    ``get_dynamic_geometry``, the evaluators given ``params``, the ``params``
     setter), not inside the recursion.
 
     Parameters
@@ -683,98 +688,6 @@ def check_diagram_params(params, subsystem_ids):
         raise ValueError(
             f"Unknown subsystem ids in diagram params: {names}; available: {available}"
         )
-
-
-def check_algebraic_loops(diagram: DiagramSystem) -> None:
-    """Check a wired diagram for algebraic loops.
-
-    An algebraic loop exists when a cycle contains only direct-feedthrough
-    paths (i.e., output ports whose ``dependencies`` include the input ports
-    that close the cycle). This check is **standalone**: call it right after
-    wiring a diagram to validate its topology before simulation; the order
-    the compiler evaluates the ports in is :func:`evaluation_order_of`.
-
-    Parameters
-    ----------
-    diagram : DiagramSystem
-        The wired diagram to analyse.
-
-    Raises
-    ------
-    RuntimeError
-        If an algebraic loop is detected, with the full cycle path in the
-        error message.
-    """
-    evaluation_order_of(diagram)
-
-
-def evaluation_order_of(diagram: DiagramSystem) -> list[tuple[str, str]]:
-    """The topological evaluation order of a diagram's output ports.
-
-    Uses depth-first search over output-port dependency edges; a cycle of
-    direct-feedthrough paths (an algebraic loop) is refused.
-
-    Parameters
-    ----------
-    diagram : DiagramSystem
-        The wired diagram to analyse.
-
-    Returns
-    -------
-    list[tuple[str, str]]
-        Output ports ``(sys_id, port_id)`` in valid topological order
-        (dependencies before dependents).
-
-    Raises
-    ------
-    RuntimeError
-        If an algebraic loop is detected, with the full cycle path in the
-        error message.
-    """
-    visited: set[tuple[str, str]] = set()
-    stack: list[tuple[str, str]] = []
-    stack_set: set[tuple[str, str]] = set()
-    order: list[tuple[str, str]] = []
-
-    def visit_port(sys_id: str, port_id: str) -> None:
-        node = (sys_id, port_id)
-
-        # A port already on the search path closes an algebraic loop
-        require_no_algebraic_loop(node, stack, stack_set)
-
-        # A port already scheduled
-        if node in visited:
-            return
-
-        # The sources the port feeds through from come first
-        stack.append(node)
-        stack_set.add(node)
-
-        port = diagram.subsystems[sys_id].outputs.get(port_id)
-        if port is not None:
-            deps = port.dependencies
-            sys_inputs = diagram.subsystems[sys_id].inputs
-            input_deps = sys_inputs.keys() if deps == "all" else deps
-
-            for in_port_id in input_deps:
-                source = diagram.connections[sys_id].get(in_port_id)
-                if source is not None:
-                    src_sys_id, src_port_id = source
-                    if src_sys_id != "input":
-                        visit_port(src_sys_id, src_port_id)
-
-        # Its sources scheduled, the port takes its place in the order
-        stack.pop()
-        stack_set.remove(node)
-        visited.add(node)
-        order.append(node)
-
-    # Every output port of every subsystem, in insertion order
-    for sys_id, subsystem in diagram.subsystems.items():
-        for port_id in subsystem.outputs:
-            visit_port(sys_id, port_id)
-
-    return order
 
 
 def iter_subsystems(diagram, prefix=()):
@@ -895,48 +808,3 @@ def require_output_port(outputs, sys_id, port_id):
             f"Unknown output port {port_id!r} on subsystem {sys_id!r}; "
             f"available: {', '.join(outputs) or '(none)'}"
         )
-
-
-def feedthrough_inputs(diagram, sys_id, port_id) -> tuple[str, ...]:
-    """
-    Diagram boundary inputs that reach one subsystem output by direct feedthrough.
-
-    Walks the ``dependencies`` edges back from ``sys_id:port_id``; a state
-    breaks the path, a boundary input ends it. The result is what a leaf would
-    declare for the same port, in diagram input order. An algebraic loop inside
-    the diagram ends the walk here and is reported by :func:`check_algebraic_loops`.
-    """
-    reached = set()
-    visited = set()
-    stack = [(sys_id, port_id)]
-
-    # Back along the feedthrough edges: a boundary input ends a path, an output
-    # continues it
-    while stack:
-        node = stack.pop()
-        if node in visited:
-            continue
-        visited.add(node)
-
-        source_sys_id, source_port_id = node
-        subsystem = diagram.subsystems[source_sys_id]
-        deps = subsystem.outputs[source_port_id].dependencies
-        for in_port_id in subsystem.inputs if deps == "all" else deps:
-            source = diagram.connections[source_sys_id].get(in_port_id)
-            if source is None:
-                continue
-            if source[0] == "input":
-                reached.add(source[1])
-            else:
-                stack.append(source)
-
-    return tuple(input_id for input_id in diagram.inputs if input_id in reached)
-
-
-def require_no_algebraic_loop(node, stack, stack_set):
-    """Refuse a port already on the search path, which closes an algebraic loop."""
-    if node in stack_set:
-        cycle_start_idx = stack.index(node)
-        cycle_path = stack[cycle_start_idx:] + [node]
-        cycle_str = " -> ".join(f"{s}:{p}" for s, p in cycle_path)
-        raise RuntimeError(f"Algebraic loop detected: {cycle_str}")

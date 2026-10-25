@@ -3,7 +3,6 @@
 bare-jax	minilink/analysis/derivatives.py::from jax.errors	1
 bare-jax	minilink/simulation/compile_backend.py::import jax	1
 np-under-xp	minilink/control/geometric.py::PurePursuit.ctl	1
-np-under-xp	minilink/core/distributions.py::random_bits	2
 return-math	minilink/dynamics/catalog/vehicles/dynamic_bicycle.py::DynamicBicycle.tf	1
 return-math	minilink/dynamics/catalog/vehicles/steering.py::KinematicBicycle.tf	1
 return-math	minilink/dynamics/catalog/vehicles/steering.py::KinematicCar.tf	1

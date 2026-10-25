@@ -14,9 +14,9 @@ from minilink.control.state import (
     TimeVaryingFeedback,
 )
 from minilink.core.costs import QuadraticCost
-from minilink.core.feedback import command_port
+from minilink.core.roles import command_port
 from minilink.core.trajectory import interpolate_schedule
-from minilink.planning.engine import nominal_trajectory
+from minilink.planning.evaluator import nominal_trajectory
 from minilink.planning.planner import Planner
 from minilink.planning.problems import PlanningProblem, nominal_plant_params
 from minilink.planning.results import PlanningSolution

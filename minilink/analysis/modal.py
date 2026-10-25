@@ -85,7 +85,7 @@ def animate_modal(
     Each mode is animated as an absolute state, the operating point plus the
     mode's motion, so the system's own kinematics draw it. Calls
     :func:`modal_analysis`, then
-    :meth:`~minilink.core.facades.SharedSystemFacades.animate` once per mode.
+    :meth:`~minilink.core.facades.animation.SystemAnimation.animate` once per mode.
 
     Parameters
     ----------

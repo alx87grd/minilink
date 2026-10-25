@@ -1973,7 +1973,7 @@ class TestSensitivity(unittest.TestCase):
     def test_a_filter_on_the_measurement(self):
         from minilink.analysis import complementary_sensitivity, sensitivity
         from minilink.blocks.transfer_function import TransferFunction
-        from minilink.core.composition import feedback
+        from minilink.core.closed_loop import feedback
 
         H = TransferFunction([1.0], [1.0, 3.0, 2.0])
         C = PID(4.0, 2.0, 0.5)

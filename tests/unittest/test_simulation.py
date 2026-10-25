@@ -491,7 +491,7 @@ class TestStaticSimulatorJax(unittest.TestCase):
 
 
 from minilink.control.modelbased import SlidingMode
-from minilink.core.composition import closed_loop
+from minilink.core.closed_loop import closed_loop
 from minilink.dynamics.catalog.pendulum.pendulum import Pendulum
 from minilink.simulation.simulator import Simulator
 
@@ -593,10 +593,11 @@ class TestStepSubsteps(unittest.TestCase):
         np.testing.assert_allclose(x_final, x_seq[-1], rtol=1e-10, atol=1e-10)
 
 
-from minilink.core.compile.evaluators.step_rollout import gather_u
-from minilink.core.diagram import StepDiagramSystem
-from minilink.core.system import StepSystem, System
-from minilink.simulation.computer import Computer, StepSchedule
+from minilink.core.compile.evaluators.base import gather_u
+from minilink.core.discrete.step_diagram import StepDiagramSystem
+from minilink.core.system import System
+from minilink.core.discrete.step_system import StepSystem
+from minilink.simulation.discrete.computer import Computer, StepSchedule
 
 
 class KDependentPort(System):
@@ -790,8 +791,8 @@ class TestComputer(unittest.TestCase):
 
 
 from minilink.control.siso import P
-from minilink.core.hybrid_composition import hybrid_closed_loop
-from minilink.simulation.computer import Computer, StepSchedule, as_computer
+from minilink.core.discrete.hybrid_composition import hybrid_closed_loop
+from minilink.simulation.discrete.computer import Computer, StepSchedule, as_computer
 
 
 class ScheduledP(P):

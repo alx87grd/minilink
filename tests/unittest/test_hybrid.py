@@ -1,12 +1,13 @@
-"""Tests for :class:`~minilink.core.hybrid_diagram.HybridDiagram` boundary wiring."""
+"""Tests for :class:`~minilink.core.discrete.hybrid_diagram.HybridDiagram` boundary wiring."""
 
 import unittest
 import numpy as np
 from minilink.blocks.basic import Integrator
 from minilink.control.siso import P
-from minilink.core.diagram import DiagramSystem, StepDiagramSystem
-from minilink.core.hybrid_diagram import BoundaryConnection, HybridDiagram
-from minilink.simulation.computer import Computer, StepSchedule
+from minilink.core.diagram import DiagramSystem
+from minilink.core.discrete.step_diagram import StepDiagramSystem
+from minilink.core.discrete.hybrid_diagram import BoundaryConnection, HybridDiagram
+from minilink.simulation.discrete.computer import Computer, StepSchedule
 
 
 def _build_computer_diagram():
@@ -78,8 +79,8 @@ class TestHybridBoundaryConnect(unittest.TestCase):
         self.assertEqual(hybrid.plant.n, 1)
 
 
-from minilink.core.hybrid_composition import hybrid_closed_loop
-from minilink.core.hybrid_diagram import HybridDiagram
+from minilink.core.discrete.hybrid_composition import hybrid_closed_loop
+from minilink.core.discrete.hybrid_diagram import HybridDiagram
 
 
 class TestHybridClosedLoop(unittest.TestCase):
@@ -166,9 +167,9 @@ class TestHybridClosedLoop(unittest.TestCase):
         self.assertIn("plant", hybrid.plant.subsystems)
 
 
-from minilink.core.step_rollout import StepRollout
+from minilink.core.discrete.step_rollout import StepRollout
 from minilink.core.trajectory import Trajectory
-from minilink.simulation.hybrid_simulator import HybridSimulator
+from minilink.simulation.discrete.hybrid_simulator import HybridSimulator
 
 
 def _build_hybrid():
@@ -335,7 +336,7 @@ class TestHybridSimulator(unittest.TestCase):
         hybrid.animate(show=False)
 
     def test_plant_diagram_inherits_camera_scale(self):
-        from minilink.core.hybrid_composition import as_plant_diagram
+        from minilink.core.discrete.hybrid_composition import as_plant_diagram
         from minilink.dynamics.catalog.pendulum.pendulum import Pendulum
 
         plant = Pendulum(length=1.0, mass=1.0)
@@ -345,7 +346,7 @@ class TestHybridSimulator(unittest.TestCase):
     def test_hybrid_animate_refreshes_plant_camera_scale(self):
         from minilink.blocks.basic import Integrator
         from minilink.control.siso import P
-        from minilink.core.hybrid_composition import hybrid_closed_loop
+        from minilink.core.discrete.hybrid_composition import hybrid_closed_loop
 
         plant = Integrator()
         plant.camera_scale = 3.0
@@ -357,7 +358,7 @@ class TestHybridSimulator(unittest.TestCase):
 
 
 from minilink.core.backends import array_module
-from minilink.core.system import StepSystem
+from minilink.core.discrete.step_system import StepSystem
 from minilink.graphical.diagrams.hybrid_topology import (
     build_hybrid_topology,
     export_hybrid_topology,

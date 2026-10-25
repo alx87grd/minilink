@@ -5,8 +5,8 @@ examples/demos/compile/neural_controller_jax.py minilink.graphical.common.matplo
 examples/demos/compile/params_gradient.py minilink.core.backends
 examples/demos/compile/pid_autotuning_jax.py minilink.graphical.signals
 examples/demos/hybrid/hybrid_multi_rate.py minilink.core.backends
-examples/demos/hybrid/hybrid_multi_rate.py minilink.core.hybrid_composition
-examples/demos/hybrid/sampled_smc_pendulum.py minilink.core.hybrid_composition
+examples/demos/hybrid/hybrid_multi_rate.py minilink.core.discrete.hybrid_composition
+examples/demos/hybrid/sampled_smc_pendulum.py minilink.core.discrete.hybrid_composition
 examples/demos/hybrid/step_accumulator.py minilink.core.backends
 examples/demos/hybrid/step_fibonacci.py minilink.core.backends
 examples/demos/hybrid/step_unity_feedback.py minilink.core.backends
@@ -46,7 +46,6 @@ examples/demos/realtime/game_ur5_setpoint.py minilink.simulation.realtime
 examples/tutorial/showcase_jax.ipynb minilink.experimental.c_export
 examples/tutorial/showcase_minilink.ipynb minilink.core.kinematics
 examples/tutorial/showcase_minilink.ipynb minilink.graphical.animation.primitives
-examples/teaching/courses/udes_gro501/racecar_toward_mpc.ipynb minilink.core.hybrid_composition
 examples/teaching/courses/udes_gro501/racecar_toward_mpc.ipynb minilink.graphical.catalog.racecar_skin
 examples/teaching/courses/udes_gro501/racecar_toward_mpc.ipynb minilink.planning.spatial.grid
 examples/teaching/courses/udes_gro501/racecar_toward_mpc.ipynb minilink.planning.spatial.plotting

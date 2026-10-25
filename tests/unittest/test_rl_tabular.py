@@ -98,6 +98,19 @@ def test_nearest_rounding_aliases_a_coarse_grid():
         TabularLearningPlanner(problem, rounding="floor", **GRID)
 
 
+def test_the_learner_steps_with_its_grids_solver_unless_told_otherwise():
+    problem = double_integrator_problem()
+    learner = TabularLearningPlanner(problem, **GRID)
+    assert learner.env.solver == learner.grid.solver == "euler"
+    x = np.array([0.5, -0.3])
+    u = np.array([1.0])
+    x_next = learner.env.plant_step(x, u, 0.0)
+    np.testing.assert_allclose(x_next, learner.grid.sys.f(x, u) * GRID["dt"] + x)
+
+    rk4 = TabularLearningPlanner(problem, solver="rk4", **GRID)
+    assert rk4.env.solver == "rk4"
+
+
 @pytest.mark.parametrize(
     "algorithm", ["sarsa", "monte_carlo", QLearning(), SARSA(), MonteCarloControl()]
 )

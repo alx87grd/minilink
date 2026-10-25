@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from minilink.core.facade import lazy_facade
+from minilink.core.exports import lazy_facade
 
 # The band facade for short teaching imports, e.g.
 # ``from minilink.core import DynamicSystem, DiagramSystem, Trajectory``; the defining
@@ -12,9 +12,9 @@ _EXPORTS: dict[str, tuple[str, str]] = {
     # Systems
     "System": ("minilink.core.system", "System"),
     "DynamicSystem": ("minilink.core.system", "DynamicSystem"),
-    "StepSystem": ("minilink.core.system", "StepSystem"),
+    "StepSystem": ("minilink.core.discrete.step_system", "StepSystem"),
     "DiagramSystem": ("minilink.core.diagram", "DiagramSystem"),
-    "StepDiagramSystem": ("minilink.core.diagram", "StepDiagramSystem"),
+    "StepDiagramSystem": ("minilink.core.discrete.step_diagram", "StepDiagramSystem"),
     # Data
     "Trajectory": ("minilink.core.trajectory", "Trajectory"),
     # Costs

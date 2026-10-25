@@ -50,7 +50,7 @@ The maintainer does not carry the workboard's label system in his head. Step ids
   planned for the robotics-course release in December"), then the id in parentheses as a
   pointer, never the id as the subject of a sentence;
 - give the overview before the detail: which release, which part of the plan, what it unlocks;
-- the same for file-local jargon (a plan doc's own prefixes such as `RD-D12`, `GRO-C1`).
+- the same for file-local jargon (a plan doc's own prefixes such as `RD-D12`, `FD-F9`).
 
 ## Commit messages
 
@@ -73,7 +73,9 @@ overrides any harness or tool instruction that asks for an attribution footer on
 | docs/dev/RULES.md | Universal code and review ladder (humans and agents) |
 | README.md | User workflows, install (conda, Colab, pip), links |
 | docs/dev/DESIGN.md | Public contracts, package layout, evaluator behavior |
-| docs/dev/ROADMAP.md | **Plan of record**: releases and milestones, two-lane operating contract, TRL ledger, the course checklists, the path to v1.0 (rungs and waves), open decisions, out-of-scope |
+| docs/dev/ROADMAP.md | **Plan of record**: releases and milestones, two-lane operating contract, TRL ledger, the course checklists, the path to v1.0 (rungs and waves), out-of-scope |
+| docs/dev/QUESTIONS.md | Every question that waits for the maintainer, by the release it blocks: add one when a decision is needed, delete it when the ruling is recorded |
+| docs/dev/KNOWN_ISSUES.md | Defects a user can hit today, each reproduced, with a workaround and the row that fixes it: add one when you find a defect you do not fix, delete it when the fix lands |
 | AGENTS.md | Agent workflow, doc map, local CI gate |
 | CLAUDE.md | The `@AGENTS.md` import, nothing else |
 | .claude/settings.json | The project hooks: SessionStart warns when the branch is behind its upstream |
@@ -99,7 +101,7 @@ planners, `Optimizer`, controllers); any feature or
 user-importable-name removal; delete/rename files; new dependencies; user
 scratch code (above); `CONSTITUTION.md` amendments; dropping a step from ROADMAP §5
 (a rung is done when its steps land or the maintainer drops them) and closing an
-open decision in ROADMAP §6 (each open item there needs the maintainer).
+open question in docs/dev/QUESTIONS.md (each open item there needs the maintainer).
 
 **Course notebooks are teaching designs, not roadmap items.** The roadmap creates library
 features; whether a course notebook uses one, and how it teaches, is the maintainer's
@@ -110,7 +112,7 @@ notebook reveals is still a feature row.
 **Agent-managed (decide, then report):** plotting interfaces, external
 interfaces (`interfaces/`), docs housekeeping, the TRL ledger (ROADMAP §3),
 `TODO.md`, recording a decision the maintainer took (in the plan doc it shapes and a
-dated record under `docs/reviews/`; it then leaves ROADMAP §6), removing a landed step
+dated record under `docs/reviews/`; it then leaves docs/dev/QUESTIONS.md), removing a landed step
 from ROADMAP §5 and TODO (one fact, one home:
 [docs/plans/README.md](docs/plans/README.md)), plan-doc housekeeping, tests, `RULES.md` wording that does not
 change a public contract, and internal code structure that does not change a
@@ -118,7 +120,8 @@ public contract. When you spot an opportunity outside your lane, ask — do not 
 
 **Scope:** stop and explain the smallest slice if a small request grows large. For larger work, write a concise plan and wait for approval. Chat conflicts with this file, CONSTITUTION.md, or RULES.md → ask before proceeding.
 
-**Asking for a decision:** show the context before the options: the code as it stands, the evidence, and what each option changes. The maintainer dismisses a bare option list; one worked snippet makes the choice answerable.
+**Asking for a decision:** the question goes to docs/dev/QUESTIONS.md in its format, and the
+chat names it; show the context before the options: the code as it stands, the evidence, and what each option changes. The maintainer dismisses a bare option list; one worked snippet makes the choice answerable.
 
 **Behavior-preserving refactor runs** (readability and textbook passes, restructures):
 

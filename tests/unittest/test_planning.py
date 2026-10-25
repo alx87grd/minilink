@@ -197,17 +197,13 @@ class TestPlanningArchitecture(unittest.TestCase):
         problem = PlanningProblem(
             sys=sys,
             Xf=SingletonSet(np.array([0.0, 0.0])),
-            metadata={"tag": "demo"},
             U=sys.input_box,
         )
         self.assertIs(problem.params["plant"], sys.params)  # a view of the parts
-        self.assertEqual(problem.metadata["tag"], "demo")
-        with self.assertRaises(TypeError):
-            problem.metadata["tag"] = "changed"
         with self.assertRaises(TypeError):
             PlanningProblem(sys=sys, params={"plant": {}}, U=sys.input_box)
-        with self.assertRaisesRegex(TypeError, "metadata must be"):
-            PlanningProblem(sys=sys, metadata=[("tag", "demo")], U=sys.input_box)
+        with self.assertRaises(TypeError):  # A problem keeps no free-form notes
+            PlanningProblem(sys=sys, metadata={"tag": "demo"}, U=sys.input_box)
 
     def test_quadratic_cost_evaluates_trajectory(self):
         sys = self.make_system()
@@ -436,7 +432,7 @@ class TestPlanningArchitecture(unittest.TestCase):
         self.assertTrue(traj.has_signal("cost"))
 
     def test_dynamics_function_routes_system_params_through_compiled_evaluator(self):
-        """System params flow through the parametric tier f_p, not direct sys.f."""
+        """System params flow through the compiled evaluator's params argument, not direct sys.f."""
         from minilink.blocks.basic import Integrator
         from minilink.planning.trajectory_optimization.transcription import (
             dynamics_function,
@@ -475,9 +471,7 @@ class TestPlanningArchitecture(unittest.TestCase):
     def test_evaluator_forced_rk4_rollout_matches_integrator(self):
         sys = self.make_single_integrator()
         evaluator = sys.compile(backend="numpy", verbose=False)
-        x = evaluator.jit.rollout(
-            np.array([0.0]), np.ones((5, 1)), 0.0, 0.25, hold="foh"
-        )
+        x = evaluator.rollout(np.array([0.0]), np.ones((5, 1)), 0.0, 0.25, hold="foh")
         np.testing.assert_allclose(x.reshape(-1), np.linspace(0.0, 1.0, 5))
 
     def test_live_trajectory_plot_callback_reuses_artists(self):
@@ -974,7 +968,7 @@ def test_steering_edge_is_dynamically_feasible():
     x = np.asarray(edge.states[0], dtype=float)
     for k in range(len(edge.inputs)):
         dt = float(edge.times[k + 1] - edge.times[k])
-        x = np.asarray(evaluator.jit.step(x, edge.inputs[k], 0.0, dt=dt), dtype=float)
+        x = np.asarray(evaluator.step(x, edge.inputs[k], 0.0, dt=dt), dtype=float)
         assert np.allclose(x, edge.states[k + 1], atol=1e-06)
 
 
@@ -1012,7 +1006,7 @@ def test_dubins_edge_is_dynamically_feasible():
     x = np.asarray(states[0], dtype=float)
     for k in range(len(inputs)):
         dt = float(times[k + 1] - times[k])
-        x = np.asarray(evaluator.jit.step(x, inputs[k], 0.0, dt=dt), dtype=float)
+        x = np.asarray(evaluator.step(x, inputs[k], 0.0, dt=dt), dtype=float)
         assert np.allclose(x, states[k + 1], atol=1e-06)
 
 

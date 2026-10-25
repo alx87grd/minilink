@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from minilink.core.facade import lazy_facade
+from minilink.core.exports import lazy_facade
 
 # The band facade for short teaching imports, e.g.
 #
@@ -73,10 +73,10 @@ _EXPORTS: dict[str, tuple[str, str]] = {
         "LinearApproximator",
     ),
     # Evaluation: a controller on a problem, one run or the problem's draws
-    "evaluate": ("minilink.planning.engine", "evaluate"),
-    "evaluate_trajectory": ("minilink.planning.engine", "evaluate_trajectory"),
-    "Evaluation": ("minilink.planning.engine", "Evaluation"),
-    "ProblemEvaluator": ("minilink.planning.engine", "ProblemEvaluator"),
+    "evaluate": ("minilink.planning.evaluator", "evaluate"),
+    "evaluate_trajectory": ("minilink.planning.evaluation", "evaluate_trajectory"),
+    "Evaluation": ("minilink.planning.evaluation", "Evaluation"),
+    "ProblemEvaluator": ("minilink.planning.evaluator", "ProblemEvaluator"),
     # Spatial scene: tracks, collision geometry, cost shaping
     "ReferenceTrack": ("minilink.planning.spatial.track", "ReferenceTrack"),
     "circuit_waypoints": (

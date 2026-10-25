@@ -79,7 +79,7 @@ class Sys2Gym(gym.Env):
     ----------
     compile_backend : str
         Backend actually used for the step (``"numpy"`` or ``"jax"``).
-    evaluator : DynamicsEvaluator
+    evaluator : DynamicEvaluator or DiagramEvaluator
         Compiled plant the step runs on.
     clipping_inputs : bool
         Clip the actions to the input-port bounds (default ``True``).
@@ -207,7 +207,7 @@ class Sys2Gym(gym.Env):
 
         # One step of the plant's step model, the action held
         x_new = np.asarray(
-            self.evaluator.jit.step(
+            self.evaluator.step(
                 x, u, t, dt=dt, solver=self.solver, substeps=self.substeps
             ),
             dtype=float,
@@ -226,9 +226,12 @@ class Sys2Gym(gym.Env):
         else:
             r = -float(self.cost.g(x, u, t)) * dt  # running cost over the step
 
-        # Truncation of episodes if out of space-time bounds
+        # Truncation of episodes at the horizon tf (within half a step) or out of
+        # the state bounds
         truncated = bool(
-            (t_new > self.tf) or np.any(x_new < self.x_lb) or np.any(x_new > self.x_ub)
+            (t_new >= self.tf - 0.5 * dt)
+            or np.any(x_new < self.x_lb)
+            or np.any(x_new > self.x_ub)
         )
 
         # Memory update
@@ -383,7 +386,7 @@ class ProblemEnv(Sys2Gym):
 
 
 def _compiled_step(sys, compile_backend):
-    """Return ``(backend, evaluator)``; the env steps through ``evaluator.jit.step``.
+    """Return ``(backend, evaluator)``; the env steps through ``evaluator.step``.
 
     ``compile_backend=None`` tries JAX when it is installed and falls back to
     NumPy for plants that do not trace (catalog plants written with NumPy

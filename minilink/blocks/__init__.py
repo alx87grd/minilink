@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from minilink.core.facade import lazy_facade
+from minilink.core.exports import lazy_facade
 
 # The band facade for short teaching imports, e.g.
 # ``from minilink.blocks import Step, Integrator, Error, Sum, Saturation``; the defining

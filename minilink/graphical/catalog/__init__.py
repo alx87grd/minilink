@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from minilink.core.facade import lazy_facade
+from minilink.core.exports import lazy_facade
 
 _SHAPES = "minilink.graphical.catalog.shapes"
 _SKINS = "minilink.graphical.catalog.skins"

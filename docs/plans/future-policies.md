@@ -1,18 +1,19 @@
 # Projecting the API onto MPPI, behavior cloning and diffusion policy
 
 **Status:** ideas to review, 2026-10-21 — an independent analysis. Aligned 2026-10-23 to the
-rulings of 2026-10-22/23 ([continuous-core.md](continuous-core.md)): the compiled problem
+rulings of 2026-10-22/23 ([the record](../reviews/2026-10-22-rulings-session-1.md)): the compiled problem
 exports a `MathematicalProgram` and no `tune` facade exists (R23); the sampled loop is a tool on
 ticks (R13, R14), its memory and dispatch parked to the hybrid phase (D13–D15); point 4 is D29
-for v0.4.  
+for v0.4. Points 2–4 of §5 now stand as workboard rows (S31, V1's step 7b, C5) or open
+decisions (D14, D15, D29); §7's questions 1, 3, 4 and 5 are open, maintainer-owned.  
 **Lane:** maintainer-owned: it shapes core decisions still open.  
 **Serves:** the sampled loop (S31, [sampled-path.md](sampled-path.md) §8), the names of the
-differentiable path ([differentiable-problem.md](differentiable-problem.md), step 0 and ask 5),
+differentiable path (landed: DESIGN §6; the open steps in [differentiable-problem.md](differentiable-problem.md)),
 identification (C4), the MPPI planner ([mppi.md](mppi.md)), and the behavior-cloning row
 after v1.0 (ROADMAP §5.6).
 
 The question: do the proposals on the table (the step model, the sampled loop as a tool, the
-compiled problem and its program export, the optimizer's program classes (deferred, R25), planners
+compiled problem and its program export, the optimizer's program classes (S74, landed in v0.3 on 2026-10-24, R74), planners
 returning a `PlanningSolution`) carry the features that come later, or will those features
 force a redesign? Three are projected here: MPPI (planned), behavior cloning (planned after
 v1.0) and diffusion policy (not planned).
@@ -112,9 +113,9 @@ demo than human driving, and free of hardware.
    counter-based pattern ([randomness.md](randomness.md)), as point 4 describes.
 3. **The evaluator dispatches on the policy kind.** A continuous law runs the continuous
    closed loop, as ruled (RD-D24); a sampled controller runs the sampled kernel's JAX face, so
-   MPPI and diffusion policies get the same batched `evaluate` and program export. The plan
-   today says a sampled loop falls back to NumPy "until the hybrid seam batches"; with the
-   kernel, that fallback goes.
+   MPPI and diffusion policies get the same batched `evaluate` and program export. Today the
+   evaluator refuses a sampled controller (`require_continuous`, `planning/evaluator.py`)
+   until the sampled face joins it (V1's step 7b); with the kernel, that refusal goes.
 4. **One standard stochastic policy outside the RL package, built like the noise block**
    (the maintainer's direction, 2026-10-22). The white-noise block keeps its `seed` in
    `params`, draws `ε_k = F(seed, ⌊t/Δ⌋)` with a counter-based Threefry generator identical on

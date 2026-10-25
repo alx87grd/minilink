@@ -11,7 +11,7 @@ return a :class:`~minilink.core.trajectory.Trajectory` when the session stops.
 
 Sibling orchestrators: :class:`~minilink.simulation.simulator.Simulator`
 (offline time grid) and
-:class:`~minilink.simulation.hybrid_simulator.HybridSimulator` (computer
+:class:`~minilink.simulation.discrete.hybrid_simulator.HybridSimulator` (computer
 ticks). The stepping math lives in the evaluators; this module owns only the
 loop, the clock policy, and the recording.
 
@@ -58,7 +58,7 @@ class RealtimeSimulator:
     Advance a continuous system live, one rendered frame at a time.
 
     Each frame: ``u, stop = input.poll(t, x)`` (nominal ``u`` when no input),
-    then ``x = evaluator.jit.step(x, u, t, dt=dt_hold, substeps=…)`` (steps of about ``sim_dt``),
+    then ``x = evaluator.step(x, u, t, dt=dt_hold, substeps=…)`` (steps of about ``sim_dt``),
     live draw, optional external publish, then sleep out the frame budget.
 
     Parameters
@@ -303,7 +303,7 @@ class RealtimeSimulator:
                     u, should_stop = self.input.poll(t, x)
                     u = np.asarray(u, dtype=float).reshape(evaluator.m)
 
-                x = evaluator.jit.step(
+                x = evaluator.step(
                     x, u, t, dt=dt_hold, substeps=substeps_of(dt_hold, sim_dt)
                 )
                 x = np.asarray(x, dtype=float)  # native array → NumPy boundary
@@ -447,7 +447,7 @@ class RealtimeSimulator:
         evaluator = self.evaluator
 
         def _one_frame():
-            x_out = evaluator.jit.step(
+            x_out = evaluator.step(
                 x, u, t, dt=frame_dt, substeps=substeps_of(frame_dt, sim_dt_probe)
             )
             if getattr(evaluator, "backend", "numpy") == "jax":
@@ -520,7 +520,7 @@ class RealtimeSimulator:
         inside the loop would stall the first frame. The warm result is
         discarded.
         """
-        x_warm = self.evaluator.jit.step(
+        x_warm = self.evaluator.step(
             x, u, t, dt=self.frame_dt, substeps=substeps_of(self.frame_dt, self.sim_dt)
         )
         outputs_warm = None

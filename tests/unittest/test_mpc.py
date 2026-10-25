@@ -12,8 +12,9 @@ from minilink.planning.trajectory_optimization.mpc import (
 )
 from minilink.core.backends import configure_jax, require_jax_numpy
 from minilink.core.costs import QuadraticCost
-from minilink.core.hybrid_diagram import HybridDiagram
-from minilink.core.system import DynamicSystem, StepSystem, System
+from minilink.core.discrete.hybrid_diagram import HybridDiagram
+from minilink.core.system import DynamicSystem, System
+from minilink.core.discrete.step_system import StepSystem
 from minilink.planning.problems import PlanningProblem
 from minilink.planning.results import PlanningSolution
 from minilink.planning.trajectory_optimization.direct_collocation import (
@@ -201,8 +202,8 @@ class TestModelPredictiveController(unittest.TestCase):
         from minilink.planning.trajectory_optimization.mpc.utilities import (
             mpc_default_computer_x0,
         )
-        from minilink.simulation.computer import Computer
-        from minilink.simulation.hybrid_simulator import HybridSimulator
+        from minilink.simulation.discrete.computer import Computer
+        from minilink.simulation.discrete.hybrid_simulator import HybridSimulator
 
         planner = self._make_planner(0.0)
         plant = JaxSingleIntegrator()
@@ -366,7 +367,8 @@ from minilink.planning.trajectory_optimization.mpc.utilities import (
     shift_plan_trajectory,
     mpc_warm_start_guess,
 )
-from minilink.core.system import DynamicSystem, StepSystem
+from minilink.core.system import DynamicSystem
+from minilink.core.discrete.step_system import StepSystem
 from minilink.core.trajectory import Trajectory
 
 
@@ -656,7 +658,7 @@ class TestMPCSolveTrajectoryFrom(unittest.TestCase):
 
 
 from minilink import BicycleDynRate
-from minilink.simulation.computer import Computer
+from minilink.simulation.discrete.computer import Computer
 
 
 def _planner():
@@ -735,7 +737,7 @@ class TestMpcExportComputer(unittest.TestCase):
             mpc.dual_rate_computer(dt_broadcast=0.07)
 
     def test_dual_rate_matmul_hybrid(self):
-        from minilink.core.hybrid_diagram import HybridDiagram
+        from minilink.core.discrete.hybrid_diagram import HybridDiagram
 
         planner = _planner()
         plant = planner.problem.sys
@@ -966,8 +968,8 @@ class TestMPCNumPyRebuild(unittest.TestCase):
         self.assertEqual(len(n_compile_parametric), 0)
 
 
-from minilink.core.hybrid_composition import hybrid_closed_loop
-from minilink.simulation.computer import as_computer
+from minilink.core.discrete.hybrid_composition import hybrid_closed_loop
+from minilink.simulation.discrete.computer import as_computer
 
 
 class TestMpcComputerScheduleCheck(unittest.TestCase):
@@ -1105,7 +1107,7 @@ from minilink.planning.trajectory_optimization.mpc import (
     mpc_animation_overlays,
     mpc_plans_from_rollout,
 )
-from minilink.simulation.hybrid_simulator import HybridSimulator
+from minilink.simulation.discrete.hybrid_simulator import HybridSimulator
 
 
 def _build_bicycle_hybrid(*, mpc_hz=5.0):
@@ -1237,9 +1239,10 @@ from minilink.planning.trajectory_optimization.mpc.utilities import (
     mpc_default_computer_x0,
     mpc_warm_start_guess,
 )
-from minilink.core.diagram import DiagramSystem, StepDiagramSystem
+from minilink.core.diagram import DiagramSystem
+from minilink.core.discrete.step_diagram import StepDiagramSystem
 from minilink import BicycleDynRate
-from minilink.simulation.computer import Computer, StepSchedule
+from minilink.simulation.discrete.computer import Computer, StepSchedule
 
 
 def _build_bicycle_hybrid_warm(*, mpc_hz=5.0):
@@ -1461,7 +1464,7 @@ def run_hand_loop_warm_mpc(*, sys_sim, planner, problem):
         for _ in range(SUBSTEPS):
             if t >= TF_SIM:
                 break
-            x = sim_evaluator.jit.step(x, u_hold, t, dt=SIM_DT)
+            x = sim_evaluator.step(x, u_hold, t, dt=SIM_DT)
             t += SIM_DT
             t_hist.append(t)
             x_hist.append(x.copy())

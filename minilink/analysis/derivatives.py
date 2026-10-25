@@ -62,7 +62,7 @@ def jacobian(
         ``wrt="params"`` a dict shaped like ``params`` with leaves
         ``(dim(of), *leaf.shape)`` (float leaves only). A block whose ``f``
         reads instance attributes instead of its ``params`` argument reports
-        zero sensitivity, like every parametric tier.
+        zero sensitivity, like every evaluator taking ``params``.
     """
     # The operating point, the family defaults filled in
     x_bar, u_bar, params = operating_point(sys, x_bar, u_bar, params)

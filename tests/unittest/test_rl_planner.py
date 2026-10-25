@@ -470,7 +470,7 @@ def test_neural_closed_loop_compiles_and_differentiates_under_jax():
     cl_sys = ctl @ plant
     evaluator = cl_sys.compile(backend="jax", verbose=False)
     x = jnp.array([0.3, 0.0])
-    A = jax.jacfwd(lambda x: evaluator.f_trace(x, jnp.zeros(0), 0.0))(x)
+    A = jax.jacfwd(lambda x: evaluator.f(x, jnp.zeros(0), 0.0))(x)
     assert A.shape == (2, 2) and bool(jnp.all(jnp.isfinite(A)))
     A_lin = cl_sys.linearize(np.array([0.3, 0.0])).A()
     np.testing.assert_allclose(np.asarray(A), A_lin, atol=1e-6)

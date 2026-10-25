@@ -3,7 +3,7 @@
 import unittest
 import numpy as np
 from minilink.blocks.step import UnitDelay
-from minilink.core.system import StepSystem
+from minilink.core.discrete.step_system import StepSystem
 
 
 class Accumulator(StepSystem):
@@ -19,6 +19,14 @@ class Accumulator(StepSystem):
 
 
 class TestStepSystem(unittest.TestCase):
+    def test_the_default_step_is_a_fresh_copy_of_the_state(self):
+        x = np.array([1.0, 2.0])
+
+        x_next = StepSystem(2).step(x, np.zeros(0))
+        x_next[0] = 9.0
+
+        np.testing.assert_allclose(x, [1.0, 2.0])
+
     def test_step_returns_next_state(self):
         plant = Accumulator()
         x1 = plant.step(np.array([1.0]), np.array([2.0]), k=3)
@@ -56,9 +64,10 @@ from minilink.blocks.basic import Integrator
 from minilink.blocks.routing import Gain
 from minilink.core.backends import array_module
 from minilink.core.compile.compiler import compile
-from minilink.core.compile.evaluators.numpy_evaluators import NumpyStepDiagramEvaluator
-from minilink.core.diagram import StepDiagramSystem
-from minilink.core.system import StepSystem, System
+from minilink.core.compile.evaluators.discrete import StepDiagramEvaluator
+from minilink.core.discrete.step_diagram import StepDiagramSystem
+from minilink.core.system import System
+from minilink.core.discrete.step_system import StepSystem
 
 
 class KDependentPort(System):
@@ -138,7 +147,7 @@ class TestStepDiagram(unittest.TestCase):
     def test_compile_returns_step_diagram_evaluator(self):
         diagram = _build_gain_plant_loop()
         ev = compile(diagram)
-        self.assertIsInstance(ev, NumpyStepDiagramEvaluator)
+        self.assertIsInstance(ev, StepDiagramEvaluator)
 
     def test_compiled_step_matches_interpreted(self):
         diagram = _build_gain_plant_loop()
@@ -275,13 +284,13 @@ class TestStepDiagramRollout(unittest.TestCase):
 
 
 import pytest
-from minilink.core.compile.evaluators.step_rollout import gather_u
-from minilink.core.compile.execution_plan import (
+from minilink.core.compile.evaluators.base import gather_u
+from minilink.core.compile.plan import (
     EXTERNAL_INPUT,
     INTERNAL_SIGNAL,
     NOMINAL,
 )
-from minilink.core.step_rollout import StepRollout
+from minilink.core.discrete.step_rollout import StepRollout
 from minilink.core.trajectory import Trajectory
 
 try:
@@ -420,7 +429,7 @@ class TestStepRolloutJax(unittest.TestCase):
         np.testing.assert_allclose(rollout.x, ref.x, atol=1e-05)
 
 
-from minilink.core.compile.evaluators.jax_evaluators import JaxStepDiagramEvaluator
+from minilink.core.compile.evaluators.discrete import StepDiagramEvaluator
 
 try:
     import jax
@@ -454,11 +463,35 @@ class TestStepDiagramJax(unittest.TestCase):
         diagram.connect("input", "u", "gain", "u")
         diagram.connect("gain", "y", "plant", "u")
         ev = compile(diagram, backend="jax")
-        self.assertIsInstance(ev, JaxStepDiagramEvaluator)
+        self.assertIsInstance(ev, StepDiagramEvaluator)
         rollout = ev.rollout(diagram.x0, n_steps=5, u=np.array([1.0]))
         np_ev = compile(diagram, backend="numpy")
         ref = np_ev.rollout(diagram.x0, n_steps=5, u=np.array([1.0]))
         np.testing.assert_allclose(rollout.x, ref.x, rtol=1e-10, atol=1e-10)
+
+    def test_the_default_step_holds_the_state_on_jax(self):
+        ev = compile(StepSystem(2, input_dim=1), backend="jax")
+
+        x_next = ev.step(np.array([1.0, 2.0]), np.zeros(1))
+
+        np.testing.assert_allclose(x_next, [1.0, 2.0])
+
+    def test_the_interpreted_step_runs_on_jax_arrays(self):
+        import jax.numpy as jnp
+
+        diagram = StepDiagramSystem()
+        diagram.add_subsystem(Gain(1.0, dim=1), "gain")
+        diagram.add_subsystem(Accumulator_step_diagram_jax(), "plant")
+        diagram.add_input_port("u")
+        diagram.connect("input", "u", "gain", "u")
+        diagram.connect("gain", "y", "plant", "u")
+
+        x_next = diagram.step(jnp.array([1.0]), jnp.array([2.0]), k=0)
+
+        np.testing.assert_allclose(x_next, [3.0])
+        np.testing.assert_allclose(
+            diagram.step(np.array([1.0]), np.array([2.0]), k=0), [3.0]
+        )
 
 
 class Counter(StepSystem):

@@ -4,11 +4,10 @@ from typing import TYPE_CHECKING
 
 import numpy as np
 
-from minilink.core.facades import (
-    DynamicSystemFacades,
-    SharedSystemFacades,
-    StepSystemFacades,
-)
+from minilink.core.facades.analysis import DynamicAnalysis, SystemAnalysis
+from minilink.core.facades.animation import DynamicAnimation, SystemAnimation
+from minilink.core.facades.plotting import DynamicPlotting, SystemPlotting
+from minilink.core.facades.simulation import DynamicSimulation, SystemSimulation
 from minilink.core.inspect import inspect_text
 from minilink.core.signals import InputPort, OutputPort, VectorSignal
 
@@ -24,7 +23,7 @@ DEFAULT_SMALLEST_TIME_CONSTANT = 0.001
 ###############################################################################
 
 
-class System(SharedSystemFacades):
+class System(SystemSimulation, SystemAnalysis, SystemPlotting, SystemAnimation):
     """Static input-output shell: ports, parameters, metadata, and facades.
 
     ``y = h(x, u, t; p)`` (via port ``compute`` / :meth:`h`).
@@ -46,10 +45,10 @@ class System(SharedSystemFacades):
       (:attr:`solver_info`).
     - **Visualization contract**: forward-kinematic geometry for rendering
       and animation.
-    - **User shortcut façade**: :meth:`compile`, :meth:`compute_trajectory`,
-      :meth:`render`, :meth:`animate` on
-      :class:`~minilink.core.facades.SharedSystemFacades` (continuous analysis
-      and :meth:`game` on :class:`~minilink.core.facades.DynamicSystemFacades`).
+    - **User shortcuts** (:mod:`minilink.core.facades`), by what they do:
+      simulation (:meth:`compile`, :meth:`compute_trajectory`), analysis,
+      plotting and animation (:meth:`render`, :meth:`animate`); a
+      :class:`DynamicSystem` adds the continuous analysis and :meth:`game`.
     - **Inspect**: :meth:`__str__` is a short summary (name, class, ``n``,
       ports with dimensions; a diagram adds its keys). A notebook last
       expression still draws the Graphviz block.
@@ -413,10 +412,10 @@ class System(SharedSystemFacades):
         Neither operand is modified: a diagram operand is laid out flat in the
         result, which shares its blocks and carries the left operand's name,
         ``x0`` and camera settings. See
-        :func:`~minilink.core.composition.add_systems`.
+        :func:`~minilink.core.operators.add_systems`.
         """
-        # A real cycle: composition imports System from this module
-        from minilink.core.composition import add_systems
+        # A real cycle: the operators import System from this module
+        from minilink.core.operators import add_systems
 
         return add_systems(self, other)
 
@@ -424,12 +423,12 @@ class System(SharedSystemFacades):
         """Return a new diagram with ``self`` connected in series to ``other``.
 
         Neither operand is modified: a diagram operand is laid out flat in the
-        result, which shares its blocks and carries the left operand's name,
-        ``x0`` and camera settings. See
-        :func:`~minilink.core.composition.series`.
+        result, which shares its blocks, carries the left operand's ``x0`` and
+        camera settings, and is named after every operand. See
+        :func:`~minilink.core.operators.series`.
         """
-        # A real cycle: composition imports System from this module
-        from minilink.core.composition import series
+        # A real cycle: the operators import System from this module
+        from minilink.core.operators import series
 
         return series(self, other)
 
@@ -442,18 +441,18 @@ class System(SharedSystemFacades):
         inserted. A number on the right is refused: ``feedback(L)`` and
         ``feedback(L, K)`` close an open loop on itself. Neither operand is
         modified: the loop is a new diagram. See
-        :func:`~minilink.core.composition.closed_loop` and
-        :func:`~minilink.core.composition.feedback`.
+        :func:`~minilink.core.closed_loop.closed_loop` and
+        :func:`~minilink.core.closed_loop.feedback`.
         """
-        # A real cycle: composition imports System from this module
-        from minilink.core.composition import closed_loop
+        # A real cycle: the closed loop imports System from this module
+        from minilink.core.closed_loop import closed_loop
 
         return closed_loop(self, other)
 
     def __mod__(self, schedule: object):
-        """Return a scheduled :class:`~minilink.simulation.computer.Computer`."""
+        """Return a scheduled :class:`~minilink.simulation.discrete.computer.Computer`."""
         # A real cycle: the computer imports the diagrams, which import this module
-        from minilink.simulation.computer import build_computer
+        from minilink.simulation.discrete.computer import build_computer
 
         return build_computer(self, schedule)
 
@@ -514,7 +513,9 @@ class System(SharedSystemFacades):
 # Specialized system types
 
 
-class DynamicSystem(DynamicSystemFacades, System):
+class DynamicSystem(
+    DynamicSimulation, DynamicAnalysis, DynamicPlotting, DynamicAnimation, System
+):
     """
     A system with continuous evolution ``dx = f(x, u, t; p)``.
 
@@ -618,104 +619,6 @@ class DynamicSystem(DynamicSystemFacades, System):
         return y
 
 
-class StepSystem(StepSystemFacades, System):
-    """
-    A system with discrete states (``n >= 1``)
-
-        x_{k+1} = step(x, u, k; p)
-        y_k     = h(x, u, k; p)
-
-    The constructor can create the standard ports in one line: an input ``u``,
-    a primary output ``y`` wired to :meth:`~System.h`, and optionally an
-    auxiliary state output ``x``.
-    """
-
-    def __init__(
-        self,
-        n,
-        *,
-        input_dim=None,
-        output_dim=None,
-        expose_state=False,
-        y_dependencies=(),
-    ):
-        """
-        Initialize a StepSystem.
-
-        Parameters
-        ----------
-        n : int
-            Number of discrete states.
-        input_dim : int, optional
-            If provided, create a standard input port named ``u``.
-        output_dim : int, optional
-            If provided, create a standard primary output port named ``y``.
-        expose_state : bool, optional
-            If True, create an auxiliary state output port named ``x``.
-        y_dependencies : tuple or "all", optional
-            Direct-feedthrough dependencies for the standard ``y`` output.
-        """
-        require_step_state(n)
-        System.__init__(self, n)
-
-        # Memory: the last rollout ``compute_rollout`` produced
-        self.rollout = None
-
-        # Ports, each when asked: the input u, the output y_k = h(x, u), the state x
-        add_standard_ports(self, input_dim, output_dim, expose_state, y_dependencies)
-
-    def step(self, x, u, k=0, params=None):
-        """
-        Discrete state update ``x_{k+1} = step(x, u, k; p)``.
-
-        Parameters
-        ----------
-        x : array of shape (n,)
-        u : array of shape (m,)
-        k : int
-        params : dict, optional
-            ``None`` means "use ``self.params``".
-
-        Returns
-        -------
-        x_next : array of shape (n,)
-        """
-        n = self.n
-
-        # x_{k+1} = x_k, as a fresh copy of the state
-        x_next = np.asarray(x).reshape(n).copy()
-
-        return x_next
-
-    def h(self, x, u, k=0, params=None):
-        """
-        Output ``y_k = h(x, u, k; p)``.
-
-        Default: ``y = x`` when ``p == n``; zeros otherwise.
-
-        Parameters
-        ----------
-        x : array of shape (n,)
-        u : array of shape (m,)
-        k : int
-        params : dict, optional
-
-        Returns
-        -------
-        y : array of shape (p,)
-        """
-        p = self.p
-        n = self.n
-
-        # y_k = x_k when the output carries the full state (p = n), y_k = 0 otherwise
-        if p == n:
-            return x
-
-        y = np.zeros(p)
-
-        return y
-
-
 ###############################################################################
 # Internal machinery
 ###############################################################################
@@ -776,12 +679,6 @@ def add_standard_ports(system, input_dim, output_dim, expose_state, y_dependenci
         )
     if expose_state:
         system.add_output_port("x", dim=system.n, function=system.compute_state)
-
-
-def require_step_state(n):
-    """Refuse a step system with no state to update."""
-    if int(n) < 1:
-        raise ValueError("StepSystem requires n >= 1")
 
 
 if __name__ == "__main__":

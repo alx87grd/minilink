@@ -8,7 +8,7 @@ from dataclasses import dataclass
 
 from minilink.core.system import System
 from minilink.core.trajectory import Trajectory
-from minilink.planning.engine import Evaluation
+from minilink.planning.evaluation import Evaluation
 from minilink.planning.problems import PlanningProblem
 
 ###############################################################################
@@ -23,7 +23,7 @@ class PlanningSolution:
 
     Everything here is the solver's own claim under its own model — the table
     on its grid, the Riccati form on the linear model, the critic's fit. A
-    measurement of the law comes from the evaluators (:func:`~minilink.planning.engine.evaluate`,
+    measurement of the law comes from the evaluators (:func:`~minilink.planning.evaluator.evaluate`,
     ``PolicyEvaluator``) as its own object and is never written back here.
 
     Parameters
@@ -93,7 +93,7 @@ class PlanningSolution:
         """
         Draw the feedback law over the problem's state box.
 
-        The policy's own :meth:`~minilink.core.facades.SharedSystemFacades.plot_control_law`,
+        The policy's own :meth:`~minilink.core.facades.plotting.SystemPlotting.plot_control_law`,
         with ``bounds`` filled from the problem's constraint set (or the
         plant's state box) and the colour limits from its input set, so that
         laws of one problem share one scale. Every keyword passes through

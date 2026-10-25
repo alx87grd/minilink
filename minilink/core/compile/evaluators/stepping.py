@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import operator
 
+import numpy as np
+
 SOLVERS = ("rk4", "euler")
 HOLDS = ("zoh", "foh")
 
@@ -55,6 +57,31 @@ def substeps_of(dt_hold, dt_inner=None):
         return 1
 
     return max(1, int(round(float(dt_hold) / float(dt_inner))))
+
+
+def iterate(evaluator, transition, x0, sequences):
+    """``[x_0, …, x_N]`` of ``x_{k+1} = transition(x_k, *row_k)`` over the rows of ``sequences``.
+
+    A Python loop on NumPy, one ``lax.scan`` on JAX.
+    """
+    if evaluator.backend != "jax":
+        x = x0
+        x_path = [x]
+        for row in zip(*sequences):
+            x = transition(x, *row)
+            x_path.append(x)
+        x_samples = np.array(x_path)
+
+        return x_samples
+
+    def scan_body(x, row):
+        x_next = transition(x, *row)
+        return x_next, x_next
+
+    _, xs = evaluator.jax.lax.scan(scan_body, x0, sequences)
+    x_samples = evaluator.jnp.concatenate((x0[None, :], xs), axis=0)
+
+    return x_samples
 
 
 def held_inputs(u_seq, hold):
