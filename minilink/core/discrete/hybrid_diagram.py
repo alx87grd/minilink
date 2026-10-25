@@ -362,6 +362,7 @@ class HybridDiagram:
         )
 
     def __str__(self):
+        # A real cycle: inspect_text imports HybridDiagram lazily from this module
         from minilink.core.inspect import inspect_text
 
         return inspect_text(self)

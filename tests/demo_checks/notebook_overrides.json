@@ -1,7 +1,8 @@
 {
   "examples/tutorial/showcase_minilink.ipynb": {
     "requires": [
-      "jax"
+      "jax",
+      "meshcat"
     ],
     "timeout": 420
   },
@@ -13,7 +14,8 @@
   },
   "examples/tutorial/showcase_from_rl_to_bode.ipynb": {
     "requires": [
-      "jax"
+      "jax",
+      "meshcat"
     ],
     "timeout": 300
   },

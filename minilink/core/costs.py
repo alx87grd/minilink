@@ -183,6 +183,7 @@ class QuadraticCost(CostFunction):
     ubar = param_view("ubar")
 
     def _repr_latex_(self):
+        # A real cycle: costs imports inspect_text at module level
         from minilink.core.inspect import latex_inspect
 
         return latex_inspect(self)

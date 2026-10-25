@@ -136,11 +136,11 @@ def flatten_diagram(diagram: DiagramSystem) -> tuple[DiagramSystem, FlattenRepor
     id_map: dict[str, str] = {}
 
     while True:
-        nested_id = _first_nested_subsystem_id(flat)
+        nested_id = first_nested_subsystem_id(flat)
         if nested_id is None:
             break
         inner_flat, _inner_report = flatten_diagram(flat.subsystems[nested_id])
-        local_map = _replace_nested_subsystem(flat, nested_id, inner_flat)
+        local_map = replace_nested_subsystem(flat, nested_id, inner_flat)
         for source_id, target_id in local_map.items():
             id_map[f"{nested_id}/{source_id}"] = target_id
 
@@ -157,19 +157,19 @@ def remap_params_nested_to_flat(diagram: DiagramSystem, params) -> dict | None:
 
     check_diagram_params(params, diagram.subsystems)
     flat, _report = flatten_diagram(diagram)
-    remapped = _remap_params_tree(diagram, params, prefix="")
+    remapped = remap_params_tree(diagram, params, prefix="")
     check_diagram_params(remapped, flat.subsystems)
     return remapped
 
 
-def _first_nested_subsystem_id(diagram: DiagramSystem) -> str | None:
+def first_nested_subsystem_id(diagram: DiagramSystem) -> str | None:
     for sys_id, subsystem in diagram.subsystems.items():
         if isinstance(subsystem, DiagramSystem):
             return sys_id
     return None
 
 
-def _reorder_subsystems_after_inline(
+def reorder_subsystems_after_inline(
     diagram: DiagramSystem,
     order_before: list[str],
     nested_id: str,
@@ -199,7 +199,7 @@ def _reorder_subsystems_after_inline(
         diagram.connections["output"] = output_connections
 
 
-def _replace_nested_subsystem(
+def replace_nested_subsystem(
     diagram: DiagramSystem,
     nested_id: str,
     inner_flat: DiagramSystem,
@@ -250,7 +250,7 @@ def _replace_nested_subsystem(
     del diagram.subsystems[nested_id]
     del diagram.connections[nested_id]
     # x = [x_block1; x_block2; …] follows subsystem order; inline_diagram appends.
-    _reorder_subsystems_after_inline(
+    reorder_subsystems_after_inline(
         diagram, order_before, nested_id, inner_flat, local_map
     )
     diagram.n, diagram.state_index, diagram.state, diagram.x0, diagram.derived_x0 = (
@@ -260,13 +260,13 @@ def _replace_nested_subsystem(
     return local_map
 
 
-def _remap_params_tree(diagram: DiagramSystem, params: Mapping, *, prefix: str) -> dict:
+def remap_params_tree(diagram: DiagramSystem, params: Mapping, *, prefix: str) -> dict:
     remapped = {}
     for sys_id, subsystem in diagram.subsystems.items():
         flat_id = f"{prefix}__{sys_id}" if prefix else sys_id
         piece = params[sys_id]
         if isinstance(subsystem, DiagramSystem):
-            remapped.update(_remap_params_tree(subsystem, piece, prefix=flat_id))
+            remapped.update(remap_params_tree(subsystem, piece, prefix=flat_id))
         else:
             remapped[flat_id] = piece
     return remapped

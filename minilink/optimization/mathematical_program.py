@@ -118,6 +118,7 @@ class MathematicalProgram:
         repr_pretty(self, p, cycle)
 
     def _repr_latex_(self):
+        # A real cycle: inspect imports MathematicalProgram lazily for LaTeX display
         from minilink.core.inspect import latex_inspect
 
         return latex_inspect(self)

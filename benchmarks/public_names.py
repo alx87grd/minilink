@@ -81,7 +81,11 @@ def registry() -> dict[int, dict]:
     for facade in FACADES:
         module = importlib.import_module(facade)
         for name in module.__all__:
-            obj = getattr(module, name)
+            try:
+                obj = getattr(module, name)
+            except (ImportError, ModuleNotFoundError):
+                # Optional facade exports (e.g. gymnasium bridge) may be absent on Basic tier.
+                continue
             if isinstance(obj, types.ModuleType):
                 continue
             row = rows.setdefault(
@@ -250,8 +254,11 @@ def imported(module_name, name):
         module = importlib.import_module(module_name)
     except Exception:
         return None
-    if hasattr(module, name):
-        return getattr(module, name)
+    try:
+        if hasattr(module, name):
+            return getattr(module, name)
+    except (ImportError, ModuleNotFoundError):
+        return None
     try:
         return importlib.import_module(f"{module_name}.{name}")
     except Exception:
@@ -273,6 +280,8 @@ def attribute_object(node, aliases):
             return None
         try:
             obj = getattr(obj, attr)
+        except (ImportError, ModuleNotFoundError):
+            return None
         except Exception:
             try:
                 obj = importlib.import_module(f"{obj.__name__}.{attr}")

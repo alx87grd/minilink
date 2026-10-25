@@ -145,6 +145,7 @@ class SystemPlotting:
 
     def _repr_mimebundle_(self, include=None, exclude=None):
         """Notebook repr: text inspect plus inline diagram SVG when available."""
+        # A real cycle: inspect imports diagram types through the display stack
         from minilink.core.inspect import inspect_text
 
         bundle = {"text/plain": inspect_text(self)}
