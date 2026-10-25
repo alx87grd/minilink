@@ -28,7 +28,7 @@ few screens plus one contract narrowing in the MPC block
 
 ## The design in one screen
 
-- **A planner, not a controller.** `PathIntegralPlanner(problem, dt=, n_samples=,
+- **A planner, not a controller.** `MPPIPlanner(problem, dt=, n_samples=,
   temperature=, noise=)` is a trajectory-family planner beside
   `TrajectoryOptimizationPlanner`: `solve()` returns a `PlanningSolution` whose policy is
   the open-loop schedule `u = pi(t)` and `solve_trajectory_from(x0)` is the online tick.
@@ -200,7 +200,7 @@ plant draw per control sample is not it.
 ## 3. Input and output: the contract
 
 ```python
-PathIntegralPlanner(
+MPPIPlanner(
     problem,                 # PlanningProblem or StochasticPlanningProblem (finite tf, a cost)
     *,
     dt=0.05,                 # control period; N = round(tf / dt) held inputs
@@ -220,7 +220,7 @@ PathIntegralPlanner(
 - **`solve(*, initial_guess=None, evaluate=False, n_trials=50)`** → `PlanningSolution`:
   `policy` the held schedule as a `TrajectorySource` (`interpolation="previous"`: the
   rollout held its inputs, so `policy >> plant` replays the plan — the RRT precedent),
-  `solver` a `PathIntegralRecord`, `trajectory` the nominal rollout of `U` from
+  `solver` a `MPPIRecord`, `trajectory` the nominal rollout of `U` from
   `x_start` on the nominal plant (the planner's evidence, as every planner), and the
   evaluation when asked. `initial_guess` is a `Trajectory` or an `(N, m)` array;
   default the nominal input of the ports.
@@ -295,15 +295,13 @@ Later idea in TODO; the minimax consumer would be exactly this planner's
 trajectory-family planner (its output is a schedule, its policy an open-loop source),
 so it shelves with the transcription planner it is the gradient-free sibling of; the
 package name says what the verb does, not how (RULES 2.1). It is not an NLP, so it
-imports nothing from `optimization/`. Exports: `PathIntegralPlanner` and
-`PathIntegralRecord` on the `minilink.planning` facade once provisional (an [ask]:
+imports nothing from `optimization/`. Exports: `MPPIPlanner` and
+`MPPIRecord` on the `minilink.planning` facade once provisional (an [ask]:
 public names).
 
-**Name:** `PathIntegralPlanner` (the textbook verb, Kappen / Theodorou: path integral
-control), so that `ModelPredictiveController(PathIntegralPlanner(...))` reads as "model
-predictive path integral" — the composition spells the acronym. The alternative,
-`MPPIPlanner`, is the name students will search for; a docstring's first line carries
-it either way. [ask]
+**Name (ruled 2026-10-25, R106):** `MPPIPlanner` and `MPPIRecord`, by the `LQRPlanner`
+precedent: the name students search for; the docstring's first line carries the long form,
+path integral control (Kappen / Theodorou).
 
 **Dependencies:** `core` (backends, trajectory, sets, costs), `planning.problems`,
 `planning.planner`, `planning.results`, and `learning.reinforcement_learning.environment`
@@ -350,7 +348,7 @@ def solve_trajectory_from(self, x0, *, params=None, initial_guess=None):
 
     # Output: the nominal rollout of U_new as the plan, the record of this tick
     trajectory = self.nominal_rollout(x0, U_new)
-    record = PathIntegralRecord(
+    record = MPPIRecord(
         S_min=float(S_min), S_weighted=float(w @ S),
         effective_samples=float(1.0 / jnp.sum(w**2)),
         exit_rate=float(jnp.mean(left_X)), z=np.asarray(U_new).reshape(-1),
@@ -376,7 +374,7 @@ verbs and nothing else:
 | --- | --- |
 | `planner.transcription.decision_dimension(problem)`, `transcription.options.n_steps >= 2` | `planner.decision_dimension()` (trajopt: the packed `z`; MPPI: `N m`), and the plan's `n_samples >= 2` checked on the returned trajectory |
 | `planner.options.compile_backend == "jax"` → `compile_parametric_program()` | `planner.prepare_online()`: trajopt compiles its parametric program, MPPI jits its rollout; the block calls it once at construction |
-| `planner.last_optimization_result.z` after the solve | `solution.solver.z` on the tick's record (`TrajectoryOptimizationRecord` gains `z`; `PathIntegralRecord` has it) — the T6 row "one record per tick" |
+| `planner.last_optimization_result.z` after the solve | `solution.solver.z` on the tick's record (`TrajectoryOptimizationRecord` gains `z`; `MPPIRecord` has it) — the T6 row "one record per tick" |
 | `mpc_warm_start_guess(z_prev, y, planner, dt_mpc=, k=)` (unpacks with the transcription) | `planner.warm_start_guess(z_prev, y, *, dt_mpc, k)`: trajopt shifts the knot schedule as today; MPPI shifts `U` by `round(dt_mpc / dt)` periods and repeats the last input |
 
 No `hasattr` probing (RULES 4.3): the three verbs become methods of the `Planner` base
@@ -401,11 +399,11 @@ refactor in the abstract.
 | Planner or controller | (a) a planner wrapped by `ModelPredictiveController`; (b) an `MPPIController` block of its own | (a) | One receding-horizon loop, one latch, one export, one animation path; `compare(MPC=, MPPI=)` on one problem is then one line; (b) duplicates 900 lines of `controller.py` |
 | Problem class | (a) deterministic only; (b) stochastic only via `as_stochastic`; (c) both, one branch in the sampling beat | (c) | The base class already makes every planner accept both; `accepts_stochastic=True` is one attribute; the deterministic twin is the test |
 | Where the step semantics live | (a) rewrite `x_{t+1}`, the exit rule and `h` inside the planner on `ev.rollout`; (b) `RolloutEnvironment.step` | (b) | One owner of what an episode costs (S65); the equations still appear as the named lines of §5; the env already carries the disturbance and parameter draws and will carry `realize(key)` after RN-4 |
-| Plant draws per control sample | `M = 1` always; `M` a knob | `M` a knob, default 4 on a stochastic problem | §4: `M = 1` rewards lucky draws |
+| Plant draws per control sample | `M = 1` always; `M` a knob | `M` a knob, default 1, the bias stated in the docstring (R107) | §4: `M = 1` rewards lucky draws |
 | Home | `planning/trajectory_optimization/`; a new `planning/sampling/`; `planning/trajectory_optimization/mpc/` | `trajectory_optimization/` | Output is a schedule; a package per algorithm family is the existing taxonomy; the MPC block is the wrapper, not the solver |
 | Backend | JAX only; `xp` body from day one | JAX only for the prototype, NumPy `loop` backend with the teaching decision | The vectorized-over-`K` `xp` path needs the NumPy evaluator to batch, which it does not; the per-sample loop is the `loop` rung of the DP ladder and is fine for a 2-D teaching plant |
 | Grid | `dt=`; `n_steps=` | `dt=` | §3 |
-| Name | `PathIntegralPlanner`; `MPPIPlanner` | `PathIntegralPlanner` [ask] | §5 |
+| Name | `PathIntegralPlanner`; `MPPIPlanner` | `MPPIPlanner` (R106) | §5 |
 | Smoothing, adaptive `λ`, CVaR | in the prototype; later | later, each one option with a test | the prototype is the paper's Algorithm 2 |
 
 ## 8. Steps
@@ -430,7 +428,7 @@ Ids are local to this doc (`MP-1` …); the workboard row is S72. Each step: `ru
 stated in the report.
 
 - [ ] **MP-1 The planner, deterministic** (JAX). `planning/trajectory_optimization/path_integral.py`:
-  `PathIntegralPlanner` and `PathIntegralRecord`, `solve` / `solve_trajectory_from`,
+  `MPPIPlanner` and `MPPIRecord`, `solve` / `solve_trajectory_from`,
   the body of §5 on a `PlanningProblem`, `rollout_sequences` on `RolloutEnvironment`,
   `decision_dimension`, `warm_start_guess`. Tests
   (`tests/unittest/test_planning_path_integral.py`): seeded determinism (two solves,
@@ -456,7 +454,7 @@ stated in the report.
   `validate_mpc_planner` reads the verbs, `mpc_warm_start_guess` becomes trajopt's
   `warm_start_guess`. Behaviour-preserving for trajopt: the MPC baselines
   (`test_mpc.py`, `mpc_car_minimal`, `mpc_integrator_numpy`) byte-identical before and
-  after (AGENTS recipe). Then `ModelPredictiveController(PathIntegralPlanner(...),
+  after (AGENTS recipe). Then `ModelPredictiveController(MPPIPlanner(...),
   dt_mpc=)` runs the pendulum and `mpc_car_minimal` with one line changed. Done when
   `test_mpc.py` gains the MPPI twin of its warm-start and stateless tests and the
   baselines `cmp`.
@@ -508,14 +506,14 @@ Recommended answers (2026-10-22) in [end-state-api.md](end-state-api.md): ask 1 
 (`MPPIPlanner`), ask 2 D27 (the three verbs), ask 3 D28 (`n_plant_samples=1`), ask 5 D30 (no
 move: a caller of the step model and the sampled kernel). All for v0.4.
 
-1. **The name** (§5): `PathIntegralPlanner` or `MPPIPlanner`. One decides the record's
+1. **The name** (§5), ruled 2026-10-25 (R106): `MPPIPlanner`. One decides the record's
    name and the facade entry.
 2. **The MPC block contract** (§6): the three `Planner` verbs (`decision_dimension`,
    `prepare_online`, `warm_start_guess`) and `z` on the tick's record, as the shape of
    T6 for `controller.py`. A yes schedules MP-4; a different shape is written here
    before any code.
-3. **The stochastic default** (§4): `n_plant_samples = 4` on a stochastic problem, or
-   `1` with the bias stated in the docstring.
+3. **The stochastic default** (§4), ruled 2026-10-25 (R107): `n_plant_samples = 1`, the bias
+   stated in the docstring.
 4. **Timing** (§9): decided 2026-10-02 — RN-4 and RN-5 first, then MP-1 to MP-3; the
    standalone script stands in until then.
 5. **`RolloutEnvironment`'s home**: stays in `reinforcement_learning/` (an intra-band

@@ -432,13 +432,11 @@ workboard; the former wave G rows are §5 rows.
   moves from `DynamicSystem` to the generalized child. Done when the boat and the plane pass the
   catalog contract test as children of `MechanicalSystem`, `ComputedTorque` runs on one of them in a
   test, and no class names the mass matrix `M`.
-  Postponed by the maintainer (2026-10-24) on three open questions, each with the agent's
-  recommendation: (1) computed torque on a body-frame plant,
-  `v̇_des = Kp N(q)⁻¹ (q_d − q) + Kd (v_d − v)` (today's law when `N = I`), refusing a
-  non-square `N`; (2) an underactuated plant (the boat, the plane, the cart-pole, which fails
-  at wiring today): `u = B(q)⁺ τ` when `B` is not square, a solve when it is; (3)
-  `DynamicBicycle`: `M` renamed `H` only, its base left on `DynamicSystem` until K8 reworks
-  the car family (its named ports and its subclasses' extra states do not fit `[q; v]`).
+  Postponed by the maintainer (2026-10-24). Ruled 2026-10-25: computed torque on a body-frame
+  plant is `v̇_des = Kp N(q)⁻¹ (q_d − q) + Kd (v_d − v)`, a non-square `N` refused (R101); a
+  model-based law refuses an underactuated plant at construction (R102), so the done-when runs
+  `ComputedTorque` on a fully actuated body-frame test body, not on the boat or the plane.
+  Still open (QUESTIONS.md): `DynamicBicycle`'s base.
 
 ---
 
@@ -551,11 +549,11 @@ LQGPlanner as picked; S73 any time, self-contained.
 
 **On the spine.**
 
-- [ ] **S72 The path-integral planner (MPPI)** **[ask — name, MPC block contract]**, after
+- [ ] **S72 The path-integral planner (MPPI)** **[ask — MPC block contract]**, after
   S31's sampled kernel (v0.4) and RN-4 and RN-5, its plant the step model (S75), on the evaluator's batched rollout over realizations. Design:
   [mppi.md](mppi.md); the standalone prototypes `experimental/mppi/pendulum_mppi.py`
   and `racecar_mppi.py` run today. MP-1 `planning/trajectory_optimization/path_integral.py`:
-  `PathIntegralPlanner` / `PathIntegralRecord` (working names; the name is the ask), `solve`
+  `MPPIPlanner` / `MPPIRecord` (R106), `solve`
   and `solve_trajectory_from` on
   `RolloutEnvironment` (`jit(vmap(scan))` over `K` samples), the six-beat body of the plan's
   §5, `decision_dimension` and `warm_start_guess`; MP-2 the hand-loop demo

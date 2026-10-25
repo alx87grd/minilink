@@ -42,6 +42,8 @@ read `last_result` read `traj`.
 
 ### D14 Controller memory and the draws on the tick (S31; future-policies.md §5 points 2, 4)
 
+**Ruled 2026-10-25 (R104):** as recommended below.
+
 **Today:** MPPI's shifted warm start and a diffusion policy's chunk have no channel; the RL
 collectors thread their own keys.
 
@@ -58,6 +60,8 @@ class MPPIController(StepSystem):          # memory = the shifted input sequence
 ```
 
 ### D15 The compiled problem dispatches on the policy's kind (S31; V1 step 7b)
+
+**Ruled 2026-10-25 (R105):** as recommended below.
 
 **Recommended:** `problem.compile(policy)` reads the policy: a continuous law runs the loop as
 a diagram; a `Computer` (anything built by `%`) runs the sampled kernel's JAX face. In v0.3 the
@@ -87,6 +91,8 @@ loop = (estimator + mpc).autowire() @ plant                              # the e
 
 ### D26 MPPI's name (mppi.md ask 1)
 
+**Ruled 2026-10-25 (R106):** as recommended below.
+
 **Recommended:** `MPPIPlanner` and `MPPIRecord`, by the `LQRPlanner` precedent (an algorithm's
 own acronym, as the course notes say it); `PathIntegralPlanner` stays the docstring's long
 form.
@@ -98,6 +104,8 @@ form.
 probing. `ModelPredictiveController(planner, dt_mpc=)` then wraps trajopt and MPPI alike.
 
 ### D28 The stochastic default of MPPI (mppi.md ask 3)
+
+**Ruled 2026-10-25 (R107):** as recommended below.
 
 **Recommended:** `n_plant_samples=1` on a stochastic problem with the bias stated in the
 docstring; the user raises it knowingly, as with `n_trials`.

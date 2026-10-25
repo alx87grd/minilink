@@ -7,17 +7,18 @@ a dated record in docs/reviews/), applies it, and deletes the entry. Rulings alr
 
 ## Blocks v0.3 (the robotics-course release, December 2026)
 
-### Do you review the 36 decisions the overnight run took for you, or accept them as a block?
+### Do you review the overnight run's 16 remaining decisions, or accept them as a block?
 - **Blocks:** your merge of the v0.3 branch into `dev` (R79).
 - **Today:** the run of 2026-10-24 decided 36 points without you, each with its reason, the
-  alternative and the commit (OD-1–OD-36); its §3 measures the intended number changes. You
-  have since confirmed OD-9 (`outputs` keeps its name); OD-10 is superseded (no `ev.jit`).
-- **Options:** accept all 36; review each; accept all but the ones you name.
+  alternative and the commit; its §3 measures the intended number changes. Settled since: OD-9
+  confirmed, OD-10 superseded, sixteen accepted from chat (R103). Open: OD-7, OD-8, OD-12,
+  OD-14, OD-17, OD-18, OD-20, OD-21, OD-23, OD-24, OD-25, OD-26, OD-27, OD-29, OD-30, OD-35;
+  OD-32 and OD-33 are the two questions below.
+- **Options:** accept the rest as a block; review each; accept all but the ones you name.
 - **Recommendation:** the log's "please look first at": the number changes (value iteration's
   default price is now the cost bound, so the GRO860 cost-to-go colour scale tops there;
   scores moved from a held law to the continuous loop, up to 8% for a stiff PD), the input-box
-  sweep (OD-18), the planners' reported trajectory (OD-27), `compare`'s two forms (OD-28), the
-  cost term ids (OD-22); then the rest as a block. The two it left for you follow.
+  sweep (OD-18), the planners' reported trajectory (OD-27); then the rest as a block.
 - **Detail:** [the run's log, §1–§3](../reviews/2026-10-24-v03-run-decisions.md#2-decisions)
 - **Answer:**
 
@@ -43,40 +44,13 @@ a dated record in docs/reviews/), applies it, and deletes the entry. Rulings alr
 - **Detail:** [the run's log, OD-18, OD-33](../reviews/2026-10-24-v03-run-decisions.md#2-decisions)
 - **Answer:**
 
-### One mechanical family, question 1: how does computed torque drive a plant with body-frame velocities?
-- **Blocks:** one mechanical family (S32, ruled R62, postponed by you on 2026-10-24).
-- **Today:** `ComputedTorque` writes one torque per coordinate; the boat and the 3-D plane
-  (`q̇ = N(q) v`) are refused.
-- **Recommendation:** `v̇_des = Kp N(q)⁻¹ (q_d − q) + Kd (v_d − v)` (today's law when `N = I`),
-  refusing a non-square `N`.
-- **Detail:** [TODO, S32](../plans/TODO.md#4-v03--a-cleaner-core-and-the-differentiable-path-then-gmc714)
-- **Answer:**
-
-### One mechanical family, question 2: how does a model-based law drive an underactuated plant?
-- **Blocks:** one mechanical family (S32).
-- **Today:** `ComputedTorque(CartPole()) @ CartPole()` fails at wiring (two torques, one input);
-  the boat and the plane are underactuated too.
-- **Recommendation:** `u = B(q)⁺ τ` when `B` is not square, a solve when it is.
-- **Detail:** [TODO, S32](../plans/TODO.md#4-v03--a-cleaner-core-and-the-differentiable-path-then-gmc714);
-  [KNOWN_ISSUES.md](KNOWN_ISSUES.md)
-- **Answer:**
-
-### One mechanical family, question 3: does `DynamicBicycle` move onto the generalized mechanical base now?
+### One mechanical family: does `DynamicBicycle` move onto the generalized mechanical base now?
 - **Blocks:** one mechanical family (S32); the car family clean-up (K8).
 - **Today:** the row moves its base from `DynamicSystem` to the generalized child, but its named
   ports and its subclasses' extra states do not fit `[q; v]`.
 - **Options:** move it now; rename `M` to `H` only and move it when K8 reworks the cars.
 - **Recommendation:** rename only; the base waits for K8.
 - **Detail:** [TODO, S32](../plans/TODO.md#4-v03--a-cleaner-core-and-the-differentiable-path-then-gmc714)
-- **Answer:**
-
-### Should the same cost added twice be refused?
-- **Blocks:** the cost algebra's parameters.
-- **Today:** `q + 10 * q` shares its parameters between both terms; refusing it refuses
-  `cost + cost` too.
-- **Options:** refuse; keep the sharing.
-- **Recommendation:** none yet.
-- **Detail:** [the run's log, §6 item 5](../reviews/2026-10-24-v03-run-decisions.md#6-the-review-pass-after-the-run)
 - **Answer:**
 
 ### Should the failure price follow a run's cost overrides?
@@ -89,20 +63,6 @@ a dated record in docs/reviews/), applies it, and deletes the entry. Rulings alr
 - **Detail:** [the run's log, §6 item 6](../reviews/2026-10-24-v03-run-decisions.md#6-the-review-pass-after-the-run)
 - **Answer:**
 
-### Do `closed_loop` and `feedback` join a band facade?
-- **Blocks:** the band facades (a public name).
-- **Today:** on the root prelude, on no band facade, as before the run.
-- **Recommendation:** none yet.
-- **Detail:** [the run's log, §7](../reviews/2026-10-24-v03-run-decisions.md#7-the-second-review-pass)
-- **Answer:**
-
-### Should a chain `A >> B >> C` carry every name?
-- **Blocks:** only a chained diagram's display name.
-- **Today:** it is named `A >> B` (checked on the branch), as before the run.
-- **Recommendation:** none yet.
-- **Detail:** [the run's log, §7](../reviews/2026-10-24-v03-run-decisions.md#7-the-second-review-pass)
-- **Answer:**
-
 ### Do three demos change style?
 - **Blocks:** your demo pass (K4) and the closing example (S77).
 - **Today:** `pid_autotuning_jax.py` keeps two helpers, prints that carry arithmetic and a
@@ -112,41 +72,12 @@ a dated record in docs/reviews/), applies it, and deletes the entry. Rulings alr
 - **Detail:** [the run's log, §7](../reviews/2026-10-24-v03-run-decisions.md#7-the-second-review-pass)
 - **Answer:**
 
-### Does the dependency law gain three exceptions, or do three imports move?
-- **Blocks:** DESIGN's dependency law.
-- **Today:** no exception covers `planning/dynamic_programming/lqr.py` → `control`,
-  `core/discrete/` and `System.__mod__` → `simulation.discrete`, or `graphical/diagrams/` →
-  `blocks.routing` and `simulation.discrete`.
-- **Options:** write the exceptions with their reasons; move the code.
-- **Recommendation:** none yet.
-- **Detail:** [DESIGN, "Dependency law"](DESIGN.md#dependency-law)
-- **Answer:**
-
-## Blocks v0.4 (winter 2027)
-
 ### Do the run caches on the sampled loop go?
 - **Blocks:** the sampled loop (S31, D13); RULES 2.4, no run state on a System.
 - **Today:** `StepSystem.rollout` and `HybridDiagram.last_result` cache a run beside `self.traj`.
 - **Recommendation:** they go: `loop.compute_trajectory()` returns the `Trajectory` and stores
   `loop.traj`; the facades read `traj`.
 - **Detail:** [end-state-api.md, D13](../plans/end-state-api.md#d13-the-run-state-caches-s31-rules-24)
-- **Answer:**
-
-### Does a sampled controller with memory and draws need a channel of its own?
-- **Blocks:** the sampled loop (S31, D14).
-- **Today:** MPPI's warm start and a diffusion policy's chunk have no channel; the RL collectors
-  thread their own keys.
-- **Recommendation:** no: a controller with memory is a `StepSystem` with state; its draws come
-  from its own `params["seed"]` and the tick, as the noise block's do.
-- **Detail:** [end-state-api.md, D14](../plans/end-state-api.md#d14-controller-memory-and-the-draws-on-the-tick-s31-future-policiesmd-5-points-2-4)
-- **Answer:**
-
-### Does `problem.compile(policy)` pick the continuous or the sampled run by the policy's kind?
-- **Blocks:** the sampled face of the compiled problem (V1 step 7b, D15).
-- **Today:** v0.3 refuses a `StepSystem` controller (`require_continuous`).
-- **Recommendation:** a continuous law runs as a diagram, a `Computer` on the sampled kernel's
-  JAX face; one `compile` and one `evaluate` for both.
-- **Detail:** [end-state-api.md, D15](../plans/end-state-api.md#d15-the-compiled-problem-dispatches-on-the-policys-kind-s31-v1-step-7b)
 - **Answer:**
 
 ### Does the parametric program become one family, with hand-written parameters and live MPC ports?
@@ -163,14 +94,6 @@ a dated record in docs/reviews/), applies it, and deletes the entry. Rulings alr
   [parametric-program.md §2](../plans/parametric-program.md#2-the-recommendation-one-family-the-frozen-program-a-binding)
 - **Answer:**
 
-### Is the path-integral planner named `MPPIPlanner` or `PathIntegralPlanner`?
-- **Blocks:** the MPPI planner (S72, D26).
-- **Today:** working names `PathIntegralPlanner` / `PathIntegralRecord`; prototypes in
-  `experimental/mppi/`.
-- **Recommendation:** `MPPIPlanner` and `MPPIRecord` (the `LQRPlanner` precedent).
-- **Detail:** [end-state-api.md, D26](../plans/end-state-api.md#d26-mppis-name-mppimd-ask-1); [mppi.md §10](../plans/mppi.md#10-asks-for-the-maintainer)
-- **Answer:**
-
 ### Does the MPC block ask its planner for three verbs instead of probing it?
 - **Blocks:** the MPC block's contract (T6, D27) and MPPI inside it (MP-4).
 - **Today:** `validate_mpc_planner` and the dual-rate export probe with `hasattr`.
@@ -178,13 +101,6 @@ a dated record in docs/reviews/), applies it, and deletes the entry. Rulings alr
   `warm_start_guess(z_prev, y, *, dt_mpc, k)` and `z` on the tick's record; then
   `ModelPredictiveController(planner, dt_mpc=)` wraps trajectory optimization and MPPI alike.
 - **Detail:** [end-state-api.md, D27](../plans/end-state-api.md#d27-the-mpc-blocks-planner-contract-mppimd-ask-2-t6)
-- **Answer:**
-
-### How many plant draws does MPPI take per control sample by default?
-- **Blocks:** MPPI's stochastic branch (S72, D28).
-- **Today:** not built; the plan weighs 4 against 1.
-- **Recommendation:** `n_plant_samples=1`, the bias stated in the docstring.
-- **Detail:** [end-state-api.md, D28](../plans/end-state-api.md#d28-the-stochastic-default-of-mppi-mppimd-ask-3)
 - **Answer:**
 
 ### What does the standard stochastic policy look like as a seeded block?

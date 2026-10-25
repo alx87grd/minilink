@@ -459,7 +459,7 @@ meanwhile and does not gate it); the steps, in order, are TODO §5.
 
 **On the spine:**
 - **S72** The path-integral planner (MPPI) on the sampled kernel, after RN-4 / RN-5
-  ([mppi.md](../plans/mppi.md)). **[ask — name, the MPC block contract]**
+  ([mppi.md](../plans/mppi.md)). **[ask — the MPC block contract]**
 - **C5** RL follow-ups: **S50** SAC actor step, **S51** policy iteration on the grid,
   **S52** deep Q-learning, and the standard stochastic policy as a seeded block (the RL
   heads rebuilt on it, the RL numbers changing once).

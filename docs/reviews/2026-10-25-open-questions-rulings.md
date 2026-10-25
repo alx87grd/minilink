@@ -36,3 +36,59 @@ Numbering continues the rulings record of 2026-10-22 (R1–R90).
   `tf` (a float tolerance), not past it, so an episode of `tf = 1`, `dt = 0.1` is 10 steps, as in
   minilink's RL environment; the class the GRO860 `gymnasium_interface` notebook teaches changes
   the same way. The SB3 notebooks train one step shorter per episode.
+- **R97 (2026-10-25) The same cost object added twice is refused.** A sum that would hold one cost
+  object twice (`q + 10 * q`, `cost + cost`) is refused with a message: write `11 * q` (or
+  `2 * cost`), or pass a copy. Today the value was right but the object's parameters sat twice in
+  the parameter tree, so tuning them moved one copy.
+- **R98 (2026-10-25) `closed_loop` and `feedback` join the `minilink.control` facade**, beside the
+  controllers and the design verbs; they stay on the root prelude.
+- **R99 (2026-10-25) A chain carries every operand's name.** `Step() >> PID() >> Pendulum()` is
+  named `"Step >> PID >> Pendulum"`; today the left diagram's name was kept (`"Step >> PID"`).
+  Display only.
+- **R100 (2026-10-25) Three dependency-law exceptions, written down.** DESIGN §3 gains: the LQR
+  planner imports `control.design` and `control.state` (it solves with the design verb and returns
+  its state-feedback law); `core/discrete/` and `System.__mod__` import `simulation.discrete`
+  lazily (the `%` operator builds a `Computer`, a hybrid diagram simulates through the
+  `HybridSimulator`); `graphical/diagrams/` imports `blocks.routing.Sum` and `StepSchedule` (to
+  draw a summing junction and a rate). Moving `Computer` into `core/discrete/` is reconsidered with
+  the sampled loop (S31, v0.4).
+- **R101 (2026-10-25) Computed torque on a body-frame plant** (the one mechanical family, S32,
+  question 1): `v̇_des = Kp N(q)⁻¹ (q_d − q) + Kd (v_d − v)`, today's law when `N = I` (identical
+  numbers for every current plant); a plant whose `N` is not square is refused.
+- **R102 (2026-10-25) A model-based law refuses an underactuated plant** (S32, question 2): a clear
+  error at construction (the plant has fewer actuators than coordinates), not a wiring failure; no
+  least-squares allocation. S32's done-when then runs `ComputedTorque` on a fully actuated
+  body-frame test body, not on the boat or the plane (both underactuated). Question 3
+  (`DynamicBicycle`'s base) stays open, postponed to later work.
+- **R103 (2026-10-25) Sixteen of the overnight run's decisions accepted as taken**
+  ([the run's log, §2](2026-10-24-v03-run-decisions.md#2-decisions)): OD-1 (`ProblemEnv` kept as
+  internal machinery of the Gym bridge, off the facade), OD-2 (the teaching-surface test reads the
+  root prelude as a subset of the bands), OD-3 (the neural-controller demo on
+  `MLP(2, 1, hidden=(8,), seed=2)`), OD-4 (the package moves and renames before the catalog
+  clean-up), OD-5 (MPC under `planning/trajectory_optimization/mpc/`, offered by
+  `minilink.control`), OD-6 (`ModelPredictiveController` in `mpc/predictive.py`, its constructor
+  frozen), OD-11 (the step formulas stay in `core/compile`), OD-13 (the recorded plant input is
+  `plant.u`), OD-15 (the new optimizer presets named by algorithm, no aliases), OD-16
+  (`Optimizer`'s `z0` optional, read from the program), OD-19 (the `car_trajopt` notebook's
+  syntax fix), OD-22 (cost term ids are the class name verbatim, as block ids), OD-28
+  (`compare`'s two forms), OD-31 (no leaf scaling), OD-34 (the README snippet gains
+  `U=plant.input_box`), OD-36 (`Set.contains` derived from the margin on the array module). With
+  OD-9 confirmed and OD-10 superseded, sixteen stay open for review and two wait on their own
+  questions (OD-32, OD-33).
+- **R104 (2026-10-25) A sampled controller's memory is its state, its draws its seed and the
+  tick** (end-state-api.md D14, the sampled loop S31): no channel of its own. MPPI's warm start or
+  a diffusion policy's chunk lives in the `StepSystem`'s state; its draws come from its own
+  `params["seed"]` and the tick, as `WhiteNoise`'s do, so `loop.realize(key)` seeds it like any
+  random block. The RL collectors' hand-threaded keys move to the same rule. The run-cache
+  question (D13) was put off to the sampled-loop work.
+- **R105 (2026-10-25) `problem.compile(policy)` dispatches on the policy's kind**
+  (end-state-api.md D15, V1 step 7b): a continuous law runs the loop as a diagram, a `Computer`
+  (built by `%`) runs the sampled kernel's JAX face; one `compile`, one `evaluate`, the same `J`,
+  criterion and Monte Carlo for both. v0.3 keeps the refusal (`require_continuous`); the sampled
+  branch lands with the sampled loop (S31, v0.4).
+- **R106 (2026-10-25) The path-integral planner is `MPPIPlanner`, its record `MPPIRecord`**
+  (end-state-api.md D26, mppi.md ask 1), by the `LQRPlanner` precedent; the docstring's first line
+  carries the long form, path integral control.
+- **R107 (2026-10-25) MPPI takes one plant draw per control sample by default**
+  (end-state-api.md D28, mppi.md ask 3): `n_plant_samples=1` on a stochastic problem, the bias
+  stated in the docstring; the user raises it knowingly, as with `n_trials`.
