@@ -820,8 +820,8 @@ One line each; open a plan doc only when a design needs a writeup.
   2026-10-25): native solvers as pure laws beside the wrapped ones, program categories, fully
   traced JAX solves; first a fixed-iteration MPC compiled and differentiable with its closed
   loop (MPPI's tick the first instance), long term convergence analysed as stability —
-  [native-optimizers.md](native-optimizers.md) (NS-1–NS-9; four asks in QUESTIONS.md; rung for
-  the maintainer).
+  [native-optimizers.md](native-optimizers.md) (NS-1–NS-9; three asks in QUESTIONS.md; the
+  discrete step analysis NS-5 needs ruled in, R122; rung for the maintainer).
 
 - **A plant that owns its noise ports, as a real example** (R57): a disturbance the loop cannot
   add (unmatched, `B_w ≠ B`: a push on the cart-pole's tip, a lateral wind on `Drone2D`) and noise

@@ -156,3 +156,9 @@ Numbering continues the rulings record of 2026-10-22 (R1–R90).
   `params_filtered_jit` are gone). Copy `evaluator.params` and replace the block
   you change. `ProblemEvaluator.merged` stays the one convenience merge, at the
   problem boundary, and hands a complete tree down. Supersedes R117.
+- **R122 (2026-10-25) Discrete step analysis comes back when solver stability needs it**
+  (native-optimizers.md §4.7, option B). The linearization of a step system at a fixed point
+  (`A = ∂step/∂x`, from the existing `jacobian`) and its eigenvalues against the unit circle are
+  planned, built with NS-5 (convergence of an optimization process analysed as stability) when
+  that work requires them. The rest of the z-domain family the 2026-10-17 ruling dropped
+  (exact `c2d`, the z-plane pole map, discrete Bode, root locus) stays dropped.

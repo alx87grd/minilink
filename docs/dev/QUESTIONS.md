@@ -217,19 +217,6 @@ a dated record in docs/reviews/), applies it, and deletes the entry. Rulings alr
 - **Detail:** [native-optimizers.md](../plans/native-optimizers.md) §4.6, §5
 - **Answer:**
 
-### Native optimizers: does convergence analysis bring back the linearization and poles of a step system?
-- **Blocks:** NS-5 (goal 2, convergence analysed as stability); long term.
-- **Today:** step systems have `jacobian` only. The 2026-10-17 ruling dropped the z-domain
-  analysis family (exact `c2d`, z-plane pole map, discrete Bode, root locus) for every release.
-- **Options:** (A) keep the ruling; the lesson computes `eig(I − ηH)` by hand from `jacobian`;
-  (B) bring back only `linearize` of a step system at a fixed point and its eigenvalues against
-  the unit circle, for this goal; (C) reopen the z tier.
-- **Recommendation:** B: the slice is small, reuses `jacobian`, and serves the optimization
-  lesson without the GRO501 tooling the ruling dropped.
-- **Detail:** [native-optimizers.md](../plans/native-optimizers.md) §4.7;
-  [the z-tier record](../reviews/2026-10-17-z-tier-dropped.md)
-- **Answer:**
-
 ### Does Diffrax join as an optional JAX solver?
 - **Blocks:** the foundations (S27); a new optional dependency.
 - **Today:** the integrators are in `core/compile/evaluators/stepping.py` (OD-11).
