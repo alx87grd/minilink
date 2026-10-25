@@ -5,7 +5,7 @@ from abc import ABC, abstractmethod
 import numpy as np
 
 from minilink.core.backends import array_module
-from minilink.core.inspect import inspect_text, repr_pretty
+from minilink.core.inspect import inspect_text, latex_inspect, repr_pretty
 from minilink.core.trajectory import Trajectory
 
 
@@ -183,9 +183,6 @@ class QuadraticCost(CostFunction):
     ubar = param_view("ubar")
 
     def _repr_latex_(self):
-        # A real cycle: costs imports inspect_text at module level
-        from minilink.core.inspect import latex_inspect
-
         return latex_inspect(self)
 
     @classmethod
