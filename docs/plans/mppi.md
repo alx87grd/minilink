@@ -15,7 +15,9 @@ and RN-5 of the randomness plan (the ordering of §8), hardened before the v0.9 
 **Prototype:** `experimental/mppi/pendulum_mppi.py` and `racecar_mppi.py`
 (2026-10-02), two standalone scripts on the library as it stands — the swing-up works, and
 the racecar laps the circuit with the cone against the collocation MPC on the same problem;
-the findings are in §1.
+the findings are in §1. The tick is already one pure jitted function; the closed loop in one
+scan and its gradient (tuning `λ`, `Σ` and the cost weights) are
+[native-optimizers.md](native-optimizers.md) §4.6b.
 
 MPPI (model predictive path integral control, Williams et al. 2016–2018) is the
 sampling-based MPC modern robotics stacks run: no gradients, no NLP, thousands of

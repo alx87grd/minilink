@@ -816,6 +816,12 @@ One line each; open a plan doc only when a design needs a writeup.
 - A `ClippedCost`, when a saturating cost is needed (planned with the cost, 2026-10-23).
 - A tutorial on gradient descent and the `Optimizer`, once the generic optimizer and the
   mathematical-program system are extended (R91); until then the closing PID example teaches it.
+- **[ask — core]** Native optimizers, the solve as a rollout (the maintainer's vision,
+  2026-10-25): native solvers as pure laws beside the wrapped ones, program categories, fully
+  traced JAX solves; first a fixed-iteration MPC compiled and differentiable with its closed
+  loop (MPPI's tick the first instance), long term convergence analysed as stability —
+  [native-optimizers.md](native-optimizers.md) (NS-1–NS-9; four asks in QUESTIONS.md; rung for
+  the maintainer).
 
 - **A plant that owns its noise ports, as a real example** (R57): a disturbance the loop cannot
   add (unmatched, `B_w ≠ B`: a push on the cart-pole's tip, a lateral wind on `Drone2D`) and noise

@@ -165,7 +165,9 @@ the step model. MPC is not a week of the GMC714 syllabus, but its teaching name 
 - Single shooting with parameters; multiple shooting has no parametric form today.
 - The sensitivity of the solved plan to `p` (implicit differentiation of the optimality
   conditions): a differentiable MPC, beside the traceable inner solver
-  [sampled-path.md](sampled-path.md) §8 anticipates.
+  [sampled-path.md](sampled-path.md) §8 anticipates. The native solvers that bind this
+  program inside a fixed-iteration MPC tick are [native-optimizers.md](native-optimizers.md)
+  (§4.3, §4.6).
 
 ---
 

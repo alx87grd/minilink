@@ -8,6 +8,21 @@ The design choices are not ruled; the asks are in
 natural slot is after the sampled loop (S31) and the parametric program (S76), both v0.4,
 because this plan builds on the step model's rollout and on the program's parameters.
 
+**Where each idea lives** (one fact, one home: this doc holds the native solvers and the
+two goals; the neighbours hold what they already owned):
+
+| Idea | Home |
+| --- | --- |
+| Native solvers as pure laws, program categories, the solve as a rollout, the three ways to differentiate a solve | this doc, §3–§4 |
+| The fixed-iteration MPC tick (goal 1) | this doc, §4.6, NS-8 |
+| MPPI's tick in the closed loop, differentiable | this doc, §4.6b; the planner itself is [mppi.md](mppi.md) (S72) |
+| Convergence analysed as stability (goal 2) | this doc, §4.7, NS-5; the ask on the z-tier ruling in QUESTIONS.md |
+| The program's parameters (`x0`, plant, cost, sets) and one backend table | [parametric-program.md](parametric-program.md) (S76, OPW-1–OPW-5) |
+| The computer + plant loop as one rollout kernel, NumPy and JAX faces | [sampled-path.md](sampled-path.md) §8 (S31) |
+| The differentiable evaluation of a hybrid loop (`problem.compile` of a sampled controller) | [differentiable-problem.md](differentiable-problem.md), step 7b (R105) |
+| The MPC block's contract with its planner (the verbs a native tick must answer) | [end-state-api.md](end-state-api.md) D27, [mppi.md](mppi.md) §6 |
+| A gradient-descent tutorial on the extended `Optimizer` | [TODO.md](TODO.md) §7 (R91) |
+
 Contracts in code today: [DESIGN.md](../dev/DESIGN.md) §6 (Planning / NLP). The neighbours:
 [parametric-program.md](parametric-program.md) (the program's parameters and one backend table,
 S76 and OPW-1–OPW-5), [differentiable-problem.md](differentiable-problem.md) (the path from any
@@ -293,8 +308,17 @@ block and S31's scan. Several MPPI iterations per tick (`n_iter`, a structural c
 of `I − ηH`, heavy ball and Nesterov as second-order linear filters in feedback with `∇J`, and
 later the robust view (the gradient a sector-bounded nonlinearity, the rate certified for a
 whole class of `J`: the integral quadratic constraints of Lessard, Recht and Packard). It needs
-`linearize` and discrete poles on step systems (today `jacobian` only), and the `@` shortcut on
-step systems or a helper that wires the law to the oracle.
+`linearize` and discrete poles on step systems (today `jacobian` only), and a helper that wires
+the law to the oracle (no operator composes step systems today: `@`, `>>` and `+` refuse
+them, and giving the step algebra operators is a core-grammar ask, CONSTITUTION §6).
+
+**A ruling stands in the way, in part.** The 2026-10-17 ruling
+([the record](../reviews/2026-10-17-z-tier-dropped.md)) dropped the z-domain analysis family
+(exact `c2d`, the z-plane pole map, discrete Bode and root locus) for every release; GRO501
+teaches with `discretize` and simulation. Goal 2 needs only a slice of it: the linearization
+of a step system at a fixed point (`A = ∂step/∂x`, from the `jacobian` that exists) and its
+eigenvalues against the unit circle. Whether that slice comes back, for this goal and not for
+GRO501, is the maintainer's call (QUESTIONS.md, "Blocks v0.9 / v1.0").
 
 ## 5. Steps (local ids NS-1–NS-9; none scheduled)
 
@@ -309,8 +333,9 @@ step systems or a helper that wires the law to the oracle.
 - **NS-4 The least-squares category** with Gauss–Newton and Levenberg–Marquardt; done when
   `Manipulator`'s inverse kinematics can use it in place of its hand SciPy call.
 - **NS-5 The teaching face**: the update law and the oracle as step blocks, their loop rolled
-  out and linearized (needs `linearize` and discrete poles on step systems, a row of its own);
-  one notebook-sized demo (the step-size stability lesson).
+  out and linearized; one notebook-sized demo (the step-size stability lesson). Needs
+  `linearize` and discrete poles on step systems, which the z-tier ruling of 2026-10-17
+  dropped: waits on the ask of §4.7.
 - **NS-6 Constraints natively**: augmented Lagrangian over NS-1's kernel, then its implicit
   derivative through the KKT system.
 - **NS-7 The stochastic category**: `J(z, key)` with SGD and Adam, the problem evaluator's
@@ -340,5 +365,7 @@ identification, the Monte Carlo objective).
    a teaching view, rather than every solver a `StepSystem` by construction?
 2. Which categories and which native algorithms are in scope (§4.1, §4.2), against
    CONSTITUTION §1.4?
+4. Does goal 2 bring back the linearization and poles of a step system, the slice of the
+   dropped z tier it needs (§4.7)?
 3. Where does this enter the roadmap? The maintainer's priority is the MPC path (§1.1); the
    ask left is the rung: with S76 and S31 in v0.4, or after them.

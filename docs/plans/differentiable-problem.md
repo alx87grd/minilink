@@ -128,7 +128,8 @@ content. Steps 0–6 and 7a landed on 2026-10-24.
   (today `evaluate` holds the `disturbances` ports at their nominal values and warns,
   `warn_if_disturbed` in `planning/evaluator.py`).
 - **Step 7b, the sampled face** (the hybrid phase, after S31's kernel): `compile` dispatches a
-  sampled controller (a digital PID, a held neural policy, MPPI, the RL policies) to the
+  sampled controller (a digital PID, a held neural policy, MPPI, the RL policies, and later
+  the fixed-iteration MPC of [native-optimizers.md](native-optimizers.md) §4.6) to the
   kernel's JAX face; the refusal goes (today `require_continuous` in `planning/evaluator.py`
   refuses a `StepSystem` controller); a continuous law's numbers unchanged.
 - **Step 8, sets as costs, the lowerings, the metrics as constraints** (v0.4). `shaping.py`

@@ -52,7 +52,8 @@ to the hybrid phase, after the continuous core.
   digital PID traces end to end (the RL planner, gain tuning, a digital PID tuned by
   gradient). MPC with SciPy or Ipopt inside runs on the NumPy face. A traceable inner solver
   later makes MPC a differentiable policy too, so the MPC block's `step` stays a pure
-  function of arrays with the solver inside.
+  function of arrays with the solver inside: the fixed-iteration MPC tick and MPPI's tick of
+  [native-optimizers.md](native-optimizers.md) §4.6–§4.6b.
 - **Parked to the hybrid phase (D13–D15):** whether the run-state caches
   (`StepSystem.rollout` in `core/discrete/step_system.py`, `HybridDiagram.last_result` in
   `core/discrete/hybrid_diagram.py`) join `self.traj` as allowed caches (RULES 2.4); the
