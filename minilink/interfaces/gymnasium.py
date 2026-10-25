@@ -226,9 +226,12 @@ class Sys2Gym(gym.Env):
         else:
             r = -float(self.cost.g(x, u, t)) * dt  # running cost over the step
 
-        # Truncation of episodes if out of space-time bounds
+        # Truncation of episodes at the horizon tf (within half a step) or out of
+        # the state bounds
         truncated = bool(
-            (t_new > self.tf) or np.any(x_new < self.x_lb) or np.any(x_new > self.x_ub)
+            (t_new >= self.tf - 0.5 * dt)
+            or np.any(x_new < self.x_lb)
+            or np.any(x_new > self.x_ub)
         )
 
         # Memory update

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import math
+import warnings
 from dataclasses import dataclass
 from functools import lru_cache
 
@@ -122,7 +123,13 @@ class Evaluation:
 
 
 def score_run(
-    problem, traj: Trajectory, *, tf=None, params=None, price=PROBLEM_PRICE
+    problem,
+    traj: Trajectory,
+    *,
+    tf=None,
+    params=None,
+    price=PROBLEM_PRICE,
+    cost_bound=None,
 ) -> dict:
     """
     The scores of one plant run under the problem: the formula every evaluation reports.
@@ -135,15 +142,20 @@ def score_run(
         failed              = not finite, or feasibility_margin < 0
         reachability_margin = Xf.margin(x(tf), tf)       reached = margin ≥ 0  (no Xf: reached)
         cost                = ∫ e^{−ρt} g dt + e^{−ρ tf} h(x(tf))   (+inf when not finite)
-        J                   = cost, or cost + price · (failed or not reached) with the price on
+        J                   = cost, or with the price on
+                              cost + price · (failed or not reached)   finite
+                              cost_bound + price                       not finite
 
-    A run that is not finite is scored on zeros (a safe ``where``), so its
-    score stays finite with the price on; its gradient is not defined, since
-    the rollout itself overflowed before the ``where``. ``params`` overrides the
-    problem's own leaves (``"cost"``, the sets' by role, ``"discount_rate"``);
-    ``None`` reads the problem's. ``price`` is the failure price as
-    :func:`price_of` resolves it (``None`` the switch off); by default the
-    problem's.
+    A run that is not finite is scored on zeros (a safe ``where``), and with the
+    price on its cost term is the problem's cost bound, the largest cost a finite
+    run can reach: its ``J`` stays finite and above that of any finite run. Its
+    gradient is not defined, since the rollout itself overflowed before the
+    ``where``. ``params`` overrides the problem's own leaves (``"cost"``, the
+    sets' by role, ``"discount_rate"``); ``None`` reads the problem's. ``price``
+    is the failure price as :func:`price_of` resolves it (``None`` the switch
+    off); by default the problem's. ``cost_bound`` is the cost bound as
+    :func:`diverged_cost_of` resolves it; by default the problem's
+    ``cost_bound(tf)``, its ``1e6`` fallback when the boxes bound no cost.
     """
     params = problem_leaves(problem) if params is None else params
     xp = array_module(traj.x)
@@ -163,6 +175,8 @@ def score_run(
     u = traj.u.T
     tf = t[-1] if tf is None else tf
     price = price_of(problem, tf) if price is PROBLEM_PRICE else price
+    if cost_bound is None:
+        cost_bound = diverged_cost_of(problem, tf, price)
 
     # Finite: every sample, then the run on zeros where it is not (the safe where)
     finite = xp.all(xp.isfinite(x)) & xp.all(xp.isfinite(u))
@@ -189,11 +203,12 @@ def score_run(
         cost = cost + xp.exp(-rho * tf) * cost_fn.h(x[-1], tf, cost_params)
     cost = xp.where(finite, cost, xp.inf)  # A run not finite costs +inf
 
-    # J = cost, or cost + price · (failed or not reached) with the price on
+    # J = cost, or with the price on cost + price · (failed or not reached),
+    # and cost_bound + price for a run not finite
     if price is None:
         J = cost
     else:
-        J = xp.where(finite, cost, 0.0) + xp.where(failed | ~reached, price, 0.0)
+        J = xp.where(finite, cost, cost_bound) + xp.where(failed | ~reached, price, 0.0)
 
     return {
         "cost": cost,
@@ -295,6 +310,26 @@ def price_of(problem, tf):
         return problem.cost_bound(tf)
 
     return price
+
+
+def diverged_cost_of(problem, tf, price):
+    """
+    The cost a run that is not finite is charged with the price on: the problem's cost bound.
+
+    ``None`` with the price off. ``price`` is the one :func:`price_of` resolved
+    for the problem: when the problem prices a failure at its bound
+    (``infeasible_cost=True``) it is the bound itself; else the bound is computed
+    here, once, and its ``1e6`` fallback is not announced, the price being the
+    problem's own number.
+    """
+    if price is None:
+        return None
+    if problem.infeasible_cost is True:
+        return price
+
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        return problem.cost_bound(tf)
 
 
 def criterion_of(problem):

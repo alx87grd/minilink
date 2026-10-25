@@ -897,11 +897,15 @@ feasibility_margin  = min over the run of X.margin(x_k, t_k), U.margin(u_k, x_k,
 failed              = not finite, or feasibility_margin < 0
 reachability_margin = Xf.margin(x(tf), tf)        reached = margin ≥ 0   (Xf = None: reached)
 cost                = ∫₀^{tf} e^{−ρt} g dt + e^{−ρ tf} h(x(tf))  (trapezoid; +inf when not finite; no h on an infinite horizon)
-J                   = cost, or cost + price · (failed or not reached) with the price on
+J                   = cost, or with the price on cost + price · (failed or not reached),
+                      and cost_bound + price for a run not finite
 ```
 
-A run that is not finite is scored on zeros behind a safe `where`, so its score stays finite with
-the price on; its gradient is not defined (the rollout overflowed before the `where`). A run whose
+A run that is not finite is scored on zeros behind a safe `where`, and with the price on its cost
+term is the problem's `cost_bound(tf)`, the largest cost a finite run can reach (its `1e6`
+fallback, unannounced, when the boxes bound no cost and the price is a number): its `J` stays
+finite and above that of any finite run, failed or not. Its gradient is not defined (the rollout
+overflowed before the `where`). A run whose
 states stay finite while its cost overflows scores `+inf`, price or not. A trajectory is
 scored on its `plant` role; one without roles is scored as the plant's run only when `x`
 has the plant's `n`, `u` its `m`, and it carries no recorded signals (a logged run), and a

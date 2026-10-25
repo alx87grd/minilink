@@ -20,6 +20,7 @@ from minilink.core.trajectory import Trajectory
 from minilink.planning.evaluation import (
     Evaluation,
     criterion_of,
+    diverged_cost_of,
     price_of,
     problem_leaves,
     register_evaluation_pytree,
@@ -175,10 +176,14 @@ class ProblemEvaluator:
         params = self.merged(params)
         n_trials = trials_of(self.problem, n_trials)
 
-        # The draws, the price of a failure, then the runs and their scores, batched on JAX
+        # The draws, the price of a failure and the cost bound of a run not finite,
+        # then the runs and their scores, batched on JAX
         x_starts, trial_params = self.realize(params, key, n_trials)
         price = price_of(self.problem, self.tf)
-        rows, trajectories = self.run_trials(trial_params, x_starts, record, price)
+        bound = diverged_cost_of(self.problem, self.tf, price)
+        rows, trajectories = self.run_trials(
+            trial_params, x_starts, record, price, bound
+        )
 
         return Evaluation(
             **rows,
@@ -378,8 +383,11 @@ class ProblemEvaluator:
         # An abstract trace of the run and its score: no compile, no numbers
         try:
             price = price_of(self.problem, self.tf)
+            bound = diverged_cost_of(self.problem, self.tf, price)
             jax.eval_shape(
-                lambda p, x0: self.score(p, x0, False, price)[0], params, x_start
+                lambda p, x0: self.score(p, x0, False, price, bound)[0],
+                params,
+                x_start,
             )
         except (TypeError, jax.errors.JAXTypeError, jax.errors.ConcretizationTypeError):
             return False
@@ -395,23 +403,30 @@ class ProblemEvaluator:
             [xp.reshape(params[port], (-1,)) for port in self.free_inputs]
         )
 
-    def score(self, params, x_start, record, price):
+    def score(self, params, x_start, record, price, bound):
         """One trial's row of the record (and its trajectory when ``record``)."""
         traj = self.run(params, x_start)
         plant_run = traj.of("plant")
 
-        row = score_run(self.problem, plant_run, tf=self.tf, params=params, price=price)
+        row = score_run(
+            self.problem,
+            plant_run,
+            tf=self.tf,
+            params=params,
+            price=price,
+            cost_bound=bound,
+        )
 
         return row, (traj if record else None)
 
-    def run_trials(self, params, x_starts, record, price):
+    def run_trials(self, params, x_starts, record, price, bound):
         """The rows of every trial: a ``vmap`` on JAX, a loop on NumPy."""
         if self.backend == BACKEND_JAX:
-            return self.run_trials_jax(params, x_starts, record, price)
+            return self.run_trials_jax(params, x_starts, record, price, bound)
 
-        return self.run_trials_numpy(params, x_starts, record, price)
+        return self.run_trials_numpy(params, x_starts, record, price, bound)
 
-    def run_trials_jax(self, params, x_starts, record, price):
+    def run_trials_jax(self, params, x_starts, record, price, bound):
         """The trials as one ``vmap`` of the run, jitted once per batch layout and problem parts."""
         jax = ensure_jax_x64()
         register_evaluation_pytree()
@@ -428,20 +443,21 @@ class ProblemEvaluator:
         cached = self.trials_fn.get(layout)
         if cached is None or any(a is not b for a, b in zip(cached[1], parts)):
             batched = jax.vmap(
-                lambda p, x0, c: self.score(p, x0, record, c), in_axes=(axes, 0, None)
+                lambda p, x0, c, b: self.score(p, x0, record, c, b),
+                in_axes=(axes, 0, None, None),
             )
             self.trials_fn[layout] = (jax.jit(batched), parts)
 
         trials_fn, _ = self.trials_fn[layout]
-        rows, trajs = trials_fn(tree, x_starts, price)
+        rows, trajs = trials_fn(tree, x_starts, price, bound)
 
         return rows, unbatch(trajs, x_starts.shape[0]) if record else None
 
-    def run_trials_numpy(self, params, x_starts, record, price):
+    def run_trials_numpy(self, params, x_starts, record, price, bound):
         """The trials one at a time, stacked into the record's arrays."""
         rows, trajs = [], []
         for i, x_start in enumerate(x_starts):
-            row, traj = self.score(take_trial(params, i), x_start, record, price)
+            row, traj = self.score(take_trial(params, i), x_start, record, price, bound)
             rows.append(row)
             trajs.append(traj)
 

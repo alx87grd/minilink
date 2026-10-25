@@ -77,9 +77,10 @@ class TabularLearningPlanner(Planner):
         value read at the node is, in expectation, the multilinear
         interpolation value iteration uses: the learner then samples the same
         Markov decision process value iteration solves on the grid.
-    solver : {"rk4", "euler"}
-        Integration scheme of one control period; value iteration's grid
-        steps with Euler.
+    solver : {"rk4", "euler"}, optional
+        Integration scheme of one control period; default the grid's (Euler
+        for a grid built from ``x_grid`` and ``u_grid``), so the learner steps
+        the plant as value iteration does on the same grid.
     seed : int
         Seed of the starts, the exploration and the rounding.
 
@@ -110,7 +111,7 @@ class TabularLearningPlanner(Planner):
         episode_length=None,
         exploring_starts=True,
         rounding="stochastic",
-        solver="rk4",
+        solver=None,
         substeps=1,
         seed=0,
     ):
@@ -129,7 +130,7 @@ class TabularLearningPlanner(Planner):
             problem.replace(X=problem.X & grid.X, infeasible_cost=price),
             dt=grid.dt,
             episode_length=episode_length,
-            solver=solver,
+            solver=grid.solver if solver is None else solver,
             substeps=substeps,
             backend="numpy",
             training_zone=grid.X,

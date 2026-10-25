@@ -137,11 +137,35 @@ def test_a_run_that_is_not_finite_costs_inf_or_the_price():
     off = score_run(PlanningProblem(sys, cost=cost, tf=1.0, U=sys.input_box), run)
     assert off["failed"] and off["J"] == np.inf and off["cost"] == np.inf
 
-    on = score_run(
-        PlanningProblem(sys, cost=cost, tf=1.0, infeasible_cost=50.0, U=sys.input_box),
-        run,
+    problem = PlanningProblem(
+        sys, cost=cost, tf=1.0, infeasible_cost=50.0, U=sys.input_box
     )
-    assert on["J"] == pytest.approx(50.0)
+    on = score_run(problem, run)
+    assert on["J"] == pytest.approx(problem.cost_bound(1.0) + 50.0)
+
+
+def test_a_run_not_finite_scores_above_a_finite_run_that_leaves_x():
+    sys = plant()
+    cost = QuadraticCost.from_system(sys)
+    problem = PlanningProblem(
+        sys, cost=cost, tf=1.0, infeasible_cost=50.0, X=sys.state.box, U=sys.input_box
+    )
+    t = np.linspace(0.0, 1.0, 11)
+    diverged = np.zeros((2, t.size))
+    diverged[0, -1] = np.inf
+    left = np.zeros((2, t.size))
+    left[0, -1] = 10.0  # Past the state box, |θ| ≤ 2π
+    u = np.zeros((1, t.size))
+
+    nan_row = score_run(problem, Trajectory(t, diverged, u))
+    out_row = score_run(problem, Trajectory(t, left, u))
+
+    # J = cost_bound + price for the run not finite, cost + price for the one that left
+    assert nan_row["failed"] and out_row["failed"]
+    assert np.isfinite(nan_row["J"])
+    assert nan_row["J"] == pytest.approx(problem.cost_bound(1.0) + 50.0)
+    assert out_row["J"] == pytest.approx(out_row["cost"] + 50.0)
+    assert nan_row["J"] > out_row["J"]
 
 
 def test_the_criteria_reduce_the_runs():
