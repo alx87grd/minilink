@@ -130,6 +130,68 @@ compile); the parameter tree is the loop's, every block named (R121).
 3. The computational delay (a one-tick delay of the command, as on a real computer): a schedule
    option, or modelled by the user as a delay block?
 
+### 8.2 Orchestrator or pure transcription: the options compared (draft, 2026-10-25)
+
+The maintainer asked for the full comparison of keeping a clock orchestrator that calls each
+block when its clock fires, against transcribing every rate into a pure step with conditional
+updates and the held signals as state. Four options, because "keep the orchestrator" splits in
+two:
+
+- **O1 Orchestrator, stateful blocks** (today): `Computer.tick` mutates `k`, `x` and the signal
+  buffers; `HybridSimulator` integrates the plant between ticks in a Python loop; a block may
+  hold side effects (the MPC's tick latch, a host SciPy solve).
+- **O2 Orchestrator over pure blocks**: the same scheduler, but every block is a pure
+  `step(x, u, k, p)` (§8.1, R104), and the runner only keeps the clock and the buffers.
+- **O3 Pure tick at the base rate**: one pure `tick(X, u, k; p)` with the holds in `X` and each
+  block's update a select on `k mod d` (§8.1, Drafts 1–2).
+- **O4 Pure structured transcription**: the schedule unrolled statically. A nested scan for two
+  clocks (controller period outside, plant substeps inside), or one step per hyperperiod
+  `lcm(d_i)` for several (a cyclic executive). No conditionals.
+
+✓ good, ~ possible with a cost, ✗ not possible.
+
+| Aspect | O1 Orchestrator, stateful | O2 Orchestrator, pure blocks | O3 Pure base tick, selects | O4 Pure structured |
+| --- | --- | --- | --- | --- |
+| **Deployed on a real computer (hard realtime)** | ✓ the natural shape of an RTOS: one task per rate, the slow task preempted by the fast one | ✓ same, and each block's code is a pure function to export (C, `jit`) | ~ every block runs every base tick unless compiled to real `if`s (C branches cheaply; JAX's `where` does not): worst-case time is the sum of all blocks | ~ a cyclic executive, classic in avionics: deterministic frames, but a slow block must fit inside one minor frame (no preemption) |
+| **A slow block longer than a fast period** (an MPC at 50 Hz beside a 1 kHz loop) | ✓ by preemption, in execution | ✓ same | ✗ as execution; ✓ as semantics, with a one-period delay state on its output | ✗ as execution; ✓ as semantics, the same delay state |
+| **Realtime in Python** (game mode, hardware in the loop: I/O between ticks) | ✓ today's shape | ✓ each block jitted, called by the host loop | ~ the pure tick jitted and called once per real tick (JAX dispatch about 10–50 µs a call) | ~ the same, one call per frame |
+| **Simulation on NumPy** | ✓ skips idle blocks | ✓ same | ~ computes idle blocks and throws them away | ✓ no waste |
+| **Simulation on JAX** | ✗ Python loop around a host runner | ~ one dispatch per block per tick: slow | ✓ one `lax.scan`, but idle blocks computed (worst for an expensive slow block like an MPC) | ✓ one `lax.scan`, no waste: the fastest |
+| **Compile the computer side alone** (`jit`, C export) | ~ blocks one by one; the schedule stays Python | ✓ blocks one by one, and the schedule is plain data to generate a runner from | ✓ the computer's tick as one function | ✓ the computer's frame as one function |
+| **Compile the whole closed loop** (plant inside) | ✗ the plant runs in `solve_ivp` or a host loop | ✗ the loop stays on the host | ✓ fixed-step plant substeps inside the tick | ✓ the same, substeps nested in each controller period |
+| **Adaptive plant integration** (`solve_ivp`), events | ✓ | ✓ | ✗ fixed step only (Diffrax later, S27) | ✗ the same |
+| **`vmap`** (Monte Carlo, families) | ✗ loop over trials | ✗ the same | ~ yes, but `lax.cond` becomes a select under `vmap`: idle blocks computed in every trial | ✓ clean |
+| **Gradients of the closed-loop cost** | ✗ | ✗ through the loop (✓ per block) | ✓ through the select (the branch taken); memory per tick, `jax.checkpoint` per tick | ✓ best: memory per controller period, checkpoint per period |
+| **Analysis tools on the loop** (R122's linearization, the stability of the sampled-data loop) | ✗ no single map | ✗ the same; per-block analysis only | ~ one map, but periodic in `k` (period `lcm(d_i)`): stability needs the product over a hyperperiod | ✓ one map per period, time-invariant: its eigenvalues are the loop's stability directly (the textbook `x⁺ = Φx + Γu` of a sampled-data loop) |
+| **Host-only blocks** (SciPy or Ipopt MPC, hardware I/O, stateful drivers) | ✓ | ✓ through a block that calls out (no tracing) | ✗ (`pure_callback`, no gradient) | ✗ the same |
+| **Asynchronous or non-commensurate rates, jitter** | ~ possible in principle (ROADMAP §7: out of scope) | ~ the same | ✗ | ✗ |
+| **Debugging, introspection** | ✓ breakpoints, prints | ✓ | ~ jitted: harder (run on NumPy to debug) | ~ the same |
+| **Reads like the textbook** | the engineer's view: tasks at rates | the same | the sampled-data model, with conditionals | the sampled-data model, cleanest (`Φ`, `Γ` per period) |
+| **Constitution fit** (purity first; R13, R120: the loop a tool, not a `System`) | ✗ side effects in blocks | ✓ blocks pure, the runner a tool | ✓ pure; the map is a tool's internal, unless exposed (§8.1, open point 1) | ✓ the same |
+| **Maintenance** | one runner | one runner plus pure blocks | one kernel | one kernel; the hyperperiod unrolling grows with `lcm(d_i)` |
+
+**Reading the matrix.** No option wins every row: an orchestrator is the shape of *execution*
+(a real computer, Python realtime, host-only blocks), a pure transcription is the shape of
+*semantics* (what the loop computes, compiled, batched, differentiated, analysed). The
+difference that matters most is the slow block: a real computer runs it across several fast
+periods by preemption, which no pure step expresses as execution; the pure model expresses its
+*effect* instead, a one-period delay on its output, which is also the honest model of what the
+real computer does.
+
+**The draft recommendation: both layers, one set of block functions.**
+1. **Pure blocks everywhere** (O2's blocks): every block a pure `step(x, u, k, p)`, its memory
+   in its state (R104), no latch. This is required by every other row and costs nothing.
+2. **The pure loop is the reference model** for simulation, gradients, `vmap` and analysis: O4
+   (the nested scan) for the two-clock loop first, O3 (base tick with selects) for a general
+   `StepSchedule`, O4's hyperperiod as its optimization.
+3. **The orchestrator stays as the execution shell** (O2): realtime and game mode, hardware in
+   the loop, host-only blocks, the NumPy face; it calls the same pure block functions, so it is
+   a runner, not a second model, and the pure loop is its test oracle (the same numbers on
+   NumPy, byte for byte).
+4. **Deployment on a real computer** generates its runner from the schedule (tasks per rate, or
+   a cyclic executive) around the exported pure blocks; the computational delay of a slow block
+   is in the model as a delay state, so simulation and hardware agree.
+
 **Order:** the continuous core it waits for landed on 2026-10-24 (the step model, then V1's
 steps 1–6); the loop comes in v0.4 (R86), with P10's AC-8b; the hand-copied `HybridDiagram`
 facades go with it; the hybrid topology drawing (`graphical/diagrams/hybrid_topology.py`)
