@@ -167,6 +167,11 @@ class LTISystem(StateSpaceSystem):
     def __str__(self):
         return f"{super().__str__()}\n{matrices_text(self)}"
 
+    def _repr_latex_(self):
+        from minilink.core.inspect import latex_inspect
+
+        return latex_inspect(self)
+
 
 ###############################################################################
 # Internal machinery

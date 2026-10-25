@@ -217,6 +217,11 @@ class Simulator:
         if self.verbose:
             print_setup_panel(self, setup_notes)
 
+    def __str__(self):
+        from minilink.core.inspect import inspect_text
+
+        return inspect_text(self)
+
     def solve(self):
         """
         Run the simulation over ``self.t`` with the **nominal** input.

@@ -351,8 +351,8 @@ def test_scipy_minimize_disp_prints_report(capsys):
     assert "Optimization Program" in captured.out
     assert "method=" in captured.out
     assert "Running solver" in captured.out
-    assert "success:" in captured.out
-    assert "Completed in" in captured.out
+    assert "OptimizationResult, success=" in captured.out
+    assert "solve_time_s:" in captured.out
     assert out.solve_time_s is not None
     assert out.success
 

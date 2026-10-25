@@ -6,6 +6,7 @@ from dataclasses import replace
 
 import numpy as np
 
+from minilink.core.inspect import inspect_text, repr_pretty
 from minilink.optimization.evaluators.compiler import compile_program_evaluator
 from minilink.optimization.mathematical_program import (
     MathematicalProgram,
@@ -147,6 +148,12 @@ class Optimizer:
         kwargs = backend_kwargs_of(preset, method_kwargs, options)
         self.backend = self.select_backend(backend_key, kwargs)
 
+    def __str__(self):
+        return inspect_text(self)
+
+    def _repr_pretty_(self, p, cycle):
+        repr_pretty(self, p, cycle)
+
     def solve(
         self,
         *,
@@ -265,10 +272,9 @@ class Optimizer:
         print(DISP_RULE_MAIN)
         print("===               Optimization Program                   ===")
         print(DISP_RULE_MAIN)
-        print("n_z:", int(self.program.n_z))
+        for line in inspect_text(self).splitlines():
+            print(line)
         print("z0:", preview_vector(z0))
-        print(f"method={self.method!r}")
-        print(f"compile_backend={self.program_evaluator.backend!r}")
         print("options:", getattr(self.backend, "options", {}))
         print(DISP_RULE_DIV)
         print("Running solver...")
@@ -278,11 +284,9 @@ class Optimizer:
         result: OptimizationResult,
     ) -> None:
         """Print the **After solve** section and close the solve panel."""
-        print("Completed in", result.solve_time_s, "seconds")
         print(DISP_RULE_DIV)
-        print("success:", result.success)
-        print("z*:", preview_vector(result.z))
-        print("J*:", result.cost)
+        for line in inspect_text(result).splitlines():
+            print(line)
         print("stats:", result.stats)
         print(DISP_RULE_MAIN)
 

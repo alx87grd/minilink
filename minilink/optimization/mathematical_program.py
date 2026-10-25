@@ -117,6 +117,11 @@ class MathematicalProgram:
     def _repr_pretty_(self, p, cycle):
         repr_pretty(self, p, cycle)
 
+    def _repr_latex_(self):
+        from minilink.core.inspect import latex_inspect
+
+        return latex_inspect(self)
+
 
 @dataclass(frozen=True)
 class OptimizationResult:
@@ -149,6 +154,12 @@ class OptimizationResult:
         # The measured time as a float, when one was measured
         if self.solve_time_s is not None:
             object.__setattr__(self, "solve_time_s", float(self.solve_time_s))
+
+    def __str__(self):
+        return inspect_text(self)
+
+    def _repr_pretty_(self, p, cycle):
+        repr_pretty(self, p, cycle)
 
 
 ###############################################################################

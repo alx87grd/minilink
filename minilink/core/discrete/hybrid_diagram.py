@@ -361,6 +361,11 @@ class HybridDiagram:
             abstract_boundary=abstract_boundary,
         )
 
+    def __str__(self):
+        from minilink.core.inspect import inspect_text
+
+        return inspect_text(self)
+
     def _repr_svg_(self):
         """Notebook inline SVG for the hybrid topology (IPython / Jupyter)."""
         # A real cycle: graphical.diagrams.hybrid_dot imports HybridDiagram through

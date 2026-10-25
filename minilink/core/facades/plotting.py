@@ -143,6 +143,17 @@ class SystemPlotting:
         except Exception:
             return None
 
+    def _repr_mimebundle_(self, include=None, exclude=None):
+        """Notebook repr: text inspect plus inline diagram SVG when available."""
+        from minilink.core.inspect import inspect_text
+
+        bundle = {"text/plain": inspect_text(self)}
+        svg = self._repr_svg_()
+        if svg is not None:
+            bundle["image/svg+xml"] = svg
+
+        return bundle
+
     def plot_diagram(
         self,
         filename=None,

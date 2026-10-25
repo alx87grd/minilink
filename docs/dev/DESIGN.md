@@ -1180,12 +1180,28 @@ selects brute-force or a SciPy ``cKDTree`` for Euclidean nearest queries.
 
 Facades delegate to `graphical/`. Time plots: `signals=("x", "u", "block:port")`.
 Phase plane: matplotlib default. Diagrams: Graphviz layout (notebook SVG;
-script Matplotlib window). `print(sys)` is a short text
-summary: name, class, `n`, ports with dimensions; a diagram adds its keys, an
-`LTISystem` its `A`, `B`, `C`, `D`, a `TransferFunction` its `G(s) = (s + 2) / (s² + 3 s + 2)`.
-The same inspect print lives on `Trajectory`, sets, distributions, costs,
-`PlanningProblem`, `StateField`, and `MathematicalProgram` (a notebook
-last-expression on a `System` is still the Graphviz block).
+script Matplotlib window).
+
+**Inspect (`core/inspect.py`).** One text layout for textbook objects:
+line 1 is `{TypeName}, …` identity tokens; further lines are two-space
+indented `label: value`. `print(obj)` and IPython `_repr_pretty_` call
+`inspect_text`; unknown types fall back to `repr`. Covered types include
+`System`, `Trajectory`, sets, distributions, costs (including sums and
+quadratic weights), state fields, `PlanningProblem` and
+`StochasticPlanningProblem`, `PlanningSolution`, `MathematicalProgram`,
+`Optimizer`, `OptimizationResult`, `HybridDiagram`, and `Simulator`.
+Subclasses may append a deep block after the hub summary (`LTISystem`
+matrices, `TransferFunction` `G(s)`, `Observer` gain and poles).
+
+**Notebook-rich repr.** A bare last expression on a `System` prefers
+`_repr_mimebundle_`: `text/plain` inspect plus `image/svg+xml` diagram
+when Graphviz is available; `_repr_svg_` remains for SVG-only consumers.
+`HybridDiagram` keeps inline SVG; `PlotResult` displays nothing so plots
+are not doubled. Optional `_repr_latex_` on `LTISystem`, `QuadraticCost`,
+and `MathematicalProgram` renders the textbook equation shape (not the
+callable bodies). Optimizer `verbose=True` frames the same inspect lines
+inside the solve panel (`optimization/reporting.py` rules).
+
 Plotly under `plotting` extra.
 
 **Camera:** plain `camera_*` hints on `System` resolve to a 4×4 matrix

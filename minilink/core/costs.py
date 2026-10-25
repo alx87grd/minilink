@@ -182,6 +182,11 @@ class QuadraticCost(CostFunction):
     xbar = param_view("xbar")
     ubar = param_view("ubar")
 
+    def _repr_latex_(self):
+        from minilink.core.inspect import latex_inspect
+
+        return latex_inspect(self)
+
     @classmethod
     def from_system(
         cls,

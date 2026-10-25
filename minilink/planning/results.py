@@ -6,6 +6,7 @@ import re
 from collections.abc import Callable
 from dataclasses import dataclass
 
+from minilink.core.inspect import inspect_text, repr_pretty
 from minilink.core.system import System
 from minilink.core.trajectory import Trajectory
 from minilink.planning.evaluation import Evaluation
@@ -145,28 +146,10 @@ class PlanningSolution:
     # Display
 
     def __str__(self) -> str:
-        # The law's kind, the rollout's extent, the evaluation, the solver's record
-        law = "u = pi(t), open loop" if self.open_loop else "u = pi(x), feedback"
-        if self.trajectory is None:
-            trajectory = "not rolled out (solve with evaluate=True)"
-        else:
-            trajectory = (
-                f"{self.trajectory.n_samples} samples over "
-                f"{self.trajectory.time_duration:.3g} s"
-            )
-        evaluation = "none" if self.evaluation is None else str(self.evaluation)
-
-        return "\n".join(
-            [
-                f"policy: {self.policy.name} ({law})",
-                f"trajectory: {trajectory}",
-                f"evaluation: {evaluation}",
-                f"solver: {self.solver}",
-            ]
-        )
+        return inspect_text(self)
 
     def _repr_pretty_(self, p, cycle):
-        p.text("..." if cycle else str(self))
+        repr_pretty(self, p, cycle)
 
     ###########################################################################
     # Internal machinery
