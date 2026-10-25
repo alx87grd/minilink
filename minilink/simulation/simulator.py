@@ -9,6 +9,7 @@ from minilink.core.backends import (
     BACKEND_JAX,
     BACKEND_NUMPY,
 )
+from minilink.core.inspect import inspect_text
 from minilink.core.system import DEFAULT_SMALLEST_TIME_CONSTANT, DynamicSystem
 from minilink.core.trajectory import Trajectory
 from minilink.simulation.compile_backend import resolve_auto_backend
@@ -218,9 +219,6 @@ class Simulator:
             print_setup_panel(self, setup_notes)
 
     def __str__(self):
-        # A real cycle: inspect imports Simulator lazily for display
-        from minilink.core.inspect import inspect_text
-
         return inspect_text(self)
 
     def solve(self):

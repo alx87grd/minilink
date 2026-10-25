@@ -83,7 +83,7 @@ def inspect_text(obj):
 
 def latex_inspect(obj):
     """Notebook LaTeX summary when meaningful; otherwise ``None``."""
-    # A real cycle: costs and optimization import inspect_text at module level
+    # A real cycle: costs, state_space and mathematical_program import this module
     from minilink.core.costs import QuadraticCost
     from minilink.dynamics.abstraction.state_space import LTISystem
     from minilink.optimization.mathematical_program import MathematicalProgram
@@ -162,7 +162,7 @@ def trajectory_text(traj):
 
 
 def set_text(obj):
-    # A real cycle: sets import inspect_text; FieldSet pulls planning into inspect display
+    # A real cycle: sets imports this module
     from minilink.core.sets import (
         BallSet,
         BoxInputSet,
@@ -289,7 +289,7 @@ def solution_text(solution):
 
 
 def optimizer_text(opt):
-    # A real cycle: reporting imports inspect for optimizer display
+    # Tools import core (DESIGN §3): the optimization band loads on first use
     from minilink.optimization.reporting import preview_vector
 
     headline = f"Optimizer, method={opt.method!r}"
@@ -303,7 +303,7 @@ def optimizer_text(opt):
 
 
 def optimization_result_text(result):
-    # A real cycle: reporting imports inspect for result display
+    # Tools import core (DESIGN §3): the optimization band loads on first use
     from minilink.optimization.reporting import preview_vector
 
     success = "yes" if result.success else "no"
@@ -325,7 +325,7 @@ def optimization_result_text(result):
 
 
 def program_text(program):
-    # A real cycle: optimizer imports compile paths that may import inspect
+    # A real cycle: optimizer imports this module
     from minilink.optimization.optimizer import program_class
 
     kind = program_class(program)

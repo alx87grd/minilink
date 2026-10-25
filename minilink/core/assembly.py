@@ -114,7 +114,12 @@ def inline_diagram(
 
 @dataclass(frozen=True)
 class FlattenReport:
-    """How :func:`flatten_diagram` renamed nested blocks (``parent/child`` → ``parent__child``)."""
+    """How :func:`flatten_diagram` renamed nested blocks.
+
+    ``id_map`` keys every leaf block by its nested path, joined with ``/`` at every
+    level (``"loop/inner/plant"``), to its flat id (``"loop__inner__plant"``, or a
+    numbered id when that name was taken).
+    """
 
     id_map: dict[str, str]
 
@@ -139,13 +144,15 @@ def flatten_diagram(diagram: DiagramSystem) -> tuple[DiagramSystem, FlattenRepor
         nested_id = first_nested_subsystem_id(flat)
         if nested_id is None:
             break
-        inner_flat, _inner_report = flatten_diagram(flat.subsystems[nested_id])
+        inner_flat, inner_report = flatten_diagram(flat.subsystems[nested_id])
         local_map = replace_nested_subsystem(flat, nested_id, inner_flat)
-        for source_id, target_id in local_map.items():
-            id_map[f"{nested_id}/{source_id}"] = target_id
+        for inner_path, inner_id in inner_report.id_map.items():
+            id_map[f"{nested_id}/{inner_path}"] = local_map[inner_id]
 
-    for sys_id in flat.subsystems:
-        id_map.setdefault(sys_id, sys_id)
+    # The top-level leaves keep their ids
+    for sys_id, subsystem in diagram.subsystems.items():
+        if not isinstance(subsystem, DiagramSystem):
+            id_map[sys_id] = sys_id
 
     return flat, FlattenReport(id_map=id_map)
 
@@ -156,8 +163,11 @@ def remap_params_nested_to_flat(diagram: DiagramSystem, params) -> dict | None:
         return None
 
     check_diagram_params(params, diagram.subsystems)
-    flat, _report = flatten_diagram(diagram)
-    remapped = remap_params_tree(diagram, params, prefix="")
+    flat, report = flatten_diagram(diagram)
+    remapped = {
+        report.id_map[path]: piece
+        for path, piece in nested_params_by_path(diagram, params)
+    }
     check_diagram_params(remapped, flat.subsystems)
     return remapped
 
@@ -228,24 +238,24 @@ def replace_nested_subsystem(
         boundary_outputs=False,
     )
     for target_sys_id, target_port_id, nested_port_id in outbound:
-        inner_edge = inner_flat.connections["output"].get(nested_port_id)
-        if inner_edge is None:
-            raise ValueError(
-                f"Nested block {nested_id!r} output port {nested_port_id!r} is not "
-                "exposed on the inner diagram boundary"
-            )
-        source_sys_id, source_port_id = inner_edge
-        if source_sys_id == "input":
-            raise TypeError(
-                "Flattening nested diagram outputs sourced directly from external "
-                "inputs is not supported."
-            )
+        source_sys_id, source_port_id = inner_source(
+            inner_flat, nested_id, nested_port_id
+        )
         diagram.connect(
             local_map[source_sys_id],
             source_port_id,
             target_sys_id,
             target_port_id,
         )
+
+    # The diagram's own outputs read off the nested box: the inner block that feeds it
+    output_connections = diagram.connections.get("output", {})
+    for output_id, edge in output_connections.items():
+        if edge is None or edge[0] != nested_id:
+            continue
+        source_sys_id, source_port_id = inner_source(inner_flat, nested_id, edge[1])
+        output_connections[output_id] = (local_map[source_sys_id], source_port_id)
+        diagram.outputs[output_id].source = output_connections[output_id]
 
     del diagram.subsystems[nested_id]
     del diagram.connections[nested_id]
@@ -260,16 +270,30 @@ def replace_nested_subsystem(
     return local_map
 
 
-def remap_params_tree(diagram: DiagramSystem, params: Mapping, *, prefix: str) -> dict:
-    remapped = {}
+def inner_source(inner_flat: DiagramSystem, nested_id: str, nested_port_id: str):
+    """The ``(block, port)`` inside ``inner_flat`` that feeds its boundary output ``nested_port_id``."""
+    inner_edge = inner_flat.connections["output"].get(nested_port_id)
+    if inner_edge is None:
+        raise ValueError(
+            f"Nested block {nested_id!r} output port {nested_port_id!r} is not "
+            "exposed on the inner diagram boundary"
+        )
+    if inner_edge[0] == "input":
+        raise TypeError(
+            "Flattening nested diagram outputs sourced directly from external "
+            "inputs is not supported."
+        )
+    return inner_edge
+
+
+def nested_params_by_path(diagram: DiagramSystem, params: Mapping, prefix=""):
+    """Yield ``(path, block params)`` for every leaf block, ``path`` joined with ``/``."""
     for sys_id, subsystem in diagram.subsystems.items():
-        flat_id = f"{prefix}__{sys_id}" if prefix else sys_id
-        piece = params[sys_id]
+        path = f"{prefix}/{sys_id}" if prefix else sys_id
         if isinstance(subsystem, DiagramSystem):
-            remapped.update(remap_params_tree(subsystem, piece, prefix=flat_id))
+            yield from nested_params_by_path(subsystem, params[sys_id], path)
         else:
-            remapped[flat_id] = piece
-    return remapped
+            yield path, params[sys_id]
 
 
 def add_system_to_diagram(diagram, sys, *, role=None) -> str:

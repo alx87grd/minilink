@@ -7,7 +7,7 @@ from typing import Any, TypeAlias
 import numpy as np
 
 from minilink.core.backends import BACKEND_NUMPY
-from minilink.core.inspect import inspect_text, repr_pretty
+from minilink.core.inspect import inspect_text, latex_inspect, repr_pretty
 
 # These stay loose on purpose: the runtime contract is native-backend behavior
 # plus shape checks in evaluators, without making JAX a core dependency.
@@ -118,9 +118,6 @@ class MathematicalProgram:
         repr_pretty(self, p, cycle)
 
     def _repr_latex_(self):
-        # A real cycle: inspect imports MathematicalProgram lazily for LaTeX display
-        from minilink.core.inspect import latex_inspect
-
         return latex_inspect(self)
 
 

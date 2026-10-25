@@ -7,6 +7,7 @@ from typing import TYPE_CHECKING, Literal
 
 from minilink.core.diagram import DiagramSystem
 from minilink.core.discrete.step_diagram import StepDiagramSystem
+from minilink.core.inspect import inspect_text
 
 if TYPE_CHECKING:
     from minilink.simulation.discrete.computer import Computer
@@ -362,9 +363,6 @@ class HybridDiagram:
         )
 
     def __str__(self):
-        # A real cycle: inspect_text imports HybridDiagram lazily from this module
-        from minilink.core.inspect import inspect_text
-
         return inspect_text(self)
 
     def _repr_svg_(self):

@@ -3,6 +3,7 @@
 import numpy as np
 
 from minilink.core.backends import array_module
+from minilink.core.inspect import latex_inspect
 from minilink.core.system import DynamicSystem
 
 ###############################################################################
@@ -168,9 +169,6 @@ class LTISystem(StateSpaceSystem):
         return f"{super().__str__()}\n{matrices_text(self)}"
 
     def _repr_latex_(self):
-        # A real cycle: inspect imports LTISystem lazily for LaTeX display
-        from minilink.core.inspect import latex_inspect
-
         return latex_inspect(self)
 
 
