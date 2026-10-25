@@ -114,16 +114,6 @@ a dated record in docs/reviews/), applies it, and deletes the entry. Rulings alr
 - **Detail:** [end-state-api.md, D29](../plans/end-state-api.md#d29-the-standard-stochastic-policy-as-a-seeded-block-future-policiesmd-5-point-4)
 - **Answer:**
 
-### Where does the RL rollout environment live once MPPI reads it?
-- **Blocks:** MPPI (S72, D30).
-- **Today:** `RolloutEnvironment` is in `learning/reinforcement_learning/`. D30's reason ("a
-  caller of the sampled kernel") reads against R13 (the RL environment depends on the step model
-  only).
-- **Options:** it stays; it moves to `planning/environment.py`.
-- **Recommendation:** it stays; its reason restated against R13.
-- **Detail:** [end-state-api.md, D30](../plans/end-state-api.md#d30-where-rolloutenvironment-lives-mppimd-ask-5)
-- **Answer:**
-
 ### Do you adopt or drop the optional `KinematicModel` delegate?
 - **Blocks:** the general serial chain (C6), decided with its mechanism description.
 - **Today:** C6 is design first; its July 2026 draft is in git history.
@@ -138,41 +128,11 @@ a dated record in docs/reviews/), applies it, and deletes the entry. Rulings alr
 - **Detail:** [pyro-port-remaining.md](../plans/pyro-port-remaining.md)
 - **Answer:**
 
-### Are the rest of pyro's game demos ported to the realtime simulator, or dropped?
-- **Blocks:** the parity rows (C1); the behavior-cloning game mode would reuse them.
-- **Today:** the table marks them "Drop (use `simulation/realtime/` or skip)".
-- **Recommendation:** none yet.
-- **Detail:** [pyro-port-remaining.md](../plans/pyro-port-remaining.md)
-- **Answer:**
-
-### Is the parity table's "hybrid events / mixed-rate sim: Drop" row still right?
-- **Blocks:** the parity rows (C1).
-- **Today:** the code has the hybrid simulator and `Computer` (`simulation/discrete/`);
-  event-driven switching stays out of scope (ROADMAP §7).
-- **Recommendation:** none yet.
-- **Detail:** [the run's log, §12](../reviews/2026-10-24-v03-run-decisions.md#12-the-docs-brought-to-the-branch-the-landed-plans-and-stale-audits-retired)
-- **Answer:**
-
-### Are Lyapunov certificates a GRO860 checklist row of their own, or an analysis tool the lecture uses?
-- **Blocks:** the field object (A1), which makes the certificate's `V` a field.
-- **Today:** `region_of_attraction` returns a provisional `LyapunovCertificate` (ROADMAP §3).
-- **Recommendation:** none yet.
-- **Detail:** [fields.md](../plans/fields.md)
-- **Answer:**
-
 ### Do the planning records get solver-specific views?
 - **Blocks:** the planning records before the freeze.
 - **Today:** no plan doc says more than this line.
 - **Recommendation:** none yet.
 - **Detail:** none beyond this entry (a one-line item of ROADMAP §6).
-- **Answer:**
-
-### Is `PlanningProblem.metadata` documented or retired?
-- **Blocks:** the problem's constructor before the freeze.
-- **Today:** a read-only mapping that no library tool reads (`minilink/planning/problems.py`);
-  left as is in session 4.
-- **Recommendation:** none yet.
-- **Detail:** [TODO §7](../plans/TODO.md#7-later-ideas)
 - **Answer:**
 
 ## Blocks v0.9 / v1.0
@@ -195,14 +155,6 @@ a dated record in docs/reviews/), applies it, and deletes the entry. Rulings alr
 - **Recommendation:** two axes, staged between terms; to rule with it, the chapter list and a home
   for `hybrid`, `mpc`, `realtime`, `robotic` and the racecar plant folder.
 - **Detail:** [repository-structure.md §3](../plans/repository-structure.md#33-recommendation)
-- **Answer:**
-
-### Does the pinned install cell use `pip install minilink==<tag>` or `git clone -b v<tag>`?
-- **Blocks:** the pinned Colab cell (V6).
-- **Today:** the course notebooks import from the examples tree by relative path.
-- **Options:** `pip install` (fast, no examples tree); `git clone -b` (keeps those imports).
-- **Recommendation:** none yet.
-- **Detail:** [repository-structure.md §6, ask 2](../plans/repository-structure.md#6-the-asks)
 - **Answer:**
 
 ### Does a diagram's start state become a derived property, like its live parameters?
@@ -246,21 +198,6 @@ a dated record in docs/reviews/), applies it, and deletes the entry. Rulings alr
 - **Detail:** [TODO, V4](../plans/TODO.md#v09--the-trust-contract)
 - **Answer:**
 
-### Does minilink raise its own error family?
-- **Blocks:** the trust contract (S70) and the wiring-time checks (S66).
-- **Today:** plain `ValueError` / `TypeError`.
-- **Recommendation:** the row's proposal: `WiringError`, `ShapeError`, `SolverError` subclassing
-  today's errors, so no caller breaks.
-- **Detail:** [TODO, S70](../plans/TODO.md#v09--the-trust-contract)
-- **Answer:**
-
-### Does minilink get a Zenodo DOI, and is a JOSS paper wanted?
-- **Blocks:** v1.0's release hygiene (V2), and the RULES 6.9 carve-out JOSS would need.
-- **Today:** on PyPI since 0.1.0.
-- **Recommendation:** none yet.
-- **Detail:** [TODO, V2](../plans/TODO.md#v10--a-colleague-can-build-a-course-on-it)
-- **Answer:**
-
 ## Standing (no release depends on it)
 
 ### Do you place the proposed sentence in CONSTITUTION §1, or drop it?
@@ -277,15 +214,6 @@ a dated record in docs/reviews/), applies it, and deletes the entry. Rulings alr
   roadmap"; R13 ruled the sampled loop a tool, and no such item is open.
 - **Recommendation:** none yet.
 - **Detail:** [CONSTITUTION, the invariants](CONSTITUTION.md#the-five-contract-invariants)
-- **Answer:**
-
-### Does an undeclared feedthrough raise or warn at compile?
-- **Blocks:** wiring mistakes failing at wiring time (S66).
-- **Today:** an output that reads an undeclared input is handed zero, so a loop solves the wrong
-  fixed point silently ([KNOWN_ISSUES.md](KNOWN_ISSUES.md)).
-- **Options:** raise; warn.
-- **Recommendation:** none yet.
-- **Detail:** [TODO, S66](../plans/TODO.md#3-wave-d--textbook-code-minimal-demos-consolidation)
 - **Answer:**
 
 ### Is there one separator rule for wires, parameter paths, block labels and duplicate state labels?

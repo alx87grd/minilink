@@ -120,6 +120,10 @@ on it in C5 (v0.4), the RL numbers changing once.
 
 ### D30 Where `RolloutEnvironment` lives (mppi.md ask 5)
 
+**Ruled 2026-10-25 (R108), against the recommendation below:** it moves to
+`planning/environment.py` before the MPPI planner, the RL import kept: it is the problem
+sampled at `dt`, a planning object read by RL and MPPI alike.
+
 **Recommended:** answered by D11 (the sampled loop a tool on one kernel, R13;
 [sampled-path.md](sampled-path.md) §8): it becomes a caller of the sampled kernel and stays a
 thin RL-facing adapter in `learning/reinforcement_learning/`; no move.

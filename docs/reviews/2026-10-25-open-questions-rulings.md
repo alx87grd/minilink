@@ -92,3 +92,39 @@ Numbering continues the rulings record of 2026-10-22 (R1–R90).
 - **R107 (2026-10-25) MPPI takes one plant draw per control sample by default**
   (end-state-api.md D28, mppi.md ask 3): `n_plant_samples=1` on a stochastic problem, the bias
   stated in the docstring; the user raises it knowingly, as with `n_trials`.
+- **R108 (2026-10-25) The rollout environment moves to `planning/`** (end-state-api.md D30,
+  mppi.md ask 5), amending D30's recommendation: `RolloutEnvironment` is the planning problem
+  sampled at `dt` (a Markov decision process: one step, its reward `−g·dt`, the failure price, the
+  horizon), so it is a planning object, beside `score_run`; not core, which never imports the
+  problem. It moves to `planning/environment.py` as a housekeeping step before the MPPI planner
+  (v0.4), the `minilink.learning.reinforcement_learning` import kept; it still depends on the
+  step model only (R13). The failure, price and horizon rules, written twice today (the
+  environment's step and `score_run`), get one owner later.
+- **R109 (2026-10-25) Pyro's game demos stay dropped, ported on demand.** The `sys2game` games
+  (pendulum, double pendulum, rocket, boat, the joystick tests) are not ported; the two realtime
+  games (`examples/demos/realtime/game_cartpole.py`, `game_ur5_setpoint.py`) are the pattern, and
+  a game is written on `simulation/realtime/` only when a course or behavior cloning needs one.
+- **R110 (2026-10-25) The parity table's hybrid row splits.** Mixed-rate simulation (a sampled
+  controller on a continuous plant) is done: `HybridSimulator` and `Computer`. Event-driven
+  switching (guards and resets) stays out of scope (ROADMAP §7).
+- **R111 (2026-10-25) Lyapunov certificates are a research-lane analysis tool**, not a GRO860
+  checklist row: `region_of_attraction` and `LyapunovCertificate` stay provisional, the lecture
+  uses them as they are, and the field work (A1, v0.4) reshapes `V` with no course deadline.
+- **R112 (2026-10-25) `PlanningProblem.metadata` is retired.** No library tool reads it and no
+  demo or notebook passes it; the keyword, its coercion and its one test go before the freeze.
+  A user keeps notes in their own variables. (Removing a user-importable keyword, approved here.)
+- **R113 (2026-10-25) The pinned Colab cell clones a tag:** `git clone --depth 1 -b v<tag>`, not
+  `pip install minilink==<tag>`, so the course notebooks' relative imports of the examples tree
+  keep working (repository-structure.md §6 ask 2; V6). Where the course material lives (a course
+  repository at v1.0 or not) was put off.
+- **R114 (2026-10-25) minilink raises its own error family** (S70): `WiringError(ValueError)`,
+  `ShapeError(ValueError)`, `SolverError(RuntimeError)`, each a subclass of what is raised today,
+  so every `except ValueError` still catches them; the wiring-time checks (S66) raise them. The
+  deprecation-shim question for v1.0 (V4) was put off.
+- **R115 (2026-10-25) A Zenodo DOI now; JOSS after v1.0** (V2): the maintainer links the GitHub
+  repository on Zenodo once, so each release from v0.3 is citable, with a `CITATION.cff` at the
+  root; the JOSS paper and the RULES 6.9 carve-out it needs are decided after v1.0.
+- **R116 (2026-10-25) An undeclared feedthrough raises at compile** (S66): the compile probe finds
+  an output that moves with an input missing from its `dependencies` and raises, naming the
+  block, the port and the fix (`dependencies=("u",)` or `"all"`); the library's under-declared
+  blocks are fixed first, in the same work.

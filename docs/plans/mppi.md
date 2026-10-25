@@ -2,9 +2,9 @@
 
 **Status:** design draft (2026-10-02), not started (the prototypes in `experimental/mppi/`
 run). Asks 1–3 and 5 of §10 are for the maintainer's ruling; the recommended answers are
-D26–D28 and D30 of [end-state-api.md](end-state-api.md) (2026-10-22: `MPPIPlanner`, the three
-planner verbs, `n_plant_samples=1`, `RolloutEnvironment` staying in `reinforcement_learning/`
-as a caller of the step model), to rule for v0.4; ask 4 (timing) decided 2026-10-02. The
+D26–D28 and D30 of [end-state-api.md](end-state-api.md); ruled 2026-10-25: `MPPIPlanner`
+(R106), `n_plant_samples=1` (R107), `RolloutEnvironment` moving to `planning/environment.py`
+before MP-1 (R108); the three planner verbs (ask 2) still to rule for v0.4; ask 4 (timing) decided 2026-10-02. The
 planner waits on S31's sampled kernel, RN-4 and the rest of RN-5 (RN-5's v0.3 part, `evaluate`
 over the start and parameter draws, landed 2026-10-24).
 **Lane:** research lane first (`experimental/`), provisional band with the MPC
@@ -305,10 +305,9 @@ path integral control (Kappen / Theodorou).
 
 **Dependencies:** `core` (backends, trajectory, sets, costs), `planning.problems`,
 `planning.planner`, `planning.results`, and `learning.reinforcement_learning.environment`
-for `RolloutEnvironment` — an intra-band import, legal under the dependency law; if the
-maintainer prefers, `environment.py` moves up to `planning/environment.py` first (it is
-already shared by the RL collectors and the tabular learners, DESIGN §6 says so; the move is
-one import rewrite with no behaviour change and a Later row of its own).
+for `RolloutEnvironment`, which moves to `planning/environment.py` first (R108, 2026-10-25):
+it is the problem sampled at `dt`, shared by the RL collectors, the tabular learners and this
+planner; the move is one import rewrite with no behaviour change, the RL import kept.
 
 **The body, in the `dp.py` style** (three beats, no `self.` in the math, plumbing in
 helpers under `# Internal machinery`):
@@ -503,8 +502,8 @@ visibly provisional at v1.0 with the rest of the MPC band.
 ## 10. Asks for the maintainer
 
 Recommended answers (2026-10-22) in [end-state-api.md](end-state-api.md): ask 1 D26
-(`MPPIPlanner`), ask 2 D27 (the three verbs), ask 3 D28 (`n_plant_samples=1`), ask 5 D30 (no
-move: a caller of the step model and the sampled kernel). All for v0.4.
+(`MPPIPlanner`), ask 2 D27 (the three verbs), ask 3 D28 (`n_plant_samples=1`), ask 5 D30 (amended by
+R108: it moves to `planning/`). All for v0.4.
 
 1. **The name** (§5), ruled 2026-10-25 (R106): `MPPIPlanner`. One decides the record's
    name and the facade entry.
@@ -516,9 +515,8 @@ move: a caller of the step model and the sampled kernel). All for v0.4.
    stated in the docstring.
 4. **Timing** (§9): decided 2026-10-02 — RN-4 and RN-5 first, then MP-1 to MP-3; the
    standalone script stands in until then.
-5. **`RolloutEnvironment`'s home**: stays in `reinforcement_learning/` (an intra-band
-   import from `trajectory_optimization/`), or moves to `planning/environment.py` as a
-   housekeeping step first.
+5. **`RolloutEnvironment`'s home**, ruled 2026-10-25 (R108): it moves to
+   `planning/environment.py` as a housekeeping step before MP-1.
 
 Sources (the method): Williams, Aldrich, Theodorou, "Model predictive path integral
 control: from theory to parallel computation" (JGCD 2017); Williams et al.,

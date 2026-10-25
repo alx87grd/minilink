@@ -257,8 +257,8 @@ pick):
   across the `compute_*` facades.
 - [ ] **S66 Wiring mistakes fail at wiring time** **[ask — core]** (RULES 4.10; scan:
   core#2, core#13): `connect` refuses to rewire a connected subsystem input; the compile
-  probe detects an output that moves with an input it does not declare (raise or warn:
-  [QUESTIONS.md](../dev/QUESTIONS.md)). After P10's AC-4 (landed 2026-10-14): the loop-input junctions still rewire
+  probe detects an output that moves with an input it does not declare and raises, the message
+  naming the block, the port and the fix (R116), the library's under-declared blocks fixed first. After P10's AC-4 (landed 2026-10-14): the loop-input junctions still rewire
   the connected input they sum into (`composition.sum_into`), so S66 changes them first.
 - [ ] **S67 One plot vocabulary** (scan: graphics#0, graphics#4, graphics#5, graphics#6,
   graphics#8, graphics#9, analysis#9, analysis#10): `title`, `ax`, `backend` and `show`
@@ -555,7 +555,8 @@ LQGPlanner as picked; S73 any time, self-contained.
   and `racecar_mppi.py` run today. MP-1 `planning/trajectory_optimization/path_integral.py`:
   `MPPIPlanner` / `MPPIRecord` (R106), `solve`
   and `solve_trajectory_from` on
-  `RolloutEnvironment` (`jit(vmap(scan))` over `K` samples), the six-beat body of the plan's
+  `RolloutEnvironment` (`jit(vmap(scan))` over `K` samples; MP-0 first moves it to
+  `planning/environment.py`, the RL import kept, R108), the six-beat body of the plan's
   §5, `decision_dimension` and `warm_start_guess`; MP-2 the hand-loop demo
   `experimental/mppi/pendulum_mppi.py`; MP-3 the stochastic branch
   (`n_plant_samples` realizations per control sample, mean or CVaR by the problem's
@@ -697,7 +698,8 @@ in December 2026 after the v0.3 tag; the v1.0 rows after two cohorts.
   is the recommended install and README leads with it; `pip install minilink` is the light
   alternative, one `full` extra beside it (one install story, ruled 2026-10-17,
   [record](../reviews/2026-10-17-one-install-story.md)). What remains: the Colab setup cell
-  installs a pinned release (`%pip install minilink==X.Y`) instead of `git clone main`;
+  clones a pinned release (`git clone --depth 1 -b vX.Y`, R113: the notebooks' relative
+  imports of the examples tree keep working) instead of `git clone main`;
   `COLAB_CLONE` in `tests/unittest/test_repo_contract.py` follows. `showcase_jax.ipynb`
   imports `minilink.experimental.c_export`, which the wheel does not ship: settle it here.
   The "pin the course notebooks on `0.2.0` now" option of
@@ -705,8 +707,8 @@ in December 2026 after the v0.3 tag; the v1.0 rows after two cohorts.
   sync is secondary to the order of the waves; the course notebooks keep tracking `main` and
   migrating in the same commit until then).
   Done when every notebook carries the pinned cell and runs in Colab.
-- [ ] **S70 `MinilinkError` family** **[ask — core]**: `WiringError`, `ShapeError`,
-  `SolverError` subclassing the `ValueError` / `TypeError` raised today (no caller breaks);
+- [ ] **S70 `MinilinkError` family** (ruled 2026-10-25, R114): `WiringError(ValueError)`,
+  `ShapeError(ValueError)`, `SolverError(RuntimeError)`, subclassing what is raised today (no caller breaks);
   S66's wiring-time checks and P10's refusals raise them. Done when the wiring and compile
   paths of `core/` raise only the family.
 - [ ] **V11 Rewrite the history without notebook outputs** **[ask — force-push]**, in
@@ -763,8 +765,9 @@ in December 2026 after the v0.3 tag; the v1.0 rows after two cohorts.
 - [ ] **V10 The public face** **[ask]**: the README opens on a teaching quickstart; TRL,
   lanes, wave and step ids leave README and `examples/README.md`; `CONTRIBUTING.md`, issue
   templates, a code of conduct (the governance docs moved under `docs/dev/` on 2026-10-17).
-- [ ] **V2** Zenodo archive and a citable DOI (`CITATION.cff`) after PyPI; the JOSS entry
-  and the RULES 6.9 carve-out for its state-of-the-field section, decided then.
+- [ ] **V2** Zenodo archive and a citable DOI (`CITATION.cff`), now (R115: the maintainer links
+  the repository on Zenodo once; each release then gets a DOI); the JOSS entry and the RULES 6.9
+  carve-out for its state-of-the-field section, decided after v1.0.
 - [ ] **S49 The Stable-Baselines3 teaching notebooks** **[ask]**, at the end of the term.
   Four, in `teaching/courses/udes_gro860/`: retire `drone_ppo_sb3.ipynb` and
   `pendulum_value_iteration_vs_lqr_vs_ppo_sb3.ipynb` (delete them, their notebook overrides
@@ -836,16 +839,14 @@ One line each; open a plan doc only when a design needs a writeup.
 - `RobustPlanningProblem` (set-bounded uncertainty, minimax criterion) only when a minimax
   consumer exists; the path-integral planner's `"worst_case"` branch (CVaR over plant draws,
   [mppi.md](mppi.md) §4) would be that consumer; the two decisions go together.
-- `RolloutEnvironment` may move from `reinforcement_learning/` to `planning/environment.py`
-  once a second band reads it (open: [QUESTIONS.md](../dev/QUESTIONS.md)) (the path-integral planner; the RL
-  collectors and the tabular learners already do): one import rewrite, no behaviour change.
+- The environment's step and `score_run` apply the same failure, price and horizon rules,
+  written twice; once the environment sits in `planning/` (R108), one owner of those rules.
 - Diffusion policy (research lane, JAX-only, after behavior cloning): a sampled controller with
   memory and a key, trained by `fit`; see [future-policies.md](future-policies.md).
 - `MjxPlant` (`interfaces/mjx.py`) and `torch` / `flax` model wrappers in `interfaces/`;
   Pacejka tire; stochastic forcing; ROS2 / FMI; sparse long-horizon trajopt; RRT-Connect.
 - Ipopt given the Lagrangian Hessian, not the objective's alone (scan: planning#13);
-  `optimizer_method="auto"` picking Ipopt when installed (scan: examples#11);
-  `PlanningProblem.metadata` documented or retired (scan: planning#14; [QUESTIONS.md](../dev/QUESTIONS.md)).
+  `optimizer_method="auto"` picking Ipopt when installed (scan: examples#11).
 - `LowPassFilter(tau=)`: the shaping filter of the colored-noise recipe parameterized by its
   time constant, beside `cutoff_hz` (randomness.md RD-D23, RN-4).
 - A fixed-step RK4 that samples held sources once per step, so the four stages read one

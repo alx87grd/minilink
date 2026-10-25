@@ -171,8 +171,8 @@ research material is a separate call (§6, ask 3).
 1. **The chapter list** for B2: the twelve tutorial chapters as the spine, and a home for
    `hybrid`, `mpc`, `realtime`, `robotic` and the racecar plant folder (a chapter each, or
    folded into `05_simulation`, `09_planning`, `02_dynamics`).
-2. **The pin form** for C3: `pip install minilink==<tag>` (fast, no examples tree) or
-   `git clone -b v<tag>` (keeps the notebooks' relative imports of the examples tree).
+2. **The pin form** for C3, ruled 2026-10-25 (R113): `git clone -b v<tag>` (keeps the
+   notebooks' relative imports of the examples tree), not `pip install minilink==<tag>`.
 3. **`projects/`**: research material that stays (`research/projects/`), or course material
    that moves with the course repo at v1.0.
 
