@@ -712,6 +712,10 @@ is requested at compile. :func:`~minilink.core.assembly.flatten_diagram` preserv
 global state stacking order: inlined leaves replace each nested box at the same stack
 position as that box's inner states, so ``x``, ``x0``, and native
 :meth:`~minilink.core.diagram.DiagramSystem.f` agree with the unflattened diagram.
+Wires and diagram outputs that read a nested box are rewired to the inner block
+behind that port. The returned report's ``id_map`` keys each leaf by its nested path,
+``/`` at every level (``"loop/inner/plant"``), to its flat id; the params remap reads it,
+so a renamed block (``loop__plant2`` when the name was taken) still gets its params.
 
 **`outputs()` are boundary outputs
 only** (dict keyed by port id, not diagram internals); a diagram's internal signals are
