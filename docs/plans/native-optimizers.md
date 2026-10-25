@@ -256,6 +256,30 @@ whose dynamics are equality rows, stays on Ipopt and SciPy.
 parameters without a recompile); NS-1 and NS-2 (the native kernel and its fixed-`K` traced
 form); for the closed loop, S31's sampled kernel with its JAX face.
 
+### 4.6b MPPI: the same tick, already pure
+
+The path-integral planner (MPPI, S72, [mppi.md](mppi.md)) is the same template as §4.6 with a
+derivative-free iteration, and the prototype (`experimental/mppi/pendulum_mppi.py`,
+`racecar_mppi.py`) already writes its tick as one `jax.jit`-ed pure function
+`mppi_tick(U, x0, key)`: sample `K` perturbed sequences, roll them out in one `vmap`, score,
+weigh by `exp(−S/λ)`, average. Two things stand between it and §4.6's closed loop in one scan:
+
+- **The receding horizon is a Python `for` loop**, with the key split by hand. Under R104 the
+  sequence `U` is the block's state and the draws come from its `params["seed"]` and the tick,
+  so the loop becomes the sampled kernel's `lax.scan` (S31) with no change to the tick.
+- **No block yet**: MP-1 of mppi.md builds `MPPIPlanner` (named by R106); the receding-horizon
+  block asks its planner for the verbs of mppi.md §6.
+
+Differentiable too: with the key fixed, `U_new` is a softmax-weighted average of rollouts, a
+smooth function of the cost weights, `λ`, `Σ` and the plant's parameters (the noise enters by
+reparameterisation, `V = U + ε`, `ε` drawn from the key). The clip to the input box has a zero
+gradient where it binds, as the projection of a projected gradient method does; the gradient is
+noisy across keys, so tuning averages it over the Monte Carlo evaluator's trials.
+
+**So MPPI is the first instance, ahead of NS-8**: it needs no native gradient solver, only the
+block and S31's scan. Several MPPI iterations per tick (`n_iter`, a structural constant like
+§4.6's `K`) fit the same shape.
+
 ### 4.7 The long-term target: convergence as stability
 
 §3.1's loop, analysed with the control tools: the step size's stability region from the poles
@@ -293,7 +317,9 @@ step systems or a helper that wires the law to the oracle.
   kernel's JAX face; done when `problem.compile(mpc_computer).evaluate(p)` runs, `vmap`s over
   starts, and its gradient with respect to the MPC's cost weights tunes a demo by `Optimizer`.
 
-**Order, by the maintainer's two goals.** The MPC path first: NS-1 (any time, internal) →
+**Order, by the maintainer's two goals.** The MPC path first. MPPI reaches the closed loop in
+one scan soonest (§4.6b: MP-1 of mppi.md, then S31's scan, no native solver needed); then the
+gradient MPC: NS-1 (any time, internal) →
 NS-2's fixed-`K` form → NS-8, after S76's `ParametricProgram` (so the tick binds `x0` and the
 plant without a recompile) → NS-9, after S31's sampled kernel (v0.4); NS-6 when the MPC needs
 state constraints. The control-analysis path is long term: NS-5 with `linearize` and poles on
