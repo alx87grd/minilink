@@ -996,10 +996,13 @@ grid (`nominal_trajectory`), the planner's evidence; `evaluate` scores the conti
 The pipeline in two pictures. Every object carries its parameters (the amber tab on its
 edge), and they form one tree `θ = pe.params`, a branch per object under its key; the plant,
 cost, sets and start belong to the problem, and the controller closes the loop on the
-problem's plant at compile. The program tunes any leaves of `θ` (`wrt`, dotted paths such as
-`"controller.Kp"`) with the margins `m` as its constraint rows, and the optimizer writes the
-tuned leaves back into `θ`. Colours: blue, the objects; amber, the parameters; purple,
-randomness; green, the result. The figures are drawn by `docs/pipeline_figures.py`.
+problem's plant at compile. Below the tree, the loop of tuning: the closed loop is simulated
+(integrated forward from `x₀` to `tf`), its `Trajectory` is scored (the cost `J`, and the
+margin `m` of the run to the sets, negative when it leaves one), the program minimizes `J`
+over the chosen leaves of `θ` (`wrt`, dotted paths such as `"controller.Kp"`) with `m ≥ 0` as
+its rows, and the optimizer writes the tuned leaves back into `θ`. Colours: blue, the
+objects; amber, the parameters; purple, randomness; green, the result. The figures are drawn
+by `docs/pipeline_figures.py`.
 
 **Deterministic:** one run, one score.
 
