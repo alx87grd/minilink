@@ -1,7 +1,8 @@
-"""Draw the two evaluator-pipeline figures of DESIGN §6 as hand-laid SVG.
+"""Draw the pipeline figures of Minilink as hand-laid SVG.
 
-Run from the repository root: ``python docs/pipeline_figures.py``; it writes
-``docs/_static/pipeline_deterministic.svg`` and ``pipeline_stochastic.svg``.
+Run from the repository root: ``python docs/pipeline_figures.py``; it writes one
+``docs/_static/pipeline_<name>.svg`` per figure in :data:`FIGURES`. The evaluator's two
+(deterministic, stochastic) are in DESIGN §6; the gallery is ``docs/pipelines.md``.
 """
 
 from pathlib import Path
@@ -96,6 +97,37 @@ class Figure:
         )
         self.text(x + w / 2, y + h - 30, title, 15, 650, ink)
         self.text(x + w / 2, y + h - 11, sub, 13.5, 400, ink)
+
+    def grid_icon(self, x, y, n=5, step=9):
+        """A small lattice of nodes: a discretized state space."""
+        for i in range(n):
+            for j in range(n):
+                self.add(
+                    f'<circle cx="{x + i * step}" cy="{y + j * step}" r="1.8" fill="{COLORS["obj"][1]}"/>'
+                )
+
+    def heat_icon(self, x, y, n=5, size=9):
+        """A small table of shaded cells: a cost-to-go on the grid."""
+        for i in range(n):
+            for j in range(n):
+                d = ((i - 2) ** 2 + (j - 2) ** 2) / 8
+                alpha = 0.15 + 0.7 * min(d, 1)
+                self.add(
+                    f'<rect x="{x + i * size}" y="{y + j * size}" width="{size - 1}" height="{size - 1}" '
+                    f'fill="{COLORS["obj"][1]}" opacity="{alpha:.2f}"/>'
+                )
+
+    def loop_back(self, x0, x1, y, label, color=LINE, below=0):
+        """An arc over a row (or under it, ``below`` its height), from ``x1`` back to ``x0``."""
+        if below:
+            yb = y + below
+            d = f"M{x1},{yb} C{x1},{yb + 46} {x0},{yb + 46} {x0},{yb + 2}"
+            self.arrow(d, color, dashed=True)
+            self.text((x0 + x1) / 2, yb + 50, label, 12.5, 500, MUTED)
+            return
+        d = f"M{x1},{y} C{x1},{y - 46} {x0},{y - 46} {x0},{y - 2}"
+        self.arrow(d, color, dashed=True)
+        self.text((x0 + x1) / 2, y - 40, label, 12.5, 500, MUTED)
 
     def svg(self):
         markers = "".join(
@@ -314,7 +346,487 @@ def stochastic():
     return f.svg()
 
 
+def chain(f, y, h, items, x0=60, gap=44, reverse=False, arrows=True):
+    """Lay cards along a row, left to right (or right to left), with arrows between.
+
+    Each item is ``(kind, w, title, lines)``; ``kind`` is a colour role, ``"traj"``
+    for a trajectory card, or ``"pill"`` for a result. Returns the ``(x, w)`` of each.
+    """
+    xs, x = [], x0
+    for _kind, w, _title, _lines in items:
+        xs.append((x, w))
+        x += w + gap
+    if reverse:
+        right = xs[-1][0] + xs[-1][1]
+        xs = [(right - (xx - x0) - w, w) for xx, w in xs]
+    for (kind, w, title, lines), (x, _) in zip(items, xs):
+        if kind == "traj":
+            f.trajectory(x, y + 4, w, h - 8, title, lines[0])
+        elif kind == "pill":
+            f.pill(x + w / 2, y + h / 2, title, "out", w=w, h=40, size=15, weight=700)
+        else:
+            f.card(x, y, w, h, title, lines, kind)
+    if arrows:
+        for (a, wa), (b, wb) in zip(xs, xs[1:]):
+            if reverse:
+                f.arrow(f"M{a},{y + h / 2} L{b + wb + 2},{y + h / 2}")
+            else:
+                f.arrow(f"M{a + wa},{y + h / 2} L{b - 2},{y + h / 2}")
+    return xs
+
+
+def problem_row(f, cards, label, y=70, h=76):
+    """The problem's box: its object cards in one row."""
+    f.frame(30, y - 44, 1120, h + 66, label)
+    w = (1120 - 40 - 24 * (len(cards) - 1)) / len(cards)
+    for i, (title, lines, kind) in enumerate(cards):
+        f.card(50 + i * (w + 24), y, w, h, title, lines, kind)
+    return y + h + 22
+
+
+def trajectory_optimization():
+    f = Figure(1180, 520)
+    bottom = problem_row(
+        f,
+        [
+            ("Plant", ["ẋ = f(x, u)"], "obj"),
+            ("Cost", ["∫ g dt + h(x(tf))"], "obj"),
+            ("Sets", ["x ∈ X,  u ∈ U"], "obj"),
+            ("Goal", ["x(tf) ∈ Xf"], "obj"),
+            ("Start", ["x(0) = x₀"], "obj"),
+        ],
+        "PlanningProblem",
+    )
+
+    # The transcription: the trajectory itself is the decision
+    y, h = bottom + 58, 96
+    label = (
+        "Transcription · direct collocation (or single, multiple shooting): "
+        "no simulation, the dynamics become constraints"
+    )
+    f.frame(30, y - 34, 1120, h + 60, label)
+    f.arrow(f"M590,{bottom} L590,{y - 36}")
+    chain(
+        f,
+        y,
+        h,
+        [
+            (
+                "step",
+                220,
+                "Decision vector",
+                ["z = (x₀ … xₙ, u₀ … uₙ)", "the knots of the trajectory"],
+            ),
+            (
+                "step",
+                300,
+                "Dynamics as defects",
+                ["xₖ₊₁ − xₖ − dt/2 (fₖ + fₖ₊₁) = 0", "on every interval"],
+            ),
+            (
+                "step",
+                250,
+                "Cost as a sum",
+                ["Σ dt/2 (gₖ + gₖ₊₁) + h(xₙ)", "the trapezoidal rule"],
+            ),
+            ("step", 210, "Sets as rows", ["xₖ ∈ X, uₖ ∈ U", "xₙ ∈ Xf"]),
+        ],
+        x0=50,
+        gap=24,
+        arrows=False,
+    )
+
+    # The program, its solver, and the plan read back
+    y2 = y + h + 74
+    f.arrow(f"M590,{y + h + 26} L590,{y2 - 2}")
+    xs = chain(
+        f,
+        y2,
+        h,
+        [
+            (
+                "step",
+                260,
+                "MathematicalProgram",
+                ["min J(z)", "s.t. h(z) = 0, g(z) ≥ 0"],
+            ),
+            ("step", 200, "Optimizer", ["SLSQP · Ipopt", "from a first guess z₀"]),
+            ("traj", 150, "Trajectory", ["x*(t), u*(t)"]),
+            (
+                "obj",
+                290,
+                "PlanningSolution",
+                ["policy u = π(t), open loop", "or tracked; MPC re-solves"],
+            ),
+        ],
+        x0=60,
+        gap=60,
+    )
+    f.text((xs[1][0] + xs[1][1] + xs[2][0]) / 2, y2 + h / 2 - 8, "z*", 13, 600, MUTED)
+    return f.svg()
+
+
+def dynamic_programming():
+    f = Figure(1180, 560)
+    bottom = problem_row(
+        f,
+        [
+            ("Plant", ["ẋ = f(x, u)"], "obj"),
+            ("Cost", ["g(x, u) dt,  h(x)"], "obj"),
+            ("Sets", ["X, U: bounded boxes"], "obj"),
+        ],
+        "PlanningProblem",
+    )
+
+    # The discretization: nodes, actions and their successors
+    y, h = bottom + 58, 96
+    f.frame(
+        30, y - 34, 1120, h + 60, "StateSpaceGrid · the continuous problem on a lattice"
+    )
+    f.arrow(f"M590,{bottom} L590,{y - 36}")
+    xs = chain(
+        f,
+        y,
+        h,
+        [
+            ("step", 320, "Nodes", ["x-grid over X", "N states"]),
+            ("step", 320, "Actions", ["u-grid over U", "A inputs"]),
+            (
+                "step",
+                360,
+                "Successors",
+                ["x⁺ = x + f(x, u) dt", "between nodes: interpolated"],
+            ),
+        ],
+        x0=50,
+        gap=40,
+        arrows=False,
+    )
+    f.grid_icon(xs[0][0] + 24, y + 26)
+
+    # The Bellman sweep, backward, then the greedy policy
+    y2 = y + h + 100
+    f.arrow(f"M590,{y + h + 26} L590,{y2 - 50}")
+    xs = chain(
+        f,
+        y2,
+        h,
+        [
+            ("step", 170, "Terminal", ["J(x, tf) = h(x)"]),
+            (
+                "step",
+                320,
+                "Bellman backup",
+                ["Jₖ(x) = minᵤ [ g(x, u) dt", "+ α Jₖ₊₁(x⁺) ]"],
+            ),
+            ("obj", 220, "Cost-to-go", ["      J(x) on the grid"]),
+            (
+                "obj",
+                260,
+                "PlanningSolution",
+                ["policy u = π(x) = argminᵤ", "a lookup table, and J"],
+            ),
+        ],
+        x0=50,
+        gap=40,
+    )
+    f.loop_back(
+        xs[1][0] + 60,
+        xs[1][0] + xs[1][1] - 60,
+        y2,
+        "backward in time, until J converges",
+    )
+    f.heat_icon(xs[2][0] + 14, y2 + 26)
+    return f.svg()
+
+
+def lqr():
+    f = Figure(1180, 450)
+    bottom = problem_row(
+        f,
+        [
+            ("Plant", ["ẋ = f(x, u)"], "obj"),
+            ("QuadraticCost", ["g = (x − x̄)ᵀQ(x − x̄) + (u − ū)ᵀR(u − ū)"], "obj"),
+        ],
+        "PlanningProblem",
+    )
+
+    y, h = bottom + 58, 96
+    f.arrow(f"M205,{bottom} L205,{y - 2}")
+    xs = chain(
+        f,
+        y,
+        h,
+        [
+            (
+                "step",
+                290,
+                "Linearize at (x̄, ū)",
+                ["A = ∂f/∂x,  B = ∂f/∂u", "the model near the goal"],
+            ),
+            (
+                "step",
+                380,
+                "Riccati",
+                ["AᵀP + PA − PBR⁻¹BᵀP + Q = 0", "(finite tf: the ODE backward from S)"],
+            ),
+            ("step", 290, "Gain", ["K = R⁻¹BᵀP", "(K(t) on a finite horizon)"]),
+        ],
+        x0=60,
+        gap=60,
+    )
+
+    y2 = y + h + 70
+    cx = xs[2][0] + xs[2][1] / 2
+    f.arrow(f"M{cx},{y + h} L{cx},{y2 - 2}")
+    chain(
+        f,
+        y2,
+        h,
+        [
+            ("obj", 290, "Poles", ["eig(A − BK)", "stable in the left half-plane"]),
+            (
+                "obj",
+                380,
+                "Cost-to-go",
+                ["J(x) = (x − x̄)ᵀP(x − x̄)", "of the linear model"],
+            ),
+            (
+                "obj",
+                290,
+                "PlanningSolution",
+                ["policy u = ū − K(x − x̄)", "a StateFeedback block"],
+            ),
+        ],
+        x0=60,
+        gap=60,
+        reverse=True,
+    )
+    return f.svg()
+
+
+def reinforcement_learning():
+    f = Figure(1180, 600)
+    bottom = problem_row(
+        f,
+        [
+            ("Plant", ["ẋ = f(x, u, w)"], "obj"),
+            ("Cost", ["reward r = −g dt"], "obj"),
+            ("Sets", ["leave X: a failure"], "obj"),
+            ("Distributions", ["x₀ ~ X0,  θp ~ Θ"], "rnd"),
+        ],
+        "StochasticPlanningProblem",
+    )
+
+    y, h = bottom + 58, 96
+    f.frame(
+        30, y - 34, 1120, h + 60, "RolloutEnvironment · the step model of the problem"
+    )
+    f.arrow(f"M590,{bottom} L590,{y - 36}")
+    chain(
+        f,
+        y,
+        h,
+        [
+            ("step", 330, "Step", ["xₖ₊₁ = Φ(xₖ, uₖ)", "the plant held over dt"]),
+            (
+                "step",
+                330,
+                "Reward and end",
+                ["rₖ = −g(xₖ, uₖ) dt", "done when x ∉ X, or at the horizon"],
+            ),
+            ("rnd", 340, "Reset", ["x₀ drawn from X0", "one seed per episode"]),
+        ],
+        x0=50,
+        gap=40,
+        arrows=False,
+    )
+
+    # The learning loop: collect with the current policy, then update it
+    y2 = y + h + 70
+    f.arrow(f"M410,{y + h + 26} L410,{y2 - 2}")
+    xs = chain(
+        f,
+        y2,
+        h,
+        [
+            ("step", 220, "Policy πθ", ["u ~ πθ(· | x)", "a neural network"]),
+            ("step", 220, "Collect", ["episodes, one scan", "vmap over envs"]),
+            ("step", 220, "Returns", ["Gₖ = Σⱼ γʲ rₖ₊ⱼ", "advantages, critic"]),
+            ("step", 230, "Update θ", ["θ ← θ + η ∇θ E[G]", "PPO · SAC · REINFORCE"]),
+        ],
+        x0=50,
+        gap=30,
+    )
+    f.loop_back(
+        xs[0][0] + xs[0][1] / 2,
+        xs[3][0] + xs[3][1] / 2,
+        y2,
+        "repeat: collect with the updated policy",
+        below=h,
+    )
+    f.arrow(f"M{xs[3][0] + xs[3][1]},{y2 + h / 2} L1053,{y2 + h / 2}")
+    f.pill(1094, y2 + h / 2, "π(x)", "out", w=78, h=40, size=15, weight=700)
+    f.text(1094, y2 + h / 2 + 40, "PlanningSolution", 12.5, 500, COLORS["out"][2])
+    return f.svg()
+
+
+def modeling_and_simulation():
+    f = Figure(1180, 540)
+    # The model: blocks wired into one system
+    y, h = 70, 86
+    f.frame(
+        30, y - 44, 1120, h + 66, "Model · every block a System, the diagram a System"
+    )
+    f.card(60, y, 220, h, "Plant", ["ẋ = f(x, u, t; p)", "y = h(x, u, t; p)"], "obj")
+    f.card(330, y, 220, h, "Controller", ["u = π(y; p)"], "obj")
+    f.arrow(f"M550,{y + h / 2} L598,{y + h / 2}")
+    f.text(574, y + h / 2 - 8, "@", 15, 700, MUTED)
+    lines = ["Ẋ = F(X, U, t; P), one system again", "operators @ >> +, or connect"]
+    f.card(600, y, 520, h, "Closed-loop diagram", lines, "obj")
+
+    # Compile once
+    y2 = y + h + 92
+    f.frame(30, y2 - 34, 1120, h + 60, "compile(backend): the diagram lowered once")
+    f.arrow(f"M860,{y + h + 22} L860,{y2 - 36}")
+    chain(
+        f,
+        y2,
+        h,
+        [
+            (
+                "step",
+                330,
+                "ExecutionPlan",
+                ["block order, wires, state slices", "algebraic loops refused"],
+            ),
+            (
+                "step",
+                340,
+                "Evaluator",
+                ["f, h, rollout as arrays", "NumPy, or JAX: jit · grad · vmap"],
+            ),
+            (
+                "step",
+                330,
+                "Parameters",
+                ["params = None: the snapshot", "or a complete tree"],
+            ),
+        ],
+        x0=50,
+        gap=40,
+        arrows=False,
+    )
+
+    # What uses it: the simulator and the analysis tools
+    y3 = y2 + h + 80
+    f.arrow(f"M190,{y2 + h + 26} L190,{y3 - 2}")
+    f.arrow(f"M975,{y2 + h + 26} L975,{y3 - 2}")
+    chain(
+        f,
+        y3,
+        h,
+        [
+            (
+                "step",
+                260,
+                "Simulator",
+                ["integrate ẋ = f from x₀", "solve_ivp or fixed-step RK4"],
+            ),
+            ("traj", 150, "Trajectory", ["x(t), u(t), y(t)"]),
+            ("obj", 170, "Plots, animation", ["plot_trajectory", "animate"]),
+        ],
+        x0=60,
+        gap=40,
+    )
+    f.card(
+        830,
+        y3,
+        290,
+        h,
+        "Analysis",
+        ["linearize: A, B, C, D", "poles · Bode · margins"],
+        "step",
+    )
+    return f.svg()
+
+
+def overview():
+    f = Figure(1180, 450)
+    y, h = 30, 70
+    f.card(
+        390,
+        y,
+        400,
+        h,
+        "PlanningProblem",
+        ["plant · cost · sets · start · horizon"],
+        "obj",
+    )
+
+    # Five planners, one problem, one kind of solution
+    y2 = y + h + 64
+    y3 = y2 + 92 + 76
+    solution_cx = 260 + 125
+    planners = [
+        ("LQR", ["linearize + Riccati", "u = ū − K(x − x̄)"]),
+        ("Dynamic programming", ["Bellman on a grid", "u = π(x), J(x)"]),
+        ("Trajectory optimization", ["transcription + NLP", "u = π(t), x*(t)"]),
+        ("Reinforcement learning", ["collect + update θ", "u = πθ(x)"]),
+        ("RRT", ["kinodynamic tree", "u = π(t)"]),
+    ]
+    w, gap = 200, 20
+    for i, (title, lines) in enumerate(planners):
+        x = 50 + i * (w + gap)
+        cx = x + w / 2
+        f.arrow(f"M590,{y + h} C590,{y + h + 36} {cx},{y2 - 36} {cx},{y2 - 2}")
+        f.card(x, y2, w, 92, title, lines, "step")
+        down = f"M{cx},{y2 + 92} C{cx},{y2 + 130} {solution_cx},{y3 - 40} {solution_cx},{y3 - 2}"
+        f.arrow(down)
+
+    chain(
+        f,
+        y3,
+        96,
+        [
+            (
+                "obj",
+                250,
+                "PlanningSolution",
+                ["policy · trajectory", "the solver's own evidence"],
+            ),
+            (
+                "obj",
+                230,
+                "Closed loop",
+                ["solution.policy @ plant", "the script closes it"],
+            ),
+            (
+                "step",
+                300,
+                "ProblemEvaluator",
+                ["simulate, score J and margins", "→ Evaluation, compare(…)"],
+            ),
+        ],
+        x0=260,
+        gap=50,
+    )
+    return f.svg()
+
+
+FIGURES = {
+    "deterministic": deterministic,
+    "stochastic": stochastic,
+    "trajectory_optimization": trajectory_optimization,
+    "dynamic_programming": dynamic_programming,
+    "lqr": lqr,
+    "reinforcement_learning": reinforcement_learning,
+    "modeling_and_simulation": modeling_and_simulation,
+    "overview": overview,
+}
+
+
 if __name__ == "__main__":
     static = Path(__file__).resolve().parent / "_static"
-    (static / "pipeline_deterministic.svg").write_text(deterministic())
-    (static / "pipeline_stochastic.svg").write_text(stochastic())
+    for name, draw in FIGURES.items():
+        (static / f"pipeline_{name}.svg").write_text(draw())

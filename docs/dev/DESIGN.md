@@ -1004,7 +1004,7 @@ evaluates a solution. Tuning is an optional export: `pe.program(wrt)` minimizes 
 over the chosen leaves of `θ` (dotted paths such as `"controller.Kp"`) with `m ≥ 0` as its
 rows, and the optimizer writes the tuned leaves back into `θ`. Colours: blue, the objects;
 amber, the parameters; purple, randomness; green, the results. The figures are drawn by
-`docs/pipeline_figures.py`.
+`docs/pipeline_figures.py`; the other pipelines are in [docs/pipelines.md](../pipelines.md).
 
 **Deterministic:** one run, one score.
 
