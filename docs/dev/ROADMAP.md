@@ -382,7 +382,8 @@ core-architecture §N, TODO §1.N and the QUESTIONS tags:
 - **Two joins:**
   - one score (§6);
   - the MPC's closed loop in one scan (§8).
-- **Then last:** Fields' noun (§9) and §10.
+- **Beside, from §1 on:** Fields (§9), additive to the path.
+- **Then last:** §10, hardening and the merge.
 
 The definition of done is proposed as acceptance scripts (core-architecture §11; QUESTIONS).
 

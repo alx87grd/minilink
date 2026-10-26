@@ -128,7 +128,7 @@ V = QuadraticField(P)                            # §9: the terminal cost as a f
 - **Today.**
   - The discrete evaluators' `rollout` (`core/compile/evaluators/discrete.py`) returns host
     NumPy. There is no step `rollout_batch`.
-  - `compile_step_diagram(flatten=True)` raises.
+  - `compile_step_diagram(flatten=True)` raises, and step diagrams refuse a continuous leaf.
   - Two same-tick semantics: `StepDiagramEvaluator` propagates within a tick, while
     `Computer.tick` reads the last tick's buffer.
   - `@`, `>>` and `+` refuse step systems. There is `jacobian` but no `linearize` or poles.
@@ -165,6 +165,7 @@ V = QuadraticField(P)                            # §9: the terminal cost as a f
   - `evaluate` holds disturbances at nominal and warns.
   - One integer key draws different values on NumPy and JAX (`trial_key`; KNOWN_ISSUES).
   - `Sys2Gym.from_problem` applies no draw, although DESIGN §6 says it does.
+  - The free loop inputs are constant over a run.
   - There is no `NoiseSource`.
 - **Open:**
   - one `realize` shape;
@@ -383,7 +384,8 @@ The lanes follow the dependencies instead. Each lane starts once the rulings it 
 | **The program lane** | §7: one backend table, the program with parameters, collocation reading the plant, the online call → §8: the native kernel, byte-identical, then its fixed-`K` traced form | §7's rulings |
 | **Join 1** | §6: one per-step cost and one failure rule, read by the evaluator, then value iteration and RL | the objects and loop lanes |
 | **Join 2** | §8: the fixed-iteration MPC tick, its closed loop in one scan tuned by gradient; §7: the stochastic program as a convention and a test | all three lanes |
-| **Last** | §9: the `Field` noun and `QuadraticField`; hardening (S66, with the error family if moved in); the notebooks (R47); the merge | everything |
+| **Beside, from §1 on** | §9: Fields, additive to the path; it needs only `Set.as_cost`'s signature from §1 | §1's `as_cost` signature |
+| **Last** | hardening (S66, with the error family if moved in); the notebooks (R47); the merge | everything |
 
 **The clean-up lane runs beside them** (TODO §2).
 
@@ -393,12 +395,15 @@ The lanes follow the dependencies instead. Each lane starts once the rulings it 
 - a move or rename stays byte-identical;
 - no alias, one sweep.
 
-The intended changes already named, in the order that moves each number once:
+The intended changes already named, each a commit of its own with a ledger line:
 1. the same-tick semantic;
-2. the MPC delay;
-3. the hybrid defaults;
-4. the one-score `J`, before any RL re-pin;
-5. the cross-backend draws and live disturbances.
+2. the one-score `J`;
+3. the cross-backend draws and live disturbances;
+4. R123's one-period MPC delay;
+5. the hybrid defaults.
+
+Reviewer C's sequence, so each number moves once: the same-tick semantic, then the MPC delay,
+then the hybrid defaults; the per-step cost before any RL re-pin.
 
 When to re-pin (per change, or once) is open.
 
@@ -428,7 +433,7 @@ v0.4 reads the core and never changes it.
 | MPPI (S72, MP-1–MP-6) and the MPC planner contract (D27; T6 in TODO §3) | §3, §5, §6 | [mppi.md](mppi.md) |
 | Identification and trajectory generation (C4) | §7 (the export with a data cost) | [differentiable-problem.md](differentiable-problem.md) §1 |
 | `LQGPlanner` | §3 | [estimation-and-state-feedback.md](estimation-and-state-feedback.md) §5 |
-| Workspace geometry (A3), then the CBF safety filter (unscheduled) | §9 | [geometry-module.md](geometry-module.md), [cbf-safety-filter.md](cbf-safety-filter.md) |
+| Workspace geometry (A3), then the CBF safety filter (unscheduled; QUESTIONS.md, Standing) | §9 | [geometry-module.md](geometry-module.md), [cbf-safety-filter.md](cbf-safety-filter.md) |
 | The RL follow-ups (C5), the RL heads (open: here or §4), reward scaling (TODO §6) | §4 | [future-policies.md](future-policies.md), [rl-reward-scaling.md](rl-reward-scaling.md) |
 | Native solvers beyond the proof of concept (NS-2's tolerance form, NS-3–NS-7) | §7, §8 | [native-optimizers.md](native-optimizers.md) |
 | Traceable linear analysis (S73) | the Jacobian | [differentiable-problem.md](differentiable-problem.md) §4.6 |

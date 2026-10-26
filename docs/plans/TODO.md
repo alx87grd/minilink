@@ -132,8 +132,9 @@ Why: [core-architecture.md](core-architecture.md) §2.
   callers are byte-identical.
 - [ ] **`StepRollout` folded into `Trajectory`** (what V1.1 left; the native `Trajectory`, the
   cost's quadrature and `contains` on `xp` landed 2026-10-24): `t = k·dt`. It is the hybrid
-  simulator's computer record (R86, OD-36), so it lands in the loop lane with §1.5, not before
-  it. Done when it lands byte-identical.
+  simulator's computer record (R86, OD-36), so the proposed order puts it in the loop lane with §1.5 (the
+  order of 2026-10-26 had it with the step algebra or with the hybrid loop: open until the order
+  is ruled). Done when it lands byte-identical.
 - [ ] **The batch price of a parameter family** (S53): profile `rollout_batch` with a `params`
   family, which takes 278 ms against 27 ms for the plain batch (pendulum, 1000 × 1000 RK4
   steps). Done when the family path is within 2× of the plain batch. Also: gate the quoted
