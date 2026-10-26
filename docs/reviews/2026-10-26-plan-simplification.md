@@ -266,6 +266,48 @@ remaining entries moved verbatim on 2026-10-26, each to the plan doc it shapes:
 | D30 where `RolloutEnvironment` lives | ruled, R108 | [mppi.md](mppi.md) §10 |
 | The CONSTITUTION §1 sentence | landed, R119 | CONSTITUTION §1.1 |
 
-## 7. The coverage check
+## 7. The coverage check, and the archive retired
 
-Filled in by the second pass (below).
+**Ids, checked mechanically.** The regex of the consolidation's check (the workboard, plan and
+ruling families, the D and OD decision ids) found 291 ids in the archive and 0 missing from the
+live set. Eight now appear only in the dated records, because the text citing them was history
+moved here verbatim:
+- OD-15 (end-state-api's map, §6 above);
+- R29, R30, R83, R84, R85 and R89 (ROADMAP §5.3's history, §5 above);
+- R81, which the live docs cite as the range R80–R82.
+
+**Ideas, checked by two independent read-only audits.** Each was given only the archive and the
+live paths:
+- the first covered ROADMAP, QUESTIONS, core-architecture, AGENTS and KNOWN_ISSUES;
+- the second covered TODO and every plan doc.
+
+Neither found a real loss. They found two kinds of thing to fix, both fixed:
+- **Meaning drifts:**
+  - R26 is the ruling of D19, so the `ParametricProgram` name has one ruling without the name
+    in its text, not two conflicting sources;
+  - ROADMAP §5 merged the 2026-10-22 ruling (the calendar is secondary) with the 2026-10-26
+    direction (no calendar shapes a step);
+  - the lane table moved Fields last by accident, and it is back beside the lanes from §1 on;
+  - the `StepRollout` fold's place read as settled, and is now marked as the proposal's.
+- **Dropped details, restored:**
+  - two code facts: step diagrams refuse a continuous leaf, and the free loop inputs are
+    constant over a run;
+  - the CBF row's QUESTIONS pointer;
+  - the old list of intended number changes;
+  - sampled-path's lane line;
+  - a stale §2.2 pointer.
+
+**Accepted as provenance only:**
+- the phrase "an open point the 2026-10-26 consolidation recorded" on nine QUESTIONS entries
+  (the consolidation record §4 lists them);
+- QUESTIONS' detail pointers into the old core-architecture sections, whose content is in the
+  new §N;
+- stale timing remarks in ROADMAP §5 (K7 and A6 have landed);
+- TODO's transition note on old rungs;
+- randomness.md's pre-direction rung history;
+- "(R86)" and "proposed 2026-10-22" on the OPW and S76 rows.
+
+**The archive retired.** With nothing lost, `docs/reviews/archive/2026-10-26-pre-simplification/`
+was deleted in the commit after `55c26065`. That commit is the last to hold it, so
+`git show 55c26065:docs/reviews/archive/2026-10-26-pre-simplification/<path>` restores any
+file; the same text is also every file at `9fb1ad77`.
