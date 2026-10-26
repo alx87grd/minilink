@@ -2,22 +2,25 @@
 
 One figure per major pipeline, in one visual language: blue, the objects (systems, the
 problem, trajectories, solutions); amber, parameters; fuchsia, randomness; white, the steps;
-green, the results. On the map, teal is the loop back to a `System` and indigo is JAX.
+green, the results. The map has its own palette: blue, the three foundations; a colour per
+tool, cool for the tools that start from the system and warm for those that start from the
+problem; indigo, JAX.
 One notation throughout: `p` is one object's own parameters, the `p` of `f(x, u, t; p)`;
 `θ` is what a tool moves, the evaluator's whole tree `θ = pe.params` or a policy's weights
-(`π_θ`), and `D₀`, `Dₚ` are the distributions of the start and of `p`. The figures are drawn by `docs/pipeline_figures.py`
-(`python docs/pipeline_figures.py` rebuilds every `docs/_static/pipeline_*.svg`).
+(`π_θ`), and `D₀`, `Dₚ` are the distributions of the start and of `p`. The figures are drawn
+by `docs/pipeline_figures.py` (`python docs/pipeline_figures.py` rebuilds every `docs/_static/pipeline_*.svg`).
 
 ## The library on one page
 
 Three foundations (CONSTITUTION §1.1): the model, a `System`; the task, a `PlanningProblem`
 built on it; and the solver boundary, a `MathematicalProgram` and its `Optimizer`. Every tool
 is a path from them: simulate, analyze and design straight from the system; plan, learn and
-evaluate from the problem. The paths that solve a program (trajectory optimization, tuning)
-meet the optimizer, and every controller a path returns is a `System` again, closed on the
-plant with `@`. The JAX column says what the objects linked to it give: their equations trace under JAX, so
-the tools built on them compile once (`jit`), give exact gradients (`grad`), and run many cases
-in one call (`vmap`).
+evaluate from the problem. Each tool's lane ends in what it gives back, drawn as a small
+picture. The paths that solve a program (trajectory optimization, tuning) meet the optimizer,
+and every controller a path returns is a `System` again, closed on the plant with `@`. The
+JAX column says what the objects linked to it give: their equations trace under JAX, so the
+tools built on them compile once (`jit`), give exact gradients (`grad`), and run many cases in
+one call (`vmap`).
 
 ![The library on one page](_static/pipeline_map.svg)
 

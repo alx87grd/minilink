@@ -922,7 +922,7 @@ def jax_column(f, x, y, w, h):
         mid = ty + step / 2
         jax_icon(f, name, x + w / 2 - 22, mid - 52)
         f.text(x + w / 2, mid + 22, name, 16, 700, ink)
-        f.text(x + w / 2, mid + 40, line, 12, 500, ink)
+        f.text(x + w / 2, mid + 42, line, 14, 500, ink)
 
 
 def link(f, x0, y0, x1, y1, kind="jax", dash="3 3"):
@@ -935,21 +935,6 @@ def link(f, x0, y0, x1, y1, kind="jax", dash="3 3"):
     f.add(f'<circle cx="{x0}" cy="{y0}" r="4" fill="{stroke}"/>')
 
 
-def legend(f, x, y, entries):
-    """A legend: one line sample and its words per entry."""
-    for i, (style, color, words) in enumerate(entries):
-        yy = y + i * 22
-        dash = {
-            "solid": "",
-            "dashed": ' stroke-dasharray="5 4"',
-            "dotted": ' stroke-dasharray="3 3"',
-        }[style]
-        f.add(
-            f'<path d="M{x},{yy} L{x + 34},{yy}" stroke="{color}" stroke-width="1.8"{dash}/>'
-        )
-        f.text(x + 46, yy + 4.5, words, 12.5, 500, MUTED, anchor="start")
-
-
 PATHS = {
     "Simulate": r"$x(t) = x_0 + \int_0^t f\, d\tau$",
     "Analyze": r"$\dot{\tilde{x}} = A\tilde{x} + B\tilde{u}$",
@@ -958,52 +943,273 @@ PATHS = {
     "Learn": r"$\theta \leftarrow \theta + \eta \nabla_{\theta} \mathbb{E}[G]$",
     "Evaluate": r"$J(\theta) = \mathbb{E}[J]$",
 }
-OUTS = {
-    "Simulate": ("Trajectory", None),
-    "Analyze": ("Poles · Bode", r"$\lambda(A),\;\; G(j\omega)$"),
-    "Design": ("Controller", r"$u = -K\,x$"),
-    "Plan": ("PlanningSolution", r"$u = \pi^*(x)$"),
-    "Learn": ("Neural policy", r"$u = \pi_{\theta}(x)$"),
-    "Evaluate": ("Evaluation", r"$J,\;\; \mathrm{margins}$"),
+# (fill, stroke, ink) per tool: a sweep around the wheel, left to right
+ACCENT = {
+    # The System's tools, cool
+    "Simulate": ("#ecfeff", "#0891b2", "#164e63"),
+    "Analyze": ("#ecfdf5", "#059669", "#064e3b"),
+    "Design": ("#f7fee7", "#65a30d", "#365314"),
+    # The problem's tools, warm
+    "Plan": ("#fff7ed", "#ea580c", "#7c2d12"),
+    "Learn": ("#fff1f2", "#e11d48", "#881337"),
+    "Evaluate": ("#fdf4ff", "#c026d3", "#701a75"),
+}
+RESULT = {
+    "Simulate": "Trajectory",
+    "Analyze": "Poles · Bode",
+    "Design": "Controller",
+    "Plan": "PlanningSolution",
+    "Learn": "Neural policy",
+    "Evaluate": "Evaluation",
+}
+BLUE = COLORS["obj"]
+
+
+def markers(f):
+    """One arrowhead per accent, and one for the loop back (System blue)."""
+    items = [(f"m{k}", v[1]) for k, v in ACCENT.items()] + [("mblue", BLUE[1])]
+    f.add(
+        "<defs>"
+        + "".join(
+            f'<marker id="{mid}" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" '
+            f'markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" '
+            f'fill="{c}"/></marker>'
+            for mid, c in items
+        )
+        + '<linearGradient id="gblue" x1="0" y1="0" x2="0" y2="1">'
+        '<stop offset="0" stop-color="#f0f9ff"/><stop offset="1" stop-color="#dbeafe"/>'
+        "</linearGradient></defs>"
+    )
+
+
+# --- Pictograms: each drawn in a box (x, y, w, h), in one colour -------------------------
+
+
+def pic_trajectory(f, x, y, w, h, c):
+    f.add(
+        f'<path d="M{x},{y + h} L{x + w},{y + h}" stroke="{c}" stroke-width="1" opacity="0.4"/>'
+    )
+    f.add(
+        f'<path d="M{x + 2},{y + h * 0.7} C{x + w * 0.2},{y - h * 0.1} {x + w * 0.35},{y + h * 1.0} '
+        f'{x + w * 0.55},{y + h * 0.45} S{x + w * 0.85},{y + h * 0.2} {x + w - 2},{y + h * 0.3}" '
+        f'fill="none" stroke="{c}" stroke-width="2.4" stroke-linecap="round"/>'
+    )
+    f.add(f'<circle cx="{x + 2}" cy="{y + h * 0.7}" r="3" fill="{c}"/>')
+
+
+def pic_bode(f, x, y, w, h, c):
+    f.add(
+        f'<path d="M{x},{y} L{x},{y + h} L{x + w},{y + h}" fill="none" stroke="{c}" '
+        f'stroke-width="1" opacity="0.4"/>'
+    )
+    f.add(
+        f'<path d="M{x + 4},{y + h * 0.25} L{x + w * 0.4},{y + h * 0.25} '
+        f'Q{x + w * 0.52},{y + h * 0.15} {x + w * 0.58},{y + h * 0.4} L{x + w - 4},{y + h * 0.95}" '
+        f'fill="none" stroke="{c}" stroke-width="2.4" stroke-linecap="round"/>'
+    )
+
+
+def cross(f, cx, cy, r, c, width=2.2, opacity=1):
+    f.add(
+        f'<path d="M{cx - r},{cy - r} L{cx + r},{cy + r} M{cx - r},{cy + r} L{cx + r},{cy - r}" '
+        f'stroke="{c}" stroke-width="{width}" stroke-linecap="round" opacity="{opacity}"/>'
+    )
+
+
+def pic_poles(f, x, y, w, h, c):
+    """The complex plane: poles moved from the right half into the left."""
+    ax = x + w * 0.62
+    f.add(
+        f'<path d="M{x},{y + h / 2} L{x + w},{y + h / 2} M{ax},{y} L{ax},{y + h}" '
+        f'stroke="{c}" stroke-width="1" opacity="0.4"/>'
+    )
+    for dy in (-0.3, 0, 0.3):
+        cross(f, ax + w * 0.2, y + h * (0.5 + dy), 3.5, MUTED, 1.6, 0.6)
+        cross(f, x + w * 0.22, y + h * (0.5 + dy), 4, c)
+    f.add(
+        f'<path d="M{ax + w * 0.13},{y + h / 2} L{x + w * 0.32},{y + h / 2}" stroke="{c}" '
+        f'stroke-width="1.4" stroke-dasharray="3 3" marker-end="url(#mDesign)"/>'
+    )
+
+
+def pic_path(f, x, y, w, h, c):
+    """A start, an obstacle, a path around it and a goal."""
+    f.add(
+        f'<circle cx="{x + w * 0.5}" cy="{y + h * 0.55}" r="{h * 0.3}" fill="#e2e8f0"/>'
+    )
+    f.add(
+        f'<path d="M{x + 4},{y + h * 0.85} C{x + w * 0.3},{y + h * 0.9} {x + w * 0.3},{y - h * 0.05} '
+        f'{x + w * 0.55},{y + h * 0.08} S{x + w * 0.85},{y + h * 0.5} {x + w - 8},{y + h * 0.45}" '
+        f'fill="none" stroke="{c}" stroke-width="2.4" stroke-linecap="round"/>'
+    )
+    f.add(f'<circle cx="{x + 4}" cy="{y + h * 0.85}" r="3.5" fill="{c}"/>')
+    f.add(
+        f'<circle cx="{x + w - 8}" cy="{y + h * 0.45}" r="6" fill="none" stroke="{c}" stroke-width="2"/>'
+    )
+
+
+def pic_network(f, x, y, w, h, c):
+    layers = [3, 4, 2]
+    pts = []
+    for i, n in enumerate(layers):
+        lx = x + w * (0.12 + 0.38 * i)
+        pts.append([(lx, y + h * (j + 0.5) / n) for j in range(n)])
+    for a, b in zip(pts, pts[1:]):
+        for p in a:
+            for q in b:
+                f.add(
+                    f'<path d="M{p[0]},{p[1]} L{q[0]},{q[1]}" stroke="{c}" stroke-width="0.9" opacity="0.45"/>'
+                )
+    for layer in pts:
+        for px, py in layer:
+            f.add(
+                f'<circle cx="{px}" cy="{py}" r="4.2" fill="#ffffff" stroke="{c}" stroke-width="2"/>'
+            )
+
+
+def pic_histogram(f, x, y, w, h, c):
+    heights = [0.2, 0.5, 0.9, 1.0, 0.65, 0.3, 0.12]
+    bw = w / len(heights)
+    for i, v in enumerate(heights):
+        f.add(
+            f'<rect x="{x + i * bw + 1.5}" y="{y + h * (1 - v)}" width="{bw - 3}" height="{h * v}" '
+            f'rx="1.5" fill="{c}" opacity="{0.35 + 0.5 * v:.2f}"/>'
+        )
+    mx = x + bw * 3.2
+    f.add(
+        f'<path d="M{mx},{y - 3} L{mx},{y + h}" stroke="{ACCENT["Evaluate"][2]}" stroke-width="1.6" '
+        f'stroke-dasharray="3 2"/>'
+    )
+
+
+PICS = {
+    "Simulate": pic_trajectory,
+    "Analyze": pic_bode,
+    "Design": pic_poles,
+    "Plan": pic_path,
+    "Learn": pic_network,
+    "Evaluate": pic_histogram,
 }
 
 
-def trajectory_card(f, x, y, w, h):
-    """A result card holding a sketch of x(t)."""
-    f.card(x, y, w, h, "", [], "out")
-    sx, sy = x + w / 2 - 55, y + 54
+def pic_diagram(f, x, y, w, h, c):
+    """A controller and a plant closed in a loop."""
+    bw, bh = w * 0.26, h * 0.46
+    b1x, b2x, by = x + w * 0.16, x + w * 0.6, y + h * 0.04
+    for bx in (b1x, b2x):
+        f.add(
+            f'<rect x="{bx}" y="{by}" width="{bw}" height="{bh}" rx="5" fill="#ffffff" '
+            f'stroke="{c}" stroke-width="2"/>'
+        )
+    for bx, s_ in ((b1x, "π"), (b2x, "f")):
+        f.text(bx + bw / 2, by + bh / 2 + 5, s_, 14, 600, c)
+    my, fy = by + bh / 2, y + h * 0.88
     f.add(
-        f'<path d="M{sx},{sy} C{sx + 22},{sy - 30} {sx + 40},{sy + 16} {sx + 62},{sy - 8} '
-        f'S{sx + 96},{sy - 16} {sx + 110},{sy - 12}" fill="none" '
-        f'stroke="{COLORS["out"][1]}" stroke-width="2.2"/>'
+        f'<path d="M{b1x + bw},{my} L{b2x - 2},{my}" stroke="{c}" stroke-width="2" '
+        f'marker-end="url(#mblue)"/>'
     )
-    f.text(x + w / 2, y + 26, "Trajectory", 15, 650, COLORS["out"][2])
+    f.add(
+        f'<path d="M{b2x + bw},{my} L{x + w},{my} L{x + w},{fy} L{x},{fy} L{x},{my} '
+        f'L{b1x - 2},{my}" fill="none" stroke="{c}" stroke-width="2" stroke-linejoin="round" '
+        f'marker-end="url(#mblue)"/>'
+    )
+
+
+def pic_problem(f, x, y, w, h, c):
+    """The allowed set X, a start in it and the goal set Xf."""
+    f.add(
+        f'<path d="M{x + w * 0.1},{y + h * 0.5} C{x},{y} {x + w * 0.6},{y - h * 0.1} {x + w * 0.85},{y + h * 0.2} '
+        f"S{x + w * 1.05},{y + h * 0.95} {x + w * 0.5},{y + h * 0.95} S{x + w * 0.18},{y + h * 0.85} "
+        f'{x + w * 0.1},{y + h * 0.5} Z" fill="#ffffff" stroke="{c}" stroke-width="1.6" stroke-dasharray="4 3"/>'
+    )
+    sx, sy, gx, gy = x + w * 0.24, y + h * 0.62, x + w * 0.72, y + h * 0.4
+    f.add(
+        f'<path d="M{sx},{sy} Q{x + w * 0.45},{y + h * 0.2} {gx - 9},{gy}" fill="none" stroke="{c}" '
+        f'stroke-width="2" marker-end="url(#mblue)"/>'
+    )
+    f.add(f'<circle cx="{sx}" cy="{sy}" r="3.5" fill="{c}"/>')
+    f.add(
+        f'<circle cx="{gx}" cy="{gy}" r="8" fill="{BLUE[0]}" stroke="{c}" stroke-width="2"/>'
+    )
+
+
+def pic_bowl(f, x, y, w, h, c):
+    """Level sets of a cost and the iterates descending to its minimum."""
+    cx, cy = x + w / 2, y + h / 2
+    for k, s in enumerate((1.0, 0.72, 0.44, 0.2)):
+        f.add(
+            f'<ellipse cx="{cx}" cy="{cy}" rx="{w / 2 * s}" ry="{h / 2 * s}" fill="none" '
+            f'stroke="{c}" stroke-width="1.4" opacity="{0.35 + 0.15 * k:.2f}"/>'
+        )
+    pts = [
+        (x + w * 0.08, y + h * 0.4),
+        (x + w * 0.28, y + h * 0.7),
+        (x + w * 0.42, y + h * 0.45),
+        (cx, cy),
+    ]
+    d = " L".join(f"{px},{py}" for px, py in pts)
+    f.add(f'<path d="M{d}" fill="none" stroke="{c}" stroke-width="1.8"/>')
+    for px, py in pts[:-1]:
+        f.add(f'<circle cx="{px}" cy="{py}" r="2.6" fill="{c}"/>')
+    f.add(f'<circle cx="{cx}" cy="{cy}" r="4" fill="{BLUE[2]}"/>')
+
+
+def foundation(f, x, y, w, h, title, texs, pic, pic_w, size):
+    """A foundation card: a soft gradient, its pictogram on the left, title and equations."""
+    f.add(
+        f'<rect x="{x}" y="{y}" width="{w}" height="{h}" rx="12" fill="url(#gblue)" '
+        f'stroke="{BLUE[1]}" stroke-width="1.8"/>'
+    )
+    pad = 22
+    pic(f, x + pad, y + 18, pic_w, h - 36, BLUE[1])
+    lx = x + pad + pic_w + 10
+    cx = (lx + x + w) / 2
+    f.text(cx, y + 28, title, 16, 700, BLUE[2])
+    room = (y + h - 12) - (y + 40)
+    for i, tex in enumerate(texs):
+        f.math(
+            cx,
+            y + 40 + room * (i + 0.5) / len(texs),
+            tex,
+            size,
+            BLUE[2],
+            max_width=x + w - lx - 16,
+        )
+
+
+TOOL_TEX = {**PATHS, "Plan": r"$\pi^{\star} = \arg\min_{\pi}\; J$"}
 
 
 def library_map():
-    """The whole library on one page: three foundations, the tools as parallel paths, JAX beside them."""
-    f = Figure(1180, 726)
-    order = ["Simulate", "Analyze", "Design", "Plan", "Learn", "Evaluate"]
-    x0, w, gap = 30, 146, 14
+    """The whole library on one page: three foundations, six tools as coloured lanes, JAX beside."""
+    order = list(ACCENT)
+    x0, w, gap = 58, 144, 14
     cols = {name: x0 + i * (w + gap) for i, name in enumerate(order)}
     right = x0 + 6 * w + 5 * gap
-    px0, px1 = cols["Plan"], cols["Evaluate"] + w
-    loop_c = COLORS["loop"][1]
+    px0, px1 = cols["Plan"], right
+    sys_y, sys_h = 30, 80
+    py, ph = sys_y + sys_h + 36, 120
+    ry, rh = py + ph + 36, 92
+    oy, oh = ry + rh + 30, 104
+    bus_y = oy + oh + 28
+    by, bh = bus_y + 44, 88
+    f = Figure(1180, by + bh + 30)
+    markers(f)
 
-    # The model and the task
-    sys_y, sys_h = 30, 84
-    f.eq_card(
+    foundation(
+        f,
         x0,
         sys_y,
         right - x0,
         sys_h,
         "System",
         [r"$\dot{x} = f(x, u, t;\, p) \qquad y = h(x, u, t;\, p)$"],
-        "obj",
-        size=21,
+        pic_diagram,
+        150,
+        21,
     )
-    py, ph = sys_y + sys_h + 40, 126
-    f.eq_card(
+    foundation(
+        f,
         px0,
         py,
         px1 - px0,
@@ -1013,89 +1219,111 @@ def library_map():
             r"$J = \int_0^{t_f} g(x, u, t)\, dt \;+\; h(x(t_f))$",
             r"$x \in X \quad u \in U \quad x(0) = x_0 \quad x(t_f) \in X_f$",
         ],
-        "obj",
-        size=17,
+        pic_problem,
+        92,
+        16,
     )
-    f.arrow(f"M{(px0 + px1) / 2},{sys_y + sys_h} L{(px0 + px1) / 2},{py - 2}")
-
-    # Six parallel paths, and what each gives back
-    ry, rh = py + ph + 40, 92
-    oy, oh = ry + rh + 40, 84
-    for name, x in cols.items():
-        cx = x + w / 2
-        f.eq_card(x, ry, w, rh, name, PATHS[name], "step", size=17)
-        top = sys_y + sys_h if name in ("Simulate", "Analyze", "Design") else py + ph
-        f.arrow(f"M{cx},{top} L{cx},{ry - 2}")
-        title, tex = OUTS[name]
-        if tex is None:
-            trajectory_card(f, x, oy, w, oh)
-        else:
-            f.eq_card(x, oy, w, oh, title, tex, "out", size=17)
-        f.arrow(f"M{cx},{ry + rh} L{cx},{oy - 2}")
-
-    # Every controller is a System again: one bus under the three, back to the top
-    bus_y = oy + oh + 22
-    ctl = [cols[n] + w / 2 for n in ("Design", "Plan", "Learn")]
-    for cx in ctl:
-        f.add(
-            f'<path d="M{cx},{oy + oh} L{cx},{bus_y}" stroke="{loop_c}" stroke-width="1.6" stroke-dasharray="5 4"/>'
-        )
     f.arrow(
-        f"M{max(ctl)},{bus_y} L14,{bus_y} L14,{sys_y + sys_h / 2} L{x0 - 2},{sys_y + sys_h / 2}",
-        loop_c,
-        dashed=True,
-        marker="arrt",
+        f"M{(px0 + px1) / 2},{sys_y + sys_h} L{(px0 + px1) / 2},{py - 2}",
+        BLUE[1],
+        marker="mblue",
+        width=2,
     )
+
+    # The program, reached by Plan and Evaluate: straight down from what they give back
+    plan_cx = cols["Plan"] + w / 2
+    links = {"Plan": plan_cx + 30, "Evaluate": cols["Evaluate"] + w / 2}
+    for name, lx in links.items():
+        f.arrow(
+            f"M{lx},{oy + oh} L{lx},{by - 2}",
+            ACCENT[name][1],
+            dashed=True,
+            marker=f"m{name}",
+            width=1.8,
+        )
+
+    # Six lanes: the tool, then what it gives back, in one colour
+    for name, x in cols.items():
+        fill, stroke, ink = ACCENT[name]
+        cx = x + w / 2
+        f.add(
+            f'<rect x="{x - 4}" y="{ry - 8}" width="{w + 8}" height="{oy + oh - ry + 16}" rx="14" '
+            f'fill="{fill}"/>'
+        )
+        top = sys_y + sys_h if name in ("Simulate", "Analyze", "Design") else py + ph
+        f.arrow(f"M{cx},{top} L{cx},{ry - 10}", stroke, marker=f"m{name}", width=2)
+        f.add(
+            f'<rect x="{x}" y="{ry}" width="{w}" height="{rh}" rx="10" fill="#ffffff" '
+            f'stroke="{stroke}" stroke-width="1.6"/>'
+        )
+        f.add(
+            f'<path d="M{x + 10},{ry} L{x + w - 10},{ry}" stroke="{stroke}" stroke-width="5" '
+            f'stroke-linecap="round"/>'
+        )
+        f.text(cx, ry + 28, name, 15.5, 700, ink)
+        f.math(cx, ry + 62, TOOL_TEX[name], 17, "#0f172a", max_width=w - 28)
+        f.arrow(f"M{cx},{ry + rh} L{cx},{oy - 2}", stroke, marker=f"m{name}", width=2)
+        f.add(
+            f'<rect x="{x}" y="{oy}" width="{w}" height="{oh}" rx="10" fill="#ffffff" '
+            f'stroke="{stroke}" stroke-width="1.6"/>'
+        )
+        f.text(cx, oy + 24, RESULT[name], 14.5, 650, ink)
+        PICS[name](f, x + 24, oy + 40, w - 48, oh - 54, stroke)
+
+    # Every controller is a System again: one bold loop back to the top
+    drops = [cols["Design"] + w / 2, plan_cx - 30, cols["Learn"] + w / 2]
+    loop = BLUE[1]
+    lx = 34
+    path = f"M{max(drops)},{bus_y} L{lx},{bus_y} L{lx},{sys_y + sys_h / 2} L{x0 - 2},{sys_y + sys_h / 2}"
+    f.add(f'<path d="{path}" fill="none" stroke="#ffffff" stroke-width="8"/>')
+    for cx in drops:
+        f.add(
+            f'<path d="M{cx},{oy + oh + 8} L{cx},{bus_y}" stroke="{loop}" stroke-width="2.4"/>'
+        )
+        f.add(f'<circle cx="{cx}" cy="{oy + oh + 8}" r="3.5" fill="{loop}"/>')
+    f.arrow(path, loop, marker="mblue", width=2.4)
     f.text(
-        x0 + 4,
-        bus_y + 18,
-        "policy @ plant",
-        12.5,
-        600,
-        COLORS["loop"][2],
+        x0,
+        bus_y + 24,
+        "closed loop: policy @ plant is a System again",
+        14.5,
+        650,
+        BLUE[2],
         anchor="start",
     )
 
-    # The solver boundary, reached from the Plan and the Evaluate cards
-    by, bh = bus_y + 52, 88
-    f.eq_card(
+    foundation(
+        f,
         px0,
         by,
         px1 - px0,
         bh,
         "MathematicalProgram · Optimizer",
-        r"$\min_{z}\; J(z) \quad \mathrm{s.t.} \quad h(z) = 0,\;\; g(z) \geq 0$",
-        "obj",
-        size=18,
-    )
-    plan_gx = cols["Plan"] + w + gap / 2
-    eval_gx = cols["Evaluate"] - gap / 2
-    for x_edge, gx in ((cols["Plan"] + w, plan_gx), (cols["Evaluate"], eval_gx)):
-        f.add(f'<circle cx="{x_edge}" cy="{ry + rh / 2}" r="3.5" fill="{LINE}"/>')
-        f.arrow(
-            f"M{x_edge},{ry + rh / 2} L{gx},{ry + rh / 2} L{gx},{by - 2}", dashed=True
-        )
-
-    # The legend, in the free corner
-    legend(
-        f,
-        x0 + 6,
-        by + 12,
-        [
-            ("solid", LINE, "produces"),
-            ("dashed", LINE, "solved as a program"),
-            ("dashed", loop_c, "a controller is a System again"),
-            ("dotted", COLORS["jax"][1], "traces under JAX"),
-        ],
+        [r"$\min_{z}\; J(z) \quad \mathrm{s.t.} \quad h(z) = 0,\;\; g(z) \geq 0$"],
+        pic_bowl,
+        92,
+        17,
     )
 
-    # JAX beside the three foundations
+    # JAX
     jx = right + 24
     jax_column(f, jx, sys_y, 1150 - jx, by + bh - sys_y)
-    # The foundations trace, and so does the evaluator built on them
     for y in (sys_y + sys_h / 2, py + ph / 2, ry + rh / 2, by + bh / 2):
-        x_from = right if y < by else px1
-        link(f, x_from, y, jx, y)
+        link(f, right if y < by else px1, y, jx, y)
+
+    # A two-line key, in the free corner
+    kx, ky = x0 + 4, by + bh / 2 - 6
+    for k, name in enumerate(("Plan", "Evaluate")):
+        c = ACCENT[name][1]
+        f.add(
+            f'<path d="M{kx + 18 * k},{ky} L{kx + 18 * k + 14},{ky}" stroke="{c}" stroke-width="2.2"/>'
+        )
+    f.add(
+        f'<path d="M{kx},{ky + 28} L{kx + 32},{ky + 28}" stroke="{COLORS["jax"][1]}" '
+        f'stroke-width="2.2" stroke-dasharray="3 3"/>'
+    )
+    f.text(kx + 46, ky + 5, "solved as a program", 14.5, 500, MUTED, anchor="start")
+    f.text(kx + 46, ky + 33, "traces under JAX", 14.5, 500, MUTED, anchor="start")
     return f.svg()
 
 
