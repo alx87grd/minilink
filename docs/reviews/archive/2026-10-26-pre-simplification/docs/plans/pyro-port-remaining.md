@@ -1,0 +1,385 @@
+# Pyro 2.0 ↔ Minilink parity audit
+
+Snapshot vs [SherbyRobotics/pyro](https://github.com/SherbyRobotics/pyro) local checkout (2026-06-29).
+
+Status: open — the parity rows and the pyro → minilink migration guide (C1), v0.4 (moved from v0.3 by R48). Open rows plus the landed name map; re-audit against the code before the migration guide.
+
+Status legend: **Done** = equivalent landed · **Partial** = framework exists, gap noted · **TODO** = planned/in-scope · **Drop** = explicit non-goal
+
+---
+
+## Summary
+
+Shrunk 2026-09-05 to the **open** rows; landed symbols are listed
+once in the name map at the end. Counts recounted from the tables below on 2026-10-24.
+
+| Bucket | Pyro | Done | Partial | TODO | Drop |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| Library symbols | 105 | 85 | 10 | 4 | 6 |
+| Example scripts | 195 | 29 | 47 | 83 | 36 |
+
+Parity is part of the **v0.4** milestone (moved from v0.3 by R48; [ROADMAP.md §5.4](../dev/ROADMAP.md#5-the-path-to-v10)); v0.1 is GRO860 end to end.
+Release criterion carried over: every **in-scope** pyro library module has a minilink home or a documented drop; representative closed-loop demo per major plant family; README pyro → minilink migration guide (built from the name map below).
+
+## 1. Library modules — pyro → minilink
+
+| Band | Pyro module | Pyro symbol | Minilink home | Minilink symbol | Status | Notes |
+| --- | --- | --- | --- | --- | --- | --- |
+| Framework | `pyro/dynamic/mechanical.py` | MechanicalSystemWithPositionInputs | `—` | — | **Drop** | No such class in minilink; DESIGN rejects `WithPositionInputs` inheritance branches — mixed inputs use named ports + `generalized_force` |
+| Framework | `pyro/dynamic/rigidbody.py` | GeneralizedMechanicalSystemWithPositionInputs | `—` | — | **Drop** | No such class in minilink; DESIGN rejects `WithPositionInputs` inheritance branches — mixed inputs use named ports + `generalized_force` |
+| Framework | `pyro/dynamic/rigidbody.py` | RigidBody2D | `—` | — | **Drop** | Use GeneralizedMechanicalSystem or catalog plant |
+| Framework | `pyro/dynamic/stochastic.py` | NoiseSignal | `minilink/blocks/sources.py` | noise ports in diagrams | **Partial** | No StochasticSystemWrapper |
+| Framework | `pyro/dynamic/stochastic.py` | StochasticSystemWrapper | `—` | — | **Drop** | Explicit non-goal unless reversed ([TODO.md](TODO.md) Later) |
+| Catalog | `pyro/dynamic/vehicle_dynamic.py` | TireModel (ABC) | `minilink/dynamics/catalog/vehicles/dynamic_bicycle.py`, `minilink/dynamics/catalog/vehicles/tires.py` | `linear_tire_forces`, `brush_tire_forces` | **Partial** | The linear tire (`DynamicBicycle`) and the brush tire (`UdeSRacecar`) as pure functions; no tire ABC, no Pacejka |
+| Catalog | `pyro/dynamic/vehicle_dynamic.py` | Pacejka | `—` | — | **TODO** | [TODO.md](TODO.md) Later |
+| Catalog | `pyro/dynamic/vehicle_steering.py` | HolonomicMobileRobotwithObstacles | `minilink/planning/spatial/` | Scene + bind() | **Partial** | Scene replaces plant wrapper |
+| Catalog | `pyro/dynamic/vehicle_steering.py` | Holonomic3DMobileRobotwithObstacles | `minilink/planning/spatial/` | Scene | **Partial** | Scene replaces plant wrapper |
+| Catalog | `pyro/dynamic/vehicle_steering.py` | KinematicCarModelwithObstacles | `minilink/planning/spatial/` | Scene | **Partial** |  |
+| Catalog | `pyro/dynamic/manipulator.py` | TwoLinkManipulatorwithObstacles | `minilink/planning/spatial/` | Scene | **Partial** |  |
+| Catalog | `pyro/dynamic/manipulator.py` | FiveLinkPlanarManipulatorwithObstacles | `minilink/planning/spatial/` | Scene | **Partial** |  |
+| Control | `pyro/control/controller.py` | DynamicClosedLoopSystem | `minilink/core/diagram.py` | DiagramSystem | **Partial** |  |
+| Control | `pyro/control/robotcontrollers.py` | JointPD, EndEffectorPD, … | `minilink/control/robotic.py` | JointImpedance, TaskImpedance, TaskKinematic, TaskKinematicNullspace | **Partial** | Dynamic joint/effector PID wrappers TODO |
+| Planning | `pyro/planning/dynamicprogramming.py` | DynamicProgramming2DRectBivariateSpline | `minilink/planning/dynamic_programming/dp.py` | — | **Drop** | Not needed; grid backends cover use cases |
+| Planning | `pyro/planning/filters.py` | TrajectoryFilter | `minilink/planning/` | — | **TODO** | Butterworth filtfilt post-filter |
+| Planning | `pyro/planning/plan.py` | OpenLoopController | `minilink/blocks/sources.py` | TrajectorySource | **Partial** |  |
+| Planning | `pyro/planning/trajectorygeneration.py` | SingleAxisPolynomialTrajectoryGenerator | `minilink/planning/` | — | **TODO** | trajectory_generation/ |
+| Planning | `pyro/planning/trajectorygeneration.py` | MultiPointSingleAxisPolynomialTrajectoryGenerator | `minilink/planning/` | — | **TODO** | min-snap / differential flatness |
+| Tools | `pyro/tools/sys2game.py` | InteractiveContinuousDynamicSystem | `minilink/simulation/realtime/` | superseded by `RealtimeSimulator` + `PygameInput` | **Drop** | Own realtime tool, not a port |
+
+## 2. Minilink-only (no pyro equivalent)
+
+| Minilink | What | Notes |
+| --- | --- | --- |
+| `minilink/core/compile/` | `compile`, the execution plans (`plan.py`), one evaluator per system kind on either backend (`DynamicEvaluator`, `DiagramEvaluator`, `StaticEvaluator`, `StepEvaluator`, `StepDiagramEvaluator`) | Compile band; pyro has no separate compile layer |
+| `minilink/core/geometry.py` | SDF shapes (`Shape`, `Sphere`, `Box`, `Union`, `Inflated`); the cost algebra is `core/costs.py` | Spatial primitives (planned package `core/geometry/`, [geometry-module.md](geometry-module.md)) |
+| `minilink/optimization/` | MathematicalProgram, Optimizer | General NLP; pyro trajopt is narrower |
+| `minilink/planning/spatial/` | Scene, WorkspaceField, CollisionBody (`bind()`) | Obstacle/clearance layer replaces *withObstacles plants (retires into `core/geometry/`) |
+| `minilink/planning/search/dubins.py` | Dubins steering | Extra beyond pyro RRT |
+| `minilink/blocks/neural.py` | MLP block (JAX) | Prototype; pyro RL is SB3-only |
+| `minilink/experimental/symbolic/` | Symbolic derivation | Quarantine; no pyro equivalent |
+| `minilink/experimental/engines/` | Contact, ANCF tire (JAX) | Experimental physics engines |
+| `examples/demos/mpc/` | Rate MPC closed-loop demos | Minilink extra; no pyro MPC module |
+
+---
+
+## 3. Example scripts — full inventory
+
+The open pyro scripts under `examples/` (of 195; the 28 Done at the 2026-09-05 shrink are not listed), grouped by top-level folder; a script landed since is marked **Done** in place.
+
+### 3.1 `courses/`
+
+| Pyro script | Status | Minilink equivalent / notes |
+| --- | --- | --- |
+| `courses/corom_impedance_control/corom_robots.py` | **TODO** | Robot control; blocked on control/robotic.py |
+| `courses/corom_impedance_control/custom_drilling_controller.py` | **TODO** | Robot control; blocked on control/robotic.py |
+| `courses/corom_impedance_control/custom_drilling_controller_test.py` | **TODO** | Robot control; blocked on control/robotic.py |
+| `courses/corom_impedance_control/twolinkrobot_effector_impedance_controller.py` | **TODO** | Robot control; blocked on control/robotic.py |
+| `courses/corom_impedance_control/twolinkrobot_joint_impedance_controller.py` | **TODO** | Robot control; blocked on control/robotic.py |
+| `courses/udes_gmc714/demo_simple_pendulum_multiple_controller_options.py` | **TODO** | Robot control; blocked on control/robotic.py |
+| `courses/udes_gmc714/manipulator_dynamic_terms.py` | **TODO** | Robot control; blocked on control/robotic.py |
+| `courses/udes_gro501/float_mass_pids/one_mass_with_pid.py` | **TODO** | Robot control; blocked on control/robotic.py |
+| `courses/udes_gro501/float_mass_pids/three_mass_with_pid.py` | **TODO** | Robot control; blocked on control/robotic.py |
+| `courses/udes_gro501/float_mass_pids/two_mass_with_pid.py` | **TODO** | Robot control; blocked on control/robotic.py |
+| `courses/udes_gro501/mass-spring-dampers/one_mass_with_pid.py` | **TODO** | Robot control; blocked on control/robotic.py |
+| `courses/udes_gro501/mass-spring-dampers/three_mass_with_pid.py` | **TODO** | Robot control; blocked on control/robotic.py |
+| `courses/udes_gro501/mass-spring-dampers/two_mass_with_pid.py` | **TODO** | Robot control; blocked on control/robotic.py |
+| `courses/udes_gro640/prob/abcd1234.py` | **TODO** | Robot control; blocked on control/robotic.py |
+| `courses/udes_gro640/prob/demo_crash_commande_en_position.py` | **TODO** | Robot control; blocked on control/robotic.py |
+| `courses/udes_gro640/prob/gro640_robots.py` | **TODO** | Robot control; blocked on control/robotic.py |
+| `courses/udes_gro640/prob/test_commande_en_force.py` | **TODO** | Robot control; blocked on control/robotic.py |
+| `courses/udes_gro640/prob/test_commande_en_position.py` | **TODO** | Robot control; blocked on control/robotic.py |
+| `courses/udes_gro640/prob/test_f.py` | **TODO** | Robot control; blocked on control/robotic.py |
+| `courses/udes_gro640/prob/test_trajectoire_3D.py` | **TODO** | Robot control; blocked on control/robotic.py |
+| `courses/udes_gro860/dp_mass_min_time_policy_evaluation.py` | **Partial** | Core tool demos exist; course variant not ported |
+| `courses/udes_gro860/lqr_cartpole_traj.py` | **Partial** | Core tool demos exist; course variant not ported |
+
+### 3.2 `demos_by_system/`
+
+| Pyro script | Status | Minilink equivalent / notes |
+| --- | --- | --- |
+| `demos_by_system/acrobot/acrobot_with_lqr.py` | **Partial** | Controller exists; plant demo TODO |
+| `demos_by_system/acrobot/acrobot_with_trajectory_optimization.py` | **Partial** | Trajopt done; plant-specific demo TODO |
+| `demos_by_system/boat/boat_position_controller.py` | **Partial** | Research-lane prototype `experimental/boat/parking_cascade.py` (cascade with a heading switch, in a current); no `demos/` twin yet |
+| `demos_by_system/boat/boat_with_ppo_demo.py` | **Partial** | Research-lane prototype `experimental/boat/parking_ppo.py` (native PPO planner, in a current); no `demos/` twin yet |
+| `demos_by_system/car_dynamic/demo_oversteer.py` | **TODO** | Representative closed-loop for car_dynamic |
+| `demos_by_system/car_dynamic/demo_understeer.py` | **TODO** | Representative closed-loop for car_dynamic |
+| `demos_by_system/car_propulsion/longitudinal_car_braking_value_iteration.py` | **Partial** | DP done; plant-specific demo TODO |
+| `demos_by_system/car_propulsion/longitudinal_car_with_torque_input.py` | **TODO** | Representative closed-loop for car_propulsion |
+| `demos_by_system/car_steering/bicycle.py` | **TODO** | Representative closed-loop for car_steering |
+| `demos_by_system/car_steering/bicycle_exploration_with_rrt.py` | **Partial** | RRT done; plant-specific demo TODO |
+| `demos_by_system/car_steering/bicycle_parallel_parking_with_rrt.py` | **Drop** | parking demo removed; kinodynamic RRT remains in `examples/demos/rrt/` |
+| `demos_by_system/car_steering/car.py` | **TODO** | Representative closed-loop for car_steering |
+| `demos_by_system/car_steering/car_trajectory_with_rrt.py` | **Partial** | RRT done; plant-specific demo TODO |
+| `demos_by_system/car_steering/car_with_custom_lateral_controller.py` | **TODO** | Representative closed-loop for car_steering |
+| `demos_by_system/car_steering/car_with_valueiteration_minimum_time.py` | **Partial** | DP done; plant-specific demo TODO |
+| `demos_by_system/car_steering/car_with_valueiteration_quadratic_cost.py` | **Partial** | DP done; plant-specific demo TODO |
+| `demos_by_system/cartpole/cartpole_LQG.py` | **Done** | `examples/demos/control/lqg_cartpole.py` (`kalman`, `lqr`, `closed_loop` with the observer, under `WhiteNoise`) |
+| `demos_by_system/cartpole/cartpole_demo.py` | **TODO** | Open-loop cartpole showcase |
+| `demos_by_system/cartpole/cartpole_stabilization.py` | **Partial** | examples/demos/control/cartpole_lqr.py |
+| `demos_by_system/cartpole/cartpole_with_trajectory_optimization.py` | **Partial** | trajopt framework; cartpole-specific demo TODO |
+| `demos_by_system/cartpole_rotating/cartpole_modes.py` | **Partial** | Use examples/demos/analysis/analysis_modal.py + open-loop sim |
+| `demos_by_system/cartpole_rotating/cartpole_natural_behavior.py` | **TODO** | Representative closed-loop for cartpole_rotating |
+| `demos_by_system/cartpole_rotating/cartpole_swingup_trajectory_optimisation.py` | **Partial** | Trajopt done; plant-specific demo TODO |
+| `demos_by_system/cartpole_rotating/cartpole_with_computed_torque.py` | **TODO** | control/modelbased.py |
+| `demos_by_system/cartpole_rotating/cartpole_with_rrt_and_computed_torque.py` | **TODO** | control/modelbased.py |
+| `demos_by_system/cartpole_rotating/underactuated_cartpole_swingup.py` | **TODO** | Representative closed-loop for cartpole_rotating |
+| `demos_by_system/cartpole_rotating/underactuated_cartpole_with_partialfeedbacklinearization.py` | **TODO** | control/modelbased.py |
+| `demos_by_system/cartpole_rotating/underactuated_cartpole_with_rrt.py` | **Partial** | RRT done; plant-specific demo TODO |
+| `demos_by_system/cartpole_rotating/undercartpole_with_rrt_and_direct_colocation.py` | **Partial** | RRT done; plant-specific demo TODO |
+| `demos_by_system/drone/planar_drone_trajectory_optimisation.py` | **Partial** | Trajopt done; plant-specific demo TODO |
+| `demos_by_system/drone/planar_drone_trajectory_optimisation_linearized.py` | **Partial** | Trajopt done; plant-specific demo TODO |
+| `demos_by_system/drone/planar_drone_with_lqr.py` | **Partial** | Controller exists; plant demo TODO |
+| `demos_by_system/equations/double_integrator.py` | **TODO** | Representative closed-loop for equations |
+| `demos_by_system/equations/double_integrator_optimal_controller.py` | **TODO** | Representative closed-loop for equations |
+| `demos_by_system/equations/integrators_with_closed_loops.py` | **TODO** | Representative closed-loop for equations |
+| `demos_by_system/equations/simple_integrator.py` | **TODO** | Representative closed-loop for equations |
+| `demos_by_system/equations/triple_integrator.py` | **TODO** | Representative closed-loop for equations |
+| `demos_by_system/equations/vanderpol.py` | **TODO** | Representative closed-loop for equations |
+| `demos_by_system/holonomic_mobile_robot/holonomic_mobile_robot_exploration_with_rrt.py` | **Partial** | RRT done; plant-specific demo TODO |
+| `demos_by_system/holonomic_mobile_robot/holonomic_mobile_robot_with_valueiteration.py` | **Partial** | DP done; plant-specific demo TODO |
+| `demos_by_system/mass_spring_damper/single_mass_with_pid.py` | **Partial** | Controller exists; plant demo TODO |
+| `demos_by_system/mass_spring_damper/three_mass_dynamic.py` | **TODO** | Representative closed-loop for mass_spring_damper |
+| `demos_by_system/mass_spring_damper/three_mass_eigen_modes.py` | **Partial** | Use examples/demos/analysis/analysis_modal.py + open-loop sim |
+| `demos_by_system/mass_spring_damper/three_mass_with_lqr.py` | **Partial** | Controller exists; plant demo TODO |
+| `demos_by_system/mass_spring_damper/three_mass_with_pid.py` | **Partial** | Controller exists; plant demo TODO |
+| `demos_by_system/mass_spring_damper/two_mass_dynamic.py` | **TODO** | Representative closed-loop for mass_spring_damper |
+| `demos_by_system/mass_spring_damper/two_mass_eigen_modes.py` | **Partial** | Use examples/demos/analysis/analysis_modal.py + open-loop sim |
+| `demos_by_system/mass_spring_damper/two_mass_with_lqr.py` | **Partial** | Controller exists; plant demo TODO |
+| `demos_by_system/mass_spring_damper/two_mass_with_pid.py` | **Partial** | Controller exists; plant demo TODO |
+| `demos_by_system/mountain_car/mountain_car_with_valueiteration_quadratic.py` | **Partial** | DP done; plant-specific demo TODO |
+| `demos_by_system/pendulum_double/double_pendulum.py` | **TODO** | Representative closed-loop for pendulum_double |
+| `demos_by_system/pendulum_double/double_pendulum_game.py` | **Drop** | sys2game interactive game; ported on demand (R109) |
+| `demos_by_system/pendulum_double/double_pendulum_modes.py` | **Partial** | Use examples/demos/analysis/analysis_modal.py + open-loop sim |
+| `demos_by_system/pendulum_double/double_pendulum_with_computed_torque.py` | **TODO** | control/modelbased.py |
+| `demos_by_system/pendulum_double/double_pendulum_with_computed_torque_and_sinus_ref.py` | **TODO** | control/modelbased.py |
+| `demos_by_system/pendulum_double/double_pendulum_with_lqr.py` | **Partial** | Controller exists; plant demo TODO |
+| `demos_by_system/pendulum_double/double_pendulum_with_rrt.py` | **Partial** | RRT done; plant-specific demo TODO |
+| `demos_by_system/pendulum_double/double_pendulum_with_rrt_and_computed_torque.py` | **TODO** | control/modelbased.py |
+| `demos_by_system/pendulum_double/double_pendulum_with_sliding_mode.py` | **TODO** | control/modelbased.py |
+| `demos_by_system/pendulum_double/double_pendulum_with_trajectory_following_computed_torque.py` | **TODO** | control/modelbased.py |
+| `demos_by_system/pendulum_double/double_pendulum_with_trajectory_following_open_loop_controller.py` | **TODO** | Representative closed-loop for pendulum_double |
+| `demos_by_system/pendulum_double/double_pendulum_with_trajectory_following_sliding_mode_controller.py` | **TODO** | control/modelbased.py |
+| `demos_by_system/pendulum_double/double_pendulum_with_trajectory_optimization.py` | **Partial** | Trajopt done; plant-specific demo TODO |
+| `demos_by_system/pendulum_double/double_pendulum_with_trajectory_optimization_and_computed_torque.py` | **TODO** | control/modelbased.py |
+| `demos_by_system/pendulum_simple/pendulum_game.py` | **Drop** | sys2game interactive game; ported on demand (R109) |
+| `demos_by_system/pendulum_simple/simple_pendulum.py` | **TODO** | Representative closed-loop for pendulum_simple |
+| `demos_by_system/pendulum_simple/simple_pendulum_custom_parameters.py` | **TODO** | Representative closed-loop for pendulum_simple |
+| `demos_by_system/pendulum_simple/simple_pendulum_modes.py` | **Partial** | Use examples/demos/analysis/analysis_modal.py + open-loop sim |
+| `demos_by_system/pendulum_simple/simple_pendulum_trajectory_optimization.py` | **Partial** | Trajopt done; plant-specific demo TODO |
+| `demos_by_system/pendulum_simple/simple_pendulum_with_lqr.py` | **Partial** | Controller exists; plant demo TODO |
+| `demos_by_system/pendulum_simple/simple_pendulum_with_open_loop_controller.py` | **TODO** | Representative closed-loop for pendulum_simple |
+| `demos_by_system/pendulum_simple/simple_pendulum_with_pid.py` | **Partial** | Controller exists; plant demo TODO |
+| `demos_by_system/pendulum_simple/simple_pendulum_with_trajectory_following_computed_torque.py` | **TODO** | control/modelbased.py |
+| `demos_by_system/pendulum_simple/simple_pendulum_with_trajectory_following_sliding_mode_controller.py` | **TODO** | control/modelbased.py |
+| `demos_by_system/pendulum_simple/simple_pendulum_with_valueiteration_minimum_time.py` | **Partial** | examples/demos/value_iteration/vi_minimum_time.py (mass) + examples/demos/value_iteration/vi_pendulum_swingup.py |
+| `demos_by_system/plane/plane_cobra.py` | **TODO** | Representative closed-loop for plane |
+| `demos_by_system/plane/plane_simple_controller.py` | **TODO** | Representative closed-loop for plane |
+| `demos_by_system/robot_arm_2dof/twolinkrobot_effector_impedance_controller.py` | **TODO** | control/robotic.py + manipulator rebase |
+| `demos_by_system/robot_arm_2dof/twolinkrobot_effector_pid_controller.py` | **TODO** | control/robotic.py + manipulator rebase |
+| `demos_by_system/robot_arm_2dof/twolinkrobot_joint_pid_controller.py` | **TODO** | control/robotic.py + manipulator rebase |
+| `demos_by_system/robot_arm_2dof/twolinkrobot_kinematic_vs_dynamic_openloop.py` | **TODO** | control/robotic.py + manipulator rebase |
+| `demos_by_system/robot_arm_2dof/twolinkrobot_quasi_static_controllers.py` | **TODO** | control/robotic.py + manipulator rebase |
+| `demos_by_system/robot_arm_2dof/twolinkrobot_sliding_mode_controller.py` | **TODO** | control/modelbased.py |
+| `demos_by_system/robot_arm_2dof/twolinkrobot_with_obstacles_path_planning.py` | **TODO** | control/robotic.py + manipulator rebase |
+| `demos_by_system/robot_arm_3dof/threelinkrobot_computed_torque_controller.py` | **TODO** | control/modelbased.py |
+| `demos_by_system/robot_arm_3dof/threelinkrobot_effector_impedance_controller.py` | **TODO** | control/robotic.py + manipulator rebase |
+| `demos_by_system/robot_arm_3dof/threelinkrobot_effector_pid_controller.py` | **TODO** | control/robotic.py + manipulator rebase |
+| `demos_by_system/robot_arm_3dof/threelinkrobot_joint_impedance_controller.py` | **TODO** | control/robotic.py + manipulator rebase |
+| `demos_by_system/robot_arm_3dof/threelinkrobot_kinematic_controller.py` | **TODO** | control/robotic.py + manipulator rebase |
+| `demos_by_system/robot_arm_5dof/fivelinkrobot_kinematic_controller.py` | **TODO** | control/robotic.py + manipulator rebase |
+| `demos_by_system/robot_arm_5dof/fivelinkrobot_with_obstacles_load_plan.py` | **TODO** | control/robotic.py + manipulator rebase |
+| `demos_by_system/robot_arm_5dof/fivelinkrobot_with_obstacles_path_planning.py` | **TODO** | control/robotic.py + manipulator rebase |
+| `demos_by_system/rocket/rocket_game.py` | **Drop** | sys2game interactive game; ported on demand (R109) |
+| `demos_by_system/rocket/rocket_landing_with_lqr.py` | **Partial** | Controller exists; plant demo TODO |
+| `demos_by_system/suspension/suspension.py` | **TODO** | Representative closed-loop for suspension |
+
+### 3.3 `demos_by_tool/`
+
+| Pyro script | Status | Minilink equivalent / notes |
+| --- | --- | --- |
+| `demos_by_tool/differentialflatness/droneminsnap.py` | **TODO** | trajectory_generation/ |
+| `demos_by_tool/differentialflatness/droneminsnap_waypoints.py` | **TODO** | trajectory_generation/ |
+| `demos_by_tool/differentialflatness/rigidbody.py` | **Drop** | RigidBody2D not ported |
+| `demos_by_tool/differentialflatness/rigidbody_waypoints.py` | **Drop** | RigidBody2D not ported |
+| `demos_by_tool/dynamicprogramming/2D_navigation.py` | **TODO** | DP specialty demo not ported |
+| `demos_by_tool/dynamicprogramming/active_suspension.py` | **TODO** | DP specialty demo not ported |
+| `demos_by_tool/dynamicprogramming/braking_reachability.py` | **TODO** | DP specialty demo not ported |
+| `demos_by_tool/dynamicprogramming/car_braking.py` | **TODO** | DP specialty demo not ported |
+| `demos_by_tool/dynamicprogramming/double_pendulum_optimal_swingup_load.py` | **Partial** | examples/demos/value_iteration/vi_double_pendulum_jax.py |
+| `demos_by_tool/dynamicprogramming/helicopter_tunnel.py` | **TODO** | DP specialty demo not ported |
+| `demos_by_tool/dynamicprogramming/pendulum_optimal_swingup_low_def_fast_computation.py` | **Partial** | examples/demos/value_iteration/vi_pendulum_swingup.py (grid tuning differs) |
+| `demos_by_tool/dynamicprogramming/pendulum_reachability.py` | **Partial** | `ReachabilityCost` not in minilink (check at C1); demo TODO |
+| `demos_by_tool/dynamicprogramming/policy_evaluator_with_computed_torque.py` | **TODO** | control/modelbased.py |
+| `demos_by_tool/optimal_control_demo.py` | **TODO** | Not yet audited |
+| `demos_by_tool/rl_with_stable_baseline3/double_pendulum_with_ppo.py` | **Drop** | External SB3 training |
+| `demos_by_tool/rl_with_stable_baseline3/drone_with_ppo.py` | **Drop** | External SB3 training |
+| `demos_by_tool/rl_with_stable_baseline3/pendulum_dp_vs_ppo_bangbang.py` | **Drop** | External SB3 training |
+| `demos_by_tool/rl_with_stable_baseline3/pendulum_dp_vs_ppo_pump.py` | **Drop** | External SB3 training |
+| `demos_by_tool/rl_with_stable_baseline3/pendulum_dp_vs_ppo_tmotor_bangbang.py` | **Drop** | External SB3 training |
+| `demos_by_tool/rl_with_stable_baseline3/pendulum_with_PPO_baseline_gym_example.py` | **Drop** | External SB3 training |
+| `demos_by_tool/rl_with_stable_baseline3/pendulum_with_PPO_baseline_pyro_reproduction.py` | **Drop** | External SB3 training |
+| `demos_by_tool/trajectory_planning/double_pendulum_with_trajectory_optimization.py` | **Partial** | Trajopt done; plant-specific demo TODO |
+| `demos_by_tool/trajectory_planning/mountain_car_trajectory_optimization.py` | **Partial** | Trajopt done; plant-specific demo TODO |
+| `demos_by_tool/trajectory_stabilization/cartpole_swing_up_with_lqr_stabilization.py` | **Partial** | examples/demos/control/trajectory_lqr_cartpole.py |
+| `demos_by_tool/trajectory_stabilization/double_pendulum_with_trajectory_following_lqr_controller.py` | **TODO** | Plant-specific demo TODO (`trajectory_lqr` landed) |
+| `demos_by_tool/trajectory_stabilization/pendulum_swing_up_with_lqr_stabilization.py` | **TODO** | Plant-specific demo TODO (`trajectory_lqr` landed) |
+| `demos_by_tool/transfer_functions/mass_with_pid.py` | **Partial** | examples/demos/control/pid_anti_windup.py |
+
+### 3.4 `projects/`
+
+| Pyro script | Status | Minilink equivalent / notes |
+| --- | --- | --- |
+| `projects/adaptive_controllers/adaptive_computed_torque.py` | **Drop** | Research/course project; out of library demo scope |
+| `projects/adaptive_controllers/double_pendulum_with_adaptative.py` | **Drop** | Research/course project; out of library demo scope |
+| `projects/adaptive_controllers/simple_pendulum_with_adaptative.py` | **Drop** | Research/course project; out of library demo scope |
+| `projects/adaptive_controllers/simple_pendulum_with_adaptative_traj_following.py` | **Drop** | Research/course project; out of library demo scope |
+| `projects/asimov/asimov.py` | **Drop** | Research/course project; out of library demo scope |
+| `projects/asimov/asimov_computed_torque_controller.py` | **Drop** | Research/course project; out of library demo scope |
+| `projects/asimov/asimov_endeffector_pid_controller.py` | **Drop** | Research/course project; out of library demo scope |
+| `projects/asimov/asimov_joint_pid_controller.py` | **Drop** | Research/course project; out of library demo scope |
+| `projects/asimov/asimov_kinematic_controller.py` | **Drop** | Research/course project; out of library demo scope |
+| `projects/pygame/boat_game.py` | **Drop** | sys2game; ported on `simulation/realtime/` only when a course or behavior cloning needs it (R109) |
+| `projects/pygame/double_pendulum_game.py` | **Drop** | sys2game; ported on `simulation/realtime/` only when a course or behavior cloning needs it (R109) |
+| `projects/pygame/test_double_pendulum_joy.py` | **Drop** | sys2game; ported on `simulation/realtime/` only when a course or behavior cloning needs it (R109) |
+| `projects/pygame/test_pendulum_joy.py` | **Drop** | sys2game; ported on `simulation/realtime/` only when a course or behavior cloning needs it (R109) |
+| `projects/tmotor_robot/tmotor_robot_controller_simulation_tests.py` | **Drop** | Research/course project; out of library demo scope |
+| `projects/ugv/ugv_backup.py` | **Drop** | Research/course project; out of library demo scope |
+| `projects/ugv/ugv_dubins.py` | **Drop** | Research/course project; out of library demo scope |
+| `projects/ugv/ugv_gemini.py` | **Drop** | Research/course project; out of library demo scope |
+| `projects/ugv/ugv_map.py` | **Drop** | Research/course project; out of library demo scope |
+| `projects/ugv/ugv_model.py` | **Drop** | Research/course project; out of library demo scope |
+| `projects/ugv/ugv_planner.py` | **Drop** | Research/course project; out of library demo scope |
+| `projects/wcrt/WCRT_with_adaptative.py` | **Drop** | Research/course project; out of library demo scope |
+| `projects/wcrt/wcrt.py` | **Drop** | Research/course project; out of library demo scope |
+| `projects/wcrt/wcrt_with_computed_torque.py` | **Drop** | Research/course project; out of library demo scope |
+
+---
+
+## 5. Explicit non-goals (library + demos)
+
+| Item | Decision | Replacement |
+| --- | --- | --- |
+| Discrete-time / ZOH library | **Done** (2026-10-24) | The exact zero-order hold on `discretize(sys, dt, solver="exact")` (`analysis/discretization.py`), S75's step SM-2 (the contract in DESIGN §5); the z tier itself (Tustin `c2d`, z-plane tools) is not planned, ruled 2026-10-17 |
+| RNN / recurrent blocks | **Drop** | — |
+| Mixed-rate sim (a sampled controller on a continuous plant) | **Done** | `HybridSimulator`, `Computer` (`simulation/discrete/`, the `%` operator); R110, 2026-10-25 |
+| Hybrid events (guards and resets, event-driven switching) | **Drop** | out of scope (ROADMAP §7); R110 |
+| Pyro `sys2game` framework | **Drop** | superseded by `simulation/realtime/` (`RealtimeSimulator`) |
+| Stable-Baselines3 in-library RL | **Drop** | interfaces/gymnasium.py; train externally |
+| `*withObstacles` plant subclasses | **Drop** | planning/spatial/Scene + bind() |
+| DynamicProgramming2DRectBivariateSpline | **Drop** | Grid DP backends |
+| RigidBody2D standalone plant | **Drop** | GeneralizedMechanicalSystem |
+| StochasticSystemWrapper | **Drop** | Noise ports only unless reversed |
+| University course folders | **Drop** | Port ideas via library demos, not 1:1 |
+| Research projects (asimov, ugv, wcrt, …) | **Drop** | Out of library scope |
+| Pacejka tire | **TODO/review** | [TODO.md](TODO.md) Later |
+
+---
+
+## 6. Priority backlog (from gaps above)
+
+Ordered by unblock count:
+
+| Priority | Work | Unblocks |
+| --- | --- | --- |
+| prio 2 | ~~`Manipulator` catalog rebase + `control/modelbased.py`, `control/robotic.py`~~ (library landed) | representative closed-loop demos per plant band |
+| prio 2 | ~~`TrajectoryLQRController`~~ (landed: `trajectory_lqr`) | trajectory_stabilization/ demos |
+| prio 3 | `planning/trajectory_generation/` (min-snap) | differentialflatness/ demos |
+| prio 3 | ~~`estimation/luenberger.py`, `kalman.py`~~ (landed: `luenberger`, `kalman` in `estimation/design.py`) | LQG demos |
+| prio 3 | `identification/fitting.py` | params-gradient workflow |
+| prio 3 | ~~`interfaces/gymnasium.py`~~ (landed) | GRO860 course notebooks |
+| prio 3 | ~~Frequency tools (pole-zero, Nyquist, margins, `ss2tf`)~~ (landed 2026-09-07) | transfer_functions/ completion |
+| prio 3 | `planning/filters.py` TrajectoryFilter | traj post-processing |
+| prio 4 | Representative closed-loop demo per `demos_by_system/*` plant band | ~93 TODO demos shrink to ~20 targets |
+| prio 4 | README pyro → minilink API mapping table | migration guide |
+
+## Appendix — pyro → minilink name map (landed)
+
+Record of every symbol marked Done, at the 2026-09-05 shrink and since; the source for the v0.4 migration guide.
+
+| Pyro symbol | Minilink symbol | Minilink module |
+| --- | --- | --- |
+| ContinuousDynamicSystem | DynamicSystem, System, DiagramSystem | `minilink/core/system.py` |
+| MechanicalSystem | MechanicalSystem | `minilink/dynamics/abstraction/mechanical.py` |
+| GeneralizedMechanicalSystem | GeneralizedMechanicalSystem | `minilink/dynamics/abstraction/generalized_mechanical.py` |
+| StateSpaceSystem | LTISystem, StateSpaceSystem | `minilink/dynamics/abstraction/state_space.py` |
+| linearize() | linearize() | `minilink/analysis/linearization.py` |
+| TransferFunction | TransferFunction | `minilink/blocks/transfer_function.py` |
+| ss2tf() | transfer_function() (2026-09-07) | `minilink/analysis/frequency.py` |
+| StateObserver | StateObserver; `kalman()` / `luenberger()` replace the `kalman` / `kalman_from_ss` classmethods, pyro's `G=` is the caller's `Q_n = B W Bᵀ` (2026-10-14) | `minilink/estimation/observer.py`, `minilink/estimation/design.py` |
+| ObservedSystem | `lqg(...) @ plant`, the observer + gain box (2026-10-14) | `minilink/control/design.py` |
+| VanderPol | VanderPol | `minilink/dynamics/catalog/equations/oscillators.py` |
+| SimpleIntegrator | the `Integrator` block (the plant deleted 2026-10-24, R54) | `minilink/blocks/basic.py` |
+| DoubleIntegrator | DoubleIntegrator | `minilink/dynamics/catalog/equations/integrators.py` |
+| TripleIntegrator | TripleIntegrator | `minilink/dynamics/catalog/equations/integrators.py` |
+| SinglePendulum | Pendulum | `minilink/dynamics/catalog/pendulum/pendulum.py` |
+| InvertedPendulum | InvertedPendulum | `minilink/dynamics/catalog/pendulum/pendulum.py` |
+| DoublePendulum | DoublePendulum | `minilink/dynamics/catalog/pendulum/double_pendulum.py` |
+| Acrobot | Acrobot | `minilink/dynamics/catalog/pendulum/double_pendulum.py` |
+| TwoIndependentSinglePendulum | TwoIndependentPendulums | `minilink/dynamics/catalog/pendulum/pendulum.py` |
+| CartPole | CartPole | `minilink/dynamics/catalog/pendulum/cartpole.py` |
+| RotatingCartPole | RotatingCartPole | `minilink/dynamics/catalog/pendulum/cartpole.py` |
+| UnderActuatedRotatingCartPole | UnderactuatedRotatingCartPole | `minilink/dynamics/catalog/pendulum/cartpole.py` |
+| SingleMass | SingleMass | `minilink/dynamics/catalog/mass_spring_damper/linear.py` |
+| TwoMass | TwoMass | `minilink/dynamics/catalog/mass_spring_damper/linear.py` |
+| ThreeMass | ThreeMass | `minilink/dynamics/catalog/mass_spring_damper/linear.py` |
+| FloatingSingleMass | FloatingSingleMass | `minilink/dynamics/catalog/mass_spring_damper/linear.py` |
+| FloatingTwoMass | FloatingTwoMass | `minilink/dynamics/catalog/mass_spring_damper/linear.py` |
+| FloatingThreeMass | FloatingThreeMass | `minilink/dynamics/catalog/mass_spring_damper/linear.py` |
+| MountainCar | MountainCar | `minilink/dynamics/catalog/vehicles/mountain_car.py` |
+| Boat2D | Boat2D | `minilink/dynamics/catalog/marine/boat.py` |
+| Boat2DwithCurrent | Boat2DWithCurrent | `minilink/dynamics/catalog/marine/boat.py` |
+| Drone2D | Drone2D | `minilink/dynamics/catalog/aerial/drone.py` |
+| SpeedControlledDrone2D | SpeedControlledDrone2D | `minilink/dynamics/catalog/aerial/drone.py` |
+| ConstantSpeedHelicopterTunnel | ConstantSpeedHelicopterTunnel | `minilink/dynamics/catalog/aerial/drone.py` |
+| Drone2DwithSideTruster | Drone2DWithSideThruster | `minilink/dynamics/catalog/aerial/drone.py` |
+| Plane2D | Plane2D | `minilink/dynamics/catalog/aerial/plane.py` |
+| Rocket | Rocket | `minilink/dynamics/catalog/aerial/rocket.py` |
+| QuarterCar | QuarterCar | `minilink/dynamics/catalog/vehicles/suspension.py` |
+| LinearTire | `tire_slip` / `linear_tire_forces` (coefficients in plant `params`) | `minilink/dynamics/catalog/vehicles/dynamic_bicycle.py` |
+| DynamicBicycle | DynamicBicycle (+ JAX twins, rate inputs) | `minilink/dynamics/catalog/vehicles/dynamic_bicycle.py` |
+| LongitudinalSlipCar | same | `minilink/dynamics/catalog/vehicles/propulsion.py` |
+| LongitudinalTorqueCar | same | `minilink/dynamics/catalog/vehicles/propulsion.py` |
+| KinematicBicyleModel | KinematicBicycle | `minilink/dynamics/catalog/vehicles/steering.py` |
+| HolonomicMobileRobot | HolonomicMobileRobot | `minilink/dynamics/catalog/vehicles/steering.py` |
+| Holonomic3DMobileRobot | not in minilink (check at C1) | project only: `examples/projects/car_trajopt/vehicles/extras.py` |
+| KinematicCarModel | KinematicCar | `minilink/dynamics/catalog/vehicles/steering.py` |
+| ConstantSpeedKinematicCarModel | not in minilink (check at C1) | project only: `examples/projects/car_trajopt/vehicles/extras.py` |
+| UdeSRacecar | UdeSRacecar | `minilink/dynamics/catalog/vehicles/racecar.py` |
+| Manipulator | Manipulator | `minilink/dynamics/abstraction/manipulator.py` |
+| KinematicManipulator | KinematicManipulator | `minilink/dynamics/catalog/manipulators/arms.py` |
+| OneLinkManipulator | OneLinkManipulator | `minilink/dynamics/catalog/manipulators/arms.py` |
+| TwoLinkManipulator | TwoLinkManipulator | `minilink/dynamics/catalog/manipulators/arms.py` |
+| ThreeLinkManipulator | ThreeLinkManipulator | `minilink/dynamics/catalog/manipulators/arms.py` |
+| FiveLinkManipulator | FiveLinkManipulator | `minilink/dynamics/catalog/manipulators/arms.py` |
+| StaticController | DiagramSystem wiring | `minilink/core/diagram.py` |
+| StaticController.plot_control_law | plot_control_law(), plot_input_output_map() | `minilink/graphical/port_map.py` |
+| ClosedLoopSystem | `@` (`closed_loop`), `>>`, `+` composition | `minilink/core/closed_loop.py`, `minilink/core/operators.py` |
+| DynamicController | a `DynamicSystem` with the standard ports (the controller classes are removed by P10's AC-0) | `minilink/core/system.py` |
+| ProportionalController | `P` | `minilink/control/siso.py` |
+| PIDController | PID (filtered PID), PI, PD (2026-09-07) | `minilink/control/siso.py` |
+| synthesize_lqr_controller | `lqr` on a linear model, `lqr_gain` on arrays | `minilink/control/design.py` |
+| linearize_and_synthesize_lqr_controller | `lqr(sys, Q, R, x_bar=, u_bar=)`, which linearizes then designs | `minilink/control/design.py` |
+| TrajectoryLQRController | trajectory_lqr, TrajectoryFeedback | `minilink/control/design.py`, `minilink/control/state.py` |
+| ComputedTorque | ComputedTorque | `minilink/control/modelbased.py` |
+| SlidingMode | SlidingMode | `minilink/control/modelbased.py` |
+| stable_baseline3_controller | SB3Controller | `minilink/interfaces/gymnasium.py` |
+| Trajectory | Trajectory | `minilink/core/trajectory.py` |
+| Simulator | Simulator | `minilink/simulation/simulator.py` |
+| CLosedLoopSimulator | compute_trajectory() | `minilink/core/facades/simulation.py` |
+| DynamicCLosedLoopSimulator | Simulator | `minilink/simulation/simulator.py` |
+| CostFunction, QuadraticCostFunction, … | CostFunction, QuadraticCost, … | `minilink/core/costs.py` |
+| Reachability | not in minilink (check at C1) | — |
+| TrajectoryPlotter | plot_trajectory() | `minilink/graphical/` |
+| Animator | animate() | `minilink/graphical/animation/` |
+| PhasePlot, PhasePlot3 | plot_phase_plane() | `minilink/graphical/phase_plane/` |
+| GridDynamicSystem | StateSpaceGrid | `minilink/planning/dynamic_programming/discretizer.py` |
+| DynamicProgramming | DynamicProgrammingPlanner | `minilink/planning/dynamic_programming/dp.py` |
+| DynamicProgrammingWithLookUpTable | same planner + lookup | `minilink/planning/dynamic_programming/dp.py` |
+| LookUpTableController | LookupPolicy | `minilink/planning/dynamic_programming/lookup_policy.py` |
+| PolicyEvaluator | PolicyEvaluator | `minilink/planning/dynamic_programming/policy_eval.py` |
+| Planner | Planner | `minilink/planning/planner.py` |
+| RRT | RRTPlanner, RRTStarPlanner | `minilink/planning/search/` |
+| DirectCollocationTrajectoryOptimisation | TrajectoryOptimizationPlanner (DirectCollocationTranscription, ShootingTranscription, MultipleShootingTranscription) | `minilink/planning/trajectory_optimization/` |
+| transformation_matrix_2D | frame tf helpers | `minilink/core/kinematics.py` |
+| transform_points_2D, arrows | primitives, drawables | `minilink/graphical/animation/` |
+| Sys2Gym | Sys2Gym | `minilink/interfaces/gymnasium.py` |
