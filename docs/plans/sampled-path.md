@@ -365,6 +365,11 @@ today's, and `solver="scipy"` for the adaptive path: it keeps the numbers and th
 today's default gives (R123's delay aside) and makes `compute_trajectory`, `evaluate` and the
 gradients agree by default. Not ruled.
 
+**Scoring on the same discrete footing** ([differentiable-problem.md](differentiable-problem.md)
+§9, a draft idea): once `dt` and the scheme are set, every loop that steps, a discretized
+continuous loop or `computer @ plant`, would be scored by one discrete evaluator on a
+discretized problem.
+
 ### 8.5 `computer @ plant` is a step diagram that knows it is hybrid (the maintainer, 2026-10-26, tentative draft vision)
 
 > The result of `computer @ plant` is considered to be the step diagram, at least for the
