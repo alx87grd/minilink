@@ -525,8 +525,9 @@ R108: it moves to `planning/`). All for v0.4.
    `planning/environment.py` as a housekeeping step before MP-1.
 
 **The recommendations, moved from end-state-api.md (2026-10-26)**, verbatim; the ids stay:
+they were "the v0.4 names the v0.3 code will already print" (end-state-api.md §3).
 
-#### D26 MPPI's name (mppi.md ask 1)
+### D26 MPPI's name (mppi.md ask 1)
 
 **Ruled 2026-10-25 (R106):** as recommended below.
 
@@ -534,20 +535,20 @@ R108: it moves to `planning/`). All for v0.4.
 own acronym, as the course notes say it); `PathIntegralPlanner` stays the docstring's long
 form.
 
-#### D27 The MPC block's planner contract (mppi.md ask 2; T6)
+### D27 The MPC block's planner contract (mppi.md ask 2; T6)
 
 **Recommended:** the three `Planner` verbs (`decision_dimension()`, `prepare_online()`,
 `warm_start_guess(z_prev, y, *, dt_mpc, k)`) and `z` on the tick's record; no `hasattr`
 probing. `ModelPredictiveController(planner, dt_mpc=)` then wraps trajopt and MPPI alike.
 
-#### D28 The stochastic default of MPPI (mppi.md ask 3)
+### D28 The stochastic default of MPPI (mppi.md ask 3)
 
 **Ruled 2026-10-25 (R107):** as recommended below.
 
 **Recommended:** `n_plant_samples=1` on a stochastic problem with the bias stated in the
 docstring; the user raises it knowingly, as with `n_trials`.
 
-#### D30 Where `RolloutEnvironment` lives (mppi.md ask 5)
+### D30 Where `RolloutEnvironment` lives (mppi.md ask 5)
 
 **Ruled 2026-10-25 (R108), against the recommendation below:** it moves to
 `planning/environment.py` before the MPPI planner, the RL import kept: it is the problem

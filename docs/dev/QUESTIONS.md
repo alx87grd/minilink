@@ -22,13 +22,13 @@ the bucket they had.
   (ruled R114, v0.9), whose types S66 (in the core's last phase) raises; the realtime
   simulator re-based on the pure blocks and the hybrid orchestrator's adaptive plant
   integration (sampled-path.md §8.4); the RL heads rebuilt on the seeded policy (C5, v0.4).
-- **Options:** each joins v0.3's core; or each keeps its rung (S29 and S70 in v0.9, the realtime review at
-  v1.0, the RL heads with C5 in v0.4).
+- **Options:** each joins v0.3's core; or each keeps its rung outside v0.3 (S29 and S70 in v0.9; the realtime re-base
+  with the realtime band, whose architectural review is a v1.0 row; the RL heads with C5 in v0.4).
 - **Recommendation:** none (an open point the 2026-10-26 consolidation recorded).
 - **Detail:** [core-architecture.md](../plans/core-architecture.md) §4
 - **Answer:**
 
-**Foundations: every object pure; the step algebra (P1, P2)**
+**Foundations: every object pure; the step algebra (phases 1, 2)**
 
 ### Which same-tick semantic does a step diagram have?
 - **Blocks:** the step algebra (TODO §1.2) and the hybrid loop's pure tick (§1.5); numbers move once either way.
@@ -51,10 +51,11 @@ the bucket they had.
 - **Detail:** [native-optimizers.md](../plans/native-optimizers.md) §3.1, §4.7
 - **Answer:**
 
-**One discrete judge (P3)**
+**One discrete judge (phase 3)**
 
 ### Does the evaluation unify from the rollout on, with a discretized planning problem? (needs refinement)
-- **Blocks:** nothing yet; it shapes step 7b (the sampled face) and the sampled loop (S31), v0.4.
+- **Blocks:** one discrete judge (TODO §1.3); it shapes step 7b (the sampled face) and the sampled
+  loop (S31), both v0.3 (TODO §1.5).
 - **Today:** the evaluator's run is already the step model and its score already reads the
   samples; the same continuous cost becomes a per-step cost three ways (value iteration and RL
   a left Riemann sum `g dt`, the evaluator a trapezoid), so one policy has three close `J`s.
@@ -83,11 +84,11 @@ the bucket they had.
 - **Detail:** [differentiable-problem.md](../plans/differentiable-problem.md) §9.4; [core-architecture.md](../plans/core-architecture.md) §3
 - **Answer:**
 
-**The draws and the seeded policy (P4)**
+**The draws and the seeded policy (phase 4)**
 
 ### What does the standard stochastic policy look like as a seeded block?
-- **Blocks:** the RL follow-ups (C5, D29): the RL heads rebuilt on it, the RL numbers changing
-  once.
+- **Blocks:** the seeded stochastic policy (TODO §1.4, D29); the RL heads rebuilt on it, the RL
+  numbers changing once (core or the RL follow-ups C5: open, the release entry above).
 - **Today:** your direction (2026-10-22), `u = μ_θ(x) + σ_θ(x) · ε(seed, ⌊t/Δ⌋)`; its methods
   and first heads are open.
 - **Recommendation:** `GaussianPolicy(mean, log_std, *, dt, seed=None)` in `control/neural.py`,
@@ -107,18 +108,19 @@ the bucket they had.
 - **Detail:** [future-policies.md](../plans/future-policies.md) §5 point 4, §5.1; [sampled-path.md](../plans/sampled-path.md) §8.6 (D14)
 - **Answer:**
 
-**The hybrid loop: one model, two runners (P5)**
+**The hybrid loop: one model, two runners (phase 5)**
 
 ### Does `computer @ plant` become a step diagram, with a CONSTITUTION amendment?
-- **Blocks:** the sampled loop (S31, v0.4); CONSTITUTION invariant 1.
+- **Blocks:** the sampled loop (S31, v0.3, TODO §1.5); CONSTITUTION invariant 1.
 - **Today:** `computer @ plant` builds a `HybridDiagram`, a plain class beside the step algebra;
   R13 and R120 rule the sampled loop a tool, not a `System`.
-- **Your direction (2026-10-26, a tentative draft vision, promising, not decided):** the result is a `StepDiagramSystem` subclass on the base
-  clock (the computer's pure step and the plant discretized), regular for the algebra and the
-  analysis, with hybrid-aware `compute_trajectory`, `plot_diagram` and the clock runner.
-- **Your direction (2026-10-26):** a core pillar of v0.3, "one model, two runners": the pure step diagram for
-  analysis, evaluation and gradients, the clock orchestrator for realtime and compute
-  efficiency, over the same pure blocks; the amendment itself stays open.
+- **Your direction (2026-10-26):** a tentative draft vision, promising, not decided: the result is
+  a `StepDiagramSystem` subclass on the base clock (the computer's pure step and the plant
+  discretized), regular for the algebra and the analysis, with hybrid-aware
+  `compute_trajectory`, `plot_diagram` and the clock runner. Later the same day, a core pillar of
+  v0.3, "one model, two runners": the pure step diagram for analysis, evaluation and gradients,
+  the clock orchestrator for realtime and compute efficiency, over the same pure blocks; the
+  amendment itself stays open.
 - **Options:** amend invariant 1's second sentence to "the coupling is a tool; its result, at the
   base clock, is a `System` of the step algebra"; or keep R120 and expose a read-only step map.
 - **Recommendation:** the amendment, when S31 lands; the precedent is `Discretization`.
@@ -156,7 +158,7 @@ the bucket they had.
 - **Detail:** [core-architecture.md](../plans/core-architecture.md) §6.3
 - **Answer:**
 
-**The generic parametric program; the stochastic program its case (P6a, P6b)**
+**The generic parametric program; the stochastic program its case (phases 6a, 6b)**
 
 ### Does the parametric program become one family, with hand-written parameters and live MPC ports?
 - **Blocks:** the compiled MPC program binding every parameter (S76, D25); the parametric
@@ -177,8 +179,8 @@ the bucket they had.
 - **Answer:**
 
 ### How do programs and solvers take parameters and randomness? (needs analysis and discussion)
-- **Blocks:** nothing yet; it shapes S76's `ParametricProgram` (v0.4), the native solvers and the
-  stochastic category of native-optimizers.md.
+- **Blocks:** the stochastic-program row (TODO §1.6); it shapes S76's `ParametricProgram` (v0.3),
+  the native solvers and the stochastic category of native-optimizers.md.
 - **Today:** only `x0` varies in the compiled MPC program; `pe.program(wrt, key, n_trials)`
   freezes its draws at build (a sample average); seeds live in `params` as integers (RD-R6, R118);
   overrides are complete trees (R121) while `parametric-program.md` §3.1 binds partial ones.
@@ -195,10 +197,13 @@ the bucket they had.
 - **Detail:** [native-optimizers.md](../plans/native-optimizers.md) §7
 - **Answer:**
 
-**The solve as a rollout, a proof of concept (P6c)**
+**The solve as a rollout, a proof of concept (phase 6c)**
 
 ### Native optimizers: is the solver a pure kernel with a step-system view, or a `StepSystem` itself?
-- **Blocks:** the native-optimizer plan (NS-1, NS-2, NS-5); no rung yet.
+- **Blocks:** the native-optimizer plan: the proof of concept (NS-1, NS-2's fixed-`K` form; TODO
+  §1.7, v0.3) and the teaching face (NS-5, v0.4).
+- **Your direction (2026-10-26):** a proof of concept in v0.3, a simple fixed-step solver and an
+  MPC on it; better solvers in v0.4. The kernel's shape stays open.
 - **Today:** `gd` and `adam` are a Python loop in `optimizers/first_order.py`; a hand-wired
   `StepDiagramSystem` of a law `z⁺ = z − η u` and a gradient oracle already rolls out gradient
   descent.
@@ -210,7 +215,19 @@ the bucket they had.
 - **Detail:** [native-optimizers.md](../plans/native-optimizers.md) §3
 - **Answer:**
 
-**Fields (P7)**
+### Which fixed-iteration tick comes first: the gradient MPC or MPPI's?
+- **Blocks:** the solve as a rollout (TODO §1.7) and MPPI (S72, TODO §4).
+- **Today:** native-optimizers.md §4.6b and §5 say "MPPI is the first instance, ahead of NS-8": its
+  tick is already pure, needing no native solver. Your direction of 2026-10-26 puts the gradient
+  MPC's proof of concept (NS-1, NS-2's fixed-`K` form, NS-8, NS-9) in v0.3 and MPPI in v0.4.
+- **Options:** the gradient MPC first, as the direction places it; MPPI's tick first as the
+  sampled loop's first pure controller, MPPI's planner still v0.4; both in the same phase.
+- **Recommendation:** none (an open point the 2026-10-26 consolidation recorded).
+- **Detail:** [native-optimizers.md](../plans/native-optimizers.md) §4.6, §4.6b, §5;
+  [core-architecture.md](../plans/core-architecture.md) §8
+- **Answer:**
+
+**Fields (phase 7)**
 
 ### Where do `as_cost` and the shaping live?
 - **Blocks:** Fields (TODO §1.8), V1's step 8 (§1.1) and the workspace geometry (A3, v0.4).
@@ -283,7 +300,8 @@ the bucket they had.
 - **Answer:**
 
 ### Should the failure price follow a run's cost overrides?
-- **Blocks:** programs over cost weights.
+- **Blocks:** programs over cost weights (`pe.program(wrt=["cost…"])`; the parametric program,
+  S76, TODO §1.6).
 - **Today:** the price keeps the problem's own weights; with no exact bound it costs 4096 calls
   of `g` at every `evaluate` and program iteration. A cache keyed on the cost's parameters
   would remove that.
@@ -293,7 +311,7 @@ the bucket they had.
 - **Answer:**
 
 ### Do three demos change style?
-- **Blocks:** your demo pass (K4) and the closing example (S77).
+- **Blocks:** your demo pass (K4); the closing example (S77) landed.
 - **Today:** `pid_autotuning_jax.py` keeps two helpers, prints that carry arithmetic and a
   hand-made last figure; `diagram_shortcuts.py` labels `NoisyPendulum()` as `Pendulum()`;
   `custom_one_link_arm.py` reads module constants, not `params`, and a comment restates a line.
@@ -352,13 +370,15 @@ the bucket they had.
 - **Blocks:** the planning records before the freeze.
 - **Today:** no plan doc says more than this line.
 - **Recommendation:** none yet.
-- **Detail:** none beyond this entry (a one-line item of ROADMAP §6).
+- **Detail:** none beyond this entry (once a one-line item of ROADMAP §6).
 - **Answer:**
 
 ## Blocks v0.9 / v1.0
 
 ### Where do the course material and the research projects live?
 - **Blocks:** the freeze candidate (K5, then the move K6), between terms after GMC714.
+- **Your direction (2026-10-26):** no course calendar shapes a step; "between terms" above is the
+  plan's wording before it. The question stays open.
 - **Today:** the GRO860 notes and webpage and GRO501's `\colab{}` cite the course notebooks, which
   clone `main` unpinned; on 2026-10-22 you put pinning off to the pinned cell (V6).
 - **Options:** one repo; a course repo pinned on a release; one repo with pinned course cells and
@@ -369,6 +389,8 @@ the bucket they had.
 
 ### How is the examples tree laid out?
 - **Blocks:** the examples moves, between terms (with K5).
+- **Your direction (2026-10-26):** no course calendar shapes a step; "between terms" above is the
+  plan's wording before it. The question stays open.
 - **Today:** five kinds of folder on four axes; the README table is the only map.
 - **Options:** tidy today's names; two axes, chapter and course; notebook-first with paired
   scripts.
@@ -470,6 +492,8 @@ your go (or your review) before an agent starts.
 | The noise seeds on the draws | V1 step 7 | v0.3 (the core, the draws) | one seed per random block in `problem.realize` (RN-4, RN-5, AC-7) |
 | LQG as a planner | LQGPlanner | v0.4 | `LQGPlanner(problem)` beside `LQRPlanner` |
 | The field object | A1 | v0.3 (the core, Fields) | `StateField` → `Field` in `core/fields.py`; the certificate's `V` a field |
+| GMC714's names pinned | G3 | v0.3 (the clean-up lane) | `test_teaching_surface.py` pins the teaching names, each with a demo |
+| The unsupported plants to the experimental tier | K8-3 | v0.3 (the clean-up lane) | per plant, from K1's table |
 | Workspace geometry | A3 | v0.4 | the `core/geometry/` package; `planning.spatial` moved, then deleted |
 | SAC's actor step | S50 | v0.4 | the critic before the update (today) or after it |
 | Policy iteration on the grid | S51 | v0.4 | a mode or a sibling of `DynamicProgrammingPlanner` |
@@ -478,9 +502,10 @@ your go (or your review) before an agent starts.
 | The pyro → minilink migration guide | C1 | v0.4 | its section in README |
 | Value iteration on a finite horizon | S63 | v0.4 | backward sweeps for a finite `tf`, or a warning |
 | Catalog hygiene | S64 | v0.4 | the per-plant clean-ups |
+| Traceable linear analysis | S73 | v0.4 (any time) | `poles`, `frequency_response`, `margins` through the array module, and the sensitivity peaks |
 | The move of the course material | K6 | v0.9 | only if K5 says so |
 | The pinned Colab cell | V6 | v0.9 | a pinned release in every notebook; `showcase_jax`'s `c_export` import |
-| A lighter git history | V11 | after the v0.3 tag | a force-push without notebook outputs (176 MB clone to under 25 MB) |
+| A lighter git history | V11 | v0.9 (after the v0.3 tag) | a force-push without notebook outputs (176 MB clone to under 25 MB) |
 | The convergence leftovers | TODO §6 | before V3 | the racecar 3-D skin moved; `Sys2Gym` / `SB3Controller` to the experimental tier; `planning/search/` cut; three facade verbs |
 | The public face | V10 | v1.0 | a teaching quickstart first in README; `CONTRIBUTING.md` and templates |
 | The Stable-Baselines3 notebooks | S49 | v1.0 | retire two, decide two |

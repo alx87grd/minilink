@@ -11,10 +11,10 @@ Identity: [CONSTITUTION.md](CONSTITUTION.md).
 | --- | --- | --- |
 | **v0.1** | **GRO860 end to end**, plus a working **`pip install minilink` on PyPI**. Every topic of the running optimal-control & RL course runs on the teaching surface, in Colab (git-clone cell) and in the conda env: value iteration / DP on a grid · LQR + linearization · trajectory optimization · RL via native `ReinforcementLearningPlanner` (with `Sys2Gym` + SB3 as an optional bridge). See §4.1. | Fall 2026 — `0.1.0` on PyPI (2026-09-16); `0.1.1` (2026-09-26) is the first release a GitHub tag published. Conda from `environment.yml` is the recommended install. The course notebooks' names are frozen until v1.0, with the freeze paused between terms (§4.1 gate 7). |
 | **v0.2** | **GRO501 end to end** (the classical-control course: multi-physics modelling · root locus / Bode / margins · PID to spec · digital implementation · state feedback, pole placement, LQR, observers — see §4.2). Conda stays the recommended install. | `0.2.0` on PyPI (2026-10-17), from the GitHub tag; every §4.2 row green |
-| **v0.3** | **The complete core** (§5.3; the maintainer's direction of 2026-10-26, [core-architecture.md](../plans/core-architecture.md)): one architecture from the plant to the evaluation and the optimizer, supporting stochastic problems and the hybrid sampled loop, built in the natural order of the code. Landed first (2026-10-24, DESIGN §4–§6): **the convergence pass** (the core kept, side features to the experimental tier) and **the continuous core** (one step model under every sampled tool, one evaluation of any run, and the deterministic differentiable path to the cost behind a clean API: `evaluate`, `compare`, `problem.compile(loop)`, the program export, cost parameters; a closing PID-tuning example by hand and by the pipeline, S77). Then two foundations (every object pure, every number a parameter; the step algebra first-class) and seven pillars: one discrete judge, the draws over starts, parameters, disturbances and block seeds, the seeded stochastic policy, the hybrid loop (one model, two runners), one generic parametric program with the stochastic program its case, a native solver and an MPC on it as a proof of concept, Fields. The teaching surface covers every GMC714 lab (§4.3, R48); the course material stays on `main` until v0.3 merges. | When the core is complete (no date; the order is the commitment) |
+| **v0.3** | **The complete core** (§5.3; the maintainer's direction of 2026-10-26, [core-architecture.md](../plans/core-architecture.md)): one architecture from the plant to the evaluation and the optimizer, supporting stochastic problems and the hybrid sampled loop, built in the natural order of the code. Landed first (2026-10-24, DESIGN §4–§6): **the convergence pass** (the core kept, side features to the experimental tier) and **the continuous core** (one step model under every sampled tool, one evaluation of any run, and the deterministic differentiable path to the cost behind a clean API: `evaluate`, `compare`, `problem.compile(loop)`, the program export, cost parameters; a closing PID-tuning example by hand and by the pipeline, S77). Then two foundations (every object pure, every number a parameter; the step algebra first-class) and seven pillars (the eight items the maintainer named, the parametric and the stochastic programs grouped as one): one discrete judge, the draws over starts, parameters, disturbances and block seeds, the seeded stochastic policy, the hybrid loop (one model, two runners), one generic parametric program with the stochastic program its case, a native solver and an MPC on it as a proof of concept, Fields. The teaching surface covers every GMC714 lab (§4.3, R48); the course material stays on `main` until v0.3 merges. | When the core is complete (no date; the order is the commitment) |
 | **v0.4** | **Features on the core** (§5.4), not intertwined with it: MPPI on the sampled kernel; identification as the program export's first data consumer; `LQGPlanner`; workspace geometry; the RL follow-ups; native solvers beyond the proof of concept; the general serial chain (C6); pyro parity and the former wave G rows; traceable linear analysis. | After v0.3 (no date) |
-| **v0.9** | **Freeze candidate** (§5.5): the foundation questions that could still break a public name are decided (derived `x0`, Diffrax as an optional solve, the glyph/solid rename, the frozen surface); the trust contract is in place (deprecation policy, pinned export list, CHANGELOG, pinned installs); the standard-syllabus holes close (estimation; the discrete-time one closes with S75 in v0.3); the docs site renders the tutorials. | Spring 2027 |
-| **v1.0** | **A colleague can build a course on it and trust it for three years** (§5.6): the API frozen under the deprecation policy, the standard control syllabus covered and checked against textbook worked examples, course-neutral labs an instructor adopts outside UdeS, green on Windows, macOS and Linux; after two cohorts. Two Stable-Baselines3 teaching notebooks retire (S49) and the GRO860 name freeze becomes the general one. | 2027 |
+| **v0.9** | **Freeze candidate** (§5.5): the foundation questions that could still break a public name are decided (derived `x0`, Diffrax as an optional solve, the glyph/solid rename, the frozen surface); the trust contract is in place (deprecation policy, pinned export list, CHANGELOG, pinned installs); the standard-syllabus holes close (estimation; the discrete-time one closes with S75 in v0.3); the docs site renders the tutorials. | Spring 2027 (indicative, set before 2026-10-26; the releases carry no dates now) |
+| **v1.0** | **A colleague can build a course on it and trust it for three years** (§5.6): the API frozen under the deprecation policy, the standard control syllabus covered and checked against textbook worked examples, course-neutral labs an instructor adopts outside UdeS, green on Windows, macOS and Linux; after two cohorts. Two Stable-Baselines3 teaching notebooks retire (S49) and the GRO860 name freeze becomes the general one. | 2027 (indicative, set before 2026-10-26; v1.0 comes when the API feels mature) |
 
 ## 2. Two lanes
 
@@ -108,7 +108,7 @@ Step ids (`S29`, `P4`, `T2`, …) are the rows of
 | Core + diagrams | teaching | 7 | Public API and diagram API stable; compile-vs-reference parity tested; wrong-shape `f` / `h` fails at `compile()`; the modules by job (the operators, the closed loop, the roles, the port graph; the discrete-time pieces in `core/discrete/`, the `System` shortcuts in `core/facades/`, 2026-10-24). | Automation by convention, the rest (P10: plots and animation by role; the cost on the plant's draws, the v0.3 core); derived `x0` (S29, v0.9; its release open, QUESTIONS). |
 | Compile (`core/compile/`) | teaching (frozen subset) | 4 | Integrated; the frozen evaluator subset is named in DESIGN §5; one evaluator class per system kind on either backend, one body per method compiled on JAX (SM-6, 2026-10-24); the step model (`ev.step` / `ev.rollout`, `solver=`, `substeps=`, `hold=`) under every sampled tool, `discretize` on it (S75, 2026-10-24). Speed lives in batches (1000 rollouts × 1000 RK4 steps in 27 ms); float64 on JAX by default. | `rollout_batch` with a `params` family (S53); the step algebra first-class, one discrete judge, the draws and the sampled face (the v0.3 core, [core-architecture.md](../plans/core-architecture.md) §2.2, §3, §5, §6; the deterministic path landed); Diffrax (S27, v0.9). |
 | Simulation | teaching | 7 | Mature; fixed 10 001-point default grid; `verbose` names unified. | One owner per rule (S65). |
-| Dynamics (abstraction + catalog) | teaching | 7 | Plants QA'd; `MechanicalSystem` / `Manipulator`; UR5 ABA/RNEA; **every catalog plant compiles on both backends** (contract test); four-rung vehicle ladder; UdeS racecar (kinematic, dynamic, 3-D); every plant states its own bounds, the mechanical bases invent none (R68, 2026-10-24). | The catalog clean-up (K8, v0.3); one mechanical family (S32, v0.3, R62; postponed by the maintainer on three open questions, TODO §2); catalog hygiene (S64) and the general serial chain (C6), v0.4. |
+| Dynamics (abstraction + catalog) | teaching | 7 | Plants QA'd; `MechanicalSystem` / `Manipulator`; UR5 ABA/RNEA; **every catalog plant compiles on both backends** (contract test); four-rung vehicle ladder; UdeS racecar (kinematic, dynamic, 3-D); every plant states its own bounds, the mechanical bases invent none (R68, 2026-10-24). | The catalog clean-up (K8, v0.3); one mechanical family (S32, v0.3, R62; postponed by the maintainer on three open questions, two since ruled (R101, R102), `DynamicBicycle`'s base left, TODO §2); catalog hygiene (S64) and the general serial chain (C6), v0.4. |
 | Control | teaching | 6 | Linear, LQR (infinite horizon, finite horizon, along a trajectory), pole placement, reference scaling (`N`), `P` / `PI` / `PD` / `PID` and the rate-measured `Impedance` / `IntegralImpedance` as one family (what is measured decides the derivative; limits with infinite defaults, anti-windup once a limit is declared; the shared pieces three pure functions), model-based SMC and computed torque, robotic impedance and kinematic laws, neural policy block; a controller is a plain `System`; MPC's teaching name `ModelPredictiveController` on `minilink.control` (G3). | The robotic PID wrappers (C2, v0.4). |
 | Analysis | teaching | 6 | Jacobians, linearize, structural, equilibria, modal; one-channel Bode with grid-free margins, pole-zero, root locus, Nyquist, the linear step response on matplotlib and plotly; the sensitivity functions `S` / `T` / `PS` / `CS`. Every verb takes any `System`, the linear model as is, the rest linearized at the operating point (2026-10-15). | Nichols and overlays later; Bode, poles and margins traceable for sensitivity to params (idea to review, S73). |
 | Blocks | teaching | 5 | Routing, nonlinear, filters, sources (with `Sine`), TF, `MLP`, `UnitDelay`. | `Ramp` / `Chirp` / `Delay` / `Switch` (C3, v0.4). |
@@ -237,17 +237,18 @@ Names as ruled by R52 and R63 (the renames landed with A6 on 2026-10-24, on `dev
 | 8 | To come | — | — | — |
 | 10–13 | Projects | "a new system or controller integrated into the library" | the `System` contract | on the surface |
 
-Not a week of the syllabus: MPC (its teaching name stable by January all the same, R49), robust control as a topic of its own
+Not a week of the syllabus: MPC (its teaching name stable all the same, R49; by January as
+planned then, when v0.3 merges now), robust control as a topic of its own
 (one section of week 5, the sliding mode), the draws and Monte Carlo, gradient tuning.
 
 **The gate:** every row above stays on the teaching surface through the v0.3 changes, so a lab
 written against the v0.3 interface needs nothing more; and (R49) the tools the labs use carry
-one public, stable teaching name by January (RRT, MPC, trajectory optimization, computed
+one public, stable teaching name when v0.3 merges (RRT, MPC, trajectory optimization, computed
 torque, sliding mode, the task- and joint-space impedance laws, task-space position control
 with a nullspace posture, `Manipulator`), frozen for the term (TODO §2, G3). The lab notebooks themselves are the
 maintainer's teaching design (AGENTS), written when he chooses; agents draft on request.
 **Reworded 2026-10-26** (the maintainer's direction): the course material stays on `main` until
-the new v0.3 core is ready; "by January" no longer dates the gate, which holds when v0.3 merges.
+the new v0.3 core is ready; the gate read "by January" before.
 
 ## 5. The path to v1.0
 
@@ -256,15 +257,17 @@ Each rung names its open steps, one line each. The steps themselves, with files,
 every step in it is landed or explicitly dropped by the maintainer. Landed work leaves this
 section; its history is in git and in [docs/reviews/](../reviews/). This section names the
 rows of the architecture and course waves; wave D's rows (the T rows, D1–D3, S43, S53, S65–S69,
-A4, P4) are named in TODO only, except those that joined the core on 2026-10-26 (T1, T2, S53,
-S65, S66, named in §5.3).
+A4, P4) are named in TODO only beyond §5.2's summary, except those that joined the core on
+2026-10-26 (T1, T2, S53, S65, S66, named in §5.3); two core rows are named in TODO only, small
+parts of their pillars: `Sys2Gym`'s start law (the draws) and the `HybridSimulator` drift (the
+hybrid loop).
 
 **The order is the commitment; the course calendar is secondary** (ruled 2026-10-22,
 [record](../reviews/2026-10-22-second-roadmap-review-rulings.md)). GRO860 runs in the fall
 term (running now) and GMC714 in the winter term, which v0.3 prepares. Two windows the plan
 cites: *between terms* is late December 2026 to early January 2027 (the between-terms moves
 of K7 and A6, V11); *between cohorts* means between GRO860 cohorts, the course whose material
-reads the Monte Carlo evaluator and the RL numbers (v0.4's one-time number changes). Neither
+reads the Monte Carlo evaluator and the RL numbers (v0.4's one-time number changes, before 2026-10-26; the v0.3 core's now). Neither
 window delays a wave: a step that would move a running course's numbers ships behind the
 pinned release the course runs on (V6) rather than waiting. **From 2026-10-26 no course
 calendar shapes a step** (the maintainer's direction,
@@ -284,30 +287,29 @@ core** (the landed continuous core, then the core's own pillars, [core-architect
 **v0.4 adds the features built on it**, v0.9 decides what can still break a name, v1.0 freezes
 when the API is mature.
 
-**At a glance** (the proposed order of the core, [core-architecture.md](../plans/core-architecture.md) §4, not ruled; no dates):
+**At a glance** (the phases 0–8 of the proposed order of the core, [core-architecture.md](../plans/core-architecture.md) §4, not ruled; no dates):
 
 ```mermaid
 flowchart TB
-    L["Landed on dev-v0.3, 2026-10-24/25: the clean-up's renames and moves; the step model (S75);
-    the path to the cost (V1 steps 1–6, 7a, A2); the optimizer's table (S74); the PID example (S77)"]
-    L --> P0["P0 the rulings the phases need (QUESTIONS, Blocks v0.3)"]
-    P0 --> P1["P1 every object pure, every number a parameter"]
-    P1 --> P2["P2 the step algebra first-class"]
-    P2 --> P3["P3 one discrete judge"]
-    P3 --> P4["P4 the draws and the seeded policy"]
-    P4 --> P5["P5 the hybrid loop: one model, two runners"]
-    P1 --> P6a["P6a the generic parametric program"]
-    P6a --> P6b["P6b the stochastic program, its case"]
-    P4 --> P6b
-    P6a --> P6c["P6c the solve as a rollout: a native solver and an MPC, a proof of concept"]
-    P5 --> P6c
-    P1 --> P7["P7 Fields"]
-    K["the clean-up lane: K8, S32, G3, K4"] --> P8
-    P5 --> P8["P8 hardening, the notebooks, the merge: v0.3"]
-    P6b --> P8
-    P6c --> P8
-    P7 --> P8
-    P8 --> V4["v0.4 features on the core"]
+    L["Landed on dev-v0.3, 2026-10-24/25: the clean-up's renames and moves; the step model (S75);<br/>the path to the cost (V1 steps 1–6, 7a, A2); the optimizer's table (S74); the PID example (S77)"]
+    L --> F0["phase 0, the rulings the phases need (QUESTIONS, Blocks v0.3)"]
+    F0 --> F1["phase 1, every object pure, every number a parameter"]
+    F1 --> F2["phase 2, the step algebra first-class"]
+    F2 --> F3["phase 3, one discrete judge"]
+    F3 --> F4["phase 4, the draws and the seeded policy"]
+    F4 --> F5["phase 5, the hybrid loop: one model, two runners"]
+    F1 --> F6a["phase 6a, the generic parametric program"]
+    F6a --> F6b["phase 6b, the stochastic program, its case"]
+    F4 --> F6b
+    F6a --> F6c["phase 6c, the solve as a rollout: a native solver and an MPC, a proof of concept"]
+    F5 --> F6c
+    F1 --> F7["phase 7, Fields"]
+    K["the clean-up lane: K4, K8, K9, G3, S32, the rests of V1.2 and S74"] --> F8
+    F5 --> F8["phase 8, hardening, the notebooks, the merge: v0.3"]
+    F6b --> F8
+    F6c --> F8
+    F7 --> F8
+    F8 --> V4["v0.4 features on the core"]
     V4 --> V9["v0.9 freeze candidate"]
     V9 --> V10["v1.0"]
 ```
@@ -365,7 +367,8 @@ the cost (V1's steps 1–6 with the cost parameters A2 and the Monte Carlo fold)
 method table (S74) and the closing PID example (S77), on `dev-v0.3` pending the maintainer's
 review (R79).
 
-**The rows, by foundation and core pillar** (each **[ask — core]**; the seven pillars are
+**The rows, by foundation and core pillar** (each **[ask — core]**; the maintainer named eight
+items, grouped as seven pillars, the parametric and stochastic programs one; they are
 [core-architecture.md](../plans/core-architecture.md) §1, the seeded policy riding with the draws here; the
 last bullet is the merge):
 - **Every object pure, every number a parameter** (TODO §1.1): A5's sets reading `params`, RN-2,
@@ -472,7 +475,7 @@ each reads is [core-architecture.md](../plans/core-architecture.md) §10.
   **S63** DP reading a finite horizon, **S64** catalog hygiene.
 - **S73** Traceable linear analysis, any time, self-contained.
 
-### 5.5 v0.9 — freeze candidate (spring 2027)
+### 5.5 v0.9 — freeze candidate (spring 2027, indicative, set before 2026-10-26)
 
 What v1.0 asks is adoption, not architecture: a colleague builds a course on minilink and
 trusts it for three years. The
@@ -512,7 +515,6 @@ public name; v1.0 (§5.6) freezes.
   git history, once, after the v0.3 tag (planned for December 2026 when v0.3 had that date). **[ask]**
 
 **The syllabus holes** (beyond GRO501's P4):
-- **`discretize` follow-ups**: landed with S75 in v0.3 (its step SM-2).
 - **Estimation follow-ups** after P4: EKF, time-varying and discrete Kalman; online parameter
   estimators (recursive least squares, gradient laws).
 - **C4** Identification: moved to v0.4 (V1's program export with a data cost).
@@ -523,7 +525,7 @@ public name; v1.0 (§5.6) freezes.
 - **V7** The docs site renders the tutorials, a plant gallery with pictures, and a short
   concept guide.
 
-### 5.6 v1.0 — a colleague can build a course on it (2027)
+### 5.6 v1.0 — a colleague can build a course on it (2027, indicative, set before 2026-10-26)
 
 After two cohorts have run on v0.2 and the freeze candidate has held a term:
 - **V8** A textbook-validation suite: Dorf / Ogata / Franklin worked examples asserted

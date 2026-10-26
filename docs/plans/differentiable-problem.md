@@ -18,7 +18,7 @@ and the three demos that teach a hand gradient loop (OD-32).
 [core-architecture.md](core-architecture.md)): the `StepRollout` fold ([TODO.md](TODO.md) §1.2),
 step 8 (§1.1), the discrete judge of §9 (§1.3, a pillar), step 7 with RN-4 of
 [randomness.md](randomness.md) (§1.4), step 7b after S31's kernel (§1.5), step 9 with the merge
-(§1.9); S73, any time (R76), a v0.4 row (§4). The rungs the step list of §8 writes are the ones
+(§1.9); S73, any time (R76), a v0.4 row (§4). The rungs the step list of §8 and §9.4 write are the ones
 before that direction.  
 **Lane:** core; the open steps are **[ask — core]**.
 
@@ -155,7 +155,7 @@ content. Steps 0–6 and 7a landed on 2026-10-24.
 ## 9. Draft idea: one discrete evaluator from the rollout on (the maintainer, 2026-10-26)
 
 **Status: a draft idea, not ruled; it needs refinement (§9.4).** The ask is in QUESTIONS.md
-("Blocks v0.4").
+("Blocks v0.3" since 2026-10-26, when it became a core pillar).
 
 > Once the cost function is set and the time discretization is decided (`dt`, the substeps,
 > the Runge–Kutta scheme), a continuous system's rollout is the same thing as a system that

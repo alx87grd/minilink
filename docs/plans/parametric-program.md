@@ -185,7 +185,8 @@ the step model. MPC is not a week of the GMC714 syllabus, but its teaching name 
 ## 5. Later, not scheduled
 
 - The scene leaf (moving obstacles), with A3.
-- Single shooting with parameters; multiple shooting has no parametric form today.
+- Single shooting with parameters; multiple shooting has no parametric form today. (Since
+  2026-10-26 single shooting with parameters is in the core proof of concept's row, TODO §1.7.)
 - The sensitivity of the solved plan to `p` (implicit differentiation of the optimality
   conditions): a differentiable MPC, beside the traceable inner solver
   [sampled-path.md](sampled-path.md) §8 anticipates. The native solvers that bind this

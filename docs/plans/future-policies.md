@@ -149,6 +149,9 @@ demo than human driving, and free of hardware.
 
 ### 5.1 D29, the standard stochastic policy as a seeded block (moved from end-state-api.md, 2026-10-26)
 
+Moved verbatim; its rung ("C5 (v0.4)") is the one before 2026-10-26: the block is a v0.3 core
+pillar now, the RL heads' rebuild open (QUESTIONS.md).
+
 **Recommended:** `GaussianPolicy(mean, log_std, *, dt, seed=None)` in `control/neural.py`, a
 plain `System` whose `h` is `u = μ_θ(x) + σ_θ(x) · ε(seed, ⌊t/Δ⌋)`; `seed=None` is the
 deterministic face (`NeuralPolicyController` becomes that face); `log_prob(x, u)` and

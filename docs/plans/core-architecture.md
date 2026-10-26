@@ -42,10 +42,12 @@ PlanningProblem / StochasticPlanningProblem                   §5    the draws (
 Field  value(x, u, t; p)  (sets, costs, cost-to-go, V, Q)      §9    the last textbook noun
 ```
 
-**Seven pillars, two foundations.** The maintainer named seven pillars on 2026-10-26: the hybrid
+**Seven pillars, two foundations.** The maintainer named eight items on 2026-10-26: the hybrid
 loop, one model and two runners (§6); one discrete judge (§3); stochastic problems (§5); the
-generic parametric program with the stochastic program as its case (§7); a native solver and an
-MPC as a proof of concept (§8); Fields (§9); the seeded stochastic policy (§5.3). Two
+generic parametric program (§7); the stochastic program, which he related to it (§7); a native
+solver and an MPC as a proof of concept (§8); Fields (§9); the seeded stochastic policy (§5.3).
+This doc groups the parametric and the stochastic programs as one pillar, as his own words do
+("the stochastic program is solving over multiple seeds" of the deterministic one), so seven. Two
 foundations sit under them, gathered from the plan docs: every object pure with every number a
 parameter (§2.1), and the step algebra first-class (§2.2).
 
@@ -117,7 +119,8 @@ one-tick lag inside a `Computer`).
 **Vision (draft, the maintainer, 2026-10-26; [differentiable-problem.md](differentiable-problem.md)
 §9).** Once `dt` and the scheme are set, a continuous rollout is the same thing as a system that
 is already discrete. So the evaluation is unified from that point on:
-- `problem.discretize(dt, solver=, substeps=)` gives a discrete problem:
+- the continuous problem is discretized once into a discrete problem (QUESTIONS writes
+  `problem.discretize(dt, solver=, substeps=)`; the object and its name are open, §9.4 point 3):
   - the per-step cost `c_k = ∫ e^{−ρt} g dt` with `u_k` held;
   - the sets at the index;
   - `N = tf / dt`, `γ = e^{−ρ dt}`.
@@ -155,45 +158,47 @@ is already discrete. So the evaluation is unified from that point on:
 
 ## 4. The proposed build order (a proposal, not ruled)
 
-The natural order of the code, each phase building on the one before. An independent review
-(2026-10-26) checked the order against the code; its points are recorded here and in QUESTIONS,
-none ruled.
+The natural order of the code, each phase building on the one before. The agent's order review
+in the consolidation session of 2026-10-26 checked it against the code
+([the record](../reviews/2026-10-26-core-consolidation.md) §3); its points are recorded here and
+in QUESTIONS, none ruled.
 
 | Phase | What | Needs | Why here |
 | --- | --- | --- | --- |
-| P0 | The rulings the phases need (QUESTIONS.md, "Blocks v0.3"), and the clean-up lane (K8, S32, G3, K4) beside the core | — | No foundation code before the ruling that shapes it (the rule of the 2026-10-22 sessions) |
-| P1 | Every object pure, every number a parameter (§2.1) | P0 | The draws, the hybrid tick and the programs all read leaves of `params` |
-| P2 | The step algebra first-class (§2.2) | P1 | The judge and the hybrid kernel are step loops |
-| P3 | One discrete judge (§3) | P2 | One kernel before the draws and the sampled loop plug into it |
-| P4 | The draws and the seeded policy (§5) | P3 | One change site for the realization; the computer's noise blocks need RN-4's seeds by name |
-| P5 | The hybrid loop: one model, two runners (§6) | P2–P4 | A sampled loop is one more step loop for the judge |
-| P6a | The generic parametric program (§7) | P1 (cost and set leaves) | Collocation uses the continuous `f`, not the step model (parametric-program.md §4) |
-| P6b | The stochastic program, its case (§7) | P4 (the seed leaf) | |
-| P6c | The solve as a rollout, the MPC capstone (§8) | P5, P6a | The MPC's closed loop runs through the sampled face |
-| P7 | Fields (§9) | P1 (`Set.as_cost`'s signature) | Additive to the path |
-| P8 | Hardening (S66), the notebooks migrated (R47), the merge (R79) | all | |
+| 0 | The rulings the phases need (QUESTIONS.md, "Blocks v0.3"), and the clean-up lane beside the core (TODO §2: K4, K8, K9, G3, S32, V1.2's and S74's rests) | — | No foundation code before the ruling that shapes it (the rule of the 2026-10-22 sessions) |
+| 1 | Every object pure, every number a parameter (§2.1) | phase 0 | The draws, the hybrid tick and the programs all read leaves of `params` |
+| 2 | The step algebra first-class (§2.2) | phase 1 | The judge and the hybrid kernel are step loops |
+| 3 | One discrete judge (§3) | phase 2 | One kernel before the draws and the sampled loop plug into it |
+| 4 | The draws and the seeded policy (§5) | phase 3 | One change site for the realization; the computer's noise blocks need RN-4's seeds by name |
+| 5 | The hybrid loop: one model, two runners (§6) | phases 2–4 | A sampled loop is one more step loop for the judge |
+| 6a | The generic parametric program (§7) | phase 1 (cost and set leaves) | Collocation uses the continuous `f`, not the step model (parametric-program.md §4) |
+| 6b | The stochastic program, its case (§7) | phase 4 (the seed leaf), phase 6a | |
+| 6c | The solve as a rollout, the MPC capstone (§8) | phase 5, phase 6a | The MPC's closed loop runs through the sampled face |
+| 7 | Fields (§9) | phase 1 (`Set.as_cost`'s signature) | Additive to the path |
+| 8 | Hardening (S66), the notebooks migrated (R47), the merge (R79) | all | |
 
-**Number changes.** The rule is R80–R82: closeness on the same problem and cost, `rtol 1e-6` on a
-restructure. Every phase step stays byte-identical except these, each a commit of its own with a
-ledger line:
+**Number changes.** The rule is R80–R81: an intended change is checked by closeness on the same
+problem and cost (R80), a restructured computation agrees to `rtol 1e-6` (R81), and a pure move
+or rename stays byte-identical; R82 adds no alias, one sweep. The intended changes the phases
+already name, each a commit of its own with a ledger line:
 - the same-tick semantic;
 - the one-judge `J`;
 - the cross-backend draws and live disturbances;
 - R123's one-period MPC delay;
 - the hybrid defaults.
 
-The proposal is to re-pin the demos, notebooks and baselines once, at the end of P5.
+The proposal is to re-pin the demos, notebooks and baselines once, at the end of phase 5.
 
 **Open points the order raises** (QUESTIONS.md):
-- S70 (the error family, ruled R114, a v0.9 row) earlier than P8, since S66 raises its types,
-  and S29 in P1 (both in the release question);
-- whether `problem.compile` refuses the stateless MPC until P5 (R123's computational delay lands
+- S70 (the error family, ruled R114, a v0.9 row) earlier than phase 8, since S66 raises its types,
+  and S29 in phase 1 (both in the release question);
+- whether `problem.compile` refuses the stateless MPC until phase 5 (R123's computational delay lands
   with the hybrid loop; today's stateless MPC is a plain `System` that `problem.compile` accepts);
 - the release of the rows the core reads but that sit elsewhere (S29, S70, the realtime runner's
   re-base and the orchestrator's adaptive plant integration, the RL heads' rebuild);
-- the CONSTITUTION amendment ruled before P5 and applied with it;
-- the `StepRollout` fold, placed in P2 here, waits for S31 in its row (OD-36: it is the hybrid
-  simulator's record), so it lands in P2 or with P5.
+- the CONSTITUTION amendment ruled before phase 5 and applied with it;
+- the `StepRollout` fold, placed in phase 2 here, waits for S31 in its row (OD-36: it is the hybrid
+  simulator's record), so it lands in phase 2 or with phase 5.
 
 ## 5. Stochastic problems: the draws (a pillar; ruled in its convention)
 
@@ -241,8 +246,11 @@ QUESTIONS.md:
 - D29's contract;
 - one draw convention for a policy: the held draw `⌊t/Δ⌋` of D29, or the tick index of R104
   (with `Δ = d·dt_base` they agree, a convention to state);
-- whether the RL heads' rebuild on the block is core or an RL follow-up (v0.4);
-- `Sys2Gym` against DESIGN.
+- whether the RL heads' rebuild on the block is core or an RL follow-up (v0.4, in the release
+  entry).
+
+Elsewhere: `Sys2Gym.from_problem` against DESIGN §6, a finding of
+[the record](../reviews/2026-10-26-core-consolidation.md) §5 (the rest of RN-5 closes it).
 
 ### 5.5 Steps
 
@@ -278,8 +286,9 @@ loop holds the held signals as state and makes a block's firing a select on `k m
   hyperperiod unrolled as an optimization (§8.1, Draft 3).
 - **The clock orchestrator.** Today's `Computer.tick` and `HybridSimulator` shape, over the same
   pure blocks. It serves realtime and game mode, hardware in the loop, host-only blocks (an
-  Ipopt MPC), and efficient simulation: idle blocks are skipped, and an adaptive plant
-  integration restarts only when the held input changes (§8.4).
+  Ipopt MPC), and efficient simulation, its idle blocks skipped (§8.2). Whether it also
+  integrates the plant adaptively by default (restarting only when the held input changes) is
+  one of §8.4's two open defaults, with the agent's conditions, not part of the vision.
 
 Neither runner owns a copy of a block's equations, and the step diagram is the orchestrator's
 test oracle. Deployment generates its runner from the schedule (§8.2).
@@ -305,14 +314,17 @@ QUESTIONS.md, "Blocks v0.3":
   orchestrator with an adaptive plant: §8.4), and the plant trajectory's resolution;
 - the same-tick semantic (§2.2);
 - D13, the run caches (now [sampled-path.md](sampled-path.md) §8.6);
-- whether the realtime simulator's re-base on the pure blocks is core or a feature;
-- AC-8a's port names (automation-by-convention.md §6);
-- R123's B option (a Mealy `update`), a study.
+- whether `problem.compile` refuses the stateless MPC until the sampled face lands;
+- whether the realtime simulator's re-base on the pure blocks is core or a feature (the release
+  entry).
+
+Elsewhere: AC-8a's port names, a planned step (automation-by-convention.md §6–§7, TODO §3);
+R123's option B (a Mealy `update`), a study (sampled-path.md §8.3).
 
 ### 6.5 Steps
 
-TODO §1.5: the two-runner row (design open), S31, V1 step 7b, the `HybridSimulator` drift row;
-AC-8a and AC-8b (automation-by-convention.md §7).
+TODO §1.5: the two-runner row (design open), S31 (with AC-8b), V1 step 7b, the `HybridSimulator`
+drift row; AC-8a is a TODO §3 step, "alongside" (automation-by-convention.md §7).
 
 ## 7. One generic parametric program; the stochastic program its case (a pillar)
 
@@ -328,7 +340,8 @@ rebind without recompiling. The generic parametric program is finished all at on
 - one evaluator body, a hand-written `J(z)` being the case `p = {}`;
 - one backend table for the offline and the compiled paths (§6, OPW-1–OPW-5).
 
-The names are ruled: `ParametricProgram`, the key `plant` (R26, D19).
+The names are ruled: the key `plant` (R26); the family `ParametricProgram` (D19, PP-0, as
+parametric-program.md records it).
 
 **The stochastic program as its case** (direction, 2026-10-26, from the maintainer's leaning of
 2026-10-25, [native-optimizers.md](native-optimizers.md) §7.2): every program is deterministic
@@ -343,7 +356,8 @@ several seeds (§7.3–§7.4, a draft):
 
 - `ParametricMathematicalProgram` varies `x0` only.
 - Direct collocation captures the plant, cost and set parameters in closures, and
-  `require_online_params` refuses every other key.
+  `require_online_params` refuses every `params` key, `scene` included; only the `x0` argument
+  binds.
 - The MPC port functions drop their `params`.
 - `JaxParametricProgramEvaluator` repeats about half of the plain evaluator.
 - The compiled path accepts SciPy only (`build_parametric_optimizer_backend`).
@@ -364,9 +378,11 @@ QUESTIONS.md:
 - D25 (a hand-written program declares its own `p`; the MPC's live-parameter ports, now
   [parametric-program.md](parametric-program.md) §2.1);
 - `bind` on both the evaluator and the program;
-- single shooting with parameters (parametric-program.md §5), which the proof of concept needs;
-- the stale `system.mu` of parametric-program.md §3.5 against the ruled key `plant`;
 - native-optimizers.md §4.1's `J(z, key)` against the seed as a leaf of `p`.
+
+Elsewhere: single shooting with parameters, unscheduled in parametric-program.md §5, is in the
+proof of concept's row (TODO §1.7); the stale `system.mu` of parametric-program.md §3.5 against
+the ruled key `plant` is annotated there.
 
 ### 7.4 Steps
 
@@ -391,7 +407,9 @@ two goals, 2026-10-25:
 - its closed loop in one scan, tuned by gradient (NS-9).
 
 State-of-the-art solvers and MPC are v0.4. MPPI's tick is the same shape and already pure
-(native-optimizers.md §4.6b); MPPI itself is a v0.4 feature.
+(native-optimizers.md §4.6b); MPPI itself is a v0.4 feature. Open point (QUESTIONS.md): the
+plan doc makes MPPI's tick "the first instance, ahead of NS-8" (§4.6b, §5), while the direction
+puts the gradient MPC's proof of concept in v0.3 and MPPI in v0.4.
 
 ### 8.2 Today in the code
 
@@ -405,8 +423,10 @@ State-of-the-art solvers and MPC are v0.4. MPPI's tick is the same shape and alr
 QUESTIONS.md:
 - the kernel's shape: a pure kernel with a step-system view (recommended), or a `StepSystem`;
 - which categories and algorithms are in scope;
-- the fixed-iteration MPC's rung is answered by the direction: the proof of concept is v0.3,
-  the rest v0.4.
+- which fixed-iteration tick comes first, the gradient MPC or MPPI's.
+
+Answered by the direction, so out of QUESTIONS: the fixed-iteration MPC's rung (the proof of
+concept in v0.3, the rest v0.4).
 
 ### 8.4 Steps
 
@@ -451,18 +471,18 @@ TODO §1.8 (A1).
 **Direction (2026-10-26):** v0.4 adds features built on the finished core, not intertwined with
 it. Each feature reads one or more pillars:
 
-| Feature (TODO §4) | Reads | Plan |
+| Feature (TODO §4 unless named) | Reads | Plan |
 | --- | --- | --- |
-| MPPI (S72, MP-1–MP-6) and the MPC planner contract (D27, T6) | §3, §5, §6 | [mppi.md](mppi.md) |
+| MPPI (S72, MP-1–MP-6) and the MPC planner contract (D27; T6 in TODO §3) | §3, §5, §6 | [mppi.md](mppi.md) |
 | Identification and trajectory generation (C4) | §7 (the program export with a data cost) | [differentiable-problem.md](differentiable-problem.md) §1 |
 | `LQGPlanner` | §5 | [estimation-and-state-feedback.md](estimation-and-state-feedback.md) §5 |
 | Workspace geometry (A3), then the CBF safety filter | §9 | [geometry-module.md](geometry-module.md), [cbf-safety-filter.md](cbf-safety-filter.md) |
-| The RL follow-ups (C5), the RL heads on the seeded policy (open: core or here), reward scaling | §5.3 | [future-policies.md](future-policies.md), [rl-reward-scaling.md](rl-reward-scaling.md) |
+| The RL follow-ups (C5), the RL heads on the seeded policy (open: core or here), reward scaling (a Later idea, TODO §6) | §5.3 | [future-policies.md](future-policies.md), [rl-reward-scaling.md](rl-reward-scaling.md) |
 | Native solvers beyond the proof of concept (NS-2's tolerance form, NS-3–NS-7) | §7, §8 | [native-optimizers.md](native-optimizers.md) |
 | Traceable linear analysis (S73) | independent (the Jacobian) | [differentiable-problem.md](differentiable-problem.md) §4.6 |
 | The general serial chain (C6), pyro parity (C1), C2, C3, S63, S64 | — | [pyro-port-remaining.md](pyro-port-remaining.md) |
-| The estimation follow-ups (v0.9 rows): the sampled filters | §6 | [estimation-and-state-feedback.md](estimation-and-state-feedback.md) §6 |
-| After v1.0: behavior cloning (a `fit` verb and a dataset noun, open), diffusion policy | §5.3, §6 | [future-policies.md](future-policies.md) §3–§5 |
+| The estimation follow-ups (v0.9 rows, TODO §5): the sampled filters | §6 | [estimation-and-state-feedback.md](estimation-and-state-feedback.md) §6 |
+| After v1.0 (TODO §5, §6): behavior cloning (a `fit` verb and a dataset noun, open), diffusion policy | §5.3, §6 | [future-policies.md](future-policies.md) §3–§5 |
 
 ## 11. Where `end-state-api.md`'s entries went
 

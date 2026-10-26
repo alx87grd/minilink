@@ -4,7 +4,8 @@ Status: **ideas to review**, written 2026-10-25 from the maintainer's vision (§
 state of the code (§2) and the agent's read (§3–§6). The maintainer named the two goals the same
 day (§1.1): the fixed-iteration MPC first, convergence analysis with control tools long term.
 The design choices are not ruled; the asks are in
-[QUESTIONS.md](../dev/QUESTIONS.md) ("Blocks v0.9 / v1.0"). Lane: research. Rung: none yet; the
+[QUESTIONS.md](../dev/QUESTIONS.md) ("Blocks v0.3" and "Blocks v0.4" since 2026-10-26; "Blocks v0.9 / v1.0"
+before). Lane: research. Rung (as written before 2026-10-26; the rung note below holds now): none yet; the
 natural slot is after the sampled loop (S31) and the parametric program (S76), both v0.4,
 because this plan builds on the step model's rollout and on the program's parameters.
 **Rung, 2026-10-26:** the maintainer's direction puts a proof of concept in v0.3's core: a simple
@@ -71,7 +72,7 @@ parameter to the cost), [sampled-path.md](sampled-path.md) §8 (the one rollout 
 | Program evaluators | `optimization/evaluators/` | NumPy and JAX; the JAX one jits `J`, `∇J`, `∇²J`, the Jacobians, then **returns NumPy arrays** to the solver | the derivatives are; the solve is not |
 | Parameters | `planning/trajectory_optimization/parametric_program.py` | `ParametricMathematicalProgram`: only `x0` varies between solves (S76 widens it, v0.4) | partly (the JAX MPC path) |
 | `Adam` | `optimizers/first_order.py` | Optax-style `init` / `update` on a pytree; also the RL learners' optimizer (`sac.py`, `algorithms/base.py`) | **yes**: the RL planner runs its gradient steps in one `lax.scan` (`planner.py`), PPO too |
-| The step model | `core/discrete/step_system.py`, `core/compile/evaluators/discrete.py`, `stepping.py` | `step(x, u, k, params)`; `rollout` is a Python loop on NumPy, one `lax.scan` on JAX; no `rollout_batch` for step systems yet (the continuous evaluator has one) | yes |
+| The step model | `core/discrete/step_system.py`, `core/compile/evaluators/discrete.py`, `stepping.py` | `step(x, u, k, params)`; `rollout` is a Python loop on NumPy, one `lax.scan` on JAX; no `rollout_batch` for step systems yet (the continuous evaluator has one) | yes (open point: `DiscreteEvaluator.rollout` returns host NumPy, so not end to end; core-architecture.md §2.2) |
 | Other solvers in disguise | `planning/dynamic_programming/dp_jax.py` (value iteration in a `lax.while_loop`), `learning/.../ppo.py` (scan of minibatch steps), MPPI (planned, S72) | each owns its own loop | yes |
 
 Nothing in the library differentiates *through* a solve today: no `custom_vjp`, no implicit
@@ -304,7 +305,9 @@ reparameterisation, `V = U + ε`, `ε` drawn from the key). The clip to the inpu
 gradient where it binds, as the projection of a projected gradient method does; the gradient is
 noisy across keys, so tuning averages it over the Monte Carlo evaluator's trials.
 
-**So MPPI is the first instance, ahead of NS-8**: it needs no native gradient solver, only the
+(Open point, QUESTIONS.md: the direction of 2026-10-26 puts the gradient MPC's proof of concept,
+NS-1, NS-2's fixed-`K` form, NS-8 and NS-9, in v0.3 and MPPI in v0.4.) **So MPPI is the first
+instance, ahead of NS-8**: it needs no native gradient solver, only the
 block and S31's scan. Several MPPI iterations per tick (`n_iter`, a structural constant like
 §4.6's `K`) fit the same shape.
 
@@ -326,7 +329,7 @@ point (`A = ∂step/∂x`, from the `jacobian` that exists) and its eigenvalues 
 circle. That slice is planned, built with NS-5 when the solver-stability work needs it; the
 rest of the z tier stays dropped.
 
-## 5. Steps (local ids NS-1–NS-9; none scheduled)
+## 5. Steps (local ids NS-1–NS-9; none scheduled before 2026-10-26, when NS-1, NS-2's fixed-`K` form, NS-8 and NS-9 became the v0.3 proof of concept)
 
 - **NS-1 The kernel**: `init` / `step` laws for `gd` and `adam`, on the array module of their
   input; the `Optimizer` loop on NumPy unchanged in behaviour (the AGENTS refactor recipe, a
@@ -355,7 +358,8 @@ rest of the z tier stays dropped.
   kernel's JAX face; done when `problem.compile(mpc_computer).evaluate(p)` runs, `vmap`s over
   starts, and its gradient with respect to the MPC's cost weights tunes a demo by `Optimizer`.
 
-**Order, by the maintainer's two goals.** The MPC path first. MPPI reaches the closed loop in
+**Order, by the maintainer's two goals** (as written before 2026-10-26; which tick comes first is
+now an open point, QUESTIONS.md). The MPC path first. MPPI reaches the closed loop in
 one scan soonest (§4.6b: MP-1 of mppi.md, then S31's scan, no native solver needed); then the
 gradient MPC: NS-1 (any time, internal) →
 NS-2's fixed-`K` form → NS-8, after S76's `ParametricProgram` (so the tick binds `x0` and the
@@ -371,13 +375,18 @@ identification, the Monte Carlo objective).
    a teaching view, rather than every solver a `StepSystem` by construction?
 2. Which categories and which native algorithms are in scope (§4.1, §4.2), against
    CONSTITUTION §1.4?
+3. Where does this enter the roadmap? The maintainer's priority is the MPC path (§1.1); the
+   ask left is the rung: with S76 and S31 in v0.4, or after them. **Answered 2026-10-26** by the
+   maintainer's direction ([the record](../reviews/2026-10-26-core-consolidation.md) §2): a proof
+   of concept in v0.3 (NS-1, NS-2's fixed-`K` form, NS-8, NS-9), the rest in v0.4; the entry left
+   QUESTIONS.md.
+
 Ruled: the discrete step analysis goal 2 needs comes back with NS-5, when solver stability
 requires it (R122, §4.7).
 
 Needs analysis before any recommendation: how programs and solvers take parameters and
-randomness (§7; the maintainer's leaning recorded as a draft in §7.2).
-3. Where does this enter the roadmap? The maintainer's priority is the MPC path (§1.1); the
-   ask left is the rung: with S76 and S31 in v0.4, or after them.
+randomness (§7; the maintainer's leaning recorded as a draft in §7.2, his direction on
+2026-10-26: the stochastic program is the parametric program's case, solved over seeds).
 
 ## 7. Needs analysis: parametric and stochastic programs (not converged)
 

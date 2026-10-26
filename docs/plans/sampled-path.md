@@ -427,7 +427,8 @@ stays for teaching.
 ### 8.6 The sampled loop's details, D13–D15 (moved from end-state-api.md, 2026-10-26)
 
 Moved verbatim when `end-state-api.md` was retired into [core-architecture.md](core-architecture.md);
-the ids stay, as QUESTIONS.md and the rulings records cite them.
+the ids stay, as QUESTIONS.md and the rulings records cite them. The rungs the entries write
+("in v0.4 it lands") are the ones before 2026-10-26: the sampled loop is v0.3's core now.
 
 The loop itself is ruled: a tool, not a `System`, the name `HybridDiagram` kept for now (R13),
 on integer ticks (R14); [sampled-path.md](sampled-path.md) §8 designs it.

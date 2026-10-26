@@ -33,6 +33,9 @@ the contradictions and gaps the consolidation found became open questions, not a
   - **Fields.**
   - **The seeded stochastic policy.**
 
+  Eight items; core-architecture.md groups the parametric and the stochastic programs as one
+  pillar, as the maintainer related them, so it counts seven.
+
 ## 2. What the direction re-assigns
 
 - **R86** ("v0.3 stays continuous"; the sampled loop, the draws and the parametric MPC solve in
@@ -58,7 +61,8 @@ the contradictions and gaps the consolidation found became open questions, not a
   - the open points;
   - the steps.
 
-  It also holds the proposed build order (P0–P8, the agent's, not ruled) and the core against
+  It also holds the proposed build order (phases 0–8, the agent's, not ruled; first labelled
+  P0–P8, renamed the same day because P4, P8 and P10 are workboard ids) and the core against
   the features.
 - **`end-state-api.md` deleted.** Its open entries moved verbatim to the plan docs they shape:
   - D13–D15: sampled-path §8.6;
@@ -107,6 +111,21 @@ kept here in the rulings records and the run's log.
 8. One home for `as_cost` and the shaping (three plans).
 9. mppi.md's design text against R104, R107 and R123.
 
+**The order review.** Before the order was written, the agent asked a planning subagent, in
+the same session, to stress-test it against the code. Its points are in core-architecture.md §4
+and QUESTIONS.md:
+- R123 lands with the MPC as a step block;
+- S70 is wanted before S66;
+- S29 is a core gap;
+- the discrete problem needs one failure rule and one hold;
+- the `Trajectory` fold must allow dense substeps;
+- the number changes are grouped for one re-pin.
+
+**The double-check (same day).** Three read-only audits ran on the result: nothing lost,
+accuracy against the sources and the code, and consistency across the docs. They found no lost
+ruling or step. They did find citation errors, status blurs, stale dates and labels, and the
+phase-id collision; one follow-up commit fixed them.
+
 ## 5. Found while consolidating, not changed
 
 - DESIGN §6 says `Sys2Gym.from_problem` draws the problem's parameters and disturbances; the code
@@ -115,3 +134,21 @@ kept here in the rulings records and the run's log.
   are attributes, not leaves. RN-2 closes it.
 - TODO T2 says `TrajectorySource.h` cannot trace. That has been stale since OD-30, and the row is
   annotated.
+- **The roadmap's dated plan, kept here as history** (the Gantt chart of ROADMAP §5 before
+  2026-10-26, indicative dates, "the order is the commitment, the dates are not"). These
+  durations were the only sizing estimates in the docs.
+  - Rulings sessions 1 and 2 (R1–R29), 2026-10-22, 2 days, done.
+  - The GMC714 audit G1, 2026-10-23, done.
+  - Wave K's renames and moves (K1–K3, K10, A6), 2026-10-23, 2 days, done.
+  - Wave K's rest (K4, K8, K9), S32 and G3, from 2026-11-01, 3 weeks.
+  - The step model S75, 2026-10-23, 2 days, done.
+  - V1's steps 1–6 with A2, S74 and S77, 2026-10-23, 2 days, done.
+  - The v0.3 tag, 2026-12-21.
+  - The sampled loop S31 and OPW, from 2027-01-04, 3 weeks.
+  - V1's steps 7–9, the draws and C4, from 2027-01-04, 4 weeks.
+  - S76 and the wave G rest, from 2027-01-04, 4 weeks.
+  - The V1 sampled face, A1 fields and A3, after the draws, 6 weeks.
+  - MPPI, the C6 serial chain and the RL follow-ups, after the draws, 5 weeks.
+  - The v0.4 tag, 2027-04-30.
+  - The v0.9 foundations and the trust contract, from 2027-05-03, 8 weeks.
+  - v1.0, two cohorts then the freeze, from 2027-07-01, 20 weeks.
