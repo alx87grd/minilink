@@ -380,6 +380,8 @@ identification, the Monte Carlo objective).
    maintainer's direction ([the record](../reviews/2026-10-26-core-consolidation.md) §2): a proof
    of concept in v0.3 (NS-1, NS-2's fixed-`K` form, NS-8, NS-9), the rest in v0.4; the entry left
    QUESTIONS.md.
+4. Which fixed-iteration tick comes first, the gradient MPC or MPPI's (§4.6b, §5)? Added
+   2026-10-26: the direction puts the gradient MPC's proof of concept in v0.3 and MPPI in v0.4.
 
 Ruled: the discrete step analysis goal 2 needs comes back with NS-5, when solver stability
 requires it (R122, §4.7).

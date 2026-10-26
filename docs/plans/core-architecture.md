@@ -160,7 +160,7 @@ is already discrete. So the evaluation is unified from that point on:
 
 The natural order of the code, each phase building on the one before. The agent's order review
 in the consolidation session of 2026-10-26 checked it against the code
-([the record](../reviews/2026-10-26-core-consolidation.md) §3); its points are recorded here and
+([the record](../reviews/2026-10-26-core-consolidation.md) §4); its points are recorded here and
 in QUESTIONS, none ruled.
 
 | Phase | What | Needs | Why here |
@@ -340,8 +340,9 @@ rebind without recompiling. The generic parametric program is finished all at on
 - one evaluator body, a hand-written `J(z)` being the case `p = {}`;
 - one backend table for the offline and the compiled paths (§6, OPW-1–OPW-5).
 
-The names are ruled: the key `plant` (R26); the family `ParametricProgram` (D19, PP-0, as
-parametric-program.md records it).
+The names are ruled: the key `plant` (R26). The family `ParametricProgram` is credited to R26 in
+parametric-program.md's status line and QUESTIONS.md, and to D19 at its PP-0 step; R26's own text
+in the rulings record names the key only (a citation to reconcile, not a design question).
 
 **The stochastic program as its case** (direction, 2026-10-26, from the maintainer's leaning of
 2026-10-25, [native-optimizers.md](native-optimizers.md) §7.2): every program is deterministic
@@ -476,7 +477,7 @@ it. Each feature reads one or more pillars:
 | MPPI (S72, MP-1–MP-6) and the MPC planner contract (D27; T6 in TODO §3) | §3, §5, §6 | [mppi.md](mppi.md) |
 | Identification and trajectory generation (C4) | §7 (the program export with a data cost) | [differentiable-problem.md](differentiable-problem.md) §1 |
 | `LQGPlanner` | §5 | [estimation-and-state-feedback.md](estimation-and-state-feedback.md) §5 |
-| Workspace geometry (A3), then the CBF safety filter | §9 | [geometry-module.md](geometry-module.md), [cbf-safety-filter.md](cbf-safety-filter.md) |
+| Workspace geometry (A3), then the CBF safety filter (unscheduled; QUESTIONS.md, Standing) | §9 | [geometry-module.md](geometry-module.md), [cbf-safety-filter.md](cbf-safety-filter.md) |
 | The RL follow-ups (C5), the RL heads on the seeded policy (open: core or here), reward scaling (a Later idea, TODO §6) | §5.3 | [future-policies.md](future-policies.md), [rl-reward-scaling.md](rl-reward-scaling.md) |
 | Native solvers beyond the proof of concept (NS-2's tolerance form, NS-3–NS-7) | §7, §8 | [native-optimizers.md](native-optimizers.md) |
 | Traceable linear analysis (S73) | independent (the Jacobian) | [differentiable-problem.md](differentiable-problem.md) §4.6 |

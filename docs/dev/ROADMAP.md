@@ -237,8 +237,8 @@ Names as ruled by R52 and R63 (the renames landed with A6 on 2026-10-24, on `dev
 | 8 | To come | — | — | — |
 | 10–13 | Projects | "a new system or controller integrated into the library" | the `System` contract | on the surface |
 
-Not a week of the syllabus: MPC (its teaching name stable all the same, R49; by January as
-planned then, when v0.3 merges now), robust control as a topic of its own
+Not a week of the syllabus: MPC (its teaching name stable all the same, R49: when v0.3 merges,
+by January as planned before 2026-10-26), robust control as a topic of its own
 (one section of week 5, the sliding mode), the draws and Monte Carlo, gradient tuning.
 
 **The gate:** every row above stays on the teaching surface through the v0.3 changes, so a lab

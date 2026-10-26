@@ -124,7 +124,7 @@ and QUESTIONS.md:
 **The double-check (same day).** Three read-only audits ran on the result: nothing lost,
 accuracy against the sources and the code, and consistency across the docs. They found no lost
 ruling or step. They did find citation errors, status blurs, stale dates and labels, and the
-phase-id collision; one follow-up commit fixed them.
+phase-id collision; follow-up commits fixed them.
 
 ## 5. Found while consolidating, not changed
 
@@ -138,7 +138,7 @@ phase-id collision; one follow-up commit fixed them.
   2026-10-26, indicative dates, "the order is the commitment, the dates are not"). These
   durations were the only sizing estimates in the docs.
   - Rulings sessions 1 and 2 (R1–R29), 2026-10-22, 2 days, done.
-  - The GMC714 audit G1, 2026-10-23, done.
+  - The GMC714 audit G1, 2026-10-23, 1 day, done.
   - Wave K's renames and moves (K1–K3, K10, A6), 2026-10-23, 2 days, done.
   - Wave K's rest (K4, K8, K9), S32 and G3, from 2026-11-01, 3 weeks.
   - The step model S75, 2026-10-23, 2 days, done.
