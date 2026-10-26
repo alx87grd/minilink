@@ -192,6 +192,39 @@ real computer does.
    a cyclic executive) around the exported pure blocks; the computational delay of a slow block
    is in the model as a delay state, so simulation and hardware agree.
 
+### 8.3 One model, two runners; the MPC's tick latch in a pure model (draft, 2026-10-26)
+
+**One model, not two.** §8.2's recommendation keeps O2 and O4 side by side, but as two *runners*
+of one description: the pure blocks plus the schedule (plain data). O4 transcribes it into one
+pure map, with full JAX capability; O2 executes it on a host, without computing idle blocks.
+Neither owns its own copy of a block's equations, and O4 is O2's test oracle.
+
+**What O4 composes with.** O4 applied to the computer alone turns a multi-rate computer into one
+single-rate step system at its frame period `lcm(d_i) · dt_base`, which joins the step algebra
+(`StepDiagramSystem`) beside other step systems, a plant discretized with `discretize` included.
+One limit: at the frame period the plant sees one input per frame, so a fast loop that must see
+the plant inside the frame (a 1 kHz inner loop around a 50 Hz MPC) composes only if the plant is
+inside the transcription (§8.1, Draft 4's substeps), not outside it at the frame rate. Whether
+the transcribed map is exposed as a `StepSystem` is §8.1's open point 1 (R13, R120).
+
+**The latch.** `MPCTickLatch` (`planning/trajectory_optimization/mpc/controller.py`) exists
+because four functions want the same solve in one tick: the output ports `u_ff`, `x_ff` and `z`
+(each fed through from `y`) and the block's `step`. It caches the solve by `(k, y)`: a hidden
+cache, so the block is not pure, and a traced tick cannot use it. Four ways out, from the
+simplest:
+
+| Option | What changes | One solve per tick? | Cost |
+| --- | --- | --- | --- |
+| **A. Computational delay**: the solve in `step`, the outputs read from the state | `step` computes `z_{k+1}` from `y_k`; `u_ff` is the first input of `z_k`, so the outputs have no feedthrough from `y` | ✓ | the command applied at `k` comes from the measurement at `k − 1`: one period late, as on a real computer whose solve takes time (§8.2) |
+| **B. One update returning both**: `update(x, u, k, p) → (x_next, y)`, the block's step and outputs from one call (a Mealy form, the shape of a `scan` body) | a new optional method on step blocks; the step plan calls it once and fills the ports and the state | ✓ | a change to the `StepSystem` contract: **[ask — core]** |
+| **C. Rely on the compiler**: call the pure solve four times inside one traced tick | none | ✗ on NumPy; on JAX only if XLA merges the identical calls (not guaranteed through `while_loop` and `scan`) | fragile |
+| **D. The solve as a port the step reads**: the step receives the block's own port values of the same tick | the step plan feeds a block's outputs to its own step | ✓ | the same contract question as B, in another form |
+
+**Draft recommendation: A by default for the MPC, B studied as the general mechanism.** A needs
+no new contract, makes the block pure today, matches what a real computer does, and is the delay
+state §8.2 already uses for a slow block. B is for the cases that need a zero-delay output from
+an expensive computation; it is a core contract change, so it waits for the maintainer.
+
 **Order:** the continuous core it waits for landed on 2026-10-24 (the step model, then V1's
 steps 1–6); the loop comes in v0.4 (R86), with P10's AC-8b; the hand-copied `HybridDiagram`
 facades go with it; the hybrid topology drawing (`graphical/diagrams/hybrid_topology.py`)
