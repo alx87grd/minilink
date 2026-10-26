@@ -855,16 +855,92 @@ def overview():
     return f.svg()
 
 
-def library_map():
-    """The whole library on one page: three foundations, the tools as parallel paths."""
-    f = Figure(1180, 744)
-    w, gap, x0 = 170, 20, 45
-    cols = [x0 + i * (w + gap) for i in range(6)]
-    centers = [x + w / 2 for x in cols]
-    right = cols[5] + w
-    problem_w = 3 * w + 2 * gap
+JAX_TILES = (
+    ("jit", "compiled once, fast"),
+    ("grad", "∂J/∂θ for free"),
+    ("vmap", "many runs at once"),
+)
 
-    # The model: one System, whatever it is made of
+
+def jax_icon(f, name, ix, iy):
+    fill, stroke, ink = COLORS["jax"]
+    if name == "jit":
+        f.add(
+            f'<path d="M{ix + 22},{iy} L{ix + 6},{iy + 26} L{ix + 18},{iy + 26} L{ix + 12},{iy + 48} L{ix + 32},{iy + 18} L{ix + 20},{iy + 18} Z" fill="{stroke}"/>'
+        )
+    elif name == "grad":
+        f.add(
+            f'<path d="M{ix},{iy + 6} Q{ix + 20},{iy + 62} {ix + 44},{iy + 10}" fill="none" stroke="{stroke}" stroke-width="2"/>'
+        )
+        f.add(
+            f'<path d="M{ix - 3.75},{iy + 7.9} L{ix + 24.25},{iy + 46.6}" stroke="{ink}" stroke-width="1.6"/>'
+        )
+        f.add(f'<circle cx="{ix + 10.25}" cy="{iy + 27.25}" r="3.2" fill="{ink}"/>')
+    else:
+        for n in range(5):
+            dy = n * 7
+            f.add(
+                f'<path d="M{ix},{iy + 36} C{ix + 12},{iy + 4 + dy} {ix + 26},{iy + 30 - dy / 2} {ix + 44},{iy + 6 + dy}" fill="none" stroke="{stroke}" stroke-width="1.6" opacity="{0.45 + 0.11 * n:.2f}"/>'
+            )
+
+
+def jax_column(f, x, y, w, h):
+    fill, stroke, ink = COLORS["jax"]
+    f.add(
+        f'<rect x="{x}" y="{y}" width="{w}" height="{h}" rx="10" fill="{fill}" stroke="{stroke}" stroke-width="1.6"/>'
+    )
+    f.text(x + w / 2, y + 26, "JAX", 17, 750, ink)
+    f.text(x + w / 2, y + 44, "every linked object traces", 11.5, 500, ink)
+    step = (h - 70) / 3
+    for k, (name, line) in enumerate(JAX_TILES):
+        ty = y + 64 + k * step
+        jax_icon(f, name, x + w / 2 - 22, ty + 8)
+        f.text(x + w / 2, ty + 80, name, 16, 700, ink)
+        f.text(x + w / 2, ty + 98, line, 12, 500, ink)
+
+
+def link(f, x0, y0, x1, y1):
+    """A dotted indigo link from a traced object to the JAX panel, a dot at the object."""
+    stroke = COLORS["jax"][1]
+    f.add(
+        f'<path d="M{x0},{y0} L{x1},{y1}" stroke="{stroke}" stroke-width="1.6" stroke-dasharray="3 3" fill="none"/>'
+    )
+    f.add(f'<circle cx="{x0}" cy="{y0}" r="4" fill="{stroke}"/>')
+
+
+PATHS = {
+    "Simulate": r"$x(t) = x_0 + \int_0^t f\, d\tau$",
+    "Analyze": r"$\dot{\tilde{x}} = A\tilde{x} + B\tilde{u}$",
+    "Design": r"$u = -K\, x$",
+    "Plan": r"$\pi^* = \mathrm{arg\,min}_{\pi}\; J$",
+    "Learn": r"$\theta \leftarrow \theta + \eta \nabla_{\theta} \mathbb{E}[G]$",
+    "Evaluate": r"$J(\theta),\; m(\theta)$",
+}
+OUTS = {
+    "Simulate": ("Trajectory", None),
+    "Analyze": ("Poles · Bode", r"$G(s) = C(sI - A)^{-1}B$"),
+    "Design": ("Controller", r"$u = \pi(y)$"),
+    "Plan": ("PlanningSolution", r"$u = \pi^*(x)$"),
+    "Learn": ("Neural policy", r"$u = \pi_{\theta}(x)$"),
+    "Evaluate": ("Evaluation", r"$\mathbb{E}[J],\; \mathrm{CVaR},\; \max J$"),
+}
+
+
+def trajectory_card(f, x, y, w, h):
+    f.card(x, y, w, h, "", [], "out")
+    sx, sy = x + w / 2 - 55, y + 52
+    f.add(
+        f'<path d="M{sx},{sy} C{sx + 22},{sy - 30} {sx + 40},{sy + 16} {sx + 62},{sy - 8} S{sx + 96},{sy - 16} {sx + 110},{sy - 12}" fill="none" stroke="{COLORS["out"][1]}" stroke-width="2.2"/>'
+    )
+    f.text(x + w / 2, y + 26, "Trajectory", 15, 650, COLORS["out"][2])
+
+
+def body(f, order, x0, w, gap, eq_size, out_size):
+    """The common map: system, problem over the problem-side columns, paths, results, program."""
+    cols = {name: x0 + i * (w + gap) for i, name in enumerate(order)}
+    right = x0 + 6 * w + 5 * gap
+    side = [cols[n] for n in ("Plan", "Learn", "Evaluate")]
+    px0, px1 = min(side), max(side) + w
     f.eq_card(
         x0,
         24,
@@ -875,13 +951,11 @@ def library_map():
         "obj",
         size=21,
     )
-
-    # The task, built on the model
-    py = 154
+    py = 150
     f.eq_card(
-        cols[3],
+        px0,
         py,
-        problem_w,
+        px1 - px0,
         128,
         "PlanningProblem",
         [
@@ -891,63 +965,63 @@ def library_map():
         "obj",
         size=17,
     )
-    f.arrow(f"M{cols[3] + problem_w / 2},108 L{cols[3] + problem_w / 2},{py - 2}")
-
-    # Six parallel paths
-    ry, rh = py + 128 + 48, 92
-    paths = [
-        ("Simulate", r"$x(t) = x_0 + \int_0^t f\, d\tau$"),
-        ("Analyze", r"$\dot{\tilde{x}} = A\tilde{x} + B\tilde{u}$"),
-        ("Design", r"$u = -K\, x$"),
-        ("Plan", r"$\pi^* = \mathrm{arg\,min}_{\pi}\; J$"),
-        ("Learn", r"$\theta \leftarrow \theta + \eta \nabla_{\theta} \mathbb{E}[G]$"),
-        ("Evaluate", r"$J(\theta),\; m(\theta)$"),
-    ]
-    for i, (title, tex) in enumerate(paths):
-        f.eq_card(cols[i], ry, w, rh, title, tex, "step", size=16)
-    for i in range(3):
-        f.arrow(f"M{centers[i]},108 L{centers[i]},{ry - 2}")
-    for i in range(3, 6):
-        f.arrow(f"M{centers[i]},{py + 128} L{centers[i]},{ry - 2}")
-
-    # What each path gives back
-    oy, oh = ry + rh + 46, 80
-    outs = [
-        ("Trajectory", None),
-        ("Poles · Bode", r"$G(s) = C(sI - A)^{-1}B$"),
-        ("Controller", r"$u = \pi(y)$"),
-        ("PlanningSolution", r"$u = \pi^*(x)$"),
-        ("Neural policy", r"$u = \pi_{\theta}(x)$"),
-        ("Evaluation", r"$\mathbb{E}[J],\; \mathrm{CVaR},\; \max J$"),
-    ]
-    for i, (title, tex) in enumerate(outs):
+    f.arrow(f"M{(px0 + px1) / 2},108 L{(px0 + px1) / 2},{py - 2}")
+    ry, rh = py + 128 + 44, 92
+    oy, oh = ry + rh + 44, 80
+    for name, x in cols.items():
+        cx = x + w / 2
+        f.eq_card(x, ry, w, rh, name, PATHS[name], "step", size=eq_size)
+        top = 108 if name in ("Simulate", "Analyze", "Design") else py + 128
+        f.arrow(f"M{cx},{top} L{cx},{ry - 2}")
+        title, tex = OUTS[name]
         if tex is None:
-            f.card(cols[i], oy, w, oh, "", [], "out")
-            sx, sy = cols[i] + 30, oy + 52
-            f.add(
-                f'<path d="M{sx},{sy} C{sx + 22},{sy - 30} {sx + 40},{sy + 16} {sx + 62},{sy - 8} '
-                f'S{sx + 96},{sy - 16} {sx + 110},{sy - 12}" fill="none" '
-                f'stroke="{COLORS["out"][1]}" stroke-width="2.2"/>'
-            )
-            f.text(centers[i], oy + 26, title, 15, 650, COLORS["out"][2])
+            trajectory_card(f, x, oy, w, oh)
         else:
-            f.eq_card(
-                cols[i], oy, w, oh, title, tex, "out", size=15 if i in (1, 5) else 16
-            )
-        f.arrow(f"M{centers[i]},{ry + rh} L{centers[i]},{oy - 2}")
-
-    # Every controller is a System again: the loop closes on the plant
+            f.eq_card(x, oy, w, oh, title, tex, "out", size=out_size)
+        f.arrow(f"M{cx},{ry + rh} L{cx},{oy - 2}")
+    # The loop back to the System
     loop_y = oy + oh + 18
-    for i in (2, 3, 4):
-        f.dotted(f"M{centers[i]},{oy + oh} L{centers[i]},{loop_y}", COLORS["out"][1])
+    ctl = [cols[n] + w / 2 for n in ("Design", "Plan", "Learn")]
+    for cx in ctl:
+        f.dotted(f"M{cx},{oy + oh} L{cx},{loop_y}", COLORS["out"][1])
+    return cols, right, (px0, px1), py, ry, rh, oy, oh, loop_y, ctl
+
+
+def program(f, px0, px1, by, ry, rh, cols, w, gap):
+    f.eq_card(
+        px0,
+        by,
+        px1 - px0,
+        92,
+        "MathematicalProgram · Optimizer",
+        r"$\min_{z}\; J(z) \quad \mathrm{s.t.} \quad h(z) = 0,\;\; g(z) \geq 0$",
+        "obj",
+        size=18,
+    )
+    for name, label in (("Plan", "trajectory optimization"), ("Evaluate", "tuning")):
+        gx = cols[name] + w + gap / 2 if name == "Plan" else cols[name] - gap / 2
+        if name == "Evaluate" and cols["Evaluate"] < cols["Plan"]:
+            gx = cols[name] + w + gap / 2
+        f.arrow(f"M{gx},{ry + rh / 2} L{gx},{by - 2}", dashed=True)
+        f.text(gx + 6, by - 10, label, 12, 500, MUTED, anchor="start")
+
+
+def library_map():
+    """The whole library on one page: three foundations, the tools as parallel paths, JAX beside them."""
+    f = Figure(1180, 760)
+    order = ["Simulate", "Analyze", "Design", "Plan", "Learn", "Evaluate"]
+    w, gap, x0 = 146, 12, 30
+    cols, right, (px0, px1), py, ry, rh, oy, oh, loop_y, ctl = body(
+        f, order, x0, w, gap, 15, 14
+    )
     f.arrow(
-        f"M{centers[4]},{loop_y} L18,{loop_y} L18,66 L{x0 - 2},66",
+        f"M{max(ctl)},{loop_y} L14,{loop_y} L14,66 L{x0 - 2},66",
         COLORS["out"][1],
         dashed=True,
         marker="arrg",
     )
     f.text(
-        30,
+        24,
         loop_y + 18,
         "every controller is a System: policy @ plant",
         12.5,
@@ -955,95 +1029,13 @@ def library_map():
         COLORS["out"][2],
         anchor="start",
     )
-
-    # The solver boundary, shared by the paths that solve a program
-    by = oy + oh + 64
-    f.eq_card(
-        cols[3],
-        by,
-        problem_w,
-        104,
-        "MathematicalProgram · Optimizer",
-        r"$\min_{z}\; J(z) \quad \mathrm{s.t.} \quad h(z) = 0,\;\; g(z) \geq 0$",
-        "obj",
-        size=18,
-    )
-    gap_plan = cols[3] + w + gap / 2
-    gap_eval = right + 12
-    f.arrow(f"M{gap_plan},{ry + rh / 2} L{gap_plan},{by - 2}", dashed=True)
-    f.arrow(
-        f"M{right},{ry + rh / 2} L{gap_eval},{ry + rh / 2} L{gap_eval},{by + 52} L{right + 2},{by + 52}",
-        dashed=True,
-    )
-    f.text(
-        gap_plan - 6, by - 10, "trajectory optimization", 12, 500, MUTED, anchor="end"
-    )
-    f.text(right - 76, by - 10, "tuning: pe.program(wrt)", 12, 500, MUTED, anchor="end")
-
-    # JAX: every equation above traces, so the tools compile, differentiate and batch
-    jax_panel(f, x0, by, problem_w, 104)
-    for cx, cy in (
-        (right - 44, 24),
-        (cols[3] + problem_w - 44, py),
-        (right - 36, ry),
-        (cols[3] + problem_w - 44, by),
-    ):
-        f.pill(cx, cy, "JAX", "jax", w=44, h=20, size=11, weight=700)
+    by = loop_y + 56
+    program(f, px0, px1, by, ry, rh, cols, w, gap)
+    jx = right + 26
+    jax_column(f, jx, 24, 1150 - jx, by + 92 - 24)
+    for y in (66, py + 64, ry + rh / 2, by + 46):
+        link(f, right, y, jx, y)
     return f.svg()
-
-
-def jax_panel(f, x, y, w, h):
-    """JAX in three pictures: compiled once, gradients for free, many runs in one call."""
-    fill, stroke, ink = COLORS["jax"]
-    f.add(
-        f'<rect x="{x}" y="{y}" width="{w}" height="{h}" rx="10" fill="{fill}" stroke="{stroke}" stroke-width="1.6"/>'
-    )
-    f.text(
-        x + 16,
-        y + 22,
-        "JAX · every equation tagged JAX traces",
-        14,
-        650,
-        ink,
-        anchor="start",
-    )
-    tile = w / 3
-    ty = y + 40
-    for k, (name, line) in enumerate(
-        (
-            ("jit", "compiled once, fast"),
-            ("grad", "∂J/∂θ for free"),
-            ("vmap", "many runs at once"),
-        )
-    ):
-        tx = x + k * tile
-        ix, iy = tx + 16, ty + 8
-        if name == "jit":
-            # A lightning bolt
-            f.add(
-                f'<path d="M{ix + 22},{iy} L{ix + 6},{iy + 26} L{ix + 18},{iy + 26} L{ix + 12},{iy + 48} '
-                f'L{ix + 32},{iy + 18} L{ix + 20},{iy + 18} Z" fill="{stroke}"/>'
-            )
-        elif name == "grad":
-            # A cost curve, a point on it, and its tangent
-            f.add(
-                f'<path d="M{ix},{iy + 6} Q{ix + 20},{iy + 62} {ix + 44},{iy + 10}" fill="none" '
-                f'stroke="{stroke}" stroke-width="2"/>'
-            )
-            f.add(
-                f'<path d="M{ix - 3.75},{iy + 7.9} L{ix + 24.25},{iy + 46.6}" stroke="{ink}" stroke-width="1.6"/>'
-            )
-            f.add(f'<circle cx="{ix + 10.25}" cy="{iy + 27.25}" r="3.2" fill="{ink}"/>')
-        else:
-            # A fan of trajectories, run side by side
-            for n in range(5):
-                dy = n * 7
-                f.add(
-                    f'<path d="M{ix},{iy + 36} C{ix + 12},{iy + 4 + dy} {ix + 26},{iy + 30 - dy / 2} {ix + 44},{iy + 6 + dy}" '
-                    f'fill="none" stroke="{stroke}" stroke-width="1.6" opacity="{0.45 + 0.11 * n:.2f}"/>'
-                )
-        f.text(tx + 68, ty + 24, name, 15, 700, ink, anchor="start")
-        f.text(tx + 68, ty + 44, line, 12.5, 500, ink, anchor="start")
 
 
 FIGURES = {

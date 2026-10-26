@@ -12,7 +12,7 @@ built on it; and the solver boundary, a `MathematicalProgram` and its `Optimizer
 is a path from them: simulate, analyze and design straight from the system; plan, learn and
 evaluate from the problem. The paths that solve a program (trajectory optimization, tuning)
 meet the optimizer, and every controller a path returns is a `System` again, closed on the
-plant with `@`. The JAX panel says what the tagged objects give: their equations trace under JAX, so
+plant with `@`. The JAX column says what the objects linked to it give: their equations trace under JAX, so
 the tools built on them compile once (`jit`), give exact gradients (`grad`), and run many cases
 in one call (`vmap`).
 
