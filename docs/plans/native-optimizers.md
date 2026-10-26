@@ -18,7 +18,7 @@ two goals; the neighbours hold what they already owned):
 | MPPI's tick in the closed loop, differentiable | this doc, §4.6b; the planner itself is [mppi.md](mppi.md) (S72) |
 | Convergence analysed as stability (goal 2), with the discrete step analysis it needs | this doc, §4.7, NS-5 (R122) |
 | The program's parameters (`x0`, plant, cost, sets) and one backend table | [parametric-program.md](parametric-program.md) (S76, OPW-1–OPW-5) |
-| The computer + plant loop as one rollout kernel, NumPy and JAX faces; the pure tick of a multi-rate loop (held values as state, firing as a select) | [sampled-path.md](sampled-path.md) §8, §8.1 (S31; draft ideas) |
+| The computer + plant loop as one rollout kernel, NumPy and JAX faces; the pure tick of a multi-rate loop (held values as state, firing as a select); the end vision of `computer @ plant` as one step diagram on a base clock | [sampled-path.md](sampled-path.md) §8.1–§8.4 (S31; draft, R123 ruled) |
 | The differentiable evaluation of a hybrid loop (`problem.compile` of a sampled controller) | [differentiable-problem.md](differentiable-problem.md), step 7b (R105) |
 | The MPC block's contract with its planner (the verbs a native tick must answer) | [end-state-api.md](end-state-api.md) D27, [mppi.md](mppi.md) §6 |
 | A gradient-descent tutorial on the extended `Optimizer` | [TODO.md](TODO.md) §7 (R91) |

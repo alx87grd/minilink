@@ -220,10 +220,67 @@ simplest:
 | **C. Rely on the compiler**: call the pure solve four times inside one traced tick | none | ✗ on NumPy; on JAX only if XLA merges the identical calls (not guaranteed through `while_loop` and `scan`) | fragile |
 | **D. The solve as a port the step reads**: the step receives the block's own port values of the same tick | the step plan feeds a block's outputs to its own step | ✓ | the same contract question as B, in another form |
 
-**Draft recommendation: A by default for the MPC, B studied as the general mechanism.** A needs
-no new contract, makes the block pure today, matches what a real computer does, and is the delay
-state §8.2 already uses for a slow block. B is for the cases that need a zero-delay output from
-an expensive computation; it is a core contract change, so it waits for the maintainer.
+**Ruled 2026-10-26 (R123): A for the MPC.** The latch goes; the block solves in `step` and its
+outputs read the state, one period late, as on a real computer. A needs no new contract, makes
+the block pure, and is the delay state §8.2 already uses for a slow block. The MPC's closed-loop
+numbers move by that one-period delay when it lands (with S31): the MPC baselines are refreshed
+then, under R80's closeness check. B stays a study for a zero-delay output from an expensive
+computation, a core contract change for the maintainer.
+
+### 8.4 The end vision for this limited hybrid (the maintainer, 2026-10-26, draft)
+
+> `computer @ plant` is fully supported as one discrete model on a base clock, the common
+> denominator of all the computer's clocks. The computer exports as a pure step block; the
+> plant exports as a step block on the same base clock, with internal substeps if needed. This
+> limited kind of hybrid is then fully closed, as one step diagram. In parallel, a computer keeps
+> another runner, with a clock, for realtime and faster simulation (as today), but every block
+> inside is pure, unlike today's MPC with its cache. Whether closed-loop simulation keeps a
+> specialised orchestrator or uses only the step-diagram runner remains to be seen.
+
+**The pieces, and what exists.**
+
+| Piece | What it is | Today |
+| --- | --- | --- |
+| The base clock | `dt_base` with every block firing on `k mod d_i = 0`, the rates integer multiples (the "limited" hybrid: commensurate clocks only) | ✓ `StepSchedule(dt_base, fire)`, `from_rates` refuses a rate that is not a whole divisor |
+| The computer as a pure step block | its blocks, its held signals in its state (§8.1, Draft 1), firing as a select on `k` (Draft 2), one `step(X, u, k, p)` at `dt_base` | ✗ `Computer.tick` mutates its fields; NumPy only |
+| The plant as a step block | `discretize(plant, dt_base, solver="rk4", substeps=n)`: the plant one base period later, its input held | ✓ `analysis/discretization.py` (and `"exact"` for a linear plant) |
+| The closed loop as one step diagram | the two step blocks in a `StepDiagramSystem`: the computer reads `y_k = h(x_k)`, the plant steps over the period with `u_k` held, the zero-order hold of the textbook sampled-data loop | ✓ the step algebra exists (CONSTITUTION invariant 1); ✗ `computer @ plant` builds a `HybridDiagram`, not this |
+| Every block pure | memory in state (R104), the MPC's latch gone (R123) | ✗ the MPC latch |
+| The clock runner | the computer's realtime and fast-simulation runner, calling the same pure blocks (§8.2's O2) | ✓ `Computer.tick` as the shape; to make a runner over pure blocks |
+| Closed-loop simulation: orchestrator or step diagram | open (below) | `HybridSimulator` today |
+
+**Does it make sense: yes, with four points to keep in view.**
+
+1. **It is R13's kernel, made explicit.** R13 already rules "a scan over clock ticks on the step
+   model with the computer's step between samples"; the vision names its form: discretize the
+   plant at the base clock, then everything is the step algebra. It refines R120's wording rather
+   than reversing it: the *coupling* of a continuous plant and a computer stays a tool
+   (`HybridDiagram`, the conversion), and what the conversion produces is an ordinary
+   `StepDiagramSystem`, single-clock, a `System` of the step algebra. A sentence in CONSTITUTION
+   invariant 1 or in DESIGN may be wanted to say so: the maintainer's call when the code lands.
+2. **The base clock is the semantics; execution may be smarter.** At `dt_base`, a slow block is
+   a select that computes and discards on the ticks it skips (§8.2's O3). That is the model; a
+   runner may skip idle blocks (O2) or unroll the hyperperiod (O4) as optimizations with the same
+   numbers.
+3. **The fast loop must stay inside the base clock.** The plant is discretized at `dt_base`, the
+   fastest rate, so a 1 kHz inner loop sees the plant every tick; discretizing the plant at a
+   slower frame rate would lose it (§8.3).
+4. **The plant's integration is fixed-step inside the step diagram.** An adaptive `solve_ivp`
+   with tight tolerances stays with a runner on the NumPy face. This is the main argument for
+   keeping a specialised closed-loop orchestrator.
+
+**The open question, with what would decide it.** Keep a specialised closed-loop orchestrator
+(today's `HybridSimulator`), or simulate only through the step-diagram runner?
+
+| For a specialised orchestrator | For the step-diagram runner only |
+| --- | --- |
+| adaptive plant integration (`solve_ivp`), events, stiff plants | one code path: the same numbers in simulation, gradients, `vmap` and analysis |
+| skips idle slow blocks on NumPy | `discretize` already gives the plant its step |
+| a dense plant trajectory between samples, for plots | the sampled trajectory, with substeps recorded on request |
+
+Two facts would decide it: whether a course or research demo needs adaptive integration in a
+sampled loop, and a benchmark of the step-diagram runner against `HybridSimulator` on the
+racecar MPC and a multi-rate demo.
 
 **Order:** the continuous core it waits for landed on 2026-10-24 (the step model, then V1's
 steps 1–6); the loop comes in v0.4 (R86), with P10's AC-8b; the hand-copied `HybridDiagram`

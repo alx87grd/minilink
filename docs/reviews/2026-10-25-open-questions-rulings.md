@@ -162,3 +162,10 @@ Numbering continues the rulings record of 2026-10-22 (R1–R90).
   planned, built with NS-5 (convergence of an optimization process analysed as stability) when
   that work requires them. The rest of the z-domain family the 2026-10-17 ruling dropped
   (exact `c2d`, the z-plane pole map, discrete Bode, root locus) stays dropped.
+- **R123 (2026-10-26) The MPC block's tick latch goes: the computational delay** (sampled-path.md
+  §8.3, option A). The block solves in `step` from the measurement `y_k` and its outputs read
+  the state, so the command applied at tick `k` comes from the measurement at `k − 1`, as on a
+  real computer whose solve takes time; one solve per tick with no hidden cache, and the block is
+  a pure step block. Lands with the sampled loop (S31); the MPC's closed-loop numbers move by the
+  one-period delay and its baselines are refreshed then (R80). A combined `update → (x_next, y)`
+  for a zero-delay output stays a study (option B, a core contract change).
