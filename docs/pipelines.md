@@ -2,7 +2,10 @@
 
 One figure per major pipeline, in one visual language: blue, the objects (systems, the
 problem, trajectories, solutions); amber, parameters; fuchsia, randomness; white, the steps;
-green, the results. On the map, teal is the loop back to a `System` and indigo is JAX. The figures are drawn by `docs/pipeline_figures.py`
+green, the results. On the map, teal is the loop back to a `System` and indigo is JAX.
+One notation throughout: `p` is one object's own parameters, the `p` of `f(x, u, t; p)`;
+`θ` is what a tool moves, the evaluator's whole tree `θ = pe.params` or a policy's weights
+(`π_θ`), and `D₀`, `Dₚ` are the distributions of the start and of `p`. The figures are drawn by `docs/pipeline_figures.py`
 (`python docs/pipeline_figures.py` rebuilds every `docs/_static/pipeline_*.svg`).
 
 ## The library on one page

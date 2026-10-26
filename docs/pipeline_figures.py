@@ -210,7 +210,7 @@ def objects(f, cards, problem_label, y=92, band_y=244):
     f.arrow(f"M{plant_x},{y + 50} L{ctl_x + CARD_W + 2},{y + 50}")
     f.text(mid, y + 67, "y", 14, 500, MUTED)
 
-    leaves = [(ctl_x + CARD_W / 2, [("θc", "par")], "controller")]
+    leaves = [(ctl_x + CARD_W / 2, [("p", "par")], "controller")]
     for x, title, lines, kind, tabs, key in cards:
         f.card(x, y, CARD_W, CARD_H, title, lines, kind, lift=6)
         leaves.append((x + CARD_W / 2, tabs, key))
@@ -268,9 +268,9 @@ def deterministic():
     band_bottom = objects(
         f,
         [
-            (330, "Plant", ["ẋ = f(x, u)"], "obj", [("θp", "par")], "plant"),
-            (520, "Cost", ["∫ g dt + h"], "obj", [("θg", "par")], "cost"),
-            (710, "Sets", ["X · U · Xf"], "obj", [("θs", "par")], "X · U · Xf"),
+            (330, "Plant", ["ẋ = f(x, u)"], "obj", [("p", "par")], "plant"),
+            (520, "Cost", ["∫ g dt + h"], "obj", [("p", "par")], "cost"),
+            (710, "Sets", ["X · U · Xf"], "obj", [("p", "par")], "X · U · Xf"),
             (900, "Start", ["x(0)"], "obj", [("x₀", "par")], "x_start"),
         ],
         "PlanningProblem",
@@ -329,17 +329,17 @@ def stochastic():
                 "Plant",
                 ["ẋ = f(x, u, w)"],
                 "obj",
-                [("θp", "par"), ("seed", "rnd")],
+                [("p", "par"), ("seed", "rnd")],
                 "plant · seed",
             ),
-            (520, "Cost", ["∫ g dt + h"], "obj", [("θg", "par")], "cost"),
-            (710, "Sets", ["X · U · Xf"], "obj", [("θs", "par")], "X · U · Xf"),
+            (520, "Cost", ["∫ g dt + h"], "obj", [("p", "par")], "cost"),
+            (710, "Sets", ["X · U · Xf"], "obj", [("p", "par")], "X · U · Xf"),
             (
                 900,
                 "Distributions",
-                ["x₀ ~ X0 · θp ~ Θ"],
+                ["x₀ ~ D₀ · p ~ Dₚ"],
                 "rnd",
-                [("θd", "par")],
+                [("p", "par")],
                 "distributions",
             ),
         ],
@@ -357,7 +357,7 @@ def stochastic():
     f.pill(72, r1 + h / 2, "key", "rnd", w=48, h=28)
     f.arrow(f"M96,{r1 + h / 2} L108,{r1 + h / 2}", COLORS["rnd"][1], marker="arrp")
     f.arrow(f"M170,{band_bottom} L170,{r1 - 2}")
-    f.card(110, r1, 120, h, "Draws", ["ω₁ … ωₙ", "x₀ᵢ, θpᵢ, seedᵢ"])
+    f.card(110, r1, 120, h, "Draws", ["ω₁ … ωₙ", "x₀ᵢ, pᵢ, seedᵢ"])
     f.arrow(f"M230,{r1 + h / 2} L252,{r1 + h / 2}")
     f.card(
         254,
@@ -660,7 +660,7 @@ def reinforcement_learning():
             ("Plant", ["ẋ = f(x, u, w)"], "obj"),
             ("Cost", ["reward r = −g dt"], "obj"),
             ("Sets", ["leave X: a failure"], "obj"),
-            ("Distributions", ["x₀ ~ X0,  θp ~ Θ"], "rnd"),
+            ("Distributions", ["x₀ ~ D₀,  p ~ Dₚ"], "rnd"),
         ],
         "StochasticPlanningProblem",
     )
@@ -682,7 +682,7 @@ def reinforcement_learning():
                 "Reward and end",
                 ["rₖ = −g(xₖ, uₖ) dt", "done when x ∉ X, or at the horizon"],
             ),
-            ("rnd", 340, "Reset", ["x₀ drawn from X0", "one seed per episode"]),
+            ("rnd", 340, "Reset", ["x₀ drawn from D₀", "one seed per episode"]),
         ],
         x0=50,
         gap=40,

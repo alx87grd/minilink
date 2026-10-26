@@ -993,8 +993,8 @@ with no gradient, and a non-finite objective at `z0` warns once. The feedback pl
 reported `trajectory` is their own held-input rollout on their
 grid (`nominal_trajectory`), the planner's evidence; `evaluate` scores the continuous loop.
 
-The pipeline in two pictures. Every object carries its parameters (the amber tab on its
-edge), and they form one tree `θ = pe.params`, a branch per object under its key; the plant,
+The pipeline in two pictures. Every object carries its own parameters `p` (the amber tab on
+its edge), and they form one tree `θ = pe.params`, a branch per object under its key; the plant,
 cost, sets and start (or, on a stochastic problem, the distributions) belong to the problem,
 and the controller closes the loop on the problem's plant at compile. The problem evaluator
 is its own object: it simulates the closed loop (integrated forward from `x₀` to `tf`),
@@ -1003,7 +1003,7 @@ when it leaves one), and returns the objective with its `Evaluation`; `pe.evalua
 evaluates a solution. Tuning is an optional export: `pe.program(wrt)` minimizes the objective
 over the chosen leaves of `θ` (dotted paths such as `"controller.Kp"`) with `m ≥ 0` as its
 rows, and the optimizer writes the tuned leaves back into `θ`. Colours: blue, the objects;
-amber, the parameters; purple, randomness; green, the results. The figures are drawn by
+amber, the parameters; fuchsia, randomness; green, the results. The figures are drawn by
 `docs/pipeline_figures.py`; the other pipelines are in [docs/pipelines.md](../pipelines.md).
 
 **Deterministic:** one run, one score.
