@@ -968,9 +968,14 @@ RESULT = {
 BLUE = COLORS["obj"]
 
 
+GREY, GREY_INK = "#94a3b8", "#64748b"  # The composition inset, which recedes
+MONO = "ui-monospace, 'SF Mono', Menlo, Consolas, monospace"
+
+
 def markers(f):
     """One arrowhead per accent, and one for the loop back (System blue)."""
-    items = [(f"m{k}", v[1]) for k, v in ACCENT.items()] + [("mblue", BLUE[1])]
+    items = [(f"m{k}", v[1]) for k, v in ACCENT.items()]
+    items += [("mblue", BLUE[1]), ("mgrey", GREY)]
     f.add(
         "<defs>"
         + "".join(
@@ -1095,27 +1100,78 @@ PICS = {
 }
 
 
-def pic_diagram(f, x, y, w, h, c):
-    """A controller and a plant closed in a loop."""
-    bw, bh = w * 0.26, h * 0.46
-    b1x, b2x, by = x + w * 0.16, x + w * 0.6, y + h * 0.04
-    for bx in (b1x, b2x):
-        f.add(
-            f'<rect x="{bx}" y="{by}" width="{bw}" height="{bh}" rx="5" fill="#ffffff" '
-            f'stroke="{c}" stroke-width="2"/>'
-        )
-    for bx, s_ in ((b1x, "π"), (b2x, "f")):
-        f.text(bx + bw / 2, by + bh / 2 + 5, s_, 14, 600, c)
-    my, fy = by + bh / 2, y + h * 0.88
+def grey_block(f, x, y, w, h, label):
     f.add(
-        f'<path d="M{b1x + bw},{my} L{b2x - 2},{my}" stroke="{c}" stroke-width="2" '
-        f'marker-end="url(#mblue)"/>'
+        f'<rect x="{x}" y="{y}" width="{w}" height="{h}" rx="5" fill="#ffffff" '
+        f'stroke="{GREY}" stroke-width="1.8"/>'
     )
+    f.text(x + w / 2, y + h / 2 + 4, label, 11, 650, GREY)
+
+
+def grey_wire(f, d, width=1.5):
     f.add(
-        f'<path d="M{b2x + bw},{my} L{x + w},{my} L{x + w},{fy} L{x},{fy} L{x},{my} '
-        f'L{b1x - 2},{my}" fill="none" stroke="{c}" stroke-width="2" stroke-linejoin="round" '
-        f'marker-end="url(#mblue)"/>'
+        f'<path d="{d}" fill="none" stroke="{GREY}" stroke-width="{width}" '
+        f'stroke-linejoin="round" marker-end="url(#mgrey)"/>'
     )
+
+
+def code(f, cx, y, s):
+    s = s.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+    f.add(
+        f'<text x="{cx}" y="{y}" font-size="12.5" font-weight="600" fill="{GREY_INK}" '
+        f'text-anchor="middle" font-family="{MONO}">{s}</text>'
+    )
+
+
+def pic_composition(f, x, y, w, h, c):
+    """A lighter inset: a closed loop and an arbitrary wiring, and each is a System."""
+    f.add(
+        f'<rect x="{x - 8}" y="{y - 10}" width="326" height="{h + 20}" rx="9" '
+        f'fill="#ffffff" fill-opacity="0.7" stroke="#cbd5e1" stroke-width="1.2"/>'
+    )
+    f.text(x + 2, y + 4, "composition", 10.5, 600, GREY_INK, anchor="start")
+    y, h = y + 10, h - 10
+    # K @ P
+    cx, yy, bw, bh = x + 66, y + 12, 30, 20
+    grey_block(f, cx - bw - 8, yy, bw, bh, "K")
+    grey_block(f, cx + 8, yy, bw, bh, "P")
+    my, fy = yy + bh / 2, yy + bh + 14
+    grey_wire(f, f"M{cx - 8},{my} L{cx + 6},{my}")
+    grey_wire(
+        f,
+        f"M{cx + 8 + bw},{my} L{cx + bw + 20},{my} L{cx + bw + 20},{fy} "
+        f"L{cx - bw - 20},{fy} L{cx - bw - 20},{my} L{cx - bw - 10},{my}",
+    )
+    code(f, cx, y + h - 2, "K @ P")
+    # Any wiring: a branch, a sum and a loop around them
+    ax, my = x + 150, y + 30
+    grey_block(f, ax, my - 10, 26, 20, "A")
+    grey_block(f, ax + 50, y + 2, 26, 18, "B")
+    grey_block(f, ax + 50, y + 38, 26, 18, "C")
+    sx = ax + 102
+    f.add(
+        f'<circle cx="{sx}" cy="{my}" r="6" fill="#ffffff" stroke="{GREY}" stroke-width="1.5"/>'
+    )
+    f.text(sx, my + 3.5, "+", 10, 700, GREY)
+    grey_block(f, sx + 18, my - 10, 26, 20, "D")
+    grey_wire(f, f"M{ax - 12},{my} L{ax - 2},{my}")
+    grey_wire(
+        f, f"M{ax + 26},{my} L{ax + 36},{my} L{ax + 36},{y + 11} L{ax + 48},{y + 11}"
+    )
+    grey_wire(f, f"M{ax + 36},{my} L{ax + 36},{y + 47} L{ax + 48},{y + 47}")
+    grey_wire(f, f"M{ax + 76},{y + 11} L{sx},{y + 11} L{sx},{my - 8}")
+    grey_wire(f, f"M{ax + 76},{y + 47} L{sx},{y + 47} L{sx},{my + 8}")
+    grey_wire(f, f"M{sx + 6},{my} L{sx + 16},{my}")
+    ly = y + 58
+    grey_wire(
+        f,
+        f"M{sx + 44},{my} L{sx + 54},{my} L{sx + 54},{ly} L{ax + 13},{ly} L{ax + 13},{my + 12}",
+    )
+    code(f, ax + 64, y + h - 2, "connect(...)")
+    # Each is a System: the arrow leads to the definition
+    rx = x + 326
+    grey_wire(f, f"M{rx},{my + 4} L{x + w + 2},{my + 4}", width=2.2)
+    f.text((rx + x + w) / 2, my - 6, "is a System", 12, 650, GREY_INK)
 
 
 def pic_problem(f, x, y, w, h, c):
@@ -1190,7 +1246,7 @@ def library_map():
     cols = {name: x0 + i * (w + gap) for i, name in enumerate(order)}
     right = x0 + 6 * w + 5 * gap
     px0, px1 = cols["Plan"], right
-    sys_y, sys_h = 30, 80
+    sys_y, sys_h = 30, 124
     py, ph = sys_y + sys_h + 36, 120
     ry, rh = py + ph + 36, 92
     oy, oh = ry + rh + 30, 104
@@ -1206,10 +1262,10 @@ def library_map():
         right - x0,
         sys_h,
         "System",
-        [r"$\dot{x} = f(x, u, t;\, p) \qquad y = h(x, u, t;\, p)$"],
-        pic_diagram,
-        150,
-        21,
+        [r"$\dot{x} = f(x, u, t;\, p)$", r"$y = h(x, u, t;\, p)$"],
+        pic_composition,
+        440,
+        24,
     )
     foundation(
         f,
