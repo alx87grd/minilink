@@ -7,6 +7,11 @@ Run from the repository root: ``python docs/pipeline_figures.py``; it writes one
 
 from pathlib import Path
 
+from matplotlib import rcParams
+from matplotlib.textpath import TextPath
+
+rcParams["mathtext.fontset"] = "cm"  # The equations in Computer Modern, as in the notes
+
 FONT = "Inter, 'Helvetica Neue', Helvetica, Arial, sans-serif"
 
 # (fill, stroke, ink) per role
@@ -97,6 +102,41 @@ class Figure:
         )
         self.text(x + w / 2, y + h - 30, title, 15, 650, ink)
         self.text(x + w / 2, y + h - 11, sub, 13.5, 400, ink)
+
+    def math(self, cx, cy, tex, size=17, color=INK):
+        """A LaTeX equation (matplotlib's mathtext) as filled SVG paths, centred on (cx, cy)."""
+        text = TextPath((0, 0), tex, size=size)
+        box = text.get_extents()
+        d = []
+        for vertices, code in text.iter_segments():
+            points = " ".join(
+                f"{vx:.2f},{vy:.2f}" for vx, vy in vertices.reshape(-1, 2)
+            )
+            d.append(
+                {1: "M", 2: "L", 3: "Q", 4: "C"}.get(code, "Z")
+                + (points if code != 79 else "")
+            )
+        tx = cx - box.x0 - box.width / 2
+        ty = cy + box.y0 + box.height / 2
+        self.add(
+            f'<path d="{" ".join(d)}" fill="{color}" '
+            f'transform="translate({tx:.2f},{ty:.2f}) scale(1,-1)"/>'
+        )
+
+    def eq_card(self, x, y, w, h, title, tex, kind="step", size=17):
+        """A card with its title and one or two equations under it."""
+        fill, stroke, ink = COLORS[kind]
+        self.add(
+            f'<rect x="{x}" y="{y}" width="{w}" height="{h}" rx="8" fill="{fill}" '
+            f'stroke="{stroke}" stroke-width="1.5"/>'
+        )
+        lines = [tex] if isinstance(tex, str) else tex
+        top = y + 26
+        self.text(x + w / 2, top, title, 15, 650, ink)
+        room = (y + h - 10) - (top + 12)
+        for i, line in enumerate(lines):
+            cy = top + 12 + room * (i + 0.5) / len(lines)
+            self.math(x + w / 2, cy, line, size, ink)
 
     def grid_icon(self, x, y, n=5, step=9):
         """A small lattice of nodes: a discretized state space."""
@@ -816,81 +856,95 @@ def overview():
 
 def library_map():
     """The whole library on one page: three foundations, the tools as parallel paths."""
-    f = Figure(1180, 660)
+    f = Figure(1180, 720)
     w, gap, x0 = 170, 20, 45
     cols = [x0 + i * (w + gap) for i in range(6)]
     centers = [x + w / 2 for x in cols]
     right = cols[5] + w
+    problem_w = 3 * w + 2 * gap
 
     # The model: one System, whatever it is made of
-    f.card(
+    f.eq_card(
         x0,
         24,
         right - x0,
-        76,
-        "System",
-        [
-            "ẋ = f(x, u, t; p),  y = h(x, u, t; p)",
-            "a plant, a controller, a diagram of blocks: one object",
-        ],
+        84,
+        "System · a plant, a controller, a diagram: one object",
+        [r"$\dot{x} = f(x, u, t;\, p) \qquad y = h(x, u, t;\, p)$"],
         "obj",
+        size=21,
     )
 
     # The task, built on the model
-    problem_w = 3 * w + 2 * gap
-    f.card(
+    py = 154
+    f.eq_card(
         cols[3],
-        146,
+        py,
         problem_w,
-        72,
+        128,
         "PlanningProblem",
-        ["system · cost · sets · start (or its distributions) · horizon"],
+        [
+            r"$J = \int_0^{t_f} g(x, u, t)\, dt \;+\; h(x(t_f))$",
+            r"$x \in X \quad u \in U \quad x(0) = x_0 \quad x(t_f) \in X_f$",
+        ],
         "obj",
+        size=17,
     )
-    f.arrow(f"M{cols[3] + problem_w / 2},100 L{cols[3] + problem_w / 2},{146 - 2}")
+    f.arrow(f"M{cols[3] + problem_w / 2},108 L{cols[3] + problem_w / 2},{py - 2}")
 
     # Six parallel paths
-    ry, rh = 270, 104
+    ry, rh = py + 128 + 48, 92
     paths = [
-        ("Simulate", ["Simulator", "integrate ẋ = f"]),
-        ("Analyze", ["linearize", "A, B, C, D"]),
-        ("Design", ["lqr · place", "PID · observers"]),
-        ("Plan", ["DP · trajectory opt.", "RRT · LQR planner"]),
-        ("Learn", ["RL: collect, update θ", "PPO · SAC"]),
-        ("Evaluate", ["ProblemEvaluator", "J, margins, criterion"]),
+        ("Simulate", r"$x(t) = x_0 + \int_0^t f\, d\tau$"),
+        ("Analyze", r"$\dot{\tilde{x}} = A\tilde{x} + B\tilde{u}$"),
+        ("Design", r"$u = -K\, x$"),
+        ("Plan", r"$\pi^* = \mathrm{arg\,min}_{\pi}\; J$"),
+        ("Learn", r"$\theta \leftarrow \theta + \eta \nabla_{\theta} \mathbb{E}[G]$"),
+        ("Evaluate", r"$J(\theta),\; m(\theta)$"),
     ]
-    for i, (title, lines) in enumerate(paths):
-        f.card(cols[i], ry, w, rh, title, lines, "step")
+    for i, (title, tex) in enumerate(paths):
+        f.eq_card(cols[i], ry, w, rh, title, tex, "step", size=16)
     for i in range(3):
-        f.arrow(f"M{centers[i]},100 L{centers[i]},{ry - 2}")
+        f.arrow(f"M{centers[i]},108 L{centers[i]},{ry - 2}")
     for i in range(3, 6):
-        f.arrow(f"M{centers[i]},218 L{centers[i]},{ry - 2}")
+        f.arrow(f"M{centers[i]},{py + 128} L{centers[i]},{ry - 2}")
 
     # What each path gives back
-    oy, oh = ry + rh + 46, 70
+    oy, oh = ry + rh + 46, 80
     outs = [
-        ("Trajectory", ["x(t), u(t)"]),
-        ("Poles · Bode", ["margins, sensitivity"]),
-        ("Controller", ["u = π(y)"]),
-        ("PlanningSolution", ["policy · trajectory"]),
-        ("Neural policy", ["u = πθ(x)"]),
-        ("Evaluation", ["objective · compare"]),
+        ("Trajectory", None),
+        ("Poles · Bode", r"$G(s) = C(sI - A)^{-1}B$"),
+        ("Controller", r"$u = \pi(y)$"),
+        ("PlanningSolution", r"$u = \pi^*(x)$"),
+        ("Neural policy", r"$u = \pi_{\theta}(x)$"),
+        ("Evaluation", r"$\mathbb{E}[J],\; \mathrm{CVaR},\; \max J$"),
     ]
-    for i, (title, lines) in enumerate(outs):
-        f.card(cols[i], oy, w, oh, title, lines, "out")
+    for i, (title, tex) in enumerate(outs):
+        if tex is None:
+            f.card(cols[i], oy, w, oh, "", [], "out")
+            sx, sy = cols[i] + 30, oy + 52
+            f.add(
+                f'<path d="M{sx},{sy} C{sx + 22},{sy - 30} {sx + 40},{sy + 16} {sx + 62},{sy - 8} '
+                f'S{sx + 96},{sy - 16} {sx + 110},{sy - 12}" fill="none" '
+                f'stroke="{COLORS["out"][1]}" stroke-width="2.2"/>'
+            )
+            f.text(centers[i], oy + 26, title, 15, 650, COLORS["out"][2])
+        else:
+            f.eq_card(
+                cols[i], oy, w, oh, title, tex, "out", size=15 if i in (1, 5) else 16
+            )
         f.arrow(f"M{centers[i]},{ry + rh} L{centers[i]},{oy - 2}")
 
     # Every controller is a System again: the loop closes on the plant
     loop_y = oy + oh + 18
-    for i in (3, 4):
+    for i in (2, 3, 4):
         f.dotted(f"M{centers[i]},{oy + oh} L{centers[i]},{loop_y}", COLORS["out"][1])
     f.arrow(
-        f"M{centers[4]},{loop_y} L18,{loop_y} L18,62 L{x0 - 2},62",
+        f"M{centers[4]},{loop_y} L18,{loop_y} L18,66 L{x0 - 2},66",
         COLORS["out"][1],
         dashed=True,
         marker="arrg",
     )
-    f.dotted(f"M{centers[2]},{oy + oh} L{centers[2]},{loop_y}", COLORS["out"][1])
     f.text(
         30,
         loop_y + 18,
@@ -903,20 +957,21 @@ def library_map():
 
     # The solver boundary, shared by the paths that solve a program
     by = oy + oh + 64
-    f.card(
+    f.eq_card(
         cols[3],
         by,
         problem_w,
-        62,
+        80,
         "MathematicalProgram · Optimizer",
-        ["min J(z) s.t. h(z) = 0, g(z) ≥ 0 · SLSQP · Ipopt · L-BFGS · Adam"],
+        r"$\min_{z}\; J(z) \quad \mathrm{s.t.} \quad h(z) = 0,\;\; g(z) \geq 0$",
         "obj",
+        size=18,
     )
     gap_plan = cols[3] + w + gap / 2
     gap_eval = right + 12
     f.arrow(f"M{gap_plan},{ry + rh / 2} L{gap_plan},{by - 2}", dashed=True)
     f.arrow(
-        f"M{right},{ry + rh / 2} L{gap_eval},{ry + rh / 2} L{gap_eval},{by + 31} L{right + 2},{by + 31}",
+        f"M{right},{ry + rh / 2} L{gap_eval},{ry + rh / 2} L{gap_eval},{by + 40} L{right + 2},{by + 40}",
         dashed=True,
     )
     f.text(
