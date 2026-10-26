@@ -8,7 +8,11 @@ per method", "The step model"); the decisions taken during the run are in
 half (the eight discretizations it replaced, the knobs, the measurements, the steps) is in git
 history. This doc now holds the other half: the sampled loop (S31), ruled a tool with ticks
 (R13, R14 of [the rulings](../reviews/2026-10-22-rulings-session-1.md)), its details parked
-(D13–D15 of [end-state-api.md](end-state-api.md)).  
+(D13–D15 of [end-state-api.md](end-state-api.md)). **Tentative draft vision (2026-10-25/26,
+§8.1–§8.5): promising, not decided.** `computer @ plant` as a step diagram on a base clock that
+knows it is hybrid, the computer a pure step block, the plant discretized at the base clock,
+every block pure, a clock runner beside it for realtime; one point of it ruled (R123: the MPC's
+computational delay), the rest open, including the CONSTITUTION amendment it would need.  
 **Lane:** core (the hybrid tool, the sampled kernel, every sampled controller) — every step is
 **[ask — core]**.  
 **Rung:** v0.4: S31 in [TODO.md](TODO.md) §5, after the continuous path (R86), with the
@@ -63,6 +67,10 @@ to the hybrid phase, after the continuous core.
   random draws come from the controller's seed and the tick, as the noise block's;
   [future-policies.md](future-policies.md)); how the compiled problem dispatches a sampled
   controller to this kernel (V1's step 7b).
+
+> **§8.1–§8.5 are the tentative draft vision of the hybrid loop** (the maintainer, 2026-10-26):
+> promising, not yet decided. Only R123 (§8.3) is ruled. Where they differ from §8 above (R13:
+> "a tool, not a `System`"), §8 stands until the maintainer rules; the ask is in QUESTIONS.md.
 
 ### 8.1 The pure tick of a multi-rate loop (draft ideas, 2026-10-25)
 
@@ -357,7 +365,7 @@ today's, and `solver="scipy"` for the adaptive path: it keeps the numbers and th
 today's default gives (R123's delay aside) and makes `compute_trajectory`, `evaluate` and the
 gradients agree by default. Not ruled.
 
-### 8.5 `computer @ plant` is a step diagram that knows it is hybrid (the maintainer, 2026-10-26, draft)
+### 8.5 `computer @ plant` is a step diagram that knows it is hybrid (the maintainer, 2026-10-26, tentative draft vision)
 
 > The result of `computer @ plant` is considered to be the step diagram, at least for the
 > composition algebra and the analysis shortcuts. Some methods know it is a hybrid system and

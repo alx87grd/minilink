@@ -473,7 +473,10 @@ LQGPlanner as picked; S73 any time, self-contained.
   it. Parked until the continuous path lands (the maintainer, 2026-10-22; R86): the run-state caches
   (RULES 2.4), controller memory and the computer's draws on the tick, the evaluator's dispatch
   of a sampled controller (D13–D15), the `core` → `simulation` import (scan: core#14). In v0.4, after the continuous path (R86). Done when
-  D13–D15 are ruled and the kernel's steps are rows here.
+  D13–D15 are ruled and the kernel's steps are rows here. A tentative draft vision, not decided
+  (sampled-path.md §8.1–§8.5): `computer @ plant` a step diagram on a base clock that knows it is
+  hybrid, every block pure (the MPC latch goes for the computational delay, R123), the
+  orchestrator kept as the clock runner; it would need a CONSTITUTION amendment (QUESTIONS.md).
 - [ ] **OPW-1–OPW-5** (after S74, with S76; R86) The parametric (MPC) optimizer goes through `Optimizer`'s
   backend table ([parametric-program.md](parametric-program.md) §6; scan: planning#9). Done
   when `optimizer_method="ipopt"` reaches the parametric MPC path and the plan's OPW-4 tests

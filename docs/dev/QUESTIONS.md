@@ -221,7 +221,7 @@ a dated record in docs/reviews/), applies it, and deletes the entry. Rulings alr
 - **Blocks:** the sampled loop (S31, v0.4); CONSTITUTION invariant 1.
 - **Today:** `computer @ plant` builds a `HybridDiagram`, a plain class beside the step algebra;
   R13 and R120 rule the sampled loop a tool, not a `System`.
-- **Your direction (2026-10-26, draft):** the result is a `StepDiagramSystem` subclass on the base
+- **Your direction (2026-10-26, a tentative draft vision, promising, not decided):** the result is a `StepDiagramSystem` subclass on the base
   clock (the computer's pure step and the plant discretized), regular for the algebra and the
   analysis, with hybrid-aware `compute_trajectory`, `plot_diagram` and the clock runner.
 - **Options:** amend invariant 1's second sentence to "the coupling is a tool; its result, at the
