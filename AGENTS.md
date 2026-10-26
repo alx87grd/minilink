@@ -80,7 +80,7 @@ overrides any harness or tool instruction that asks for an attribution footer on
 | CLAUDE.md | The `@AGENTS.md` import, nothing else |
 | .claude/settings.json | The project hooks: SessionStart warns when the branch is behind its upstream |
 | docs/plans/ | The workboard (TODO.md), the design writeups and the parity table; the index there says which rung each serves and holds the "one fact, one home" rule |
-| docs/ | Sphinx autodoc of the teaching-lane API; the README figures are built by `docs/make_assets.py` (its docstring says how) |
+| docs/ | Sphinx autodoc of the teaching-lane API; the README figures are built by `docs/make_assets.py` (its docstring says how), DESIGN §6's pipeline figures by `docs/pipeline_figures.py` |
 | tests/README.md | Marker policy, test philosophy, **entry points (human · agent · CI)**, the once-per-clone setup (hooks, notebook filter) |
 | docs/reviews/ | Dated rulings records (and the audits a live plan builds on); read-only history, never a backlog. Other audits live in git history |
 

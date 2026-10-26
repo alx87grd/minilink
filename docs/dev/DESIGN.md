@@ -993,132 +993,23 @@ with no gradient, and a non-finite objective at `z0` warns once. The feedback pl
 reported `trajectory` is their own held-input rollout on their
 grid (`nominal_trajectory`), the planner's evidence; `evaluate` scores the continuous loop.
 
-The pipeline in two pictures. Colours: blue, the objects; amber, their parameters, all
-gathered in one tree `θ = pe.params`; purple, randomness (the noise and its seed, the laws, the
-key); white, the steps; green, the result. The plant, cost, sets and start belong to the
-problem; the controller is closed on the problem's plant at compile. The program tunes any
-leaves of `θ` (`wrt`, dotted paths such as `"controller.Kp"`); the margins `m` are its
-constraint rows.
+The pipeline in two pictures. Every object carries its parameters (the amber tab on its
+edge), and they form one tree `θ = pe.params`, a branch per object under its key; the plant,
+cost, sets and start belong to the problem, and the controller closes the loop on the
+problem's plant at compile. The program tunes any leaves of `θ` (`wrt`, dotted paths such as
+`"controller.Kp"`) with the margins `m` as its constraint rows, and the optimizer writes the
+tuned leaves back into `θ`. Colours: blue, the objects; amber, the parameters; purple,
+randomness; green, the result. The figures are drawn by `docs/pipeline_figures.py`.
 
 **Deterministic:** one run, one score.
 
-```mermaid
-%%{init: {"theme": "base", "flowchart": {"htmlLabels": false, "curve": "basis", "nodeSpacing": 22, "rankSpacing": 34, "padding": 16}, "themeVariables": {"fontFamily": "Inter, Helvetica, Arial, sans-serif", "fontSize": "15px", "lineColor": "#64748b", "primaryTextColor": "#0f172a", "clusterBkg": "#f8fafc", "clusterBorder": "#cbd5e1", "edgeLabelBackground": "#ffffff"}}}%%
-flowchart TD
-    subgraph OBJ["① Objects, each with its parameters θ"]
-        direction LR
-        tc(("θc")) -.- C["`**Controller**
-        u = π(y)`"]
-        subgraph PROB["PlanningProblem"]
-            direction LR
-            P["`**Plant**
-            ẋ = f(x, u)`"] -.- tp(("θp"))
-            tp ~~~ tg(("θg"))
-            tg -.- G["`**Cost**
-            ∫ g dt + h`"]
-            G ~~~ ts(("θs"))
-            ts -.- S["`**Sets**
-            X · U · Xf`"]
-            S ~~~ t0(("x₀"))
-            t0 -.- X0["`**Start**
-            x(0)`"]
-        end
-        C -- u --> P
-        P -- y --> C
-    end
+![The evaluator pipeline, deterministic](../_static/pipeline_deterministic.svg)
 
-    OBJ --> PIPE
-    subgraph PIPE["② pe = problem.compile(controller, dt): the controller closed on the problem's plant"]
-        direction LR
-        TH[("`**θ**
-        one tree`")] --> R["`**Rollout**
-        x(t), u(t)`"]
-        R --> SC["`**Score**
-        J(θ), m(θ)`"]
-        SC --> NLP["`**Program**
-        min J(θ)
-        s.t. m(θ) ≥ 0`"]
-        NLP --> O["`**Optimizer**`"]
-        O --> TS(["θ*"])
-    end
+**Stochastic:** the noise's seed is a leaf of `θ` like any other, and so are the laws' own
+parameters; the draws `ωᵢ` (starts, drawn parameters, block seeds) are realized from one key,
+the `n` runs go in one `vmap`, and the criterion `C` reduces their `Jᵢ`.
 
-    classDef obj fill:#e0f2fe,stroke:#0284c7,stroke-width:1.5px,color:#0c4a6e
-    classDef par fill:#fef3c7,stroke:#d97706,stroke-width:1.5px,color:#78350f
-    classDef rnd fill:#f3e8ff,stroke:#9333ea,stroke-width:1.5px,color:#581c87
-    classDef step fill:#ffffff,stroke:#94a3b8,stroke-width:1.2px,color:#0f172a
-    classDef out fill:#dcfce7,stroke:#16a34a,stroke-width:1.5px,color:#14532d
-    class C,P,G,S,X0 obj
-    class tc,tp,tg,ts,t0,TH par
-    class R,SC,NLP,O step
-    class TS out
-    style OBJ fill:#ffffff,stroke:#e2e8f0
-    style PIPE fill:#ffffff,stroke:#e2e8f0
-```
-
-**Stochastic:** the draws `ωᵢ` (starts, drawn parameters, block seeds) realized from one key,
-`n` runs in one `vmap`, the criterion over their `Jᵢ`; a seed is a leaf of `θ` like any other.
-
-```mermaid
-%%{init: {"theme": "base", "flowchart": {"htmlLabels": false, "curve": "basis", "nodeSpacing": 22, "rankSpacing": 34, "padding": 16}, "themeVariables": {"fontFamily": "Inter, Helvetica, Arial, sans-serif", "fontSize": "15px", "lineColor": "#64748b", "primaryTextColor": "#0f172a", "clusterBkg": "#f8fafc", "clusterBorder": "#cbd5e1", "edgeLabelBackground": "#ffffff"}}}%%
-flowchart TD
-    subgraph OBJ["① Objects, each with its parameters θ; the noise w, its seed and the laws are among them"]
-        direction LR
-        tc(("θc")) -.- C["`**Controller**
-        u = π(y)`"]
-        subgraph PROB["StochasticPlanningProblem"]
-            direction LR
-            P["`**Plant**
-            ẋ = f(x, u, w)`"] -.- tp(("θp"))
-            tp ~~~ tg(("θg"))
-            tg -.- G["`**Cost**
-            ∫ g dt + h`"]
-            G ~~~ ts(("θs"))
-            ts -.- S["`**Sets**
-            X · U · Xf`"]
-            S ~~~ L0["`**Start law**
-            x₀ ~ X0`"]
-            L0 ~~~ LP["`**Parameter law**
-            θp ~ Θ`"]
-            P -.- tw(("`w
-            seed`"))
-        end
-        C -- u --> P
-        P -- y --> C
-    end
-
-    OBJ --> PIPE
-    subgraph PIPE["② pe = problem.compile(controller, dt) · pe.evaluate(θ, key, n)"]
-        direction LR
-        TH[("`**θ**
-        one tree`")] --> RE["`**Realize**
-        ω₁ … ωₙ`"]
-        K(("key")) --> RE
-        RE --> R["`**Rollout × n**
-        vmap`"]
-        R --> SC["`**Scores**
-        Jᵢ, mᵢ`"]
-        SC --> CR["`**Criterion C**
-        mean · CVaR · worst`"]
-        CR --> NLP["`**Program**
-        min C(J₁ … Jₙ)
-        s.t. mᵢ(θ) ≥ 0`"]
-        NLP --> O["`**Optimizer**`"]
-        O --> TS(["θ*"])
-    end
-
-    classDef obj fill:#e0f2fe,stroke:#0284c7,stroke-width:1.5px,color:#0c4a6e
-    classDef par fill:#fef3c7,stroke:#d97706,stroke-width:1.5px,color:#78350f
-    classDef rnd fill:#f3e8ff,stroke:#9333ea,stroke-width:1.5px,color:#581c87
-    classDef step fill:#ffffff,stroke:#94a3b8,stroke-width:1.2px,color:#0f172a
-    classDef out fill:#dcfce7,stroke:#16a34a,stroke-width:1.5px,color:#14532d
-    class C,P,G,S obj
-    class L0,LP,tw,K rnd
-    class tc,tp,tg,ts,TH par
-    class RE,R,SC,CR,NLP,O step
-    class TS out
-    style OBJ fill:#ffffff,stroke:#e2e8f0
-    style PIPE fill:#ffffff,stroke:#e2e8f0
-```
+![The evaluator pipeline, stochastic](../_static/pipeline_stochastic.svg)
 
 **Reinforcement learning (`learning/reinforcement_learning/`):** two
 policy-family planners beside DP, one per representation of the law.
