@@ -984,6 +984,9 @@ def markers(f):
             f'fill="{c}"/></marker>'
             for mid, c in items
         )
+        + '<filter id="lift" x="-10%" y="-25%" width="120%" height="160%">'
+        '<feDropShadow dx="0" dy="3" stdDeviation="6" flood-color="#0284c7" '
+        'flood-opacity="0.3"/></filter>'
         + '<linearGradient id="gblue" x1="0" y1="0" x2="0" y2="1">'
         '<stop offset="0" stop-color="#f0f9ff"/><stop offset="1" stop-color="#dbeafe"/>'
         "</linearGradient></defs>"
@@ -1239,6 +1242,25 @@ def foundation(f, x, y, w, h, title, texs, pic, pic_w, size):
 TOOL_TEX = {**PATHS, "Plan": r"$\pi^{\star} = \arg\min_{\pi}\; J$"}
 
 
+def system_card(f, x, y, w, h):
+    """The System: the composition inset, then the definition, the first thing the eye meets."""
+    f.add(
+        f'<rect x="{x}" y="{y}" width="{w}" height="{h}" rx="12" fill="#f0f9ff" '
+        f'stroke="{BLUE[1]}" stroke-width="1.4"/>'
+    )
+    pic_composition(f, x + 22, y + 18, 440, h - 36, BLUE[1])
+    bx, by = x + 22 + 444, y + 10
+    bw, bh = x + w - 14 - bx, h - 20
+    f.add(
+        f'<rect x="{bx}" y="{by}" width="{bw}" height="{bh}" rx="10" fill="#ffffff" '
+        f'stroke="{BLUE[1]}" stroke-width="3" filter="url(#lift)"/>'
+    )
+    cx = bx + bw / 2
+    f.text(cx, by + 28, "System", 19, 750, BLUE[2])
+    f.math(cx, by + 58, r"$\dot{x} = f(x, u, t;\, p)$", 25, BLUE[2])
+    f.math(cx, by + 92, r"$y = h(x, u, t;\, p)$", 25, BLUE[2])
+
+
 def library_map():
     """The whole library on one page: three foundations, six tools as coloured lanes, JAX beside."""
     order = list(ACCENT)
@@ -1246,7 +1268,7 @@ def library_map():
     cols = {name: x0 + i * (w + gap) for i, name in enumerate(order)}
     right = x0 + 6 * w + 5 * gap
     px0, px1 = cols["Plan"], right
-    sys_y, sys_h = 30, 124
+    sys_y, sys_h = 30, 134
     py, ph = sys_y + sys_h + 36, 120
     ry, rh = py + ph + 36, 92
     oy, oh = ry + rh + 30, 104
@@ -1255,18 +1277,7 @@ def library_map():
     f = Figure(1180, by + bh + 30)
     markers(f)
 
-    foundation(
-        f,
-        x0,
-        sys_y,
-        right - x0,
-        sys_h,
-        "System",
-        [r"$\dot{x} = f(x, u, t;\, p)$", r"$y = h(x, u, t;\, p)$"],
-        pic_composition,
-        440,
-        24,
-    )
+    system_card(f, x0, sys_y, right - x0, sys_h)
     foundation(
         f,
         px0,
