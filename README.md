@@ -51,6 +51,16 @@ optimization, model predictive control and reinforcement learning. NumPy, SciPy 
 Matplotlib are enough for a course; the same equations compile and differentiate
 under JAX for research.
 
+## Minilink on one page
+
+Everything starts from one definition, a `System`: `ẋ = f(x, u, t; p)`, `y = h(x, u, t; p)`.
+A diagram of systems is a `System` too, and so is every controller a tool returns. Each tool
+is a lane from the system, or from a `PlanningProblem` built on it, to what it gives back;
+the pipelines behind them are drawn one by one in
+[docs/pipelines.md](https://github.com/alx87grd/minilink/blob/main/docs/pipelines.md).
+
+![Minilink on one page: the System, the PlanningProblem and the optimizer, six tools and JAX](https://raw.githubusercontent.com/alx87grd/minilink/main/docs/_static/pipeline_map.png)
+
 ## Write a model
 
 A model is dynamics `f`, outputs `h` and body poses `tf`, functions of the state
@@ -139,10 +149,7 @@ pendulum.animate()
 Every tool is a verb on a `System`, a leaf or a whole diagram alike: simulate, analyze and
 design straight from the system; plan, learn and evaluate from a `PlanningProblem` built on
 it. Every controller a tool returns is a `System` again, and the same equations run on NumPy
-or trace under JAX. Each pipeline has its own figure in
-[docs/pipelines.md](https://github.com/alx87grd/minilink/blob/main/docs/pipelines.md).
-
-![Minilink on one page: the System, the PlanningProblem and the optimizer, six tools and JAX](https://raw.githubusercontent.com/alx87grd/minilink/main/docs/_static/pipeline_map.png)
+or trace under JAX.
 
 | | |
 | --- | --- |
