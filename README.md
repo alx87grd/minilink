@@ -136,10 +136,13 @@ pendulum.animate()
 
 ## One toolbox, every System
 
-Every tool is a verb on a `System`, a leaf or a whole diagram alike. One pendulum, six
-tools:
+Every tool is a verb on a `System`, a leaf or a whole diagram alike: simulate, analyze and
+design straight from the system; plan, learn and evaluate from a `PlanningProblem` built on
+it. Every controller a tool returns is a `System` again, and the same equations run on NumPy
+or trace under JAX. Each pipeline has its own figure in
+[docs/pipelines.md](https://github.com/alx87grd/minilink/blob/main/docs/pipelines.md).
 
-![one pendulum through six tools](https://raw.githubusercontent.com/alx87grd/minilink/main/docs/_static/tool_montage.png)
+![Minilink on one page: the System, the PlanningProblem and the optimizer, six tools and JAX](https://raw.githubusercontent.com/alx87grd/minilink/main/docs/_static/pipeline_map.png)
 
 | | |
 | --- | --- |

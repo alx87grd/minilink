@@ -1,4 +1,4 @@
-"""Build every README figure: the showcase GIFs and their 3-D pages, the diagram PNG, the tool montage."""
+"""Build every README figure: the library map, the showcase GIFs and their 3-D pages, the diagram PNG, the tool montage."""
 
 from __future__ import annotations
 
@@ -14,7 +14,7 @@ STATIC = ROOT / "docs" / "_static"
 SHOWCASE = STATIC / "showcase"  # interactive 3-D pages, served by the docs site
 
 import numpy as np  # noqa: E402
-from asset_export import html_to_gif, montage_png, shrink_gif  # noqa: E402
+from asset_export import html_to_gif, montage_png, shrink_gif, svg_to_png  # noqa: E402
 
 from minilink import DynamicSystem  # noqa: E402
 from minilink.core.sets import SingletonSet  # noqa: E402
@@ -479,8 +479,19 @@ def gif_rocket() -> None:
     save_gif(cl_sys, traj, "rocket_landing.gif", time_factor_video=1.0, camera=camera)
 
 
+def pipeline_map() -> None:
+    """The library on one page: its SVG from docs/pipeline_figures.py, and a PNG for PyPI."""
+    from pipeline_figures import library_map
+
+    svg = STATIC / "pipeline_map.svg"
+    svg.write_text(library_map())
+    svg_to_png(svg, STATIC / "pipeline_map.png")
+    print("pipeline_map.png")
+
+
 # name: (builder, the files it writes under docs/_static)
 ASSETS = {
+    "map": (pipeline_map, ["pipeline_map.png"]),
     "diagram": (diagram_png, ["diagram_closed_loop.png"]),
     "montage": (tool_montage, ["tool_montage.png"]),
     "cartpole": (gif_cartpole, ["cartpole_swingup.gif"]),

@@ -218,6 +218,22 @@ _HUB_SPOKES = """\
 """
 
 
+def svg_to_png(svg_path: Path, png_path: Path, *, scale: int = 2) -> None:
+    """Render an SVG at its own size, ``scale`` times sharper, to a PNG with a clear background."""
+    sync_playwright = require_playwright()
+    with sync_playwright() as playwright:
+        browser = playwright.chromium.launch()
+        page = browser.new_page(device_scale_factor=scale)
+        page.goto(Path(svg_path).resolve().as_uri())
+        width, height = page.evaluate(
+            "() => [document.documentElement.width.baseVal.value, "
+            "document.documentElement.height.baseVal.value]"
+        )
+        page.set_viewport_size({"width": round(width), "height": round(height)})
+        page.screenshot(path=str(png_path), omit_background=True)
+        browser.close()
+
+
 def montage_png(figures, path: Path, *, columns: int, dpi: int = 110) -> None:
     """Paste matplotlib figures into one PNG grid, ``columns`` wide, row by row."""
     import io

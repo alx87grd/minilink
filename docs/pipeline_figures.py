@@ -3,6 +3,9 @@
 Run from the repository root: ``python docs/pipeline_figures.py``; it writes one
 ``docs/_static/pipeline_<name>.svg`` per figure in :data:`FIGURES`. The evaluator's two
 (deterministic, stochastic) are in DESIGN §6; the gallery is ``docs/pipelines.md``.
+
+The map is also the README's first figure, as a PNG (a raw-URL SVG does not show on
+PyPI): ``python docs/make_assets.py map`` rebuilds both.
 """
 
 from pathlib import Path
