@@ -993,53 +993,135 @@ with no gradient, and a non-finite objective at `z0` warns once. The feedback pl
 reported `trajectory` is their own held-input rollout on their
 grid (`nominal_trajectory`), the planner's evidence; `evaluate` scores the continuous loop.
 
-The pipeline in one picture: the objects and their parameters, one compile, one parameter
-tree, the evaluation of every trial, and the program that tunes any leaf of the tree.
+The pipeline in two pictures. Colours: blue, the objects; amber, their parameters, all
+gathered in one tree `θ = pe.params`; purple, randomness (laws, seeds, the key); white, the
+steps; green, the result. The program tunes any leaves of `θ` (`wrt`, dotted paths such as
+`"controller.Kp"`); the margins `m` are its constraint rows.
+
+**Deterministic:** one run, one score.
 
 ```mermaid
+%%{init: {"theme": "base", "flowchart": {"htmlLabels": false, "curve": "basis", "nodeSpacing": 22, "rankSpacing": 34, "padding": 16}, "themeVariables": {"fontFamily": "Inter, Helvetica, Arial, sans-serif", "fontSize": "15px", "lineColor": "#64748b", "primaryTextColor": "#0f172a", "clusterBkg": "#f8fafc", "clusterBorder": "#cbd5e1", "edgeLabelBackground": "#ffffff"}}}%%
 flowchart TD
-    subgraph S1["① The statement: every object carries its params"]
+    subgraph OBJ["① Objects, each with its parameters θ"]
+        direction TB
+        subgraph LOOP["closed loop"]
+            direction LR
+            tc(("θc")) -.- C["`**Controller**
+            u = π(y)`"]
+            C -- u --> P["`**Plant**
+            ẋ = f(x, u)`"]
+            P -- y --> C
+            P -.- tp(("θp"))
+        end
+        subgraph TASK["task"]
+            direction LR
+            tg(("θg")) -.- G["`**Cost**
+            ∫ g dt + h`"]
+            G ~~~ ts(("θs"))
+            ts -.- S["`**Sets**
+            X · U · Xf`"]
+            S ~~~ t0(("x₀"))
+            t0 -.- X0["`**Start**
+            x(0)`"]
+        end
+    end
+
+    OBJ --> PIPE
+    subgraph PIPE["② pe = problem.compile(controller, dt)"]
         direction LR
-        CTL["Controller<br/>u = π(y; p)"]
-        PLANT["Plant<br/>ẋ = f(x, u, t; p)"]
-        COST["Cost<br/>g(x, u, t; p), h(x, t; p)"]
-        SETS["Sets<br/>X, U, Xf"]
-        START["Start<br/>x_start or a start law"]
+        TH[("`**θ**
+        one tree`")] --> R["`**Rollout**
+        x(t), u(t)`"]
+        R --> SC["`**Score**
+        J(θ), m(θ)`"]
+        SC --> NLP["`**Program**
+        min J(θ)
+        s.t. m(θ) ≥ 0`"]
+        NLP --> O["`**Optimizer**`"]
+        O --> TS(["θ*"])
     end
 
-    PROB["PlanningProblem<br/>plant · cost · sets · start · tf · discount ρ · price · criterion"]
-    PLANT --> PROB
-    COST --> PROB
-    SETS --> PROB
-    START --> PROB
+    classDef obj fill:#e0f2fe,stroke:#0284c7,stroke-width:1.5px,color:#0c4a6e
+    classDef par fill:#fef3c7,stroke:#d97706,stroke-width:1.5px,color:#78350f
+    classDef rnd fill:#f3e8ff,stroke:#9333ea,stroke-width:1.5px,color:#581c87
+    classDef step fill:#ffffff,stroke:#94a3b8,stroke-width:1.2px,color:#0f172a
+    classDef out fill:#dcfce7,stroke:#16a34a,stroke-width:1.5px,color:#14532d
+    class C,P,G,S,X0 obj
+    class tc,tp,tg,ts,t0,TH par
+    class R,SC,NLP,O step
+    class TS out
+    style OBJ fill:#ffffff,stroke:#e2e8f0
+    style PIPE fill:#ffffff,stroke:#e2e8f0
+```
 
-    subgraph S2["② Compile once: pe = problem.compile(controller, dt, solver, substeps)"]
-        LOOP["Closed loop<br/>controller @ plant"]
-        TREE[("One parameter tree: pe.params<br/>controller · plant · cost · X · U · Xf · x_start · discount_rate")]
-        LOOP --> TREE
-    end
-    CTL --> LOOP
-    PROB --> LOOP
+**Stochastic:** the draws `ωᵢ` (starts, drawn parameters, block seeds) realized from one key,
+`n` runs in one `vmap`, the criterion over their `Jᵢ`; a seed is a leaf of `θ` like any other.
 
-    subgraph S3["③ Evaluate: pe.evaluate(params, key, n_trials)"]
-        REAL["Realize the draws from key<br/>starts x0ᵢ · drawn params · block seeds"]
-        RUN["Roll out each trial<br/>fixed-step model · vmap over trials on JAX"]
-        SCORE["Score each run<br/>cost = ∫ e^(−ρt) g dt + e^(−ρ tf) h<br/>J = cost, + price if failed or goal missed<br/>feasibility margin · reachability margin"]
-        EV["Evaluation: one row per run<br/>cost · J · margins · failed · reached · x0"]
-        OBJ["objective = criterion over J<br/>mean · CVaR_α · worst case"]
-        REAL --> RUN --> SCORE --> EV --> OBJ
+```mermaid
+%%{init: {"theme": "base", "flowchart": {"htmlLabels": false, "curve": "basis", "nodeSpacing": 22, "rankSpacing": 34, "padding": 16}, "themeVariables": {"fontFamily": "Inter, Helvetica, Arial, sans-serif", "fontSize": "15px", "lineColor": "#64748b", "primaryTextColor": "#0f172a", "clusterBkg": "#f8fafc", "clusterBorder": "#cbd5e1", "edgeLabelBackground": "#ffffff"}}}%%
+flowchart TD
+    subgraph OBJ["① Objects, each with its parameters θ; laws and seeds among them"]
+        direction TB
+        subgraph LOOP["closed loop with noise"]
+            direction LR
+            tc(("θc")) -.- C["`**Controller**
+            u = π(y)`"]
+            C -- u --> P["`**Plant**
+            ẋ = f(x, u, w)`"]
+            P -- y --> C
+            W["`**Noise**
+            w`"] -- w --> P
+            sw(("seed")) -.- W
+            P -.- tp(("θp"))
+        end
+        subgraph TASK["task"]
+            direction LR
+            tg(("θg")) -.- G["`**Cost**
+            ∫ g dt + h`"]
+            G ~~~ ts(("θs"))
+            ts -.- S["`**Sets**
+            X · U · Xf`"]
+            S ~~~ L0["`**Start law**
+            x₀ ~ X0`"]
+            L0 ~~~ LP["`**Parameter law**
+            θp ~ Θ`"]
+        end
     end
-    TREE --> REAL
 
-    subgraph S4["④ Tune any leaves of the tree"]
-        PROG["pe.program(wrt, bounds)<br/>MathematicalProgram<br/>min_z J(z) s.t. margins(z) ≥ 0<br/>wrt = paths: 'controller.Kp', 'plant.m', 'cost.Q'"]
-        OPT["Optimizer(program).solve()"]
-        BEST["pe.unpack(z*): the tuned tree"]
-        GRAD["or directly: jax.grad(objective)<br/>w.r.t. the whole tree"]
-        PROG --> OPT --> BEST
+    OBJ --> PIPE
+    subgraph PIPE["② pe = problem.compile(controller, dt) · pe.evaluate(θ, key, n)"]
+        direction LR
+        TH[("`**θ**
+        one tree`")] --> RE["`**Realize**
+        ω₁ … ωₙ`"]
+        K(("key")) --> RE
+        RE --> R["`**Rollout × n**
+        vmap`"]
+        R --> SC["`**Scores**
+        Jᵢ, mᵢ`"]
+        SC --> CR["`**Criterion C**
+        mean · CVaR · worst`"]
+        CR --> NLP["`**Program**
+        min C(J₁ … Jₙ)
+        s.t. mᵢ(θ) ≥ 0`"]
+        NLP --> O["`**Optimizer**`"]
+        O --> TS(["θ*"])
     end
-    OBJ --> PROG
-    OBJ --> GRAD
+
+    classDef obj fill:#e0f2fe,stroke:#0284c7,stroke-width:1.5px,color:#0c4a6e
+    classDef par fill:#fef3c7,stroke:#d97706,stroke-width:1.5px,color:#78350f
+    classDef rnd fill:#f3e8ff,stroke:#9333ea,stroke-width:1.5px,color:#581c87
+    classDef step fill:#ffffff,stroke:#94a3b8,stroke-width:1.2px,color:#0f172a
+    classDef out fill:#dcfce7,stroke:#16a34a,stroke-width:1.5px,color:#14532d
+    class C,P,G,S obj
+    class W,L0,LP rnd
+    class tc,tp,tg,ts,TH par
+    class sw,K rnd
+    class RE,R,SC,CR,NLP,O step
+    class TS out
+    style OBJ fill:#ffffff,stroke:#e2e8f0
+    style PIPE fill:#ffffff,stroke:#e2e8f0
 ```
 
 **Reinforcement learning (`learning/reinforcement_learning/`):** two
