@@ -297,11 +297,29 @@ remains to be seen"). The facts that bear on it:
 - **Today's hybrid default** is already fixed-step: `HybridDiagram.compute_trajectory` integrates
   the plant by RK4 substeps inside each base tick (`plant_dt_inner`).
 
+**The resolution of the plant trajectory (the maintainer, 2026-10-26).** A step-diagram runner
+emits one plant state per base tick, sparse next to today: `HybridSimulator` records every RK4
+substep inside each tick (its `t_plant_parts`, `x_plant_parts`), so a 10 Hz MPC on a fast plant
+plots smoothly. `Discretization.step` (`analysis/discretization.py`) computes the same substeps
+(`step_body(..., substeps)`) and returns only `x_next`: the dense points are computed either way,
+and the question is only what the runner records. Three ways, which give the same numbers:
+
+| Option | How | Cost | Fits |
+| --- | --- | --- | --- |
+| **A. A finer base clock** | `dt_base` set at the plant's resolution; the computer fires every `d` ticks; the substeps become base ticks | none new (`StepSchedule` allows it); the carry recorded at every base tick, so more memory under `grad` | when the fine grid is wanted everywhere; RK4 over `dt_base` per tick is the same arithmetic as the substeps, so A and B agree |
+| **B. Record the substeps** | the runner emits the plant's intermediate states as the scan's per-tick output, through a substep path on `Discretization` (`(x_next, xs_sub)`), internal to the runner | memory only, and only when asked; no change to the `StepSystem` contract | `compute_trajectory`: today's density by default |
+| **C. Reconstruct after the run** | re-integrate each tick from the recorded `(x_k, u_k)`, a `vmap` over ticks, deterministic so the same numbers (as `reconstruct_internal_signals` does for a diagram's signals) | a cheap pass after the run; nothing in the main run or under `grad` | plots of an `evaluate` or a gradient run, whose main pass records per tick |
+
+So resolution is decoupled from the computer's clock: `compute_trajectory` records the substeps
+by default (B), as dense as today; `evaluate` and the gradient path record per tick and
+reconstruct on request (C); a finer base clock (A) stays available.
+
 So the agent's draft recommendation is the step-diagram runner by default, with the substeps
 chosen by the continuous rule (the largest divisor of `dt_base` at or under the plant's time
-constant scaled by `AUTO_DT_SCALE`), and `solver="scipy"` for the adaptive path: it keeps the
-numbers today's default gives (R123's delay aside) and makes `compute_trajectory`,
-`evaluate` and the gradients agree by default. Not ruled.
+constant scaled by `AUTO_DT_SCALE`), the substeps recorded (B above) so the plot is as dense as
+today's, and `solver="scipy"` for the adaptive path: it keeps the numbers and the resolution
+today's default gives (R123's delay aside) and makes `compute_trajectory`, `evaluate` and the
+gradients agree by default. Not ruled.
 
 **Order:** the continuous core it waits for landed on 2026-10-24 (the step model, then V1's
 steps 1–6); the loop comes in v0.4 (R86), with P10's AC-8b; the hand-copied `HybridDiagram`
