@@ -18,10 +18,11 @@ FONT = "Inter, 'Helvetica Neue', Helvetica, Arial, sans-serif"
 COLORS = {
     "obj": ("#e0f2fe", "#0284c7", "#0c4a6e"),
     "par": ("#fef3c7", "#d97706", "#78350f"),
-    "rnd": ("#f3e8ff", "#9333ea", "#581c87"),
+    "rnd": ("#fae8ff", "#c026d3", "#701a75"),
     "step": ("#ffffff", "#94a3b8", "#0f172a"),
     "out": ("#dcfce7", "#16a34a", "#14532d"),
     "jax": ("#eef2ff", "#4f46e5", "#312e81"),
+    "loop": ("#f0fdfa", "#0f766e", "#134e4a"),
 }
 INK, MUTED, LINE = "#0f172a", "#64748b", "#64748b"
 CARD_W, CARD_H = 150, 76
@@ -104,9 +105,12 @@ class Figure:
         self.text(x + w / 2, y + h - 30, title, 15, 650, ink)
         self.text(x + w / 2, y + h - 11, sub, 13.5, 400, ink)
 
-    def math(self, cx, cy, tex, size=17, color=INK):
+    def math(self, cx, cy, tex, size=17, color=INK, max_width=None):
         """A LaTeX equation (matplotlib's mathtext) as filled SVG paths, centred on (cx, cy)."""
         text = TextPath((0, 0), tex, size=size)
+        if max_width is not None and text.get_extents().width > max_width:
+            size = size * max_width / text.get_extents().width
+            text = TextPath((0, 0), tex, size=size)
         box = text.get_extents()
         d = []
         for vertices, code in text.iter_segments():
@@ -137,7 +141,7 @@ class Figure:
         room = (y + h - 10) - (top + 12)
         for i, line in enumerate(lines):
             cy = top + 12 + room * (i + 0.5) / len(lines)
-            self.math(x + w / 2, cy, line, size, ink)
+            self.math(x + w / 2, cy, line, size, ink, max_width=w - 18)
 
     def grid_icon(self, x, y, n=5, step=9):
         """A small lattice of nodes: a discretized state space."""
@@ -179,12 +183,14 @@ class Figure:
                 ("arr", LINE),
                 ("arrg", COLORS["out"][1]),
                 ("arrp", COLORS["rnd"][1]),
+                ("arrt", COLORS["loop"][1]),
             )
         )
         return (
             f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 {self.width} {self.height}" '
             f'width="{self.width}" height="{self.height}" font-family="{FONT}">'
-            f'<defs>{markers}</defs><rect width="100%" height="100%" fill="#ffffff"/>'
+            f'<defs>{markers}</defs><rect x="1" y="1" width="{self.width - 2}" height="{self.height - 2}" '
+            f'rx="18" fill="#ffffff" stroke="#e2e8f0" stroke-width="1.5"/>'
             + "".join(self.parts)
             + "</svg>"
         )
@@ -479,7 +485,7 @@ def trajectory_optimization():
 
     # The program, its solver, and the plan read back
     y2 = y + h + 74
-    f.arrow(f"M590,{y + h + 26} L590,{y2 - 2}")
+    f.arrow(f"M190,{y + h + 26} L190,{y2 - 2}")
     xs = chain(
         f,
         y2,
@@ -508,7 +514,7 @@ def trajectory_optimization():
 
 
 def dynamic_programming():
-    f = Figure(1180, 560)
+    f = Figure(1180, 580)
     bottom = problem_row(
         f,
         [
@@ -546,8 +552,8 @@ def dynamic_programming():
     f.grid_icon(xs[0][0] + 24, y + 26)
 
     # The Bellman sweep, backward, then the greedy policy
-    y2 = y + h + 100
-    f.arrow(f"M590,{y + h + 26} L590,{y2 - 50}")
+    y2 = y + h + 70
+    f.arrow(f"M420,{y + h + 26} L420,{y2 - 2}")
     xs = chain(
         f,
         y2,
@@ -560,7 +566,7 @@ def dynamic_programming():
                 "Bellman backup",
                 ["Jₖ(x) = minᵤ [ g(x, u) dt", "+ α Jₖ₊₁(x⁺) ]"],
             ),
-            ("obj", 220, "Cost-to-go", ["      J(x) on the grid"]),
+            ("obj", 220, "Cost-to-go", ["J(x) on the grid"]),
             (
                 "obj",
                 260,
@@ -576,14 +582,15 @@ def dynamic_programming():
         xs[1][0] + xs[1][1] - 60,
         y2,
         "backward in time, until J converges",
+        below=h,
     )
-    f.heat_icon(xs[2][0] + 14, y2 + 26)
+    f.heat_icon(xs[2][0] + 12, y2 + 30, size=7)
     return f.svg()
 
 
 def lqr():
-    f = Figure(1180, 450)
-    bottom = problem_row(
+    f = Figure(1180, 470)
+    problem_row(
         f,
         [
             ("Plant", ["ẋ = f(x, u)"], "obj"),
@@ -592,8 +599,8 @@ def lqr():
         "PlanningProblem",
     )
 
-    y, h = bottom + 58, 96
-    f.arrow(f"M205,{bottom} L205,{y - 2}")
+    # The plant feeds the linearization, the cost's weights the Riccati equation
+    y, h = 226, 96
     xs = chain(
         f,
         y,
@@ -616,38 +623,37 @@ def lqr():
         x0=60,
         gap=60,
     )
+    f.arrow(f"M{xs[0][0] + 145},168 L{xs[0][0] + 145},{y - 2}")
+    f.arrow(f"M{xs[1][0] + 190},168 L{xs[1][0] + 190},{y - 2}")
+    f.text(xs[1][0] + 200, 200, "Q, R", 13, 600, MUTED, anchor="start")
 
-    y2 = y + h + 70
-    cx = xs[2][0] + xs[2][1] / 2
-    f.arrow(f"M{cx},{y + h} L{cx},{y2 - 2}")
-    chain(
-        f,
+    # The solution from the gain; the cost-to-go and the poles beside it
+    y2 = y + h + 46
+    f.card(
+        xs[1][0],
         y2,
+        380,
         h,
-        [
-            ("obj", 290, "Poles", ["eig(A − BK)", "stable in the left half-plane"]),
-            (
-                "obj",
-                380,
-                "Cost-to-go",
-                ["J(x) = (x − x̄)ᵀP(x − x̄)", "of the linear model"],
-            ),
-            (
-                "obj",
-                290,
-                "PlanningSolution",
-                ["policy u = ū − K(x − x̄)", "a StateFeedback block"],
-            ),
-        ],
-        x0=60,
-        gap=60,
-        reverse=True,
+        "Cost-to-go",
+        ["J(x) = (x − x̄)ᵀP(x − x̄)", "of the linear model"],
+        "obj",
     )
+    f.arrow(f"M{xs[1][0] + 190},{y + h} L{xs[1][0] + 190},{y2 - 2}")
+    f.card(
+        xs[2][0],
+        y2,
+        290,
+        h,
+        "PlanningSolution",
+        ["policy u = ū − K(x − x̄)", "poles eig(A − BK)"],
+        "obj",
+    )
+    f.arrow(f"M{xs[2][0] + 145},{y + h} L{xs[2][0] + 145},{y2 - 2}")
     return f.svg()
 
 
 def reinforcement_learning():
-    f = Figure(1180, 600)
+    f = Figure(1180, 576)
     bottom = problem_row(
         f,
         [
@@ -714,17 +720,21 @@ def reinforcement_learning():
 
 def modeling_and_simulation():
     f = Figure(1180, 540)
-    # The model: blocks wired into one system
+    # The model: Controller @ Plant = one closed-loop System
     y, h = 70, 86
     f.frame(
-        30, y - 44, 1120, h + 66, "Model · every block a System, the diagram a System"
+        30,
+        y - 44,
+        1120,
+        h + 66,
+        "Model · every block a System, and so is their diagram",
     )
-    f.card(60, y, 220, h, "Plant", ["ẋ = f(x, u, t; p)", "y = h(x, u, t; p)"], "obj")
-    f.card(330, y, 220, h, "Controller", ["u = π(y; p)"], "obj")
-    f.arrow(f"M550,{y + h / 2} L598,{y + h / 2}")
-    f.text(574, y + h / 2 - 8, "@", 15, 700, MUTED)
-    lines = ["Ẋ = F(X, U, t; P), one system again", "operators @ >> +, or connect"]
-    f.card(600, y, 520, h, "Closed-loop diagram", lines, "obj")
+    f.card(60, y, 230, h, "Controller", ["u = π(y; p)"], "obj")
+    f.text(318, y + h / 2 + 10, "@", 28, 700, MUTED)
+    f.card(346, y, 230, h, "Plant", ["ẋ = f(x, u, t; p)", "y = h(x, u, t; p)"], "obj")
+    f.text(606, y + h / 2 + 10, "=", 30, 700, MUTED)
+    lines = ["Ẋ = F(X, U, t; P)", "operators @ >> +, or connect"]
+    f.card(636, y, 484, h, "Closed-loop diagram, a System", lines, "obj")
 
     # Compile once
     y2 = y + h + 92
@@ -751,7 +761,7 @@ def modeling_and_simulation():
                 "step",
                 330,
                 "Parameters",
-                ["params = None: the snapshot", "or a complete tree"],
+                ["params: one tree for all blocks", "swap any leaf, no recompile"],
             ),
         ],
         x0=50,
@@ -775,7 +785,7 @@ def modeling_and_simulation():
                 ["integrate ẋ = f from x₀", "solve_ivp or fixed-step RK4"],
             ),
             ("traj", 150, "Trajectory", ["x(t), u(t), y(t)"]),
-            ("obj", 170, "Plots, animation", ["plot_trajectory", "animate"]),
+            ("out", 170, "Plots, animation", ["plot_trajectory", "animate"]),
         ],
         x0=60,
         gap=40,
@@ -813,7 +823,7 @@ def overview():
         ("LQR", ["linearize + Riccati", "u = ū − K(x − x̄)"]),
         ("Dynamic programming", ["Bellman on a grid", "u = π(x), J(x)"]),
         ("Trajectory optimization", ["transcription + NLP", "u = π(t), x*(t)"]),
-        ("Reinforcement learning", ["collect + update θ", "u = πθ(x)"]),
+        ("Reinforcement learning", ["collect + update θ", "u = π(x; θ)"]),
         ("RRT", ["kinodynamic tree", "u = π(t)"]),
     ]
     w, gap = 200, 20
@@ -834,13 +844,13 @@ def overview():
                 "obj",
                 250,
                 "PlanningSolution",
-                ["policy · trajectory", "the solver's own evidence"],
+                ["policy · trajectory", "and the solver's log"],
             ),
             (
                 "obj",
                 230,
                 "Closed loop",
-                ["solution.policy @ plant", "the script closes it"],
+                ["solution.policy @ plant", "you connect it"],
             ),
             (
                 "step",
@@ -863,100 +873,142 @@ JAX_TILES = (
 
 
 def jax_icon(f, name, ix, iy):
-    fill, stroke, ink = COLORS["jax"]
+    """The picture of one JAX transform, in a 44 × 48 box at (ix, iy)."""
+    _fill, stroke, ink = COLORS["jax"]
     if name == "jit":
+        # A lightning bolt
         f.add(
-            f'<path d="M{ix + 22},{iy} L{ix + 6},{iy + 26} L{ix + 18},{iy + 26} L{ix + 12},{iy + 48} L{ix + 32},{iy + 18} L{ix + 20},{iy + 18} Z" fill="{stroke}"/>'
+            f'<path d="M{ix + 22},{iy} L{ix + 6},{iy + 26} L{ix + 18},{iy + 26} L{ix + 12},{iy + 48} '
+            f'L{ix + 32},{iy + 18} L{ix + 20},{iy + 18} Z" fill="{stroke}"/>'
         )
     elif name == "grad":
+        # A cost curve, a point on it, and its tangent there (t = 1/4: the slope 58/42)
         f.add(
-            f'<path d="M{ix},{iy + 6} Q{ix + 20},{iy + 62} {ix + 44},{iy + 10}" fill="none" stroke="{stroke}" stroke-width="2"/>'
+            f'<path d="M{ix},{iy + 6} Q{ix + 20},{iy + 62} {ix + 44},{iy + 10}" fill="none" '
+            f'stroke="{stroke}" stroke-width="2"/>'
         )
         f.add(
-            f'<path d="M{ix - 3.75},{iy + 7.9} L{ix + 24.25},{iy + 46.6}" stroke="{ink}" stroke-width="1.6"/>'
+            f'<path d="M{ix - 3.75},{iy + 7.9} L{ix + 24.25},{iy + 46.6}" stroke="{ink}" '
+            f'stroke-width="1.6"/>'
         )
         f.add(f'<circle cx="{ix + 10.25}" cy="{iy + 27.25}" r="3.2" fill="{ink}"/>')
     else:
+        # A fan of trajectories, run side by side
         for n in range(5):
             dy = n * 7
             f.add(
-                f'<path d="M{ix},{iy + 36} C{ix + 12},{iy + 4 + dy} {ix + 26},{iy + 30 - dy / 2} {ix + 44},{iy + 6 + dy}" fill="none" stroke="{stroke}" stroke-width="1.6" opacity="{0.45 + 0.11 * n:.2f}"/>'
+                f'<path d="M{ix},{iy + 36} C{ix + 12},{iy + 4 + dy} {ix + 26},{iy + 30 - dy / 2} '
+                f'{ix + 44},{iy + 6 + dy}" fill="none" stroke="{stroke}" stroke-width="1.6" '
+                f'opacity="{0.45 + 0.11 * n:.2f}"/>'
             )
 
 
 def jax_column(f, x, y, w, h):
+    """JAX as a column: its name, then jit, grad and vmap, evenly spaced."""
     fill, stroke, ink = COLORS["jax"]
     f.add(
-        f'<rect x="{x}" y="{y}" width="{w}" height="{h}" rx="10" fill="{fill}" stroke="{stroke}" stroke-width="1.6"/>'
+        f'<rect x="{x}" y="{y}" width="{w}" height="{h}" rx="12" fill="{fill}" '
+        f'stroke="{stroke}" stroke-width="1.6"/>'
     )
-    f.text(x + w / 2, y + 26, "JAX", 17, 750, ink)
-    f.text(x + w / 2, y + 44, "every linked object traces", 11.5, 500, ink)
-    step = (h - 70) / 3
+    f.text(x + w / 2, y + 30, "JAX", 19, 750, ink)
+    f.text(x + w / 2, y + 50, "the foundations trace", 12, 500, ink)
+    top, step = y + 70, (h - 80) / 3
     for k, (name, line) in enumerate(JAX_TILES):
-        ty = y + 64 + k * step
-        jax_icon(f, name, x + w / 2 - 22, ty + 8)
-        f.text(x + w / 2, ty + 80, name, 16, 700, ink)
-        f.text(x + w / 2, ty + 98, line, 12, 500, ink)
+        ty = top + k * step
+        if k:
+            f.add(
+                f'<path d="M{x + 24},{ty} L{x + w - 24},{ty}" stroke="{stroke}" '
+                f'stroke-width="1" opacity="0.25"/>'
+            )
+        mid = ty + step / 2
+        jax_icon(f, name, x + w / 2 - 22, mid - 52)
+        f.text(x + w / 2, mid + 22, name, 16, 700, ink)
+        f.text(x + w / 2, mid + 40, line, 12, 500, ink)
 
 
-def link(f, x0, y0, x1, y1):
-    """A dotted indigo link from a traced object to the JAX panel, a dot at the object."""
-    stroke = COLORS["jax"][1]
+def link(f, x0, y0, x1, y1, kind="jax", dash="3 3"):
+    """A dotted link from an object to a panel, a dot on the object."""
+    stroke = COLORS[kind][1]
     f.add(
-        f'<path d="M{x0},{y0} L{x1},{y1}" stroke="{stroke}" stroke-width="1.6" stroke-dasharray="3 3" fill="none"/>'
+        f'<path d="M{x0},{y0} L{x1},{y1}" stroke="{stroke}" stroke-width="1.6" '
+        f'stroke-dasharray="{dash}" fill="none"/>'
     )
     f.add(f'<circle cx="{x0}" cy="{y0}" r="4" fill="{stroke}"/>')
+
+
+def legend(f, x, y, entries):
+    """A legend: one line sample and its words per entry."""
+    for i, (style, color, words) in enumerate(entries):
+        yy = y + i * 22
+        dash = {
+            "solid": "",
+            "dashed": ' stroke-dasharray="5 4"',
+            "dotted": ' stroke-dasharray="3 3"',
+        }[style]
+        f.add(
+            f'<path d="M{x},{yy} L{x + 34},{yy}" stroke="{color}" stroke-width="1.8"{dash}/>'
+        )
+        f.text(x + 46, yy + 4.5, words, 12.5, 500, MUTED, anchor="start")
 
 
 PATHS = {
     "Simulate": r"$x(t) = x_0 + \int_0^t f\, d\tau$",
     "Analyze": r"$\dot{\tilde{x}} = A\tilde{x} + B\tilde{u}$",
-    "Design": r"$u = -K\, x$",
+    "Design": r"$\lambda(A - BK) = \{p_i\}$",
     "Plan": r"$\pi^* = \mathrm{arg\,min}_{\pi}\; J$",
     "Learn": r"$\theta \leftarrow \theta + \eta \nabla_{\theta} \mathbb{E}[G]$",
-    "Evaluate": r"$J(\theta),\; m(\theta)$",
+    "Evaluate": r"$J(\theta) = \mathbb{E}[J]$",
 }
 OUTS = {
     "Simulate": ("Trajectory", None),
-    "Analyze": ("Poles · Bode", r"$G(s) = C(sI - A)^{-1}B$"),
-    "Design": ("Controller", r"$u = \pi(y)$"),
+    "Analyze": ("Poles · Bode", r"$\lambda(A),\;\; G(j\omega)$"),
+    "Design": ("Controller", r"$u = -K\,x$"),
     "Plan": ("PlanningSolution", r"$u = \pi^*(x)$"),
     "Learn": ("Neural policy", r"$u = \pi_{\theta}(x)$"),
-    "Evaluate": ("Evaluation", r"$\mathbb{E}[J],\; \mathrm{CVaR},\; \max J$"),
+    "Evaluate": ("Evaluation", r"$J,\;\; \mathrm{margins}$"),
 }
 
 
 def trajectory_card(f, x, y, w, h):
+    """A result card holding a sketch of x(t)."""
     f.card(x, y, w, h, "", [], "out")
-    sx, sy = x + w / 2 - 55, y + 52
+    sx, sy = x + w / 2 - 55, y + 54
     f.add(
-        f'<path d="M{sx},{sy} C{sx + 22},{sy - 30} {sx + 40},{sy + 16} {sx + 62},{sy - 8} S{sx + 96},{sy - 16} {sx + 110},{sy - 12}" fill="none" stroke="{COLORS["out"][1]}" stroke-width="2.2"/>'
+        f'<path d="M{sx},{sy} C{sx + 22},{sy - 30} {sx + 40},{sy + 16} {sx + 62},{sy - 8} '
+        f'S{sx + 96},{sy - 16} {sx + 110},{sy - 12}" fill="none" '
+        f'stroke="{COLORS["out"][1]}" stroke-width="2.2"/>'
     )
     f.text(x + w / 2, y + 26, "Trajectory", 15, 650, COLORS["out"][2])
 
 
-def body(f, order, x0, w, gap, eq_size, out_size):
-    """The common map: system, problem over the problem-side columns, paths, results, program."""
+def library_map():
+    """The whole library on one page: three foundations, the tools as parallel paths, JAX beside them."""
+    f = Figure(1180, 726)
+    order = ["Simulate", "Analyze", "Design", "Plan", "Learn", "Evaluate"]
+    x0, w, gap = 30, 146, 14
     cols = {name: x0 + i * (w + gap) for i, name in enumerate(order)}
     right = x0 + 6 * w + 5 * gap
-    side = [cols[n] for n in ("Plan", "Learn", "Evaluate")]
-    px0, px1 = min(side), max(side) + w
+    px0, px1 = cols["Plan"], cols["Evaluate"] + w
+    loop_c = COLORS["loop"][1]
+
+    # The model and the task
+    sys_y, sys_h = 30, 84
     f.eq_card(
         x0,
-        24,
+        sys_y,
         right - x0,
-        84,
+        sys_h,
         "System · a plant, a controller, a diagram: one object",
         [r"$\dot{x} = f(x, u, t;\, p) \qquad y = h(x, u, t;\, p)$"],
         "obj",
         size=21,
     )
-    py = 150
+    py, ph = sys_y + sys_h + 40, 126
     f.eq_card(
         px0,
         py,
         px1 - px0,
-        128,
+        ph,
         "PlanningProblem",
         [
             r"$J = \int_0^{t_f} g(x, u, t)\, dt \;+\; h(x(t_f))$",
@@ -965,76 +1017,89 @@ def body(f, order, x0, w, gap, eq_size, out_size):
         "obj",
         size=17,
     )
-    f.arrow(f"M{(px0 + px1) / 2},108 L{(px0 + px1) / 2},{py - 2}")
-    ry, rh = py + 128 + 44, 92
-    oy, oh = ry + rh + 44, 80
+    f.arrow(f"M{(px0 + px1) / 2},{sys_y + sys_h} L{(px0 + px1) / 2},{py - 2}")
+
+    # Six parallel paths, and what each gives back
+    ry, rh = py + ph + 40, 92
+    oy, oh = ry + rh + 40, 84
     for name, x in cols.items():
         cx = x + w / 2
-        f.eq_card(x, ry, w, rh, name, PATHS[name], "step", size=eq_size)
-        top = 108 if name in ("Simulate", "Analyze", "Design") else py + 128
+        f.eq_card(x, ry, w, rh, name, PATHS[name], "step", size=17)
+        top = sys_y + sys_h if name in ("Simulate", "Analyze", "Design") else py + ph
         f.arrow(f"M{cx},{top} L{cx},{ry - 2}")
         title, tex = OUTS[name]
         if tex is None:
             trajectory_card(f, x, oy, w, oh)
         else:
-            f.eq_card(x, oy, w, oh, title, tex, "out", size=out_size)
+            f.eq_card(x, oy, w, oh, title, tex, "out", size=17)
         f.arrow(f"M{cx},{ry + rh} L{cx},{oy - 2}")
-    # The loop back to the System
-    loop_y = oy + oh + 18
+
+    # Every controller is a System again: one bus under the three, back to the top
+    bus_y = oy + oh + 22
     ctl = [cols[n] + w / 2 for n in ("Design", "Plan", "Learn")]
     for cx in ctl:
-        f.dotted(f"M{cx},{oy + oh} L{cx},{loop_y}", COLORS["out"][1])
-    return cols, right, (px0, px1), py, ry, rh, oy, oh, loop_y, ctl
+        f.add(
+            f'<path d="M{cx},{oy + oh} L{cx},{bus_y}" stroke="{loop_c}" stroke-width="1.6" stroke-dasharray="5 4"/>'
+        )
+    f.arrow(
+        f"M{max(ctl)},{bus_y} L14,{bus_y} L14,{sys_y + sys_h / 2} L{x0 - 2},{sys_y + sys_h / 2}",
+        loop_c,
+        dashed=True,
+        marker="arrt",
+    )
+    f.text(
+        x0 + 4,
+        bus_y + 18,
+        "every controller is a System again: policy @ plant",
+        12.5,
+        600,
+        COLORS["loop"][2],
+        anchor="start",
+    )
 
-
-def program(f, px0, px1, by, ry, rh, cols, w, gap):
+    # The solver boundary, reached from the Plan and the Evaluate cards
+    by, bh = bus_y + 52, 88
     f.eq_card(
         px0,
         by,
         px1 - px0,
-        92,
+        bh,
         "MathematicalProgram · Optimizer",
         r"$\min_{z}\; J(z) \quad \mathrm{s.t.} \quad h(z) = 0,\;\; g(z) \geq 0$",
         "obj",
         size=18,
     )
-    for name, label in (("Plan", "trajectory optimization"), ("Evaluate", "tuning")):
-        gx = cols[name] + w + gap / 2 if name == "Plan" else cols[name] - gap / 2
-        if name == "Evaluate" and cols["Evaluate"] < cols["Plan"]:
-            gx = cols[name] + w + gap / 2
-        f.arrow(f"M{gx},{ry + rh / 2} L{gx},{by - 2}", dashed=True)
-        f.text(gx + 6, by - 10, label, 12, 500, MUTED, anchor="start")
+    plan_gx = cols["Plan"] + w + gap / 2
+    eval_gx = cols["Evaluate"] - gap / 2
+    for x_edge, gx, label, anchor, dx in (
+        (cols["Plan"] + w, plan_gx, "trajectory optimization", "end", -8),
+        (cols["Evaluate"], eval_gx, "tuning", "start", 8),
+    ):
+        f.add(f'<circle cx="{x_edge}" cy="{ry + rh / 2}" r="3.5" fill="{LINE}"/>')
+        f.arrow(
+            f"M{x_edge},{ry + rh / 2} L{gx},{ry + rh / 2} L{gx},{by - 2}", dashed=True
+        )
+        f.text(gx + dx, by - 10, label, 12, 500, MUTED, anchor=anchor)
 
+    # The legend, in the free corner
+    legend(
+        f,
+        x0 + 6,
+        by + 12,
+        [
+            ("solid", LINE, "produces"),
+            ("dashed", LINE, "solved as a mathematical program"),
+            ("dashed", loop_c, "a controller is a System again"),
+            ("dotted", COLORS["jax"][1], "traces under JAX: jit, grad, vmap"),
+        ],
+    )
 
-def library_map():
-    """The whole library on one page: three foundations, the tools as parallel paths, JAX beside them."""
-    f = Figure(1180, 760)
-    order = ["Simulate", "Analyze", "Design", "Plan", "Learn", "Evaluate"]
-    w, gap, x0 = 146, 12, 30
-    cols, right, (px0, px1), py, ry, rh, oy, oh, loop_y, ctl = body(
-        f, order, x0, w, gap, 15, 14
-    )
-    f.arrow(
-        f"M{max(ctl)},{loop_y} L14,{loop_y} L14,66 L{x0 - 2},66",
-        COLORS["out"][1],
-        dashed=True,
-        marker="arrg",
-    )
-    f.text(
-        24,
-        loop_y + 18,
-        "every controller is a System: policy @ plant",
-        12.5,
-        500,
-        COLORS["out"][2],
-        anchor="start",
-    )
-    by = loop_y + 56
-    program(f, px0, px1, by, ry, rh, cols, w, gap)
-    jx = right + 26
-    jax_column(f, jx, 24, 1150 - jx, by + 92 - 24)
-    for y in (66, py + 64, ry + rh / 2, by + 46):
-        link(f, right, y, jx, y)
+    # JAX beside the three foundations
+    jx = right + 24
+    jax_column(f, jx, sys_y, 1150 - jx, by + bh - sys_y)
+    for y in (sys_y + sys_h / 2, py + ph / 2, by + bh / 2):
+        x_from = right if y < py + ph else px1
+        link(f, x_from, y, jx, y)
     return f.svg()
 
 

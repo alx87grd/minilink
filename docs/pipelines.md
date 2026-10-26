@@ -1,8 +1,8 @@
 # Minilink's pipelines, in pictures
 
 One figure per major pipeline, in one visual language: blue, the objects (systems, the
-problem, trajectories, solutions); amber, parameters; purple, randomness; white, the steps;
-green, the results. The figures are drawn by `docs/pipeline_figures.py`
+problem, trajectories, solutions); amber, parameters; fuchsia, randomness; white, the steps;
+green, the results. On the map, teal is the loop back to a `System` and indigo is JAX. The figures are drawn by `docs/pipeline_figures.py`
 (`python docs/pipeline_figures.py` rebuilds every `docs/_static/pipeline_*.svg`).
 
 ## The library on one page
