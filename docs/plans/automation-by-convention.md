@@ -15,6 +15,9 @@ options rejected, the fifteen rulings) is in the decision record,
 [2026-10-11-automation-by-convention.md](../reviews/2026-10-11-automation-by-convention.md);
 the second opinion and its eight rulings (R1–R8) are in
 [2026-10-13-automation-by-convention-second-opinion.md](../reviews/2026-10-13-automation-by-convention-second-opinion.md).
+**Rung, 2026-10-26:** AC-7's draws and AC-8a / AC-8b are v0.3's core (the maintainer's direction:
+[core-architecture.md](core-architecture.md) §5 and §6; [TODO.md](TODO.md) §1.4, §1.5); AC-5 and AC-6 stay in the
+plotting lane (TODO §3). The rungs written below are the ones before that direction.
 Sections 1 to 4.4 described the landed part and were cut (the history is in git); the
 section numbers of what is left are kept, so the citations to them hold.
 

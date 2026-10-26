@@ -2,13 +2,15 @@
 
 **Status:** design draft (2026-10-02), not started (the prototypes in `experimental/mppi/`
 run). Asks 1–3 and 5 of §10 are for the maintainer's ruling; the recommended answers are
-D26–D28 and D30 of [end-state-api.md](end-state-api.md); ruled 2026-10-25: `MPPIPlanner`
+D26–D28 and D30, now in §10; ruled 2026-10-25: `MPPIPlanner`
 (R106), `n_plant_samples=1` (R107), `RolloutEnvironment` moving to `planning/environment.py`
 before MP-1 (R108); the three planner verbs (ask 2) still to rule for v0.4; ask 4 (timing) decided 2026-10-02. The
 planner waits on S31's sampled kernel, RN-4 and the rest of RN-5 (RN-5's v0.3 part, `evaluate`
 over the start and parameter draws, landed 2026-10-24).
 **Lane:** research lane first (`experimental/`), provisional band with the MPC
 block once MP-5 lands, teaching-surface decision at V3 (v0.9).
+**Rung, 2026-10-26:** a v0.4 feature on the core (S72, [TODO.md](TODO.md) §4); the sampled kernel,
+RN-4 and RN-5 it waits on are v0.3's core ([core-architecture.md](core-architecture.md) §5, §6, §10).
 **Rung proposed:** S72 on the workboard, v0.4, on S31's sampled kernel (the hybrid phase,
 after the continuous core) and the step model of S75, and after RN-4
 and RN-5 of the randomness plan (the ordering of §8), hardened before the v0.9 freeze; see §9.
@@ -53,6 +55,7 @@ few screens plus one contract narrowing in the MPC block
   form and comes with the teaching-surface decision, not before.
 - **One narrowing in the MPC block.** The block today reads trajopt internals
   (`planner.transcription`, `last_optimization_result.z`, `compile_parametric_program`).
+  (Open point, QUESTIONS.md: this list differs from §6 and D27, which name `prepare_online()`.)
   It needs three planner verbs instead: `decision_dimension()`, `solve_trajectory_from()`
   returning a record that carries `z`, and `warm_start_guess()`. That is the T6
   conversation already on the workboard, done with its first second consumer.
@@ -277,7 +280,7 @@ sample's score being the problem's criterion over them —
 (Risk-Aware MPPI). With `M = 1` the softmin rewards a lucky plant draw as much as a
 good input sequence, which biases the update toward optimism; the paper that makes
 this point is the reason `M` is a knob and its default on a stochastic problem should
-be small but above one (`M = 4` proposed). On a deterministic problem `M` is ignored
+be small but above one (`M = 4` proposed; R107 ruled `n_plant_samples=1`, §7). On a deterministic problem `M` is ignored
 (there is nothing to draw; the twin test pins byte-identity with `M = 1` and no draws).
 
 Cost of the stochastic branch: `K × M` rollouts per tick instead of `K`. The JAX
@@ -323,7 +326,7 @@ def solve_trajectory_from(self, x0, *, params=None, initial_guess=None):
     K, M, lam, alpha = self.n_samples, self.n_plant_samples, self.temperature, self.control_cost
     Sigma, Sigma_inv, u_lower, u_upper = self.noise, self.noise_inv, *self.input_box
     U = self.sequence_of(initial_guess)                     # (N, m), the nominal sequence
-    self.key, k_eps, k_plant = jax.random.split(self.key, 3)
+    self.key, k_eps, k_plant = jax.random.split(self.key, 3)   # open point: R104 draws from the seed and the tick
 
     # Sample: V^k = U + eps^k, eps^k_t ~ N(0, Sigma), clipped to the input box
     eps = jax.random.multivariate_normal(k_eps, jnp.zeros(U.shape[1]), Sigma, (K, N))
@@ -382,7 +385,8 @@ No `hasattr` probing (RULES 4.3): the three verbs become methods of the `Planner
 that raise `NotImplementedError` by name, as `solve_trajectory_from` does today, and
 `validate_mpc_planner` calls them. `warm_start=True` keeps packing the planner's `z` on
 `Computer.x`, which for MPPI is exactly the shifted nominal sequence — the state the
-algorithm carries between ticks in every implementation. `Command`, the tick latch, the
+algorithm carries between ticks in every implementation. (Open point, QUESTIONS.md: R123 removes
+the tick latch this sentence keeps.) `Command`, the tick latch, the
 dual-rate broadcast, `export_to_computer`, `mpc @ plant` and the overlays
 (`mpc_plans_from_rollout`, `mpc_animation_overlays`) are unchanged: they read the
 trajectory of the tick's solution. The check that `dt_mpc` is a multiple of the
@@ -503,7 +507,7 @@ visibly provisional at v1.0 with the rest of the MPC band.
 
 ## 10. Asks for the maintainer
 
-Recommended answers (2026-10-22) in [end-state-api.md](end-state-api.md): ask 1 D26
+Recommended answers (2026-10-22), moved below from `end-state-api.md`: ask 1 D26
 (`MPPIPlanner`), ask 2 D27 (the three verbs), ask 3 D28 (`n_plant_samples=1`), ask 5 D30 (amended by
 R108: it moves to `planning/`). All for v0.4.
 
@@ -519,6 +523,39 @@ R108: it moves to `planning/`). All for v0.4.
    standalone script stands in until then.
 5. **`RolloutEnvironment`'s home**, ruled 2026-10-25 (R108): it moves to
    `planning/environment.py` as a housekeeping step before MP-1.
+
+**The recommendations, moved from end-state-api.md (2026-10-26)**, verbatim; the ids stay:
+
+#### D26 MPPI's name (mppi.md ask 1)
+
+**Ruled 2026-10-25 (R106):** as recommended below.
+
+**Recommended:** `MPPIPlanner` and `MPPIRecord`, by the `LQRPlanner` precedent (an algorithm's
+own acronym, as the course notes say it); `PathIntegralPlanner` stays the docstring's long
+form.
+
+#### D27 The MPC block's planner contract (mppi.md ask 2; T6)
+
+**Recommended:** the three `Planner` verbs (`decision_dimension()`, `prepare_online()`,
+`warm_start_guess(z_prev, y, *, dt_mpc, k)`) and `z` on the tick's record; no `hasattr`
+probing. `ModelPredictiveController(planner, dt_mpc=)` then wraps trajopt and MPPI alike.
+
+#### D28 The stochastic default of MPPI (mppi.md ask 3)
+
+**Ruled 2026-10-25 (R107):** as recommended below.
+
+**Recommended:** `n_plant_samples=1` on a stochastic problem with the bias stated in the
+docstring; the user raises it knowingly, as with `n_trials`.
+
+#### D30 Where `RolloutEnvironment` lives (mppi.md ask 5)
+
+**Ruled 2026-10-25 (R108), against the recommendation below:** it moves to
+`planning/environment.py` before the MPPI planner, the RL import kept: it is the problem
+sampled at `dt`, a planning object read by RL and MPPI alike.
+
+**Recommended:** answered by D11 (the sampled loop a tool on one kernel, R13;
+[sampled-path.md](sampled-path.md) §8): it becomes a caller of the sampled kernel and stays a
+thin RL-facing adapter in `learning/reinforcement_learning/`; no move.
 
 Sources (the method): Williams, Aldrich, Theodorou, "Model predictive path integral
 control: from theory to parallel computation" (JGCD 2017); Williams et al.,

@@ -2,7 +2,7 @@
 
 **Status:** core contract — design agreed 2026-09-21, not started.  
 **Lane:** core (`minilink.core.geometry`), then a teaching catalog of courses.  
-**Rung:** v0.4, step A3 of [TODO.md](TODO.md).  
+**Rung:** v0.4, step A3 of [TODO.md](TODO.md) §4, a feature on the core; the `Field` it needs is a v0.3 core pillar ([core-architecture.md](core-architecture.md) §9).  
 **Depends on:** [fields.md](fields.md) for the `Field` ABC (can move spatial files first and rename `StateField` → `Field` in the same pass or after).
 
 Workspace math is split today: SDF solids in [`core/geometry.py`](../../minilink/core/geometry.py), everything else under [`planning/spatial/`](../../minilink/planning/spatial/). That home is an accident of first consumer (trajopt). Control cannot import planning ([RULES.md](../dev/RULES.md) 3.2), so [`PurePursuit`](../../minilink/control/geometric.py) takes a raw waypoint array. Demos rebuild the same oval and cones by hand.

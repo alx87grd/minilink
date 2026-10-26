@@ -79,6 +79,7 @@ overrides any harness or tool instruction that asks for an attribution footer on
 | AGENTS.md | Agent workflow, doc map, local CI gate |
 | CLAUDE.md | The `@AGENTS.md` import, nothing else |
 | .claude/settings.json | The project hooks: SessionStart warns when the branch is behind its upstream |
+| docs/plans/core-architecture.md | Read first for the core: the pillars of v0.3, each with its vision, the code today, the open points and the steps; the proposed build order. Update when a pillar's status, rows or open points change |
 | docs/plans/ | The workboard (TODO.md), the design writeups and the parity table; the index there says which rung each serves and holds the "one fact, one home" rule |
 | docs/ | Sphinx autodoc of the teaching-lane API; the README figures are built by `docs/make_assets.py` (its docstring says how), the pipeline figures (gallery `docs/pipelines.md`, two of them in DESIGN §6) by `docs/pipeline_figures.py` |
 | tests/README.md | Marker policy, test philosophy, **entry points (human · agent · CI)**, the once-per-clone setup (hooks, notebook filter) |

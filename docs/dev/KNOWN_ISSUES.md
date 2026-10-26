@@ -13,7 +13,7 @@ lands. Last checked against the code: 2026-10-25.
   starts and parameters: the key seeds a NumPy generator on one backend and a JAX PRNG key on
   the other (`planning/evaluator.py`, `trial_key`). Each backend is deterministic on its own.
 - **Workaround:** compare runs within one backend.
-- **Fix:** RN-4 (v0.4), one draw convention on both backends.
+- **Fix:** RN-4 (the v0.3 core's draws, TODO §1.4), one draw convention on both backends.
 
 ## Composition and control
 
@@ -30,7 +30,8 @@ lands. Last checked against the code: 2026-10-25.
 - **Symptom:** a second `diagram.connect(..., "i", "u")` onto the same input rewires it to the
   new source with no warning (the old source is dropped).
 - **Workaround:** check `diagram.connections` or set `diagram.connection_verbose = True`.
-- **Fix:** S66 (`connect` refuses to rewire a connected input), an ask on the workboard.
+- **Fix:** S66 (`connect` refuses to rewire a connected input), an ask on the workboard (the v0.3
+  core's hardening, TODO §1.9).
 
 ### An output that reads an input it does not declare reads a stale value
 - **Symptom:** a port whose `compute` reads an input missing from its `dependencies` is
@@ -47,14 +48,14 @@ lands. Last checked against the code: 2026-10-25.
   keys, so the change has no effect and nothing says so. Diagram-level params check their
   block ids; a block's own keys are not checked.
 - **Workaround:** read the key back (`plant.params["m"]`) after a change.
-- **Fix:** a Later idea in TODO §7 (a `validate_params` hook on `System`).
+- **Fix:** a Later idea in TODO §6 (a `validate_params` hook on `System`).
 
 ## Planning and learning
 
 ### `ReinforcementLearningPlanner` sizes its default `NeuralPolicyController` from the plant's port bounds instead of `problem.U`
 - **Symptom:** a user subclass of `MechanicalSystem` has unbounded port bounds (`[-inf, inf]`, R68); declaring finite bounds on the problem (`U=BoxInputSet.from_bounds(...)`) and calling `ReinforcementLearningPlanner(problem)` raises `ValueError: NeuralPolicyController needs finite bounds on the plant's action port` because `NeuralPolicyController` in `control/neural.py` reads `sys.inputs[command_port(sys)].box` instead of `problem.U`. Conversely, omitting `U` on a catalog plant lets `ReinforcementLearningPlanner` scale actions to the plant's port bounds while `problem.U` is unconstrained, and omitting `X` lets `StateSpaceGrid.state_bounds` in `planning/dynamic_programming/discretizer.py` silently fall back to `sys.state.box` (against R21).
 - **Workaround:** set `plant.inputs["u"].lower_bound` and `upper_bound` on custom plants before calling `ReinforcementLearningPlanner`, and pass `X=plant.state.box, U=plant.input_box` explicitly on `PlanningProblem`.
-- **Fix:** V1.2's rest in [TODO.md](../plans/TODO.md) (`ReinforcementLearningPlanner` reads `problem.U.bounding_box()` and refuses an unbounded `problem.U`; `StateSpaceGrid.state_bounds` aligns with `input_bounds`).
+- **Fix:** V1.2's rest in [TODO.md](../plans/TODO.md) §2 (`ReinforcementLearningPlanner` reads `problem.U.bounding_box()` and refuses an unbounded `problem.U`; `StateSpaceGrid.state_bounds` aligns with `input_bounds`).
 
 ## Tooling
 

@@ -5,7 +5,224 @@ One entry per question that waits for you, ordered by the release it blocks. Ans
 a dated record in docs/reviews/), applies it, and deletes the entry. Rulings already taken:
 [docs/reviews/](../reviews/). Known defects: [KNOWN_ISSUES.md](KNOWN_ISSUES.md).
 
-## Blocks v0.3 (the robotics-course release, December 2026)
+## Blocks v0.3 (the complete core)
+
+By the core's pillars, in the proposed order of [TODO](../plans/TODO.md#1-v03--the-complete-core-by-pillar)
+§1 ([core-architecture.md](../plans/core-architecture.md)): the scope and the order first, then
+each pillar, then the landed continuous core and the clean-up lane. The entries marked "an open
+point the 2026-10-26 consolidation recorded" are new; the others are kept as written, moved from
+the bucket they had.
+
+**The scope and the order**
+
+### Which release does each borderline row take, now that v0.3 is the complete core?
+- **Blocks:** the order of the core's rows ([TODO](../plans/TODO.md#1-v03--the-complete-core-by-pillar) §1).
+- **Today:** rows the core reads but that sit elsewhere: S29, the diagram's derived start state (v0.9;
+  only the plant slice of the start is a leaf of `pe.params` today); S70, the error family
+  (ruled R114, v0.9), whose types S66 (in the core's last phase) raises; the realtime
+  simulator re-based on the pure blocks and the hybrid orchestrator's adaptive plant
+  integration (sampled-path.md §8.4); the RL heads rebuilt on the seeded policy (C5, v0.4).
+- **Options:** each joins v0.3's core; or each keeps its rung (S29 and S70 in v0.9, the realtime review at
+  v1.0, the RL heads with C5 in v0.4).
+- **Recommendation:** none (an open point the 2026-10-26 consolidation recorded).
+- **Detail:** [core-architecture.md](../plans/core-architecture.md) §4
+- **Answer:**
+
+**Foundations: every object pure; the step algebra (P1, P2)**
+
+### Which same-tick semantic does a step diagram have?
+- **Blocks:** the step algebra (TODO §1.2) and the hybrid loop's pure tick (§1.5); numbers move once either way.
+- **Today:** two semantics: the step-diagram evaluator propagates a signal within its tick, from a fresh
+  buffer; `Computer.tick` reads the previous tick's committed buffer, one tick of latency per
+  wire. S65 lists "the one-tick lag inside a `Computer` tested and stated, or removed".
+- **Options:** propagation within the tick; one tick per wire (the committed buffer); either, stated per
+  connection.
+- **Recommendation:** none (an open point the 2026-10-26 consolidation recorded).
+- **Detail:** [core-architecture.md](../plans/core-architecture.md) §2.2; [sampled-path.md](../plans/sampled-path.md) §8.1 (Draft 2); TODO S65
+- **Answer:**
+
+### Do step systems get the composition operators?
+- **Blocks:** the teaching face of the solver loop (NS-5) and `computer @ plant` as a step diagram (§8.5).
+- **Today:** `@`, `>>` and `+` refuse step systems; a step diagram is wired with `connect` only. CONSTITUTION
+  §6 freezes the grammar and gives the hybrid algebra one operator, `%`.
+- **Options:** operators on the step algebra (a core-grammar ask); a helper that wires a loop
+  (`gradient_loop`, native-optimizers.md §4.5); `connect` only.
+- **Recommendation:** none (an open point the 2026-10-26 consolidation recorded).
+- **Detail:** [native-optimizers.md](../plans/native-optimizers.md) §3.1, §4.7
+- **Answer:**
+
+**One discrete judge (P3)**
+
+### Does the evaluation unify from the rollout on, with a discretized planning problem? (needs refinement)
+- **Blocks:** nothing yet; it shapes step 7b (the sampled face) and the sampled loop (S31), v0.4.
+- **Today:** the evaluator's run is already the step model and its score already reads the
+  samples; the same continuous cost becomes a per-step cost three ways (value iteration and RL
+  a left Riemann sum `g dt`, the evaluator a trapezoid), so one policy has three close `J`s.
+- **Your idea (2026-10-26, draft):** once `dt` and the scheme are set, discretize the problem
+  (time becomes an index in the cost and the sets) and score every stepping loop with one
+  discrete evaluator.
+- **Options:** the per-step cost by integrating the cost with the state (exact, the agent's
+  recommendation), or by a quadrature on the samples; the object's name and contents
+  (`problem.discretize(dt, ...)` returning a discrete problem).
+- **Recommendation:** the direction, yes; refine the six points of the detail before a plan.
+- **Your direction (2026-10-26):** a core pillar of v0.3, "one discrete judge"; the refinement stays open.
+- **Detail:** [differentiable-problem.md](../plans/differentiable-problem.md) §9
+- **Answer:**
+
+### What failure rule, hold and scope does the discrete problem take?
+- **Blocks:** one discrete judge (TODO §1.3); the numbers of value iteration, RL and the evaluator move once.
+- **Today:** `score_run` integrates to `tf` and checks `X` and `U` at every sample, under the price switch;
+  the RL environment stops at the first exit from `X` and checks no `U`; value iteration prices
+  the cells that leave its grid and ignores a finite `tf` (S63, a v0.4 row); shooting scores with
+  its own trapezoid and a first-order hold; the feedback planners report their held-input
+  rollout (OD-27).
+- **Options:** as the docs state them: one rule, absorbing or not; the zero-order hold; shooting's score
+  lowered to the discrete problem, or kept; planner policies acting at a fixed `dt` scored
+  through the sampled face; S63 with the judge, or in v0.4.
+- **Recommendation:** none (an open point the 2026-10-26 consolidation recorded).
+- **Detail:** [differentiable-problem.md](../plans/differentiable-problem.md) §9.4; [core-architecture.md](../plans/core-architecture.md) §3
+- **Answer:**
+
+**The draws and the seeded policy (P4)**
+
+### What does the standard stochastic policy look like as a seeded block?
+- **Blocks:** the RL follow-ups (C5, D29): the RL heads rebuilt on it, the RL numbers changing
+  once.
+- **Today:** your direction (2026-10-22), `u = μ_θ(x) + σ_θ(x) · ε(seed, ⌊t/Δ⌋)`; its methods
+  and first heads are open.
+- **Recommendation:** `GaussianPolicy(mean, log_std, *, dt, seed=None)` in `control/neural.py`,
+  `seed=None` the deterministic face, `log_prob` and `entropy` beside `h`, the squashed variant
+  a subclass.
+- **Your direction (2026-10-26):** the seeded stochastic policy is a core pillar of v0.3; its contract stays open.
+- **Detail:** [future-policies.md §5.1, D29](../plans/future-policies.md#51-d29-the-standard-stochastic-policy-as-a-seeded-block-moved-from-end-state-apimd-2026-10-26)
+- **Answer:**
+
+### Which draw convention does a seeded policy use: the held sample or the tick?
+- **Blocks:** the seeded stochastic policy (TODO §1.4) and every sampled controller with draws (§1.5).
+- **Today:** D29 writes `ε(seed, ⌊t/Δ⌋)`, the noise block's held draw on continuous time; R104 draws a
+  sampled controller's noise from its seed and the tick `k`.
+- **Options:** one convention, stated (with `Δ = d·dt_base`, `⌊t/Δ⌋` is the tick index); two, by the block's
+  kind.
+- **Recommendation:** none (an open point the 2026-10-26 consolidation recorded).
+- **Detail:** [future-policies.md](../plans/future-policies.md) §5 point 4, §5.1; [sampled-path.md](../plans/sampled-path.md) §8.6 (D14)
+- **Answer:**
+
+**The hybrid loop: one model, two runners (P5)**
+
+### Does `computer @ plant` become a step diagram, with a CONSTITUTION amendment?
+- **Blocks:** the sampled loop (S31, v0.4); CONSTITUTION invariant 1.
+- **Today:** `computer @ plant` builds a `HybridDiagram`, a plain class beside the step algebra;
+  R13 and R120 rule the sampled loop a tool, not a `System`.
+- **Your direction (2026-10-26, a tentative draft vision, promising, not decided):** the result is a `StepDiagramSystem` subclass on the base
+  clock (the computer's pure step and the plant discretized), regular for the algebra and the
+  analysis, with hybrid-aware `compute_trajectory`, `plot_diagram` and the clock runner.
+- **Your direction (2026-10-26):** a core pillar of v0.3, "one model, two runners": the pure step diagram for
+  analysis, evaluation and gradients, the clock orchestrator for realtime and compute
+  efficiency, over the same pure blocks; the amendment itself stays open.
+- **Options:** amend invariant 1's second sentence to "the coupling is a tool; its result, at the
+  base clock, is a `System` of the step algebra"; or keep R120 and expose a read-only step map.
+- **Recommendation:** the amendment, when S31 lands; the precedent is `Discretization`.
+- **Detail:** [sampled-path.md](../plans/sampled-path.md) §8.5
+- **Answer:**
+
+### On a hybrid loop, which runner does `compute_trajectory` use by default, and how dense is the plant's trajectory?
+- **Blocks:** the hybrid loop (TODO §1.5); the hybrid demos' numbers and the regression gates `f.hybrid_zoh`,
+  `f.dual_rate`; the shape of the `StepRollout` fold (§1.2).
+- **Today:** `HybridDiagram.compute_trajectory` integrates the plant by RK4 substeps inside each base tick
+  and records every substep; no adaptive option exists.
+- **Options:** sampled-path.md §8.4's two drafts: the step-diagram runner by default (the substeps recorded,
+  `solver="scipy"` the adaptive path), or the orchestrator with an adaptive plant by default
+  (the step diagram for analysis, `evaluate` and gradients); and the resolution: a finer base
+  clock, the substeps recorded, or reconstructed after the run.
+- **Recommendation:** none (an open point the 2026-10-26 consolidation recorded).
+- **Detail:** [sampled-path.md](../plans/sampled-path.md) §8.4
+- **Answer:**
+
+### Do the run caches on the sampled loop go?
+- **Blocks:** the sampled loop (S31, D13); RULES 2.4, no run state on a System.
+- **Today:** `StepSystem.rollout` and `HybridDiagram.last_result` cache a run beside `self.traj`.
+- **Recommendation:** they go: `loop.compute_trajectory()` returns the `Trajectory` and stores
+  `loop.traj`; the facades read `traj`.
+- **Detail:** [sampled-path.md §8.6, D13](../plans/sampled-path.md#d13-the-run-state-caches-s31-rules-24)
+- **Answer:**
+
+### Does `problem.compile` refuse the stateless MPC until the sampled face lands?
+- **Blocks:** the hybrid loop (TODO §1.5); R123 lands with it.
+- **Today:** `require_continuous` (`planning/evaluator.py`) refuses a `StepSystem` controller, but
+  `MPCStatelessController` is a plain `System` (`planning/trajectory_optimization/mpc/controller.py`),
+  so `problem.compile` accepts it and its tick latch then runs at the RK4 stages.
+- **Options:** refuse it now, naming the hybrid loop; leave it until V1's step 7b.
+- **Recommendation:** none (an open point the 2026-10-26 consolidation recorded).
+- **Detail:** [core-architecture.md](../plans/core-architecture.md) §6.3
+- **Answer:**
+
+**The generic parametric program; the stochastic program its case (P6a, P6b)**
+
+### Does the parametric program become one family, with hand-written parameters and live MPC ports?
+- **Blocks:** the compiled MPC program binding every parameter (S76, D25); the parametric
+  optimizer table (OPW-1–OPW-5).
+- **Today:** it binds the measured `x0` only; collocation freezes the plant, cost and set
+  parameters in closures. Names ruled (R26: `ParametricProgram`, the key `plant`).
+- **Options:** two parallel types; one class always taking `p`; one family, the plain
+  `MathematicalProgram` its binding.
+- **Recommendation:** the family; a hand-written program may declare its own `p`; the MPC block
+  takes optional live-parameter ports, unwired at nominal (`live=["plant.mu"]`). Also open:
+  `bind` on both the evaluator and the program.
+- **Your direction (2026-10-26):** the generic parametric program, a `MathematicalProgram` compiled once with an
+  explicit, optional `params` argument (`x0`, the plant, the cost and the sets), finished all at
+  once in v0.3's core; open: a hand-written program's own `p`, the MPC's live ports, `bind` on
+  both.
+- **Detail:** [parametric-program.md §2.1, D25](../plans/parametric-program.md#21-d25-the-two-remaining-asks-moved-from-end-state-apimd-2026-10-26);
+  [parametric-program.md §2](../plans/parametric-program.md#2-the-recommendation-one-family-the-frozen-program-a-binding)
+- **Answer:**
+
+### How do programs and solvers take parameters and randomness? (needs analysis and discussion)
+- **Blocks:** nothing yet; it shapes S76's `ParametricProgram` (v0.4), the native solvers and the
+  stochastic category of native-optimizers.md.
+- **Today:** only `x0` varies in the compiled MPC program; `pe.program(wrt, key, n_trials)`
+  freezes its draws at build (a sample average); seeds live in `params` as integers (RD-R6, R118);
+  overrides are complete trees (R121) while `parametric-program.md` §3.1 binds partial ones.
+- **Your leaning (2026-10-25, draft):** seeds are params, as on a system, so every program is
+  deterministic given its params; a stochastic solver may change the seed internally to work on
+  the sampled, noisy function.
+- **Your direction (2026-10-26):** every program is deterministic given its params, the seed one of them; solving a
+  stochastic program is solving over several seeds; the stochastic program is the parametric
+  program's case, a core pillar of v0.3. Open: §7.5's seven points.
+- **Options:** not yet; the draft is one signature `J(z, p)` with the seed an integer leaf of `p`,
+  kept fixed by deterministic solvers (a sample average), advanced per iteration by stochastic
+  ones (`child(seed, k)`), with four soundness conditions and seven open points to settle.
+- **Recommendation:** none yet; a discussion session first.
+- **Detail:** [native-optimizers.md](../plans/native-optimizers.md) §7
+- **Answer:**
+
+**The solve as a rollout, a proof of concept (P6c)**
+
+### Native optimizers: is the solver a pure kernel with a step-system view, or a `StepSystem` itself?
+- **Blocks:** the native-optimizer plan (NS-1, NS-2, NS-5); no rung yet.
+- **Today:** `gd` and `adam` are a Python loop in `optimizers/first_order.py`; a hand-wired
+  `StepDiagramSystem` of a law `z⁺ = z − η u` and a gradient oracle already rolls out gradient
+  descent.
+- **Options:** (A) every native solver a `StepSystem` by construction; (B) a pure
+  `init` / `step` kernel run by `Optimizer`, with the step-diagram loop as a teaching view of it;
+  (C) kernel only.
+- **Recommendation:** B: A forces Adam's pytree state into a flat `x`, C loses the
+  step-size-as-stability lesson.
+- **Detail:** [native-optimizers.md](../plans/native-optimizers.md) §3
+- **Answer:**
+
+**Fields (P7)**
+
+### Where do `as_cost` and the shaping live?
+- **Blocks:** Fields (TODO §1.8), V1's step 8 (§1.1) and the workspace geometry (A3, v0.4).
+- **Today:** three plans: `Set.as_cost(weight=, shaping=)` (A5; differentiable-problem.md step 8, after
+  `shaping.py` moves to `core/`); `Field.as_cost` with the shaping next to it in `core/fields.py`
+  (fields.md 4.1); the shaping helpers moved to `core/fields.py` (geometry-module.md).
+- **Options:** one home and one signature for sets and fields; `Set.as_cost` first, fields following.
+- **Recommendation:** none (an open point the 2026-10-26 consolidation recorded).
+- **Detail:** [fields.md](../plans/fields.md) 4.1; [geometry-module.md](../plans/geometry-module.md); [differentiable-problem.md](../plans/differentiable-problem.md) §8
+- **Answer:**
+
+**The landed continuous core and the clean-up lane**
 
 ### Should compile-time diagram flatten default to on after the parity and speed study?
 - **Blocks:** nothing until benchmarks and tests are stable; default stays `False` until you decide.
@@ -62,7 +279,7 @@ a dated record in docs/reviews/), applies it, and deletes the entry. Rulings alr
   ports and its subclasses' extra states do not fit `[q; v]`.
 - **Options:** move it now; rename `M` to `H` only and move it when K8 reworks the cars.
 - **Recommendation:** rename only; the base waits for K8.
-- **Detail:** [TODO, S32](../plans/TODO.md#4-v03--a-cleaner-core-and-the-differentiable-path-then-gmc714)
+- **Detail:** [TODO, S32](../plans/TODO.md#2-v03--the-clean-up-lane-beside-the-core)
 - **Answer:**
 
 ### Should the failure price follow a run's cost overrides?
@@ -84,44 +301,7 @@ a dated record in docs/reviews/), applies it, and deletes the entry. Rulings alr
 - **Detail:** [the run's log, §7](../reviews/2026-10-24-v03-run-decisions.md#7-the-second-review-pass)
 - **Answer:**
 
-## Blocks v0.4 (winter 2027)
-
-### Does the evaluation unify from the rollout on, with a discretized planning problem? (needs refinement)
-- **Blocks:** nothing yet; it shapes step 7b (the sampled face) and the sampled loop (S31), v0.4.
-- **Today:** the evaluator's run is already the step model and its score already reads the
-  samples; the same continuous cost becomes a per-step cost three ways (value iteration and RL
-  a left Riemann sum `g dt`, the evaluator a trapezoid), so one policy has three close `J`s.
-- **Your idea (2026-10-26, draft):** once `dt` and the scheme are set, discretize the problem
-  (time becomes an index in the cost and the sets) and score every stepping loop with one
-  discrete evaluator.
-- **Options:** the per-step cost by integrating the cost with the state (exact, the agent's
-  recommendation), or by a quadrature on the samples; the object's name and contents
-  (`problem.discretize(dt, ...)` returning a discrete problem).
-- **Recommendation:** the direction, yes; refine the six points of the detail before a plan.
-- **Detail:** [differentiable-problem.md](../plans/differentiable-problem.md) §9
-- **Answer:**
-
-### Do the run caches on the sampled loop go?
-- **Blocks:** the sampled loop (S31, D13); RULES 2.4, no run state on a System.
-- **Today:** `StepSystem.rollout` and `HybridDiagram.last_result` cache a run beside `self.traj`.
-- **Recommendation:** they go: `loop.compute_trajectory()` returns the `Trajectory` and stores
-  `loop.traj`; the facades read `traj`.
-- **Detail:** [end-state-api.md, D13](../plans/end-state-api.md#d13-the-run-state-caches-s31-rules-24)
-- **Answer:**
-
-### Does the parametric program become one family, with hand-written parameters and live MPC ports?
-- **Blocks:** the compiled MPC program binding every parameter (S76, D25); the parametric
-  optimizer table (OPW-1–OPW-5).
-- **Today:** it binds the measured `x0` only; collocation freezes the plant, cost and set
-  parameters in closures. Names ruled (R26: `ParametricProgram`, the key `plant`).
-- **Options:** two parallel types; one class always taking `p`; one family, the plain
-  `MathematicalProgram` its binding.
-- **Recommendation:** the family; a hand-written program may declare its own `p`; the MPC block
-  takes optional live-parameter ports, unwired at nominal (`live=["plant.mu"]`). Also open:
-  `bind` on both the evaluator and the program.
-- **Detail:** [end-state-api.md, D25](../plans/end-state-api.md#d25-s76s-two-remaining-asks-for-v04-parametric-programmd-2);
-  [parametric-program.md §2](../plans/parametric-program.md#2-the-recommendation-one-family-the-frozen-program-a-binding)
-- **Answer:**
+## Blocks v0.4 (features on the core)
 
 ### Does the MPC block ask its planner for three verbs instead of probing it?
 - **Blocks:** the MPC block's contract (T6, D27) and MPPI inside it (MP-4).
@@ -129,25 +309,36 @@ a dated record in docs/reviews/), applies it, and deletes the entry. Rulings alr
 - **Recommendation:** `decision_dimension()`, `prepare_online()`,
   `warm_start_guess(z_prev, y, *, dt_mpc, k)` and `z` on the tick's record; then
   `ModelPredictiveController(planner, dt_mpc=)` wraps trajectory optimization and MPPI alike.
-- **Detail:** [end-state-api.md, D27](../plans/end-state-api.md#d27-the-mpc-blocks-planner-contract-mppimd-ask-2-t6)
+- **Detail:** [mppi.md §10, D27](../plans/mppi.md#d27-the-mpc-blocks-planner-contract-mppimd-ask-2-t6)
 - **Answer:**
 
-### What does the standard stochastic policy look like as a seeded block?
-- **Blocks:** the RL follow-ups (C5, D29): the RL heads rebuilt on it, the RL numbers changing
-  once.
-- **Today:** your direction (2026-10-22), `u = μ_θ(x) + σ_θ(x) · ε(seed, ⌊t/Δ⌋)`; its methods
-  and first heads are open.
-- **Recommendation:** `GaussianPolicy(mean, log_std, *, dt, seed=None)` in `control/neural.py`,
-  `seed=None` the deterministic face, `log_prob` and `entropy` beside `h`, the squashed variant
-  a subclass.
-- **Detail:** [end-state-api.md, D29](../plans/end-state-api.md#d29-the-standard-stochastic-policy-as-a-seeded-block-future-policiesmd-5-point-4)
+### mppi.md's design predates R104, R107 and R123: is it rewritten to them before MP-1?
+- **Blocks:** the MPPI planner (S72, v0.4).
+- **Today:** its body splits a stateful `self.key` (R104: a sampled controller draws from its seed and the
+  tick); §4 proposes `M = 4` plant draws (R107: one by default); §6 keeps the tick latch (R123:
+  it goes); its opening lists the planner verbs otherwise than §6 and D27.
+- **Options:** rewrite the doc to the rulings when MP-1 starts; now.
+- **Recommendation:** none (an open point the 2026-10-26 consolidation recorded).
+- **Detail:** [mppi.md](../plans/mppi.md) §1, §4–§6, §10
+- **Answer:**
+
+### Native optimizers: which program categories and which native algorithms are in scope?
+- **Blocks:** NS-4, NS-6, NS-7; CONSTITUTION §1.4 ("not a solver framework").
+- **Today:** three classes read from the fields (`unconstrained`, `bounded`, `constrained`);
+  native `gd` and `adam` only.
+- **Options:** add least squares, stochastic and parametric categories; native GD, momentum,
+  Adam, Newton, Gauss–Newton, Levenberg–Marquardt, augmented Lagrangian; or a smaller set.
+- **Recommendation:** the categories each with a named consumer (identification, inverse
+  kinematics, the Monte Carlo objective, the MPC); the textbook algorithms only; Ipopt stays the
+  constrained workhorse.
+- **Detail:** [native-optimizers.md](../plans/native-optimizers.md) §4.1–§4.2
 - **Answer:**
 
 ### Do you adopt or drop the optional `KinematicModel` delegate?
 - **Blocks:** the general serial chain (C6), decided with its mechanism description.
 - **Today:** C6 is design first; its July 2026 draft is in git history.
 - **Recommendation:** none yet.
-- **Detail:** [TODO, C6](../plans/TODO.md#5-v04--the-draws-and-the-textbook-objects)
+- **Detail:** [TODO, C6](../plans/TODO.md#4-v04--features-on-the-core)
 - **Answer:**
 
 ### Which pyro demos do the courses still need?
@@ -195,56 +386,6 @@ a dated record in docs/reviews/), applies it, and deletes the entry. Rulings alr
 - **Detail:** [TODO, S29](../plans/TODO.md#v09--what-could-still-break-a-name)
 - **Answer:**
 
-### Native optimizers: is the solver a pure kernel with a step-system view, or a `StepSystem` itself?
-- **Blocks:** the native-optimizer plan (NS-1, NS-2, NS-5); no rung yet.
-- **Today:** `gd` and `adam` are a Python loop in `optimizers/first_order.py`; a hand-wired
-  `StepDiagramSystem` of a law `z⁺ = z − η u` and a gradient oracle already rolls out gradient
-  descent.
-- **Options:** (A) every native solver a `StepSystem` by construction; (B) a pure
-  `init` / `step` kernel run by `Optimizer`, with the step-diagram loop as a teaching view of it;
-  (C) kernel only.
-- **Recommendation:** B: A forces Adam's pytree state into a flat `x`, C loses the
-  step-size-as-stability lesson.
-- **Detail:** [native-optimizers.md](../plans/native-optimizers.md) §3
-- **Answer:**
-
-### Native optimizers: which program categories and which native algorithms are in scope?
-- **Blocks:** NS-4, NS-6, NS-7; CONSTITUTION §1.4 ("not a solver framework").
-- **Today:** three classes read from the fields (`unconstrained`, `bounded`, `constrained`);
-  native `gd` and `adam` only.
-- **Options:** add least squares, stochastic and parametric categories; native GD, momentum,
-  Adam, Newton, Gauss–Newton, Levenberg–Marquardt, augmented Lagrangian; or a smaller set.
-- **Recommendation:** the categories each with a named consumer (identification, inverse
-  kinematics, the Monte Carlo objective, the MPC); the textbook algorithms only; Ipopt stays the
-  constrained workhorse.
-- **Detail:** [native-optimizers.md](../plans/native-optimizers.md) §4.1–§4.2
-- **Answer:**
-
-### Native optimizers: which rung does the fixed-iteration MPC take?
-- **Blocks:** scheduling NS-1, NS-2, NS-8 and NS-9.
-- **Today:** unscheduled, research lane. Your priority (2026-10-25): the MPC whose solver runs a
-  fixed number of iterations first, fully compiled and differentiable with its closed loop;
-  convergence analysis with control tools long term.
-- **Options:** with S76 and S31 in v0.4 (NS-8 right after S76, NS-9 right after S31); or after
-  v0.4.
-- **Recommendation:** NS-1 (internal) any time; NS-8 and NS-9 in v0.4 behind S76 and S31, since
-  both already change the MPC block and the sampled loop.
-- **Detail:** [native-optimizers.md](../plans/native-optimizers.md) §4.6, §5
-- **Answer:**
-
-### Does `computer @ plant` become a step diagram, with a CONSTITUTION amendment?
-- **Blocks:** the sampled loop (S31, v0.4); CONSTITUTION invariant 1.
-- **Today:** `computer @ plant` builds a `HybridDiagram`, a plain class beside the step algebra;
-  R13 and R120 rule the sampled loop a tool, not a `System`.
-- **Your direction (2026-10-26, a tentative draft vision, promising, not decided):** the result is a `StepDiagramSystem` subclass on the base
-  clock (the computer's pure step and the plant discretized), regular for the algebra and the
-  analysis, with hybrid-aware `compute_trajectory`, `plot_diagram` and the clock runner.
-- **Options:** amend invariant 1's second sentence to "the coupling is a tool; its result, at the
-  base clock, is a `System` of the step algebra"; or keep R120 and expose a read-only step map.
-- **Recommendation:** the amendment, when S31 lands; the precedent is `Discretization`.
-- **Detail:** [sampled-path.md](../plans/sampled-path.md) §8.5
-- **Answer:**
-
 ### Does Diffrax join as an optional JAX solver?
 - **Blocks:** the foundations (S27); a new optional dependency.
 - **Today:** the integrators are in `core/compile/evaluators/stepping.py` (OD-11).
@@ -278,22 +419,6 @@ a dated record in docs/reviews/), applies it, and deletes the entry. Rulings alr
 - **Answer:**
 
 ## Standing (no release depends on it)
-
-### How do programs and solvers take parameters and randomness? (needs analysis and discussion)
-- **Blocks:** nothing yet; it shapes S76's `ParametricProgram` (v0.4), the native solvers and the
-  stochastic category of native-optimizers.md.
-- **Today:** only `x0` varies in the compiled MPC program; `pe.program(wrt, key, n_trials)`
-  freezes its draws at build (a sample average); seeds live in `params` as integers (RD-R6, R118);
-  overrides are complete trees (R121) while `parametric-program.md` §3.1 binds partial ones.
-- **Your leaning (2026-10-25, draft):** seeds are params, as on a system, so every program is
-  deterministic given its params; a stochastic solver may change the seed internally to work on
-  the sampled, noisy function.
-- **Options:** not yet; the draft is one signature `J(z, p)` with the seed an integer leaf of `p`,
-  kept fixed by deterministic solvers (a sample average), advanced per iteration by stochastic
-  ones (`child(seed, k)`), with four soundness conditions and seven open points to settle.
-- **Recommendation:** none yet; a discussion session first.
-- **Detail:** [native-optimizers.md](../plans/native-optimizers.md) §7
-- **Answer:**
 
 ### Is there one separator rule for wires, parameter paths, block labels and duplicate state labels?
 - **Blocks:** the larger naming alignment.
@@ -335,16 +460,16 @@ your go (or your review) before an agent starts.
 
 | Step, in plain words | Id | Release | What the ask is |
 | --- | --- | --- | --- |
-| The default output stub builds a NumPy array under JAX | T1 | v0.3 (wave D) | the returned type of the default `h` (`np.zeros(p)`) |
-| The demo sweep to the flatness rule | D1.3 | v0.3 (wave D) | your review of each diff; `showcase_jax` waits |
-| The planning demos on the solution verbs | D1.4 | v0.3 (wave D) | `solution.plot_*` and `compare(...)` in place of hand-rolled comparisons |
-| `Source.show_signal` | D2 | v0.3 (wave D) | remove it (the same picture is `plot_trajectory`) |
-| Two dead modules | D2 | v0.3 (wave D) | remove `planning/spatial/overlays.py` (with A3) and `experimental/symbolic/mechanics/utils.py` |
-| A connected input rewired silently | S66 | v0.3 (wave D) | `connect` refuses to rewire it |
-| Your demo pass, and a tabular Q-learning demo | K4 | v0.3 | your pass; the demo beside value iteration (R65) |
-| The noise seeds on the draws | V1 step 7 | v0.4 | one seed per random block in `problem.realize` (RN-4, RN-5, AC-7) |
+| The default output stub builds a NumPy array under JAX | T1 | v0.3 (the core, first foundation) | the returned type of the default `h` (`np.zeros(p)`) |
+| The demo sweep to the flatness rule | D1.3 | standing (wave D) | your review of each diff; `showcase_jax` waits |
+| The planning demos on the solution verbs | D1.4 | standing (wave D) | `solution.plot_*` and `compare(...)` in place of hand-rolled comparisons |
+| `Source.show_signal` | D2 | standing (wave D) | remove it (the same picture is `plot_trajectory`) |
+| Two dead modules | D2 | standing (wave D) | remove `planning/spatial/overlays.py` (with A3) and `experimental/symbolic/mechanics/utils.py` |
+| A connected input rewired silently | S66 | v0.3 (the core, hardening) | `connect` refuses to rewire it |
+| Your demo pass, and a tabular Q-learning demo | K4 | v0.3 (the clean-up lane) | your pass; the demo beside value iteration (R65) |
+| The noise seeds on the draws | V1 step 7 | v0.3 (the core, the draws) | one seed per random block in `problem.realize` (RN-4, RN-5, AC-7) |
 | LQG as a planner | LQGPlanner | v0.4 | `LQGPlanner(problem)` beside `LQRPlanner` |
-| The field object | A1 | v0.4 | `StateField` → `Field` in `core/fields.py`; the certificate's `V` a field |
+| The field object | A1 | v0.3 (the core, Fields) | `StateField` → `Field` in `core/fields.py`; the certificate's `V` a field |
 | Workspace geometry | A3 | v0.4 | the `core/geometry/` package; `planning.spatial` moved, then deleted |
 | SAC's actor step | S50 | v0.4 | the critic before the update (today) or after it |
 | Policy iteration on the grid | S51 | v0.4 | a mode or a sibling of `DynamicProgrammingPlanner` |
@@ -355,8 +480,8 @@ your go (or your review) before an agent starts.
 | Catalog hygiene | S64 | v0.4 | the per-plant clean-ups |
 | The move of the course material | K6 | v0.9 | only if K5 says so |
 | The pinned Colab cell | V6 | v0.9 | a pinned release in every notebook; `showcase_jax`'s `c_export` import |
-| A lighter git history | V11 | December 2026 | a force-push without notebook outputs (176 MB clone to under 25 MB) |
-| The convergence leftovers | TODO §7 | before V3 | the racecar 3-D skin moved; `Sys2Gym` / `SB3Controller` to the experimental tier; `planning/search/` cut; three facade verbs |
+| A lighter git history | V11 | after the v0.3 tag | a force-push without notebook outputs (176 MB clone to under 25 MB) |
+| The convergence leftovers | TODO §6 | before V3 | the racecar 3-D skin moved; `Sys2Gym` / `SB3Controller` to the experimental tier; `planning/search/` cut; three facade verbs |
 | The public face | V10 | v1.0 | a teaching quickstart first in README; `CONTRIBUTING.md` and templates |
 | The Stable-Baselines3 notebooks | S49 | v1.0 | retire two, decide two |
 | The realtime band's review | — | v1.0 | frozen surface or provisional |

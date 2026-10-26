@@ -26,6 +26,9 @@ V1's step 7 (TODO §1); RN-3 with its first consumer, in the v0.4 row (unless a 
 needs sampled sensor noise first); RN-4's per-block noise seeds and the rest of RN-5 in v0.4,
 joining under the same verb, before the v0.9 freeze; RN-6 with each step. The course runs on
 `main` while v0.3 stays on `dev` (R47).
+**Rung, 2026-10-26:** RN-2 to RN-6 are v0.3's core, the stochastic-problem pillar (the
+maintainer's direction; [core-architecture.md](core-architecture.md) §5, [TODO.md](TODO.md) §1.1 and §1.4); the rungs
+written in this doc are the ones before that direction.
 **Aligned 2026-10-23** to the continuous core (DESIGN §5) and the rulings R10, R15,
 R27 of [2026-10-22-rulings-session-1.md](../reviews/2026-10-22-rulings-session-1.md), and to
 its session 3 (R36 `dt` required, R44 the fold in v0.3, R45 the record's names): the evaluator

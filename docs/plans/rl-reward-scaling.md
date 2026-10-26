@@ -1,6 +1,6 @@
 # Automatic reward scaling for the RL planner
 
-**Status:** Proposal (2026-09-27). Evidence gathered; not started (no `reward_scale` in the code) and not scheduled (a Later row of TODO §7); the rung is the maintainer's (it moves every RL demo's numbers once, between cohorts).
+**Status:** Proposal (2026-09-27). Evidence gathered; not started (no `reward_scale` in the code) and not scheduled (a Later row of TODO §6); the rung is the maintainer's (it moves every RL demo's numbers once, between cohorts).
 **Lane:** teaching (a keyword on `ReinforcementLearningPlanner`) — **[ask — planner API]**.
 **Found on:** the GRO860 Gymnasium lab (`examples/teaching/courses/udes_gro860/particle_gymnasium_sb3.ipynb`), where the native planner trained a worse policy than Stable-Baselines3 on the same task.
 

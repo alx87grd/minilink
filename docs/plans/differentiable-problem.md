@@ -9,14 +9,17 @@ formula", "Stochastic problem", "The problem evaluator"); the decisions the run 
 maintainer are [the run's log](../reviews/2026-10-24-v03-run-decisions.md) §2, and the rulings
 are [the rulings record](../reviews/2026-10-22-rulings-session-1.md) (R9–R11, R15–R47,
 R71–R77) and [the 2026-10-25 rulings](../reviews/2026-10-25-open-questions-rulings.md) (R91–R97). The design of the landed steps is in git history. This doc now holds what remains,
-all v0.4: a draft idea to unify the evaluation from the rollout on (§9, 2026-10-26, not ruled); the `StepRollout` fold, step 7 (`disturbances=` port signals and cross-backend draws in `problem.realize`), step 7b (the sampled
+planned in v0.4 until the maintainer's direction of 2026-10-26 made it v0.3's core: a draft idea to unify the evaluation from the rollout on (§9, 2026-10-26, not ruled); the `StepRollout` fold, step 7 (`disturbances=` port signals and cross-backend draws in `problem.realize`), step 7b (the sampled
 face), step 8 (sets as costs, a source policy's samples as leaves) and step 9 (the material),
 and traceable linear analysis (S73, §4.6), any time. Two leftovers of landed steps wait for the
-maintainer in [TODO.md](TODO.md) §4: the LQR warning on a declared `U` (OD-33 of the run's log)
+maintainer in [TODO.md](TODO.md) §2: the LQR warning on a declared `U` (OD-33 of the run's log)
 and the three demos that teach a hand gradient loop (OD-32).  
-**Rung:** v0.4, the rows of [TODO.md](TODO.md) §5: the `StepRollout` fold with the sampled
-loop (S31); step 7 with RN-4 of [randomness.md](randomness.md); step 7b after S31's kernel;
-steps 8 and 9; S73 any time (R76).  
+**Rung:** v0.3, the core (the maintainer's direction of 2026-10-26; the pillars are
+[core-architecture.md](core-architecture.md)): the `StepRollout` fold ([TODO.md](TODO.md) §1.2),
+step 8 (§1.1), the discrete judge of §9 (§1.3, a pillar), step 7 with RN-4 of
+[randomness.md](randomness.md) (§1.4), step 7b after S31's kernel (§1.5), step 9 with the merge
+(§1.9); S73, any time (R76), a v0.4 row (§4). The rungs the step list of §8 writes are the ones
+before that direction.  
 **Lane:** core; the open steps are **[ask — core]**.
 
 The problem evaluator turns a planning problem and a controller into one traceable function

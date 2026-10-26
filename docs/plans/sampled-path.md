@@ -8,16 +8,19 @@ per method", "The step model"); the decisions taken during the run are in
 half (the eight discretizations it replaced, the knobs, the measurements, the steps) is in git
 history. This doc now holds the other half: the sampled loop (S31), ruled a tool with ticks
 (R13, R14 of [the rulings](../reviews/2026-10-22-rulings-session-1.md)), its details parked
-(D13–D15 of [end-state-api.md](end-state-api.md)). **Tentative draft vision (2026-10-25/26,
+(D13–D15, now §8.6). **Tentative draft vision (2026-10-25/26,
 §8.1–§8.5): promising, not decided.** `computer @ plant` as a step diagram on a base clock that
 knows it is hybrid, the computer a pure step block, the plant discretized at the base clock,
 every block pure, a clock runner beside it for realtime; one point of it ruled (R123: the MPC's
-computational delay), the rest open, including the CONSTITUTION amendment it would need.  
+computational delay), the rest open, including the CONSTITUTION amendment it would need. The maintainer named it a core pillar on
+2026-10-26, "one model, two runners" ([core-architecture.md](core-architecture.md) §6); the
+vision's status is unchanged, and its open points are in QUESTIONS.md ("Blocks v0.3").  
 **Lane:** core (the hybrid tool, the sampled kernel, every sampled controller) — every step is
 **[ask — core]**.  
-**Rung:** v0.4: S31 in [TODO.md](TODO.md) §5, after the continuous path (R86), with the
-automation-by-convention plan's last step (AC-8b) and the sampled face of the differentiable
-problem (its step 7b).
+**Rung:** v0.3, the core's hybrid-loop pillar (the maintainer's direction of 2026-10-26, which
+reassigns R86's v0.4): S31, the two-runner row and the sampled face of the differentiable
+problem (its step 7b) in [TODO.md](TODO.md) §1.5, with the automation-by-convention plan's
+AC-8a and AC-8b.
 
 A sampled controller (a digital PID, a held neural policy, MPC, MPPI, the RL policies) runs
 once per sample period on a computer, and the plant is stepped by the step model between two
@@ -31,7 +34,7 @@ The step model (DESIGN §5) is the plant half; the loop half runs a sampled cont
 
 **Ruled 2026-10-22 (R13): the loop is a tool, not a `System`; the name `HybridDiagram` stays for
 now. Ruled the same day (R14): ticks** (`step(x, u, k, params)`; the loop converts to seconds
-where it calls the plant). The rest (D13–D15 of [end-state-api.md](end-state-api.md)) is parked
+where it calls the plant). The rest (D13–D15, §8.6) is parked
 to the hybrid phase, after the continuous core.
 
 - **Two model algebras, both closed.** The continuous one (`System`, diagrams, `@`, `>>`,
@@ -416,9 +419,59 @@ step); its *result* is a `System` of the step algebra. That needs a CONSTITUTION
 invariant 1's second sentence, maintainer-owned, when this lands.
 
 **Order:** the continuous core it waits for landed on 2026-10-24 (the step model, then V1's
-steps 1–6); the loop comes in v0.4 (R86), with P10's AC-8b; the hand-copied `HybridDiagram`
+steps 1–6); the loop comes in v0.3's core (the maintainer's direction of 2026-10-26; it was v0.4 by R86),
+with P10's AC-8b; the hand-copied `HybridDiagram`
 facades go with it; the hybrid topology drawing (`graphical/diagrams/hybrid_topology.py`)
 stays for teaching.
+
+### 8.6 The sampled loop's details, D13–D15 (moved from end-state-api.md, 2026-10-26)
+
+Moved verbatim when `end-state-api.md` was retired into [core-architecture.md](core-architecture.md);
+the ids stay, as QUESTIONS.md and the rulings records cite them.
+
+The loop itself is ruled: a tool, not a `System`, the name `HybridDiagram` kept for now (R13),
+on integer ticks (R14); [sampled-path.md](sampled-path.md) §8 designs it.
+
+**Parked 2026-10-22 (the maintainer): D13, D14 and D15 below are ruled after the continuous
+architecture and API are done and implemented; the hybrid tool's details wait for that phase.**
+
+#### D13 The run-state caches (S31; RULES 2.4)
+
+**Today:** `StepSystem.rollout` and `HybridDiagram.last_result` cache a run beside the
+allowed `self.traj`.
+
+**Recommended:** they go. A tool returns its result; `loop.compute_trajectory()` returns the
+`Trajectory` and stores it as `loop.traj` like every `System`, nothing else. The facades that
+read `last_result` read `traj`.
+
+#### D14 Controller memory and the draws on the tick (S31; future-policies.md §5 points 2, 4)
+
+**Ruled 2026-10-25 (R104):** as recommended below.
+
+**Today:** MPPI's shifted warm start and a diffusion policy's chunk have no channel; the RL
+collectors thread their own keys.
+
+**Recommended:** no new channel. A sampled controller with memory *is* a `StepSystem` with
+state, and the kernel already carries the computer's `x` across ticks (`MPCStatefulController`
+packs `z` there today). Its draws come from its own `params["seed"]` and the tick, the noise
+block's counter-based pattern, so `vmap` over seeds and `realize(key)` work unchanged:
+
+```python
+class MPPIController(StepSystem):          # memory = the shifted input sequence, in x
+    def step(self, x, u, k=0, params=None):
+        eps = standard_normal(params["seed"], k, self.n_samples)   # the noise block's draw
+        ...
+```
+
+#### D15 The compiled problem dispatches on the policy's kind (S31; V1 step 7b)
+
+**Ruled 2026-10-25 (R105):** as recommended below.
+
+**Recommended:** `problem.compile(policy)` reads the policy: a continuous law runs the loop as
+a diagram; a `Computer` (anything built by `%`) runs the sampled kernel's JAX face. In v0.3 the
+second branch refuses (`require_continuous` in `planning/evaluator.py` refuses a `StepSystem`
+controller and names the hybrid loop); in v0.4 it lands. One `compile` and one `evaluate` for
+both kinds.
 
 ## Kept for S53: the price of a parameter family
 

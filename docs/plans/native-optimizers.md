@@ -7,6 +7,11 @@ The design choices are not ruled; the asks are in
 [QUESTIONS.md](../dev/QUESTIONS.md) ("Blocks v0.9 / v1.0"). Lane: research. Rung: none yet; the
 natural slot is after the sampled loop (S31) and the parametric program (S76), both v0.4,
 because this plan builds on the step model's rollout and on the program's parameters.
+**Rung, 2026-10-26:** the maintainer's direction puts a proof of concept in v0.3's core: a simple
+fixed-step solver and an MPC on it, to show the pipeline closes (NS-1, NS-2's fixed-`K` form,
+NS-8, NS-9; [core-architecture.md](core-architecture.md) §8, [TODO.md](TODO.md) §1.7); better solvers and MPC are
+v0.4 (TODO §4). §7's stochastic program is the parametric program's case, a core pillar
+([core-architecture.md](core-architecture.md) §7).
 
 **Where each idea lives** (one fact, one home: this doc holds the native solvers and the
 two goals; the neighbours hold what they already owned):
@@ -20,8 +25,8 @@ two goals; the neighbours hold what they already owned):
 | The program's parameters (`x0`, plant, cost, sets) and one backend table | [parametric-program.md](parametric-program.md) (S76, OPW-1–OPW-5) |
 | The computer + plant loop as one rollout kernel, NumPy and JAX faces; the pure tick of a multi-rate loop (held values as state, firing as a select); the end vision of `computer @ plant` as one step diagram on a base clock | [sampled-path.md](sampled-path.md) §8.1–§8.5 (S31; a tentative draft vision, R123 ruled) |
 | The differentiable evaluation of a hybrid loop (`problem.compile` of a sampled controller) | [differentiable-problem.md](differentiable-problem.md), step 7b (R105) |
-| The MPC block's contract with its planner (the verbs a native tick must answer) | [end-state-api.md](end-state-api.md) D27, [mppi.md](mppi.md) §6 |
-| A gradient-descent tutorial on the extended `Optimizer` | [TODO.md](TODO.md) §7 (R91) |
+| The MPC block's contract with its planner (the verbs a native tick must answer) | [mppi.md](mppi.md) §6 and D27 in §10 |
+| A gradient-descent tutorial on the extended `Optimizer` | [TODO.md](TODO.md) §6 (R91) |
 | Parametric and stochastic programs in the solvers: keys, seeds, bind (**needs analysis**) | this doc, §7; the parameter family itself is [parametric-program.md](parametric-program.md), randomness in simulation [randomness.md](randomness.md) |
 
 Contracts in code today: [DESIGN.md](../dev/DESIGN.md) §6 (Planning / NLP). The neighbours:
@@ -163,7 +168,7 @@ Today's three classes stay. The additions, each with its consumer:
 | --- | --- | --- | --- |
 | unconstrained / bounded / constrained | as today | the method table of S74 | every program |
 | **least squares** | `J(z) = ½‖r(z)‖²`, the residual `r` given | Gauss–Newton, Levenberg–Marquardt (native); `scipy.optimize.least_squares` | identification (C4), inverse kinematics (`Manipulator` calls `scipy.optimize.least_squares` by hand today) |
-| **stochastic** | `J(z, key)`, a sampled objective | SGD and Adam on minibatches | the Monte Carlo evaluator (`pe.evaluate(p, key)`), the ML lessons |
+| **stochastic** | `J(z, key)`, a sampled objective (open point, QUESTIONS.md: §7.3 makes the seed a leaf of `p` instead) | SGD and Adam on minibatches | the Monte Carlo evaluator (`pe.evaluate(p, key)`), the ML lessons |
 | **parametric** | `J(z, p)`, `h(z, p)`, `g(z, p)` | one compile, many solves; `vmap` over `p`; the sensitivity `dz*/dp` | the MPC (S76's `ParametricProgram`) |
 
 A category is read from the program's fields (a `residual` field makes it least squares, as `h`

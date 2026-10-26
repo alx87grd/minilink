@@ -13,6 +13,13 @@ GMC714 teaches in December needs it). Lane: research
 (the MPC band is provisional, ROADMAP §2). Scope: direct collocation and the MPC block
 first; the other transcriptions later (§5).
 
+**Rung, 2026-10-26:** v0.3, the core. The maintainer's direction names the generic parametric
+program, finished all at once, a core pillar, with the stochastic program as its case (every
+program deterministic given its parameters, the seed one of them; solving a stochastic program
+is solving over seeds): [core-architecture.md](core-architecture.md) §7, [TODO.md](TODO.md) §1.6. The rungs written above and
+below are the ones before that direction; the decisions still open are in QUESTIONS.md
+("Blocks v0.3").
+
 Contracts in code: [DESIGN.md](../dev/DESIGN.md) §4 (Parameters, the planning tiers) and §6
 (Planning / NLP).
 
@@ -90,6 +97,18 @@ declare its own `p` (free, and tutorial 08 could solve one NLP for several value
 parameter); `bind` on both the evaluator (the fast path, compiled functions kept) and the
 program (the plain noun returned).
 
+### 2.1 D25, the two remaining asks (moved from end-state-api.md, 2026-10-26)
+
+**Recommended:** a hand-written program may declare its own `p` (`ParametricProgram(n_z, J, params=…)`
+with `J(z, p)`), since it costs nothing and lets tutorial 08 solve one NLP for several
+parameter values; the MPC block takes optional live-parameter ports, unwired ports at their
+nominal:
+
+```python
+mpc = ModelPredictiveController(planner, dt_mpc=0.1, live=["plant.mu"])   # a port "mu" appears
+loop = (estimator + mpc).autowire() @ plant                              # the estimate drives the plan
+```
+
 ## 3. The design
 
 ### 3.1 The parameter tree
@@ -99,7 +118,7 @@ program (the plain noun returned).
 `scene` once A3 gives workspace geometry its home. Its sample is the
 problem's nominal values, so its structure is fixed at compile time and its values vary
 without retracing (JAX takes numeric leaves; the diagram parameters already work this way,
-DESIGN §4). A bind takes a partial tree, merged onto the bound values and checked against
+DESIGN §4). (Open point, QUESTIONS.md: a partial tree here against R121's complete trees.) A bind takes a partial tree, merged onto the bound values and checked against
 the structure: an unknown path raises and names the known ones; a leaf of a new shape
 raises; `scene` raises until A3. The key for the plant is `plant` (ruled 2026-10-23, D19), the
 same tree as the compiled problem's `pe.params`, so the two say one word; the bundle's `system`
@@ -132,7 +151,7 @@ so the two paths answer one API at two speeds.
 ### 3.5 The MPC block's live parameters
 
 The block declares, at construction, optional input ports that feed leaves of the tree (a
-port `mu` feeding `system.mu`, a port `x_ref` feeding a cost target). An unwired port reads
+port `mu` feeding `system.mu` (the key is `plant` since D19, so `plant.mu`), a port `x_ref` feeding a cost target). An unwired port reads
 the nominal value (RULES 4.5), so the diagram's wiring does not depend on whether a live
 value is connected; the port functions forward the values to the tick's bind instead of
 dropping them. The argument's name and form are the naming session's.
