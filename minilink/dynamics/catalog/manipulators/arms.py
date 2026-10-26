@@ -829,6 +829,9 @@ class KinematicManipulator(DynamicSystem):
         # The plant, named after the arm whose kinematics it reads
         inst = cls(arm.dof, arm.task_dim)
         inst._kin_arm = arm
+
+        # The arm's parameters are the plant's: its kinematics read them from the plant's branch
+        inst.params = dict(arm.params)
         inst.name = f"{arm.dof} Joint Speed Controlled {arm.name}"
 
         # Graphics: the camera frames the arm's full reach
@@ -853,6 +856,7 @@ class KinematicManipulator(DynamicSystem):
 
     def forward_kinematics(self, q, params=None):
         if self._kin_arm is not None:
+            params = self.params if params is None else params
             return self._kin_arm.forward_kinematics(q, params)
 
         xp = array_module(q)
@@ -866,6 +870,7 @@ class KinematicManipulator(DynamicSystem):
 
     def J(self, q, params=None):
         if self._kin_arm is not None:
+            params = self.params if params is None else params
             return self._kin_arm.J(q, params)
 
         xp = array_module(q)
@@ -890,7 +895,7 @@ class KinematicManipulator(DynamicSystem):
         """The drawn link lengths: the arm's, read from ``params`` when they are given."""
         if self._kin_arm is not None:
             arm = self._kin_arm
-            arm_params = arm.params if params is None else params
+            arm_params = self.params if params is None else params
             if hasattr(arm, "lengths"):
                 return arm.lengths(arm_params)
             if "l" in arm_params:

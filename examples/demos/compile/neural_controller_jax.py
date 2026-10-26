@@ -46,7 +46,8 @@ r_batch = jnp.array([[0.0], [0.2], [0.5], [0.8], [-0.2], [1.0]])
 
 
 def rk4_step(x, t, r, nn_params):
-    params = {"nn": nn_params}
+    # The full parameter tree, the network's branch replaced (R121)
+    params = {**evaluator.params, "nn": nn_params}
     k1 = f(x, r, t, params)
     k2 = f(x + 0.5 * dt * k1, r, t + 0.5 * dt, params)
     k3 = f(x + 0.5 * dt * k2, r, t + 0.5 * dt, params)

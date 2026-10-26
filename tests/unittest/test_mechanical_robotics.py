@@ -710,6 +710,24 @@ class TestRoboticWrappers(unittest.TestCase):
         self.assertEqual(diagram.connections["controller"]["y"], ("plant", "y"))
         self.assertNotIn("mux", diagram.subsystems)
 
+    def test_kinematic_plant_carries_the_arm_params_into_a_compiled_loop(self):
+        two_link = TwoLinkManipulator()
+        arm = KinematicManipulator.from_manipulator(two_link)
+        self.assertEqual(set(arm.params), set(two_link.params))
+
+        # The compiled loop hands the plant its own branch; the effector port reads it
+        diagram = closed_loop(TaskKinematic(arm, Kp=[1.0, 1.0]), arm)
+        ev = diagram.compile()
+        x = np.array([0.2, -0.1])
+        r = np.array([0.5, 0.5])
+        np.testing.assert_allclose(ev.f(x, r, 0.0), diagram.f(x, r, 0.0))
+
+        # A tuned link length reaches the kinematics through the plant's branch
+        params = {**ev.params, "plant": {**ev.params["plant"], "l1": 2.0}}
+        q = np.zeros(2)
+        p = arm.forward_kinematics(q, params["plant"])
+        self.assertAlmostEqual(np.linalg.norm(p), 2.0 + two_link.params["l2"])
+
     def test_task_kinematic_nullspace_projection(self):
         arm = KinematicManipulator.from_manipulator(FiveLinkManipulator())
         ctl = TaskKinematicNullspace(arm, Kp=[1.0, 1.0], K_null=[10.0] * 5)
