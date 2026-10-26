@@ -13,7 +13,7 @@ lands. Last checked against the code: 2026-10-25.
   starts and parameters: the key seeds a NumPy generator on one backend and a JAX PRNG key on
   the other (`planning/evaluator.py`, `trial_key`). Each backend is deterministic on its own.
 - **Workaround:** compare runs within one backend.
-- **Fix:** RN-4 (the v0.3 core's draws, TODO §1.4), one draw convention on both backends.
+- **Fix:** RN-4 (the v0.3 core's draws, TODO §1.3), one draw convention on both backends.
 
 ## Composition and control
 
@@ -31,7 +31,7 @@ lands. Last checked against the code: 2026-10-25.
   new source with no warning (the old source is dropped).
 - **Workaround:** check `diagram.connections` or set `diagram.connection_verbose = True`.
 - **Fix:** S66 (`connect` refuses to rewire a connected input), an ask on the workboard (the v0.3
-  core's hardening, TODO §1.9).
+  core's hardening, TODO §1.10).
 
 ### An output that reads an input it does not declare reads a stale value
 - **Symptom:** a port whose `compute` reads an input missing from its `dependencies` is
