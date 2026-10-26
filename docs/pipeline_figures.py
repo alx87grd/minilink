@@ -866,9 +866,9 @@ def overview():
 
 
 JAX_TILES = (
-    ("jit", "compiled once, fast"),
-    ("grad", "∂J/∂θ for free"),
-    ("vmap", "many runs at once"),
+    ("jit", "compile once"),
+    ("grad", "exact gradients"),
+    ("vmap", "batch many runs"),
 )
 
 
@@ -911,8 +911,7 @@ def jax_column(f, x, y, w, h):
         f'stroke="{stroke}" stroke-width="1.6"/>'
     )
     f.text(x + w / 2, y + 30, "JAX", 19, 750, ink)
-    f.text(x + w / 2, y + 50, "the foundations trace", 12, 500, ink)
-    top, step = y + 70, (h - 80) / 3
+    top, step = y + 50, (h - 60) / 3
     for k, (name, line) in enumerate(JAX_TILES):
         ty = top + k * step
         if k:
@@ -998,7 +997,7 @@ def library_map():
         sys_y,
         right - x0,
         sys_h,
-        "System · a plant, a controller, a diagram: one object",
+        "System",
         [r"$\dot{x} = f(x, u, t;\, p) \qquad y = h(x, u, t;\, p)$"],
         "obj",
         size=21,
@@ -1050,7 +1049,7 @@ def library_map():
     f.text(
         x0 + 4,
         bus_y + 18,
-        "every controller is a System again: policy @ plant",
+        "policy @ plant",
         12.5,
         600,
         COLORS["loop"][2],
@@ -1071,15 +1070,11 @@ def library_map():
     )
     plan_gx = cols["Plan"] + w + gap / 2
     eval_gx = cols["Evaluate"] - gap / 2
-    for x_edge, gx, label, anchor, dx in (
-        (cols["Plan"] + w, plan_gx, "trajectory optimization", "end", -8),
-        (cols["Evaluate"], eval_gx, "tuning", "start", 8),
-    ):
+    for x_edge, gx in ((cols["Plan"] + w, plan_gx), (cols["Evaluate"], eval_gx)):
         f.add(f'<circle cx="{x_edge}" cy="{ry + rh / 2}" r="3.5" fill="{LINE}"/>')
         f.arrow(
             f"M{x_edge},{ry + rh / 2} L{gx},{ry + rh / 2} L{gx},{by - 2}", dashed=True
         )
-        f.text(gx + dx, by - 10, label, 12, 500, MUTED, anchor=anchor)
 
     # The legend, in the free corner
     legend(
@@ -1088,17 +1083,18 @@ def library_map():
         by + 12,
         [
             ("solid", LINE, "produces"),
-            ("dashed", LINE, "solved as a mathematical program"),
+            ("dashed", LINE, "solved as a program"),
             ("dashed", loop_c, "a controller is a System again"),
-            ("dotted", COLORS["jax"][1], "traces under JAX: jit, grad, vmap"),
+            ("dotted", COLORS["jax"][1], "traces under JAX"),
         ],
     )
 
     # JAX beside the three foundations
     jx = right + 24
     jax_column(f, jx, sys_y, 1150 - jx, by + bh - sys_y)
-    for y in (sys_y + sys_h / 2, py + ph / 2, by + bh / 2):
-        x_from = right if y < py + ph else px1
+    # The foundations trace, and so does the evaluator built on them
+    for y in (sys_y + sys_h / 2, py + ph / 2, ry + rh / 2, by + bh / 2):
+        x_from = right if y < by else px1
         link(f, x_from, y, jx, y)
     return f.svg()
 
