@@ -53,7 +53,7 @@ reviewers' design proposals became QUESTIONS entries.
    - automation-by-convention;
    - mppi.
 
-   The `ParametricProgram` citation (R26 against D19) is stated as unresolved, and the docs'
+   The name `ParametricProgram` is stated as without ruling text (R26, the ruling of D19, names only the key and the verbs), and the docs'
    `method="scipy"` became `solver="scipy"`, the code's keyword.
 4. **Indexes:** the plans README has one short line per doc and the id rule. The AGENTS doc map
    gives the reading order and a temporary archive row.

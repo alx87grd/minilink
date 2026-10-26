@@ -4,8 +4,8 @@ Status: **draft plan**.
 - **Dates:** the optimizer table (OPW-1–OPW-5, §6) dates from July 2026; the parameter binding
   (PP-0–PP-5) and the recommendation of §2 were added 2026-10-22.
 - **The names (PP-0):** the plant's key in every parameter tree is `plant`, ruled 2026-10-23
-  (R26). The family's name `ParametricProgram` is credited to R26 here before and to D19 at PP-0,
-  but R26's text names only the key. It is an open QUESTIONS entry, with the alternative
+  (R26). The family's name `ParametricProgram` was credited to R26, the ruling of D19,
+  but R26's text names the key and the evaluator's verbs, not the family. It is an open QUESTIONS entry, with the alternative
   `MathematicalProgram(..., params=None)`.
 - **Open asks:** a hand-written program declaring its own `p`, and the MPC block's live ports
   (D25, §2.1).
@@ -161,7 +161,7 @@ dropping them. The argument's name and form are the naming session's.
 ## 4. The steps (one commit each; the AGENTS recipe where behaviour must hold)
 
 - **PP-0 The names**: the key `plant` ruled 2026-10-23 (R26). The family's name
-  `ParametricProgram` is cited to D19 here, with no findable ruling (an open QUESTIONS entry).
+  `ParametricProgram` has no ruling text in R26, the ruling of D19 (an open QUESTIONS entry).
   The MPC argument (`live=`, recommended in D25) and `bind` go with D25.
 - **PP-1 The program with parameters**: the family of §3.2, one evaluator, `bind` on both.
   Done when the MPC baselines (`test_mpc.py`, the trajopt parity scenario) are byte-identical

@@ -260,9 +260,10 @@ the new v0.3 core is ready; the gate read "by January" before.
 - Wave D's rows (the T rows, D1–D3, S43, S67–S69, A4, P4) are named in TODO only, beyond §5.2's
   summary.
 
-**The order is the commitment; no course calendar shapes a step** (ruled 2026-10-22,
-[record](../reviews/2026-10-22-second-roadmap-review-rulings.md); the maintainer's direction of
-2026-10-26, [record](../reviews/2026-10-26-core-consolidation.md)).
+**The order is the commitment; the course calendar is secondary** (ruled 2026-10-22,
+[record](../reviews/2026-10-22-second-roadmap-review-rulings.md)). **From 2026-10-26 no course
+calendar shapes a step** (the maintainer's direction,
+[record](../reviews/2026-10-26-core-consolidation.md)).
 - The class material stays on `main` until the new v0.3 core is ready, and the releases carry
   no dates.
 - GRO860 runs in the fall term and GMC714 in the winter term.

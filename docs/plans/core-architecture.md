@@ -295,8 +295,8 @@ V = QuadraticField(P)                            # §9: the terminal cost as a f
     - one family: `J(z, p)`, `h(z, p)`, `g(z, p)`, whose binding is the plain program;
     - one evaluator body, a hand-written `J(z)` the case `p = {}`;
     - one backend table for the offline and compiled paths (OPW-1–OPW-5).
-  - The key `plant` is ruled (R26). The name `ParametricProgram` has no findable ruling: it is
-    credited to R26 in some places and to D19 in others, and R26's text names only the key.
+  - The key `plant` is ruled (R26). The name `ParametricProgram` has no ruling text: R26 is
+    the ruling of D19, and its text names the key and the evaluator's verbs, not the family.
     Reviewer B O1's alternative is a QUESTIONS entry.
 - **Today.**
   - `ParametricMathematicalProgram` varies `x0` only.

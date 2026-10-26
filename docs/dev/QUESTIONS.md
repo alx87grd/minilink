@@ -331,8 +331,8 @@ In the order to decide (reviewer C §5).
   - the stochastic program (§7).
 - **Today:** it binds the measured `x0` only; collocation freezes the plant, cost and set
   parameters in closures. The key `plant` is ruled (R26). The name `ParametricProgram` is
-  credited to R26 in some places and to D19 in others, but R26's text names only the key, so
-  the name has no findable ruling.
+  credited to R26, the ruling of D19, but R26's text names the key and the evaluator's verbs,
+  not the family, so the name has no ruling text.
 - **Your direction (2026-10-26):** the generic parametric program, a `MathematicalProgram`
   compiled once with an explicit, optional `params` argument (`x0`, the plant, the cost and the
   sets), finished all at once in v0.3's core.
