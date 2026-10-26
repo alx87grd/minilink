@@ -994,9 +994,11 @@ reported `trajectory` is their own held-input rollout on their
 grid (`nominal_trajectory`), the planner's evidence; `evaluate` scores the continuous loop.
 
 The pipeline in two pictures. Colours: blue, the objects; amber, their parameters, all
-gathered in one tree `θ = pe.params`; purple, randomness (laws, seeds, the key); white, the
-steps; green, the result. The program tunes any leaves of `θ` (`wrt`, dotted paths such as
-`"controller.Kp"`); the margins `m` are its constraint rows.
+gathered in one tree `θ = pe.params`; purple, randomness (the noise and its seed, the laws, the
+key); white, the steps; green, the result. The plant, cost, sets and start belong to the
+problem; the controller is closed on the problem's plant at compile. The program tunes any
+leaves of `θ` (`wrt`, dotted paths such as `"controller.Kp"`); the margins `m` are its
+constraint rows.
 
 **Deterministic:** one run, one score.
 
@@ -1004,19 +1006,15 @@ steps; green, the result. The program tunes any leaves of `θ` (`wrt`, dotted pa
 %%{init: {"theme": "base", "flowchart": {"htmlLabels": false, "curve": "basis", "nodeSpacing": 22, "rankSpacing": 34, "padding": 16}, "themeVariables": {"fontFamily": "Inter, Helvetica, Arial, sans-serif", "fontSize": "15px", "lineColor": "#64748b", "primaryTextColor": "#0f172a", "clusterBkg": "#f8fafc", "clusterBorder": "#cbd5e1", "edgeLabelBackground": "#ffffff"}}}%%
 flowchart TD
     subgraph OBJ["① Objects, each with its parameters θ"]
-        direction TB
-        subgraph LOOP["closed loop"]
+        direction LR
+        tc(("θc")) -.- C["`**Controller**
+        u = π(y)`"]
+        subgraph PROB["PlanningProblem"]
             direction LR
-            tc(("θc")) -.- C["`**Controller**
-            u = π(y)`"]
-            C -- u --> P["`**Plant**
-            ẋ = f(x, u)`"]
-            P -- y --> C
-            P -.- tp(("θp"))
-        end
-        subgraph TASK["task"]
-            direction LR
-            tg(("θg")) -.- G["`**Cost**
+            P["`**Plant**
+            ẋ = f(x, u)`"] -.- tp(("θp"))
+            tp ~~~ tg(("θg"))
+            tg -.- G["`**Cost**
             ∫ g dt + h`"]
             G ~~~ ts(("θs"))
             ts -.- S["`**Sets**
@@ -1025,10 +1023,12 @@ flowchart TD
             t0 -.- X0["`**Start**
             x(0)`"]
         end
+        C -- u --> P
+        P -- y --> C
     end
 
     OBJ --> PIPE
-    subgraph PIPE["② pe = problem.compile(controller, dt)"]
+    subgraph PIPE["② pe = problem.compile(controller, dt): the controller closed on the problem's plant"]
         direction LR
         TH[("`**θ**
         one tree`")] --> R["`**Rollout**
@@ -1061,23 +1061,16 @@ flowchart TD
 ```mermaid
 %%{init: {"theme": "base", "flowchart": {"htmlLabels": false, "curve": "basis", "nodeSpacing": 22, "rankSpacing": 34, "padding": 16}, "themeVariables": {"fontFamily": "Inter, Helvetica, Arial, sans-serif", "fontSize": "15px", "lineColor": "#64748b", "primaryTextColor": "#0f172a", "clusterBkg": "#f8fafc", "clusterBorder": "#cbd5e1", "edgeLabelBackground": "#ffffff"}}}%%
 flowchart TD
-    subgraph OBJ["① Objects, each with its parameters θ; laws and seeds among them"]
-        direction TB
-        subgraph LOOP["closed loop with noise"]
+    subgraph OBJ["① Objects, each with its parameters θ; the noise w, its seed and the laws are among them"]
+        direction LR
+        tc(("θc")) -.- C["`**Controller**
+        u = π(y)`"]
+        subgraph PROB["StochasticPlanningProblem"]
             direction LR
-            tc(("θc")) -.- C["`**Controller**
-            u = π(y)`"]
-            C -- u --> P["`**Plant**
-            ẋ = f(x, u, w)`"]
-            P -- y --> C
-            W["`**Noise**
-            w`"] -- w --> P
-            sw(("seed")) -.- W
-            P -.- tp(("θp"))
-        end
-        subgraph TASK["task"]
-            direction LR
-            tg(("θg")) -.- G["`**Cost**
+            P["`**Plant**
+            ẋ = f(x, u, w)`"] -.- tp(("θp"))
+            tp ~~~ tg(("θg"))
+            tg -.- G["`**Cost**
             ∫ g dt + h`"]
             G ~~~ ts(("θs"))
             ts -.- S["`**Sets**
@@ -1086,7 +1079,11 @@ flowchart TD
             x₀ ~ X0`"]
             L0 ~~~ LP["`**Parameter law**
             θp ~ Θ`"]
+            P -.- tw(("`w
+            seed`"))
         end
+        C -- u --> P
+        P -- y --> C
     end
 
     OBJ --> PIPE
@@ -1115,9 +1112,8 @@ flowchart TD
     classDef step fill:#ffffff,stroke:#94a3b8,stroke-width:1.2px,color:#0f172a
     classDef out fill:#dcfce7,stroke:#16a34a,stroke-width:1.5px,color:#14532d
     class C,P,G,S obj
-    class W,L0,LP rnd
+    class L0,LP,tw,K rnd
     class tc,tp,tg,ts,TH par
-    class sw,K rnd
     class RE,R,SC,CR,NLP,O step
     class TS out
     style OBJ fill:#ffffff,stroke:#e2e8f0
