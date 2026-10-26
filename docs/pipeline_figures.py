@@ -814,6 +814,118 @@ def overview():
     return f.svg()
 
 
+def library_map():
+    """The whole library on one page: three foundations, the tools as parallel paths."""
+    f = Figure(1180, 660)
+    w, gap, x0 = 170, 20, 45
+    cols = [x0 + i * (w + gap) for i in range(6)]
+    centers = [x + w / 2 for x in cols]
+    right = cols[5] + w
+
+    # The model: one System, whatever it is made of
+    f.card(
+        x0,
+        24,
+        right - x0,
+        76,
+        "System",
+        [
+            "ẋ = f(x, u, t; p),  y = h(x, u, t; p)",
+            "a plant, a controller, a diagram of blocks: one object",
+        ],
+        "obj",
+    )
+
+    # The task, built on the model
+    problem_w = 3 * w + 2 * gap
+    f.card(
+        cols[3],
+        146,
+        problem_w,
+        72,
+        "PlanningProblem",
+        ["system · cost · sets · start (or its distributions) · horizon"],
+        "obj",
+    )
+    f.arrow(f"M{cols[3] + problem_w / 2},100 L{cols[3] + problem_w / 2},{146 - 2}")
+
+    # Six parallel paths
+    ry, rh = 270, 104
+    paths = [
+        ("Simulate", ["Simulator", "integrate ẋ = f"]),
+        ("Analyze", ["linearize", "A, B, C, D"]),
+        ("Design", ["lqr · place", "PID · observers"]),
+        ("Plan", ["DP · trajectory opt.", "RRT · LQR planner"]),
+        ("Learn", ["RL: collect, update θ", "PPO · SAC"]),
+        ("Evaluate", ["ProblemEvaluator", "J, margins, criterion"]),
+    ]
+    for i, (title, lines) in enumerate(paths):
+        f.card(cols[i], ry, w, rh, title, lines, "step")
+    for i in range(3):
+        f.arrow(f"M{centers[i]},100 L{centers[i]},{ry - 2}")
+    for i in range(3, 6):
+        f.arrow(f"M{centers[i]},218 L{centers[i]},{ry - 2}")
+
+    # What each path gives back
+    oy, oh = ry + rh + 46, 70
+    outs = [
+        ("Trajectory", ["x(t), u(t)"]),
+        ("Poles · Bode", ["margins, sensitivity"]),
+        ("Controller", ["u = π(y)"]),
+        ("PlanningSolution", ["policy · trajectory"]),
+        ("Neural policy", ["u = πθ(x)"]),
+        ("Evaluation", ["objective · compare"]),
+    ]
+    for i, (title, lines) in enumerate(outs):
+        f.card(cols[i], oy, w, oh, title, lines, "out")
+        f.arrow(f"M{centers[i]},{ry + rh} L{centers[i]},{oy - 2}")
+
+    # Every controller is a System again: the loop closes on the plant
+    loop_y = oy + oh + 18
+    for i in (3, 4):
+        f.dotted(f"M{centers[i]},{oy + oh} L{centers[i]},{loop_y}", COLORS["out"][1])
+    f.arrow(
+        f"M{centers[4]},{loop_y} L18,{loop_y} L18,62 L{x0 - 2},62",
+        COLORS["out"][1],
+        dashed=True,
+        marker="arrg",
+    )
+    f.dotted(f"M{centers[2]},{oy + oh} L{centers[2]},{loop_y}", COLORS["out"][1])
+    f.text(
+        30,
+        loop_y + 18,
+        "every controller is a System: policy @ plant",
+        12.5,
+        500,
+        COLORS["out"][2],
+        anchor="start",
+    )
+
+    # The solver boundary, shared by the paths that solve a program
+    by = oy + oh + 64
+    f.card(
+        cols[3],
+        by,
+        problem_w,
+        62,
+        "MathematicalProgram · Optimizer",
+        ["min J(z) s.t. h(z) = 0, g(z) ≥ 0 · SLSQP · Ipopt · L-BFGS · Adam"],
+        "obj",
+    )
+    gap_plan = cols[3] + w + gap / 2
+    gap_eval = right + 12
+    f.arrow(f"M{gap_plan},{ry + rh / 2} L{gap_plan},{by - 2}", dashed=True)
+    f.arrow(
+        f"M{right},{ry + rh / 2} L{gap_eval},{ry + rh / 2} L{gap_eval},{by + 31} L{right + 2},{by + 31}",
+        dashed=True,
+    )
+    f.text(
+        gap_plan - 6, by - 10, "trajectory optimization", 12, 500, MUTED, anchor="end"
+    )
+    f.text(right - 8, by - 10, "tuning: pe.program(wrt)", 12, 500, MUTED, anchor="end")
+    return f.svg()
+
+
 FIGURES = {
     "deterministic": deterministic,
     "stochastic": stochastic,
@@ -823,6 +935,7 @@ FIGURES = {
     "reinforcement_learning": reinforcement_learning,
     "modeling_and_simulation": modeling_and_simulation,
     "overview": overview,
+    "map": library_map,
 }
 
 

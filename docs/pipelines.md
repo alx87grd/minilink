@@ -5,6 +5,17 @@ problem, trajectories, solutions); amber, parameters; purple, randomness; white,
 green, the results. The figures are drawn by `docs/pipeline_figures.py`
 (`python docs/pipeline_figures.py` rebuilds every `docs/_static/pipeline_*.svg`).
 
+## The library on one page
+
+Three foundations (CONSTITUTION §1.1): the model, a `System`; the task, a `PlanningProblem`
+built on it; and the solver boundary, a `MathematicalProgram` and its `Optimizer`. Every tool
+is a path from them: simulate, analyze and design straight from the system; plan, learn and
+evaluate from the problem. The paths that solve a program (trajectory optimization, tuning)
+meet the optimizer, and every controller a path returns is a `System` again, closed on the
+plant with `@`.
+
+![The library on one page](_static/pipeline_map.svg)
+
 ## The planners, one problem, one yardstick
 
 Every planner takes the same `PlanningProblem` and returns the same kind of
