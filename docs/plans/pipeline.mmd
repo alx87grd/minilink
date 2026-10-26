@@ -27,7 +27,7 @@ flowchart TD
 
     subgraph score["One evaluation of any run"]
         ET["evaluate_trajectory(problem, traj)<br/>integrate to tf, no event"]
-        REC["Evaluation, one row per run<br/>cost, value, feasibility_margin, failed,<br/>reachability_margin, reached; criterion_value"]
+        REC["Evaluation, one row per run<br/>cost, value, feasibility_margin, failed,<br/>reachability_margin, reached, x0; objective"]
         ET --> REC
     end
     TRAJ --> ET
@@ -36,10 +36,10 @@ flowchart TD
     subgraph outputs["What comes out"]
         EVAL["evaluate(problem, arg, dt, method, n_trials, key)<br/>the same Evaluation, the facade"]
         CMP["compare(problem, **args)<br/>Comparison, the plots"]
-        VAL["pe.evaluate(params, key, n).criterion_value<br/>the criterion over the draws, traced"]
+        VAL["pe.evaluate(params, key, n).objective<br/>the criterion over the draws, traced"]
         PROG["pe.program(wrt, bounds)<br/>MathematicalProgram"]
         OPT["Optimizer(program).solve()<br/>pe.unpack(z) gives params"]
-        GRAD["jax.grad(lambda p: pe.evaluate(p).criterion_value)"]
+        GRAD["jax.grad(lambda p: pe.evaluate(p).objective)"]
     end
     REC -->|"stack over trials"| EVAL --> CMP
     REC --> VAL --> PROG --> OPT
