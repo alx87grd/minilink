@@ -9,7 +9,7 @@ formula", "Stochastic problem", "The problem evaluator"); the decisions the run 
 maintainer are [the run's log](../reviews/2026-10-24-v03-run-decisions.md) §2, and the rulings
 are [the rulings record](../reviews/2026-10-22-rulings-session-1.md) (R9–R11, R15–R47,
 R71–R77) and [the 2026-10-25 rulings](../reviews/2026-10-25-open-questions-rulings.md) (R91–R97). The design of the landed steps is in git history. This doc now holds what remains,
-all v0.4: the `StepRollout` fold, step 7 (`disturbances=` port signals and cross-backend draws in `problem.realize`), step 7b (the sampled
+all v0.4: a draft idea to unify the evaluation from the rollout on (§9, 2026-10-26, not ruled); the `StepRollout` fold, step 7 (`disturbances=` port signals and cross-backend draws in `problem.realize`), step 7b (the sampled
 face), step 8 (sets as costs, a source policy's samples as leaves) and step 9 (the material),
 and traceable linear analysis (S73, §4.6), any time. Two leftovers of landed steps wait for the
 maintainer in [TODO.md](TODO.md) §4: the LQR warning on a declared `U` (OD-33 of the run's log)
@@ -146,3 +146,92 @@ content. Steps 0–6 and 7a landed on 2026-10-24.
   rest").
 
 **In parallel, any time:** S73 (§4.6), self-contained for a cloud agent.
+
+---
+
+## 9. Draft idea: one discrete evaluator from the rollout on (the maintainer, 2026-10-26)
+
+**Status: a draft idea, not ruled; it needs refinement (§9.4).** The ask is in QUESTIONS.md
+("Blocks v0.4").
+
+> Once the cost function is set and the time discretization is decided (`dt`, the substeps,
+> the Runge–Kutta scheme), a continuous system's rollout is the same thing as a system that
+> is already discrete and stepping. So the evaluation pipeline should be unified from that
+> point on. The objects of the planning problem are written in continuous time, so it needs a
+> method that discretizes the problem: the time argument of the cost and of the sets becomes
+> an index, and everything is defined the same way with time as an index.
+
+### 9.1 What already holds in the code
+
+- **The run is already a step map.** The evaluator's rollout is the step model
+  (`core/compile/evaluators/stepping.py`, DESIGN §5 "The step model"): the same one-period
+  body as `discretize(plant, dt, solver=, substeps=)`, the input held over each period.
+- **The score is already discrete.** `score_run` (`planning/evaluation.py`) reads the samples
+  `(t_k, x_k, u_k)`: the margins are minima over the samples, the cost a trapezoid sum over
+  them (`CostFunction.integrate`, `core/costs.py`).
+- **R15** makes the fixed-step run the one engine and judge; `method="scipy"` swaps in the
+  adaptive integrator and nothing else. **R105** dispatches a sampled controller to the
+  sampled kernel's JAX face with "one compile, one evaluate, the same `J`". **The `StepRollout`
+  fold** (step 1's last commit, §8) makes a step rollout a `Trajectory` with `t = k·dt`.
+  [sampled-path.md](sampled-path.md) §8.4 (a tentative draft vision) makes `computer @ plant`
+  a step diagram on a base clock.
+- **What is not unified: the per-step cost.** The same continuous cost becomes a per-step cost
+  three ways: value iteration takes `g(x_k, u_k, t_k) dt` (a left Riemann sum,
+  `dynamic_programming/dp.py`), the RL environment the reward `−g(x_k, u_k, t_k) dt`
+  (`learning/reinforcement_learning/environment.py`), the evaluator the trapezoid over the
+  samples. One policy has three slightly different `J`s; R80 checks closeness, not equality.
+
+### 9.2 The proposal, in two stages
+
+1. **Discretize (once).** The continuous loop with `(dt, solver, substeps)` becomes a step map
+   `x_{k+1} = Φ(x_k, u_k, k; p)` (what `discretize` already builds). The continuous problem with
+   the same `dt` becomes a **discrete problem**: the per-step cost
+   `c_k = ∫_{t_k}^{t_{k+1}} e^{−ρt} g dt` with `u_k` held, and the terminal `h(x_N)`; the sets
+   at the index, `X.margin(x_k, t_k)`, `U.margin(u_k, x_k, t_k)`, `Xf` at `N = tf / dt`; the
+   discount `γ = e^{−ρ dt}`; the start (or its distribution) unchanged.
+2. **Evaluate (one kernel).** Every loop that steps (a continuous loop discretized, a plant
+   already a `StepSystem`, a sampled computer on its plant) is scored by one discrete
+   evaluator: a scan over `k` accumulating `c_k`, the least margin and the terminal term. Value
+   iteration, the RL environment, the evaluator and the sampled loop read the same discrete
+   problem, so a policy has one `J`.
+
+The continuous problem stays the primary object (CONSTITUTION §5, "the continuous contract is
+primary"): the discrete problem is a lowering a tool asks for, like `discretize` for a plant.
+The tools of continuous time keep reading the continuous problem: direct collocation (its
+defects are written on `f`), the continuous LQR, the linear analysis, the adaptive simulation
+(`method="scipy"`, R15's cross-check).
+
+### 9.3 The agent's read
+
+The direction is sound, and the code is closer to it than the docs say: the run and the score
+are already discrete, so stage 2 is mostly a renaming of what the evaluator does, extended to
+loops that are discrete from the start. What it buys: one `J` for every planner (the three
+quadratures above become one), the sampled face of step 7b for free (a sampled loop is one
+more step loop), and a discrete problem that native discrete models (a grid world) can state
+directly.
+
+One refinement makes it exact rather than approximate: **integrate the cost with the state.**
+Append the running cost to the state, `ċ = e^{−ρt} g(x, u, t)`, and let the same Runge–Kutta
+step with the same substeps integrate it; the step then returns `c_k` with the accuracy of the
+state itself, no separate quadrature, and the substeps count for the cost as they do for `x`
+(today the trapezoid sees only the samples).
+
+### 9.4 What needs refinement before it is a plan
+
+1. **The per-step cost's rule.** The augmented-state integral above, or a quadrature on the
+   samples (left Riemann, as DP and RL; the trapezoid, as the evaluator, which is a transition
+   cost `c(x_k, u_k, x_{k+1})`). Value iteration and RL need it per transition, which all three
+   forms give. Whichever is chosen, the numbers of the planners that change move once (R80's
+   closeness check).
+2. **The margins between samples.** Today a set is checked at the samples only; a violation
+   inside a period is invisible. The step could return the least margin over its substeps.
+3. **The object and its name.** `problem.discretize(dt, solver=, substeps=)` returning a
+   discrete problem (`StepPlanningProblem`?): a core object, maintainer-owned. What it holds
+   (the step plant, the per-step cost as a function of `(x_k, u_k, k)`, the sets at the index,
+   `N`, `γ`) and whether a native discrete problem is the same class.
+4. **Time-varying objects.** A cost or a set that reads `t` binds `t_k = t₀ + k dt`; a
+   time-varying set read between samples (point 2) needs `t` inside the step.
+5. **The discount.** `e^{−ρ t_k}` and `γ^k` agree with `γ = e^{−ρ dt}`; the RL planner's own
+   `DEFAULT_GAMMA` then follows from the problem's rate when one is set.
+6. **The order of work.** After the `StepRollout` fold and S31's kernel (both v0.4), and
+   together with step 7b, since the sampled face is one of the loops this kernel scores.

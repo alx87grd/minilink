@@ -86,6 +86,21 @@ a dated record in docs/reviews/), applies it, and deletes the entry. Rulings alr
 
 ## Blocks v0.4 (winter 2027)
 
+### Does the evaluation unify from the rollout on, with a discretized planning problem? (needs refinement)
+- **Blocks:** nothing yet; it shapes step 7b (the sampled face) and the sampled loop (S31), v0.4.
+- **Today:** the evaluator's run is already the step model and its score already reads the
+  samples; the same continuous cost becomes a per-step cost three ways (value iteration and RL
+  a left Riemann sum `g dt`, the evaluator a trapezoid), so one policy has three close `J`s.
+- **Your idea (2026-10-26, draft):** once `dt` and the scheme are set, discretize the problem
+  (time becomes an index in the cost and the sets) and score every stepping loop with one
+  discrete evaluator.
+- **Options:** the per-step cost by integrating the cost with the state (exact, the agent's
+  recommendation), or by a quadrature on the samples; the object's name and contents
+  (`problem.discretize(dt, ...)` returning a discrete problem).
+- **Recommendation:** the direction, yes; refine the six points of the detail before a plan.
+- **Detail:** [differentiable-problem.md](../plans/differentiable-problem.md) §9
+- **Answer:**
+
 ### Do the run caches on the sampled loop go?
 - **Blocks:** the sampled loop (S31, D13); RULES 2.4, no run state on a System.
 - **Today:** `StepSystem.rollout` and `HybridDiagram.last_result` cache a run beside `self.traj`.
