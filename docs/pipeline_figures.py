@@ -21,6 +21,7 @@ COLORS = {
     "rnd": ("#f3e8ff", "#9333ea", "#581c87"),
     "step": ("#ffffff", "#94a3b8", "#0f172a"),
     "out": ("#dcfce7", "#16a34a", "#14532d"),
+    "jax": ("#eef2ff", "#4f46e5", "#312e81"),
 }
 INK, MUTED, LINE = "#0f172a", "#64748b", "#64748b"
 CARD_W, CARD_H = 150, 76
@@ -856,7 +857,7 @@ def overview():
 
 def library_map():
     """The whole library on one page: three foundations, the tools as parallel paths."""
-    f = Figure(1180, 720)
+    f = Figure(1180, 744)
     w, gap, x0 = 170, 20, 45
     cols = [x0 + i * (w + gap) for i in range(6)]
     centers = [x + w / 2 for x in cols]
@@ -961,7 +962,7 @@ def library_map():
         cols[3],
         by,
         problem_w,
-        80,
+        104,
         "MathematicalProgram · Optimizer",
         r"$\min_{z}\; J(z) \quad \mathrm{s.t.} \quad h(z) = 0,\;\; g(z) \geq 0$",
         "obj",
@@ -971,14 +972,78 @@ def library_map():
     gap_eval = right + 12
     f.arrow(f"M{gap_plan},{ry + rh / 2} L{gap_plan},{by - 2}", dashed=True)
     f.arrow(
-        f"M{right},{ry + rh / 2} L{gap_eval},{ry + rh / 2} L{gap_eval},{by + 40} L{right + 2},{by + 40}",
+        f"M{right},{ry + rh / 2} L{gap_eval},{ry + rh / 2} L{gap_eval},{by + 52} L{right + 2},{by + 52}",
         dashed=True,
     )
     f.text(
         gap_plan - 6, by - 10, "trajectory optimization", 12, 500, MUTED, anchor="end"
     )
-    f.text(right - 8, by - 10, "tuning: pe.program(wrt)", 12, 500, MUTED, anchor="end")
+    f.text(right - 76, by - 10, "tuning: pe.program(wrt)", 12, 500, MUTED, anchor="end")
+
+    # JAX: every equation above traces, so the tools compile, differentiate and batch
+    jax_panel(f, x0, by, problem_w, 104)
+    for cx, cy in (
+        (right - 44, 24),
+        (cols[3] + problem_w - 44, py),
+        (right - 36, ry),
+        (cols[3] + problem_w - 44, by),
+    ):
+        f.pill(cx, cy, "JAX", "jax", w=44, h=20, size=11, weight=700)
     return f.svg()
+
+
+def jax_panel(f, x, y, w, h):
+    """JAX in three pictures: compiled once, gradients for free, many runs in one call."""
+    fill, stroke, ink = COLORS["jax"]
+    f.add(
+        f'<rect x="{x}" y="{y}" width="{w}" height="{h}" rx="10" fill="{fill}" stroke="{stroke}" stroke-width="1.6"/>'
+    )
+    f.text(
+        x + 16,
+        y + 22,
+        "JAX · every equation tagged JAX traces",
+        14,
+        650,
+        ink,
+        anchor="start",
+    )
+    tile = w / 3
+    ty = y + 40
+    for k, (name, line) in enumerate(
+        (
+            ("jit", "compiled once, fast"),
+            ("grad", "∂J/∂θ for free"),
+            ("vmap", "many runs at once"),
+        )
+    ):
+        tx = x + k * tile
+        ix, iy = tx + 16, ty + 8
+        if name == "jit":
+            # A lightning bolt
+            f.add(
+                f'<path d="M{ix + 22},{iy} L{ix + 6},{iy + 26} L{ix + 18},{iy + 26} L{ix + 12},{iy + 48} '
+                f'L{ix + 32},{iy + 18} L{ix + 20},{iy + 18} Z" fill="{stroke}"/>'
+            )
+        elif name == "grad":
+            # A cost curve, a point on it, and its tangent
+            f.add(
+                f'<path d="M{ix},{iy + 6} Q{ix + 20},{iy + 62} {ix + 44},{iy + 10}" fill="none" '
+                f'stroke="{stroke}" stroke-width="2"/>'
+            )
+            f.add(
+                f'<path d="M{ix - 3.75},{iy + 7.9} L{ix + 24.25},{iy + 46.6}" stroke="{ink}" stroke-width="1.6"/>'
+            )
+            f.add(f'<circle cx="{ix + 10.25}" cy="{iy + 27.25}" r="3.2" fill="{ink}"/>')
+        else:
+            # A fan of trajectories, run side by side
+            for n in range(5):
+                dy = n * 7
+                f.add(
+                    f'<path d="M{ix},{iy + 36} C{ix + 12},{iy + 4 + dy} {ix + 26},{iy + 30 - dy / 2} {ix + 44},{iy + 6 + dy}" '
+                    f'fill="none" stroke="{stroke}" stroke-width="1.6" opacity="{0.45 + 0.11 * n:.2f}"/>'
+                )
+        f.text(tx + 68, ty + 24, name, 15, 700, ink, anchor="start")
+        f.text(tx + 68, ty + 44, line, 12.5, 500, ink, anchor="start")
 
 
 FIGURES = {
