@@ -74,12 +74,15 @@ class Figure:
             f'stroke-dasharray="3 3"/>'
         )
 
-    def frame(self, x, y, w, h, label):
+    def frame(self, x, y, w, h, label, dashed=False, label_bottom=False):
+        dash = ' stroke-dasharray="6 5"' if dashed else ""
+        fill = "#ffffff" if dashed else "#f8fafc"
         self.add(
-            f'<rect x="{x}" y="{y}" width="{w}" height="{h}" rx="12" fill="#f8fafc" '
-            f'stroke="#cbd5e1" stroke-width="1.2"/>'
+            f'<rect x="{x}" y="{y}" width="{w}" height="{h}" rx="12" fill="{fill}" '
+            f'stroke="#cbd5e1" stroke-width="1.2"{dash}/>'
         )
-        self.text(x + 16, y + 22, label, 13.5, 600, MUTED, anchor="start")
+        label_y = y + h - 12 if label_bottom else y + 22
+        self.text(x + 16, label_y, label, 13.5, 600, MUTED, anchor="start")
 
     def trajectory(self, x, y, w, h, title, sub, stack=0):
         """The trajectory object: a card with a small sketch of x(t)."""
@@ -150,8 +153,39 @@ def objects(f, cards, problem_label, y=92, band_y=244):
     return band_y + 46
 
 
+def evaluator_frame(f, y, h, label):
+    """The problem evaluator's box: one row, its steps inside."""
+    f.frame(30, y - 24, 1120, h + 74, label, label_bottom=True)
+
+
+def optional_export(f, objective_cx, y_obj, y, h, program, optimizer, band_bottom):
+    """The optional export: the program over chosen leaves, its optimizer, θ* back into θ."""
+    label = "optional export · pe.program(wrt): tune the chosen leaves of θ"
+    f.frame(30, y - 40, 1120, h + 62, label, dashed=True)
+    f.arrow(f"M{objective_cx},{y_obj} L{objective_cx},{y - 2}", dashed=True)
+    f.card(830, y, 300, h, "Program", program)
+    f.arrow(f"M830,{y + h / 2} L772,{y + h / 2}")
+    f.card(470, y, 300, h, "Optimizer", optimizer)
+    f.arrow(f"M470,{y + h / 2} L412,{y + h / 2}")
+    f.pill(378, y + h / 2, "θ*", "out", w=62, h=34, size=16, weight=700)
+    f.arrow(
+        f"M347,{y + h / 2} L40,{y + h / 2} C14,{y + h / 2} 14,{y + h / 2 - 26} 14,{y + h / 2 - 40} "
+        f"L14,{band_bottom + 40} C14,{band_bottom + 16} 22,{band_bottom + 8} 40,{band_bottom + 4}",
+        COLORS["out"][1],
+        dashed=True,
+        marker="arrg",
+    )
+
+
+def objective(f, cx, cy, value, w=118):
+    """The evaluator's output: the objective, and the record it comes with."""
+    f.pill(cx, cy, value, "out", w=w, h=40, size=15, weight=700)
+    f.text(cx, cy + 40, "pe.evaluate(θ)", 12.5, 500, COLORS["out"][2])
+    f.text(cx, cy + 56, "→ Evaluation", 12.5, 500, COLORS["out"][2])
+
+
 def deterministic():
-    f = Figure(1180, 640)
+    f = Figure(1180, 712)
     band_bottom = objects(
         f,
         [
@@ -163,76 +197,51 @@ def deterministic():
         "PlanningProblem",
     )
 
-    # Forward: simulate the closed loop, then score its trajectory
-    r1, h = 372, 96
-    f.text(
-        246,
-        r1 - 30,
-        "pe = problem.compile(controller, dt)",
-        13.5,
-        600,
-        MUTED,
-        anchor="start",
-    )
-    f.arrow(f"M{100 + 130},{band_bottom} L{100 + 130},{r1 - 2}")
+    # The problem evaluator: simulate the closed loop, score its trajectory
+    r1, h = 362, 96
+    evaluator_frame(f, r1, h, "ProblemEvaluator · pe = problem.compile(controller, dt)")
+    f.arrow(f"M190,{band_bottom} L190,{r1 - 2}")
     f.card(
-        100,
+        60,
         r1,
         260,
         h,
         "Simulation",
         ["ẋ = f(x, π(y)),  x(0) = x₀", "integrated forward on [0, tf]"],
     )
-    f.arrow(f"M360,{r1 + h / 2} L408,{r1 + h / 2}")
-    f.trajectory(410, r1 + 4, 150, h - 8, "Trajectory", "x(t), u(t)")
-    f.arrow(f"M560,{r1 + h / 2} L608,{r1 + h / 2}")
+    f.arrow(f"M320,{r1 + h / 2} L358,{r1 + h / 2}")
+    f.trajectory(360, r1 + 4, 140, h - 8, "Trajectory", "x(t), u(t)")
+    f.arrow(f"M500,{r1 + h / 2} L538,{r1 + h / 2}")
     f.card(
-        610,
+        540,
         r1,
-        470,
+        400,
         h,
         "Score",
         [
-            "J = ∫ g(x, u) dt + h(x(tf)),  over [0, tf]",
-            "m = margin of x(t), u(t) to X, U, Xf  (m < 0: a set is left)",
+            "J = ∫ g(x, u) dt + h(x(tf))",
+            "m = margin to X, U, Xf  (m < 0: a set is left)",
         ],
     )
+    f.arrow(f"M940,{r1 + h / 2} L1008,{r1 + h / 2}")
+    objective(f, 1070, r1 + h / 2 - 12, "J(θ), m(θ)")
 
-    # Back: the program, the optimizer, the tuned leaves into θ
-    r2 = r1 + h + 44
-    f.arrow(f"M{845},{r1 + h} L{845},{r2 - 2}")
-    f.card(
-        700,
+    r2 = r1 + h + 112
+    optional_export(
+        f,
+        1070,
+        r1 + h / 2 + 52,
         r2,
-        290,
         h,
-        "Program",
-        ["min J(θ)  over chosen leaves of θ", "s.t.  m(θ) ≥ 0"],
-    )
-    f.arrow(f"M700,{r2 + h / 2} L632,{r2 + h / 2}")
-    f.card(
-        330,
-        r2,
-        300,
-        h,
-        "Optimizer",
+        ["min J(θ)", "s.t.  m(θ) ≥ 0"],
         ["θ ← θ − η ∇J(θ)", "gd · Adam · L-BFGS · SLSQP · Ipopt"],
+        band_bottom,
     )
-    f.arrow(f"M330,{r2 + h / 2} L238,{r2 + h / 2}")
-    f.pill(205, r2 + h / 2, "θ*", "out", w=62, h=34, size=16, weight=700)
-    f.arrow(
-        f"M174,{r2 + h / 2} C60,{r2 + h / 2} 52,{band_bottom + 60} 52,{band_bottom + 4}",
-        COLORS["out"][1],
-        dashed=True,
-        marker="arrg",
-    )
-    f.text(66, r2 - 8, "tuned leaves", 12.5, 500, COLORS["out"][2], anchor="start")
-    f.text(66, r2 + 8, "back in θ", 12.5, 500, COLORS["out"][2], anchor="start")
     return f.svg()
 
 
 def stochastic():
-    f = Figure(1180, 660)
+    f = Figure(1180, 718)
     band_bottom = objects(
         f,
         [
@@ -246,71 +255,61 @@ def stochastic():
             ),
             (520, "Cost", ["∫ g dt + h"], "obj", [("θg", "par")], "cost"),
             (710, "Sets", ["X · U · Xf"], "obj", [("θs", "par")], "X · U · Xf"),
-            (900, "Laws", ["x₀ ~ X0 · θp ~ Θ"], "rnd", [("θℓ", "par")], "laws"),
+            (
+                900,
+                "Distributions",
+                ["x₀ ~ X0 · θp ~ Θ"],
+                "rnd",
+                [("θd", "par")],
+                "distributions",
+            ),
         ],
         "StochasticPlanningProblem",
     )
 
-    # Forward: n draws, n simulations, n trajectories, n scores
-    r1, h = 382, 96
-    f.text(
-        220,
-        r1 - 34,
-        "pe = problem.compile(controller, dt) · pe.evaluate(θ, key, n)",
-        13.5,
-        600,
-        MUTED,
-        anchor="start",
-    )
-    f.pill(90, r1 + h / 2, "key", "rnd", w=52, h=30)
-    f.arrow(f"M116,{r1 + h / 2} L128,{r1 + h / 2}", COLORS["rnd"][1], marker="arrp")
-    f.arrow(f"M{130 + 75},{band_bottom} L{130 + 75},{r1 - 2}")
-    f.card(130, r1, 150, h, "Draws", ["ω₁ … ωₙ", "x₀ᵢ, θpᵢ, seedᵢ"])
-    f.arrow(f"M280,{r1 + h / 2} L304,{r1 + h / 2}")
-    f.card(
-        306,
+    # The problem evaluator: n draws, n simulations, n trajectories, n scores, one criterion
+    r1, h = 368, 96
+    evaluator_frame(
+        f,
         r1,
-        290,
+        h,
+        "ProblemEvaluator · pe = problem.compile(controller, dt) · pe.evaluate(θ, key, n)",
+    )
+    f.pill(72, r1 + h / 2, "key", "rnd", w=48, h=28)
+    f.arrow(f"M96,{r1 + h / 2} L108,{r1 + h / 2}", COLORS["rnd"][1], marker="arrp")
+    f.arrow(f"M170,{band_bottom} L170,{r1 - 2}")
+    f.card(110, r1, 120, h, "Draws", ["ω₁ … ωₙ", "x₀ᵢ, θpᵢ, seedᵢ"])
+    f.arrow(f"M230,{r1 + h / 2} L252,{r1 + h / 2}")
+    f.card(
+        254,
+        r1,
+        200,
         h,
         "Simulation × n",
-        ["ẋ = f(x, π(y), wᵢ),  x(0) = x₀ᵢ", "integrated forward, one vmap"],
+        ["ẋ = f(x, π(y), wᵢ)", "x(0) = x₀ᵢ, one vmap"],
         stack=2,
     )
-    f.arrow(f"M608,{r1 + h / 2} L638,{r1 + h / 2}")
-    f.trajectory(640, r1 + 4, 140, h - 8, "Trajectories", "xᵢ(t), uᵢ(t)", stack=2)
-    f.arrow(f"M792,{r1 + h / 2} L818,{r1 + h / 2}")
+    f.arrow(f"M466,{r1 + h / 2} L488,{r1 + h / 2}")
+    f.trajectory(490, r1 + 4, 124, h - 8, "Trajectories", "xᵢ(t), uᵢ(t)", stack=2)
+    f.arrow(f"M626,{r1 + h / 2} L648,{r1 + h / 2}")
     f.card(
-        820,
-        r1,
-        270,
-        h,
-        "Scores",
-        ["Jᵢ = ∫ g dt + h", "mᵢ = margin to X, U, Xf  (< 0: left)"],
-        stack=2,
+        650, r1, 190, h, "Scores", ["Jᵢ = ∫ g dt + h", "mᵢ = margin to sets"], stack=2
     )
+    f.arrow(f"M852,{r1 + h / 2} L874,{r1 + h / 2}")
+    f.card(876, r1, 140, h, "Criterion C", ["mean, CVaR", "or worst case"])
+    f.arrow(f"M1016,{r1 + h / 2} L1032,{r1 + h / 2}")
+    objective(f, 1090, r1 + h / 2 - 12, "C(J₁ … Jₙ)", w=112)
 
-    # Back: the criterion, the program, the optimizer, the tuned leaves into θ
-    r2 = r1 + h + 50
-    f.arrow(f"M{955},{r1 + h} L{955},{r2 - 2}")
-    f.card(840, r2, 240, h, "Criterion C", ["mean · CVaR · worst", "over J₁ … Jₙ"])
-    f.arrow(f"M840,{r2 + h / 2} L782,{r2 + h / 2}")
-    f.card(560, r2, 220, h, "Program", ["min C(J₁ … Jₙ)", "s.t.  mᵢ(θ) ≥ 0"])
-    f.arrow(f"M560,{r2 + h / 2} L502,{r2 + h / 2}")
-    f.card(
-        250,
+    r2 = r1 + h + 112
+    optional_export(
+        f,
+        1090,
+        r1 + h / 2 + 52,
         r2,
-        250,
         h,
-        "Optimizer",
+        ["min C(J₁ … Jₙ)", "s.t.  mᵢ(θ) ≥ 0"],
         ["θ ← θ − η ∇C(θ)", "Adam · L-BFGS · SLSQP · Ipopt"],
-    )
-    f.arrow(f"M250,{r2 + h / 2} L208,{r2 + h / 2}")
-    f.pill(175, r2 + h / 2, "θ*", "out", w=62, h=34, size=16, weight=700)
-    f.arrow(
-        f"M144,{r2 + h / 2} C12,{r2 + h / 2} 12,{band_bottom + 50} 40,{band_bottom + 4}",
-        COLORS["out"][1],
-        dashed=True,
-        marker="arrg",
+        band_bottom,
     )
     return f.svg()
 

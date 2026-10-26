@@ -995,21 +995,23 @@ grid (`nominal_trajectory`), the planner's evidence; `evaluate` scores the conti
 
 The pipeline in two pictures. Every object carries its parameters (the amber tab on its
 edge), and they form one tree `θ = pe.params`, a branch per object under its key; the plant,
-cost, sets and start belong to the problem, and the controller closes the loop on the
-problem's plant at compile. Below the tree, the loop of tuning: the closed loop is simulated
-(integrated forward from `x₀` to `tf`), its `Trajectory` is scored (the cost `J`, and the
-margin `m` of the run to the sets, negative when it leaves one), the program minimizes `J`
-over the chosen leaves of `θ` (`wrt`, dotted paths such as `"controller.Kp"`) with `m ≥ 0` as
-its rows, and the optimizer writes the tuned leaves back into `θ`. Colours: blue, the
-objects; amber, the parameters; purple, randomness; green, the result. The figures are drawn
-by `docs/pipeline_figures.py`.
+cost, sets and start (or, on a stochastic problem, the distributions) belong to the problem,
+and the controller closes the loop on the problem's plant at compile. The problem evaluator
+is its own object: it simulates the closed loop (integrated forward from `x₀` to `tf`),
+scores its `Trajectory` (the cost `J`, and the margin `m` of the run to the sets, negative
+when it leaves one), and returns the objective with its `Evaluation`; `pe.evaluate(θ)` alone
+evaluates a solution. Tuning is an optional export: `pe.program(wrt)` minimizes the objective
+over the chosen leaves of `θ` (dotted paths such as `"controller.Kp"`) with `m ≥ 0` as its
+rows, and the optimizer writes the tuned leaves back into `θ`. Colours: blue, the objects;
+amber, the parameters; purple, randomness; green, the results. The figures are drawn by
+`docs/pipeline_figures.py`.
 
 **Deterministic:** one run, one score.
 
 ![The evaluator pipeline, deterministic](../_static/pipeline_deterministic.svg)
 
-**Stochastic:** the noise's seed is a leaf of `θ` like any other, and so are the laws' own
-parameters; the draws `ωᵢ` (starts, drawn parameters, block seeds) are realized from one key,
+**Stochastic:** the noise's seed is a leaf of `θ` like any other, and so are the
+distributions' own parameters; the draws `ωᵢ` (starts, drawn parameters, block seeds) are realized from one key,
 the `n` runs go in one `vmap`, and the criterion `C` reduces their `Jᵢ`.
 
 ![The evaluator pipeline, stochastic](../_static/pipeline_stochastic.svg)
