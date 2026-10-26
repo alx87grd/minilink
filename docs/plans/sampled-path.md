@@ -22,7 +22,8 @@
   [automation-by-convention.md](automation-by-convention.md);
 - its open decisions: [QUESTIONS.md](../dev/QUESTIONS.md).
 
-Every step is **[ask — core]**.
+**Lane:** core (the hybrid tool, the sampled kernel, every sampled controller); every step is
+**[ask — core]**.
 
 A sampled controller (a digital PID, a held neural policy, MPC, MPPI, the RL policies) runs
 once per sample period on a computer, and the plant is stepped by the step model between two
