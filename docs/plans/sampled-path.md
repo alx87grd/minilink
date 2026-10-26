@@ -269,18 +269,39 @@ computation, a core contract change for the maintainer.
    with tight tolerances stays with a runner on the NumPy face. This is the main argument for
    keeping a specialised closed-loop orchestrator.
 
-**The open question, with what would decide it.** Keep a specialised closed-loop orchestrator
-(today's `HybridSimulator`), or simulate only through the step-diagram runner?
+**Closed-loop simulation: both paths, in R15's shape (agreed with the maintainer 2026-10-26,
+draft).** The continuous side already settled the same question: R15 makes the fixed-step
+compiled rollout the one engine and judge, and `evaluate(..., method="scipy")` swaps the run for
+the adaptive `Simulator` "and nothing else". The hybrid loop follows it:
 
-| For a specialised orchestrator | For the step-diagram runner only |
-| --- | --- |
-| adaptive plant integration (`solve_ivp`), events, stiff plants | one code path: the same numbers in simulation, gradients, `vmap` and analysis |
-| skips idle slow blocks on NumPy | `discretize` already gives the plant its step |
-| a dense plant trajectory between samples, for plots | the sampled trajectory, with substeps recorded on request |
+| Path | Role | What it reuses |
+| --- | --- | --- |
+| **The step-diagram runner** (the pure computer step plus `discretize(plant, dt_base, substeps=n)`) | the engine and the judge: `jit`, `grad`, `vmap`, analysis, `evaluate` | everything |
+| **Adaptive hybrid simulation** (a `method="scipy"` swap) | only the plant's integration between samples changes: `solve_ivp` restarted at every sample, no event detection since the sample times are known | the same pure computer tick, the plant's `f` |
+| **The clock runner** | execution, not simulation: realtime, game mode, hardware in the loop | the same pure blocks |
 
-Two facts would decide it: whether a course or research demo needs adaptive integration in a
-sampled loop, and a benchmark of the step-diagram runner against `HybridSimulator` on the
-racecar MPC and a multi-rate demo.
+The adaptive path stays for stiff plants, a long sample period over fast plant dynamics, a dense
+plant trajectory between samples for plots, teaching (`solve_ivp` as the reference integrator),
+and as a cross-check of the substep count, the role `evaluate(method="scipy")` plays for a
+continuous loop. It must not be a second model: today's `HybridSimulator`, with its own tick loop
+and block handling, shrinks to "call the pure computer tick, integrate the plant over the
+period".
+
+**Open: the default of `compute_trajectory()` on a hybrid loop** (the maintainer, 2026-10-26: "it
+remains to be seen"). The facts that bear on it:
+
+- **The continuous rule** (`Simulator.select_solver`): SciPy adaptive on a smooth loop; Euler on a
+  discontinuous one; fixed-step RK4 at a divisor of the period as soon as a block holds a signal
+  over a sample period (DESIGN §4, the three periods). A sampled loop is exactly that case.
+- **The evaluator's default** is the fixed-step engine (R15: `evaluate(..., method="rk4")`).
+- **Today's hybrid default** is already fixed-step: `HybridDiagram.compute_trajectory` integrates
+  the plant by RK4 substeps inside each base tick (`plant_dt_inner`).
+
+So the agent's draft recommendation is the step-diagram runner by default, with the substeps
+chosen by the continuous rule (the largest divisor of `dt_base` at or under the plant's time
+constant scaled by `AUTO_DT_SCALE`), and `solver="scipy"` for the adaptive path: it keeps the
+numbers today's default gives (R123's delay aside) and makes `compute_trajectory`,
+`evaluate` and the gradients agree by default. Not ruled.
 
 **Order:** the continuous core it waits for landed on 2026-10-24 (the step model, then V1's
 steps 1–6); the loop comes in v0.4 (R86), with P10's AC-8b; the hand-copied `HybridDiagram`
