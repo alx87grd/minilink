@@ -44,7 +44,7 @@ this section's heading is its rung now.
 phases need ([QUESTIONS.md](../dev/QUESTIONS.md), "Blocks v0.3"), the clean-up lane (§2) beside;
 P1 every object pure, every number a parameter (§1.1); P2 the step algebra (§1.2); P3 the
 discrete judge (§1.3); P4 the draws and the seeded policy (§1.4); P5 the hybrid loop (§1.5); P6
-the program lane, from P1 on (§1.6, §1.7); P7 Fields, from P1 on (§1.8); P8 hardening and the
+the program lane, from P1 on (§1.6, §1.7; the stochastic program after P4, the MPC capstone after P5); P7 Fields, from P1 on (§1.8); P8 hardening and the
 merge (§1.9). The work happens on `dev-v0.3`, merged into `dev` after the maintainer's review
 (R79); nothing merges to `main` until every notebook has moved (R47), and the course material
 stays on `main` until then.
@@ -97,8 +97,8 @@ is an open question (QUESTIONS.md).
   `hasattr(self, "solver_info")`. (The audit's bug, `StepDiagramSystem.step` writing in place,
   is fixed, 2026-10-24.)
 - [ ] **T2 blocks and control**: `blocks/transfer_function.py`'s `tf` calls `self.h(x, u, t)`
-  on `np` and drops `params`; `TrajectorySource.h` cannot trace (`interp1d`; stale since OD-30, 2026-10-24: it
-  interpolates on the array module and traces); `mpc/viz.py`
+  on `np` and drops `params`; `TrajectorySource.h` cannot trace (`interp1d`) — stale: since OD-30 (2026-10-24) it
+  interpolates on the array module and traces; `mpc/viz.py`
   imports `HybridSimResult` at module level instead of under `TYPE_CHECKING` (RULES 3.2;
   scan: control#12).
   Also (scan: control#2, control#5, control#7): one time-interpolation for trajectories and
@@ -146,7 +146,8 @@ The maintainer's idea of 2026-10-26, named a core pillar (core-architecture.md �
   that steps: a continuous loop discretized, a plant already a `StepSystem`, a sampled computer
   on its plant. Value iteration, the RL environment, the evaluator and the sampled loop read the
   same discrete problem, so a policy has one `J` (today three close ones: a left Riemann sum
-  `g dt` in value iteration and RL, a trapezoid in the evaluator). The continuous problem stays
+  `g dt` in value iteration and RL, a trapezoid in the evaluator; a fourth in shooting's own
+  trapezoid). The continuous problem stays
   the primary object; the tools of continuous time keep reading it (direct collocation, the
   continuous LQR, the linear analysis, `method="scipy"`). Also (moved from §6): the
   environment's step and `score_run` apply the same failure, price and horizon rules, written
@@ -213,7 +214,7 @@ The loop that couples a computer's clock to a continuous plant (core-architectur
   it. Parked until the continuous path lands (the maintainer, 2026-10-22; R86): the run-state caches
   (RULES 2.4), controller memory and the computer's draws on the tick, the evaluator's dispatch
   of a sampled controller (D13–D15), the `core` → `simulation` import (scan: core#14). In v0.3's core since the maintainer's direction of 2026-10-26 (it was v0.4 by R86, after the continuous path). Done when
-  D13–D15 are ruled and the kernel's steps are rows here. A tentative draft vision, not decided
+  D13–D15 are ruled (D14 and D15 since, R104 and R105; D13 open) and the kernel's steps are rows here. A tentative draft vision, not decided
   (sampled-path.md §8.1–§8.5): `computer @ plant` a step diagram on a base clock that knows it is
   hybrid, every block pure (the MPC latch goes for the computational delay, R123), the
   orchestrator kept as the clock runner; it would need a CONSTITUTION amendment (QUESTIONS.md).

@@ -72,7 +72,8 @@ and integer seeds only (ruled, R118). An override is `None` or a complete tree (
 - The MPC's tick latch (`MPCTickLatch`) is a hidden cache (R123 removes it).
 - `StepSystem.rollout` and `HybridDiagram.last_result` are run caches (D13, open).
 
-**Steps.** TODO §1.1: A5, RN-2, T1, T2. S29 (the diagram's derived `x0`, `n`, `state`) is a v0.9
+**Steps.** TODO §1.1: A5, RN-2, V1's step 8 (`Set.as_cost`, the open-loop table in `params`), T1,
+T2. S29 (the diagram's derived `x0`, `n`, `state`) is a v0.9
 row; whether it joins this foundation is open (QUESTIONS.md).
 
 ### 2.2 The step algebra first-class
@@ -190,7 +191,9 @@ The proposal is to re-pin the demos, notebooks and baselines once, at the end of
   with the hybrid loop; today's stateless MPC is a plain `System` that `problem.compile` accepts);
 - the release of the rows the core reads but that sit elsewhere (S29, S70, the realtime runner's
   re-base and the orchestrator's adaptive plant integration, the RL heads' rebuild);
-- the CONSTITUTION amendment ruled before P5 and applied with it.
+- the CONSTITUTION amendment ruled before P5 and applied with it;
+- the `StepRollout` fold, placed in P2 here, waits for S31 in its row (OD-36: it is the hybrid
+  simulator's record), so it lands in P2 or with P5.
 
 ## 5. Stochastic problems: the draws (a pillar; ruled in its convention)
 
@@ -388,7 +391,7 @@ two goals, 2026-10-25:
 - its closed loop in one scan, tuned by gradient (NS-9).
 
 State-of-the-art solvers and MPC are v0.4. MPPI's tick is the same shape and already pure
-(§4.6b); MPPI itself is a v0.4 feature.
+(native-optimizers.md §4.6b); MPPI itself is a v0.4 feature.
 
 ### 8.2 Today in the code
 

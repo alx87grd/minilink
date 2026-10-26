@@ -256,7 +256,8 @@ Each rung names its open steps, one line each. The steps themselves, with files,
 every step in it is landed or explicitly dropped by the maintainer. Landed work leaves this
 section; its history is in git and in [docs/reviews/](../reviews/). This section names the
 rows of the architecture and course waves; wave D's rows (the T rows, D1–D3, S43, S53, S65–S69,
-A4, P4) are named in TODO only.
+A4, P4) are named in TODO only, except those that joined the core on 2026-10-26 (T1, T2, S53,
+S65, S66, named in §5.3).
 
 **The order is the commitment; the course calendar is secondary** (ruled 2026-10-22,
 [record](../reviews/2026-10-22-second-roadmap-review-rulings.md)). GRO860 runs in the fall
@@ -277,7 +278,8 @@ lowered to a `MathematicalProgram`, solved by the `Optimizer`. Two step paths on
 continuous one (`Simulator`, the differentiable evaluator) and the sampled one (the step
 model, DESIGN §5, and the sampled loop, [sampled-path.md](../plans/sampled-path.md)). Six pillars on the
 spine: classical and modern control, nonlinear control, trajectory optimization and MPC,
-reinforcement learning, identification and imitation, estimation. **v0.3 builds the complete
+reinforcement learning, identification and imitation, estimation (these are the application
+pillars; the core's own pillars, which v0.3 builds, are core-architecture.md's). **v0.3 builds the complete
 core** (the landed continuous core, then the core's own pillars, [core-architecture.md](../plans/core-architecture.md)),
 **v0.4 adds the features built on it**, v0.9 decides what can still break a name, v1.0 freezes
 when the API is mature.
@@ -363,7 +365,9 @@ the cost (V1's steps 1–6 with the cost parameters A2 and the Monte Carlo fold)
 method table (S74) and the closing PID example (S77), on `dev-v0.3` pending the maintainer's
 review (R79).
 
-**The two foundations and the seven pillars** (each **[ask — core]**):
+**The rows, by foundation and core pillar** (each **[ask — core]**; the seven pillars are
+[core-architecture.md](../plans/core-architecture.md) §1, the seeded policy riding with the draws here; the
+last bullet is the merge):
 - **Every object pure, every number a parameter** (TODO §1.1): A5's sets reading `params`, RN-2,
   V1's step 8 (`Set.as_cost`, the open-loop table in `params`), T1, T2.
 - **The step algebra first-class** (§1.2): the `StepRollout` fold into `Trajectory` (V1.1's
