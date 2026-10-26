@@ -120,7 +120,7 @@ scope. The schedule's divisors, `dt_base` and the substep count are structural (
 compile); the parameter tree is the loop's, every block named (R121).
 
 **Open for the maintainer.**
-1. Is the pure tick of the closed loop also exposed as a `StepSystem` (it is one,
+1. *(The maintainer's direction, 2026-10-26: yes, §8.5.)* Is the pure tick of the closed loop also exposed as a `StepSystem` (it is one,
    mathematically: `X_{k+1} = F(X_k, k; p)`)? That would let the step tools read it, the
    linearization of R122 included (the sampled-data loop's stability as the eigenvalues of its
    map), but R13 and R120 rule the loop a simulation tool, not a `System`; a read-only view
@@ -356,6 +356,51 @@ constant scaled by `AUTO_DT_SCALE`), the substeps recorded (B above) so the plot
 today's, and `solver="scipy"` for the adaptive path: it keeps the numbers and the resolution
 today's default gives (R123's delay aside) and makes `compute_trajectory`, `evaluate` and the
 gradients agree by default. Not ruled.
+
+### 8.5 `computer @ plant` is a step diagram that knows it is hybrid (the maintainer, 2026-10-26, draft)
+
+> The result of `computer @ plant` is considered to be the step diagram, at least for the
+> composition algebra and the analysis shortcuts. Some methods know it is a hybrid system and
+> use that for special operations: drawing the diagram, computing the trajectory, running the
+> computer on its clock in realtime. By default it is just a regular step diagram.
+
+**The shape.** `computer @ plant` returns a subclass of `StepDiagramSystem` (the name is open;
+R13 keeps `HybridDiagram` for now) holding two blocks on the base clock, the computer as one pure
+step block (§8.1) and `discretize(plant, dt_base, substeps=n)`, and keeping the continuous plant
+and the schedule as its source, the way `Discretization` (`analysis/discretization.py`) is a
+`StepSystem` that keeps its continuous `source`.
+
+| Inherited as a step diagram (the algebra, unchanged) | Added or specialised because it knows it is hybrid |
+| --- | --- |
+| `step`, `compute_rollout`, `compile` (the step diagram's evaluator: `jit`, `scan`, `vmap`, `grad`) | `compute_trajectory()`: a trajectory in seconds, dense plant (§8.4), on the default chosen there (the step runner, or the orchestrator with an adaptive plant) |
+| joining a larger `StepDiagramSystem` as a block | `plot_diagram()`: the two-side hybrid drawing (`graphical/diagrams/hybrid_topology.py`), computer and continuous plant, not two step boxes |
+| the step tools: `jacobian`, and R122's linearization with its eigenvalues against the unit circle, the sampled-data loop's stability | the clock runner (§8.2's O2): realtime, game mode, hardware in the loop |
+| the parameter tree, every block named (R121) | plots on the time axis: ticks converted to seconds with `dt_base` (R14: the loop converts where it meets the plant) |
+
+**The agent's read: it works well, and it is the cleanest version of the vision.**
+
+- **No method is redefined against its parent.** `StepSystem.compute_trajectory` raises today
+  ("use `compute_rollout`"); the subclass adds a working one, so `compute_rollout` keeps the pure
+  step meaning everywhere and `compute_trajectory` is the new, hybrid-aware verb. A tool that
+  takes any step system never sees a different answer from it.
+- **Its precedent is in the code.** `Discretization` is a `StepSystem` that knows its continuous
+  source and reads its parameters through it.
+- **It satisfies CONSTITUTION invariant 1's first sentence** ("everything that can be viewed as a
+  system is a System") better than today's `HybridDiagram`, a plain class beside the algebra.
+- **One limit, accepted:** placed inside a larger plain `StepDiagramSystem`, it is an ordinary
+  block; its hybrid-aware verbs belong to the outermost loop that knows its clock, as a
+  `Discretization` inside a diagram is just a step block.
+- **The two runs must agree:** `compute_rollout` (the step semantics) and `compute_trajectory` (if
+  its default is the adaptive orchestrator) differ by the integration error only; §8.4's
+  cross-check test holds them together.
+
+**What it changes in the rulings (for the maintainer, when ruled).** R13 ("the sampled loop is a
+tool") and R120 (CONSTITUTION invariant 1: "the sampled loop (`Computer`, `HybridDiagram`) is a
+simulation tool coupling the two clocks rather than an open `System` seam") say the opposite of
+"the result is a step diagram". The reconciliation: the *coupling* of a continuous plant and a
+computer stays a tool, the conversion (`discretize` at the base clock plus the computer's pure
+step); its *result* is a `System` of the step algebra. That needs a CONSTITUTION amendment of
+invariant 1's second sentence, maintainer-owned, when this lands.
 
 **Order:** the continuous core it waits for landed on 2026-10-24 (the step model, then V1's
 steps 1–6); the loop comes in v0.4 (R86), with P10's AC-8b; the hand-copied `HybridDiagram`

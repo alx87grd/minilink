@@ -217,6 +217,19 @@ a dated record in docs/reviews/), applies it, and deletes the entry. Rulings alr
 - **Detail:** [native-optimizers.md](../plans/native-optimizers.md) §4.6, §5
 - **Answer:**
 
+### Does `computer @ plant` become a step diagram, with a CONSTITUTION amendment?
+- **Blocks:** the sampled loop (S31, v0.4); CONSTITUTION invariant 1.
+- **Today:** `computer @ plant` builds a `HybridDiagram`, a plain class beside the step algebra;
+  R13 and R120 rule the sampled loop a tool, not a `System`.
+- **Your direction (2026-10-26, draft):** the result is a `StepDiagramSystem` subclass on the base
+  clock (the computer's pure step and the plant discretized), regular for the algebra and the
+  analysis, with hybrid-aware `compute_trajectory`, `plot_diagram` and the clock runner.
+- **Options:** amend invariant 1's second sentence to "the coupling is a tool; its result, at the
+  base clock, is a `System` of the step algebra"; or keep R120 and expose a read-only step map.
+- **Recommendation:** the amendment, when S31 lands; the precedent is `Discretization`.
+- **Detail:** [sampled-path.md](../plans/sampled-path.md) §8.5
+- **Answer:**
+
 ### Does Diffrax join as an optional JAX solver?
 - **Blocks:** the foundations (S27); a new optional dependency.
 - **Today:** the integrators are in `core/compile/evaluators/stepping.py` (OD-11).
