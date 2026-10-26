@@ -314,7 +314,43 @@ So resolution is decoupled from the computer's clock: `compute_trajectory` recor
 by default (B), as dense as today; `evaluate` and the gradient path record per tick and
 reconstruct on request (C); a finer base clock (A) stays available.
 
-So the agent's draft recommendation is the step-diagram runner by default, with the substeps
+**The alternative split (the maintainer, 2026-10-26): simulate with the orchestrator, analyse
+with the step diagram.** `compute_trajectory` on a hybrid loop defaults to the clock orchestrator
+over the pure blocks with an adaptive plant integration (`solve_ivp` between samples); the pure
+step diagram serves analysis, composition, `evaluate`, gradients and `vmap`. (Today's default is
+the orchestrator with fixed-step RK4 substeps, `plant_eval.rollout(x_plant, u_held, t_k, h)` per
+tick: no adaptive option exists yet.)
+
+| | Step diagram by default | Orchestrator + adaptive by default |
+| --- | --- | --- |
+| The continuous precedent | the `Simulator`'s rule for a held signal (fixed-step RK4 at a divisor of the period) and R15's engine | `compute_trajectory` → `Simulator` (adaptive on a smooth loop), `evaluate` → the engine: R15's split, applied literally |
+| `compute_trajectory` and `evaluate` | the same numbers by default | differ by the integration error, as they already do on a smooth continuous loop |
+| Accuracy | set by the substep count | set by a tolerance; no substep count to choose |
+| Dense plant trajectory | recorded substeps (B above) | the solver's interpolant, natural |
+| Stiff plants | need many substeps | handled (`scipy_stiff`) |
+| Speed | one compiled scan on JAX; a Python loop on NumPy | a `solve_ivp` restart per held-input change (about 0.1–1 ms each): fine at a controller's rate, slow if restarted at a 1 kHz base tick |
+| Hybrid numbers today | unchanged (R123's delay aside) | move once: the demos and the hybrid regression gates (`f.hybrid_zoh`, `f.dual_rate`) re-baselined |
+
+**The agent's read: a sound split, on three conditions.** It is the continuous design applied
+literally, and it puts each path where it is strongest: the adaptive orchestrator for the most
+accurate reference plot, the step diagram for everything that composes, compiles or
+differentiates.
+1. **No second model:** the orchestrator calls the same pure computer tick (O2); only the plant's
+   integration differs.
+2. **Restart only when the plant's input changes:** `solve_ivp` runs from one change of the held
+   plant input to the next (the instants a block feeding the plant fires), not at every base
+   tick, so a fast base clock with a slow controller stays cheap. The restart is what makes an
+   adaptive solver correct across the steps of a held input, which is why the `Simulator`
+   avoids adaptive solvers on a loop with a held signal it does not restart at.
+3. **A cross-check test:** the orchestrator's run and the step diagram's agree within the
+   integration tolerance on the hybrid demos, the way `evaluate(method="scipy")` cross-checks a
+   continuous loop.
+
+Both defaults are defensible; the choice is a priority. Is `compute_trajectory` the most
+accurate reference (the orchestrator), or the same numbers as `evaluate` and the gradients (the
+step diagram)? The continuous side answers "most accurate" for a smooth loop. Not ruled.
+
+The first draft recommendation was the step-diagram runner by default, with the substeps
 chosen by the continuous rule (the largest divisor of `dt_base` at or under the plant's time
 constant scaled by `AUTO_DT_SCALE`), the substeps recorded (B above) so the plot is as dense as
 today's, and `solver="scipy"` for the adaptive path: it keeps the numbers and the resolution
