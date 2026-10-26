@@ -1,7 +1,7 @@
 # The field object
 
 Status: core contract — agreed 2026-09-15 (FD-C12, time and action arguments included); not started, step 4.7 done 2026-10-12; the field signature `value(x, u=None, t=0.0, params=None)` already on `StateField`.
-Rung: v0.3, the core's Fields pillar (the maintainer's direction of 2026-10-26; [core-architecture.md](core-architecture.md) §9), step A1 of [TODO.md](TODO.md) §1.8 (it was v0.4). Depends on the sets-and-distributions pass (landed 2026-09-15: `bounding_box`, `.box`, the draw convention); the Lyapunov rulings it cites were open items of ROADMAP §6, now QUESTIONS.md (R111 ruled the certificates a research-lane tool).
+Where it sits: the core's Fields pillar ([core-architecture.md](core-architecture.md) §9), row A1 of [TODO.md](TODO.md) §1.9. Depends on the sets-and-distributions pass (landed 2026-09-15: `bounding_box`, `.box`, the draw convention); the Lyapunov rulings it cites were open items of ROADMAP §6, now QUESTIONS.md (R111 ruled the certificates a research-lane tool).
 Name-preserving (`V(x)`, `value_at`, `cost_to_go` keep working). Finding FD-F12 of the foundations review, docs/reviews/2026-09-15-foundations-review.md (`FD-` marks that review's findings and comments: its F12, C6, C12).
 
 The scalar function on `(x, u, t)` becomes a core noun, `Field`, with the same verbs

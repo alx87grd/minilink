@@ -1,26 +1,47 @@
 # The differentiable planning problem: one path from any parameter to any metric
 
-**Status:** steps 0–6 and the Monte Carlo fold (step 7a) landed on 2026-10-24: the native
-`Trajectory`, one scoring formula on the problem's fields, the problem evaluator
-(`problem.compile`, `evaluate`, `compare`) and its program export, the cost parameters, and the
-draws of the start and of the plant parameters (and on 2026-10-25, R92, per-trial realizations
-of random blocks inside the evaluated loop). The contract is DESIGN §4–§6 (§6 "One scoring
-formula", "Stochastic problem", "The problem evaluator"); the decisions the run took without the
-maintainer are [the run's log](../reviews/2026-10-24-v03-run-decisions.md) §2, and the rulings
-are [the rulings record](../reviews/2026-10-22-rulings-session-1.md) (R9–R11, R15–R47,
-R71–R77) and [the 2026-10-25 rulings](../reviews/2026-10-25-open-questions-rulings.md) (R91–R97). The design of the landed steps is in git history. This doc now holds what remains,
-planned in v0.4 until the maintainer's direction of 2026-10-26 made it v0.3's core: a draft idea to unify the evaluation from the rollout on (§9, 2026-10-26, not ruled); the `StepRollout` fold, step 7 (`disturbances=` port signals and cross-backend draws in `problem.realize`), step 7b (the sampled
-face), step 8 (sets as costs, a source policy's samples as leaves) and step 9 (the material),
-and traceable linear analysis (S73, §4.6), any time. Two leftovers of landed steps wait for the
-maintainer in [TODO.md](TODO.md) §2: the LQR warning on a declared `U` (OD-33 of the run's log)
-and the three demos that teach a hand gradient loop (OD-32).  
-**Rung:** v0.3, the core (the maintainer's direction of 2026-10-26; the pillars are
-[core-architecture.md](core-architecture.md)): the `StepRollout` fold ([TODO.md](TODO.md) §1.2),
-step 8 (§1.1), the discrete judge of §9 (§1.3, a pillar), step 7 with RN-4 of
-[randomness.md](randomness.md) (§1.4), step 7b after S31's kernel (§1.5), step 9 with the merge
-(§1.9); S73, any time (R76), a v0.4 row (§4). The rungs the step list of §8 and §9.4 write are the ones
-before that direction.  
-**Lane:** core; the open steps are **[ask — core]**.
+**Status:**
+- **Landed on 2026-10-24:** steps 0–6 and the Monte Carlo fold (step 7a):
+  - the native `Trajectory`;
+  - one scoring formula on the problem's fields;
+  - the problem evaluator (`problem.compile`, `evaluate`, `compare`) and its program export;
+  - the cost parameters;
+  - the draws of the start and of the plant parameters.
+
+  On 2026-10-25, R92 added per-trial realizations of the random blocks inside the evaluated
+  loop.
+- **The record:**
+  - the contract is DESIGN §4–§6 (§6 "One scoring formula", "Stochastic problem", "The problem
+    evaluator");
+  - the decisions taken without the maintainer are
+    [the run's log](../reviews/2026-10-24-v03-run-decisions.md) §2;
+  - the rulings are [the rulings record](../reviews/2026-10-22-rulings-session-1.md) (R9–R11,
+    R15–R47, R71–R77) and [the 2026-10-25 rulings](../reviews/2026-10-25-open-questions-rulings.md)
+    (R91–R97);
+  - the design of the landed steps is in git history.
+- **This doc holds what remains:**
+  - the `StepRollout` fold;
+  - step 7: `disturbances=` port signals and cross-backend draws in `problem.realize`;
+  - step 7b: the sampled face;
+  - step 8: sets as costs, a source policy's samples as leaves;
+  - step 9: the material;
+  - §9: a draft idea to unify the evaluation from the rollout on (2026-10-26, not ruled);
+  - traceable linear analysis (S73, §4.6).
+- **Two leftovers of landed steps** wait for the maintainer in [TODO.md](TODO.md) §2: the LQR
+  warning on a declared `U` (OD-33 of the run's log), and the three demos that teach a hand
+  gradient loop (OD-32).
+
+**Where it sits** (the core, [core-architecture.md](core-architecture.md); rows in
+[TODO.md](TODO.md)):
+- the `StepRollout` fold: §1.2;
+- step 8: §1.1;
+- step 7, with RN-4 of [randomness.md](randomness.md): §1.3;
+- step 7b, after S31's kernel: §1.5;
+- §9's one score: §1.6, a pillar;
+- step 9, with the merge: §1.10;
+- S73: any time (R76), a v0.4 row (§4).
+
+The open steps are **[ask — core]**.
 
 The problem evaluator turns a planning problem and a controller into one traceable function
 from the parameters to the run's record, and its program export hands that function to the
@@ -116,26 +137,26 @@ DESIGN §6. Three steer steps 8 and 9 and S73:
 One commit per step or sub-step; each records a seeded baseline of every branch it touches
 before any edit, runs it twice and `cmp`s, and ends byte-identical unless the step names its
 one intended change, which gets its own test and a ledger line. Every math line reads next to
-`planning/dynamic_programming/dp.py` before it lands. **The gates are the TODO rows** (§5 for
-these steps; the `StepRollout` fold is the row "V1.1, the rest" of §4); this list is the
+`planning/dynamic_programming/dp.py` before it lands. **The gates are the TODO rows** (TODO §1:
+the fold §1.2, step 7 §1.3, step 7b §1.5, step 8 §1.1, step 9 §1.10); this list is the
 content. Steps 0–6 and 7a landed on 2026-10-24.
 
-- **Step 1, its last commit: the `StepRollout` fold** (v0.4, with S31; OD-36). `StepRollout`
+- **Step 1, its last commit: the `StepRollout` fold** (with S31, in the loop lane; OD-36). `StepRollout`
   becomes a constructor of `Trajectory` with `t = k·dt`, byte-identical; it waits for S31
   because it is the hybrid simulator's computer record and MPC's dual-rate view, and every
-  hybrid piece moved to v0.4 (R86).
-- **Step 7, `disturbances=` port signals and `problem.realize` seeds** (v0.4, RN-4): per-trial
+  hybrid piece went with S31 (R86 then said v0.4; the v0.3 core since 2026-10-26).
+- **Step 7, `disturbances=` port signals and `problem.realize` seeds** (with RN-4): per-trial
   realization of random blocks inside the evaluated loop landed in v0.3 (`trial_seeds`, R92);
   step 7 moves those seeds into `problem.realize(key, n)` (alongside cross-backend start and
   parameter draws) and wires `disturbances=` signal blocks onto their ports in `evaluate`
   (today `evaluate` holds the `disturbances` ports at their nominal values and warns,
   `warn_if_disturbed` in `planning/evaluator.py`).
-- **Step 7b, the sampled face** (the hybrid phase, after S31's kernel): `compile` dispatches a
+- **Step 7b, the sampled face** (after S31's kernel): `compile` dispatches a
   sampled controller (a digital PID, a held neural policy, MPPI, the RL policies, and later
   the fixed-iteration MPC of [native-optimizers.md](native-optimizers.md) §4.6) to the
   kernel's JAX face; the refusal goes (today `require_continuous` in `planning/evaluator.py`
   refuses a `StepSystem` controller); a continuous law's numbers unchanged.
-- **Step 8, sets as costs, the lowerings, the metrics as constraints** (v0.4). `shaping.py`
+- **Step 8, sets as costs, the lowerings, the metrics as constraints**. `shaping.py`
   (today `planning/spatial/shaping.py`) to `core/`, `Set.as_cost(weight=, shaping=)`; sets
   reading `params`; `TrajectorySource` with its table in `params` (its `h` already traces), so
   the start `"x_start"` and `"controller.values"` are decision leaves with `Xf` lowered; the
@@ -155,7 +176,7 @@ content. Steps 0–6 and 7a landed on 2026-10-24.
 ## 9. Draft idea: one discrete evaluator from the rollout on (the maintainer, 2026-10-26)
 
 **Status: a draft idea, not ruled; it needs refinement (§9.4).** The ask is in QUESTIONS.md
-("Blocks v0.3" since 2026-10-26, when it became a core pillar).
+(it became a core pillar on 2026-10-26).
 
 > Once the cost function is set and the time discretization is decided (`dt`, the substeps,
 > the Runge–Kutta scheme), a continuous system's rollout is the same thing as a system that
@@ -172,7 +193,7 @@ content. Steps 0–6 and 7a landed on 2026-10-24.
 - **The score is already discrete.** `score_run` (`planning/evaluation.py`) reads the samples
   `(t_k, x_k, u_k)`: the margins are minima over the samples, the cost a trapezoid sum over
   them (`CostFunction.integrate`, `core/costs.py`).
-- **R15** makes the fixed-step run the one engine and judge; `method="scipy"` swaps in the
+- **R15** makes the fixed-step run the one engine and judge; `solver="scipy"` swaps in the
   adaptive integrator and nothing else. **R105** dispatches a sampled controller to the
   sampled kernel's JAX face with "one compile, one evaluate, the same `J`". **The `StepRollout`
   fold** (step 1's last commit, §8) makes a step rollout a `Trajectory` with `t = k·dt`.
@@ -202,7 +223,7 @@ The continuous problem stays the primary object (CONSTITUTION §5, "the continuo
 primary"): the discrete problem is a lowering a tool asks for, like `discretize` for a plant.
 The tools of continuous time keep reading the continuous problem: direct collocation (its
 defects are written on `f`), the continuous LQR, the linear analysis, the adaptive simulation
-(`method="scipy"`, R15's cross-check).
+(`solver="scipy"`, R15's cross-check).
 
 ### 9.3 The agent's read
 
@@ -236,5 +257,5 @@ state itself, no separate quadrature, and the substeps count for the cost as the
    time-varying set read between samples (point 2) needs `t` inside the step.
 5. **The discount.** `e^{−ρ t_k}` and `γ^k` agree with `γ = e^{−ρ dt}`; the RL planner's own
    `DEFAULT_GAMMA` then follows from the problem's rate when one is set.
-6. **The order of work.** After the `StepRollout` fold and S31's kernel (both v0.4), and
+6. **The order of work.** After the `StepRollout` fold and S31's kernel, and
    together with step 7b, since the sampled face is one of the loops this kernel scores.

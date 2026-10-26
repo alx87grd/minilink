@@ -3,12 +3,12 @@
 **Status:** ideas to review, 2026-10-21 — an independent analysis. Aligned 2026-10-23 to the
 rulings of 2026-10-22/23 ([the record](../reviews/2026-10-22-rulings-session-1.md)): the compiled problem
 exports a `MathematicalProgram` and no `tune` facade exists (R23); the sampled loop is a tool on
-ticks (R13, R14), its memory and dispatch parked to the hybrid phase (D13–D15); point 4 is D29
-for v0.4. Points 2–4 of §5 now stand as workboard rows (S31, V1's step 7b, C5) or open
+ticks (R13, R14), its memory and dispatch parked to the hybrid phase (D13–D15); point 4 is D29. Points 2–4 of §5 now stand as workboard rows (S31, V1's step 7b, C5) or open
 decisions (D14, D15, D29); §7's questions 1, 3, 4 and 5 are open, maintainer-owned.  
 **Lane:** maintainer-owned: it shapes core decisions still open.  
-**Rung, 2026-10-26:** points 2–4 of §5 are v0.3's core (the hybrid loop and the seeded policy,
-[core-architecture.md](core-architecture.md) §5.3, §6); behavior cloning and diffusion policy stay after v1.0.  
+**Where it sits:** points 2–4 of §5 are v0.3's core: the hybrid loop and the seeded policy
+([core-architecture.md](core-architecture.md) §4, §5; [TODO.md](TODO.md) §1.4, §1.5). Behavior
+cloning and diffusion policy stay after v1.0.  
 **Serves:** the sampled loop (S31, [sampled-path.md](sampled-path.md) §8), the names of the
 differentiable path (landed: DESIGN §6; the open steps in [differentiable-problem.md](differentiable-problem.md)),
 identification (C4), the MPPI planner ([mppi.md](mppi.md)), and the behavior-cloning row
@@ -149,14 +149,14 @@ demo than human driving, and free of hardware.
 
 ### 5.1 D29, the standard stochastic policy as a seeded block (moved from end-state-api.md, 2026-10-26)
 
-Moved verbatim; its rung ("C5 (v0.4)") is the one before 2026-10-26: the block is a v0.3 core
-pillar now, the RL heads' rebuild open (QUESTIONS.md).
+Moved verbatim from end-state-api.md. The block is a v0.3 core pillar (TODO §1.4); whether the RL
+heads' rebuild lands with it or in C5 (v0.4) is open (QUESTIONS.md).
 
 **Recommended:** `GaussianPolicy(mean, log_std, *, dt, seed=None)` in `control/neural.py`, a
 plain `System` whose `h` is `u = μ_θ(x) + σ_θ(x) · ε(seed, ⌊t/Δ⌋)`; `seed=None` is the
 deterministic face (`NeuralPolicyController` becomes that face); `log_prob(x, u)` and
 `entropy(x)` as methods beside `h`, the squashed variant a subclass. The RL heads are rebuilt
-on it in C5 (v0.4), the RL numbers changing once.
+on it (with the block or in C5: open), the RL numbers changing once.
 
 ## 6. Timing
 
@@ -164,7 +164,8 @@ on it in C5 (v0.4), the RL numbers changing once.
   evaluator. Ruled 2026-10-22/23: the loop a tool on ticks (R13, R14); the tick's memory and the
   dispatch (D14, D15) parked to the hybrid phase, after the continuous core; point 3 is V1's step
   7b.
-- **Point 4 is planned now and built with the RL follow-ups (v0.4)** as a C5 row of TODO §5 then (the block now the core's, TODO §1.4; the RL heads' rebuild C5, TODO §4);
+- **Point 4 is planned now**: the block is the core's (TODO §1.4); the RL heads' rebuild is
+  with it or with the RL follow-ups (C5, TODO §4), open. It was a C5 row (v0.4) before 2026-10-26;
   nothing new hard-codes the RL-only head meanwhile.
 - **Points 1 and 5 are not critical to the core tools** (the maintainer, 2026-10-22): the
   supervised pipeline, a `fit` verb and a dataset noun, stays a note for behavior cloning, not
@@ -182,5 +183,5 @@ on it in C5 (v0.4), the RL numbers changing once.
 4. Is distilling MPC or MPPI into a neural policy the first imitation demo?
 5. The standard stochastic policy as a seeded block (point 4) is the maintainer's direction;
    still to rule: its contract beyond `h` (the methods' names, which heads ship first);
-   recommended as `GaussianPolicy` in D29 (§5.1), for v0.4; the maintainer named the seeded
-   policy a core pillar of v0.3 on 2026-10-26 ([core-architecture.md](core-architecture.md) §5.3).
+   recommended as `GaussianPolicy` in D29 (§5.1); the maintainer named the seeded policy a core
+   pillar of v0.3 on 2026-10-26 ([core-architecture.md](core-architecture.md) §4).

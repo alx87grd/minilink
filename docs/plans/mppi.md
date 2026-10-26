@@ -9,11 +9,11 @@ planner waits on S31's sampled kernel, RN-4 and the rest of RN-5 (RN-5's v0.3 pa
 over the start and parameter draws, landed 2026-10-24).
 **Lane:** research lane first (`experimental/`), provisional band with the MPC
 block once MP-5 lands, teaching-surface decision at V3 (v0.9).
-**Rung, 2026-10-26:** a v0.4 feature on the core (S72, [TODO.md](TODO.md) §4); the sampled kernel,
-RN-4 and RN-5 it waits on are v0.3's core ([core-architecture.md](core-architecture.md) §5, §6, §10).
-**Rung proposed:** S72 on the workboard, v0.4, on S31's sampled kernel (the hybrid phase,
-after the continuous core) and the step model of S75, and after RN-4
-and RN-5 of the randomness plan (the ordering of §8), hardened before the v0.9 freeze; see §9.
+**Where it sits:** a v0.4 feature on the core (S72, [TODO.md](TODO.md) §4), on the step model
+(S75), the sampled kernel (S31) and the draws (RN-4, RN-5), which are v0.3's core
+([core-architecture.md](core-architecture.md) §3, §5, §12; the ordering of §8); hardened before
+the v0.9 freeze (§9). §10's open ask for v0.4 is the planner contract (D27); whether the design
+text is rewritten to R104, R107 and R123 before MP-1 is a QUESTIONS entry.
 **Prototype:** `experimental/mppi/pendulum_mppi.py` and `racecar_mppi.py`
 (2026-10-02), two standalone scripts on the library as it stands — the swing-up works, and
 the racecar laps the circuit with the cone against the collocation MPC on the same problem;

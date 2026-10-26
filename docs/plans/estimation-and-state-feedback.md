@@ -12,9 +12,9 @@ follow-ups of v0.9, each in its slot (the time-varying and trajectory filters, t
 Kalman filter, the sampled filters, and Layer 3, the estimation problem and its tools; §3,
 §5, §6). The open work is in TODO.md (the P4 follow-ups, `LQGPlanner`, the estimation
 follow-ups). P4's build plan, its ask-first list and its verification were cut once it
-landed (the history is in git). **Rung, 2026-10-26:** `LQGPlanner` stays a v0.4 feature
+landed (the history is in git). **Where it sits:** `LQGPlanner` stays a v0.4 feature
 ([TODO.md](TODO.md) §4), the follow-ups v0.9 rows; the sampled filters read the core's hybrid
-loop and the draws ([core-architecture.md](core-architecture.md) §5, §6, §10).
+loop and the draws ([core-architecture.md](core-architecture.md) §3, §5, §12).
 
 ## 1. Vision
 

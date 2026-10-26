@@ -2,17 +2,19 @@
 
 Status: **ideas to review**, written 2026-10-25 from the maintainer's vision (§1), with the
 state of the code (§2) and the agent's read (§3–§6). The maintainer named the two goals the same
-day (§1.1): the fixed-iteration MPC first, convergence analysis with control tools long term.
-The design choices are not ruled; the asks are in
-[QUESTIONS.md](../dev/QUESTIONS.md) ("Blocks v0.3" and "Blocks v0.4" since 2026-10-26; "Blocks v0.9 / v1.0"
-before). Lane: research. Rung (as written before 2026-10-26; the rung note below holds now): none yet; the
-natural slot is after the sampled loop (S31) and the parametric program (S76), both v0.4,
-because this plan builds on the step model's rollout and on the program's parameters.
-**Rung, 2026-10-26:** the maintainer's direction puts a proof of concept in v0.3's core: a simple
-fixed-step solver and an MPC on it, to show the pipeline closes (NS-1, NS-2's fixed-`K` form,
-NS-8, NS-9; [core-architecture.md](core-architecture.md) §8, [TODO.md](TODO.md) §1.7); better solvers and MPC are
-v0.4 (TODO §4). §7's stochastic program is the parametric program's case, a core pillar
-([core-architecture.md](core-architecture.md) §7).
+day (§1.1): the fixed-iteration MPC first, and convergence analysis with control tools long
+term. The design choices are not ruled; the asks are in [QUESTIONS.md](../dev/QUESTIONS.md).
+Lane: research.
+
+**Where it sits** (the maintainer's direction of 2026-10-26):
+- **The proof of concept is v0.3's core:** a simple fixed-step solver and an MPC on it, to show
+  the pipeline closes (NS-1, NS-2's fixed-`K` form, NS-8, NS-9).
+  [core-architecture.md](core-architecture.md) §8, [TODO.md](TODO.md) §1.8.
+- **Better solvers and MPC are v0.4** (TODO §4).
+- **§7's stochastic program** is the parametric program's case (core-architecture §7, TODO
+  §1.7).
+- **The order this doc wrote before that direction** (after S31 and S76, "MPPI's tick first,
+  ahead of NS-8" in §4.6b and §5) is superseded. Which tick comes first is a QUESTIONS entry.
 
 **Where each idea lives** (one fact, one home: this doc holds the native solvers and the
 two goals; the neighbours hold what they already owned):
@@ -70,7 +72,7 @@ parameter to the cost), [sampled-path.md](sampled-path.md) §8 (the one rollout 
 | Wrapped backends | `optimizers/scipy_minimize.py`, `optimizers/ipopt.py` | L-BFGS-B, SLSQP, trust-constr; Ipopt through optional `cyipopt` | no (host callbacks) |
 | Native backend | `optimizers/first_order.py` | `gd` and `adam`, projected on the box: a Python `for` loop on NumPy arrays; Adam's update is `jax.jit`-ed, so `adam` needs JAX even on a NumPy program | no |
 | Program evaluators | `optimization/evaluators/` | NumPy and JAX; the JAX one jits `J`, `∇J`, `∇²J`, the Jacobians, then **returns NumPy arrays** to the solver | the derivatives are; the solve is not |
-| Parameters | `planning/trajectory_optimization/parametric_program.py` | `ParametricMathematicalProgram`: only `x0` varies between solves (S76 widens it, v0.4) | partly (the JAX MPC path) |
+| Parameters | `planning/trajectory_optimization/parametric_program.py` | `ParametricMathematicalProgram`: only `x0` varies between solves (S76 widens it, the v0.3 core) | partly (the JAX MPC path) |
 | `Adam` | `optimizers/first_order.py` | Optax-style `init` / `update` on a pytree; also the RL learners' optimizer (`sac.py`, `algorithms/base.py`) | **yes**: the RL planner runs its gradient steps in one `lax.scan` (`planner.py`), PPO too |
 | The step model | `core/discrete/step_system.py`, `core/compile/evaluators/discrete.py`, `stepping.py` | `step(x, u, k, params)`; `rollout` is a Python loop on NumPy, one `lax.scan` on JAX; no `rollout_batch` for step systems yet (the continuous evaluator has one) | yes (open point: `DiscreteEvaluator.rollout` returns host NumPy, so not end to end; core-architecture.md §2.2) |
 | Other solvers in disguise | `planning/dynamic_programming/dp_jax.py` (value iteration in a `lax.while_loop`), `learning/.../ppo.py` (scan of minibatch steps), MPPI (planned, S72) | each owns its own loop | yes |
@@ -122,7 +124,7 @@ What this buys, beyond reuse:
   analysis tools would answer "why does this step size diverge?" on the solver itself, once
   step systems get `linearize` and discrete poles (today: `jacobian` only), a lesson GRO860 and
   the control courses would get almost for free.
-- **The iterates are a `Trajectory`** (once `StepRollout` folds into it, V1's rest, v0.4):
+- **The iterates are a `Trajectory`** (once `StepRollout` folds into it, V1's rest, with S31):
   the plot of `J` against `k`, the path of `z` on the contour, all with the existing plotting.
 - **`vmap` over the start** is a multi-start; over `η`, a step-size sweep; over `p`, a family
   of problems, the same way `rollout_batch` takes a family of rod lengths today.
@@ -234,7 +236,7 @@ is already the ruled shape (R104: a sampled controller's memory is its state): a
 whose state `x` is the packed plan `z` of the last tick, warm-starting the next. What stops it
 compiling is the inside of its `step`: a host solve (SciPy SLSQP) through a tick latch with side
 effects. The sampled loop's JAX face that would run it (S31, R105: a `Computer` runs the sampled
-kernel's JAX face under `problem.compile(policy)`) is v0.4 work.
+kernel's JAX face under `problem.compile(policy)`) is the v0.3 core's hybrid loop (TODO §1.5).
 
 **The law.** One tick is `K` iterations of a native method on the parametric program, bound
 with the measurement:
@@ -363,7 +365,7 @@ now an open point, QUESTIONS.md). The MPC path first. MPPI reaches the closed lo
 one scan soonest (§4.6b: MP-1 of mppi.md, then S31's scan, no native solver needed); then the
 gradient MPC: NS-1 (any time, internal) →
 NS-2's fixed-`K` form → NS-8, after S76's `ParametricProgram` (so the tick binds `x0` and the
-plant without a recompile) → NS-9, after S31's sampled kernel (v0.4); NS-6 when the MPC needs
+plant without a recompile) → NS-9, after S31's sampled kernel; NS-6 when the MPC needs
 state constraints. The control-analysis path is long term: NS-5 with `linearize` and poles on
 step systems, after the `StepRollout` fold into `Trajectory` (V1's rest, with S31). NS-3, NS-4
 and NS-7 when their consumers are scheduled (a solve to convergence inside a loss, C4
@@ -376,7 +378,7 @@ identification, the Monte Carlo objective).
 2. Which categories and which native algorithms are in scope (§4.1, §4.2), against
    CONSTITUTION §1.4?
 3. Where does this enter the roadmap? The maintainer's priority is the MPC path (§1.1); the
-   ask left is the rung: with S76 and S31 in v0.4, or after them. **Answered 2026-10-26** by the
+   ask left was the rung: with S76 and S31 (then v0.4), or after them. **Answered 2026-10-26** by the
    maintainer's direction ([the record](../reviews/2026-10-26-core-consolidation.md) §2): a proof
    of concept in v0.3 (NS-1, NS-2's fixed-`K` form, NS-8, NS-9), the rest in v0.4; the entry left
    QUESTIONS.md.

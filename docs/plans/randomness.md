@@ -1,34 +1,40 @@
 # One convention for randomness
 
 Status: decided (§8: RD-D1–RD-D12 on 2026-09-26, RD-D13–RD-D24 on 2026-09-30; the evaluator
-rulings superseded in part by R10, R15, R19, R27 and R44, as §8's note says). Landed: RN-1 on
-2026-09-30 (`WhiteNoise` on the counter-based cipher, `System.realize`, the solver hint; DESIGN
-§4, "Randomness") and RN-5's v0.3 part on 2026-10-24 (`evaluate(problem, arg, *, dt, n_trials,
-key)` over the start and parameter draws of `problem.realize(key, n)`, `compare` and
-`pe.program` on the same draws, `MonteCarloEvaluator` removed; DESIGN §6, "The problem
-evaluator"). This doc holds what is open, all in v0.4: RN-2 (the distributions read `params`,
-before V1's step 7), RN-3 (`NoiseSource`, with its first consumer), RN-4 (per-block seeds in
-`problem.realize`, signals on `disturbances`), the rest of RN-5 (the disturbance signals wired on
-their ports in `evaluate`, today held at nominal with a warning; `Sys2Gym`'s start law; the LQG
-gate) and RN-6 (the docs, with each step). RN-4 and RN-5 change public behaviour and the Monte
-Carlo numbers once, before the v0.9 freeze. The description of the code before RN-1, RN-1's
-build plan and its measurements were cut once they landed (the history is in git).
-Reviewed 2026-09-30: factual corrections applied in place; the ten amendments of §10 are ruled
-(RD-A1 as RD-D13, RD-A2–RD-A10 as RD-D14–RD-D23) and the maintainer added RD-D24 (the evaluator
-simulates the closed-loop diagram). §10 stays as the record of the findings.
-Ids: `RD-` marks this doc's own, the rules RD-R1–RD-R6 (§3), the rulings RD-D1–RD-D24 (§8) and
-the review's amendments RD-A1–RD-A10 (§10); `FD-F9` is finding F9 of the foundations review;
-a bare `A5`, `P4`, `RN-2` is a workboard step.
-Rungs (decided 2026-09-26, reorganized 2026-10-21 and 2026-10-23): RN-1 (`WhiteNoise`) in v0.2
-wave B, the prerequisite of B3 (`estimation/`, P4), landed; RN-5's fold into `evaluate` in v0.3
-(R44: V1's step 4, the draws over the start and parameter laws), landed; RN-2 in v0.4, before
-V1's step 7 (TODO §1); RN-3 with its first consumer, in the v0.4 row (unless a teaching notebook
-needs sampled sensor noise first); RN-4's per-block noise seeds and the rest of RN-5 in v0.4,
-joining under the same verb, before the v0.9 freeze; RN-6 with each step. The course runs on
-`main` while v0.3 stays on `dev` (R47).
-**Rung, 2026-10-26:** RN-2 to RN-6 are v0.3's core, the stochastic-problem pillar (the
-maintainer's direction; [core-architecture.md](core-architecture.md) §5, [TODO.md](TODO.md) §1.1 and §1.4); the rungs
-written in this doc are the ones before that direction.
+rulings superseded in part by R10, R15, R19, R27 and R44, as §8's note says).
+- **Landed:**
+  - RN-1 on 2026-09-30: `WhiteNoise` on the counter-based cipher, `System.realize`, the solver
+    hint (DESIGN §4, "Randomness"). It was v0.2 wave B, the prerequisite of B3
+    (`estimation/`, P4).
+  - RN-5's first part on 2026-10-24 (R44, V1's step 4): `evaluate(problem, arg, *, dt,
+    n_trials, key)` over the start and parameter draws of `problem.realize(key, n)`, with
+    `compare` and `pe.program` on the same draws and `MonteCarloEvaluator` removed (DESIGN §6,
+    "The problem evaluator").
+
+  The description of the code before RN-1, RN-1's build plan and its measurements were cut
+  once they landed (the history is in git).
+- **Open:**
+  - RN-2: the distributions read `params`;
+  - RN-3: `NoiseSource`, with its first consumer;
+  - RN-4: per-block seeds in `problem.realize`, signals on `disturbances`;
+  - the rest of RN-5: the disturbance signals wired on their ports in `evaluate` (today held at
+    nominal with a warning), `Sys2Gym`'s start law, the LQG gate;
+  - RN-6: the docs, with each step.
+
+  RN-4 and RN-5 change public behaviour and the Monte Carlo numbers once.
+- **Reviewed 2026-09-30:** factual corrections applied in place. The ten amendments of §10 are
+  ruled (RD-A1 as RD-D13, RD-A2–RD-A10 as RD-D14–RD-D23), and the maintainer added RD-D24 (the
+  evaluator simulates the closed-loop diagram). §10 stays as the record of the findings.
+- **Ids:** `RD-` marks this doc's own: the rules RD-R1–RD-R6 (§3), the rulings RD-D1–RD-D24
+  (§8) and the review's amendments RD-A1–RD-A10 (§10). `FD-F9` is finding F9 of the
+  foundations review; a bare `A5`, `P4` or `RN-2` is a workboard step.
+
+**Where it sits:**
+- RN-2 is in the core's first invariant: [core-architecture.md](core-architecture.md) §1,
+  [TODO.md](TODO.md) §1.1.
+- RN-3 to RN-6 are the draws: core-architecture §3, TODO §1.3.
+- The order and the rung are TODO's; this doc states none.
+
 **Aligned 2026-10-23** to the continuous core (DESIGN §5) and the rulings R10, R15,
 R27 of [2026-10-22-rulings-session-1.md](../reviews/2026-10-22-rulings-session-1.md), and to
 its session 3 (R36 `dt` required, R44 the fold in v0.3, R45 the record's names): the evaluator
@@ -636,7 +642,7 @@ Decided 2026-09-30 (maintainer), from the decision batch on RD-A2–RD-A10 of §
   hand-written held-input rollouts (`evaluate_jax`, `evaluate_numpy`, `evaluate_simulator`)
   with one path; `backend` chooses the arrays only. Any controller, any noise block, any
   parameter draw is a regular diagram simulation. `dt` becomes the simulation step rather than
-  a control period, so the evaluator's numbers change once, in v0.4 with RN-5.
+  a control period, so the evaluator's numbers change once, with RN-5.
 
 **Superseded in part by R10, R15, R19, R27 (2026-10-22/23;
 [the rulings](../reviews/2026-10-22-rulings-session-1.md)).** The rulings above stand as the
@@ -670,8 +676,9 @@ history of this plan; where they conflict, the later rulings hold:
 
 Order: RN-1 first (landed); RN-2 before RN-3; RN-5 before RN-4 since R44 (the fold landed in
 v0.3 on the start and parameter draws; RN-4's per-block seeds join under the same verb); RN-6
-closes each step's docs as it lands. Rungs as in the header: RN-1 landed in v0.2 and RN-5's
-first part in v0.3; RN-2, RN-3, RN-4, the rest of RN-5 and RN-6 in v0.4. Each
+closes each step's docs as it lands. RN-1 landed in v0.2 and RN-5's first part in v0.3; the rungs of the rest are TODO's (§1.1,
+§1.3, the v0.3 core since 2026-10-26; v0.4 before). RN-3 comes with its first consumer, earlier
+if a teaching notebook needs sampled sensor noise first. Each
 step that changes draws records a seeded baseline before and pins the new numbers with a test
 after (RULES 7.7, AGENTS refactor recipe); each step's math is read next to `dp.py` before it
 lands. The acceptance test of every step is its deterministic twin (RD-D23).
@@ -724,7 +731,7 @@ lands. The acceptance test of every step is its deterministic twin (RD-D23).
   `pe.program(wrt, key=, n_trials=)` on the same draws; `Planner.evaluate` calling it;
   `MonteCarloEvaluator`, `evaluate_jax`, `evaluate_numpy`, `evaluate_simulator` and the
   `simulator` backend removed; a controller with state accepted, a sampled controller refused
-  until V1's step 7b. What is left, in v0.4:
+  until V1's step 7b. What is left:
   1. each `disturbances` signal wired on its port in the evaluated loop (today `evaluate` holds
      the declared ports at nominal and warns, `warn_if_disturbed`), and a noise block inside
      `sys` realized per trial with RN-4's seeds.
@@ -734,7 +741,7 @@ lands. The acceptance test of every step is its deterministic twin (RD-D23).
   the same `evaluate` call on JAX and on NumPy agrees to a tolerance on one key; the
   deterministic twin (`n_trials=1` on the nominal problem) equals the deterministic `evaluate`;
   the release note records the one change of the evaluator's numbers. The workboard row
-  (RN-3 / RN-4 / RN-5 with V1's step 7, v0.4) carries the gate.
+  (TODO §1.3, the per-block seeds and disturbance signals) carries the gate.
 - [ ] **RN-6 Docs**, with each step: DESIGN §4 (the distributions entry: the convention, the
   three periods, the bridge table with its two periods, the solver hint) and §6 (the stochastic
   problem's `disturbances`, `realize`, `evaluate` on the draws). Done so far: DESIGN §4

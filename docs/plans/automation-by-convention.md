@@ -8,16 +8,19 @@ names, the three reserved role names `plant`, `controller` and `observer`, `role
 and the `DiagramSystem` section beside it; the cost scored on the plant (the deterministic
 half of AC-7) landed with the problem evaluator in v0.3 (DESIGN §6). This doc holds what is
 still open: the plots (AC-5) and the animation (AC-6), in the plotting lane; the draws of
-AC-7, with V1's step 7 and the randomness steps RN-4 and RN-5 (v0.4); the sampled loop kept
+AC-7, with V1's step 7 and the randomness steps RN-4 and RN-5; the sampled loop kept
 in step with the core rules (AC-8a), alongside; and the sampled loop made mainstream (AC-8b),
-with S31 in v0.4. How each rule was reached (the analysis of the old code, the evidence, the
+with S31. How each rule was reached (the analysis of the old code, the evidence, the
 options rejected, the fifteen rulings) is in the decision record,
 [2026-10-11-automation-by-convention.md](../reviews/2026-10-11-automation-by-convention.md);
 the second opinion and its eight rulings (R1–R8) are in
 [2026-10-13-automation-by-convention-second-opinion.md](../reviews/2026-10-13-automation-by-convention-second-opinion.md).
-**Rung, 2026-10-26:** AC-7's draws and AC-8a / AC-8b are v0.3's core (the maintainer's direction:
-[core-architecture.md](core-architecture.md) §5 and §6; [TODO.md](TODO.md) §1.4, §1.5); AC-5 and AC-6 stay in the
-plotting lane (TODO §3). The rungs written above and below are the ones before that direction.
+**Where it sits:**
+- AC-7's draws are the core's draws ([core-architecture.md](core-architecture.md) §3,
+  [TODO.md](TODO.md) §1.3).
+- AC-8b is the core's hybrid loop (core-architecture §5, TODO §1.5).
+- AC-8a runs alongside (TODO §3).
+- AC-5 and AC-6 stay in the plotting lane (TODO §3).
 Sections 1 to 4.4 described the landed part and were cut (the history is in git); the
 section numbers of what is left are kept, so the citations to them hold.
 
@@ -125,9 +128,9 @@ roles and control-law sweeps) is captured before and after each step and compare
 | AC-1, AC-0, AC-2, AC-OP, AC-3, AC-4 | Landed 2026-10-10 to 2026-10-14. | — |
 | AC-5 | Plots (§5): the auto mode, role selectors, paths into boxes, labels, units and colours by role, one default | plotting lane |
 | AC-6 | Animation (§5): the camera chosen when animating, looking inside `plant`; no compensator skin in a loop; the camera copy goes | plotting lane |
-| AC-7 | Cost and tools (§5): one compiled loop (the compiled problem) for every evaluation, `command_port`, controllers with state, time, cost params, one price; Gym and the rollout environment aligned | the deterministic part landed with V1's steps 2–4 (v0.3: the plant scored, controllers with state, the price switch of R32); the draws with V1's step 7, RN-4's per-block noise seeds and the rest of RN-5, v0.4 (the v0.3 core since 2026-10-26) |
+| AC-7 | Cost and tools (§5): one compiled loop (the compiled problem) for every evaluation, `command_port`, controllers with state, time, cost params, one price; Gym and the rollout environment aligned | the deterministic part landed with V1's steps 2–4 (v0.3: the plant scored, controllers with state, the price switch of R32); the draws with V1's step 7, RN-4's per-block noise seeds and the rest of RN-5 (the v0.3 core since 2026-10-26; v0.4 before) |
 | AC-8a | The sampled loop keeps in step (§4.5): `hybrid_closed_loop`'s keywords and the port guesses go, MPC gives `u` | alongside |
-| AC-8b | The sampled loop goes mainstream (§4.5, "later") | v0.4, with S31 (R86); the v0.3 core since 2026-10-26 |
+| AC-8b | The sampled loop goes mainstream (§4.5, "later") | with S31, the v0.3 core since 2026-10-26 (v0.4 by R86 before) |
 
 **Done when:**
 - `controller @ plant`, the same loop wired by hand with the role names, and `closed_loop`

@@ -1,26 +1,28 @@
 # The sampled loop
 
-**Status:** the step model this loop runs on landed on 2026-10-24 (the step-model work of
-the continuous core, S75, steps SM-0 to SM-8): `discretize` and the compiled evaluator's one
-`step` and `rollout`, called by every sampled consumer. Its contract is DESIGN §5 ("One body
-per method", "The step model"); the decisions taken during the run are in
-[the run's log](../reviews/2026-10-24-v03-run-decisions.md) (§2, §9, §10). The design of that
-half (the eight discretizations it replaced, the knobs, the measurements, the steps) is in git
-history. This doc now holds the other half: the sampled loop (S31), ruled a tool with ticks
-(R13, R14 of [the rulings](../reviews/2026-10-22-rulings-session-1.md)), its details parked
-(D13–D15, now §8.6). **Tentative draft vision (2026-10-25/26,
-§8.1–§8.5): promising, not decided.** `computer @ plant` as a step diagram on a base clock that
-knows it is hybrid, the computer a pure step block, the plant discretized at the base clock,
-every block pure, a clock runner beside it for realtime; one point of it ruled (R123: the MPC's
-computational delay), the rest open, including the CONSTITUTION amendment it would need. The maintainer named it a core pillar on
-2026-10-26, "one model, two runners" ([core-architecture.md](core-architecture.md) §6); the
-vision's status is unchanged, and its open points are in QUESTIONS.md ("Blocks v0.3").  
-**Lane:** core (the hybrid tool, the sampled kernel, every sampled controller) — every step is
-**[ask — core]**.  
-**Rung:** v0.3, the core's hybrid-loop pillar (the maintainer's direction of 2026-10-26, which
-reassigns R86's v0.4): S31, the two-runner row and the sampled face of the differentiable
-problem (its step 7b) in [TODO.md](TODO.md) §1.5, with the automation-by-convention plan's
-AC-8a and AC-8b.
+**Status:**
+- **Landed (2026-10-24):** the step model this loop runs on (S75, steps SM-0 to SM-8):
+  `discretize` and the compiled evaluator's one `step` and `rollout`, called by every sampled
+  consumer. Its contract is DESIGN §5 ("One body per method", "The step model"). The decisions
+  taken during the run are in [the run's log](../reviews/2026-10-24-v03-run-decisions.md) (§2,
+  §9, §10); the design of that half is in git history.
+- **This doc holds the other half, the sampled loop (S31).**
+  - **Ruled:** a tool with ticks (R13, R14 of
+    [the rulings](../reviews/2026-10-22-rulings-session-1.md)).
+  - **Parked:** its details (D13–D15, in §8.6).
+  - **A tentative draft vision of 2026-10-25/26, not decided (§8.1–§8.5):** `computer @ plant`
+    as a step diagram on a base clock that knows it is hybrid, every block pure, and a clock
+    runner beside it for realtime. One point of it is ruled (R123, the MPC's computational
+    delay).
+
+**Where it sits:**
+- the core's hybrid loop, "one model, two runners"
+  ([core-architecture.md](core-architecture.md) §5);
+- its rows: [TODO.md](TODO.md) §1.5, with AC-8a and AC-8b of
+  [automation-by-convention.md](automation-by-convention.md);
+- its open decisions: [QUESTIONS.md](../dev/QUESTIONS.md).
+
+Every step is **[ask — core]**.
 
 A sampled controller (a digital PID, a held neural policy, MPC, MPPI, the RL policies) runs
 once per sample period on a computer, and the plant is stepped by the step model between two
@@ -282,18 +284,18 @@ computation, a core contract change for the maintainer.
 
 **Closed-loop simulation: both paths, in R15's shape (agreed with the maintainer 2026-10-26,
 draft).** The continuous side already settled the same question: R15 makes the fixed-step
-compiled rollout the one engine and judge, and `evaluate(..., method="scipy")` swaps the run for
+compiled rollout the one engine and judge, and `evaluate(..., solver="scipy")` swaps the run for
 the adaptive `Simulator` "and nothing else". The hybrid loop follows it:
 
 | Path | Role | What it reuses |
 | --- | --- | --- |
 | **The step-diagram runner** (the pure computer step plus `discretize(plant, dt_base, substeps=n)`) | the engine and the judge: `jit`, `grad`, `vmap`, analysis, `evaluate` | everything |
-| **Adaptive hybrid simulation** (a `method="scipy"` swap) | only the plant's integration between samples changes: `solve_ivp` restarted at every sample, no event detection since the sample times are known | the same pure computer tick, the plant's `f` |
+| **Adaptive hybrid simulation** (a `solver="scipy"` swap) | only the plant's integration between samples changes: `solve_ivp` restarted at every sample, no event detection since the sample times are known | the same pure computer tick, the plant's `f` |
 | **The clock runner** | execution, not simulation: realtime, game mode, hardware in the loop | the same pure blocks |
 
 The adaptive path stays for stiff plants, a long sample period over fast plant dynamics, a dense
 plant trajectory between samples for plots, teaching (`solve_ivp` as the reference integrator),
-and as a cross-check of the substep count, the role `evaluate(method="scipy")` plays for a
+and as a cross-check of the substep count, the role `evaluate(solver="scipy")` plays for a
 continuous loop. It must not be a second model: today's `HybridSimulator`, with its own tick loop
 and block handling, shrinks to "call the pure computer tick, integrate the plant over the
 period".
@@ -354,7 +356,7 @@ differentiates.
    adaptive solver correct across the steps of a held input, which is why the `Simulator`
    avoids adaptive solvers on a loop with a held signal it does not restart at.
 3. **A cross-check test:** the orchestrator's run and the step diagram's agree within the
-   integration tolerance on the hybrid demos, the way `evaluate(method="scipy")` cross-checks a
+   integration tolerance on the hybrid demos, the way `evaluate(solver="scipy")` cross-checks a
    continuous loop.
 
 Both defaults are defensible; the choice is a priority. Is `compute_trajectory` the most
@@ -427,8 +429,7 @@ stays for teaching.
 ### 8.6 The sampled loop's details, D13–D15 (moved from end-state-api.md, 2026-10-26)
 
 Moved verbatim when `end-state-api.md` was retired into [core-architecture.md](core-architecture.md);
-the ids stay, as QUESTIONS.md and the rulings records cite them. The rungs the entries write
-("in v0.4 it lands") are the ones before 2026-10-26: the sampled loop is v0.3's core now.
+the ids stay, as QUESTIONS.md and the rulings records cite them.
 
 The loop itself is ruled: a tool, not a `System`, the name `HybridDiagram` kept for now (R13),
 on integer ticks (R14); [sampled-path.md](sampled-path.md) §8 designs it.
@@ -469,9 +470,9 @@ class MPPIController(StepSystem):          # memory = the shifted input sequence
 **Ruled 2026-10-25 (R105):** as recommended below.
 
 **Recommended:** `problem.compile(policy)` reads the policy: a continuous law runs the loop as
-a diagram; a `Computer` (anything built by `%`) runs the sampled kernel's JAX face. In v0.3 the
+a diagram; a `Computer` (anything built by `%`) runs the sampled kernel's JAX face. Today the
 second branch refuses (`require_continuous` in `planning/evaluator.py` refuses a `StepSystem`
-controller and names the hybrid loop); in v0.4 it lands. One `compile` and one `evaluate` for
+controller and names the hybrid loop); it lands with the sampled face (TODO §1.5). One `compile` and one `evaluate` for
 both kinds.
 
 ## Kept for S53: the price of a parameter family

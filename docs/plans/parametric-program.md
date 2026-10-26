@@ -1,24 +1,26 @@
 # The parametric program: every problem parameter bound at solve time
 
-Status: **draft plan**. The optimizer table (OPW-1–OPW-5, §6) dates from July 2026; the
-parameter binding (PP-0–PP-5) and the recommendation of §2 were added 2026-10-22. The names
-(PP-0) were ruled 2026-10-23 (R26): the family is
-`ParametricProgram`, the plant's key in every parameter tree is `plant`; the two remaining asks
-(a hand-written program declaring its own `p`, the MPC block's live ports) are D25, for v0.4.
-Not started: PP-1–PP-5 and OPW-1–OPW-5 are open for v0.4 with S76.
-Rung: OPW-1–OPW-5 wait with S76 (R86), on the optimizer method table and first-order backend
-that S74 landed in v0.3 (R74, 2026-10-24); the binding (row S76) in v0.4 on the compiled problem's program export
-and A2's cost leaves (moved from wave V on 2026-10-22: the MPC band is research lane and nothing
-GMC714 teaches in December needs it). Lane: research
-(the MPC band is provisional, ROADMAP §2). Scope: direct collocation and the MPC block
-first; the other transcriptions later (§5).
+Status: **draft plan**.
+- **Dates:** the optimizer table (OPW-1–OPW-5, §6) dates from July 2026; the parameter binding
+  (PP-0–PP-5) and the recommendation of §2 were added 2026-10-22.
+- **The names (PP-0):** the plant's key in every parameter tree is `plant`, ruled 2026-10-23
+  (R26). The family's name `ParametricProgram` is credited to R26 here before and to D19 at PP-0,
+  but R26's text names only the key. It is an open QUESTIONS entry, with the alternative
+  `MathematicalProgram(..., params=None)`.
+- **Open asks:** a hand-written program declaring its own `p`, and the MPC block's live ports
+  (D25, §2.1).
+- **Not started:** PP-1–PP-5 and OPW-1–OPW-5. They build on the optimizer method table and the
+  first-order backend that S74 landed (R74, 2026-10-24), on the compiled problem's program
+  export, and on A2's cost leaves.
+- **Scope:** direct collocation and the MPC block first; the other transcriptions later (§5).
+  The row moved from wave V on 2026-10-22, since the MPC band is research lane (ROADMAP §2).
 
-**Rung, 2026-10-26:** v0.3, the core. The maintainer's direction names the generic parametric
-program, finished all at once, a core pillar, with the stochastic program as its case (every
-program deterministic given its parameters, the seed one of them; solving a stochastic program
-is solving over seeds): [core-architecture.md](core-architecture.md) §7, [TODO.md](TODO.md) §1.6. The rungs written above and
-below are the ones before that direction; the decisions still open are in QUESTIONS.md
-("Blocks v0.3").
+**Where it sits:** the core's parametric program, with the stochastic program as its seed case
+(the maintainer's direction of 2026-10-26: every program deterministic given its parameters, the
+seed one of them; solving a stochastic program is solving over seeds).
+- [core-architecture.md](core-architecture.md) §7;
+- rows in [TODO.md](TODO.md) §1.7;
+- open decisions in [QUESTIONS.md](../dev/QUESTIONS.md).
 
 Contracts in code: [DESIGN.md](../dev/DESIGN.md) §4 (Parameters, the planning tiers) and §6
 (Planning / NLP).
@@ -158,8 +160,9 @@ dropping them. The argument's name and form are the naming session's.
 
 ## 4. The steps (one commit each; the AGENTS recipe where behaviour must hold)
 
-- **PP-0 The names**: ruled 2026-10-23 (D19): `ParametricProgram`, the key `plant`; the MPC
-  argument (`live=`, recommended in D25) and `bind` with D25 in v0.4.
+- **PP-0 The names**: the key `plant` ruled 2026-10-23 (R26). The family's name
+  `ParametricProgram` is cited to D19 here, with no findable ruling (an open QUESTIONS entry).
+  The MPC argument (`live=`, recommended in D25) and `bind` go with D25.
 - **PP-1 The program with parameters**: the family of §3.2, one evaluator, `bind` on both.
   Done when the MPC baselines (`test_mpc.py`, the trajopt parity scenario) are byte-identical
   with `p = {"x0": …}` and the plain programs of tutorial 08 and the optimization demos solve
@@ -176,17 +179,17 @@ dropping them. The argument's name and form are the naming session's.
 - **PP-5 The contracts**: DESIGN §4 (the online call binds the tree) and §6 (the family, the
   evaluator), once the code lands; this plan's landed parts leave it.
 
-**Order**: PP-0 ruled; PP-1, PP-2 and PP-4 in v0.4 with S76, after the continuous core's program
+**Order**: PP-0 ruled; PP-1, PP-2 and PP-4 with S76 (the v0.3 core), after the continuous core's program
 export (V1's step 5) and beside S74 with OPW-1–OPW-5 if it has landed (the same evaluator and
 backend factory); PP-3 after A5's sets reading `params` (A2, V1's step 6, landed in v0.3); the scene
 leaf with A3 in v0.4. No dependency on S75 or S31: collocation uses the continuous `f`, not
-the step model. MPC is not a week of the GMC714 syllabus, but its teaching name is frozen by January (R49, G3).
+the step model. MPC is not a week of the GMC714 syllabus, but its teaching name is frozen (R49, G3; the January date lifted on 2026-10-26: pinned when v0.3 merges).
 
 ## 5. Later, not scheduled
 
 - The scene leaf (moving obstacles), with A3.
 - Single shooting with parameters; multiple shooting has no parametric form today. (Since
-  2026-10-26 single shooting with parameters is in the core proof of concept's row, TODO §1.7.)
+  2026-10-26 single shooting with parameters is in the core proof of concept's row, TODO §1.8.)
 - The sensitivity of the solved plan to `p` (implicit differentiation of the optimality
   conditions): a differentiable MPC, beside the traceable inner solver
   [sampled-path.md](sampled-path.md) §8 anticipates. The native solvers that bind this
