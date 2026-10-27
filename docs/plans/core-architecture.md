@@ -171,9 +171,13 @@ V = QuadraticField(P)                            # §9: the terminal cost as a f
   - `Sys2Gym.from_problem` applies no draw, although DESIGN §6 says it does.
   - The free loop inputs are constant over a run.
   - There is no `NoiseSource`.
-- **Open:**
-  - one `realize` shape;
-  - the CONSTITUTION §2 disturbance sentence against RD-R4.
+- **Preliminary choice, 2026-10-27 (R128; open to revision):**
+  - no `Distribution` on a port: a disturbance is a source block wired into the problem's system
+    (explicitly, or by the shortcut `disturbances={"d": block}`, which wires it), for the
+    deterministic and the stochastic problem alike;
+  - one shape, `problem.realize(key, n_trials) -> (x0s, params)`, the sources' seeds leaves of
+    the tree;
+  - CONSTITUTION §2's disturbance sentence amended when it lands.
 - **Rows:** [TODO §1.3](TODO.md#13-the-draws).
 
 ## 4. The seeded stochastic policy (pillar)

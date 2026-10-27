@@ -200,7 +200,13 @@ when": [randomness.md](randomness.md) §9.
   - `problem.realize(key, n)` gains one seed per random block, named by path (RN-4), so a noise
     block inside the loop or on a port draws per trial under the same
     `evaluate(..., n_trials, key)`;
-  - `disturbances=` takes signals, which fixes the frozen-noise defect;
+  - disturbances are source blocks only (R128, a preliminary choice of 2026-10-27,
+    [record](../reviews/2026-10-27-design-questions-rulings.md)): the problem's system wires
+    them onto the plant's ports, `disturbances={"d": block}` the shortcut that builds that
+    diagram, a bare `Distribution` refused naming the fix, on `PlanningProblem` too; this fixes
+    the frozen-noise defect, and CONSTITUTION §2's sentence is amended in the same change;
+  - `problem.realize(key, n_trials) -> (x0s, params)`, one shape: the sources' seeds are leaves
+    of the batched tree and the `"disturbances"` key goes (R128);
   - the Monte Carlo evaluator is a batched simulation of the closed loop on its test set (RN-5;
     the fold landed as V1.4b, R44);
   - the cost is scored on the plant across every evaluator and design tool, with the draws

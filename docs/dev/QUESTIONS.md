@@ -173,36 +173,6 @@ In the order to decide (reviewer C §5).
 - **Reviewers:** B P3 proposes the rule. A and C: `sample_period` on the seeded policy.
 - **Answer:**
 
-### Does `realize` return one shape everywhere?
-- **Blocks:** the draws (§3).
-- **Today:**
-  - `System.realize(key)` returns a params tree.
-  - `PlanningProblem.realize(key=None, n=1)` and the stochastic one return
-    `(x0s, {"params", "disturbances"})`.
-  - `ProblemEvaluator.realize(params, key, n_trials)` returns `(x0s, Batched)`.
-  - The draws' own rule says a realization is `(x0, params)` and nothing else.
-  - `n` and `n_trials` both appear.
-- **Options:** `problem.realize(key, n_trials) -> (x0s, params)` with the full batched tree;
-  `"disturbances"` disappears once disturbances are seeded blocks. Or keep the shapes.
-- **Recommendation:** none.
-- **Reviewers:** B P4: the single shape, landing with the noise seeds.
-- **Answer:**
-
-### Does CONSTITUTION §2 say disturbances are noise signals, not bare laws?
-- **Blocks:** the draws (§3), whose first change is the disturbance port. It is a CONSTITUTION
-  amendment.
-- **Today:**
-  - CONSTITUTION §2: "the stochastic sibling adds distributions over … disturbances".
-  - The code (`StochasticPlanningProblem.sample_disturbances`, `planning/problems.py`) takes a
-    bare `Distribution` per port and holds one draw.
-  - randomness.md's RD-R4 rules "a disturbance port takes a signal, never a bare law".
-- **Options:** amend to "… adds distributions over starts and parameters, and noise signals on
-  its disturbance ports", with a one-time refusal message for a bare law; or amend RD-R4.
-- **Recommendation:** none.
-- **Reviewers:** A §2.3: amend the CONSTITUTION, and refuse a bare law in the draws' first
-  commit.
-- **Answer:**
-
 ### What does the standard stochastic policy look like as a seeded block?
 - **Blocks:** the seeded stochastic policy (§4, D29); the RL heads rebuilt on it, the RL
   numbers changing once (core or C5: the borderline entry).

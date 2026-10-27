@@ -34,6 +34,11 @@ rulings superseded in part by R10, R15, R19, R27 and R44, as §8's note says).
   [TODO.md](TODO.md) §1.1.
 - RN-3 to RN-6 are the draws: core-architecture §3, TODO §1.3.
 - The order and the rung are TODO's; this doc states none.
+- **Preliminary choice, 2026-10-27 (R128):** RD-R4 taken to its end: no `Distribution` on a
+  port; a disturbance is a source block wired into the problem's system, with
+  `disturbances={"d": block}` as the shortcut; one realization shape, `(x0s, params)`
+  ([record](../reviews/2026-10-27-design-questions-rulings.md)). Where this doc's body says a
+  port takes a law, that is the code it describes.
 
 **Aligned 2026-10-23** to the continuous core (DESIGN §5) and the rulings R10, R15,
 R27 of [2026-10-22-rulings-session-1.md](../reviews/2026-10-22-rulings-session-1.md), and to

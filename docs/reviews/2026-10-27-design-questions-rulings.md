@@ -114,3 +114,35 @@ and which runner its verbs use.
 Options weighed: stay a tool with a read-only step map (no amendment, two objects for one
 loop); one verb with the step runner by default (one `J` everywhere, but the dense trajectory
 needs a contract change). Reviewers A, B and C: a step diagram; `SampledDataSystem`; one verb.
+
+## R128 (2026-10-27, preliminary) Disturbances are source blocks; one realization shape
+
+The questions: CONSTITUTION §2 says a stochastic problem adds "distributions over …
+disturbances", the code takes a bare `Distribution` per port and holds one draw for the run, and
+randomness.md's RD-R4 says a port takes a signal, never a bare law; and three `realize` methods
+return three shapes.
+
+- **No `Distribution` on a port.** A disturbance is a source block wired into the problem's
+  system: `WhiteNoise`, a held source, a `Step` load, a colored-noise filter. Its time behaviour
+  is stated by the block.
+- **Two forms, one diagram:**
+  - explicit: the problem's system is a diagram whose sources feed the plant's ports (the
+    `plant` role still names the plant, so the cost scores it and `x_start` is its slice, R124);
+  - the shortcut: `disturbances={"d": WhiteNoise(...)}` accepts blocks only, and the problem
+    wires each onto its port, building exactly that diagram. A bare law is refused, naming the
+    fix.
+- **For both problems.** A deterministic `PlanningProblem` carries a deterministic load (a
+  `Step`) the same way; the stochastic sibling adds the laws on the start and the parameters.
+- **The draws.** A source's seed is a leaf of `params`, found by its path (`"load.seed"`); a
+  stateful source's start is an `x0` leaf (R124).
+- **One realization shape:** `problem.realize(key, n_trials) -> (x0s, params)`, the batched tree
+  carrying the parameter draws and every source's seed; the `"disturbances"` key goes; `n_trials`
+  everywhere, as on `evaluate`.
+- **CONSTITUTION §2 is amended** when it lands: "the stochastic sibling adds distributions over
+  starts and parameters; disturbances are source blocks on the plant's ports". The text comes to
+  the maintainer with the landing change.
+
+Options weighed: accept both a law (one constant draw) and a signal (two meanings for one
+argument); keep the bare law and amend RD-R4 (contradicts the textbook's noise intensity and the
+LQG gate); the explicit diagram only (one way, but every stochastic task builds a diagram).
+Reviewer A: signals, a refusal for a bare law; reviewer B: one `realize` shape.
