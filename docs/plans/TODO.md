@@ -352,12 +352,17 @@ Why: [core-architecture.md](core-architecture.md) §7. Design:
 
     This row absorbs the D3 row on the parametric evaluator's placement and the scene binding
     of the Later list.
-  - **The recommendation** (the plan's §2, option C):
-    - one family: `J(z, p)`, `h(z, p)`, `g(z, p)` on the problem's tree (`x0`, plant, cost,
-      sets; the scene with A3);
-    - the frozen `MathematicalProgram` is its binding;
-    - hand-written programs stay `J(z)`;
-    - one evaluator body serves both, and the optimizer sees a flat `z`.
+  - **The shape** (R130, a preliminary choice of 2026-10-27,
+    [record](../reviews/2026-10-27-design-questions-rulings.md)): one noun,
+    `MathematicalProgram(..., params=None)`; `J(z, params=None)`, `h(z, params=None)`,
+    `g(z, params=None)` on the problem's tree (`x0`, plant, cost, sets; the scene with A3), the
+    frozen default when `None`; the values passed at the solve
+    (`Optimizer(program).solve(params=...)`); hand-written programs stay `J(z)`; one evaluator
+    body serves both, and the optimizer sees a flat `z`; `ParametricMathematicalProgram` folds
+    in. The plan's §2 option C (a family with `bind`) is superseded.
+  - **The performance gate, first:** benchmark compile time and per-solve time of the compiled
+    MPC program carrying `params` against the same program with them frozen; if carrying them
+    costs speed, an export option compiles a parameter-free program, its parameters baked in.
   - **First users:** direct collocation and the MPC block, with optional live-parameter ports,
     unwired ports at nominal.
   - **Order:** PP-1, PP-2 and PP-4 on S74's backend factory (OPW-1); then PP-3, the cost and set

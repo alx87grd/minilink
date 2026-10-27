@@ -171,3 +171,30 @@ Options weighed: a deterministic law with a noise input port fed by a `WhiteNois
 factory (randomness only in source blocks, but `log_prob` less direct); a block drawing by its own
 rule. Reviewers A, B and C: `sample_period=` and one convention; A leaned to the law-plus-input
 form.
+
+## R130 (2026-10-27, preliminary) One program noun: `MathematicalProgram(..., params=None)`
+
+The question: one noun with optional parameters, or a family (`ParametricProgram` with `bind(p)`)
+whose binding is the plain program.
+
+- **One noun, mirroring `f(x, u, t; params)`.** A `MathematicalProgram` may declare parameters;
+  its functions are `J(z, params=None)`, `h(z, params=None)`, `g(z, params=None)`. The
+  parameters are always there but optional: `params=None` reads the frozen default, as on a
+  `System`.
+- **The solve takes the values:** `Optimizer(program).solve(params=...)`; the MPC rebinds `x0`,
+  the plant, the cost and the sets per tick without recompiling.
+- **Students' form unchanged:** `MathematicalProgram(n_z=3, J=J)` with a one-argument `J`.
+- **No `ParametricProgram` noun and no `bind` on programs.** `ParametricMathematicalProgram`
+  (today, `x0` only) folds into the one noun.
+- **A performance gate.** Optional parameters everywhere must not slow compilation or execution.
+  Before the change lands, benchmark the compiled program carrying `params` against the same
+  program with its parameters frozen (compile time and per-solve time, on the MPC and the PID
+  examples). If carrying them costs speed, add an export option that compiles a program with no
+  `params` argument, its parameters baked in as constants, for the fastest compile and run.
+- **Its companions, recommended and confirmed with the naming question:** the MPC's optional
+  live-parameter ports (`parameter_ports=` or `live=`), and `program.params_at(z)` returning the
+  full tuned tree from an exported program.
+
+Options weighed: a family with `bind` (two nouns, a fourth meaning of `bind`); one class always
+taking `p` (students write an unused argument). Reviewers A and B: one noun with `params=None`;
+C: the family, `bind` on the program only.

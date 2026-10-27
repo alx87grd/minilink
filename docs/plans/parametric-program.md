@@ -15,6 +15,11 @@ Status: **draft plan**.
 - **Scope:** direct collocation and the MPC block first; the other transcriptions later (§5).
   The row moved from wave V on 2026-10-22, since the MPC band is research lane (ROADMAP §2).
 
+**Preliminary choice, 2026-10-27 (R130, [record](../reviews/2026-10-27-design-questions-rulings.md)):**
+one noun, `MathematicalProgram(..., params=None)`, mirroring `f(x, u, t; params)`; no
+`ParametricProgram` and no `bind` on programs; a performance gate before it lands (an export
+with the parameters baked in if carrying them costs speed). §2's option C below is superseded.
+
 **Where it sits:** the core's parametric program, with the stochastic program as its seed case
 (the maintainer's direction of 2026-10-26: every program deterministic given its parameters, the
 seed one of them; solving a stochastic program is solving over seeds).

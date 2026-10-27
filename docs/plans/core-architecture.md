@@ -303,15 +303,14 @@ V = QuadraticField(P)                            # §9: the terminal cost as a f
     - a Monte Carlo over solves (`vmap` over seeds);
     - stochastic approximation, the solver advancing `child(seed, k)` under four soundness
       conditions.
-- **Status.** The direction is set.
-  - **The recommendation, not ruled** ([parametric-program.md](parametric-program.md) §2,
-    option C):
-    - one family: `J(z, p)`, `h(z, p)`, `g(z, p)`, whose binding is the plain program;
-    - one evaluator body, a hand-written `J(z)` the case `p = {}`;
-    - one backend table for the offline and compiled paths (OPW-1–OPW-5).
-  - The key `plant` is ruled (R26). The name `ParametricProgram` has no ruling text: R26 is
-    the ruling of D19, and its text names the key and the evaluator's verbs, not the family.
-    Reviewer B O1's alternative is a QUESTIONS entry.
+- **Status.** The direction is set. Preliminary choice, 2026-10-27 (R130; open to revision):
+  - one noun, `MathematicalProgram(..., params=None)`, mirroring `f(x, u, t; params)`: its
+    functions take `(z, params=None)`, the frozen default when `None`; the solve takes the values
+    (`Optimizer(program).solve(params=...)`); no `ParametricProgram` and no `bind` on programs;
+  - one evaluator body and one backend table for the offline and compiled paths (OPW-1–OPW-5);
+  - a performance gate: if carrying `params` slows compilation or execution, an export option
+    compiles a program with its parameters baked in;
+  - the key `plant` (R26).
 - **Today.**
   - `ParametricMathematicalProgram` varies `x0` only.
   - Collocation closes over the plant, cost and set parameters, and `require_online_params`
@@ -322,10 +321,9 @@ V = QuadraticField(P)                            # §9: the terminal cost as a f
   - `pe.program(wrt, key, n_trials)` realizes once (a sample average) and refuses `"x_start"`
     in `wrt` on a stochastic problem.
 - **Open:**
-  - one family, D25 and `bind`;
   - native-optimizers §7.5's seven points, with §4.1's `J(z, key)`;
-  - `MathematicalProgram(..., params=None)` against a second noun;
-  - the stochastic program's v0.3 scope.
+  - the stochastic program's scope;
+  - the names of the MPC's live-parameter ports and of `params_at` (the naming question).
 
   Elsewhere:
   - single shooting with parameters is in §8's row;
