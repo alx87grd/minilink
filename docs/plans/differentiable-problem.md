@@ -175,8 +175,8 @@ content. Steps 0–6 and 7a landed on 2026-10-24.
 
 ## 9. Draft idea: one discrete evaluator from the rollout on (the maintainer, 2026-10-26)
 
-**Status: a draft idea, not ruled; it needs refinement (§9.4).** The ask is in QUESTIONS.md
-(it became a core pillar on 2026-10-26).
+**Status: a draft idea, not ruled; it needs refinement (§9.4).** It became a core pillar on
+2026-10-26; the question is in QUESTIONS.md, an investigation for the final design (2026-10-27).
 
 > Once the cost function is set and the time discretization is decided (`dt`, the substeps,
 > the Runge–Kutta scheme), a continuous system's rollout is the same thing as a system that

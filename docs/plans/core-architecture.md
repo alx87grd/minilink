@@ -4,7 +4,8 @@
 goal, a status, what the code does today, its open decisions and its rows. Where the pieces live:
 - **The rows** (files, "done when") are [TODO.md](TODO.md) §1.N, with the same N as the section
   here.
-- **The open decisions** are [QUESTIONS.md](../dev/QUESTIONS.md), each tagged with the same §N.
+- **The open design questions** are [QUESTIONS.md](../dev/QUESTIONS.md); the preliminary choices of
+  2026-10-27 are [their record](../reviews/2026-10-27-design-questions-rulings.md) (R124–R139).
 - **The design detail** is in the topic plan doc each section links.
 - **The landed contracts** are [DESIGN.md](../dev/DESIGN.md) §4–§6.
 
@@ -65,8 +66,8 @@ CONSTITUTION's three objects, so this doc says "invariants".
 control, nonlinear control, trajectory optimization and MPC, RL, identification and imitation,
 estimation) are "the toolbox chapters".
 
-**What a user writes at the end of v0.3** (a proposal, illustrative, not a contract; each name
-marked `open` is a QUESTIONS entry):
+**What a user writes at the end of v0.3** (a proposal, illustrative, not a contract; the names follow the
+preliminary choices of 2026-10-27):
 
 ```python
 problem = StochasticPlanningProblem(plant, cost=cost, tf=5.0,              # §3: laws on starts,
@@ -451,7 +452,7 @@ v0.4 reads the core and never changes it.
 | MPPI (S72, MP-1–MP-6) and the generic planner interface for the MPC (R135; D27, T6 in TODO §3) | §3, §5, §6 | [mppi.md](mppi.md) |
 | Identification and trajectory generation (C4) | §7 (the export with a data cost) | [differentiable-problem.md](differentiable-problem.md) §1 |
 | `LQGPlanner` | §3 | [estimation-and-state-feedback.md](estimation-and-state-feedback.md) §5 |
-| Workspace geometry (A3), then the CBF safety filter (unscheduled; QUESTIONS.md, Standing) | §9 | [geometry-module.md](geometry-module.md), [cbf-safety-filter.md](cbf-safety-filter.md) |
+| Workspace geometry (A3), then the CBF safety filter (unscheduled; research lane until a course asks) | §9 | [geometry-module.md](geometry-module.md), [cbf-safety-filter.md](cbf-safety-filter.md) |
 | The RL follow-ups (C5), the RL heads (open: here or §4), reward scaling (TODO §6) | §4 | [future-policies.md](future-policies.md), [rl-reward-scaling.md](rl-reward-scaling.md) |
 | Native solvers beyond the proof of concept (NS-2's tolerance form, NS-3–NS-7) | §7, §8 | [native-optimizers.md](native-optimizers.md) |
 | Traceable linear analysis (S73) | the Jacobian | [differentiable-problem.md](differentiable-problem.md) §4.6 |

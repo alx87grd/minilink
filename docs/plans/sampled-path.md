@@ -20,7 +20,8 @@
   ([core-architecture.md](core-architecture.md) §5);
 - its rows: [TODO.md](TODO.md) §1.5, with AC-8a and AC-8b of
   [automation-by-convention.md](automation-by-convention.md);
-- its open decisions: [QUESTIONS.md](../dev/QUESTIONS.md).
+- its choices: the 2026-10-27 record (R125, R127); the run caches and the MPC refusal are rows of
+  TODO §1.5.
 
 **Lane:** core (the hybrid tool, the sampled kernel, every sampled controller); every step is
 **[ask — core]**.
@@ -76,7 +77,8 @@ to the hybrid phase, after the continuous core.
 
 > **§8.1–§8.5 are the tentative draft vision of the hybrid loop** (the maintainer, 2026-10-26):
 > promising, not yet decided. Only R123 (§8.3) is ruled. Where they differ from §8 above (R13:
-> "a tool, not a `System`"), §8 stands until the maintainer rules; the ask is in QUESTIONS.md.
+> "a tool, not a `System`"), §8 stands until the maintainer rules. The maintainer's preliminary choices of 2026-10-27 (R125, R127) take
+> the step-diagram direction ([record](../reviews/2026-10-27-design-questions-rulings.md)).
 
 ### 8.1 The pure tick of a multi-rate loop (draft ideas, 2026-10-25)
 
@@ -127,7 +129,7 @@ The nested scan first, as the kernel of the two-clock loop; the base tick next, 
 **Draft 4: the plant between samples.** A fixed-step integrator (RK4 substeps, `stepping.py`'s
 `step_body`) inside the tick: the sample times are known in advance (commensurate rates), so no
 event detection is needed, which is what makes the loop pure. An adaptive solver
-(`solve_ivp`) stays on the NumPy face; Diffrax is a separate question (QUESTIONS.md, S27).
+(`solve_ivp`) stays on the NumPy face; Diffrax is a separate row (S27: only if a benchmark asks for it, R139).
 
 **Draft 5: what stays out.** Rates that are not integer multiples of a base tick, asynchronous
 or event-triggered clocks, jitter: the arbitrary multi-clock scheduling ROADMAP §7 puts out of

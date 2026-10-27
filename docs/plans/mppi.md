@@ -12,8 +12,8 @@ block once MP-5 lands, teaching-surface decision at V3 (v0.9).
 **Where it sits:** a v0.4 feature on the core (S72, [TODO.md](TODO.md) §4), on the step model
 (S75), the sampled kernel (S31) and the draws (RN-4, RN-5), which are v0.3's core
 ([core-architecture.md](core-architecture.md) §3, §5, §12; the ordering of §8); hardened before
-the v0.9 freeze (§9). §10's open ask for v0.4 is the planner contract (D27); whether the design
-text is rewritten to R104, R107 and R123 before MP-1 is a QUESTIONS entry.
+the v0.9 freeze (§9). §10's open ask for v0.4 is the planner contract (D27); MP-1 first rewrites the
+design text to R104, R107, R123 and the generic planner interface (R135).
 **Prototype:** `experimental/mppi/pendulum_mppi.py` and `racecar_mppi.py`
 (2026-10-02), two standalone scripts on the library as it stands — the swing-up works, and
 the racecar laps the circuit with the cone against the collocation MPC on the same problem;
@@ -55,7 +55,8 @@ few screens plus one contract narrowing in the MPC block
   form and comes with the teaching-surface decision, not before.
 - **One narrowing in the MPC block.** The block today reads trajopt internals
   (`planner.transcription`, `last_optimization_result.z`, `compile_parametric_program`).
-  (Open point, QUESTIONS.md: this list differs from §6 and D27, which name `prepare_online()`.)
+  (This list differs from §6 and D27, which name `prepare_online()`; both give way to the generic
+  planner interface, R135.)
   It needs three planner verbs instead: `decision_dimension()`, `solve_trajectory_from()`
   returning a record that carries `z`, and `warm_start_guess()`. That is the T6
   conversation already on the workboard, done with its first second consumer.
@@ -385,8 +386,8 @@ No `hasattr` probing (RULES 4.3): the three verbs become methods of the `Planner
 that raise `NotImplementedError` by name, as `solve_trajectory_from` does today, and
 `validate_mpc_planner` calls them. `warm_start=True` keeps packing the planner's `z` on
 `Computer.x`, which for MPPI is exactly the shifted nominal sequence — the state the
-algorithm carries between ticks in every implementation. (Open point, QUESTIONS.md: R123 removes
-the tick latch this sentence keeps.) `Command`, the tick latch, the
+algorithm carries between ticks in every implementation. (R123 removes the tick latch this
+sentence keeps; MP-1 rewrites it.) `Command`, the tick latch, the
 dual-rate broadcast, `export_to_computer`, `mpc @ plant` and the overlays
 (`mpc_plans_from_rollout`, `mpc_animation_overlays`) are unchanged: they read the
 trajectory of the tick's solution. The check that `dt_mpc` is a multiple of the

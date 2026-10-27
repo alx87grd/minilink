@@ -1,8 +1,9 @@
 # Plans index
 
 Three backlog homes (do not invent a fourth); audits live separately. Two indexes point into
-them without holding work of their own: [QUESTIONS.md](../dev/QUESTIONS.md), every question
-that waits for the maintainer, and [KNOWN_ISSUES.md](../dev/KNOWN_ISSUES.md), the defects a
+them without holding work of their own: [QUESTIONS.md](../dev/QUESTIONS.md), the design
+questions that wait for the maintainer (architecture, API and naming, vision, performance; a
+detail waits in its TODO row instead), and [KNOWN_ISSUES.md](../dev/KNOWN_ISSUES.md), the defects a
 user can hit today, each with the row that fixes it.
 
 | Home | Use for |
@@ -13,8 +14,8 @@ user can hit today, each with the row that fixes it.
 | [../reviews/](../reviews/) | Dated architecture audits and decision records (read-only history) |
 
 **One fact, one home.** What to build lives in the plan doc; the order of work and each
-step's "done when" in TODO; milestones, maturity and course goals in ROADMAP; *open* questions in
-QUESTIONS.md; how and why a decision was taken in a dated record under `docs/reviews/`; landed
+step's "done when" in TODO; milestones, maturity and course goals in ROADMAP; *open* design questions
+in QUESTIONS.md, and the details waiting for the maintainer in their TODO row; how and why a decision was taken in a dated record under `docs/reviews/`; landed
 contracts in DESIGN. Other docs link to the home instead of restating it. A ruling goes to
 the plan doc it shapes and to its dated record; it leaves QUESTIONS.md when it is taken.
 

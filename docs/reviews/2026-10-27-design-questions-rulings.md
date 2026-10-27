@@ -393,3 +393,36 @@ The questions: four points before the v1.0 freeze. Lines a, b and c taken; line 
   the rule.
 - **d. Not adopted: a `DeprecationWarning` shim for one minor release from v1.0.** The trust
   contract's deprecation policy (V4) stays open; R82 (no alias, one sweep) holds meanwhile.
+
+## The scope of QUESTIONS (the maintainer's direction, 2026-10-27)
+
+> Okay, regarding the number of questions growing, I think you're putting stuff in question that
+> should not go there. Maybe edit all of them, but the question should be a place for
+> architectural design, API, vision question. Don't put there all the detail about version or test
+> and implementation, really detail that we would settle on the way anyway. Focus the question, do
+> a consolidation on just true fundamental design and naming, stuff affecting the performance or
+> the API or the architecture. If there's a lot of question about, for instance, what is this
+> branch? I don't want you to handle the branch. I just want the doc to show a path to finalizing
+> the architecture of MiniLink and implementation step toward that, basically.
+
+The design questions were then taken one at a time (R124–R139 above). The entries that were not
+design moved to their homes; QUESTIONS keeps two (one score, an investigation; the post-v1.0
+rename policy).
+
+| Entry | New home |
+| --- | --- |
+| The overnight run's 16 decisions | TODO §1.10, the merge row (your review, with the log's order) |
+| Merge the landed core now; `origin/v0.3.0`; a v0.3.0 / v0.3.x split | dropped from the live docs (branch and release handling are not the plan's); the reviewers' view stays in their reviews |
+| The definition of done | core-architecture §11, a proposal |
+| Re-pin per change or once | TODO §1's gates: per change for the regression baselines, the student-facing numbers at the merge |
+| Which release the borderline rows take | notes on the rows: S29 is R124; S70 before or with S66; the realtime re-base with the realtime review; the RL heads a placement detail of their row |
+| Refuse the stateless MPC | a TODO §1.5 row and a KNOWN_ISSUES entry |
+| The run caches | the §1.5 row: they go (RULES 2.4) |
+| The failure price under cost overrides | a note in the §1.7 parametric-program row, with both options |
+| The flatten default | a §3 row: after one benchmark |
+| The hand-loop demos, the LQR warning, `DynamicBicycle`'s base, three demos' style | their §2 rows (S74's rest, V1.2's rest, S32, K4), each with its options |
+| Rewriting mppi.md before MP-1 | the S72 row: MP-1 rewrites it |
+| Which pyro demos the courses need | the C1 row |
+| Where the course material lives; the examples tree | the K5 row and repository-structure.md |
+| A rung for the CBF safety filter; reward scaling by default | TODO §6, Later |
+| "Steps waiting for your go" | moved to the head of TODO as "Rows waiting for the maintainer's go", with the new detail asks |

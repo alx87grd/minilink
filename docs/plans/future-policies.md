@@ -155,7 +155,7 @@ one block, `sample_period=` in place of `dt`, its noise internal and determinist
 the recommendation as it stood.
 
 Moved verbatim from end-state-api.md. The block is a v0.3 core pillar (TODO §1.4); whether the RL
-heads' rebuild lands with it or in C5 (v0.4) is open (QUESTIONS.md).
+heads' rebuild lands with it or in C5 (v0.4) is a placement detail of its row.
 
 **Recommended:** `GaussianPolicy(mean, log_std, *, dt, seed=None)` in `control/neural.py`, a
 plain `System` whose `h` is `u = μ_θ(x) + σ_θ(x) · ε(seed, ⌊t/Δ⌋)`; `seed=None` is the

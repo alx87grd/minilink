@@ -346,8 +346,8 @@ supporting stochastic problems and the hybrid sampled loop, built in the natural
 code, with no date. It supersedes R86's "v0.3 stays continuous". Where the pieces live:
 - **The design home:** [core-architecture.md](../plans/core-architecture.md).
 - **The rows:** TODO §1.
-- **The open decisions:** QUESTIONS.md, sorted by what each gates: the merge into `dev`, the
-  critical path, later core work, the clean-up lane.
+- **The design questions:** QUESTIONS.md; the preliminary choices of 2026-10-27,
+  [their record](../reviews/2026-10-27-design-questions-rulings.md) (R124–R139).
 - **The history of how v0.3 got here:** [the simplification record](../reviews/2026-10-26-plan-simplification.md)
   §4.
 
@@ -359,7 +359,7 @@ code, with no date. It supersedes R86's "v0.3 stays continuous". Where the piece
 - the closing PID example (S77).
 
 **The workstreams** (each **[ask — core]**). One number per workstream, the same in
-core-architecture §N, TODO §1.N and the QUESTIONS tags:
+core-architecture §N and TODO §1.N:
 
 | § | Workstream | The main rows |
 | --- | --- | --- |
@@ -385,7 +385,7 @@ core-architecture §N, TODO §1.N and the QUESTIONS tags:
 - **Beside, from §1 on:** Fields (§9), additive to the path.
 - **Then last:** §10, hardening and the merge.
 
-The definition of done is proposed as acceptance scripts (core-architecture §11; QUESTIONS).
+The definition of done is proposed as acceptance scripts (core-architecture §11, a proposal).
 
 **The clean-up lane, beside the core** (TODO §2):
 - **K4: one demo per feature.** It runs before D1.3 sweeps the rest, and it is the maintainer's
@@ -433,7 +433,7 @@ each reads is [core-architecture.md](../plans/core-architecture.md) §12.
   `PurePursuit` on a `Track`. **[ask — core]** The CBF safety filter after it (unscheduled).
 - **C5** RL follow-ups: **S50** SAC actor step, **S51** policy iteration on the grid,
   **S52** deep Q-learning, approximate dynamic programming; the RL heads rebuilt on the seeded
-  policy (core or here: open, QUESTIONS.md).
+  policy (with the block or here: a placement detail of its row).
 - **Native solvers beyond the proof of concept** ([native-optimizers.md](../plans/native-optimizers.md)):
   the tolerance form, implicit differentiation, least squares, the augmented Lagrangian, the
   stochastic category, convergence as stability.
@@ -476,8 +476,8 @@ public name; v1.0 (§5.6) freezes.
   2026-10-17: conda recommended, `pip install minilink` plus one `full` extra, no
   `install.md`).
 - **S70** A `MinilinkError` family (wiring, shape, solver) under the plain
-  `ValueError` / `TypeError`. **[ask — core]** (Whether it lands before the core's S66 is open,
-  QUESTIONS.md.)
+  `ValueError` / `TypeError`. **[ask — core]** (It lands before or with the core's S66, which
+  raises its types.)
 - **V11** A light history: the notebook outputs committed before `nbstripout` leave the
   git history, once, after the v0.3 tag (planned for December 2026 when v0.3 had that date). **[ask]**
 
@@ -529,8 +529,8 @@ each item; agents execute only what was picked.
 
 ## 6. Decisions
 
-The open decisions live in [QUESTIONS.md](QUESTIONS.md), one entry each, by the release each
-blocks. A decision leaves it when it is taken: its ruling goes to the plan doc it shapes and to
+The open design questions live in [QUESTIONS.md](QUESTIONS.md), one entry each; details and
+the rows waiting for the maintainer's go are in TODO. A decision leaves it when it is taken: its ruling goes to the plan doc it shapes and to
 a dated record in [docs/reviews/](../reviews/), and its contract to DESIGN when the code lands.
 
 Past rulings: the dated records in [docs/reviews/](../reviews/), named by date and subject.

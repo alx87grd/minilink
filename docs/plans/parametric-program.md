@@ -5,7 +5,7 @@ Status: **draft plan**.
   (PP-0–PP-5) and the recommendation of §2 were added 2026-10-22.
 - **The names (PP-0):** the plant's key in every parameter tree is `plant`, ruled 2026-10-23
   (R26). The family's name `ParametricProgram` was credited to R26, the ruling of D19,
-  but R26's text names the key and the evaluator's verbs, not the family. It is an open QUESTIONS entry, with the alternative
+  but R26's text names the key and the evaluator's verbs, not the family. It is superseded by R130, the alternative
   `MathematicalProgram(..., params=None)`.
 - **Open asks:** a hand-written program declaring its own `p`, and the MPC block's live ports
   (D25, §2.1).
@@ -25,7 +25,7 @@ with the parameters baked in if carrying them costs speed). §2's option C below
 seed one of them; solving a stochastic program is solving over seeds).
 - [core-architecture.md](core-architecture.md) §7;
 - rows in [TODO.md](TODO.md) §1.7;
-- open decisions in [QUESTIONS.md](../dev/QUESTIONS.md).
+- the preliminary choices in [the 2026-10-27 record](../reviews/2026-10-27-design-questions-rulings.md).
 
 Contracts in code: [DESIGN.md](../dev/DESIGN.md) §4 (Parameters, the planning tiers) and §6
 (Planning / NLP).
@@ -98,8 +98,8 @@ Why C:
 how a stochastic program's seed fits in `p`, and §3.1's partial `bind` against R121's complete
 trees are open for discussion in [native-optimizers.md](native-optimizers.md) §7.
 
-Open with C (the asks, [QUESTIONS.md](../dev/QUESTIONS.md)): the family's name (ruled 2026-10-23: `ParametricProgram`,
-D19); whether a hand-written program may
+Open with C, now superseded by R130 (one noun with `params=None`, no `bind`): the family's name
+(cited to D19); whether a hand-written program may
 declare its own `p` (free, and tutorial 08 could solve one NLP for several values of a
 parameter); `bind` on both the evaluator (the fast path, compiled functions kept) and the
 program (the plain noun returned).
@@ -125,7 +125,7 @@ loop = (estimator + mpc).autowire() @ plant                              # the e
 `scene` once A3 gives workspace geometry its home. Its sample is the
 problem's nominal values, so its structure is fixed at compile time and its values vary
 without retracing (JAX takes numeric leaves; the diagram parameters already work this way,
-DESIGN §4). (Open point, QUESTIONS.md: a partial tree here against R121's complete trees.) A bind takes a partial tree, merged onto the bound values and checked against
+DESIGN §4). (Superseded by R131: complete trees inside, a partial tree merged once at the boundary.) A bind takes a partial tree, merged onto the bound values and checked against
 the structure: an unknown path raises and names the known ones; a leaf of a new shape
 raises; `scene` raises until A3. The key for the plant is `plant` (ruled 2026-10-23, D19), the
 same tree as the compiled problem's `pe.params`, so the two say one word; the bundle's `system`
@@ -166,7 +166,7 @@ dropping them. The argument's name and form are the naming session's.
 ## 4. The steps (one commit each; the AGENTS recipe where behaviour must hold)
 
 - **PP-0 The names**: the key `plant` ruled 2026-10-23 (R26). The family's name
-  `ParametricProgram` has no ruling text in R26, the ruling of D19 (an open QUESTIONS entry).
+  `ParametricProgram` has no ruling text in R26, the ruling of D19 (superseded by R130: one noun, `MathematicalProgram(..., params=None)`).
   The MPC argument (`live=`, recommended in D25) and `bind` go with D25.
 - **PP-1 The program with parameters**: the family of §3.2, one evaluator, `bind` on both.
   Done when the MPC baselines (`test_mpc.py`, the trajopt parity scenario) are byte-identical

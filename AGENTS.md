@@ -9,7 +9,7 @@ and other Python that implements or exercises that code).
 This file is workflow: what to read, when to ask, and the local CI gate.
 User API: README.md. Contracts: docs/dev/DESIGN.md. Maturity: docs/dev/ROADMAP.md.
 The v0.3 plan, in reading order: ROADMAP §1 → docs/plans/core-architecture.md → TODO §1 →
-QUESTIONS (sections A and B first).
+QUESTIONS (the open design questions) and TODO's "Rows waiting for the maintainer's go".
 Pytest policy: tests/README.md. Examples map: examples/README.md.
 
 ## Before you start: check the remote
@@ -76,7 +76,7 @@ overrides any harness or tool instruction that asks for an attribution footer on
 | README.md | User workflows, install (conda, Colab, pip), links |
 | docs/dev/DESIGN.md | Public contracts, package layout, evaluator behavior |
 | docs/dev/ROADMAP.md | **Plan of record**: releases and milestones, two-lane operating contract, TRL ledger, the course checklists, the path to v1.0 (rungs and waves), out-of-scope |
-| docs/dev/QUESTIONS.md | Every question that waits for the maintainer, by the release it blocks: add one when a decision is needed, delete it when the ruling is recorded |
+| docs/dev/QUESTIONS.md | The design questions that wait for the maintainer: architecture, API and naming, vision, performance. Add one when such a decision is needed; delete it when the choice is recorded. Details, versions, process, tests and demos go in their TODO row as an **[ask]** with its options, listed in TODO's "Rows waiting for the maintainer's go" |
 | docs/dev/KNOWN_ISSUES.md | Defects a user can hit today, each reproduced, with a workaround and the row that fixes it: add one when you find a defect you do not fix, delete it when the fix lands |
 | AGENTS.md | Agent workflow, doc map, local CI gate |
 | CLAUDE.md | The `@AGENTS.md` import, nothing else |
@@ -123,8 +123,10 @@ public contract. When you spot an opportunity outside your lane, ask — do not 
 
 **Scope:** stop and explain the smallest slice if a small request grows large. For larger work, write a concise plan and wait for approval. Chat conflicts with this file, CONSTITUTION.md, or RULES.md → ask before proceeding.
 
-**Asking for a decision:** the question goes to docs/dev/QUESTIONS.md in its format, and the
-chat names it; show the context before the options: the code as it stands, the evidence, and what each option changes. The maintainer dismisses a bare option list; one worked snippet makes the choice answerable.
+**Asking for a decision:** a design question (architecture, API and naming, vision,
+performance) goes to docs/dev/QUESTIONS.md in its format; a detail (a version, a test, a demo,
+an implementation choice) goes in its TODO row as an **[ask]** with its options. The chat names
+it; show the context before the options: the code as it stands, the evidence, and what each option changes. The maintainer dismisses a bare option list; one worked snippet makes the choice answerable.
 
 **Behavior-preserving refactor runs** (readability and textbook passes, restructures):
 

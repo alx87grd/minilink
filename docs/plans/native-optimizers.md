@@ -176,7 +176,7 @@ Today's three classes stay. The additions, each with its consumer:
 | --- | --- | --- | --- |
 | unconstrained / bounded / constrained | as today | the method table of S74 | every program |
 | **least squares** | `J(z) = ½‖r(z)‖²`, the residual `r` given | Gauss–Newton, Levenberg–Marquardt (native); `scipy.optimize.least_squares` | identification (C4), inverse kinematics (`Manipulator` calls `scipy.optimize.least_squares` by hand today) |
-| **stochastic** | `J(z, key)`, a sampled objective (open point, QUESTIONS.md: §7.3 makes the seed a leaf of `p` instead) | SGD and Adam on minibatches | the Monte Carlo evaluator (`pe.evaluate(p, key)`), the ML lessons |
+| **stochastic** | `J(z, key)`, a sampled objective (superseded: the seed is a leaf of `params`, R131; the category comes with the optimizer seed strategies) | SGD and Adam on minibatches | the Monte Carlo evaluator (`pe.evaluate(p, key)`), the ML lessons |
 | **parametric** | `J(z, p)`, `h(z, p)`, `g(z, p)` | one compile, many solves; `vmap` over `p`; the sensitivity `dz*/dp` | the MPC (S76's `ParametricProgram`) |
 
 A category is read from the program's fields (a `residual` field makes it least squares, as `h`
@@ -312,8 +312,8 @@ reparameterisation, `V = U + ε`, `ε` drawn from the key). The clip to the inpu
 gradient where it binds, as the projection of a projected gradient method does; the gradient is
 noisy across keys, so tuning averages it over the Monte Carlo evaluator's trials.
 
-(Open point, QUESTIONS.md: the direction of 2026-10-26 puts the gradient MPC's proof of concept,
-NS-1, NS-2's fixed-`K` form, NS-8 and NS-9, in v0.3 and MPPI in v0.4.) **So MPPI is the first
+(The direction of 2026-10-26 puts the gradient MPC's proof of concept, NS-1, NS-2's fixed-`K`
+form, NS-8 and NS-9, first, in v0.3, and MPPI in v0.4.) **So MPPI is the first
 instance, ahead of NS-8**: it needs no native gradient solver, only the
 block and S31's scan. Several MPPI iterations per tick (`n_iter`, a structural constant like
 §4.6's `K`) fit the same shape.
@@ -365,8 +365,8 @@ rest of the z tier stays dropped.
   kernel's JAX face; done when `problem.compile(mpc_computer).evaluate(p)` runs, `vmap`s over
   starts, and its gradient with respect to the MPC's cost weights tunes a demo by `Optimizer`.
 
-**Order, by the maintainer's two goals** (as written before 2026-10-26; which tick comes first is
-now an open point, QUESTIONS.md). The MPC path first. MPPI reaches the closed loop in
+**Order, by the maintainer's two goals** (as written before 2026-10-26; the gradient MPC now comes
+first, TODO §1.8). The MPC path first. MPPI reaches the closed loop in
 one scan soonest (§4.6b: MP-1 of mppi.md, then S31's scan, no native solver needed); then the
 gradient MPC: NS-1 (any time, internal) →
 NS-2's fixed-`K` form → NS-8, after S76's `ParametricProgram` (so the tick binds `x0` and the
@@ -376,19 +376,20 @@ step systems, after the `StepRollout` fold into `Trajectory` (V1's rest, with S3
 and NS-7 when their consumers are scheduled (a solve to convergence inside a loss, C4
 identification, the Monte Carlo objective).
 
-## 6. Open (the asks, in QUESTIONS.md)
+## 6. The asks (all answered)
 
 1. Is the two-layer split right: a pure kernel run by `Optimizer`, with the `StepSystem` loop as
-   a teaching view, rather than every solver a `StepSystem` by construction?
+   a teaching view, rather than every solver a `StepSystem` by construction? **Yes, a
+   preliminary choice of 2026-10-27 (R132).**
 2. Which categories and which native algorithms are in scope (§4.1, §4.2), against
-   CONSTITUTION §1.4?
+   CONSTITUTION §1.4? **Added with the first solver that needs them, minimalist (R132).**
 3. Where does this enter the roadmap? The maintainer's priority is the MPC path (§1.1); the
    ask left was the rung: with S76 and S31 (then v0.4), or after them. **Answered 2026-10-26** by the
    maintainer's direction ([the record](../reviews/2026-10-26-core-consolidation.md) §2): a proof
    of concept in v0.3 (NS-1, NS-2's fixed-`K` form, NS-8, NS-9), the rest in v0.4; the entry left
    QUESTIONS.md.
-4. Which fixed-iteration tick comes first, the gradient MPC or MPPI's (§4.6b, §5)? Added
-   2026-10-26: the direction puts the gradient MPC's proof of concept in v0.3 and MPPI in v0.4.
+4. Which fixed-iteration tick comes first, the gradient MPC or MPPI's (§4.6b, §5)? The gradient
+   MPC, as the direction of 2026-10-26 places it; MPPI in v0.4.
 
 Ruled: the discrete step analysis goal 2 needs comes back with NS-5, when solver stability
 requires it (R122, §4.7).
@@ -409,7 +410,8 @@ native solvers.
 program and its solvers handle (a) many versions of one program solved without recompiling and
 (b) randomness is not settled. This section holds the facts (§7.1), the maintainer's leaning
 (§7.2), the agent's draft of how it would work (§7.3–§7.4) and the open points (§7.5). Nothing
-here is ruled. The ask is in QUESTIONS.md ("Standing").
+here is ruled. The convention points were taken as preliminary choices on 2026-10-27 (R131);
+the seed strategies are an `Optimizer` matter for later.
 
 ### 7.1 What is already fixed around it
 

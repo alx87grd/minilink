@@ -64,8 +64,8 @@ concrete formatting, ordered by the cost of being wrong:
   `params` yet. Override rule and gap: DESIGN §4, 'Parameters'.
 - **2.4 No run state on a System.** A `System` does not store simulation trajectories, solver state,
   or run history. Exception: `self.traj` is the one daily-use shortcut; a new exception needs a
-  reason of that weight. `StepSystem.rollout` and `HybridDiagram.last_result` are an open
-  question (docs/dev/QUESTIONS.md).
+  reason of that weight. `StepSystem.rollout` and `HybridDiagram.last_result` go with the
+  sampled loop (TODO §1.5).
 - **2.5 Prefer arrays and existing core objects.** New APIs take and return arrays or types
   students already know (`System`, `Trajectory`, `PlanningProblem`, sets, costs). Do not add
   request/response dataclasses, option bags, or adapter layers that only wrap those. A new
