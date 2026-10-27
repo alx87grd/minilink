@@ -19,7 +19,6 @@ the entries below hold the context:
 2. **The stateless MPC:** refuse it in `problem.compile` now (B).
 6. **The run caches:** they go (B).
 10. **`as_cost` and the shaping:** one function, moved to `core/` first (B).
-14. **The first fixed-iteration tick:** the gradient MPC; MPPI in v0.4 (C).
 15. **The borderline rows:** S70 lands before S66, the realtime re-base
     waits for v1.0, and the RL heads go to v0.4 (B).
 16. **LQR and `U`:** no warning (D).
@@ -247,21 +246,6 @@ In the order to decide (reviewer C §5).
   - shooting's reported score lowered;
   - S63 in v0.4.
 - **Detail:** [differentiable-problem.md](../plans/differentiable-problem.md) §9.4
-- **Answer:**
-
-### Which fixed-iteration tick comes first: the gradient MPC or MPPI's?
-- **Blocks:** the native proof of concept (§8) and MPPI (S72, TODO §4).
-- **Today:** native-optimizers.md §4.6b and §5 say "MPPI is the first instance, ahead of NS-8",
-  because its tick is already pure and needs no native solver. Your direction of 2026-10-26 puts
-  the gradient MPC's proof of concept in v0.3 and MPPI in v0.4.
-- **Options:**
-  - the gradient MPC first, as the direction places it;
-  - MPPI's tick first, as the sampled loop's first pure controller, MPPI's planner still v0.4;
-  - both together.
-- **Recommendation:** none.
-- **Reviewers:** all three: the gradient MPC as directed; the sampled kernel's first consumer is
-  the digital PID; MPPI stays in v0.4; fix native-optimizers' wording.
-- **Detail:** [native-optimizers.md](../plans/native-optimizers.md) §4.6, §4.6b, §5
 - **Answer:**
 
 ### Do all of Fields' steps land in v0.3?
