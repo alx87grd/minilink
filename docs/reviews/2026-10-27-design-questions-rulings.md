@@ -454,3 +454,18 @@ consolidation pass over every core math object: audit each against the five poin
 gaps, document the exceptions, and hold the contract with one test. CONSTITUTION §2's paragraph
 gains the composite-tree and determinism sentences when the test lands; the text comes to the
 maintainer with it.
+
+**How the audit resolves five frictions** (agreed by the maintainer, 2026-10-27):
+1. **Distributions:** the key is a distribution's specific argument, like `x` for `f`, and the
+   law's own numbers (`mean`, `std`) are its `params`: `sample(key, n, params=None)`. Blocks that
+   draw by themselves (the sources, the seeded policy) keep their seed as a leaf.
+2. **An object with no parameters** has `params = {}`, not `None` (a set without parameters
+   today), so the rule holds with no special case and a composed tree has no holes.
+3. **A composed object's tree holds its parts' dicts and its own leaves:** `problem.params` has
+   `plant`, `cost`, `X`, … and its own `x_start` and `discount_rate`, as a diagram holds its
+   blocks.
+4. **RL training** draws from its own keys today; it is a written exception until the
+   seeded-policy row moves the collectors to per-episode seeds.
+5. **Student-written models are not bound by the contract:** RULES 2.3's tolerance (a student who
+   hard-codes constants still simulates) stands; the contract and its test cover the library's
+   public core math objects.

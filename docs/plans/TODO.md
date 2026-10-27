@@ -137,7 +137,12 @@ Why: [core-architecture.md](core-architecture.md) §1.
   blocks, costs, sets, distributions, fields, shapes, sources, `Trajectory`, `PlanningProblem`,
   `MathematicalProgram`, the policies), one table in the row's report; fix the gaps one object
   family per commit, behaviour-preserving where no number moves (AGENTS' recipe); write the
-  exceptions and the contract in DESIGN §4 and RULES 2.3. This row absorbs the "sets and
+  exceptions and the contract in DESIGN §4 and RULES 2.3. The audit starts from five
+  resolutions (R140's record): a distribution's key is its specific argument and its law's
+  numbers its `params` (`sample(key, n, params=None)`); an object with no parameters has
+  `params = {}`, not `None`; a composed tree holds its parts' dicts and its own leaves
+  (`problem.params`'s `x_start`); RL training is a written exception until its collectors take
+  per-episode seeds; student-written models stay exempt (RULES 2.3). This row absorbs the "sets and
   distributions read `params`" items below (A5's library sets, RN-2) as the same contract. Done
   when one contract test walks every public core math object on both backends (its `params`, a
   `params=None` call equal to a call with its defaults, `jax.grad` through a float leaf, the
