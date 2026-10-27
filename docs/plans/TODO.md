@@ -376,19 +376,22 @@ Why: [core-architecture.md](core-architecture.md) §7. Design:
 - [ ] **One optimizer backend table for the parametric path** (OPW-1–OPW-5, after S74, with S76;
   [parametric-program.md](parametric-program.md) §6; scan: planning#9). Done when
   `optimizer_method="ipopt"` reaches the parametric MPC path and the plan's OPW-4 tests pass.
-- [ ] **The stochastic program as the parametric program's seed case** **[ask — core]**, design
-  open (native-optimizers.md §7; the maintainer's leaning of 2026-10-25, his direction of
-  2026-10-26).
-  - Every program is deterministic given its parameters. The seed is one of them, an integer
-    leaf of `p` (RD-R6, R118).
-  - Solving a stochastic program is solving over seeds, in one of three ways:
-    - a sample average: `N` seeds fixed inside `J`, which is today's
-      `pe.program(wrt, key=, n_trials=)`;
-    - a Monte Carlo over solves (`vmap` over seeds);
-    - stochastic approximation (`child(seed, k)`).
+- [ ] **The stochastic program as the parametric program's seed case** **[ask — core]**
+  (native-optimizers.md §7; the maintainer's direction of 2026-10-26; the convention a
+  preliminary choice of 2026-10-27, R131,
+  [record](../reviews/2026-10-27-design-questions-rulings.md)):
+  - every program is deterministic given its parameters, the seed one of them, an integer leaf
+    of `params` found by the `seed` key (RD-R6, R118); integers never in `wrt`; complete trees
+    inside, one merge at the boundary; sizes structural; the warm start on the solve call;
+  - the core keeps the sample-average export that exists today, `pe.program(wrt, key=,
+    n_trials=)` (the draws realized once from `key`); a Monte Carlo over solves comes free once
+    a solve traces;
+  - how a solver uses the seed (stochastic approximation, `child(seed, k)`, the stochastic
+    category) is an `Optimizer` strategy, with the native solvers beyond the proof of concept
+    (§4).
 
-  Open: §7.5's points, and the v0.3 scope (reviewers A and C: the sample average only). Done
-  when the rulings are taken.
+  Done when the convention is stated in DESIGN §6 and a test solves the sample-average program of
+  a stochastic problem (robust gain tuning) on both backends.
 
 ### 1.8 The native proof of concept
 

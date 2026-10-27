@@ -395,6 +395,12 @@ randomness (§7; the maintainer's leaning recorded as a draft in §7.2, his dire
 
 ## 7. Needs analysis: parametric and stochastic programs (not converged)
 
+**Preliminary choice, 2026-10-27 (R131, [record](../reviews/2026-10-27-design-questions-rulings.md)):**
+§7.5's convention points as recommended (complete trees inside, the `seed` key, integers never in
+`wrt`, sizes structural, the warm start on the solve, `J(z, key)` dropped). The core keeps the
+sample-average export; how a solver uses the seed is an `Optimizer` strategy, taken up with the
+native solvers.
+
 **Status: draft ideas, flagged by the maintainer 2026-10-25 as needing more analysis.** How a
 program and its solvers handle (a) many versions of one program solved without recompiling and
 (b) randomness is not settled. This section holds the facts (§7.1), the maintainer's leaning

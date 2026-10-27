@@ -198,3 +198,34 @@ whose binding is the plain program.
 Options weighed: a family with `bind` (two nouns, a fourth meaning of `bind`); one class always
 taking `p` (students write an unused argument). Reviewers A and B: one noun with `params=None`;
 C: the family, `bind` on the program only.
+
+## R131 (2026-10-27, preliminary) Programs, parameters and randomness: the convention now, the seed strategies later
+
+The question: native-optimizers.md §7.5's open points on how programs and solvers take
+parameters and randomness, and the scope of the stochastic program.
+
+- **The convention, as one block:**
+  - inside, a program's functions always see a complete tree (R121); at the user boundary
+    (`solve(params=...)`), a partial tree is merged once onto the defaults;
+  - the seed is found by the `seed` key, an integer leaf, as on blocks, policies (R129) and
+    sources (R128);
+  - integer leaves never enter `wrt`; asking for one is refused;
+  - sizes (the horizon `N`, the iterations `K`, batch sizes) are constructor arguments, and only
+    values live in `params`;
+  - the warm start is an argument of the solve call (`z0=`), not of the program;
+  - sensitivities through a solve come later, with implicit differentiation;
+  - `J(z, key)` is dropped: the seed lives in `params`.
+- **The maintainer's note: the goal now is to build the playground.** How a solver handles the
+  seed (keep it fixed, `vmap` over it, or advance it per iteration as stochastic approximation
+  does) is an `Optimizer` strategy, tackled when the optimizers are worked on (the native
+  solvers beyond the proof of concept, v0.4).
+- **What exists today:** one pipeline produces a stochastic program, `pe.program(wrt, key=,
+  n_trials=)` on a `StochasticPlanningProblem`: a deterministic `MathematicalProgram` whose `J` is
+  the mean over `n_trials` draws realized once from `key` (a sample average). No demo uses it
+  yet. RL trains with its own loop and keys, and MPPI averages inside its tick; neither builds a
+  `MathematicalProgram`.
+- **So the core keeps:** the convention above and the sample-average export. A Monte Carlo over
+  solves (`vmap` over seeds) comes free once a solve traces. Stochastic approximation and the
+  stochastic program category go with the optimizer strategies.
+
+Reviewers A, B and C agreed on the convention; A and C limited the core to the sample average.

@@ -18,8 +18,6 @@ the entries below hold the context:
    the rest, then merge the landed core into `dev`, and each workstream as it lands (A).
 2. **The stateless MPC:** refuse it in `problem.compile` now (B).
 6. **The run caches:** they go (B).
-9. **Programs:** pass `p`, complete trees inside, the seed by the `seed` key, the warm start on
-   the solve call (B).
 10. **`as_cost` and the shaping:** one function, moved to `core/` first (B).
 13. **The native kernel:** a pure kernel with a step-system view (C).
 14. **The first fixed-iteration tick:** the gradient MPC; MPPI in v0.4 (C).
@@ -167,47 +165,6 @@ In the order to decide (reviewer C §5).
   Renaming the frozen names `compile_backend` and `dt_mpc` (G3, R50) is a separate sweep (R82).
 - **Recommendation:** none.
 - **Reviewers:** B P3 proposes the rule. A and C: `sample_period` on the seeded policy.
-- **Answer:**
-
-### How do programs and solvers take parameters and randomness, and what ships in v0.3? (needs a discussion)
-- **Blocks:**
-  - the stochastic-program row (§7);
-  - the parametric program;
-  - the native solvers and the stochastic category of native-optimizers.md.
-- **Today:**
-  - Only `x0` varies in the compiled MPC program.
-  - `pe.program(wrt, key, n_trials)` freezes its draws at build, a sample average.
-  - Seeds live in `params` as integers (RD-R6, R118).
-  - Overrides are complete trees (R121), while parametric-program.md §3.1 binds partial ones.
-- **Your direction (2026-10-26):**
-  - every program is deterministic given its params, the seed one of them;
-  - solving a stochastic program is solving over several seeds;
-  - the stochastic program is the parametric program's case, a core pillar of v0.3.
-
-  Open: §7.5's seven points (bind or pass `p`, partial or complete trees, non-differentiable
-  leaves, which leaf is the seed, structural against value parameters, the warm start,
-  sensitivities), and §4.1's `J(z, key)`.
-- **Options:**
-  - **The signature:** not settled. The draft is one signature `J(z, p)`, with the seed an
-    integer leaf of `p`:
-    - deterministic solvers keep it fixed (a sample average);
-    - stochastic solvers advance it per iteration (`child(seed, k)`), under four soundness
-      conditions.
-  - **The v0.3 scope:** all three ways, or the sample average only, with stochastic
-    approximation waiting for the stochastic category (NS-7, v0.4).
-- **Recommendation:** none yet; a discussion session first.
-- **Reviewers:** all three:
-  - pass `p`, binding only at the user boundary;
-  - complete trees inside, one merge at the boundary;
-  - the seed found by the `seed` key, with integers never in `wrt`;
-  - shapes are structural;
-  - the warm start goes on the solve call.
-
-  Also:
-  - B and C: sensitivities in v0.4;
-  - B: drop `J(z, key)`;
-  - A and C: only the sample average in v0.3.
-- **Detail:** [native-optimizers.md](../plans/native-optimizers.md) §7
 - **Answer:**
 
 ### Where do `as_cost` and the shaping live, and are the conversions named by what they return?

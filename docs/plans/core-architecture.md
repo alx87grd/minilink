@@ -321,8 +321,10 @@ V = QuadraticField(P)                            # §9: the terminal cost as a f
   - `pe.program(wrt, key, n_trials)` realizes once (a sample average) and refuses `"x_start"`
     in `wrt` on a stochastic problem.
 - **Open:**
-  - native-optimizers §7.5's seven points, with §4.1's `J(z, key)`;
-  - the stochastic program's scope;
+  - (§7.5's points are a preliminary choice of 2026-10-27, R131: complete trees inside and one
+    merge at the boundary, the `seed` key, integers never in `wrt`, sizes structural, the warm
+    start on the solve, `J(z, key)` dropped; the core keeps the sample-average export, and how a
+    solver uses the seed is an `Optimizer` strategy for later);
   - the names of the MPC's live-parameter ports and of `params_at` (the naming question).
 
   Elsewhere:
