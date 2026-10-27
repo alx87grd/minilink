@@ -90,6 +90,24 @@ Decision 3 of the vision, taken as recommended.
   tutorial 11, the showcases) are swept once, every caller in the same commit, no alias (R82;
   the name freeze is paused between terms).
 
+## R144 (2026-10-27, preliminary) `realize` returns one tree; the start is a leaf of the problem's parameters
+
+Decision 4 of the vision, taken as recommended. The maintainer: "x0 should be part of params of
+a planning problem".
+
+- **The start is a parameter of the problem.** `problem.params` already holds it as the
+  `"x_start"` leaf beside `"plant"`, `"cost"`, the sets and `"discount_rate"`
+  (`planning/problems.py`, the `params` view); with R143 that leaf may hold a law.
+- **`problem.realize(key, n_trials) -> params`:** one tree, `params["x_start"]` of shape
+  `(n, nx)`, every drawn leaf and every seed with a trial axis, the shared leaves unchanged. The
+  judge reads the start from the tree like any leaf, so `pe.evaluate(params={"x_start": starts})`
+  and a realized tree mean the same thing.
+- **Revises R128's wording only** (its pair `(x0s, params)`); its substance stays: disturbances
+  are source blocks, their seeds leaves of the tree. Today's internal `realize` returns
+  `(x0s, {"params": ..., "disturbances": ...})` and changes with the draws lane.
+- **The name stays `x_start`** (R124): `x0` is a block's own default start, `x_start` the
+  problem's start of the plant.
+
 ## The one-score question
 
 R141 and R142 answer its object (the compiled step face) and its per-step cost. Still open

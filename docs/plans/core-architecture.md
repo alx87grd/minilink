@@ -191,8 +191,8 @@ V = QuadraticField(P)                            # §9: the terminal cost as a f
   - no `Distribution` on a port: a disturbance is a source block wired into the problem's system
     (explicitly, or by the shortcut `disturbances={"d": block}`, which wires it), for the
     deterministic and the stochastic problem alike;
-  - one shape, `problem.realize(key, n_trials) -> (x0s, params)`, the sources' seeds leaves of
-    the tree;
+  - one shape, `problem.realize(key, n_trials) -> params`, one tree with `x_start` a leaf
+    (R144 revises R128's pair), the sources' seeds leaves of the tree;
   - CONSTITUTION §2's disturbance sentence amended when it lands.
 - **Rows:** [TODO §1.3](TODO.md#13-the-draws).
 
