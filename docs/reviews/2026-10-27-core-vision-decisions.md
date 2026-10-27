@@ -138,6 +138,57 @@ controller side".
 - **Depends on decision 6**, the multi-clock computer: what `%` returns inside a computer (a
   block carrying its period, or a one-block `Computer`) is settled there.
 
+## R146 (2026-10-27, preliminary) Periods on blocks; one `SampledSystem`, a system on a clock; no `Computer`, `StepSchedule` or `HybridDiagram`
+
+Decisions 6 and 7 of the vision, with the maintainer's refinements: a pure step system carries no
+`dt` ("it would force chess to have `dt = None`"), a sampled block is a child of `StepSystem`,
+and `discretize` returns it directly, with no intermediate class.
+
+- **The tree:**
+
+  ```text
+  StepSystem ─── StepDiagramSystem         pure tick: step(x, u, k); chess, grid worlds; no clock
+    └─ SampledSystem                       any system on a clock; discretize and % return it
+        └─ SampledDiagramSystem            a diagram with a clocked block: the computer, and computer @ plant
+  ```
+
+- **A pure `StepSystem` stays clean:** no `dt`, no `source`. A native z-domain design is one.
+- **`SampledSystem(source, sample_period, *, solver="rk4", substeps=1)`, "this system on this
+  clock":**
+  - `source` is always set: a continuous system (its `step` integrates `source.f` over the
+    period, the input held), a static block (its `h` sampled) or a pure `StepSystem` (its `step`
+    delegated);
+  - `sample_period` is a structural attribute, not a parameter: it sets the divisors, the base
+    period and the tick count, so it is fixed at compile (a sweep, not a gradient);
+  - `solver` and `substeps` apply to a continuous source; a step source refuses them;
+  - **a view, not a container:** its `params` are the source's own dict, live and not nested,
+    its ports, state and labels the source's; a parent's tree holds it as one block;
+  - nobody subclasses it: physics is written as a `DynamicSystem`, a native law as a
+    `StepSystem`, and the clock is always applied from outside;
+  - `discretize(sys, dt)` (RK4) and `sys % dt` (Euler, R145) return it and leave the source
+    unchanged.
+- **`Discretization` is renamed `SampledSystem`** (no alias, R82; its callers `dp.py`,
+  `policy_eval.py`, the trajectory-optimization planner and one test file, none student-facing);
+  its `dt` becomes `sample_period`; `ExactDiscretization` folds in as `solver="exact"` or a
+  private subclass.
+- **Periods on blocks; the schedule derived** (decision 6, option a): a diagram with any clocked
+  block is a `SampledDiagramSystem`, its base period the greatest common divisor of its blocks';
+  a block of divisor `d > 1` fires on `k mod d = 0` and its held outputs are state slots; a period
+  not an integer multiple of the base is refused at wiring; a pure step block inside runs at the
+  base tick. A multi-rate computer is ordinary composition, `(filt % 0.01) >> (ctl % 0.1)`. The
+  MPC's two rates are `mpc % 0.05` beside a `% 0.01` block, so `replan_every` goes.
+- **`Computer` and `StepSchedule` go** as core classes; "computer" stays the word of the runner
+  (realtime, hardware in the loop) and of the drawing's box.
+- **The operators** (R126): `%`, then `>>`, `+`, `@` between step systems; `sampled @ continuous`
+  is the one place the two worlds meet, the plant becoming `discretize(plant, base, substeps=n)`
+  under `plant`; every other mix refused, naming `%`.
+- **The loop needs no class of its own** (decision 7): `computer @ plant` is a
+  `SampledDiagramSystem` whose plant block is a `SampledSystem` of the continuous plant; the dense
+  and adaptive runs reach the plant through its `source`. `HybridDiagram` (not a `System` today)
+  goes. Revises R127's "named `HybridDiagram`".
+- CONSTITUTION invariant 1 is amended when it lands (the sampled loop a step diagram of the
+  sibling algebra, as R127 already names).
+
 ## The one-score question
 
 R141 and R142 answer its object (the compiled step face) and its per-step cost. Still open
