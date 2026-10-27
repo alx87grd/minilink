@@ -249,3 +249,32 @@ categories and algorithms are in scope.
 Options weighed: every solver a `StepSystem` (Adam's tree state packed into a flat `x`); a kernel
 with no view (loses the step-size-as-stability lesson). Reviewers A, B and C: the kernel with a
 view.
+
+## R133 (2026-10-27, preliminary) A minimal `Field` in the core; one `as_cost`; conversions named by what they return
+
+The questions: why the `Field` noun at all; one home for `as_cost` and the shaping; the
+conversions' names.
+
+- **Why a `Field`:** one scalar function of the state appears under five APIs (the Lyapunov
+  certificate, the DP cost-to-go, the LQR value, the RL critic, the workspace fields; the CBF
+  barrier a sixth). The core's pipeline needs three conversions of it: a set as a soft cost, a
+  value function as a terminal cost, a sublevel set.
+- **The core builds a minimal `Field`:** `Field` (today's `StateField` moved to `core/`),
+  `QuadraticField` (the LQR value, the Lyapunov `V`), the shaping functions moved from
+  `planning/spatial/shaping.py` to `core/`, and the three conversions.
+- **Later, with their consumers, after the core:** `GridField` (the DP tables), `CallableField`
+  (the RL critics), the approximator, and the rebuilds of DP, the certificates and the critics
+  on the noun (fields.md steps 4.4–4.6 and the rest).
+- **One `as_cost`:** `Field.as_cost(weight=, shaping=)` is the one implementation,
+  `g = weight · shaping(V(x, u, t))`. `Set.as_cost(weight=, shaping=)` is the same function on
+  the set's margin seen as a field. The shaping move and `Set.as_cost` come first (the program
+  bridge's soft constraints need them); `Field` generalizes later without changing the
+  signature.
+- **Names by what they return:** `as_set(lower=, upper=)` (a `Set`), `as_input_set(...)` (an
+  `InputSet`), `as_cost(...)` (a `CostFunction`). `as_constraint` and `as_input_constraint` are
+  renamed in one sweep with every caller, the track demos included, no alias (R82).
+
+Options weighed: the full field plan in the core (most work off the core's path); no `Field`
+noun (the five APIs stay separate, the CONSTITUTION's planned noun dropped); two independent
+`as_cost` implementations. Reviewers A, B and C: one function, moved first; B: `as_set`;
+C: Fields 4.1–4.3 in the core, 4.4–4.6 later.

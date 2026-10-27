@@ -103,14 +103,13 @@ Why: [core-architecture.md](core-architecture.md) §1.
 - [ ] **Sets as costs, the lowerings, the metrics as constraints** **[ask — core]** (was V1
   step 8; [differentiable-problem.md](differentiable-problem.md) §8):
   - `shaping.py` (today `planning/spatial/shaping.py`) moves to `core/`;
-  - `Set.as_cost(weight=, shaping=)`;
+  - `Set.as_cost(weight=, shaping=)`, the field `as_cost` applied to the set's margin (R133);
   - the sets read `params`;
   - `TrajectorySource` holds its table in `params` (its `h` already traces), so `"x_start"` and
     `"controller.values"` are decision leaves, with `Xf` lowered;
   - the robust-tuning and identification demos run on the export;
   - the metric objective and the margin-floor example wait for S73, a v0.4 row.
 
-  Open: one home for `as_cost` and the shaping.
 - [ ] **One parameter-tree module** (new, from reviewer A §2.6; internal, agent-managed): the
   path lookup, merge and flatten of parameter trees, written today in `planning/evaluator.py`
   (`lookup`, `with_leaf`, `merge_tree`, `flat_leaves`), `planning/problems.py` (`lookup_param`,
@@ -425,23 +424,24 @@ Why: [core-architecture.md](core-architecture.md) §8. Design:
 Why: [core-architecture.md](core-architecture.md) §9. Design: [fields.md](fields.md). Baselines
 first.
 
-- [ ] **The field object, `core/fields.py`** **[ask — core]** (A1; steps 4.1–4.8 of
-  fields.md; step 4.7, the CBF plan's, is done):
-  - promote `StateField` to `Field` on `(x, u, t)`, with `as_constraint` /
-    `as_input_constraint` / `as_cost` and `gradient`;
+- [ ] **A minimal field object, `core/fields.py`** **[ask — core]** (A1, steps 4.1–4.3 of
+  fields.md; the scope a preliminary choice of 2026-10-27, R133,
+  [record](../reviews/2026-10-27-design-questions-rulings.md)):
+  - promote `StateField` to `Field` on `(x, u, t)`, with `as_set` / `as_input_set` / `as_cost`
+    and `gradient`; `as_constraint` and `as_input_constraint` renamed with every caller, the
+    track demos included, no alias (R82) **[ask — student-facing]**;
+  - the shaping functions moved from `planning/spatial/shaping.py` to `core/`, and `Field.as_cost`
+    the one implementation that `Set.as_cost` (§1.1) reuses on a set's margin;
   - `QuadraticField` (the Lyapunov `V`, the LQR value, the `S(t)` schedule), with the ellipsoid
     as its sublevel set;
-  - `GridField` (DP and tabular tables, a per-sweep time axis);
-  - `CallableField` (RL critics);
-  - `LinearApproximator` as a field;
-  - `LyapunovCertificate.V` a field;
-  - the DESIGN §4 fields bullet;
-  - `PolicyEvaluator` takes the evaluators' verb and returns a field-shaped result (scan:
-    planning#4).
+  - the DESIGN §4 fields bullet.
 
-  Done when the RoA and DP baselines `cmp` and `test_analysis_lyapunov.py`,
-  `test_planning_solution.py`, `test_rl_tabular.py` and `test_rl_planner.py` pass. Open
-  (reviewer C §3.2): 4.1–4.3 in v0.3, 4.4–4.6 in v0.4.
+  Done when the RoA baseline `cmp`s, `test_analysis_lyapunov.py` and the corridor and RRT demos
+  pass, and an LQR value serves as an MPC terminal cost through `QuadraticField.as_cost`.
+
+The rest of the field plan (steps 4.4–4.8: `GridField`, `CallableField`, `LinearApproximator`
+and `LyapunovCertificate.V` as fields, `PolicyEvaluator`'s field-shaped result) is a row of §4,
+after the core. Step 4.7, the CBF plan's, is done.
 
 ### 1.10 Hardening and the merge
 
@@ -791,6 +791,13 @@ pillar names it.
   and the poles, the cost-to-go the certainty-equivalent form; `Q_n = B_w W B_wᵀ`,
   `R_n = D_v V D_vᵀ` from `linearize_matrices(sys, wrt="d")` / `wrt="n"` and the blocks'
   `psd`. With RN-4. Design: [estimation-and-state-feedback.md](estimation-and-state-feedback.md) §5.
+
+- [ ] **The rest of the field object** **[ask — core]** (A1's steps 4.4–4.8 of
+  [fields.md](fields.md), after the minimal `Field` of §1.9, R133): `GridField` (DP and tabular
+  tables, a per-sweep time axis); `CallableField` (RL critics); `LinearApproximator` as a field;
+  `LyapunovCertificate.V` a field; `PolicyEvaluator` takes the evaluators' verb and returns a
+  field-shaped result (scan: planning#4). Done when the DP baselines `cmp` and
+  `test_planning_solution.py`, `test_rl_tabular.py` and `test_rl_planner.py` pass.
 
 **Workspace geometry.** Design: [geometry-module.md](geometry-module.md) (the field object is
 §1.9). Baselines first, as each plan states.

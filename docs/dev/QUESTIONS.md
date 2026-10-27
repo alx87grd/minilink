@@ -18,7 +18,6 @@ the entries below hold the context:
    the rest, then merge the landed core into `dev`, and each workstream as it lands (A).
 2. **The stateless MPC:** refuse it in `problem.compile` now (B).
 6. **The run caches:** they go (B).
-10. **`as_cost` and the shaping:** one function, moved to `core/` first (B).
 15. **The borderline rows:** S70 lands before S66, the realtime re-base
     waits for v1.0, and the RL heads go to v0.4 (B).
 16. **LQR and `U`:** no warning (D).
@@ -165,32 +164,6 @@ In the order to decide (reviewer C §5).
 - **Reviewers:** B P3 proposes the rule. A and C: `sample_period` on the seeded policy.
 - **Answer:**
 
-### Where do `as_cost` and the shaping live, and are the conversions named by what they return?
-- **Blocks:**
-  - Fields (§9);
-  - the sets as costs (§1, was V1 step 8);
-  - the workspace geometry (A3, v0.4).
-- **Today:** three plans:
-  - `Set.as_cost(weight=, shaping=)` (A5; differentiable-problem.md step 8, after `shaping.py`
-    moves to `core/`);
-  - `Field.as_cost`, with the shaping next to it in `core/fields.py` (fields.md 4.1);
-  - the shaping helpers moved to `core/fields.py` (geometry-module.md).
-- **Options:**
-  - one home and one signature for sets and fields, `Set.as_cost` first and fields following;
-  - for the names, `as_constraint` / `as_input_constraint` (student-facing in the track demos)
-    or `as_set` / `as_input_set`.
-- **Recommendation:** none.
-- **Reviewers:**
-  - all three: one function, moved first;
-  - A: in `core/fields.py`;
-  - B: in `core/shaping.py`;
-  - C: the shaping to `core/` as a pure move now;
-  - B: `as_set(upper=c)` / `as_input_set` / `as_cost`.
-- **Detail:** [fields.md](../plans/fields.md) 4.1; [geometry-module.md](../plans/geometry-module.md); [differentiable-problem.md](../plans/differentiable-problem.md) §8
-- **Answer:**
-
-## v0.3 — C. Gates later core work
-
 ### Does the evaluation unify from the rollout on, with a discretized planning problem? (an investigation for the final design)
 - **Your note (2026-10-27): an investigation for the final design, not settled tonight.** Sets and
   costs take time as an argument: does a discrete problem need discrete versions of them, or
@@ -246,16 +219,6 @@ In the order to decide (reviewer C §5).
   - shooting's reported score lowered;
   - S63 in v0.4.
 - **Detail:** [differentiable-problem.md](../plans/differentiable-problem.md) §9.4
-- **Answer:**
-
-### Do all of Fields' steps land in v0.3?
-- **Blocks:** Fields (§9).
-- **Today:** fields.md's steps 4.1–4.8 are one row, A1. 4.1–4.3 fix a public signature and the
-  Lyapunov `V`; 4.4–4.6 (`GridField`, the approximator, `CallableField`) are the tables and the
-  critics.
-- **Options:** all in v0.3; 4.1–4.3 in v0.3 and 4.4–4.6 in v0.4.
-- **Recommendation:** none.
-- **Reviewers:** C §3.2: the split.
 - **Answer:**
 
 ### Should the failure price follow a run's cost overrides?

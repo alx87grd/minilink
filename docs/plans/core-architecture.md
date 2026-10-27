@@ -371,14 +371,18 @@ V = QuadraticField(P)                            # §9: the terminal cost as a f
     `CallableField` (the RL critics).
   - The certificate's `V`, the DP cost-to-go, the LQR value and the critics all speak it. The CBF
     barrier is a field (step 4.7, done).
-- **Status.** Agreed and not started. It is additive to the path.
+- **Status.** Agreed and not started. It is additive to the path. Preliminary choice,
+  2026-10-27 (R133; open to revision):
+  - **the core builds a minimal `Field`:** `Field` (today's `StateField` moved to `core/`),
+    `QuadraticField`, the shaping functions in `core/`, and the three conversions the pipeline
+    uses (a set as a soft cost, a value function as a terminal cost, a sublevel set);
+  - **later, with their consumers:** `GridField`, `CallableField`, the approximator, and DP, the
+    certificates and the critics rebuilt on the noun;
+  - **one `as_cost`:** `Field.as_cost` is the implementation, and `Set.as_cost` is the same
+    function on the set's margin seen as a field;
+  - **names by what they return:** `as_set`, `as_input_set`, `as_cost`.
 - **Today.** `StateField` lives in `planning/spatial/state_fields.py`. `V(x)` and `cost_to_go`
   are not fields.
-- **Open:**
-  - one home and one signature for `as_cost` and the shaping, in three plans: `Set.as_cost`,
-    `Field.as_cost`, and the geometry module's shaping;
-  - the conversions' names (`as_set`?);
-  - whether steps 4.4–4.6 wait for v0.4.
 - **Rows:** [TODO §1.9](TODO.md#19-fields).
 
 ## 10. The order: three lanes, two joins (a proposal, not ruled)
