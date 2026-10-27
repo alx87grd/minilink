@@ -222,7 +222,7 @@ recorded?" answered by one evaluator method.
 - The hybrid demos and tutorial 06 re-pin once, with the same-tick semantic (R125) and the MPC
   delay (R123). Revises R127's default runner of `compute_trajectory`.
 
-## R148 (2026-10-27, preliminary) The planner compiled to a pure face; the MPC one block in two forms
+## R148 (2026-10-27, preliminary, amended the same day) The planner compiled to a pure face; the MPC one block in two forms
 
 Decision 9 of the vision. Reached over several rounds: the maintainer's cases (an adaptive MPC fed
 estimated mass and friction, RRT and value iteration as the replanner, a future discrete-time
@@ -246,9 +246,15 @@ this entry). The maintainer then asked for the clean end state, built from scrat
     layout the planner's own and opaque to everyone else (a system's `n`);
   - `initial(params=None) -> z`: the default initial guess;
   - `solve(params=None, z0=None) -> (z, status)`: the solve as a function, no mutation of the
-    planner; given `z0` it shifts it itself from the `t_start` recorded in `z0` to
-    `params["t_start"]`, on its own knots (R135); `status` a small numeric record (success,
-    iterations, residual);
+    planner, from the guess `z0` as given, with no time logic; it records in `z` the origin it
+    solved from (`params["t_start"]`); `status` a small numeric record (success, iterations,
+    residual);
+  - `shift(z, dt) -> z` (amended the same day, the maintainer: "the solver doesn't know z0 needs
+    to be shifted because it is in a loop"): the same plan `dt` later, its data and its recorded
+    origin moved by `dt`, on the planner's own knots: trajopt re-reads its knots and holds the
+    tail, MPPI shifts `U`, RRT drops the path already passed; the identity for time-invariant
+    solutions (value iteration, LQR, RL), the base default. It is R135 literally: the planner
+    knows what shifting means, the MPC decides to do it;
   - `policy(z, x, t, params=None) -> u`: the command a solution gives at `x` and `t`, the
     traceable bridge from a solution to an input; `policy(z, x_start, t_start)` is the first
     action, `policy(z, x_k, t_k)` reads the plan later; open-loop plans ignore `x`, feedback
@@ -272,11 +278,17 @@ this entry). The maintainer then asked for the clean end state, built from scrat
   time; on a step problem it is an integer tick, and integer leaves are allowed, never in `wrt`
   (amends R118). A planner pins the start from `x_start`; `X0` is derived from it.
 - **The MPC:** `ModelPredictiveController(planner, *, inputs={"x_start": "y", "t_start": "t"},
-  delay=True)`, using only `n_z`, `initial`, `solve` and `policy`:
-  - **the delayed form** (R123, the default): one `StepSystem`, state `z` (`n = pv.n_z`,
-    `x0 = pv.initial()`); `step` solves once per tick warm from its state and keeps the old `z`
-    when the solve fails; the output is `u = pv.policy(z, x̂_k, t_k)`. The plan is one period
-    late, applying it instantaneous;
+  delay=True)`, using only `n_z`, `initial`, `shift`, `solve` and `policy`:
+  - **the delayed form** (R123, the default): one `StepSystem`, state `(z, t_last)`
+    (`n = pv.n_z + 1`, the MPC keeping the time of its last solve itself, never reading inside
+    `z`); the output is `u_k = pv.policy(z, x̂_k, t_k)`; `step` runs
+    `z0 = pv.shift(z, t_k − t_last)`, `z_new, st = pv.solve(P_k, z0=z0)`, and keeps `(z, t_last)`
+    when the solve fails (the next tick then shifts by `2Δ`, no special case). The plan is one
+    period late, applying it instantaneous;
+  - **tick 0** (the maintainer: the nominal values read from the defaults): `x0 =
+    (pv.initial(planner.params), t_start)`, the default initial guess, no solve at
+    construction; the first period's command is the guess's first input; `x0` is a leaf of the
+    loop's tree (R124), so a solved first plan is one assignment;
   - **the pure form** (`delay=False`): one static block, `u = pv.policy(pv.solve(bound)[0], x̂, t)`,
     no memory; it needs one signal pass per tick in the step evaluators (an internal change)
     to solve once;
