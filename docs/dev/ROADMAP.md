@@ -105,7 +105,7 @@ Step ids (`S29`, `P4`, `T2`, …) are the rows of
 
 | Area | Lane | TRL | State | Next |
 | --- | --- | --- | --- | --- |
-| Core + diagrams | teaching | 7 | Public API and diagram API stable; compile-vs-reference parity tested; wrong-shape `f` / `h` fails at `compile()`; the modules by job (the operators, the closed loop, the roles, the port graph; the discrete-time pieces in `core/discrete/`, the `System` shortcuts in `core/facades/`, 2026-10-24). | Automation by convention, the rest (P10: plots and animation by role; the cost on the plant's draws, the v0.3 core); the three owners of a start (S29, R124, the v0.3 core). |
+| Core + diagrams | teaching | 7 | Public API and diagram API stable; compile-vs-reference parity tested; wrong-shape `f` / `h` fails at `compile()`; the modules by job (the operators, the closed loop, the roles, the port graph; the discrete-time pieces in `core/discrete/`, the `System` shortcuts in `core/facades/`, 2026-10-24). | Automation by convention, the rest (P10: plots and animation by role; the cost on the plant's draws, the v0.3 core); the three owners of a start (S29, R124 preliminary, the v0.3 core). |
 | Compile (`core/compile/`) | teaching (frozen subset) | 4 | Integrated; the frozen evaluator subset is named in DESIGN §5; one evaluator class per system kind on either backend, one body per method compiled on JAX (SM-6, 2026-10-24); the step model (`ev.step` / `ev.rollout`, `solver=`, `substeps=`, `hold=`) under every sampled tool, `discretize` on it (S75, 2026-10-24). Speed lives in batches (1000 rollouts × 1000 RK4 steps in 27 ms); float64 on JAX by default. | `rollout_batch` with a `params` family (S53); the step algebra first-class, one score, the draws and the sampled face (the v0.3 core, [core-architecture.md](../plans/core-architecture.md) §2, §3, §5, §6; the deterministic path landed); Diffrax (S27, v0.9). |
 | Simulation | teaching | 7 | Mature; fixed 10 001-point default grid; `verbose` names unified. | One owner per rule (S65). |
 | Dynamics (abstraction + catalog) | teaching | 7 | Plants QA'd; `MechanicalSystem` / `Manipulator`; UR5 ABA/RNEA; **every catalog plant compiles on both backends** (contract test); four-rung vehicle ladder; UdeS racecar (kinematic, dynamic, 3-D); every plant states its own bounds, the mechanical bases invent none (R68, 2026-10-24). | The catalog clean-up (K8, v0.3); one mechanical family (S32, v0.3, R62; postponed by the maintainer on three open questions, two since ruled (R101, R102), `DynamicBicycle`'s base left, TODO §2); catalog hygiene (S64) and the general serial chain (C6), v0.4. |
@@ -363,7 +363,7 @@ core-architecture §N, TODO §1.N and the QUESTIONS tags:
 
 | § | Workstream | The main rows |
 | --- | --- | --- |
-| 1 | Every object pure, every number a parameter (invariant) | the three owners of a start (S29, R124), A5, RN-2, the sets as costs (was V1 step 8), one parameter-tree module, T1, T2 |
+| 1 | Every object pure, every number a parameter (invariant) | the three owners of a start (S29, R124, preliminary), A5, RN-2, the sets as costs (was V1 step 8), one parameter-tree module, T1, T2 |
 | 2 | The step algebra first-class (invariant) | step evaluators trace and batch, the `StepRollout` fold (V1.1's rest), S53, S65 |
 | 3 | The draws | per-block seeds and disturbance signals (V1 step 7, RN-4, RN-5, AC-7), RN-3, `Sys2Gym`'s start law |
 | 4 | The seeded stochastic policy | the seeded block (D29) |

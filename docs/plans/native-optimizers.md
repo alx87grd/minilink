@@ -322,7 +322,7 @@ later the robust view (the gradient a sector-bounded nonlinearity, the rate cert
 whole class of `J`: the integral quadratic constraints of Lessard, Recht and Packard). It needs
 `linearize` and discrete poles on step systems (today `jacobian` only), and a helper that wires
 the law to the oracle (no operator composes step systems today: `@`, `>>` and `+` refuse
-them; ruled 2026-10-27, R126: the same operators on the step algebra, TODO §1.2).
+them; a preliminary choice of 2026-10-27, R126: the same operators on the step algebra, TODO §1.2).
 
 **Ruled 2026-10-25 (R122): the slice comes back, later, when solver stability needs it.** The
 2026-10-17 ruling ([the record](../reviews/2026-10-17-z-tier-dropped.md)) dropped the z-domain

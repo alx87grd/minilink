@@ -91,7 +91,7 @@ V = QuadraticField(P)                            # §9: the terminal cost as a f
   - a sampled controller's memory is its state, its draws from seed and tick (R104);
   - `params` holds numbers and integer seeds only (R118);
   - an override is `None` or a complete tree (R121);
-  - three owners of a start (R124): the block owns its `x0`, a diagram's `x0`, `n` and `state`
+  - three owners of a start (R124, a preliminary choice of 2026-10-27): the block owns its `x0`, a diagram's `x0`, `n` and `state`
     are views of its blocks (setting `diagram.x0` writes through), the problem owns the plant's
     start, and each stateful block's start is an `x0` leaf of the evaluator's tree.
 - **Today.**
@@ -144,7 +144,7 @@ V = QuadraticField(P)                            # §9: the terminal cost as a f
     - shooting;
     - multiple shooting;
     - the DP discretizer.
-- **Ruled 2026-10-27:**
+- **Preliminary choices, 2026-10-27** (open to revision in the final draft):
   - one same-tick semantic, propagation within the tick; a delay is a block (R125);
   - the same `@`, `>>` and `+` on step systems, mixing kinds refused (R126).
 - **Open:**
@@ -232,7 +232,7 @@ V = QuadraticField(P)                            # §9: the terminal cost as a f
   - `problem.compile` refuses a `StepSystem` controller, but it accepts the stateless MPC,
     whose latch then runs at the RK4 stages.
   - `%` refuses a controller with continuous states (automation-by-convention.md §4.5, no row).
-- **Ruled 2026-10-27 (R127):**
+- **Preliminary choice, 2026-10-27 (R127):**
   - `computer @ plant` is a `StepDiagramSystem` at its base clock, still named
     `HybridDiagram`; CONSTITUTION invariant 1 is amended when it lands;
   - `compute_rollout()` is the standard step rollout (ticks only, traced; `evaluate`'s

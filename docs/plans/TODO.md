@@ -81,7 +81,7 @@ Why: [core-architecture.md](core-architecture.md) §1.
 
   Reviewer A §2.7 suggests `log_prob` live on the policy instead (QUESTIONS, the seeded policy).
 - [ ] **Three owners of a start; a diagram's state derived from its blocks** **[ask — core]**
-  (S29, ruled 2026-10-27, R124,
+  (S29; the maintainer's preliminary choice of 2026-10-27, R124,
   [record](../reviews/2026-10-27-design-questions-rulings.md)):
   - a diagram's `x0`, `n` and `state` become views computed from its blocks; setting
     `diagram.x0` writes through to the blocks; the structural parts are cached and recomputed
@@ -136,13 +136,13 @@ Why: [core-architecture.md](core-architecture.md) §1.
 
 Why: [core-architecture.md](core-architecture.md) §2.
 
-- [ ] **One same-tick semantic** **[ask — core]** (R125, 2026-10-27,
+- [ ] **One same-tick semantic** **[ask — core]** (a preliminary choice, R125, 2026-10-27,
   [record](../reviews/2026-10-27-design-questions-rulings.md)): every step diagram and runner
   propagates within the tick; `Computer.tick` stops reading the last tick's committed buffer;
   a delay exists only as a block (`UnitDelay`, the MPC's delay, a held slow output); an
   algebraic loop is refused at wiring time. Done when the step-diagram evaluator and
   `Computer.tick` agree on every hybrid demo and the moved numbers carry a closeness report.
-- [ ] **The composition operators on step systems** **[ask — core]** (R126, 2026-10-27): `@`,
+- [ ] **The composition operators on step systems** **[ask — core]** (a preliminary choice, R126, 2026-10-27): `@`,
   `>>` and `+` on `StepSystem` and `StepDiagramSystem`, on `core/assembly.py`, returning a
   `StepDiagramSystem`; a continuous and a step operand together refused, naming `%` or
   `discretize`; the CONSTITUTION §6 grammar sentence amended in the same change (its text to the
@@ -269,7 +269,7 @@ Why: [core-architecture.md](core-architecture.md) §5. Design:
     - "the hybrid and realtime simulators move onto the step model with it", from the old S31
       rung; whether the realtime re-base is core is open.
   - **Open:**
-    Ruled 2026-10-27 ([record](../reviews/2026-10-27-design-questions-rulings.md)):
+    Preliminary choices of 2026-10-27, open to revision ([record](../reviews/2026-10-27-design-questions-rulings.md)):
     - `computer @ plant` is a `StepDiagramSystem` at its base clock, named `HybridDiagram` for
       now, with the CONSTITUTION invariant-1 amendment in the landing change (R127);
     - `compute_rollout()` is the standard step rollout, the samples at the ticks, `evaluate`'s

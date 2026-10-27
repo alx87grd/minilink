@@ -4,9 +4,12 @@
 **Context:** after the 2026-10-26 simplification, the maintainer asked that QUESTIONS hold only
 fundamental design questions (architecture, API and naming, vision, performance), and to go
 through them one at a time: a brief context, options with their consequences, a recommendation.
-Each ruling below was taken in session; the plan doc it shapes and TODO carry it.
+**Status: preliminary choices, not final rulings.** The maintainer's words (2026-10-27): record
+each answer as a preliminary choice; when the final architecture is drafted, these decisions stay
+open to readjustment. The R-ids are anchors for citation; each heading says "preliminary". The
+plan doc each choice shapes and TODO carry it, with the same caveat.
 
-## R124 (2026-10-27) Three owners of a start; a diagram's state derived from its blocks
+## R124 (2026-10-27, preliminary) Three owners of a start; a diagram's state derived from its blocks
 
 The question: does a diagram's start state become a parameter (S29)?
 
@@ -41,7 +44,7 @@ the task with the design); a read-only `diagram.x0` (purer, but breaks `loop.x0 
 lessons); keeping S29 in v0.9 (one exception to "every number a parameter" in the core).
 Reviewers A, B and C all placed S29 in the core. The row moves from v0.9 to TODO §1.1.
 
-## R125 (2026-10-27) One same-tick semantic: propagation within the tick
+## R125 (2026-10-27, preliminary) One same-tick semantic: propagation within the tick
 
 The question: a step diagram propagated a signal within its tick, while `Computer.tick` read the
 previous tick's committed buffer (one tick of latency per wire). The same diagram gave different
@@ -61,7 +64,7 @@ Options weighed: one tick per wire (simple to execute, but a diagram no longer m
 equations); either, per connection (two dialects). Reviewers A, B and C: propagation within the
 tick.
 
-## R126 (2026-10-27) The composition operators on step systems
+## R126 (2026-10-27, preliminary) The composition operators on step systems
 
 The question: `@`, `>>` and `+` refused step systems; a step diagram was wired with `connect`
 only.
@@ -77,7 +80,7 @@ only.
 Options weighed: a helper per pattern (`gradient_loop`); `connect` only. Reviewers A and B: the
 operators; C: none in v0.3, extending `feedback()` if a lesson needs it.
 
-## R127 (2026-10-27) `computer @ plant` is a step diagram at its base clock; two verbs, two runners
+## R127 (2026-10-27, preliminary) `computer @ plant` is a step diagram at its base clock; two verbs, two runners
 
 The question: what the coupling of a sampled computer and a continuous plant returns, its name,
 and which runner its verbs use.
