@@ -394,14 +394,15 @@ found two edges of that line that contradicted the plan docs:
 - the one score came before the sampled loop it scores;
 - the `StepRollout` fold was placed two phases before the sampled loop it waits on.
 
-The lanes follow the dependencies instead. Each lane starts once the rulings it needs are taken.
+The lanes follow the dependencies instead. The preliminary choices of 2026-10-27 (R124–R139) give
+every lane what it needs to start; only one score (join 1) waits on its investigation.
 
 | Lane | Workstreams, in order | Waits on |
 | --- | --- | --- |
-| **The objects-and-draws lane** | §1: the textbook leftovers, distributions and sets reading `params`, the shaping to `core/`, `Set.as_cost`, one parameter-tree module → §3: per-block seeds and disturbance signals, one draw on both backends, `NoiseSource` → §4: the seeded policy | the draws' rulings |
-| **The loop lane** (the critical path; it starts first) | §2: step evaluators trace and batch, one same-tick semantic → §5: the pure computer tick (with `Computer.tick` as its oracle), the MPC delay, the caches gone, the step-diagram runner, the sampled face with a digital PID, the `StepRollout` fold, the orchestrator over pure blocks | §2's and §5's rulings |
-| **The program lane** | §7: one backend table, the program with parameters, collocation reading the plant, the online call → §8: the native kernel, byte-identical, then its fixed-`K` traced form | §7's rulings |
-| **Join 1** | §6: one per-step cost and one failure rule, read by the evaluator, then value iteration and RL | the objects and loop lanes |
+| **The objects-and-draws lane** | §1: the textbook leftovers, distributions and sets reading `params`, the shaping to `core/`, `Set.as_cost`, one parameter-tree module → §3: per-block seeds and disturbance signals, one draw on both backends, `NoiseSource` → §4: the seeded policy | ready (R124, R128, R129, R133, R134) |
+| **The loop lane** (the critical path; it starts first) | §2: step evaluators trace and batch, one same-tick semantic → §5: the pure computer tick (with `Computer.tick` as its oracle), the MPC delay, the caches gone, the step-diagram runner, the sampled face with a digital PID, the `StepRollout` fold, the orchestrator over pure blocks | ready (R125, R126, R127) |
+| **The program lane** | §7: one backend table, the program with parameters, collocation reading the plant, the online call → §8: the native kernel, byte-identical, then its fixed-`K` traced form | ready (R130, R131, R132) |
+| **Join 1** | §6: one per-step cost and one failure rule, read by the evaluator, then value iteration and RL | the objects and loop lanes, and the one-score investigation (QUESTIONS) |
 | **Join 2** | §8: the fixed-iteration MPC tick, its closed loop in one scan tuned by gradient; §7: the stochastic program as a convention and a test | all three lanes |
 | **Beside, from §1 on** | §9: Fields, additive to the path; it needs only `Set.as_cost`'s signature from §1 | §1's `as_cost` signature |
 | **Last** | hardening (S66, with the error family if moved in); the notebooks (R47); the merge | everything |
@@ -424,7 +425,8 @@ The intended changes already named, each a commit of its own with a ledger line:
 Reviewer C's sequence, so each number moves once: the same-tick semantic, then the MPC delay,
 then the hybrid defaults; the per-step cost before any RL re-pin.
 
-When to re-pin (per change, or once) is open.
+Re-pinning: each intended change re-pins the regression baselines it moves, in its own commit;
+the student-facing numbers at the merge (TODO §1's gates).
 
 ## 11. Definition of done (a proposal; the maintainer confirms)
 
