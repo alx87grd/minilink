@@ -372,6 +372,11 @@ textbook form), not hidden.
 
 ## 6. The receding-horizon block: the contract it should ask for
 
+**Superseded (2026-10-27, R148):** the planner contract is now
+[planner-and-mpc.md](planner-and-mpc.md): MPPI implements the compiled face (`z` its nominal `U`
+and origin, `shift` the shifted `U`, `policy` the input at `t`, `seed` a leaf). The text below is
+the earlier proposal.
+
 To wrap any trajectory-family planner, `ModelPredictiveController` should read three
 verbs and nothing else:
 
