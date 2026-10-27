@@ -14,9 +14,10 @@ by `docs/pipeline_figures.py` (`python docs/pipeline_figures.py` rebuilds every 
 
 Three foundations (CONSTITUTION §1.1): the model, a `System`; the task, a `PlanningProblem`
 built on it; and the solver boundary, a `MathematicalProgram` and its `Optimizer`. Every tool
-is a path from them: simulate, analyze and design straight from the system; plan, learn and
-evaluate from the problem. Each tool's lane ends in what it gives back, drawn as a small
-picture. The paths that solve a program (trajectory optimization, tuning) meet the optimizer,
+is a path from them: simulate, play, analyze and design straight from the system; plan, learn
+and evaluate from the problem. Each tool's lane ends in what it gives back, drawn as a small
+picture. Play is the live session (`sys.game()`, keyboard or joystick on the wall clock), and a
+simulated trajectory replays as the same animation (`sys.animate(traj)`). The paths that solve a program (trajectory optimization, tuning) meet the optimizer,
 and every controller a path returns is a `System` again, closed on the plant with `@`. The
 JAX column says what the objects linked to it give: their equations trace under JAX, so the
 tools built on them compile once (`jit`), give exact gradients (`grad`), and run many cases in

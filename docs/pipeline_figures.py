@@ -950,6 +950,7 @@ PATHS = {
 ACCENT = {
     # The System's tools, cool
     "Simulate": ("#ecfeff", "#0891b2", "#164e63"),
+    "Play": ("#eff6ff", "#2563eb", "#1e3a8a"),
     "Analyze": ("#ecfdf5", "#059669", "#064e3b"),
     "Design": ("#f7fee7", "#65a30d", "#365314"),
     # The problem's tools, warm
@@ -959,6 +960,7 @@ ACCENT = {
 }
 RESULT = {
     "Simulate": "Trajectory",
+    "Play": "Animation",
     "Analyze": "Poles · Bode",
     "Design": "Controller",
     "Plan": "PlanningSolution",
@@ -1093,8 +1095,54 @@ def pic_histogram(f, x, y, w, h, c):
     )
 
 
+def pic_screen(f, x, y, w, h, c):
+    """A screen on its stand, a cart and its pendulum in it."""
+    sw, sh = min(w, 1.6 * h), h - 8
+    sx = x + (w - sw) / 2
+    f.add(
+        f'<rect x="{sx}" y="{y}" width="{sw}" height="{sh}" rx="4" fill="none" stroke="{c}" '
+        f'stroke-width="2"/>'
+    )
+    mx = sx + sw / 2
+    f.add(
+        f'<path d="M{mx},{y + sh} L{mx},{y + h} M{mx - 10},{y + h} L{mx + 10},{y + h}" '
+        f'stroke="{c}" stroke-width="2" stroke-linecap="round"/>'
+    )
+    gy = y + sh - 9
+    f.add(
+        f'<path d="M{sx + 8},{gy} L{sx + sw - 8},{gy}" stroke="{c}" stroke-width="1" opacity="0.4"/>'
+    )
+    cx = mx - 10
+    f.add(f'<rect x="{cx - 9}" y="{gy - 8}" width="18" height="8" rx="2" fill="{c}"/>')
+    f.add(
+        f'<path d="M{cx},{gy - 8} L{cx + 16},{y + 9}" stroke="{c}" stroke-width="2" '
+        f'stroke-linecap="round"/>'
+    )
+    f.add(f'<circle cx="{cx + 16}" cy="{y + 9}" r="4" fill="{c}"/>')
+
+
+def pic_gamepad(f, x, y, w, h, c):
+    """A gamepad: a body with two grips, a d-pad and two buttons, centred in the box."""
+    cx, cy = x + w / 2, y + h / 2 - 4
+    f.add(
+        f'<path d="M{cx - 26},{cy - 13} L{cx + 26},{cy - 13} Q{cx + 39},{cy - 13} {cx + 41},{cy + 2} '
+        f"L{cx + 44},{cy + 17} Q{cx + 45},{cy + 25} {cx + 36},{cy + 23} L{cx + 21},{cy + 10} "
+        f"L{cx - 21},{cy + 10} L{cx - 36},{cy + 23} Q{cx - 45},{cy + 25} {cx - 44},{cy + 17} "
+        f'L{cx - 41},{cy + 2} Q{cx - 39},{cy - 13} {cx - 26},{cy - 13} Z" fill="none" '
+        f'stroke="{c}" stroke-width="2.2" stroke-linejoin="round"/>'
+    )
+    dx = cx - 22
+    f.add(
+        f'<path d="M{dx - 6},{cy - 1} L{dx + 6},{cy - 1} M{dx},{cy - 7} L{dx},{cy + 5}" '
+        f'stroke="{c}" stroke-width="3" stroke-linecap="round"/>'
+    )
+    for bx, by in ((cx + 18, cy - 5), (cx + 26, cy + 2)):
+        f.add(f'<circle cx="{bx}" cy="{by}" r="3.2" fill="{c}"/>')
+
+
 PICS = {
     "Simulate": pic_trajectory,
+    "Play": pic_screen,
     "Analyze": pic_bode,
     "Design": pic_poles,
     "Plan": pic_path,
@@ -1262,11 +1310,15 @@ def system_card(f, x, y, w, h):
 
 
 def library_map():
-    """The whole library on one page: three foundations, six tools as coloured lanes, JAX beside."""
+    """The whole library on one page: three foundations, seven tools as coloured lanes, JAX beside."""
     order = list(ACCENT)
     x0, w, gap = 58, 144, 14
-    cols = {name: x0 + i * (w + gap) for i, name in enumerate(order)}
-    right = x0 + 6 * w + 5 * gap
+    pair = 14  # Simulate and Play share a lane, the replay arrow between them
+    cols = {
+        name: x0 + i * (w + gap) + (pair if i else 0) for i, name in enumerate(order)
+    }
+    right = cols[order[-1]] + w
+    jx, jw = right + 24, 134
     px0, px1 = cols["Plan"], right
     sys_y, sys_h = 30, 134
     py, ph = sys_y + sys_h + 36, 120
@@ -1274,7 +1326,7 @@ def library_map():
     oy, oh = ry + rh + 30, 104
     bus_y = oy + oh + 28
     by, bh = bus_y + 44, 88
-    f = Figure(1180, by + bh + 30)
+    f = Figure(jx + jw + 30, by + bh + 30)
     markers(f)
 
     system_card(f, x0, sys_y, right - x0, sys_h)
@@ -1312,15 +1364,21 @@ def library_map():
             width=1.8,
         )
 
-    # Six lanes: the tool, then what it gives back, in one colour
+    # Seven lanes: the tool, then what it gives back, in one colour
     for name, x in cols.items():
         fill, stroke, ink = ACCENT[name]
         cx = x + w / 2
-        f.add(
-            f'<rect x="{x - 4}" y="{ry - 8}" width="{w + 8}" height="{oy + oh - ry + 16}" rx="14" '
-            f'fill="{fill}"/>'
+        if name != "Play":
+            bw = cols["Play"] + w - x if name == "Simulate" else w
+            f.add(
+                f'<rect x="{x - 4}" y="{ry - 8}" width="{bw + 8}" height="{oy + oh - ry + 16}" '
+                f'rx="14" fill="{fill}"/>'
+            )
+        top = (
+            sys_y + sys_h
+            if name in ("Simulate", "Play", "Analyze", "Design")
+            else py + ph
         )
-        top = sys_y + sys_h if name in ("Simulate", "Analyze", "Design") else py + ph
         f.arrow(f"M{cx},{top} L{cx},{ry - 10}", stroke, marker=f"m{name}", width=2)
         f.add(
             f'<rect x="{x}" y="{ry}" width="{w}" height="{rh}" rx="10" fill="#ffffff" '
@@ -1331,7 +1389,10 @@ def library_map():
             f'stroke-linecap="round"/>'
         )
         f.text(cx, ry + 28, name, 15.5, 700, ink)
-        f.math(cx, ry + 62, TOOL_TEX[name], 17, "#0f172a", max_width=w - 28)
+        if name == "Play":
+            pic_gamepad(f, x + 14, ry + 40, w - 28, rh - 44, stroke)
+        else:
+            f.math(cx, ry + 62, TOOL_TEX[name], 17, "#0f172a", max_width=w - 28)
         f.arrow(f"M{cx},{ry + rh} L{cx},{oy - 2}", stroke, marker=f"m{name}", width=2)
         f.add(
             f'<rect x="{x}" y="{oy}" width="{w}" height="{oh}" rx="10" fill="#ffffff" '
@@ -1339,6 +1400,15 @@ def library_map():
         )
         f.text(cx, oy + 24, RESULT[name], 14.5, 650, ink)
         PICS[name](f, x + 24, oy + 40, w - 48, oh - 54, stroke)
+
+    # A trajectory replays as an animation too
+    ty = oy + oh / 2 + 8
+    f.arrow(
+        f"M{cols['Simulate'] + w},{ty} L{cols['Play'] - 2},{ty}",
+        ACCENT["Play"][1],
+        marker="mPlay",
+        width=2,
+    )
 
     # Every controller is a System again: one bold loop back to the top
     drops = [cols["Design"] + w / 2, plan_cx - 30, cols["Learn"] + w / 2]
@@ -1376,8 +1446,7 @@ def library_map():
     )
 
     # JAX
-    jx = right + 24
-    jax_column(f, jx, sys_y, 1150 - jx, by + bh - sys_y)
+    jax_column(f, jx, sys_y, jw, by + bh - sys_y)
     for y in (sys_y + sys_h / 2, py + ph / 2, ry + rh / 2, by + bh / 2):
         link(f, right if y < by else px1, y, jx, y)
 
