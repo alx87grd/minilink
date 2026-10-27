@@ -280,7 +280,10 @@ V = QuadraticField(P)                            # §9: the terminal cost as a f
     - value iteration prices the cells that leave its grid.
   - The rules are written twice, in the environment's step and in `score_run` (R108 gives them
     one owner).
-- **Open:**
+- **Open, an investigation for the final design** (the maintainer, 2026-10-27): sets and costs
+  read `t`, so whether a discrete problem needs discrete versions of them or binds `t_k`; whether
+  a continuous system's evaluation is done exactly as a `StepSystem` on its `dt` (the trapezoid a
+  plain sum). Then:
   - differentiable-problem §9.4's six points;
   - the failure rule, the hold and the scope: shooting's score, the planners' fixed-`dt`
     policies, S63;

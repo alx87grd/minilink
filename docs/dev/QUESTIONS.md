@@ -21,8 +21,6 @@ the entries below hold the context:
 9. **Programs:** pass `p`, complete trees inside, the seed by the `seed` key, the warm start on
    the solve call (B).
 10. **`as_cost` and the shaping:** one function, moved to `core/` first (B).
-11. **One score:** the per-step cost integrated with the state (C).
-12. **The failure rule:** `score_run`'s, with a zero-order hold and S63 in v0.4 (C).
 13. **The native kernel:** a pure kernel with a step-system view (C).
 14. **The first fixed-iteration tick:** the gradient MPC; MPPI in v0.4 (C).
 15. **The borderline rows:** S70 lands before S66, the realtime re-base
@@ -270,7 +268,13 @@ In the order to decide (reviewer C §5).
 
 ## v0.3 — C. Gates later core work
 
-### Does the evaluation unify from the rollout on, with a discretized planning problem? (needs refinement)
+### Does the evaluation unify from the rollout on, with a discretized planning problem? (an investigation for the final design)
+- **Your note (2026-10-27): an investigation for the final design, not settled tonight.** Sets and
+  costs take time as an argument: does a discrete problem need discrete versions of them, or
+  do they bind `t_k = t₀ + k·dt`, and how does a natively discrete cost `c(x_k, u_k, k)` fit?
+  Should the evaluation of a continuous system be done exactly as a `StepSystem` on its `dt`, so
+  that the trapezoid becomes a plain sum? This is a core part of the final design; investigate
+  the cleanest option, with its pros and cons, before a choice.
 - **Blocks:** one score (§6); it shapes the sampled face and the sampled loop (§5).
 - **Today:** the evaluator's run is already the step model, and its score already reads the
   samples. The same continuous cost becomes a per-step cost three ways: value iteration and RL
@@ -296,6 +300,7 @@ In the order to decide (reviewer C §5).
 - **Answer:**
 
 ### What failure rule, hold and scope does the discrete problem take?
+- **Status (2026-10-27):** part of the one-score investigation above; settled with it.
 - **Blocks:** one score (§6). The numbers of value iteration, RL and the evaluator move once.
 - **Today:**
   - `score_run` integrates to `tf` and checks `X` and `U` at every sample, under the price
