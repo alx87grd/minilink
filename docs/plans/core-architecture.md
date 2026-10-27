@@ -188,16 +188,16 @@ V = QuadraticField(P)                            # §9: the terminal cost as a f
   - a seed per experiment comes from `realize(key)`;
   - `log_prob` and `entropy` sit beside `h`.
 
-  A draft from reviewer A §3.4 is an alternative: a deterministic law with a noise input port.
-- **Status.** The direction is set. The contract is open (D29,
-  [future-policies.md](future-policies.md) §5.1). The recommendation is
-  `GaussianPolicy(mean, log_std, *, dt, seed=None)`, with `NeuralPolicyController` its
-  deterministic face.
+- **Status.** The direction is set. Preliminary choice, 2026-10-27 (R129; open to revision):
+  - one block, `GaussianPolicy(mean, log_std, *, sample_period, seed=None)`, its noise `ε(t)`
+    internal and deterministic given the seed (the `WhiteNoise` counter-based signal at
+    `⌊t/Δ⌋`), `seed` an integer leaf of `params`;
+  - `log_prob` and `entropy` methods of the block, not of `Distribution`;
+  - one draw convention, the sample index from the block's own period (the tick index of R104
+    in a computer);
+  - `NeuralPolicyController` is its deterministic face (`seed=None`).
 - **Today.** The RL Gaussian heads draw from their own keys.
-- **Open:**
-  - the contract and its period keyword;
-  - one draw convention, the held sample or the tick;
-  - the RL heads' rebuild, in the core or in v0.4.
+- **Open:** the RL heads' rebuild, with the block or in v0.4 (a placement detail).
 - **Rows:** [TODO §1.4](TODO.md#14-the-seeded-stochastic-policy).
 
 ## 5. The hybrid loop: one model, two runners (pillar)

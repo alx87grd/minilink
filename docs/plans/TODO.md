@@ -230,8 +230,11 @@ Why: [core-architecture.md](core-architecture.md) §4. Design:
 [future-policies.md](future-policies.md) §5 point 4 and §5.1 (D29).
 
 - [ ] **The standard stochastic policy as a seeded block** **[ask — core]** (the maintainer's
-  direction, 2026-10-22):
-  - `u = μ_θ(x) + σ_θ(x) · ε(seed, ⌊t/Δ⌋)`, with the noise block's counter-based draw;
+  direction, 2026-10-22; its shape a preliminary choice of 2026-10-27, R129,
+  [record](../reviews/2026-10-27-design-questions-rulings.md)):
+  - one block, `GaussianPolicy(mean, log_std, *, sample_period, seed=None)`:
+    `u = μ_θ(x) + σ_θ(x) · ε(t)`, `ε(t)` the noise block's counter-based signal at `⌊t/Δ⌋`,
+    deterministic given the seed;
   - the mean at `seed=None`, and a seed per experiment from `realize(key)`;
   - the log-probability and the entropy as methods beside `h`;
   - the RL Gaussian and squashed-Gaussian heads rebuilt on it;

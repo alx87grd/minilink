@@ -18,8 +18,6 @@ the entries below hold the context:
    the rest, then merge the landed core into `dev`, and each workstream as it lands (A).
 2. **The stateless MPC:** refuse it in `problem.compile` now (B).
 6. **The run caches:** they go (B).
-7. **One draw convention:** the sample index from the block's own period (B).
-8. **The seeded policy:** its period is `sample_period=` (B).
 9. **Programs:** pass `p`, complete trees inside, the seed by the `seed` key, the warm start on
    the solve call (B).
 10. **`as_cost` and the shaping:** one function, moved to `core/` first (B).
@@ -171,39 +169,6 @@ In the order to decide (reviewer C §5).
   Renaming the frozen names `compile_backend` and `dt_mpc` (G3, R50) is a separate sweep (R82).
 - **Recommendation:** none.
 - **Reviewers:** B P3 proposes the rule. A and C: `sample_period` on the seeded policy.
-- **Answer:**
-
-### What does the standard stochastic policy look like as a seeded block?
-- **Blocks:** the seeded stochastic policy (§4, D29); the RL heads rebuilt on it, the RL
-  numbers changing once (core or C5: the borderline entry).
-- **Today:** your direction (2026-10-22), `u = μ_θ(x) + σ_θ(x) · ε(seed, ⌊t/Δ⌋)`. Its methods
-  and first heads are open.
-- **Your direction (2026-10-26):** a core pillar of v0.3; its contract stays open.
-- **Options:**
-  - D29's one block;
-  - or a deterministic law with a noise input port fed by `WhiteNoise`, from a factory (reviewer
-    A §3.4: the reparameterization as a diagram, and no draw-convention question).
-- **Recommendation:** `GaussianPolicy(mean, log_std, *, dt, seed=None)` in `control/neural.py`:
-  - `seed=None` is the deterministic face;
-  - `log_prob` and `entropy` sit beside `h`;
-  - the squashed variant is a subclass.
-- **Reviewers:**
-  - all three: `sample_period=` in place of `dt`;
-  - A: `log_prob` and `entropy` on the policy, not on `Distribution`; weigh §3.4 first;
-  - B: the `…Policy` suffix rule at v1.0, with the RL `StochasticPolicy` renamed.
-- **Detail:** [future-policies.md §5.1, D29](../plans/future-policies.md#51-d29-the-standard-stochastic-policy-as-a-seeded-block-moved-from-end-state-apimd-2026-10-26)
-- **Answer:**
-
-### Which draw convention does a seeded policy use: the held sample or the tick?
-- **Blocks:** the seeded stochastic policy (§4) and every sampled controller with draws (§5).
-- **Today:** D29 writes `ε(seed, ⌊t/Δ⌋)`, the noise block's held draw on continuous time. R104
-  draws a sampled controller's noise from its seed and the tick `k`.
-- **Options:** one convention, stated (with `Δ = d·dt_base`, `⌊t/Δ⌋` is the tick index); or
-  two, by the block's kind.
-- **Recommendation:** none.
-- **Reviewers:** all three: one convention, the sample index `⌊t/Δ⌋` from the block's own
-  period (on the tick, `k` with `Δ = d·dt_base`), stated once in DESIGN §4.
-- **Detail:** [future-policies.md](../plans/future-policies.md) §5 point 4, §5.1; [sampled-path.md](../plans/sampled-path.md) §8.6 (D14)
 - **Answer:**
 
 ### Does the parametric program become one family, and is it one noun or two?

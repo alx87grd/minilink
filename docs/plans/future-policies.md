@@ -149,6 +149,11 @@ demo than human driving, and free of hardware.
 
 ### 5.1 D29, the standard stochastic policy as a seeded block (moved from end-state-api.md, 2026-10-26)
 
+**Preliminary choice, 2026-10-27 (R129, [record](../reviews/2026-10-27-design-questions-rulings.md)):**
+one block, `sample_period=` in place of `dt`, its noise internal and deterministic given the seed
+(the `WhiteNoise` signal at `⌊t/Δ⌋`), `log_prob` and `entropy` on the block. The text below is
+the recommendation as it stood.
+
 Moved verbatim from end-state-api.md. The block is a v0.3 core pillar (TODO §1.4); whether the RL
 heads' rebuild lands with it or in C5 (v0.4) is open (QUESTIONS.md).
 

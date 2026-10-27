@@ -146,3 +146,28 @@ Options weighed: accept both a law (one constant draw) and a signal (two meaning
 argument); keep the bare law and amend RD-R4 (contradicts the textbook's noise intensity and the
 LQG gate); the explicit diagram only (one way, but every stochastic task builds a diagram).
 Reviewer A: signals, a refusal for a bare law; reviewer B: one `realize` shape.
+
+## R129 (2026-10-27, preliminary) The seeded stochastic policy: one block, its noise a deterministic signal of its seed
+
+The question: the shape of the standard stochastic policy (D29), its draw convention and its
+keywords.
+
+- **One block,** `GaussianPolicy(mean, log_std, *, sample_period, seed=None)`:
+  `u = μ_θ(x) + σ_θ(x) · ε(t)`.
+- **Its noise is internal and deterministic given the seed:** `ε(t)` is the same counter-based
+  signal a `WhiteNoise` source produces, a pure function of `seed` and the sample index
+  `⌊t/Δ⌋`, so the block stays pure and its draws reproduce on NumPy and JAX.
+- **`seed` is a parameter** (an integer leaf, found by the `seed` key, R118), realized per trial
+  from one key and vmappable; `seed=None` gives the deterministic face `u = μ(x)`
+  (`NeuralPolicyController`).
+- **`log_prob(x, u)` and `entropy(x)` are methods of the block**, not of `Distribution`, which
+  keeps its two methods.
+- **One draw convention:** the sample index from the block's own period, `k = ⌊t/Δ⌋`; in a
+  computer at `dt_base`, with `Δ = d·dt_base`, it is the tick index of R104.
+- **The period keyword is `sample_period=`**, as on `WhiteNoise`; `dt` stays a tool's grid.
+- Variants (the squashed Gaussian) are subclasses.
+
+Options weighed: a deterministic law with a noise input port fed by a `WhiteNoise` source, from a
+factory (randomness only in source blocks, but `log_prob` less direct); a block drawing by its own
+rule. Reviewers A, B and C: `sample_period=` and one convention; A leaned to the law-plus-input
+form.
