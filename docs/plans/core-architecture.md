@@ -232,13 +232,15 @@ V = QuadraticField(P)                            # §9: the terminal cost as a f
   - `problem.compile` refuses a `StepSystem` controller, but it accepts the stateless MPC,
     whose latch then runs at the RK4 stages.
   - `%` refuses a controller with continuous states (automation-by-convention.md §4.5, no row).
+- **Ruled 2026-10-27 (R127):**
+  - `computer @ plant` is a `StepDiagramSystem` at its base clock, still named
+    `HybridDiagram`; CONSTITUTION invariant 1 is amended when it lands;
+  - `compute_rollout()` is the standard step rollout (ticks only, traced; `evaluate`'s
+    semantics); `compute_trajectory()` is the orchestrator with a continuous plant solver (dense);
+  - both follow one same-tick semantic (R125, §2).
 - **Open:**
-  - the CONSTITUTION amendment, `computer @ plant` a step diagram;
-  - `compute_trajectory`'s default runner and the plant trajectory's resolution;
-  - (the same-tick semantic is ruled, R125, §2);
   - the run caches (D13);
   - refusing the stateless MPC now;
-  - the name (`SampledDataSystem`);
   - the realtime re-base, core or later.
 
   Elsewhere:
@@ -420,8 +422,8 @@ From reviewer C §3.3. v0.3 is done when these scripts run as tests:
    `jax.grad` matches central differences.
 3. **One compiled MPC program**, rebound with two plant `mu` values and a moved target, matches
    the rebuilds. `optimizer_method="ipopt"` works on the compiled path.
-4. **The same digital PID** run by `compute_trajectory` and scored by `evaluate` gives one `J` to
-   `rtol`.
+4. **The same digital PID** run by `compute_rollout` and scored by `evaluate` gives one `J` to
+   `rtol`, and `compute_trajectory` (the orchestrator) agrees within its integration tolerance.
 5. **The fixed-iteration MPC's closed loop**: `problem.compile(mpc).evaluate(p)` runs, `vmap`s
    over starts, and its gradient tunes a cost weight.
 6. **A `QuadraticField`** serves as a terminal cost and as the certificate's `V`, with the DP and

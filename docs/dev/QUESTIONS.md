@@ -17,10 +17,6 @@ the entries below hold the context:
 1. **The 16 overnight decisions:** look at the number changes and the input-box sweep, accept
    the rest, then merge the landed core into `dev`, and each workstream as it lands (A).
 2. **The stateless MPC:** refuse it in `problem.compile` now (B).
-4. **`computer @ plant`:** a step diagram, with the invariant-1 amendment, named
-   `SampledDataSystem` (B).
-5. **`compute_trajectory` on a hybrid loop:** the step-diagram runner, with the substeps
-   recorded (B).
 6. **The run caches:** they go (B).
 7. **One draw convention:** the sample index from the block's own period (B).
 8. **The seeded policy:** its period is `sample_period=` (B).
@@ -96,7 +92,7 @@ the entries below hold the context:
   - an LQG Monte Carlo on one key;
   - a digital PID's gradient;
   - an MPC program rebound;
-  - one `J` from `compute_trajectory` and `evaluate`;
+  - one `J` from `compute_rollout` and `evaluate`;
   - the fixed-iteration MPC tuned;
   - a `QuadraticField` as terminal cost and `V`;
   - every plant and notebook green.
@@ -149,49 +145,6 @@ In the order to decide (reviewer C §5).
 - **Options:** refuse it now, naming the hybrid loop; leave it until the sampled face.
 - **Recommendation:** none.
 - **Reviewers:** all three: refuse it now (one line).
-- **Answer:**
-
-### Does `computer @ plant` become a step diagram, with a CONSTITUTION amendment, and what is it called?
-- **Blocks:** the sampled loop (§5); CONSTITUTION invariant 1.
-- **Today:** `computer @ plant` builds a `HybridDiagram`, a plain class beside the step
-  algebra. R13 and R120 rule the sampled loop a tool, not a `System`.
-- **Your direction (2026-10-26):** a tentative draft vision, not decided. The result is a
-  `StepDiagramSystem` subclass on the base clock, regular for the algebra and the analysis.
-  Later that day it became a core pillar, "one model, two runners". The amendment stays open.
-- **Options:**
-  - amend invariant 1's second sentence to "the coupling is a tool; its result, at the base
-    clock, is a `System` of the step algebra";
-  - or keep R120 and expose a read-only step map.
-
-  For the name: `HybridDiagram`, or `SampledDataSystem` (Åström and Wittenmark's term).
-- **Recommendation:** the amendment, when the kernel lands; the precedent is `Discretization`.
-- **Reviewers:**
-  - all three: yes, the amendment;
-  - A: a subclass only if it adds verbs and overrides none, with a test;
-  - C: amend when the pure tick passes the `Computer.tick` oracle;
-  - all three prefer `SampledDataSystem` to `HybridDiagram`.
-- **Detail:** [sampled-path.md](../plans/sampled-path.md) §8.5
-- **Answer:**
-
-### On a hybrid loop, which runner does `compute_trajectory` use by default, and how dense is the plant's trajectory?
-- **Blocks:**
-  - the hybrid loop (§5);
-  - the hybrid demos' numbers and the regression gates `f.hybrid_zoh` and `f.dual_rate`;
-  - the shape of the `StepRollout` fold (§2).
-- **Today:** `HybridDiagram.compute_trajectory` integrates the plant by RK4 substeps inside each
-  base tick and records every substep. No adaptive option exists.
-- **Options** (sampled-path.md §8.4's two drafts):
-  - the default runner:
-    - the step-diagram runner, with `solver="scipy"` as the adaptive path;
-    - or the orchestrator with an adaptive plant, the step diagram kept for analysis,
-      `evaluate` and gradients;
-  - the resolution: a finer base clock, the substeps recorded, or a reconstruction after the
-    run.
-- **Recommendation:** none.
-- **Reviewers:** all three: the step-diagram runner with the substeps recorded, so it gives the
-  same `J` as `evaluate`; `solver="scipy"` for the adaptive path, later. B adds one verb for
-  every kind once the fold lands (`compute_rollout` folds into `compute_trajectory`).
-- **Detail:** [sampled-path.md](../plans/sampled-path.md) §8.4
 - **Answer:**
 
 ### Do the run caches on the sampled loop go?

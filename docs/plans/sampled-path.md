@@ -244,6 +244,11 @@ computation, a core contract change for the maintainer.
 
 ### 8.4 The end vision for this limited hybrid (the maintainer, 2026-10-26, draft)
 
+**Ruled 2026-10-27 (R127, [record](../reviews/2026-10-27-design-questions-rulings.md)):**
+`compute_rollout()` is the standard step rollout (the ticks, `evaluate`'s semantics) and
+`compute_trajectory()` the orchestrator with a continuous plant solver (the dense trajectory);
+the drafts below are the analysis that led there.
+
 > `computer @ plant` is fully supported as one discrete model on a base clock, the common
 > denominator of all the computer's clocks. The computer exports as a pure step block; the
 > plant exports as a step block on the same base clock, with internal substeps if needed. This
@@ -378,6 +383,9 @@ continuous loop or `computer @ plant`, would be scored by one discrete evaluator
 discretized problem.
 
 ### 8.5 `computer @ plant` is a step diagram that knows it is hybrid (the maintainer, 2026-10-26, tentative draft vision)
+
+**Ruled 2026-10-27 (R127):** yes, a `StepDiagramSystem` at its base clock, named `HybridDiagram`
+for now; the CONSTITUTION invariant-1 amendment comes with the landing change.
 
 > The result of `computer @ plant` is considered to be the step diagram, at least for the
 > composition algebra and the analysis shortcuts. Some methods know it is a hybrid system and

@@ -76,3 +76,38 @@ only.
 
 Options weighed: a helper per pattern (`gradient_loop`); `connect` only. Reviewers A and B: the
 operators; C: none in v0.3, extending `feedback()` if a lesson needs it.
+
+## R127 (2026-10-27) `computer @ plant` is a step diagram at its base clock; two verbs, two runners
+
+The question: what the coupling of a sampled computer and a continuous plant returns, its name,
+and which runner its verbs use.
+
+- **A `System` of the step algebra.** `computer @ plant` returns a `StepDiagramSystem` at its
+  base clock: the computer's pure tick plus `discretize(plant, dt_base, substeps=n)`, keeping its
+  continuous source (the `Discretization` precedent). Every step tool applies (`rollout`,
+  `jacobian`, the sampled-data loop's poles, `problem.compile`, `vmap`, `grad`).
+  **CONSTITUTION invariant 1 is amended** when it lands ("the coupling is a tool; its result, at
+  the base clock, is a `System` of the step algebra"), against R13 and R120's "not a `System`";
+  the text comes to the maintainer with the landing commit.
+- **The name stays `HybridDiagram` for now** (a `StepDiagramSystem` subclass). `SampledDataSystem`
+  (the reviewers' choice, the textbook term) stays an option for the naming of the frozen surface.
+- **Two verbs, two runners, the same pure blocks:**
+  - `loop.compute_rollout()` is the standard step-system rollout: the samples at the base ticks,
+    pure, traced, differentiable. `problem.compile` and `evaluate` run this semantics, so `J`
+    matches `compute_rollout`.
+  - `loop.compute_trajectory()` is the specialized hybrid simulation: the clock orchestrator
+    ticks the computer and a continuous solver integrates the plant between ticks (adaptive,
+    restarted at each sample, since the sample times are known), giving the dense plant
+    trajectory. It is the realtime runner's offline twin, and it differs from `evaluate`'s `J`
+    by the integration error only.
+- **Why two verbs:** a step rollout records only the ticks; the plant's substeps live inside
+  `discretize`'s step. Recording them through the standard rollout would change the
+  `StepSystem` contract. The orchestrator gives the dense trajectory without that change.
+- **Both runners follow R125** (propagation within the tick), and the step diagram is the
+  orchestrator's test oracle at the ticks.
+- **Left to the implementation:** the plant solver's default in `compute_trajectory` (adaptive,
+  per this ruling; today's fixed RK4 substeps kept as a `solver=` choice) and its tolerances.
+
+Options weighed: stay a tool with a read-only step map (no amendment, two objects for one
+loop); one verb with the step runner by default (one `J` everywhere, but the dense trajectory
+needs a contract change). Reviewers A, B and C: a step diagram; `SampledDataSystem`; one verb.

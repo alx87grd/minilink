@@ -269,10 +269,14 @@ Why: [core-architecture.md](core-architecture.md) §5. Design:
     - "the hybrid and realtime simulators move onto the step model with it", from the old S31
       rung; whether the realtime re-base is core is open.
   - **Open:**
-    - the CONSTITUTION invariant-1 amendment (R13, R120);
-    - `compute_trajectory`'s default and the plant's resolution (§8.4).
-
-    The same-tick semantic is ruled: propagation within the tick (R125).
+    Ruled 2026-10-27 ([record](../reviews/2026-10-27-design-questions-rulings.md)):
+    - `computer @ plant` is a `StepDiagramSystem` at its base clock, named `HybridDiagram` for
+      now, with the CONSTITUTION invariant-1 amendment in the landing change (R127);
+    - `compute_rollout()` is the standard step rollout, the samples at the ticks, `evaluate`'s
+      semantics; `compute_trajectory()` is the orchestrator ticking the computer with a
+      continuous solver on the plant (adaptive by default, today's RK4 substeps a `solver=`
+      choice), the dense trajectory (R127);
+    - propagation within the tick, in both runners (R125).
 
   Done when the rulings are taken and the kernel's steps are written as rows here. It was v0.4
   by R86, and has been in v0.3's core since 2026-10-26.
