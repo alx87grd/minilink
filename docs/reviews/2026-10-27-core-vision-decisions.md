@@ -71,6 +71,25 @@ Decision 2 of the vision, taken as recommended.
   judge's trapezoid `J` changes once (an intended number change, R80). A logged run scored by
   `evaluate_trajectory` keeps the trapezoid and says so.
 
+## R143 (2026-10-27, preliminary) A problem is stochastic by its parts; `StochasticPlanningProblem` goes
+
+Decision 3 of the vision, taken as recommended.
+
+- **No stochastic class.** Where a number goes, a law may go:
+  - `x_start=` takes a point, a `Set` or a `Distribution` (R124's three kinds of start);
+  - `params=` takes laws in the tree's own shape (`{"plant": {"m": Uniform(0.9, 1.1)}}`), not
+    flat names;
+  - disturbances are source blocks (R128).
+- `x0_distribution=` and `params_distribution=` go; `criterion=` and `nominal()` (each law
+  replaced by its mean) move onto the class; `problem.is_stochastic` is read off its parts.
+- The same rule holds on `StepPlanningProblem` (R141): two problem classes in all, not four.
+- **Why:** R141's two classes are justified by different fields (horizon, discount, cost kind);
+  a stochastic problem has the same fields, some of them random, so a class would add nothing.
+- **Student-facing [ask — student-facing, given]:** the four RL demos and ten notebooks that
+  write `StochasticPlanningProblem(..., x0_distribution=...)` (the GRO860 RL notebooks,
+  tutorial 11, the showcases) are swept once, every caller in the same commit, no alias (R82;
+  the name freeze is paused between terms).
+
 ## The one-score question
 
 R141 and R142 answer its object (the compiled step face) and its per-step cost. Still open

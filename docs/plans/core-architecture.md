@@ -43,7 +43,7 @@ enters the pipeline, which landed 2026-10-24/25 (DESIGN §5–§6):
 ```text
 System  f(x, u, t; p)                                        §1  every number a leaf
   └─ compile → evaluator: f, step, rollout (the step model)  §2  the step algebra
-PlanningProblem / StochasticPlanningProblem                   §3  the draws (realize)   §4 seeded policy
+PlanningProblem (stochastic by its parts, R143)                §3  the draws (realize)   §4 seeded policy
   └─ problem.compile(controller, dt) → ProblemEvaluator       §5  a sampled controller (computer @ plant)
        run → Trajectory → score_run → Evaluation               §6  one score
        pe.program(wrt) → MathematicalProgram                   §7  one parametric family, the seed a leaf
@@ -75,8 +75,8 @@ estimation) are "the toolbox chapters".
 preliminary choices of 2026-10-27):
 
 ```python
-problem = StochasticPlanningProblem(plant, cost=cost, tf=5.0,              # §3: laws on starts,
-    x0=Gaussian(x_bar, std), params={"plant": {"m": Uniform(0.9, 1.1)}},   #     parameters and
+problem = PlanningProblem(plant, cost=cost, tf=5.0,                       # §3: laws on starts,
+    x_start=Gaussian(x_bar, std), params={"plant": {"m": Uniform(0.9, 1.1)}},   #     parameters and
     disturbances={"d": WhiteNoise(1, psd=0.1, sample_period=0.01)})        #     noise signals
 pe = problem.compile(pid % 0.01, dt=0.01)        # §5: a digital PID, the sampled face
 print(pe.evaluate(pe.params, n_trials=100, key=1))   # §3, §6: one key, one J
