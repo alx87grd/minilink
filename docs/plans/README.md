@@ -25,7 +25,7 @@ Pyro parity rows stay in [pyro-port-remaining.md](pyro-port-remaining.md)
 to a Later bullet in [TODO.md](TODO.md) first — open a plan doc only when the
 design needs a writeup.
 
-Step ids (`A3`, `P4`, `S60`, …) are global and assigned in [TODO.md](TODO.md) only; `R1`–`R123`
+Step ids (`A3`, `P4`, `S60`, …) are global and assigned in [TODO.md](TODO.md) only; `R1`–`R153`
 are rulings, numbered in their dated records under [../reviews/](../reviews/). A plan doc numbers
 its own steps locally (fields.md's 4.1–4.8, cited as "steps 4.1–4.8 of fields.md") or with a
 prefix of its own (`CBF-1`, `OPW-1`, `AM-1`), never with a bare workboard-style id. The prefix
@@ -42,15 +42,17 @@ sentence: the plain title comes first.
 - **The rows:** TODO §1.N, with the same N.
 - **The other plan docs:** they hold design detail only, never a rung, an order or a restated
   status; they link their TODO row instead.
-- **Editing:** edit in place when a fact changes; no new consolidation pass. The last one, and
-  why, is [the simplification record](../reviews/2026-10-26-plan-simplification.md).
+- **Editing:** edit in place when a fact changes; no new consolidation pass. The last ones, and
+  why: [the simplification record](../reviews/2026-10-26-plan-simplification.md) (2026-10-26)
+  and the pass that brought every plan doc onto R141–R153 (2026-10-27, at the maintainer's
+  request; [the decisions record](../reviews/2026-10-27-core-vision-decisions.md)).
 
 ## The plan docs
 
 | Doc | Scope | Where it sits |
 | --- | --- | --- |
 | [core-architecture.md](core-architecture.md) | **Read first for the core.** The v0.3 workstreams (two invariants, seven pillars), each with its goal, status, code today, open decisions and rows; the order (three lanes); the proposed definition of done; the core against the features | v0.3 |
-| [sampled-path.md](sampled-path.md) | The sampled loop (S31): a tool on ticks, one kernel in two faces; the draft "one model, two runners" (§8.1–§8.5); D13–D15 (§8.6); kept for S53 | core §5 |
+| [sampled-path.md](sampled-path.md) | The sampled loop (S31, R145–R147): `SampledSystem`, periods on blocks, `SampledDiagramSystem`, the two run verbs, the two runners; D13–D15; kept for S53 | core §5 |
 | [randomness.md](randomness.md) | One convention for randomness: a `Distribution` has no time, noise is a held law, one key per experiment; RD-D1–RD-D24; RN-2–RN-6 | core §1, §3 |
 | [differentiable-problem.md](differentiable-problem.md) | What remains of the path from any parameter to any metric: the `StepRollout` fold, steps 7, 7b, 8, 9; §9's one score (a draft); traceable linear analysis (S73, §4.6) | core §1, §2, §3, §5, §6; S73 v0.4 |
 | [parametric-program.md](parametric-program.md) | One program family with every problem parameter bound at solve time (PP-0–PP-5, D25 in §2.1); one optimizer backend table (OPW-1–OPW-5) | core §7 |

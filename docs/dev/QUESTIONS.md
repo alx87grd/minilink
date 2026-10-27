@@ -8,52 +8,39 @@ the head of [TODO.md](../plans/TODO.md#rows-waiting-for-the-maintainers-go). Kno
 
 Answers are recorded as **preliminary choices**, open to revision when the final architecture is
 drafted, in a dated record under [docs/reviews/](../reviews/) (the latest:
-[2026-10-27](../reviews/2026-10-27-design-questions-rulings.md), R124–R139), in the plan doc each
+[R124–R140](../reviews/2026-10-27-design-questions-rulings.md) and
+[R141–R153](../reviews/2026-10-27-core-vision-decisions.md), 2026-10-27), in the plan doc each
 shapes, and in TODO; the entry then leaves this file. `§N` names the workstream of
 [core-architecture.md](../plans/core-architecture.md).
 
 ## The core
 
-### One score: how is a stepping loop evaluated? (an investigation for the final design)
-- **Your note (2026-10-27): a core part of the final design, to investigate before a choice.**
-  Sets and costs take time as an argument: does a discrete problem need discrete versions of
-  them, or do they bind `t_k = t₀ + k·dt`, and how does a natively discrete cost `c(x_k, u_k, k)`
-  fit? Should the evaluation of a continuous system be done exactly as a `StepSystem` on its
-  `dt`, so that the trapezoid becomes a plain sum? Investigate the cleanest option, with its pros
-  and cons.
-- **Your idea (2026-10-26, draft; a core pillar):** once `dt` and the scheme are set, discretize
-  the problem (time becomes an index in the cost and the sets) and score every stepping loop with
-  one discrete evaluator, so a policy has one `J`.
-- **Today:**
-  - one policy gets three or four close `J`s: a left Riemann sum `g dt` in value iteration and
-    RL, a trapezoid in `score_run`, shooting's own trapezoid with a first-order hold;
-  - the failure rules differ: `score_run` integrates to `tf` and checks `X` and `U` at every
-    sample under the price switch; the RL environment stops at the first exit from `X` and
-    checks no `U`; value iteration prices the cells that leave its grid and ignores a finite `tf`
-    (S63, v0.4); the feedback planners report their held-input rollout (OD-27).
-- **The points to settle together:**
-  - the per-step cost: integrate the cost with the state (exact for the scheme; under forward
-    Euler it is today's `g·dt`, so value iteration's and RL's numbers do not move), or a
-    quadrature on the samples;
-  - the object: a new noun (`StepPlanningProblem` from `problem.discretize(dt, ...)`), the same
-    `PlanningProblem` whose `sys` is a `StepSystem`, or an internal lowering held by the
-    evaluator;
-  - time-varying sets and costs, and the margins between samples;
-  - one failure rule (absorbing or not) and the zero-order hold; shooting's reported score
-    lowered to it or kept; planner policies acting at a fixed `dt` scored through the sampled
-    face;
-  - the discount, `γ = e^{−ρ dt}`.
-- **Reviewers:** all three: integrate the cost with the state; `score_run`'s rule, to the
-  horizon, the RL early stop a training choice that reports the score's `J`; the zero-order hold;
-  shooting's reported score lowered; S63 in v0.4. A and B: no new noun, the same
-  `PlanningProblem` on a `StepSystem`; C: internal first, and after the loop lane.
-- **Detail:** [differentiable-problem.md](../plans/differentiable-problem.md) §9 (its six points
-  in §9.4); [core-architecture.md](../plans/core-architecture.md) §6
-- **Answer, in part (2026-10-27, preliminary):** the object and the per-step cost are chosen
-  ([R141, R142](../reviews/2026-10-27-core-vision-decisions.md)): a `StepPlanningProblem` sibling,
-  the sampled step face compiled by `problem.compile(dt=)` (`discretize(problem, dt)` explicit), `c_k` integrated in the transition in the
-  stationary form. Still open: time-varying sets and the margins between samples, the failure
-  rule and the hold, shooting's reported score.
+### One score: the three points left (an investigation for the final design)
+- **Decided (2026-10-27, preliminary; [R141, R142, R150](../reviews/2026-10-27-core-vision-decisions.md)):**
+  two problem classes, `PlanningProblem` and `StepPlanningProblem`; a problem's step face is
+  compiled, `problem.compile(dt=)` giving `transition(x, u, k) -> (x_next, c_k)`, `N` and
+  `γ = e^{−ρ dt}`; the stage cost integrated with the state in the stationary form; the RL
+  discount derived from the problem. Every stepping tool reads that one face.
+- **Still open, the points to settle together:**
+  - **time-varying sets and costs, and the margins between samples:** they read `t`; the step face
+    evaluates them at `t_k`, so a violation between two samples is not seen. Options: accept
+    the sampled check (the score is of the sampled loop); check at the substeps the dense run
+    already computes (R147); or a margin integrated over the period like the cost;
+  - **one failure rule and the input hold:** `score_run` integrates to the horizon and checks `X`
+    and `U` at every sample; the RL environment stops at the first exit and checks no `U`; value
+    iteration prices the cells that leave its grid. Options: absorbing (the first exit ends the
+    run and pays the price, the RL rule) or to the horizon (today's judge, every violation
+    priced); the hold is the zero-order hold of `transition` (the reviewers' view) unless a
+    planner states otherwise;
+  - **shooting's reported score:** shooting reports its own trapezoid with a first-order hold.
+    Options: lower it onto `transition` (one `J`), or keep it as the transcription's own
+    objective, reported beside the judge's.
+- **Reviewers (2026-10-27):** to the horizon, the RL early stop a training choice reporting the
+  judge's `J`; the zero-order hold; shooting's score lowered; value iteration on a finite horizon
+  (S63) in v0.4.
+- **Detail:** [differentiable-problem.md](../plans/differentiable-problem.md) §9;
+  [core-architecture.md](../plans/core-architecture.md) §6
+- **Answer:**
 
 ## Toward v1.0
 
@@ -61,8 +48,7 @@ shapes, and in TODO; the entry then leaves this file. `§N` names the workstream
 - **Your answer (2026-10-27):** not a `DeprecationWarning` shim for one minor release, as
   proposed; the policy stays open (R139). R82 (no alias, one sweep) holds meanwhile.
 - **Blocks:** the trust contract (V4); the renames that wait for the freeze (`xbar` / `ubar` →
-  `x_bar` / `u_bar`, `plot_cost2go` → `plot_cost_to_go`, `NeuralPolicyController` →
-  `NeuralPolicy`).
+  `x_bar` / `u_bar`, `plot_cost2go` → `plot_cost_to_go`; `NeuralPolicy` moved to v0.3, R151).
 - **Today:** no alias or shim ever (R82). The frozen names are drawn at v0.9 from one rule (R139).
 - **Options still open:** do the pending renames before the freeze, so none is needed after it;
   a shim of another length; a major version per rename; a snapshot test of the export list

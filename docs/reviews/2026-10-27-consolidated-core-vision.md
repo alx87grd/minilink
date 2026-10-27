@@ -2,11 +2,12 @@
 
 **Date:** 2026-10-27
 **Audience:** Prof. Alexandre Girard (Maintainer)
-**Status:** a consolidated draft, not a ruling. It is the input of the one-by-one review
-(phase two): §8 lists the decisions the maintainer takes, each with its concept, its options
-and a recommendation. Once a decision is taken it is recorded as a ruling and
-`docs/plans/core-architecture.md` is updated; this file stays as the dated record of how the
-vision was assembled.
+**Status:** a consolidated draft, not a ruling; **its fourteen decisions (§8) were taken the
+same day as [R141–R153](2026-10-27-core-vision-decisions.md)**, several revised from the
+recommendations here (two problem classes, `SampledSystem`, the planner's compiled face, a
+separate `as_terminal_cost`). Where they differ, the rulings and
+[core-architecture.md](../plans/core-architecture.md) hold; this file stays as the dated record
+of how the vision was assembled.
 **Built from:** the six independent proposals of the same day
 (`2026-10-27-final-architecture-proposal-{a..f}.md`), read in full, and the preliminary
 choices of the maintainer (R124–R140, `2026-10-27-design-questions-rulings.md`). Where the

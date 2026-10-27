@@ -8,6 +8,40 @@ maintainer's choice and how it was reached.
 [R124–R140](2026-10-27-design-questions-rulings.md): open to readjustment when the final
 architecture is drafted.
 
+## The rulings in one screen
+
+| Ruling | Decision | In one line | Design home |
+| --- | --- | --- | --- |
+| R141 | 1 | Two problem classes, `PlanningProblem` and `StepPlanningProblem`; a problem is a description, `problem.compile(dt=)` its step face (`transition`); `discretize(problem, dt)` explicit | [core-architecture](../plans/core-architecture.md) §6 |
+| R142 | 2 | The stage cost `c_k` integrated in the step, in the stationary discount form | core-architecture §6 |
+| R143 | 3 | A problem is stochastic by its parts; `StochasticPlanningProblem` goes | [randomness](../plans/randomness.md) |
+| R144 | 4 | `realize` returns one tree; laws drawn to values, sources given seeds, by path from one key | randomness |
+| R145 | 5 | `sys % dt` is `discretize(sys, dt, solver="euler")`, for any system | [sampled-path](../plans/sampled-path.md) |
+| R146 | 6, 7 | `StepSystem` → `SampledSystem` → `SampledDiagramSystem`; periods on blocks; no `Computer`, `StepSchedule`, `HybridDiagram` | sampled-path |
+| R147 | 8 | `compute_rollout` (the ticks) and `compute_trajectory` (the same scan, substeps kept) agree | sampled-path |
+| R148 | 9 | The planner compiled to a pure face (`n_z`, `initial`, `solve`, `shift`, `policy`, …); the MPC one block in two forms; `t_start`; inputs as bindings | [planner-and-mpc](../plans/planner-and-mpc.md) |
+| R149 | 10 | `Optimizer(program, method=, iterations=K)`, the fixed-count solve | [native-optimizers](../plans/native-optimizers.md) |
+| R150 | 11 | The RL discount derived from the problem; `gamma=` a training-only override | core-architecture §6 |
+| R151 | 13 | `NeuralPolicyController` renamed `NeuralPolicy` in v0.3 | TODO §1.1 (the names sweep) |
+| R152 | 14 | The gradient over a tree with integer leaves: `jax.grad(f, allow_int=True)` | DESIGN §6 |
+| R153 | 12 | `Field.as_terminal_cost` beside `as_cost`; `GridField` stays in v0.4 | [fields](../plans/fields.md) |
+
+**What they revise among R124–R140** ([that record](2026-10-27-design-questions-rulings.md)):
+
+| Earlier choice | Now |
+| --- | --- |
+| R118 `params` holds numbers and integer seeds only | integer leaves allowed, never in `wrt` (R148) |
+| R127 `computer @ plant` a step diagram named `HybridDiagram`; `compute_trajectory` the orchestrator | a `SampledDiagramSystem`, `HybridDiagram` goes (R146); `compute_trajectory` the same scan with its substeps, the orchestrator `solver="scipy"` (R147) |
+| R128 `realize -> (x0s, params)` | one tree (R144) |
+| R130 the MPC key `plant` | kept; the MPC's tree is `planner.params` (R148) |
+| R133 `as_cost` the one conversion | `as_terminal_cost` beside it (R153) |
+| R134 `NeuralPolicy` at v1.0 | in v0.3 (R151) |
+| R135 a generic planner interface, verbs to draft | the compiled planner and `shift` (R148) |
+| D27's three verbs (mppi.md) | superseded by R148 |
+
+The one-score question (QUESTIONS.md) is answered in part by R141 and R142; its three remaining
+points are listed at the end.
+
 ## R141 (2026-10-27, preliminary, amended the same day) Two kinds of problem, sibling classes; the step face compiled, the discretization explicit
 
 Decision 1 of the vision. The vision recommended one `PlanningProblem` on either kind of system,
@@ -16,8 +50,8 @@ picture that holds when a problem is natively discrete (a chess game, a cost of 
 `dt`), as systems already have three kinds: continuous, step, and sampled.
 
 - **Two kinds, mirroring the systems.** `DynamicSystem` and `StepSystem` are sibling classes and
-  `Discretization(StepSystem)` is a step system that keeps its continuous `source` and `dt`. The
-  problems follow the same shape:
+  `Discretization(StepSystem)` (renamed `SampledSystem` by R146) is a step system that keeps its
+  continuous `source` and `dt`. The problems follow the same shape:
   - `PlanningProblem`: the continuous problem, unchanged (`tf`, `discount_rate`, a
     `CostFunction` whose `g` is a rate);
   - `StepPlanningProblem`: a problem on a `StepSystem`, with a horizon `N`, a discount per step
@@ -40,7 +74,7 @@ picture that holds when a problem is natively discrete (a chess game, a cost of 
     and the linear analysis read the continuous description.
 - **The explicit discretization, as for systems** (the maintainer: "useful, and it matches the
   system pattern"): `discretize(problem, dt, *, solver=, substeps=)` beside `discretize(sys, dt)`
-  returns a `StepPlanningProblem` on `Discretization(plant, dt)` with `N`, `gamma` and the sets
+  returns a `StepPlanningProblem` on `discretize(plant, dt)` (a `SampledSystem`, R146) with `N`, `gamma` and the sets
   at `t_k`; `problem.discretize(dt)` is its facade (CONSTITUTION §4.3). Compiling the
   discretization gives the same face as `problem.compile(dt=...)`, to the bit: one test pins
   it. (`System` has no `discretize` facade today; adding `sys.discretize(dt)` for symmetry is a
@@ -135,8 +169,7 @@ controller side".
 - No number moves: `%` refuses a law with continuous states today
   (`core/discrete/step_diagram.py`, `require_step_subsystem`). Tustin is not part of it; a later
   feature row if wanted.
-- **Depends on decision 6**, the multi-clock computer: what `%` returns inside a computer (a
-  block carrying its period, or a one-block `Computer`) is settled there.
+- What `%` returns is settled by R146: a `SampledSystem` (no `Computer`).
 
 ## R146 (2026-10-27, preliminary) Periods on blocks; one `SampledSystem`, a system on a clock; no `Computer`, `StepSchedule` or `HybridDiagram`
 
@@ -369,6 +402,6 @@ v0.3; the maintainer chose option (b), "clearer".
 
 ## The one-score question
 
-R141 and R142 answer its object (the compiled step face) and its per-step cost. Still open
-there, for the review of the remaining decisions: time-varying sets and the margins between samples, the one failure rule and
-the hold, shooting's reported score.
+R141 and R142 answer its object (the compiled step face) and its per-step cost. Three points
+stay open (QUESTIONS.md): time-varying sets and the margins between samples; one failure rule
+and the input hold; shooting's reported score.
