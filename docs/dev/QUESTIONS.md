@@ -17,8 +17,6 @@ the entries below hold the context:
 1. **The 16 overnight decisions:** look at the number changes and the input-box sweep, accept
    the rest, then merge the landed core into `dev`, and each workstream as it lands (A).
 2. **The stateless MPC:** refuse it in `problem.compile` now (B).
-3. **One same-tick semantic:** propagation within the tick, with latency only where a block
-   states it (B).
 4. **`computer @ plant`:** a step diagram, with the invariant-1 amendment, named
    `SampledDataSystem` (B).
 5. **`compute_trajectory` on a hybrid loop:** the step-diagram runner, with the substeps
@@ -153,24 +151,6 @@ In the order to decide (reviewer C §5).
 - **Reviewers:** all three: refuse it now (one line).
 - **Answer:**
 
-### Which same-tick semantic does a step diagram have?
-- **Blocks:** the step algebra (§2) and the hybrid loop's pure tick (§5). Numbers move once
-  either way.
-- **Today:** two semantics:
-  - the step-diagram evaluator propagates a signal within its tick, from a fresh buffer;
-  - `Computer.tick` reads the previous tick's committed buffer, one tick of latency per wire.
-
-  S65 lists "the one-tick lag inside a `Computer` tested and stated, or removed".
-- **Options:**
-  - propagation within the tick;
-  - one tick per wire;
-  - either, stated per connection.
-- **Recommendation:** none.
-- **Reviewers:** all three: propagation within the tick. Latency only where a block states it
-  (a `UnitDelay`, the MPC's delay state), and the computer's hidden lag removed.
-- **Detail:** [sampled-path.md](../plans/sampled-path.md) §8.1 (Draft 2); TODO S65
-- **Answer:**
-
 ### Does `computer @ plant` become a step diagram, with a CONSTITUTION amendment, and what is it called?
 - **Blocks:** the sampled loop (§5); CONSTITUTION invariant 1.
 - **Today:** `computer @ plant` builds a `HybridDiagram`, a plain class beside the step
@@ -221,24 +201,6 @@ In the order to decide (reviewer C §5).
   `loop.traj`, and the facades read `traj`.
 - **Reviewers:** all three: they go.
 - **Detail:** [sampled-path.md §8.6, D13](../plans/sampled-path.md#d13-the-run-state-caches-s31-rules-24)
-- **Answer:**
-
-### Do step systems get the composition operators?
-- **Blocks:**
-  - `computer @ plant` as a step diagram (§5);
-  - the teaching face of the solver loop (NS-5, v0.4).
-- **Today:** `@`, `>>` and `+` refuse step systems; a step diagram is wired with `connect` only.
-  CONSTITUTION §6 freezes the grammar and gives the hybrid algebra one operator, `%`.
-- **Options:**
-  - operators on the step algebra (a core-grammar ask);
-  - a helper that wires a loop (`gradient_loop`, native-optimizers.md §4.5);
-  - `connect` only.
-- **Recommendation:** none.
-- **Reviewers:**
-  - A and B: yes, the same `>>`, `+` and `@`, with mixing kinds refused and naming `%` or
-    `discretize`;
-  - C: none in v0.3, extending `feedback()` if a lesson needs a one-liner.
-- **Detail:** [native-optimizers.md](../plans/native-optimizers.md) §3.1, §4.7
 - **Answer:**
 
 ### Is there one keyword per concept: `backend`, `solver`, `method`, `sample_period`, `dt`?

@@ -144,9 +144,10 @@ V = QuadraticField(P)                            # §9: the terminal cost as a f
     - shooting;
     - multiple shooting;
     - the DP discretizer.
+- **Ruled 2026-10-27:**
+  - one same-tick semantic, propagation within the tick; a delay is a block (R125);
+  - the same `@`, `>>` and `+` on step systems, mixing kinds refused (R126).
 - **Open:**
-  - one same-tick semantic;
-  - operators on step systems;
   - whether the `Trajectory` fold carries a hybrid run's dense substeps (§5's default-runner
     entry).
 - **Rows:** [TODO §1.2](TODO.md#12-the-step-algebra-first-class).
@@ -234,7 +235,7 @@ V = QuadraticField(P)                            # §9: the terminal cost as a f
 - **Open:**
   - the CONSTITUTION amendment, `computer @ plant` a step diagram;
   - `compute_trajectory`'s default runner and the plant trajectory's resolution;
-  - the same-tick semantic (§2);
+  - (the same-tick semantic is ruled, R125, §2);
   - the run caches (D13);
   - refusing the stateless MPC now;
   - the name (`SampledDataSystem`);

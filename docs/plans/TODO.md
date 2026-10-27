@@ -136,6 +136,18 @@ Why: [core-architecture.md](core-architecture.md) §1.
 
 Why: [core-architecture.md](core-architecture.md) §2.
 
+- [ ] **One same-tick semantic** **[ask — core]** (R125, 2026-10-27,
+  [record](../reviews/2026-10-27-design-questions-rulings.md)): every step diagram and runner
+  propagates within the tick; `Computer.tick` stops reading the last tick's committed buffer;
+  a delay exists only as a block (`UnitDelay`, the MPC's delay, a held slow output); an
+  algebraic loop is refused at wiring time. Done when the step-diagram evaluator and
+  `Computer.tick` agree on every hybrid demo and the moved numbers carry a closeness report.
+- [ ] **The composition operators on step systems** **[ask — core]** (R126, 2026-10-27): `@`,
+  `>>` and `+` on `StepSystem` and `StepDiagramSystem`, on `core/assembly.py`, returning a
+  `StepDiagramSystem`; a continuous and a step operand together refused, naming `%` or
+  `discretize`; the CONSTITUTION §6 grammar sentence amended in the same change (its text to the
+  maintainer). Done when `discretize(pid, dt) @ discretize(plant, dt)` rolls out the same numbers
+  as the hand-wired step diagram, on both backends.
 - [ ] **Step evaluators trace and batch** (new, from reviewer C §2.3; the invariant's own
   deliverable, which had no row):
   - the discrete evaluators' `rollout` (`core/compile/evaluators/discrete.py`) returns native
@@ -164,7 +176,7 @@ Why: [core-architecture.md](core-architecture.md) §2.
     - the forced-input hold as one `input_interp` option every solver obeys (its sampled side
       is S75; today the automatic solver choice changes the hold model);
     - what `n_steps` counts on each verb;
-    - the one-tick lag inside a `Computer` tested and stated, or removed.
+    - the one-tick lag inside a `Computer` removed (R125).
   - **The rest, which no pillar reads and which reviewer C §3.2 would return to standing
     work:**
     - the try-JAX-then-NumPy policy in `compile_auto`, with a typed `NotTraceableError`;
@@ -258,8 +270,9 @@ Why: [core-architecture.md](core-architecture.md) §5. Design:
       rung; whether the realtime re-base is core is open.
   - **Open:**
     - the CONSTITUTION invariant-1 amendment (R13, R120);
-    - `compute_trajectory`'s default and the plant's resolution (§8.4);
-    - the same-tick semantic.
+    - `compute_trajectory`'s default and the plant's resolution (§8.4).
+
+    The same-tick semantic is ruled: propagation within the tick (R125).
 
   Done when the rulings are taken and the kernel's steps are written as rows here. It was v0.4
   by R86, and has been in v0.3's core since 2026-10-26.

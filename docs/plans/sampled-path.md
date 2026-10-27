@@ -90,7 +90,8 @@ needs that solved. Nothing below is ruled.
 pure already: its only mutable fields are the tick `k`, the block states `x` and the committed
 signal buffer `signal_read`. A block fires when `k mod d = 0` (`StepSchedule`'s integer divisors,
 so the rates are commensurate by construction); a skipped block holds by the copy of the read
-buffer into the write buffer; fired blocks read the committed buffer only. What keeps it from
+buffer into the write buffer; fired blocks read the committed buffer only (one tick of latency per wire, which R125 removes:
+propagation within the tick, a delay only as a block). What keeps it from
 tracing: in-place writes, a Python `if` on `k`, NumPy only (`require_numpy_backend`), each op
 reading `op.bound_params` (an explicit `params` never reaches the blocks), and the MPC block's
 tick latch, a side effect.

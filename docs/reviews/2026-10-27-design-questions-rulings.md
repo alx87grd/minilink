@@ -40,3 +40,39 @@ Options weighed: the whole start under `x_start` (one tree, but `x_start` change
 the task with the design); a read-only `diagram.x0` (purer, but breaks `loop.x0 = ...` in
 lessons); keeping S29 in v0.9 (one exception to "every number a parameter" in the core).
 Reviewers A, B and C all placed S29 in the core. The row moves from v0.9 to TODO §1.1.
+
+## R125 (2026-10-27) One same-tick semantic: propagation within the tick
+
+The question: a step diagram propagated a signal within its tick, while `Computer.tick` read the
+previous tick's committed buffer (one tick of latency per wire). The same diagram gave different
+numbers by runner.
+
+- **The rule.** Every step diagram and every runner propagates within the tick: if A feeds B, B
+  at tick k reads A's output at tick k, as in the textbook block diagram and a continuous
+  diagram's feedthrough.
+- **Delay is a block.** Latency exists only where a block states it: a `UnitDelay`, the MPC's
+  one-period computational delay (R123), a held slow output.
+- **The `Computer`'s hidden one-tick lag is removed** (S65's item "tested and stated, or
+  removed" is settled: removed). The hybrid demos' numbers move once, with a closeness report
+  (R80).
+- **An algebraic loop** (a cycle with no delay) is refused at wiring time.
+
+Options weighed: one tick per wire (simple to execute, but a diagram no longer means its
+equations); either, per connection (two dialects). Reviewers A, B and C: propagation within the
+tick.
+
+## R126 (2026-10-27) The composition operators on step systems
+
+The question: `@`, `>>` and `+` refused step systems; a step diagram was wired with `connect`
+only.
+
+- **The same `@`, `>>` and `+`, with the same meaning, on the step algebra**, built on the same
+  assembly code (`core/assembly.py`), not a copy. The result is a `StepDiagramSystem`.
+- **Mixing a continuous and a step operand is refused**, naming the fix (`%` or `discretize`).
+- **CONSTITUTION §6's grammar sentence is amended** when the operators land: the three operators
+  are the composition language of both algebras, and `%` stays the one operator between them.
+  The text of the amendment comes to the maintainer with the landing commit.
+- This is what `computer @ plant` as a step diagram needs (the hybrid-loop question).
+
+Options weighed: a helper per pattern (`gradient_loop`); `connect` only. Reviewers A and B: the
+operators; C: none in v0.3, extending `feedback()` if a lesson needs it.
