@@ -376,3 +376,20 @@ training curve, the LQR gains).
   `DynamicProgrammingPlanner.plot_policy`); a planner's record holds the data they read.
 - Rejected: one `PlanningSolution` subclass per planner; forwarding unknown attributes to the
   record.
+
+## R139 (2026-10-27, preliminary) The road to the freeze: Diffrax on need, glyphs renamed, a rule for the frozen names; no deprecation shims
+
+The questions: four points before the v1.0 freeze. Lines a, b and c taken; line d not.
+
+- **a. Diffrax only if a benchmark asks for it:** an optional extra (`solver="diffrax"`) for
+  adaptive and stiff integration traced on JAX, never a required dependency. The hybrid
+  orchestrator's adaptive plant solver (R127) would be its first consumer on JAX.
+- **b. The posed-geometry hook is designed with the serial chain's description (R137).** The
+  collision solids keep `Sphere` and `Box`; the drawing glyphs become `SphereGlyph` and
+  `BoxGlyph`, so no two public types share a name.
+- **c. A rule for the frozen names, not a list now:** a name joins the v1.0 freeze when it has its
+  teaching demo, its test, and has gone through one release unchanged; until then it is marked
+  provisional on the teaching-surface registry and the API site. The list is drawn at v0.9 from
+  the rule.
+- **d. Not adopted: a `DeprecationWarning` shim for one minor release from v1.0.** The trust
+  contract's deprecation policy (V4) stays open; R82 (no alias, one sweep) holds meanwhile.

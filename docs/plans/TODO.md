@@ -949,7 +949,9 @@ after the v0.3 tag (planned for December 2026 when v0.3 had that date); the v1.0
   links, GRO501's `\colab{}`), the new repositories' CI pinned on a minilink release, the
   notebook smoke check moved with them, this repo's README and `examples/README.md` pointing
   there. Done when every course link resolves and both CIs pass.
-- [ ] **S27** Diffrax as an optional JAX solver backend, beside the step model's integrators
+- [ ] **S27** Diffrax as an optional JAX solver backend, beside the step model's integrators,
+  only if a benchmark asks for it, an optional extra (`solver="diffrax"`), never required (R139,
+  a preliminary choice of 2026-10-27)
   (`core/compile/evaluators/stepping.py`, kept there by OD-11). S37 (evaluators keep pure maps and one scannable step; the integrators'
   move; the evaluator internals deduplicated: ZOH sugar, the JAX step rollout, the four
   Jacobian probes, the undeclared batch cache; scan: compile-sim#9) is absorbed by S75's SM-1
@@ -957,10 +959,12 @@ after the v0.3 tag (planned for December 2026 when v0.3 had that date); the v1.0
 - [ ] **S44** A single posed-geometry hook so "two functions" (`f` + drawing) is literal;
   today `tf` + skin. Designed with C6's mechanism description, so a robot's drawing reads the
   same frames (R137).
-- [ ] **S30** Rename the graphical `Sphere` / `Box` glyphs so no two importable public types
-  share a name with the geometry solids. **[ask — public names]**
+- [ ] **S30** Rename the graphical `Sphere` / `Box` glyphs to `SphereGlyph` / `BoxGlyph`, so no
+  two importable public types share a name with the geometry solids (R139). **[ask — public
+  names]**
 - [ ] **V3 The frozen surface** **[ask — public names]**: list the names the v1.0 freeze
-  covers. `StepSystem`, `StepDiagramSystem`, `UnitDelay` (blocks facade), `ModelPredictiveController`
+  covers, drawn from one rule (R139, a preliminary choice of 2026-10-27): a name joins the freeze
+  when it has its teaching demo, its test, and has gone through one release unchanged. `StepSystem`, `StepDiagramSystem`, `UnitDelay` (blocks facade), `ModelPredictiveController`
   (control facade) and the spatial names A3 moves to `core/geometry/` (provisional teaching
   names, ROADMAP §2) join it or move behind a visibly provisional name. Done when the
   teaching-surface registry (`tests/unittest/test_teaching_surface.py`) marks each name
@@ -968,7 +972,8 @@ after the v0.3 tag (planned for December 2026 when v0.3 had that date); the v1.0
 
 ### v0.9 — the trust contract
 
-- [ ] **V4 Deprecation policy** **[ask]**: from v1.0, a teaching-surface removal or rename
+- [ ] **V4 Deprecation policy** **[ask]** (open: the shim below was not adopted on 2026-10-27,
+  R139; R82 holds meanwhile). The proposal was: from v1.0, a teaching-surface removal or rename
   ships one minor release as a `DeprecationWarning` shim (RULES "no deprecated aliases" is
   amended for v1.0 on). A snapshot of the export list is a test; changing it fails until the
   snapshot and the CHANGELOG line move together. Done when RULES, ROADMAP §2 and the

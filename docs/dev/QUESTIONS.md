@@ -331,31 +331,8 @@ In the order to decide (reviewer C §5).
 - **Detail:** [repository-structure.md §3](../plans/repository-structure.md#33-recommendation)
 - **Answer:**
 
-### Does Diffrax join as an optional JAX solver?
-- **Blocks:** the foundations (S27); a new optional dependency.
-- **Today:** the integrators are in `core/compile/evaluators/stepping.py` (OD-11).
-- **Recommendation:** none yet.
-- **Detail:** [TODO, S27](../plans/TODO.md#v09--what-could-still-break-a-name)
-- **Answer:**
-
-### Does one posed-geometry hook replace `tf` plus a skin, and are the drawing `Sphere` and `Box` renamed?
-- **Blocks:** the foundations (S44, S30).
-- **Today:** `graphical/animation/primitives.py` and `core/geometry.py` each export a `Sphere`
-  and a `Box`.
-- **Recommendation:** none yet.
-- **Detail:** [TODO, S44 and S30](../plans/TODO.md#v09--what-could-still-break-a-name)
-- **Answer:**
-
-### Which names does the v1.0 freeze cover?
-- **Blocks:** the frozen surface (V3).
-- **Today:** `StepSystem`, `StepDiagramSystem`, `UnitDelay`, `ModelPredictiveController` and its
-  sub-facade, and the spatial names the geometry work moves, are provisional.
-- **Options:** each joins the freeze, or sits behind a visibly provisional name.
-- **Recommendation:** none yet.
-- **Detail:** [TODO, V3](../plans/TODO.md#v09--what-could-still-break-a-name)
-- **Answer:**
-
 ### From v1.0, does a rename ship one minor release behind a deprecation shim?
+- **Your answer (2026-10-27):** not the shim as proposed; the policy stays open (R139).
 - **Blocks:** the trust contract (V4); amends RULES "no deprecated aliases" from v1.0.
 - **Today:** no alias or shim (R82); `xbar` / `ubar` and `plot_cost2go` wait on this.
 - **Recommendation:** the row's proposal: a `DeprecationWarning` shim for one minor release, and
