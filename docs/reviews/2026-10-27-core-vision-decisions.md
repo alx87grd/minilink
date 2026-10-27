@@ -306,6 +306,50 @@ this entry). The maintainer then asked for the clean end state, built from scrat
   scenario and robust laws (the planner expands them); binding part of a diagram plant's start.
 - **Names for the sweep:** `pv.policy` (or `action`, `control`); the letter `z`.
 
+## R149 (2026-10-27, preliminary) The fixed-count solve: `iterations=K` on `Optimizer`
+
+Decision 10 of the vision, taken as recommended.
+
+- `Optimizer(program, method="adam", iterations=K)`: a structural keyword where `method` is.
+  `iterations=None` runs to a tolerance (today's behaviour, `maxiter` its cap); `iterations=K` is
+  exactly `K` steps, one `lax.scan`, pure and differentiable. A cap and a fixed count stay two
+  things.
+- The planner's `iterations` (R148) is forwarded to its optimizer; the iterates as a `Trajectory`
+  are `optimizer.as_step_system().compute_rollout(K)` (R132), not a second solve verb.
+- Rejected: an `iterate` verb; `solve(iterations=K)` (a size belongs at build, R131).
+
+## R150 (2026-10-27, preliminary) The RL discount derived from the problem; `gamma=` a training override
+
+Decision 11 of the vision. The maintainer: derive it by default; an override may help training,
+"interpreted as a training parameter to help convergence, not changing the problem on which we
+score the result".
+
+- **By default** the RL planner's discount is the problem's step face, `γ = e^{−ρ dt}`
+  (`discount_factor`, R141); `planner.gamma` reads it, so a lesson can print it.
+- **`gamma=` on the RL planner is a training hyperparameter**, a leaf of `planner.params["method"]`:
+  it shapes the training return only. The problem, the judge's `J` and every evaluation keep the
+  problem's discount. When the two differ the planner says so in its record.
+- Today's `resolve_discount` (`learning/reinforcement_learning/planner.py`) keeps its order with
+  this meaning; an algorithm's own `gamma` is the same training override.
+- **Student-facing [given]:** the notebooks and demos that pass `gamma=` (the GRO860 RL notebooks,
+  the RL topic notebooks, three RL demos, two showcases) either set `discount_rate` on the problem
+  (the scored discount) or keep `gamma=` as a stated training choice; swept with R143's cells.
+
+## R151 (2026-10-27, preliminary) `NeuralPolicyController` renamed `NeuralPolicy` in the v0.3 sweep
+
+Decision 13 of the vision, taken as recommended. Moves R134's line 4 from the v1.0 window to the
+v0.3 names sweep, between terms (the freeze paused): the same RL notebooks are swept once with
+R143, and `NeuralPolicy` reads beside `GaussianPolicy` (R129). Thirteen files, every caller in the
+same commit, no alias (R82). **[student-facing, given]**
+
+## R152 (2026-10-27, preliminary) The gradient over a tree with integer leaves: `allow_int=True`
+
+Decision 14 of the vision, taken as recommended. A tree holds integer leaves (the `seed`; a step
+problem's tick offset, R148), so the raw gradient over the whole tree is written
+`jax.grad(f, allow_int=True)(pe.params)`: the integer leaves get a zero (`float0`) gradient. One
+line in DESIGN §6 and the examples. The tuning path, `pe.program(wrt)`, never sees integers
+(R131). Rejected: a helper (`pe.float_params`); a float seed.
+
 ## The one-score question
 
 R141 and R142 answer its object (the compiled step face) and its per-step cost. Still open
