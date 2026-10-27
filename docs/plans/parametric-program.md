@@ -273,7 +273,7 @@ planner = TrajectoryOptimizationPlanner(
     n_steps=40,
     transcription="direct_collocation",
     compile_backend="jax",
-    optimizer_method="ipopt",          # today's keywords; the constructor's names go with the sweep (R148)
+    optimizer_method="ipopt",          # today's keywords; the constructor's names go with the sweep (R134)
     optimizer_options={"max_iter": 500, "tol": 1e-6},
 )
 plan = planner.solve()                 # offline

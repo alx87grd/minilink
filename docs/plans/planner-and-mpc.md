@@ -195,8 +195,9 @@ pair `MPCStatelessController` / `MPCStatefulController`, `export_to_computer`, `
 
 ## 10. What the core must provide
 
-1. Every planner implements the compiled face of §3; trajectory optimization and MPPI first (the
-   MPC's consumers), the others as they are wrapped.
+1. Every planner implements the compiled face of §3: trajectory optimization first (the MPC's
+   consumer), then LQR and value iteration, the others as they are wrapped; MPPI with its v0.4
+   row (S72).
 2. Every policy keeps its tables in `params` (core §1: `TrajectorySource` and `LookupPolicy` keep
    them as attributes today).
 3. `t_start` on problems, the discount counted from it; integer leaves.

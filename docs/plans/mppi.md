@@ -440,7 +440,7 @@ stated in the report.
 - [ ] **MP-3 The stochastic branch.** `n_plant_samples`, `plant_realizations`,
   the criterion over `M` (mean; CVaR for `"worst_case"`), on the laws of the problem's
   `params` tree and the disturbance seeds of the realized tree (R143, R144). Tests: the
-  deterministic twin (a problem with a `Particles` start and no draws, `M = 1`:
+  deterministic twin (a problem with a point start and no draws, `M = 1`:
   byte-identical to MP-1); a pendulum
   with a mass distribution plans a more conservative swing than the nominal one (the
   weighted cost rises with the spread). Done when both pass.
@@ -459,7 +459,7 @@ stated in the report.
 - [ ] **MP-6 Teaching form and the freeze decision** (v0.9, with V3). The `loop` backend
   (per-sample NumPy, the textbook double loop; `backend=` as `DynamicProgrammingPlanner`),
   so the Basic tier runs a small MPPI; the `minilink.planning` facade names; the GMC714
-  notebook cell if G1 put MPC on the teaching surface; DESIGN §6 paragraph; the
+  notebook cell (MPC is on the teaching surface, R49); DESIGN §6 paragraph; the
   smoothing / adaptive-temperature options if a course asks. Done when the teaching
   surface test lists the names, or V3 rules them provisional.
 

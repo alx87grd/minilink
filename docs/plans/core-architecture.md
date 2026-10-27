@@ -202,7 +202,7 @@ terminal = QuadraticField(P, x_bar).as_terminal_cost()   # §9: the LQR value en
 - **Ruled:** R13, R14 (ticks), R104, R105 (`problem.compile` dispatches on the policy's kind),
   R123 (the MPC's one-period computational delay), R100 (the lazy `core` → `simulation.discrete`
   import), R125, R145, R146, R147. R146 revises R120 and R127: the loop is a `System` of the step
-  algebra; CONSTITUTION invariant 1 is amended when it lands.
+  algebra; CONSTITUTION invariants 1 and 3 and §6's `%` sentence are amended when it lands.
 - **Today:** `Computer` is mutable and NumPy-only; `HybridSimulator` is a Python tick loop with no
   `params`, no roles and no problem; `StepRollout` is the computer's record; `problem.compile`
   refuses a `StepSystem` controller but accepts the stateless MPC, whose latch then runs at the

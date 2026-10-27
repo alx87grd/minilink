@@ -153,10 +153,10 @@ Neither runner owns a copy of a block's equations; both follow §8.3.
 
 ### 8.7 Open points
 
-- **The run-state caches** (D13, §8.8).
-- **The `core` → `simulation` import:** `core/discrete/hybrid_diagram.py` and
+- **The `core` → `simulation` import:** today `core/discrete/hybrid_diagram.py` and
   `hybrid_composition.py` load `simulation/discrete/computer.py` on first use (a written
-  exception, R100); whether it disappears with `HybridDiagram` or the host runner keeps one.
+  exception, R100); those modules go with R146, so what is left is whether the host clock runner
+  keeps a lazy import.
 - **The realtime runner's re-base** on the pure blocks: in the v0.3 core, or with the realtime
   architectural review (its v1.0 row in [TODO.md](TODO.md)), the reviewers' view.
 - **`problem.compile(controller, dt=)` on a sampled controller** (D15, R141): whether `dt=` must

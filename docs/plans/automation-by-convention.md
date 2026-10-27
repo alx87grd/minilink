@@ -142,7 +142,7 @@ The removals tagged AC-0, AC-2, AC-OP and AC-3, the renames and their migrations
 | The camera copied at composition time, and `camera_priority` (never read) | the camera chosen when animating | AC-6 |
 
 AC-8a's three rows edit code that R146 and R148 remove in AC-8b; whether AC-8a still lands
-first is the workboard's call ([TODO.md](TODO.md) §1.5).
+first is open, for the maintainer ([TODO.md](TODO.md) §1.5).
 
 **Migrations:**
 

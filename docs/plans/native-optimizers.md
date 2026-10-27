@@ -298,10 +298,8 @@ reparameterisation, `V = U + ε`). The clip to the input box has a zero gradient
 as the projection of a projected gradient method does; the gradient is noisy across seeds, so
 tuning averages it over the Monte Carlo evaluator's trials.
 
-**Open: which fixed-iteration tick comes first.** MPPI needs no native gradient solver, only
-the block and the sampled scan, so it could reach the closed loop in one scan soonest. The
-maintainer's direction of 2026-10-26 places the gradient MPC's proof of concept in v0.3 and MPPI
-in v0.4 (TODO §1.8, §4); no ruling has taken the question beyond that placement.
+**Which fixed-iteration tick comes first:** settled by the maintainer's direction of 2026-10-26,
+the gradient MPC's proof of concept in v0.3 and MPPI in v0.4 (TODO §1.8, §4).
 
 ### 4.7 The long-term target: convergence as stability
 
@@ -362,7 +360,7 @@ The order and each row's "done when" are TODO §1.8 (the proof of concept) and �
 4. The fixed-count keyword: **`iterations=K` on `Optimizer` (R149)**; rejected, an `iterate`
    verb and `solve(iterations=K)`.
 
-Still open: which fixed-iteration tick comes first (§4.6b). Ruled: the discrete step analysis
+Ruled: the discrete step analysis
 comes back with NS-5 (R122, §4.7).
 
 ## 7. Parametric and stochastic programs

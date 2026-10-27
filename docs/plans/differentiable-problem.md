@@ -246,20 +246,9 @@ a step system, so the evaluation unifies from there, with time as an index.
 
 ### 9.4 Still open
 
-For the review of the remaining decisions (the maintainer's; not decided here):
+Three points, kept with their options in one home, [QUESTIONS.md](../dev/QUESTIONS.md) (the
+one-score entry), for the maintainer:
+1. time-varying sets and the margins between samples;
+2. one failure rule and the input hold;
+3. shooting's reported score.
 
-1. **Time-varying sets and the margins between samples.** Today a set is checked at the samples
-   only, so a violation inside a period is invisible. Options: keep the margins at the samples
-   `t_k`; or have the transition return the least margin over its substeps, which needs `t`
-   inside the step for a set that reads it.
-2. **One failure rule and the hold.** Today the rules differ: `score_run` integrates to `tf` and
-   checks `X` and `U` at every sample; the RL environment stops at the first exit from `X` and
-   checks no `U`; value iteration prices the cells that leave its grid; the rules are written
-   twice, in the environment's step and in `score_run` (R108 gives them one owner). Options:
-   `score_run`'s rule for all (run to the horizon, the RL early stop a training choice that
-   reports the score's `J`), or an absorbing failure state. The hold: a continuous policy under
-   `problem.compile(policy, dt=)` sampled with its command held over the period (zero order, what
-   `evaluate` does today), or read continuously inside the step.
-3. **Shooting's reported score.** Options: lowered onto the step face (its trapezoid with a
-   first-order hold moves once to `c_k`), or kept as the transcription's own number beside the
-   judge's `J`.
