@@ -64,6 +64,19 @@ agent-managed. Landed rows leave this file; their history is git and
 
 Why: [core-architecture.md](core-architecture.md) §1.
 
+- [ ] **Names across the API, before the new signatures** **[ask — public names]** (R134, a
+  preliminary choice of 2026-10-27, [record](../reviews/2026-10-27-design-questions-rulings.md)),
+  one sweep per line, every caller in the same change, no alias (R82):
+  - one keyword per concept, written in DESIGN §4: `compile_backend=` becomes `backend=`, the
+    `Optimizer.backend` attribute becomes `adapter`, the MPC's `dt_mpc` becomes `sample_period`;
+  - the geometry `bind(sys, geometry, frame=)` becomes `mount(geometry, on=sys, frame=)`;
+  - one separator rule: `.` walks a tree, `:` names a signal (`plant.u` in records becomes
+    `plant:u`);
+  - the RL package's internal `StochasticPolicy` renamed, so `GaussianPolicy` owns the idea.
+
+  Done when DESIGN §4 states the rule and no public signature uses `compile_backend`, `dt_mpc` or
+  the geometry `bind`. Later, not in this row: `NeuralPolicyController` → `NeuralPolicy` (the v1.0
+  rename list, V4) and the compiled-model classes → `Compiled…` (the v0.9 name pass, V3).
 - [ ] **Later nouns, each with its first consumer** (A5):
   - `log_prob` on the distributions;
   - parameter-dictionary support on sets and distributions (one flatten rule, with
@@ -362,8 +375,9 @@ Why: [core-architecture.md](core-architecture.md) §7. Design:
   - **The performance gate, first:** benchmark compile time and per-solve time of the compiled
     MPC program carrying `params` against the same program with them frozen; if carrying them
     costs speed, an export option compiles a parameter-free program, its parameters baked in.
-  - **First users:** direct collocation and the MPC block, with optional live-parameter ports,
-    unwired ports at nominal.
+  - **First users:** direct collocation and the MPC block, with optional live-parameter ports
+    (`parameter_ports=["plant.mu"]`, R134), unwired ports at nominal; the export gains
+    `program.params_at(z)`, the full tuned tree.
   - **Order:** PP-1, PP-2 and PP-4 on S74's backend factory (OPW-1); then PP-3, the cost and set
     leaves, on A2.
 
@@ -953,7 +967,8 @@ after the v0.3 tag (planned for December 2026 when v0.3 had that date); the v1.0
   The rename list, applied with shims under the policy (the names hold until then, with no
   alias before): `xbar` / `ubar` → `x_bar` / `u_bar`, the name everywhere else, on the costs
   (`QuadraticCost.from_system(xbar=, ubar=)`, `cost.xbar`, `cost.ubar`, `TimeCost`'s
-  `xbar`); `plot_cost2go` → `plot_cost_to_go` (A4).
+  `xbar`); `plot_cost2go` → `plot_cost_to_go` (A4); `NeuralPolicyController` → `NeuralPolicy`
+  (R134).
 - [ ] **V5 `CHANGELOG.md`**: user-facing, one entry per release from v0.9 (back-filled for
   0.1.0 / 0.1.1 from ROADMAP §2's breaking changes); `pyproject.toml` `Changelog` URL points
   there. Done when `publish.yml` refuses a tag without its CHANGELOG heading.

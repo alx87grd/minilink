@@ -147,23 +147,6 @@ In the order to decide (reviewer C §5).
 - **Detail:** [sampled-path.md §8.6, D13](../plans/sampled-path.md#d13-the-run-state-caches-s31-rules-24)
 - **Answer:**
 
-### Is there one keyword per concept: `backend`, `solver`, `method`, `sample_period`, `dt`?
-- **Blocks:** every new signature the workstreams write (§1–§8); S65's one-owner rule.
-- **Today:**
-  - `solver=` is the integrator (`problem.compile`, `discretize`).
-  - `method=` is the `Optimizer`'s algorithm.
-  - The plan docs wrote `evaluate(..., method="scipy")`, now corrected to `solver=`.
-  - `backend=` is the array module on `problem.compile`, but `compile_backend=` on `Optimizer`
-    and the planners, where `Optimizer.backend` is the solver adapter.
-  - The sample period is `sample_period` (`WhiteNoise`), `dt` (`%`, D29's `GaussianPolicy`),
-    `dt_mpc` (the MPC) and `dt_base` (`StepSchedule`).
-- **Options:** one rule in DESIGN §4: `backend=` the array module, `solver=` the integrator,
-  `method=` the optimization algorithm, `sample_period=` a block's period, `dt=` a tool's grid.
-  Renaming the frozen names `compile_backend` and `dt_mpc` (G3, R50) is a separate sweep (R82).
-- **Recommendation:** none.
-- **Reviewers:** B P3 proposes the rule. A and C: `sample_period` on the seeded policy.
-- **Answer:**
-
 ### Does the evaluation unify from the rollout on, with a discretized planning problem? (an investigation for the final design)
 - **Your note (2026-10-27): an investigation for the final design, not settled tonight.** Sets and
   costs take time as an argument: does a discrete problem need discrete versions of them, or
@@ -234,23 +217,6 @@ In the order to decide (reviewer C §5).
   - B and C: follow the overrides with the cache, or a tuned weight can price a failed run
     below a feasible one.
 - **Detail:** [the run's log, §6 item 6](../reviews/2026-10-24-v03-run-decisions.md#6-the-review-pass-after-the-run)
-- **Answer:**
-
-### Does the geometry `bind` keep its name, now that programs may bind parameters?
-- **Blocks:** the program API (§7) and the workspace geometry (A3, v0.4). It is a public name.
-- **Today:** `bind` means three things:
-  - `minilink.planning.bind(sys, geometry, frame="body")` mounts collision geometry on a plant,
-    on the teaching facade;
-  - `ParametricProgramEvaluator.bind(x0)` binds the measured start;
-  - an RL algorithm's `bind(policy, critic, gamma)`.
-
-  The program plan adds a fourth.
-- **Options:** rename the geometry verb (`mount(geometry, on=sys, frame=)` or `attach`); keep
-  `bind` and drop it from the program API; keep both.
-- **Recommendation:** none.
-- **Reviewers:**
-  - B: drop `bind` from programs and rename the geometry verb `mount`;
-  - C: rename it `attach` and keep `bind` for parameters.
 - **Answer:**
 
 ## v0.3 — D. The clean-up lane; blocks no core code
@@ -421,14 +387,6 @@ In the order to decide (reviewer C §5).
 - **Answer:**
 
 ## Standing (no release depends on it)
-
-### Is there one separator rule for wires, parameter paths, block labels and duplicate state labels?
-- **Blocks:** the larger naming alignment.
-- **Today:** block outputs are recorded `id:port`, the plant's input `plant.u` (OD-13), parameter
-  paths `motor.v2.A`; `add_subsystem` refuses an id holding `.`, `/` or `:`.
-- **Recommendation:** none yet.
-- **Detail:** [the run's log, §7](../reviews/2026-10-24-v03-run-decisions.md#7-the-second-review-pass)
-- **Answer:**
 
 ### How do behavior cloning and diffusion policy enter the API?
 - **Blocks:** nothing (for discussion).

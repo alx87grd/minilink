@@ -278,3 +278,32 @@ Options weighed: the full field plan in the core (most work off the core's path)
 noun (the five APIs stay separate, the CONSTITUTION's planned noun dropped); two independent
 `as_cost` implementations. Reviewers A, B and C: one function, moved first; B: `as_set`;
 C: Fields 4.1–4.3 in the core, 4.4–4.6 later.
+
+## R134 (2026-10-27, preliminary) Names across the API
+
+The question: cross-cutting names, settled before the core's new signatures copy today's
+inconsistencies. All six lines taken as recommended.
+
+1. **One keyword per concept**, written in DESIGN §4: `backend=` the array module, `solver=` the
+   integrator, `method=` the optimization algorithm, `sample_period=` a block's period, `dt=` a
+   tool's grid. `compile_backend=` (planners, `Optimizer`) becomes `backend=`, and the
+   `Optimizer.backend` attribute (the solver adapter) becomes `adapter`; the MPC's `dt_mpc`
+   becomes `sample_period` (its constructor frozen for GMC714, so one sweep with every caller,
+   R82); `%`'s `dt` stays, as the tool's sampling grid.
+2. **`bind` leaves the public surface.** The planning facade's geometry verb becomes
+   `mount(geometry, on=sys, frame=)`; the RL algorithms' internal `bind` stays internal; programs
+   have none (R130).
+3. **One separator rule.** `.` walks a tree (blocks and parameters: `controller.Kp`,
+   `plant.mu`); `:` names a signal of a block (a port or a state label: `plant:u`, `pid:e`).
+   The plant input recorded as `plant.u` becomes `plant:u`.
+4. **A learned or tabulated law `u = π(x)` is a `…Policy`** (`NeuralPolicy`, `LookupPolicy`,
+   `GaussianPolicy`); classical controllers keep their textbook names. `NeuralPolicyController`
+   becomes `NeuralPolicy` in the v1.0 rename window, under the deprecation policy; the RL
+   package's internal `StochasticPolicy` is renamed so `GaussianPolicy` owns the idea.
+5. **"Evaluate" and `Evaluation` mean scoring against a problem.** The compiled-model classes
+   (`DynamicEvaluator`, `StepDiagramEvaluator`, …) become `Compiled…` at the v0.9 name pass;
+   `PolicyEvaluator` keeps its textbook name; the one score adds no class.
+6. **The MPC's live-parameter ports are `parameter_ports=[...]`**, and an exported program has
+   `program.params_at(z)`, the full tuned tree (R130's companions).
+
+Reviewer B proposed lines 1, 2, 4, 5 and 6 (C: `attach` for line 2); line 3 was the agent's.
