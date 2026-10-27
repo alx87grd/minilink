@@ -107,6 +107,15 @@ a planning problem".
   `(x0s, {"params": ..., "disturbances": ...})` and changes with the draws lane.
 - **The name stays `x_start`** (R124): `x0` is a block's own default start, `x_start` the
   problem's start of the plant.
+- **What `realize` writes, by kind** (a clarification the maintainer asked for and accepted):
+  - **a law in a leaf** (`x_start`, a plant parameter): drawn **to a value**, once per trial, from
+    a sub-key derived by the leaf's path (`child(key, i, "x_start")`); the realized tree holds
+    numbers, never the law or a seed, so the start stays differentiable and inspectable;
+  - **a source block** (a noise block, the seeded policy): given **an integer seed** leaf
+    (`p["d"]["seed"][i]`); the block draws during the run from its seed and the tick;
+  - both from the one key, by name (randomness.md, one stream per consumer): adding a law leaves
+    the others' draws unchanged. Today's positional `split_keys` and the held disturbance value
+    change with the draws lane (RN-4, RN-5).
 
 ## The one-score question
 
