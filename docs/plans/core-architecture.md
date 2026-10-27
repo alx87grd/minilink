@@ -287,9 +287,12 @@ V = QuadraticField(P)                            # §9: the terminal cost as a f
   word; the function stays `score_run`.
 - **Preliminary choices, 2026-10-27** ([R141, R142](../reviews/2026-10-27-core-vision-decisions.md)):
   - two problem classes mirroring the systems: `PlanningProblem` (continuous, unchanged) and
-    `StepPlanningProblem` (`N`, `gamma`, a `StepCost` `c(x, u, k)`); `problem.discretize(dt)`
-    returns the step problem on `Discretization(plant, dt)`; every stepping tool reads
-    `transition(x, u, k, params) -> (x_next, c_k)`, `N`, `gamma`, the sets at the index;
+    `StepPlanningProblem` (`N`, `gamma`, a `StepCost` `c(x, u, k)`); the problem stays a
+    description and its step face is compiled: `problem.compile(dt=)` (open loop) gives
+    `transition(x, u, k, params) -> (x_next, c_k)`, `N`, `gamma`, the sets at the index, and
+    `problem.compile(controller, dt=)` scans it; every stepping tool reads that face;
+    `discretize(problem, dt)` (facade `problem.discretize`) returns the explicit
+    `StepPlanningProblem`, compiling to the same face;
   - `c_k` integrated with the state in the transition, stationary form
     (`c_k = ∫₀^dt e^{−ρτ} g dτ`, `J = Σ γ^k c_k + γ^N h`).
 - **Today.**

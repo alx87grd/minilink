@@ -51,7 +51,7 @@ shapes, and in TODO; the entry then leaves this file. `§N` names the workstream
   in §9.4); [core-architecture.md](../plans/core-architecture.md) §6
 - **Answer, in part (2026-10-27, preliminary):** the object and the per-step cost are chosen
   ([R141, R142](../reviews/2026-10-27-core-vision-decisions.md)): a `StepPlanningProblem` sibling,
-  `problem.discretize(dt)` for the sampled case, `c_k` integrated in the transition in the
+  the sampled step face compiled by `problem.compile(dt=)` (`discretize(problem, dt)` explicit), `c_k` integrated in the transition in the
   stationary form. Still open: time-varying sets and the margins between samples, the failure
   rule and the hold, shooting's reported score.
 

@@ -8,7 +8,7 @@ maintainer's choice and how it was reached.
 [R124–R140](2026-10-27-design-questions-rulings.md): open to readjustment when the final
 architecture is drafted.
 
-## R141 (2026-10-27, preliminary) Two kinds of problem, sibling classes; "sampled" is a step problem that keeps its source
+## R141 (2026-10-27, preliminary, amended the same day) Two kinds of problem, sibling classes; the step face compiled, the discretization explicit
 
 Decision 1 of the vision. The vision recommended one `PlanningProblem` on either kind of system,
 a natively discrete task's cost "reading `t` as the tick". The maintainer asked for one global
@@ -22,17 +22,36 @@ picture that holds when a problem is natively discrete (a chess game, a cost of 
     `CostFunction` whose `g` is a rate);
   - `StepPlanningProblem`: a problem on a `StepSystem`, with a horizon `N`, a discount per step
     `gamma`, and a `StepCost` whose stage cost `c(x, u, k)` is per step and `h(x, k)` terminal;
-  - "sampled" is not a third class: `problem.discretize(dt, solver=, substeps=)` returns a
-    `StepPlanningProblem` on `Discretization(plant, dt)`, with `N = tf/dt`,
-    `gamma = exp(-discount_rate * dt)` and the sets at `t_k = k·dt`.
-- **The one face every stepping tool reads:** `transition(x, u, k, params) -> (x_next, c_k)`,
-  `N`, `gamma`, the sets at the index, the price. Value iteration, the RL environment, the judge,
-  shooting and the native MPC read only this face and cannot tell a native problem from a sampled
-  one. Collocation, the continuous LQR and the linear analysis take the continuous class.
+  - "sampled" is not a third kind: it is a step object derived from a continuous one,
+    keeping its source and `dt`.
+- **The problem stays a description; the step face is compiled** (amended the same day, the
+  maintainer: "the problem should be kept clean"). As a `System` holds `f` and its compiled
+  evaluator holds the step model (`ev.step(x, u, t, dt=, solver=, substeps=)`), a problem holds
+  `g`, `h`, its sets and horizon, and compiling it gives the step face:
+  - `problem.compile(dt=, solver=, substeps=)`, with no controller (new, open loop):
+    `transition(x, u, k, params) -> (x_next, c_k)`, `N = tf/dt`, `gamma = exp(-discount_rate *
+    dt)`, the sets at `t_k = k·dt`, the price;
+  - `problem.compile(controller, dt=, ...)` (today's `ProblemEvaluator`, closed loop): its run is
+    one scan of the same `transition`, `u_k` from the controller, so `evaluate`, `program` and
+    the Monte Carlo score through the same `c_k`;
+  - a `StepPlanningProblem` compiles to the same face, with no `dt`;
+  - value iteration, the RL environment, the judge, shooting and the native MPC read only this
+    face and cannot tell a native problem from a sampled one. Collocation, the continuous LQR
+    and the linear analysis read the continuous description.
+- **The explicit discretization, as for systems** (the maintainer: "useful, and it matches the
+  system pattern"): `discretize(problem, dt, *, solver=, substeps=)` beside `discretize(sys, dt)`
+  returns a `StepPlanningProblem` on `Discretization(plant, dt)` with `N`, `gamma` and the sets
+  at `t_k`; `problem.discretize(dt)` is its facade (CONSTITUTION §4.3). Compiling the
+  discretization gives the same face as `problem.compile(dt=...)`, to the bit: one test pins
+  it. (`System` has no `discretize` facade today; adding `sys.discretize(dt)` for symmetry is a
+  naming detail for the names sweep.)
 - **A sampled problem has no cost object of its own:** its `c_k` needs the plant's flow over the
-  period, so `transition` produces it (R142). `StepCost` exists for native step problems.
+  period, so `transition` produces it (R142); the discretized problem's cost is that transition's
+  cost row, not a free-standing `StepCost`. `StepCost` is written for native step problems.
 - **What students meet is unchanged:** the course notebooks keep building a `PlanningProblem`;
-  a stepping planner calls `discretize(dt)` itself.
+  a stepping planner compiles it at its `dt` itself.
+- **Open, internal:** whether the open-loop face is `ProblemEvaluator` with no controller or a
+  smaller sibling the closed loop builds on; settled when the code lands.
 - **Shared parts by composition:** the sets, the start, the parameter tree and `realize` are
   composed the same way in both classes; a private mixin only if the duplication shows in code.
 - **Independent of decision 3** (stochastic by its parts): together, two problem classes.
@@ -54,6 +73,6 @@ Decision 2 of the vision, taken as recommended.
 
 ## The one-score question
 
-R141 and R142 answer its object and its per-step cost. Still open there, for the review of the
-remaining decisions: time-varying sets and the margins between samples, the one failure rule and
+R141 and R142 answer its object (the compiled step face) and its per-step cost. Still open
+there, for the review of the remaining decisions: time-varying sets and the margins between samples, the one failure rule and
 the hold, shooting's reported score.
