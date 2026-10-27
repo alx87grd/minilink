@@ -90,13 +90,17 @@ V = QuadraticField(P)                            # §9: the terminal cost as a f
   - a realization is `(x0, params)` and nothing else (randomness.md §5);
   - a sampled controller's memory is its state, its draws from seed and tick (R104);
   - `params` holds numbers and integer seeds only (R118);
-  - an override is `None` or a complete tree (R121).
+  - an override is `None` or a complete tree (R121);
+  - three owners of a start (R124): the block owns its `x0`, a diagram's `x0`, `n` and `state`
+    are views of its blocks (setting `diagram.x0` writes through), the problem owns the plant's
+    start, and each stateful block's start is an `x0` leaf of the evaluator's tree.
 - **Today.**
   - `Set.params = None` (OD-24).
   - Distributions keep `mean` / `std` as attributes; DESIGN §6's figure draws them as leaves.
   - `TrajectorySource` keeps its table as an attribute.
   - Only the plant's slice of the start is a leaf (`"x_start"`); a controller's or observer's
-    start is read from `loop.x0`.
+    start is read from `loop.x0`. A diagram stores stacked copies of `x0`, `n` and `state`,
+    restacked by `refresh()`.
   - `Computer` blocks read `op.bound_params`, frozen at compile.
   - The MPC's `MPCTickLatch` is a hidden cache (R123 removes it).
   - `StepSystem.rollout` and `HybridDiagram.last_result` cache runs (D13).
@@ -108,7 +112,6 @@ V = QuadraticField(P)                            # §9: the terminal cost as a f
 
   Reviewer A §2.6 counted them.
 - **Open:**
-  - the derived start state (S29), in "Which release does each borderline row take";
   - the CONSTITUTION's disturbance sentence.
 - **Rows:** [TODO §1.1](TODO.md#11-every-object-pure-every-number-a-parameter). Design:
   [randomness.md](randomness.md) (RN-2), [differentiable-problem.md](differentiable-problem.md)

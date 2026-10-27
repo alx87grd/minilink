@@ -33,7 +33,7 @@ the entries below hold the context:
 12. **The failure rule:** `score_run`'s, with a zero-order hold and S63 in v0.4 (C).
 13. **The native kernel:** a pure kernel with a step-system view (C).
 14. **The first fixed-iteration tick:** the gradient MPC; MPPI in v0.4 (C).
-15. **The borderline rows:** S29 joins the core, S70 lands before S66, the realtime re-base
+15. **The borderline rows:** S70 lands before S66, the realtime re-base
     waits for v1.0, and the RL heads go to v0.4 (B).
 16. **LQR and `U`:** no warning (D).
 17. **`DynamicBicycle`:** rename only (D).
@@ -128,17 +128,14 @@ In the order to decide (reviewer C §5).
 ### Which release does each borderline row take, now that v0.3 is the complete core?
 - **Blocks:** the order of the core's rows (§1, §5, §1.10).
 - **Today:** these are rows the core reads that sit elsewhere:
-  - S29, the diagram's derived start state (v0.9): only the plant's slice of the start is a
-    leaf of `pe.params`;
   - S70, the error family (R114, v0.9), whose types S66 raises;
   - the realtime simulator re-based on the pure blocks;
   - the orchestrator's adaptive plant integration (sampled-path.md §8.4);
   - the RL heads rebuilt on the seeded policy (C5, v0.4).
-- **Options:** each joins v0.3's core, or keeps its rung: S29 and S70 in v0.9, the realtime
+- **Options:** each joins v0.3's core, or keeps its rung: S70 in v0.9, the realtime
   re-base with the realtime review (v1.0), the RL heads with C5 (v0.4).
 - **Recommendation:** none.
 - **Reviewers:** all three agree:
-  - S29 joins §1;
   - S70 lands before or with S66;
   - the realtime re-base waits for v1.0's review;
   - the adaptive orchestrator goes to v0.4 or later;
@@ -694,15 +691,6 @@ In the order to decide (reviewer C §5).
 - **Recommendation:** two axes, staged between terms; to rule with it, the chapter list and a home
   for `hybrid`, `mpc`, `realtime`, `robotic` and the racecar plant folder.
 - **Detail:** [repository-structure.md §3](../plans/repository-structure.md#33-recommendation)
-- **Answer:**
-
-### Does a diagram's start state become a derived property, like its live parameters?
-- **Blocks:** the foundations that could break a name (S29).
-- **Today:** `DiagramSystem.x0`, `n` and `state` are stored; `Simulator` reads them after a
-  `refresh()`.
-- **Recommendation:** the row's plan: derived properties, `x0` and `state.nominal_value` with
-  one owner each.
-- **Detail:** [TODO, S29](../plans/TODO.md#v09--what-could-still-break-a-name)
 - **Answer:**
 
 ### Does Diffrax join as an optional JAX solver?

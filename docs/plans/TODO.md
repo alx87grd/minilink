@@ -62,8 +62,7 @@ agent-managed. Landed rows leave this file; their history is git and
 
 ### 1.1 Every object pure, every number a parameter
 
-Why: [core-architecture.md](core-architecture.md) §1. The diagram's derived start state (S29,
-§5) may join here: QUESTIONS, the borderline rows.
+Why: [core-architecture.md](core-architecture.md) §1.
 
 - [ ] **Later nouns, each with its first consumer** (A5):
   - `log_prob` on the distributions;
@@ -81,6 +80,24 @@ Why: [core-architecture.md](core-architecture.md) §1. The diagram's derived sta
     (scan: examples#10).
 
   Reviewer A §2.7 suggests `log_prob` live on the policy instead (QUESTIONS, the seeded policy).
+- [ ] **Three owners of a start; a diagram's state derived from its blocks** **[ask — core]**
+  (S29, ruled 2026-10-27, R124,
+  [record](../reviews/2026-10-27-design-questions-rulings.md)):
+  - a diagram's `x0`, `n` and `state` become views computed from its blocks; setting
+    `diagram.x0` writes through to the blocks; the structural parts are cached and recomputed
+    when the wiring changes;
+  - `refresh()` leaves `Simulator`, and the `derived_x0` heuristic in `core/wiring.py` goes;
+    the racecar solver hint, `WhiteNoise` and the diagrams' bubbled solver hints stop depending
+    on the pre-read `refresh()`;
+  - the problem keeps the plant's start (`x_start`, a point, a set or a law);
+  - each stateful block gets an `x0` leaf in the evaluator's tree (`controller.x0`,
+    `observer.x0`), read from the block at compile as the nominal;
+  - `x0` (the start) and `state.nominal_value` (the operating point x̄, ruled 2026-10-13) keep
+    one owner each (scan: core#11, dynamics#10, examples#14).
+
+  Done when no diagram stores a stacked copy, `Simulator` calls no `refresh()` before a run,
+  `jax.grad` of `objective` with respect to `observer.x0` matches a central difference, and the
+  baselines are byte-identical.
 - [ ] **Distributions read `params`** (RN-2 of [randomness.md](randomness.md)):
   `Gaussian(cov=)`, and every `sample` takes a key.
 - [ ] **Sets as costs, the lowerings, the metrics as constraints** **[ask — core]** (was V1
@@ -852,7 +869,7 @@ pillar names it.
 ROADMAP §5.5 and §5.6: v1.0 means a colleague builds a course on minilink and trusts it for
 three years. The foundation rows are design conversations before code.
 
-**Order:** the foundations (S29, S27, S44, S30, V3; S31 and S75 moved to v0.3, S37 absorbed by S75) before the trust contract; V11 once,
+**Order:** the foundations (S27, S44, S30, V3; S31 and S75 moved to v0.3, S37 absorbed by S75) before the trust contract; V11 once,
 after the v0.3 tag (planned for December 2026 when v0.3 had that date); the v1.0 rows after two cohorts.
 
 ### v0.9 — what could still break a name
@@ -866,12 +883,6 @@ after the v0.3 tag (planned for December 2026 when v0.3 had that date); the v1.0
   links, GRO501's `\colab{}`), the new repositories' CI pinned on a minilink release, the
   notebook smoke check moved with them, this repo's README and `examples/README.md` pointing
   there. Done when every course link resolves and both CIs pass.
-- [ ] **S29** `DiagramSystem.x0` / `n` / `state` as derived properties (mirror the live
-  `params` view); `Simulator` drops its pre-read `refresh()`.
-  Also (scan: core#11, dynamics#10, examples#14): `x0` (the simulation start) and
-  `state.nominal_value` (the operating point x̄, ruled 2026-10-13) are two quantities with
-  one owner each; a diagram derives both from its blocks; the racecar solver hint, `WhiteNoise` and the diagrams' bubbled
-  solver hints stop depending on the pre-read `refresh()`.
 - [ ] **S27** Diffrax as an optional JAX solver backend, beside the step model's integrators
   (`core/compile/evaluators/stepping.py`, kept there by OD-11). S37 (evaluators keep pure maps and one scannable step; the integrators'
   move; the evaluator internals deduplicated: ZOH sugar, the JAX step rollout, the four
