@@ -412,6 +412,8 @@ V = QuadraticField(P)                            # §9: the terminal cost as a f
   - **one `as_cost`:** `Field.as_cost` is the implementation, and `Set.as_cost` is the same
     function on the set's margin seen as a field;
   - **names by what they return:** `as_set`, `as_input_set`, `as_cost`.
+  - **a separate terminal conversion** (R153): `as_terminal_cost` beside `as_cost`; `GridField`
+    stays in v0.4.
 - **Today.** `StateField` lives in `planning/spatial/state_fields.py`. `V(x)` and `cost_to_go`
   are not fields.
 - **Rows:** [TODO §1.9](TODO.md#19-fields).

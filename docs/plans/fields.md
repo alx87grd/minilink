@@ -6,6 +6,9 @@ Where it sits: the core's Fields pillar ([core-architecture.md](core-architectur
 steps 4.1–4.3 (a minimal `Field`, `QuadraticField`, the shaping in `core/`); 4.4–4.8 come later with
 their consumers; one `as_cost` (`Set.as_cost` reuses it on a set's margin); the conversions are named
 `as_set`, `as_input_set`, `as_cost`, so `as_constraint` below reads `as_set` once it lands.
+**Preliminary choice, 2026-10-27 (R153, [record](../reviews/2026-10-27-core-vision-decisions.md)):**
+a separate `as_terminal_cost(weight=, shaping=)` beside `as_cost` (the terminal cost `h`, no
+`terminal=` keyword); `GridField` (step 4.4) stays with its v0.4 consumers.
 Name-preserving (`V(x)`, `value_at`, `cost_to_go` keep working). Finding FD-F12 of the foundations review, docs/reviews/2026-09-15-foundations-review.md (`FD-` marks that review's findings and comments: its F12, C6, C12).
 
 The scalar function on `(x, u, t)` becomes a core noun, `Field`, with the same verbs

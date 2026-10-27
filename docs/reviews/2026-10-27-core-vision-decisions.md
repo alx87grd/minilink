@@ -350,6 +350,23 @@ problem's tick offset, R148), so the raw gradient over the whole tree is written
 line in DESIGN §6 and the examples. The tuning path, `pe.program(wrt)`, never sees integers
 (R131). Rejected: a helper (`pe.float_params`); a float seed.
 
+## R153 (2026-10-27, preliminary) Fields: a separate `as_terminal_cost`; `GridField` stays in v0.4
+
+Decision 12 of the vision. The vision recommended `as_cost(..., terminal=True)` and `GridField` in
+v0.3; the maintainer chose option (b), "clearer".
+
+- **Two conversions, each one cost:** `Field.as_cost(weight=, shaping=)` gives the running cost
+  `g = weight·shaping(value(x))`; **`Field.as_terminal_cost(weight=, shaping=)`** gives the terminal
+  cost `h = weight·shaping(value(x))` (a value function ending a short horizon: an MPC's terminal
+  cost, a certificate's `V`). No keyword switching what the conversion returns. For a quadratic
+  value, `QuadraticCost(S=P)` already does the same; `as_terminal_cost` serves the non-quadratic
+  ones.
+- **`GridField` stays in v0.4** with its consumers (R133 as written; fields.md step 4.4). Value
+  iteration's `cost_to_go` stays today's callable in v0.3, the one exception to R148's "the
+  cost-to-go as a `Field`" until then; `sol.cost_to_go(x)` keeps working either way.
+- The minimal v0.3 `Field` is unchanged otherwise (R133): `Field`, `QuadraticField`, the shaping in
+  `core/`, `as_set`, `as_cost`, and now `as_terminal_cost`.
+
 ## The one-score question
 
 R141 and R142 answer its object (the compiled step face) and its per-step cost. Still open

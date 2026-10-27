@@ -55,7 +55,7 @@ pv  = planner.compile(backend="jax")
 | `shift` | `shift(z, dt) -> z` | the same plan `dt` later: the planner's data and its recorded origin moved by `dt`, on its own knots; the identity for a solution that does not depend on time (the base default) |
 | `policy` | `policy(z, x, t, params=None) -> u` | the command a solution gives at state `x` and time `t`: the traceable bridge from a solution to an input. `policy(z, x_start, t_start)` is the first action; `policy(z, x_k, t_k)` reads the plan later. Open-loop plans ignore `x`; feedback plans read it |
 | `prediction` | `prediction(z, t, params=None) -> (x, u)` | optional: the planned state and input at `t`, for planners that predict |
-| `solution` | `solution(z, params=None) -> PlanningSolution` | host-side: the policy as a block, the nominal trajectory, the cost-to-go as a `Field`, the record. `solution.policy.h(x, ·, t)` equals `pv.policy(z, x, t)` |
+| `solution` | `solution(z, params=None) -> PlanningSolution` | host-side: the policy as a block, the nominal trajectory, the cost-to-go as a `Field` (value iteration's stays a callable until `GridField`, v0.4, R153), the record. `solution.policy.h(x, ·, t)` equals `pv.policy(z, x, t)` |
 | `pack` | `pack(guess, params=None) -> z` | the other way: from a `Trajectory` or a `PlanningSolution` (a user's guess, a saved solution, another planner's result) |
 | `program` | `MathematicalProgram` or `None` | the parametric program, for planners that have one; outside the MPC's contract |
 
