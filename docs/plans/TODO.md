@@ -868,7 +868,9 @@ pillar names it.
   URDF: geometry, inertia, topology) feeding RNEA / ABA beyond the UR5, the shared serial-chain
   stack, ABA on the other RNEA arms, the symbolic path reading the same description; the GMC714
   arm topic's modelling rung. Design first (the July 2026 articulated-mechanism draft is in git
-  history; it is re-planned here, the optional `KinematicModel` delegate decided with it, QUESTIONS.md). Moved here from wave G on 2026-10-22; the GMC714 audit (2026-10-23) found the labs need no
+  history; it is re-planned here, no separate `KinematicModel` delegate: its one mechanism description is the robot's home for its
+  frames, feeding the dynamics, the kinematics and the drawing's poses, R137, a preliminary
+  choice of 2026-10-27). Moved here from wave G on 2026-10-22; the GMC714 audit (2026-10-23) found the labs need no
   second arm description (`ThreeLinkManipulator` and the UR5 cover them). Done when a second arm runs on the shared
   stack with the catalog both-backends test.
 - **The former wave G rows** (moved from v0.3 by R48; none is needed by GMC714):
@@ -953,7 +955,8 @@ after the v0.3 tag (planned for December 2026 when v0.3 had that date); the v1.0
   Jacobian probes, the undeclared batch cache; scan: compile-sim#9) is absorbed by S75's SM-1
   and SM-6 (ruled 2026-10-22).
 - [ ] **S44** A single posed-geometry hook so "two functions" (`f` + drawing) is literal;
-  today `tf` + skin.
+  today `tf` + skin. Designed with C6's mechanism description, so a robot's drawing reads the
+  same frames (R137).
 - [ ] **S30** Rename the graphical `Sphere` / `Box` glyphs so no two importable public types
   share a name with the geometry solids. **[ask — public names]**
 - [ ] **V3 The frozen surface** **[ask — public names]**: list the names the v1.0 freeze

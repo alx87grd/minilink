@@ -346,3 +346,20 @@ The questions: how fitting to recorded data enters the API (a data-cost program 
   keeps it possible: a sampled controller with memory (R104) and a seeded draw (R129).
 - A first imitation demo distilling MPC or MPPI into a neural policy stays a pointer, not a
   decision.
+
+## R137 (2026-10-27, preliminary) No separate `KinematicModel`: the serial chain's description is a robot's one home for its frames
+
+The question: adopt or drop the optional `KinematicModel` delegate on `System` (from the mid-2026
+graphics and architecture review), now that the general serial chain (C6) and the posed-geometry
+hook (S44) plan overlapping descriptions of a robot's geometry.
+
+- **No separate delegate.** The general serial chain's one mechanism description (a DH table or a
+  URDF: geometry, inertia, topology) is the one place a robot's frames live. It feeds the
+  dynamics (RNEA, ABA), the kinematics (forward kinematics, the Jacobian) and the poses the
+  drawing reads.
+- **The posed-geometry hook (S44) is designed with it,** so the drawing reads the same frames.
+- **A hand-written plant keeps its own methods;** no math moves off `System`.
+
+Options weighed: a `KinematicModel` object for every plant with geometry, now (a new core
+abstraction before its consumer); dropping the idea (the serial chain and the drawing hook could
+describe the same frames twice).

@@ -298,13 +298,6 @@ In the order to decide (reviewer C §5).
 - **Detail:** [mppi.md](../plans/mppi.md) §1, §4–§6, §10
 - **Answer:**
 
-### Do you adopt or drop the optional `KinematicModel` delegate?
-- **Blocks:** the general serial chain (C6), decided with its mechanism description.
-- **Today:** C6 is design first; its July 2026 draft is in git history.
-- **Recommendation:** none yet.
-- **Detail:** [TODO, C6](../plans/TODO.md#4-v04--features-on-the-core)
-- **Answer:**
-
 ### Which pyro demos do the courses still need?
 - **Blocks:** the pyro parity rows and the migration guide (C1).
 - **Today:** of pyro's 195 example scripts, 29 done, 47 partial, 83 to do, 36 dropped.
