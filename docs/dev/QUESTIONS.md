@@ -305,13 +305,6 @@ In the order to decide (reviewer C §5).
 - **Detail:** [pyro-port-remaining.md](../plans/pyro-port-remaining.md)
 - **Answer:**
 
-### Do the planning records get solver-specific views?
-- **Blocks:** the planning records before the freeze.
-- **Today:** no plan doc says more than this line.
-- **Recommendation:** none yet.
-- **Detail:** none beyond this entry (once a one-line item of ROADMAP §6).
-- **Answer:**
-
 ## Blocks v0.9 / v1.0
 
 ### Where do the course material and the research projects live?

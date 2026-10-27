@@ -363,3 +363,16 @@ hook (S44) plan overlapping descriptions of a robot's geometry.
 Options weighed: a `KinematicModel` object for every plant with geometry, now (a new core
 abstraction before its consumer); dropping the idea (the serial chain and the drawing hook could
 describe the same frames twice).
+
+## R138 (2026-10-27, preliminary) A basic `PlanningSolution`; planner-specific plots stay on the planner
+
+The question: where a planner's specific views live (the RRT tree, trajopt's convergence, RL's
+training curve, the LQR gains).
+
+- **`PlanningSolution` stays basic:** the common fields (`problem`, `policy`, `trajectory`,
+  `evaluation`, `cost_to_go`, `success`, the planner's record in `solver`) and the generic plots
+  only (`plot_trajectory`, `plot_cost_to_go`, `plot_control_law`).
+- **Planner-specific plots stay on the planner class**, as today (`RRTPlanner.plot_tree`,
+  `DynamicProgrammingPlanner.plot_policy`); a planner's record holds the data they read.
+- Rejected: one `PlanningSolution` subclass per planner; forwarding unknown attributes to the
+  record.
