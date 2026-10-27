@@ -222,6 +222,78 @@ recorded?" answered by one evaluator method.
 - The hybrid demos and tutorial 06 re-pin once, with the same-tick semantic (R125) and the MPC
   delay (R123). Revises R127's default runner of `compute_trajectory`.
 
+## R148 (2026-10-27, preliminary) The planner compiled to a pure face; the MPC one block in two forms
+
+Decision 9 of the vision. Reached over several rounds: the maintainer's cases (an adaptive MPC fed
+estimated mass and friction, RRT and value iteration as the replanner, a future discrete-time
+planner, knots independent of the sample period) changed the interface each time, so the
+interface was studied in full and attacked by an independent reviewer
+([the study](2026-10-27-mpc-planner-interface-proposal.md); its §3.1 and §3.3 are superseded by
+this entry). The maintainer then asked for the clean end state, built from scratch.
+
+- **The pattern:** a planner is a description, and `planner.compile()` gives its pure face, as
+  `sys.compile()` gives `ev.step` / `ev.rollout` and `problem.compile(dt=)` gives `transition`
+  (R141).
+- **The planner (description):** a constructor holding structure only (the method, the knot
+  count, the grid, `iterations`); `planner.params`, the problem's tree (`x_start`, `t_start`,
+  `plant`, `cost`, the sets, `discount_rate`) plus `"method"` (the algorithm's numbers: a learning
+  rate, MPPI's temperature) plus `seed` where it draws; `planner.solve(params=None, *, guess=None,
+  evaluate=False, n_trials=50) -> PlanningSolution`, the convenience verb (compile, pack the
+  guess, solve, rebuild the solution, evaluate on request), every `planner.solve()` of today
+  working unchanged; `planner.compile(backend=) -> pv`.
+- **The compiled planner `pv` (pure, traceable where the algorithm is):**
+  - `n_z`: the size of the planner's solution vector `z`, everything it needs to continue, its
+    layout the planner's own and opaque to everyone else (a system's `n`);
+  - `initial(params=None) -> z`: the default initial guess;
+  - `solve(params=None, z0=None) -> (z, status)`: the solve as a function, no mutation of the
+    planner; given `z0` it shifts it itself from the `t_start` recorded in `z0` to
+    `params["t_start"]`, on its own knots (R135); `status` a small numeric record (success,
+    iterations, residual);
+  - `policy(z, x, t, params=None) -> u`: the command a solution gives at `x` and `t`, the
+    traceable bridge from a solution to an input; `policy(z, x_start, t_start)` is the first
+    action, `policy(z, x_k, t_k)` reads the plan later; open-loop plans ignore `x`, feedback
+    plans read it;
+  - `prediction(z, t, params=None) -> (x, u)`, optional: the planned state and input, for
+    planners that predict;
+  - `solution(z, params=None) -> PlanningSolution`, host-side: the policy as a block, the nominal
+    trajectory, the cost-to-go as a `Field`, the record; `solution.policy.h(x, ·, t)` equals
+    `pv.policy(z, x, t)`;
+  - `pack(guess, params=None) -> z`: from a `Trajectory` or a `PlanningSolution`;
+  - `program`: the parametric `MathematicalProgram`, or `None`.
+- **What `z` holds:** trajectory optimization its decision and `t_start` (and Ipopt's multipliers);
+  MPPI its nominal `U` and `t_start`; value iteration its `J` and `π` tables; LQR `K`, `x̄`, `ū`;
+  RL its weights; RRT its path resampled to `N` knots and `t_start`. Its size is fixed for any
+  parameter values.
+- **`PlanningSolution` stays a rich host object**, rebuilt from `z`; no DTO and no pytree
+  registration (CONSTITUTION §4.6). The planner stops mutating itself in the core
+  (`last_solution` and the caches leave the pure path).
+- **The problem:** `t_start` is a new leaf, the horizon `[t_start, t_start + tf]` (0 reproduces
+  today); the discount and the horizon count from it, costs, sets and references read absolute
+  time; on a step problem it is an integer tick, and integer leaves are allowed, never in `wrt`
+  (amends R118). A planner pins the start from `x_start`; `X0` is derived from it.
+- **The MPC:** `ModelPredictiveController(planner, *, inputs={"x_start": "y", "t_start": "t"},
+  delay=True)`, using only `n_z`, `initial`, `solve` and `policy`:
+  - **the delayed form** (R123, the default): one `StepSystem`, state `z` (`n = pv.n_z`,
+    `x0 = pv.initial()`); `step` solves once per tick warm from its state and keeps the old `z`
+    when the solve fails; the output is `u = pv.policy(z, x̂_k, t_k)`. The plan is one period
+    late, applying it instantaneous;
+  - **the pure form** (`delay=False`): one static block, `u = pv.policy(pv.solve(bound)[0], x̂, t)`,
+    no memory; it needs one signal pass per tick in the step evaluators (an internal change)
+    to solve once;
+  - **inputs are bindings** from ports to leaves of the planner's tree; a bound leaf stays in the
+    tree as the value used when its port is unwired; `t` is a port wired by convention to the
+    loop's clock (seconds in a sampled or continuous loop, the tick in a pure step loop), so the
+    MPC never knows `Δ`; the seed is drawn from the block's seed and the tick (R104);
+  - **the tree:** `controller` is `planner.params` (`controller.cost.Q`, `controller.plant.m`);
+  - **ports out:** `u`, `z`, and `x_ref` / `u_ref` from `prediction`;
+  - **dual rate:** `(mpc % 0.05) >> (PlanFollower(planner) % 0.01)`, the follower applying
+    `pv.policy` to the `z` it receives;
+  - it drops `dt_mpc`, `t0`, `warm_start`, `MPCTickLatch`, the stateless and stateful class pair,
+    `export_to_computer`, `dt_broadcast`, `Command` and `replan_divisor`.
+- **Out of the contract, named:** a shrinking horizon (`N` is structural); RRT traced (not pure);
+  scenario and robust laws (the planner expands them); binding part of a diagram plant's start.
+- **Names for the sweep:** `pv.policy` (or `action`, `control`); the letter `z`.
+
 ## The one-score question
 
 R141 and R142 answer its object (the compiled step face) and its per-step cost. Still open

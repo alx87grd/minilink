@@ -1,7 +1,8 @@
 # The MPC and its planner: one interface for every planner (2026-10-27, proposal)
 
 **Audience:** Prof. Alexandre Girard (Maintainer)
-**Status: a proposal, not a ruling.** Decision 9 of
+**Status: a proposal; recorded, as revised in the same session, as [R148](2026-10-27-core-vision-decisions.md)** (the planner compiled to a pure face with a solution vector `z` and `policy(z, x, t)`; §3.1's `Plan`, `guess` and policy template, and §3.3's details, are superseded there).
+**Originally: a proposal, not a ruling.** Decision 9 of
 [the consolidated core vision](2026-10-27-consolidated-core-vision.md) §8, studied after the review
 session of the same day ([R141–R147](2026-10-27-core-vision-decisions.md)) changed the interface
 at every new case the maintainer raised. This study fixes the frame first, lists every use case,

@@ -384,6 +384,11 @@ V = QuadraticField(P)                            # §9: the terminal cost as a f
   algorithm are added with the first solver that needs them, minimalist for now.
 - **Open:** which fixed-iteration tick comes first (an order detail: the gradient MPC, as the
   direction places it).
+- **Preliminary choice, 2026-10-27 (R148):** the planner compiled to a pure face
+  (`pv = planner.compile()`: `n_z`, `initial`, `solve(params, z0) -> (z, status)`,
+  `policy(z, x, t)`, `prediction`, `solution`, `pack`, `program`); `planner.solve()` the
+  convenience verb; the MPC one block in two forms (delayed, R123; pure), inputs as bindings to
+  the planner's leaves, time on a `t` port, `t_start` a new problem leaf.
 - **Rows:** [TODO §1.8](TODO.md#18-the-native-proof-of-concept).
 
 ## 9. Fields (pillar)
