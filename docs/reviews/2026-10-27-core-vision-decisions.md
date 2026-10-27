@@ -189,6 +189,39 @@ and `discretize` returns it directly, with no intermediate class.
 - CONSTITUTION invariant 1 is amended when it lands (the sampled loop a step diagram of the
   sibling algebra, as R127 already names).
 
+## R147 (2026-10-27, preliminary) Two run verbs that agree: the ticks and the same scan with its substeps kept
+
+Decision 8 of the vision, option (a), with the maintainer's question "how would the substeps be
+recorded?" answered by one evaluator method.
+
+- **The verbs, by what an object has underneath:**
+  - `compute_rollout` on every `StepSystem`: the ticks, a `Trajectory` (`StepRollout` folded, §2),
+    `t = k` on a pure step system, `t = k·Δ` on a sampled one; what `evaluate` scores and
+    `jax.grad` differentiates;
+  - `compute_trajectory` wherever continuous time is underneath: a `DynamicSystem` (unchanged), a
+    `SampledSystem` or `SampledDiagramSystem` with a continuous source (the loop,
+    `discretize(plant)`); refused on a pure step system and on a clocked step source.
+- **The dense run is the same scan, its substeps kept.** `step_body`
+  (`core/compile/evaluators/stepping.py`) already computes the plant at `t_k + j·Δ/substeps` and
+  keeps only `x(t_k + Δ)`; the dense path keeps every substep end, so its value at each tick is
+  the tick value, bit for bit. The input is the held staircase; the outputs are evaluated at
+  every substep point; the RK4 stage slopes are not recorded.
+- **One new evaluator method beside `rollout`:** `rollout` keeps its one shape `(N+1, n)`; the
+  new method (name for the names sweep: `rollout_path`, `rollout_dense`, …) returns
+  `(N·substeps+1, n)` from one shared period body, on the system and the sampled-diagram
+  evaluators alike. `compute_rollout` calls `rollout`, `compute_trajectory` the new method; user
+  code never calls them directly. No flag changing `rollout`'s return shape.
+- **The substep count is structural, on the loop's plant `SampledSystem`**, defaulting from the
+  automatic-`dt` rule (`AUTO_DT_SCALE × τ_min` against the base period): `compute_rollout`,
+  `compute_trajectory` and `evaluate` integrate with the same count, one run.
+- **The cross-check:** `compute_trajectory(solver="scipy")` is the clock runner with an adaptive
+  plant between the held inputs (NumPy), agreeing within its tolerance. The loop re-clocked at
+  `Δ/substeps` (the computer's divisor times `substeps`) is the dense method's test oracle, to
+  `rtol 1e-12`.
+- `x0_plant=` and `x0_computer=` go (R124's views: one `x0`, written through to each block).
+- The hybrid demos and tutorial 06 re-pin once, with the same-tick semantic (R125) and the MPC
+  delay (R123). Revises R127's default runner of `compute_trajectory`.
+
 ## The one-score question
 
 R141 and R142 answer its object (the compiled step face) and its per-step cost. Still open
