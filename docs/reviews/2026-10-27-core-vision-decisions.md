@@ -38,6 +38,8 @@ architecture is drafted.
 | R134 `NeuralPolicy` at v1.0 | in v0.3 (R151) |
 | R135 a generic planner interface, verbs to draft | the compiled planner and `shift` (R148) |
 | D27's three verbs (mppi.md) | superseded by R148 |
+| R134 the MPC's `dt_mpc` becomes `sample_period`; `parameter_ports=` | `dt_mpc` goes, the clock applied by `%` (R146, R148); `inputs=` bindings replace `parameter_ports=` (R148) |
+| R130's companion live-parameter ports on the MPC | `inputs=` bindings (R148) |
 
 The one-score question (QUESTIONS.md) is answered in part by R141 and R142; its three remaining
 points are listed at the end.

@@ -16,7 +16,8 @@ everywhere: `value(x, u=None, t=0.0, params=None)` (native-array, bare signature
 amended; a field reads the arguments it depends on and ignores the rest, as `f` ignores `t`),
 `as_constraint(lower=, upper=)` → a `Set` over `x`, `as_input_constraint(lower=, upper=)` → an
 `InputSet` over `u` at a given `x` (for fields that read `u`), `as_cost(weight=, shaping=)` → a
-`CostFunction`. No new verb for the sublevel set: `V.as_constraint(upper=level)` *is*
+`CostFunction` (the running cost `g`), `as_terminal_cost(weight=, shaping=)` → the terminal cost
+`h` (R153). No new verb for the sublevel set: `V.as_constraint(upper=level)` *is*
 `{x : V(x) ≤ level}`. Time enters through `t`; a schedule (`S(t)` from the Riccati sweep, the
 per-step DP tables) is held on the concrete field and interpolated in `t`.
 Baseline first: the region-of-attraction level, extent and
@@ -30,7 +31,8 @@ Baseline first: the region-of-attraction level, extent and
   `PathDistanceField`, `CorridorMarginField`) subclass that ABC in
   `core/geometry/fields.py` — **not** `planning.spatial` ([geometry-module.md](geometry-module.md);
   they are workspace→state maps that a controller eval needs with no planner).
-  Shaping (`quadratic_hinge`, …) lives next to `Field.as_cost` in `core/fields.py`.
+  Shaping (`quadratic_hinge`, …) lives next to `Field.as_cost` and `Field.as_terminal_cost`
+  (R153) in `core/fields.py`.
   RULES 3.4: call sites updated (`geometry` fields, `scene.py`, `track.py`, `test_planning.py`,
   DESIGN §6 twice), no shim; `minilink.core._EXPORTS` gains `Field`. New: `FieldInputSet
   (InputSet)` with `margin(u, x, t, params) = value(x, u, t, params) − lower` (and `upper −
@@ -63,7 +65,8 @@ Baseline first: the region-of-attraction level, extent and
   of `t` — the finite-horizon `J(x, t)`; or a trailing action axis (the tabular `Q` table over
   `grid.actions`), and then `value(x, u)` reads `Q(x, u)`, `min_over_u()` returns the `J` field
   and `greedy()` the `LookupPolicy` — the two lines the `TabularLearningPlanner` docstring
-  already states. DP's `PlanningSolution.cost_to_go` becomes `GridField(grid, J)`;
+  already states. DP's `PlanningSolution.cost_to_go` becomes `GridField(grid, J)` (until then
+  it stays today's callable, R153; `sol.cost_to_go(x)` works either way);
   `TabularLearningPlanner`'s result the same; `PolicyEvaluator` holds a `GridField` and
   `value_at(x)` delegates (the name stays: `double_integrator_policy_evaluation.ipynb` uses it);
   `plot_cost2go` / `StateSpaceGrid.plot_value` accept a field or a table. Done when the DP
@@ -83,7 +86,7 @@ Baseline first: the region-of-attraction level, extent and
   `sys.f`, and its superlevel set `.as_input_constraint(lower=0)` is the `InputSet` `U(x)` the
   safety QP enforces — no `Scene.as_cbf`, no barrier type of its own.
 - [ ] **4.8 DESIGN §4** gains a fields bullet (the noun on `(x, u, t)`, `value` / `gradient`, the
-  three exports, schedules in `t`, the ellipsoid as a quadratic field's sublevel set); ROADMAP
+  four conversions, schedules in `t`, the ellipsoid as a quadratic field's sublevel set); ROADMAP
   §3 Lyapunov and DP rows note it.
 
 ## Verification

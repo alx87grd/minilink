@@ -62,7 +62,7 @@ Layer 1  blocks                     StateFeedback(K, xbar, ubar)            x, r
                                     TimeVaryingStateObserver(t, L, A, B, C, ...)      u, y -> x    L(t)                                 [later]
                                     TrajectoryObserver(traj, L, A, B, C schedules)    u, y -> x    δx̂ about x_d(t), y_d(t)              [later]
                                     ExtendedKalmanFilter(model, Q_n, R_n, x0, P0)     u, y -> x, P  A(x̂), C(x̂) online, P a state        [later]
-                                    UnscentedKalmanFilter / ParticleFilter (StepSystem) u, y -> x   sampled, in a Computer              [later]
+                                    UnscentedKalmanFilter / ParticleFilter (StepSystem) u, y -> x   on a clock, `% dt` (R146)           [later]
 
 Layer 2  designs on a model         lqr(model, Q, R)  place(model, poles)       kalman(model, Q_n, R_n)  luenberger(model, poles)
          or a plant                 lqr_finite_horizon(model, Q, R, S_f, tf)  kalman_finite_horizon(model, Q_n, R_n, P0, tf)  [later]
@@ -72,7 +72,7 @@ Layer 2  designs on a model         lqr(model, Q, R)  place(model, poles)       
                                       an LTISystem as is, with the point it carries; any other System linearized at (x̄, ū),
                                       about its command port only; arrays go to the gains, lqr_gain(A, B, Q, R) -> K
 
-Layer 3  problems and solutions     PlanningProblem / StochasticPlanningProblem        EstimationProblem                                  [later]
+Layer 3  problems and solutions     PlanningProblem (stochastic by its parts, R143)    EstimationProblem                                  [later]
                                     Planner(problem).solve() -> PlanningSolution      Estimator-tool(problem).solve() -> EstimationSolution
                                       policy (a controller block)                       the estimator block
                                       solver record (RiccatiRecord: K, P, poles)        record (L, P, poles; or the P(t) schedule)
@@ -113,13 +113,13 @@ verb for how it is obtained. The names reserved for later:
 
 ## 5. Layer 3, the long view (not built now; the architecture must allow it)
 
-`EstimationProblem(sys, disturbances, x0_distribution, measured=("y",), data=None, tf=None)`
-shares the `StochasticPlanningProblem` spine (system, `disturbances={"d": WhiteNoise(psd=W),
-"n": WhiteNoise(psd=V)}`, the prior `x0_distribution` = x̂₀ and `P0`) and adds the record of
-measurements for offline runs (a `Trajectory` of `(t, u, y)`) and which ports are measured.
-A `StochasticPlanningProblem` converts to it (`from_problem`), which is how `LQGPlanner` gets
-its filter. `EstimationSolution(problem, estimator, record, trajectory, evaluation,
-covariance)` mirrors `PlanningSolution` field for field: the block, the tool's own account
+`EstimationProblem(sys, x_start=Gaussian(x̂₀, P0), measured=("y",), data=None, tf=None)`
+shares the `PlanningProblem` spine of a problem stochastic by its parts (R143): the system, its
+noise as source blocks (`WhiteNoise(psd=W)` on the process input, `WhiteNoise(psd=V)` on the
+measurement, R128), the prior as the law of `x_start`; it adds the record of measurements for
+offline runs (a `Trajectory` of `(t, u, y)`) and which ports are measured. A stochastic
+`PlanningProblem` converts to it (`from_problem`), which is how `LQGPlanner` gets its filter.
+`EstimationSolution(problem, estimator, record, trajectory, evaluation, covariance)` mirrors `PlanningSolution` field for field: the block, the tool's own account
 (`L`, `P`, poles, or the `P(t)` schedule), the estimate along the data, Monte Carlo error
 statistics over the problem's draws (the dual of `J`), and `covariance` as the dual of
 `cost_to_go`. Tools: `KalmanEstimator` (steady-state or time-varying by the horizon, as
@@ -137,8 +137,8 @@ whiteness. Where the pieces come from today: `Planner` base (`planning/planner.p
 | Time-varying Kalman (continuous) | `TimeVaryingStateObserver`, `L(t)` from the forward Riccati schedule | `u`, `y` -> `x`; x̂ only | `kalman_finite_horizon(model, Q_n, R_n, P0, tf)` | holds: the dual of `lqr_finite_horizon` line for line |
 | Linearized Kalman along a trajectory | `TrajectoryObserver`: schedules `t, x_d, u_d, y_d, A, B, C, L` in `params`; `x̂ = x_d(t) + δx̂` | `u`, `y` -> `x` | `trajectory_kalman(sys, traj, Q_n, R_n, P0)` | holds: the dual of `trajectory_lqr`; needs `riccati_step` run forward (`interpolate_schedule` is in `core/trajectory.py`) |
 | Extended Kalman filter | `ExtendedKalmanFilter(model, Q_n, R_n, x0, P0)`: state `[x̂; vec(P)]`; `A(x̂) = ∂f/∂x`, `C(x̂) = ∂h/∂x` taken **directly on `model.f` / `model.h`** inside `f` (`jax.jacfwd` when tracing, central differences on NumPy), never through `analysis.jacobian`, which compiles an evaluator and coerces to NumPy per call | `u`, `y` -> `x` (a slice), `P` | the block is the algorithm; later `ExtendedKalmanEstimator(problem)` | holds: `estimate` is already a port function, not `compute_state`; the model-based params rule (DESIGN §4) covers `model.params` |
-| Unscented Kalman, discrete Kalman | `StepSystem`s in a hand-built `StepDiagramSystem` (the flow `+` refuses a `StepSystem`, `%` refuses a flow diagram): `computer = StepDiagramSystem(); add_subsystem(ukf, "observer"); add_subsystem(gain, "gain"); connect…; computer % dt @ plant` | `u`, `y` -> `x`, `P`; `k` | `UnscentedKalmanFilter(model, Q_d, R_d, dt)`; `kalman(…, dt=)` or `kalman_discrete` with a `c2d` | strains the sampled seam: `expose_computer_boundary_ports` auto-exposes one block only and `as_step_diagram` names it `controller` regardless of `id` (AC-8a, S31), and the discrete numbers need a `c2d`, which has no row since P6 was dropped (2026-10-17); `kalman` stays continuous in name |
-| Particle filter | `StepSystem(N·n + N)`, counter-based draws from `(seed, k)`, `is_random`, `realize(key)` | `u`, `y` -> `x` (weighted mean) | `ParticleFilter(model, process_noise: Distribution, measurement_noise: Distribution, n_particles, seed)` | holds the port convention; needs RN-2 (`sample(key)`) and the `realize` tree |
+| Unscented Kalman, discrete Kalman | `StepSystem`s on a clock, `ukf % dt` and `gain % dt` wired as the `lqg` box is (`x` and `u` connected) into a `SampledDiagramSystem`, then `@ plant` (R126, R146); today a hand-built `StepDiagramSystem` (`add_subsystem`, `connect`, `computer % dt @ plant`), as the flow `+` refuses a `StepSystem` | `u`, `y` -> `x`, `P`; `k` | `UnscentedKalmanFilter(model, Q_d, R_d, dt)`; `kalman(…, dt=)` or `kalman_discrete` with a `c2d` | strains today's sampled seam: `expose_computer_boundary_ports` auto-exposes one block only and `as_step_diagram` names it `controller` regardless of `id` (AC-8a, S31); the discrete numbers need a `c2d`, which has no row since P6 was dropped (2026-10-17); `kalman` stays continuous in name |
+| Particle filter | `StepSystem(N·n + N)`, counter-based draws from `(seed, k)`, its `seed` an integer leaf of `problem.realize(key, n_trials)`'s tree (R144) | `u`, `y` -> `x` (weighted mean) | `ParticleFilter(model, process_noise: Distribution, measurement_noise: Distribution, n_particles, seed)` | holds the port convention; needs RN-2 (`sample(key)`) and the realized tree |
 | Moving-horizon estimator | a trajopt over a window of past data | `u`, `y` -> `x` | `MovingHorizonEstimator(problem)` (Layer 3) | holds: the dual of MPC; needs `EstimationProblem.data` |
 | Parameter estimators (RLS, gradient laws) | `u`, `y` -> `theta` | not `x` | online identification in `minilink.learning` (R66, R67), or a new role | the role means a *state* estimate; decide the noun when it lands |
 

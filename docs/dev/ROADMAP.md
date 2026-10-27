@@ -425,9 +425,9 @@ audit was done 2026-10-23 (G1).
 **The maintainer's direction (2026-10-26):** v0.4 adds features built on the finished core, not
 intertwined with it; any order, each independent. The rows are TODO §4; the map of which pillar
 each reads is [core-architecture.md](../plans/core-architecture.md) §12.
-- **S72** The path-integral planner (MPPI) on the core's sampled kernel and draws
-  ([mppi.md](../plans/mppi.md)), with the MPC block's planner contract (D27, T6). **[ask — the
-  MPC block contract]**
+- **S72** The path-integral planner (MPPI) on the core's sampled loop and draws
+  ([mppi.md](../plans/mppi.md)), a planner under the compiled-face contract
+  ([planner-and-mpc.md](../plans/planner-and-mpc.md), R148).
 - **C4** Identification as the path's first data consumer: the program export with a
   data-mismatch cost; trajectory generation and experiment design beside it.
 - **LQGPlanner** with RN-4 (the core).

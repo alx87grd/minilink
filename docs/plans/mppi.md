@@ -1,19 +1,15 @@
 # Path integral control (MPPI) in Minilink
 
 **Status:** design draft (2026-10-02), not started (the prototypes in `experimental/mppi/`
-run). Asks 1–3 and 5 of §10 are for the maintainer's ruling; the recommended answers are
-D26–D28 and D30, now in §10; ruled 2026-10-25: `MPPIPlanner`
-(R106), `n_plant_samples=1` (R107), `RolloutEnvironment` moving to `planning/environment.py`
-before MP-1 (R108); the three planner verbs (ask 2) still to rule for v0.4; ask 4 (timing) decided 2026-10-02. The
-planner waits on S31's sampled kernel, RN-4 and the rest of RN-5 (RN-5's v0.3 part, `evaluate`
-over the start and parameter draws, landed 2026-10-24).
+run). Ruled 2026-10-25: `MPPIPlanner` (R106), `n_plant_samples=1` (R107), `RolloutEnvironment`
+moving to `planning/environment.py` before MP-1 (R108). The planner contract (ask 2, D27) is
+answered by R148: MPPI implements the compiled planner face of
+[planner-and-mpc.md](planner-and-mpc.md), and `ModelPredictiveController` wraps it like any
+planner (§6). The planner builds on the draws (RN-4, RN-5) and the sampled loop as one scan
+(R146, R147).
 **Lane:** research lane first (`experimental/`), provisional band with the MPC
 block once MP-5 lands, teaching-surface decision at V3 (v0.9).
-**Where it sits:** a v0.4 feature on the core (S72, [TODO.md](TODO.md) §4), on the step model
-(S75), the sampled kernel (S31) and the draws (RN-4, RN-5), which are v0.3's core
-([core-architecture.md](core-architecture.md) §3, §5, §12; the ordering of §8); hardened before
-the v0.9 freeze (§9). §10's open ask for v0.4 is the planner contract (D27); MP-1 first rewrites the
-design text to R104, R107, R123 and the generic planner interface (R135).
+**Rows:** S72, [TODO.md](TODO.md) §4.
 **Prototype:** `experimental/mppi/pendulum_mppi.py` and `racecar_mppi.py`
 (2026-10-02), two standalone scripts on the library as it stands — the swing-up works, and
 the racecar laps the circuit with the cone against the collocation MPC on the same problem;
@@ -27,21 +23,22 @@ rollouts of a nominal input sequence perturbed by noise, a softmin over their co
 weighted average as the new sequence, one step applied, shift, repeat. Minilink already
 owns every piece it needs — a batched JAX rollout, the stochastic problem's draws, the
 scoring contract of an episode, a receding-horizon block — so the work is a planner of a
-few screens plus one contract narrowing in the MPC block
-(`planning/trajectory_optimization/mpc/`, exported from `minilink.control`).
+few screens implementing the compiled planner face the MPC block reads
+([planner-and-mpc.md](planner-and-mpc.md)).
 
 ## The design in one screen
 
 - **A planner, not a controller.** `MPPIPlanner(problem, dt=, n_samples=,
   temperature=, noise=)` is a trajectory-family planner beside
   `TrajectoryOptimizationPlanner`: `solve()` returns a `PlanningSolution` whose policy is
-  the open-loop schedule `u = pi(t)` and `solve_trajectory_from(x0)` is the online tick.
-  Receding horizon is the existing wrapper: `ModelPredictiveController(planner, dt_mpc=)`
-  — that composition *is* MPPI, as `ModelPredictiveController(trajopt)` is MPC.
-- **Both problem classes.** A `PlanningProblem` gives the textbook algorithm: noise on
-  the inputs only. A `StochasticPlanningProblem` adds a plant realization per sample —
-  parameter draws and disturbance draws from the problem's own distributions — so the
-  softmin scores paths under model uncertainty, not only under input noise. The
+  the open-loop schedule `u = pi(t)`, and `planner.compile()` gives the pure face of
+  planner-and-mpc.md §3 (§6). Receding horizon is the one MPC block:
+  `ModelPredictiveController(planner) % 0.05` — that composition *is* MPPI, as
+  `ModelPredictiveController(trajopt)` is MPC.
+- **Deterministic or stochastic problems.** A deterministic `PlanningProblem` gives the
+  textbook algorithm: noise on the inputs only. A problem stochastic by its parts (laws in its
+  `params` tree, disturbance source blocks; R143, R128) adds a plant realization per sample, so
+  the softmin scores paths under model uncertainty, not only under input noise. The
   deterministic twin is byte-identical to the stochastic one with no draws (the test).
 - **The rollout is the one Minilink already has.** `ev.rollout_batch`
   (or a `vmap` of `ev.rollout`) runs `K` held-input RK4 rollouts in one jitted call; the
@@ -53,13 +50,10 @@ few screens plus one contract narrowing in the MPC block
 - **JAX first, the ladder later.** The prototype is JAX-only (one `jit(vmap(scan))` per
   tick). The three-backend ladder of `dp.py` (`loop` / `numpy` / `jax`) is the teaching
   form and comes with the teaching-surface decision, not before.
-- **One narrowing in the MPC block.** The block today reads trajopt internals
-  (`planner.transcription`, `last_optimization_result.z`, `compile_parametric_program`).
-  (This list differs from §6 and D27, which name `prepare_online()`; both give way to the generic
-  planner interface, R135.)
-  It needs three planner verbs instead: `decision_dimension()`, `solve_trajectory_from()`
-  returning a record that carries `z`, and `warm_start_guess()`. That is the T6
-  conversation already on the workboard, done with its first second consumer.
+- **No planner probing in the MPC block.** Today the block reads trajopt internals
+  (`planner.transcription`, `last_optimization_result.z`, `compile_parametric_program`). Under
+  R148 it reads only the compiled face (`n_z`, `initial`, `shift`, `solve`, `policy`), which
+  MPPI implements (§6).
 
 ## 1. The code as it stands
 
@@ -73,10 +67,9 @@ What exists, what it is coupled to, and what MPPI reuses.
 `planner.transcription.decision_dimension(problem)`. The tick latch (`MPCTickLatch`,
 line 567) reads `planner.last_optimization_result.z` after every solve and builds the
 warm start through `mpc_warm_start_guess`, which unpacks `z` with
-`planner.transcription.unpack`. So the block takes exactly one planner family. The
-workboard already carries the fix as T6 ("one record per MPC tick, `Command` and
-`MPCTickSolve` folded into the `PlanningSolution`") and D3 ("MPC port computes drop
-`params`").
+`planner.transcription.unpack`. So the block takes exactly one planner family. R148
+replaces the probing, the latch and `Command` with the compiled planner face
+([planner-and-mpc.md](planner-and-mpc.md) §9).
 
 **The planner base.** `Planner` (`minilink/planning/planner.py`) gives `solve`,
 `solve_trajectory`, `solve_trajectory_from(x0)`, `last_solution`, `open_loop_policy`
@@ -97,8 +90,9 @@ also samples and weighs on device wants. Measured
 2026-09: 1000 rollouts × 1000 RK4 steps in 27 ms (ROADMAP §3); an MPPI tick is
 `K = 1024` × `N = 40`.
 
-**The stochastic problem and the episode semantics.** `StochasticPlanningProblem`
-(`minilink/planning/problems.py`) owns `sample_x0(key)`, `sample_params(key)` (one
+**The stochastic problem and the episode semantics.** Today `StochasticPlanningProblem`
+(`minilink/planning/problems.py`; R143 removes the class, a problem being stochastic by its
+parts) owns `sample_x0(key)`, `sample_params(key)` (one
 `{name: value}` override of `sys.params`, dotted names into a diagram) and
 `sample_disturbances(key)` (one `{port: value}` draw held on the port), plus the
 `criterion` (`"expectation"` / `"worst_case"`). `RolloutEnvironment`
@@ -109,8 +103,9 @@ state leaves `X`, charges `h` at a finite horizon, and fills the disturbance por
 `key`. DESIGN §6 names it the one owner of what a training episode means, shared by the RL
 collectors and the tabular learners (`evaluate` scores a law on the compiled continuous
 loop instead, since V1's step 4b). The randomness plan
-(`randomness.md`, RN-4) will turn `disturbances` into signals realized per episode by
-`realize(key)`; the env's `reset(key)` / `step` keep their shape.
+(`randomness.md`, RN-4) turns disturbances into source blocks whose seeds are leaves of the
+tree `problem.realize(key, n_trials)` returns (R128, R144); the env's `reset(key)` / `step`
+keep their shape.
 
 **The standalone prototype.** `experimental/mppi/pendulum_mppi.py` is the
 algorithm of §2 as one script on the library as it stands: `plant.compile(backend="jax")`,
@@ -155,8 +150,9 @@ teaching figure.
 
 **The MPC exemplar.** `examples/demos/mpc/mpc_car_minimal.py` is the whole user story:
 a `PlanningProblem` with a quadratic cost, a planner, `ModelPredictiveController(planner,
-dt_mpc=)`, `mpc @ sys`, `compute_trajectory`, `animate` with `mpc_animation_overlays`.
-MPPI should read the same with one line changed.
+dt_mpc=)`, `mpc @ sys`, `compute_trajectory`, `animate` with `mpc_animation_overlays`
+(today; under R148 the period comes from `%`, `(mpc % 0.05) @ sys`). MPPI should read the same
+with one line changed.
 
 ## 2. The core math (what the planner body shows)
 
@@ -184,8 +180,9 @@ nominal sequence is `U = (u_0, …, u_{N-1})`, each `u_k ∈ ℝ^m`.
 5. **Update.** `U ← U + Σ_k w^k ε^k`, optionally smoothed along `t` (Savitzky–Golay in
    the paper; a later option, not the prototype). `n_iterations` repeats 1–5 on the
    same `x_0`; the default is one pass per tick, the MPPI of the literature.
-6. **Apply and shift.** The tick's output is `U`; the receding-horizon block applies
-   `u_0`, and the next tick starts from `U ← (u_1, …, u_{N-1}, u_{N-1})`.
+6. **Apply and shift.** The solve's output is `U`; the MPC block applies its input at `t`
+   (`pv.policy`) and starts the next solve from the shifted sequence
+   `U ← (u_1, …, u_{N-1}, u_{N-1})` (`pv.shift`, planner-and-mpc.md §6.2).
 
 The record of a solve carries the things a user tunes against: `S_min`, the weighted
 cost `Σ w^k S^k`, the effective sample size `1 / Σ (w^k)²` (a few means `λ` is too
@@ -207,7 +204,7 @@ plant draw per control sample is not it.
 
 ```python
 MPPIPlanner(
-    problem,                 # PlanningProblem or StochasticPlanningProblem (finite tf, a cost)
+    problem,                 # a PlanningProblem, stochastic by its parts or not (R143); finite tf, a cost
     *,
     dt=0.05,                 # control period; N = round(tf / dt) held inputs
     n_samples=1024,          # K
@@ -223,22 +220,22 @@ MPPIPlanner(
 )
 ```
 
-- **`solve(*, initial_guess=None, evaluate=False, n_trials=50)`** → `PlanningSolution`:
-  `policy` the held schedule as a `TrajectorySource` (`interpolation="previous"`: the
-  rollout held its inputs, so `policy >> plant` replays the plan — the RRT precedent),
-  `solver` a `MPPIRecord`, `trajectory` the nominal rollout of `U` from
-  `x_start` on the nominal plant (the planner's evidence, as every planner), and the
-  evaluation when asked. `initial_guess` is a `Trajectory` or an `(N, m)` array;
-  default the nominal input of the ports.
-- **`solve_trajectory_from(x0, *, params=None, initial_guess=None)`** — the online tick:
-  the same solve from the measured state, warm-started from `initial_guess`
-  (the shifted previous `U`). The MPC block calls this.
+- **Structure and values (R148).** `dt`, `n_samples`, `n_iterations`, `n_plant_samples` and
+  `solver` set sizes and are fixed at build. `temperature`, `noise` and `control_cost` are
+  the defaults of `planner.params["method"]`, and `seed` of `planner.params["seed"]`, beside the
+  problem's tree, so each can be rebound per solve, swept or differentiated.
+
+- **`solve(params=None, *, guess=None, evaluate=False, n_trials=50)`** →
+  `PlanningSolution`, the convenience verb of planner-and-mpc.md §2: `policy` the held
+  schedule as a `TrajectorySource` (`interpolation="previous"`: the rollout held its inputs,
+  so `policy >> plant` replays the plan — the RRT precedent), `solver` a `MPPIRecord`,
+  `trajectory` the nominal rollout of `U` from `x_start` on the nominal plant (the planner's
+  evidence, as every planner), and the evaluation when asked. `guess` is a `Trajectory` or a
+  `PlanningSolution`; default the nominal input of the ports.
+- **`planner.compile()`**, the pure face the MPC block reads (§6).
 - **`accepts_stochastic = True`**: a stochastic problem's draws are used (§4); a
   deterministic problem is the textbook algorithm. A deterministic planner's warning
   is not raised.
-- **Returned `trajectory`** has `N + 1` samples, so the MPC block's `x_ff = plan.x[:, 1]`
-  and its command `u = plan.u[:, 0]` (named `u_ff` until P10 renames the MPC port) read as
-  they do for trajopt.
 - **The picture.** The fan of sampled futures is the MPPI figure, so the record keeps
   the `n_shown` heaviest sampled rollouts of the tick with their weights (a bounded
   array, not the `K` paths), and `solution.plot_samples(signal=)` draws them shaded by
@@ -256,8 +253,9 @@ MPPIPlanner(
 Why `dt` and not `n_steps`: the MPPI grid is a control grid, the same object
 `ReinforcementLearningPlanner(dt=)`, `RolloutEnvironment(dt=)` and
 `evaluate(problem, arg, dt=)` (formerly `MonteCarloEvaluator(dt=)`) name; trajopt's `n_steps` counts collocation knots on a
-continuous plan, a different object. The receding-horizon shift is then one control
-period, so `dt_mpc` should be a multiple of `dt` (checked at wrap time, §6).
+continuous plan, a different object. The MPC's sample period and the planner's `dt` are
+independent (R148); what `shift(z, dt)` does for a shift that is not a multiple of the
+planner's `dt` (interpolate `U`, or refuse) is open, settled with MP-1.
 
 ## 4. The stochastic question
 
@@ -270,15 +268,16 @@ randomness is `ε^k`. This is what every MPPI paper runs on a simulator and what
 GMC714 lesson would show.
 
 **Stochastic problem** (the robust branch): each sample `k` also draws a realization of
-the plant, `θ^k ~ params_distribution` through `problem.sample_params(key)` and a
-disturbance path `w^k_t ~ disturbances` through `problem.sample_disturbances(key)` per
-step (after RN-4, a realized signal per sample). `x0_distribution` is *not* sampled:
-the tick starts from the measured state, so the start law is the evaluator's business.
+the plant, `θ^k` from the laws in the problem's `params` tree (R143) and a disturbance path
+`w^k_t` from the disturbance source blocks' seeds (R128), both by path from one key (R144).
+The start is *not* sampled: the planner solves from the bound `x_start`, a point (the MPC
+refuses a start law, planner-and-mpc.md §6.1), so the start law is the evaluator's business.
+Expanding the laws is the planner's own business (planner-and-mpc.md §8).
 
 The honest form: `n_plant_samples = M` realizations per control sample, the control
 sample's score being the problem's criterion over them —
 `S^k = mean_m S^{k,m}` for `"expectation"`, the CVaR of the `M` for `"worst_case"`
-(Risk-Aware MPPI). With `M = 1` the softmin rewards a lucky plant draw as much as a
+(Risk-Aware MPPI; the criterion is `problem.criterion`, R143). With `M = 1` the softmin rewards a lucky plant draw as much as a
 good input sequence, which biases the update toward optimism; the paper that makes
 this point is the reason `M` is a knob and its default on a stochastic problem should
 be small but above one (`M = 4` proposed; R107 ruled `n_plant_samples=1`, §7). On a deterministic problem `M` is ignored
@@ -319,15 +318,16 @@ planner; the move is one import rewrite with no behaviour change, the RL import 
 helpers under `# Internal machinery`):
 
 ```python
-def solve_trajectory_from(self, x0, *, params=None, initial_guess=None):
-    """One path-integral solve from ``x0``: sample, roll out, weigh, update."""
-    # Unpack
-    jax, jnp = require_jax(), require_jax_numpy()
-    env, cost, dt, N = self.env, self.env.cost, self.env.dt, self.n_steps
-    K, M, lam, alpha = self.n_samples, self.n_plant_samples, self.temperature, self.control_cost
-    Sigma, Sigma_inv, u_lower, u_upper = self.noise, self.noise_inv, *self.input_box
-    U = self.sequence_of(initial_guess)                     # (N, m), the nominal sequence
-    self.key, k_eps, k_plant = jax.random.split(self.key, 3)   # open point: R104 draws from the seed and the tick
+def solve(params, z0):
+    """One path-integral solve from ``params["x_start"]``: sample, roll out, weigh, update."""
+    # Unpack (the structure K, M, N and the input box are fixed at build, closed over)
+    x0, t0 = params["x_start"], params["t_start"]
+    lam = params["method"]["temperature"]
+    alpha = params["method"]["control_cost"]
+    Sigma = params["method"]["noise"]
+    Sigma_inv = jnp.linalg.inv(Sigma)
+    U = unpack_sequence(z0)                                   # (N, m), the nominal sequence
+    k_eps, k_plant = streams(params["seed"], "eps", "plant")  # one seed, streams by name (R144)
 
     # Sample: V^k = U + eps^k, eps^k_t ~ N(0, Sigma), clipped to the input box
     eps = jax.random.multivariate_normal(k_eps, jnp.zeros(U.shape[1]), Sigma, (K, N))
@@ -335,12 +335,12 @@ def solve_trajectory_from(self, x0, *, params=None, initial_guess=None):
 
     # Roll out: x^k_{t+1} = Phi(x^k_t, v^k_t; theta^k, w^k_t) over dt, input held,
     # on M plant realizations per control sample (one, nominal, on a deterministic problem)
-    theta, keys_w = self.plant_realizations(k_plant, K * M)
-    x, g_path, left_X = rollout_sequences(env, x0, jnp.repeat(V, M, axis=0), theta, keys_w)
+    theta, seeds_w = plant_realizations(k_plant, params, K * M)
+    x, g_path, left_X = rollout_sequences(env, x0, t0, jnp.repeat(V, M, axis=0), theta, seeds_w)
 
     # Score: S^k = sum_t g dt + h(x_N) + infeasible price, then the criterion over the M draws,
     # plus the information-theoretic control term lam (1 - alpha) sum_t u_t^T Sigma^-1 eps^k_t
-    S_path = self.criterion(g_path.reshape(K, M))
+    S_path = criterion(g_path.reshape(K, M))
     S = S_path + lam * (1.0 - alpha) * jnp.einsum("tm,mn,ktn->k", U, Sigma_inv, eps)
 
     # Weigh: w^k = exp(-(S^k - S_min) / lam), normalized
@@ -351,63 +351,53 @@ def solve_trajectory_from(self, x0, *, params=None, initial_guess=None):
     # Update: U <- U + sum_k w^k eps^k
     U_new = U + jnp.einsum("k,ktm->tm", w, eps)
 
-    # Output: the nominal rollout of U_new as the plan, the record of this tick
-    trajectory = self.nominal_rollout(x0, U_new)
-    record = MPPIRecord(
-        S_min=float(S_min), S_weighted=float(w @ S),
-        effective_samples=float(1.0 / jnp.sum(w**2)),
-        exit_rate=float(jnp.mean(left_X)), z=np.asarray(U_new).reshape(-1),
-        success=bool(self.stays_in_X(trajectory)),
+    # Output: z (the new sequence and its origin t0) and the status, a small numeric record
+    status = dict(
+        success=stays_in_X(nominal_rollout(x0, t0, U_new, params)),
+        S_min=S_min, S_weighted=w @ S,
+        effective_samples=1.0 / jnp.sum(w**2), exit_rate=jnp.mean(left_X),
     )
-    return self.store_solution(self.trajectory_solution(trajectory, record))
+    return pack_sequence(U_new, t0), status
 ```
+
+This is `pv.solve` of the compiled face (planner-and-mpc.md §3): pure, no `self` and no stored
+key, so the MPC can run it inside its `lax.scan`; `pv.solution(z)` builds the `MPPIRecord` and
+the `PlanningSolution` on the host. The helper names are placeholders.
 
 `rollout_sequences` is the `jit(vmap(scan(env.step)))` helper — the scan over `t` and
 the vmap over samples are plumbing, the step is `env.step` so the exit rule and the
-disturbance draw have one owner; `plant_realizations` is the `sample_params` /
-`sample_disturbances` branch (nominal on a deterministic problem). One compiled
+disturbance draw have one owner; `plant_realizations` draws the laws of the `params` tree and
+the disturbance seeds (nominal on a deterministic problem). One compiled
 function per planner, shapes fixed at construction, so a tick is one device call. The
 `n_iterations` loop wraps the five beats and is written as a `for` in the body (the
 textbook form), not hidden.
 
-## 6. The receding-horizon block: the contract it should ask for
+## 6. The compiled face MPPI implements (R148)
 
-**Superseded (2026-10-27, R148):** the planner contract is now
-[planner-and-mpc.md](planner-and-mpc.md): MPPI implements the compiled face (`z` its nominal `U`
-and origin, `shift` the shifted `U`, `policy` the input at `t`, `seed` a leaf). The text below is
-the earlier proposal.
+The MPC block and its contract are [planner-and-mpc.md](planner-and-mpc.md) (§3 the face, §6 the
+block). MPPI fills the face so (its §4 row):
 
-To wrap any trajectory-family planner, `ModelPredictiveController` should read three
-verbs and nothing else:
-
-| Today (trajopt internals) | Proposed (planner verbs) |
+| Member | MPPI |
 | --- | --- |
-| `planner.transcription.decision_dimension(problem)`, `transcription.options.n_steps >= 2` | `planner.decision_dimension()` (trajopt: the packed `z`; MPPI: `N m`), and the plan's `n_samples >= 2` checked on the returned trajectory |
-| `planner.options.compile_backend == "jax"` → `compile_parametric_program()` | `planner.prepare_online()`: trajopt compiles its parametric program, MPPI jits its rollout; the block calls it once at construction |
-| `planner.last_optimization_result.z` after the solve | `solution.solver.z` on the tick's record (`TrajectoryOptimizationRecord` gains `z`; `MPPIRecord` has it) — the T6 row "one record per tick" |
-| `mpc_warm_start_guess(z_prev, y, planner, dt_mpc=, k=)` (unpacks with the transcription) | `planner.warm_start_guess(z_prev, y, *, dt_mpc, k)`: trajopt shifts the knot schedule as today; MPPI shifts `U` by `round(dt_mpc / dt)` periods and repeats the last input |
+| `z`, `n_z` | the nominal sequence `U` (`N m` numbers) and the origin `t_start` it was solved from: `n_z = N m + 1` |
+| `initial(params)` | zeros, or the nominal input of the ports, at `params["t_start"]` |
+| `solve(params, z0)` | §5's body: `n_iterations` passes from `z0`, pure on the `seed` leaf |
+| `shift(z, dt)` | `U` moved `dt` later, the last input repeated, the origin moved by `dt` (a shift that is not a multiple of `dt`: open, §3) |
+| `policy(z, x, t)` | the input of `U` held at `t`; `x` ignored (an open-loop plan) |
+| `prediction(z, t)` | the nominal rollout of `U` at `t` (for `x_ref`, `u_ref`) |
+| `solution(z)` | the `PlanningSolution` and its `MPPIRecord`, host-side |
+| `pack(guess)` | a `Trajectory` or a `PlanningSolution` resampled to `U` |
+| `seed` | a leaf of `planner.params`; the MPC draws it from the block's seed and the tick (R104) |
 
-No `hasattr` probing (RULES 4.3): the three verbs become methods of the `Planner` base
-that raise `NotImplementedError` by name, as `solve_trajectory_from` does today, and
-`validate_mpc_planner` calls them. `warm_start=True` keeps packing the planner's `z` on
-`Computer.x`, which for MPPI is exactly the shifted nominal sequence — the state the
-algorithm carries between ticks in every implementation. (R123 removes the tick latch this
-sentence keeps; MP-1 rewrites it.) `Command`, the tick latch, the
-dual-rate broadcast, `export_to_computer`, `mpc @ plant` and the overlays
-(`mpc_plans_from_rollout`, `mpc_animation_overlays`) are unchanged: they read the
-trajectory of the tick's solution. The check that `dt_mpc` is a multiple of the
-planner's `dt` belongs to `warm_start_guess` (MPPI raises; trajopt interpolates as today).
-
-This is the T6 `planning/trajectory_optimization/mpc/controller.py` conversation the workboard already owes (and
-the D3 rows "MPC port computes drop `params`" and "dual online-params façades"). Doing
-it with MPPI as the second consumer is what makes the contract honest instead of a
-refactor in the abstract.
+The shifted `U` is the state the algorithm carries between ticks in every implementation, so the
+MPC's state `(z, t_last)` (planner-and-mpc.md §6.2) is exactly MPPI's. The overlays
+(`mpc_plans_from_rollout`, `mpc_animation_overlays`) read the plans from the MPC's `z` port.
 
 ## 7. Options weighed
 
 | Question | Options | Proposed | Why |
 | --- | --- | --- | --- |
-| Planner or controller | (a) a planner wrapped by `ModelPredictiveController`; (b) an `MPPIController` block of its own | (a) | One receding-horizon loop, one latch, one export, one animation path; `compare(MPC=, MPPI=)` on one problem is then one line; (b) duplicates 900 lines of `controller.py` |
+| Planner or controller | (a) a planner wrapped by `ModelPredictiveController`; (b) an `MPPIController` block of its own | (a) | One MPC block for every planner (R148), one animation path; `compare(MPC=, MPPI=)` on one problem is then one line; (b) duplicates 900 lines of `controller.py` |
 | Problem class | (a) deterministic only; (b) stochastic only via `as_stochastic`; (c) both, one branch in the sampling beat | (c) | The base class already makes every planner accept both; `accepts_stochastic=True` is one attribute; the deterministic twin is the test |
 | Where the step semantics live | (a) rewrite `x_{t+1}`, the exit rule and `h` inside the planner on `ev.rollout`; (b) `RolloutEnvironment.step` | (b) | One owner of what an episode costs (S65); the equations still appear as the named lines of §5; the env already carries the disturbance and parameter draws and will carry `realize(key)` after RN-4 |
 | Plant draws per control sample | `M = 1` always; `M` a knob | `M` a knob, default 1, the bias stated in the docstring (R107) | §4: `M = 1` rewards lucky draws |
@@ -419,19 +409,14 @@ refactor in the abstract.
 
 ## 8. Steps
 
-**Order (decided with the maintainer 2026-10-02):** RN-4 and RN-5 of the randomness plan
-land first — `realize(key)`, signals on `disturbances`, the Monte Carlo evaluator as a
-batched simulation of the closed-loop diagram over realizations `(x0, params, seeds)`,
-any diagram and any output. (RN-5's v0.3 part landed 2026-10-24: `evaluate` over the
-start and parameter draws of `problem.realize(key, n)`; the per-block seeds of RN-4 and the
-disturbance signals on their ports are what is left.) Then the path-integral planner lands on that contract: its
-`K × M` rollouts are the evaluator's own batch over realizations, so MP-1 and MP-3 share
-one rollout path with the evaluator and the RL collectors instead of a scan of their own,
-and MP-3 is written once. Two things RN-4 and RN-5 should settle with this consumer in
-view: a realization carries seeds per sample, never drawn noise arrays, so `K × M`
-realizations vmap like a family of masses (randomness.md's RD-D13 already says so); and the batch takes an
-input *sequence* per member as `rollout_batch` does today, not only a closed loop, since
-a sampling planner rolls out the open-loop plant. Until then the standalone script is the
+**The rollout contract it builds on** (the order, decided with the maintainer 2026-10-02, is
+TODO S72's): the planner lands on the draws of the randomness plan (RN-4, RN-5), so its
+`K × M` rollouts are the evaluator's own batch over realizations and MP-1 and MP-3 share one
+rollout path with the evaluator and the RL collectors. Two things that contract must hold with
+this consumer in view: a realization carries seeds per sample, never drawn noise arrays, so
+`K × M` realizations vmap like a family of masses (R144; randomness.md's RD-D13); and the batch
+takes an input *sequence* per member as `rollout_batch` does today, not only a closed loop,
+since a sampling planner rolls out the open-loop plant. Until then the standalone script is the
 prototype.
 
 Ids are local to this doc (`MP-1` …); the workboard row is S72. Each step: `ruff check
@@ -439,9 +424,8 @@ Ids are local to this doc (`MP-1` …); the workboard row is S72. Each step: `ru
 stated in the report.
 
 - [ ] **MP-1 The planner, deterministic** (JAX). `planning/trajectory_optimization/path_integral.py`:
-  `MPPIPlanner` and `MPPIRecord`, `solve` / `solve_trajectory_from`,
-  the body of §5 on a `PlanningProblem`, `rollout_sequences` on `RolloutEnvironment`,
-  `decision_dimension`, `warm_start_guess`. Tests
+  `MPPIPlanner` and `MPPIRecord`, `solve` and the compiled face of §6 (the body of §5 on a
+  `PlanningProblem`, `rollout_sequences` on `RolloutEnvironment`). Tests
   (`tests/unittest/test_planning_path_integral.py`): seeded determinism (two solves,
   equal arrays); the double integrator with the LQR cost — the MPPI plan's cost within
   a tolerance of the `LQRPlanner` nominal rollout's as `K` grows; the pendulum swing-up
@@ -450,25 +434,21 @@ stated in the report.
   `dp.py`.
 - [ ] **MP-2 The hand-loop demo** (research lane).
   `experimental/mppi/pendulum_mppi.py`: the planner, `compute_command`-style
-  hand loop (`solve_trajectory_from`, apply `u_0`, step the plant with `discretize`,
-  shift) until MP-4; `print(solution)`; the plan over the closed-loop trajectory.
+  hand loop (`pv.shift`, `pv.solve`, apply `pv.policy`, step the plant with `discretize`)
+  until MP-4; `print(solution)`; the plan over the closed-loop trajectory.
   Done when it runs in the nightly sweep's wall-clock budget.
 - [ ] **MP-3 The stochastic branch.** `n_plant_samples`, `plant_realizations`,
-  the criterion over `M` (mean; CVaR for `"worst_case"`), on `sample_params` and
-  `sample_disturbances` as they stand (one held draw per step), rewritten to the
-  realized signals when RN-4 lands. Tests: the deterministic twin (stochastic problem
-  with a `Particles` start and no draws, `M = 1`: byte-identical to MP-1); a pendulum
+  the criterion over `M` (mean; CVaR for `"worst_case"`), on the laws of the problem's
+  `params` tree and the disturbance seeds of the realized tree (R143, R144). Tests: the
+  deterministic twin (a problem with a `Particles` start and no draws, `M = 1`:
+  byte-identical to MP-1); a pendulum
   with a mass distribution plans a more conservative swing than the nominal one (the
   weighted cost rises with the spread). Done when both pass.
-- [ ] **MP-4 The MPC block takes the planner** **[ask — main-tool API, T6]**. The §6
-  contract: the three `Planner` verbs, `z` on `TrajectoryOptimizationRecord`,
-  `validate_mpc_planner` reads the verbs, `mpc_warm_start_guess` becomes trajopt's
-  `warm_start_guess`. Behaviour-preserving for trajopt: the MPC baselines
-  (`test_mpc.py`, `mpc_car_minimal`, `mpc_integrator_numpy`) byte-identical before and
-  after (AGENTS recipe). Then `ModelPredictiveController(MPPIPlanner(...),
-  dt_mpc=)` runs the pendulum and `mpc_car_minimal` with one line changed. Done when
-  `test_mpc.py` gains the MPPI twin of its warm-start and stateless tests and the
-  baselines `cmp`.
+- [ ] **MP-4 The MPC block takes the planner.** The block is planner-and-mpc.md's (its
+  rows are TODO §1.8); this step checks MPPI under it:
+  `ModelPredictiveController(MPPIPlanner(...)) % 0.05` runs the pendulum and
+  `mpc_car_minimal` with one line changed. Done when `test_mpc.py` gains the MPPI twin of its
+  warm-start (delayed form) and pure-form tests.
 - [ ] **MP-5 Demos to the rule and the comparison.** `examples/demos/mpc/mppi_car_minimal.py`
   (the `mpc_car_minimal` story with the planner swapped) and the lesson
   `examples/demos/mpc/mpc_vs_mppi_pendulum.py` (`compare(MPC=, MPPI=)` on one
@@ -483,46 +463,26 @@ stated in the report.
   smoothing / adaptive-temperature options if a course asks. Done when the teaching
   surface test lists the names, or V3 rules them provisional.
 
-Dependencies: MP-1 to MP-3 follow RN-4 and RN-5 (the order above); the deterministic
-core would run on `dev` today, as the script shows, but a planner that waits for its
-rollout contract is written once. MP-4 is the T6 conversation and needs the maintainer
-in the room.
+Dependencies: MP-1 to MP-3 on the draws (RN-4, RN-5); MP-4 on the MPC block of
+planner-and-mpc.md. The deterministic core would run on `dev` today, as the script shows, but a
+planner that waits for its rollout contract is written once.
 
 ## 9. Timing
 
-The question asked: when. The proposal, against the rungs of ROADMAP §5:
-
-- **Now (2026-10-02): the standalone script** under `experimental/mppi/`, so
-  the G1 audit of GMC714 sees both MPC flavours running; it touches no library file.
-- **v0.4, after RN-4 and RN-5 (between cohorts): MP-1, MP-2, MP-3** on the
-  research lane, on the sampled kernel of S31 and the step model of S75
-  ([sampled-path.md](sampled-path.md)), batched over realizations. The three steps
-  touch no public name and no teaching file.
-- **Before the v0.9 freeze (spring 2027): MP-4 and MP-5.** MP-4 is T6's
-  `planning/trajectory_optimization/mpc/controller.py` conversation, already queued before v0.9 because V3 must
-  decide whether the MPC block joins the frozen surface; narrowing the planner contract
-  is a prerequisite of freezing that block's name, so MPPI costs the freeze nothing it
-  did not already owe. MP-5's demos land as soon as MP-4 does.
-- **v0.9 / v1.0: MP-6** with V3 — the teaching form (`loop` backend, Basic tier), the
-  facade names, the DESIGN paragraph. Not before: a planner reaches the teaching
-  surface through a demo, a both-backends test and a cohort (ROADMAP §2).
-
-So: a running script now, the planner in v0.4 on the finished rollout contract (the
-maintainer's "before v1" is met with a term to spare), provisional in v0.9, frozen or
-visibly provisional at v1.0 with the rest of the MPC band.
+Decided 2026-10-02 (ask 4): the standalone script under `experimental/mppi/` now, the planner
+on the finished rollout contract, provisional in v0.9, frozen or visibly provisional at v1.0
+with the rest of the MPC band. The rows and their rungs are TODO S72 (§4); MP-6, the teaching
+form, waits for V3: a planner reaches the teaching surface through a demo, a both-backends
+test and a cohort (ROADMAP §2).
 
 ## 10. Asks for the maintainer
 
-Recommended answers (2026-10-22), moved below from `end-state-api.md`: ask 1 D26
-(`MPPIPlanner`), ask 2 D27 (the three verbs), ask 3 D28 (`n_plant_samples=1`), ask 5 D30 (amended by
-R108: it moves to `planning/`). All for v0.4.
+All five are answered: ask 1 D26, ask 2 D27, ask 3 D28, ask 5 D30 below.
 
 1. **The name** (§5), ruled 2026-10-25 (R106): `MPPIPlanner`. One decides the record's
    name and the facade entry.
-2. **The MPC block contract** (§6): the three `Planner` verbs (`decision_dimension`,
-   `prepare_online`, `warm_start_guess`) and `z` on the tick's record, as the shape of
-   T6 for `controller.py`. A yes schedules MP-4; a different shape is written here
-   before any code.
+2. **The MPC block contract** (§6), answered 2026-10-27 (R148): the compiled planner face of
+   planner-and-mpc.md, which MPPI implements.
 3. **The stochastic default** (§4), ruled 2026-10-25 (R107): `n_plant_samples = 1`, the bias
    stated in the docstring.
 4. **Timing** (§9): decided 2026-10-02 — RN-4 and RN-5 first, then MP-1 to MP-3; the
@@ -541,15 +501,13 @@ they were "the v0.4 names the v0.3 code will already print" (end-state-api.md §
 own acronym, as the course notes say it); `PathIntegralPlanner` stays the docstring's long
 form.
 
-### D27 The MPC block's planner contract (mppi.md ask 2; T6)
+### D27 The MPC block's planner contract (mppi.md ask 2)
 
-**Preliminary choice, 2026-10-27 (R135, [record](../reviews/2026-10-27-design-questions-rulings.md)):**
-a generic planner interface, the loop mechanics kept in the MPC class; the planner does not know it
-runs in a loop. The three verbs below are the earlier proposal, an input to that design.
-
-**Recommended:** the three `Planner` verbs (`decision_dimension()`, `prepare_online()`,
-`warm_start_guess(z_prev, y, *, dt_mpc, k)`) and `z` on the tick's record; no `hasattr`
-probing. `ModelPredictiveController(planner, dt_mpc=)` then wraps trajopt and MPPI alike.
+**Answered 2026-10-27 by R148** ([record](../reviews/2026-10-27-core-vision-decisions.md)), which
+supersedes the three verbs once recommended here (`decision_dimension`, `prepare_online`,
+`warm_start_guess`) and R135's interface still to draft: the planner compiles to a pure face
+(`n_z`, `initial`, `solve`, `shift`, `policy`, …), the MPC block reads five of its members, and
+nobody probes the planner ([planner-and-mpc.md](planner-and-mpc.md); MPPI's members, §6).
 
 ### D28 The stochastic default of MPPI (mppi.md ask 3)
 
@@ -560,13 +518,9 @@ docstring; the user raises it knowingly, as with `n_trials`.
 
 ### D30 Where `RolloutEnvironment` lives (mppi.md ask 5)
 
-**Ruled 2026-10-25 (R108), against the recommendation below:** it moves to
+**Ruled 2026-10-25 (R108), against the earlier recommendation (no move):** it moves to
 `planning/environment.py` before the MPPI planner, the RL import kept: it is the problem
 sampled at `dt`, a planning object read by RL and MPPI alike.
-
-**Recommended:** answered by D11 (the sampled loop a tool on one kernel, R13;
-[sampled-path.md](sampled-path.md) §8): it becomes a caller of the sampled kernel and stays a
-thin RL-facing adapter in `learning/reinforcement_learning/`; no move.
 
 Sources (the method): Williams, Aldrich, Theodorou, "Model predictive path integral
 control: from theory to parallel computation" (JGCD 2017); Williams et al.,

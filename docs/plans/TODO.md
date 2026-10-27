@@ -672,8 +672,8 @@ workboard; the former wave G rows are §4 rows.
   `minilink.dynamics` (R50, R61): `MechanicalSystem`, `Manipulator`, `GeneralizedMechanicalSystem`,
   `StateSpaceSystem`, `LTISystem`, with `JaxMechanicalSystem` deleted (`MechanicalSystem`'s default
   builders on `xp`); MPC as one teaching name, `ModelPredictiveController` (R50), over today's
-  `MPCStatelessController` / `MPCStatefulController`, its constructor frozen while S76 (§1.7) and the
-  planner contract (D27; T6 in §3) reshape its internals, and the loop it runs in (`mpc @ plant`,
+  `MPCStatelessController` / `MPCStatefulController`, its constructor frozen until the rebuild on the planner's
+  compiled face (R148, TODO §1.8) changes it once, and the loop it runs in (`mpc @ plant`,
   as every demo and lesson writes it) kept as the user's syntax through S31. `ModelPredictiveController`
   already exists as a factory over the two classes, in a research-lane module the teaching-surface
   test rejects: it moves to a teaching-lane module. A6's catalog renames land before the term
@@ -783,21 +783,12 @@ on `dev` at 638215e; the recipe and the reference are AGENTS'. (T1 and T2 moved 
   `ReinforcementLearningPlanner(verbose=True)` keeps printing by default (ruled). The
   parametric optimizer's backend table (OPW-1–OPW-5) changes behaviour, so it is out of this
   row: it is the OPW row of §1.7.
-- [ ] **T6 the MPC block's contract** **[ask first]**: `export_mpc_dual_rate_computer`'s
-  single-rate path still undoes the dual-rate hooks with `hasattr(block, "replan_divisor")`
-  and `hasattr(latch, "set_after_solve")`; `validate_mpc_planner` probes the planner's
-  verbs with `hasattr`.
-  Also: one record per MPC tick, `Command` and `MPCTickSolve` folded into the
-  `PlanningSolution` (scan: control#4). The MPC port rename (`x` + `r` → `u`, extras `x_ff`
-  and `z`) and the dual-rate composite's `u` are P10's AC-3 and AC-8a. The planner contract is
-  a preliminary choice of 2026-10-27 (R135,
-  [record](../reviews/2026-10-27-design-questions-rulings.md)): one generic planner interface
-  offering what an MPC needs (build once, solve many times with `params` at the solve, a plan the
-  MPC can read, a warm start from a previous solution where the planner type has one), with the
-  loop mechanics (the tick, its memory, the delay, when to replan) owned by the MPC class, not
-  the planner; its verbs are drafted here. The earlier proposal (three `Planner` verbs, `z` on
-  the tick's record) is [mppi.md](mppi.md) §6; MP-4 there is this step's
-  second consumer, and the trajopt MPC baselines are its safety net.
+- [ ] **T6 the MPC block's contract**: answered by R148 ([planner-and-mpc.md](planner-and-mpc.md));
+  the work is TODO §1.8's "The MPC rebuilt on the planner's face", which removes the `hasattr`
+  probing (`validate_mpc_planner`, `export_mpc_dual_rate_computer`'s `replan_divisor` and
+  `set_after_solve` checks), `Command` and `MPCTickSolve`. The MPC port rename (`x` + `r` → `u`,
+  extras `x_ff` and `z`) and the dual-rate composite's `u` are P10's AC-3 and AC-8a. This row
+  closes when that §1.8 row lands.
 
 **D1 — demos to the rule** (RULES 6.1 / 6.10 / 6.11; the census is comment FD-C14 of the
 foundations review, docs/reviews/2026-09-15-foundations-review.md).
@@ -959,23 +950,20 @@ pillar names it.
 
 **On the spine.**
 
-- [ ] **S72 The path-integral planner (MPPI)** **[ask — MPC block contract]** (MP-1 first
-  rewrites mppi.md to R104, R107 and R123: the seed and the tick, one plant draw by default, no
-  tick latch; and to the generic planner interface, R135), after
-  S31's sampled kernel and RN-4 and RN-5 (the core, §1.3 and §1.5), its plant the step model (S75), on the evaluator's batched rollout over realizations. Design:
+- [ ] **S72 The path-integral planner (MPPI)** (a planner under the compiled-face contract of
+  [planner-and-mpc.md](planner-and-mpc.md), R148; the seed and the tick, R104; one plant draw by
+  default, R107), after the core's sampled loop and draws (§1.3, §1.5), its plant the step model (S75), on the evaluator's batched rollout over realizations. Design:
   [mppi.md](mppi.md); the standalone prototypes `experimental/mppi/pendulum_mppi.py`
   and `racecar_mppi.py` run today. MP-1 `planning/trajectory_optimization/path_integral.py`:
-  `MPPIPlanner` / `MPPIRecord` (R106), `solve`
-  and `solve_trajectory_from` on
+  `MPPIPlanner` / `MPPIRecord` (R106), its compiled face (mppi.md §6) on
   `RolloutEnvironment` (`jit(vmap(scan))` over `K` samples; MP-0 first moves it to
   `planning/environment.py`, the RL import kept, R108), the six-beat body of the plan's
-  §5, `decision_dimension` and `warm_start_guess`; MP-2 the hand-loop demo
+  §5; MP-2 the hand-loop demo
   `experimental/mppi/pendulum_mppi.py`; MP-3 the stochastic branch
   (`n_plant_samples` realizations per control sample, mean or CVaR by the problem's
   criterion) and the fan of sampled futures as `solution.plot_samples()`. Done when the
   seeded-determinism, LQR-agreement and swing-up tests pass, the deterministic twin of the
-  stochastic branch is byte-identical, and the body reads next to `dp.py`. MP-4 (the MPC
-  block reads the planner verbs: T6) and MP-5 (demos, `compare(MPC=, MPPI=)`) before v0.9;
+  stochastic branch is byte-identical, and the body reads next to `dp.py`. MP-4 (the rebuilt MPC on MPPI) and MP-5 (demos, `compare(MPC=, MPPI=)`) before v0.9;
   MP-6 (the `loop` backend, facade names, DESIGN §6) with V3.
 - [ ] **C5 RL follow-ups**:
   - [ ] **S50 SAC actor step** **[ask]**: pre-update critic (today, kept for bit-identity) or
