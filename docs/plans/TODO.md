@@ -32,6 +32,11 @@ Workboard rows marked **[ask]**: each waits for the maintainer's go, pick or rev
 agent starts. They are details, versions and demos, not design questions (those are
 [QUESTIONS.md](../dev/QUESTIONS.md)); each row holds its options.
 
+**One go per lane (an ask, 2026-10-27 evening):** 23 of the 43 open rows of §1 are
+**[ask — core]**, and R141–R153 now rule their shape. The asks with an option left are the
+discretized problem's cost, D15 and the one-score points (QUESTIONS.md); one go per lane of
+[core-architecture.md](core-architecture.md) §10 would let the rest start.
+
 | Step, in plain words | Id | Release | What the ask is |
 | --- | --- | --- | --- |
 | Your review of the overnight run's open decisions | OD-7 … OD-35 | v0.3 (the merge, §1.10) | review the number changes first, then the rest as a block |
@@ -164,7 +169,9 @@ Why: [core-architecture.md](core-architecture.md) §1.
     swept once with R143's cells) **[student-facing, given]**;
   - the names the day's rulings left to this sweep: `sys.discretize(dt)` as the facade of
     `discretize` (R141), the dense-run evaluator method (R147), and the planner and MPC names of
-    [planner-and-mpc.md](planner-and-mpc.md) §11 (`pv.policy`, the letter `z`, `PlanFollower`).
+    [planner-and-mpc.md](planner-and-mpc.md) §11 (`pv.policy`, the letter `z`, `PlanFollower`),
+    and `dt` at the calls against `sample_period` on the object (R146; QUESTIONS, the names
+    entry).
 
   Done when DESIGN §4 states the rule and no public signature uses `compile_backend`,
   `optimizer_method` or the geometry `bind`. Later, not in this row: the compiled-model classes →
@@ -382,7 +389,8 @@ Ruled: R13, R14, R104, R105, R123, R125, R145, R146, R147 (preliminary choices o
   `HybridDiagram`** **[ask — core]** (merges S31, D13 and P10's AC-8b; R146): a diagram with a
   clocked block is a `SampledDiagramSystem`, its base period the gcd of its blocks', a block of
   divisor `d > 1` firing on `k mod d = 0` with its held outputs as state slots, a period not a
-  multiple of the base refused at wiring; `computer @ plant` is one, its plant the plant on the
+  multiple of the base refused at wiring (the ratios checked to a tolerance, today's `1e-9` of
+  `rate_to_divisor`); `computer @ plant` is one, its plant the plant on the
   base clock with substeps (defaulting from the automatic-`dt` rule); the hybrid demos, tutorial 06
   and the dual-rate projects rewritten as composition (`(filt % 0.01) >> (ctl % 0.1)`); the
   run-state caches gone (RULES 2.4, D13); the `core` → `simulation` import (scan: core#14);

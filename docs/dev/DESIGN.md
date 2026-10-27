@@ -976,7 +976,9 @@ output recorded (`"id:port"`, the plant's input `"plant.u"`, the role `plant`);
 problem `vmap`ped on JAX, so `jax.grad(lambda p: pe.evaluate(p).objective)(pe.params)`
 reaches every gain, plant parameter, cost weight and the start; a tree holding an integer leaf (a
 noise block's `seed`) is differentiated with `jax.grad(..., allow_int=True)`, the integer leaves
-getting a zero (`float0`) gradient (R152). `solver="scipy*"` is the
+getting a zero (`float0`) gradient (R152); that reads a gradient, since `float0` leaves refuse
+the next tree arithmetic, and tuning goes through `pe.program(wrt)`, which never sees an
+integer leaf (R131). `solver="scipy*"` is the
 adaptive integral on NumPy, `dt` its reporting grid; `"auto"` falls back to NumPy when the
 loop, the cost or a set does not trace. `pe.program(wrt, bounds, key, n_trials,
 params=)` exports the tuning `MathematicalProgram` over the leaves `wrt` (dotted paths,

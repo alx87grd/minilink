@@ -31,9 +31,10 @@ landing change; the text comes to the maintainer with it.
 ### 8.1 The tree (R146)
 
 ```text
-StepSystem ─── StepDiagramSystem         pure tick: step(x, u, k, params); no clock, no dt
+StepSystem                               pure tick: step(x, u, k, params); no clock, no dt
+  ├─ StepDiagramSystem                   a diagram of step systems, by the assembly code (§8.4)
+  │    └─ SampledDiagramSystem           a diagram with a clocked block: the computer, and computer @ plant
   └─ SampledSystem                       any system on a clock; discretize and % return it
-      └─ SampledDiagramSystem            a diagram with a clocked block: the computer, and computer @ plant
 ```
 
 - **`StepSystem`** stays clean: no `dt`, no `source`. Chess, a grid world and a native z-domain
@@ -47,7 +48,9 @@ StepSystem ─── StepDiagramSystem         pure tick: step(x, u, k, params);
     parent's tree holds it as one block; nobody subclasses it;
   - `sample_period` is structural, not a parameter (a sweep, never a gradient).
 - **`SampledDiagramSystem`**: any diagram with a clocked block; its base period is the greatest
-  common divisor of its blocks' periods (§8.2).
+  common divisor of its blocks' periods (§8.2). It is a `StepDiagramSystem` with a base period,
+  built by the assembly code (§8.4), not a `SampledSystem`, which views one source and is never
+  subclassed.
 - **Today:** `Discretization` (`analysis/discretization.py`) is this view under another name; it
   is renamed `SampledSystem` (its `dt` becomes `sample_period`; `ExactDiscretization` folds in as
   `solver="exact"`). `Computer` and `StepSchedule` (`simulation/discrete/computer.py`) and

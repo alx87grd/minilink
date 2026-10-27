@@ -107,7 +107,9 @@ terminal = QuadraticField(P, x_bar).as_terminal_cost()   # §9: the LQR value en
   runs (D13); the path lookup and merge of parameter trees are written four times
   (`planning/evaluator.py`, `planning/problems.py`, `core/compile/evaluators/jacobian.py`,
   `core/assembly.py`).
-- **Open:** the CONSTITUTION's disturbance sentence, amended when the draws land (R128).
+- **Open:** the CONSTITUTION's amendments (invariants 1 and 3, §6's `%` sentence, §2's
+  disturbance sentence): their text is proposed in QUESTIONS.md, to rule before the loop lane
+  starts.
 - **Rows:** [TODO §1.1](TODO.md#11-every-object-pure-every-number-a-parameter). Design:
   [randomness.md](randomness.md) (RN-2), [differentiable-problem.md](differentiable-problem.md) §8.
 
@@ -208,7 +210,11 @@ terminal = QuadraticField(P, x_bar).as_terminal_cost()   # §9: the LQR value en
   refuses a `StepSystem` controller but accepts the stateless MPC, whose latch then runs at the
   RK4 stages (KNOWN_ISSUES); `%` refuses a law with continuous states.
 - **Open:** whether the realtime simulator is re-based on the pure blocks in v0.3 or with the
-  realtime review (v1.0); AC-8a's port names (automation-by-convention.md).
+  realtime review (v1.0); AC-8a's port names (automation-by-convention.md); D15, whether
+  `problem.compile(controller, dt=)` on a sampled controller must equal the loop's base period
+  or reads it (sampled-path.md §8.7); whether the host clock runner keeps the lazy
+  `core` → `simulation` import once the hybrid modules go (R100); `dt` at the calls against
+  `sample_period` on the object (QUESTIONS, the names entry).
 - **Rows:** [TODO §1.5](TODO.md#15-the-sampled-loop-a-step-diagram-two-runners).
 
 ## 6. One score (pillar)
@@ -220,7 +226,9 @@ terminal = QuadraticField(P, x_bar).as_terminal_cost()   # §9: the LQR value en
     `gamma`, a `StepCost` `c(x, u, k)`, `h(x, k)`), each stochastic by its parts;
   - **a problem is a description; its step face is compiled:** `problem.compile(dt=)` (no
     controller) gives `transition(x, u, k, params) -> (x_next, c_k)`, `N = tf/dt`,
-    `gamma = e^{−ρ dt}`, the sets at `t_k`, the price; `problem.compile(controller)` scans it;
+    `gamma = e^{−ρ dt}`, the sets at `t_k`, the price; `problem.compile(controller)` scans it, the
+    loop compiled with its plant block augmented to `(x_next, c_k)` inside its period body, so a
+    stateful controller's loop is still one scan with one plant evaluation per period;
     `discretize(problem, dt)` (facade `problem.discretize`) is the explicit `StepPlanningProblem`,
     compiling to the same face; value iteration, the RL environment, the judge, shooting and the
     native MPC read only that face;
@@ -238,9 +246,12 @@ terminal = QuadraticField(P, x_bar).as_terminal_cost()   # §9: the LQR value en
   failure rules differ (`score_run` integrates to `tf` and checks `X` and `U` at every sample; the
   RL environment stops at the first exit from `X` and checks no `U`; value iteration prices the
   cells that leave its grid), written twice (the environment's step and `score_run`; R108 gives
-  them one owner).
+  them one owner); the hold differs too: the planners' `nominal_trajectory` holds `u_k` over the
+  period while `evaluate` closes the law as a continuous diagram and reads it at the RK4 stages,
+  so a lookup policy is scored on two loops today.
 - **Open** (QUESTIONS, the one-score entry): time-varying sets and the margins between samples;
-  one failure rule (absorbing or not) and the input hold; shooting's reported score.
+  one failure rule (absorbing or not) and the input hold; shooting's reported score. And the
+  discretized problem's cost, which R141 leaves with no object (QUESTIONS).
 - **Rows:** [TODO §1.6](TODO.md#16-one-score).
 
 ## 7. The parametric program; the stochastic program its seed case (pillar)
@@ -267,7 +278,8 @@ terminal = QuadraticField(P, x_bar).as_terminal_cost()   # §9: the LQR value en
   evaluator; the compiled path takes SciPy only; problems have no start time; shooting and
   collocation pin the start through `X0`; `pe.program(wrt, key, n_trials)` refuses `"x_start"` in
   `wrt` on a stochastic problem.
-- **Open:** the name of `program.params_at(z)` (the names sweep).
+- **Open:** the name of `program.params_at(z)` (the names sweep); a performance budget for the
+  gate (QUESTIONS).
 - **Rows:** [TODO §1.7](TODO.md#17-the-parametric-program-the-stochastic-program-its-seed-case).
 
 ## 8. The native proof of concept: the planner's pure face and an MPC on it (pillar)
@@ -294,7 +306,8 @@ terminal = QuadraticField(P, x_bar).as_terminal_cost()   # §9: the LQR value en
   update jitted; nothing differentiates through a solve; the RL learners already run their steps
   in one `lax.scan`; the planners have no pure face, `solve` mutates them (`last_solution`); the
   MPC is two classes with `dt_mpc`, `t0`, `warm_start` and a tick latch, probing the planner.
-- **Open:** the names in planner-and-mpc.md §11.
+- **Open:** the names in planner-and-mpc.md §11; one owner of the plan's time (`t_last` beside
+  the origin in `z`) and the clock port `t` (QUESTIONS).
 - **Rows:** [TODO §1.8](TODO.md#18-the-native-proof-of-concept-the-planners-pure-face-and-an-mpc-on-it).
 
 ## 9. Fields (pillar)
@@ -319,13 +332,15 @@ terminal = QuadraticField(P, x_bar).as_terminal_cost()   # §9: the LQR value en
 
 The lanes follow the dependencies (they replaced the phases 0–8 of 2026-10-26, whose two
 backward edges reviewer C found; [the simplification record](../reviews/2026-10-26-plan-simplification.md)).
-Every lane is ready to start; only join 1 waits on the one-score question's three open points.
+Every lane is ready to start once step 0 lands; only join 1 waits on the one-score question's
+three open points.
 
 | Lane | Workstreams, in order | Waits on |
 | --- | --- | --- |
-| **Objects and draws** | §1: the contract and the tree (`core/params.py`), the textbook leftovers, the names sweep, distributions and sets reading `params`, the shaping to `core/`, `Set.as_cost` → §3: one draw by path on both backends, disturbances as source blocks, the one-tree `realize`, the problem stochastic by its parts, `NoiseSource` → §4: the seeded policy | ready |
-| **The loop** (the critical path; it starts first) | §2: one same-tick semantic, the operators on step systems, step evaluators that trace and batch, one signal pass per tick → §5: `SampledSystem` (renamed from `Discretization`), periods on blocks with divisors and held outputs, `SampledDiagramSystem`, the two run verbs and the dense method, the host clock runner over the pure blocks, the hybrid demos re-pinned once | ready |
-| **The program** | §7: one backend table, the program with parameters, `t_start` and the start from `x_start`, collocation reading the plant, the online call → §8: the native kernel, byte-identical, then `iterations=K`; the planner's compiled face on trajectory optimization | ready |
+| **Step 0** (serial, before the lanes) | §1: the names sweep (R134, R151) and the one parameter-tree module (`core/params.py`): they touch every lane's files (`planning/evaluator.py`, `problems.py`, `jacobian.py`, `assembly.py`; `compile_backend` → `backend` across the API), so no lane starts before them | nothing |
+| **Objects and draws** | §1: the contract, the textbook leftovers, distributions and sets reading `params`, the shaping to `core/`, `Set.as_cost` → §3: one draw by path on both backends, disturbances as source blocks, the one-tree `realize`, the problem stochastic by its parts, `NoiseSource` → §4: the seeded policy | step 0 |
+| **The loop** (the critical path; it starts first) | §2: one same-tick semantic, the operators on step systems, step evaluators that trace and batch, one signal pass per tick → §5: `SampledSystem` (renamed from `Discretization`), periods on blocks with divisors and held outputs, `SampledDiagramSystem`, the two run verbs and the dense method, the host clock runner over the pure blocks, the hybrid demos re-pinned once | step 0 |
+| **The program** | §7: one backend table, the program with parameters, `t_start` and the start from `x_start`, collocation reading the plant, the online call → §8: the native kernel, byte-identical, then `iterations=K`; the planner's compiled face on trajectory optimization | step 0 |
 | **Join 1** | §6: `StepPlanningProblem`, `problem.compile(dt=)` and `transition`, the judge on the scan, then value iteration and the RL environment on `transition`, the RL discount derived | the objects and loop lanes, and the one-score question |
 | **Join 2** | §8: the MPC rebuilt on the planner's face (both forms, the `t` port), its closed loop in one scan tuned by gradient; §7: the stochastic program as a convention and a test | all three lanes |
 | **Beside, from §1 on** | §9: Fields, additive to the path | §1's `as_cost` signature |
@@ -337,20 +352,33 @@ Every lane is ready to start; only join 1 waits on the one-score question's thre
 cost; a restructure agrees to `rtol 1e-6`; a move or rename stays byte-identical; no alias, one
 sweep. The intended changes, each a commit of its own with a ledger line, in this sequence so
 each number moves once (reviewer C):
-1. the sampled loop: the same-tick semantic (R125), then the MPC's one-period delay (R123), then
-   the run verbs' defaults (R147);
+1. the sampled loop: the same-tick semantic (R125), then the run verbs' defaults (R147); the MPC
+   demos, which `Computer` runs today, are not re-pinned here: they move again at 5 and are
+   pinned once there;
 2. the one-score `J` (R142), before any RL re-pin;
 3. the cross-backend draws and live disturbances (R128, R144);
-4. the RL re-pin with the seeded policy (R129) and the derived discount (R150).
+4. the RL re-pin with the seeded policy (R129) and the derived discount (R150);
+5. the MPC's one-period delay (R123), with the MPC rebuilt on the planner's face (join 2): the
+   MPC demos pinned once, here.
 
 Each re-pins the regression baselines it moves, in its own commit; the student-facing numbers at
 the merge (TODO §1's gates).
+
+**Spikes before a lane starts** (what the vision's prototypes did not verify,
+[its §10](../reviews/2026-10-27-consolidated-core-vision.md)): the hold slots and the divisors
+inside the compiled step plan (`plan.py`) and the plant block augmented to `(x_next, c_k)` inside
+the loop's evaluator, before the loop lane; the host clock runner with an adaptive plant between
+held inputs (`solver="scipy"`), with it; the DP sweep on `transition` under JAX, before join 1;
+the program's constraint rows on the compiled path with Ipopt inside a tick, before join 2;
+`jax.checkpoint` on long loops under `grad`, when a demo needs it.
 
 ## 11. Definition of done (a proposal; the maintainer confirms)
 
 From reviewer C §3.3, in the ruled names. v0.3 is done when these scripts run as tests:
 1. **An LQG loop** with noise on `d` and `n`: the Monte Carlo mean is within the covariance
-   prediction's sampling error, and one key gives the same draws on NumPy and JAX.
+   prediction's sampling error, and one key gives the same draws on NumPy and JAX; the same loop
+   with its computer sampled (`% dt`) scores with its noise blocks realized per trial (the
+   draws × loop join).
 2. **A digital PID** (`problem.compile(pid % 0.01)`): `evaluate(p)` runs and `jax.grad` matches
    central differences.
 3. **The same digital PID** run by `compute_rollout` and scored by `evaluate` gives one `J`;
@@ -361,7 +389,8 @@ From reviewer C §3.3, in the ruled names. v0.3 is done when these scripts run a
 5. **The fixed-iteration MPC's closed loop:** `problem.compile(mpc % Δ).evaluate(p)` runs, `vmap`s
    over starts, and its gradient tunes a cost weight.
 6. **A native step problem** (a grid world as a `StepPlanningProblem`) solved by value iteration
-   on `transition`, and a continuous problem's value iteration and judge giving one `J`.
+   on `transition`, and a continuous problem's value iteration and the judge, which scores the
+   lookup policy through the sampled face (`policy % dt`, R105), giving one `J`.
 7. **A `QuadraticField`** serves as a terminal cost (`as_terminal_cost`) and as the certificate's
    `V`, with the DP and RoA baselines unchanged.
 8. **Every catalog plant and notebook** is green on the merge gate.

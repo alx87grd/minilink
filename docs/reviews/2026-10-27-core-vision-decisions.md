@@ -182,10 +182,15 @@ and `discretize` returns it directly, with no intermediate class.
 - **The tree:**
 
   ```text
-  StepSystem ─── StepDiagramSystem         pure tick: step(x, u, k); chess, grid worlds; no clock
+  StepSystem                               pure tick: step(x, u, k); chess, grid worlds; no clock
+    ├─ StepDiagramSystem                   a diagram of step systems
+    │    └─ SampledDiagramSystem           a diagram with a clocked block: the computer, and computer @ plant
     └─ SampledSystem                       any system on a clock; discretize and % return it
-        └─ SampledDiagramSystem            a diagram with a clocked block: the computer, and computer @ plant
   ```
+
+  (The drawing was corrected the same evening: it placed `SampledDiagramSystem` under
+  `SampledSystem`, against the entry's own words below, which make a `SampledSystem` a view of one
+  source that nobody subclasses, and the operators build a step diagram.)
 
 - **A pure `StepSystem` stays clean:** no `dt`, no `source`. A native z-domain design is one.
 - **`SampledSystem(source, sample_period, *, solver="rk4", substeps=1)`, "this system on this

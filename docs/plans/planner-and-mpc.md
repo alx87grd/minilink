@@ -140,7 +140,9 @@ step at k:    z0 = pv.shift(z, t_k − t_last)
 - **A failed solve keeps `(z, t_last)`**; the next tick shifts by `2Δ` and reads the old plan
   `2Δ` in, with no special case.
 - **One solve per tick**, no cache; no algebraic loop (the discretized plant has no feedthrough,
-  `z` is state). Traced, `step` is a `lax.scan` body and the fallback a `where`.
+  `z` is state). Traced, `step` is a `lax.scan` body and the fallback a `where`. A fixed-count
+  native solve (R149) always reports success, so the fallback is live only on a host solver
+  (Ipopt, SLSQP): the traced tick has no branch.
 - **Tick 0:** `x0 = (pv.initial(planner.params), t_start)`, the default guess, no solve at
   construction. The first period's command is the guess's first input (zero for a default
   trajectory-optimization guess). `x0` is a leaf of the loop's tree (R124), so a solved first plan

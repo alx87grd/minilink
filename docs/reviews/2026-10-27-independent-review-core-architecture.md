@@ -125,3 +125,17 @@ The description-and-compiled-face pattern (§1 of planner-and-mpc); the stage co
 stationary form (R142); `realize` as one tree (R144); periods on blocks with the schedule
 derived (R146); the two verbs that agree (R147); `iterations=K` on the optimizer (R149); the
 definition of done as scripts; the "today" paragraphs; the lanes replacing the phases.
+
+## 7. Where each point went (the same evening)
+
+Fixed in the docs, one commit: the R146 class tree (§2.1; sampled-path §8.1 and the record's
+drawing, with a note); the number-change sequence and the MPC demos pinned once at join 2
+(§2.2); §5's open list (§2.3); script 6 through the sampled face and the hold in §6's "today"
+(§2.4); the augmented plant block stated in §6 and the vision's "not verified" list as spikes in
+§10 (§3.D); step 0 before the lanes (§4.H); the fixed-count solve's fallback (§5); the ratio
+tolerance on the periods row (§5); the `allow_int` line in DESIGN §6 (§5); the draws × loop
+clause on script 1 (§5); the one-go-per-lane ask at the head of TODO (§4.F).
+
+To the maintainer, as entries of QUESTIONS.md: the discretized problem's cost (§3.A); one owner
+of the plan's time (§3.B); the clock port `t` (§3.C); the CONSTITUTION amendments, with their
+text (§4.G); a performance budget (§3.E); `dt` or `sample_period` (§2.5).
