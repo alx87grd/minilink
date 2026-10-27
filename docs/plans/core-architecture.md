@@ -285,6 +285,13 @@ V = QuadraticField(P)                            # §9: the terminal cost as a f
   `g·dt` of value iteration and RL (reviewer A §3.1).
 - **Status.** The direction names it a pillar. The idea is a draft. "Judge" was the working
   word; the function stays `score_run`.
+- **Preliminary choices, 2026-10-27** ([R141, R142](../reviews/2026-10-27-core-vision-decisions.md)):
+  - two problem classes mirroring the systems: `PlanningProblem` (continuous, unchanged) and
+    `StepPlanningProblem` (`N`, `gamma`, a `StepCost` `c(x, u, k)`); `problem.discretize(dt)`
+    returns the step problem on `Discretization(plant, dt)`; every stepping tool reads
+    `transition(x, u, k, params) -> (x_next, c_k)`, `N`, `gamma`, the sets at the index;
+  - `c_k` integrated with the state in the transition, stationary form
+    (`c_k = ∫₀^dt e^{−ρτ} g dτ`, `J = Σ γ^k c_k + γ^N h`).
 - **Today.**
   - One policy gets three or four close `J`s:
     - a left Riemann sum `g dt` in `dp.py` and the RL reward;

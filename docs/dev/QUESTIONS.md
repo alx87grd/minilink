@@ -49,7 +49,11 @@ shapes, and in TODO; the entry then leaves this file. `§N` names the workstream
   `PlanningProblem` on a `StepSystem`; C: internal first, and after the loop lane.
 - **Detail:** [differentiable-problem.md](../plans/differentiable-problem.md) §9 (its six points
   in §9.4); [core-architecture.md](../plans/core-architecture.md) §6
-- **Answer:**
+- **Answer, in part (2026-10-27, preliminary):** the object and the per-step cost are chosen
+  ([R141, R142](../reviews/2026-10-27-core-vision-decisions.md)): a `StepPlanningProblem` sibling,
+  `problem.discretize(dt)` for the sampled case, `c_k` integrated in the transition in the
+  stationary form. Still open: time-varying sets and the margins between samples, the failure
+  rule and the hold, shooting's reported score.
 
 ## Toward v1.0
 
