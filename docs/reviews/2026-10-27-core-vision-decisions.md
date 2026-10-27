@@ -117,6 +117,27 @@ a planning problem".
     the others' draws unchanged. Today's positional `split_keys` and the held disturbance value
     change with the draws lane (RN-4, RN-5).
 
+## R145 (2026-10-27, preliminary) `%` is the shortcut of `discretize`, generic for any system, Euler by default
+
+Decision 5 of the vision. The maintainer: "`%` should just be a shortcut to the discretize
+method, generic for any system; Euler by default is fine, this shortcut being mostly for the
+controller side".
+
+- **`sys % dt` is `discretize(sys, dt, solver="euler")`**, for every kind of system:
+  - a `DynamicSystem` with states (a PID, a lead-lag, an observer) becomes its difference
+    equation, `z_{k+1} = z_k + dt·f(z_k, e_k)`, the one a GRO501 student writes for the Arduino;
+  - a static block and a `StepSystem` are tagged with their period.
+- **`discretize(sys, dt)` keeps `rk4`** as its own default: the shortcut is for implementing a
+  law, the function for simulating a plant. Another scheme is the function's `solver=`
+  (`discretize(pid, 0.01, solver="rk4")`); `%` takes none.
+- `sys.discretize(dt)` is the method facade of the function (R141's note), so `%` reads as its
+  operator form.
+- No number moves: `%` refuses a law with continuous states today
+  (`core/discrete/step_diagram.py`, `require_step_subsystem`). Tustin is not part of it; a later
+  feature row if wanted.
+- **Depends on decision 6**, the multi-clock computer: what `%` returns inside a computer (a
+  block carrying its period, or a one-block `Computer`) is settled there.
+
 ## The one-score question
 
 R141 and R142 answer its object (the compiled step face) and its per-step cost. Still open
