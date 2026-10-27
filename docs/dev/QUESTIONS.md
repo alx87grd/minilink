@@ -19,7 +19,6 @@ the entries below hold the context:
 2. **The stateless MPC:** refuse it in `problem.compile` now (B).
 6. **The run caches:** they go (B).
 10. **`as_cost` and the shaping:** one function, moved to `core/` first (B).
-13. **The native kernel:** a pure kernel with a step-system view (C).
 14. **The first fixed-iteration tick:** the gradient MPC; MPPI in v0.4 (C).
 15. **The borderline rows:** S70 lands before S66, the realtime re-base
     waits for v1.0, and the RL heads go to v0.4 (B).
@@ -250,25 +249,6 @@ In the order to decide (reviewer C §5).
 - **Detail:** [differentiable-problem.md](../plans/differentiable-problem.md) §9.4
 - **Answer:**
 
-### Native optimizers: is the solver a pure kernel with a step-system view, or a `StepSystem` itself?
-- **Blocks:** the native proof of concept (NS-1, NS-2's fixed-`K` form; §8) and the teaching
-  face (NS-5, v0.4).
-- **Your direction (2026-10-26):** a proof of concept in v0.3, a simple fixed-step solver and an
-  MPC on it; better solvers in v0.4. The kernel's shape stays open.
-- **Today:** `gd` and `adam` are a Python loop in `optimizers/first_order.py`. A hand-wired
-  `StepDiagramSystem` of a law `z⁺ = z − η u` and a gradient oracle already rolls out gradient
-  descent.
-- **Options:**
-  - (A) every native solver a `StepSystem` by construction;
-  - (B) a pure `init` / `step` kernel run by `Optimizer`, with the step-diagram loop as a
-    teaching view of it;
-  - (C) kernel only.
-- **Recommendation:** B. A forces Adam's pytree state into a flat `x`; C loses the
-  step-size-as-stability lesson.
-- **Reviewers:** all three: B, with the view arriving with NS-5 in v0.4.
-- **Detail:** [native-optimizers.md](../plans/native-optimizers.md) §3
-- **Answer:**
-
 ### Which fixed-iteration tick comes first: the gradient MPC or MPPI's?
 - **Blocks:** the native proof of concept (§8) and MPPI (S72, TODO §4).
 - **Today:** native-optimizers.md §4.6b and §5 say "MPPI is the first instance, ahead of NS-8",
@@ -412,18 +392,6 @@ In the order to decide (reviewer C §5).
 - **Options:** rewrite the doc to the rulings when MP-1 starts; now.
 - **Recommendation:** none (an open point the 2026-10-26 consolidation recorded).
 - **Detail:** [mppi.md](../plans/mppi.md) §1, §4–§6, §10
-- **Answer:**
-
-### Native optimizers: which program categories and which native algorithms are in scope?
-- **Blocks:** NS-4, NS-6, NS-7; CONSTITUTION §1.4 ("not a solver framework").
-- **Today:** three classes read from the fields (`unconstrained`, `bounded`, `constrained`);
-  native `gd` and `adam` only.
-- **Options:** add least squares, stochastic and parametric categories; native GD, momentum,
-  Adam, Newton, Gauss–Newton, Levenberg–Marquardt, augmented Lagrangian; or a smaller set.
-- **Recommendation:** the categories each with a named consumer (identification, inverse
-  kinematics, the Monte Carlo objective, the MPC); the textbook algorithms only; Ipopt stays the
-  constrained workhorse.
-- **Detail:** [native-optimizers.md](../plans/native-optimizers.md) §4.1–§4.2
 - **Answer:**
 
 ### Do you adopt or drop the optional `KinematicModel` delegate?

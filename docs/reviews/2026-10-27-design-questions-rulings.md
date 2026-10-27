@@ -229,3 +229,23 @@ parameters and randomness, and the scope of the stochastic program.
   stochastic program category go with the optimizer strategies.
 
 Reviewers A, B and C agreed on the convention; A and C limited the core to the sample average.
+
+## R132 (2026-10-27, preliminary) A native solver is a pure kernel with a step-system view; categories with their first solver
+
+The questions: is a native solver a `StepSystem` by construction or a kernel, and which program
+categories and algorithms are in scope.
+
+- **A pure kernel,** `init(z0, params) -> state` and `step(state, params) -> state` on the array
+  module (the Optax shape the RL learners' `Adam` already uses), run by `Optimizer` (a
+  `lax.scan` when traced).
+- **A step-system view of it,** `as_step_system(solver, program)`, for the lesson ("the solve is
+  a rollout") and, later, convergence analysed as stability. One implementation, not two.
+- **Categories and algorithms: minimalist.** A program category is added with the first solver
+  that needs it (least squares with identification; the stochastic category with the optimizer
+  seed strategies, R131). Native algorithms are the textbook ones, each landing when something
+  needs it; Ipopt stays the constrained workhorse. The core needs gradient descent and Adam as
+  kernels, for the proof of concept.
+
+Options weighed: every solver a `StepSystem` (Adam's tree state packed into a flat `x`); a kernel
+with no view (loses the step-size-as-stability lesson). Reviewers A, B and C: the kernel with a
+view.

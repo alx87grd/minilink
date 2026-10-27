@@ -16,6 +16,10 @@ Lane: research.
 - **The order this doc wrote before that direction** (after S31 and S76, "MPPI's tick first,
   ahead of NS-8" in §4.6b and §5) is superseded. Which tick comes first is a QUESTIONS entry.
 
+**Preliminary choice, 2026-10-27 (R132, [record](../reviews/2026-10-27-design-questions-rulings.md)):**
+the two-layer split of §3 (a pure kernel run by `Optimizer`, a step-system view for the lesson);
+§4.1–§4.2's categories and algorithms added only with the first solver that needs them.
+
 **Where each idea lives** (one fact, one home: this doc holds the native solvers and the
 two goals; the neighbours hold what they already owned):
 

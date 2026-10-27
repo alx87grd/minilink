@@ -415,7 +415,10 @@ Why: [core-architecture.md](core-architecture.md) §8. Design:
   - `problem.compile(mpc_computer).evaluate(p)` runs, `vmap`s over starts, and its gradient with
     respect to the MPC's cost weights tunes a demo by `Optimizer`.
 
-  Open: the kernel's shape, and which tick comes first.
+  The kernel's shape is a preliminary choice of 2026-10-27 (R132,
+  [record](../reviews/2026-10-27-design-questions-rulings.md)): a pure `init` / `step` kernel
+  with a step-system view; categories and algorithms added with their first solver. The gradient
+  MPC's tick comes first, as the direction places it; MPPI is v0.4.
 
 ### 1.9 Fields
 

@@ -353,10 +353,11 @@ V = QuadraticField(P)                            # §9: the terminal cost as a f
     jitted.
   - Nothing differentiates through a solve.
   - The RL learners already run their steps in one `lax.scan`.
-- **Open:**
-  - the kernel's shape: a pure kernel with a step-system view, or a `StepSystem`;
-  - which fixed-iteration tick comes first;
-  - the categories and algorithms in scope (v0.4).
+- **Preliminary choice, 2026-10-27 (R132; open to revision):** a pure `init` / `step` kernel run
+  by `Optimizer`, with a step-system view (`as_step_system`); a program category and a native
+  algorithm are added with the first solver that needs them, minimalist for now.
+- **Open:** which fixed-iteration tick comes first (an order detail: the gradient MPC, as the
+  direction places it).
 - **Rows:** [TODO §1.8](TODO.md#18-the-native-proof-of-concept).
 
 ## 9. Fields (pillar)
