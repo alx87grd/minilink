@@ -797,7 +797,8 @@ The maintainer's direction (2026-10-26): v0.4 adds features built on the finishe
 intertwined with it; the rows are independent and run in any order. A row that reads a core
 pillar names it.
 
-- [ ] **C4 Identification and generation**: identification is V1's program export
+- [ ] **C4 Identification and generation** (its design states which fitting route it takes and
+  flags it for the behavior-cloning decision, R136): identification is V1's program export
   (`pe.program(wrt=["plant.…"])` and the `Optimizer`) with a data-mismatch cost (`identification/fitting.py` on `rollout_batch`; physical params and NN
   weights are one verb), its first data consumer; `trajectory_generation/` port (polynomial,
   min-snap); SMC trajectory-following demo; trajectory post-filter; experiment-design
@@ -1071,6 +1072,9 @@ after the v0.3 tag (planned for December 2026 when v0.3 had that date); the v1.0
   planner that fits a policy to them (imitation beside the RL planner, `NeuralPolicyController`
   as its output); the cloned controller closed on the plant and compared against the
   demonstrator. Its first scenes are realtime games written for it (pyro's are not ported, R109).
+  How fitting enters the API is decided here (R136, a preliminary choice of 2026-10-27): the
+  program export with a data-mismatch cost (a dataset as `Trajectory`s, no new verb), or a `fit`
+  verb beside `solve` with a dataset noun ([future-policies.md](future-policies.md) §7).
 
 ---
 
@@ -1121,8 +1125,8 @@ One line each; open a plan doc only when a design needs a writeup.
 - `RobustPlanningProblem` (set-bounded uncertainty, minimax criterion) only when a minimax
   consumer exists; the path-integral planner's `"worst_case"` branch (CVaR over plant draws,
   [mppi.md](mppi.md) §4) would be that consumer; the two decisions go together.
-- Diffusion policy (research lane, JAX-only, after behavior cloning): a sampled controller with
-  memory and a key, trained by `fit`; see [future-policies.md](future-policies.md).
+- Diffusion policy (research lane only, JAX-only, after behavior cloning, R136): a sampled
+  controller with memory and a seeded draw; see [future-policies.md](future-policies.md).
 - `MjxPlant` (`interfaces/mjx.py`) and `torch` / `flax` model wrappers in `interfaces/`;
   Pacejka tire; stochastic forcing; ROS2 / FMI; sparse long-horizon trajopt; RRT-Connect.
 - Ipopt given the Lagrangian Hessian, not the objective's alone (scan: planning#13);

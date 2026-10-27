@@ -379,15 +379,6 @@ In the order to decide (reviewer C §5).
 
 ## Standing (no release depends on it)
 
-### How do behavior cloning and diffusion policy enter the API?
-- **Blocks:** nothing (for discussion).
-- **Today:** three questions: does `fit` join `solve` and the program export as the third way to
-  train; is diffusion policy in scope, research lane only; is distilling MPC or MPPI into a
-  neural policy the first imitation demo?
-- **Recommendation:** none yet.
-- **Detail:** [future-policies.md §7](../plans/future-policies.md#7-questions-for-the-maintainer-for-discussion-not-blocking)
-- **Answer:**
-
 ### Does the safety filter with control barrier functions get a rung?
 - **Blocks:** nothing.
 - **Today:** a design draft, after the field object (A1) and the geometry (A3).

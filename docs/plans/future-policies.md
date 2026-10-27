@@ -180,6 +180,11 @@ on it (with the block or in C5: open), the RL numbers changing once.
 
 ## 7. Questions for the maintainer (for discussion, not blocking)
 
+**Preliminary choices, 2026-10-27 (R136, [record](../reviews/2026-10-27-design-questions-rulings.md)):**
+how fitting enters the API (question 1) is decided at the behavior-cloning row, identification
+(C4) flagging its route for it; diffusion policy (question 3) is research-lane only, JAX-only,
+after behavior cloning; distilling MPC or MPPI (question 4) stays a pointer.
+
 1. Does `fit` join `solve` and the program export as the third way to train, and under that
    name?
 2. Does the sampled loop's tick contract carry controller memory (the draws coming from the

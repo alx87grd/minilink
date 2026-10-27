@@ -331,3 +331,18 @@ tick, which today probes the planner with `hasattr` (D27, T6).
 
 The interface's exact verbs are drafted with the MPC work (T6) and before MPPI's planner (S72),
 both consumers.
+
+## R136 (2026-10-27, preliminary) Learning from data: decided at the behavior-cloning row; diffusion policy research-lane
+
+The questions: how fitting to recorded data enters the API (a data-cost program export, or a
+`fit` verb and a dataset noun), and the scope of diffusion policy.
+
+- **Fitting to data is decided later, at the behavior-cloning row** (after v1.0). The options
+  stay recorded there: the program export with a data-mismatch cost over `wrt` (a dataset as
+  `Trajectory`s, no new verb), or a `fit` verb beside `solve` with a dataset noun. Identification
+  (C4, v0.4) lands first; its design states which route it takes and flags it for this decision,
+  so it does not set the pattern silently.
+- **Diffusion policy is research-lane only,** JAX-only, after behavior cloning. The core only
+  keeps it possible: a sampled controller with memory (R104) and a seeded draw (R129).
+- A first imitation demo distilling MPC or MPPI into a neural policy stays a pointer, not a
+  decision.
