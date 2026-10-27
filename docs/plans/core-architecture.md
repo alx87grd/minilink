@@ -5,7 +5,12 @@ goal, a status, what the code does today, its open decisions and its rows. Where
 - **The rows** (files, "done when") are [TODO.md](TODO.md) §1.N, with the same N as the section
   here.
 - **The open design questions** are [QUESTIONS.md](../dev/QUESTIONS.md); the preliminary choices of
-  2026-10-27 are [their record](../reviews/2026-10-27-design-questions-rulings.md) (R124–R139).
+  2026-10-27 are [their record](../reviews/2026-10-27-design-questions-rulings.md) (R124–R140).
+- **The end-state vision under review** is
+  [the consolidated core vision](../reviews/2026-10-27-consolidated-core-vision.md): the six
+  independent proposals of 2026-10-27 unified into one API, architecture and naming, with the
+  fourteen decisions the maintainer takes one by one (its §8). Each decision taken becomes a
+  ruling and updates the section here.
 - **The design detail** is in the topic plan doc each section links.
 - **The landed contracts** are [DESIGN.md](../dev/DESIGN.md) §4–§6.
 

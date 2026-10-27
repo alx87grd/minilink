@@ -9,7 +9,9 @@ agent-managed. Landed rows leave this file; their history is git and
 - **Why each v0.3 row exists:** [core-architecture.md](core-architecture.md) §N, the same N as
   §1.N here.
 - **Its open design questions:** [QUESTIONS.md](../dev/QUESTIONS.md); the preliminary choices
-  are [the 2026-10-27 record](../reviews/2026-10-27-design-questions-rulings.md).
+  are [the 2026-10-27 record](../reviews/2026-10-27-design-questions-rulings.md); the end-state
+  vision under review is
+  [the consolidated core vision](../reviews/2026-10-27-consolidated-core-vision.md).
 - **Milestones:** [ROADMAP](../dev/ROADMAP.md#5-the-path-to-v10).
 - **Pyro parity:** [pyro-port-remaining.md](pyro-port-remaining.md).
 - `scan: band#n` cites the 2026-09-22 improvement scan, which is in git history before
