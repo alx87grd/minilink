@@ -363,7 +363,7 @@ core-architecture §N and TODO §1.N:
 
 | § | Workstream | The main rows |
 | --- | --- | --- |
-| 1 | Every object pure, every number a parameter (invariant) | the three owners of a start (S29, R124, preliminary), A5, RN-2, the sets as costs (was V1 step 8), one parameter-tree module, T1, T2 |
+| 1 | Every object pure, every number a parameter (invariant) | one contract for every core math object (R140, first), the three owners of a start (S29, R124, preliminary), A5, RN-2, the sets as costs (was V1 step 8), one parameter-tree module, T1, T2 |
 | 2 | The step algebra first-class (invariant) | step evaluators trace and batch, the `StepRollout` fold (V1.1's rest), S53, S65 |
 | 3 | The draws | per-block seeds and disturbance signals (V1 step 7, RN-4, RN-5, AC-7), RN-3, `Sys2Gym`'s start law |
 | 4 | The seeded stochastic policy | the seeded block (D29) |

@@ -84,9 +84,19 @@ V = QuadraticField(P)                            # §9: the terminal cost as a f
 
 ## 1. Every object pure, every number a parameter (invariant)
 
-- **Goal.** CONSTITUTION §2, "One signature": an object's mathematics is a method on
-  `(x, u, t; p)` that traces in every argument. "An object that does not yet read `params` is a
-  gap to close." The equation paths are pure.
+- **Goal: the one contract every core math object converges back to** (CONSTITUTION §2, "One
+  signature"; the maintainer's direction of 2026-10-27, R140):
+  - its mathematics is a function of its specific arguments and `params`, `params=None` reading
+    the frozen defaults: `f(x, u, t, params=None)`, `g(...)`, `margin(...)`, `value(...)`,
+    `J(z, params=None)`;
+  - every core math object has a `params` field, unless a written reason makes it an exception;
+  - a composed object's `params` is a dict of its sub-objects' dicts, reachable by a dotted path
+    (`cost.Q` on a problem, `controller.Kp` on a diagram);
+  - leaves are floats or numeric arrays; a seed is the one integer leaf (the `seed` key);
+  - every function is fully deterministic given its parameters, the seed among them.
+
+  The first step of the core is a consolidation pass holding every object to it, with one
+  contract test.
 - **Status.** Ruled in its rules:
   - a realization is `(x0, params)` and nothing else (randomness.md §5);
   - a sampled controller's memory is its state, its draws from seed and tick (R104);

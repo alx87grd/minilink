@@ -120,6 +120,28 @@ agent starts. They are details, versions and demos, not design questions (those 
 
 Why: [core-architecture.md](core-architecture.md) §1.
 
+- [ ] **One contract for every core math object** **[ask — core]** (R140, the maintainer's
+  direction of 2026-10-27, a preliminary choice,
+  [record](../reviews/2026-10-27-design-questions-rulings.md)): a consolidation of the code style
+  and the interface of every core math object, what everything converges back to:
+  - its mathematics is a function of its specific arguments and `params`, `params=None` reading
+    the frozen defaults (`f(x, u, t, params=None)`, `g(...)`, `margin(...)`, `value(...)`,
+    `J(z, params=None)`);
+  - it has a `params` field, unless a written reason makes it an exception (listed in DESIGN §4);
+  - a composed object's `params` is a dict of its sub-objects' dicts, reachable by a dotted path
+    (`cost.Q` on a problem, `controller.Kp` on a diagram);
+  - leaves are floats or numeric arrays; a seed is the one integer leaf, under the `seed` key;
+  - every function is fully deterministic given its parameters, the seed among them.
+
+  Steps: audit every core math object against the five points (the `System` family and the
+  blocks, costs, sets, distributions, fields, shapes, sources, `Trajectory`, `PlanningProblem`,
+  `MathematicalProgram`, the policies), one table in the row's report; fix the gaps one object
+  family per commit, behaviour-preserving where no number moves (AGENTS' recipe); write the
+  exceptions and the contract in DESIGN §4 and RULES 2.3. This row absorbs the "sets and
+  distributions read `params`" items below (A5's library sets, RN-2) as the same contract. Done
+  when one contract test walks every public core math object on both backends (its `params`, a
+  `params=None` call equal to a call with its defaults, `jax.grad` through a float leaf, the
+  same values twice from one seed) and the exceptions list is written.
 - [ ] **Names across the API, before the new signatures** **[ask — public names]** (R134, a
   preliminary choice of 2026-10-27, [record](../reviews/2026-10-27-design-questions-rulings.md)),
   one sweep per line, every caller in the same change, no alias (R82):

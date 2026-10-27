@@ -426,3 +426,31 @@ rename policy).
 | Where the course material lives; the examples tree | the K5 row and repository-structure.md |
 | A rung for the CBF safety filter; reward scaling by default | TODO §6, Later |
 | "Steps waiting for your go" | moved to the head of TODO as "Rows waiting for the maintainer's go", with the new detail asks |
+
+## R140 (2026-10-27, preliminary) The one contract every core math object converges back to
+
+The maintainer's direction: include in the next steps a consolidation of the code style and the
+interface of every core math object, clarifying what we always converge back to.
+
+- **An object's mathematics is a function of its specific arguments and `params`:**
+  `f(x, u, t, params=None)` on a system, `g(x, u, t, params=None)` on a cost,
+  `margin(x, t, params=None)` on a set, `value(x, u, t, params=None)` on a field,
+  `J(z, params=None)` on a program (R130), and so on. `params=None` reads the object's frozen
+  default values.
+- **Every core math object has a `params` field** (its defaults) unless there is a good, written
+  reason for an exception; the exceptions are listed in DESIGN §4.
+- **A composed object's `params` is a dict of its sub-objects' dicts,** by name, reachable by a
+  dotted path: a problem's `params["cost"]["Q"]` is the path `cost.Q`, a diagram's
+  `params["controller"]["Kp"]` is `controller.Kp` (the separator rule of R134; keys are the
+  roles and block ids, so `PlanningProblem.Cost.Q` reads `cost.Q`).
+- **Leaves are floats or numeric arrays only** (R118); the exception is a seed, a special
+  integer leaf found by the `seed` key (R129, R131). No `bool` or `str` in `params`: structural
+  choices are fixed at construction.
+- **Every function is fully deterministic given its parameters, the seed among them:** no hidden
+  state, no draw outside a seed (R104, R128, R129).
+
+This restates CONSTITUTION §2's "One signature" and RULES 2.3 as one contract. The step is a
+consolidation pass over every core math object: audit each against the five points, fix the
+gaps, document the exceptions, and hold the contract with one test. CONSTITUTION §2's paragraph
+gains the composite-tree and determinism sentences when the test lands; the text comes to the
+maintainer with it.
