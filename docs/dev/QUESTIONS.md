@@ -288,15 +288,6 @@ In the order to decide (reviewer C §5).
 
 ## Blocks v0.4 (features on the core)
 
-### Does the MPC block ask its planner for three verbs instead of probing it?
-- **Blocks:** the MPC block's contract (T6, D27) and MPPI inside it (MP-4).
-- **Today:** `validate_mpc_planner` and the dual-rate export probe with `hasattr`.
-- **Recommendation:** `decision_dimension()`, `prepare_online()`,
-  `warm_start_guess(z_prev, y, *, dt_mpc, k)` and `z` on the tick's record; then
-  `ModelPredictiveController(planner, dt_mpc=)` wraps trajectory optimization and MPPI alike.
-- **Detail:** [mppi.md §10, D27](../plans/mppi.md#d27-the-mpc-blocks-planner-contract-mppimd-ask-2-t6)
-- **Answer:**
-
 ### mppi.md's design predates R104, R107 and R123: is it rewritten to them before MP-1?
 - **Blocks:** the MPPI planner (S72, v0.4).
 - **Today:** its body splits a stateful `self.key` (R104: a sampled controller draws from its seed and the

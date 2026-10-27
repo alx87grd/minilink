@@ -448,7 +448,7 @@ v0.4 reads the core and never changes it.
 
 | Feature (TODO §4 unless named) | Reads | Plan |
 | --- | --- | --- |
-| MPPI (S72, MP-1–MP-6) and the MPC planner contract (D27; T6 in TODO §3) | §3, §5, §6 | [mppi.md](mppi.md) |
+| MPPI (S72, MP-1–MP-6) and the generic planner interface for the MPC (R135; D27, T6 in TODO §3) | §3, §5, §6 | [mppi.md](mppi.md) |
 | Identification and trajectory generation (C4) | §7 (the export with a data cost) | [differentiable-problem.md](differentiable-problem.md) §1 |
 | `LQGPlanner` | §3 | [estimation-and-state-feedback.md](estimation-and-state-feedback.md) §5 |
 | Workspace geometry (A3), then the CBF safety filter (unscheduled; QUESTIONS.md, Standing) | §9 | [geometry-module.md](geometry-module.md), [cbf-safety-filter.md](cbf-safety-filter.md) |

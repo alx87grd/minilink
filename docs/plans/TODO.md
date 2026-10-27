@@ -673,9 +673,14 @@ on `dev` at 638215e; the recipe and the reference are AGENTS'. (T1 and T2 moved 
   verbs with `hasattr`.
   Also: one record per MPC tick, `Command` and `MPCTickSolve` folded into the
   `PlanningSolution` (scan: control#4). The MPC port rename (`x` + `r` → `u`, extras `x_ff`
-  and `z`) and the dual-rate composite's `u` are P10's AC-3 and AC-8a. The shape proposed for
-  the planner contract (three `Planner` verbs, `z` on the tick's record,
-  `validate_mpc_planner` reading them) is [mppi.md](mppi.md) §6; MP-4 there is this step's
+  and `z`) and the dual-rate composite's `u` are P10's AC-3 and AC-8a. The planner contract is
+  a preliminary choice of 2026-10-27 (R135,
+  [record](../reviews/2026-10-27-design-questions-rulings.md)): one generic planner interface
+  offering what an MPC needs (build once, solve many times with `params` at the solve, a plan the
+  MPC can read, a warm start from a previous solution where the planner type has one), with the
+  loop mechanics (the tick, its memory, the delay, when to replan) owned by the MPC class, not
+  the planner; its verbs are drafted here. The earlier proposal (three `Planner` verbs, `z` on
+  the tick's record) is [mppi.md](mppi.md) §6; MP-4 there is this step's
   second consumer, and the trajopt MPC baselines are its safety net.
 
 **D1 — demos to the rule** (RULES 6.1 / 6.10 / 6.11; the census is comment FD-C14 of the

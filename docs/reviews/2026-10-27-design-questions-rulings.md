@@ -307,3 +307,27 @@ inconsistencies. All six lines taken as recommended.
    `program.params_at(z)`, the full tuned tree (R130's companions).
 
 Reviewer B proposed lines 1, 2, 4, 5 and 6 (C: `attach` for line 2); line 3 was the agent's.
+
+## R135 (2026-10-27, preliminary) A generic planner interface; the loop mechanics stay in the MPC
+
+The question: the contract between `ModelPredictiveController` and the planner it runs at every
+tick, which today probes the planner with `hasattr` (D27, T6).
+
+- **A planner does not know it runs in a loop.** It plans: given a problem's parameters (the
+  start `x0` among them, R124, R130) it returns a solution.
+- **The MPC class owns the loop mechanics:** the tick, its memory and the one-period
+  computational delay (R123, R104), when to replan, and turning the plan into the input it
+  applies.
+- **To design: one generic planner interface** offering everything an MPC needs, the same for
+  trajectory optimization, MPPI and the native fixed-iteration solver:
+  - build once, then solve many times without recompiling (with `params` at the solve, R130);
+  - solve from a given start and parameters, returning a plan the MPC can read (the input
+    sequence, and the decision `z` where the planner has one);
+  - a warm start, where the planner type has one: accept a guess built from a previous solution
+    (what "shifting" means for its decision is the planner's knowledge, the decision to do it
+    each tick is the MPC's).
+- **Rejected:** a planner exposing a pure `tick` (it would make the planner loop-aware); D27's
+  three verbs as written (shaped around a host NLP solve); keeping the probing.
+
+The interface's exact verbs are drafted with the MPC work (T6) and before MPPI's planner (S72),
+both consumers.

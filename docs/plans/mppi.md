@@ -537,6 +537,10 @@ form.
 
 ### D27 The MPC block's planner contract (mppi.md ask 2; T6)
 
+**Preliminary choice, 2026-10-27 (R135, [record](../reviews/2026-10-27-design-questions-rulings.md)):**
+a generic planner interface, the loop mechanics kept in the MPC class; the planner does not know it
+runs in a loop. The three verbs below are the earlier proposal, an input to that design.
+
 **Recommended:** the three `Planner` verbs (`decision_dimension()`, `prepare_online()`,
 `warm_start_guess(z_prev, y, *, dt_mpc, k)`) and `z` on the tick's record; no `hasattr`
 probing. `ModelPredictiveController(planner, dt_mpc=)` then wraps trajopt and MPPI alike.
