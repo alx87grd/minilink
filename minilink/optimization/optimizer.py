@@ -6,6 +6,8 @@ from dataclasses import replace
 
 import numpy as np
 
+from minilink.core.backends import array_module
+from minilink.core.discrete.step_system import StepSystem
 from minilink.core.inspect import inspect_text, repr_pretty
 from minilink.optimization.evaluators.compiler import compile_program_evaluator
 from minilink.optimization.mathematical_program import (
@@ -43,6 +45,9 @@ _USER_OPTIMIZER_METHODS: dict[str, tuple[str, dict]] = {
     ),
     "ipopt": ("ipopt", {"options": {}, "tol": 1e-8}),
 }
+
+# The native methods: a pure law run by the optimizer, with a fixed count or to tolerance
+NATIVE_METHODS = ("gd", "adam")
 
 # The program's class, read from its fields, and the methods each class admits
 # ("auto" picks the first).
@@ -110,6 +115,12 @@ class Optimizer:
         when no ``hess_J`` is supplied.
     options : dict, optional
         Solver options merged into the preset's ``options`` dict (user keys win).
+    iterations : int, optional
+        For the native methods (``"gd"``, ``"adam"``): exactly this many steps,
+        no tolerance (R149). On a JAX program the solve is one ``lax.scan``,
+        pure: ``solve(params=, z0=)`` traces under ``jit``, ``vmap`` and
+        ``grad``. ``None`` (default) runs to the method's tolerance, its
+        ``maxiter`` the cap. A size, structural: never a parameter (R131).
     **method_kwargs
         Extra keyword arguments override the preset's top-level kwargs and are
         forwarded to the backend constructor.
@@ -124,10 +135,12 @@ class Optimizer:
         backend: str | None = None,
         use_hessian: bool = False,
         options: dict | None = None,
+        iterations: int | None = None,
         **method_kwargs,
     ):
         # The method: the class default for "auto", refused when the class does not admit it
         method = method_for(program, method)
+        self.iterations = count_of(method, iterations)
 
         # The program, compiled once at the default start
         self.program = program
@@ -187,6 +200,11 @@ class Optimizer:
         verbose : bool, optional
             If True, print the framed solve panel (preamble and report).
         """
+        # A fixed count of native steps: the pure solve
+        if self.iterations is not None:
+            require_no_hook(callback)
+            return self.solve_count(params, z0)
+
         z_start = self.z0 if z0 is None else self.decision_vector(z0, self.program.n_z)
         time_solve = record_solve_time or verbose
 
@@ -225,6 +243,39 @@ class Optimizer:
             self.print_solve_report(result)
 
         return result
+
+    def as_step_system(self, params=None):
+        """
+        The solve as a step system (R132): the state the law's, one tick one iteration.
+
+        ``x`` is the law's state flattened (``z``; with Adam its moments and step
+        count after it), ``x0`` the law's start from :attr:`z0`, the update
+        ``x_{k+1} = S(x_k, ∇J(z_k; p))`` and the output ``y = z``; ``params``
+        the program's tree (``None`` its defaults). A view of the same kernel,
+        so ``compute_rollout(K)`` gives the iterates of a ``K``-step solve.
+        """
+        require_native(self.method)
+        return IterationSystem(self, self.program_evaluator.merged(params))
+
+    def solve_count(self, params, z0):
+        """Exactly :attr:`iterations` native steps from ``z0`` on the merged tree: a pure solve, its result traced or on the host."""
+        evaluator = self.program_evaluator
+        K = self.iterations
+
+        # The start and the tree, merged once, bound to nothing
+        tree = evaluator.merged(params)
+        z_start = self.z0 if z0 is None else z0
+
+        # z_K = S^K(z0; p), and J(z_K; p)
+        z, J = self.adapter.run(evaluator, z_start, tree, K)
+
+        return OptimizationResult(
+            z=host_or_traced(z),
+            success=True,
+            cost=host_or_traced(J, float),
+            message=f"{K} steps taken",
+            stats={"nit": K, "algorithm": self.method},
+        )
 
     ###########################################################################
     # Internal machinery
@@ -319,6 +370,103 @@ def adapter_of(adapter_key: str, kwargs: dict) -> OptimizerBackend:
         return FirstOrderOptimizer(**kwargs)
 
     raise ValueError(f"Unknown optimizer adapter key {adapter_key!r}.")
+
+
+class IterationSystem(StepSystem):
+    """A native solve as a step system: the law's state flattened, one tick one step (:meth:`Optimizer.as_step_system`)."""
+
+    def __init__(self, optimizer, tree):
+        evaluator = optimizer.program_evaluator
+        law = optimizer.adapter.law(evaluator)
+        state0 = law.init(np.asarray(optimizer.z0, dtype=float))
+
+        # The state's layout: each entry of the law's state, flattened in order
+        self.law = law
+        self.evaluator = evaluator
+        self.keys = tuple(state0)
+        self.shapes = tuple(np.shape(state0[key]) for key in self.keys)
+        n = int(sum(int(np.prod(shape)) for shape in self.shapes))
+
+        n_z = int(optimizer.program.n_z)
+        StepSystem.__init__(self, n, output_dim=n_z)
+        self.name = f"{optimizer.method} on the program"
+        self.params = tree
+        self.x0 = self.flat(state0)
+
+    def step(self, x, u, k=0, params=None):
+        params = self.params if params is None else params
+
+        state = self.unflat(x)
+
+        # x_{k+1} = S(x_k, ∇J(z_k; p))
+        grad = self.evaluator.native_gradient(state["z"], params)
+        state_next = self.law.update(grad, state)
+
+        return self.flat(state_next)
+
+    def h(self, x, u, k=0, params=None):
+        return self.unflat(x)["z"]
+
+    def flat(self, state):
+        """The law's state as one flat vector, its entries in order."""
+        xp = array_module(*state.values())
+        pieces = [
+            xp.reshape(xp.asarray(state[key], dtype=float), (-1,)) for key in self.keys
+        ]
+
+        return xp.concatenate(pieces)
+
+    def unflat(self, x):
+        """The flat vector as the law's state (the step count a whole number)."""
+        state = {}
+        start = 0
+        for key, shape in zip(self.keys, self.shapes):
+            size = int(np.prod(shape))
+            state[key] = x[start : start + size].reshape(shape)
+            start += size
+
+        return state
+
+
+def host_or_traced(value, cast=None):
+    """A concrete result as a NumPy value (or ``cast`` of it), a traced one as it is."""
+    try:
+        concrete = np.asarray(value, dtype=float)
+    except TypeError:  # a tracer has no value
+        return value
+
+    return concrete if cast is None else cast(concrete)
+
+
+def count_of(method, iterations):
+    """The fixed step count: ``None``, or a positive whole number for a native method."""
+    if iterations is None:
+        return None
+    require_native(method)
+    if isinstance(iterations, bool) or int(iterations) != iterations or iterations < 1:
+        raise ValueError(
+            f"iterations must be a positive whole number, got {iterations!r}"
+        )
+
+    return int(iterations)
+
+
+def require_native(method):
+    """Refuse a fixed count, or the step-system view, for a method that is not native."""
+    if method not in NATIVE_METHODS:
+        raise ValueError(
+            f"iterations= and as_step_system take the native methods {NATIVE_METHODS}; "
+            f"{method!r} runs to its own tolerance"
+        )
+
+
+def require_no_hook(callback):
+    """Refuse a progress hook on a fixed-count solve: the steps are one pure scan."""
+    if callback is not None:
+        raise ValueError(
+            "a fixed-count solve (iterations=) is one pure scan: no callback; "
+            "use as_step_system().compute_rollout(K) for the iterates"
+        )
 
 
 def program_class(program) -> str:

@@ -375,11 +375,6 @@ Why: [core-architecture.md](core-architecture.md) §8. Design:
 [native-optimizers.md](native-optimizers.md), [planner-and-mpc.md](planner-and-mpc.md). Better
 solvers and MPPI are v0.4 (§4).
 
-- [ ] **The native kernel and the fixed-count solve** (NS-1, NS-2's fixed-`K`
-  form; R132, R149): pure `init` / `step` laws for `gd` and `adam` on the array module, run by
-  `Optimizer`, with `as_step_system`; `Optimizer(program, method=, iterations=K)` exactly `K`
-  steps in one `lax.scan`, `iterations=None` to a tolerance (`maxiter` its cap). Done when the
-  NumPy path is byte-identical and `jax.grad` through `K` iterations matches a central difference.
 - [ ] **The planner's compiled face** (R148): `planner.compile()` gives `n_z`,
   `initial`, `solve(params, z0) -> (z, status)`, `shift(z, t)`, `command(z, x, t)`,
   `prediction`, `solution`, `pack`, `program`; `planner.params` is the problem's tree plus

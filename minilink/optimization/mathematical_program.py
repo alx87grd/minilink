@@ -6,7 +6,7 @@ from typing import Any, TypeAlias
 
 import numpy as np
 
-from minilink.core.backends import BACKEND_NUMPY
+from minilink.core.backends import BACKEND_NUMPY, array_module
 from minilink.core.inspect import inspect_text, latex_inspect, repr_pretty
 
 # These stay loose on purpose: the runtime contract is native-backend behavior
@@ -158,8 +158,12 @@ class OptimizationResult:
     solve_time_s: float | None = None
 
     def __post_init__(self) -> None:
-        # The solution as a flat float copy, the statistics as their own dict
-        z = np.asarray(self.z, dtype=float).reshape(-1).copy()
+        # The solution as a flat float copy (a JAX array kept as it is, so a solve
+        # traces), the statistics as their own dict
+        if array_module(self.z) is not np:
+            z = self.z.reshape(-1)
+        else:
+            z = np.asarray(self.z, dtype=float).reshape(-1).copy()
         object.__setattr__(self, "z", z)
         object.__setattr__(self, "stats", dict(self.stats))
 

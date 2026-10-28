@@ -145,6 +145,14 @@ class JaxMathematicalProgramEvaluator(MathematicalProgramEvaluator):
     def g(self, z):
         return self._jit_g(self.jax_decision_vector(z), self.params)
 
+    # The oracle of a traced solve: the compiled functions on JAX arrays, no conversion
+
+    def native_objective(self, z, params):
+        return self._jit_J(z, params)
+
+    def native_gradient(self, z, params):
+        return self._jit_grad_J(z, params)
+
     # The compiled derivatives, as flat NumPy arrays
 
     def gradient(self, z) -> np.ndarray:

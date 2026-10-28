@@ -63,6 +63,16 @@ class NumpyMathematicalProgramEvaluator(MathematicalProgramEvaluator):
             return np.zeros(0, dtype=float)
         return self.call(self.program.g, z_arr)
 
+    # The oracle of a solve on a given tree, as the program returns it
+
+    def native_objective(self, z, params):
+        return self.call(self.program.J, z, params)
+
+    def native_gradient(self, z, params):
+        if self.program.grad_J is None:
+            return super().gradient(z)
+        return self.call(self.program.grad_J, z, params)
+
     # The derivatives the program supplies, as flat NumPy arrays
 
     def gradient(self, z) -> np.ndarray:

@@ -97,6 +97,10 @@ class MathematicalProgramEvaluator(ABC):
         ones, and a leaf of a new shape raises; a program without parameters
         refuses any.
         """
+        self.params = self.merged(params)
+
+    def merged(self, params=None):
+        """The program's defaults with ``params`` merged over them, on the evaluator's backend: :meth:`bind`'s tree, bound to nothing (pure, so it traces)."""
         defaults = self.program.params
         if params:
             require_declared_params(defaults)
@@ -104,7 +108,15 @@ class MathematicalProgramEvaluator(ABC):
         else:
             tree = defaults or {}
 
-        self.params = self.native_tree(tree)
+        return self.native_tree(tree)
+
+    def native_objective(self, z, params):
+        """``J(z; params)`` on the backend's arrays, no conversion: the oracle of a traced solve."""
+        raise NotImplementedError(f"{type(self).__name__} has no native objective")
+
+    def native_gradient(self, z, params):
+        """``∇J(z; params)`` on the backend's arrays, no conversion: the oracle of a traced solve."""
+        raise NotImplementedError(f"{type(self).__name__} has no native gradient")
 
     # The SciPy/Ipopt bridge: Python floats and flat NumPy arrays
 
@@ -206,12 +218,12 @@ class MathematicalProgramEvaluator(ABC):
     # Internal machinery
     ###########################################################################
 
-    def call(self, function, z):
-        """A program callable at ``z`` and the bound parameters: ``function(z, params)``, or ``function(z)`` for a program without them."""
+    def call(self, function, z, params=None):
+        """A program callable at ``z`` and the bound parameters (or ``params``): ``function(z, params)``, or ``function(z)`` for a program without them."""
         if self.program.params is None:
             return function(z)
 
-        return function(z, self.params)
+        return function(z, self.params if params is None else params)
 
     def native_tree(self, tree):
         """The bound tree as the evaluator's backend reads it (NumPy keeps it as given)."""

@@ -757,3 +757,86 @@ def test_a_program_without_parameters_refuses_values():
         opt.solve(params={"c": 1.0})
     with pytest.raises(TypeError, match="must be a dict"):
         MathematicalProgram(n_z=1, J=lambda z, p: z @ z, params=[1.0])
+
+
+def parametric_quadratic(backend):
+    """``J(z; c, a) = ½ a ‖z − c‖² + ¼ ‖z‖⁴`` on a box: its minimizer a smooth function of ``c`` and ``a``."""
+    from minilink.core.backends import array_module
+    from minilink.optimization.mathematical_program import MathematicalProgram
+
+    def J(z, params):
+        xp = array_module(z)
+        c = params["c"]
+        a = params["a"]
+        return 0.5 * a * xp.sum((z - c) ** 2) + 0.25 * xp.sum(z**2) ** 2
+
+    return MathematicalProgram(
+        n_z=2,
+        J=J,
+        backend=backend,
+        lower=np.array([-3.0, -3.0]),
+        upper=np.array([3.0, 3.0]),
+        params={"c": np.array([1.0, -0.5]), "a": 2.0},
+    )
+
+
+@pytest.mark.jax
+@pytest.mark.parametrize("method", ["gd", "adam"])
+def test_a_fixed_count_solve_is_one_pure_scan_with_a_gradient(method):
+    import jax
+    import jax.numpy as jnp
+
+    program = parametric_quadratic("jax")
+    options = {"learning_rate": 0.05}
+    opt = Optimizer(
+        program, z0=[0.0, 0.0], method=method, options=options, iterations=40
+    )
+
+    # Exactly K steps: the iterates of the step-system view end where the solve does
+    result = opt.solve()
+    assert result.stats["nit"] == 40 and result.success
+    rollout = opt.as_step_system().compute_rollout(40)
+    np.testing.assert_allclose(
+        rollout.x[:2, -1], result.z, rtol=1e-12
+    )  # z leads the state
+
+    # d z_K / d c through the K steps, against a central difference
+    def z_of(c):
+        return opt.solve(params={"c": c}).z
+
+    c = jnp.asarray([1.0, -0.5])
+    jacobian = np.asarray(jax.jacobian(z_of)(c))
+    h = 1e-6
+    for i in range(2):
+        dc = np.zeros(2)
+        dc[i] = h
+        central = (np.asarray(z_of(c + dc)) - np.asarray(z_of(c - dc))) / (2 * h)
+        np.testing.assert_allclose(jacobian[:, i], central, rtol=1e-5, atol=1e-8)
+
+    # A batch of starts in one vmap, each the solve from its start
+    starts = jnp.asarray([[0.0, 0.0], [1.0, 1.0], [-2.0, 0.5]])
+    batch = jax.vmap(lambda z0: opt.solve(z0=z0).z)(starts)
+    for z0, z in zip(starts, batch):
+        np.testing.assert_allclose(z, opt.solve(z0=np.asarray(z0)).z, rtol=1e-12)
+
+
+@pytest.mark.parametrize("method", ["gd", "adam"])
+def test_a_fixed_count_solve_on_numpy_takes_the_same_steps(method):
+    def grad(z, params):
+        a = params["a"]
+        return a * (z - params["c"]) + np.sum(z**2) * z
+
+    program = parametric_quadratic("numpy")
+    program = type(program)(**{**program.__dict__, "grad_J": grad})
+    options = {"learning_rate": 0.05, "maxiter": 25}
+    fixed = Optimizer(
+        program, z0=[0.0, 0.0], method=method, options=options, iterations=25
+    )
+    loop = Optimizer(program, z0=[0.0, 0.0], method=method, options=options)
+    np.testing.assert_allclose(fixed.solve().z, loop.solve().z, rtol=1e-12)
+
+    # A count is for the native methods, and a whole number
+    with pytest.raises(ValueError, match="native methods"):
+        Optimizer(program, z0=[0.0, 0.0], method="l-bfgs", iterations=10)
+    with pytest.raises(ValueError, match="positive whole number"):
+        Optimizer(program, z0=[0.0, 0.0], method=method, iterations=0)

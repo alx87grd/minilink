@@ -3,7 +3,11 @@
 Status: written 2026-10-25 from the maintainer's vision (§1), with the state of the code (§2)
 and the agent's read (§3–§4). Lane: research. The rows: the proof of concept (NS-1, NS-2's
 fixed-`K` form, NS-8, NS-9) is [TODO.md](TODO.md) §1.8 ([core-architecture.md](core-architecture.md)
-§8); the rest is TODO §4.
+§8); the rest is TODO §4. **Landed in the v0.3 run:** NS-1 and NS-2's fixed-`K` form (the
+laws `GradientDescentLaw` and `AdamLaw` in `optimizers/first_order.py`, `Optimizer(...,
+iterations=K)`, `as_step_system`; a traced solve returns its `OptimizationResult` with JAX
+arrays, §4.5's open point); `iterations=None` stays the host loop to a tolerance, its
+`lax.while_loop` form with NS-2's rest.
 
 **Choices of 2026-10-27** (the architecture of record since 2026-10-28, R166):
 - the two-layer split of §3: a pure kernel run by `Optimizer`, a step-system view for the

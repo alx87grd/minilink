@@ -965,7 +965,17 @@ merge at the boundary; sizes structural (the knots `N`, the iterations `K`, a ba
 constructor arguments, never parameters); the warm start an argument of the solve (`z0=`). The
 core's sample-average export is `pe.program(wrt, key=, n_trials=)`: the draws realized once
 from `key`, so `J` is deterministic and any method solves it; how a solver uses the seed
-(advanced per iteration, `vmap`ped) is an `Optimizer` strategy for later. The failure price of
+(advanced per iteration, `vmap`ped) is an `Optimizer` strategy for later. **The native
+methods** `gd` and `adam` are pure laws on the array module of their input (R132,
+`optimizers/first_order.py`: `law.init(z0) -> state`, `law.update(grad, state) -> state`, the
+gradient oracle beside it, the box projection in the step). `Optimizer(program, method=,
+iterations=K)` takes exactly `K` steps (R149): one `lax.scan` on a JAX program, so
+`solve(params=, z0=)` traces under `jit`, `vmap` and `grad` (the result then holds JAX arrays,
+`success=True`, `cost` the final `J`), and a loop of the same steps on NumPy; no callback.
+`iterations=None` runs to the method's tolerance on the host (`maxiter` its cap, Adam's update
+jitted when JAX is at hand, plain NumPy without it). `optimizer.as_step_system(params=None)` is
+the solve as a `StepSystem`: the law's state flattened (`z` first), `compute_rollout(K)` the
+iterates. The failure price of
 an evaluation follows its cost's numbers (R165): the bound is taken at the overridden weights,
 once per value (cached), and under a trace at the problem's own (a price is a step, with no
 gradient). One method table
