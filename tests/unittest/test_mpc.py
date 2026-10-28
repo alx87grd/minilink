@@ -597,3 +597,19 @@ class TestTheMPCsSeamFixes(unittest.TestCase):
         run = loop.compute_trajectory(tf=0.6)
         plans = mpc_plans_from_rollout(run, mpc, loop=loop)
         assert [round(t, 9) for t, _ in plans] == [0.0, 0.2, 0.4]
+
+
+def test_plant_run_carries_the_input_the_loop_fed_the_plant():
+    from minilink import P, Integrator
+    from minilink.planning.trajectory_optimization.mpc import plant_run
+
+    loop = (P(2.0, ports="reference") % 0.1) @ discretize(Integrator(), 0.1, substeps=2)
+    run = loop.compute_trajectory(tf=0.5, u=np.array([1.0]))
+    plant = plant_run(run, loop)
+
+    # u = 2 (r − y) at each tick, held over its period; x the plant's own slice
+    p0, p1 = loop.state_index["plant"]
+    np.testing.assert_array_equal(plant.x, run.x[p0:p1])
+    ticks = np.floor(run.t / 0.1 + 1e-9).astype(int)
+    tick_y = {k: run.x[p0, np.flatnonzero(ticks == k)[0]] for k in set(ticks)}
+    np.testing.assert_allclose(plant.u[0], [2.0 * (1.0 - tick_y[k]) for k in ticks])

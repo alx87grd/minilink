@@ -161,18 +161,67 @@ def mpc_plans_from_rollout(
 
 
 def plant_run(rollout: Trajectory, loop=None) -> Trajectory:
-    """The plant's run inside a loop's run: its role, else its state slice of ``loop`` (a sampled loop's ``compute_trajectory``)."""
+    """
+    The plant's run inside a loop's run: its role, else its slice of ``loop`` (a sampled loop's ``compute_trajectory``).
+
+    With ``loop``, ``x`` is the plant's state slice and ``u`` the input the
+    loop fed it, read once per tick from the loop's signals and held over the
+    period, so the run can be handed on as the plant's own (for instance to a
+    diagram's ``trajectory_of`` when the plant is itself a diagram).
+    """
     if loop is None:
         return rollout.of("plant")
 
     start, end = loop.state_index["plant"]
+    u = plant_inputs_of(rollout, loop)
 
-    return Trajectory(t=rollout.t, x=rollout.x[start:end], u=rollout.u)
+    return Trajectory(t=rollout.t, x=rollout.x[start:end], u=u)
 
 
 ###############################################################################
 # Internal machinery
 ###############################################################################
+
+
+def plant_inputs_of(rollout, loop):
+    """The plant's stacked input at each sample of a sampled loop's run: its sources at the sample's tick."""
+    ev = loop.compile()
+    h = loop.sample_period
+    t = np.asarray(rollout.t, dtype=float)
+    t_start = float(t[0])
+    plant = loop.subsystems["plant"]
+    sources = [loop.connections["plant"][port_id] for port_id in plant.inputs]
+    edge_rows = input_rows_of(loop)
+
+    # The tick each sample holds: k = ⌊(t − t_start)/Δ⌋, the tick's own sample its first
+    ticks = np.floor((t - t_start) / h + 1e-9).astype(int)
+    u = np.zeros((int(plant.m), t.size))
+    for k in np.unique(ticks):
+        samples = np.flatnonzero(ticks == k)
+        first = samples[0]
+        signals = ev.compute_internal_signals_dict(
+            rollout.x[:, first], rollout.u[:, first], int(k), t_start=t_start
+        )
+        u_k = [
+            rollout.u[edge_rows[port], first]
+            if sys_id == "input"
+            else signals[f"{sys_id}:{port}"]
+            for sys_id, port in sources
+        ]
+        u[:, samples] = np.concatenate(u_k).reshape(-1, 1)
+
+    return u
+
+
+def input_rows_of(system):
+    """Each input port's rows in the stacked input ``u``, in port order."""
+    rows = {}
+    start = 0
+    for port_id, port in system.inputs.items():
+        rows[port_id] = slice(start, start + int(port.dim))
+        start += int(port.dim)
+
+    return rows
 
 
 def plan_history_of(rollout, mpc, loop, block):
