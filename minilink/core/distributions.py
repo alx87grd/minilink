@@ -62,10 +62,24 @@ class Distribution(ABC):
         Draw one sample (shape ``(dim,)``) or ``n`` samples (``(n, dim)``).
 
         ``key`` is a :class:`numpy.random.Generator`, an integer seed, or a
-        JAX PRNG key (JAX arrays out, traceable). ``params=None`` reads the
-        law's own :attr:`params`.
+        JAX PRNG key (JAX arrays out, traceable); ``key=None`` draws nothing
+        and returns the mean (:meth:`mean_draw`), as a noise block's
+        ``seed=None`` gives its mean signal (the maintainer, 2026-10-28).
+        ``params=None`` reads the law's own :attr:`params`.
         """
         ...
+
+    def mean_at(self, params=None):
+        """The law's mean at its numbers ``params`` (``None``: its own)."""
+        return self.mean
+
+    def mean_draw(self, n=None, params=None):
+        """The draw of no key: the mean at ``params``, ``(dim,)``, or ``(n, dim)`` tiled."""
+        params = self.params if params is None else params
+        mean = self.mean_at(params)
+        xp = array_module(mean)
+
+        return mean if n is None else xp.tile(mean, (int(n), 1))
 
 
 class Gaussian(Distribution):
@@ -102,7 +116,13 @@ class Gaussian(Distribution):
 
         return self.full_cov
 
+    def mean_at(self, params=None):
+        params = self.params if params is None else params
+        return params["mean"]
+
     def sample(self, key, n=None, params=None):
+        if key is None:
+            return self.mean_draw(n, params)
         params = self.params if params is None else params
 
         mean = params["mean"]
@@ -163,7 +183,17 @@ class Uniform(Distribution):
 
         return cov
 
+    def mean_at(self, params=None):
+        params = self.params if params is None else params
+
+        # The box's center, (a + b) / 2
+        mean = 0.5 * (params["lower"] + params["upper"])
+
+        return mean
+
     def sample(self, key, n=None, params=None):
+        if key is None:
+            return self.mean_draw(n, params)
         return self.box.sample(key, n, params)
 
 
@@ -193,7 +223,19 @@ class Particles(Distribution):
 
         return cov
 
+    def mean_at(self, params=None):
+        params = self.params if params is None else params
+        points = params["points"]
+        xp = array_module(points)
+
+        # p̄ = (1/N) Σᵢ pᵢ
+        mean = xp.mean(points, axis=0)
+
+        return mean
+
     def sample(self, key, n=None, params=None):
+        if key is None:
+            return self.mean_draw(n, params)
         params = self.params if params is None else params
 
         points = params["points"]

@@ -681,7 +681,9 @@ provided.
 - Distributions (`core/distributions.py`): a duck type — `dim`, `mean` (an array),
   `sample(key, n=None, params=None)` with `key` a NumPy generator, an integer seed or a JAX
   PRNG key (JAX arrays out, traceable); `(dim,)` for one draw, `(n, dim)` with `n`; `support`
-  an optional `Set`. A library law's numbers are its `params` and `cov` is the covariance of
+  an optional `Set`. **No key, no draw:** `sample(None)` is the mean at the law's numbers
+  (`mean_at(params)`; `(n, dim)` tiled with `n`), as a noise block's `seed=None` is its mean
+  signal: the design point (the maintainer, 2026-10-28). A library law's numbers are its `params` and `cov` is the covariance of
   one draw (RD-R1): `Gaussian(mean, std=None, cov=None)` (one spread, `{"mean", "std"}` or
   `{"mean", "cov"}`, a full `cov` drawn through its Cholesky factor), `Uniform(lower, upper)`
   (its `BoxSet`'s bounds, `cov = diag((b − a)² / 12)`), `Particles(points)` (`{"points"}`, the
@@ -1100,8 +1102,9 @@ parts; `problem.params` shows each law at its leaf and the start's law under `"x
 integers (`drawn_paths()` names them); every consumer draws from its own stream, named by its
 path (`child_seed(key, "plant.m")`, a source's seed by its block and the trial), so adding a
 law or a source leaves every other draw unchanged, and an integer key draws on the host: the
-same trials on NumPy and JAX. `nominal()` replaces each law by its mean and drops the random
-sources. The evaluated loop is exactly the one `closed_loop` builds with the same sources (R128:
+same trials on NumPy and JAX. `realize(None)` draws nothing: every law at its mean, every seed
+`None`; `nominal()` is that tree written into a copy of the problem's parts (the caller's
+untouched), the random sources kept with seed `None`, their mean signal. The evaluated loop is exactly the one `closed_loop` builds with the same sources (R128:
 two forms, one diagram): the source of `d` is its block `disturbance`, of `n` its `noise` (a
 `Sum` on the command or the measurement when the plant has no such port), any other port's
 under the port's name; its seed is the leaf `"disturbance.seed"`. An evaluation draws a seed per

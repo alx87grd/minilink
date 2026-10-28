@@ -510,3 +510,65 @@ def test_the_rollout_refuses_a_source_it_cannot_feed():
     # An integer key gives each port its own seed
     assert episode_seed(5, "d") != episode_seed(5, "n")
     assert episode_seed(5, "d") == episode_seed(5, "d")
+
+
+def test_a_law_without_a_key_is_its_mean_at_its_numbers():
+    from minilink.core.distributions import Gaussian, Particles, Uniform
+
+    laws = {
+        "gaussian": (
+            Gaussian([1.0, -2.0], [0.3, 0.1]),
+            {"mean": np.array([0.5, 0.5]), "std": np.ones(2)},
+            [0.5, 0.5],
+        ),
+        "uniform": (
+            Uniform([0.0, 1.0], [2.0, 5.0]),
+            {"lower": np.zeros(2), "upper": np.ones(2)},
+            [0.5, 0.5],
+        ),
+        "particles": (
+            Particles([[0.0, 0.0], [2.0, 4.0]]),
+            {"points": np.array([[1.0, 1.0], [3.0, 3.0]])},
+            [2.0, 2.0],
+        ),
+    }
+    for law, moved, moved_mean in laws.values():
+        np.testing.assert_array_equal(law.sample(None), law.mean)
+        assert law.sample(None, 3).shape == (3, law.dim)
+        np.testing.assert_allclose(law.sample(None, params=moved), moved_mean)
+
+
+def test_the_nominal_problem_is_the_problem_at_its_means():
+    from minilink import Pendulum, PlanningProblem, QuadraticCost
+    from minilink.blocks.sources import NoiseSource
+    from minilink.core.distributions import Gaussian, Uniform
+
+    plant = Pendulum()
+    m_own = plant.params["m"]
+    problem = PlanningProblem(
+        plant,
+        tf=1.0,
+        cost=QuadraticCost.from_system(plant),
+        x_start=Gaussian([0.5, 0.0], [0.1, 0.1]),
+        params={"plant": {"m": Uniform([1.2], [1.6])}},
+        disturbances={
+            "d": NoiseSource(Gaussian([0.3], [1.0]), sample_period=0.1, seed=4)
+        },
+    )
+
+    # realize(None): every law at its mean, every seed None
+    tree = problem.realize(None, 2)
+    np.testing.assert_allclose(tree["x_start"], [[0.5, 0.0], [0.5, 0.0]])
+    np.testing.assert_allclose(tree["plant"]["m"], [1.4, 1.4])
+    assert tree["disturbance"]["seed"] is None
+
+    # nominal(): that tree in a copy, the caller's plant untouched
+    nominal = problem.nominal()
+    assert not nominal.is_stochastic
+    np.testing.assert_allclose(nominal.x_start, [0.5, 0.0])
+    assert float(np.squeeze(nominal.sys.params["m"])) == pytest.approx(1.4)
+    assert plant.params["m"] == m_own and nominal.sys is not plant
+    source = nominal.disturbances["d"]
+    assert source.params["seed"] is None
+    np.testing.assert_allclose(source.h(None, None, 0.35), [0.3])  # the mean signal
+    assert problem.disturbances["d"].params["seed"] == 4

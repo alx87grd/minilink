@@ -5,6 +5,7 @@ from __future__ import annotations
 import warnings
 import zlib
 from collections.abc import Mapping
+from copy import deepcopy
 
 import numpy as np
 
@@ -340,7 +341,10 @@ class PlanningProblem:
         :meth:`drawn_paths` names the leaves with a trial axis. A deterministic
         problem has one realization, its own start. ``key`` follows the draw
         convention of :class:`~minilink.core.distributions.Distribution`; the
-        sources' seeds need an integer key.
+        sources' seeds need an integer key. ``key=None`` draws nothing: every
+        law at its mean (tiled ``n`` times) and every source's seed ``None``,
+        its mean signal (the maintainer, 2026-10-28): the tree :meth:`nominal`
+        writes.
         """
         n = int(n)
         tree = self.parts_view()
@@ -361,10 +365,14 @@ class PlanningProblem:
             values = law.sample(stream_of(key, ".".join(path)), n)
             tree = with_leaf(tree, path, values.reshape((n, *nominal)))
 
-        # Each random source's seeds, n times, named by its block id and the trial
+        # Each random source's seeds, n times, named by its block id and the trial;
+        # without a key, every seed None (the mean signal)
         for sys_id, block in self.sources_by_id().items():
             if block.is_random:
-                seeds = source_seeds(block, key, sys_id, n)
+                if key is None:
+                    seeds = seeds_of(block, block.realize(None))
+                else:
+                    seeds = source_seeds(block, key, sys_id, n)
                 tree = with_leaf(tree, (sys_id,), merge_tree(tree[sys_id], seeds))
 
         return tree
@@ -404,21 +412,31 @@ class PlanningProblem:
 
     def nominal(self) -> PlanningProblem:
         """
-        The certainty-equivalent problem: the start at its law's mean, no law, no random source.
+        The certainty-equivalent problem: the problem at ``realize(None)``, every law at its mean, every seed ``None``.
 
-        The start's mean is the one start (a singleton ``X0``); a parameter
-        with a law keeps its part's own number (the parts are shared, never
-        written); a deterministic source (a load ``Step``) stays.
+        A copy, its parts copied (the caller's stay as they are): the start at
+        its law's mean (a singleton ``X0``), each parameter with a law at the
+        law's mean in the copied part, each random source kept with its seed
+        ``None``, its mean signal (the maintainer, 2026-10-28); no law remains.
         """
-        sources = {
-            port: block
-            for port, block in self.disturbances.items()
-            if not block.is_random
-        }
+        tree = self.realize(None)
 
-        return self.replace(
-            x_start=self.x_start, X0=None, params=None, disturbances=sources
-        )
+        # The copy without its laws, the start at its mean
+        nominal = deepcopy(self).replace(x_start=self.x_start, X0=None, params=None)
+
+        # Each law's mean in the copied part
+        means = {}
+        for path, _ in flatten(self.laws):
+            set_leaf(means, path, lookup(tree, path)[0])
+        if means:
+            nominal.params = merge_tree(nominal.parts_view(), means)
+
+        # Each random source at its mean signal: its seed None
+        for block in nominal.sources_by_id().values():
+            if block.is_random:
+                block.params = block.realize(None)
+
+        return nominal
 
     def replace(self, **changes):
         """A new problem of the same class with the named fields replaced (the others shared)."""
@@ -746,6 +764,8 @@ class SetStart(Distribution):
         return int(self.mean.size)
 
     def sample(self, key, n=None, params=None):
+        if key is None:
+            return self.mean_draw(n)
         return self.support.sample(key, n, params)
 
 
@@ -858,7 +878,9 @@ def require_criterion(criterion, criteria) -> None:
 
 
 def stream_of(key, name):
-    """The stream of the consumer ``name`` under ``key``: an integer seed, or a JAX key folded by the name."""
+    """The stream of the consumer ``name`` under ``key``: an integer seed, a JAX key folded by the name, or ``None`` for no key (no draw)."""
+    if key is None:
+        return None
     if is_jax_key(key):
         jax = require_jax()
         return jax.random.fold_in(key, zlib.crc32(name.encode()))
