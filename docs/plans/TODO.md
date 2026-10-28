@@ -218,15 +218,7 @@ Why: [core-architecture.md](core-architecture.md) §1.
   `merge_params`), `core/compile/evaluators/jacobian.py` (`flatten_params`, `replace_leaf`)
   and `core/assembly.py`, become one `core/params.py` used by every caller. Done when the four
   copies are gone and a seeded baseline is byte-identical.
-- [ ] **The core's textbook leftovers** (T1):
-  - `system.py`'s default `h` stub builds `np.zeros(p)`, a returned-type decision under JAX;
-  - `wiring.py`'s `refresh` still guards with `hasattr(self, "solver_info")`.
-
-  The audit's bug, `StepDiagramSystem.step` writing in place, was fixed on 2026-10-24.
-- [ ] **Blocks and control leftovers** (T2):
-  - `blocks/transfer_function.py`'s `tf` calls `self.h(x, u, t)` on `np` and drops `params`;
-  - `mpc/viz.py` imports `HybridSimResult` at module level, not under `TYPE_CHECKING` (RULES
-    3.2; scan: control#12);
+- [ ] **Blocks and control leftovers** (T2; its first two items and T1 landed in the v0.3 run):
   - one time-interpolation for trajectories and gain schedules;
   - one warm-start helper on the plan `Trajectory`;
   - the impedance and robotic law bodies consolidated (scan: control#2, #5, #7).

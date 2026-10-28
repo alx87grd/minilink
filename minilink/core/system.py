@@ -4,6 +4,7 @@ from typing import TYPE_CHECKING
 
 import numpy as np
 
+from minilink.core.backends import array_module
 from minilink.core.facades.analysis import DynamicAnalysis, SystemAnalysis
 from minilink.core.facades.animation import DynamicAnimation, SystemAnimation
 from minilink.core.facades.plotting import DynamicPlotting, SystemPlotting
@@ -176,10 +177,12 @@ class System(SystemSimulation, SystemAnalysis, SystemPlotting, SystemAnimation):
         -------
         y : array of shape (p,)
         """
+        xp = array_module(x, u)
+
         p = self.p
 
         # y = 0 ∈ ℝᵖ: the static shell writes no output map of its own
-        y = np.zeros(p)
+        y = xp.zeros(p)
 
         return y
 
@@ -624,6 +627,8 @@ class DynamicSystem(
         -------
         y : array of shape (p,)
         """
+        xp = array_module(x, u)
+
         p = self.p
         n = self.n
 
@@ -631,7 +636,7 @@ class DynamicSystem(
         if p == n:
             return x
 
-        y = np.zeros(p)
+        y = xp.zeros(p)
 
         return y
 
@@ -700,8 +705,6 @@ def add_standard_ports(system, input_dim, output_dim, expose_state, y_dependenci
 
 if __name__ == "__main__":
     # Hello world: a double integrator dx = [x[1], u[0]]
-    from minilink.core.backends import array_module
-
     class DoubleIntegrator(DynamicSystem):
         def __init__(self):
             super().__init__(n=2, input_dim=1, output_dim=2)

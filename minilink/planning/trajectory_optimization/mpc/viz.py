@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+
 import numpy as np
 
 from minilink.core.discrete.step_rollout import StepRollout
@@ -16,7 +18,9 @@ from minilink.planning.problems import PlanningProblem
 from minilink.planning.trajectory_optimization.direct_collocation import (
     DirectCollocationTranscription,
 )
-from minilink.simulation.discrete.hybrid_simulator import HybridSimResult
+
+if TYPE_CHECKING:
+    from minilink.simulation.discrete.hybrid_simulator import HybridSimResult
 
 ###############################################################################
 # Public API

@@ -436,9 +436,6 @@ class WiredDiagramMixin:
         hint on the block it describes: one set by hand on the diagram is
         replaced at the next refresh.
         """
-        if not hasattr(self, "solver_info"):
-            return
-
         # Discontinuous when any subsystem is
         self.solver_info["discontinuous_behavior"] = any(
             subsystem.solver_info.get("discontinuous_behavior", False)

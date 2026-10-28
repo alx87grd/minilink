@@ -334,3 +334,13 @@ def test_disjoint_members_make_an_empty_intersection():
     touch = BoxSet(lower=np.array([1.0, -1.0]), upper=np.array([2.0, 1.0]))
     np.testing.assert_allclose((box & touch).bounding_box().lower, [1.0, -1.0])
     np.testing.assert_allclose((box & touch).bounding_box().upper, [1.0, 1.0])
+
+
+@pytest.mark.jax
+def test_the_default_output_stub_is_on_the_arrays_module():
+    jnp = pytest.importorskip("jax.numpy")
+    from minilink.core.system import DynamicSystem
+
+    sys = DynamicSystem(n=2, input_dim=1, output_dim=1)
+    y = sys.h(jnp.zeros(2), jnp.zeros(1))
+    assert type(y).__module__.startswith("jax") and y.shape == (1,)
