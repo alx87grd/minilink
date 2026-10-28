@@ -36,6 +36,7 @@ scene for fast RRT contract tests.
 | [`run_f_mpc_parity.py`](run_f_mpc_parity.py) | Thin wrapper → `--suite f_mpc` (capture/compare) |
 | [`baselines/*.json`](baselines/) | Committed golden metrics |
 | [`step_model_baseline.py`](step_model_baseline.py) | The step model's before/after check: every sampled consumer's numbers to JSON (no timings, so two captures are byte-identical), `--compare REF.json --rtol` against a capture (AGENTS' refactor recipe) |
+| [`v03_baseline.py`](v03_baseline.py) | The v0.3 core run's before/after check: the step model's entries plus the sampled loop, the problem evaluator, the draws, the optimizer, RL and the fields, to JSON with no timings; `--compare REF.json [--rtol R]` against [`baselines/v03_core.json`](baselines/v03_core.json) (byte-identical by default) |
 | [`params_binding.py`](params_binding.py) | Frozen step vs `params` as an argument vs bound parameters, on JAX: the evidence of the step model's parameter binding |
 | [`public_names.py`](public_names.py) | The public-name inventory: every facade name and the files using it; `--untested` lists the names no test uses (held empty by `tests/unittest/test_public_names.py`) |
 
