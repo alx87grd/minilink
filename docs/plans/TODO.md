@@ -459,7 +459,7 @@ after the core (R153). Step 4.7, the CBF plan's, is done.
 
 ### 1.10 Hardening and the merge
 
-- [ ] **Wiring mistakes fail at wiring time** (S66; RULES 4.10; scan: core#2,
+- [x] **Wiring mistakes fail at wiring time** (S66; RULES 4.10; scan: core#2,
   #13):
   - `connect` refuses to rewire a connected subsystem input;
   - the compile probe detects an output that moves with an input it does not declare and
@@ -470,6 +470,11 @@ after the core (R153). Step 4.7, the CBF plan's, is done.
 
   The refusals use plain `ValueError` and `TypeError` with clear messages (R165); the typed
   error family (S70) stays where it is planned, §5.
+
+  Landed in the v0.3 run (step 7; the log's RD-60): `connect` refuses a rewire and
+  `disconnect(sys_id, port_id)` opens an input; `sum_into`, `filter_into` and the flattener's
+  inlining disconnect first; the compile probe refuses an undeclared feedthrough (no library
+  block was under-declared: the catalog, the flagship demos and the suite pass).
 - [ ] **Material and contracts** (was V1 step 9;
   [differentiable-problem.md](differentiable-problem.md) §8):
   - each step updates DESIGN when it lands (§4 `Trajectory` and parameters, §5 the rollout, §6

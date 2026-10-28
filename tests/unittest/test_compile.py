@@ -1127,7 +1127,9 @@ class TestEquationShapeValidation(unittest.TestCase):
         self.assertIn("step() of", str(ctx.exception))
         self.assertIn("(plant)", str(ctx.exception))
 
-    def test_step_diagram_compile_probes_each_hook_once(self):
+    def test_step_diagram_compile_probes_each_hook_once_and_each_undeclared_input_once(
+        self,
+    ):
         from minilink.core.discrete.step_diagram import StepDiagramSystem
         from minilink.core.discrete.step_system import StepSystem
 
@@ -1150,7 +1152,8 @@ class TestEquationShapeValidation(unittest.TestCase):
         diagram.add_input_port("u")
         diagram.connect("input", "u", "plant", "u")
         diagram.compile()
-        self.assertEqual(block.calls, {"step": 1, "h": 1})
+        # h once for its shape, once more with the undeclared u moved
+        self.assertEqual(block.calls, {"step": 1, "h": 2})
 
     def test_wrong_f_shape_raises_from_compute_trajectory(self):
         with self.assertRaises(ValueError):
@@ -1460,7 +1463,6 @@ class TestCompileFlatten(unittest.TestCase):
         mid.add_subsystem(Gain([1.0]), "gain")
         mid.add_subsystem(inner, "loop")
         mid.connect("loop", "y", "gain", "u")
-        mid.connect("gain", "y", "loop", "r")
         mid.connect_new_output_port("gain", "y", "y")
         mid.add_input_port("r")
         mid.connect("input", "r", "loop", "r")
@@ -1504,3 +1506,44 @@ def test_every_jax_evaluator_applies_the_float64_policy():
         jax.config.update("jax_enable_x64", True)
 
     assert dx.dtype == np.float64
+
+
+# Wiring mistakes fail at wiring time
+
+
+def test_connect_refuses_to_rewire_a_connected_input_and_disconnect_opens_it():
+    diagram = DiagramSystem()
+    diagram.add_subsystem(P(), "controller")
+    diagram.add_subsystem(Integrator(), "plant")
+    diagram.connect("controller", "u", "plant", "u")
+
+    with pytest.raises(
+        ValueError, match="plant:u is already connected to controller:u"
+    ):
+        diagram.connect("plant", "y", "plant", "u")
+    assert diagram.disconnect("plant", "u") == ("controller", "u")
+    assert diagram.disconnect("plant", "u") is None
+    diagram.connect("plant", "y", "plant", "u")
+    assert diagram.connections["plant"]["u"] == ("plant", "y")
+
+
+def test_compile_refuses_an_output_that_reads_an_undeclared_input():
+    class HiddenFeedthrough(DynamicSystem):
+        def __init__(self):
+            super().__init__(n=1, input_dim=1, output_dim=1, y_dependencies=())
+
+        def f(self, x, u, t=0.0, params=None):
+            return -x
+
+        def h(self, x, u, t=0.0, params=None):
+            return x + u
+
+    with pytest.raises(
+        ValueError, match="output 'y' of 'HiddenFeedthrough' moves with input 'u'"
+    ):
+        compile(HiddenFeedthrough())
+
+    declared = HiddenFeedthrough()
+    declared.outputs["y"].dependencies = ("u",)
+    compile(declared)
+    np.testing.assert_allclose(declared.h(np.ones(1), np.ones(1)), [2.0])

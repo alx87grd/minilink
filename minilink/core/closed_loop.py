@@ -524,7 +524,7 @@ def plant_box_with_state(plant):
 def filter_into(diagram, filter, target):
     """The return filter on the wire into ``target``; returns where a noise then enters."""
     sys_id, port_id = target
-    source = diagram.connections[sys_id][port_id]
+    source = diagram.disconnect(sys_id, port_id)
     signal, filter_in = insert_filter(diagram, filter, source)
     diagram.connect(*signal, sys_id, port_id)
 
@@ -560,7 +560,7 @@ def sum_into(diagram, target, name):
     from minilink.blocks.routing import Sum
 
     sys_id, in_port = target
-    source = diagram.connections[sys_id][in_port]
+    source = diagram.disconnect(sys_id, in_port)
     dim = diagram.subsystems[sys_id].inputs[in_port].dim
 
     # The Sum between the target and its source, its second input left open

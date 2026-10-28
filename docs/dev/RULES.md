@@ -172,8 +172,9 @@ concrete formatting, ordered by the cost of being wrong:
   names drive the operators. Contract: DESIGN §4, 'Control laws'.
 - **4.10 Early structural validation:** Diagram connection utilities (`@`, `>>`, `DiagramSystem.connect`)
   validate port existence and dimensional compatibility at wiring time, failing with explicit
-  error messages naming the mismatched ports and blocks. This rule covers wiring, not `f`/`h`
-  return-shape checks at ODE time.
+  error messages naming the mismatched ports and blocks; a connected input is rewired only
+  through `disconnect`, and an output's undeclared feedthrough is refused at compile. This rule
+  covers wiring, not `f`/`h` return-shape checks at ODE time.
 - **4.11 Build vs run.** Does runtime stepping mutate what wiring and `compile()` froze? Law:
   CONSTITUTION §6, 'Build vs run'.
 - **4.12 Defaults that change the mathematics are announced.** When a tool fills in a value
