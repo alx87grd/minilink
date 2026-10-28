@@ -18,7 +18,7 @@ from minilink.core.compile.evaluators.base import (
 )
 from minilink.core.compile.evaluators.compiled import body_of, compiled
 from minilink.core.compile.evaluators.dynamic import check_leaf_traces
-from minilink.core.compile.evaluators.stepping import iterate
+from minilink.core.compile.evaluators.stepping import iterate, iterate_dense
 from minilink.core.compile.plan import SampledPortOperation, StepExecutionPlan
 from minilink.core.diagram import check_diagram_params
 from minilink.core.discrete.sampled_system import SampledSystem
@@ -187,6 +187,29 @@ class StepEvaluator(DiscreteEvaluator):
         xp = self.xp
         params = self._frozen_params if params is None else params
         return outputs_from_ports(self._system, xp.asarray(x), xp.asarray(u), k, params)
+
+    @compiled(static=("n_steps",))
+    def rollout_dense(self, x0, u_seq=None, params=None, *, n_steps=None, t_start=0.0):
+        """The run of a system on a clock with its substeps kept: ``(N·s + 1, n)``, the ticks bit for bit."""
+        xp = self.xp
+        n = self.n
+        system = self._system
+        params = self._frozen_params if params is None else params
+
+        x0 = xp.asarray(x0, dtype=float).reshape(n)
+        u_seq = self.input_sequence_of(u_seq, n_steps)
+        ks = self.indices(u_seq.shape[0])
+
+        def period(x, k, u_k):
+            x_next = xp.reshape(self.step(x, u_k, k, params, t_start=t_start), (n,))
+            t_k = t_start + k * system.sample_period
+            path = system.update_path(x, u_k, t_k, params)
+            points = assigned(xp, path, -1, x_next)
+            return x_next, points
+
+        x_samples = iterate_dense(self, period, x0, (ks, u_seq))
+
+        return x_samples
 
 
 class StepDiagramEvaluator(DiscreteEvaluator):
@@ -429,6 +452,33 @@ class SampledDiagramEvaluator(StepDiagramEvaluator):
             for port_id, sl in self.plan.external_output_slices.items()
         }
 
+    @compiled(static=("n_steps",))
+    def rollout_dense(self, x0, u_seq=None, params=None, *, n_steps=None, t_start=0.0):
+        """
+        The run with the plant's substeps kept: ``(N·S + 1, n)`` at ``t_start + (k + j/S)·Δ``.
+
+        ``S`` is :attr:`~minilink.core.compile.plan.SampledExecutionPlan.dense_points`.
+        Each period is the tick of :meth:`rollout`, its state at the period's end
+        the same, bit for bit; inside the period the loop's plant (a continuous
+        plant integrated by its substeps) shows its substep ends, every other
+        block its state at the tick, the input held.
+        """
+        xp = self.xp
+        n = self.n
+
+        x0 = xp.asarray(x0, dtype=float).reshape(n)
+        u_seq = self.input_sequence_of(u_seq, n_steps)
+        ks = self.indices(u_seq.shape[0])
+
+        def period(x, k, u_k):
+            x_next = xp.reshape(self.step(x, u_k, k, params, t_start=t_start), (n,))
+            points = self.substep_points(x, u_k, k, params, x_next, t_start)
+            return x_next, points
+
+        x_samples = iterate_dense(self, period, x0, (ks, u_seq))
+
+        return x_samples
+
     def compute_internal_signals_dict(self, x, u, k=0, params=None, *, t_start=0.0):
         """Every block output at ``(x, u, k)``, keyed ``"block:port"`` (flat ids)."""
         x, u = self.float_arrays(x, u)
@@ -471,8 +521,13 @@ class SampledDiagramEvaluator(StepDiagramEvaluator):
                 signals = added(xp, signals, op.out_slice, inject[1])
         return signals
 
-    def next_from_signals(self, x, u, k, params, signals, *, t_start=0.0):
-        """Every block's ``x_{k+1}`` and every held output from the filled signal buffer."""
+    def next_from_signals(self, x, u, k, params, signals, *, t_start=0.0, advance=None):
+        """Every block's ``x_{k+1}`` and every held output from the filled signal buffer.
+
+        ``advance(system, x, u, t, params)``, when given, takes the loop's plant
+        (a continuous plant on the base clock) over the period in place of its
+        own step: the host clock runner's adaptive integrator.
+        """
         xp = self.xp
         dtype = self.dtype
         x_old = xp.asarray(x, dtype=dtype).reshape(self.plan.state_dim)
@@ -490,7 +545,9 @@ class SampledDiagramEvaluator(StepDiagramEvaluator):
                 x_i = op.step_func(local_x, local_u, time, p_op)
                 return xp.reshape(xp.asarray(x_i, dtype=dtype), (n_i,))
 
-            if op.divisor == 1:
+            if advance is not None and op is self.plan.plant_op:
+                x_i = advance(op.system, local_x, local_u, time, p_op)
+            elif op.divisor == 1:
                 x_i = fire()
             else:
                 x_i = self.fired(k, op.divisor, fire, lambda local_x=local_x: local_x)
@@ -501,6 +558,31 @@ class SampledDiagramEvaluator(StepDiagramEvaluator):
             if op.hold_slice is not None:
                 x_new = assigned(xp, x_new, op.hold_slice, signals[op.out_slice])
         return x_new
+
+    def substep_points(self, x, u, k, params, x_next, t_start):
+        """The loop's state at the ``S`` points of the period after ``t_k``: ``(S, n)``, the last ``x_{k+1}``."""
+        xp = self.xp
+        dtype = self.dtype
+        S = self.plan.dense_points
+        x_old = xp.asarray(x, dtype=dtype).reshape(self.plan.state_dim)
+        points = xp.tile(x_old, (S, 1))
+        if S == 1:
+            return xp.reshape(x_next, (1, -1))
+
+        params = self._frozen_params if params is None else params
+        signals = self.port_signals(x_old, u, k, params, t_start=t_start)
+        t_k = t_start + k * self.sample_period
+        op = self.plan.plant_op
+        local_u = gather_u(op.gather_sources, op.u_dim, signals, u, xp, dtype)
+        path = op.system.update_path(
+            x_old[op.local_x_slice], local_u, t_k, lookup(params, op.params_path)
+        )
+
+        # The plant at its substep ends, every other block at the tick
+        points = assigned(xp, points, (slice(0, S), op.local_x_slice), path)
+        points = assigned(xp, points, S - 1, x_next)
+
+        return points
 
     def fired(self, k, d, fire, hold):
         """``fire()`` on the ticks ``k mod d = 0``, ``hold()`` otherwise: a branch, never both."""

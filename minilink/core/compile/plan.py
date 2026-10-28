@@ -508,7 +508,11 @@ class SampledPortOperation:
 
 @dataclass(frozen=True)
 class SampledStepOperation:
-    """One state advance of a sampled plan: ``update(x, u, t_k)`` or ``step(x, u, k)``, on its clock."""
+    """One state advance of a sampled plan: ``update(x, u, t_k)`` or ``step(x, u, k)``, on its clock.
+
+    ``system`` is the block itself, which the dense run and the host clock
+    runner read (its substeps, its continuous source).
+    """
 
     step_func: Callable[..., object]
     local_x_slice: slice
@@ -517,6 +521,7 @@ class SampledStepOperation:
     face: str
     divisor: int
     params_path: tuple[str, ...]
+    system: object = None
     bound_params: dict | None = None
     label: str = ""
     sys_id: str = ""
@@ -538,6 +543,25 @@ class SampledExecutionPlan:
     step_ops: tuple[SampledStepOperation, ...]
     output_slices: dict[tuple[str, str], slice]
     external_output_slices: dict[str, slice]
+
+    @property
+    def plant_op(self):
+        """The state advance of the loop's plant on the base clock, a continuous plant integrated inside the period; else ``None``."""
+        for op in self.step_ops:
+            if (
+                op.params_path == ("plant",)
+                and op.divisor == 1
+                and op.face == "seconds"
+            ):
+                if op.system.resolves:
+                    return op
+        return None
+
+    @property
+    def dense_points(self) -> int:
+        """``S``, the points per base period the dense run keeps: the plant's substeps (1 with no plant)."""
+        op = self.plant_op
+        return 1 if op is None else op.system.substeps
 
 
 def build_sampled_execution_plan(diagram) -> SampledExecutionPlan:
@@ -601,6 +625,7 @@ def build_sampled_execution_plan(diagram) -> SampledExecutionPlan:
                 face=face,
                 divisor=diagram.divisor_of(sys),
                 params_path=path,
+                system=sys,
                 bound_params=snapshot[sys_id],
                 label="/".join(path),
                 sys_id=sys_id,

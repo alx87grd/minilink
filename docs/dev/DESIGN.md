@@ -832,7 +832,13 @@ Keep `ExecutionPlan.output_slices` and `external_output_slices` aligned.
   `rollout(x0, u_seq=None, params=None, *, n_steps=None, t_start=0.0)` returns the states
   `(N + 1, n)` as native arrays (one `lax.scan` on JAX, traced and differentiable end to end),
   `rollout_batch` maps it over starts, inputs and a parameter family in one `vmap`, and a step
-  diagram's `tick(x, u, k)` gives the next state and the boundary outputs from one signal pass
+  diagram's `tick(x, u, k)` gives the next state and the boundary outputs from one signal pass;
+  on a clock with a continuous plant underneath, `compute_trajectory(tf, u=None, *, x0=None,
+  t_start=0.0, solver=None)` is the same scan with the plant's substeps kept (the evaluator's
+  `rollout_dense`, `(N·S + 1, n)`, `S` the plant block's substeps), equal to the ticks bit for
+  bit at the ticks, and `solver="scipy"` the host clock runner
+  (`simulation/discrete/clock_runner.py`: the same blocks ticked on the host, the plant integrated
+  by `solve_ivp` between the held inputs, NumPy), the cross-check; a tick law refuses it
 - :class:`~minilink.core.discrete.hybrid_diagram.HybridDiagram` →
   :class:`~minilink.simulation.discrete.hybrid_simulator.HybridSimulator` or façade
   `compute_trajectory` / `compute_forced` (hybrid :class:`~minilink.simulation.discrete.hybrid_simulator.HybridSimResult`)

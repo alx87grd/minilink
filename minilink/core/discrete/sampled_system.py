@@ -5,7 +5,7 @@ from __future__ import annotations
 import numpy as np
 
 from minilink.core.backends import array_module, require_jax
-from minilink.core.compile.evaluators.stepping import step_body
+from minilink.core.compile.evaluators.stepping import step_body, step_path
 from minilink.core.discrete.step_system import StepSystem
 from minilink.core.system import (
     AUTO_DT_SCALE,
@@ -136,6 +136,38 @@ class SampledSystem(StepSystem):
 
         return x_next
 
+    @property
+    def resolves(self) -> bool:
+        """Whether a continuous source is integrated inside the period, so its substeps can be kept."""
+        source = self.source
+        continuous = isinstance(source, DynamicSystem) and source.n > 0
+
+        return continuous and self.solver != "exact"
+
+    def update_path(self, x, u, t, params=None):
+        """
+        The state at the end of every substep of :meth:`update`: ``(substeps, n)``.
+
+        The last row is ``x(t + h)`` from the same steps; the dense run of a
+        loop (``compute_trajectory``) keeps them.
+        """
+        params = self.params if params is None else params
+
+        source = self.source
+        h = self.sample_period
+        solver = self.solver
+        substeps = self.substeps
+
+        require_resolved(self)
+
+        def f(x, u, t):
+            return source.f(x, u, t, params)
+
+        # x(t + j h / s) for j = 1 … s, the input held over [t, t + h]
+        x_path = step_path(f, x, u, u, t, h, solver, substeps)
+
+        return x_path
+
     def step(self, x, u, k=0, params=None):
         params = self.params if params is None else params
 
@@ -265,6 +297,15 @@ def require_sampleable(source, solver, substeps) -> None:
             f"the params of {source.name} carry 'dt' = {source.params['dt']!r}, but "
             "the sample period is the clock's, which f never receives; remove 'dt' "
             "from the params and call discretize(system, dt)."
+        )
+
+
+def require_resolved(system) -> None:
+    """Refuse the substeps of a block that integrates nothing inside its period."""
+    if not system.resolves:
+        raise TypeError(
+            f"{system.name} integrates no continuous state inside its period: it has "
+            "no substeps to keep"
         )
 
 

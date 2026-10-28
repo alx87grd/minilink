@@ -6,6 +6,8 @@ import operator
 
 import numpy as np
 
+from minilink.core.backends import array_module
+
 SOLVERS = ("rk4", "euler")
 HOLDS = ("zoh", "foh")
 
@@ -51,6 +53,25 @@ def step_body(f, x, u0, u1, t, dt, solver, substeps):
     return x
 
 
+def step_path(f, x, u0, u1, t, dt, solver, substeps):
+    """``[x(t + dt/s), …, x(t + dt)]``: the end of every substep of :func:`step_body`, ``(s, n)``."""
+    xp = array_module(x)
+    integrate = rk4 if solver == "rk4" else euler
+    h = dt / substeps
+
+    # The substeps, each end kept, the input at their ends read off the line from u0 to u1
+    path = []
+    for i in range(substeps):
+        ua = u0 if i == 0 else u0 + (i / substeps) * (u1 - u0)
+        ub = u1 if i == substeps - 1 else u0 + ((i + 1) / substeps) * (u1 - u0)
+        x = integrate(f, x, ua, ub, t + i * h, h)
+        path.append(x)
+
+    x_path = xp.stack(path)
+
+    return x_path
+
+
 def substeps_of(dt_hold, dt_inner=None):
     """The number of integration steps of about ``dt_inner`` in one hold of ``dt_hold``."""
     if dt_inner is None:
@@ -80,6 +101,34 @@ def iterate(evaluator, transition, x0, sequences):
 
     _, xs = evaluator.jax.lax.scan(scan_body, x0, sequences)
     x_samples = evaluator.jnp.concatenate((x0[None, :], xs), axis=0)
+
+    return x_samples
+
+
+def iterate_dense(evaluator, period, x0, sequences):
+    """``[x_0, …]`` of every point a run keeps: ``period(x_k, *row_k) -> (x_{k+1}, points_k)``.
+
+    ``points_k`` is ``(S, n)``, the state at the ``S`` points of the period after
+    its start, its last row ``x_{k+1}``; the run returns ``(N·S + 1, n)``. A
+    Python loop on NumPy, one ``lax.scan`` on JAX.
+    """
+    if evaluator.backend != "jax":
+        x = x0
+        x_path = [x0[None, :]]
+        for row in zip(*sequences):
+            x, points = period(x, *row)
+            x_path.append(points)
+        x_samples = np.concatenate(x_path, axis=0)
+
+        return x_samples
+
+    def scan_body(x, row):
+        x_next, points = period(x, *row)
+        return x_next, points
+
+    _, points = evaluator.jax.lax.scan(scan_body, x0, sequences)
+    n = x0.shape[0]
+    x_samples = evaluator.jnp.concatenate((x0[None, :], points.reshape(-1, n)), axis=0)
 
     return x_samples
 

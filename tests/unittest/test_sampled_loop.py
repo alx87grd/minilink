@@ -160,3 +160,53 @@ def test_a_box_of_clocked_blocks_nests_under_its_role():
     assert isinstance(computer, SampledDiagramSystem)
     assert computer.sample_period == 0.01
     assert computer.hold_dim == 1
+
+
+def a_digital_pid_on_a_pendulum(dt=0.01):
+    plant = Pendulum()
+    plant.x0 = np.array([0.3, 0.0])
+    plant.solver_info["smallest_time_constant"] = 0.005
+    return (PID(Kp=8.0, Ki=1.0, Kd=2.0) % dt) @ plant
+
+
+@pytest.mark.parametrize("backend", ["numpy", "jax"])
+def test_the_two_run_verbs_agree_at_the_ticks(backend):
+    if backend == "jax":
+        pytest.importorskip("jax")
+    loop = a_digital_pid_on_a_pendulum()
+    S = loop.subsystems["plant"].substeps
+    assert S == 20
+
+    ticks = loop.compute_rollout(100, backend=backend)
+    dense = loop.compute_trajectory(tf=1.0, backend=backend)
+
+    assert dense.x.shape == (4, 100 * S + 1)
+    np.testing.assert_allclose(dense.t[::S], ticks.t, rtol=0, atol=1e-15)
+    np.testing.assert_array_equal(dense.x[:, ::S], ticks.x)
+
+
+def test_the_dense_run_is_the_loop_re_clocked_at_its_substeps():
+    dt = 0.01
+    loop = a_digital_pid_on_a_pendulum(dt)
+    S = loop.subsystems["plant"].substeps
+    plant = loop.subsystems["plant"].source
+    re_clocked = (PID(Kp=8.0, Ki=1.0, Kd=2.0) % dt) @ discretize(plant, dt / S)
+    assert re_clocked.sample_period == pytest.approx(dt / S)
+
+    dense = loop.compute_trajectory(tf=0.5)
+    fine = re_clocked.compute_rollout(50 * S)
+    a, b = loop.state_index["plant"]
+    c, d = re_clocked.state_index["plant"]
+    np.testing.assert_allclose(dense.x[a:b], fine.x[c:d], rtol=1e-12, atol=1e-14)
+
+
+def test_the_host_clock_runner_agrees_within_its_tolerance():
+    loop = a_digital_pid_on_a_pendulum()
+    dense = loop.compute_trajectory(tf=1.0)
+    host = loop.compute_trajectory(tf=1.0, solver="scipy")
+    np.testing.assert_allclose(host.x, dense.x, atol=1e-8)
+
+
+def test_a_tick_law_has_no_continuous_time():
+    with pytest.raises(TypeError, match="compute_rollout"):
+        (LowPass() % 0.01).compute_trajectory(tf=1.0)
