@@ -9,6 +9,8 @@ of a continuous evaluator (``step``, ``rollout``, ``rollout_batch``) lives here.
 
 from __future__ import annotations
 
+import copy
+
 import numpy as np
 
 from minilink.core.backends import (
@@ -30,7 +32,7 @@ from minilink.core.compile.plan import (
     INTERNAL_SIGNAL,
     NOMINAL,
 )
-from minilink.core.params import canonical_tree, flat_leaves, tree_digest
+from minilink.core.params import DeviceTree, canonical_tree, flat_leaves, tree_digest
 
 # Above this many numbers a frozen leaf is passed as an argument, not baked into the executable
 LARGE_LEAF = 1_000
@@ -71,7 +73,8 @@ class Evaluator(JacobianMixin):
         self._u_nominal = self.xp.array(np.asarray(u_nominal, dtype=float))
         self._frozen_params = None
         self.params_reader = None
-        self.on_device = None
+        self.on_device = DeviceTree()
+        self.frozen_on_device = None
 
     @property
     def params(self):
@@ -99,18 +102,20 @@ class Evaluator(JacobianMixin):
         device in its compiled dtypes and shapes, kept there while its values
         repeat: every value of every number type is then one trace.
         """
-        if params is None and not has_large_leaf(self._frozen_params):
-            return None
-        tree = self._frozen_params if params is None else params
+        frozen = self._frozen_params
+        if params is None:
+            if not has_large_leaf(frozen):
+                return None
+            # The compiled tree never changes: on the device once
+            if self.frozen_on_device is None:
+                self.frozen_on_device = self.jax.device_put(frozen)
+            return self.frozen_on_device
 
         # The tree in its compiled types, on the device: put there once and kept
         # while its values repeat (a host loop's calls transfer nothing)
-        digest = tree_digest(tree)
-        if self.on_device is None or self.on_device[0] != digest:
-            canonical = canonical_tree(tree, self._frozen_params)
-            self.on_device = (digest, self.jax.device_put(canonical))
-
-        return self.on_device[1]
+        return self.on_device.get(
+            params, lambda tree: canonical_tree(tree, frozen), self.jax.device_put
+        )
 
     @property
     def nominal_input(self):
@@ -337,6 +342,15 @@ class ContinuousEvaluator(Evaluator):
 def blocks_params(diagram, frozen):
     """A diagram's parameters now, by the block ids its compiled tree holds."""
     return {sys_id: diagram.subsystems[sys_id].params for sys_id in frozen}
+
+
+def every_block(frozen, diagram):
+    """``frozen`` naming every block of ``diagram``: one with no operation (a sink) its parameters copied."""
+    for sys_id, sub in diagram.subsystems.items():
+        if sys_id not in frozen:
+            frozen[sys_id] = copy.deepcopy(getattr(sub, "params", {}))
+
+    return frozen
 
 
 def has_large_leaf(tree) -> bool:

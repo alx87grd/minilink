@@ -14,6 +14,7 @@ from minilink.core.compile.evaluators.base import (
     assigned,
     blocks_params,
     check_jax_compatible,
+    every_block,
     gather_u,
     outputs_from_ports,
 )
@@ -233,11 +234,14 @@ class StepDiagramEvaluator(DiscreteEvaluator):
         )
         self.plan = plan
         self.dtype = self.xp.float64
-        self._frozen_params = {
-            op.sys_id: op.bound_params
-            for op in (*plan.port_ops, *plan.step_ops)
-            if op.sys_id
-        }
+        self._frozen_params = every_block(
+            {
+                op.sys_id: op.bound_params
+                for op in (*plan.port_ops, *plan.step_ops)
+                if op.sys_id
+            },
+            diagram,
+        )
         self.params_reader = lambda: blocks_params(diagram, self._frozen_params)
         self._subsystem_ids = tuple(diagram.subsystems)
 

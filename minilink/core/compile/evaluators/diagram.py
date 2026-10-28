@@ -13,6 +13,7 @@ from minilink.core.compile.evaluators.base import (
     assigned,
     blocks_params,
     check_jax_compatible,
+    every_block,
     gather_u,
     gathered_on_host,
 )
@@ -39,11 +40,14 @@ class DiagramEvaluator(ContinuousEvaluator):
             plan.state_dim, diagram.m, p, backend, diagram.get_u_from_input_ports()
         )
         self.plan = plan
-        self._frozen_params = {
-            op.sys_id: op.bound_params
-            for op in (*plan.port_ops, *plan.state_ops)
-            if op.sys_id
-        }
+        self._frozen_params = every_block(
+            {
+                op.sys_id: op.bound_params
+                for op in (*plan.port_ops, *plan.state_ops)
+                if op.sys_id
+            },
+            diagram,
+        )
         self.params_reader = lambda: blocks_params(diagram, self._frozen_params)
         self._subsystem_ids = tuple(diagram.subsystems)
 

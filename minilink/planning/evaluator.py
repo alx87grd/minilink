@@ -18,6 +18,7 @@ from minilink.core.distributions import child_seed
 from minilink.core.options import require_one_of
 from minilink.core.params import (
     Batched,
+    DeviceTree,
     canonical_tree,
     flat_leaves,
     flatten,
@@ -26,7 +27,6 @@ from minilink.core.params import (
     merge_tree,
     set_leaf,
     split_path,
-    tree_digest,
     with_leaf,
 )
 from minilink.core.trajectory import Trajectory
@@ -144,7 +144,7 @@ class ProblemEvaluator:
         self.trials_fn = None
         self.run_fn = None
         self.price_cache = {}
-        self.on_device = None
+        self.on_device = DeviceTree()
 
         # "auto" keeps JAX only when the whole score traces (the cost and the sets too)
         if backend == "auto" and self.backend == BACKEND_JAX and not self.traces():
@@ -361,11 +361,8 @@ class ProblemEvaluator:
     def device_tree(self, tree):
         """``tree`` on the device: put there once and kept while its values repeat, so a repeat transfers nothing."""
         jax = ensure_jax_x64()
-        digest = tree_digest(tree)
-        if self.on_device is None or self.on_device[0] != digest:
-            self.on_device = (digest, jax.device_put(tree))
 
-        return self.on_device[1]
+        return self.on_device.get(tree, lambda same: same, jax.device_put)
 
     def run_compiled(self, params, x_start):
         """:meth:`run` jitted once per problem parts: the recorded run in one dispatch."""

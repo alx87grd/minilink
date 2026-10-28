@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import collections
+import hashlib
 
 import numpy as np
 
@@ -74,7 +75,7 @@ def clear_compiled():
     COMPILED.clear()
 
 
-def fingerprint(system) -> tuple:
+def fingerprint(system, seen=frozenset()) -> tuple:
     """
     The structure a compile reads, by Python identity: the key of a reused evaluator.
 
@@ -88,6 +89,10 @@ def fingerprint(system) -> tuple:
     diagram is not keyed by its own identity, so a loop rebuilt over the same
     blocks (``problem.compile``, ``closed_loop``) reuses the evaluator.
     """
+    # A block reached again through its own attributes (two blocks naming each other)
+    if id(system) in seen:
+        return ("seen", id(system))
+    seen = seen | {id(system)}
     subsystems = vars(system).get("subsystems")
 
     # A diagram is its wiring and its blocks: one rebuilt over the same blocks is the same
@@ -98,11 +103,13 @@ def fingerprint(system) -> tuple:
         identity,
         ports_of(system),
         overrides_of(system),
-        attributes_of(system),
+        attributes_of(system, seen),
     ]
     if subsystems is not None:
         parts.append(
-            tuple((sys_id, fingerprint(sub)) for sys_id, sub in subsystems.items())
+            tuple(
+                (sys_id, fingerprint(sub, seen)) for sys_id, sub in subsystems.items()
+            )
         )
         parts.append(wiring_of(system))
 
@@ -117,6 +124,9 @@ def structure_of(obj) -> tuple:
 ###############################################################################
 # Internal machinery
 ###############################################################################
+
+# Above this many bytes an attribute's value is keyed by its digest, not kept in the key
+KEY_BYTES = 512
 
 # The reused evaluators, oldest first
 COMPILED = collections.OrderedDict()
@@ -162,35 +172,38 @@ def overrides_of(system) -> tuple:
     )
 
 
-def attributes_of(system) -> tuple:
+def attributes_of(system, seen=frozenset()) -> tuple:
     """The plain attributes outside the parameters and the start: what an equation may read at trace time."""
     parts = []
     for name, value in vars(system).items():
         if name in NOT_STRUCTURE:
             continue
-        part = structure_value(value)
+        part = structure_value(value, seen)
         if part is not None:
             parts.append((name, part))
 
     return tuple(parts)
 
 
-def structure_value(value):
-    """What the fingerprint reads of one attribute: plain values by bytes, a system by its fingerprint, a law by its numbers."""
+def structure_value(value, seen=frozenset()):
+    """What the fingerprint reads of one attribute: plain values by bytes, a system by its fingerprint and numbers, a law by its numbers."""
     # Lazy import: a real cycle, the systems import the compiler
     from minilink.core.system import System
 
+    # A model held by a block (a computed-torque law's plant) is read at trace time,
+    # its numbers too
     if isinstance(value, System):
-        return fingerprint(value)
+        return (fingerprint(value, seen), tree_digest(getattr(value, "params", {})))
     if value is None or isinstance(
         value, (bool, int, float, str, np.ndarray, np.generic)
     ):
-        return leaf_bytes(value)
+        raw = leaf_bytes(value)
+        return raw if len(raw) <= KEY_BYTES else hashlib.blake2b(raw).digest()
     if isinstance(value, (list, tuple)):
-        items = tuple(structure_value(item) for item in value)
+        items = tuple(structure_value(item, seen) for item in value)
         return items if all(item is not None for item in items) else None
     if isinstance(value, dict):
-        items = tuple((key, structure_value(item)) for key, item in value.items())
+        items = tuple((key, structure_value(item, seen)) for key, item in value.items())
         return tuple(item for item in items if item[1] is not None)
     if isinstance(getattr(value, "params", None), dict):
         return (type(value), id(value), tree_digest(value.params))

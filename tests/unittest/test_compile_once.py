@@ -11,6 +11,7 @@ jax = pytest.importorskip("jax")
 
 from minilink import (  # noqa: E402
     CartPole,
+    DiagramSystem,
     DynamicSystem,
     Integrator,
     P,
@@ -19,6 +20,7 @@ from minilink import (  # noqa: E402
     QuadraticCost,
     StateFeedback,
     Sum,
+    System,
     TrajectoryOptimizationPlanner,
     lqr,
 )
@@ -181,6 +183,44 @@ def test_a_parameter_sweep_through_the_simulation_compiles_once_and_reads_each_v
     assert total <= 1
 
 
+def test_a_repeated_gradient_through_a_compiled_method_never_reuses_a_tracer():
+    ev = Integrator().compile(backend="jax")
+    u = np.ones((5, 1))
+
+    def last(p):
+        return ev.rollout(np.zeros(1), u, 0.0, 0.1, p)[-1, 0]
+
+    grad = jax.grad(last)
+    for _ in range(50):
+        grad(dict(ev.params))
+    jax.vmap(lambda k: last({**ev.params, "k": k}))(np.ones(3))
+    assert ev.on_device.entry is None
+
+
+class Decay(DynamicSystem):
+    """``dx = −a x``, ``a`` written as an integer, as a student writes it."""
+
+    def __init__(self):
+        super().__init__(n=1, input_dim=1, output_dim=1)
+        self.params = {"a": 1}
+        self.x0 = np.array([1.0])
+
+    def f(self, x, u, t=0.0, params=None):
+        params = self.params if params is None else params
+        return -params["a"] * x
+
+
+def test_a_float_for_an_integer_default_is_never_truncated():
+    plant = Decay()
+    run = dict(tf=1.0, n_steps=11, solver="rk4_fixedsteps", verbose=False)
+    plant.compute_trajectory(**run, backend="jax")
+    plant.params["a"] = 2.5
+    jax_x = plant.compute_trajectory(**run, backend="jax").x[0, -1]
+    numpy_x = plant.compute_trajectory(**run, backend="numpy").x[0, -1]
+    assert jax_x == pytest.approx(numpy_x, rel=1e-12)
+    assert numpy_x == pytest.approx(np.exp(-2.5), rel=1e-3)
+
+
 # The frozen and the parametric forms
 
 
@@ -238,6 +278,58 @@ def test_a_structural_edit_is_seen_after_clear_compiled():
     signs.signs = np.array([1.0, 1.0])
     clear_compiled()
     assert float(compiled_of(signs, "jax").outputs(np.zeros(0), u)["y"][0]) == 3.0
+
+
+def test_an_embedded_models_numbers_are_part_of_the_key():
+    from minilink.control.modelbased import ComputedTorque
+
+    plant = Pendulum()
+    plant.x0 = np.array([0.5, 0.0])
+    model = copy.deepcopy(plant)
+    loop = ComputedTorque(model, tracking_ref=False) @ plant
+    run = dict(tf=1.0, n_steps=101, solver="rk4_fixedsteps", verbose=False)
+    loop.compute_trajectory(**run, backend="jax")
+    model.params["m"] = 3.0 * np.asarray(model.params["m"])
+    np.testing.assert_allclose(
+        loop.compute_trajectory(**run, backend="jax").x,
+        loop.compute_trajectory(**run, backend="numpy").x,
+        rtol=1e-9,
+        atol=1e-12,
+    )
+
+
+class Sink(System):
+    """A block with one input, no state and no output."""
+
+    def __init__(self):
+        super().__init__(0)
+        self.add_input_port("u", dim=1, nominal_value=np.zeros(1))
+        self.params = {"gain": 1.0}
+
+
+def test_a_parameter_edit_runs_on_a_diagram_holding_a_sink():
+    diagram = DiagramSystem()
+    plant = Integrator()
+    plant.x0 = np.array([1.0])
+    diagram.add_subsystem(plant, "plant")
+    diagram.add_subsystem(Sink(), "sink")
+    diagram.connect("plant", "y", "sink", "u")
+    run = dict(tf=1.0, n_steps=11, solver="rk4_fixedsteps", verbose=False)
+    diagram.compute_trajectory(**run, backend="jax")
+    plant.params["k"] = 2.0
+    np.testing.assert_allclose(
+        diagram.compute_trajectory(**run, backend="jax").x,
+        diagram.compute_trajectory(**run, backend="numpy").x,
+        rtol=1e-12,
+    )
+
+
+def test_two_blocks_naming_each_other_have_a_fingerprint():
+    from minilink.core.compile.cache import fingerprint
+
+    first, second = Integrator(), Integrator()
+    first.other, second.other = second, first
+    assert fingerprint(first) == fingerprint(first)
 
 
 def test_a_new_horizon_before_a_solve_is_a_new_program():

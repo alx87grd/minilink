@@ -148,6 +148,31 @@ def canonical_tree(tree, reference):
     return canonical_leaf(tree, reference)
 
 
+class DeviceTree:
+    """
+    One tree kept on the device while its values repeat: a host loop's calls then transfer nothing.
+
+    The entry holds the leaves it was built from, so a JAX leaf's identity (what
+    the digest reads of it) cannot be reused by another array while the entry
+    lives. A tree holding a tracer (a call under an outer ``jit``, ``grad`` or
+    ``vmap``) is prepared and returned, never kept: a tracer outlives its trace.
+    """
+
+    def __init__(self):
+        self.entry = None
+
+    def get(self, tree, prepare, put):
+        """``put(prepare(tree))``, reused while ``tree``'s values repeat; ``prepare(tree)`` alone for a traced tree."""
+        leaves = [leaf for _, leaf in flatten_any(tree)]
+        if any(is_tracer(leaf) for leaf in leaves):
+            return prepare(tree)
+        digest = tree_digest(tree)
+        if self.entry is None or self.entry[0] != digest:
+            self.entry = (digest, leaves, put(prepare(tree)))
+
+        return self.entry[2]
+
+
 def tree_digest(tree) -> bytes:
     """A digest of a tree's structure and values: JAX arrays by identity, host values by their bytes."""
     digest = hashlib.blake2b(digest_size=16)
@@ -175,6 +200,12 @@ def canonical_leaf(leaf, reference):
     dtype = np.result_type(reference)
     shape = np.shape(reference)
 
+    # A value its reference's dtype cannot hold (2.5 for an integer default) promotes
+    # instead: one more trace, never a truncated number
+    own = leaf.dtype if hasattr(leaf, "dtype") else np.asarray(leaf).dtype
+    if not np.can_cast(own, dtype, "same_kind"):
+        dtype = np.result_type(own, dtype)
+
     # A JAX value (a tracer under an outer transform) keeps its module
     value = (
         strong_jax(leaf, dtype) if is_jax_value(leaf) else np.asarray(leaf, dtype=dtype)
@@ -191,6 +222,16 @@ def strong_jax(value, dtype):
     from jax import lax
 
     return lax.convert_element_type(value, dtype)
+
+
+def is_tracer(value) -> bool:
+    """Whether ``value`` is a JAX tracer: a value inside a trace, not an array."""
+    if not is_jax_value(value):
+        return False
+    # Lazy import: only a JAX value reaches here
+    from jax.core import Tracer
+
+    return isinstance(value, Tracer)
 
 
 def is_jax_value(value) -> bool:

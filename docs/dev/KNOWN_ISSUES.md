@@ -44,9 +44,10 @@ lands. Last checked against the code: 2026-10-28.
 ### A structural attribute edited after a JAX run is not seen until `clear_compiled()`
 - **Symptom:** the JAX convenience calls (`compute_trajectory`, `Simulator`,
   `problem.compile`) reuse a compiled evaluator keyed by the blocks' structure. Plain
-  attributes (a `Sum`'s signs, a flag, a period) and a law's `params` are in the key; an
-  attribute an equation reads through another object (a lookup table held on a helper, a
-  module global) is not, so a run after editing it reuses the old trace.
+  attributes (a `Sum`'s signs, a flag, a period), a law's `params` and the numbers of a model
+  a block holds (a computed-torque law's plant) are in the key; an attribute an equation
+  reads through another object (a lookup table held on a helper, a function stored on the
+  block, a module global) is not, so a run after editing it reuses the old trace.
 - **Reproduce:** a block whose `f` reads `self.table.gain` (a plain object without `params`),
   run with `backend="jax"`, then `block.table.gain = 2.0` and run again: the old gain.
 - **Workaround:** `from minilink.core.compile.cache import clear_compiled; clear_compiled()`
