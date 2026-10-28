@@ -118,7 +118,7 @@ planner = TrajectoryOptimizationPlanner(
     transcription="direct_collocation",
     backend=BACKEND,
     record_solve_time=True,
-    optimizer_method="scipy_slsqp",
+    method="scipy_slsqp",
     optimizer_options={"maxiter": 100, "ftol": 0.1},
 )
 mpc = ModelPredictiveController(planner, dt_mpc=MPC_DT, warm_start=True, verbose=True)

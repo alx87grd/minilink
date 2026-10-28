@@ -67,7 +67,7 @@ planner = TrajectoryOptimizationPlanner(
     n_steps=N_STEPS,
     transcription="direct_collocation",
     backend="jax",
-    # optimizer_method="ipopt",
+    # method="ipopt",
     verbose=PRINT_SOLVE_REPORT,
     optimizer_options={
         "disp": SCIPY_DISP,

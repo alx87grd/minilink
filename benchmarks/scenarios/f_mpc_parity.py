@@ -87,7 +87,7 @@ def _bicycle_planner():
         options=TrajectoryOptimizationOptions(
             backend="jax",
             record_solve_time=True,
-            optimizer_method="scipy_slsqp",
+            method="scipy_slsqp",
             optimizer_options={"maxiter": MAXITER, "ftol": FTOL, "disp": False},
         ),
     )

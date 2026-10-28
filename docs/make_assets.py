@@ -205,7 +205,7 @@ def gif_cartpole() -> None:
         n_steps=40,
         transcription="direct_collocation",
         backend="jax",
-        optimizer_method="scipy_slsqp",
+        method="scipy_slsqp",
         verbose=False,
     )
     traj = planner.solve().trajectory.resample(n_samples=240)
@@ -375,7 +375,7 @@ def racecar_mpc() -> None:
         n_steps=MPC_STEPS,
         transcription="direct_collocation",
         backend="jax",
-        optimizer_method="scipy_slsqp",
+        method="scipy_slsqp",
         optimizer_options={"maxiter": 60, "ftol": 1.0},
     )
     mpc = ModelPredictiveController(planner, dt_mpc=MPC_DT, warm_start=True)

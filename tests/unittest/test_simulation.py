@@ -889,7 +889,7 @@ class TestAsComputer(unittest.TestCase):
             options=TrajectoryOptimizationOptions(
                 backend="jax",
                 record_solve_time=True,
-                optimizer_method="scipy_slsqp",
+                method="scipy_slsqp",
                 optimizer_options={"maxiter": 5, "ftol": 0.1},
             ),
         )

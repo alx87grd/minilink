@@ -126,7 +126,7 @@ def run_pendulum_rebuild(*, n_runs: int = 1, tiny: bool = False) -> list[MetricR
         ),
         options=TrajectoryOptimizationOptions(
             backend="jax",
-            optimizer_method="scipy_slsqp",
+            method="scipy_slsqp",
             optimizer_options={
                 "maxiter": maxiter,
                 "ftol": PENDULUM_FTOL,
@@ -238,7 +238,7 @@ def run_bicycle_parametric(
         ),
         options=TrajectoryOptimizationOptions(
             backend="jax",
-            optimizer_method="scipy_slsqp",
+            method="scipy_slsqp",
             record_solve_time=True,
             optimizer_options={
                 "maxiter": maxiter,

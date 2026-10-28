@@ -195,7 +195,7 @@ v0.3 merges).
 
 ## 6. The optimizer table for both paths (OPW-1–OPW-5)
 
-Swapping `optimizer_method` (SciPy SLSQP → IPOPT) on the compiled MPC path should be an
+Swapping `method` (SciPy SLSQP → IPOPT) on the compiled MPC path should be an
 orthogonal change: the solver layer sees an evaluator and `z0` only. Offline trajectory
 optimization supports IPOPT through the generic `Optimizer`; the compiled path rejects every
 method but SciPy's.
@@ -235,7 +235,7 @@ whether the evaluator came from a one-shot transcription or a compiled program w
 narrow slice: a planner-local method registry with `scipy_slsqp` only,
 `build_parametric_optimizer_backend()` returning `ScipyMinimizeOptimizer` whatever the method,
 and `solve_trajectory_from_parametric()` calling that backend directly. Setting
-`optimizer_method="ipopt"` raises `Unknown optimizer method 'ipopt' for parametric compile`:
+`method="ipopt"` raises `Unknown optimizer method 'ipopt' for parametric compile`:
 a wiring failure, not an NLP or IPOPT incompatibility. The parametric evaluator already
 exposes the solver-facing surface IPOPT duck-types on.
 
@@ -262,7 +262,7 @@ quasi-Newton; `cyipopt` is optional.
 
 ### Target contract
 
-| Planner mode | `optimizer_method` | IPOPT | Callback / `record_history` |
+| Planner mode | `method` | IPOPT | Callback / `record_history` |
 | --- | --- | --- | --- |
 | `planner.solve()` (offline or rebuild) | `ipopt` | Yes | SciPy only |
 | `planner.compile()` and the MPC on it | `ipopt` | Yes after OPW-1 | SciPy only |
@@ -274,11 +274,11 @@ planner = TrajectoryOptimizationPlanner(
     n_steps=40,
     transcription="direct_collocation",
     backend="jax",
-    optimizer_method="ipopt",          # today's keywords; the constructor's names go with the sweep (R134)
+    method="ipopt",          # the optimizer's algorithm (R134)
     optimizer_options={"max_iter": 500, "tol": 1e-6},
 )
 plan = planner.solve()                 # offline
-mpc  = ModelPredictiveController(planner)   # compiles the planner, the same optimizer_method
+mpc  = ModelPredictiveController(planner)   # compiles the planner, the same method
 loop = (mpc % 0.2) @ plant
 ```
 

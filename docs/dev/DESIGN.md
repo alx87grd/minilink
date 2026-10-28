@@ -336,7 +336,8 @@ read `params` yet, the gap is tracked below.
   `params or self.params`).
 - **One keyword per kind of choice (R134).** `backend=` is the array module (`"numpy"`,
   `"jax"`, or `"auto"` where a tool can fall back) on every tool and facade that compiles;
-  `solver=` is the time integration; `method=` is the verb's own numerical method; the
+  `solver=` is the time integration; `method=` is the verb's own numerical method (the
+  optimizer's algorithm on `Optimizer` and on every planner that optimizes); the
   optimizer's solver adapter, which a method binds, is `Optimizer.adapter`.
 - **Two words for two times (R157).** `dt` is the step of a computation and names it at every
   call (`discretize(sys, dt)`, `sys % dt`, `problem.compile(dt=)`, the evaluator's `step(…, dt=)`);

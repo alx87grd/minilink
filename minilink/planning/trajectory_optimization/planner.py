@@ -42,7 +42,7 @@ _TRAJOPT_OPTION_KEYS = (
     "backend",
     "initial_guess",
     "warm_start",
-    "optimizer_method",
+    "method",
     "optimizer_options",
     "use_hessian",
     "record_history",
@@ -93,7 +93,7 @@ class TrajectoryOptimizationPlanner(Planner):
         backend=_UNSET,
         initial_guess=_UNSET,
         warm_start=_UNSET,
-        optimizer_method=_UNSET,
+        method=_UNSET,
         optimizer_options=_UNSET,
         use_hessian=_UNSET,
         record_history=_UNSET,
@@ -109,7 +109,7 @@ class TrajectoryOptimizationPlanner(Planner):
         problem : PlanningProblem
             Continuous-time planning task (requires a cost).
         transcription : Transcription or str, optional
-            Discretization method. ``None`` defaults to direct collocation.
+            The transcription. ``None`` defaults to direct collocation.
             String presets: ``\"direct_collocation\"``, ``\"multiple_shooting\"``.
             Teach demos should pass the string explicitly.
         n_steps : int, optional
@@ -118,7 +118,7 @@ class TrajectoryOptimizationPlanner(Planner):
             already carries its grid (must not conflict if also passed).
         options : TrajectoryOptimizationOptions, optional
             Tier-2 workflow bag. Flat kwargs below overlay matching fields.
-        backend, initial_guess, warm_start, optimizer_method,
+        backend, initial_guess, warm_start, method,
         optimizer_options, use_hessian, record_history, callback,
         record_solve_time, verbose, feasibility_tol, live_plot
             Tier-1 flat mirrors of :class:`TrajectoryOptimizationOptions`.
@@ -135,7 +135,7 @@ class TrajectoryOptimizationPlanner(Planner):
             backend=backend,
             initial_guess=initial_guess,
             warm_start=warm_start,
-            optimizer_method=optimizer_method,
+            method=method,
             optimizer_options=optimizer_options,
             use_hessian=use_hessian,
             record_history=record_history,
@@ -431,7 +431,7 @@ class TrajectoryOptimizationPlanner(Planner):
         return Optimizer(
             program,
             z0=z0,
-            method=self.options.optimizer_method,
+            method=self.options.method,
             use_hessian=self.options.use_hessian,
             options=dict(self.options.optimizer_options),
         )
@@ -473,7 +473,7 @@ class TrajectoryOptimizationPlanner(Planner):
         )
         print("z0:", preview_vector(z0))
         print(DISP_RULE_DIV)
-        print(f"method={self.options.optimizer_method!r}")
+        print(f"method={self.options.method!r}")
         print("options:", getattr(optimizer.adapter, "options", {}))
         print(f"setup: transcribe={transcribe_s:.6g}s compile={compile_s:.6g}s")
         print(DISP_RULE_DIV)
@@ -630,7 +630,7 @@ class TrajectoryOptimizationPlanner(Planner):
 
     def build_parametric_optimizer_backend(self) -> ScipyMinimizeOptimizer:
         """The SciPy backend of the online ticks, from the one preset the parametric path accepts."""
-        method = self.options.optimizer_method
+        method = self.options.method
         if method not in self._USER_OPTIMIZER_METHODS:
             valid = ", ".join(sorted(self._USER_OPTIMIZER_METHODS))
             raise ValueError(
@@ -798,7 +798,7 @@ class TrajectoryOptimizationOptions:
     backend: str = BACKEND_NUMPY
     initial_guess: np.ndarray | Trajectory | None = None
     warm_start: bool = False
-    optimizer_method: str = "scipy_slsqp"
+    method: str = "scipy_slsqp"
     optimizer_options: dict[str, object] = field(default_factory=dict)
     use_hessian: bool = False
     record_history: bool = False

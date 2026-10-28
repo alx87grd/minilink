@@ -81,7 +81,7 @@ def run_showcase_cartpole_trajopt(
         ),
         options=TrajectoryOptimizationOptions(
             backend="jax",
-            optimizer_method="scipy_slsqp",
+            method="scipy_slsqp",
             optimizer_options={
                 "maxiter": maxiter,
                 "ftol": SHOWCASE_TRAJOPT_FTOL,

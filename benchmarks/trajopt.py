@@ -577,7 +577,7 @@ def _planner(
         transcription=_transcription(variant, config),
         options=TrajectoryOptimizationOptions(
             backend=variant.backend,
-            optimizer_method=variant.optimizer_method,
+            method=variant.optimizer_method,
             use_hessian=variant.use_hessian,
             optimizer_options=_optimizer_options(variant, config),
         ),

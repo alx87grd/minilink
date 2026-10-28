@@ -135,7 +135,7 @@ def _pendulum_numpy_trajopt_metrics(cfg: SolveSpeedSuiteConfig) -> list[MetricRe
         ),
         options=TrajectoryOptimizationOptions(
             backend="numpy",
-            optimizer_method="scipy_slsqp",
+            method="scipy_slsqp",
             optimizer_options={
                 "maxiter": PENDULUM_MAXITER,
                 "ftol": PENDULUM_FTOL,

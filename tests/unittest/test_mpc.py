@@ -679,7 +679,7 @@ def _planner():
         options=TrajectoryOptimizationOptions(
             backend="jax",
             record_solve_time=True,
-            optimizer_method="scipy_slsqp",
+            method="scipy_slsqp",
             optimizer_options={"maxiter": 5, "ftol": 0.1},
         ),
     )
@@ -1154,7 +1154,7 @@ def _build_bicycle_hybrid(*, mpc_hz=5.0):
         options=TrajectoryOptimizationOptions(
             backend="jax",
             record_solve_time=True,
-            optimizer_method="scipy_slsqp",
+            method="scipy_slsqp",
             optimizer_options={"maxiter": 80, "ftol": 0.01},
         ),
     )
@@ -1291,7 +1291,7 @@ def _build_bicycle_hybrid_warm(*, mpc_hz=5.0):
         options=TrajectoryOptimizationOptions(
             backend="jax",
             record_solve_time=True,
-            optimizer_method="scipy_slsqp",
+            method="scipy_slsqp",
             optimizer_options={"maxiter": 80, "ftol": 0.01},
         ),
     )
@@ -1422,7 +1422,7 @@ def _make_planner(sys_mpc, cost, x0):
         options=TrajectoryOptimizationOptions(
             backend="jax",
             record_solve_time=True,
-            optimizer_method="scipy_slsqp",
+            method="scipy_slsqp",
             optimizer_options={"maxiter": MPC_MAXITER, "ftol": MPC_FTOL},
         ),
     )

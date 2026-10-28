@@ -63,7 +63,7 @@ for water, current in WATERS.items():
         n_steps=MPC_STEPS,
         transcription="direct_collocation",
         backend="jax",
-        optimizer_method="scipy_slsqp",
+        method="scipy_slsqp",
         optimizer_options={"maxiter": 40, "ftol": 1e-3},
     )
     mpc = ModelPredictiveController(planner, dt_mpc=MPC_DT, warm_start=True)
