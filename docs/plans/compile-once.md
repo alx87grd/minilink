@@ -1,8 +1,9 @@
 # Compile once, in the form the call needs
 
-Status: revised 2026-10-28 after two independent reviews (A: JAX and performance; B: architecture
-and correctness; their findings and the resolution of each in §7); implementation on
-`dev-v0.3-compile`. The maintainer's ask: "frozen parameters, or parameters as arguments for a
+Status: landed 2026-10-28 on `dev-v0.3` (from `dev-v0.3-compile`), after two independent
+reviews of the plan (A: JAX and performance; B: architecture and correctness; their findings
+and the resolution of each in §7) and one of the implementation (its five defects fixed, §7).
+The frozen forms of §3.3 and §3.4 are not built: the benchmark (§5) measured none faster. The maintainer's ask: "frozen parameters, or parameters as arguments for a
 parametric computation, each as fast as if hard-coded, behind the one method entry; `jit` at
 the right place on every pipeline".
 Where it sits: a hardening row of the v0.3 core (TODO §1.10), beside the wiring-time refusals.
@@ -94,14 +95,16 @@ compiled object.
 - `trajectory()` runs under a cached jitted trial (record on, one trial), as `evaluate()` does,
   and the recorded signals (`signals_along`, `signals_at_ticks`) inside it.
 - A frozen form at this layer is built only if the benchmark (§5) shows a steady gain above
-  15 % over the device-resident parametric form.
+  15 % over the device-resident parametric form. Measured: the parametric `pe.evaluate()` 3.1 ms,
+  a frozen `jit(lambda: pe.evaluate(P))` 4.4 ms; not built.
 
 ### 3.4 The program evaluator (`optimization/evaluators/jax_evaluator.py`)
 
 - The parametric jitted functions of `(z, params)` stay the one form; `bind(params)`
   canonicalizes the tree and puts it on the device once (keyed by its digest), so a host solver's
   thousands of callbacks transfer only `z`. The frozen question is the same as §3.3, decided by
-  the benchmark (review B4: a frozen form must not survive a `bind`).
+  the benchmark (review B4: a frozen form must not survive a `bind`). Measured: a native
+  200-step solve 24.4 ms parametric against 24.7 ms frozen; not built.
 
 ### 3.5 The first-order solves (`optimization/optimizers/first_order.py`)
 
@@ -192,3 +195,16 @@ baseline).
 | B12 every `System` reaches `System.__init__` | (no change needed with a module-level cache) |
 | B13 one rule in one place | `call_params()`, §3.1 |
 | B15 docs and tests | §4; DESIGN §4–§6, the `compile_diagram` docstring, the definition of done, KNOWN_ISSUES |
+
+### The implementation's review (2026-10-28)
+
+| Finding | Resolution |
+| --- | --- |
+| A repeated `jax.grad` or `vmap` through a compiled method met a dead tracer from the device cache | a tree holding a tracer is prepared and never kept (`DeviceTree`) |
+| A freed JAX leaf's identity reused by a new array returned the old values | the kept entry holds its leaves, so their identities stay theirs |
+| `2.5` given for an integer default was truncated to `2` | a value its default's dtype cannot hold promotes (one more trace) |
+| A model a block holds (a computed-torque law's plant) kept its old numbers | a system attribute is keyed by its fingerprint and its parameters' digest |
+| A parameter edit crashed a diagram holding a sink | the compiled tree names every block |
+| Two blocks naming each other made the fingerprint recurse forever; a large attribute was copied into the key | a block seen again ends the walk; above 512 bytes an attribute is keyed by its digest |
+| The first solve traced the objective again inside its timer (the gates' trajopt rows) | the program's defaults are canonical from construction |
+
