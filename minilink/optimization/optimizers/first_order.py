@@ -2,7 +2,7 @@
 
 import numpy as np
 
-from minilink.core.backends import require_jax, require_jax_numpy
+from minilink.core.backends import array_module, require_jax, require_jax_numpy
 from minilink.optimization.evaluators.program_evaluator import (
     MathematicalProgramEvaluator,
 )
@@ -25,8 +25,11 @@ class FirstOrderOptimizer(OptimizerBackend):
 
     Each iteration reads ``J(z)`` and ``∇J(z)`` and steps, then projects on the
     box: ``z ← Π(z − η ∇J)`` for ``"gd"``, the bias-corrected moment step of
-    :class:`Adam` for ``"adam"``. It stops after ``maxiter`` steps, or when
-    ``‖∇J‖ ≤ gtol``.
+    :class:`Adam` for ``"adam"``. :meth:`solve` stops after ``maxiter`` steps,
+    or when ``‖∇J‖ ≤ gtol``; :meth:`run` takes exactly ``K`` steps, one
+    ``lax.scan`` on JAX, pure and differentiable (R149). Both run the method's
+    pure law (:meth:`law`, R132): ``init(z0) -> state`` and
+    ``update(grad, state) -> state``, the gradient oracle beside it.
 
     Parameters
     ----------
@@ -53,6 +56,25 @@ class FirstOrderOptimizer(OptimizerBackend):
         self.algorithm = algorithm
         self.options = {**self.DEFAULTS, **(options or {})}
 
+    def law(self, program_evaluator):
+        """The method's pure law on the program's box: :class:`GradientDescentLaw` or :class:`AdamLaw`."""
+        opts = self.options
+        lower, upper = box_of(program_evaluator)
+        eta = float(opts["learning_rate"])
+
+        if self.algorithm == "gd":
+            return GradientDescentLaw(eta, lower, upper)
+
+        return AdamLaw(
+            eta,
+            lower,
+            upper,
+            b1=opts["b1"],
+            b2=opts["b2"],
+            eps=opts["eps"],
+            max_grad_norm=opts["max_grad_norm"],
+        )
+
     def solve(
         self,
         program_evaluator: MathematicalProgramEvaluator,
@@ -60,31 +82,21 @@ class FirstOrderOptimizer(OptimizerBackend):
         *,
         callback: BackendIterateCallback | None = None,
     ) -> OptimizationResult:
-        """Run the first-order loop from ``z0`` and return a backend-neutral result."""
+        """Run the first-order loop from ``z0`` to its tolerance (``maxiter`` its cap) and return a backend-neutral result."""
         require_gradient(program_evaluator)
         require_no_constraints(program_evaluator)
         opts = self.options
 
-        eta = float(opts["learning_rate"])
         maxiter = int(opts["maxiter"])
         gtol = float(opts["gtol"])
         lower, upper = box_of(program_evaluator)
 
-        # The step rule: η ∇J, or Adam's moments
-        adam_step = None
-        if self.algorithm == "adam":
-            jax = require_jax()
-            adam = Adam(
-                eta,
-                b1=opts["b1"],
-                b2=opts["b2"],
-                eps=opts["eps"],
-                max_grad_norm=opts["max_grad_norm"],
-            )
-            state = adam.init(np.asarray(z0, dtype=float))
-            adam_step = jax.jit(adam.update)  # One compiled update, not one per step
+        # The law, Adam's update compiled once when JAX is at hand (not once per step)
+        law = self.law(program_evaluator)
+        update = law.update if self.algorithm == "gd" else compiled(law.update)
+        state = law.init(np.asarray(z0, dtype=float))
 
-        z = np.clip(np.asarray(z0, dtype=float), lower, upper)
+        z = state["z"]
         converged = False
         for k in range(maxiter):
             # Stationary on the box: ‖z − Π(z − ∇J)‖ ≤ gtol (‖∇J‖ inside the box)
@@ -95,16 +107,12 @@ class FirstOrderOptimizer(OptimizerBackend):
                 break
 
             # z ← Π(z − η ∇J), or Π of Adam's step
-            if adam_step is None:
-                z_next = z - eta * grad
-            else:
-                z_next, state = adam_step(grad, state, z)
-                z_next = np.asarray(z_next, dtype=float)
-            z_next = np.clip(z_next, lower, upper)
+            state = update(grad, state)
+            z_next = np.asarray(state["z"], dtype=float)
 
             # Gradient descent at a fixed point in floating point: the step no longer
             # moves z (Adam's moments still evolve, so its step may move z again)
-            if adam_step is None and np.array_equal(z_next, z):
+            if self.algorithm == "gd" and np.array_equal(z_next, z):
                 converged = True
                 break
             z = z_next
@@ -130,6 +138,130 @@ class FirstOrderOptimizer(OptimizerBackend):
             message=message,
             stats={"nit": k, "grad_norm": grad_norm, "algorithm": self.algorithm},
         )
+
+    def run(self, program_evaluator, z0, params, iterations):
+        """
+        Exactly ``iterations`` steps of the law from ``z0`` on the tree ``params``: ``(z_K, J(z_K))``.
+
+        On a JAX program the steps are one ``lax.scan``: pure, so the solve
+        traces under ``jit``, ``vmap`` and ``grad`` (R149); on NumPy, a loop of
+        the same steps. No tolerance, no early stop: the count is the contract.
+        """
+        require_gradient(program_evaluator)
+        require_no_constraints(program_evaluator)
+        law = self.law(program_evaluator)
+        gradient = program_evaluator.native_gradient
+        K = int(iterations)
+
+        # z_{k+1} = S(z_k, ∇J(z_k; p)), k = 0 … K − 1
+        def body(state, _):
+            grad = gradient(state["z"], params)
+            return law.update(grad, state), None
+
+        state = law.init(z0)
+        if program_evaluator.backend == "jax":
+            jax = require_jax()
+            state, _ = jax.lax.scan(body, state, None, length=K)
+        else:
+            for _ in range(K):
+                state, _ = body(state, None)
+
+        z = state["z"]
+        J = program_evaluator.native_objective(z, params)
+
+        return z, J
+
+
+class GradientDescentLaw:
+    """Projected gradient descent as a pure law: ``z ← Π(z − η ∇J)`` on the array module of its input."""
+
+    def __init__(self, learning_rate, lower, upper):
+        self.learning_rate = float(learning_rate)
+        self.lower = lower
+        self.upper = upper
+
+    def init(self, z0):
+        """The state ``{"z": Π(z0)}``: the start projected on the box."""
+        xp = array_module(z0)
+        z = xp.clip(z0, self.lower, self.upper)
+
+        return {"z": z}
+
+    def update(self, grad, state):
+        """One step: ``z ← Π(z − η ∇J)``."""
+        xp = array_module(grad, state["z"])
+
+        eta = self.learning_rate
+        z = state["z"]
+
+        # z ← Π(z − η ∇J)
+        z_next = xp.clip(z - eta * grad, self.lower, self.upper)
+
+        return {"z": z_next}
+
+
+class AdamLaw:
+    """Projected Adam on a flat ``z`` as a pure law, on the array module of its input: :class:`Adam`'s step, then ``Π``."""
+
+    def __init__(
+        self,
+        learning_rate,
+        lower,
+        upper,
+        b1=0.9,
+        b2=0.999,
+        eps=1e-8,
+        max_grad_norm=None,
+    ):
+        # Hyperparameters: the step size η, the moment decay rates β₁ and β₂, and ε
+        self.learning_rate = float(learning_rate)
+        self.b1 = float(b1)
+        self.b2 = float(b2)
+        self.eps = float(eps)
+        self.max_grad_norm = None if max_grad_norm is None else float(max_grad_norm)
+
+        # The box the step is projected on
+        self.lower = lower
+        self.upper = upper
+
+    def init(self, z0):
+        """The state: ``z`` projected on the box, zero moments ``m`` and ``v``, the step count ``0``."""
+        xp = array_module(z0)
+
+        z = xp.clip(z0, self.lower, self.upper)
+        zeros = z0 * 0.0
+        step = xp.asarray(0)
+
+        return {"z": z, "m": zeros, "v": zeros, "step": step}
+
+    def update(self, grad, state):
+        """One step: the clipped gradient's moments, the bias-corrected step, then ``Π``."""
+        xp = array_module(grad, state["z"])
+
+        eta = self.learning_rate
+        b1 = self.b1
+        b2 = self.b2
+        eps = self.eps
+        max_norm = self.max_grad_norm
+        z = state["z"]
+
+        # The gradient clipped to one norm, then the step count k advanced
+        if max_norm is not None:
+            norm = safe_root(xp.sum(grad**2), xp)
+            grad = grad * xp.minimum(1.0, max_norm / (norm + 1e-6))
+        step = state["step"] + 1
+
+        # Moment estimates: m = β₁ m + (1 − β₁) g,  v = β₂ v + (1 − β₂) g²
+        m = b1 * state["m"] + (1 - b1) * grad
+        v = b2 * state["v"] + (1 - b2) * grad * grad
+
+        # Bias-corrected step: z ← Π(z − η_k m / (√v + ε)), η_k = η √(1 − β₂ᵏ) / (1 − β₁ᵏ)
+        eta_k = eta * (1 - b2**step) ** 0.5 / (1 - b1**step)
+        z_next = xp.clip(
+            z - eta_k * m / (safe_root(v, xp) + eps), self.lower, self.upper
+        )
+
+        return {"z": z_next, "m": m, "v": v, "step": step}
 
 
 class Adam:
@@ -212,6 +344,26 @@ def clip_by_global_norm(grads, max_norm):
 ###############################################################################
 # Internal machinery
 ###############################################################################
+
+
+def safe_root(v, xp):
+    """``√v`` with a finite derivative at ``v = 0`` (zero there): the same value, so ``grad`` through a step is never ``nan``."""
+    positive = v > 0
+
+    # √v where v > 0, 0 elsewhere, the root never taken at 0
+    root = xp.where(positive, xp.where(positive, v, 1.0) ** 0.5, 0.0)
+
+    return root
+
+
+def compiled(update):
+    """The law's update compiled once by ``jax.jit`` when JAX is at hand, else the update on NumPy."""
+    try:
+        jax = require_jax()
+    except ImportError:
+        return update
+
+    return jax.jit(update)
 
 
 def require_algorithm(algorithm):

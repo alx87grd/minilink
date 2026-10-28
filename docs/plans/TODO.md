@@ -340,6 +340,18 @@ Why: [core-architecture.md](core-architecture.md) §7. Design:
     tuned tree.
   - **Order:** PP-1, PP-2 and PP-4 on S74's backend factory (OPW-1); then PP-3, the cost and set
     leaves, on A2.
+  - **Landed in the v0.3 run:** PP-1, the noun with its optional `params`, `Optimizer.solve(params=,
+    z0=)` with the one checked merge (`core.params.merge_known`), one evaluator body;
+    `ParametricMathematicalProgram` and `JaxParametricProgramEvaluator` folded in.
+    PP-2 and PP-3: collocation's JAX program reads the tree (plant, cost, margin sets,
+    `x_start`, `t_start`, the discount; a box in the bounds is structure), the online call binds
+    any leaf, the NumPy rebuild path answers the same values on a copy (acceptance script 4:
+    two friction values and a moved target match the rebuilds; Ipopt on the compiled program).
+    The performance gate: 1.34× compile, 1.14× solve, 1.51× a call, under the 2× bar (no
+    frozen-export option). The failure price follows the overridden weights, cached by value
+    (R165). The stochastic program as the seed case (R131): the convention in DESIGN §6, a seed
+    refused in `wrt`, a robust gain tuning solved on both backends. Rest: the MPC's `inputs=`
+    bindings and the friction-aware example from a port (with §1.8's MPC rebuild).
 
   Done when one compiled MPC program, bound with two values of a plant parameter and of a cost
   target, gives what a rebuild gives; the MPC baselines are byte-identical with only `x_start`
@@ -351,30 +363,18 @@ Why: [core-architecture.md](core-architecture.md) §7. Design:
   every planner pins the start from the `x_start` leaf and `X0` is derived from it
   (today shooting and collocation read `X0` first). Done when a time-varying reference is tracked
   from `t_start = 100` with the same cost as from 0, and every baseline is byte-identical at
-  `t_start = 0`.
-- [ ] **One optimizer backend table for the parametric path** (OPW-1–OPW-5, after S74, with S76;
-  [parametric-program.md](parametric-program.md) §6; scan: planning#9). Done when `method="ipopt"`
-  reaches the parametric MPC path and the plan's OPW-4 tests pass.
-- [ ] **The stochastic program as the parametric program's seed case**
-  (native-optimizers.md §7; R131): every program is deterministic given its parameters, the seed
-  one of them; integers never in `wrt`; complete trees inside, one merge at the boundary; sizes
-  structural; the warm start on the solve call; the core keeps the sample-average export,
-  `pe.program(wrt, key=, n_trials=)`; a Monte Carlo over solves comes free once a solve traces;
-  how a solver uses the seed is an `Optimizer` strategy (§4). Done when the convention is stated
-  in DESIGN §6 and a test solves the sample-average program of a stochastic problem (robust gain
-  tuning) on both backends.
-
+  `t_start = 0`. Landed in the v0.3 run: the field and leaf on `PlanningProblem`, the evaluator's
+  run and score (acceptance script 12, both backends, continuous and sampled, with `jax.grad` in
+  `t_start`), the fixed grids of the transcriptions, the discount of `CostFunction.integrate`
+  counted from it, shooting pinned from `x_start`, collocation's program reading `t_start`;
+  every baseline byte-identical at `t_start = 0` but two JAX Monte Carlo entries, one ulp (the
+  run log). Rest: the step problem's tick offset (§1.6).
 ### 1.8 The native proof of concept: the planner's pure face and an MPC on it
 
 Why: [core-architecture.md](core-architecture.md) §8. Design:
 [native-optimizers.md](native-optimizers.md), [planner-and-mpc.md](planner-and-mpc.md). Better
 solvers and MPPI are v0.4 (§4).
 
-- [ ] **The native kernel and the fixed-count solve** (NS-1, NS-2's fixed-`K`
-  form; R132, R149): pure `init` / `step` laws for `gd` and `adam` on the array module, run by
-  `Optimizer`, with `as_step_system`; `Optimizer(program, method=, iterations=K)` exactly `K`
-  steps in one `lax.scan`, `iterations=None` to a tolerance (`maxiter` its cap). Done when the
-  NumPy path is byte-identical and `jax.grad` through `K` iterations matches a central difference.
 - [ ] **The planner's compiled face** (R148): `planner.compile()` gives `n_z`,
   `initial`, `solve(params, z0) -> (z, status)`, `shift(z, t)`, `command(z, x, t)`,
   `prediction`, `solution`, `pack`, `program`; `planner.params` is the problem's tree plus
@@ -382,7 +382,14 @@ solvers and MPPI are v0.4 (§4).
   mutation (`last_solution` and the caches leave the pure path; the plotting shortcuts move to
   the solution, with D1.4); trajectory optimization first, then LQR and value iteration, the
   others as they are wrapped. Done when `pv.solution(pv.solve(p)[0])` reproduces today's
-  `planner.solve()` byte-identically and `jax.vmap` over starts runs on the native method.
+  `planner.solve()` byte-identically and `jax.vmap` over starts runs on the native method. Landed in the v0.3 run for trajectory optimization: `planner.compile()` →
+  `CompiledTrajectoryPlanner` (`z` the knots with the origin appended), `planner.params`,
+  `iterations=` forwarded to the `Optimizer`, single shooting's JAX program on the tree; both
+  done-when checks pass (byte-identical on NumPy and JAX, a `vmap` of the native Adam planner
+  over starts). Rest: the `"method"` and `seed` leaves of `planner.params` (with NS-8, the
+  native method's numbers), `planner.solve` rebuilt on the face without mutation and
+  `last_solution` gone (with the MPC's rebuild, which reads it; the run log's RD-35), LQR and
+  value iteration.
 - [ ] **The MPC rebuilt on the planner's face** (NS-8; R148, R123):
   `ModelPredictiveController(planner, *, inputs={"x_start": "y", "t_start": "t"}, delay=True)`;
   the delayed form a block whose state is `z` alone, its origin inside (R155; its kind under the
@@ -642,15 +649,13 @@ on `dev` at 638215e; the recipe and the reference are AGENTS'. (T1 and T2 moved 
 - [ ] **analysis** (T4): `analysis/lyapunov.py`'s `EVEN` / `ODD` slices sit under Internal
   machinery, apart from `METHODS` at the top.
 - [ ] **planning** (T5): `trajectory_optimization/planner.py` probes
-  `getattr(transcription, "supports_parametric", False)` and keeps the optimizer-method
-  table as a `_USER_OPTIMIZER_METHODS` class attribute; `direct_collocation.py` /
+  `getattr(transcription, "supports_parametric", False)`; `direct_collocation.py` /
   `shooting.py` / `multiple_shooting.py` read `self.options.*` inside their bodies;
   `search/extenders.py` asks `getattr(U, "box", None)` instead of `U.bounding_box()` (also a
   D3 row); `spatial/paths.py`'s `PolylinePath` sets `_seg_lengths`, `_s_knots` and
   `_total_length` through `object.__setattr__` without declaring them as fields.
-  `ReinforcementLearningPlanner(verbose=True)` keeps printing by default (ruled). The
-  parametric optimizer's backend table (OPW-1–OPW-5) changes behaviour, so it is out of this
-  row: it is the OPW row of §1.7.
+  `ReinforcementLearningPlanner(verbose=True)` keeps printing by default (ruled). (The planner's
+  method table went with OPW-1, in the v0.3 run.)
 - [ ] **the MPC block's contract** (T6): answered by R148 ([planner-and-mpc.md](planner-and-mpc.md));
   the work is TODO §1.8's "The MPC rebuilt on the planner's face", which removes the `hasattr`
   probing (`validate_mpc_planner`, `export_mpc_dual_rate_computer`'s `replan_divisor` and

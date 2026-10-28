@@ -90,7 +90,13 @@ class FixedGridOptions:
         self.n_steps = int(self.n_steps)
 
     def t(self, problem: PlanningProblem) -> np.ndarray:
-        """Time grid from finite ``problem.tf`` and ``n_steps``."""
+        """The time grid on the horizon ``[t_start, t_start + tf]``: ``t_start`` plus ``linspace(0, tf, n_steps)``."""
+        t = problem.t_start + fixed_grid_t(problem.require_finite_tf(), self.n_steps)
+
+        return t
+
+    def offsets(self, problem: PlanningProblem) -> np.ndarray:
+        """The knots' offsets from the horizon's start, ``linspace(0, tf, n_steps)``: ``t_k = t_start + offset_k``."""
         return fixed_grid_t(problem.require_finite_tf(), self.n_steps)
 
     def dt(self, problem: PlanningProblem) -> float:
@@ -103,16 +109,23 @@ class FixedGridOptions:
 # collocation defect, one RK4 step between input knots)
 
 
-def trajectory_cost(cost, x, u, t, dt, params):
-    """Sampled Bolza objective on a uniform grid.
+def trajectory_cost(cost, x, u, t, dt, params, *, discount_rate=0.0, t_start=0.0):
+    """Sampled Bolza objective on a uniform grid, discounted from the horizon's start.
 
     ``x`` and ``u`` are knot matrices with shape ``(dim, N)``; the running
-    cost is integrated with the trapezoid rule.
+    cost is integrated with the trapezoid rule. The discount is the
+    problem's, ``e^{−ρ(t − t_start)}`` (R148); ``ρ = 0`` is the plain sum.
     """
-    # J = Σ dt/2 (g_k + g_{k+1}) + h(x_N, t_N)
-    g = running_cost_samples(cost, x, u, t, params)
+    xp = array_module(x, t)
+    rho = discount_rate
+
+    # w_k = e^{−ρ(t_k − t_start)}, the discount at each knot
+    w = xp.exp(-rho * (t - t_start))
+
+    # J = Σ dt/2 (w_k g_k + w_{k+1} g_{k+1}) + w_N h(x_N, t_N)
+    g = w * running_cost_samples(cost, x, u, t, params)
     running = trapezoid_integral(g, dt)
-    terminal = cost.h(x[:, -1], t[-1], params=params)
+    terminal = w[-1] * cost.h(x[:, -1], t[-1], params=params)
     J = running + terminal
 
     return J
@@ -216,6 +229,20 @@ def native_concatenate(values, like):
         return empty
 
     stacked = xp.concatenate(pieces)
+
+    return stacked
+
+
+def stack_parametric(constraints):
+    """One native constraint vector of ``(z, params)`` from a list of vector functions, ``None`` for none."""
+    if not constraints:
+        return None
+
+    def stacked(z, params):
+        values = native_concatenate(
+            (constraint(z, params) for constraint in constraints), z
+        )
+        return values
 
     return stacked
 

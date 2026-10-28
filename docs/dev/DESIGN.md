@@ -951,12 +951,46 @@ and `adam` (the first-order backend, projected on the box), `l-bfgs`, `scipy_sls
 (the default), `scipy_trust_constr`, `ipopt`. The program's class is read from its
 fields (`unconstrained`, `bounded`, `constrained`); `method="auto"` picks L-BFGS for the
 first two and SLSQP for the third, and a method the class does not admit (`gd` on
-constraint rows) is refused. `z0` defaults to `program.metadata["z0"]`.
+constraint rows) is refused. `z0` defaults to `program.metadata["z0"]`. A program may
+declare parameters (R130): `MathematicalProgram(..., params=tree)` takes callables of
+`(z, params)`, `tree` their default; `Optimizer(program).solve(params=, z0=)` merges a partial
+tree once onto the defaults (`core.params.merge_known`: an unknown path raises naming the known
+ones, a new shape raises) and binds it, so one compiled program is solved for many values
+without a recompile; a program without `params` keeps callables of `z` alone. One evaluator
+body serves both: it holds the bound tree, the JAX one passes it as a traced argument and
+differentiates in `z`. **The stochastic program is the seed case** (R131): every program is
+deterministic given its parameters, the seed one of them, an integer leaf found by the key
+`seed` and never a decision (`pe.program` refuses a seed in `wrt`); complete trees inside, one
+merge at the boundary; sizes structural (the knots `N`, the iterations `K`, a batch size are
+constructor arguments, never parameters); the warm start an argument of the solve (`z0=`). The
+core's sample-average export is `pe.program(wrt, key=, n_trials=)`: the draws realized once
+from `key`, so `J` is deterministic and any method solves it; how a solver uses the seed
+(advanced per iteration, `vmap`ped) is an `Optimizer` strategy for later. **The native
+methods** `gd` and `adam` are pure laws on the array module of their input (R132,
+`optimizers/first_order.py`: `law.init(z0) -> state`, `law.update(grad, state) -> state`, the
+gradient oracle beside it, the box projection in the step). `Optimizer(program, method=,
+iterations=K)` takes exactly `K` steps (R149): one `lax.scan` on a JAX program, so
+`solve(params=, z0=)` traces under `jit`, `vmap` and `grad` (the result then holds JAX arrays,
+`success=True`, `cost` the final `J`), and a loop of the same steps on NumPy; no callback.
+`iterations=None` runs to the method's tolerance on the host (`maxiter` its cap, Adam's update
+jitted when JAX is at hand, plain NumPy without it). `optimizer.as_step_system(params=None)` is
+the solve as a `StepSystem`: the law's state flattened (`z` first), `compute_rollout(K)` the
+iterates. The failure price of
+an evaluation follows its cost's numbers (R165): the bound is taken at the overridden weights,
+once per value (cached), and under a trace at the problem's own (a price is a step, with no
+gradient). One method table
+serves every solve path: `make_optimizer_backend(method, options=)` gives the preset's adapter
+(`adapter.solve(evaluator, z0)`), so a planner's compiled program takes every method, `ipopt`
+among them, as the offline `Optimizer` does (OPW-1).
 
 **Planning:** `PlanningProblem` (a plain class; `problem.replace(**fields)` derives one)
 owns system, sets (`X` and `U` unconstrained unless declared: `X=plant.state.box`,
-`U=plant.input_box`), cost, the continuous horizon `tf`, the discount rate and the price
-switch (below). `X0`/`Xf` authoritative; `x_start`/`x_goal` are representative points,
+`U=plant.input_box`), cost, the continuous horizon `tf` and its start `t_start` (R148: the
+horizon is `[t_start, t_start + tf]`, `0` by default; a run starts there, costs, sets and
+references read absolute time, the discount counts from it, the fixed grids of the
+transcriptions are `t_start + linspace(0, tf, N)`; a leaf of `problem.params` and of the
+evaluator's tree, so `jax.grad` differentiates it), the discount rate and the price
+switch (below). The planners pin the start from `x_start`; a singleton `X0` is derived from it. `X0`/`Xf` authoritative; `x_start`/`x_goal` are representative points,
 and `x_goal` never creates `Xf` (an exact terminal state is `Xf=SingletonSet(x_goal)`).
 A planner that needs a finite box (value iteration's grid, RRT's bang-bang) refuses an
 unbounded one with the line to write. Offline entry is
@@ -1024,14 +1058,14 @@ terminating without cost would reward escaping under a cost. `h` keeps its one
 job: the end of a finite horizon.
 
 **One scoring formula** (`planning.evaluation.score_run`, every evaluation's): a run is
-integrated to `tf` (no event, no cut), then
+integrated from `t_start` to `t_end = t_start + tf` (no event, no cut), then
 
 ```
 finite              = every x_k and u_k finite
 feasibility_margin  = min over the run of X.margin(x_k, t_k), U.margin(u_k, x_k, t_k)
 failed              = not finite, or feasibility_margin < 0
-reachability_margin = Xf.margin(x(tf), tf)        reached = margin ≥ 0   (Xf = None: reached)
-cost                = ∫₀^{tf} e^{−ρt} g dt + e^{−ρ tf} h(x(tf))  (trapezoid; +inf when not finite; no h on an infinite horizon)
+reachability_margin = Xf.margin(x(t_end), t_end)  reached = margin ≥ 0   (Xf = None: reached)
+cost                = ∫ e^{−ρ(t − t_start)} g dt + e^{−ρ tf} h(x(t_end), t_end)  (trapezoid; +inf when not finite; no h on an infinite horizon)
 J                   = cost, or with the price on cost + price · (failed or not reached),
                       and cost_bound + price for a run not finite
 ```
@@ -1216,17 +1250,36 @@ the solver flag without a residual check. **I-level constructors** take flat kwa
 `transcription=` explicitly. Tier-2 still accepts a `Transcription` instance
 and/or `options=TrajectoryOptimizationOptions(...)`. Offline
 `solve_trajectory` always rebuilds a fresh
-`MathematicalProgram`. Optional `compile_parametric_program()` builds a
-`ParametricMathematicalProgram` (``h(z, x0)``) once so
-`solve_trajectory_from(x0, params=None)` is bind + solve only on the JAX
-parametric path; with ``backend='numpy'`` or ``'direct'``, each
-from-solve rebuilds the NLP (expected for no-JAX MPC). A one-time speed warning
-is emitted only when a JAX planner omits parametric compile.
-Online ``params`` binds `x0` only; the reserved key ``scene`` raises
-``NotImplementedError`` (§4, 'Parameters'). Knot count
+`MathematicalProgram`. A JAX transcription's program declares the problem's tree it reads
+(PP-2, PP-3, R148): `x_start` (the start's residual when `X0` is the start's singleton),
+`t_start`, the plant's, the cost's, `discount_rate`, and each set it reads as margins by role
+(`X` and `U` when not lowered to the decision bounds, a non-singleton `X0`, `Xf`; a box in the
+bounds is structure, not a leaf). Optional `compile_parametric_program()` compiles that program
+once (a singleton `X0` required) so `solve_trajectory_from(x0, params=)` is bind + solve
+only: `params` is a partial tree (`{"plant": {"mu": …}, "cost": {"xbar": …}, "t_start": t}`)
+merged once onto the defaults with `x0` as `x_start`, an unknown path raising and naming the
+known ones; with ``backend='numpy'`` or ``'direct'`` each from-solve rebuilds the NLP on a copy
+of the problem holding the values (the caller's parts unchanged): one API at two speeds. A
+one-time speed warning is emitted only when a JAX planner omits parametric compile. The
+reserved key ``scene`` raises ``NotImplementedError`` until the scene bind (A3). Carrying the
+tree costs 1.34× the compile, 1.14× the solve and 1.51× an evaluator call of the same program
+with it frozen on the bicycle MPC (R156's bar is 2×). Every transcription's objective is the
+problem's, discounted from `t_start`, `Σ dt/2 (w_k g_k + w_{k+1} g_{k+1}) + w_N h`,
+`w_k = e^{−ρ(t_k − t_start)}`. Knot count
 `n_steps` is a planner flat kwarg (or lives on a custom transcription's
 options); the time grid is
-`linspace(0, problem.tf, n_steps)` for finite `tf`. Single backend-native
+`t_start + linspace(0, problem.tf, n_steps)` for finite `tf`. **The compiled face** (R148):
+`planner.compile(backend=None)` gives `pv`, the planner's solve as functions of `(params, z)`:
+`z` is the transcription's decision vector with the origin `t_start` appended (`pv.n_z`);
+`pv.params` the tree (`planner.params`); `pv.initial(params)` the default guess packed;
+`pv.solve(params=None, z0=None) -> (z, status)`; `pv.shift(z, t)` the knot rows re-read at
+`t + offset`, the tail held; `pv.command(z, x, t)` the input at `t`; `pv.prediction(z, t)` the
+planned `(x, u)` (collocation); `pv.solution(z, params, status)` the host-side
+`PlanningSolution`; `pv.pack(guess)`; `pv.program`. A native method with `iterations=K` (a
+planner keyword, forwarded to its `Optimizer`) on a box-bounded JAX program (single shooting
+with an input box) makes `pv.solve` pure: `jit`, `vmap` over starts, `grad`. The face keeps no
+last solution; `planner.solve()` stays the offline verb (callbacks, history, live plot, the
+report) and stores `last_solution` until the MPC's rebuild. Single backend-native
 transcription classes; no parallel JAX transcription types. NumPy transcriptions
 build constraints via `dynamics_function` (the compiled evaluator's `f`).
 **JAX transcriptions** embed `problem.sys.f` directly in the NLP (not the

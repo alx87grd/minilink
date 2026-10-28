@@ -90,9 +90,15 @@ class PlanningProblem:
         (RRT / some DP tasks). ``+inf`` means infinite-horizon. Finite trajopt /
         MPC grids require a finite ``tf`` — demos should always set it
         explicitly. Knot count ``N`` lives on transcription options.
+    t_start : float, optional
+        The start time of the horizon, ``[t_start, t_start + tf]`` (R148): a run
+        starts at ``t_start``, its costs, sets and references read absolute
+        time, and the discount counts from it. ``0`` (default) is today's
+        horizon; it is a leaf of :attr:`params`, so an MPC binds the time of its
+        tick and ``jax.grad`` differentiates it.
     discount_rate : float, optional
         The continuous discount rate ``ρ ≥ 0`` of the objective
-        ``∫ e^{−ρt} g dt + e^{−ρ tf} h``, applied by every consumer (value
+        ``∫ e^{−ρ(t − t_start)} g dt + e^{−ρ tf} h``, applied by every consumer (value
         iteration's ``α`` and reinforcement learning's ``γ`` are
         :meth:`discount_factor` of their step). ``0`` (default) is undiscounted.
     infeasible_cost : None, True or float, optional
@@ -133,13 +139,24 @@ class PlanningProblem:
         "X0",
         "Xf",
         "tf",
+        "t_start",
         "infeasible_cost",
         "discount_rate",
         "params",
         "disturbances",
         "criterion",
     )
-    ROLES = ("plant", "cost", "X", "U", "X0", "Xf", "x_start", "discount_rate")
+    ROLES = (
+        "plant",
+        "cost",
+        "X",
+        "U",
+        "X0",
+        "Xf",
+        "x_start",
+        "t_start",
+        "discount_rate",
+    )
     CRITERIA = ("expectation", "worst_case", "cvar")
 
     def __init__(
@@ -153,6 +170,7 @@ class PlanningProblem:
         X0: Set | None = None,
         Xf: Set | None = None,
         tf: float | None = None,
+        t_start: float = 0.0,
         infeasible_cost: bool | float | None = None,
         discount_rate: float = 0.0,
         params: Mapping | None = None,
@@ -176,6 +194,7 @@ class PlanningProblem:
         self.X0 = X0
         self.Xf = Xf
         self.tf = tf
+        self.t_start = coerce_start_time(t_start)
         self.infeasible_cost = infeasible_cost
         self.discount_rate = discount_rate
         n = int(self.sys.n)
@@ -251,7 +270,7 @@ class PlanningProblem:
         The live view of the problem's parameters, by role, as a diagram's are by block.
 
         ``{"plant": sys.params, "cost": cost.params, "X": …, "U": …, "X0": …,
-        "Xf": …, "x_start": x_start, "discount_rate": ρ}``, assembled on each
+        "Xf": …, "x_start": x_start, "t_start": t₀, "discount_rate": ρ}``, assembled on each
         access from the parts, which stay the one home of each number (a set's
         entry is its own ``params``, ``{}`` for a set without parameters); each
         disturbance source's ``params`` under its port; a law in place of each
@@ -285,6 +304,8 @@ class PlanningProblem:
                 self.cost.params = entry
             elif role == "x_start":
                 self.move_start(entry)
+            elif role == "t_start":
+                self.t_start = coerce_start_time(entry)
             elif role == "discount_rate":
                 self.discount_rate = coerce_rate(entry)
             elif role in self.sources_by_id():
@@ -455,6 +476,7 @@ class PlanningProblem:
         for port, block in getattr(self, "disturbances", {}).items():
             view[source_id(port)] = block.params
         view["x_start"] = self.x_start
+        view["t_start"] = self.t_start
         view["discount_rate"] = self.discount_rate
 
         return view
@@ -468,7 +490,7 @@ class PlanningProblem:
 
         return float(gamma)
 
-    def cost_bound(self, tf=None, *, discount_rate=None, dt=None):
+    def cost_bound(self, tf=None, *, discount_rate=None, dt=None, params=None):
         """
         An upper bound of the cost of any run that stays in the boxes: always finite.
 
@@ -480,7 +502,8 @@ class PlanningProblem:
         ``dt``: the integral is then its sum ``Σ_{k<N} γᵏ dt``, ``γ = e^{−ρ dt}``,
         ``N = T / dt``, which is larger. An infinite horizon charges no ``h``; one
         with ``ρ = 0``, or boxes with no finite bound, falls back to ``1e6`` with
-        a warning naming ``infeasible_cost``.
+        a warning naming ``infeasible_cost``. ``params`` are the cost's numbers to
+        bound (an evaluation's overridden weights, R165); ``None`` reads its own.
         """
         cost = self.require_cost()
         rho = self.discount_rate if discount_rate is None else float(discount_rate)
@@ -496,8 +519,8 @@ class PlanningProblem:
         if X_box is None or U_box is None:
             return fallback_bound("the state or input box has no finite bound")
 
-        g_max = cost.g_max(X_box, U_box)
-        h_max = cost.h_max(X_box) if np.isfinite(T) else 0.0
+        g_max = cost.g_max(X_box, U_box, params)
+        h_max = cost.h_max(X_box, params) if np.isfinite(T) else 0.0
 
         if not (rho > 0.0 or np.isfinite(T)):
             return fallback_bound("an infinite undiscounted horizon has no cost bound")
@@ -941,6 +964,15 @@ def fallback_bound(reason):
     )
 
     return 1.0e6
+
+
+def coerce_start_time(t_start) -> float:
+    """The start time as a float; refuse one that is not finite."""
+    t_start = float(t_start)
+    if not np.isfinite(t_start):
+        raise ValueError(f"t_start must be finite, got {t_start!r}")
+
+    return t_start
 
 
 def coerce_rate(rate) -> float:

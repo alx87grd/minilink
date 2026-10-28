@@ -19,10 +19,12 @@ from minilink.core.options import require_one_of
 from minilink.core.params import (
     Batched,
     flat_leaves,
+    flatten,
     float_leaves,
     lookup,
     merge_tree,
     set_leaf,
+    split_path,
     with_leaf,
 )
 from minilink.core.trajectory import Trajectory
@@ -134,8 +136,10 @@ class ProblemEvaluator:
         require_free_names(self.free_inputs, self.block_ids)
         require_no_x0_key(self.loop, self.start_ids)
 
-        # The forms generated once: the batched trial, jitted on JAX
+        # The forms generated once: the batched trial, jitted on JAX; the price
+        # and bound of each value of the cost's numbers
         self.trials_fn = None
+        self.price_cache = {}
 
         # "auto" keeps JAX only when the whole score traces (the cost and the sets too)
         if backend == "auto" and self.backend == BACKEND_JAX and not self.traces():
@@ -203,8 +207,7 @@ class ProblemEvaluator:
         # The draws, the price of a failure and the cost bound of a run not finite,
         # then the runs and their scores, batched on JAX
         x_starts, trial_params = self.realize(params, key, n_trials)
-        price = price_of(self.problem, self.tf)
-        bound = diverged_cost_of(self.problem, self.tf, price)
+        price, bound = self.price_and_bound(params)
         rows, trajectories = self.run_trials(
             trial_params, x_starts, record, price, bound
         )
@@ -241,6 +244,7 @@ class ProblemEvaluator:
         from minilink.optimization.mathematical_program import MathematicalProgram
 
         wrt = paths_of(wrt)
+        require_no_seed(wrt)
         if tunes(wrt, "x_start") and self.problem.is_stochastic:
             raise ValueError(
                 "cannot put 'x_start' in wrt on a stochastic problem: the starts are drawn"
@@ -256,8 +260,7 @@ class ProblemEvaluator:
         freeze = not tunes(wrt, "x_start") and not tunes(wrt, "cost")
         if freeze:
             x_starts, trial_params = self.realize(base, key, n_trials)
-            price = price_of(self.problem, self.tf)
-            bound = diverged_cost_of(self.problem, self.tf, price)
+            price, bound = self.price_and_bound(base)
             batched = isinstance(trial_params, Batched)
             frozen_tree = trial_params.tree if batched else trial_params
             frozen_axes = trial_params.axes if batched else None
@@ -345,6 +348,34 @@ class ProblemEvaluator:
 
         return merge_tree(self.params, params)
 
+    def price_and_bound(self, params):
+        """
+        The price of a failure and the cost bound of a run not finite, at the cost's numbers of ``params`` (R165).
+
+        The bound follows the overridden weights: it is computed once per value
+        of the cost's leaves and cached by it (and by the problem's parts and
+        price switch, which may be replaced after the compile), since each bound
+        samples ``g`` over the boxes. Under a trace the weights have no value, and the bound
+        is the problem's own (a price is a step: it carries no gradient).
+        """
+        problem = self.problem
+        cost_params = params.get("cost")
+        numbers = numbers_key(cost_params)
+        if numbers is None:
+            cost_params, numbers = None, "own"
+
+        # The key: the price switch and the numbers; the entry holds the parts it
+        # was taken on, so a part replaced since takes a new bound
+        parts = problem_parts(problem)
+        key = (problem.infeasible_cost, problem.discount_rate, numbers)
+        cached = self.price_cache.get(key)
+        if cached is None or any(a is not b for a, b in zip(cached[0], parts)):
+            price = price_of(problem, self.tf, cost_params)
+            bound = diverged_cost_of(problem, self.tf, price, cost_params)
+            cached = self.price_cache[key] = (parts, price, bound)
+
+        return cached[1:]
+
     def realize(self, params, key, n_trials):
         """
         The trials' starts ``(n_trials, n)`` and parameters (one tree, a leading trial axis where drawn).
@@ -415,20 +446,21 @@ class ProblemEvaluator:
         u = self.held_inputs(params, xp)
         u_seq = xp.broadcast_to(u, (N, u.size))
 
-        # x_{k+1} = Φ(x_k, u, t_k), t_k = k dt, k = 0 … N − 1; or the adaptive
-        # integral reported on that grid
+        # x_{k+1} = Φ(x_k, u, t_k), t_k = t_start + k dt, k = 0 … N − 1; or the
+        # adaptive integral reported on that grid
         loop_params = {
             sys_id: block_params_of(loop, params, sys_id) for sys_id in self.block_ids
         }
         loop_params = integer_seeds(loop, loop_params)
-        ts = xp.arange(N + 1) * dt
+        t_start = params["t_start"]
+        ts = t_start + xp.arange(N + 1) * dt
         if self.sampled:
-            xs = ev.rollout(x0, u_seq, loop_params, n_steps=N)
+            xs = ev.rollout(x0, u_seq, loop_params, n_steps=N, t_start=t_start)
         elif self.adaptive is None:
             xs = ev.rollout(
                 x0,
                 u_seq,
-                0.0,
+                t_start,
                 dt,
                 loop_params,
                 solver=self.solver,
@@ -441,7 +473,7 @@ class ProblemEvaluator:
 
         # Every block output at every sample, and the plant's input among them
         if self.sampled:
-            signals = signals_at_ticks(ev, xs, us, loop_params)
+            signals = signals_at_ticks(ev, xs, us, loop_params, t_start)
         else:
             signals = signals_along(ev, xs, us, ts, loop_params)
         u_plant = gather_samples(self.plant_input, signals, us, xp)
@@ -977,17 +1009,22 @@ def signal_name_of(ev, sys_id, sampled):
     return "/".join(ev.plan.paths[sys_id])
 
 
-def signals_at_ticks(ev, xs, us, params):
-    """Every block output at every tick of a sampled loop, ``(N + 1, n_signals)``: ``vmap`` on JAX."""
+def signals_at_ticks(ev, xs, us, params, t_start=0.0):
+    """Every block output at every tick of a sampled loop, ``(N + 1, n_signals)``, the clock started at ``t_start``: ``vmap`` on JAX."""
     xp = array_module(xs)
     if xp is np:
         return xp.stack(
-            [ev.signals(x, u, k, params) for k, (x, u) in enumerate(zip(xs, us))]
+            [
+                ev.signals(x, u, k, params, t_start=t_start)
+                for k, (x, u) in enumerate(zip(xs, us))
+            ]
         )
 
     jax = ensure_jax_x64()
     ks = jax.numpy.arange(xs.shape[0])
-    return jax.vmap(lambda x, u, k: ev.signals(x, u, k, params))(xs, us, ks)
+    return jax.vmap(lambda x, u, k: ev.signals(x, u, k, params, t_start=t_start))(
+        xs, us, ks
+    )
 
 
 def signals_along(ev, xs, us, ts, params):
@@ -1062,6 +1099,29 @@ def trials_of(draws, n_trials):
     return int(n_trials)
 
 
+def require_no_seed(wrt):
+    """Refuse a seed among the tuned leaves: an integer leaf, never a decision (R131)."""
+    seeds = [path for path in wrt if split_path(path)[-1] == "seed"]
+    if seeds:
+        raise ValueError(
+            f"cannot put {seeds} in wrt: a seed is an integer leaf, a parameter of the "
+            "program, never a decision (R131); fix it, or average over seeds with n_trials"
+        )
+
+
+def numbers_key(tree):
+    """A hashable key of the values of a tree's leaves, ``None`` when one has no value (a tracer)."""
+    entries = []
+    for path, leaf in flatten(tree or {}):
+        try:
+            value = np.asarray(leaf, dtype=float)
+        except TypeError:  # a tracer has no value
+            return None
+        entries.append((path, value.shape, value.tobytes()))
+
+    return tuple(entries)
+
+
 def stateful_blocks_of(loop):
     """The ids of the loop's blocks other than the plant that hold a state: each has an ``x0`` leaf."""
     return tuple(
@@ -1096,7 +1156,7 @@ def block_params_of(loop, params, sys_id):
 
 def require_free_names(free_inputs, block_ids):
     """Refuse a free input or a block named like another key of the tree (or a problem leaf)."""
-    reserved = {"cost", "X", "U", "Xf", "x_start", "discount_rate"}
+    reserved = {"cost", "X", "U", "Xf", "x_start", "t_start", "discount_rate"}
     clash = sorted(
         (set(free_inputs) & set(block_ids))
         | ((set(free_inputs) | set(block_ids)) & reserved)

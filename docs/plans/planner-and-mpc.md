@@ -5,7 +5,11 @@ review of 2026-10-27, the architecture of record since 2026-10-28 (R166): [R148]
 of R141–R147 of the same record and R123, R104, R130–R135. How it was reached, the use cases and
 the rejected candidates: [the study](../reviews/2026-10-27-mpc-planner-interface-proposal.md).
 The rows are TODO §1.7 and §1.8 ([core-architecture.md](core-architecture.md) §7, §8); MPPI
-([mppi.md](mppi.md)) is a planner under this contract.
+([mppi.md](mppi.md)) is a planner under this contract. **Landed in the v0.3 run:** §3's face for
+trajectory optimization (`planner.compile()`, `CompiledTrajectoryPlanner` in
+`trajectory_optimization/compiled.py`; `planner.params`; `iterations=` on the planner), §5's
+`t_start` and the start from `x_start`; §2's `"method"` and `seed` leaves, the mutation-free
+`planner.solve` and §6's MPC wait for the MPC's rebuild (TODO §1.8).
 
 ## 1. The pattern
 

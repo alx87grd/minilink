@@ -288,11 +288,12 @@ terminal = QuadraticField(P, x_bar).as_terminal_cost()   # §9: the LQR value en
     seed (stochastic approximation) is an `Optimizer` strategy for later
     ([native-optimizers.md](native-optimizers.md) §7).
 - **Ruled:** R26 (the key `plant`), R130, R131, R148.
-- **Today:** `ParametricMathematicalProgram` varies `x0` only; collocation closes over the plant,
-  cost and set parameters, and `require_online_params` refuses every other key; the MPC port
-  functions drop `params`; `JaxParametricProgramEvaluator` repeats about half of the plain
-  evaluator; the compiled path takes SciPy only; problems have no start time; shooting and
-  collocation pin the start through `X0`; `pe.program(wrt, key, n_trials)` refuses `"x_start"` in
+- **Today:** the one noun is in (PP-1, the v0.3 run): `MathematicalProgram(..., params=)`,
+  `Optimizer.solve(params=, z0=)`, one evaluator body (the parametric program and its evaluator
+  folded in); collocation's JAX program reads the problem's tree (the plant, the cost, the
+  margin sets, `x_start`, `t_start`, the discount) and the online call binds any of its leaves
+  (PP-2, PP-3, acceptance script 4); the MPC port functions drop `params`; the compiled path takes every method of the one table (OPW, landed in the v0.3 run); the problem's start time `t_start` is in (the v0.3 run: the problem, the evaluator, the
+  transcriptions' grids, collocation's program; shooting pins the start from `x_start`); `pe.program(wrt, key, n_trials)` refuses `"x_start"` in
   `wrt` on a stochastic problem.
 - **Open:** nothing; the export's full tuned tree is `program.unpack(z)` (R164). The performance
   gate has its budget: §11's ninth script (R156).
@@ -318,8 +319,11 @@ terminal = QuadraticField(P, x_bar).as_terminal_cost()   # §9: the LQR value en
     trajectory optimization, the gradient MPC on it, its closed loop in one scan tuned by
     gradient. State-of-the-art solvers and MPPI are v0.4.
 - **Ruled:** R132, R135 (answered by R148), R148, R149, R155, R158.
-- **Today:** `gd` and `adam` are a Python loop on NumPy (`optimizers/first_order.py`), Adam's
-  update jitted; nothing differentiates through a solve; the RL learners already run their steps
+- **Today:** the kernel is in (NS-1, NS-2's fixed `K`, the v0.3 run): `gd` and `adam` are pure
+  laws (`init`, `update(grad, state)`) run by `Optimizer`, `iterations=K` one `lax.scan` that
+  traces under `jit`, `vmap` and `grad`, `as_step_system()` the iterates as a step system;
+  trajectory optimization has its compiled face (`planner.compile()`, R148: `solve`, `shift`,
+  `command`, `prediction`, `solution`, `pack`; a native method `vmap`s over starts); the RL learners already run their steps
   in one `lax.scan`; the planners have no pure face, `solve` mutates them (`last_solution`); the
   MPC is two classes with `dt_mpc`, `t0`, `warm_start` and a tick latch, probing the planner.
 - **Open:** nothing; the names are ruled (R164).

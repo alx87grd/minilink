@@ -6,6 +6,8 @@ from dataclasses import replace
 
 import numpy as np
 
+from minilink.core.backends import array_module
+from minilink.core.discrete.step_system import StepSystem
 from minilink.core.inspect import inspect_text, repr_pretty
 from minilink.optimization.evaluators.compiler import compile_program_evaluator
 from minilink.optimization.mathematical_program import (
@@ -43,6 +45,9 @@ _USER_OPTIMIZER_METHODS: dict[str, tuple[str, dict]] = {
     ),
     "ipopt": ("ipopt", {"options": {}, "tol": 1e-8}),
 }
+
+# The native methods: a pure law run by the optimizer, with a fixed count or to tolerance
+NATIVE_METHODS = ("gd", "adam")
 
 # The program's class, read from its fields, and the methods each class admits
 # ("auto" picks the first).
@@ -110,6 +115,12 @@ class Optimizer:
         when no ``hess_J`` is supplied.
     options : dict, optional
         Solver options merged into the preset's ``options`` dict (user keys win).
+    iterations : int, optional
+        For the native methods (``"gd"``, ``"adam"``): exactly this many steps,
+        no tolerance (R149). On a JAX program the solve is one ``lax.scan``,
+        pure: ``solve(params=, z0=)`` traces under ``jit``, ``vmap`` and
+        ``grad``. ``None`` (default) runs to the method's tolerance, its
+        ``maxiter`` the cap. A size, structural: never a parameter (R131).
     **method_kwargs
         Extra keyword arguments override the preset's top-level kwargs and are
         forwarded to the backend constructor.
@@ -124,10 +135,12 @@ class Optimizer:
         backend: str | None = None,
         use_hessian: bool = False,
         options: dict | None = None,
+        iterations: int | None = None,
         **method_kwargs,
     ):
         # The method: the class default for "auto", refused when the class does not admit it
         method = method_for(program, method)
+        self.iterations = count_of(method, iterations)
 
         # The program, compiled once at the default start
         self.program = program
@@ -142,9 +155,7 @@ class Optimizer:
         )
 
         # The solver adapter: the method's preset, the caller's keywords and options over it
-        adapter_key, preset = _USER_OPTIMIZER_METHODS[method]
-        kwargs = backend_kwargs_of(preset, method_kwargs, options)
-        self.adapter = self.select_adapter(adapter_key, kwargs)
+        self.adapter = make_optimizer_backend(method, options=options, **method_kwargs)
 
     def __str__(self):
         return inspect_text(self)
@@ -155,6 +166,7 @@ class Optimizer:
     def solve(
         self,
         *,
+        params=None,
         z0=None,
         callback: OptimizationProgressCallback | None = None,
         record_solve_time: bool = False,
@@ -165,9 +177,14 @@ class Optimizer:
 
         Parameters
         ----------
+        params : dict, optional
+            The values of the program's parameters for this solve, a partial
+            tree merged once onto the program's defaults (R130; a path the
+            program does not declare raises). ``None`` solves at the defaults.
+            The compiled program is reused: a new value never recompiles.
         z0 : array_like, optional
-            One-off initial decision vector. If omitted, use the default ``z0``
-            supplied to :class:`Optimizer`.
+            One-off initial decision vector, the warm start. If omitted, use
+            the default ``z0`` supplied to :class:`Optimizer`.
         record_solve_time : bool, optional
             If True, set
             :attr:`~minilink.optimization.mathematical_program.OptimizationResult.solve_time_s`
@@ -183,8 +200,16 @@ class Optimizer:
         verbose : bool, optional
             If True, print the framed solve panel (preamble and report).
         """
+        # A fixed count of native steps: the pure solve
+        if self.iterations is not None:
+            require_no_hook(callback)
+            return self.solve_count(params, z0)
+
         z_start = self.z0 if z0 is None else self.decision_vector(z0, self.program.n_z)
         time_solve = record_solve_time or verbose
+
+        # The values of this solve, bound once at the boundary
+        self.program_evaluator.bind(params)
 
         if verbose:
             self.print_solve_preamble(z_start)
@@ -219,9 +244,51 @@ class Optimizer:
 
         return result
 
+    def as_step_system(self, params=None):
+        """
+        The solve as a step system (R132): the state the law's, one tick one iteration.
+
+        ``x`` is the law's state flattened (``z``; with Adam its moments and step
+        count after it), ``x0`` the law's start from :attr:`z0`, the update
+        ``x_{k+1} = S(x_k, ∇J(z_k; p))`` and the output ``y = z``; ``params``
+        the program's tree (``None`` its defaults). A view of the same kernel,
+        so ``compute_rollout(K)`` gives the iterates of a ``K``-step solve.
+        """
+        require_native(self.method)
+        return IterationSystem(self, self.program_evaluator.merged(params))
+
+    def solve_count(self, params, z0):
+        """Exactly :attr:`iterations` native steps from ``z0`` on the merged tree: a pure solve, its result traced or on the host."""
+        evaluator = self.program_evaluator
+        K = self.iterations
+
+        # The start and the tree, merged once, bound to nothing
+        tree = evaluator.merged(params)
+        z_start = self.z0 if z0 is None else self.start_vector(z0)
+
+        # z_K = S^K(z0; p), and J(z_K; p)
+        z, J = self.adapter.run(evaluator, z_start, tree, K)
+
+        return OptimizationResult(
+            z=host_or_traced(z),
+            success=True,
+            cost=host_or_traced(J, float),
+            message=f"{K} steps taken",
+            stats={"nit": K, "algorithm": self.method},
+        )
+
     ###########################################################################
     # Internal machinery
     ###########################################################################
+
+    def start_vector(self, z0):
+        """A start checked as :meth:`decision_vector` when it has values, a traced one by its shape."""
+        n_z = self.program.n_z
+        try:
+            return self.decision_vector(z0, n_z)
+        except TypeError:  # a tracer has no value
+            require_start_shape(z0, n_z)
+            return z0
 
     @staticmethod
     def decision_vector(z, n_z: int) -> np.ndarray:
@@ -230,39 +297,6 @@ class Optimizer:
         if arr.shape != (int(n_z),):
             raise ValueError(f"decision vector must have shape ({int(n_z)},)")
         return arr
-
-    @staticmethod
-    def select_adapter(adapter_key: str, kwargs: dict) -> OptimizerBackend:
-        """The solver adapter of a preset's key, built from its keyword arguments."""
-        if adapter_key == "scipy_minimize":
-            # Lazy import: SciPy's solvers load on first use, not with the optimizer
-            from minilink.optimization.optimizers.scipy_minimize import (
-                ScipyMinimizeOptimizer,
-            )
-
-            return ScipyMinimizeOptimizer(**kwargs)
-
-        if adapter_key == "ipopt":
-            # Lazy import: the Ipopt adapter loads on first use, not with the optimizer
-            from minilink.optimization.optimizers.ipopt import (
-                IpoptOptimizer,
-                require_cyipopt,
-            )
-
-            # Ipopt is an optional dependency: refuse early when cyipopt is missing
-            require_cyipopt()
-
-            return IpoptOptimizer(**kwargs)
-
-        if adapter_key == "first_order":
-            # Lazy import: the first-order loop loads on first use
-            from minilink.optimization.optimizers.first_order import (
-                FirstOrderOptimizer,
-            )
-
-            return FirstOrderOptimizer(**kwargs)
-
-        raise ValueError(f"Unknown optimizer adapter key {adapter_key!r}.")
 
     def print_solve_preamble(self, z0: np.ndarray) -> None:
         """Open the solve panel: the program, the start and the method."""
@@ -289,9 +323,165 @@ class Optimizer:
         print(DISP_RULE_MAIN)
 
 
+def make_optimizer_backend(method: str, *, options: dict | None = None, **kwargs):
+    """
+    The solver adapter of a method preset: the one method table of every solve path.
+
+    ``method`` names a preset of :class:`Optimizer` (``"scipy_slsqp"``,
+    ``"ipopt"``, ``"adam"``, …; not ``"auto"``, which needs the program's
+    class); ``options`` are merged over the preset's solver options and
+    ``kwargs`` over its constructor keywords. The adapter solves any program
+    evaluator from a start, ``adapter.solve(evaluator, z0)``, whether the
+    evaluator came from one transcription or a compiled program with
+    parameters (OPW-1).
+    """
+    require_method(method)
+    require_named_method(method)
+    adapter_key, preset = _USER_OPTIMIZER_METHODS[method]
+    backend_kwargs = backend_kwargs_of(preset, kwargs, options)
+
+    return adapter_of(adapter_key, backend_kwargs)
+
+
 ###############################################################################
 # Internal machinery
 ###############################################################################
+
+
+def adapter_of(adapter_key: str, kwargs: dict) -> OptimizerBackend:
+    """The solver adapter of a preset's key, built from its keyword arguments."""
+    if adapter_key == "scipy_minimize":
+        # Lazy import: SciPy's solvers load on first use, not with the optimizer
+        from minilink.optimization.optimizers.scipy_minimize import (
+            ScipyMinimizeOptimizer,
+        )
+
+        return ScipyMinimizeOptimizer(**kwargs)
+
+    if adapter_key == "ipopt":
+        # Lazy import: the Ipopt adapter loads on first use, not with the optimizer
+        from minilink.optimization.optimizers.ipopt import (
+            IpoptOptimizer,
+            require_cyipopt,
+        )
+
+        # Ipopt is an optional dependency: refuse early when cyipopt is missing
+        require_cyipopt()
+
+        return IpoptOptimizer(**kwargs)
+
+    if adapter_key == "first_order":
+        # Lazy import: the first-order loop loads on first use
+        from minilink.optimization.optimizers.first_order import (
+            FirstOrderOptimizer,
+        )
+
+        return FirstOrderOptimizer(**kwargs)
+
+    raise ValueError(f"Unknown optimizer adapter key {adapter_key!r}.")
+
+
+class IterationSystem(StepSystem):
+    """A native solve as a step system: the law's state flattened, one tick one step (:meth:`Optimizer.as_step_system`)."""
+
+    def __init__(self, optimizer, tree):
+        evaluator = optimizer.program_evaluator
+        law = optimizer.adapter.law(evaluator)
+        state0 = law.init(np.asarray(optimizer.z0, dtype=float))
+
+        # The state's layout: each entry of the law's state, flattened in order
+        self.law = law
+        self.evaluator = evaluator
+        self.keys = tuple(state0)
+        self.shapes = tuple(np.shape(state0[key]) for key in self.keys)
+        n = int(sum(int(np.prod(shape)) for shape in self.shapes))
+
+        n_z = int(optimizer.program.n_z)
+        StepSystem.__init__(self, n, output_dim=n_z)
+        self.name = f"{optimizer.method} on the program"
+        self.params = tree
+        self.x0 = self.flat(state0)
+
+    def step(self, x, u, k=0, params=None):
+        params = self.params if params is None else params
+
+        state = self.unflat(x)
+
+        # x_{k+1} = S(x_k, ∇J(z_k; p))
+        grad = self.evaluator.native_gradient(state["z"], params)
+        state_next = self.law.update(grad, state)
+
+        return self.flat(state_next)
+
+    def h(self, x, u, k=0, params=None):
+        return self.unflat(x)["z"]
+
+    def flat(self, state):
+        """The law's state as one flat vector, its entries in order."""
+        xp = array_module(*state.values())
+        pieces = [
+            xp.reshape(xp.asarray(state[key], dtype=float), (-1,)) for key in self.keys
+        ]
+
+        return xp.concatenate(pieces)
+
+    def unflat(self, x):
+        """The flat vector as the law's state (the step count a whole number)."""
+        state = {}
+        start = 0
+        for key, shape in zip(self.keys, self.shapes):
+            size = int(np.prod(shape))
+            state[key] = x[start : start + size].reshape(shape)
+            start += size
+
+        return state
+
+
+def host_or_traced(value, cast=None):
+    """A concrete result as a NumPy value (or ``cast`` of it), a traced one as it is."""
+    try:
+        concrete = np.asarray(value, dtype=float)
+    except TypeError:  # a tracer has no value
+        return value
+
+    return concrete if cast is None else cast(concrete)
+
+
+def count_of(method, iterations):
+    """The fixed step count: ``None``, or a positive whole number for a native method."""
+    if iterations is None:
+        return None
+    require_native(method)
+    if isinstance(iterations, bool) or int(iterations) != iterations or iterations < 1:
+        raise ValueError(
+            f"iterations must be a positive whole number, got {iterations!r}"
+        )
+
+    return int(iterations)
+
+
+def require_native(method):
+    """Refuse a fixed count, or the step-system view, for a method that is not native."""
+    if method not in NATIVE_METHODS:
+        raise ValueError(
+            f"iterations= and as_step_system take the native methods {NATIVE_METHODS}; "
+            f"{method!r} runs to its own tolerance"
+        )
+
+
+def require_start_shape(z0, n_z):
+    """Refuse a traced start that is not of shape ``(n_z,)``."""
+    if tuple(z0.shape) != (int(n_z),):
+        raise ValueError(f"decision vector must have shape ({int(n_z)},)")
+
+
+def require_no_hook(callback):
+    """Refuse a progress hook on a fixed-count solve: the steps are one pure scan."""
+    if callback is not None:
+        raise ValueError(
+            "a fixed-count solve (iterations=) is one pure scan: no callback; "
+            "use as_step_system().compute_rollout(K) for the iterates"
+        )
 
 
 def program_class(program) -> str:
@@ -341,6 +531,15 @@ def require_method(method):
         valid = ", ".join(["auto", *sorted(_USER_OPTIMIZER_METHODS)])
         raise ValueError(
             f"Unknown optimizer method {method!r}. Expected one of: {valid}."
+        )
+
+
+def require_named_method(method):
+    """Refuse ``"auto"`` where no program is at hand to choose from."""
+    if method == "auto":
+        raise ValueError(
+            "method='auto' picks from a program's class: give the program to "
+            "Optimizer, or name the method"
         )
 
 

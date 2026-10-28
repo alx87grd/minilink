@@ -49,42 +49,52 @@ class NumpyMathematicalProgramEvaluator(MathematicalProgramEvaluator):
 
     def J(self, z):
         z_arr = self.decision_vector(z)
-        return self.program.J(z_arr)
+        return self.call(self.program.J, z_arr)
 
     def h(self, z):
         z_arr = self.decision_vector(z)
         if self.program.h is None:
             return np.zeros(0, dtype=float)
-        return self.program.h(z_arr)
+        return self.call(self.program.h, z_arr)
 
     def g(self, z):
         z_arr = self.decision_vector(z)
         if self.program.g is None:
             return np.zeros(0, dtype=float)
-        return self.program.g(z_arr)
+        return self.call(self.program.g, z_arr)
+
+    # The oracle of a solve on a given tree, as the program returns it
+
+    def native_objective(self, z, params):
+        return self.call(self.program.J, z, params)
+
+    def native_gradient(self, z, params):
+        if self.program.grad_J is None:
+            return super().gradient(z)
+        return self.call(self.program.grad_J, z, params)
 
     # The derivatives the program supplies, as flat NumPy arrays
 
     def gradient(self, z) -> np.ndarray:
         if self.program.grad_J is None:
             return super().gradient(z)
-        value = self.program.grad_J(self.decision_vector(z))
+        value = self.call(self.program.grad_J, self.decision_vector(z))
         return self.as_vector(value, self.n_z, "objective gradient")
 
     def hessian(self, z) -> np.ndarray:
         if self.program.hess_J is None:
             return super().hessian(z)
-        value = self.program.hess_J(self.decision_vector(z))
+        value = self.call(self.program.hess_J, self.decision_vector(z))
         return self.as_matrix(value, (self.n_z, self.n_z), "objective Hessian")
 
     def jacobian_h(self, z) -> np.ndarray:
         if self.n_h == 0 or self.program.jac_h is None:
             return super().jacobian_h(z)
-        value = self.program.jac_h(self.decision_vector(z))
+        value = self.call(self.program.jac_h, self.decision_vector(z))
         return self.as_matrix(value, (self.n_h, self.n_z), "equality Jacobian")
 
     def jacobian_g(self, z) -> np.ndarray:
         if self.n_g == 0 or self.program.jac_g is None:
             return super().jacobian_g(z)
-        value = self.program.jac_g(self.decision_vector(z))
+        value = self.call(self.program.jac_g, self.decision_vector(z))
         return self.as_matrix(value, (self.n_g, self.n_z), "inequality Jacobian")

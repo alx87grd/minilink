@@ -5,13 +5,16 @@ from __future__ import annotations
 import time
 import warnings
 from collections.abc import Callable
+from copy import deepcopy
 from dataclasses import dataclass, field, replace
 
 import numpy as np
 
 from minilink.core.backends import BACKEND_JAX, BACKEND_NUMPY, normalize_backend
+from minilink.core.params import merge_known
 from minilink.core.sets import SingletonSet
 from minilink.core.trajectory import Trajectory
+from minilink.optimization.evaluators.compiler import compile_program_evaluator
 from minilink.optimization.mathematical_program import (
     MathematicalProgram,
     OptimizationResult,
@@ -19,8 +22,9 @@ from minilink.optimization.mathematical_program import (
 from minilink.optimization.optimizer import (
     OptimizationProgressCallback,
     Optimizer,
+    make_optimizer_backend,
+    method_for,
 )
-from minilink.optimization.optimizers.scipy_minimize import ScipyMinimizeOptimizer
 from minilink.optimization.reporting import (
     DISP_RULE_DIV,
     DISP_RULE_MAIN,
@@ -28,7 +32,7 @@ from minilink.optimization.reporting import (
 )
 from minilink.planning.initial_guess import default_initial_trajectory
 from minilink.planning.planner import Planner
-from minilink.planning.problems import PlanningProblem, nominal_plant_params
+from minilink.planning.problems import PlanningProblem
 from minilink.planning.results import PlanningSolution
 from minilink.planning.trajectory_optimization.transcription import (
     Transcription,
@@ -51,6 +55,7 @@ _TRAJOPT_OPTION_KEYS = (
     "verbose",
     "feasibility_tol",
     "live_plot",
+    "iterations",
 )
 
 _TRANSCRIPTION_PRESETS = frozenset({"direct_collocation", "multiple_shooting"})
@@ -76,13 +81,6 @@ class TrajectoryOptimizationPlanner(Planner):
     each from-solve is bind + solve only.
     """
 
-    _USER_OPTIMIZER_METHODS = {
-        "scipy_slsqp": (
-            "scipy_minimize",
-            {"scipy_method": "SLSQP", "options": {"disp": False}},
-        ),
-    }
-
     def __init__(
         self,
         problem: PlanningProblem,
@@ -102,6 +100,7 @@ class TrajectoryOptimizationPlanner(Planner):
         verbose=_UNSET,
         feasibility_tol=_UNSET,
         live_plot=_UNSET,
+        iterations=_UNSET,
     ) -> None:
         """
         Parameters
@@ -120,7 +119,7 @@ class TrajectoryOptimizationPlanner(Planner):
             Tier-2 workflow bag. Flat kwargs below overlay matching fields.
         backend, initial_guess, warm_start, method,
         optimizer_options, use_hessian, record_history, callback,
-        record_solve_time, verbose, feasibility_tol, live_plot
+        record_solve_time, verbose, feasibility_tol, live_plot, iterations
             Tier-1 flat mirrors of :class:`TrajectoryOptimizationOptions`.
         """
         super().__init__(problem)
@@ -144,6 +143,7 @@ class TrajectoryOptimizationPlanner(Planner):
             verbose=verbose,
             feasibility_tol=feasibility_tol,
             live_plot=live_plot,
+            iterations=iterations,
         )
 
         # Memory of the latest solve
@@ -155,7 +155,7 @@ class TrajectoryOptimizationPlanner(Planner):
         # The compiled parametric program, its optimizer and its dynamics
         self.program = None
         self.program_evaluator = None
-        self.optimizer_backend: ScipyMinimizeOptimizer | None = None
+        self.optimizer_backend = None
         self._dynamics = None
 
         # Wall-clock times of the latest compile, solve and step
@@ -165,6 +165,27 @@ class TrajectoryOptimizationPlanner(Planner):
 
         # The rebuild path warns once, on JAX, that a compiled program is faster
         self._warned_uncompiled_from = False
+
+    @property
+    def params(self) -> dict:
+        """The tree the plan depends on (R148): ``x_start``, ``t_start``, the plant's, the cost's, the discount and the sets the program reads."""
+        return self.transcription.program_params(self.problem)
+
+    def compile(self, backend=None):
+        """
+        The planner's pure face, ``pv`` (R148): its solve as functions of ``(params, z)``.
+
+        ``backend`` defaults to the planner's. See
+        :class:`~minilink.planning.trajectory_optimization.compiled.CompiledTrajectoryPlanner`.
+        """
+        # Lazy import: the compiled face loads on first compile, not with the planner
+        from minilink.planning.trajectory_optimization.compiled import (
+            CompiledTrajectoryPlanner,
+        )
+
+        backend = self.options.backend if backend is None else backend
+
+        return CompiledTrajectoryPlanner(self, backend)
 
     @property
     def has_parametric_program(self) -> bool:
@@ -312,13 +333,7 @@ class TrajectoryOptimizationPlanner(Planner):
         require_jax_compile_backend(self.options.backend)
         require_parametric_transcription(self.transcription)
 
-        # Lazy import: the parametric JAX evaluator loads on first compile, not with
-        # the planner
-        from minilink.planning.trajectory_optimization.parametric_evaluator import (
-            JaxParametricProgramEvaluator,
-        )
-
-        # The program with the start x0 as its parameter
+        # The program with the start x_start as its parameter
         t0 = time.perf_counter()
         self.program = self.transcription.transcribe_parametric(
             self.problem,
@@ -331,20 +346,13 @@ class TrajectoryOptimizationPlanner(Planner):
             self.transcription.initial_guess_time_grid(self.problem),
         )
         z0 = self.transcription.pack_initial_guess(self.problem, guess)
-        self.program_evaluator = JaxParametricProgramEvaluator(
-            self.program,
-            sample_z=z0,
-            sample_x0=self.problem.x_start,
+        self.program_evaluator = compile_program_evaluator(
+            self.program, BACKEND_JAX, sample_z=z0
         )
-        self.program_evaluator.bind(self.problem.x_start)
+        self.program_evaluator.bind({"x_start": self.problem.x_start})
 
-        # The compiled dynamics that read each tick's plan back
-        params = nominal_plant_params(self.problem)
-        evaluator = self.problem.sys.compile(backend=backend, verbose=False)
-        if params is None:
-            self._dynamics = evaluator.f
-        else:
-            self._dynamics = lambda x, u, t: evaluator.f(x, u, t, params)
+        # The compiled plant that reads each tick's plan back, on the tick's numbers
+        self._dynamics = self.problem.sys.compile(backend=backend, verbose=False).f
 
         # The optimizer every online tick reuses
         self.optimizer_backend = self.build_parametric_optimizer_backend()
@@ -367,8 +375,12 @@ class TrajectoryOptimizationPlanner(Planner):
         x0 : array_like
             Measured initial state.
         params : mapping, optional
-            Scene / bind façade. ``None`` or ``{}`` binds ``x0`` only.
-            Non-empty keys are refused (``scene`` is reserved for the scene bind).
+            The values of this tick, a partial tree of the problem's leaves
+            (``{"plant": {"mu": 0.6}, "cost": {"xbar": …}, "t_start": t}``),
+            merged once onto the program's defaults with ``x0`` as its
+            ``x_start`` (R148): an unknown path raises naming the known ones.
+            ``None`` or ``{}`` binds ``x0`` only; ``scene`` is reserved for the
+            scene bind (A3) and raises.
         initial_guess : ndarray or Trajectory, optional
             NLP seed (schedule and/or packed ``z``). Warm-start *policy*
             (reuse last latch) is owned by ``ModelPredictiveController``, not
@@ -377,19 +389,27 @@ class TrajectoryOptimizationPlanner(Planner):
         Notes
         -----
         Fast bind path when :attr:`has_parametric_program`; otherwise rebuilds
-        the NLP with ``x_start`` replaced (one-time warning suggesting
-        :meth:`compile_parametric_program`).
+        the NLP on a copy of the problem holding the values (one-time warning
+        suggesting :meth:`compile_parametric_program`): one API at two speeds.
         """
-        require_online_params(params)
+        require_no_scene(params)
 
         # The fast bind path on a compiled program, else a rebuild from x0
         if self.has_parametric_program:
             return self.solve_trajectory_from_parametric(
-                x0, initial_guess=initial_guess, evaluate=evaluate, n_trials=n_trials
+                x0,
+                params=params,
+                initial_guess=initial_guess,
+                evaluate=evaluate,
+                n_trials=n_trials,
             )
 
         return self.solve_trajectory_from_rebuild(
-            x0, initial_guess=initial_guess, evaluate=evaluate, n_trials=n_trials
+            x0,
+            params=params,
+            initial_guess=initial_guess,
+            evaluate=evaluate,
+            n_trials=n_trials,
         )
 
     def step(
@@ -434,6 +454,7 @@ class TrajectoryOptimizationPlanner(Planner):
             method=self.options.method,
             use_hessian=self.options.use_hessian,
             options=dict(self.options.optimizer_options),
+            iterations=self.options.iterations,
         )
 
     def print_solve_preamble(
@@ -571,19 +592,24 @@ class TrajectoryOptimizationPlanner(Planner):
         )
 
     def trajectory_solution(
-        self, trajectory, record, evaluate, n_trials
+        self, trajectory, record, evaluate, n_trials, problem=None
     ) -> PlanningSolution:
-        """The schedule as a solution: its input replayed by a source block, scored over the draws when asked."""
+        """The schedule as a solution of the planner's problem (or ``problem``): its input replayed by a source block, scored over the draws when asked."""
+        problem = self.problem if problem is None else problem
         policy = self.open_loop_policy(trajectory)
 
         evaluation = None
         if evaluate:
             dt = float(trajectory.t[1] - trajectory.t[0])
             evaluation = self.evaluate(
-                policy, dt=dt, n_trials=n_trials, tf=float(trajectory.tf)
+                policy,
+                dt=dt,
+                n_trials=n_trials,
+                tf=float(trajectory.tf - trajectory.t[0]),
+                problem=problem,
             )
 
-        return PlanningSolution(self.problem, policy, record, trajectory, evaluation)
+        return PlanningSolution(problem, policy, record, trajectory, evaluation)
 
     def print_solve_report(
         self,
@@ -628,43 +654,38 @@ class TrajectoryOptimizationPlanner(Planner):
         )
         print(DISP_RULE_MAIN)
 
-    def build_parametric_optimizer_backend(self) -> ScipyMinimizeOptimizer:
-        """The SciPy backend of the online ticks, from the one preset the parametric path accepts."""
-        method = self.options.method
-        if method not in self._USER_OPTIMIZER_METHODS:
-            valid = ", ".join(sorted(self._USER_OPTIMIZER_METHODS))
-            raise ValueError(
-                f"Unknown optimizer method {method!r} for parametric compile. "
-                f"Expected one of: {valid}."
-            )
+    def build_parametric_optimizer_backend(self):
+        """The solver of the online ticks: the method's preset from the one table (OPW-1), the planner's options over it."""
+        method = method_for(self.program, self.options.method)
+        options = dict(self.options.optimizer_options)
 
-        # The preset's keywords, copied, with the user's options over its own
-        _, preset = self._USER_OPTIMIZER_METHODS[method]
-        kwargs = {}
-        for key, value in preset.items():
-            kwargs[key] = dict(value) if isinstance(value, dict) else value
-        existing = kwargs.get("options", {})
-        kwargs["options"] = {**existing, **dict(self.options.optimizer_options)}
-
-        return ScipyMinimizeOptimizer(**kwargs)
+        return make_optimizer_backend(method, options=options)
 
     def solve_trajectory_from_parametric(
         self,
         x0,
         *,
+        params=None,
         initial_guess: np.ndarray | Trajectory | None = None,
         evaluate: bool = False,
         n_trials: int = 50,
     ) -> PlanningSolution:
-        """One online tick on the compiled program: bind ``x0``, seed, solve, read the plan back."""
+        """One online tick on the compiled program: bind ``x0`` and the tick's values, seed, solve, read the plan back."""
         require_compiled_program(self.program_evaluator, self.optimizer_backend)
 
-        # The problem restarted at the measured state, which the program binds
+        # The tick's tree: the given values, the measured state as x_start, bound once
         step_t0 = time.perf_counter()
         x_arr = np.asarray(x0, dtype=float).reshape(-1)
         require_x0_shape(x_arr, self.problem.sys)
-        problem_k = self.problem.replace(x_start=x_arr, X0=SingletonSet(x_arr))
-        self.program_evaluator.bind(x_arr)
+        self.program_evaluator.bind({**(params or {}), "x_start": x_arr})
+        bound = self.program_evaluator.params
+
+        # The problem restarted at the measured state and the tick's start time, a
+        # copy holding the tick's other values when there are any
+        t_start = float(bound["t_start"])
+        problem_k = problem_with(self.problem, host_tree(params)).replace(
+            x_start=x_arr, X0=SingletonSet(x_arr), t_start=t_start
+        )
 
         # The seed: the given guess, else the default schedule from the measured state
         if initial_guess is None:
@@ -697,11 +718,13 @@ class TrajectoryOptimizationPlanner(Planner):
         else:
             self.last_solve_time_s = None
 
-        # The plan read back from z* with the compiled dynamics
+        # The plan read back from z* with the compiled dynamics on the tick's plant
+        plant = bound["plant"]
         trajectory = self.transcription.reconstruct_result(
             result,
             problem=problem_k,
-            dynamics=self._dynamics,
+            dynamics=lambda x, u, t: self._dynamics(x, u, t, plant),
+            params=bound,
         )
         self.last_step_time_s = time.perf_counter() - step_t0
         self.last_optimization_result = result
@@ -721,7 +744,9 @@ class TrajectoryOptimizationPlanner(Planner):
             stats=dict(result.stats),
         )
         solution = self.store_solution(
-            self.trajectory_solution(trajectory, record, evaluate, n_trials)
+            self.trajectory_solution(
+                trajectory, record, evaluate, n_trials, problem=problem_k
+            )
         )
 
         if self.options.verbose:
@@ -743,11 +768,12 @@ class TrajectoryOptimizationPlanner(Planner):
         self,
         x0,
         *,
+        params=None,
         initial_guess: np.ndarray | Trajectory | None = None,
         evaluate: bool = False,
         n_trials: int = 50,
     ) -> PlanningSolution:
-        """One online tick by an offline solve from ``x0`` (warns once, on JAX, to compile instead)."""
+        """One online tick by an offline solve from ``x0`` and the tick's values (warns once, on JAX, to compile instead)."""
         # Once: on JAX, a compiled parametric program would skip the rebuild
         if not self._warned_uncompiled_from:
             backend = normalize_backend(self.options.backend, allow_direct=True)
@@ -766,7 +792,9 @@ class TrajectoryOptimizationPlanner(Planner):
         x_arr = np.asarray(x0, dtype=float).reshape(-1)
         require_x0_shape(x_arr, self.problem.sys)
         saved_problem = self.problem
-        self.problem = saved_problem.replace(x_start=x_arr, X0=SingletonSet(x_arr))
+        self.problem = problem_with(saved_problem, params).replace(
+            x_start=x_arr, X0=SingletonSet(x_arr)
+        )
         try:
             return self.solve_trajectory(
                 initial_guess=initial_guess,
@@ -812,6 +840,9 @@ class TrajectoryOptimizationOptions:
     #: Redraw the iterate trajectory during the solve (matplotlib); a
     #: custom ``callback`` takes precedence.
     live_plot: bool = False
+    #: A native method's fixed step count, forwarded to its ``Optimizer``
+    #: (R149): exactly this many steps; ``None`` runs to the method's tolerance.
+    iterations: int | None = None
 
 
 @dataclass(frozen=True)
@@ -882,16 +913,13 @@ class TrajectoryOptimizationIteration:
     min_ineq: float | None
 
 
-# Online keys reserved for the scene bind (ObstacleBank / J(z, p)), refused here
-_DEFERRED_ONLINE_PARAM_KEYS = frozenset({"scene"})
-
-
-def require_online_params(params) -> None:
+def require_no_scene(params) -> None:
     """
-    Refuse online ``params`` that ``solve_trajectory_from`` / MPC cannot bind.
+    Refuse online ``params`` that are not a tree, or that hold the reserved ``scene``.
 
-    ``None`` or ``{}`` → bind ``x0`` only. The reserved key ``scene`` raises
-    :class:`NotImplementedError`. Any other key raises :class:`ValueError`.
+    The tree's own check is the program's (an unknown path raises naming the
+    known ones); ``scene`` waits for the scene bind (A3) and raises
+    :class:`NotImplementedError`.
     """
     if params is None:
         return
@@ -900,23 +928,41 @@ def require_online_params(params) -> None:
         raise TypeError(
             f"params must be a mapping or None; got {type(params).__name__}."
         )
-
-    keys = list(params.keys())
-    if not keys:
-        return
-
-    unknown = sorted(k for k in keys if k not in _DEFERRED_ONLINE_PARAM_KEYS)
-    deferred = sorted(k for k in keys if k in _DEFERRED_ONLINE_PARAM_KEYS)
-    if unknown:
-        raise ValueError(
-            "solve_trajectory_from got unknown params keys "
-            f"{unknown!r}; pass params=None or {{}} (x0-only bind)."
-        )
-    if deferred:
+    if "scene" in params:
         raise NotImplementedError(
-            f"Online params key(s) {deferred} are not supported; "
-            "pass params=None or {} (x0-only bind)."
+            "the online params key 'scene' waits for the scene bind (A3); "
+            "bind the problem's own leaves (plant, cost, t_start, …)"
         )
+
+
+def host_tree(tree):
+    """A tree with every leaf a NumPy value (``None`` kept), or ``None`` for none."""
+    if not tree:
+        return None
+    if isinstance(tree, dict):
+        return {
+            key: host_tree(value) if isinstance(value, dict) else host_leaf(value)
+            for key, value in tree.items()
+        }
+
+    return tree
+
+
+def host_leaf(value):
+    """One leaf on the host: a NumPy value, ``None`` kept."""
+    return None if value is None else np.asarray(value)
+
+
+def problem_with(problem, params):
+    """The problem itself for no values, else a copy holding them: its parts copied, so the caller's stay as they are."""
+    if not params:
+        return problem
+
+    merged = merge_known(problem.parts_view(), params)
+    copy = deepcopy(problem)
+    copy.params = merged
+
+    return copy
 
 
 ###############################################################################

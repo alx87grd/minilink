@@ -682,3 +682,192 @@ def test_an_optimizer_returns_the_optimum_its_cost_and_its_record():
     np.testing.assert_allclose(result.z, [1.0, -2.0], atol=1e-6)
     assert result.success and result.cost == pytest.approx(0.0, abs=1e-10)
     assert isinstance(result.message, str) and isinstance(result.stats, dict)
+
+
+def test_one_method_table_builds_every_solve_paths_adapter():
+    from minilink.optimization.optimizer import make_optimizer_backend
+    from minilink.optimization.optimizers.first_order import FirstOrderOptimizer
+    from minilink.optimization.optimizers.scipy_minimize import ScipyMinimizeOptimizer
+
+    slsqp = make_optimizer_backend("scipy_slsqp", options={"maxiter": 7})
+    assert isinstance(slsqp, ScipyMinimizeOptimizer)
+    assert slsqp.options == {
+        "disp": False,
+        "maxiter": 7,
+    }  # the preset's, the caller's over it
+    assert isinstance(make_optimizer_backend("adam"), FirstOrderOptimizer)
+
+    with pytest.raises(ValueError, match="Unknown optimizer method"):
+        make_optimizer_backend("newton")
+    with pytest.raises(ValueError, match="name the method"):
+        make_optimizer_backend("auto")
+
+
+def test_the_method_table_gives_ipopt():
+    pytest.importorskip("cyipopt")
+    from minilink.optimization.optimizer import make_optimizer_backend
+    from minilink.optimization.optimizers.ipopt import IpoptOptimizer
+
+    assert isinstance(make_optimizer_backend("ipopt"), IpoptOptimizer)
+
+
+@pytest.mark.parametrize(
+    "backend", ["numpy", pytest.param("jax", marks=pytest.mark.jax)]
+)
+def test_one_program_with_parameters_solves_for_each_value(backend):
+    from minilink.optimization.mathematical_program import MathematicalProgram
+
+    traces = []
+
+    # J(z; c) = ‖z − c‖², its minimum at c
+    def J(z, params):
+        traces.append(1)
+        c = params["target"]["c"]
+        return (z - c) @ (z - c)
+
+    program = MathematicalProgram(
+        n_z=2, J=J, backend=backend, params={"target": {"c": np.array([1.0, 2.0])}}
+    )
+    opt = Optimizer(program, z0=[0.0, 0.0], method="l-bfgs")
+    n_traces = len(traces)
+
+    np.testing.assert_allclose(opt.solve().z, [1.0, 2.0], atol=1e-6)
+    moved = opt.solve(params={"target": {"c": np.array([-3.0, 0.5])}})
+    np.testing.assert_allclose(moved.z, [-3.0, 0.5], atol=1e-6)
+    np.testing.assert_allclose(
+        opt.solve().z, [1.0, 2.0], atol=1e-6
+    )  # the defaults again
+    if backend == "jax":
+        assert len(traces) == n_traces  # compiled once, never retraced
+
+    # The one merge at the boundary: an unknown path, a new shape
+    with pytest.raises(ValueError, match="known entries are"):
+        opt.solve(params={"target": {"d": 1.0}})
+    with pytest.raises(ValueError, match="shape"):
+        opt.solve(params={"target": {"c": np.zeros(3)}})
+
+
+def test_a_program_without_parameters_refuses_values():
+    from minilink.optimization.mathematical_program import MathematicalProgram
+
+    program = MathematicalProgram(n_z=1, J=lambda z: z @ z)
+    opt = Optimizer(program, z0=[1.0], method="l-bfgs")
+    assert abs(opt.solve(params={}).z[0]) < 1e-6
+    with pytest.raises(ValueError, match="declares no parameters"):
+        opt.solve(params={"c": 1.0})
+    with pytest.raises(TypeError, match="must be a dict"):
+        MathematicalProgram(n_z=1, J=lambda z, p: z @ z, params=[1.0])
+
+
+def parametric_quadratic(backend):
+    """``J(z; c, a) = ½ a ‖z − c‖² + ¼ ‖z‖⁴`` on a box: its minimizer a smooth function of ``c`` and ``a``."""
+    from minilink.core.backends import array_module
+    from minilink.optimization.mathematical_program import MathematicalProgram
+
+    def J(z, params):
+        xp = array_module(z)
+        c = params["c"]
+        a = params["a"]
+        return 0.5 * a * xp.sum((z - c) ** 2) + 0.25 * xp.sum(z**2) ** 2
+
+    return MathematicalProgram(
+        n_z=2,
+        J=J,
+        backend=backend,
+        lower=np.array([-3.0, -3.0]),
+        upper=np.array([3.0, 3.0]),
+        params={"c": np.array([1.0, -0.5]), "a": 2.0},
+    )
+
+
+@pytest.mark.jax
+@pytest.mark.parametrize("method", ["gd", "adam"])
+def test_a_fixed_count_solve_is_one_pure_scan_with_a_gradient(method):
+    import jax
+    import jax.numpy as jnp
+
+    program = parametric_quadratic("jax")
+    options = {"learning_rate": 0.05}
+    opt = Optimizer(
+        program, z0=[0.0, 0.0], method=method, options=options, iterations=40
+    )
+
+    # Exactly K steps: the iterates of the step-system view end where the solve does
+    result = opt.solve()
+    assert result.stats["nit"] == 40 and result.success
+    rollout = opt.as_step_system().compute_rollout(40)
+    np.testing.assert_allclose(
+        rollout.x[:2, -1], result.z, rtol=1e-12
+    )  # z leads the state
+
+    # d z_K / d c through the K steps, against a central difference
+    def z_of(c):
+        return opt.solve(params={"c": c}).z
+
+    c = jnp.asarray([1.0, -0.5])
+    jacobian = np.asarray(jax.jacobian(z_of)(c))
+    h = 1e-6
+    for i in range(2):
+        dc = np.zeros(2)
+        dc[i] = h
+        central = (np.asarray(z_of(c + dc)) - np.asarray(z_of(c - dc))) / (2 * h)
+        np.testing.assert_allclose(jacobian[:, i], central, rtol=1e-5, atol=1e-8)
+
+    # A batch of starts in one vmap, each the solve from its start
+    starts = jnp.asarray([[0.0, 0.0], [1.0, 1.0], [-2.0, 0.5]])
+    batch = jax.vmap(lambda z0: opt.solve(z0=z0).z)(starts)
+    for z0, z in zip(starts, batch):
+        np.testing.assert_allclose(z, opt.solve(z0=np.asarray(z0)).z, rtol=1e-12)
+
+
+@pytest.mark.parametrize("method", ["gd", "adam"])
+def test_a_fixed_count_solve_on_numpy_takes_the_same_steps(method):
+    def grad(z, params):
+        a = params["a"]
+        return a * (z - params["c"]) + np.sum(z**2) * z
+
+    program = parametric_quadratic("numpy")
+    program = type(program)(**{**program.__dict__, "grad_J": grad})
+    options = {"learning_rate": 0.05, "maxiter": 25}
+    fixed = Optimizer(
+        program, z0=[0.0, 0.0], method=method, options=options, iterations=25
+    )
+    loop = Optimizer(program, z0=[0.0, 0.0], method=method, options=options)
+    np.testing.assert_allclose(fixed.solve().z, loop.solve().z, rtol=1e-12)
+
+    # A count is for the native methods, and a whole number
+    with pytest.raises(ValueError, match="native methods"):
+        Optimizer(program, z0=[0.0, 0.0], method="l-bfgs", iterations=10)
+    with pytest.raises(ValueError, match="positive whole number"):
+        Optimizer(program, z0=[0.0, 0.0], method=method, iterations=0)
+
+
+@pytest.mark.jax
+def test_adams_fixed_count_gradient_is_finite_at_a_zero_gradient_entry():
+    import jax
+    import jax.numpy as jnp
+
+    from minilink.core.backends import array_module
+    from minilink.optimization.mathematical_program import MathematicalProgram
+
+    def J(z, params):
+        xp = array_module(z)
+        return xp.sum((z - params["c"]) ** 2)
+
+    program = MathematicalProgram(
+        n_z=2, J=J, backend="jax", params={"c": np.array([0.0, 2.0])}
+    )
+    for max_grad_norm in (None, 1.0):
+        opt = Optimizer(
+            program,
+            z0=[0.0, 0.0],  # a list: the start is checked as on the host path
+            method="adam",
+            iterations=20,
+            options={"max_grad_norm": max_grad_norm},
+        )
+        jacobian = jax.jacobian(lambda c: opt.solve(params={"c": c}).z)(
+            jnp.asarray([0.0, 2.0])
+        )
+        assert np.all(np.isfinite(np.asarray(jacobian)))
+    with pytest.raises(ValueError, match="shape"):
+        opt.solve(z0=[0.0, 0.0, 0.0])

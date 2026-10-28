@@ -363,7 +363,16 @@ def test_the_problems_params_are_a_live_view_whose_writes_reach_the_parts():
     sys, cost = problem.sys, problem.cost
     view = problem.params
     assert view["plant"] is sys.params and view["cost"] is cost.params
-    assert set(view) == {"plant", "cost", "X", "U", "X0", "x_start", "discount_rate"}
+    assert set(view) == {
+        "plant",
+        "cost",
+        "X",
+        "U",
+        "X0",
+        "x_start",
+        "t_start",
+        "discount_rate",
+    }
 
     # In place, and by assignment: the parts change
     problem.params["cost"]["R"][0, 0] = 2.0
@@ -848,3 +857,65 @@ def test_a_point_start_reads_the_start_the_params_give():
 def test_a_start_set_that_cannot_draw_is_refused():
     with pytest.raises(ValueError, match="cannot draw a start"):
         PlanningProblem(plant(), x_start=BallSet(np.zeros(2), 1.0), tf=1.0)
+
+
+def test_the_failure_price_follows_the_overridden_weights_once_per_value():
+    sys = plant()
+    cost = QuadraticCost.from_system(sys)
+    problem = PlanningProblem(
+        sys,
+        x_start=[0.5, 0.0],
+        cost=cost,
+        tf=1.0,
+        X=sys.state.box,
+        U=sys.input_box,
+        infeasible_cost=True,
+    )
+    pe = problem.compile(pid(), dt=0.01, backend="numpy")
+
+    calls = []
+    g_max = cost.g_max
+
+    def counted(X, U, params=None):
+        calls.append(1)
+        return g_max(X, U, params)
+
+    cost.g_max = counted
+    own_price, _ = pe.price_and_bound(pe.params)
+    doubled = {"cost": {"Q": 2.0 * cost.params["Q"], "R": 2.0 * cost.params["R"]}}
+    price, _ = pe.price_and_bound(pe.merged(doubled))
+    assert price == pytest.approx(2.0 * own_price, rel=1e-12)  # the bound scales with g
+
+    # Cached by the value: the same weights again sample g no more
+    n_calls = len(calls)
+    pe.evaluate(doubled)
+    pe.evaluate(doubled)
+    assert len(calls) == n_calls
+
+
+@pytest.mark.parametrize(
+    "backend", ["numpy", pytest.param("jax", marks=pytest.mark.jax)]
+)
+def test_a_robust_gain_tuning_solves_the_sample_average_program(backend):
+    from minilink.optimization import Optimizer
+
+    # The seed case (R131): the program is deterministic given its draws, one key
+    problem = stochastic_problem()
+    pe = problem.compile(PID(Kp=10.0, Kd=1.0), dt=0.02, backend=backend)
+    program = pe.program(
+        ["controller.Kp", "controller.Kd"],
+        bounds={"controller.Kp": (1.0, 80.0), "controller.Kd": (0.1, 20.0)},
+        key=4,
+        n_trials=6,
+    )
+    z0 = program.metadata["z0"]
+    result = Optimizer(program, method="auto", options={"maxiter": 60}).solve()
+    assert float(program.J(result.z)) < float(program.J(z0))
+    np.testing.assert_array_equal(program.J(z0), program.J(z0))  # one key, one value
+
+    # A seed is never a decision
+    noisy = problem.replace(
+        disturbances={"d": WhiteNoise(1, psd=0.1, sample_period=0.02)}
+    ).compile(PID(Kp=10.0, Kd=1.0), dt=0.02, backend=backend)
+    with pytest.raises(ValueError, match="integer leaf"):
+        noisy.program(["disturbance.seed"], key=4, n_trials=2)
