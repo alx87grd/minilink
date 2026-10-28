@@ -480,7 +480,7 @@ def pinned_shift(pv, z, x, t):
 
     # The state rows come first in z, N knots each: x_i's first knot at i·N
     xp = array_module(z_shifted, x)
-    first_knots = np.arange(pv.n) * pv.offsets.size
+    first_knots = xp.arange(pv.n) * pv.offsets.size
     z_guess = assigned(xp, z_shifted, first_knots, xp.reshape(x, (pv.n,)))
 
     return z_guess

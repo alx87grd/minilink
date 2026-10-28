@@ -224,7 +224,7 @@ def test_the_problem_refuses_the_pure_mpc_naming_its_clock():
         plant, cost=QuadraticCost.from_system(plant), x_start=np.zeros(2), tf=1.0
     )
     planner = TrajectoryOptimizationPlanner(problem, n_steps=5, verbose=False)
-    mpc = ModelPredictiveController(planner, delay=False)
+    mpc = ModelPredictiveController(planner, delay=False, warm_start=False)
     with pytest.raises(TypeError, match="mpc % dt"):
         problem.compile(mpc, dt=0.1)
 
