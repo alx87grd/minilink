@@ -254,7 +254,7 @@ Why `dt` and not `n_steps`: the MPPI grid is a control grid, the same object
 `ReinforcementLearningPlanner(dt=)`, `RolloutEnvironment(dt=)` and
 `evaluate(problem, arg, dt=)` (formerly `MonteCarloEvaluator(dt=)`) name; trajopt's `n_steps` counts collocation knots on a
 continuous plan, a different object. The MPC's sample period and the planner's `dt` are
-independent (R148); what `shift(z, dt)` does for a shift that is not a multiple of the
+independent (R148); what `shift(z, t)` does for a shift that is not a multiple of the
 planner's `dt` (interpolate `U`, or refuse) is open, settled with MP-1.
 
 ## 4. The stochastic question
@@ -382,7 +382,7 @@ block). MPPI fills the face so (its §4 row):
 | `z`, `n_z` | the nominal sequence `U` (`N m` numbers) and the origin `t_start` it was solved from: `n_z = N m + 1` |
 | `initial(params)` | zeros, or the nominal input of the ports, at `params["t_start"]` |
 | `solve(params, z0)` | §5's body: `n_iterations` passes from `z0`, pure on the `seed` leaf |
-| `shift(z, dt)` | `U` moved `dt` later, the last input repeated, the origin moved by `dt` (a shift that is not a multiple of `dt`: open, §3) |
+| `shift(z, t)` | `U` moved to the origin `t` (R155), the last input repeated (a shift that is not a multiple of MPPI's `dt`: open, §3) |
 | `policy(z, x, t)` | the input of `U` held at `t`; `x` ignored (an open-loop plan) |
 | `prediction(z, t)` | the nominal rollout of `U` at `t` (for `x_ref`, `u_ref`) |
 | `solution(z)` | the `PlanningSolution` and its `MPPIRecord`, host-side |

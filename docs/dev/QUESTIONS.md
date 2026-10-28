@@ -42,54 +42,14 @@ shapes, and in TODO; the entry then leaves this file. `§N` names the workstream
   [core-architecture.md](../plans/core-architecture.md) §6
 - **Answer:**
 
-### The discretized problem's cost (§6)
-- **Decided (2026-10-27, preliminary; [R141](../reviews/2026-10-27-core-vision-decisions.md)):**
-  `discretize(problem, dt)` returns a `StepPlanningProblem` on the plant's `SampledSystem`; "a
-  sampled problem has no cost object of its own", its `c_k` produced by `transition` (R142).
-- **The gap:** `StepPlanningProblem` then has two shapes: a native one with a `StepCost`
-  (`c(x, u, k)`, `h(x, k)`) and a sampled one whose `cost` is nothing a user can call.
-  `problem.discretize(dt).cost.c(x, u, k)` has no answer, and the class R141 justified by its
-  fields has a field that is sometimes empty.
-- **Options:**
-  - (a) a `SampledCost(g, h, plant, dt, *, solver=, substeps=)`, a `StepCost` whose `c(x, u, k)`
-    integrates `e^{−ρτ} g` over one period from `x` under the held `u` when called directly (a
-    second plant evaluation only on that direct call; the compiled face still fuses it into the
-    transition), so the class keeps one shape and the discretized problem prints its cost;
-  - (b) `problem.compile(dt=)` the one entry in v0.3, and the explicit `discretize(problem, dt)`
-    a v0.4 row that lands with its first consumer;
-  - (c) as written: the sampled problem's `cost` is `None`, stated in the docstring.
-- **Recommendation (agent):** (a), R142's integral stated as an object.
-- **Detail:** [core-architecture.md](../plans/core-architecture.md) §6;
-  [differentiable-problem.md](../plans/differentiable-problem.md) §9.1.
-- **Answer:**
-
-### One owner of the plan's time in the MPC (§8)
-- **Decided (2026-10-27, preliminary; [R148](../reviews/2026-10-27-core-vision-decisions.md)):**
-  `pv.solve` records in `z` the origin it solved from; the MPC's state is `(z, t_last)`,
-  `n = pv.n_z + 1`; its `step` runs `z0 = pv.shift(z, t_k − t_last)`.
-- **The gap:** one number, two homes (RULES 5.6): `z` holds the origin and the MPC holds
-  `t_last`, kept equal by hand, on a failed solve included.
-- **Options:**
-  - (a) the MPC's state is `z` alone (`n = pv.n_z`); `shift(z, t) -> z` rebases the plan to the
-    absolute time `t` from the origin `z` records; a failed solve keeps `z` with its old origin
-    and the next tick rebases from it, no special case; the MPC still reads nothing inside `z`:
-
-    ```python
-    def step(self, x, u, k=0, params=None):      # x is z; t from the clock
-        z0 = pv.shift(x, t)                      # the same plan, rebased to now
-        z_new, status = pv.solve(P_k, z0=z0)
-        return where(status.success, z_new, x)
-    ```
-
-  - (b) `z` holds no time: `shift(z, dt)` is relative, the MPC owns `t_last` and passes
-    `t − t_last` to `policy`;
-  - (c) as written.
-- **Recommendation (agent):** (a); the planner already owns the origin, so the block carries
-  nothing of its own.
-- **Detail:** [planner-and-mpc.md](../plans/planner-and-mpc.md) §3, §6.2.
-- **Answer:**
-
 ### The clock port `t` (§8; [automation-by-convention.md](../plans/automation-by-convention.md) §4.6)
+- **Direction (2026-10-28, in session, not yet ruled):** the `t` port is dropped; the question
+  widened to what `t` is for every block in every diagram (continuous, step, sampled) and to
+  `SampledSystem` as the sampled-data kind, `update(x, u, t)` its equation and `step(x, u, k)` its
+  tick face, the MPC its first native child; multi-rate in the compiled plan of the sampled
+  diagram, each clocked block fed its own index `k // d`. Three independent reviews run on it
+  (`docs/reviews/2026-10-28-time-in-the-core-reviewer-{a,b,c}.md`); ruled after them. The entries
+  below are the question as it stood before.
 - **Decided (2026-10-27, preliminary; R148):** time reaches the MPC by a standard input port
   `t`, wired by convention to the loop's clock, so the MPC "never knows `Δ`"; where the clock
   comes from in a continuous diagram is the landing change's detail.

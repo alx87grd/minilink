@@ -52,7 +52,7 @@ pv  = planner.compile(backend="jax")
 | `params` | tree | the compiled defaults |
 | `initial` | `initial(params=None) -> z` | the default initial guess in `z` form, before any solve (§4); what `solve` starts from when `z0` is `None` |
 | `solve` | `solve(params=None, z0=None) -> (z, status)` | the solve as a function: from the guess `z0` as given, no time logic, no mutation of the planner; it records in `z` the origin it solved from (`params["t_start"]`); `status` is a small numeric record (success, iterations, residual) |
-| `shift` | `shift(z, dt) -> z` | the same plan `dt` later: the planner's data and its recorded origin moved by `dt`, on its own knots; the identity for a solution that does not depend on time (the base default) |
+| `shift` | `shift(z, t) -> z` | the same plan rebased to the absolute time `t` (R155): the planner's data moved by `t − origin` on its own knots, its recorded origin set to `t`; the identity for a solution that does not depend on time (the base default) |
 | `policy` | `policy(z, x, t, params=None) -> u` | the command a solution gives at state `x` and time `t`: the traceable bridge from a solution to an input. `policy(z, x_start, t_start)` is the first action; `policy(z, x_k, t_k)` reads the plan later. Open-loop plans ignore `x`; feedback plans read it |
 | `prediction` | `prediction(z, t, params=None) -> (x, u)` | optional: the planned state and input at `t`, for planners that predict |
 | `solution` | `solution(z, params=None) -> PlanningSolution` | host-side: the policy as a block, the nominal trajectory, the cost-to-go as a `Field` (value iteration's stays a callable until `GridField`, v0.4, R153), the record. `solution.policy.h(x, ·, t)` equals `pv.policy(z, x, t)` |
@@ -74,7 +74,7 @@ pv.solution(zs[3]).plot_trajectory()                                     # look 
 
 ## 4. What each planner puts in `z`
 
-| Planner | `z` | `initial(params)` | `shift(z, dt)` | `policy(z, x, t)` |
+| Planner | `z` | `initial(params)` | `shift(z, t)` | `policy(z, x, t)` |
 | --- | --- | --- | --- | --- |
 | Trajectory optimization (collocation, shooting) | the decision vector, the origin `t_start`, Ipopt's multipliers where used | today's default guess (`default_initial_trajectory`: a cubic path for a mechanical plant, else linear, from `x_start` to the goal; zero or nominal inputs), packed | re-read the knots `dt` later, hold the tail | the input of the plan at `t` |
 | MPPI | the nominal input sequence `U`, `t_start` | zeros or the nominal input | shift `U`, repeat the last input | the input of `U` at `t` |
@@ -124,21 +124,23 @@ The MPC uses five members of `pv`: `n_z`, `initial`, `shift`, `solve` and `polic
 
 ### 6.2 The delayed form (the default, R123)
 
-One `StepSystem` with state `(z, t_last)`, `n = pv.n_z + 1`; the MPC keeps the time of its last
-solve itself.
+One block whose state is `z` alone, `n = pv.n_z` (R155): the plan carries its own origin, so the
+MPC keeps no time of its own and reads nothing inside `z`. (Its kind, a `StepSystem` on the `t`
+port or a native `SampledSystem` with `update(z, y, t)`, is under review: QUESTIONS, the clock
+port entry.)
 
 ```text
 output at k:  u_k = pv.policy(z, x̂_k, t_k)
-step at k:    z0 = pv.shift(z, t_k − t_last)
+step at k:    z0 = pv.shift(z, t_k)                 # the same plan, rebased to now
               z_new, st = pv.solve(P_k, z0=z0)
-              (z, t_last) = (z_new, t_k) if st.success else (z, t_last)
+              z = z_new if st.success else z
 ```
 
 - **The plan is one period late; applying it is instantaneous.** `u_k` reads the plan solved at
   `t_{k−1}` at `Δ` into it (an open-loop plan's second knot when the knots equal `Δ`); a feedback
   plan also reads the fresh `x̂_k`.
-- **A failed solve keeps `(z, t_last)`**; the next tick shifts by `2Δ` and reads the old plan
-  `2Δ` in, with no special case.
+- **A failed solve keeps `z`** with its old origin; the next tick rebases it `2Δ` on and reads the
+  old plan `2Δ` in, with no special case.
 - **One solve per tick**, no cache; no algebraic loop (the discretized plant has no feedthrough,
   `z` is state). Traced, `step` is a `lax.scan` body and the fallback a `where`. A fixed-count
   native solve (R149) always reports success, so the fallback is live only on a host solver

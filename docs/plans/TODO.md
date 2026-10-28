@@ -437,8 +437,10 @@ Why: [core-architecture.md](core-architecture.md) §6. Design:
 open (QUESTIONS, the one-score entry).
 
 - [ ] **`StepPlanningProblem` and `StepCost`** **[ask — core]** (R141): a problem on a
-  `StepSystem` with a horizon `N`, a per-step `gamma` and a `StepCost` (`c(x, u, k)`, `h(x, k)`),
-  sharing the sets, the start, the tree and `realize` with `PlanningProblem` by composition. Done
+  `StepSystem` with a horizon `N`, a per-step `gamma` and a `StepCost` (`c(x, u, k)`, `h(x, k)`);
+  `SampledCost(g, h, plant, dt, *, solver=, substeps=)` the `StepCost` of a discretized problem,
+  its `c` integrating one period when called directly with the plant's solver and substeps
+  (R154); sharing the sets, the start, the tree and `realize` with `PlanningProblem` by composition. Done
   when a grid world solves by value iteration as a `StepPlanningProblem`.
 - [ ] **The compiled step face** **[ask — core]** (R141, R142): `problem.compile(dt=, solver=,
   substeps=)` with no controller gives `transition(x, u, k, params) -> (x_next, c_k)`, `N`,
@@ -521,7 +523,7 @@ solvers and MPPI are v0.4 (§4).
   steps in one `lax.scan`, `iterations=None` to a tolerance (`maxiter` its cap). Done when the
   NumPy path is byte-identical and `jax.grad` through `K` iterations matches a central difference.
 - [ ] **The planner's compiled face** **[ask — core]** (R148): `planner.compile()` gives `n_z`,
-  `initial`, `solve(params, z0) -> (z, status)`, `shift(z, dt)`, `policy(z, x, t)`,
+  `initial`, `solve(params, z0) -> (z, status)`, `shift(z, t)`, `policy(z, x, t)`,
   `prediction`, `solution`, `pack`, `program`; `planner.params` is the problem's tree plus
   `"method"` and `seed`; `planner.solve(params=None, *, guess=None, ...)` rebuilt on it, with no
   mutation (`last_solution` and the caches leave the pure path; the plotting shortcuts move to
@@ -530,7 +532,8 @@ solvers and MPPI are v0.4 (§4).
   `planner.solve()` byte-identically and `jax.vmap` over starts runs on the native method.
 - [ ] **The MPC rebuilt on the planner's face** **[ask — core]** (NS-8; R148, R123):
   `ModelPredictiveController(planner, *, inputs={"x_start": "y", "t_start": "t"}, delay=True)`;
-  the delayed form a `StepSystem` with state `(z, t_last)` (`x0` from `pv.initial`), shifting and
+  the delayed form a block whose state is `z` alone, its origin inside (R155; its kind under the
+  2026-10-28 reviews), `x0` from `pv.initial`, shifting and
   solving once per tick and keeping the old plan on a failed solve; the pure form a static block;
   inputs as bindings, the `t` port wired by convention; ports `u`, `z`, `x_ref`, `u_ref`;
   `PlanFollower` for dual rate; `dt_mpc`, `t0`, `warm_start`, `MPCTickLatch`, the stateless and

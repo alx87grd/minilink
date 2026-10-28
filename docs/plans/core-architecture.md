@@ -230,7 +230,7 @@ terminal = QuadraticField(P, x_bar).as_terminal_cost()   # §9: the LQR value en
     loop compiled with its plant block augmented to `(x_next, c_k)` inside its period body, so a
     stateful controller's loop is still one scan with one plant evaluation per period;
     `discretize(problem, dt)` (facade `problem.discretize`) is the explicit `StepPlanningProblem`,
-    compiling to the same face; value iteration, the RL environment, the judge, shooting and the
+    its cost a `SampledCost` (the one-period integral of `g`, R154), compiling to the same face; value iteration, the RL environment, the judge, shooting and the
     native MPC read only that face;
   - **the stage cost** is integrated with the state inside the step, in the stationary form
     `c_k = ∫₀^dt e^{−ρτ} g dτ`, `J = Σ γ^k c_k + γ^N h` (R142); under forward Euler it is
@@ -250,8 +250,7 @@ terminal = QuadraticField(P, x_bar).as_terminal_cost()   # §9: the LQR value en
   period while `evaluate` closes the law as a continuous diagram and reads it at the RK4 stages,
   so a lookup policy is scored on two loops today.
 - **Open** (QUESTIONS, the one-score entry): time-varying sets and the margins between samples;
-  one failure rule (absorbing or not) and the input hold; shooting's reported score. And the
-  discretized problem's cost, which R141 leaves with no object (QUESTIONS).
+  one failure rule (absorbing or not) and the input hold; shooting's reported score.
 - **Rows:** [TODO §1.6](TODO.md#16-one-score).
 
 ## 7. The parametric program; the stochastic program its seed case (pillar)
@@ -290,11 +289,11 @@ terminal = QuadraticField(P, x_bar).as_terminal_cost()   # §9: the LQR value en
     `Optimizer(program, method="adam", iterations=K)` is exactly `K` steps, one `lax.scan`, pure
     and differentiable; `iterations=None` runs to a tolerance (R149).
   - **A planner is a description; `planner.compile()` is its pure face** (R148): `n_z`,
-    `initial`, `solve(params, z0) -> (z, status)`, `shift(z, dt)`, `policy(z, x, t)`,
+    `initial`, `solve(params, z0) -> (z, status)`, `shift(z, t)`, `policy(z, x, t)`,
     `prediction`, `solution`, `pack`, `program`; `planner.solve()` stays the convenience verb.
     Every planner fits: what differs is what its solution vector `z` holds.
   - **The MPC** is one block in two forms on that face (R148, R123): the delayed form, a
-    `StepSystem` whose state is `(z, t_last)`, shifting and solving once per tick and applying the
+    block whose state is `z` alone, its origin inside (R155), shifting and solving once per tick and applying the
     stored plan; the pure form, a static block. Its inputs are bindings to leaves of the planner's
     tree (`{"x_start": "y", "t_start": "t"}` by default), time on a `t` port wired by convention,
     its tree the planner's `params`.
@@ -306,8 +305,8 @@ terminal = QuadraticField(P, x_bar).as_terminal_cost()   # §9: the LQR value en
   update jitted; nothing differentiates through a solve; the RL learners already run their steps
   in one `lax.scan`; the planners have no pure face, `solve` mutates them (`last_solution`); the
   MPC is two classes with `dt_mpc`, `t0`, `warm_start` and a tick latch, probing the planner.
-- **Open:** the names in planner-and-mpc.md §11; one owner of the plan's time (`t_last` beside
-  the origin in `z`) and the clock port `t` (QUESTIONS).
+- **Open:** the names in planner-and-mpc.md §11; the clock port `t` and what time a block reads,
+  under three reviews of 2026-10-28 (QUESTIONS).
 - **Rows:** [TODO §1.8](TODO.md#18-the-native-proof-of-concept-the-planners-pure-face-and-an-mpc-on-it).
 
 ## 9. Fields (pillar)

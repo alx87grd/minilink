@@ -211,8 +211,11 @@ a step system, so the evaluation unifies from there, with time as an index.
   the same `c_k`. A `StepPlanningProblem` compiles to the same face, with no `dt`.
 - **The explicit discretization.** `discretize(problem, dt, *, solver=, substeps=)` (facade
   `problem.discretize(dt)`) returns a `StepPlanningProblem` on the plant's `SampledSystem`
-  (R146), compiling to the same face to the bit (one test pins it). Its cost is the
-  transition's cost row, not a free-standing `StepCost`.
+  (R146), compiling to the same face to the bit (one test pins it). Its cost is a
+  `SampledCost(g, h, plant, dt, *, solver=, substeps=)` (R154), a `StepCost` whose `c(x, u, k)`
+  integrates `e^{−ρτ} g` over one period from `x` under the held `u` when called directly, with
+  the plant's solver and substeps, and whose `h(x, k)` is the terminal cost at `t_k`; the compiled
+  face fuses it into the transition, so the direct call is the only second plant evaluation.
 - **Who reads which face.** Value iteration, the RL environment, the judge, shooting and the
   native MPC read only the step face and cannot tell a native problem from a sampled one.
   Collocation, the continuous LQR, the linear analysis and `solver="scipy"` read the continuous
