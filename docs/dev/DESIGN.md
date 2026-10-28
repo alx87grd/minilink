@@ -334,6 +334,12 @@ read `params` yet, the gap is tracked below.
 
 - `params is None` → `self.params`; any other value overrides (never
   `params or self.params`).
+- **Two words for two times (R157).** `dt` is the step of a computation and names it at every
+  call (`discretize(sys, dt)`, `sys % dt`, `problem.compile(dt=)`, the evaluator's `step(…, dt=)`);
+  `sample_period` is the clock a block holds and names it on every such block (the sampled
+  system, the noise sources, the seeded policy). `discretize(plant, dt, substeps=4)` shows the
+  two: the period above, the integration step `dt / 4` underneath. A noise block's period is
+  never a `dt`: its physics does not change with the tool's step.
 - **Diagram params are nested by subsystem id**: `{"plant": {…}, "controller": {…}}`.
   `DiagramSystem.params` is a live-view property — the getter assembles
   `{sys_id: subsystem.params}` from live references (subsystems stay the

@@ -12,6 +12,8 @@ reviews and are recorded here when ruled.
 | --- | --- | --- |
 | R154 | `discretize(problem, dt)` gives its `StepPlanningProblem` a `SampledCost`, the one-period integral of `g` as a `StepCost` | [differentiable-problem](../plans/differentiable-problem.md) §9.1 |
 | R155 | The plan's origin is one entry of `z`; the MPC's state is `z` alone; `shift(z, t)` rebases to an absolute time | [planner-and-mpc](../plans/planner-and-mpc.md) §3, §6.2 |
+| R156 | A performance budget: a benchmark script, the ninth item of the definition of done, 2× on five measured numbers | [core-architecture](../plans/core-architecture.md) §11 |
+| R157 | `dt` at the calls, `sample_period` on the blocks that hold a clock | DESIGN §4 |
 
 ## R154 (2026-10-28, preliminary) The discretized problem's cost is a `SampledCost`
 
@@ -55,3 +57,32 @@ keep `t_last` in its own state, `n = pv.n_z + 1`: one number, two homes.
   plan) must be handed the origin beside it, and the follower needs a second port for it.
 - Amends R148's delayed form: the state `(z, t_last)` becomes `z`; `shift(z, dt)` becomes
   `shift(z, t)`.
+
+## R156 (2026-10-28, preliminary) A performance budget for the core
+
+The question: the parametric program's gate ("if carrying `params` costs speed, an export option
+bakes them in") had no number, and the definition of done no budget.
+
+- **The choice:** option (a). A ninth script in the definition of done, run as a benchmark at the
+  merge with its numbers in the report, not a CI gate: the compiled sampled loop, the one score
+  and the native MPC's closed loop each within 2× of the vision's measurement at the same size
+  (44 ms, 93 ms, 134 ms; CPU, float64, the vision §7.5); the parametric program's solve within 2×
+  of the same program with its parameters frozen; a parameter family within 2× of the plain batch
+  (S53's bar).
+- **Why:** the numbers and the scripts exist; 2× passes a correct implementation without tuning
+  and fails a design mistake (a retrace per tick, a Python loop left in) by an order of magnitude.
+- Rejected: no budget; only the parametric gate quantified.
+
+## R157 (2026-10-28, preliminary) `dt` at the calls, `sample_period` on the blocks
+
+The question: the calls say `dt` and the objects say `sample_period` for what looks like one
+quantity; R134's rule is one keyword per concept.
+
+- **The choice:** option (a), two words for two things. `dt` is the step of a computation, at every
+  call (`discretize(sys, dt)`, `sys % dt`, `problem.compile(dt=)`, the evaluator's `step(…, dt=)`);
+  `sample_period` is the clock a block holds, on every such block (the sampled system, the noise
+  sources, the seeded policy). `discretize(plant, dt, substeps=4)` already separates the period
+  from the integration step underneath. One line in DESIGN §4.
+- Rejected: `sample_period` at the calls (a long keyword in the student's line, a mismatch with
+  the evaluator's `dt=`); `dt` on the blocks (a noise block's period is not an integration step,
+  randomness RD-R3).

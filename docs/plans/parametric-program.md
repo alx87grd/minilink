@@ -82,10 +82,11 @@ MathematicalProgram(n_z=3, J=J, grad_J=grad)         # J(z): no parameters decla
   minilink stays out of optimization modelling (CONSTITUTION §1.4).
 - **It is the case the differentiable problem's bridge names:** the compiled MPC program is "no
   decision leaves, parameters bound" (the program export, `pe.program`: DESIGN §6).
-- **The performance gate (open).** Before the change lands, benchmark the compiled program
+- **The performance gate (R156).** Before the change lands, benchmark the compiled program
   carrying `params` against the same program with its parameters frozen (compile time and
-  per-solve time, on the MPC and the PID examples). If carrying them costs speed, an export
-  option compiles a program with its parameters baked in as constants.
+  per-solve time, on the MPC and the PID examples); the bar is 2×, one of the five numbers of the
+  budget script in core-architecture §11. If carrying them costs more, an export option compiles
+  a program with its parameters baked in as constants.
 
 ### 2.1 D25, the two asks (moved from end-state-api.md, 2026-10-26)
 

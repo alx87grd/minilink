@@ -96,40 +96,6 @@ shapes, and in TODO; the entry then leaves this file. `§N` names the workstream
     start, a parameter), and a disturbance a noise source block wired onto a port".
 - **Answer:**
 
-### A performance budget for the core (performance; §5, §7)
-- **Today:** §7's gate says "if carrying `params` costs speed, an export option bakes them in",
-  with no number, and the definition of done has no budget. The vision measured (CPU, float64,
-  [its §7.5](../reviews/2026-10-27-consolidated-core-vision.md)): the one score, 1000 starts ×
-  200 RK4 steps in 44 ms; the sampled loop, 100 starts × 3000 base ticks in 93 ms; the native
-  MPC's closed loop, 60 ticks × 15 iterations × a 20-step horizon in 134 ms a call; a parameter
-  family at 278 ms against 27 ms for the plain batch (S53).
-- **Options:**
-  - (a) a ninth script in the definition of done: the compiled sampled loop, the one score and
-    the native MPC's loop each within 2× of the vision's measurement at the same sizes, the
-    parametric program's solve within 2× of the same program with its parameters frozen, and the
-    parameter family within 2× of the plain batch (S53's bar);
-  - (b) no budget in v0.3; the gate stays qualitative;
-  - (c) another factor, or only the parametric gate quantified.
-- **Recommendation (agent):** (a).
-- **Answer:**
-
-### `dt` or `sample_period` (API and naming; §5)
-- **Today:** the calls say `dt` (`discretize(sys, dt)`, `problem.compile(dt=)`,
-  `discretize(problem, dt)`, `sys % dt`) and the objects say `sample_period` (R146's rename of
-  `Discretization.dt`; the noise blocks, R128; `GaussianPolicy(sample_period=)`, R129). R134's
-  rule is one keyword per concept.
-- **Options:**
-  - (a) `dt` wherever a tool integrates or steps (the calls); `sample_period` on every block that
-    holds a clock (the sampled system, the noise sources, the seeded policy): two words for two
-    things, an integration step and a block's clock, stated in one line of DESIGN §4;
-  - (b) `sample_period` at the calls too (`discretize(sys, sample_period=)`), one word;
-  - (c) `dt` on the objects too.
-- **Recommendation (agent):** (a); `discretize(plant, dt, substeps=)` already separates a period
-  from the step underneath it.
-- **Detail:** TODO §1.1, the names row.
-- **Answer:**
-
-
 ## Toward v1.0
 
 ### How does a public name change once v1.0 is frozen?

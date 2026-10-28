@@ -277,8 +277,8 @@ terminal = QuadraticField(P, x_bar).as_terminal_cost()   # §9: the LQR value en
   evaluator; the compiled path takes SciPy only; problems have no start time; shooting and
   collocation pin the start through `X0`; `pe.program(wrt, key, n_trials)` refuses `"x_start"` in
   `wrt` on a stochastic problem.
-- **Open:** the name of `program.params_at(z)` (the names sweep); a performance budget for the
-  gate (QUESTIONS).
+- **Open:** the name of `program.params_at(z)` (the names sweep). The performance gate has its
+  budget: §11's ninth script (R156).
 - **Rows:** [TODO §1.7](TODO.md#17-the-parametric-program-the-stochastic-program-its-seed-case).
 
 ## 8. The native proof of concept: the planner's pure face and an MPC on it (pillar)
@@ -393,6 +393,13 @@ From reviewer C §3.3, in the ruled names. v0.3 is done when these scripts run a
 7. **A `QuadraticField`** serves as a terminal cost (`as_terminal_cost`) and as the certificate's
    `V`, with the DP and RoA baselines unchanged.
 8. **Every catalog plant and notebook** is green on the merge gate.
+9. **The budget** (R156), a benchmark script run at the merge with its numbers in the report, not a
+   CI gate: the compiled sampled loop, the one score and the native MPC's closed loop each within
+   2× of the vision's measurement at the same size (44 ms for 1000 starts × 200 RK4 steps; 93 ms
+   for 100 starts × 3000 base ticks; 134 ms a call for 60 ticks × 15 iterations × a 20-step
+   horizon, CPU, float64, [the vision §7.5](../reviews/2026-10-27-consolidated-core-vision.md));
+   the parametric program's solve within 2× of the same program with its parameters frozen; a
+   parameter family within 2× of the plain batch (S53's bar).
 
 ## 12. The core and the features
 

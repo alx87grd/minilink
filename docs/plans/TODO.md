@@ -170,8 +170,8 @@ Why: [core-architecture.md](core-architecture.md) §1.
   - the names the day's rulings left to this sweep: `sys.discretize(dt)` as the facade of
     `discretize` (R141), the dense-run evaluator method (R147), and the planner and MPC names of
     [planner-and-mpc.md](planner-and-mpc.md) §11 (`pv.policy`, the letter `z`, `PlanFollower`),
-    and `dt` at the calls against `sample_period` on the object (R146; QUESTIONS, the names
-    entry).
+    and the rule `dt` at the calls, `sample_period` on the blocks that hold a clock (R157),
+    written in DESIGN §4.
 
   Done when DESIGN §4 states the rule and no public signature uses `compile_backend`,
   `optimizer_method` or the geometry `bind`. Later, not in this row: the compiled-model classes →
