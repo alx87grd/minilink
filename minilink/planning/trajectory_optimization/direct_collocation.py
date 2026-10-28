@@ -216,9 +216,14 @@ class DirectCollocationTranscription(Transcription):
         return self.options.t(problem)
 
     def decision_bounds(
-        self, problem: PlanningProblem
+        self, problem: PlanningProblem, *, boxes_only=False
     ) -> tuple[np.ndarray, np.ndarray]:
-        """Build box bounds on the packed decision vector when sets expose boxes."""
+        """Build box bounds on the packed decision vector when sets expose boxes.
+
+        ``boxes_only``: the bounds of a true box only (the JAX program, whose
+        other sets are leaves of its tree: a moved set's compile-time box would
+        stay in the bounds).
+        """
         n = int(problem.sys.n)
         n_steps = self.options.n_steps
         n_z = self.decision_dimension(problem)
@@ -227,13 +232,13 @@ class DirectCollocationTranscription(Transcription):
         upper = np.full(n_z, np.inf)
 
         # The state box on every state knot
-        X_box = problem.X.bounding_box()
+        X_box = box_bounds(problem.X, BoxSet, boxes_only)
         if X_box is not None:
             lower[: n * n_steps] = np.repeat(X_box.lower, n_steps)
             upper[: n * n_steps] = np.repeat(X_box.upper, n_steps)
 
         # The input box on every input knot
-        U_box = problem.U.bounding_box()
+        U_box = box_bounds(problem.U, BoxInputSet, boxes_only)
         if U_box is not None:
             start = n * n_steps
             lower[start:] = np.repeat(U_box.lower, n_steps)
@@ -272,7 +277,7 @@ class DirectCollocationTranscription(Transcription):
         # defect law; then the boundary and path constraints
         equalities, inequalities = self.jax_constraints(problem, unpack_jax, jax)
         equalities = [dynamics_residual, *equalities]
-        lower, upper = self.decision_bounds(problem)
+        lower, upper = self.decision_bounds(problem, boxes_only=True)
 
         return MathematicalProgram(
             n_z=self.decision_dimension(problem),
@@ -584,6 +589,14 @@ class DirectCollocationTranscription(Transcription):
 ###############################################################################
 # Internal machinery
 ###############################################################################
+
+
+def box_bounds(set_, box_type, boxes_only):
+    """The set's bounding box for the decision bounds: any set's, or with ``boxes_only`` a true box's (else ``None``)."""
+    if boxes_only and not isinstance(set_, box_type):
+        return None
+
+    return set_.bounding_box()
 
 
 def constrained_roles(problem) -> tuple[str, ...]:

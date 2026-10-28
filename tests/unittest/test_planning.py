@@ -2475,6 +2475,23 @@ def test_the_compiled_face_reproduces_the_planners_solve(backend):
     x, u = pv.prediction(z, 0.0)
     np.testing.assert_allclose(x, solved.trajectory.x[:, 0], atol=1e-12)
 
+    # A solve at other values is checked on the program it was solved on: the
+    # record of a planner built at that start, on the same z
+    start = {"x_start": np.array([0.05, 0.0])}
+    moved, moved_status = pv.solve(start)
+    record = pv.solution(moved, start, moved_status).solver
+    at_start = TrajectoryOptimizationPlanner(
+        face_swing_up().replace(x_start=start["x_start"]),
+        n_steps=11,
+        transcription="direct_collocation",
+        backend=backend,
+        optimizer_options={"maxiter": 60},
+    ).compile()
+    oracle = at_start.solution(moved, None, moved_status).solver
+    assert record.max_equality_violation == pytest.approx(
+        oracle.max_equality_violation, rel=1e-9, abs=1e-12
+    )
+
     # A guess packs back to z, and an unknown path is refused
     np.testing.assert_allclose(pv.pack(face)[:-1], z[:-1], atol=1e-12)
     with pytest.raises(ValueError, match="known entries"):

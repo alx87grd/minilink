@@ -592,19 +592,24 @@ class TrajectoryOptimizationPlanner(Planner):
         )
 
     def trajectory_solution(
-        self, trajectory, record, evaluate, n_trials
+        self, trajectory, record, evaluate, n_trials, problem=None
     ) -> PlanningSolution:
-        """The schedule as a solution: its input replayed by a source block, scored over the draws when asked."""
+        """The schedule as a solution of the planner's problem (or ``problem``): its input replayed by a source block, scored over the draws when asked."""
+        problem = self.problem if problem is None else problem
         policy = self.open_loop_policy(trajectory)
 
         evaluation = None
         if evaluate:
             dt = float(trajectory.t[1] - trajectory.t[0])
             evaluation = self.evaluate(
-                policy, dt=dt, n_trials=n_trials, tf=float(trajectory.tf)
+                policy,
+                dt=dt,
+                n_trials=n_trials,
+                tf=float(trajectory.tf - trajectory.t[0]),
+                problem=problem,
             )
 
-        return PlanningSolution(self.problem, policy, record, trajectory, evaluation)
+        return PlanningSolution(problem, policy, record, trajectory, evaluation)
 
     def print_solve_report(
         self,
@@ -675,9 +680,10 @@ class TrajectoryOptimizationPlanner(Planner):
         self.program_evaluator.bind({**(params or {}), "x_start": x_arr})
         bound = self.program_evaluator.params
 
-        # The problem restarted at the measured state and the tick's start time
+        # The problem restarted at the measured state and the tick's start time, a
+        # copy holding the tick's other values when there are any
         t_start = float(bound["t_start"])
-        problem_k = self.problem.replace(
+        problem_k = problem_with(self.problem, host_tree(params)).replace(
             x_start=x_arr, X0=SingletonSet(x_arr), t_start=t_start
         )
 
@@ -738,7 +744,9 @@ class TrajectoryOptimizationPlanner(Planner):
             stats=dict(result.stats),
         )
         solution = self.store_solution(
-            self.trajectory_solution(trajectory, record, evaluate, n_trials)
+            self.trajectory_solution(
+                trajectory, record, evaluate, n_trials, problem=problem_k
+            )
         )
 
         if self.options.verbose:
@@ -925,6 +933,24 @@ def require_no_scene(params) -> None:
             "the online params key 'scene' waits for the scene bind (A3); "
             "bind the problem's own leaves (plant, cost, t_start, …)"
         )
+
+
+def host_tree(tree):
+    """A tree with every leaf a NumPy value (``None`` kept), or ``None`` for none."""
+    if not tree:
+        return None
+    if isinstance(tree, dict):
+        return {
+            key: host_tree(value) if isinstance(value, dict) else host_leaf(value)
+            for key, value in tree.items()
+        }
+
+    return tree
+
+
+def host_leaf(value):
+    """One leaf on the host: a NumPy value, ``None`` kept."""
+    return None if value is None else np.asarray(value)
 
 
 def problem_with(problem, params):

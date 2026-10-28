@@ -247,7 +247,8 @@ class AdamLaw:
 
         # The gradient clipped to one norm, then the step count k advanced
         if max_norm is not None:
-            grad = grad * xp.minimum(1.0, max_norm / (xp.sqrt(xp.sum(grad**2)) + 1e-6))
+            norm = safe_root(xp.sum(grad**2), xp)
+            grad = grad * xp.minimum(1.0, max_norm / (norm + 1e-6))
         step = state["step"] + 1
 
         # Moment estimates: m = β₁ m + (1 − β₁) g,  v = β₂ v + (1 − β₂) g²
@@ -256,7 +257,9 @@ class AdamLaw:
 
         # Bias-corrected step: z ← Π(z − η_k m / (√v + ε)), η_k = η √(1 − β₂ᵏ) / (1 − β₁ᵏ)
         eta_k = eta * (1 - b2**step) ** 0.5 / (1 - b1**step)
-        z_next = xp.clip(z - eta_k * m / (v**0.5 + eps), self.lower, self.upper)
+        z_next = xp.clip(
+            z - eta_k * m / (safe_root(v, xp) + eps), self.lower, self.upper
+        )
 
         return {"z": z_next, "m": m, "v": v, "step": step}
 
@@ -341,6 +344,16 @@ def clip_by_global_norm(grads, max_norm):
 ###############################################################################
 # Internal machinery
 ###############################################################################
+
+
+def safe_root(v, xp):
+    """``√v`` with a finite derivative at ``v = 0`` (zero there): the same value, so ``grad`` through a step is never ``nan``."""
+    positive = v > 0
+
+    # √v where v > 0, 0 elsewhere, the root never taken at 0
+    root = xp.where(positive, xp.where(positive, v, 1.0) ** 0.5, 0.0)
+
+    return root
 
 
 def compiled(update):

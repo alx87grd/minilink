@@ -264,7 +264,7 @@ class Optimizer:
 
         # The start and the tree, merged once, bound to nothing
         tree = evaluator.merged(params)
-        z_start = self.z0 if z0 is None else z0
+        z_start = self.z0 if z0 is None else self.start_vector(z0)
 
         # z_K = S^K(z0; p), and J(z_K; p)
         z, J = self.adapter.run(evaluator, z_start, tree, K)
@@ -280,6 +280,15 @@ class Optimizer:
     ###########################################################################
     # Internal machinery
     ###########################################################################
+
+    def start_vector(self, z0):
+        """A start checked as :meth:`decision_vector` when it has values, a traced one by its shape."""
+        n_z = self.program.n_z
+        try:
+            return self.decision_vector(z0, n_z)
+        except TypeError:  # a tracer has no value
+            require_start_shape(z0, n_z)
+            return z0
 
     @staticmethod
     def decision_vector(z, n_z: int) -> np.ndarray:
@@ -458,6 +467,12 @@ def require_native(method):
             f"iterations= and as_step_system take the native methods {NATIVE_METHODS}; "
             f"{method!r} runs to its own tolerance"
         )
+
+
+def require_start_shape(z0, n_z):
+    """Refuse a traced start that is not of shape ``(n_z,)``."""
+    if tuple(z0.shape) != (int(n_z),):
+        raise ValueError(f"decision vector must have shape ({int(n_z)},)")
 
 
 def require_no_hook(callback):

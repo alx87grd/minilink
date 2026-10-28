@@ -840,3 +840,34 @@ def test_a_fixed_count_solve_on_numpy_takes_the_same_steps(method):
         Optimizer(program, z0=[0.0, 0.0], method="l-bfgs", iterations=10)
     with pytest.raises(ValueError, match="positive whole number"):
         Optimizer(program, z0=[0.0, 0.0], method=method, iterations=0)
+
+
+@pytest.mark.jax
+def test_adams_fixed_count_gradient_is_finite_at_a_zero_gradient_entry():
+    import jax
+    import jax.numpy as jnp
+
+    from minilink.core.backends import array_module
+    from minilink.optimization.mathematical_program import MathematicalProgram
+
+    def J(z, params):
+        xp = array_module(z)
+        return xp.sum((z - params["c"]) ** 2)
+
+    program = MathematicalProgram(
+        n_z=2, J=J, backend="jax", params={"c": np.array([0.0, 2.0])}
+    )
+    for max_grad_norm in (None, 1.0):
+        opt = Optimizer(
+            program,
+            z0=[0.0, 0.0],  # a list: the start is checked as on the host path
+            method="adam",
+            iterations=20,
+            options={"max_grad_norm": max_grad_norm},
+        )
+        jacobian = jax.jacobian(lambda c: opt.solve(params={"c": c}).z)(
+            jnp.asarray([0.0, 2.0])
+        )
+        assert np.all(np.isfinite(np.asarray(jacobian)))
+    with pytest.raises(ValueError, match="shape"):
+        opt.solve(z0=[0.0, 0.0, 0.0])

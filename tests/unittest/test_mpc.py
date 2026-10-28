@@ -680,6 +680,45 @@ class TestMPCSolveTrajectoryFrom(unittest.TestCase):
         # A box lowered to the decision bounds is structure, not a leaf
         self.assertNotIn("U", planner.program.params)
 
+        # A moved ball takes its own bounds: none of the compile-time box stays
+        def moved(center):
+            problem = problem_of(1.0)
+            problem.X = BallSet(np.array([center]), 1.0)
+            return problem
+
+        start = np.array([1.5])
+        plan = planner.solve_trajectory_from(start, params={"X": {"center": [1.0]}})
+        rebuilt = self.make_planner(moved(1.0)).solve_trajectory_from(start)
+        self.assertTrue(plan.success)
+        np.testing.assert_allclose(plan.trajectory.x, rebuilt.trajectory.x, atol=1e-6)
+
+    def test_the_compiled_ticks_evaluation_is_the_ticks_problem(self):
+        sys = JaxSingleIntegrator()
+        cost = QuadraticCost.from_system(sys, Q=np.eye(1), R=0.1 * np.eye(1))
+        problem = PlanningProblem(
+            sys=sys, tf=1.0, x_start=np.array([0.0]), cost=cost, U=sys.input_box
+        )
+        values = {"t_start": 3.0, "cost": {"Q": 4.0 * np.eye(1)}}
+        x0 = np.array([0.3])
+        compiled = self.make_planner(problem).solve_trajectory_from(
+            x0, params=values, evaluate=True
+        )
+        rebuild = TrajectoryOptimizationPlanner(
+            problem,
+            transcription=DirectCollocationTranscription(
+                DirectCollocationOptions(n_steps=5)
+            ),
+            options=TrajectoryOptimizationOptions(
+                backend="numpy", optimizer_options={"maxiter": 50, "ftol": 0.0001}
+            ),
+        ).solve_trajectory_from(x0, params=values, evaluate=True)
+        self.assertEqual(compiled.problem.t_start, 3.0)
+        np.testing.assert_allclose(compiled.problem.x_start, x0)
+        np.testing.assert_allclose(
+            compiled.evaluation.J, rebuild.evaluation.J, rtol=1e-3
+        )
+        self.assertEqual(problem.t_start, 0.0)  # the caller's problem as it was
+
     def test_the_compiled_tick_solves_with_ipopt(self):
         pytest.importorskip("cyipopt")
         problem = self.make_problem(0.0)

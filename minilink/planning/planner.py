@@ -170,23 +170,25 @@ class Planner(ABC):
         return TrajectorySource(trajectory.t, u, interpolation=interpolation)
 
     def evaluate(
-        self, policy, *, dt, n_trials=50, tf=None, backend="numpy"
+        self, policy, *, dt, n_trials=50, tf=None, backend="numpy", problem=None
     ) -> Evaluation | None:
         """
-        The :func:`~minilink.planning.evaluator.evaluate` of ``policy`` on this planner's problem.
+        The :func:`~minilink.planning.evaluator.evaluate` of ``policy`` on this planner's problem (or ``problem``).
 
         One run when nothing is random, ``n_trials`` draws from key 0 otherwise;
         ``None`` when the problem declares no cost (a search without one).
         """
+        problem = self.problem if problem is None else problem
+
         # A problem without a cost has nothing to score
-        if self.problem.cost is None:
+        if problem.cost is None:
             return None
 
         # One run when nothing is random, n_trials draws otherwise
-        trials = int(n_trials) if self.problem.is_stochastic else None
+        trials = int(n_trials) if problem.is_stochastic else None
 
         return evaluate(
-            self.problem,
+            problem,
             policy,
             dt=dt,
             n_trials=trials,

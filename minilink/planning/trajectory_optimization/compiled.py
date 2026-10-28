@@ -82,16 +82,8 @@ class CompiledTrajectoryPlanner:
         z_dec0 = z_start[:-1]
 
         # z* = argmin J(z; p) from the guess, by the planner's method
-        if self.program.params is None and params:
-            optimizer = self.planner.build_optimizer(
-                self.transcription.transcribe(
-                    self.problem_at(params), backend=self.backend
-                ),
-                np.asarray(z_dec0, dtype=float),
-            )
-            result = optimizer.solve()
-        elif self.program.params is None:
-            result = self.optimizer.solve(z0=z_dec0)
+        if self.program.params is None:
+            result = self.optimizer_at(params, z_dec0).solve(z0=z_dec0)
         else:
             result = self.optimizer.solve(params=params, z0=z_dec0)
 
@@ -180,9 +172,12 @@ class CompiledTrajectoryPlanner:
             result, problem=problem, backend=self.backend
         )
 
-        # Feasible to tol: max |h(z*)| ≤ tol, min g(z*) ≥ −tol, z* within its bounds
-        evaluator = self.optimizer.program_evaluator
-        if self.program.params is not None:
+        # Feasible to tol: max |h(z*)| ≤ tol, min g(z*) ≥ −tol, z* within its bounds,
+        # on the program the plan was solved on
+        if self.program.params is None:
+            evaluator = self.optimizer_at(params, z_dec).program_evaluator
+        else:
+            evaluator = self.optimizer.program_evaluator
             evaluator.bind(params)
         max_eq, min_ineq, max_bound = evaluator.constraint_violations(z_dec)
         tol = float(self.planner.options.feasibility_tol)
@@ -229,6 +224,17 @@ class CompiledTrajectoryPlanner:
 
         return merge_known(self.params, params)
 
+    def optimizer_at(self, params, z_dec):
+        """The optimizer of a NumPy program at ``params``: the compiled one for none, else one rebuilt on a copy of the problem holding them."""
+        if not params:
+            return self.optimizer
+
+        program = self.transcription.transcribe(
+            self.problem_at(params), backend=self.backend
+        )
+
+        return self.planner.build_optimizer(program, np.asarray(z_dec, dtype=float))
+
     def rows(self, z):
         """The knot rows of ``z``'s decision vector, ``(rows, N)``."""
         n_steps = self.offsets.size
@@ -238,7 +244,10 @@ class CompiledTrajectoryPlanner:
     def problem_at(self, params):
         """The problem itself for no values, else a copy holding them (its parts copied)."""
         # Lazy import: the planner module imports this one
-        from minilink.planning.trajectory_optimization.planner import problem_with
+        from minilink.planning.trajectory_optimization.planner import (
+            host_tree,
+            problem_with,
+        )
 
         return problem_with(self.problem, host_tree(params))
 
@@ -250,6 +259,9 @@ class CompiledTrajectoryPlanner:
 
 def has_values(tree) -> bool:
     """Whether every leaf of a tree has a value (none is a tracer)."""
+    # Lazy import: the planner module imports this one
+    from minilink.planning.trajectory_optimization.planner import host_tree
+
     if not tree:
         return False
     try:
@@ -258,26 +270,6 @@ def has_values(tree) -> bool:
         return False
 
     return True
-
-
-def host_tree(tree):
-    """A tree with every leaf a NumPy value (``None`` kept), or ``None`` for none."""
-    if not tree:
-        return None
-    if isinstance(tree, dict):
-        return {key: host_tree_leaf(value) for key, value in tree.items()}
-
-    return tree
-
-
-def host_tree_leaf(value):
-    """One entry of a tree on the host: a subtree recursively, a leaf as a NumPy value."""
-    if isinstance(value, dict):
-        return {key: host_tree_leaf(item) for key, item in value.items()}
-    if value is None:
-        return None
-
-    return np.asarray(value)
 
 
 def require_state_knots(transcription):

@@ -76,7 +76,8 @@ def merge_known(tree, override):
     A partial tree is checked against the structure it merges onto: a key the
     tree lacks raises and names the known ones, a subtree given as a leaf (or a
     leaf as a subtree) raises, and a leaf of a new shape raises (a ``None``
-    leaf, such as a seed at its mean, takes any value).
+    leaf, such as a seed at its mean, takes any value). A list or tuple leaf
+    becomes an array: a tree's containers are dicts.
     """
     merged = dict(tree)
     for key, value in override.items():
@@ -87,7 +88,9 @@ def merge_known(tree, override):
             merged[key] = merge_known(node, value)
         else:
             require_same_shape(key, value, node)
-            merged[key] = value
+            merged[key] = (
+                np.asarray(value) if isinstance(value, (list, tuple)) else value
+            )
 
     return merged
 
