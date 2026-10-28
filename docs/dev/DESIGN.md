@@ -763,7 +763,8 @@ SciPy solver adapts `f` for `solve_ivp` itself (`simulation/solvers/scipy_ivp.py
 `discretize(plant, dt, *, solver="rk4", substeps=1) -> StepSystem` is the plant one sample
 period later, the input held: `solver` is `"rk4"` or `"euler"` (`substeps` per period) or
 `"exact"` (the matrix exponential, a linear model only). Its `step(x, u, k=0, params=None)`
-takes the integer tick and binds `t_k = t₀ + k dt`; the sample time is `dt` alone, never a
+takes the integer tick and binds `t_k = k dt` (the origin 0; R158 gives a consumer with an origin
+the seconds face); the sample time is `dt` alone, never a
 key of the plant's `params`. The hold belongs to sequences (`rollout`), never to a step.
 
 Layout of `core/compile/`: `compiler.py` (`compile`, `compile_auto`, `compile_diagram`,

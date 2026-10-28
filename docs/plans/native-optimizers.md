@@ -235,7 +235,7 @@ delay, tick 0 and the bindings are [planner-and-mpc.md](planner-and-mpc.md) §6.
 terms one tick is
 
 ```text
-z_k = S^K( pv.shift(z_{k−1}, t_k − t_last) ; P_k )      P_k: the planner's tree, x_start and t_start bound
+z_k = S^K( pv.shift(z_{k−1}, t_k) ; P_k )               P_k: the planner's tree, x_start and t_start bound (R155)
 ```
 
 with `S` one iteration of the method (projected fast gradient, Adam). `K` is structural, fixed at

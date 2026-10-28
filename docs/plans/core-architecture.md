@@ -121,13 +121,14 @@ terminal = QuadraticField(P, x_bar).as_terminal_cost()   # §9: the LQR value en
   - `@`, `>>` and `+` on step systems; mixing a continuous and a step operand refused, naming `%`,
     except `sampled @ continuous`, the one place the two worlds meet (R126, R146);
   - a pure `StepSystem` has no clock: `step(x, u, k)`, a chess game or a grid world; a clock is
-    applied from outside (§5, R146);
+    applied from outside (§5, R146); a pure step diagram hands its count to every block, so a
+    static block in it reads `t = k` (R158);
   - `compute_rollout` on every step system returns a `Trajectory` (`StepRollout` folded), `t = k`
     on a pure step system, `t = k·Δ` on a sampled one (R147);
   - step rollouts trace end to end and batch over starts, seeds and parameter families
     (native-optimizers.md §3.1); the step tools linearize at a fixed point and read eigenvalues
     against the unit circle (R122).
-- **Ruled:** R125, R126, R146, R147.
+- **Ruled:** R125, R126, R146, R147, R158.
 - **Today:** the discrete evaluators' `rollout` (`core/compile/evaluators/discrete.py`) returns
   host NumPy, with no step `rollout_batch`; `compile_step_diagram(flatten=True)` raises, and step
   diagrams refuse a continuous leaf; two same-tick semantics (`StepDiagramEvaluator` propagates
@@ -186,6 +187,16 @@ terminal = QuadraticField(P, x_bar).as_terminal_cost()   # §9: the LQR value en
     `SampledSystem(source, sample_period, *, solver, substeps)`: any system on a clock, a view of
     its source (its `params`, ports and state the source's), the period structural. It replaces
     and renames `Discretization`.
+  - **`SampledSystem` is the sampled-data kind** (R158): one equation with two faces,
+    `update(x, u, t)` and `output(x, u, t)` in seconds (Åström–Wittenmark's
+    `x(kh + h) = F(x(kh), u(kh), kh)`), `step(x, u, k)` and `h(x, u, k)` the tick faces for the
+    step algebra; the views write the seconds face from their source, and a native sampled law
+    (the MPC first) subclasses it with no source. A pure `StepSystem` never sees seconds.
+  - **Time belongs to the loop** (R158): a block reads the time of the diagram it sits in through
+    the one argument `t`; a sampled diagram's plan hands `t_k = t_start + k·Δ` to every block in
+    seconds (a static block, a seconds face) and its own count to a tick law; the origin is the
+    run's argument, like `x0`, bound by `problem.compile` from the problem's leaf; nested boxes
+    inline into one flat plan, one clock; no clock port.
   - **Periods on blocks; the schedule derived** (R146): a diagram with a clocked block is a
     `SampledDiagramSystem`, its base period the gcd of its blocks'; a block of divisor `d > 1`
     fires on `k mod d = 0`, its held outputs state slots; a multi-rate computer is composition,
@@ -203,18 +214,18 @@ terminal = QuadraticField(P, x_bar).as_terminal_cost()   # §9: the LQR value en
   - **The MPC** is a block of this loop, designed in [planner-and-mpc.md](planner-and-mpc.md) (§8).
 - **Ruled:** R13, R14 (ticks), R104, R105 (`problem.compile` dispatches on the policy's kind),
   R123 (the MPC's one-period computational delay), R100 (the lazy `core` → `simulation.discrete`
-  import), R125, R145, R146, R147. R146 revises R120 and R127: the loop is a `System` of the step
-  algebra; CONSTITUTION invariants 1 and 3 and §6's `%` sentence are amended when it lands.
+  import), R125, R145, R146, R147, R158 (on three independent reviews,
+  [the record](../reviews/2026-10-28-session-rulings.md)). R146 revises R120 and R127: the loop is
+  a `System` of the step algebra; CONSTITUTION invariants 1 and 3 and §6's `%` sentence are
+  amended when it lands (their text in QUESTIONS).
 - **Today:** `Computer` is mutable and NumPy-only; `HybridSimulator` is a Python tick loop with no
   `params`, no roles and no problem; `StepRollout` is the computer's record; `problem.compile`
   refuses a `StepSystem` controller but accepts the stateless MPC, whose latch then runs at the
   RK4 stages (KNOWN_ISSUES); `%` refuses a law with continuous states.
 - **Open:** whether the realtime simulator is re-based on the pure blocks in v0.3 or with the
-  realtime review (v1.0); AC-8a's port names (automation-by-convention.md); D15, whether
-  `problem.compile(controller, dt=)` on a sampled controller must equal the loop's base period
-  or reads it (sampled-path.md §8.7); whether the host clock runner keeps the lazy
-  `core` → `simulation` import once the hybrid modules go (R100); `dt` at the calls against
-  `sample_period` on the object (QUESTIONS, the names entry).
+  realtime review (v1.0); AC-8a's port names and the role name of the computer side
+  (automation-by-convention.md); whether the host clock runner keeps the lazy
+  `core` → `simulation` import once the hybrid modules go (R100).
 - **Rows:** [TODO §1.5](TODO.md#15-the-sampled-loop-a-step-diagram-two-runners).
 
 ## 6. One score (pillar)
@@ -293,20 +304,19 @@ terminal = QuadraticField(P, x_bar).as_terminal_cost()   # §9: the LQR value en
     `prediction`, `solution`, `pack`, `program`; `planner.solve()` stays the convenience verb.
     Every planner fits: what differs is what its solution vector `z` holds.
   - **The MPC** is one block in two forms on that face (R148, R123): the delayed form, a
-    block whose state is `z` alone, its origin inside (R155), shifting and solving once per tick and applying the
-    stored plan; the pure form, a static block. Its inputs are bindings to leaves of the planner's
-    tree (`{"x_start": "y", "t_start": "t"}` by default), time on a `t` port wired by convention,
-    its tree the planner's `params`.
+    native `SampledSystem` whose state is `z` alone, its origin inside (R155, R158), its `update`
+    shifting and solving once per tick and its `output` applying the stored plan; the pure form, a
+    static block. Its inputs are bindings to leaves of the planner's tree (`{"x_start": "y"}` by
+    default), `t_start` bound to the time its `update` receives, its tree the planner's `params`.
   - **In v0.3, a proof of concept** (the direction): a fixed-step solver, the planner's face on
     trajectory optimization, the gradient MPC on it, its closed loop in one scan tuned by
     gradient. State-of-the-art solvers and MPPI are v0.4.
-- **Ruled:** R132, R135 (answered by R148), R148, R149.
+- **Ruled:** R132, R135 (answered by R148), R148, R149, R155, R158.
 - **Today:** `gd` and `adam` are a Python loop on NumPy (`optimizers/first_order.py`), Adam's
   update jitted; nothing differentiates through a solve; the RL learners already run their steps
   in one `lax.scan`; the planners have no pure face, `solve` mutates them (`last_solution`); the
   MPC is two classes with `dt_mpc`, `t0`, `warm_start` and a tick latch, probing the planner.
-- **Open:** the names in planner-and-mpc.md §11; the clock port `t` and what time a block reads,
-  under three reviews of 2026-10-28 (QUESTIONS).
+- **Open:** the names in planner-and-mpc.md §11.
 - **Rows:** [TODO §1.8](TODO.md#18-the-native-proof-of-concept-the-planners-pure-face-and-an-mpc-on-it).
 
 ## 9. Fields (pillar)
@@ -341,7 +351,7 @@ three open points.
 | **The loop** (the critical path; it starts first) | §2: one same-tick semantic, the operators on step systems, step evaluators that trace and batch, one signal pass per tick → §5: `SampledSystem` (renamed from `Discretization`), periods on blocks with divisors and held outputs, `SampledDiagramSystem`, the two run verbs and the dense method, the host clock runner over the pure blocks, the hybrid demos re-pinned once | step 0 |
 | **The program** | §7: one backend table, the program with parameters, `t_start` and the start from `x_start`, collocation reading the plant, the online call → §8: the native kernel, byte-identical, then `iterations=K`; the planner's compiled face on trajectory optimization | step 0 |
 | **Join 1** | §6: `StepPlanningProblem`, `problem.compile(dt=)` and `transition`, the judge on the scan, then value iteration and the RL environment on `transition`, the RL discount derived | the objects and loop lanes, and the one-score question |
-| **Join 2** | §8: the MPC rebuilt on the planner's face (both forms, the `t` port), its closed loop in one scan tuned by gradient; §7: the stochastic program as a convention and a test | all three lanes |
+| **Join 2** | §8: the MPC rebuilt on the planner's face (both forms, a native `SampledSystem`), its closed loop in one scan tuned by gradient; §7: the stochastic program as a convention and a test | all three lanes |
 | **Beside, from §1 on** | §9: Fields, additive to the path | §1's `as_cost` signature |
 | **Last** | hardening (S66, with the error family if moved in); the notebooks (R47); the merge | everything |
 

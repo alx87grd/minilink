@@ -42,37 +42,11 @@ shapes, and in TODO; the entry then leaves this file. `§N` names the workstream
   [core-architecture.md](../plans/core-architecture.md) §6
 - **Answer:**
 
-### The clock port `t` (§8; [automation-by-convention.md](../plans/automation-by-convention.md) §4.6)
-- **Direction (2026-10-28, in session, not yet ruled):** the `t` port is dropped; the question
-  widened to what `t` is for every block in every diagram (continuous, step, sampled) and to
-  `SampledSystem` as the sampled-data kind, `update(x, u, t)` its equation and `step(x, u, k)` its
-  tick face, the MPC its first native child; multi-rate in the compiled plan of the sampled
-  diagram, each clocked block fed its own index `k // d`. Three independent reviews run on it
-  (`docs/reviews/2026-10-28-time-in-the-core-reviewer-{a,b,c}.md`); ruled after them. The entries
-  below are the question as it stood before.
-- **Decided (2026-10-27, preliminary; R148):** time reaches the MPC by a standard input port
-  `t`, wired by convention to the loop's clock, so the MPC "never knows `Δ`"; where the clock
-  comes from in a continuous diagram is the landing change's detail.
-- **Why it exists:** the delayed MPC is a pure `StepSystem`, whose `step(x, u, k)` sees the
-  tick, not seconds; every equation path already takes `t` as an argument (CONSTITUTION §2, "One
-  signature"), so the port is a second channel for time.
-- **Options:**
-  - (a) the port, as ruled: a wiring convention every time-reading step block will need (a
-    reference tracker, a scheduled gain, the MPC), and a clock source in continuous diagrams;
-    delay compensation is rewiring `t + Δ`;
-  - (b) the `SampledSystem` wrapper, which knows `Δ`, hands its source the clock: for a pure step
-    source that declares it reads seconds, the wrapper binds `t_k = t_start + k·Δ` as it binds
-    `t_k` for a continuous source today, and the MPC binds `t_start` from that `t`, no port;
-    delay compensation is a keyword on the MPC (`lookahead=Δ`) or a predictor block on
-    `x_start`.
-- **Recommendation (agent):** (b) keeps one channel for time; (a) is defensible if a clock
-  source is wanted for other blocks anyway. Choose knowingly.
-- **Answer:**
-
 ### The CONSTITUTION amended for the sampled loop and the draws (vision; §2, §3, §5)
-- **Decided (2026-10-27, preliminary; R146, R128):** the sampled loop is a
+- **Decided (2026-10-27/28, preliminary; R146, R128, R158):** the sampled loop is a
   `SampledDiagramSystem` of the step algebra, `Computer` and `HybridDiagram` go; a disturbance
-  is a source block. The amendments are deferred to the landing changes.
+  is a source block; time is the argument, the time of the diagram a block sits in. The
+  amendments are deferred to the landing changes.
 - **The gap:** invariant 1, invariant 3, §6's `%` sentence and §2's disturbance sentence say the
   opposite today, and AGENTS.md has every agent read the CONSTITUTION first: the first agent on
   the loop lane meets a conflict the rules say to stop on.
@@ -93,7 +67,10 @@ shapes, and in TODO; the entry then leaves this file. `§N` names the workstream
     solver="euler")`); its `>>`, `+` and `@` are the same grammar on step systems";
   - **§2, `PlanningProblem`**, replacing "the stochastic sibling adds distributions over starts,
     parameters and disturbances": "stochastic by its parts: a law where a number goes (the
-    start, a parameter), and a disturbance a noise source block wired onto a port".
+    start, a parameter), and a disturbance a noise source block wired onto a port";
+  - **§2, "One signature"**, one clause added after "the model's arguments `(x, u, t; p)`":
+    "`t` is the time of the diagram the object sits in, seconds under a clock and the count
+    without one; a tick law's `k` is its own count" (R158).
 - **Answer:**
 
 ## Toward v1.0

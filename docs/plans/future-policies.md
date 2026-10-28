@@ -40,8 +40,8 @@ optimizer. Two of the three gaps this analysis found are now closed by design:
   loop is "the batched cost of many tables from one state", with no new machinery.
 - **The receding horizon is the one MPC block** (R148): MPPI implements the planner's compiled
   face (its `z` the nominal sequence and its origin, `shift` the shifted sequence, `seed` a leaf),
-  and the MPC's state `(z, t_last)` is the shifted warm start; its fresh samples come from the
-  block's seed and the tick (R104). [mppi.md](mppi.md) §6.
+  and the MPC's state `z` is the shifted warm start (R155); its fresh samples come from the
+  block's seed and `⌊t/Δ⌋` (R104, R158). [mppi.md](mppi.md) §6.
 - **A payoff.** MPPI's update is a weighted average, so it is differentiable end to end: its
   temperature and noise level (`controller.method.*`) can be optimized by gradient through the
   same program export (`pe.program(wrt=[...])` solved by `Optimizer`) as a PID gain.

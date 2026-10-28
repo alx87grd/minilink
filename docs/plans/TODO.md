@@ -375,7 +375,8 @@ Why: [core-architecture.md](core-architecture.md) §4. Design:
 
 Why: [core-architecture.md](core-architecture.md) §5. Design: [sampled-path.md](sampled-path.md).
 Ruled: R13, R14, R104, R105, R123, R125, R145, R146, R147 (preliminary choices of 2026-10-27,
-[record](../reviews/2026-10-27-core-vision-decisions.md)).
+[record](../reviews/2026-10-27-core-vision-decisions.md)); R158, time in the core and
+`SampledSystem` the sampled-data kind (2026-10-28, [record](../reviews/2026-10-28-session-rulings.md)).
 
 - [ ] **`SampledSystem`, a system on a clock** **[ask — core]** (R145, R146): `Discretization` is
   renamed `SampledSystem(source, sample_period, *, solver, substeps)` (its callers `dp.py`,
@@ -383,15 +384,25 @@ Ruled: R13, R14, R104, R105, R123, R125, R145, R146, R147 (preliminary choices o
   `dt` becomes `sample_period`; `ExactDiscretization` folded as `solver="exact"`); it accepts a
   continuous, a static or a pure step source, its `params`, ports and state the source's; `sys % Δ`
   returns `discretize(sys, Δ, solver="euler")` for any system, so a law with continuous states (a
-  PID) becomes its difference equation instead of being refused. Done when `pid % 0.01` rolls out
-  the hand-written Euler difference equation and the discretize baselines are byte-identical.
+  PID) becomes its difference equation instead of being refused. Its equations are the seconds
+  faces `update(x, u, t)` and `output(x, u, t)`, the tick faces `step(x, u, k)` and `h(x, u, k)`
+  converting `t = k·sample_period` (R158); the views write the seconds face from their source (a
+  tick source has none); a native sampled law subclasses it with no source (the MPC, §1.8); a
+  sampled static block has `n = 0` (`require_step_state` relaxed). Done when `pid % 0.01` rolls
+  out the hand-written Euler difference equation, `ev.step(x, u, t, dt=)` and `update` agree bit
+  for bit, and the discretize baselines are byte-identical.
 - [ ] **Periods on blocks; `SampledDiagramSystem`; no `Computer`, `StepSchedule` or
   `HybridDiagram`** **[ask — core]** (merges S31, D13 and P10's AC-8b; R146): a diagram with a
   clocked block is a `SampledDiagramSystem`, its base period the gcd of its blocks', a block of
   divisor `d > 1` firing on `k mod d = 0` with its held outputs as state slots, a period not a
   multiple of the base refused at wiring (the ratios checked to a tolerance, today's `1e-9` of
   `rate_to_divisor`); `computer @ plant` is one, its plant the plant on the
-  base clock with substeps (defaulting from the automatic-`dt` rule); the hybrid demos, tutorial 06
+  base clock with substeps (defaulting from the automatic-`dt` rule); the plan hands
+  `t_k = t_start + k·Δ` to every block in seconds (a static block, a seconds face) and its own
+  count `k // d` to a tick law, the firing a `lax.cond` or the hyperperiod unroll (never a
+  `where`); the origin a run argument, `compute_rollout(n_steps, t_start=0.0)`, bound by
+  `problem.compile` from the problem's leaf; a nested sampled box inlined into one flat plan, one
+  clock (R158); the hybrid demos, tutorial 06
   and the dual-rate projects rewritten as composition (`(filt % 0.01) >> (ctl % 0.1)`); the
   run-state caches gone (RULES 2.4, D13); the `core` → `simulation` import (scan: core#14);
   the CONSTITUTION amended in the landing change, its text to the maintainer: invariant 1 (the
@@ -416,8 +427,8 @@ Ruled: R13, R14, R104, R105, R123, R125, R145, R146, R147 (preliminary choices o
 - [ ] **The sampled face** **[ask — core]** (was V1 step 7b; R105):
   `problem.compile(controller)` reads the controller's kind; a continuous law runs the loop as a
   diagram; a sampled controller (a digital PID, a held neural policy, the MPC, the RL policies)
-  runs the `SampledDiagramSystem` on its JAX face (`dt` read off its clock or checked against
-  it: open, D15), so `trajectory`,
+  runs the `SampledDiagramSystem` on its JAX face (`dt=` omitted reads the loop's base period,
+  given must equal it: D15, closed by R158), so `trajectory`,
   `evaluate` and `program` serve both; the `require_continuous` refusal goes. Done when the
   gradient of a digital PID's `objective` matches a central difference and a continuous law's
   numbers are unchanged.
@@ -494,8 +505,9 @@ Why: [core-architecture.md](core-architecture.md) §7. Design:
   bound; the friction-aware MPC example runs from a port.
 - [ ] **`t_start` and the start from `x_start`** **[ask — core]** (R148): a problem's horizon is
   `[t_start, t_start + tf]` (`t_start = 0` reproduces today); the discount and the horizon count
-  from `t_start`, costs, sets and references read absolute time; on a step problem `t_start` is
-  the tick offset; every planner pins the start from the `x_start` leaf and `X0` is derived from it
+  from `t_start`, costs, sets and references read absolute time; on a native step problem
+  `t_start` is the tick offset, and a discretized problem keeps `(dt, t_start)` in seconds (R158);
+  every planner pins the start from the `x_start` leaf and `X0` is derived from it
   (today shooting and collocation read `X0` first). Done when a time-varying reference is tracked
   from `t_start = 100` with the same cost as from 0, and every baseline is byte-identical at
   `t_start = 0`.
@@ -533,9 +545,11 @@ solvers and MPPI are v0.4 (§4).
 - [ ] **The MPC rebuilt on the planner's face** **[ask — core]** (NS-8; R148, R123):
   `ModelPredictiveController(planner, *, inputs={"x_start": "y", "t_start": "t"}, delay=True)`;
   the delayed form a block whose state is `z` alone, its origin inside (R155; its kind under the
-  2026-10-28 reviews), `x0` from `pv.initial`, shifting and
-  solving once per tick and keeping the old plan on a failed solve; the pure form a static block;
-  inputs as bindings, the `t` port wired by convention; ports `u`, `z`, `x_ref`, `u_ref`;
+  R158: a native `SampledSystem`, `update` solving and `output` applying), `x0` from
+  `pv.initial`, shifting and solving once per tick and keeping the old plan on a failed solve; the
+  pure form a static block; inputs as bindings (`{"x_start": "y"}` by default), `t_start` bound
+  to the time `update` receives, `lookahead=` for delay compensation; ports `u`, `z`, `x_ref`,
+  `u_ref`;
   `PlanFollower` for dual rate; `dt_mpc`, `t0`, `warm_start`, `MPCTickLatch`, the stateless and
   stateful pair, `export_to_computer`, `dt_broadcast`, `Command` and `replan_divisor` gone; the
   MPC demos, the racecar demos and `racecar_toward_mpc.ipynb` swept **[student-facing]**; the MPC

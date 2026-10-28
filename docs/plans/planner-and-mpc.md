@@ -91,8 +91,10 @@ pv.solution(zs[3]).plot_trajectory()                                     # look 
   read absolute time: `J = ∫_{t_s}^{t_s+T} e^{−ρ(t − t_s)} g(x, u, t) dt + e^{−ρT} h`. (On absolute
   time a cost would be scaled by `e^{−ρ t_s}`, `4.5e−5` at `ρ = 0.1`, `t = 100 s`, defeating the
   solver's tolerances.)
-- **On a step problem `t_start` is the tick offset**, an integer: integer leaves are allowed,
-  never in `wrt` (amends R118).
+- **On a native step problem `t_start` is the tick offset**, an integer: integer leaves are
+  allowed, never in `wrt` (amends R118). A discretized problem (`discretize(problem, dt)`) is a
+  problem on a clock and keeps `(dt, t_start)` in seconds, its transition forming
+  `t_k = t_start + k·dt` (R158).
 - **A planner pins the start from the `x_start` leaf**; `X0` is derived from it (shooting and
   collocation read `X0` first today, `shooting.py`, `direct_collocation.py`).
 
@@ -103,37 +105,45 @@ mpc  = ModelPredictiveController(planner)                     # the delayed form
 mpc  = ModelPredictiveController(planner, delay=False)        # the pure law
 mpc  = ModelPredictiveController(planner, inputs={"x_start": "x_hat",
                                                   "plant.m": "m_hat", "plant.mu": "mu_hat"})
-loop = (mpc % 0.05) @ plant
+mpc  = ModelPredictiveController(planner, lookahead=0.05)     # delay compensation, with a predictor on x_start
+loop = (mpc % 0.05) @ plant                                   # % sets the native law's period
 ```
 
-The MPC uses five members of `pv`: `n_z`, `initial`, `shift`, `solve` and `policy`.
+The MPC uses five members of `pv`: `n_z`, `initial`, `shift`, `solve` and `policy`. The delayed
+form is a **native `SampledSystem`** (R158, [sampled-path.md](sampled-path.md) §8.1): its equations
+are `update(z, y, t)` and `output(z, y, t)` in seconds, its tick faces serve the step algebra, and
+`%` sets its period.
 
-### 6.1 Inputs are bindings; time is a port
+### 6.1 Inputs are bindings; time is the argument
 
 - `inputs` maps leaves of the planner's tree to the block's input ports; the default is
-  `{"x_start": "y", "t_start": "t"}`. At each tick the block forms `P_k`: the planner's tree (the
-  loop's `controller.*` leaves) with each bound leaf overwritten from its port, and `seed` drawn
-  from the block's own seed and the tick (R104).
+  `{"x_start": "y"}`. At each tick the block forms `P_k`: the planner's tree (the loop's
+  `controller.*` leaves) with each bound leaf overwritten from its port, `t_start` bound to the
+  time `t` its `update` receives, and `seed` drawn from the block's own seed and `⌊t/Δ⌋` (R104,
+  R158).
 - A bound leaf stays in the tree as the value used when its port is not wired, so the tree's
   shape never depends on the wiring.
-- **Time is a port, `t`, wired by convention** to the loop's clock: seconds in a sampled or
-  continuous loop, the tick in a pure step loop. The MPC never knows `Δ`; the planner's knots and
-  the sample period stay independent.
+- **Time is the argument** (R158): the loop's plan hands the block `t_k = t_start + k·Δ`, the
+  one channel every equation path has; no clock port, no clock source. The block's equations
+  never read `Δ` (only its base class does, to serve the tick face); the planner's knots and the
+  sample period stay independent.
 - `x_start` must be a point in the planner's problem; a problem whose start is a set or a law is
   refused, naming why.
 
 ### 6.2 The delayed form (the default, R123)
 
-One block whose state is `z` alone, `n = pv.n_z` (R155): the plan carries its own origin, so the
-MPC keeps no time of its own and reads nothing inside `z`. (Its kind, a `StepSystem` on the `t`
-port or a native `SampledSystem` with `update(z, y, t)`, is under review: QUESTIONS, the clock
-port entry.)
+One native `SampledSystem` whose state is `z` alone, `n = pv.n_z` (R155, R158): the plan carries
+its own origin, so the MPC keeps no time of its own and reads nothing inside `z`.
 
-```text
-output at k:  u_k = pv.policy(z, x̂_k, t_k)
-step at k:    z0 = pv.shift(z, t_k)                 # the same plan, rebased to now
-              z_new, st = pv.solve(P_k, z0=z0)
-              z = z_new if st.success else z
+```python
+class ModelPredictiveController(SampledSystem):          # no source: a native sampled law
+    def output(self, z, y, t, params=None):              # u_k = π(z, x̂_k, t_k), the stored plan
+        return pv.policy(z, y, t)
+
+    def update(self, z, y, t, params=None):              # one solve per tick, from the rebased plan
+        P = bind(params, self.inputs, y) | {"t_start": t + self.lookahead}
+        z_new, status = pv.solve(P, z0=pv.shift(z, t))
+        return where(status.success, z_new, z)
 ```
 
 - **The plan is one period late; applying it is instantaneous.** `u_k` reads the plan solved at
@@ -167,8 +177,8 @@ the step evaluators (today they compute the signals in `step` and again in `outp
 - **Dual rate:** `(mpc % 0.05) >> (PlanFollower(planner) % 0.01)`, the follower applying
   `pv.policy` to the `z` it receives. The plan solved from `y_j` reaches the follower at the next
   slow tick: one slow period of delay, as on a real computer, not two.
-- **Delay compensation** is wiring, not an option: the `t` port rewired to `t + Δ` and `x_start`
-  bound to a predictor block.
+- **Delay compensation:** `lookahead=Δ` binds `t_start = t + Δ`, and `x_start` is bound to a
+  predictor block (`inputs={"x_start": "x_pred"}`); the keyword alone shifts only the time.
 
 ## 7. The cases it serves
 
@@ -205,10 +215,11 @@ pair `MPCStatelessController` / `MPCStatefulController`, `export_to_computer`, `
 2. Every policy keeps its tables in `params` (core §1: `TrajectorySource` and `LookupPolicy` keep
    them as attributes today).
 3. `t_start` on problems, the discount counted from it; integer leaves.
-4. The standard port name `t`, wired by convention.
+4. `SampledSystem` as the sampled-data kind, `update` / `output` its seconds faces, the loop's plan
+   handing them `t_k` (R158).
 5. One signal pass per tick in the step evaluators (for the pure form).
 
 ## 11. Names for the sweep
 
 `pv.policy` (or `action`, `control`); the letter `z` (a planner's `z` is its decision, extended);
-`PlanFollower`; `inputs=`; `delay=`.
+`PlanFollower`; `inputs=`; `delay=`; `lookahead=`; `update` / `output` (sampled-path.md §8.7).

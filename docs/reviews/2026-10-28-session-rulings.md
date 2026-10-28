@@ -14,6 +14,7 @@ reviews and are recorded here when ruled.
 | R155 | The plan's origin is one entry of `z`; the MPC's state is `z` alone; `shift(z, t)` rebases to an absolute time | [planner-and-mpc](../plans/planner-and-mpc.md) §3, §6.2 |
 | R156 | A performance budget: a benchmark script, the ninth item of the definition of done, 2× on five measured numbers | [core-architecture](../plans/core-architecture.md) §11 |
 | R157 | `dt` at the calls, `sample_period` on the blocks that hold a clock | DESIGN §4 |
+| R158 | Time belongs to the loop; `SampledSystem` the sampled-data kind with two faces; the MPC its first native child; no clock port | [sampled-path](../plans/sampled-path.md) §8.1–§8.2, [planner-and-mpc](../plans/planner-and-mpc.md) §6 |
 
 ## R154 (2026-10-28, preliminary) The discretized problem's cost is a `SampledCost`
 
@@ -86,3 +87,64 @@ quantity; R134's rule is one keyword per concept.
 - Rejected: `sample_period` at the calls (a long keyword in the student's line, a mismatch with
   the evaluator's `dt=`); `dt` on the blocks (a noise block's period is not an integration step,
   randomness RD-R3).
+
+## R158 (2026-10-28, preliminary) Time belongs to the loop; `SampledSystem` is the sampled-data kind; no clock port
+
+The question, as it grew in session: R148 gave the MPC a standard input port `t` so that a pure
+`StepSystem` could read seconds. The maintainer asked what `t` is in `(x, u, t; params)` for every
+block in every diagram, and rejected in turn a unit declaration on `StepSystem`, a wrapper passing
+seconds into a tick law, three static kinds and a doubled static catalog. Three independent
+reviews were run on the converged proposal ([A, the textbook and the student](2026-10-28-time-in-the-core-reviewer-a.md);
+[B, the implementation, with prototypes](2026-10-28-time-in-the-core-reviewer-b.md);
+[C, the future and the adversary](2026-10-28-time-in-the-core-reviewer-c.md)). All three kept its
+skeleton and corrected the same two points; the maintainer ruled the amended design.
+
+- **The principle.** Time is one channel, the third argument of every equation; what it holds is
+  decided by the diagram a block sits in, never by the block: seconds wherever the diagram has a
+  clock (continuous, sampled), the count where it has none (a pure step diagram). A tick law
+  (`StepSystem`) reads its own count and never seconds. No block declares a unit or a clock, and a
+  block's `params` never carry a sample time. One static catalog serves every diagram.
+- **`SampledSystem` is the sampled-data kind,** `x(kh + h) = F(x(kh), u(kh), kh)`: `update(x, u, t)`
+  and `output(x, u, t)` in seconds are its equations; `step(x, u, k)` and `h(x, u, k)` are its tick
+  faces for the step algebra, `t = k·sample_period`, the origin 0, never overridden. The views
+  (`discretize`, `%` on a continuous, a static or a tick source) write the seconds face from their
+  source; a tick source keeps only its tick face. **A native sampled law subclasses it with no
+  source** (the delayed MPC first; a discrete Kalman filter with a time-varying model, MPPI, an
+  action chunk later); `%` on it sets its period. Revises R146's "nobody subclasses it". A sampled
+  static block has `n = 0`.
+- **The sampled diagram is the clock.** It stays a step diagram, one pure map on the base tick;
+  its compiled plan holds the divisors and the hold slots, computes `t_k = t_start + k·Δ` once per
+  tick and hands it to every block whose equations are in seconds (a static block, a seconds face),
+  its own count `k // d` to a tick law under `%`, the base count to a bare tick law; the per-face
+  decision is made at build by base class, as port ops and step ops already are. The pure step
+  diagram's plan is untouched. `Sine() >> (pid % Δ) @ plant` equals `(Sine() % Δ) >> (pid % Δ)
+  @ plant` bit for bit, so `%` on a static block means its period and nothing else.
+- **The origin is the run's,** the time twin of `x0`: `compute_rollout(n_steps, t_start=0.0)` and
+  the evaluator's `rollout`, bound by `problem.compile` from the problem's `t_start` leaf (R148),
+  where the gradient and the Monte Carlo over it live; never a key of `params`, never read by an
+  equation from an attribute. (The reviewers' option C; A and B wanted a leaf of the loop's tree,
+  rejected as a second home beside the problem's leaf.)
+- **Nesting:** a sampled box inside another is inlined into one flat plan; one clock, the gcd of
+  every leaf's period. **The firing** is a `lax.cond` on `k mod d` or the hyperperiod unroll,
+  never a `where`; the contract says only "fires on `k mod d = 0`, outputs held".
+- **The MPC** is a native `SampledSystem`: `output(z, y, t) = pv.policy(z, y, t)`,
+  `update(z, y, t)` binds `t_start = t`, rebases and solves (R155). `inputs` defaults to
+  `{"x_start": "y"}`; delay compensation is `lookahead=Δ` with a predictor bound to `x_start`.
+  **The `t` port of R148 goes**, and with it the clock source block and automation-by-convention's
+  §4.6 as written. "The MPC never knows `Δ`" becomes "its equations never read `Δ`".
+- **A problem on a clock keeps seconds:** `discretize(problem, dt)` keeps `(dt, t_start)` in
+  seconds and its transition forms `t_k = t_start + k·dt`; only a native step problem has an
+  integer origin (amends R148's sentence).
+- **D15 closed:** `problem.compile(controller, dt=)` on a sampled controller reads the loop's
+  base period when `dt=` is omitted, and refuses a `dt=` that differs, naming it.
+- **Why the reviews' corrections were taken:** under the earlier bullet (a bare static block in a
+  sampled loop reading the count), `Sine(omega=1) >> (pid % 0.01) @ plant` ran its reference
+  100× too fast silently, a `WhiteNoise` with its own period drew a fresh sample every base tick,
+  the seeded policy's `⌊t/Δ⌋` broke common random numbers against the continuous evaluator, the
+  gradient with respect to `t_start` was zero through every bare reference, and the host runner
+  and the scan disagreed on any bare reference (C §3.2, A §3). And `t_start` "written through to
+  every clocked block" had no pure home (A, B, C alike).
+- **Draws, stated once:** a seconds reader draws from `(seed, ⌊t/Δ⌋)` of its own period, a tick
+  law from `(seed, k)`.
+- **Names for the sweep:** `update` / `output` (Simulink's pair; `advance` the alternative); `t0`
+  and `t_start` one word for the run's origin on every runner.

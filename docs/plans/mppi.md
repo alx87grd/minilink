@@ -390,7 +390,7 @@ block). MPPI fills the face so (its §4 row):
 | `seed` | a leaf of `planner.params`; the MPC draws it from the block's seed and the tick (R104) |
 
 The shifted `U` is the state the algorithm carries between ticks in every implementation, so the
-MPC's state `(z, t_last)` (planner-and-mpc.md §6.2) is exactly MPPI's. The overlays
+MPC's state `z` (planner-and-mpc.md §6.2, R155) is exactly MPPI's. The overlays
 (`mpc_plans_from_rollout`, `mpc_animation_overlays`) read the plans from the MPC's `z` port.
 
 ## 7. Options weighed

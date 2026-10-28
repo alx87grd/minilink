@@ -12,7 +12,7 @@ left:
 - the cost's draws (the rest of AC-7), now on the 2026-10-27 choices R143 and R144: a problem
   stochastic by its parts, one realized tree;
 - the sampled loop (AC-8a, AC-8b), now on R145–R147 (the loop a `SampledDiagramSystem`, periods
-  on blocks, two run verbs) and R148 (the MPC, and the new standard port `t`); the record is
+  on blocks, two run verbs), R148 (the MPC) and R158 (time is the argument, no clock port); the record is
   [the core-vision decisions](../reviews/2026-10-27-core-vision-decisions.md), the design home
   [sampled-path.md](sampled-path.md) §8.
 
@@ -37,8 +37,9 @@ section numbers of what is left are kept, so the citations to them hold.
 Everything is a `System` with named ports, a diagram is `System`s wired by name, and three
 reserved subsystem names tell every tool which block is the plant, the controller and the
 estimator. A plant reads `u`, `d`, `n` and gives `y`, `x`; a controller reads `e`, `y` or
-`x`, plus `r`, and gives `u`; an estimator reads `u`, `y` and gives `x`. A block that reads the
-time has an input `t`, wired by convention to the loop's clock (R148, §4.6). Roles are never
+`x`, plus `r`, and gives `u`; an estimator reads `u`, `y` and gives `x`. A block reads the time
+through the third argument of its equations, the time of the diagram it sits in (R158, §4.6);
+there is no clock port. Roles are never
 inferred from the wiring: a diagram with no `plant` has no plant, and a tool that needs one
 says so. Every shortcut (`+` with `autowire`, `>>`, `@`, `closed_loop`, `feedback`) builds
 exactly the diagram a student could write with `add_subsystem` and `connect`. DESIGN §4 states
@@ -87,20 +88,18 @@ conventions.
   `@` gives, or a box holding `controller`, `error` and `filter`), settled with the landing
   change.
 
-### 4.6 The clock port `t` (R148)
+### 4.6 Time is the argument, not a port (R158; was the clock port `t` of R148)
 
-- `t` joins the standard port names: an input that reads the loop's clock, wired by convention
-  when the block is composed, as `y` and `u` are. It holds seconds in a sampled or continuous
-  loop and the tick in a pure step loop, so a block that reads time never knows the sample
-  period.
-- Its first reader is the MPC (`inputs={"x_start": "y", "t_start": "t"}`,
-  [planner-and-mpc.md](planner-and-mpc.md) §6.1). Delay compensation rewires it (`t + Δ`) by
-  hand.
-- On the MPC, an unwired `t` leaves the bound leaf (`t_start`) at its value in the tree, so the
-  tree's shape never depends on the wiring.
-- The core must provide it (planner-and-mpc.md §10, point 4); where the clock comes from in a
-  continuous diagram (the simulator's time, a clock source block) is the landing change's
-  detail.
+- There is no standard port `t`. Every block reads the time through the third argument of its
+  equations, the time of the diagram it sits in: seconds in a continuous diagram and in a
+  sampled one (the sampled diagram's plan hands `t_k = t_start + k·Δ` to every block in
+  seconds), the count in a pure step diagram; a tick law reads its own count
+  ([sampled-path.md](sampled-path.md) §8.1–§8.2).
+- The MPC binds `t_start` from the `t` its `update` receives (`inputs={"x_start": "y"}` by
+  default, [planner-and-mpc.md](planner-and-mpc.md) §6.1); delay compensation is the keyword
+  `lookahead=Δ`.
+- No clock source block exists in a continuous diagram; the simulator's time reaches every block
+  as it does today.
 
 ## 5. What each tool does
 
@@ -164,7 +163,7 @@ roles and control-law sweeps) is captured before and after each step and compare
 | AC-6 | Animation (§5): the camera chosen when animating, looking inside `plant`; no compensator skin in a loop; the camera copy goes | plotting lane |
 | AC-7 | Cost and tools (§5): one compiled loop (the compiled problem) for every evaluation, `command_port`, controllers with state, time, cost params, one price; Gym and the rollout environment aligned | the deterministic part landed with V1's steps 2–4 (the plant scored, controllers with state, the price switch of R32); the draws (R143, R144) with V1's step 7, RN-4's per-block noise seeds and the rest of RN-5 (TODO §1.3) |
 | AC-8a | The sampled loop keeps in step (§4.5, §6): `hybrid_closed_loop`'s keywords and the port guesses go, MPC gives `u` | alongside (TODO §3) |
-| AC-8b | The sampled loop goes mainstream (§4.5, §4.6): `%` as `discretize`, `computer @ plant` a `SampledDiagramSystem`, the two run verbs, the port `t` (R145–R148) | with S31 (TODO §1.5) |
+| AC-8b | The sampled loop goes mainstream (§4.5, §4.6): `%` as `discretize`, `computer @ plant` a `SampledDiagramSystem`, the two run verbs, time the argument (R145–R148, R158) | with S31 (TODO §1.5) |
 
 **Done when:**
 - `controller @ plant`, the same loop wired by hand with the role names, and `closed_loop`
