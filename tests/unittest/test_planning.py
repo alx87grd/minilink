@@ -1482,17 +1482,17 @@ from minilink.planning.spatial.collision import (
 )
 from minilink.planning.spatial.grid import sample_field_costs
 from minilink.planning.spatial.scene import Scene
-from minilink.planning.spatial.shaping import (
+from minilink.core.shaping import (
     inverse_barrier,
     occupancy,
     quadratic_hinge,
 )
-from minilink.planning.spatial.state_fields import StateField
+from minilink.core.fields import Field
 from minilink.planning.spatial.workspace_fields import GaussianField
 
 
 @dataclass(frozen=True)
-class _ConstField(StateField):
+class _ConstField(Field):
     val: float
 
     def value(self, x, u=None, t=0.0, params=None):
@@ -1610,7 +1610,7 @@ def test_bound_jax_twin_margin_matches_and_differentiates():
 
     scene = Scene(obstacles=(Sphere([2.0, 2.0], 0.5),))
     sys = HolonomicMobileRobot()
-    free = scene.clearance_field(mount(disc(0.3), on=sys)).as_constraint()
+    free = scene.clearance_field(mount(disc(0.3), on=sys)).as_set()
     x = np.array([0.0, 0.0])
     assert float(free.margin(jnp.array(x))[0]) == pytest.approx(
         float(free.margin(x)[0])
@@ -1624,7 +1624,7 @@ def test_clearance_pipeline_in_3d():
     body = mount(Sphere(np.zeros(3), 0.5), on=_Point3D())
     field = scene.clearance_field(body)
     assert field.value(np.array([3.0, 0.0, 0.0])) == pytest.approx(3.0 - 1.0 - 0.5)
-    free = field.as_constraint()
+    free = field.as_set()
     assert free.contains(np.array([3.0, 0.0, 0.0]))
     assert not free.contains(np.array([0.5, 0.0, 0.0]))
 
@@ -1679,7 +1679,7 @@ def test_cost_field_as_constraint_keep_out_band():
     scene = Scene(
         workspace_fields=(GaussianField(center=[0.0, 0.0], amplitude=1.0, sigma=0.5),)
     )
-    keep_out = scene.cost_field(_holonomic_point()).as_constraint(upper=0.2)
+    keep_out = scene.cost_field(_holonomic_point()).as_set(upper=0.2)
     assert keep_out.contains(np.array([2.0, 0.0]))
     assert not keep_out.contains(np.array([0.0, 0.0]))
 
@@ -1695,7 +1695,7 @@ def test_empty_workspace_fields_return_zero_density_and_cost_field():
 def test_fieldset_contains_matches_minkowski_sum():
     center, obstacle_r, robot_r = (np.array([2.0, 2.0]), 0.5, 0.3)
     scene = Scene(obstacles=(Sphere(center, obstacle_r),))
-    free = scene.clearance_field(_holonomic_disc(robot_r)).as_constraint()
+    free = scene.clearance_field(_holonomic_disc(robot_r)).as_set()
     rng = np.random.default_rng(0)
     for x in rng.uniform(-1.0, 5.0, size=(200, 2)):
         expected_free = np.linalg.norm(x - center) >= obstacle_r + robot_r
@@ -1705,20 +1705,20 @@ def test_fieldset_contains_matches_minkowski_sum():
 def test_sphere_radius_shifts_free_boundary():
     scene = Scene(obstacles=(Sphere([0.0, 0.0], 0.5),))
     x = np.array([0.65, 0.0])
-    assert scene.clearance_field(_holonomic_point()).as_constraint().contains(x)
-    assert not scene.clearance_field(_holonomic_disc(0.3)).as_constraint().contains(x)
+    assert scene.clearance_field(_holonomic_point()).as_set().contains(x)
+    assert not scene.clearance_field(_holonomic_disc(0.3)).as_set().contains(x)
 
 
 def test_fieldset_bound_mechanics():
     f = _ConstField(0.5)
-    assert f.as_constraint(lower=0.0).contains(np.zeros(1))
-    assert not f.as_constraint(lower=None, upper=0.2).contains(np.zeros(1))
-    assert f.as_constraint(lower=0.0, upper=1.0).contains(np.zeros(1))
+    assert f.as_set(lower=0.0).contains(np.zeros(1))
+    assert not f.as_set(lower=None, upper=0.2).contains(np.zeros(1))
+    assert f.as_set(lower=0.0, upper=1.0).contains(np.zeros(1))
 
 
 def test_fieldset_requires_a_bound():
     with pytest.raises(ValueError):
-        _ConstField(1.0).as_constraint(lower=None, upper=None)
+        _ConstField(1.0).as_set(lower=None, upper=None)
 
 
 def test_fieldcost_weight_and_shaping():
@@ -1731,7 +1731,7 @@ def test_fieldcost_weight_and_shaping():
 def test_cross_export_constraint_and_barrier_cost():
     scene = Scene(obstacles=(Sphere([0.0, 0.0], 0.5),))
     field = scene.clearance_field(_holonomic_disc(0.3))
-    free = field.as_constraint()
+    free = field.as_set()
 
     def barrier(v):
         xp = array_module(v)
@@ -1779,7 +1779,7 @@ def test_jax_twin_margin_matches_and_differentiates():
     import jax.numpy as jnp
 
     scene = Scene(obstacles=(Sphere([2.0, 2.0], 0.5),))
-    free = scene.clearance_field(_holonomic_disc(0.3)).as_constraint()
+    free = scene.clearance_field(_holonomic_disc(0.3)).as_set()
     x = np.array([0.0, 0.0])
     assert float(free.margin(jnp.array(x))[0]) == pytest.approx(
         float(free.margin(x)[0])
@@ -1928,7 +1928,7 @@ import os
 from minilink.dynamics.catalog.vehicles.steering import HolonomicMobileRobot
 from minilink.planning.spatial.collision import mount, disc, point_probe
 from minilink.planning.spatial.paths import PolylinePath, from_waypoints
-from minilink.planning.spatial.shaping import quadratic_excess
+from minilink.core.shaping import quadratic_excess
 from minilink.planning.spatial.track import ReferenceTrack
 
 _HOLONOMIC = HolonomicMobileRobot()
@@ -1995,7 +1995,7 @@ def test_path_distance_field_uses_robot_probes():
 
 def test_corridor_field_as_constraint():
     track = ReferenceTrack(from_waypoints([[0, 0], [10, 0]]), half_width=1.0)
-    inside = track.corridor_field(_point()).as_constraint(lower=0.0)
+    inside = track.corridor_field(_point()).as_set(lower=0.0)
     assert inside.contains(np.array([5.0, 0.5]))
     assert not inside.contains(np.array([5.0, 2.0]))
 
@@ -2015,9 +2015,9 @@ def test_obstacle_and_corridor_compose():
     scene = Scene(obstacles=(Sphere([5.0, 0.0], 0.5),))
     track = ReferenceTrack(from_waypoints([[0, 0], [10, 0]]), half_width=1.0)
     body = _point()
-    free = scene.clearance_field(body).as_constraint() & track.corridor_field(
-        body
-    ).as_constraint(lower=0.0)
+    free = scene.clearance_field(body).as_set() & track.corridor_field(body).as_set(
+        lower=0.0
+    )
     assert free.contains(np.array([1.0, 0.2]))
     assert not free.contains(np.array([5.0, 0.0]))
     assert not free.contains(np.array([1.0, 2.0]))
@@ -2367,3 +2367,48 @@ def test_a_track_draws_and_overlays_its_corridor_at_half_width_from_the_centerli
     fig, ax = plot_track(track, show=False)
     assert len(ax.get_lines()) >= 3
     plt.close(fig)
+
+
+def test_a_field_has_four_conversions_and_a_gradient():
+    from minilink.core.fields import Field
+
+    class Energy(Field):
+        def value(self, x, u=None, t=0.0, params=None):
+            return 0.5 * x[0] ** 2 + (0.0 if u is None else u[0])
+
+    V = Energy()
+    x, u = np.array([2.0]), np.array([0.5])
+    assert V.as_set(upper=1.0).contains(np.array([1.0]))
+    assert not V.as_set(upper=1.0).contains(np.array([2.0]))
+    assert V.as_input_set(upper=2.5).contains(u, x)
+    assert V.as_cost(weight=3.0).g(x, u) == pytest.approx(7.5)
+    assert V.as_terminal_cost(weight=3.0).h(x) == pytest.approx(6.0)
+    assert V.as_terminal_cost().g(x, u) == 0.0
+    np.testing.assert_allclose(V.gradient(x), [2.0], rtol=1e-8)
+
+
+@pytest.mark.optional
+@pytest.mark.jax
+def test_a_field_gradient_is_jax_grad_on_jax_arrays():
+    jnp = pytest.importorskip("jax.numpy")
+    from minilink.core.fields import Field
+
+    class Bowl(Field):
+        def value(self, x, u=None, t=0.0, params=None):
+            return x @ x
+
+    np.testing.assert_allclose(Bowl().gradient(jnp.array([1.0, -2.0])), [2.0, -4.0])
+
+
+def test_a_set_as_a_cost_is_its_margin_through_a_hinge():
+    from minilink.core.shaping import quadratic_hinge
+
+    box = BoxSet([-1.0], [1.0])
+    cost = box.as_cost(weight=2.0)
+    assert cost.g(np.array([0.5]), np.zeros(0)) == 0.0
+    assert cost.g(np.array([1.5]), np.zeros(0)) == pytest.approx(2.0 * 0.5**2)
+    identity = box.as_cost(shaping=lambda v: v)
+    assert identity.g(np.array([0.25]), np.zeros(0)) == pytest.approx(0.75)
+    assert box.as_cost(shaping=quadratic_hinge(0.5)).g(
+        np.array([0.75]), np.zeros(0)
+    ) == pytest.approx(0.25**2)

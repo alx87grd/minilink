@@ -73,7 +73,7 @@ def car_outline(
     Body-frame rectangular car footprint: corners and edge midpoints.
 
     Each probe is a :class:`Sphere` offset in the body frame. Attach to a
-    planner plant with :func:`bind` and ``frame="body"`` (default).
+    planner plant with :func:`mount` and ``frame="body"`` (default).
     """
     # Half length and half width of the footprint
     hl = 0.5 * length

@@ -72,8 +72,8 @@ concrete formatting, ordered by the cost of being wrong:
   named record is justified when it is a domain noun (a trajectory, a certificate, a plan) —
   not when it is a programming convenience. Before adding a record, name the object it already
   is: a `(lower, upper)` pair is a `BoxSet`, a reset rule is a `Distribution`, a sublevel set
-  is a `Set`, a scalar function of the state is a `Field` (a planned core object; today
-  `StateField` in `planning/spatial`), a sampled run is a `Trajectory`.
+  is a `Set`, a scalar function of the state is a `Field` (`core/fields.py`), a sampled run
+  is a `Trajectory`.
 - **2.6 Names are short, and the class name is the name.** A block's display `name` is its
   class name unless the class sets its own, and a composite is named as the expression that
   built it (`PID @ Pendulum`, `Step >> Integrator`, `A + B`, `feedback(G)`). Those names

@@ -10,7 +10,7 @@ from minilink.planning.spatial.collision import CollisionBody
 from minilink.planning.spatial.paths import ReferencePath
 
 if TYPE_CHECKING:
-    from minilink.planning.spatial.state_fields import StateField
+    from minilink.core.fields import Field
 
 
 ###############################################################################
@@ -27,7 +27,7 @@ class ReferenceTrack:
     through its state fields::
 
         track = ReferenceTrack(from_waypoints(pts), half_width=1.0)
-        X = bounds & track.corridor_field(body).as_constraint()
+        X = bounds & track.corridor_field(body).as_set()
         cost = base + track.distance_field(body).as_cost(weight=5.0)
 
     Parameters
@@ -60,14 +60,14 @@ class ReferenceTrack:
 
         return margin
 
-    def distance_field(self, body: CollisionBody) -> StateField:
+    def distance_field(self, body: CollisionBody) -> Field:
         """The least distance from ``body``'s probes to the centerline, as a field."""
         # Lazy import: the state fields load on first use, not with the track
         from minilink.planning.spatial.state_fields import PathDistanceField
 
         return PathDistanceField(self, body)
 
-    def corridor_field(self, body: CollisionBody) -> StateField:
+    def corridor_field(self, body: CollisionBody) -> Field:
         """The smallest corridor margin over ``body``'s probes, as a field."""
         # Lazy import: the state fields load on first use, not with the track
         from minilink.planning.spatial.state_fields import CorridorMarginField

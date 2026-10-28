@@ -81,6 +81,23 @@ class Set(ABC):
         self.params = params
         return self
 
+    def as_cost(self, *, weight: float = 1.0, shaping: Callable | None = None):
+        """
+        The running cost of leaving the set: ``g = weight · shaping(V(x))``, ``V(x) = minᵢ mᵢ(x)``.
+
+        The set's least margin seen as a field
+        (:meth:`~minilink.core.fields.Field.as_cost`, the one implementation);
+        ``shaping=None`` is the quadratic hinge ``max(−V, 0)²``, zero inside the
+        set, so the cost is the soft form of the constraint.
+        """
+        # A real cycle: the fields build on the sets
+        from minilink.core.fields import MarginField
+        from minilink.core.shaping import quadratic_hinge
+
+        shaping = quadratic_hinge() if shaping is None else shaping
+
+        return MarginField(self).as_cost(weight=weight, shaping=shaping)
+
     def __and__(self, other: "Set") -> "IntersectionSet":
         """Return the intersection ``self & other`` of two sets."""
         return IntersectionSet.of(self, other)

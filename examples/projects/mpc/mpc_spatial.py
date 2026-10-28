@@ -21,17 +21,17 @@ from minilink.core.backends import configure_jax
 from minilink.core.costs import QuadraticCost
 from minilink.core.geometry import Sphere
 from minilink.core.sets import BoxSet
+from minilink.core.shaping import (
+    inverse_barrier,
+    quadratic_excess,
+    quadratic_hinge,
+)
 from minilink.planning.problems import PlanningProblem
 from minilink.planning.spatial.collision import car_outline, mount, point_probe
 from minilink.planning.spatial.grid import pad_bounds, sample_field_costs
 from minilink.planning.spatial.paths import from_waypoints
 from minilink.planning.spatial.plotting import plot_cost_field_exports
 from minilink.planning.spatial.scene import Scene
-from minilink.planning.spatial.shaping import (
-    inverse_barrier,
-    quadratic_excess,
-    quadratic_hinge,
-)
 from minilink.planning.spatial.track import ReferenceTrack
 from minilink.planning.trajectory_optimization.planner import (
     TrajectoryOptimizationPlanner,
@@ -186,8 +186,8 @@ cost = (
 
 X = (
     BoxSet.from_system_state(sys_mpc)
-    & scene.clearance_field(body).as_constraint(lower=0.0)
-    & track.corridor_field(body).as_constraint(lower=0.0)
+    & scene.clearance_field(body).as_set(lower=0.0)
+    & track.corridor_field(body).as_set(lower=0.0)
 )
 problem = PlanningProblem(
     sys=sys_mpc, x_start=x0, X=X, cost=cost, tf=MPC_HORIZON, U=sys_mpc.input_box

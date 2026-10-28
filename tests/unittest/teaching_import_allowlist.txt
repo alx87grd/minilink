@@ -14,7 +14,7 @@ examples/demos/mpc/mpc_car_circuit.py minilink.planning.spatial.grid
 examples/demos/mpc/mpc_car_circuit.py minilink.planning.spatial.paths
 examples/demos/mpc/mpc_car_circuit.py minilink.planning.spatial.plotting
 examples/demos/mpc/mpc_car_circuit.py minilink.planning.spatial.scene
-examples/demos/mpc/mpc_car_circuit.py minilink.planning.spatial.shaping
+examples/demos/mpc/mpc_car_circuit.py minilink.core.shaping
 examples/demos/mpc/mpc_car_circuit.py minilink.planning.spatial.track
 examples/demos/udes_racecar/mpc_racecar_dynamic.py minilink.graphical.catalog.racecar_skin
 examples/demos/udes_racecar/mpc_racecar_kinematic.py minilink.graphical.catalog.racecar_skin
@@ -37,7 +37,7 @@ examples/demos/trajopt/trajopt_holonomic_corridor.py minilink.graphical.animatio
 examples/demos/trajopt/trajopt_holonomic_corridor.py minilink.planning.spatial.collision
 examples/demos/trajopt/trajopt_holonomic_corridor.py minilink.planning.spatial.paths
 examples/demos/trajopt/trajopt_holonomic_corridor.py minilink.planning.spatial.scene
-examples/demos/trajopt/trajopt_holonomic_corridor.py minilink.planning.spatial.shaping
+examples/demos/trajopt/trajopt_holonomic_corridor.py minilink.core.shaping
 examples/demos/trajopt/trajopt_holonomic_corridor.py minilink.planning.spatial.track
 examples/demos/realtime/game_cartpole.py minilink.simulation.realtime
 examples/demos/realtime/game_ur5_setpoint.py minilink.simulation.realtime

@@ -47,6 +47,12 @@ Core
 .. automodule:: minilink.core.sets
    :members:
 
+.. automodule:: minilink.core.fields
+   :members:
+
+.. automodule:: minilink.core.shaping
+   :members:
+
 .. automodule:: minilink.core.costs
    :members:
 

@@ -337,8 +337,10 @@ terminal = QuadraticField(P, x_bar).as_terminal_cost()   # §9: the LQR value en
   value iteration, the certificates and the critics rebuilt on the noun; value iteration's
   `cost_to_go` stays a callable until then.
 - **Ruled:** R133, R153.
-- **Today:** `StateField` lives in `planning/spatial/state_fields.py`, its `as_cost` a running
-  cost only; `V(x)` and `cost_to_go` are not fields.
+- **Today:** `Field` is in `core/fields.py` with its four conversions and `gradient`, the
+  shaping in `core/shaping.py`, and `Set.as_cost` reuses it (the v0.3 run, step 2); the four
+  workspace fields subclass it in `planning/spatial/state_fields.py`. `QuadraticField`, the
+  certificate's `V` and `cost_to_go` are not fields yet.
 - **Open:** nothing at the design level.
 - **Rows:** [TODO §1.9](TODO.md#19-fields).
 

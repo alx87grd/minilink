@@ -207,8 +207,6 @@ Why: [core-architecture.md](core-architecture.md) §1.
   baselines are byte-identical.
 - [ ] **Sets as costs, the lowerings, the metrics as constraints** (was V1
   step 8; [differentiable-problem.md](differentiable-problem.md) §8):
-  - `shaping.py` (today `planning/spatial/shaping.py`) moves to `core/`;
-  - `Set.as_cost(weight=, shaping=)`, the field `as_cost` applied to the set's margin (R133);
   - `TrajectorySource` holds its table in `params` (its `h` already traces), so `"x_start"` and
     `"controller.values"` are decision leaves, with `Xf` lowered;
   - the robust-tuning and identification demos run on the export;
@@ -489,12 +487,9 @@ first.
 
 - [ ] **A minimal field object, `core/fields.py`** (A1, steps 4.1–4.3 of
   fields.md; R133, R153):
-  - promote `StateField` to `Field` on `(x, u, t)`, with `as_set` / `as_input_set` / `as_cost`
-    and `gradient`; `as_constraint` and `as_input_constraint` renamed with every caller, the
-    track demos included, no alias (R82) **[student-facing, given]** (R165);
-  - `as_terminal_cost(weight=, shaping=)` beside `as_cost`, the terminal cost `h` (R153);
-  - the shaping functions moved from `planning/spatial/shaping.py` to `core/`, and `Field.as_cost`
-    the one implementation that `Set.as_cost` (§1.1) reuses on a set's margin;
+  - landed in the v0.3 run (step 2): `Field` in `core/fields.py` with `gradient` and the four
+    conversions, `as_set` / `as_input_set` renamed with every caller, `core/shaping.py`, and
+    `Set.as_cost` reusing `Field.as_cost` (the log's RD-20, RD-21);
   - `QuadraticField` (the Lyapunov `V`, the LQR value, the `S(t)` schedule), with the ellipsoid
     as its sublevel set;
   - the DESIGN §4 fields bullet.

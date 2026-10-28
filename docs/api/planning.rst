@@ -53,9 +53,6 @@ Spatial
 .. automodule:: minilink.planning.spatial.paths
    :members:
 
-.. automodule:: minilink.planning.spatial.shaping
-   :members:
-
 .. automodule:: minilink.planning.spatial.workspace_fields
    :members:
 

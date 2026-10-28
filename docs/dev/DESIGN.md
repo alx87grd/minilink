@@ -652,6 +652,16 @@ provided.
   none), read when `params` is `None`, so they enter the problem's tree by role (`X.upper`);
   a library set is a frozen value, and `with_params(params)` is the moved copy a problem
   assignment (`problem.params = {"U": {...}}`) puts in the role.
+- Fields (`core/fields.py`): `Field`, a scalar `value(x, u=None, t=0.0, params=None)` (it reads
+  the arguments it depends on), `gradient` (`jax.grad` on JAX, central differences on NumPy),
+  and four conversions named by what they return: `as_set(lower=, upper=)` (a `FieldSet`;
+  `as_set(upper=level)` is the sublevel set), `as_input_set` (an `InputSet` over `u` at `x`),
+  `as_cost(weight=, shaping=)` (the running cost `g = weight · shaping(V)`) and
+  `as_terminal_cost` (the terminal cost `h`). The shaping functions (`quadratic_hinge`,
+  `quadratic_excess`, `inverse_barrier`, `occupancy`) are in `core/shaping.py`.
+  `Set.as_cost(weight=, shaping=)` is `Field.as_cost` on the set's least margin
+  `V(x) = minᵢ mᵢ(x)`, its default shaping the quadratic hinge `max(−V, 0)²` (zero inside:
+  the soft form of the constraint). The workspace fields subclass it (`planning/spatial/`).
 - Distributions (`core/distributions.py`): a duck type — `dim`, `mean` (an array),
   `sample(key, n=None, params=None)` with `key` a NumPy generator, an integer seed or a JAX
   PRNG key (JAX arrays out, traceable); `(dim,)` for one draw, `(n, dim)` with `n`; `support`
@@ -1225,11 +1235,11 @@ programming: fit a cost-to-go from value iteration, or learn one online.
 
 **Spatial scene** (`planning/spatial/`; its planned home `core/geometry/` is in §3): two domains — **workspace** `p ∈ ℝ²/ℝ³` and
 **state** `x`. On W: hard `Shape` obstacles and soft `WorkspaceField` sources live in
-`Scene` (`obstacles`, `workspace_fields`). On X: `StateField.value(x)` fuses the robot
+`Scene` (`obstacles`, `workspace_fields`). On X: a `Field`'s `value(x)` fuses the robot
 placement with scene queries (`clearance_field`, `cost_field`). Export separately —
 `clearance_field(body)` for collision (hard `Set` or barrier `CostFunction`) and
 `cost_field(body)` for terrain (soft `CostFunction` or hard band via
-`as_constraint(upper=...)`). `StateField.value(x)` is a **scalar** (min clearance, max
+`as_set(upper=...)`). The field's `value(x)` is a **scalar** (min clearance, max
 density over body probes). **Collision reuse:** frameless geometry (`disc`,
 `car_outline`, `point_probe`) binds to the **planner** plant with
 `mount(geometry, on=sys, frame="body")`; world probes use ``sys.tf(x,u,t)[frame]``
@@ -1245,9 +1255,9 @@ geometry: :func:`~minilink.planning.spatial.collision.disc`,
 from waypoint polylines via `from_waypoints` (default `kind="polyline"`), wrapped in
 `ReferenceTrack(path, half_width)`. Same export pattern as obstacles —
 `distance_field(robot).as_cost(shaping=quadratic_excess)` for soft path following,
-`corridor_field(body).as_constraint(lower=0)` for a hard tube. Probe semantics match
+`corridor_field(body).as_set(lower=0)` for a hard tube. Probe semantics match
 clearance (subtract body radius). Compose with obstacles:
-`X = bounds & scene.clearance_field(body).as_constraint() & track.corridor_field(body).as_constraint()`.
+`X = bounds & scene.clearance_field(body).as_set() & track.corridor_field(body).as_set()`.
 
 **Workspace cost raster** (`grid.sample_field_costs`, `plotting.plot_cost_field` /
 `plot_cost_field_3d` / `plot_cost_field_exports`): rasterize shaped ``FieldCost`` terms

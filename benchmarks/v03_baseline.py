@@ -424,15 +424,15 @@ def gym_problem_entries(out):
 
 def field_entries(out):
     """A state field's set and cost."""
-    from minilink.planning.spatial.state_fields import StateField
+    from minilink.core.fields import Field
 
-    class Energy(StateField):
+    class Energy(Field):
         def value(self, x, u=None, t=0.0, params=None):
             return 0.5 * x[1] ** 2 - np.cos(x[0])
 
     field = Energy()
     states = [np.array([0.1, 0.2]), np.array([2.0, -1.0])]
-    constraint = field.as_constraint(lower=-0.5, upper=0.5)
+    constraint = field.as_set(lower=-0.5, upper=0.5)
     cost = field.as_cost(weight=2.0, shaping=lambda v: v**2)
     out["field.margin"] = [constraint.margin(x) for x in states]
     out["field.cost"] = [cost.g(x, np.zeros(1), 0.0) for x in states]

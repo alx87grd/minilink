@@ -32,9 +32,9 @@ Graphics stay a second vocabulary on purpose (the 2026-09-05 architecture review
 | `WorkspaceField`, `GaussianField` | [`planning/spatial/workspace_fields.py`](../../minilink/planning/spatial/workspace_fields.py) | `core/geometry/` beside Scene |
 | `disc`, `point_probe`, `car_outline` | [`planning/spatial/collision.py`](../../minilink/planning/spatial/collision.py) | `core/geometry/probes.py` |
 | `CollisionBody`, `mount` | same file | `core/geometry/collision.py` |
-| `StateField` → `Field`, `FieldSet`, `FieldCost` | [`planning/spatial/state_fields.py`](../../minilink/planning/spatial/state_fields.py) | [`core/fields.py`](fields.md) |
+| `Field`, `FieldSet`, `FieldCost` (was `StateField`) | [`core/fields.py`](../../minilink/core/fields.py) (moved in the v0.3 run) | stays |
 | `ClearanceField`, `CostDensityField`, `PathDistanceField`, `CorridorMarginField` | same file | `core/geometry/fields.py` (subclass `Field`) |
-| `quadratic_hinge`, `quadratic_excess`, `inverse_barrier`, `occupancy` | [`planning/spatial/shaping.py`](../../minilink/planning/spatial/shaping.py) | `core/fields.py` next to `Field.as_cost` |
+| `quadratic_hinge`, `quadratic_excess`, `inverse_barrier`, `occupancy` | [`core/shaping.py`](../../minilink/core/shaping.py) (moved in the v0.3 run) | stays, beside `core/fields.py` |
 | `FieldGrid`, `sample_grid` | [`planning/spatial/grid.py`](../../minilink/planning/spatial/grid.py) | `core/geometry/grid.py` |
 | `plot_scene`, `plot_track`, cost rasters | [`planning/spatial/plotting.py`](../../minilink/planning/spatial/plotting.py) | `graphical/` (lazy; `scene.plot()` / `track.plot()` stay on the object) |
 | `TrackCorridorOverlay` | [`planning/spatial/overlays.py`](../../minilink/planning/spatial/overlays.py) | `graphical/` |

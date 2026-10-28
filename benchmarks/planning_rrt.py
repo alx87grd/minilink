@@ -75,7 +75,7 @@ def holonomic_problem():
         )
     )
     body = mount(disc(0.25), on=sys)
-    X = BoxSet.from_system_state(sys) & scene.clearance_field(body).as_constraint()
+    X = BoxSet.from_system_state(sys) & scene.clearance_field(body).as_set()
     x_goal = np.array([4.0, 4.0])
     problem = PlanningProblem(
         sys=sys,

@@ -43,7 +43,7 @@ scene = Scene(
     )
 )
 body = mount(disc(0.22), on=sys)
-X = BoxSet.from_system_state(sys) & scene.clearance_field(body).as_constraint()
+X = BoxSet.from_system_state(sys) & scene.clearance_field(body).as_set()
 
 x_start = np.array([-4.5, -4.5])
 x_goal = np.array([4.5, 4.5])

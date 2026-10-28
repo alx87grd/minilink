@@ -17,7 +17,7 @@ amended; a field reads the arguments it depends on and ignores the rest, as `f` 
 `as_constraint(lower=, upper=)` → a `Set` over `x`, `as_input_constraint(lower=, upper=)` → an
 `InputSet` over `u` at a given `x` (for fields that read `u`), `as_cost(weight=, shaping=)` → a
 `CostFunction` (the running cost `g`), `as_terminal_cost(weight=, shaping=)` → the terminal cost
-`h` (R153). No new verb for the sublevel set: `V.as_constraint(upper=level)` *is*
+`h` (R153). No new verb for the sublevel set: `V.as_set(upper=level)` *is*
 `{x : V(x) ≤ level}`. Time enters through `t`; a schedule (`S(t)` from the Riccati sweep, the
 per-step DP tables) is held on the concrete field and interpolated in `t`.
 Baseline first: the region-of-attraction level, extent and
@@ -36,7 +36,7 @@ Baseline first: the region-of-attraction level, extent and
   RULES 3.4: call sites updated (`geometry` fields, `scene.py`, `track.py`, `test_planning.py`,
   DESIGN §6 twice), no shim; `minilink.core._EXPORTS` gains `Field`. New: `FieldInputSet
   (InputSet)` with `margin(u, x, t, params) = value(x, u, t, params) − lower` (and `upper −
-  value`), built by `Field.as_input_constraint()`; and `gradient(x, u, t, params)` on `Field`:
+  value`), built by `Field.as_input_set()`; and `gradient(x, u, t, params)` on `Field`:
   `jax.grad` of `value` under JAX, central differences on NumPy through `analysis.derivatives`
   (the one place finite differences already live). Done when the corridor and RRT demos and
   `test_planning.py` are byte-identical.
@@ -46,7 +46,7 @@ Baseline first: the region-of-attraction level, extent and
   interpolates `K(t)`: then `value(x, t)` is the finite-horizon LQR value `xᵀ S(t) x`, and
   `lqr_finite_horizon` can hand it out beside the controller (additive; the cart-pole LQR
   notebook is its consumer). Its sublevel set is the one set that knows how
-  to sample: `QuadraticField.as_constraint(upper=level)` returns an `EllipsoidSet(FieldSet)`
+  to sample: `QuadraticField.as_set(upper=level)` returns an `EllipsoidSet(FieldSet)`
   with `sample` (uniform in the ellipsoid, moved from `lyapunov.sample_in_ellipsoid`) and
   `bounding_box` (`sqrt(level · diag(P⁻¹))`). Tests: value and gradient against NumPy on random
   points, jit parity, `sample` inside the set, `bounding_box` contains every sample.
@@ -54,7 +54,7 @@ Baseline first: the region-of-attraction level, extent and
   `certificate.V` is the `QuadraticField(x_bar, P)`; `StateField.__call__ = value` so the
   existing `certificate.V(x)` calls (`test_analysis_lyapunov.py`, the certificate's own `verify` and
   plot in `analysis/lyapunov.py`) keep working and
-  `certificate.V.as_constraint(upper=certificate.level)` reads as math; `region` property
+  `certificate.V.as_set(upper=certificate.level)` reads as math; `region` property
   returns that set; `contains`, `extent`, `slice_extent` and `verify` delegate to it
   (`sample_in_ellipsoid`, `as_box`, `clip_box` go — the window is a `BoxSet`); `V_dot` is `gradient · f`; `search_level` reads `V.value` / `V.gradient`. Public
   names unchanged. Done when the RoA baseline `cmp`s and `test_analysis_lyapunov.py` passes.
@@ -81,9 +81,9 @@ Baseline first: the region-of-attraction level, extent and
   `PlanningSolution.cost_to_go` is typed `Field | None` on every planner. Done when
   `test_rl_planner.py` passes.
 - [x] **4.7 CBF plan amendment** (done 2026-10-12, `cbf-safety-filter.md` §3 and CBF-2): the barrier is a `Field`
-  (`scene.clearance_field(body)`), its safe set `h.as_constraint(lower=0)` a `Set`; the barrier
+  (`scene.clearance_field(body)`), its safe set `h.as_set(lower=0)` a `Set`; the barrier
   condition `∇h · f(x, u) + α h(x)` is a second `Field` on `(x, u)` built from `h.gradient` and
-  `sys.f`, and its superlevel set `.as_input_constraint(lower=0)` is the `InputSet` `U(x)` the
+  `sys.f`, and its superlevel set `.as_input_set(lower=0)` is the `InputSet` `U(x)` the
   safety QP enforces — no `Scene.as_cbf`, no barrier type of its own.
 - [ ] **4.8 DESIGN §4** gains a fields bullet (the noun on `(x, u, t)`, `value` / `gradient`, the
   four conversions, schedules in `t`, the ellipsoid as a quadratic field's sublevel set); ROADMAP

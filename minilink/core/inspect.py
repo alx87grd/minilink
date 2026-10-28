@@ -24,6 +24,7 @@ def inspect_text(obj):
     """One short summary for a textbook object; unknown types use ``repr``."""
     # Real cycles: every module below imports inspect_text for its own display
     from minilink.core.costs import CostFunction
+    from minilink.core.fields import Field
     from minilink.core.sets import InputSet, Set
     from minilink.core.system import System
     from minilink.core.trajectory import Trajectory
@@ -34,7 +35,6 @@ def inspect_text(obj):
     from minilink.optimization.optimizer import Optimizer
     from minilink.planning.problems import PlanningProblem, StochasticPlanningProblem
     from minilink.planning.results import PlanningSolution
-    from minilink.planning.spatial.state_fields import StateField
 
     if isinstance(obj, System):
         return system_text(obj)
@@ -51,7 +51,7 @@ def inspect_text(obj):
 
     if isinstance(obj, CostFunction):
         return cost_text(obj)
-    if isinstance(obj, StateField):
+    if isinstance(obj, Field):
         return field_text(obj)
     if isinstance(obj, StochasticPlanningProblem):
         return stochastic_problem_text(obj)
@@ -163,6 +163,7 @@ def trajectory_text(traj):
 
 def set_text(obj):
     # A real cycle: sets imports this module
+    from minilink.core.fields import FieldSet
     from minilink.core.sets import (
         BallSet,
         BoxInputSet,
@@ -170,7 +171,6 @@ def set_text(obj):
         IntersectionSet,
         SingletonSet,
     )
-    from minilink.planning.spatial.state_fields import FieldSet
 
     if isinstance(obj, BoxSet):
         return f"BoxSet, dim={obj.dim}, {box_interval(obj.lower, obj.upper, 'z')}"

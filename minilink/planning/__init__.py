@@ -89,9 +89,9 @@ _EXPORTS: dict[str, tuple[str, str]] = {
     "mount": ("minilink.planning.spatial.collision", "mount"),
     "car_outline": ("minilink.planning.spatial.collision", "car_outline"),
     "point_probe": ("minilink.planning.spatial.collision", "point_probe"),
-    "quadratic_excess": ("minilink.planning.spatial.shaping", "quadratic_excess"),
-    "quadratic_hinge": ("minilink.planning.spatial.shaping", "quadratic_hinge"),
-    "inverse_barrier": ("minilink.planning.spatial.shaping", "inverse_barrier"),
+    "quadratic_excess": ("minilink.core.shaping", "quadratic_excess"),
+    "quadratic_hinge": ("minilink.core.shaping", "quadratic_hinge"),
+    "inverse_barrier": ("minilink.core.shaping", "inverse_barrier"),
     "TrackCorridorOverlay": (
         "minilink.planning.spatial.overlays",
         "TrackCorridorOverlay",
