@@ -219,9 +219,9 @@ def canonical_leaf(leaf, reference):
 def strong_jax(value, dtype):
     """A JAX value in ``dtype`` with a strong type (a weak scalar would trace apart)."""
     # Lazy import: only a JAX leaf reaches here
-    from jax import lax
+    from minilink.core.backends import require_jax
 
-    return lax.convert_element_type(value, dtype)
+    return require_jax().lax.convert_element_type(value, dtype)
 
 
 def is_tracer(value) -> bool:
@@ -229,9 +229,9 @@ def is_tracer(value) -> bool:
     if not is_jax_value(value):
         return False
     # Lazy import: only a JAX value reaches here
-    from jax.core import Tracer
+    from minilink.core.backends import require_jax
 
-    return isinstance(value, Tracer)
+    return isinstance(value, require_jax().core.Tracer)
 
 
 def is_jax_value(value) -> bool:

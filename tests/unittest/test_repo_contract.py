@@ -101,6 +101,7 @@ TEACHING_EXAMPLE_ROOTS = ("examples/tutorial", "examples/teaching", "examples/de
 # missing jax may skip whole.  Elsewhere the ``jax`` marker skips the JAX tests
 # and the NumPy tests beside them still run.
 JAX_ONLY_TEST_MODULES = [
+    "tests/unittest/test_compile_once.py",
     "tests/unittest/test_jax_planning.py",
     "tests/unittest/test_rl_planner.py",
     "tests/unittest/test_ur5_jax.py",
