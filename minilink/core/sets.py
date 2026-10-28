@@ -234,8 +234,14 @@ class BoxSet(Set):
 
         shape = (dim,) if n is None else (int(n), dim)
 
-        # z ~ U(lower, upper), drawn on the key's backend
-        if is_jax_key(key):
+        # A real cycle: the distributions build on the sets
+        from minilink.core.distributions import is_counter_key, standard_uniform
+
+        # z ~ U(lower, upper), drawn on the key's backend (a counter key by the cipher)
+        if is_counter_key(key):
+            require_one_sample(n)
+            z = lower + (upper - lower) * standard_uniform(key.seed, key.k, dim)
+        elif is_jax_key(key):
             jax = require_jax()
             z = jax.random.uniform(key, shape, minval=lower, maxval=upper)
         else:
@@ -559,6 +565,12 @@ def require_finite_box(box):
     """Refuse to sample a box with an infinite bound."""
     if not is_finite_box(box):
         raise ValueError("Cannot sample from a box with infinite bounds")
+
+
+def require_one_sample(n):
+    """Refuse ``n`` draws from one counter key: it names one sample."""
+    if n is not None:
+        raise ValueError("a CounterKey names one sample: draw it with n=None")
 
 
 def require_sample_count(n):

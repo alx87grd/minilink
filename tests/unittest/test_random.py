@@ -415,3 +415,46 @@ def test_a_set_reads_its_numbers_from_params_and_moves_by_them():
     )
     assert moved.margin(z)[-1] < 0.0 <= both.margin(z)[-1]
     assert SingletonSet([1.0]).params["point"].tolist() == [1.0]
+
+
+def test_a_sampled_sensor_holds_draws_of_its_datasheet_law():
+    from minilink import Gaussian
+    from minilink.blocks import NoiseSource
+
+    R_d = np.array([[0.04, 0.01], [0.01, 0.09]])
+    sensor = NoiseSource(Gaussian(np.zeros(2), cov=R_d), sample_period=0.02, seed=4)
+    assert set(sensor.params) == {"seed", "sample_period", "law"} and sensor.dim == 2
+
+    # The twin: the samples' covariance is the datasheet's, each sample held over Δ
+    t = 0.02 * np.arange(4000) + 0.005
+    w = np.array([sensor.h(None, None, tk) for tk in t])
+    np.testing.assert_allclose(np.cov(w, rowvar=False), R_d, atol=0.006)
+    np.testing.assert_array_equal(
+        sensor.h(None, None, 0.021), sensor.h(None, None, 0.039)
+    )
+
+    # The law's numbers are parameters; no seed is the mean; a period is a hint
+    quiet = dict(sensor.params, law={"mean": np.zeros(2), "cov": 0.25 * R_d})
+    np.testing.assert_allclose(
+        sensor.h(None, None, 0.1, quiet), 0.5 * sensor.h(None, None, 0.1)
+    )
+    np.testing.assert_array_equal(
+        sensor.h(None, None, 0.1, dict(sensor.params, seed=None)), [0.0, 0.0]
+    )
+    assert sensor.solver_info["sample_period"] == 0.02
+
+
+@pytest.mark.jax
+def test_a_noise_source_is_the_same_signal_on_both_backends():
+    pytest.importorskip("jax")
+    from minilink import Uniform
+    from minilink.blocks import NoiseSource
+    from minilink.core.backends import ensure_jax_x64
+
+    jax = ensure_jax_x64()
+    noise = NoiseSource(Uniform([-0.005], [0.005]), sample_period=0.02, seed=3)
+    t = 0.02 * np.arange(20) + 0.01
+    on_numpy = np.array([noise.h(None, None, tk) for tk in t])
+    on_jax = jax.vmap(lambda tk: noise.h(jax.numpy.zeros(0), jax.numpy.zeros(0), tk))(t)
+    np.testing.assert_array_equal(np.asarray(on_jax), on_numpy)
+    assert np.all(np.abs(on_numpy) <= 0.005)

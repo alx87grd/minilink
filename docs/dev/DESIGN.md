@@ -708,6 +708,12 @@ provided.
   adaptive solver, two blocks sharing a seed, and a declared disturbance the stepped tools
   never read are announced. Kalman reads `Q = B_w W B_wᵀ`, `R = D_v V D_vᵀ` for the
   continuous filter, `Q_d = B_w W B_wᵀ Δ`, `R_d = D_v V D_vᵀ / Δ` for the discrete one.
+  `NoiseSource(law, *, sample_period, seed, hold)` is sampled noise (RD-D3): `w_k` the law drawn
+  at the counter key `CounterKey(seed, k)` by the same cipher (each library law and `BoxSet`
+  draw from one), held over `Δ`, the law's numbers under `params["law"]`; a per-sample
+  covariance keeps each sample when `Δ` is edited (a datasheet sensor,
+  `NoiseSource(Gaussian(0, cov=R_d), sample_period=Tₛ)`). `WhiteNoise` is its subclass whose
+  per-sample law, `N(0, psd / Δ)`, is derived in `h`; both are in `minilink.blocks`.
 - Costs: `g(x,u,t,params=None)`, `h(x,t,params=None)` on `CostFunction` in `core`; attach
   to `PlanningProblem`, not the plant. The cost is the integrand only: `integrate(traj, *,
   discount_rate, params)` is its trapezoid on the trajectory's array module, `g_max(X, U)`

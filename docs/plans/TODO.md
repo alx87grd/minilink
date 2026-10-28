@@ -233,7 +233,6 @@ when": [randomness.md](randomness.md) §9.
   blocks, `criterion=` and `nominal()` on `PlanningProblem`), every Python caller swept; the
   ten notebooks move at step 7 (the run log's §4). Rest: the RL baselines re-pin with the
   seeded policy (§1.4).
-- [ ] **`NoiseSource` with its first consumer** (RN-3).
 - [ ] **`Sys2Gym` takes a `Distribution` for the start state** (randomness.md RD-R5, with RN-5;
   scan: graphics#1). The same row brings `Sys2Gym.from_problem` in line with DESIGN §6's claim
   that it draws.

@@ -578,7 +578,8 @@ its deterministic twin (RD-D23). RN-3 comes with its first consumer.
   `core/distributions.py`, `core/sets.py`, every `sample` call site. Baseline: every `sample`
   call site, byte-identical. Done when a family of noise levels vmaps like a family of masses
   (one test).
-- [ ] **RN-3 `NoiseSource`** (RD-D3, RD-D12, RD-D23): the law's numbers under `params["law"]`;
+- [x] **RN-3 `NoiseSource`** (landed in the v0.3 run; its first consumer the `lqg_monte_carlo`
+  demo's sensor; a law draws at a `CounterKey(seed, k)` by the cipher) (RD-D3, RD-D12, RD-D23): the law's numbers under `params["law"]`;
   `WhiteNoise` becomes its subclass; the datasheet-sensor recipe
   `NoiseSource(Gaussian(0, cov=R_d), sample_period=Tₛ)` as the first demo. Done when the twin
   test of a sampled sensor passes (the sample covariance against `R_d`) and `WhiteNoise`'s tests

@@ -3,6 +3,7 @@
 import warnings
 import zlib
 from abc import ABC, abstractmethod
+from dataclasses import dataclass
 
 import numpy as np
 
@@ -25,8 +26,11 @@ class Distribution(ABC):
     """Vector-valued distribution: ``dim``, ``mean``, ``cov``, ``params`` and ``sample(key, n=None, params=None)``.
 
     A duck type, not a probability library: anything with ``dim``, ``sample(key)``
-    and ``mean`` works; ``params`` and ``cov`` are the library laws'. ``key`` is a NumPy generator, an integer seed, or a JAX
-    PRNG key (JAX arrays out, traceable under ``jit`` / ``vmap`` / ``scan``).
+    and ``mean`` works; ``params`` and ``cov`` are the library laws'. ``key`` is a
+    NumPy generator, an integer seed, a JAX PRNG key (JAX arrays out, traceable
+    under ``jit`` / ``vmap`` / ``scan``), or, on the library laws, a
+    :class:`CounterKey` ``(seed, k)``: one draw by the library's cipher, the same
+    on both backends (what a noise source holds over its sample ``k``).
     The law's numbers are its ``params``; ``sample(key, n, params)`` draws from
     the law they name, so a noise level is a parameter like a mass (RD-R1).
     """
@@ -108,8 +112,12 @@ class Gaussian(Distribution):
 
         shape = (dim,) if n is None else (int(n), dim)
 
-        # ε ~ N(0, I), drawn on the key's backend
-        if is_jax_key(key):
+        # ε ~ N(0, I), drawn on the key's backend (a counter key by the cipher)
+        if is_counter_key(key):
+            require_one_counter_draw(n)
+            xp = array_module(key.seed, key.k, mean, std, cov)
+            eps = standard_normal(key.seed, key.k, dim)
+        elif is_jax_key(key):
             jax = require_jax()
             xp = jax.numpy
             eps = jax.random.normal(key, shape)
@@ -192,7 +200,13 @@ class Particles(Distribution):
         count = points.shape[0]
 
         # A uniform index into the points: x = points[idx]
-        if is_jax_key(key):
+        if is_counter_key(key):
+            require_one_counter_draw(n)
+            xp = array_module(key.seed, key.k, points)
+            u = standard_uniform(key.seed, key.k, 1)[0]
+            idx = xp.minimum(xp.floor(u * count).astype(int), count - 1)
+            x = xp.asarray(points)[idx]
+        elif is_jax_key(key):
             jax = require_jax()
             xp = array_module(key)
             idx = jax.random.randint(key, () if n is None else (int(n),), 0, count)
@@ -209,6 +223,30 @@ class Particles(Distribution):
 ###############################################################################
 # Internal machinery
 ###############################################################################
+
+
+@dataclass(frozen=True)
+class CounterKey:
+    """The key of one counter-based draw: the stream's ``seed`` and the sample index ``k``.
+
+    A law sampled with it draws by the library's cipher (:func:`standard_normal`,
+    :func:`standard_uniform`): a pure function of ``(seed, k)``, identical on NumPy
+    and JAX and traceable in both.
+    """
+
+    seed: object
+    k: object
+
+
+def is_counter_key(key) -> bool:
+    """Whether ``key`` is a :class:`CounterKey`."""
+    return isinstance(key, CounterKey)
+
+
+def require_one_counter_draw(n):
+    """Refuse ``n`` draws from one counter key: it names one sample."""
+    if n is not None:
+        raise ValueError("a CounterKey names one sample: draw it with n=None")
 
 
 def require_one_spread(std, cov):
@@ -326,6 +364,16 @@ def standard_normal(seed, k, p):
     eps = xp.sqrt(-2.0 * xp.log(u_1)) * xp.cos(2.0 * xp.pi * u_2)
 
     return eps
+
+
+def standard_uniform(seed, k, p):
+    """``p`` independent uniforms in ``(0, 1)`` for sample ``k`` of the stream keyed by ``seed``, the same on NumPy and JAX."""
+    bits_1, _ = random_bits(seed, k, p)
+
+    # u = (bits ≫ 8) 2⁻²⁴ + 2⁻²⁵, the top 24 bits of the first word
+    u = (bits_1 >> 8).astype(float) * 2.0**-24 + 2.0**-25
+
+    return u
 
 
 def sample_index(t, period):
