@@ -248,7 +248,11 @@ Why: [core-architecture.md](core-architecture.md) §4. Design:
   - the collectors moved from their own keys to per-episode seeds. The RL numbers change once,
     with a baseline and one re-pin.
 
-  Its deterministic face is `NeuralPolicy` (R151). The heads are rebuilt in v0.3 with the block
+  The block landed in the v0.3 run (`control/stochastic.py`: `GaussianPolicy` and
+  `SquashedGaussianPolicy`, `log_prob` and `entropy`, `vmap` over seeds on both backends); the
+  heads' rebuild, the per-episode seeds of the collectors and the RL re-pin wait for join 1
+  (the run log's RD-29: the core plan's change 4 follows change 2, the one score). Its
+  deterministic face is `NeuralPolicy` (R151). The heads are rebuilt in v0.3 with the block
   (R160), with one gate: the training performance is unchanged after the move (the learning
   curve and the final score within the Monte Carlo spread on the same demo and seeds, the training
   time within the budget's 2× bar). Done when the RL demos re-pin and a policy block vmaps over

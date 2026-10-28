@@ -34,6 +34,8 @@ _EXPORTS: dict[str, tuple[str, str]] = {
         "ComputedTorque",
     ),
     "NeuralPolicy": ("minilink.control.neural", "NeuralPolicy"),
+    "GaussianPolicy": ("minilink.control.stochastic", "GaussianPolicy"),
+    "SquashedGaussianPolicy": ("minilink.control.stochastic", "SquashedGaussianPolicy"),
     "angle_features": ("minilink.control.neural", "angle_features"),
     "PID": ("minilink.control.siso", "PID"),
     "PurePursuit": ("minilink.control.geometric", "PurePursuit"),
