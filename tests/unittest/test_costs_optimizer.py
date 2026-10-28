@@ -682,3 +682,30 @@ def test_an_optimizer_returns_the_optimum_its_cost_and_its_record():
     np.testing.assert_allclose(result.z, [1.0, -2.0], atol=1e-6)
     assert result.success and result.cost == pytest.approx(0.0, abs=1e-10)
     assert isinstance(result.message, str) and isinstance(result.stats, dict)
+
+
+def test_one_method_table_builds_every_solve_paths_adapter():
+    from minilink.optimization.optimizer import make_optimizer_backend
+    from minilink.optimization.optimizers.first_order import FirstOrderOptimizer
+    from minilink.optimization.optimizers.scipy_minimize import ScipyMinimizeOptimizer
+
+    slsqp = make_optimizer_backend("scipy_slsqp", options={"maxiter": 7})
+    assert isinstance(slsqp, ScipyMinimizeOptimizer)
+    assert slsqp.options == {
+        "disp": False,
+        "maxiter": 7,
+    }  # the preset's, the caller's over it
+    assert isinstance(make_optimizer_backend("adam"), FirstOrderOptimizer)
+
+    with pytest.raises(ValueError, match="Unknown optimizer method"):
+        make_optimizer_backend("newton")
+    with pytest.raises(ValueError, match="name the method"):
+        make_optimizer_backend("auto")
+
+
+def test_the_method_table_gives_ipopt():
+    pytest.importorskip("cyipopt")
+    from minilink.optimization.optimizer import make_optimizer_backend
+    from minilink.optimization.optimizers.ipopt import IpoptOptimizer
+
+    assert isinstance(make_optimizer_backend("ipopt"), IpoptOptimizer)

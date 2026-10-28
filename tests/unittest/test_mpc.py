@@ -646,6 +646,25 @@ class TestMPCSolveTrajectoryFrom(unittest.TestCase):
             plan_off.trajectory.x[:, 0], problem.x_start, atol=1e-05
         )
 
+    def test_the_compiled_tick_solves_with_ipopt(self):
+        pytest.importorskip("cyipopt")
+        problem = self.make_problem(0.0)
+        planner = TrajectoryOptimizationPlanner(
+            problem,
+            transcription=DirectCollocationTranscription(
+                DirectCollocationOptions(n_steps=5)
+            ),
+            options=TrajectoryOptimizationOptions(
+                backend="jax", method="ipopt", optimizer_options={"max_iter": 100}
+            ),
+        )
+        planner.compile_parametric_program()
+        plan = planner.solve_trajectory_from(np.array([0.2]))
+        reference = self.make_planner(problem).solve_trajectory_from(np.array([0.2]))
+        self.assertTrue(plan.success)
+        np.testing.assert_allclose(plan.trajectory.x[:, 0], [0.2], atol=1e-6)
+        np.testing.assert_allclose(plan.trajectory.u, reference.trajectory.u, atol=1e-3)
+
     def test_initial_guess_accepted(self):
         problem = self.make_problem(0.0)
         planner = self.make_planner(problem)

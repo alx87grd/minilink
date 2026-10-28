@@ -142,9 +142,7 @@ class Optimizer:
         )
 
         # The solver adapter: the method's preset, the caller's keywords and options over it
-        adapter_key, preset = _USER_OPTIMIZER_METHODS[method]
-        kwargs = backend_kwargs_of(preset, method_kwargs, options)
-        self.adapter = self.select_adapter(adapter_key, kwargs)
+        self.adapter = make_optimizer_backend(method, options=options, **method_kwargs)
 
     def __str__(self):
         return inspect_text(self)
@@ -231,39 +229,6 @@ class Optimizer:
             raise ValueError(f"decision vector must have shape ({int(n_z)},)")
         return arr
 
-    @staticmethod
-    def select_adapter(adapter_key: str, kwargs: dict) -> OptimizerBackend:
-        """The solver adapter of a preset's key, built from its keyword arguments."""
-        if adapter_key == "scipy_minimize":
-            # Lazy import: SciPy's solvers load on first use, not with the optimizer
-            from minilink.optimization.optimizers.scipy_minimize import (
-                ScipyMinimizeOptimizer,
-            )
-
-            return ScipyMinimizeOptimizer(**kwargs)
-
-        if adapter_key == "ipopt":
-            # Lazy import: the Ipopt adapter loads on first use, not with the optimizer
-            from minilink.optimization.optimizers.ipopt import (
-                IpoptOptimizer,
-                require_cyipopt,
-            )
-
-            # Ipopt is an optional dependency: refuse early when cyipopt is missing
-            require_cyipopt()
-
-            return IpoptOptimizer(**kwargs)
-
-        if adapter_key == "first_order":
-            # Lazy import: the first-order loop loads on first use
-            from minilink.optimization.optimizers.first_order import (
-                FirstOrderOptimizer,
-            )
-
-            return FirstOrderOptimizer(**kwargs)
-
-        raise ValueError(f"Unknown optimizer adapter key {adapter_key!r}.")
-
     def print_solve_preamble(self, z0: np.ndarray) -> None:
         """Open the solve panel: the program, the start and the method."""
         print()
@@ -289,9 +254,62 @@ class Optimizer:
         print(DISP_RULE_MAIN)
 
 
+def make_optimizer_backend(method: str, *, options: dict | None = None, **kwargs):
+    """
+    The solver adapter of a method preset: the one method table of every solve path.
+
+    ``method`` names a preset of :class:`Optimizer` (``"scipy_slsqp"``,
+    ``"ipopt"``, ``"adam"``, …; not ``"auto"``, which needs the program's
+    class); ``options`` are merged over the preset's solver options and
+    ``kwargs`` over its constructor keywords. The adapter solves any program
+    evaluator from a start, ``adapter.solve(evaluator, z0)``, whether the
+    evaluator came from one transcription or a compiled program with
+    parameters (OPW-1).
+    """
+    require_method(method)
+    require_named_method(method)
+    adapter_key, preset = _USER_OPTIMIZER_METHODS[method]
+    backend_kwargs = backend_kwargs_of(preset, kwargs, options)
+
+    return adapter_of(adapter_key, backend_kwargs)
+
+
 ###############################################################################
 # Internal machinery
 ###############################################################################
+
+
+def adapter_of(adapter_key: str, kwargs: dict) -> OptimizerBackend:
+    """The solver adapter of a preset's key, built from its keyword arguments."""
+    if adapter_key == "scipy_minimize":
+        # Lazy import: SciPy's solvers load on first use, not with the optimizer
+        from minilink.optimization.optimizers.scipy_minimize import (
+            ScipyMinimizeOptimizer,
+        )
+
+        return ScipyMinimizeOptimizer(**kwargs)
+
+    if adapter_key == "ipopt":
+        # Lazy import: the Ipopt adapter loads on first use, not with the optimizer
+        from minilink.optimization.optimizers.ipopt import (
+            IpoptOptimizer,
+            require_cyipopt,
+        )
+
+        # Ipopt is an optional dependency: refuse early when cyipopt is missing
+        require_cyipopt()
+
+        return IpoptOptimizer(**kwargs)
+
+    if adapter_key == "first_order":
+        # Lazy import: the first-order loop loads on first use
+        from minilink.optimization.optimizers.first_order import (
+            FirstOrderOptimizer,
+        )
+
+        return FirstOrderOptimizer(**kwargs)
+
+    raise ValueError(f"Unknown optimizer adapter key {adapter_key!r}.")
 
 
 def program_class(program) -> str:
@@ -341,6 +359,15 @@ def require_method(method):
         valid = ", ".join(["auto", *sorted(_USER_OPTIMIZER_METHODS)])
         raise ValueError(
             f"Unknown optimizer method {method!r}. Expected one of: {valid}."
+        )
+
+
+def require_named_method(method):
+    """Refuse ``"auto"`` where no program is at hand to choose from."""
+    if method == "auto":
+        raise ValueError(
+            "method='auto' picks from a program's class: give the program to "
+            "Optimizer, or name the method"
         )
 
 

@@ -17,7 +17,7 @@ Status: **draft plan**, its shape decided (2026-10-27; the architecture of recor
   - R130's performance gate (§2);
   - the name of `program.unpack(z)`, the full tuned tree from an exported program (the
     naming question).
-- **Not started:** PP-1–PP-5 and OPW-1–OPW-5. They build on the optimizer method table and the
+- **Not started:** PP-1–PP-5 (OPW-1–OPW-5 landed, §6). They build on the optimizer method table and the
   first-order backend that S74 landed (R74, 2026-10-24), on the compiled problem's program
   export, and on A2's cost leaves.
 - **Scope:** direct collocation and the MPC first; the other transcriptions later (§5).
@@ -193,94 +193,11 @@ v0.3 merges).
 
 ---
 
-## 6. The optimizer table for both paths (OPW-1–OPW-5)
+## 6. The optimizer table for both paths (OPW-1–OPW-5): landed
 
-Swapping `method` (SciPy SLSQP → IPOPT) on the compiled MPC path should be an
-orthogonal change: the solver layer sees an evaluator and `z0` only. Offline trajectory
-optimization supports IPOPT through the generic `Optimizer`; the compiled path rejects every
-method but SciPy's.
-
-### The pipeline
-
-```text
-PlanningProblem
-    → Transcription
-        → MathematicalProgram(..., params)   [one noun; the plain program has no declared params]
-
-MathematicalProgram
-    → compile → evaluator (functions of z and params)
-
-Evaluator + z0 (+ params)
-    → OptimizerBackend.solve() → OptimizationResult
-
-OptimizationResult
-    → Transcription.reconstruct_result() → Trajectory / PlanningSolution
-```
-
-**Design law:** transcription and the parameter values are upstream; solver choice is
-downstream. `OptimizerBackend` adapters (`ScipyMinimizeOptimizer`, `IpoptOptimizer`) do not know
-whether the evaluator came from a one-shot transcription or a compiled program with parameters.
-
-### What works today
-
-| Path | Entry | Solver wiring | IPOPT (`cyipopt`) |
-| --- | --- | --- | --- |
-| Offline / rebuild | `solve()` / `solve_trajectory_from` without parametric compile | `Optimizer(program, method=…)` | **Yes** (`examples/demos/trajopt/trajopt_cartpole_collocation_jax.py`) |
-| NumPy MPC rebuild | `backend='numpy'`, no parametric compile | the same `Optimizer` via `build_optimizer` | **Yes** (with the optional dependency) |
-| JAX MPC fast path | `compile_parametric_program()` + `solve_trajectory_from` | **custom** `build_parametric_optimizer_backend` | **No**, SciPy only |
-
-### Why the compiled path breaks on a solver swap
-
-`TrajectoryOptimizationPlanner`'s parametric solve bypasses `Optimizer` and reimplements a
-narrow slice: a planner-local method registry with `scipy_slsqp` only,
-`build_parametric_optimizer_backend()` returning `ScipyMinimizeOptimizer` whatever the method,
-and `solve_trajectory_from_parametric()` calling that backend directly. Setting
-`method="ipopt"` raises `Unknown optimizer method 'ipopt' for parametric compile`:
-a wiring failure, not an NLP or IPOPT incompatibility. The parametric evaluator already
-exposes the solver-facing surface IPOPT duck-types on.
-
-Known solver limits, orthogonal to the path: IPOPT has no per-iterate `callback` /
-`record_history`; the parametric evaluator reports no Hessian, so IPOPT uses its own
-quasi-Newton; `cyipopt` is optional.
-
-### The steps
-
-- **OPW-1 One backend factory.** `make_optimizer_backend(method, *, options=None, **kwargs)`
-  in `optimization/` maps a method to its `OptimizerBackend` from `Optimizer`'s one registry;
-  the planner's compiled path calls it and its local registry is deleted. S74's new presets
-  register here.
-- **OPW-2 One solve shape.** Both paths read `backend = make_optimizer_backend(…)`,
-  `result = backend.solve(evaluator, z0, callback=…)`, `reconstruct_result(…)`; the offline
-  path keeps `Optimizer` as its orchestrator, the compiled path its evaluator and the bound
-  values.
-- **OPW-3 The evaluator contract**, documented in
-  `optimization/evaluators/program_evaluator.py` (with PP-1, one evaluator body).
-- **OPW-4 Tests:** the factory returns `IpoptOptimizer` for `"ipopt"`; one compiled MPC
-  solve with IPOPT (skipped without `cyipopt`); an unknown method still raises clearly.
-- **OPW-5 Docs:** DESIGN §6's path × solver matrix; the implication that the compiled path is
-  SciPy-only by design removed.
-
-### Target contract
-
-| Planner mode | `method` | IPOPT | Callback / `record_history` |
-| --- | --- | --- | --- |
-| `planner.solve()` (offline or rebuild) | `ipopt` | Yes | SciPy only |
-| `planner.compile()` and the MPC on it | `ipopt` | Yes after OPW-1 | SciPy only |
-| NumPy rebuild MPC | `ipopt` | Yes | SciPy only |
-
-```python
-planner = TrajectoryOptimizationPlanner(
-    problem,
-    n_steps=40,
-    transcription="direct_collocation",
-    backend="jax",
-    method="ipopt",          # the optimizer's algorithm (R134)
-    optimizer_options={"max_iter": 500, "tol": 1e-6},
-)
-plan = planner.solve()                 # offline
-mpc  = ModelPredictiveController(planner)   # compiles the planner, the same method
-loop = (mpc % 0.2) @ plant
-```
-
-Non-goals of this part: a NumPy parametric compile (rebuild-each-tick is the NumPy MPC);
-IPOPT per-iterate callbacks.
+Landed in the v0.3 run: `make_optimizer_backend(method, *, options=None, **kwargs)` in
+`optimization/optimizer.py` maps a method to its adapter from `Optimizer`'s one table; the
+planner's compiled path calls it, its local registry gone, so `method="ipopt"` reaches the
+compiled MPC program (tested with `cyipopt`); the contract is DESIGN §6. Known solver limits,
+orthogonal to the path: Ipopt has no per-iterate `callback` / `record_history`; the compiled
+evaluator reports no Hessian, so Ipopt uses its own quasi-Newton; `cyipopt` is optional.

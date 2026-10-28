@@ -352,9 +352,6 @@ Why: [core-architecture.md](core-architecture.md) §7. Design:
   (today shooting and collocation read `X0` first). Done when a time-varying reference is tracked
   from `t_start = 100` with the same cost as from 0, and every baseline is byte-identical at
   `t_start = 0`.
-- [ ] **One optimizer backend table for the parametric path** (OPW-1–OPW-5, after S74, with S76;
-  [parametric-program.md](parametric-program.md) §6; scan: planning#9). Done when `method="ipopt"`
-  reaches the parametric MPC path and the plan's OPW-4 tests pass.
 - [ ] **The stochastic program as the parametric program's seed case**
   (native-optimizers.md §7; R131): every program is deterministic given its parameters, the seed
   one of them; integers never in `wrt`; complete trees inside, one merge at the boundary; sizes
@@ -642,15 +639,13 @@ on `dev` at 638215e; the recipe and the reference are AGENTS'. (T1 and T2 moved 
 - [ ] **analysis** (T4): `analysis/lyapunov.py`'s `EVEN` / `ODD` slices sit under Internal
   machinery, apart from `METHODS` at the top.
 - [ ] **planning** (T5): `trajectory_optimization/planner.py` probes
-  `getattr(transcription, "supports_parametric", False)` and keeps the optimizer-method
-  table as a `_USER_OPTIMIZER_METHODS` class attribute; `direct_collocation.py` /
+  `getattr(transcription, "supports_parametric", False)`; `direct_collocation.py` /
   `shooting.py` / `multiple_shooting.py` read `self.options.*` inside their bodies;
   `search/extenders.py` asks `getattr(U, "box", None)` instead of `U.bounding_box()` (also a
   D3 row); `spatial/paths.py`'s `PolylinePath` sets `_seg_lengths`, `_s_knots` and
   `_total_length` through `object.__setattr__` without declaring them as fields.
-  `ReinforcementLearningPlanner(verbose=True)` keeps printing by default (ruled). The
-  parametric optimizer's backend table (OPW-1–OPW-5) changes behaviour, so it is out of this
-  row: it is the OPW row of §1.7.
+  `ReinforcementLearningPlanner(verbose=True)` keeps printing by default (ruled). (The planner's
+  method table went with OPW-1, in the v0.3 run.)
 - [ ] **the MPC block's contract** (T6): answered by R148 ([planner-and-mpc.md](planner-and-mpc.md));
   the work is TODO §1.8's "The MPC rebuilt on the planner's face", which removes the `hasattr`
   probing (`validate_mpc_planner`, `export_mpc_dual_rate_computer`'s `replan_divisor` and

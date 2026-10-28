@@ -951,7 +951,10 @@ and `adam` (the first-order backend, projected on the box), `l-bfgs`, `scipy_sls
 (the default), `scipy_trust_constr`, `ipopt`. The program's class is read from its
 fields (`unconstrained`, `bounded`, `constrained`); `method="auto"` picks L-BFGS for the
 first two and SLSQP for the third, and a method the class does not admit (`gd` on
-constraint rows) is refused. `z0` defaults to `program.metadata["z0"]`.
+constraint rows) is refused. `z0` defaults to `program.metadata["z0"]`. One method table
+serves every solve path: `make_optimizer_backend(method, options=)` gives the preset's adapter
+(`adapter.solve(evaluator, z0)`), so a planner's compiled program takes every method, `ipopt`
+among them, as the offline `Optimizer` does (OPW-1).
 
 **Planning:** `PlanningProblem` (a plain class; `problem.replace(**fields)` derives one)
 owns system, sets (`X` and `U` unconstrained unless declared: `X=plant.state.box`,

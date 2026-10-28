@@ -19,8 +19,9 @@ from minilink.optimization.mathematical_program import (
 from minilink.optimization.optimizer import (
     OptimizationProgressCallback,
     Optimizer,
+    make_optimizer_backend,
+    method_for,
 )
-from minilink.optimization.optimizers.scipy_minimize import ScipyMinimizeOptimizer
 from minilink.optimization.reporting import (
     DISP_RULE_DIV,
     DISP_RULE_MAIN,
@@ -75,13 +76,6 @@ class TrajectoryOptimizationPlanner(Planner):
     unless :meth:`compile_parametric_program` has been called, in which case
     each from-solve is bind + solve only.
     """
-
-    _USER_OPTIMIZER_METHODS = {
-        "scipy_slsqp": (
-            "scipy_minimize",
-            {"scipy_method": "SLSQP", "options": {"disp": False}},
-        ),
-    }
 
     def __init__(
         self,
@@ -155,7 +149,7 @@ class TrajectoryOptimizationPlanner(Planner):
         # The compiled parametric program, its optimizer and its dynamics
         self.program = None
         self.program_evaluator = None
-        self.optimizer_backend: ScipyMinimizeOptimizer | None = None
+        self.optimizer_backend = None
         self._dynamics = None
 
         # Wall-clock times of the latest compile, solve and step
@@ -628,25 +622,12 @@ class TrajectoryOptimizationPlanner(Planner):
         )
         print(DISP_RULE_MAIN)
 
-    def build_parametric_optimizer_backend(self) -> ScipyMinimizeOptimizer:
-        """The SciPy backend of the online ticks, from the one preset the parametric path accepts."""
-        method = self.options.method
-        if method not in self._USER_OPTIMIZER_METHODS:
-            valid = ", ".join(sorted(self._USER_OPTIMIZER_METHODS))
-            raise ValueError(
-                f"Unknown optimizer method {method!r} for parametric compile. "
-                f"Expected one of: {valid}."
-            )
+    def build_parametric_optimizer_backend(self):
+        """The solver of the online ticks: the method's preset from the one table (OPW-1), the planner's options over it."""
+        method = method_for(self.program, self.options.method)
+        options = dict(self.options.optimizer_options)
 
-        # The preset's keywords, copied, with the user's options over its own
-        _, preset = self._USER_OPTIMIZER_METHODS[method]
-        kwargs = {}
-        for key, value in preset.items():
-            kwargs[key] = dict(value) if isinstance(value, dict) else value
-        existing = kwargs.get("options", {})
-        kwargs["options"] = {**existing, **dict(self.options.optimizer_options)}
-
-        return ScipyMinimizeOptimizer(**kwargs)
+        return make_optimizer_backend(method, options=options)
 
     def solve_trajectory_from_parametric(
         self,
