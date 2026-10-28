@@ -571,7 +571,7 @@ def _new_timed_sim(
     evaluator_cache: dict[tuple[int, str], Any] | None = None,
 ) -> _TimedSimulator:
     kwargs = dict(
-        t0=t0,
+        t_start=t0,
         tf=tf,
         dt=dt,
         solver=variant.solver,

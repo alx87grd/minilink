@@ -835,17 +835,17 @@ class TestSimBoundaries(unittest.TestCase):
     def test_static_leaf_rejects_simulator(self):
         gain = Gain(K=1.0, dim=1)
         with self.assertRaises(TypeError):
-            Simulator(gain, t0=0, tf=1, n_steps=3)
+            Simulator(gain, t_start=0, tf=1, n_steps=3)
 
     def test_static_simulator_accepts_gain(self):
         gain = Gain(K=1.0, dim=1)
-        sim = StaticSimulator(gain, t0=0, tf=1, n_steps=3)
+        sim = StaticSimulator(gain, t_start=0, tf=1, n_steps=3)
         self.assertIsInstance(sim, StaticSimulator)
 
     def test_static_simulator_rejects_diagram(self):
         diagram = _unity_feedback_diagram()
         with self.assertRaises(TypeError):
-            StaticSimulator(diagram, t0=0, tf=1, n_steps=3)
+            StaticSimulator(diagram, t_start=0, tf=1, n_steps=3)
 
 
 class TestCompileTypes(unittest.TestCase):

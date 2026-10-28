@@ -66,7 +66,7 @@ hybrid.plot_diagram()
 
 result = hybrid.compute_forced(
     reference,
-    t0=0,
+    t_start=0,
     tf=TF,
     input_port_id="r",
     plant_dt_inner=PLANT_DT_INNER,

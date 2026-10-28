@@ -20,7 +20,7 @@ def print_simulation_preamble(
     n: int,
     m: int,
     x0,
-    t0: float,
+    t_start: float,
     tf: float,
     n_pts: int,
     dt: float,
@@ -42,7 +42,7 @@ def print_simulation_preamble(
     print(f"system: {system_name!r}")
     print(f"n={n}, m={m}")
     print(f"x0: {preview_vector(x0)}")
-    print(f"interval: [{t0:g}, {tf:g}]")
+    print(f"interval: [{t_start:g}, {tf:g}]")
     grid_note = " (auto grid)" if auto_time_grid else ""
     print(f"n_pts={n_pts}, dt={dt:g}{grid_note}")
 
@@ -101,7 +101,7 @@ def print_realtime_preamble(
     n: int,
     m: int,
     x0,
-    t0: float,
+    t_start: float,
     frame_dt: float,
     sim_dt: float,
     sim_dt_auto: bool,
@@ -127,7 +127,7 @@ def print_realtime_preamble(
     print(f"system: {system_name!r}")
     print(f"n={n}, m={m}")
     print(f"x0: {preview_vector(x0)}")
-    print(f"t0: {t0:g}")
+    print(f"t_start: {t_start:g}")
     if tf is not None:
         print(f"tf: {tf:g}")
     if max_steps is not None:

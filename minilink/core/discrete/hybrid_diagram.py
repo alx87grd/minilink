@@ -102,7 +102,7 @@ class HybridDiagram:
 
     def compute_trajectory(
         self,
-        t0=0,
+        t_start=0,
         tf=10,
         *,
         x0_plant=None,
@@ -113,7 +113,7 @@ class HybridDiagram:
         verbose=True,
         show=False,
     ):
-        """Simulate with nominal boundary inputs on ``[t0, tf]``.
+        """Simulate with nominal boundary inputs on ``[t_start, tf]``.
 
         Parameters
         ----------
@@ -126,7 +126,7 @@ class HybridDiagram:
             Stored on :attr:`last_result`; plant view on :attr:`traj`.
         """
         result = self.build_simulator(
-            t0=t0,
+            t_start=t_start,
             tf=tf,
             x0_plant=x0_plant,
             x0_computer=x0_computer,
@@ -147,7 +147,7 @@ class HybridDiagram:
         u,
         *,
         input_port_id=None,
-        t0=0,
+        t_start=0,
         tf=10,
         x0_plant=None,
         x0_computer=None,
@@ -157,7 +157,7 @@ class HybridDiagram:
         verbose=True,
         show=False,
     ):
-        """Simulate with prescribed computer-boundary input on ``[t0, tf]``.
+        """Simulate with prescribed computer-boundary input on ``[t_start, tf]``.
 
         Parameters
         ----------
@@ -170,7 +170,7 @@ class HybridDiagram:
             Stored on :attr:`last_result`; plant view on :attr:`traj`.
         """
         result = self.build_simulator(
-            t0=t0,
+            t_start=t_start,
             tf=tf,
             x0_plant=x0_plant,
             x0_computer=x0_computer,
@@ -390,7 +390,7 @@ class HybridDiagram:
     def build_simulator(
         self,
         *,
-        t0=0,
+        t_start=0,
         tf=10,
         x0_plant=None,
         x0_computer=None,
@@ -407,7 +407,7 @@ class HybridDiagram:
             self,
             x0_plant=x0_plant,
             x0_computer=x0_computer,
-            t0=t0,
+            t_start=t_start,
             tf=tf,
             n_steps=n_steps,
             plant_dt_inner=plant_dt_inner,

@@ -129,7 +129,7 @@ def _simulate_once(
 ):
     sim = Simulator(
         system,
-        t0=t0,
+        t_start=t0,
         tf=tf,
         dt=dt,
         solver=solver,

@@ -26,7 +26,7 @@ hybrid = hybrid_closed_loop(
 result_hy = hybrid.compute_forced(
     REF,
     input_port_id="r",
-    t0=0.0,
+    t_start=0.0,
     tf=TF,
     plant_dt_inner=SIM_DT,
 )

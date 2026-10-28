@@ -116,13 +116,13 @@ class Simulator:
         Model to simulate; compiled with ``backend`` as below.
     x0 : array_like, optional
         Initial state in :math:`\\mathbb{R}^n`. If ``None``, uses ``sys.x0``.
-    t0, tf : float
+    t_start, tf : float
         Start and end time.
     n_steps : int, optional
         Number of time samples (including endpoints) when ``dt`` is not set.
     dt : float, optional
         Step size when ``n_steps`` is not set. The grid ends at ``tf`` when
-        ``dt`` divides ``tf - t0``; otherwise its last sample is the first
+        ``dt`` divides ``tf - t_start``; otherwise its last sample is the first
         step past ``tf``.
     solver : str, optional
         Solver mode; if ``None``, chosen by :meth:`select_solver`. Use
@@ -144,7 +144,7 @@ class Simulator:
         self,
         sys,
         x0=None,  # Initial state; sys.x0 when None
-        t0=0,
+        t_start=0,
         tf=10,
         n_steps=None,
         dt=None,
@@ -163,7 +163,7 @@ class Simulator:
         self.user_specified_dt = dt is not None
         self.auto_time_grid = n_steps is None and dt is None
         self.solver_warnings = solver_warnings
-        self.t0 = float(t0)
+        self.t_start = float(t_start)
         self.tf = float(tf)
 
         # The latest run, filled by solve and solve_forced
@@ -186,11 +186,11 @@ class Simulator:
         if self.auto_time_grid:
             self.solver_mode = self.select_solver(sys, solver)
             self.t, dt, n_steps = self.select_time_vector(
-                t0, tf, None, None, sys, solver_mode=self.solver_mode
+                t_start, tf, None, None, sys, solver_mode=self.solver_mode
             )
             self.n_pts = len(self.t)
         else:
-            self.t, dt, n_steps = self.select_time_vector(t0, tf, n_steps, dt, sys)
+            self.t, dt, n_steps = self.select_time_vector(t_start, tf, n_steps, dt, sys)
             self.n_pts = len(self.t)
             self.solver_mode = self.select_solver(sys, solver)
 
@@ -303,9 +303,9 @@ class Simulator:
 
     # Solver and time-grid selection
 
-    def select_time_vector(self, t0, tf, n_steps, dt, sys, solver_mode=None):
+    def select_time_vector(self, t_start, tf, n_steps, dt, sys, solver_mode=None):
         """
-        Build time samples on [t0, tf] and return (time_vector, dt, len).
+        Build time samples on [t_start, tf] and return (time_vector, dt, len).
 
         Explicit ``n_steps`` or ``dt`` win (``n_steps`` if both are set, with a
         logged warning). With neither, the automatic grid depends on the
@@ -337,7 +337,9 @@ class Simulator:
                     n = int(np.ceil(period / default_dt))
                 default_dt = period / n
 
-        return build_time_grid(t0, tf, n_steps=n_steps, dt=dt, default_dt=default_dt)
+        return build_time_grid(
+            t_start, tf, n_steps=n_steps, dt=dt, default_dt=default_dt
+        )
 
     def select_solver(self, sys, user_solver=None):
         """
@@ -464,7 +466,7 @@ def print_setup_panel(sim: Simulator, notes: list[str]) -> None:
         n=sim.sys.n,
         m=sim.sys.m,
         x0=sim.x0,
-        t0=sim.t0,
+        t_start=sim.t_start,
         tf=sim.tf,
         n_pts=sim.n_pts,
         dt=sim.dt,

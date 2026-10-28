@@ -32,7 +32,7 @@ class StaticSimulator:
         self,
         sys,
         x0=None,
-        t0=0,
+        t_start=0,
         tf=10,
         n_steps=None,
         dt=None,
@@ -55,7 +55,7 @@ class StaticSimulator:
         # Outputs are sampled, not integrated: no dt policy, so the automatic
         # grid is the DEFAULT_N_STEPS reporting grid
         self.t, self.dt, self.n_pts = build_time_grid(
-            t0,
+            t_start,
             tf,
             n_steps=n_steps,
             dt=dt,

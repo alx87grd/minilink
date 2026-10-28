@@ -1130,7 +1130,7 @@ class TestAdvancedPlotting(unittest.TestCase):
         self.diagram.connect("step", "y", "controller", "r")
         self.diagram.connect("controller", "u", "plant", "u")
         self.diagram.connect("plant", "y", "controller", "y")
-        self.sim = Simulator(self.diagram, t0=0, tf=2.0, dt=0.1, verbose=False)
+        self.sim = Simulator(self.diagram, t_start=0, tf=2.0, dt=0.1, verbose=False)
         self.traj = self.sim.solve()
 
     def test_plotting_import_is_quiet(self):

@@ -111,7 +111,7 @@ class ContinuousEvaluator(Evaluator):
         self,
         x0,
         u_seq,
-        t0,
+        t_start,
         dt,
         params=None,
         *,
@@ -135,16 +135,16 @@ class ContinuousEvaluator(Evaluator):
         u_start, u_end = held_inputs(u_seq, hold)
         ks = self.indices(u_start.shape[0])
 
-        # x_{k+1} = Φ(x_k, u_k, t_k), t_k = t₀ + k dt
+        # x_{k+1} = Φ(x_k, u_k, t_k), t_k = t_start + k dt
         def period(x, k, ua, ub):
-            return step_body(f, x, ua, ub, t0 + k * dt, dt, solver, substeps)
+            return step_body(f, x, ua, ub, t_start + k * dt, dt, solver, substeps)
 
         x_samples = iterate(self, period, x0, (ks, u_start, u_end))
 
         return x_samples
 
     def rollout_batch(
-        self, x0s, u_sequences=None, *, t0=0.0, dt, n_steps=None, params=None
+        self, x0s, u_sequences=None, *, t_start=0.0, dt, n_steps=None, params=None
     ):
         """Roll out a family of RK4 / ZOH trajectories in one ``jax.vmap`` call (JAX).
 
@@ -155,7 +155,7 @@ class ContinuousEvaluator(Evaluator):
         u_sequences : None, ``(N, m)``, or ``(B, N, m)``
             Held inputs per step: the compiled nominal input (``n_steps``
             required), one sequence shared by the batch, or one per member.
-        t0, dt : float
+        t_start, dt : float
             Start time and step, shared by the batch.
         params : None or pytree
             ``None`` uses the compiled values. Otherwise a params pytree whose
@@ -193,7 +193,7 @@ class ContinuousEvaluator(Evaluator):
                 )
             if n_steps is not None and u_seq.shape[-2] != int(n_steps):
                 raise ValueError("n_steps disagrees with u_sequences")
-        t0 = jnp.asarray(t0, dtype=float)
+        t_start = jnp.asarray(t_start, dtype=float)
         dt = jnp.asarray(dt, dtype=float)
 
         # One jitted vmap per (input layout, family layout): repeated sweeps
@@ -205,12 +205,12 @@ class ContinuousEvaluator(Evaluator):
             if fn is None:
                 fn = jax.jit(
                     jax.vmap(
-                        lambda x0, u, t0, dt: self.rollout(x0, u, t0, dt),
+                        lambda x0, u, t_start, dt: self.rollout(x0, u, t_start, dt),
                         in_axes=(0, u_axis, None, None),
                     )
                 )
                 cache[key] = fn
-            return fn(x0s, u_seq, t0, dt)
+            return fn(x0s, u_seq, t_start, dt)
         axes = self.params_batch_axes(params, batch)
         leaves, treedef = jax.tree_util.tree_flatten(axes, is_leaf=lambda a: a is None)
         key = (u_axis, str(treedef), tuple(leaves))
@@ -218,12 +218,12 @@ class ContinuousEvaluator(Evaluator):
         if fn is None:
             fn = jax.jit(
                 jax.vmap(
-                    lambda x0, u, t0, dt, p: self.rollout(x0, u, t0, dt, p),
+                    lambda x0, u, t_start, dt, p: self.rollout(x0, u, t_start, dt, p),
                     in_axes=(0, u_axis, None, None, axes),
                 )
             )
             cache[key] = fn
-        return fn(x0s, u_seq, t0, dt, params)
+        return fn(x0s, u_seq, t_start, dt, params)
 
     ###########################################################################
     # Internal machinery

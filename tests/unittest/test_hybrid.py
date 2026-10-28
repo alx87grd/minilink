@@ -153,7 +153,7 @@ class TestHybridClosedLoop(unittest.TestCase):
         reference = (P(0.5, ports="reference") % 0.01) @ leaf
         runs = [
             loop.compute_forced(
-                np.array([1.0]), t0=0, tf=0.05, input_port_id="r", verbose=False
+                np.array([1.0]), t_start=0, tf=0.05, input_port_id="r", verbose=False
             )
             for loop in (hybrid, reference)
         ]
@@ -191,7 +191,7 @@ def _build_hybrid():
 class TestHybridSimulator(unittest.TestCase):
     def test_records_both_states(self):
         hybrid = _build_hybrid()
-        sim = HybridSimulator(hybrid, t0=0, tf=0.2)
+        sim = HybridSimulator(hybrid, t_start=0, tf=0.2)
         result = sim.solve_forced(np.array([1.0]), input_port_id="r")
         self.assertEqual(result.computer.x.shape[0], hybrid.computer.diagram.n)
         self.assertEqual(result.plant.x.shape[0], hybrid.plant.n)
@@ -204,16 +204,16 @@ class TestHybridSimulator(unittest.TestCase):
     def test_initial_states_are_finite_flat_vectors(self):
         hybrid = _build_hybrid()
         with self.assertRaisesRegex(ValueError, r"x0_plant must be a 1-D array"):
-            HybridSimulator(hybrid, t0=0, tf=0.1, x0_plant=np.zeros((1, 1)))
+            HybridSimulator(hybrid, t_start=0, tf=0.1, x0_plant=np.zeros((1, 1)))
         with self.assertRaisesRegex(ValueError, r"x0_plant must have shape \(1,\)"):
-            HybridSimulator(hybrid, t0=0, tf=0.1, x0_plant=np.zeros(2))
+            HybridSimulator(hybrid, t_start=0, tf=0.1, x0_plant=np.zeros(2))
         with self.assertRaisesRegex(ValueError, "x0_plant must contain only finite"):
-            HybridSimulator(hybrid, t0=0, tf=0.1, x0_plant=np.array([np.nan]))
-        sim = HybridSimulator(hybrid, t0=0, tf=0.1, x0_plant=[0.5])
+            HybridSimulator(hybrid, t_start=0, tf=0.1, x0_plant=np.array([np.nan]))
+        sim = HybridSimulator(hybrid, t_start=0, tf=0.1, x0_plant=[0.5])
         np.testing.assert_array_equal(sim.x0_plant, [0.5])
 
     def test_forced_input_refuses_nan_and_a_callable_of_another_size(self):
-        sim = HybridSimulator(_build_hybrid(), t0=0, tf=0.05, n_steps=5)
+        sim = HybridSimulator(_build_hybrid(), t_start=0, tf=0.05, n_steps=5)
         for u in (np.array([np.nan]), lambda t: np.nan):
             with self.assertRaisesRegex(ValueError, "must contain only finite values"):
                 sim.solve_forced(u, input_port_id="r")
@@ -222,7 +222,7 @@ class TestHybridSimulator(unittest.TestCase):
 
     def test_one_tick_measurement_delay(self):
         hybrid = _build_hybrid()
-        sim = HybridSimulator(hybrid, t0=0, tf=0.05, n_steps=5)
+        sim = HybridSimulator(hybrid, t_start=0, tf=0.05, n_steps=5)
         result = sim.solve_forced(np.array([1.0]), input_port_id="r")
         self.assertAlmostEqual(float(result.computer.signals["u_cmd"][0, 0]), 0.5)
 
@@ -231,7 +231,7 @@ class TestHybridSimulator(unittest.TestCase):
 
         matplotlib.use("Agg")
         hybrid = _build_hybrid()
-        hybrid.compute_forced(np.array([1.0]), t0=0, tf=0.1, input_port_id="r")
+        hybrid.compute_forced(np.array([1.0]), t_start=0, tf=0.1, input_port_id="r")
         hybrid.plot_trajectory(signals=("r", "y", "u_cmd", "x"), show=False)
 
     def test_plot_abscissa_selects_plant_time_or_computer_ticks(self):
@@ -242,7 +242,7 @@ class TestHybridSimulator(unittest.TestCase):
 
         hybrid = _build_hybrid()
         result = hybrid.compute_forced(
-            np.array([1.0]), t0=0, tf=0.1, input_port_id="r", verbose=False
+            np.array([1.0]), t_start=0, tf=0.1, input_port_id="r", verbose=False
         )
         views = {
             "plant time": hybrid.plot_trajectory(show=False),
@@ -286,7 +286,7 @@ class TestHybridSimulator(unittest.TestCase):
             smc, plant, schedule=0.02, computer_in="y", plant_out="y"
         )
         hybrid.compute_forced(
-            np.array([0.0, 0.0]), t0=0.0, tf=0.1, input_port_id="r", verbose=False
+            np.array([0.0, 0.0]), t_start=0.0, tf=0.1, input_port_id="r", verbose=False
         )
         hybrid.plot_trajectory(show=False)
 
@@ -304,7 +304,7 @@ class TestHybridSimulator(unittest.TestCase):
             smc, plant, schedule=0.02, computer_in="y", plant_out="y"
         )
         result = hybrid.compute_forced(
-            np.array([0.0, 0.0]), t0=0.0, tf=0.1, input_port_id="r", verbose=False
+            np.array([0.0, 0.0]), t_start=0.0, tf=0.1, input_port_id="r", verbose=False
         )
         self.assertIn("y", result.plant.signals)
         signals = resolve_plot_signals(hybrid.plant)
@@ -322,7 +322,7 @@ class TestHybridSimulator(unittest.TestCase):
         self.assertIsNone(hybrid.traj)
         self.assertIsNone(hybrid.last_result)
         result = hybrid.compute_forced(
-            np.array([1.0]), t0=0, tf=0.05, input_port_id="r", verbose=False
+            np.array([1.0]), t_start=0, tf=0.05, input_port_id="r", verbose=False
         )
         self.assertIs(hybrid.last_result, result)
         self.assertIs(hybrid.traj, result.plant)
@@ -331,7 +331,7 @@ class TestHybridSimulator(unittest.TestCase):
     def test_animate_uses_plant_traj(self):
         hybrid = _build_hybrid()
         hybrid.compute_forced(
-            np.array([1.0]), t0=0, tf=0.05, input_port_id="r", verbose=False
+            np.array([1.0]), t_start=0, tf=0.05, input_port_id="r", verbose=False
         )
         hybrid.animate(show=False)
 
@@ -549,7 +549,7 @@ class TestHybridMultiRate(unittest.TestCase):
 
     def test_scheduled_hybrid_runs(self):
         hybrid = _build_hybrid_hybrid_topology()
-        sim = HybridSimulator(hybrid, t0=0, tf=1.6)
+        sim = HybridSimulator(hybrid, t_start=0, tf=1.6)
         result = sim.solve_forced(_reference, input_port_id="r")
         self.assertEqual(result.computer.n_samples, 160)
         self.assertIn("y_f", result.computer.signals)
@@ -585,7 +585,7 @@ class TestHybridMultiRate(unittest.TestCase):
                 plant_eval.outputs(x_plant, u_plant, (k + 1) * dt_base)["y"][0]
             )
             y_hand.append(y_sample)
-        sim = HybridSimulator(hybrid, t0=0, n_steps=n_steps)
+        sim = HybridSimulator(hybrid, t_start=0, n_steps=n_steps)
         result = sim.solve_forced(_reference, input_port_id="r")
         np.testing.assert_allclose(
             result.computer.signals["y_meas"][0, :n_steps], y_hand, rtol=1e-06
@@ -604,7 +604,7 @@ class TestHybridFineRecording(unittest.TestCase):
         hybrid = hybrid_closed_loop(
             ctl, plant, schedule=0.1, computer_in="y", plant_out="y"
         )
-        sim = HybridSimulator(hybrid, t0=0.0, tf=0.5, plant_dt_inner=0.01)
+        sim = HybridSimulator(hybrid, t_start=0.0, tf=0.5, plant_dt_inner=0.01)
         result = sim.solve_forced(np.array([0.0, 0.0]), input_port_id="r")
         self.assertIsInstance(result.computer, StepRollout)
         self.assertIsInstance(result.plant, Trajectory)
@@ -651,7 +651,9 @@ class TestSmcHybrid(unittest.TestCase):
             x_plant = plant_eval.step(x_plant, u_plant, k * dt_base, dt=dt_base)
             y_sample = plant_eval.outputs(x_plant, u_plant, (k + 1) * dt_base)["y"]
             q_hand.append(float(y_sample[0]))
-        sim = HybridSimulator(hybrid, t0=0.0, n_steps=n_steps, plant_dt_inner=0.002)
+        sim = HybridSimulator(
+            hybrid, t_start=0.0, n_steps=n_steps, plant_dt_inner=0.002
+        )
         result = sim.solve_forced(ref, input_port_id="r")
         np.testing.assert_allclose(
             result.computer.signals["y"][0, :n_steps], q_hand, rtol=1e-05, atol=1e-05
@@ -662,7 +664,7 @@ def test_a_hybrid_run_returns_the_computer_and_plant_views():
     from minilink.simulation import HybridSimResult
 
     hybrid = _build_hybrid()
-    result = HybridSimulator(hybrid, t0=0, tf=0.2).solve_forced(
+    result = HybridSimulator(hybrid, t_start=0, tf=0.2).solve_forced(
         np.array([1.0]), input_port_id="r"
     )
 

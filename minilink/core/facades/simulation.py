@@ -32,7 +32,7 @@ class SystemSimulation:
 
     def compute_trajectory(
         self,
-        t0=0,
+        t_start=0,
         tf=10,
         n_steps=None,
         dt=None,
@@ -72,7 +72,7 @@ class SystemSimulation:
         sim = StaticSimulator(
             self,
             x0=x0,
-            t0=t0,
+            t_start=t_start,
             tf=tf,
             n_steps=n_steps,
             dt=dt,
@@ -96,7 +96,7 @@ class SystemSimulation:
         self,
         u,
         input_port_id=None,
-        t0=0,
+        t_start=0,
         tf=10,
         n_steps=None,
         dt=None,
@@ -142,7 +142,7 @@ class SystemSimulation:
         sim = StaticSimulator(
             self,
             x0=x0,
-            t0=t0,
+            t_start=t_start,
             tf=tf,
             n_steps=n_steps,
             dt=dt,
@@ -202,7 +202,7 @@ class DynamicSimulation:
 
     def compute_trajectory(
         self,
-        t0=0,
+        t_start=0,
         tf=10,
         n_steps=None,
         dt=None,
@@ -244,7 +244,7 @@ class DynamicSimulation:
         sim = Simulator(
             self,
             x0=x0,
-            t0=t0,
+            t_start=t_start,
             tf=tf,
             n_steps=n_steps,
             dt=dt,
@@ -269,7 +269,7 @@ class DynamicSimulation:
         self,
         u,
         input_port_id=None,
-        t0=0,
+        t_start=0,
         tf=10,
         n_steps=None,
         dt=None,
@@ -318,7 +318,7 @@ class DynamicSimulation:
         sim = Simulator(
             self,
             x0=x0,
-            t0=t0,
+            t_start=t_start,
             tf=tf,
             n_steps=n_steps,
             dt=dt,

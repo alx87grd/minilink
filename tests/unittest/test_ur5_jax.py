@@ -137,7 +137,7 @@ class TestUR5NativeArrayJax(unittest.TestCase):
         arm, x0, _ = _scenario_arm(manifest)
         kwargs = dict(
             x0=x0,
-            t0=0.0,
+            t_start=0.0,
             tf=manifest["tf"],
             dt=manifest["dt"],
             solver=manifest["solver"],
@@ -167,7 +167,7 @@ class TestUR5NativeArrayJax(unittest.TestCase):
         arm, x0, _ = _scenario_arm(manifest)
         kwargs = dict(
             x0=x0,
-            t0=0.0,
+            t_start=0.0,
             tf=manifest["tf"],
             dt=manifest["dt"],
             solver=manifest["solver"],

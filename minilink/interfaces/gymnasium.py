@@ -56,7 +56,7 @@ class Sys2Gym(gym.Env):
         Time step of one env step (zero-order hold on the action).
     tf : float
         Maximum duration of an episode (truncation).
-    t0 : float
+    t_start : float
         Initial time (only relevant if the system is time dependent).
     reset_mode : {"uniform", "gaussian", "determinist"}
         Distribution of the initial state on :meth:`reset`: uniform between
@@ -101,7 +101,7 @@ class Sys2Gym(gym.Env):
         cost,
         dt=0.05,
         tf=10.0,
-        t0=0.0,
+        t_start=0.0,
         render_mode=None,
         reset_mode="uniform",
         solver="rk4",
@@ -111,7 +111,7 @@ class Sys2Gym(gym.Env):
         self.sys = sys
         self.cost = cost
         self.dt = dt
-        self.t0 = t0
+        self.t_start = t_start
         self.tf = tf  # for truncation of episodes
 
         # The step model of one env step, compiled once for the whole run
@@ -144,7 +144,7 @@ class Sys2Gym(gym.Env):
         # Memory
         self.x = np.asarray(sys.x0, dtype=float).copy()
         self.u = sys.get_u_from_input_ports()
-        self.t = t0
+        self.t = t_start
 
         if self.render_mode == "human":
             self._init_render()
@@ -189,7 +189,7 @@ class Sys2Gym(gym.Env):
             self.x = np.asarray(self.sys.x0, dtype=float).copy()
 
         self.u = self.sys.get_u_from_input_ports()
-        self.t = self.t0
+        self.t = self.t_start
 
         y = np.asarray(
             self.sys.h(self.x, self.u, self.t), dtype=self.observation_space.dtype
@@ -360,7 +360,7 @@ class ProblemEnv(Sys2Gym):
         gym.Env.reset(self, seed=seed)  # seeds np_random; the problem draws the start
         self.x = np.asarray(self.problem.sample_x0(self.np_random), dtype=float)
         self.u = self.sys.get_u_from_input_ports()
-        self.t = self.t0
+        self.t = self.t_start
         y = np.asarray(
             self.sys.h(self.x, self.u, self.t), dtype=self.observation_space.dtype
         )

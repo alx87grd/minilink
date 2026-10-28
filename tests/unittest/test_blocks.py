@@ -62,7 +62,7 @@ class TestBlocks(unittest.TestCase):
         plant = Integrator()
         evaluator = plant.compile()
         u_sequence = np.ones((3, 1))
-        x = evaluator.rollout(np.array([0.0]), u_sequence, t0=0.0, dt=0.1)
+        x = evaluator.rollout(np.array([0.0]), u_sequence, t_start=0.0, dt=0.1)
         np.testing.assert_allclose(x[:, 0], np.array([0.0, 0.1, 0.2, 0.3]))
 
     def test_integrator_compiled_parametric_rollout(self):
@@ -70,7 +70,7 @@ class TestBlocks(unittest.TestCase):
         evaluator = plant.compile()
         u_sequence = np.ones((2, 1))
         x = evaluator.rollout(
-            np.array([0.0]), u_sequence, t0=0.0, dt=0.1, params={"k": 2.0}
+            np.array([0.0]), u_sequence, t_start=0.0, dt=0.1, params={"k": 2.0}
         )
         np.testing.assert_allclose(x[:, 0], np.array([0.0, 0.2, 0.4]))
 

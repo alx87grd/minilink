@@ -139,7 +139,7 @@ def hybrid_entries(out):
     for i in range(2):
         result = hybrid.compute_forced(
             lambda t: np.array([1.0 if t < 1.0 else 0.0]),
-            t0=0,
+            t_start=0,
             tf=2.0,
             input_port_id="r",
             plant_dt_inner=0.002,
@@ -157,7 +157,7 @@ def hybrid_entries(out):
     result = hybrid.compute_forced(
         np.array([0.0, 0.0]),
         input_port_id="r",
-        t0=0.0,
+        t_start=0.0,
         tf=1.0,
         plant_dt_inner=0.001,
     )

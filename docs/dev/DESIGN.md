@@ -236,7 +236,7 @@ the named car profiles live with their scenarios in `examples/projects/car_trajo
 - **Hybrid (computer + plant):** `HybridDiagram` bundles a `Computer` (the step side and its
   `StepSchedule`) and a continuous `DiagramSystem` plant; the boundary channels are ZOH
   (computer → plant) and sample (plant → computer). `HybridSimulator` mirrors `Simulator`
-  (`t0` / `tf`, `solve`, `solve_forced`; `plant_dt_inner` sub-steps the plant) and returns
+  (`t_start` / `tf`, `solve`, `solve_forced`; `plant_dt_inner` sub-steps the plant) and returns
   a `HybridSimResult`: `computer` (a `StepRollout`, tick `k`) and `plant` (a `Trajectory`,
   wall time `t`); the facades cache the plant trajectory on `self.traj`, the full result on
   `self.last_result` and the computer view on `self.rollout`. Shortcuts: `block % schedule`
@@ -339,6 +339,9 @@ read `params` yet, the gap is tracked below.
   `solver=` is the time integration; `method=` is the verb's own numerical method (the
   optimizer's algorithm on `Optimizer` and on every planner that optimizes); the
   optimizer's solver adapter, which a method binds, is `Optimizer.adapter`.
+- **One word for a run's origin (R164):** `t_start`, on every runner (`compute_trajectory`,
+  `compute_forced`, `Simulator`, the evaluator's `rollout`, the hybrid simulator, the realtime
+  run, the gym bridge). A trajectory's first sample is its `t0` property.
 - **Two words for two times (R157).** `dt` is the step of a computation and names it at every
   call (`discretize(sys, dt)`, `sys % dt`, `problem.compile(dt=)`, the evaluator's `step(…, dt=)`);
   `sample_period` is the clock a block holds and names it on every such block (the sampled
@@ -700,7 +703,7 @@ backend (`backend` picked at construction; JAX imported only by a JAX evaluator)
 - :class:`StepSystem` → `StepEvaluator`, a step diagram → `StepDiagramEvaluator`
   (`evaluators/discrete.py`): `step`, `outputs`, state-only `rollout`; no `f`
 
-On JAX a continuous evaluator also offers `rollout_batch(x0s, u_sequences=None, *, t0,
+On JAX a continuous evaluator also offers `rollout_batch(x0s, u_sequences=None, *, t_start,
 dt, n_steps, params=None)` — one `vmap` of the RK4 / ZOH rollout over a family of
 initial states, input sequences, and params (a params leaf with one more
 dimension than the compiled value is swept); the research facade for
@@ -740,8 +743,8 @@ block):
     ev.f(x, u, t=0.0, params=None)                                            # dx; a continuous evaluator
     ev.outputs(x, u, t=0.0, params=None)                                      # the boundary ports
     ev.step(x, u, t, params=None, *, dt, solver="rk4", substeps=1)            # x_{k+1}, u held
-    ev.rollout(x0, u_seq, t0, dt, params=None, *, solver="rk4", substeps=1, hold="zoh", n_steps=None)
-    ev.rollout_batch(x0s, u_sequences=None, *, t0=0.0, dt, n_steps=None, params=None)   # JAX: a family, one vmap
+    ev.rollout(x0, u_seq, t_start, dt, params=None, *, solver="rk4", substeps=1, hold="zoh", n_steps=None)
+    ev.rollout_batch(x0s, u_sequences=None, *, t_start=0.0, dt, n_steps=None, params=None)   # JAX: a family, one vmap
 
 A step evaluator has `step(x, u, k=0, params=None)` (the system's own map on the integer
 tick, no knobs), `outputs` and a state-only `rollout(x0, *, n_steps, u=None, params=None)`;

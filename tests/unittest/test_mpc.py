@@ -1170,7 +1170,9 @@ class TestMpcHybridStraightLine(unittest.TestCase):
     def test_stateless_u_ff_matches_planner_in_hybrid_sim(self):
         hybrid, mpc_planner, transcription, problem = _build_bicycle_hybrid()
         n_steps = 4
-        sim = HybridSimulator(hybrid, t0=0.0, n_steps=n_steps, plant_dt_inner=0.005)
+        sim = HybridSimulator(
+            hybrid, t_start=0.0, n_steps=n_steps, plant_dt_inner=0.005
+        )
         result = sim.solve()
         plant_eval = hybrid.plant.compile()
         u_nom = hybrid.plant.get_u_from_input_ports()
@@ -1192,7 +1194,7 @@ class TestMpcHybridStraightLine(unittest.TestCase):
         hybrid, _planner, transcription, problem = _build_bicycle_hybrid()
         n_steps = 3
         result = HybridSimulator(
-            hybrid, t0=0.0, n_steps=n_steps, plant_dt_inner=0.005
+            hybrid, t_start=0.0, n_steps=n_steps, plant_dt_inner=0.005
         ).solve()
         plans = mpc_plans_from_rollout(
             result.computer,
@@ -1208,7 +1210,7 @@ class TestMpcHybridStraightLine(unittest.TestCase):
         hybrid, planner, _transcription, _problem = _build_bicycle_hybrid()
         n_steps = 3
         result = HybridSimulator(
-            hybrid, t0=0.0, n_steps=n_steps, plant_dt_inner=0.005
+            hybrid, t_start=0.0, n_steps=n_steps, plant_dt_inner=0.005
         ).solve()
         overlays = mpc_animation_overlays(result, planner, reference_pad=5.0)
         self.assertEqual(len(overlays), 1)
@@ -1335,7 +1337,7 @@ class TestMpcHybridWarmStartParity(unittest.TestCase):
         )
         n_steps = 4
         result = HybridSimulator(
-            hybrid, t0=0.0, n_steps=n_steps, plant_dt_inner=0.005, x0_computer=z0
+            hybrid, t_start=0.0, n_steps=n_steps, plant_dt_inner=0.005, x0_computer=z0
         ).solve()
         plant_eval = hybrid.plant.compile()
         u_nom = hybrid.plant.get_u_from_input_ports()
@@ -1539,7 +1541,7 @@ class TestMpcHybridDemoParity(unittest.TestCase):
         )
         result = HybridSimulator(
             hybrid,
-            t0=0.0,
+            t_start=0.0,
             tf=TF_SIM,
             plant_dt_inner=SIM_DT,
             x0_plant=x0,

@@ -26,7 +26,7 @@ class HybridSimulator:
     Advance a :class:`HybridDiagram` on the computer base tick grid.
 
     The API mirrors :class:`~minilink.simulation.simulator.Simulator`:
-    construct with ``t0`` / ``tf``, then :meth:`solve` or :meth:`solve_forced`.
+    construct with ``t_start`` / ``tf``, then :meth:`solve` or :meth:`solve_forced`.
 
     Parameters
     ----------
@@ -34,8 +34,8 @@ class HybridSimulator:
         Computer + plant + boundary connections.
     x0_plant, x0_computer : array_like, optional
         Initial plant / computer states (defaults from diagram ``x0``).
-    t0, tf : float
-        Simulation interval in seconds. Duration defaults to ``tf - t0``.
+    t_start, tf : float
+        Simulation interval in seconds. Duration defaults to ``tf - t_start``.
     n_steps : int, optional
         Override number of base ticks (advanced).
     plant_dt_inner : float, optional
@@ -53,7 +53,7 @@ class HybridSimulator:
         *,
         x0_plant=None,
         x0_computer=None,
-        t0=0,
+        t_start=0,
         tf=10,
         n_steps=None,
         plant_dt_inner=None,
@@ -69,11 +69,11 @@ class HybridSimulator:
         self.plant = hybrid.plant
         self.plant_dt_inner = plant_dt_inner
 
-        # The base tick grid on [t0, tf], at the schedule's base period
-        self.t0 = float(t0)
+        # The base tick grid on [t_start, tf], at the schedule's base period
+        self.t_start = float(t_start)
         self.tf = float(tf)
         self.dt_base, self.n_ticks, self.times = select_tick_grid(
-            t0=self.t0,
+            t_start=self.t_start,
             tf=self.tf,
             dt_base=self.computer.schedule.dt_base,
             n_steps=n_steps,
@@ -104,7 +104,7 @@ class HybridSimulator:
         if self.verbose:
             print(
                 f"HybridSimulator: dt_base={self.dt_base}, n_ticks={self.n_ticks}, "
-                f"t=[{self.t0}, {self.tf}]"
+                f"t=[{self.t_start}, {self.tf}]"
             )
 
     def solve(self):
@@ -150,7 +150,7 @@ class HybridSimulator:
         plant_eval = self.plant_eval
         c2p = self.c2p
         p2c = self.p2c
-        t0 = self.t0
+        t_start = self.t_start
         dt_base = self.dt_base
         dt_inner = self.plant_dt_inner
         n_ticks = self.n_ticks
@@ -166,7 +166,7 @@ class HybridSimulator:
             plant_eval,
             x_plant,
             u_plant_nominal,
-            t0,
+            t_start,
             p2c,
         )
 
@@ -188,7 +188,7 @@ class HybridSimulator:
         for tick_idx in range(n_ticks):
             # Tick the computer on its forced input and the plant outputs it sampled
             k = computer.k
-            t_k = t0 + k * dt_base
+            t_k = t_start + k * dt_base
             u_computer = assemble_computer_u(
                 diagram,
                 u_traj[:, tick_idx],
@@ -475,22 +475,22 @@ def require_hybrid_diagram(hybrid):
         )
 
 
-def select_tick_grid(*, t0, tf, dt_base, n_steps):
+def select_tick_grid(*, t_start, tf, dt_base, n_steps):
     """The base period, the tick count (``n_steps`` over ``tf``) and the tick times."""
-    t0 = float(t0)
+    t_start = float(t_start)
     tf = float(tf)
-    if tf <= t0:
-        raise ValueError("tf must be greater than t0")
+    if tf <= t_start:
+        raise ValueError("tf must be greater than t_start")
     dt_base = float(dt_base)
     if dt_base <= 0.0:
         raise ValueError("computer.schedule.dt_base must be positive")
 
     if n_steps is None:
-        n_ticks = max(1, int(round((tf - t0) / dt_base)))
+        n_ticks = max(1, int(round((tf - t_start) / dt_base)))
     else:
         if int(n_steps) < 1:
             raise ValueError("n_steps must be >= 1")
-        derived = max(1, int(round((tf - t0) / dt_base)))
+        derived = max(1, int(round((tf - t_start) / dt_base)))
         if int(n_steps) != derived:
             logging.warning(
                 "HybridSimulator: n_steps=%s overrides tf-derived tick count %s",
@@ -499,7 +499,7 @@ def select_tick_grid(*, t0, tf, dt_base, n_steps):
             )
         n_ticks = int(n_steps)
 
-    times = t0 + np.arange(n_ticks) * dt_base
+    times = t_start + np.arange(n_ticks) * dt_base
 
     return dt_base, n_ticks, times
 

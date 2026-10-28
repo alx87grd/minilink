@@ -36,7 +36,7 @@ def main() -> None:
     traj = Simulator(
         arm,
         x0=x0,
-        t0=0.0,
+        t_start=0.0,
         tf=TF,
         dt=DT,
         solver=SOLVER,
