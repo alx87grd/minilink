@@ -699,3 +699,72 @@ def test_script_05_join_the_dual_rate_form_gives_the_plan_one_slow_period_late()
     z0, _ = pv.solve({"x_start": problem.x_start, "t_start": 0.0}, z0=pv.initial())
     expected = [float(pv.command(z0, None, 0.01 * k)[0]) for k in range(5, 10)]
     np.testing.assert_allclose(u[5:10], expected, rtol=1e-10)
+
+
+# Script 7
+
+
+def test_script_07_fields_the_certificates_v_is_a_quadratic_field():
+    from minilink.analysis.lyapunov import region_of_attraction
+    from minilink.core.fields import EllipsoidSet, QuadraticField
+
+    plant = Pendulum()
+    plant.params["d"] = 0.5
+    roa = region_of_attraction(plant)
+    X = roa.x_bar + np.random.default_rng(0).normal(scale=0.3, size=(20, 2))
+    d = X - roa.x_bar
+
+    # V = (x − x̄)ᵀ P (x − x̄), its sublevel set the certified region
+    assert isinstance(roa.V, QuadraticField)
+    np.testing.assert_array_equal(roa.V(X), np.einsum("ij,jk,ik->i", d, roa.P, d))
+    assert isinstance(roa.region, EllipsoidSet)
+    np.testing.assert_array_equal(
+        roa.contains(X), [bool(roa.region.contains(x)) for x in X]
+    )
+
+    # The same field is a terminal cost: h(x) = V(x)
+    h = roa.V.as_terminal_cost()
+    assert h.h(X[0]) == roa.V(X[0])
+
+
+@pytest.mark.optional
+@pytest.mark.jax
+def test_script_07_fields_the_lqr_value_ends_a_short_mpc():
+    from scipy.linalg import solve_continuous_are
+
+    from minilink import InvertedPendulum
+    from minilink.analysis import linearize
+    from minilink.control import ModelPredictiveController
+    from minilink.core.fields import QuadraticField
+    from minilink.planning import TrajectoryOptimizationPlanner
+
+    plant = InvertedPendulum()
+    Q = np.diag([10.0, 1.0])
+    R = 0.1 * np.eye(1)
+    x_start = np.array([0.4, 0.0])
+    score = QuadraticCost.from_system(plant, Q=Q, R=R)
+    problem = PlanningProblem(
+        plant, cost=score, x_start=x_start, tf=4.0, U=plant.input_box
+    )
+    model = linearize(plant)
+    V = QuadraticField(model.xbar, solve_continuous_are(model.A(), model.B(), Q, R))
+
+    def J_of(cost):
+        planner = TrajectoryOptimizationPlanner(
+            PlanningProblem(
+                plant, cost=cost, x_start=x_start, tf=0.3, U=plant.input_box
+            ),
+            n_steps=3,
+            transcription="single_shooting",
+            backend="jax",
+            method="adam",
+            iterations=40,
+            optimizer_options={"learning_rate": 0.2},
+        )
+        pe = problem.compile(ModelPredictiveController(planner) % 0.1, backend="jax")
+        return float(pe.evaluate(pe.params).objective)
+
+    # Three periods ahead the pendulum falls; ended by the LQR value it is held up
+    J_short = J_of(score)
+    J_ended = J_of(score + V.as_terminal_cost())
+    assert J_ended < 0.1 * J_short

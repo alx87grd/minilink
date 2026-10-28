@@ -25,6 +25,8 @@ _EXPORTS: dict[str, tuple[str, str]] = {
     "TimeCost": ("minilink.core.costs", "TimeCost"),
     # Fields
     "Field": ("minilink.core.fields", "Field"),
+    "QuadraticField": ("minilink.core.fields", "QuadraticField"),
+    "EllipsoidSet": ("minilink.core.fields", "EllipsoidSet"),
     # Sets
     "Set": ("minilink.core.sets", "Set"),
     "InputSet": ("minilink.core.sets", "InputSet"),

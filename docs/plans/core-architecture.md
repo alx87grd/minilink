@@ -343,8 +343,11 @@ terminal = QuadraticField(P, x_bar).as_terminal_cost()   # §9: the LQR value en
 - **Ruled:** R133, R153.
 - **Today:** `Field` is in `core/fields.py` with its four conversions and `gradient`, the
   shaping in `core/shaping.py`, and `Set.as_cost` reuses it (the v0.3 run, step 2); the four
-  workspace fields subclass it in `planning/spatial/state_fields.py`. `QuadraticField`, the
-  certificate's `V` and `cost_to_go` are not fields yet.
+  workspace fields subclass it in `planning/spatial/state_fields.py`. `QuadraticField` (a
+  matrix or a schedule `S(t)`) and its `EllipsoidSet` landed in step 6, the certificate's `V`,
+  `region`, `extent` and `verify`'s draw on them (fields.md 4.2, and 4.3 in part, the RoA
+  baseline byte-identical; the rest of 4.3 is a row of TODO §4); value iteration's
+  `cost_to_go` is not a field yet.
 - **Open:** nothing at the design level.
 - **Rows:** [TODO §1.9](TODO.md#19-fields).
 
