@@ -474,8 +474,8 @@ Explicit `add_subsystem` / `connect` remains canonical for general topology.
 `ctl @ plant` and the sampled loop `ctl % dt @ plant`), like `feedback()`, return
 a new diagram that shares the operands' blocks: a diagram operand is laid out
 flat in the result with its ids, wiring and boundary ports, and the left operand
-keeps its blocks, wiring, ports, name, `x0` and camera settings, which `+` and
-`>>` carry into the result; a `>>` chain is named after every operand
+keeps its blocks, wiring, ports, name and camera settings, which `+` and `>>`
+carry into the result (its `x0` comes with the shared blocks, which own it); a `>>` chain is named after every operand
 (`"Step >> PID >> Pendulum"`). Blocks are shared, never copied, so `a >> b >> c`
 chains stay cheap. `connect()`, `autowire()` and `expose()` are methods and
 change the diagram they are called on. Known gap (on the workboard): `step_diagram % dt`
@@ -888,10 +888,19 @@ plotting resolution — the integrator picks its own steps); fixed-step solvers
 take `dt` from `solver_info["smallest_time_constant"]` × `AUTO_DT_SCALE` (0.1,
 one owner in `simulation/time_grid.py`), discontinuous loops included. A diagram's hint is
 the smallest over its stateful subsystems and any block that sets its own; a
-static block left at the default does not count. Both hints are bubbled again
-at every `refresh()`, which `Simulator` runs before solving, so a hint belongs on
-the block: one set by hand on the diagram is replaced. `StaticSimulator` shares
-the 10001-point default.
+static block left at the default does not count. A diagram's hints are derived from its
+blocks at each read, and a block whose hint follows its parameters (a noise block's sample
+period, the racecar's fastest mode) reads them at each read too, so no tool refreshes before
+a run and a hint belongs on the block: one set by hand on the diagram is replaced.
+`StaticSimulator` shares the 10001-point default.
+
+**Three owners of a start (R124).** A block owns its `x0`; a diagram's `x0` is a view
+stacked from its blocks' (a read-only array; assigning a whole vector writes each slice
+through to its block), a sampled loop's held outputs keep their own start (`hold_x0`), and a
+`SampledSystem`'s `x0` is its source's. `refresh()` only rebuilds the stacked layout after a
+structural change inside a block. The problem owns the plant's start (`x_start`), and the
+evaluator's tree gives every other stateful block its start as a leaf (`controller.x0`,
+`observer.x0`), read from the block at compile.
 
 Solver presets: `scipy`, `scipy_stiff`, `scipy_max`, `scipy_ultra`, `scipy_lsoda`,
 `euler` (variable knot spacing), `euler_fixedsteps` (uniform grid via the step
@@ -1043,7 +1052,8 @@ grid of `dt`; a sampled controller (`pid % 0.01`, a held policy, a loop on a clo
 `SampledDiagramSystem` on its own base period, `dt` omitted reading it and a differing `dt`
 refused (D15), its plant's solver and substeps the plant block's; a tick law with no clock and
 the stateless MPC are refused, naming the clock.
-`pe.params` is the run's tree: the loop's blocks by id, the problem's own leaves (`"cost"`,
+`pe.params` is the run's tree: the loop's blocks by id (a stateful block other than the
+plant with its `"x0"` leaf), the problem's own leaves (`"cost"`,
 the sets' parameters, `"x_start"`, `"discount_rate"`) and each free input at its nominal
 value. `pe.trajectory(params)` is one run to the horizon on the step model, every block
 output recorded (`"id:port"`, the plant's input `"plant:u"`, the role `plant`);

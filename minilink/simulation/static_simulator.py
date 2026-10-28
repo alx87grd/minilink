@@ -47,10 +47,9 @@ class StaticSimulator:
                 stacklevel=2,
             )
 
-        # The system, refreshed, and the options
+        # The system and the options
         self.verbose = verbose
         self.sys = sys
-        self.sys.refresh()
 
         # Outputs are sampled, not integrated: no dt policy, so the automatic
         # grid is the DEFAULT_N_STEPS reporting grid

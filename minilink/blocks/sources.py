@@ -75,8 +75,6 @@ class Source(System):
             style_trajectory_subplot,
         )
 
-        self.refresh()
-
         # The time range, 0 to 10 s by default
         if t0 is None:
             t0 = 0.0
@@ -246,9 +244,6 @@ class WhiteNoise(Source):
             "psd": as_intensity(psd, p),
         }
 
-        # Solver hints: the sample period
-        self.refresh()
-
     @property
     def psd(self):
         """The intensity ``W``: a ``(p,)`` diagonal or a ``(p, p)`` matrix."""
@@ -292,11 +287,20 @@ class WhiteNoise(Source):
         seed = None if key is None else child_seed(key, "seed")
         return dict(self.params, seed=seed)
 
-    def refresh(self):
-        """Publish the sample period as the solver hint of the block."""
+    @property
+    def solver_info(self) -> dict:
+        """The solver hints, the sample period among them, read from the current ``params``."""
         period = float(self.params["sample_period"])
-        self.solver_info["sample_period"] = period
-        self.solver_info["smallest_time_constant"] = period
+
+        info = self.own_solver_info
+        info["sample_period"] = period
+        info["smallest_time_constant"] = period
+
+        return info
+
+    @solver_info.setter
+    def solver_info(self, value: dict):
+        self.own_solver_info = dict(value)
 
 
 class TrajectorySource(Source):

@@ -187,24 +187,6 @@ Why: [core-architecture.md](core-architecture.md) §1.
     (scan: examples#10).
 
   `log_prob` lives on the seeded policy, not on `Distribution` (R129).
-- [ ] **Three owners of a start; a diagram's state derived from its blocks**
-  (S29; the maintainer's choice of 2026-10-27, R124,
-  [record](../reviews/2026-10-27-design-questions-rulings.md)):
-  - a diagram's `x0`, `n` and `state` become views computed from its blocks; setting
-    `diagram.x0` writes through to the blocks; the structural parts are cached and recomputed
-    when the wiring changes;
-  - `refresh()` leaves `Simulator`, and the `derived_x0` heuristic in `core/wiring.py` goes;
-    the racecar solver hint, `WhiteNoise` and the diagrams' bubbled solver hints stop depending
-    on the pre-read `refresh()`;
-  - the problem keeps the plant's start (`x_start`, a point, a set or a law);
-  - each stateful block gets an `x0` leaf in the evaluator's tree (`controller.x0`,
-    `observer.x0`), read from the block at compile as the nominal;
-  - `x0` (the start) and `state.nominal_value` (the operating point x̄, ruled 2026-10-13) keep
-    one owner each (scan: core#11, dynamics#10, examples#14).
-
-  Done when no diagram stores a stacked copy, `Simulator` calls no `refresh()` before a run,
-  `jax.grad` of `objective` with respect to `observer.x0` matches a central difference, and the
-  baselines are byte-identical.
 - [ ] **Sets as costs, the lowerings, the metrics as constraints** (was V1
   step 8; [differentiable-problem.md](differentiable-problem.md) §8):
   - `TrajectorySource` holds its table in `params` (its `h` already traces), so `"x_start"` and

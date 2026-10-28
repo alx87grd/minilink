@@ -127,8 +127,10 @@ class ProblemEvaluator:
         self.plant_slice = self.loop.state_index["plant"]
         self.plant_input = plant_input_sources(self.loop, self.evaluator, self.sampled)
         self.block_ids = tuple(self.loop.subsystems)
+        self.start_ids = stateful_blocks_of(self.loop)
         self.free_inputs = tuple(self.loop.inputs)
         require_free_names(self.free_inputs, self.block_ids)
+        require_no_x0_key(self.loop, self.start_ids)
 
         # The forms generated once: the batched trial, jitted on JAX
         self.trials_fn = None
@@ -142,16 +144,21 @@ class ProblemEvaluator:
         """
         The run's parameters as one nested tree, fresh from the objects.
 
-        ``{block_id: block params}`` for every block of the loop; the problem's
-        own leaves (``"cost"``, the parameters of the sets that hold any by role,
-        ``"x_start"``, ``"discount_rate"``); and each free input of the loop at its
-        nominal value. Every leaf a float array, so ``jax.grad`` differentiates the
-        whole tree.
+        ``{block_id: block params}`` for every block of the loop, a stateful block
+        other than the plant with its start as the leaf ``"x0"`` (``controller.x0``,
+        ``observer.x0``; R124: the plant's start is the problem's ``x_start``); the
+        problem's own leaves (``"cost"``, the parameters of the sets that hold any by
+        role, ``"x_start"``, ``"discount_rate"``); and each free input of the loop at
+        its nominal value. Every leaf a float array, so ``jax.grad`` differentiates
+        the whole tree.
         """
         loop = self.loop
         problem = self.problem
 
         tree = {sys_id: loop.subsystems[sys_id].params for sys_id in self.block_ids}
+        for sys_id in self.start_ids:
+            block = loop.subsystems[sys_id]
+            tree[sys_id] = {**(block.params or {}), "x0": block.x0}
         tree.update(problem_leaves(problem))
         for port in self.free_inputs:
             tree[port] = loop.inputs[port].nominal_value
@@ -367,6 +374,22 @@ class ProblemEvaluator:
 
         return x_starts, Batched(merge_tree(params, overrides), axes)
 
+    def loop_start(self, params, x_start, xp):
+        """The loop's start ``x(0)``: the plant at ``x_start``, every other stateful block at its ``x0`` leaf, a held output at its own."""
+        loop = self.loop
+
+        pieces = []
+        for sys_id in self.block_ids:
+            if sys_id == "plant":
+                pieces.append(xp.reshape(xp.asarray(x_start, dtype=float), (-1,)))
+            elif sys_id in self.start_ids:
+                pieces.append(xp.reshape(params[sys_id]["x0"], (-1,)))
+        pieces.append(xp.asarray(getattr(loop, "hold_x0", np.zeros(0)), dtype=float))
+
+        x0 = xp.concatenate(pieces)
+
+        return x0
+
     def run(self, params, x_start) -> Trajectory:
         """One run of the loop from the plant state ``x_start``: the loop's trajectory, signals recorded."""
         ev = self.evaluator
@@ -374,11 +397,9 @@ class ProblemEvaluator:
         xp = array_module(x_start, *flat_leaves(params))
         dt = self.dt
         N = self.n_steps
-        a, b = self.plant_slice
 
-        # The loop's start: its own initial state, the plant's slice at x_start
-        x0_loop = xp.asarray(loop.x0, dtype=float)
-        x0 = xp.concatenate([x0_loop[:a], xp.reshape(x_start, (-1,)), x0_loop[b:]])
+        # The loop's start: each block's x0 leaf, the plant's slice at x_start
+        x0 = self.loop_start(params, x_start, xp)
 
         # The free inputs held at their parameters over every period
         u = self.held_inputs(params, xp)
@@ -386,7 +407,9 @@ class ProblemEvaluator:
 
         # x_{k+1} = Φ(x_k, u, t_k), t_k = k dt, k = 0 … N − 1; or the adaptive
         # integral reported on that grid
-        loop_params = {sys_id: params[sys_id] for sys_id in self.block_ids}
+        loop_params = {
+            sys_id: block_params_of(loop, params, sys_id) for sys_id in self.block_ids
+        }
         loop_params = integer_seeds(loop, loop_params)
         ts = xp.arange(N + 1) * dt
         if self.sampled:
@@ -424,7 +447,7 @@ class ProblemEvaluator:
             x=xs.T,
             u=us.T,
             signals=recorded,
-            roles={"plant": {"x": (a, b), "u": PLANT_INPUT}},
+            roles={"plant": {"x": self.plant_slice, "u": PLANT_INPUT}},
         )
 
     def traces(self) -> bool:
@@ -1009,6 +1032,38 @@ def trials_of(problem, n_trials):
         raise ValueError("a stochastic problem needs n_trials, the number of draws")
 
     return int(n_trials)
+
+
+def stateful_blocks_of(loop):
+    """The ids of the loop's blocks other than the plant that hold a state: each has an ``x0`` leaf."""
+    return tuple(
+        sys_id
+        for sys_id, block in loop.subsystems.items()
+        if sys_id != "plant" and block.n > 0
+    )
+
+
+def require_no_x0_key(loop, start_ids):
+    """Refuse a stateful block whose own params name ``"x0"``: the tree's ``x0`` leaf is its start."""
+    for sys_id in start_ids:
+        if "x0" in (loop.subsystems[sys_id].params or {}):
+            raise ValueError(
+                f"the block {sys_id!r} has a parameter named 'x0', the name of its "
+                "start in the evaluator's tree: rename the parameter"
+            )
+
+
+def block_params_of(loop, params, sys_id):
+    """A block's entry of the run's tree as the block reads it: its ``x0`` leaf taken out."""
+    entry = params[sys_id]
+    if not isinstance(entry, dict) or "x0" not in entry:
+        return entry
+
+    rest = {key: value for key, value in entry.items() if key != "x0"}
+    if not rest and loop.subsystems[sys_id].params is None:
+        return None
+
+    return rest
 
 
 def require_free_names(free_inputs, block_ids):

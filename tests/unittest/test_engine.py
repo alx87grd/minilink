@@ -530,7 +530,7 @@ def test_a_deterministic_problem_runs_the_noise_blocks_own_seed():
     traj = pe.trajectory()
 
     # The loop simulated with its own params: the block's seed 3
-    x0 = np.asarray(loop.x0, dtype=float)
+    x0 = np.array(loop.x0, dtype=float)
     a, b = loop.state_index["plant"]
     x0[a:b] = [0.5, 0.0]
     reference = Simulator(loop, x0=x0, tf=1.0, dt=0.01, solver="rk4_fixedsteps").solve()
@@ -653,3 +653,60 @@ def test_a_disturbance_the_loop_does_not_draw_is_announced():
 def test_the_step_refuses_a_substep_count_that_is_not_a_positive_integer(substeps):
     with pytest.raises(ValueError, match="substeps"):
         upright_problem().compile(pid(), dt=0.01, substeps=substeps)
+
+
+def test_each_stateful_block_has_its_start_as_a_leaf():
+    sys = plant()
+    problem = PlanningProblem(
+        sys, x_start=[0.5, 0.0], cost=QuadraticCost.from_system(sys), tf=1.0
+    )
+    controller = pid()
+    pe = problem.compile(controller, dt=0.01, backend="numpy")
+    assert "x0" in pe.params["controller"] and "x0" not in pe.params["plant"]
+    np.testing.assert_array_equal(pe.params["controller"]["x0"], controller.x0)
+
+    # A moved start moves the run, as the block's own x0 would
+    moved = {"controller": {"x0": np.full(controller.n, 0.2)}}
+    controller.x0 = np.full(controller.n, 0.2)
+    rebuilt = problem.compile(controller, dt=0.01, backend="numpy")
+    np.testing.assert_allclose(pe.evaluate(moved).J, rebuilt.evaluate().J, rtol=1e-12)
+
+
+@pytest.mark.jax
+def test_the_gradient_reaches_an_observers_start():
+    pytest.importorskip("jax")
+    import jax
+
+    from minilink.control.state import StateFeedback
+    from minilink.core.closed_loop import closed_loop
+    from minilink.dynamics.abstraction.state_space import LTISystem
+    from minilink.estimation.observer import StateObserver
+
+    A = np.array([[0.0, 1.0], [-2.0, -0.5]])
+    B = np.array([[0.0], [1.0]])
+    C = np.array([[1.0, 0.0]])
+    plant_ = LTISystem(A, B, C)
+    observer = StateObserver(A, B, C, np.array([[3.0], [2.0]]))
+    loop = closed_loop(StateFeedback(np.array([[1.0, 1.5]])), plant_, observer=observer)
+    problem = PlanningProblem(
+        plant_, x_start=[1.0, 0.0], cost=QuadraticCost.from_system(plant_), tf=2.0
+    )
+    pe = problem.compile(loop, dt=0.01, backend="jax")
+    params = pe.params
+
+    grad = jax.grad(lambda p: pe.evaluate(p).objective)(params)["observer"]["x0"]
+
+    eps = 1e-6
+    for i in range(2):
+        up, down = (
+            {
+                **params,
+                "observer": {
+                    **params["observer"],
+                    "x0": params["observer"]["x0"] + s * eps * np.eye(2)[i],
+                },
+            }
+            for s in (1.0, -1.0)
+        )
+        central = (pe.evaluate(up).objective - pe.evaluate(down).objective) / (2 * eps)
+        np.testing.assert_allclose(grad[i], central, rtol=1e-6)

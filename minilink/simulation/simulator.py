@@ -159,7 +159,6 @@ class Simulator:
         # The model and the options as given
         self.verbose = verbose
         self.sys = sys
-        self.sys.refresh()
         self.user_solver = solver
         self.user_specified_dt = dt is not None
         self.auto_time_grid = n_steps is None and dt is None

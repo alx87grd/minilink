@@ -46,9 +46,36 @@ class WiredDiagramMixin:
         self.connection_verbose = False
 
         # The stacked state of the (still empty) subsystems
-        self.n, self.state_index, self.state, self.x0, self.derived_x0 = state_layout(
-            self.subsystems
-        )
+        self.n, self.state_index, self.state = state_layout(self.subsystems)
+
+    @property
+    def x0(self):
+        """
+        The diagram's initial state: a view stacked from its blocks' ``x0`` (R124).
+
+        Read-only as an array; assigning a whole vector writes each block's
+        slice through to the block, which owns its start.
+        """
+        x0 = stacked_x0(self.subsystems)
+        x0.flags.writeable = False
+
+        return x0
+
+    @x0.setter
+    def x0(self, value):
+        write_through_x0(self, value, self.n)
+
+    @property
+    def solver_info(self):
+        """The diagram's solver hints, derived from its blocks at each read (set a hint on the block it describes)."""
+        info = self.own_solver_info
+        bubble_solver_info(info, self.subsystems)
+
+        return info
+
+    @solver_info.setter
+    def solver_info(self, value):
+        self.own_solver_info = dict(value)
 
     @property
     def params(self):
@@ -91,11 +118,8 @@ class WiredDiagramMixin:
         self.subsystems[sys_id] = sys
         self.connections[sys_id] = {port_id: None for port_id in sys.inputs}
 
-        # The stacked state and the solver hints, with the new block
-        self.n, self.state_index, self.state, self.x0, self.derived_x0 = state_layout(
-            self.subsystems
-        )
-        self.refresh_solver_info()
+        # The stacked state, with the new block
+        self.n, self.state_index, self.state = state_layout(self.subsystems)
 
     def connect(self, source_sys_id, source_port_id, target_sys_id, target_port_id):
         """
@@ -256,27 +280,15 @@ class WiredDiagramMixin:
     # Refresh, random draws and topology
 
     def refresh(self):
-        """Refresh all subsystems and rebuild the flattened state metadata.
+        """Refresh all subsystems and rebuild the stacked state layout.
 
-        The solver hints are then bubbled again from the refreshed subsystems
-        (``refresh_solver_info``). Compiled evaluators are snapshots:
-        recompile after structural changes. An ``x0`` set on the diagram itself
-        is kept; otherwise the subsystems' current ``x0`` are stacked again.
+        A structural change inside a block (its state size) needs it; the
+        diagram's ``x0`` and solver hints are views of its blocks and need none.
+        Compiled evaluators are snapshots: recompile after structural changes.
         """
-        x0 = own_x0_of(self)
-
-        # The subsystems first, then the stack of their metadata
         for subsystem in self.subsystems.values():
             subsystem.refresh()
-        self.n, self.state_index, self.state, self.x0, self.derived_x0 = state_layout(
-            self.subsystems
-        )
-
-        # The diagram's own x0 stays while its size still fits
-        if x0 is not None and x0.shape == self.x0.shape:
-            self.x0 = x0
-
-        self.refresh_solver_info()
+        self.n, self.state_index, self.state = state_layout(self.subsystems)
 
     def realize(self, key):
         """Nested params with every random block realized under its own stream, named by its id."""
@@ -419,51 +431,6 @@ class WiredDiagramMixin:
     ###########################################################################
     # Internal machinery
     ###########################################################################
-
-    def refresh_solver_info(self):
-        """Bubble subsystem solver hints to the diagram root.
-
-        The diagram is discontinuous when any subsystem is. Its smallest time
-        constant is the smallest one among the subsystems that carry one: every
-        stateful subsystem, and a stateless block that sets its own. A static
-        block left at the default has no time constant and does not pin the
-        diagram to the default. Its sample period is the shortest one among the
-        sampled subsystems, and it has none when no subsystem is sampled.
-
-        The hints are derived from the subsystems at every :meth:`add_subsystem`
-        and :meth:`refresh` (a ``Simulator`` refreshes before it solves), so a
-        hint changed on a block after composition reaches the diagram. Set a
-        hint on the block it describes: one set by hand on the diagram is
-        replaced at the next refresh.
-        """
-        # Discontinuous when any subsystem is
-        self.solver_info["discontinuous_behavior"] = any(
-            subsystem.solver_info.get("discontinuous_behavior", False)
-            for subsystem in self.subsystems.values()
-        )
-
-        # The smallest time constant among the subsystems that carry one
-        time_constants = []
-        for subsystem in self.subsystems.values():
-            tau = subsystem.solver_info.get(
-                "smallest_time_constant", DEFAULT_SMALLEST_TIME_CONSTANT
-            )
-            if subsystem.n > 0 or tau != DEFAULT_SMALLEST_TIME_CONSTANT:
-                time_constants.append(tau)
-        self.solver_info["smallest_time_constant"] = min(
-            time_constants, default=DEFAULT_SMALLEST_TIME_CONSTANT
-        )
-
-        # The shortest sample period, when any subsystem is sampled
-        periods = [
-            subsystem.solver_info["sample_period"]
-            for subsystem in self.subsystems.values()
-            if "sample_period" in subsystem.solver_info
-        ]
-        if periods:
-            self.solver_info["sample_period"] = min(periods)
-        else:
-            self.solver_info.pop("sample_period", None)
 
     def require_connectable(
         self, source_sys_id, source_port_id, target_sys_id, target_port_id
@@ -698,26 +665,86 @@ def iter_subsystems(diagram, prefix=()):
 ###############################################################################
 
 
-def own_x0_of(system):
-    """A copy of the ``x0`` set on the system itself (it differs from the one read from its blocks), else ``None``."""
-    x0 = np.copy(system.x0)
-    derived_x0 = system.derived_x0
-    if x0.shape == derived_x0.shape and not np.array_equal(x0, derived_x0):
-        return x0
+def bubble_solver_info(info, subsystems) -> None:
+    """Write the solver hints a diagram derives from its blocks into ``info``.
 
-    return None
+    The diagram is discontinuous when any subsystem is. Its smallest time
+    constant is the smallest one among the subsystems that carry one: every
+    stateful subsystem, and a stateless block that sets its own. A static
+    block left at the default has no time constant and does not pin the
+    diagram to the default. Its sample period is the shortest one among the
+    sampled subsystems, and it has none when no subsystem is sampled. Read at
+    each access, so a hint changed on a block after composition reaches the
+    diagram; one set by hand on the diagram is replaced at the next read.
+    """
+    # Discontinuous when any subsystem is
+    info["discontinuous_behavior"] = any(
+        subsystem.solver_info.get("discontinuous_behavior", False)
+        for subsystem in subsystems.values()
+    )
+
+    # The smallest time constant among the subsystems that carry one
+    time_constants = []
+    for subsystem in subsystems.values():
+        tau = subsystem.solver_info.get(
+            "smallest_time_constant", DEFAULT_SMALLEST_TIME_CONSTANT
+        )
+        if subsystem.n > 0 or tau != DEFAULT_SMALLEST_TIME_CONSTANT:
+            time_constants.append(tau)
+    info["smallest_time_constant"] = min(
+        time_constants, default=DEFAULT_SMALLEST_TIME_CONSTANT
+    )
+
+    # The shortest sample period, when any subsystem is sampled
+    periods = [
+        subsystem.solver_info["sample_period"]
+        for subsystem in subsystems.values()
+        if "sample_period" in subsystem.solver_info
+    ]
+    if periods:
+        info["sample_period"] = min(periods)
+    else:
+        info.pop("sample_period", None)
+
+
+def stacked_x0(subsystems):
+    """The blocks' ``x0`` stacked in insertion order, a fresh float array."""
+    if not subsystems:
+        return np.zeros(0)
+
+    return np.concatenate(
+        [np.asarray(sub.x0, dtype=float).reshape(-1) for sub in subsystems.values()]
+    )
+
+
+def write_through_x0(diagram, value, n) -> None:
+    """Write each block's slice of ``value`` (the diagram's stacked state, size ``n``) to the block."""
+    value = np.array(value, dtype=float).reshape(-1)
+    require_x0_size(diagram, value, n)
+    for sys_id, sub in diagram.subsystems.items():
+        start, end = diagram.state_index[sys_id]
+        if end > start:
+            sub.x0 = value[start:end]
+
+
+def require_x0_size(diagram, value, n) -> None:
+    """Refuse an ``x0`` whose size is not the diagram's state size."""
+    if value.size != n:
+        raise ValueError(
+            f"{diagram.name}: x0 has size {value.size}, the diagram's state has {n}"
+        )
 
 
 def state_layout(subsystems):
     """
-    The stacked state of a diagram's blocks: ``(n, state_index, state, x0, derived_x0)``.
+    The stacked state layout of a diagram's blocks: ``(n, state_index, state)``.
 
     The stacked state vector is ``x = [x_1; x_2; ...]`` in subsystem insertion
     order; ``state_index`` maps each subsystem id to its ``(start, end)``
     indices in the stacked vector. State labels are prefixed with the
-    subsystem id whenever the same label appears in several subsystems.
-    ``derived_x0`` is a copy of the stacked ``x0``, so a refresh can tell an
-    ``x0`` set on the diagram from a stale stacked one.
+    subsystem id whenever the same label appears in several subsystems. The
+    stacked ``x0`` is not part of it: it is a view of the blocks
+    (:func:`stacked_x0`).
     """
     # x = [x_1; x_2; ...]: each subsystem's (start, end) in the stack
     state_index = {}
@@ -740,12 +767,11 @@ def state_layout(subsystems):
         for sys_id, label in owned_labels
     ]
 
-    # The stacked state signal, and its default initial condition
+    # The stacked state signal
     n = idx
     state = VectorSignal("x", dim=n)
-    x0 = np.zeros(n)
 
-    # The subsystems' metadata and x0, stacked in insertion order
+    # The subsystems' metadata, stacked in insertion order
     if subsystems:
         substates = [sub.state for sub in subsystems.values()]
         state.labels = labels
@@ -753,12 +779,8 @@ def state_layout(subsystems):
         state.upper_bound = np.concatenate([s.upper_bound for s in substates])
         state.lower_bound = np.concatenate([s.lower_bound for s in substates])
         state.nominal_value = np.concatenate([s.nominal_value for s in substates])
-        x0 = np.concatenate([sub.x0 for sub in subsystems.values()])
 
-    # The x0 stacked from the subsystems
-    derived_x0 = np.copy(x0)
-
-    return n, state_index, state, x0, derived_x0
+    return n, state_index, state
 
 
 def require_params_mapping(params):
