@@ -25,13 +25,13 @@ from typing import TYPE_CHECKING
 
 import numpy as np
 
+from minilink.core.discrete.step_diagram import StepDiagramSystem
 from minilink.core.discrete.step_system import StepSystem
 from minilink.core.system import DynamicSystem
 from minilink.core.topology import evaluation_order_of
 
 if TYPE_CHECKING:
     from minilink.core.diagram import DiagramSystem
-    from minilink.core.discrete.step_diagram import StepDiagramSystem
 
 ###############################################################################
 # Public API
@@ -475,3 +475,185 @@ def state_slice_of(diagram, sys_id: str, stateful=DynamicSystem) -> slice:
         start, end = diagram.state_index[sys_id]
         return slice(start, end)
     return slice(0, 0)
+
+
+# The sampled plan: a step plan on a clock
+
+
+@dataclass(frozen=True)
+class SampledPortOperation:
+    """One output-port evaluation of a sampled plan: a :class:`PortOperation` and its clock.
+
+    ``face`` says what the block reads as time: ``"seconds"`` (``t_k``, a static
+    block or a system on a clock), ``"count"`` (``k // divisor``, a tick law on a
+    clock) or ``"base"`` (``k``, a bare tick law). A block of ``divisor > 1``
+    computes its output on the ticks ``k mod divisor = 0`` and reads it from
+    ``hold_slice`` of the state in between. ``params_path`` is the block's keys
+    in the diagram's nested parameter tree.
+    """
+
+    compute_func: Callable[..., np.ndarray]
+    local_x_slice: slice
+    gather_sources: tuple[tuple[int, object, int], ...]
+    out_slice: slice
+    u_dim: int
+    face: str
+    divisor: int
+    hold_slice: slice | None
+    params_path: tuple[str, ...]
+    bound_params: dict | None = None
+    label: str = ""
+    sys_id: str = ""
+
+
+@dataclass(frozen=True)
+class SampledStepOperation:
+    """One state advance of a sampled plan: ``update(x, u, t_k)`` or ``step(x, u, k)``, on its clock."""
+
+    step_func: Callable[..., object]
+    local_x_slice: slice
+    gather_sources: tuple[tuple[int, object, int], ...]
+    u_dim: int
+    face: str
+    divisor: int
+    params_path: tuple[str, ...]
+    bound_params: dict | None = None
+    label: str = ""
+    sys_id: str = ""
+
+
+@dataclass(frozen=True)
+class SampledExecutionPlan:
+    """Immutable flattened schedule of a sampled diagram: its blocks' operations on one base clock.
+
+    ``base_period`` is ``Δ``; nested boxes are inlined (``output_slices`` keyed by
+    the flat ids ``box__block``), while every slice of the state reads the
+    nested layout of the diagram, held outputs included.
+    """
+
+    state_dim: int
+    signal_dim: int
+    base_period: float
+    port_ops: tuple[SampledPortOperation, ...]
+    step_ops: tuple[SampledStepOperation, ...]
+    output_slices: dict[tuple[str, str], slice]
+    external_output_slices: dict[str, slice]
+
+
+def build_sampled_execution_plan(diagram) -> SampledExecutionPlan:
+    """Build the :class:`SampledExecutionPlan` of a sampled diagram, its nested boxes inlined."""
+    # A real cycle: the assembly imports the diagrams, which import this module's users
+    from minilink.core.assembly import flatten_diagram
+    from minilink.core.discrete.sampled_system import SampledSystem
+
+    base = diagram.sample_period
+    require_clock(diagram, base)
+
+    # The wiring of one flat level; the slices of the nested layout
+    flat, report = flatten_diagram(diagram)
+    layout = nested_layout(diagram)
+    paths = {flat_id: tuple(path.split("/")) for path, flat_id in report.id_map.items()}
+    order = evaluation_order_of(flat)
+    output_slices, signal_dim = signal_layout(flat)
+    snapshot = params_snapshot(flat)
+
+    port_ops = []
+    for sys_id, port_id in order:
+        sys = flat.subsystems[sys_id]
+        path = paths[sys_id]
+        x_slice, holds = layout[path]
+        gather_sources, u_dim = gather_sources_of(
+            flat, sys_id, output_slices, dependencies=sys.outputs[port_id].dependencies
+        )
+        port_ops.append(
+            SampledPortOperation(
+                compute_func=sys.outputs[port_id].compute,
+                local_x_slice=x_slice,
+                gather_sources=tuple(gather_sources),
+                out_slice=output_slices[(sys_id, port_id)],
+                u_dim=u_dim,
+                face=face_of(sys, SampledSystem),
+                divisor=diagram.divisor_of(sys),
+                hold_slice=holds.get(port_id),
+                params_path=path,
+                bound_params=snapshot[sys_id],
+                label=f"{'/'.join(path)}:{port_id}",
+                sys_id=sys_id,
+            )
+        )
+
+    # One state advance per block with a state: the seconds face on a clock, the step otherwise
+    step_ops = []
+    for sys_id, sys in flat.subsystems.items():
+        if not isinstance(sys, StepSystem) or sys.n == 0:
+            continue
+        path = paths[sys_id]
+        face = face_of(sys, SampledSystem)
+        gather_sources, u_dim = gather_sources_of(
+            flat, sys_id, output_slices, dependencies="all"
+        )
+        step_ops.append(
+            SampledStepOperation(
+                step_func=sys.update if face == "seconds" else sys.step,
+                local_x_slice=layout[path][0],
+                gather_sources=tuple(gather_sources),
+                u_dim=u_dim,
+                face=face,
+                divisor=diagram.divisor_of(sys),
+                params_path=path,
+                bound_params=snapshot[sys_id],
+                label="/".join(path),
+                sys_id=sys_id,
+            )
+        )
+
+    external = {}
+    for out_port_id in diagram.outputs:
+        src = flat.connections.get("output", {}).get(out_port_id)
+        if src is not None:
+            external[out_port_id] = output_slices[tuple(src)]
+
+    return SampledExecutionPlan(
+        state_dim=diagram.n,
+        signal_dim=signal_dim,
+        base_period=base,
+        port_ops=tuple(port_ops),
+        step_ops=tuple(step_ops),
+        output_slices=output_slices,
+        external_output_slices=external,
+    )
+
+
+def face_of(sys, sampled_kind) -> str:
+    """What the block reads as time in a sampled plan: ``"seconds"``, ``"count"`` or ``"base"``."""
+    if isinstance(sys, sampled_kind):
+        return "count" if sys.counts else "seconds"
+    if isinstance(sys, StepSystem):
+        return "base"
+
+    return "seconds"
+
+
+def nested_layout(diagram, offset=0, prefix=()):
+    """``path → (state slice, {port: hold slice})`` of every leaf, in the diagram's nested layout."""
+    layout = {}
+    for sys_id, sys in diagram.subsystems.items():
+        start, end = diagram.state_index[sys_id]
+        path = (*prefix, sys_id)
+        if isinstance(sys, StepDiagramSystem):
+            layout.update(nested_layout(sys, offset + start, path))
+        else:
+            layout[path] = (slice(offset + start, offset + end), {})
+    for (path, port_id), (start, end) in diagram.hold_index.items():
+        layout[(*prefix, *path)][1][port_id] = slice(offset + start, offset + end)
+
+    return layout
+
+
+def require_clock(diagram, base) -> None:
+    """Refuse a sampled diagram with no block on a clock: a tick diagram is a StepDiagramSystem."""
+    if base is None:
+        raise ValueError(
+            f"{diagram.name} has no block on a clock: put one on a clock (block % dt) "
+            "or build a StepDiagramSystem"
+        )

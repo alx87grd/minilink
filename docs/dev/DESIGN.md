@@ -183,9 +183,30 @@ block.
 
 The law is CONSTITUTION §2 (invariants 1, 3, 4). Its mechanics here: the evolution kind is
 the type (`isinstance(sys, StepSystem)`), never a flag or a solver option, so `f` is always a
-rate; step and hybrid live on sibling types and separate compile and simulation paths
-(`StepSystem` beside `DynamicSystem`, `HybridDiagram` as two-side glue), and nothing of
-theirs enters `DynamicSystem`, flow `compile()` or `Simulator`.
+rate; step and sampled systems live on sibling types and separate compile and simulation paths
+(`StepSystem` beside `DynamicSystem`), and nothing of theirs enters `DynamicSystem`, flow
+`compile()` or `Simulator`.
+
+**The sampled loop is a step diagram on a clock** (R146, R158). `sys % dt` is
+`discretize(sys, dt, solver="euler")`, a `SampledSystem` (a law with states becomes its
+difference equation; a static block and a tick law take the period). The operators `>>`, `+`
+and `@` compose step systems with the meaning they have on continuous ones, on the same assembly
+code; the operands decide the algebra (`core/assembly.py`, `algebra_of`): a clocked operand
+makes a `SampledDiagramSystem`, a tick law a `StepDiagramSystem`, continuous and static operands
+a `DiagramSystem`; a static block joins any of them; a continuous operand with states beside a
+step one is refused, naming `%`, except `sampled @ continuous`, the one place the two worlds
+meet, where the plant becomes the plant on the controller's base clock (`plant` role,
+`discretize(plant, Δ, substeps=n)`, `n` from the automatic step rule). A
+`SampledDiagramSystem`'s base period `Δ` is the greatest common divisor of its clocked blocks'
+periods (on a nanosecond grid); a block of divisor `d > 1` fires on `k mod d = 0`, its held
+outputs state slots after the blocks' states (`hold_index`); its compiled plan
+(`build_sampled_execution_plan`, nested boxes inlined into one flat schedule) forms
+`t_k = t_start + k·Δ` once per tick and hands it to every block whose equations are in seconds
+(a static block, a `SampledSystem`'s seconds face), `k // d` to a tick law on a clock, `k` to a
+bare tick law; the firing is a `lax.cond` on the tick on JAX, a branch on NumPy, never a
+`where`. Signals propagate within the tick (R125): a delay is a block. The hybrid glue of
+`simulation/discrete/` (`Computer`, `StepSchedule`, `HybridDiagram`) is the MPC's runtime until
+its rebuild on this loop.
 
 The reusable bases are `dynamics/abstraction`: `StateSpaceSystem` builds its matrices
 through methods `A(t, params)`, `B(t, params)`, `C(t, params)`, `D(t, params)`

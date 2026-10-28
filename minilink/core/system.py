@@ -457,12 +457,21 @@ class System(SystemSimulation, SystemAnalysis, SystemPlotting, SystemAnimation):
 
         return closed_loop(self, other)
 
-    def __mod__(self, schedule: object):
-        """Return a scheduled :class:`~minilink.simulation.discrete.computer.Computer`."""
-        # A real cycle: the computer imports the diagrams, which import this module
-        from minilink.simulation.discrete.computer import build_computer
+    def __mod__(self, dt: float):
+        """Return this block on a clock of period ``dt``: ``discretize(self, dt, solver="euler")``.
 
-        return build_computer(self, schedule)
+        A law with states becomes its difference equation,
+        ``z_{k+1} = z_k + dt·f(z_k, e_k, t_k)``; a static block and a tick law
+        keep their equations and take the period. See
+        :class:`~minilink.core.discrete.sampled_system.SampledSystem`.
+        """
+        # A real cycle: the sampled system imports System from this module
+        from minilink.core.discrete.sampled_system import SampledSystem
+
+        sampled = SampledSystem(self, dt, solver="euler")
+        sampled.name = f"{self.name} % {float(dt):g}"
+
+        return sampled
 
     # Display
 

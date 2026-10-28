@@ -9,12 +9,16 @@ import numpy as np
 from minilink.core.assembly import (
     add_input_port_like,
     add_system_to_diagram,
+    algebra_of,
     copy_diagram,
     default_output_port,
     inline_diagram,
+    is_box,
+    kind_of,
     propagate_animation_camera,
 )
 from minilink.core.diagram import DiagramSystem
+from minilink.core.discrete.sampled_system import SampledSystem, sampled_substeps
 from minilink.core.roles import (
     block_roles,
     command_port,
@@ -161,12 +165,13 @@ def closed_loop(
         require_no_state_filter(controller, roles, filter)
 
     # The plant as the loop reads it: a box whose state the controller reads gives
-    # its own x
+    # its own x; under a sampled controller, the plant on its base clock
     reads_plant_state = "x" in roles.measurements and observer is None
     plant_box = plant_box_with_state(plant) if reads_plant_state else plant
+    plant_box = on_the_controller_clock(controller, plant_box)
 
-    # The controller and the plant, each under its role name
-    diagram = DiagramSystem()
+    # The controller and the plant, each under its role name, in their algebra
+    diagram = algebra_of(controller, plant_box)()
     controller_id = add_system_to_diagram(diagram, controller, role="controller")
     plant_id = add_system_to_diagram(diagram, plant_box, role="plant")
     command = default_control_out(controller)
@@ -306,10 +311,10 @@ def open_loop(sys):
     its edge; a leaf is the block ``plant`` with its default output as ``y``.
     """
     entry = command_entry(sys)
-    diagram = DiagramSystem()
+    diagram = algebra_of(sys)()
 
     # A box laid out flat, its entry taken off the edge
-    if isinstance(sys, DiagramSystem):
+    if is_box(sys):
         inline_diagram(diagram, sys, output_collision="replace")
         entries = drop_input(diagram, entry)
         return diagram, entries
@@ -333,7 +338,7 @@ def command_entry(sys) -> str:
     if roles.measurements:
         raise ValueError(
             f"{sys.name} reads its measurement on {roles.measurement!r}"
-            + (" (on its edge)" if isinstance(sys, DiagramSystem) else "")
+            + (" (on its edge)" if is_box(sys) else "")
             + (f" and its reference on {roles.reference!r}" if roles.reference else "")
             + ": an Error block cannot drive it. Close it on the plant directly "
             "(controller @ plant), use its error layout (ports='error') if it has one, "
@@ -487,9 +492,26 @@ def insert_filter(diagram, filter, signal):
     return (filter_id, filter_out), (filter_id, filter_in)
 
 
+def on_the_controller_clock(controller, plant):
+    """A continuous plant under a sampled controller: the plant on the loop's base clock, else as is.
+
+    ``sampled @ continuous`` is where the two algebras meet: the plant becomes
+    ``discretize(plant, Δ, substeps=n)``, ``Δ`` the controller's base period and
+    ``n`` from the automatic step rule.
+    """
+    if kind_of(controller) != "clocked" or kind_of(plant) != "continuous":
+        return plant
+
+    base = controller.sample_period
+    sampled = SampledSystem(plant, base, substeps=sampled_substeps(plant, base))
+    sampled.name = plant.name
+
+    return sampled
+
+
 def plant_box_with_state(plant):
     """``plant`` with its state on its edge: a box gets its own ``x``, a leaf is as built."""
-    if not isinstance(plant, DiagramSystem) or "x" in plant.outputs:
+    if not is_box(plant) or "x" in plant.outputs:
         return plant
 
     return copy_diagram(plant).expose("x")

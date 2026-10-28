@@ -19,10 +19,11 @@ from minilink.core.compile.evaluators.base import (
 from minilink.core.compile.evaluators.compiled import body_of, compiled
 from minilink.core.compile.evaluators.dynamic import check_leaf_traces
 from minilink.core.compile.evaluators.stepping import iterate
-from minilink.core.compile.plan import StepExecutionPlan
+from minilink.core.compile.plan import SampledPortOperation, StepExecutionPlan
 from minilink.core.diagram import check_diagram_params
 from minilink.core.discrete.sampled_system import SampledSystem
 from minilink.core.discrete.step_system import StepSystem
+from minilink.core.params import lookup
 
 ###############################################################################
 # Public API
@@ -363,3 +364,179 @@ def check_plan_traces(evaluator, plan, verbose):
 
     if verbose:
         print(f"  ({time.perf_counter() - t0:.3f}s)")
+
+
+class SampledDiagramEvaluator(StepDiagramEvaluator):
+    """
+    A compiled sampled diagram on NumPy or JAX: its plan swept once per base tick, on its clock.
+
+    At tick ``k`` the plan forms ``t_k = t_start + k·Δ`` once and hands each block
+    its time (seconds, its own count ``k // d``, or the base count); a block of
+    divisor ``d > 1`` fires on ``k mod d = 0`` (a ``lax.cond`` on JAX, its
+    predicate on the tick alone) and its held outputs are read from the state in
+    between. ``params`` is the diagram's nested tree.
+    """
+
+    def __init__(self, plan, diagram, backend="numpy", verbose=False):
+        p = sum(diagram.outputs[pid].dim for pid in plan.external_output_slices)
+        DiscreteEvaluator.__init__(
+            self,
+            plan.state_dim,
+            diagram.m,
+            p,
+            backend,
+            diagram.get_u_from_input_ports(),
+        )
+        self.plan = plan
+        self.dtype = self.xp.float64
+        self._frozen_params = copy.deepcopy(diagram.params)
+        self._subsystem_ids = tuple(diagram.subsystems)
+        self.sample_period = plan.base_period
+
+        if backend == BACKEND_JAX:
+            check_sampled_plan_traces(self, plan, verbose)
+
+        self._jac_setup(diagram, "step", state_fn=None, outputs_fn=None, plan=plan)
+
+    @compiled
+    def step(self, x, u, k=0, params=None, *, t_start=0.0):
+        """``X_{k+1}`` of the loop at tick ``k``, its clock's origin at ``t_start``."""
+        self.require_params(params)
+        x, u = self.float_arrays(x, u)
+        signals = self.port_signals(x, u, k, params, t_start=t_start)
+        return self.next_from_signals(x, u, k, params, signals, t_start=t_start)
+
+    @compiled
+    def tick(self, x, u, k=0, params=None, *, t_start=0.0):
+        """``(X_{k+1}, outputs_k)``: the next state and the boundary outputs from one signal pass."""
+        self.require_params(params)
+        x, u = self.float_arrays(x, u)
+        signals = self.port_signals(x, u, k, params, t_start=t_start)
+        x_next = self.next_from_signals(x, u, k, params, signals, t_start=t_start)
+        outputs = {
+            port_id: signals[sl]
+            for port_id, sl in self.plan.external_output_slices.items()
+        }
+        return x_next, outputs
+
+    @compiled
+    def outputs(self, x, u, k=0, params=None, *, t_start=0.0):
+        self.require_params(params)
+        x, u = self.float_arrays(x, u)
+        signals = self.port_signals(x, u, k, params, t_start=t_start)
+        return {
+            port_id: signals[sl]
+            for port_id, sl in self.plan.external_output_slices.items()
+        }
+
+    def compute_internal_signals_dict(self, x, u, k=0, params=None, *, t_start=0.0):
+        """Every block output at ``(x, u, k)``, keyed ``"block:port"`` (flat ids)."""
+        x, u = self.float_arrays(x, u)
+        signals = self.port_signals(x, u, k, params, t_start=t_start)
+        return {
+            f"{sys_id}:{port_id}": signals[sl]
+            for (sys_id, port_id), sl in self.plan.output_slices.items()
+        }
+
+    ###########################################################################
+    # Internal machinery
+    ###########################################################################
+
+    def port_signals(self, x, u, k, params, inject=None, *, t_start=0.0):
+        """Fill the signal buffer at tick ``k``; ``inject=(wire_slice, delta)`` adds ``delta`` to one wire."""
+        xp = self.xp
+        dtype = self.dtype
+        signals = xp.zeros(self.plan.signal_dim, dtype=dtype)
+        x_arr = xp.asarray(x, dtype=dtype).reshape(self.plan.state_dim)
+        params = self._frozen_params if params is None else params
+        t_k = t_start + k * self.sample_period
+        for op in self.plan.port_ops:
+            local_x = x_arr[op.local_x_slice]
+            local_u = gather_u(op.gather_sources, op.u_dim, signals, u, xp, dtype)
+            time = time_of(op, k, t_k)
+            p_op = lookup(params, op.params_path)
+            dim = op.out_slice.stop - op.out_slice.start
+
+            def fire(op=op, local_x=local_x, local_u=local_u, time=time, p_op=p_op):
+                y = op.compute_func(local_x, local_u, time, p_op)
+                return xp.reshape(xp.asarray(y, dtype=dtype), (dim,))
+
+            if op.divisor == 1:
+                y_out = fire()
+            else:
+                held = x_arr[op.hold_slice]
+                y_out = self.fired(k, op.divisor, fire, lambda held=held: held)
+            signals = assigned(xp, signals, op.out_slice, y_out)
+            if inject is not None and op.out_slice == inject[0]:
+                signals = added(xp, signals, op.out_slice, inject[1])
+        return signals
+
+    def next_from_signals(self, x, u, k, params, signals, *, t_start=0.0):
+        """Every block's ``x_{k+1}`` and every held output from the filled signal buffer."""
+        xp = self.xp
+        dtype = self.dtype
+        x_old = xp.asarray(x, dtype=dtype).reshape(self.plan.state_dim)
+        x_new = xp.array(x_old, dtype=dtype)
+        params = self._frozen_params if params is None else params
+        t_k = t_start + k * self.sample_period
+        for op in self.plan.step_ops:
+            local_x = x_old[op.local_x_slice]
+            local_u = gather_u(op.gather_sources, op.u_dim, signals, u, xp, dtype)
+            time = time_of(op, k, t_k)
+            p_op = lookup(params, op.params_path)
+            n_i = op.local_x_slice.stop - op.local_x_slice.start
+
+            def fire(op=op, local_x=local_x, local_u=local_u, time=time, p_op=p_op):
+                x_i = op.step_func(local_x, local_u, time, p_op)
+                return xp.reshape(xp.asarray(x_i, dtype=dtype), (n_i,))
+
+            if op.divisor == 1:
+                x_i = fire()
+            else:
+                x_i = self.fired(k, op.divisor, fire, lambda local_x=local_x: local_x)
+            x_new = assigned(xp, x_new, op.local_x_slice, x_i)
+
+        # The held outputs: every slow block's output this tick, fired or held
+        for op in self.plan.port_ops:
+            if op.hold_slice is not None:
+                x_new = assigned(xp, x_new, op.hold_slice, signals[op.out_slice])
+        return x_new
+
+    def fired(self, k, d, fire, hold):
+        """``fire()`` on the ticks ``k mod d = 0``, ``hold()`` otherwise: a branch, never both."""
+        if self.xp is np:
+            return fire() if k % d == 0 else hold()
+
+        return self.jax.lax.cond(k % d == 0, fire, hold)
+
+    def _jac_validate_params(self, params):
+        check_diagram_params(params, self._subsystem_ids)
+
+
+def time_of(op, k, t_k):
+    """What a block reads as time at tick ``k``: ``t_k`` in seconds, its own count, or the base count."""
+    if op.face == "seconds":
+        return t_k
+    if op.face == "count":
+        return k // op.divisor
+
+    return k
+
+
+def check_sampled_plan_traces(evaluator, plan, verbose):
+    """Refuse a sampled diagram holding a block whose step, update or an output port does not trace."""
+    jax, jnp = evaluator.jax, evaluator.jnp
+    dummy_x = jnp.zeros(plan.state_dim)
+    for op in (*plan.port_ops, *plan.step_ops):
+        func = op.compute_func if isinstance(op, SampledPortOperation) else op.step_func
+        check_jax_compatible(
+            func,
+            op.label,
+            dummy_x[op.local_x_slice],
+            jnp.zeros(op.u_dim),
+            0.0 if op.face == "seconds" else 0,
+            op.bound_params,
+            jax,
+        )
+    if verbose:
+        print("[compile] The sampled plan traces on JAX.")

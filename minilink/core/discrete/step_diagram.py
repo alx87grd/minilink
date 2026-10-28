@@ -31,6 +31,11 @@ class StepDiagramSystem(WiredDiagramMixin, StepSystem):
         self.subsystems = {}
         self.connections = {}
 
+        # The held outputs of a block slower than the base tick, (path, port) →
+        # their slice of the stacked state: none on a tick diagram
+        self.hold_index = {}
+        self.hold_dim = 0
+
         # The System shell alone: a step diagram may hold no state yet (StepSystem
         # requires n ≥ 1), and its ports are the ones it exposes
         System.__init__(self, 0)
@@ -44,7 +49,7 @@ class StepDiagramSystem(WiredDiagramMixin, StepSystem):
         A :class:`DynamicSystem` with states has no ``step`` to stack, so it is
         refused here rather than left frozen by :meth:`step`.
         """
-        require_step_subsystem(sys, sys_id)
+        self.require_subsystem(sys, sys_id)
 
         super().add_subsystem(sys, sys_id)
 
@@ -106,10 +111,29 @@ class StepDiagramSystem(WiredDiagramMixin, StepSystem):
 
         return compile_step_diagram(self, backend=backend, verbose=verbose)
 
+    ###########################################################################
+    # Internal machinery
+    ###########################################################################
+
+    def require_subsystem(self, sys, sys_id):
+        """Refuse a continuous block with states, and a block on a clock (a tick diagram has none)."""
+        require_step_subsystem(sys, sys_id)
+        require_no_clock(sys, sys_id)
+
 
 ###############################################################################
 # Internal machinery
 ###############################################################################
+
+
+def require_no_clock(sys, sys_id):
+    """Refuse a block on a clock: its loop is a :class:`SampledDiagramSystem`."""
+    if isinstance(sys, StepSystem) and sys.sample_period is not None:
+        raise TypeError(
+            f"{sys.name} {sys_id!r} is on a clock of {sys.sample_period:g} s: a diagram "
+            "with a clocked block is a SampledDiagramSystem (compose it with >>, + "
+            "or @, or build a SampledDiagramSystem)"
+        )
 
 
 def require_step_subsystem(sys, sys_id):

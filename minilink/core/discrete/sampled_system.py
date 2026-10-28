@@ -67,6 +67,7 @@ class SampledSystem(StepSystem):
         # The System shell: a static source has no state (n = 0)
         System.__init__(self, source.n)
         self.name = f"Discretized({source.name})"
+        self.id = source.id
         self.params = None
         self.solver_info = source.solver_info
 
