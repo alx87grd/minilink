@@ -1,5 +1,6 @@
 """Simulation shortcuts: compile a system, simulate it, score the run."""
 
+import numpy as np
 
 ###############################################################################
 # Public API
@@ -342,20 +343,84 @@ class DynamicSimulation:
 
 class StepSimulation:
     """
-    Discrete-time rollouts for :class:`~minilink.core.discrete.step_system.StepSystem`.
+    The run verbs of :class:`~minilink.core.discrete.step_system.StepSystem`: the ticks and, on a clock, the dense run.
 
-    A step system has no continuous-time simulation: :meth:`compute_trajectory`
-    and :meth:`compute_forced` raise and point at :meth:`compute_rollout`
-    (compiled ``step`` / ``rollout``).
+    :meth:`compute_rollout` gives the ticks, what ``evaluate`` scores;
+    :meth:`compute_trajectory` is the same scan with a continuous plant's
+    substeps kept, wherever continuous time is underneath (a system on a clock
+    with a continuous source, a sampled loop on a continuous plant). A tick law
+    has no continuous time: it refuses it.
     """
 
-    def compute_trajectory(self, *args, **kwargs):
-        """Refuse: a step system rolls out with :meth:`compute_rollout`."""
-        raise TypeError(
-            f"{type(self).__name__} is a StepSystem — use compute_rollout(...), "
-            "not compute_trajectory. Continuous-time simulation belongs on "
-            "DynamicSystem; hybrid closed loops use HybridSimulator."
-        )
+    def compute_trajectory(
+        self,
+        tf=10.0,
+        u=None,
+        *,
+        x0=None,
+        t_start=0.0,
+        solver=None,
+        backend="numpy",
+        show=False,
+        verbose=False,
+    ):
+        """
+        The run with the continuous plant's substeps kept: a :class:`~minilink.core.trajectory.Trajectory` on ``[t_start, tf]``.
+
+        The same scan as :meth:`compute_rollout`, its value at each tick the tick
+        value bit for bit; inside each period the plant shows its substep ends
+        and every other block its state at the tick, the input held.
+        ``solver="scipy"`` runs the host clock runner instead: the same blocks
+        ticked on the host and the plant integrated adaptively between the
+        ticks, the cross-check (NumPy).
+
+        Parameters
+        ----------
+        tf : float
+            End of the run in seconds; the run takes ``round((tf - t_start) / Δ)`` ticks.
+        u : array, sequence, callable, or None, optional
+            The input of each tick, as for :meth:`compute_rollout`.
+        x0 : array, optional
+            Initial state; defaults to :attr:`x0`.
+        t_start : float
+            The clock's origin.
+        solver : None or "scipy"
+            ``None``: the scan with its substeps; ``"scipy"``: the host clock runner.
+        """
+        # A real cycle through minilink.core.system
+        from minilink.core.trajectory import Trajectory
+
+        require_continuous_underneath(self)
+        require_run_solver(solver)
+        h = self.sample_period
+        n_steps = int(round((float(tf) - float(t_start)) / h))
+        ev = self.compile(backend="numpy" if solver else backend, verbose=verbose)
+        x0 = x0 if x0 is not None else self.x0
+        u_samples = ev.rollout_inputs_of(n_steps, u)
+        u_steps = u_samples[:, :n_steps].T
+        S = dense_points_of(self, ev)
+
+        # The scan with its substeps, or the host runner on the same blocks
+        if solver is None:
+            xs = ev.rollout_dense(x0, u_steps, n_steps=n_steps, t_start=t_start)
+        else:
+            # Tools import core (DESIGN §3): the host runner loads on first use
+            from minilink.simulation.discrete.clock_runner import run_on_the_clock
+
+            xs = run_on_the_clock(self, u_steps, x0=x0, t_start=t_start, points=S)
+
+        # t = t_start + (k + j/S) Δ, the input held over each period
+        t = t_start + h * np.arange(n_steps * S + 1) / S
+        u_dense = np.repeat(u_samples[:, :n_steps], S, axis=1)
+        u_dense = np.concatenate([u_dense, u_samples[:, -1:]], axis=1)
+
+        traj = Trajectory(t=t, x=np.asarray(xs, dtype=float).T, u=u_dense)
+        self.traj = traj
+
+        if show:
+            self.plot_trajectory(traj)
+
+        return traj
 
     def compute_forced(self, *args, **kwargs):
         """Refuse: a step system rolls out with :meth:`compute_rollout`."""
@@ -371,25 +436,28 @@ class StepSimulation:
         u=None,
         *,
         x0=None,
+        t_start=0.0,
         backend="numpy",
         show=False,
         verbose=False,
     ):
         """
-        Convenience shortcut to roll out a discrete-time step system.
+        Convenience shortcut to roll out a discrete-time step system: its ticks, a :class:`~minilink.core.trajectory.Trajectory`.
 
-        Returns a state-only :class:`~minilink.core.discrete.step_rollout.StepRollout`.
-        Boundary output logging belongs in :class:`~minilink.simulation.discrete.computer.Computer`
-        or :class:`~minilink.simulation.discrete.hybrid_simulator.HybridSimulator` — not here.
+        The samples sit at ``t = k`` on a tick law, at ``t = t_start + k·Δ``
+        seconds on a system on a clock of period ``Δ``.
 
         Parameters
         ----------
         n_steps : int
             Number of step transitions to apply.
         u : array, sequence, callable, or None, optional
-            Input schedule passed to the compiled evaluator rollout.
+            The input of each step: ``None`` (the nominal input), a constant
+            vector, an ``(n_steps, m)`` sequence, or ``u(k)``.
         x0 : array, optional
             Initial state; defaults to :attr:`x0`.
+        t_start : float
+            The clock's origin, the time of the first tick (a system on a clock).
         backend : str
             Backend passed to :meth:`compile`.
         show : bool
@@ -397,24 +465,70 @@ class StepSimulation:
 
         Returns
         -------
-        StepRollout
-            The rollout, also stored in :attr:`rollout`.
+        Trajectory
+            The ticks ``(t, x, u)``, also stored in :attr:`traj`.
         """
+        # A real cycle through minilink.core.system
+        from minilink.core.trajectory import Trajectory
+
         ev = self.compile(backend=backend, verbose=verbose)
         x0 = x0 if x0 is not None else self.x0
-        rollout = ev.rollout(x0, n_steps=n_steps, u=u)
+        u_samples = ev.rollout_inputs_of(n_steps, u)
 
-        self.rollout = rollout
+        # x_{k+1} = step(x_k, u_k, k) for k = 0 … N − 1, at the ticks' times
+        xs = ev.rollout(x0, u_samples[:, :n_steps].T, n_steps=n_steps, t_start=t_start)
+        k = np.arange(n_steps + 1, dtype=float)
+        t = k if self.sample_period is None else t_start + k * self.sample_period
+
+        traj = Trajectory(t=t, x=np.asarray(xs, dtype=float).T, u=u_samples)
+        self.traj = traj
 
         if show:
-            self.plot_rollout(rollout)
+            self.plot_rollout(traj)
 
-        return rollout
+        return traj
 
 
 ###############################################################################
 # Internal machinery
 ###############################################################################
+
+
+def require_continuous_underneath(system):
+    """Refuse the dense run of a system with no continuous time underneath: a tick law counts, it has no seconds."""
+    # A real cycle through minilink.core.system
+    from minilink.core.discrete.sampled_diagram import SampledDiagramSystem
+    from minilink.core.discrete.sampled_system import SampledSystem
+
+    on_a_clock = isinstance(system, (SampledSystem, SampledDiagramSystem))
+    if (
+        not on_a_clock
+        or system.sample_period is None
+        or isinstance(system, SampledSystem)
+        and system.counts
+    ):
+        raise TypeError(
+            f"{type(system).__name__} {system.name!r} counts its ticks: it has no continuous "
+            "time underneath — use compute_rollout(n_steps)"
+        )
+
+
+def require_run_solver(solver):
+    """Refuse a solver the dense run does not have: the scan (``None``) or the host runner (``"scipy"``)."""
+    if solver not in (None, "scipy"):
+        raise ValueError(
+            f"solver must be None (the scan with its substeps) or 'scipy' (the host "
+            f"clock runner with an adaptive plant), got {solver!r}"
+        )
+
+
+def dense_points_of(system, ev):
+    """The points per period the dense run keeps: the plan's, or a lone block's substeps."""
+    plan = getattr(ev, "plan", None)
+    if plan is not None:
+        return plan.dense_points
+
+    return system.substeps if system.resolves else 1
 
 
 def scored_trajectory(system, of, traj):

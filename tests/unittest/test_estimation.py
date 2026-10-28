@@ -126,7 +126,7 @@ def test_an_observer_is_not_a_controller():
             self.add_output_port("x", dim=2, function=self.compute_state)
 
     with pytest.raises(ValueError, match="an observer, not a controller"):
-        SampledObserver() % 0.01
+        SampledObserver() % 0.01 @ plant
 
 
 def test_print_shows_the_gain_and_the_poles():

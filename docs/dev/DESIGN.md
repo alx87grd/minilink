@@ -69,7 +69,7 @@ in [ROADMAP.md](ROADMAP.md) §5 and the workboard
 | Package | Role |
 | --- | --- |
 | `core/` | `System` (+ its shortcuts, `facades/` by what they do: `simulation.py`, `analysis.py`, `plotting.py`, `animation.py`), the package import tables (`exports.py`), `DynamicSystem`, `DiagramSystem` (subclasses `DynamicSystem`), shared diagram wiring (`wiring.py`: `WiredDiagramMixin`, gather, params nesting), the port-dependency graph (`topology.py`: evaluation order, algebraic loops), the composition grammar (`operators.py`: `+`, `>>`, `autowire`; `closed_loop.py`: `@`, `closed_loop`, `feedback`; `assembly.py`: the operands laid out flat, their ids, default ports and camera, which both build on; `roles.py`: the block roles the port names declare), signals/ports (`signals.py`), backend policy & helpers (`backends.py`), the parameter trees (`params.py`: the path lookup, merge and flatten of nested `params`, one owner), `Trajectory`, sets, distributions (`distributions.py`), costs, geometry (`geometry.py`; **planned package** `core/geometry/` — Path, Track, Scene, mount, spatial Fields, course catalog: [docs/plans/geometry-module.md](../plans/geometry-module.md)) |
-| `core/discrete/` | the discrete-time sibling, `x_{k+1} = F(x_k, u_k, k)` on an integer index: `StepSystem` (`step_system.py`), `StepDiagramSystem` (`step_diagram.py`), the hybrid loop (`hybrid_diagram.py`: `HybridDiagram`; `hybrid_composition.py`: `hybrid_closed_loop` and the port resolution behind `Computer @ plant`), `StepRollout` (`step_rollout.py`) |
+| `core/discrete/` | the discrete-time sibling, `x_{k+1} = F(x_k, u_k, k)` on an integer index: `StepSystem` (`step_system.py`), `SampledSystem` (`sampled_system.py`: a system on a clock), `StepDiagramSystem` (`step_diagram.py`), the hybrid loop (`hybrid_diagram.py`: `HybridDiagram`; `hybrid_composition.py`: `hybrid_closed_loop` and the port resolution behind `Computer @ plant`), `StepRollout` (`step_rollout.py`) |
 | `core/compile/` | the compiler, the two execution plans, one evaluator per system kind |
 
 **System libraries** — `System` subclasses you drop into a diagram, shelved by
@@ -183,9 +183,34 @@ block.
 
 The law is CONSTITUTION §2 (invariants 1, 3, 4). Its mechanics here: the evolution kind is
 the type (`isinstance(sys, StepSystem)`), never a flag or a solver option, so `f` is always a
-rate; step and hybrid live on sibling types and separate compile and simulation paths
-(`StepSystem` beside `DynamicSystem`, `HybridDiagram` as two-side glue), and nothing of
-theirs enters `DynamicSystem`, flow `compile()` or `Simulator`.
+rate; step and sampled systems live on sibling types and separate compile and simulation paths
+(`StepSystem` beside `DynamicSystem`), and nothing of theirs enters `DynamicSystem`, flow
+`compile()` or `Simulator`.
+
+**The sampled loop is a step diagram on a clock** (R146, R158). `sys % dt` is
+`discretize(sys, dt, solver="euler")`, a `SampledSystem` (a law with states becomes its
+difference equation; a static block and a tick law take the period). The operators `>>`, `+`
+and `@` compose step systems with the meaning they have on continuous ones, on the same assembly
+code; the operands decide the algebra (`core/assembly.py`, `algebra_of`): a clocked operand
+makes a `SampledDiagramSystem`, a tick law a `StepDiagramSystem`, continuous and static operands
+a `DiagramSystem`; a static block joins any of them; a continuous operand with states beside a
+step one is refused, naming `%`, except `sampled @ continuous`, the one place the two worlds
+meet, where the plant becomes the plant on the controller's base clock (`plant` role,
+`discretize(plant, Δ, substeps=n)`, `n` from the automatic step rule). A
+`SampledDiagramSystem`'s base period `Δ` is the greatest common divisor of its clocked blocks'
+periods (on a nanosecond grid); a block of divisor `d > 1` fires on `k mod d = 0`, its held
+outputs state slots after the blocks' states (`hold_index`); its compiled plan
+(`build_sampled_execution_plan`, nested boxes inlined into one flat schedule) forms
+`t_k = t_start + k·Δ` once per tick and hands it to every block whose equations are in seconds
+(a static block, a `SampledSystem`'s seconds face), `k // d` to a tick law on a clock, `k` to a
+bare tick law; the firing is a `lax.cond` on the tick on JAX, a branch on NumPy, never a
+`where`. A bare tick law reads the base count of the loop it runs in, so a tick law designed
+for a rate names it (`filt % 0.01`). The loop's plant, whose substeps the dense run keeps and
+the host runner integrates adaptively, is the block integrated inside every base period (the
+one named `plant` if several are). Signals propagate within the tick (R125): a delay is a
+block. The hybrid glue of
+`simulation/discrete/` (`Computer`, `StepSchedule`, `HybridDiagram`) is the MPC's runtime until
+its rebuild on this loop.
 
 The reusable bases are `dynamics/abstraction`: `StateSpaceSystem` builds its matrices
 through methods `A(t, params)`, `B(t, params)`, `C(t, params)`, `D(t, params)`
@@ -768,13 +793,18 @@ value iteration (`StateSpaceGrid.successor`), shooting, the fixed-step solvers, 
 the Lyapunov sampler, the problem evaluator and the hybrid and realtime simulators all
 call them, or the one-period formula they share (`step_body`). The adaptive
 SciPy solver adapts `f` for `solve_ivp` itself (`simulation/solvers/scipy_ivp.py`).
-`discretize(plant, dt, *, solver="rk4", substeps=1) -> StepSystem` (its method facade
-`plant.discretize(dt)`) is the plant one sample
-period later, the input held: `solver` is `"rk4"` or `"euler"` (`substeps` per period) or
-`"exact"` (the matrix exponential, a linear model only). Its `step(x, u, k=0, params=None)`
-takes the integer tick and binds `t_k = k dt` (the origin 0; R158 gives a consumer with an origin
-the seconds face); the sample time is `dt` alone, never a
-key of the plant's `params`. The hold belongs to sequences (`rollout`), never to a step.
+`discretize(sys, dt, *, solver="rk4", substeps=1) -> SampledSystem` (its method facade
+`plant.discretize(dt)`) is the system on a clock of period `dt`, the input held
+(`core/discrete/sampled_system.py`). A `SampledSystem` is a view of its source: its `params`,
+ports (their functions included) and state metadata are the source's, its `sample_period`
+structural. One equation, two faces: the seconds face `update(x, u, t, params=None)`, the state
+one period after the sampling instant `t` (a continuous source integrated by `solver`, `"rk4"`
+or `"euler"` with `substeps` per period, or `"exact"`, the matrix exponential of a linear model;
+a static source has `n = 0`), its output ports functions in seconds; the tick face
+`step(x, u, k)` and `h(x, u, k)`, `t_k = k·sample_period` (the origin 0; a consumer with an origin
+calls the seconds face, R158). A tick source (a `StepSystem`) keeps its count and has no seconds
+face (`counts` is true). The sample time is `dt` alone, never a key of the plant's `params`. The
+hold belongs to sequences (`rollout`), never to a step.
 
 Layout of `core/compile/`: `compiler.py` (`compile`, `compile_auto`, `compile_diagram`,
 `compile_step_diagram`, the shape probe), `plan.py` (`ExecutionPlan` and `StepExecutionPlan`, their
@@ -800,10 +830,19 @@ Keep `ExecutionPlan.output_slices` and `external_output_slices` aligned.
 - static :class:`System` leaf (`n=0`) →
   :class:`~minilink.simulation.static_simulator.StaticSimulator` (time grid +
   boundary outputs in `Trajectory.signals`; not state evolution)
-- :class:`StepSystem` → `compile().rollout(...)` or `compute_rollout(n_steps=...)`
-  (state-only :class:`~minilink.core.discrete.step_rollout.StepRollout` ``(k, x, u)``; evaluators
-  and the façade do not record boundary signals — logging is owned by
-  :class:`~minilink.simulation.discrete.computer.Computer` / :class:`~minilink.simulation.discrete.hybrid_simulator.HybridSimulator`; not `Simulator`)
+- :class:`StepSystem` → `compute_rollout(n_steps, u=None, *, x0=None, t_start=0.0)`, a
+  :class:`~minilink.core.trajectory.Trajectory` of the ticks (`t = k` on a tick law,
+  `t = t_start + k·Δ` on a system on a clock); its compiled evaluator's
+  `rollout(x0, u_seq=None, params=None, *, n_steps=None, t_start=0.0)` returns the states
+  `(N + 1, n)` as native arrays (one `lax.scan` on JAX, traced and differentiable end to end),
+  `rollout_batch` maps it over starts, inputs and a parameter family in one `vmap`, and a step
+  diagram's `tick(x, u, k)` gives the next state and the boundary outputs from one signal pass;
+  on a clock with a continuous plant underneath, `compute_trajectory(tf, u=None, *, x0=None,
+  t_start=0.0, solver=None)` is the same scan with the plant's substeps kept (the evaluator's
+  `rollout_dense`, `(N·S + 1, n)`, `S` the plant block's substeps), equal to the ticks bit for
+  bit at the ticks, and `solver="scipy"` the host clock runner
+  (`simulation/discrete/clock_runner.py`: the same blocks ticked on the host, the plant integrated
+  by `solve_ivp` between the held inputs, NumPy), the cross-check; a tick law refuses it
 - :class:`~minilink.core.discrete.hybrid_diagram.HybridDiagram` →
   :class:`~minilink.simulation.discrete.hybrid_simulator.HybridSimulator` or façade
   `compute_trajectory` / `compute_forced` (hybrid :class:`~minilink.simulation.discrete.hybrid_simulator.HybridSimResult`)
@@ -979,9 +1018,14 @@ Gymnasium view (draws of `x0`, the exit rule, `h` at a finite horizon). Distribu
 stochastic one.
 
 **The problem evaluator (the second verb, `planning/evaluator.py`):**
-`pe = problem.compile(controller, dt, *, solver="rk4", substeps=1, backend="auto")` closes
+`pe = problem.compile(controller, dt=None, *, solver="rk4", substeps=1, backend="auto")` closes
 a controller on the plant (`controller @ plant`; a source block drives the command; a built
-loop is taken when its block `plant` is the problem's system) and compiles it once.
+loop is taken when its block `plant` is the problem's system) and compiles it once. The
+controller's kind decides the loop (R105): a continuous law runs the continuous diagram on the
+grid of `dt`; a sampled controller (`pid % 0.01`, a held policy, a loop on a clock) runs its
+`SampledDiagramSystem` on its own base period, `dt` omitted reading it and a differing `dt`
+refused (D15), its plant's solver and substeps the plant block's; a tick law with no clock and
+the stateless MPC are refused, naming the clock.
 `pe.params` is the run's tree: the loop's blocks by id, the problem's own leaves (`"cost"`,
 the sets' parameters, `"x_start"`, `"discount_rate"`) and each free input at its nominal
 value. `pe.trajectory(params)` is one run to the horizon on the step model, every block

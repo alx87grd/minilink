@@ -23,6 +23,7 @@ from minilink.core.trajectory import Trajectory
 from minilink.core.backends import array_module
 from minilink.core.compile.compiler import compile_auto
 from minilink.core.diagram import DiagramSystem
+from minilink.core.discrete.step_system import StepSystem
 from minilink.core.system import DynamicSystem
 from minilink.dynamics.catalog.mass_spring_damper.linear import SingleMass
 from minilink.dynamics.abstraction.state_space import LTISystem
@@ -1273,12 +1274,12 @@ class TestDiscretize(unittest.TestCase):
         step_leaf = discretize(plant, 0.1)
         self.assertEqual(step_leaf.outputs["y"].dependencies, "all")
 
-    def test_discretize_reads_a_partial_feedthrough_on_its_one_input(self):
+    def test_discretize_keeps_the_partial_feedthrough_of_each_port(self):
         from minilink.dynamics.catalog.pendulum.pendulum import NoisyPendulum
 
         plant = NoisyPendulum()  # y reads the noise port n alone
         step_leaf = discretize(plant, 0.05)
-        self.assertEqual(step_leaf.outputs["y"].dependencies, ("u",))
+        self.assertEqual(step_leaf.outputs["y"].dependencies, ("n",))
         x = np.array([0.3, 0.1])
         u = np.array([0.2, 0.0, 0.5])  # torque, disturbance, noise
         x1 = step_leaf.step(x, u, k=0)
@@ -1405,21 +1406,46 @@ class TestDiscretize(unittest.TestCase):
         rollout = step_leaf.compute_rollout(n_steps=3, u=np.zeros((3, 1)))
         self.assertGreater(np.abs(rollout.x[0, -1]), 0.4)
 
-    def test_discretize_stacks_each_input_port_into_u(self):
+    def test_discretize_keeps_each_input_port_of_its_source(self):
         plant = _GainIntegrator()
         plant.add_input_port("w", labels=["disturbance"], upper_bound=[1.0])
         step_leaf = discretize(plant, 0.1)
-        self.assertEqual(step_leaf.inputs["u"].labels, ["u[0]", "disturbance"])
-        np.testing.assert_array_equal(step_leaf.inputs["u"].upper_bound, [np.inf, 1.0])
+        self.assertEqual(list(step_leaf.inputs), ["u", "w"])
+        self.assertEqual(step_leaf.inputs["w"].labels, ["disturbance"])
+        np.testing.assert_array_equal(step_leaf.inputs["w"].upper_bound, [1.0])
 
     def test_discretize_rejects_unknown_integrator(self):
         plant = DoubleIntegrator()
         with self.assertRaises(ValueError):
             discretize(plant, 0.01, solver="bdf")
 
-    def test_discretize_rejects_static_system(self):
+    def test_discretize_reads_a_static_block_at_the_sampling_instants(self):
+        gain = P(2.0, ports="reference")
+        sampled = discretize(gain, dt=0.01)
+        u = np.array([1.0, 0.25])
+        self.assertEqual(sampled.n, 0)
+        self.assertEqual(list(sampled.inputs), list(gain.inputs))
+        np.testing.assert_array_equal(
+            sampled.h(np.zeros(0), u, k=3), gain.h(np.zeros(0), u, 0.03)
+        )
+        self.assertEqual(sampled.step(np.zeros(0), u, k=3).shape, (0,))
+
+    def test_a_tick_law_keeps_its_count_and_has_no_seconds_face(self):
+        class Counter(StepSystem):
+            def __init__(self):
+                super().__init__(n=1, input_dim=1, output_dim=1)
+
+            def step(self, x, u, k=0, params=None):
+                return x + k
+
+        sampled = discretize(Counter(), 0.1)
+        np.testing.assert_array_equal(
+            sampled.step(np.zeros(1), np.zeros(1), k=4), [4.0]
+        )
         with self.assertRaises(TypeError):
-            discretize(P(1.0, ports="reference"), dt=0.01)
+            sampled.update(np.zeros(1), np.zeros(1), 0.4)
+        with self.assertRaises(ValueError):
+            discretize(Counter(), 0.1, substeps=2)
 
 
 from minilink.dynamics.abstraction.state_space import LTISystem, StateSpaceSystem

@@ -242,41 +242,13 @@ Why: [core-architecture.md](core-architecture.md) §1.
 
 Why: [core-architecture.md](core-architecture.md) §2.
 
-- [ ] **One same-tick semantic** (a choice, R125, 2026-10-27,
-  [record](../reviews/2026-10-27-design-questions-rulings.md)): every step diagram and runner
-  propagates within the tick; `Computer.tick` stops reading the last tick's committed buffer;
-  a delay exists only as a block (`UnitDelay`, the MPC's delay, a held slow output); an
-  algebraic loop is refused at wiring time. Done when the step-diagram evaluator and
-  `Computer.tick` agree on every hybrid demo and the moved numbers carry a closeness report.
-- [ ] **The composition operators on step systems** (R126, R146,
-  choices of 2026-10-27): `@`, `>>` and `+` on `StepSystem` and `StepDiagramSystem`, on
-  `core/assembly.py`, returning a step diagram (a `SampledDiagramSystem` when a block has a clock,
-  §1.5); a continuous and a step operand together refused, naming `%`, except
-  `sampled @ continuous`, the one place the two worlds meet; the CONSTITUTION §6 grammar sentence
-  amended in the same change (its text to the maintainer). Done when
-  `(pid % dt) @ discretize(plant, dt)` rolls out the same numbers as the hand-wired step diagram,
-  on both backends.
-- [ ] **Step evaluators trace and batch** (new, from reviewer C §2.3; the invariant's own
-  deliverable, which had no row):
-  - the discrete evaluators' `rollout` (`core/compile/evaluators/discrete.py`) returns native
-    arrays and differentiates end to end;
-  - a step `rollout_batch` maps over starts, seeds and parameter families, like the continuous
-    one;
-  - the loops written around `step_body` (`stepping.py`) are listed, each with the row that
-    moves it.
-
-  Done when `jax.grad` through a step rollout matches a central difference and the NumPy
-  callers are byte-identical.
-- [ ] **`StepRollout` folded into `Trajectory`** (what V1.1 left; the native `Trajectory`, the
-  cost's quadrature and `contains` on `xp` landed 2026-10-24): `compute_rollout` on every step
-  system returns a `Trajectory`, `t = k` on a pure step system, `t = k·Δ` on a sampled one (R147).
-  It is the hybrid simulator's computer record (R86, OD-36), so it lands in the loop lane with
-  §1.5. Done when it lands byte-identical.
-- [ ] **One signal pass per tick** (R148; internal, agent-managed): the step evaluators compute the
-  port signals once per tick and fill both the next state and the outputs from them (today
-  `step` and `outputs` each call `port_signals`, `core/compile/evaluators/discrete.py`), so an
-  expensive memoryless block (the pure-form MPC, a network) runs once. Done when a counter on a
-  static block reads one call per tick and the baselines are byte-identical.
+- [ ] **The step algebra's rest, with the MPC's rebuild** (landed on `dev-v0.3-loop` 2026-10-28:
+  the same-tick semantic in the sampled loop, the operators on step systems, the step evaluators
+  that trace and batch, `compute_rollout` returning a `Trajectory`, one signal pass per tick;
+  [the run's log](../reviews/2026-10-29-v03-run-log.md) §7): `Computer.tick`'s one-tick lag and
+  `StepRollout`, the legacy hybrid computer's record, leave with `Computer` when the MPC is
+  rebuilt on the sampled loop (§1.8, join 2; the run's log RD-8). Done when no `Computer` or
+  `StepRollout` remains.
 - [ ] **The batch price of a parameter family** (S53): profile `rollout_batch` with a `params`
   family, which takes 278 ms against 27 ms for the plain batch (pendulum, 1000 × 1000 RK4
   steps). Done when the family path is within 2× of the plain batch. Also: gate the quoted
@@ -375,66 +347,18 @@ Ruled: R13, R14, R104, R105, R123, R125, R145, R146, R147 (choices of 2026-10-27
 [record](../reviews/2026-10-27-core-vision-decisions.md)); R158, time in the core and
 `SampledSystem` the sampled-data kind (2026-10-28, [record](../reviews/2026-10-28-session-rulings.md)).
 
-- [ ] **`SampledSystem`, a system on a clock** (R145, R146): `Discretization` is
-  renamed `SampledSystem(source, sample_period, *, solver, substeps)` (its callers `dp.py`,
-  `policy_eval.py`, the trajectory-optimization planner and one test file, none student-facing;
-  `dt` becomes `sample_period`; `ExactDiscretization` folded as `solver="exact"`); it accepts a
-  continuous, a static or a pure step source, its `params`, ports and state the source's; `sys % Δ`
-  returns `discretize(sys, Δ, solver="euler")` for any system, so a law with continuous states (a
-  PID) becomes its difference equation instead of being refused. Its equations are the seconds
-  face `update(x, u, t)` with the output ports' functions in seconds, the tick faces `step(x, u, k)` and `h(x, u, k)`
-  converting `t = k·sample_period` (R158); the views write the seconds face from their source (a
-  tick source has none); a native sampled law subclasses it with no source (the MPC, §1.8); a
-  sampled static block has `n = 0` (`require_step_state` relaxed). Done when `pid % 0.01` rolls
-  out the hand-written Euler difference equation, `ev.step(x, u, t, dt=)` and `update` agree bit
-  for bit, and the discretize baselines are byte-identical.
-- [ ] **Periods on blocks; `SampledDiagramSystem`; no `Computer`, `StepSchedule` or
-  `HybridDiagram`** (merges S31, D13 and P10's AC-8b; R146): a diagram with a
-  clocked block is a `SampledDiagramSystem`, its base period the gcd of its blocks', a block of
-  divisor `d > 1` firing on `k mod d = 0` with its held outputs as state slots, a period not a
-  multiple of the base refused at wiring (the ratios checked to a tolerance, today's `1e-9` of
-  `rate_to_divisor`); `computer @ plant` is one, its plant the plant on the
-  base clock with substeps (defaulting from the automatic-`dt` rule); the plan hands
-  `t_k = t_start + k·Δ` to every block in seconds (a static block, a seconds face) and its own
-  count `k // d` to a tick law, the firing a `lax.cond` or the hyperperiod unroll (never a
-  `where`); the origin a run argument, `compute_rollout(n_steps, t_start=0.0)`, bound by
-  `problem.compile` from the problem's leaf; a nested sampled box inlined into one flat plan, one
-  clock (R158); the hybrid demos, tutorial 06
-  and the dual-rate projects rewritten as composition (`(filt % 0.01) >> (ctl % 0.1)`); the
-  run-state caches gone (RULES 2.4, D13); the `core` → `simulation` import (scan: core#14);
-  the CONSTITUTION amended in the landing change, its text to the maintainer: invariant 1 (the
-  sampled loop a step diagram), invariant 3 (`Computer @ plant`, `HybridDiagram`) and §6 (`%`
-  scheduling a block into a `Computer`). Done when
-  every hybrid demo runs as a `SampledDiagramSystem` and matches today's `Computer.tick` after the
-  same-tick change, with the moved numbers in a closeness report.
-- [ ] **Two run verbs that agree** (R147): `compute_rollout` gives the ticks;
-  `compute_trajectory` on an object with a continuous source is the same scan with the plant's
-  substeps kept, through one new evaluator method beside `rollout` (its name in the names sweep);
-  `solver="scipy"` is the host clock runner with an adaptive plant between samples; `x0_plant=`
-  and `x0_computer=` go (R124's views). Done when the dense run equals the ticks bit for bit at the
-  samples, the re-clocked loop at `Δ/substeps` matches the dense run to `rtol 1e-12`, and
-  `solver="scipy"` agrees within its tolerance.
-- [ ] **The host clock runner over the pure blocks** (the two-runner row): today's
-  `HybridSimulator` shape kept for the scipy cross-check and host-only blocks (an Ipopt MPC),
-  reading the same blocks as the step diagram, which is its test oracle;
-  its conventions drift fixed with it (scan: compile-sim#4, #5: shared input coercion, the
-  positional `input_port_id`, the framed verbose panel). The realtime simulator's re-base is a
-  v0.4 feature (§4, R161); in v0.3 the realtime loop calls the blocks' faces and never
-  re-implements a hold or a divisor. Done when the runner and the step diagram agree on every
-  hybrid demo.
-- [ ] **The sampled face** (was V1 step 7b; R105):
-  `problem.compile(controller)` reads the controller's kind; a continuous law runs the loop as a
-  diagram; a sampled controller (a digital PID, a held neural policy, the MPC, the RL policies)
-  runs the `SampledDiagramSystem` on its JAX face (`dt=` omitted reads the loop's base period,
-  given must equal it: D15, closed by R158), so `trajectory`,
-  `evaluate` and `program` serve both; the `require_continuous` refusal goes. Done when the
-  gradient of a digital PID's `objective` matches a central difference and a continuous law's
-  numbers are unchanged.
-- [ ] **`problem.compile` refuses the stateless MPC, until the MPC is rebuilt**:
-  `MPCStatelessController` is a plain `System`, so it is accepted today and its tick latch runs at
-  the RK4 stages, a silent continuous-feedback MPC (KNOWN_ISSUES). Refuse it now, naming the
-  sampled loop; the rebuilt MPC (§1.8) replaces it. Done when `problem.compile(mpc)` raises with
-  the fix named.
+- [ ] **The sampled loop's rest** (landed on `dev-v0.3-loop` 2026-10-28: `SampledSystem`, `%`
+  on any system, `SampledDiagramSystem` and its plan, the two run verbs and `rollout_dense`, the
+  host clock runner, the sampled face of `problem.compile`, the stateless MPC refused, the hybrid
+  demos re-pinned once; [the run's log](../reviews/2026-10-29-v03-run-log.md) §7):
+  - `Computer`, `StepSchedule`, `HybridDiagram`, `hybrid_closed_loop`, `HybridSimulator`'s
+    computer path, `x0_plant=` and `x0_computer=`, `HybridDiagram.last_result` (D13) and the
+    `core` → `simulation` lazy import they carry: they are the MPC's runtime and go with its
+    rebuild (§1.8, join 2);
+  - the dual-rate MPC projects rewritten as composition, with the MPC (join 2);
+  - tutorial 06 on the sampled loop, with the notebook sweep (§1.10, R167).
+
+  Done when every hybrid notebook and project runs as a `SampledDiagramSystem`.
 
 The conventions' first sampled-loop step (AC-8a: standard port names only, the MPC gives `u`,
 no port guessing) is folded into this section's rows (R163): it is what the rebuilt loop does by

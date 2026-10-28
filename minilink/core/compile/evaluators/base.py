@@ -84,6 +84,94 @@ class Evaluator(JacobianMixin):
         """Every boundary output port at ``(x, u, t)``; ``params=None`` reads the compiled ones."""
         raise NotImplementedError
 
+    ###########################################################################
+    # Internal machinery
+    ###########################################################################
+
+    def batched_rollout(self, run, x0s, u_sequences, n_steps, params, *shared):
+        """``run(x0, u, p, *shared)`` over a family in one jitted ``jax.vmap`` (JAX).
+
+        The family is the starts ``x0s`` ``(B, n)``, the inputs (the nominal one
+        for ``n_steps``, one ``(N, m)`` sequence shared, or ``(B, N, m)``) and the
+        parameter leaves with one more dimension than the compiled value; the
+        ``shared`` arguments are the same for every member.
+        """
+        require_jax_evaluator(self, "rollout_batch")
+        jax, jnp = self.jax, self.jnp
+        x0s = jnp.asarray(x0s, dtype=float)
+        if x0s.ndim != 2 or x0s.shape[1] != self.n:
+            raise ValueError(f"x0s must have shape (B, {self.n}); got {x0s.shape}")
+        batch = int(x0s.shape[0])
+
+        if u_sequences is None:
+            if n_steps is None:
+                raise ValueError("n_steps is required when u_sequences is None")
+            u_seq = jnp.broadcast_to(self._u_nominal, (int(n_steps), self.m))
+            u_axis = None
+        else:
+            u_seq = jnp.asarray(u_sequences, dtype=float)
+            if u_seq.ndim == 2:
+                u_axis = None
+            elif u_seq.ndim == 3 and u_seq.shape[0] == batch:
+                u_axis = 0
+            else:
+                raise ValueError(
+                    f"u_sequences must have shape (N, {self.m}) or "
+                    f"({batch}, N, {self.m}); got {u_seq.shape}"
+                )
+            if n_steps is not None and u_seq.shape[-2] != int(n_steps):
+                raise ValueError("n_steps disagrees with u_sequences")
+        shared_axes = (None,) * len(shared)
+
+        # One jitted vmap per (input layout, family layout): repeated sweeps
+        # with the same shapes reuse the compiled rollout instead of re-tracing.
+        cache = self.compiled_forms.setdefault("rollout_batch", {})
+        if params is None:
+            key = (u_axis, None)
+            fn = cache.get(key)
+            if fn is None:
+                fn = jax.jit(
+                    jax.vmap(
+                        lambda x0, u, *rest: run(x0, u, None, *rest),
+                        in_axes=(0, u_axis, *shared_axes),
+                    )
+                )
+                cache[key] = fn
+            return fn(x0s, u_seq, *shared)
+        axes = self.params_batch_axes(params, batch)
+        leaves, treedef = jax.tree_util.tree_flatten(axes, is_leaf=lambda a: a is None)
+        key = (u_axis, str(treedef), tuple(leaves))
+        fn = cache.get(key)
+        if fn is None:
+            fn = jax.jit(
+                jax.vmap(
+                    lambda x0, u, p, *rest: run(x0, u, p, *rest),
+                    in_axes=(0, u_axis, axes, *shared_axes),
+                )
+            )
+            cache[key] = fn
+        return fn(x0s, u_seq, params, *shared)
+
+    def params_batch_axes(self, params, batch):
+        """``in_axes`` for ``params``: 0 on family leaves, ``None`` on shared ones.
+
+        A leaf is a family when it has one more dimension than the compiled
+        value at the same path.
+        """
+        tree_util = self.jax.tree_util
+        reference = {
+            tree_util.keystr(path): np.ndim(leaf)
+            for path, leaf in tree_util.tree_leaves_with_path(self._frozen_params)
+        }
+
+        def axis(path, leaf):
+            ref_ndim = reference.get(tree_util.keystr(path))
+            if ref_ndim is None:
+                return None
+            return 0 if np.ndim(leaf) == ref_ndim + 1 else None
+
+        return tree_util.tree_map_with_path(axis, params)
+
 
 class ContinuousEvaluator(Evaluator):
     """A compiled continuous-time system: ``f``, ``outputs`` and the step model on ``f``."""
@@ -168,62 +256,18 @@ class ContinuousEvaluator(Evaluator):
         jax.Array, shape ``(B, N + 1, n)``
             Sampled states, ``x0`` first, for every member of the family.
         """
-        require_jax_evaluator(self, "rollout_batch")
-        jax, jnp = self.jax, self.jnp
-        x0s = jnp.asarray(x0s, dtype=float)
-        if x0s.ndim != 2 or x0s.shape[1] != self.n:
-            raise ValueError(f"x0s must have shape (B, {self.n}); got {x0s.shape}")
-        batch = int(x0s.shape[0])
+        t_start = self.jnp.asarray(t_start, dtype=float)
+        dt = self.jnp.asarray(dt, dtype=float)
 
-        if u_sequences is None:
-            if n_steps is None:
-                raise ValueError("n_steps is required when u_sequences is None")
-            u_seq = jnp.broadcast_to(self._u_nominal, (int(n_steps), self.m))
-            u_axis = None
-        else:
-            u_seq = jnp.asarray(u_sequences, dtype=float)
-            if u_seq.ndim == 2:
-                u_axis = None
-            elif u_seq.ndim == 3 and u_seq.shape[0] == batch:
-                u_axis = 0
-            else:
-                raise ValueError(
-                    f"u_sequences must have shape (N, {self.m}) or "
-                    f"({batch}, N, {self.m}); got {u_seq.shape}"
-                )
-            if n_steps is not None and u_seq.shape[-2] != int(n_steps):
-                raise ValueError("n_steps disagrees with u_sequences")
-        t_start = jnp.asarray(t_start, dtype=float)
-        dt = jnp.asarray(dt, dtype=float)
-
-        # One jitted vmap per (input layout, family layout): repeated sweeps
-        # with the same shapes reuse the compiled rollout instead of re-tracing.
-        cache = self.compiled_forms.setdefault("rollout_batch", {})
-        if params is None:
-            key = (u_axis, None)
-            fn = cache.get(key)
-            if fn is None:
-                fn = jax.jit(
-                    jax.vmap(
-                        lambda x0, u, t_start, dt: self.rollout(x0, u, t_start, dt),
-                        in_axes=(0, u_axis, None, None),
-                    )
-                )
-                cache[key] = fn
-            return fn(x0s, u_seq, t_start, dt)
-        axes = self.params_batch_axes(params, batch)
-        leaves, treedef = jax.tree_util.tree_flatten(axes, is_leaf=lambda a: a is None)
-        key = (u_axis, str(treedef), tuple(leaves))
-        fn = cache.get(key)
-        if fn is None:
-            fn = jax.jit(
-                jax.vmap(
-                    lambda x0, u, t_start, dt, p: self.rollout(x0, u, t_start, dt, p),
-                    in_axes=(0, u_axis, None, None, axes),
-                )
-            )
-            cache[key] = fn
-        return fn(x0s, u_seq, t_start, dt, params)
+        return self.batched_rollout(
+            lambda x0, u, p, t_start, dt: self.rollout(x0, u, t_start, dt, p),
+            x0s,
+            u_sequences,
+            n_steps,
+            params,
+            t_start,
+            dt,
+        )
 
     ###########################################################################
     # Internal machinery
@@ -247,26 +291,6 @@ class ContinuousEvaluator(Evaluator):
             raise ValueError(f"u_seq must have shape (N, {self.m}), got {u_seq.shape}")
 
         return u_seq
-
-    def params_batch_axes(self, params, batch):
-        """``in_axes`` for ``params``: 0 on family leaves, ``None`` on shared ones.
-
-        A leaf is a family when it has one more dimension than the compiled
-        value at the same path.
-        """
-        tree_util = self.jax.tree_util
-        reference = {
-            tree_util.keystr(path): np.ndim(leaf)
-            for path, leaf in tree_util.tree_leaves_with_path(self._frozen_params)
-        }
-
-        def axis(path, leaf):
-            ref_ndim = reference.get(tree_util.keystr(path))
-            if ref_ndim is None:
-                return None
-            return 0 if np.ndim(leaf) == ref_ndim + 1 else None
-
-        return tree_util.tree_map_with_path(axis, params)
 
 
 def outputs_from_ports(system, x, u, t, params) -> dict:

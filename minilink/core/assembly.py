@@ -8,9 +8,13 @@ from dataclasses import dataclass
 import numpy as np
 
 from minilink.core.diagram import DiagramSystem
+from minilink.core.discrete.sampled_diagram import SampledDiagramSystem
+from minilink.core.discrete.sampled_system import SampledSystem
+from minilink.core.discrete.step_diagram import StepDiagramSystem
+from minilink.core.discrete.step_system import StepSystem
 from minilink.core.roles import check_reserved_id
-from minilink.core.system import System
-from minilink.core.wiring import check_diagram_params, state_layout
+from minilink.core.system import DynamicSystem, System
+from minilink.core.wiring import WiredDiagramMixin, check_diagram_params, state_layout
 
 ###############################################################################
 # Public API
@@ -129,12 +133,16 @@ def flatten_diagram(diagram: DiagramSystem) -> tuple[DiagramSystem, FlattenRepor
 
     Nested block ids join with ``__`` (``inner__plant``), matching topology
     expand. The stacked state ``x = [x_1; x_2; \\ldots]`` (block order from
-    :func:`~minilink.core.wiring.state_layout`) matches the unflattened diagram.
-    The input diagram is not modified.
+    :func:`~minilink.core.wiring.state_layout`) matches the unflattened diagram,
+    except for a sampled diagram whose boxes hold outputs: the flat copy holds
+    them all at its one level, so the sampled plan reads its slices from the
+    nested layout
+    (:func:`~minilink.core.compile.plan.nested_layout`). The input diagram is
+    not modified.
     """
-    if not isinstance(diagram, DiagramSystem):
+    if not is_box(diagram):
         raise TypeError(
-            f"flatten_diagram expects DiagramSystem, got {type(diagram).__name__}"
+            f"flatten_diagram expects a diagram, got {type(diagram).__name__}"
         )
 
     flat = copy_diagram(diagram)
@@ -151,7 +159,7 @@ def flatten_diagram(diagram: DiagramSystem) -> tuple[DiagramSystem, FlattenRepor
 
     # The top-level leaves keep their ids
     for sys_id, subsystem in diagram.subsystems.items():
-        if not isinstance(subsystem, DiagramSystem):
+        if not is_box(subsystem):
             id_map[sys_id] = sys_id
 
     return flat, FlattenReport(id_map=id_map)
@@ -174,7 +182,7 @@ def remap_params_nested_to_flat(diagram: DiagramSystem, params) -> dict | None:
 
 def first_nested_subsystem_id(diagram: DiagramSystem) -> str | None:
     for sys_id, subsystem in diagram.subsystems.items():
-        if isinstance(subsystem, DiagramSystem):
+        if is_box(subsystem):
             return sys_id
     return None
 
@@ -290,7 +298,7 @@ def nested_params_by_path(diagram: DiagramSystem, params: Mapping, prefix=""):
     """Yield ``(path, block params)`` for every leaf block, ``path`` joined with ``/``."""
     for sys_id, subsystem in diagram.subsystems.items():
         path = f"{prefix}/{sys_id}" if prefix else sys_id
-        if isinstance(subsystem, DiagramSystem):
+        if is_box(subsystem):
             yield from nested_params_by_path(subsystem, params[sys_id], path)
         else:
             yield path, params[sys_id]
@@ -309,19 +317,73 @@ def add_system_to_diagram(diagram, sys, *, role=None) -> str:
     return sys_id
 
 
+# The algebra the operands compose in
+
+
+def algebra_of(*operands):
+    """
+    The diagram class the operands compose into: one algebra per kind of operand.
+
+    A clocked operand (``block % dt``, a sampled box) makes a
+    :class:`SampledDiagramSystem`; a tick law (a :class:`StepSystem`, a step box)
+    a :class:`StepDiagramSystem`; continuous and static operands a
+    :class:`DiagramSystem`. A static block joins any of them. A continuous
+    operand with states beside a step one is refused, naming ``%``.
+    """
+    kinds = {kind_of(op) for op in operands}
+    if "continuous" in kinds and kinds & {"tick", "clocked"}:
+        raise TypeError(
+            "a continuous system with states and a discrete one do not compose: put "
+            "the continuous one on a clock (block % dt, discretize(plant, dt)), or "
+            "close a sampled controller on a continuous plant with (block % dt) @ plant"
+        )
+    if "clocked" in kinds:
+        return SampledDiagramSystem
+    if "tick" in kinds:
+        return StepDiagramSystem
+
+    return DiagramSystem
+
+
+def kind_of(sys) -> str:
+    """``"clocked"``, ``"tick"``, ``"continuous"`` or ``"static"``: the algebra an operand belongs to."""
+    if isinstance(sys, SampledSystem) or (
+        isinstance(sys, SampledDiagramSystem) and sys.sample_period is not None
+    ):
+        return "clocked"
+    if isinstance(sys, StepSystem):
+        return "tick"
+    if isinstance(sys, DynamicSystem) and sys.n > 0:
+        return "continuous"
+
+    return "static"
+
+
+def is_box(sys) -> bool:
+    """Whether ``sys`` is a diagram of blocks (a box), of either algebra."""
+    return isinstance(sys, WiredDiagramMixin)
+
+
+def is_step_box(sys) -> bool:
+    """Whether ``sys`` is a step or sampled diagram."""
+    return isinstance(sys, StepDiagramSystem)
+
+
 def carry_left_operand(diagram, left) -> None:
     """Carry a diagram left operand's name, ``x0`` and camera settings into ``diagram``.
 
     The left operand's blocks come first in the result, so its ``x0`` is the
     head of the stacked state; a leaf left operand carries nothing.
     """
-    if not isinstance(left, DiagramSystem):
+    if not is_box(left):
         return
 
-    # The name, and the left operand's x0 at the head of the stacked state
+    # The name, and the left operand's blocks' x0 at the head of the stacked state
+    # (a held output starts anywhere: every block fires at the first tick)
+    n_blocks = left.n - left.hold_dim if is_step_box(left) else left.n
     diagram.name = left.name
     diagram.x0 = np.concatenate(
-        [np.asarray(left.x0, dtype=float), diagram.x0[left.n :]]
+        [np.asarray(left.x0, dtype=float)[:n_blocks], diagram.x0[n_blocks:]]
     )
 
     # The camera settings
@@ -339,7 +401,7 @@ def copy_diagram(diagram):
     The blocks are shared, not copied; the operators build on the copy and leave
     the user's diagram untouched.
     """
-    copy = DiagramSystem()
+    copy = algebra_of(diagram)()
     inline_diagram(copy, diagram, output_collision="replace")
     carry_left_operand(copy, diagram)
 
@@ -348,7 +410,7 @@ def copy_diagram(diagram):
 
 def new_diagram_like(sys):
     """A diagram operand as a new diagram with the same ids and wiring; a leaf as is."""
-    return copy_diagram(sys) if isinstance(sys, DiagramSystem) else sys
+    return copy_diagram(sys) if is_box(sys) else sys
 
 
 def add_input_port_like(diagram, port_id: str, port) -> None:
@@ -423,7 +485,10 @@ def default_subsystem_id(sys, *, role=None) -> str:
 
 
 def base_system_id(sys) -> str:
-    """The block's class name as an id (``Pendulum``, ``Drone2D``, ``UdeSRacecar``)."""
+    """The block's class name as an id (``Pendulum``, ``Drone2D``, ``UdeSRacecar``); a block on a clock takes its source's."""
+    if isinstance(sys, SampledSystem):
+        return base_system_id(sys.source)
+
     return type(sys).__name__
 
 
@@ -458,11 +523,7 @@ def propagate_animation_camera(diagram, *sources):
             return
 
         # Else the first leaf, as the fallback
-        if (
-            fallback is None
-            and isinstance(source, System)
-            and not isinstance(source, DiagramSystem)
-        ):
+        if fallback is None and isinstance(source, System) and not is_box(source):
             fallback = source
 
     if fallback is not None:
@@ -471,7 +532,7 @@ def propagate_animation_camera(diagram, *sources):
 
 def animated_geometry_source(obj):
     """First drawable in *obj* (or its subsystems) with static kinematic geometry."""
-    if isinstance(obj, DiagramSystem):
+    if is_box(obj):
         for sub in obj.subsystems.values():
             if sub.get_kinematic_geometry():
                 return sub

@@ -7,10 +7,11 @@ import warnings
 from minilink.core.assembly import (
     add_input_port_like,
     add_system_to_diagram,
+    algebra_of,
     carry_left_operand,
-    copy_diagram,
     default_output_port,
     inline_diagram,
+    is_box,
     propagate_animation_camera,
 )
 from minilink.core.diagram import DiagramSystem
@@ -53,11 +54,11 @@ def add_systems(*systems: System | DiagramSystem) -> DiagramSystem:
         Existing diagram-internal connections are preserved, but no new
         cross-connections are inferred.
     """
-    diagram = DiagramSystem()
+    diagram = algebra_of(*systems)()
 
     # Each operand side by side: a diagram laid out flat, a leaf as one block
     for sys in systems:
-        if isinstance(sys, DiagramSystem):
+        if is_box(sys):
             inline_diagram(diagram, sys, output_collision="unique")
         else:
             add_system_to_diagram(diagram, sys)
@@ -66,7 +67,7 @@ def add_systems(*systems: System | DiagramSystem) -> DiagramSystem:
     # sum as written
     if systems:
         carry_left_operand(diagram, systems[0])
-        if not isinstance(systems[0], DiagramSystem):
+        if not is_box(systems[0]):
             diagram.name = " + ".join(sys.name for sys in systems)
 
     return diagram
@@ -104,8 +105,9 @@ def series(
         A new diagram with each stage connected output-to-input, named after
         every operand (``"Step >> PID >> Pendulum"``).
     """
-    # The chain so far: a diagram operand copied, a leaf with its inputs on the edge
-    diagram = as_composition_diagram(left)
+    # The chain so far: a diagram operand copied, a leaf with its inputs on the edge,
+    # in the algebra of every stage
+    diagram = as_composition_diagram(left, algebra_of(left, right, *rest))
 
     # Each next stage on the chain's output, by the ``>>`` rule
     series_pair(diagram, right)
@@ -210,12 +212,14 @@ def autowire(
 ###############################################################################
 
 
-def as_composition_diagram(sys) -> DiagramSystem:
-    """A diagram operand as a copy; a leaf as a diagram with its inputs on the edge."""
-    if isinstance(sys, DiagramSystem):
-        return copy_diagram(sys)
+def as_composition_diagram(sys, algebra) -> DiagramSystem:
+    """A diagram operand as a copy, a leaf as a diagram with its inputs on the edge, in ``algebra``."""
+    diagram = algebra()
+    if is_box(sys):
+        inline_diagram(diagram, sys, output_collision="replace")
+        carry_left_operand(diagram, sys)
+        return diagram
 
-    diagram = DiagramSystem()
     sys_id = add_system_to_diagram(diagram, sys)
     expose_free_inputs(diagram, sys_id)
 
@@ -245,7 +249,7 @@ def series_pair(diagram, right) -> None:
         del diagram.outputs[output_id]
         diagram.connections["output"].pop(output_id, None)
 
-    if isinstance(right, DiagramSystem):
+    if is_box(right):
         # A box laid out flat, its input bound to the chain's output
         inline_diagram(
             diagram,
@@ -323,7 +327,7 @@ def series_connection(diagram, outputs, inputs) -> tuple[str, str]:
 
 def require_diagram(diagram) -> None:
     """Refuse anything but a diagram to wire."""
-    if not isinstance(diagram, DiagramSystem):
+    if not is_box(diagram):
         raise TypeError("autowire() expects a DiagramSystem")
 
 

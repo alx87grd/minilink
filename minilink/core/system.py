@@ -17,6 +17,14 @@ if TYPE_CHECKING:
 # Solver hint of a system that declares no time constant of its own (seconds)
 DEFAULT_SMALLEST_TIME_CONSTANT = 0.001
 
+# Automatic step of a fixed-step solver, smooth or discontinuous loop alike:
+# dt = AUTO_DT_SCALE × solver_info["smallest_time_constant"]
+AUTO_DT_SCALE = 0.1
+
+# Integration steps per sample of a held signal on a smooth loop that declares
+# no time constant: the period itself is the resolution
+HELD_SIGNAL_STEPS_PER_SAMPLE = 1
+
 
 ###############################################################################
 # Public API
@@ -449,12 +457,21 @@ class System(SystemSimulation, SystemAnalysis, SystemPlotting, SystemAnimation):
 
         return closed_loop(self, other)
 
-    def __mod__(self, schedule: object):
-        """Return a scheduled :class:`~minilink.simulation.discrete.computer.Computer`."""
-        # A real cycle: the computer imports the diagrams, which import this module
-        from minilink.simulation.discrete.computer import build_computer
+    def __mod__(self, dt: float):
+        """Return this block on a clock of period ``dt``: ``discretize(self, dt, solver="euler")``.
 
-        return build_computer(self, schedule)
+        A law with states becomes its difference equation,
+        ``z_{k+1} = z_k + dt·f(z_k, e_k, t_k)``; a static block and a tick law
+        keep their equations and take the period. See
+        :class:`~minilink.core.discrete.sampled_system.SampledSystem`.
+        """
+        # A real cycle: the sampled system imports System from this module
+        from minilink.core.discrete.sampled_system import SampledSystem
+
+        sampled = SampledSystem(self, dt, solver="euler")
+        sampled.name = f"{self.name} % {float(dt):g}"
+
+        return sampled
 
     # Display
 

@@ -50,6 +50,7 @@ def compile(system, backend=BACKEND_NUMPY, verbose=False, *, flatten=False):
         If ``True``, print timed compilation steps.
     """
     from minilink.core.diagram import DiagramSystem
+    from minilink.core.discrete.sampled_diagram import SampledDiagramSystem
     from minilink.core.discrete.step_diagram import StepDiagramSystem
     from minilink.core.discrete.step_system import StepSystem
     from minilink.core.system import DynamicSystem
@@ -58,6 +59,9 @@ def compile(system, backend=BACKEND_NUMPY, verbose=False, *, flatten=False):
         return compile_diagram(
             system, backend=backend, verbose=verbose, flatten=flatten
         )
+
+    if isinstance(system, SampledDiagramSystem):
+        return compile_sampled_diagram(system, backend=backend, verbose=verbose)
 
     if isinstance(system, StepDiagramSystem):
         return compile_step_diagram(
@@ -298,6 +302,37 @@ def compile_step_diagram(
     from minilink.core.compile.evaluators.discrete import StepDiagramEvaluator
 
     evaluator = StepDiagramEvaluator(plan, diagram, backend=key, verbose=verbose)
+
+    if verbose:
+        print(f"[compile] Done.  ({time.perf_counter() - t_total:.3f}s total)")
+
+    return evaluator
+
+
+def compile_sampled_diagram(
+    diagram, backend: str = BACKEND_NUMPY, *, verbose: bool = False
+):
+    """Compile a :class:`~minilink.core.discrete.sampled_diagram.SampledDiagramSystem` into its evaluator.
+
+    The plan inlines nested boxes into one flat schedule on the base clock:
+    each block's divisor, its held outputs and what it reads as time.
+    """
+    from minilink.core.compile.evaluators.discrete import SampledDiagramEvaluator
+    from minilink.core.compile.plan import build_sampled_execution_plan
+    from minilink.core.wiring import iter_subsystems
+
+    for path, subsystem in iter_subsystems(diagram):
+        validate_equation_shapes(
+            subsystem, label=f"{subsystem.name} ({'/'.join(path)})"
+        )
+
+    t_total = time.perf_counter()
+    plan = build_sampled_execution_plan(diagram)
+
+    key = normalize_backend(backend)
+    if key != BACKEND_NUMPY:
+        require_jax_numpy()
+    evaluator = SampledDiagramEvaluator(plan, diagram, backend=key, verbose=verbose)
 
     if verbose:
         print(f"[compile] Done.  ({time.perf_counter() - t_total:.3f}s total)")

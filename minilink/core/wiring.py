@@ -263,12 +263,7 @@ class WiredDiagramMixin:
         recompile after structural changes. An ``x0`` set on the diagram itself
         is kept; otherwise the subsystems' current ``x0`` are stacked again.
         """
-        # An x0 set on the diagram differs from the one stacked from its subsystems
-        x0 = np.copy(self.x0)
-        derived_x0 = self.derived_x0
-        user_set_x0 = x0.shape == derived_x0.shape and not np.array_equal(
-            x0, derived_x0
-        )
+        x0 = own_x0_of(self)
 
         # The subsystems first, then the stack of their metadata
         for subsystem in self.subsystems.values():
@@ -278,7 +273,7 @@ class WiredDiagramMixin:
         )
 
         # The diagram's own x0 stays while its size still fits
-        if user_set_x0 and x0.shape == self.x0.shape:
+        if x0 is not None and x0.shape == self.x0.shape:
             self.x0 = x0
 
         self.refresh_solver_info()
@@ -704,6 +699,16 @@ def iter_subsystems(diagram, prefix=()):
 ###############################################################################
 # Internal machinery
 ###############################################################################
+
+
+def own_x0_of(system):
+    """A copy of the ``x0`` set on the system itself (it differs from the one read from its blocks), else ``None``."""
+    x0 = np.copy(system.x0)
+    derived_x0 = system.derived_x0
+    if x0.shape == derived_x0.shape and not np.array_equal(x0, derived_x0):
+        return x0
+
+    return None
 
 
 def state_layout(subsystems):

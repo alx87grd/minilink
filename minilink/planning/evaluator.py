@@ -6,6 +6,7 @@ import warnings
 
 import numpy as np
 
+from minilink.core.assembly import is_box
 from minilink.core.backends import (
     BACKEND_JAX,
     BACKEND_NUMPY,
@@ -68,9 +69,11 @@ class ProblemEvaluator:
         A controller block (or a solution's policy) closed on the plant, a source
         block (no input) driving the plant's command, or a built loop with a
         ``plant`` block.
-    dt : float
+    dt : float, optional
         Sample period of the run: the free inputs are held over it and the run is
-        recorded on its grid.
+        recorded on its grid. A sampled controller (``pid % 0.01``, a loop on a
+        clock) runs on its own base period: ``dt`` omitted reads it, and a ``dt``
+        that differs is refused.
     solver : {"rk4", "euler"}
         Integration formula of one step.
     substeps : int
@@ -85,7 +88,7 @@ class ProblemEvaluator:
         self,
         problem,
         controller,
-        dt,
+        dt=None,
         *,
         solver="rk4",
         substeps=1,
@@ -99,15 +102,20 @@ class ProblemEvaluator:
         else:
             backend = require_numpy_for_adaptive(backend)
 
-        # The task and the loop that runs it
+        # The task and the loop that runs it: a continuous diagram, or a sampled
+        # loop on its own clock
         self.problem = problem
         self.loop = closed_loop_of(problem, controller)
+        self.sampled = is_sampled(self.loop)
+        if self.sampled:
+            dt = sampled_dt_of(self.loop, dt)
+            require_loop_knobs(solver, substeps, self.adaptive)
         warn_if_disturbed(problem)
         self.solver = solver
         self.substeps = int(substeps)
 
         # The grid: N periods of dt to the horizon
-        self.dt = float(dt)
+        self.dt = float(require_dt(dt))
         self.tf = horizon_of(problem, episode_length)
         self.n_steps = steps_of(self.tf, self.dt)
 
@@ -117,7 +125,7 @@ class ProblemEvaluator:
         # The static layout of the run: the plant's state slice, the sources of its
         # input, the recorded signals and the free inputs
         self.plant_slice = self.loop.state_index["plant"]
-        self.plant_input = plant_input_sources(self.loop, self.evaluator)
+        self.plant_input = plant_input_sources(self.loop, self.evaluator, self.sampled)
         self.block_ids = tuple(self.loop.subsystems)
         self.free_inputs = tuple(self.loop.inputs)
         require_free_names(self.free_inputs, self.block_ids)
@@ -381,7 +389,9 @@ class ProblemEvaluator:
         loop_params = {sys_id: params[sys_id] for sys_id in self.block_ids}
         loop_params = integer_seeds(loop, loop_params)
         ts = xp.arange(N + 1) * dt
-        if self.adaptive is None:
+        if self.sampled:
+            xs = ev.rollout(x0, u_seq, loop_params, n_steps=N)
+        elif self.adaptive is None:
             xs = ev.rollout(
                 x0,
                 u_seq,
@@ -397,11 +407,14 @@ class ProblemEvaluator:
         us = xp.broadcast_to(u, (N + 1, u.size))
 
         # Every block output at every sample, and the plant's input among them
-        signals = signals_along(ev, xs, us, ts, loop_params)
+        if self.sampled:
+            signals = signals_at_ticks(ev, xs, us, loop_params)
+        else:
+            signals = signals_along(ev, xs, us, ts, loop_params)
         u_plant = gather_samples(self.plant_input, signals, us, xp)
 
         recorded = {
-            f"{sys_id}:{port}": signals[:, sl].T
+            f"{signal_name_of(ev, sys_id, self.sampled)}:{port}": signals[:, sl].T
             for (sys_id, port), sl in ev.plan.output_slices.items()
         }
         recorded[PLANT_INPUT] = u_plant.T
@@ -600,13 +613,16 @@ def closed_loop_of(problem, controller):
     # Lazy imports: the composition tools and the results load with the first loop
     from minilink.core.closed_loop import closed_loop
     from minilink.core.diagram import DiagramSystem
+    from minilink.core.discrete.step_diagram import StepDiagramSystem
     from minilink.core.discrete.step_system import StepSystem
 
     plant = problem.sys
     controller = policy_of(controller)
 
-    require_continuous(controller)
-    if isinstance(controller, DiagramSystem) and "plant" in controller.subsystems:
+    require_continuous_or_clocked(controller)
+    require_no_stateless_mpc(controller)
+    is_loop = isinstance(controller, (DiagramSystem, StepDiagramSystem))
+    if is_loop and "plant" in controller.subsystems:
         require_plant_block(controller, plant)
         return controller
     if isinstance(plant, StepSystem):
@@ -785,17 +801,71 @@ def warn_if_disturbed(problem):
     )
 
 
-def require_continuous(controller):
-    """Refuse a sampled controller: the evaluator runs a continuous loop."""
+def require_continuous_or_clocked(controller):
+    """Refuse a tick law with no clock: the loop runs in seconds, continuous or on a clock."""
     # Lazy import: the system module imports the compile chain, which loads after this one
     from minilink.core.discrete.step_system import StepSystem
 
-    if isinstance(controller, StepSystem):
+    if isinstance(controller, StepSystem) and controller.sample_period is None:
         raise TypeError(
-            f"{getattr(controller, 'name', controller)!r} is a discrete-time "
-            "StepSystem: the evaluator runs a continuous loop; a sampled controller "
-            "joins it with the hybrid loop"
+            f"{getattr(controller, 'name', controller)!r} is a tick law with no clock: "
+            "put it on one (controller % dt) and the loop runs on that clock"
         )
+
+
+def require_no_stateless_mpc(controller):
+    """Refuse the stateless MPC: closed as a continuous law, it would re-solve at every integrator stage."""
+    # Lazy import: the MPC loads with the first one evaluated
+    from minilink.planning.trajectory_optimization.mpc.controller import (
+        MPCStatelessController,
+    )
+
+    if isinstance(controller, MPCStatelessController):
+        raise TypeError(
+            "an MPC solves once per period on its clock: the stateless MPC closed as a "
+            "continuous law would re-solve at every integrator stage; run it in its "
+            "sampled loop (mpc % dt @ plant, compute_trajectory)"
+        )
+
+
+def is_sampled(loop) -> bool:
+    """Whether the loop is a sampled diagram, run on its own clock."""
+    # Lazy import: the sampled diagram loads with the first sampled loop
+    from minilink.core.discrete.sampled_diagram import SampledDiagramSystem
+
+    return isinstance(loop, SampledDiagramSystem)
+
+
+def sampled_dt_of(loop, dt):
+    """A sampled loop's period: its base period, ``dt`` omitted or equal to it; else refused."""
+    base = loop.sample_period
+    if dt is not None and abs(float(dt) - base) > 1e-12 * base:
+        raise ValueError(
+            f"the loop runs on its own clock, Δ = {base:g} s: omit dt, or pass dt={base:g}"
+        )
+
+    return base
+
+
+def require_loop_knobs(solver, substeps, adaptive):
+    """Refuse integration knobs on a sampled loop: its plant's solver and substeps are the plant block's."""
+    if adaptive is not None or solver != "rk4" or int(substeps) != 1:
+        raise ValueError(
+            "a sampled loop integrates its plant as its plant block says "
+            "(discretize(plant, dt, solver=, substeps=)); leave solver and substeps "
+            "at their defaults"
+        )
+
+
+def require_dt(dt):
+    """Refuse a continuous loop with no sample period: its run is recorded on the grid of ``dt``."""
+    if dt is None:
+        raise TypeError(
+            "a continuous loop needs dt, the sample period of its run: "
+            "problem.compile(controller, dt=0.01)"
+        )
+
+    return dt
 
 
 def require_plant_block(loop, plant):
@@ -808,7 +878,7 @@ def require_plant_block(loop, plant):
         )
 
 
-def plant_input_sources(loop, evaluator):
+def plant_input_sources(loop, evaluator, sampled=False):
     """The sources of the plant's input, port by port: ``(kind, where, dim)``.
 
     ``kind`` is ``"signal"`` (a block output, ``where`` its slice in the signal
@@ -829,10 +899,47 @@ def plant_input_sources(loop, evaluator):
         src_id, src_port = wires[port_id]
         if src_id == "input":
             sources.append(("input", loop.get_input_port_slice(src_port), dim))
+        elif sampled:
+            path, leaf_port = leaf_source(loop, src_id, src_port)
+            sources.append(
+                ("signal", evaluator.plan.output_slice_of(path, leaf_port), dim)
+            )
         else:
             sources.append(("signal", output_slices[(src_id, src_port)], dim))
 
     return tuple(sources)
+
+
+def leaf_source(diagram, sys_id, port_id, prefix=()):
+    """The leaf block's path and port behind a block's output: a box's boundary output followed in."""
+    block = diagram.subsystems[sys_id]
+    if not is_box(block):
+        return (*prefix, sys_id), port_id
+
+    inner_id, inner_port = block.connections["output"][port_id]
+
+    return leaf_source(block, inner_id, inner_port, (*prefix, sys_id))
+
+
+def signal_name_of(ev, sys_id, sampled):
+    """A recorded block's name: its id, or its path through the boxes of a sampled loop."""
+    if not sampled:
+        return sys_id
+
+    return "/".join(ev.plan.paths[sys_id])
+
+
+def signals_at_ticks(ev, xs, us, params):
+    """Every block output at every tick of a sampled loop, ``(N + 1, n_signals)``: ``vmap`` on JAX."""
+    xp = array_module(xs)
+    if xp is np:
+        return xp.stack(
+            [ev.signals(x, u, k, params) for k, (x, u) in enumerate(zip(xs, us))]
+        )
+
+    jax = ensure_jax_x64()
+    ks = jax.numpy.arange(xs.shape[0])
+    return jax.vmap(lambda x, u, k: ev.signals(x, u, k, params))(xs, us, ks)
 
 
 def signals_along(ev, xs, us, ts, params):

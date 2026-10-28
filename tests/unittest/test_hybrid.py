@@ -5,6 +5,7 @@ import numpy as np
 from minilink.blocks.basic import Integrator
 from minilink.control.siso import P
 from minilink.core.diagram import DiagramSystem
+from minilink.core.discrete.sampled_diagram import SampledDiagramSystem
 from minilink.core.discrete.step_diagram import StepDiagramSystem
 from minilink.core.discrete.hybrid_diagram import BoundaryConnection, HybridDiagram
 from minilink.simulation.discrete.computer import Computer, StepSchedule
@@ -92,15 +93,16 @@ class TestHybridClosedLoop(unittest.TestCase):
         plant = Pendulum()
         plant.x0 = np.array([0.3, 0.0])
         loop = StateFeedback(K) % 0.01 @ plant
-        self.assertIn("x", loop.plant.outputs)
-        sampled = loop.compute_trajectory(tf=2.0, verbose=False)
+        self.assertIsInstance(loop, SampledDiagramSystem)
+        self.assertIn("x", loop.subsystems["plant"].outputs)
+        sampled = loop.compute_rollout(200)
         continuous = (StateFeedback(K) @ plant).compute_trajectory(
             tf=2.0, verbose=False
         )
-        np.testing.assert_allclose(sampled.plant.x[:, 0], [0.3, 0.0])
-        np.testing.assert_allclose(
-            sampled.plant.x[:, -1], continuous.x[:, -1], atol=0.01
-        )
+        a, b = loop.state_index["plant"]
+        np.testing.assert_allclose(sampled.x[a:b, 0], [0.3, 0.0])
+        np.testing.assert_allclose(sampled.t[-1], 2.0)
+        np.testing.assert_allclose(sampled.x[a:b, -1], continuous.x[:, -1], atol=0.01)
 
     def test_shortcut_matches_manual_wiring(self):
         schedule = StepSchedule(dt_base=0.01)
@@ -138,26 +140,22 @@ class TestHybridClosedLoop(unittest.TestCase):
         plant = DiagramSystem()
         plant.add_subsystem(integrator, "integ")
         plant.x0 = np.array([0.7])
-        hybrid = (P(0.5, ports="reference") % 0.01) @ plant
-        self.assertEqual((list(plant.inputs), list(plant.outputs)), ([], []))
-        self.assertEqual(plant.connections, {"integ": {"u": None}})
-        self.assertEqual(list(hybrid.plant.subsystems), ["integ"])
-        self.assertIs(hybrid.plant.subsystems["integ"], integrator)
-        self.assertEqual(list(hybrid.plant.inputs), ["u"])
-        self.assertEqual(list(hybrid.plant.outputs), ["y"])
-        hybrid_closed_loop(P(0.5, ports="reference"), plant, schedule=0.01)
-        self.assertEqual((list(plant.inputs), list(plant.outputs)), ([], []))
+        plant.expose("u", "y")
+        loop = (P(0.5, ports="reference") % 0.01) @ plant
+        self.assertEqual((list(plant.inputs), list(plant.outputs)), (["u"], ["y"]))
+        sampled_plant = loop.subsystems["plant"]
+        self.assertIs(sampled_plant.source, plant)
+        self.assertIs(plant.subsystems["integ"], integrator)
+        bare = DiagramSystem()
+        bare.add_subsystem(integrator, "integ")
+        hybrid_closed_loop(P(0.5, ports="reference"), bare, schedule=0.01)
+        self.assertEqual((list(bare.inputs), list(bare.outputs)), ([], []))
 
         leaf = Integrator()
         leaf.x0 = np.array([0.7])
         reference = (P(0.5, ports="reference") % 0.01) @ leaf
-        runs = [
-            loop.compute_forced(
-                np.array([1.0]), t_start=0, tf=0.05, input_port_id="r", verbose=False
-            )
-            for loop in (hybrid, reference)
-        ]
-        np.testing.assert_array_equal(runs[0].plant.x, runs[1].plant.x)
+        runs = [run.compute_rollout(5, u=np.array([1.0])) for run in (loop, reference)]
+        np.testing.assert_array_equal(runs[0].x, runs[1].x)
 
     def test_leaf_system_wrapping(self):
         hybrid = hybrid_closed_loop(

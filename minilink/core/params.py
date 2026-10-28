@@ -25,9 +25,9 @@ def split_path(path):
 
 
 def lookup(tree, path):
-    """The leaf of ``tree`` at ``path``; refuse a path that names none."""
+    """The leaf of ``tree`` at ``path`` (a dotted string or a sequence of keys); refuse a path that names none."""
     node = tree
-    for part in split_path(path):
+    for part in split_path(path) if isinstance(path, str) else path:
         if not isinstance(node, dict) or part not in node:
             raise KeyError(f"{path!r} names no leaf of the parameters")
         node = node[part]

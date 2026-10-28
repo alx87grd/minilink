@@ -359,7 +359,7 @@ class PlanningProblem:
     def compile(
         self,
         controller,
-        dt,
+        dt=None,
         *,
         solver="rk4",
         substeps=1,
@@ -372,6 +372,8 @@ class PlanningProblem:
         The controller closed on the plant (or a built loop with a ``plant`` block),
         compiled once: ``pe.evaluate()`` scores it, ``pe.params`` holds every
         parameter of the run, ``pe.program(wrt)`` exports the tuning program.
+        A sampled controller (``pid % 0.01``) runs the sampled loop on its own
+        clock: ``dt`` omitted reads its base period.
         """
         # Lazy import: the engine loads with its first evaluator
         from minilink.planning.evaluator import ProblemEvaluator

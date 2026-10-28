@@ -5,8 +5,6 @@ examples/demos/compile/neural_controller_jax.py minilink.graphical.common.matplo
 examples/demos/compile/params_gradient.py minilink.core.backends
 examples/demos/compile/pid_autotuning_jax.py minilink.graphical.signals
 examples/demos/hybrid/hybrid_multi_rate.py minilink.core.backends
-examples/demos/hybrid/hybrid_multi_rate.py minilink.core.discrete.hybrid_composition
-examples/demos/hybrid/sampled_smc_pendulum.py minilink.core.discrete.hybrid_composition
 examples/demos/hybrid/step_accumulator.py minilink.core.backends
 examples/demos/hybrid/step_fibonacci.py minilink.core.backends
 examples/demos/hybrid/step_unity_feedback.py minilink.core.backends

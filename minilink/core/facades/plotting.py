@@ -412,11 +412,12 @@ class StepPlotting:
         Convenience shortcut to plot sampled step signals.
 
         If the rollout is not computed yet, it must be provided or available on
-        :attr:`rollout`.
+        :attr:`traj` (the last :meth:`compute_rollout`).
         """
         # A real cycle through minilink.core.system
         from minilink.graphical.signals import (
             STEP_ABSCISSA_LABEL,
+            TIME_ABSCISSA_LABEL,
             plot_time_signals,
             resolve_plot_signals,
         )
@@ -426,14 +427,18 @@ class StepPlotting:
 
         # The rollout passed, else the last one computed
         if rollout is None:
-            rollout = self.rollout
+            rollout = self.traj
         require_rollout(rollout)
 
         return plot_time_signals(
             self,
-            rollout.as_trajectory(),
+            rollout,
             signals=signals,
-            abscissa_label=STEP_ABSCISSA_LABEL,
+            abscissa_label=(
+                STEP_ABSCISSA_LABEL
+                if self.sample_period is None
+                else TIME_ABSCISSA_LABEL
+            ),
             backend=backend,
             show=show,
         )

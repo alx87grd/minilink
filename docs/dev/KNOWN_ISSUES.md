@@ -15,15 +15,6 @@ lands. Last checked against the code: 2026-10-25.
 - **Workaround:** compare runs within one backend.
 - **Fix:** RN-4 (the v0.3 core's draws, TODO §1.3), one draw convention on both backends.
 
-### `problem.compile` accepts the stateless MPC and re-solves it at the RK4 stages
-- **Symptom:** `problem.compile(mpc, dt)` with an `MPCStatelessController` runs, but the MPC is a
-  plain `System`: its tick latch keys on `(k, y)`, the measurement changes at every RK4 stage, and
-  the NLP is re-solved up to four times per step, a continuous-feedback MPC the user did not
-  build. A `StepSystem` controller is refused (`require_continuous`), the stateless MPC is not.
-- **Workaround:** evaluate an MPC through its sampled loop, `mpc % dt @ plant`, with
-  `compute_trajectory`.
-- **Fix:** the refusal row in [TODO.md](../plans/TODO.md) §1.5, then the sampled face.
-
 ## Composition and control
 
 ### `ComputedTorque` cannot drive an underactuated plant

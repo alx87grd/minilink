@@ -25,6 +25,9 @@ class StepSystem(StepSimulation, StepAnalysis, StepPlotting, System):
     auxiliary state output ``x``.
     """
 
+    #: The clock's period in seconds; a tick law has none
+    sample_period = None
+
     def __init__(
         self,
         n,
@@ -52,9 +55,6 @@ class StepSystem(StepSimulation, StepAnalysis, StepPlotting, System):
         """
         require_step_state(n)
         System.__init__(self, n)
-
-        # Memory: the last rollout ``compute_rollout`` produced
-        self.rollout = None
 
         # Ports, each when asked: the input u, the output y_k = h(x, u), the state x
         add_standard_ports(self, input_dim, output_dim, expose_state, y_dependencies)

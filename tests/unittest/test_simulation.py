@@ -9,7 +9,7 @@ import pytest
 from minilink.core.backends import array_module
 from minilink.core.system import DEFAULT_SMALLEST_TIME_CONSTANT, DynamicSystem
 from minilink.simulation.simulator import COMPILE_BACKEND_AUTO, Simulator
-from minilink.simulation.time_grid import AUTO_DT_SCALE
+from minilink.core.system import AUTO_DT_SCALE
 
 
 def _have_jax() -> bool:
@@ -594,6 +594,7 @@ class TestStepSubsteps(unittest.TestCase):
 
 
 from minilink.core.compile.evaluators.base import gather_u
+from minilink.core.discrete.sampled_system import SampledSystem
 from minilink.core.discrete.step_diagram import StepDiagramSystem
 from minilink.core.system import System
 from minilink.core.discrete.step_system import StepSystem
@@ -821,8 +822,10 @@ def _build_step_diagram():
 
 
 class TestAsComputer(unittest.TestCase):
-    def test_leaf_mod_float(self):
-        computer = P(0.3, ports="reference") % 0.02
+    """The MPC's legacy runtime, until its rebuild on the sampled loop."""
+
+    def test_leaf_as_computer(self):
+        computer = as_computer(P(0.3, ports="reference"), 0.02)
         self.assertIsInstance(computer, Computer)
         self.assertAlmostEqual(computer.schedule.dt_base, 0.02)
         self.assertIn("controller", computer.diagram.subsystems)
@@ -834,19 +837,14 @@ class TestAsComputer(unittest.TestCase):
 
     def test_rejects_continuous_plant(self):
         with self.assertRaises(TypeError):
-            Integrator() % 0.01
+            as_computer(Integrator(), 0.01)
 
-    def test_mod_override_calling_super_builds_a_computer(self):
-        """``%``, ``as_computer`` and ``hybrid_closed_loop`` reach the plain build."""
+    def test_mod_override_calling_super_puts_the_block_on_a_clock(self):
+        """``%`` is the clock for every block; only a block's own Computer builds one."""
         ctl = ScheduledP(0.3, ports="reference")
-        computers = (
-            ctl % 0.02,
-            as_computer(ctl, 0.02),
-            hybrid_closed_loop(ctl, Integrator(), schedule=0.02).computer,
-        )
-        for computer in computers:
-            self.assertIsInstance(computer, Computer)
-            self.assertAlmostEqual(computer.schedule.dt_base, 0.02)
+        self.assertIsInstance(ctl % 0.02, SampledSystem)
+        with self.assertRaises(TypeError):
+            as_computer(ctl, 0.02)
 
     def test_as_computer_rejects_a_mod_that_is_not_a_computer(self):
         with self.assertRaises(TypeError):
@@ -1411,7 +1409,7 @@ class TestAutomaticTimeGrid(unittest.TestCase):
 
     def test_a_held_signal_selects_rk4_on_a_divisor_of_its_period(self):
         from minilink import Pendulum, WhiteNoise
-        from minilink.simulation.simulator import HELD_SIGNAL_STEPS_PER_SAMPLE
+        from minilink.core.system import HELD_SIGNAL_STEPS_PER_SAMPLE
 
         cases = [
             # (declared plant time constant, sample period, discontinuous) -> (solver, dt)

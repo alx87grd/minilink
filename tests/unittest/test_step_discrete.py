@@ -4,6 +4,7 @@ import unittest
 import numpy as np
 from minilink.blocks.step import UnitDelay
 from minilink.core.discrete.step_system import StepSystem
+from minilink.core.system import System
 
 
 class Accumulator(StepSystem):
@@ -45,9 +46,9 @@ class TestStepSystem(unittest.TestCase):
         ev = compile(plant)
         self.assertFalse(hasattr(ev, "f"))
 
-    def test_rollout_attr_initialized(self):
+    def test_no_run_is_kept_before_a_rollout(self):
         plant = Accumulator()
-        self.assertIsNone(plant.rollout)
+        self.assertIsNone(plant.traj)
 
     def test_unit_delay_returns_the_input_one_tick_late(self):
         hold = UnitDelay()
@@ -254,9 +255,8 @@ class TestStepDiagramRollout(unittest.TestCase):
         r = 1.0
         n_steps = 25
         k_ref, x_ref = _manual_unity_feedback_rollout(r, 0.3, n_steps)
-        ev = compile(diagram)
-        rollout = ev.rollout(diagram.x0, n_steps=n_steps, u=np.array([r]))
-        np.testing.assert_allclose(rollout.k, k_ref)
+        rollout = diagram.compute_rollout(n_steps=n_steps, u=np.array([r]))
+        np.testing.assert_allclose(rollout.t, k_ref)
         np.testing.assert_allclose(rollout.x, x_ref, rtol=1e-10, atol=1e-10)
         np.testing.assert_allclose(rollout.u[0, :], r)
 
@@ -265,11 +265,9 @@ class TestStepDiagramRollout(unittest.TestCase):
         n_steps = 15
         r = 2.0
         via_facade = diagram.compute_rollout(n_steps=n_steps, u=np.array([r]))
-        via_eval = diagram.compile().rollout(
-            diagram.x0, n_steps=n_steps, u=np.array([r])
-        )
-        np.testing.assert_allclose(via_facade.x, via_eval.x)
-        np.testing.assert_allclose(via_facade.u, via_eval.u)
+        via_eval = diagram.compile().rollout(diagram.x0, np.full((n_steps, 1), r))
+        np.testing.assert_array_equal(via_facade.x, via_eval.T)
+        np.testing.assert_allclose(via_facade.u, r)
 
     def test_interpreted_step_track_rollout(self):
         diagram = _build_unity_feedback(K=0.4)
@@ -279,8 +277,8 @@ class TestStepDiagramRollout(unittest.TestCase):
         u_boundary = np.array([r])
         for k in range(n_steps):
             x = diagram.step(x, u_boundary, k=k)
-        rollout = diagram.compile().rollout(diagram.x0, n_steps=n_steps, u=u_boundary)
-        np.testing.assert_allclose(x, rollout.x[:, -1], rtol=1e-10, atol=1e-10)
+        xs = diagram.compile().rollout(diagram.x0, np.tile(u_boundary, (n_steps, 1)))
+        np.testing.assert_allclose(x, xs[-1], rtol=1e-10, atol=1e-10)
 
 
 import pytest
@@ -372,8 +370,7 @@ class TestStepRollout(unittest.TestCase):
 
     def test_rollout_constant_u(self):
         plant = AffineStep()
-        ev = compile(plant)
-        rollout = ev.rollout(plant.x0, n_steps=3, u=np.array([1.0]))
+        rollout = plant.compute_rollout(n_steps=3, u=np.array([1.0]))
         self.assertEqual(rollout.x.shape, (1, 4))
         self.assertEqual(rollout.u.shape, (1, 4))
         np.testing.assert_allclose(rollout.x[0], [0.0, 1.0, 3.0, 6.0])
@@ -382,7 +379,8 @@ class TestStepRollout(unittest.TestCase):
         plant = AffineStep()
         ev = compile(plant)
         u_seq = np.array([[1.0], [0.0], [2.0]])
-        rollout = ev.rollout(plant.x0, n_steps=3, u=u_seq)
+        rollout = plant.compute_rollout(n_steps=3, u=u_seq)
+        np.testing.assert_array_equal(rollout.x.T, ev.rollout(plant.x0, u_seq))
         np.testing.assert_allclose(rollout.u[0, :3], [1.0, 0.0, 2.0])
         np.testing.assert_allclose(rollout.u[0, 3], 2.0)
 
@@ -393,14 +391,15 @@ class TestStepRollout(unittest.TestCase):
         def u_of_k(k):
             return np.array([float(k)])
 
-        rollout = ev.rollout(plant.x0, n_steps=2, u=u_of_k)
+        rollout = plant.compute_rollout(n_steps=2, u=u_of_k)
         np.testing.assert_allclose(rollout.u[0, :2], [0.0, 1.0])
+        self.assertIsNotNone(ev)
 
     def test_rollout_state_only_by_default(self):
         plant = AffineStep()
         ev = compile(plant)
-        rollout = ev.rollout(plant.x0, n_steps=2, u=np.array([0.0]))
-        self.assertEqual(len(rollout.signals), 0)
+        xs = ev.rollout(plant.x0, n_steps=2)
+        self.assertEqual(xs.shape, (3, 1))
 
 
 @pytest.mark.optional
@@ -423,10 +422,10 @@ class TestStepRolloutJax(unittest.TestCase):
 
         plant = JaxFriendlyStep()
         ev = compile(plant, backend="jax")
-        rollout = ev.rollout(plant.x0, n_steps=4, u=np.array([1.0]))
+        rollout = ev.rollout(plant.x0, np.ones((4, 1)))
         ev_np = compile(plant, backend="numpy")
-        ref = ev_np.rollout(plant.x0, n_steps=4, u=np.array([1.0]))
-        np.testing.assert_allclose(rollout.x, ref.x, atol=1e-05)
+        ref = ev_np.rollout(plant.x0, np.ones((4, 1)))
+        np.testing.assert_allclose(rollout, ref, atol=1e-05)
 
 
 from minilink.core.compile.evaluators.discrete import StepDiagramEvaluator
@@ -464,10 +463,10 @@ class TestStepDiagramJax(unittest.TestCase):
         diagram.connect("gain", "y", "plant", "u")
         ev = compile(diagram, backend="jax")
         self.assertIsInstance(ev, StepDiagramEvaluator)
-        rollout = ev.rollout(diagram.x0, n_steps=5, u=np.array([1.0]))
+        rollout = ev.rollout(diagram.x0, np.ones((5, 1)))
         np_ev = compile(diagram, backend="numpy")
-        ref = np_ev.rollout(diagram.x0, n_steps=5, u=np.array([1.0]))
-        np.testing.assert_allclose(rollout.x, ref.x, rtol=1e-10, atol=1e-10)
+        ref = np_ev.rollout(diagram.x0, np.ones((5, 1)))
+        np.testing.assert_allclose(rollout, ref, rtol=1e-10, atol=1e-10)
 
     def test_the_default_step_holds_the_state_on_jax(self):
         ev = compile(StepSystem(2, input_dim=1), backend="jax")
@@ -507,8 +506,10 @@ class TestFacadesRollout(unittest.TestCase):
     def test_compute_rollout_caches_on_system(self):
         plant = Counter()
         rollout = plant.compute_rollout(n_steps=5)
-        self.assertIs(plant.rollout, rollout)
+        self.assertIs(plant.traj, rollout)
+        self.assertIsInstance(rollout, Trajectory)
         self.assertEqual(rollout.n_samples, 6)
+        np.testing.assert_allclose(rollout.t, np.arange(6))
         np.testing.assert_allclose(rollout.x[0, -1], 5.0)
         self.assertEqual(len(rollout.signals), 0)
 
@@ -526,3 +527,106 @@ class TestFacadesRollout(unittest.TestCase):
     def test_compute_rollout_only_on_step_system(self):
         with self.assertRaises(AttributeError):
             Integrator().compute_rollout(n_steps=3)
+
+
+class CountingGain(System):
+    """``y = 2 u``, counting its calls."""
+
+    def __init__(self):
+        super().__init__()
+        self.calls = 0
+        self.add_input_port("u", dim=1)
+        self.add_output_port("y", dim=1, function=self.h, dependencies=("u",))
+
+    def h(self, x, u, t=0.0, params=None):
+        self.calls += 1
+        return 2.0 * u
+
+
+def _counting_loop():
+    diagram = StepDiagramSystem()
+    diagram.add_subsystem(CountingGain(), "gain")
+    diagram.add_subsystem(Accumulator_step_diagram_jax(), "plant")
+    diagram.add_input_port("u")
+    diagram.connect("input", "u", "gain", "u")
+    diagram.connect("gain", "y", "plant", "u")
+    diagram.connect_new_output_port("plant", "y", "y")
+    return diagram
+
+
+def test_one_signal_pass_per_tick():
+    diagram = _counting_loop()
+    ev = compile(diagram)
+    gain = diagram.subsystems["gain"]
+    gain.calls = 0  # the compile's shape probe read it once
+
+    x_next, outputs = ev.tick(np.array([1.0]), np.array([0.5]))
+    assert gain.calls == 1
+    np.testing.assert_allclose(x_next, [2.0])
+    np.testing.assert_allclose(outputs["y"], [1.0])
+
+    gain.calls = 0
+    ev.rollout(diagram.x0, np.ones((7, 1)))
+    assert gain.calls == 7
+
+
+@pytest.mark.optional
+@pytest.mark.jax
+def test_a_step_rollout_traces_and_batches():
+    pytest.importorskip("jax")
+    import jax
+    import jax.numpy as jnp
+
+    diagram = StepDiagramSystem()
+    diagram.add_subsystem(Gain(0.5, dim=1), "gain")
+    diagram.add_subsystem(Accumulator_step_diagram_jax(), "plant")
+    diagram.add_input_port("u")
+    diagram.connect("input", "u", "gain", "u")
+    diagram.connect("gain", "y", "plant", "u")
+    ev = compile(diagram, backend="jax")
+    us = jnp.linspace(0.0, 1.0, 6)[:, None]
+
+    def J(params, x0):
+        xs = ev.rollout(x0, us, params)
+        return jnp.sum(xs**2)
+
+    params = ev.params
+    grad = jax.grad(J)(params, jnp.array([0.3]))
+    key = next(iter(params["gain"]))
+    eps = 1e-6
+    up = {**params, "gain": {**params["gain"], key: params["gain"][key] + eps}}
+    down = {**params, "gain": {**params["gain"], key: params["gain"][key] - eps}}
+    central = (J(up, jnp.array([0.3])) - J(down, jnp.array([0.3]))) / (2 * eps)
+    np.testing.assert_allclose(np.sum(grad["gain"][key]), central, rtol=1e-6)
+
+    x0s = jnp.array([[0.0], [1.0], [2.0]])
+    batch = ev.rollout_batch(x0s, us)
+    assert batch.shape == (3, 7, 1)
+    for i in range(3):
+        np.testing.assert_allclose(batch[i], ev.rollout(x0s[i], us), rtol=1e-12)
+
+
+@pytest.mark.optional
+@pytest.mark.jax
+def test_a_system_on_a_clock_rolls_out_from_its_origin():
+    pytest.importorskip("jax")
+    from minilink import Pendulum
+    from minilink.analysis import discretize
+
+    sampled = discretize(Pendulum(), 0.05)
+    x0 = np.array([0.4, -0.2])
+    us = np.zeros((10, 1))
+    for backend in ("numpy", "jax"):
+        ev = compile(sampled, backend=backend)
+        xs = np.asarray(ev.rollout(x0, us))
+        x = x0
+        for k in range(10):
+            x = sampled.step(x, us[k], k)
+        np.testing.assert_allclose(xs[-1], x, rtol=1e-13)
+        shifted = np.asarray(ev.rollout(x0, us, t_start=1.0))
+        x = x0
+        for k in range(10):
+            x = sampled.update(x, us[k], 1.0 + k * 0.05)
+        np.testing.assert_allclose(shifted[-1], x, rtol=1e-13)
+    traj = sampled.compute_rollout(4, t_start=2.0)
+    np.testing.assert_allclose(traj.t, 2.0 + 0.05 * np.arange(5))

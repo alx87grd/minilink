@@ -668,8 +668,8 @@ class TestResolver(unittest.TestCase):
         )
 
         sampled = ctl % 0.01 @ plant
-        self.assertIs(roles(sampled).plant, plant)
-        self.assertIs(roles(sampled).controller, ctl)
+        self.assertIs(roles(sampled).plant.source, plant)
+        self.assertIs(roles(sampled).controller.source, ctl)
 
         observer, box = (
             Integrator(),
