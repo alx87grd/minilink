@@ -10,6 +10,7 @@ from minilink.core.backends import array_module
 from minilink.core.discrete.sampled_system import SampledSystem
 from minilink.core.discrete.step_diagram import StepDiagramSystem
 from minilink.core.discrete.step_system import StepSystem
+from minilink.core.wiring import WiredDiagramMixin, own_x0_of
 
 # The clocks' grid: every period is a whole number of nanoseconds, to a relative
 # tolerance, and their common base is the greatest common divisor on that grid
@@ -53,8 +54,12 @@ class SampledDiagramSystem(StepDiagramSystem):
         self.add_hold_slots()
 
     def refresh(self):
+        # The x0 set on the loop itself, its held outputs included, stays while it fits
+        x0 = own_x0_of(self)
         super().refresh()
         self.add_hold_slots()
+        if x0 is not None and x0.shape == self.x0.shape:
+            self.x0 = x0
 
     def divisor_of(self, sys) -> int:
         """The block's divisor ``d``: it fires on the ticks ``k mod d = 0`` of the base clock."""
@@ -142,7 +147,7 @@ def clock_periods(diagram):
     for sys in diagram.subsystems.values():
         if isinstance(sys, SampledSystem):
             periods.append(sys.sample_period)
-        elif isinstance(sys, StepDiagramSystem):
+        elif isinstance(sys, WiredDiagramMixin):
             periods.extend(clock_periods(sys))
     return periods
 
@@ -205,13 +210,14 @@ def leaves_of(diagram, prefix=()):
     """``(path, leaf, held inside)`` of every leaf block, nested boxes walked; a box's own holds marked."""
     for sys_id, sys in diagram.subsystems.items():
         path = (*prefix, sys_id)
-        if not isinstance(sys, StepDiagramSystem):
+        if not isinstance(sys, WiredDiagramMixin):
             yield path, sys, False
             continue
+        hold_index = getattr(sys, "hold_index", {})
         for leaf_path, leaf, held in leaves_of(sys, path):
             inside = leaf_path[len(path) :]
             held_here = held or any(
-                (inside, port) in sys.hold_index for port in leaf.outputs
+                (inside, port) in hold_index for port in leaf.outputs
             )
             yield leaf_path, leaf, held_here
 

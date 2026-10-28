@@ -21,6 +21,7 @@ from __future__ import annotations
 import copy
 from collections.abc import Callable
 from dataclasses import dataclass
+from functools import cached_property
 from typing import TYPE_CHECKING
 
 import numpy as np
@@ -29,6 +30,7 @@ from minilink.core.discrete.step_diagram import StepDiagramSystem
 from minilink.core.discrete.step_system import StepSystem
 from minilink.core.system import DynamicSystem
 from minilink.core.topology import evaluation_order_of
+from minilink.core.wiring import WiredDiagramMixin
 
 if TYPE_CHECKING:
     from minilink.core.diagram import DiagramSystem
@@ -550,18 +552,23 @@ class SampledExecutionPlan:
         flat_id = next(f for f, p in self.paths.items() if p == tuple(path))
         return self.output_slices[(flat_id, port_id)]
 
-    @property
+    @cached_property
     def plant_op(self):
-        """The state advance of the loop's plant on the base clock, a continuous plant integrated inside the period; else ``None``."""
-        for op in self.step_ops:
-            if (
-                op.params_path == ("plant",)
-                and op.divisor == 1
-                and op.face == "seconds"
-            ):
-                if op.system.resolves:
-                    return op
-        return None
+        """The state advance of the loop's plant: the block integrated inside every base period, else ``None``.
+
+        A continuous block on the base clock is the plant whatever its id; of
+        several, the one whose id is ``plant``, at any depth.
+        """
+        candidates = [
+            op
+            for op in self.step_ops
+            if op.divisor == 1 and op.face == "seconds" and op.system.resolves
+        ]
+        if len(candidates) > 1:
+            candidates = [op for op in candidates if op.params_path[-1] == "plant"]
+            require_one_plant(candidates, self.step_ops)
+
+        return candidates[0] if candidates else None
 
     @property
     def dense_points(self) -> int:
@@ -672,14 +679,28 @@ def nested_layout(diagram, offset=0, prefix=()):
     for sys_id, sys in diagram.subsystems.items():
         start, end = diagram.state_index[sys_id]
         path = (*prefix, sys_id)
-        if isinstance(sys, StepDiagramSystem):
+        if isinstance(sys, WiredDiagramMixin):
             layout.update(nested_layout(sys, offset + start, path))
         else:
             layout[path] = (slice(offset + start, offset + end), {})
-    for (path, port_id), (start, end) in diagram.hold_index.items():
+    for (path, port_id), (start, end) in getattr(diagram, "hold_index", {}).items():
         layout[(*prefix, *path)][1][port_id] = slice(offset + start, offset + end)
 
     return layout
+
+
+def require_one_plant(candidates, step_ops) -> None:
+    """Refuse a loop of several continuous blocks on the base clock none of which, or more than one, is the plant."""
+    if len(candidates) != 1:
+        integrated = [
+            op.label
+            for op in step_ops
+            if op.divisor == 1 and op.face == "seconds" and op.system.resolves
+        ]
+        raise ValueError(
+            f"the blocks {integrated} are all integrated inside the base period; the "
+            "dense run keeps one plant's substeps: name it 'plant'"
+        )
 
 
 def require_clock(diagram, base) -> None:

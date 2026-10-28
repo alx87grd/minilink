@@ -14,6 +14,7 @@ from minilink.core.system import (
     DynamicSystem,
     System,
 )
+from minilink.core.wiring import own_x0_of
 
 SAMPLED_SOLVERS = ("rk4", "euler", "exact")
 
@@ -73,6 +74,7 @@ class SampledSystem(StepSystem):
 
         # State: the source's initial state, labels, units, bounds and nominal value
         self.x0 = np.array(source.x0, dtype=float)
+        self.derived_x0 = np.copy(self.x0)
         self.state = source.state
 
         # Ports: the source's own, their functions included
@@ -97,6 +99,25 @@ class SampledSystem(StepSystem):
     @params.setter
     def params(self, value: dict | None):
         self.params_override = value
+
+    def refresh(self):
+        """Refresh the source, then read again what the view copied: its size, state, ports, ``x0`` and solver hints.
+
+        An ``x0`` set on the view itself is kept while its size still fits.
+        """
+        x0 = own_x0_of(self)
+        source = self.source
+        source.refresh()
+
+        self.n = source.n
+        self.state = source.state
+        self.inputs = source.inputs
+        self.outputs = source.outputs
+        self.solver_info = source.solver_info
+        self.x0 = np.array(source.x0, dtype=float)
+        self.derived_x0 = np.copy(self.x0)
+        if x0 is not None and x0.shape == self.x0.shape:
+            self.x0 = x0
 
     @property
     def counts(self) -> bool:

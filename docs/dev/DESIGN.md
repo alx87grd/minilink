@@ -204,7 +204,11 @@ outputs state slots after the blocks' states (`hold_index`); its compiled plan
 `t_k = t_start + k·Δ` once per tick and hands it to every block whose equations are in seconds
 (a static block, a `SampledSystem`'s seconds face), `k // d` to a tick law on a clock, `k` to a
 bare tick law; the firing is a `lax.cond` on the tick on JAX, a branch on NumPy, never a
-`where`. Signals propagate within the tick (R125): a delay is a block. The hybrid glue of
+`where`. A bare tick law reads the base count of the loop it runs in, so a tick law designed
+for a rate names it (`filt % 0.01`). The loop's plant, whose substeps the dense run keeps and
+the host runner integrates adaptively, is the block integrated inside every base period (the
+one named `plant` if several are). Signals propagate within the tick (R125): a delay is a
+block. The hybrid glue of
 `simulation/discrete/` (`Computer`, `StepSchedule`, `HybridDiagram`) is the MPC's runtime until
 its rebuild on this loop.
 

@@ -183,10 +183,15 @@ class StepEvaluator(DiscreteEvaluator):
         return system.step(x, u, k, params)
 
     @compiled
-    def outputs(self, x, u, k=0, params=None):
+    def outputs(self, x, u, k=0, params=None, *, t_start=0.0):
         xp = self.xp
         params = self._frozen_params if params is None else params
-        return outputs_from_ports(self._system, xp.asarray(x), xp.asarray(u), k, params)
+        system = self._system
+
+        # The ports of a system on a clock read seconds, t_k = t_start + k Δ
+        t = t_start + k * system.sample_period if self.seconds else k
+
+        return outputs_from_ports(system, xp.asarray(x), xp.asarray(u), t, params)
 
     @compiled(static=("n_steps",))
     def rollout_dense(self, x0, u_seq=None, params=None, *, n_steps=None, t_start=0.0):
@@ -202,6 +207,8 @@ class StepEvaluator(DiscreteEvaluator):
 
         def period(x, k, u_k):
             x_next = xp.reshape(self.step(x, u_k, k, params, t_start=t_start), (n,))
+            if not system.resolves:
+                return x_next, x_next[None, :]
             t_k = t_start + k * system.sample_period
             path = system.update_path(x, u_k, t_k, params)
             points = assigned(xp, path, -1, x_next)
@@ -590,7 +597,11 @@ class SampledDiagramEvaluator(StepDiagramEvaluator):
         return points
 
     def fired(self, k, d, fire, hold):
-        """``fire()`` on the ticks ``k mod d = 0``, ``hold()`` otherwise: a branch, never both."""
+        """``fire()`` on the ticks ``k mod d = 0``, ``hold()`` otherwise: a branch, never a ``where``.
+
+        One branch runs per tick; under ``vmap`` the ``lax.cond`` is lowered to
+        a select, which evaluates both (the result is the same).
+        """
         if self.xp is np:
             return fire() if k % d == 0 else hold()
 

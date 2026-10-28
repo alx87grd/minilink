@@ -133,8 +133,12 @@ def flatten_diagram(diagram: DiagramSystem) -> tuple[DiagramSystem, FlattenRepor
 
     Nested block ids join with ``__`` (``inner__plant``), matching topology
     expand. The stacked state ``x = [x_1; x_2; \\ldots]`` (block order from
-    :func:`~minilink.core.wiring.state_layout`) matches the unflattened diagram.
-    The input diagram is not modified.
+    :func:`~minilink.core.wiring.state_layout`) matches the unflattened diagram,
+    except for a sampled diagram whose boxes hold outputs: the flat copy holds
+    them all at its one level, so the sampled plan reads its slices from the
+    nested layout
+    (:func:`~minilink.core.compile.plan.nested_layout`). The input diagram is
+    not modified.
     """
     if not is_box(diagram):
         raise TypeError(

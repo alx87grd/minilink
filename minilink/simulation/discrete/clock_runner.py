@@ -23,8 +23,9 @@ def run_on_the_clock(
     The run of a system on a clock with an adaptive plant: ``(N·points + 1, n)``.
 
     The blocks are the pure ones the step diagram runs: at each tick the plan
-    forms the signals and steps every discrete block; the loop's plant (a
-    continuous plant on the base clock, the block ``plant``; or the system itself)
+    forms the signals and steps every discrete block; the loop's plant (the
+    continuous block on the base clock, :attr:`~minilink.core.compile.plan.SampledExecutionPlan.plant_op`;
+    or the system itself)
     is integrated by SciPy's adaptive ``solve_ivp`` from ``t_k`` to ``t_k + Δ``,
     its input held, restarted at every tick (the sample times are known), and
     reported at ``points`` instants of the period. The step diagram is the
@@ -80,8 +81,13 @@ def tick_on_the_host(ev, system, x, u, k, t_start, params, points, rtol, atol):
         inside = inside_points(ev, x, x_next, paths, points)
     else:
         params = system.params if params is None else params
-        x_next = advance(system, x, u, t_start + k * h, params)
-        inside = paths[0]
+        if system.resolves:
+            x_next = advance(system, x, u, t_start + k * h, params)
+            inside = paths[0]
+        else:
+            # A block with nothing to integrate inside its period: its own update
+            x_next = ev.step(x, u, k, params, t_start=t_start)
+            inside = x_next[None, :]
 
     return x_next, inside
 

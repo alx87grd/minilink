@@ -4,7 +4,7 @@ import numpy as np
 import pytest
 
 from minilink import PID, Integrator, P, Pendulum, Sine, StepSystem
-from minilink.analysis import discretize
+from minilink.analysis import discretize, linearize
 from minilink.core.backends import array_module
 from minilink.core.discrete.sampled_diagram import SampledDiagramSystem
 from minilink.core.discrete.sampled_system import SampledSystem
@@ -238,3 +238,120 @@ def test_a_tick_law_with_no_clock_is_refused_by_the_problem():
     problem = PlanningProblem(plant, cost=QuadraticCost.from_system(plant), tf=1.0)
     with pytest.raises(TypeError, match="%"):
         problem.compile(LowPass(), dt=0.01)
+
+
+def test_the_seconds_face_is_the_evaluators_step():
+    plant = Pendulum()
+    sampled = discretize(plant, 0.05, substeps=3)
+    ev = plant.compile()
+    x, u = np.array([0.4, -0.2]), np.array([0.3])
+    np.testing.assert_array_equal(
+        sampled.update(x, u, 1.25), ev.step(x, u, 1.25, dt=0.05, substeps=3)
+    )
+
+
+@pytest.mark.parametrize(
+    "loop",
+    [
+        lambda: multi_rate_computer_on_an_integrator(),
+        lambda: (
+            (SlidingModeOf(Pendulum()) % 0.05)
+            @ discretize(Pendulum(), 0.05, substeps=10)
+        ),
+    ],
+)
+def test_the_host_runner_agrees_on_the_hybrid_demos(loop):
+    loop = loop()
+    dense = loop.compute_trajectory(tf=1.0, u=np.ones(loop.m) if loop.m else None)
+    host = loop.compute_trajectory(
+        tf=1.0, u=np.ones(loop.m) if loop.m else None, solver="scipy"
+    )
+    np.testing.assert_allclose(host.x, dense.x, atol=1e-6)
+
+
+def SlidingModeOf(plant):
+    """The sampled sliding-mode demo's law on its plant, the reference at the origin."""
+    from minilink import SlidingMode
+
+    plant.x0 = np.array([np.pi + 0.25, 0.0])
+    return SlidingMode(plant, lam=2.0, gain=8.0, nab=0.15)
+
+
+@pytest.mark.parametrize(
+    "block",
+    [
+        lambda: discretize(linearize(Pendulum()), 0.01, solver="exact"),
+        lambda: P(2.0) % 0.1,
+    ],
+)
+def test_a_block_with_nothing_to_integrate_has_one_point_per_period(block):
+    block = block()
+    h = block.sample_period
+    ticks = block.compute_rollout(5, u=np.ones(block.m))
+    dense = block.compute_trajectory(tf=5 * h, u=np.ones(block.m))
+    host = block.compute_trajectory(tf=5 * h, u=np.ones(block.m), solver="scipy")
+    np.testing.assert_array_equal(dense.x, ticks.x)
+    np.testing.assert_array_equal(host.x, ticks.x)
+
+
+def test_the_plant_is_the_continuous_block_on_the_base_clock_whatever_its_id():
+    chain = (Sine() % 0.05) >> discretize(Pendulum(), 0.05, substeps=5)
+    assert "plant" not in chain.subsystems
+    ev = chain.compile()
+    assert ev.plan.dense_points == 5
+
+    dense = chain.compute_trajectory(tf=0.5)
+    host = chain.compute_trajectory(tf=0.5, solver="scipy")
+    assert dense.x.shape[1] == 10 * 5 + 1
+    np.testing.assert_allclose(host.x, dense.x, atol=1e-7)
+
+
+def test_several_continuous_blocks_and_none_named_plant_are_refused():
+    loop = SampledDiagramSystem()
+    loop.add_subsystem(discretize(Integrator(), 0.01, substeps=2), "a")
+    loop.add_subsystem(discretize(Integrator(), 0.01, substeps=3), "b")
+    with pytest.raises(ValueError, match="'plant'"):
+        loop.compile().plan.dense_points
+
+
+def test_a_static_box_joins_a_sampled_loop():
+    gains = P(2.0) >> P(3.0)
+    loop = SampledDiagramSystem()
+    loop.add_subsystem(LowPass() % 0.01, "filter")
+    loop.add_subsystem(gains, "gains")
+    loop.connect("filter", "y", "gains", list(gains.inputs)[0])
+    loop.connect_new_output_port("gains", list(gains.outputs)[0], "y")
+
+    ev = loop.compile()
+    x = np.array([0.5])
+    np.testing.assert_allclose(ev.outputs(x, np.zeros(0), 0)["y"], [3.0])
+
+
+def test_a_loop_keeps_its_own_x0_held_outputs_included_on_refresh():
+    loop = multi_rate_computer_on_an_integrator()
+    loop.x0 = np.array([0.5, 1.0, 0.0])
+    loop.refresh()
+    np.testing.assert_array_equal(loop.x0, [0.5, 1.0, 0.0])
+
+
+def test_a_sampled_plant_reads_its_source_x0_again_on_refresh():
+    plant = Pendulum()
+    loop = (PID() % 0.01) @ plant
+    plant.x0 = np.array([0.3, 0.0])
+    loop.refresh()
+    a, b = loop.state_index["plant"]
+    np.testing.assert_array_equal(loop.x0[a:b], plant.x0)
+
+    # An x0 set on the view itself stays
+    view = discretize(Pendulum(), 0.01)
+    view.x0 = np.array([1.0, 0.0])
+    view.refresh()
+    np.testing.assert_array_equal(view.x0, [1.0, 0.0])
+
+
+def test_a_block_on_a_clock_reads_seconds_in_its_outputs():
+    s = Sine() % 0.1
+    ev = s.compile()
+    x, u = np.zeros(0), np.zeros(0)
+    np.testing.assert_array_equal(ev.outputs(x, u, 3)["y"], s.h(x, u, 3))
+    np.testing.assert_allclose(ev.outputs(x, u, 3)["y"], np.sin(0.3))
