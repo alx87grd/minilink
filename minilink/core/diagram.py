@@ -210,8 +210,8 @@ def require_flow_subsystem(sys, sys_id):
     if isinstance(sys, StepSystem):
         raise TypeError(
             f"{type(sys).__name__} {sys_id!r} is a StepSystem and cannot join "
-            "a flow DiagramSystem: a StepSystem belongs in a StepDiagramSystem "
-            "or a Computer: block % dt @ plant"
+            "a flow DiagramSystem: a StepSystem belongs in a StepDiagramSystem, "
+            "or on a clock in a sampled loop: block % dt @ plant"
         )
 
 

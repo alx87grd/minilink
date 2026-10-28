@@ -427,7 +427,8 @@ class StepSimulation:
         raise TypeError(
             f"{type(self).__name__} is a StepSystem — use compute_rollout(...), "
             "not compute_forced. Continuous-time simulation belongs on "
-            "DynamicSystem; hybrid closed loops use HybridSimulator."
+            "DynamicSystem; a sampled loop (block % dt @ plant) runs with "
+            "compute_rollout or compute_trajectory."
         )
 
     def compute_rollout(

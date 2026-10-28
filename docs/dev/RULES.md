@@ -69,8 +69,7 @@ concrete formatting, ordered by the cost of being wrong:
   `params` yet. Override rule and gap: DESIGN §4, 'Parameters'.
 - **2.4 No run state on a System.** A `System` does not store simulation trajectories, solver state,
   or run history. Exception: `self.traj` is the one daily-use shortcut; a new exception needs a
-  reason of that weight. `StepSystem.rollout` and `HybridDiagram.last_result` go with the
-  sampled loop (TODO §1.5).
+  reason of that weight. `StepSystem.rollout` goes with the sampled loop (TODO §1.5).
 - **2.5 Prefer arrays and existing core objects.** New APIs take and return arrays or types
   students already know (`System`, `Trajectory`, `PlanningProblem`, sets, costs). Do not add
   request/response dataclasses, option bags, or adapter layers that only wrap those. A new
@@ -122,8 +121,8 @@ concrete formatting, ordered by the cost of being wrong:
   a second copy. Do not add new markdown guides unless the maintainer asks.
 - **3.7 Intro surfaces stay canonical.** README.md, the three showcase notebooks, and
   `examples/tutorial/` present the main core tools: `System`, diagrams, simulate,
-  compile, analysis, planning trajopt, the hybrid step path (`StepSystem`,
-  `StepDiagramSystem`, `Computer`, `HybridDiagram`), and MPC as the hybrid exemplar.
+  compile, analysis, planning trajopt, the sampled step path (`StepSystem`,
+  `StepDiagramSystem`, `SampledSystem`, `SampledDiagramSystem`), and MPC as its exemplar.
   Do not update them to track every new demo, compare script, or research-lane
   experiment. New demos land under `examples/`, whose map is `examples/README.md`. Add a
   row to README's verb table only when a core tool gains its canonical call.

@@ -82,8 +82,7 @@ def collect_discontinuous_solver_notes(
         "Prefer explicit Euler with a small dt; logged port torques match "
         "one evaluation per step. RK4 sub-steps and SciPy adaptive stepping "
         "can produce misleading or unstable results. For digital sample-and-hold "
-        "semantics, consider HybridSimulator with a sampled computer model and "
-        "an explicit sample time (hybrid_closed_loop)."
+        "semantics, put the law on its clock: (ctl % dt) @ plant."
     ]
 
     # The risk of the solver the user forced
@@ -115,8 +114,8 @@ def collect_discontinuous_solver_notes(
         if dt > recommended_dt:
             notes.append(
                 f"Euler with dt={dt:g} may be too coarse for discontinuous feedback; "
-                f"consider dt <= {recommended_dt:g}, HybridSimulator with an explicit "
-                "computer sample time, or a hybrid_closed_loop path."
+                f"consider dt <= {recommended_dt:g}, or the law on its clock: "
+                "(ctl % dt) @ plant."
             )
     elif user_solver is None and solver_mode == "euler" and verbose and dt is not None:
         notes.append(

@@ -187,7 +187,8 @@ Why: [core-architecture.md](core-architecture.md) §2.
   [the run's log](../reviews/2026-10-29-v03-run-log.md) §7): `Computer.tick`'s one-tick lag and
   `StepRollout`, the legacy hybrid computer's record, leave with `Computer` when the MPC is
   rebuilt on the sampled loop (§1.8, join 2; the run's log RD-8). Done when no `Computer` or
-  `StepRollout` remains.
+  `StepRollout` remains. Landed at join 2: `Computer`, `StepRollout` and the hybrid runtime
+  removed.
 - [ ] **The batch price of a parameter family** (S53): profile `rollout_batch` with a `params`
   family, which takes 278 ms against 27 ms for the plain batch (pendulum, 1000 × 1000 RK4
   steps). Done when the family path is within 2× of the plain batch. Also: gate the quoted
@@ -280,7 +281,10 @@ Ruled: R13, R14, R104, R105, R123, R125, R145, R146, R147 (choices of 2026-10-27
   - the dual-rate MPC projects rewritten as composition, with the MPC (join 2);
   - tutorial 06 on the sampled loop, with the notebook sweep (§1.10, R167).
 
-  Done when every hybrid notebook and project runs as a `SampledDiagramSystem`.
+  Done when every hybrid notebook and project runs as a `SampledDiagramSystem`. Landed at join
+  2: the legacy runtime removed (`Computer`, `StepSchedule`, `HybridDiagram`,
+  `hybrid_closed_loop`, `HybridSimulator`, the hybrid diagram drawings), the dual-rate MPC
+  projects written as composition; rest: tutorial 06 and the other hybrid notebooks at step 7.
 
 The conventions' first sampled-loop step (AC-8a: standard port names only, the MPC gives `u`,
 no port guessing) is folded into this section's rows (R163): it is what the rebuilt loop does by
