@@ -63,7 +63,7 @@ sentence: the plain title comes first.
 | [automation-by-convention.md](automation-by-convention.md) | What is left of the conventions: role-aware plots and animation (AC-5, AC-6), the cost's draws (AC-7), the sampled loop in step and mainstream (AC-8a, AC-8b). History: [the decision record](../reviews/2026-10-11-automation-by-convention.md), [the second opinion](../reviews/2026-10-13-automation-by-convention-second-opinion.md) | core §3, §5; plotting lane |
 | [mppi.md](mppi.md) | Path integral control: `MPPIPlanner` beside trajopt, wrapped by the MPC block (MP-1–MP-6; D26–D28 and D30 in §10, D29 in future-policies.md §5.1) | v0.4 (S72); MP-4, MP-5 before v0.9 |
 | [estimation-and-state-feedback.md](estimation-and-state-feedback.md) | State feedback and estimation as duals: `LQGPlanner` (§5), the estimation follow-ups and their slots (§3, §6). History: [the rulings](../reviews/2026-10-14-state-space-design-rulings.md) | v0.4; v0.9 |
-| [geometry-module.md](geometry-module.md) | Workspace geometry in `core/geometry/` (shapes, paths, track, scene, `bind`, spatial fields, course catalog); `planning.spatial` retires | v0.4 (A3) |
+| [geometry-module.md](geometry-module.md) | Workspace geometry in `core/geometry/` (shapes, paths, track, scene, `mount`, spatial fields, course catalog); `planning.spatial` retires | v0.4 (A3) |
 | [pyro-port-remaining.md](pyro-port-remaining.md) | Pyro parity: open rows and the name map; the migration guide | v0.4 (C1) |
 | [repository-structure.md](repository-structure.md) | The examples tree and where the teaching material lives; options, a recommendation, the asks | v0.9 (K5, K6) |
 | [rl-reward-scaling.md](rl-reward-scaling.md) | Automatic reward scaling for the RL planner (RS-1–RS-4) | unscheduled (TODO §6) |

@@ -14,9 +14,9 @@ from minilink.planning import (
     ReferenceTrack,
     Scene,
     Sphere,
-    bind,
     circuit_waypoints,
     from_waypoints,
+    mount,
     point_probe,
     quadratic_hinge,
 )
@@ -49,7 +49,7 @@ x0 = np.array(
 car.x0 = x0
 
 # --- cost: cruise, stay in the lane, miss the cone ---
-probe = bind(car, point_probe())
+probe = mount(point_probe(), on=car)
 quad = QuadraticCost.from_system(
     car, Q=np.zeros((3, 3)), R=np.diag([2.0, 1.0]), ubar=np.array([V_REF, 0.0])
 )

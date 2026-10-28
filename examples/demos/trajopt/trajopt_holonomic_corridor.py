@@ -15,7 +15,7 @@ from minilink.core import SingletonSet
 from minilink.core.geometry import Sphere
 from minilink.graphical.animation.primitives import CustomLine, TrajectoryPolyline
 from minilink.graphical.catalog import SceneHistory
-from minilink.planning.spatial.collision import bind, disc
+from minilink.planning.spatial.collision import disc, mount
 from minilink.planning.spatial.paths import from_waypoints
 from minilink.planning.spatial.scene import Scene
 from minilink.planning.spatial.shaping import quadratic_excess
@@ -89,7 +89,7 @@ sys.inputs["u"].upper_bound = np.array([1.5, 1.5])
 
 scene = Scene(obstacles=OBSTACLES)
 track = ReferenceTrack(from_waypoints(WAYPOINTS), half_width=CORRIDOR_HALF_WIDTH)
-body = bind(sys, disc(ROBOT_RADIUS))
+body = mount(disc(ROBOT_RADIUS), on=sys)
 
 X = (
     BoxSet.from_system_state(sys)

@@ -13,10 +13,10 @@ from minilink.planning import (
     ReferenceTrack,
     Scene,
     Sphere,
-    bind,
     car_outline,
     circuit_waypoints,
     from_waypoints,
+    mount,
     point_probe,
     quadratic_excess,
     quadratic_hinge,
@@ -75,9 +75,10 @@ design.state.upper_bound[8] = design.params["P_max"]
 # What the car is asked for: hold the target speed, keep its centre on the line, keep
 # its whole footprint inside the lane and clear of the cones. The quadratic part says
 # nothing about where the car is on the map — the three spatial fields do all of that.
-centre = bind(design, point_probe())
-body = bind(
-    design, car_outline(length=BODY_LENGTH, width=BODY_WIDTH, margin=BODY_MARGIN)
+centre = mount(point_probe(), on=design)
+body = mount(
+    car_outline(length=BODY_LENGTH, width=BODY_WIDTH, margin=BODY_MARGIN),
+    on=design,
 )
 x_cruise = np.zeros(design.n)
 x_cruise[3] = V_TARGET

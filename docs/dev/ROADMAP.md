@@ -31,7 +31,7 @@ a **contract**, not a documentation convention.
 | **Research lane** | Everything else: the provisional bands (hybrid, MPC, realtime), the experimental tier (`minilink/experimental/`: symbolic mechanics, the contact-engine leaf, C export, the unsupported plants once the catalog clean-up moves them; the top-level `experimental/` folder of prototype scripts), `examples/projects/`. | No stability promise, no entry requirements, out of the release contract. The provisional bands ship in the wheel. The experimental tier is **out of the wheel**, **untested by default** (nightly smoke at most; `c_export`'s flagship smoke and the quick C-export demo of `showcase_jax.ipynb` the two gate exceptions, ruled 2026-10-23), off the docs site, never cited by a course, and the staging area for what may leave into its own project at v1.0 (ruled 2026-10-22). Deep imports always remain valid. |
 
 **Provisional teaching names:** the spatial names the planning facade exports (`Scene`,
-`bind`, `ReferenceTrack`, `car_outline`, `plot_track`, …) sit in the teaching lane under
+`mount`, `ReferenceTrack`, `car_outline`, `plot_track`, …) sit in the teaching lane under
 `planning.spatial`, checked like every band-facade name (a docstring, a teaching-lane home)
 but outside the registry, and stay provisional until A3 moves them to `core/geometry/`.
 

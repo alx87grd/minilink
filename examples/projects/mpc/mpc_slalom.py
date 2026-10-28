@@ -15,7 +15,7 @@ from minilink.core.backends import configure_jax
 from minilink.core.costs import QuadraticCost
 from minilink.core.geometry import Sphere
 from minilink.planning.problems import PlanningProblem
-from minilink.planning.spatial.collision import bind, point_probe
+from minilink.planning.spatial.collision import mount, point_probe
 from minilink.planning.spatial.scene import Scene
 from minilink.planning.spatial.shaping import inverse_barrier
 from minilink.planning.trajectory_optimization.mpc import (
@@ -63,7 +63,7 @@ sys_mpc.inputs["u"].upper_bound = np.array([80.0, 2.0])
 r_r = sys_mpc.params["r_r"]
 x_ref = np.array([0.0, 0.0, 0.0, U_TARGET, 0.0, 0.0, U_TARGET / r_r, 0.0])
 x0 = np.array([0.0, 3.0, 0.0, VX0, 0.0, 0.0, VX0 / r_r, 0.0])
-body = bind(sys_mpc, point_probe())
+body = mount(point_probe(), on=sys_mpc)
 cost = QuadraticCost.from_system(
     sys_mpc,
     Q=np.diag([0.0, 12.0, 18.0, 0.5, 4.0, 6.0, 0.1, 100.0]),

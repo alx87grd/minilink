@@ -11,7 +11,7 @@ Workspace math is split today: SDF solids in [`core/geometry.py`](../../minilink
 
 ```python
 track, scene = racecar_circuit()
-body = bind(car, point_probe())
+body = mount(point_probe(), on=car)
 cost = track.distance_field(body).as_cost() + scene.clearance_field(body).as_cost(shaping=quadratic_hinge())
 loop = PurePursuit(track) @ car
 J_t = cost.integrate(loop.compute_trajectory(tf=10))   # the running integral J(t_k), no problem needed (total_cost leaves the cost, R20)
@@ -31,7 +31,7 @@ Graphics stay a second vocabulary on purpose (the 2026-09-05 architecture review
 | `Scene` | [`planning/spatial/scene.py`](../../minilink/planning/spatial/scene.py) | `core/geometry/scene.py` |
 | `WorkspaceField`, `GaussianField` | [`planning/spatial/workspace_fields.py`](../../minilink/planning/spatial/workspace_fields.py) | `core/geometry/` beside Scene |
 | `disc`, `point_probe`, `car_outline` | [`planning/spatial/collision.py`](../../minilink/planning/spatial/collision.py) | `core/geometry/probes.py` |
-| `CollisionBody`, `bind` | same file | `core/geometry/collision.py` |
+| `CollisionBody`, `mount` | same file | `core/geometry/collision.py` |
 | `StateField` → `Field`, `FieldSet`, `FieldCost` | [`planning/spatial/state_fields.py`](../../minilink/planning/spatial/state_fields.py) | [`core/fields.py`](fields.md) |
 | `ClearanceField`, `CostDensityField`, `PathDistanceField`, `CorridorMarginField` | same file | `core/geometry/fields.py` (subclass `Field`) |
 | `quadratic_hinge`, `quadratic_excess`, `inverse_barrier`, `occupancy` | [`planning/spatial/shaping.py`](../../minilink/planning/spatial/shaping.py) | `core/fields.py` next to `Field.as_cost` |
@@ -41,7 +41,7 @@ Graphics stay a second vocabulary on purpose (the 2026-09-05 architecture review
 | named courses | copy-pasted in demos | `core/geometry/catalog.py` |
 | `planning.spatial` | owner | re-export, then **delete** |
 
-Student import after the move: `from minilink.core.geometry import Scene, bind, racecar_circuit`. Band facades may keep `minilink.planning` names for one migration commit ([RULES.md](../dev/RULES.md) 3.4), then drop them.
+Student import after the move: `from minilink.core.geometry import Scene, mount, racecar_circuit`. Band facades may keep `minilink.planning` names for one migration commit ([RULES.md](../dev/RULES.md) 3.4), then drop them.
 
 **Stay put**
 
@@ -108,7 +108,7 @@ minilink/graphical/          # drawing only
 ## Implementation (later)
 
 1. `geometry.py` → `core/geometry/shapes.py`.
-2. Move Path, Track, Scene, probes, `bind`, spatial Fields, grid; shaping next to `Field.as_cost`; plots/overlays under `graphical/` with lazy methods on Scene/Track.
+2. Move Path, Track, Scene, probes, `mount`, spatial Fields, grid; shaping next to `Field.as_cost`; plots/overlays under `graphical/` with lazy methods on Scene/Track.
 3. `planning.spatial` re-exports, then delete in the same change as call-site updates ([RULES.md](../dev/RULES.md) 3.4).
 4. Catalog factories; switch the two UdeS racecar demos and the RRT forest demo.
 5. PurePursuit accepts a `Path` / `Track`.

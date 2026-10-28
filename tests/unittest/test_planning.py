@@ -1475,7 +1475,7 @@ from minilink.dynamics.catalog.vehicles.steering import (
 )
 from minilink.planning.spatial.collision import (
     CollisionBody,
-    bind,
+    mount,
     car_outline,
     disc,
     point_probe,
@@ -1515,15 +1515,15 @@ class _TwoSphereBody(CollisionBody):
 
 
 def _holonomic_disc(radius=0.3):
-    return bind(HolonomicMobileRobot(), disc(radius))
+    return mount(disc(radius), on=HolonomicMobileRobot())
 
 
 def _holonomic_point():
-    return bind(HolonomicMobileRobot(), point_probe())
+    return mount(point_probe(), on=HolonomicMobileRobot())
 
 
 def _kinematic_car_body(length=1.6, width=0.5):
-    return bind(KinematicCar(), car_outline(length, width))
+    return mount(car_outline(length, width), on=KinematicCar())
 
 
 def test_bind_disc_body_pose():
@@ -1547,7 +1547,7 @@ class _Point3D(DynamicSystem):
 
 
 def test_bind_disc_in_3d():
-    body = bind(_Point3D(), Sphere(np.zeros(3), 0.5))
+    body = mount(Sphere(np.zeros(3), 0.5), on=_Point3D())
     (T,) = body.body_poses(np.array([1.0, 2.0, 3.0]))
     assert T.shape == (4, 4)
     assert apply(T, np.zeros(3)) == pytest.approx([1.0, 2.0, 3.0])
@@ -1582,7 +1582,7 @@ def test_bound_car_clearance_depends_on_heading():
 
 def test_bound_frame_mismatch_raises():
     sys = HolonomicMobileRobot()
-    body = bind(sys, disc(0.1), frame="missing")
+    body = mount(disc(0.1), on=sys, frame="missing")
     with pytest.raises(KeyError):
         body.body_poses(np.array([0.0, 0.0]))
 
@@ -1599,7 +1599,7 @@ class _TwoFramePlant:
 
 def test_bind_multi_frame():
     scene = Scene(obstacles=(Sphere([0.0, 0.0], 0.5),))
-    body = bind(_TwoFramePlant(), [("f1", disc(0.1)), ("f2", disc(0.2))])
+    body = mount([("f1", disc(0.1)), ("f2", disc(0.2))], on=_TwoFramePlant())
     value = scene.clearance_field(body).value(np.array([0.0, 0.0]))
     assert value == pytest.approx(min(-0.5 - 0.1, 1.0 - 0.5 - 0.2))
 
@@ -1610,7 +1610,7 @@ def test_bound_jax_twin_margin_matches_and_differentiates():
 
     scene = Scene(obstacles=(Sphere([2.0, 2.0], 0.5),))
     sys = HolonomicMobileRobot()
-    free = scene.clearance_field(bind(sys, disc(0.3))).as_constraint()
+    free = scene.clearance_field(mount(disc(0.3), on=sys)).as_constraint()
     x = np.array([0.0, 0.0])
     assert float(free.margin(jnp.array(x))[0]) == pytest.approx(
         float(free.margin(x)[0])
@@ -1621,7 +1621,7 @@ def test_bound_jax_twin_margin_matches_and_differentiates():
 
 def test_clearance_pipeline_in_3d():
     scene = Scene(obstacles=(Sphere([0.0, 0.0, 0.0], 1.0),))
-    body = bind(_Point3D(), Sphere(np.zeros(3), 0.5))
+    body = mount(Sphere(np.zeros(3), 0.5), on=_Point3D())
     field = scene.clearance_field(body)
     assert field.value(np.array([3.0, 0.0, 0.0])) == pytest.approx(3.0 - 1.0 - 0.5)
     free = field.as_constraint()
@@ -1926,7 +1926,7 @@ def test_plot_cost_field_exports_smoke(tmp_path):
 
 import os
 from minilink.dynamics.catalog.vehicles.steering import HolonomicMobileRobot
-from minilink.planning.spatial.collision import bind, disc, point_probe
+from minilink.planning.spatial.collision import mount, disc, point_probe
 from minilink.planning.spatial.paths import PolylinePath, from_waypoints
 from minilink.planning.spatial.shaping import quadratic_excess
 from minilink.planning.spatial.track import ReferenceTrack
@@ -1935,11 +1935,11 @@ _HOLONOMIC = HolonomicMobileRobot()
 
 
 def _disc(radius=0.3):
-    return bind(_HOLONOMIC, disc(radius))
+    return mount(disc(radius), on=_HOLONOMIC)
 
 
 def _point():
-    return bind(_HOLONOMIC, point_probe())
+    return mount(point_probe(), on=_HOLONOMIC)
 
 
 def test_polyline_distance_to_segment():

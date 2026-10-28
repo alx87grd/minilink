@@ -24,10 +24,10 @@ from minilink.planning import (
     Scene,
     Sphere,
     TrackCorridorOverlay,
-    bind,
     circuit_waypoints,
     evaluate_trajectory,
     from_waypoints,
+    mount,
     point_probe,
     quadratic_hinge,
 )
@@ -67,7 +67,7 @@ x0 = np.array(
 )
 car.x0 = x0
 
-probe = bind(car, point_probe())
+probe = mount(point_probe(), on=car)
 quad = QuadraticCost.from_system(
     car, Q=np.zeros((3, 3)), R=np.diag([2.0, 1.0]), ubar=np.array([V_REF, 0.0])
 )

@@ -24,7 +24,7 @@ from minilink.graphical.animation.primitives import (
 )
 from minilink.graphical.catalog import SceneHistory
 from minilink.planning.problems import PlanningProblem
-from minilink.planning.spatial.collision import bind, car_outline, point_probe
+from minilink.planning.spatial.collision import car_outline, mount, point_probe
 from minilink.planning.spatial.grid import sample_field_costs
 from minilink.planning.spatial.overlays import TrackCorridorOverlay
 from minilink.planning.spatial.paths import from_waypoints
@@ -82,7 +82,7 @@ sys_mpc.inputs["u"].upper_bound = np.array([80.0, 2.0])
 
 r_r = sys_mpc.params["r_r"]
 x_cruise = np.array([0.0, 0.0, 0.0, U_TARGET, 0.0, 0.0, U_TARGET / r_r, 0.0])
-body = bind(sys_mpc, car_outline(length=2.4, width=0.2, margin=0.05))
+body = mount(car_outline(length=2.4, width=0.2, margin=0.05), on=sys_mpc)
 path_cost = track.distance_field(body).as_cost(
     weight=PATH_COST_WEIGHT, shaping=quadratic_excess(threshold=0.1)
 )
@@ -141,7 +141,7 @@ if SHOW_COST_FIELD:
         (waypoints[:, 0].min() - 4.0, waypoints[:, 0].max() + 4.0),
         (waypoints[:, 1].min() - 4.0, waypoints[:, 1].max() + 4.0),
     )
-    probe = bind(sys_mpc, point_probe())
+    probe = mount(point_probe(), on=sys_mpc)
     path_viz = track.distance_field(probe).as_cost(
         weight=PATH_COST_WEIGHT, shaping=quadratic_excess(threshold=0.1)
     )

@@ -37,7 +37,7 @@ from minilink.core.costs import QuadraticCost
 from minilink.core.geometry import Sphere
 from minilink.core.trajectory import Trajectory
 from minilink.planning.problems import PlanningProblem
-from minilink.planning.spatial.collision import bind, car_outline, disc, point_probe
+from minilink.planning.spatial.collision import car_outline, disc, mount, point_probe
 from minilink.planning.spatial.overlays import TrackCorridorOverlay
 from minilink.planning.spatial.paths import from_waypoints
 from minilink.planning.spatial.scene import Scene
@@ -639,7 +639,7 @@ def _speed_profile(case: ModelCase, traj: Trajectory) -> np.ndarray:
 def _solve_obstacle_case(case: ModelCase, scene: Scene) -> SolveRun:
     sys, x_start, x_ref, ubar, Q, R, S = OBS_BUILDERS[case.key]()
     tracking_cost = QuadraticCost.from_system(sys, Q=Q, R=R, S=S, xbar=x_ref, ubar=ubar)
-    obstacle_cost = scene.clearance_field(bind(sys, point_probe())).as_cost(
+    obstacle_cost = scene.clearance_field(mount(point_probe(), on=sys)).as_cost(
         weight=OBSTACLE_REPULSION_WEIGHT,
         shaping=inverse_barrier(epsilon=OBSTACLE_REPULSION_EPS),
     )
@@ -676,7 +676,7 @@ def _solve_obstacle_case(case: ModelCase, scene: Scene) -> SolveRun:
 
 def _solve_corner_case(case: ModelCase, track: ReferenceTrack) -> SolveRun:
     sys, x_start, x_ref, ubar, Q, R, S, backend, geom = CORNER_BUILDERS[case.key](track)
-    body = bind(sys, geom)
+    body = mount(geom, on=sys)
     tracking_cost = QuadraticCost.from_system(sys, Q=Q, R=R, S=S, xbar=x_ref, ubar=ubar)
     path_cost = track.distance_field(body).as_cost(
         weight=CORNER_PATH_WEIGHT, shaping=quadratic_excess(threshold=0.1)

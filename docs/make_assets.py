@@ -274,10 +274,10 @@ def racecar_mpc() -> None:
         ReferenceTrack,
         Scene,
         Sphere,
-        bind,
         car_outline,
         circuit_waypoints,
         from_waypoints,
+        mount,
         point_probe,
         quadratic_excess,
         quadratic_hinge,
@@ -317,9 +317,10 @@ def racecar_mpc() -> None:
     design.state.lower_bound[8] = -design.params["P_max"]
     design.state.upper_bound[8] = design.params["P_max"]
 
-    centre = bind(design, point_probe())
-    body = bind(
-        design, car_outline(length=BODY_LENGTH, width=BODY_WIDTH, margin=BODY_MARGIN)
+    centre = mount(point_probe(), on=design)
+    body = mount(
+        car_outline(length=BODY_LENGTH, width=BODY_WIDTH, margin=BODY_MARGIN),
+        on=design,
     )
     x_cruise = np.zeros(design.n)
     x_cruise[3] = V_TARGET

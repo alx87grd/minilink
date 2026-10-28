@@ -68,7 +68,7 @@ in [ROADMAP.md](ROADMAP.md) §5 and the workboard
 
 | Package | Role |
 | --- | --- |
-| `core/` | `System` (+ its shortcuts, `facades/` by what they do: `simulation.py`, `analysis.py`, `plotting.py`, `animation.py`), the package import tables (`exports.py`), `DynamicSystem`, `DiagramSystem` (subclasses `DynamicSystem`), shared diagram wiring (`wiring.py`: `WiredDiagramMixin`, gather, params nesting), the port-dependency graph (`topology.py`: evaluation order, algebraic loops), the composition grammar (`operators.py`: `+`, `>>`, `autowire`; `closed_loop.py`: `@`, `closed_loop`, `feedback`; `assembly.py`: the operands laid out flat, their ids, default ports and camera, which both build on; `roles.py`: the block roles the port names declare), signals/ports (`signals.py`), backend policy & helpers (`backends.py`), `Trajectory`, sets, distributions (`distributions.py`), costs, geometry (`geometry.py`; **planned package** `core/geometry/` — Path, Track, Scene, bind, spatial Fields, course catalog: [docs/plans/geometry-module.md](../plans/geometry-module.md)) |
+| `core/` | `System` (+ its shortcuts, `facades/` by what they do: `simulation.py`, `analysis.py`, `plotting.py`, `animation.py`), the package import tables (`exports.py`), `DynamicSystem`, `DiagramSystem` (subclasses `DynamicSystem`), shared diagram wiring (`wiring.py`: `WiredDiagramMixin`, gather, params nesting), the port-dependency graph (`topology.py`: evaluation order, algebraic loops), the composition grammar (`operators.py`: `+`, `>>`, `autowire`; `closed_loop.py`: `@`, `closed_loop`, `feedback`; `assembly.py`: the operands laid out flat, their ids, default ports and camera, which both build on; `roles.py`: the block roles the port names declare), signals/ports (`signals.py`), backend policy & helpers (`backends.py`), `Trajectory`, sets, distributions (`distributions.py`), costs, geometry (`geometry.py`; **planned package** `core/geometry/` — Path, Track, Scene, mount, spatial Fields, course catalog: [docs/plans/geometry-module.md](../plans/geometry-module.md)) |
 | `core/discrete/` | the discrete-time sibling, `x_{k+1} = F(x_k, u_k, k)` on an integer index: `StepSystem` (`step_system.py`), `StepDiagramSystem` (`step_diagram.py`), the hybrid loop (`hybrid_diagram.py`: `HybridDiagram`; `hybrid_composition.py`: `hybrid_closed_loop` and the port resolution behind `Computer @ plant`), `StepRollout` (`step_rollout.py`) |
 | `core/compile/` | the compiler, the two execution plans, one evaluator per system kind |
 
@@ -1084,7 +1084,7 @@ to the policy weights. Official demos: `examples/demos/rl/` (pendulum swing-up, 
 drone, rocket); the tutorial chapter is
 `examples/tutorial/11_reinforcement_learning.ipynb`; native teaching
 notebooks are `pendulum_value_iteration_vs_lqr_vs_rl` and `drone_ppo`. The
-spatial scene names (`ReferenceTrack`, `from_waypoints`, `Scene`, `bind`,
+spatial scene names (`ReferenceTrack`, `from_waypoints`, `Scene`, `mount`,
 `car_outline`, `point_probe`, the shaping helpers, `TrackCorridorOverlay`,
 `plot_track`) are exported on the `minilink.planning` facade so track demos
 import through the teaching surface.
@@ -1177,7 +1177,7 @@ placement with scene queries (`clearance_field`, `cost_field`). Export separatel
 `as_constraint(upper=...)`). `StateField.value(x)` is a **scalar** (min clearance, max
 density over body probes). **Collision reuse:** frameless geometry (`disc`,
 `car_outline`, `point_probe`) binds to the **planner** plant with
-`bind(sys, geometry, frame="body")`; world probes use ``sys.tf(x,u,t)[frame]``
+`mount(geometry, on=sys, frame="body")`; world probes use ``sys.tf(x,u,t)[frame]``
 via :func:`~minilink.core.kinematics.apply` — the same FK as rendering. Frameless
 geometry: :func:`~minilink.planning.spatial.collision.disc`,
 :func:`~minilink.planning.spatial.collision.point_probe`,
@@ -1197,7 +1197,7 @@ clearance (subtract body radius). Compose with obstacles:
 **Workspace cost raster** (`grid.sample_field_costs`, `plotting.plot_cost_field` /
 `plot_cost_field_3d` / `plot_cost_field_exports`): rasterize shaped ``FieldCost`` terms
 at workspace points ``p = (x, y)`` with a **point probe** body (heading-independent).
-Build viz costs with ``bind(sys, point_probe())``; MPC may still use ``car_outline``.
+Build viz costs with ``mount(point_probe(), on=sys)``; MPC may still use ``car_outline``.
 
 **Search / RRT** (`planning/search/`): `RRTPlanner(Planner)` owns the invariant loop and
 sources every concern from the problem — collision `problem.X.contains` (optional

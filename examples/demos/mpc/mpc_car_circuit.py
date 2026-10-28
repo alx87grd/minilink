@@ -10,7 +10,7 @@ from minilink import (
 )
 from minilink.control import ModelPredictiveController
 from minilink.core.geometry import Sphere
-from minilink.planning.spatial.collision import bind, car_outline, point_probe
+from minilink.planning.spatial.collision import car_outline, mount, point_probe
 from minilink.planning.spatial.grid import sample_field_costs
 from minilink.planning.spatial.paths import from_waypoints
 from minilink.planning.spatial.plotting import plot_cost_field_3d
@@ -122,8 +122,8 @@ sys_mpc.inputs["u"].upper_bound = np.array([80.0, 2.0])
 
 r_r = sys_mpc.params["r_r"]
 x_cruise = np.array([0.0, 0.0, 0.0, U_TARGET, 0.0, 0.0, U_TARGET / r_r, 0.0])
-body = bind(sys_mpc, car_outline(length=2.4, width=0.2, margin=0.05))
-probe = bind(sys_mpc, point_probe())
+body = mount(car_outline(length=2.4, width=0.2, margin=0.05), on=sys_mpc)
+probe = mount(point_probe(), on=sys_mpc)
 path_cost = track.distance_field(body).as_cost(
     weight=PATH_COST_WEIGHT, shaping=quadratic_excess(threshold=0.1)
 )

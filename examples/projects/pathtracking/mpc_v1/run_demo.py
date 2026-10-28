@@ -26,7 +26,7 @@ from minilink.core.costs import QuadraticCost
 from minilink.core.diagram import DiagramSystem
 from minilink.core.discrete.hybrid_composition import hybrid_closed_loop
 from minilink.planning.problems import PlanningProblem
-from minilink.planning.spatial.collision import bind, car_outline
+from minilink.planning.spatial.collision import car_outline, mount
 from minilink.planning.spatial.paths import from_waypoints
 from minilink.planning.spatial.shaping import quadratic_excess, quadratic_hinge
 from minilink.planning.spatial.track import ReferenceTrack
@@ -72,7 +72,7 @@ sys_mpc.inputs["u"].upper_bound = np.array([80.0, 2.0])
 
 r_r = sys_mpc.params["r_r"]
 x_cruise = np.array([0.0, 0.0, 0.0, U_TARGET, 0.0, 0.0, U_TARGET / r_r, 0.0])
-body = bind(sys_mpc, car_outline(length=2.4, width=0.2, margin=0.05))
+body = mount(car_outline(length=2.4, width=0.2, margin=0.05), on=sys_mpc)
 path_cost = track.distance_field(body).as_cost(
     weight=PATH_COST_WEIGHT, shaping=quadratic_excess(threshold=0.1)
 )

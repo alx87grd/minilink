@@ -21,7 +21,7 @@ from minilink.core.backends import configure_jax
 from minilink.core.costs import QuadraticCost
 from minilink.core.geometry import Sphere
 from minilink.planning.problems import PlanningProblem
-from minilink.planning.spatial.collision import bind, point_probe
+from minilink.planning.spatial.collision import mount, point_probe
 from minilink.planning.spatial.grid import sample_field_costs
 from minilink.planning.spatial.plotting import plot_cost_field
 from minilink.planning.spatial.scene import Scene
@@ -78,7 +78,7 @@ tracking_cost = QuadraticCost.from_system(
     ubar=ubar,
 )
 scene = Scene(obstacles=[Sphere(OBSTACLE_CENTER, keepout_radius)])
-obstacle_cost = scene.clearance_field(bind(sys, point_probe())).as_cost(
+obstacle_cost = scene.clearance_field(mount(point_probe(), on=sys)).as_cost(
     weight=OBSTACLE_REPULSION_WEIGHT,
     shaping=inverse_barrier(epsilon=OBSTACLE_REPULSION_EPS),
 )

@@ -972,7 +972,7 @@ pillar names it.
 
 - [ ] **Workspace geometry** (A3) **[ask — core]** (S57 was its earlier id).
   [geometry-module.md](geometry-module.md) implementation steps 1–6: `core/geometry/`
-  package (shapes, paths, track, scene, probes, `bind`, spatial fields, grid, catalog
+  package (shapes, paths, track, scene, probes, `mount`, spatial fields, grid, catalog
   `oval_circuit` / `racecar_circuit` / `holonomic_forest`); shaping next to `Field.as_cost`;
   plots and overlays under `graphical/` with lazy methods on `Scene` / `Track`;
   `planning.spatial` re-exports then deletes in the same change as the call sites;

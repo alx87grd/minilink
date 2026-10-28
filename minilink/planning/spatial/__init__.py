@@ -2,9 +2,9 @@
 
 from minilink.planning.spatial.collision import (
     CollisionBody,
-    bind,
     car_outline,
     disc,
+    mount,
     point_probe,
 )
 from minilink.planning.spatial.paths import (
@@ -38,7 +38,7 @@ __all__ = [
     "ReferenceTrack",
     "Scene",
     "StateField",
-    "bind",
+    "mount",
     "car_outline",
     "disc",
     "circuit_waypoints",

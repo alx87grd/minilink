@@ -13,7 +13,7 @@ from minilink import (
 from minilink.core.geometry import Sphere
 from minilink.planning.search.extenders import KinodynamicExtender, SteeringExtender
 from minilink.planning.search.steering import StraightLineSteering
-from minilink.planning.spatial.collision import bind, disc, point_probe
+from minilink.planning.spatial.collision import disc, mount, point_probe
 from minilink.planning.spatial.scene import Scene
 from minilink.planning.spatial.workspace_fields import GaussianField
 
@@ -65,7 +65,7 @@ def make_holonomic_problem(*, robot_radius=0.25):
     sys.inputs["u"].upper_bound = np.array([1.0, 1.0])
 
     scene = Scene(obstacles=HOLONOMIC_OBSTACLES)
-    body = bind(sys, disc(robot_radius))
+    body = mount(disc(robot_radius), on=sys)
     X = BoxSet.from_system_state(sys) & scene.clearance_field(body).as_constraint()
     problem = PlanningProblem(
         sys=sys, x_start=X_START, x_goal=X_GOAL, X=X, U=sys.input_box
@@ -98,8 +98,8 @@ def run_scene_intro():
         obstacles=(Sphere((4.0, 0.0), 0.5),),
         workspace_fields=(GaussianField((2.0, 1.5), 2.0, 1.0),),
     )
-    robot_disc = bind(sys, disc(0.25))
-    robot_point = bind(sys, point_probe())
+    robot_disc = mount(disc(0.25), on=sys)
+    robot_point = mount(point_probe(), on=sys)
     sample = np.array([3.5, 0.0])
     point_clearance = float(scene.clearance_field(robot_point).value(sample))
     disc_clearance = float(scene.clearance_field(robot_disc).value(sample))

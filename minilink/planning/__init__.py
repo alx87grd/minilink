@@ -86,7 +86,7 @@ _EXPORTS: dict[str, tuple[str, str]] = {
     "from_waypoints": ("minilink.planning.spatial.paths", "from_waypoints"),
     "Sphere": ("minilink.core.geometry", "Sphere"),
     "Scene": ("minilink.planning.spatial.scene", "Scene"),
-    "bind": ("minilink.planning.spatial.collision", "bind"),
+    "mount": ("minilink.planning.spatial.collision", "mount"),
     "car_outline": ("minilink.planning.spatial.collision", "car_outline"),
     "point_probe": ("minilink.planning.spatial.collision", "point_probe"),
     "quadratic_excess": ("minilink.planning.spatial.shaping", "quadratic_excess"),
