@@ -188,8 +188,8 @@ terminal = QuadraticField(P, x_bar).as_terminal_cost()   # §9: the LQR value en
     its source (its `params`, ports and state the source's), the period structural. It replaces
     and renames `Discretization`.
   - **`SampledSystem` is the sampled-data kind** (R158): one equation with two faces,
-    `update(x, u, t)` and `output(x, u, t)` in seconds (Åström–Wittenmark's
-    `x(kh + h) = F(x(kh), u(kh), kh)`), `step(x, u, k)` and `h(x, u, k)` the tick faces for the
+    `update(x, u, t)` in seconds (Åström–Wittenmark's `x(kh + h) = F(x(kh), u(kh), kh)`) with
+    its output ports' functions in seconds as on any system, `step(x, u, k)` and `h(x, u, k)` the tick faces for the
     step algebra; the views write the seconds face from their source, and a native sampled law
     (the MPC first) subclasses it with no source. A pure `StepSystem` never sees seconds.
   - **Time belongs to the loop** (R158): a block reads the time of the diagram it sits in through

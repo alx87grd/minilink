@@ -385,7 +385,7 @@ Ruled: R13, R14, R104, R105, R123, R125, R145, R146, R147 (preliminary choices o
   continuous, a static or a pure step source, its `params`, ports and state the source's; `sys % Δ`
   returns `discretize(sys, Δ, solver="euler")` for any system, so a law with continuous states (a
   PID) becomes its difference equation instead of being refused. Its equations are the seconds
-  faces `update(x, u, t)` and `output(x, u, t)`, the tick faces `step(x, u, k)` and `h(x, u, k)`
+  face `update(x, u, t)` with the output ports' functions in seconds, the tick faces `step(x, u, k)` and `h(x, u, k)`
   converting `t = k·sample_period` (R158); the views write the seconds face from their source (a
   tick source has none); a native sampled law subclasses it with no source (the MPC, §1.8); a
   sampled static block has `n = 0` (`require_step_state` relaxed). Done when `pid % 0.01` rolls
@@ -545,7 +545,7 @@ solvers and MPPI are v0.4 (§4).
 - [ ] **The MPC rebuilt on the planner's face** **[ask — core]** (NS-8; R148, R123):
   `ModelPredictiveController(planner, *, inputs={"x_start": "y", "t_start": "t"}, delay=True)`;
   the delayed form a block whose state is `z` alone, its origin inside (R155; its kind under the
-  R158: a native `SampledSystem`, `update` solving and `output` applying), `x0` from
+  R158: a native `SampledSystem`, `update` solving and the `u` port applying), `x0` from
   `pv.initial`, shifting and solving once per tick and keeping the old plan on a failed solve; the
   pure form a static block; inputs as bindings (`{"x_start": "y"}` by default), `t_start` bound
   to the time `update` receives, `lookahead=` for delay compensation; ports `u`, `z`, `x_ref`,

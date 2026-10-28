@@ -47,7 +47,7 @@ never carry a sample time.
 | static `System` (`n = 0`: a gain, a sum, a saturation, a reference, a schedule) | `h(x, u, t)` | the time of the diagram it sits in: seconds under a clock, the count `k` in a pure step diagram | the diagram; one catalog serves every kind of diagram |
 | `DynamicSystem` | `f(x, u, t)`, `h(x, u, t)` | seconds, always | the integrator, or its `SampledSystem` |
 | `StepSystem` (a tick law: chess, a grid world, a z-domain filter) | `step(x, u, k)`, `h(x, u, k)` | its own count of firings; no clock, no seconds, ever | the step or sampled diagram (`k`, or `k // d` under a divisor) |
-| `SampledSystem` (a system on a clock) | **the seconds face is the equation:** `update(x, u, t)`, `output(x, u, t)`, Åström–Wittenmark's `x(kh + h) = F(x(kh), u(kh), kh)`; **the tick face serves the step algebra:** `step(x, u, k) = update(x, u, k·sample_period)`, `h` likewise, the clock's origin 0 | seconds inside, the count outside | the base class, one line; a consumer with an origin (a sampled diagram's plan, a problem's `transition`, the host runner) calls the seconds face |
+| `SampledSystem` (a system on a clock) | **the seconds face is the equation:** `update(x, u, t)` for the state, Åström–Wittenmark's `x(kh + h) = F(x(kh), u(kh), kh)`, and every output port's own function in seconds (`h` for `y`, `compute_state` for `x`, `compute_<port>` for the others, as on any system); **the tick face serves the step algebra:** `step(x, u, k) = update(x, u, k·sample_period)`, `h(x, u, k)` likewise, the clock's origin 0 | seconds inside, the count outside | the base class, one line; a consumer with an origin (a sampled diagram's plan, a problem's `transition`, the host runner) calls the seconds face |
 
 ```text
 StepSystem                               pure tick: step(x, u, k, params); no clock, no dt
@@ -62,14 +62,15 @@ StepSystem                               pure tick: step(x, u, k, params); no cl
   clock", one equation with two faces. Its implementations, each writing the seconds face:
   - a continuous source (`discretize(sys, dt)`, `sys % dt`): `update` integrates `source.f` over
     the period, the input held, the stages at `t + c_i·Δ/substeps` (the step model of DESIGN §5,
-    today's `ev.step(x, u, t, dt=)`); `output` is `source.h` at `t`;
-  - a static source under `%`: no state, `output` samples `source.h(u, t)`; needed only to slow
+    today's `ev.step(x, u, t, dt=)`); its output ports are the source's own, functions included;
+  - a static source under `%`: no state, its ports the source's own, read at `t_k`; needed only to slow
     or hold the block (a divisor above one, §8.2), never to give it seconds; a sampled static
     block has `n = 0` (`require_step_state` relaxed for it);
   - a tick source under `%`: the tick face delegates `source.step(x, u, k)` and `h`; it has no
     seconds face (`update` refuses, naming the tick); it declares that it counts;
-  - **a native sampled law** subclasses it with no `source` and writes `update` and `output` in
-    seconds: the delayed MPC first ([planner-and-mpc.md](planner-and-mpc.md) §6), later a
+  - **a native sampled law** subclasses it with no `source`, writes `update` in seconds and
+    declares its output ports as any system does (`add_output_port(id, function=…)`, each
+    function in seconds): the delayed MPC first ([planner-and-mpc.md](planner-and-mpc.md) §6), later a
     discrete Kalman filter with a time-varying model, MPPI with its shifted warm start, a diffusion
     policy's action chunk. `%` on a native law sets its period. (Revises R146's "nobody subclasses
     it".)
@@ -240,7 +241,7 @@ wall clock never reaches a block.
 - **Between the samples** (the one-score question, [QUESTIONS.md](../dev/QUESTIONS.md)):
   time-varying sets and the margins between samples; one failure rule and the input hold.
 - **Names for the sweep:** the dense evaluator method (`rollout_path`, `rollout_dense`, …);
-  `update` / `output` (Simulink's pair; `advance` the alternative); `t0` and `t_start`, one word
+  `update` (`advance` the alternative; outputs are ports and need no verb); `t0` and `t_start`, one word
   for the run's origin on every runner.
 
 ### 8.8 The sampled loop's details, D13–D15

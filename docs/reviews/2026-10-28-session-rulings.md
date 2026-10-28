@@ -105,7 +105,9 @@ skeleton and corrected the same two points; the maintainer ruled the amended des
   (`StepSystem`) reads its own count and never seconds. No block declares a unit or a clock, and a
   block's `params` never carry a sample time. One static catalog serves every diagram.
 - **`SampledSystem` is the sampled-data kind,** `x(kh + h) = F(x(kh), u(kh), kh)`: `update(x, u, t)`
-  and `output(x, u, t)` in seconds are its equations; `step(x, u, k)` and `h(x, u, k)` are its tick
+  in seconds is its state equation and its output ports carry their own functions in seconds, as on
+  any system (amended the same day: the maintainer noted a block has many outputs, each a port, so
+  there is no `output` method; `h` is the standard `y` port's function); `step(x, u, k)` and `h(x, u, k)` are its tick
   faces for the step algebra, `t = k·sample_period`, the origin 0, never overridden. The views
   (`discretize`, `%` on a continuous, a static or a tick source) write the seconds face from their
   source; a tick source keeps only its tick face. **A native sampled law subclasses it with no
@@ -127,7 +129,7 @@ skeleton and corrected the same two points; the maintainer ruled the amended des
 - **Nesting:** a sampled box inside another is inlined into one flat plan; one clock, the gcd of
   every leaf's period. **The firing** is a `lax.cond` on `k mod d` or the hyperperiod unroll,
   never a `where`; the contract says only "fires on `k mod d = 0`, outputs held".
-- **The MPC** is a native `SampledSystem`: `output(z, y, t) = pv.policy(z, y, t)`,
+- **The MPC** is a native `SampledSystem`: its `u` port's function is `pv.policy(z, y, t)`,
   `update(z, y, t)` binds `t_start = t`, rebases and solves (R155). `inputs` defaults to
   `{"x_start": "y"}`; delay compensation is `lookahead=Δ` with a predictor bound to `x_start`.
   **The `t` port of R148 goes**, and with it the clock source block and automation-by-convention's
@@ -146,5 +148,5 @@ skeleton and corrected the same two points; the maintainer ruled the amended des
   every clocked block" had no pure home (A, B, C alike).
 - **Draws, stated once:** a seconds reader draws from `(seed, ⌊t/Δ⌋)` of its own period, a tick
   law from `(seed, k)`.
-- **Names for the sweep:** `update` / `output` (Simulink's pair; `advance` the alternative); `t0`
+- **Names for the sweep:** `update` (`advance` the alternative; outputs are ports); `t0`
   and `t_start` one word for the run's origin on every runner.

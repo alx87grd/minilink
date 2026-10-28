@@ -111,7 +111,7 @@ loop = (mpc % 0.05) @ plant                                   # % sets the nativ
 
 The MPC uses five members of `pv`: `n_z`, `initial`, `shift`, `solve` and `policy`. The delayed
 form is a **native `SampledSystem`** (R158, [sampled-path.md](sampled-path.md) §8.1): its equations
-are `update(z, y, t)` and `output(z, y, t)` in seconds, its tick faces serve the step algebra, and
+are `update(z, y, t)` in seconds and its output ports' functions (`u` first), its tick faces serve the step algebra, and
 `%` sets its period.
 
 ### 6.1 Inputs are bindings; time is the argument
@@ -137,7 +137,12 @@ its own origin, so the MPC keeps no time of its own and reads nothing inside `z`
 
 ```python
 class ModelPredictiveController(SampledSystem):          # no source: a native sampled law
-    def output(self, z, y, t, params=None):              # u_k = π(z, x̂_k, t_k), the stored plan
+    def __init__(self, planner, *, inputs=None, delay=True, lookahead=0.0):
+        ...
+        self.add_output_port("u", dim=m, function=self.compute_u, dependencies=("y",))
+        self.add_output_port("z", dim=pv.n_z, function=self.compute_state)
+
+    def compute_u(self, z, y, t, params=None):           # u_k = π(z, x̂_k, t_k), the stored plan
         return pv.policy(z, y, t)
 
     def update(self, z, y, t, params=None):              # one solve per tick, from the rebased plan
@@ -215,11 +220,11 @@ pair `MPCStatelessController` / `MPCStatefulController`, `export_to_computer`, `
 2. Every policy keeps its tables in `params` (core §1: `TrajectorySource` and `LookupPolicy` keep
    them as attributes today).
 3. `t_start` on problems, the discount counted from it; integer leaves.
-4. `SampledSystem` as the sampled-data kind, `update` / `output` its seconds faces, the loop's plan
+4. `SampledSystem` as the sampled-data kind, `update` and the port functions its seconds faces, the loop's plan
    handing them `t_k` (R158).
 5. One signal pass per tick in the step evaluators (for the pure form).
 
 ## 11. Names for the sweep
 
 `pv.policy` (or `action`, `control`); the letter `z` (a planner's `z` is its decision, extended);
-`PlanFollower`; `inputs=`; `delay=`; `lookahead=`; `update` / `output` (sampled-path.md §8.7).
+`PlanFollower`; `inputs=`; `delay=`; `lookahead=`; `update` (sampled-path.md §8.7).
