@@ -1181,9 +1181,9 @@ def require_integer_key(key):
 def seeds_of(system, realized):
     """The ``"seed"`` entries of the random blocks in a realization of ``system``, nested like it."""
     # Lazy import: the diagram tools load with the first loop
-    from minilink.core.diagram import DiagramSystem
+    from minilink.core.wiring import WiredDiagramMixin
 
-    if not isinstance(system, DiagramSystem):
+    if not isinstance(system, WiredDiagramMixin):
         return {"seed": realized["seed"]}
 
     return {
@@ -1204,11 +1204,11 @@ def stack_leaves(trees):
 def integer_seeds(system, params):
     """``params`` with the seed of every random block of ``system`` an integer (the tree holds floats)."""
     # Lazy import: the diagram tools load with the first loop
-    from minilink.core.diagram import DiagramSystem
+    from minilink.core.wiring import WiredDiagramMixin
 
     if not system.is_random:
         return params
-    if isinstance(system, DiagramSystem):
+    if isinstance(system, WiredDiagramMixin):
         return {
             sys_id: integer_seeds(system.subsystems[sys_id], value)
             for sys_id, value in params.items()

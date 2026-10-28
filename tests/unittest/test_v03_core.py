@@ -55,6 +55,109 @@ def digital_pid_problem():
     return problem, pid
 
 
+# Script 1, the objects lane
+
+LQG_DT, LQG_TF = 0.01, 5.0
+PROCESS_PSD = 0.04  # W, the torque's white-noise intensity
+SENSOR_STD = 1.0  # the rate sensor's per-sample standard deviation over LQG_DT
+
+
+def lqg_problem():
+    """An LQG compensator on the noisy pendulum: white noise on the torque, a sampled sensor on the rate."""
+    from minilink import Gaussian, NoisyPendulum
+    from minilink.blocks import NoiseSource
+    from minilink.control.design import lqg
+
+    plant = NoisyPendulum()
+    Q, r = np.diag([10.0, 1.0]), 0.1
+    V = SENSOR_STD**2 * LQG_DT  # the sensor's intensity: its variance over its period
+    box = lqg(
+        plant,
+        Q,
+        np.array([[r]]),
+        Q_n=np.diag([0.0, PROCESS_PSD]),
+        R_n=np.diag([1e-4, V]),
+    )
+    cost = QuadraticCost.from_system(plant, Q=Q, R=np.diag([r, 0.0, 0.0]))
+    problem = PlanningProblem(
+        plant,
+        cost=cost,
+        x_start=np.zeros(2),
+        tf=LQG_TF,
+        disturbances={
+            "d": WhiteNoise(1, psd=PROCESS_PSD, sample_period=LQG_DT, seed=1),
+            "n": NoiseSource(
+                Gaussian([0.0], [SENSOR_STD]), sample_period=LQG_DT, seed=2
+            ),
+        },
+    )
+    return problem, box, Q, r, V
+
+
+def predicted_cost(plant, box, Q, r, V):
+    """``E[J] = ∫₀ᵀ tr(M P(t)) dt``, ``Ṗ = A P + P Aᵀ + N``: the loop's covariance from a zero start."""
+    from minilink.analysis import linearize
+
+    lin = linearize(plant)
+    K = box.subsystems["gain"].params["K"]
+    L = box.subsystems["observer"].params["L"]
+    A, C = lin.A(), lin.C()
+    B_u, B_d, D_n = lin.B()[:, :1], lin.B()[:, 1:2], lin.D()[:, 2:3]
+
+    # X = [x; x̂]: ẋ = A x − B K x̂ + B_d d, the estimate driven by y = C x + D_n n
+    A_cl = np.block([[A, -B_u @ K], [L @ C, A - B_u @ K - L @ C]])
+    B_w = np.vstack([B_d, np.zeros((2, 1))])
+    B_v = np.vstack([np.zeros((2, 1)), L @ D_n])
+    N = PROCESS_PSD * B_w @ B_w.T + V * B_v @ B_v.T
+    M = np.zeros((4, 4))
+    M[:2, :2] = Q
+    M[2:, 2:] = r * K.T @ K
+
+    # The Lyapunov differential equation by RK4, E[J] by the trapezoid
+    h = 1e-3
+    P = np.zeros((4, 4))
+    expected = 0.0
+    for _ in range(round(LQG_TF / h)):
+
+        def rate(P):
+            return A_cl @ P + P @ A_cl.T + N
+
+        k1 = rate(P)
+        k2 = rate(P + 0.5 * h * k1)
+        k3 = rate(P + 0.5 * h * k2)
+        k4 = rate(P + h * k3)
+        P_next = P + h / 6.0 * (k1 + 2.0 * k2 + 2.0 * k3 + k4)
+        expected += 0.5 * h * (np.trace(M @ P) + np.trace(M @ P_next))
+        P = P_next
+
+    return expected
+
+
+@pytest.mark.optional
+@pytest.mark.jax
+def test_script_01_objects_an_lqg_loop_scores_its_covariance_prediction():
+    pytest.importorskip("jax")
+    problem, box, Q, r, V = lqg_problem()
+    expected = predicted_cost(problem.sys, box, Q, r, V)
+
+    # The Monte Carlo mean within the sampling error of the prediction (3 standard errors)
+    runs = problem.compile(box, dt=LQG_DT, backend="jax").evaluate(n_trials=400, key=1)
+    J = np.asarray(runs.J)
+    assert abs(J.mean() - expected) < 3.0 * J.std(ddof=1) / np.sqrt(J.size)
+
+    # One key, the same draws on NumPy and JAX
+    on_numpy = problem.compile(box, dt=LQG_DT, backend="numpy").evaluate(
+        n_trials=4, key=1
+    )
+    np.testing.assert_allclose(np.asarray(on_numpy.J), J[:4], rtol=1e-9)
+
+    # The computer sampled: its noise blocks realized per trial, the same prediction
+    sampled = problem.compile(box % LQG_DT, backend="jax").evaluate(n_trials=400, key=1)
+    J_s = np.asarray(sampled.J)
+    assert len(set(J_s[:10])) == 10
+    assert abs(J_s.mean() - expected) < 3.0 * J_s.std(ddof=1) / np.sqrt(J_s.size)
+
+
 # Script 2, the loop lane
 
 

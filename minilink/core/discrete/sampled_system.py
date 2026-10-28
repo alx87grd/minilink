@@ -138,6 +138,10 @@ class SampledSystem(StepSystem):
         """Whether the source draws random numbers from a seed in its ``params``."""
         return self.source.is_random
 
+    def realize(self, key):
+        """The params of one realization: the source's, under ``key``."""
+        return self.source.realize(key)
+
     def update(self, x, u, t, params=None):
         """
         The state one sample period later, ``x(t + h)``, from ``x(t)`` and the held ``u(t)``.

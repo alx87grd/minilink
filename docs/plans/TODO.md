@@ -225,8 +225,6 @@ when": [randomness.md](randomness.md) §9.
   NumPy and JAX (the KNOWN_ISSUES entry gone). Rest:
   - the cost scored on the plant across every design tool with the draws (AC-7's rest,
     [automation-by-convention.md](automation-by-convention.md) §5, §7);
-  - RN-5's LQG loop within the covariance prediction's sampling error: the acceptance script 1
-    and the `lqg_monte_carlo` demo;
   - RN-6, the contract in DESIGN, with each step.
 - [ ] **A problem stochastic by its parts** (R143): landed in the v0.3 run (no
   `StochasticPlanningProblem`; `x_start=` a law or a set, `params=` laws, `disturbances=` source
