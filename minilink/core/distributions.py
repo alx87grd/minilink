@@ -335,7 +335,7 @@ def sample_index(t, period):
     error before a boundary. Returned as a 0-d integer array; the 32-bit JAX mode cannot
     hold the index past a few boundaries and is announced once.
     """
-    xp = array_module(t)
+    xp = array_module(t, period)
 
     # The 32-bit JAX mode is announced, not refused
     if xp is not np and not jax_x64_policy():

@@ -33,8 +33,11 @@ class Field(ABC):
     over ``x``), :meth:`as_input_set` (an :class:`~minilink.core.sets.InputSet`
     over ``u`` at a given ``x``), :meth:`as_cost` (the running cost ``g``) and
     :meth:`as_terminal_cost` (the terminal cost ``h``). ``V.as_set(upper=level)``
-    is the sublevel set ``{x : V(x) ≤ level}``.
+    is the sublevel set ``{x : V(x) ≤ level}``. ``params`` is the field's own
+    numbers (``{}`` for a field with none, R140).
     """
+
+    params = {}
 
     @abstractmethod
     def value(self, x, u=None, t=0.0, params=None):

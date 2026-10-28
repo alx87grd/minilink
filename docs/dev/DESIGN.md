@@ -359,6 +359,22 @@ read `params` yet, the gap is tracked below (the distributions and the sets read
 
 - `params is None` → `self.params`; any other value overrides (never
   `params or self.params`).
+- **One contract for every core math object (R140).** Its mathematics is a function of its
+  arguments and `params` (`f`, `h`, `step`, `g`, `margin`, `value`, `sample`); it has a
+  `params` dict, `{}` when it has none; a composed object's `params` is its parts' dicts, by a
+  dotted path; the leaves are numbers and numeric arrays, an integer leaf (a seed) never in
+  `wrt`; every function is deterministic given its parameters, the seed among them.
+  `tests/unittest/test_contract.py` walks every public system, cost, set and law on both
+  backends (`params=None` its defaults, the same values twice, the JAX numbers the NumPy ones,
+  a finite gradient through a float leaf). The written exceptions: the abstract shells and the
+  diagrams (their `params` are their blocks', walked as blocks); `LookupPolicy` (a table over a
+  SciPy interpolator, host-only until join 1 puts value iteration on `transition`);
+  `Trajectory` (a record, not a function); `MathematicalProgram` (`J(z)` closes over its
+  problem's tree until the parametric program gives it `params`, the program lane); the
+  shapes and the workspace fields (frozen geometry read from their fields, the geometry
+  module's plan); a threshold with no useful gradient kept as structure (`TimeCost.eps`); RL
+  training until its collectors take per-episode seeds (TODO §1.4); a student-written model
+  (RULES 2.3).
 - **One keyword per kind of choice (R134).** `backend=` is the array module (`"numpy"`,
   `"jax"`, or `"auto"` where a tool can fall back) on every tool and facade that compiles;
   `solver=` is the time integration; `method=` is the verb's own numerical method (the

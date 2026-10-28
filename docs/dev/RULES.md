@@ -58,6 +58,11 @@ concrete formatting, ordered by the cost of being wrong:
   An explicit override on a diagram or evaluator is the complete nested tree (every
   block id present) or `None` for the compile snapshot; a missing block is an error
   (ruled 2026-10-25, R121). Live mutation of one number stays `sys.params["m"] = 4`.
+  The same holds for every core math object (R140): a cost, a set, a distribution, a field
+  have a `params` dict (`{}` when they have none), read when the call passes `None`; a
+  composed object's `params` is its parts' dicts, by a dotted path; every function is
+  deterministic given its parameters, the seed among them. The written exceptions are DESIGN
+  §4's list, and `tests/unittest/test_contract.py` walks every other public core object.
   However, the core framework remains forgiving:
   models where a student hard-codes constants directly into equations must simulate without friction.
   Costs, sets, fields and shapes owe the same signature; the library ones do not read

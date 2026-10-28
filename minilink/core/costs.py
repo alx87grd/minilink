@@ -45,13 +45,13 @@ class CostFunction(ABC):
     The discount rate ``rho`` is the problem's (``PlanningProblem.discount_rate``):
     the cost is the integrand only, and :meth:`integrate` takes the rate.
 
-    Class attributes: ``params``, the cost's parameters (``None`` for a cost
+    Class attributes: ``params``, the cost's parameters (``{}`` for a cost
     that hard-codes its constants; the library costs hold a dictionary, the
     System pattern: ``params=None`` in ``g`` and ``h`` reads them), and ``id``,
     the cost's key in a sum (``None``: its class name).
     """
 
-    params = None
+    params = {}
     id = None
 
     @abstractmethod

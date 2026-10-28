@@ -156,7 +156,7 @@ class Step(Source):
 
     def h(self, x, u, t=0, params=None):
         params = self.params if params is None else params
-        xp = array_module(t)
+        xp = array_module(t, *params.values())
 
         step_time = params["step_time"]
         initial_value = params["initial_value"]
@@ -258,8 +258,8 @@ class WhiteNoise(Source):
         hold = self.hold
         p = self.dim
 
-        # The backend of the time and of the intensity
-        xp = array_module(t, W)
+        # The backend of the time, of the intensity and of the period
+        xp = array_module(t, W, period)
 
         # Without a seed, the mean: no draw
         if seed is None:
