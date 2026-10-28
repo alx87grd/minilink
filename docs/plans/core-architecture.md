@@ -321,7 +321,9 @@ terminal = QuadraticField(P, x_bar).as_terminal_cost()   # §9: the LQR value en
 - **Ruled:** R132, R135 (answered by R148), R148, R149, R155, R158.
 - **Today:** the kernel is in (NS-1, NS-2's fixed `K`, the v0.3 run): `gd` and `adam` are pure
   laws (`init`, `update(grad, state)`) run by `Optimizer`, `iterations=K` one `lax.scan` that
-  traces under `jit`, `vmap` and `grad`, `as_step_system()` the iterates as a step system; the RL learners already run their steps
+  traces under `jit`, `vmap` and `grad`, `as_step_system()` the iterates as a step system;
+  trajectory optimization has its compiled face (`planner.compile()`, R148: `solve`, `shift`,
+  `command`, `prediction`, `solution`, `pack`; a native method `vmap`s over starts); the RL learners already run their steps
   in one `lax.scan`; the planners have no pure face, `solve` mutates them (`last_solution`); the
   MPC is two classes with `dt_mpc`, `t0`, `warm_start` and a tick latch, probing the planner.
 - **Open:** nothing; the names are ruled (R164).

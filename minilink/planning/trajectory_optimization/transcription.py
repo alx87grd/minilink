@@ -95,6 +95,10 @@ class FixedGridOptions:
 
         return t
 
+    def offsets(self, problem: PlanningProblem) -> np.ndarray:
+        """The knots' offsets from the horizon's start, ``linspace(0, tf, n_steps)``: ``t_k = t_start + offset_k``."""
+        return fixed_grid_t(problem.require_finite_tf(), self.n_steps)
+
     def dt(self, problem: PlanningProblem) -> float:
         """Step size from finite ``problem.tf`` and ``n_steps``."""
         return fixed_grid_dt(problem.require_finite_tf(), self.n_steps)
@@ -225,6 +229,20 @@ def native_concatenate(values, like):
         return empty
 
     stacked = xp.concatenate(pieces)
+
+    return stacked
+
+
+def stack_parametric(constraints):
+    """One native constraint vector of ``(z, params)`` from a list of vector functions, ``None`` for none."""
+    if not constraints:
+        return None
+
+    def stacked(z, params):
+        values = native_concatenate(
+            (constraint(z, params) for constraint in constraints), z
+        )
+        return values
 
     return stacked
 

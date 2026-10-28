@@ -382,7 +382,14 @@ solvers and MPPI are v0.4 (§4).
   mutation (`last_solution` and the caches leave the pure path; the plotting shortcuts move to
   the solution, with D1.4); trajectory optimization first, then LQR and value iteration, the
   others as they are wrapped. Done when `pv.solution(pv.solve(p)[0])` reproduces today's
-  `planner.solve()` byte-identically and `jax.vmap` over starts runs on the native method.
+  `planner.solve()` byte-identically and `jax.vmap` over starts runs on the native method. Landed in the v0.3 run for trajectory optimization: `planner.compile()` →
+  `CompiledTrajectoryPlanner` (`z` the knots with the origin appended), `planner.params`,
+  `iterations=` forwarded to the `Optimizer`, single shooting's JAX program on the tree; both
+  done-when checks pass (byte-identical on NumPy and JAX, a `vmap` of the native Adam planner
+  over starts). Rest: the `"method"` and `seed` leaves of `planner.params` (with NS-8, the
+  native method's numbers), `planner.solve` rebuilt on the face without mutation and
+  `last_solution` gone (with the MPC's rebuild, which reads it; the run log's RD-35), LQR and
+  value iteration.
 - [ ] **The MPC rebuilt on the planner's face** (NS-8; R148, R123):
   `ModelPredictiveController(planner, *, inputs={"x_start": "y", "t_start": "t"}, delay=True)`;
   the delayed form a block whose state is `z` alone, its origin inside (R155; its kind under the

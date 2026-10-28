@@ -55,6 +55,7 @@ _TRAJOPT_OPTION_KEYS = (
     "verbose",
     "feasibility_tol",
     "live_plot",
+    "iterations",
 )
 
 _TRANSCRIPTION_PRESETS = frozenset({"direct_collocation", "multiple_shooting"})
@@ -99,6 +100,7 @@ class TrajectoryOptimizationPlanner(Planner):
         verbose=_UNSET,
         feasibility_tol=_UNSET,
         live_plot=_UNSET,
+        iterations=_UNSET,
     ) -> None:
         """
         Parameters
@@ -117,7 +119,7 @@ class TrajectoryOptimizationPlanner(Planner):
             Tier-2 workflow bag. Flat kwargs below overlay matching fields.
         backend, initial_guess, warm_start, method,
         optimizer_options, use_hessian, record_history, callback,
-        record_solve_time, verbose, feasibility_tol, live_plot
+        record_solve_time, verbose, feasibility_tol, live_plot, iterations
             Tier-1 flat mirrors of :class:`TrajectoryOptimizationOptions`.
         """
         super().__init__(problem)
@@ -141,6 +143,7 @@ class TrajectoryOptimizationPlanner(Planner):
             verbose=verbose,
             feasibility_tol=feasibility_tol,
             live_plot=live_plot,
+            iterations=iterations,
         )
 
         # Memory of the latest solve
@@ -162,6 +165,27 @@ class TrajectoryOptimizationPlanner(Planner):
 
         # The rebuild path warns once, on JAX, that a compiled program is faster
         self._warned_uncompiled_from = False
+
+    @property
+    def params(self) -> dict:
+        """The tree the plan depends on (R148): ``x_start``, ``t_start``, the plant's, the cost's, the discount and the sets the program reads."""
+        return self.transcription.program_params(self.problem)
+
+    def compile(self, backend=None):
+        """
+        The planner's pure face, ``pv`` (R148): its solve as functions of ``(params, z)``.
+
+        ``backend`` defaults to the planner's. See
+        :class:`~minilink.planning.trajectory_optimization.compiled.CompiledTrajectoryPlanner`.
+        """
+        # Lazy import: the compiled face loads on first compile, not with the planner
+        from minilink.planning.trajectory_optimization.compiled import (
+            CompiledTrajectoryPlanner,
+        )
+
+        backend = self.options.backend if backend is None else backend
+
+        return CompiledTrajectoryPlanner(self, backend)
 
     @property
     def has_parametric_program(self) -> bool:
@@ -430,6 +454,7 @@ class TrajectoryOptimizationPlanner(Planner):
             method=self.options.method,
             use_hessian=self.options.use_hessian,
             options=dict(self.options.optimizer_options),
+            iterations=self.options.iterations,
         )
 
     def print_solve_preamble(
@@ -807,6 +832,9 @@ class TrajectoryOptimizationOptions:
     #: Redraw the iterate trajectory during the solve (matplotlib); a
     #: custom ``callback`` takes precedence.
     live_plot: bool = False
+    #: A native method's fixed step count, forwarded to its ``Optimizer``
+    #: (R149): exactly this many steps; ``None`` runs to the method's tolerance.
+    iterations: int | None = None
 
 
 @dataclass(frozen=True)

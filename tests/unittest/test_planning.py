@@ -2422,3 +2422,99 @@ def test_a_field_set_in_an_intersection_survives_a_params_write():
 
     problem.params = problem.params  # a frozen field set has no numbers to write
     assert problem.X.contains(np.zeros(1))
+
+
+# --- the planner's compiled face (R148) ---
+
+
+def face_swing_up():
+    from minilink import Pendulum
+
+    plant = Pendulum()
+    goal = np.array([np.pi, 0.0])
+    return PlanningProblem(
+        plant,
+        tf=2.0,
+        x_start=np.zeros(2),
+        Xf=SingletonSet(goal),
+        cost=QuadraticCost.from_system(plant, xbar=goal, R=0.1 * np.eye(1)),
+        U=plant.input_box,
+    )
+
+
+@pytest.mark.parametrize(
+    "backend", ["numpy", pytest.param("jax", marks=pytest.mark.jax)]
+)
+def test_the_compiled_face_reproduces_the_planners_solve(backend):
+    planner = TrajectoryOptimizationPlanner(
+        face_swing_up(),
+        n_steps=11,
+        transcription="direct_collocation",
+        backend=backend,
+        optimizer_options={"maxiter": 60},
+    )
+    solved = planner.solve()
+    pv = planner.compile()
+
+    # pv.solution(pv.solve()) is planner.solve(), number for number
+    z, status = pv.solve()
+    face = pv.solution(z, status=status)
+    np.testing.assert_array_equal(face.trajectory.x, solved.trajectory.x)
+    np.testing.assert_array_equal(face.trajectory.u, solved.trajectory.u)
+    assert face.solver.cost == solved.solver.cost
+    assert pv.n_z == 3 * 11 + 1 and z[-1] == 0.0  # the knots, then the origin
+    assert set(pv.params) >= {"x_start", "t_start", "plant", "cost"}
+
+    # The plan's command is its input at t; shifted, it is the same plan read later
+    np.testing.assert_allclose(pv.command(z, None, 0.0), solved.trajectory.u[:, 0])
+    shifted = pv.shift(z, 0.4)
+    assert shifted[-1] == 0.4
+    np.testing.assert_allclose(
+        pv.command(shifted, None, 0.4), pv.command(z, None, 0.8), atol=1e-12
+    )
+    x, u = pv.prediction(z, 0.0)
+    np.testing.assert_allclose(x, solved.trajectory.x[:, 0], atol=1e-12)
+
+    # A guess packs back to z, and an unknown path is refused
+    np.testing.assert_allclose(pv.pack(face)[:-1], z[:-1], atol=1e-12)
+    with pytest.raises(ValueError, match="known entries"):
+        pv.solve({"plant": {"nu": 1.0}})
+
+
+@pytest.mark.jax
+def test_the_native_face_solves_a_family_of_starts_in_one_vmap():
+    import jax
+    import jax.numpy as jnp
+
+    from minilink import Pendulum
+
+    plant = Pendulum()
+    problem = PlanningProblem(
+        plant,
+        tf=2.0,
+        x_start=np.array([0.5, 0.0]),
+        cost=QuadraticCost.from_system(plant, R=0.1 * np.eye(1)),
+        U=plant.input_box,
+    )
+    planner = TrajectoryOptimizationPlanner(
+        problem,
+        transcription=ShootingTranscription(ShootingOptions(n_steps=11)),
+        backend="jax",
+        method="adam",
+        iterations=200,
+        optimizer_options={"learning_rate": 0.05},
+    )
+    pv = planner.compile()
+
+    starts = jnp.asarray([[0.5, 0.0], [0.2, 0.1], [-0.4, 0.0]])
+    zs, status = jax.vmap(lambda x: pv.solve({"x_start": x}))(starts)
+    assert zs.shape == (3, pv.n_z)
+    for x, z in zip(starts, zs):
+        alone, _ = pv.solve({"x_start": np.asarray(x)})
+        np.testing.assert_allclose(z, alone, rtol=1e-12)
+
+    # One jitted solve, and the cost lower than at the initial guess
+    solve = jax.jit(lambda x: pv.solve({"x_start": x})[0])
+    np.testing.assert_allclose(solve(starts[1]), zs[1], rtol=1e-12)
+    J0 = float(pv.optimizer.program_evaluator.objective(pv.initial()[:-1]))
+    assert float(status["cost"][0]) < J0

@@ -1268,7 +1268,18 @@ problem's, discounted from `t_start`, `Σ dt/2 (w_k g_k + w_{k+1} g_{k+1}) + w_N
 `w_k = e^{−ρ(t_k − t_start)}`. Knot count
 `n_steps` is a planner flat kwarg (or lives on a custom transcription's
 options); the time grid is
-`t_start + linspace(0, problem.tf, n_steps)` for finite `tf`. Single backend-native
+`t_start + linspace(0, problem.tf, n_steps)` for finite `tf`. **The compiled face** (R148):
+`planner.compile(backend=None)` gives `pv`, the planner's solve as functions of `(params, z)`:
+`z` is the transcription's decision vector with the origin `t_start` appended (`pv.n_z`);
+`pv.params` the tree (`planner.params`); `pv.initial(params)` the default guess packed;
+`pv.solve(params=None, z0=None) -> (z, status)`; `pv.shift(z, t)` the knot rows re-read at
+`t + offset`, the tail held; `pv.command(z, x, t)` the input at `t`; `pv.prediction(z, t)` the
+planned `(x, u)` (collocation); `pv.solution(z, params, status)` the host-side
+`PlanningSolution`; `pv.pack(guess)`; `pv.program`. A native method with `iterations=K` (a
+planner keyword, forwarded to its `Optimizer`) on a box-bounded JAX program (single shooting
+with an input box) makes `pv.solve` pure: `jit`, `vmap` over starts, `grad`. The face keeps no
+last solution; `planner.solve()` stays the offline verb (callbacks, history, live plot, the
+report) and stores `last_solution` until the MPC's rebuild. Single backend-native
 transcription classes; no parallel JAX transcription types. NumPy transcriptions
 build constraints via `dynamics_function` (the compiled evaluator's `f`).
 **JAX transcriptions** embed `problem.sys.f` directly in the NLP (not the

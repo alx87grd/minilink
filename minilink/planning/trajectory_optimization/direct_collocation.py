@@ -20,11 +20,11 @@ from minilink.planning.trajectory_optimization.transcription import (
     FixedGridOptions,
     Transcription,
     dynamics_function,
-    fixed_grid_t,
     native_concatenate,
     program_backend_for_compile,
     require_jax_compile_backend,
     stack_constraints,
+    stack_parametric,
     trajectory_cost,
     trapezoidal_defect,
 )
@@ -408,11 +408,7 @@ class DirectCollocationTranscription(Transcription):
 
     def knot_offsets(self, problem: PlanningProblem, xp):
         """The knots' offsets from the horizon's start, ``linspace(0, tf, N)``: ``t_k = t_start + offset_k``."""
-        offsets = xp.asarray(
-            fixed_grid_t(problem.require_finite_tf(), self.options.n_steps)
-        )
-
-        return offsets
+        return xp.asarray(self.options.offsets(problem))
 
     def jax_unpacker(self, problem: PlanningProblem):
         """``unpack_jax(z) -> (x, u)``: the knots packed in ``z``, the states row by row, then the inputs."""
@@ -643,20 +639,6 @@ def input_margins(U, unpack_jax, grid):
         return native_concatenate(values, z)
 
     return margins
-
-
-def stack_parametric(constraints):
-    """One native constraint vector of ``(z, params)`` from a list of vector functions, ``None`` for none."""
-    if not constraints:
-        return None
-
-    def stacked(z, params):
-        values = native_concatenate(
-            (constraint(z, params) for constraint in constraints), z
-        )
-        return values
-
-    return stacked
 
 
 def require_singleton_x0(problem):
