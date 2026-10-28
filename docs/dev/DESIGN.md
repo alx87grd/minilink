@@ -1063,12 +1063,16 @@ parts; `problem.params` shows each law at its leaf and the start's law under `"x
 `problem.realize(key, n)` is one tree (R144): the problem's numbers with `"x_start"` of shape
 `(n, nx)`, each law's leaf drawn `n` times and each random source's `seed` a trial axis of
 integers (`drawn_paths()` names them); every consumer draws from its own stream, named by its
-path (`child_seed(key, "plant.m")`, a source's seed by its port and the trial), so adding a law
-or a source leaves every other draw unchanged, and an integer key draws on the host: the same
-trials on NumPy and JAX. `nominal()` replaces each law by its mean and drops the random
-sources. `evaluate` wires each source onto its plant port in the evaluated loop, under the
-port's name (its seed the leaf `"d.seed"`); the stepped environment reads each source at `t_k`
-with the episode's seed (RD-D21). A deterministic planner given a stochastic problem plans
+path (`child_seed(key, "plant.m")`, a source's seed by its block and the trial), so adding a
+law or a source leaves every other draw unchanged, and an integer key draws on the host: the
+same trials on NumPy and JAX. `nominal()` replaces each law by its mean and drops the random
+sources. The evaluated loop is exactly the one `closed_loop` builds with the same sources (R128:
+two forms, one diagram): the source of `d` is its block `disturbance`, of `n` its `noise` (a
+`Sum` on the command or the measurement when the plant has no such port), any other port's
+under the port's name; its seed is the leaf `"disturbance.seed"`. An evaluation draws a seed per
+trial for every random block of the loop, the problem's sources or the loop's own, even on a
+deterministic problem: a block's own seed is only its default realization (RD-R4b). The stepped
+environment reads each source at `t_k` with the episode's seed (RD-D21). A deterministic planner given a stochastic problem plans
 from the mean start and warns; `Sys2Gym(sys, cost, x_start=law)` draws each episode's start
 from a `Distribution` with its `np_random` (`None`: `sys.x0`), and
 `Sys2Gym.from_problem(problem, dt=)` is the Gymnasium view

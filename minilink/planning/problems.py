@@ -109,9 +109,11 @@ class PlanningProblem:
         drawn per trial by :meth:`realize` (domain randomization, robustness).
     disturbances : mapping, optional
         Source blocks on the plant's input ports, ``{"d": WhiteNoise(...)}``
-        (R128): the evaluator wires each onto its port, under the port's name,
-        so its seed is the leaf ``"d.seed"``. A bare law is refused: a
-        disturbance states its time behaviour as a block.
+        (R128): the loop the evaluator closes is exactly the one ``closed_loop``
+        builds with the same sources, the source of ``d`` its block
+        ``disturbance`` and of ``n`` its ``noise`` (any other port's under the
+        port's name), so its seed is the leaf ``"disturbance.seed"``. A bare law
+        is refused: a disturbance states its time behaviour as a block.
     criterion : {"expectation", "worst_case"} or ("cvar", alpha)
         What "optimal" means over the draws of a stochastic problem: the mean,
         the worst, or the mean of the worst ``alpha`` fraction of the runs' ``J``
@@ -275,8 +277,8 @@ class PlanningProblem:
                 self.move_start(entry)
             elif role == "discount_rate":
                 self.discount_rate = coerce_rate(entry)
-            elif role in self.disturbances:
-                self.disturbances[role].params = entry
+            elif role in self.sources_by_id():
+                self.sources_by_id()[role].params = entry
             else:
                 setattr(self, role, moved_set(role, getattr(self, role), entry))
 
@@ -328,11 +330,11 @@ class PlanningProblem:
             values = law.sample(stream_of(key, ".".join(path)), n)
             tree = with_leaf(tree, path, values.reshape((n, *nominal)))
 
-        # Each random source's seed, n times, named by its port and the trial
-        for port, block in self.disturbances.items():
+        # Each random source's seed, n times, named by its block id and the trial
+        for sys_id, block in self.sources_by_id().items():
             if block.is_random:
-                seeds = source_seeds(block, key, port, n)
-                tree = with_leaf(tree, (port, "seed"), seeds)
+                seeds = source_seeds(block, key, sys_id, n)
+                tree = with_leaf(tree, (sys_id, "seed"), seeds)
 
         return tree
 
@@ -341,8 +343,8 @@ class PlanningProblem:
         paths = [("x_start",)]
         paths.extend(path for path, _ in flatten(self.laws))
         paths.extend(
-            (port, "seed")
-            for port, block in self.disturbances.items()
+            (sys_id, "seed")
+            for sys_id, block in self.sources_by_id().items()
             if block.is_random
         )
 
@@ -427,6 +429,10 @@ class PlanningProblem:
 
         return self.start_law is not None or bool(self.laws) or random_source
 
+    def sources_by_id(self) -> dict:
+        """The disturbance sources by the id of their block in the evaluated loop (``d`` → ``disturbance``, ``n`` → ``noise``)."""
+        return {source_id(port): block for port, block in self.disturbances.items()}
+
     def parts_view(self) -> dict:
         """The parts' numbers by role, live: :attr:`params` without the laws (the start its point)."""
         view = {"plant": self.sys.params}
@@ -437,7 +443,7 @@ class PlanningProblem:
             if set_ is not None:
                 view[role] = getattr(set_, "params", None)
         for port, block in getattr(self, "disturbances", {}).items():
-            view[port] = block.params
+            view[source_id(port)] = block.params
         view["x_start"] = self.x_start
         view["discount_rate"] = self.discount_rate
 
@@ -705,6 +711,15 @@ def require_samplable_start(set_, box):
         )
 
 
+# The blocks closed_loop names its loop inputs' sources by (any other port: its own name)
+SOURCE_IDS = {"d": "disturbance", "n": "noise"}
+
+
+def source_id(port):
+    """The id of the source of ``port`` in the evaluated loop: ``closed_loop``'s role name, else the port's."""
+    return SOURCE_IDS.get(port, port)
+
+
 def coerce_disturbances(disturbances, sys) -> dict:
     """The disturbance sources as a dict ``{port: block}``; refuse a bare law, a missing port, the command port."""
     sources = dict(disturbances or {})
@@ -724,15 +739,18 @@ def coerce_disturbances(disturbances, sys) -> dict:
             raise TypeError(
                 f"disturbances[{port!r}] must be a source block (a System with no input)"
             )
-        if port not in sys.inputs:
-            raise ValueError(f"disturbances key {port!r} is not an input port of sys")
+        if port not in sys.inputs and port not in SOURCE_IDS:
+            raise ValueError(
+                f"disturbances key {port!r} is not an input port of sys (nor d or n, "
+                "which closed_loop adds to the command and the measurement)"
+            )
         if port == command:
             raise ValueError(
                 f"disturbances key {port!r} is the command port of sys: a source "
                 "there would replace the policy's command. Give the disturbance "
                 "its own input port (for example 'd')."
             )
-        if port in PlanningProblem.ROLES:
+        if source_id(port) in PlanningProblem.ROLES:
             raise ValueError(
                 f"disturbances key {port!r} is a role of the problem's parameters"
             )

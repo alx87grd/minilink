@@ -35,6 +35,7 @@ from minilink.planning.evaluation import (
     register_evaluation_pytree,
     score_run,
 )
+from minilink.planning.problems import source_id
 
 BACKENDS = ("auto", BACKEND_JAX, BACKEND_NUMPY)
 EPISODE_LENGTH = 10.0  # s, the run of an infinite-horizon problem when none is named
@@ -128,6 +129,7 @@ class ProblemEvaluator:
         self.plant_input = plant_input_sources(self.loop, self.evaluator, self.sampled)
         self.block_ids = tuple(self.loop.subsystems)
         self.start_ids = stateful_blocks_of(self.loop)
+        self.draws = problem.is_stochastic or self.loop.is_random
         self.free_inputs = tuple(self.loop.inputs)
         require_free_names(self.free_inputs, self.block_ids)
         require_no_x0_key(self.loop, self.start_ids)
@@ -196,7 +198,7 @@ class ProblemEvaluator:
         keeps the runs' trajectories (outside a trace).
         """
         params = self.merged(params)
-        n_trials = trials_of(self.problem, n_trials)
+        n_trials = trials_of(self.draws, n_trials)
 
         # The draws, the price of a failure and the cost bound of a run not finite,
         # then the runs and their scores, batched on JAX
@@ -246,7 +248,7 @@ class ProblemEvaluator:
 
         base = self.merged(params)
         z0 = self.pack(base, wrt)
-        n_trials = trials_of(self.problem, n_trials)
+        n_trials = trials_of(self.draws, n_trials)
         rows = declared_rows(self.problem)
 
         # The draws, the price and the cost bound stay fixed when the start and
@@ -347,28 +349,34 @@ class ProblemEvaluator:
         """
         The trials' starts ``(n_trials, n)`` and parameters (one tree, a leading trial axis where drawn).
 
-        A stochastic problem draws the starts and the plant's laws from ``key``,
-        and each trial ``i`` realizes the loop's random blocks under
-        ``child_seed(key, "trial i")``: an integer key gives the same noise on
-        NumPy and JAX. A deterministic problem keeps each block's own seed.
+        A stochastic problem draws the starts and its laws from ``key``, and each
+        trial ``i`` realizes the loop's random blocks under
+        ``child_seed(key, "trial i")``, whether they are the problem's sources or
+        blocks of the loop itself (a block's own seed is only its default
+        realization, never an evaluation's, RD-R4b): an integer key gives the
+        same draws on NumPy and JAX. A run with nothing random is the one run.
         """
         problem = self.problem
         loop = self.loop
 
-        # A deterministic problem: its one start, the parameters as they are
-        if not problem.is_stochastic:
+        # Nothing random: the one start, the parameters as they are
+        if not self.draws:
             xp = array_module(params["x_start"])
             return xp.reshape(params["x_start"], (1, -1)), params
 
         # x0 ~ p(x0), each law and each source's seed, n_trials times: one tree,
-        # drawn on the host from an integer key whatever the backend
-        tree = problem.realize(key, n_trials)
-        x_starts = tree["x_start"]
-
-        # The drawn leaves override theirs (the problem's paths are the run's)
+        # drawn on the host from an integer key whatever the backend; a point
+        # start, the same for every trial
         overrides = {}
-        for path in problem.drawn_paths()[1:]:
-            set_leaf(overrides, path, lookup(tree, path))
+        if problem.is_stochastic:
+            tree = problem.realize(key, n_trials)
+            x_starts = tree["x_start"]
+            for path in problem.drawn_paths()[1:]:
+                set_leaf(overrides, path, lookup(tree, path))
+        else:
+            x_starts = np.tile(
+                np.asarray(params["x_start"], dtype=float), (n_trials, 1)
+            )
 
         # Each trial's seeds of the loop's random blocks override theirs
         if loop.is_random:
@@ -658,10 +666,19 @@ def closed_loop_of(problem, controller):
             "the problem's system is a discrete-time StepSystem: the evaluator runs "
             "a continuous loop"
         )
+    sources = dict(problem.disturbances)
     if int(controller.m) == 0:
-        return with_sources(open_loop_of(controller, plant), problem.disturbances)
+        return with_sources(open_loop_of(controller, plant), sources)
 
-    return with_sources(closed_loop(controller, plant), problem.disturbances)
+    # The loop closed_loop builds with the same sources: d and n under its role names
+    loop = closed_loop(
+        controller,
+        plant,
+        disturbance=sources.pop("d", False),
+        noise=sources.pop("n", False),
+    )
+
+    return with_sources(loop, sources)
 
 
 ###############################################################################
@@ -815,10 +832,11 @@ def open_loop_of(source, plant):
 
 
 def with_sources(loop, sources):
-    """The loop with each disturbance source wired onto its plant port, under the port's name (R128)."""
+    """The loop with each disturbance source wired onto its plant port (R128), under its block id (:func:`~minilink.planning.problems.source_id`)."""
     for port, block in sources.items():
-        loop.add_subsystem(block, port)
-        loop.connect(port, next(iter(block.outputs)), "plant", port)
+        sys_id = source_id(port)
+        loop.add_subsystem(block, sys_id)
+        loop.connect(sys_id, next(iter(block.outputs)), "plant", port)
 
     return loop
 
@@ -1027,9 +1045,9 @@ def steps_of(tf, dt):
     return n_steps
 
 
-def trials_of(problem, n_trials):
-    """The number of runs: one for a deterministic problem, ``n_trials`` (required) for a stochastic one."""
-    if not problem.is_stochastic:
+def trials_of(draws, n_trials):
+    """The number of runs: one when nothing is random, ``n_trials`` (required) when the problem or the loop draws."""
+    if not draws:
         if n_trials not in (None, 1):
             raise ValueError(
                 "a deterministic problem is one run: n_trials must be 1 or unset, "
@@ -1038,7 +1056,10 @@ def trials_of(problem, n_trials):
         return 1
 
     if n_trials is None:
-        raise ValueError("a stochastic problem needs n_trials, the number of draws")
+        raise ValueError(
+            "a stochastic problem (or a loop with a random block) needs n_trials, "
+            "the number of draws"
+        )
 
     return int(n_trials)
 

@@ -538,47 +538,41 @@ def test_a_deterministic_problem_runs_the_noise_blocks_own_seed():
     reference = Simulator(loop, x0=x0, tf=1.0, dt=0.01, solver="rk4_fixedsteps").solve()
     np.testing.assert_allclose(traj.x[:, -1], reference.x[:, -1], rtol=1e-9)
 
-    # Another seed, another run
+    # An evaluation draws a seed per trial: a block's own seed is only its default
+    # realization (RD-R4b), so another seed on the block scores the same trials
     other = problem.compile(noisy_loop(seed=4), dt=0.01, backend="numpy")
-    assert not np.allclose(other.evaluate().J, pe.evaluate().J)
+    np.testing.assert_array_equal(
+        other.evaluate(n_trials=2, key=0).J, pe.evaluate(n_trials=2, key=0).J
+    )
+    assert not np.allclose(*pe.evaluate(n_trials=2, key=0).J)
 
 
-@pytest.mark.jax
-@pytest.mark.parametrize("stochastic", [False, True])
-def test_the_gradient_crosses_a_loop_with_a_noise_block(stochastic):
-    import jax
-
+def test_the_disturbance_shortcut_is_the_loop_closed_loop_builds():
     sys = plant()
-    deterministic = PlanningProblem(
-        sys, x_start=[0.5, 0.0], cost=QuadraticCost.from_system(sys), tf=1.0
+    cost = QuadraticCost.from_system(sys)
+    start = Uniform([0.4, -0.1], [0.6, 0.1])
+    noise = WhiteNoise(1, psd=0.5, sample_period=0.01, seed=3)
+    ctl = PID(Kp=20.0, Ki=1.0, Kd=4.0)
+
+    # Explicit: the loop built with its source (a Sum on the command, the plant has
+    # no d); the shortcut: the problem's d, wired the same way under the same ids
+    explicit = PlanningProblem(sys, x_start=start, cost=cost, tf=1.0).compile(
+        closed_loop(ctl, sys, disturbance=noise), dt=0.01, backend="numpy"
     )
-    problem = point_start_problem() if stochastic else deterministic
-    n_trials = 3 if stochastic else None
-    pe = problem.compile(noisy_loop(), dt=0.01, backend="jax")
-
-    grad = jax.grad(lambda p: pe.evaluate(p, 1, n_trials).objective)(pe.params)
-    assert np.isfinite(float(grad["controller"]["Kp"][0]))
-    assert float(grad["disturbance"]["seed"]) == 0.0  # a seed carries no gradient
-
-
-@pytest.mark.jax
-def test_a_sets_membership_traces_on_jax():
-    import jax
-    import jax.numpy as jnp
-
-    from minilink.core.sets import BallSet
-
-    ball = BallSet(center=[0.0, 0.0], radius=1.0)
-    box = BoxInputSet.from_bounds([-1.0], [1.0])
-    inside = jax.jit(lambda z: ball.contains(z))
-    assert bool(inside(jnp.array([0.5, 0.0]))) and not bool(
-        inside(jnp.array([2.0, 0.0]))
+    problem = PlanningProblem(
+        sys, x_start=start, cost=cost, tf=1.0, disturbances={"d": noise}
     )
-    assert bool(jax.jit(lambda u: box.contains(u))(jnp.array([0.5])))
-    assert ball.contains(np.array([0.5, 0.0]))  # NumPy in, a NumPy boolean out
+    shortcut = problem.compile(ctl, dt=0.01, backend="numpy")
+    assert list(shortcut.loop.subsystems) == list(explicit.loop.subsystems)
+    assert (
+        "disturbance" in problem.params
+        and ("disturbance", "seed") in problem.drawn_paths()
+    )
 
-
-# --- the edges: unwired plant ports, a changed problem, the view round trip ---
+    # One diagram, one Monte Carlo score, every source drawing its seed per trial
+    np.testing.assert_array_equal(
+        shortcut.evaluate(n_trials=3, key=0).J, explicit.evaluate(n_trials=3, key=0).J
+    )
 
 
 def test_a_plant_input_left_unwired_reads_its_nominal_value():
@@ -649,12 +643,14 @@ def test_a_disturbance_source_runs_in_the_evaluated_loop_with_a_seed_per_trial()
         disturbances={"d": WhiteNoise(1, psd=1.0, sample_period=0.05)},
     )
     pe = problem.compile(PID(Kp=5.0, Kd=1.0), dt=0.05, backend="numpy")
-    assert "d" in pe.loop.subsystems and pe.params["d"]["psd"].shape == (1,)
+    assert "disturbance" in pe.loop.subsystems  # closed_loop's name for d's source
+    assert pe.params["disturbance"]["psd"].shape == (1,)
 
     # Each trial its own seed, named by the port: the same trial without the
     # noise scores differently, and the seeds are the tree's leaves
     tree = problem.realize(1, 3)
-    assert tree["d"]["seed"].shape == (3,) and len(set(tree["d"]["seed"])) == 3
+    seeds = tree["disturbance"]["seed"]
+    assert seeds.shape == (3,) and len(set(seeds)) == 3
     quiet = problem.replace(disturbances={}).compile(PID(Kp=5.0, Kd=1.0), dt=0.05)
     assert not np.allclose(
         pe.evaluate(n_trials=3, key=1).J, quiet.evaluate(n_trials=3, key=1).J

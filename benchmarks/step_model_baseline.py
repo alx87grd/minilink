@@ -141,9 +141,7 @@ def gym_entries(out):
         plant = Pendulum()
         plant.x0 = X0.copy()
         cost = QuadraticCost.from_system(plant)
-        env = Sys2Gym(
-            plant, cost, dt=DT, tf=10.0, solver=integrator, reset_mode="nominal"
-        )
+        env = Sys2Gym(plant, cost, dt=DT, tf=10.0, solver=integrator)
         env.reset(seed=0)
         rows = []
         for k in range(N):

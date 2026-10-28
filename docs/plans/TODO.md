@@ -222,10 +222,9 @@ when": [randomness.md](randomness.md) §9.
   RN-4, the rest of RN-5 and the rest of P10's AC-7). Landed in the v0.3 run: `problem.realize`
   one tree with a stream per consumer by name and a seed per random source; disturbances are
   source blocks only, wired into the evaluated loop; one integer key draws the same trials on
-  NumPy and JAX (the KNOWN_ISSUES entry gone). Rest:
-  - the cost scored on the plant across every design tool with the draws (AC-7's rest,
-    [automation-by-convention.md](automation-by-convention.md) §5, §7);
-  - RN-6, the contract in DESIGN, with each step.
+  NumPy and JAX (the KNOWN_ISSUES entry gone); the shortcut is the loop `closed_loop` builds
+  with the same sources, one Monte Carlo score for both forms (AC-7's done-when); RN-5's LQG
+  gate is acceptance script 1. Rest: RN-6, the contract in DESIGN, with each step.
 - [ ] **A problem stochastic by its parts** (R143): landed in the v0.3 run (no
   `StochasticPlanningProblem`; `x_start=` a law or a set, `params=` laws, `disturbances=` source
   blocks, `criterion=` and `nominal()` on `PlanningProblem`), every Python caller swept; the
