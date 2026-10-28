@@ -29,6 +29,7 @@ from minilink.core.params import (
 )
 from minilink.core.trajectory import Trajectory
 from minilink.planning.evaluation import (
+    RUNNING_COST,
     Evaluation,
     criterion_of,
     diverged_cost_of,
@@ -446,29 +447,37 @@ class ProblemEvaluator:
         u = self.held_inputs(params, xp)
         u_seq = xp.broadcast_to(u, (N, u.size))
 
-        # x_{k+1} = Φ(x_k, u, t_k), t_k = t_start + k dt, k = 0 … N − 1; or the
-        # adaptive integral reported on that grid
+        # x_{k+1} = Φ(x_k, u, t_k), t_k = t_start + k dt, k = 0 … N − 1, with the
+        # plant's stage cost integrated beside the state (R142); or the adaptive
+        # integral reported on that grid
         loop_params = {
             sys_id: block_params_of(loop, params, sys_id) for sys_id in self.block_ids
         }
         loop_params = integer_seeds(loop, loop_params)
         t_start = params["t_start"]
         ts = t_start + xp.arange(N + 1) * dt
+        rate = self.cost_rate(params)
         if self.sampled:
-            xs = ev.rollout(x0, u_seq, loop_params, n_steps=N, t_start=t_start)
+            xs, running = ev.rollout_with_cost(
+                x0, u_seq, loop_params, rate, n_steps=N, t_start=t_start
+            )
         elif self.adaptive is None:
-            xs = ev.rollout(
+            xs, running = ev.rollout_with_cost(
                 x0,
                 u_seq,
                 t_start,
                 dt,
                 loop_params,
+                rate,
                 solver=self.solver,
                 substeps=self.substeps,
                 n_steps=N,
             )
         else:
-            xs = integrate_adaptive(ev.rhs_of(loop_params), x0, u, ts, self.adaptive)
+            f_aug = ev.rhs_with_cost(loop_params, "plant", rate)
+            z0 = np.concatenate([np.asarray(x0, dtype=float), np.zeros(1)])
+            zs = integrate_adaptive(f_aug, z0, u, ts, self.adaptive)
+            xs, running = zs[:, :-1], zs[:, -1]
         us = xp.broadcast_to(u, (N + 1, u.size))
 
         # Every block output at every sample, and the plant's input among them
@@ -483,6 +492,7 @@ class ProblemEvaluator:
             for (sys_id, port), sl in ev.plan.output_slices.items()
         }
         recorded[PLANT_INPUT] = u_plant.T
+        recorded[RUNNING_COST] = xp.reshape(running, (1, -1))
 
         return Trajectory(
             t=ts,
@@ -491,6 +501,20 @@ class ProblemEvaluator:
             signals=recorded,
             roles={"plant": {"x": self.plant_slice, "u": PLANT_INPUT}},
         )
+
+    def cost_rate(self, params):
+        """The plant's discounted cost rate ``e^{−ρ(τ − t_start)} g(x, u, τ)`` on the run's tree: the integrand the run carries (R142)."""
+        g = self.problem.require_cost().g
+        cost_params = params["cost"]
+        rho = params["discount_rate"]
+        t_start = params["t_start"]
+
+        # ċ = e^{−ρ(τ − t_start)} g(x_plant, u_plant, τ)
+        def rate(x, u, tau):
+            xp = array_module(x, u, tau)
+            return xp.exp(-rho * (tau - t_start)) * g(x, u, tau, cost_params)
+
+        return rate
 
     def traces(self) -> bool:
         """Whether one trial's score traces on JAX (the loop does; the cost, ``X``, ``U`` and ``Xf`` may not)."""
@@ -533,6 +557,7 @@ class ProblemEvaluator:
             params=params,
             price=price,
             cost_bound=bound,
+            running_cost=traj.signals[RUNNING_COST][0],
         )
 
         return row, (traj if record else None)

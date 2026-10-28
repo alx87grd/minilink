@@ -1067,12 +1067,19 @@ finite              = every x_k and u_k finite
 feasibility_margin  = min over the run of X.margin(x_k, t_k), U.margin(u_k, x_k, t_k)
 failed              = not finite, or feasibility_margin < 0
 reachability_margin = Xf.margin(x(t_end), t_end)  reached = margin ≥ 0   (Xf = None: reached)
-cost                = ∫ e^{−ρ(t − t_start)} g dt + e^{−ρ tf} h(x(t_end), t_end)  (trapezoid; +inf when not finite; no h on an infinite horizon)
+cost                = C_N + e^{−ρ tf} h(x(t_end), t_end),  C_N = Σ_k γᵏ c_k = ∫ e^{−ρ(t − t_start)} g dt  (+inf when not finite; no h on an infinite horizon)
 J                   = cost, or with the price on cost + price · (failed or not reached),
                       and cost_bound + price for a run not finite
 ```
 
-A run that is not finite is scored on zeros behind a safe `where`, and with the price on its cost
+**The stage cost is integrated with the state** (R142): the evaluator's run carries the running
+cost `C(t) = ∫ e^{−ρ(τ − t_start)} g(x_plant, u_plant, τ) dτ` beside the loop's state, by the same
+scheme and substeps, read at the plant block's own state and input in the pass that computes
+`dx` (a sampled loop: inside the plant's period, `SampledSystem.update_with_cost`), recorded as
+the signal `"plant:running_cost"`; its last value is the run's running cost, the stage costs
+`c_k` of the step face summed with their discount. `evaluate_trajectory` reads that signal when
+the run carries it (one score) and scores a logged run, which has none, by the trapezoid on its
+samples. A run that is not finite is scored on zeros behind a safe `where`, and with the price on its cost
 term is the problem's `cost_bound(tf)`, the largest cost a finite run can reach (its `1e6`
 fallback, unannounced, when the boxes bound no cost and the price is a number): its `J` stays
 finite and above that of any finite run, failed or not. Its gradient is not defined (the rollout

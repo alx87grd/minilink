@@ -315,9 +315,13 @@ def test_evaluate_trajectory_scores_the_plant_run_of_a_loop_or_a_logged_run():
     traj = pe.trajectory(UPRIGHT)
     report = pe.evaluate(UPRIGHT)
 
-    # The loop's run, projected by its role, and the plant's run itself: one score
-    for held in (traj, traj.of("plant")):
-        np.testing.assert_allclose(evaluate_trajectory(problem, held).J, report.J)
+    # The loop's run carries its running cost: the evaluator's score, to the bit
+    np.testing.assert_array_equal(evaluate_trajectory(problem, traj).J, report.J)
+
+    # The plant's run alone is a logged run: the trapezoid on its samples, close
+    logged = evaluate_trajectory(problem, traj.of("plant")).J
+    np.testing.assert_allclose(logged, report.J, rtol=2e-3)
+    assert not np.array_equal(logged, report.J)
 
     # Signals without a role, or the wrong sizes, are refused
     with pytest.raises(ValueError, match="role"):

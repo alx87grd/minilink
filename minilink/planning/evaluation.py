@@ -18,6 +18,9 @@ from minilink.core.trajectory import Trajectory
 PROBLEM_PRICE = "problem"  # score_run's price read from the problem
 
 
+# The run's discounted running cost, integrated with the state (R142): the evaluator's recorded signal
+RUNNING_COST = "plant:running_cost"
+
 ###############################################################################
 # Public API
 ###############################################################################
@@ -130,6 +133,7 @@ def score_run(
     params=None,
     price=PROBLEM_PRICE,
     cost_bound=None,
+    running_cost=None,
 ) -> dict:
     """
     The scores of one plant run under the problem: the formula every evaluation reports.
@@ -151,7 +155,10 @@ def score_run(
     price on its cost term is the problem's cost bound, the largest cost a finite
     run can reach: its ``J`` stays finite and above that of any finite run. Its
     gradient is not defined, since the rollout itself overflowed before the
-    ``where``. ``tf`` is the horizon's length (by default the run's,
+    ``where``. ``running_cost`` is the run's integral of
+    ``e^{−ρ(t − t_start)} g`` carried with the state by the step model (R142,
+    the evaluator's), ``(N + 1,)``; without it, a logged run, the integral is
+    the trapezoid on the samples. ``tf`` is the horizon's length (by default the run's,
     ``t[-1] − t_start``) and ``t_start`` its start (R148). ``params`` overrides
     the problem's own leaves (``"cost"``, the sets' by role, ``"t_start"``,
     ``"discount_rate"``); ``None`` reads the problem's. ``price``
@@ -200,12 +207,15 @@ def score_run(
         reachability_margin = xp.min(problem.Xf.margin(x[-1], t_end, Xf_params))
     reached = reachability_margin >= 0.0
 
-    # cost = ∫ e^{−ρ(t − t_start)} g dt + e^{−ρ tf} h(x(t_end), t_end), the
-    # integral by the trapezoid
-    safe_run = Trajectory(t=t, x=x.T, u=u.T)
-    _, running = cost_fn.integrate(
-        safe_run, discount_rate=rho, params=cost_params, t_start=t_start
-    )
+    # cost = ∫ e^{−ρ(t − t_start)} g dt + e^{−ρ tf} h(x(t_end), t_end): the
+    # integral the run carried, or the trapezoid on a logged run's samples
+    if running_cost is None:
+        safe_run = Trajectory(t=t, x=x.T, u=u.T)
+        _, running = cost_fn.integrate(
+            safe_run, discount_rate=rho, params=cost_params, t_start=t_start
+        )
+    else:
+        running = xp.where(finite, running_cost, 0.0)
     cost = running[-1]
     if finite_horizon:
         cost = cost + xp.exp(-rho * tf) * cost_fn.h(x[-1], t_end, cost_params)
@@ -235,12 +245,18 @@ def evaluate_trajectory(problem, traj: Trajectory) -> Evaluation:
     A loop's run is projected to the plant's by its ``plant`` role
     (``traj.of("plant")``); a trajectory without roles is the plant's own only
     when its ``x`` and ``u`` have the plant's sizes and it records no signals
-    (a logged run). On the trajectory's array module.
+    (a logged run). A loop's run from the evaluator carries its running cost,
+    the stage cost integrated with the state (R142), so its score is the
+    evaluator's; a logged run, which has none, is scored by the trapezoid on
+    its samples. On the trajectory's array module.
     """
     run = plant_run_of(problem, traj)
     xp = array_module(run.x)
 
-    row = score_run(problem, run)
+    # A loop's run carries its running cost (R142): its score is the evaluator's;
+    # a logged run is scored on its samples by the trapezoid
+    running = traj.signals.get(RUNNING_COST)
+    row = score_run(problem, run, running_cost=None if running is None else running[0])
 
     return Evaluation(
         **{name: xp.reshape(value, (1,)) for name, value in row.items()},
