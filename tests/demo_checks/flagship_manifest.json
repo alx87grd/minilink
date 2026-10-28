@@ -76,5 +76,17 @@
     "requires": [
       "jax"
     ]
+  },
+  {
+    "id": "digital_pid_tuning",
+    "path": "examples/demos/compile/digital_pid_tuning.py",
+    "requires": [
+      "jax"
+    ]
+  },
+  {
+    "id": "multi_rate_computer",
+    "path": "examples/demos/compile/multi_rate_computer.py",
+    "requires": []
   }
 ]
