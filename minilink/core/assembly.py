@@ -249,6 +249,7 @@ def replace_nested_subsystem(
         source_sys_id, source_port_id = inner_source(
             inner_flat, nested_id, nested_port_id
         )
+        diagram.disconnect(target_sys_id, target_port_id)
         diagram.connect(
             local_map[source_sys_id],
             source_port_id,

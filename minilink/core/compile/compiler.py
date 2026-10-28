@@ -26,6 +26,9 @@ if TYPE_CHECKING:
     from minilink.core.diagram import DiagramSystem
     from minilink.core.discrete.step_diagram import StepDiagramSystem
 
+# How far the compile probe moves an input an output does not declare
+DEPENDENCY_PROBE = 0.5
+
 
 ###############################################################################
 # Public API
@@ -377,12 +380,15 @@ def validate_equation_shapes(system, label=None):
         hook = getattr(function, "__name__", "")
         if hook not in ("h", "compute_state"):
             continue
+        y0 = function(x0, u0, 0.0)
         require_shape(
-            function(x0, u0, 0.0),
+            y0,
             (port.dim,),
             f"{hook}() of '{name}'",
             f"for output port '{port_id}'",
         )
+        if hook == "h":
+            require_declared_inputs(system, name, port_id, x0, u0, y0)
 
 
 ###############################################################################
@@ -396,6 +402,48 @@ def require_shape(value, expected, what, context):
     if shape == expected or (shape == () and expected == (1,)):
         return
     raise ValueError(f"{what} returned shape {shape}; expected {expected} {context}")
+
+
+def require_declared_inputs(system, name, port_id, x0, u0, y0):
+    """Refuse an output ``y = h(x, u, t)`` that moves with an input its dependencies do not declare.
+
+    The undeclared input is a hidden feedthrough: the diagram orders the blocks
+    without it, so the output would read the input's previous value or none.
+    Each undeclared input is moved by :data:`DEPENDENCY_PROBE` at ``(x0, u0, 0)``
+    and ``h`` evaluated once more; a hook that raises there is not judged.
+    """
+    port = system.outputs[port_id]
+    if port.dependencies == "all":
+        return
+    y0 = np.asarray(y0, dtype=float)
+
+    for input_id, rows in input_rows(system).items():
+        if input_id in port.dependencies:
+            continue
+        u_moved = u0.copy()
+        u_moved[rows] += DEPENDENCY_PROBE
+        try:
+            y_moved = np.asarray(port.compute(x0, u_moved, 0.0), dtype=float)
+        except Exception:
+            continue
+        if not np.allclose(y_moved, y0, rtol=1e-12, atol=1e-12, equal_nan=True):
+            raise ValueError(
+                f"output '{port_id}' of '{name}' moves with input '{input_id}', "
+                f"which its dependencies {tuple(port.dependencies)} do not declare; "
+                f"add '{input_id}' to them (y_dependencies= in the constructor, or "
+                'dependencies= in add_output_port), or declare "all"'
+            )
+
+
+def input_rows(system):
+    """Each input port's rows in the stacked input vector ``u``, in port order."""
+    rows = {}
+    start = 0
+    for input_id, port in system.inputs.items():
+        rows[input_id] = slice(start, start + int(port.dim))
+        start += int(port.dim)
+
+    return rows
 
 
 def warn_shared_seeds(diagram):

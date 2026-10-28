@@ -458,6 +458,14 @@ defaults to the last trajectory computed (a user shortcut; library code passes
 it).
 `connect()` validates port existence and dimensions at wiring time and is
 quiet by default (`connection_verbose=False`; set `True` for one line per connection).
+It refuses to rewire a subsystem input that already reads a source (`ValueError`, naming
+both ends); `disconnect(sys_id, port_id)` opens the input and returns the source it read,
+so a rewire is the two calls. At compile, each leaf's `y = h(x, u, t)` is probed once more
+per input its `dependencies` leave out (that input moved, `h` evaluated at `x0`, the nominal
+inputs and `t = 0`): an output seen to move there with an undeclared input is a hidden
+feedthrough the evaluation order would miss, and compile refuses it, naming the block, the
+port, the input and the declaration to add. It is a probe at one point, not a proof: a
+feedthrough that vanishes there (`h = x u` at `x0 = 0`, a saturated output) passes.
 A diagram boundary output (`connect_new_output_port`, and every shortcut's `y`)
 derives its direct feedthrough from the current wiring — the boundary inputs its
 source reaches through `dependencies` edges — unless declared explicitly. A closed

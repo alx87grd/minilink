@@ -77,7 +77,6 @@ def deep_pid_nest() -> DiagramSystem:
     mid.add_subsystem(Gain([1.0]), "gain")
     mid.add_subsystem(inner, "loop")
     mid.connect("loop", "y", "gain", "u")
-    mid.connect("gain", "y", "loop", "r")
     mid.connect_new_output_port("gain", "y", "y")
     mid.add_input_port("r")
     mid.connect("input", "r", "loop", "r")

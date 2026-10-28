@@ -129,11 +129,13 @@ class WiredDiagramMixin:
         ``target_sys_id="output"`` connects to a diagram boundary output
         (used by :meth:`connect_new_output_port`). Existence and dimension
         are validated immediately so wiring mistakes fail at connect time,
-        not at compile or simulation time.
+        not at compile or simulation time. A subsystem input already connected
+        is refused: :meth:`disconnect` it first to rewire it.
         """
         self.require_connectable(
             source_sys_id, source_port_id, target_sys_id, target_port_id
         )
+        self.require_open_input(target_sys_id, target_port_id)
 
         # The target input reads the source output
         self.connections.setdefault(target_sys_id, {})[target_port_id] = (
@@ -146,6 +148,16 @@ class WiredDiagramMixin:
                 f"Connected {source_sys_id}:{source_port_id} "
                 f"to {target_sys_id}:{target_port_id}"
             )
+
+    def disconnect(self, target_sys_id, target_port_id):
+        """Open a subsystem input and return the ``(sys_id, port_id)`` it read, ``None`` if it was open."""
+        require_subsystem_target(target_sys_id)
+        self.target_port_of(target_sys_id, target_port_id)
+
+        source = self.connections[target_sys_id][target_port_id]
+        self.connections[target_sys_id][target_port_id] = None
+
+        return source
 
     def connect_new_output_port(
         self,
@@ -444,6 +456,18 @@ class WiredDiagramMixin:
                 f"Port dimension mismatch: {source_sys_id}:{source_port_id} "
                 f"has dim {source_port.dim}, {target_sys_id}:{target_port_id} "
                 f"has dim {target_port.dim}"
+            )
+
+    def require_open_input(self, target_sys_id, target_port_id):
+        """Refuse to rewire a subsystem input that already reads a source."""
+        if target_sys_id == "output":
+            return
+        source = self.connections.get(target_sys_id, {}).get(target_port_id)
+        if source is not None:
+            raise ValueError(
+                f"{target_sys_id}:{target_port_id} is already connected to "
+                f"{source[0]}:{source[1]}; disconnect('{target_sys_id}', "
+                f"'{target_port_id}') first to rewire it"
             )
 
     def source_port_of(self, source_sys_id, source_port_id):
@@ -833,4 +857,13 @@ def require_output_port(outputs, sys_id, port_id):
         raise ValueError(
             f"Unknown output port {port_id!r} on subsystem {sys_id!r}; "
             f"available: {', '.join(outputs) or '(none)'}"
+        )
+
+
+def require_subsystem_target(target_sys_id):
+    """Refuse to disconnect a diagram output: its source is set where it is exposed."""
+    if target_sys_id == "output":
+        raise ValueError(
+            "disconnect opens a subsystem input; a diagram output is set where it is "
+            "exposed (connect_new_output_port or expose)"
         )

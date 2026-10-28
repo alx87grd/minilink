@@ -247,6 +247,9 @@ class TestDiagramCompositionShortcuts(unittest.TestCase):
         self.assertEqual(diagram.connections["P"]["r"], ("Step", "r"))
         self.assertEqual(diagram.connections["P"]["y"], ("Integrator", "y"))
         self.assertEqual(diagram.connections["Integrator"]["u"], ("P", "u"))
+        with self.assertRaisesRegex(ValueError, "already connected to P:u"):
+            diagram.connect("Step", "r", "Integrator", "u")
+        self.assertEqual(diagram.disconnect("Integrator", "u"), ("P", "u"))
         diagram.connect("Step", "r", "Integrator", "u")
         diagram.autowire(strict=True)
         self.assertEqual(diagram.connections["Integrator"]["u"], ("Step", "r"))

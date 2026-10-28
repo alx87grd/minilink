@@ -73,7 +73,7 @@ def mpc_animation_overlays(
     list
         Overlay drawables for ``animate(overlays=...)``.
     """
-    traj = plant_run(rollout, loop) if traj is None else traj
+    traj = plant_trail_of(rollout, loop) if traj is None else traj
 
     # The receding horizons: one plan per tick, in absolute time
     mpc_plans = mpc_plans_from_rollout(rollout, mpc, loop=loop, block=block)
@@ -160,19 +160,66 @@ def mpc_plans_from_rollout(
     return plans
 
 
-def plant_run(rollout: Trajectory, loop=None) -> Trajectory:
-    """The plant's run inside a loop's run: its role, else its state slice of ``loop`` (a sampled loop's ``compute_trajectory``)."""
+def plant_run(rollout: Trajectory, loop=None, params=None) -> Trajectory:
+    """
+    The plant's run inside a loop's run: its role, else its slice of ``loop`` (a sampled loop's ``compute_trajectory``).
+
+    With ``loop``, ``x`` is the plant's state slice and ``u`` the input the
+    loop fed it, as its compiled plan gathers it at each tick (an open port at
+    its nominal value) and held over the period, so the run can be handed on as
+    the plant's own (to a diagram's ``trajectory_of`` when the plant is itself
+    a diagram). ``params`` is the tree the run was made with (``None``: the
+    loop's own). Reading ``u`` evaluates every block once per tick: a pure MPC
+    solves again.
+    """
     if loop is None:
         return rollout.of("plant")
 
-    start, end = loop.state_index["plant"]
+    x = plant_states_of(rollout, loop)
+    u = plant_inputs_of(rollout, loop, params)
 
-    return Trajectory(t=rollout.t, x=rollout.x[start:end], u=rollout.u)
+    return Trajectory(t=rollout.t, x=x, u=u)
 
 
 ###############################################################################
 # Internal machinery
 ###############################################################################
+
+
+def plant_trail_of(rollout, loop):
+    """The plant's states for the executed trail, with no block evaluated again (its role with no ``loop``)."""
+    if loop is None:
+        return rollout.of("plant")
+
+    return Trajectory(t=rollout.t, x=plant_states_of(rollout, loop), u=rollout.u)
+
+
+def plant_states_of(rollout, loop):
+    """The plant's state slice of a sampled loop's run."""
+    start, end = loop.state_index["plant"]
+
+    return rollout.x[start:end]
+
+
+def plant_inputs_of(rollout, loop, params=None):
+    """The plant's input at each sample of a sampled loop's dense run: ``S`` samples per tick, the last the end."""
+    ev = loop.compile()
+    t_start = float(rollout.t[0])
+    S = ev.plan.dense_points
+    n_samples = rollout.t.size
+
+    # Sample i lies in the period of tick ⌊i / S⌋; the last sample is the end's tick
+    ticks = np.arange(n_samples) // S
+    u = np.zeros((int(ev.plan.plant_op.u_dim), n_samples))
+    for k in np.unique(ticks):
+        samples = np.flatnonzero(ticks == k)
+        first = samples[0]
+        u_k = ev.plant_input(
+            rollout.x[:, first], rollout.u[:, first], int(k), params, t_start=t_start
+        )
+        u[:, samples] = np.asarray(u_k).reshape(-1, 1)
+
+    return u
 
 
 def plan_history_of(rollout, mpc, loop, block):
