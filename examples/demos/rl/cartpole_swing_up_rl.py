@@ -6,8 +6,8 @@ import numpy as np
 from minilink import (
     CartPole,
     CostFunction,
+    PlanningProblem,
     ReinforcementLearningPlanner,
-    StochasticPlanningProblem,
     Uniform,
     evaluate,
 )
@@ -41,11 +41,11 @@ class SwingUpCost(CostFunction):
         return 0.0
 
 
-problem = StochasticPlanningProblem(
+problem = PlanningProblem(
     plant,
     cost=SwingUpCost(),
     tf=np.inf,
-    x0_distribution=Uniform([-1.0, -np.pi, -1.0, -1.0], [1.0, np.pi, 1.0, 1.0]),
+    x_start=Uniform([-1.0, -np.pi, -1.0, -1.0], [1.0, np.pi, 1.0, 1.0]),
     U=plant.input_box,
 )
 

@@ -46,9 +46,9 @@ class TabularLearningPlanner(Planner):
 
     Parameters
     ----------
-    problem : PlanningProblem or StochasticPlanningProblem
-        The task: plant, cost, box and exit rule; a stochastic problem adds
-        its start, parameter and disturbance draws.
+    problem : PlanningProblem
+        The task: plant, cost, box and exit rule; a stochastic one adds its
+        start law, its parameter laws and its disturbance sources.
     x_grid, u_grid, dt
         Grid levels per state and input axis and the control period, as for
         value iteration; or pass ``grid=`` instead, never both.

@@ -6,8 +6,8 @@ import numpy as np
 from minilink import (
     CostFunction,
     Pendulum,
+    PlanningProblem,
     ReinforcementLearningPlanner,
-    StochasticPlanningProblem,
     Uniform,
     evaluate,
 )
@@ -37,11 +37,11 @@ class SwingUpCost(CostFunction):
 
 
 # The problem: infinite horizon, starts anywhere on the circle with small rates
-problem = StochasticPlanningProblem(
+problem = PlanningProblem(
     plant,
     cost=SwingUpCost(),
     tf=np.inf,
-    x0_distribution=Uniform([-np.pi, -1.0], [np.pi, 1.0]),
+    x_start=Uniform([-np.pi, -1.0], [np.pi, 1.0]),
     U=plant.input_box,
 )
 

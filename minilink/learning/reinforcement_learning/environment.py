@@ -1,18 +1,31 @@
 """The rollout environment: a stochastic planning problem as pure step functions, on NumPy or JAX."""
 
 import warnings
+import zlib
 
 import numpy as np
 
-from minilink.core.backends import BACKEND_JAX, BACKEND_NUMPY, array_module
+from minilink.core.backends import (
+    BACKEND_JAX,
+    BACKEND_NUMPY,
+    array_module,
+    is_jax_key,
+    numpy_generator,
+    require_jax,
+)
 from minilink.core.compile.evaluators.stepping import require_step_knobs
-from minilink.core.params import merge_tree
+from minilink.core.distributions import child_seed
+from minilink.core.params import flatten, merge_tree
 from minilink.core.roles import command_port
-from minilink.planning.problems import as_stochastic
+from minilink.core.wiring import WiredDiagramMixin
 
 ###############################################################################
 # Public API
 ###############################################################################
+
+
+# An episode's seed of a source: a non-negative 31-bit integer
+MAX_SEED = 2**31 - 1
 
 
 class RolloutEnvironment:
@@ -30,11 +43,10 @@ class RolloutEnvironment:
 
     Parameters
     ----------
-    problem : StochasticPlanningProblem
+    problem : PlanningProblem
         The task: plant, cost, constraint set ``X`` and its price of infeasibility,
-        horizon, start distribution, optional parameter and disturbance distributions. A deterministic
-        :class:`~minilink.planning.problems.PlanningProblem` is adapted by
-        :func:`~minilink.planning.problems.as_stochastic` and restarts at its
+        horizon, start (a point, a set or a law), the plant's parameter laws and
+        the disturbance sources. A point start restarts every episode at
         ``x_start``.
     dt : float
         Control period (one integration step, input held).
@@ -64,7 +76,6 @@ class RolloutEnvironment:
         training_zone=None,
     ):
         # The task: the problem, its plant and its cost, on one control period
-        problem = as_stochastic(problem)
         self.problem = problem
         self.sys = problem.sys
         self.cost = problem.require_cost()
@@ -89,9 +100,12 @@ class RolloutEnvironment:
         self.solver = solver
         self.substeps = int(substeps)
 
-        # Randomized plant parameters: the episode carries its own draw
-        self.params_distribution = dict(problem.params_distribution)
-        self.randomizes_params = bool(self.params_distribution)
+        # The episode's realization: the plant's laws drawn, a seed per random source
+        self.laws = problem.laws.get("plant", {})
+        self.sources = dict(problem.disturbances)
+        require_stepped_sources(self.sys, self.sources)
+        random_sources = any(block.is_random for block in self.sources.values())
+        self.randomizes_params = bool(self.laws) or random_sources
 
         # The constraint X, whose exit is a failure, and the training zone, whose
         # exit is a truncation
@@ -111,10 +125,10 @@ class RolloutEnvironment:
         self.infeasible_cost = self.price_of_infeasibility()
 
         # Noise the held-input rollout never sees is announced
-        warn_inert_noise(self.sys, problem.disturbances)
+        warn_inert_noise(self.sys, self.sources)
 
     def reset(self, key):
-        """An initial state drawn from the problem's start distribution."""
+        """An initial state drawn from the problem's start (its law, or its one point)."""
         xp = array_module(key)
 
         x0 = xp.asarray(self.problem.sample_x0(key), dtype=float)
@@ -122,11 +136,29 @@ class RolloutEnvironment:
         return x0
 
     def sample_params(self, key):
-        """The episode's parameter draws ``{name: array}`` (empty when nothing is randomized)."""
+        """
+        The episode's realization: ``{"plant": draws, port: {"seed": s}}`` (empty when nothing is drawn).
+
+        Each law of the plant is drawn once, at its path; each random source gets
+        the episode's seed (RD-D21), so two episodes from one training key see
+        distinct noise.
+        """
         if not self.randomizes_params:
             return {}
 
-        return self.problem.sample_params(key)
+        draws = self.problem.sample_params(key) if self.laws else {}
+        realization = {"plant": draws.get("plant", {})} if self.laws else {}
+        realization.update(self.source_seeds(key))
+
+        return realization
+
+    def source_seeds(self, key):
+        """The episode's seed of each random source, ``{port: {"seed": s}}``."""
+        return {
+            port: {"seed": episode_seed(key, port)}
+            for port, block in self.sources.items()
+            if block.is_random
+        }
 
     def step(self, x, t, u, key, params=None):
         """
@@ -150,8 +182,8 @@ class RolloutEnvironment:
         zone = self.training_zone
         set_params = self.set_params
 
-        # Plant input: the action on its port, the disturbance draws on theirs
-        u_full = self.input_vector(u, key)
+        # Plant input: the action on its port, each source's signal at t on theirs
+        u_full = self.input_vector(u, t, params)
 
         # Dynamics: x_{k+1} = f(x_k, u_k, w_k) over one control period, input held
         x_next = self.plant_step(x, u_full, t, params)
@@ -186,18 +218,20 @@ class RolloutEnvironment:
 
     def plant_step(self, x, u_full, t, params=None):
         """One control period of the plant, on the nominal or the episode's parameters."""
-        p = self.full_params(params) if params else None
+        plant = (params or {}).get("plant")
+        p = self.full_params(plant) if plant else None
 
         return self.evaluator.step(
             x, u_full, t, p, dt=self.dt, solver=self.solver, substeps=self.substeps
         )
 
-    def input_vector(self, u, key):
+    def input_vector(self, u, t, params=None):
         """
-        Full plant input: the action on its port, fresh disturbance draws on theirs.
+        Full plant input: the action on its port, each source's signal at ``t`` on theirs.
 
         The action is applied as given; port bounds are information, not
-        saturation. Without a ``key`` the disturbance ports keep their nominal values.
+        saturation. A random source reads the episode's seed from ``params``;
+        without one it is at its mean (RD-D17).
         """
         xp = array_module(u)
 
@@ -205,9 +239,9 @@ class RolloutEnvironment:
         ports = dict(self.nominal_inputs)
         ports[self.action_port] = u
 
-        # Fresh disturbance draws on their ports
-        if key is not None:
-            ports.update(self.problem.sample_disturbances(key))
+        # Each source's output at t on its port, with the episode's seed
+        for port, block in self.sources.items():
+            ports[port] = source_signal(block, t, (params or {}).get(port), xp)
 
         # The ports stacked in port order
         u_full = xp.concatenate(
@@ -229,11 +263,8 @@ class RolloutEnvironment:
         kind = "finite horizon" if self.finite_horizon else "infinite horizon"
         price = self.infeasible_cost
         charged = f"{price:.3g}"
-        randomized = (
-            f", randomized params {sorted(self.params_distribution)}"
-            if self.randomizes_params
-            else ""
-        )
+        names = [".".join(path) for path, _ in flatten(self.laws)]
+        randomized = f", randomized params {sorted(names)}" if self.laws else ""
 
         return (
             f"{kind}, episodes of {self.tf:g} s at dt={self.dt:g}; a failure (leaving X, "
@@ -275,6 +306,45 @@ def require_episode_steps(n_steps, tf, dt):
             f"an episode of {tf:g} s is shorter than half the control period dt={dt:g} s "
             "and holds no step; lengthen the episode or shorten dt"
         )
+
+
+def episode_seed(key, port):
+    """The episode's integer seed of the source on ``port``, from the episode's key: one stream per port."""
+    if is_jax_key(key):
+        jax = require_jax()
+        k = jax.random.fold_in(key, zlib.crc32(port.encode()))
+        return jax.random.randint(k, (), 0, MAX_SEED)
+    if isinstance(key, (int, np.integer)):
+        return child_seed(int(key), port)
+
+    return int(numpy_generator(key).integers(0, MAX_SEED))
+
+
+def require_stepped_sources(sys, sources):
+    """Refuse a source the stepped episode cannot feed: a port the plant lacks, a state, a diagram."""
+    for port, block in sources.items():
+        if port not in sys.inputs:
+            raise ValueError(
+                f"the disturbance on {port!r} has no port on {sys.name} "
+                f"(inputs {list(sys.inputs)}): the RL episode feeds plant ports only"
+            )
+        if isinstance(block, WiredDiagramMixin) or block.n > 0:
+            raise TypeError(
+                f"the source on {port!r} ({block.name}) has a state or blocks of its own: "
+                "the RL episode evaluates a source's h at t; give a memoryless source"
+            )
+
+
+def source_signal(block, t, realization, xp):
+    """A source block's output at ``t``: the episode's seed when given, its mean otherwise."""
+    params = block.realize(None) if block.is_random else block.params
+    if realization is not None:
+        params = dict(params, **realization)
+    nothing = xp.zeros(0)
+
+    w = block.h(nothing, nothing, t, params)
+
+    return xp.reshape(xp.asarray(w, dtype=float), (-1,))
 
 
 def warn_inert_noise(sys, disturbances):

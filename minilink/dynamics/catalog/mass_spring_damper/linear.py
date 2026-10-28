@@ -2,6 +2,7 @@
 
 import numpy as np
 
+from minilink.core.backends import array_module
 from minilink.core.kinematics import translation
 from minilink.dynamics.abstraction.state_space import StateSpaceSystem
 from minilink.graphical.animation.primitives import (
@@ -38,6 +39,7 @@ class SingleMass(StateSpaceSystem):
 
     def A(self, t=0.0, params=None):
         params = self.params if params is None else params
+        xp = array_module(t, *params.values())
 
         mass = params["mass"]
         k = params["k"]
@@ -45,7 +47,7 @@ class SingleMass(StateSpaceSystem):
 
         # m ẍ + b ẋ + k x = u, on the state [x, ẋ]
         # fmt: off
-        A = np.array([
+        A = xp.array([
             [      0.0,       1.0],
             [-k / mass, -b / mass],
         ])
@@ -55,12 +57,13 @@ class SingleMass(StateSpaceSystem):
 
     def B(self, t=0.0, params=None):
         params = self.params if params is None else params
+        xp = array_module(t, *params.values())
 
         mass = params["mass"]
 
         # The force enters through the acceleration row
         # fmt: off
-        B = np.array([
+        B = xp.array([
             [0.0],
             [1.0 / mass],
         ])
@@ -141,6 +144,7 @@ class TwoMass(StateSpaceSystem):
 
     def A(self, t=0.0, params=None):
         params = self.params if params is None else params
+        xp = array_module(t, *params.values())
 
         m1 = params["m1"]
         m2 = params["m2"]
@@ -161,7 +165,7 @@ class TwoMass(StateSpaceSystem):
 
         # The state [x₁, x₂, ẋ₁, ẋ₂]: the positions move at the velocities
         # fmt: off
-        A = np.array([
+        A = xp.array([
             [0.0, 0.0, 1.0, 0.0],
             [0.0, 0.0, 0.0, 1.0],
             [A31, A32, A33, 0.0],
@@ -173,12 +177,13 @@ class TwoMass(StateSpaceSystem):
 
     def B(self, t=0.0, params=None):
         params = self.params if params is None else params
+        xp = array_module(t, *params.values())
 
         m2 = params["m2"]
 
         # The force enters on the second mass
         # fmt: off
-        B = np.array([
+        B = xp.array([
             [0.0],
             [0.0],
             [0.0],
@@ -271,6 +276,7 @@ class ThreeMass(StateSpaceSystem):
 
     def A(self, t=0.0, params=None):
         params = self.params if params is None else params
+        xp = array_module(t, *params.values())
 
         m1 = params["m1"]
         m2 = params["m2"]
@@ -300,7 +306,7 @@ class ThreeMass(StateSpaceSystem):
 
         # The state [x₁, x₂, x₃, ẋ₁, ẋ₂, ẋ₃]: the positions move at the velocities
         # fmt: off
-        A = np.array([
+        A = xp.array([
             [0.0, 0.0, 0.0, 1.0, 0.0, 0.0],
             [0.0, 0.0, 0.0, 0.0, 1.0, 0.0],
             [0.0, 0.0, 0.0, 0.0, 0.0, 1.0],
@@ -314,12 +320,13 @@ class ThreeMass(StateSpaceSystem):
 
     def B(self, t=0.0, params=None):
         params = self.params if params is None else params
+        xp = array_module(t, *params.values())
 
         m3 = params["m3"]
 
         # The force enters on the third mass
         # fmt: off
-        B = np.array([
+        B = xp.array([
             [0.0],
             [0.0],
             [0.0],

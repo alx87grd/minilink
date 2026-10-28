@@ -10,7 +10,7 @@ from minilink.core.exports import lazy_facade
 #
 #     from minilink import Pendulum, Impedance, lqr
 #     from minilink import QuadraticCost, PlanningProblem, DynamicProgrammingPlanner
-#     from minilink import ReinforcementLearningPlanner, StochasticPlanningProblem
+#     from minilink import ReinforcementLearningPlanner, Uniform
 #
 # The band facades organise the same names by role (``minilink.catalog``,
 # ``minilink.blocks``, ``minilink.dynamics``, ``minilink.control``,
@@ -149,10 +149,6 @@ _EXPORTS: dict[str, tuple[str, str]] = {
     "PolicyEvaluator": (
         "minilink.planning.dynamic_programming.policy_eval",
         "PolicyEvaluator",
-    ),
-    "StochasticPlanningProblem": (
-        "minilink.planning.problems",
-        "StochasticPlanningProblem",
     ),
     "Gaussian": ("minilink.core.distributions", "Gaussian"),
     "Uniform": ("minilink.core.distributions", "Uniform"),

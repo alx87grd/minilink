@@ -3,6 +3,7 @@
 import warnings
 import zlib
 from abc import ABC, abstractmethod
+from dataclasses import dataclass
 
 import numpy as np
 
@@ -22,11 +23,16 @@ from minilink.core.sets import BoxSet, Set
 
 
 class Distribution(ABC):
-    """Vector-valued distribution: ``dim``, ``mean`` (an array), ``sample(key, n=None)``, optional ``support``.
+    """Vector-valued distribution: ``dim``, ``mean``, ``cov``, ``params`` and ``sample(key, n=None, params=None)``.
 
     A duck type, not a probability library: anything with ``dim``, ``sample(key)``
-    and ``mean`` works. ``key`` is a NumPy generator, an integer seed, or a JAX
-    PRNG key (JAX arrays out, traceable under ``jit`` / ``vmap`` / ``scan``).
+    and ``mean`` works; ``params`` and ``cov`` are the library laws'. ``key`` is a
+    NumPy generator, an integer seed, a JAX PRNG key (JAX arrays out, traceable
+    under ``jit`` / ``vmap`` / ``scan``), or, on the library laws, a
+    :class:`CounterKey` ``(seed, k)``: one draw by the library's cipher, the same
+    on both backends (what a noise source holds over its sample ``k``).
+    The law's numbers are its ``params``; ``sample(key, n, params)`` draws from
+    the law they name, so a noise level is a parameter like a mass (RD-R1).
     """
 
     support: Set | None = None
@@ -36,6 +42,14 @@ class Distribution(ABC):
     @abstractmethod
     def dim(self) -> int: ...
 
+    # The law's numbers, by name (``{}`` for a law that exposes none)
+    params = {}
+
+    @property
+    def cov(self) -> np.ndarray:
+        """The covariance of one draw, ``(dim, dim)``, for a law that states it."""
+        raise NotImplementedError(f"{type(self).__name__} states no covariance")
+
     def __str__(self):
         return inspect_text(self)
 
@@ -43,42 +57,81 @@ class Distribution(ABC):
         repr_pretty(self, p, cycle)
 
     @abstractmethod
-    def sample(self, key, n=None):
+    def sample(self, key, n=None, params=None):
         """
         Draw one sample (shape ``(dim,)``) or ``n`` samples (``(n, dim)``).
 
         ``key`` is a :class:`numpy.random.Generator`, an integer seed, or a
-        JAX PRNG key (JAX arrays out, traceable).
+        JAX PRNG key (JAX arrays out, traceable). ``params=None`` reads the
+        law's own :attr:`params`.
         """
         ...
 
 
 class Gaussian(Distribution):
-    """Diagonal Gaussian ``x ~ N(mean, diag(std**2))``."""
+    """Gaussian ``x ~ N(mean, Σ)``: diagonal from ``std`` (``Σ = diag(std²)``), or full from ``cov``."""
 
-    def __init__(self, mean, std):
+    def __init__(self, mean, std=None, cov=None):
+        require_one_spread(std, cov)
         self.mean = np.asarray(mean, dtype=float).reshape(-1)
-        self.std = np.broadcast_to(np.asarray(std, dtype=float), self.mean.shape).copy()
+        if cov is None:
+            self.std = np.broadcast_to(
+                np.asarray(std, dtype=float), self.mean.shape
+            ).copy()
+            self.full_cov = None
+        else:
+            self.std = None
+            self.full_cov = np.asarray(cov, dtype=float).reshape(self.dim, self.dim)
 
     @property
     def dim(self) -> int:
         return int(self.mean.size)
 
-    def sample(self, key, n=None):
-        mean = self.mean
-        std = self.std
+    @property
+    def params(self) -> dict:
+        """``{"mean", "std"}`` for a diagonal law, ``{"mean", "cov"}`` for a full one."""
+        if self.full_cov is None:
+            return {"mean": self.mean, "std": self.std}
+
+        return {"mean": self.mean, "cov": self.full_cov}
+
+    @property
+    def cov(self) -> np.ndarray:
+        if self.full_cov is None:
+            return np.diag(self.std**2)
+
+        return self.full_cov
+
+    def sample(self, key, n=None, params=None):
+        params = self.params if params is None else params
+
+        mean = params["mean"]
+        std = params.get("std")
+        cov = params.get("cov")
         dim = self.dim
 
         shape = (dim,) if n is None else (int(n), dim)
 
-        # ε ~ N(0, I), drawn on the key's backend
-        if is_jax_key(key):
+        # ε ~ N(0, I), drawn on the key's backend (a counter key by the cipher)
+        if is_counter_key(key):
+            require_one_counter_draw(n)
+            xp = array_module(key.seed, key.k, mean, std, cov)
+            eps = standard_normal(key.seed, key.k, dim)
+        elif is_jax_key(key):
             jax = require_jax()
+            xp = jax.numpy
             eps = jax.random.normal(key, shape)
         else:
+            xp = np
             eps = numpy_generator(key).standard_normal(shape)
 
-        x = mean + std * eps
+        if cov is None:
+            # x = mean + std ε
+            x = mean + std * eps
+        else:
+            # x = mean + L ε, with Σ = L Lᵀ
+            L = xp.linalg.cholesky(cov)
+            x = mean + eps @ L.T
 
         return x
 
@@ -95,8 +148,23 @@ class Uniform(Distribution):
     def dim(self) -> int:
         return self.box.dim
 
-    def sample(self, key, n=None):
-        return self.box.sample(key, n)
+    @property
+    def params(self) -> dict:
+        """``{"lower", "upper"}``, the box's bounds."""
+        return self.box.params
+
+    @property
+    def cov(self) -> np.ndarray:
+        lower = self.box.lower
+        upper = self.box.upper
+
+        # Σ = diag((b − a)² / 12)
+        cov = np.diag((upper - lower) ** 2 / 12.0)
+
+        return cov
+
+    def sample(self, key, n=None, params=None):
+        return self.box.sample(key, n, params)
 
 
 class Particles(Distribution):
@@ -111,13 +179,34 @@ class Particles(Distribution):
     def dim(self) -> int:
         return int(self.points.shape[1])
 
-    def sample(self, key, n=None):
+    @property
+    def params(self) -> dict:
+        """``{"points"}``, the ``(N, dim)`` support points."""
+        return {"points": self.points}
+
+    @property
+    def cov(self) -> np.ndarray:
         points = self.points
 
+        # The law's own covariance: Σ = (1/N) Σᵢ (pᵢ − p̄)(pᵢ − p̄)ᵀ
+        cov = np.atleast_2d(np.cov(points, rowvar=False, bias=True))
+
+        return cov
+
+    def sample(self, key, n=None, params=None):
+        params = self.params if params is None else params
+
+        points = params["points"]
         count = points.shape[0]
 
         # A uniform index into the points: x = points[idx]
-        if is_jax_key(key):
+        if is_counter_key(key):
+            require_one_counter_draw(n)
+            xp = array_module(key.seed, key.k, points)
+            u = standard_uniform(key.seed, key.k, 1)[0]
+            idx = xp.minimum(xp.floor(u * count).astype(int), count - 1)
+            x = xp.asarray(points)[idx]
+        elif is_jax_key(key):
             jax = require_jax()
             xp = array_module(key)
             idx = jax.random.randint(key, () if n is None else (int(n),), 0, count)
@@ -134,6 +223,36 @@ class Particles(Distribution):
 ###############################################################################
 # Internal machinery
 ###############################################################################
+
+
+@dataclass(frozen=True)
+class CounterKey:
+    """The key of one counter-based draw: the stream's ``seed`` and the sample index ``k``.
+
+    A law sampled with it draws by the library's cipher (:func:`standard_normal`,
+    :func:`standard_uniform`): a pure function of ``(seed, k)``, identical on NumPy
+    and JAX and traceable in both.
+    """
+
+    seed: object
+    k: object
+
+
+def is_counter_key(key) -> bool:
+    """Whether ``key`` is a :class:`CounterKey`."""
+    return isinstance(key, CounterKey)
+
+
+def require_one_counter_draw(n):
+    """Refuse ``n`` draws from one counter key: it names one sample."""
+    if n is not None:
+        raise ValueError("a CounterKey names one sample: draw it with n=None")
+
+
+def require_one_spread(std, cov):
+    """Refuse a Gaussian given both ``std`` and ``cov``, or neither."""
+    if (std is None) == (cov is None):
+        raise ValueError("Gaussian takes one spread: std= (diagonal) or cov= (full)")
 
 
 def check_points(points):
@@ -247,6 +366,16 @@ def standard_normal(seed, k, p):
     return eps
 
 
+def standard_uniform(seed, k, p):
+    """``p`` independent uniforms in ``(0, 1)`` for sample ``k`` of the stream keyed by ``seed``, the same on NumPy and JAX."""
+    bits_1, _ = random_bits(seed, k, p)
+
+    # u = (bits ≫ 8) 2⁻²⁴ + 2⁻²⁵, the top 24 bits of the first word
+    u = (bits_1 >> 8).astype(float) * 2.0**-24 + 2.0**-25
+
+    return u
+
+
 def sample_index(t, period):
     """The index ``k`` of the sample held at time ``t``, the floor of ``t / period``.
 
@@ -254,7 +383,7 @@ def sample_index(t, period):
     error before a boundary. Returned as a 0-d integer array; the 32-bit JAX mode cannot
     hold the index past a few boundaries and is announced once.
     """
-    xp = array_module(t)
+    xp = array_module(t, period)
 
     # The 32-bit JAX mode is announced, not refused
     if xp is not np and not jax_x64_policy():

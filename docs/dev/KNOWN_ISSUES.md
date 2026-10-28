@@ -6,15 +6,6 @@ names the symptom, a minimal reproduction, a workaround, and the workboard row t
 in [TODO.md](../plans/TODO.md); this list is the index, and an entry leaves it when its fix
 lands. Last checked against the code: 2026-10-25.
 
-## Simulation and evaluation
-
-### The same key draws different trials on NumPy and on JAX
-- **Symptom:** `evaluate(..., key=0, backend="numpy")` and `backend="jax"` draw different
-  starts and parameters: the key seeds a NumPy generator on one backend and a JAX PRNG key on
-  the other (`planning/evaluator.py`, `trial_key`). Each backend is deterministic on its own.
-- **Workaround:** compare runs within one backend.
-- **Fix:** RN-4 (the v0.3 core's draws, TODO §1.3), one draw convention on both backends.
-
 ## Composition and control
 
 ### `ComputedTorque` cannot drive an underactuated plant

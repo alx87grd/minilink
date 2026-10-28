@@ -6,8 +6,8 @@ from minilink import (
     CostFunction,
     Drone2D,
     Gaussian,
+    PlanningProblem,
     ReinforcementLearningPlanner,
-    StochasticPlanningProblem,
     evaluate,
 )
 
@@ -58,11 +58,11 @@ class HoverCost(CostFunction):
         return 0.0
 
 
-problem = StochasticPlanningProblem(
+problem = PlanningProblem(
     plant,
     cost=HoverCost(),
     tf=np.inf,
-    x0_distribution=Gaussian(np.zeros(6), [5.0, 5.0, 1.0, 1.0, 1.0, 0.2]),
+    x_start=Gaussian(np.zeros(6), [5.0, 5.0, 1.0, 1.0, 1.0, 0.2]),
     U=plant.input_box,
 )
 

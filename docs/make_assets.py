@@ -410,9 +410,9 @@ def gif_rocket() -> None:
     from minilink import (
         CostFunction,
         Gaussian,
+        PlanningProblem,
         ReinforcementLearningPlanner,
         Rocket,
-        StochasticPlanningProblem,
     )
     from minilink.graphical.catalog import camera_matrix
 
@@ -444,11 +444,11 @@ def gif_rocket() -> None:
         def h(self, x, t=0.0, params=None):
             return 0.0
 
-    problem = StochasticPlanningProblem(
+    problem = PlanningProblem(
         plant,
         cost=LandingCost(),
         tf=TF,
-        x0_distribution=Gaussian(
+        x_start=Gaussian(
             [0.0, 20.0, 0.0, 0.0, 0.0, 0.0], [10.0, 8.0, 0.3, 2.0, 2.0, 0.3]
         ),
         infeasible_cost=100.0,

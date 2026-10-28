@@ -275,24 +275,28 @@ def test_the_rollout_environment_warns_about_noise_it_never_sees():
     import warnings
 
     from minilink import NoisyPendulum
+    from minilink.blocks.sources import WhiteNoise
     from minilink.core.costs import QuadraticCost
-    from minilink.core.distributions import Gaussian, Uniform
+    from minilink.core.distributions import Uniform
     from minilink.learning.reinforcement_learning.environment import RolloutEnvironment
-    from minilink.planning.problems import StochasticPlanningProblem
+    from minilink.planning.problems import PlanningProblem
 
     def problem(sys, **disturbances):
-        return StochasticPlanningProblem(
+        return PlanningProblem(
             sys,
             cost=QuadraticCost.from_system(sys),
             tf=1.0,
-            x0_distribution=Uniform([-0.5, -0.5], [0.5, 0.5]),
+            x_start=Uniform([-0.5, -0.5], [0.5, 0.5]),
             disturbances=disturbances or None,
             U=sys.input_box,
         )
 
     cases = [
-        (problem(NoisyPendulum(), d=Gaussian(0.0, 0.1)), None),
-        (problem(NoisyPendulum(), n=Gaussian(0.0, 0.1)), "never calls h"),
+        (problem(NoisyPendulum(), d=WhiteNoise(1, psd=0.01, sample_period=0.1)), None),
+        (
+            problem(NoisyPendulum(), n=WhiteNoise(1, psd=0.01, sample_period=0.1)),
+            "never calls h",
+        ),
         (problem(noisy_plant()), "fixed seed"),
     ]
     for prob, expected in cases:
@@ -319,7 +323,6 @@ def test_a_distribution_is_dim_mean_and_sample_and_a_user_law_drives_a_problem()
     from minilink import Gaussian, PlanningProblem, QuadraticCost, Uniform
     from minilink.core import Distribution
     from minilink.dynamics.catalog.equations import DoubleIntegrator
-    from minilink.planning.problems import StochasticPlanningProblem
 
     # The library laws are Distributions: their draws have the shape (n, dim)
     for law in (Gaussian([0.0, 1.0], 0.1), Uniform([-1.0, -1.0], [1.0, 1.0])):
@@ -338,9 +341,172 @@ def test_a_distribution_is_dim_mean_and_sample_and_a_user_law_drives_a_problem()
             return draws[0] if n is None else draws
 
     plant = DoubleIntegrator()
-    problem = StochasticPlanningProblem(
-        plant, cost=QuadraticCost.from_system(plant), x0_distribution=Corners()
+    problem = PlanningProblem(
+        plant, cost=QuadraticCost.from_system(plant), x_start=Corners()
     )
-    x0s, _ = problem.realize(0, 4)
+    x0s = problem.realize(0, 4)["x_start"]
     assert x0s.shape == (4, 2) and set(np.abs(x0s).ravel()) == {1.0}
     assert isinstance(problem.nominal(), PlanningProblem)
+
+
+def test_a_law_reads_its_numbers_from_params():
+    from minilink import Gaussian, Uniform
+    from minilink.core.distributions import Particles
+
+    law = Gaussian([0.0, 1.0], [1.0, 0.5])
+    assert set(law.params) == {"mean", "std"}
+    np.testing.assert_array_equal(law.cov, np.diag([1.0, 0.25]))
+    wider = {"mean": law.mean, "std": 2.0 * law.std}
+    np.testing.assert_allclose(
+        law.sample(3, 4, wider) - law.mean, 2.0 * (law.sample(3, 4) - law.mean)
+    )
+
+    np.testing.assert_allclose(Uniform([0.0], [1.0]).cov, [[1.0 / 12.0]])
+    points = np.array([[0.0, 0.0], [2.0, 4.0]])
+    np.testing.assert_allclose(Particles(points).cov, [[1.0, 2.0], [2.0, 4.0]])
+
+
+def test_a_full_covariance_is_drawn_through_its_cholesky_factor():
+    from minilink import Gaussian
+
+    cov = np.array([[1.0, 0.8], [0.8, 1.0]])
+    law = Gaussian(np.zeros(2), cov=cov)
+    assert set(law.params) == {"mean", "cov"}
+    draws = law.sample(0, 20000)
+    np.testing.assert_allclose(np.cov(draws, rowvar=False), cov, atol=0.03)
+    with pytest.raises(ValueError, match="one spread"):
+        Gaussian(np.zeros(2), std=1.0, cov=cov)
+
+
+@pytest.mark.optional
+@pytest.mark.jax
+def test_a_family_of_noise_levels_vmaps_like_a_family_of_masses():
+    jax = pytest.importorskip("jax")
+    import jax.numpy as jnp
+
+    from minilink import Gaussian
+
+    law = Gaussian(np.zeros(2), np.ones(2))
+    key = jax.random.PRNGKey(0)
+    stds = jnp.array([[0.1, 0.1], [1.0, 1.0], [3.0, 3.0]])
+
+    family = jax.vmap(
+        lambda std: law.sample(key, params={"mean": law.mean, "std": std})
+    )(stds)
+
+    one = law.sample(key)
+    np.testing.assert_allclose(family, np.asarray(stds) * np.asarray(one), rtol=1e-12)
+
+
+def test_a_set_reads_its_numbers_from_params_and_moves_by_them():
+    from minilink.core.sets import BallSet, BoxSet, SingletonSet
+
+    box = BoxSet([0.0, 0.0], [1.0, 2.0])
+    z = np.array([0.5, 0.5])
+    assert set(box.params) == {"lower", "upper"}
+    np.testing.assert_array_equal(
+        box.margin(z, params={"lower": np.zeros(2), "upper": np.ones(2)}),
+        box.with_params({"lower": np.zeros(2), "upper": np.ones(2)}).margin(z),
+    )
+    both = box & BallSet([0.0, 0.0], 1.0)
+    assert set(both.params) == {"0", "1"}
+    moved = both.with_params(
+        {**both.params, "1": {"center": np.ones(2), "radius": 0.1}}
+    )
+    assert moved.margin(z)[-1] < 0.0 <= both.margin(z)[-1]
+    assert SingletonSet([1.0]).params["point"].tolist() == [1.0]
+
+
+def test_a_sampled_sensor_holds_draws_of_its_datasheet_law():
+    from minilink import Gaussian
+    from minilink.blocks import NoiseSource
+
+    R_d = np.array([[0.04, 0.01], [0.01, 0.09]])
+    sensor = NoiseSource(Gaussian(np.zeros(2), cov=R_d), sample_period=0.02, seed=4)
+    assert set(sensor.params) == {"seed", "sample_period", "law"} and sensor.dim == 2
+
+    # The twin: the samples' covariance is the datasheet's, each sample held over Δ
+    t = 0.02 * np.arange(4000) + 0.005
+    w = np.array([sensor.h(None, None, tk) for tk in t])
+    np.testing.assert_allclose(np.cov(w, rowvar=False), R_d, atol=0.006)
+    np.testing.assert_array_equal(
+        sensor.h(None, None, 0.021), sensor.h(None, None, 0.039)
+    )
+
+    # The law's numbers are parameters; no seed is the mean; a period is a hint
+    quiet = dict(sensor.params, law={"mean": np.zeros(2), "cov": 0.25 * R_d})
+    np.testing.assert_allclose(
+        sensor.h(None, None, 0.1, quiet), 0.5 * sensor.h(None, None, 0.1)
+    )
+    np.testing.assert_array_equal(
+        sensor.h(None, None, 0.1, dict(sensor.params, seed=None)), [0.0, 0.0]
+    )
+    assert sensor.solver_info["sample_period"] == 0.02
+
+
+@pytest.mark.jax
+def test_a_noise_source_is_the_same_signal_on_both_backends():
+    pytest.importorskip("jax")
+    from minilink import Uniform
+    from minilink.blocks import NoiseSource
+    from minilink.core.backends import ensure_jax_x64
+
+    jax = ensure_jax_x64()
+    noise = NoiseSource(Uniform([-0.005], [0.005]), sample_period=0.02, seed=3)
+    t = 0.02 * np.arange(20) + 0.01
+    on_numpy = np.array([noise.h(None, None, tk) for tk in t])
+    on_jax = jax.vmap(lambda tk: noise.h(jax.numpy.zeros(0), jax.numpy.zeros(0), tk))(t)
+    np.testing.assert_array_equal(np.asarray(on_jax), on_numpy)
+    assert np.all(np.abs(on_numpy) <= 0.005)
+
+
+def test_a_source_without_a_seed_is_its_mean_and_not_random():
+    from minilink import Gain
+    from minilink.blocks.sources import NoiseSource
+    from minilink.control.stochastic import GaussianPolicy
+    from minilink.core.distributions import Gaussian
+
+    law = Gaussian([1.0], [0.5])
+    source = NoiseSource(law, sample_period=0.1, seed=None)
+    assert not source.is_random and NoiseSource(law, sample_period=0.1).is_random
+
+    # The mean is the one the params give
+    moved = dict(source.params, law={"mean": np.array([2.0]), "std": law.std})
+    np.testing.assert_array_equal(source.h(None, None, 0.3, moved), [2.0])
+
+    policy = GaussianPolicy(Gain(np.array([[1.0]])), -1.0, sample_period=0.1)
+    assert not policy.is_random
+    policy.params["seed"] = 3
+    assert policy.is_random
+
+
+def test_a_full_covariance_law_prints_its_covariance():
+    from minilink.core.distributions import Gaussian
+
+    text = str(Gaussian([0.0, 0.0], cov=[[1.0, 0.2], [0.2, 2.0]]))
+    assert "cov=" in text and "None" not in text
+
+
+def test_the_rollout_refuses_a_source_it_cannot_feed():
+    from minilink import Pendulum
+    from minilink.blocks.sources import WhiteNoise
+    from minilink.core.costs import QuadraticCost
+    from minilink.learning.reinforcement_learning.environment import (
+        RolloutEnvironment,
+        episode_seed,
+    )
+    from minilink.planning.problems import PlanningProblem
+
+    sys = Pendulum()
+    problem = PlanningProblem(
+        sys,
+        cost=QuadraticCost.from_system(sys),
+        tf=1.0,
+        disturbances={"n": WhiteNoise(2, psd=0.1)},
+    )
+    with pytest.raises(ValueError, match="no port on"):
+        RolloutEnvironment(problem, dt=0.1, backend="numpy")
+
+    # An integer key gives each port its own seed
+    assert episode_seed(5, "d") != episode_seed(5, "n")
+    assert episode_seed(5, "d") == episode_seed(5, "d")

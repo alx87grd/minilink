@@ -271,10 +271,7 @@ def replace_nested_subsystem(
     reorder_subsystems_after_inline(
         diagram, order_before, nested_id, inner_flat, local_map
     )
-    diagram.n, diagram.state_index, diagram.state, diagram.x0, diagram.derived_x0 = (
-        state_layout(diagram.subsystems)
-    )
-    diagram.refresh_solver_info()
+    diagram.n, diagram.state_index, diagram.state = state_layout(diagram.subsystems)
     return local_map
 
 
@@ -370,21 +367,16 @@ def is_step_box(sys) -> bool:
 
 
 def carry_left_operand(diagram, left) -> None:
-    """Carry a diagram left operand's name, ``x0`` and camera settings into ``diagram``.
+    """Carry a diagram left operand's name and camera settings into ``diagram``.
 
-    The left operand's blocks come first in the result, so its ``x0`` is the
-    head of the stacked state; a leaf left operand carries nothing.
+    The result shares the left operand's blocks, so their ``x0`` (which the
+    blocks own, R124) comes with them; a leaf left operand carries nothing.
     """
     if not is_box(left):
         return
 
-    # The name, and the left operand's blocks' x0 at the head of the stacked state
-    # (a held output starts anywhere: every block fires at the first tick)
-    n_blocks = left.n - left.hold_dim if is_step_box(left) else left.n
+    # The name
     diagram.name = left.name
-    diagram.x0 = np.concatenate(
-        [np.asarray(left.x0, dtype=float)[:n_blocks], diagram.x0[n_blocks:]]
-    )
 
     # The camera settings
     diagram.camera_scale = left.camera_scale

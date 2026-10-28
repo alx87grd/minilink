@@ -2,6 +2,8 @@
 
 import numpy as np
 
+from minilink.core.params import flatten
+
 ###############################################################################
 # Public API
 ###############################################################################
@@ -24,6 +26,7 @@ def inspect_text(obj):
     """One short summary for a textbook object; unknown types use ``repr``."""
     # Real cycles: every module below imports inspect_text for its own display
     from minilink.core.costs import CostFunction
+    from minilink.core.fields import Field
     from minilink.core.sets import InputSet, Set
     from minilink.core.system import System
     from minilink.core.trajectory import Trajectory
@@ -32,9 +35,8 @@ def inspect_text(obj):
         OptimizationResult,
     )
     from minilink.optimization.optimizer import Optimizer
-    from minilink.planning.problems import PlanningProblem, StochasticPlanningProblem
+    from minilink.planning.problems import PlanningProblem
     from minilink.planning.results import PlanningSolution
-    from minilink.planning.spatial.state_fields import StateField
 
     if isinstance(obj, System):
         return system_text(obj)
@@ -51,9 +53,9 @@ def inspect_text(obj):
 
     if isinstance(obj, CostFunction):
         return cost_text(obj)
-    if isinstance(obj, StateField):
+    if isinstance(obj, Field):
         return field_text(obj)
-    if isinstance(obj, StochasticPlanningProblem):
+    if isinstance(obj, PlanningProblem) and obj.is_stochastic:
         return stochastic_problem_text(obj)
     if isinstance(obj, PlanningProblem):
         return problem_text(obj)
@@ -163,6 +165,7 @@ def trajectory_text(traj):
 
 def set_text(obj):
     # A real cycle: sets imports this module
+    from minilink.core.fields import FieldSet
     from minilink.core.sets import (
         BallSet,
         BoxInputSet,
@@ -170,7 +173,6 @@ def set_text(obj):
         IntersectionSet,
         SingletonSet,
     )
-    from minilink.planning.spatial.state_fields import FieldSet
 
     if isinstance(obj, BoxSet):
         return f"BoxSet, dim={obj.dim}, {box_interval(obj.lower, obj.upper, 'z')}"
@@ -201,9 +203,10 @@ def distribution_text(obj):
     from minilink.core.distributions import Distribution, Gaussian, Particles, Uniform
 
     if isinstance(obj, Gaussian):
-        return (
-            f"Gaussian, dim={obj.dim}, mean={array_text(obj.mean)}, "
+        return f"Gaussian, dim={obj.dim}, mean={array_text(obj.mean)}, " + (
             f"std={array_text(obj.std)}"
+            if obj.full_cov is None
+            else f"cov={array_text(obj.full_cov)}"
         )
     if isinstance(obj, Uniform):
         box = obj.box
@@ -251,11 +254,13 @@ def stochastic_problem_text(problem):
         criterion_s = str(criterion)
     headline = f"{headline}, criterion={criterion_s}"
 
-    body.append(body_line("x0", inspect_inline(problem.x0_distribution)))
-    if problem.params_distribution:
-        names = ", ".join(sorted(problem.params_distribution))
-        n = len(problem.params_distribution)
-        body.append(body_line("params", f"{n} laws ({names})"))
+    if problem.start_law is not None:
+        body.append(body_line("x0", inspect_inline(problem.start_law)))
+    if problem.laws:
+        paths = [".".join(path) for path, _ in flatten(problem.laws)]
+        body.append(
+            body_line("params", f"{len(paths)} laws ({', '.join(sorted(paths))})")
+        )
     if problem.disturbances:
         body.append(body_line("disturbances", ", ".join(sorted(problem.disturbances))))
 

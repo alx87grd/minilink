@@ -14,7 +14,7 @@ from minilink.learning.reinforcement_learning import (
     TabularLearningPlanner,
 )
 from minilink.learning.reinforcement_learning.environment import RolloutEnvironment
-from minilink.planning import StochasticPlanningProblem, Uniform
+from minilink.planning import Uniform
 from minilink.planning.dynamic_programming.dp import DynamicProgrammingResult
 from minilink.planning.dynamic_programming.lookup_policy import LookupPolicy
 from minilink.planning.results import PlanningSolution
@@ -31,13 +31,13 @@ def double_integrator_problem(stochastic=False):
     cost = QuadraticCost.from_system(plant, Q=np.diag([1.0, 0.1]), R=np.diag([0.01]))
     exit_rule = dict(infeasible_cost=20.0)  # one price for both tools
     if stochastic:
-        return StochasticPlanningProblem(
+        return PlanningProblem(
             plant,
             cost=cost,
             tf=np.inf,
             X=plant.state.box,
             U=plant.input_box,
-            x0_distribution=Uniform([-1, -1], [1, 1]),
+            x_start=Uniform([-1, -1], [1, 1]),
             **exit_rule,
         )
     return PlanningProblem(

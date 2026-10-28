@@ -14,7 +14,6 @@ from minilink.core.system import (
     DynamicSystem,
     System,
 )
-from minilink.core.wiring import own_x0_of
 
 SAMPLED_SOLVERS = ("rk4", "euler", "exact")
 
@@ -65,16 +64,16 @@ class SampledSystem(StepSystem):
         self.solver = solver
         self.substeps = int(substeps)
 
-        # The System shell: a static source has no state (n = 0)
+        # The System shell: a static source has no state (n = 0); the shell's zero
+        # start would write through to the source, whose own start is put back
+        x0 = np.array(source.x0, dtype=float)
         System.__init__(self, source.n)
+        source.x0 = x0
         self.name = f"Discretized({source.name})"
         self.id = source.id
         self.params = None
-        self.solver_info = source.solver_info
 
-        # State: the source's initial state, labels, units, bounds and nominal value
-        self.x0 = np.array(source.x0, dtype=float)
-        self.derived_x0 = np.copy(self.x0)
+        # State: the source's (its x0 a view, R124), labels, units, bounds and nominal value
         self.state = source.state
 
         # Ports: the source's own, their functions included
@@ -100,12 +99,27 @@ class SampledSystem(StepSystem):
     def params(self, value: dict | None):
         self.params_override = value
 
-    def refresh(self):
-        """Refresh the source, then read again what the view copied: its size, state, ports, ``x0`` and solver hints.
+    @property
+    def x0(self):
+        """The source's ``x0``, read live; setting it writes through to the source, which owns it (R124)."""
+        return np.asarray(self.source.x0, dtype=float)
 
-        An ``x0`` set on the view itself is kept while its size still fits.
-        """
-        x0 = own_x0_of(self)
+    @x0.setter
+    def x0(self, value):
+        self.source.x0 = np.array(value, dtype=float)
+
+    @property
+    def solver_info(self) -> dict:
+        """The source's solver hints, read live: they describe the source."""
+        return self.source.solver_info
+
+    @solver_info.setter
+    def solver_info(self, value: dict):
+        # The System shell's defaults: the view's hints are its source's
+        return
+
+    def refresh(self):
+        """Refresh the source, then read again the structure the view took from it: its size, state and ports."""
         source = self.source
         source.refresh()
 
@@ -113,11 +127,6 @@ class SampledSystem(StepSystem):
         self.state = source.state
         self.inputs = source.inputs
         self.outputs = source.outputs
-        self.solver_info = source.solver_info
-        self.x0 = np.array(source.x0, dtype=float)
-        self.derived_x0 = np.copy(self.x0)
-        if x0 is not None and x0.shape == self.x0.shape:
-            self.x0 = x0
 
     @property
     def counts(self) -> bool:
@@ -128,6 +137,10 @@ class SampledSystem(StepSystem):
     def is_random(self):
         """Whether the source draws random numbers from a seed in its ``params``."""
         return self.source.is_random
+
+    def realize(self, key):
+        """The params of one realization: the source's, under ``key``."""
+        return self.source.realize(key)
 
     def update(self, x, u, t, params=None):
         """

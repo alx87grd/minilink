@@ -14,10 +14,10 @@ from minilink import BicycleDynRate
 from minilink.core.backends import configure_jax
 from minilink.core.costs import QuadraticCost
 from minilink.core.geometry import Sphere
+from minilink.core.shaping import inverse_barrier
 from minilink.planning.problems import PlanningProblem
 from minilink.planning.spatial.collision import mount, point_probe
 from minilink.planning.spatial.scene import Scene
-from minilink.planning.spatial.shaping import inverse_barrier
 from minilink.planning.trajectory_optimization.mpc import (
     ModelPredictiveController,
     mpc_animation_overlays,

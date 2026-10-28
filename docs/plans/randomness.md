@@ -571,18 +571,21 @@ its deterministic twin (RD-D23). RN-3 comes with its first consumer.
   `core/distributions.py`), the block in `blocks/sources.py`, the solver hints,
   `System.realize(key)` and the stepped-tools warnings. DESIGN §4 ("Randomness") states the
   contract.
-- [ ] **RN-2 Distributions read `params`** (RD-R1, RD-D9, RD-D12): `Gaussian(cov=)`, `cov` on
+- [x] **RN-2 Distributions read `params`** (landed in the v0.3 run, the objects lane; the sets
+  with them, a set's numbers its `params` and `with_params` its moved copy) (RD-R1, RD-D9, RD-D12): `Gaussian(cov=)`, `cov` on
   every law, `sample(key, n=None, params=None)`, a `params` dict on `Gaussian`, `Uniform`,
   `Particles`; `Set.sample` and `InputSet.sample` take a required key. Files:
   `core/distributions.py`, `core/sets.py`, every `sample` call site. Baseline: every `sample`
   call site, byte-identical. Done when a family of noise levels vmaps like a family of masses
   (one test).
-- [ ] **RN-3 `NoiseSource`** (RD-D3, RD-D12, RD-D23): the law's numbers under `params["law"]`;
+- [x] **RN-3 `NoiseSource`** (landed in the v0.3 run; its first consumer the `lqg_monte_carlo`
+  demo's sensor; a law draws at a `CounterKey(seed, k)` by the cipher) (RD-D3, RD-D12, RD-D23): the law's numbers under `params["law"]`;
   `WhiteNoise` becomes its subclass; the datasheet-sensor recipe
   `NoiseSource(Gaussian(0, cov=R_d), sample_period=Tₛ)` as the first demo. Done when the twin
   test of a sampled sensor passes (the sample covariance against `R_d`) and `WhiteNoise`'s tests
   pass untouched.
-- [ ] **RN-4 `realize` and the problem** (RD-R4, RD-R4b, RD-D6, RD-D7, RD-D10, RD-D18,
+- [x] **RN-4 `realize` and the problem** (landed in the v0.3 run, the objects lane: items 1–3; the
+  hold rule (4) stands as written; colored noise (5) waits for its demo and twin test) (RD-R4, RD-R4b, RD-D6, RD-D7, RD-D10, RD-D18,
   RD-D20–RD-D22; R128, R143, R144).
   1. `problem.realize(key, n_trials) -> params`, one tree: each law in a leaf drawn to a value
      from a sub-key by its path, each source block (on the shortcut or inside `sys`) given a seed

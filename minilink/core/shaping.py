@@ -1,16 +1,15 @@
-"""Cost shaping: the penalty of a scalar field value, before a state field's cost weights it."""
+"""Cost shaping: the penalty of a scalar field value, before a field's cost weights it."""
 
 from minilink.core.backends import array_module
 
-# The core field stays a signed physical quantity (clearance in length units);
-# shaping at the edge, before
-# :meth:`~minilink.planning.spatial.state_fields.StateField.as_cost` weights it,
-# turns it into a barrier, a one-sided hinge, or a bounded occupancy score, so an
+# The field stays a signed physical quantity (clearance in length units); shaping
+# at the edge, before :meth:`~minilink.core.fields.Field.as_cost` weights it, turns
+# it into a barrier, a one-sided hinge, or a bounded occupancy score, so an
 # obstacle term balances cleanly against other costs such as quadratic tracking.
 #
 # Each factory returns a native-array callable ``shape(v) -> penalty`` for
-# ``field.as_cost(shaping=...)``; the callables stay NumPy under NumPy input and
-# trace under JAX.
+# ``field.as_cost(shaping=...)`` and ``set_.as_cost(shaping=...)``; the callables
+# stay NumPy under NumPy input and trace under JAX.
 
 
 ###############################################################################

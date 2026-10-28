@@ -101,10 +101,11 @@ terminal = QuadraticField(P, x_bar).as_terminal_cost()   # §9: the LQR value en
   start (`x_start`, a leaf), and each stateful block's start is an `x0` leaf of the evaluator's
   tree; a realization is one tree (R144); a problem's tree gains `t_start` and a planner's tree is
   its problem's plus `"method"` and `seed` (R148).
-- **Today:** `Set.params = None` (OD-24); distributions keep `mean` / `std` as attributes;
-  `TrajectorySource` and `LookupPolicy` keep their tables as attributes; only the plant's slice of
-  the start is a leaf, a diagram stores stacked copies of `x0`, `n` and `state` restacked by
-  `refresh()`; `Computer` blocks read `op.bound_params`, frozen at compile; the MPC's
+- **Today:** the sets and the distributions read their `params` (RN-2, the v0.3 run);
+  `LookupPolicy` keeps its table as an attribute (`TrajectorySource` holds its values in
+  `params` since the v0.3 run); the three owners of a
+  start landed in the v0.3 run (a diagram's `x0` a view of its blocks, each stateful block's
+  start a leaf of the evaluator's tree, no `refresh()` before a run); `Computer` blocks read `op.bound_params`, frozen at compile; the MPC's
   `MPCTickLatch` is a hidden cache; `StepSystem.rollout` and `HybridDiagram.last_result` cache
   runs (D13); the path lookup and merge of parameter trees are written four times
   (`planning/evaluator.py`, `planning/problems.py`, `core/compile/evaluators/jacobian.py`,
@@ -337,8 +338,10 @@ terminal = QuadraticField(P, x_bar).as_terminal_cost()   # §9: the LQR value en
   value iteration, the certificates and the critics rebuilt on the noun; value iteration's
   `cost_to_go` stays a callable until then.
 - **Ruled:** R133, R153.
-- **Today:** `StateField` lives in `planning/spatial/state_fields.py`, its `as_cost` a running
-  cost only; `V(x)` and `cost_to_go` are not fields.
+- **Today:** `Field` is in `core/fields.py` with its four conversions and `gradient`, the
+  shaping in `core/shaping.py`, and `Set.as_cost` reuses it (the v0.3 run, step 2); the four
+  workspace fields subclass it in `planning/spatial/state_fields.py`. `QuadraticField`, the
+  certificate's `V` and `cost_to_go` are not fields yet.
 - **Open:** nothing at the design level.
 - **Rows:** [TODO §1.9](TODO.md#19-fields).
 

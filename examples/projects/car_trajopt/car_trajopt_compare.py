@@ -35,17 +35,17 @@ from minilink import BicycleDynRate, DynamicBicycle
 from minilink.core.backends import configure_jax
 from minilink.core.costs import QuadraticCost
 from minilink.core.geometry import Sphere
+from minilink.core.shaping import (
+    inverse_barrier,
+    quadratic_excess,
+    quadratic_hinge,
+)
 from minilink.core.trajectory import Trajectory
 from minilink.planning.problems import PlanningProblem
 from minilink.planning.spatial.collision import car_outline, disc, mount, point_probe
 from minilink.planning.spatial.overlays import TrackCorridorOverlay
 from minilink.planning.spatial.paths import from_waypoints
 from minilink.planning.spatial.scene import Scene
-from minilink.planning.spatial.shaping import (
-    inverse_barrier,
-    quadratic_excess,
-    quadratic_hinge,
-)
 from minilink.planning.spatial.track import ReferenceTrack
 from minilink.planning.trajectory_optimization.planner import (
     TrajectoryOptimizationPlanner,

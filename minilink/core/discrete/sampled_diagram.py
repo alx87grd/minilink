@@ -10,7 +10,12 @@ from minilink.core.backends import array_module
 from minilink.core.discrete.sampled_system import SampledSystem
 from minilink.core.discrete.step_diagram import StepDiagramSystem
 from minilink.core.discrete.step_system import StepSystem
-from minilink.core.wiring import WiredDiagramMixin, own_x0_of
+from minilink.core.wiring import (
+    WiredDiagramMixin,
+    require_x0_size,
+    stacked_x0,
+    write_through_x0,
+)
 
 # The clocks' grid: every period is a whole number of nanoseconds, to a relative
 # tolerance, and their common base is the greatest common divisor on that grid
@@ -54,12 +59,26 @@ class SampledDiagramSystem(StepDiagramSystem):
         self.add_hold_slots()
 
     def refresh(self):
-        # The x0 set on the loop itself, its held outputs included, stays while it fits
-        x0 = own_x0_of(self)
         super().refresh()
         self.add_hold_slots()
-        if x0 is not None and x0.shape == self.x0.shape:
-            self.x0 = x0
+
+    @property
+    def x0(self):
+        """The loop's initial state: its blocks' ``x0`` (a view, R124), then the held outputs' own start."""
+        x0 = np.concatenate([stacked_x0(self.subsystems), self.hold_x0])
+        x0.flags.writeable = False
+
+        return x0
+
+    @x0.setter
+    def x0(self, value):
+        value = np.array(value, dtype=float).reshape(-1)
+        require_x0_size(self, value, self.n)
+
+        # The blocks' slices to the blocks, the held outputs' to this level
+        n_blocks = self.n - self.hold_dim
+        write_through_x0(self, value[:n_blocks], n_blocks)
+        self.hold_x0 = value[n_blocks:]
 
     def divisor_of(self, sys) -> int:
         """The block's divisor ``d``: it fires on the ticks ``k mod d = 0`` of the base clock."""
@@ -106,7 +125,8 @@ class SampledDiagramSystem(StepDiagramSystem):
         """
         holds = held_ports(self)
 
-        # The slots after the blocks' states, zero at the start (every block fires at k = 0)
+        # The slots after the blocks' states, zero at the start (every block fires at
+        # k = 0); a start set on them stays while their size does
         start = self.n
         self.hold_index = {}
         labels = []
@@ -120,6 +140,8 @@ class SampledDiagramSystem(StepDiagramSystem):
             )
             start += dim
         self.hold_dim = start - self.n
+        if self.hold_x0.size != self.hold_dim:
+            self.hold_x0 = np.zeros(self.hold_dim)
         if not self.hold_dim:
             return
 
@@ -136,8 +158,6 @@ class SampledDiagramSystem(StepDiagramSystem):
         state.nominal_value = np.concatenate(
             [state.nominal_value, np.zeros(self.hold_dim)]
         )
-        self.x0 = np.concatenate([self.x0, np.zeros(self.hold_dim)])
-        self.derived_x0 = np.copy(self.x0)
         self.n = start
 
 

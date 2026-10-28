@@ -6,6 +6,7 @@ import numpy as np
 from minilink.blocks.basic import Integrator
 from minilink.core.costs import QuadraticCost
 from minilink.core.distributions import Gaussian, Particles, Uniform
+from minilink.core.fields import Field
 from minilink.core.inspect import latex_inspect
 from minilink.core.sets import BallSet, BoxSet, SingletonSet
 from minilink.core.trajectory import Trajectory
@@ -15,8 +16,7 @@ from minilink.optimization.mathematical_program import (
     OptimizationResult,
 )
 from minilink.optimization.optimizer import Optimizer
-from minilink.planning.problems import PlanningProblem, StochasticPlanningProblem
-from minilink.planning.spatial.state_fields import StateField
+from minilink.planning.problems import PlanningProblem
 
 
 class TestInspectPrint(unittest.TestCase):
@@ -85,26 +85,26 @@ class TestInspectPrint(unittest.TestCase):
     def test_stochastic_planning_problem(self):
         plant = Integrator()
         law = Gaussian([0.0], [0.1])
-        problem = StochasticPlanningProblem(
+        problem = PlanningProblem(
             plant,
             tf=1.0,
-            x0_distribution=law,
+            x_start=law,
             cost=QuadraticCost.from_system(plant),
         )
         text = str(problem)
-        self.assertIn("StochasticPlanningProblem", text)
+        self.assertIn("PlanningProblem", text)
         self.assertIn("criterion=expectation", text)
         self.assertIn("x0:", text)
         self.assertIn("Gaussian", text)
 
     def test_field_and_field_set(self):
-        class Height(StateField):
+        class Height(Field):
             def value(self, x, u=None, t=0.0, params=None):
                 return x[0]
 
         field = Height()
         self.assertEqual(str(field), "Height")
-        self.assertIn("FieldSet (Height)", str(field.as_constraint(lower=0.0)))
+        self.assertIn("FieldSet (Height)", str(field.as_set(lower=0.0)))
 
     def test_mathematical_program(self):
         program = MathematicalProgram(n_z=3, J=lambda z: z @ z, lower=np.zeros(3))

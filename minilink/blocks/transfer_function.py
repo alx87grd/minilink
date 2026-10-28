@@ -98,7 +98,7 @@ class TransferFunction(ErrorDriven, LTISystem):
         }
 
     def tf(self, x, u, t=0, params=None):
-        y = self.h(x, u, t)
+        y = self.h(x, u, t, params)
 
         # The body slides along the ground by the output
         output = float(np.asarray(y).reshape(-1)[0])

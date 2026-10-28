@@ -22,6 +22,7 @@ from minilink.core.params import (
     float_leaves,
     lookup,
     merge_tree,
+    set_leaf,
     with_leaf,
 )
 from minilink.core.trajectory import Trajectory
@@ -34,6 +35,7 @@ from minilink.planning.evaluation import (
     register_evaluation_pytree,
     score_run,
 )
+from minilink.planning.problems import seeds_of, source_id, stack_leaves
 
 BACKENDS = ("auto", BACKEND_JAX, BACKEND_NUMPY)
 EPISODE_LENGTH = 10.0  # s, the run of an infinite-horizon problem when none is named
@@ -110,7 +112,6 @@ class ProblemEvaluator:
         if self.sampled:
             dt = sampled_dt_of(self.loop, dt)
             require_loop_knobs(solver, substeps, self.adaptive)
-        warn_if_disturbed(problem)
         self.solver = solver
         self.substeps = int(substeps)
 
@@ -127,8 +128,11 @@ class ProblemEvaluator:
         self.plant_slice = self.loop.state_index["plant"]
         self.plant_input = plant_input_sources(self.loop, self.evaluator, self.sampled)
         self.block_ids = tuple(self.loop.subsystems)
+        self.start_ids = stateful_blocks_of(self.loop)
+        self.draws = problem.is_stochastic or self.loop.is_random
         self.free_inputs = tuple(self.loop.inputs)
         require_free_names(self.free_inputs, self.block_ids)
+        require_no_x0_key(self.loop, self.start_ids)
 
         # The forms generated once: the batched trial, jitted on JAX
         self.trials_fn = None
@@ -142,16 +146,21 @@ class ProblemEvaluator:
         """
         The run's parameters as one nested tree, fresh from the objects.
 
-        ``{block_id: block params}`` for every block of the loop; the problem's
-        own leaves (``"cost"``, the parameters of the sets that hold any by role,
-        ``"x_start"``, ``"discount_rate"``); and each free input of the loop at its
-        nominal value. Every leaf a float array, so ``jax.grad`` differentiates the
-        whole tree.
+        ``{block_id: block params}`` for every block of the loop, a stateful block
+        other than the plant with its start as the leaf ``"x0"`` (``controller.x0``,
+        ``observer.x0``; R124: the plant's start is the problem's ``x_start``); the
+        problem's own leaves (``"cost"``, the parameters of the sets that hold any by
+        role, ``"x_start"``, ``"discount_rate"``); and each free input of the loop at
+        its nominal value. Every leaf a float array, so ``jax.grad`` differentiates
+        the whole tree.
         """
         loop = self.loop
         problem = self.problem
 
         tree = {sys_id: loop.subsystems[sys_id].params for sys_id in self.block_ids}
+        for sys_id in self.start_ids:
+            block = loop.subsystems[sys_id]
+            tree[sys_id] = {**(block.params or {}), "x0": block.x0}
         tree.update(problem_leaves(problem))
         for port in self.free_inputs:
             tree[port] = loop.inputs[port].nominal_value
@@ -189,7 +198,7 @@ class ProblemEvaluator:
         keeps the runs' trajectories (outside a trace).
         """
         params = self.merged(params)
-        n_trials = trials_of(self.problem, n_trials)
+        n_trials = trials_of(self.draws, n_trials)
 
         # The draws, the price of a failure and the cost bound of a run not finite,
         # then the runs and their scores, batched on JAX
@@ -239,7 +248,7 @@ class ProblemEvaluator:
 
         base = self.merged(params)
         z0 = self.pack(base, wrt)
-        n_trials = trials_of(self.problem, n_trials)
+        n_trials = trials_of(self.draws, n_trials)
         rows = declared_rows(self.problem)
 
         # The draws, the price and the cost bound stay fixed when the start and
@@ -340,24 +349,32 @@ class ProblemEvaluator:
         """
         The trials' starts ``(n_trials, n)`` and parameters (one tree, a leading trial axis where drawn).
 
-        A stochastic problem draws the starts and the plant's laws from ``key``,
-        and each trial ``i`` realizes the loop's random blocks under
-        ``child_seed(key, "trial i")``: an integer key gives the same noise on
-        NumPy and JAX. A deterministic problem keeps each block's own seed.
+        A stochastic problem draws the starts and its laws from ``key``, and each
+        trial ``i`` realizes the loop's random blocks under
+        ``child_seed(key, "trial i")``, whether they are the problem's sources or
+        blocks of the loop itself (a block's own seed is only its default
+        realization, never an evaluation's, RD-R4b): an integer key gives the
+        same draws on NumPy and JAX. A run with nothing random is the one run.
         """
         problem = self.problem
         loop = self.loop
+        xp = array_module(params["x_start"])
 
-        # A deterministic problem: its one start, the parameters as they are
-        if not problem.is_stochastic:
-            xp = array_module(params["x_start"])
+        # Nothing random: the one start, the parameters as they are
+        if not self.draws:
             return xp.reshape(params["x_start"], (1, -1)), params
 
-        # x0 ~ p(x0) and each law, n_trials times, from one key on the backend
-        x_starts, draws = problem.realize(trial_key(key, self.backend), n_trials)
-
-        # The plant's draws override its entries
-        overrides = {"plant": draws["params"]} if draws["params"] else {}
+        # x0 ~ p(x0), each law and each source's seed, n_trials times: one tree,
+        # drawn on the host from an integer key whatever the backend; a point
+        # start, the same for every trial
+        overrides = {}
+        x_starts = xp.tile(xp.asarray(params["x_start"], dtype=float), (n_trials, 1))
+        if problem.is_stochastic:
+            tree = problem.realize(key, n_trials)
+            if problem.start_law is not None:
+                x_starts = tree["x_start"]
+            for path in problem.drawn_paths()[1:]:
+                set_leaf(overrides, path, lookup(tree, path))
 
         # Each trial's seeds of the loop's random blocks override theirs
         if loop.is_random:
@@ -367,6 +384,22 @@ class ProblemEvaluator:
 
         return x_starts, Batched(merge_tree(params, overrides), axes)
 
+    def loop_start(self, params, x_start, xp):
+        """The loop's start ``x(0)``: the plant at ``x_start``, every other stateful block at its ``x0`` leaf, a held output at its own."""
+        loop = self.loop
+
+        pieces = []
+        for sys_id in self.block_ids:
+            if sys_id == "plant":
+                pieces.append(xp.reshape(xp.asarray(x_start, dtype=float), (-1,)))
+            elif sys_id in self.start_ids:
+                pieces.append(xp.reshape(params[sys_id]["x0"], (-1,)))
+        pieces.append(xp.asarray(getattr(loop, "hold_x0", np.zeros(0)), dtype=float))
+
+        x0 = xp.concatenate(pieces)
+
+        return x0
+
     def run(self, params, x_start) -> Trajectory:
         """One run of the loop from the plant state ``x_start``: the loop's trajectory, signals recorded."""
         ev = self.evaluator
@@ -374,11 +407,9 @@ class ProblemEvaluator:
         xp = array_module(x_start, *flat_leaves(params))
         dt = self.dt
         N = self.n_steps
-        a, b = self.plant_slice
 
-        # The loop's start: its own initial state, the plant's slice at x_start
-        x0_loop = xp.asarray(loop.x0, dtype=float)
-        x0 = xp.concatenate([x0_loop[:a], xp.reshape(x_start, (-1,)), x0_loop[b:]])
+        # The loop's start: each block's x0 leaf, the plant's slice at x_start
+        x0 = self.loop_start(params, x_start, xp)
 
         # The free inputs held at their parameters over every period
         u = self.held_inputs(params, xp)
@@ -386,7 +417,9 @@ class ProblemEvaluator:
 
         # x_{k+1} = Φ(x_k, u, t_k), t_k = k dt, k = 0 … N − 1; or the adaptive
         # integral reported on that grid
-        loop_params = {sys_id: params[sys_id] for sys_id in self.block_ids}
+        loop_params = {
+            sys_id: block_params_of(loop, params, sys_id) for sys_id in self.block_ids
+        }
         loop_params = integer_seeds(loop, loop_params)
         ts = xp.arange(N + 1) * dt
         if self.sampled:
@@ -424,7 +457,7 @@ class ProblemEvaluator:
             x=xs.T,
             u=us.T,
             signals=recorded,
-            roles={"plant": {"x": (a, b), "u": PLANT_INPUT}},
+            roles={"plant": {"x": self.plant_slice, "u": PLANT_INPUT}},
         )
 
     def traces(self) -> bool:
@@ -624,16 +657,26 @@ def closed_loop_of(problem, controller):
     is_loop = isinstance(controller, (DiagramSystem, StepDiagramSystem))
     if is_loop and "plant" in controller.subsystems:
         require_plant_block(controller, plant)
+        require_no_problem_sources(problem)
         return controller
     if isinstance(plant, StepSystem):
         raise TypeError(
             "the problem's system is a discrete-time StepSystem: the evaluator runs "
             "a continuous loop"
         )
+    sources = dict(problem.disturbances)
     if int(controller.m) == 0:
-        return open_loop_of(controller, plant)
+        return with_sources(open_loop_of(controller, plant), sources)
 
-    return closed_loop(controller, plant)
+    # The loop closed_loop builds with the same sources: d and n under its role names
+    loop = closed_loop(
+        controller,
+        plant,
+        disturbance=sources.pop("d", False),
+        noise=sources.pop("n", False),
+    )
+
+    return with_sources(loop, sources)
 
 
 ###############################################################################
@@ -786,19 +829,24 @@ def open_loop_of(source, plant):
     return loop
 
 
-def warn_if_disturbed(problem):
-    """Warn when the problem draws disturbances: the evaluated loop holds those ports at nominal."""
-    if not problem.is_stochastic or not problem.disturbances:
-        return
-    ports = sorted(problem.disturbances)
+def with_sources(loop, sources):
+    """The loop with each disturbance source wired onto its plant port (R128), under its block id (:func:`~minilink.planning.problems.source_id`)."""
+    for port, block in sources.items():
+        sys_id = source_id(port)
+        loop.add_subsystem(block, sys_id)
+        loop.connect(sys_id, next(iter(block.outputs)), "plant", port)
 
-    warnings.warn(
-        f"the evaluation does not draw the disturbances on {ports}: the loop reads "
-        "those ports at their nominal values. The per-step draws run in the stepped "
-        "environment (Sys2Gym.from_problem); a disturbance inside the loop is a source "
-        "block (closed_loop(controller, plant, disturbance=WhiteNoise(...)))",
-        stacklevel=4,
-    )
+    return loop
+
+
+def require_no_problem_sources(problem):
+    """Refuse the problem's disturbance sources on a loop built by hand: that loop wires its own."""
+    if problem.disturbances:
+        raise ValueError(
+            f"the problem's disturbances {sorted(problem.disturbances)} cannot be wired "
+            "into a loop built by hand: wire the source blocks in the loop, or pass "
+            "the controller and let the problem close the loop"
+        )
 
 
 def require_continuous_or_clocked(controller):
@@ -995,9 +1043,9 @@ def steps_of(tf, dt):
     return n_steps
 
 
-def trials_of(problem, n_trials):
-    """The number of runs: one for a deterministic problem, ``n_trials`` (required) for a stochastic one."""
-    if not problem.is_stochastic:
+def trials_of(draws, n_trials):
+    """The number of runs: one when nothing is random, ``n_trials`` (required) when the problem or the loop draws."""
+    if not draws:
         if n_trials not in (None, 1):
             raise ValueError(
                 "a deterministic problem is one run: n_trials must be 1 or unset, "
@@ -1006,9 +1054,44 @@ def trials_of(problem, n_trials):
         return 1
 
     if n_trials is None:
-        raise ValueError("a stochastic problem needs n_trials, the number of draws")
+        raise ValueError(
+            "a stochastic problem (or a loop with a random block) needs n_trials, "
+            "the number of draws"
+        )
 
     return int(n_trials)
+
+
+def stateful_blocks_of(loop):
+    """The ids of the loop's blocks other than the plant that hold a state: each has an ``x0`` leaf."""
+    return tuple(
+        sys_id
+        for sys_id, block in loop.subsystems.items()
+        if sys_id != "plant" and block.n > 0
+    )
+
+
+def require_no_x0_key(loop, start_ids):
+    """Refuse a stateful block whose own params name ``"x0"``: the tree's ``x0`` leaf is its start."""
+    for sys_id in start_ids:
+        if "x0" in (loop.subsystems[sys_id].params or {}):
+            raise ValueError(
+                f"the block {sys_id!r} has a parameter named 'x0', the name of its "
+                "start in the evaluator's tree: rename the parameter"
+            )
+
+
+def block_params_of(loop, params, sys_id):
+    """A block's entry of the run's tree as the block reads it: its ``x0`` leaf taken out."""
+    entry = params[sys_id]
+    if not isinstance(entry, dict) or "x0" not in entry:
+        return entry
+
+    rest = {key: value for key, value in entry.items() if key != "x0"}
+    if not rest and loop.subsystems[sys_id].params is None:
+        return None
+
+    return rest
 
 
 def require_free_names(free_inputs, block_ids):
@@ -1114,37 +1197,14 @@ def require_integer_key(key):
         )
 
 
-def seeds_of(system, realized):
-    """The ``"seed"`` entries of the random blocks in a realization of ``system``, nested like it."""
-    # Lazy import: the diagram tools load with the first loop
-    from minilink.core.diagram import DiagramSystem
-
-    if not isinstance(system, DiagramSystem):
-        return {"seed": realized["seed"]}
-
-    return {
-        sys_id: seeds_of(subsystem, realized[sys_id])
-        for sys_id, subsystem in system.subsystems.items()
-        if subsystem.is_random
-    }
-
-
-def stack_leaves(trees):
-    """One tree of the shape of each of ``trees``, each leaf their values stacked on a leading axis."""
-    if isinstance(trees[0], dict):
-        return {key: stack_leaves([tree[key] for tree in trees]) for key in trees[0]}
-
-    return np.stack([np.asarray(leaf) for leaf in trees])
-
-
 def integer_seeds(system, params):
     """``params`` with the seed of every random block of ``system`` an integer (the tree holds floats)."""
     # Lazy import: the diagram tools load with the first loop
-    from minilink.core.diagram import DiagramSystem
+    from minilink.core.wiring import WiredDiagramMixin
 
     if not system.is_random:
         return params
-    if isinstance(system, DiagramSystem):
+    if isinstance(system, WiredDiagramMixin):
         return {
             sys_id: integer_seeds(system.subsystems[sys_id], value)
             for sys_id, value in params.items()
@@ -1214,12 +1274,3 @@ def unbatch(trajs, n):
         )
 
     return out
-
-
-def trial_key(key, backend):
-    """The draws' key on the backend: a JAX PRNG key, or a NumPy generator."""
-    if backend == BACKEND_JAX:
-        jax = ensure_jax_x64()
-        return jax.random.PRNGKey(key) if isinstance(key, int) else key
-
-    return np.random.default_rng(key)

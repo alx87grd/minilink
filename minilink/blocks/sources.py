@@ -3,7 +3,12 @@
 import numpy as np
 
 from minilink.core.backends import array_module
-from minilink.core.distributions import child_seed, sample_index, standard_normal
+from minilink.core.distributions import (
+    CounterKey,
+    child_seed,
+    sample_index,
+    standard_normal,
+)
 from minilink.core.options import require_one_of
 from minilink.core.system import System
 
@@ -74,8 +79,6 @@ class Source(System):
             signal_stack_figsize,
             style_trajectory_subplot,
         )
-
-        self.refresh()
 
         # The time range, 0 to 10 s by default
         if t0 is None:
@@ -158,7 +161,7 @@ class Step(Source):
 
     def h(self, x, u, t=0, params=None):
         params = self.params if params is None else params
-        xp = array_module(t)
+        xp = array_module(t, *params.values())
 
         step_time = params["step_time"]
         initial_value = params["initial_value"]
@@ -208,7 +211,96 @@ class Sine(Source):
         return y
 
 
-class WhiteNoise(Source):
+class NoiseSource(Source):
+    """Sampled noise: independent draws ``w_k ~ p`` of a law, each held over its ``sample_period``.
+
+    ``w(t) = w_k`` on ``[kΔ, (k+1)Δ)``, ``w_k`` the law drawn at the counter key
+    ``(seed, k)`` by the library's cipher, so the signal is a pure function of
+    ``(t, params)``, the same on NumPy and JAX (RD-D13). The law's numbers are
+    the ``"law"`` entry of :attr:`params` (``{"seed", "sample_period", "law"}``),
+    so a noise level is a parameter. A per-sample covariance keeps each sample
+    when ``Δ`` is edited, and so changes the physics: that is what sampled
+    noise means (a datasheet sensor, ``NoiseSource(Gaussian(0, cov=R_d),
+    sample_period=Tₛ)``); a white noise, whose physics does not change with
+    ``Δ``, is :class:`WhiteNoise`. ``hold="linear"`` interpolates between
+    samples. ``seed=None`` gives the law's mean; :meth:`realize` draws another
+    seed. The block's dimension is the law's.
+    """
+
+    HOLDS = ("zoh", "linear")
+
+    def __init__(self, law, *, sample_period=0.01, seed=0, hold="zoh", port="y"):
+        require_one_of("hold", hold, self.HOLDS)
+        require_seed(seed)
+        require_positive_period(sample_period)
+
+        Source.__init__(self, law.dim, port=port)
+        self.law = law
+        self.hold = hold
+
+        # Parameters: the realization's seed, the sample period Δ and the law's numbers
+        self.params = {
+            "seed": seed,
+            "sample_period": float(sample_period),
+            "law": law.params,
+        }
+
+    def h(self, x, u, t=0, params=None):
+        params = self.params if params is None else params
+
+        seed = params["seed"]
+        period = params["sample_period"]
+        law_params = params["law"]
+        law = self.law
+        hold = self.hold
+
+        # The backend of the time and of the period
+        xp = array_module(t, period)
+
+        # Without a seed, the mean (the law's own number when it names one): no draw
+        if seed is None:
+            w_mean = xp.asarray(law_params.get("mean", law.mean), dtype=float)
+            return w_mean
+
+        # The sample index of the held train: w(t) = w_k on [kΔ, (k+1)Δ)
+        k = sample_index(t, period)
+        s = t / period - k
+
+        # w_k ~ p, drawn at the counter key (seed, k); the linear hold blends in w_{k+1}
+        w = law.sample(CounterKey(seed, k), params=law_params)
+        if hold == "linear":
+            w_next = law.sample(CounterKey(seed, k + 1), params=law_params)
+            w = (1 - s) * w + s * w_next
+
+        return w
+
+    def realize(self, key):
+        """The params of one realization: a fresh seed under ``key``, or the mean for ``None``."""
+        seed = None if key is None else child_seed(key, "seed")
+        return dict(self.params, seed=seed)
+
+    @property
+    def is_random(self):
+        """A seed draws; ``seed=None`` is the mean, a deterministic signal no realization reseeds."""
+        return self.params["seed"] is not None
+
+    @property
+    def solver_info(self) -> dict:
+        """The solver hints, the sample period among them, read from the current ``params``."""
+        period = float(self.params["sample_period"])
+
+        info = self.own_solver_info
+        info["sample_period"] = period
+        info["smallest_time_constant"] = period
+
+        return info
+
+    @solver_info.setter
+    def solver_info(self, value: dict):
+        self.own_solver_info = dict(value)
+
+
+class WhiteNoise(NoiseSource):
     """White noise of intensity ``psd``, held over each ``sample_period``.
 
     The intensity is the two-sided spectral density of the signal (a one-sided
@@ -226,9 +318,6 @@ class WhiteNoise(Source):
     one.
     """
 
-    HOLDS = ("zoh", "linear")
-    is_random = True
-
     def __init__(
         self, p=1, *, psd=1.0, sample_period=0.01, seed=0, hold="zoh", port="y"
     ):
@@ -236,6 +325,7 @@ class WhiteNoise(Source):
         require_seed(seed)
         require_positive_period(sample_period)
 
+        # The per-sample law is derived in h from the intensity: the shell is Source's
         Source.__init__(self, p, port=port)
         self.hold = hold
 
@@ -245,9 +335,6 @@ class WhiteNoise(Source):
             "sample_period": float(sample_period),
             "psd": as_intensity(psd, p),
         }
-
-        # Solver hints: the sample period
-        self.refresh()
 
     @property
     def psd(self):
@@ -263,8 +350,8 @@ class WhiteNoise(Source):
         hold = self.hold
         p = self.dim
 
-        # The backend of the time and of the intensity
-        xp = array_module(t, W)
+        # The backend of the time, of the intensity and of the period
+        xp = array_module(t, W, period)
 
         # Without a seed, the mean: no draw
         if seed is None:
@@ -287,17 +374,6 @@ class WhiteNoise(Source):
 
         return w
 
-    def realize(self, key):
-        """The params of one realization: a fresh seed under ``key``, or the mean for ``None``."""
-        seed = None if key is None else child_seed(key, "seed")
-        return dict(self.params, seed=seed)
-
-    def refresh(self):
-        """Publish the sample period as the solver hint of the block."""
-        period = float(self.params["sample_period"])
-        self.solver_info["sample_period"] = period
-        self.solver_info["smallest_time_constant"] = period
-
 
 class TrajectorySource(Source):
     """Replay a stored signal ``y(t)`` sampled at times ``t``.
@@ -309,7 +385,9 @@ class TrajectorySource(Source):
     (``"previous"``, the zero-order hold of a sampled controller). Values
     outside ``[t[0], t[-1]]`` hold the nearest endpoint. ``values`` has shape
     ``(p, N)`` (or ``(N,)`` for a scalar signal) aligned with the ``N``
-    sample times in ``t``.
+    sample times in ``t``. The values are the block's ``params``
+    (``{"values": ...}``), so a planned input is a leaf of a problem's tree
+    (``controller.values``); the times and the rule are its structure.
     """
 
     INTERPOLATIONS = ("linear", "previous")
@@ -325,10 +403,10 @@ class TrajectorySource(Source):
 
         Source.__init__(self, values.shape[0], port=port)
 
-        # The samples and the rule between them
+        # The samples: the times and the rule are structure, the values parameters
         self.sample_times = t
-        self.sample_values = values
         self.interpolation = interpolation
+        self.params = {"values": values}
 
     @classmethod
     def from_trajectory(cls, traj, signal="u", *, interpolation="linear"):
@@ -337,10 +415,11 @@ class TrajectorySource(Source):
 
     def h(self, x, u, t=0, params=None):
         """The sample at ``t``: linear between samples, or the previous one; endpoints held (traces on JAX)."""
-        xp = array_module(x, u, t)
+        params = self.params if params is None else params
+        xp = array_module(x, u, t, params["values"])
 
         t_k = xp.asarray(self.sample_times)
-        y_k = xp.asarray(self.sample_values)
+        y_k = xp.asarray(params["values"])
 
         # Linear: y(t) = y_k + (t − t_k) (y_{k+1} − y_k) / (t_{k+1} − t_k), clamped at the ends
         if self.interpolation == "linear":

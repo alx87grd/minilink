@@ -5,9 +5,9 @@ import numpy as np
 from minilink import (
     CostFunction,
     Gaussian,
+    PlanningProblem,
     ReinforcementLearningPlanner,
     Rocket,
-    StochasticPlanningProblem,
     evaluate,
 )
 
@@ -47,13 +47,11 @@ class LandingCost(CostFunction):
 
 # The problem: starts around 20 m altitude; touching the ground (y < 0)
 # terminates the episode and costs 100, more than a gentle landing does.
-problem = StochasticPlanningProblem(
+problem = PlanningProblem(
     plant,
     cost=LandingCost(),
     tf=TF,
-    x0_distribution=Gaussian(
-        [0.0, 20.0, 0.0, 0.0, 0.0, 0.0], [10.0, 8.0, 0.3, 2.0, 2.0, 0.3]
-    ),
+    x_start=Gaussian([0.0, 20.0, 0.0, 0.0, 0.0, 0.0], [10.0, 8.0, 0.3, 2.0, 2.0, 0.3]),
     infeasible_cost=100.0,
     X=plant.state.box,
     U=plant.input_box,

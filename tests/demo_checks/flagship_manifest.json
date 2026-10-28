@@ -88,5 +88,12 @@
     "id": "multi_rate_computer",
     "path": "examples/demos/compile/multi_rate_computer.py",
     "requires": []
+  },
+  {
+    "id": "lqg_monte_carlo",
+    "path": "examples/demos/compile/lqg_monte_carlo.py",
+    "requires": [
+      "jax"
+    ]
   }
 ]

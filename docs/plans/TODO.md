@@ -120,34 +120,6 @@ maintainer would and logged in the run's record.
 
 Why: [core-architecture.md](core-architecture.md) §1.
 
-- [ ] **One contract for every core math object** (R140, the maintainer's
-  direction of 2026-10-27, a choice,
-  [record](../reviews/2026-10-27-design-questions-rulings.md)): a consolidation of the code style
-  and the interface of every core math object, what everything converges back to:
-  - its mathematics is a function of its specific arguments and `params`, `params=None` reading
-    the frozen defaults (`f(x, u, t, params=None)`, `g(...)`, `margin(...)`, `value(...)`,
-    `J(z, params=None)`);
-  - it has a `params` field, unless a written reason makes it an exception (listed in DESIGN §4);
-  - a composed object's `params` is a dict of its sub-objects' dicts, reachable by a dotted path
-    (`cost.Q` on a problem, `controller.Kp` on a diagram);
-  - leaves are numbers or numeric arrays; integer leaves (the `seed`, a step problem's tick
-    offset) are allowed and never in `wrt` (R148, amending R118);
-  - every function is fully deterministic given its parameters, the seed among them.
-
-  Steps: audit every core math object against the five points (the `System` family and the
-  blocks, costs, sets, distributions, fields, shapes, sources, `Trajectory`, `PlanningProblem`,
-  `MathematicalProgram`, the policies), one table in the row's report; fix the gaps one object
-  family per commit, behaviour-preserving where no number moves (AGENTS' recipe); write the
-  exceptions and the contract in DESIGN §4 and RULES 2.3. The audit starts from five
-  resolutions (R140's record): a distribution's key is its specific argument and its law's
-  numbers its `params` (`sample(key, n, params=None)`); an object with no parameters has
-  `params = {}`, not `None`; a composed tree holds its parts' dicts and its own leaves
-  (`problem.params`'s `x_start`); RL training is a written exception until its collectors take
-  per-episode seeds; student-written models stay exempt (RULES 2.3). This row absorbs the "sets and
-  distributions read `params`" items below (A5's library sets, RN-2) as the same contract. Done
-  when one contract test walks every public core math object on both backends (its `params`, a
-  `params=None` call equal to a call with its defaults, `jax.grad` through a float leaf, the
-  same values twice from one seed) and the exceptions list is written.
 - [ ] **Names across the API, before the new signatures** (R134, R151,
   choices of 2026-10-27), one sweep per line, every caller in the same change, no
   alias (R82):
@@ -180,40 +152,15 @@ Why: [core-architecture.md](core-architecture.md) §1.
     moves to `core/`, and MPPI reads it next;
   - `UnionSet` via `|`, when reachability or multi-goal work needs it;
   - vector bounds on `Saturation`;
-  - the library sets, shapes and fields reading `params` (the same rule as A2, after it);
+  - the library shapes and fields reading `params` (the same rule as A2; the sets read theirs);
   - `PlanningProblem.hamiltonian()`, only if the course teaches Pontryagin;
   - the RL critic as a `Field` once training is over;
   - the double-integrator homework's two verbs, entry time into a set and the Bellman residual
     (scan: examples#10).
 
   `log_prob` lives on the seeded policy, not on `Distribution` (R129).
-- [ ] **Three owners of a start; a diagram's state derived from its blocks**
-  (S29; the maintainer's choice of 2026-10-27, R124,
-  [record](../reviews/2026-10-27-design-questions-rulings.md)):
-  - a diagram's `x0`, `n` and `state` become views computed from its blocks; setting
-    `diagram.x0` writes through to the blocks; the structural parts are cached and recomputed
-    when the wiring changes;
-  - `refresh()` leaves `Simulator`, and the `derived_x0` heuristic in `core/wiring.py` goes;
-    the racecar solver hint, `WhiteNoise` and the diagrams' bubbled solver hints stop depending
-    on the pre-read `refresh()`;
-  - the problem keeps the plant's start (`x_start`, a point, a set or a law);
-  - each stateful block gets an `x0` leaf in the evaluator's tree (`controller.x0`,
-    `observer.x0`), read from the block at compile as the nominal;
-  - `x0` (the start) and `state.nominal_value` (the operating point x̄, ruled 2026-10-13) keep
-    one owner each (scan: core#11, dynamics#10, examples#14).
-
-  Done when no diagram stores a stacked copy, `Simulator` calls no `refresh()` before a run,
-  `jax.grad` of `objective` with respect to `observer.x0` matches a central difference, and the
-  baselines are byte-identical.
-- [ ] **Distributions read `params`** (RN-2 of [randomness.md](randomness.md)):
-  `Gaussian(cov=)`, and every `sample` takes a key.
 - [ ] **Sets as costs, the lowerings, the metrics as constraints** (was V1
   step 8; [differentiable-problem.md](differentiable-problem.md) §8):
-  - `shaping.py` (today `planning/spatial/shaping.py`) moves to `core/`;
-  - `Set.as_cost(weight=, shaping=)`, the field `as_cost` applied to the set's margin (R133);
-  - the sets read `params`;
-  - `TrajectorySource` holds its table in `params` (its `h` already traces), so `"x_start"` and
-    `"controller.values"` are decision leaves, with `Xf` lowered;
   - the robust-tuning and identification demos run on the export;
   - the metric objective and the margin-floor example wait for S73, a v0.4 row.
 
@@ -223,15 +170,7 @@ Why: [core-architecture.md](core-architecture.md) §1.
   `merge_params`), `core/compile/evaluators/jacobian.py` (`flatten_params`, `replace_leaf`)
   and `core/assembly.py`, become one `core/params.py` used by every caller. Done when the four
   copies are gone and a seeded baseline is byte-identical.
-- [ ] **The core's textbook leftovers** (T1):
-  - `system.py`'s default `h` stub builds `np.zeros(p)`, a returned-type decision under JAX;
-  - `wiring.py`'s `refresh` still guards with `hasattr(self, "solver_info")`.
-
-  The audit's bug, `StepDiagramSystem.step` writing in place, was fixed on 2026-10-24.
-- [ ] **Blocks and control leftovers** (T2):
-  - `blocks/transfer_function.py`'s `tf` calls `self.h(x, u, t)` on `np` and drops `params`;
-  - `mpc/viz.py` imports `HybridSimResult` at module level, not under `TYPE_CHECKING` (RULES
-    3.2; scan: control#12);
+- [ ] **Blocks and control leftovers** (T2; its first two items and T1 landed in the v0.3 run):
   - one time-interpolation for trajectories and gain schedules;
   - one warm-start helper on the plan `Trajectory`;
   - the impedance and robotic law bodies consolidated (scan: control#2, #5, #7).
@@ -279,43 +218,18 @@ Why: [core-architecture.md](core-architecture.md) §2.
 Why: [core-architecture.md](core-architecture.md) §3. Design and the per-step files and "done
 when": [randomness.md](randomness.md) §9.
 
-- [ ] **Per-block seeds and disturbance signals, one draw on both backends**
-  (merges V1 step 7, RN-4, the rest of RN-5 and the rest of P10's AC-7, which randomness.md §9
-  calls one row):
-  - `problem.realize(key, n)` gains one seed per random block, named by path (RN-4), so a noise
-    block inside the loop or on a port draws per trial under the same
-    `evaluate(..., n_trials, key)`;
-  - disturbances are source blocks only (R128, a choice of 2026-10-27,
-    [record](../reviews/2026-10-27-design-questions-rulings.md)): the problem's system wires
-    them onto the plant's ports, `disturbances={"d": block}` the shortcut that builds that
-    diagram, a bare `Distribution` refused naming the fix, on `PlanningProblem` too; this fixes
-    the frozen-noise defect, and CONSTITUTION §2's sentence is amended in the same change;
-  - `problem.realize(key, n_trials) -> params`, one tree (R144): a law in a leaf drawn to a value
-    from a sub-key derived by the leaf's path, a source block given an integer seed leaf, every
-    drawn leaf with a trial axis; the `"disturbances"` key goes;
-  - the Monte Carlo evaluator is a batched simulation of the closed loop on its test set (RN-5;
-    the fold landed as V1.4b, R44);
-  - the cost is scored on the plant across every evaluator and design tool, with the draws
-    (AC-7's rest, [automation-by-convention.md](automation-by-convention.md) §5, §7; its
-    deterministic half landed with V1's steps 2–4);
-  - one integer key draws the same values on NumPy and JAX (KNOWN_ISSUES);
-  - RN-6, the contract in DESIGN, goes with each step.
-
-  Done when:
-  - two trials from one key draw distinct noise;
-  - adding a random block leaves every other stream unchanged;
-  - RN-5's LQG loop scores within the covariance prediction's sampling error.
-- [ ] **A problem stochastic by its parts** **[ask — student-facing, given]** (R143): no
-  `StochasticPlanningProblem`; `x_start=` takes a point, a `Set` or a `Distribution`, `params=`
-  takes laws in the tree's own shape, `criterion=` and `nominal()` move onto `PlanningProblem`,
-  `problem.is_stochastic` is read off its parts; `x0_distribution=` and `params_distribution=` go.
-  The four RL demos and ten notebooks that build one are swept in the same commit (with R151's
-  rename and R150's discount). Done when no public name `StochasticPlanningProblem` remains and the
-  RL baselines are byte-identical.
-- [ ] **`NoiseSource` with its first consumer** (RN-3).
-- [ ] **`Sys2Gym` takes a `Distribution` for the start state** (randomness.md RD-R5, with RN-5;
-  scan: graphics#1). The same row brings `Sys2Gym.from_problem` in line with DESIGN §6's claim
-  that it draws.
+- [ ] **Per-block seeds and disturbance signals, one draw on both backends** (merges V1 step 7,
+  RN-4, the rest of RN-5 and the rest of P10's AC-7). Landed in the v0.3 run: `problem.realize`
+  one tree with a stream per consumer by name and a seed per random source; disturbances are
+  source blocks only, wired into the evaluated loop; one integer key draws the same trials on
+  NumPy and JAX (the KNOWN_ISSUES entry gone); the shortcut is the loop `closed_loop` builds
+  with the same sources, one Monte Carlo score for both forms (AC-7's done-when); RN-5's LQG
+  gate is acceptance script 1. Rest: RN-6, the contract in DESIGN, with each step.
+- [ ] **A problem stochastic by its parts** (R143): landed in the v0.3 run (no
+  `StochasticPlanningProblem`; `x_start=` a law or a set, `params=` laws, `disturbances=` source
+  blocks, `criterion=` and `nominal()` on `PlanningProblem`), every Python caller swept; the
+  ten notebooks move at step 7 (the run log's §4). Rest: the RL baselines re-pin with the
+  seeded policy (§1.4).
 
 ### 1.4 The seeded stochastic policy
 
@@ -334,7 +248,11 @@ Why: [core-architecture.md](core-architecture.md) §4. Design:
   - the collectors moved from their own keys to per-episode seeds. The RL numbers change once,
     with a baseline and one re-pin.
 
-  Its deterministic face is `NeuralPolicy` (R151). The heads are rebuilt in v0.3 with the block
+  The block landed in the v0.3 run (`control/stochastic.py`: `GaussianPolicy` and
+  `SquashedGaussianPolicy`, `log_prob` and `entropy`, `vmap` over seeds on both backends); the
+  heads' rebuild, the per-episode seeds of the collectors and the RL re-pin wait for join 1
+  (the run log's RD-29: the core plan's change 4 follows change 2, the one score). Its
+  deterministic face is `NeuralPolicy` (R151). The heads are rebuilt in v0.3 with the block
   (R160), with one gate: the training performance is unchanged after the move (the learning
   curve and the final score within the Monte Carlo spread on the same demo and seeds, the training
   time within the budget's 2× bar). Done when the RL demos re-pin and a policy block vmaps over
@@ -492,12 +410,9 @@ first.
 
 - [ ] **A minimal field object, `core/fields.py`** (A1, steps 4.1–4.3 of
   fields.md; R133, R153):
-  - promote `StateField` to `Field` on `(x, u, t)`, with `as_set` / `as_input_set` / `as_cost`
-    and `gradient`; `as_constraint` and `as_input_constraint` renamed with every caller, the
-    track demos included, no alias (R82) **[student-facing, given]** (R165);
-  - `as_terminal_cost(weight=, shaping=)` beside `as_cost`, the terminal cost `h` (R153);
-  - the shaping functions moved from `planning/spatial/shaping.py` to `core/`, and `Field.as_cost`
-    the one implementation that `Set.as_cost` (§1.1) reuses on a set's margin;
+  - landed in the v0.3 run (step 2): `Field` in `core/fields.py` with `gradient` and the four
+    conversions, `as_set` / `as_input_set` renamed with every caller, `core/shaping.py`, and
+    `Set.as_cost` reusing `Field.as_cost` (the log's RD-20, RD-21);
   - `QuadraticField` (the Lyapunov `V`, the LQR value, the `S(t)` schedule), with the ellipsoid
     as its sublevel set;
   - the DESIGN §4 fields bullet.

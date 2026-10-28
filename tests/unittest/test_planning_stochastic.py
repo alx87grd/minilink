@@ -3,16 +3,12 @@
 import numpy as np
 import pytest
 
-from minilink import Pendulum
+from minilink import Pendulum, WhiteNoise
 from minilink.core.costs import CostFunction, QuadraticCost
 from minilink.core.distributions import Gaussian, Particles, Uniform
 from minilink.core.trajectory import Trajectory
 from minilink.planning.dynamic_programming.dp import DynamicProgrammingPlanner
-from minilink.planning.problems import (
-    PlanningProblem,
-    StochasticPlanningProblem,
-    as_stochastic,
-)
+from minilink.planning.problems import PlanningProblem
 
 
 def pendulum():
@@ -178,12 +174,12 @@ def test_distributions_sample_and_trace_on_jax():
 
 def test_stochastic_problem_is_a_planning_problem_with_a_nominal_bridge():
     plant = pendulum()
-    problem = StochasticPlanningProblem(
+    problem = PlanningProblem(
         plant,
         cost=quadratic(plant),
         tf=np.inf,
-        x0_distribution=Uniform([-np.pi, -1.0], [np.pi, 1.0]),
-        params_distribution={"m": Uniform([0.8], [1.2])},
+        x_start=Uniform([-np.pi, -1.0], [np.pi, 1.0]),
+        params={"plant": {"m": Uniform([0.8], [1.2])}},
         infeasible_cost=100.0,
         U=plant.input_box,
     )
@@ -191,27 +187,31 @@ def test_stochastic_problem_is_a_planning_problem_with_a_nominal_bridge():
     np.testing.assert_allclose(problem.x_start, [0.0, 0.0])
     assert problem.X0.contains(np.array([1.0, 0.5]))  # the support of the draw
     assert problem.sample_x0(0, n=4).shape == (4, 2)
-    assert set(problem.sample_params(0)) == {"m"}
+    assert set(problem.sample_params(0)["plant"]) == {"m"}
+    assert (
+        problem.is_stochastic
+        and problem.params["plant"]["m"] is problem.laws["plant"]["m"]
+    )
 
     nominal = problem.nominal()
-    assert type(nominal) is PlanningProblem
+    assert type(nominal) is PlanningProblem and not nominal.is_stochastic
     np.testing.assert_allclose(nominal.x_start, [0.0, 0.0])
     assert nominal.infeasible_cost == 100.0
 
     with pytest.raises(ValueError):
-        StochasticPlanningProblem(
-            plant, x0_distribution=Gaussian([0.0], 1.0), U=plant.input_box
-        )
+        PlanningProblem(plant, x_start=Gaussian([0.0], 1.0), U=plant.input_box)
     with pytest.raises(ValueError):
-        StochasticPlanningProblem(
+        PlanningProblem(
             plant,
-            x0_distribution=Gaussian([0.0, 0.0], 1.0),
-            params_distribution={"nope": Uniform([0.0], [1.0])},
+            x_start=Gaussian([0.0, 0.0], 1.0),
+            params={"plant": {"nope": Uniform([0.0], [1.0])}},
             U=plant.input_box,
         )
 
 
-def test_as_stochastic_is_the_inverse_bridge_of_nominal():
+def test_a_point_start_is_one_start_and_a_set_start_draws_from_the_set():
+    from minilink.core.sets import BoxSet
+
     plant = pendulum()
     deterministic = PlanningProblem(
         plant,
@@ -221,18 +221,18 @@ def test_as_stochastic_is_the_inverse_bridge_of_nominal():
         infeasible_cost=10.0,
         U=plant.input_box,
     )
-    stochastic = as_stochastic(deterministic)
-    assert type(stochastic) is StochasticPlanningProblem
-    # every draw is the single start, and nothing else is random
-    np.testing.assert_allclose(stochastic.sample_x0(0, n=3), [[0.3, -0.1]] * 3)
-    assert stochastic.sample_params(0) == {} and stochastic.sample_disturbances(0) == {}
-    assert stochastic.criterion == "expectation"
-    assert (stochastic.tf, stochastic.infeasible_cost) == (
-        5.0,
-        10.0,
-    )
-    np.testing.assert_allclose(stochastic.nominal().x_start, [0.3, -0.1])
-    assert as_stochastic(stochastic) is stochastic
+    assert not deterministic.is_stochastic and deterministic.criterion == "expectation"
+    np.testing.assert_allclose(deterministic.sample_x0(0, n=3), [[0.3, -0.1]] * 3)
+    assert deterministic.sample_params(0) == {}
+    assert deterministic.nominal().x_start.tolist() == [0.3, -0.1]
+
+    # A set as the start is the uniform law on it, the set its X0
+    box = BoxSet([0.0, -1.0], [1.0, 1.0])
+    from_a_set = deterministic.replace(x_start=box)
+    assert from_a_set.is_stochastic and from_a_set.X0 is box
+    starts = from_a_set.sample_x0(1, n=50)
+    assert np.all([box.contains(x) for x in starts])
+    np.testing.assert_allclose(from_a_set.x_start, [0.5, 0.0])
 
 
 # --- the shared scoring contract ---
@@ -363,10 +363,10 @@ def test_the_backends_share_the_score_on_identical_starts():
     ctl = NeuralPolicy(plant, hidden=(8,), seed=5)  # bounded by construction
     one_start = Particles([[2.5, 0.0]])
     for kwargs in ({"tf": np.inf}, {"tf": 1.0, "infeasible_cost": 20.0}):
-        problem = StochasticPlanningProblem(
+        problem = PlanningProblem(
             plant,
             cost=Discounted(),
-            x0_distribution=one_start,
+            x_start=one_start,
             discount_rate=0.2,
             **kwargs,
         )
@@ -400,11 +400,11 @@ def test_the_law_runs_beyond_the_port_bounds_and_fails_the_declared_U():
         def h(self, x, t=0.0, params=None):
             return 0.0
 
-    problem = StochasticPlanningProblem(
+    problem = PlanningProblem(
         plant,
         cost=Effort(),
         tf=np.inf,
-        x0_distribution=Particles([[0.5, 0.0]]),
+        x_start=Particles([[0.5, 0.0]]),
         U=plant.input_box,
     )
     settings = dict(dt=0.01, n_trials=1, episode_length=1.0)
@@ -420,12 +420,12 @@ def test_an_exiting_run_scores_alike_on_the_step_and_the_adaptive_solver():
     from minilink.planning import evaluate
 
     plant = pendulum()
-    problem = StochasticPlanningProblem(
+    problem = PlanningProblem(
         plant,
         cost=quadratic(plant),
         tf=np.inf,
         X=plant.state.box,
-        x0_distribution=Particles([[6.0, 5.0]]),  # leaves θ ≤ 2π within 0.1 s
+        x_start=Particles([[6.0, 5.0]]),  # leaves θ ≤ 2π within 0.1 s
     )
     ctl = StateFeedback(K=[[0.0, 0.0]])
     settings = dict(dt=0.01, n_trials=1, episode_length=1.0, backend="numpy")
@@ -444,11 +444,11 @@ def test_a_controller_with_internal_state_scores_like_its_static_twin():
     from minilink.planning import evaluate
 
     mass = SingleMass()
-    problem = StochasticPlanningProblem(
+    problem = PlanningProblem(
         mass,
         cost=quadratic(mass),
         tf=np.inf,
-        x0_distribution=Particles([[0.5, 0.0]]),
+        x_start=Particles([[0.5, 0.0]]),
     )
     settings = dict(dt=0.01, n_trials=1, episode_length=2.0, backend="numpy")
     J_pid = evaluate(problem, PID(Kp=4.0), **settings).J  # with filter states
@@ -469,11 +469,9 @@ def test_randomized_parameters_reach_the_dynamics_on_both_backends():
     plant.inputs["u"].upper_bound = np.array([4.0])
     ctl = NeuralPolicy(plant, hidden=(8,), seed=5)
     start = Particles([[0.5, 0.0]])
-    task = dict(cost=quadratic(plant), tf=np.inf, x0_distribution=start)
-    heavy = StochasticPlanningProblem(
-        plant, params_distribution={"m": Particles([[3.0]])}, **task
-    )
-    nominal = StochasticPlanningProblem(plant, **task)
+    task = dict(cost=quadratic(plant), tf=np.inf, x_start=start)
+    heavy = PlanningProblem(plant, params={"plant": {"m": Particles([[3.0]])}}, **task)
+    nominal = PlanningProblem(plant, **task)
     settings = dict(dt=0.05, n_trials=1, episode_length=1.0)
     J_heavy = {}
     for backend in ("jax", "numpy"):
@@ -563,11 +561,11 @@ def test_the_default_backend_falls_back_on_a_numpy_only_set_or_cost():
     law = StateFeedback(K=[[5.0, 1.0]])
     task = dict(
         tf=1.0,
-        x0_distribution=Uniform([-0.5, -0.5], [0.5, 0.5]),
+        x_start=Uniform([-0.5, -0.5], [0.5, 0.5]),
         infeasible_cost=5.0,
     )
     for X, cost in ((NumpyBand(), quadratic(plant)), (plant.state.box, NumpyEnergy())):
-        problem = StochasticPlanningProblem(plant, cost=cost, X=X, **task)
+        problem = PlanningProblem(plant, cost=cost, X=X, **task)
         auto = ProblemEvaluator(problem, law, 0.1)
         assert auto.backend == "numpy"
         numpy = ProblemEvaluator(problem, law, 0.1, backend="numpy")
@@ -576,7 +574,7 @@ def test_the_default_backend_falls_back_on_a_numpy_only_set_or_cost():
         )
 
     # the same band written with xp traces, and keeps the JAX backend
-    problem = StochasticPlanningProblem(plant, cost=quadratic(plant), X=Band(), **task)
+    problem = PlanningProblem(plant, cost=quadratic(plant), X=Band(), **task)
     assert ProblemEvaluator(problem, law, 0.1).backend == "jax"
 
 
@@ -586,11 +584,11 @@ def test_deterministic_planner_warns_on_a_stochastic_problem():
     )
 
     plant = pendulum()
-    problem = StochasticPlanningProblem(
+    problem = PlanningProblem(
         plant,
         cost=quadratic(plant),
         tf=2.0,
-        x0_distribution=Uniform([-0.1, -0.1], [0.1, 0.1]),
+        x_start=Uniform([-0.1, -0.1], [0.1, 0.1]),
         U=plant.input_box,
     )
     with pytest.warns(
@@ -605,12 +603,11 @@ def test_nominal_keeps_the_mean_start_and_drops_the_support_and_x_start():
     from minilink.core.sets import SingletonSet
 
     plant = pendulum()
-    problem = StochasticPlanningProblem(
+    problem = PlanningProblem(
         plant,
         cost=quadratic(plant),
         tf=2.0,
-        x_start=[0.05, 0.0],
-        x0_distribution=Uniform([-0.1, -0.1], [0.1, 0.1]),
+        x_start=Uniform([-0.1, -0.1], [0.1, 0.1]),
         U=plant.input_box,
     )
     assert problem.X0.contains(np.array([0.08, -0.08]))  # the support
@@ -628,12 +625,12 @@ def test_gymnasium_view_of_a_stochastic_problem():
     plant = pendulum()
     plant.inputs["u"].lower_bound = np.array([-4.0])
     plant.inputs["u"].upper_bound = np.array([4.0])
-    problem = StochasticPlanningProblem(
+    problem = PlanningProblem(
         plant,
         cost=quadratic(plant),
         tf=1.0,
         X=plant.state.box,
-        x0_distribution=Particles([[0.3, 0.0], [-0.3, 0.0]]),
+        x_start=Particles([[0.3, 0.0], [-0.3, 0.0]]),
         infeasible_cost=50.0,
         U=plant.input_box,
     )
@@ -726,10 +723,10 @@ def test_a_time_varying_law_scores_alike_on_every_backend():
     t = np.linspace(0.0, 1.0, 5)
     K = np.stack([np.array([[1.0 + 10.0 * k, 0.5]]) for k in range(5)])
     ctl = TimeVaryingFeedback(t, K)
-    problem = StochasticPlanningProblem(
+    problem = PlanningProblem(
         pendulum(),
         cost=QuadraticCost.from_system(pendulum()),
-        x0_distribution=Particles([[0.5, 0.0]]),
+        x_start=Particles([[0.5, 0.0]]),
         tf=1.0,
     )
     settings = dict(dt=0.01, n_trials=1)
@@ -742,9 +739,9 @@ def test_a_time_varying_law_scores_alike_on_every_backend():
 
 def test_a_disturbance_on_the_command_port_is_refused():
     with pytest.raises(ValueError, match="command port of sys"):
-        StochasticPlanningProblem(
+        PlanningProblem(
             pendulum(),
             cost=QuadraticCost.from_system(pendulum()),
-            x0_distribution=Particles([[0.5, 0.0]]),
-            disturbances={"u": Gaussian([0.0], 0.1)},
+            x_start=Particles([[0.5, 0.0]]),
+            disturbances={"u": WhiteNoise(1, psd=0.1)},
         )

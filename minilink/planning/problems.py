@@ -1,17 +1,18 @@
-"""Planning problems: the deterministic task and its stochastic class."""
+"""Planning problems: the task, deterministic or stochastic by its parts (a law where a number goes)."""
 
 from __future__ import annotations
 
 import warnings
+import zlib
 from collections.abc import Mapping
 
 import numpy as np
 
-from minilink.core.backends import is_jax_key, numpy_generator, require_jax
+from minilink.core.backends import is_jax_key, require_jax
 from minilink.core.costs import CostFunction
-from minilink.core.distributions import Distribution, Particles, split_keys
+from minilink.core.distributions import Distribution, child_seed, split_keys
 from minilink.core.inspect import inspect_text, repr_pretty
-from minilink.core.params import lookup
+from minilink.core.params import flatten, lookup, merge_tree, set_leaf, with_leaf
 from minilink.core.sets import (
     BoxInputSet,
     BoxSet,
@@ -21,6 +22,7 @@ from minilink.core.sets import (
     is_finite_box,
 )
 from minilink.core.system import System
+from minilink.core.wiring import WiredDiagramMixin
 
 ###############################################################################
 # Public API
@@ -29,7 +31,7 @@ from minilink.core.system import System
 
 class PlanningProblem:
     """
-    Deterministic planning problem for a Minilink system.
+    Planning problem for a Minilink system: deterministic, or stochastic by its parts.
 
     The generic mathematical form is ``x(t) in X(t)``,
     ``u(t) in U(x(t), t)``, with boundary sets ``X0`` and optional ``Xf``.
@@ -42,15 +44,24 @@ class PlanningProblem:
     The parameters live on the parts; :attr:`params` is their live view by role,
     as a diagram's are by block.
 
+    A problem is stochastic by its parts (R143): where a number goes, a law may
+    go (``x_start=`` a law or a set; ``params=`` laws in the tree's own shape),
+    and a disturbance is a source block on a plant port (R128). :meth:`realize`
+    draws them into one tree (R144), :meth:`nominal` is the problem without its
+    laws (the start at its law's mean, the parts at their own numbers), and
+    :attr:`is_stochastic` is read off the parts.
+
     Parameters
     ----------
     sys : System
         Minilink system or diagram to plan for.
-    x_start : array_like, optional
-        Representative initial state. When ``X0`` is omitted, this creates a
-        singleton ``X0``. When ``X0`` is provided, it must belong to ``X0`` and
-        is used by solvers or guesses that need one concrete start point.
-        Defaults to singleton ``X0`` when available, otherwise ``sys.x0``.
+    x_start : array_like, Distribution or Set, optional
+        The plant's start (R124): a point, a law over ``x(0)``, or a set (the
+        uniform law on it). A point is the representative start: when ``X0`` is
+        omitted, it creates a singleton ``X0``; when ``X0`` is provided, it must
+        belong to ``X0``. A law's mean is the representative start and its
+        support the default ``X0``; a set is the default ``X0``. Defaults to the
+        singleton ``X0`` when available, otherwise ``sys.x0``.
     x_goal : array_like, optional
         Representative terminal target, for the tools that need one point (an
         initial guess, RRT's goal bias). It never creates ``Xf``: an exact
@@ -92,6 +103,24 @@ class PlanningProblem:
         iteration and the learners always price a failure: this number when it
         is one, else :meth:`cost_bound`. A declared price should exceed the
         cost-to-go of finishing the task from a typical start.
+    params : mapping, optional
+        Laws over the problem's parameters, in the tree's own shape
+        (``{"plant": {"m": Uniform([0.9], [1.1])}}``; a block inside a diagram
+        plant by its id, ``{"plant": {"plant": {"m": ...}}}``): each leaf a
+        :class:`~minilink.core.distributions.Distribution` over that number,
+        drawn per trial by :meth:`realize` (domain randomization, robustness).
+    disturbances : mapping, optional
+        Source blocks on the plant's input ports, ``{"d": WhiteNoise(...)}``
+        (R128): the loop the evaluator closes is exactly the one ``closed_loop``
+        builds with the same sources, the source of ``d`` its block
+        ``disturbance`` and of ``n`` its ``noise`` (any other port's under the
+        port's name), so its seed is the leaf ``"disturbance.seed"``. A bare law
+        is refused: a disturbance states its time behaviour as a block.
+    criterion : {"expectation", "worst_case"} or ("cvar", alpha)
+        What "optimal" means over the draws of a stochastic problem: the mean,
+        the worst, or the mean of the worst ``alpha`` fraction of the runs' ``J``
+        (the conditional value at risk). An evaluation reports every statistic
+        and its ``objective`` is this one.
     """
 
     FIELDS = (
@@ -106,8 +135,12 @@ class PlanningProblem:
         "tf",
         "infeasible_cost",
         "discount_rate",
+        "params",
+        "disturbances",
+        "criterion",
     )
     ROLES = ("plant", "cost", "X", "U", "X0", "Xf", "x_start", "discount_rate")
+    CRITERIA = ("expectation", "worst_case", "cvar")
 
     def __init__(
         self,
@@ -122,7 +155,17 @@ class PlanningProblem:
         tf: float | None = None,
         infeasible_cost: bool | float | None = None,
         discount_rate: float = 0.0,
+        params: Mapping | None = None,
+        disturbances: Mapping[str, System] | None = None,
+        criterion="expectation",
     ):
+        # The start: a point, or a law over x(0) (a set is the uniform law on it)
+        self.start_law = start_law_of(x_start)
+        if self.start_law is not None:
+            x_start = None
+            if X0 is None:
+                X0 = self.start_law.support
+
         # The fields as given, coerced below
         self.sys = sys
         self.x_start = x_start
@@ -195,33 +238,46 @@ class PlanningProblem:
         self.X0 = X0
         self.Xf = Xf
 
+        # The laws over the parameters, the source blocks on the plant's ports, and
+        # the criterion over the draws
+        self.disturbances = coerce_disturbances(disturbances, self.sys)
+        self.laws = coerce_laws(params, self.parts_view())
+        require_criterion(criterion, self.CRITERIA)
+        self.criterion = criterion
+
     @property
     def params(self) -> dict:
         """
-        The live view of the problem's parameters, by role, as a diagram's by block.
+        The live view of the problem's parameters, by role, as a diagram's are by block.
 
         ``{"plant": sys.params, "cost": cost.params, "X": …, "U": …, "X0": …,
         "Xf": …, "x_start": x_start, "discount_rate": ρ}``, assembled on each
         access from the parts, which stay the one home of each number (a set's
-        entry is its own ``params``, ``None`` for a set without parameters).
+        entry is its own ``params``, ``{}`` for a set without parameters); each
+        disturbance source's ``params`` under its port; a law in place of each
+        number the problem draws (the start's law under ``"x_start"``).
         Assigning a dictionary routes each entry to its part, so
         ``problem.params = {"plant": {...}}`` sets the plant's parameters.
         """
-        view = {"plant": self.sys.params}
-        if self.cost is not None:
-            view["cost"] = self.cost.params
-        for role in ("X", "U", "X0", "Xf"):
-            set_ = getattr(self, role)
-            if set_ is not None:
-                view[role] = getattr(set_, "params", None)
-        view["x_start"] = self.x_start
-        view["discount_rate"] = self.discount_rate
+        view = self.parts_view()
+        if self.start_law is not None:
+            view["x_start"] = self.start_law
+        if self.laws:
+            view = merge_tree(view, self.laws)
 
         return view
 
     @params.setter
     def params(self, value):
         require_roles(value, self.params)
+
+        # A law in the tree moves the problem's laws; the numbers move the parts
+        value, laws = split_laws(value, self.parts_view())
+        if "x_start" in laws:
+            self.start_law = laws.pop("x_start")
+            value.pop("x_start", None)
+        self.laws = merge_tree(self.laws, laws) if laws else self.laws
+
         for role, entry in value.items():
             if role == "plant":
                 self.sys.params = entry
@@ -231,8 +287,10 @@ class PlanningProblem:
                 self.move_start(entry)
             elif role == "discount_rate":
                 self.discount_rate = coerce_rate(entry)
+            elif role in self.sources_by_id():
+                self.sources_by_id()[role].params = entry
             else:
-                write_set_params(role, getattr(self, role), entry)
+                setattr(self, role, moved_set(role, getattr(self, role), entry))
 
     def move_start(self, x_start):
         """Set ``x_start``: a singleton ``X0`` moves with it, any other ``X0`` must hold it."""
@@ -245,15 +303,108 @@ class PlanningProblem:
         self.x_start = start
 
     def realize(self, key=None, n=1):
-        """The one realization of a deterministic problem: its start, no draws (``n`` is 1)."""
-        require_one_run(n)
-        x0s = np.reshape(self.x_start, (1, -1))
+        """
+        ``n`` realizations of the problem's draws from one key: one tree (R144).
 
-        return x0s, {"params": {}, "disturbances": {}}
+        The problem's numbers (:meth:`parts_view`), with ``"x_start"`` of shape
+        ``(n, nx)``, each law's leaf drawn ``n`` times in its number's shape
+        (``(n, *shape)``), and each random disturbance source's ``seed`` an
+        integer leaf of shape ``(n,)``; the other leaves are shared. Each
+        consumer draws from its own stream, named by its path
+        (``child_seed(key, "x_start")``, ``child_seed(key, "plant.m")``; a
+        source's seed by its port and the trial): adding a law or a source
+        leaves every other draw unchanged. An integer key draws on the host,
+        the same values for a NumPy and a JAX run (RD-D13); a JAX key draws
+        traceable JAX arrays.
+        :meth:`drawn_paths` names the leaves with a trial axis. A deterministic
+        problem has one realization, its own start. ``key`` follows the draw
+        convention of :class:`~minilink.core.distributions.Distribution`; the
+        sources' seeds need an integer key.
+        """
+        n = int(n)
+        tree = self.parts_view()
+
+        # A deterministic problem: its one start, the shared numbers
+        if not self.is_stochastic:
+            require_one_run(n)
+            tree["x_start"] = self.sample_x0(None, n)
+            return tree
+
+        # x(0) ~ the start's law, n times, from the stream named "x_start"
+        tree["x_start"] = self.sample_x0(stream_of(key, "x_start"), n)
+
+        # Each law's leaf n times, in its number's shape, from the stream named by
+        # its path (the tree copied along the path: the parts' dicts stay untouched)
+        for path, law in flatten(self.laws):
+            nominal = np.shape(lookup(tree, path))
+            values = law.sample(stream_of(key, ".".join(path)), n)
+            tree = with_leaf(tree, path, values.reshape((n, *nominal)))
+
+        # Each random source's seeds, n times, named by its block id and the trial
+        for sys_id, block in self.sources_by_id().items():
+            if block.is_random:
+                seeds = source_seeds(block, key, sys_id, n)
+                tree = with_leaf(tree, (sys_id,), merge_tree(tree[sys_id], seeds))
+
+        return tree
+
+    def drawn_paths(self):
+        """The paths of the leaves :meth:`realize` draws with a trial axis."""
+        paths = [("x_start",)]
+        paths.extend(path for path, _ in flatten(self.laws))
+        for sys_id, block in self.sources_by_id().items():
+            if block.is_random:
+                seeds = seeds_of(block, block.realize(0))
+                paths.extend((sys_id, *path) for path, _ in flatten(seeds))
+
+        return paths
+
+    def sample_x0(self, key, n=None):
+        """Draw starts from the start's law: ``(nx,)`` for one, ``(n, nx)`` with ``n``."""
+        if self.start_law is None:
+            x_start = self.x_start
+            return x_start.copy() if n is None else np.tile(x_start, (int(n), 1))
+
+        return self.start_law.sample(key, n)
+
+    def sample_params(self, key):
+        """One draw of each law, at its path in the problem's tree (empty when nothing is drawn)."""
+        paths = [path for path, _ in flatten(self.laws)]
+        keys = split_keys(key, len(paths))
+        view = self.parts_view()
+
+        draws = {}
+        for path, k in zip(paths, keys):
+            # One draw, in the nominal entry's shape, at its path
+            value = lookup(self.laws, path).sample(k)
+            set_leaf(draws, path, value.reshape(np.shape(lookup(view, path))))
+
+        return draws
+
+    def nominal(self) -> PlanningProblem:
+        """
+        The certainty-equivalent problem: the start at its law's mean, no law, no random source.
+
+        The start's mean is the one start (a singleton ``X0``); a parameter
+        with a law keeps its part's own number (the parts are shared, never
+        written); a deterministic source (a load ``Step``) stays.
+        """
+        sources = {
+            port: block
+            for port, block in self.disturbances.items()
+            if not block.is_random
+        }
+
+        return self.replace(
+            x_start=self.x_start, X0=None, params=None, disturbances=sources
+        )
 
     def replace(self, **changes):
         """A new problem of the same class with the named fields replaced (the others shared)."""
         fields = {name: getattr(self, name) for name in self.FIELDS}
+        fields["params"] = self.laws or None
+        if self.start_law is not None:
+            fields["x_start"] = self.start_law
         unknown = sorted(set(changes) - set(fields))
         if unknown:
             raise TypeError(f"{type(self).__name__} has no field(s) {unknown}")
@@ -264,11 +415,10 @@ class PlanningProblem:
             if isinstance(self.X0, SingletonSet):
                 fields["X0"] = None
 
-        # A new start law takes its own mean and support, unless they are given
-        if "x0_distribution" in changes:
-            for name in ("x_start", "X0"):
-                if name not in changes:
-                    fields[name] = None
+        # A new start law takes its own support, unless one is given
+        if isinstance(changes.get("x_start"), (Distribution, Set)):
+            if "X0" not in changes:
+                fields["X0"] = None
 
         return type(self)(**fields)
 
@@ -284,8 +434,30 @@ class PlanningProblem:
 
     @property
     def is_stochastic(self) -> bool:
-        """``True`` when the problem draws starts, parameters or disturbances."""
-        return False
+        """``True`` when a part is random: a law on the start or a parameter, a random source."""
+        random_source = any(block.is_random for block in self.disturbances.values())
+
+        return self.start_law is not None or bool(self.laws) or random_source
+
+    def sources_by_id(self) -> dict:
+        """The disturbance sources by the id of their block in the evaluated loop (``d`` → ``disturbance``, ``n`` → ``noise``)."""
+        return {source_id(port): block for port, block in self.disturbances.items()}
+
+    def parts_view(self) -> dict:
+        """The parts' numbers by role, live: :attr:`params` without the laws (the start its point)."""
+        view = {"plant": self.sys.params}
+        if self.cost is not None:
+            view["cost"] = self.cost.params
+        for role in ("X", "U", "X0", "Xf"):
+            set_ = getattr(self, role)
+            if set_ is not None:
+                view[role] = getattr(set_, "params", None)
+        for port, block in getattr(self, "disturbances", {}).items():
+            view[source_id(port)] = block.params
+        view["x_start"] = self.x_start
+        view["discount_rate"] = self.discount_rate
+
+        return view
 
     def discount_factor(self, dt) -> float:
         """The per-step factor ``γ = e^{−ρ dt}`` of a planner stepping ``dt``."""
@@ -449,9 +621,11 @@ class PlanningProblem:
         return value
 
     def default_x_start(self):
-        """The start given, else the point of a singleton ``X0``, else ``sys.x0``."""
+        """The start given, else its law's mean, else the point of a singleton ``X0``, else ``sys.x0``."""
         if self.x_start is not None:
             return self.x_start
+        if self.start_law is not None:
+            return self.start_law.mean
         if isinstance(self.X0, SingletonSet):
             return self.X0.point
 
@@ -506,305 +680,196 @@ class PlanningProblem:
             raise ValueError(f"{point_label} must belong to {set_label}")
 
 
-class StochasticPlanningProblem(PlanningProblem):
-    """
-    Planning problem with probabilistic uncertainty (the stochastic class).
-
-    Same spine as :class:`PlanningProblem` — the deterministic problem is its
-    base class, so every planner that accepts one accepts this — plus the
-    uncertainty channels and the criterion:
-
-    Parameters
-    ----------
-    x0_distribution : Distribution
-        Law of the initial state ``x(0) ~ p(x0)``. Its mean is the default
-        ``x_start`` and its support (when it has one) the default ``X0``.
-    params_distribution : mapping, optional
-        Mapping of parameter names to :class:`~minilink.core.distributions.Distribution`
-        over entries of ``sys.params`` (domain randomization, robustness
-        sweeps); each sample overrides those entries. A dotted name reaches
-        into a diagram's subsystem params (``sys.mass`` for the plant inside
-        a closed loop).
-    disturbances : mapping, optional
-        Mapping of input port ids to :class:`~minilink.core.distributions.Distribution`
-        on ``sys``: a fresh draw per step held on that port (a seeded
-        disturbance signal).
-    criterion : {"expectation", "worst_case"} or ("cvar", alpha)
-        What "optimal" means over the draws: the mean, the worst, or the mean
-        of the worst ``alpha`` fraction of the runs' ``J`` (the conditional value
-        at risk). Reinforcement learning optimizes the expectation; an
-        evaluation reports every statistic and its ``objective`` is this one.
-
-    Notes
-    -----
-    Solve verbs (RL, gain search) and the evaluate verb (Monte Carlo) both
-    read this description; :meth:`nominal` returns the certainty-equivalent
-    :class:`PlanningProblem` for trajectory optimization and LQR.
-    """
-
-    FIELDS = (
-        *PlanningProblem.FIELDS,
-        "x0_distribution",
-        "params_distribution",
-        "disturbances",
-        "criterion",
-    )
-    CRITERIA = ("expectation", "worst_case", "cvar")
-
-    def __init__(
-        self,
-        sys: System,
-        x_start=None,
-        x_goal=None,
-        cost: CostFunction | None = None,
-        X: Set | None = None,
-        U: InputSet | None = None,
-        X0: Set | None = None,
-        Xf: Set | None = None,
-        tf: float | None = None,
-        infeasible_cost: bool | float | None = None,
-        discount_rate: float = 0.0,
-        x0_distribution: Distribution | None = None,
-        params_distribution: Mapping[str, Distribution] | None = None,
-        disturbances: Mapping[str, Distribution] | None = None,
-        criterion="expectation",
-    ):
-        # The start law: its mean the default start, its support the default X0
-        self.require_start_law(x0_distribution)
-        if x_start is None:
-            x_start = x0_distribution.mean
-        if X0 is None and x0_distribution.support is not None:
-            X0 = x0_distribution.support
-
-        # The deterministic spine
-        super().__init__(
-            sys,
-            x_start=x_start,
-            x_goal=x_goal,
-            cost=cost,
-            X=X,
-            U=U,
-            X0=X0,
-            Xf=Xf,
-            tf=tf,
-            infeasible_cost=infeasible_cost,
-            discount_rate=discount_rate,
-        )
-
-        # The criterion, and the draws against the system they perturb
-        self.require_criterion(criterion, self.CRITERIA)
-        self.require_start_dim(x0_distribution, self.sys)
-        self.require_param_names(params_distribution, self.sys)
-        self.require_disturbance_ports(disturbances, self.sys)
-
-        # The laws, the draws as plain dicts
-        self.x0_distribution = x0_distribution
-        self.params_distribution = dict(params_distribution or {})
-        self.disturbances = dict(disturbances or {})
-        self.criterion = criterion
-
-    @property
-    def is_stochastic(self) -> bool:
-        return True
-
-    def sample_x0(self, key, n=None):
-        """Draw initial states: ``(n,)`` for one, ``(n_samples, n)`` with ``n``."""
-        return self.x0_distribution.sample(key, n)
-
-    def sample_params(self, key):
-        """Draw one ``{name: value}`` override of ``sys.params`` (empty if none), nominal shapes."""
-        names = list(self.params_distribution)
-        keys = split_keys(key, len(names))
-
-        draws = {}
-        for name, k in zip(names, keys):
-            # One draw, in the nominal entry's shape
-            value = self.params_distribution[name].sample(k)
-            value = value.reshape(np.shape(lookup(self.sys.params, name)))
-
-            # Placed at its dotted path in the nested override
-            node = draws
-            *path, last = name.split(".")
-            for part in path:
-                node = node.setdefault(part, {})
-            node[last] = value
-
-        return draws
-
-    def sample_disturbances(self, key):
-        """Draw one ``{port_id: value}`` of held disturbance inputs (empty if none)."""
-        ports = list(self.disturbances)
-        keys = split_keys(key, len(ports))
-
-        return {port: self.disturbances[port].sample(k) for port, k in zip(ports, keys)}
-
-    def realize(self, key, n):
-        """
-        ``n`` realizations of the problem's draws from one key: ``(x0s, draws)``.
-
-        ``x0s`` is ``(n, nx)``, drawn from the start law; ``draws`` is
-        ``{"params": {...}, "disturbances": {...}}``, each drawn parameter of
-        ``sys.params`` at its (dotted) path and each disturbance port's held value,
-        every leaf with a leading axis of ``n``. ``key`` follows the draw
-        convention of :class:`~minilink.core.distributions.Distribution`: a JAX key
-        gives JAX arrays (traceable), a NumPy generator or a seed NumPy arrays.
-        """
-        n = int(n)
-
-        # One key for the starts, one for the laws
-        if is_jax_key(key):
-            jax = require_jax()
-            x_key, law_key = jax.random.split(key)
-        else:
-            x_key = law_key = numpy_generator(key)
-
-        # x0 ~ p(x0), n times
-        x0s = self.sample_x0(x_key, n)
-
-        # Each drawn parameter n times, in its nominal entry's shape, at its path
-        names = list(self.params_distribution)
-        ports = list(self.disturbances)
-        keys = split_keys(law_key, len(names) + len(ports))
-        params = {}
-        for name, k in zip(names, keys[: len(names)]):
-            nominal = np.shape(lookup(self.sys.params, name))
-            values = self.params_distribution[name].sample(k, n)
-            node = params
-            *path, last = name.split(".")
-            for part in path:
-                node = node.setdefault(part, {})
-            node[last] = values.reshape((n, *nominal))
-
-        # Each disturbance port's held value, n times
-        disturbances = {
-            port: self.disturbances[port].sample(k, n)
-            for port, k in zip(ports, keys[len(names) :])
-        }
-
-        return x0s, {"params": params, "disturbances": disturbances}
-
-    def nominal(self) -> PlanningProblem:
-        """
-        Certainty-equivalent deterministic problem: the mean start, no draws.
-
-        The start law's mean is the one start (a singleton ``X0``): the support
-        ``X0`` of the start law and an explicit ``x_start`` are dropped, and the
-        parameter and disturbance draws with them.
-        """
-        return PlanningProblem(
-            sys=self.sys,
-            x_start=self.x0_distribution.mean,
-            x_goal=self.x_goal,
-            cost=self.cost,
-            X=self.X,
-            U=self.U,
-            Xf=self.Xf,
-            tf=self.tf,
-            infeasible_cost=self.infeasible_cost,
-            discount_rate=self.discount_rate,
-        )
-
-    ###########################################################################
-    # Internal machinery
-    ###########################################################################
-
-    @staticmethod
-    def require_start_law(x0_distribution) -> None:
-        """Refuse a stochastic problem without the law of its initial state."""
-        if x0_distribution is None:
-            raise ValueError("StochasticPlanningProblem requires x0_distribution")
-
-    @staticmethod
-    def require_criterion(criterion, criteria) -> None:
-        """Refuse a criterion that is not one of ``criteria`` (``("cvar", alpha)`` with ``0 < alpha ≤ 1``)."""
-        if isinstance(criterion, tuple):
-            kind = criterion[0] if criterion else None
-            ok = (
-                kind == "cvar"
-                and len(criterion) == 2
-                and 0.0 < float(criterion[1]) <= 1
-            )
-        else:
-            ok = criterion in criteria and criterion != "cvar"
-        if not ok:
-            raise ValueError(
-                "criterion must be 'expectation', 'worst_case' or ('cvar', alpha) with "
-                f"0 < alpha <= 1, got {criterion!r}"
-            )
-
-    @staticmethod
-    def require_start_dim(x0_distribution, sys) -> None:
-        """Refuse a start law whose dimension is not the state's."""
-        if int(x0_distribution.dim) != int(sys.n):
-            raise ValueError("x0_distribution.dim must equal sys.n")
-
-    @staticmethod
-    def require_param_names(params_distribution, sys) -> None:
-        """Refuse a drawn name missing from ``sys.params``, or one naming a whole subsystem dict."""
-        for name in params_distribution or {}:
-            try:
-                leaf = lookup(sys.params, name)
-            except KeyError:
-                raise ValueError(
-                    f"params_distribution key {name!r} is not in sys.params"
-                ) from None
-            if isinstance(leaf, dict):
-                raise ValueError(
-                    f"params_distribution over {name!r}: distributions apply to "
-                    "array-valued parameters, not to a whole subsystem dict"
-                )
-
-    @staticmethod
-    def require_disturbance_ports(disturbances, sys) -> None:
-        """Refuse a disturbance on a port ``sys`` lacks, or on its command port."""
-        # The command port: u, else the one input there is
-        inputs = list(sys.inputs)
-        command = "u" if "u" in inputs else (inputs[0] if len(inputs) == 1 else None)
-
-        for port in disturbances or {}:
-            if port not in sys.inputs:
-                raise ValueError(
-                    f"disturbances key {port!r} is not an input port of sys"
-                )
-            if port == command:
-                raise ValueError(
-                    f"disturbances key {port!r} is the command port of sys: a draw "
-                    "there would replace the policy's command. Give the disturbance "
-                    "its own input port (for example 'd')."
-                )
-
-
-def as_stochastic(problem: PlanningProblem) -> StochasticPlanningProblem:
-    """
-    The same task as a stochastic problem, the inverse of :meth:`StochasticPlanningProblem.nominal`.
-
-    A stochastic problem is returned unchanged. A deterministic one keeps every
-    field and starts from its single ``x_start``, with no parameter or
-    disturbance draws: it trains and evaluates from one start, so coverage of
-    other starts comes from giving a stochastic problem a start distribution.
-    """
-    if isinstance(problem, StochasticPlanningProblem):
-        return problem
-
-    return StochasticPlanningProblem(
-        sys=problem.sys,
-        x_start=problem.x_start,
-        x_goal=problem.x_goal,
-        cost=problem.cost,
-        X=problem.X,
-        U=problem.U,
-        X0=problem.X0,
-        Xf=problem.Xf,
-        tf=problem.tf,
-        infeasible_cost=problem.infeasible_cost,
-        discount_rate=problem.discount_rate,
-        x0_distribution=Particles(np.atleast_2d(problem.x_start)),
-    )
-
-
 ###############################################################################
 # Internal machinery
 ###############################################################################
+
+
+class SetStart(Distribution):
+    """The uniform law on a start set: a :class:`~minilink.core.sets.Set` given as ``x_start``."""
+
+    def __init__(self, set_):
+        box = set_.bounding_box()
+        require_samplable_start(set_, box)
+        self.support = set_
+        self.mean = 0.5 * (box.lower + box.upper)
+
+    @property
+    def dim(self) -> int:
+        return int(self.mean.size)
+
+    def sample(self, key, n=None, params=None):
+        return self.support.sample(key, n, params)
+
+
+def start_law_of(x_start):
+    """The law of a start given as a law or a set, ``None`` for a point."""
+    if isinstance(x_start, Distribution):
+        return x_start
+    if isinstance(x_start, Set):
+        return SetStart(x_start)
+
+    return None
+
+
+def require_samplable_start(set_, box):
+    """Refuse a start set that cannot draw: no finite bounding box, or no ``sample`` of its own."""
+    if type(set_).sample is Set.sample:
+        raise ValueError(
+            f"x_start {type(set_).__name__} cannot draw a start (only a box samples): "
+            "give a law (a Distribution), or a box"
+        )
+    if not is_finite_box(box):
+        raise ValueError(
+            f"x_start {type(set_).__name__} has no finite bounding box: give a law "
+            "(a Distribution) or a bounded set"
+        )
+
+
+# The blocks closed_loop names its loop inputs' sources by (any other port: its own name)
+SOURCE_IDS = {"d": "disturbance", "n": "noise"}
+
+
+def source_id(port):
+    """The id of the source of ``port`` in the evaluated loop: ``closed_loop``'s role name, else the port's."""
+    return SOURCE_IDS.get(port, port)
+
+
+def coerce_disturbances(disturbances, sys) -> dict:
+    """The disturbance sources as a dict ``{port: block}``; refuse a bare law, a missing port, the command port."""
+    sources = dict(disturbances or {})
+
+    # The command port: u, else the one input there is
+    inputs = list(sys.inputs)
+    command = "u" if "u" in inputs else (inputs[0] if len(inputs) == 1 else None)
+
+    for port, block in sources.items():
+        if isinstance(block, Distribution):
+            raise TypeError(
+                f"disturbances[{port!r}] is a bare law: a disturbance is a source block "
+                "that states its time behaviour (R128); pass WhiteNoise(...) for a "
+                "white noise, NoiseSource(law, sample_period=...) for a held draw"
+            )
+        if not isinstance(block, System) or int(block.m) != 0:
+            raise TypeError(
+                f"disturbances[{port!r}] must be a source block (a System with no input)"
+            )
+        if port not in sys.inputs and port not in SOURCE_IDS:
+            raise ValueError(
+                f"disturbances key {port!r} is not an input port of sys (nor d or n, "
+                "which closed_loop adds to the command and the measurement)"
+            )
+        if port == command:
+            raise ValueError(
+                f"disturbances key {port!r} is the command port of sys: a source "
+                "there would replace the policy's command. Give the disturbance "
+                "its own input port (for example 'd')."
+            )
+        if source_id(port) in PlanningProblem.ROLES:
+            raise ValueError(
+                f"disturbances key {port!r} is a role of the problem's parameters"
+            )
+
+    return sources
+
+
+def coerce_laws(laws, view) -> dict:
+    """The laws over the parameters, in the tree's own shape; refuse a path the tree lacks."""
+    laws = {} if laws is None else dict(laws)
+    for path, law in flatten(laws):
+        name = ".".join(path)
+        if not isinstance(law, Distribution):
+            raise TypeError(f"params[{name!r}] must be a Distribution, got {law!r}")
+        if path[0] == "x_start":
+            raise ValueError("a law over the start is x_start=law, not params=")
+        try:
+            leaf = lookup(view, path)
+        except KeyError:
+            raise ValueError(
+                f"params law {name!r} names no leaf of the problem's parameters"
+            ) from None
+        if isinstance(leaf, dict):
+            raise ValueError(
+                f"params law over {name!r}: a law applies to a number, not to a whole dict"
+            )
+
+    return laws
+
+
+def require_criterion(criterion, criteria) -> None:
+    """Refuse a criterion that is not one of ``criteria`` (``("cvar", alpha)`` with ``0 < alpha ≤ 1``)."""
+    if isinstance(criterion, tuple):
+        kind = criterion[0] if criterion else None
+        ok = kind == "cvar" and len(criterion) == 2 and 0.0 < float(criterion[1]) <= 1
+    else:
+        ok = criterion in criteria and criterion != "cvar"
+    if not ok:
+        raise ValueError(
+            "criterion must be 'expectation', 'worst_case' or ('cvar', alpha) with "
+            f"0 < alpha <= 1, got {criterion!r}"
+        )
+
+
+def stream_of(key, name):
+    """The stream of the consumer ``name`` under ``key``: an integer seed, or a JAX key folded by the name."""
+    if is_jax_key(key):
+        jax = require_jax()
+        return jax.random.fold_in(key, zlib.crc32(name.encode()))
+
+    require_integer_key(key)
+
+    return child_seed(int(key), name)
+
+
+def source_seeds(block, key, sys_id, n):
+    """The seeds of a random source over ``n`` trials, nested like the block: trial ``i`` its realization under ``child_seed(key, "trial i")``."""
+    require_integer_key(key)
+    trial_keys = [child_seed(int(key), f"trial {i}") for i in range(n)]
+    seeds = [seeds_of(block, block.realize(child_seed(k, sys_id))) for k in trial_keys]
+
+    return stack_leaves(seeds)
+
+
+def split_laws(value, view):
+    """``(numbers, laws)``: the tree with each law replaced by the part's current number, and the laws alone."""
+    numbers = dict(value)
+    laws = {}
+    for path, leaf in flatten(value):
+        if isinstance(leaf, Distribution):
+            set_leaf(laws, path, leaf)
+            if path != ("x_start",):
+                numbers = with_leaf(numbers, path, lookup(view, path))
+
+    return numbers, laws
+
+
+def seeds_of(system, realized):
+    """The ``"seed"`` entries of the random blocks in a realization of ``system``, nested like it."""
+    if not isinstance(system, WiredDiagramMixin):
+        return {"seed": realized["seed"]}
+
+    return {
+        sys_id: seeds_of(subsystem, realized[sys_id])
+        for sys_id, subsystem in system.subsystems.items()
+        if subsystem.is_random
+    }
+
+
+def stack_leaves(trees):
+    """One tree of the shape of each of ``trees``, each leaf their values stacked on a leading axis."""
+    if isinstance(trees[0], dict):
+        return {key: stack_leaves([tree[key] for tree in trees]) for key in trees[0]}
+
+    return np.stack([np.asarray(leaf) for leaf in trees])
+
+
+def require_integer_key(key):
+    """Refuse a key that is not an integer (or a JAX key, for the laws alone)."""
+    if isinstance(key, bool) or not isinstance(key, (int, np.integer)):
+        raise TypeError(
+            "the problem's draws are realized from an integer key (a JAX key draws "
+            f"the laws, but not a source's seed): got {type(key).__name__}"
+        )
 
 
 def require_one_run(n):
@@ -812,7 +877,8 @@ def require_one_run(n):
     if int(n) != 1:
         raise ValueError(
             f"a deterministic problem has one realization, got n={n!r}: give the "
-            "problem laws (StochasticPlanningProblem) to draw several"
+            "problem laws (a law on x_start, laws in params, a random source) to "
+            "draw several"
         )
 
 
@@ -833,15 +899,15 @@ def require_roles(value, view):
         )
 
 
-def write_set_params(role, set_, entry):
-    """Set a set's parameters; refuse a set that holds none (a frozen library set)."""
+def moved_set(role, set_, entry):
+    """The set of ``role`` with its numbers ``entry``; refuse numbers a set does not hold."""
     # The view's own entry for a set without parameters writes back as nothing
-    if entry is None and set_.params is None:
-        return
-    try:
-        set_.params = entry
-    except AttributeError:
-        raise TypeError(f"{role} ({type(set_).__name__}) holds no parameters") from None
+    if not entry and not set_.params:
+        return set_
+    if not set_.params:
+        raise TypeError(f"{role} ({type(set_).__name__}) holds no parameters")
+
+    return set_.with_params(entry)
 
 
 def coerce_price(price):

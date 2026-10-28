@@ -13,12 +13,12 @@ from minilink import (
 )
 from minilink.core import SingletonSet
 from minilink.core.geometry import Sphere
+from minilink.core.shaping import quadratic_excess
 from minilink.graphical.animation.primitives import CustomLine, TrajectoryPolyline
 from minilink.graphical.catalog import SceneHistory
 from minilink.planning.spatial.collision import disc, mount
 from minilink.planning.spatial.paths import from_waypoints
 from minilink.planning.spatial.scene import Scene
-from minilink.planning.spatial.shaping import quadratic_excess
 from minilink.planning.spatial.track import ReferenceTrack
 
 TF = 14.0
@@ -93,8 +93,8 @@ body = mount(disc(ROBOT_RADIUS), on=sys)
 
 X = (
     BoxSet.from_system_state(sys)
-    & scene.clearance_field(body).as_constraint()
-    & track.corridor_field(body).as_constraint(lower=0.0)
+    & scene.clearance_field(body).as_set()
+    & track.corridor_field(body).as_set(lower=0.0)
 )
 control_cost = QuadraticCost.from_system(
     sys,

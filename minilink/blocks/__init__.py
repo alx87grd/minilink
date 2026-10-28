@@ -17,6 +17,7 @@ _EXPORTS: dict[str, tuple[str, str]] = {
     "Sine": ("minilink.blocks.sources", "Sine"),
     "TrajectorySource": ("minilink.blocks.sources", "TrajectorySource"),
     "WhiteNoise": ("minilink.blocks.sources", "WhiteNoise"),
+    "NoiseSource": ("minilink.blocks.sources", "NoiseSource"),
     # Routing
     "Demux": ("minilink.blocks.routing", "Demux"),
     "Error": ("minilink.blocks.routing", "Error"),

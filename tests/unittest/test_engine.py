@@ -12,7 +12,7 @@ from minilink.core.sets import BallSet, BoxInputSet
 from minilink.core.trajectory import Trajectory
 from minilink.planning.evaluation import Evaluation, reduce_criterion, score_run
 from minilink.planning.evaluator import closed_loop_of, evaluate
-from minilink.planning.problems import PlanningProblem, StochasticPlanningProblem
+from minilink.planning.problems import PlanningProblem
 
 UPRIGHT = {"r": np.array([np.pi])}
 
@@ -181,13 +181,13 @@ def test_the_criteria_reduce_the_runs():
 def stochastic_problem(**fields):
     sys = plant()
     cost = QuadraticCost.from_system(sys)
-    return StochasticPlanningProblem(
+    return PlanningProblem(
         sys=sys,
         cost=cost,
         tf=1.0,
         U=BoxInputSet.from_bounds([-50.0], [50.0]),
-        x0_distribution=Gaussian(mean=np.array([0.5, 0.0]), std=np.array([0.1, 0.1])),
-        params_distribution={"m": Uniform(np.array([0.9]), np.array([1.1]))},
+        x_start=Gaussian(mean=np.array([0.5, 0.0]), std=np.array([0.1, 0.1])),
+        params={"plant": {"m": Uniform(np.array([0.9]), np.array([1.1]))}},
         **fields,
     )
 
@@ -378,8 +378,9 @@ def test_the_problems_params_are_a_live_view_whose_writes_reach_the_parts():
 
     with pytest.raises(ValueError, match="unknown problem role"):
         problem.params = {"gains": {}}
-    with pytest.raises(TypeError, match="holds no parameters"):
-        problem.params = {"U": {"lower": 0.0}}
+    # A set is a value: its numbers move it, a new set in the role
+    problem.params = {"U": {"lower": np.array([-2.0]), "upper": np.array([2.0])}}
+    assert problem.U.box.upper.tolist() == [2.0]
 
 
 @pytest.mark.jax
@@ -461,15 +462,17 @@ def test_a_tuning_that_leaves_X_comes_back_inside_through_the_margin_row():
 
 def test_a_problem_realizes_its_draws_from_one_key():
     problem = stochastic_problem()
-    x0s, draws = problem.realize(0, 5)
-    assert x0s.shape == (5, 2) and draws["params"]["m"].shape == (5,)
-    again, _ = problem.realize(0, 5)
-    np.testing.assert_array_equal(x0s, again)  # one key, the same draws
-    assert np.all((draws["params"]["m"] >= 0.9) & (draws["params"]["m"] <= 1.1))
+    tree = problem.realize(0, 5)
+    assert tree["x_start"].shape == (5, 2) and tree["plant"]["m"].shape == (5,)
+    again = problem.realize(0, 5)
+    np.testing.assert_array_equal(tree["x_start"], again["x_start"])  # one key
+    assert np.all((tree["plant"]["m"] >= 0.9) & (tree["plant"]["m"] <= 1.1))
+    assert problem.drawn_paths() == [("x_start",), ("plant", "m")]
 
-    # A deterministic problem has one realization: its start, no draws
-    one, none = upright_problem().realize()
-    assert one.shape == (1, 2) and none == {"params": {}, "disturbances": {}}
+    # A deterministic problem has one realization: its start, the shared numbers
+    deterministic = upright_problem()
+    one = deterministic.realize()
+    assert one["x_start"].shape == (1, 2) and one["plant"] is deterministic.sys.params
     with pytest.raises(ValueError, match="one realization"):
         upright_problem().realize(0, 3)
 
@@ -481,11 +484,11 @@ def noisy_loop(seed=3):
 
 def point_start_problem():
     sys = plant()
-    return StochasticPlanningProblem(
+    return PlanningProblem(
         sys=sys,
         cost=QuadraticCost.from_system(sys),
         tf=1.0,
-        x0_distribution=Gaussian(mean=np.array([0.5, 0.0]), std=np.array([0.0, 0.0])),
+        x_start=Gaussian(mean=np.array([0.5, 0.0]), std=np.array([0.0, 0.0])),
     )
 
 
@@ -529,53 +532,47 @@ def test_a_deterministic_problem_runs_the_noise_blocks_own_seed():
     traj = pe.trajectory()
 
     # The loop simulated with its own params: the block's seed 3
-    x0 = np.asarray(loop.x0, dtype=float)
+    x0 = np.array(loop.x0, dtype=float)
     a, b = loop.state_index["plant"]
     x0[a:b] = [0.5, 0.0]
     reference = Simulator(loop, x0=x0, tf=1.0, dt=0.01, solver="rk4_fixedsteps").solve()
     np.testing.assert_allclose(traj.x[:, -1], reference.x[:, -1], rtol=1e-9)
 
-    # Another seed, another run
+    # An evaluation draws a seed per trial: a block's own seed is only its default
+    # realization (RD-R4b), so another seed on the block scores the same trials
     other = problem.compile(noisy_loop(seed=4), dt=0.01, backend="numpy")
-    assert not np.allclose(other.evaluate().J, pe.evaluate().J)
+    np.testing.assert_array_equal(
+        other.evaluate(n_trials=2, key=0).J, pe.evaluate(n_trials=2, key=0).J
+    )
+    assert not np.allclose(*pe.evaluate(n_trials=2, key=0).J)
 
 
-@pytest.mark.jax
-@pytest.mark.parametrize("stochastic", [False, True])
-def test_the_gradient_crosses_a_loop_with_a_noise_block(stochastic):
-    import jax
-
+def test_the_disturbance_shortcut_is_the_loop_closed_loop_builds():
     sys = plant()
-    deterministic = PlanningProblem(
-        sys, x_start=[0.5, 0.0], cost=QuadraticCost.from_system(sys), tf=1.0
+    cost = QuadraticCost.from_system(sys)
+    start = Uniform([0.4, -0.1], [0.6, 0.1])
+    noise = WhiteNoise(1, psd=0.5, sample_period=0.01, seed=3)
+    ctl = PID(Kp=20.0, Ki=1.0, Kd=4.0)
+
+    # Explicit: the loop built with its source (a Sum on the command, the plant has
+    # no d); the shortcut: the problem's d, wired the same way under the same ids
+    explicit = PlanningProblem(sys, x_start=start, cost=cost, tf=1.0).compile(
+        closed_loop(ctl, sys, disturbance=noise), dt=0.01, backend="numpy"
     )
-    problem = point_start_problem() if stochastic else deterministic
-    n_trials = 3 if stochastic else None
-    pe = problem.compile(noisy_loop(), dt=0.01, backend="jax")
-
-    grad = jax.grad(lambda p: pe.evaluate(p, 1, n_trials).objective)(pe.params)
-    assert np.isfinite(float(grad["controller"]["Kp"][0]))
-    assert float(grad["disturbance"]["seed"]) == 0.0  # a seed carries no gradient
-
-
-@pytest.mark.jax
-def test_a_sets_membership_traces_on_jax():
-    import jax
-    import jax.numpy as jnp
-
-    from minilink.core.sets import BallSet
-
-    ball = BallSet(center=[0.0, 0.0], radius=1.0)
-    box = BoxInputSet.from_bounds([-1.0], [1.0])
-    inside = jax.jit(lambda z: ball.contains(z))
-    assert bool(inside(jnp.array([0.5, 0.0]))) and not bool(
-        inside(jnp.array([2.0, 0.0]))
+    problem = PlanningProblem(
+        sys, x_start=start, cost=cost, tf=1.0, disturbances={"d": noise}
     )
-    assert bool(jax.jit(lambda u: box.contains(u))(jnp.array([0.5])))
-    assert ball.contains(np.array([0.5, 0.0]))  # NumPy in, a NumPy boolean out
+    shortcut = problem.compile(ctl, dt=0.01, backend="numpy")
+    assert list(shortcut.loop.subsystems) == list(explicit.loop.subsystems)
+    assert (
+        "disturbance" in problem.params
+        and ("disturbance", "seed") in problem.drawn_paths()
+    )
 
-
-# --- the edges: unwired plant ports, a changed problem, the view round trip ---
+    # One diagram, one Monte Carlo score, every source drawing its seed per trial
+    np.testing.assert_array_equal(
+        shortcut.evaluate(n_trials=3, key=0).J, explicit.evaluate(n_trials=3, key=0).J
+    )
 
 
 def test_a_plant_input_left_unwired_reads_its_nominal_value():
@@ -619,12 +616,12 @@ def test_the_problems_params_write_back_to_themselves():
 
 def test_a_new_start_law_brings_its_own_mean_and_support():
     sys = plant()
-    problem = StochasticPlanningProblem(
+    problem = PlanningProblem(
         sys,
         cost=QuadraticCost.from_system(sys),
-        x0_distribution=Uniform([-0.1, -0.1], [0.1, 0.1]),
+        x_start=Uniform([-0.1, -0.1], [0.1, 0.1]),
     )
-    moved = problem.replace(x0_distribution=Uniform([2.0, 0.0], [2.2, 0.1]))
+    moved = problem.replace(x_start=Uniform([2.0, 0.0], [2.2, 0.1]))
     np.testing.assert_allclose(moved.x_start, [2.1, 0.05])
     assert moved.X0.contains(np.array([2.1, 0.05]))
 
@@ -634,21 +631,220 @@ def test_the_cvar_counts_the_worst_fraction_without_rounding_up():
     assert reduce_criterion(J, ("cvar", 0.07)) == np.mean(J[-7:])
 
 
-def test_a_disturbance_the_loop_does_not_draw_is_announced():
+def test_a_disturbance_source_runs_in_the_evaluated_loop_with_a_seed_per_trial():
     from minilink import NoisyPendulum
 
     sys = NoisyPendulum()
-    problem = StochasticPlanningProblem(
+    problem = PlanningProblem(
         sys,
         cost=QuadraticCost.from_system(sys),
-        x0_distribution=Uniform([-0.1, -0.1], [0.1, 0.1]),
-        disturbances={"d": Gaussian([0.0], [1.0])},
+        x_start=Uniform([-0.1, -0.1], [0.1, 0.1]),
+        tf=1.0,
+        disturbances={"d": WhiteNoise(1, psd=1.0, sample_period=0.05)},
     )
-    with pytest.warns(UserWarning, match="does not draw the disturbances on \\['d'\\]"):
-        problem.compile(PID(Kp=5.0, Kd=1.0), dt=0.05, backend="numpy")
+    pe = problem.compile(PID(Kp=5.0, Kd=1.0), dt=0.05, backend="numpy")
+    assert "disturbance" in pe.loop.subsystems  # closed_loop's name for d's source
+    assert pe.params["disturbance"]["psd"].shape == (1,)
+
+    # Each trial its own seed, named by the port: the same trial without the
+    # noise scores differently, and the seeds are the tree's leaves
+    tree = problem.realize(1, 3)
+    seeds = tree["disturbance"]["seed"]
+    assert seeds.shape == (3,) and len(set(seeds)) == 3
+    quiet = problem.replace(disturbances={}).compile(PID(Kp=5.0, Kd=1.0), dt=0.05)
+    assert not np.allclose(
+        pe.evaluate(n_trials=3, key=1).J, quiet.evaluate(n_trials=3, key=1).J
+    )
+
+    # A disturbance is a source block: a bare law is refused, naming the fix
+    with pytest.raises(TypeError, match="WhiteNoise"):
+        PlanningProblem(sys, disturbances={"d": Gaussian([0.0], [1.0])})
+
+
+@pytest.mark.jax
+def test_one_integer_key_draws_the_same_trials_on_both_backends():
+    pytest.importorskip("jax")
+    problem = stochastic_problem()
+    scores = {
+        backend: problem.compile(pid(), dt=0.01, backend=backend).evaluate(
+            n_trials=4, key=7
+        )
+        for backend in ("numpy", "jax")
+    }
+    np.testing.assert_array_equal(scores["numpy"].x0, scores["jax"].x0)
+    np.testing.assert_allclose(scores["numpy"].J, scores["jax"].J, rtol=1e-9)
+
+
+def test_each_law_draws_from_its_own_stream():
+    problem = stochastic_problem()
+    first = problem.realize(0, 4)
+    assert len({tuple(x) for x in first["x_start"]}) == 4  # distinct trials
+
+    # Adding a law leaves the other draws unchanged
+    laws = {"plant": {**problem.laws["plant"], "l": Uniform([0.9], [1.1])}}
+    more = problem.replace(params=laws).realize(0, 4)
+    np.testing.assert_array_equal(more["x_start"], first["x_start"])
+    np.testing.assert_array_equal(more["plant"]["m"], first["plant"]["m"])
 
 
 @pytest.mark.parametrize("substeps", [2.0, np.float32(2.0), True, 0])
 def test_the_step_refuses_a_substep_count_that_is_not_a_positive_integer(substeps):
     with pytest.raises(ValueError, match="substeps"):
         upright_problem().compile(pid(), dt=0.01, substeps=substeps)
+
+
+def test_each_stateful_block_has_its_start_as_a_leaf():
+    sys = plant()
+    problem = PlanningProblem(
+        sys, x_start=[0.5, 0.0], cost=QuadraticCost.from_system(sys), tf=1.0
+    )
+    controller = pid()
+    pe = problem.compile(controller, dt=0.01, backend="numpy")
+    assert "x0" in pe.params["controller"] and "x0" not in pe.params["plant"]
+    np.testing.assert_array_equal(pe.params["controller"]["x0"], controller.x0)
+
+    # A moved start moves the run, as the block's own x0 would
+    moved = {"controller": {"x0": np.full(controller.n, 0.2)}}
+    controller.x0 = np.full(controller.n, 0.2)
+    rebuilt = problem.compile(controller, dt=0.01, backend="numpy")
+    np.testing.assert_allclose(pe.evaluate(moved).J, rebuilt.evaluate().J, rtol=1e-12)
+
+
+@pytest.mark.jax
+def test_the_gradient_reaches_an_observers_start():
+    pytest.importorskip("jax")
+    import jax
+
+    from minilink.control.state import StateFeedback
+    from minilink.core.closed_loop import closed_loop
+    from minilink.dynamics.abstraction.state_space import LTISystem
+    from minilink.estimation.observer import StateObserver
+
+    A = np.array([[0.0, 1.0], [-2.0, -0.5]])
+    B = np.array([[0.0], [1.0]])
+    C = np.array([[1.0, 0.0]])
+    plant_ = LTISystem(A, B, C)
+    observer = StateObserver(A, B, C, np.array([[3.0], [2.0]]))
+    loop = closed_loop(StateFeedback(np.array([[1.0, 1.5]])), plant_, observer=observer)
+    problem = PlanningProblem(
+        plant_, x_start=[1.0, 0.0], cost=QuadraticCost.from_system(plant_), tf=2.0
+    )
+    pe = problem.compile(loop, dt=0.01, backend="jax")
+    params = pe.params
+
+    grad = jax.grad(lambda p: pe.evaluate(p).objective)(params)["observer"]["x0"]
+
+    eps = 1e-6
+    for i in range(2):
+        up, down = (
+            {
+                **params,
+                "observer": {
+                    **params["observer"],
+                    "x0": params["observer"]["x0"] + s * eps * np.eye(2)[i],
+                },
+            }
+            for s in (1.0, -1.0)
+        )
+        central = (pe.evaluate(up).objective - pe.evaluate(down).objective) / (2 * eps)
+        np.testing.assert_allclose(grad[i], central, rtol=1e-6)
+
+
+@pytest.mark.jax
+def test_a_planned_input_is_a_decision_leaf_with_the_goal_lowered():
+    pytest.importorskip("jax")
+    from minilink import Optimizer
+    from minilink.blocks.sources import TrajectorySource
+    from minilink.dynamics.catalog.equations import DoubleIntegrator
+
+    sys = DoubleIntegrator()
+    cost = QuadraticCost.from_system(sys, Q=np.zeros((2, 2)), R=np.eye(1))
+    goal = BallSet(center=[1.0, 0.0], radius=0.05)
+    problem = PlanningProblem(sys, x_start=np.zeros(2), cost=cost, tf=2.0, Xf=goal)
+    source = TrajectorySource(np.linspace(0.0, 2.0, 11), np.zeros(11))
+    pe = problem.compile(source, dt=0.01, backend="jax")
+    assert pe.params["controller"]["values"].shape == (1, 11)
+    assert not pe.evaluate().reached[0]
+
+    wrt = ["controller.values"]
+    program = pe.program(wrt)
+    assert program.n_z == 11 and program.metadata["rows"] == ["reachability_margin"]
+    result = Optimizer(program, method="scipy_slsqp", options={"maxiter": 200}).solve()
+
+    # The goal reached to the solver's tolerance: the optimum sits on its boundary
+    planned = pe.evaluate(pe.unpack(result.z, wrt, pe.params))
+    assert result.success and float(planned.reachability_margin[0]) >= -1e-8
+
+
+# --- the problem's laws, sources and starts: the seam review's cases ---
+
+
+def test_a_law_written_into_the_params_moves_the_laws_and_leaves_the_parts():
+    problem = stochastic_problem()
+    m_before = problem.sys.params["m"]
+    law = Uniform(np.array([1.5]), np.array([1.6]))
+    start = Gaussian(mean=np.array([0.2, 0.0]), std=np.array([0.01, 0.01]))
+
+    params = problem.params
+    params["plant"]["m"] = law
+    params["x_start"] = start
+    problem.params = params
+
+    # The laws hold the new law, the plant keeps its own number
+    assert problem.laws["plant"]["m"] is law
+    assert problem.start_law is start
+    assert problem.sys.params["m"] is m_before
+    tree = problem.realize(0, 4)
+    assert np.all(tree["plant"]["m"] >= 1.5)
+    np.testing.assert_allclose(tree["x_start"].mean(axis=0), [0.2, 0.0], atol=0.05)
+
+
+def two_noise_source():
+    from minilink.blocks.routing import Sum
+    from minilink.core.diagram import DiagramSystem
+
+    source = DiagramSystem()
+    source.add_subsystem(WhiteNoise(1, psd=1.0, sample_period=0.05, seed=1), "w1")
+    source.add_subsystem(WhiteNoise(1, psd=0.5, sample_period=0.05, seed=2), "w2")
+    source.add_subsystem(Sum(signs=(1.0, 1.0)), "sum")
+    source.connect("w1", "y", "sum", "in0")
+    source.connect("w2", "y", "sum", "in1")
+    source.connect_new_output_port("sum", "y", "y")
+    return source
+
+
+def test_a_diagram_source_draws_a_seed_per_noise_block_per_trial():
+    from minilink import NoisyPendulum
+
+    sys = NoisyPendulum()
+    problem = PlanningProblem(
+        sys,
+        cost=QuadraticCost.from_system(sys),
+        x_start=[0.1, 0.0],
+        tf=1.0,
+        disturbances={"d": two_noise_source()},
+    )
+    assert problem.drawn_paths() == [
+        ("x_start",),
+        ("disturbance", "w1", "seed"),
+        ("disturbance", "w2", "seed"),
+    ]
+    tree = problem.realize(1, 3)
+    w1, w2 = tree["disturbance"]["w1"]["seed"], tree["disturbance"]["w2"]["seed"]
+    assert w1.shape == w2.shape == (3,) and not np.array_equal(w1, w2)
+
+    report = problem.compile(PID(Kp=5.0, Kd=1.0), dt=0.05).evaluate(n_trials=3, key=1)
+    assert len(np.unique(report.J)) == 3
+
+
+def test_a_point_start_reads_the_start_the_params_give():
+    problem = stochastic_problem().replace(x_start=np.array([0.5, 0.0]))
+    pe = problem.compile(pid(), dt=0.01, backend="numpy")
+    moved = pe.merged({"x_start": np.array([0.3, 0.0])})
+    report = pe.evaluate(moved, n_trials=2, key=0)
+    np.testing.assert_array_equal(report.x0, np.tile([0.3, 0.0], (2, 1)))
+
+
+def test_a_start_set_that_cannot_draw_is_refused():
+    with pytest.raises(ValueError, match="cannot draw a start"):
+        PlanningProblem(plant(), x_start=BallSet(np.zeros(2), 1.0), tf=1.0)

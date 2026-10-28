@@ -77,7 +77,7 @@ class TestSys2Gym(unittest.TestCase):
         np.testing.assert_allclose(env.action_space.high, [+1.0])
 
     def test_reward_is_negative_cost_increment(self):
-        env = self.make_env(reset_mode="determinist")
+        env = self.make_env()
         y, _ = env.reset()
         x, t, dt = env.x.copy(), env.t, env.dt
         u = np.array([0.3])
@@ -86,7 +86,7 @@ class TestSys2Gym(unittest.TestCase):
         self.assertAlmostEqual(r, expected)
 
     def test_euler_option_reproduces_the_explicit_formula(self):
-        env = self.make_env(reset_mode="determinist", solver="euler")
+        env = self.make_env(solver="euler")
         env.reset()
         x, t = env.x.copy(), env.t
         u = np.array([0.0])
@@ -95,7 +95,7 @@ class TestSys2Gym(unittest.TestCase):
         np.testing.assert_allclose(env.x, expected)
 
     def test_default_step_is_rk4_on_the_compiled_plant(self):
-        env = self.make_env(reset_mode="determinist", backend="numpy")
+        env = self.make_env(backend="numpy")
         self.assertEqual(env.solver, "rk4")
         self.assertEqual(env.backend, "numpy")
         env.reset()
@@ -120,7 +120,6 @@ class TestSys2Gym(unittest.TestCase):
                 cost,
                 dt=1e-3,
                 tf=1.0,
-                reset_mode="determinist",
                 solver=name,
                 backend="numpy",
             )
@@ -145,7 +144,7 @@ class TestSys2Gym(unittest.TestCase):
 
         plant = make_bounded_pendulum()
         cost = QuadraticCost.from_system(plant, xbar=np.zeros(2))
-        env = Sys2Gym(plant, cost, dt=0.1, tf=1.0, reset_mode="determinist")
+        env = Sys2Gym(plant, cost, dt=0.1, tf=1.0)
         env.reset()
 
         # tf = 1, dt = 0.1: the episode is 10 steps, the last one truncated
@@ -154,34 +153,35 @@ class TestSys2Gym(unittest.TestCase):
         self.assertAlmostEqual(env.t, 1.0)
 
     def test_input_clipping(self):
-        env = self.make_env(reset_mode="determinist")
+        env = self.make_env()
         env.reset()
         env.step(np.array([100.0]))
         self.assertLessEqual(float(env.u[0]), 1.0)
 
-    def test_reset_modes(self):
-        for mode in ("uniform", "gaussian", "determinist"):
-            env = self.make_env(reset_mode=mode)
+    def test_the_start_is_a_law_drawn_with_the_environments_generator(self):
+        from minilink.core.distributions import Gaussian, Uniform
+
+        for law in (
+            Uniform([-0.5, -1.0], [0.5, 1.0]),
+            Gaussian([0.0, 0.0], [0.1, 0.1]),
+        ):
+            env = self.make_env(x_start=law)
             y, info = env.reset(seed=1)
             self.assertEqual(y.shape, (2,))
             self.assertIn("state", info)
+            again, _ = env.reset(seed=1)
+            np.testing.assert_array_equal(y, again)  # one seed, one start
+        y, _ = self.make_env(x_start=Uniform([-0.5, -1.0], [0.5, 1.0])).reset(seed=0)
+        self.assertTrue(np.all(np.abs(y) <= [0.5, 1.0]))
 
-    def test_random_reset_without_state_bounds_asks_for_them(self):
+    def test_no_law_starts_every_episode_at_x0(self):
         from minilink.interfaces.gymnasium import Sys2Gym
 
         plant = make_unbounded_pendulum()
         cost = QuadraticCost.from_system(plant, Q=np.eye(2), R=np.eye(1))
-        for mode in ("uniform", "gaussian"):
-            env = Sys2Gym(plant, cost, reset_mode=mode, backend="numpy")
-            with self.assertRaisesRegex(ValueError, "state bounds"):
-                env.reset(seed=0)
-        env = Sys2Gym(plant, cost, reset_mode="determinist", backend="numpy")
-        np.testing.assert_array_equal(env.reset(seed=0)[0], [0.0, 0.0])
-        # a start spread set by hand is drawn as given
         env = Sys2Gym(plant, cost, backend="numpy")
-        env.x0_lb, env.x0_ub = np.array([-0.5, -1.0]), np.array([0.5, 1.0])
-        y, _ = env.reset(seed=0)
-        self.assertTrue(np.all(np.abs(y) <= [0.5, 1.0]))
+        np.testing.assert_array_equal(env.reset(seed=0)[0], [0.0, 0.0])
+        np.testing.assert_array_equal(env.reset(seed=1)[0], [0.0, 0.0])
 
     def test_from_problem_draws_the_start_from_the_problem_only(self):
         from gymnasium.utils import seeding
@@ -190,7 +190,6 @@ class TestSys2Gym(unittest.TestCase):
         from minilink.interfaces.gymnasium import Sys2Gym
         from minilink.planning.problems import (
             PlanningProblem,
-            StochasticPlanningProblem,
         )
 
         # A deterministic problem on a plant without state bounds starts at x_start
@@ -210,8 +209,8 @@ class TestSys2Gym(unittest.TestCase):
         np.testing.assert_allclose(y, [0.2, 0.0])
         # The start is the problem's first draw on the seeded generator
         start = Uniform([-1.0, -0.5], [1.0, 0.5])
-        problem = StochasticPlanningProblem(
-            make_bounded_pendulum(), cost=cost, tf=1.0, x0_distribution=start
+        problem = PlanningProblem(
+            make_bounded_pendulum(), cost=cost, tf=1.0, x_start=start
         )
         env = Sys2Gym.from_problem(problem, backend="numpy")
         for seed in (0, 7):
@@ -271,7 +270,7 @@ class TestSys2GymJax(unittest.TestCase):
 
         plant = make_bounded_pendulum()
         cost = QuadraticCost.from_system(plant, xbar=np.zeros(2))
-        return Sys2Gym(plant, cost, dt=0.05, tf=1.0, reset_mode="determinist", **kwargs)
+        return Sys2Gym(plant, cost, dt=0.05, tf=1.0, **kwargs)
 
     def test_jax_is_picked_when_the_plant_traces(self):
         env = self._envs()

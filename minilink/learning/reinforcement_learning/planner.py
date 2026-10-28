@@ -72,10 +72,9 @@ class ReinforcementLearningPlanner(Planner):
 
     Parameters
     ----------
-    problem : StochasticPlanningProblem
-        Task with a start distribution, cost and constraint set. A plain
-        :class:`~minilink.planning.problems.PlanningProblem` is accepted and
-        trained from its single ``x_start``.
+    problem : PlanningProblem
+        Task with a start (a law, a set, or one point to train from), cost and
+        constraint set.
     dt : float
         Control period of the learned law (one RK4 step per period).
     policy : NeuralPolicy, optional
@@ -658,17 +657,19 @@ class ReinforcementLearningPlanner(Planner):
         # N = t_f / dt control periods, over the episode unless tf is given
         n_steps = int(round((env.tf if tf is None else float(tf)) / env.dt))
 
+        # The episode's sources: their seeds drawn only with a key, the plant nominal
+        sources = None if key is None else env.source_seeds(key)
+
         # Closed loop on the grid: u_k = π(x_k), then one control period of the plant
-        def body(carry, key):
+        def body(carry, _):
             x, t = carry
             u = pi(theta, x)
-            x_next, t_next, _, _, _ = env.step(x, t, u, key)
+            x_next, t_next, _, _, _ = env.step(x, t, u, None, sources)
             return (x_next, t_next), (x, u)
 
-        # The N periods from x0 at t = 0, the disturbances drawn only with a key
-        keys = None if key is None else jax.random.split(key, n_steps)
+        # The N periods from x0 at t = 0
         x0 = jnp.asarray(x0, dtype=float)
-        (x_end, _), (xs, us) = jax.lax.scan(body, (x0, 0.0), keys, length=n_steps)
+        (x_end, _), (xs, us) = jax.lax.scan(body, (x0, 0.0), None, length=n_steps)
 
         # N + 1 samples: the final state appended, the last input held at it
         xs = np.concatenate([np.asarray(xs), np.asarray(x_end)[None]])

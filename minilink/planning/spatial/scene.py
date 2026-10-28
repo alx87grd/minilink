@@ -10,7 +10,7 @@ from minilink.core.geometry import Union
 from minilink.planning.spatial.collision import CollisionBody
 
 if TYPE_CHECKING:
-    from minilink.planning.spatial.state_fields import StateField
+    from minilink.core.fields import Field
 
 
 ###############################################################################
@@ -26,7 +26,7 @@ class Scene:
     A scene composes into a :class:`~minilink.planning.problems.PlanningProblem`
     through its state fields::
 
-        X = bounds & scene.clearance_field(body).as_constraint()
+        X = bounds & scene.clearance_field(body).as_set()
         cost = base + w * scene.cost_field(body).as_cost()
     """
 
@@ -64,7 +64,7 @@ class Scene:
 
         return density
 
-    def clearance_field(self, body: CollisionBody) -> StateField:
+    def clearance_field(self, body: CollisionBody) -> Field:
         """The clearance of ``body``'s probes to the obstacles, as a field over the state."""
         require_obstacles_for_field(self.obstacles)
 
@@ -73,7 +73,7 @@ class Scene:
 
         return ClearanceField(self, body)
 
-    def cost_field(self, body: CollisionBody) -> StateField:
+    def cost_field(self, body: CollisionBody) -> Field:
         """The largest cost density over ``body``'s probes, as a field over the state."""
         # A real cycle: state_fields imports Scene from this module
         from minilink.planning.spatial.state_fields import CostDensityField

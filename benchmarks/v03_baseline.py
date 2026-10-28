@@ -292,7 +292,7 @@ def optimizer_entries(out):
 
 def draw_entries(out):
     """The distributions, a stochastic problem's realization and its Monte Carlo score."""
-    from minilink import Gaussian, StochasticPlanningProblem, Uniform
+    from minilink import Gaussian, PlanningProblem, Uniform
 
     for backend in ("numpy", "jax"):
         key = 0
@@ -308,17 +308,17 @@ def draw_entries(out):
         )
 
     plant = Pendulum()
-    problem = StochasticPlanningProblem(
+    problem = PlanningProblem(
         plant,
         cost=QuadraticCost.from_system(plant),
         tf=1.0,
-        x0_distribution=Uniform([-0.5, -0.5], [0.5, 0.5]),
-        params_distribution={"m": Uniform([0.8], [1.2])},
+        x_start=Uniform([-0.5, -0.5], [0.5, 0.5]),
+        params={"plant": {"m": Uniform([0.8], [1.2])}},
         U=plant.input_box,
     )
-    x0s, draws = problem.realize(0, 3)
-    out["draws.realize.x0s"] = x0s
-    out["draws.realize.m"] = draws["params"]["m"]
+    tree = problem.realize(0, 3)
+    out["draws.realize.x0s"] = tree["x_start"]
+    out["draws.realize.m"] = tree["plant"]["m"]
     for backend in ("numpy", "jax"):
         pe = problem.compile(pd_controller(), dt=DT, backend=backend)
         for i in range(2):
@@ -352,7 +352,6 @@ def rl_entries(out):
 
     from minilink import (
         ReinforcementLearningPlanner,
-        StochasticPlanningProblem,
         Uniform,
     )
 
@@ -369,11 +368,11 @@ def rl_entries(out):
         def h(self, x, t=0.0, params=None):
             return 0.0
 
-    problem = StochasticPlanningProblem(
+    problem = PlanningProblem(
         plant,
         cost=SwingUpCost(),
         tf=np.inf,
-        x0_distribution=Uniform([-np.pi, -1.0], [np.pi, 1.0]),
+        x_start=Uniform([-np.pi, -1.0], [np.pi, 1.0]),
         U=plant.input_box,
     )
     planner = ReinforcementLearningPlanner(
@@ -399,15 +398,15 @@ def rl_entries(out):
 
 def gym_problem_entries(out):
     """``Sys2Gym.from_problem``: reset and a few steps."""
-    from minilink import StochasticPlanningProblem, Uniform
+    from minilink import PlanningProblem, Uniform
     from minilink.interfaces import Sys2Gym
 
     plant = Pendulum()
-    problem = StochasticPlanningProblem(
+    problem = PlanningProblem(
         plant,
         cost=QuadraticCost.from_system(plant),
         tf=1.0,
-        x0_distribution=Uniform([-0.5, -0.5], [0.5, 0.5]),
+        x_start=Uniform([-0.5, -0.5], [0.5, 0.5]),
         U=plant.input_box,
     )
     env = Sys2Gym.from_problem(problem, dt=DT)
@@ -424,15 +423,15 @@ def gym_problem_entries(out):
 
 def field_entries(out):
     """A state field's set and cost."""
-    from minilink.planning.spatial.state_fields import StateField
+    from minilink.core.fields import Field
 
-    class Energy(StateField):
+    class Energy(Field):
         def value(self, x, u=None, t=0.0, params=None):
             return 0.5 * x[1] ** 2 - np.cos(x[0])
 
     field = Energy()
     states = [np.array([0.1, 0.2]), np.array([2.0, -1.0])]
-    constraint = field.as_constraint(lower=-0.5, upper=0.5)
+    constraint = field.as_set(lower=-0.5, upper=0.5)
     cost = field.as_cost(weight=2.0, shaping=lambda v: v**2)
     out["field.margin"] = [constraint.margin(x) for x in states]
     out["field.cost"] = [cost.g(x, np.zeros(1), 0.0) for x in states]

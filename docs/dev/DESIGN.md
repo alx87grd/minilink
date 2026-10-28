@@ -81,7 +81,7 @@ or neural network alike):
 | `blocks/` | plant-agnostic wiring: sources, `Integrator`, `TransferFunction` (and `Lead`, its lead compensator), routing (`Error`/`Sum`/`Gain`/`Mux`/`Demux`), nonlinear (`Saturation`), filters (`LowPassFilter`), neural (`MLP`), the step block `UnitDelay` |
 | `dynamics/` | plants: `abstraction/` mother classes, `catalog/` by physical domain |
 | `catalog/` | **teaching alias** of `dynamics/catalog/` — flat re-exports for short imports (`from minilink.catalog import Pendulum`); ownership stays in `dynamics/` |
-| `control/` | control laws and design verbs: `design.py` (`lqr`, `place`, `lqr_finite_horizon`, `lqg`, `trajectory_lqr` on a linear model or a plant; their gains on arrays), `siso.py` (`P`, `PI`, `PD`, `PID`), `state.py`, `impedance.py`, `robotic.py`, `modelbased.py`, `neural.py`, `geometric.py` (`PurePursuit`); `ModelPredictiveController` re-exported from `planning/trajectory_optimization/mpc/`. The port contract is §4, 'Control laws' |
+| `control/` | control laws and design verbs: `design.py` (`lqr`, `place`, `lqr_finite_horizon`, `lqg`, `trajectory_lqr` on a linear model or a plant; their gains on arrays), `siso.py` (`P`, `PI`, `PD`, `PID`), `state.py`, `impedance.py`, `robotic.py`, `modelbased.py`, `neural.py`, `stochastic.py` (`GaussianPolicy(mean, log_std, *, sample_period, seed=None)`, `u = μ(x) + σ(x) ε(t)` with `ε` the noise block's counter signal of its seed at `⌊t/Δ⌋`, `seed=None` the mean; `log_prob` and `entropy` as methods; `SquashedGaussianPolicy` in a box, R129), `geometric.py` (`PurePursuit`); `ModelPredictiveController` re-exported from `planning/trajectory_optimization/mpc/`. The port contract is §4, 'Control laws' |
 | `estimation/` | state observers and their designs: `observer.py` (`StateObserver`, the innovation form, ports `u`, `y` → `x`, role `observer`), `design.py` (`luenberger`, `kalman`, the duals of `place` and `lqr`) |
 
 **Tools** — verbs on a `System`; they return data or plots and never define
@@ -353,12 +353,28 @@ Applies to every method CONSTITUTION §2 names ('One signature'), and also to po
 computes, transcriptions and the `MathematicalProgram` `J`/`h`/`g`.
 Native in, native out; no `np.asarray` / `float()` inside equation paths. Convert at
 boundaries (evaluators, solvers, plotting, `Trajectory`, I/O). Where an object does not
-read `params` yet, the gap is tracked below.
+read `params` yet, the gap is tracked below (the distributions and the sets read theirs).
 
 ### Parameters
 
 - `params is None` → `self.params`; any other value overrides (never
   `params or self.params`).
+- **One contract for every core math object (R140).** Its mathematics is a function of its
+  arguments and `params` (`f`, `h`, `step`, `g`, `margin`, `value`, `sample`); it has a
+  `params` dict, `{}` when it has none; a composed object's `params` is its parts' dicts, by a
+  dotted path; the leaves are numbers and numeric arrays, an integer leaf (a seed) never in
+  `wrt`; every function is deterministic given its parameters, the seed among them.
+  `tests/unittest/test_contract.py` walks every public system, cost, set and law on both
+  backends (`params=None` its defaults, the same values twice, the JAX numbers the NumPy ones,
+  a finite gradient through a float leaf). The written exceptions: the abstract shells and the
+  diagrams (their `params` are their blocks', walked as blocks); `LookupPolicy` (a table over a
+  SciPy interpolator, host-only until join 1 puts value iteration on `transition`);
+  `Trajectory` (a record, not a function); `MathematicalProgram` (`J(z)` closes over its
+  problem's tree until the parametric program gives it `params`, the program lane); the
+  shapes and the workspace fields (frozen geometry read from their fields, the geometry
+  module's plan); a threshold with no useful gradient kept as structure (`TimeCost.eps`); RL
+  training until its collectors take per-episode seeds (TODO §1.4); a student-written model
+  (RULES 2.3).
 - **One keyword per kind of choice (R134).** `backend=` is the array module (`"numpy"`,
   `"jax"`, or `"auto"` where a tool can fall back) on every tool and facade that compiles;
   `solver=` is the time integration; `method=` is the verb's own numerical method (the
@@ -398,7 +414,8 @@ read `params` yet, the gap is tracked below.
   blocks): `problem.params` is `{"plant", "cost", "X", "U", "X0", "Xf", "x_start",
   "discount_rate"}`, assembled on each access from the parts, which stay the one home of
   each number; assigning a dictionary routes each entry to its part (a singleton `X0`
-  moves with `x_start`; a set that holds no parameters refuses a write). Library costs
+  moves with `x_start`; a library set, a frozen value, is replaced by its `with_params` copy;
+  a set that holds no parameters refuses a write). Library costs
   hold their parameters on the System pattern (`QuadraticCost.params` is `Q`, `R`, `S`,
   `xbar`, `ubar`, its attributes views); a `SumCost` keys its terms by id like a diagram
   (the class name verbatim, `QuadraticCost2` for a repeat, a scaled term the id of the
@@ -473,8 +490,8 @@ Explicit `add_subsystem` / `connect` remains canonical for general topology.
 `ctl @ plant` and the sampled loop `ctl % dt @ plant`), like `feedback()`, return
 a new diagram that shares the operands' blocks: a diagram operand is laid out
 flat in the result with its ids, wiring and boundary ports, and the left operand
-keeps its blocks, wiring, ports, name, `x0` and camera settings, which `+` and
-`>>` carry into the result; a `>>` chain is named after every operand
+keeps its blocks, wiring, ports, name and camera settings, which `+` and `>>`
+carry into the result (its `x0` comes with the shared blocks, which own it); a `>>` chain is named after every operand
 (`"Step >> PID >> Pendulum"`). Blocks are shared, never copied, so `a >> b >> c`
 chains stay cheap. `connect()`, `autowire()` and `expose()` are methods and
 change the diagram they are called on. Known gap (on the workboard): `step_diagram % dt`
@@ -640,20 +657,36 @@ provided.
   plant's run by static indexing.
   `print(traj)` is `N`, the time span, and the array shapes, not the sample dump.
 - Sets: `margin ≥ 0` feasible; `contains` is that test on the array module (a traceable
-  boolean under JAX); `sample(key, n=None)`
+  boolean under JAX); `sample(key, n=None, params=None)`, the key required,
   follows the distributions' draw convention below (`BoxSet.sample` traces);
   `bounding_box()` is the tightest box containing the set, or `None` — tools that need a
   box (decision bounds, a grid's extent, a sampler's box) ask for it and never probe the
   set's type. Compose with
-  `&` → `IntersectionSet`. `margin(z, t, params=None)`: a set that holds parameters
-  stores `self.params` and reads it when `params` is `None`; the tools pass nothing, so
-  each set reads its own. The library sets hold none yet (the gap in 'Parameters').
+  `&` → `IntersectionSet`. `margin(z, t, params=None)`: a set's numbers are its `params`
+  (`{"lower", "upper"}` on a box, `{"center", "radius"}` on a ball, `{"point"}` on a
+  singleton, the members' by position `{"0", "1", …}` on an intersection, `{}` for a set with
+  none), read when `params` is `None`, so they enter the problem's tree by role (`X.upper`);
+  a library set is a frozen value, and `with_params(params)` is the moved copy a problem
+  assignment (`problem.params = {"U": {...}}`) puts in the role.
+- Fields (`core/fields.py`): `Field`, a scalar `value(x, u=None, t=0.0, params=None)` (it reads
+  the arguments it depends on), `gradient` (`jax.grad` on JAX, central differences on NumPy),
+  and four conversions named by what they return: `as_set(lower=, upper=)` (a `FieldSet`;
+  `as_set(upper=level)` is the sublevel set), `as_input_set` (an `InputSet` over `u` at `x`),
+  `as_cost(weight=, shaping=)` (the running cost `g = weight · shaping(V)`) and
+  `as_terminal_cost` (the terminal cost `h`). The shaping functions (`quadratic_hinge`,
+  `quadratic_excess`, `inverse_barrier`, `occupancy`) are in `core/shaping.py`.
+  `Set.as_cost(weight=, shaping=)` is `Field.as_cost` on the set's least margin
+  `V(x) = minᵢ mᵢ(x)`, its default shaping the quadratic hinge `max(−V, 0)²` (zero inside:
+  the soft form of the constraint). The workspace fields subclass it (`planning/spatial/`).
 - Distributions (`core/distributions.py`): a duck type — `dim`, `mean` (an array),
-  `sample(key, n=None)` with `key` a NumPy generator, an integer seed or a JAX PRNG key
-  (JAX arrays out, traceable); `(dim,)` for one draw, `(n, dim)` with `n`; `support` an
-  optional `Set`. `Uniform(lower, upper)` holds its `BoxSet`; the same `sample` convention
-  holds on sets. `Gaussian`, `Uniform`, `Particles`; sets are support,
-  distributions are probability.
+  `sample(key, n=None, params=None)` with `key` a NumPy generator, an integer seed or a JAX
+  PRNG key (JAX arrays out, traceable); `(dim,)` for one draw, `(n, dim)` with `n`; `support`
+  an optional `Set`. A library law's numbers are its `params` and `cov` is the covariance of
+  one draw (RD-R1): `Gaussian(mean, std=None, cov=None)` (one spread, `{"mean", "std"}` or
+  `{"mean", "cov"}`, a full `cov` drawn through its Cholesky factor), `Uniform(lower, upper)`
+  (its `BoxSet`'s bounds, `cov = diag((b − a)² / 12)`), `Particles(points)` (`{"points"}`, the
+  law's own covariance); so a family of noise levels vmaps like a family of masses. Sets are
+  support, distributions are probability.
 - Randomness (`blocks/sources.py`, `core/distributions.py`): a `Distribution` has no time; a
   noise signal is a block holding draws over a sample period. `WhiteNoise(p, *, psd,
   sample_period, seed, hold)` is white noise of two-sided intensity `psd`, each sample
@@ -661,7 +694,8 @@ provided.
   does not change with the period; `seed`, `sample_period` and `psd` are params, and `h`
   computes `w(t)` from `(t, params)` with a counter-based cipher (Threefry-2x32, the same bits
   on NumPy and JAX), so the block is pure, traces, and edits without a refresh. `seed=None` is
-  the mean. `System.realize(key)` returns the params of one realization: every random block
+  the mean, and such a block is not random (`is_random` reads the seed): no realization or
+  evaluation reseeds it. `System.realize(key)` returns the params of one realization: every random block
   reseeded under its own stream, named by its id (a diagram nests it like `params`), or every
   seed `None` for `key=None`; the analysis verbs (`operating_point`, `find_equilibrium`) and a
   `PlanningProblem` on a random system resolve `params=None` through `realize(None)`, so a
@@ -675,6 +709,12 @@ provided.
   adaptive solver, two blocks sharing a seed, and a declared disturbance the stepped tools
   never read are announced. Kalman reads `Q = B_w W B_wᵀ`, `R = D_v V D_vᵀ` for the
   continuous filter, `Q_d = B_w W B_wᵀ Δ`, `R_d = D_v V D_vᵀ / Δ` for the discrete one.
+  `NoiseSource(law, *, sample_period, seed, hold)` is sampled noise (RD-D3): `w_k` the law drawn
+  at the counter key `CounterKey(seed, k)` by the same cipher (each library law and `BoxSet`
+  draw from one), held over `Δ`, the law's numbers under `params["law"]`; a per-sample
+  covariance keeps each sample when `Δ` is edited (a datasheet sensor,
+  `NoiseSource(Gaussian(0, cov=R_d), sample_period=Tₛ)`). `WhiteNoise` is its subclass whose
+  per-sample law, `N(0, psd / Δ)`, is derived in `h`; both are in `minilink.blocks`.
 - Costs: `g(x,u,t,params=None)`, `h(x,t,params=None)` on `CostFunction` in `core`; attach
   to `PlanningProblem`, not the plant. The cost is the integrand only: `integrate(traj, *,
   discount_rate, params)` is its trapezoid on the trajectory's array module, `g_max(X, U)`
@@ -871,10 +911,19 @@ plotting resolution — the integrator picks its own steps); fixed-step solvers
 take `dt` from `solver_info["smallest_time_constant"]` × `AUTO_DT_SCALE` (0.1,
 one owner in `simulation/time_grid.py`), discontinuous loops included. A diagram's hint is
 the smallest over its stateful subsystems and any block that sets its own; a
-static block left at the default does not count. Both hints are bubbled again
-at every `refresh()`, which `Simulator` runs before solving, so a hint belongs on
-the block: one set by hand on the diagram is replaced. `StaticSimulator` shares
-the 10001-point default.
+static block left at the default does not count. A diagram's hints are derived from its
+blocks at each read, and a block whose hint follows its parameters (a noise block's sample
+period, the racecar's fastest mode) reads them at each read too, so no tool refreshes before
+a run and a hint belongs on the block: one set by hand on the diagram is replaced.
+`StaticSimulator` shares the 10001-point default.
+
+**Three owners of a start (R124).** A block owns its `x0`; a diagram's `x0` is a view
+stacked from its blocks' (a read-only array; assigning a whole vector writes each slice
+through to its block), a sampled loop's held outputs keep their own start (`hold_x0`), and a
+`SampledSystem`'s `x0` is its source's. `refresh()` only rebuilds the stacked layout after a
+structural change inside a block. The problem owns the plant's start (`x_start`), and the
+evaluator's tree gives every other stateful block its start as a leaf (`controller.x0`,
+`observer.x0`), read from the block at compile.
 
 Solver presets: `scipy`, `scipy_stiff`, `scipy_max`, `scipy_ultra`, `scipy_lsoda`,
 `euler` (variable knot spacing), `euler_fixedsteps` (uniform grid via the step
@@ -1002,20 +1051,33 @@ left-Riemann discretization of the same running cost (`r_k = -g dt`) with per-st
 `gamma = exp(-rho dt)`; `exp(-rho t)` is not folded into the reward (that would discount
 twice); its plans report `evaluate`.
 
-**Stochastic problem:** `StochasticPlanningProblem(PlanningProblem)` adds
-`x0_distribution` (its mean is `x_start`, its support `X0`),
-`params_distribution` (`{name: Distribution}` over `sys.params`, dotted names
-reaching a diagram's subsystem params such as `"sys.mass"`, one draw per
-episode carried through the step model's `params`),
-`disturbances` (`{port_id: Distribution}`, a fresh draw per step held on the
-port in the stepped environment and `Sys2Gym`; `evaluate` holds those ports at their
-nominal value and warns) and `criterion` (`"expectation"` default, `"worst_case"`, or `("cvar", alpha)`, the
-mean of the worst `alpha` fraction; an evaluation's `objective` is this reduction of the
-runs' `J`, and the RL planner, which optimizes the expectation, refuses the others). A deterministic planner given a stochastic problem plans from
-the mean start and warns; `Sys2Gym.from_problem(problem, dt=)` is the
-Gymnasium view (draws of `x0`, the exit rule, `h` at a finite horizon). Distributions are §4's duck type. `nominal()` is the certainty-equivalent
-`PlanningProblem`. Every planner that takes a `PlanningProblem` takes the
-stochastic one.
+**A problem stochastic by its parts (R143):** there is no stochastic class; where a number
+goes, a law may go. `x_start=` takes a point, a `Set` (the uniform law on it, the set its
+`X0`) or a `Distribution` (its mean the representative `x_start`, its support the default
+`X0`); `params=` takes laws in the tree's own shape (`{"plant": {"m": Uniform([0.9], [1.1])}}`,
+a block inside a diagram plant by its id); `disturbances=` takes source blocks on the plant's
+ports (`{"d": WhiteNoise(...)}`, R128; a bare law is refused, naming the fix); `criterion`
+(`"expectation"` default, `"worst_case"`, or `("cvar", alpha)`, the mean of the worst `alpha`
+fraction; an evaluation's `objective` is this reduction of the runs' `J`, and the RL planner,
+which optimizes the expectation, refuses the others). `problem.is_stochastic` is read off the
+parts; `problem.params` shows each law at its leaf and the start's law under `"x_start"`;
+`problem.realize(key, n)` is one tree (R144): the problem's numbers with `"x_start"` of shape
+`(n, nx)`, each law's leaf drawn `n` times and each random source's `seed` a trial axis of
+integers (`drawn_paths()` names them); every consumer draws from its own stream, named by its
+path (`child_seed(key, "plant.m")`, a source's seed by its block and the trial), so adding a
+law or a source leaves every other draw unchanged, and an integer key draws on the host: the
+same trials on NumPy and JAX. `nominal()` replaces each law by its mean and drops the random
+sources. The evaluated loop is exactly the one `closed_loop` builds with the same sources (R128:
+two forms, one diagram): the source of `d` is its block `disturbance`, of `n` its `noise` (a
+`Sum` on the command or the measurement when the plant has no such port), any other port's
+under the port's name; its seed is the leaf `"disturbance.seed"`. An evaluation draws a seed per
+trial for every random block of the loop, the problem's sources or the loop's own, even on a
+deterministic problem: a block's own seed is only its default realization (RD-R4b). The stepped
+environment reads each source at `t_k` with the episode's seed (RD-D21). A deterministic planner given a stochastic problem plans
+from the mean start and warns; `Sys2Gym(sys, cost, x_start=law)` draws each episode's start
+from a `Distribution` with its `np_random` (`None`: `sys.x0`), and
+`Sys2Gym.from_problem(problem, dt=)` is the Gymnasium view
+(draws of `x0`, the exit rule, `h` at a finite horizon). Distributions are §4's duck type.
 
 **The problem evaluator (the second verb, `planning/evaluator.py`):**
 `pe = problem.compile(controller, dt=None, *, solver="rk4", substeps=1, backend="auto")` closes
@@ -1026,7 +1088,8 @@ grid of `dt`; a sampled controller (`pid % 0.01`, a held policy, a loop on a clo
 `SampledDiagramSystem` on its own base period, `dt` omitted reading it and a differing `dt`
 refused (D15), its plant's solver and substeps the plant block's; a tick law with no clock and
 the stateless MPC are refused, naming the clock.
-`pe.params` is the run's tree: the loop's blocks by id, the problem's own leaves (`"cost"`,
+`pe.params` is the run's tree: the loop's blocks by id (a stateful block other than the
+plant with its `"x0"` leaf), the problem's own leaves (`"cost"`,
 the sets' parameters, `"x_start"`, `"discount_rate"`) and each free input at its nominal
 value. `pe.trajectory(params)` is one run to the horizon on the step model, every block
 output recorded (`"id:port"`, the plant's input `"plant:u"`, the role `plant`);
@@ -1218,11 +1281,11 @@ programming: fit a cost-to-go from value iteration, or learn one online.
 
 **Spatial scene** (`planning/spatial/`; its planned home `core/geometry/` is in §3): two domains — **workspace** `p ∈ ℝ²/ℝ³` and
 **state** `x`. On W: hard `Shape` obstacles and soft `WorkspaceField` sources live in
-`Scene` (`obstacles`, `workspace_fields`). On X: `StateField.value(x)` fuses the robot
+`Scene` (`obstacles`, `workspace_fields`). On X: a `Field`'s `value(x)` fuses the robot
 placement with scene queries (`clearance_field`, `cost_field`). Export separately —
 `clearance_field(body)` for collision (hard `Set` or barrier `CostFunction`) and
 `cost_field(body)` for terrain (soft `CostFunction` or hard band via
-`as_constraint(upper=...)`). `StateField.value(x)` is a **scalar** (min clearance, max
+`as_set(upper=...)`). The field's `value(x)` is a **scalar** (min clearance, max
 density over body probes). **Collision reuse:** frameless geometry (`disc`,
 `car_outline`, `point_probe`) binds to the **planner** plant with
 `mount(geometry, on=sys, frame="body")`; world probes use ``sys.tf(x,u,t)[frame]``
@@ -1238,9 +1301,9 @@ geometry: :func:`~minilink.planning.spatial.collision.disc`,
 from waypoint polylines via `from_waypoints` (default `kind="polyline"`), wrapped in
 `ReferenceTrack(path, half_width)`. Same export pattern as obstacles —
 `distance_field(robot).as_cost(shaping=quadratic_excess)` for soft path following,
-`corridor_field(body).as_constraint(lower=0)` for a hard tube. Probe semantics match
+`corridor_field(body).as_set(lower=0)` for a hard tube. Probe semantics match
 clearance (subtract body radius). Compose with obstacles:
-`X = bounds & scene.clearance_field(body).as_constraint() & track.corridor_field(body).as_constraint()`.
+`X = bounds & scene.clearance_field(body).as_set() & track.corridor_field(body).as_set()`.
 
 **Workspace cost raster** (`grid.sample_field_costs`, `plotting.plot_cost_field` /
 `plot_cost_field_3d` / `plot_cost_field_exports`): rasterize shaped ``FieldCost`` terms
@@ -1278,8 +1341,8 @@ line 1 is `{TypeName}, …` identity tokens; further lines are two-space
 indented `label: value`. `print(obj)` and IPython `_repr_pretty_` call
 `inspect_text`; unknown types fall back to `repr`. Covered types include
 `System`, `Trajectory`, sets, distributions, costs (including sums and
-quadratic weights), state fields, `PlanningProblem` and
-`StochasticPlanningProblem`, `PlanningSolution`, `MathematicalProgram`,
+quadratic weights), fields, `PlanningProblem` (a stochastic one with its
+laws and criterion), `PlanningSolution`, `MathematicalProgram`,
 `Optimizer`, `OptimizationResult`, `HybridDiagram`, and `Simulator`.
 Subclasses may append a deep block after the hub summary (`LTISystem`
 matrices, `TransferFunction` `G(s)`, `Observer` gain and poles).

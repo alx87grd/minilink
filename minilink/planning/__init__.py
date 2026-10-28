@@ -16,11 +16,6 @@ from minilink.core.exports import lazy_facade
 _EXPORTS: dict[str, tuple[str, str]] = {
     # Problem and results
     "PlanningProblem": ("minilink.planning.problems", "PlanningProblem"),
-    "StochasticPlanningProblem": (
-        "minilink.planning.problems",
-        "StochasticPlanningProblem",
-    ),
-    "as_stochastic": ("minilink.planning.problems", "as_stochastic"),
     "Gaussian": ("minilink.core.distributions", "Gaussian"),
     "Uniform": ("minilink.core.distributions", "Uniform"),
     "Particles": ("minilink.core.distributions", "Particles"),
@@ -89,9 +84,9 @@ _EXPORTS: dict[str, tuple[str, str]] = {
     "mount": ("minilink.planning.spatial.collision", "mount"),
     "car_outline": ("minilink.planning.spatial.collision", "car_outline"),
     "point_probe": ("minilink.planning.spatial.collision", "point_probe"),
-    "quadratic_excess": ("minilink.planning.spatial.shaping", "quadratic_excess"),
-    "quadratic_hinge": ("minilink.planning.spatial.shaping", "quadratic_hinge"),
-    "inverse_barrier": ("minilink.planning.spatial.shaping", "inverse_barrier"),
+    "quadratic_excess": ("minilink.core.shaping", "quadratic_excess"),
+    "quadratic_hinge": ("minilink.core.shaping", "quadratic_hinge"),
+    "inverse_barrier": ("minilink.core.shaping", "inverse_barrier"),
     "TrackCorridorOverlay": (
         "minilink.planning.spatial.overlays",
         "TrackCorridorOverlay",

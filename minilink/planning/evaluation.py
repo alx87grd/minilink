@@ -293,7 +293,7 @@ def problem_leaves(problem) -> dict:
     leaves = {"cost": problem.cost.params if problem.cost is not None else None}
     for role in ("X", "U", "Xf"):
         set_params = getattr(getattr(problem, role), "params", None)
-        if set_params is not None:
+        if set_params:
             leaves[role] = set_params
     leaves["x_start"] = problem.x_start
     leaves["discount_rate"] = problem.discount_rate

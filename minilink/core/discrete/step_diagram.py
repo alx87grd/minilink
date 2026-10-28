@@ -1,5 +1,7 @@
 """Step diagrams: discrete-time systems built by connecting step and static blocks."""
 
+import numpy as np
+
 from minilink.core.backends import array_module
 from minilink.core.discrete.step_system import StepSystem
 from minilink.core.system import DynamicSystem, System
@@ -35,6 +37,7 @@ class StepDiagramSystem(WiredDiagramMixin, StepSystem):
         # their slice of the stacked state: none on a tick diagram
         self.hold_index = {}
         self.hold_dim = 0
+        self.hold_x0 = np.zeros(0)
 
         # The System shell alone: a step diagram may hold no state yet (StepSystem
         # requires n ≥ 1), and its ports are the ones it exposes
