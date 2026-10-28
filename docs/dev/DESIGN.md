@@ -981,7 +981,7 @@ loop is taken when its block `plant` is the problem's system) and compiles it on
 `pe.params` is the run's tree: the loop's blocks by id, the problem's own leaves (`"cost"`,
 the sets' parameters, `"x_start"`, `"discount_rate"`) and each free input at its nominal
 value. `pe.trajectory(params)` is one run to the horizon on the step model, every block
-output recorded (`"id:port"`, the plant's input `"plant.u"`, the role `plant`);
+output recorded (`"id:port"`, the plant's input `"plant:u"`, the role `plant`);
 `pe.evaluate(params, key, n_trials)` the `Evaluation` (a pytree record, one row per run:
 `cost`, `J`, the margins, `failed`, `reached`, `x0`; `objective` the criterion over `J`,
 `mean` / `std` / `worst` / `cvar(alpha)` and the three rates), the draws of a stochastic

@@ -29,7 +29,7 @@ from minilink.planning.evaluation import (
 
 BACKENDS = ("auto", BACKEND_JAX, BACKEND_NUMPY)
 EPISODE_LENGTH = 10.0  # s, the run of an infinite-horizon problem when none is named
-PLANT_INPUT = "plant.u"  # the recorded signal of the plant's input, the plant role's u
+PLANT_INPUT = "plant:u"  # the recorded signal of the plant's input, the plant role's u
 
 
 ###############################################################################

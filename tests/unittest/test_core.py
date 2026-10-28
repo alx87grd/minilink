@@ -659,8 +659,8 @@ def test_a_trajectory_is_a_jax_pytree_and_its_plant_run_traces():
             t=t,
             x=x,
             u=jnp.zeros((1, 5)),
-            signals={"plant.u": a * x[:1]},
-            roles={"plant": {"x": (0, 1), "u": "plant.u"}},
+            signals={"plant:u": a * x[:1]},
+            roles={"plant": {"x": (0, 1), "u": "plant:u"}},
         )
 
     assert isinstance(jax.jit(run)(2.0), Trajectory)
@@ -700,10 +700,10 @@ def test_a_saved_trajectory_keeps_its_roles(tmp_path):
         t=np.linspace(0.0, 1.0, 3),
         x=np.zeros((2, 3)),
         u=np.zeros((1, 3)),
-        signals={"plant.u": np.ones((1, 3))},
-        roles={"plant": {"x": (0, 1), "u": "plant.u"}},
+        signals={"plant:u": np.ones((1, 3))},
+        roles={"plant": {"x": (0, 1), "u": "plant:u"}},
     )
     traj.save(tmp_path / "run.npz")
     loaded = Trajectory.load(tmp_path / "run.npz")
-    assert dict(loaded.roles) == {"plant": {"x": (0, 1), "u": "plant.u"}}
+    assert dict(loaded.roles) == {"plant": {"x": (0, 1), "u": "plant:u"}}
     np.testing.assert_array_equal(loaded.of("plant").u, np.ones((1, 3)))

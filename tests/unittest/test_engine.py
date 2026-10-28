@@ -49,7 +49,7 @@ def test_the_run_records_every_block_output_and_the_plant_role(backend):
     assert traj.x.shape == (4, 201)
     assert np.allclose(traj.t[-1], 2.0)
     assert "controller:u" in traj.signals
-    assert np.allclose(traj.signals["plant.u"], traj.signals["controller:u"])
+    assert np.allclose(traj.signals["plant:u"], traj.signals["controller:u"])
 
     # The plant's run: its state slice and its input
     run = traj.of("plant")
@@ -431,7 +431,7 @@ def test_the_recorded_plant_command_is_the_reconstructed_signal():
     loop.inputs["r"].nominal_value = np.array([np.pi])
     rebuilt = loop.reconstruct_internal_signals(traj)
     np.testing.assert_allclose(
-        traj.signals["plant.u"], rebuilt.signals["controller:u"], atol=1e-12
+        traj.signals["plant:u"], rebuilt.signals["controller:u"], atol=1e-12
     )
 
 
