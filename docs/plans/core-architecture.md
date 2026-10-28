@@ -400,13 +400,15 @@ From reviewer C §3.3, in the ruled names. v0.3 is done when these scripts run a
 4. **One compiled MPC program**, rebound with two plant `mu` values and a moved target, matches
    the rebuilds; `method="ipopt"` works on the compiled path.
 5. **The fixed-iteration MPC's closed loop:** `problem.compile(mpc % Δ).evaluate(p)` runs, `vmap`s
-   over starts, and its gradient tunes a cost weight.
+   over starts, and its gradient tunes a cost weight; the dual-rate form,
+   `(mpc % 0.05) >> (PlanFollower(planner) % 0.01)`, gives the plan one slow period late.
 6. **A native step problem** (a grid world as a `StepPlanningProblem`) solved by value iteration
    on `transition`, and a continuous problem's value iteration and the judge, which scores the
    lookup policy through the sampled face (`policy % dt`, R105), giving one `J`.
 7. **A `QuadraticField`** serves as a terminal cost (`as_terminal_cost`) and as the certificate's
    `V`, with the DP and RoA baselines unchanged.
-8. **Every catalog plant and notebook** is green on the merge gate.
+8. **Every catalog plant and notebook** is green on the merge gate; the notebooks' code moved to
+   the new API and debugged as the run's last step, no new notebook written (R167).
 9. **The budget** (R156), a benchmark script run at the merge with its numbers in the report, not a
    CI gate: the compiled sampled loop, the one score and the native MPC's closed loop each within
    2× of the vision's measurement at the same size (44 ms for 1000 starts × 200 RK4 steps; 93 ms
@@ -414,6 +416,19 @@ From reviewer C §3.3, in the ruled names. v0.3 is done when these scripts run a
    horizon, CPU, float64, [the vision §7.5](../reviews/2026-10-27-consolidated-core-vision.md));
    the parametric program's solve within 2× of the same program with its parameters frozen; a
    parameter family within 2× of the plain batch (S53's bar).
+10. **A multi-rate computer on a continuous plant,** `(filt % 0.01) >> (ctl % 0.1) @ plant`: the
+    `cond` firing and the hyperperiod unroll bit-identical, the held command in the record, and
+    the numbers matching today's `Computer` after the same-tick change.
+11. **A bare reference in a sampled loop reads seconds** (R158): `Sine() >> (pid % Δ) @ plant`
+    equals `(Sine() % Δ) >> (pid % Δ) @ plant` bit for bit; a `WhiteNoise` with its own period,
+    bare in the loop, reproduces its continuous-diagram draws at the ticks from the same seed.
+12. **A loop started at `t_start = 100`** with a time-varying cost scores as from 0 with the
+    reference shifted, and `jax.grad` with respect to `t_start` matches a central difference.
+13. **The RL heads' gate** (R160): on the same demo and seeds, the learning curve and the final
+    score within the Monte Carlo spread of today's, the training time within the budget's bar.
+
+The scripts live as `tests/unittest/test_v03_core.py` (one test per script, named by its
+number and lane) and `benchmarks/v03_budget.py` for script 9.
 
 ## 12. The core and the features
 

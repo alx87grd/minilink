@@ -551,7 +551,8 @@ solvers and MPPI are v0.4 (§4).
   `u_ref`;
   `PlanFollower` for dual rate; `dt_mpc`, `t0`, `warm_start`, `MPCTickLatch`, the stateless and
   stateful pair, `export_to_computer`, `dt_broadcast`, `Command` and `replan_divisor` gone; the
-  MPC demos, the racecar demos and `racecar_toward_mpc.ipynb` swept **[student-facing]**; the MPC
+  MPC demos and the racecar demos swept **[student-facing, given]**, `racecar_toward_mpc.ipynb`
+  with the notebook sweep (R167); the MPC
   numbers re-pinned once with R123's delay. Done when one tick jits on the native planner and
   matches the host SLSQP plan within a tolerance on the pendulum and the cart-pole, and the Ipopt
   MPC runs on the host runner.

@@ -22,6 +22,7 @@ reviews and are recorded here when ruled.
 | R163 | The conventions' first sampled-loop step (AC-8a) folded into the loop lane | TODO §1.5 |
 | R164 | The names: `update`, `rollout_dense`, `pv.command`, `z`, `PlanFollower`, `inputs=`, `delay=`, `lookahead=`, `t_start` everywhere, `program.unpack(z)` | [planner-and-mpc](../plans/planner-and-mpc.md) §11 |
 | R165 | The failure price follows overridden cost weights (cached); the `as_constraint` → `as_set` rename given; plain exceptions for the wiring-time refusals | TODO §1.7, §1.9, §1.10 |
+| R167 | The notebooks' code moved to the new API and debugged at the end of the run; no new tutorial or demo notebook; four acceptance scripts added | core-architecture §11, the run brief |
 | R166 | The architecture of record: R124–R165 confirmed, the go for every lane, the "ask, core" marks removed; the 10-24 run's decisions reviewed with the new run's log | TODO §1, QUESTIONS |
 
 ## R154 (2026-10-28, preliminary) The discretized problem's cost is a `SampledCost`
@@ -233,3 +234,18 @@ tuned tree (was `params_at`; the evaluator already has `pe.unpack`).
   10-24 rule.
 - The 10-24 overnight run's open decisions (OD-7 to OD-35) are reviewed in the morning after the
   new run, both logs together.
+
+## R167 (2026-10-28) The notebooks at the end of the run; four more acceptance scripts
+
+- At the end of the run the notebooks' code is moved to the new API and debugged (the notebook
+  smoke check), every notebook, as the run's last step after the material and contracts; the
+  racecar MPC notebook goes with that sweep and the racecar demos are given. No new tutorial or
+  demo notebook is written on the new API.
+- The definition of done gains four scripts (10 to 13: the multi-rate computer, a bare reference
+  reading seconds in a sampled loop, a loop started at `t_start = 100`, the RL heads' gate) and
+  the dual-rate clause on script 5; they live in `tests/unittest/test_v03_core.py`, the budget in
+  `benchmarks/v03_budget.py`.
+- New demo scripts on the new pipeline in `examples/` (six were proposed: the digital PID tuned,
+  the LQG Monte Carlo, the multi-rate computer, the native MPC tuned by gradient, a grid world as
+  a step problem, a terminal field) remain the maintainer's call, `examples/` being
+  student-facing.
