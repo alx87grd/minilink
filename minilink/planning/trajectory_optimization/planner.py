@@ -58,7 +58,9 @@ _TRAJOPT_OPTION_KEYS = (
     "iterations",
 )
 
-_TRANSCRIPTION_PRESETS = frozenset({"direct_collocation", "multiple_shooting"})
+_TRANSCRIPTION_PRESETS = frozenset(
+    {"direct_collocation", "multiple_shooting", "single_shooting"}
+)
 
 
 ###############################################################################
@@ -109,7 +111,7 @@ class TrajectoryOptimizationPlanner(Planner):
             Continuous-time planning task (requires a cost).
         transcription : Transcription or str, optional
             The transcription. ``None`` defaults to direct collocation.
-            String presets: ``\"direct_collocation\"``, ``\"multiple_shooting\"``.
+            String presets: ``\"direct_collocation\"``, ``\"multiple_shooting\"``, ``\"single_shooting\"`` (box-bounded: the native methods solve it).
             Teach demos should pass the string explicitly.
         n_steps : int, optional
             Knot count when ``transcription`` is omitted or a string preset.
@@ -936,16 +938,19 @@ def require_no_scene(params) -> None:
 
 
 def host_tree(tree):
-    """A tree with every leaf a NumPy value (``None`` kept), or ``None`` for none."""
+    """A tree with every leaf a NumPy value (``None`` kept, an empty subtree kept empty), or ``None`` for none."""
     if not tree:
         return None
-    if isinstance(tree, dict):
-        return {
-            key: host_tree(value) if isinstance(value, dict) else host_leaf(value)
-            for key, value in tree.items()
-        }
 
-    return tree
+    return host_subtree(tree)
+
+
+def host_subtree(tree):
+    """Every leaf of ``tree`` a NumPy value, its subtrees kept, the empty ones too."""
+    return {
+        key: host_subtree(value) if isinstance(value, dict) else host_leaf(value)
+        for key, value in tree.items()
+    }
 
 
 def host_leaf(value):
@@ -1013,6 +1018,16 @@ def resolve_transcription(
         )
 
         return MultipleShootingTranscription(MultipleShootingOptions(n_steps=n_steps))
+
+    if name == "single_shooting":
+        # Lazy import: a preset's transcription loads when it is chosen, not with
+        # the planner
+        from minilink.planning.trajectory_optimization.shooting import (
+            ShootingOptions,
+            ShootingTranscription,
+        )
+
+        return ShootingTranscription(ShootingOptions(n_steps=n_steps))
 
     raise ValueError(
         f"Unknown transcription {name!r}. Use one of {_TRANSCRIPTION_PRESETS}, "

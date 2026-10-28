@@ -176,12 +176,13 @@ def hybrid_entries(out):
 
 
 def mpc_entries(out):
-    """The NumPy MPC on a single integrator (mpc_integrator_numpy), shortened."""
+    """The NumPy MPC on a single integrator (mpc_integrator_numpy), shortened: the delayed MPC on its clock."""
     from minilink import (
         DynamicSystem,
         SingletonSet,
         TrajectoryOptimizationPlanner,
     )
+    from minilink.analysis import discretize
     from minilink.control import ModelPredictiveController
 
     class SingleIntegrator(DynamicSystem):
@@ -220,12 +221,11 @@ def mpc_entries(out):
         optimizer_options={"maxiter": 80, "ftol": 1e-6},
         verbose=False,
     )
-    mpc = ModelPredictiveController(planner, dt_mpc=0.2, warm_start=True, verbose=False)
-    hybrid = mpc @ plant
-    traj = hybrid.compute_trajectory(
-        tf=1.0, x0_plant=x0, plant_dt_inner=0.01, backend="numpy"
-    )
-    out["mpc.integrator.x"] = traj.plant.x
+    mpc = ModelPredictiveController(planner)
+    loop = (mpc % 0.2) @ discretize(plant, 0.2, substeps=20)
+    traj = loop.compute_trajectory(tf=1.0)
+    start, end = loop.state_index["plant"]
+    out["mpc.integrator.x"] = traj.x[start:end]
 
 
 # Entries: the problem evaluator and its program

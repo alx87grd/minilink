@@ -113,7 +113,7 @@ state-feedback block):
   never catalog content. (The abstraction modules are the shared mathematical
   bases of the library band: `blocks/` builds LTI wiring on them, `control/`
   computed torque, `estimation/` EKFs.)
-- **Exception:** the `minilink.control` facade re-exports `ModelPredictiveController`
+- **Exception:** the `minilink.control` facade re-exports `ModelPredictiveController` and `PlanFollower`
   from `planning/trajectory_optimization/mpc/` (the receding-horizon block wraps a
   trajectory optimization planner, so it lives with it).
 - **Exception:** `learning/` builds on `planning/`: the problem, the planner base,
@@ -266,8 +266,7 @@ the named car profiles live with their scenarios in `examples/projects/car_trajo
   wall time `t`); the facades cache the plant trajectory on `self.traj`, the full result on
   `self.last_result` and the computer view on `self.rollout`. Shortcuts: `block % schedule`
   → `Computer`; `Computer @ plant` and `hybrid_closed_loop` wire the standard feedback
-  ports as `ctl @ plant` does; an MPC block goes through `export_to_computer`, which
-  refuses a `dt` other than `dt_mpc`. `plot_diagram` draws the plant and computer clusters
+  ports as `ctl @ plant` does. `plot_diagram` draws the plant and computer clusters
   with dashed boundary edges (`abstract_boundary=True` by default).
 - **Realtime (live sessions):** `RealtimeSimulator` (`simulation/realtime/`) is the third
   orchestrator. Per frame it polls a `RealtimeInput` (`u`, `should_stop`; the nominal `u`
@@ -280,16 +279,28 @@ the named car profiles live with their scenarios in `examples/projects/car_trajo
   by `sys.game()`. `PygameInput` maps held keys or a connected gamepad (`joystick_axes`,
   3-D `camera_axes` orbit) to the input ports' bounds or slews a setpoint, staying
   windowless when a controller is connected.
-- **MPC hybrid block:** `ModelPredictiveController(planner, dt_mpc=)` returns a
-  `StepSystem` whose state is the last packed `z` (the default `warm_start=True`), or a
-  static `System` with `warm_start=False`.
-  On JAX the planner's parametric program is compiled once and each tick is bind + solve,
-  memoized across the ports `u`, `x_ff`, `z`; on NumPy each tick rebuilds the NLP. The
-  deploy loop is `compute_command` → `Command` (the tick's `PlanningSolution`, `k`,
-  `t_solve`, `u_ff`, `x_ff`, `z`, `success`); `reset()` clears the latch. A dual-rate
-  `Computer` (`dual_rate_computer(dt_broadcast)`) replans at `dt_mpc` and broadcasts the
-  interpolated nominal in between; the two leaves share one block, so there is no port
-  edge between them. Post-run horizons and animation overlays: `planning/trajectory_optimization/mpc/viz.py`.
+- **MPC on the planner's face:** `ModelPredictiveController(planner, *, inputs=None,
+  delay=True, lookahead=0.0)` closes a planner's compiled face `pv = planner.compile()` on the
+  loop, one solve per tick, `(mpc % dt) @ plant`. The delayed form (the default) is a native
+  `SampledSystem` (`core.discrete.sampled_system.NativeSampledSystem`: no source, its seconds
+  face `update` and its port functions written in seconds, `%` setting the period on a copy)
+  whose state is the plan `z` (`n = pv.n_z`, `x0 = pv.initial()`): at tick `k` it applies the
+  plan solved at the previous tick, `u_k = pv.command(z_k, x̂_k, t_k)`, and solves the next,
+  `z_{k+1} = pv.solve(P_k, z0=pv.shift(z_k, t_k))`, keeping `z_k` on a failed solve: one
+  period of computation delay and no algebraic loop. `P_k` is the planner's tree (the block's
+  `params`, so `controller.cost.Q` tunes the plan) with each leaf named in `inputs` read from
+  its port (default `{"x_start": "y"}`) and `t_start` the tick's time; `lookahead=Δ` starts the
+  plan at `t_k + Δ` from the measured start predicted that far under the stored plan (the
+  planner's model, its commands linear between knots). The pure form (`delay=False`) is a
+  static law, a cold solve per tick, refused without a clock. Ports out: `u`, `z`, and
+  `x_ref`, `u_ref` when the plan carries states. `PlanFollower(planner)` applies a received
+  plan, `u = pv.command(z, t)`: the dual rate is `(mpc % slow) >> (PlanFollower(planner) %
+  fast)`, the plan one slow period late. A native fixed-iteration planner (single shooting,
+  `method="adam"`, `iterations=K`) makes the tick traceable: `problem.compile(mpc % Δ)` is
+  one scan on JAX, `vmap`s over starts and differentiates in the plan's weights. Post-run
+  horizons and animation overlays: `planning/trajectory_optimization/mpc/viz.py`
+  (`mpc_plans_from_rollout`, `mpc_animation_overlays`, the plan read from the run's `z` or
+  from the loop's state).
 - **Observer:** a block that reads the plant's `u` and `y` and gives the estimate on `x`
   (`StateObserver`; later filters keep the ports, their state may be larger than the
   estimate). Under the id `observer`, top level or inside the controller box, `roles()`

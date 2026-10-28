@@ -1,14 +1,10 @@
-"""Model predictive control: receding-horizon control blocks on trajectory optimization."""
+"""Model predictive control: a planner's compiled face closed on the loop."""
 
-# The product entry is :func:`~minilink.planning.trajectory_optimization.mpc.predictive.ModelPredictiveController`
-# with a :class:`~minilink.planning.trajectory_optimization.planner.TrajectoryOptimizationPlanner`.
-# ``backend='jax'`` auto-compiles a parametric NLP once (bind + solve per tick);
-# ``backend='numpy'`` or ``'direct'`` rebuilds the NLP each replan tick (no JAX
-# required). Terminal boundaries, non-singleton ``X0`` and shooting transcriptions are
-# not supported.
-from minilink.planning.trajectory_optimization.mpc.controller import Command
+# The entry is ModelPredictiveController(planner) on a TrajectoryOptimizationPlanner,
+# closed as mpc % dt @ plant; PlanFollower applies its plan at a faster rate.
 from minilink.planning.trajectory_optimization.mpc.predictive import (
     ModelPredictiveController,
+    PlanFollower,
 )
 from minilink.planning.trajectory_optimization.mpc.viz import (
     mpc_animation_overlays,
@@ -16,8 +12,8 @@ from minilink.planning.trajectory_optimization.mpc.viz import (
 )
 
 __all__ = [
-    "Command",
     "ModelPredictiveController",
+    "PlanFollower",
     "mpc_animation_overlays",
     "mpc_plans_from_rollout",
 ]

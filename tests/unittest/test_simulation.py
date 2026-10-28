@@ -850,7 +850,7 @@ class TestAsComputer(unittest.TestCase):
         with self.assertRaises(TypeError):
             as_computer(UnscheduledP(0.3, ports="reference"), 0.02)
 
-    def test_mpc_mod_exposes_u_ff(self):
+    def test_mpc_mod_sets_the_native_laws_period(self):
         pytest = __import__("pytest")
         jax = pytest.importorskip("jax")
         del jax
@@ -891,11 +891,10 @@ class TestAsComputer(unittest.TestCase):
                 optimizer_options={"maxiter": 5, "ftol": 0.1},
             ),
         )
-        computer = (
-            ModelPredictiveController(planner, dt_mpc=0.2, warm_start=False) % 0.2
-        )
-        self.assertIn("y", computer.diagram.inputs)
-        self.assertIn("u_ff", computer.diagram.outputs)
+        computer = ModelPredictiveController(planner) % 0.2
+        self.assertEqual(computer.sample_period, 0.2)
+        self.assertIn("y", computer.inputs)
+        self.assertEqual(list(computer.outputs)[:2], ["u", "z"])
 
 
 from minilink.simulation.realtime import (

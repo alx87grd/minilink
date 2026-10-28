@@ -3,6 +3,7 @@
 import numpy as np
 
 from minilink import PlanningProblem, QuadraticCost, TrajectoryOptimizationPlanner
+from minilink.analysis import discretize
 from minilink.catalog import UdeSRacecarDyn
 from minilink.control import ModelPredictiveController
 from minilink.graphical.catalog.racecar_skin import (
@@ -141,32 +142,30 @@ planner = TrajectoryOptimizationPlanner(
     method="scipy_slsqp",
     optimizer_options={"maxiter": SLSQP_MAXITER, "ftol": SLSQP_FTOL},
 )
-mpc = ModelPredictiveController(planner, dt_mpc=MPC_DT, warm_start=True, verbose=True)
+mpc = ModelPredictiveController(planner)
 
 car = UdeSRacecarDyn(named_ports=False)
 car.params["mu"] = PLANT_MU
 car.x0 = x0.copy()  # the whole circuit, not the car
 car.camera_scale = 2.0
 
-lap = mpc @ car
+lap = (mpc % MPC_DT) @ discretize(car, MPC_DT, substeps=round(MPC_DT / SIM_DT))
 # lap.plot_diagram()
-result = lap.compute_trajectory(
-    tf=TF_SIM, x0_plant=x0, plant_dt_inner=SIM_DT, backend="jax"
-)
+result = lap.compute_trajectory(tf=TF_SIM)
 # lap.plot_trajectory()
 
 
 # car.skin = racecar_skin_2d
 # lap.animate(
-#     result.plant.resample(n_samples=N_FRAMES),
-#     overlays=mpc_animation_overlays(result, planner, scene=scene, track=track),
+#     result.resample(n_samples=N_FRAMES),
+#     overlays=mpc_animation_overlays(result, mpc, loop=lap, scene=scene, track=track),
 # )
 
 
 car.skin = racecar_skin_3d
 lap.animate(
-    result.plant.resample(n_samples=N_FRAMES),
-    overlays=mpc_animation_overlays(result, planner, scene=scene, track=track),
+    result.resample(n_samples=N_FRAMES),
+    overlays=mpc_animation_overlays(result, mpc, loop=lap, scene=scene, track=track),
     renderer="meshcat",
     native=False,
 )

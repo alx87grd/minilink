@@ -29,6 +29,10 @@ _EXPORTS: dict[str, tuple[str, str]] = {
         "minilink.planning.trajectory_optimization.mpc.predictive",
         "ModelPredictiveController",
     ),
+    "PlanFollower": (
+        "minilink.planning.trajectory_optimization.mpc.predictive",
+        "PlanFollower",
+    ),
     "ComputedTorque": (
         "minilink.control.modelbased",
         "ComputedTorque",

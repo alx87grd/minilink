@@ -1,12 +1,9 @@
-"""MPC visualization: the receding horizons of a hybrid rollout, as animation overlays."""
+"""MPC visualization: the receding horizons of a sampled MPC loop's run, as animation overlays."""
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
-
 import numpy as np
 
-from minilink.core.discrete.step_rollout import StepRollout
 from minilink.core.trajectory import Trajectory
 from minilink.graphical.animation.drawables import SceneHistory
 from minilink.graphical.animation.primitives import (
@@ -14,13 +11,6 @@ from minilink.graphical.animation.primitives import (
     HorizonPolyline,
     TrajectoryPolyline,
 )
-from minilink.planning.problems import PlanningProblem
-from minilink.planning.trajectory_optimization.direct_collocation import (
-    DirectCollocationTranscription,
-)
-
-if TYPE_CHECKING:
-    from minilink.simulation.discrete.hybrid_simulator import HybridSimResult
 
 ###############################################################################
 # Public API
@@ -28,69 +18,62 @@ if TYPE_CHECKING:
 
 
 def mpc_animation_overlays(
-    result: HybridSimResult,
-    planner,
+    rollout: Trajectory,
+    mpc,
     *,
+    loop=None,
+    block: str = "controller",
     scene=None,
     track=None,
     traj=None,
     trail: bool = True,
     reference_pad: float | None = None,
-    t0: float = 0.0,
-    dt_mpc: float | None = None,
     scene_color: str = "tab:red",
     scene_opacity: float = 0.45,
 ) -> list:
     """
-    Build ``animate(overlays=[...])`` layers for a hybrid MPC rollout.
+    Build ``animate(overlays=[...])`` layers for a sampled MPC loop's run.
 
-    Reconstructs horizon polylines from the computer tick history, optionally
-    an executed-path trail, and optionally a straight reference line, obstacle
-    scene skin, or track corridor.
+    The receding horizons from the plan ``z`` the MPC block records at each
+    tick, optionally an executed-path trail, a straight reference line, an
+    obstacle scene skin, or a track corridor.
 
     Parameters
     ----------
-    result : HybridSimResult
-        Output of :meth:`~minilink.core.discrete.hybrid_diagram.HybridDiagram.compute_trajectory`.
-    planner :
-        Trajopt planner (transcription and template problem).
+    rollout : Trajectory
+        A run of the loop ``mpc % dt @ plant`` (``compute_rollout``, or the
+        evaluator's ``trajectory``), the MPC block's ``z`` among its signals.
+    mpc : DelayedPredictiveController
+        The MPC block (its compiled face reads the plans).
+    loop : SampledDiagramSystem, optional
+        The loop the run is of, for a run that records its state only
+        (``loop.compute_trajectory``): the plan and the plant's path are read
+        from their state slices.
+    block : str, optional
+        The MPC block's id in the loop (``"controller"`` for ``mpc % dt @ plant``).
     scene : Scene, optional
         Collision scene drawn via :meth:`~minilink.planning.spatial.scene.Scene.as_visualizer`.
     track : Track, optional
         2-D track corridor edges and centerline.
     traj : Trajectory, optional
-        Executed path for the trail. Defaults to ``result.plant``. Pass the
-        leaf-car trajectory when the hybrid plant is a nested diagram, so the
-        trail is pose ``(x, y)`` and not the first two diagram states.
+        Executed path for the trail; default the run's plant.
     trail : bool, optional
-        Draw the executed-path polyline. ``False`` keeps the receding horizon
-        and any track/scene layers without the growing trail.
+        Draw the executed-path polyline.
     reference_pad : float, optional
         When set, draw a dashed world ``y=0`` reference spanning the executed
         path in ``x`` by this padding on each end.
-    t0 : float, optional
-        Simulation start time for horizon alignment.
-    dt_mpc : float, optional
-        MPC sample period. Defaults to ``result.hybrid.computer.schedule.dt_base``.
     scene_color, scene_opacity
         Passed to :meth:`~minilink.planning.spatial.scene.Scene.as_visualizer`.
 
     Returns
     -------
     list
-        Overlay drawables ready for :meth:`~minilink.core.discrete.hybrid_diagram.HybridDiagram.animate`.
+        Overlay drawables for ``animate(overlays=...)``.
     """
-    dt_mpc = mpc_period_of(result, dt_mpc)
-    traj = result.plant if traj is None else traj
+    traj = plant_path_of(rollout, loop) if traj is None else traj
 
-    # The receding horizons: one plan per computer tick, in absolute time
-    mpc_plans = mpc_plans_from_rollout(
-        result.computer,
-        planner.transcription,
-        planner.problem,
-        t0=t0,
-        dt_mpc=dt_mpc,
-    )
+    # The receding horizons: one plan per tick, in absolute time
+    mpc_plans = mpc_plans_from_rollout(rollout, mpc, loop=loop, block=block)
 
     # The time-indexed layers: the horizon, then the executed trail
     history_layers = {
@@ -139,56 +122,33 @@ def mpc_animation_overlays(
 
 
 def mpc_plans_from_rollout(
-    computer: StepRollout,
-    transcription: DirectCollocationTranscription,
-    problem: PlanningProblem,
-    *,
-    z_source: str = "signals",
-    signal_name: str = "z",
-    t0: float = 0.0,
-    dt_mpc: float,
+    rollout: Trajectory, mpc, *, loop=None, block: str = "controller"
 ) -> list[tuple[float, Trajectory]]:
     """
-    Build absolute-time MPC plans from per-tick packed decision vectors.
+    The plan of every tick of a sampled MPC loop's run, in absolute time: ``(t_k, plan)`` pairs.
 
-    Parameters
-    ----------
-    computer : StepRollout
-        Tick-indexed computer rollout from :class:`~minilink.simulation.discrete.hybrid_simulator.HybridSimulator`.
-    transcription : DirectCollocationTranscription
-        Collocation transcription used by the MPC block.
-    problem : PlanningProblem
-        Template planning problem (system / cost layout).
-    z_source : str, optional
-        ``"signals"`` reads ``computer.signals[signal_name]``; ``"x"`` reads
-        ``computer.x`` (warm-start step block state).
-    signal_name : str, optional
-        Signal key when ``z_source="signals"``.
-    t0 : float, optional
-        Simulation start time.
-    dt_mpc : float
-        MPC sample period (``Computer.schedule.dt_base``).
-
-    Returns
-    -------
-    list of (float, Trajectory)
-        ``(t_solve, plan)`` pairs suitable for :class:`~minilink.graphical.animation.primitives.HorizonPolyline`.
+    Each plan is the MPC block's ``z`` at that tick read on its knots: its
+    origin ``z[-1]`` plus the knots' offsets, the state and input rows of a
+    collocation plan, the pairs :class:`~minilink.graphical.animation.primitives.HorizonPolyline`
+    draws. The plan is the run's ``"<block>:z"`` signal, else the block's
+    state slice of ``loop``; a dense run repeats it inside each period, and
+    each plan is kept once, at the first sample that holds it.
     """
-    z_hist = decision_history_of(computer, z_source, signal_name)
+    pv = mpc.pv
+    z_history = plan_history_of(rollout, loop, block)
+    n_steps = pv.offsets.size
 
-    t_grid = np.asarray(transcription.options.t(problem), dtype=float).reshape(-1)
     plans: list[tuple[float, Trajectory]] = []
+    for col in range(z_history.shape[1]):
+        z_k = np.asarray(z_history[:, col], dtype=float)
+        if col > 0 and np.array_equal(z_k, z_history[:, col - 1]):
+            continue
 
-    for col in range(computer.n_samples):
-        # The tick's solve time t_solve = t₀ + k Δt
-        k = int(computer.k[col])
-        t_solve = float(t0 + k * dt_mpc)
-
-        # Its decision vector unpacked as a plan, moved to absolute time
-        z_k = np.asarray(z_hist[:, col], dtype=float).reshape(-1)
-        x_plan, u_plan = transcription.unpack(z_k, problem)
-        plan = Trajectory(t=t_grid + t_solve, x=x_plan, u=u_plan)
-        plans.append((t_solve, plan))
+        # The tick's plan: its knots from its own origin, its state and input rows
+        rows = z_k[:-1].reshape(-1, n_steps)
+        t_plan = z_k[-1] + pv.offsets
+        plan = Trajectory(t=t_plan, x=rows[: pv.n], u=rows[-pv.m :])
+        plans.append((float(rollout.t[col]), plan))
 
     return plans
 
@@ -198,31 +158,41 @@ def mpc_plans_from_rollout(
 ###############################################################################
 
 
-def mpc_period_of(result, dt_mpc):
-    """The MPC sample period: ``dt_mpc`` as given, or the hybrid computer's base period."""
-    if dt_mpc is not None:
-        return dt_mpc
+###############################################################################
+# Internal machinery
+###############################################################################
 
-    hybrid = result.hybrid
-    if hybrid is None:
+
+def plan_history_of(rollout, loop, block):
+    """The MPC block's plan at every sample, as columns: its ``z`` signal, else its state slice of ``loop``."""
+    name = f"{block}:z"
+    if rollout.has_signal(name):
+        return rollout.get_signal(name)
+    require_loop(loop, name)
+
+    # Lazy import: the sampled plan's layout loads with the first plan read
+    from minilink.core.compile.plan import nested_layout
+
+    # The block's state slice in the loop's nested layout, by its path ("a/b")
+    x_slice, _ = nested_layout(loop)[tuple(block.split("/"))]
+
+    return rollout.x[x_slice]
+
+
+def plant_path_of(rollout, loop):
+    """The plant's path in the run: its role, else its state slice of ``loop``."""
+    if loop is None:
+        return rollout.of("plant")
+
+    start, end = loop.state_index["plant"]
+
+    return Trajectory(t=rollout.t, x=rollout.x[start:end], u=rollout.u)
+
+
+def require_loop(loop, name):
+    """Refuse a run with no plan signal when no loop names the plan's state slice."""
+    if loop is None:
         raise ValueError(
-            "dt_mpc is required when result.hybrid is unset; "
-            "pass dt_mpc=... or attach hybrid to HybridSimResult."
+            f"the run records no {name!r} signal: pass loop= (the loop it is a run "
+            "of) to read the plan from its state"
         )
-
-    return float(hybrid.computer.schedule.dt_base)
-
-
-def decision_history_of(computer, z_source, signal_name):
-    """The per-tick decision vectors, as columns: ``computer.signals[signal_name]`` or ``computer.x``."""
-    if z_source == "signals":
-        if signal_name not in computer.signals:
-            raise KeyError(
-                f"z_source='signals' requires computer.signals[{signal_name!r}]"
-            )
-        return computer.signals[signal_name]
-
-    if z_source == "x":
-        return computer.x
-
-    raise ValueError("z_source must be 'signals' or 'x'")

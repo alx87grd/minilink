@@ -199,8 +199,6 @@ TEACHING_LANE_PREFIXES = (
     "minilink.optimization.",
 )
 RESEARCH_LANE_PREFIXES = (
-    "minilink.planning.trajectory_optimization.mpc.controller",
-    "minilink.planning.trajectory_optimization.mpc.utilities",
     "minilink.planning.trajectory_optimization.mpc.viz",
     "minilink.simulation.realtime",
     "minilink.simulation.discrete.computer",

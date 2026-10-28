@@ -1,9 +1,13 @@
-"""Dual-rate hybrid MPC: replan at ``dt_mpc``, broadcast ``u_nom`` at ``dt_broadcast``.
+"""Dual-rate MPC: replan at ``MPC_DT``, apply the plan at ``DT_BROADCAST``.
 
-Contrasts with default ``mpc @ plant`` (single-rate ``u_ff`` ZOH)::
+Contrasts with the single-rate ``(mpc % dt) @ plant`` (the plan's command held
+over each slow period)::
 
-    computer = mpc.dual_rate_computer(dt_broadcast=0.01)
+    computer = (mpc % 0.5) >> (PlanFollower(planner) % 0.01)
     hybrid = computer @ plant
+
+The plan solved from the state at one slow tick reaches the follower at the
+next: one slow period of delay, as on a real computer.
 
 Run from repo root::
 
@@ -13,11 +17,13 @@ Run from repo root::
 import numpy as np
 
 from minilink import BicycleDynRate
+from minilink.analysis import discretize
 from minilink.core.backends import configure_jax
 from minilink.core.costs import QuadraticCost
 from minilink.planning.problems import PlanningProblem
 from minilink.planning.trajectory_optimization.mpc import (
     ModelPredictiveController,
+    PlanFollower,
     mpc_animation_overlays,
 )
 from minilink.planning.trajectory_optimization.planner import (
@@ -63,21 +69,23 @@ planner = TrajectoryOptimizationPlanner(
     optimizer_options={"maxiter": 50, "ftol": 1.0},
 )
 
-mpc = ModelPredictiveController(
-    planner, dt_mpc=MPC_DT, warm_start=True, verbose=STEP_DISP
-)
-computer = mpc.dual_rate_computer(dt_broadcast=DT_BROADCAST)
-hybrid = computer @ sys
+mpc = ModelPredictiveController(planner, lookahead=MPC_DT)  # delay compensation
+computer = (mpc % MPC_DT) >> (PlanFollower(planner) % DT_BROADCAST)
+hybrid = computer @ discretize(sys, DT_BROADCAST, substeps=round(DT_BROADCAST / SIM_DT))
 
 hybrid.plot_diagram()
 
-result = hybrid.compute_trajectory(
-    tf=TF_SIM,
-    x0_plant=x0,
-    plant_dt_inner=SIM_DT,
-    backend="jax",
-)
+result = hybrid.compute_trajectory(tf=TF_SIM)
+if STEP_DISP:
+    start, end = hybrid.state_index["plant"]
+    print(f"{round(TF_SIM / MPC_DT)} solves; final state {result.x[start:end, -1]}")
 hybrid.plot_trajectory()
 hybrid.animate(
-    overlays=mpc_animation_overlays(result, planner, reference_pad=REF_X_PAD)
+    overlays=mpc_animation_overlays(
+        result,
+        mpc,
+        loop=hybrid,
+        block="controller/DelayedPredictiveController",
+        reference_pad=REF_X_PAD,
+    )
 )

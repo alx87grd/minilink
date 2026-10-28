@@ -1,7 +1,7 @@
-"""Hybrid MPC slalom: straight lane + staggered keepout spheres.
+"""Sampled MPC slalom: straight lane + staggered keepout spheres.
 
 Tracking cost on ``y=0`` plus soft clearance from a ``Scene`` of four
-obstacles. Closed loop via ``ModelPredictiveController`` and ``mpc @ plant``.
+obstacles. Closed loop via ``ModelPredictiveController`` and ``(mpc % dt) @ plant``.
 
 Run from repo root::
 
@@ -11,6 +11,7 @@ Run from repo root::
 import numpy as np
 
 from minilink import BicycleDynRate
+from minilink.analysis import discretize
 from minilink.core.backends import configure_jax
 from minilink.core.costs import QuadraticCost
 from minilink.core.geometry import Sphere
@@ -92,7 +93,7 @@ planner = TrajectoryOptimizationPlanner(
     method="scipy_slsqp",
     optimizer_options={"maxiter": 100, "ftol": 0.1},
 )
-mpc = ModelPredictiveController(planner, dt_mpc=MPC_DT, warm_start=True, verbose=True)
+mpc = ModelPredictiveController(planner)
 
 sys_sim = BicycleDynRate()
 sys_sim.params["mass"] = 1.03 * sys_mpc.params["mass"]
@@ -100,17 +101,12 @@ sys_sim.params["inertia"] = 1.02 * sys_mpc.params["inertia"]
 sys_sim.camera_scale = 12.0
 sys_sim.x0 = x0.copy()
 
-hybrid = mpc @ sys_sim
+hybrid = (mpc % MPC_DT) @ discretize(sys_sim, MPC_DT, substeps=round(MPC_DT / SIM_DT))
 hybrid.plot_diagram()
-result = hybrid.compute_trajectory(
-    tf=TF_SIM,
-    x0_plant=x0,
-    plant_dt_inner=SIM_DT,
-    backend="jax",
-)
+result = hybrid.compute_trajectory(tf=TF_SIM)
 hybrid.plot_trajectory()
 hybrid.animate(
     overlays=mpc_animation_overlays(
-        result, planner, scene=scene, reference_pad=REF_X_PAD
+        result, mpc, loop=hybrid, scene=scene, reference_pad=REF_X_PAD
     )
 )
