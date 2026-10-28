@@ -3,12 +3,14 @@
 from __future__ import annotations
 
 import copy
+from collections import OrderedDict
 
 import numpy as np
 
 from minilink.core.backends import array_module
+from minilink.core.compile.evaluators.base import assigned
 from minilink.core.discrete.sampled_system import NativeSampledSystem
-from minilink.core.params import lookup, with_leaf
+from minilink.core.params import flatten, lookup, with_leaf
 from minilink.core.system import System
 from minilink.planning.trajectory_optimization.direct_collocation import (
     DirectCollocationTranscription,
@@ -17,18 +19,27 @@ from minilink.planning.trajectory_optimization.direct_collocation import (
 # The default binding: the measured state on the input port y is the plan's start
 DEFAULT_INPUTS = {"x_start": "y"}
 
+# The zero-delay MPC's stored solves: about one per tick of a long run
+SOLVES_KEPT = 10_000
+
 ###############################################################################
 # Public API
 ###############################################################################
 
 
 def ModelPredictiveController(
-    planner, *, inputs=None, delay=True, lookahead=0.0, backend=None
+    planner,
+    *,
+    inputs=None,
+    delay=True,
+    warm_start=True,
+    lookahead=0.0,
+    backend=None,
 ):
     """
     Model predictive control on a planner's compiled face: re-plan from the measured state at each tick, apply the plan.
 
-    ``mpc % dt @ plant`` closes it on a clock of period ``dt``. Two forms:
+    ``mpc % dt @ plant`` closes it on a clock of period ``dt``. Three forms:
 
     - **delayed** (``delay=True``, the default): a native sampled law whose
       state is the plan ``z``. At tick ``k`` it applies the plan solved at the
@@ -38,9 +49,17 @@ def ModelPredictiveController(
       no usable plan (a non-finite cost or plan) keeps ``z_k``, the next tick
       reading the old plan further in; a solver stopped at its iteration limit
       still returns its last iterate, which is used.
-    - **pure** (``delay=False``): a static law, ``u_k = command(solve(P_k), x̂_k,
-      t_k)``, the first action of a solve from the default guess at every tick:
-      the ideal law, a reference for studies.
+    - **zero delay, warm-started** (``delay=False``): a native sampled law
+      whose state is the last plan. At tick ``k`` it solves from the
+      measurement, warm-started from the last plan shifted one period with its
+      first state knot at the measurement, ``z*_k = solve(P_k, z0=warm(z_k,
+      x̂_k, t_k))``, applies it at once, ``u_k = command(z*_k, x̂_k, t_k)``, and
+      keeps it, ``z_{k+1} = z*_k``: the solve takes no time, the classic
+      textbook MPC. Each tick solves once on the host: the output and the
+      state update read one stored solve per ``(t_k, z_k, P_k)``.
+    - **pure** (``delay=False, warm_start=False``): a static law, ``u_k =
+      command(solve(P_k), x̂_k, t_k)``, the first action of a solve from the
+      default guess at every tick: the ideal law, a reference for studies.
 
     ``P_k`` is the planner's tree (the block's ``params``, so the loop's
     ``controller.cost.Q`` tunes the plan) with each leaf named in ``inputs``
@@ -56,7 +75,11 @@ def ModelPredictiveController(
         A bound leaf stays in the tree as the value used when its port is not
         wired.
     delay : bool
-        The delayed form (default) or the pure one.
+        The delayed form (default), or a zero-delay one.
+    warm_start : bool
+        With ``delay=False``: warm-start each solve from the last plan
+        (default), or solve cold from the default guess (the pure form). The
+        delayed form always warm-starts.
     lookahead : float
         Delay compensation, in seconds: the plan starts at ``t_k + lookahead``
         from the measured start predicted that far ahead under the planner's
@@ -76,6 +99,8 @@ def ModelPredictiveController(
 
     if delay:
         return DelayedPredictiveController(pv, bindings, lookahead)
+    if warm_start:
+        return WarmStartedPredictiveController(pv, bindings, lookahead)
 
     return PurePredictiveController(pv, bindings, lookahead)
 
@@ -170,6 +195,137 @@ class DelayedPredictiveController(NativeSampledSystem):
         _, u_ref = pv.prediction(x, t)
 
         return u_ref
+
+
+class WarmStartedPredictiveController(NativeSampledSystem):
+    """
+    The zero-delay MPC: a native sampled law whose state is the last plan ``z``, ``n = pv.n_z``.
+
+    At each tick it solves from the bound leaves, warm-started from the last
+    plan shifted one period with its first state knot at the measurement, and
+    applies that plan at once; its state update keeps it. The command reads
+    the bound input ports (a direct feedthrough), so the plant it closes on
+    must not feed through. The command and the update read one stored solve
+    per tick on the host (a traced call solves each time). Built by
+    :func:`ModelPredictiveController` with ``delay=False``.
+    """
+
+    def __init__(self, pv, bindings, lookahead=0.0):
+        super().__init__(n=pv.n_z)
+        self.name = "ModelPredictiveController"
+
+        # The face, the bindings and the plan's start at tick 0: the default guess,
+        # no plan yet (the first solve starts from the default guess at the
+        # measured start)
+        self.pv = pv
+        self.bindings = bindings
+        self.lookahead = float(lookahead)
+        self.params = copy.deepcopy(pv.params)
+        self.default_guess = np.asarray(pv.initial(), dtype=float)
+        self.x0 = self.default_guess.copy()
+        self.state.labels = [f"z[{i}]" for i in range(pv.n_z)]
+
+        # The solves of a run, by their arguments: one per tick
+        self.solves = StoredSolves()
+
+        # Ports: the bound leaves in; the command, the plan and the references
+        # out, each fed through from them
+        declare_bound_inputs(self, pv, bindings)
+        ports = tuple(bindings.values())
+        self.add_output_port("u", dim=pv.m, function=self.compute_u, dependencies=ports)
+        self.add_output_port(
+            "z", dim=pv.n_z, function=self.compute_z, dependencies=ports
+        )
+        if predicts(pv):
+            self.add_output_port(
+                "x_ref", dim=pv.n, function=self.compute_x_ref, dependencies=ports
+            )
+            self.add_output_port(
+                "u_ref", dim=pv.m, function=self.compute_u_ref, dependencies=ports
+            )
+
+    def update(self, x, u, t, params=None):
+        params = self.params if params is None else params
+
+        # z_{k+1} = z*_k: the plan solved and applied at this tick, kept
+        z_next = self.solve_at(x, u, t, params)
+
+        return z_next
+
+    def compute_u(self, x, u, t=0, params=None):
+        """The command: the plan solved at this tick from the measurement, applied at once."""
+        params = self.params if params is None else params
+
+        pv = self.pv
+        x_hat = measured_start(self, u)
+
+        # u_k = command(z*_k, x̂_k, t_k)
+        z_star = self.solve_at(x, u, t, params)
+        u_k = pv.command(z_star, x_hat, t)
+
+        return u_k
+
+    def compute_z(self, x, u, t=0, params=None):
+        """The plan solved at this tick."""
+        params = self.params if params is None else params
+
+        z_star = self.solve_at(x, u, t, params)
+
+        return z_star
+
+    def compute_x_ref(self, x, u, t=0, params=None):
+        """The planned state at ``t``, on the plan solved at this tick."""
+        params = self.params if params is None else params
+
+        pv = self.pv
+
+        # The plan solved at this tick, read at t
+        z_star = self.solve_at(x, u, t, params)
+        x_ref, _ = pv.prediction(z_star, t)
+
+        return x_ref
+
+    def compute_u_ref(self, x, u, t=0, params=None):
+        """The planned input at ``t``, on the plan solved at this tick."""
+        params = self.params if params is None else params
+
+        pv = self.pv
+
+        # The plan solved at this tick, read at t
+        z_star = self.solve_at(x, u, t, params)
+        _, u_ref = pv.prediction(z_star, t)
+
+        return u_ref
+
+    def solve_at(self, z, u, t, params):
+        """``z*_k``: the tick's solve from the bound leaves, warm-started from the last plan ``z``; ``z`` kept when it returns no usable plan."""
+        xp = array_module(z, u)
+
+        pv = self.pv
+        lookahead = self.lookahead
+        z_default = self.default_guess
+
+        # P_k: the planner's tree with the bound leaves read from their ports and
+        # the plan's origin t_start = t_k + lookahead; a stored solve of P_k from z_k
+        P = bound_tree(self, params, u, t + lookahead)
+        key = solve_key(z, P)
+        stored = self.solves.get(key)
+        if stored is not None:
+            return stored
+
+        # z*_k = solve(P_k, z0 = shift(z_k, t_k + lookahead) with x_0 = x̂_k), from
+        # the default guess at P_k while z_k is no plan yet; z_k kept when the solve
+        # returns no usable plan
+        z_guess = warm_guess(pv, z, measured_start(self, u), P, z_default)
+        z_new, status = pv.solve(P, z0=z_guess)
+        cost = status["cost"]
+        finite_cost = True if cost is None else xp.isfinite(cost)
+        usable = xp.all(xp.isfinite(z_new)) & finite_cost
+        z_star = xp.where(usable, z_new, z)
+
+        self.solves.put(key, z_star)
+
+        return z_star
 
 
 class PurePredictiveController(System):
@@ -294,6 +450,93 @@ def predicted_start(pv, x, u_k, t, lookahead, params):
     x_ahead = step_body(dynamics, x, u_k, u_k, t, lookahead, "rk4", n_sub)
 
     return x_ahead
+
+
+def warm_guess(pv, z, x, params, z_default):
+    """
+    The warm start of a solve on ``params`` from the last plan ``z``: ``z`` rebased to the plan's origin, its first state knot at the measured ``x``.
+
+    While ``z`` is still ``z_default`` (the block's start, no plan yet) the
+    guess is the default guess at ``params``, from the measured start.
+    """
+    t = params["t_start"]
+    xp = array_module(z, t)
+
+    # No plan yet: the default guess from the measured start
+    fresh = xp.all(z == z_default)
+    if is_concrete(fresh):
+        if bool(fresh):
+            return pv.initial(params)
+        return pinned_shift(pv, z, x, t)
+
+    return xp.where(fresh, pv.initial(params), pinned_shift(pv, z, x, t))
+
+
+def pinned_shift(pv, z, x, t):
+    """The plan rebased to ``t`` (``pv.shift``), its first state knot at ``x`` when the plan carries states."""
+    z_shifted = pv.shift(z, t)
+    if x is None or not predicts(pv):
+        return z_shifted
+
+    # The state rows come first in z, N knots each: x_i's first knot at i·N
+    xp = array_module(z_shifted, x)
+    first_knots = np.arange(pv.n) * pv.offsets.size
+    z_guess = assigned(xp, z_shifted, first_knots, xp.reshape(x, (pv.n,)))
+
+    return z_guess
+
+
+def is_concrete(value) -> bool:
+    """Whether ``value`` has a value on the host (a traced one has none)."""
+    try:
+        bool(value)
+    except TypeError:  # a tracer cannot be concretized
+        return False
+
+    return True
+
+
+class StoredSolves:
+    """
+    The solves of a run by their arguments, on the host: the zero-delay MPC's command and update share one solve per tick.
+
+    A solve is deterministic, so a stored one is the solve itself; a key of
+    ``None`` (a traced argument) is never stored. The oldest are dropped past
+    ``size`` (a dropped one is solved again, to the same plan).
+    """
+
+    def __init__(self, size=SOLVES_KEPT):
+        self.size = int(size)
+        self.plans = OrderedDict()
+
+    def get(self, key):
+        """The stored plan of ``key``, or ``None``."""
+        if key is None:
+            return None
+
+        return self.plans.get(key)
+
+    def put(self, key, z):
+        """Store ``z`` under ``key`` (nothing for ``None``)."""
+        if key is None:
+            return
+        self.plans[key] = z
+        if len(self.plans) > self.size:
+            self.plans.popitem(last=False)
+
+
+def solve_key(z, params):
+    """The bytes of ``z`` and of every leaf of ``params``, or ``None`` when one is traced or not numeric (never stored)."""
+    try:
+        leaves = [np.asarray(z, dtype=float)] + [
+            np.asarray(leaf, dtype=float)
+            for _, leaf in flatten(params)
+            if leaf is not None
+        ]
+    except (TypeError, ValueError):  # a tracer has no value; a string no bytes
+        return None
+
+    return b"".join(leaf.tobytes() for leaf in leaves)
 
 
 def measured_start(block, u):

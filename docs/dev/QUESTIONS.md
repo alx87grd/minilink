@@ -16,7 +16,31 @@ TODO; the entry then leaves this file. The v0.3 core's rulings are the architect
 
 ## The core
 
-Nothing open (2026-10-28, R166): the v0.3 core's architecture is of record.
+The v0.3 core's architecture is of record (2026-10-28, R166), with one question your ask of
+2026-10-28 opened (the demos keep the old MPC's performance):
+
+### The zero-delay MPC: a stored solve per tick, and which warm start?
+- **Blocks:** the MPC demos' numbers on `dev-v0.3-mpc-nodelay` (`delay=False`), and whether
+  R123 is amended.
+- **Today (on that branch):** `ModelPredictiveController(planner, delay=False)` is the old
+  MPC: zero delay, warm-started from the last plan shifted one period with its first state
+  knot at the measurement. Its command and its update both need the tick's solve, and the
+  run's read-backs (the plant's input, the overlays) need it again, so the block keeps its
+  solves by `(t_k, z_k, P_k)` on the host: one solve per tick, as the old latch did. R123 had
+  removed that latch ("no hidden cache"). The warm start is the correct one-period shift; the
+  old code's shift had a timing slip (its guess re-timed by `k·Δ` on a plan timed from 0, so
+  after `tf/Δ` ticks it was the last plan's next-to-last knot held constant). That guess,
+  replayed, gives the old runs to the bit (the integrator demo exactly, the kinematic racecar
+  to 1.8e-14); the correct shift drives 5–8 % less distance on the racecars and the slalom
+  at their loose SLSQP `ftol`, and is faster, and better on the circuit (no stall).
+- **Options:** (a) keep the stored solve and amend R123 for the zero-delay form; (b) R123's
+  option B: a combined `update → (x_next, y)` face and runs that record their signals in the
+  scan, a core evaluator change, then no store. For the warm start: the correct shift (with
+  the demos' `ftol` retuned by you where the distance matters), or the old guess replayed for
+  bit-equal demo numbers.
+- **Detail:** [planner-and-mpc.md §6.3](../plans/planner-and-mpc.md), the evidence in
+  [the record](../reviews/2026-10-28-zero-delay-mpc.md).
+- **Answer:**
 
 ## Toward v1.0
 

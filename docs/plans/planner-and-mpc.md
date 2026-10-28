@@ -105,7 +105,8 @@ pv.solution(zs[3]).plot_trajectory()                                     # look 
 
 ```python
 mpc  = ModelPredictiveController(planner)                     # the delayed form (R123), the default
-mpc  = ModelPredictiveController(planner, delay=False)        # the pure law
+mpc  = ModelPredictiveController(planner, delay=False)        # zero delay, warm-started (the old MPC)
+mpc  = ModelPredictiveController(planner, delay=False, warm_start=False)  # the pure law
 mpc  = ModelPredictiveController(planner, inputs={"x_start": "x_hat",
                                                   "plant.m": "m_hat", "plant.mu": "mu_hat"})
 mpc  = ModelPredictiveController(planner, lookahead=0.05)     # delay compensation, with a predictor on x_start
@@ -168,9 +169,20 @@ class ModelPredictiveController(SampledSystem):          # no source: a native s
   trajectory-optimization guess). `x0` is a leaf of the loop's tree (R124), so a solved first plan
   is one assignment.
 
-### 6.3 The pure form (`delay=False`)
+### 6.3 The zero-delay forms (`delay=False`)
 
-One static block, no memory: `u_k = pv.command(pv.solve(P_k)[0], x̂_k, t_k)`, the first action of a
+**Warm-started (the default of `delay=False`).** A native sampled law whose state is the last
+plan: `z*_k = pv.solve(P_k, z0=pv.shift(z_k, t_k)` with its first state knot at `x̂_k`), `u_k =
+pv.command(z*_k, x̂_k, t_k)`, `z_{k+1} = z*_k`: the solve takes no time, the classic MPC and
+the legacy block's numbers (the demos' form, the maintainer's ask of 2026-10-28). Its outputs
+feed through from the bound ports. The command and the update both need `z*_k`, and the run's
+read-backs (the plant's input, the overlays) need it again, so the block keeps its solves by
+their arguments `(t_k, z_k, P_k)` on the host: one solve per tick. That store is the hidden
+cache R123 removed; it stays until a combined `update → (x_next, y)` face and runs that record
+their signals in the scan (R123's option B) make it unnecessary. A traced call is never
+stored.
+
+**Cold (`warm_start=False`).** One static block, no memory: `u_k = pv.command(pv.solve(P_k)[0], x̂_k, t_k)`, the first action of a
 solve from the default guess. It is the ideal law, a reference for studies; a cold start each tick
 is slow on Ipopt and weak for a fixed-iteration solver. It needs **one signal pass per tick** in
 the step evaluators (today they compute the signals in `step` and again in `outputs`,
