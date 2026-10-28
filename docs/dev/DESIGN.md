@@ -958,7 +958,17 @@ tree once onto the defaults (`core.params.merge_known`: an unknown path raises n
 ones, a new shape raises) and binds it, so one compiled program is solved for many values
 without a recompile; a program without `params` keeps callables of `z` alone. One evaluator
 body serves both: it holds the bound tree, the JAX one passes it as a traced argument and
-differentiates in `z`. One method table
+differentiates in `z`. **The stochastic program is the seed case** (R131): every program is
+deterministic given its parameters, the seed one of them, an integer leaf found by the key
+`seed` and never a decision (`pe.program` refuses a seed in `wrt`); complete trees inside, one
+merge at the boundary; sizes structural (the knots `N`, the iterations `K`, a batch size are
+constructor arguments, never parameters); the warm start an argument of the solve (`z0=`). The
+core's sample-average export is `pe.program(wrt, key=, n_trials=)`: the draws realized once
+from `key`, so `J` is deterministic and any method solves it; how a solver uses the seed
+(advanced per iteration, `vmap`ped) is an `Optimizer` strategy for later. The failure price of
+an evaluation follows its cost's numbers (R165): the bound is taken at the overridden weights,
+once per value (cached), and under a trace at the problem's own (a price is a step, with no
+gradient). One method table
 serves every solve path: `make_optimizer_backend(method, options=)` gives the preset's adapter
 (`adapter.solve(evaluator, z0)`), so a planner's compiled program takes every method, `ipopt`
 among them, as the offline `Optimizer` does (OPW-1).

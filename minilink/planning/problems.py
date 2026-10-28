@@ -490,7 +490,7 @@ class PlanningProblem:
 
         return float(gamma)
 
-    def cost_bound(self, tf=None, *, discount_rate=None, dt=None):
+    def cost_bound(self, tf=None, *, discount_rate=None, dt=None, params=None):
         """
         An upper bound of the cost of any run that stays in the boxes: always finite.
 
@@ -502,7 +502,8 @@ class PlanningProblem:
         ``dt``: the integral is then its sum ``Σ_{k<N} γᵏ dt``, ``γ = e^{−ρ dt}``,
         ``N = T / dt``, which is larger. An infinite horizon charges no ``h``; one
         with ``ρ = 0``, or boxes with no finite bound, falls back to ``1e6`` with
-        a warning naming ``infeasible_cost``.
+        a warning naming ``infeasible_cost``. ``params`` are the cost's numbers to
+        bound (an evaluation's overridden weights, R165); ``None`` reads its own.
         """
         cost = self.require_cost()
         rho = self.discount_rate if discount_rate is None else float(discount_rate)
@@ -518,8 +519,8 @@ class PlanningProblem:
         if X_box is None or U_box is None:
             return fallback_bound("the state or input box has no finite bound")
 
-        g_max = cost.g_max(X_box, U_box)
-        h_max = cost.h_max(X_box) if np.isfinite(T) else 0.0
+        g_max = cost.g_max(X_box, U_box, params)
+        h_max = cost.h_max(X_box, params) if np.isfinite(T) else 0.0
 
         if not (rho > 0.0 or np.isfinite(T)):
             return fallback_bound("an infinite undiscounted horizon has no cost bound")

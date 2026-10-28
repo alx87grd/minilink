@@ -310,18 +310,22 @@ def problem_leaves(problem) -> dict:
     return leaves
 
 
-def price_of(problem, tf):
-    """The price of a failed or missed run of length ``tf``: ``None`` (switch off), the bound (``True``), or the number."""
+def price_of(problem, tf, cost_params=None):
+    """The price of a failed or missed run of length ``tf``: ``None`` (switch off), the bound (``True``), or the number.
+
+    ``cost_params`` are the cost's numbers the bound is taken at (an
+    evaluation's overridden weights, R165); ``None`` reads the cost's own.
+    """
     price = problem.infeasible_cost
     if price is None:
         return None
     if price is True:
-        return problem.cost_bound(tf)
+        return problem.cost_bound(tf, params=cost_params)
 
     return price
 
 
-def diverged_cost_of(problem, tf, price):
+def diverged_cost_of(problem, tf, price, cost_params=None):
     """
     The cost a run that is not finite is charged with the price on: the problem's cost bound.
 
@@ -329,7 +333,7 @@ def diverged_cost_of(problem, tf, price):
     for the problem: when the problem prices a failure at its bound
     (``infeasible_cost=True``) it is the bound itself; else the bound is computed
     here, once, and its ``1e6`` fallback is not announced, the price being the
-    problem's own number.
+    problem's own number. ``cost_params`` as :func:`price_of`.
     """
     if price is None:
         return None
@@ -338,7 +342,7 @@ def diverged_cost_of(problem, tf, price):
 
     with warnings.catch_warnings():
         warnings.simplefilter("ignore")
-        return problem.cost_bound(tf)
+        return problem.cost_bound(tf, params=cost_params)
 
 
 def criterion_of(problem):

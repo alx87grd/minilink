@@ -348,8 +348,10 @@ Why: [core-architecture.md](core-architecture.md) §7. Design:
     any leaf, the NumPy rebuild path answers the same values on a copy (acceptance script 4:
     two friction values and a moved target match the rebuilds; Ipopt on the compiled program).
     The performance gate: 1.34× compile, 1.14× solve, 1.51× a call, under the 2× bar (no
-    frozen-export option). Rest: the failure price under cost overrides (R165), and the MPC's
-    `inputs=` bindings and the friction-aware example from a port (with §1.8's MPC rebuild).
+    frozen-export option). The failure price follows the overridden weights, cached by value
+    (R165). The stochastic program as the seed case (R131): the convention in DESIGN §6, a seed
+    refused in `wrt`, a robust gain tuning solved on both backends. Rest: the MPC's `inputs=`
+    bindings and the friction-aware example from a port (with §1.8's MPC rebuild).
 
   Done when one compiled MPC program, bound with two values of a plant parameter and of a cost
   target, gives what a rebuild gives; the MPC baselines are byte-identical with only `x_start`
@@ -367,15 +369,6 @@ Why: [core-architecture.md](core-architecture.md) §7. Design:
   counted from it, shooting pinned from `x_start`, collocation's program reading `t_start`;
   every baseline byte-identical at `t_start = 0` but two JAX Monte Carlo entries, one ulp (the
   run log). Rest: the step problem's tick offset (§1.6).
-- [ ] **The stochastic program as the parametric program's seed case**
-  (native-optimizers.md §7; R131): every program is deterministic given its parameters, the seed
-  one of them; integers never in `wrt`; complete trees inside, one merge at the boundary; sizes
-  structural; the warm start on the solve call; the core keeps the sample-average export,
-  `pe.program(wrt, key=, n_trials=)`; a Monte Carlo over solves comes free once a solve traces;
-  how a solver uses the seed is an `Optimizer` strategy (§4). Done when the convention is stated
-  in DESIGN §6 and a test solves the sample-average program of a stochastic problem (robust gain
-  tuning) on both backends.
-
 ### 1.8 The native proof of concept: the planner's pure face and an MPC on it
 
 Why: [core-architecture.md](core-architecture.md) §8. Design:
