@@ -404,10 +404,10 @@ solvers and MPPI are v0.4 (§4).
   `CompiledTrajectoryPlanner` (`z` the knots with the origin appended), `planner.params`,
   `iterations=` forwarded to the `Optimizer`, single shooting's JAX program on the tree; both
   done-when checks pass (byte-identical on NumPy and JAX, a `vmap` of the native Adam planner
-  over starts). Rest: the `"method"` and `seed` leaves of `planner.params` (with NS-8, the
-  native method's numbers), `planner.solve` rebuilt on the face without mutation and
-  `last_solution` gone (with the MPC's rebuild, which reads it; the run log's RD-35), LQR and
-  value iteration.
+  over starts). At join 2: `planner.solve(params=None, *, guess=None, ...)`, no solve reading
+  `last_solution` (the run log's RD-53). Rest: the `"method"` and `seed` leaves of
+  `planner.params` (v0.4 with MPPI, RD-54), `last_solution` with the plotting shortcuts (D1.4),
+  the face of LQR and value iteration.
 - [ ] **The MPC rebuilt on the planner's face** (NS-8; R148, R123):
   `ModelPredictiveController(planner, *, inputs={"x_start": "y", "t_start": "t"}, delay=True)`;
   the delayed form a block whose state is `z` alone, its origin inside (R155; its kind under the
@@ -423,10 +423,16 @@ solvers and MPPI are v0.4 (§4).
   numbers re-pinned once with R123's delay. Done when one tick jits on the native planner and
   matches the host SLSQP plan within a tolerance on the pendulum and the cart-pole, and the Ipopt
   MPC runs on the host runner.
+  Landed at join 2 (the run log's RD-49 to RD-52): `ModelPredictiveController` on the face,
+  delayed (a `NativeSampledSystem` whose state is the plan) or pure, `inputs=`, `lookahead=`
+  (delay compensation), `PlanFollower`, the legacy MPC and the hybrid runtime gone, every MPC
+  demo and project swept, the MPC baselines re-pinned once. Rest: the MPC demos' retuning for
+  the delay (RD-52, yours), `racecar_toward_mpc.ipynb` at step 7.
 - [ ] **Its closed loop in one scan, tuned by gradient** (NS-9): `problem.compile(mpc % Δ)`
   `.evaluate(p)` runs, `vmap`s over starts, and `jax.grad` with respect to `controller.cost.Q`
   tunes a demo by `Optimizer`. The gradient MPC comes first, as the direction places it; MPPI is
-  v0.4.
+  v0.4. Landed at join 2: acceptance script 5, the `native_mpc_tuning` demo (the plan's
+  weights tuned by L-BFGS through the closed loop).
 
 ### 1.9 Fields
 

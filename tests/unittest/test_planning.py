@@ -380,7 +380,7 @@ class TestPlanningArchitecture(unittest.TestCase):
             ),
         )
         traj = planner.solve().trajectory
-        warm_started = planner.solve(warm_start=True).trajectory
+        warm_started = planner.solve(guess=planner.last_solution).trajectory
         self.assertTrue(planner.last_optimization_result.success)
         self.assertEqual(planner.last_program.metadata["backend"], "direct")
         self.assertGreater(len(planner.iteration_history), 0)
@@ -509,7 +509,7 @@ class TestPlanningArchitecture(unittest.TestCase):
         self.assertEqual(id(callback.fig), fig_id)
         self.assertEqual([id(line) for line in callback.lines], line_ids)
 
-    def test_trajopt_warm_start_passes_previous_trajectory(self):
+    def test_trajopt_a_solution_as_guess_passes_its_trajectory(self):
 
         class RecordingTranscription(DirectCollocationTranscription):
             def __init__(self, options):
@@ -526,12 +526,28 @@ class TestPlanningArchitecture(unittest.TestCase):
             problem,
             transcription=transcription,
             options=TrajectoryOptimizationOptions(
-                warm_start=True, optimizer_options={"maxiter": 100, "ftol": 1e-09}
+                optimizer_options={"maxiter": 100, "ftol": 1e-09}
             ),
         )
-        first = planner.solve().trajectory
+        first = planner.solve()
+        planner.solve(guess=first)
+        self.assertIs(transcription.guesses[1], first.trajectory)
+
+        # No solve reads the last one: a bare solve starts from the default again
         planner.solve()
-        self.assertIs(transcription.guesses[1], first)
+        self.assertIsNot(transcription.guesses[2], first.trajectory)
+
+    def test_trajopt_solve_on_params_is_a_solve_of_the_moved_problem(self):
+        problem = self.make_single_integrator_problem()
+        planner = TrajectoryOptimizationPlanner(
+            problem,
+            n_steps=5,
+            transcription="direct_collocation",
+            optimizer_options={"maxiter": 100, "ftol": 1e-09},
+        )
+        moved = planner.solve({"x_start": np.array([0.4])})
+        np.testing.assert_allclose(moved.trajectory.x[:, 0], [0.4], atol=1e-9)
+        np.testing.assert_allclose(planner.problem.x_start, problem.x_start)
 
 
 import pytest

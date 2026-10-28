@@ -323,7 +323,7 @@ class TestMPCSolveTrajectoryFrom(unittest.TestCase):
         guess = default_initial_trajectory(
             problem, planner.transcription.initial_guess_time_grid(problem)
         )
-        plan = planner.solve_trajectory_from(np.array([0.05]), initial_guess=guess)
+        plan = planner.solve_trajectory_from(np.array([0.05]), guess=guess)
         np.testing.assert_allclose(plan.trajectory.x[:, 0], [0.05], atol=1e-05)
         self.assertIsNotNone(planner.last_optimization_result.z)
 

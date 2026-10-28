@@ -44,8 +44,7 @@ _UNSET = object()  # Marks a keyword the caller did not pass
 
 _TRAJOPT_OPTION_KEYS = (
     "backend",
-    "initial_guess",
-    "warm_start",
+    "guess",
     "method",
     "optimizer_options",
     "use_hessian",
@@ -91,8 +90,7 @@ class TrajectoryOptimizationPlanner(Planner):
         n_steps: int | None = None,
         options: TrajectoryOptimizationOptions | None = None,
         backend=_UNSET,
-        initial_guess=_UNSET,
-        warm_start=_UNSET,
+        guess=_UNSET,
         method=_UNSET,
         optimizer_options=_UNSET,
         use_hessian=_UNSET,
@@ -119,7 +117,7 @@ class TrajectoryOptimizationPlanner(Planner):
             already carries its grid (must not conflict if also passed).
         options : TrajectoryOptimizationOptions, optional
             Tier-2 workflow bag. Flat kwargs below overlay matching fields.
-        backend, initial_guess, warm_start, method,
+        backend, guess, method,
         optimizer_options, use_hessian, record_history, callback,
         record_solve_time, verbose, feasibility_tol, live_plot, iterations
             Tier-1 flat mirrors of :class:`TrajectoryOptimizationOptions`.
@@ -134,8 +132,7 @@ class TrajectoryOptimizationPlanner(Planner):
         self.options = trajopt_options_of(
             options,
             backend=backend,
-            initial_guess=initial_guess,
-            warm_start=warm_start,
+            guess=guess,
             method=method,
             optimizer_options=optimizer_options,
             use_hessian=use_hessian,
@@ -196,47 +193,56 @@ class TrajectoryOptimizationPlanner(Planner):
 
     def solve(
         self,
+        params=None,
         *,
-        initial_guess: np.ndarray | Trajectory | None = None,
-        warm_start: bool | None = None,
+        guess=None,
         evaluate: bool = False,
         n_trials: int = 50,
     ) -> PlanningSolution:
         """
         Offline trajopt entry (``solve_trajectory``).
 
-        The solution's policy is the optimized input as a source block,
-        ``policy >> plant``; ``evaluate=True`` also replays it over the
-        problem's draws (one trial when nothing is random).
+        ``params`` is a partial tree of the problem's leaves (``planner.params``:
+        ``x_start``, ``t_start``, the plant's, the cost's, ...), solved on a copy
+        of the problem holding them; ``None`` solves the problem as it is.
+        ``guess`` seeds the solve: a :class:`~minilink.core.trajectory.Trajectory`,
+        a packed ``z``, or a :class:`~minilink.planning.results.PlanningSolution`
+        (a warm start: ``planner.solve(guess=previous)``); ``None`` takes the
+        options' guess, else the default. The solution's policy is the optimized
+        input as a source block, ``policy >> plant``; ``evaluate=True`` also
+        replays it over the problem's draws (one trial when nothing is random).
         """
         return self.solve_trajectory(
-            initial_guess=initial_guess,
-            warm_start=warm_start,
-            evaluate=evaluate,
-            n_trials=n_trials,
+            params, guess=guess, evaluate=evaluate, n_trials=n_trials
         )
 
     def solve_trajectory(
         self,
+        params=None,
         *,
-        initial_guess: np.ndarray | Trajectory | None = None,
-        warm_start: bool | None = None,
+        guess=None,
         evaluate: bool = False,
         n_trials: int = 50,
     ) -> PlanningSolution:
-        """Compute and store a trajectory-optimization solution (always rebuild)."""
+        """Compute and store a trajectory-optimization solution on the problem holding ``params`` (always rebuild)."""
+        problem = problem_with(self.problem, host_tree(params))
+
+        return self.solve_on(problem, guess, evaluate, n_trials)
+
+    def solve_on(self, problem, guess, evaluate, n_trials) -> PlanningSolution:
+        """One offline solve of ``problem`` from ``guess``: transcribe, seed, solve, read back, check, store."""
         workflow_t0 = time.perf_counter()
         backend = self.options.backend
-        guess = self.resolve_initial_guess(initial_guess, warm_start)
+        seed = self.resolve_guess(problem, guess)
 
         # The problem transcribed into a program, and the seed packed into its z0
         transcribe_t0 = time.perf_counter()
         program = self.transcription.transcribe(
-            self.problem,
+            problem,
             backend=backend,
         )
         transcribe_s = time.perf_counter() - transcribe_t0
-        z0 = self.transcription.pack_initial_guess(self.problem, guess)
+        z0 = self.transcription.pack_initial_guess(problem, seed)
 
         # The program compiled into an optimizer
         compile_t0 = time.perf_counter()
@@ -263,7 +269,7 @@ class TrajectoryOptimizationPlanner(Planner):
         reconstruct_t0 = time.perf_counter()
         trajectory = self.transcription.reconstruct_result(
             optimization_result,
-            problem=self.problem,
+            problem=problem,
             backend=backend,
         )
         reconstruct_s = time.perf_counter() - reconstruct_t0
@@ -305,7 +311,9 @@ class TrajectoryOptimizationPlanner(Planner):
             stats=dict(optimization_result.stats),
         )
         solution = self.store_solution(
-            self.trajectory_solution(trajectory, record, evaluate, n_trials)
+            self.trajectory_solution(
+                trajectory, record, evaluate, n_trials, problem=problem
+            )
         )
 
         if self.options.verbose:
@@ -365,7 +373,7 @@ class TrajectoryOptimizationPlanner(Planner):
         x0,
         *,
         params=None,
-        initial_guess: np.ndarray | Trajectory | None = None,
+        guess=None,
         evaluate: bool = False,
         n_trials: int = 50,
     ) -> PlanningSolution:
@@ -383,10 +391,9 @@ class TrajectoryOptimizationPlanner(Planner):
             ``x_start``: an unknown path raises naming the known ones.
             ``None`` or ``{}`` binds ``x0`` only; ``scene`` is reserved for the
             scene bind (A3) and raises.
-        initial_guess : ndarray or Trajectory, optional
-            NLP seed (schedule and/or packed ``z``). Warm-start *policy*
-            (reuse last latch) is owned by ``ModelPredictiveController``, not
-            this method.
+        guess : ndarray, Trajectory or PlanningSolution, optional
+            NLP seed (a schedule, a packed ``z``, or a solution's trajectory);
+            ``None`` the default schedule from ``x0``.
 
         Notes
         -----
@@ -401,7 +408,7 @@ class TrajectoryOptimizationPlanner(Planner):
             return self.solve_trajectory_from_parametric(
                 x0,
                 params=params,
-                initial_guess=initial_guess,
+                guess=guess,
                 evaluate=evaluate,
                 n_trials=n_trials,
             )
@@ -409,42 +416,28 @@ class TrajectoryOptimizationPlanner(Planner):
         return self.solve_trajectory_from_rebuild(
             x0,
             params=params,
-            initial_guess=initial_guess,
+            guess=guess,
             evaluate=evaluate,
             n_trials=n_trials,
         )
 
-    def step(
-        self,
-        x0,
-        *,
-        initial_guess: np.ndarray | Trajectory | None = None,
-    ) -> Trajectory:
+    def step(self, x0, *, guess=None) -> Trajectory:
         """Solve one from-tick and return the bare schedule (hand loops)."""
-        return self.solve_trajectory_from(x0, initial_guess=initial_guess).trajectory
+        return self.solve_trajectory_from(x0, guess=guess).trajectory
 
     ###########################################################################
     # Internal machinery
     ###########################################################################
 
-    def resolve_initial_guess(
-        self,
-        initial_guess: np.ndarray | Trajectory | None,
-        warm_start: bool | None,
-    ) -> np.ndarray | Trajectory:
-        """The seed: the given guess, the last plan on a warm start, the options' guess, else the default."""
-        if initial_guess is not None:
-            return initial_guess
+    def resolve_guess(self, problem, guess) -> np.ndarray | Trajectory:
+        """The seed: the given guess (a solution's trajectory), the options' guess, else the default on ``problem``."""
+        if guess is None:
+            guess = self.options.guess
+        if guess is not None:
+            return getattr(guess, "trajectory", guess)
 
-        use_warm_start = self.options.warm_start if warm_start is None else warm_start
-        if use_warm_start and self.last_solution is not None:
-            return self.last_solution.trajectory
-
-        if self.options.initial_guess is not None:
-            return self.options.initial_guess
-
-        t = self.transcription.initial_guess_time_grid(self.problem)
-        return default_initial_trajectory(self.problem, t)
+        t = self.transcription.initial_guess_time_grid(problem)
+        return default_initial_trajectory(problem, t)
 
     def build_optimizer(
         self, program: MathematicalProgram, z0: np.ndarray
@@ -668,7 +661,7 @@ class TrajectoryOptimizationPlanner(Planner):
         x0,
         *,
         params=None,
-        initial_guess: np.ndarray | Trajectory | None = None,
+        guess=None,
         evaluate: bool = False,
         n_trials: int = 50,
     ) -> PlanningSolution:
@@ -690,12 +683,8 @@ class TrajectoryOptimizationPlanner(Planner):
         )
 
         # The seed: the given guess, else the default schedule from the measured state
-        if initial_guess is None:
-            initial_guess = default_initial_trajectory(
-                problem_k,
-                self.transcription.initial_guess_time_grid(problem_k),
-            )
-        z0 = self.transcription.pack_initial_guess(problem_k, initial_guess)
+        seed = self.resolve_guess(problem_k, guess)
+        z0 = self.transcription.pack_initial_guess(problem_k, seed)
 
         # z* = argmin J(z; x0), timed when asked
         record_solve_time = self.options.record_solve_time or self.options.verbose
@@ -771,7 +760,7 @@ class TrajectoryOptimizationPlanner(Planner):
         x0,
         *,
         params=None,
-        initial_guess: np.ndarray | Trajectory | None = None,
+        guess=None,
         evaluate: bool = False,
         n_trials: int = 50,
     ) -> PlanningSolution:
@@ -789,23 +778,14 @@ class TrajectoryOptimizationPlanner(Planner):
                 )
             self._warned_uncompiled_from = True
 
-        # One offline solve on the problem restarted at the measured state, then the
-        # planner's own problem back
+        # One offline solve on a copy of the problem restarted at the measured state
         x_arr = np.asarray(x0, dtype=float).reshape(-1)
         require_x0_shape(x_arr, self.problem.sys)
-        saved_problem = self.problem
-        self.problem = problem_with(saved_problem, params).replace(
+        problem_k = problem_with(self.problem, params).replace(
             x_start=x_arr, X0=SingletonSet(x_arr)
         )
-        try:
-            return self.solve_trajectory(
-                initial_guess=initial_guess,
-                warm_start=False,
-                evaluate=evaluate,
-                n_trials=n_trials,
-            )
-        finally:
-            self.problem = saved_problem
+
+        return self.solve_on(problem_k, guess, evaluate, n_trials)
 
 
 @dataclass
@@ -826,8 +806,7 @@ class TrajectoryOptimizationOptions:
     """
 
     backend: str = BACKEND_NUMPY
-    initial_guess: np.ndarray | Trajectory | None = None
-    warm_start: bool = False
+    guess: np.ndarray | Trajectory | None = None
     method: str = "scipy_slsqp"
     optimizer_options: dict[str, object] = field(default_factory=dict)
     use_hessian: bool = False
