@@ -99,6 +99,17 @@ class DynamicAnalysis:
             minimal=minimal,
         )
 
+    def discretize(self, dt, *, solver="rk4", substeps=1):
+        """Return this system on a clock of period ``dt``, its input held: a ``SampledSystem``.
+
+        ``plant.discretize(0.05)`` is ``discretize(plant, 0.05)``. See
+        :func:`minilink.analysis.discretization.discretize`.
+        """
+        # Tools import core (DESIGN §3): the analysis band loads on first use
+        from minilink.analysis.discretization import discretize
+
+        return discretize(self, dt, solver=solver, substeps=substeps)
+
     def find_equilibrium(
         self, x_guess=None, u_bar=None, t=0.0, params=None, *, tol=1e-9
     ):

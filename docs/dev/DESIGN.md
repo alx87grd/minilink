@@ -768,7 +768,8 @@ value iteration (`StateSpaceGrid.successor`), shooting, the fixed-step solvers, 
 the Lyapunov sampler, the problem evaluator and the hybrid and realtime simulators all
 call them, or the one-period formula they share (`step_body`). The adaptive
 SciPy solver adapts `f` for `solve_ivp` itself (`simulation/solvers/scipy_ivp.py`).
-`discretize(plant, dt, *, solver="rk4", substeps=1) -> StepSystem` is the plant one sample
+`discretize(plant, dt, *, solver="rk4", substeps=1) -> StepSystem` (its method facade
+`plant.discretize(dt)`) is the plant one sample
 period later, the input held: `solver` is `"rk4"` or `"euler"` (`substeps` per period) or
 `"exact"` (the matrix exponential, a linear model only). Its `step(x, u, k=0, params=None)`
 takes the integer tick and binds `t_k = k dt` (the origin 0; R158 gives a consumer with an origin

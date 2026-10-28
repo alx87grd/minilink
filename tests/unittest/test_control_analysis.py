@@ -1235,6 +1235,15 @@ class TestDiscretize(unittest.TestCase):
         np.testing.assert_allclose(x1, x1_ref, rtol=1e-09, atol=1e-09)
         self.assertEqual(step_leaf.sample_period, dt)
 
+    def test_the_method_facade_is_the_function(self):
+        plant = DoubleIntegrator()
+        x = np.array([0.2, -0.1])
+        u = np.array([0.4])
+        np.testing.assert_array_equal(
+            plant.discretize(0.05, solver="euler").step(x, u, k=3),
+            discretize(plant, 0.05, solver="euler").step(x, u, k=3),
+        )
+
     def test_discretize_h_delegates_to_source(self):
         plant = DoubleIntegrator()
         dt = 0.05
