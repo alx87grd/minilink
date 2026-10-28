@@ -479,12 +479,17 @@ class SampledDiagramEvaluator(StepDiagramEvaluator):
 
         return x_samples
 
-    def compute_internal_signals_dict(self, x, u, k=0, params=None, *, t_start=0.0):
-        """Every block output at ``(x, u, k)``, keyed ``"block:port"`` (flat ids)."""
+    def signals(self, x, u, k=0, params=None, *, t_start=0.0):
+        """The signal buffer at tick ``k``: every block output, flat (``plan.output_slices``)."""
         x, u = self.float_arrays(x, u)
-        signals = self.port_signals(x, u, k, params, t_start=t_start)
+        return self.port_signals(x, u, k, params, t_start=t_start)
+
+    def compute_internal_signals_dict(self, x, u, k=0, params=None, *, t_start=0.0):
+        """Every block output at ``(x, u, k)``, keyed ``"path/block:port"`` by its nested path."""
+        signals = self.signals(x, u, k, params, t_start=t_start)
+        paths = self.plan.paths
         return {
-            f"{sys_id}:{port_id}": signals[sl]
+            f"{'/'.join(paths[sys_id])}:{port_id}": signals[sl]
             for (sys_id, port_id), sl in self.plan.output_slices.items()
         }
 

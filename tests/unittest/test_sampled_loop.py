@@ -210,3 +210,31 @@ def test_the_host_clock_runner_agrees_within_its_tolerance():
 def test_a_tick_law_has_no_continuous_time():
     with pytest.raises(TypeError, match="compute_rollout"):
         (LowPass() % 0.01).compute_trajectory(tf=1.0)
+
+
+@pytest.mark.optional
+@pytest.mark.jax
+def test_the_problem_refuses_the_stateless_mpc_naming_its_clock():
+    pytest.importorskip("jax")
+    from minilink import PlanningProblem, QuadraticCost, TrajectoryOptimizationPlanner
+    from minilink.planning.trajectory_optimization.mpc.controller import (
+        MPCStatelessController,
+    )
+
+    plant = Pendulum()
+    problem = PlanningProblem(
+        plant, cost=QuadraticCost.from_system(plant), x_start=np.zeros(2), tf=1.0
+    )
+    planner = TrajectoryOptimizationPlanner(problem, n_steps=5, verbose=False)
+    mpc = MPCStatelessController(planner, dt_mpc=0.1)
+    with pytest.raises(TypeError, match="mpc % dt"):
+        problem.compile(mpc, dt=0.1)
+
+
+def test_a_tick_law_with_no_clock_is_refused_by_the_problem():
+    from minilink import PlanningProblem, QuadraticCost
+
+    plant = Pendulum()
+    problem = PlanningProblem(plant, cost=QuadraticCost.from_system(plant), tf=1.0)
+    with pytest.raises(TypeError, match="%"):
+        problem.compile(LowPass(), dt=0.01)

@@ -295,7 +295,7 @@ def test_a_built_loop_is_taken_as_it_is_and_a_step_system_refused():
 
     from minilink.blocks.step import UnitDelay
 
-    with pytest.raises(TypeError, match="StepSystem"):
+    with pytest.raises(TypeError, match="tick law"):
         closed_loop_of(problem, UnitDelay())
 
 

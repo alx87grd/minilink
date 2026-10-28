@@ -1014,9 +1014,14 @@ Gymnasium view (draws of `x0`, the exit rule, `h` at a finite horizon). Distribu
 stochastic one.
 
 **The problem evaluator (the second verb, `planning/evaluator.py`):**
-`pe = problem.compile(controller, dt, *, solver="rk4", substeps=1, backend="auto")` closes
+`pe = problem.compile(controller, dt=None, *, solver="rk4", substeps=1, backend="auto")` closes
 a controller on the plant (`controller @ plant`; a source block drives the command; a built
-loop is taken when its block `plant` is the problem's system) and compiles it once.
+loop is taken when its block `plant` is the problem's system) and compiles it once. The
+controller's kind decides the loop (R105): a continuous law runs the continuous diagram on the
+grid of `dt`; a sampled controller (`pid % 0.01`, a held policy, a loop on a clock) runs its
+`SampledDiagramSystem` on its own base period, `dt` omitted reading it and a differing `dt`
+refused (D15), its plant's solver and substeps the plant block's; a tick law with no clock and
+the stateless MPC are refused, naming the clock.
 `pe.params` is the run's tree: the loop's blocks by id, the problem's own leaves (`"cost"`,
 the sets' parameters, `"x_start"`, `"discount_rate"`) and each free input at its nominal
 value. `pe.trajectory(params)` is one run to the horizon on the step model, every block

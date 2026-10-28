@@ -543,6 +543,12 @@ class SampledExecutionPlan:
     step_ops: tuple[SampledStepOperation, ...]
     output_slices: dict[tuple[str, str], slice]
     external_output_slices: dict[str, slice]
+    paths: dict[str, tuple[str, ...]] = None
+
+    def output_slice_of(self, path, port_id) -> slice:
+        """The signal buffer's slice of the leaf at ``path`` (its keys in the nested diagram), port ``port_id``."""
+        flat_id = next(f for f, p in self.paths.items() if p == tuple(path))
+        return self.output_slices[(flat_id, port_id)]
 
     @property
     def plant_op(self):
@@ -646,6 +652,7 @@ def build_sampled_execution_plan(diagram) -> SampledExecutionPlan:
         step_ops=tuple(step_ops),
         output_slices=output_slices,
         external_output_slices=external,
+        paths=paths,
     )
 
 
