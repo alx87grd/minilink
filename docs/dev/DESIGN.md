@@ -1069,7 +1069,9 @@ trials on NumPy and JAX. `nominal()` replaces each law by its mean and drops the
 sources. `evaluate` wires each source onto its plant port in the evaluated loop, under the
 port's name (its seed the leaf `"d.seed"`); the stepped environment reads each source at `t_k`
 with the episode's seed (RD-D21). A deterministic planner given a stochastic problem plans
-from the mean start and warns; `Sys2Gym.from_problem(problem, dt=)` is the Gymnasium view
+from the mean start and warns; `Sys2Gym(sys, cost, x_start=law)` draws each episode's start
+from a `Distribution` with its `np_random` (`None`: `sys.x0`), and
+`Sys2Gym.from_problem(problem, dt=)` is the Gymnasium view
 (draws of `x0`, the exit rule, `h` at a finite horizon). Distributions are §4's duck type.
 
 **The problem evaluator (the second verb, `planning/evaluator.py`):**

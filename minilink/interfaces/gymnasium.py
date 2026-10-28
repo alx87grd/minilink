@@ -58,12 +58,11 @@ class Sys2Gym(gym.Env):
         Maximum duration of an episode (truncation).
     t_start : float
         Initial time (only relevant if the system is time dependent).
-    reset_mode : {"uniform", "gaussian", "determinist"}
-        Distribution of the initial state on :meth:`reset`: uniform between
-        :attr:`x0_lb` and :attr:`x0_ub`, Gaussian around ``x0`` with
-        :attr:`x0_std`, or ``x0`` itself. The two random modes spread the start
-        over a tenth of the state bounds, so they need finite bounds (or the
-        spread set by hand); :meth:`reset` raises ``ValueError`` otherwise.
+    x_start : Distribution, optional
+        The law of the initial state on :meth:`reset` (RD-R5), drawn with the
+        environment's ``np_random`` (``Uniform(lower, upper)``,
+        ``Gaussian(mean, std)``, any :class:`~minilink.core.distributions.Distribution`);
+        ``None`` starts every episode at ``sys.x0``.
     render_mode : None or "human"
         ``"human"`` renders the system with the matplotlib animator.
     solver : {"rk4", "euler"}
@@ -87,10 +86,8 @@ class Sys2Gym(gym.Env):
         Clip the states to the state bounds after integration (default
         ``False``; some classic gym envs do this, but it is a very artificial
         behaviour — use with caution).
-    x0_lb, x0_ub : arrays
-        Initial-state bounds for ``reset_mode="uniform"``.
-    x0_std : array
-        Initial-state standard deviation for ``reset_mode="gaussian"``.
+    x_start : Distribution or None
+        The start's law, as given (it may be replaced between episodes).
     """
 
     metadata = {"render_modes": ["human"]}
@@ -103,7 +100,7 @@ class Sys2Gym(gym.Env):
         tf=10.0,
         t_start=0.0,
         render_mode=None,
-        reset_mode="uniform",
+        x_start=None,
         solver="rk4",
         substeps=1,
         backend=None,
@@ -135,11 +132,8 @@ class Sys2Gym(gym.Env):
         self._animator = None
         self._render_backend = None
 
-        # Reset parameters (stochasticity of the initial state)
-        self.reset_mode = reset_mode
-        self.x0_lb = sys.x0 + 0.1 * self.x_lb
-        self.x0_ub = sys.x0 + 0.1 * self.x_ub
-        self.x0_std = 0.1 * (self.x_ub - self.x_lb)
+        # The start's law (None: sys.x0 every episode)
+        self.x_start = x_start
 
         # Memory
         self.x = np.asarray(sys.x0, dtype=float).copy()
@@ -175,14 +169,11 @@ class Sys2Gym(gym.Env):
     def reset(self, seed=None, options=None):
         super().reset(seed=seed)
 
-        if self.reset_mode == "uniform":
-            _require_finite_start(self.sys, self.reset_mode, self.x0_lb, self.x0_ub)
-            self.x = self.np_random.uniform(self.x0_lb, self.x0_ub)
-        elif self.reset_mode == "gaussian":
-            _require_finite_start(self.sys, self.reset_mode, self.x0_std)
-            self.x = self.np_random.normal(self.sys.x0, self.x0_std)
-        else:  # deterministic
+        # x(0) ~ the start's law, drawn with the environment's generator, else sys.x0
+        if self.x_start is None:
             self.x = np.asarray(self.sys.x0, dtype=float).copy()
+        else:
+            self.x = np.asarray(self.x_start.sample(self.np_random), dtype=float)
 
         self.u = self.sys.get_u_from_input_ports()
         self.t = self.t_start
@@ -396,19 +387,6 @@ def _compiled_step(sys, backend):
         evaluator = sys.compile(backend=backend, verbose=False)
 
     return backend, evaluator
-
-
-def _require_finite_start(sys, reset_mode, *spread):
-    """Raise when a random reset would spread the start over an unbounded range."""
-    finite = np.all(np.isfinite(spread), axis=0)
-    if not np.all(finite):
-        unbounded = [label for label, ok in zip(sys.state.labels, finite) if not ok]
-        raise ValueError(
-            f"reset_mode={reset_mode!r} spreads the start over a tenth of the state "
-            f"bounds, and {unbounded} have none: bound sys.state, set x0_lb / x0_ub "
-            "(uniform) or x0_std (gaussian), pass reset_mode='determinist', or use "
-            "Sys2Gym.from_problem with a start distribution"
-        )
 
 
 def _box_bounds(space):
