@@ -85,6 +85,11 @@
     ]
   },
   {
+    "id": "grid_world_step_problem",
+    "path": "examples/demos/compile/grid_world_step_problem.py",
+    "requires": []
+  },
+  {
     "id": "multi_rate_computer",
     "path": "examples/demos/compile/multi_rate_computer.py",
     "requires": []

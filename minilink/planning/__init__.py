@@ -16,6 +16,7 @@ from minilink.core.exports import lazy_facade
 _EXPORTS: dict[str, tuple[str, str]] = {
     # Problem and results
     "PlanningProblem": ("minilink.planning.problems", "PlanningProblem"),
+    "StepPlanningProblem": ("minilink.planning.step_problems", "StepPlanningProblem"),
     "Gaussian": ("minilink.core.distributions", "Gaussian"),
     "Uniform": ("minilink.core.distributions", "Uniform"),
     "Particles": ("minilink.core.distributions", "Particles"),

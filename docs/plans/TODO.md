@@ -257,6 +257,10 @@ Why: [core-architecture.md](core-architecture.md) §4. Design:
   curve and the final score within the Monte Carlo spread on the same demo and seeds, the training
   time within the budget's 2× bar). Done when the RL demos re-pin and a policy block vmaps over
   seeds on both backends.
+  The rest landed at join 1: the heads draw at a `CounterKey(seed, k)` (the block's draw), the
+  collectors carry a policy seed per episode, the RL entries of the v03 baseline re-pinned once
+  (no RL demo pins a number elsewhere), and the gate passed (acceptance script 13, the run log's
+  RD-38).
 
 ### 1.5 The sampled loop: a step diagram, two runners
 
@@ -308,12 +312,20 @@ the input held, a solver's own objective allowed but the score always the proble
   (after the open points): `problem.compile(controller)` scans `transition`; value iteration's
   backup and the RL environment's step read it; the environment's step and `score_run` share one
   failure, price and horizon rule (R108's one owner); the judge's `J` re-pinned once (R80). Done
-  when one policy gets one `J` from the judge, value iteration and the RL environment.
+  when one policy gets one `J` from the judge, value iteration and the RL environment. Landed in
+  the v0.3 run: the judge's running cost integrated with the state, value iteration's backup and
+  the RL environment's step on the face (reward `−c_k`, the failure the judge's rule at the
+  sample), a planner's score holding its feedback law over each period (`policy % dt`, R159),
+  `nominal_trajectory` on the face; acceptance script 6 gets one `J` to the bit from the face,
+  the judge, the RL environment and the planner. Rest: `Sys2Gym` on the face (v0.4, the run log's
+  RD-40).
 - [ ] **The RL discount derived** (R150): the RL planner's `γ` read from the problem's step face
   by default, `planner.gamma` readable; `gamma=` a training hyperparameter under
   `planner.params["method"]`, the record saying when it differs from the scored discount; the
   notebooks and demos swept with R143's cells **[student-facing, given]**. Done when the training
-  return and the judge use the same `γ` unless an override is stated.
+  return and the judge use the same `γ` unless an override is stated. Landed in the v0.3 run:
+  the derived `γ`, `planner.gamma`, the record's `gamma` and `scored_gamma` and its line naming
+  an override. Rest: the `"method"` leaf with NS-8 (§1.8), the notebook sweep at step 7.
 
 ### 1.7 The parametric program; the stochastic program its seed case
 

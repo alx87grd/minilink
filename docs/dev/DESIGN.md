@@ -1162,7 +1162,24 @@ call, and each trial realizes the loop's random blocks under that key (trial `i`
 key, while a deterministic problem runs each block's own seed. The program reads the same `J` as the report: with the price on, the price is a step
 with no gradient, and a non-finite objective at `z0` warns once. The feedback planners'
 reported `trajectory` is their own held-input rollout on their
-grid (`nominal_trajectory`), the planner's evidence; `evaluate` scores the continuous loop.
+grid (`nominal_trajectory`, the problem's step face from `t_start`), the planner's evidence;
+a planner's score (`Planner.evaluate`) holds a feedback law with no clock of its own over
+each period, `policy % dt` on the plant's own clock (R159), so value iteration's or a
+learner's policy gets the face's `J`; an open-loop source keeps the interpolation its planner
+states. `problem.compile(law)` called directly closes a continuous law as a continuous loop.
+
+**The step face (R141, `planning/step_face.py`):** `problem.compile(dt=, solver="rk4",
+substeps=1)` with no controller is the problem's `StepFace`: `transition(x, u, k, params)
+-> (x_next, c_k)`, one period of the step model with `c_k = ∫₀^dt e^{−ρτ} g dτ` integrated
+beside the state by the same scheme (`g·dt` to the last bit under one Euler step, R142),
+`N = tf/dt`, `gamma = e^{−ρ dt}`, `terminal`, the sets, `price(gamma)` and `run(policy)`
+(`J = Σ γᵏ c_k + γᴺ h`); `params` is the tree its calls read (the plant at its mean, the
+cost, `x_start`, `t_start`, the discount). A `StepPlanningProblem(sys, *, N, cost, gamma,
+...)` (`planning/step_problems.py`) is the native form on a `StepSystem` with a `StepCost`
+(`c(x, u, k)`, `h(x, k)`), its start, sets and laws a `PlanningProblem`'s by composition, its
+face `problem.compile()` with no `dt`; `problem.discretize(dt)` is the explicit step problem
+of a continuous one, its cost a `SampledCost` (R154), compiling to the same face to the bit.
+Value iteration, the RL environment and a planner's evidence read only this face.
 
 The pipeline in two pictures. Every object carries its own parameters `p` (the amber tab on
 its edge), and they form one tree `θ = pe.params`, a branch per object under its key; the plant,
@@ -1223,9 +1240,15 @@ attributes declare the family (`on_policy`, `head_kind`, `critic_kind`). Bare JA
 Flax/Optax dependency. Training prints one line per update; `verbose=False` silences it.
 
 `RolloutEnvironment(problem, dt=, backend=)` is the problem's semantics as
-step functions on either backend — the reward `r = -g dt`, the exit rule and
-the horizon — shared by the JAX collectors and the tabular learners, so one object owns
-what a training episode means (an evaluation scores the learned law by `evaluate`).
+step functions on either backend — the step face's `transition` with the reward `r = −c_k`,
+the judge's failure rule at the sample (`X` at `x_{k+1}`, `U` at `u_k`; the episode ends at
+the first failure, a training device, R159) and the horizon — shared by the JAX collectors
+and the tabular learners, so one object owns what a training episode means (an evaluation
+scores the learned law by `evaluate`, the law held over each period). The heads draw at a JAX
+key or at a `CounterKey(seed, k)`; the collectors carry one policy seed per episode and draw
+tick `k = ⌊t/dt⌋` at it, the draw `GaussianPolicy(..., seed=)` makes (R160). The discount is
+the problem's `e^{−ρ dt}` unless `gamma=` overrides it, and the record (`gamma`,
+`scored_gamma`) says when the two differ (R150).
 Teaching demos write the observation map by hand
 (``z = (cos θ, sin θ, scaled rate)``). `control.angle_features(angles, scales)`
 is the same map as a helper for scripts. The action port is `u` when the

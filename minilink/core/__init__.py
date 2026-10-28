@@ -20,6 +20,8 @@ _EXPORTS: dict[str, tuple[str, str]] = {
     # Costs
     "CostFunction": ("minilink.core.costs", "CostFunction"),
     "QuadraticCost": ("minilink.core.costs", "QuadraticCost"),
+    "StepCost": ("minilink.core.costs", "StepCost"),
+    "SampledCost": ("minilink.core.costs", "SampledCost"),
     "TimeCost": ("minilink.core.costs", "TimeCost"),
     # Fields
     "Field": ("minilink.core.fields", "Field"),
