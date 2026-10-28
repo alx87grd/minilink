@@ -32,7 +32,13 @@ from minilink.core.compile.plan import (
     INTERNAL_SIGNAL,
     NOMINAL,
 )
-from minilink.core.params import DeviceTree, canonical_tree, flat_leaves, tree_digest
+from minilink.core.params import (
+    DeviceTree,
+    canonical_tree,
+    flat_leaves,
+    is_tracer,
+    tree_digest,
+)
 
 # Above this many numbers a frozen leaf is passed as an argument, not baked into the executable
 LARGE_LEAF = 1_000
@@ -106,10 +112,14 @@ class Evaluator(JacobianMixin):
         if params is None:
             if not has_large_leaf(frozen):
                 return None
-            # The compiled tree never changes: on the device once
-            if self.frozen_on_device is None:
-                self.frozen_on_device = self.jax.device_put(frozen)
-            return self.frozen_on_device
+            # The compiled tree never changes: on the device once (put inside an
+            # outer trace, the result is traced: returned, not kept)
+            if self.frozen_on_device is not None:
+                return self.frozen_on_device
+            on_device = self.jax.device_put(frozen)
+            if not any(is_tracer(leaf) for leaf in flat_leaves(on_device)):
+                self.frozen_on_device = on_device
+            return on_device
 
         # The tree in its compiled types, on the device: put there once and kept
         # while its values repeat (a host loop's calls transfer nothing)

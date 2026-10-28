@@ -155,7 +155,8 @@ class DeviceTree:
     The entry holds the leaves it was built from, so a JAX leaf's identity (what
     the digest reads of it) cannot be reused by another array while the entry
     lives. A tree holding a tracer (a call under an outer ``jit``, ``grad`` or
-    ``vmap``) is prepared and returned, never kept: a tracer outlives its trace.
+    ``vmap``), or put on the device inside one, is returned, never kept: a tracer
+    outlives its trace.
     """
 
     def __init__(self):
@@ -167,10 +168,15 @@ class DeviceTree:
         if any(is_tracer(leaf) for leaf in leaves):
             return prepare(tree)
         digest = tree_digest(tree)
-        if self.entry is None or self.entry[0] != digest:
-            self.entry = (digest, leaves, put(prepare(tree)))
+        if self.entry is not None and self.entry[0] == digest:
+            return self.entry[2]
 
-        return self.entry[2]
+        # Put inside an outer trace, the result is itself traced: returned, not kept
+        on_device = put(prepare(tree))
+        if not any(is_tracer(leaf) for _, leaf in flatten_any(on_device)):
+            self.entry = (digest, leaves, on_device)
+
+        return on_device
 
 
 def tree_digest(tree) -> bytes:

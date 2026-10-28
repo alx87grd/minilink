@@ -196,6 +196,13 @@ def test_a_repeated_gradient_through_a_compiled_method_never_reuses_a_tracer():
     jax.vmap(lambda k: last({**ev.params, "k": k}))(np.ones(3))
     assert ev.on_device.entry is None
 
+    # A host tree put on the device inside an outer jit is traced too: never kept
+    host = {"k": np.array(2.0)}
+    batch = jax.jit(jax.vmap(lambda x0: ev.rollout(x0, u, 0.0, 0.1, host)[-1]))
+    batch(np.zeros((3, 1)))
+    assert ev.on_device.entry is None
+    np.testing.assert_allclose(ev.rollout(np.zeros(1), u, 0.0, 0.1, host)[-1], [1.0])
+
 
 class Decay(DynamicSystem):
     """``dx = −a x``, ``a`` written as an integer, as a student writes it."""
@@ -247,6 +254,10 @@ class Weighted(DynamicSystem):
 
 def test_a_large_frozen_leaf_is_an_argument_not_a_constant():
     ev = Weighted().compile(backend="jax")
+
+    # First reached inside an outer jit: the traced tree is not kept
+    jax.jit(jax.vmap(lambda x: ev.f(x, np.ones(1))))(np.zeros((3, 1)))
+    assert ev.frozen_on_device is None
     assert ev.call_tree(None) is not None
     frozen = ev.rollout(np.zeros(1), np.ones((10, 1)), 0.0, 0.1)
     parametric = ev.rollout(np.zeros(1), np.ones((10, 1)), 0.0, 0.1, ev.params)
