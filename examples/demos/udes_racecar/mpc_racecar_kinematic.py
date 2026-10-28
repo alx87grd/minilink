@@ -69,7 +69,7 @@ planner = TrajectoryOptimizationPlanner(
     method="scipy_slsqp",
     optimizer_options={"maxiter": 40, "ftol": 0.05},
 )
-mpc = ModelPredictiveController(planner)
+mpc = ModelPredictiveController(planner, delay=False)
 
 # --- closed loop ---
 diagram = (mpc % MPC_DT) @ discretize(car, MPC_DT, substeps=round(MPC_DT / 0.01))

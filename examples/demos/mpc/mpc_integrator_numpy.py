@@ -59,7 +59,7 @@ planner = TrajectoryOptimizationPlanner(
     optimizer_options={"maxiter": 80, "ftol": 1e-6},
 )
 
-mpc = ModelPredictiveController(planner)
+mpc = ModelPredictiveController(planner, delay=False)
 
 # The MPC on its clock, the plant sampled at it with SIM_DT steps inside each period
 hybrid = (mpc % MPC_DT) @ discretize(sys, MPC_DT, substeps=round(MPC_DT / SIM_DT))

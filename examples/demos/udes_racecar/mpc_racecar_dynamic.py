@@ -142,7 +142,7 @@ planner = TrajectoryOptimizationPlanner(
     method="scipy_slsqp",
     optimizer_options={"maxiter": SLSQP_MAXITER, "ftol": SLSQP_FTOL},
 )
-mpc = ModelPredictiveController(planner)
+mpc = ModelPredictiveController(planner, delay=False)
 
 car = UdeSRacecarDyn(named_ports=False)
 car.params["mu"] = PLANT_MU

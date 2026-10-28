@@ -6,8 +6,9 @@ over each slow period)::
     computer = (mpc % 0.5) >> (PlanFollower(planner) % 0.01)
     hybrid = computer @ plant
 
-The plan solved from the state at one slow tick reaches the follower at the
-next: one slow period of delay, as on a real computer.
+The zero-delay MPC (``delay=False``) hands the plan solved from the state at
+one slow tick to the follower at that tick; the delayed MPC (the default)
+hands it at the next, one slow period late, as on a real computer.
 
 Run from repo root::
 
@@ -69,7 +70,7 @@ planner = TrajectoryOptimizationPlanner(
     optimizer_options={"maxiter": 50, "ftol": 1.0},
 )
 
-mpc = ModelPredictiveController(planner, lookahead=MPC_DT)  # delay compensation
+mpc = ModelPredictiveController(planner, delay=False)
 computer = (mpc % MPC_DT) >> (PlanFollower(planner) % DT_BROADCAST)
 hybrid = computer @ discretize(sys, DT_BROADCAST, substeps=round(DT_BROADCAST / SIM_DT))
 
@@ -85,7 +86,7 @@ hybrid.animate(
         result,
         mpc,
         loop=hybrid,
-        block="controller/DelayedPredictiveController",
+        block="controller/WarmStartedPredictiveController",
         reference_pad=REF_X_PAD,
     )
 )
