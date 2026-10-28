@@ -91,9 +91,14 @@ class FirstOrderOptimizer(OptimizerBackend):
         gtol = float(opts["gtol"])
         lower, upper = box_of(program_evaluator)
 
-        # The law, Adam's update compiled once when JAX is at hand (not once per step)
+        # The law, Adam's update compiled once per program and numbers when JAX is at
+        # hand (not once per step, nor once per solve)
         law = self.law(program_evaluator)
-        update = law.update if self.algorithm == "gd" else compiled(law.update)
+        update = (
+            law.update
+            if self.algorithm == "gd"
+            else self.compiled_update(program_evaluator, law)
+        )
         state = law.init(np.asarray(z0, dtype=float))
 
         z = state["z"]
@@ -149,9 +154,19 @@ class FirstOrderOptimizer(OptimizerBackend):
         """
         require_gradient(program_evaluator)
         require_no_constraints(program_evaluator)
+        K = int(iterations)
+
+        # On JAX the whole count is one jitted function of (z0, params), compiled once
+        # per program and numbers: a call from Python is one dispatch
+        if program_evaluator.backend == "jax":
+            return self.compiled_run(program_evaluator, K)(z0, params)
+
+        return self.steps(program_evaluator, z0, params, K)
+
+    def steps(self, program_evaluator, z0, params, K):
+        """``(z_K, J(z_K))`` after ``K`` steps of the law: one ``lax.scan`` on JAX, a loop on NumPy."""
         law = self.law(program_evaluator)
         gradient = program_evaluator.native_gradient
-        K = int(iterations)
 
         # z_{k+1} = S(z_k, ∇J(z_k; p)), k = 0 … K − 1
         def body(state, _):
@@ -170,6 +185,43 @@ class FirstOrderOptimizer(OptimizerBackend):
         J = program_evaluator.native_objective(z, params)
 
         return z, J
+
+    def compiled_run(self, program_evaluator, K):
+        """The ``K``-step run jitted once on ``program_evaluator``, keyed by this solver's numbers."""
+        forms = program_evaluator.compiled_forms
+        key = ("run", K, *self.numbers_key(program_evaluator))
+        if key not in forms:
+            jax = require_jax()
+            forms[key] = jax.jit(
+                lambda z0, params: self.steps(program_evaluator, z0, params, K)
+            )
+
+        return forms[key]
+
+    def compiled_update(self, program_evaluator, law):
+        """The law's update jitted once on ``program_evaluator``, keyed by this solver's numbers (NumPy: the update itself)."""
+        if program_evaluator.backend != "jax":
+            return law.update
+        forms = program_evaluator.compiled_forms
+        key = ("update", *self.numbers_key(program_evaluator))
+        if key not in forms:
+            forms[key] = compiled(law.update)
+
+        return forms[key]
+
+    def numbers_key(self, program_evaluator):
+        """What the law bakes in at trace time: the step rule, its options and the program's box."""
+        lower, upper = box_of(program_evaluator)
+        options = tuple(
+            sorted((name, repr(value)) for name, value in self.options.items())
+        )
+
+        return (
+            self.algorithm,
+            options,
+            np.asarray(lower).tobytes(),
+            np.asarray(upper).tobytes(),
+        )
 
 
 class GradientDescentLaw:

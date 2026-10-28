@@ -4,7 +4,7 @@ from abc import ABC, abstractmethod
 
 import numpy as np
 
-from minilink.core.params import merge_known
+from minilink.core.params import canonical_tree, merge_known
 from minilink.optimization.mathematical_program import MathematicalProgram
 
 ###############################################################################
@@ -45,8 +45,13 @@ class MathematicalProgramEvaluator(ABC):
         self.n_h = 0
         self.n_g = 0
 
-        # The bound parameters: the program's defaults, the empty tree for none
-        self.params = self.native_tree(program.params or {})
+        # The bound parameters: the program's defaults in strong types (the warm-up and
+        # every bind then share one trace), the empty tree for none
+        defaults = program.params or {}
+        self.params = self.native_tree(canonical_tree(defaults, defaults))
+
+        # The forms a solver compiles on this program once, by the solver's numbers
+        self.compiled_forms = {}
 
     @abstractmethod
     def J(self, z):
@@ -108,7 +113,8 @@ class MathematicalProgramEvaluator(ABC):
         else:
             tree = defaults or {}
 
-        return self.native_tree(tree)
+        # Each leaf in its default's dtype and shape: one trace for every value
+        return self.native_tree(canonical_tree(tree, defaults))
 
     def native_objective(self, z, params):
         """``J(z; params)`` on the backend's arrays, no conversion: the oracle of a traced solve."""

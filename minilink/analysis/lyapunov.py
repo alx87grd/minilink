@@ -12,6 +12,7 @@ from minilink.analysis.derivatives import jacobian
 from minilink.analysis.equilibria import find_equilibrium
 from minilink.core.backends import BACKEND_JAX, require_jax, require_jax_numpy
 from minilink.core.fields import EllipsoidSet, QuadraticField
+from minilink.core.params import tree_digest
 from minilink.core.sets import BoxSet, Set
 
 #: Families of Lyapunov function this tool can build.
@@ -518,7 +519,12 @@ def dynamics_on(backend, evaluator, u_bar, t, params):
         jax = require_jax()
         jnp = require_jax_numpy()
 
-        batch = jax.jit(jax.vmap(lambda x: evaluator.f(x, u_bar, t, params)))
+        # One jitted batch per evaluator and point, kept for every later call
+        key = ("certificate dynamics", tree_digest({"u": u_bar, "t": t, "p": params}))
+        forms = evaluator.compiled_forms
+        if key not in forms:
+            forms[key] = jax.jit(jax.vmap(lambda x: evaluator.f(x, u_bar, t, params)))
+        batch = forms[key]
         return lambda states: np.asarray(batch(jnp.asarray(states)))
 
     # NumPy: f state by state
@@ -690,7 +696,12 @@ def rollout_on(backend, evaluator, u_bar, t, dt: float, tf: float):
         def one(x0):
             return evaluator.rollout(x0, u_seq, t, dt)[-1]
 
-        batch = jax.jit(jax.vmap(one))
+        # One jitted batch per evaluator, point and horizon, kept for every later call
+        key = ("certificate rollout", tree_digest({"u": u_seq, "t": t, "dt": dt}))
+        forms = evaluator.compiled_forms
+        if key not in forms:
+            forms[key] = jax.jit(jax.vmap(one))
+        batch = forms[key]
         return lambda states: np.asarray(batch(jnp.asarray(states)))
 
     # NumPy: x_{k+1} = RK4(x_k, ū, t_k), n_steps times, state by state

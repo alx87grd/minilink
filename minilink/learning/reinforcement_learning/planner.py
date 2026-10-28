@@ -221,6 +221,9 @@ class ReinforcementLearningPlanner(Planner):
             lambda theta, x: self.controller.action(x, {"mlp": theta["mlp"]})
         )
 
+        # The law's rollouts, one jitted scan per number of periods and source draw
+        self.rollout_forms = {}
+
     @property
     def gamma(self):
         """The one discount per control period the algorithm trains with."""
@@ -664,17 +667,24 @@ class ReinforcementLearningPlanner(Planner):
         # The episode's sources: their seeds drawn only with a key, the plant nominal
         sources = None if key is None else env.source_seeds(key)
 
-        # Closed loop on the grid: u_k = π(x_k), then one control period of the plant
-        def body(carry, _):
-            x, t = carry
-            u = pi(theta, x)
-            x_next, t_next, _, _, _ = env.step(x, t, u, None, sources)
-            return (x_next, t_next), (x, u)
-
-        # The N periods from x0 at t_start
+        # The N periods from x0 at t_start, one jitted scan per (N, sources drawn)
         x0 = jnp.asarray(x0, dtype=float)
         t_start = env.t_start
-        (x_end, _), (xs, us) = jax.lax.scan(body, (x0, t_start), None, length=n_steps)
+        form = (n_steps, sources is None)
+        if form not in self.rollout_forms:
+
+            def rollout(theta, x0, sources):
+                # Closed loop on the grid: u_k = π(x_k), then one control period of the plant
+                def body(carry, _):
+                    x, t = carry
+                    u = pi(theta, x)
+                    x_next, t_next, _, _, _ = env.step(x, t, u, None, sources)
+                    return (x_next, t_next), (x, u)
+
+                return jax.lax.scan(body, (x0, t_start), None, length=n_steps)
+
+            self.rollout_forms[form] = jax.jit(rollout)
+        (x_end, _), (xs, us) = self.rollout_forms[form](theta, x0, sources)
 
         # N + 1 samples: the final state appended, the last input held at it
         xs = np.concatenate([np.asarray(xs), np.asarray(x_end)[None]])

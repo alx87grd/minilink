@@ -11,7 +11,8 @@ from dataclasses import dataclass, field, replace
 import numpy as np
 
 from minilink.core.backends import BACKEND_JAX, BACKEND_NUMPY, normalize_backend
-from minilink.core.params import merge_known
+from minilink.core.compile.cache import compiled_of, fingerprint, structure_of
+from minilink.core.params import merge_known, tree_digest
 from minilink.core.sets import SingletonSet
 from minilink.core.trajectory import Trajectory
 from minilink.optimization.evaluators.compiler import compile_program_evaluator
@@ -151,6 +152,9 @@ class TrajectoryOptimizationPlanner(Planner):
         self.last_optimization_result: OptimizationResult | None = None
         self.iteration_history: list[TrajectoryOptimizationIteration] = []
 
+        # The offline program and its optimizer, kept with the key they were built on
+        self.offline = None
+
         # The compiled parametric program, its optimizer and its dynamics
         self.program = None
         self.program_evaluator = None
@@ -236,20 +240,28 @@ class TrajectoryOptimizationPlanner(Planner):
         backend = self.options.backend
         seed = self.resolve_guess(problem, guess)
 
-        # The problem transcribed into a program, and the seed packed into its z0
+        # The problem transcribed into a program and compiled into an optimizer, or
+        # the ones of the last solve while the problem is unchanged; the seed packed
+        # into its z0
+        key = self.offline_key(problem)
         transcribe_t0 = time.perf_counter()
-        program = self.transcription.transcribe(
-            problem,
-            backend=backend,
-        )
-        transcribe_s = time.perf_counter() - transcribe_t0
-        seed = decision_vector_of(seed, program)
-        z0 = self.transcription.pack_initial_guess(problem, seed)
-
-        # The program compiled into an optimizer
-        compile_t0 = time.perf_counter()
-        optimizer = self.build_optimizer(program, z0)
-        compile_s = time.perf_counter() - compile_t0
+        if key is None or self.offline is None or self.offline[0] != key:
+            program = self.transcription.transcribe(
+                problem,
+                backend=backend,
+            )
+            transcribe_s = time.perf_counter() - transcribe_t0
+            seed = decision_vector_of(seed, program)
+            z0 = self.transcription.pack_initial_guess(problem, seed)
+            compile_t0 = time.perf_counter()
+            optimizer = self.build_optimizer(program, z0)
+            compile_s = time.perf_counter() - compile_t0
+            self.offline = (key, program, optimizer)
+        else:
+            _, program, optimizer = self.offline
+            seed = decision_vector_of(seed, program)
+            z0 = self.transcription.pack_initial_guess(problem, seed)
+            transcribe_s = compile_s = 0.0
 
         if self.options.verbose:
             self.print_solve_preamble(
@@ -264,6 +276,7 @@ class TrajectoryOptimizationPlanner(Planner):
         # back from z*
         self.iteration_history = []
         optimization_result = optimizer.solve(
+            z0=z0,
             callback=self.build_callback(optimizer, backend),
             record_solve_time=self.options.record_solve_time or self.options.verbose,
             verbose=False,
@@ -364,7 +377,7 @@ class TrajectoryOptimizationPlanner(Planner):
         self.program_evaluator.bind({"x_start": self.problem.x_start})
 
         # The compiled plant that reads each tick's plan back, on the tick's numbers
-        self._dynamics = self.problem.sys.compile(backend=backend, verbose=False).f
+        self._dynamics = compiled_of(self.problem.sys, backend).f
 
         # The optimizer every online tick reuses
         self.optimizer_backend = self.build_parametric_optimizer_backend()
@@ -440,6 +453,20 @@ class TrajectoryOptimizationPlanner(Planner):
 
         t = self.transcription.initial_guess_time_grid(problem)
         return default_initial_trajectory(problem, t)
+
+    def offline_key(self, problem):
+        """What an offline program is built from: the problem's structure and numbers, the transcription's and the planner's options (``None``: build every time)."""
+        params_of = getattr(self.transcription, "program_params", None)
+        if params_of is None:
+            return None
+
+        return (
+            fingerprint(problem.sys),
+            structure_of(problem),
+            tree_digest(params_of(problem)),
+            repr(self.transcription.options),
+            repr(self.options),
+        )
 
     def build_optimizer(
         self, program: MathematicalProgram, z0: np.ndarray

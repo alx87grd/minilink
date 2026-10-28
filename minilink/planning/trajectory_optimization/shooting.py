@@ -10,6 +10,7 @@ from minilink.core.backends import (
     ensure_jax_x64,
     normalize_backend,
 )
+from minilink.core.compile.cache import compiled_of
 from minilink.core.compile.evaluators.stepping import step_body
 from minilink.core.sets import BoxInputSet, BoxSet, SingletonSet
 from minilink.core.trajectory import Trajectory
@@ -350,14 +351,15 @@ class ShootingTranscription(Transcription):
 
         # A compiled system without explicit params: its own integrator over the grid
         if key != BACKEND_DIRECT and nominal_plant_params(problem) is None:
-            evaluator = problem.sys.compile(backend=key, verbose=False)
+            evaluator = compiled_of(problem.sys, key)
+            params = evaluator.call_params()
 
             def rollout(u):
                 t0 = float(self.options.t(problem)[0])
                 dt = self.options.dt(problem)
 
                 # x_{k+1} = RK4(x_k, u_k, u_{k+1}), one row per knot, turned to columns
-                x_samples = evaluator.rollout(x0, u.T, t0, dt, hold="foh")
+                x_samples = evaluator.rollout(x0, u.T, t0, dt, params, hold="foh")
                 x = x_samples.T
 
                 return x

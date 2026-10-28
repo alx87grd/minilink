@@ -25,6 +25,7 @@ class EulerFixedStepSolverBackend(SolverBackend):
         times: np.ndarray,
         x0: np.ndarray,
         args=None,
+        params=None,
     ) -> np.ndarray:
         n_pts = times.shape[0]
         t0 = times[0]
@@ -32,7 +33,9 @@ class EulerFixedStepSolverBackend(SolverBackend):
         n_steps = n_pts - 1
 
         # x_{k+1} = x_k + Δt f(x_k, ū, t_k), n_steps steps from x₀ in one compiled rollout
-        x_seq = evaluator.rollout(x0, None, t0, dt, solver="euler", n_steps=n_steps)
+        x_seq = evaluator.rollout(
+            x0, None, t0, dt, params, solver="euler", n_steps=n_steps
+        )
         x_traj = np.asarray(x_seq).T  # (n, n_pts)
 
         # The run's record: one evaluation of f per step
@@ -47,6 +50,7 @@ class EulerFixedStepSolverBackend(SolverBackend):
         u: np.ndarray,
         x0: np.ndarray,
         args=None,
+        params=None,
     ) -> np.ndarray:
         n_pts = times.shape[0]
         t0 = times[0]
@@ -56,7 +60,7 @@ class EulerFixedStepSolverBackend(SolverBackend):
         u_sequence = np.asarray(u[:, : n_pts - 1].T)
 
         # x_{k+1} = x_k + Δt f(x_k, u_k, t_k), each u_k held, in one compiled rollout
-        x_seq = evaluator.rollout(x0, u_sequence, t0, dt, solver="euler")
+        x_seq = evaluator.rollout(x0, u_sequence, t0, dt, params, solver="euler")
         x_traj = np.asarray(x_seq).T
 
         # The run's record: one evaluation of f per step

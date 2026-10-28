@@ -14,6 +14,7 @@ from minilink.core.backends import (
     ensure_jax_x64,
     normalize_backend,
 )
+from minilink.core.compile.cache import compiled_of
 from minilink.core.trajectory import Trajectory
 from minilink.optimization.mathematical_program import (
     MathematicalProgram,
@@ -204,9 +205,11 @@ def dynamics_function(problem: PlanningProblem, backend: str):
     if key == BACKEND_DIRECT:
         return lambda x, u, t: problem.sys.f(x, u, t, params)
 
-    # A compiled evaluator, on the params when given
-    evaluator = problem.sys.compile(backend=key, verbose=False)
+    # A compiled evaluator (a JAX form reused), on the params when given, else on the
+    # plant's numbers now
+    evaluator = compiled_of(problem.sys, key)
     f = evaluator.f
+    params = evaluator.call_params() if params is None else params
 
     return lambda x, u, t: f(x, u, t, params)
 

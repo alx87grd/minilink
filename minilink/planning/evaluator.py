@@ -18,6 +18,8 @@ from minilink.core.distributions import child_seed
 from minilink.core.options import require_one_of
 from minilink.core.params import (
     Batched,
+    DeviceTree,
+    canonical_tree,
     flat_leaves,
     flatten,
     float_leaves,
@@ -140,7 +142,9 @@ class ProblemEvaluator:
         # The forms generated once: the batched trial, jitted on JAX; the price
         # and bound of each value of the cost's numbers
         self.trials_fn = None
+        self.run_fn = None
         self.price_cache = {}
+        self.on_device = DeviceTree()
 
         # "auto" keeps JAX only when the whole score traces (the cost and the sets too)
         if backend == "auto" and self.backend == BACKEND_JAX and not self.traces():
@@ -189,6 +193,10 @@ class ProblemEvaluator:
             x_start, params = self.realize(params, key, 1)
             x_start = x_start[0]
             params = take_trial(params, 0)
+
+        # One jitted run on JAX (its scan and its recorded signals one dispatch)
+        if self.backend == BACKEND_JAX and self.adaptive is None:
+            return self.run_compiled(params, x_start)
 
         return self.run(params, x_start)
 
@@ -343,11 +351,31 @@ class ProblemEvaluator:
     ###########################################################################
 
     def merged(self, params):
-        """:attr:`params`, with the entries of ``params`` overriding."""
+        """:attr:`params`, with the entries of ``params`` overriding, each in its default's dtype and shape (one trace for every value)."""
+        defaults = self.params
         if params is None:
-            return self.params
+            return defaults
 
-        return merge_tree(self.params, params)
+        return canonical_tree(merge_tree(defaults, params), defaults)
+
+    def device_tree(self, tree):
+        """``tree`` on the device: put there once and kept while its values repeat, so a repeat transfers nothing."""
+        jax = ensure_jax_x64()
+
+        return self.on_device.get(tree, lambda same: same, jax.device_put)
+
+    def run_compiled(self, params, x_start):
+        """:meth:`run` jitted once per problem parts: the recorded run in one dispatch."""
+        jax = ensure_jax_x64()
+
+        parts = problem_parts(self.problem)
+        if self.run_fn is None or any(
+            a is not b for a, b in zip(self.run_fn[1], parts)
+        ):
+            self.run_fn = (jax.jit(self.run), parts)
+        run, _ = self.run_fn
+
+        return run(self.device_tree(params), np.asarray(x_start, dtype=float))
 
     def price_and_bound(self, params):
         """
@@ -582,6 +610,7 @@ class ProblemEvaluator:
         # The trace reads the problem's cost and sets, so a part replaced on the
         # problem traces anew, in place of the entry it replaces
         tree, axes = batch_axes(params)
+        tree = self.device_tree(tree)
         parts = problem_parts(self.problem)
         layout = (record, tree_signature(axes))
         cached = self.trials_fn.get(layout)
@@ -859,14 +888,15 @@ def require_static_law(controller):
 
 
 def compile_loop(loop, backend):
-    """``(backend, evaluator)`` of the loop: JAX when asked, or when ``"auto"`` and it traces."""
+    """``(backend, evaluator)`` of the loop: JAX when asked, or when ``"auto"`` and it traces; a JAX form reused."""
     # Lazy import: the compiler loads with the first evaluator
-    from minilink.core.compile.compiler import compile, compile_auto
+    from minilink.core.compile.cache import compiled_of
+    from minilink.core.compile.compiler import compile_auto
 
     if backend == "auto":
-        backend, evaluator = compile_auto(loop)
+        backend, evaluator = compile_auto(loop, reuse=True)
     else:
-        evaluator = compile(loop, backend=backend)
+        evaluator = compiled_of(loop, backend)
     if backend == BACKEND_JAX:
         ensure_jax_x64()
 

@@ -4,7 +4,7 @@ Defects and surprising behaviour a user can hit in the code today, each reproduc
 names the symptom, a minimal reproduction, a workaround, and the workboard row that fixes it
 (or the design question it waits on, in [QUESTIONS.md](QUESTIONS.md)). The fix is planned work
 in [TODO.md](../plans/TODO.md); this list is the index, and an entry leaves it when its fix
-lands. Last checked against the code: 2026-10-25.
+lands. Last checked against the code: 2026-10-28.
 
 ## Composition and control
 
@@ -40,6 +40,28 @@ lands. Last checked against the code: 2026-10-25.
   block ids; a block's own keys are not checked.
 - **Workaround:** read the key back (`plant.params["m"]`) after a change.
 - **Fix:** a Later idea in TODO §6 (a `validate_params` hook on `System`).
+
+### A structural attribute edited after a JAX run is not seen until `clear_compiled()`
+- **Symptom:** the JAX convenience calls (`compute_trajectory`, `Simulator`,
+  `problem.compile`) reuse a compiled evaluator keyed by the blocks' structure. Plain
+  attributes (a `Sum`'s signs, a flag, a period), a law's `params` and the numbers of a model
+  a block holds (a computed-torque law's plant) are in the key; an attribute an equation
+  reads through another object (a lookup table held on a helper, a function stored on the
+  block, a module global) is not, so a run after editing it reuses the old trace.
+- **Reproduce:** a block whose `f` reads `self.table.gain` (a plain object without `params`),
+  run with `backend="jax"`, then `block.table.gain = 2.0` and run again: the old gain.
+- **Workaround:** `from minilink.core.compile.cache import clear_compiled; clear_compiled()`
+  after such an edit, or put the number in the block's `params`.
+- **Fix:** none planned; the compile-once plan's risk §6
+  ([compile-once](../plans/compile-once.md)).
+
+### `copy.deepcopy` of a plant fails after a JAX simulation
+- **Symptom:** `plant.compute_trajectory(backend="jax")` then `copy.deepcopy(plant)` raises
+  "cannot pickle 'mappingproxy' object": the run's trajectory kept on the plant (`plant.traj`)
+  does not deep-copy. The same on `main`.
+- **Workaround:** deep-copy before the run, set `plant.traj = None` first, or copy
+  `plant.params` into a new plant.
+- **Fix:** none planned yet (TODO §1.10, the core's hardening).
 
 ## Planning and learning
 
